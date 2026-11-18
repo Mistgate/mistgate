@@ -91,7 +91,7 @@ func nodeLoad(r capacity.Report) *opsv1.NodeLoad {
 		PeopleBusyHour: f32(r.PeopleBusyHour), PeoplePeak: r.PeoplePeak, CpuPeakP95Pct: f32(r.CPUPeakP95), CpuPeakTypicalPct: f32(r.CPUPeakTypical),
 		StealP95Pct: f32p(r.StealP95), ConntrackPeakPct: f32p(r.ConntrackPeakPct), RamPeakPct: f32p(r.RAMPeakPct), SwapUsedMaxBytes: r.SwapUsedMax,
 		DiskUsedPct: f32p(r.DiskUsedPct), RxPeakBps: r.RxPeakBps, TxPeakBps: r.TxPeakBps, CapacityMbps: r.LinkMbps, CapacitySource: r.LinkSource,
-		BandwidthPeakPct: f32p(r.BandwidthPeakPct), AgentCpuAvgPct: f32p(r.AgentCPUAvg), AgentCpuMaxPct: f32p(r.AgentCPUMax),
+		BandwidthPeakPct: f32p(r.BandwidthPeakPct), BandwidthTypicalPct: f32p(r.BandwidthTypicalPct), BandwidthBusyHourPct: f32p(r.BandwidthBusyHourPct), LinkSeenMbps: r.LinkSeenMbps, AgentCpuAvgPct: f32p(r.AgentCPUAvg), AgentCpuMaxPct: f32p(r.AgentCPUMax),
 		AgentRssMaxBytes: r.AgentRSSMax, AgentRssGrowthPctPerDay: f32p(r.AgentRSSGrowthPctPerDay), Fit: r.Fit,
 		CpuPctPerHundredPeople: f32p(r.CPUPer100), MbpsPerPerson: f32p(r.MbpsPerPerson), HeadroomPeople: u32p(r.Headroom),
 		Recommendations: []*opsv1.LoadRecommendation{},

@@ -105,7 +105,7 @@ export const isLoadStatus = (s: string): s is LoadStatus => s === "ok" || s === 
 const resources = ["cpu", "steal", "bandwidth", "ram", "conntrack", "disk"] as const;
 export const bottleneckKey = (b: string): MessageKey | null => ((resources as readonly string[]).includes(b) ? (`load.res.${b}` as MessageKey) : null);
 
-const recCodes = ["update_agent", "steal_high", "conntrack_near_limit", "cpu_busy", "cpu_busy_add_node", "bandwidth_busy", "ram_high", "swap_in_use", "disk_filling", "agent_memory_growing"] as const;
+const recCodes = ["update_agent", "steal_high", "conntrack_near_limit", "cpu_busy", "cpu_busy_add_node", "cpu_busy_few_people", "bandwidth_limit_low", "bandwidth_busy", "ram_high", "swap_in_use", "disk_filling", "agent_memory_growing"] as const;
 
 /** The sentence of a recommendation: its code's, with the variant that names a target node when the panel found one; null for a code this page does not know (a newer panel). */
 export function recKey(r: Pick<Plain<LoadRecommendation>, "code" | "params">): MessageKey | null {

@@ -41,7 +41,6 @@ export const en = {
   "nv.load.peak": "peak over the period",
   "nv.load.now": "now",
   "nv.load.usually": "usually {v}",
-  "nv.load.from": "of {n} Mbit/s",
   "nv.map.inSubs": "{n} of {m} in subscriptions",
 };
 
@@ -85,7 +84,6 @@ export const ru: typeof en = {
   "nv.load.peak": "пик за период",
   "nv.load.now": "сейчас",
   "nv.load.usually": "обычно {v}",
-  "nv.load.from": "от {n} Мбит/с",
   "nv.map.inSubs": "{n} из {m} в подписках",
 };
 
@@ -129,7 +127,6 @@ export const zh: typeof en = {
   "nv.load.peak": "时段峰值",
   "nv.load.now": "现在",
   "nv.load.usually": "通常 {v}",
-  "nv.load.from": "共 {n} Mbit/s",
   "nv.map.inSubs": "{m} 个中有 {n} 个在订阅中",
 };
 
@@ -173,7 +170,6 @@ export const fa: typeof en = {
   "nv.load.peak": "اوج در بازه",
   "nv.load.now": "اکنون",
   "nv.load.usually": "معمولاً {v}",
-  "nv.load.from": "از {n} Mbit/s",
   "nv.map.inSubs": "{n} از {m} در اشتراک‌ها",
 };
 
@@ -217,6 +213,5 @@ export const tr: typeof en = {
   "nv.load.peak": "dönemin zirvesi",
   "nv.load.now": "şimdi",
   "nv.load.usually": "genellikle {v}",
-  "nv.load.from": "{n} Mbit/s üzerinden",
   "nv.map.inSubs": "{m} içinde {n} abonelikte",
 };

@@ -75,14 +75,16 @@ describe("the fleet's load in words", () => {
     conntrack_near_limit: { fill_pct: "90", limit: "262144" },
     cpu_busy: { cpu_pct: "86", peak_pct: "99", target: "nl1", target_headroom: "80" },
     cpu_busy_add_node: { cpu_pct: "86", peak_pct: "99" },
-    bandwidth_busy: { peak_pct: "92", link_mbps: "1000" },
+    cpu_busy_few_people: { cpu_pct: "79", people: "1" },
+    bandwidth_limit_low: { link_mbps: "250", seen_mbps: "308" },
+    bandwidth_busy: { peak_pct: "92", hour_pct: "81", link_mbps: "1000" },
     ram_high: { ram_pct: "96" },
     swap_in_use: { swap_mb: "300" },
     disk_filling: { disk_pct: "85" },
     agent_memory_growing: { growth_pct_day: "12", rss_mb: "640", days: "5" },
   };
   it("has a sentence in every language for every code, every placeholder filled", () => {
-    const cases = [...Object.entries(sent), ["bandwidth_busy", { peak_pct: "92", link_mbps: "1000", target: "nl1", target_headroom: "40" }] as const];
+    const cases = [...Object.entries(sent), ["bandwidth_busy", { peak_pct: "92", hour_pct: "81", link_mbps: "1000", target: "nl1", target_headroom: "40" }] as const];
     for (const [code, params] of cases) {
       const key = recKey({ code, params: { ...params } });
       expect(key, code).not.toBeNull();

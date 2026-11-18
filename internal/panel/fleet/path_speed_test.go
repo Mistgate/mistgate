@@ -113,6 +113,12 @@ func TestPathSpeedServesRunsStopsAndStoresWithoutAnAddress(t *testing.T) {
 	if err != nil || len(last) != 1 || last[0].MbitS != 412.3 {
 		t.Errorf("LastSpeeds = %+v, %v", last, err)
 	}
+	// both nodes' traffic of that hour is the test's: the capacity report leaves it out
+	for _, id := range []string{sender.nodeID, target.nodeID} {
+		if at, err := x.st.SpeedTestTimes(x.ctx, id, time.Unix(0, 0)); err != nil || len(at) != 1 {
+			t.Errorf("speed test times of %s = %v, %v", id, at, err)
+		}
+	}
 }
 
 func TestPathSpeedUpDirectionAndTheTargetStopsAfterAFailure(t *testing.T) {
@@ -137,6 +143,10 @@ func TestPathSpeedUpDirectionAndTheTargetStopsAfterAFailure(t *testing.T) {
 	}
 	if rows, _ := x.st.PathSpeeds(x.ctx, time.Unix(0, 0), "", 0); len(rows) != 0 {
 		t.Errorf("a test that did not run was stored: %+v", rows)
+	}
+	// it still moved bytes: the hour is marked
+	if at, _ := x.st.SpeedTestTimes(x.ctx, sender.nodeID, time.Unix(0, 0)); len(at) != 1 {
+		t.Errorf("a failed test left no mark: %v", at)
 	}
 	// The failed run still reserved a start. Five more reservations reach the node limit; the panel's replacement must keep it.
 	for range speedNodeDayMax - 1 {

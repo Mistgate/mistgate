@@ -19,12 +19,13 @@ import (
 func capacityTools() []toolDef {
 	return []toolDef{
 		readTool("capacity_report", ProfileReadonly, procs(adminv1connect.NodeServiceListNodesProcedure, opsv1connect.OpsServiceGetFleetLoadProcedure),
-			"How loaded each node was over the last hours (default 168, 1 to 720) and how many more people it can take: per node a status (ok, busy, overloaded, unknown = no data), "+
+			"How loaded each node was over the last hours (default 168, 1 to 720) and how many more people it can take: per node a status (ok, busy, overloaded, unknown = no data, or a node whose history is under a day: the install is not a pattern, so it carries no advice about people, only a full disk), "+
 				"the bottleneck that runs out first (cpu, steal, bandwidth, ram, conntrack, disk), the busy hour (highest hourly CPU mean) with its CPU and people, people at peak, the hourly CPU peaks as their p95 (the highest) and cpu_peak_typical_pct (p75, what most hours stay under; the status reads this one, and peaks alone make a node busy at most, never overloaded: a few spikes to 100% are the server's own upkeep, not people), "+
-				"steal p95, conntrack and RAM peaks, swap, disk, traffic peaks against the owner's bandwidth or the NIC's link speed, the agent's own CPU and memory with its daily growth, "+
+				"steal p95, conntrack and RAM peaks, swap, disk, traffic against the owner's bandwidth or the NIC's link speed read like the CPU: bandwidth_peak_typical_pct (p75 of the hourly peaks) and bandwidth_busy_hour_pct (the highest hourly mean) are what the status reads, capacity_seen_mbps is set when the owner's number is below what a stored speed test or an hourly peak went (then the link is judged busy at most and bandwidth_limit_low asks to check the number), bandwidth_peak_pct is the single highest peak, shown only (one burst, a download or a speed measurement fills any link; hours of the panel's own speed measurements are left out; say 'usually N, at most M'), the agent's own CPU and memory with its daily growth, "+
+				"hours with too few samples (an install, a reconnect, the hour still running) and the node's first hour are left out of every number, "+
 				"cpu_per_100_people_pct and mbps_per_person (a fit over the hours; fit says few_hours, flat or no_trend when the data cannot carry one: then say there is not enough data), "+
-				"headroom_people (people it can add before its busy hour reaches 80% CPU), and recommendations as codes with params: update_agent, steal_high (the provider oversells the host: move the node), "+
-				"conntrack_near_limit, cpu_busy (target = the node with the most headroom to move people to), cpu_busy_add_node, bandwidth_busy, ram_high, swap_in_use, disk_filling, agent_memory_growing (a likely leak). "+
+				"headroom_people (people it can add before its busy hour reaches 80% CPU; held to 5 times the people it has carried at once, and absent when the fit says few_hours, flat or no_trend: never quote a number without it), and recommendations as codes with params: update_agent, steal_high (the provider oversells the host: move the node), "+
+				"conntrack_near_limit, cpu_busy (target = the node with the most headroom to move people to; only with at least 3 people online in the busy hour), cpu_busy_add_node, cpu_busy_few_people (busy with hardly anyone online: the load is not people's, look at what else runs on the server), bandwidth_busy (peak_pct typical, hour_pct busiest hour), bandwidth_limit_low (link_mbps set, seen_mbps measured: the number is too low), ram_high, swap_in_use, disk_filling, agent_memory_growing (a likely leak). "+
 				"summary: nodes by status, total headroom, the most loaded and the most free nodes. With node: that node only, and the fleet summary. "+
 				"A value that is absent is not known (an agent too old to report it), not zero. Use it for load questions and for where to put new people.",
 			func(c *call, in capacityArg) (any, error) {
@@ -71,39 +72,42 @@ type loadRecV struct {
 }
 
 type nodeLoadV struct {
-	NodeID          string     `json:"node_id"`
-	NodeName        string     `json:"node_name"`
-	Connected       bool       `json:"connected"`
-	CPUs            uint32     `json:"cpus,omitempty"`
-	Status          string     `json:"status"`
-	Bottleneck      string     `json:"bottleneck,omitempty"`
-	HoursWithData   uint32     `json:"hours_with_data"`
-	ExtHours        uint32     `json:"ext_hours"`
-	BusyHourUnix    int64      `json:"busy_hour_unix,omitempty"`
-	BusyHourCPU     float32    `json:"busy_hour_cpu_pct"`
-	PeopleBusyHour  float32    `json:"people_busy_hour"`
-	PeoplePeak      uint32     `json:"people_peak"`
-	CPUPeakP95      float32    `json:"cpu_peak_p95_pct"`
-	CPUPeakTypical  float32    `json:"cpu_peak_typical_pct"`
-	StealP95        *float32   `json:"steal_p95_pct,omitempty"`
-	ConntrackPeak   *float32   `json:"conntrack_peak_pct,omitempty"`
-	RAMPeak         *float32   `json:"ram_peak_pct,omitempty"`
-	SwapUsedMax     *uint64    `json:"swap_used_max_bytes,omitempty"`
-	DiskUsed        *float32   `json:"disk_used_pct,omitempty"`
-	RxPeakBps       uint64     `json:"rx_peak_bps"`
-	TxPeakBps       uint64     `json:"tx_peak_bps"`
-	CapacityMbps    uint32     `json:"capacity_mbps,omitempty"`
-	CapacitySource  string     `json:"capacity_source,omitempty"`
-	BandwidthPeak   *float32   `json:"bandwidth_peak_pct,omitempty"`
-	AgentCPUAvg     *float32   `json:"agent_cpu_avg_pct,omitempty"`
-	AgentCPUMax     *float32   `json:"agent_cpu_max_pct,omitempty"`
-	AgentRSSMax     *uint64    `json:"agent_rss_max_bytes,omitempty"`
-	AgentRSSGrowth  *float32   `json:"agent_rss_growth_pct_per_day,omitempty"`
-	Fit             string     `json:"fit"`
-	CPUPer100People *float32   `json:"cpu_per_100_people_pct,omitempty"`
-	MbpsPerPerson   *float32   `json:"mbps_per_person,omitempty"`
-	HeadroomPeople  *uint32    `json:"headroom_people,omitempty"`
-	Recommendations []loadRecV `json:"recommendations,omitempty"`
+	NodeID           string     `json:"node_id"`
+	NodeName         string     `json:"node_name"`
+	Connected        bool       `json:"connected"`
+	CPUs             uint32     `json:"cpus,omitempty"`
+	Status           string     `json:"status"`
+	Bottleneck       string     `json:"bottleneck,omitempty"`
+	HoursWithData    uint32     `json:"hours_with_data"`
+	ExtHours         uint32     `json:"ext_hours"`
+	BusyHourUnix     int64      `json:"busy_hour_unix,omitempty"`
+	BusyHourCPU      float32    `json:"busy_hour_cpu_pct"`
+	PeopleBusyHour   float32    `json:"people_busy_hour"`
+	PeoplePeak       uint32     `json:"people_peak"`
+	CPUPeakP95       float32    `json:"cpu_peak_p95_pct"`
+	CPUPeakTypical   float32    `json:"cpu_peak_typical_pct"`
+	StealP95         *float32   `json:"steal_p95_pct,omitempty"`
+	ConntrackPeak    *float32   `json:"conntrack_peak_pct,omitempty"`
+	RAMPeak          *float32   `json:"ram_peak_pct,omitempty"`
+	SwapUsedMax      *uint64    `json:"swap_used_max_bytes,omitempty"`
+	DiskUsed         *float32   `json:"disk_used_pct,omitempty"`
+	RxPeakBps        uint64     `json:"rx_peak_bps"`
+	TxPeakBps        uint64     `json:"tx_peak_bps"`
+	CapacityMbps     uint32     `json:"capacity_mbps,omitempty"`
+	CapacitySource   string     `json:"capacity_source,omitempty"`
+	BandwidthPeak    *float32   `json:"bandwidth_peak_pct,omitempty"`
+	BandwidthTypical *float32   `json:"bandwidth_peak_typical_pct,omitempty"`
+	BandwidthBusyHr  *float32   `json:"bandwidth_busy_hour_pct,omitempty"`
+	CapacitySeenMbps uint32     `json:"capacity_seen_mbps,omitempty"`
+	AgentCPUAvg      *float32   `json:"agent_cpu_avg_pct,omitempty"`
+	AgentCPUMax      *float32   `json:"agent_cpu_max_pct,omitempty"`
+	AgentRSSMax      *uint64    `json:"agent_rss_max_bytes,omitempty"`
+	AgentRSSGrowth   *float32   `json:"agent_rss_growth_pct_per_day,omitempty"`
+	Fit              string     `json:"fit"`
+	CPUPer100People  *float32   `json:"cpu_per_100_people_pct,omitempty"`
+	MbpsPerPerson    *float32   `json:"mbps_per_person,omitempty"`
+	HeadroomPeople   *uint32    `json:"headroom_people,omitempty"`
+	Recommendations  []loadRecV `json:"recommendations,omitempty"`
 }
 
 type loadRefV struct {
@@ -165,6 +169,7 @@ func capacityView(r *opsv1.GetFleetLoadResponse, nodeID string) *CapacityV {
 			CPUPeakP95: n.GetCpuPeakP95Pct(), CPUPeakTypical: n.GetCpuPeakTypicalPct(), StealP95: n.StealP95Pct, ConntrackPeak: n.ConntrackPeakPct, RAMPeak: n.RamPeakPct,
 			SwapUsedMax: n.SwapUsedMaxBytes, DiskUsed: n.DiskUsedPct, RxPeakBps: n.GetRxPeakBps(), TxPeakBps: n.GetTxPeakBps(),
 			CapacityMbps: n.GetCapacityMbps(), CapacitySource: clean(n.GetCapacitySource(), 16), BandwidthPeak: n.BandwidthPeakPct,
+			BandwidthTypical: n.BandwidthTypicalPct, BandwidthBusyHr: n.BandwidthBusyHourPct, CapacitySeenMbps: n.GetLinkSeenMbps(),
 			AgentCPUAvg: n.AgentCpuAvgPct, AgentCPUMax: n.AgentCpuMaxPct, AgentRSSMax: n.AgentRssMaxBytes, AgentRSSGrowth: n.AgentRssGrowthPctPerDay,
 			Fit: clean(n.GetFit(), 16), CPUPer100People: n.CpuPctPerHundredPeople, MbpsPerPerson: n.MbpsPerPerson, HeadroomPeople: n.HeadroomPeople,
 		}

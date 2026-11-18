@@ -10,7 +10,15 @@
 //   - Every float it returns is finite: a division by a zero count, a fit over flat data or a bogus row gives nil (or 0
 //     where 0 is the truth), never NaN or Inf.
 //   - The per-person costs come from a least-squares fit over the hours, and only when the hours can carry one: at least
-//     MinFitHours hours with samples and people online that varied by at least MinPeopleSpread. Otherwise Fit says why.
+//     MinFitHours hours with samples, people online that varied by at least MinPeopleSpread, and a CPU that follows them
+//     (R² of at least MinFitR2). Otherwise Fit says why. The headroom it gives is held to MaxHeadroomOverPeak times the people
+//     the node has ever carried: a line is not trusted far beyond the data it was drawn from.
+//   - Only hours that say something about people's load count: an hour with fewer than MinHourFill of the node's fullest
+//     hour's samples (an install, a reconnect, the hour that is still running) and the node's first hour (Node.FirstHour: the
+//     install is not people) are left out of every number. A node whose history is shorter than MinFitHours hours is
+//     "unknown" and gets no advice about people: the first day is not a pattern.
+//   - One burst is not a load. The CPU and the link are both judged by the busy hour's mean and by the typical hourly peak
+//     (p75), so a single spike in a week changes neither the status nor the advice; the highest peak is shown beside them.
 package capacity
 
 import (
@@ -30,12 +38,17 @@ const (
 	// The hourly CPU peaks are judged by their 75th percentile, the peak most hours stay under: a server's own upkeep (the
 	// distribution's updates, a restart) spikes a small box to 100% for a moment in a few hours a day, and the 95th percentile
 	// read that as an overloaded node at a 10% busy hour. Peaks alone make a node busy at most: what people feel is the mean.
-	CPUPeakBusyPct   = 85.0 // p75 of the hourly CPU peaks
-	CPUPeakOverPct   = 97.0 // the pressure scale of the peaks (never "overloaded" by itself)
-	StealBusyPct     = 10.0 // p95 of the hourly steal means (doctor cpu_steal: 10 / 25 over 10 minutes)
-	StealOverPct     = 25.0
-	LinkBusyPct      = 70.0 // the busier direction's hourly peak against the link
+	CPUPeakBusyPct = 85.0 // p75 of the hourly CPU peaks
+	CPUPeakOverPct = 97.0 // the pressure scale of the peaks (never "overloaded" by itself)
+	StealBusyPct   = 10.0 // p95 of the hourly steal means (doctor cpu_steal: 10 / 25 over 10 minutes)
+	StealOverPct   = 25.0
+	// The link: the typical (p75) hourly peak of the busier direction against it, and the busiest hour's mean. A saturated link
+	// is minutes of full pipe inside the hour, so the mean's scale is lower, like the CPU's. The single highest peak is shown,
+	// never judged: a speed measurement or a download of a few seconds fills any link.
+	LinkBusyPct      = 70.0
 	LinkOverPct      = 90.0
+	LinkHourBusyPct  = 60.0
+	LinkHourOverPct  = 80.0
 	RAMBusyPct       = 85.0 // hourly peak of used memory (MemTotal - MemAvailable)
 	RAMOverPct       = 95.0
 	ConntrackBusyPct = 80.0 // doctor conntrack_fill: 80 / 95
@@ -48,11 +61,25 @@ const (
 	HeadroomCPUPct = CPUOverPct
 	// MaxHeadroom caps a headroom that a tiny per-person cost would make absurd.
 	MaxHeadroom = 10000
+	// MaxHeadroomOverPeak holds the headroom to this many times the people the node has carried at once (at least
+	// MinPeopleBasis of them): the per-person cost was read between none and that peak, and nothing says it stays the same far
+	// beyond it.
+	MaxHeadroomOverPeak = 5
+	MinPeopleBasis      = 10
 
 	// MinFitHours and MinPeopleSpread gate the per-person fit: a day of hours, and people online that moved enough for
 	// the CPU to follow them.
 	MinFitHours     = 24
 	MinPeopleSpread = 4.0
+	// MinFitR2 is how much of the hourly CPU the people must explain: below it the slope is noise, and a noise slope makes
+	// room for thousands.
+	MinFitR2 = 0.2
+
+	// MinHourFill is the share of the node's fullest hour's samples an hour needs to count.
+	MinHourFill = 0.5
+	// MinPeopleToMove is the people online in the busy hour from which moving some of them is advice: a node that is busy with
+	// one or two people online is busy with something else.
+	MinPeopleToMove = 3.0
 
 	// SwapNoteBytes is the swap use worth a note: a few idle pages swapped out are normal.
 	SwapNoteBytes = 100 << 20
@@ -96,7 +123,9 @@ const (
 	RecConntrackNearLimit = "conntrack_near_limit" // fill_pct, limit: raise nf_conntrack_max or spread people
 	RecCPUBusy            = "cpu_busy"             // cpu_pct, target, target_headroom: move people to the node with the most headroom
 	RecCPUBusyAddNode     = "cpu_busy_add_node"    // cpu_pct: no other node has room; add one
-	RecBandwidthBusy      = "bandwidth_busy"       // peak_pct, link_mbps, target (optional)
+	RecCPUBusyFewPeople   = "cpu_busy_few_people"  // cpu_pct, people: busy with hardly anyone online, so not people's load
+	RecBandwidthLimitLow  = "bandwidth_limit_low"  // link_mbps (the owner's), seen_mbps: the node carried more than the number set; check it
+	RecBandwidthBusy      = "bandwidth_busy"       // peak_pct (typical), hour_pct (busiest hour), link_mbps, target (optional)
 	RecRAMHigh            = "ram_high"             // ram_pct
 	RecSwapInUse          = "swap_in_use"          // swap_mb
 	RecDiskFilling        = "disk_filling"         // disk_pct
@@ -123,6 +152,15 @@ type Node struct {
 	Connected           bool
 	// Hours of host load in the window, any order.
 	Hours []store.HostHour
+	// FirstHour is the start of the node's first hour of host load ever stored (0 = not known: then nothing is taken for the
+	// first hour). Its readings are the install and are left out; a node whose history is under MinFitHours hours is "unknown".
+	FirstHour int64
+	// MeasuredMbps is the fastest a stored speed test between this node and another (kept 7 days) went, Mbit/s; 0 = none. It
+	// proves the link is at least that wide.
+	MeasuredMbps uint32
+	// WindowHours is the window the hours were read for (0 = not known). A day-long window holds fewer than MinFitHours settled
+	// hours (the hour still running does not count), so it asks for that many fewer.
+	WindowHours int
 	// SpeedTests is when the node's own speed measurements ended (unix seconds). The traffic peak of the hours they ran in
 	// is not people's traffic and is left out of the link reading.
 	SpeedTests []int64
@@ -146,6 +184,7 @@ type Report struct {
 	// Pressure is how close the bottleneck is to its "overloaded" threshold, 1 = at it. It orders nodes.
 	Pressure float64
 
+	// HoursWithData counts every hour with samples; the numbers below are read from the settled ones (see the package comment).
 	HoursWithData, ExtHours int
 	// The busy hour: the hour with the highest CPU mean, and the people online in it.
 	BusyHourUnix   int64
@@ -162,12 +201,19 @@ type Report struct {
 	SwapUsedMax      *uint64
 	DiskUsedPct      *float64
 
+	// The highest hourly peaks of the main NIC (a single burst may be all they are), not counting hours of a speed measurement.
 	RxPeakBps, TxPeakBps uint64
 	// LinkMbps is the capacity the traffic is set against; LinkSource "configured" (the owner's), "nic" (the link speed the
 	// agent reported) or "" (not known).
-	LinkMbps         uint32
-	LinkSource       string
-	BandwidthPeakPct *float64
+	LinkMbps   uint32
+	LinkSource string
+	// BandwidthPeakPct is the highest hourly peak against the link (shown only); BandwidthTypicalPct the p75 of the hourly
+	// peaks and BandwidthBusyHourPct the highest hourly mean: what the status and the advice read.
+	BandwidthPeakPct, BandwidthTypicalPct, BandwidthBusyHourPct *float64
+	// LinkSeenMbps is set when the owner's capacity (LinkSource "configured") is below what the node was seen to carry: a
+	// stored speed test or an hourly peak went faster. The number set is then wrong, the shares above are against it, and the
+	// link is judged busy at most, with bandwidth_limit_low in place of bandwidth_busy. 0 = not the case.
+	LinkSeenMbps uint32
 
 	AgentCPUAvg, AgentCPUMax  *float64
 	AgentRSSMax               *uint64
@@ -241,25 +287,29 @@ func statusRank(s string) int {
 // Read is one node's report, without the fleet's targets (Fleet adds them to cpu_busy and bandwidth_busy).
 func Read(n Node) Report {
 	r := Report{ID: n.ID, Name: n.Name, CPUs: n.CPUs, Connected: n.Connected, Status: StatusUnknown, Fit: FitFewHours}
-	hours := make([]store.HostHour, 0, len(n.Hours))
+	all := make([]store.HostHour, 0, len(n.Hours))
 	for _, h := range n.Hours {
 		if h.Samples > 0 {
-			hours = append(hours, sane(h))
+			all = append(all, sane(h))
 		}
 	}
-	sort.Slice(hours, func(i, j int) bool { return hours[i].HourStart < hours[j].HourStart })
-	r.HoursWithData = len(hours)
+	sort.Slice(all, func(i, j int) bool { return all[i].HourStart < all[j].HourStart })
+	r.HoursWithData = len(all)
 	if n.DiskTotal > 0 {
 		r.DiskUsedPct = ptr(pct(float64(n.DiskUsed), float64(n.DiskTotal)))
 	}
-	if len(hours) == 0 {
+	// A node whose history is under a day is not read: the first hours are an install, not a pattern. Only the disk, a fact of
+	// now, is still said.
+	hours := settled(all, n.FirstHour)
+	if len(hours) == 0 || young(all, n.FirstHour) {
 		if r.DiskUsedPct != nil && *r.DiskUsedPct >= DiskBusyPct {
 			r.Recs = append(r.Recs, Rec{Code: RecDiskFilling, Severity: sevOf(*r.DiskUsedPct >= DiskOverPct), Params: map[string]string{"disk_pct": itoa(*r.DiskUsedPct)}})
 		}
 		return r
 	}
 
-	var peaks []float64
+	var peaks, linkPeaks []float64
+	var linkMean float64 // the highest hourly mean of the busier direction, bit/s
 	var steals []float64
 	var extSamples, agentCPUSum float64
 	ramTotal := n.RAMTotal
@@ -271,6 +321,8 @@ func Read(n Node) Report {
 		r.PeoplePeak = max(r.PeoplePeak, h.SessionsMax)
 		if !measured(h.HourStart, n.SpeedTests) {
 			r.RxPeakBps, r.TxPeakBps = max(r.RxPeakBps, h.RxMax), max(r.TxPeakBps, h.TxMax)
+			linkPeaks = append(linkPeaks, float64(max(h.RxMax, h.TxMax)))
+			linkMean = max(linkMean, float64(max(h.RxAvg, h.TxAvg)))
 		}
 		if total := cmp(h.RAMTotal, ramTotal); total > 0 {
 			v := pct(float64(h.RAMUsedMax), float64(total))
@@ -317,10 +369,19 @@ func Read(n Node) Report {
 		r.LinkMbps, r.LinkSource = n.BandwidthMbps, "configured"
 	}
 	if r.LinkMbps > 0 {
-		r.BandwidthPeakPct = ptr(pct(float64(max(r.RxPeakBps, r.TxPeakBps)), float64(r.LinkMbps)*1e6))
+		link := float64(r.LinkMbps) * 1e6
+		r.BandwidthPeakPct = ptr(pct(float64(max(r.RxPeakBps, r.TxPeakBps)), link))
+		r.BandwidthTypicalPct = ptr(pct(percentile(linkPeaks, 0.75), link))
+		r.BandwidthBusyHourPct = ptr(pct(linkMean, link))
+		if r.LinkSource == "configured" {
+			seen := max(uint64(n.MeasuredMbps), max(r.RxPeakBps, r.TxPeakBps)/1_000_000)
+			if seen > uint64(r.LinkMbps) {
+				r.LinkSeenMbps = uint32(min(seen, math.MaxUint32))
+			}
+		}
 	}
 	r.leak(hours)
-	r.fit(hours)
+	r.fit(hours, n.WindowHours)
 	r.judge()
 	r.recommend()
 	return r
@@ -337,11 +398,43 @@ func sane(h store.HostHour) store.HostHour {
 	return h
 }
 
+// settled keeps the hours that say something about people's load: not the node's first hour, and not one with under
+// MinHourFill of the samples of its fullest hour. The fullest hour is the node's own measure of a whole hour (the sampling
+// interval is a setting).
+func settled(all []store.HostHour, first int64) []store.HostHour {
+	var full uint32
+	for _, h := range all {
+		full = max(full, h.Samples)
+	}
+	out := make([]store.HostHour, 0, len(all))
+	for _, h := range all {
+		if h.HourStart != first && float64(h.Samples) >= MinHourFill*float64(full) {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
+// young is true while the node's history, from its first hour to the newest it sent, is under MinFitHours hours.
+func young(all []store.HostHour, first int64) bool {
+	if len(all) == 0 {
+		return true
+	}
+	if first <= 0 || first > all[0].HourStart {
+		first = all[0].HourStart
+	}
+	return (all[len(all)-1].HourStart-first)/3600+1 < MinFitHours
+}
+
 // fit reads the per-person costs: CPU on people (least squares with an intercept: an idle node still uses some CPU) and
 // traffic on people (through the origin: no people, no traffic).
-func (r *Report) fit(hours []store.HostHour) {
+func (r *Report) fit(hours []store.HostHour, window int) {
 	r.Fit = FitFewHours
-	if len(hours) < MinFitHours {
+	need := MinFitHours
+	if window > 0 { // the hour still running does not count: a day-long window has a day less one
+		need = min(need, max(window-2, 1))
+	}
+	if len(hours) < need {
 		return
 	}
 	xs := make([]float64, len(hours))
@@ -367,7 +460,7 @@ func (r *Report) fit(hours []store.HostHour) {
 		return
 	}
 	slope, _, r2, ok := leastSquares(xs, ys)
-	if !ok || slope <= 0 {
+	if !ok || slope <= 0 || r2 < MinFitR2 {
 		r.Fit = FitNoTrend
 		return
 	}
@@ -377,9 +470,10 @@ func (r *Report) fit(hours []store.HostHour) {
 	room := 0
 	if r.BusyHourCPU < HeadroomCPUPct {
 		room = int(math.Min(math.Floor((HeadroomCPUPct-r.BusyHourCPU)/slope+1e-6), MaxHeadroom)) // 1e-6: a fit's rounding is not a person
+		room = min(room, MaxHeadroomOverPeak*int(max(r.PeoplePeak, MinPeopleBasis)))
 	}
 	if r.LinkMbps > 0 && r.MbpsPerPerson != nil && *r.MbpsPerPerson > 0 {
-		left := float64(r.LinkMbps)*LinkOverPct/100 - busiest
+		left := float64(max(r.LinkMbps, r.LinkSeenMbps))*LinkOverPct/100 - busiest
 		bw := 0
 		if left > 0 {
 			bw = int(math.Min(math.Floor(left / *r.MbpsPerPerson + 1e-6), MaxHeadroom))
@@ -473,8 +567,8 @@ func (r *Report) judge() {
 	if r.StealP95 != nil {
 		all = append(all, res{ResSteal, *r.StealP95, StealBusyPct, StealOverPct, false})
 	}
-	if r.BandwidthPeakPct != nil {
-		all = append(all, res{ResBandwidth, *r.BandwidthPeakPct, LinkBusyPct, LinkOverPct, false})
+	if r.BandwidthTypicalPct != nil {
+		all = append(all, res{ResBandwidth, *r.BandwidthTypicalPct, LinkBusyPct, LinkOverPct, r.LinkSeenMbps > 0}, res{ResBandwidth, *r.BandwidthBusyHourPct, LinkHourBusyPct, LinkHourOverPct, r.LinkSeenMbps > 0})
 	}
 	if r.RAMPeakPct != nil {
 		all = append(all, res{ResRAM, *r.RAMPeakPct, RAMBusyPct, RAMOverPct, false})
@@ -529,10 +623,17 @@ func (r *Report) recommend() {
 		add(RecConntrackNearLimit, sevOf(*r.ConntrackPeakPct >= ConntrackOverPct), "fill_pct", itoa(*r.ConntrackPeakPct), "limit", strconv.FormatUint(r.ConntrackLimit, 10))
 	}
 	if r.BusyHourCPU >= CPUBusyPct || r.CPUPeakTypical >= CPUPeakBusyPct {
-		add(RecCPUBusy, sevOf(r.BusyHourCPU >= CPUOverPct), "cpu_pct", itoa(r.BusyHourCPU), "peak_pct", itoa(r.CPUPeakTypical))
+		if r.PeopleBusyHour >= MinPeopleToMove { // moving people helps only when people are the load
+			add(RecCPUBusy, sevOf(r.BusyHourCPU >= CPUOverPct), "cpu_pct", itoa(r.BusyHourCPU), "peak_pct", itoa(r.CPUPeakTypical))
+		} else {
+			add(RecCPUBusyFewPeople, sevOf(r.BusyHourCPU >= CPUOverPct), "cpu_pct", itoa(r.BusyHourCPU), "people", itoa(r.PeopleBusyHour))
+		}
 	}
-	if r.BandwidthPeakPct != nil && *r.BandwidthPeakPct >= LinkBusyPct {
-		add(RecBandwidthBusy, sevOf(*r.BandwidthPeakPct >= LinkOverPct), "peak_pct", itoa(*r.BandwidthPeakPct), "link_mbps", strconv.Itoa(int(r.LinkMbps)))
+	if r.LinkSeenMbps > 0 {
+		add(RecBandwidthLimitLow, SevWarn, "link_mbps", strconv.Itoa(int(r.LinkMbps)), "seen_mbps", strconv.Itoa(int(r.LinkSeenMbps)))
+	} else if r.BandwidthTypicalPct != nil && (*r.BandwidthTypicalPct >= LinkBusyPct || *r.BandwidthBusyHourPct >= LinkHourBusyPct) {
+		add(RecBandwidthBusy, sevOf(*r.BandwidthTypicalPct >= LinkOverPct || *r.BandwidthBusyHourPct >= LinkHourOverPct),
+			"peak_pct", itoa(*r.BandwidthTypicalPct), "hour_pct", itoa(*r.BandwidthBusyHourPct), "link_mbps", strconv.Itoa(int(r.LinkMbps)))
 	}
 	if r.RAMPeakPct != nil && *r.RAMPeakPct >= RAMBusyPct {
 		add(RecRAMHigh, sevOf(*r.RAMPeakPct >= RAMOverPct), "ram_pct", itoa(*r.RAMPeakPct))

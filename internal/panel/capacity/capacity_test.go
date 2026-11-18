@@ -128,15 +128,20 @@ func TestEmpty(t *testing.T) {
 	}
 }
 
-func TestSingleHour(t *testing.T) {
-	r := Read(Node{Name: "de1", Hours: build([]hour{{cpu: 50, peak: 70, people: 12, mbps: 30}})})
-	if r.Status != StatusOK || r.HoursWithData != 1 || r.BusyHourCPU != 50 || r.BusyHourUnix != t0 || r.PeopleBusyHour != 12 || r.PeoplePeak != 12 {
-		t.Fatalf("single hour: %+v", r)
+func TestShortHistory(t *testing.T) {
+	// under a day of history is not read: "unknown", no advice
+	if r := Read(Node{Name: "de1", Hours: build([]hour{{cpu: 50, peak: 70, people: 12, mbps: 30}})}); r.Status != StatusUnknown || r.HoursWithData != 1 || len(r.Recs) != 0 || r.Bottleneck != "" {
+		t.Fatalf("one hour of history: %+v", r)
 	}
-	if r.CPUPeakP95 != 70 || r.Fit != FitFewHours || r.Headroom != nil || r.CPUPer100 != nil || r.MbpsPerPerson != nil {
-		t.Fatalf("one hour carries no fit: %+v", r)
+	// a day of it flat: read, with a typical peak of 60 (the busy hour's 50 and +10)
+	r := Read(Node{Name: "de1", Hours: build(steady(MinFitHours, 50, 0, func(int) float64 { return 12 }, nil))})
+	if r.Status != StatusOK || r.HoursWithData != MinFitHours || r.BusyHourCPU != 50 || r.PeopleBusyHour != 12 || r.PeoplePeak != 12 {
+		t.Fatalf("a day: %+v", r)
 	}
-	if r.Bottleneck != ResCPU || math.Abs(r.Pressure-70.0/97) > 1e-9 { // the peak, 70/97, is closer to its limit than the mean, 50/80
+	if r.CPUPeakP95 != 60 || r.Fit != FitFlat || r.Headroom != nil || r.CPUPer100 != nil {
+		t.Fatalf("flat people carry no fit: %+v", r)
+	}
+	if r.Bottleneck != ResCPU || math.Abs(r.Pressure-50.0/80) > 1e-9 { // the mean, 50/80, is closer to its limit than the typical peak, 60/97
 		t.Fatalf("bottleneck %q pressure %v", r.Bottleneck, r.Pressure)
 	}
 	if r.RAMPeakPct == nil || math.Abs(*r.RAMPeakPct-400.0/2048*100) > 1e-9 {
@@ -296,10 +301,14 @@ func TestEachResource(t *testing.T) {
 		}
 	})
 	t.Run("bandwidth", func(t *testing.T) {
-		// 30 people x 2 Mbit/s = 60 Mbit/s mean, 90 peak: 90% of a 100 Mbit/s link.
-		r := Read(Node{Name: "de1", BandwidthMbps: 100, Hours: base(nil)})
+		// 30 people x 2 Mbit/s = 60 Mbit/s in the busiest hour, 86% of a 70 Mbit/s link: the busy hour's mean says overloaded.
+		hs := base(nil)
+		for i := range hs { // no peak above the mean: the link is full, not wider than it was said to be
+			hs[i].RxMax, hs[i].TxMax = hs[i].RxAvg, hs[i].TxAvg
+		}
+		r := Read(Node{Name: "de1", BandwidthMbps: 70, Hours: hs})
 		b := rec(r, RecBandwidthBusy)
-		if r.Status != StatusOverloaded || r.Bottleneck != ResBandwidth || b == nil || b.Params["peak_pct"] != "90" || b.Params["link_mbps"] != "100" {
+		if r.Status != StatusOverloaded || r.Bottleneck != ResBandwidth || b == nil || b.Severity != SevCrit || b.Params["hour_pct"] != "86" || b.Params["link_mbps"] != "70" {
 			t.Fatalf("%s %s %+v", r.Status, r.Bottleneck, r.Recs)
 		}
 	})
@@ -401,10 +410,11 @@ func TestFleetTargetsAndSummary(t *testing.T) {
 		t.Fatalf("summary counts %+v", s)
 	}
 	// de1 is busy but still below 80%: (80 - 65) / 0.5 = 30 people; msk1 (80 - 6) / 0.1 = 740.
-	if s.HeadroomNodes != 4 || s.HeadroomPeople != 30+115+135+740 {
+	// msk1's 740 is held to 5 x the 10 people it has carried.
+	if s.HeadroomNodes != 4 || s.HeadroomPeople != 30+115+135+50 {
 		t.Fatalf("headroom %d over %d nodes", s.HeadroomPeople, s.HeadroomNodes)
 	}
-	if len(s.MostLoaded) != 3 || s.MostLoaded[0].Name != "de1" || len(s.MostFree) != 3 || s.MostFree[0].Name != "msk1" || s.MostFree[1].Name != "nl1" {
+	if len(s.MostLoaded) != 3 || s.MostLoaded[0].Name != "de1" || len(s.MostFree) != 3 || s.MostFree[0].Name != "nl1" || s.MostFree[1].Name != "fi1" {
 		t.Fatalf("most loaded %+v, most free %+v", s.MostLoaded, s.MostFree)
 	}
 

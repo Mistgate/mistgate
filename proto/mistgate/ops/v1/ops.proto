@@ -366,9 +366,11 @@ message GetFleetLoadRequest {
 message LoadRecommendation {
   // update_agent (the agent predates the resource fields: steal, swap, conntrack and its own cost are not known),
   // steal_high (steal_pct: the provider oversells the host; move the node), conntrack_near_limit (fill_pct, limit),
-  // cpu_busy (cpu_pct, peak_pct, target, target_headroom: move people to the node with the most headroom),
-  // cpu_busy_add_node (cpu_pct, peak_pct: no other node has room), bandwidth_busy (peak_pct, link_mbps, and target,
-  // target_headroom when another node has room), ram_high (ram_pct), swap_in_use (swap_mb), disk_filling (disk_pct),
+  // cpu_busy (cpu_pct, peak_pct, target, target_headroom: move people to the node with the most headroom; only with at least
+  // 3 people online in the busy hour), cpu_busy_add_node (cpu_pct, peak_pct: no other node has room), cpu_busy_few_people
+  // (cpu_pct, people: busy with hardly anyone online, so the load is not people's), bandwidth_limit_low (link_mbps: the number set, seen_mbps: what the node carried; check the number in the node's settings,
+  // and bandwidth_busy is not given), bandwidth_busy (peak_pct: the typical
+  // hourly peak, hour_pct: the busiest hour's mean, link_mbps, and target, target_headroom when another node has room), ram_high (ram_pct), swap_in_use (swap_mb), disk_filling (disk_pct),
   // agent_memory_growing (growth_pct_day, rss_mb, days: the agent's daily peak memory climbs faster than its people).
   string code = 1;
   // "info", "warn" or "crit".
@@ -384,7 +386,8 @@ message NodeLoad {
   string node_name = 2;
   bool connected = 3;
   uint32 cpus = 4;
-  // "ok", "busy", "overloaded", or "unknown" (no hour of host load in the window).
+  // "ok", "busy", "overloaded", or "unknown": no hour of host load in the window, or a node whose history is under a day (the
+  // install is not a pattern; then hours_with_data is above 0 and only a full disk is advised).
   string status = 5;
   // What runs out first once it is at least halfway to its limit: cpu, steal, bandwidth, ram, conntrack or disk; "" otherwise.
   string bottleneck = 6;
@@ -413,6 +416,8 @@ message NodeLoad {
   // reported ("nic"); 0 and "" = not known.
   uint32 capacity_mbps = 21;
   string capacity_source = 22;
+  // The highest hourly peak of the busier direction against that capacity: shown, not judged (a single burst, a download or a
+  // measurement, fills any link; hours of the panel's own speed measurements are left out).
   optional float bandwidth_peak_pct = 23;
   // The agent process: mean and peak CPU in percent of the machine, peak memory, and how fast its daily peak memory grows
   // (percent per day, from three days on).
@@ -422,18 +427,28 @@ message NodeLoad {
   optional float agent_rss_growth_pct_per_day = 27;
   // "ok" when the per-person costs could be read from the hours (a least-squares fit of the hourly CPU mean on the hourly
   // mean people online); otherwise why not: "few_hours" (under 24 hours with samples), "flat" (people online changed by
-  // fewer than 4), "no_trend" (the CPU does not rise with the people).
+  // fewer than 4), "no_trend" (the CPU does not rise with the people, or they explain under a fifth of its changes).
   string fit = 28;
   optional float cpu_pct_per_hundred_people = 29;
   optional float mbps_per_person = 30;
   // People the node could add before its busy-hour CPU mean reaches 80% (and, with a known link and per-person traffic, its
-  // busier direction 90% of the link). 0 when it is overloaded already.
+  // busier direction 90% of the link), held to 5 times the people the node has had online at once (at least 10 of them): a
+  // fit is not followed far beyond the data it was drawn from. 0 when it is overloaded already.
   optional uint32 headroom_people = 31;
   // Most severe first.
   repeated LoadRecommendation recommendations = 32;
   // The 75th percentile of the hourly CPU peaks: the peak most hours stay under. The status and the advice read it, not the
   // 95th: a few spikes of a server's own upkeep do not make a node busy, and peaks alone never make it overloaded.
   float cpu_peak_typical_pct = 33;
+  // The link, read like the CPU: the 75th percentile of the hourly peaks of the busier direction against the capacity (what the
+  // status and the advice read, with the busy hour's mean below), and the highest hourly mean of the busier direction. Unset
+  // with bandwidth_peak_pct when the capacity is not known.
+  optional float bandwidth_typical_pct = 34;
+  optional float bandwidth_busy_hour_pct = 35;
+  // Set (Mbit/s) when the owner's capacity (capacity_source "configured") is below what the node was seen to carry: a stored
+  // speed test or an hourly peak went faster. The number set is then wrong, the shares above are against it, and the link is
+  // judged busy at most; 0 = not the case.
+  uint32 link_seen_mbps = 36;
 }
 
 message LoadNodeRef {

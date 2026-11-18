@@ -258,7 +258,11 @@ function Details({ n, hours, fmt }: { n: Row; hours: number; fmt: Fmt }) {
         label: t("load.d.traffic"),
         value:
           n.capacityMbps > 0 && n.bandwidthPeakPct !== undefined
-            ? t(n.capacitySource === "configured" ? "load.d.traffic.configured" : "load.d.traffic.nic", { pct: pct(n.bandwidthPeakPct), mbps: fmt.num(n.capacityMbps, 0) })
+            ? t(n.capacitySource === "configured" ? "load.d.traffic.configured" : "load.d.traffic.nic", {
+                typical: pct(n.bandwidthTypicalPct ?? n.bandwidthPeakPct),
+                top: pct(n.bandwidthPeakPct),
+                mbps: fmt.num(n.capacityMbps, 0),
+              })
             : fmt.mbit(Math.max(n.rxPeakBps, n.txPeakBps)),
       },
       {
@@ -286,7 +290,7 @@ function Details({ n, hours, fmt }: { n: Row; hours: number; fmt: Fmt }) {
     <div className="fz-ld grid animate-[mg-up_0.25s_var(--e)_both] grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-x-10 gap-y-5 bg-[color-mix(in_srgb,var(--text)_3%,transparent)] px-6 pt-4 pb-6 @max-[940px]/fzt:grid-cols-1 @max-[520px]/fzt:px-4 @max-[520px]/fzt:pt-3 @max-[520px]/fzt:pb-5">
       <div className={cx("col-span-full flex items-center gap-2.5 rounded-field px-3 py-2.5 @max-[520px]/fzt:flex-wrap", warn ? "bg-warn-soft" : "bg-step")}>
         <i aria-hidden className={cx("size-2 flex-none rounded-full @max-[520px]/fzt:mt-2 @max-[520px]/fzt:self-start", warn ? "bg-warn" : "bg-accent-mark")} />
-        <b className="font-medium text-pretty @max-[520px]/fzt:min-w-0 @max-[520px]/fzt:flex-1">{lead ? recText(t, lead) : known ? t("load.noRecs") : t("load.noData")}</b>
+        <b className="font-medium text-pretty @max-[520px]/fzt:min-w-0 @max-[520px]/fzt:flex-1">{lead ? recText(t, lead) : known ? t("load.noRecs") : n.hoursWithData > 0 ? t("load.young") : t("load.noData")}</b>
         <Link to="/nodes/$id" params={{ id: n.nodeId }} className="ms-auto text-[13px] whitespace-nowrap text-fg underline decoration-line underline-offset-4 hover:decoration-current @max-[520px]/fzt:ms-[18px] @max-[520px]/fzt:basis-full">
           {t("fm.openNode")}
         </Link>
@@ -299,7 +303,7 @@ function Details({ n, hours, fmt }: { n: Row; hours: number; fmt: Fmt }) {
           {meter(t("load.res.cpu"), "cpu", n.cpuPeakP95Pct, n.cpuPeakTypicalPct !== undefined ? t("nv.load.usually", { v: pct(n.cpuPeakTypicalPct) }) : undefined)}
           {meter(t("load.res.ram"), "ram", n.ramPeakPct)}
           {meter(t("load.res.disk"), "disk", n.diskUsedPct, t("nv.load.now"))}
-          {meter(t("load.res.bandwidth"), "bandwidth", n.bandwidthPeakPct, n.capacityMbps > 0 ? t("nv.load.from", { n: fmt.num(n.capacityMbps, 0) }) : undefined)}
+          {meter(t("load.res.bandwidth"), "bandwidth", n.bandwidthPeakPct, n.bandwidthTypicalPct !== undefined ? t("nv.load.usually", { v: pct(n.bandwidthTypicalPct) }) : undefined)}
           {meter(t("load.res.conntrack"), "conntrack", n.conntrackPeakPct)}
         </div>
       )}
