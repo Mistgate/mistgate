@@ -8,7 +8,7 @@ import { Icon } from "@/components/ui/icons";
 import { ProtocolTag } from "@/components/ui/protocol-tag";
 import { StatusDot } from "@/components/ui/status";
 import type { Node as NodeMsg } from "@/gen/mistgate/admin/v1/node_pb";
-import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { NodeShareMode, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import type { Fmt } from "@/lib/format";
@@ -212,6 +212,11 @@ export function NodeList({
                 <span className="flex min-w-0 flex-col">
                   <b className="truncate font-mono font-medium tabular-nums">
                     {n.name}
+                    {n.sharing?.mode === NodeShareMode.NONE && n.status !== NodeStatus.RETIRED && (
+                      <i title={t(n.sharing.idle ? "ns.label.tipIdle" : "ns.label.tip")} className="ms-2 inline-flex h-[18px] items-center rounded-[9px] bg-tone-lavender-bg px-1.5 align-[1px] font-sans text-[11px] leading-none font-medium text-tone-lavender not-italic">
+                        {t("ns.label")}
+                      </i>
+                    )}
                     {(w?.role === "entry" || w?.role === "mixed") && (
                       <i className="ms-2 inline-flex h-[18px] items-center rounded-[9px] bg-tone-sand-bg px-1.5 align-[1px] font-sans text-[11px] leading-none font-medium text-tone-sand not-italic">{t("nw.role")}</i>
                     )}

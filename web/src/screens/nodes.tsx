@@ -1,12 +1,12 @@
 import { Menu } from "@base-ui/react/menu";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useAddNode } from "@/components/add-node";
 import { useEscClear } from "@/components/bulk";
 import { useToast } from "@/components/ui/toast";
 import { useListEntrance } from "@/components/fx/page";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/chips";
 import { PageTitle } from "@/components/ui/bits";
 import { Icon } from "@/components/ui/icons";
@@ -224,6 +224,9 @@ export function NodesScreen({ demo }: { demo?: NodesDemo } = {}) {
           <i aria-hidden className="fz-live-dot size-2 flex-none rounded-full bg-accent-mark" />
           {nodes.length > 0 ? `${t.n("nodes.summary", nodes.length, { o: onlineTotal })}${problems ? ` · ${t.n("nodes.withProblems", problems)}` : ""}${noWayN > 0 ? ` · ${t("nw.sum.noway", { n: noWayN, country: countryIn(t, audience) })}` : ""}${owner && waysData === "ready" && ways.downN > 0 ? ` · ${t.n("nw.sum.down", ways.downN)}` : ""}` : t("nv.none")}
         </span>
+        <Link to="/decoys" className={cx(buttonClass("secondary", "lg"), "no-underline max-md:flex-none")}>
+          {t("nav.decoys")}
+        </Link>
         <Button variant="primary" size="lg" className="max-md:flex-none" onClick={() => addNode()}>
           <Icon name="plus" size={16} />
           {t("nv.addShort")}

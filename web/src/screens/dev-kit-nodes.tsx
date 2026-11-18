@@ -6,7 +6,7 @@ import { PageTitle } from "@/components/ui/bits";
 import { Shot } from "@/screens/dev-kit-redesign";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
-import { InboundState, NodeStatus, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
+import { InboundState, NodeShareMode, NodeStatus, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { isLang, setLang, useLang, useT } from "@/i18n";
@@ -34,7 +34,7 @@ import type { Avail } from "@/components/bulk";
 // iframe, so the window's breakpoints answer to the frame); each frame is a page of its own, for the screenshot script and for
 // the side-by-side with the board:
 //   /dev-kit?only=nodes-page&state=<state>[&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1]
-// states: list (the board's four nodes) | calm (the same, nothing to look at) | first (no node) | one | twelve | dead (nl1 does not answer) | mixed (every state a node
+// states: held (nodes nobody gets) | list (the board's four nodes) | calm (the same, nothing to look at) | first (no node) | one | twelve | dead (nl1 does not answer) | mixed (every state a node
 // has) | offer (the panel-key offer) | select (selecting, two ticked: the bulk bar) | find (a search that finds one) | nomatch
 // (a search that finds none) | load | map | map-card (the map with nl1 selected) | job-running | job-done | job-failed (the bar's
 // batch states) | edge (the Cloudflare edition: no load, no map on a phone is the width's doing).
@@ -151,6 +151,14 @@ function fleetOf(state: string) {
     const i = rows.findIndex((r) => r.name === name);
     if (i >= 0) rows[i] = { ...rows[i]!, ...over };
   };
+  // the node nobody gets (SetNodeSharing: NONE): fi1 for a while, nl1 for over a day
+  if (state === "held") {
+    const share = (mode: NodeShareMode, receiving: number, idle: boolean) => ({ mode, groupsReceiving: receiving, groupsTotal: 3, changedUnix: now - (idle ? 3 : 0) * 86400 - 600, idle });
+    set("de1", { sharing: share(NodeShareMode.ALL, 3, false) });
+    set("fi1", { sharing: share(NodeShareMode.NONE, 0, false) });
+    set("nl1", { sharing: share(NodeShareMode.NONE, 0, true) });
+    set("msk1", { sharing: share(NodeShareMode.LISTED, 1, false) });
+  }
   if (state === "dead") set("nl1", { status: NodeStatus.DOWN, reason: reason("agent_silent", { minutes: "14" }), online: [], hasMetrics: false, cpuPct: 0, trafficTodayBytes: 0, uptimeS: 0 });
   if (state === "mixed" || state === "list" || state.startsWith("ru-") || state.startsWith("rw-")) set("de1", { reason: reason("state_drift") });
   if (sc.rst === "entoff") set("msk1", { status: NodeStatus.DOWN, reason: reason("agent_silent", { minutes: "14" }), online: [], hasMetrics: false, cpuPct: 0, trafficTodayBytes: 0, uptimeS: 0 });
@@ -375,6 +383,9 @@ export function NodesPage() {
 
 export const frames: Frame[] = [
   { id: "nodes-list", state: "list", title: "The board's four nodes: de1 with a remark, fi1 with an old agent (1440)", w: 1440, h: 780 },
+  { id: "nodes-held", state: "held", title: "Nodes nobody gets: the label \"Nobody\" (fi1 new, nl1 for over a day), the link to the decoy sites in the head", w: 1440, h: 780 },
+  { id: "nodes-held-phone", state: "held", title: "The same on a phone", w: 400, h: 780 },
+  { id: "nodes-held-ru", state: "held", title: "The same in Russian", w: 1440, h: 780, params: "&lang=ru" },
   { id: "nodes-calm", state: "calm", title: "Four nodes, nothing to look at", w: 1440, h: 780 },
   { id: "nodes-list-light", state: "list", title: "The same on the light theme", w: 1440, h: 780, params: "&theme=light" },
   { id: "nodes-list-rail", state: "list", title: "A 900 window: the rail, the card narrows (profiles, online, arrow)", w: 900, h: 780 },

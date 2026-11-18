@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
-import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { NodeShareMode, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
 import { en } from "@/i18n/en";
 import { setLang } from "@/i18n";
@@ -158,6 +158,29 @@ describe("the list", () => {
     expect(document.body.textContent).toContain("2 with problems");
     await click([...document.querySelectorAll("section[data-select] button")].find((b) => b.textContent === en["node.add.button"]));
     expect(addNode).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("who gets a node", () => {
+  const share = (mode: NodeShareMode, idle = false) => ({ sharing: { mode, groupsReceiving: mode === NodeShareMode.NONE ? 0 : 1, groupsTotal: 3, changedUnix: 0, idle } });
+
+  it("labels a node that no group gets, and only that one", async () => {
+    await mount([node("de1", share(NodeShareMode.ALL)), node("nl1", share(NodeShareMode.NONE)), node("fi1", share(NodeShareMode.LISTED)), node("se1")]);
+    const labels = [...document.querySelectorAll("b.font-mono")].filter((b) => b.textContent?.includes(en["ns.label"])).map((b) => b.textContent);
+    expect(labels).toEqual([`nl1${en["ns.label"]}`]);
+    expect(document.querySelector(`[title="${en["ns.label.tip"]}"]`)).not.toBeNull();
+  });
+
+  it("says how long nobody has had it once it is over a day, and labels no retired node", async () => {
+    await mount([node("nl1", share(NodeShareMode.NONE, true)), node("fi1", { ...share(NodeShareMode.NONE), status: NodeStatus.RETIRED })]);
+    expect(document.querySelector(`[title="${en["ns.label.tipIdle"]}"]`)).not.toBeNull();
+    expect(document.body.textContent?.split(en["ns.label"]).length).toBe(2);
+  });
+
+  it("has a link to the decoy sites beside the button that adds a node", async () => {
+    await mount();
+    const link = [...document.querySelectorAll("a")].find((a) => a.textContent === en["nav.decoys"]);
+    expect(link?.getAttribute("href")).toBe("/decoys");
   });
 });
 

@@ -92,6 +92,8 @@ describe("the Overview", () => {
     expect(text()).toContain("Traffic today");
     expect(text()).toContain("Resource headroom");
     expect(text()).toContain("Recently closed");
+    // who gets the node: under what waits for you, in the first column
+    expect(text()).toContain("Who gets this node");
     // 24 cells an hour for each of the three profiles
     expect(host!.querySelectorAll(".nd-tk").length).toBe(3);
     expect(host!.querySelectorAll(".nd-tk")[0]!.children.length).toBe(24);
@@ -149,6 +151,8 @@ describe("the Overview", () => {
     await mount("retired");
     expect(text()).not.toContain("Resource headroom");
     expect(text()).not.toContain("Kernel networking");
+    // a retired node is given to nobody: the panel refuses it (node_retired), so the card is not there
+    expect(text()).not.toContain("Who gets this node");
     expect(buttons("Restart profiles")).toHaveLength(0);
     expect([...host!.querySelectorAll("[role=tab]")].map((t) => t.textContent)).toEqual(["Overview", "History", "Server"]);
   });

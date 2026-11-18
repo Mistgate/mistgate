@@ -184,7 +184,7 @@ export function PagingKit() {
         id="paging-users"
         title="Users: 137 people, the server counts and skips rows (offset)"
         seed={[
-          [groupsQuery.queryKey, groups.map((g) => ({ id: g.id, name: g.name, profileIds: [], userCount: 40, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: g.color }))],
+          [groupsQuery.queryKey, groups.map((g) => ({ id: g.id, name: g.name, profileIds: [], userCount: 40, dnsPresetId: "", happNodes: 2, amneziaNodes: 1, color: g.color, disabledNodeIds: [] }))],
           [userCountQuery.queryKey, { counts: { all: 137, online: 28 } }],
           [nodesQuery.queryKey, { nodes: [{ id: "nod_1", name: "de1", status: NodeStatus.ONLINE }] }],
           ...[1, 2, 3, 4, 5, 6].flatMap((p) => [25, 50, 100].map((s): [readonly unknown[], unknown] => [["users", "list", "all", "", "", p, s], userPage(p, s)])),

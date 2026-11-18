@@ -17,6 +17,8 @@ export const errorCodes = [
   "node_offline",
   "agent_too_old",
   "node_retired",
+  // a group's own form that would switch on a node the owner holds back from it (UpdateGroup, "node=<id>"): the node is given from its page
+  "node_held",
   "sub_address_missing",
   "preset_is_default",
   "preset_builtin",
