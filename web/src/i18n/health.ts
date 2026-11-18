@@ -994,7 +994,7 @@ export const ru: typeof en = {
   "health.alert.path_lossy.why":
     "UDP от {node} ({region}) до {target} теряет {lost} % на портах {ports}, а с {other} ({other_region}) доходит {arrived}. Потери на пути от {node}, а не на {target}: его порты в порядке. Сутки проверки портов шлют сначала с других нод; алерт закроется через 30 часов после последней проверки, которая видела потери.",
   "health.alert.warp_reach.title": "{domain} показывает страницу блокировки через WARP",
-  "health.alert.warp_reach.why": "Через WARP этой ноды {domain} отвечает страницей блокировки (HTTP {http_status}) на выходе Cloudflare {colo}. Проверок подряд с таким ответом: {streak}. Часть сайтов не пускает WARP на одном выходе и пускает на другом: перезапусти WARP на вкладке «Выход» ноды, чтобы получить другой. Замечание закроется само, когда проверка пройдёт.",
+  "health.alert.warp_reach.why": "Через WARP этой ноды {domain} отвечает страницей блокировки (HTTP {http_status}) на выходе Cloudflare {colo}. Проверок подряд с таким ответом: {streak}. Часть сайтов не пускает WARP на одном выходе и пускает на другом: перезапусти WARP на вкладке «Выход» ноды, чтобы получить другой. Алерт закроется сам, когда проверка пройдёт.",
   "health.alert.path_lossy.title.filtered": "Фильтр UDP по пути к {target}",
   "health.alert.path_lossy.why.filtered":
     "От {node} ({region}) UDP доходит до {target} только на {open}; на порты {ports} — ничего, а с {other} ({other_region}) доходит всё. Это фильтр по пути, часто защита хостера от DDoS из датацентров: сама {target} в порядке, люди из домашних сетей обычно подключаются, но проверки портов (и ретрансляция) с {node} проходить не будут.",
@@ -1585,7 +1585,7 @@ export const zh: typeof en = {
   "health.alert.agent_crash_loop.why": "节点 Agent 在最近 {window_min} 分钟内崩溃并重启了 {count} 次。每次重启都是一个 agent_started 事件，且上一次运行不是正常退出；事件参数会说明 systemd 看到的是退出码、信号还是内存不足被杀。窗口内的崩溃重启少于三次时，告警关闭。",
   "health.alert.path_lossy.why": "从 {node}（{region}）发往 {target} 的 UDP 在端口 {ports} 上丢失 {lost}%，而来自 {other}（{other_region}）的到达 {arrived}。丢包发生在从 {node} 出发的路上，不在 {target} 上：它的端口正常。一天内端口检测会优先从其他节点发送；最后一次发现丢包的检测过去 30 小时后，告警会关闭。",
   "health.alert.warp_reach.title": "{domain} 通过 WARP 显示拦截页",
-  "health.alert.warp_reach.why": "通过此节点的 WARP，{domain} 在 Cloudflare 出口 {colo} 返回了拦截页（HTTP {http_status}）。连续这样回应的检查次数：{streak}。有些网站在一个出口拒绝 WARP，在另一个出口却不会：请在节点的“出口”标签页重启 WARP，换一个出口。检查通过后，此提醒会自动关闭。",
+  "health.alert.warp_reach.why": "通过此节点的 WARP，{domain} 在 Cloudflare 出口 {colo} 返回了拦截页（HTTP {http_status}）。连续这样回应的检查次数：{streak}。有些网站在一个出口拒绝 WARP，在另一个出口却不会：请在节点的“出口”标签页重启 WARP，换一个出口。检查通过后，此告警会自动关闭。",
   "health.alert.path_lossy.title.filtered": "发往 {target} 的 UDP 在途中被过滤",
   "health.alert.path_lossy.why.filtered":
     "从 {node}（{region}）发往 {target} 的 UDP 只有 {open} 能到达；端口 {ports} 完全收不到，而来自 {other}（{other_region}）的全部到达。这是路径上的过滤，常见于服务商针对数据中心流量的 DDoS 防护：{target} 本身正常，家庭网络的用户通常能连接，但来自 {node} 的端口检测（以及中转）无法通过。",

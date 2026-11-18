@@ -114,6 +114,15 @@ describe("the head of the page", () => {
 });
 
 describe("the open alerts", () => {
+  it("goes back to the grey cards while Retry asks the panel again, as the board does", async () => {
+    await draw("alerts.err");
+    expect(document.querySelector(".pv-qe")).not.toBeNull();
+    (healthApi as unknown as Record<string, unknown>).listAlerts = () => new Promise(() => {});
+    await click(button("Retry"));
+    expect(document.querySelector(".pv-qe")).toBeNull();
+    expect(document.querySelector(".hl-skl")?.getAttribute("aria-busy")).toBe("true");
+  });
+
   it("opens one row at a time, the first by itself, and a second press shuts it", async () => {
     await draw("alerts");
     expect(toggles().map((t) => t.getAttribute("aria-expanded"))).toEqual(["true", "false", "false", "false", "false"]);

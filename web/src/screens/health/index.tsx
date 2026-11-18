@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useAddNode } from "@/components/add-node";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
@@ -84,10 +84,18 @@ export function HealthPage({ tab, onTab: setTab, scene }: { tab: HealthTab; onTa
               ? t("hl.sum.active", { problems: count, min })
               : t("hl.sum.quiet", { min });
 
+  // "Retry" on the page's error goes back to the grey cards until the panel has answered again (the board loads for a moment, then shows what it got)
+  const [retrying, setRetrying] = useState(false);
+  const retry = () => {
+    setRetrying(true);
+    void alerts.refetch().finally(() => setRetrying(false));
+  };
+
   // a tab whose own query has not come, has failed, or the state of the whole page (the board's skeleton, error card and "no nodes")
   const state = (q: { data?: unknown; isError: boolean; refetch: () => unknown }, ready: () => ReactNode): ReactNode => {
     if (loading) return <LoadCards label={t("hlp.loading")} />;
-    if (failed) return <LoadFailed title={t("hlp.err.title")} text={t("hlp.err.text")} retry={t("hlp.retry")} onRetry={() => void alerts.refetch()} />;
+    // "Retry" goes back to the grey cards while the panel is asked again (the board loads for a moment, then answers)
+    if (failed) return retrying ? <LoadCards label={t("hlp.loading")} /> : <LoadFailed title={t("hlp.err.title")} text={t("hlp.err.text")} retry={t("hlp.retry")} onRetry={retry} />;
     if (bare)
       return (
         <Calm
