@@ -659,6 +659,47 @@ func TestDecoyAssignPlanApplyThroughTheOwner(t *testing.T) {
 	}
 }
 
+// The plan applies exactly the version its card showed: a draft saved again between the plan and the owner's approval is refused at the
+// apply (nothing is marked ready, nothing is put anywhere) with a reason that says so, and a fresh plan then goes through.
+func TestDecoyAssignAppliesOnlyTheVersionThePlanShowed(t *testing.T) {
+	e := newTestEnv(t)
+	lib := e.w.lib
+	draft := lib.put("Tea", "a tea shop", "draft", bakery(t))
+	_, ad := e.token(ProfileAdmin)
+	s := e.session(ad)
+
+	p := planOf(t, s, "decoy_site_assign", map[string]any{"site_id": draft.id, "mark_ready": true, "nodes": []any{"de1"}})
+	if err := e.plans.decide(p.PlanID, true); err != nil {
+		t.Fatal(err)
+	}
+	// the draft is saved again before the apply: it is version 2 now
+	draft.versions = append(draft.versions, withFile(t, bakery(t), "extra.html", "x"))
+	out := applyError(t, s, "decoy_site_assign", p.ConfirmToken)
+	if !strings.Contains(out, "changed after the plan") || !strings.Contains(out, "version 1") || !strings.Contains(out, "version 2") {
+		t.Fatalf("apply on a draft saved again: %s", out)
+	}
+	if len(lib.assigned) != 0 || draft.state != "draft" || slices.Contains(lib.calls, "SetDecoySiteReady") {
+		t.Fatalf("the refused apply changed the library: assigned %d, state %s, calls %v", len(lib.assigned), draft.state, lib.calls)
+	}
+	// the same for marking ready on its own
+	r := planOf(t, s, "decoy_site_ready", map[string]any{"site_id": draft.id})
+	if err := e.plans.decide(r.PlanID, true); err != nil {
+		t.Fatal(err)
+	}
+	draft.versions = append(draft.versions, withFile(t, bakery(t), "more.html", "y"))
+	if out := applyError(t, s, "decoy_site_ready", r.ConfirmToken); !strings.Contains(out, "changed after the plan") || draft.state != "draft" {
+		t.Fatalf("ready on a draft saved again: %s (state %s)", out, draft.state)
+	}
+	// a new plan names the current version and applies
+	p2 := planOf(t, s, "decoy_site_assign", map[string]any{"site_id": draft.id, "mark_ready": true, "nodes": []any{"de1"}})
+	if err := e.plans.decide(p2.PlanID, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := applyOf(t, s, "decoy_site_assign", p2.ConfirmToken); got.Status != "applied" || len(lib.assigned) != 1 {
+		t.Fatalf("apply = %+v", got)
+	}
+}
+
 // A new version of a ready site that stands on nodes: the plan names the nodes and lists the files, with sizes and no text; the apply
 // saves it only on the version the plan was made against.
 func TestDecoyVersionPlanListsFilesAndNodesWithoutContents(t *testing.T) {

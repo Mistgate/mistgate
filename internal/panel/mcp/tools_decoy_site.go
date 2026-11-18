@@ -651,6 +651,7 @@ func decoySiteTools() []toolDef {
 type decoyReadyArgs struct {
 	ReasonField
 	SiteID string `json:"site_id" jsonschema:"the id of the draft to mark ready"`
+	decoyPinned
 }
 
 var decoySiteReady = changeSpec[decoyReadyArgs]{
@@ -671,16 +672,43 @@ var decoySiteReady = changeSpec[decoyReadyArgs]{
 		}
 		return &planned{
 			Summary: "Mark a decoy site ready. It stands on no node or on the panel until it is assigned. The owner must approve this change before it is applied.",
-			Facts:   facts, Danger: []string{dangerFleet}, Params: decoyReadyArgs{SiteID: a.SiteID},
+			Facts:   facts, Danger: []string{dangerFleet}, Params: decoyReadyArgs{SiteID: a.SiteID, decoyPinned: pinOf(r.GetSite())},
 			AuditParams: map[string]any{"site_id": a.SiteID},
 		}, nil
 	},
 	apply: func(c *call, a decoyReadyArgs, _ Plan) (done, error) {
+		if err := c.decoyUnchanged(a.SiteID, a.decoyPinned); err != nil {
+			return done{}, err
+		}
 		if _, err := c.cl.DecoySite.SetDecoySiteReady(c.ctx, connect.NewRequest(&decoysitev1.SetDecoySiteReadyRequest{SiteId: a.SiteID, Ready: true})); err != nil {
 			return done{}, decoyAPIError(err)
 		}
 		return done{text: "The decoy site is ready."}, nil
 	},
+}
+
+// decoyPinned is the version of a site a plan showed (set by the plan, never by the caller): its files' hash and number. The apply
+// refuses a site that has been saved again, reverted or re-uploaded since, instead of quietly putting a different one.
+type decoyPinned struct {
+	PlanBundle  string `json:"plan_bundle_sha256,omitempty" jsonschema:"-"`
+	PlanVersion uint32 `json:"plan_version,omitempty" jsonschema:"-"`
+}
+
+func pinOf(s *decoysitev1.DecoySite) decoyPinned {
+	return decoyPinned{PlanBundle: s.GetBundleSha256(), PlanVersion: s.GetVersion()}
+}
+
+// decoyUnchanged reads the site again and refuses when it is not the version the plan showed.
+func (c *call) decoyUnchanged(siteID string, p decoyPinned) error {
+	r, err := c.decoyGet(siteID)
+	if err != nil {
+		return err
+	}
+	if p.PlanBundle != "" && r.GetSite().GetBundleSha256() != p.PlanBundle {
+		return failure("decoy_site_changed", fmt.Sprintf("the site changed after the plan: the plan was for version %d, it is version %d now. Make a new plan", p.PlanVersion, r.GetSite().GetVersion()),
+			"planned", fmt.Sprint(p.PlanVersion), "now", fmt.Sprint(r.GetSite().GetVersion()))
+	}
+	return nil
 }
 
 func warnPaths(paths []string) string {
@@ -698,6 +726,7 @@ type decoyAssignArgs struct {
 	Nodes     []string `json:"nodes,omitempty" jsonschema:"node ids or exact names to put the site on, at most 20; their own site is replaced"`
 	Panel     bool     `json:"panel,omitempty" jsonschema:"also put the site on the panel's own public address"`
 	MarkReady bool     `json:"mark_ready,omitempty" jsonschema:"the site is a draft: mark it ready first and put it on the targets, in this one plan"`
+	decoyPinned
 }
 
 var decoySiteAssign = changeSpec[decoyAssignArgs]{
@@ -756,9 +785,14 @@ var decoySiteAssign = changeSpec[decoyAssignArgs]{
 			summary = "The site already stands on every target: nothing would change. " + summary
 		}
 		a.Nodes = ids
+		a.decoyPinned = pinOf(site)
 		return &planned{Summary: summary, Facts: facts, Danger: []string{dangerFleet}, Params: a, AuditParams: map[string]any{"site_id": a.SiteID, "nodes": ids, "panel": a.Panel}}, nil
 	},
 	apply: func(c *call, a decoyAssignArgs, _ Plan) (done, error) {
+		// what is put on the targets is exactly the version the card showed
+		if err := c.decoyUnchanged(a.SiteID, a.decoyPinned); err != nil {
+			return done{}, err
+		}
 		if a.MarkReady {
 			r, err := c.decoyGet(a.SiteID)
 			if err != nil {
