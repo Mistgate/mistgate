@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { InboundState, NodeStatus, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
-import type { ProfileSummary } from "@/gen/mistgate/admin/v1/profile_pb";
 import { groups as groupsApi, nodes as nodesApi, profiles as profilesApi } from "@/lib/api";
 import { reasons } from "@/lib/port-check";
 import { nodesQuery } from "@/lib/queries";
@@ -14,8 +13,6 @@ import { meQuery } from "@/lib/session";
 import { AddInbound } from "@/screens/node/add-inbound";
 import { ProfilesTab } from "@/screens/node/profiles";
 import { CheckPortsButton, Ports as PortRows, usePortCheck } from "@/screens/node/ports";
-import { DeployDialog } from "@/screens/profiles/deploy";
-import { TwinPanel, twinPlanKey } from "@/screens/profiles/twin";
 import { groupsQuery, profileListQuery } from "@/screens/users/rpc";
 
 // Development only, part of /dev-kit: the port check (design/udp-port-check.md, design/vless.md §7.4) on made-up data — the node's
@@ -189,11 +186,6 @@ function fakePorts() {
   p.createProfile = async () => ({ profile: { id: "prf_quick", name: "Hysteria2 · 443", version: 1 } });
   p.updateProfile = async () => ({ profile: { id: "prf_quick", version: 2 } });
   (groupsApi as unknown as Record<string, unknown>).updateGroup = async () => ({});
-  p.twinProfile = async (r: { profileId: string }) => {
-    await wait(r.profileId === "prf_slow" ? 5000 : 3000);
-    if (r.profileId === "prf_none") throw new ConnectError("no_clean_port", Code.FailedPrecondition);
-    return twinPlan;
-  };
   (nodesApi as unknown as Record<string, unknown>).checkPorts = async () => {
     await wait(7000);
     const ports = [check({}), check({ port: 8443, verdict: "lossy", got: 270, badUnix: now })];
@@ -242,51 +234,6 @@ function AddDemo({ label, quick, checks, list }: { label: string; quick?: boolea
         {label}
       </Button>
       <AddInbound open={open} onOpenChange={setOpen} data={{ node: baseNode(), inbounds: [], portChecks: [] } as never} />
-    </Cache>
-  );
-}
-
-function DeployDemo() {
-  const [open, setOpen] = useState(false);
-  return (
-    <Cache>
-      <Button
-        onClick={() => {
-          fakePorts();
-          setOpen(true);
-        }}
-      >
-        Put “hy2 · 443” on fi1 / de2 / se1
-      </Button>
-      <DeployDialog open={open} onOpenChange={setOpen} profile={{ id: "prf_main", name: "hy2 · 443 · Salamander", protocol: "hysteria2", tlsMode: "acme_domain", sni: "" }} inbounds={[{ nodeId: "nod_de1" }]} preselect={["nod_fi1", "nod_de2", "nod_se1"]} />
-    </Cache>
-  );
-}
-
-// ---- the twin -----------------------------------------------------------------------------------------------------------
-const twinPlan = {
-  name: "hy2 · 443 · WARP",
-  egress: "warp",
-  port: 2053,
-  nodeIds: ["nod_de1", "nod_fi1"],
-  groupIds: ["grp_all"],
-  hopDropped: false,
-  portChecks: [
-    { nodeId: "nod_de1", port: 2053, verdict: "ok", sent: 300, got: 300, checkedUnix: BigInt(now - 5), badUnix: 0n, sender: "de2", reason: "" },
-    { nodeId: "nod_fi1", port: 2053, verdict: "", sent: 0, got: 0, checkedUnix: 0n, badUnix: 0n, sender: "", reason: "no_sender" },
-    { nodeId: "nod_de1", port: 8443, verdict: "lossy", sent: 300, got: 189, checkedUnix: BigInt(now - 5), badUnix: BigInt(now - 5), sender: "de2", reason: "" },
-  ],
-};
-const twinProfile = (id: string, version: number) => ({ id, name: "hy2 · 443 · Salamander", protocol: "hysteria2", nodeCount: 2, userCount: 12, version, warnings: [] }) as unknown as ProfileSummary;
-
-function TwinDemo({ caption, profile, plan }: { caption: string; profile: ProfileSummary; plan?: object }) {
-  const fill: Fill[] = plan ? [[twinPlanKey(profile.id, "warp", profile.version), plan]] : [];
-  return (
-    <Cache fill={[...fill, [nodesQuery.queryKey, { nodes: kitNodes.map((n) => ({ ...n, warp: { state: WarpState.UP } })) }]]}>
-      <div onClickCapture={fakePorts} className="flex min-w-[260px] flex-col gap-1.5">
-        <span className="text-xs text-muted">{caption}</span>
-        <TwinPanel profile={profile} egress="direct" dirty={false} />
-      </div>
     </Cache>
   );
 }
@@ -400,18 +347,6 @@ export function PortsKit() {
               <p className="pt-2 text-xs text-muted">Edit → type 8443: refused from the stored checks (Take 4443 / Save anyway).</p>
             </div>
           </Cache>
-        </div>
-      </Demo>
-
-      <Demo title="Put a profile on nodes: fi1 loses packets on 443 (clean port offered, or put on anyway), de2 could not be checked, se1 is clean">
-        <DeployDemo />
-      </Demo>
-
-      <Demo title="Twin: UDP badge per node (checked / unchecked: reason), a skipped candidate / checking on 2 nodes, then the plan / no clean port">
-        <div className="flex flex-wrap gap-2">
-          <TwinDemo caption="The plan is here" profile={twinProfile("prf_main", 4)} plan={twinPlan} />
-          <TwinDemo caption="Checking UDP on 2 nodes… (5 s), then the plan" profile={twinProfile("prf_slow", 5)} />
-          <TwinDemo caption="Checking (3 s), then no_clean_port" profile={twinProfile("prf_none", 6)} />
         </div>
       </Demo>
     </div>

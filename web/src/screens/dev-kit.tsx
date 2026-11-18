@@ -1,12 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRef, useState, type ReactNode } from "react";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
-import { InboundState, NodeStatus, WarpState, type Inbound } from "@/gen/mistgate/admin/v1/common_pb";
-import type { ProfileSummary } from "@/gen/mistgate/admin/v1/profile_pb";
+import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
-import { TwinPanel, twinPlanKey, type Egress } from "@/screens/profiles/twin";
-import { WherePanel } from "@/screens/profiles/where";
 import { groupsQuery } from "@/screens/users/rpc";
 import { AccentPicker } from "@/components/accent-picker";
 import { Avatar, Card, Chip, Kbd, PageTitle, SectionLabel } from "@/components/ui/bits";
@@ -36,15 +33,10 @@ import { PortsKit } from "@/screens/dev-kit-ports";
 import { useT } from "@/i18n";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
-import { profiles as profilesApi } from "@/lib/api";
-import { ConnectError, Code } from "@connectrpc/connect";
-import { AfterCreate, useAfterCreate } from "@/screens/profiles/after-create";
-import { DeployDialog } from "@/screens/profiles/deploy";
 import { GroupsTab, ReachLine } from "@/screens/users/groups";
 import { profileListQuery, protocolsQuery } from "@/screens/users/rpc";
 import { DevicesPanel } from "@/screens/users/user-detail";
 import { dnsPresetsQuery } from "@/screens/subscriptions/queries";
-import type { ProtocolInfo } from "@/gen/mistgate/admin/v1/profile_pb";
 import { HaloKit } from "./dev-kit-halo";
 import { FleetKit } from "./dev-kit-fleet";
 import { ProfileApprovalsKit, SettingsDemos } from "./dev-kit-settings";
@@ -122,34 +114,6 @@ function SyntaxSample() {
   );
 }
 
-// "Where it runs" on the profile page, on a private query cache so it needs no server: three states, one per verdict
-const demoGroups = [
-  { id: "grp_1", name: "family", profileIds: ["prf_1"], userCount: 5, dnsPresetId: "" },
-  { id: "grp_2", name: "friends", profileIds: ["prf_1", "prf_2"], userCount: 2, dnsPresetId: "" },
-  { id: "grp_3", name: "test", profileIds: ["prf_2"], userCount: 1, dnsPresetId: "" },
-];
-const demoNodes = [
-  { id: "nod_1", name: "de1", status: NodeStatus.ONLINE, countryCode: "DE" },
-  { id: "nod_2", name: "fi1", status: NodeStatus.ONLINE, countryCode: "FI" },
-];
-const demoProfile = (over: object) => ({ id: "prf_1", name: "Amnezia 3.1 test", protocol: "awg", nodeCount: 1, userCount: 7, version: 1, ...over }) as unknown as ProfileSummary;
-const demoInbound = (over: object) => ({ id: "inb_1", profileId: "prf_1", nodeId: "nod_1", nodeName: "de1", port: 51820, state: InboundState.ACTIVE, lastError: "", ...over }) as unknown as Inbound;
-
-function WhereDemo({ profile, inbounds, groups, role = Role.OWNER, twin }: { profile: ProfileSummary; inbounds: Inbound[]; groups: typeof demoGroups; role?: Role; twin?: boolean }) {
-  const [qc] = useState(() => {
-    const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
-    c.setQueryData(groupsQuery.queryKey, groups as never);
-    c.setQueryData(nodesQuery.queryKey, { nodes: demoNodes } as never);
-    c.setQueryData(meQuery.queryKey, { admin: { role } } as never);
-    return c;
-  });
-  return (
-    <QueryClientProvider client={qc}>
-      <WherePanel profile={profile} inbounds={inbounds} twin={twin ? { egress: "direct", dirty: false } : undefined} />
-    </QueryClientProvider>
-  );
-}
-
 // Groups, the two ways and "what a person gets", the "put on nodes" window, the new-profile block and the card's devices:
 // mock data on a private cache that never asks the server (queries off by default).
 const kitProfiles = [
@@ -186,52 +150,6 @@ function KitCache({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-/**
- * Dev only: the window's calls answered here, refusing the way the panel does: nl1 has the port taken (and names a free
- * one), fi1 sits on an IP, where Let's Encrypt needs a domain.
- */
-function fakeDeploy() {
-  (profilesApi as unknown as { createInbound: unknown }).createInbound = async (r: { profileId: string; nodeId: string; portOverride: number; tlsServerNameOverride: string }) => {
-    await new Promise((res) => setTimeout(res, 400));
-    if (r.nodeId === "nod_2" && !r.portOverride) throw new ConnectError("port_taken: port=443&profile=hy2 · WARP · 8443&free=8444", Code.AlreadyExists);
-    if (r.nodeId === "nod_3" && r.profileId === "p_hy" && !r.tlsServerNameOverride) throw new ConnectError("acme_needs_domain: address=203.0.113.10", Code.FailedPrecondition);
-    return { inbound: {} };
-  };
-}
-
-function DeployDemo() {
-  const [open, setOpen] = useState<"" | "hy2" | "awg">("");
-  const profile =
-    open === "awg" ? { id: "p_awg", name: "AWG 3.1 · QUIC", protocol: "awg" } : { id: "p_hy", name: "hy2 · 443 · Salamander", protocol: "hysteria2", tlsMode: "acme_domain", sni: "" };
-  return (
-    <KitCache>
-      <Button
-        onClick={() => {
-          fakeDeploy();
-          setOpen("hy2");
-        }}
-      >
-        Hysteria2 + Let's Encrypt
-      </Button>
-      <Button
-        onClick={() => {
-          fakeDeploy();
-          setOpen("awg");
-        }}
-      >
-        AmneziaWG, first on a node
-      </Button>
-      <DeployDialog open={open !== ""} onOpenChange={(o) => !o && setOpen("")} profile={profile} inbounds={[{ nodeId: "nod_1" }]} />
-    </KitCache>
-  );
-}
-
-function AfterDemo() {
-  const info = kitProtocols[0] as unknown as ProtocolInfo;
-  const a = useAfterCreate(info, "");
-  return <AfterCreate a={a} info={info} settings={{ port: 443, tls_mode: "acme_domain", sni: "" }} />;
-}
-
 const kitUser = { id: "usr_demo", name: "Марина", groupName: "Все", deviceLimit: 5, devicesUsed: 2, apps: { happ: true, amnezia: true } } as never;
 const kitDevices = [
   // kind: 1 an app on the link with its device ID, 2 the place the apps without one share, 3 an AmneziaVPN key
@@ -262,23 +180,6 @@ const kitDevices = [
     address: "10.66.4.3",
   },
 ] as never;
-
-// "The same server with and without WARP": the action and its dialog, the plan filled in the cache (the server's dry run)
-function TwinDemo({ profile, egress, plan }: { profile: ProfileSummary; egress: Egress; plan: object }) {
-  const [qc] = useState(() => {
-    const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
-    c.setQueryData(groupsQuery.queryKey, demoGroups as never);
-    c.setQueryData(nodesQuery.queryKey, { nodes: demoNodes.map((n, i) => ({ ...n, warp: { state: i === 0 ? WarpState.UP : WarpState.NOT_CONFIGURED } })) } as never);
-    c.setQueryData(meQuery.queryKey, { admin: { role: Role.OWNER } } as never);
-    c.setQueryData(twinPlanKey(profile.id, egress === "warp" ? "direct" : "warp", profile.version), plan as never);
-    return c;
-  });
-  return (
-    <QueryClientProvider client={qc}>
-      <TwinPanel profile={profile} egress={egress} dirty={false} />
-    </QueryClientProvider>
-  );
-}
 
 // Subscriptions -> "Names & texts": the servers of the busiest group as GetSubscriptionSettings sends them (two in one
 // country, to show the number), and an announcement longer than Happ shows (the counter and the cut)
@@ -530,20 +431,6 @@ export default function DevKit() {
       />
 
       <section className="flex flex-col gap-3">
-        <SectionLabel>Where it runs (profile page): works / on no node / in no group / read-only</SectionLabel>
-        <WhereDemo profile={demoProfile({ protocol: "hysteria2" })} inbounds={[demoInbound({}), demoInbound({ id: "inb_2", nodeId: "nod_2", nodeName: "fi1", state: InboundState.FAILED, lastError: "bind: address already in use" })]} groups={demoGroups} twin />
-        <WhereDemo profile={demoProfile({ userCount: 0 })} inbounds={[]} groups={demoGroups.slice(2)} />
-        <WhereDemo profile={demoProfile({ userCount: 0, protocol: "hysteria2" })} inbounds={[demoInbound({})]} groups={demoGroups.slice(2)} />
-        <WhereDemo profile={demoProfile({})} inbounds={[demoInbound({})]} groups={demoGroups} role={Role.READONLY} />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <SectionLabel>Same server with and without WARP (profile page): direct profile / WARP profile (AmneziaWG)</SectionLabel>
-        <TwinDemo profile={demoProfile({ protocol: "hysteria2", name: "files" })} egress="direct" plan={{ name: "files · WARP", egress: "warp", port: 8443, nodeIds: ["nod_1", "nod_2"], groupIds: ["grp_1", "grp_2"], hopDropped: true }} />
-        <TwinDemo profile={demoProfile({ name: "Amnezia 3.1 test · WARP" })} egress="warp" plan={{ name: "Amnezia 3.1 test", egress: "direct", port: 31877, nodeIds: ["nod_1"], groupIds: ["grp_1"], hopDropped: false }} />
-      </section>
-
-      <section className="flex flex-col gap-3">
         <SectionLabel>Groups tab (users screen) and what a person of a group gets (create-user form)</SectionLabel>
         <KitCache>
           <GroupsTab creating={false} onCreatingChange={() => {}} />
@@ -552,17 +439,6 @@ export default function DevKit() {
               <ReachLine key={g.id} group={g} />
             ))}
           </Card>
-        </KitCache>
-      </section>
-
-      <Block title="Put on nodes (profile page): results per node; nl1 has the port taken, fi1 is an IP (Let's Encrypt needs a domain); the AWG backend of a node's first AWG profile">
-        <DeployDemo />
-      </Block>
-
-      <section className="flex flex-col gap-3">
-        <SectionLabel>New profile: right after it is created (a group with Hysteria2 is left alone, one without gets it)</SectionLabel>
-        <KitCache>
-          <AfterDemo />
         </KitCache>
       </section>
 
