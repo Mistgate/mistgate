@@ -510,6 +510,8 @@ package mistgate.agent.v1;
 //   - An inbound that asks for a name another inbound of the port (a lower id) holds is not started: its InboundResult is
 //     FAILED with an error that starts with "sni_shadowed:". A front that cannot bind the port (another process holds it)
 //     fails every inbound of the port with the bind error and is tried again on the agent's next sweep.
+//   - An inbound that is not running (FAILED, or not accepting within 5 seconds) does not close the connections that ask for
+//     its names: they go to the default route, as a stranger's do.
 //   - SharedPort (StatsBatch.shared_ports): one row per shared port, counters since the agent started, a snapshot of the whole
 //     list, newest batch wins (a coalescer keeps the last). No client address is ever in it.
 //
@@ -1141,7 +1143,7 @@ message SharedPort {
   uint64 timeouts = 10;
   // Closed to make room: more than 1024 connections without a complete hello, this was the oldest.
   uint64 evicted = 11;
-  // Closed: the route did not accept within 5 seconds, or went away.
+  // Closed: the route did not accept within 5 seconds and neither did the default route, or the route went away.
   uint64 refused = 12;
   // Closed: no route and no default route to send it to.
   uint64 no_route = 13;
@@ -1151,6 +1153,9 @@ message SharedPort {
   repeated SharedUnknownName unknown_names = 15;
   // Why the front is not up (the bind error of the port); empty when it is. Counters are zero then.
   string bind_error = 16;
+  // Went to the default route because the service of the name they asked for is not running (it failed, or did not accept
+  // within 5 seconds). Not counted in refused: those are the connections that could not be served at all.
+  uint64 default_route_down = 17;
 }
 
 message SharedRoute {

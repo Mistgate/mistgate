@@ -442,6 +442,69 @@ func TestRouteThatNeverReturnsIsGivenUpOn(t *testing.T) {
 	}
 }
 
+// A route whose service is not running (SetDown) sends its names to the default route at once, with the bytes read.
+func TestDownRouteGoesToTheDefaultAtOnce(t *testing.T) {
+	r := newRig(t, func(f *Front) { f.routeWait = 5 * time.Second }, nil)
+	r.f.SetDown("b", true)
+	hello := helloOf(t, "b.example.com")
+	c := r.dial()
+	_, _ = c.Write(hello)
+	got, err := accept(t, r.lst["a"], time.Second)
+	if err != nil {
+		t.Fatalf("the default route got nothing: %v", err)
+	}
+	defer got.Close()
+	buf := make([]byte, len(hello))
+	if _, err := io.ReadFull(got, buf); err != nil || !bytes.Equal(buf, hello) {
+		t.Fatalf("replay: %v", err)
+	}
+	if s := r.f.Stats(); s.RouteDown != 1 || s.Delivered["a"] != 1 || s.Delivered["b"] != 0 || s.Refused != 0 || s.UnknownName != 0 {
+		t.Fatalf("stats %+v", s)
+	}
+	r.f.SetDown("b", false) // the service is back: its name is its own again
+	_, _ = r.dial().Write(helloOf(t, "b.example.com"))
+	if _, err := accept(t, r.lst["b"], time.Second); err != nil {
+		t.Fatalf("b did not get its name back: %v", err)
+	}
+}
+
+// A route that is up but does not Accept in time (an engine that never came back) is given up on for the default route
+// instead of a closed connection; nowhere to go, and it is closed.
+func TestRouteThatDoesNotAcceptFallsBackToTheDefault(t *testing.T) {
+	r := newRig(t, func(f *Front) { f.routeWait = 300 * time.Millisecond }, nil)
+	_ = r.lst["b"].Close()
+	hello := helloOf(t, "b.example.com")
+	c := r.dial()
+	_, _ = c.Write(hello)
+	got, err := accept(t, r.lst["a"], 2*time.Second)
+	if err != nil {
+		t.Fatalf("the default route got nothing: %v", err)
+	}
+	defer got.Close()
+	buf := make([]byte, len(hello))
+	if _, err := io.ReadFull(got, buf); err != nil || !bytes.Equal(buf, hello) {
+		t.Fatalf("replay: %v", err)
+	}
+	if s := r.f.Stats(); s.RouteDown != 1 || s.Refused != 0 || s.Delivered["a"] != 1 || s.Delivered["b"] != 0 {
+		t.Fatalf("stats %+v", s)
+	}
+}
+
+// The default route itself is down: nothing to fall back to, closed at once, not after a wait.
+func TestDownDefaultRouteClosesAtOnce(t *testing.T) {
+	r := newRig(t, func(f *Front) { f.routeWait = 5 * time.Second }, nil)
+	r.f.SetDown("a", true)
+	c := r.dial()
+	_, _ = c.Write(helloOf(t, "a.example.com"))
+	start := time.Now()
+	if err := closedBy(t, c); err != io.EOF {
+		t.Fatalf("want FIN, got %v", err)
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Fatal("waited for a route that is down")
+	}
+}
+
 func TestRoutesAreReplacedOnTheFly(t *testing.T) {
 	r := newRig(t, nil, nil)
 	a := r.lst["a"]

@@ -51,7 +51,8 @@ type Stats struct {
 	HelloTooLarge uint64
 	Timeouts      uint64 // closed: no complete hello in time
 	Evicted       uint64 // closed: more than maxPending unfinished, this was the oldest
-	Refused       uint64 // closed: the route did not Accept in time, or went away
+	RouteDown     uint64 // went to the default route: the route's service is not running (SetDown), or did not Accept in time
+	Refused       uint64 // closed: nobody Accepted it in time (the default route too), or the route went away
 	NoRoute       uint64 // closed: nowhere to send it
 	Panics        uint64
 	// Unknown is the most frequent names no route holds, most frequent first. A name that came in after the list was
@@ -81,7 +82,7 @@ type Front struct {
 	unknown map[string]uint64
 
 	accepted, noSNI, unknownName, notTLS, badHello, tooLarge atomic.Uint64
-	timeouts, evicted, refused, noRoute, panics              atomic.Uint64
+	timeouts, evicted, refused, noRoute, panics, routeDown   atomic.Uint64
 	lastOverloadLog, lastPanicLog                            atomic.Int64 // unix ns
 }
 
@@ -101,6 +102,7 @@ type queue struct {
 	ch        chan net.Conn
 	gone      chan struct{} // closed when the route is removed
 	delivered atomic.Uint64
+	down      atomic.Bool // the service behind the route is not running: its names go to the default route at once
 }
 
 // pending is a connection whose hello has not been handed over yet.
@@ -170,6 +172,19 @@ func (f *Front) SetRoutes(routes []Route, def string) {
 	f.table.Store(t)
 }
 
+// SetDown says whether the service of route id is not running (it failed, or never started). Its names then go to the default
+// route at once, as a stranger's do, instead of waiting for an Accept that will not come. A route that is up but does not
+// Accept in time (an engine restarting) sends the connection to the default route too, after routeWait. The default route
+// itself has nowhere to fall back to.
+func (f *Front) SetDown(id string, down bool) {
+	f.rmu.Lock()
+	q := f.queues[id]
+	f.rmu.Unlock()
+	if q != nil {
+		q.down.Store(down)
+	}
+}
+
 // Listener returns the listener of route id, nil if there is no such route. Closing it ends one engine's Accept; the
 // route stays, and Listener gives the next engine a new one.
 func (f *Front) Listener(id string) net.Listener {
@@ -187,7 +202,7 @@ func (f *Front) Stats() Stats {
 	s := Stats{
 		Accepted: f.accepted.Load(), NoSNI: f.noSNI.Load(), UnknownName: f.unknownName.Load(), NotTLS: f.notTLS.Load(),
 		BadHello: f.badHello.Load(), HelloTooLarge: f.tooLarge.Load(), Timeouts: f.timeouts.Load(),
-		Evicted: f.evicted.Load(), Refused: f.refused.Load(), NoRoute: f.noRoute.Load(), Panics: f.panics.Load(),
+		Evicted: f.evicted.Load(), RouteDown: f.routeDown.Load(), Refused: f.refused.Load(), NoRoute: f.noRoute.Load(), Panics: f.panics.Load(),
 		Delivered: map[string]uint64{},
 	}
 	f.rmu.Lock()
@@ -323,6 +338,10 @@ func (f *Front) route(p *pending) bool {
 	case helloTooLarge:
 		f.tooLarge.Add(1)
 	}
+	if rt != nil && rt.q.down.Load() && rt != t.def && t.def != nil {
+		f.routeDown.Add(1)
+		rt = nil
+	}
 	if rt == nil {
 		if rt = t.def; rt == nil {
 			f.noRoute.Add(1)
@@ -330,25 +349,44 @@ func (f *Front) route(p *pending) bool {
 		}
 	}
 	_ = conn.SetReadDeadline(time.Time{})
-	if tcp, ok := conn.(*net.TCPConn); ok && rt.ka != nil {
+	ok, refused := f.handOff(p, rt, head)
+	// The route's engine did not Accept in time or is gone: a visitor of its name gets what a stranger gets, not a closed
+	// connection (the default route may be down too, then there is nothing left to try).
+	if !ok && refused && t.def != nil && rt != t.def {
+		f.routeDown.Add(1)
+		ok, refused = f.handOff(p, t.def, head)
+	}
+	if refused {
+		f.refused.Add(1)
+	}
+	return ok
+}
+
+// handOff gives the connection, with the bytes already read in front, to rt's Accept. When it fails, refused says the route
+// did not take it (down, not Accepting in routeWait, gone), as opposed to the connection being evicted or the front closing.
+func (f *Front) handOff(p *pending, rt *route, head []byte) (ok, refused bool) {
+	if rt.q.down.Load() {
+		return false, true
+	}
+	if tcp, isTCP := p.conn.(*net.TCPConn); isTCP && rt.ka != nil {
 		_ = tcp.SetKeepAliveConfig(*rt.ka)
 	}
-	out := newReplayConn(conn, head)
+	out := newReplayConn(p.conn, head)
 	timer := time.NewTimer(f.routeWait)
 	defer timer.Stop()
 	rt.q.delivered.Add(1) // before the hand-off, so whoever accepted it already sees it counted
 	select {
 	case rt.q.ch <- out:
-		return true
+		return true, false
 	case <-timer.C:
-		f.refused.Add(1)
+		refused = true
 	case <-rt.q.gone:
-		f.refused.Add(1)
+		refused = true
 	case <-p.gone:
 	case <-f.done:
 	}
 	rt.q.delivered.Add(^uint64(0))
-	return false
+	return false, refused
 }
 
 // noteUnknown counts a name no route holds, if it looks like a host name: the names are the client's to choose.

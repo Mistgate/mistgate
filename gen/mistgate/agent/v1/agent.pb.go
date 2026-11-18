@@ -2321,7 +2321,7 @@ type SharedPort struct {
 	Timeouts uint64 `protobuf:"varint,10,opt,name=timeouts,proto3" json:"timeouts,omitempty"`
 	// Closed to make room: more than 1024 connections without a complete hello, this was the oldest.
 	Evicted uint64 `protobuf:"varint,11,opt,name=evicted,proto3" json:"evicted,omitempty"`
-	// Closed: the route did not accept within 5 seconds, or went away.
+	// Closed: the route did not accept within 5 seconds and neither did the default route, or the route went away.
 	Refused uint64 `protobuf:"varint,12,opt,name=refused,proto3" json:"refused,omitempty"`
 	// Closed: no route and no default route to send it to.
 	NoRoute uint64 `protobuf:"varint,13,opt,name=no_route,json=noRoute,proto3" json:"no_route,omitempty"`
@@ -2330,9 +2330,12 @@ type SharedPort struct {
 	// The most frequent host names no route holds, most frequent first, at most 5. Names only, never addresses.
 	UnknownNames []*SharedUnknownName `protobuf:"bytes,15,rep,name=unknown_names,json=unknownNames,proto3" json:"unknown_names,omitempty"`
 	// Why the front is not up (the bind error of the port); empty when it is. Counters are zero then.
-	BindError     string `protobuf:"bytes,16,opt,name=bind_error,json=bindError,proto3" json:"bind_error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	BindError string `protobuf:"bytes,16,opt,name=bind_error,json=bindError,proto3" json:"bind_error,omitempty"`
+	// Went to the default route because the service of the name they asked for is not running (it failed, or did not accept
+	// within 5 seconds). Not counted in refused: those are the connections that could not be served at all.
+	DefaultRouteDown uint64 `protobuf:"varint,17,opt,name=default_route_down,json=defaultRouteDown,proto3" json:"default_route_down,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *SharedPort) Reset() {
@@ -2475,6 +2478,13 @@ func (x *SharedPort) GetBindError() string {
 		return x.BindError
 	}
 	return ""
+}
+
+func (x *SharedPort) GetDefaultRouteDown() uint64 {
+	if x != nil {
+		return x.DefaultRouteDown
+	}
+	return 0
 }
 
 type SharedRoute struct {
@@ -2764,7 +2774,6 @@ func (x *PersonNetwork) GetConnects() uint32 {
 //   - attrs keeps only these keys: inbound, protocol, profile, port, state, reason, code, backend, mode, version, kernel,
 //     iface, check, fix, count, err, error; at most 8, each value cleaned the same way and at most 160 characters.
 //   - inbound_id is the record's "inbound" attribute when it names an inbound.
-//
 // Records with the same level, source, message, inbound_id and attrs["code"] in one batch interval are one entry with a
 // count and the first and last time; after 64 kinds the rest are counted in one entry of source "agent" and message
 // "journal_overflow" (count = records left out). The panel cleans addresses again and replaces the node's own secret names.
@@ -2986,18 +2995,17 @@ type LinkCounters struct {
 	// request is answered as it always was (X-Warning 300/301/302/310, or the site when the stream was not accepted). No credential,
 	// person or destination is attached: these are counts on the inbound. A _udp2 stream counts one refusal per datagram it
 	// lost to a refusal.
-	//
-	//	tunnel_blocked: the egress forbids the destination (310).
-	//	tunnel_no_ipv4: the destination has no IPv4 address and IPv6 is off for clients (301); ordinary traffic of any client.
-	//	tunnel_conn_refused, tunnel_conn_unreachable, tunnel_conn_dns, tunnel_conn_other: the connection to the destination
-	//	  failed (301): refused, no route to the network or host, the name did not resolve, anything else.
-	//	tunnel_timeout: the connect timeout (302).
-	//	tunnel_other_deadlines, tunnel_other_authority, tunnel_other_icmp, tunnel_other_dial (300): the site's deadlines could not
-	//	  be lifted; the request's authority could not be read; an ICMP tunnel, which the engine does not carry; the egress failed
-	//	  in a way none of the other reasons names (a missing WARP device, say).
-	//	tunnel_stream_closed, tunnel_stream_cred_gone, tunnel_stream_conn_limit: the stream was not accepted and the client got the
-	//	  site: the connection was closing, the credential was removed, kicked or expired, the credential already holds the most
-	//	  connections it may (16).
+	//   tunnel_blocked: the egress forbids the destination (310).
+	//   tunnel_no_ipv4: the destination has no IPv4 address and IPv6 is off for clients (301); ordinary traffic of any client.
+	//   tunnel_conn_refused, tunnel_conn_unreachable, tunnel_conn_dns, tunnel_conn_other: the connection to the destination
+	//     failed (301): refused, no route to the network or host, the name did not resolve, anything else.
+	//   tunnel_timeout: the connect timeout (302).
+	//   tunnel_other_deadlines, tunnel_other_authority, tunnel_other_icmp, tunnel_other_dial (300): the site's deadlines could not
+	//     be lifted; the request's authority could not be read; an ICMP tunnel, which the engine does not carry; the egress failed
+	//     in a way none of the other reasons names (a missing WARP device, say).
+	//   tunnel_stream_closed, tunnel_stream_cred_gone, tunnel_stream_conn_limit: the stream was not accepted and the client got the
+	//     site: the connection was closing, the credential was removed, kicked or expired, the credential already holds the most
+	//     connections it may (16).
 	TunnelBlocked         uint32 `protobuf:"varint,34,opt,name=tunnel_blocked,json=tunnelBlocked,proto3" json:"tunnel_blocked,omitempty"`
 	TunnelNoIpv4          uint32 `protobuf:"varint,35,opt,name=tunnel_no_ipv4,json=tunnelNoIpv4,proto3" json:"tunnel_no_ipv4,omitempty"`
 	TunnelConnRefused     uint32 `protobuf:"varint,36,opt,name=tunnel_conn_refused,json=tunnelConnRefused,proto3" json:"tunnel_conn_refused,omitempty"`
@@ -9607,7 +9615,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x0fperson_networks\x18\f \x03(\v2 .mistgate.agent.v1.PersonNetworkR\x0epersonNetworks\x12,\n" +
 	"\x12networks_db_sha256\x18\r \x01(\tR\x10networksDbSha256\x128\n" +
 	"\abridges\x18\x0e \x03(\v2\x1e.mistgate.agent.v1.BridgeStateR\abridges\x12@\n" +
-	"\fshared_ports\x18\x0f \x03(\v2\x1d.mistgate.agent.v1.SharedPortR\vsharedPorts\"\xf2\x04\n" +
+	"\fshared_ports\x18\x0f \x03(\v2\x1d.mistgate.agent.v1.SharedPortR\vsharedPorts\"\xa0\x05\n" +
 	"\n" +
 	"SharedPort\x12\x12\n" +
 	"\x04port\x18\x01 \x01(\rR\x04port\x12\x1a\n" +
@@ -9627,7 +9635,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x06panics\x18\x0e \x01(\x04R\x06panics\x12I\n" +
 	"\runknown_names\x18\x0f \x03(\v2$.mistgate.agent.v1.SharedUnknownNameR\funknownNames\x12\x1d\n" +
 	"\n" +
-	"bind_error\x18\x10 \x01(\tR\tbindError\"J\n" +
+	"bind_error\x18\x10 \x01(\tR\tbindError\x12,\n" +
+	"\x12default_route_down\x18\x11 \x01(\x04R\x10defaultRouteDown\"J\n" +
 	"\vSharedRoute\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12\x1c\n" +
