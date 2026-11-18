@@ -501,7 +501,7 @@ func TestNodeMessageCarriesTheLivePanelBridgeEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 	live := store.NodeLiveRow{NodeID: node.ID, Connected: true, LiveJSON: `{"link_via_node_id":"` + x.entry.nodeID + `"}`}
-	got := x.f.nodeMsg(x.ctx, node, nil, 0, 0, map[string]string{}, x.f.now(), live, nil, store.NodeHealthSummary{}, store.IPv6Doctor{})
+	got := x.f.nodeMsg(x.ctx, node, nil, 0, 0, map[string]string{}, x.f.now(), live, nil, store.NodeHealthSummary{}, store.IPv6Doctor{}, store.NodeShare{})
 	if got.LinkViaNodeId != x.entry.nodeID {
 		t.Fatalf("node link_via_node_id = %q, want %q", got.LinkViaNodeId, x.entry.nodeID)
 	}

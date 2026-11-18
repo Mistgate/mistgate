@@ -382,7 +382,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		// node did not finish writing its identity, rotate the token and retry with the same
 		// persisted CSR key.
 		if nodeState == "active" || secret.EnrollmentToken == "" || secret.TokenExpiresUnix <= s.cfg.Now().Unix() || secret.CAFingerprint == "" {
-			spec := NodeSpec{ID: job.NodeID, Name: job.Name, Address: job.Address, CountryCode: job.CountryCode, Location: job.Location, Provider: job.Provider}
+			spec := NodeSpec{ID: job.NodeID, Name: job.Name, Address: job.Address, CountryCode: job.CountryCode, Location: job.Location, Provider: job.Provider, Sharing: job.Sharing}
 			now := s.cfg.Now().UTC()
 			expires := now.Add(defaultEnrollmentTTL)
 			token, caFingerprint, err := s.cfg.Nodes.CreateProvisionEnrollment(ctx, spec, job.CreatedBy, now, expires)

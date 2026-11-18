@@ -34,7 +34,7 @@ func (s *Service) groupProtos(ctx context.Context, gs ...store.AccessGroup) ([]*
 func (s *Service) reachOf(g store.AccessGroup, full []store.AccessInboundFull) (happ, amnezia, telegram uint32) {
 	hn, an, tn := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, f := range full {
-		if !liveInbound(f) || !slices.Contains(g.ProfileIDs, f.Profile.ID) || slices.Contains(g.DisabledNodeIDs, f.Node.ID) {
+		if !liveInbound(f) || !slices.Contains(g.ProfileIDs, f.Profile.ID) || !g.GetsNode(f.Node.ID) {
 			continue
 		}
 		proto, ok := s.reg.Get(f.Profile.Protocol)
@@ -184,6 +184,11 @@ func (s *Service) UpdateGroup(ctx context.Context, req *connect.Request[adminv1.
 	before, err := a.Group(ctx, m.GroupId)
 	if err != nil {
 		return nil, groupErr(s, "get group", err)
+	}
+	if disabledNodeIDs != nil {
+		if err := s.checkHeldNodes(ctx, before, *disabledNodeIDs); err != nil {
+			return nil, err
+		}
 	}
 	var impact *adminv1.AccessImpact
 	if profiles != nil {

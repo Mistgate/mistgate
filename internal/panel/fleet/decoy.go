@@ -83,9 +83,13 @@ func (f *Fleet) nodeMessages(ctx context.Context, nodes []store.NodeRow) ([]*adm
 	panelBundle, _ := f.panelDecoyBundle()
 	healthSummaries := f.healthSummaries(ctx)
 	d6 := f.ipv6Doctors(ctx)
+	shares, err := f.st.NodeShares(ctx)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]*adminv1.Node, 0, len(nodes))
 	for _, node := range nodes {
-		out = append(out, f.nodeMsg(ctx, node, protos[node.ID], today[node.ID], relayToday[node.ID], inboundsOf(enabled, node.ID), now, live[node.ID], panelBundle, healthSummaries[node.ID], d6[node.ID]))
+		out = append(out, f.nodeMsg(ctx, node, protos[node.ID], today[node.ID], relayToday[node.ID], inboundsOf(enabled, node.ID), now, live[node.ID], panelBundle, healthSummaries[node.ID], d6[node.ID], shares[node.ID]))
 	}
 	return out, nil
 }

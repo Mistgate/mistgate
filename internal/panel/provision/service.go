@@ -21,6 +21,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/nodeshare"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"golang.org/x/crypto/ssh"
@@ -37,6 +38,8 @@ var provisionNodeName = regexp.MustCompile(`^[a-z0-9-]{2,24}$`)
 // NodeSpec is the node metadata reserved by one provisioning job.
 type NodeSpec struct {
 	ID, Name, Address, CountryCode, Location, Provider string
+	// Sharing is who the node is handed out to; the zero value lets the panel decide when the node is made.
+	Sharing store.NodeShareChoice
 }
 
 // NodeManager joins a durable installation job to the fleet CA and agent stream.
@@ -287,6 +290,10 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 		!validPlainText(req.Msg.Location, 100) || !validPlainText(req.Msg.Provider, 100) {
 		return nil, invalidArgument("invalid node metadata")
 	}
+	sharing, err := nodeshare.Choice(req.Msg.Sharing)
+	if err != nil {
+		return nil, err
+	}
 	admin, ok := auth.AdminFrom(ctx)
 	if !ok || admin.ID == "" {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("not signed in"))
@@ -319,7 +326,7 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 		ID: store.NewID("prv_"), NodeID: store.NewID("nod_"), Name: name, Address: req.Msg.Address,
 		CountryCode: country, Location: req.Msg.Location, Provider: req.Msg.Provider,
 		SSHHost: target.Host(), SSHPort: target.Port(), HostFingerprint: req.Msg.Fingerprint,
-		CreatedBy: admin.ID, CreatedAt: now, UpdatedAt: now,
+		CreatedBy: admin.ID, CreatedAt: now, UpdatedAt: now, Sharing: sharing,
 	}
 	secret, err := s.sealCredentials(job.ID, credentials{
 		Method: method, Username: username, Password: password, PrivateKey: privateKey, InstallPanelKey: installPanelKey,
@@ -335,7 +342,14 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 		s.cfg.Log.Error("save node provisioning job", "err", err)
 		return nil, internalConnectError()
 	}
-	s.audit(ctx, "node.ssh_provision_start", map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name, "auth": method})
+	audit := map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name, "auth": method}
+	if sharing.Mode != "" {
+		audit["sharing"] = sharing.Mode
+		if len(sharing.GroupIDs) > 0 {
+			audit["groups"] = strings.Join(sharing.GroupIDs, ",")
+		}
+	}
+	s.audit(ctx, "node.ssh_provision_start", audit)
 	s.signalWorker()
 	return connect.NewResponse(&adminv1.StartNodeProvisionResponse{Job: toProvisionJob(job)}), nil
 }

@@ -302,6 +302,8 @@ func planningDryRun(r *http.Request) bool {
 		return m.GetValidateOnly()
 	case *adminv1.UpdateGroupRequest:
 		return m.GetDryRun()
+	case *adminv1.SetNodeSharingRequest:
+		return m.GetDryRun()
 	}
 	if x, ok := planningExtra[r.URL.Path]; ok {
 		return x.dry(m)
@@ -325,6 +327,8 @@ func planningRequest(path string) proto.Message {
 		return &adminv1.CreateInboundRequest{}
 	case adminv1connect.GroupServiceUpdateGroupProcedure:
 		return &adminv1.UpdateGroupRequest{}
+	case adminv1connect.GroupServiceSetNodeSharingProcedure:
+		return &adminv1.SetNodeSharingRequest{}
 	default:
 		if x, ok := planningExtra[path]; ok {
 			return x.message()

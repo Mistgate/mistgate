@@ -24,6 +24,7 @@ import (
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/edition"
+	"github.com/mistgate/mistgate/internal/panel/nodeshare"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -250,14 +251,14 @@ func pct(used, total uint64) float32 {
 
 // nodeMsg builds the Node message. protos, todayBytes, enabled and live are looked up by the caller once per
 // request.
-func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes, relayTodayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle, health store.NodeHealthSummary, d6 store.IPv6Doctor) *adminv1.Node {
+func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes, relayTodayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle, health store.NodeHealthSummary, d6 store.IPv6Doctor, share store.NodeShare) *adminv1.Node {
 	view := decodeLiveView(live)
 	st := f.statusOfLive(ctx, n, live, enabled, now, health)
 	out := &adminv1.Node{
 		Id: n.ID, Name: n.Name, CountryCode: n.CountryCode, Location: n.Location, Provider: n.Provider, Address: n.Address, Notes: n.Notes, PublicLabel: n.PublicLabel, LinkSealed: n.LinkSealed,
 		Status: st.status, Reason: st.reason, Protocols: protos, TrafficTodayBytes: todayBytes, RelayTodayBytes: relayTodayBytes, AgentVersion: n.AgentVersion,
 		LastSeenUnix: fleetUnix(live.LastSeenAt), AwgBackend: n.AwgBackend, TorrentBlockerEnabled: n.TorrentBlockerEnabled,
-		BandwidthMbps: uint32(n.BandwidthMbps), ClientIpv6: n.ClientIPv6,
+		BandwidthMbps: uint32(n.BandwidthMbps), ClientIpv6: n.ClientIPv6, Sharing: shareMsg(n, enabled, share, now),
 	}
 	caps := live.AgentCaps
 	out.TorrentBlockerSupported = store.CapabilityPresent(caps, capTorrentGuard)
@@ -456,9 +457,13 @@ func (s nodeService) ListNodes(ctx context.Context, req *connect.Request[adminv1
 	panelBundle, _ := f.panelDecoyBundle()
 	healthSummaries := f.healthSummaries(ctx)
 	d6 := f.ipv6Doctors(ctx)
+	shares, err := f.st.NodeShares(ctx)
+	if err != nil {
+		return nil, internalErr(f.log.Error, "node shares", err)
+	}
 	resp := &adminv1.ListNodesResponse{ExpectedAgentVersion: f.cfg.ExpectedAgentVersion}
 	for _, n := range nodes {
-		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], relayToday[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID], panelBundle, healthSummaries[n.ID], d6[n.ID]))
+		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], relayToday[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID], panelBundle, healthSummaries[n.ID], d6[n.ID], shares[n.ID]))
 	}
 	return connect.NewResponse(resp), nil
 }
@@ -543,7 +548,7 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	}
 	view := decodeLiveView(live)
 	panelBundle, _ := f.panelDecoyBundle()
-	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], relayToday[n.ID], enabled, now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))
+	resp.Node = f.nodeMsg(ctx, n, protos, today[n.ID], relayToday[n.ID], enabled, now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID), f.shareOf(ctx, n.ID))
 	if n.State == "pending" {
 		if exp, err := f.st.PendingEnrollmentExpiry(ctx, n.ID, now); err == nil {
 			resp.EnrollmentExpiresUnix = fleetUnix(exp)
@@ -720,6 +725,16 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 	now := f.now().UTC()
 	panelBundle, _ := f.panelDecoyBundle()
 	var newNode *store.NodeRow
+	share, err := nodeshare.Choice(m.Sharing)
+	switch {
+	case err != nil:
+		return nil, err
+	case m.NodeId != "" && share.Mode != "":
+		return nil, invalid("sharing is for a new node; set it on an existing one with SetNodeSharing")
+	}
+	if err := f.checkShareGroups(ctx, share); err != nil {
+		return nil, err
+	}
 	if m.NodeId == "" {
 		name := strings.ToLower(m.Name)
 		cc := strings.ToUpper(m.CountryCode)
@@ -733,7 +748,7 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 		case !validText(m.Location, maxNodeText) || !validText(m.Provider, maxNodeText):
 			return nil, invalid("location and provider must be plain text up to 100 characters")
 		}
-		newNode = &store.NodeRow{ID: store.NewID("nod_"), Name: name, Address: m.Address, CountryCode: cc, Location: m.Location, Provider: m.Provider}
+		newNode = &store.NodeRow{ID: store.NewID("nod_"), Name: name, Address: m.Address, CountryCode: cc, Location: m.Location, Provider: m.Provider, Share: share}
 		if panelBundle != nil {
 			newNode.DecoyMode = decoy.ModePanel
 		}
@@ -750,13 +765,17 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 	case err != nil:
 		return nil, internalErr(f.log.Error, "create enrollment", err)
 	}
-	f.audit(ctx, "node.create_enrollment", map[string]string{"node_id": n.ID, "name": n.Name}) // never the token
+	audit := map[string]string{"node_id": n.ID, "name": n.Name} // never the token
+	if newNode != nil {
+		f.auditShare(ctx, audit, n.ID, share)
+	}
+	f.audit(ctx, "node.create_enrollment", audit)
 	install := installCommand(f.cfg.PanelAddr, f.cfg.AgentSNI, f.ca.fingerprint, token)
 	if linkOnly {
 		install = linkInstallCommand(f.cfg.LinkURL, f.ca.fingerprint, token)
 	}
 	return connect.NewResponse(&adminv1.CreateEnrollmentResponse{
-		Node:           f.nodeMsg(ctx, n, nil, 0, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle, store.NodeHealthSummary{}, store.IPv6Doctor{}), // pending: no checks yet
+		Node:           f.nodeMsg(ctx, n, nil, 0, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle, store.NodeHealthSummary{}, store.IPv6Doctor{}, f.shareOf(ctx, n.ID)), // pending: no checks yet
 		InstallCommand: install,
 		CaFingerprint:  "sha256:" + f.ca.fingerprint,
 		ExpiresUnix:    now.Add(ttl).Unix(),
@@ -1101,7 +1120,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	relayToday, _ := f.st.RelayTodayBytesByNode(ctx, todayStart(now))
 	enabled, _ := f.st.FleetEnabledInbounds(ctx)
 	panelBundle, _ := f.panelDecoyBundle()
-	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], relayToday[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID))}), nil
+	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], relayToday[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID), f.shareOf(ctx, n.ID))}), nil
 }
 
 // nodeUpdateAudit is the audit record of an UpdateNode: the names of the fields the request carried and, for the
