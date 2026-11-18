@@ -143,13 +143,14 @@ type Agent struct {
 	awgKmodAttempted atomic.Bool
 	decoySite        *decoy.Site
 
-	// A new panel link address (panellink.go). meta.Link, meta.NextLink, meta.PrevLink, meta.PrevMTLS and cfg.LinkURL
-	// change at run time and are guarded by metaMu; the rest of meta is fixed at start.
+	// A new panel link address (panellink.go). meta.Link, meta.NextLink, meta.PrevLink, meta.PrevMTLS, meta.LinkSince and
+	// cfg.LinkURL change at run time and are guarded by metaMu; the rest of meta is fixed at start.
 	metaMu        sync.Mutex
-	triedNext     bool        // connectLoop only: the last session tried meta.NextLink
-	currentFailed bool        // connectLoop only: the last session over the current link did not establish
-	switchPending atomic.Bool // the current session ends to try a new panel link address
-	configLink    string      // cfg.LinkURL as configured, before agent.json's link replaced it: an mTLS agent's own link
+	triedNext     bool             // connectLoop only: the last session tried meta.NextLink
+	currentFailed bool             // connectLoop only: the last session over the current link did not establish
+	switchPending atomic.Bool      // the current session ends to try a new panel link address
+	configLink    string           // cfg.LinkURL as configured, before agent.json's link replaced it: an mTLS agent's own link
+	linkClock     func() time.Time // the clock of meta.LinkSince; nil = a.now (tests move it days ahead)
 
 	engines            map[string]engine.Engine
 	protocols          []string // sorted keys of engines
@@ -1320,7 +1321,7 @@ func (a *Agent) session(ctx context.Context) error {
 		}
 	}
 	if a.linkOnly() {
-		err := a.linkSession(ctx, a.dialLink)
+		err := a.linkSession(ctx, a.dialCurrentLink)
 		a.currentFailed = errors.Is(err, errLinkNotEstablished) && ctx.Err() == nil
 		return err
 	}
