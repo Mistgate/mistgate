@@ -34,7 +34,7 @@ import { ShellLayout } from "./shell";
 // <view> (the board's "Состояние"): hist (Разговоры) | empty (Начало) | think (Думает) | answer (Ответ и план) | done (Применено) | err (Ошибка) |
 //   off (Не подключён). <what> (a view may come with them: "empty.md"): md (the choice of the agent open) | seen-<provider> (its column in view: 1 Anthropic, 2 DeepSeek, 3 Z.ai, 4 Ollama
 //   Cloud, 5 custom) | bud (a provider's budget is spent) | d0 d2 (the depth, with md) | nopage (the page let go) | warn (a secret typed into the box) |
-//   busy (the plan waits for the confirmation) | tools (six calls, one failed, open) | row (the calls open to their input) | think-open (what the
+//   busy (the plan waits for the confirmation) | rej (the plan was turned down) | tools (six calls, one failed, open) | row (the calls open to their input) | think-open (what the
 //   model said between the calls) | long (a heading, a table, code) | fu (follow-ups) | cards (an opened page, a secret field) | install (the
 //   inline approval of a node install) | ask (a row of the list asks) | wipe (delete all asks) | hq (a search with no match) | none (no
 //   conversations).
@@ -150,7 +150,7 @@ export function messagesOf(view: View, mods: ReadonlySet<string>, say: Say, page
     case "think":
       return [q, msg({ ...base, text: "", tools: [{ ...digest, count: 4 }] as never, end: "", workedMs: undefined, t0: NOW * 1000 - 3000 } as never)];
     case "answer":
-      return [q, msg({ ...base, text: text(long || answerText(say)), interimEnd, plans: plan(PlanState.PROPOSED), end: "end" } as never)];
+      return [q, msg({ ...base, text: text(long || answerText(say)), interimEnd, plans: plan(mods.has("rej") ? PlanState.DISMISSED : PlanState.PROPOSED), end: "end" } as never)];
     case "done":
       return [q, msg({ ...base, text: text(long || answerText(say)), interimEnd, plans: plan(PlanState.APPLIED), end: "end" } as never)];
     case "err":
@@ -364,6 +364,7 @@ export const frames: Frame[] = [
   f("think-open", "answer.think-open", "What the model said between its calls"),
   f("long", "answer.long", "A long answer: a heading, a table, a list, code and a quote"),
   f("busy", "answer.busy", "The plan waits for the confirmation"),
+  f("rej", "answer.rej", "Отклонено: the card quiets down, the line says nothing was changed"),
   f("fu", "empty.fu", "Follow-ups: one answered, one missed, one waits"),
   f("cards", "empty.cards", "A page to open, a secure field, a remembered note"),
   f("install", "empty.install", "A node install: the owner confirms right under the card"),

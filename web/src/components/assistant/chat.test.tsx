@@ -180,7 +180,7 @@ describe("the assistant's chat", () => {
     });
     await mount();
     await send("Hello");
-    expect(text()).toContain("This month's budget for the provider is spent.");
+    expect(text()).toContain("Monthly budget used up");
   });
 
   it("sends the agent and the depth picked in the composer with the turn, and remembers them", async () => {
@@ -210,7 +210,8 @@ describe("the assistant's chat", () => {
     await click(tabs.find((r) => r.textContent?.includes("DeepSeek")));
     const model = document.querySelector("[role=option]")!;
     expect(model.textContent).toContain("deepseek-v4.1-flash");
-    expect(document.querySelector("[role=listbox]")?.textContent).toContain("$0.3 / $1.2");
+    // the price is under the model's row, not in the board's one-line note
+    expect(model.getAttribute("title")).toContain("$0.3 / $1.2");
     await click(model);
     await settle();
     // picking a model shuts the window; the depth is a slider of three places, the panel's own (Normal) first

@@ -205,9 +205,10 @@ function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, prob
 }
 
 /** Digits only (plus one dot for a non-integer); an empty box stays empty and the server names the problem. */
-export function NumberInput({ label, value, integer, invalid, describedBy, onChange, className }: { label: string; value: unknown; integer: boolean; invalid: boolean; describedBy?: string; onChange: (v: number | string) => void; className?: string }) {
+export function NumberInput({ label, value, integer, invalid, describedBy, onChange, className, masked }: { label: string; value: unknown; integer: boolean; invalid: boolean; describedBy?: string; onChange: (v: number | string) => void; className?: string; masked?: boolean }) {
   return (
     <input
+      type={masked ? "password" : undefined}
       aria-label={label}
       aria-invalid={invalid || undefined}
       aria-describedby={describedBy}

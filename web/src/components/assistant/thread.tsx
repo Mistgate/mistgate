@@ -87,7 +87,7 @@ function Header({ time, label }: { time: string; label?: ReactNode }) {
 export function Typing({ label, avatar = true }: { label: ReactNode; avatar?: boolean }) {
   const t = useT();
   return (
-    <div role="status" data-slot="typing" className="as-a">
+    <div role="status" data-slot="typing" className={cx("as-a", !avatar && "as-cont")}>
       {avatar && (
         <div className="as-ah">
           <Avatar />
@@ -277,18 +277,24 @@ function AssistantBubble({ m, first, running, owner, chat, onNavigate }: { m: Ms
 const mendable = new Set(["ai.err.budget_reached", "ai.err.bad_key", "ai.err.no_balance", "ai.err.no_provider", "ai.err.assistant_off"]);
 
 /** A trouble of the turn (.as-er): what happened, what to do about the budget, and the way to the settings for the owner. */
-function Trouble({ error, owner, onNavigate }: { error: string; owner: boolean; onNavigate: () => void }) {
+function Trouble({ error, owner, onNavigate, avatar }: { error: string; owner: boolean; onNavigate: () => void; avatar: boolean }) {
   const t = useT();
+  const fmt = useFmt();
+  const [now] = useState(() => Math.floor(Date.now() / 1000));
   const known = error.startsWith("ai.");
+  // the board draws it under the assistant's name line, indented as its words are (an answer already on screen has the line above it)
   return (
-    <div role="alert" data-slot="error" className="as-er">
-      <b>{known ? t(error as MessageKey) : error}</b>
-      {error === "ai.err.budget_reached" && <span>{t("as.err.budget")}</span>}
-      {owner && mendable.has(error) && (
-        <Link to="/ai" onClick={onNavigate} className={buttonClass("secondary", "md")}>
-          {t("as.err.go")}
-        </Link>
-      )}
+    <div data-slot="trouble" className="as-a">
+      {avatar && <Header time={fmt.clock(now)} />}
+      <div role="alert" data-slot="error" className="as-er">
+        <b>{error === "ai.err.budget_reached" ? t("as.err.budgetT") : known ? t(error as MessageKey) : error}</b>
+        {error === "ai.err.budget_reached" && <span>{t("as.err.budget")}</span>}
+        {owner && mendable.has(error) && (
+          <Link to="/ai" onClick={onNavigate} className={buttonClass("secondary", "md")}>
+            {t("as.err.go")}
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
@@ -332,7 +338,7 @@ export function Thread({ chat, owner, onNavigate }: { chat: ChatApi; owner: bool
         <PendingFollowUp key={f.id} f={f} tz={tz} onCancel={() => void chat.cancelFollowUp?.(f.id)} />
       ))}
       {typing && <Typing avatar={lastShown?.role !== ChatRole.ASSISTANT} label={openTool ? <CheckingLabel tool={openTool.tool} /> : t("ai.chat.typing")} />}
-      {chat.error && <Trouble error={chat.error} owner={owner} onNavigate={onNavigate} />}
+      {chat.error && <Trouble error={chat.error} owner={owner} onNavigate={onNavigate} avatar={lastShown?.role !== ChatRole.ASSISTANT} />}
     </>
   );
 }

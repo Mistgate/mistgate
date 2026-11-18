@@ -95,6 +95,14 @@ const depthIndex = (effort: number) => {
   return k < 0 ? 1 : k;
 };
 
+/** The line under the provider's name in the board: where it processes the data and whether it trains on it (the long text is on the AI page). */
+const shortNote: Partial<Record<AssistantProvider, MessageKey>> = {
+  [AssistantProvider.ANTHROPIC]: "as.pick.note.an",
+  [AssistantProvider.ZAI]: "as.pick.note.za",
+  [AssistantProvider.OLLAMA_CLOUD]: "as.pick.note.ol",
+  [AssistantProvider.DEEPSEEK]: "as.pick.note.ds",
+};
+
 type Tab = { id: number; name: string; connected: boolean; option?: Pick["options"][number]; dataKey?: MessageKey };
 
 /** What the left column lists: the connected providers as the panel orders them, then the built-in ones that have no key yet. */
@@ -164,7 +172,9 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen, disabled }: 
     (e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[tabs.indexOf(next)] ?? null)?.focus();
   };
 
-  const note = see ? (see.dataKey ? t(see.dataKey) : see.option?.url || "") : "";
+  const short = see ? shortNote[see.id as AssistantProvider] : undefined;
+  const note = see ? (short ? t(short) : see.dataKey ? t(see.dataKey) : see.option?.url || "") : "";
+  // the price is not on the board's note: it stays one line, and the price is under the model's row
   const price = see?.option && see.option.inUsd > 0 ? t("ai.prov.price", { in: money(see.option.inUsd), out: money(see.option.outUsd) }) : "";
   const mark = (id: number, url?: string) => (
     <span className="as-pv" aria-hidden>
@@ -194,7 +204,7 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen, disabled }: 
               ))}
             </div>
             <div className="as-m2m" role="listbox" aria-label={t("as.pick.model")}>
-              <p className="as-m2n">{[note, price].filter(Boolean).join(" · ")}</p>
+              <p className="as-m2n">{note}</p>
               {see?.option && (
                 <button
                   key={see.id}
@@ -202,6 +212,7 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen, disabled }: 
                   role="option"
                   aria-selected={see.id === pick.selectedProvider}
                   className="as-mo"
+                  title={price || undefined}
                   disabled={see.option.budgetReached}
                   onClick={() => {
                     pick.setProvider(see.option!.isDefault ? 0 : see.id);

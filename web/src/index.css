@@ -756,7 +756,7 @@
   }
 }
 .chat-word {
-  animation: mg-word-in 0.45s ease-out both;
+  animation: mg-word-in 0.4s var(--e) both;
 }
 @media (prefers-reduced-motion: reduce) {
   .chat-word {

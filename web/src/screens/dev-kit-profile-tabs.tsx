@@ -75,7 +75,8 @@ function fakeCalls(state: string) {
 /** The profile's data as a state of these tabs wants it: a server starting, an AmneziaWG status, a certificate about to end, a port of its own. */
 export function tabsData(data: PageData, state: string): PageData {
   const v = new Set(tokens(state));
-  const inbounds = data.inbounds.map((i, k) => {
+  // "free": the profile is on no node yet (an AmneziaWG one then has client networks it can still change)
+  const inbounds = (v.has("free") ? [] : data.inbounds).map((i, k) => {
     const o = { ...i } as Record<string, unknown>;
     if (v.has("apply") && k === 0) o.state = InboundState.PENDING;
     if (i.protocol === "awg") o.awg = { backend: k === 0 ? "userspace" : "kernel", backendVersion: "", ifaceUp: true, peers: k === 0 ? 12 : 2, peersHandshaken: 12, peersOnline: k === 0 ? 7 : 1, newestHandshakeUnix: NOW - (k === 0 ? 60 : 360), udpRxPackets: 100, unknownPeerEvents: 0, reportedUnix: NOW };

@@ -57,8 +57,8 @@ function usePageContext(): Context | null {
   return { kind: id ? (sectionKinds[section] ?? section) : section, id, label: id ? `${label} · ${id}` : label, route: path } as Context;
 }
 
-/** Example questions: the first five are the buttons of an empty chat, all of them are what the message box offers to finish. */
-const EXAMPLES = ["ai.chat.ex1", "ai.chat.ex2", "ai.chat.ex3", "ai.chat.ex4", "ai.chat.ex5", "ai.chat.ex6", "ai.chat.ex7", "ai.chat.ex8", "ai.chat.ex9"] as const;
+/** Example questions: the first five are the buttons of an empty chat (the board's: a question, a question, a change, a site, a template), all of them are what the message box offers to finish. */
+const EXAMPLES = ["ai.chat.ex1", "ai.chat.ex2", "ai.chat.ex3", "ai.chat.ex9", "ai.chat.ex10", "ai.chat.ex4", "ai.chat.ex5", "ai.chat.ex6", "ai.chat.ex7", "ai.chat.ex8"] as const;
 const SHOWN = 5;
 
 const phone = () => typeof matchMedia === "function" && matchMedia("(max-width: 720px)").matches;

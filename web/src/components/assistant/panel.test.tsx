@@ -291,7 +291,7 @@ describe("the picker and the slider by keyboard", () => {
 });
 
 describe("the reveal animation", () => {
-  it("brings the wave, the glints at the edge and the dotted halo only when it is on, and not with reduced motion", async () => {
+  it("brings the wave and the glints at the edge only when it is on, and not with reduced motion", async () => {
     access = on;
     await mount(<Window />);
     expect($(".as-wv")).toBeNull();

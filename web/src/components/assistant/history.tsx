@@ -7,7 +7,7 @@ import type { ListConversationsResponse } from "@/gen/mistgate/admin/v1/assistan
 import { assistantErrorKey } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
-import { useFmt } from "@/lib/format";
+import { dayLabel, useFmt } from "@/lib/format";
 import type { Plain } from "@/lib/plain";
 import { I } from "./as-icons";
 import { useScene } from "./scene";
@@ -96,7 +96,7 @@ export function History({ list, loaded, failed, query, onQuery, current, tz, onP
                         <span>{c.title || t("ai.conv.untitled")}</span>
                         {c.taskId && <span className="as-tm">{t("ai.conv.scheduled")}</span>}
                       </b>
-                      <span>{c.id === current ? t("as.hist.now") : fmt.ago(c.updatedUnix)}</span>
+                      <span title={fmt.ago(c.updatedUnix)}>{c.id === current ? t("as.hist.now") : g.key === "earlier" ? dayLabel(t, fmt, c.updatedUnix) : fmt.clock(c.updatedUnix)}</span>
                     </span>
                     <span className="as-h2">
                       {t.n("ai.conv.messages", c.messages)}

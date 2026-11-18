@@ -174,7 +174,7 @@ describe("AwgPanel score and remarks", () => {
   it("draws the server's remarks by code, with numbers; the port remark names the port and is not an alarm", async () => {
     const { el } = await mount(start, { warnings: [fe("mtu_headroom", { s4: "30", suggested_mtu: "1390" }), fe("preset_port", { preset: "quic", ports: "443" }), fe("h_lt5")], score: undefined });
     expect(el.textContent).toContain("S4 = 30 does not fit under 1500 at this MTU: data packets fragment. MTU 1390 fits.");
-    expect(el.textContent).toContain("QUIC traffic is normally on port 443.");
+    expect(el.textContent).toContain("QUIC traffic usually goes over port 443. On another port this look is more noticeable");
     expect(el.textContent).toContain(en["awg.warn.h_lt5"]);
     // two amber notices, the port line is plain text
     expect(el.querySelectorAll('[role="status"]')).toHaveLength(2);

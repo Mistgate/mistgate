@@ -103,3 +103,77 @@ describe("the scenes of the profile page's Settings tab", () => {
     expect(document.querySelector(".pp-form[inert]")).not.toBeNull();
   });
 });
+
+describe("the scenes of AmneziaWG's settings", () => {
+  const rows = (card: number) => [...document.querySelectorAll("section.pp-sec")].filter((s) => s.querySelector(".pp-sh"))[card];
+  it("aw1 is the board's three cards in the board's order, with the remarks, the score and the oldest clients", async () => {
+    await draw("aw1.settings");
+    const titles = [...document.querySelectorAll("section.pp-sec .pp-sh h3")].map((h) => h.textContent);
+    expect(titles.slice(0, 4)).toEqual(["Issues 2", "Basics", "Masquerade and bypass", "Network"]);
+    expect(titles.at(-1)).toBe("Apps");
+    // the remarks of the server have the board's buttons
+    const rm = [...document.querySelectorAll(".pp-rm")].map((r) => r.textContent);
+    expect(rm[0]).toContain("Keepalive 31 s is longer than the UDP timeout of many NATs");
+    expect(rm[0]).toContain("Set 25");
+    expect(rm[1]).toContain("DNS traffic usually goes over port 53");
+    expect(rm[1]).toContain("Port 53critical");
+    expect(document.querySelector(".pp-score")?.textContent).toBe("Disguise 88/100");
+    expect(document.querySelector(".pf-cl")?.textContent).toContain("AmneziaVPN 5.0.1.5");
+    expect(document.querySelector(".pr-fm")?.textContent).toContain("AmneziaVPN keys");
+    // the bar comes after the danger zone, as the board has it
+    const col = document.querySelector(".pp-grid > .col")!;
+    expect([...col.children].map((c) => (c.classList.contains("pf-save") ? "bar" : c.classList.contains("up-dz") ? "danger" : "")).filter(Boolean)).toEqual(["danger", "bar"]);
+    expect(document.querySelector(".up-dz .btn.up-del")?.textContent).toBe("Delete…");
+    expect(rows(1)).toBeTruthy();
+  });
+
+  it("the remarks' buttons put the numbers in the form: the keepalive 25, the look's port 53", async () => {
+    await draw("aw1.settings");
+    const act2 = async (el: Element | undefined) => {
+      await act(async () => (el as HTMLElement).click());
+      for (let i = 0; i < 6; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+    };
+    await act2([...document.querySelectorAll(".pp-rm .btn")].find((b) => b.textContent?.includes("Set 25")));
+    expect(document.querySelector(".pf-save.on")?.textContent).toContain("Changed 1");
+    // Why? opens the reason under the remark
+    await act2([...document.querySelectorAll(".pp-rm .an-lk")].find((b) => b.textContent === "Why?"));
+    expect(document.querySelector(".pp-rm em")?.textContent).toContain("Many NATs close a UDP connection sooner");
+  });
+
+  it("2.0 picks its card and says what it is for; the folds, the score and the oldest clients are 2.0's", async () => {
+    await draw("aw2.settings");
+    expect(document.querySelector("[data-k=version] [role=radio][aria-checked=true]")?.textContent).toContain("AmneziaWG 2.0");
+    expect(document.querySelector("[data-k=version] .pp-rmk")?.textContent).toContain("only for old clients");
+    expect(document.querySelector(".pp-score")?.className).toContain("part");
+    expect(document.querySelector(".pf-cl")?.textContent).toContain("AmneziaVPN 4.8.12.9");
+  });
+
+  it.each([
+    ["aw1.settings.score", () => expect(document.querySelector(".pp-scb h3")?.textContent).toBe("What the score is made of")],
+    ["aw1.settings.adv", () => expect(document.querySelectorAll(".pp-hgr").length).toBe(5)],
+    ["aw1.settings.adv.show", () => expect((document.querySelector("[data-k='obfuscation.jc'] input") as HTMLInputElement).value).toBe("5")],
+    ["aw1.settings.adv.conf", () => expect(document.querySelector(".pf-conf textarea")).not.toBeNull()],
+    ["aw1.settings.net", () => expect(document.querySelectorAll(".pf-lock").length).toBe(2)],
+    ["aw1.settings.net.free", () => expect(document.querySelectorAll("[data-k=subnets] input").length).toBe(2)],
+    ["aw1.settings.warp", () => expect(document.querySelector("[data-k=egress] .pp-twin")?.textContent).toBe("Make a copy without WARP…")],
+  ])("%s says what it is made to say", async (state, check) => {
+    await draw(state);
+    check();
+    expect(body()).not.toContain("undefined");
+  });
+
+  it.each(["ru", "zh", "fa", "tr"] as const)("the three cards, the folds and the score draw in %s with no key left bare", async (lang) => {
+    setLang(lang);
+    await draw("aw1.settings.score.adv.net.show");
+    expect(document.querySelectorAll(".pp-hgr").length).toBe(5);
+    expect(body()).not.toMatch(/\b(awg|pf|profiles)\.[a-z]+\./);
+    expect(body()).not.toContain("undefined");
+  });
+
+  it("an observer reads the cards: no Random port that works, the bar and the danger zone are gone", async () => {
+    await draw("aw1.settings", Role.READONLY);
+    expect(document.querySelector(".pf-save")).toBeNull();
+    expect(document.querySelector(".pp-form[inert]")).not.toBeNull();
+    expect(document.querySelector(".pp-rm .btn")).toBeNull();
+  });
+});

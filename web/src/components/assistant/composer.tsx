@@ -145,7 +145,8 @@ export function Composer({
             <i aria-hidden />
           </button>
         ) : (
-          <button type="button" className="as-go" aria-label={t("ai.chat.send")} title={t("ai.chat.send")} disabled={off || !text.trim()} onClick={onSubmit}>
+          // the board draws the button the same whatever the box holds: an empty box sends nothing and takes the cursor instead
+          <button type="button" className="as-go" aria-label={t("ai.chat.send")} title={t("ai.chat.send")} aria-disabled={off || !text.trim() || undefined} onClick={() => (off ? undefined : text.trim() ? onSubmit() : area.current?.focus())}>
             <I g="send" />
           </button>
         )}

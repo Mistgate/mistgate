@@ -1,0 +1,391 @@
+/*
+ * AmneziaWG's cards of the profile page (screens/profiles/awg-settings.tsx): the rules of pn.css the page's other protocols do not need, under .pf and with
+ * the product's tokens (--accent is the fill, --accent-text the text, --border the hairline). The numbers in the comments are the board's lines (pn.css).
+ */
+/* L31-33 the button that does the card's main thing */
+.pf .btn.pri {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--ink-on-accent);
+}
+.pf .btn.pri:hover {
+  background: color-mix(in srgb, var(--accent) 88%, #fff);
+}
+/* L2502-2506 the round mark of a card that is picked */
+.pf .nx-rad {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--text) 30%, transparent);
+  transition: border-color 0.15s var(--e);
+}
+.pf .nx-rad i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-mark);
+  transform: scale(0);
+  transition: transform 0.25s var(--as-spring, cubic-bezier(0.3, 1.5, 0.5, 1));
+}
+.pf .nx-rad[aria-checked="true"] {
+  border-color: var(--accent-mark);
+}
+.pf .nx-rad[aria-checked="true"] i {
+  transform: scale(1);
+}
+.pf .nx-rad:hover {
+  border-color: var(--text);
+}
+/* L4282-4287, L4624 the version's cards */
+.pf .pf-opt {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.pf .pf-opt > button {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  text-align: start;
+  transition: border-color 0.15s var(--e), background-color 0.15s var(--e);
+}
+.pf .pf-opt > button:hover {
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.pf .pf-opt > button[aria-checked="true"] {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.pf .pf-opt > button:disabled {
+  cursor: default;
+}
+.pf .pf-opt .nx-rad {
+  margin-top: 2px;
+}
+.pf .pf-opt b {
+  display: block;
+  font-weight: 500;
+}
+.pf .pf-opt div > span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+/* L4788-4792 the looks of the first packets */
+.pf .pp-pc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pf .pp-pc > button {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 14px;
+  color: var(--sec);
+  white-space: nowrap;
+  transition: border-color 0.15s var(--e), background-color 0.15s var(--e), color 0.15s var(--e);
+}
+.pf .pp-pc > button:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 26%, transparent);
+}
+.pf .pp-pc > button[aria-checked="true"] {
+  border-color: var(--accent-mark);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--text);
+  font-weight: 500;
+}
+.pf .pp-pc > button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+/* L4631-4634 the score in the card's head and what it is made of */
+.pf .pp-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  background: var(--step);
+  font-size: 12px;
+  color: var(--sec);
+  white-space: nowrap;
+}
+.pf .pp-score b {
+  font-weight: 500;
+}
+.pf .pp-score.ok {
+  background: var(--tone-mint-bg);
+  color: var(--accent-text);
+}
+.pf .pp-score.part {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+.pf .pp-score.bad {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+.pf .pp-sci {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.pf .pp-sci b {
+  font-weight: 500;
+}
+.pf .pp-sci b.ok {
+  color: var(--accent-text);
+}
+.pf .pp-sci b.part {
+  color: var(--warning-text);
+}
+.pf .pp-scb .pp-sh {
+  justify-content: space-between;
+}
+/* L4729-4740 the fold's head: the text, then what is in it (critical, changed) as a small tag */
+.pf .pp-advh > span {
+  flex: none;
+}
+.pf .pp-advh > .t {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pf .pp-advh > em {
+  flex: none;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+.pf .pp-adv.has > .pp-advh > em {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 7px;
+  background: var(--step);
+}
+.pf .pp-adv.has.ch > .pp-advh > em {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+/* L4643, L4652 the line over the block of the fold and its foot */
+.pf .pp-advt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pf .pp-advf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pf .pp-advg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* L4428-4430 the box that takes a client's .conf */
+.pf .pf-conf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: pn-up 0.2s var(--e) both;
+}
+.pf .pf-conf textarea {
+  height: auto;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 18px;
+  resize: vertical;
+}
+.pf .pf-conf > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.pf .pf-conf > small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.pf .pf-conf-r {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 16px;
+}
+/* L4416-4418 a value that is kept (the client networks of a profile on a node) */
+.pf .pf-lock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  font-size: 14px;
+  color: var(--sec);
+}
+.pf .pf-lock svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+  flex: none;
+}
+.pf .pf-nets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* L4623 a link under a control */
+.pf .pp-twin {
+  align-self: flex-start;
+  font-size: 13px;
+}
+.pf .pp-twin:disabled,
+.pf .pp-twin[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+/* L3947, L4419-4422 the oldest clients, in the right column */
+.pf .pr-l {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pf .pr-l b {
+  font-weight: 500;
+  color: var(--sec);
+}
+.pf .pp-as .pr-l {
+  margin-top: 8px;
+}
+.pf .pf-cl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pf .pf-cl > span {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--step);
+  font-size: 13px;
+  color: var(--sec);
+}
+@media (max-width: 720px) {
+  .pf .pf-opt {
+    grid-template-columns: 1fr;
+  }
+  .pf .pp-sci {
+    padding: 0 16px;
+  }
+  .pf .pf-dz {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0 16px 16px;
+  }
+}
+/* the list of built-in domains is the box's suggestions: the arrow Chrome puts in a box that has one would eat the width of the placeholder */
+.pf .pf-ib > input[list]::-webkit-calendar-picker-indicator {
+  display: none !important;
+}
+/* L4645-4651 the block's groups: a title, then cards of three in a row, each a label over its value */
+.pf .pp-hgr {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pf .pp-hgr > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.pf .pp-hgr label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  min-width: 0;
+  cursor: text;
+  transition: border-color 0.15s var(--e);
+}
+.pf .pp-hgr label:focus-within {
+  border-color: var(--accent-line);
+}
+.pf .pp-hgr label > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--muted);
+}
+.pf .pp-hgr label > input,
+.pf .pp-hgr label > b,
+.pf .pp-hgr label > .pp-sw {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--text);
+  text-align: start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pf .pp-hgr label > input::placeholder {
+  color: var(--text);
+}
+.pf .pp-hgr label.ch {
+  border-color: var(--accent-line);
+}
+.pf .pp-hgr label.err {
+  border-color: color-mix(in srgb, var(--danger) 60%, var(--border));
+}
+.pf .pp-hgr .pp-sw {
+  cursor: pointer;
+}
+@media (max-width: 720px) {
+  .pf .pp-hgr > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.pf .pp-hgr label.flash {
+  animation: pp-flash 1.4s var(--e);
+}

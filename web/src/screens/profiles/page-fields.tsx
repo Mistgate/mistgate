@@ -108,7 +108,9 @@ export function PageFields({ protocol, groups, settings, base, problems, onChang
   );
 }
 
-function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, problems, onChange }: { protocol: string; f: Field; t: Tx; settings: Settings; locked: boolean; offers?: Props["offers"]; extra?: ReactNode; dirty: boolean; problems: Problem[]; onChange: (path: string[], value: unknown) => void }) {
+/** One row of a protocol's form, from the schema's field: its label, hint, control and problems. `after` sits in the box's line (a "Random port" button), `below` under the control,
+ *  `masked` shows a typed value as dots (the board hides the block of AmneziaWG's keys until "Show values"). */
+export function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, problems, onChange, after, below, masked }: { protocol: string; f: Field; t: Tx; settings: Settings; locked: boolean; offers?: Props["offers"]; extra?: ReactNode; dirty: boolean; problems: Problem[]; onChange: (path: string[], value: unknown) => void; after?: ReactNode; below?: ReactNode; masked?: boolean }) {
   const copy = (part: string) => t.opt(`profiles.f.${protocol}.${f.id}.${part}`);
   const label = copy("title") ?? f.title;
   const hint = copy("hint") ?? f.hint;
@@ -140,9 +142,10 @@ function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, prob
     }
     case "number":
       control = (
-        <div className="pf-ib pp-short">
-          <NumberInput label={label} value={getAt(settings, f.path)} integer={f.integer} invalid={invalid} describedBy={describedBy} onChange={(v) => onChange(f.path, v)} className="an-i mono" />
+        <div className={cx("pf-ib", !after && "pp-short")}>
+          <NumberInput label={label} value={getAt(settings, f.path)} integer={f.integer} invalid={invalid} describedBy={describedBy} masked={masked} onChange={(v) => onChange(f.path, v)} className="an-i mono" />
           {unit && <em>{unit}</em>}
+          {after}
         </div>
       );
       break;
@@ -163,8 +166,9 @@ function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, prob
       control = <SecretField label={label} value={getAt(settings, f.path)} invalid={invalid} t={t} make={() => makeSecret(f)} onChange={(v) => onChange(f.path, v)} />;
       break;
     case "text":
-      control = (
+      const box = (
         <input
+          type={masked ? "password" : "text"}
           aria-label={label}
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
@@ -176,6 +180,14 @@ function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, prob
           onChange={(e) => onChange(f.path, e.target.value)}
           className="an-i mono"
         />
+      );
+      control = unit ? (
+        <div className="pf-ib pp-short">
+          {box}
+          <em>{unit}</em>
+        </div>
+      ) : (
+        box
       );
       break;
     case "list":
@@ -199,6 +211,7 @@ function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, prob
       </div>
       <div className="pp-ct">
         {control}
+        {below}
         {shown.length > 0 && (
           <span id={errId} className="pp-fes">
             {shown.map((p, i) => (
