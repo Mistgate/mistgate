@@ -24,7 +24,7 @@ import {
   type Approvals,
 } from "@/lib/integrations";
 import { ApprovalCard as InstallCard } from "@/screens/integrations/approvals";
-import { Empty, Gl, ICONS, Pill, Sec, type Kind } from "./bits";
+import { Empty, Gl, ICONS, Pill, Sec, useFresh, useScene, type Kind } from "./bits";
 
 // What an agent asked for and waits on the owner for, and what was decided lately, as the board draws them (PnAI "Ждут вас"): one card per
 // change with the time left, the facts in the panel's words, the agent's reason apart, and Reject / Approve (Approve asks for a passkey or
@@ -184,6 +184,9 @@ function Recent({ data }: { data: Approvals }) {
   const fmt = useFmt();
   const paging = usePaging({ sizes: [pageSize], defaultSize: pageSize });
   const rows = data.approvals.filter((a) => a.state !== ApprovalState.AWAITING);
+  // the row that has just been decided flashes once (the board's "just"); a scene of the dev kit opens with it flashing
+  const scene = useScene();
+  const fresh = useFresh(rows.map((a) => a.id)) || (scene.has("done") || scene.has("denied") ? (rows[0]?.id ?? "") : "");
   if (rows.length === 0) return null;
   const page = clampPage(paging.page, rows.length, pageSize);
   const shown = rows.slice((page - 1) * pageSize, page * pageSize);
@@ -197,7 +200,7 @@ function Recent({ data }: { data: Approvals }) {
           const said = outcomeText(t, fmt, a);
           const res = a.error ? (said ?? a.error) : (said ?? a.result);
           return (
-            <div key={a.id} className="ai-rec">
+            <div key={a.id} className={cx("ai-rec", a.id === fresh && "fresh")}>
               <div>
                 <b>{toolTitle(t, a.tool)}</b>
                 <em>{[a.tokenName, a.decidedByName ? t("int.ap.decidedBy", { name: a.decidedByName }) : "", fmt.ago(at)].filter(Boolean).join(" · ")}</em>

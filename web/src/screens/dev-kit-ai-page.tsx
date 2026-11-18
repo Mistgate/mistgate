@@ -36,7 +36,7 @@ import { ShellLayout } from "./shell";
 //   "Токены": empty | nocopy; "Одобрение": soon | exp | none; and what is open — as: dd-chat | dd-fall | dlg-connect-<p> | dlg-replace-<p> |
 //   dlg-remove-<p> | keyerr | keyfilled | open-<p> | shut-<p> | dirty (<p>: anthropic | deepseek | zai | ollama | custom1); mem: new-note | edit-note |
 //   ask-note | fresh-note | dlg-forget | ask-conv | dlg-wipe; tk: runs | running | ask-task | dlg-task | dlg-task-as | dlg-task-edit | tried; mcp: dlg-tok |
-//   op | tried | dlg-secret | dlg-rev | dlg-lim | old; ap: install | many; any: edge (the Cloudflare edition).
+//   op | tried | dlg-secret | dlg-rev | dlg-lim | old; ap: install | many | done | denied; any: edge (the Cloudflare edition).
 // Made-up data of the board: the nodes de1, nl1, fi1 and msk1, the admin "owner", documentation addresses and not-a-real-token secrets.
 
 export type Tab = "as" | "mem" | "tk" | "mcp" | "ap";
@@ -184,7 +184,7 @@ const plan = (id: string, tool: string, state: ApprovalState, over: Record<strin
 
 export function approvalsData(mods: ReadonlySet<string>) {
   const expiresUnix = mods.has("soon") ? NOW + 48 : mods.has("exp") ? NOW - 1 : NOW + 417;
-  const waiting = !mods.has("none") && !mods.has("empty");
+  const waiting = !mods.has("none") && !mods.has("empty") && !mods.has("done") && !mods.has("denied");
   const list = [
     ...(waiting && mods.has("install")
       ? [plan("pln_in", "node_install", ApprovalState.AWAITING, { facts: [fact("host", "203.0.113.9"), fact("host_key", "SHA256:Qm9y3xk2Jv0eVwUQxk1v2Tn8sY4GmR7pL5dXc1aF0hE"), fact("host_key_algorithm", "ssh-ed25519")], expiresUnix, createdUnix: expiresUnix - 420 })]
@@ -197,6 +197,12 @@ export function approvalsData(mods: ReadonlySet<string>) {
               createdUnix: expiresUnix - 420,
             }),
           ]
+        : []),
+    // "Одобрено" / "Отклонено" of the board: the change that waited has just been decided and is the top of the history
+    ...(mods.has("done")
+      ? [plan("pln_1", "node_fix", ApprovalState.APPLIED, { facts: [fact("node", "de1", { untrusted: true })], decidedByName: "owner", decidedUnix: NOW, appliedUnix: NOW, result: "journal 3870 MB to 500 MB", createdUnix: NOW - 100 })]
+      : mods.has("denied")
+        ? [plan("pln_1", "node_fix", ApprovalState.REJECTED, { decidedByName: "owner", decidedUnix: NOW, createdUnix: NOW - 100 })]
         : []),
     plan("pln_h1", "alert_mute", ApprovalState.APPLIED, { decidedByName: "owner", decidedUnix: NOW - 4 * H, appliedUnix: NOW - 4 * H, result: "muted for 6 h", createdUnix: NOW - 4 * H - 120 }),
     plan("pln_h2", "rollout_start", ApprovalState.APPLIED, { decidedByName: "owner", decidedUnix: NOW - 4 * H, appliedUnix: NOW - 4 * H, result: "rollout rol_1 started", createdUnix: NOW - 4 * H - 200 }),
@@ -444,6 +450,8 @@ export const frames: Frame[] = [
   f("ap-soon", "ap.soon", "Under a minute left: amber", 1440, 1300),
   f("ap-exp", "ap.exp", "The request ran out", 1440, 800),
   f("ap-none", "ap.none", "Nothing waits", 1440, 800),
+  f("ap-done", "ap.done", "Approved: the card gives way to the answer, the history gets the new row", 1440, 1300),
+  f("ap-denied", "ap.denied", "Rejected: nothing waits, the history gets the new row", 1440, 1300),
   f("ap-install", "ap.install", "A node install: the host key and the login (the Integrations card)", 1440, 1500),
   f("ap-many", "ap.many", "A long history: a pager", 1440, 1500),
   f("ap-load", "ap.load", "Loading", 1440, 700),

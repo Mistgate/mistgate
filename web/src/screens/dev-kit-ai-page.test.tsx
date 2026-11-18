@@ -119,15 +119,15 @@ describe("what a scene shows", () => {
 
   it("the assistant: the three trouble banners are the board's", async () => {
     await draw("as.bud");
-    expect($(".rc-pb.bad")?.textContent).toContain("The monthly budget is spent");
+    expect($(".rc-pb.bad")?.textContent).toContain("Monthly budget used up");
     expect(all(".rc-pb button").map((b) => b.textContent)).toEqual(["Raise to $40"]);
     await clear();
     await draw("as.key");
     expect($(".rc-pb.bad")?.textContent).toContain("Anthropic did not accept the key");
-    expect($(".ai-prov.bad")?.textContent).toContain("Key not accepted");
+    expect($(".ai-prov.bad")?.textContent).toContain("Key rejected");
     await clear();
     await draw("as.noprov");
-    expect($(".ai-np")?.textContent).toContain("No provider is connected");
+    expect($(".ai-np")?.textContent).toContain("No provider connected");
     expect($(".ai-body")).not.toBeNull();
     await clear();
     await draw("as.off");
@@ -177,17 +177,25 @@ describe("what a scene shows", () => {
     expect(body()).toContain("Request expired");
     await clear();
     await draw("ap.none");
-    expect(body()).toContain("Nothing is waiting");
+    expect(body()).toContain("Nothing waiting");
+    await clear();
+    await draw("ap.done");
+    expect($(".ai-ap")).toBeNull();
+    expect(all(".ai-rec")).toHaveLength(6);
+    expect($(".ai-rec.fresh")?.textContent).toContain("Done");
+    await clear();
+    await draw("ap.denied");
+    expect($(".ai-rec.fresh")?.textContent).toContain("Rejected");
   });
 
   it("the summary under the title follows what waits", async () => {
     await draw("ap");
     expect($(".sb-h p")?.textContent).toBe("1 change is waiting for your decision");
     await clear();
-    await draw("as");
-    expect($(".sb-h p")?.textContent).toContain("Assistant is on");
+    await draw("as.none");
+    expect($(".sb-h p")?.textContent).toBe("Assistant is on · nothing awaits a decision");
     await clear();
-    await draw("as.off.ap.none".replace("ap.", ""));
+    await draw("as.off.none");
     expect($(".sb-h p")?.textContent).toBe("Assistant is off");
   });
 });
