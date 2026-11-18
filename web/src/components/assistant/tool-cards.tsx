@@ -160,18 +160,18 @@ export function ToolRow({ tool }: { tool: LiveTool }) {
   return (
     <div data-slot="tool" data-state={state} data-open={open || undefined} className="as-tr">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="as-trh">
-        <Icon name={toolIcon(tool.tool)} size={16} className="i" />
+        <Icon name={toolIcon(tool.tool)} size={16} className="as-i" />
         <b>{toolLabel(t, tool.tool)}</b>
         <span className="as-tra">
           {chips.map((c) => (
-            <span key={c} dir="auto" className="tag mono">
+            <span key={c} dir="auto" className="as-tag as-mn">
               {c}
             </span>
           ))}
           {bad && <span className="as-te">{tool.error}</span>}
         </span>
         <State tool={tool} />
-        <I g="chev" />
+        <I g="chev" className="as-cv" />
       </button>
       <Collapse open={open}>
         <div className="as-trd">
@@ -267,7 +267,7 @@ export function Thinking({ m, running, interim }: { m: LiveMsg; running: boolean
   const label = (
     <>
       {before}
-      <b className="mono">{secs}</b>
+      <b className="as-mn">{secs}</b>
       {after}
     </>
   );

@@ -176,7 +176,7 @@ function wordSpans(text: string, key: string): ReactNode[] {
 function EntityChip({ e, label, onNavigate }: { e: ChatEntity; label: string; onNavigate?: () => void }) {
   return (
     <Link to="/nodes/$id" params={{ id: e.id }} onClick={onNavigate} data-entity="node" className="as-nc">
-      <i aria-hidden className={cx("dot", e.dot !== "ok" && e.dot)} />
+      <i aria-hidden className={cx("as-dt", e.dot !== "ok" && e.dot)} />
       {label}
       <I g="out" flip />
     </Link>

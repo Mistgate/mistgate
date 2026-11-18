@@ -27,9 +27,9 @@ export const P = {
 export type Glyph = keyof typeof P;
 
 /** One glyph of the window. `flip` turns it over in right-to-left (an arrow that points the way of reading). */
-export function I({ g, flip }: { g: Glyph; flip?: boolean }) {
+export function I({ g, flip, className }: { g: Glyph; flip?: boolean; className?: string }) {
   return (
-    <svg className="i" viewBox="0 0 24 24" aria-hidden data-flip={flip ? "" : undefined}>
+    <svg className={className ? `as-i ${className}` : "as-i"} width={16} height={16} viewBox="0 0 24 24" aria-hidden data-flip={flip ? "" : undefined}>
       <path d={P[g]} />
     </svg>
   );

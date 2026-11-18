@@ -77,7 +77,7 @@ function Header({ time, label }: { time: string; label?: ReactNode }) {
       <Avatar />
       <b>{t("ai.chat.title")}</b>
       {label}
-      {time && <span className="mono">{time}</span>}
+      {time && <span className="as-mn">{time}</span>}
     </div>
   );
 }
@@ -213,7 +213,7 @@ function UserBubble({ m }: { m: Msg }) {
       {/* a scheduled task's run (internal/panel/assistant/scheduled.go) names its task and when it ran, not a page */}
       {m.context?.label && <span className="as-mt">{m.context.kind === "task" ? t("ai.chat.scheduledRun", { label: m.context.label, time: fmt.stamp(m.createdUnix) }) : t("ai.chat.page", { label: m.context.label })}</span>}
       <div className="as-u">{m.text}</div>
-      {m.createdUnix > 0 && <span className="as-mt mono">{fmt.clock(m.createdUnix)}</span>}
+      {m.createdUnix > 0 && <span className="as-mt as-mn">{fmt.clock(m.createdUnix)}</span>}
     </div>
   );
 }

@@ -86,7 +86,7 @@ export function Composer({
     <div className="as-in">
       {context && attached && (
         <div className="as-cr">
-          <span className="tag as-cx">
+          <span className="as-tag as-cx">
             <I g="link" />
             <span>{t("ai.chat.page", { label: context.label })}</span>
             <button type="button" aria-label={t("ai.chat.unpage")} title={t("ai.chat.unpage")} onClick={() => onAttach(false)}>

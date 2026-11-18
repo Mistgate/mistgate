@@ -101,7 +101,7 @@ export function History({ list, loaded, failed, query, onQuery, current, tz, onP
                       {due(c) > 0 && <> · {t("ai.conv.followUp", { time: fmt.stampAt(due(c), tz) })}</>}
                     </span>
                   </button>
-                  <button type="button" className="ic as-hx" aria-label={t("as.hist.del")} title={t("as.hist.del")} onClick={() => setAsking(c.id)}>
+                  <button type="button" className="as-ic as-hx" aria-label={t("as.hist.del")} title={t("as.hist.del")} onClick={() => setAsking(c.id)}>
                     <I g="trash" />
                   </button>
                 </div>

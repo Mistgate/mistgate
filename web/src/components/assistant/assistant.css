@@ -143,12 +143,12 @@
 .as p {
   margin: 0;
 }
-.as .mono {
+.as-mn {
   font-family: var(--font-mono);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
-.as .i {
+.as-i {
   display: block;
   width: 16px;
   height: 16px;
@@ -159,24 +159,24 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.as .i:dir(rtl)[data-flip] {
+.as-i:dir(rtl)[data-flip] {
   transform: scaleX(-1);
 }
-.as .dot,
-.as-nc .dot {
+.as-dt,
+.as-nc .as-dt {
   flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--ok);
 }
-.as .dot.warn,
-.as-nc .dot.warn { background: var(--warning); }
-.as .dot.bad,
-.as-nc .dot.bad { background: var(--danger); }
-.as .dot.off,
-.as-nc .dot.off { background: var(--faint); }
-.as .tag {
+.as-dt.warn,
+.as-nc .as-dt.warn { background: var(--warning); }
+.as-dt.bad,
+.as-nc .as-dt.bad { background: var(--danger); }
+.as-dt.off,
+.as-nc .as-dt.off { background: var(--faint); }
+.as-tag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -189,8 +189,8 @@
   background: var(--step);
   color: var(--sec);
 }
-/* the header's and the list's round-cornered icon buttons (.ic, L79) */
-.as .ic {
+/* the header's and the list's round-cornered icon buttons (.as-ic, L79) */
+.as-ic {
   display: grid;
   place-items: center;
   width: 40px;
@@ -201,21 +201,21 @@
   text-decoration: none;
   transition: background-color 0.15s var(--e), color 0.15s var(--e);
 }
-.as .ic:hover {
+.as-ic:hover {
   background: var(--step);
   color: var(--text);
 }
 /* a text link (.an-lk, L769) */
-.as .as-lk {
+.as-lk {
   color: var(--text);
   text-decoration: underline;
   text-decoration-color: var(--border);
   text-underline-offset: 4px;
 }
-.as .as-lk:hover {
+.as-lk:hover {
   text-decoration-color: currentColor;
 }
-.as .as-sp {
+.as-sp {
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -330,7 +330,7 @@
   padding-inline: 16px 8px;
   border-bottom: 1px solid var(--border);
 }
-.as-h .ic[aria-pressed="true"] {
+.as-h .as-ic[aria-pressed="true"] {
   background: var(--step);
   color: var(--text);
 }
@@ -358,7 +358,7 @@
   font-size: 15px;
   font-weight: 500;
 }
-.as-ht .mono {
+.as-ht .as-mn {
   font-size: 11px;
   line-height: 16px;
   font-weight: 400;
@@ -452,7 +452,7 @@
   background: var(--tone-mint-bg);
   color: var(--accent-mark);
 }
-.as-eo .i {
+.as-eo .as-i {
   width: 22px;
   height: 22px;
 }
@@ -494,7 +494,7 @@
   text-align: start;
   transition: border-color 0.15s var(--e), background-color 0.15s var(--e), transform 0.15s var(--e);
 }
-.as-sg button .i {
+.as-sg button .as-i {
   color: var(--muted);
   transition: transform 0.2s var(--e), color 0.15s var(--e);
 }
@@ -502,11 +502,11 @@
   border-color: var(--accent-line);
   background: var(--accent-soft);
 }
-.as-sg button:hover .i {
+.as-sg button:hover .as-i {
   color: var(--accent-mark);
   transform: translate(2px, -2px);
 }
-.as-sg button:dir(rtl):hover .i {
+.as-sg button:dir(rtl):hover .as-i {
   transform: translate(-2px, -2px) scaleX(-1);
 }
 .as-sg button:active {
@@ -587,7 +587,7 @@
 .as-ah b {
   font-weight: 500;
 }
-.as-ah .mono {
+.as-ah .as-mn {
   font-size: 11px;
   font-weight: 400;
   color: var(--muted);
@@ -620,13 +620,13 @@ button.as-rs {
 button.as-rs:hover {
   color: var(--text);
 }
-button.as-rs .i {
+button.as-rs .as-i {
   width: 12px;
   height: 12px;
   color: var(--muted);
   transition: transform 0.25s var(--e);
 }
-button.as-rs[aria-expanded="true"] .i {
+button.as-rs[aria-expanded="true"] .as-i {
   transform: rotate(180deg);
 }
 .as-thought {
@@ -723,7 +723,7 @@ button.as-rs[aria-expanded="true"] .i {
 .as-trh:hover {
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
-.as-trh > .i {
+.as-trh > .as-i {
   color: var(--muted);
 }
 .as-trh b {
@@ -736,7 +736,7 @@ button.as-rs[aria-expanded="true"] .i {
   gap: 6px;
   overflow: hidden;
 }
-.as-tr .tag {
+.as-tr .as-tag {
   height: 20px;
   font-size: 11px;
   max-width: 9rem;
@@ -815,7 +815,7 @@ button.as-rs[aria-expanded="true"] .i {
   flex: none;
   color: var(--accent-text);
 }
-.as-ts .i {
+.as-ts .as-i {
   width: 14px;
   height: 14px;
   stroke-width: 2;
@@ -836,7 +836,7 @@ button.as-rs[aria-expanded="true"] .i {
 .as-ts.now::before {
   opacity: 1;
 }
-.as-ts.done .i {
+.as-ts.done .as-i {
   opacity: 1;
   stroke-dasharray: 24;
   stroke-dashoffset: 24;
@@ -845,7 +845,7 @@ button.as-rs[aria-expanded="true"] .i {
 .as-ts.bad {
   color: var(--danger);
 }
-.as-ts.bad .i {
+.as-ts.bad .as-i {
   opacity: 1;
 }
 
@@ -1034,11 +1034,11 @@ button.as-rs[aria-expanded="true"] .i {
   cursor: pointer;
   transition: background-color 0.15s var(--e), border-color 0.15s var(--e), color 0.15s var(--e), transform 0.15s var(--as-spring, cubic-bezier(0.3, 1.5, 0.5, 1));
 }
-.as-nc .dot {
+.as-nc .as-dt {
   width: 6px;
   height: 6px;
 }
-.as-nc .i {
+.as-nc .as-i {
   width: 0;
   height: 10px;
   margin-inline-start: 0;
@@ -1053,8 +1053,8 @@ button.as-rs[aria-expanded="true"] .i {
   color: var(--text);
   transform: translateY(-1px);
 }
-.as-nc:hover .i,
-.as-nc:focus-visible .i {
+.as-nc:hover .as-i,
+.as-nc:focus-visible .as-i {
   width: 10px;
   margin-inline-start: -2px;
   opacity: 1;
@@ -1090,7 +1090,7 @@ button.as-rs[aria-expanded="true"] .i {
   font-size: 12px;
   color: var(--muted);
 }
-.as-plh .mono {
+.as-plh .as-mn {
   font-size: 11px;
   font-weight: 400;
   white-space: nowrap;
@@ -1118,7 +1118,7 @@ button.as-rs[aria-expanded="true"] .i {
 .as-pl li {
   display: contents;
 }
-.as-pl li .mono {
+.as-pl li .as-mn {
   font-size: 12px;
   color: var(--text);
   overflow-wrap: anywhere;
@@ -1143,7 +1143,7 @@ button.as-rs[aria-expanded="true"] .i {
   font-size: 13px;
   color: var(--warning-text);
 }
-.as-w .i {
+.as-w .as-i {
   margin-top: 2px;
 }
 .as-pa {
@@ -1226,7 +1226,7 @@ button.as-rs[aria-expanded="true"] .i {
   text-align: center;
   animation: as-in 0.3s var(--e) both;
 }
-.as-fu .i {
+.as-fu .as-i {
   width: 12px;
   height: 12px;
   color: var(--accent-text);
@@ -1255,7 +1255,7 @@ button.as-rs[aria-expanded="true"] .i {
   line-height: 16px;
   white-space: nowrap;
 }
-.as-tm .i {
+.as-tm .as-i {
   width: 10px;
   height: 10px;
 }
@@ -1271,7 +1271,7 @@ button.as-rs[aria-expanded="true"] .i {
   line-height: 16px;
   animation: as-in 0.25s var(--e) both;
 }
-.as-rm .i {
+.as-rm .as-i {
   width: 12px;
   height: 12px;
   color: var(--accent-text);
@@ -1301,7 +1301,7 @@ button.as-rs[aria-expanded="true"] .i {
   background: var(--bg);
   animation: as-in 0.3s var(--e) both;
 }
-.as-cd .as-plh .i {
+.as-cd .as-plh .as-i {
   width: 14px;
   height: 14px;
   margin-inline-end: 6px;
@@ -1410,7 +1410,7 @@ button.as-rs[aria-expanded="true"] .i {
 .as-cx:hover {
   color: var(--text);
 }
-.as-cx > .i {
+.as-cx > .as-i {
   width: 12px;
   height: 12px;
 }
@@ -1431,7 +1431,7 @@ button.as-rs[aria-expanded="true"] .i {
   background: var(--step);
   color: var(--text);
 }
-.as-cx button .i {
+.as-cx button .as-i {
   width: 12px;
   height: 12px;
 }
@@ -1458,7 +1458,7 @@ button.as-rs[aria-expanded="true"] .i {
   color: var(--warning-text);
   text-wrap: pretty;
 }
-.as-sw .i {
+.as-sw .as-i {
   width: 12px;
   height: 12px;
   margin-top: 2px;
@@ -1514,11 +1514,11 @@ button.as-rs[aria-expanded="true"] .i {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.as-md > .i {
+.as-md > .as-i {
   color: var(--muted);
   transition: transform 0.2s var(--e);
 }
-.as-md[aria-expanded="true"] > .i {
+.as-md[aria-expanded="true"] > .as-i {
   transform: rotate(180deg);
 }
 .as-pv {
@@ -1555,7 +1555,7 @@ button.as-rs[aria-expanded="true"] .i {
   opacity: 0.4;
   transform: none;
 }
-.as-go .i {
+.as-go .as-i {
   stroke-width: 2;
 }
 .as-go.stop {
@@ -1624,12 +1624,12 @@ button.as-rs[aria-expanded="true"] .i {
 .as-pt > span:nth-child(2) {
   white-space: nowrap;
 }
-.as-pt .dot {
+.as-pt .as-dt {
   width: 6px;
   height: 6px;
   opacity: 0;
 }
-.as-pt.as-cur .dot {
+.as-pt.as-cur .as-dt {
   opacity: 1;
 }
 .as-pt[aria-selected="true"] {
@@ -1666,7 +1666,7 @@ button.as-rs[aria-expanded="true"] .i {
   text-align: start;
   animation: as-in 0.2s var(--e) both;
 }
-.as-mo .mono {
+.as-mo .as-mn {
   font-size: 12px;
   font-weight: 400;
   letter-spacing: -0.01em;
@@ -1674,7 +1674,7 @@ button.as-rs[aria-expanded="true"] .i {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.as-mo[aria-selected="true"] .mono {
+.as-mo[aria-selected="true"] .as-mn {
   font-weight: 500;
 }
 .as-mo > span:nth-child(2) {
@@ -1683,7 +1683,7 @@ button.as-rs[aria-expanded="true"] .i {
   text-align: end;
   white-space: nowrap;
 }
-.as-mo .i {
+.as-mo .as-i {
   position: absolute;
   inset-inline-end: 8px;
   top: 10px;
@@ -1698,7 +1698,7 @@ button.as-rs[aria-expanded="true"] .i {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent-line);
 }
-.as-mo[aria-selected="true"] .i {
+.as-mo[aria-selected="true"] .as-i {
   opacity: 1;
 }
 .as-mo[aria-selected="true"] > span:nth-child(2) {

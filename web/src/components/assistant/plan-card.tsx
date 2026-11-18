@@ -32,7 +32,7 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
       <div className="as-plh">
         <span>{t("ai.plan.title")}</span>
         {open && left > 0 && (
-          <span className="mono" title={t("ai.plan.expires", { time: fmt.clock(plan.expiresUnix) })}>
+          <span className="as-mn" title={t("ai.plan.expires", { time: fmt.clock(plan.expiresUnix) })}>
             {t("as.plan.expires", { time: fmt.duration(left) })}
           </span>
         )}
@@ -45,7 +45,7 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
             const fact = f as unknown as Fact;
             return (
               <li key={i}>
-                <span className="mono">{factLabel(t, fact.key)}</span>
+                <span className="as-mn">{factLabel(t, fact.key)}</span>
                 <span>
                   {factWords(t, fmt, fact).map((p, j) =>
                     typeof p === "string" ? (

@@ -165,7 +165,7 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
         )}
         <header className="as-h">
           {history ? (
-            <button type="button" className="ic as-bk" aria-label={t("as.back")} title={t("as.back")} onClick={() => setHistory(false)}>
+            <button type="button" className="as-ic as-bk" aria-label={t("as.back")} title={t("as.back")} onClick={() => setHistory(false)}>
               <I g="back" flip />
             </button>
           ) : (
@@ -175,22 +175,22 @@ export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, in
           )}
           <div className="as-ht">
             <b>{history ? t("ai.chat.history") : t("ai.chat.title")}</b>
-            {history ? <span className="as-sb">{convs.data ? (count > 0 ? t.n("as.hist.count", count) : t("as.hist.none")) : " "}</span> : sub && <span className="mono">{sub}</span>}
+            {history ? <span className="as-sb">{convs.data ? (count > 0 ? t.n("as.hist.count", count) : t("as.hist.none")) : " "}</span> : sub && <span className="as-mn">{sub}</span>}
           </div>
           {!history && (
-            <button type="button" className="ic" aria-label={t("ai.chat.history")} title={t("ai.chat.history")} aria-pressed={history} onClick={() => setHistory(true)}>
+            <button type="button" className="as-ic" aria-label={t("ai.chat.history")} title={t("ai.chat.history")} aria-pressed={history} onClick={() => setHistory(true)}>
               <I g="list" />
             </button>
           )}
-          <button type="button" className="ic" aria-label={t("ai.chat.new")} title={t("ai.chat.new")} onClick={fresh}>
+          <button type="button" className="as-ic" aria-label={t("ai.chat.new")} title={t("ai.chat.new")} onClick={fresh}>
             <I g="plus" />
           </button>
           {!history && owner && (
-            <Link to="/ai" className="ic" aria-label={t("ai.chat.settings")} title={t("ai.chat.settings")} onClick={onNavigate}>
+            <Link to="/ai" className="as-ic" aria-label={t("ai.chat.settings")} title={t("ai.chat.settings")} onClick={onNavigate}>
               <I g="gear" />
             </Link>
           )}
-          <button type="button" className="ic" aria-label={t("ai.chat.close")} title={t("ai.chat.close")} onClick={onClose}>
+          <button type="button" className="as-ic" aria-label={t("ai.chat.close")} title={t("ai.chat.close")} onClick={onClose}>
             <I g="x" />
           </button>
         </header>

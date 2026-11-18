@@ -161,7 +161,7 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen, disabled }: 
   const note = see ? (see.dataKey ? t(see.dataKey) : see.option?.url || "") : "";
   const price = see?.option && see.option.inUsd > 0 ? t("ai.prov.price", { in: money(see.option.inUsd), out: money(see.option.outUsd) }) : "";
   const mark = (id: number, url?: string) => (
-    <span className="as-pv mono" aria-hidden>
+    <span className="as-pv" aria-hidden>
       <ProviderMark provider={id} size={14} url={url} />
     </span>
   );
@@ -169,7 +169,7 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen, disabled }: 
   return (
     <div ref={wrap} className="as-mw" onKeyDown={onKey}>
       <button ref={trigger} type="button" className="as-md" aria-haspopup="listbox" aria-expanded={open} aria-label={t("ai.pick.agent")} title={t("ai.pick.agent")} disabled={disabled} onClick={() => (open ? shut(false) : setOpen(true))}>
-        <span className="as-pv mono" aria-hidden>
+        <span className="as-pv" aria-hidden>
           {pick.selectedProvider ? <ProviderMark provider={pick.selectedProvider} size={14} url={cur?.option?.url} /> : "–"}
         </span>
         <span>{pick.name || t("as.off.model")}</span>
@@ -183,7 +183,7 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen, disabled }: 
                 <button key={g.id} type="button" role="tab" aria-selected={g.id === see?.id} tabIndex={g.id === see?.id ? 0 : -1} className={cx("as-pt", g.id === pick.selectedProvider && "as-cur")} onClick={() => setSeen(g.id)} onMouseEnter={() => setSeen(g.id)}>
                   {mark(g.id, g.option?.url)}
                   <span>{g.name}</span>
-                  <i className="dot" aria-hidden />
+                  <i className="as-dt" aria-hidden />
                 </button>
               ))}
             </div>
@@ -202,7 +202,7 @@ export function AgentPicker({ pick, owner, onNavigate, defaultOpen, disabled }: 
                     shut();
                   }}
                 >
-                  <span className="mono">{see.option.model || t("ai.prov.modelDefault")}</span>
+                  <span className="as-mn">{see.option.model || t("ai.prov.modelDefault")}</span>
                   <span>{see.option.budgetReached ? t("ai.pick.budget") : see.option.isDefault ? t("ai.pick.default") : ""}</span>
                   <I g="check" />
                 </button>
