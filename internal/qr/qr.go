@@ -36,6 +36,19 @@ func (c *Code) Black(x, y int) bool {
 	return c.mods[y*c.Size+x]
 }
 
+// Packed is the modules row by row, eight to a byte with the first module in the high bit, a dark module a 1 bit; the last
+// byte is padded with zeros. A caller that draws the code itself takes this: it is Size*Size/8 bytes where an SVG of the same
+// code is about thirty times that.
+func (c *Code) Packed() []byte {
+	out := make([]byte, (len(c.mods)+7)/8)
+	for i, dark := range c.mods {
+		if dark {
+			out[i/8] |= 0x80 >> (i % 8)
+		}
+	}
+	return out
+}
+
 // Encode encodes data in byte mode in the smallest version that fits at level.
 func Encode(data []byte, level Level) (*Code, error) {
 	if level < L || level > H {

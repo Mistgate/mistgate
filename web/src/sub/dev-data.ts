@@ -1,5 +1,5 @@
 import { isLang } from "./i18n";
-import type { AmneziaData, AppEntry, AwgDevice, AwgProfile, Device, DnsInfo, DnsPreset, Lang, MgData, Platform, ServerEntry } from "./types";
+import type { AmneziaData, AppEntry, AwgDevice, AwgProfile, Device, DnsInfo, DnsPreset, Lang, MgData, Platform, Qr, ServerEntry } from "./types";
 
 // Sample mg-data for working on the page, one per state. Used ONLY by the dev server (vite.sub.config.ts injects it
 // in place of the <!--MG_DATA--> marker for `?case=<name>&lang=ru|en|zh|fa|tr`); it is not imported by the page and never
@@ -143,11 +143,22 @@ const ber: ServerEntry = { id: "nod_ber", country_code: "DE", place: "Берли
 const mow: ServerEntry = { id: "nod_mow", country_code: "RU", place: "Москва", label: "Россия · Москва", app_names: [], connections: [{ way: "key", exit: "direct", app_name: "", profile_id: "p31" }], online: true, load: "medium", dns: dnsOf("dns_yandex", ["dns_yandex"]) };
 const dnsOn: DnsInfo = { enabled: true, endpoint: "dev:", refresh_hours: 12, link: { effective: "dns_adblock", choice: "", default: "dns_adblock", options: [] } };
 
+/**
+ * A real code (Mistgate's own encoder, internal/qr: a made-up link, level Q, with the logo's window) for every place the page
+ * draws one while it has no server to ask: the dev scenes and the tests. It does not read as the value next to it.
+ */
+export const sampleQr: Qr = {
+  n: 41,
+  bits: "/s4oHz/BIHyNEG6wvQ6rt1eSC+XboUChIuwXP1vpB/qqqqr+Aa5hLABXufbw9pQFgiVzVMTo2keHIsd/BWS2mUbeRmgUeaKyH8wFcKrTlKLdUFoveD2VQFIYgBnXyOcwkjqPXJviHvoT8ud8h17iNT9qVTGkDZOdErQG/5zAzfCAPoRAqjfknOO+Lq38rdscvbWLzBOrkUaDtqoUnhBSKfM1OZurhrpC+4BbojHE/6Y0mSpQUuyakeuizcKP1dafAydO6SvmiDcFWlTLov4xcgf9AA==",
+  window: 9.98,
+};
+
 const base: MgData = {
   v: 1,
   lang: "ru",
   brand: { parts: ["mist", "gate"], logo_svg: "", accent: "#b8acf2" },
   title: "Mistgate",
+  qr: sampleQr,
   subscription_url: url,
   server_count: 3,
   server_loads: [
@@ -430,8 +441,8 @@ cases["awg-relay"] = { ...dnsBoth, servers: [de1Awg, nl1], dns: linkDns(offered)
 
 // the Telegram proxy: one card per tg://proxy link, the twins of a server's link (its IPv6 entry, a relay in RU) marked
 const tgUrl = (host: string, port = 443) => `tg://proxy?server=${host}&port=${port}&secret=ee0123456789abcdef0123456789abcdef7777772e676f6f676c652e636f6d`;
-const tgFra = { label: "Германия · Франкфурт", country_code: "DE", place: "Франкфурт", ipv6: false, relay: false, via: "", url: tgUrl("de1.example.com") };
-const tgLinks = [tgFra, { ...tgFra, ipv6: true, url: tgUrl("[2001:db8::7]") }, { ...tgFra, relay: true, via: "RU", url: tgUrl("198.51.100.20", 8443) }, { label: "Финляндия", country_code: "FI", place: "", ipv6: false, relay: false, via: "", url: tgUrl("fi1.example.com") }];
+const tgFra = { label: "Германия · Франкфурт", country_code: "DE", place: "Франкфурт", ipv6: false, relay: false, via: "", url: tgUrl("de1.example.com"), qr: sampleQr };
+const tgLinks = [tgFra, { ...tgFra, ipv6: true, url: tgUrl("[2001:db8::7]") }, { ...tgFra, relay: true, via: "RU", url: tgUrl("198.51.100.20", 8443) }, { label: "Финляндия", country_code: "FI", place: "", ipv6: false, relay: false, via: "", url: tgUrl("fi1.example.com"), qr: sampleQr }];
 // the person's Telegram key among the devices: issued by the admin, used by Telegram two hours ago
 const tgKey = { ...dev("tg1", "", "Telegram proxy", "telegram", 2 * hour, false, "telegram"), can_remove: false, can_rename: false };
 cases.telegram = { ...returning, access: { ...returning.access, telegram: true }, telegram: { links: tgLinks }, devices: [...returning.devices, tgKey] };
@@ -444,12 +455,12 @@ cases["telegram-soon"] = { ...returning, access: { ...returning.access, telegram
 // person will see), the twins of a server marked ("IPv6" on the exit, a relay in RU), and a server with no link (a self-signed
 // certificate: only the Mistgate app trusts it) as a card that says so
 const ttUrl = (name: string) => `tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEACQEBDA${name}DRYKMTkyLjAuMi41MwoxOTIuMC4yLjU0`;
-const ttDe = { label: "Германия · Франкфурт", country_code: "DE", place: "Франкфурт", has_ipv6: false, relay: false, via: "", note: "", url: ttUrl("DZGUx") };
+const ttDe = { label: "Германия · Франкфурт", country_code: "DE", place: "Франкфурт", has_ipv6: false, relay: false, via: "", note: "", url: ttUrl("DZGUx"), qr: sampleQr };
 const ttLinks = [
   ttDe,
   { ...ttDe, relay: true, via: "RU", url: ttUrl("DZGUy") },
-  { label: "Нидерланды", country_code: "NL", place: "", has_ipv6: true, relay: false, via: "", note: "", url: ttUrl("DbmwxA") },
-  { label: "Финляндия", country_code: "FI", place: "", has_ipv6: false, relay: false, via: "", note: "self_signed", url: "" },
+  { label: "Нидерланды", country_code: "NL", place: "", has_ipv6: true, relay: false, via: "", note: "", url: ttUrl("DbmwxA"), qr: sampleQr },
+  { label: "Финляндия", country_code: "FI", place: "", has_ipv6: false, relay: false, via: "", note: "self_signed", url: "", qr: null },
 ];
 // the TrustTunnel key among the devices: issued by the admin, used by an app yesterday
 const ttKey = { ...dev("tt1", "", "TrustTunnel key", "trusttunnel", day, false, "trusttunnel"), can_remove: false, can_rename: false };

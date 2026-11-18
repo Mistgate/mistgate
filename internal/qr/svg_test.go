@@ -463,3 +463,22 @@ func BenchmarkEncodeConfig(b *testing.B) {
 		}
 	}
 }
+
+func TestPacked(t *testing.T) {
+	c := mustEncode(t, "hello, qr1", M)
+	b := c.Packed()
+	if len(b) != (c.Size*c.Size+7)/8 {
+		t.Fatalf("%d bytes for %d modules", len(b), c.Size*c.Size)
+	}
+	for y := 0; y < c.Size; y++ {
+		for x := 0; x < c.Size; x++ {
+			i := y*c.Size + x
+			if got := b[i/8]>>(7-i%8)&1 == 1; got != c.Black(x, y) {
+				t.Fatalf("module %d,%d", x, y)
+			}
+		}
+	}
+	if pad := b[len(b)-1] & (1<<(8-(c.Size*c.Size)%8%8) - 1); (c.Size*c.Size)%8 != 0 && pad != 0 {
+		t.Errorf("the padding bits are %b", pad)
+	}
+}

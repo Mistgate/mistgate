@@ -1,6 +1,7 @@
 import type { Api } from "./amz-actions";
 import { ApiError, type Answer, type DnsAnswer } from "./api";
 import type { DnsApi } from "./dns-actions";
+import { sampleQr } from "./dev-data";
 import { awgConfig, awgDevice, linkDns, serverEntry } from "./logic";
 import type { ServerEntry } from "./types";
 
@@ -56,6 +57,7 @@ const cfg = (node: string, cc: string, stale = false, via = "") =>
     country_code: cc,
     version: "3.1",
     conf: conf(via ? "msk1" : node),
+    qr: sampleQr,
     vpn_key: `vpn://${"AAAAAQAAAGh4nO".repeat(10)}`,
     filename: `mistgate-${cc.toLowerCase()}${via ? `-via-${via.toLowerCase()}` : ""}.conf`,
     stale,

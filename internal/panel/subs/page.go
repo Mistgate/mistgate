@@ -97,6 +97,7 @@ type pageData struct {
 	Brand           pageBrand        `json:"brand"`
 	Title           string           `json:"title"`
 	SubscriptionURL string           `json:"subscription_url"`
+	QR              *pageQR          `json:"qr"`           // the code of SubscriptionURL for the QR card; null when the owner has it off or there is no link
 	ServerCount     int              `json:"server_count"` // servers (nodes) the link carries ("all your servers (3) are already there")
 	ServerLoads     []pageServer     `json:"server_loads"` // kept for the old page; derived from Servers
 	User            pageUser         `json:"user"`
@@ -182,10 +183,11 @@ type pageTelegramLink struct {
 	CountryCode string `json:"country_code"`
 	Place       string `json:"place"`
 	// IPv6: the node's IPv6 entry. Relay: the link goes through a relay of an entry node whose country code is Via.
-	IPv6  bool   `json:"ipv6,omitempty"`
-	Relay bool   `json:"relay,omitempty"`
-	Via   string `json:"via,omitempty"`
-	URL   string `json:"url"`
+	IPv6  bool    `json:"ipv6,omitempty"`
+	Relay bool    `json:"relay,omitempty"`
+	Via   string  `json:"via,omitempty"`
+	URL   string  `json:"url"`
+	QR    *pageQR `json:"qr"` // the code of URL
 }
 
 // pageTrustTunnel is the official app's key links. A skipped self-signed inbound is included with a note and no URL.
@@ -194,14 +196,15 @@ type pageTrustTunnel struct {
 }
 
 type pageTrustTunnelLink struct {
-	Label       string `json:"label"`
-	CountryCode string `json:"country_code"`
-	Place       string `json:"place"`
-	HasIPv6     bool   `json:"has_ipv6"`
-	Relay       bool   `json:"relay,omitempty"`
-	Via         string `json:"via,omitempty"`
-	Note        string `json:"note,omitempty"`
-	URL         string `json:"url"`
+	Label       string  `json:"label"`
+	CountryCode string  `json:"country_code"`
+	Place       string  `json:"place"`
+	HasIPv6     bool    `json:"has_ipv6"`
+	Relay       bool    `json:"relay,omitempty"`
+	Via         string  `json:"via,omitempty"`
+	Note        string  `json:"note,omitempty"`
+	URL         string  `json:"url"`
+	QR          *pageQR `json:"qr"` // the code of URL (null with no URL)
 }
 
 type pageAccess struct {
@@ -279,6 +282,9 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 		own := d.DevicesEndpoint != "" && dv.Kind != "shared" && dv.Kind != "telegram" && dv.Kind != "trusttunnel" // key devices are issued and revoked by the owner
 		d.Devices = append(d.Devices, pageDevice{ID: dv.ID, Platform: dv.Platform, Model: dv.Model, App: dv.App, LastSeenUnix: unixOrZero(dv.LastSeen), Online: dv.Online,
 			Kind: dv.Kind, CanRemove: own, CanRename: own, OSVersion: dv.OSVersion, Client: dv.Client})
+	}
+	if opt.GetShowQr() {
+		d.QR = pageQROf(link)
 	}
 	d.Amnezia = amneziaData(v, link, subsettings.SelfService(set), preview, now)
 	if v.AppTelegram {

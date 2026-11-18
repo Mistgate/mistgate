@@ -5,6 +5,7 @@ import { safeUrl, serverName } from "./logic";
 import { qrCard } from "./qr";
 import { flag } from "./servers";
 import type { Ctx } from "./state";
+import type { Qr } from "./types";
 import { copyButton } from "./ui";
 
 // The Telegram proxy of the person, as the board draws it. A computer: the list of the proxies' countries on the left (one is
@@ -13,7 +14,7 @@ import { copyButton } from "./ui";
 // person with one proxy is left out (nothing to choose). TrustTunnel is the same panel with its own words (trusttunnel.ts).
 
 /** What one proxy link of either kind is: the server as the page names it, its marks, the link ("" = none yet). */
-export type ProxyLink = { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string };
+export type ProxyLink = { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string; qr: Qr | null };
 
 export type ProxySpec = {
   /** The prefix of every data-k ("tg", "tt"). */
@@ -59,7 +60,7 @@ export function proxyPanel(c: Ctx, o: ProxySpec): Kid[] {
   const pane = (l: ProxyLink, i: number) => {
     const n = nameOf(c, l);
     const url = o.href(l.url);
-    const qr = url ? qrCard(url, o.qrAria(n.country), logoSrc(d), { big: true }) : null;
+    const qr = url ? qrCard(l.qr, o.qrAria(n.country), logoSrc(d), { big: true }) : null;
     return h(
       "section",
       { class: `u-card u-pane${qr ? "" : " noqr"}`, "aria-label": o.pane },

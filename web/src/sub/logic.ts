@@ -23,6 +23,7 @@ import type {
   ServerLoad,
   Status,
   Theme,
+  Qr,
   TrustTunnelLink,
 } from "./types";
 
@@ -49,6 +50,20 @@ const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 
 const rec = (v: unknown): Record<string, unknown> => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
 const list = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.map(rec) : []);
 const strs = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => str(x)).filter(Boolean) : []);
+
+/**
+ * A code the server drew, checked before it is drawn: a QR side (21 to 177, 4 v + 17), the bits as base64 of exactly the bytes
+ * n * n bits take, a window that fits inside. Anything else is no code (null), never a half-drawn one.
+ */
+export function qrOf(raw: unknown): Qr | null {
+  const x = rec(raw);
+  const n = x.n;
+  const bits = str(x.bits);
+  if (typeof n !== "number" || !Number.isInteger(n) || n < 21 || n > 177 || (n - 17) % 4 !== 0) return null;
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(bits) || bits.length !== 4 * Math.ceil(Math.ceil((n * n) / 8) / 3)) return null;
+  const window = typeof x.window === "number" && Number.isFinite(x.window) && x.window > 0 && x.window <= n / 2 ? x.window : 0;
+  return { n, bits, window };
+}
 
 const minClients = (v: unknown): MinClient[] => list(v).map((m) => ({ client: str(m.client), app: str(m.app), min: str(m.min) })).filter((m) => m.app !== "");
 
@@ -87,6 +102,7 @@ export function awgConfig(raw: unknown): AwgConfig {
     stale: c.stale === true,
     warnings: strs(c.warnings),
     min_clients: minClients(c.min_clients),
+    qr: qrOf(c.qr),
   };
 }
 
@@ -183,11 +199,11 @@ export function normalize(raw: unknown): MgData {
   const tg = r.telegram && typeof r.telegram === "object" ? rec(r.telegram) : null;
   const telegram = tg
     ? {
-        links: list(tg.links).flatMap((l): { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string }[] => {
+        links: list(tg.links).flatMap((l): { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string; qr: Qr | null }[] => {
           const x = rec(l);
           const url = str(x.url);
           return /^tg:/i.test(url)
-            ? [{ label: str(x.label), country_code: str(x.country_code), place: str(x.place), ipv6: x.ipv6 === true, relay: x.relay === true, via: str(x.via), url }]
+            ? [{ label: str(x.label), country_code: str(x.country_code), place: str(x.place), ipv6: x.ipv6 === true, relay: x.relay === true, via: str(x.via), url, qr: qrOf(x.qr) }]
             : [];
         }),
       }
@@ -201,7 +217,7 @@ export function normalize(raw: unknown): MgData {
           const note = str(x.note);
           // a link the page cannot open (not tt://) and says nothing about is not a row
           return url || note
-            ? [{ label: str(x.label), country_code: str(x.country_code), place: str(x.place), has_ipv6: x.has_ipv6 === true, relay: x.relay === true, via: str(x.via), note, url }]
+            ? [{ label: str(x.label), country_code: str(x.country_code), place: str(x.place), has_ipv6: x.has_ipv6 === true, relay: x.relay === true, via: str(x.via), note, url, qr: qrOf(x.qr) }]
             : [];
         }),
       }
@@ -216,6 +232,7 @@ export function normalize(raw: unknown): MgData {
     },
     title: str(r.title),
     subscription_url: str(r.subscription_url),
+    qr: qrOf(r.qr),
     server_count: num(r.server_count),
     server_loads: list(r.server_loads).flatMap((s): ServerLoad[] =>
       typeof s.name === "string" && s.name.trim() && levels.includes(s.level as LoadLevel) ? [{ name: s.name, level: s.level as LoadLevel }] : [],

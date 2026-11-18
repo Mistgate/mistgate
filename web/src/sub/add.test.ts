@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { deviceModalStage } from "./add";
 import { newAmzState } from "./amnezia";
 import { amzActions, type Api } from "./amz-actions";
-import { cases } from "./dev-data";
+import { cases, sampleQr } from "./dev-data";
 import { dict } from "./i18n";
 import { awgConfig, defaultPane, keyAvailability } from "./logic";
 import type { AddPane } from "./state";
@@ -15,7 +15,7 @@ import { view } from "./view";
 const noApi = {} as Api;
 const keys = (el: Element) => [...el.querySelectorAll("[data-k]")].map((x) => x.getAttribute("data-k")!);
 const dupes = (list: string[]) => list.filter((k, i) => list.indexOf(k) !== i);
-const cfg = (cc = "DE") => awgConfig({ node_id: `n-${cc}`, label: cc === "DE" ? "Германия" : "Нидерланды", country_code: cc, version: "3.1", conf: "[Interface]\nPrivateKey = x\n", vpn_key: "vpn://k", filename: "x.conf", warnings: [] });
+const cfg = (cc = "DE") => awgConfig({ node_id: `n-${cc}`, label: cc === "DE" ? "Германия" : "Нидерланды", country_code: cc, version: "3.1", conf: "[Interface]\nPrivateKey = x\n", vpn_key: "vpn://k", filename: "x.conf", warnings: [], qr: sampleQr });
 const at = (pane: AddPane) => ({ pane });
 /** The class of every element of a step, in order: what the board's step has too. */
 const shape = (el: Element) => [...el.querySelectorAll("*")].filter((x) => !x.closest("svg")).map((x) => x.className).filter(Boolean);

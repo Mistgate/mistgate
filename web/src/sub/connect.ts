@@ -139,7 +139,7 @@ function stepsOf(c: Ctx, app: AppEntry): HTMLElement {
 /** The QR code of this page: a phone's camera opens the page there. On a computer only (the phone is the device). */
 function qrSide(c: Ctx): HTMLElement | null {
   const { d, t } = c;
-  const card = qrOn(c) ? qrCard(d.subscription_url, t.qrAlt, logoSrc(d)) : null;
+  const card = qrOn(c) ? qrCard(d.qr, t.qrAlt, logoSrc(d)) : null;
   return card && h("div", { class: "a-side pg" }, card, h("p", { class: "u-hint" }, t.adQrHint));
 }
 
