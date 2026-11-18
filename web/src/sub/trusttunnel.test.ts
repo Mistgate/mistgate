@@ -7,12 +7,11 @@ import { actions, data, state, text } from "./test-kit";
 import { ttAppsUrl } from "./trusttunnel";
 import { view } from "./view";
 
-// The TrustTunnel key on the person's own page (subs/page_trusttunnel.go): one card per tt:// link, the marks, a card with no link
+// The TrustTunnel key on the person's own page (subs/page_trusttunnel.go): the panel of the proxies (telegram.ts) with its own words, a place per tt:// link, the marks, a pane with no link
 // for a self-signed server, the key among the devices (nothing to remove), and the words in all five languages.
 
 const link = (over: object = {}) => ({ label: "Germany · Frankfurt", country_code: "DE", place: "Frankfurt", has_ipv6: false, relay: false, via: "", note: "", url: "tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20", ...over });
 const withTt = (links: object[]) => normalize({ ...cases.first, access: { happ: true, amnezia: false, trust_tunnel: true }, trust_tunnel: { links } });
-const cards = (el: Element) => [...el.querySelectorAll<HTMLElement>(".srv.tt")];
 
 describe("the TrustTunnel links of the page data", () => {
   it("keeps tt:// links, and a row with a note and no link; drops any other scheme without a word", () => {
@@ -32,70 +31,95 @@ describe("the TrustTunnel links of the page data", () => {
 });
 
 describe("the TrustTunnel block", () => {
+  const tt = (d: ReturnType<typeof withTt>, lang: "ru" | "en" | "zh" | "fa" | "tr" = "en", a = actions()) => view(d, state("windows", { tab: "trusttunnel" }, lang), a);
+  const pane = (el: Element) => el.querySelector<HTMLElement>(".u-tg .u-pane")!;
+  const picks = (el: Element) => [...el.querySelectorAll<HTMLButtonElement>(".u-tg .u-pick")];
+  const prows = (el: Element) => [...el.querySelectorAll<HTMLElement>(".u-prow")];
+
   it("is not there when it is off for the person", () => {
     const el = view(data("first"), state("windows", {}, "en"), actions());
-    expect(el.querySelector(".srv.tt")).toBeNull();
+    expect(el.querySelector(".u-tg, .u-prow, [data-k=tab-trusttunnel]")).toBeNull();
     expect(text(el)).not.toContain("TrustTunnel");
   });
 
-  it("gives every link a card: Open in the app, Copy, a QR code for a computer, the marks of the twins, and the steps in one line", () => {
-    const el = view(withTt([link(), link({ has_ipv6: true, url: "tt://?AAEB2" }), link({ relay: true, via: "RU", url: "tt://?AAEB3" })]), state("windows", {}, "en"), actions());
-    const [direct, v6, relay] = cards(el);
-    expect(text(direct!.querySelector(".srv-name"))).toBe("Germany · Frankfurt");
-    expect(direct!.querySelector(".srv-top .chip")).toBeNull();
-    expect(text(v6!.querySelector(".srv-top .chip"))).toBe("IPv6");
-    expect(text(relay!.querySelector(".srv-top .chip"))).toBe("via RU");
-    // several links: none leads; the link itself is an ordinary tt:// anchor
-    expect(direct!.querySelector<HTMLAnchorElement>("a.btn")!.getAttribute("href")).toBe("tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20");
-    expect(direct!.querySelector("a.btn")!.classList.contains("sec")).toBe(true);
-    expect(text(direct!.querySelector("[data-k=tt-copy-0]"))).toBe("Copy link");
-    expect(direct!.querySelector(".tt-qr svg")?.getAttribute("aria-label")).toBe("QR code of the TrustTunnel link: Germany");
-    expect(text(el)).toContain("Install the TrustTunnel app, then scan the QR code or open the link.");
+  it("is a tab with the number of its links, and the panel of the proxies with its own words", () => {
+    const el = tt(withTt([link(), link({ has_ipv6: true, url: "tt://?AAEB2" })]));
+    expect(text(el.querySelector("[data-k=tab-trusttunnel]"))).toContain("TrustTunnel");
+    expect(el.querySelector("[data-k=tab-trusttunnel] .n.only-m")?.textContent).toBe("2");
+    expect(text(el.querySelector(".u-tg .u-cap"))).toBe("Server");
+    expect(pane(el).getAttribute("aria-label")).toBe("TrustTunnel connection");
   });
 
-  it("makes the one link of the person the main action, and copies the link itself", () => {
+  it("gives every link a place in the list: the marks of the twins; the chosen one has the pane with its QR code, 'Open in the app' and Copy", () => {
+    const el = tt(withTt([link(), link({ has_ipv6: true, url: "tt://?AAEB2" }), link({ relay: true, via: "RU", url: "tt://?AAEB3" })]));
+    expect(picks(el).map((b) => text(b.querySelector("span:nth-of-type(2)")))).toEqual(["GermanyFrankfurt", "GermanyFrankfurt", "GermanyFrankfurt"]);
+    expect(picks(el).map((b) => text(b.querySelector(".u-tag")))).toEqual(["", "IPv6", "via RU"]);
+    expect(picks(el).map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
+    const p = pane(el);
+    expect(p.querySelector(".u-qr.big svg")?.getAttribute("aria-label")).toBe("QR code of the TrustTunnel link: Germany");
+    // the link itself is an ordinary tt:// anchor
+    const open = p.querySelector<HTMLAnchorElement>("[data-k=tt-open-0]")!;
+    expect([open.getAttribute("href"), text(open), open.classList.contains("pri")]).toEqual(["tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20", "Open in the app", true]);
+    expect(text(p.querySelector("[data-k=tt-copy-0]"))).toContain("Copy link");
+    expect(text(p.querySelector(".u-hint"))).toContain("Install the TrustTunnel app, then scan the QR code or open the link.");
+    picks(el)[2]!.click();
+    expect(pane(el).querySelector("[data-k=tt-open-2]")?.getAttribute("href")).toBe("tt://?AAEB3");
+    picks(el)[0]!.click();
+  });
+
+  it("copies the link itself, and a phone has a row for each with 'Open' and a copy button", () => {
     const a = actions();
-    const el = view(withTt([link()]), state("ios", {}, "en"), a);
-    expect(el.querySelector(".srv.tt a.btn.pri")?.getAttribute("href")).toBe("tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20");
-    el.querySelector<HTMLButtonElement>("[data-k=tt-copy-0]")!.click();
-    expect(a.log).toContain("copy tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20");
+    const el = tt(withTt([link(), link({ url: "tt://?AAEB2" })]), "en", a);
+    pane(el).querySelector<HTMLButtonElement>("[data-k=tt-copy-0]")!.click();
+    expect(a.log).toEqual(["copy tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20"]);
+    expect(prows(el)).toHaveLength(2);
+    expect(text(el.querySelector("p.u-hint.only-m"))).toContain("Install the TrustTunnel app, then tap “Open in the app”.");
+    const open = prows(el)[1]!.querySelector<HTMLAnchorElement>("[data-k=tt-open-m-1]")!;
+    expect([text(open), open.getAttribute("href")]).toEqual(["Open", "tt://?AAEB2"]);
+    const copy = prows(el)[1]!.querySelector<HTMLButtonElement>("[data-k=tt-copy-m-1]")!;
+    expect(copy.getAttribute("aria-label")).toBe("Copy the TrustTunnel link: Germany");
+    copy.click();
+    expect(a.log.at(-1)).toBe("copy tt://?AAEB2");
   });
 
-  it("points to the official page of the apps, the one the project's README names", () => {
+  it("points to the official page of the apps, the one the project's README names, on both sizes", () => {
     expect(ttAppsUrl).toBe("https://github.com/TrustTunnel/TrustTunnel#clients");
-    const a = view(withTt([link()]), state("ios", {}, "en"), actions()).querySelector<HTMLAnchorElement>("[data-k=tt-get]")!;
-    expect(a.getAttribute("href")).toBe(ttAppsUrl);
-    expect(a.getAttribute("rel")).toBe("noopener noreferrer");
-    expect(a.getAttribute("target")).toBe("_blank");
+    for (const key of ["tt-get", "tt-get-m"]) {
+      const a = tt(withTt([link()])).querySelector<HTMLAnchorElement>(`[data-k=${key}]`)!;
+      expect(a.getAttribute("href")).toBe(ttAppsUrl);
+      expect(a.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(a.getAttribute("target")).toBe("_blank");
+      expect(text(a)).toBe("Where to get the app");
+    }
   });
 
   it("says a self-signed server has no link yet, and offers nothing to open or copy there", () => {
-    const el = view(withTt([link({ url: "", note: "self_signed", label: "Finland", country_code: "FI", place: "" })]), state("ios", {}, "en"), actions());
-    const card = cards(el)[0]!;
-    expect(card.classList.contains("off")).toBe(true);
-    expect(text(card.querySelector("[data-k=tt-nolink-0]"))).toBe("There is no link for this server yet — message the admin.");
-    expect(card.querySelector("a")).toBeNull();
-    expect(card.querySelector("button")).toBeNull();
-    expect(card.querySelector(".tt-qr")).toBeNull();
+    const el = tt(withTt([link({ url: "", note: "self_signed", label: "Finland", country_code: "FI", place: "" })]));
+    expect(text(pane(el).querySelector(".u-hint"))).toBe("There is no link for this server yet — message the admin.");
+    expect(pane(el).querySelector("a, button, .u-qr")).toBeNull();
+    const row = prows(el)[0]!;
+    expect(row.classList.contains("nolink")).toBe(true);
+    expect(text(row.querySelector(".u-hint"))).toBe("There is no link for this server yet — message the admin.");
+    expect(row.querySelector("a, button")).toBeNull();
   });
 
   it("says the keys are still being prepared when no TrustTunnel profile runs", () => {
-    const el = view(withTt([]), state("windows", {}, "en"), actions());
-    expect(cards(el)).toHaveLength(0);
-    expect(text(el.querySelector(".tg-empty"))).toBe("The keys are still being prepared — message the admin.");
+    const el = tt(withTt([]));
+    expect(picks(el)).toHaveLength(0);
+    expect(text(el.querySelector(".u-card .u-empty"))).toBe("The keys are still being prepared — message the admin.");
   });
 
   it("lists the key among the devices with a name of its own and nothing to remove or rename", () => {
-    const el = view(data("trusttunnel"), state("windows", {}, "en"), actions());
-    const rows = [...el.querySelectorAll<HTMLElement>(".dev")].filter((r) => text(r).includes("TrustTunnel key"));
+    const el = view(data("trusttunnel"), state("windows", { tab: "devices", devicesOpen: true }, "en"), actions());
+    const rows = [...el.querySelectorAll<HTMLElement>(".u-dv")].filter((r) => text(r).includes("TrustTunnel key"));
     expect(rows).toHaveLength(1);
     expect(rows[0]!.querySelector("button")).toBeNull();
-    expect(text(rows[0])).toContain("connected");
+    expect(text(rows[0]!.querySelector(".when"))).toContain("connected");
   });
 
   it("shows no block on a page that is not active, only the key among the devices", () => {
     const el = view(data("trusttunnel-disabled"), state("ios", {}, "en"), actions());
-    expect(el.querySelector(".srv.tt")).toBeNull();
+    expect(el.querySelector(".u-tg, .u-prow")).toBeNull();
     expect(text(el)).toContain("TrustTunnel key");
   });
 
@@ -104,18 +128,20 @@ describe("the TrustTunnel block", () => {
     const svg = qrSvg(real, "x");
     expect(svg).not.toBeNull();
     const modules = Number(svg!.getAttribute("viewBox")!.split(" ")[2]);
-    // about 60 modules: at the 176 px of .tt-qr (less its padding) a module is 2.5 px
+    // about 60 modules: at the 216 px of the big card (less its padding) a module is about 3 px
     expect(modules).toBeGreaterThan(40);
     expect(modules).toBeLessThanOrEqual(69);
+    expect(pane(tt(withTt([link({ url: real })]))).querySelector(".u-qr.big svg")).not.toBeNull();
   });
 });
 
 describe("the words of the TrustTunnel block", () => {
   it("are in all five languages", () => {
-    const keys = ["ttT", "ttS", "ttNoLinks", "ttOpen", "ttCopy", "ttHowPhone", "ttHowDesk", "ttGet", "ttNoLink", "ttKey"] as const;
+    const keys = ["ttT", "ttS", "ttNoLinks", "ttOpen", "ttCopy", "ttHowPhone", "ttHowDesk", "ttGet", "ttNoLink", "ttKey", "ttCap", "ttPane"] as const;
     for (const lang of langs) {
       for (const k of keys) expect(dict[lang][k], `${lang} ${k}`).toBeTruthy();
       expect(dict[lang].ttQr("X"), lang).toContain("X");
+      expect(dict[lang].ttCopyAria("X"), lang).toContain("X");
     }
     // the steps say what to do: install the app, then scan or open
     expect(dict.ru.ttHowDesk).toContain("отсканируйте QR");
