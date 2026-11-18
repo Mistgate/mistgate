@@ -5,7 +5,7 @@ import { genitive } from "./i18n-dlg";
 import { LINK } from "./logic";
 import { createModal } from "./modal";
 import type { Ctx, State } from "./state";
-import { actions, amzNoop, data, state, text } from "./test-kit";
+import { actions, amzNoop, data, plain, state, text } from "./test-kit";
 import type { MgData } from "./types";
 import type { Lang } from "./types";
 
@@ -54,6 +54,8 @@ const asked = () => {
   });
   return { a, log };
 };
+/** The name of a DNS option: the text of its .t without the "now" tag. */
+const own = (o: Element) => plain(o.querySelector(".t")!.firstChild!.textContent);
 const head = (box: Element) => ({ cls: q(box, ".a-dlg").className, role: q(box, ".a-dlg").getAttribute("role"), modal: q(box, ".a-dlg").getAttribute("aria-modal"), title: text(q(box, ".a-h .t")) });
 afterEach(() => document.body.replaceChildren());
 
@@ -156,7 +158,7 @@ describe("the menu of a device", () => {
     expect(q(en, ".a-dlg").getAttribute("aria-label")).toBe("Device actions");
     const fa = draw(ctx("many", { amz: { menu: "d3" }, lang: "fa" }));
     expect(all(fa, ".a-act")).toHaveLength(4);
-    expect(q(fa, ".a-h .t bdi")).not.toBeNull(); // the name reads in its own direction
+    expect(text(q(fa, ".a-h .t"))).toBe("Pixel 7"); // the name stands as it is: the page isolates it in CSS (sub-dlg.css)
   });
 });
 
@@ -300,7 +302,7 @@ describe("a key that is no longer valid", () => {
 });
 
 describe("the DNS choice", () => {
-  const radios = (box: Element) => all(box, ".a-opt").map((o) => [text(o.querySelector(".t bdi")), text(o.querySelector(".d")), o.getAttribute("aria-checked")]);
+  const radios = (box: Element) => all(box, ".a-opt").map((o) => [own(o), text(o.querySelector(".d")), o.getAttribute("aria-checked")]);
 
   it("several servers: the scope (all servers first), the DNS list, the hint and Cancel / Save", () => {
     const { a, log } = asked();
@@ -331,20 +333,27 @@ describe("the DNS choice", () => {
     expect(log).toEqual(["dns-scope false", "dns-scope true", "dns-pick dns_builtin_adblock", "dns-apply", "dns-open null", "dns-open null"]);
   });
 
+  it("twin servers of one country are told apart by their number in the chips, as in the table", () => {
+    const c = ctx("dns-both", { dns: { open: "de1", all: true }, f: (d) => d.servers.push({ ...structuredClone(d.servers[0]!), id: "de2", label: "Германия 2" }) });
+    expect(all(draw(c), ".a-seg .a-chip").map(text)).toEqual(["Все серверы", "Только Германия DE-1"]);
+    c.s.dns.open = "de2";
+    expect(all(draw(c), ".a-seg .a-chip").map(text)).toEqual(["Все серверы", "Только Германия DE-2"]);
+  });
+
   it("one server of the choice: no scope chips; the picked one is checked and takes the keyboard", () => {
     const box = draw(ctx("dns-both", { dns: { open: "de1", pick: "dns_builtin_family" }, f: (d) => d.servers.pop() }));
     expect(all(box, ".a-fld .a-lbl").map(text)).toEqual(["DNS"]);
     const on = q(box, ".a-opt.on");
-    expect([on.getAttribute("aria-checked"), on.hasAttribute("data-autofocus"), text(on.querySelector(".t bdi"))]).toEqual(["true", true, "AdGuard Family: без рекламы и 18+"]);
+    expect([on.getAttribute("aria-checked"), on.hasAttribute("data-autofocus"), own(on)]).toEqual(["true", true, "AdGuard Family: без рекламы и 18+"]);
   });
 
   it("the default names the server's own default; for all servers whose defaults differ, it does not", () => {
     const c = ctx("dns-both", { dns: { open: "de1", all: true }, f: (d) => (d.servers[1]!.dns!.default = "dns_builtin_adblock") });
     const first = all(draw(c), ".a-opt")[0]!;
-    expect(text(first.querySelector(".t bdi"))).toBe("По умолчанию");
+    expect(own(first)).toBe("По умолчанию");
     expect(first.querySelector(".d")).toBeNull();
     c.s.dns.all = false;
-    expect(text(all(draw(c), ".a-opt")[0]!.querySelector(".t bdi"))).toContain("По умолчанию — ");
+    expect(own(all(draw(c), ".a-opt")[0]!)).toContain("По умолчанию — ");
   });
 
   it("the hint about the keys is there only when the server has keys; a save waits with a spinner; a failure keeps the window and offers Retry", () => {

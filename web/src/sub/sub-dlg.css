@@ -5,11 +5,10 @@
 .still .a-dlg, .still .a-b > * { animation: none; }
 
 /* names of devices and servers read in their own direction inside a right-to-left page */
-.a-h .t bdi, .a-opt .t bdi, .a-chip bdi, .a-opt .d { unicode-bidi: isolate; }
+.a-h .t, .a-opt .t, .a-opt .d, .a-chip { unicode-bidi: isolate; }
 
-/* a long server name does not push a chip off a narrow window */
-.a-seg .a-chip { max-width: 100%; min-width: 0; }
-.a-chip bdi { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* a long server name wraps inside its chip instead of pushing it off a narrow window */
+.a-seg .a-chip { max-width: 100%; height: auto; min-height: 40px; padding-block: 8px; white-space: normal; text-align: start; }
 
 /* the key rows of "DNS changed": the name and the line take the room, the button stays at the end */
 .a-opt .tx .d { overflow-wrap: anywhere; }

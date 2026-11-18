@@ -62,7 +62,7 @@ export function menuWindow(c: Ctx): Kid[] {
   const w = who(c, c.s.amz.menu)!;
   return frame(c, {
     label: t.dgMenuAria,
-    title: h("bdi", null, w.name),
+    title: w.name,
     small: true,
     close: () => a.amz.menu(null),
     body: h(
@@ -141,10 +141,10 @@ export function confirmWindow(c: Ctx): Kid[] {
   const title = rotate ? t.dgRotT(w.name) : t.dgDelT(w.name);
   return frame(c, {
     label: rotate ? t.rotateKey : t.dgDelete,
-    title: h("bdi", null, title),
+    title: title,
     small: true,
     close: () => a.amz.ask(null),
-    body: h("div", { class: "a-b" }, h("p", { class: "a-lead" }, lead), about && h("p", { class: "u-hint" }, h("bdi", null, about)), err),
+    body: h("div", { class: "a-b" }, h("p", { class: "a-lead" }, lead), about && h("p", { class: "u-hint" }, about), err),
     // the safe answer takes the keyboard
     foot: foot(h("button", { class: "u-btn", type: "button", "data-k": "dlg-no", "data-autofocus": "", on: { click: () => a.amz.ask(null) } }, t.awgCancel), go),
   });
@@ -163,7 +163,7 @@ export function staleWindow(c: Ctx): Kid[] {
   const steps = t.dgStaleSteps(keyAppName(d, ((x.platform || null) as Platform | null)));
   return frame(c, {
     label: t.dgStaleT(label(x, t)),
-    title: h("bdi", null, t.dgStaleT(label(x, t))),
+    title: t.dgStaleT(label(x, t)),
     close: () => a.amz.stale(null),
     body: h(
       "div",

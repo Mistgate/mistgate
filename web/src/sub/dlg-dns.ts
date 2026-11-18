@@ -3,7 +3,7 @@ import { keyDnsServers } from "./dns-actions";
 import { errLine, foot, frame, spin } from "./dlg-kit";
 import { h, type Kid } from "./dom";
 import { icon } from "./icons";
-import { countryName, dnsChoices, dnsDefault, dnsPresetOf, hasKeys, keyAppName, LINK, linkAppName, linkChoices, presetDescription, presetName, serverText, type DnsChoice } from "./logic";
+import { countryName, dnsChoices, dnsDefault, dnsPresetOf, hasKeys, keyAppName, LINK, linkAppName, linkChoices, presetDescription, presetName, serversOf, serverText, type DnsChoice } from "./logic";
 import { flag } from "./servers";
 import type { Ctx } from "./state";
 import type { AwgDevice, Platform, ServerEntry } from "./types";
@@ -12,6 +12,15 @@ import type { AwgDevice, Platform, ServerEntry } from "./types";
 // what applies now and which key devices must get their key again. One window for the keys of a server (or of all servers) and
 // the same for the apps that use the link (LINK), which have one DNS for all servers and no keys. State: s.dns (open, pick, all,
 // busy, error, skipped, done); the window does not close when the choice is saved, it turns into the result.
+
+/** What a server is called in the window: the place ("Германия · Франкфурт"), and its number among the twins of its country ("Германия DE-2") when the table says so too. */
+function placeOf(c: Ctx, x: ServerEntry): string {
+  const cc = x.country_code.trim().toUpperCase();
+  const twins = cc && !x.place ? serversOf(c.d).filter((y) => y.country_code.trim().toUpperCase() === cc && !y.place) : [];
+  // the panel names the twins "Germany 2": its number is the server's; else the order in the subscription
+  const n = /\s(\d{1,2})$/.exec(x.label.trim());
+  return twins.length > 1 ? `${serverText(x, c.s.lang)} ${cc}-${n ? n[1] : twins.indexOf(x) + 1}` : serverText(x, c.s.lang);
+}
 
 const server = (c: Pick<Ctx, "d">, id: string | null) => (id && id !== LINK ? c.d.servers.find((x) => x.id === id) : undefined);
 
@@ -64,7 +73,7 @@ function options(c: Ctx, choices: DnsChoice[], now: string, sameDefault: boolean
         h(
           "span",
           { class: "tx" },
-          h("span", { class: "t" }, h("bdi", null, o.isDefault ? (plain ? t.dnsDefaultPlain : t.dnsDefault(o.name.split(/\s+—\s+/)[0] ?? o.name)) : o.name), o.id === now && h("span", { class: "tag" }, t.dnsNow)),
+          h("span", { class: "t" }, o.isDefault ? (plain ? t.dnsDefaultPlain : t.dnsDefault(o.name.split(/\s+—\s+/)[0] ?? o.name)) : o.name, o.id === now && h("span", { class: "tag" }, t.dnsNow)),
           o.description && !plain && h("span", { class: "d" }, o.description),
         ),
       );
@@ -83,8 +92,8 @@ function pick(c: Ctx): Kid[] {
   const sameDefault = !all || targets.every((x) => x.dns && dnsDefault(x.dns) === dnsDefault(srv!.dns!));
   const busy = s.dns.busy !== "";
   const e = s.dns.error;
-  const fail = e && (e.server === LINK || !all ? t.dnsErr(e.code, e.retryMin) : `${serverText(server(c, e.server) ?? srv!, s.lang)}: ${t.dnsErr(e.code, e.retryMin)}`);
-  const chip = (on: boolean, k: string, text: string, click: () => void) => h("button", { class: `a-chip${on ? " on" : ""}`, type: "button", role: "radio", "aria-checked": on, "data-k": k, on: { click } }, h("bdi", null, text));
+  const fail = e && (e.server === LINK || !all ? t.dnsErr(e.code, e.retryMin) : `${placeOf(c, server(c, e.server) ?? srv!)}: ${t.dnsErr(e.code, e.retryMin)}`);
+  const chip = (on: boolean, k: string, text: string, click: () => void) => h("button", { class: `a-chip${on ? " on" : ""}`, type: "button", role: "radio", "aria-checked": on, "data-k": k, on: { click } }, text);
   const body = h(
     "div",
     { class: "a-b" },
@@ -94,7 +103,7 @@ function pick(c: Ctx): Kid[] {
         "div",
         { class: "a-fld" },
         h("p", { class: "a-lbl", id: "dlg-sc" }, t.dgDnsScope),
-        h("div", { class: "a-seg", role: "radiogroup", "aria-labelledby": "dlg-sc" }, chip(all, "dlg-sc-all", t.dgDnsAll, () => a.dns.scope(true)), chip(!all, "dlg-sc-one", t.dgDnsOne(serverText(srv!, s.lang)), () => a.dns.scope(false))),
+        h("div", { class: "a-seg", role: "radiogroup", "aria-labelledby": "dlg-sc" }, chip(all, "dlg-sc-all", t.dgDnsAll, () => a.dns.scope(true)), chip(!all, "dlg-sc-one", t.dgDnsOne(placeOf(c, srv!)), () => a.dns.scope(false))),
       ),
     h("div", { class: "a-fld" }, h("p", { class: "a-lbl", id: "dlg-dns" }, t.dgDnsField), options(c, choices, nowOf(c, srv), sameDefault)),
     fail && errLine(fail),
@@ -140,7 +149,7 @@ function rows(c: Ctx, list: AwgDevice[]): HTMLElement {
         "div",
         { class: "a-opt" },
         srv && flag(c, srv, true),
-        h("span", { class: "tx" }, h("span", { class: "t" }, h("bdi", null, name)), h("span", { class: "d" }, country ? t.dgDoneRow(country) : t.dgDoneRowNo)),
+        h("span", { class: "tx" }, h("span", { class: "t" }, name), h("span", { class: "d" }, country ? t.dgDoneRow(country) : t.dgDoneRowNo)),
         h("button", { class: "u-btn", type: "button", "data-k": `dlg-get-${x.id}`, disabled: busy, "aria-busy": busy ? "true" : false, "aria-label": t.dgGetAria(name), on: { click: () => !busy && a.amz.renew(x.id) } }, busy && spin(), busy ? t.awgBusy : t.dgGet),
       );
     }),
@@ -159,7 +168,7 @@ function done(c: Ctx): Kid[] {
   let lead: string;
   if (link) lead = t.dgDoneLink(d.dns!.refresh_hours);
   else if (stale.length === 0) lead = all ? t.dgDoneNoneAll : t.dgDoneNoneOne;
-  else lead = all ? t.dgDoneAll(name, desc) : t.dgDoneOne(serverText(srv!, s.lang), name, desc);
+  else lead = all ? t.dgDoneAll(name, desc) : t.dgDoneOne(placeOf(c, srv!), name, desc);
   const skipped = s.dns.skipped.map((id) => server(c, id)).filter((x): x is ServerEntry => !!x);
   const renewFail = s.amz.error && s.amz.errorAt.startsWith("renew:") && stale.some((x) => `renew:${x.id}` === s.amz.errorAt) ? errLine(t.err(s.amz.error, s.amz.retryMin)) : null;
   return frame(c, {
@@ -170,7 +179,7 @@ function done(c: Ctx): Kid[] {
       "div",
       { class: "a-b" },
       h("p", { class: "a-lead" }, lead),
-      all && skipped.length > 0 && h("p", { class: "u-hint" }, t.dgDoneSkip(skipped.map((x) => serverText(x, s.lang)).join(", "))),
+      all && skipped.length > 0 && h("p", { class: "u-hint" }, t.dgDoneSkip(skipped.map((x) => placeOf(c, x)).join(", "))),
       !link && stale.length > 0 && rows(c, stale),
       renewFail,
     ),
