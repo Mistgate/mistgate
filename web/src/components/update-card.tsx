@@ -4,6 +4,7 @@ import { useT } from "@/i18n";
 import { buttonClass } from "@/components/ui/button";
 import { useStaleVersion } from "@/lib/stale";
 import { meQuery } from "@/lib/session";
+import { RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { updateNotices, updatesQuery, useIsOwner, type UpdateNotice } from "@/lib/updates";
 
 // The owner learns about a release without opening Updates: a card at the foot of the menu (and the version beside Updates in
@@ -25,6 +26,19 @@ export function useUpdateNotice(): UpdateNotice | undefined {
   const active = owner && !stale;
   const { data } = useQuery({ ...updatesQuery, enabled: active, refetchInterval: pollMs });
   return active ? updateNotices(data)[0] : undefined;
+}
+
+/**
+ * A rollout the owner started and has not seen the end of: "paused" (it stopped on a node that failed its check and waits for
+ * the owner) or "running". The notice above is silent while a rollout is active, so the menu marks Updates with this instead.
+ */
+export function useRolloutMark(): "paused" | "running" | undefined {
+  const owner = useIsOwner();
+  const stale = useStaleVersion() !== "";
+  const active = owner && !stale;
+  const { data } = useQuery({ ...updatesQuery, enabled: active, refetchInterval: pollMs });
+  const st = active ? data?.rollout?.status : undefined;
+  return st === RolloutStatus.PAUSED ? "paused" : st === RolloutStatus.RUNNING ? "running" : undefined;
 }
 
 export function UpdateCard() {

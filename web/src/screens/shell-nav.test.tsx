@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
-import { BundleStatus, NodeUpdateState } from "@/gen/mistgate/admin/v1/update_pb";
+import { BundleStatus, NodeUpdateState, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { setLang } from "@/i18n";
 import { setMenuFolded } from "@/lib/menu";
 import { overviewQuery, userCountQuery } from "@/lib/queries";
@@ -64,7 +64,7 @@ const card = (id: string, status: NodeStatus, reason?: string) => ({ id, name: i
 const release = (version: string) => ({ version, url: "", checkedUnix: 1, available: true, supported: true, installable: true, installing: false, errorKey: "" });
 
 /** The shell on a seeded cache: three nodes (one broken, one needs a look), 12 people (4 online), 2 approvals, a newer release. */
-async function mount(over: { update?: boolean; role?: Role; demo?: { mobile?: boolean } } = {}) {
+async function mount(over: { update?: boolean; rollout?: RolloutStatus; role?: Role; demo?: { mobile?: boolean } } = {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, refetchInterval: false } } });
   qc.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role: over.role ?? Role.OWNER }, version: "0.1.71", sourceUrl: "", stepUpUntilUnix: 0 } as never);
   qc.setQueryData(overviewQuery().queryKey, {
@@ -81,6 +81,7 @@ async function mount(over: { update?: boolean; role?: Role; demo?: { mobile?: bo
     bundle: { status: BundleStatus.TRUSTED, version: "v0.1.71", built: 100 },
     nodes: [{ nodeId: "n1", name: "nl1", state: NodeUpdateState.UP_TO_DATE, supportsUpdate: true, built: 100 }],
   } as never);
+  if (over.rollout) qc.setQueryData(updatesQuery.queryKey, { ...(qc.getQueryData(updatesQuery.queryKey) as object), rollout: { status: over.rollout, steps: [] } } as never);
   if (over.update === false) qc.setQueryData(updatesQuery.queryKey, { ...(qc.getQueryData(updatesQuery.queryKey) as object), panel: { version: "v0.1.71", built: 100, update: { ...release("v0.1.71"), available: false } } } as never);
   host = document.createElement("div");
   document.body.append(host);
@@ -161,6 +162,12 @@ describe("the menu column", () => {
     await mount({ role: Role.HELPER });
     expect(aside().querySelector("section")).toBeNull();
     expect(link("Updates")!.textContent).toBe("Updates");
+  });
+
+  it("marks Updates while a rollout waits for the owner, over the release beside it", async () => {
+    await mount({ rollout: RolloutStatus.PAUSED });
+    expect(link("Updates")!.textContent).toBe("Updates!");
+    expect(link("Updates")!.querySelector("[role=img]")!.getAttribute("aria-label")).toBe("Paused");
   });
 
   it("opens the owner's menu above the button, with the way to sign-in, sessions and settings, and Esc brings the focus back", async () => {

@@ -2,7 +2,7 @@ import { Tooltip } from "@base-ui/react/tooltip";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { CSSProperties, ReactElement, ReactNode, Ref } from "react";
-import { UpdateCard, useUpdateNotice, vee } from "@/components/update-card";
+import { UpdateCard, useRolloutMark, useUpdateNotice, vee } from "@/components/update-card";
 import { Brand, Logo } from "@/components/brand";
 import { navKey, sections, type Section, type SectionId } from "@/components/nav";
 import { chooseLanguage, ThemeToggle } from "@/components/prefs";
@@ -39,6 +39,7 @@ export type NavMeta = {
   problems: { n: number; tone: "bad" | "warn" };
   approvals: number;
   update: ReturnType<typeof useUpdateNotice>;
+  rollout: ReturnType<typeof useRolloutMark>;
 };
 
 export function useNavMeta(): NavMeta {
@@ -46,6 +47,7 @@ export function useNavMeta(): NavMeta {
   const cards = useFleetNodes();
   const approvals = useAwaitingApprovals();
   const update = useUpdateNotice();
+  const rollout = useRolloutMark();
   const n = problemCount(s);
   return {
     fleet: s.nodes > 0,
@@ -56,6 +58,7 @@ export function useNavMeta(): NavMeta {
     problems: { n, tone: healthKind(s.broken, n, s.critical) === "bad" ? "bad" : "warn" },
     approvals,
     update,
+    rollout,
   };
 }
 
@@ -65,6 +68,9 @@ type Pill = { text: string; tone?: "warn" | "sky" | "bad"; label?: string };
 function pillOf(id: SectionId, m: NavMeta, t: T): Pill | null {
   if (id === "health" && m.problems.n > 0) return { text: String(m.problems.n), tone: m.problems.tone, label: t.n("health.problems", m.problems.n) };
   if (id === "ai" && m.approvals > 0) return { text: String(m.approvals), tone: "sky", label: t.n("int.badge", m.approvals) };
+  // a rollout that stopped and waits for the owner outranks "there is an update"; a running one says so quietly
+  if (id === "updates" && m.rollout === "paused") return { text: "!", tone: "warn", label: t("up.ro.status.paused") };
+  if (id === "updates" && m.rollout === "running") return { text: "…", label: t("up.ro.status.running") };
   if (id === "updates" && m.update) {
     const u = m.update;
     return { text: u.kind === "panel" ? vee(u.version) : String(u.outdated), label: t(u.kind === "panel" ? "up.toast.panelTitle" : "up.toast.nodesTitle", { version: vee(u.version) }) };
