@@ -689,7 +689,7 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 			return nil, err
 		}
 	}
-	switch err := a.UpdateUser(ctx, u, setNodes); {
+	switch err := a.UpdateUser(ctx, u, setNodes, store.AccessGroupChange{}); { // the extra groups change through the API only from step 3
 	case errors.Is(err, store.ErrAccessExists):
 		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
@@ -725,10 +725,12 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	return connect.NewResponse(&adminv1.UpdateUserResponse{User: users[0], Impact: impact}), nil
 }
 
-// groupChangeImpact is what moving the user to another group does to their profiles and AmneziaVPN keys.
+// groupChangeImpact is what moving the user to another main group does to their profiles and AmneziaVPN keys: the profiles of
+// all their groups before against the ones after, where the new main group takes the place of the old one and the extra groups
+// stay (the new main group leaves them).
 func (s *Service) groupChangeImpact(ctx context.Context, u store.AccessUser, to string) (*adminv1.AccessImpact, error) {
 	a := s.st.Access()
-	from, err := a.Group(ctx, u.GroupID)
+	from, err := a.UserGroups(ctx, u)
 	if err != nil {
 		return nil, s.internal("group", err)
 	}
@@ -738,11 +740,17 @@ func (s *Service) groupChangeImpact(ctx context.Context, u store.AccessUser, to 
 	} else if err != nil {
 		return nil, s.internal("group", err)
 	}
+	after := store.AccessGroups{next}
+	for _, g := range from[1:] {
+		if g.ID != next.ID {
+			after = append(after, g)
+		}
+	}
 	awg, err := a.AWGDevicesPerProfile(ctx, "", u.ID)
 	if err != nil {
 		return nil, s.internal("awg devices", err)
 	}
-	return s.impactOf(ctx, from.ProfileIDs, next.ProfileIDs, 1, awg)
+	return s.impactOf(ctx, from.ProfileIDs(), after.ProfileIDs(), 1, awg)
 }
 
 func checkIDs(ids []string) error {

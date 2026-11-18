@@ -142,11 +142,14 @@ func deleteProfileStmts(id string, now time.Time) []Stmt {
 // AccessBrief is a user id and name.
 type AccessBrief struct{ ID, Name string }
 
-// ProfileUsers lists users whose group contains the profile and whose app toggles allow it. Ordered by name.
+// ProfileUsers lists users with a group (the main one or an extra one) that contains the profile and whose app toggles allow
+// it, each once. Ordered by name.
 func (a Access) ProfileUsers(ctx context.Context, profileID string, happ, amnezia, telegram, trustTunnel bool) ([]AccessBrief, error) {
 	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT u.id, u.name FROM user u JOIN user_group_profile gp ON gp.group_id = u.group_id
-		 WHERE gp.profile_id = ? AND ((? = 1 AND u.app_happ = 1) OR (? = 1 AND u.app_amnezia = 1) OR (? = 1 AND u.app_telegram = 1) OR (? = 1 AND u.app_trusttunnel = 1))
+		`SELECT u.id, u.name FROM user u
+		 WHERE u.id IN (SELECT m.id FROM user_group_profile gp JOIN user m ON m.group_id = gp.group_id WHERE gp.profile_id = ?1
+		                UNION SELECT x.user_id FROM user_group_profile gp JOIN user_extra_group x ON x.group_id = gp.group_id WHERE gp.profile_id = ?1)
+		   AND ((?2 = 1 AND u.app_happ = 1) OR (?3 = 1 AND u.app_amnezia = 1) OR (?4 = 1 AND u.app_telegram = 1) OR (?5 = 1 AND u.app_trusttunnel = 1))
 		 ORDER BY u.name`, profileID, accBool(happ), accBool(amnezia), accBool(telegram), accBool(trustTunnel))
 	if err != nil {
 		return nil, err
@@ -514,9 +517,11 @@ type AccessGroup struct {
 	ID, Name        string
 	ProfileIDs      []string
 	DisabledNodeIDs []string
-	UserCount       int
-	CreatedAt       time.Time
-	DNSPresetID     string // "" = the instance default
+	UserCount       int // people whose main group it is
+	// ExtraUserCount is the people who have it as an extra group (user_extra_group). Read by groups() only.
+	ExtraUserCount int
+	CreatedAt      time.Time
+	DNSPresetID    string // "" = the instance default
 	// Color is a tone of GroupTones, "" = none picked. CreateGroup fills in the least used tone when it is empty.
 	Color string
 }
@@ -560,12 +565,14 @@ func (gs AccessGroups) ProfileIDs() []string {
 	return slices.Compact(out)
 }
 
-// GroupsOf picks the person's groups out of all groups by id: the main one first. A group that is not in the map (it was
-// deleted since the person was read) is skipped.
+// GroupsOf picks the person's groups out of all groups by id: the main one first, then the extra ones. A group that is not in
+// the map (it was deleted since the person was read) is skipped.
 func GroupsOf(u AccessUser, byID map[string]AccessGroup) AccessGroups {
-	out := make(AccessGroups, 0, 1)
-	if g, ok := byID[u.GroupID]; ok {
-		out = append(out, g)
+	out := make(AccessGroups, 0, 1+len(u.ExtraGroupIDs))
+	for _, id := range append([]string{u.GroupID}, u.ExtraGroupIDs...) {
+		if g, ok := byID[id]; ok {
+			out = append(out, g)
+		}
 	}
 	return out
 }
@@ -601,15 +608,15 @@ func groupsWithLists(groups []AccessGroup, profiles, disabled []groupItem) Acces
 	return groups
 }
 
-// accUserGroupIDs is the SQL list of the ids of one person's groups, where userExpr is the SQL of the person's id (a
-// placeholder, or a subquery of one).
+// accUserGroupIDs is the SQL list of the ids of one person's groups, the main one and the extra ones, where userExpr is the SQL
+// of the person's id (a numbered placeholder, or a subquery of one: it is written twice, so it must not be a bare "?").
 func accUserGroupIDs(userExpr string) string {
-	return `SELECT group_id FROM user WHERE id = ` + userExpr
+	return `SELECT group_id FROM user WHERE id = ` + userExpr + ` UNION ALL SELECT group_id FROM user_extra_group WHERE user_id = ` + userExpr
 }
 
 // UserGroups reads the person's groups, the main one first; ErrNotFound when the main group is gone.
 func (a Access) UserGroups(ctx context.Context, u AccessUser) (AccessGroups, error) {
-	all, err := a.groups(ctx, []string{u.GroupID})
+	all, err := a.groups(ctx, append([]string{u.GroupID}, u.ExtraGroupIDs...))
 	if err != nil {
 		return nil, err
 	}
@@ -732,6 +739,26 @@ func (a Access) groups(ctx context.Context, ids []string) ([]AccessGroup, error)
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	xrows, err := a.s.R.QueryContext(ctx,
+		`SELECT group_id, count(*) FROM user_extra_group WHERE (json_array_length(?1) = 0 OR group_id IN (SELECT value FROM json_each(?1))) GROUP BY group_id`, list)
+	if err != nil {
+		return nil, err
+	}
+	for xrows.Next() {
+		var gid string
+		var n int
+		if err := xrows.Scan(&gid, &n); err != nil {
+			xrows.Close()
+			return nil, err
+		}
+		if i, ok := idx[gid]; ok {
+			out[i].ExtraUserCount = n
+		}
+	}
+	xrows.Close()
+	if err := xrows.Err(); err != nil {
+		return nil, err
+	}
 	prow, err := a.s.R.QueryContext(ctx,
 		`SELECT group_id, profile_id FROM user_group_profile WHERE (json_array_length(?1) = 0 OR group_id IN (SELECT value FROM json_each(?1))) ORDER BY profile_id`, list)
 	if err != nil {
@@ -845,8 +872,12 @@ func (a Access) DeleteGroup(ctx context.Context, id, moveTo string) error {
 		}
 		return err
 	}
+	// The people of the group are the ones that have it as their main group; the ones that have it as an extra group just leave it
+	// (their rows go with the group). A person that is moved to a group they already have as an extra group keeps it as the
+	// main one only (user_extra_group never holds a person's main group): the extra row goes first.
 	_, err = a.s.batch(ctx,
 		guard(`EXISTS (SELECT 1 FROM user_group WHERE id = ?)`, id),
+		Stmt{Query: `DELETE FROM user_extra_group WHERE group_id = ?1 AND user_id IN (SELECT id FROM user WHERE group_id = ?2)`, Args: []any{moveTo, id}},
 		Stmt{Query: `UPDATE user SET group_id = ? WHERE group_id = ?`, Args: []any{moveTo, id}},
 		Stmt{Query: `DELETE FROM user_group WHERE id = ?`, Args: []any{id}},
 	)

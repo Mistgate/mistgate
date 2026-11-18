@@ -221,6 +221,24 @@ func (a Access) RelayReachabilityUsers(ctx context.Context) ([]RelayReachability
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	xrows, err := a.s.R.QueryContext(ctx, `SELECT user_id, group_id FROM user_extra_group ORDER BY group_id`)
+	if err != nil {
+		return nil, err
+	}
+	for xrows.Next() {
+		var uid, gid string
+		if err := xrows.Scan(&uid, &gid); err != nil {
+			xrows.Close()
+			return nil, err
+		}
+		if i, ok := idx[uid]; ok {
+			out[i].GroupIDs = append(out[i].GroupIDs, gid)
+		}
+	}
+	xrows.Close()
+	if err := xrows.Err(); err != nil {
+		return nil, err
+	}
 	nrows, err := a.s.R.QueryContext(ctx, `SELECT user_id, node_id FROM user_node ORDER BY node_id`)
 	if err != nil {
 		return nil, err

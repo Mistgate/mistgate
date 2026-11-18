@@ -1493,7 +1493,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 			t.Fatal(err)
 		}
 		u.Name, u.AllNodes, u.NodeIDs = "After", false, []string{"nod_update_user"}
-		if err := st.Access().UpdateUser(ctx, u, true); err != nil {
+		if err := st.Access().UpdateUser(ctx, u, true, AccessGroupChange{}); err != nil {
 			t.Fatal(err)
 		}
 		if got, err := st.Access().User(ctx, u.ID); err != nil || got.Name != "After" || len(got.NodeIDs) != 1 || got.NodeIDs[0] != "nod_update_user" {
@@ -2516,6 +2516,11 @@ func TestD1OwnProbeEnrollUsesOneStatement(t *testing.T) {
 	if calls.queries != 1 || calls.batches != 0 {
 		t.Fatalf("EnrollOwnProbe used %d sequential D1 calls and %d batches, want one UPDATE RETURNING", calls.queries, calls.batches)
 	}
+}
+
+// The extra groups of a person on D1: the same proof as on SQLite (extra_group_test.go).
+func TestD1ExtraGroups(t *testing.T) {
+	extraGroupStoreProof(t, openD1Store)
 }
 
 func TestD1RelaysStorage(t *testing.T) {
