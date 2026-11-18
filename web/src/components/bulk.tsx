@@ -1,14 +1,14 @@
 import { Menu } from "@base-ui/react/menu";
 import { Link, useBlocker } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon, IconChip, type IconName, type Tone } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { selectItemClass, selectPopupClass } from "@/components/ui/select";
-import { StatusDot, StatusPill, type StatusKind } from "@/components/ui/status";
+import { StatusPill, type StatusKind } from "@/components/ui/status";
 import { dirOf, useLang, useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
-import type { Job, Row, Skipped, Target } from "@/lib/batch";
+import type { Row, Skipped, Target } from "@/lib/batch";
 import { cx } from "@/lib/cx";
 
 // The parts the bulk bars of the Nodes and Users pages share: the dock the bar floats in, the row of actions and its
@@ -25,63 +25,6 @@ export type MenuEntry<A extends string> = { id: A; meta: ActionMeta; avail: Avai
 
 /** A link to a row's own page: the router's `to`, its params and search. */
 export type RowLink = { to: string; params?: Record<string, string>; search?: Record<string, unknown> };
-
-/**
- * The dock's material: translucent, blurred, the dock radius and its one shadow. Floating, it sits at the foot of the
- * content (beside the sidebar on a desktop, in the dock's place on a phone); `float={false}` draws it in place (dev kit).
- */
-export function BulkDock({ float = true, wide, region, children }: { float?: boolean; wide?: boolean; region: string; children: ReactNode }) {
-  const frame = (
-    <div
-      role="region"
-      aria-label={region}
-      className={cx(
-        "pointer-events-auto flex w-full flex-col overflow-hidden rounded-dock border border-line bg-dock shadow-(--shadow-dock) backdrop-blur-[16px]",
-        "transition-[translate,opacity] duration-200 ease-out-soft starting:translate-y-3 starting:opacity-0 md:w-fit md:max-w-full",
-        wide && "md:min-w-[min(100%,640px)]",
-      )}
-    >
-      {children}
-    </div>
-  );
-  if (!float) return frame;
-  return (
-    <div data-bulk-bar className="pointer-events-none fixed inset-x-3.5 bottom-3.5 z-20 flex justify-center md:inset-s-(--menu-w) md:inset-e-0 md:bottom-6 md:px-5 rail:px-8">
-      {frame}
-    </div>
-  );
-}
-
-/**
- * Narrow when the full row (every action on the bar) is wider than the room the bar can take, its frame's parent: then
- * the actions that can go move into "More". Measured, not guessed, since the words differ by language; unknown
- * (no layout, as in tests) reads as wide.
- */
-export function useNarrow(ref: RefObject<HTMLElement | null>): boolean {
-  const lang = useLang();
-  // decided per language: another one has other widths, so it starts wide and is measured again
-  const [seen, setSeen] = useState({ lang, narrow: false });
-  const narrow = seen.lang === lang && seen.narrow;
-  const need = useRef(0);
-  useLayoutEffect(() => {
-    const row = ref.current;
-    const room = row?.parentElement?.parentElement;
-    if (!row || !room) return;
-    const check = () => {
-      if (!narrow) need.current = row.scrollWidth;
-      const cs = getComputedStyle(room);
-      const w = room.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      const next = w > 0 && need.current > w + 1;
-      setSeen((p) => (p.lang === lang && p.narrow === next ? p : { lang, narrow: next }));
-    };
-    check();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(check);
-    ro.observe(room);
-    return () => ro.disconnect();
-  }, [ref, narrow, lang]);
-  return narrow;
-}
 
 export const barButton =
   "inline-flex h-10 flex-none items-center gap-2 rounded-ctl px-2.5 text-[13px] font-bold whitespace-nowrap text-fg outline-none transition-[background-color,transform] duration-150 ease-out-soft hover:bg-surface-2 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-surface-2 disabled:pointer-events-none disabled:opacity-35";
@@ -171,138 +114,6 @@ export type PanelHead = {
   hint?: string;
 };
 
-/**
- * The batch above the bar: what runs and how far ("SSH password change · 3 of 7", Stop), a bar that fills, then a row per
- * item (name, what came of it, "Open" to its card). At the end the summary takes the head, with Retry for the failed and
- * the never-started, `extra` (a button of the page's own) and Close; only the summary is read out. With `fold`, a batch
- * of more rows than that shows counters in place of the rows that went well, and keeps the failed ones in sight.
- */
-export function BatchPanel({
-  job,
-  rows,
-  head,
-  open,
-  fold,
-  extra,
-  onStop,
-  onRetry,
-  onClose,
-}: {
-  job: Job;
-  rows: readonly Row[];
-  head: PanelHead;
-  /** The row's own page, when it has one to show (an "Open" link). */
-  open?: (row: Row) => RowLink | null;
-  fold?: number;
-  extra?: ReactNode;
-  onStop: () => void;
-  onRetry: () => void;
-  onClose: () => void;
-}) {
-  const t = useT();
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setShown(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-  const count = (s: Row["state"]) => rows.filter((r) => r.state === s).length;
-  const [ok, bad, skipped, notStarted, running, waiting] = [count("ok"), count("bad"), count("skipped"), count("notStarted"), count("running"), count("waiting")];
-  const total = rows.length - skipped;
-  const done = ok + bad + notStarted;
-  const again = bad + notStarted;
-  const finished = !job.running;
-  const folded = !!fold && rows.length > fold;
-  const list = folded ? rows.filter((r) => r.state === "bad") : rows;
-  return (
-    <div className="grid transition-[grid-template-rows] duration-[250ms] ease-out-soft" style={{ gridTemplateRows: shown ? "1fr" : "0fr" }}>
-      <div className="min-h-0 overflow-hidden">
-        <div data-batch className="@container flex max-h-[min(60dvh,520px)] flex-col border-b border-line">
-          {/* the title's line is the chip's height: they line up with no nudge, and the hint falls under the title */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
-            <div className="flex min-w-0 flex-[1_1_240px] items-start gap-2.5">
-              <IconChip icon={head.icon} tone={head.tone} size={20} />
-              <div className="flex min-w-0 flex-col">
-                {!finished && (
-                  <p className="min-w-0 text-[13px] leading-5 font-bold">
-                    {head.title} <span className="font-mono text-xs font-medium text-muted tabular-nums">· {t("bulk.progress", { done, n: total })}</span>
-                  </p>
-                )}
-                <p aria-live="polite" className={finished ? "min-w-0 text-[13px] leading-5 font-bold text-pretty" : "sr-only"}>
-                  {finished && (
-                    <>
-                      {head.done(rows.length, ok)}
-                      {[bad && t.n("bulk.sum.bad", bad), skipped && t.n("bulk.sum.skipped", skipped), notStarted && t.n("bulk.sum.notStarted", notStarted)]
-                        .filter(Boolean)
-                        .map((part) => (
-                          <span key={String(part)} className="font-medium text-muted">
-                            {" · "}
-                            {part}
-                          </span>
-                        ))}
-                    </>
-                  )}
-                </p>
-                {finished && bad > 0 && head.hint && <p className="text-xs leading-snug text-pretty text-muted">{head.hint}</p>}
-              </div>
-            </div>
-            <div className="ms-auto flex flex-none flex-wrap gap-2">
-              {!finished && (
-                <Button variant="secondary" size="sm" disabled={job.stopping} onClick={onStop}>
-                  {job.stopping ? t("bulk.stopping") : t("bulk.stop")}
-                </Button>
-              )}
-              {finished && again > 0 && (job.spec.call || job.spec.many) && (
-                <Button variant="secondary" size="sm" onClick={onRetry}>
-                  <Icon name="refresh" size={12} />
-                  {t("bulk.retry", { n: again })}
-                </Button>
-              )}
-              {finished && extra}
-              {finished && (
-                <Button variant="ghost" size="sm" onClick={onClose}>
-                  {t("common.close")}
-                </Button>
-              )}
-            </div>
-          </div>
-          {!finished && (
-            <div role="progressbar" aria-label={head.title} aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} className="mx-4 mb-1 h-1 flex-none overflow-hidden rounded-full bg-surface-2">
-              <div className="h-full origin-left rounded-full bg-accent transition-transform duration-300 ease-out-soft rtl:origin-right" style={{ transform: `scaleX(${total > 0 ? Math.max(0.03, done / total) : 0})` }} />
-            </div>
-          )}
-          {folded && !finished && (
-            <p data-fold className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-1 pb-3 text-xs font-medium text-muted tabular-nums">
-              {(
-                [
-                  [ok, "ok", t("bulk.fold.done", { n: ok })],
-                  [running, "busy", t("bulk.fold.running", { n: running })],
-                  [waiting, "off", t("bulk.fold.waiting", { n: waiting })],
-                  [skipped, "off", t.n("bulk.sum.skipped", skipped)],
-                  [notStarted, "off", t.n("bulk.sum.notStarted", notStarted)],
-                ] as const
-              )
-                .filter(([n]) => n > 0)
-                .map(([, kind, text]) => (
-                  <span key={text} className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <StatusDot kind={kind} />
-                    {text}
-                  </span>
-                ))}
-            </p>
-          )}
-          {list.length > 0 && (
-            <ul className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto] content-start gap-x-3 overflow-y-auto overscroll-contain px-4 pb-1 @lg:grid-cols-[minmax(0,13rem)_auto_minmax(0,1fr)]">
-              {list.map((r) => (
-                <BatchRow key={r.id} row={r} link={open?.(r) ?? null} />
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function BatchRow({ row, link }: { row: Row; link: RowLink | null }) {
   const t = useT();
   const look = stateLook[row.state];
@@ -340,47 +151,6 @@ export function BatchRow({ row, link }: { row: Row; link: RowLink | null }) {
 
 // ---------------------------------------------------------------------------------------------------
 // Quick picks
-
-/** One row of "Select ▾": its words and the ids it picks; no ids yet (still being collected) reads "…" and cannot be chosen. */
-export type QuickPick = { label: string; ids?: readonly string[] } | null;
-
-/**
- * "Select ▾" by the filters: every pick replaces the selection, and the last one clears it. `null` is a divider. `head` is a
- * line above the rows; `onOpenChange` lets a page start collecting what its picks need only once the menu opens.
- */
-export function PickMenu({ picks, any, head, onPick, onOpenChange }: { picks: readonly QuickPick[]; any: boolean; head?: string; onPick: (ids: readonly string[]) => void; onOpenChange?: (open: boolean) => void }) {
-  const t = useT();
-  return (
-    <Menu.Root onOpenChange={(o) => onOpenChange?.(o)}>
-      <Menu.Trigger className="flex h-9 flex-none items-center gap-2 rounded-ctl border border-line bg-surface px-3 text-xs font-medium text-fg outline-none transition-colors duration-200 focus-visible:border-accent data-popup-open:border-accent-line">
-        <Icon name="check" size={12} className="text-muted" />
-        {t("bulk.pick")}
-        <Icon name="chevronDown" size={12} className="text-muted" />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner sideOffset={6} align="start" className="z-50 outline-none">
-          <Menu.Popup aria-busy={picks.some((p) => p && !p.ids) || undefined} className={cx(selectPopupClass, "min-w-52")}>
-            {head && <p className="px-2.5 py-1.5 text-[11px] font-medium text-muted">{head}</p>}
-            {picks.map((p, i) =>
-              p ? (
-                <Menu.Item key={p.label} disabled={!p.ids || p.ids.length === 0} onClick={() => p.ids && onPick(p.ids)} className={cx(selectItemClass, "justify-between gap-4 data-disabled:cursor-default data-disabled:text-muted")}>
-                  {p.label}
-                  <span className="font-mono text-xs font-medium text-muted tabular-nums">{p.ids ? p.ids.length : "…"}</span>
-                </Menu.Item>
-              ) : (
-                <Menu.Separator key={`sep${i}`} className="mx-2.5 my-1 h-px bg-line" />
-              ),
-            )}
-            <Menu.Separator className="mx-2.5 my-1 h-px bg-line" />
-            <Menu.Item disabled={!any} onClick={() => onPick([])} className={cx(selectItemClass, "data-disabled:cursor-default data-disabled:text-muted")}>
-              {t("bulk.clear")}
-            </Menu.Item>
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
-  );
-}
 
 // ---------------------------------------------------------------------------------------------------
 // Under a confirm

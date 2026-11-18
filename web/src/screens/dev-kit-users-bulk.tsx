@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
-import { PickMenu } from "@/components/bulk";
 import { SectionLabel } from "@/components/ui/bits";
 import { Button } from "@/components/ui/button";
 import { ToastProvider } from "@/components/ui/toast";
@@ -159,31 +158,6 @@ function Confirm({ id, title, which }: { id: string; title: string; which: "exte
   );
 }
 
-/** "Select" with the list still being collected, and with its numbers. */
-function PickShot({ id, title, loaded, phone }: { id: string; title: string; loaded: boolean; phone?: boolean }) {
-  const t = useT();
-  const ids = (keep: (u: UserN) => boolean) => (loaded ? everyone.filter(keep).map((u) => u.id) : undefined);
-  return (
-    <Shot id={id} title={title} phone={phone}>
-      <div className="flex min-h-[340px] items-start gap-2">
-        <PickMenu
-          any
-          onPick={noop}
-          picks={[
-            { label: t("bulk.people.pick.page"), ids: everyone.slice(0, 50).map((u) => u.id) },
-            { label: t("bulk.people.pick.all"), ids: ids(() => true) },
-            null,
-            { label: t("bulk.people.pick.expired"), ids: ids((u) => u.status === UserStatus.EXPIRED) },
-            { label: t("bulk.people.pick.disabled"), ids: ids((u) => u.status === UserStatus.DISABLED) },
-            { label: t("bulk.people.pick.noAccess"), ids: ids((u) => u.id.endsWith("7")) },
-            { label: t("bulk.people.pick.neverSeen"), ids: ids((u) => u.lastSeenUnix === 0) },
-          ]}
-        />
-      </div>
-    </Shot>
-  );
-}
-
 export function UsersBulkKit() {
   const jobs = useJobs();
   const frames = (phone: boolean) => (
@@ -210,8 +184,6 @@ export function UsersBulkKit() {
     <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-8">
       {frames(false)}
       <div className="flex flex-wrap items-start gap-8">{frames(true)}</div>
-      <PickShot id="ub-pick-loading" title="Select, while the list is collected" loaded={false} />
-      <PickShot id="ub-pick" title="Select, with its numbers" loaded />
       <Confirm id="ub-extend" title="Confirm: the term" which="extend" />
       <Confirm id="ub-disable" title="Confirm: disable" which="disable" />
       <Confirm id="ub-enable" title="Confirm: enable" which="enable" />
