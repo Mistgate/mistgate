@@ -53,7 +53,10 @@ export function CreateUserModal({ open, onOpenChange, onCreated, startName, star
     <Modal
       open={open}
       onOpenChange={(o) => {
-        if (!o) setDone(null);
+        if (!o) {
+          setDone(null);
+          setQr(false);
+        }
         onOpenChange(o);
       }}
       title={done ? t("ul.new.done") : t("users.new")}
