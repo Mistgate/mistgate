@@ -106,36 +106,69 @@ canvas.mg-wave {
   }
 }
 
-/* the toast comes out with a halo of dots in the accent (only with the effects on) */
+/* the toast comes out with a ring of dots in the accent that spreads from it, 1.2 s (only with the effects on): the board's last word
+   (pn.css, th:), which replaced its first, a halo that breathed for 8 s */
+@property --thr {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
 .toast-halo {
   position: absolute;
   left: 50%;
   bottom: -24px;
   z-index: -1;
   width: 560px;
-  height: 200px;
+  height: 176px;
   transform: translateX(-50%);
   pointer-events: none;
   background-image: radial-gradient(circle, color-mix(in srgb, var(--accent) 80%, transparent) 1.2px, transparent 1.7px);
   background-size: 10px 10px;
-  mask-image: radial-gradient(closest-side, #000 0%, transparent 100%);
-  animation: mg-toast-halo 8s var(--e) both;
+  mask-image: radial-gradient(ellipse calc(var(--thr) * 2.4) var(--thr) at 50% calc(100% - 46px), rgba(0, 0, 0, 0.3) 0, rgba(0, 0, 0, 0.45) 45%, #000 78%, rgba(0, 0, 0, 0.5) 90%, transparent 100%);
+  animation: mg-toast-ring 1.2s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
-@keyframes mg-toast-halo {
+@keyframes mg-toast-ring {
   0% {
+    --thr: 8px;
     opacity: 0;
-    transform: translateX(-50%) scale(0.7);
   }
-  8% {
-    opacity: 0.9;
-    transform: translateX(-50%);
+  15% {
+    opacity: 0.75;
   }
-  40% {
-    opacity: 0.5;
+  50% {
+    opacity: 0.45;
   }
   100% {
-    opacity: 0.25;
-    transform: translateX(-50%);
+    --thr: 112px;
+    opacity: 0;
+  }
+}
+@keyframes mg-toast-ring-s {
+  0% {
+    --thr: 8px;
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 0.45;
+  }
+  100% {
+    --thr: 84px;
+    opacity: 0;
+  }
+}
+@media (max-width: 720px) {
+  .toast-halo {
+    width: 340px;
+    height: 150px;
+    animation-name: mg-toast-ring-s;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-halo {
+    display: none;
   }
 }
 
