@@ -13,7 +13,7 @@ import { userTabs, UserDetail, type UserTab } from "./users/user-detail";
 // The scenes of /dev-kit?only=pn-user draw the real page on made-up data: every state a frame names must draw, in every language and
 // for every role, and each tab shows its own cards.
 
-vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) } }));
+vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, users: {} }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className }: { children?: ReactNode; className?: string }) => <a className={className}>{children}</a>,
   useBlocker: () => ({ status: "idle" }),
@@ -70,6 +70,23 @@ describe("the scenes of the person's page", () => {
     expect(host!.textContent).not.toContain("undefined");
     expect(host!.querySelector(marker[scene.tab])).not.toBeNull();
     expect(host!.querySelectorAll("[role=tab]")).toHaveLength(5);
+  });
+
+  it("draws the page password in each of its states: with a password, removed, and off for the whole instance", async () => {
+    const overview = (state: string) => ({ state, tab: "overview" as UserTab, role: Role.OWNER, ui: "" });
+    await draw(overview("ok"));
+    expect(host!.querySelector("[data-pw=set]")?.textContent).toContain("••••••••••••");
+    expect([...host!.querySelectorAll("[data-pw] button")].map((b) => b.textContent)).toEqual(expect.arrayContaining(["Show", "Change", "Remove"]));
+    act(() => root?.unmount());
+    host?.remove();
+    await draw(overview("pw-removed"));
+    expect(host!.querySelector("[data-pw=removed]")?.textContent).toContain("not set, anyone with the link can open the page");
+    expect([...host!.querySelectorAll("[data-pw] button")].map((b) => b.textContent)).toEqual(["Bring the password back"]);
+    act(() => root?.unmount());
+    host?.remove();
+    await draw(overview("pw-off"));
+    expect(host!.querySelector("[data-pw=off]")?.textContent).toContain("Page passwords are switched off for everyone.");
+    expect(host!.querySelectorAll("[data-pw] button")).toHaveLength(0);
   });
 
   it("draws the main group and the extra ones as chips, with the hint when there is none", async () => {

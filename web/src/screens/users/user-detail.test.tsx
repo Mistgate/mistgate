@@ -7,8 +7,7 @@ import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { LinkDeviceLimit, SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
-import { DeviceKind, QuotaReset, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
-import { en } from "@/i18n/en";
+import { DeviceKind, PagePasswordAction, QuotaReset, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { UserScreen } from "./user-detail";
 
 const getUser = vi.fn();
@@ -1041,8 +1040,9 @@ describe("the tabs and the head of the page", () => {
     expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", expiresUnix: 0n });
   });
 
-  it("shows the link and its password on the Overview, copies the link, and asks before a new one", async () => {
+  it("shows the link and its password on the Overview, copies the link, and changes the password only after the question in the block", async () => {
     getSubscriptionLink.mockResolvedValue(link);
+    updateUser.mockResolvedValue({ user });
     const write = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText: write }, configurable: true });
     await mount();
@@ -1053,13 +1053,52 @@ describe("the tabs and the head of the page", () => {
     expect(text()).toContain(link.pagePassword);
     await click(document.querySelector(".up-code button"));
     expect(write).toHaveBeenCalledWith(link.url);
-    getSubscriptionLink.mockResolvedValue({ url: "https://sub.example.com/s/alice-new", pagePassword: "fern-4409-dune" });
+
+    getSubscriptionLink.mockResolvedValue({ url: link.url, pagePassword: "fern-4409-dune" });
     await click(button("Change"));
-    expect(getSubscriptionLink).toHaveBeenCalledTimes(1); // nothing before the question
-    await click([...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent === en["users.rotateDo"]));
+    expect(document.querySelector("[role=alert]")?.textContent).toContain("Change the page password?");
+    expect(updateUser).not.toHaveBeenCalled(); // nothing before the question
+    await click([...document.querySelectorAll("[role=alert] button")].find((b) => b.textContent === "Change"));
     await settle();
-    expect(getSubscriptionLink).toHaveBeenLastCalledWith({ userId: "usr_1", rotate: true });
-    expect(document.querySelector(".up-code code")?.textContent).toBe("https://sub.example.com/s/alice-new");
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", pagePasswordAction: PagePasswordAction.CHANGE });
+    expect(getSubscriptionLink).not.toHaveBeenCalledWith({ userId: "usr_1", rotate: true }); // the link stays
+    expect(document.querySelector(".up-code code")?.textContent).toBe(link.url);
+    expect(text()).toContain("fern-4409-dune");
+    expect(text()).toContain("A new password. The old one no longer works");
+  });
+
+  it("removes the password after the question, and brings it back as a new one", async () => {
+    getSubscriptionLink.mockResolvedValue(link);
+    updateUser.mockResolvedValue({ user: { ...user, pageOpen: true } });
+    await mount();
+    await click(button("Remove"));
+    expect(document.querySelector("[role=alert]")?.textContent).toContain("Remove the page password?");
+    getSubscriptionLink.mockResolvedValue({ url: link.url, pagePassword: "" });
+    await click([...document.querySelectorAll("[role=alert] button")].find((b) => b.textContent === "Remove"));
+    await settle();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", pagePasswordAction: PagePasswordAction.REMOVE });
+    expect(text()).toContain("not set, anyone with the link can open the page");
+    expect(button("Show")).toBeUndefined();
+
+    updateUser.mockResolvedValue({ user: { ...user, pageOpen: false } });
+    getSubscriptionLink.mockResolvedValue({ url: link.url, pagePassword: "back-7788-oak" });
+    await click(button("Bring the password back"));
+    await settle();
+    expect(updateUser).toHaveBeenLastCalledWith({ userId: "usr_1", pagePasswordAction: PagePasswordAction.RESTORE });
+    expect(text()).toContain("back-7788-oak");
+    expect(text()).toContain("The password is back, and it is a new one. The old one no longer works");
+  });
+
+  it("a person whose password was removed starts as such, and an instance that asks for none says so", async () => {
+    getSubscriptionLink.mockResolvedValue({ url: link.url, pagePassword: "" });
+    await mount(1, undefined, undefined, { ...detail, user: { ...user, pageOpen: true } });
+    expect(text()).toContain("not set, anyone with the link can open the page");
+    expect(button("Bring the password back")).toBeDefined();
+    act(() => root?.unmount());
+    host?.remove();
+    await mount();
+    expect(text()).toContain("Page passwords are switched off for everyone.");
+    expect(button("Bring the password back")).toBeUndefined();
   });
 
   it("does not ask the panel for the link of an observer, and says who sees it", async () => {

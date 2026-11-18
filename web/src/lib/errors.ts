@@ -12,6 +12,8 @@ import { lossyVars } from "./port-check";
 export const errorCodes = [
   "name_taken",
   "group_not_empty",
+  // the password of a person's page that was removed cannot be changed: it is brought back first (UpdateUser page_password_action)
+  "page_password_removed",
   // a change of a person's groups (UpdateUser add_group_ids / remove_group_ids): "group_in_both: group=<id>", "main_group: group=<id>", "too_many_groups"
   "group_in_both",
   "main_group",

@@ -45,7 +45,12 @@ The apps show the same reason as the subscription's only entry: see [Subscriptio
 With **Password on the page** on (the default), the page asks for a password before it shows anything, and the self-service calls need it too. The subscription itself, which apps fetch from the same address, never asks for it: apps cannot type a password.
 
 - The password looks like `k7m2-x9pq`: eight lower-case letters and digits, without the look-alikes 0, 1, l and o. Capitals, spaces and dashes are ignored when it is typed.
-- It is not stored anywhere: the panel derives it from the person's link. A new link means a new password, and the old link and password stop working.
+- It is not stored anywhere: the panel computes it from the person's link and a small number it keeps for the person, the generation of the password (0 until you change it, so nobody's password changed when the number was added). The database holds that number and nothing else: no password, no hash of one.
+- **Change** gives the person a new password for the same link. It asks first, in the password block (in the person's row, in the link window and on the person's page). The old password stops working at once and every browser that entered it asks again; the link and the apps are not touched.
+- **Remove** opens this person's page on their link alone, with no question (it asks first as well). Everyone else keeps their password. **Bring the password back** asks again, with a new password: the old one does not come back.
+- **New link** gives a new password together with the link and starts the number again. A password that was removed stays removed.
+- **Password on the page** stays the main switch: with it off nobody is asked, and the block says that page passwords are switched off for everyone, with a link to the setting.
+- Only the owner and helpers see the password. A token or an agent can change, remove or bring it back (`user_update`, field `page_password`) but never sees it.
 - The admin sees it in the link window next to the link (**Page password**, with its own copy button). **Copy to send** copies the link and the password together as one message:
 
   ```ini

@@ -253,7 +253,7 @@ func main() {
 
 ## 响应中不会包含的内容
 
-- 使用令牌调用 `CreateUser` 时，返回的用户信息不包含订阅链接和页面密码。令牌不能调用 `GetSubscriptionLink`。
+- 使用令牌调用 `CreateUser` 时，返回的用户信息不包含订阅链接和页面密码。令牌不能调用 `GetSubscriptionLink`。`UpdateUser` 接受 `page_password_action`（`CHANGE`、`REMOVE` 或 `RESTORE`）来处理用户页面密码：同一链接换新密码、页面仅凭链接即可打开、重新要求密码并使用新密码。它在令牌的每小时限额中算作对该用户的一次更改，没有实际变化的重复请求不计数，任何响应都不返回密码（所有者通过 `GetSubscriptionLink` 查看）。`User.page_open` 表示密码已被移除。
 - 对所有调用者，协议配置密钥都会以遮蔽形式返回（`••••`）。
 - 令牌不能访问设备密钥和配置（`DeviceService`）及 WARP 账户。
 - 设备 ID（HWID）既不会被保存，也不会被返回：`Device.fingerprint` 是其哈希的前六个字符，足以区分两部相同的手机。

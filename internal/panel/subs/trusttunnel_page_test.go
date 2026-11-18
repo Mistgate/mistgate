@@ -118,7 +118,7 @@ func TestTrustTunnelLinksAreOnlyForTheUnlockedPage(t *testing.T) {
 	if d, _ := pageData(t, locked.Body.String()); d["locked"] != true || d["trust_tunnel"] != nil || strings.Contains(locked.Body.String(), "tt://") {
 		t.Fatalf("the locked page shows the key: locked=%v block=%v", d["locked"], d["trust_tunnel"])
 	}
-	unlock := call{e.h, t, token}.post("/unlock", string(mustJSON(map[string]string{"password": pagepass.Password(pageKey(t), token)})))
+	unlock := call{e.h, t, token}.post("/unlock", string(mustJSON(map[string]string{"password": pagepass.Password(pageKey(t), token, 0)})))
 	if unlock.Code != 200 {
 		t.Fatalf("unlock = %d %s", unlock.Code, unlock.Body.String())
 	}

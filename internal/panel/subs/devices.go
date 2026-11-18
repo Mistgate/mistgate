@@ -311,8 +311,9 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 }
 
 // enter is the start every call under a link shares (the devices and the DNS pick), in this order: the page password (a
-// locked page locks what it calls: a token the handler has not seen is checked first, an unknown one gets the
-// decoy and a miss like on every other route; the identify work behind it only a cookie of this token earns), the
+// locked page locks what it calls: without a genuine cookie of this token the person's row is looked up first, an unknown token
+// gets the decoy and a miss like on every other route, and a person whose password was removed goes on; the identify work behind
+// it only a cookie of the current generation, or a removed password, earns), the
 // token (unknown = the decoy and a miss), the Source can do the
 // call (else the decoy: the endpoint does not exist), the cross-origin check, the owner's switch (403 off). It answers
 // and returns false when the call ends there. exists says whether the Source can do the call.
@@ -325,24 +326,35 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 	on func(*adminv1.SubscriptionSettings) bool, off string) (access.SubView, *tokenState, bool) {
 	ctx := r.Context()
 	set := h.settings(ctx)
-	if exists && h.gated(set) && !h.unlocked(r, token) {
-		// "locked" is the answer of a token that exists; one that does not gets the decoy and a miss, as everywhere else.
-		if _, known := h.tokens.Get(token); !known {
-			if checker, ok := h.src.(TokenChecker); ok {
-				err := checker.CheckSubscriptionToken(ctx, token)
-				if errors.Is(err, access.ErrUnknownToken) {
-					h.miss(ctx, client)
-					h.decoy.ServeHTTP(w, r)
-					return access.SubView{}, nil, false
-				}
-				if err != nil {
-					jsonError(w, http.StatusInternalServerError, "internal", "")
-					return access.SubView{}, nil, false
-				}
+	// The page password. The instance asks (the main switch) and the request holds no cookie that could be right: the call is open
+	// only for a person whose password was removed, which only their row says, so one lookup tells (the same one-row read that
+	// confirms a link). "locked" is the answer of a token that exists; one that does not gets the decoy and a miss, as everywhere
+	// else. A request with a genuine cookie goes on without the lookup and is judged against the person's current generation as
+	// soon as their row is read below (identify).
+	earnedGen, earned := 0, false
+	if exists && h.asks(set) {
+		if earnedGen, earned = h.cookieEarned(r, token); !earned {
+			checker, ok := h.src.(TokenChecker)
+			if !ok { // a source that cannot read the person's state cannot tell that the password was removed
+				jsonError(w, http.StatusUnauthorized, "locked", "")
+				return access.SubView{}, nil, false
+			}
+			page, err := checker.CheckSubscriptionToken(ctx, token)
+			if errors.Is(err, access.ErrUnknownToken) {
+				h.tokens.Delete(token)
+				h.miss(ctx, client)
+				h.decoy.ServeHTTP(w, r)
+				return access.SubView{}, nil, false
+			}
+			if err != nil {
+				jsonError(w, http.StatusInternalServerError, "internal", "")
+				return access.SubView{}, nil, false
+			}
+			if h.gated(set, page) {
+				jsonError(w, http.StatusUnauthorized, "locked", "")
+				return access.SubView{}, nil, false
 			}
 		}
-		jsonError(w, http.StatusUnauthorized, "locked", "")
-		return access.SubView{}, nil, false
 	}
 	if _, ok := h.tokens.Get(token); ok && exists {
 		switch {
@@ -378,6 +390,11 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 		jsonError(w, http.StatusInternalServerError, "internal", "")
 		return access.SubView{}, nil, false
 	}
+	if exists && h.gated(set, v.Page) && !(earned && earnedGen == v.Page.Gen) {
+		// the row is read now: a cookie of an older generation (the password was changed) is locked like none at all
+		jsonError(w, http.StatusUnauthorized, "locked", "")
+		return access.SubView{}, nil, false
+	}
 	if !exists {
 		h.decoy.ServeHTTP(w, r)
 		return access.SubView{}, nil, false
@@ -397,7 +414,7 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 func (h *handler) confirmCachedToken(ctx context.Context, w http.ResponseWriter, r *http.Request, token, client string) bool {
 	var err error
 	if checker, ok := h.src.(TokenChecker); ok {
-		err = checker.CheckSubscriptionToken(ctx, token)
+		_, err = checker.CheckSubscriptionToken(ctx, token)
 	} else {
 		_, err = h.fetch(ctx, token, plugin.FormatURIList, access.DeviceHint{}, false, false, false)
 	}

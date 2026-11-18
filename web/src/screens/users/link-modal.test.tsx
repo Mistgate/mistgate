@@ -3,13 +3,15 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
+import { PagePasswordAction } from "@/gen/mistgate/admin/v1/user_pb";
 import { LinkModal, type LinkTarget } from "./link-modal";
 
 const getSubscriptionLink = vi.fn();
 const getSubscriptionSettings = vi.fn();
+const updateUser = vi.fn();
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
-  users: { getSubscriptionLink: (...a: unknown[]) => getSubscriptionLink(...a) },
+  users: { getSubscriptionLink: (...a: unknown[]) => getSubscriptionLink(...a), updateUser: (...a: unknown[]) => updateUser(...a) },
   subscriptions: { getSubscriptionSettings: (...a: unknown[]) => getSubscriptionSettings(...a) },
 }));
 // no router in the test: a link is an anchor that carries its target
@@ -34,6 +36,7 @@ afterEach(() => {
   host?.remove();
   root = host = null;
   getSubscriptionLink.mockReset();
+  updateUser.mockReset();
   written.length = 0;
   shared.length = 0;
   delete (navigator as { share?: unknown }).share;
@@ -102,11 +105,14 @@ describe("the link modal and the page password", () => {
     expect(text()).toContain("aaaa-2345");
   });
 
-  it("without a password (the setting is off) the row says anyone with the link opens the page, and the primary button copies just the link", async () => {
+  it("without a password because the instance asks for none, the row says the passwords are off for everyone and leads to the setting, and the primary button copies just the link", async () => {
     getSubscriptionLink.mockResolvedValue({ url, pagePassword: "" });
     await mount();
     expect(text()).toContain("Page password");
-    expect(text()).toContain("not set, anyone with the link can open the page");
+    expect(text()).toContain("Page passwords are switched off for everyone.");
+    expect(document.querySelector<HTMLAnchorElement>("a[href='/subscriptions']")?.dataset.search).toBe(JSON.stringify({ tab: "page" }));
+    expect(button("Bring the password back")).toBeUndefined();
+    expect(button("Change")).toBeUndefined();
     expect(byLabel("Copy the page password")).toBeNull();
     expect(text()).toContain("Send the link in a private message");
     expect(text()).not.toContain("carry the link and the password");
@@ -190,6 +196,98 @@ Page password: aaaa-2345` }]);
     await mount();
     await click(button("New link"));
     expect(document.querySelector("[role=alert]")?.textContent).toContain("A new link replaces the old one at once. Everyone who had the old one needs the new one.");
+  });
+});
+
+describe("the page password in the window", () => {
+  const link = (pagePassword: string) => ({ url, pagePassword });
+  const alert = () => document.querySelector("[role=alert]");
+  const inAlert = (label: string) => [...(alert()?.querySelectorAll("button") ?? [])].find((b) => b.textContent === label);
+
+  it("changes it only after the question, shows the new one with the hint, and puts it into the message", async () => {
+    getSubscriptionLink.mockResolvedValue(link("old1-old2"));
+    updateUser.mockResolvedValue({ user: { id: "usr_1", pageOpen: false } });
+    await mount();
+    expect(button("Change")).toBeDefined();
+    await click(button("Change"));
+    expect(alert()?.textContent).toContain("Change the page password?");
+    expect(alert()?.textContent).toContain("The link and the apps stay as they are.");
+    expect(updateUser).not.toHaveBeenCalled();
+    await click(button("Cancel"));
+    expect(alert()).toBeNull();
+    expect(updateUser).not.toHaveBeenCalled();
+
+    getSubscriptionLink.mockResolvedValue(link("new1-new2"));
+    await click(button("Change"));
+    await click(inAlert("Change"));
+    await settle();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", pagePasswordAction: PagePasswordAction.CHANGE });
+    expect(text()).toContain("new1-new2");
+    expect(text()).not.toContain("old1-old2");
+    expect(text()).toContain("A new password. The old one no longer works");
+    await click(button("Copy to send"));
+    expect(written).toEqual([`Your link: ${url}\nPage password: new1-new2`]);
+  });
+
+  it("removes it only after the question; then the page opens on the link alone and the message is the bare link", async () => {
+    getSubscriptionLink.mockResolvedValue(link("old1-old2"));
+    updateUser.mockResolvedValue({ user: { id: "usr_1", pageOpen: true } });
+    await mount();
+    await click(button("Remove"));
+    expect(alert()?.textContent).toContain("Remove the page password?");
+    expect(alert()?.textContent).toContain("Anyone with the link will open this person’s page without a question.");
+    expect(updateUser).not.toHaveBeenCalled();
+    getSubscriptionLink.mockResolvedValue(link(""));
+    await click(inAlert("Remove"));
+    await settle();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", pagePasswordAction: PagePasswordAction.REMOVE });
+    expect(text()).toContain("not set, anyone with the link can open the page");
+    expect(text()).not.toContain("old1-old2");
+    expect(button("Bring the password back")).toBeDefined();
+    expect(button("Change")).toBeUndefined();
+    expect(text()).toContain("Send the link in a private message");
+    await click(button("Copy to send"));
+    expect(written).toEqual([url]);
+  });
+
+  it("a person whose password was removed: says so, brings it back with no question, and the password it gives is new", async () => {
+    getSubscriptionLink.mockResolvedValue(link(""));
+    updateUser.mockResolvedValue({ user: { id: "usr_1", pageOpen: false } });
+    await mount({ target: { pageOpen: true } });
+    expect(text()).toContain("not set, anyone with the link can open the page");
+    expect(text()).not.toContain("switched off for everyone");
+    expect(byLabel("Copy the page password")).toBeNull();
+    getSubscriptionLink.mockResolvedValue(link("back-0001"));
+    await click(button("Bring the password back"));
+    await settle();
+    expect(alert()).toBeNull();
+    expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", pagePasswordAction: PagePasswordAction.RESTORE });
+    expect(text()).toContain("back-0001");
+    expect(text()).toContain("The password is back, and it is a new one. The old one no longer works");
+    expect(byLabel("Copy the page password")).not.toBeNull();
+  });
+
+  it("a refusal of the panel leaves the block as it was", async () => {
+    getSubscriptionLink.mockResolvedValue(link("old1-old2"));
+    updateUser.mockRejectedValue(new Error("boom"));
+    await mount();
+    await click(button("Change"));
+    await click(inAlert("Change"));
+    await settle();
+    expect(text()).toContain("old1-old2");
+    expect(text()).not.toContain("The old one no longer works");
+    expect(button("Change")).toBeDefined();
+  });
+
+  it("a new link keeps a removed password removed", async () => {
+    getSubscriptionLink.mockImplementation(async (req: { rotate?: boolean }) => (req.rotate ? { url: `${url}2`, pagePassword: "" } : { url, pagePassword: "" }));
+    await mount({ target: { pageOpen: true } });
+    await click(button("New link"));
+    expect(alert()?.textContent).toContain("A new link replaces the old one at once. Everyone who had the old one needs the new one.");
+    await click(button("Replace"));
+    await settle();
+    expect(text()).toContain("not set, anyone with the link can open the page");
+    expect(button("Bring the password back")).toBeDefined();
   });
 });
 

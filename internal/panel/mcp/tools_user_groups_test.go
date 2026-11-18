@@ -158,3 +158,60 @@ func TestAccessReportCountsExtraMembers(t *testing.T) {
 		t.Errorf("groups giving alice the server = %v", got)
 	}
 }
+
+// The page password through user_update: the model asks to change, remove or restore it and never sees it; the plan names the action
+// as a coded fact, the apply sends the API action, and a request that makes no sense is refused at the plan.
+func TestUserUpdatePlansThePagePassword(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileOperator)
+	s := e.session(secret)
+
+	for _, c := range []struct {
+		word string
+		want adminv1.PagePasswordAction
+	}{
+		{"change", adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_CHANGE},
+		{"remove", adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_REMOVE},
+	} {
+		before := len(e.w.updateReq)
+		p := planOf(t, s, "user_update", map[string]any{"user_id": "usr_alice", "page_password": c.word})
+		if f := factOf(t, p, "page_password"); f.Code != "page_password_"+c.word || f.Untrusted {
+			t.Errorf("%s: fact %+v", c.word, f)
+		}
+		if len(e.w.updateReq) != before {
+			t.Fatalf("%s: the plan changed the password", c.word)
+		}
+		applyOf(t, s, "user_update", p.ConfirmToken)
+		if len(e.w.updateReq) != before+1 {
+			t.Fatalf("%s: the apply made %d updates", c.word, len(e.w.updateReq)-before)
+		}
+		if got := e.w.updateReq[len(e.w.updateReq)-1]; got.GetPagePasswordAction() != c.want || got.Name != nil {
+			t.Errorf("%s: the applied request: %+v", c.word, got)
+		}
+	}
+	// restore needs a person whose password was removed, change needs one who has it
+	e.w.users["usr_alice"].User.PageOpen = true
+	if out := mustFail(t, s, "user_update_plan", map[string]any{"user_id": "usr_alice", "page_password": "change"}); !strings.Contains(out, "restore") {
+		t.Errorf("change of a removed password: %s", out)
+	}
+	if out := mustFail(t, s, "user_update_plan", map[string]any{"user_id": "usr_alice", "page_password": "remove"}); !strings.Contains(out, "nothing to change") {
+		t.Errorf("a repeated removal: %s", out)
+	}
+	p := planOf(t, s, "user_update", map[string]any{"user_id": "usr_alice", "page_password": "restore"})
+	if f := factOf(t, p, "page_password"); f.Code != "page_password_restore" {
+		t.Errorf("restore: %+v", f)
+	}
+	e.w.users["usr_alice"].User.PageOpen = false
+	if out := mustFail(t, s, "user_update_plan", map[string]any{"user_id": "usr_alice", "page_password": "restore"}); !strings.Contains(out, "nothing to change") {
+		t.Errorf("a restore of a password that is there: %s", out)
+	}
+	if out := mustFail(t, s, "user_update_plan", map[string]any{"user_id": "usr_alice", "page_password": "show"}); !strings.Contains(out, "change, remove or restore") {
+		t.Errorf("an unknown word: %s", out)
+	}
+	// the model sees whether the page is open, never the password
+	e.w.users["usr_alice"].User.PageOpen = true
+	out := mustOK(t, s, "user_get", map[string]any{"user_id": "usr_alice"})
+	if !strings.Contains(out, `"page_open":true`) || strings.Contains(strings.ToLower(out), "password") {
+		t.Errorf("user_get: %s", out)
+	}
+}

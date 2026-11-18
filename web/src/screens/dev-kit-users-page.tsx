@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChatButton } from "@/components/assistant/chat";
 import { LangToggle, ThemeToggle } from "@/components/prefs";
 import { PageTitle } from "@/components/ui/bits";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
-import { QuotaReset, UserFilter, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
+import { PagePasswordAction, QuotaReset, UserFilter, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { isLang, setLang, useLang } from "@/i18n";
 import { groups as groupsApi, users as usersApi } from "@/lib/api";
 import type { Job, Row } from "@/lib/batch";
@@ -126,11 +126,22 @@ const userOf = (s: Spec, over: Record<string, unknown> = {}) => {
     id: `usr_${s.n}`, name: s.n, subscriptionName: "", groupId: g.id, groupName: g.name, groupColor: g.color, ...extrasOf(s), status, apps: { happ: true, amnezia: !!s.via?.includes(App.AMNEZIA), telegram: false, mistgate: true },
     via: s.via ?? [], devicesUsed: s.du, deviceLimit: s.dm, usedBytes: BigInt(Math.round(s.gb * GB)), quotaBytes: BigInt(s.q * GB), quotaReset: QuotaReset.MONTH, nextResetUnix: BigInt(now + 14 * DAY),
     expiresUnix: BigInt(s.days === 0 ? 0 : now + s.days * DAY), lastSeenUnix: BigInt(online ? now - 60 : s.last < 0 ? 0 : now - s.last), online, currentNodeId: s.node ? nodeIds[s.node as keyof typeof nodeIds] : "", currentNodeName: s.node ?? "",
-    speedLimitBps: 0n, deviceSpeedLimitBps: 0n, createdUnix: BigInt(now - 60 * DAY), nodes: { all: true, nodeIds: [] }, dnsPresetId: "", accessHapp: true, accessAmnezia: !!s.via?.includes(App.AMNEZIA), accessTelegram: false, telegramIssued: false, devicesIdle: 0, ...over,
+    speedLimitBps: 0n, deviceSpeedLimitBps: 0n, createdUnix: BigInt(now - 60 * DAY), nodes: { all: true, nodeIds: [] }, dnsPresetId: "", accessHapp: true, accessAmnezia: !!s.via?.includes(App.AMNEZIA), accessTelegram: false, telegramIssued: false, devicesIdle: 0, pageOpen: pwState.open.has(s.n), ...over,
   };
 };
 
-const pw = "lake-2718-moss";
+/**
+ * The page passwords of the scene, answered by its own calls: bob's was removed (his row says anyone with the link opens the page), the
+ * others have one; each change gives the next made-up password. A `-off` scene is an instance that asks for none (nobody has one to show).
+ */
+const pwWords = ["lake-2718-moss", "fern-4409-dune", "reed-9051-wave", "moss-3376-lark"];
+const pwState = { open: new Set<string>(), gen: new Map<string, number>(), off: false };
+const resetPasswords = (state: string) => {
+  pwState.off = state.endsWith("-off");
+  pwState.open = new Set(pwState.off ? [] : ["bob"]);
+  pwState.gen = new Map();
+};
+const pwOf = (name: string) => (pwState.off || pwState.open.has(name) ? "" : pwWords[(pwState.gen.get(name) ?? 0) % pwWords.length]!);
 
 /** The panel's calls of this screen, answered here (the scene is its own page, so patching the shared client is safe). */
 function fakeCalls(state: string, count: number) {
@@ -159,7 +170,18 @@ function fakeCalls(state: string, count: number) {
       dailyTraffic: [], nodeTraffic: [], profiles: [], nodeAccess: [], blockedDevices: [],
     };
   };
-  api.getSubscriptionLink = async ({ userId }: { userId: string }) => ({ url: `https://sub.example.com/s/${userId.replace("usr_", "")}-7f3k9q`, pagePassword: userId === "usr_alice" ? pw : "" });
+  api.getSubscriptionLink = async ({ userId }: { userId: string }) => ({ url: `https://sub.example.com/s/${userId.replace("usr_", "")}-7f3k9q`, pagePassword: pwOf(userId.replace("usr_", "")) });
+  api.updateUser = async ({ userId, pagePasswordAction }: { userId: string; pagePasswordAction: PagePasswordAction }) => {
+    const n = userId.replace("usr_", "");
+    const bump = () => pwState.gen.set(n, (pwState.gen.get(n) ?? 0) + 1);
+    if (pagePasswordAction === PagePasswordAction.CHANGE) bump();
+    else if (pagePasswordAction === PagePasswordAction.REMOVE) pwState.open.add(n);
+    else if (pagePasswordAction === PagePasswordAction.RESTORE) {
+      pwState.open.delete(n);
+      bump();
+    }
+    return { user: userOf(tenOf(state, crowd.find((x) => x.n === n) ?? crowd[0]!)) };
+  };
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   for (const name of ["extendUsers", "resetUserTraffic", "setUsersEnabled", "deleteUsers"]) api[name] = async () => (await wait(300), { users: [] });
   api.createUser = async ({ name }: { name: string }) => ({ user: userOf({ n: name, g: "friends", du: 0, dm: 3, gb: 0, q: 50, days: 30, last: -1, st: "new", devs: [] }), subscriptionUrl: `https://sub.example.com/s/${name}-7f3k9q`, pagePassword: state === "person-done-pw" ? "tide-8132-pine" : "" });
@@ -168,6 +190,7 @@ function fakeCalls(state: string, count: number) {
 
 /** The private query cache of a scene (exported for its smoke test). */
 export function seeded(state: string, role: Role) {
+  resetPasswords(state);
   const count = BIG.has(state) || state.startsWith("select") ? (state === "select" || state === "select-ask" ? 3 : 10) : 3;
   fakeCalls(state, BIG.has(state) ? 10 : count);
   const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false, refetchInterval: false } } });
@@ -193,9 +216,13 @@ export const demoOf: Record<string, UsersDemo> = {
   search: { find: "ali" },
   nomatch: { find: "zzz" },
   open: { open: "usr_alice" },
-  // the send window ("QR and send") over alice's open row: her page asks for a password; bob's does not
+  // the send window ("QR and send") over alice's open row: her page asks for a password; bob's password was removed
   send: { open: "usr_alice", send: "usr_alice" },
   "send-plain": { open: "usr_bob", send: "usr_bob" },
+  // the instance asks for no page password: nobody has one
+  "send-off": { open: "usr_alice", send: "usr_alice" },
+  "open-removed": { open: "usr_bob" },
+  "open-off": { open: "usr_alice" },
   "open-erin": { open: "usr_erin" },
   // a person who never connected: no devices to list ("None yet")
   "open-heidi": { open: "usr_heidi" },
@@ -235,11 +262,39 @@ export function SceneEdit({ state }: { state: string }) {
   return e ? <GroupEditModal group={e.group as never} open onOpenChange={() => {}} demo={e.demo} /> : null;
 }
 
+/**
+ * Presses what a `ui=` names once the page has drawn, in the password block of the send window when it is open and of the row otherwise
+ * (for a screenshot of that state): pw-show | pw-change | pw-remove (the question in the block) | pw-changed (a change made) | pw-restored.
+ */
+function useUi(ui: string) {
+  useEffect(() => {
+    if (!ui) return;
+    const press = (el: HTMLElement | null | undefined) => {
+      if (!el) return;
+      for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) el.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
+    };
+    const act = (name: string) => press((document.querySelector("[data-shot=link-modal]") ?? document).querySelector<HTMLElement>(`[data-pw] [data-act=${name}]`));
+    const run: Record<string, () => void> = {
+      "pw-show": () => act("show"),
+      "pw-change": () => act("change"),
+      "pw-remove": () => act("remove"),
+      "pw-changed": () => {
+        act("change");
+        window.setTimeout(() => act("yes"), 250);
+      },
+      "pw-restored": () => act("restore"),
+    };
+    const t = window.setTimeout(() => run[ui]?.(), 900);
+    return () => window.clearTimeout(t);
+  }, [ui]);
+}
+
 /** One whole page of the scene: the screen in the real shell, at the window's own width. */
 export function UsersPage() {
   const tx = useTx();
   const params = new URLSearchParams(location.search);
   const state = params.get("state") ?? "list";
+  useUi(params.get("ui") ?? "");
   const [qc] = useState(() => {
     const lang = params.get("lang");
     if (isLang(lang)) setLang(lang);
@@ -295,7 +350,21 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "users-open", state: "open", title: "alice's row open: the link, the password, four devices", w: 1440, h: 860 },
   { id: "users-send", state: "send", title: "The send window over alice's row: the QR, the link, the page password, Copy to send", w: 1440, h: 860 },
   { id: "users-send-light", state: "send", title: "The same on the light theme", w: 1440, h: 860, params: "&theme=light" },
-  { id: "users-send-plain", state: "send-plain", title: "bob: no page password, the row says anyone with the link opens the page", w: 1440, h: 860 },
+  { id: "users-send-plain", state: "send-plain", title: "bob: the password was removed, the block says anyone with the link opens the page and offers it back", w: 1440, h: 860 },
+  { id: "users-open-pw-shown", state: "open", title: "alice's row: the page password shown (Show pressed)", w: 1440, h: 860, params: "&ui=pw-show" },
+  { id: "users-open-pw-change", state: "open", title: "alice's row: Change asks first, in the block", w: 1440, h: 860, params: "&ui=pw-change" },
+  { id: "users-open-pw-remove", state: "open", title: "alice's row: Remove asks first, in the block", w: 1440, h: 860, params: "&ui=pw-remove" },
+  { id: "users-open-pw-changed", state: "open", title: "alice's row: the password just changed, the new one and the hint", w: 1440, h: 860, params: "&ui=pw-changed" },
+  { id: "users-open-pw-changed-light", state: "open", title: "The same on the light theme", w: 1440, h: 860, params: "&ui=pw-changed&theme=light" },
+  { id: "users-open-pw-changed-phone", state: "open", title: "The same on a phone", w: 400, h: 1100, params: "&ui=pw-changed" },
+  { id: "users-open-pw-remove-fa", state: "open", title: "The question of Remove, right to left (fa)", w: 1440, h: 860, params: "&ui=pw-remove&lang=fa" },
+  { id: "users-open-removed", state: "open-removed", title: "bob's row: the password was removed, Bring the password back", w: 1440, h: 860 },
+  { id: "users-open-restored", state: "open-removed", title: "bob's row: the password brought back, a new one shown", w: 1440, h: 860, params: "&ui=pw-restored" },
+  { id: "users-open-off", state: "open-off", title: "alice's row on an instance that asks for no page password: said so, with the setting", w: 1440, h: 860 },
+  { id: "users-send-pw-change", state: "send", title: "The send window: Change asks first, in the block", w: 1440, h: 900, params: "&ui=pw-change" },
+  { id: "users-send-pw-changed", state: "send", title: "The send window after a change: the new password in the block", w: 1440, h: 900, params: "&ui=pw-changed" },
+  { id: "users-send-pw-remove", state: "send", title: "The send window: Remove asks first", w: 1440, h: 900, params: "&ui=pw-remove" },
+  { id: "users-send-off", state: "send-off", title: "The send window on an instance that asks for no page password", w: 1440, h: 860 },
   { id: "users-send-phone", state: "send", title: "The send window on a phone (a sheet)", w: 400, h: 900 },
   { id: "users-send-fa", state: "send", title: "The send window, right to left (fa)", w: 1440, h: 860, params: "&lang=fa" },
   { id: "users-open-phone", state: "open", title: "alice's row open on a phone", w: 400, h: 1100 },

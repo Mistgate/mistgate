@@ -253,7 +253,7 @@ Every token call writes a row to the audit log: "called <procedure>", the HTTP s
 
 ## What responses never contain
 
-- `CreateUser` called with a token returns the user without the subscription link and the page password. `GetSubscriptionLink` is closed to tokens.
+- `CreateUser` called with a token returns the user without the subscription link and the page password. `GetSubscriptionLink` is closed to tokens. `UpdateUser` takes `page_password_action` (`CHANGE`, `REMOVE` or `RESTORE`) for the person's page password: a new password for the same link, the page open on the link alone, the password asked again with a new one. It counts as one change of the person for a token's hourly limit, a repeat that changes nothing is free, and no response carries the password (the owner reads it with `GetSubscriptionLink`). `User.page_open` says that the password was removed.
 - Profile secrets come back masked (`••••`), for every caller.
 - Device keys and configurations (`DeviceService`) and WARP accounts are closed to tokens.
 - A device's ID (HWID) is never stored or returned: `Device.fingerprint` is the first six characters of its hash, enough to tell two identical phones apart.

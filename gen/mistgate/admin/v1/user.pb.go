@@ -382,6 +382,64 @@ func (DeviceKind) EnumDescriptor() ([]byte, []int) {
 	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{5}
 }
 
+// What UpdateUserRequest.page_password_action does to the page password of one person. The password is computed from the link and a
+// small number, so it is never stored or sent here: the owner reads it with GetSubscriptionLink (closed to tokens).
+type PagePasswordAction int32
+
+const (
+	PagePasswordAction_PAGE_PASSWORD_ACTION_UNSPECIFIED PagePasswordAction = 0
+	// A new password for the same link (the number it is computed with goes up by one): the cookies of the old one stop working at
+	// once, the subscription and the apps are not touched. FAILED_PRECONDITION "page_password_removed" while the password is removed.
+	PagePasswordAction_PAGE_PASSWORD_ACTION_CHANGE PagePasswordAction = 1
+	// The person's page opens on the link alone, with no question. A repeat does nothing.
+	PagePasswordAction_PAGE_PASSWORD_ACTION_REMOVE PagePasswordAction = 2
+	// The password is asked again, and it is a new one (the old one does not come back). A repeat does nothing.
+	PagePasswordAction_PAGE_PASSWORD_ACTION_RESTORE PagePasswordAction = 3
+)
+
+// Enum value maps for PagePasswordAction.
+var (
+	PagePasswordAction_name = map[int32]string{
+		0: "PAGE_PASSWORD_ACTION_UNSPECIFIED",
+		1: "PAGE_PASSWORD_ACTION_CHANGE",
+		2: "PAGE_PASSWORD_ACTION_REMOVE",
+		3: "PAGE_PASSWORD_ACTION_RESTORE",
+	}
+	PagePasswordAction_value = map[string]int32{
+		"PAGE_PASSWORD_ACTION_UNSPECIFIED": 0,
+		"PAGE_PASSWORD_ACTION_CHANGE":      1,
+		"PAGE_PASSWORD_ACTION_REMOVE":      2,
+		"PAGE_PASSWORD_ACTION_RESTORE":     3,
+	}
+)
+
+func (x PagePasswordAction) Enum() *PagePasswordAction {
+	p := new(PagePasswordAction)
+	*p = x
+	return p
+}
+
+func (x PagePasswordAction) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PagePasswordAction) Descriptor() protoreflect.EnumDescriptor {
+	return file_mistgate_admin_v1_user_proto_enumTypes[6].Descriptor()
+}
+
+func (PagePasswordAction) Type() protoreflect.EnumType {
+	return &file_mistgate_admin_v1_user_proto_enumTypes[6]
+}
+
+func (x PagePasswordAction) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PagePasswordAction.Descriptor instead.
+func (PagePasswordAction) EnumDescriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_user_proto_rawDescGZIP(), []int{6}
+}
+
 type GetUserConnectionRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -1019,8 +1077,12 @@ type User struct {
 	ExtraGroupIds    []string `protobuf:"bytes,34,rep,name=extra_group_ids,json=extraGroupIds,proto3" json:"extra_group_ids,omitempty"`
 	ExtraGroupNames  []string `protobuf:"bytes,35,rep,name=extra_group_names,json=extraGroupNames,proto3" json:"extra_group_names,omitempty"`
 	ExtraGroupColors []string `protobuf:"bytes,36,rep,name=extra_group_colors,json=extraGroupColors,proto3" json:"extra_group_colors,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// The person's page password was removed: their page opens on the link alone (see PagePasswordAction). It says nothing about
+	// the instance-wide switch (SubscriptionSettings.user_page.require_page_password), which, when off, opens every page. Not a
+	// secret: the password itself is never part of a User.
+	PageOpen      bool `protobuf:"varint,37,opt,name=page_open,json=pageOpen,proto3" json:"page_open,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -1303,6 +1365,13 @@ func (x *User) GetExtraGroupColors() []string {
 		return x.ExtraGroupColors
 	}
 	return nil
+}
+
+func (x *User) GetPageOpen() bool {
+	if x != nil {
+		return x.PageOpen
+	}
+	return false
 }
 
 type ListUsersRequest struct {
@@ -2585,8 +2654,11 @@ type UpdateUserRequest struct {
 	// of the person for a token's user-change limit, like a change of the main group.
 	AddGroupIds    []string `protobuf:"bytes,15,rep,name=add_group_ids,json=addGroupIds,proto3" json:"add_group_ids,omitempty"`
 	RemoveGroupIds []string `protobuf:"bytes,16,rep,name=remove_group_ids,json=removeGroupIds,proto3" json:"remove_group_ids,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Change, remove or restore the person's page password. Counts as one change of the person for a token's user-change limit. The
+	// response never carries the password; the owner reads the new one with GetSubscriptionLink.
+	PagePasswordAction PagePasswordAction `protobuf:"varint,17,opt,name=page_password_action,json=pagePasswordAction,proto3,enum=mistgate.admin.v1.PagePasswordAction" json:"page_password_action,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *UpdateUserRequest) Reset() {
@@ -2729,6 +2801,13 @@ func (x *UpdateUserRequest) GetRemoveGroupIds() []string {
 		return x.RemoveGroupIds
 	}
 	return nil
+}
+
+func (x *UpdateUserRequest) GetPagePasswordAction() PagePasswordAction {
+	if x != nil {
+		return x.PagePasswordAction
+	}
+	return PagePasswordAction_PAGE_PASSWORD_ACTION_UNSPECIFIED
 }
 
 type UpdateUserResponse struct {
@@ -3541,8 +3620,9 @@ type GetSubscriptionLinkResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// https://<subscription domain>/<secret prefix>/<token>. The token is shown only here and to the user.
 	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
-	// The password of the user's page for this link (xxxx-xxxx), derived from the token: a new link is a new password.
-	// Empty when the instance does not ask for one. Like the link, never shown to agents.
+	// The password of the user's page for this link (xxxx-xxxx), derived from the token and the password's number: a new link is a
+	// new password, and so is a change of the password (UpdateUser page_password_action). Empty when the instance does not ask for one
+	// or this person's password was removed (User.page_open). Like the link, never shown to agents.
 	PagePassword  string `protobuf:"bytes,2,opt,name=page_password,json=pagePassword,proto3" json:"page_password,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -4138,7 +4218,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\r_trust_tunnel\"<\n" +
 	"\rNodeSelection\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12\x19\n" +
-	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xd3\v\n" +
+	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xf0\v\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
@@ -4183,7 +4263,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\fdevices_idle\x18! \x01(\rR\vdevicesIdle\x12&\n" +
 	"\x0fextra_group_ids\x18\" \x03(\tR\rextraGroupIds\x12*\n" +
 	"\x11extra_group_names\x18# \x03(\tR\x0fextraGroupNames\x12,\n" +
-	"\x12extra_group_colors\x18$ \x03(\tR\x10extraGroupColors\"\x9f\x02\n" +
+	"\x12extra_group_colors\x18$ \x03(\tR\x10extraGroupColors\x12\x1b\n" +
+	"\tpage_open\x18% \x01(\bR\bpageOpen\"\x9f\x02\n" +
 	"\x10ListUsersRequest\x125\n" +
 	"\x06filter\x18\x01 \x01(\x0e2\x1d.mistgate.admin.v1.UserFilterR\x06filter\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x19\n" +
@@ -4301,7 +4382,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x12CreateUserResponse\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.mistgate.admin.v1.UserR\x04user\x12)\n" +
 	"\x10subscription_url\x18\x02 \x01(\tR\x0fsubscriptionUrl\x12#\n" +
-	"\rpage_password\x18\x03 \x01(\tR\fpagePassword\"\x90\a\n" +
+	"\rpage_password\x18\x03 \x01(\tR\fpagePassword\"\xe9\a\n" +
 	"\x11UpdateUserRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1e\n" +
@@ -4322,7 +4403,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"R\x10subscriptionName\x88\x01\x01\x12<\n" +
 	"\x16device_speed_limit_bps\x18\x0e \x01(\x04B\x020\x02H\vR\x13deviceSpeedLimitBps\x88\x01\x01\x12\"\n" +
 	"\radd_group_ids\x18\x0f \x03(\tR\vaddGroupIds\x12(\n" +
-	"\x10remove_group_ids\x18\x10 \x03(\tR\x0eremoveGroupIdsB\a\n" +
+	"\x10remove_group_ids\x18\x10 \x03(\tR\x0eremoveGroupIds\x12W\n" +
+	"\x14page_password_action\x18\x11 \x01(\x0e2%.mistgate.admin.v1.PagePasswordActionR\x12pagePasswordActionB\a\n" +
 	"\x05_nameB\v\n" +
 	"\t_group_idB\x0e\n" +
 	"\f_quota_bytesB\x0e\n" +
@@ -4454,7 +4536,12 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x10DEVICE_KIND_LINK\x10\x01\x12\x1b\n" +
 	"\x17DEVICE_KIND_LINK_SHARED\x10\x02\x12\x13\n" +
 	"\x0fDEVICE_KIND_KEY\x10\x03\x12\x1c\n" +
-	"\x18DEVICE_KIND_TELEGRAM_KEY\x10\x042\xe5\f\n" +
+	"\x18DEVICE_KIND_TELEGRAM_KEY\x10\x04*\x9e\x01\n" +
+	"\x12PagePasswordAction\x12$\n" +
+	" PAGE_PASSWORD_ACTION_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bPAGE_PASSWORD_ACTION_CHANGE\x10\x01\x12\x1f\n" +
+	"\x1bPAGE_PASSWORD_ACTION_REMOVE\x10\x02\x12 \n" +
+	"\x1cPAGE_PASSWORD_ACTION_RESTORE\x10\x032\xe5\f\n" +
 	"\vUserService\x12V\n" +
 	"\tListUsers\x12#.mistgate.admin.v1.ListUsersRequest\x1a$.mistgate.admin.v1.ListUsersResponse\x12P\n" +
 	"\aGetUser\x12!.mistgate.admin.v1.GetUserRequest\x1a\".mistgate.admin.v1.GetUserResponse\x12Y\n" +
@@ -4488,7 +4575,7 @@ func file_mistgate_admin_v1_user_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_user_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_user_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_mistgate_admin_v1_user_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
 var file_mistgate_admin_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_mistgate_admin_v1_user_proto_goTypes = []any{
 	(UserStatus)(0),                     // 0: mistgate.admin.v1.UserStatus
@@ -4497,137 +4584,139 @@ var file_mistgate_admin_v1_user_proto_goTypes = []any{
 	(UserSort)(0),                       // 3: mistgate.admin.v1.UserSort
 	(DnsSource)(0),                      // 4: mistgate.admin.v1.DnsSource
 	(DeviceKind)(0),                     // 5: mistgate.admin.v1.DeviceKind
-	(*GetUserConnectionRequest)(nil),    // 6: mistgate.admin.v1.GetUserConnectionRequest
-	(*DeviceConnection)(nil),            // 7: mistgate.admin.v1.DeviceConnection
-	(*GetUserConnectionResponse)(nil),   // 8: mistgate.admin.v1.GetUserConnectionResponse
-	(*AppToggles)(nil),                  // 9: mistgate.admin.v1.AppToggles
-	(*NodeSelection)(nil),               // 10: mistgate.admin.v1.NodeSelection
-	(*User)(nil),                        // 11: mistgate.admin.v1.User
-	(*ListUsersRequest)(nil),            // 12: mistgate.admin.v1.ListUsersRequest
-	(*UserCounts)(nil),                  // 13: mistgate.admin.v1.UserCounts
-	(*ListUsersResponse)(nil),           // 14: mistgate.admin.v1.ListUsersResponse
-	(*GetUserRequest)(nil),              // 15: mistgate.admin.v1.GetUserRequest
-	(*Device)(nil),                      // 16: mistgate.admin.v1.Device
-	(*DayTraffic)(nil),                  // 17: mistgate.admin.v1.DayTraffic
-	(*NodeTraffic)(nil),                 // 18: mistgate.admin.v1.NodeTraffic
-	(*NodeAccess)(nil),                  // 19: mistgate.admin.v1.NodeAccess
-	(*ProfileRef)(nil),                  // 20: mistgate.admin.v1.ProfileRef
-	(*GetUserResponse)(nil),             // 21: mistgate.admin.v1.GetUserResponse
-	(*BlockedDevice)(nil),               // 22: mistgate.admin.v1.BlockedDevice
-	(*CreateUserRequest)(nil),           // 23: mistgate.admin.v1.CreateUserRequest
-	(*CreateUserResponse)(nil),          // 24: mistgate.admin.v1.CreateUserResponse
-	(*UpdateUserRequest)(nil),           // 25: mistgate.admin.v1.UpdateUserRequest
-	(*UpdateUserResponse)(nil),          // 26: mistgate.admin.v1.UpdateUserResponse
-	(*AccessImpact)(nil),                // 27: mistgate.admin.v1.AccessImpact
-	(*ImpactProfile)(nil),               // 28: mistgate.admin.v1.ImpactProfile
-	(*SetUsersEnabledRequest)(nil),      // 29: mistgate.admin.v1.SetUsersEnabledRequest
-	(*SetUsersEnabledResponse)(nil),     // 30: mistgate.admin.v1.SetUsersEnabledResponse
-	(*ExtendUsersRequest)(nil),          // 31: mistgate.admin.v1.ExtendUsersRequest
-	(*ExtendUsersResponse)(nil),         // 32: mistgate.admin.v1.ExtendUsersResponse
-	(*ResetUserTrafficRequest)(nil),     // 33: mistgate.admin.v1.ResetUserTrafficRequest
-	(*ResetUserTrafficResponse)(nil),    // 34: mistgate.admin.v1.ResetUserTrafficResponse
-	(*RevokeDeviceRequest)(nil),         // 35: mistgate.admin.v1.RevokeDeviceRequest
-	(*RevokeDeviceResponse)(nil),        // 36: mistgate.admin.v1.RevokeDeviceResponse
-	(*UnblockDeviceRequest)(nil),        // 37: mistgate.admin.v1.UnblockDeviceRequest
-	(*UnblockDeviceResponse)(nil),       // 38: mistgate.admin.v1.UnblockDeviceResponse
-	(*DeleteUsersRequest)(nil),          // 39: mistgate.admin.v1.DeleteUsersRequest
-	(*DeleteUsersResponse)(nil),         // 40: mistgate.admin.v1.DeleteUsersResponse
-	(*GetSubscriptionLinkRequest)(nil),  // 41: mistgate.admin.v1.GetSubscriptionLinkRequest
-	(*GetSubscriptionLinkResponse)(nil), // 42: mistgate.admin.v1.GetSubscriptionLinkResponse
-	(*GetTelegramLinksRequest)(nil),     // 43: mistgate.admin.v1.GetTelegramLinksRequest
-	(*TelegramProxyLink)(nil),           // 44: mistgate.admin.v1.TelegramProxyLink
-	(*GetTelegramLinksResponse)(nil),    // 45: mistgate.admin.v1.GetTelegramLinksResponse
-	(*IssueTelegramKeyRequest)(nil),     // 46: mistgate.admin.v1.IssueTelegramKeyRequest
-	(*IssueTelegramKeyResponse)(nil),    // 47: mistgate.admin.v1.IssueTelegramKeyResponse
-	(*RotateTelegramKeyRequest)(nil),    // 48: mistgate.admin.v1.RotateTelegramKeyRequest
-	(*RotateTelegramKeyResponse)(nil),   // 49: mistgate.admin.v1.RotateTelegramKeyResponse
-	(*RevokeTelegramKeyRequest)(nil),    // 50: mistgate.admin.v1.RevokeTelegramKeyRequest
-	(*RevokeTelegramKeyResponse)(nil),   // 51: mistgate.admin.v1.RevokeTelegramKeyResponse
-	(*LinkHour)(nil),                    // 52: mistgate.admin.v1.LinkHour
-	(*HelloKexDevice)(nil),              // 53: mistgate.admin.v1.HelloKexDevice
-	(App)(0),                            // 54: mistgate.admin.v1.App
-	(*ProfileFormat)(nil),               // 55: mistgate.admin.v1.ProfileFormat
+	(PagePasswordAction)(0),             // 6: mistgate.admin.v1.PagePasswordAction
+	(*GetUserConnectionRequest)(nil),    // 7: mistgate.admin.v1.GetUserConnectionRequest
+	(*DeviceConnection)(nil),            // 8: mistgate.admin.v1.DeviceConnection
+	(*GetUserConnectionResponse)(nil),   // 9: mistgate.admin.v1.GetUserConnectionResponse
+	(*AppToggles)(nil),                  // 10: mistgate.admin.v1.AppToggles
+	(*NodeSelection)(nil),               // 11: mistgate.admin.v1.NodeSelection
+	(*User)(nil),                        // 12: mistgate.admin.v1.User
+	(*ListUsersRequest)(nil),            // 13: mistgate.admin.v1.ListUsersRequest
+	(*UserCounts)(nil),                  // 14: mistgate.admin.v1.UserCounts
+	(*ListUsersResponse)(nil),           // 15: mistgate.admin.v1.ListUsersResponse
+	(*GetUserRequest)(nil),              // 16: mistgate.admin.v1.GetUserRequest
+	(*Device)(nil),                      // 17: mistgate.admin.v1.Device
+	(*DayTraffic)(nil),                  // 18: mistgate.admin.v1.DayTraffic
+	(*NodeTraffic)(nil),                 // 19: mistgate.admin.v1.NodeTraffic
+	(*NodeAccess)(nil),                  // 20: mistgate.admin.v1.NodeAccess
+	(*ProfileRef)(nil),                  // 21: mistgate.admin.v1.ProfileRef
+	(*GetUserResponse)(nil),             // 22: mistgate.admin.v1.GetUserResponse
+	(*BlockedDevice)(nil),               // 23: mistgate.admin.v1.BlockedDevice
+	(*CreateUserRequest)(nil),           // 24: mistgate.admin.v1.CreateUserRequest
+	(*CreateUserResponse)(nil),          // 25: mistgate.admin.v1.CreateUserResponse
+	(*UpdateUserRequest)(nil),           // 26: mistgate.admin.v1.UpdateUserRequest
+	(*UpdateUserResponse)(nil),          // 27: mistgate.admin.v1.UpdateUserResponse
+	(*AccessImpact)(nil),                // 28: mistgate.admin.v1.AccessImpact
+	(*ImpactProfile)(nil),               // 29: mistgate.admin.v1.ImpactProfile
+	(*SetUsersEnabledRequest)(nil),      // 30: mistgate.admin.v1.SetUsersEnabledRequest
+	(*SetUsersEnabledResponse)(nil),     // 31: mistgate.admin.v1.SetUsersEnabledResponse
+	(*ExtendUsersRequest)(nil),          // 32: mistgate.admin.v1.ExtendUsersRequest
+	(*ExtendUsersResponse)(nil),         // 33: mistgate.admin.v1.ExtendUsersResponse
+	(*ResetUserTrafficRequest)(nil),     // 34: mistgate.admin.v1.ResetUserTrafficRequest
+	(*ResetUserTrafficResponse)(nil),    // 35: mistgate.admin.v1.ResetUserTrafficResponse
+	(*RevokeDeviceRequest)(nil),         // 36: mistgate.admin.v1.RevokeDeviceRequest
+	(*RevokeDeviceResponse)(nil),        // 37: mistgate.admin.v1.RevokeDeviceResponse
+	(*UnblockDeviceRequest)(nil),        // 38: mistgate.admin.v1.UnblockDeviceRequest
+	(*UnblockDeviceResponse)(nil),       // 39: mistgate.admin.v1.UnblockDeviceResponse
+	(*DeleteUsersRequest)(nil),          // 40: mistgate.admin.v1.DeleteUsersRequest
+	(*DeleteUsersResponse)(nil),         // 41: mistgate.admin.v1.DeleteUsersResponse
+	(*GetSubscriptionLinkRequest)(nil),  // 42: mistgate.admin.v1.GetSubscriptionLinkRequest
+	(*GetSubscriptionLinkResponse)(nil), // 43: mistgate.admin.v1.GetSubscriptionLinkResponse
+	(*GetTelegramLinksRequest)(nil),     // 44: mistgate.admin.v1.GetTelegramLinksRequest
+	(*TelegramProxyLink)(nil),           // 45: mistgate.admin.v1.TelegramProxyLink
+	(*GetTelegramLinksResponse)(nil),    // 46: mistgate.admin.v1.GetTelegramLinksResponse
+	(*IssueTelegramKeyRequest)(nil),     // 47: mistgate.admin.v1.IssueTelegramKeyRequest
+	(*IssueTelegramKeyResponse)(nil),    // 48: mistgate.admin.v1.IssueTelegramKeyResponse
+	(*RotateTelegramKeyRequest)(nil),    // 49: mistgate.admin.v1.RotateTelegramKeyRequest
+	(*RotateTelegramKeyResponse)(nil),   // 50: mistgate.admin.v1.RotateTelegramKeyResponse
+	(*RevokeTelegramKeyRequest)(nil),    // 51: mistgate.admin.v1.RevokeTelegramKeyRequest
+	(*RevokeTelegramKeyResponse)(nil),   // 52: mistgate.admin.v1.RevokeTelegramKeyResponse
+	(*LinkHour)(nil),                    // 53: mistgate.admin.v1.LinkHour
+	(*HelloKexDevice)(nil),              // 54: mistgate.admin.v1.HelloKexDevice
+	(App)(0),                            // 55: mistgate.admin.v1.App
+	(*ProfileFormat)(nil),               // 56: mistgate.admin.v1.ProfileFormat
 }
 var file_mistgate_admin_v1_user_proto_depIdxs = []int32{
-	52, // 0: mistgate.admin.v1.DeviceConnection.hours:type_name -> mistgate.admin.v1.LinkHour
-	7,  // 1: mistgate.admin.v1.GetUserConnectionResponse.rows:type_name -> mistgate.admin.v1.DeviceConnection
-	53, // 2: mistgate.admin.v1.GetUserConnectionResponse.hello_kex:type_name -> mistgate.admin.v1.HelloKexDevice
+	53, // 0: mistgate.admin.v1.DeviceConnection.hours:type_name -> mistgate.admin.v1.LinkHour
+	8,  // 1: mistgate.admin.v1.GetUserConnectionResponse.rows:type_name -> mistgate.admin.v1.DeviceConnection
+	54, // 2: mistgate.admin.v1.GetUserConnectionResponse.hello_kex:type_name -> mistgate.admin.v1.HelloKexDevice
 	0,  // 3: mistgate.admin.v1.User.status:type_name -> mistgate.admin.v1.UserStatus
-	9,  // 4: mistgate.admin.v1.User.apps:type_name -> mistgate.admin.v1.AppToggles
-	54, // 5: mistgate.admin.v1.User.via:type_name -> mistgate.admin.v1.App
+	10, // 4: mistgate.admin.v1.User.apps:type_name -> mistgate.admin.v1.AppToggles
+	55, // 5: mistgate.admin.v1.User.via:type_name -> mistgate.admin.v1.App
 	1,  // 6: mistgate.admin.v1.User.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	10, // 7: mistgate.admin.v1.User.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	11, // 7: mistgate.admin.v1.User.nodes:type_name -> mistgate.admin.v1.NodeSelection
 	4,  // 8: mistgate.admin.v1.User.dns_source:type_name -> mistgate.admin.v1.DnsSource
 	2,  // 9: mistgate.admin.v1.ListUsersRequest.filter:type_name -> mistgate.admin.v1.UserFilter
 	3,  // 10: mistgate.admin.v1.ListUsersRequest.sort:type_name -> mistgate.admin.v1.UserSort
-	11, // 11: mistgate.admin.v1.ListUsersResponse.users:type_name -> mistgate.admin.v1.User
-	13, // 12: mistgate.admin.v1.ListUsersResponse.counts:type_name -> mistgate.admin.v1.UserCounts
+	12, // 11: mistgate.admin.v1.ListUsersResponse.users:type_name -> mistgate.admin.v1.User
+	14, // 12: mistgate.admin.v1.ListUsersResponse.counts:type_name -> mistgate.admin.v1.UserCounts
 	5,  // 13: mistgate.admin.v1.Device.kind:type_name -> mistgate.admin.v1.DeviceKind
-	55, // 14: mistgate.admin.v1.ProfileRef.formats:type_name -> mistgate.admin.v1.ProfileFormat
-	11, // 15: mistgate.admin.v1.GetUserResponse.user:type_name -> mistgate.admin.v1.User
-	16, // 16: mistgate.admin.v1.GetUserResponse.devices:type_name -> mistgate.admin.v1.Device
-	17, // 17: mistgate.admin.v1.GetUserResponse.daily_traffic:type_name -> mistgate.admin.v1.DayTraffic
-	18, // 18: mistgate.admin.v1.GetUserResponse.node_traffic:type_name -> mistgate.admin.v1.NodeTraffic
-	20, // 19: mistgate.admin.v1.GetUserResponse.profiles:type_name -> mistgate.admin.v1.ProfileRef
-	19, // 20: mistgate.admin.v1.GetUserResponse.node_access:type_name -> mistgate.admin.v1.NodeAccess
-	22, // 21: mistgate.admin.v1.GetUserResponse.blocked_devices:type_name -> mistgate.admin.v1.BlockedDevice
+	56, // 14: mistgate.admin.v1.ProfileRef.formats:type_name -> mistgate.admin.v1.ProfileFormat
+	12, // 15: mistgate.admin.v1.GetUserResponse.user:type_name -> mistgate.admin.v1.User
+	17, // 16: mistgate.admin.v1.GetUserResponse.devices:type_name -> mistgate.admin.v1.Device
+	18, // 17: mistgate.admin.v1.GetUserResponse.daily_traffic:type_name -> mistgate.admin.v1.DayTraffic
+	19, // 18: mistgate.admin.v1.GetUserResponse.node_traffic:type_name -> mistgate.admin.v1.NodeTraffic
+	21, // 19: mistgate.admin.v1.GetUserResponse.profiles:type_name -> mistgate.admin.v1.ProfileRef
+	20, // 20: mistgate.admin.v1.GetUserResponse.node_access:type_name -> mistgate.admin.v1.NodeAccess
+	23, // 21: mistgate.admin.v1.GetUserResponse.blocked_devices:type_name -> mistgate.admin.v1.BlockedDevice
 	1,  // 22: mistgate.admin.v1.CreateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	9,  // 23: mistgate.admin.v1.CreateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
-	10, // 24: mistgate.admin.v1.CreateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
-	11, // 25: mistgate.admin.v1.CreateUserResponse.user:type_name -> mistgate.admin.v1.User
+	10, // 23: mistgate.admin.v1.CreateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
+	11, // 24: mistgate.admin.v1.CreateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	12, // 25: mistgate.admin.v1.CreateUserResponse.user:type_name -> mistgate.admin.v1.User
 	1,  // 26: mistgate.admin.v1.UpdateUserRequest.quota_reset:type_name -> mistgate.admin.v1.QuotaReset
-	9,  // 27: mistgate.admin.v1.UpdateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
-	10, // 28: mistgate.admin.v1.UpdateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
-	11, // 29: mistgate.admin.v1.UpdateUserResponse.user:type_name -> mistgate.admin.v1.User
-	27, // 30: mistgate.admin.v1.UpdateUserResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
-	28, // 31: mistgate.admin.v1.AccessImpact.lost:type_name -> mistgate.admin.v1.ImpactProfile
-	28, // 32: mistgate.admin.v1.AccessImpact.gained:type_name -> mistgate.admin.v1.ImpactProfile
-	11, // 33: mistgate.admin.v1.SetUsersEnabledResponse.users:type_name -> mistgate.admin.v1.User
-	11, // 34: mistgate.admin.v1.ExtendUsersResponse.users:type_name -> mistgate.admin.v1.User
-	11, // 35: mistgate.admin.v1.ResetUserTrafficResponse.users:type_name -> mistgate.admin.v1.User
-	11, // 36: mistgate.admin.v1.RevokeDeviceResponse.user:type_name -> mistgate.admin.v1.User
-	11, // 37: mistgate.admin.v1.UnblockDeviceResponse.user:type_name -> mistgate.admin.v1.User
-	44, // 38: mistgate.admin.v1.GetTelegramLinksResponse.links:type_name -> mistgate.admin.v1.TelegramProxyLink
-	45, // 39: mistgate.admin.v1.IssueTelegramKeyResponse.proxy:type_name -> mistgate.admin.v1.GetTelegramLinksResponse
-	45, // 40: mistgate.admin.v1.RotateTelegramKeyResponse.proxy:type_name -> mistgate.admin.v1.GetTelegramLinksResponse
-	45, // 41: mistgate.admin.v1.RevokeTelegramKeyResponse.proxy:type_name -> mistgate.admin.v1.GetTelegramLinksResponse
-	12, // 42: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
-	15, // 43: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
-	23, // 44: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
-	25, // 45: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
-	29, // 46: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
-	31, // 47: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
-	33, // 48: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
-	35, // 49: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
-	37, // 50: mistgate.admin.v1.UserService.UnblockDevice:input_type -> mistgate.admin.v1.UnblockDeviceRequest
-	39, // 51: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
-	41, // 52: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
-	43, // 53: mistgate.admin.v1.UserService.GetTelegramLinks:input_type -> mistgate.admin.v1.GetTelegramLinksRequest
-	46, // 54: mistgate.admin.v1.UserService.IssueTelegramKey:input_type -> mistgate.admin.v1.IssueTelegramKeyRequest
-	48, // 55: mistgate.admin.v1.UserService.RotateTelegramKey:input_type -> mistgate.admin.v1.RotateTelegramKeyRequest
-	50, // 56: mistgate.admin.v1.UserService.RevokeTelegramKey:input_type -> mistgate.admin.v1.RevokeTelegramKeyRequest
-	6,  // 57: mistgate.admin.v1.UserService.GetUserConnection:input_type -> mistgate.admin.v1.GetUserConnectionRequest
-	14, // 58: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
-	21, // 59: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
-	24, // 60: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
-	26, // 61: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
-	30, // 62: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
-	32, // 63: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
-	34, // 64: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
-	36, // 65: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
-	38, // 66: mistgate.admin.v1.UserService.UnblockDevice:output_type -> mistgate.admin.v1.UnblockDeviceResponse
-	40, // 67: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
-	42, // 68: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
-	45, // 69: mistgate.admin.v1.UserService.GetTelegramLinks:output_type -> mistgate.admin.v1.GetTelegramLinksResponse
-	47, // 70: mistgate.admin.v1.UserService.IssueTelegramKey:output_type -> mistgate.admin.v1.IssueTelegramKeyResponse
-	49, // 71: mistgate.admin.v1.UserService.RotateTelegramKey:output_type -> mistgate.admin.v1.RotateTelegramKeyResponse
-	51, // 72: mistgate.admin.v1.UserService.RevokeTelegramKey:output_type -> mistgate.admin.v1.RevokeTelegramKeyResponse
-	8,  // 73: mistgate.admin.v1.UserService.GetUserConnection:output_type -> mistgate.admin.v1.GetUserConnectionResponse
-	58, // [58:74] is the sub-list for method output_type
-	42, // [42:58] is the sub-list for method input_type
-	42, // [42:42] is the sub-list for extension type_name
-	42, // [42:42] is the sub-list for extension extendee
-	0,  // [0:42] is the sub-list for field type_name
+	10, // 27: mistgate.admin.v1.UpdateUserRequest.apps:type_name -> mistgate.admin.v1.AppToggles
+	11, // 28: mistgate.admin.v1.UpdateUserRequest.nodes:type_name -> mistgate.admin.v1.NodeSelection
+	6,  // 29: mistgate.admin.v1.UpdateUserRequest.page_password_action:type_name -> mistgate.admin.v1.PagePasswordAction
+	12, // 30: mistgate.admin.v1.UpdateUserResponse.user:type_name -> mistgate.admin.v1.User
+	28, // 31: mistgate.admin.v1.UpdateUserResponse.impact:type_name -> mistgate.admin.v1.AccessImpact
+	29, // 32: mistgate.admin.v1.AccessImpact.lost:type_name -> mistgate.admin.v1.ImpactProfile
+	29, // 33: mistgate.admin.v1.AccessImpact.gained:type_name -> mistgate.admin.v1.ImpactProfile
+	12, // 34: mistgate.admin.v1.SetUsersEnabledResponse.users:type_name -> mistgate.admin.v1.User
+	12, // 35: mistgate.admin.v1.ExtendUsersResponse.users:type_name -> mistgate.admin.v1.User
+	12, // 36: mistgate.admin.v1.ResetUserTrafficResponse.users:type_name -> mistgate.admin.v1.User
+	12, // 37: mistgate.admin.v1.RevokeDeviceResponse.user:type_name -> mistgate.admin.v1.User
+	12, // 38: mistgate.admin.v1.UnblockDeviceResponse.user:type_name -> mistgate.admin.v1.User
+	45, // 39: mistgate.admin.v1.GetTelegramLinksResponse.links:type_name -> mistgate.admin.v1.TelegramProxyLink
+	46, // 40: mistgate.admin.v1.IssueTelegramKeyResponse.proxy:type_name -> mistgate.admin.v1.GetTelegramLinksResponse
+	46, // 41: mistgate.admin.v1.RotateTelegramKeyResponse.proxy:type_name -> mistgate.admin.v1.GetTelegramLinksResponse
+	46, // 42: mistgate.admin.v1.RevokeTelegramKeyResponse.proxy:type_name -> mistgate.admin.v1.GetTelegramLinksResponse
+	13, // 43: mistgate.admin.v1.UserService.ListUsers:input_type -> mistgate.admin.v1.ListUsersRequest
+	16, // 44: mistgate.admin.v1.UserService.GetUser:input_type -> mistgate.admin.v1.GetUserRequest
+	24, // 45: mistgate.admin.v1.UserService.CreateUser:input_type -> mistgate.admin.v1.CreateUserRequest
+	26, // 46: mistgate.admin.v1.UserService.UpdateUser:input_type -> mistgate.admin.v1.UpdateUserRequest
+	30, // 47: mistgate.admin.v1.UserService.SetUsersEnabled:input_type -> mistgate.admin.v1.SetUsersEnabledRequest
+	32, // 48: mistgate.admin.v1.UserService.ExtendUsers:input_type -> mistgate.admin.v1.ExtendUsersRequest
+	34, // 49: mistgate.admin.v1.UserService.ResetUserTraffic:input_type -> mistgate.admin.v1.ResetUserTrafficRequest
+	36, // 50: mistgate.admin.v1.UserService.RevokeDevice:input_type -> mistgate.admin.v1.RevokeDeviceRequest
+	38, // 51: mistgate.admin.v1.UserService.UnblockDevice:input_type -> mistgate.admin.v1.UnblockDeviceRequest
+	40, // 52: mistgate.admin.v1.UserService.DeleteUsers:input_type -> mistgate.admin.v1.DeleteUsersRequest
+	42, // 53: mistgate.admin.v1.UserService.GetSubscriptionLink:input_type -> mistgate.admin.v1.GetSubscriptionLinkRequest
+	44, // 54: mistgate.admin.v1.UserService.GetTelegramLinks:input_type -> mistgate.admin.v1.GetTelegramLinksRequest
+	47, // 55: mistgate.admin.v1.UserService.IssueTelegramKey:input_type -> mistgate.admin.v1.IssueTelegramKeyRequest
+	49, // 56: mistgate.admin.v1.UserService.RotateTelegramKey:input_type -> mistgate.admin.v1.RotateTelegramKeyRequest
+	51, // 57: mistgate.admin.v1.UserService.RevokeTelegramKey:input_type -> mistgate.admin.v1.RevokeTelegramKeyRequest
+	7,  // 58: mistgate.admin.v1.UserService.GetUserConnection:input_type -> mistgate.admin.v1.GetUserConnectionRequest
+	15, // 59: mistgate.admin.v1.UserService.ListUsers:output_type -> mistgate.admin.v1.ListUsersResponse
+	22, // 60: mistgate.admin.v1.UserService.GetUser:output_type -> mistgate.admin.v1.GetUserResponse
+	25, // 61: mistgate.admin.v1.UserService.CreateUser:output_type -> mistgate.admin.v1.CreateUserResponse
+	27, // 62: mistgate.admin.v1.UserService.UpdateUser:output_type -> mistgate.admin.v1.UpdateUserResponse
+	31, // 63: mistgate.admin.v1.UserService.SetUsersEnabled:output_type -> mistgate.admin.v1.SetUsersEnabledResponse
+	33, // 64: mistgate.admin.v1.UserService.ExtendUsers:output_type -> mistgate.admin.v1.ExtendUsersResponse
+	35, // 65: mistgate.admin.v1.UserService.ResetUserTraffic:output_type -> mistgate.admin.v1.ResetUserTrafficResponse
+	37, // 66: mistgate.admin.v1.UserService.RevokeDevice:output_type -> mistgate.admin.v1.RevokeDeviceResponse
+	39, // 67: mistgate.admin.v1.UserService.UnblockDevice:output_type -> mistgate.admin.v1.UnblockDeviceResponse
+	41, // 68: mistgate.admin.v1.UserService.DeleteUsers:output_type -> mistgate.admin.v1.DeleteUsersResponse
+	43, // 69: mistgate.admin.v1.UserService.GetSubscriptionLink:output_type -> mistgate.admin.v1.GetSubscriptionLinkResponse
+	46, // 70: mistgate.admin.v1.UserService.GetTelegramLinks:output_type -> mistgate.admin.v1.GetTelegramLinksResponse
+	48, // 71: mistgate.admin.v1.UserService.IssueTelegramKey:output_type -> mistgate.admin.v1.IssueTelegramKeyResponse
+	50, // 72: mistgate.admin.v1.UserService.RotateTelegramKey:output_type -> mistgate.admin.v1.RotateTelegramKeyResponse
+	52, // 73: mistgate.admin.v1.UserService.RevokeTelegramKey:output_type -> mistgate.admin.v1.RevokeTelegramKeyResponse
+	9,  // 74: mistgate.admin.v1.UserService.GetUserConnection:output_type -> mistgate.admin.v1.GetUserConnectionResponse
+	59, // [59:75] is the sub-list for method output_type
+	43, // [43:59] is the sub-list for method input_type
+	43, // [43:43] is the sub-list for extension type_name
+	43, // [43:43] is the sub-list for extension extendee
+	0,  // [0:43] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_user_proto_init() }
@@ -4644,7 +4733,7 @@ func file_mistgate_admin_v1_user_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_user_proto_rawDesc), len(file_mistgate_admin_v1_user_proto_rawDesc)),
-			NumEnums:      6,
+			NumEnums:      7,
 			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,

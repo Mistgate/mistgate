@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { users } from "@/lib/api";
@@ -12,6 +11,7 @@ import { useFmt } from "@/lib/format";
 import { agoText, devicesView, lastOnlineOf, nowSec, warnOf, type Reach } from "./format";
 import { detailN, type DeviceN, type UserN as User } from "./model";
 import { AppLink } from "./nav";
+import { PagePasswordBlock } from "./page-password";
 import { platformLabel } from "./awg-devices";
 import { useTx, type Tx } from "./t";
 import { G, P } from "./user-bits";
@@ -85,9 +85,8 @@ function DeviceLine({ d, t }: { d: DeviceN; t: Tx }) {
 
 /**
  * The subscription link (one for all devices) with its copy button and "QR and send" (the send window), and the page password under
- * it. The password is the link's own (derived from its token): the server can neither set one nor remove it, so the board's
- * "Change" and "Remove" are not drawn; "new link" in the send window changes both. An instance that asks for none has no password:
- * the line says that anyone with the link opens the page.
+ * it (PagePasswordBlock): show, change, remove and bring back, in every state it has. The password is computed from the link and a number
+ * the panel keeps, so "Change" gives a new one for the same link; "new link" in the send window changes it as well.
  */
 function LinkBlock({ u, onLink }: { u: User; onLink: () => void }) {
   const t = useTx();
@@ -101,9 +100,7 @@ function LinkBlock({ u, onLink }: { u: User; onLink: () => void }) {
     staleTime: 0,
     retry: false,
   });
-  const [shown, setShown] = useState(false);
   const url = q.data?.url ?? "";
-  const pw = q.data?.password ?? "";
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <span className="text-xs leading-5 text-muted">{t("ul.link")}</span>
@@ -118,25 +115,7 @@ function LinkBlock({ u, onLink }: { u: User; onLink: () => void }) {
         </Button>
       </div>
       <small className="text-xs leading-5 text-muted">{t("ul.link.hint")}</small>
-      {!q.isPending && (
-        <div className="mt-2.5 grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-field border border-line py-2 ps-2.5 pe-2 @max-[520px]/ust:grid-cols-[28px_minmax(0,1fr)]">
-          <span aria-hidden className={cx("grid size-7 place-items-center rounded-ctl", pw ? "bg-tone-mint-bg text-accent-text" : "bg-step text-sec")}>
-            <Icon name="lock" size={16} />
-          </span>
-          <div className="flex min-w-0 flex-col">
-            <b className="text-[13px] font-medium">{t("users.pagePassword")}</b>
-            <span className={cx("truncate text-xs leading-4", pw ? "font-mono font-medium text-sec" : "text-muted")}>{pw ? (shown ? pw : "••••••••••••") : t("ul.pw.none")}</span>
-          </div>
-          {pw && (
-            <div className="flex items-center gap-1.5 @max-[520px]/ust:col-span-full">
-              <Button size="md" onClick={() => setShown(!shown)}>
-                {shown ? t("ul.pw.hide") : t("ul.pw.show")}
-              </Button>
-              <CopyButton iconOnly value={pw} size="md" label={t("users.copyPassword")} />
-            </div>
-          )}
-        </div>
-      )}
+      <PagePasswordBlock userId={u.id} open={u.pageOpen} password={q.data?.password ?? ""} ready={!q.isPending} className="mt-2.5" />
     </div>
   );
 }

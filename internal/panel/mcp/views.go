@@ -888,6 +888,8 @@ type userV struct {
 	AllNodes    bool     `json:"all_nodes"`
 	NodeIDs     []string `json:"node_ids,omitempty"`
 	CreatedUnix int64    `json:"created_unix"`
+	// PageOpen: the person's own page opens on their link alone (their page password was removed). The password itself is not here.
+	PageOpen bool `json:"page_open,omitempty"`
 }
 
 func userView(u *adminv1.User) userV {
@@ -897,7 +899,7 @@ func userView(u *adminv1.User) userV {
 		DevicesUsed: u.GetDevicesUsed(), DevicesIdle: u.GetDevicesIdle(), DeviceLimit: u.GetDeviceLimit(), UsedBytes: u.GetUsedBytes(), QuotaBytes: u.GetQuotaBytes(),
 		QuotaReset: enumName("QUOTA_RESET_", u.GetQuotaReset().String()), ExpiresUnix: u.GetExpiresUnix(), LastSeen: u.GetLastSeenUnix(),
 		Node: nm(u.GetCurrentNodeName()), SpeedLimit: u.GetSpeedLimitBps(), DeviceSpeedLimit: u.GetDeviceSpeedLimitBps(), Happ: u.GetApps().GetHapp(), Amnezia: u.GetApps().GetAmnezia(),
-		Telegram: u.GetApps().GetTelegram(), Mistgate: mistgateOn(u.GetApps()), AllNodes: u.GetNodes().GetAll(), CreatedUnix: u.GetCreatedUnix(),
+		Telegram: u.GetApps().GetTelegram(), Mistgate: mistgateOn(u.GetApps()), AllNodes: u.GetNodes().GetAll(), CreatedUnix: u.GetCreatedUnix(), PageOpen: u.GetPageOpen(),
 	}
 	for i, id := range u.GetExtraGroupIds() {
 		if i == maxIDs {

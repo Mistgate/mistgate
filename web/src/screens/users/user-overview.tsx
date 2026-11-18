@@ -1,11 +1,10 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Scramble } from "@/components/fx/scramble-react";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
 import { ProtocolTag } from "@/components/ui/protocol-tag";
-import { useToast } from "@/components/ui/toast";
 import { users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
@@ -17,9 +16,9 @@ import { DAY, daysLeft, nowSec } from "./format";
 import { ConnectionAlerts } from "./user-connection";
 import { CopyBtn, CardHead, G, GroupTags, P } from "./user-bits";
 import type { DetailN, UserN as User } from "./model";
+import { PagePasswordBlock } from "./page-password";
 import { protocolsQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
-import { ConfirmModal } from "./ui";
 import { useReadonly } from "./user-actions";
 
 const dayFmt = (t: Tx, unix: number, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(t.locale, { timeZone: "UTC", ...o }).format(new Date(unix * 1000));
@@ -165,14 +164,12 @@ function NowCard({ data, nodeName, onDevices, blocked }: { data: DetailN; nodeNa
 }
 
 /**
- * The subscription link of a person and its page password (derived from the link: a new link is a new password). Read when the page opens
- * (owner and helpers; an observer is not let), never cached; "rotate" makes a new link, which stops the old one.
+ * The subscription link of a person and the password of their page (computed from the link and a number the panel keeps). Read when the page
+ * opens (owner and helpers; an observer is not let), never cached. A new link is made in the send window ("QR and send").
  */
 export function useSubLink(user: User) {
   const t = useTx();
-  const toast = useToast();
   const readonly = useReadonly();
-  const [rotated, setRotated] = useState<{ url: string; password: string } | null>(null);
   const q = useQuery({
     queryKey: ["users", "link", user.id],
     queryFn: async ({ signal }) => {
@@ -183,56 +180,12 @@ export function useSubLink(user: User) {
     gcTime: 0,
     staleTime: 0,
   });
-  const rotate = useMutation({
-    mutationFn: async () => {
-      const r = await users.getSubscriptionLink({ userId: user.id, rotate: true });
-      return { url: r.url, password: r.pagePassword };
-    },
-    onSuccess: (r) => {
-      setRotated(r);
-      toast(t("users.rotated"));
-    },
-    onError: (e) => toast.error(errorText(e, t)),
-  });
-  return { readonly, url: rotated?.url ?? q.data?.url ?? "", password: rotated ? rotated.password : (q.data?.password ?? ""), error: q.isError && !rotated ? errorText(q.error, t) : "", rotate };
+  return { readonly, url: q.data?.url ?? "", password: q.data?.password ?? "", ready: !q.isPending, error: q.isError ? errorText(q.error, t) : "" };
 }
 
-/** The page password (the board's .us-pw): hidden dots, "Show", "Change" (a new link and password: asks first). Not set: the page opens for anyone with the link. */
-export function PagePassword({ link }: { link: ReturnType<typeof useSubLink> }) {
-  const t = useTx();
-  const [shown, setShown] = useState(false);
-  const [ask, setAsk] = useState(false);
-  const has = !!link.password;
-  return (
-    <div className={cx("up-pw", has && "set")}>
-      <span className="g" aria-hidden>
-        <G d={P.lock} size={16} />
-      </span>
-      <div className="t">
-        <b>{t("users.pagePassword")}</b>
-        <span className={cx(has && "mono")}>{has ? (shown ? link.password : "••••••••••••") : t("up.pwNone")}</span>
-      </div>
-      {has && (
-        <div className="a">
-          <Button size="md" aria-pressed={shown} onClick={() => setShown(!shown)}>
-            {shown ? t("up.pwHide") : t("up.pwShow")}
-          </Button>
-          <Button size="md" disabled={!link.url || link.rotate.isPending || link.readonly} onClick={() => setAsk(true)}>
-            {t("up.pwChange")}
-          </Button>
-        </div>
-      )}
-      <ConfirmModal
-        open={ask}
-        onOpenChange={setAsk}
-        title={t("users.rotateT")}
-        description={has ? t("users.rotateBodyPw") : t("users.rotateBody")}
-        confirmLabel={t("users.rotateDo")}
-        danger
-        onConfirm={() => link.rotate.mutateAsync().then(() => setShown(false))}
-      />
-    </div>
-  );
+/** The page password (the board's .us-pw): see PagePasswordBlock. */
+export function PagePassword({ user, link }: { user: User; link: ReturnType<typeof useSubLink> }) {
+  return <PagePasswordBlock userId={user.id} open={user.pageOpen} password={link.password} ready={link.ready} readonly={link.readonly} stacked className="mt-1" />;
 }
 
 /** The link card (the board's .up-lkc): the subscription link to copy, a way to the QR window, the page's password. */
@@ -261,7 +214,7 @@ export function LinkCard({ user, onQr }: { user: User; onQr: () => void }) {
               </Button>
             </div>
             <small>{t("up.linkHint")}</small>
-            <PagePassword link={link} />
+            <PagePassword user={user} link={link} />
           </>
         )}
       </div>

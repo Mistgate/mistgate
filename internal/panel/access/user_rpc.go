@@ -143,7 +143,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 			UsedBytes: u.UsedBytes, QuotaBytes: u.QuotaBytes, QuotaReset: resetToProto[u.QuotaReset], NextResetUnix: next,
 			ExpiresUnix: unixOrZero(u.ExpiresAt), LastSeenUnix: unixOrZero(u.LastSeenAt), Online: isOnline,
 			SpeedLimitBps: u.SpeedLimitBps, DeviceSpeedLimitBps: u.DeviceSpeedLimitBps, Nodes: &adminv1.NodeSelection{All: u.AllNodes, NodeIds: u.NodeIDs},
-			CreatedUnix: u.CreatedAt.Unix(), DnsPresetId: u.DNSPresetID,
+			CreatedUnix: u.CreatedAt.Unix(), DnsPresetId: u.DNSPresetID, PageOpen: u.PageOpen,
 		}
 		effID, effName, src := dnsLookup.Resolve(u.DNSPresetID, u.GroupDNSPresetID)
 		out[i].EffectiveDnsPresetId, out[i].EffectiveDnsPresetName, out[i].DnsSource = effID, effName, dns.Source(src).Proto()
@@ -342,7 +342,7 @@ func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.C
 	if auth.PrincipalFrom(ctx).Token {
 		return connect.NewResponse(resp), nil
 	}
-	if resp.PagePassword, err = s.pagePassword(ctx, token); err != nil {
+	if resp.PagePassword, err = s.pagePassword(ctx, token, 0, false); err != nil {
 		return nil, err
 	}
 	resp.SubscriptionUrl = url
@@ -661,6 +661,10 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		}
 		u.DNSPresetID = *m.DnsPresetId // DNS is client-side (the subscription): no state push for the nodes
 	}
+	pageAction, err := pagePasswordAction(m.PagePasswordAction, old)
+	if err != nil {
+		return nil, err
+	}
 	u.Status = ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, u.UsedBytes, now)
 	u.ExtraGroupIDs = nextExtra
 	groupsChanged := u.GroupID != old.GroupID || !slices.Equal(old.ExtraGroupIDs, nextExtra)
@@ -678,7 +682,7 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		return connect.NewResponse(&adminv1.UpdateUserResponse{User: users[0], Impact: impact}), nil
 	}
 	asked := 0
-	if userUpdateChanges(old, u) || groupsChanged {
+	if userUpdateChanges(old, u) || groupsChanged || pageAction != "" {
 		asked = 1
 	}
 	reservation, err := s.reserveTokenUserChanges(ctx, adminv1connect.UserServiceUpdateUserProcedure, asked)
@@ -698,7 +702,12 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 			return nil, err
 		}
 	}
-	switch err := a.UpdateUser(ctx, u, setNodes, change); {
+	// A request that asks for nothing but the page password does not rewrite the row from the values read above (a change made in
+	// between would be lost): the password is one statement of its own, below.
+	if changedUserFields(m) != "page_password" {
+		err = a.UpdateUser(ctx, u, setNodes, change)
+	}
+	switch {
 	case errors.Is(err, store.ErrAccessExists):
 		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
@@ -708,6 +717,13 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	case err != nil:
 		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
 		return nil, s.internal("update user", err)
+	}
+	if pageAction != "" {
+		if _, err := a.SetPagePassword(ctx, u.ID, pageAction); errors.Is(err, store.ErrNotFound) {
+			return nil, notFound("user")
+		} else if err != nil {
+			return nil, s.internal("set page password", err)
+		}
 	}
 	reservation.markTouched(asked)
 	if !u.AppTelegram && old.AppTelegram {
@@ -729,6 +745,9 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	fields := map[string]any{"user": u.ID, "name": u.Name, "fields": changedUserFields(m)}
 	if added, removed := idsDiff(old.ExtraGroupIDs, nextExtra); len(added)+len(removed) > 0 { // what the person's extra groups really did
 		fields["groups_added"], fields["groups_removed"] = strings.Join(added, ","), strings.Join(removed, ",")
+	}
+	if pageAction != "" { // the word of what was done; the password is computed and never written anywhere
+		fields["page_password"] = map[string]string{store.PagePassChange: "changed", store.PagePassRemove: "removed", store.PagePassRestore: "restored"}[pageAction]
 	}
 	s.audit(ctx, actor(ctx), "user_update", fields)
 	users, err := s.loadUsers(ctx, u.ID)
@@ -1042,12 +1061,39 @@ func changedUserFields(m *adminv1.UpdateUserRequest) string {
 		{m.ExpiresUnix != nil, "expires"}, {m.DeviceLimit != nil, "device_limit"}, {m.Apps != nil, "apps"}, {m.Apps != nil && m.Apps.Mistgate != nil, "app_mistgate"},
 		{m.Apps != nil && m.Apps.TrustTunnel != nil, "app_trusttunnel"}, {m.Nodes != nil, "nodes"},
 		{m.SpeedLimitBps != nil, "speed_limit"}, {m.DeviceSpeedLimitBps != nil, "device_speed_limit"}, {m.DnsPresetId != nil, "dns"}, {m.SubscriptionName != nil, "subscription_name"},
+		{m.PagePasswordAction != adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_UNSPECIFIED, "page_password"},
 	} {
 		if x.set {
 			f = append(f, x.name)
 		}
 	}
 	return strings.Join(f, ",")
+}
+
+// pagePasswordAction is the store's word for what a request does to the page password of a person ("" for nothing: no action asked,
+// or one that changes nothing, like removing a password that is removed). Changing a removed password is refused: there is none to
+// change, and "restore" is what brings one back.
+func pagePasswordAction(a adminv1.PagePasswordAction, old store.AccessUser) (string, error) {
+	switch a {
+	case adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_UNSPECIFIED:
+		return "", nil
+	case adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_CHANGE:
+		if old.PageOpen {
+			return "", coded(connect.CodeFailedPrecondition, "page_password_removed")
+		}
+		return store.PagePassChange, nil
+	case adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_REMOVE:
+		if old.PageOpen {
+			return "", nil
+		}
+		return store.PagePassRemove, nil
+	case adminv1.PagePasswordAction_PAGE_PASSWORD_ACTION_RESTORE:
+		if !old.PageOpen {
+			return "", nil
+		}
+		return store.PagePassRestore, nil
+	}
+	return "", invalid("unknown page password action")
 }
 
 // userUpdateChanges reports whether the normalized update differs from a stored, admin-editable user field.
@@ -1155,6 +1201,7 @@ func (s *Service) GetSubscriptionLink(ctx context.Context, req *connect.Request[
 		return nil, s.internal("get user", err)
 	}
 	var token string
+	gen, open := u.PagePassGen, u.PageOpen
 	if req.Msg.Rotate {
 		tok, hash := newToken()
 		if err := a.SetSubToken(ctx, u.ID, hash, s.vault.Seal([]byte(tok), u.ID)); err != nil {
@@ -1163,7 +1210,7 @@ func (s *Service) GetSubscriptionLink(ctx context.Context, req *connect.Request[
 		s.tokens.remove([32]byte(u.SubTokenHash))
 		s.tokens.add([32]byte(hash))
 		s.audit(ctx, actor(ctx), "user_link_rotate", map[string]any{"user": u.ID, "name": u.Name})
-		token = tok
+		token, gen = tok, 0 // SetSubToken starts the password's number again; page_open stays as the owner left it
 	} else {
 		pt, err := s.vault.Open(u.SubTokenEnc, u.ID)
 		if err != nil {
@@ -1175,22 +1222,22 @@ func (s *Service) GetSubscriptionLink(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	pw, err := s.pagePassword(ctx, token)
+	pw, err := s.pagePassword(ctx, token, gen, open)
 	if err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&adminv1.GetSubscriptionLinkResponse{Url: url, PagePassword: pw}), nil
 }
 
-// pagePassword is the password of the page of a token, "" when the instance does not ask for one. It is computed
-// (package pagepass), so a rotated link has a new one.
-func (s *Service) pagePassword(ctx context.Context, token string) (string, error) {
+// pagePassword is the password of the page of a token in a generation, "" when the instance does not ask for one or the person's
+// password was removed (open). It is computed (package pagepass), so a new link or a change of the password is a new one.
+func (s *Service) pagePassword(ctx context.Context, token string, gen int, open bool) (string, error) {
 	set, err := subsettings.Load(ctx, s.st)
 	if err != nil {
 		return "", s.internal("load subscription settings", err)
 	}
-	if !subsettings.PagePassword(set) {
+	if !subsettings.PagePassword(set) || open {
 		return "", nil
 	}
-	return pagepass.Password(s.vault.Derive(pagepass.KeyLabel), token), nil
+	return pagepass.Password(s.vault.Derive(pagepass.KeyLabel), token, gen), nil
 }

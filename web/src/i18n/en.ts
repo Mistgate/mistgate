@@ -273,6 +273,7 @@ const core = {
   // The panel's refusal codes (src/lib/errors.ts errorCodes): what happened and what to do.
   "err.name_taken": "This name is taken. Pick another one.",
   "err.group_not_empty": "Users still in this group: {users}. Move them to another group, then delete it.",
+  "err.page_password_removed": "This person’s page has no password now. Bring it back first.",
   "err.group_in_both": "The same group is in both lists: add it or take it away, not both.",
   "err.main_group": "The main group cannot be taken away: make another group the main one instead.",
   "err.too_many_groups": "A person can be in 16 groups at most.",

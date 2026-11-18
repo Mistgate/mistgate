@@ -273,6 +273,10 @@ message User {
   repeated string extra_group_ids = 34;
   repeated string extra_group_names = 35;
   repeated string extra_group_colors = 36;
+  // The person's page password was removed: their page opens on the link alone (see PagePasswordAction). It says nothing about
+  // the instance-wide switch (SubscriptionSettings.user_page.require_page_password), which, when off, opens every page. Not a
+  // secret: the password itself is never part of a User.
+  bool page_open = 37;
 }
 
 enum DnsSource {
@@ -492,6 +496,19 @@ message CreateUserResponse {
   string page_password = 3;
 }
 
+// What UpdateUserRequest.page_password_action does to the page password of one person. The password is computed from the link and a
+// small number, so it is never stored or sent here: the owner reads it with GetSubscriptionLink (closed to tokens).
+enum PagePasswordAction {
+  PAGE_PASSWORD_ACTION_UNSPECIFIED = 0;
+  // A new password for the same link (the number it is computed with goes up by one): the cookies of the old one stop working at
+  // once, the subscription and the apps are not touched. FAILED_PRECONDITION "page_password_removed" while the password is removed.
+  PAGE_PASSWORD_ACTION_CHANGE = 1;
+  // The person's page opens on the link alone, with no question. A repeat does nothing.
+  PAGE_PASSWORD_ACTION_REMOVE = 2;
+  // The password is asked again, and it is a new one (the old one does not come back). A repeat does nothing.
+  PAGE_PASSWORD_ACTION_RESTORE = 3;
+}
+
 message UpdateUserRequest {
   string user_id = 1;
   optional string name = 2;
@@ -522,6 +539,9 @@ message UpdateUserRequest {
   // of the person for a token's user-change limit, like a change of the main group.
   repeated string add_group_ids = 15;
   repeated string remove_group_ids = 16;
+  // Change, remove or restore the person's page password. Counts as one change of the person for a token's user-change limit. The
+  // response never carries the password; the owner reads the new one with GetSubscriptionLink.
+  PagePasswordAction page_password_action = 17;
 }
 
 message UpdateUserResponse {
@@ -615,8 +635,9 @@ message GetSubscriptionLinkRequest {
 message GetSubscriptionLinkResponse {
   // https://<subscription domain>/<secret prefix>/<token>. The token is shown only here and to the user.
   string url = 1;
-  // The password of the user's page for this link (xxxx-xxxx), derived from the token: a new link is a new password.
-  // Empty when the instance does not ask for one. Like the link, never shown to agents.
+  // The password of the user's page for this link (xxxx-xxxx), derived from the token and the password's number: a new link is a
+  // new password, and so is a change of the password (UpdateUser page_password_action). Empty when the instance does not ask for one
+  // or this person's password was removed (User.page_open). Like the link, never shown to agents.
   string page_password = 2;
 }
 

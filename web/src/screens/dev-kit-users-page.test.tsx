@@ -100,6 +100,10 @@ describe("the scenes of the People screen", () => {
     if (state === "open") expect(document.querySelector("button[aria-label='alice'][aria-expanded=true]")).not.toBeNull();
     if (state === "send") expect(document.querySelector("[data-shot=link-modal]")?.textContent).toContain("lake-2718-moss");
     if (state === "send-plain") expect(document.querySelector("[data-shot=link-modal]")?.textContent).toContain("not set, anyone with the link can open the page");
+    if (state === "send-off") expect(document.querySelector("[data-shot=link-modal]")?.textContent).toContain("Page passwords are switched off for everyone.");
+    if (state === "open-removed") expect(rows()[1]!.textContent).toContain("Bring the password back");
+    if (state === "open-off") expect(rows()[0]!.textContent).toContain("Page passwords are switched off for everyone.");
+    if (state === "open") expect(rows()[0]!.querySelector("[data-pw=set]")).not.toBeNull();
     if (state === "select") expect(document.querySelector("[role=toolbar]")?.textContent).toContain("2 people");
     if (state === "select-ask") expect(document.querySelector("[role=toolbar]")?.textContent).toContain("Links stop working. Sure?");
     if (state === "groups") expect(document.querySelectorAll("h3")).toHaveLength(2);
