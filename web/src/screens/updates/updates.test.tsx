@@ -1005,7 +1005,7 @@ describe("What's new", () => {
   });
 
   it("shows the panel's notes in the panel card, only for a verified release", async () => {
-    const releaseUpdate = { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" };
+    const update = { version: "v0.3.0", url: "https://github.com/Mistgate/mistgate/releases/tag/v0.3.0", publishedUnix: 2000, checkedUnix: 1000, available: true, supported: true, installable: true, installing: false, errorKey: "" };
     await mount(page({ panel: { ...page().panel, update }, panelNotes: [note("v0.3.0", { en: "- Panel thing." }), note("v0.2.5")] }));
     expect(text()).toContain("Panel thing.");
     expect(text()).toContain("and 1 earlier version");
