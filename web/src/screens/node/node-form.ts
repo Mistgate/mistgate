@@ -29,6 +29,11 @@ export function useNodeForm<T extends Record<string, unknown>>(init: () => T) {
     dirty: keys.some(changed),
     /** A save went through: these fields (all) are what the node has now. */
     commit: (of?: readonly (keyof T)[]) => setStart((s) => ({ ...s, ...Object.fromEntries((of ?? keys).map((k) => [k, f[k]])) })),
+    /** The node has these values now (they were saved by another call than this form's Save): both the start and the field take them. */
+    adopt: (values: Partial<T>) => {
+      setStart((s) => ({ ...s, ...values }));
+      setF((x) => ({ ...x, ...values }));
+    },
     /** Back to what the node has: these fields (all). */
     revert: (of?: readonly (keyof T)[]) => setF((x) => ({ ...x, ...Object.fromEntries((of ?? keys).map((k) => [k, start[k]])) })),
   };

@@ -29,6 +29,7 @@ import { CodeBlock } from "@/screens/integrations/parts";
 import { Glyph } from "@/screens/overview-parts";
 import { AwgBackendCard } from "./awg-backend";
 import { MeasureButton, MeasureResult, useBandwidthMeasure } from "./bandwidth-measure";
+import { ChannelLastLine, ChannelMeasureButton, ChannelMeasureDialog, useChannelMeasure } from "./channel-measure";
 import { DebugCaptureCard } from "./debug-capture";
 import { DecoyCard } from "./decoy";
 import { useNodeForm, useSaveSection } from "./node-form";
@@ -255,6 +256,24 @@ function ChannelSection({ data, form }: { data: Plain<GetNodeResponse>; form: Fo
   const retired = node.status === NodeStatus.RETIRED;
   const { f, set, changed } = form;
   const m = useBandwidthMeasure(node.id);
+  // the channel measure against the fleet's own nodes: VPS edition only (the Cloudflare edition has no probe service), the owner's alone
+  const edition = useEdition();
+  const cmOn = owner && !retired && !edition.edge;
+  const cm = useChannelMeasure(node.id, cmOn);
+  const qc = useQueryClient();
+  const toast = useToast();
+  // "Set" in the measure's window: the number goes to the node by the call that saves it, and the field takes it as the node's own
+  const setLimit = useMutation({
+    mutationFn: (mbps: number) => nodesApi.updateNode({ nodeId: node.id, bandwidthMbps: mbps }),
+    onSuccess: (_r, mbps) => {
+      form.adopt({ bandwidth: String(mbps) });
+      toast(t("common.saved"));
+      void qc.invalidateQueries({ queryKey: ["node", node.id] });
+      void qc.invalidateQueries({ queryKey: ["nodes"] });
+      void qc.invalidateQueries({ queryKey: ["overview"] });
+    },
+    onError: (e) => toast.error(errorText(e, t)),
+  });
   // the measurement is in: the board's wave from the card's head, for three seconds
   const [wave, setWave] = useState(false);
   const answer = m.measure.data;
@@ -295,9 +314,17 @@ function ChannelSection({ data, form }: { data: Plain<GetNodeResponse>; form: Fo
           </div>
           <small className={cx("text-xs leading-4", error ? "text-danger-text" : "text-muted")}>{error ?? t("node.settings.bandwidthHint")}</small>
         </label>
-        {!retired && owner && <MeasureButton m={m} />}
+        {!retired && owner && (
+          <div className="sv-chb">
+            <MeasureButton m={m} />
+            {cmOn && <ChannelMeasureButton m={cm} />}
+          </div>
+        )}
       </div>
+      {cmOn && <ChannelLastLine m={cm} />}
       {!retired && owner && <MeasureResult m={m} current={f.bandwidth} onUse={(v) => set("bandwidth", v)} />}
+      {cmOn && <p className="sv-note cm-cardnote">{t("cm.cardNote")}</p>}
+      {cmOn && <ChannelMeasureDialog m={cm} name={node.name} configured={node.bandwidthMbps} onSet={(v) => setLimit.mutateAsync(v)} />}
       <SvSave dirty={sec.dirty} saved={sec.saved} busy={sec.busy} invalid={!!error} onCancel={sec.cancel} onSave={sec.save} />
     </SvCard>
   );

@@ -1,0 +1,169 @@
+/*
+ * The window of "Measure the channel" (screens/node/channel-measure.tsx) and its line on the channel card. The tiles are the board's
+ * .sv-runs (server.css), here without the card's side padding; the rest is the window's own: what the run is doing now, the partners it
+ * will use, and the offer of a number for the channel field.
+ */
+
+.sv-ch > .sv-chb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 25px;
+  justify-self: start;
+}
+.sv-chb > button {
+  gap: 8px;
+}
+.cm-last {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+  padding: 0 24px 14px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.sv-note.cm-cardnote {
+  border-top: 0;
+  padding-top: 0;
+}
+.cm-lead {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--sec);
+  text-wrap: pretty;
+}
+.cm-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.cm-partners {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.cm-partners > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.cm-partners ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 18px;
+}
+.cm-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.cm-now b {
+  flex: 1 1 auto;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--text);
+}
+.sv-runs.cm-runs {
+  padding: 0;
+}
+.sv-runs.cm-steps {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.sv-runs.cm-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.sv-runs .failed {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.sv-runs .failed em {
+  color: var(--danger-text);
+}
+.cm-offer {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--accent-line);
+  background: color-mix(in srgb, var(--accent-mark) 6%, transparent);
+}
+.cm-offer p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-wrap: pretty;
+}
+.cm-offer small {
+  font-size: 12px;
+  line-height: 16px;
+}
+.cm-offer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+.cm-offer-row label {
+  display: grid;
+  gap: 6px;
+  min-width: 140px;
+  flex: 0 1 180px;
+}
+.cm-offer-row label span {
+  font-size: 13px;
+  color: var(--sec);
+}
+.cm-input {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+.cm-input:focus-visible {
+  outline: 2px solid var(--accent-mark);
+  outline-offset: 1px;
+}
+.cm-input[data-invalid] {
+  border-color: var(--danger);
+}
+@media (max-width: 720px) {
+  .cm-last {
+    padding: 0 16px 14px;
+  }
+  .sv-runs.cm-steps,
+  .sv-runs.cm-two {
+    grid-template-columns: 1fr;
+  }
+  .cm-offer-row > button {
+    flex: 1 1 100%;
+  }
+}
+@media (max-width: 720px) {
+  .sv-ch > .sv-chb {
+    margin-top: 0;
+    justify-self: stretch;
+  }
+  .sv-chb > button {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}

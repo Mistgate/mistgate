@@ -144,6 +144,7 @@ export const en = {
   "approval.value.more_before": "{n} more earlier value|{n} more earlier values",
   "approval.value.node_sharing_people": "{gain} people gain the node, {lose} lose it",
   "approval.value.path_speed_effect": "The target opens a listener on a free port for one connection (a one-time token, closed after 30 seconds at most); the sender connects to it. Nothing else runs, nothing is changed on either node, and no public server is used. Both nodes carry the traffic once; the figure is kept for 7 days.",
+  "approval.value.channel_measure_effect": "The node and each partner take turns: a partner opens a listener on a free port for 8 streams (a one-time token, closed after the eighth stream or 20 seconds), the node receives for 10 seconds and then sends for 10 seconds. Both ends stop at 2 GiB and 15 seconds a direction whatever happens. People on these nodes are slower while it runs and a node with paid traffic pays for it. Nothing is changed on any node, no public server is used, and the node’s channel setting is not touched; the figures are kept for 7 days.",
   "approval.value.response_header_count": "Replace the own response headers with {n} entry|Replace the own response headers with {n} entries",
   "approval.value.rule_count": "Replace the ordered rules with {n} entry|Replace the ordered rules with {n} entries",
   "approval.value.shared_link_users": "{n} person on a shared link will be refused|{n} people on a shared link will be refused",
@@ -249,6 +250,10 @@ export const en = {
   "approval.fail.template_has_redaction_markers": "the template contains markers of a hidden value: remove them",
   "approval.outcome.path_speed_done.down": "Speed test {from} to {to}, {mb} MB from the target to the sender: {mbit_s} Mbit/s over {duration_ms} ms, connect {connect_ms} ms, first byte after {first_byte_ms} ms.",
   "approval.outcome.path_speed_done.up": "Speed test {from} to {to}, {mb} MB from the sender to the target: {mbit_s} Mbit/s over {duration_ms} ms, connect {connect_ms} ms.",
+  "approval.outcome.channel_measure_done": "Channel of {node} measured: receiving {down_mbps} Mbit/s with {down_partner}, sending {up_mbps} Mbit/s with {up_partner}. An estimate at that moment, not a guarantee of the tariff.",
+  "approval.outcome.channel_measure_done.down": "Channel of {node} measured, receiving only: {down_mbps} Mbit/s with {down_partner}; sending did not work. An estimate at that moment, not a guarantee of the tariff.",
+  "approval.outcome.channel_measure_done.up": "Channel of {node} measured, sending only: {up_mbps} Mbit/s with {up_partner}; receiving did not work. An estimate at that moment, not a guarantee of the tariff.",
+  "approval.outcome.channel_measure_done.running": "The channel measure of {node} is still running: its figures will be on the node’s page when it ends.",
 };
 
 export const ru: typeof en = {
@@ -391,6 +396,7 @@ export const ru: typeof en = {
   "approval.value.more_before": "Ещё {n} прежнее значение|Ещё {n} прежних значения|Ещё {n} прежних значений",
   "approval.value.node_sharing_people": "{gain} получат ноду, {lose} потеряют её",
   "approval.value.path_speed_effect": "Целевая нода откроет на свободном порту приёмник на одно соединение (одноразовый токен, закрывается не позже чем через 30 секунд), измеряющая подключится к нему. Больше ничего не запускается, на обеих нодах ничего не меняется, публичные серверы не используются. Трафик пройдёт через обе ноды один раз; результат хранится 7 дней.",
+  "approval.value.channel_measure_effect": "Нода и каждый напарник работают по очереди: напарник открывает на свободном порту приёмник на 8 потоков (одноразовый токен, закрывается после восьмого потока или через 20 секунд), нода 10 секунд принимает, потом 10 секунд отдаёт. Обе стороны останавливаются на 2 ГиБ и 15 секундах в каждую сторону, что бы ни случилось. Людям на этих нодах в это время медленнее, а нода с платным трафиком его оплачивает. Ничего на нодах не меняется, публичные серверы не используются, настройка канала ноды не трогается; результат хранится 7 дней.",
   "approval.value.response_header_count": "Заменить собственные заголовки ответа ({n} запись)|Заменить собственные заголовки ответа ({n} записи)|Заменить собственные заголовки ответа ({n} записей)",
   "approval.value.rule_count": "Заменить упорядоченные правила ({n} запись)|Заменить упорядоченные правила ({n} записи)|Заменить упорядоченные правила ({n} записей)",
   "approval.value.shared_link_users": "{n} человеку с общей ссылкой будет отказано|{n} людям с общей ссылкой будет отказано|{n} людям с общей ссылкой будет отказано",
@@ -496,6 +502,10 @@ export const ru: typeof en = {
   "approval.fail.template_has_redaction_markers": "в шаблоне остались метки скрытого значения: убери их",
   "approval.outcome.path_speed_done.down": "Замер скорости {from} → {to}, {mb} МБ от целевой ноды к измеряющей: {mbit_s} Мбит/с за {duration_ms} мс, соединение {connect_ms} мс, первый байт через {first_byte_ms} мс.",
   "approval.outcome.path_speed_done.up": "Замер скорости {from} → {to}, {mb} МБ от измеряющей ноды к целевой: {mbit_s} Мбит/с за {duration_ms} мс, соединение {connect_ms} мс.",
+  "approval.outcome.channel_measure_done": "Канал {node} измерен: приём {down_mbps} Мбит/с с {down_partner}, отдача {up_mbps} Мбит/с с {up_partner}. Оценка на тот момент, а не гарантия тарифа.",
+  "approval.outcome.channel_measure_done.down": "Канал {node} измерен только на приём: {down_mbps} Мбит/с с {down_partner}; отдача не сработала. Оценка на тот момент, а не гарантия тарифа.",
+  "approval.outcome.channel_measure_done.up": "Канал {node} измерен только на отдачу: {up_mbps} Мбит/с с {up_partner}; приём не сработал. Оценка на тот момент, а не гарантия тарифа.",
+  "approval.outcome.channel_measure_done.running": "Замер канала {node} ещё идёт: его цифры появятся на странице ноды, когда он закончится.",
 };
 
 export const zh: typeof en = {
@@ -638,6 +648,7 @@ export const zh: typeof en = {
   "approval.value.more_before": "另有 {n} 个之前的值",
   "approval.value.node_sharing_people": "{gain} 人将获得该节点，{lose} 人将失去它",
   "approval.value.path_speed_effect": "目标节点会在空闲端口上为一个连接打开监听（一次性令牌，最多 30 秒后关闭），发送方连接到它。不会运行其他任何东西，两个节点都不会被更改，也不使用公共服务器。两个节点各承载一次流量；结果保存 7 天。",
+  "approval.value.channel_measure_effect": "节点与每个对端依次进行：对端在空闲端口上为 8 条流打开监听（一次性令牌，第八条流之后或 20 秒后关闭），节点先接收 10 秒，再发送 10 秒。无论发生什么，两端每个方向都在 2 GiB 和 15 秒时停止。运行期间这些节点上的用户会变慢，按流量计费的节点要为此付费。不会更改任何节点，不使用公共服务器，也不触碰节点的通道设置；结果保存 7 天。",
   "approval.value.response_header_count": "将自定义响应头替换为 {n} 项",
   "approval.value.rule_count": "将有序规则替换为 {n} 项",
   "approval.value.shared_link_users": "{n} 位使用共享链接的人将被拒绝",
@@ -743,6 +754,10 @@ export const zh: typeof en = {
   "approval.fail.template_has_redaction_markers": "模板中含有被隐藏值的标记：请移除",
   "approval.outcome.path_speed_done.down": "测速 {from} 到 {to}，{mb} MB 从目标到发送方：{mbit_s} Mbit/s，用时 {duration_ms} 毫秒，连接 {connect_ms} 毫秒，首字节 {first_byte_ms} 毫秒后到达。",
   "approval.outcome.path_speed_done.up": "测速 {from} 到 {to}，{mb} MB 从发送方到目标：{mbit_s} Mbit/s，用时 {duration_ms} 毫秒，连接 {connect_ms} 毫秒。",
+  "approval.outcome.channel_measure_done": "已测量 {node} 的通道：接收 {down_mbps} Mbit/s（对端 {down_partner}），发送 {up_mbps} Mbit/s（对端 {up_partner}）。这是当时的估算，不是套餐保证值。",
+  "approval.outcome.channel_measure_done.down": "已测量 {node} 的通道，仅接收：{down_mbps} Mbit/s（对端 {down_partner}）；发送未成功。这是当时的估算，不是套餐保证值。",
+  "approval.outcome.channel_measure_done.up": "已测量 {node} 的通道，仅发送：{up_mbps} Mbit/s（对端 {up_partner}）；接收未成功。这是当时的估算，不是套餐保证值。",
+  "approval.outcome.channel_measure_done.running": "{node} 的通道测量仍在进行：结束后数据会显示在节点页面上。",
 };
 
 export const fa: typeof en = {
@@ -885,6 +900,7 @@ export const fa: typeof en = {
   "approval.value.more_before": "{n} مقدار قبلی دیگر",
   "approval.value.node_sharing_people": "{gain} نفر نود را می‌گیرند، {lose} نفر آن را از دست می‌دهند",
   "approval.value.path_speed_effect": "نود مقصد روی یک پورت آزاد برای یک اتصال گوش می‌دهد (توکن یک‌بارمصرف، حداکثر پس از ۳۰ ثانیه بسته می‌شود) و فرستنده به آن وصل می‌شود. چیز دیگری اجرا نمی‌شود، روی هیچ‌یک از نودها چیزی تغییر نمی‌کند و از سرور عمومی استفاده نمی‌شود. ترافیک یک‌بار از هر دو نود می‌گذرد؛ نتیجه ۷ روز نگه داشته می‌شود.",
+  "approval.value.channel_measure_effect": "نود و هر نود همراه به نوبت کار می‌کنند: نود همراه روی یک پورت آزاد برای ۸ جریان گوش می‌دهد (توکن یک‌بارمصرف، پس از جریان هشتم یا ۲۰ ثانیه بسته می‌شود)، نود ۱۰ ثانیه دریافت و سپس ۱۰ ثانیه ارسال می‌کند. هر دو طرف در هر جهت هر اتفاقی بیفتد در ۲ گیبی‌بایت و ۱۵ ثانیه می‌ایستند. در این مدت کاربران این نودها کندتر می‌شوند و نود با ترافیک پولی هزینه‌اش را می‌دهد. روی هیچ نودی چیزی تغییر نمی‌کند، از سرور عمومی استفاده نمی‌شود و تنظیم کانال نود دست نمی‌خورد؛ نتیجه ۷ روز نگه داشته می‌شود.",
   "approval.value.response_header_count": "سرآیندهای پاسخ خودی با {n} مورد جایگزین می‌شوند",
   "approval.value.rule_count": "قوانین مرتب با {n} مورد جایگزین می‌شوند",
   "approval.value.shared_link_users": "{n} نفر با لینک مشترک رد می‌شوند",
@@ -990,6 +1006,10 @@ export const fa: typeof en = {
   "approval.fail.template_has_redaction_markers": "قالب نشانه‌های مقدار پنهان دارد: آن‌ها را بردارید",
   "approval.outcome.path_speed_done.down": "آزمایش سرعت {from} به {to}، {mb} مگابایت از مقصد به فرستنده: {mbit_s} Mbit/s در {duration_ms} میلی‌ثانیه، اتصال {connect_ms} میلی‌ثانیه، بایت اول پس از {first_byte_ms} میلی‌ثانیه.",
   "approval.outcome.path_speed_done.up": "آزمایش سرعت {from} به {to}، {mb} مگابایت از فرستنده به مقصد: {mbit_s} Mbit/s در {duration_ms} میلی‌ثانیه، اتصال {connect_ms} میلی‌ثانیه.",
+  "approval.outcome.channel_measure_done": "کانال {node} اندازه‌گیری شد: دریافت {down_mbps} Mbit/s با {down_partner}، ارسال {up_mbps} Mbit/s با {up_partner}. تخمینِ همان لحظه است، نه تضمین تعرفه.",
+  "approval.outcome.channel_measure_done.down": "کانال {node} فقط برای دریافت اندازه‌گیری شد: {down_mbps} Mbit/s با {down_partner}؛ ارسال کار نکرد. تخمینِ همان لحظه است، نه تضمین تعرفه.",
+  "approval.outcome.channel_measure_done.up": "کانال {node} فقط برای ارسال اندازه‌گیری شد: {up_mbps} Mbit/s با {up_partner}؛ دریافت کار نکرد. تخمینِ همان لحظه است، نه تضمین تعرفه.",
+  "approval.outcome.channel_measure_done.running": "اندازه‌گیری کانال {node} هنوز در جریان است: وقتی تمام شود ارقامش در صفحه نود می‌آید.",
 };
 
 export const tr: typeof en = {
@@ -1132,6 +1152,7 @@ export const tr: typeof en = {
   "approval.value.more_before": "{n} önceki değer daha",
   "approval.value.node_sharing_people": "{gain} kişi düğümü alır, {lose} kişi kaybeder",
   "approval.value.path_speed_effect": "Hedef düğüm boş bir portta tek bağlantı için dinleyici açar (tek kullanımlık jeton, en geç 30 saniye sonra kapanır); gönderen ona bağlanır. Başka bir şey çalışmaz, iki düğümde de hiçbir şey değişmez ve herkese açık sunucu kullanılmaz. Trafik iki düğümden bir kez geçer; sonuç 7 gün saklanır.",
+  "approval.value.channel_measure_effect": "Düğüm ve her eşi sırayla çalışır: eş, boş bir portta 8 akış için dinleyici açar (tek kullanımlık jeton, sekizinci akıştan ya da 20 saniye sonra kapanır), düğüm 10 saniye alır, sonra 10 saniye gönderir. Ne olursa olsun iki uç da her yönde 2 GiB ve 15 saniyede durur. Çalışırken bu düğümlerdeki kişiler yavaşlar, trafiği ücretli düğüm bunun bedelini öder. Hiçbir düğümde bir şey değişmez, herkese açık sunucu kullanılmaz, düğümün kanal ayarına dokunulmaz; sonuç 7 gün saklanır.",
   "approval.value.response_header_count": "Kendi yanıt başlıkları {n} girdiyle değiştirilir",
   "approval.value.rule_count": "Sıralı kurallar {n} girdiyle değiştirilir",
   "approval.value.shared_link_users": "Ortak bağlantıdaki {n} kişi reddedilecek",
@@ -1237,4 +1258,8 @@ export const tr: typeof en = {
   "approval.fail.template_has_redaction_markers": "şablonda gizlenmiş değer işaretleri var: bunları kaldır",
   "approval.outcome.path_speed_done.down": "Hız testi {from} → {to}, hedeften göndericiye {mb} MB: {duration_ms} ms’de {mbit_s} Mbit/s, bağlantı {connect_ms} ms, ilk bayt {first_byte_ms} ms sonra.",
   "approval.outcome.path_speed_done.up": "Hız testi {from} → {to}, göndericiden hedefe {mb} MB: {duration_ms} ms’de {mbit_s} Mbit/s, bağlantı {connect_ms} ms.",
+  "approval.outcome.channel_measure_done": "{node} kanalı ölçüldü: alma {down_mbps} Mbit/s ({down_partner} ile), gönderme {up_mbps} Mbit/s ({up_partner} ile). O âna ait bir tahmin, tarifenin güvencesi değil.",
+  "approval.outcome.channel_measure_done.down": "{node} kanalı yalnızca alma için ölçüldü: {down_mbps} Mbit/s ({down_partner} ile); gönderme çalışmadı. O âna ait bir tahmin, tarifenin güvencesi değil.",
+  "approval.outcome.channel_measure_done.up": "{node} kanalı yalnızca gönderme için ölçüldü: {up_mbps} Mbit/s ({up_partner} ile); alma çalışmadı. O âna ait bir tahmin, tarifenin güvencesi değil.",
+  "approval.outcome.channel_measure_done.running": "{node} kanal ölçümü hâlâ sürüyor: bitince rakamlar düğümün sayfasında olacak.",
 };

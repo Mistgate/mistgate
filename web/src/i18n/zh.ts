@@ -47,6 +47,7 @@ import { zh as aipageZh } from "./aipage";
 import { zh as igpageZh } from "./igpage";
 import { zh as aspageZh } from "./aspage";
 import { zh as nodeshareZh } from "./nodeshare";
+import { zh as channelZh } from "./channel";
 import { zh as overviewZh } from "./overview";
 import { zh as windowsZh } from "./windows";
 import { zh as nodepageZh } from "./nodepage";
@@ -317,4 +318,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "暂不支持为 IP 地址申请 Let’s Encrypt 证书：请使用域名或自签名证书",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...decoysitesZh, ...planwordsZh, ...nodeswaysZh, ...nodewaysZh, ...profilespageZh, ...healthpageZh, ...reachpageZh, ...profilesrvZh, ...profilenewZh, ...subspnZh, ...subshxZh, ...subsdnsZh, ...updatespageZh, ...settingspageZh, ...aipageZh, ...igpageZh, ...aspageZh, ...nodeshareZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...decoysitesZh, ...planwordsZh, ...nodeswaysZh, ...nodewaysZh, ...profilespageZh, ...healthpageZh, ...reachpageZh, ...profilesrvZh, ...profilenewZh, ...subspnZh, ...subshxZh, ...subsdnsZh, ...updatespageZh, ...settingspageZh, ...aipageZh, ...igpageZh, ...aspageZh, ...nodeshareZh, ...channelZh };
