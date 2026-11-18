@@ -148,6 +148,9 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		effID, effName, src := dnsLookup.Resolve(u.DNSPresetID, u.GroupDNSPresetID)
 		out[i].EffectiveDnsPresetId, out[i].EffectiveDnsPresetName, out[i].DnsSource = effID, effName, dns.Source(src).Proto()
 		out[i].GroupColor = groups[u.GroupID].Color
+		for _, g := range sortedExtraGroups(u, groups) {
+			out[i].ExtraGroupIds, out[i].ExtraGroupNames, out[i].ExtraGroupColors = append(out[i].ExtraGroupIds, g.ID), append(out[i].ExtraGroupNames, g.Name), append(out[i].ExtraGroupColors, g.Color)
+		}
 		out[i].AccessHapp, out[i].AccessAmnezia, out[i].AccessTelegram, _ = s.accessOf(u, store.GroupsOf(u, groups), full)
 		_, out[i].TelegramIssued = telegramKeys[u.ID]
 		if isOnline {
@@ -601,6 +604,10 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		}
 		u.GroupID = *m.GroupId
 	}
+	change, nextExtra, err := groupChangeOf(old, u.GroupID, m.AddGroupIds, m.RemoveGroupIds)
+	if err != nil {
+		return nil, err
+	}
 	if m.QuotaBytes != nil {
 		u.QuotaBytes = *m.QuotaBytes
 	}
@@ -655,9 +662,11 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		u.DNSPresetID = *m.DnsPresetId // DNS is client-side (the subscription): no state push for the nodes
 	}
 	u.Status = ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, u.UsedBytes, now)
+	u.ExtraGroupIDs = nextExtra
+	groupsChanged := u.GroupID != old.GroupID || !slices.Equal(old.ExtraGroupIDs, nextExtra)
 	var impact *adminv1.AccessImpact
-	if u.GroupID != old.GroupID {
-		if impact, err = s.groupChangeImpact(ctx, old, u.GroupID); err != nil {
+	if groupsChanged || len(change.Add)+len(change.Remove) > 0 { // an unknown group is NOT_FOUND on a dry run too
+		if impact, err = s.userGroupsImpact(ctx, old, u); err != nil {
 			return nil, err
 		}
 	}
@@ -669,7 +678,7 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		return connect.NewResponse(&adminv1.UpdateUserResponse{User: users[0], Impact: impact}), nil
 	}
 	asked := 0
-	if userUpdateChanges(old, u) {
+	if userUpdateChanges(old, u) || groupsChanged {
 		asked = 1
 	}
 	reservation, err := s.reserveTokenUserChanges(ctx, adminv1connect.UserServiceUpdateUserProcedure, asked)
@@ -689,7 +698,7 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 			return nil, err
 		}
 	}
-	switch err := a.UpdateUser(ctx, u, setNodes, store.AccessGroupChange{}); { // the extra groups change through the API only from step 3
+	switch err := a.UpdateUser(ctx, u, setNodes, change); {
 	case errors.Is(err, store.ErrAccessExists):
 		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
@@ -712,12 +721,16 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		}
 	}
 	// No other credentials are issued here: a device gets the ones its apps allow when it fetches the subscription.
-	if u.Status != old.Status || u.GroupID != old.GroupID || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia || u.AppTelegram != old.AppTelegram || u.AppTrustTunnel != old.AppTrustTunnel || u.AppMistgateOff != old.AppMistgateOff ||
+	if u.Status != old.Status || groupsChanged || u.AppHapp != old.AppHapp || u.AppAmnezia != old.AppAmnezia || u.AppTelegram != old.AppTelegram || u.AppTrustTunnel != old.AppTrustTunnel || u.AppMistgateOff != old.AppMistgateOff ||
 		u.AllNodes != old.AllNodes || !slices.Equal(u.NodeIDs, old.NodeIDs) || u.SpeedLimitBps != old.SpeedLimitBps ||
 		u.DeviceSpeedLimitBps != old.DeviceSpeedLimitBps || !u.ExpiresAt.Equal(old.ExpiresAt) {
 		s.notify.StateChanged()
 	}
-	s.audit(ctx, actor(ctx), "user_update", map[string]any{"user": u.ID, "name": u.Name, "fields": changedUserFields(m)})
+	fields := map[string]any{"user": u.ID, "name": u.Name, "fields": changedUserFields(m)}
+	if added, removed := idsDiff(old.ExtraGroupIDs, nextExtra); len(added)+len(removed) > 0 { // what the person's extra groups really did
+		fields["groups_added"], fields["groups_removed"] = strings.Join(added, ","), strings.Join(removed, ",")
+	}
+	s.audit(ctx, actor(ctx), "user_update", fields)
 	users, err := s.loadUsers(ctx, u.ID)
 	if err != nil {
 		return nil, err
@@ -725,32 +738,137 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	return connect.NewResponse(&adminv1.UpdateUserResponse{User: users[0], Impact: impact}), nil
 }
 
-// groupChangeImpact is what moving the user to another main group does to their profiles and AmneziaVPN keys: the profiles of
-// all their groups before against the ones after, where the new main group takes the place of the old one and the extra groups
-// stay (the new main group leaves them).
-func (s *Service) groupChangeImpact(ctx context.Context, u store.AccessUser, to string) (*adminv1.AccessImpact, error) {
+// maxUserGroups is how many groups one person may be in, the main one counted. A check at the edge of what the API takes, not a
+// setting: a person's subscription and desired state read every one of their groups.
+const maxUserGroups = 16
+
+// groupChangeOf validates the group part of an update and works out the person's next extra groups. main is the main group
+// after the request (the request's group_id, or the stored one). The extra groups are the stored ones, plus add, minus remove,
+// without main: the old main group stays only when add names it. Errors are INVALID_ARGUMENT group_in_both, main_group and
+// too_many_groups. The returned change is what the store applies as deltas (ids sorted, without repeats).
+func groupChangeOf(old store.AccessUser, main string, add, remove []string) (store.AccessGroupChange, []string, error) {
+	add, remove = slices.Compact(slices.Sorted(slices.Values(add))), slices.Compact(slices.Sorted(slices.Values(remove)))
+	if len(add) > 0 && add[0] == "" || len(remove) > 0 && remove[0] == "" {
+		return store.AccessGroupChange{}, nil, invalid("group id is empty")
+	}
+	if len(add)+len(remove) > 2*maxUserGroups {
+		return store.AccessGroupChange{}, nil, coded(connect.CodeInvalidArgument, "too_many_groups")
+	}
+	for _, id := range add {
+		if slices.Contains(remove, id) {
+			return store.AccessGroupChange{}, nil, coded(connect.CodeInvalidArgument, "group_in_both", "group", id)
+		}
+	}
+	if slices.Contains(remove, main) {
+		return store.AccessGroupChange{}, nil, coded(connect.CodeInvalidArgument, "main_group", "group", main)
+	}
+	next := slices.Clone(old.ExtraGroupIDs)
+	next = append(next, add...)
+	next = slices.DeleteFunc(next, func(id string) bool { return id == main || slices.Contains(remove, id) })
+	slices.Sort(next)
+	next = slices.Compact(next)
+	if 1+len(next) > maxUserGroups {
+		return store.AccessGroupChange{}, nil, coded(connect.CodeInvalidArgument, "too_many_groups")
+	}
+	return store.AccessGroupChange{Add: add, Remove: remove}, next, nil
+}
+
+// idsDiff is the ids that are in next and not in old (added) and the other way round (removed).
+func idsDiff(old, next []string) (added, removed []string) {
+	for _, id := range next {
+		if !slices.Contains(old, id) {
+			added = append(added, id)
+		}
+	}
+	for _, id := range old {
+		if !slices.Contains(next, id) {
+			removed = append(removed, id)
+		}
+	}
+	return added, removed
+}
+
+// sortedExtraGroups are the person's extra groups that exist (by the map of all groups), ordered by name.
+func sortedExtraGroups(u store.AccessUser, byID map[string]store.AccessGroup) []store.AccessGroup {
+	var out []store.AccessGroup
+	for _, id := range u.ExtraGroupIDs {
+		if g, ok := byID[id]; ok {
+			out = append(out, g)
+		}
+	}
+	slices.SortFunc(out, func(a, b store.AccessGroup) int {
+		if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+			return c
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	return out
+}
+
+// userGroupsImpact is what a person's change of groups (the main group and the extra ones, as in `to`: GroupID and ExtraGroupIDs)
+// does to their profiles, AmneziaVPN keys and nodes: all their groups before against all after. Profiles by the union of what
+// the groups hold (for one group each side this is the plain profile impact); nodes by pairs (profile, node) on live inbounds
+// within the person's own node choice (to.AllNodes, to.NodeIDs), so a group with the same profiles but another set of nodes
+// shows as a change. NOT_FOUND "group" for an id that does not exist. Nil when nothing changes.
+func (s *Service) userGroupsImpact(ctx context.Context, from, to store.AccessUser) (*adminv1.AccessImpact, error) {
 	a := s.st.Access()
-	from, err := a.UserGroups(ctx, u)
+	all, err := a.Groups(ctx)
 	if err != nil {
 		return nil, s.internal("group", err)
 	}
-	next, err := a.Group(ctx, to)
-	if errors.Is(err, store.ErrNotFound) {
-		return nil, notFound("group")
-	} else if err != nil {
-		return nil, s.internal("group", err)
+	byID := make(map[string]store.AccessGroup, len(all))
+	for _, g := range all {
+		byID[g.ID] = g
 	}
-	after := store.AccessGroups{next}
-	for _, g := range from[1:] {
-		if g.ID != next.ID {
-			after = append(after, g)
+	for _, id := range append([]string{to.GroupID}, to.ExtraGroupIDs...) {
+		if _, ok := byID[id]; !ok {
+			return nil, notFound("group")
 		}
 	}
-	awg, err := a.AWGDevicesPerProfile(ctx, "", u.ID)
+	before, after := store.GroupsOf(from, byID), store.GroupsOf(to, byID)
+	awg, err := a.AWGDevicesPerProfile(ctx, "", from.ID)
 	if err != nil {
 		return nil, s.internal("awg devices", err)
 	}
-	return s.impactOf(ctx, from.ProfileIDs(), after.ProfileIDs(), 1, awg)
+	imp, err := s.impactOf(ctx, before.ProfileIDs(), after.ProfileIDs(), 1, awg)
+	if err != nil {
+		return nil, err
+	}
+	full, err := a.InboundsFull(ctx, "")
+	if err != nil {
+		return nil, s.internal("inbounds", err)
+	}
+	gets := func(gs store.AccessGroups) map[string]bool {
+		out := map[string]bool{}
+		for _, f := range full {
+			if liveInbound(f) && gs.Gives(f.Profile.ID, f.Node.ID) && (to.AllNodes || slices.Contains(to.NodeIDs, f.Node.ID)) {
+				out[f.Node.ID] = true
+			}
+		}
+		return out
+	}
+	was, will := gets(before), gets(after)
+	var gained, lost []string
+	for id := range will {
+		if !was[id] {
+			gained = append(gained, id)
+		}
+	}
+	for id := range was {
+		if !will[id] {
+			lost = append(lost, id)
+		}
+	}
+	if len(gained)+len(lost) == 0 {
+		return imp, nil
+	}
+	if imp == nil {
+		imp = &adminv1.AccessImpact{Users: 1}
+	}
+	slices.Sort(gained)
+	slices.Sort(lost)
+	imp.GainedNodeIds, imp.LostNodeIds = gained, lost
+	return imp, nil
 }
 
 func checkIDs(ids []string) error {
@@ -920,7 +1038,7 @@ func changedUserFields(m *adminv1.UpdateUserRequest) string {
 		set  bool
 		name string
 	}{
-		{m.Name != nil, "name"}, {m.GroupId != nil, "group"}, {m.QuotaBytes != nil, "quota"}, {m.QuotaReset != nil, "quota_reset"},
+		{m.Name != nil, "name"}, {m.GroupId != nil, "group"}, {len(m.AddGroupIds)+len(m.RemoveGroupIds) > 0, "groups"}, {m.QuotaBytes != nil, "quota"}, {m.QuotaReset != nil, "quota_reset"},
 		{m.ExpiresUnix != nil, "expires"}, {m.DeviceLimit != nil, "device_limit"}, {m.Apps != nil, "apps"}, {m.Apps != nil && m.Apps.Mistgate != nil, "app_mistgate"},
 		{m.Apps != nil && m.Apps.TrustTunnel != nil, "app_trusttunnel"}, {m.Nodes != nil, "nodes"},
 		{m.SpeedLimitBps != nil, "speed_limit"}, {m.DeviceSpeedLimitBps != nil, "device_speed_limit"}, {m.DnsPresetId != nil, "dns"}, {m.SubscriptionName != nil, "subscription_name"},

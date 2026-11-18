@@ -54,7 +54,8 @@ type GroupServiceClient interface {
 	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
 	CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error)
 	UpdateGroup(context.Context, *connect.Request[v1.UpdateGroupRequest]) (*connect.Response[v1.UpdateGroupResponse], error)
-	// FAILED_PRECONDITION while users still belong to it, unless move_users_to names where they go.
+	// FAILED_PRECONDITION while people have it as their MAIN group, unless move_users_to names where they go. People that have it
+	// as an extra group just leave it (they keep their main group and lose what this group gave them).
 	DeleteGroup(context.Context, *connect.Request[v1.DeleteGroupRequest]) (*connect.Response[v1.DeleteGroupResponse], error)
 	// Hands a node out as asked, in one transaction: ALL clears every group's switch for the node and lets groups made later
 	// have it, LISTED gives it to the listed groups only (groups made later do not get it), NONE to no group. The groups' own
@@ -151,7 +152,8 @@ type GroupServiceHandler interface {
 	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
 	CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error)
 	UpdateGroup(context.Context, *connect.Request[v1.UpdateGroupRequest]) (*connect.Response[v1.UpdateGroupResponse], error)
-	// FAILED_PRECONDITION while users still belong to it, unless move_users_to names where they go.
+	// FAILED_PRECONDITION while people have it as their MAIN group, unless move_users_to names where they go. People that have it
+	// as an extra group just leave it (they keep their main group and lose what this group gave them).
 	DeleteGroup(context.Context, *connect.Request[v1.DeleteGroupRequest]) (*connect.Response[v1.DeleteGroupResponse], error)
 	// Hands a node out as asked, in one transaction: ALL clears every group's switch for the node and lets groups made later
 	// have it, LISTED gives it to the listed groups only (groups made later do not get it), NONE to no group. The groups' own

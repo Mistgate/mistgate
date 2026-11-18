@@ -1013,9 +1013,14 @@ type User struct {
 	// a usable MTProto inbound (access_telegram). Not called "key": a token-reachable response has no field that looks like a secret.
 	TelegramIssued bool `protobuf:"varint,32,opt,name=telegram_issued,json=telegramIssued,proto3" json:"telegram_issued,omitempty"`
 	// Devices currently idle and omitted from devices_used; their rows and credentials remain.
-	DevicesIdle   uint32 `protobuf:"varint,33,opt,name=devices_idle,json=devicesIdle,proto3" json:"devices_idle,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	DevicesIdle uint32 `protobuf:"varint,33,opt,name=devices_idle,json=devicesIdle,proto3" json:"devices_idle,omitempty"`
+	// The extra groups of the person (they only add access; group_id is the main group), ordered by name. The three lists run
+	// in step: the id, the name and the colour (Group.color, "" = none picked) of each, so a chip needs no second request.
+	ExtraGroupIds    []string `protobuf:"bytes,34,rep,name=extra_group_ids,json=extraGroupIds,proto3" json:"extra_group_ids,omitempty"`
+	ExtraGroupNames  []string `protobuf:"bytes,35,rep,name=extra_group_names,json=extraGroupNames,proto3" json:"extra_group_names,omitempty"`
+	ExtraGroupColors []string `protobuf:"bytes,36,rep,name=extra_group_colors,json=extraGroupColors,proto3" json:"extra_group_colors,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -1279,11 +1284,33 @@ func (x *User) GetDevicesIdle() uint32 {
 	return 0
 }
 
+func (x *User) GetExtraGroupIds() []string {
+	if x != nil {
+		return x.ExtraGroupIds
+	}
+	return nil
+}
+
+func (x *User) GetExtraGroupNames() []string {
+	if x != nil {
+		return x.ExtraGroupNames
+	}
+	return nil
+}
+
+func (x *User) GetExtraGroupColors() []string {
+	if x != nil {
+		return x.ExtraGroupColors
+	}
+	return nil
+}
+
 type ListUsersRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Filter UserFilter             `protobuf:"varint,1,opt,name=filter,proto3,enum=mistgate.admin.v1.UserFilter" json:"filter,omitempty"`
-	// Case-insensitive substring of name or group name.
-	Query   string `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	// Case-insensitive substring of name or group name (the main group's).
+	Query string `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	// In the group: people that have it as their main group or as an extra one, each person once.
 	GroupId string `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
 	// Default 50, max 200. The selected sort value uses `descending`; ties use name ascending, then id ascending.
 	// Name order supports keyset paging with page_token. Other orders use offset paging; page_token with any other
@@ -2549,8 +2576,17 @@ type UpdateUserRequest struct {
 	SubscriptionName *string `protobuf:"bytes,13,opt,name=subscription_name,json=subscriptionName,proto3,oneof" json:"subscription_name,omitempty"`
 	// The device limit (User.device_speed_limit_bps). 0 = remove the limit.
 	DeviceSpeedLimitBps *uint64 `protobuf:"varint,14,opt,name=device_speed_limit_bps,json=deviceSpeedLimitBps,proto3,oneof" json:"device_speed_limit_bps,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// The extra groups change by these two lists, not by a full set, so two changes made at once do not undo each other and a
+	// repeat does nothing. Ids; each must exist (NOT_FOUND "group"). INVALID_ARGUMENT "group_in_both" for an id in both lists,
+	// "main_group" for remove_group_ids with the person's main group (as it is after this request), "too_many_groups" when the
+	// person would be in more than 16 groups in all (the main one counted). An id of add_group_ids that is the main group (after
+	// this request) is skipped. group_id = B with add_group_ids = [A] makes B the main group and keeps A as an extra group;
+	// without A there the old main group is left. The new main group leaves the extra groups. Changing the groups is one change
+	// of the person for a token's user-change limit, like a change of the main group.
+	AddGroupIds    []string `protobuf:"bytes,15,rep,name=add_group_ids,json=addGroupIds,proto3" json:"add_group_ids,omitempty"`
+	RemoveGroupIds []string `protobuf:"bytes,16,rep,name=remove_group_ids,json=removeGroupIds,proto3" json:"remove_group_ids,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateUserRequest) Reset() {
@@ -2681,11 +2717,26 @@ func (x *UpdateUserRequest) GetDeviceSpeedLimitBps() uint64 {
 	return 0
 }
 
+func (x *UpdateUserRequest) GetAddGroupIds() []string {
+	if x != nil {
+		return x.AddGroupIds
+	}
+	return nil
+}
+
+func (x *UpdateUserRequest) GetRemoveGroupIds() []string {
+	if x != nil {
+		return x.RemoveGroupIds
+	}
+	return nil
+}
+
 type UpdateUserResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The user after the update; with dry_run, as it is now.
 	User *User `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
-	// What a new group does to the user's profiles; unset when the group stays.
+	// What the new set of groups (a new main group, added or removed extra groups) does to the person's profiles and nodes; unset
+	// when they get the same profiles on the same nodes.
 	Impact        *AccessImpact `protobuf:"bytes,2,opt,name=impact,proto3" json:"impact,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2741,8 +2792,14 @@ type AccessImpact struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Lost   []*ImpactProfile       `protobuf:"bytes,1,rep,name=lost,proto3" json:"lost,omitempty"`
 	Gained []*ImpactProfile       `protobuf:"bytes,2,rep,name=gained,proto3" json:"gained,omitempty"`
-	// People touched: the user, or the group's users.
-	Users         uint32 `protobuf:"varint,3,opt,name=users,proto3" json:"users,omitempty"`
+	// People touched: the user, or the group's users (main and extra members).
+	Users uint32 `protobuf:"varint,3,opt,name=users,proto3" json:"users,omitempty"`
+	// Nodes where the person gets something after the change and got nothing before (the node comes), and the reverse (the node
+	// goes), judged by pairs (profile, node) on the enabled inbounds within the person's own node choice, so a group with the
+	// same profiles but other nodes shows as a change too. Ordered by id. Only UpdateUser fills them; a group update leaves them
+	// empty.
+	GainedNodeIds []string `protobuf:"bytes,4,rep,name=gained_node_ids,json=gainedNodeIds,proto3" json:"gained_node_ids,omitempty"`
+	LostNodeIds   []string `protobuf:"bytes,5,rep,name=lost_node_ids,json=lostNodeIds,proto3" json:"lost_node_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2796,6 +2853,20 @@ func (x *AccessImpact) GetUsers() uint32 {
 		return x.Users
 	}
 	return 0
+}
+
+func (x *AccessImpact) GetGainedNodeIds() []string {
+	if x != nil {
+		return x.GainedNodeIds
+	}
+	return nil
+}
+
+func (x *AccessImpact) GetLostNodeIds() []string {
+	if x != nil {
+		return x.LostNodeIds
+	}
+	return nil
 }
 
 type ImpactProfile struct {
@@ -4067,8 +4138,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\r_trust_tunnel\"<\n" +
 	"\rNodeSelection\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\bR\x03all\x12\x19\n" +
-	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xd1\n" +
-	"\n" +
+	"\bnode_ids\x18\x02 \x03(\tR\anodeIds\"\xd3\v\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
@@ -4110,7 +4180,10 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x16device_speed_limit_bps\x18\x1e \x01(\x04B\x020\x02R\x13deviceSpeedLimitBps\x12'\n" +
 	"\x0faccess_telegram\x18\x1f \x01(\bR\x0eaccessTelegram\x12'\n" +
 	"\x0ftelegram_issued\x18  \x01(\bR\x0etelegramIssued\x12!\n" +
-	"\fdevices_idle\x18! \x01(\rR\vdevicesIdle\"\x9f\x02\n" +
+	"\fdevices_idle\x18! \x01(\rR\vdevicesIdle\x12&\n" +
+	"\x0fextra_group_ids\x18\" \x03(\tR\rextraGroupIds\x12*\n" +
+	"\x11extra_group_names\x18# \x03(\tR\x0fextraGroupNames\x12,\n" +
+	"\x12extra_group_colors\x18$ \x03(\tR\x10extraGroupColors\"\x9f\x02\n" +
 	"\x10ListUsersRequest\x125\n" +
 	"\x06filter\x18\x01 \x01(\x0e2\x1d.mistgate.admin.v1.UserFilterR\x06filter\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x19\n" +
@@ -4228,7 +4301,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x12CreateUserResponse\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.mistgate.admin.v1.UserR\x04user\x12)\n" +
 	"\x10subscription_url\x18\x02 \x01(\tR\x0fsubscriptionUrl\x12#\n" +
-	"\rpage_password\x18\x03 \x01(\tR\fpagePassword\"\xc2\x06\n" +
+	"\rpage_password\x18\x03 \x01(\tR\fpagePassword\"\x90\a\n" +
 	"\x11UpdateUserRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1e\n" +
@@ -4247,7 +4320,9 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\adry_run\x18\f \x01(\bR\x06dryRun\x120\n" +
 	"\x11subscription_name\x18\r \x01(\tH\n" +
 	"R\x10subscriptionName\x88\x01\x01\x12<\n" +
-	"\x16device_speed_limit_bps\x18\x0e \x01(\x04B\x020\x02H\vR\x13deviceSpeedLimitBps\x88\x01\x01B\a\n" +
+	"\x16device_speed_limit_bps\x18\x0e \x01(\x04B\x020\x02H\vR\x13deviceSpeedLimitBps\x88\x01\x01\x12\"\n" +
+	"\radd_group_ids\x18\x0f \x03(\tR\vaddGroupIds\x12(\n" +
+	"\x10remove_group_ids\x18\x10 \x03(\tR\x0eremoveGroupIdsB\a\n" +
 	"\x05_nameB\v\n" +
 	"\t_group_idB\x0e\n" +
 	"\f_quota_bytesB\x0e\n" +
@@ -4262,11 +4337,13 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x17_device_speed_limit_bps\"z\n" +
 	"\x12UpdateUserResponse\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.mistgate.admin.v1.UserR\x04user\x127\n" +
-	"\x06impact\x18\x02 \x01(\v2\x1f.mistgate.admin.v1.AccessImpactR\x06impact\"\x94\x01\n" +
+	"\x06impact\x18\x02 \x01(\v2\x1f.mistgate.admin.v1.AccessImpactR\x06impact\"\xe0\x01\n" +
 	"\fAccessImpact\x124\n" +
 	"\x04lost\x18\x01 \x03(\v2 .mistgate.admin.v1.ImpactProfileR\x04lost\x128\n" +
 	"\x06gained\x18\x02 \x03(\v2 .mistgate.admin.v1.ImpactProfileR\x06gained\x12\x14\n" +
-	"\x05users\x18\x03 \x01(\rR\x05users\"p\n" +
+	"\x05users\x18\x03 \x01(\rR\x05users\x12&\n" +
+	"\x0fgained_node_ids\x18\x04 \x03(\tR\rgainedNodeIds\x12\"\n" +
+	"\rlost_node_ids\x18\x05 \x03(\tR\vlostNodeIds\"p\n" +
 	"\rImpactProfile\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +

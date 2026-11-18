@@ -90,9 +90,11 @@ type accGroup struct {
 
 type accUser struct {
 	ID, GroupID string
-	AllNodes    bool
-	NodeIDs     []string
-	LastSeen    int64
+	// GroupIDs are all the person's groups, the main one first; empty = GroupID alone (see groups).
+	GroupIDs []string
+	AllNodes bool
+	NodeIDs  []string
+	LastSeen int64
 }
 
 // accRow is one device on one inbound over the window (one row of GetUserConnection).

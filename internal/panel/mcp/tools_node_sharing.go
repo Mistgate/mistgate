@@ -42,10 +42,10 @@ func nodeSharingView(n *adminv1.Node, groups []*adminv1.Group) *nodeSharingV {
 	for i, g := range groups {
 		on := !slices.Contains(g.GetDisabledNodeIds(), n.GetId())
 		if on {
-			v.PeopleReceiving += g.GetUserCount()
+			v.PeopleReceiving += g.GetUserCount() + g.GetExtraUserCount() // a person in two groups that receive the node is counted twice here
 		}
 		if i < maxIDs {
-			v.Groups = append(v.Groups, nodeSharingGrV{GroupID: clean(g.GetId(), 60), Group: nm(g.GetName()), Receives: on, People: g.GetUserCount()})
+			v.Groups = append(v.Groups, nodeSharingGrV{GroupID: clean(g.GetId(), 60), Group: nm(g.GetName()), Receives: on, People: g.GetUserCount() + g.GetExtraUserCount()})
 		}
 	}
 	return v

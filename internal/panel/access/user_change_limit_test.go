@@ -142,6 +142,10 @@ func rename(id, name string) *connect.Request[adminv1.UpdateUserRequest] {
 	return connect.NewRequest(&adminv1.UpdateUserRequest{UserId: id, Name: &name})
 }
 
+func inGroups(id string, add, remove []string) *connect.Request[adminv1.UpdateUserRequest] {
+	return connect.NewRequest(&adminv1.UpdateUserRequest{UserId: id, AddGroupIds: add, RemoveGroupIds: remove})
+}
+
 func TestTokenUserChangesCountEveryUserTouched(t *testing.T) {
 	c := newCapEnv(t)
 	ctx := c.e.ctx
@@ -157,6 +161,7 @@ func TestTokenUserChangesCountEveryUserTouched(t *testing.T) {
 		t.Fatal("the fixture user has no device")
 	}
 	id, api := c.token("ci", false)
+	extra := c.e.group("extra")
 
 	steps := []struct {
 		name string
@@ -191,6 +196,15 @@ func TestTokenUserChangesCountEveryUserTouched(t *testing.T) {
 			_, err := api.GetUser(ctx, connect.NewRequest(&adminv1.GetUserRequest{UserId: ids[0]}))
 			return err
 		}, 3},
+		{"add an extra group to one user", func() error { _, err := api.UpdateUser(ctx, inGroups(ids[0], []string{extra}, nil)); return err }, 2},
+		{"repeating the add is free", func() error { _, err := api.UpdateUser(ctx, inGroups(ids[0], []string{extra}, nil)); return err }, 2},
+		{"a dry run of the removal is free", func() error {
+			r := inGroups(ids[0], nil, []string{extra})
+			r.Msg.DryRun = true
+			_, err := api.UpdateUser(ctx, r)
+			return err
+		}, 2},
+		{"remove the extra group", func() error { _, err := api.UpdateUser(ctx, inGroups(ids[0], nil, []string{extra})); return err }, 1},
 	}
 	for _, s := range steps {
 		if err := s.do(); err != nil {

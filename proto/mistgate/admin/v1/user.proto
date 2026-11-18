@@ -15,11 +15,15 @@ import "mistgate/admin/v1/profile.proto";
 //    independent of the toggles.
 //
 // EFFECTIVE ACCESS (what the panel turns into desired state for a node):
+//   groups(U) = {U.group} + U.extra_groups: the main group and the extra groups of the person
 //   for every inbound I (profile P on node N) and every non-revoked device credential C of user U:
-//     U.status == ACTIVE  AND  P in U.group.profiles  AND  N not in U.group.disabled_node_ids
-//     AND  (U.all_nodes OR N in U.nodes)
+//     U.status == ACTIVE  AND  some group G of groups(U) holds P (P in G.profiles) and gets N (N not in
+//     G.disabled_node_ids): the same G for both  AND  (U.all_nodes OR N in U.nodes)
 //     AND  some enabled app of U consumes P.protocol (Protocol.Clients)  AND  I is enabled  ->  C goes to N.
+//   A relay twin of I through the entry node E needs the same G to get E as well.
 //   Changing any of these changes desired state and is pushed to the nodes at once.
+// The MAIN group (User.group_id) alone decides what is not access: the DNS preset, the Mihomo template, the response
+// headers, the colour and the sort by group. An extra group only adds access, and is never the main group.
 //
 // STATUS (precedence disabled > expired > limited > active; maintained by the access module):
 //   DISABLED  admin switch. EXPIRED  expires_at passed. LIMITED  used_bytes >= quota_bytes.
@@ -264,6 +268,11 @@ message User {
   bool telegram_issued = 32;
   // Devices currently idle and omitted from devices_used; their rows and credentials remain.
   uint32 devices_idle = 33;
+  // The extra groups of the person (they only add access; group_id is the main group), ordered by name. The three lists run
+  // in step: the id, the name and the colour (Group.color, "" = none picked) of each, so a chip needs no second request.
+  repeated string extra_group_ids = 34;
+  repeated string extra_group_names = 35;
+  repeated string extra_group_colors = 36;
 }
 
 enum DnsSource {
@@ -275,8 +284,9 @@ enum DnsSource {
 
 message ListUsersRequest {
   UserFilter filter = 1;
-  // Case-insensitive substring of name or group name.
+  // Case-insensitive substring of name or group name (the main group's).
   string query = 2;
+  // In the group: people that have it as their main group or as an extra one, each person once.
   string group_id = 3;
   // Default 50, max 200. The selected sort value uses `descending`; ties use name ascending, then id ascending.
   // Name order supports keyset paging with page_token. Other orders use offset paging; page_token with any other
@@ -503,12 +513,22 @@ message UpdateUserRequest {
   optional string subscription_name = 13;
   // The device limit (User.device_speed_limit_bps). 0 = remove the limit.
   optional uint64 device_speed_limit_bps = 14 [jstype = JS_NUMBER];
+  // The extra groups change by these two lists, not by a full set, so two changes made at once do not undo each other and a
+  // repeat does nothing. Ids; each must exist (NOT_FOUND "group"). INVALID_ARGUMENT "group_in_both" for an id in both lists,
+  // "main_group" for remove_group_ids with the person's main group (as it is after this request), "too_many_groups" when the
+  // person would be in more than 16 groups in all (the main one counted). An id of add_group_ids that is the main group (after
+  // this request) is skipped. group_id = B with add_group_ids = [A] makes B the main group and keeps A as an extra group;
+  // without A there the old main group is left. The new main group leaves the extra groups. Changing the groups is one change
+  // of the person for a token's user-change limit, like a change of the main group.
+  repeated string add_group_ids = 15;
+  repeated string remove_group_ids = 16;
 }
 
 message UpdateUserResponse {
   // The user after the update; with dry_run, as it is now.
   User user = 1;
-  // What a new group does to the user's profiles; unset when the group stays.
+  // What the new set of groups (a new main group, added or removed extra groups) does to the person's profiles and nodes; unset
+  // when they get the same profiles on the same nodes.
   AccessImpact impact = 2;
 }
 
@@ -517,8 +537,14 @@ message UpdateUserResponse {
 message AccessImpact {
   repeated ImpactProfile lost = 1;
   repeated ImpactProfile gained = 2;
-  // People touched: the user, or the group's users.
+  // People touched: the user, or the group's users (main and extra members).
   uint32 users = 3;
+  // Nodes where the person gets something after the change and got nothing before (the node comes), and the reverse (the node
+  // goes), judged by pairs (profile, node) on the enabled inbounds within the person's own node choice, so a group with the
+  // same profiles but other nodes shows as a change too. Ordered by id. Only UpdateUser fills them; a group update leaves them
+  // empty.
+  repeated string gained_node_ids = 4;
+  repeated string lost_node_ids = 5;
 }
 
 message ImpactProfile {

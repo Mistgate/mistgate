@@ -242,6 +242,31 @@ func (a *accessCtx) userGiven(u *accUser, x *accInbound) bool {
 	return a.reachability.UserGiven(u.ID, x.ID)
 }
 
+// groups are all the person's groups, the main one first.
+func (u *accUser) groups() []string {
+	if len(u.GroupIDs) > 0 {
+		return u.GroupIDs
+	}
+	return []string{u.GroupID}
+}
+
+// givingGroups are the groups of the person that make the pair for inbound x: they hold its profile and get its node. A person
+// who is given x by none of them (a rule this report does not know) is put under their main group.
+func (a *accessCtx) givingGroups(u *accUser, x *accInbound) []string {
+	var out []string
+	if x != nil {
+		for _, id := range u.groups() {
+			if g := a.groupsByID[id]; g != nil && slices.Contains(g.ProfileIDs, x.ProfileID) && store.GroupGetsNode(g.DisabledNodes, x.NodeID) {
+				out = append(out, id)
+			}
+		}
+	}
+	if len(out) == 0 {
+		out = []string{u.GroupID}
+	}
+	return out
+}
+
 func userCanUseNode(u *accUser, nodeID string) bool {
 	return u.AllNodes || slices.Contains(u.NodeIDs, nodeID)
 }
@@ -299,7 +324,9 @@ func buildAccess(in *accessInput) *AccessReportV {
 	}
 	for i := range in.Users {
 		u := &in.Users[i]
-		a.usersByGroup[u.GroupID] = append(a.usersByGroup[u.GroupID], u)
+		for _, gid := range u.groups() { // a member of a group is a person who has it as the main or as an extra group
+			a.usersByGroup[gid] = append(a.usersByGroup[gid], u)
+		}
 	}
 	for i := range in.Nodes {
 		n := &in.Nodes[i]
@@ -543,7 +570,9 @@ func (a *accessCtx) cell(x *accInbound, devs map[string]*devAgg, rows []accRow) 
 	// by group
 	byGroup := map[string][]*accUser{}
 	for _, u := range users {
-		byGroup[u.GroupID] = append(byGroup[u.GroupID], u)
+		for _, gid := range a.givingGroups(u, x) { // the groups that make this server theirs
+			byGroup[gid] = append(byGroup[gid], u)
+		}
 	}
 	var gids []string
 	for g := range byGroup {
@@ -631,8 +660,10 @@ func (a *accessCtx) affectedBy(ids ...string) affectedV {
 	for _, id := range ids {
 		for _, u := range a.given[id] {
 			seen[u.ID] = true
-			if g := a.groupsByID[u.GroupID]; g != nil {
-				groups[nm(g.Name)] = true
+			for _, gid := range a.givingGroups(u, a.inboundByID(id)) {
+				if g := a.groupsByID[gid]; g != nil {
+					groups[nm(g.Name)] = true
+				}
 			}
 		}
 	}
@@ -987,7 +1018,7 @@ func (a *accessCtx) relayReachability() store.RelayReachability {
 		in.Groups = append(in.Groups, store.RelayReachabilityGroup{ID: g.ID, ProfileIDs: g.ProfileIDs, DisabledNodeIDs: g.DisabledNodes})
 	}
 	for _, u := range a.in.Users {
-		in.Users = append(in.Users, store.RelayReachabilityUser{ID: u.ID, GroupIDs: []string{u.GroupID}, AllNodes: u.AllNodes, NodeIDs: u.NodeIDs})
+		in.Users = append(in.Users, store.RelayReachabilityUser{ID: u.ID, GroupIDs: u.groups(), AllNodes: u.AllNodes, NodeIDs: u.NodeIDs})
 	}
 	for _, x := range a.in.Inbounds {
 		way := a.ways[x.ID]
@@ -1462,7 +1493,9 @@ func (a *accessCtx) preferProtocolRecs(base accessRecV, nodeID string, inboundID
 	groups := map[string]bool{}
 	for _, id := range inboundIDs {
 		for _, u := range a.given[id] {
-			groups[u.GroupID] = true
+			for _, gid := range a.givingGroups(u, a.inboundByID(id)) {
+				groups[gid] = true
+			}
 		}
 	}
 	groupIDs := make([]string, 0, len(groups))
@@ -1509,7 +1542,7 @@ func (a *accessCtx) preferProtocolRecs(base accessRecV, nodeID string, inboundID
 		users := map[string]bool{}
 		for _, inboundID := range inboundIDs {
 			for _, u := range a.given[inboundID] {
-				if u.GroupID == id {
+				if slices.Contains(a.givingGroups(u, a.inboundByID(inboundID)), id) {
 					users[u.ID] = true
 				}
 			}

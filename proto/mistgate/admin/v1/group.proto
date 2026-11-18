@@ -11,7 +11,8 @@ service GroupService {
   rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
   rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
   rpc UpdateGroup(UpdateGroupRequest) returns (UpdateGroupResponse);
-  // FAILED_PRECONDITION while users still belong to it, unless move_users_to names where they go.
+  // FAILED_PRECONDITION while people have it as their MAIN group, unless move_users_to names where they go. People that have it
+  // as an extra group just leave it (they keep their main group and lose what this group gave them).
   rpc DeleteGroup(DeleteGroupRequest) returns (DeleteGroupResponse);
   // Hands a node out as asked, in one transaction: ALL clears every group's switch for the node and lets groups made later
   // have it, LISTED gives it to the listed groups only (groups made later do not get it), NONE to no group. The groups' own
@@ -29,6 +30,8 @@ message Group {
   string id = 1;
   string name = 2;
   repeated string profile_ids = 3;
+  // People that have this group as their main group. The ones that have it as an extra group are in extra_user_count; the two
+  // together are the people the group gives access to.
   uint32 user_count = 4;
   // Empty = the instance default.
   string dns_preset_id = 5;
@@ -46,6 +49,8 @@ message Group {
   repeated string disabled_node_ids = 9;
   // Nodes where the group's MTProto profiles give a Telegram proxy right now (same rule as happ_nodes and amnezia_nodes).
   uint32 telegram_nodes = 10;
+  // People that have this group as an extra group (a person is in one of the two counts, never both).
+  uint32 extra_user_count = 11;
 }
 
 message ListGroupsRequest {}
@@ -96,14 +101,16 @@ message NodeIds {
 message UpdateGroupResponse {
   // The group after the update; with dry_run, as it is now.
   Group group = 1;
-  // What the new profile set does to the group's users; unset when the set stays.
+  // What the new profile set does to the group's users (main and extra members; a person whose other group holds the same
+  // profile loses less than this says); unset when the set stays.
   AccessImpact impact = 2;
 }
 
 message DeleteGroupRequest {
   string group_id = 1;
-  // The group's users move here first, in the same transaction. Empty: refused with FAILED_PRECONDITION
-  // "group_not_empty: users=N" while users belong to the group.
+  // The people that have the group as their main group move here first, in the same transaction (one that had the target as an
+  // extra group keeps it as the main one). Empty: refused with FAILED_PRECONDITION "group_not_empty: users=N" while people have
+  // it as their main group. The extra members need no target: they leave the group.
   string move_users_to = 2;
 }
 
