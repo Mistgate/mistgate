@@ -87,6 +87,12 @@ const settle = async () => {
 };
 const press = (el: Element | null | undefined, key: string) => act(async () => void el?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })));
 
+function unmount() {
+  act(() => root?.unmount());
+  host?.remove();
+  root = host = null;
+}
+
 async function mount(node: ReactNode) {
   host = document.createElement("div");
   document.body.append(host);
@@ -214,9 +220,7 @@ describe("the button and the window it opens", () => {
       access = { ...on, available: false, reason, choices: [] };
       await mount(<ChatDock />);
       expect($("button.cat-fab"), reason).toBeNull();
-      act(() => root?.unmount());
-      host?.remove();
-      root = host = null;
+      unmount();
     }
   });
 
@@ -293,17 +297,13 @@ describe("the reveal animation", () => {
     expect($(".as-wv")).toBeNull();
     expect($(".as-eg")).toBeNull();
     expect($("section.as")?.hasAttribute("data-fx")).toBe(false);
-    act(() => root?.unmount());
-    host?.remove();
-    root = host = null;
+    unmount();
     act(() => setEffectsEnabled(true));
     await mount(<Window />);
     expect($(".as-wv i")).not.toBeNull();
     expect(all(".as-eg")).toHaveLength(2);
     expect($("section.as")?.getAttribute("data-fx")).toBe("1");
-    act(() => root?.unmount());
-    host?.remove();
-    root = host = null;
+    unmount();
     // the system asks for calm: the effects are off whatever the switch says
     const real = window.matchMedia;
     window.matchMedia = ((q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false })) as never;

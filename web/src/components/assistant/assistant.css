@@ -427,7 +427,8 @@
 .as[data-fx] .as-e::before {
   content: "";
   position: absolute;
-  inset-inline-start: 50%;
+  /* centred on the column, so the physical side is the right one in both directions */
+  left: 50%;
   top: -40px;
   width: 360px;
   height: 220px;
@@ -703,7 +704,7 @@ button.as-rs[aria-expanded="true"] .as-i {
   color: var(--muted);
   transition: transform 0.25s var(--e);
 }
-.as-tc.open .as-cv {
+.as-tc.open > .as-tch .as-cv {
   transform: rotate(180deg);
 }
 .as-tr {
@@ -1726,7 +1727,8 @@ button.as-rs[aria-expanded="true"] .as-i {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  padding: 10px 16px 10px 12px;
+  padding-block: 10px;
+  padding-inline: 12px 16px;
   border-top: 1px solid var(--border);
   font-size: 12px;
   color: var(--sec);
