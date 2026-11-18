@@ -54,7 +54,7 @@
   padding: 0 6px;
   border-radius: 10px;
   background: var(--warning-soft);
-  color: var(--warning);
+  color: var(--warning-text);
   font-family: var(--font-mono);
   font-size: 11px;
 }
@@ -154,10 +154,10 @@
   color: var(--accent-mark);
 }
 .sbp .rw-gl.part {
-  color: var(--warning);
+  color: var(--warning-text);
 }
 .sbp .rw-gl.bad {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .rw-gl.busy {
   color: var(--tone-sky);
@@ -280,16 +280,16 @@
 }
 .sbp .pv-pill.ok {
   background: var(--tone-mint-bg);
-  color: var(--accent-mark);
+  color: var(--accent-text);
 }
 .sbp .pv-pill.part,
 .sbp .pv-pill.nogr {
   background: var(--warning-soft);
-  color: var(--warning);
+  color: var(--warning-text);
 }
 .sbp .pv-pill.bad {
   background: var(--danger-soft);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .pv-pill.busy {
   background: var(--tone-sky-bg);
@@ -448,13 +448,13 @@
   color: var(--muted);
 }
 .sbp .pp-q1.ok {
-  color: var(--accent-mark);
+  color: var(--accent-text);
 }
 .sbp .pp-q1.bad {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .pp-q1.part {
-  color: var(--warning);
+  color: var(--warning-text);
 }
 .sbp .pp-rows>.pp-quiet,
 .sbp .pp-rows .pp-quiet {
@@ -737,7 +737,7 @@
   display: flex;
   gap: 8px;
   align-items: baseline;
-  color: var(--warning)!important;
+  color: var(--warning-text)!important;
 }
 .sbp .sb-lim .rw-gl {
   flex: none;
@@ -1032,7 +1032,7 @@
   line-height: 32px;
 }
 .sbp .sb-tiles .warn b {
-  color: var(--warning);
+  color: var(--warning-text);
 }
 .sbp .sb-tiles em {
   font-style: normal;
@@ -1094,7 +1094,7 @@
   white-space: nowrap;
 }
 .sbp .sb-v2 b.warn {
-  color: var(--warning);
+  color: var(--warning-text);
 }
 .sbp .sb-v2 em {
   font-style: normal;
@@ -1174,7 +1174,7 @@
   margin: 8px 0 0;
 }
 .sbp .sb-cnt.bad .mono {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .sb-fix {
   display: inline-flex;
@@ -1349,7 +1349,7 @@
 .sbp .sb-def[aria-pressed="true"] {
   opacity: 1;
   background: var(--tone-mint-bg);
-  color: var(--accent-mark);
+  color: var(--accent-text);
 }
 .sbp .sb-aps {
   border-top: 1px solid var(--border);
@@ -1395,7 +1395,7 @@
   background: var(--tone-mint-bg);
   font-size: 12px;
   line-height: 24px;
-  color: var(--accent-mark);
+  color: var(--accent-text);
 }
 .sbp .sb-chev {
   margin-inline-start: auto;
@@ -1772,7 +1772,7 @@
 .sbp .sb-recb[aria-pressed="true"] {
   opacity: 1;
   background: var(--tone-mint-bg);
-  color: var(--accent-mark);
+  color: var(--accent-text);
 }
 .sbp .sb-chb {
   flex: none;
@@ -1870,7 +1870,7 @@
   border: 1px solid color-mix(in srgb,var(--accent-mark) 40%,transparent);
   font-size: 12px;
   line-height: 20px;
-  color: var(--accent-mark);
+  color: var(--accent-text);
   white-space: nowrap;
 }
 .sbp .sb-ap.own.drag {
@@ -2067,7 +2067,7 @@
 .sbp .sb-go {
   padding: 0;
   font: inherit;
-  color: var(--accent-mark);
+  color: var(--accent-text);
   text-align: start;
 }
 .sbp .sb-go:hover {
@@ -2197,11 +2197,11 @@
 }
 .sbp .sb-ne.ok {
   background: var(--tone-mint-bg);
-  color: var(--accent-mark);
+  color: var(--accent-text);
 }
 .sbp .sb-ne.part {
   background: var(--warning-soft);
-  color: var(--warning);
+  color: var(--warning-text);
 }
 
 /* the strip that saves a form of several cards: it opens under them while something is not saved (the board's .sv-save, in a card of its own) */
@@ -2225,7 +2225,7 @@
 .sbp .sb-save > span {
   margin-inline-end: auto;
   font-size: 13px;
-  color: var(--warning);
+  color: var(--warning-text);
 }
 @media (width <= 720px) {
   .sbp .sb-save.on {
@@ -2288,7 +2288,7 @@
 }
 /* an app's card: the error under the link, the "known app" choice of the add bar */
 .sbp .sb-apb em.bad {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .sb-known {
   min-width: 200px;

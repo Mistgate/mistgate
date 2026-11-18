@@ -159,7 +159,7 @@
   margin-block-start: 2px;
 }
 .sbp .hx-kv em.bad {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .hx-meta {
   font-size: 12px;
@@ -267,7 +267,7 @@
   margin-top: 6px;
 }
 .sbp .hx-m.bad {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .hx-ea {
   display: grid;
@@ -280,7 +280,7 @@
   pointer-events: none;
 }
 .sbp .hx-del {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .hx-ft {
   display: flex;
@@ -297,7 +297,7 @@
   color: var(--muted);
 }
 .sbp .hx-fh.bad {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .hx-rs {
   display: flex;
@@ -415,10 +415,10 @@
   white-space: nowrap;
 }
 .sbp .mt-st.bad {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .mt-st.part {
-  color: var(--warning);
+  color: var(--warning-text);
 }
 .sbp .mt-yf {
   gap: 8px;
@@ -433,7 +433,7 @@
   color: var(--muted);
 }
 .sbp .mt-yh .bad {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .mt-tab textarea.an-i.mt-y {
   font-family: var(--font-mono);
@@ -512,7 +512,7 @@
   color: var(--muted);
 }
 .sbp .mt-res.bad b {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .mt-pre {
   max-height: 420px;
@@ -541,7 +541,7 @@
   text-align: start;
 }
 .sbp .hx-h .mono.bad {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .sbp .hx-m[role="alert"] {
   overflow-wrap: anywhere;
