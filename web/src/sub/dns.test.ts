@@ -22,14 +22,13 @@ import {
   showsKeyDns,
   usesKeys,
 } from "./logic";
-import { dnsModal } from "./servers";
+import { dialogView } from "./dialogs";
 import { newDnsState, type Ctx } from "./state";
 import { actions, data, plain, state, text } from "./test-kit";
 import { view } from "./view";
 
 const t = dict.ru;
 const settle = () => new Promise((r) => setTimeout(r, 0));
-const cards = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>(".srv")]; // the old cards: the block of the preset names still reads them
 const page = (name: string, st = state("android", { returning: true }), f: (d: ReturnType<typeof data>) => void = () => {}) => view(data(name, f), st, actions());
 
 describe("the servers", () => {
@@ -302,53 +301,7 @@ describe("DNS of the keys in a card", () => {
   });
 });
 
-describe("the DNS picker", () => {
-  const ctx = (name: string, pick: string, open = "nod_fra", f: (d: ReturnType<typeof data>) => void = () => {}, here = "android") => {
-    const d = data(name, f);
-    const st = state(here as "android", { dns: { ...newDnsState(), open, pick } });
-    const a = actions();
-    const c: Ctx = { d, s: st, a, t, support: "" };
-    const box = document.createElement("div");
-    box.append(...(dnsModal(c) as Node[]));
-    return { box, a };
-  };
-
-  it("the server's default first (with its name), then the others; 'now' marks what applies; the picked one is checked", () => {
-    const { box } = ctx("first", "dns_family");
-    expect(text(box.querySelector("h3"))).toBe("DNS ключей на сервере");
-    expect(text(box.querySelector(".sh-head .sub"))).toContain("Германия · Франкфурт");
-    expect(text(box.querySelector("#dd-d"))).toBe("Только для ключей AmneziaVPN на этом сервере. На приложения по ссылке не влияет.");
-    const opts = [...box.querySelectorAll(".opt")];
-    expect(opts.map((o) => text(o.querySelector(".opt-t")))).toEqual(["По умолчанию — AdGuard", "Обычный", "Семейный"]);
-    expect(opts.map((o) => text(o.querySelector(".opt-d")))).toEqual(["Блокирует рекламу и трекеры", "Cloudflare и Google, без фильтров", "Без рекламы и сайтов для взрослых"]);
-    expect(opts.map((o) => o.getAttribute("aria-checked"))).toEqual(["false", "false", "true"]);
-    expect(text(opts[0]!.querySelector(".chip"))).toBe("сейчас");
-    expect(box.querySelector(".opt")?.parentElement?.getAttribute("role")).toBe("radiogroup");
-  });
-
-  it("choosing, cancelling and applying go to the page", () => {
-    const { box, a } = ctx("first", "");
-    box.querySelector<HTMLButtonElement>("[data-k=dns-opt-dns_standard]")!.click();
-    box.querySelector<HTMLButtonElement>("[data-k=dns-opt-default]")!.click();
-    box.querySelector<HTMLButtonElement>("[data-k=dns-apply]")!.click();
-    box.querySelector<HTMLButtonElement>("[data-k=dns-cancel]")!.click();
-    box.querySelector<HTMLButtonElement>("[data-k=modal-x]")!.click();
-    expect(a.log).toEqual(["dns-pick dns_standard", "dns-pick ", "dns-apply", "dns-open null", "dns-open null"]);
-    expect(text(box.querySelector(".btnrow"))).toBe("ОтменаПрименить");
-  });
-
-  it("says that keys hold the DNS inside; names the devices", () => {
-    const { box } = ctx("return", "");
-    expect(text(box.querySelector(".note"))).toBe("У ключей «Pixel 7», «MacBook» DNS записан внутри — после смены получите ключи заново.");
-    const none = ctx("first", "");
-    expect(none.box.querySelector(".note")).toBeNull(); // no key devices yet
-  });
-
-  it("a server that is not there, or no picker open: nothing", () => {
-    expect(ctx("first", "", "nod_nope").box.childElementCount).toBe(0);
-    expect(ctx("first", "", "").box.childElementCount).toBe(0);
-  });
-
+describe("the DNS choices (the window itself is tested in dialogs.test.ts)", () => {
   it("the default's name is the one the server says, else what applies when nothing was chosen, else the first allowed", () => {
     const d = data("first");
     expect(dnsDefault({ choice: "", effective: "b", options: ["a", "b"], default: "", keys_to_refresh: [] })).toBe("b");
@@ -392,35 +345,100 @@ describe("the DNS actions", () => {
     return { d, st, a, calls, log, locked: () => locked };
   }
 
-  it("opening starts on what the person has chosen; closing gives the keyboard back to 'Change'", () => {
+  it("opening starts on what the person has chosen (and on all servers when there are several); closing gives the keyboard back to 'Change'", () => {
     const { st, a, log } = setup({}, "return", (d) => (d.servers[0]!.dns!.choice = "dns_family"));
     a.open("nod_fra");
-    expect(st.dns).toMatchObject({ open: "nod_fra", pick: "dns_family" });
+    expect(st.dns).toMatchObject({ open: "nod_fra", pick: "dns_family", all: true, done: {}, error: null });
     a.pick("");
     expect(st.dns.pick).toBe("");
+    a.scope(false);
+    expect(st.dns.all).toBe(false);
     a.open(null);
     expect(st.dns.open).toBeNull();
     expect(log.at(-1)).toBe("focus dns-nod_fra");
+    // one server with a DNS of its keys: nothing to choose the scope of
+    const one = setup({}, "dns-both", (d) => d.servers.pop());
+    one.a.open("de1");
+    expect(one.st.dns.all).toBe(false);
   });
 
-  it("applying posts the choice, the picker closes at once, the server and the keys on it are updated, the card says what happens next", async () => {
-    const { d, st, a, calls } = setup({
+  it("applying posts the choice; the window stays open, the server and the keys on it are updated, and it turns into the result", async () => {
+    const { d, st, a, calls, log } = setup({
       setDns: async (_e, b) => {
         calls.push(`post ${"server" in b ? b.server : "link"} "${b.preset}"`);
-        const srv = d.servers[0]!;
+        const srv = d.servers.find((x) => x.id === (b as { server: string }).server)!;
         return answer({ server: { ...srv, dns: { ...srv.dns!, choice: b.preset, effective: b.preset } }, stale_devices: ["d3"] });
       },
     });
     a.open("nod_fra");
+    a.scope(false);
     a.pick("dns_family");
     a.apply();
-    expect(st.dns).toMatchObject({ busy: "nod_fra", open: null });
+    expect(st.dns).toMatchObject({ busy: "nod_fra", open: "nod_fra" });
     await settle();
     expect(calls).toEqual(['post nod_fra "dns_family"']);
     expect(d.servers[0]!.dns).toMatchObject({ choice: "dns_family", effective: "dns_family", keys_to_refresh: ["d3"] });
+    expect(d.servers[1]!.dns?.choice).toBe(""); // the other server was not asked
     expect(d.amnezia!.devices.find((x) => x.id === "d3")).toMatchObject({ stale: true, stale_reason: "dns" });
     expect(d.amnezia!.devices.find((x) => x.id === "d4")?.stale).toBe(false);
-    expect(st.dns).toMatchObject({ busy: "", done: { nod_fra: true }, error: null });
+    expect(st.dns).toMatchObject({ busy: "", open: "nod_fra", done: { nod_fra: true }, error: null });
+    expect(log.some((x) => x.startsWith("focus"))).toBe(false); // the keyboard stays in the window
+    a.open(null);
+    expect(st.dns.done).toEqual({}); // closing forgets the result
+  });
+
+  it("'all servers' asks each one that has a DNS of its keys and offers the preset, one after the other; the others stay as they were", async () => {
+    const { d, st, a, calls } = setup({}, "dns-both");
+    d.servers[1]!.dns!.options = ["dns_builtin_standard"]; // nl1 does not offer AdGuard
+    a.open("de1");
+    expect(st.dns.all).toBe(true);
+    a.pick("dns_builtin_adblock");
+    a.apply();
+    await settle();
+    expect(calls).toEqual(['dev: de1 "dns_builtin_adblock"']);
+    expect(st.dns).toMatchObject({ done: { de1: true }, skipped: ["nl1"] });
+    expect(d.servers.map((x) => x.dns?.choice)).toEqual(["dns_builtin_adblock", ""]);
+    // the default is each server's own: posted as empty to every server that is not on it
+    a.open("de1");
+    a.pick("dns_builtin_family");
+    a.apply();
+    await settle();
+    expect(d.servers[0]!.dns?.choice).toBe("dns_builtin_family");
+    a.open("de1");
+    a.pick("");
+    a.apply();
+    await settle();
+    expect(calls.slice(-1)).toEqual(['dev: de1 ""']);
+    expect(d.servers[0]!.dns?.choice).toBe("");
+  });
+
+  it("'all servers': both are asked when both offer it; a failure stops the rest, names the server, and Retry goes on where it stopped", async () => {
+    let fail = true;
+    const { d, st, a, calls } = setup(
+      {
+        setDns: async (_e, b) => {
+          const id = (b as { server: string }).server;
+          calls.push(`${id} "${b.preset}"`);
+          if (id === "nl1" && fail) throw new ApiError(429, "too_many_requests", 600);
+          return answer();
+        },
+      },
+      "dns-both",
+    );
+    a.open("de1");
+    a.pick("dns_builtin_family");
+    a.apply();
+    await settle();
+    expect(calls).toEqual(['de1 "dns_builtin_family"', 'nl1 "dns_builtin_family"']);
+    expect(st.dns.error).toEqual({ server: "nl1", code: "too_many_requests", retryMin: 10, preset: "dns_builtin_family" });
+    expect(st.dns).toMatchObject({ busy: "", open: "de1", done: {} });
+    expect(d.servers.map((x) => x.dns?.choice)).toEqual(["dns_builtin_family", ""]);
+    fail = false;
+    a.retry();
+    await settle();
+    expect(calls.slice(2)).toEqual(['nl1 "dns_builtin_family"']); // de1 has it already: not asked again
+    expect(st.dns).toMatchObject({ error: null, done: { de1: true } });
+    expect(d.servers.map((x) => x.dns?.choice)).toEqual(["dns_builtin_family", "dns_builtin_family"]);
   });
 
   it("the default is posted as an empty preset; the same choice posts nothing", async () => {
@@ -429,10 +447,10 @@ describe("the DNS actions", () => {
     a.pick("");
     a.apply();
     await settle();
-    expect(calls).toEqual(['dev: nod_fra ""']);
+    expect(calls).toEqual(['dev: nod_fra ""']); // the other server is on its default already: not asked
     a.open("nod_fra");
     a.pick("");
-    a.apply(); // unchanged now?
+    a.apply(); // unchanged now: it just closes
     await settle();
     expect(st.dns.open).toBeNull();
   });
@@ -464,6 +482,7 @@ describe("the DNS actions", () => {
       },
     });
     a.open("nod_ams");
+    a.scope(false);
     a.pick("dns_family");
     a.apply();
     await settle();
@@ -573,16 +592,15 @@ describe("the DNS of the link apps", () => {
     const d = data("dns-both", (x) => ((x.dns!.link.choice = "dns_builtin_adblock"), (x.dns!.link.effective = "dns_builtin_adblock")));
     const c: Ctx = { d, s: state("android", { dns: { ...newDnsState(), open: LINK, pick: "dns_builtin_adblock" } }), a, t, support: "" };
     const box = document.createElement("div");
-    box.append(...(dnsModal(c) as Node[]));
-    expect(text(box.querySelector("h3"))).toBe("DNS в Happ и других приложениях по ссылке");
-    expect(text(box.querySelector(".sh-head .sub"))).toBe("Один на все серверы");
-    expect(text(box.querySelector("#dd-d"))).toBe("Приложения получат новый DNS при обновлении подписки (до 12 ч).");
-    const opts = [...box.querySelectorAll(".opt")];
-    expect(opts.map((o) => text(o.querySelector(".opt-t")))).toEqual(["По умолчанию — Cloudflare + Google", "AdGuard: без рекламы", "AdGuard Family: без рекламы и 18+", "Россия: .ru напрямую"]);
+    box.append(...(dialogView(c).content as Node[]));
+    expect(text(box.querySelector(".a-h .t"))).toBe("DNS в Happ и других приложениях по ссылке");
+    expect(text(box.querySelector(".a-lead"))).toBe("Приложения получат новый DNS при обновлении подписки (до 12 ч)");
+    const opts = [...box.querySelectorAll(".a-opt")];
+    expect(opts.map((o) => text(o.querySelector(".t")).replace("сейчас", ""))).toEqual(["По умолчанию — Cloudflare + Google", "AdGuard: без рекламы", "AdGuard Family: без рекламы и 18+", "Россия: .ru напрямую"]);
     expect(opts.map((o) => o.getAttribute("aria-checked"))).toEqual(["false", "true", "false", "false"]);
-    expect(text(opts[1]!.querySelector(".chip"))).toBe("сейчас");
-    expect(box.querySelector("[role=radiogroup]")?.getAttribute("aria-describedby")).toBe("dd-d");
-    expect(box.querySelector(".note")).toBeNull(); // no key is involved
+    expect(text(opts[1]!.querySelector(".tag"))).toBe("сейчас");
+    expect(box.querySelector("[role=radiogroup]")).not.toBeNull();
+    expect(box.querySelector(".a-f .u-hint")).toBeNull(); // no key is involved
     expect(linkChoices(d, "ru").map((o) => [o.id, o.isDefault])[0]).toEqual(["dns_builtin_standard", true]);
   });
 });
@@ -614,13 +632,13 @@ describe("saving the DNS of the link apps", () => {
     expect(st.dns).toMatchObject({ open: LINK, pick: "" });
     a.pick("dns_builtin_adblock");
     a.apply();
-    expect(st.dns).toMatchObject({ busy: LINK, open: null });
+    expect(st.dns).toMatchObject({ busy: LINK, open: LINK });
     await settle();
     expect(calls).toEqual(['dev: {"link":true,"preset":"dns_builtin_adblock"}']);
     expect(d.dns!.link).toEqual({ effective: "dns_builtin_adblock", choice: "dns_builtin_adblock", default: "dns_builtin_standard", options: ["dns_builtin_standard", "dns_builtin_adblock"] });
     expect(d.amnezia!.devices.every((x) => !x.stale)).toBe(true);
     expect(st.dns).toMatchObject({ busy: "", done: { [LINK]: true }, error: null });
-    expect(log.at(-1)).toBe("focus dns-link");
+    expect(log.some((x) => x.startsWith("focus"))).toBe(false); // the window turns into the result and keeps the keyboard
   });
 
   it("without the server's answer the page keeps what it posted; back to the default; the same pick posts nothing", async () => {
@@ -652,15 +670,15 @@ describe("preset names follow the page's language, not the browser's", () => {
       for (const s of d.servers) s.dns!.effective = "dns_builtin_family";
     });
 
-  it("a Russian page in an English browser shows the Russian names, in the card, the rows and the pickers", () => {
+  it("a Russian page in an English browser shows the Russian names, in the bar, the rows and the windows", () => {
     const el = view(english(), state("android", { returning: true }), actions());
-    expect(text(el.querySelector(".dns-link .dns-link-v"))).toBe("AdGuard: без рекламыAdGuard DNS: без рекламы и трекеров");
-    expect(cards(el).map((x) => text(x.querySelector(".dns .v")))).toEqual(["AdGuard Family: без рекламы и 18+", "AdGuard Family: без рекламы и 18+"]);
+    expect(text(el.querySelector(".u-bar .r span.only-w b"))).toBe("AdGuard: без рекламы");
+    expect([...el.querySelectorAll(".u-dns")].map(text)).toEqual(["AdGuard Family: без рекламы и 18+", "AdGuard Family: без рекламы и 18+"]);
     for (const open of [LINK, "de1"]) {
       const c: Ctx = { d: english(), s: state("android", { dns: { ...newDnsState(), open } }), a: actions(), t, support: "" };
       const box = document.createElement("div");
-      box.append(...(dnsModal(c) as Node[]));
-      const words = [...box.querySelectorAll(".opt")].map((o) => text(o));
+      box.append(...(dialogView(c).content as Node[]));
+      const words = [...box.querySelectorAll(".a-opt")].map((o) => text(o));
       expect(words.join(" ")).toContain("AdGuard: без рекламы");
       expect(words.join(" ")).not.toMatch(/no ads|filtering|for everything/);
     }
@@ -668,9 +686,9 @@ describe("preset names follow the page's language, not the browser's", () => {
 
   it("the same data on an English and a Chinese page; an owner's own text stays as it is in every language", () => {
     const en = view(english(), state("android", { returning: true }, "en"), actions());
-    expect(text(en.querySelector(".dns-link .dns-link-v"))).toBe("AdGuard: no adsAdGuard DNS: no ads, no trackers");
+    expect(text(en.querySelector(".u-bar .r span.only-w b"))).toBe("AdGuard: no ads");
     const zh = view(english(), state("android", { returning: true }, "zh"), actions());
-    expect(text(zh.querySelector(".dns-link .dns-link-v"))).toBe("AdGuard：无广告AdGuard DNS：无广告，无跟踪器");
+    expect(text(zh.querySelector(".u-bar .r span.only-w b"))).toBe("AdGuard：无广告");
     const own = { id: "x", name: "Home DNS", description: "Router at home", category: "" };
     expect([presetName(own, "ru"), presetDescription(own, "zh")]).toEqual(["Home DNS", "Router at home"]);
   });

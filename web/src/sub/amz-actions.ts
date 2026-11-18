@@ -39,7 +39,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
   const linkDevice = (id: string) => (find(id) ? undefined : data.devices.find((x) => x.id === id && x.kind !== "shared"));
   /** Where the calls for a device go: a key's at the Amnezia address, a link app's device at the page's own. */
   const urlFor = (id: string) => (find(id) ? endpoints() : data.devices_endpoint);
-  /** The control that opened a row's question or editor: its "more" button. */
+  /** The control that opened a row's window (its menu, question or editor): its "more" button. */
   const back = (id: string) => `amz-more-${id}`;
 
   const fail = (busy: string, e: unknown) => {
@@ -189,9 +189,8 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       am().menu = null;
       am().rename = null;
       render();
-      // the question takes the keyboard to its safe answer; cancelling gives it back to the control that asked
-      if (c) focus?.(`amz-no-${c.id}`);
-      else if (was) focus?.(back(was.id));
+      // the question is a window that puts the keyboard on its safe answer itself; cancelling gives it back to the control that asked
+      if (!c && was) focus?.(back(was.id));
     },
     rotate(id) {
       void run(
@@ -223,9 +222,10 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       );
     },
     menu(id) {
+      const was = am().menu;
       am().menu = id;
       render();
-      if (id) focus?.(`amz-m-ren-${id}`);
+      if (!id && was) focus?.(back(was));
     },
     renameStart(id) {
       const value = find(id)?.label ?? linkDevice(id)?.model;
@@ -236,7 +236,6 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       am().errorAt = "";
       am().rename = { id, value };
       render();
-      focus?.(`amz-ren-${id}`);
     },
     renameInput(value) {
       const r = am().rename;
