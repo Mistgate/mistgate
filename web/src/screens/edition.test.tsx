@@ -383,7 +383,7 @@ describe("the Health page on the edge", () => {
     expect(text()).not.toContain("checks every");
     expect(text()).toContain(edgeAlerts);
     expect(text()).toContain("All quiet");
-    expect(text()).toContain("No alert in the last 7 days.");
+    expect(text()).toContain("No alert in the last 7 days");
     expect(document.querySelectorAll('[role="status"]')).toHaveLength(1); // the one notice
   });
 
