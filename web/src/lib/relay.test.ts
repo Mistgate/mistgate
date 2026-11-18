@@ -67,7 +67,7 @@ describe("why a check failed", () => {
   });
   it("words what the entry's agent said", () => {
     const names = { entry: "msk1", exit: "de1" };
-    expect(agentError(tRu, "forward_drop", names)).toBe("Фаервол сервера отбрасывает пересылаемый трафик (политика FORWARD DROP). Разрешите пересылку и проверьте снова.");
+    expect(agentError(tRu, "forward_drop", names)).toBe("Фаервол сервера отбрасывает пересылаемый трафик (политика FORWARD DROP). Разреши пересылку и проверь снова.");
     expect(agentError(tRu, "resolve: no such host", names)).toBe("msk1 не смог узнать адрес de1.");
     expect(agentError(tEn, "something new", names)).toBe("msk1 could not install the forward.");
   });
