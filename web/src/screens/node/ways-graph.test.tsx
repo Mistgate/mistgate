@@ -243,7 +243,8 @@ describe("the owner's edits", () => {
     await settle();
     // the wizard of this page, at the servers of msk1 (the old dialog is gone; the toast of "Turn off" is a dialog of its own, not a modal)
     expect(document.querySelector('[role="dialog"][aria-modal="true"]')).toBeNull();
-    expect(navigate).toHaveBeenLastCalledWith({ to: "/nodes/$id", params: { id: "nod_de1" }, search: { tab: "ways", add: "via:nod_msk1" } });
+    // the graph stays as it is (view, map): the wizard opens over it
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ params: { id: "nod_de1" }, search: expect.objectContaining({ tab: "ways", view: "graph", add: "via:nod_msk1" }) }));
 
     await click(more("Through msk1"));
     await click(item("Remove…"));
@@ -302,7 +303,8 @@ describe("the owner's edits", () => {
     await drop(wayBody("way:via:nod_msk1"), "application/x-mg-server", "inb_h");
     await settle();
     expect(dialog()).toBeNull();
-    expect(navigate).toHaveBeenLastCalledWith({ to: "/nodes/$id", params: { id: "nod_de1" }, search: { tab: "ways", add: "via:nod_msk1/inb_h" } });
+    // the graph stays as it is (view, map): the wizard opens over it
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ params: { id: "nod_de1" }, search: expect.objectContaining({ tab: "ways", view: "graph", add: "via:nod_msk1/inb_h" }) }));
     await drop(wayBody("way:via:nod_msk1"), "application/x-mg-server", "inb_v");
     expect(document.body.textContent).toContain("Cannot relay this server here");
   });
@@ -325,7 +327,8 @@ describe("the owner's edits", () => {
     await click(item("Through spb1"));
     await settle();
     expect(dialog()).toBeNull();
-    expect(navigate).toHaveBeenLastCalledWith({ to: "/nodes/$id", params: { id: "nod_de1" }, search: { tab: "ways", add: "via:nod_spb1" } });
+    // the graph stays as it is (view, map): the wizard opens over it
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ params: { id: "nod_de1" }, search: expect.objectContaining({ tab: "ways", view: "graph", add: "via:nod_spb1" }) }));
     expect(card("way:via:nod_spb1")).toBeNull();
   });
 
@@ -344,7 +347,8 @@ describe("the owner's edits", () => {
     await click(item("Through msk1"));
     await settle();
     expect(dialog()).toBeNull();
-    expect(navigate).toHaveBeenLastCalledWith({ to: "/nodes/$id", params: { id: "nod_de1" }, search: { tab: "ways", add: "via:nod_msk1" } });
+    // the graph stays as it is (view, map): the wizard opens over it
+    expect(navigate).toHaveBeenLastCalledWith(expect.objectContaining({ params: { id: "nod_de1" }, search: expect.objectContaining({ tab: "ways", view: "graph", add: "via:nod_msk1" }) }));
   });
 
   it("node names on the cards link to that node's Ways in graph", async () => {

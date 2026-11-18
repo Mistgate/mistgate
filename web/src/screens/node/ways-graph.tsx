@@ -66,8 +66,11 @@ export function WaysGraph({
   full = false,
   onFull,
   initialExtra,
+  onWizard,
 }: {
   initialExtra?: { id: string; name: string }[];
+  /** Opens "Make reachable from…" at this entry's servers (one of them alone, when `only`) on this page, keeping the graph as it is; the page gives it. */
+  onWizard?: (entryId: string, only?: string) => void;
   data: Data;
   w: WaysModel;
   open: WayId;
@@ -88,7 +91,8 @@ export function WaysGraph({
   const nodesList = useQuery({ ...nodesQuery, enabled: owner }).data?.nodes ?? [];
   const [extra, setExtra] = useState<{ id: string; name: string }[]>(initialExtra ?? []);
   const [dlg, setDlg] = useState<Dialog | null>(null);
-  const openWizard = useOpenWizard();
+  const goWizard = useOpenWizard();
+  const openWizard = (exitId: string, entryId: string, only?: string) => (onWizard ? onWizard(entryId, only) : goWizard(exitId, entryId, only));
   const [help, setHelp] = useState<HelpTab | "">(() => (readPref("mg.graph.help") === "legend" ? "legend" : readPref("mg.graph.help") === "shortcuts" ? "shortcuts" : ""));
   const cc = w.cc;
 

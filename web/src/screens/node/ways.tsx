@@ -554,6 +554,7 @@ export function WaysTab({ data, ways: w }: { data: Data; ways: WaysModel }) {
           open={openLane}
           onOpen={(id) => go({ way: id })}
           onIpv6={() => go({ way: "ipv6", add: "ipv6" })}
+          onWizard={(entry, only) => go({ way: search.way, add: `via:${entry}${only ? `/${only}` : ""}` })}
           detail={<div role="tabpanel" id="way-panel" aria-labelledby={`way-tab-${lane.id}`} className="flex-1">{laneDetail}</div>}
           full={full}
           onFull={(on) => void navigate({ to: "/nodes/$id", params: { id: node.id }, search: { tab: "ways", view: "graph", map: "1", ...(search.way ? { way: search.way } : {}), ...(on ? { full: "1" as const } : {}) }, replace: true, resetScroll: false })}
