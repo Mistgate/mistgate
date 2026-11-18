@@ -14,7 +14,7 @@ import { ProfilePage } from "./profiles/page";
 // The scenes of the Servers and People tabs and of the windows of the profile page (dev-kit-profile-tabs.tsx): every state a scene names must
 // draw, in every language, and say what it is made to say. The page is the real one, on a private query cache.
 
-vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, profiles: {}, groups: {}, users: {}, nodes: {}, health: {}, relays: {} }));
+vi.mock("@/lib/api", () => ({ basepath: "/", auth: { me: () => Promise.resolve({}) }, profiles: {}, awg: {}, groups: {}, users: {}, nodes: {}, health: {}, relays: {} }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className, params: _p, search: _s, to: _t, render: _r, ...rest }: { children?: ReactNode; className?: string; params?: unknown; search?: unknown; to?: string; render?: unknown }) => (
     <a className={className} {...rest}>
