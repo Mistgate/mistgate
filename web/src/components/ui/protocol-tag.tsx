@@ -4,7 +4,7 @@ import { toneTagClass } from "./bits";
 import type { Tone } from "./icons";
 
 // One tone and one 24-grid glyph per protocol, so a protocol reads the same in every list: Hysteria2 mint, VLESS sky,
-// AmneziaWG lavender (the older generation a quiet grey), the relay and the DNS tunnel sand, TrustTunnel sage.
+// AmneziaWG lavender (the older generation a quiet grey), the relay, the DNS tunnel and the Telegram proxy sand, TrustTunnel sage.
 const kinds = {
   hysteria2: { tone: "mint", d: "M13 3L5 14h6l-1 7 8-11h-6z" },
   vless: { tone: "sky", d: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18" },
@@ -13,6 +13,8 @@ const kinds = {
   relay: { tone: "sand", d: "M4 8h13l-3-3M20 16H7l3 3" },
   trusttunnel: { tone: "sage", d: "M4.5 19v-6.5a7.5 7.5 0 0 1 15 0V19M9.5 19v-6a2.5 2.5 0 0 1 5 0v6" },
   dns: { tone: "sand", d: "M4 9h12M13 6l3 3-3 3M20 15H8M11 12l-3 3 3 3" },
+  // the Telegram proxy: the paper plane, sand as the board's .tag.tg
+  mtproto: { tone: "sand", d: "M20 4L3 11l6 2.5L11 20l3-4.5 4 3z" },
 } as const satisfies Record<string, { tone: Tone; quiet?: boolean; d: string }>;
 
 export type ProtocolKind = keyof typeof kinds;
