@@ -395,7 +395,7 @@
 
 /* L5412-5424, L5463: the cards of the releases */
 .uq .uq-rels { display: flex; flex-direction: column; }
-.uq .uq-rel { position: relative; display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px 16px; padding: 12px 20px; border-top: 1px solid var(--border); }
+.uq .uq-rel { position: relative; display: grid; grid-template-columns: 156px minmax(0, 1fr); gap: 8px 16px; padding: 12px 20px; border-top: 1px solid var(--border); }
 .uq .uq-rel:first-child { border-top: 0; padding-top: 4px; }
 .uq .uq-rel::before { content: ""; position: absolute; inset-inline-start: 23.5px; top: 0; bottom: 0; border-inline-start: 1px dashed color-mix(in srgb, var(--text) 16%, transparent); }
 .uq .uq-rel:first-child::before { top: 14px; }
@@ -412,6 +412,11 @@
 .uq .uq-rel ul { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; min-width: 0; }
 .uq .uq-rel li { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; align-items: baseline; font-size: 14px; line-height: 20px; min-width: 0; }
 .uq .uq-rel li > :last-child { min-width: 0; overflow-wrap: anywhere; }
+/* a pre-release version ("v0.2.0-dev.1") stays on one line; a line of the release that stands under no heading is its lead:
+   the whole width, quieter, no empty word in front of it */
+.uq .uq-rh b { white-space: nowrap; }
+.uq .uq-rel li:has(> .uq-tg:empty) { grid-template-columns: minmax(0, 1fr); color: var(--sec); }
+.uq .uq-rel li:has(> .uq-tg:empty) > .uq-tg { display: none; }
 .uq .uq-tg { font-size: 12px; color: var(--muted); }
 .uq .uq-tg.new { color: var(--accent-text); }
 .uq .uq-tg.sec { color: var(--warning-text); }

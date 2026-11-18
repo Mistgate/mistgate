@@ -13,7 +13,7 @@ export type Series = {
 };
 
 const protocolOrder = ["hysteria2", "vless", "amneziawg", "awg"];
-const protocolNames: Record<string, string> = { hysteria2: "Hysteria2", vless: "VLESS", amneziawg: "AmneziaWG", awg: "AmneziaWG" };
+const protocolNames: Record<string, string> = { hysteria2: "Hysteria2", vless: "VLESS", amneziawg: "AmneziaWG", awg: "AmneziaWG", mtproto: "MTProto", trusttunnel: "TrustTunnel" };
 
 /** Display name of a protocol plugin id: "hysteria2" -> "Hysteria2"; an unknown id is shown as it is. */
 export const protocolName = (id: string) => protocolNames[id] ?? id;
