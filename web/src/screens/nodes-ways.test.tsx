@@ -391,7 +391,8 @@ describe("the pair's sheet", () => {
   it("a pair with one server of two failing says which and since when, and offers another entry", async () => {
     await draw("rw-sheet-part");
     expect(sheet()!.textContent).toContain("Partly");
-    expect(sheet()!.textContent).toMatch(/Since \d{1,2}:\d{2}/);
+    // the scene counts the failure back from now: just after midnight it began yesterday and the date stands before the time
+    expect(sheet()!.textContent).toMatch(/Since .{0,16}\d{1,2}:\d{2}/);
     expect(button(en["nw.sv.other"], sheet()!)).toBeDefined();
   });
   it("Check only runs both ways on every relay of the pair and says nothing was switched", async () => {
