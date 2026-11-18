@@ -287,9 +287,6 @@
   box-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
   animation: mg-up 0.25s var(--e) both;
 }
-:root[data-theme="light"] .rw-dr {
-  box-shadow: 0 24px 60px rgb(22 22 26 / 0.18);
-}
 @media (width <= 1040px) {
   .rw-dr {
     position: sticky;

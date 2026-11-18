@@ -100,6 +100,9 @@
   --shadow-pop: 0 16px 40px rgb(0 0 0 / 0.5);
   --shadow-toast: 0 12px 32px rgb(0 0 0 / 0.4);
   --shadow-dlg: 0 32px 80px rgb(0 0 0 / 0.55);
+  /* the plain window (Modal) has none on the dark theme; the assistant's pop-ups (a menu over its input) are the same black on both */
+  --shadow-win: none;
+  --shadow-as-pop: 0 16px 40px rgb(0 0 0 / 0.5);
   --scrim: color-mix(in srgb, #000 62%, transparent);
 
   --e: cubic-bezier(0.22, 1, 0.36, 1);
@@ -165,7 +168,11 @@
   --shadow-dock: 0 12px 32px rgb(22 22 26 / 0.16);
   --shadow-pop: 0 16px 40px rgb(22 22 26 / 0.14);
   --shadow-toast: 0 12px 32px rgb(22 22 26 / 0.18);
-  --shadow-dlg: 0 32px 80px rgb(22 22 26 / 0.2);
+  /* the board's windows, the assistant and its pop-ups keep the dark theme's black shadow on the light one too (pn.css: .an, .sr, .cfm .55; .as-mp .5);
+     only its plain menus and popovers (.pop, .mm) and toasts are soft */
+  --shadow-dlg: 0 32px 80px rgb(0 0 0 / 0.55);
+  --shadow-win: var(--shadow-dlg);
+  --shadow-as-pop: 0 16px 40px rgb(0 0 0 / 0.5);
   --scrim: color-mix(in srgb, #1a1a1e 38%, transparent);
   --chart-fill-a: 0.16;
   --chart-fill-b: 0;

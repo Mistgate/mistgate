@@ -31,7 +31,7 @@ type Props = {
  * their room follows the window's own width as the board's container query does: a window up to 720 wide (the default 520, a
  * sheet on a phone) has a 64px header (16 above the 20px title, 8 below, the 40px x on the end), 16px sides and a 12px-high
  * footer; a wider one (760 and up) has a 72px header, 24px sides and a 14px-high footer. The footer is a band with a hairline above it.
- * Like the board's window it has no shadow: the scrim and the hairline are enough. It is at most 760 tall on a desktop (the board's min(760px, ...)) and leaves 24px above a sheet; what does not fit scrolls.
+ * On the light theme it has the board's window shadow (--shadow-win, pn.css .an: 0 32px 80px black .55); on the dark one none: the scrim and the hairline are enough. It is at most 760 tall on a desktop (the board's min(760px, ...)) and leaves 24px above a sheet; what does not fit scrolls.
  * It opens the way the board's window does: a spring from 90% on a desktop, a slide up on the phone. That motion is part of
  * the effects (Settings -> Interface); with them off, or with reduced motion, the window just fades in.
  */
@@ -45,7 +45,7 @@ export function Modal({ open, onOpenChange, title, description, children, footer
           <Dialog.Popup
             data-shot={shot}
             className={cx(
-              "@container/win flex max-h-[calc(100%-24px)] w-full flex-col overflow-hidden border border-line bg-surface outline-none transition-[translate,scale,opacity] md:max-h-[min(760px,100%)] md:rounded-sheet",
+              "@container/win flex max-h-[calc(100%-24px)] w-full flex-col overflow-hidden border border-line bg-surface shadow-(--shadow-win) outline-none transition-[translate,scale,opacity] md:max-h-[min(760px,100%)] md:rounded-sheet",
               wide ? "md:max-w-[760px]" : "md:max-w-[520px]",
               "rounded-t-sheet data-ending-style:opacity-0 data-starting-style:opacity-0",
               // the sheet rises 48px (the board's an-sheet, .4s), the window grows from 90% on the spring (pn-pop, .3s)
