@@ -7,11 +7,10 @@ import { h } from "./dom";
 import { scramble } from "./fx";
 import { dict, dirOf, htmlLang, isLang } from "./i18n";
 import { icon } from "./icons";
-import { pickProxy } from "./telegram";
 import { lockActions, lockView, type LockState } from "./lock";
-import { addPlatforms, asPlatform, asTheme, detectPlatform, isHex, isReturning, LINK, mainProfile, normalize, pickPlatform, safeUrl } from "./logic";
+import { addPlatforms, asPlatform, asTheme, detectPlatform, isHex, isReturning, mainProfile, normalize, pickPlatform, safeUrl } from "./logic";
 import { createModal } from "./modal";
-import { newAmzState, newDnsState, type Actions, type Ctx, type State, type Tab } from "./state";
+import { newAmzState, newDnsState, type Actions, type Ctx, type State } from "./state";
 import type { Lang, Theme } from "./types";
 import { annKey, brandName, logoSrc, view } from "./view";
 
@@ -128,6 +127,8 @@ function setDocument(lang: Lang) {
 if (data.locked) {
   // ---- the password form ----
   const st: LockState = { lang: savedLang() ?? data.lang, pw: "", busy: false, error: "", note: "" };
+  // `vite -c vite.sub.config.ts` only: &lockerr=wrong|short|latin|later|net shows the form with that error (dev-scene.ts)
+  if (import.meta.env.DEV) (await import("./dev-scene")).devLockScene(devQuery, st);
   const actions = lockActions({
     st,
     endpoint: data.unlock_url,
@@ -275,48 +276,8 @@ if (data.locked) {
     modal.sync(open, dlg?.content ?? [], dlg?.stage);
   };
 
-  // `vite -c vite.sub.config.ts` only (the scenes of the page; every state and every window opens on its own page):
-  //   &tab=servers|telegram|trusttunnel|devices   the open tab;  &more=1 the long list of devices unfolded;  &proxy=<n> the n-th proxy of the Telegram and TrustTunnel panels
-  //   &sheet=pick|link|conn|key|full   the "add a device" window at that step (full: the places are used up);  &key=<device id>[&country=<n>] the key of a device
-  //   &menu=<id> the menu of a device;  &rename=<id>;  &ask=remove:<id>|rotate:<id>;  &stale=<id> the question of a stale key
-  //   &dns=<server id>|link the DNS choice [&dnsall=0|1 the scope];  &dnsdone=1 its result
-  if (import.meta.env.DEV) {
-    const q = (k: string) => devQuery.get(k);
-    const tab = q("tab");
-    if (tab === "servers" || tab === "telegram" || tab === "trusttunnel" || tab === "devices") st.tab = tab as Tab;
-    if (q("more") === "1") st.devicesOpen = true;
-    const proxy = Number(q("proxy"));
-    if (proxy > 0) for (const k of ["tg", "tt"] as const) pickProxy(k, proxy);
-    const sheet = q("sheet");
-    if (sheet === "pick" || sheet === "link" || sheet === "conn" || sheet === "key") {
-      st.amz.adding = true;
-      st.amz.pane = sheet;
-    } else if (sheet === "full") {
-      st.amz.adding = true;
-      st.amz.pane = "pick";
-      st.amz.error = "device_limit";
-      st.amz.errorAt = "add";
-    }
-    st.amz.menu = q("menu");
-    // &key=<device id> opens the key of a device, &country=<n> on the n-th config of its list (0 = the first)
-    const key = q("key");
-    if (key) {
-      st.amz.node[key] = Number(q("country")) || 0;
-      actions.amz.show(key);
-    }
-    const rename = q("rename");
-    const label = data.amnezia?.devices.find((x) => x.id === rename)?.label ?? data.devices.find((x) => x.id === rename)?.model;
-    if (rename && label !== undefined) st.amz.rename = { id: rename, value: label };
-    const [kind, id] = (q("ask") ?? "").split(":");
-    if ((kind === "remove" || kind === "rotate") && id) st.amz.confirm = { id, kind };
-    st.amz.stale = q("stale");
-    const dns = q("dns");
-    if (dns) {
-      actions.dns.open(dns === "link" ? LINK : dns);
-      if (q("dnsall") === "0" || q("dnsall") === "1") actions.dns.scope(q("dnsall") === "1");
-      if (q("dnsdone") === "1") st.dns.done[st.dns.open ?? ""] = true;
-    }
-  }
+  // `vite -c vite.sub.config.ts` only: the scenes (every state of the page and every window opens on a page of its own; dev-scene.ts)
+  if (import.meta.env.DEV) (await import("./dev-scene")).devScene(devQuery, data, st, actions);
   render("all");
 }
 // the static favicon in sub.html is a placeholder (so the browser never asks for /favicon.ico); show the brand
