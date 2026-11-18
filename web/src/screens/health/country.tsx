@@ -210,7 +210,7 @@ export function CountryRow({ check, code }: { check: CountryCheck | undefined; c
     return (
       <>
         {tipped}
-        {look && look.ownPoints.length > 0 && <OwnPoints points={look.ownPoints} className="px-3" />}
+        {look && look.ownPoints.length > 0 && <OwnPoints points={look.ownPoints} className="px-3 text-xs" />}
       </>
     );
   return (
@@ -231,7 +231,7 @@ const pointMark = { ok: ["✓", "tone-ok tone-text"], dark: ["✕", "tone-bad to
 export function OwnPoints({ points, className }: { points: readonly OwnPoint[]; className?: string }) {
   const t = useT();
   return (
-    <ul aria-label={t("pr.points.title")} data-testid="own-points" className={cx("flex min-w-0 flex-col gap-1 text-xs", className)}>
+    <ul aria-label={t("pr.points.title")} data-testid="own-points" className={cx("flex min-w-0 flex-col gap-1", className ?? "text-xs")}>
       {points.map((p) => {
         const [glyph, cls] = pointMark[p.kind];
         return (

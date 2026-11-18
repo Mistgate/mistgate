@@ -77,7 +77,7 @@ function Meter({ label, tip, value, sub, pct }: { label: string; tip?: string; v
       <dt className="text-xs text-muted">{name}</dt>
       <dd className="mt-1 mb-2 flex min-w-0 flex-wrap content-start gap-x-1.5 gap-y-0.5">
         <b className="font-mono text-[13px] font-medium whitespace-nowrap text-fg tabular-nums">{value}</b>
-        {sub && <span className="font-mono text-[13px] whitespace-nowrap text-muted">{sub}</span>}
+        {sub && <span className="min-w-0 font-mono text-[13px] text-muted">{sub}</span>}
       </dd>
       <i
         aria-hidden

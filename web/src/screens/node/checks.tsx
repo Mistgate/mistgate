@@ -12,9 +12,9 @@ import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { cellLook, checksQuery, countryColumn, type CheckCell } from "@/lib/health";
 import type { Plain } from "@/lib/plain";
-import { CountryRow } from "@/screens/health/country";
 import { nodeTicks } from "@/screens/overview-checks";
 import { CardHead } from "@/screens/overview-parts";
+import { NodeRu } from "./checks-ru";
 import { Spin, transportOf } from "./parts";
 import { HistoryCard, ResultLine, SlowMark, useRunChecks } from "@/screens/health/history";
 
@@ -104,7 +104,7 @@ export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: re
                 onClick={() => setOpen(on ? null : col.profileId)}
                 className="flex min-w-0 flex-col text-start"
               >
-                <b className="truncate font-medium">{col.profileName}</b>
+                <b title={col.profileName} className="truncate font-medium">{col.profileName}</b>
                 {inbound && <span className="font-mono text-[11px] font-normal text-muted">{`${transportOf(inbound.protocol)}/${inbound.port}`}</span>}
               </button>
               <span role="img" aria-label={t("ov.tick.aria")} className={cx("nd-tk max-[720px]:order-3 max-[720px]:col-span-full", busy && "scan", came && "adv")}>
@@ -131,11 +131,7 @@ export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: re
           </Fragment>
         );
       })}
-      {country && (
-        <div className="border-t border-line px-6 py-3 max-[720px]:px-4">
-          <CountryRow check={country.byNode.get(nodeId)} code={country.code} />
-        </div>
-      )}
+      {country && <NodeRu check={country.byNode.get(nodeId)} code={country.code} status={row?.nodeStatus} now={busy} />}
     </section>
   );
 }

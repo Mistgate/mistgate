@@ -138,6 +138,8 @@ const four = {
   rows: [...checks.rows, { ...checks.rows[0]!, nodeId: "nod_4", nodeName: "fi1", countryCode: "FI" }, { ...checks.rows[0]!, nodeId: "nod_5", nodeName: "fi2", countryCode: "FI" }],
   countryChecks: [...countryChecks, verdict("nod_4", CountryVerdict.UNKNOWN, [probe("Selectel", "Moscow", 38, [[443, true]])], { reason: "too_few_probes", eyeball: false })],
 };
+/** The text of an element, the no-break space before a "·" as a plain one. */
+const ruText = (e: Element) => e.textContent!.replaceAll(" ", " ");
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 
 
@@ -185,18 +187,18 @@ describe("the country row on the node page", () => {
   it("comes after the checks with the same verdict and tooltip, and is not there while the integration is off", async () => {
     await mountNode({ ...own, countryChecks: [countryChecks[1]] });
     expect(getChecks).toHaveBeenCalledWith({ nodeId: "nod_2" }, expect.anything());
-    const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
-    expect(row.textContent).toBe("From RussiaTCP blockedICMP passes · Rostelecom · 4 min ago");
-    expect(row.className).toContain("tone-warn");
+    const row = document.querySelector<HTMLElement>("[data-testid=node-ru]")!;
+    expect(ruText(row)).toBe("From Russia the node’s TCP is blockedICMP passes · 1 network: Rostelecom · 4 min ago");
+    expect(row.dataset.kind).toBe("warn");
     // its title leads to the Reachability section
-    expect(row.querySelector('a[href="/reachability"]')?.textContent).toBe("From Russia");
-    await act(async () => row.focus());
+    expect(row.querySelector('a[href="/reachability"]')?.textContent).toBe("From Russia the node’s TCP is blocked");
+    await act(async () => row.querySelector<HTMLElement>("[tabindex]")!.focus());
     for (let i = 0; i < 3; i++) await settle();
     expect(document.body.textContent).toContain("ICMP 51 ms · TCP 443, 8443 ✕");
     act(() => root?.unmount());
     host?.remove();
     await mountNode({ ...own, countryChecks: [] });
-    expect(document.querySelector("[data-testid=country-row]")).toBeNull();
+    expect(document.querySelector("[data-testid=node-ru]")).toBeNull();
   });
 });
 
@@ -270,17 +272,17 @@ const withLists = {
 
 describe("the block lists on the node page", () => {
   it("shows LISTED in the country row, with its tooltip", async () => {
-    getChecks.mockResolvedValue({ ...checks, rows: [checks.rows[2]!], countryChecks: [withLists.countryChecks[2]] });
+    getChecks.mockResolvedValue({ ...checks, rows: [{ ...checks.rows[2]!, nodeStatus: NodeStatus.ONLINE }], countryChecks: [withLists.countryChecks[2]] });
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_3" /></QueryClientProvider>));
     for (let i = 0; i < 4; i++) await settle();
-    const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
-    expect(row.textContent).toBe("From RussialistedRKN registry (antifilter ipsum), community list (antifilter) · Hetzner subnet, DE · 4 min ago");
-    expect(row.className).toContain("tint-dashed");
-    await act(async () => row.focus());
+    const row = document.querySelector<HTMLElement>("[data-testid=node-ru]")!;
+    expect(ruText(row)).toBe("The node is in a block list, not checked live from RussiaRKN registry (antifilter ipsum), community list (antifilter) · Hetzner subnet, DE · 4 min ago");
+    expect(row.dataset.kind).toBe("listed");
+    await act(async () => row.querySelector<HTMLElement>("[tabindex]")!.focus());
     for (let i = 0; i < 3; i++) await settle();
     expect(document.body.textContent).toContain("In the RKN registry, not checked live");
     expect(document.body.textContent).toContain("From the block lists only");
@@ -341,10 +343,10 @@ describe("the TSPU probe on the node page", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_4" /></QueryClientProvider>));
     for (let i = 0; i < 4; i++) await settle();
-    const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
-    expect(row.textContent).toBe("From RussiaTCP blockedTCP 443, 8443: blocked · probe node probe1 · 14 min ago");
-    expect(row.className).toContain("tone-warn");
-    await act(async () => row.focus());
+    const row = document.querySelector<HTMLElement>("[data-testid=node-ru]")!;
+    expect(ruText(row)).toBe("From Russia the node’s TCP is blockedTCP 443, 8443: blocked · probe node probe1 · 14 min ago");
+    expect(row.dataset.kind).toBe("warn");
+    await act(async () => row.querySelector<HTMLElement>("[tabindex]")!.focus());
     for (let i = 0; i < 3; i++) await settle();
     expect(document.body.textContent).toContain("Probe node probe1 · TSPU after hop 6");
     expect(document.body.textContent).toContain("Checked by your TSPU probe from a data center, TCP only");
@@ -361,14 +363,14 @@ describe("a partial block on the node page", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     await act(async () => root!.render(<QueryClientProvider client={qc}><NodeChecks nodeId="nod_2" /></QueryClientProvider>));
     for (let i = 0; i < 4; i++) await settle();
-    const row = document.querySelector<HTMLElement>("[data-testid=country-row]")!;
-    expect(row.textContent).toBe("From Russiasome networks");
-    expect(row.querySelector("svg circle")).not.toBeNull();
-    expect(row.tabIndex).toBe(0);
-    const breakdown = row.parentElement!.querySelector("[data-testid=partial-breakdown]")!;
+    const row = document.querySelector<HTMLElement>("[data-testid=node-ru]")!;
+    expect(row.textContent!.startsWith("From Russia the node is not visible from all networks")).toBe(true);
+    expect(row.dataset.kind).toBe("partial");
+    const head = row.querySelector<HTMLElement>("[tabindex]")!;
+    const breakdown = row.querySelector("[data-testid=partial-breakdown]")!;
     expect(items(breakdown.querySelector("ul")!)).toEqual(["✕MTS AS8359 · Novosibirsk · Globalping", "✕MTS КРЫМ · mobile · bsbord"]);
     // the row's tooltip still opens on focus
-    await act(async () => row.focus());
+    await act(async () => head.focus());
     for (let i = 0; i < 3; i++) await settle();
     expect(document.body.textContent).toContain("MTS, Novosibirsk (reaches your other nodes, not this one)");
   });
