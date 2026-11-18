@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/dns"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
@@ -346,4 +347,69 @@ func TestOwnRoutingProfileIsNotSentOnARefusal(t *testing.T) {
 	if rec.Header().Get("X-Hwid-Max-Devices-Reached") != "true" || rec.Header().Get("Routing") != "" {
 		t.Errorf("a refused device: max-devices %q, routing %q", rec.Header().Get("X-Hwid-Max-Devices-Reached"), rec.Header().Get("Routing"))
 	}
+}
+
+// The routing profiles of the settings through the admin API: the save stores the JSON the panel wrote (never the pasted text), the
+// answer and the read carry the info, a group that was deleted since drops out, and the audit row counts the profiles.
+func TestRoutingProfilesThroughTheSettingsAPI(t *testing.T) {
+	m := newM3Rig(t)
+	svc := headerService(m)
+	ctx := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_routing", Role: store.RoleHelper})
+	temp := must(m.svc.CreateGroup(m.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "temp", ProfileIds: []string{m.profile}}))).Msg.Group.Id
+	save := func(list ...*adminv1.RoutingProfile) (*adminv1.SubscriptionSettings, error) {
+		set := subsettings.Defaults()
+		set.RoutingProfiles = list
+		r, err := svc.UpdateSubscriptionSettings(ctx, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))
+		if err != nil {
+			return nil, err
+		}
+		return r.Msg.Settings, nil
+	}
+	invalid := func(what string, list ...*adminv1.RoutingProfile) {
+		t.Helper()
+		if _, err := save(list...); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Fatalf("%s: %v", what, err)
+		}
+	}
+	invalid("a group that never existed", routingEntry(ownProfile, false, "grp_nosuchgroup"))
+	invalid("text that is no profile", routingEntry("hello", false))
+	invalid("a geo file over http", routingEntry(`{"Name":"x","Geoipurl":"http://geo.example.com/g.dat"}`, false))
+
+	// a helper may save them (like the response headers), the pasted link is stored as the profile it holds, the info is in the answer
+	pasted := "happ://routing/add/" + base64.StdEncoding.EncodeToString([]byte(`{"Name":" family ","Evil":1,"DirectSites":["domain:example.ru"]}`))
+	got, err := save(routingEntry(pasted, false, temp, m.group2), routingEntry(`{"Name":"rest","DirectSites":[]}`, true, m.group))
+	if err != nil || len(got.RoutingProfiles) != 2 {
+		t.Fatalf("two profiles: %v, %v", got, err)
+	}
+	first := got.RoutingProfiles[0]
+	if strings.Contains(first.Profile, "Evil") || strings.Contains(first.Profile, "happ://") || !strings.HasPrefix(first.Profile, `{"Name":"family"`) || first.Info == nil || first.Info.DirectSites != 1 || len(first.GroupIds) != 2 {
+		t.Fatalf("the entry as stored: %+v", first)
+	}
+	read := must(svc.GetSubscriptionSettings(ctx, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg.Settings
+	if len(read.RoutingProfiles) != 2 || read.RoutingProfiles[0].Profile != first.Profile || read.RoutingProfiles[0].Info.Name != "family" || read.RoutingProfiles[1].Info.Name != "rest" {
+		t.Fatalf("read back: %v", read.RoutingProfiles)
+	}
+
+	// the group of the profile is deleted; another tab of the admin still sends the old list: the group drops out, the save passes
+	must(m.svc.DeleteGroup(m.ctx, connect.NewRequest(&adminv1.DeleteGroupRequest{GroupId: temp})))
+	got, err = save(routingEntry(first.Profile, false, temp, m.group2), routingEntry(`{"Name":"rest","DirectSites":[]}`, true, m.group))
+	if err != nil || len(got.RoutingProfiles[0].GroupIds) != 1 || got.RoutingProfiles[0].GroupIds[0] != m.group2 {
+		t.Fatalf("a deleted group: %v, %v", got, err)
+	}
+	invalid("a group that never existed, still", routingEntry(ownProfile, false, "grp_nosuchgroup"))
+
+	for _, row := range must(m.st.ListAudit(m.ctx, "", 0, 10)) {
+		if row.Action != "subscription_settings_update" {
+			continue
+		}
+		var params map[string]any
+		if err := json.Unmarshal([]byte(row.Params), &params); err != nil {
+			t.Fatal(err)
+		}
+		if params["routing_profiles"] != float64(2) || len(row.Params) > 600 || strings.Contains(row.Params, "example.ru") {
+			t.Fatalf("audit: %v", row.Params)
+		}
+		return
+	}
+	t.Fatal("no audit row")
 }
