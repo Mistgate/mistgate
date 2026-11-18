@@ -138,22 +138,12 @@ export type State = {
   detected: Platform | null;
   /** The chosen app of the platform (appKey), "" = the first. */
   app: string;
-  /** The first-visit steps are for this way (the choice of the two; the link is the recommended one). */
-  way: "link" | "key";
   theme: Theme;
-  /** The "connect another device" row (the QR code of the link) is open. */
-  qrOpen: boolean;
-  /** The done step shows its three steps again. */
-  stepsAgain: boolean;
   /** A long list of devices is unfolded (it shows three rows otherwise). */
   devicesOpen: boolean;
-  /** The device row whose details are open ("iOS 18.1 · Happ 3.4.2"): one at a time. */
-  details: string | null;
   annClosed: boolean;
   /** A returning visitor (computed once when the page opens: the page does not reorder itself while it is read). */
   returning: boolean;
-  /** This device pressed "add" or "copy" before. */
-  marked: boolean;
   amz: AmzState;
   dns: DnsState;
 };
@@ -166,13 +156,8 @@ export type Actions = {
   tab(t: Tab): void;
   platform(p: Platform): void;
   app(key: string): void;
-  way(way: "link" | "key"): void;
   theme(t: Theme): void;
-  qrOpen(open: boolean): void;
-  stepsAgain(): void;
   devicesOpen(open: boolean): void;
-  /** Opens the details of a device row (null closes them). */
-  details(id: string | null): void;
   closeAnn(): void;
   /** This device set a connection up: remembered (the "returning" mark). */
   mark(): void;

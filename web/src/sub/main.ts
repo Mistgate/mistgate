@@ -16,7 +16,7 @@ import type { Lang, Theme } from "./types";
 import { annKey, brandName, logoSrc, view } from "./view";
 
 // Entry of the public user page. All state is here: the language, the theme and the picked device (remembered on this
-// device), the chosen app, whether the QR code is open and whether the announcement was closed. The page data is embedded by
+// device), the chosen app, the open tab and whether the announcement was closed. The page data is embedded by
 // the server, there is no network I/O except the self-service calls (and the password form's one). A page whose password was
 // not entered is the form and nothing else.
 
@@ -155,15 +155,10 @@ if (data.locked) {
     platform: pickPlatform(data, asPlatform(stored("platform")), want),
     detected: want,
     app: "",
-    way: "link",
     theme: startTheme,
-    qrOpen: false,
-    stepsAgain: false,
     devicesOpen: false,
-    details: null,
     annClosed: stored(ann) === "1",
     returning: isReturning(data, stored("setup") === "1"),
-    marked: stored("setup") === "1",
     amz: newAmzState(here || "other", mainProfile(data.amnezia?.profiles ?? []), here),
     dns: newDnsState(),
   };
@@ -198,30 +193,14 @@ if (data.locked) {
       st.app = key;
       render();
     },
-    way(w) {
-      st.way = w;
-      render();
-    },
     theme(t) {
       st.theme = t;
       store("theme", t);
       applyTheme(t);
       render();
     },
-    qrOpen(open) {
-      st.qrOpen = open;
-      render();
-    },
-    stepsAgain() {
-      st.stepsAgain = true;
-      render();
-    },
     devicesOpen(open) {
       st.devicesOpen = open;
-      render();
-    },
-    details(id) {
-      st.details = id;
       render();
     },
     closeAnn() {
@@ -230,7 +209,6 @@ if (data.locked) {
       render();
     },
     mark() {
-      st.marked = true;
       store("setup", "1");
     },
     copy,
