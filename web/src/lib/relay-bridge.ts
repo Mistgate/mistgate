@@ -34,9 +34,6 @@ export function blockedText(t: T, blocked: Blocked, n: { entry: string; exit: st
   return t("relay.way.update", { nodes: blocked === "entry_agent_old" ? n.entry : n.exit });
 }
 
-/** The reasons the panel gives for the way it stands in (Relay.mode_reason); "" is a relay that never changed. */
-export const modeReasons = ["leg_failed", "direct_back", "bridge_failed", "owner", "reverse_unsupported", "udp"] as const;
-
 /** The reason in words: why the relay is in the way it is, or "" when there is nothing to say (never changed, a UDP server). */
 export function reasonText(t: T, r: Pick<RelayMsg, "modeReason" | "mode" | "activeMode" | "viaNodeName" | "exitNodeName" | "reverseBlocked" | "network">): string {
   const n = { entry: r.viaNodeName, exit: r.exitNodeName };

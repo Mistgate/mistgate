@@ -3,7 +3,7 @@ import { dictionaries, fill, langs } from "@/i18n";
 import { en } from "@/i18n/en";
 import type { HostHour, NodeMetrics } from "@/gen/mistgate/admin/v1/node_pb";
 import type { Plain } from "./plain";
-import { bottleneckKey, conntrackFill, cpuSplit, fdFill, fillTone, fitKey, hourSeries, linkUse, loadStatusKind, memSplit, recKey } from "./resources";
+import { bottleneckKey, conntrackFill, cpuSplit, fdFill, fitKey, hourSeries, linkUse, loadStatusKind, memSplit, recKey } from "./resources";
 
 type M = Plain<NodeMetrics>;
 const base: M = {
@@ -40,7 +40,6 @@ describe("the machine's CPU and memory, split", () => {
     expect(fdFill(base)).toBe(81);
     expect(fdFill({ ...base, agent: { ...base.agent!, fdLimit: 0 } })).toBeNull();
     expect(linkUse(base)).toBe(5); // the busier direction, 50 of 1000 Mbit/s
-    expect([fillTone(79), fillTone(80), fillTone(95)]).toEqual(["ok", "warn", "bad"]);
   });
 });
 

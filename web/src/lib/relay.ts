@@ -186,27 +186,3 @@ export function seenHint(t: T, entry: string, exit?: CountryHint, entryHint?: Co
   if (both.length > 0) return { tone: "bad", text: t("relay.hint.seen.no", { entry, networks: both.join(", ") }) };
   return { tone: "ok", text: t("relay.hint.seen.yes", { entry, networks: dark.join(", ") }) };
 }
-
-export type CandidateNode = { nodeId: string; nodeName: string; servers: Candidate[]; suggested: boolean };
-
-/**
- * The candidates by exit node, in the panel's order (the ones that can be relayed first, the cut exits among them first):
- * the suggested nodes (cut, with a server that can be relayed), then the others. An exit in the entry's own country is never
- * suggested (`sameCountry`): the people's route to it would not change.
- */
-export function groupCandidates(list: Candidate[], sameCountry: (nodeId: string) => boolean = () => false): { suggested: CandidateNode[]; others: CandidateNode[] } {
-  const byNode = new Map<string, CandidateNode>();
-  for (const c of list) {
-    const g = byNode.get(c.nodeId) ?? { nodeId: c.nodeId, nodeName: c.nodeName, servers: [], suggested: false };
-    g.servers.push(c);
-    byNode.set(c.nodeId, g);
-  }
-  const all = [...byNode.values()];
-  // what can be picked first in each node: then the ones relayed already, then the ones that cannot be
-  const rank = (c: Candidate) => (c.unsupported ? 2 : c.relayId ? 1 : 0);
-  for (const g of all) {
-    g.servers.sort((a, b) => rank(a) - rank(b));
-    g.suggested = !sameCountry(g.nodeId) && g.servers.some((c) => !c.unsupported && isCut(c.country));
-  }
-  return { suggested: all.filter((g) => g.suggested), others: all.filter((g) => !g.suggested) };
-}

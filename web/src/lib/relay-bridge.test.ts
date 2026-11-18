@@ -11,7 +11,6 @@ import {
   bridgeLoad,
   bridgeNote,
   modeOf,
-  modeReasons,
   reachReason,
   reasonText,
   speedOk,
@@ -57,6 +56,7 @@ describe("the way of a relay", () => {
   });
 
   it("has a sentence, in every language, for every reason the panel gives and for none", () => {
+    const modeReasons = ["leg_failed", "direct_back", "bridge_failed", "owner", "reverse_unsupported", "udp"];
     for (const lang of langs) {
       const t = tOf(lang);
       for (const code of modeReasons) {

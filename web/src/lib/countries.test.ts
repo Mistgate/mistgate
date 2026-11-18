@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countryCodes, isCountryCode } from "./countries";
+import { countryCodes } from "./countries";
 
 describe("country options", () => {
   it("offers mainland China", () => {
@@ -10,6 +10,6 @@ describe("country options", () => {
     // the selects sort by the localized name; the source stays in code order, so a code added twice or out of place shows here
     expect([...countryCodes]).toEqual([...countryCodes].sort());
     expect(new Set(countryCodes).size).toBe(countryCodes.length);
-    expect(countryCodes.every((c) => isCountryCode(c) && c === c.toUpperCase())).toBe(true);
+    expect(countryCodes.every((c) => /^[A-Z]{2}$/.test(c))).toBe(true);
   });
 });

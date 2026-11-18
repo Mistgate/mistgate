@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import { dictionaries, fill, type Lang, type T } from "@/i18n";
-import { agentError, checkReason, countryHint, enableGate, groupCandidates, reachHint, relayState, seenHint, stageReason, type Candidate, type RelayMsg } from "./relay";
+import { agentError, checkReason, countryHint, enableGate, reachHint, relayState, seenHint, stageReason, type RelayMsg } from "./relay";
 
 const tOf = (lang: Lang) => Object.assign((key: string, vars?: Record<string, string | number>) => fill(dictionaries[lang][key as "relay.title"], vars), { n: () => "" }) as unknown as T;
 const tRu = tOf("ru");
@@ -86,13 +86,5 @@ describe("the hints of a candidate", () => {
     expect(seenHint(tRu, "msk1", exit, { verdict: "partial", dark: ["Tele2"], atUnix: now })).toEqual({ tone: "bad", text: "msk1 тоже не видна из Tele2" });
     expect(seenHint(tRu, "msk1", exit, { verdict: "no_data", dark: [], atUnix: 0 })?.text).toBe("Видна ли msk1 людям: нет данных");
     expect(seenHint(tRu, "msk1", { verdict: "ok", dark: [], atUnix: now }, undefined)).toBeNull(); // an exit seen everywhere: nothing to compare
-  });
-
-  it("put the cut exits with a server that can be relayed first, keeping the panel's order", () => {
-    const c = (nodeId: string, over: Partial<Candidate> = {}) => ({ inboundId: `inb_${nodeId}_${over.profileName ?? "a"}`, nodeId, nodeName: nodeId, profileName: "a", unsupported: "", country: { verdict: "ok", dark: [], atUnix: 0 }, ...over }) as Candidate;
-    const cut = { verdict: "partial", dark: ["MTS"], atUnix: now };
-    const g = groupCandidates([c("de1", { country: cut }), c("de1", { profileName: "b", country: cut, unsupported: "cdn" }), c("fi1"), c("nl1", { country: cut, unsupported: "acme_ip" })]);
-    expect(g.suggested.map((x) => [x.nodeId, x.servers.length])).toEqual([["de1", 2]]);
-    expect(g.others.map((x) => x.nodeId)).toEqual(["fi1", "nl1"]); // nl1 is cut, but nothing of it can be relayed
   });
 });

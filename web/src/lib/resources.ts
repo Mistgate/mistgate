@@ -49,9 +49,6 @@ export const fdFill = (m: Metrics | undefined): number | null =>
 export const linkUse = (m: Metrics | undefined): number | null =>
   hasResources(m) && m.nicSpeedMbps > 0 ? clamp((Math.max(m.netRxBps, m.netTxBps) / (m.nicSpeedMbps * 1e6)) * 100) : null;
 
-/** The meter's tone at a fill: the doctor's thresholds (warn 80%, fail 95%). */
-export const fillTone = (pct: number): "ok" | "warn" | "bad" => (pct >= 95 ? "bad" : pct >= 80 ? "warn" : "ok");
-
 // ---------------------------------------------------------------------------------------------------------------------
 // The node's hours (GetNodeHostHistory)
 

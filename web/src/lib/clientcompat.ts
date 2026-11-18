@@ -62,20 +62,6 @@ export const stateWord = {
 
 // "In fact": what the nodes saw of the ClientHellos of a device (new-style = with the post-quantum share, old-style = without it).
 
-/** The pill of a measured class: new-style is fine, old-style is what a strict profile would refuse, mixed is in between, no data stays quiet. */
-export function actualKind(a: ClientCompatActual): StatusKind {
-  switch (a) {
-    case ClientCompatActual.PQ:
-      return "ok";
-    case ClientCompatActual.CLASSIC:
-      return "bad";
-    case ClientCompatActual.MIXED:
-      return "warn";
-    default:
-      return "blip";
-  }
-}
-
 export const actualWord = {
   [ClientCompatActual.UNSPECIFIED]: "cc.act.any",
   [ClientCompatActual.NONE]: "cc.act.none",

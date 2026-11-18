@@ -6,7 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { setLang } from "@/i18n";
-import { actualKind, ClientCompatActual, ClientCompatState, helloLine, mismatchText, needText, rulesEqual, stateKind, windowDays, type CompatRule } from "@/lib/clientcompat";
+import { ClientCompatActual, ClientCompatState, helloLine, mismatchText, needText, rulesEqual, stateKind, windowDays, type CompatRule } from "@/lib/clientcompat";
 import { meQuery } from "@/lib/session";
 import { dictionaries } from "@/i18n";
 import { ClientsTab } from "./clients";
@@ -373,14 +373,6 @@ describe("In fact, the pure parts", () => {
   const t = (key: string, vars?: Record<string, string | number>) => dictionaries.en[key as keyof typeof dictionaries.en].replace(/\{(\w+)\}/g, (_, k: string) => String(vars?.[k] ?? ""));
   const tt = Object.assign(t, { n: t }) as never;
   const m = (o: Record<string, unknown> = {}) => ({ actual: ClientCompatActual.NONE, helloPq: 0, helloClassic: 0, helloUnknown: 0, tableMismatch: "", ...o }) as never;
-
-  it("colours the classes: new-style fine, old-style bad, mixed warm, no data quiet", () => {
-    expect(actualKind(ClientCompatActual.PQ)).toBe("ok");
-    expect(actualKind(ClientCompatActual.CLASSIC)).toBe("bad");
-    expect(actualKind(ClientCompatActual.MIXED)).toBe("warn");
-    expect(actualKind(ClientCompatActual.NONE)).toBe("blip");
-    expect(actualKind(ClientCompatActual.UNSPECIFIED)).toBe("blip");
-  });
 
   it("writes the counts line only where something was counted", () => {
     expect(helloLine(tt, m())).toBe("");

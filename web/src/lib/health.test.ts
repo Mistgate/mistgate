@@ -48,7 +48,6 @@ import {
   peopleOrder,
   resolutionWord,
   restartConsequence,
-  severityKind,
   type Alert,
   type CheckCell,
   type CountryCheck,
@@ -289,11 +288,6 @@ describe("alerts", () => {
     expect(secs(clock(6, 30))[1]).toBe(90 * 60); // before 08:00: this morning
     expect(secs(clock(8))[1]).toBe(24 * 3600); // at 08:00 sharp: tomorrow's
     expect(muteChoices(clock(12)).map((c) => c.key)).toEqual(["hl.mute.hour", "hl.mute.morning", "hl.mute.day", "hl.mute.week"]);
-  });
-  it("maps severity to the status kinds; info is never red", () => {
-    expect(severityKind(AlertSeverity.CRITICAL)).toBe("bad");
-    expect(severityKind(AlertSeverity.WARNING)).toBe("warn");
-    expect(severityKind(AlertSeverity.INFO)).toBe("blip");
   });
   it("counts an alert as loud only when it is a warning or worse and not muted", () => {
     expect(isLoud(alert(), 1000)).toBe(true);
