@@ -1,5 +1,6 @@
 import { add, type AddDict } from "./i18n-add";
 import { core, type CoreDict } from "./i18n-core";
+import { dlg, type DlgDict } from "./i18n-dlg";
 import { tabs, type TabsDict } from "./i18n-tabs";
 import type { Lang } from "./types";
 
@@ -360,8 +361,8 @@ const ru = {
 };
 
 type Base = typeof ru;
-/** The words of the page: the base above, then the redesign's own (i18n-core: the page and its status, i18n-add: the new-device window and the dialogs, i18n-tabs: the servers, the proxies and the devices). */
-export type Dict = Base & CoreDict & AddDict & TabsDict;
+/** The words of the page: the base above, then the redesign's own (i18n-core: the page and its status, i18n-add: the new-device window, i18n-dlg: the small windows, i18n-tabs: the servers, the proxies and the devices). */
+export type Dict = Base & CoreDict & AddDict & DlgDict & TabsDict;
 
 const en: Base = {
   dayWord: (n) => (n === 1 ? "day" : "days"),
@@ -1690,7 +1691,7 @@ const tr: Base = {
   platforms: { ios: "iPhone", android: "Android", windows: "Windows", macos: "Mac", linux: "Linux", other: "Diğer" },
 };
 
-const merge = (base: Base, l: Lang): Dict => ({ ...base, ...core[l], ...add[l], ...tabs[l] });
+const merge = (base: Base, l: Lang): Dict => ({ ...base, ...core[l], ...add[l], ...dlg[l], ...tabs[l] });
 export const dict: Record<Lang, Dict> = { ru: typeset(merge(ru, "ru")), en: typeset(merge(en, "en")), zh: typeset(merge(zh, "zh")), fa: typeset(merge(fa, "fa")), tr: typeset(merge(tr, "tr")) };
 
 /** The languages of the menu in the top bar, in order. */

@@ -19,6 +19,8 @@ export type AmzState = {
   created: string | null;
   /** The stale device whose new key the dialog shows ("new key needed"). */
   renew: string | null;
+  /** The stale device the "new key needed" question (its own small window) is open for. */
+  stale: string | null;
   /** "add", a device id, "rename:<id>" or "renew:<id>" while a call is in flight; "" otherwise. */
   busy: string;
   /** The last failure, as the panel's code; "" when none. `errorAt` is the busy key of the call that failed. */
@@ -45,6 +47,7 @@ export const newAmzState = (platform: string, profile: string, here = ""): AmzSt
   pane: "key",
   created: null,
   renew: null,
+  stale: null,
   busy: "",
   error: "",
   errorAt: "",
@@ -86,6 +89,8 @@ export type AmzActions = {
   show(id: string | null): void;
   /** "New key needed": fetches the key of a stale device and shows it in the dialog. */
   renew(id: string): void;
+  /** Opens (id) or closes (null) the "new key needed" question of a stale device. */
+  stale(id: string | null): void;
   node(id: string, i: number): void;
   where(id: string, w: string): void;
   ask(c: Confirm): void;

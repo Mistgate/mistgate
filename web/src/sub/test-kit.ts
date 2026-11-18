@@ -14,6 +14,7 @@ export const amzNoop = {
   create: noop,
   show: noop,
   renew: noop,
+  stale: noop,
   node: noop,
   where: noop,
   ask: noop,

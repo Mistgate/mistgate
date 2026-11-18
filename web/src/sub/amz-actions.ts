@@ -155,8 +155,18 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
         render();
       });
     },
+    stale(id) {
+      const was = am().stale;
+      am().stale = id;
+      am().menu = null;
+      am().error = "";
+      am().errorAt = "";
+      render();
+      if (!id && was) focus?.(back(was));
+    },
     renew(id) {
       const open = () => {
+        am().stale = null;
         am().renew = id;
         am().adding = false;
         render();
