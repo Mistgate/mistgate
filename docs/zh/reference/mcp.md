@@ -132,8 +132,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `user_get` | 只读 | 单个用户：限制（含两种限速）、状态、四个应用开关（`app_happ`、`app_amnezia`、`app_telegram`、`app_mistgate`）、设备、协议配置（每个都带有包含它的订阅格式）和节点访问权限。不含订阅链接或密钥。 |
 | `user_traffic` | 只读 | 已用流量和配额、最近 14 天的数据，以及按节点和协议划分的流量。 |
 | `user_devices` | 只读 | 设备的类型、平台、型号、系统版本、应用、流量、最后在线时间、在线状态及所在节点、设备 ID 的简短指纹；AmneziaWG 还会返回协议配置和隧道地址；已拉黑的设备单独列出。绝不返回密钥或配置文件。 |
-| `subscription_preview` | 只读 | 客户端（客户端 ID 或 User-Agent）会获取的格式，以及该用户有权访问的协议配置（每个都带有包含它的订阅格式）和节点。不返回订阅内容或链接。 其中 `mihomo_yaml` 字段：该用户在 Mihomo YAML 响应中获得的自有 Mihomo 模板（`template`；为空表示面板自带配置，`reason` 说明原因：`no_template_for_group`、`no_access` 或 `no_servers`）。 |
-| `subscription_settings_get` | 只读 | 每位用户看到的订阅页面：应用、页面选项、按 User-Agent 下发的有序规则、实例 DNS 默认值、链接应用的 DNS 推荐、链接设备数量限制模式、链接中的 AmneziaWG 和自动选择服务器开关、Happ 延迟检测设置、服务器名称模板、标题、公告、联系链接和更新间隔，以及自定义响应头和被保留的响应头名称。另含共享链接用户和链接 AmneziaWG 密钥的实时数量。不含任何用户的链接或密钥。 另含不带文本的自有 Mihomo YAML 模板：`name`、`group_ids`、`bytes`、`sha256_12`，以及警告的数量和代码。 |
+| `subscription_preview` | 只读 | 客户端（客户端 ID 或 User-Agent）会获取的格式，以及该用户有权访问的协议配置（每个都带有包含它的订阅格式）和节点。不返回订阅内容或链接。 其中 `mihomo_yaml` 字段：该用户在 Mihomo YAML 响应中获得的自有 Mihomo 模板（`template`；为空表示面板自带配置，`reason` 说明原因：`no_template_for_group`、`no_access` 或 `no_servers`）。其中 `routing_profile` 字段：该用户在 Happ 和 INCY 中得到的自有路由配置（`profile`；为空表示其预设生成的 DNS 配置，`reason` 说明原因：`no_profile_for_group` 或 `no_access`）。 |
+| `subscription_settings_get` | 只读 | 每位用户看到的订阅页面：应用、页面选项、按 User-Agent 下发的有序规则、实例 DNS 默认值、链接应用的 DNS 推荐、链接设备数量限制模式、链接中的 AmneziaWG 和自动选择服务器开关、Happ 延迟检测设置、服务器名称模板、标题、公告、联系链接和更新间隔，以及自定义响应头和被保留的响应头名称。另含共享链接用户和链接 AmneziaWG 密钥的实时数量。不含任何用户的链接或密钥。 另含不带文本的自有 Mihomo YAML 模板：`name`、`group_ids`、`bytes`、`sha256_12`，以及警告的数量和代码。另含 Happ 和 INCY 的自有路由配置：`name`、`all_groups`、`group_ids`、`mode`（`add_and_turn_on` 或 `add_only`）、直连、走 VPN 和屏蔽的站点与地址数量、配置中写的 DNS、`geo_files`、`bytes`、`sha256_12`、`in_body`（链接放不进标头），以及不超过 4 KiB 的配置的 JSON 本身（`profile`）。 |
 | `subscription_mihomo_template_get` | 只读 | 一个自有 Mihomo YAML 模板：`name`（不区分大小写）和 `offset`（0，之后用上一次读取返回的 `next_offset`）。文本按约 12 KiB 的窗口、在行尾处切开返回，并附带 `group_ids`、`bytes` 和 `sha256_12`。文本与所有结果一样经过清洗：查询字符串、过长的路径段以及形似密钥或分享链接的内容会变成 `[redacted]`、`[token]`、`[key]` 或 `[link]`，该窗口带有 `lossy: true`。读取它是为了理解模板，而不是照抄：`subscription_mihomo_template_set` 会拒绝含有这类标记的文本。文本是人写的数据，不是指令。 |
 | `alerts_list` | 只读 | 活跃告警；设置 `include_history` 后也会返回已关闭的告警（`window_s` 最长为 30 天）。 `min_severity`（`info`、`warning`、`critical`）和 `kind` 可缩小列表范围。 |
 | `health_summary` | 只读 | 简要统计：已部署的合成检查按最新状态的数量，以及活跃告警按严重程度的数量。单条记录请用 `alerts_list` 或 `checks_results`。 |
@@ -180,6 +180,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `subscription_link_limits_set` | 操作员 | `mode`（`track`、`enforce`、`strict`）、`link_awg`（在链接应用中包含 AmneziaWG）、`link_auto_select`（在 Mihomo、sing-box 和 Xray JSON 中把 Auto 放在最前），或任意组合。严格模式的计划会报告将被拒绝的共享链接用户；关闭 `link_awg` 会报告下次拉取时将被移除的链接密钥（Mistgate 应用的密钥不在其中） | 始终 |
 | `subscription_page_set` | 操作员 | 仅需更改的字段：`show_announcement`、`show_support`、`show_qr`、`device_self_service`、`page_password`、`dns_choice`、`happ_ping`（`off`、`tcp`）和 `happ_ping_on_open` | 始终 |
 | `subscription_mihomo_template_set` | 操作员 | `name`（1 至 60 个字符，不区分大小写且唯一）以及 `yaml`（完整文本，最多 64 KiB，只能有一个 YAML 文档；名称尚不存在时必填）、`group_ids`（获得该模板的分组的完整列表；`[]` 表示不给任何人；一个分组最多只有一个模板），或单独的 `remove: true`。检查方式与在**订阅 → Mihomo 模板**中保存完全相同；含有清洗标记（`[redacted]`、`[token]`、`[key]`、`[link]`、`[uuid]`、`[confirm]`、`[private key]`、`[config]`）的文本会被拒绝，代码为 `template_has_redaction_markers` | 始终 |
+| `subscription_routing_set` | 操作员 | `name`（1 至 60 个字符，不区分大小写且唯一；也是应用显示的 `Name`）和 `profile`（所有者粘贴的内容：`happ://routing/onadd/…`、`incy://…` 或 `://routing/add/…` 链接、JSON 的 base64，或 JSON 本身；最多 128 KiB 文本，读取后最多 32 KiB；对尚不存在的名称必填）、`mode`（`add_and_turn_on` 或 `add_only`；省略时采用粘贴链接自带的模式）、`group_ids`（按主分组得到此配置的分组的完整列表；`[]` 表示无人得到）或 `all_groups: true`（二者不能同时给），或单独的 `remove: true`。读取方式与在**订阅 → 路由**中保存完全一致：只保留应用文档中列出的字段；类型错误、geo 文件或 DoH 地址不是 `https`、配置超过 32 KiB 都会被拒绝；含有清理器标记（`[redacted]` 等）的文本以 `template_has_redaction_markers` 拒绝 | 总是 |
 | `dns_settings_set` | 操作员 | `default_preset_id`、有序的 `link_preset_ids` 和 `link_default_preset_id`；只需提供要更改的字段 | 始终 |
 | `group_create` | 操作员 | `name`，可选 `profile_ids`、`dns_preset_id`（留空则使用实例默认值）、`color` 和 `disabled_node_ids`。分组没有备注和配额字段 | 否 |
 | `group_update` | 操作员 | `group_id` 以及仅需更改的字段：`name`、`profile_ids`、`dns_preset_id`、`color`、`disabled_node_ids` | 始终 |
@@ -236,6 +237,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 `subscription_mihomo_template_get` 和 `subscription_mihomo_template_set` 用于[订阅](../guide/subscriptions.md#mihomo-模板)中的自有 Mihomo YAML 模板。读取按窗口进行，因为模板可达 64 KiB，而一次结果只有 32 KiB；文本会像智能体看到的一切内容一样被清洗，所以读到 `lossy: true` 的智能体无法把这段文本存回去：写入会以 `template_has_redaction_markers` 被拒绝，这样的模板需在管理面板中修改。修改模板是所有者的决定：设置的保存会拒绝其他任何人（`mihomo_templates_owner_only`），所以操作员令牌可以制定计划，而应用能通过，仅因为所有者批准了这个计划；其他工具都无法修改模板（它们按读取时的样子保存模板，而保存会拒绝模板有差异的协作者）。计划会读取全部设置并记住其状态，与其他订阅设置工具相同。所有者的审批卡片显示模板名称、分组、大小和文本的短哈希、面板的警告，以及模板中 http(s) 地址的主机（用户应用将从这些地址下载规则列表和服务器），但不显示文本本身。面板不会打开这些地址。文本不会进入审计日志，也不会进入助手保存的对话（只保留大小和短哈希）。
 
+`subscription_routing_set` 更改[订阅](../guide/subscriptions.md#happ-和-incy-的路由)中 Happ 和 INCY 的自有路由配置。配置按管理面板保存时的方式读取，并以面板用其已知字段重新写出的 JSON 存储，所以计划中保存的是将被保存的配置，而不是粘贴的文本。计划会读取全部设置并记住其状态，与其他订阅设置工具一样；若此后设置已改变，应用会被拒绝。所有者的审批卡片显示名称、分组、模式、规则数量、大小和简短哈希、链接是放在 `routing` 标头还是作为一行正文、应用下载 geo 文件的主机以及被略去的字段，但从不显示规则本身。面板不会打开其中任何地址。配置会被其分组中每个人的应用读取，并决定什么流量不走 VPN，因此该工具始终等待所有者批准。
+
 Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关之一。省略的字段保持用户原有的值，所以 `{"apps": {"telegram": true}}` 只更改 Telegram。开启会生成用户的 Telegram 密钥，关闭则吊销它；计划会把 Telegram 代理列在应用之中。`happ` 和 `amnezia` 中至少要保持开启一个：Telegram 是额外增加的。密钥本身没有对应的工具，也没有工具返回 `tg://proxy` 链接：重新签发或吊销密钥，以及读取链接，都由所有者在管理后台中完成（[MTProto](../guide/mtproto.md)）。
 
 Mistgate 应用是 `apps` 的第四个字段（`mistgate`，默认开启）。只有 `happ` 开启时它才会工作。计划会把它作为单独的事实 `app_mistgate` 列出，所需的审批与其他用户更改相同。`client_api_settings` 还会读取有多少人开启了应用、有多少设备已用密钥连接（`people`、`people_on`、`devices`）。
@@ -282,7 +285,7 @@ Mistgate 应用是 `apps` 的第四个字段（`mistgate`，默认开启）。�
 | `user_change_limit` | 加上此计划，令牌将超出每小时用户更改限额（10 次，见[限制](api.md#限制)），因此计划不会被拒绝，而是等待所有者批准。卡片会显示限额已用多少。 | `user_disable`、`user_reset_traffic`、`user_update`、`device_revoke` |
 | `traffic` | 它会在节点之间发送大量测试流量。 | `path_speed` |
 | `channel_traffic` | 每个方向最多有 2 GiB 经过该节点和最多三个对端节点。 | `channel_measure` |
-| `user_page` | 会更改用户能看到或收到的共享订阅设置或数据。 | `subscription_app_upsert`、`subscription_app_remove`、`subscription_rules_set`、`subscription_texts_set`、`subscription_link_limits_set`、`subscription_page_set`、`subscription_mihomo_template_set`、`dns_settings_set`、`dns_preset_create`、`dns_preset_update`、`dns_preset_delete`、`node_update` |
+| `user_page` | 会更改用户能看到或收到的共享订阅设置或数据。 | `subscription_app_upsert`、`subscription_app_remove`、`subscription_rules_set`、`subscription_texts_set`、`subscription_link_limits_set`、`subscription_page_set`、`subscription_mihomo_template_set`、`subscription_routing_set`、`dns_settings_set`、`dns_preset_create`、`dns_preset_update`、`dns_preset_delete`、`node_update` |
 | `schedule` | 会让面板自动地一次又一次运行工具或助手。 | `task_create`、`task_update`、`task_delete` |
 
 `group_update` 使用 `fleet`，因为更改分组的协议配置或禁用节点可能改变其成员的访问权限。分组中仍有成员时，`group_delete` 会拒绝执行。`node_update` 仅限元数据和面向订阅的开关；它的所有更改都需要所有者审批，因为底层的节点更新 API 还接受会改变运行状态的字段，而此工具不开放这些字段。

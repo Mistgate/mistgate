@@ -208,10 +208,10 @@ Mihomo 内核只在 chrome fingerprint 下发送该份额：`support-x25519mlkem
 | `Announce` | 公告，或订阅无法使用的原因。 |
 | `Support-Url` | 支持链接。 |
 | `Probe-Report` | 面板接收 kl!ck 服务器检查报告时为 `1`（**可达性 → 来源**，参见 [kl!ck 报告](../operations/reachability.md#klck-报告)）。没有它，kl!ck 不会发送任何内容。 |
-| `Routing` | 仅供 Happ 使用，且仅随链接列表发送：用户的 DNS 预设，以 Happ 路由配置形式提供。参见[DNS](dns.md)。其他格式自带 DNS，因此不发送 `Routing`。 |
+| `Routing` | 仅供 Happ 和 INCY 使用，且仅随链接列表发送：该用户所在分组的[自有路由配置](#happ-和-incy-的路由)，并填入该用户 DNS 预设的 DNS；没有自有配置时，则是该用户的 DNS 预设生成的路由配置（Happ 用 `happ://`，INCY 用 `incy://`）。链接超过 3000 字节的配置改为作为服务器之后的一行正文发送。参见[DNS](dns.md)。其他格式自带 DNS，因此不发送 `Routing`。 |
 | `Ping-Type`、`Ping-Result`、`Subscription-Ping-Onopen-Enabled` | 仅供 Happ 使用，且仅在**Happ 延迟测试**不是**应用默认**时发送：Happ 测试服务器延迟的方式、以 ms 显示延迟，以及打开应用时是否测试。参见[名称与文本](#名称与文本)。 |
 
-你自己的响应头附在这些之后：见[响应头](#响应头)。Mihomo YAML、Xray JSON 和 sing-box JSON 包含相同的响应头，但没有 `Routing`。Mihomo YAML 有包含所有服务器的一个代理组和 `dns:` 部分；Xray JSON 每台服务器一份配置；sing-box JSON 是包含所有服务器的一个选择器。各格式都以自己的形式带上用户的 DNS 预设。
+你自己的响应头附在这些之后：见[响应头](#响应头)；该标签页的“应用会得到什么”预览也会显示 `routing` 标头。Mihomo YAML、Xray JSON 和 sing-box JSON 包含相同的响应头，但没有 `Routing`。Mihomo YAML 有包含所有服务器的一个代理组和 `dns:` 部分；Xray JSON 每台服务器一份配置；sing-box JSON 是包含所有服务器的一个选择器。各格式都以自己的形式带上用户的 DNS 预设。
 
 ## 额外服务器：经 IPv6 与经中转
 
@@ -391,6 +391,48 @@ rules:
 
 回退到不含模板的面板版本后，在那里下次保存这些设置时模板会被丢弃：回退前请另存模板文本。
 
+## Happ 和 INCY 的路由
+
+Happ 和 INCY 有自己的路由：哪些直连、哪些走 VPN、哪些屏蔽。**路由**标签页把你自己的配置发给它们，对象是你选择的分组。没有自有配置时，它们得到和以前一样的内容：用户 DNS 预设生成的配置（Happ 自 DNS 预设出现起如此；INCY 也一样，使用自己的 `incy://` 前缀：两个应用读取相同的字段）。
+
+### 把配置放进面板
+
+在你已有配置的地方生成它：3x-ui（订阅的路由规则）、Happ 或 INCY。它们会给你一个类似 `happ://routing/onadd/eyJ…` 或 `incy://routing/onadd/eyJ…` 的链接。把它粘贴到新配置的**链接、base64 或 JSON**中。下面这些也可以：
+
+- 任意前缀的链接（`sbx://routing/add/…`）或没有前缀的链接（`://routing/onadd/…`，INCY 的标头就是这样写的）；
+- JSON 的纯 base64，带或不带填充；
+- JSON 本身：包含 `Name`、`GlobalProxy`、`DirectSites`、`DirectIp`、`ProxySites`、`ProxyIp`、`BlockSites`、`BlockIp`、`DnsHosts`、`Geoipurl`、`Geositeurl`、`DomainStrategy`、`FakeDNS`、`LastUpdated`、DNS 字段 `RemoteDNSType`、`RemoteDNSDomain`、`RemoteDNSIP`、`DomesticDNSType`、`DomesticDNSDomain`、`DomesticDNSIP`（以及旧的 `RemoteDns`、`DomesticDns`）和 `useChunkFiles` 的对象。
+
+`…/routing/off` 链接（它只会关闭路由）和自动更新的 `…/autorouting/…` 链接（里面是配置的地址，而不是配置）会被拒绝并说明原因。
+
+面板会立即读取粘贴的文本，并在列表旁用文字展示读到的内容：应用将显示的名称、直连、走 VPN 和进入屏蔽列表的站点与地址各有多少、其余流量如何处理（`GlobalProxy`）、geo 文件及其来源、配置如何送达应用，以及被略去的字段。无法读取的文本会被拒绝并说明原因（不是 JSON 对象、字段类型不对、没有任何路由字段、geo 文件或 DoH 地址不是 `https`、配置超过 32 KiB），也不能保存。
+
+### 面板保留什么
+
+面板不会原样转发你的文本。保存时它把文本读入两个应用文档中列出的字段，检查类型，并存储由这些字段重新写出的 JSON；发给应用的只有它。粘贴文本中不在其内的字段（应用将来可能新增）会被**略去**，标签页会列出其名称。标头是固定前缀加 base64，无论文本写了什么。geo 文件和 DoH 的地址只接受 `https://` 且不带登录信息。面板本身从不打开这些地址，而是由你的人的应用去打开，所以请使用你信任的主机。
+
+配置的名称就是其 `Name`（没有名称的配置叫 `Routing`）。名称不区分大小写且唯一：应用收到已有名称的配置时会更新它，而不是再添加一个。修改配置时请在其中写入新的 `LastUpdated`（Unix 时间）：两个应用只有在它大于已有值时才会接受更新。
+
+### 谁会得到
+
+每个配置适用于**所有分组**或所选**分组**，并有一个模式：**添加并启用**（`onadd`）或**仅添加**（`add`：应用在下载完 geo 文件后启用，或由本人启用）。粘贴的链接会设置它所写的模式。用户得到其**主分组**的配置；所属的其他分组不计入。主分组没有被任何配置点名的用户得到适用于所有分组的配置，没有的话得到和以前一样的 DNS 配置。一个分组只在一个配置中，适用于所有分组的配置只有一个：标签页和保存都不接受其他情况。
+
+### 发往哪里
+
+只发给订阅有效的用户的链接列表，且只发给 **Happ** 和 **INCY**（INCY 通过 User-Agent 中的 `INCY/<版本>/<平台>` 识别）。各自得到自己前缀的链接。被[设备数量限制](#订阅类应用的设备上限)拒绝的设备得不到你的任何规则（保持其原有行为）。其他格式和应用（Mihomo YAML、Xray JSON、sing-box JSON、任何其他应用）不受影响。
+
+不超过 3000 字节的链接放在 `routing` 标头中。面板前面的代理把响应标头缓冲在 4 或 8 KiB 中；面板自己的标头约占 1 KiB，你自定义的响应头最多 4096 字节，所以剩下 3 KiB。更长的配置作为服务器之后的一行订阅内容发送，两个应用都会在那里读取路由链接（它们的文档就是这样展示的）；标签页会说明某个配置属于哪一种。
+
+### 用户的 DNS
+
+配置中的 DNS 不由你固定：配置里的 DNS 字段（`RemoteDNS*`、`DomesticDNS*` 和旧别名）会被用户 DNS 预设中的字段替换，其主机固定项会加入 `DnsHosts`。你的规则（`DirectSites`、`ProxySites`、`BlockSites` 和地址列表）、geo 文件和其余内容保持你写的样子。预设自带的域名分流和广告列表**不会**加入你的配置：使用你的配置时，规则只属于你。如果预设中没有任何应用能用的服务器（例如只有 DoT），则保留你配置中写的 DNS。
+
+### 限制
+
+最多 20 个配置，读取后每个最多 32 KiB（粘贴文本最多 128 KiB）。更改在点击**保存**后生效，**放弃更改**会撤销。人们在下次获取订阅时（一分钟内）得到更改。
+
+格式依据两个应用的文档（Happ：dev-docs/routing；INCY：docs.incy.cc 的 Routing 和 Subscription format）。面板没有在应用本身上运行过：INCY 是否接受 `happ://` 链接，以及两者具体如何读取 base64 正文中的路由行，没有在设备上验证过。
+
 ## 订阅无法使用时
 
 用户已停用、有效期已结束或超出配额时，应用不会收到空列表。它们会收到一条永远无法连接的记录，名称和公告都会替换为面板默认语言中的对应原因：
@@ -483,4 +525,4 @@ SFA 和 SFI 不发送设备 ID，因此在**严格**模式下，它们收到的�
 
 ## 谁可以执行哪些操作
 
-所有管理员都可以查看这些设置（包括 Mihomo 模板）、测试 User-Agent 并预览模板。所有者和协作者可以更改设置，但 Mihomo 模板只有所有者可以更改。DNS 标签页详见[DNS](dns.md)。
+所有管理员都可以查看这些设置（包括 Mihomo 模板）、测试 User-Agent 并预览模板。所有者和协作者可以更改设置，但 Mihomo 模板只有所有者可以更改。路由配置与响应头一样，所有者和协作者都可以更改。DNS 标签页详见[DNS](dns.md)。

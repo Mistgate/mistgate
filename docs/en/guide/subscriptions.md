@@ -208,10 +208,10 @@ Every answer to an app carries, besides the servers, the headers subscription ap
 | `Announce` | The announcement, or the reason the subscription does not work. |
 | `Support-Url` | The support link. |
 | `Probe-Report` | `1` while the panel takes the reports of the kl!ck server check (**Reachability → Sources**, see [kl!ck reports](../operations/reachability.md#klck-reports)). Without it kl!ck sends nothing. |
-| `Routing` | The link list for Happ only: the person's DNS preset as a Happ routing profile. See [DNS](dns.md). The other formats carry their DNS inside, so they send no `Routing`. |
+| `Routing` | The link list for Happ and INCY only: your own [routing profile](#routing-for-happ-and-incy) for the person's group, with the DNS of the person's preset put in; without one, the person's DNS preset as a routing profile (Happ: `happ://`, INCY: `incy://`). A profile whose link is over 3000 bytes goes as a line of the body after the servers instead. See [DNS](dns.md). The other formats carry their DNS inside, so they send no `Routing`. |
 | `Ping-Type`, `Ping-Result`, `Subscription-Ping-Onopen-Enabled` | Happ only, and only when **Ping in Happ** is not **App default**: how Happ pings the servers, the delay in ms, and whether it pings when it opens. See [Names & texts](#names-texts). |
 
-Headers of your own go after these: see [Response headers](#response-headers). The Mihomo YAML, Xray JSON and sing-box JSON carry the same headers except `Routing`. The Mihomo YAML has a `select` group and, when enabled, an `Auto` group over the servers, plus a `dns:` section; Xray JSON has one config per server; sing-box JSON has one selector and, when enabled, an `Auto` URL test. Each takes the person's DNS preset in its own form.
+Headers of your own go after these: see [Response headers](#response-headers); the **What an app gets** preview on that tab shows the `routing` header too. The Mihomo YAML, Xray JSON and sing-box JSON carry the same headers except `Routing`. The Mihomo YAML has a `select` group and, when enabled, an `Auto` group over the servers, plus a `dns:` section; Xray JSON has one config per server; sing-box JSON has one selector and, when enabled, an `Auto` URL test. Each takes the person's DNS preset in its own form.
 
 ## Extra servers: over IPv6 and through a relay
 
@@ -391,6 +391,48 @@ The panel has no markers that cut one file by group. Make a template for each gr
 
 A panel rolled back to a version without templates drops them from the settings at its next save of these settings: keep the texts elsewhere before you roll back.
 
+## Routing for Happ and INCY
+
+Happ and INCY have their own routing: what goes out directly, what goes through the VPN and what is blocked. The **Routing** tab gives them a profile of yours, for the groups you choose. Without one they get what they got before: the DNS of the person's preset as a profile (Happ since the DNS presets came, INCY too, with its own `incy://` scheme: the two apps read the same fields).
+
+### Getting the profile in
+
+Make the profile where you already have it: in 3x-ui (the routing rules of a subscription), in Happ or in INCY. They give you a link like `happ://routing/onadd/eyJ…` or `incy://routing/onadd/eyJ…`. Paste it into **Link, base64 or JSON** of a new profile. These work as well:
+
+- the link of any scheme (`sbx://routing/add/…`) or none (`://routing/onadd/…`), the way INCY's header has it;
+- the bare base64 of the JSON, with or without the padding;
+- the JSON itself: an object with `Name`, `GlobalProxy`, `DirectSites`, `DirectIp`, `ProxySites`, `ProxyIp`, `BlockSites`, `BlockIp`, `DnsHosts`, `Geoipurl`, `Geositeurl`, `DomainStrategy`, `FakeDNS`, `LastUpdated`, the DNS fields `RemoteDNSType`, `RemoteDNSDomain`, `RemoteDNSIP`, `DomesticDNSType`, `DomesticDNSDomain`, `DomesticDNSIP` (and the older `RemoteDns`, `DomesticDns`) and `useChunkFiles`.
+
+A link `…/routing/off` (it only turns routing off) and an auto-updating `…/autorouting/…` (it holds the address of a profile, not a profile) are refused with the reason.
+
+The panel reads the text at once and shows what it found in words, beside the list: the name the app will show, how many sites and addresses go direct, through the VPN and to the block list, what the rest does (`GlobalProxy`), the geo files and where they come from, how the profile reaches the app, and the fields it left out. A text it cannot read is refused with the reason (not a JSON object, a field of the wrong type, no routing field at all, a geo file or DoH address that is not `https`, a profile over 32 KiB) and cannot be saved.
+
+### What the panel keeps
+
+The panel does not pass your text on. A save reads it into the fields the two apps document, checks their types and stores the JSON it writes out of them; the answer to the app carries only that. A field of the pasted text that is not among them (an app may add one tomorrow) is **left out**, and the tab names it. The header is a fixed prefix and base64, whatever the text says. Addresses of geo files and of DoH are taken only as `https://`, without a login. The panel never opens them: the apps of your people do, so use hosts you trust.
+
+The name of the profile is its `Name` (a profile without one is called `Routing`). Names are unique without regard to case: an app that gets a profile of a name it has already updates it, it does not add another. Put a new `LastUpdated` (Unix time) into the profile when you change it: both apps take an update only when it is higher than the one they have.
+
+### Who gets it
+
+Each profile is for **All groups** or for chosen **Groups**, and has a mode: **Adds it and turns it on** (`onadd`) or **Only adds it** (`add`: the app turns it on once the geo files are downloaded, or the person does). A pasted link sets the mode it says. A person gets the profile of their **main group**; the extra groups they are in do not count. A person whose main group no profile names gets the profile for all groups, and without one, the DNS profile as before. A group is in one profile only, and one profile is for all groups: the tab and the save refuse anything else.
+
+### Where it goes
+
+Only the link list of a person whose subscription is on, and only to **Happ** and **INCY** (INCY is told by `INCY/<version>/<platform>` in the User-Agent). Each gets the link in its own scheme. A device that the [device limit](#device-limit-for-apps-on-the-link) turns away gets none of your rules (it keeps what it got before). The other formats and apps (Mihomo YAML, Xray JSON, sing-box JSON, any other app) are not changed.
+
+A link of at most 3000 bytes goes in the `routing` header. A proxy in front of the panel buffers the headers of an answer in 4 or 8 KiB; the panel's own take about 1 KiB and your own response headers up to 4096 bytes, so 3 KiB is what is left. A longer profile goes as one line of the subscription after the servers, where both apps read a routing link (their documentation shows it there); the tab says which of the two a profile takes.
+
+### The DNS of the person
+
+The DNS of a profile is not yours to fix: the DNS fields of the profile (`RemoteDNS*`, `DomesticDNS*`, the older aliases) are replaced by those of the person's DNS preset, and its host pins are added to `DnsHosts`. Your rules (`DirectSites`, `ProxySites`, `BlockSites` and the address lists), the geo files and the rest stay as you wrote them. The preset's own split and ad list are **not** added to a profile of yours: with your profile the rules are yours alone. A preset with no server the apps can take (DoT only, say) leaves the DNS written in your profile as it is.
+
+### Limits
+
+Up to 20 profiles, 32 KiB each once read (128 KiB of pasted text). Changes wait for **Save**; **Discard** drops them. They reach people with their next fetch, within a minute.
+
+The format follows the documentation of the two apps (Happ: dev-docs/routing; INCY: docs.incy.cc, Routing and Subscription format). The panel has not been run against the apps themselves: whether INCY takes a `happ://` link, and exactly how each reads a routing line in a base64 body, was not checked on a device.
+
 ## When a subscription does not work
 
 When a person is disabled, past their term or over their quota, the apps do not get an empty list. They get one entry, named after the reason, that never connects, and the announcement is replaced by the same reason, in the panel's default language:
@@ -489,4 +531,4 @@ Rules are saved as soon as you add, move or remove one. On **Names & texts**, **
 
 ## Who can do what
 
-Every admin can read these settings, including the Mihomo templates, and try a User-Agent or a template preview. The owner and helpers change them, except the Mihomo templates, which only the owner changes. The DNS tab is described in [DNS](dns.md).
+Every admin can read these settings, including the Mihomo templates, and try a User-Agent or a template preview. The owner and helpers change them, except the Mihomo templates, which only the owner changes. The routing profiles are changed by the owner and helpers like the response headers. The DNS tab is described in [DNS](dns.md).
