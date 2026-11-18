@@ -1741,6 +1741,72 @@ func (x *NodeSharing) GetGroupIds() []string {
 	return nil
 }
 
+// A QR code the panel draws itself: the server encodes (internal/qr) and says which modules are dark, the page makes the
+// shapes. The same data as the person's page gets (subs page_qr), so both draw the one code with the logo in the middle.
+type QrCode struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Modules a side, 4*version+17.
+	N uint32 `protobuf:"varint,1,opt,name=n,proto3" json:"n,omitempty"`
+	// n*n modules row by row, eight to a byte, the first in the high bit, 1 = dark; the last byte is padded with zeros.
+	Bits []byte `protobuf:"bytes,2,opt,name=bits,proto3" json:"bits,omitempty"`
+	// Side, in modules, of the clear square in the middle for the logo; 0: no logo (the code is too small to spare the error
+	// correction). A multiple of 0.5.
+	Window        float64 `protobuf:"fixed64,3,opt,name=window,proto3" json:"window,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QrCode) Reset() {
+	*x = QrCode{}
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QrCode) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QrCode) ProtoMessage() {}
+
+func (x *QrCode) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_common_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QrCode.ProtoReflect.Descriptor instead.
+func (*QrCode) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_common_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *QrCode) GetN() uint32 {
+	if x != nil {
+		return x.N
+	}
+	return 0
+}
+
+func (x *QrCode) GetBits() []byte {
+	if x != nil {
+		return x.Bits
+	}
+	return nil
+}
+
+func (x *QrCode) GetWindow() float64 {
+	if x != nil {
+		return x.Window
+	}
+	return 0
+}
+
 var File_mistgate_admin_v1_common_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_common_proto_rawDesc = "" +
@@ -1885,7 +1951,11 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x0elast_hour_unix\x18\t \x01(\x03B\x020\x02R\flastHourUnix\"`\n" +
 	"\vNodeSharing\x124\n" +
 	"\x04mode\x18\x01 \x01(\x0e2 .mistgate.admin.v1.NodeShareModeR\x04mode\x12\x1b\n" +
-	"\tgroup_ids\x18\x02 \x03(\tR\bgroupIds*\xd5\x01\n" +
+	"\tgroup_ids\x18\x02 \x03(\tR\bgroupIds\"B\n" +
+	"\x06QrCode\x12\f\n" +
+	"\x01n\x18\x01 \x01(\rR\x01n\x12\x12\n" +
+	"\x04bits\x18\x02 \x01(\fR\x04bits\x12\x16\n" +
+	"\x06window\x18\x03 \x01(\x01R\x06window*\xd5\x01\n" +
 	"\n" +
 	"NodeStatus\x12\x1b\n" +
 	"\x17NODE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
@@ -1942,7 +2012,7 @@ func file_mistgate_admin_v1_common_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_admin_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_mistgate_admin_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(NodeStatus)(0),          // 0: mistgate.admin.v1.NodeStatus
 	(App)(0),                 // 1: mistgate.admin.v1.App
@@ -1960,10 +2030,11 @@ var file_mistgate_admin_v1_common_proto_goTypes = []any{
 	(*LinkHour)(nil),         // 13: mistgate.admin.v1.LinkHour
 	(*HelloKexDevice)(nil),   // 14: mistgate.admin.v1.HelloKexDevice
 	(*NodeSharing)(nil),      // 15: mistgate.admin.v1.NodeSharing
-	nil,                      // 16: mistgate.admin.v1.StatusReason.ParamsEntry
+	(*QrCode)(nil),           // 16: mistgate.admin.v1.QrCode
+	nil,                      // 17: mistgate.admin.v1.StatusReason.ParamsEntry
 }
 var file_mistgate_admin_v1_common_proto_depIdxs = []int32{
-	16, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
+	17, // 0: mistgate.admin.v1.StatusReason.params:type_name -> mistgate.admin.v1.StatusReason.ParamsEntry
 	2,  // 1: mistgate.admin.v1.Inbound.state:type_name -> mistgate.admin.v1.InboundState
 	9,  // 2: mistgate.admin.v1.Inbound.awg:type_name -> mistgate.admin.v1.AwgInboundStatus
 	3,  // 3: mistgate.admin.v1.WarpSummary.state:type_name -> mistgate.admin.v1.WarpState
@@ -1987,7 +2058,7 @@ func file_mistgate_admin_v1_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_common_proto_rawDesc), len(file_mistgate_admin_v1_common_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

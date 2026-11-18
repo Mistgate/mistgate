@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/panel/adminqr"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 )
 
@@ -72,6 +74,9 @@ func TestRecoveryHTTPResetsOnceAndLimitsGenericRefusals(t *testing.T) {
 	if recovered.Code != http.StatusOK || json.Unmarshal(recovered.Body.Bytes(), &details) != nil || details.Login != "alice" || details.Password == "" ||
 		!strings.HasPrefix(details.TOTPURI, "otpauth://totp/") || details.TOTPSecret == "" {
 		t.Fatal("valid recovery token did not return new sign-in details")
+	}
+	if want := adminqr.Encode(details.TOTPURI); details.TOTPQr == nil || details.TOTPQr.N != want.N || !bytes.Equal(details.TOTPQr.Bits, want.Bits) || details.TOTPQr.Window != want.Window {
+		t.Fatalf("recovery brings no code of the new secret: %+v", details.TOTPQr)
 	}
 	used := post(token, "alice")
 	wrong := post(strings.Repeat("b", 43), "alice")

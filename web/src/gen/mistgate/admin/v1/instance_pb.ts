@@ -4,13 +4,15 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { QrCode } from "./common_pb";
+import { file_mistgate_admin_v1_common } from "./common_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file mistgate/admin/v1/instance.proto.
  */
 export const file_mistgate_admin_v1_instance: GenFile = /*@__PURE__*/
-  fileDesc("CiBtaXN0Z2F0ZS9hZG1pbi92MS9pbnN0YW5jZS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEiqgEKCEluc3RhbmNlEhIKCmJyYW5kX2hlYWQYASABKAkSEgoKYnJhbmRfdGFpbBgCIAEoCRIOCgZhY2NlbnQYAyABKAkSEAoIbGFuZ3VhZ2UYBCABKAkSEAoIaGFzX2xvZ28YBSABKAgSFAoMbG9nb192ZXJzaW9uGAYgASgJEhEKCWFkbWluX3VybBgHIAEoCRIZChFzdWJzY3JpcHRpb25fYmFzZRgIIAEoCSIUChJHZXRJbnN0YW5jZVJlcXVlc3QiRAoTR2V0SW5zdGFuY2VSZXNwb25zZRItCghpbnN0YW5jZRgBIAEoCzIbLm1pc3RnYXRlLmFkbWluLnYxLkluc3RhbmNlIs8BChVVcGRhdGVJbnN0YW5jZVJlcXVlc3QSFwoKYnJhbmRfaGVhZBgBIAEoCUgAiAEBEhcKCmJyYW5kX3RhaWwYAiABKAlIAYgBARITCgZhY2NlbnQYAyABKAlIAogBARIVCghsYW5ndWFnZRgEIAEoCUgDiAEBEhUKCGxvZ29fc3ZnGAUgASgJSASIAQFCDQoLX2JyYW5kX2hlYWRCDQoLX2JyYW5kX3RhaWxCCQoHX2FjY2VudEILCglfbGFuZ3VhZ2VCCwoJX2xvZ29fc3ZnIkcKFlVwZGF0ZUluc3RhbmNlUmVzcG9uc2USLQoIaW5zdGFuY2UYASABKAsyGy5taXN0Z2F0ZS5hZG1pbi52MS5JbnN0YW5jZTLWAQoPSW5zdGFuY2VTZXJ2aWNlElwKC0dldEluc3RhbmNlEiUubWlzdGdhdGUuYWRtaW4udjEuR2V0SW5zdGFuY2VSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuR2V0SW5zdGFuY2VSZXNwb25zZRJlCg5VcGRhdGVJbnN0YW5jZRIoLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUluc3RhbmNlUmVxdWVzdBopLm1pc3RnYXRlLmFkbWluLnYxLlVwZGF0ZUluc3RhbmNlUmVzcG9uc2VCyAEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUINSW5zdGFuY2VQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z");
+  fileDesc("CiBtaXN0Z2F0ZS9hZG1pbi92MS9pbnN0YW5jZS5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEiqgEKCEluc3RhbmNlEhIKCmJyYW5kX2hlYWQYASABKAkSEgoKYnJhbmRfdGFpbBgCIAEoCRIOCgZhY2NlbnQYAyABKAkSEAoIbGFuZ3VhZ2UYBCABKAkSEAoIaGFzX2xvZ28YBSABKAgSFAoMbG9nb192ZXJzaW9uGAYgASgJEhEKCWFkbWluX3VybBgHIAEoCRIZChFzdWJzY3JpcHRpb25fYmFzZRgIIAEoCSIUChJHZXRJbnN0YW5jZVJlcXVlc3QiRAoTR2V0SW5zdGFuY2VSZXNwb25zZRItCghpbnN0YW5jZRgBIAEoCzIbLm1pc3RnYXRlLmFkbWluLnYxLkluc3RhbmNlIs8BChVVcGRhdGVJbnN0YW5jZVJlcXVlc3QSFwoKYnJhbmRfaGVhZBgBIAEoCUgAiAEBEhcKCmJyYW5kX3RhaWwYAiABKAlIAYgBARITCgZhY2NlbnQYAyABKAlIAogBARIVCghsYW5ndWFnZRgEIAEoCUgDiAEBEhUKCGxvZ29fc3ZnGAUgASgJSASIAQFCDQoLX2JyYW5kX2hlYWRCDQoLX2JyYW5kX3RhaWxCCQoHX2FjY2VudEILCglfbGFuZ3VhZ2VCCwoJX2xvZ29fc3ZnIkcKFlVwZGF0ZUluc3RhbmNlUmVzcG9uc2USLQoIaW5zdGFuY2UYASABKAsyGy5taXN0Z2F0ZS5hZG1pbi52MS5JbnN0YW5jZSIfCg9FbmNvZGVRclJlcXVlc3QSDAoEdGV4dBgBIAEoCSI5ChBFbmNvZGVRclJlc3BvbnNlEiUKAnFyGAEgASgLMhkubWlzdGdhdGUuYWRtaW4udjEuUXJDb2RlMqsCCg9JbnN0YW5jZVNlcnZpY2USXAoLR2V0SW5zdGFuY2USJS5taXN0Z2F0ZS5hZG1pbi52MS5HZXRJbnN0YW5jZVJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5HZXRJbnN0YW5jZVJlc3BvbnNlEmUKDlVwZGF0ZUluc3RhbmNlEigubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlSW5zdGFuY2VSZXF1ZXN0GikubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlSW5zdGFuY2VSZXNwb25zZRJTCghFbmNvZGVRchIiLm1pc3RnYXRlLmFkbWluLnYxLkVuY29kZVFyUmVxdWVzdBojLm1pc3RnYXRlLmFkbWluLnYxLkVuY29kZVFyUmVzcG9uc2VCyAEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUINSW5zdGFuY2VQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common]);
 
 /**
  * @generated from message mistgate.admin.v1.Instance
@@ -173,6 +175,44 @@ export const UpdateInstanceResponseSchema: GenMessage<UpdateInstanceResponse> = 
   messageDesc(file_mistgate_admin_v1_instance, 4);
 
 /**
+ * @generated from message mistgate.admin.v1.EncodeQrRequest
+ */
+export type EncodeQrRequest = Message<"mistgate.admin.v1.EncodeQrRequest"> & {
+  /**
+   * 1 to 4096 bytes (INVALID_ARGUMENT otherwise). A QR code holds at most 1663 bytes at the level the panel uses.
+   *
+   * @generated from field: string text = 1;
+   */
+  text: string;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.EncodeQrRequest.
+ * Use `create(EncodeQrRequestSchema)` to create a new message.
+ */
+export const EncodeQrRequestSchema: GenMessage<EncodeQrRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_instance, 5);
+
+/**
+ * @generated from message mistgate.admin.v1.EncodeQrResponse
+ */
+export type EncodeQrResponse = Message<"mistgate.admin.v1.EncodeQrResponse"> & {
+  /**
+   * Absent when the text is too long for any QR code: the caller offers the file or the text instead.
+   *
+   * @generated from field: mistgate.admin.v1.QrCode qr = 1;
+   */
+  qr?: QrCode | undefined;
+};
+
+/**
+ * Describes the message mistgate.admin.v1.EncodeQrResponse.
+ * Use `create(EncodeQrResponseSchema)` to create a new message.
+ */
+export const EncodeQrResponseSchema: GenMessage<EncodeQrResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_admin_v1_instance, 6);
+
+/**
  * InstanceService is the brand and look of this installation, shown on the admin sign-in
  * page, in the admin UI and (later) on the subscription page.
  *
@@ -201,6 +241,17 @@ export const InstanceService: GenService<{
     methodKind: "unary";
     input: typeof UpdateInstanceRequestSchema;
     output: typeof UpdateInstanceResponseSchema;
+  },
+  /**
+   * Any signed-in admin, closed to API tokens: encodes a text (a subscription link, a device config, a proxy link) as a QR
+   * code for the panel to draw. The text is never stored, logged or audited; it is a credential.
+   *
+   * @generated from rpc mistgate.admin.v1.InstanceService.EncodeQr
+   */
+  encodeQr: {
+    methodKind: "unary";
+    input: typeof EncodeQrRequestSchema;
+    output: typeof EncodeQrResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_admin_v1_instance, 0);

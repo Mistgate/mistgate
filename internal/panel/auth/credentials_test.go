@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/adminqr"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -194,6 +196,10 @@ func TestRebindAuthenticator(t *testing.T) {
 	b, err := beginTOTP(s, cookie, "", "")
 	if err != nil || !strings.HasPrefix(b.Msg.TotpUri, "otpauth://totp/") || !strings.Contains(b.Msg.TotpUri, "ada") {
 		t.Fatalf("begin: %+v %v", b, err)
+	}
+	// the screen has no encoder: the code of the new secret comes with it, and is the code of its otpauth URI
+	if want := adminqr.Encode(b.Msg.TotpUri); b.Msg.TotpQr == nil || !proto.Equal(b.Msg.TotpQr, want) {
+		t.Fatalf("TotpQr = %v, want the code of %q", b.Msg.TotpQr, b.Msg.TotpUri)
 	}
 	newSecret := secretOf(t, b.Msg.TotpSecret)
 	if bytes.Equal(newSecret, oldSecret) {

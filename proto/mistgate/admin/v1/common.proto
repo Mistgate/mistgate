@@ -309,3 +309,15 @@ message NodeSharing {
   NodeShareMode mode = 1;
   repeated string group_ids = 2;
 }
+
+// A QR code the panel draws itself: the server encodes (internal/qr) and says which modules are dark, the page makes the
+// shapes. The same data as the person's page gets (subs page_qr), so both draw the one code with the logo in the middle.
+message QrCode {
+  // Modules a side, 4*version+17.
+  uint32 n = 1;
+  // n*n modules row by row, eight to a byte, the first in the high bit, 1 = dark; the last byte is padded with zeros.
+  bytes bits = 2;
+  // Side, in modules, of the clear square in the middle for the logo; 0: no logo (the code is too small to spare the error
+  // correction). A multiple of 0.5.
+  double window = 3;
+}

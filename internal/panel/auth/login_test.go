@@ -53,6 +53,9 @@ func TestSetupWrongTOTPUpdatesExistingCeremony(t *testing.T) {
 	if err := st.R.QueryRowContext(ctx, `SELECT tries, totp_enc FROM auth_ceremony WHERE id = ?`, begin.Msg.CeremonyId).Scan(&tries, &sealed); err != nil || tries != 1 {
 		t.Fatalf("ceremony after typo = tries %d, err %v; want same live ceremony at try 1", tries, err)
 	}
+	if begin.Msg.TotpQr == nil || begin.Msg.TotpQr.N < 21 {
+		t.Fatalf("setup with a password brings no QR code of the secret: %v", begin.Msg.TotpQr)
+	}
 	opened, err := s.vault.Open(sealed, AuthCeremonyTOTPRecordID(begin.Msg.CeremonyId))
 	if err != nil || string(opened) != string(secret) || begin.Msg.TotpUri == "" {
 		t.Fatalf("ceremony QR secret changed after typo: err %v", err)

@@ -18,6 +18,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/buildinfo"
+	"github.com/mistgate/mistgate/internal/panel/adminqr"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
@@ -218,8 +219,9 @@ func (s *Service) beginSetupPassword(ctx context.Context, m *adminv1.BeginSetupR
 	if err != nil {
 		return nil, ceremonyPutError(err)
 	}
+	uri := totpURI(s.brandName(ctx), login, secret)
 	return connect.NewResponse(&adminv1.BeginSetupResponse{
-		CeremonyId: id, TotpUri: totpURI(s.brandName(ctx), login, secret), TotpSecret: b32.EncodeToString(secret),
+		CeremonyId: id, TotpUri: uri, TotpSecret: b32.EncodeToString(secret), TotpQr: adminqr.Encode(uri),
 	}), nil
 }
 

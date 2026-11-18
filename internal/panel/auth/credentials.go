@@ -15,6 +15,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/adminqr"
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
@@ -191,8 +192,9 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, ceremonyPutError(err)
 	}
+	uri := totpURI(s.brandName(ctx), c.login, c.totp)
 	return connect.NewResponse(&adminv1.BeginTotpEnrollmentResponse{
-		CeremonyId: id, TotpUri: totpURI(s.brandName(ctx), c.login, c.totp), TotpSecret: b32.EncodeToString(c.totp),
+		CeremonyId: id, TotpUri: uri, TotpSecret: b32.EncodeToString(c.totp), TotpQr: adminqr.Encode(uri),
 	}), nil
 }
 
