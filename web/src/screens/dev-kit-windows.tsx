@@ -27,7 +27,7 @@ const Palette = lazy(() => import("@/components/palette"));
 // in each of their states, as the board (PnLogin, PnConfirm, PnSearch, PnAddNode) has them, and the ones the board does not
 // draw (the password form with a wrong code, a refused install, a node that needs nftables, a command that is issued again).
 // Each scene is a frame of its own width (an iframe, so the window's breakpoints answer to the frame) and a page of its own:
-//   /dev-kit?only=windows-page&scene=<id>            fx=1 turns the reveal animation on (the halo and the wave), fx=0 off
+//   /dev-kit?only=windows-page&scene=<id>            fx=1 turns the reveal animation on (the halo and the wave), without it the scene is still
 // the ids are listed under each frame. The frames follow the theme and the language chosen at the top (they reload with them).
 // The app's own dev cases of the sign-in (?case=nopasskey|badtotp|locked) work on the real page, /login?case=...
 // Made-up data: the nodes de1, fi1, nl1 and msk1, the people alice and dave, the addresses of the documentation ranges.
@@ -287,8 +287,7 @@ export function WindowsPage() {
   const params = new URLSearchParams(location.search);
   const scene = scenes.find((s) => s.id === params.get("scene")) ?? scenes[0]!;
   const [qc] = useState(() => {
-    if (params.get("fx") === "1") setEffectsEnabled(true);
-    else if (params.get("fx") === "0") setEffectsEnabled(false);
+    setEffectsEnabled(params.get("fx") === "1", false);
     return seeded(scene.seed);
   });
   return (

@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { CheckStatus, CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { setLang } from "@/i18n";
 import { NodeChecks } from "@/screens/node/checks";
+import { setEffectsEnabled } from "@/lib/effects";
 import { ChecksTab } from "./checks";
 
 const getChecks = vi.fn();
@@ -29,6 +30,9 @@ vi.mock("@tanstack/react-router", () => ({
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
+
+// these read what the screen says: the numbers must not be mid-shuffle (the motion has its own tests)
+beforeEach(() => setEffectsEnabled(false));
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;

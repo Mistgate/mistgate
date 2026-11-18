@@ -105,7 +105,7 @@ export function ShellPage() {
   const state = (params.get("state") ?? "full") as State;
   const [qc] = useState(() => {
     applyScene(params);
-    if (params.get("fx") === "1") setEffectsEnabled(true);
+    setEffectsEnabled(params.get("fx") === "1", false);
     return seeded();
   });
   return (

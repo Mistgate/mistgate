@@ -154,7 +154,7 @@ export function GroupScenePage() {
     if (isLang(lang)) setLang(lang);
     const theme = params.get("theme");
     if (theme === "light" || theme === "dark") setTheme(theme);
-    if (params.get("fx") === "1") setEffectsEnabled(true);
+    setEffectsEnabled(params.get("fx") === "1", false);
     const role = params.get("role");
     return seeded(state, role === "helper" ? Role.HELPER : role === "readonly" ? Role.READONLY : Role.OWNER);
   });

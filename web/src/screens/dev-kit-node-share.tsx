@@ -167,7 +167,7 @@ export function NodeSharePage() {
   const win = state.startsWith("win-");
   const [scene] = useState(() => {
     applyScene(params);
-    if (params.get("fx") === "1") setEffectsEnabled(true);
+    setEffectsEnabled(params.get("fx") === "1", false);
     return win ? { qc: seededWindow(state), data: undefined } : seededCard(state);
   });
   return (

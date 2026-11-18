@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { setLang } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
 import { nodePageData, type NState } from "../dev-kit-node-page";
 import { ProfilesTab } from "./profiles";
 
@@ -23,6 +24,9 @@ beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
 beforeEach(() => setLang("en"));
+
+// these read what the screen says: the numbers must not be mid-shuffle (the motion has its own tests)
+beforeEach(() => setEffectsEnabled(false));
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;

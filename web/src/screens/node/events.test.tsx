@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventSeverity } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { memoryRouter } from "@/test/router";
+import { setEffectsEnabled } from "@/lib/effects";
 import { EventsTab } from "./events";
 
 const listEvents = vi.fn();
@@ -12,6 +13,9 @@ vi.mock("@/lib/api", () => ({ fleet: { listEvents: (...a: unknown[]) => listEven
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
+
+// these read what the screen says: the numbers must not be mid-shuffle (the motion has its own tests)
+beforeEach(() => setEffectsEnabled(false));
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;

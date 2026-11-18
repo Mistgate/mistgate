@@ -6,6 +6,7 @@ import { AddNodeProvider } from "@/components/add-node";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { setLang } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
 import { frames, SceneBody, seeded } from "./dev-kit-health";
 
 // The scenes of /dev-kit?only=pn-health: every state a scene names must draw, in every language, and say what it is made to say.
@@ -40,6 +41,7 @@ afterEach(() => {
 const states = [...new Set(frames.map((f) => f.state))];
 
 async function draw(state: string, role = Role.OWNER) {
+  setEffectsEnabled(false, false); // a scene is still unless its address says fx=1 (the pages read it; the tests draw the body)
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);

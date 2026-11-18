@@ -339,7 +339,7 @@ export function NodesPage() {
   const state = params.get("state") ?? "list";
   const [qc] = useState(() => {
     applyScene(params);
-    if (params.get("fx") === "1") setEffectsEnabled(true);
+    setEffectsEnabled(params.get("fx") === "1", false);
     return seeded(state, roleOfScene(state, params.get("role")), edgeOfScene(state));
   });
   const job = state.startsWith("job-");

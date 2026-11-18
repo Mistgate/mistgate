@@ -6,6 +6,7 @@ import { StepUpProvider } from "@/components/step-up";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { setLang, type Lang } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
 import { frames, parse, seeded, Window } from "./dev-kit-assistant";
 
 // The scenes of /dev-kit?only=pn-assistant draw the real window on made-up data: every state a scene names must draw, in every language, and leave
@@ -41,7 +42,9 @@ afterEach(() => {
 
 const say = (lang: string) => (en: string, ru: string) => (lang === "ru" ? ru : en);
 
-async function draw(state: string, role = Role.OWNER, lang = "en") {
+/** `fx` is the scene's `&fx=1`: its page turns the reveal animation on or off by the address, a scene is still unless it says so. */
+async function draw(state: string, role = Role.OWNER, lang = "en", fx = false) {
+  setEffectsEnabled(fx, false);
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -272,6 +275,11 @@ describe("what a scene shows", () => {
     expect($(".as-wv")).toBeNull();
     expect($(".as-eg")).toBeNull();
     expect($("section.as")?.hasAttribute("data-fx")).toBe(false);
+    await clear();
+    await draw("empty", Role.OWNER, "en", true);
+    expect($(".as-wv i")).not.toBeNull();
+    expect(all(".as-eg")).toHaveLength(2);
+    expect($("section.as")?.getAttribute("data-fx")).toBe("1");
   });
 
   it("the thread's own states: six calls with one failed, a long answer, follow-ups, cards, an inline approval", async () => {

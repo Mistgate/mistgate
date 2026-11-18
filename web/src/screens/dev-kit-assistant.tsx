@@ -315,7 +315,7 @@ export function AssistantScenePage() {
     if (isLang(lang)) setLang(lang);
     const theme = params.get("theme");
     if (theme === "light" || theme === "dark") setTheme(theme);
-    if (params.get("fx") === "1") setEffectsEnabled(true);
+    setEffectsEnabled(params.get("fx") === "1", false);
     const say: Say = (en, ru) => (lang === "ru" ? ru : en);
     return seeded(state, roleOf(params.get("role")), say, params.get("behind") ?? "overview");
   });

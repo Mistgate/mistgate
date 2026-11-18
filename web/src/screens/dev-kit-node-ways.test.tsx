@@ -46,7 +46,9 @@ function Tab({ data }: { data: never }) {
   return <WaysTab data={data} ways={w} />;
 }
 
-async function draw(q: string, state: string) {
+/** `fx` is the scene's `&fx=1`: a scene is still unless its address says so. */
+async function draw(q: string, state: string, fx = false) {
+  setEffectsEnabled(fx, false);
   const p = new URLSearchParams(q);
   search.current = { tab: "ways", ...Object.fromEntries(p) };
   const { qc, data } = nodePageData(state as never);
@@ -198,24 +200,14 @@ describe("the scenes of the wizard Make reachable and of the strip over the ways
   });
 
   it("the wave and the glints at the edge come with the end of a run, with the effects on", async () => {
-    setEffectsEnabled(true);
-    try {
-      await draw(frame("wz-4-done").q, "calm");
-      expect(dlg().querySelector(".wy-wv i")).not.toBeNull();
-      expect(dlg().querySelectorAll(".wy-eg")).toHaveLength(2);
-    } finally {
-      setEffectsEnabled(false);
-    }
+    await draw(frame("wz-4-done").q, "calm", true);
+    expect(dlg().querySelector(".wy-wv i")).not.toBeNull();
+    expect(dlg().querySelectorAll(".wy-eg")).toHaveLength(2);
   });
 
   it("a run that came out only in part has no wave, whatever the effects", async () => {
-    setEffectsEnabled(true);
-    try {
-      await draw(frame("wz-4-part").q, "calm");
-      expect(dlg().querySelector(".wy-wv")).toBeNull();
-    } finally {
-      setEffectsEnabled(false);
-    }
+    await draw(frame("wz-4-part").q, "calm", true);
+    expect(dlg().querySelector(".wy-wv")).toBeNull();
   });
 
   it("the strip says what a run left and offers to finish it", async () => {

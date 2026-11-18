@@ -33,7 +33,7 @@ export function applyScene(params: URLSearchParams) {
   if (isLang(lang)) setLang(lang);
   const theme = params.get("theme");
   if (theme === "light" || theme === "dark") setTheme(theme);
-  if (params.get("fx") === "1") setEffectsEnabled(true);
+  setEffectsEnabled(params.get("fx") === "1", false);
   restore(was);
   // what a click inside the scene writes (the folded menu, a switch) goes when the page does
   if (typeof window !== "undefined") window.addEventListener("pagehide", () => restore(was), { once: true });

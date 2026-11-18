@@ -7,7 +7,6 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 });
 afterEach(() => {
-  setEffectsEnabled(false);
   document.querySelectorAll(".mg-wave-css, canvas.mg-wave").forEach((e) => e.remove());
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -17,6 +16,7 @@ const rings = () => document.querySelectorAll<HTMLElement>(".mg-wave-css");
 
 describe("the wave", () => {
   it("plays nothing while the effects are off", () => {
+    setEffectsEnabled(false);
     playWave({ x: 10, y: 20 }, { light: false });
     expect(rings()).toHaveLength(0);
     expect(document.querySelector("canvas.mg-wave")).toBeNull();

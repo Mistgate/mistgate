@@ -7,6 +7,7 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { UserFilter, UserSort, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { setLang } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
 import { groupTone } from "./format";
 import { UsersScreen } from "./list";
 
@@ -83,6 +84,9 @@ const person = (over: Record<string, unknown>) => ({
   accessAmnezia: false,
   ...over,
 });
+
+// these read what the screen says: the numbers must not be mid-shuffle (the motion has its own tests)
+beforeEach(() => setEffectsEnabled(false));
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;

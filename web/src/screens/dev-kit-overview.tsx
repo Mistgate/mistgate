@@ -270,7 +270,7 @@ export function OverviewPage() {
   const state = (params.get("state") ?? "calm") as State;
   const [qc] = useState(() => {
     applyScene(params);
-    if (params.get("fx") === "1") setEffectsEnabled(true);
+    setEffectsEnabled(params.get("fx") === "1", false);
     return seeded(state);
   });
   return (

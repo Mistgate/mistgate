@@ -6,6 +6,7 @@ import { AddNodeProvider } from "@/components/add-node";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { setLang } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
 import { demoOf, editOf, frames, SceneEdit, seeded } from "./dev-kit-users-page";
 import { UsersScreen } from "./users/list";
 
@@ -42,6 +43,7 @@ const states = [...new Set(frames.map((f) => f.state))].filter((s) => !s.startsW
 const groupsTab = (s: string) => s.startsWith("groups") || s === "group-new" || s in editOf;
 
 async function draw(state: string, role = Role.OWNER) {
+  setEffectsEnabled(false, false); // a scene is still unless its address says fx=1 (the pages read it; the tests draw the body)
   search = state === "sorted" ? { sort: "traffic", desc: 1 } : {};
   host = document.createElement("div");
   document.body.append(host);

@@ -47,7 +47,7 @@ export default defineConfig({
   // The panel CSP allows fonts from 'self' only (no data: URIs), so never inline the woff2 files.
   build: { assetsInlineLimit: 0 },
   resolve: { tsconfigPaths: true },
-  test: { environment: "jsdom" },
+  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"] },
   server: {
     port: 5173,
     // /brand/logo.svg is served by the panel next to the API (the sign-in page shows the custom logo)

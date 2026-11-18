@@ -12,7 +12,6 @@ beforeAll(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
-  setEffectsEnabled(false);
 });
 
 const frames = (ms: number) => {
@@ -67,6 +66,7 @@ describe("the Scramble element", () => {
   };
 
   it("is the plain text, labelled with the value, while the effects are off", () => {
+    setEffectsEnabled(false);
     mount("42");
     const el = host!.firstElementChild!;
     expect(el.textContent).toBe("42");

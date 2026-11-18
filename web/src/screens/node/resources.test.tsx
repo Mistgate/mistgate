@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { NodeMetrics } from "@/gen/mistgate/admin/v1/node_pb";
 import { setLang } from "@/i18n";
 import type { Plain } from "@/lib/plain";
+import { setEffectsEnabled } from "@/lib/effects";
 import { LoadHistory } from "./load-history";
 import { ResourcesCard } from "./resources";
 
@@ -21,6 +22,9 @@ vi.mock("@tanstack/react-router", () => ({
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
+
+// these read what the screen says: the numbers must not be mid-shuffle (the motion has its own tests)
+beforeEach(() => setEffectsEnabled(false));
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;

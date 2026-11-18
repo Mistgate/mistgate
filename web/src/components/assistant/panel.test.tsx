@@ -67,7 +67,6 @@ afterEach(() => {
   root = host = null;
   for (const m of [deleteConversation, deleteAllConversations, getConversation]) m.mockClear();
   setLang("en");
-  setEffectsEnabled(false);
   localStorage.clear();
   owner = true;
   access = {};
@@ -291,8 +290,13 @@ describe("the picker and the slider by keyboard", () => {
 });
 
 describe("the reveal animation", () => {
-  it("brings the wave and the glints at the edge only when it is on, and not with reduced motion", async () => {
+  it("brings the wave and the glints at the edge by default, and not when it is off or with reduced motion", async () => {
     access = on;
+    await mount(<Window />);
+    expect($(".as-wv i")).not.toBeNull();
+    expect(all(".as-eg")).toHaveLength(2);
+    unmount();
+    act(() => setEffectsEnabled(false));
     await mount(<Window />);
     expect($(".as-wv")).toBeNull();
     expect($(".as-eg")).toBeNull();

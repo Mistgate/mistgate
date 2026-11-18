@@ -6,6 +6,7 @@ import { AddNodeProvider } from "@/components/add-node";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { setLang } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
 import { en as E } from "@/i18n/profilesrv";
 import { pageDataOf, partsOf, sceneOf, seeded } from "./dev-kit-profile";
 import { tabFrames, tabsData } from "./dev-kit-profile-tabs";
@@ -44,6 +45,7 @@ afterEach(() => {
 const states = [...new Set(tabFrames.map((f) => f.state))];
 
 async function draw(state: string, role = Role.OWNER, wait = 12) {
+  setEffectsEnabled(false, false); // a scene is still unless its address says fx=1 (the pages read it; the tests draw the body)
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);

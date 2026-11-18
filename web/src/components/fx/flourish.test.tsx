@@ -18,7 +18,6 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
-  setEffectsEnabled(false);
 });
 const draw = (node: React.ReactNode) => act(async () => root!.render(node));
 

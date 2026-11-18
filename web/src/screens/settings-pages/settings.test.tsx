@@ -607,8 +607,12 @@ describe("Settings → Interface", () => {
     expect(updateInstance.mock.calls[0]?.[0]).toMatchObject({ logoSvg: svg });
   });
 
-  it("puts the moments of the reveal animation under its switch once it is on, and draws none on the Cloudflare edition", async () => {
+  it("puts the moments of the reveal animation under its switch while it is on (the default), and draws none on the Cloudflare edition", async () => {
     await mount(<InterfacePage />);
+    expect(document.querySelector(`[role=switch][aria-label="${en["settings.fx"]}"]`)?.getAttribute("aria-checked")).toBe("true");
+    for (const k of ["settings.fx.create", "settings.fx.save", "settings.fx.pages"] as const) expect(text()).toContain(en[k]);
+    await click(document.querySelector<HTMLElement>(`[role=switch][aria-label="${en["settings.fx"]}"]`));
+    expect(readPref("fx")).toBe("off");
     expect(text()).not.toContain(en["settings.fx.create"]);
     await click(document.querySelector<HTMLElement>(`[role=switch][aria-label="${en["settings.fx"]}"]`));
     for (const k of ["settings.fx.create", "settings.fx.save", "settings.fx.pages"] as const) expect(text()).toContain(en[k]);

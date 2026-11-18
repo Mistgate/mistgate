@@ -102,7 +102,7 @@ export function FxKit() {
         <div className="flex-1" />
         <label className="flex items-center gap-2 text-xs font-bold text-muted">
           Interface effects
-          <Switch checked={enabled} onCheckedChange={setEffectsEnabled} aria-label="Interface effects" />
+          <Switch checked={enabled} onCheckedChange={(on) => setEffectsEnabled(on)} aria-label="Interface effects" />
         </label>
         <ThemeToggle />
       </div>

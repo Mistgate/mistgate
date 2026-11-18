@@ -456,7 +456,7 @@ export function NodePageFrame() {
   const state = (params.get("state") ?? "calm") as NState;
   const [scene] = useState(() => {
     applyScene(params);
-    if (params.get("fx") === "1") setEffectsEnabled(true);
+    setEffectsEnabled(params.get("fx") === "1", false);
     const os = params.get("os");
     const dbg = params.get("dbg");
     const wp = params.get("wp");

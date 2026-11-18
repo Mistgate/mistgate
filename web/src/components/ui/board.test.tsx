@@ -22,7 +22,6 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  setEffectsEnabled(false);
 });
 
 function mount(ui: React.ReactElement) {

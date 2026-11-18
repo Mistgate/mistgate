@@ -312,7 +312,7 @@ export function SettingsScenePage() {
     if (isLang(lang)) setLang(lang);
     const theme = params.get("theme");
     if (theme === "light" || theme === "dark") setTheme(theme);
-    if (params.get("fx") === "1") setEffectsEnabled(true);
+    setEffectsEnabled(params.get("fx") === "1", false);
     // the board's "buffer" switch: the clipboard refuses, and the page asks for a copy by hand
     if (params.get("copy") === "fail") Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: () => Promise.reject(new Error("denied")) } });
     return seeded(v);
