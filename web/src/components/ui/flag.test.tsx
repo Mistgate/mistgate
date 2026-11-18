@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { Flag, FlagText, hasFlag } from "./flag";
+import { Flag, FlagText } from "./flag";
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -25,11 +25,8 @@ function mount(ui: React.ReactElement) {
 
 describe("Flag", () => {
   it("draws a known country and falls back to letters for an unknown one", () => {
-    expect(hasFlag("de")).toBe(true);
-    expect(hasFlag("cn")).toBe(true); // the China split preset and the country toggle of the DNS editor
-    expect(hasFlag("IR")).toBe(true);
-    expect(hasFlag("sg")).toBe(true); // Singapore, a common hosting country
-    expect(hasFlag("xx")).toBe(false);
+    // the China split preset and the country toggle of the DNS editor, Iran, Singapore (a common hosting country)
+    for (const code of ["de", "cn", "IR", "sg"]) expect(mount(<Flag code={code} />).querySelectorAll("svg"), code).toHaveLength(1);
     const el = mount(
       <>
         <Flag code="DE" />
