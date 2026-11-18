@@ -5,15 +5,19 @@ import type { AwgConfig, Lang, MgData, Platform, Theme } from "./types";
 
 export type Confirm = { id: string; kind: "remove" | "rotate" } | null;
 
-/** The panes of the "add a device" dialog: "pick" asks how the device will connect, "link" is the app-with-the-link branch, "key" the AmneziaVPN key form. */
-export type AddPane = "pick" | "link" | "key";
+/**
+ * The panes of the "add a device" dialog (the steps of the board): "pick" asks how the device will connect, "link" is the device and
+ * the app of the app-with-the-link branch, "conn" its connecting step, "key" the AmneziaVPN key form. The key itself and "no free
+ * slot" are not panes: the state of the keys and of the limit says so.
+ */
+export type AddPane = "pick" | "link" | "conn" | "key";
 
 export type AmzState = {
   /** The device whose key the dialog shows ("Show key"). */
   open: string | null;
   /** The "add a device" dialog is open. */
   adding: boolean;
-  /** What the open "add a device" dialog shows: the choice of the way (link app or key), the link branch, or the key form. */
+  /** What the open "add a device" dialog shows: the choice of the way (link app or key), the device and app, the connecting step, or the key form. */
   pane: AddPane;
   /** The device this dialog just created: the dialog then shows its key instead of the form. */
   created: string | null;

@@ -1,0 +1,41 @@
+/* The "new device" window: what the board's .a-* rules (sub.css) leave to the page. Read after sub.css, so it may override it. */
+
+/* flags drawn in CSS (mg-v2.css:30-36, not carried into sub.css), and the two letters for a country that has none */
+.fl2.de { background: linear-gradient(#000 33.34%, #dd0000 0 66.67%, #ffce00 0); }
+.fl2.nl { background: linear-gradient(#ae1c28 33.34%, #fff 0 66.67%, #21468b 0); }
+.fl2.ru { background: linear-gradient(#fff 33.34%, #0039a6 0 66.67%, #d52b1e 0); }
+.fl2.ee { background: linear-gradient(#0072ce 33.34%, #000 0 66.67%, #fff 0); }
+.fl2.pl { background: linear-gradient(#fff 50%, #dc143c 0); }
+.fl2.ro { background: linear-gradient(90deg, #002b7f 33.34%, #fcd116 0 66.67%, #ce1126 0); }
+.fl2.by { background: linear-gradient(90deg, #fff 0 4%, #c8313e 0 8%, #fff 0 12%, transparent 0), linear-gradient(#c8313e 66.67%, #4aa657 0); }
+.fl2.cc { display: grid; place-items: center; background: var(--surface-2); color: var(--sec); font: 600 8px/1 var(--mono); }
+
+/* the title takes the focus when a step opens: no ring on it */
+.a-h .t:focus { outline: none; }
+
+/* a way that cannot be used now: quiet, no press, the reason where the points would be */
+.a-way.off { background: none; cursor: default; }
+.a-way.off:hover { border-color: var(--hair); background: none; }
+.a-way.off:active { transform: none; }
+.a-way.off .a-app { opacity: 0.6; }
+.a-way.off .a-lnk { align-self: flex-start; margin-top: 8px; margin-inline-start: -4px; text-decoration: none; }
+
+/* no app for this device: the link itself and the way to write */
+.a-nil { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px; border: 1px dashed var(--hair); border-radius: 12px; }
+.a-nil .t { font-size: 15px; line-height: 20px; font-weight: 500; }
+
+/* the buttons of the window keep the board's 16 px icons (the copy button draws its own 20 px) */
+.a-dlg .u-cpi { width: 16px; height: 16px; }
+.a-dlg .u-cpi .i { width: 16px; height: 16px; }
+
+/* a request in flight */
+.a-f .u-btn .spin { width: 14px; height: 14px; }
+
+/* values that read left to right on a right-to-left page: versions, file names, the figures of the steps */
+.a-ver .v, .a-ver .pr, .a-n, .a-fname { unicode-bidi: isolate; }
+.a-ver .pr, .a-fname { direction: ltr; }
+.a-fname { font: 400 12px/16px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.a-meta .i { flex: none; }
+.a-incl li > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.a-err { align-items: flex-start; }
+.a-st .tx .u-acts { margin-top: 0; }

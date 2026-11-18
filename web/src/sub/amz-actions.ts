@@ -113,6 +113,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
     },
     pane(pane) {
       am().pane = pane;
+      am().created = null; // "Back" from the new key: the device stays in the list, the form is there again
       am().error = "";
       am().errorAt = "";
       render();
