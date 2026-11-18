@@ -32,7 +32,8 @@ export function dnsActions({ data, st, render, api, focus, locked }: Deps): DnsA
   const server = (id: string) => data.servers.find((x) => x.id === id);
   /** What is picked now at a target ("" = its default); undefined for a target the page does not have. */
   const choiceOf = (id: string): string | undefined => (id === LINK ? data.dns?.link.choice : server(id)?.dns?.choice);
-  const keyOf = (id: string) => (id === LINK ? "dns-link" : `dns-${id}`);
+  // a phone has its own row and button (data-k *-m): focusKey takes the first of a|b that is on screen
+  const keyOf = (id: string) => (id === LINK ? "dns-link|dns-link-m" : `dns-${id}|dns-m-${id}`);
   const everyone = (id: string) => keyDnsServers(data, id);
   /** The server offers this preset ("" = its own default: always). */
   const offers = (x: ServerEntry, preset: string) => preset === "" || !!x.dns?.options.includes(preset) || (!!x.dns && dnsDefault(x.dns) === preset);

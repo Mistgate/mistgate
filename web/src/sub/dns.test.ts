@@ -355,7 +355,7 @@ describe("the DNS actions", () => {
     expect(st.dns.all).toBe(false);
     a.open(null);
     expect(st.dns.open).toBeNull();
-    expect(log.at(-1)).toBe("focus dns-nod_fra");
+    expect(log.at(-1)).toBe("focus dns-nod_fra|dns-m-nod_fra");
     // one server with a DNS of its keys: nothing to choose the scope of
     const one = setup({}, "dns-both", (d) => d.servers.pop());
     one.a.open("de1");
