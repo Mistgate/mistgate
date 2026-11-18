@@ -77,7 +77,8 @@ export function wayBody(c: Ctx): HTMLElement {
   const { d, s, a, t } = c;
   const have = ways(d);
   const apps = linkApps(c);
-  const names = new Intl.ListFormat(localeOf(s.lang), { type: "disjunction", style: "long" }).format(apps.slice(0, 3).map((x) => x.name));
+  const shown = apps.slice(0, 3).map((x) => x.name);
+  const names = typeof Intl.ListFormat === "function" ? new Intl.ListFormat(localeOf(s.lang), { type: "disjunction", style: "long" }).format(shown) : shown.join(", ");
   const link = h(
     "button",
     { class: "a-way rec", type: "button", "data-k": "add-way-link", on: { click: () => a.amz.pane("link") } },

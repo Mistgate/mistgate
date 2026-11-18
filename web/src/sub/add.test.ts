@@ -126,7 +126,7 @@ describe("the frame of every step", () => {
     expect(dialog(data("happ"), { amz: at("key") }).stage).toBe("way"); // no AmneziaVPN
     expect(dialog(data("amnezia-off"), { amz: at("key") }).stage).toBe("way"); // the owner issues the keys
     expect(dialog(data("keys-only"), { amz: at("link") }).stage).toBe("way");
-    expect(dialog(data("nolinux"), { platform: "linux", amz: at("conn") }).stage).toBe("way"); // no app on Linux: nothing to connect
+    expect(dialog(data("nolinux"), { platform: "linux", amz: at("conn") }).stage).toBe("app"); // no app on Linux: nothing to connect, the step of the app says so
   });
 });
 

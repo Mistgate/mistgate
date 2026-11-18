@@ -20,9 +20,6 @@ export type { AmzActions, AmzState, Tools } from "./state";
 /** What these parts need of the page: the data, the state they read, what they may do, the words, the support link. */
 export type AmzCtx = { d: MgData; s: { lang: Lang; amz: AmzState }; a: { amz: AmzActions } & Tools; t: Dict; support?: string };
 
-/** Windows has no flag emoji (it draws "DE"): the choices there are the country's name alone. */
-export const flagsOn = (s: { amz: AmzState }) => s.amz.here !== "windows";
-
 /** The name of a device: its label, else its platform's word, else "Device". */
 export const label = (x: AwgDevice, t: Dict) => x.label || platformWord(x.platform, t) || t.devGeneric;
 
@@ -172,6 +169,8 @@ export function keyView(platform: string, here: string, where: Where): KeyView {
 const whereIcon = (id: Where, here: string): IconName => (id === "this" ? (isPhone(here) ? "phone" : "monitor") : id === "phone" ? "phone" : "laptop");
 
 const numbered = (steps: Kid[][]) => h("ol", { class: "a-steps", style: { gap: "12px" } }, ...steps.map((kids, i) => h("li", { class: "a-st" }, h("span", { class: "a-n" }, String(i + 1)), h("div", { class: "tx" }, ...kids))));
+/** A step's words as one flex item of the step (the board's .tx is a column: its pieces would stack): the «quoted» names stay whole. */
+const say = (s: string): Kid[] => [h("span", null, ...rich(s))];
 const metaRow = (ico: IconName, ...kids: Kid[]) => h("p", null, icon(ico), h("span", null, ...kids));
 
 /** The key: where to add it, then (a country, the steps, the buttons, the QR code) as that place needs, and what the person must know. */
@@ -220,11 +219,11 @@ export function readyBody(c: AmzCtx, x: AwgDevice, mode: KeyMode): HTMLElement {
   let left: Kid[];
   let qr: HTMLElement | null = null;
   if (view === "this-phone") {
-    left = [numbered((renew ? [pasteStep, deleteStep] : t.phoneSteps(app)).map((step) => rich(step))), acts(cp)];
+    left = [numbered((renew ? [pasteStep, deleteStep] : t.phoneSteps(app)).map(say)), acts(cp)];
   } else if (view === "this-desktop") {
-    left = [numbered(t.adFileSteps(app).map((step) => rich(step))), acts(dl, h("span", { class: "a-fname" }, filename))];
+    left = [numbered(t.adFileSteps(app).map(say)), acts(dl, h("span", { class: "a-fname" }, filename))];
   } else if (view === "phone-qr") {
-    left = [numbered(t.adQrSteps(app).map((step) => rich(step))), acts(dl, cp)];
+    left = [numbered(t.adQrSteps(app).map(say)), acts(dl, cp)];
     qr = qrCard(cfg.conf, t.qrKeyAlt(app), logoSrc(d));
     if (!qr) meta.push(metaRow("info", t.qrTooBig));
   } else {

@@ -32,8 +32,8 @@ function stage(c: Ctx): Stage {
   const pane = s.amz.pane;
   const have = ways(d);
   if (pane === "key" && keyAvailability(d) === "ok") return { id: "key" };
-  if (pane === "conn" && have.includes("link") && linkApp(c)) return { id: "conn" };
-  if (pane === "link" && have.includes("link")) return { id: "app" };
+  // connecting needs an app; without one (nothing for this device) the step of the app says so
+  if ((pane === "conn" || pane === "link") && have.includes("link")) return { id: pane === "conn" && linkApp(c) ? "conn" : "app" };
   return { id: "way" };
 }
 

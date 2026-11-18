@@ -36,6 +36,7 @@
 .a-ver .pr, .a-fname { direction: ltr; }
 .a-fname { font: 400 12px/16px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
 .a-meta .i { flex: none; }
-.a-incl li > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.a-incl li > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.a-h .t { overflow-wrap: anywhere; }
 .a-err { align-items: flex-start; }
-.a-st .tx .u-acts { margin-top: 0; }
+.u-acts .a-fname { align-self: center; }
