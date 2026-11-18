@@ -37,7 +37,7 @@ import { ShellLayout } from "./shell";
 // states: list (the board's three people) | many (its ten) | none (nobody yet) | search (a search that finds alice) | nomatch (one that
 // finds nobody) | open (alice's row open) | open-erin (a person over the quota) | select (selecting, two ticked: the bulk bar) |
 // select-ask (the bar asks "Sure?") | job-running | job-done | job-failed (the bar's batch states) | groups (the board's two groups) |
-// groups-many (ten) | groups-none (a search that finds no group) | groups-empty (no group at all) | group-new (the window) |
+// ten (ten places each, bars) | sorted (&sort=traffic&desc=1) | filter-expiring | filter-over | open-heidi (no devices) | open-ten (ten devices behind Show all) | groups-many (ten) | groups-none (a search that finds no group) | groups-empty (no group at all) | group-new (the window) |
 // group-edit (the edit window of a group; -lose: the panel says who loses a profile, -held: it refuses a node the owner holds back) |
 // person-new | person-name (a name typed) | person-done | person-done-pw (with a page password).
 // Made-up data of the board: alice, bob, carol, dave, erin, frank, grace, heidi, ivan, judy; the groups family and friends; the nodes de1,
@@ -62,6 +62,16 @@ const crowd: Spec[] = [
   { n: "ivan", g: "friends", du: 2, dm: 3, gb: 31, q: 50, days: -2, last: 2 * DAY, st: "exp", via: [App.HAPP], devs: [phone("Phone"), phone("Laptop")] },
   { n: "judy", g: "family", du: 3, dm: 5, gb: 12, q: 100, days: 60, last: 7 * DAY, st: "off", via: [App.HAPP], devs: [phone("Phone"), phone("Tablet"), phone("TV", "AmneziaVPN")] },
 ];
+// the board's switch "Устройств": every person has ten places (the list draws a bar instead of dots), with the devices the board gives them
+const TEN: Record<string, number> = { alice: 10, bob: 7, carol: 3, dave: 10, erin: 9, frank: 4, grace: 6, heidi: 0, ivan: 5, judy: 8 };
+const MORE_DEVS: [string, string][] = [["Phone", "Happ"], ["Laptop", "Mistgate for Windows"], ["Tablet", "Happ"], ["TV", "AmneziaVPN"], ["Work PC", "Mistgate for Windows"], ["Router", "AmneziaVPN"], ["Second phone", "Klick"], ["Set-top box", "AmneziaVPN"], ["Old laptop", "Mihomo Party"], ["Spare phone", "Happ"]];
+/** States that show the ten people of the board (more than the three of the list). */
+const BIG = new Set(["many", "open-erin", "open-heidi", "ten", "open-ten", "sorted", "filter-expiring", "filter-over"]);
+const tenOf = (state: string, s: Spec): Spec => {
+  if (state !== "ten" && state !== "open-ten") return s;
+  const du = TEN[s.n] ?? s.du;
+  return { ...s, du, dm: 10, devs: du === 0 ? [] : s.n === "alice" ? [...s.devs, ...MORE_DEVS.slice(0, du - s.devs.length)] : MORE_DEVS.slice(0, du).map(([m, c], i) => [m, c, i === 0 && !!s.node] as [string, string, boolean]) };
+};
 const nodeIds = { de1: "nod_de1", fi1: "nod_fi1", nl1: "nod_nl1", msk1: "nod_msk1" } as const;
 const nodes = [
   { id: "nod_de1", name: "de1", countryCode: "DE", status: NodeStatus.ONLINE },
@@ -117,7 +127,7 @@ const pw = "lake-2718-moss";
 /** The panel's calls of this screen, answered here (the scene is its own page, so patching the shared client is safe). */
 function fakeCalls(state: string, count: number) {
   const api = usersApi as unknown as Record<string, unknown>;
-  const everyone = state === "none" ? [] : crowd.slice(0, count);
+  const everyone = state === "none" ? [] : crowd.slice(0, count).map((s) => tenOf(state, s));
   api.listUsers = async (req: { filter?: UserFilter; query?: string; groupId?: string; pageSize: number; offset?: number; sort?: number; descending?: boolean }) => {
     const q = (req.query ?? "").toLowerCase();
     let list = everyone.filter((s) => !q || s.n.includes(q) || s.g.includes(q)).filter((s) => !req.groupId || `grp_${s.g}` === req.groupId);
@@ -134,7 +144,7 @@ function fakeCalls(state: string, count: number) {
     };
   };
   api.getUser = async ({ userId }: { userId: string }) => {
-    const s = crowd.find((x) => `usr_${x.n}` === userId) ?? crowd[0]!;
+    const s = tenOf(state, crowd.find((x) => `usr_${x.n}` === userId) ?? crowd[0]!);
     return {
       user: userOf(s),
       devices: s.devs.map(([model, client, online], i) => ({ id: `dev_${s.n}_${i}`, platform: "other", model, firstSeenUnix: BigInt(now - 30 * DAY), lastSeenUnix: BigInt(online ? now - 30 : now - (i + 1) * 5 * 3600), online: !!online, protocols: [], awgProfileId: "", awgProfileName: "", awgVersion: "", stale: false, address: "", lastHandshakeUnix: 0n, kind: 1, osVersion: "", client, usedBytes: 0n, onlineNodeIds: [], fingerprint: "", enrolled: false, enrolLinkStale: false, idle: false, idleSinceUnix: 0n })),
@@ -150,10 +160,10 @@ function fakeCalls(state: string, count: number) {
 
 /** The private query cache of a scene (exported for its smoke test). */
 export function seeded(state: string, role: Role) {
-  const count = state === "many" || state === "open-erin" || state.startsWith("select") ? (state === "select" || state === "select-ask" ? 3 : 10) : 3;
-  fakeCalls(state, state === "many" || state === "open-erin" ? 10 : count);
+  const count = BIG.has(state) || state.startsWith("select") ? (state === "select" || state === "select-ask" ? 3 : 10) : 3;
+  fakeCalls(state, BIG.has(state) ? 10 : count);
   const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false, refetchInterval: false } } });
-  const list = state === "none" ? [] : crowd.slice(0, state === "many" || state === "open-erin" ? 10 : 3);
+  const list = state === "none" ? [] : crowd.slice(0, BIG.has(state) ? 10 : 3).map((s) => tenOf(state, s));
   const gs = state === "groups-empty" ? [] : state === "groups-many" ? moreGroups : twoGroups;
   c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role }, version: "0.1.71", sourceUrl: "https://github.com/example/mistgate", sourceStars: 298, stepUpUntilUnix: 0 } as never);
   c.setQueryData(nodesQuery.queryKey, { nodes: nodes.map((n) => ({ ...n, location: "", provider: "", notes: "", address: "203.0.113.7", reason: undefined, protocols: [], online: [], trafficTodayBytes: 0, hasMetrics: false, cpuPct: 0, uptimeS: 0, lastSeenUnix: now })), expectedAgentVersion: "0.1.71" } as never);
@@ -176,6 +186,12 @@ export const demoOf: Record<string, UsersDemo> = {
   nomatch: { find: "zzz" },
   open: { open: "usr_alice" },
   "open-erin": { open: "usr_erin" },
+  // a person who never connected: no devices to list ("None yet")
+  "open-heidi": { open: "usr_heidi" },
+  // ten places each, alice with her ten devices: four are listed, the rest sit behind "Show all"
+  "open-ten": { open: "usr_alice" },
+  "filter-expiring": { filter: "expiring" },
+  "filter-over": { filter: "over" },
   select: { selecting: true, ticked: ["usr_alice", "usr_bob"] },
   "select-ask": { selecting: true, ticked: ["usr_alice", "usr_bob"], ask: "disable" },
   "groups-none": { groupFind: "zzz" },
@@ -252,12 +268,19 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "users-list-phone", state: "list", title: "A phone, 400 wide (the sort chips take the head's place)", w: 400, h: 780 },
   { id: "users-list-fa", state: "list", title: "Right to left (fa)", w: 1440, h: 720, params: "&lang=fa" },
   { id: "users-many", state: "many", title: "The board's ten people: expiring, over quota, expired, off, never seen", w: 1440, h: 1100 },
+  { id: "users-ten", state: "ten", title: "The board's switch Devices, ten places each: a bar instead of the dots", w: 1440, h: 1100 },
+  { id: "users-ten-phone", state: "ten", title: "Ten places each, a phone", w: 400, h: 1300 },
+  { id: "users-sorted", state: "sorted", title: "Sorted by traffic, the most first: the head shows the arrow", w: 1440, h: 1100, params: "&sort=traffic&desc=1" },
+  { id: "users-filter-expiring", state: "filter-expiring", title: "The Expiring chip pressed", w: 1440, h: 520 },
+  { id: "users-filter-over", state: "filter-over", title: "The Over quota chip pressed", w: 1440, h: 520 },
   { id: "users-none", state: "none", title: "Nobody yet", w: 1440, h: 720 },
   { id: "users-none-phone", state: "none", title: "Nobody yet, a phone", w: 400, h: 900 },
   { id: "users-search", state: "search", title: "A search that finds alice", w: 1440, h: 520 },
   { id: "users-nomatch", state: "nomatch", title: "A search that finds nobody", w: 1440, h: 520 },
   { id: "users-open", state: "open", title: "alice's row open: the link, the password, four devices", w: 1440, h: 860 },
   { id: "users-open-phone", state: "open", title: "alice's row open on a phone", w: 400, h: 1100 },
+  { id: "users-open-heidi", state: "open-heidi", title: "heidi: never connected, no devices yet", w: 1440, h: 1100 },
+  { id: "users-open-ten", state: "open-ten", title: "alice with ten devices: four listed, the rest behind Show all", w: 1440, h: 900 },
   { id: "users-open-erin", state: "open-erin", title: "erin: over the quota", w: 1440, h: 900 },
   { id: "users-select", state: "select", title: "Selecting: the check column and the bulk bar", w: 1440, h: 720 },
   { id: "users-select-ask", state: "select-ask", title: "The bar asks once before it switches people off", w: 1440, h: 720 },
