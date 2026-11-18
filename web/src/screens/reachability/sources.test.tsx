@@ -1074,7 +1074,7 @@ describe("the bsbord card", () => {
     expect(spend.textContent).toBe("This month100\u00a0₽ of 100\u00a0₽0\u00a0₽ left");
     const meter = spend.querySelector("[role=meter]")!;
     expect(["aria-valuenow", "aria-valuemax", "aria-valuetext"].map((a) => meter.getAttribute(a))).toEqual(["10000", "10000", "100\u00a0₽ of 100\u00a0₽"]);
-    expect(meter.className).toContain("bad");
+    expect(meter.className).toContain("warn");
   });
 
   it("puts every status in plain words, holds back what a round under way reserves, and shows the balance from Test", async () => {
@@ -1223,7 +1223,7 @@ describe("the open source in the board's frame", () => {
     expect(section("bsbord")!.querySelector("[data-testid=source-problem] b")?.textContent).toBe("Spending has reached the limit");
     expect(tab("bsbord")?.querySelector(".pv-pill")?.textContent).toBe("Stopped");
     expect(section("bsbord")!.querySelector("[data-testid=source-problem]")?.textContent).toContain("Rounds are stopped until the end of the month. Raise the limit to continue sooner.");
-    expect(section("bsbord")!.querySelector(".rc-bud .rw-pg")?.className).toContain("bad");
+    expect(section("bsbord")!.querySelector(".rc-bud .rw-pg")?.className).toContain("warn");
   });
 
   it("says the probe node is not in touch, and leads to it", async () => {

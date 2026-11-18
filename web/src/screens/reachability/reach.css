@@ -634,9 +634,6 @@
 .rcp .rc-sl > div:first-child {
   border-top: 0;
 }
-.rcp .rc-sl > button {
-  transition: background-color 0.15s var(--e);
-}
 .rcp .rc-sl > button:hover {
   background: var(--step);
 }
@@ -809,13 +806,7 @@
 .rcp .rc-bud .rw-pg {
   margin: 0;
 }
-/* L5903: a spent month is the crit colour (page.css has the plain and the warn fill; the board's track is the box's own step of grey) */
-.rcp .rc-bud .rw-pg.bad {
-  background: linear-gradient(90deg, var(--danger) var(--w), var(--step) 0);
-}
-[dir="rtl"] .rcp .rc-bud .rw-pg.bad {
-  background: linear-gradient(270deg, var(--danger) var(--w), var(--step) 0);
-}
+/* L5112-5113: the fill is the plain one and the warn one (page.css); the board's track is the box's own step of grey, a spent month is warn too */
 
 /* the rows of a setting (L4593-4609, L4723) */
 .rcp .pp-rows {
@@ -985,7 +976,6 @@
   border-radius: 12px;
   border: 1px solid var(--border);
   text-align: start;
-  transition: border-color 0.15s var(--e);
 }
 .rcp .rc-ung button[aria-checked="true"] {
   border-color: color-mix(in srgb, var(--accent-mark) 45%, var(--border));
@@ -1294,9 +1284,6 @@
   }
   .rcp .rc-set.edit {
     flex-wrap: wrap;
-  }
-  .rcp .rc-hd {
-    align-items: flex-start;
   }
 }
 /* L5123-5145, L5150 (600): a row of the table is a card: the node and the verdict on top, the week under them */
