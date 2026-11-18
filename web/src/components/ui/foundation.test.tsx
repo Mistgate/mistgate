@@ -87,7 +87,10 @@ describe("ProtocolTag", () => {
     expect(tags[3]!.className).toContain("bg-tone-sage-bg");
     expect(tags[2]!.getAttribute("title")).toBe("Relay");
     expect(tags[2]!.getAttribute("tabindex")).toBe("0");
-    expect(tags[0]!.querySelector("svg")!.getAttribute("stroke-width")).toBe("1.5");
+    // a tag in a list is the board's plain one: no glyph, regular weight; only the compact one draws the glyph
+    expect(tags[0]!.querySelector("svg")).toBeNull();
+    expect(tags[0]!.className).not.toContain("font-medium");
+    expect(tags[2]!.querySelector("svg")!.getAttribute("stroke-width")).toBe("1.5");
   });
 
   it("opens a compact tag by itself with `expanded` (a phone has no pointer) and leaves the others folded", () => {

@@ -23,9 +23,10 @@ type Look = { tone: Tone; quiet?: boolean; d: string };
 const alias: Record<string, ProtocolKind> = { hy2: "hysteria2", amneziawg: "awg", awg2: "awg" };
 
 /**
- * A protocol as a tag: its glyph in its tone, then its name (24px, 6px radius). `compact` is the 28px glyph alone that opens
- * into the name when the pointer or focus is on it, for dense lists; the name stays in the tag for screen readers. `label`
- * replaces the name (a translated one: the relay, the DNS tunnel). `expanded` keeps a compact tag open (a phone has no pointer).
+ * A protocol as a tag. In a list or a card it is the board's plain tag: the name in the protocol's tone (24px, 6px radius,
+ * regular weight), no glyph. `compact` is the board's .tag.pf for dense lists: the 28px glyph alone that opens into the name
+ * when the pointer or focus is on it (the name stays in the tag for screen readers). `label` replaces the name (a translated
+ * one: the relay, the DNS tunnel). `expanded` keeps a compact tag open (a phone has no pointer).
  */
 export function ProtocolTag({ protocol, label, compact, expanded, className }: { protocol: string; label?: string; compact?: boolean; expanded?: boolean; className?: string }) {
   const kind = protocol in kinds ? (protocol as ProtocolKind) : alias[protocol];
@@ -36,15 +37,17 @@ export function ProtocolTag({ protocol, label, compact, expanded, className }: {
       title={compact ? name : undefined}
       tabIndex={compact ? 0 : undefined}
       className={cx(
-        "group/pt inline-flex flex-none items-center text-xs leading-4 font-medium whitespace-nowrap",
-        compact ? "h-7 rounded-ctl px-[7px] transition-colors duration-150 ease-out focus-visible:outline-offset-1" : "h-6 gap-1.5 rounded-chip ps-1.5 pe-2",
+        "group/pt inline-flex flex-none items-center text-xs leading-4 whitespace-nowrap",
+        compact ? "h-7 rounded-ctl px-[7px] font-medium transition-colors duration-150 ease-out focus-visible:outline-offset-1" : "h-6 gap-1 rounded-chip px-2",
         !look ? "bg-step text-sec" : look.quiet ? "bg-step text-tone-lavender" : toneTagClass[look.tone],
         className,
       )}
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="block flex-none">
-        <path d={look?.d ?? "M12 12h.01"} />
-      </svg>
+      {compact && (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="block flex-none">
+          <path d={look?.d ?? "M12 12h.01"} />
+        </svg>
+      )}
       <span
         className={cx(
           compact &&

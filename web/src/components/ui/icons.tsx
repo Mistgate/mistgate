@@ -11,7 +11,7 @@ const paths = {
   ellipsis: "M5 12h.01M12 12h.01M19 12h.01",
   check: "M5 12.5l4.5 4.5L19 7.5",
   x: "M6 6l12 12M18 6L6 18",
-  copy: "M9 9h10v11H9zM5 15V4h10",
+  copy: "M9 9h10v11H9zM15 9V4H5v11h4",
   upload: "M12 16V4M12 4L8 8M12 4l4 4M4 20h16",
   share: "M12 15V4M12 4L8 8M12 4l4 4M6 11H5v9h14v-9h-1",
   externalLink: "M14 4h6v6M20 4l-9 9M18 14v5H5V6h5",

@@ -75,7 +75,7 @@ function Current() {
             </span>
           )}
           <Toast.Description className="min-w-0" />
-          <Toast.Action className="flex h-7 flex-none items-center rounded-ctl bg-canvas/10 px-2.5 text-[13px] font-medium transition-colors duration-150 hover:bg-canvas/15" />
+          <Toast.Action className="flex h-7 flex-none items-center rounded-ctl bg-[color-mix(in_srgb,var(--bg)_8%,transparent)] px-2.5 text-[13px] font-medium transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--bg)_14%,transparent)] [:root[data-theme=light]_&]:bg-white/14 [:root[data-theme=light]_&]:hover:bg-white/14" />
           {error && (
             <Toast.Close aria-label={t("common.close")} className="-me-0.5 grid size-7 flex-none place-items-center rounded-ctl opacity-60 transition-opacity hover:opacity-100">
               <Icon name="x" size={14} />

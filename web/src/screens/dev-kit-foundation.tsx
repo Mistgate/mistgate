@@ -138,15 +138,12 @@ function Buttons() {
         <CopyButton value="demo" size="md" label="Copy the link" />
         <CopyButton value="demo" size="lg" variant="primary" label="Copy the command" />
       </Group>
-      <Group title="icon buttons: square 40, close 32, flat 28, field 40, round 26, round accent 26">
+      <Group title="icon buttons: square 40 (also the x of a window), compact 32, flat 28, field 40">
         <IconButton aria-label="search">
           <Icon name="search" size={16} />
         </IconButton>
         <IconButton aria-label="search" disabled>
           <Icon name="search" size={16} />
-        </IconButton>
-        <IconButton variant="close" aria-label="close">
-          <Icon name="x" size={16} />
         </IconButton>
         <IconButton variant="flat" aria-label="more">
           <Icon name="ellipsis" size={16} />
@@ -154,11 +151,8 @@ function Buttons() {
         <IconButton variant="field" aria-label="copy">
           <Icon name="copy" size={16} />
         </IconButton>
-        <IconButton variant="round" aria-label="minus">
-          <Icon name="minus" size={12} />
-        </IconButton>
-        <IconButton variant="roundAccent" aria-label="plus">
-          <Icon name="plus" size={12} />
+        <IconButton variant="compact" aria-label="close">
+          <Icon name="x" size={16} />
         </IconButton>
         <IconButton aria-label="focus" className={focusRing}>
           <Icon name="gear" size={16} />
@@ -264,7 +258,7 @@ function Controls() {
           ]}
         />
       </Group>
-      <Group title="stepper">
+      <Group title="stepper (the board's 36px capsule)">
         <div className="w-44">
           <Stepper onDecrement={() => setN((x) => x - 10)} onIncrement={() => setN((x) => x + 10)} decrementLabel="less" incrementLabel="more">
             {n} GB
@@ -296,7 +290,7 @@ function Statuses() {
   return (
     <Card className="flex flex-col gap-5 p-5">
       {([
-        ["pill 32", {}],
+        ["pill 32 (a dot and the word; busy blinks)", {}],
         ["pill small 24", { sm: true }],
         ["pill in the bar (40)", { bar: true }],
         ["glyph only", { glyphOnly: true }],
@@ -325,7 +319,7 @@ function Statuses() {
           </Chip>
         ))}
       </Group>
-      <Group title="protocol tags: full (24), compact (28, the name opens on hover or focus)">
+      <Group title="protocol tags: in a list (24, the plain tag of the board, no glyph), compact (28, the glyph opens into the name on hover or focus)">
         {protocols.map((p) => (
           <ProtocolTag key={p} protocol={p} label={protocolLabel[p]} />
         ))}
@@ -455,12 +449,13 @@ function Feedback() {
 
 function Overlays() {
   const initial = new URLSearchParams(location.search).get("open");
-  const [modal, setModal] = useState<"" | "narrow" | "wide">(initial === "modal" ? "narrow" : initial === "wide" ? "wide" : "");
+  const [modal, setModal] = useState<"" | "narrow" | "wide" | "plain">(initial === "modal" ? "narrow" : initial === "wide" ? "wide" : initial === "plain" ? "plain" : "");
   const [pop, setPop] = useState(initial === "popover");
   return (
     <Card className="flex flex-wrap items-center gap-3 p-5">
       <Button onClick={() => setModal("narrow")}>Window 520</Button>
       <Button onClick={() => setModal("wide")}>Window 760</Button>
+      <Button onClick={() => setModal("plain")}>Window, no description</Button>
       <Popover
         open={pop}
         onOpenChange={setPop}
@@ -496,7 +491,7 @@ function Overlays() {
         wide={modal === "wide"}
         closeLabel="Close"
         title="Add a person"
-        description="They get a link to the subscription page."
+        description={modal === "plain" ? undefined : "They get a link to the subscription page."}
         footer={
           <>
             <Button variant="ghost" onClick={() => setModal("")}>

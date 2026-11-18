@@ -5,6 +5,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "rea
 import { useAddNode } from "@/components/add-node";
 import { sections } from "@/components/nav";
 import { originOf, playWave } from "@/components/fx/wave";
+import { avatarColors, avatarIndex } from "@/components/ui/bits";
 import { Flag } from "@/components/ui/flag";
 import { Icon, NavIcon, navPaths, type NavIconName } from "@/components/ui/icons";
 import { StatusDot, type StatusKind } from "@/components/ui/status";
@@ -36,8 +37,6 @@ type Item = {
 };
 type Group = { title: MessageKey; items: Item[]; /** All that matched, before the list was cut to what fits. */ total: number };
 
-// The round avatars of people: the board's pastels in turn (the same cycle as the people's list).
-const avatarColors = ["#c9b8e8", "#8ec8ea", "#dcc68c", "#9fd6cf", "#e8b98f", "#e6a6b0", "#b0cc90"];
 const navOf = (id: string): NavIconName => {
   const section = id.split("-")[0]!;
   if (section in navPaths) return section as NavIconName;
@@ -228,9 +227,9 @@ export default function Palette({ open, onOpenChange, initialQuery = "" }: { ope
     // only users the server matched for exactly what is typed (the answer for an older word must not show)
     const userItems: Item[] =
       asked !== "" && asked === q
-        ? (users.data?.users ?? []).map((u, i) => ({
+        ? (users.data?.users ?? []).map((u) => ({
             id: `user-${u.id}`,
-            lead: { kind: "ava", letter: u.name.charAt(0).toUpperCase() || "?", color: avatarColors[i % avatarColors.length]! },
+            lead: { kind: "ava", letter: u.name.charAt(0).toUpperCase() || "?", color: avatarColors[avatarIndex(u.name)]! },
             title: u.name,
             sub: u.currentNodeName || u.groupName,
             status: u.online ? { text: t("win.search.online"), kind: "plain" } : undefined,

@@ -61,8 +61,8 @@ export function CreateUserModal({ open, onOpenChange, onCreated, startName, star
       }}
       title={done ? t("ul.new.done") : t("users.new")}
       closeLabel={t("common.close")}
-      // the done window is 520 wide, under the board's 720: its children take the narrow numbers (header 16 and 12, body 16, the foot 12 and 16)
-      className={cx("transition-[transform,opacity,max-width] [&>div:first-child]:items-center! [&_h2]:leading-5!", done ? "md:max-w-[520px]! [&>div:last-child]:justify-start! [&>div:last-child]:px-4! [&>div:last-child]:py-3! [&>div:first-child]:min-h-16! [&>div:first-child]:pt-4! [&>div:first-child]:pb-2! [&>div:first-child]:ps-4! [&>div:first-child]:pe-3! [&>div:nth-child(2)]:px-4! [&>div:nth-child(2)]:pt-2! [&>div:nth-child(2)]:pb-5!" : "md:max-w-[880px]! [&>div:first-child]:min-h-16! md:[&>div:first-child]:min-h-[72px]!")}
+      // the window is 880 wide, and 520 once the person is made (a window under 720 takes the narrow room on its own); the width moves
+      className={cx("transition-[translate,scale,opacity,max-width]", done ? "md:max-w-[520px]! [&>div:last-child]:justify-start!" : "md:max-w-[880px]!")}
       shot="create-user"
       footer={
         done ? (
@@ -322,7 +322,7 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
             {t("users.name")}
             <span className="relative block">
               <span className="pointer-events-none absolute start-2 top-1/2 -mt-3.5">
-                <Avatar name={name.trim() || "?"} index={avatarIndex(name.trim().toLowerCase())} size={28} fontSize={12} />
+                <Avatar name={name.trim() || "?"} index={avatarIndex(name.trim())} size={28} fontSize={12} />
               </span>
               <input
                 value={name}
@@ -544,7 +544,7 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
         <aside aria-label={t("ul.new.preview")} className="sticky top-0 flex flex-col gap-4 rounded-card bg-[color-mix(in_srgb,var(--text)_3%,transparent)] p-4 @max-[672px]/usd:static">
           <span className="text-xs text-muted">{t("ul.new.preview")}</span>
           <div className="flex min-w-0 items-center gap-3 @max-[672px]/usd:hidden">
-            <Avatar name={name.trim() || "?"} index={avatarIndex(name.trim().toLowerCase())} size={40} fontSize={15} />
+            <Avatar name={name.trim() || "?"} index={avatarIndex(name.trim())} size={40} fontSize={15} />
             <div className="flex min-w-0 flex-col">
               <b className={cx("truncate text-[15px] font-medium", name.trim() ? "font-mono" : "font-mono text-muted")}>{name.trim() || t("ul.new.nameLow")}</b>
               {group && (
@@ -581,7 +581,7 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
         </aside>
       </div>
       {error && <Notice tone="danger">{error}</Notice>}
-      <div className="sticky -bottom-5 -mx-4 -mb-5 flex flex-wrap md:-bottom-6 items-center gap-2 border-t border-line bg-[color-mix(in_srgb,var(--text)_2%,var(--surface))] px-4 py-3 md:-mx-6 md:-mb-6 md:px-6 md:py-3.5">
+      <div className="sticky -bottom-6 -mx-6 -mb-6 flex flex-wrap items-center gap-2 border-t border-line @max-[720px]/win:-bottom-5 @max-[720px]/win:-mx-4 @max-[720px]/win:-mb-5 bg-[color-mix(in_srgb,var(--text)_2%,var(--surface))] px-6 py-3.5 @max-[720px]/win:px-4 @max-[720px]/win:py-3">
         <span className="me-auto min-w-0 text-xs text-muted @max-[672px]/usd:basis-full">{name.trim() ? t("ul.new.enter") : t("ul.new.footEmpty")}</span>
         <Button variant="secondary" size="lg" onClick={onClose}>
           {t("users.cancel")}

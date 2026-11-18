@@ -38,7 +38,7 @@ export function Menu({
         <BaseMenu.Positioner side={side} align={align} sideOffset={side === "top" || side === "bottom" ? 6 : 12} className="z-50 outline-none">
           <BaseMenu.Popup
             className={cx(
-              "flex origin-(--transform-origin) flex-col rounded-pop border border-line bg-surface p-1.5 shadow-(--shadow-pop) outline-none transition-[opacity,transform] duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0",
+              "flex origin-(--transform-origin) flex-col rounded-pop border border-line bg-surface p-1.5 shadow-(--shadow-pop) outline-none transition-[opacity,translate,scale] duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0",
               pop ? "ease-spring data-ending-style:scale-90 data-starting-style:scale-90" : "ease-out data-ending-style:translate-y-2 data-starting-style:translate-y-2",
               narrow ? "w-[220px]" : "min-w-[max(216px,var(--anchor-width))]",
               "max-w-[calc(100vw-32px)]",

@@ -221,7 +221,7 @@ export function UsersBulkBar({
             <span aria-hidden className="flex ps-2 max-md:hidden">
               {people.slice(0, 4).map((u) => (
                 <span key={u.id} className="fz-bulk-pop -ms-2 flex rounded-full shadow-[0_0_0_2px_var(--surface-2)]">
-                  <Avatar name={u.name} index={avatarIndex(u.id)} size={28} fontSize={12} />
+                  <Avatar name={u.name} index={avatarIndex(u.name)} size={28} fontSize={12} />
                 </span>
               ))}
             </span>

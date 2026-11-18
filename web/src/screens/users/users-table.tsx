@@ -292,7 +292,7 @@ function PersonRow({
           {select && <Check aria-label={t("users.selectOne", { name: u.name })} checked={on} onCheckedChange={() => select.toggle(u)} />}
         </span>
         <span className={cx("flex min-w-0 items-center gap-3", off && "opacity-50")}>
-          <Avatar name={u.name} index={avatarIndex(u.id)} size={32} fontSize={13} />
+          <Avatar name={u.name} index={avatarIndex(u.name)} size={32} fontSize={13} />
           <span className="flex min-w-0 flex-col">
             <span className="flex min-w-0 items-center gap-2">
               <b className="min-w-0 truncate font-medium">{u.name}</b>

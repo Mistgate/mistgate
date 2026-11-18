@@ -1,6 +1,7 @@
 import { Select as BaseSelect } from "@base-ui/react/select";
 import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
+import { Icon } from "./icons";
 
 /**
  * `hint` is a second, muted line under the label in the list; a `disabled` option is greyed out and cannot be picked; `icon`
@@ -22,14 +23,10 @@ type Props = {
 export const selectPopupClass =
   "min-w-(--anchor-width) origin-(--transform-origin) rounded-pop border border-line bg-surface p-1.5 shadow-(--shadow-pop) outline-none transition-[scale,opacity] duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0";
 export const selectItemClass =
-  "flex min-h-10 cursor-pointer items-center gap-2.5 rounded-ctl px-2.5 py-1.5 text-[13px] text-fg outline-none select-none data-highlighted:bg-step";
-/** The tick of the chosen row. */
+  "flex min-h-9 cursor-pointer items-center gap-2.5 rounded-ctl px-2.5 py-1 text-sm text-fg outline-none select-none data-highlighted:bg-step data-selected:font-medium";
+/** The tick of the chosen row (16px, as the board's). */
 export function SelectCheck() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2.5 6.5l2.5 2.5 4.5-5.5" />
-    </svg>
-  );
+  return <Icon name="check" size={16} />;
 }
 
 /** Dropdown styled like a 40px text field; the list pops over in a menu. */
@@ -57,10 +54,8 @@ export function Select({ value, onValueChange, options, compact, className, ...r
           )}
           <BaseSelect.Value className="min-w-0 truncate" />
         </span>
-        <BaseSelect.Icon className="flex-none text-muted transition-transform duration-200 ease-out group-data-popup-open:rotate-180">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 4.5l3 3 3-3" />
-          </svg>
+        <BaseSelect.Icon className="flex-none text-muted transition-transform duration-200 ease-(--e) group-data-popup-open:rotate-180">
+          <Icon name="chevronDown" size={16} />
         </BaseSelect.Icon>
       </BaseSelect.Trigger>
       <BaseSelect.Portal>

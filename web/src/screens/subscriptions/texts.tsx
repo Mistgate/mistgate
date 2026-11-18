@@ -131,18 +131,16 @@ function TextsForm({ data }: { data: Data }) {
                   )}
                 </Row>
                 <Row label={t("subs.texts.interval")} hint={t("subs.texts.intervalHint")}>
-                  <div className="sb-step">
-                    <Stepper
-                      decrementLabel={t("users.less", { what: t("subs.texts.interval") })}
-                      incrementLabel={t("users.more", { what: t("subs.texts.interval") })}
-                      onDecrement={() => set("hours", Math.max(1, f.hours - 1))}
-                      onIncrement={() => set("hours", Math.min(72, f.hours + 1))}
-                      decrementDisabled={f.hours <= 1}
-                      incrementDisabled={f.hours >= 72}
-                    >
-                      {t("subs.texts.hours", { n: f.hours })}
-                    </Stepper>
-                  </div>
+                  <Stepper
+                    decrementLabel={t("users.less", { what: t("subs.texts.interval") })}
+                    incrementLabel={t("users.more", { what: t("subs.texts.interval") })}
+                    onDecrement={() => set("hours", Math.max(1, f.hours - 1))}
+                    onIncrement={() => set("hours", Math.min(72, f.hours + 1))}
+                    decrementDisabled={f.hours <= 1}
+                    incrementDisabled={f.hours >= 72}
+                  >
+                    {t("subs.texts.hours", { n: f.hours })}
+                  </Stepper>
                 </Row>
               </div>
             </Section>

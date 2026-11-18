@@ -1,7 +1,7 @@
 import { Scramble } from "@/components/fx/scramble-react";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Avatar } from "@/components/ui/bits";
+import { Avatar, avatarIndex } from "@/components/ui/bits";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { GetNodeResponse } from "@/gen/mistgate/admin/v1/node_pb";
 import { useT } from "@/i18n";
@@ -81,11 +81,11 @@ export function OnlineNow({ data }: { data: Plain<GetNodeResponse> }) {
       shown={shown.length}
       onAll={() => setAll(true)}
     >
-      {shown.map((u, i) => {
+      {shown.map((u) => {
         const detail = [...u.models, ...u.protocols.map(protocolName), u.connections > 1 ? t.n("node.connections", u.connections) : ""].filter(Boolean).join(" · ");
         return (
           <Link key={u.userId} to="/users/$id" params={{ id: u.userId }} className={cx("grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-t border-line py-2.5 transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]", rowPad)}>
-            <Avatar name={u.userName} index={i} />
+            <Avatar name={u.userName} index={avatarIndex(u.userName)} />
             <div className="min-w-0 overflow-hidden">
               <b className="font-medium">{u.userName}</b>
               <span className="block truncate text-xs text-muted">{detail}</span>
