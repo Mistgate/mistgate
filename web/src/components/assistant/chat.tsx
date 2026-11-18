@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Tip } from "@/components/ui/tooltip";
 import { ChatRole } from "@/gen/mistgate/admin/v1/assistant_pb";
@@ -231,6 +231,7 @@ export function ChatDock() {
   const access = useQuery({ ...accessQuery, refetchInterval: (q) => followUpPoll(q.state.data) });
   const [open, setOpen] = useState(false);
   const chat = useChat();
+  const button = useRef<HTMLButtonElement>(null);
   const openConversation = chat.open;
   const available = (access.data?.available ?? false) || access.data?.reason === "no_provider";
 
@@ -254,26 +255,34 @@ export function ChatDock() {
     return () => window.removeEventListener("mistgate:assistant-open", onOpen);
   }, [openConversation, resetChat]);
 
+  // closing from the keyboard (or the window's own button) gives the focus back to the button the window came from
+  const close = useCallback(() => {
+    const inside = !!document.activeElement?.closest(".as-dock");
+    setOpen(false);
+    if (inside) setTimeout(() => button.current?.focus(), 0);
+  }, []);
+
   useEffect(() => {
     if (!available) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
         e.preventDefault();
-        setOpen((v) => !v);
+        if (open) close();
+        else setOpen(true);
       }
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape" && open) close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [available]);
+  }, [available, open, close]);
 
   if (!available) return null;
   return (
     <>
-      <ChatButton onClick={() => setOpen(true)} onWarm={() => void loadPanel()} open={open} running={chat.running} unread={access.data?.unread ?? 0} />
+      <ChatButton buttonRef={button} onClick={() => setOpen(true)} onWarm={() => void loadPanel()} open={open} running={chat.running} unread={access.data?.unread ?? 0} />
       {open && (
         <Suspense fallback={null}>
-          <ChatPanel key={draft?.n ?? 0} chat={chat} readOnly={access.data?.readOnly ?? false} providerLabel={access.data?.model || ""} provider={access.data?.provider} draft={draft} onClose={() => setOpen(false)} />
+          <ChatPanel key={draft?.n ?? 0} chat={chat} readOnly={access.data?.readOnly ?? false} providerLabel={access.data?.model || ""} provider={access.data?.provider} draft={draft} onClose={close} />
         </Suspense>
       )}
     </>
@@ -285,7 +294,7 @@ export function ChatDock() {
  * in its name); a turn that is running draws a ring round it. It floats at the end of the window, above the dock on a phone. While the window
  * is open it shrinks away and cannot be reached (.fab.gone).
  */
-export function ChatButton({ onClick, running, unread = 0, open = false, onWarm }: { onClick: () => void; running: boolean; unread?: number; open?: boolean; onWarm?: () => void }) {
+export function ChatButton({ onClick, running, unread = 0, open = false, onWarm, buttonRef }: { onClick: () => void; running: boolean; unread?: number; open?: boolean; onWarm?: () => void; buttonRef?: RefObject<HTMLButtonElement | null> }) {
   const t = useT();
   // a follow-up answered while the admin was away: the count on the button, and in its name
   const label = unread > 0 ? `${t("ai.chat.open")}: ${t.n("ai.chat.unread", unread)}` : t("ai.chat.open");
@@ -293,6 +302,7 @@ export function ChatButton({ onClick, running, unread = 0, open = false, onWarm 
     <div className="fixed end-4 bottom-[104px] z-20 md:end-8 md:bottom-8">
       <Tip label={`${label} (Ctrl+J)`}>
         <button
+          ref={buttonRef}
           type="button"
           onClick={onClick}
           onPointerEnter={onWarm}
