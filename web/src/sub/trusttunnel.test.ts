@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { cases } from "./dev-data";
 import { dict, langs } from "./i18n";
 import { normalize, safeTtUrl } from "./logic";
-import { qrSvg } from "./qr";
 import { actions, data, state, text } from "./test-kit";
 import { ttAppsUrl } from "./trusttunnel";
 import { view } from "./view";
@@ -125,19 +124,18 @@ describe("the TrustTunnel block", () => {
 
   it("draws a QR code for a link as long as a real one, of a size a phone camera reads", () => {
     const real = "tt://?AAEBAQ9kZTEuZXhhbXBsZS5jb20FEHVhbGljZTIzNDU2NzIzNDUGIGFCMjM0NTY3Y0QyMzQ1NjdlRjIzNDU2N2dIMjM0NTY3AhNkZTEuZXhhbXBsZS5jb206NDQzBAEACQEBDANkZTENFgoxOTIuMC4yLjUzCjE5Mi4wLjIuNTQ";
-    const svg = qrSvg(real, "x");
+    const svg = pane(tt(withTt([link({ url: real })]))).querySelector(".u-qr.big svg");
     expect(svg).not.toBeNull();
     const modules = Number(svg!.getAttribute("viewBox")!.split(" ")[2]);
     // about 60 modules: at the 216 px of the big card (less its padding) a module is about 3 px
     expect(modules).toBeGreaterThan(40);
     expect(modules).toBeLessThanOrEqual(69);
-    expect(pane(tt(withTt([link({ url: real })]))).querySelector(".u-qr.big svg")).not.toBeNull();
   });
 });
 
 describe("the words of the TrustTunnel block", () => {
   it("are in all five languages", () => {
-    const keys = ["ttT", "ttS", "ttNoLinks", "ttOpen", "ttCopy", "ttHowPhone", "ttHowDesk", "ttGet", "ttNoLink", "ttKey", "ttCap", "ttPane"] as const;
+    const keys = ["ttT", "ttNoLinks", "ttOpen", "ttCopy", "ttHowPhone", "ttHowDesk", "ttGet", "ttNoLink", "ttKey", "ttCap", "ttPane"] as const;
     for (const lang of langs) {
       for (const k of keys) expect(dict[lang][k], `${lang} ${k}`).toBeTruthy();
       expect(dict[lang].ttQr("X"), lang).toContain("X");

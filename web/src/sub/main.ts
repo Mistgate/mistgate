@@ -242,9 +242,6 @@ if (data.locked) {
     },
     true,
   );
-  // a tooltip goes away with Esc and stays away until the next tap or focus
-  document.addEventListener("keydown", (e) => e.key === "Escape" && document.documentElement.classList.add("tips-off"));
-  for (const ev of ["pointerdown", "focusin"]) document.addEventListener(ev, () => document.documentElement.classList.remove("tips-off"));
 
   const ctx = (): Ctx => ({ d: data, s: st, a: actions, t: dict[st.lang], support: data.options.show_support ? safeUrl(data.support_url) : "" });
 
