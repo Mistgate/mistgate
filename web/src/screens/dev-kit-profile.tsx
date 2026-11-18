@@ -9,7 +9,7 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { InboundState, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { isLang, setLang, useLang } from "@/i18n";
-import { profiles as profilesApi } from "@/lib/api";
+import { awg as awgApi, profiles as profilesApi } from "@/lib/api";
 import { setEffectsEnabled } from "@/lib/effects";
 import { checksQuery } from "@/lib/health";
 import { awaitingQuery } from "@/lib/integrations";
@@ -146,6 +146,11 @@ function fakeCalls(variant: string) {
   const warnings = variant.split(".").includes("warns") ? [{ pointer: "/port", code: "preset_port", message: "The look of DNS is usually on port 53", params: { preset: "dns" } }] : [];
   p.previewProfile = async () => ({ errors, warnings, clientPreview: "hysteria2://••••@de1.example.com:443/\n?sni=de1.example.com&obfs=salamander&obfs-password=••••\n#de1 · hy2 · 443", clientLabel: "de1", formats: [], obfuscationScore: undefined });
   p.updateProfile = async () => ({ profile: undefined, impact: undefined });
+  // AmneziaWG's panel asks for the mimicry cards (without an answer the page says it cannot reach the panel)
+  const a = awgApi as unknown as Record<string, unknown>;
+  const preset = (id: string, name: string, usesDomain: boolean, ports: number[], varies: boolean) => ({ id, name, versions: ["3.1", "2.0"], usesDomain, naturalPorts: ports, variesPerDevice: varies });
+  a.listMimicryPresets = async () => ({ presets: [preset("quic", "QUIC", true, [443], true), preset("dns", "DNS", true, [53], true), preset("stun", "STUN", false, [], false), preset("custom", "Custom", false, [], false)], domains: ["cloudflare.com", "example.com"] });
+  a.generateObfuscation = async () => ({ obfuscationJson: JSON.stringify({ preset: "dns", per_device_signature: true }) });
 }
 
 /** The private query cache of a scene (exported for its smoke test). */
