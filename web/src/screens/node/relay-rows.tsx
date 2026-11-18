@@ -1,5 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { isFresh } from "@/components/fx/registry";
+import { useFresh } from "@/components/fx/fresh";
+import { effectsFor } from "@/lib/effects";
 import { Flag } from "@/components/ui/flag";
 import { Icon } from "@/components/ui/icons";
 import { ProtocolTag } from "@/components/ui/protocol-tag";
@@ -60,6 +63,9 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
   const fmt = useFmt();
   const [open, setOpen] = useState(!!start);
   const [menu, setMenu] = useState(false);
+  // a relay that was just made grows into its row and sweeps (the board's nd-new): decided when the row first appears, the sweep takes the mark
+  const [grow] = useState(() => effectsFor("create") && isFresh("relay", r.id));
+  const fresh = useFresh<HTMLLIElement>("relay", r.id);
   // the port and the method open under the row, in place of a window
   const [edit, setEdit] = useState<"port" | "mode" | null>(startEdit ?? null);
   const state: RelayState = busy === "check" || busy === "on" ? "checking" : relayState(r);
@@ -109,7 +115,7 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
   };
 
   return (
-    <li data-testid="relay-row" data-state={state} className={cx("wy-sv", !r.enabled && "off", busy && "now")}>
+    <li ref={fresh} data-testid="relay-row" data-state={state} className={cx("wy-sv", !r.enabled && "off", busy && "now", grow && "wy-new")}>
       <div className="wy-s1">
         <span className="tg flex justify-center">
           <ProtocolTag protocol={r.protocol} compact />

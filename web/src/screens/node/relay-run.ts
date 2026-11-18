@@ -59,6 +59,8 @@ export async function runOne(ctx: RunCtx, c: Candidate, on: boolean, port: strin
   let r: RelayMsg;
   try {
     r = existing ?? plain(await relaysApi.createRelay({ inboundId: c.inboundId, viaNodeId: entry.id, port: Number(port) || 0, ...(asked !== "auto" ? { mode: asked } : {}) })).relay!;
+    // a relay that is new grows into its row when the list reads it (the board's nd-new), and sweeps
+    if (!existing) markFresh("relay", r.id);
     r = plain(await relaysApi.checkRelay({ id: r.id, ...(wantsReach(r) ? { reverseReach: true } : {}) })).relay!;
   } catch (e) {
     const ce = ConnectError.from(e);
@@ -94,7 +96,7 @@ export async function runOne(ctx: RunCtx, c: Candidate, on: boolean, port: strin
       markFresh("lane", `${c.nodeId}:via:${entry.id}`); // on the exit's page ...
       markFresh("lane", `${entry.id}:out:${c.nodeId}`); // ... and on the entry's
     }
-    markFresh("relay", r.id);
+    if (existing) markFresh("relay", r.id); // a relay that was there already: it sweeps when it comes on
     // what the panel settled on, else what the check said
     const bridged = done ? activeOf(done) === "reverse" : viaBridge;
     set({ bridge: bridged ? "ok" : null, path: "ok", tone: "ok", text: t(bridged ? "relay.dlg.result.onBridge" : "relay.dlg.result.on", { via: viaLabel(t, entry.cc), hours }) });

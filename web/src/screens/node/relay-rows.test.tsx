@@ -418,3 +418,24 @@ describe("the editors under a server's row", () => {
     expect(document.querySelector("[data-testid=relay-port-editor]")).toBeNull();
   });
 });
+
+describe("a relay that was just made", () => {
+  it("grows into its row when the effects are on, and appears as any row without them", async () => {
+    listRelays.mockResolvedValue({ relays: [relay()] });
+    await mount(<Rows />);
+    expect(rowOf("VLESS · TCP").classList.contains("wy-new")).toBe(false);
+    act(() => root?.unmount());
+    host?.remove();
+    const { setEffectsEnabled } = await import("@/lib/effects");
+    const { markFresh, resetFresh } = await import("@/components/fx/registry");
+    setEffectsEnabled(true);
+    try {
+      markFresh("relay", "rly_1");
+      await mount(<Rows />);
+      expect(rowOf("VLESS · TCP").classList.contains("wy-new")).toBe(true);
+    } finally {
+      resetFresh();
+      setEffectsEnabled(false);
+    }
+  });
+});

@@ -4,8 +4,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { setLang } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
 import { nodePageData } from "./dev-kit-node-page";
 import { seedWays, waysFrames, waysSceneOf } from "./dev-kit-node-ways";
+import { setJob } from "./node/relay-job";
 import { useWays, WaysTab } from "./node/ways";
 
 // The scenes of the Ways in tab (/dev-kit?only=nodepage&tab=ways) draw the real tab on made-up data: every scene must draw, in every
@@ -36,6 +38,7 @@ afterEach(() => {
   root = host = null;
   localStorage.clear();
   setLang("en");
+  setJob(undefined);
 });
 
 function Tab({ data }: { data: never }) {
@@ -137,6 +140,113 @@ describe("the scenes of the Ways in tab", () => {
     for (const q of ["w=1&way=via:nod_msk1&cas=br", "w=1&role=entry&cas=full&way=out:nod_nl1"]) {
       const text = await draw(q, "calm");
       expect(text).not.toMatch(/\b(wy|nw|ways|relay)\.[a-z]/);
+      act(() => root?.unmount());
+      host?.remove();
+    }
+  });
+});
+
+describe("the scenes of the wizard Make reachable and of the strip over the ways", () => {
+  const frame = (id: string) => waysFrames.find((f) => f.id === id)!;
+  const dlg = () => document.querySelector<HTMLElement>("[role=dialog]")!;
+  const stepOf = () => dlg().querySelector<HTMLElement>("[data-testid=relay-wizard]")!.dataset.step;
+  const rowStates = () => [...dlg().querySelectorAll("[data-testid=wizard-run-row]")].map((r) => r.getAttribute("data-state"));
+
+  // scene -> the step it is at and what it says (the board's PnNode: nqW1 .. nqW4)
+  const table: [string, string, string[]][] = [
+    ["wz-1", "1", ["The wizard was opened from the node’s page, so the node is already chosen", "no way", "Node: de1"]],
+    ["wz-1-part", "1", ["partly"]],
+    ["wz-2", "2", ["Through which node should people go to de1", "msk1", "Fits", "msk2 → de1 is blocked (TSPU check)", "Direct does not pass, but a bridge is possible: de1 reaches msk2", "Load now 34 %", "No check data from spb1", "Entry: msk1"]],
+    ["wz-2-none", "2", ["All the entries are already used for de1", "Entry: none"]],
+    ["wz-3", "3", ["3 of 3 servers", "its own key through the entry for every device", "14 people get “DE · via RU”: 3 more servers of de1 through msk1, beside the old ones", "AmneziaVPN: 3 devices — download the config “via RU” again", "3 relays through msk1"]],
+    ["wz-3-bridge", "3", ["bridge", "Will go through the bridge: msk2 does not reach de1 directly", "does not go over the bridge yet", "1 of 3 servers", "Through the bridge de1 does not see the addresses of people"]],
+    ["wz-4-run", "4", ["Checking and turning on · 1 of 3", "VLESS · Reality: works", "Hysteria2: checking msk1 → de1 and from outside", "AmneziaWG 3.1: waits", "You can close the window: the run goes on"]],
+    ["wz-4-run-bridge", "4", ["Hysteria2: checking de1 → msk2 again and waiting for de1 to bring up the bridge (up to 30 s)"]],
+    ["wz-4-done", "4", ["Done · 3 of 3", "de1 is reachable through msk1", "People get the new servers with the next subscription update", "All relays are on"]],
+    ["wz-4-done-bridge", "4", ["works · bridge: msk2 does not reach de1 directly", "de1 is reachable through msk2"]],
+    ["wz-4-part", "4", ["de1 — partly: 2 of 3", "Hysteria2: Not turned on: msk1 cannot reach de1 on 4443/udp", "Another entry…", "Some did not start: they stay off"]],
+    ["wz-4-bad", "4", ["de1 — did not work out", "Port 2053 on msk1 is already taken by the profile", "Take 2054"]],
+    ["wz-4-stopped", "4", ["Stopped · 1 of 3", "not started", "What is on stays, the rest is not touched"]],
+  ];
+  it.each(table)("%s: step %s", async (id, step, says) => {
+    const text = await draw(frame(id).q, "calm");
+    expect(text).not.toContain("undefined");
+    expect(stepOf()).toBe(step);
+    for (const s of says) expect(dlg().textContent, s).toContain(s);
+    expect(dlg().textContent).not.toMatch(/\b(wy|nw|ways|relay)\.[a-z]/);
+  });
+
+  it("the steps of the run: its rows are in their states, the bar is as full as the run", async () => {
+    await draw(frame("wz-4-run").q, "calm");
+    expect(rowStates()).toEqual(["ok", "busy", "none"]);
+    expect(dlg().querySelector<HTMLElement>(".wy-pg")!.style.getPropertyValue("--pgw")).toBe("33%");
+    act(() => root?.unmount());
+    host?.remove();
+    await draw(frame("wz-4-part").q, "calm");
+    expect(rowStates()).toEqual(["ok", "bad", "ok"]);
+    expect(dlg().querySelector(".wy-pg")!.classList.contains("soon")).toBe(true);
+    act(() => root?.unmount());
+    host?.remove();
+    await draw(frame("wz-4-bad").q, "calm");
+    expect(dlg().querySelector(".wy-pg")!.classList.contains("bad")).toBe(true);
+  });
+
+  it("without the effects the end of a run has no wave and no glints", async () => {
+    await draw(frame("wz-4-done").q, "calm");
+    expect(dlg().querySelector(".wy-wv")).toBeNull();
+    expect(dlg().querySelector(".wy-eg")).toBeNull();
+  });
+
+  it("the wave and the glints at the edge come with the end of a run, with the effects on", async () => {
+    setEffectsEnabled(true);
+    try {
+      await draw(frame("wz-4-done").q, "calm");
+      expect(dlg().querySelector(".wy-wv i")).not.toBeNull();
+      expect(dlg().querySelectorAll(".wy-eg")).toHaveLength(2);
+    } finally {
+      setEffectsEnabled(false);
+    }
+  });
+
+  it("a run that came out only in part has no wave, whatever the effects", async () => {
+    setEffectsEnabled(true);
+    try {
+      await draw(frame("wz-4-part").q, "calm");
+      expect(dlg().querySelector(".wy-wv")).toBeNull();
+    } finally {
+      setEffectsEnabled(false);
+    }
+  });
+
+  it("the strip says what a run left and offers to finish it", async () => {
+    await draw(frame("wip-left").q, "calm");
+    const strip = document.querySelector<HTMLElement>("[data-testid=relay-unfinished]")!;
+    expect(strip.textContent).toContain("Not finished");
+    expect(strip.textContent).toContain("2 relays through msk1 were made but not turned on.");
+    expect(strip.textContent).toContain("Finish it");
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+  });
+
+  it("a run in the background: the strip has its count and bar, Open and Stop", async () => {
+    await draw(frame("wip-run").q, "calm");
+    const strip = document.querySelector<HTMLElement>("[data-testid=relay-run-strip]")!;
+    expect(strip.textContent).toContain("Turning on relays through msk1 · 1 of 3");
+    expect(strip.textContent).toContain("Open");
+    expect(strip.textContent).toContain("Stop");
+    expect(strip.querySelector<HTMLElement>(".wy-pg")!.style.getPropertyValue("--pgw")).toBe("33%");
+  });
+
+  it("an entry's page has the strip too, and its button leads to the exit's page", async () => {
+    await draw(frame("wip-entry").q, "calm");
+    const strip = document.querySelector<HTMLElement>("[data-testid=relay-unfinished]")!;
+    expect(strip.querySelector("a")?.textContent).toBe("Finish it");
+  });
+
+  it.each(["ru", "zh", "fa", "tr"] as const)("draws the wizard at every step in %s with every word translated", async (lang) => {
+    setLang(lang);
+    for (const id of ["wz-1", "wz-2", "wz-3-bridge", "wz-4-run", "wz-4-part", "wip-left"]) {
+      const text = await draw(frame(id).q, "calm");
+      expect(`${text}${document.querySelector("[role=dialog]")?.textContent ?? ""}`).not.toMatch(/\b(wy|nw|ways|relay)\.[a-z]/);
       act(() => root?.unmount());
       host?.remove();
     }
