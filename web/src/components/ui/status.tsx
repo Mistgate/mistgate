@@ -58,14 +58,11 @@ export function StatusPill({
   kind,
   label,
   sm,
-  bar,
   glyphOnly,
 }: {
   kind: StatusKind;
   label?: string;
   sm?: boolean;
-  /** As tall as the other controls of the top bar (h-bar), with their radius. */
-  bar?: boolean;
   /** Just the round glyph in a 20px pill (the fleet health strip); the surrounding text says the rest. */
   glyphOnly?: boolean;
 }) {
@@ -78,7 +75,7 @@ export function StatusPill({
       aria-label={glyphOnly ? t(word) : undefined}
       className={cx(
         `tone-${kind} pill inline-flex flex-none items-center font-medium whitespace-nowrap leading-none transition-colors duration-[400ms] ease-out`,
-        glyphOnly ? "h-5 gap-1.5 rounded-xl px-0.5" : bar ? "h-bar gap-2 rounded-field px-3 text-[13px]" : sm ? "h-6 gap-1.5 rounded-xl px-2.5 text-xs" : "h-8 gap-2 rounded-2xl px-3 text-[13px]",
+        glyphOnly ? "h-5 gap-1.5 rounded-xl px-0.5" : sm ? "h-6 gap-1.5 rounded-xl px-2.5 text-xs" : "h-8 gap-2 rounded-2xl px-3 text-[13px]",
       )}
     >
       {glyphOnly ? <StatusGlyph kind={kind} /> : <i aria-hidden className={cx("size-2 flex-none rounded-full bg-current", kind === "busy" && "animate-[mg-ui-blink_1.2s_var(--e)_infinite]")} />}

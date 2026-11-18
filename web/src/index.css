@@ -181,9 +181,6 @@
   --breakpoint-mid: 75rem;
   --breakpoint-full: 85rem;
 
-  /* one height for every control of the top bar (search, fleet pill, GitHub, language, theme): h-bar, size-bar */
-  --spacing-bar: 2.5rem;
-
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.3, 1.5, 0.5, 1);
