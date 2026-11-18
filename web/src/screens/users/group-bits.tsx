@@ -6,6 +6,7 @@ import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
 import { Callout } from "@/components/ui/notice";
 import { cx } from "@/lib/cx";
+import { NodeShareMode } from "@/gen/mistgate/admin/v1/common_pb";
 import { errorCode, errorVars } from "@/lib/errors";
 import { nodesQuery } from "@/lib/queries";
 import { useTx } from "./t";
@@ -143,6 +144,14 @@ export function heldNodeOf(e: unknown): string | undefined {
   if (c.code !== Code.FailedPrecondition || errorCode(c.rawMessage) !== "node_held") return undefined;
   return errorVars(c.rawMessage).node ?? "";
 }
+
+/**
+ * A node the owner holds back (Node.sharing LISTED or NONE) that this group was not given: it is on the group's SAVED disabled list. The panel
+ * refuses to switch it on for the group (node_held), so the row says so beforehand and is not pressed. A node the group was given is not held
+ * (it can be turned off and on again), nor is one that is handed out to every group.
+ */
+export const heldBack = (n: { id: string; sharing?: { mode: NodeShareMode } }, saved: readonly string[]) =>
+  n.sharing !== undefined && (n.sharing.mode === NodeShareMode.LISTED || n.sharing.mode === NodeShareMode.NONE) && saved.includes(n.id);
 
 /** What to do about it: the way is the node's own page, "Who gets it", not the group's. */
 export function HeldNote({ nodeId, className }: { nodeId: string; className?: string }) {

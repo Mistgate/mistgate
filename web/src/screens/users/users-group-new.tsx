@@ -22,7 +22,7 @@ import { useEdition } from "@/lib/edition";
 import { useLinkAppNames } from "@/screens/subscriptions/queries";
 import { DnsSelect, useInheritedDns } from "./dns-select";
 import { groupTone, groupTones, leastUsedTone } from "./format";
-import { HeldNote, heldNodeOf } from "./group-bits";
+import { heldBack, HeldNote, heldNodeOf } from "./group-bits";
 import { ImpactText } from "./groups";
 import { groupsQuery, profileListQuery, protocolsQuery } from "./rpc";
 import { useTx } from "./t";
@@ -102,6 +102,9 @@ function GroupWindow({ group, demo, initialProfiles, initialName, onClose, onCre
   // null = every profile (a new group starts with all of them in, as the old form did); an old group starts with its own
   const [chosen, setChosen] = useState<string[] | null>(group ? (demo?.impact ? group.profileIds.slice(1) : [...group.profileIds]) : (initialProfiles ?? null));
   const [allNodes, setAllNodes] = useState(!group || group.disabledNodeIds.length === 0);
+  // a node the owner holds back and the group was not given cannot be switched on here (node_held): it is said at the chip, not after the save
+  const isHeld = (id: string) => !!group && heldBack(nodes.find((n) => n.id === id) ?? { id }, group.disabledNodeIds);
+  const heldN = nodes.filter((n) => isHeld(n.id)).length;
   const [off, setOff] = useState<string[]>(group ? [...group.disabledNodeIds] : []);
   const [dnsPreset, setDnsPreset] = useState(group?.dnsPresetId ?? "");
   const [one, setOne] = useState(!!group || initialProfiles !== undefined);
@@ -188,7 +191,7 @@ function GroupWindow({ group, demo, initialProfiles, initialName, onClose, onCre
     setHeld(null);
     save.mutate(confirmed);
   };
-  const summary = !name.trim() ? t("ul.g.enterName") : taken ? t("ul.g.fixName") : needWay && !hasWay ? t("ul.g.needWay") : group ? t.n("users.groupEditUsers", group.userCount) : t("ul.g.sum", { n: ids.length });
+  const summary = !name.trim() ? t("ul.g.enterName") : taken ? t("ul.g.fixName") : needWay && !hasWay ? t("ul.g.needWay") : group ? t.n("users.groupEditUsers", group.userCount) : t.n("ul.g.sum", ids.length);
   const hint = !name.trim() ? t("ul.g.nameHint") : taken ? t("ul.g.dup") : t("ul.g.free");
 
   return (
@@ -319,20 +322,23 @@ function GroupWindow({ group, demo, initialProfiles, initialName, onClose, onCre
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-line p-3.5">
             <label className="flex min-w-0 cursor-pointer flex-col">
               <b className="text-sm font-medium text-fg">{t("users.nodesAll")}</b>
-              <span className="text-[13px] text-muted">{allNodes ? t("users.nodesAllHint") : t("ul.g.nodesSome")}</span>
+              <span className="text-[13px] text-muted">{heldN > 0 ? t("grp.nodes.heldSome", { n: heldN }) : allNodes ? t("users.nodesAllHint") : t("ul.g.nodesSome")}</span>
             </label>
-            <Switch aria-label={t("users.nodesAll")} checked={allNodes} onCheckedChange={setAllNodes} />
+            <Switch aria-label={t("users.nodesAll")} checked={allNodes} disabled={heldN > 0 && !allNodes} onCheckedChange={setAllNodes} />
             {nodes.length > 0 && (
               <div className="col-span-full flex flex-wrap gap-1.5">
                 {nodes.map((n) => {
                   const on = allNodes || !off.includes(n.id);
+                  const hold = isHeld(n.id);
                   return (
                     <button
                       key={n.id}
                       type="button"
                       aria-pressed={on}
-                      onClick={() => !allNodes && setOff(off.includes(n.id) ? off.filter((x) => x !== n.id) : [...off, n.id])}
-                      className={cx("inline-flex h-8 items-center gap-2 rounded-2xl border ps-2 pe-3 text-xs transition-[border-color,color] duration-150", on ? "border-accent-line text-fg" : "border-line text-muted", allNodes && "cursor-default border-line")}
+                      aria-disabled={hold || undefined}
+                      title={hold ? t("grp.nodes.heldHint") : undefined}
+                      onClick={() => !allNodes && !hold && setOff(off.includes(n.id) ? off.filter((x) => x !== n.id) : [...off, n.id])}
+                      className={cx("inline-flex h-8 items-center gap-2 rounded-2xl border ps-2 pe-3 text-xs transition-[border-color,color] duration-150", on ? "border-accent-line text-fg" : "border-line text-muted", (allNodes || hold) && "cursor-default border-line", hold && "opacity-60")}
                     >
                       <Flag code={n.countryCode} size={14} />
                       <span className="font-mono">{n.name}</span>

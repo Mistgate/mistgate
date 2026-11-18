@@ -20,7 +20,7 @@ import { telegramOnly, trustTunnelOnly } from "@/screens/profiles/protocol-meta"
 import { catalogOf, presetName, presetSubtitle, transportKey } from "@/screens/subscriptions/model";
 import { dnsPresetsQuery, useLinkAppList } from "@/screens/subscriptions/queries";
 import { useInheritedDns } from "./dns-select";
-import { barState, GlyphTile, heldNodeOf, HeldNote, Note, padClass, SaveBar, SvCard, Tick, type GroupDemo } from "./group-bits";
+import { barState, GlyphTile, heldBack, heldNodeOf, HeldNote, Note, padClass, SaveBar, SvCard, Tick, type GroupDemo } from "./group-bits";
 import { ImpactText, wayOf } from "./groups";
 import { profileListQuery, protocolsQuery } from "./rpc";
 import { useTx } from "./t";
@@ -216,6 +216,8 @@ function NodesCard({ group, manage }: { group: Group; manage: boolean }) {
     },
   });
   const all = !unlocked && disabled.length === 0;
+  // held-back nodes the group was not given cannot be switched on here: said in the row, not after a click
+  const heldN = items.filter((n) => heldBack(n, base)).length;
   const set = (next: string[]) => {
     setOk(false);
     setOff(next);
@@ -225,11 +227,11 @@ function NodesCard({ group, manage }: { group: Group; manage: boolean }) {
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-line px-6 py-3 max-md:px-4">
         <div>
           <b className="block font-medium">{t("grp.nodes.all")}</b>
-          <span className="block text-xs leading-4 text-muted">{t("grp.nodes.allHint")}</span>
+          <span className="block text-xs leading-4 text-muted">{heldN > 0 ? t("grp.nodes.heldSome", { n: heldN }) : t("grp.nodes.allHint")}</span>
         </div>
         <Switch
           checked={all}
-          disabled={!manage}
+          disabled={!manage || (heldN > 0 && !all)}
           aria-label={t("grp.nodes.all")}
           onCheckedChange={(on) => {
             setUnlocked(!on);
@@ -249,7 +251,8 @@ function NodesCard({ group, manage }: { group: Group; manage: boolean }) {
             const fit = n.protocols.filter((p) => protocolsOfGroup.has(p));
             const none = fit.length === 0;
             const on = !disabled.includes(n.id);
-            const locked = !manage || all || none;
+            const back = heldBack(n, base);
+            const locked = !manage || all || none || back;
             return (
               <button
                 key={n.id}
@@ -257,6 +260,7 @@ function NodesCard({ group, manage }: { group: Group; manage: boolean }) {
                 role="checkbox"
                 aria-checked={on}
                 aria-disabled={locked || undefined}
+                title={back ? t("grp.nodes.heldHint") : undefined}
                 onClick={() => {
                   if (locked) return;
                   set(on ? [...disabled, n.id] : disabled.filter((id) => id !== n.id));
@@ -266,13 +270,15 @@ function NodesCard({ group, manage }: { group: Group; manage: boolean }) {
                   locked ? "cursor-default" : "hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]",
                 )}
               >
-                <Tick on={on && !none} className={cx(all && !none && "opacity-50", none && "opacity-35")} />
-                <Flag code={n.countryCode} size={14} className={cx(none && "opacity-35")} />
-                <b className={cx("font-mono font-medium", none && "opacity-35")}>{n.name}</b>
+                <Tick on={on && !none} className={cx(all && !none && "opacity-50", (none || back) && "opacity-35")} />
+                <Flag code={n.countryCode} size={14} className={cx((none || back) && "opacity-35")} />
+                <b className={cx("font-mono font-medium", (none || back) && "opacity-35")}>{n.name}</b>
                 <span className="truncate text-muted">{[n.location, n.provider].filter(Boolean).join(" · ")}</span>
                 <span className="flex flex-wrap justify-end gap-1 max-md:col-[2/-1] max-md:justify-start">
                   {none ? (
                     <em className="text-xs text-muted not-italic">{t("grp.nodes.nofit")}</em>
+                  ) : back ? (
+                    <em className="text-xs text-muted not-italic">{t("grp.nodes.held")}</em>
                   ) : (
                     fit.map((p) => (
                       <span key={p} className={cx("[&>span]:h-[22px]", !on && "opacity-60 grayscale")}>

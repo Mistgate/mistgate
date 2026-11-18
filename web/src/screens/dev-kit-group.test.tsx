@@ -67,9 +67,23 @@ describe("the scenes of the group page", () => {
     if (f.state === "pick") expect(host!.textContent).toContain("Move 1");
     if (f.state === "find") expect(host!.textContent).toContain("Nobody found");
     if (f.state === "empty") expect(host!.textContent).toContain("Nobody in the group yet");
+    if (f.state === "access-held") {
+      const row = [...host!.querySelectorAll("[role=checkbox]")].find((e) => e.textContent?.includes("msk1"));
+      expect(row?.getAttribute("aria-disabled")).toBe("true");
+      expect(row?.textContent).toContain("not handed out to this group");
+    }
     if (f.state === "access-dirty") expect(host!.textContent).toContain("Changes not saved");
     if (f.state === "settings-ask-mv") expect(host!.textContent).toContain("Really move 3?");
     if (f.state === "settings-ask-del") expect(host!.textContent).toContain("Really delete?");
+  });
+
+  it.each(["ru", "zh", "fa", "tr"] as const)("the held-back node says why in %s", async (lang) => {
+    setLang(lang);
+    await draw("access-held", "&tab=access");
+    const row = [...host!.querySelectorAll("[role=checkbox]")].find((e) => e.textContent?.includes("msk1"));
+    expect(row?.getAttribute("aria-disabled")).toBe("true");
+    expect(row?.getAttribute("title")).toBeTruthy();
+    expect(host!.textContent).not.toContain("grp.");
   });
 
   it.each(["ru", "zh", "fa", "tr"] as const)("the three tabs draw in %s", async (lang) => {

@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
-import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { App, NodeShareMode, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { GroupScreen } from "./group-page";
 import { lostProfileIds, moveUsers } from "./group-move";
@@ -18,6 +18,8 @@ const updateUser = vi.fn();
 let role = Role.OWNER;
 let search: Record<string, unknown> = {};
 const navigate = vi.fn();
+// what the owner holds back: the share of each node by id (the panel sends Node.sharing)
+let shares: Record<string, { mode: NodeShareMode }> = {};
 
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
@@ -37,8 +39,8 @@ vi.mock("@/lib/api", async (orig) => ({
     listNodes: () =>
       Promise.resolve({
         nodes: [
-          { id: "nod_de1", name: "de1", countryCode: "DE", location: "Frankfurt", provider: "Example Cloud", status: NodeStatus.ONLINE, protocols: ["hysteria2", "awg"] },
-          { id: "nod_nl1", name: "nl1", countryCode: "NL", location: "Amsterdam", provider: "Example Cloud", status: NodeStatus.ONLINE, protocols: ["hysteria2"] },
+          { id: "nod_de1", name: "de1", countryCode: "DE", location: "Frankfurt", provider: "Example Cloud", status: NodeStatus.ONLINE, protocols: ["hysteria2", "awg"], sharing: shares.nod_de1 },
+          { id: "nod_nl1", name: "nl1", countryCode: "NL", location: "Amsterdam", provider: "Example Cloud", status: NodeStatus.ONLINE, protocols: ["hysteria2"], sharing: shares.nod_nl1 },
         ],
       }),
   },
@@ -93,6 +95,7 @@ let host: HTMLDivElement | null = null;
 beforeEach(() => {
   role = Role.OWNER;
   search = {};
+  shares = {};
   everyone = [person("bob", "grp_friends", { online: true, currentNodeName: "nl1" }), person("carol", "grp_friends"), person("alice", "grp_family"), person("erin", "grp_family")];
   listGroups.mockResolvedValue({ groups: [friends(), family()] });
   listUsers.mockImplementation(async (req: { groupId?: string; query?: string; pageSize: number; offset?: number }) => {
@@ -332,6 +335,40 @@ describe("the Access tab", () => {
     // a new try starts clean
     await click(button("Cancel"));
     expect(text()).not.toContain("is not handed out to this group");
+  });
+
+  it("locks a node the owner holds back and this group was not given, before any click (node_held)", async () => {
+    // nl1 is marked "nobody gets it": it is on this group's disabled list, and the panel would refuse to switch it on
+    shares = { nod_nl1: { mode: NodeShareMode.NONE } };
+    listGroups.mockResolvedValue({ groups: [{ ...friends(), disabledNodeIds: ["nod_nl1"] }, family()] });
+    await mount();
+    const row = by("checkbox", "nl1");
+    expect(row?.getAttribute("aria-disabled")).toBe("true");
+    expect(row?.getAttribute("title")).toContain("Give it on the node’s page");
+    expect(row?.textContent).toContain("not handed out to this group");
+    await click(row);
+    expect(row?.getAttribute("aria-checked")).toBe("false");
+    expect(button("Save")).toBeUndefined();
+    expect(updateGroup).not.toHaveBeenCalled();
+    // "All nodes" would switch it on too: that switch stays off and says why
+    const all = document.querySelector<HTMLElement>('[role=switch][aria-label="All nodes"]');
+    expect(all?.hasAttribute("data-disabled") || all?.getAttribute("aria-disabled") === "true").toBe(true);
+    expect(text()).toContain("Held back by the owner: 1");
+    // another node still turns off as usual
+    await click(by("checkbox", "de1"));
+    expect(by("checkbox", "de1")?.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("a held-back node the group was given turns off and back on (only a node it was not given is locked)", async () => {
+    shares = { nod_nl1: { mode: NodeShareMode.LISTED }, nod_de1: { mode: NodeShareMode.ALL } };
+    listGroups.mockResolvedValue({ groups: [{ ...friends(), disabledNodeIds: ["nod_de1"] }, family()] });
+    await mount();
+    expect(by("checkbox", "de1")?.getAttribute("aria-disabled")).toBeNull();
+    expect(by("checkbox", "nl1")?.getAttribute("aria-disabled")).toBeNull();
+    await click(by("checkbox", "nl1"));
+    expect(by("checkbox", "nl1")?.getAttribute("aria-checked")).toBe("false");
+    await click(by("checkbox", "nl1"));
+    expect(by("checkbox", "nl1")?.getAttribute("aria-checked")).toBe("true");
   });
 
   it("saves the DNS preset the moment it is picked", async () => {
