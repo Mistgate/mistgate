@@ -344,7 +344,7 @@ describe("the list of devices", () => {
   it("each key with what a friend needs: name, what kind of key, when; no AWG list, profile or address", () => {
     const el = rows("many");
     expect(listOf(el).map(nm)).toEqual(["Приложения без ID устройства", "Pixel 7", "MacBook", "Windows"]);
-    expect(sub(row(el, "d3"))).toBe("Ключ AmneziaVPN · Германия, Финляндия · AWG 3.1");
+    expect(sub(row(el, "d3"))).toBe("Ключ AmneziaVPN · Германия, Финляндия");
     expect([at(row(el, "d3")), at(row(el, "d4")), at(row(el, "d5"))]).toEqual(["в сети", "подключалось 12 дней назад", "ещё не подключалось"]);
     expect(el.textContent).not.toMatch(/Main|10\.66|fd66/);
   });

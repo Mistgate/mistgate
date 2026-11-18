@@ -157,7 +157,7 @@ function keyRow(c: Ctx, x: AwgDevice, serve: boolean): Kid[] {
   const inactive = d.user.status !== "active";
   const word = platformWord(x.platform, t);
   const name = x.label || word || t.devGeneric;
-  const tail = [countriesOf(c, x), x.version ? `AWG ${x.version}` : ""].filter(Boolean).join(" · ");
+  const tail = countriesOf(c, x);
   const busy = am.busy === x.id || am.busy === `rename:${x.id}` || am.busy === `renew:${x.id}`;
   return row(c, {
     id: x.id,

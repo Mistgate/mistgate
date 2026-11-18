@@ -322,12 +322,12 @@ describe("the keys of the AmneziaVPN app", () => {
   it("each key: the name, what kind of key it is, when it last connected; no profile or address", () => {
     const el = page(data("many"));
     expect(names(el)).toEqual(["Приложения без ID устройства", "Pixel 7", "MacBook", "Windows"]);
-    expect(meta(row(el, "d3"))).toBe("Ключ AmneziaVPN · Германия, Финляндия · AWG 3.1");
+    expect(meta(row(el, "d3"))).toBe("Ключ AmneziaVPN · Германия, Финляндия");
     expect(when(row(el, "d3"))).toBe("в сети");
     expect(when(row(el, "d4"))).toBe("подключалось 12 дней назад");
     expect(when(row(el, "d5"))).toBe("ещё не подключалось");
     expect(el.textContent).not.toMatch(/Main|10\.66|fd66/);
-    expect(meta(row(page(data("many"), {}, "en"), "d3"))).toBe("AmneziaVPN key · Germany, Финляндия · AWG 3.1".replace("Финляндия", "Finland"));
+    expect(meta(row(page(data("many"), {}, "en"), "d3"))).toBe("AmneziaVPN key · Germany, Финляндия".replace("Финляндия", "Finland"));
   });
 
   it("a key of a router has the board's router tile", () => {
