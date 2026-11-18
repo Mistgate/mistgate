@@ -625,6 +625,35 @@ package mistgate.agent.v1;
 //     address in the message. Errors: bad_params, unsupported_host, no_route, busy, timeout, refused, "failed: <short
 //     message>".
 
+// CHANNEL MEASURE (additive, protocol api_version stays 1)
+//   How wide a node's channel really is: the heavy mode of the PATH SPEED test. One stream (and 32 MB) shows only the lower bound of
+//   a link; this moves data over 8 parallel TCP streams for a fixed time (10 s), in one direction at a time, between a node and a
+//   partner node. The panel runs it only on the owner's explicit action (the "measure the channel" button, or an owner-approved MCP
+//   plan), never on a schedule, against at most 3 partners, one direction after the other.
+//   - WIRE SHAPE. The same speed_test command and the same UdpSend fields as PATH SPEED, with two more steps in size: 4 = serve (the
+//     partner), 5 = run (the node under test). Step 3 (stop) is shared. count = the volume cap in MiB (64-2048) for all the streams
+//     of the step together, pps = serve: how long the listener may wait for its streams, 1-20 s; run: the longest the whole run may
+//     take, 12-15 s. tag = the 16-byte one-time token, df = direction up (true) or down (false), host and ports[0] as in run.
+//   - CAPABILITY GATE. An agent lists "speed-channel/1" in Hello.capabilities. The panel sends steps 4 and 5 ONLY to a stream that
+//     listed it, to both ends; an older agent (even one with "speed/1") is told to update, never sent a step it would refuse.
+//   - SERVE. Opens a TCP listener on an ephemeral port and answers CommandResult{ok, params{"port"}}. A stream gets in only with
+//     its first 17 bytes: the token and its index 0-7; every index works once, so a replayed token, a ninth stream, a wrong token
+//     or a stream that does not show it within 5 s is closed, and at most 16 streams may wait to show it. The listener closes after
+//     the eighth stream, at its time, on a stop with the token, or when the panel's session ends. down: the partner sends random
+//     bytes on every stream; up: it reads until the sender closes its side and answers each stream with the 8 bytes (big endian) it
+//     received.
+//   - RUN. Resolves host as for TcpProbe (unspecified, multicast, link-local refused), opens 8 streams (3 s to connect), shows the
+//     token and the index on each, then moves data for 10 s. down: it reads and counts; up: it writes for 10 s, closes its side,
+//     and counts what the partner says it received, so what is still in flight is not counted as sent. Answer CommandResult{ok,
+//     params{"mbit_s": all streams over the window, "bytes", "duration_ms", "connect_ms" (the slowest stream), "first_byte_ms"
+//     (down), "streams": how many connected, "capped": "1" when the cap ended the run early}}.
+//   - CAPS, held by each end alone: the volume of all streams together never passes count (the sender stops at it, and the
+//     partner closes the streams at it whatever the sender does); a transfer never lives longer than 15 s from its first stream (the
+//     partner) or its start (the sender); one test per agent at a time, also while a bandwidth test or a speed/1 test runs; at most 12
+//     steps in 10 minutes ("too_soon"). A stop with the token, or the end of the session, closes every stream at once.
+//   - ERRORS (CommandResult.error): bad_params, busy, too_soon, unsupported_host, no_route, timeout, refused, "failed: <short
+//     message>".
+
 // COUNTRY PROBE (additive, protocol api_version stays 1)
 //   Does a TCP SYN to a fleet node survive the national DPI (the Russian TSPU)? Run on a node INSIDE that country, so the
 //   answer is for the network of that node's datacenter. The method needs no raw socket and no capability: a plain TCP

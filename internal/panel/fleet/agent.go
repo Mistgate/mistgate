@@ -908,6 +908,9 @@ func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capabilit
 	case frame.GetPathTrace() != nil:
 		return capProbe, "agent too old"
 	case frame.GetSpeedTest() != nil:
+		if frame.GetSpeedTest().GetSize() >= speedStepServeChannel {
+			return capSpeedChannel, "agent too old"
+		}
 		return capSpeed, "agent too old"
 	case frame.GetDebugCapture() != nil:
 		for _, source := range frame.GetDebugCapture().GetSources() {

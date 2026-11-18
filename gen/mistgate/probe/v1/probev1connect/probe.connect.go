@@ -45,6 +45,18 @@ const (
 	// ProbeServicePathSpeedResultsProcedure is the fully-qualified name of the ProbeService's
 	// PathSpeedResults RPC.
 	ProbeServicePathSpeedResultsProcedure = "/mistgate.probe.v1.ProbeService/PathSpeedResults"
+	// ProbeServiceChannelMeasurePlanProcedure is the fully-qualified name of the ProbeService's
+	// ChannelMeasurePlan RPC.
+	ProbeServiceChannelMeasurePlanProcedure = "/mistgate.probe.v1.ProbeService/ChannelMeasurePlan"
+	// ProbeServiceChannelMeasureStartProcedure is the fully-qualified name of the ProbeService's
+	// ChannelMeasureStart RPC.
+	ProbeServiceChannelMeasureStartProcedure = "/mistgate.probe.v1.ProbeService/ChannelMeasureStart"
+	// ProbeServiceChannelMeasureStatusProcedure is the fully-qualified name of the ProbeService's
+	// ChannelMeasureStatus RPC.
+	ProbeServiceChannelMeasureStatusProcedure = "/mistgate.probe.v1.ProbeService/ChannelMeasureStatus"
+	// ProbeServiceChannelMeasureCancelProcedure is the fully-qualified name of the ProbeService's
+	// ChannelMeasureCancel RPC.
+	ProbeServiceChannelMeasureCancelProcedure = "/mistgate.probe.v1.ProbeService/ChannelMeasureCancel"
 )
 
 // ProbeServiceClient is a client for the mistgate.probe.v1.ProbeService service.
@@ -65,6 +77,19 @@ type ProbeServiceClient interface {
 	// The speed tests kept in the last 7 days, newest first (for the MCP tool path_speed_results): what an approved path_speed plan
 	// measured, so a later question is answered from the figures and not from a guess. Names and figures only.
 	PathSpeedResults(context.Context, *connect.Request[v1.PathSpeedResultsRequest]) (*connect.Response[v1.PathSpeedResultsResponse], error)
+	// What "measure the channel" of a node would do now, and whether it can: the partners (the nodes with the widest known channel), the
+	// most data it may move and how long it takes, how long the pause lasts when the last measure is recent. Moves nothing.
+	ChannelMeasurePlan(context.Context, *connect.Request[v1.ChannelMeasurePlanRequest]) (*connect.Response[v1.ChannelMeasurePlanResponse], error)
+	// Starts the channel measure of one node: 8 parallel TCP streams for 10 seconds in each direction (receive, send) against up to
+	// three partner nodes, the same mechanism as PathSpeed (a one-time listener on the partner, a token), capped at 2 GiB and 15 seconds
+	// per direction on both ends. It fills the links of the node and its partners, so it is the owner's alone (and an MCP token's only
+	// through an approved plan). It runs on in the panel after the call returns; read it with ChannelMeasureStatus. One per node at a time
+	// and not more often than once in 10 minutes per node.
+	ChannelMeasureStart(context.Context, *connect.Request[v1.ChannelMeasureStartRequest]) (*connect.Response[v1.ChannelMeasureStartResponse], error)
+	// The run of a node now or last (steps with their figures) and its last stored measure. Moves nothing.
+	ChannelMeasureStatus(context.Context, *connect.Request[v1.ChannelMeasureStatusRequest]) (*connect.Response[v1.ChannelMeasureStatusResponse], error)
+	// Stops the run of a node: both ends close their streams at once.
+	ChannelMeasureCancel(context.Context, *connect.Request[v1.ChannelMeasureCancelRequest]) (*connect.Response[v1.ChannelMeasureCancelResponse], error)
 }
 
 // NewProbeServiceClient constructs a client for the mistgate.probe.v1.ProbeService service. By
@@ -108,16 +133,44 @@ func NewProbeServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(probeServiceMethods.ByName("PathSpeedResults")),
 			connect.WithClientOptions(opts...),
 		),
+		channelMeasurePlan: connect.NewClient[v1.ChannelMeasurePlanRequest, v1.ChannelMeasurePlanResponse](
+			httpClient,
+			baseURL+ProbeServiceChannelMeasurePlanProcedure,
+			connect.WithSchema(probeServiceMethods.ByName("ChannelMeasurePlan")),
+			connect.WithClientOptions(opts...),
+		),
+		channelMeasureStart: connect.NewClient[v1.ChannelMeasureStartRequest, v1.ChannelMeasureStartResponse](
+			httpClient,
+			baseURL+ProbeServiceChannelMeasureStartProcedure,
+			connect.WithSchema(probeServiceMethods.ByName("ChannelMeasureStart")),
+			connect.WithClientOptions(opts...),
+		),
+		channelMeasureStatus: connect.NewClient[v1.ChannelMeasureStatusRequest, v1.ChannelMeasureStatusResponse](
+			httpClient,
+			baseURL+ProbeServiceChannelMeasureStatusProcedure,
+			connect.WithSchema(probeServiceMethods.ByName("ChannelMeasureStatus")),
+			connect.WithClientOptions(opts...),
+		),
+		channelMeasureCancel: connect.NewClient[v1.ChannelMeasureCancelRequest, v1.ChannelMeasureCancelResponse](
+			httpClient,
+			baseURL+ProbeServiceChannelMeasureCancelProcedure,
+			connect.WithSchema(probeServiceMethods.ByName("ChannelMeasureCancel")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // probeServiceClient implements ProbeServiceClient.
 type probeServiceClient struct {
-	pathProbe        *connect.Client[v1.PathProbeRequest, v1.PathProbeResponse]
-	nodeTrace        *connect.Client[v1.NodeTraceRequest, v1.NodeTraceResponse]
-	nodeDnsCheck     *connect.Client[v1.NodeDnsCheckRequest, v1.NodeDnsCheckResponse]
-	pathSpeed        *connect.Client[v1.PathSpeedRequest, v1.PathSpeedResponse]
-	pathSpeedResults *connect.Client[v1.PathSpeedResultsRequest, v1.PathSpeedResultsResponse]
+	pathProbe            *connect.Client[v1.PathProbeRequest, v1.PathProbeResponse]
+	nodeTrace            *connect.Client[v1.NodeTraceRequest, v1.NodeTraceResponse]
+	nodeDnsCheck         *connect.Client[v1.NodeDnsCheckRequest, v1.NodeDnsCheckResponse]
+	pathSpeed            *connect.Client[v1.PathSpeedRequest, v1.PathSpeedResponse]
+	pathSpeedResults     *connect.Client[v1.PathSpeedResultsRequest, v1.PathSpeedResultsResponse]
+	channelMeasurePlan   *connect.Client[v1.ChannelMeasurePlanRequest, v1.ChannelMeasurePlanResponse]
+	channelMeasureStart  *connect.Client[v1.ChannelMeasureStartRequest, v1.ChannelMeasureStartResponse]
+	channelMeasureStatus *connect.Client[v1.ChannelMeasureStatusRequest, v1.ChannelMeasureStatusResponse]
+	channelMeasureCancel *connect.Client[v1.ChannelMeasureCancelRequest, v1.ChannelMeasureCancelResponse]
 }
 
 // PathProbe calls mistgate.probe.v1.ProbeService.PathProbe.
@@ -145,6 +198,26 @@ func (c *probeServiceClient) PathSpeedResults(ctx context.Context, req *connect.
 	return c.pathSpeedResults.CallUnary(ctx, req)
 }
 
+// ChannelMeasurePlan calls mistgate.probe.v1.ProbeService.ChannelMeasurePlan.
+func (c *probeServiceClient) ChannelMeasurePlan(ctx context.Context, req *connect.Request[v1.ChannelMeasurePlanRequest]) (*connect.Response[v1.ChannelMeasurePlanResponse], error) {
+	return c.channelMeasurePlan.CallUnary(ctx, req)
+}
+
+// ChannelMeasureStart calls mistgate.probe.v1.ProbeService.ChannelMeasureStart.
+func (c *probeServiceClient) ChannelMeasureStart(ctx context.Context, req *connect.Request[v1.ChannelMeasureStartRequest]) (*connect.Response[v1.ChannelMeasureStartResponse], error) {
+	return c.channelMeasureStart.CallUnary(ctx, req)
+}
+
+// ChannelMeasureStatus calls mistgate.probe.v1.ProbeService.ChannelMeasureStatus.
+func (c *probeServiceClient) ChannelMeasureStatus(ctx context.Context, req *connect.Request[v1.ChannelMeasureStatusRequest]) (*connect.Response[v1.ChannelMeasureStatusResponse], error) {
+	return c.channelMeasureStatus.CallUnary(ctx, req)
+}
+
+// ChannelMeasureCancel calls mistgate.probe.v1.ProbeService.ChannelMeasureCancel.
+func (c *probeServiceClient) ChannelMeasureCancel(ctx context.Context, req *connect.Request[v1.ChannelMeasureCancelRequest]) (*connect.Response[v1.ChannelMeasureCancelResponse], error) {
+	return c.channelMeasureCancel.CallUnary(ctx, req)
+}
+
 // ProbeServiceHandler is an implementation of the mistgate.probe.v1.ProbeService service.
 type ProbeServiceHandler interface {
 	// An on-demand probe from one fleet node to another: UDP (optionally an MTU sweep), TCP connect or TLS handshake with the
@@ -163,6 +236,19 @@ type ProbeServiceHandler interface {
 	// The speed tests kept in the last 7 days, newest first (for the MCP tool path_speed_results): what an approved path_speed plan
 	// measured, so a later question is answered from the figures and not from a guess. Names and figures only.
 	PathSpeedResults(context.Context, *connect.Request[v1.PathSpeedResultsRequest]) (*connect.Response[v1.PathSpeedResultsResponse], error)
+	// What "measure the channel" of a node would do now, and whether it can: the partners (the nodes with the widest known channel), the
+	// most data it may move and how long it takes, how long the pause lasts when the last measure is recent. Moves nothing.
+	ChannelMeasurePlan(context.Context, *connect.Request[v1.ChannelMeasurePlanRequest]) (*connect.Response[v1.ChannelMeasurePlanResponse], error)
+	// Starts the channel measure of one node: 8 parallel TCP streams for 10 seconds in each direction (receive, send) against up to
+	// three partner nodes, the same mechanism as PathSpeed (a one-time listener on the partner, a token), capped at 2 GiB and 15 seconds
+	// per direction on both ends. It fills the links of the node and its partners, so it is the owner's alone (and an MCP token's only
+	// through an approved plan). It runs on in the panel after the call returns; read it with ChannelMeasureStatus. One per node at a time
+	// and not more often than once in 10 minutes per node.
+	ChannelMeasureStart(context.Context, *connect.Request[v1.ChannelMeasureStartRequest]) (*connect.Response[v1.ChannelMeasureStartResponse], error)
+	// The run of a node now or last (steps with their figures) and its last stored measure. Moves nothing.
+	ChannelMeasureStatus(context.Context, *connect.Request[v1.ChannelMeasureStatusRequest]) (*connect.Response[v1.ChannelMeasureStatusResponse], error)
+	// Stops the run of a node: both ends close their streams at once.
+	ChannelMeasureCancel(context.Context, *connect.Request[v1.ChannelMeasureCancelRequest]) (*connect.Response[v1.ChannelMeasureCancelResponse], error)
 }
 
 // NewProbeServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -202,6 +288,30 @@ func NewProbeServiceHandler(svc ProbeServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(probeServiceMethods.ByName("PathSpeedResults")),
 		connect.WithHandlerOptions(opts...),
 	)
+	probeServiceChannelMeasurePlanHandler := connect.NewUnaryHandler(
+		ProbeServiceChannelMeasurePlanProcedure,
+		svc.ChannelMeasurePlan,
+		connect.WithSchema(probeServiceMethods.ByName("ChannelMeasurePlan")),
+		connect.WithHandlerOptions(opts...),
+	)
+	probeServiceChannelMeasureStartHandler := connect.NewUnaryHandler(
+		ProbeServiceChannelMeasureStartProcedure,
+		svc.ChannelMeasureStart,
+		connect.WithSchema(probeServiceMethods.ByName("ChannelMeasureStart")),
+		connect.WithHandlerOptions(opts...),
+	)
+	probeServiceChannelMeasureStatusHandler := connect.NewUnaryHandler(
+		ProbeServiceChannelMeasureStatusProcedure,
+		svc.ChannelMeasureStatus,
+		connect.WithSchema(probeServiceMethods.ByName("ChannelMeasureStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
+	probeServiceChannelMeasureCancelHandler := connect.NewUnaryHandler(
+		ProbeServiceChannelMeasureCancelProcedure,
+		svc.ChannelMeasureCancel,
+		connect.WithSchema(probeServiceMethods.ByName("ChannelMeasureCancel")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.probe.v1.ProbeService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProbeServicePathProbeProcedure:
@@ -214,6 +324,14 @@ func NewProbeServiceHandler(svc ProbeServiceHandler, opts ...connect.HandlerOpti
 			probeServicePathSpeedHandler.ServeHTTP(w, r)
 		case ProbeServicePathSpeedResultsProcedure:
 			probeServicePathSpeedResultsHandler.ServeHTTP(w, r)
+		case ProbeServiceChannelMeasurePlanProcedure:
+			probeServiceChannelMeasurePlanHandler.ServeHTTP(w, r)
+		case ProbeServiceChannelMeasureStartProcedure:
+			probeServiceChannelMeasureStartHandler.ServeHTTP(w, r)
+		case ProbeServiceChannelMeasureStatusProcedure:
+			probeServiceChannelMeasureStatusHandler.ServeHTTP(w, r)
+		case ProbeServiceChannelMeasureCancelProcedure:
+			probeServiceChannelMeasureCancelHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -241,4 +359,20 @@ func (UnimplementedProbeServiceHandler) PathSpeed(context.Context, *connect.Requ
 
 func (UnimplementedProbeServiceHandler) PathSpeedResults(context.Context, *connect.Request[v1.PathSpeedResultsRequest]) (*connect.Response[v1.PathSpeedResultsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.PathSpeedResults is not implemented"))
+}
+
+func (UnimplementedProbeServiceHandler) ChannelMeasurePlan(context.Context, *connect.Request[v1.ChannelMeasurePlanRequest]) (*connect.Response[v1.ChannelMeasurePlanResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.ChannelMeasurePlan is not implemented"))
+}
+
+func (UnimplementedProbeServiceHandler) ChannelMeasureStart(context.Context, *connect.Request[v1.ChannelMeasureStartRequest]) (*connect.Response[v1.ChannelMeasureStartResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.ChannelMeasureStart is not implemented"))
+}
+
+func (UnimplementedProbeServiceHandler) ChannelMeasureStatus(context.Context, *connect.Request[v1.ChannelMeasureStatusRequest]) (*connect.Response[v1.ChannelMeasureStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.ChannelMeasureStatus is not implemented"))
+}
+
+func (UnimplementedProbeServiceHandler) ChannelMeasureCancel(context.Context, *connect.Request[v1.ChannelMeasureCancelRequest]) (*connect.Response[v1.ChannelMeasureCancelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.ChannelMeasureCancel is not implemented"))
 }

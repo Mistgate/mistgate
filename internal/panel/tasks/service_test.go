@@ -810,3 +810,16 @@ func TestDeleteTask(t *testing.T) {
 		t.Fatalf("list: %+v", list.Msg)
 	}
 }
+
+// A scheduled task never fills a node's link: the channel measure is a plan and an apply (the owner's approval in between), and
+// no check step may be either, so no schedule can start one. Its figures can be read by a check.
+func TestNoScheduledTaskCanStartAChannelMeasure(t *testing.T) {
+	for _, name := range []string{"channel_measure_plan", "channel_measure_apply", "path_speed_plan", "path_speed_apply"} {
+		if CheckToolName(name) {
+			t.Errorf("a check step may run %s", name)
+		}
+	}
+	if !CheckToolName("path_speed_results") {
+		t.Error("a check cannot read the kept speed figures")
+	}
+}

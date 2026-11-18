@@ -19,4 +19,7 @@ type probeState struct {
 
 	// path_speed (path_speed.go): a node runs one test at a time, and starts are counted over a day per node and per caller.
 	speedBusy map[string]struct{}
+
+	// the channel measure (channel_measure.go): the newest run of each node, running or over
+	channel channelState
 }

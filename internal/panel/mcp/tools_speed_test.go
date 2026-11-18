@@ -32,7 +32,8 @@ func (w *world) PathSpeedResults(_ context.Context, r *connect.Request[probev1.P
 	w.mu.Unlock()
 	return connect.NewResponse(&probev1.PathSpeedResultsResponse{Tests: []*probev1.PathSpeedResponse{
 		{FromName: "nl1", ToName: "de1", Direction: "down", Mb: 32, AtUnix: 1700000000, MbitS: 308.3, ConnectMs: 37, FirstByteMs: 37, DurationMs: 870, Bytes: 32 << 20},
-	}}), nil
+		{FromName: "nl1", ToName: "se1", Direction: "up", Mb: 2048, AtUnix: 1700000100, MbitS: 455.1, DurationMs: 10000, Bytes: 568 << 20, Streams: 8, Capped: true},
+	}, Channels: []*probev1.ChannelNodeLast{{NodeName: "nl1", Last: channelFixture()}}}), nil
 }
 
 // The figure of an approved test can be read back by anyone who reads the fleet, and it says what the figure is: one stream, a lower bound.
@@ -49,7 +50,7 @@ func TestPathSpeedResultsReadsTheKeptFigures(t *testing.T) {
 	out := mustOK(t, s, "path_speed_results", map[string]any{"node": "nl1"})
 	noCanary(t, "path_speed_results", out)
 	v := decode[pathSpeedResultsView](t, out)
-	if len(v.Tests) != 1 || v.Tests[0].From != "nl1" || v.Tests[0].To != "de1" || v.Tests[0].MbitS != 308.3 || v.Tests[0].DurationMs != 870 || v.Tests[0].MB != 32 {
+	if len(v.Tests) != 2 || v.Tests[0].From != "nl1" || v.Tests[0].To != "de1" || v.Tests[0].MbitS != 308.3 || v.Tests[0].DurationMs != 870 || v.Tests[0].MB != 32 {
 		t.Fatalf("tests = %+v", v.Tests)
 	}
 	if !strings.Contains(v.Note, "ONE TCP stream") || !strings.Contains(v.Note, "lower bound") {

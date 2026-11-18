@@ -9,8 +9,10 @@ import { Pending, QueryError } from "@/components/ui/query-error";
 import { Segmented } from "@/components/ui/segmented";
 import { StatusDot } from "@/components/ui/status";
 import type { GetFleetLoadResponse, LoadRecommendation, NodeLoad } from "@/gen/mistgate/ops/v1/ops_pb";
+import type { ChannelLast } from "@/gen/mistgate/probe/v1/probe_pb";
 import { useT, type T } from "@/i18n";
-import { ops } from "@/lib/api";
+import { ops, probe } from "@/lib/api";
+import { useEdition } from "@/lib/edition";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
 import { isUnavailable } from "@/lib/ops";
@@ -58,6 +60,9 @@ export function FleetLoad() {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const q = useQuery(fleetLoadQuery(hours));
   const fleet = useQuery(nodesQuery).data?.nodes;
+  // the last "Measure the channel" of each node: a read of what the panel kept (the Cloudflare edition has no probe service)
+  const edge = useEdition().edge;
+  const measures = useQuery({ queryKey: ["channel-measures"], queryFn: () => probe.pathSpeedResults({ limit: 1 }), enabled: !edge, retry: false, staleTime: 60_000 }).data?.channels;
   const toggle = (id: string) => setOpen((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set([...s, id])));
 
   if (!q.data) {
@@ -95,7 +100,7 @@ export function FleetLoad() {
           {data.nodes.map((n) => (
             <Fragment key={n.nodeId}>
               <NodeRow n={n} fmt={fmt} expanded={open.has(n.nodeId)} onToggle={() => toggle(n.nodeId)} country={where.get(n.nodeId)?.countryCode} place={where.get(n.nodeId)?.location} />
-              {open.has(n.nodeId) && <Details n={n} hours={data.hours} fmt={fmt} />}
+              {open.has(n.nodeId) && <Details n={n} hours={data.hours} fmt={fmt} channel={measures?.find((c) => c.nodeName === n.nodeName)?.last} />}
             </Fragment>
           ))}
         </section>
@@ -234,7 +239,7 @@ function Meter({ label, value, note, first, shown }: { label: string; value: num
 }
 
 /** What to do about a node, the meters closest to their limit, then the numbers the read went by. */
-function Details({ n, hours, fmt }: { n: Row; hours: number; fmt: Fmt }) {
+function Details({ n, hours, fmt, channel }: { n: Row; hours: number; fmt: Fmt; channel?: ChannelLast }) {
   const t = useT();
   const known = n.status !== "unknown";
   const pct = (v: number | undefined) => (v === undefined ? t("load.d.unknown") : `${fmt.num(v, v < 10 ? 1 : 0)}%`);
@@ -279,6 +284,15 @@ function Details({ n, hours, fmt }: { n: Row; hours: number; fmt: Fmt }) {
               : t("load.d.agentMem.value", { rss: b(n.agentRssMaxBytes), growth: fmt.num(n.agentRssGrowthPctPerDay, 1) }),
       },
     );
+  }
+  if (channel) {
+    // what the owner's "Measure the channel" found, next to the traffic the number is judged against
+    const cap = (d?: { capped: boolean }) => (d?.capped ? `${t("cm.last.capped")} ` : "");
+    const mbps = (d?: { mbitS: number }) => t("np.sv.ch.mbps", { n: Math.round(d?.mbitS ?? 0) });
+    facts.push({
+      label: t("cm.load.label"),
+      value: t("cm.last", { when: fmt.ago(Number(channel.atUnix)), down: cap(channel.down) + mbps(channel.down), up: cap(channel.up) + mbps(channel.up) }),
+    });
   }
   const [lead, ...rest] = n.recommendations;
   const warn = n.status === "busy" || n.status === "overloaded" || lead?.severity === "crit" || lead?.severity === "warn";

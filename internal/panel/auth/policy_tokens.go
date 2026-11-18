@@ -96,6 +96,11 @@ var tokenProcedures = map[string]int{
 	PathSpeedProcedure: TokenAccessApproved,
 	// the kept figures of those tests (node names and numbers): read directly, so a later turn can read what the owner approved
 	PathSpeedResultsProcedure: TokenAccessDirect,
+	// the channel measure fills the links of a node and its partners for half a minute: only through the owner's approval; its plan and
+	// its status are reads of names and figures
+	ChannelMeasurePlanProcedure:   TokenAccessDirect,
+	ChannelMeasureStartProcedure:  TokenAccessApproved,
+	ChannelMeasureStatusProcedure: TokenAccessDirect,
 	// Day-to-day changes (level write: the operator profile and up).
 	adminv1connect.UserServiceCreateUserProcedure:       TokenAccessDirect,
 	adminv1connect.UserServiceUpdateUserProcedure:       TokenAccessDirect,
@@ -247,6 +252,7 @@ var grantProcedures = map[string][]string{
 	"node_ipv6":                   {adminv1connect.NodeServiceUpdateIpv6EntryProcedure},
 	"node_awg_backend":            {adminv1connect.NodeServiceUpdateNodeProcedure},
 	"path_speed":                  {PathSpeedProcedure},
+	"channel_measure":             {ChannelMeasureStartProcedure},
 	"node_fix":                    {adminv1connect.HealthServiceApplyFixProcedure},
 	"rollout_start":               {adminv1connect.UpdateServiceStartRolloutProcedure},
 	"rollout_pause":               {adminv1connect.UpdateServicePauseRolloutProcedure},

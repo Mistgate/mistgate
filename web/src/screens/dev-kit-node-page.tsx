@@ -33,6 +33,8 @@ import { fleet as fleetApi, health, nodes as nodesApi, warp as warpApi } from "@
 import { sitesQuery } from "@/lib/decoysites";
 import { cardDemo } from "./node/decoy";
 import { installLibrary } from "./dev-kit-decoys";
+import { channelScene, channelStateOf, channelStates } from "./dev-kit-channel";
+import { channelDemo } from "./node/channel-measure";
 import { warpQuery } from "./node/warp-model";
 import { nodeDnsOptionsQuery } from "./node/dns-options";
 import { dnsPresetsQuery } from "./subscriptions/queries";
@@ -45,6 +47,7 @@ import { osUpdatesQuery } from "@/lib/os-updates";
 // each in a frame of its own width (an iframe, so the window's breakpoints answer to the frame), inside the real shell. Each frame is
 // a page of its own: /dev-kit?only=nodepage-frame&tab=<tab>&state=<state>
 //   calm | alerts | many | high | limit | down | new | retired | viewer | edge | via | entry
+// The Channel card (?tab=server&sv=ch) takes `cm=confirm|none|old|offline|soon|busy|running|done|same|partial|capped|failed|canceled|last` for "Measure the channel" (dev-kit-channel.ts).
 // `fx=1` turns the reveal animation on. `long=1` gives the node, its profiles, people and devices the long names of live data. `ru=<kind>` seeds what the checks card says from Russia (dev-kit-node-ru.ts: ok | partial | tcp | bad | listed | unknown | none | probe | points | conflict | old | long). The Exit tab takes `wp=ok|pause|bad|none|revoked` (the WARP card) and `rc=ok|mixed|wait|old|off|stale` (the sites it is
 // checked against: all reachable, a mix, waiting for the first answer, an agent without the check, the check off, a result hours old). The decoy site card (?tab=server&sv=site) takes `ds=panel|own|pending|offline|failed|old|none|pick|warn|
 // empty` for the states of its choice and its delivery. Made-up data: nodes de1, nl1, fi1, msk1, people alice, dave, bob, a panel called owner.
@@ -490,6 +493,13 @@ export function NodePageFrame() {
     made.qc.setQueryData(sitesQuery.queryKey, (decoy.empty ? { ...library, sites: [] } : library) as never);
     Object.assign(made.data.node, decoy.node, state === "edge" ? { decoyOwnAvailable: false } : {});
     cardDemo.current = decoy.demo;
+    // "Measure the channel" (sv=ch&cm=<state>): the window and the run in the state a click would bring it to
+    const cm = channelStateOf(params.get("cm"));
+    channelDemo.current = undefined;
+    if (cm) {
+      const sc = channelScene(cm);
+      if (sc.configured) Object.assign(made.data.node, { bandwidthMbps: sc.configured });
+    }
     return made;
   });
   return (
@@ -534,6 +544,7 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-doctor-phone", state: "alerts", tab: "doctor", title: "Doctor on a phone, 400 wide", w: 400, h: 2600 },
   { id: "node-server-node", state: "calm", tab: "server", title: "Server: the node", w: 1440, h: 1000 },
   { id: "node-server-ch", state: "calm", tab: "server", q: "sv=ch", title: "Server: bandwidth", w: 1440, h: 700 },
+  ...channelStates.map((cm) => ({ id: `node-server-ch-${cm}`, state: "calm" as NState, tab: "server", q: `sv=ch&cm=${cm}`, title: `Server: measure the channel, ${cm}`, w: 1440, h: 900 })),
   { id: "node-server-ag", state: "calm", tab: "server", q: "sv=ag", title: "Server: the agent and the link", w: 1440, h: 900 },
   { id: "node-server-ssh", state: "calm", tab: "server", q: "sv=ssh", title: "Server: SSH access and the keys on the server", w: 1440, h: 1400 },
   { id: "node-server-site", state: "calm", tab: "server", q: "sv=site", title: "Server: the decoy site, the built-in page applied", w: 1440, h: 900 },

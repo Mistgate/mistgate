@@ -11,7 +11,8 @@ import { PanelResourcesCard } from "./settings-pages/panel-resources";
 // Nodes -> Load: a row per node from GetFleetLoad, recommendations in place; and Settings -> System, the panel's own resources.
 
 const ops = vi.hoisted(() => ({ getFleetLoad: vi.fn(), getPanelResources: vi.fn() }));
-vi.mock("@/lib/api", async (orig) => ({ ...(await orig<typeof import("@/lib/api")>()), ops }));
+const probe = vi.hoisted(() => ({ pathSpeedResults: vi.fn() }));
+vi.mock("@/lib/api", async (orig) => ({ ...(await orig<typeof import("@/lib/api")>()), ops, probe }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className }: { children?: ReactNode; className?: string }) => <a className={className}>{children}</a>,
 }));
@@ -31,6 +32,7 @@ afterEach(() => {
   host?.remove();
   root = host = null;
   Object.values(ops).forEach((m) => m.mockReset());
+  probe.pathSpeedResults.mockReset();
   setLang("en");
 });
 
@@ -121,6 +123,19 @@ describe("the Load view", () => {
     await click([...host!.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === "30 d")!);
     await settle();
     expect(ops.getFleetLoad).toHaveBeenLastCalledWith({ hours: 720 }, expect.anything());
+  });
+
+  it("shows the last channel measure of a node among its facts, and nothing for a node that has none", async () => {
+    ops.getFleetLoad.mockResolvedValue(load);
+    const atUnix = BigInt(Math.floor(Date.now() / 1000) - 3 * 3600);
+    probe.pathSpeedResults.mockResolvedValue({ tests: [], channels: [{ nodeName: "de1", last: { atUnix, down: { mbitS: 812.4, partner: "nl1", streams: 8, capped: false }, up: { mbitS: 455.1, partner: "se1", streams: 8, capped: true }, partners: 3 } }] });
+    await mount(<FleetLoad />);
+    expect(probe.pathSpeedResults).toHaveBeenCalledWith({ limit: 1 });
+    await click(host!.querySelector("button[aria-label='Show what to do about de1']")!);
+    expect(host!.textContent).toContain("Channel measure");
+    expect(host!.textContent).toContain("Measured 3 h ago: receiving 812 Mbps, sending at least 455 Mbps");
+    await click(host!.querySelector("button[aria-label='Show what to do about nl1']")!);
+    expect(host!.textContent!.match(/Channel measure/g)).toHaveLength(1); // only de1 has one
   });
 
   it("says what the Cloudflare edition lacks", async () => {

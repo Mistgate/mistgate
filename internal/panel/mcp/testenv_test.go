@@ -422,7 +422,12 @@ type world struct {
 	speedReqs           []*probev1.PathSpeedRequest
 	speedResultReqs     []*probev1.PathSpeedResultsRequest
 	speedCode           string // the error code PathSpeed answers with
-	probeRateLimited    bool   // PathProbe answers resource exhausted
+	channelPlanCode     string // the error code ChannelMeasurePlan answers with
+	channelStartCode    string // the error code ChannelMeasureStart answers with
+	channelEndState     string // how the run ends: done (default), failed, canceled, running (never ends), down-only
+	channelStarts       []string
+	channelPolls        int
+	probeRateLimited    bool // PathProbe answers resource exhausted
 	clientAPIEnabled    bool
 	compatReq           []*adminv1.ListOutdatedDevicesRequest
 	mu                  sync.Mutex

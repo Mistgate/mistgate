@@ -40,6 +40,11 @@ type speedState struct {
 	busy     bool
 	token    []byte
 	listener net.Listener
+	// abort ends a channel measure (speed_channel.go) that is running or listening; steps are when its recent steps started
+	abort func()
+	steps []time.Time
+	// testLimits replaces the channel limits in tests only
+	testLimits *channelLimits
 	// resolve is nil in production (tcpcheck.ResolveDestination).
 	resolve func(ctx context.Context, host string) (netip.Addr, error)
 }
@@ -56,7 +61,7 @@ func (st *speedState) acquire() bool {
 
 func (st *speedState) release() {
 	st.mu.Lock()
-	st.busy, st.token, st.listener = false, nil, nil
+	st.busy, st.token, st.listener, st.abort = false, nil, nil, nil
 	st.mu.Unlock()
 }
 
@@ -76,6 +81,10 @@ func speedCommand(u *pb.UdpSend) *speedCmd {
 		role = "run"
 	case 3:
 		role = "stop"
+	case speedStepServeChannel:
+		role = "serve-channel"
+	case speedStepRunChannel:
+		role = "run-channel"
 	}
 	c := &speedCmd{RequestId: u.RequestId, Role: role, Direction: "down", Host: u.Host, Mb: u.Count, MaxS: u.Pps, Token: u.Tag}
 	if u.Df {
@@ -97,6 +106,10 @@ func (a *Agent) speedTest(s *session, u *pb.UdpSend) {
 	if r.Role == "stop" {
 		a.speed.stop(r.Token)
 		reply(&pb.CommandResult{Ok: true})
+		return
+	}
+	if r.Role == "serve-channel" || r.Role == "run-channel" {
+		a.speedChannel(s, r, reply)
 		return
 	}
 	if (r.Role != "serve" && r.Role != "run") || (r.Direction != "down" && r.Direction != "up") ||
@@ -163,8 +176,14 @@ func (a *Agent) speedTest(s *session, u *pb.UdpSend) {
 func (st *speedState) stop(token []byte) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	if st.listener != nil && subtle.ConstantTimeCompare(st.token, token) == 1 {
+	if subtle.ConstantTimeCompare(st.token, token) != 1 {
+		return
+	}
+	if st.listener != nil {
 		st.listener.Close()
+	}
+	if st.abort != nil {
+		st.abort()
 	}
 }
 

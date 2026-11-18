@@ -90,6 +90,27 @@ describe("what came of an applied plan", () => {
     expect(said("en", "path_speed_done", speed)).toContain("308.3 Mbit/s over 870 ms");
     for (const lang of ["zh", "fa", "tr"] as const) expect(said(lang, "path_speed_done", speed), lang).toContain("308.3");
   });
+  it("words a channel measure with its figures, partners and the caveat of an estimate, in every language", () => {
+    const params = { node: "de1", down_mbps: "812.4", up_mbps: "455.1", down_partner: "nl1", up_partner: "se1" };
+    expect(said("ru", "channel_measure_done", params)).toBe("Канал de1 измерен: приём 812.4 Мбит/с с nl1, отдача 455.1 Мбит/с с se1. Оценка на тот момент, а не гарантия тарифа.");
+    expect(said("en", "channel_measure_done", params)).toBe("Channel of de1 measured: receiving 812.4 Mbit/s with nl1, sending 455.1 Mbit/s with se1. An estimate at that moment, not a guarantee of the tariff.");
+    expect(said("ru", "channel_measure_done", { ...params, direction: "down" })).toContain("только на приём");
+    expect(said("en", "channel_measure_done", { ...params, direction: "up" })).toContain("sending only");
+    expect(said("en", "channel_measure_done", { node: "de1", direction: "running" })).toContain("still running");
+    for (const lang of ["zh", "fa", "tr"] as const) {
+      expect(said(lang, "channel_measure_done", params), lang).toContain("812.4");
+      expect(said(lang, "channel_measure_done", params), lang).toContain("se1");
+    }
+    expect(said("ru", "channel_measure_not_run", { code: "no_partner" }, ApprovalState.FAILED)).toContain("замер не запустился");
+  });
+  it("words the plan card of a channel measure: its title, the partners, the warning and what happens", () => {
+    expect(planTitle(tr("ru"), "channel_measure")).toBe("Измерить канал ноды");
+    expect(line("ru", fact("partners", "nl1 (2000 Mbit/s known)"))).toContain("nl1");
+    const effect = fact("effect", "The node and each partner take turns ...", { code: "channel_measure_effect" });
+    expect(line("ru", effect)).toContain("2 ГиБ и 15 секундах");
+    expect(line("ru", effect)).not.toContain("take turns");
+    expect(line("en", effect)).toContain("paid traffic pays for it");
+  });
   it("words where a decoy site went: nodes, the panel, or both", () => {
     expect(said("ru", "decoy_site_assigned", { n: "0", panel: "true" })).toBe("Сайт-ширма стоит на адресе панели");
     expect(said("ru", "decoy_site_assigned", { n: "2", panel: "false" })).toBe("Сайт-ширма стоит на 2 нодах");
