@@ -74,6 +74,8 @@ const grid =
   "@max-[600px]/fzt:grid-cols-[var(--cb)_minmax(0,1.3fr)_minmax(0,1fr)_44px_16px]";
 const rowBase =
   "grid items-center gap-4 px-6 [transition:background-color_.12s_var(--e),grid-template-columns_.25s_var(--e)] @max-[940px]/fzt:gap-3 max-md:gap-3 max-md:px-4 " + grid;
+// a row with a note has two rows of its own (the node's line, the note's plate) with no gap between them; the plate brings its margins
+const noteRow = "grid-rows-[auto_auto] gap-y-0! pt-2.5";
 // the columns that give way as the card narrows
 const upCell = "@max-[1120px]/fzt:hidden";
 // "From Russia" has a column of its own down to 1000; narrower, its word goes under the node's name
@@ -195,6 +197,7 @@ export function NodeList({
             className={cx(
               "group relative min-h-[60px] border-t border-line transition-colors max-md:min-h-16 max-md:[[role=row]+&]:border-t-0",
               rowBase,
+              n.notes?.trim() && noteRow,
               on ? "bg-accent-soft" : "hover:bg-step",
             )}
           >
@@ -224,7 +227,6 @@ export function NodeList({
                     </span>
                   )}
                 </span>
-                <NodeNotes node={n} />
               </span>
             </div>
             <div className="flex min-w-0 flex-col">
@@ -293,6 +295,7 @@ export function NodeList({
               <Scramble once value={n.uptimeS > 0 ? fmt.duration(n.uptimeS) : "—"} />
             </span>
             <Icon name="chevronRight" size={16} className="block flex-none text-muted transition-[transform,color] duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-fg rtl:group-hover:-translate-x-0.5" />
+            <NodeNote node={n} />
             {/* last, so it lies over what is not a control of its own (the row is one big target) */}
             <Link
               to="/nodes/$id"
@@ -339,22 +342,23 @@ function StateWord({ n }: { n: Node }) {
 }
 
 /**
- * The operator's notes of a node (a line or two), when it has any. Above the row's link: only the notes show this title, and
- * clicking them still opens the node.
+ * The operator's note of a node (what the hoster gives, when it is paid until), as a plate under the row (the board's .fz-nt), when it
+ * has one: a line of plain text, however long the note is (its whole text is the title). Above the row's link: only the note shows
+ * this title, and clicking it still opens the node.
  */
-function NodeNotes({ node }: { node: Node }): ReactNode {
-  const notes = node.notes?.trim();
-  if (!notes) return null;
+function NodeNote({ node }: { node: Node }): ReactNode {
+  const note = node.notes?.trim();
+  if (!note) return null;
   return (
     <Link
       to="/nodes/$id"
       params={{ id: node.id }}
-      title={notes}
+      title={note}
       tabIndex={-1}
-      className="relative z-10 mt-1 flex w-fit min-w-0 max-w-full items-start gap-1.5 border-s-2 border-line ps-2 text-xs font-normal text-muted"
+      className="relative z-10 col-[2/-1] row-start-2 mt-2 mb-3 flex h-7 min-w-0 items-center gap-2 rounded-[8px] bg-step px-3 text-[12px] leading-4 text-sec"
     >
-      <Icon name="text" size={12} className="mt-0.5 block shrink-0 text-muted" />
-      <p className="line-clamp-2 whitespace-pre-line break-words">{notes}</p>
+      <Icon name="note" size={12} strokeWidth={1.75} />
+      <em className="min-w-0 truncate not-italic">{note}</em>
     </Link>
   );
 }

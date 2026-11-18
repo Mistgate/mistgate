@@ -126,28 +126,40 @@ const openDecoy = async () => {
 };
 
 describe("node notes", () => {
-  it("shows plain-text notes in the table and mobile cards, with the full text only on the notes", async () => {
+  it("shows a plain-text note as a plate under the node's row, with the full text as its title, and nothing else", async () => {
     const notes = "<b>Renew in March</b>\n备用节点";
     await mount([node("de1", { notes })]);
-    const summaries = [...document.querySelectorAll("p")].filter((p) => p.textContent === notes);
-    expect(summaries).toHaveLength(1);
-    expect(summaries.every((p) => p.querySelector("b") === null)).toBe(true);
-    expect([...document.querySelectorAll("a")].filter((a) => a.title === notes)).toHaveLength(1);
-    for (const summary of summaries) {
-      const link = summary.closest("a")!;
-      expect(link.title).toBe(notes);
-      expect(link.getAttribute("href")).toBe("/nodes/$id");
-      expect(link.tabIndex).toBe(-1); // the row link remains the single keyboard stop
-    }
+    const plates = [...document.querySelectorAll<HTMLAnchorElement>("a[title]")];
+    expect(plates).toHaveLength(1);
+    const plate = plates[0]!;
+    expect(plate.title).toBe(notes);
+    // text, not markup; one line (the line break is a space for the eye), a glyph before it
+    expect(plate.querySelector("em")!.textContent).toBe(notes);
+    expect(plate.querySelector("b")).toBeNull();
+    expect(plate.querySelector("svg")).not.toBeNull();
+    expect(plate.getAttribute("href")).toBe("/nodes/$id");
+    expect(plate.tabIndex).toBe(-1); // the row link remains the single keyboard stop
+    // the plate is a cell of the row's own grid (under the node's name, over the rest of the row), and the row makes room for it
+    const row = plate.parentElement!;
+    expect(plate.className).toContain("row-start-2");
+    expect(plate.className).toContain("col-[2/-1]");
+    expect(row.className).toContain("grid-rows-[auto_auto]");
+    expect(document.querySelectorAll("p")).toHaveLength(0);
     const rowLinks = document.querySelectorAll("a.absolute");
     expect(rowLinks).toHaveLength(1);
     expect([...rowLinks].every((a) => !a.hasAttribute("title"))).toBe(true);
   });
 
+  it("gives only the nodes that have a note a plate, and no extra room to the others", async () => {
+    await mount([node("de1", { notes: "Paid until March" }), node("fi1"), node("nl1", { notes: " \n\t " })]);
+    expect(document.querySelectorAll("a[title]")).toHaveLength(1);
+    expect(document.querySelectorAll("[class*='grid-rows-[auto_auto]']")).toHaveLength(1);
+  });
+
   it("omits empty and whitespace-only notes", async () => {
     await mount([node("de1"), node("fi1", { notes: " \n\t " })]);
-    expect(document.querySelectorAll("p")).toHaveLength(0);
     expect(document.querySelectorAll("a[title]")).toHaveLength(0);
+    expect(document.querySelectorAll("[class*='grid-rows-[auto_auto]']")).toHaveLength(0);
   });
 });
 

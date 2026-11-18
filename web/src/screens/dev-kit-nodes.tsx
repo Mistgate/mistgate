@@ -161,7 +161,13 @@ function fleetOf(state: string) {
     set("msk1", { sharing: share(NodeShareMode.LISTED, 1, false) });
   }
   if (state === "dead") set("nl1", { status: NodeStatus.DOWN, reason: reason("agent_silent", { minutes: "14" }), online: [], hasMetrics: false, cpuPct: 0, trafficTodayBytes: 0, uptimeS: 0 });
-  if (state === "mixed" || state === "list" || state.startsWith("ru-") || state.startsWith("rw-")) set("de1", { reason: reason("state_drift") });
+  if (state === "mixed" || state === "list" || state === "notes" || state.startsWith("ru-") || state.startsWith("rw-")) set("de1", { reason: reason("state_drift") });
+  // the board's note under nl1 (a plate under the row); "notes": a long one (one line, cut) and one that is markup as typed (shown as text)
+  if (state === "list" || state === "notes") set("nl1", { notes: "1 TB of traffic a month, paid for the year" });
+  if (state === "notes") {
+    set("de1", { notes: "Second contract, billed from the 3rd of every month. The panel and two exits of the spring sale run on it; ask Example Cloud support for the invoice before it is renewed in March, and keep the reservation of the old address until the replacement has been running for a week. ".repeat(2) });
+    set("fi1", { notes: "<b>Renew in March</b> & <i>backup node</i>\nsecond line of the note" });
+  }
   if (sc.rst === "entoff") set("msk1", { status: NodeStatus.DOWN, reason: reason("agent_silent", { minutes: "14" }), online: [], hasMetrics: false, cpuPct: 0, trafficTodayBytes: 0, uptimeS: 0 });
   if (state === "mixed") {
     set("nl1", { notes: "Hosted on the second contract.\nRenewal in March." });
@@ -391,6 +397,11 @@ export const frames: Frame[] = [
   { id: "nodes-list-light", state: "list", title: "The same on the light theme", w: 1440, h: 780, params: "&theme=light" },
   { id: "nodes-list-rail", state: "list", title: "A 900 window: the rail, the card narrows (profiles, online, arrow)", w: 900, h: 780 },
   { id: "nodes-list-phone", state: "list", title: "A phone, 400 wide", w: 400, h: 780 },
+  { id: "nodes-notes", state: "notes", title: "A note under a node: the board's short one (nl1), a long one cut at the line's end (de1), markup shown as typed (fi1)", w: 1440, h: 900 },
+  { id: "nodes-notes-light", state: "notes", title: "The notes on the light theme", w: 1440, h: 900, params: "&theme=light" },
+  { id: "nodes-notes-rail", state: "notes", title: "The notes in a 900 window", w: 900, h: 900 },
+  { id: "nodes-notes-phone", state: "notes", title: "The notes on a phone", w: 400, h: 1000 },
+  { id: "nodes-notes-fa", state: "notes", title: "The notes right to left (fa)", w: 1440, h: 900, params: "&lang=fa" },
   { id: "nodes-list-fa", state: "list", title: "Right to left (fa)", w: 1440, h: 780, params: "&lang=fa" },
   { id: "nodes-twelve", state: "twelve", title: "Twelve nodes", w: 1440, h: 1100 },
   { id: "nodes-mixed", state: "mixed", title: "Every state a node has: attention, broken, no traffic, blip, updating, waiting, down, retired, notes", w: 1440, h: 1100 },

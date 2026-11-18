@@ -66,7 +66,8 @@ const paths = {
   chat: "M4 5h16v11H9l-5 4V5z",
   bookmark: "M7 4h10v17l-5-4-5 4V4z",
   stop: "M7 7h10v10H7z",
-  text: "M4 6h16M4 10h16M4 14h10M4 18h7",
+  // a note: a leaf with a folded corner and two lines of text (the line under a node of the list)
+  note: "M5 4h14v11l-5 5H5zM14 20v-5h5M8.5 9h7M8.5 12.5h4",
   filter: "M4 5h16l-6 8v6l-4-2v-4L4 5z",
   palette: "M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.6-.3-1-.5-1.4-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A3.7 3.7 0 0 0 21 10.6C21 6.4 17 3 12 3zM7.5 11h.01M10 7.5h.01M14.5 7.5h.01",
   plug: "M9 3v4M15 3v4M6 7h12v4a6 6 0 0 1-12 0zM12 17v4",

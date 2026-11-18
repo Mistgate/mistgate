@@ -105,3 +105,27 @@ export function rolloutNow(r: Rollout): { kind: "canary" | "gate" | "batch" | "w
   const names = sent.map((s) => s.nodeName).join(", ");
   return { kind: first.stage === 0 ? "canary" : "batch", node: first.nodeName, names };
 }
+
+// The matrix of a big fleet (the board's .uq-fleet.many): from this many nodes the strip of cards would grow to rows of cards, so only
+// the node the update hangs on keeps a card (the lead) and every other node is a cell with the same colour of state. The board draws
+// the cells of the nodes that are up to date; the others a real fleet has (waiting, updating, failed, offline) get the card's own marks.
+export const MATRIX_FROM = 7;
+
+/** How urgent a state is: the lead is the card the person is to look at first. */
+const need: Record<CardKind, number> = { bad: 0, now: 1, part: 2, off: 3, "": 4, ok: 5 };
+
+export type FleetMatrix = {
+  /** The one card: the node that failed, else the one being updated, else the canary; null when every node is up to date. */
+  lead: FleetCard | null;
+  /** The nodes that are not up to date, the lead among them ("Waiting for the update"). */
+  waiting: number;
+  /** All the other nodes, the ones that need a look first. */
+  cells: FleetCard[];
+};
+
+/** `cards` comes canary first (fleetCards), so among equals the canary leads. */
+export function fleetMatrix(cards: readonly FleetCard[]): FleetMatrix {
+  const ranked = [...cards].sort((a, b) => need[a.kind] - need[b.kind]);
+  const lead = ranked[0] && ranked[0].kind !== "ok" ? ranked[0] : null;
+  return { lead, waiting: ranked.filter((c) => c.kind !== "ok").length, cells: lead ? ranked.slice(1) : ranked };
+}

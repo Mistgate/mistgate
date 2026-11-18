@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { playWave } from "@/components/fx/wave";
 import { useToast } from "@/components/ui/toast";
-import { Scramble } from "@/components/fx/scramble-react";
 import { Button, buttonClass } from "@/components/ui/button";
 import { BundleStatus, NodeUpdateState, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT, type T } from "@/i18n";
@@ -24,8 +23,9 @@ import {
   type Updates,
 } from "@/lib/updates";
 import { G } from "@/screens/users/user-bits";
-import { Bar, D, NodeName, Pill, useFlags, w, type Gk } from "./bits";
-import { fleetCards, rolloutNow, type FleetCard } from "./fleet";
+import { Bar, D, Pill, type Gk } from "./bits";
+import { fleetCards, rolloutNow } from "./fleet";
+import { Fleet } from "./fleet-grid";
 import { NodesCard } from "./nodes";
 import { BundleCard, RolloutHistory } from "./rollout";
 
@@ -72,33 +72,6 @@ function look(t: T, d: Updates, hero: Hero, edge: boolean): Look {
     default:
       return { title: t("up.hero.none.title"), text: t("up.hero.none.text"), pill: null };
   }
-}
-
-const wordKey = { ok: "uq.fl.ok", can: "uq.fl.can", sent: "uq.fl.sent", gate: "uq.fl.gate", back: "uq.fl.back", off: "uq.fl.off", wait: "uq.fl.wait", manual: "uq.fl.manual", failed: "uq.fl.failed" } as const;
-
-/** One card of the strip: flag and name, the canary mark, the tick (or the spinner, or the cross), the version and what it is doing. */
-function Card({ c, countryCode, t }: { c: FleetCard; countryCode?: string; t: T }) {
-  return (
-    <div className={cx("uq-ft", c.kind, c.canary && "can", c.just && "just")}>
-      <div className="uq-fc">
-        <NodeName name={c.name} countryCode={countryCode} />
-        {c.canary && <em className="uq-fr">{t("uq.fl.canary")}</em>}
-        <i className="uq-fd" aria-hidden>
-          <svg viewBox="0 0 24 24">
-            <path d={D.check} />
-          </svg>
-          <svg className="x" viewBox="0 0 24 24">
-            <path d={D.x} />
-          </svg>
-        </i>
-      </div>
-      <b className="mono uq-fv">
-        <Scramble value={c.version} once />
-      </b>
-      <span className="uq-fs">{t(wordKey[c.word], { version: c.wordVersion })}</span>
-      {c.pg !== undefined && <i className="rw-pg" style={w(c.pg)} aria-hidden />}
-    </div>
-  );
 }
 
 /** What the rollout is doing this moment, on one line, with the buttons that act on it. */
@@ -186,7 +159,7 @@ function Offline({ nodes }: { nodes: readonly NodeUpdate[] }) {
 }
 
 /** What a scene of the dev kit puts in place of what the cards would find out by themselves. */
-export type AgentsScene = { last?: boolean; reading?: boolean };
+export type AgentsScene = { last?: boolean; reading?: boolean; matrixOpen?: boolean };
 
 export type AgentsProps = {
   data: Updates;
@@ -202,7 +175,6 @@ export type AgentsProps = {
 export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSchedule, onRollback, scene }: AgentsProps) {
   const t = useT();
   const edition = useEdition();
-  const flags = useFlags();
   const noUpdates = edition.off("agent_updates"); // there the buttons are gone for everyone, not just for a helper
   const hero = heroOf(d);
   const l = look(t, d, hero, edition.edge);
@@ -258,11 +230,7 @@ export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSche
           )}
           {l.pill && !(canStart && hero.id === "available") && <Pill k={l.pill.k}>{l.pill.label}</Pill>}
         </div>
-        <div className="uq-fleet">
-          {cards.map((c) => (
-            <Card key={c.id} c={c} countryCode={flags.get(c.id)} t={t} />
-          ))}
-        </div>
+        <Fleet cards={cards} version={trusted ? d.bundle!.version : ""} unfolded={scene?.matrixOpen} />
         {readOnly && <p className="uq-ro">{t("uq.ro.agents")}</p>}
         {active?.status === RolloutStatus.RUNNING && <Now d={d} owner={owner} actions={actions} onCancel={onCancel} />}
         {active?.status === RolloutStatus.PAUSED && <Paused d={d} owner={owner} actions={actions} onCancel={onCancel} />}

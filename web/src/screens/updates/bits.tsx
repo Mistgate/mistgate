@@ -71,11 +71,16 @@ export function Bar({ bad, children, action }: { bad?: boolean; children: ReactN
   );
 }
 
+/** A node's flag; a node whose country the list does not know yet gets an empty frame of the same size. */
+export function NodeFlag({ countryCode }: { countryCode?: string }) {
+  return countryCode ? <Flag code={countryCode} size={12} /> : <span aria-hidden className="inline-block h-[13px] w-[18px] flex-none rounded-[3px] border border-dashed border-line" />;
+}
+
 /** A node's flag and name. The country comes from the node list; a node it does not know yet is drawn with no flag. */
 export function NodeName({ name, countryCode, to }: { name: string; countryCode?: string; to?: ReactNode }) {
   return (
     <span className="hl-cnode">
-      {countryCode ? <Flag code={countryCode} size={12} /> : <span aria-hidden className="inline-block h-[13px] w-[18px] flex-none rounded-[3px] border border-dashed border-line" />}
+      <NodeFlag countryCode={countryCode} />
       {to ?? <b className="mono">{name}</b>}
     </span>
   );

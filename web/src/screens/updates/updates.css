@@ -3,7 +3,7 @@
  * leans on: pp-, rc-, rw-, pv-, sb-, hl-, us-/an- window rules; the last rule of a selector wins). The whole panel is the board's container,
  * so a container query of the board is a media query here. Everything sits under .uq (the page), .uq-dlg (a window drawn in a portal) or
  * .uq-take (the screen that takes over while the panel installs itself): nothing leaks to the other screens. Motion that only plays under
- * the effects switch hangs on .uq-fx; the answer of a hand (a spinner, the sweep of a check, a tick that lands) always plays and is off with
+ * the effects switch hangs on .uq-fx (the flash of a node that has just finished too); the answer of a hand (a spinner, the sweep of a check, a tick that lands) always plays and is off with
  * reduced motion, as on the board. Colours: the board's --acc is --accent-mark (a fill, a line) or --accent-text (text), --hair is --border.
  */
 
@@ -500,9 +500,46 @@
   background-repeat: no-repeat;
   animation: uq-sweep 1.4s var(--e) infinite;
 }
-.uq .uq-ft.just .uq-fd { animation: uq-pop 0.5s var(--ease-spring) both; }
-.uq .uq-ft.just::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: color-mix(in srgb, var(--accent-mark) 8%, transparent); animation: uq-fade 1.4s var(--e) both; }
+.uq.uq-fx .uq-ft.just .uq-fd { animation: uq-pop 0.5s var(--ease-spring) both; }
+.uq.uq-fx .uq-ft.just::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: color-mix(in srgb, var(--accent-mark) 8%, transparent); animation: uq-fade 1.4s var(--e) both; }
 .uq .uq-ft .rw-pg { margin-top: 4px; }
+/* L7066-7084: a big fleet: the lead's card beside the matrix of the other nodes. The board draws the cells of the nodes that are up to date;
+   the marks of the others (a dot, a ring, a spinner, a cross) are the card's own colours. */
+.uq .uq-fleet.many { display: grid; grid-template-columns: minmax(0, 304px) minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 8px 16px; align-items: stretch; }
+.uq .uq-fleet.many.all { grid-template-columns: minmax(0, 1fr); }
+.uq .uq-fleet.many .uq-ft { flex: none; grid-column: 1; grid-row: 2; justify-content: center; padding: 12px 16px; max-height: 200px; }
+.uq .uq-mh1 { grid-column: 1; grid-row: 1; }
+.uq .uq-rest { display: grid; grid-template-rows: subgrid; grid-row: 1 / 3; grid-column: 2; gap: 8px; min-width: 0; }
+.uq .uq-fleet.many.all .uq-rest { grid-column: 1; }
+.uq .uq-mh { display: flex; align-items: baseline; gap: 8px; height: 16px; font-size: 12px; line-height: 16px; color: var(--muted); }
+.uq .uq-mh em { font-style: normal; color: var(--sec); }
+.uq .uq-mh b { margin-inline-start: auto; font-weight: 400; color: var(--muted); }
+.uq .uq-mcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); grid-auto-rows: minmax(44px, 1fr); align-content: stretch; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+/* eight rows (44px each) until "Show all"; the rows are whole, so no cell is cut */
+.uq .uq-mcs.fold { max-height: 352px; }
+.uq .uq-mc { position: relative; display: flex; align-items: center; gap: 8px; padding: 0 12px; min-width: 0; font-size: 13px; box-shadow: 1px 0 0 var(--border), 0 1px 0 var(--border); }
+.uq .uq-mc .fl, .uq .uq-mc > .hl-cnode { flex: none; }
+.uq .uq-mc b { flex: 1; font-weight: 400; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uq .uq-mc .i { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; color: var(--accent-mark); }
+.uq .uq-mc.bad .i { color: var(--danger); }
+.uq .uq-mc.off b { color: var(--muted); }
+.uq .uq-mc .mk { flex: none; display: grid; place-items: center; width: 14px; height: 14px; }
+.uq .uq-mc .mk::before { content: ""; box-sizing: border-box; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); opacity: 0.6; }
+.uq .uq-mc.part .mk::before { border: 0; background: var(--warning); opacity: 1; }
+.uq .uq-mc.now .mk::before { width: 12px; height: 12px; border: 1.5px solid var(--tone-sky); border-inline-end-color: transparent; opacity: 1; animation: uq-spin 0.7s linear infinite; }
+.uq .uq-mc.off .mk::before { border-style: dashed; opacity: 1; }
+.uq.uq-fx .uq-mc.just .i { animation: uq-pop 0.5s var(--ease-spring) both; }
+.uq.uq-fx .uq-mc.just::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: color-mix(in srgb, var(--accent-mark) 8%, transparent); animation: uq-fade 1.4s var(--e) both; }
+.uq .uq-mxm { grid-column: 2; grid-row: 3; justify-self: start; }
+.uq .uq-fleet.many.all .uq-mxm { grid-column: 1; }
+@media (max-width: 1180px) {
+  .uq .uq-fleet.many { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .uq .uq-fleet.many .uq-ft, .uq .uq-mh1, .uq .uq-rest, .uq .uq-mxm { grid-column: 1; grid-row: auto; }
+  .uq .uq-rest { grid-template-rows: none; }
+}
+@media (max-width: 480px) {
+  .uq .uq-mcs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .uq .uq-ag .uq-now { margin-top: -8px; }
 /* L5399-5441: the tables */
 .uq .uq-t { display: flex; flex-direction: column; }
@@ -781,9 +818,9 @@
 /* a calm page: no sweep, no spin that moves things, no entrance */
 @media (prefers-reduced-motion: reduce) {
   .uq .uq-ft.now::before, .uq .uq-w.cking::before, .uq .uq-hero.cking::after { display: none; }
-  .uq .uq-ft.now .uq-fd, .uq .an-sp, .uq-take .an-sp, .uq .rw-gl.busy, .uq .sk { animation: none; }
+  .uq .uq-ft.now .uq-fd, .uq .uq-mc.now .mk::before, .uq .an-sp, .uq-take .an-sp, .uq .rw-gl.busy, .uq .sk { animation: none; }
   .uq.uq-fx .uq-halo, .uq.uq-fx .uq-tab > *, .uq.uq-fx .uq-now, .uq.uq-fx .uq-rel + .uq-rel, .uq.uq-fx .uq-dl, .uq.uq-fx .uq-dp, .uq.uq-fx .uq-oa, .uq.uq-fx .uq-ls, .uq.uq-fx .uq-dx, .uq.uq-fx .rc-pb { animation: none; }
-  .uq .uq-trk li.ok > i, .uq .uq-trk li.bad > i, .uq .uq-ft.just .uq-fd, .uq .uq-w.ckn .pv-pill .rw-gl, .uq .uq-hero.done .uq-ok .pv-pill { animation: none; }
-  .uq .uq-ft.just::before, .uq .uq-w.ckn::before { display: none; }
+  .uq .uq-trk li.ok > i, .uq .uq-trk li.bad > i, .uq.uq-fx .uq-ft.just .uq-fd, .uq.uq-fx .uq-mc.just .i, .uq .uq-w.ckn .pv-pill .rw-gl, .uq .uq-hero.done .uq-ok .pv-pill { animation: none; }
+  .uq.uq-fx .uq-ft.just::before, .uq.uq-fx .uq-mc.just::before, .uq .uq-w.ckn::before { display: none; }
   .uq-take, .uq-take.out, .uq-take .uq-mx, .uq-take .uq-tok, .uq-take .uq-tslow, .uq-take.out .uq-tv, .uq-take .uq-trk li.ok > i, .uq-take .uq-trk li.bad > i { animation: none; }
 }

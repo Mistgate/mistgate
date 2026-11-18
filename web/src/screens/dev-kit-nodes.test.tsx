@@ -60,6 +60,13 @@ describe("the scenes of the Nodes screen", () => {
     expect(host!.textContent).not.toContain("undefined");
     if (state === "first") expect(host!.querySelectorAll("ol li")).toHaveLength(4);
     if (state === "twelve" || state === "mixed") expect(host!.querySelectorAll("section[data-select] a.absolute")).toHaveLength(12);
+    // the board's note under nl1; the notes scene has two more (a long one, one that is markup as typed): each a plate, as text
+    if (state === "list") expect([...host!.querySelectorAll("section[data-select] em.truncate")].map((e) => e.textContent)).toEqual(["1 TB of traffic a month, paid for the year"]);
+    if (state === "notes") {
+      expect(host!.querySelectorAll("section[data-select] em.truncate")).toHaveLength(3);
+      expect(host!.querySelector("section[data-select] em.truncate b")).toBeNull();
+      expect(host!.querySelector("section[data-select] em.truncate i")).toBeNull();
+    }
     if (state === "select") expect(host!.ownerDocument.querySelector("[data-nodes-bar]")?.textContent).toContain("2 nodes selected");
     if (state === "load") expect(host!.querySelectorAll("button[aria-expanded]").length).toBe(4);
     if (state === "map-card") expect(host!.ownerDocument.querySelector("aside")?.textContent).toContain("nl1");

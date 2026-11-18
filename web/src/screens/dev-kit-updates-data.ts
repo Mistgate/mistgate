@@ -58,6 +58,36 @@ export const fi1Old = (over: Variant = {}) =>
   });
 export const fleetNodes = (fi1: Variant = fi1Old()) => [upNode("de1", "de1", { onlineUsers: 3 }), fi1, upNode("nl1", "nl1"), upNode("msk1", "msk1")];
 
+/** The country of a made-up node by the letters of its name ("de2" is German, "msk3" Russian); the pool of the big fleets. */
+const COUNTRY: Record<string, string> = { de: "DE", nl: "NL", fi: "FI", msk: "RU", fr: "FR", se: "SE", pl: "PL", no: "NO", lv: "LV", lt: "LT", at: "AT" };
+export const flagOf = (name: string) => COUNTRY[name.replace(/\d+$/, "")] ?? "";
+
+/**
+ * More nodes for the big fleets of the matrix: `count` of them named de2, nl2 … (the names `taken` are skipped). "up": all up to date (the
+ * board's twelve); "wait": every third waits for the update; "mix": one of each state a node can be in, to see every cell.
+ */
+export function extraNodes(count: number, taken: ReadonlySet<string>, how: "up" | "wait" | "mix"): unknown[] {
+  const prefixes = Object.keys(COUNTRY);
+  const out: unknown[] = [];
+  const mix: Variant[] = [
+    {},
+    { version: OLD, built: B_OLD, state: NodeUpdateState.OUTDATED, lastUpdate: undefined },
+    { version: OLD, built: B_OLD, state: NodeUpdateState.UPDATING },
+    { version: OLD, built: B_OLD, state: NodeUpdateState.ROLLED_BACK },
+    { state: NodeUpdateState.OFFLINE },
+    { version: "v0.1.12", built: 0, state: NodeUpdateState.UNSUPPORTED, supportsUpdate: false, lastUpdate: undefined },
+    { version: OLD, built: B_OLD, state: NodeUpdateState.FAILED },
+  ];
+  for (let i = 0; out.length < count; i++) {
+    const name = `${prefixes[i % prefixes.length]}${Math.floor(i / prefixes.length) + 1}`;
+    if (taken.has(name)) continue;
+    const k = out.length;
+    const over = how === "mix" ? mix[k % mix.length]! : how === "wait" && k % 3 === 0 ? mix[1]! : {};
+    out.push(upNode(name, name, over));
+  }
+  return out;
+}
+
 export const step = (id: string, name: string, stage: number, state: StepState, over: Variant = {}) => ({
   nodeId: `nod_${id}`,
   nodeName: name,
