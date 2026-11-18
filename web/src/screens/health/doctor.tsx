@@ -13,7 +13,7 @@ import type { Plain } from "@/lib/plain";
 import { overviewQuery } from "@/lib/queries";
 import { pillOf } from "./alert-bits";
 import { ManualSteps, NodeDoctorLink, useDoctorItem, useRunDoctor } from "./doctor-parts";
-import { useFixWave, type FixFlow } from "./fix";
+import { fixLine, useFixWave, type FixFlow } from "./fix";
 import { Calm, Dot, P, Sec, type DotKind } from "./page-parts";
 import "./health.css";
 
@@ -44,7 +44,7 @@ function Finding({ flow, issue }: { flow: FixFlow; issue: FleetIssue }) {
   const fmt = useFmt();
   const stale = issue.stale ? fmt.duration(issue.ageS) : undefined;
   const d = useDoctorItem({ flow, nodeId, nodeName, item, stale });
-  const { t, can, accept, open, why, fact, command, steps, phase, canAccept, who, action, fixKey } = d;
+  const { t, can, accept, open, why, fact, command, steps, phase, canAccept, who, action, fixKey, target } = d;
   const root = useRef<HTMLElement>(null);
   useFixWave(flow, fixKey, root);
   const failed = fixKey && phase === "idle" ? flow.error(fixKey) : "";
@@ -69,7 +69,7 @@ function Finding({ flow, issue }: { flow: FixFlow; issue: FleetIssue }) {
         {phase === "busy" && (
           <p className="hl-run" role="status">
             <Dot kind="busy" />
-            {t("hl.fix.fixing")}
+            {(target && fixLine(t, "run", target)) || t("hl.fix.fixing")}
           </p>
         )}
         {phase === "done" && (
@@ -151,7 +151,7 @@ export function DoctorTab({ data, flow, first = false, init }: { data: Plain<Get
         </div>
         <div>
           <span>{t("hlp.doc.nodes")}</span>
-          <b className="mono">{totals.nodes}</b>
+          <b className="mono">{first ? data.nodes.length : totals.nodes}</b>
         </div>
         <div>
           <span>{t("hlp.doc.found")}</span>
@@ -197,7 +197,7 @@ export function DoctorTab({ data, flow, first = false, init }: { data: Plain<Get
                 );
               })}
             </div>
-            <QuietNodes nodes={data.nodes} />
+            <QuietNodes nodes={data.nodes} never={never} />
           </Sec>
         </aside>
       </div>
@@ -207,9 +207,9 @@ export function DoctorTab({ data, flow, first = false, init }: { data: Plain<Get
 
 /**
  * The nodes the list above cannot speak for, one line each and each for its own reason: an agent too old for the doctor (with the way to Updates), a node
- * that is offline (its last report is what is shown), one whose first report has not come. The name opens the node's Doctor tab.
+ * that is offline (its last report is what is shown), one whose first report has not come (not before the first round: the list says it of all). The name opens the node's Doctor tab.
  */
-function QuietNodes({ nodes }: { nodes: readonly NodeDoctor[] }) {
+function QuietNodes({ nodes, never }: { nodes: readonly NodeDoctor[]; never: boolean }) {
   const t = useT();
   const fmt = useFmt();
   const lines = nodes.flatMap((n) => {
@@ -217,7 +217,8 @@ function QuietNodes({ nodes }: { nodes: readonly NodeDoctor[] }) {
     const offline = n.nodeStatus !== NodeStatus.ONLINE && n.nodeStatus !== NodeStatus.NO_TRAFFIC;
     if (!n.agentSupported) return [{ n, text: n.agentVersion ? t("hl.doctor.line.tooOld", { version: n.agentVersion }) : t("hl.doctor.line.tooOldBare"), updates: true }];
     if (offline && n.lastSeenUnix > 0) return [{ n, text: t(reported ? "hl.doctor.line.offline" : "hl.doctor.line.offlineNone", { time: fmt.stamp(n.lastSeenUnix) }), updates: false }];
-    if (!reported) return [{ n, text: t("hl.doctor.line.waiting"), updates: false }];
+    // before the first round the list above already says "not checked" of every node: no second line of the same
+    if (!reported && !never) return [{ n, text: t("hl.doctor.line.waiting"), updates: false }];
     return [];
   });
   if (lines.length === 0) return null;

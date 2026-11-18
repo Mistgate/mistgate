@@ -154,7 +154,7 @@ export function LossTable({ alerts }: { alerts: Alert[] }) {
             if (p.confirm_sender) runs.push({ sender: p.confirm_sender, lost: lossPct(Number(p.confirm_sent), Number(p.confirm_got)) });
             return (
               <tr key={a.id}>
-                <td className="px-3 py-2 font-mono font-bold">{p.port}</td>
+                <td className="px-3 py-2 font-mono font-medium">{p.port}</td>
                 <td className="px-3 py-2">{p.profile}</td>
                 <td className="px-3 py-2 text-end font-mono whitespace-nowrap text-warn-text tabular-nums">
                   {runs.map((r, i) => (

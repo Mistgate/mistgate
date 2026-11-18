@@ -179,6 +179,8 @@ describe("the open alerts", () => {
     expect(document.querySelector(".hl-run.ok")?.textContent).toBe("Fixed");
     expect(button("Trim the journal")).toBeUndefined();
     expect(wave).toHaveBeenCalledTimes(1);
+    // the toast says it in the board's words for this fix
+    expect(document.querySelector("[data-toast-viewport]")?.textContent ?? "").toContain("The journal on de1 is trimmed");
   });
 
   it("says in the row that a fix did not work, with the reason and «Try again», which asks the window again", async () => {
@@ -280,7 +282,7 @@ describe("the Doctor tab", () => {
 
   it("shows the finding with its fix and the line that runs while it works", async () => {
     await draw("doctor.busy");
-    expect(document.querySelector(".hl-find .hl-run")?.textContent).toBe("Fixing…");
+    expect(document.querySelector(".hl-find .hl-run")?.textContent).toBe("Trimming the journal on de1…");
     expect(button("Trim the journal")).toBeUndefined();
     expect(document.querySelector(".hl-find")?.className).toContain("busy");
   });

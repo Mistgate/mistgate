@@ -40,6 +40,14 @@ const doneFor = 30_000; // "Fixed" stays on the row until the re-check report re
 /** What a scene of the dev kit starts the flow with: the window asking (its plan in), the fixes that run, what a failed one said. A real page starts with none. */
 export type FixSeed = { dlg?: { target: FixTarget; plan: Plain<FixPlan>; planId: string }; busy?: FixTarget[]; errors?: Record<string, string> };
 
+/**
+ * What the board says of a fix while it runs ("Сжимаю журнал на de1…") and when it is done ("Журнал на de1 сжат"): a line of the fix's own where there is one
+ * (the two the board draws), else null and the caller says the general words.
+ */
+export function fixLine(t: ReturnType<typeof useT>, kind: "run" | "ran", target: Pick<FixTarget, "fixId" | "nodeName" | "profile">): string | null {
+  return lookup(t, `hl.fix.${kind}.${target.fixId}`, { node: target.nodeName, profile: target.profile ? quoteNames(t, target.profile) : "" });
+}
+
 export type FixFlow = {
   start: (target: FixTarget) => void;
   phase: (key: string) => "idle" | "busy" | "done";
@@ -122,7 +130,7 @@ export function useFixFlow({ inline = false, seed }: { inline?: boolean; seed?: 
       }
       setPhase(target.key, { phase: "done", target });
       timers.current.push(window.setTimeout(() => setPhase(target.key, null), doneFor));
-      toast(r.resultParams.noop === "1" ? t("hl.fix.doneNothing", { node: target.nodeName }) : t("hl.fix.done", { node: target.nodeName, label }));
+      toast(r.resultParams.noop === "1" ? t("hl.fix.doneNothing", { node: target.nodeName }) : (fixLine(t, "ran", target) ?? t("hl.fix.done", { node: target.nodeName, label })));
     } catch (e) {
       setPhase(target.key, null);
       setFailed((f) => ({ ...f, [target.key]: (f[target.key] ?? 0) + 1 }));
@@ -250,12 +258,12 @@ export function FixControl({ flow, target, variant = "secondary" }: { flow: FixF
   const phase = flow.phase(target.key);
   if (phase === "busy")
     return (
-      <span className="flex items-center gap-2 text-xs font-bold text-muted" role="status">
+      <span className="flex items-center gap-2 text-xs font-medium text-muted" role="status">
         <StatusDot kind="busy" />
         {t("hl.fix.fixing")}
       </span>
     );
-  if (phase === "done") return <span className="text-xs font-bold text-muted">{t("hl.fix.fixed")}</span>;
+  if (phase === "done") return <span className="text-xs font-medium text-muted">{t("hl.fix.fixed")}</span>;
   if (!can.fix) return null;
   return (
     <Button variant={variant} size="md" onClick={() => flow.start(target)}>

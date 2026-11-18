@@ -149,7 +149,7 @@ export function CountryHead({ code }: { code: string }) {
     <Link
       to="/reachability"
       title={t("rc.open")}
-      className="ms-2 flex items-end gap-1 self-end px-1 pb-1 text-[11px] leading-tight font-bold text-muted underline-offset-2 transition-colors hover:text-fg hover:underline"
+      className="ms-2 flex items-end gap-1 self-end px-1 pb-1 text-[11px] leading-tight font-medium text-muted underline-offset-2 transition-colors hover:text-fg hover:underline"
     >
       <Icon name="globe" size={12} aria-hidden className="mb-px flex-none" />
       {title}
@@ -165,7 +165,7 @@ export function CountryCell({ check, node, code }: { check: CountryCheck | undef
   const t = useT();
   const fmt = useFmt();
   const title = useCountryTitle(code);
-  const box = "relative ms-2 box-border flex h-11 flex-col items-center justify-center rounded-[11px] px-1.5 text-center text-xs leading-tight font-bold";
+  const box = "relative ms-2 box-border flex h-11 flex-col items-center justify-center rounded-[11px] px-1.5 text-center text-xs leading-tight font-medium";
   if (!check)
     return (
       <span className={cx(box, cellCls.none)} title={t("cr.v.notYet")}>
@@ -181,7 +181,7 @@ export function CountryCell({ check, node, code }: { check: CountryCheck | undef
           <CountryMark kind={look.kind} />
           {look.label}
         </span>
-        {look.note && <span className="max-w-full truncate text-[10px] font-semibold text-muted">{look.note}</span>}
+        {look.note && <span className="max-w-full truncate text-[11px] font-semibold text-muted">{look.note}</span>}
         {look.alsoListed && (
           <span data-testid="also-listed" className="absolute top-1 inset-e-1 flex">
             <ListedGlyph />
@@ -255,11 +255,11 @@ export function CountryRow({ check, code }: { check: CountryCheck | undefined; c
       <span className="flex min-w-0 flex-[1_1_140px] items-center gap-2">
         <CountryMark kind={kind} />
         {/* the title leads to the Reachability page, where the sources and the week are */}
-        <Link to="/reachability" title={t("rc.open")} className="font-bold break-words underline-offset-2 hover:underline">
+        <Link to="/reachability" title={t("rc.open")} className="font-medium break-words underline-offset-2 hover:underline">
           {title}
         </Link>
       </span>
-      <span className={cx("flex items-center gap-1.5 text-xs font-bold", kind === "ok" || kind === "unknown" || kind === "none" ? "text-muted" : "tone-text")}>
+      <span className={cx("flex items-center gap-1.5 text-xs font-medium", kind === "ok" || kind === "unknown" || kind === "none" ? "text-muted" : "tone-text")}>
         {look?.label ?? t("hl.cell.none")}
         {look?.alsoListed && <ListedGlyph />}
       </span>
@@ -297,7 +297,7 @@ export function OwnPoints({ points, className }: { points: readonly OwnPoint[]; 
         const [glyph, cls] = pointMark[p.kind];
         return (
           <li key={p.key} className="grid grid-cols-[14px_minmax(0,1fr)] items-baseline gap-x-1.5">
-            <span aria-hidden className={cx("text-center font-extrabold", cls)}>
+            <span aria-hidden className={cx("text-center font-semibold", cls)}>
               {glyph}
             </span>
             <span className="min-w-0 break-words">
@@ -346,7 +346,7 @@ export function PartialBreakdown({ breakdown, className }: { breakdown: NonNulla
       {breakdown.noProbe && <p className="text-xs leading-snug text-muted">{breakdown.noProbe}</p>}
       <p className="text-xs leading-snug text-pretty">
         {t("cr.part.hint")}{" "}
-        <a href={t("cr.part.guideUrl")} target="_blank" rel="noopener noreferrer" className="font-bold text-accent-text underline decoration-dotted underline-offset-2">
+        <a href={t("cr.part.guideUrl")} target="_blank" rel="noopener noreferrer" className="font-medium text-accent-text underline decoration-dotted underline-offset-2">
           {t("cr.part.guide")}
         </a>
       </p>
@@ -375,13 +375,13 @@ function NetList({ label, nets, mark }: { label: string; nets: readonly Breakdow
   const [glyph, cls] = marks[mark];
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span id={id} className="text-xs font-bold">
+      <span id={id} className="text-xs font-medium">
         {label}
       </span>
       <ul id={`${id}-list`} aria-labelledby={id} className="flex flex-col gap-0.5">
         {shown.map((n, i) => (
           <li key={i} className="grid grid-cols-[14px_minmax(0,1fr)] items-baseline gap-x-1.5">
-            <span aria-hidden className={cx("text-center text-xs font-extrabold", cls)}>
+            <span aria-hidden className={cx("text-center text-xs font-semibold", cls)}>
               {glyph}
             </span>
             <span className="min-w-0 break-words">

@@ -165,7 +165,7 @@ function GroupCard({ alerts, now, flow, open, onToggle, hit }: { alerts: Alert[]
                 {t("warp.open")}
               </Link>
             )}
-            {has("open_node") && (
+            {has("open_node") && !has("open_profiles") && !has("open_warp") && (
               <Link to="/nodes/$id" params={{ id: first.nodeId }} className={linkBtn()}>
                 {t("hl.alerts.openNode")}
               </Link>

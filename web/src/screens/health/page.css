@@ -93,6 +93,11 @@
 /* L4839-4840 */
 .hlp [role="tablist"] {
   margin-top: 20px;
+  gap: 0;
+}
+/* L6677-6678: .sb-tabs{gap:0} button{padding:0 10px}; the line under the chosen tab stays 12 in from its edge (L1662) */
+.hlp [role="tab"] {
+  padding-inline: 10px;
 }
 .hlp [role="tabpanel"] {
   padding-top: 36px;
@@ -110,7 +115,7 @@
   color: var(--warning-text);
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 400;
+  font-weight: inherit;
 }
 .hlp .bdg.mut {
   background: var(--step);
@@ -294,6 +299,12 @@
 .hlp .pf-g > .col {
   min-width: 0;
 }
+/* L148: .col is a column of 16 (a margin of a card under it adds to the gap, as on the board) */
+.hlp .col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 .hlp .sb-tab > .pf-g {
   margin-top: 0;
 }
@@ -315,9 +326,13 @@
     position: static;
   }
 }
-.hlp .col > .card + .card,
-.hlp .sb-tab > .card + .card {
-  margin-top: 16px;
+/* in a tab's own block flow the legend card sits 12 under the table (L4895) */
+.hlp .sb-tab > .card + .sb-mv2 {
+  margin-top: 12px;
+}
+/* a fold in a column (the muted alerts, the product's) keeps the column's 16 */
+.hlp .col > .sb-mv2 {
+  margin-top: 0;
 }
 
 /* ---- the pill of a verdict and the dot of a state (L4513, L4165-4169, L4049) ---- */
@@ -608,6 +623,15 @@
   align-self: center;
 }
 @media (max-width: 720px) {
+  /* L4723, L4944: the head of a card and the lines under it step in to 16 */
+  .hlp .pp-sh {
+    padding: 12px 16px 4px;
+  }
+  .hlp .sb-lead,
+  .hlp .sb-pad,
+  .hlp .sb-emp {
+    padding-inline: 16px;
+  }
   .hlp .rc-pb {
     flex-wrap: wrap;
   }

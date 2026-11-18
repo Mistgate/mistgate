@@ -656,6 +656,25 @@
 .hlp .hl-steps {
   margin-top: 12px;
 }
+/* what the board does not draw, in its words: the steps by hand are a box of the step grey (as the raw line, L5036, and the box of a problem, L5095), a command a raw line */
+.hlp .hl-steps > ol {
+  margin-inline-start: 0;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--step);
+}
+.hlp .hl-steps code,
+.hlp .hl-act code {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--step);
+  color: var(--sec);
+}
+.hlp .hl-steps > ol code {
+  background: var(--surface);
+}
 .hlp .hl-dn > div span {
   margin-inline-start: auto;
 }
@@ -744,9 +763,9 @@
 .hlp .col > .hl-calm {
   margin-bottom: 16px;
 }
-/* the quiet card brings its own gap under it (the board's), so the card after it does not add another */
-.hlp .hl-calm + .card {
-  margin-top: 0 !important;
+/* the quiet card brings its own gap under it (the board's); in a block flow the next card's margin merges with it, in a column it adds (L148, L5016) */
+.hlp .sb-tab > .hl-calm + .card {
+  margin-top: 0;
 }
 
 /* ---- narrow: ≤720 the card's paddings step in (L5075-5077); ≤600 the lines fold (L5114-5147, L5172, L5192-5193) ---- */
@@ -844,11 +863,6 @@
   }
   .hlp .hl-ask .btn {
     margin-inline-start: 48px;
-  }
-  .hlp .hl-nodes > button,
-  .hlp .hl-nodes > a,
-  .hlp .hl-nodes > div {
-    padding: 0 16px;
   }
   .hlp .hl-hs {
     margin-inline-start: 16px;

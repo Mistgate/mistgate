@@ -296,7 +296,7 @@ export function checksOf(f: Flags) {
     ],
     rows: f.nonodes ? [] : rows,
     countryChecks: first || f.edge || f.nonodes ? [] : [country("de1", CountryVerdict.OK), country("fi1", CountryVerdict.PARTIAL, partial), country("nl1", CountryVerdict.OK), country("msk1", CountryVerdict.OK)].filter((x) => !(out && x.nodeId === nid("nl1"))),
-    tspuRun: first || f.edge ? undefined : { status: "ok", atUnix: NOW - 48 * 60, nodeId: nid("msk1"), dpiHop: 6, blockedRef: "192.0.2.36", nodesChecked: 4, detail: "" },
+    tspuRun: first || f.edge ? undefined : { status: "ok", atUnix: NOW - 48 * 60, nodeId: nid("msk1"), dpiHop: 0, blockedRef: "", nodesChecked: 4, detail: "" },
     ...(f.loss ? { udpLoss: { nodeIds: [nid("de1"), nid("nl1")], sharePercent: 38, lostPermille: 31, nodeLostPermille: 55 } } : {}),
   };
 }

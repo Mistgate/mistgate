@@ -78,7 +78,7 @@ describe("the scenes of the Health page", () => {
     if (state === "alerts.nonodes") expect(body()).toContain("No nodes yet");
     if (state === "alerts.first") expect(body()).toContain("The first round of checks is running: alerts appear in a few minutes");
     if (state === "alerts.load") expect(document.querySelector(".hl-skl")?.getAttribute("aria-busy")).toBe("true");
-    if (state === "alerts.err") expect(document.querySelector(".pv-qe")?.textContent).toContain("Health did not load");
+    if (state === "alerts.err") expect(document.querySelector(".pv-qe")?.textContent).toContain("Health failed to load");
     if (state === "alerts.crit") expect(document.querySelector(".hl-al.open")?.textContent).toContain("Node is unreachable");
     if (state === "alerts.fixfail") expect(document.querySelector(".hl-fail")?.textContent).toContain("Did not work");
     if (v.includes("ro")) {
@@ -86,9 +86,14 @@ describe("the scenes of the Health page", () => {
       expect(body()).not.toContain("Trim the journal");
     }
     if (state === "alerts.dlg") expect(document.querySelector("[role=dialog]")?.textContent).toContain("Shrink the system journal from 3870 MB to 500 MB");
-    if (state === "alerts.busy") expect(document.querySelector(".hl-run")?.textContent).toBe("Fixing…");
+    if (state === "alerts.busy") expect(document.querySelector(".hl-run")?.textContent).toBe("Trimming the journal on de1…");
     if (state === "alerts.closeall") expect(document.querySelector("[role=dialog]")?.textContent).toContain("Close 7 alerts?");
     if (state === "alerts.toast") expect(body()).toContain("Alert closed");
+    if (state === "alerts.toastmute") expect(body()).toContain("Undo");
+    if (state === "alerts.toastmute") expect(body()).toMatch(/de1: alert muted until /);
+    if (state === "alerts.toastmany") expect(body()).toContain("5 alerts closed");
+    if (state === "doctor.toastaccept") expect(body()).toContain("System journal size");
+    if (state === "alerts.toastfix") expect(body()).toContain("The journal on de1 is trimmed");
     if (state === "alerts.node.fi1") expect(document.querySelectorAll(".hl-al")).toHaveLength(2);
     if (state === "alerts.node.msk1.mskclean") expect(document.querySelector(".pv-nf")?.textContent).toContain("No open alerts on this node");
     if (state === "people") expect(document.querySelectorAll(".hl-al")).toHaveLength(3);

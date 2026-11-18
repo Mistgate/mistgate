@@ -460,7 +460,7 @@ export const en = {
 
 export const ru: Record<keyof typeof en, string> = {
   "rc.sub": "Открываются ли ноды из {country}",
-  "rc.open": "Открыть раздел «Доступность»",
+  "rc.open": "Открыть доступность",
   "rc.sum.title": "Ноды по вердикту",
   "rc.sum.ok": "доступны",
   "rc.sum.partial": "недоступны из части сетей",

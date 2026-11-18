@@ -73,12 +73,12 @@ const udp = {
   udpLoss: { nodeIds: ["nod_1", "nod_3"], sharePercent: 38, lostPermille: 31, nodeLostPermille: 55 },
 };
 
-async function mount(data: object = checks) {
+async function mount(data: object = checks, first = false) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  await act(async () => root!.render(<QueryClientProvider client={qc}><ChecksTab data={data as never} /></QueryClientProvider>));
+  await act(async () => root!.render(<QueryClientProvider client={qc}><ChecksTab data={data as never} first={first} /></QueryClientProvider>));
   for (let i = 0; i < 3; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 }
 
@@ -354,8 +354,8 @@ describe("the checks table", () => {
   it("says what each profile does on each node, a failed start in red apart from one switched off and a node without link", async () => {
     await mount();
     expect([...document.querySelectorAll(".hl-ch > span")].map((s) => s.textContent)).toEqual(["Node", "hy2 · 443 · Salamander", "hy2 · WARP · 8443", ""]);
-    expect(words(rowOf("de1"))).toEqual(["42 ms", "✕ not started"]);
-    expect(words(rowOf("de2"))).toEqual(["off", "✕ fails"]);
+    expect(words(rowOf("de1"))).toEqual(["42 ms", "not started"]);
+    expect(words(rowOf("de2"))).toEqual(["off", "fails"]);
     expect(words(rowOf("nl1"))).toEqual(["no link", "—"]);
     const cells = [...rowOf("de1").querySelectorAll(".hl-cv")];
     expect(cells[1]!.className).toContain("bad");
@@ -375,7 +375,7 @@ describe("the checks table", () => {
     expect([rowButton("de1"), rowButton("de2")].map((b) => b.getAttribute("aria-expanded"))).toEqual(["true", "false"]);
     const boxes = [...rowOf("de1").querySelectorAll(".hl-cd > div:not(.hl-cda)")].map((b) => b.textContent);
     expect(boxes[0]).toContain("hy2 · 443 · Salamander42 ms");
-    expect(boxes[1]).toContain("hy2 · WARP · 8443✕ not started");
+    expect(boxes[1]).toContain("hy2 · WARP · 8443not started");
     expect(boxes[1]).toContain("The node could not start the profile");
     expect(rowOf("de1").querySelector(".hl-cd")!.textContent).toContain("24 h");
     expect([...rowOf("de1").querySelectorAll("a")].map((a) => a.textContent)).toContain("Open node");
@@ -485,6 +485,16 @@ describe("the country column of the table", () => {
     expect(verdictOf("fi2").textContent).toBe("—");
     await press(rowButton("fi2"));
     expect(rowOf("fi2").querySelector(".hl-cd")!.textContent).toContain("not checked yet");
+  });
+
+  it("keeps every deployed cell in the queue while the first round has not come, and a profile that is not on a node as a dash", async () => {
+    await mount(checks, true);
+    const row = rowOf("de1");
+    expect(row.className).toContain("ckw");
+    expect(words(row)[0]).toBe("queued");
+    expect(row.querySelector(".hl-cv .rw-gl")?.className).toContain("none");
+    // the failing profile of the board is not shown as a verdict yet: no red, no cross in the text
+    expect(document.querySelector(".hl-cw")?.textContent).not.toContain("✕");
   });
 
   it("opens into what the sources said and the way to Reachability", async () => {

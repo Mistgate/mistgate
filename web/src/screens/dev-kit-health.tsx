@@ -8,10 +8,11 @@ import { ToastProvider, useToast } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { BundleStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT } from "@/i18n";
+import { useFmt } from "@/lib/format";
 import { assistant as assistantApi, fleet as fleetApi, health as healthApi, nodes as nodesApi } from "@/lib/api";
 import { accessQuery } from "@/lib/assistant";
 import { useLang } from "@/i18n";
-import { alertsQuery, checksQuery, doctorQuery, fixErrorText } from "@/lib/health";
+import { alertsQuery, checkTitle, checksQuery, doctorQuery, fixErrorText } from "@/lib/health";
 import { awaitingQuery } from "@/lib/integrations";
 import { nodesQuery, overviewQuery, userCountQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
@@ -23,7 +24,7 @@ import { applyScene, SceneGuard } from "@/screens/dev-kit-scene";
 import { nodeRows } from "@/screens/dev-kit-profiles-data";
 import { Shot } from "@/screens/dev-kit-redesign";
 import { HealthPage, type HealthScene } from "@/screens/health";
-import type { FixSeed, FixTarget } from "@/screens/health/fix";
+import { fixLine, type FixSeed, type FixTarget } from "@/screens/health/fix";
 import { healthTabs, type HealthTab } from "@/screens/health/tabs";
 import { ShellLayout } from "./shell";
 
@@ -32,7 +33,7 @@ import { ShellLayout } from "./shell";
 //   /dev-kit?only=health-page&state=<tab>[.<variant>…][&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1]
 // <tab>: alerts | people | checks | doctor. <variant> is what a scene adds, as the board's switches are (Data: calm · nonodes · first · load · err; Case: crit ·
 // fixfail · nock · off; Role: ro, the same as role=readonly) and what its script does by a click: open.<id> (the row that is open: j r x u m c, p1 p2 p3; on Checks the node,
-// open.fi1) · dlg (the window of the journal fix) · dlgx (of the restart) · busy (the fix runs) · closeall (the window "Close all shown") · toast (the toast with Undo) ·
+// open.fi1) · toast · toastmute · toastmany · toastaccept · toastfix (the toasts of the board's script, held) · dlg (the window of the journal fix) · dlgx (of the restart) · busy (the fix runs) · closeall (the window "Close all shown") ·
 // node.<name> (the filter "By node") · ckrun (the walk of "Check now" at its first step) · ckdone (its flash) · legend (the fold opened) · docbusy ("Run again" going);
 // and the product's states that the board does not draw: muted · grouped · loss · warpreach · history · nodeproblems · edge (· mskclean: msk1 has no alert).
 // Made-up data of the board: de1 fi1 nl1 msk1, alice, bob, documentation addresses; no call leaves the page (the panel's answers are the scene's own).
@@ -126,11 +127,18 @@ export function SceneBody({ state }: { state: string }) {
   const parts = partsOf(state);
   const t = useT();
   const toast = useToast();
+  const fmt = useFmt();
   const [tab, setTab] = useState<HealthTab>(parts.tab);
   const failText = t("hl.fix.failed", { error: fixErrorText(t, "busy") });
   useEffect(() => {
     // the toasts of the board's script, held long enough to be looked at
-    if (parts.variant.includes("toast")) toast(t("hl.alerts.closedToast"), { undo: () => {}, ms: 600_000 });
+    const has = (k: string) => parts.variant.includes(k);
+    if (has("toast")) toast(t("hl.alerts.closedToast"), { undo: () => {}, ms: 600_000 });
+    // the other toasts of the board's script: a mute, a close of several, "this is normal for this node", a fix that is done
+    if (has("toastmute")) toast(t("hl.alerts.mutedToast", { node: "de1", time: fmt.stamp(NOW + 3600) }), { undo: () => {}, ms: 600_000 });
+    if (has("toastmany")) toast(t.n("hl.alerts.closedToastMany", 5), { undo: () => {}, ms: 600_000 });
+    if (has("toastaccept")) toast(t("hl.doctor.acceptedToast", { node: "de1", check: checkTitle(t, "journald_size") }), { undo: () => {}, ms: 600_000 });
+    if (has("toastfix")) toast(fixLine(t, "ran", { fixId: "journald_vacuum", nodeName: "de1" }) ?? "", { ms: 600_000 });
     if (parts.flags.nock && parts.tab === "checks") toast(t("hl.checks.nowNone"), { ms: 600_000 });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the scene opens
   }, []);
@@ -196,6 +204,10 @@ export const frames: Frame[] = [
   { id: "health-busy", state: "alerts.busy", title: "The fix runs (the line in place of the buttons)", w: 1440, h: 1100 },
   { id: "health-closeall", state: "alerts.closeall", title: "The window \"Close all shown\"", w: 1440, h: 900 },
   { id: "health-toast", state: "alerts.toast", title: "The toast with Undo", w: 1440, h: 900 },
+  { id: "health-toast-mute", state: "alerts.toastmute", title: "The toast of a mute, with Undo", w: 1440, h: 900 },
+  { id: "health-toast-many", state: "alerts.toastmany", title: "The toast of a close of several, with Undo", w: 1440, h: 900 },
+  { id: "health-toast-accept", state: "doctor.toastaccept", title: "The toast of \"This is normal for this node\", with Undo", w: 1440, h: 900 },
+  { id: "health-toast-fix", state: "alerts.toastfix", title: "The toast of a fix that is done", w: 1440, h: 900 },
   { id: "health-node", state: "alerts.node.fi1", title: "By node: fi1 picked", w: 1440, h: 1100 },
   { id: "health-node-none", state: "alerts.node.msk1.mskclean", title: "By node: a node with no alert, \"Show all\"", w: 1440, h: 900 },
   // People

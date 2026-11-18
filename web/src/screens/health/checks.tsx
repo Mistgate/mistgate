@@ -162,6 +162,9 @@ function useCheckWalk(ids: readonly string[], frozen: "" | "run" | "flash" = "")
   return { busy: step > 0, flash: flash && step === 0, start, phase };
 }
 
+/** The board writes a failing value without its cross ("не проходит"): the dot in front of it is the cross (the legend keeps the "✕"). */
+const bare = (s: string) => s.replace(/^✕\s*/, "");
+
 /** What a cell says in the row, as a state of the dot and a colour of the text. */
 function cellView(look: CellLook): { dot: DotKind; tone: "" | "bad" | "part" | "dim" } {
   switch (look.kind) {
@@ -226,7 +229,7 @@ function ProfileBox({ name, cell, look }: { name: string; cell: CheckCell | unde
   return (
     <div>
       <span>{name}</span>
-      <b className={view.tone === "dim" ? "" : view.tone}>{look && look.kind !== "none" ? look.label : "—"}</b>
+      <b className={view.tone === "dim" ? "" : view.tone}>{look && look.kind !== "none" ? bare(look.label) : "—"}</b>
       {look?.slow && <em>{t("hl.cell.connect", { time: look.slow })}</em>}
       {cell && cell.deployed && last && <em>{failed ? checkError(t, last.errorCode) : <ResultLine cell={cell} />}</em>}
       {failed && last?.errorDetail && <em className="mono">{last.errorDetail}</em>}
@@ -267,7 +270,7 @@ function CountryBox({ title, look }: { title: string; look: CountryLook | null }
 /** What a scene of the dev kit starts the tab with: the row that is open, the walk of "Check now" fixed at a step, the legend opened. */
 export type ChecksInit = { open?: string; walk?: "run" | "flash"; legend?: boolean };
 
-export function ChecksTab({ data, init }: { data: Checks; init?: ChecksInit }) {
+export function ChecksTab({ data, first = false, init }: { data: Checks; first?: boolean; init?: ChecksInit }) {
   const t = useT();
   const fmt = useFmt();
   const noChecks = useEdition().off("health_checks"); // no rounds there: no "every 5 min"
@@ -341,7 +344,8 @@ export function ChecksTab({ data, init }: { data: Checks; init?: ChecksInit }) {
             </div>
             {data.rows.map((r) => {
               const isOpen = open === r.nodeId;
-              const ph = walk.phase(r.nodeId);
+              // the first round has not come: every row waits in the queue (the board's "first round")
+              const ph = first ? "wait" : walk.phase(r.nodeId);
               const check = checkOf(r);
               const clook = country && check ? countryLook(t, fmt, check) : null;
               const cview = countryView(clook);
@@ -357,8 +361,8 @@ export function ChecksTab({ data, init }: { data: Checks; init?: ChecksInit }) {
                       if (!v) return <span key={col.profileId} className="hl-cv dim" data-l={col.profileName} />;
                       const view = cellView(v.look);
                       if (ph === "run") return <Cell key={col.profileId} label={col.profileName} dot="busy" tone="" text={t("hlp.ck.checking")} />;
-                      if (ph === "wait") return <Cell key={col.profileId} label={col.profileName} dot="none" tone="" text={t("hlp.ck.queued")} />;
-                      return <Cell key={col.profileId} label={col.profileName} dot={view.dot} tone={view.tone} text={v.look.label} slow={v.look.slow} tip={v.look.tip.join("\n")} />;
+                      if (ph === "wait" && (!first || v.cell.deployed)) return <Cell key={col.profileId} label={col.profileName} dot="none" tone="" text={t("hlp.ck.queued")} />;
+                      return <Cell key={col.profileId} label={col.profileName} dot={view.dot} tone={view.tone} text={bare(v.look.label)} slow={v.look.slow} tip={v.look.tip.join("\n")} />;
                     })}
                     {country &&
                       (ph === "run" ? (

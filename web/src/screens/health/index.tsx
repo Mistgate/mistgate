@@ -149,7 +149,7 @@ export function HealthPage({ tab, onTab: setTab, scene }: { tab: HealthTab; onTa
           : state(checks, () => (
               <>
                 {note}
-                <ChecksTab data={checks.data!} init={scene?.checks} />
+                <ChecksTab data={checks.data!} first={first} init={scene?.checks} />
               </>
             )),
     },

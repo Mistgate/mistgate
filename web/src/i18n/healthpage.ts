@@ -1,7 +1,7 @@
 // The Health page as the redesign draws it (screens/health/*): the head, the tabs, the alerts, people, checks and doctor cards. English is the source of truth: the other languages are type-checked against it. The admin speaks «ты».
 export const en = {
   "hlp.loading": "Loading",
-  "hlp.err.title": "Health did not load",
+  "hlp.err.title": "Health failed to load",
   "hlp.err.text": "The panel did not answer. Nothing changed on the nodes.",
   "hlp.retry": "Retry",
   "hlp.sum.err": "No data",
@@ -55,7 +55,7 @@ export const en = {
   "hlp.dn.never": "not checked",
   "hlp.dn.found": "{n} found",
   "hlp.dn.clean": "clean",
-  "hlp.dn.tooOld": "agent too old",
+  "hlp.dn.tooOld": "agent is outdated",
   "hlp.fail.title": "Did not work",
   "hlp.ro": "Only the owner can fix and close alerts",
 };
@@ -175,7 +175,7 @@ export const zh: typeof en = {
   "hlp.dn.never": "未检查",
   "hlp.dn.found": "发现 {n} 项",
   "hlp.dn.clean": "正常",
-  "hlp.dn.tooOld": "代理过旧",
+  "hlp.dn.tooOld": "代理版本过旧",
   "hlp.fail.title": "未成功",
   "hlp.ro": "只有所有者可以修复和关闭告警",
 };
@@ -233,7 +233,7 @@ export const fa: typeof en = {
   "hlp.doc.nodesTitle": "نودها",
   "hlp.dn.offline": "بی‌ارتباط",
   "hlp.dn.never": "بررسی نشده",
-  "hlp.dn.found": "{n} یافته",
+  "hlp.dn.found": "{n} مورد پیدا شد",
   "hlp.dn.clean": "بدون مشکل",
   "hlp.dn.tooOld": "عامل قدیمی است",
   "hlp.fail.title": "نشد",

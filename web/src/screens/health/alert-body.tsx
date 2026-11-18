@@ -11,7 +11,7 @@ import { nodesQuery } from "@/lib/queries";
 import { entryOffered } from "@/lib/ways";
 import { ClientIPv6OffDialog, MuteMenu, Networks, PathRuns, RestartDialog, useClose, useMute } from "./alerts-parts";
 import { useAcceptDoctor } from "./doctor-parts";
-import { useFixWave, type FixFlow } from "./fix";
+import { fixLine, useFixWave, type FixFlow } from "./fix";
 import { Dot, Gl, P } from "./page-parts";
 import "./alert-body.css";
 
@@ -64,6 +64,17 @@ export function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a
   const lead = doFix ? "fix" : restart ? "restart" : ipv6Off ? "ipv6" : addEntry ? "entry" : userId ? "user" : "";
   const quiet = phase !== "idle" ? null : failed ? "failed" : "";
   const hasRow = shared || doFix || !!restart || ipv6Off || addEntry || acceptable;
+  const reachFirst = a.kind === AlertKind.COUNTRY_BLOCKED;
+  const reachLink = shared && !onNodePage && (a.kind === AlertKind.COUNTRY_BLOCKED || a.kind === AlertKind.NODE_DOWN) && (
+    <Link to="/reachability" className={linkBtn()}>
+      {t("rc.open")}
+    </Link>
+  );
+  const nodeLink = shared && a.nodeId && a.actions.includes("open_node") && !go && !onNodePage && (
+    <Link to="/nodes/$id" params={{ id: a.nodeId }} className={linkBtn()}>
+      {t("hl.alerts.openNode")}
+    </Link>
+  );
 
   return (
     <div id={id} ref={root} className={cx("hl-alb hlx @container", className)}>
@@ -80,7 +91,7 @@ export function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a
       {phase === "busy" && (
         <p className="hl-run" role="status">
           <Dot kind="busy" />
-          {t("hl.fix.fixing")}
+          {(target && fixLine(t, "run", target)) || t("hl.fix.fixing")}
         </p>
       )}
       {phase === "done" && (
@@ -155,16 +166,10 @@ export function AlertBody({ a, now, flow, onNodePage, part, id, className }: { a
               {t("task.open")}
             </Link>
           )}
-          {shared && !onNodePage && (a.kind === AlertKind.COUNTRY_BLOCKED || a.kind === AlertKind.NODE_DOWN) && (
-            <Link to="/reachability" className={linkBtn()}>
-              {t("rc.open")}
-            </Link>
-          )}
-          {shared && a.nodeId && a.actions.includes("open_node") && !go && !onNodePage && (
-            <Link to="/nodes/$id" params={{ id: a.nodeId }} className={linkBtn()}>
-              {t("hl.alerts.openNode")}
-            </Link>
-          )}
+          {/* the board lists the way to Reachability first on a country alert and the node first on a node that is down */}
+          {reachFirst && reachLink}
+          {nodeLink}
+          {!reachFirst && reachLink}
           {shared && a.nodeId && a.params.check && (
             <Link to="/nodes/$id" params={{ id: a.nodeId }} search={{ tab: "doctor" }} className={linkBtn()}>
               {t("hl.alerts.openDoctor")}
