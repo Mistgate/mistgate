@@ -16,7 +16,7 @@ import { meQuery } from "@/lib/session";
 import { updatesQuery } from "@/lib/updates";
 import { AlertsTab } from "@/screens/health/alerts";
 import { useFixFlow } from "@/screens/health/fix";
-import { ApprovalHistory } from "@/screens/integrations/approvals";
+import { ApprovalsTab } from "@/screens/ai/approvals";
 import { EventsTab } from "@/screens/node/events";
 import { AuditPage } from "@/screens/settings-pages/audit";
 import { UpdateDownloadSourcesCard, UpdateDownloadTimeoutCard } from "@/screens/settings-pages/system";
@@ -203,7 +203,7 @@ export function PagingKit() {
         <EventsTab nodeId="nod_1" />
       </Shot>
       <Shot id="paging-approvals" title="Integrations → recent decisions: ten to a page, no size picker">
-        <ApprovalHistory data={{ approvals: Array.from({ length: 25 }, (_, i) => decided(i + 1)), awaiting: 0, nowUnix: NOW, receivedMs: NOW * 1000 } as never} />
+        <ApprovalsTab data={{ approvals: Array.from({ length: 25 }, (_, i) => decided(i + 1)), awaiting: 0, nowUnix: NOW, receivedMs: NOW * 1000 } as never} />
       </Shot>
       <p className="text-xs text-muted">page {pageNo}</p>
     </div>

@@ -2,33 +2,14 @@ import { useState } from "react";
 import { cx } from "@/lib/cx";
 import { PanelSSHKey, usePanelKeyInUse } from "@/components/panel-ssh-key";
 import { Button } from "@/components/ui/button";
-import { SectionLabel } from "@/components/ui/bits";
 import { Icon } from "@/components/ui/icons";
-import { Pagination } from "@/components/ui/pagination";
 import { Segmented } from "@/components/ui/segmented";
-import { StatusPill } from "@/components/ui/status";
 import { SecureField } from "@/components/assistant/secure-field";
-import { ApprovalState } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { useT } from "@/i18n";
 import { useFmt } from "@/lib/format";
-import { clampPage, usePaging } from "@/lib/paging";
 import { safeHttpUrl } from "@/lib/warp";
-import {
-  approvalStateInfo,
-  clockText,
-  dangerText,
-  factLabel,
-  factWords,
-  outcomeText,
-  secondsLeft,
-  toolTitle,
-  useApprovalActions,
-  useTick,
-  type Approval,
-  type Approvals,
-  type Fact,
-} from "@/lib/integrations";
-import { card, ProfileChip } from "./parts";
+import { clockText, dangerText, factLabel, factWords, secondsLeft, toolTitle, useApprovalActions, type Approval, type Approvals, type Fact } from "@/lib/integrations";
+import { ProfileChip } from "./parts";
 
 /** One fact. A value that came from data (a name, a node's own text) is quoted and apart from the panel's wording, so it cannot pass for it. */
 export function FactRow({ fact }: { fact: Fact }) {
@@ -214,68 +195,5 @@ export function ApprovalCard({ a, data, nowMs, focused, onDecided }: { a: Approv
         <span className="text-xs text-muted">{installReady ? t("int.ap.approve.hint") : t(viaKey ? "int.ap.ssh.neededKey" : "int.ap.ssh.needed")}</span>
       </div>
     </article>
-  );
-}
-
-/** The queue: changes an agent planned that wait for the owner. It sits at the top of the screen and is only there while something waits. */
-export function ApprovalQueue({ data, focus }: { data: Approvals; focus?: string }) {
-  const t = useT();
-  const waiting = data.approvals.filter((a) => a.state === ApprovalState.AWAITING);
-  const nowMs = useTick(waiting.length > 0);
-  if (waiting.length === 0) return null;
-  return (
-    <section aria-labelledby="int-queue" className="flex flex-col gap-2.5">
-      <div className="flex flex-col gap-0.5">
-        <SectionLabel as="h2" icon="shield" tone="lavender">
-          <span id="int-queue">{t("int.ap.title")}</span>
-        </SectionLabel>
-        <span className="text-xs text-muted">{t("int.ap.sub")}</span>
-      </div>
-      {waiting.map((a) => (
-        <ApprovalCard key={a.id} a={a} data={data} nowMs={nowMs} focused={a.id === focus} />
-      ))}
-    </section>
-  );
-}
-
-const pageSize = 10;
-
-/** What was decided and what came of it, newest first, ten to a page (the panel sends the latest hundred). */
-export function ApprovalHistory({ data }: { data: Approvals }) {
-  const t = useT();
-  const fmt = useFmt();
-  const paging = usePaging({ sizes: [pageSize], defaultSize: pageSize });
-  const rows = data.approvals.filter((a) => a.state !== ApprovalState.AWAITING);
-  if (rows.length === 0) return null;
-  const page = clampPage(paging.page, rows.length, pageSize);
-  const shown = rows.slice((page - 1) * pageSize, page * pageSize);
-  return (
-    <section className={card}>
-      <SectionLabel as="h2" icon="list" tone="sand">
-        {t("int.ap.history")}
-      </SectionLabel>
-      <ul className="flex flex-col">
-        {shown.map((a) => {
-          const s = approvalStateInfo(a.state);
-          const at = a.appliedUnix || a.decidedUnix || a.createdUnix;
-          // our words for the outcome where the panel's code has them, else the panel's own line
-          const said = outcomeText(t, fmt, a);
-          return (
-            <li key={a.id} className="flex flex-wrap items-start gap-x-3 gap-y-1.5 border-t border-line py-2.5">
-              <div className="flex min-w-[200px] flex-1 flex-col gap-0.5">
-                <b className="text-[13px]">{toolTitle(t, a.tool)}</b>
-                <span className="text-[11px] leading-snug text-pretty text-muted">
-                  {[a.tokenName, a.decidedByName ? t("int.ap.decidedBy", { name: a.decidedByName }) : "", fmt.ago(at)].filter(Boolean).join(" · ")}
-                </span>
-                {a.error && <span className="text-[11px] leading-snug text-pretty text-danger-text">{said ?? a.error}</span>}
-                {!a.error && (said ?? a.result) && <span className="text-[11px] leading-snug text-pretty text-muted">{said ?? a.result}</span>}
-              </div>
-              <StatusPill kind={s.kind} label={t(s.key)} sm />
-            </li>
-          );
-        })}
-      </ul>
-      <Pagination total={rows.length} page={page} size={pageSize} onPage={paging.setPage} label={t("int.ap.history")} />
-    </section>
   );
 }
