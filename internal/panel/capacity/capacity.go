@@ -123,6 +123,9 @@ type Node struct {
 	Connected           bool
 	// Hours of host load in the window, any order.
 	Hours []store.HostHour
+	// SpeedTests is when the node's own speed measurements ended (unix seconds). The traffic peak of the hours they ran in
+	// is not people's traffic and is left out of the link reading.
+	SpeedTests []int64
 }
 
 // Rec is one recommendation.
@@ -266,7 +269,9 @@ func Read(n Node) Report {
 			r.BusyHourUnix, r.BusyHourCPU, r.PeopleBusyHour = h.HourStart, h.CPUAvg, h.SessionsAvg
 		}
 		r.PeoplePeak = max(r.PeoplePeak, h.SessionsMax)
-		r.RxPeakBps, r.TxPeakBps = max(r.RxPeakBps, h.RxMax), max(r.TxPeakBps, h.TxMax)
+		if !measured(h.HourStart, n.SpeedTests) {
+			r.RxPeakBps, r.TxPeakBps = max(r.RxPeakBps, h.RxMax), max(r.TxPeakBps, h.TxMax)
+		}
 		if total := cmp(h.RAMTotal, ramTotal); total > 0 {
 			v := pct(float64(h.RAMUsedMax), float64(total))
 			if r.RAMPeakPct == nil || v > *r.RAMPeakPct {
@@ -440,6 +445,19 @@ func (r *Report) leak(hours []store.HostHour) {
 	r.Recs = append(r.Recs, Rec{Code: RecAgentMemoryGrowing, Severity: SevWarn, Params: map[string]string{
 		"growth_pct_day": itoa(g), "rss_mb": strconv.FormatUint(uint64(rss[len(rss)-1])>>20, 10), "days": strconv.Itoa(len(keys)),
 	}})
+}
+
+// speedTestSpan is how far back from its end a speed measurement can have been filling the link.
+const speedTestSpan = 5 * 60
+
+// measured reports whether a speed measurement ran in the hour that starts at hourStart.
+func measured(hourStart int64, ends []int64) bool {
+	for _, end := range ends {
+		if end >= hourStart && end-speedTestSpan < hourStart+3600 {
+			return true
+		}
+	}
+	return false
 }
 
 // judge sets the status, the bottleneck and the pressure from every resource that is known.

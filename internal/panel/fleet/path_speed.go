@@ -137,6 +137,8 @@ func (s probeService) PathSpeed(ctx context.Context, req *connect.Request[probev
 	defer release()
 
 	res := f.runPathSpeed(ctx, from, to, m.Direction, m.Mb)
+	f.noteSpeedTest(ctx, from.ID)
+	f.noteSpeedTest(ctx, to.ID)
 	at := f.now().UTC()
 	if res.Error == "" {
 		if b, err := json.Marshal(res); err == nil {
