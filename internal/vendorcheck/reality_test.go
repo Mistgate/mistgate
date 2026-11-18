@@ -55,20 +55,88 @@ func TestVendoredRealityVersionMatchesGoMod(t *testing.T) {
 	}
 }
 
-const (
-	upstreamHunk = `			if peerPub2 == nil {
+// The patch is a list of hunks in tls.go: the key-share rule, then the listener's accept loop (the three scattered edits of that
+// one are three entries). Each is the upstream text and the text the copy holds instead; both must occur exactly once.
+var tlsHunks = []struct{ upstream, patched string }{
+	{
+		upstream: `			if peerPub2 == nil {
 				break // reject outdated/strange Client Hello that doesn't have X25519MLKEM768 before optional X25519
 			}
-`
-	patchedHunk = `			if peerPub2 == nil {
+`,
+		patched: `			if peerPub2 == nil {
 				if peerPub = legacyPeerPub(config, hs.clientHello.keyShares); peerPub == nil { // Mistgate: the pre-2026-11 rule, mistgate_compat.go
 					break // reject outdated/strange Client Hello that doesn't have X25519MLKEM768 before optional X25519
 				}
 			}
-`
-)
+`,
+	},
+	{
+		upstream: `	err   error
+}
+`,
+		patched: `	err   error
+	done  chan struct{} // Mistgate: closed by the accept goroutine after it set err; see MISTGATE.md
+}
+`,
+	},
+	{
+		upstream: `	if c, ok := <-l.conns; ok {
+		return c, nil
+	}
+	return nil, l.err
+`,
+		patched: `	select {
+	case c := <-l.conns:
+		return c, nil
+	case <-l.done:
+		return nil, l.err // Mistgate: err is written before done is closed
+	}
+`,
+	},
+	{
+		upstream: `		l.conns = make(chan net.Conn)
+		go func() {
+			for {
+				c, err := l.Listener.Accept()
+				if err != nil {
+					l.err = err
+					close(l.conns)
+					return
+				}
+				go func() {
+					defer func() { recover() }()
+					c, err = Server(context.Background(), c, l.config)
+					if err == nil {
+						l.conns <- c
+					}
+				}()
+`,
+		patched: `		l.conns = make(chan net.Conn)
+		l.done = make(chan struct{})
+		go func() {
+			for {
+				c, err := l.Listener.Accept()
+				if err != nil {
+					l.err = err
+					close(l.done) // Mistgate: conns is never closed, so a finished handshake cannot send on a closed channel
+					return
+				}
+				go func() {
+					defer func() { recover() }()
+					c, err = Server(context.Background(), c, l.config)
+					if err == nil {
+						select {
+						case l.conns <- c:
+						case <-l.done:
+							c.Close() // Mistgate: nobody is going to Accept it
+						}
+					}
+				}()
+`,
+	},
+}
 
-// The copy differs from the upstream module in the Go module cache by the one hunk in tls.go and by our own files, nothing else.
+// The copy differs from the upstream module in the Go module cache by the hunks in tls.go and by our own files, nothing else.
 func TestVendoredRealityIsUpstreamPlusTheHunk(t *testing.T) {
 	version := realityRequired(t)
 	out, err := exec.Command("go", "mod", "download", "-json", realityPath+"@"+version).Output()
@@ -101,10 +169,12 @@ func TestVendoredRealityIsUpstreamPlusTheHunk(t *testing.T) {
 			return nil
 		}
 		if rel == "tls.go" {
-			if bytes.Count(got, []byte(patchedHunk)) != 1 {
-				t.Errorf("tls.go does not hold the patch hunk exactly once")
+			for i, h := range tlsHunks {
+				if bytes.Count(got, []byte(h.patched)) != 1 {
+					t.Errorf("tls.go does not hold patch hunk %d exactly once", i+1)
+				}
+				got = bytes.Replace(got, []byte(h.patched), []byte(h.upstream), 1)
 			}
-			got = bytes.Replace(got, []byte(patchedHunk), []byte(upstreamHunk), 1)
 		}
 		if sha256.Sum256(got) != sha256.Sum256(want) {
 			t.Errorf("%s differs from upstream %s beyond the declared patch", rel, version)

@@ -524,6 +524,7 @@ type listener struct {
 	// [REALITY] SECTION: listener
 	conns chan net.Conn
 	err   error
+	done  chan struct{} // Mistgate: closed by the accept goroutine after it set err; see MISTGATE.md
 }
 
 // Accept waits for and returns the next incoming TLS connection.
@@ -536,10 +537,12 @@ func (l *listener) Accept() (net.Conn, error) {
 		}
 		return Server(c, l.config), nil
 	*/
-	if c, ok := <-l.conns; ok {
+	select {
+	case c := <-l.conns:
 		return c, nil
+	case <-l.done:
+		return nil, l.err // Mistgate: err is written before done is closed
 	}
-	return nil, l.err
 }
 
 // NewListener creates a Listener which accepts connections from an inner
@@ -553,19 +556,24 @@ func NewListener(inner net.Listener, config *Config) net.Listener {
 	l.config = config
 	{
 		l.conns = make(chan net.Conn)
+		l.done = make(chan struct{})
 		go func() {
 			for {
 				c, err := l.Listener.Accept()
 				if err != nil {
 					l.err = err
-					close(l.conns)
+					close(l.done) // Mistgate: conns is never closed, so a finished handshake cannot send on a closed channel
 					return
 				}
 				go func() {
 					defer func() { recover() }()
 					c, err = Server(context.Background(), c, l.config)
 					if err == nil {
-						l.conns <- c
+						select {
+						case l.conns <- c:
+						case <-l.done:
+							c.Close() // Mistgate: nobody is going to Accept it
+						}
 					}
 				}()
 			}
