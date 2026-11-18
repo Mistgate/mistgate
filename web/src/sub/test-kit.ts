@@ -52,7 +52,7 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
     },
     download: (f) => log.push(`download ${f}`),
     amz: { ...amzNoop, add: (o, pane) => log.push(pane ? `add ${o} ${pane}` : `add ${o}`), pane: (p) => log.push(`pane ${p}`) },
-    dns: { open: (s) => log.push(`dns-open ${s}`), pick: (p) => log.push(`dns-pick ${p}`), apply: () => log.push("dns-apply"), retry: () => log.push("dns-retry") },
+    dns: { open: (s) => log.push(`dns-open ${s}`), pick: (p) => log.push(`dns-pick ${p}`), apply: () => log.push("dns-apply"), retry: () => log.push("dns-retry"), scope: (all) => log.push(`dns-scope ${all}`) },
     ...over,
   };
 }

@@ -251,23 +251,41 @@ describe("actions", () => {
     expect(log).toEqual(["reveal amz-row-d3"]);
   });
 
-  it("'new key needed' that fails says so in its own card and opens nothing", async () => {
+  it("'new key needed' that fails opens nothing and says so under the device's row (and in its own window while that is open)", async () => {
     const { st, a, data: d } = setup("stale", fakeApi({ getConfigs: async () => Promise.reject(new ApiError(409, "no_inbound")) }));
     a.renew("d3");
     await settle();
     expect(st.amz).toMatchObject({ renew: null, error: "no_inbound", errorAt: "renew:d3" });
-    const el = view(d, state("android", { amz: st.amz }), actions());
-    expect(text(el.querySelector(".stale .note.bad"))).toBe("Этот вариант пока нигде не запущен — напишите в поддержку.");
-    expect(row(el, "d3").querySelector(".note.bad")).toBeNull();
+    const el = view(d, state("android", { amz: st.amz, tab: "devices", devicesOpen: true }), actions());
+    expect(text(row(el, "d3").nextElementSibling)).toBe("Этот вариант пока нигде не запущен — напишите в поддержку.");
   });
 
-  it("a question takes the keyboard to its safe answer, and cancelling gives it back to the control that asked", () => {
-    const { a, log } = setup("many", fakeApi());
+  it("a question is its own window (it takes the keyboard to its safe answer itself); cancelling gives the keyboard back to the control that asked; asking closes the menu and the name", () => {
+    const { st, a, log } = setup("many", fakeApi());
+    a.menu("d4");
     a.ask({ id: "d4", kind: "remove" });
+    expect(st.amz).toMatchObject({ menu: null, rename: null, confirm: { id: "d4", kind: "remove" } });
     a.ask(null);
     a.ask({ id: "d4", kind: "rotate" });
     a.ask(null);
-    expect(log).toEqual(["focus amz-no-d4", "focus amz-more-d4", "focus amz-no-d4", "focus amz-more-d4"]);
+    expect(log).toEqual(["focus amz-more-d4", "focus amz-more-d4"]);
+  });
+
+  it("the menu is a window: opening it moves no keyboard (the window does), closing it gives the keyboard back to 'more'", () => {
+    const { st, a, log } = setup("many", fakeApi());
+    a.menu("d4");
+    expect([st.amz.menu, log]).toEqual(["d4", []]);
+    a.menu(null);
+    expect([st.amz.menu, log]).toEqual([null, ["focus amz-more-d4"]]);
+  });
+
+  it("'new key needed' is a question of its own: opened, it takes the device's menu away; closed, it gives the keyboard back", () => {
+    const { st, a, log } = setup("stale", fakeApi());
+    a.menu("d3");
+    a.stale("d3");
+    expect(st.amz).toMatchObject({ stale: "d3", menu: null });
+    a.stale(null);
+    expect(log).toEqual(["focus amz-more-d3"]);
   });
 
   it("rotate replaces the key; remove drops the device and frees the slot", async () => {

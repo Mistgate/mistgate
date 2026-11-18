@@ -6,7 +6,7 @@ import { icon, type IconName } from "./icons";
 import { addPlatforms, countryName, deviceIcon, isDesktop, isPhone, keyAppName, platformWord, profileChoices, versionsFor } from "./logic";
 import { qrCard } from "./qr";
 import type { AmzActions, AmzState, Tools } from "./state";
-import { rich, tile } from "./ui";
+import { rich } from "./ui";
 import type { AwgDevice, Lang, MgData, Platform } from "./types";
 
 export { newAmzState } from "./state";
@@ -25,20 +25,6 @@ export const label = (x: AwgDevice, t: Dict) => x.label || platformWord(x.platfo
 
 import { copyButton } from "./ui";
 export { copyButton };
-
-/** The head of a sheet of the old design (a tinted icon, the title, the cross); the DNS window still stands on it. */
-export function sheetHead(t: Dict, o: { tone: string; ico: IconName; id: string; title: string; sub?: Kid | Kid[]; flagRow?: boolean; focus?: boolean }, close: () => void, back?: () => void): HTMLElement {
-  return h(
-    "div",
-    { class: "sh-head" },
-    back && h("button", { class: "ibtn round", type: "button", "data-k": "add-back", "aria-label": t.back, on: { click: back } }, icon("back", 18)),
-    tile(o.tone, o.ico),
-    h("div", { class: "grow" }, h("h3", { id: o.id, tabindex: o.focus ? "-1" : false, "data-autofocus": o.focus ? "" : false }, o.title), o.sub && h("p", { class: `sub${o.flagRow ? " flagrow" : ""}` }, ...(Array.isArray(o.sub) ? o.sub : [o.sub]))),
-    h("button", { class: "ibtn round", type: "button", "data-k": "modal-x", "aria-label": t.close, on: { click: close } }, icon("close", 16)),
-  );
-}
-
-export const grab = () => h("div", { class: "grab" });
 
 // ---- step "key": the form of a new device ----
 

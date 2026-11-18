@@ -1,11 +1,9 @@
-import { grab, sheetHead } from "./amnezia";
 import { h, type Kid } from "./dom";
 import { icon } from "./icons";
 import {
   canChooseDns,
   canChooseLinkDns,
   showsLinkDns,
-  dnsChoices,
   dnsDefault,
   dnsPresetOf,
   hasKeys,
@@ -13,7 +11,6 @@ import {
   keyAppName,
   LINK,
   linkAppName,
-  linkChoices,
   countryName,
   presetName,
   serverName,
@@ -21,10 +18,8 @@ import {
   serverText,
   showsKeyDns,
   usesKeys,
-  type DnsChoice,
 } from "./logic";
 import type { Ctx } from "./state";
-import { note } from "./ui";
 import type { LoadLevel, Platform, ServerEntry } from "./types";
 
 // The servers of the person, as the board draws them: a card with a table (a computer) or a list of rows (a phone). The bar over it
@@ -32,7 +27,7 @@ import type { LoadLevel, Platform, ServerEntry } from "./types";
 // change it. A row: the flag and the name, how busy the server is, the route (through a node in another country, the spare
 // WARP exit, or direct), the DNS of its AmneziaVPN keys with a pencil. The legend under the table says what the marks mean.
 // The page does not switch servers: the apps do. Two DNS choices, never mixed up: the apps that use the link have one DNS for all
-// servers (the bar), the keys have one per server (a row); both are chosen in a window (dnsModal), where what happens next is said.
+// servers (the bar), the keys have one per server (a row); both are chosen in a window (dlg-dns.ts), where what happens next is said.
 
 const fills: Record<LoadLevel, number> = { low: 1, medium: 2, high: 3 };
 const rank: Record<LoadLevel, number> = { low: 0, medium: 1, high: 2 };
@@ -53,12 +48,6 @@ export function flag(c: Ctx, s: Pick<ServerEntry, "country_code" | "place" | "la
 
 /** "In the app": the names the apps show this server under, without repeats. */
 const appNamesOf = (s: ServerEntry): string[] => [...new Set((s.connections.some((x) => x.way === "link" && x.app_name) ? s.connections.filter((x) => x.way === "link").map((x) => x.app_name) : s.app_names).filter(Boolean))];
-
-/** The key devices of this server that still hold the old DNS. */
-export function refreshDevices(c: Ctx, s: ServerEntry) {
-  const ids = new Set(s.dns?.keys_to_refresh ?? []);
-  return (c.d.amnezia?.devices ?? []).filter((x) => ids.has(x.id) && x.stale);
-}
 
 /** The number a server has among the ones of its country ("DE-2"), when it has twins and no place of its own to tell it apart. "" otherwise. */
 function numOf(all: ServerEntry[], x: ServerEntry): string {
@@ -245,73 +234,3 @@ export function serversSection(c: Ctx): Kid[] {
     ),
   ];
 }
-
-// ---- the DNS choice (a sheet on a phone, a window on a computer) ----
-
-/** The server whose picker is open. */
-export const dnsServer = (c: Pick<Ctx, "d" | "s">): ServerEntry | undefined => (c.s.dns.open ? c.d.servers.find((x) => x.id === c.s.dns.open) : undefined);
-
-/** The radio list of a picker and its buttons; `now` is the preset that applies. */
-function pickerBody(c: Ctx, choices: DnsChoice[], now: string): HTMLElement[] {
-  const { s, a, t } = c;
-  return [
-    h(
-      "div",
-      { class: "stack g8", role: "radiogroup", "aria-labelledby": "dlg-t", "aria-describedby": "dd-d" },
-      ...choices.map((o) => {
-        const value = o.isDefault ? "" : o.id;
-        const on = s.dns.pick === value;
-        return h(
-          "button",
-          { class: `opt${on ? " on" : ""}`, type: "button", role: "radio", "aria-checked": on, "data-k": `dns-opt-${value || "default"}`, "data-autofocus": on, on: { click: () => a.dns.pick(value) } },
-          h("span", { class: `radio${on ? " on" : ""}` }, on && icon("check", 13)),
-          h(
-            "span",
-            { class: "opt-b" },
-            h("span", { class: "row g8", style: { "flex-wrap": "wrap" } }, h("span", { class: "opt-t" }, o.isDefault ? t.dnsDefault(o.name.split(/\s+—\s+/)[0] ?? o.name) : o.name), o.id === now && h("span", { class: "chip sm" }, t.dnsNow)),
-            o.description && h("span", { class: "opt-d" }, o.description),
-          ),
-        );
-      }),
-    ),
-  ];
-}
-
-const pickerButtons = (c: Ctx) =>
-  h("div", { class: "btnrow dlg-btns" }, h("button", { class: "btn sec", type: "button", "data-k": "dns-cancel", on: { click: () => c.a.dns.open(null) } }, c.t.awgCancel), h("button", { class: "btn pri", type: "button", "data-k": "dns-apply", on: { click: () => c.a.dns.apply() } }, c.t.dnsApply));
-
-/** What the dialog holds for the open DNS picker: the link apps', or the keys' of one server. */
-export function dnsModal(c: Ctx): Kid[] {
-  const { d, s, a, t } = c;
-  if (s.dns.open === LINK) {
-    if (!d.dns) return [];
-    return [
-      grab(),
-      sheetHead(t, { tone: "sky", ico: "globe", id: "dlg-t", title: t.dnsLinkT(linkApp(c)), sub: t.dnsLinkSub }, () => a.dns.open(null)),
-      h("p", { class: "sm mut", id: "dd-d", style: { "margin-top": "-6px" } }, t.dnsLinkIntro(d.dns.refresh_hours)),
-      ...pickerBody(c, linkChoices(d, s.lang), d.dns.link.effective || d.dns.link.default),
-      pickerButtons(c),
-    ];
-  }
-  const srv = dnsServer(c);
-  if (!srv || !srv.dns) return [];
-  const app = keyAppName(d, null);
-  // the key devices whose DNS is inside the key: the ones that live on this server's key profiles
-  const profiles = new Set(srv.connections.filter((x) => x.way === "key").map((x) => x.profile_id));
-  const names = (d.amnezia?.devices ?? []).filter((x) => profiles.size === 0 || profiles.has(x.profile_id)).map((x) => x.label || t.devGeneric);
-  const keyNote = hasKeys(srv) && names.length > 0 ? t.dnsKeys(names) : "";
-  return [
-    grab(),
-    sheetHead(t, { tone: "mint", ico: "key", id: "dlg-t", title: t.dnsT, sub: [flag(c, srv), serverText(srv, s.lang)], flagRow: true }, () => a.dns.open(null)),
-    h("p", { class: "sm mut", id: "dd-d", style: { "margin-top": "-6px" } }, t.dnsIntro(app)),
-    ...pickerBody(c, dnsChoices(d, srv, s.lang), srv.dns.effective || dnsDefault(srv.dns)),
-    keyNote && note("", "info", keyNote),
-    pickerButtons(c),
-  ];
-}
-
-export const dnsLabel = (c: Ctx): string => {
-  if (c.s.dns.open === LINK) return c.t.dnsLinkT(linkApp(c));
-  const srv = dnsServer(c);
-  return srv ? `${c.t.dnsT} ${serverText(srv, c.s.lang)}` : c.t.dnsT;
-};

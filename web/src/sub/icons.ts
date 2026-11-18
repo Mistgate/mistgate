@@ -52,6 +52,8 @@ const paths = {
   chat: ["M4.5 19.5V7a2.5 2.5 0 0 1 2.5-2.5h10A2.5 2.5 0 0 1 19.5 7v7a2.5 2.5 0 0 1-2.5 2.5H8z"],
   /** the device rows of the boards (.u-dv .tl): a phone */
   ph: ["M9.3 2.5h5.4a2.8 2.8 0 0 1 2.8 2.8v13.4a2.8 2.8 0 0 1-2.8 2.8H9.3a2.8 2.8 0 0 1-2.8-2.8V5.3a2.8 2.8 0 0 1 2.8-2.8zM10.5 18h3"],
+  // E14-C, the windows (V2DlgMenu, V2DlgDelete): the board's own bin (a lid and a plain bucket), not the older .trash
+  bin: ["M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"],
 } as const satisfies Record<string, readonly Shape[]>;
 
 export type IconName = keyof typeof paths;

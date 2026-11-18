@@ -67,19 +67,23 @@ export const newAmzState = (platform: string, profile: string, here = ""): AmzSt
 });
 
 export type DnsState = {
-  /** The server whose DNS picker is open, or LINK (logic.ts) for the one of the apps that use the link. */
+  /** The server whose DNS window is open, or LINK (logic.ts) for the one of the apps that use the link. */
   open: string | null;
   /** The preset picked in it ("" = the default). */
   pick: string;
+  /** The window's scope: the choice is made for every server that has a DNS of its keys (true), or for the open one only (false). Not for LINK. */
+  all: boolean;
   /** The server (or LINK) whose choice is being saved. */
   busy: string;
   /** The last failure, where it happened. */
   error: { server: string; code: string; retryMin: number; preset: string } | null;
-  /** Servers (and LINK) whose choice was just saved: the card says what happens next. */
+  /** The servers of "all" that do not offer the picked preset: left as they were, and the result says so. */
+  skipped: string[];
+  /** The target (server id or LINK) whose choice was just saved: the window turns into "DNS changed" and stays open until it is closed. */
   done: Record<string, true>;
 };
 
-export const newDnsState = (): DnsState => ({ open: null, pick: "", busy: "", error: null, done: {} });
+export const newDnsState = (): DnsState => ({ open: null, pick: "", all: false, busy: "", error: null, skipped: [], done: {} });
 
 export type AmzActions = {
   /** Opens (true) the "add a device" dialog, at `pane` or where the person's ways say (the choice, or the only way), or closes (false) whichever dialog is open. */
@@ -114,6 +118,8 @@ export type DnsActions = {
   apply(): void;
   /** Saves a choice again after a failure. */
   retry(): void;
+  /** The scope of the open window: every server with a DNS of its keys (true) or the open one only (false). */
+  scope(all: boolean): void;
 };
 
 /** What the page offers its parts: copy (with a callback for the button's own "copied" state) and download. */
