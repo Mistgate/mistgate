@@ -1,0 +1,1353 @@
+/*
+ * The Reachability page (screens/reachability/*), in the board's own numbers (PnReach + pn.css L5041-5185 and the rules those lean on: the
+ * rows of a setting L4593-4609, the checkbox L1820-1823, the dot and the pill, the head and the cards of Health that the board shares).
+ * The last rule of a selector wins, as on the board, with `.pn.light` and `.pn.rail` folded into the product's tokens: --border is the
+ * board's hairline, --ok its mint "works", --accent-mark its accent, --warning / --danger (-text, -soft) its warn and crit, --tone-sky its
+ * sky. A container query of the board (the whole panel is its container) is a media query here. Everything hangs on .rcp, the page's own class
+ * (the rules of both pages that share the card, the pill and the dot are in ../health/page.css under .hlp), so nothing here reaches another
+ * screen. Motion: the width of the share bar (.3 s), the turn of a row's arrow (.2 s, in page.css), the hover of a chip, a source and an event
+ * (.15 s), the fill of the budget (.3 s, in page.css), the spinner of a test; reduced motion stills them, as on the board.
+ */
+
+/* ---- the head: the title and the country (L5042-5043) ---- */
+/* L5042 */
+.rcp .rc-hd {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+/* L5043 */
+.rcp .rc-cty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rcp .rc-cty .fl {
+  width: 18px;
+  height: 13px;
+  border-radius: 3px;
+}
+.rcp .rc-ctys {
+  display: inline-flex;
+}
+/* the board's small button (.btn.sm: 32, r8, 13, the step of grey) is the picker's trigger */
+.rcp .rc-ctys button {
+  width: auto;
+  height: 32px;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--step);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  transition:
+    background-color 0.15s var(--e),
+    transform 0.15s var(--e);
+}
+.rcp .rc-ctys button:hover {
+  background: color-mix(in srgb, var(--text) 9%, var(--surface));
+}
+.rcp .rc-ctys button:active {
+  transform: scale(0.98);
+}
+.rcp .rc-ctys button svg {
+  color: var(--muted);
+}
+
+/* the body of a tab sits where the board's `.sb-tab` does: 20 under the strip (page.css gives the panel its 36); the load and the error are 16 under the strip */
+.rcp .rc-tab {
+  min-width: 0;
+}
+.rcp .rc-tab > .hl-skl {
+  margin-top: 0;
+}
+.rcp .rc-tab > .pv-qe {
+  margin-top: -4px;
+}
+/* the quiet card's button is the product's, which has no `.btn` class to hang the board's rule on (L5016) */
+.hlp.rcp .us-none > :is(a, button) {
+  margin-top: 14px;
+  display: inline-flex;
+  text-decoration: none;
+}
+
+/* ---- the summary (L5167-5185) ---- */
+/* L5167 */
+.rcp .rc-sum {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 24px;
+  margin-bottom: 16px;
+  padding: 20px;
+}
+.rcp .rc-sumh {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.rcp .rc-sumh b {
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 32px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.rcp .rc-sumh > span {
+  font-size: 14px;
+  color: var(--sec);
+}
+.rcp .rc-sumf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+/* L5171 */
+.rcp .rc-sumf button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--sec);
+  transition:
+    border-color 0.15s var(--e),
+    background-color 0.15s var(--e),
+    color 0.15s var(--e);
+}
+.rcp .rc-sumf button:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 26%, transparent);
+}
+.rcp .rc-sumf button[aria-pressed="true"] {
+  background: var(--step);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 26%, transparent);
+}
+.rcp .rc-sumf button > i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--muted);
+}
+.rcp .rc-sumf button > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+/* L5174 */
+.rcp .rc-sumf .ok > i,
+.rcp .rc-bar .ok {
+  background: color-mix(in srgb, var(--ok) 55%, transparent);
+}
+.rcp .rc-sumf .part > i,
+.rcp .rc-sumf .tcp > i,
+.rcp .rc-bar .part,
+.rcp .rc-bar .tcp {
+  background: var(--warning);
+}
+.rcp .rc-sumf .bad > i,
+.rcp .rc-sumf .reg > i,
+.rcp .rc-bar .bad,
+.rcp .rc-bar .reg {
+  background: var(--danger);
+}
+/* L5175: the shares of the states; the bar grows and shrinks with the filter and the rounds */
+.rcp .rc-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 4px;
+  height: 8px;
+}
+.rcp .rc-bar i {
+  flex: 1 1 0;
+  min-width: 8px;
+  border-radius: 4px;
+  background: var(--step);
+  transition: flex-grow 0.3s var(--e);
+}
+.rcp .rc-zero {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+
+/* the notes over the cards (L5091-5092, L5111): the first round, a source in trouble, IPv6, a network dark everywhere */
+.hlp.rcp .rc-nt .an-lk {
+  flex: none;
+  font-size: 13px;
+}
+.rcp .rc-nt.rc-dark > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rcp .rc-dark em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rcp .rc-dl span,
+.rcp .rc-dl {
+  display: block;
+}
+
+/* ---- the table of the nodes (L5045-5057, L5106-5107, L5147-5185) ---- */
+.rcp .rc-main {
+  margin-bottom: 16px;
+}
+/* L5045 */
+.rcp .rc-t {
+  border-top: 1px solid var(--border);
+}
+/* L5046, L5107: the last of the two columns' definitions wins */
+.rcp .rc-r {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) 150px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 168px 16px;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 20px;
+  text-align: start;
+  font-size: 14px;
+  color: inherit;
+  cursor: pointer;
+}
+.rcp .rc-h {
+  min-height: 40px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: default;
+}
+.rcp .rc-dh {
+  display: flex;
+  justify-content: space-between;
+}
+.rcp .rc-dh i {
+  font-style: normal;
+  font-size: 11px;
+}
+/* L5048: the open row takes a shade of the text */
+.rcp .rc-w {
+  border-top: 1px solid var(--border);
+}
+.rcp .rc-w.open {
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+}
+/* the verdict now: IPv4 and, while Globalping checks it, IPv6 under it */
+.rcp .rc-now {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding-block: 8px;
+}
+.rcp .rc-fam {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.7;
+}
+/* L5049 */
+.rcp .rc-v {
+  font-size: 13px;
+  color: var(--sec);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rcp .rc-v.part {
+  color: var(--warning-text);
+}
+.rcp .rc-v.mut {
+  color: var(--muted);
+}
+/* L5050 */
+.rcp .rc-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.rcp .rc-days i {
+  height: 20px;
+  border-radius: 4px;
+  background: var(--step);
+}
+.rcp .rc-days i.ok {
+  background: color-mix(in srgb, var(--ok) 55%, transparent);
+}
+.rcp .rc-days i.part {
+  background: var(--warning);
+}
+.rcp .rc-days i.bad {
+  background: var(--danger);
+}
+/* L5051: the key of the colours */
+.rcp .rc-lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-end: 16px;
+}
+.rcp .rc-lg i {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--step);
+}
+.rcp .rc-lg i.ok {
+  background: color-mix(in srgb, var(--ok) 55%, transparent);
+}
+.rcp .rc-lg i.part {
+  background: var(--warning);
+}
+.rcp .rc-lg i.bad {
+  background: var(--danger);
+}
+/* L4523: no node in this state */
+.rcp .pv-nf button,
+.rcp .pv-nf a {
+  flex: none;
+}
+
+/* the open row (L5052-5054) */
+.rcp .rc-d {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 20px 16px;
+}
+.rcp .rc-dk {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: baseline;
+  font-size: 14px;
+}
+.rcp .rc-dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.rcp .rc-dk b {
+  font-weight: 500;
+}
+.rcp .rc-dk em {
+  grid-column: 2;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rcp .rc-ch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rcp .rc-ch i {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  background: var(--step);
+  font-style: normal;
+  font-size: 12px;
+  line-height: 24px;
+  color: var(--sec);
+}
+.rcp .rc-ch i.bad {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+.rcp .rc-ch i.part {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+.rcp .rc-ch i.mut {
+  color: var(--muted);
+}
+/* L5179: the sources as words, only where the table has no columns for them (below) */
+.rcp .rc-dsrc {
+  display: none;
+}
+/* what the page has besides the board: the week of each source as lanes, with their moments */
+.rcp .rc-wkh {
+  align-items: start;
+}
+.rcp .rc-wk {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.rcp .rc-ln {
+  display: grid;
+  grid-template-columns: 88px 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+.rcp .rc-ln.off {
+  opacity: 0.55;
+}
+.rcp .rc-nm {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rcp .rc-nm.rc-v6 {
+  padding-inline-start: 12px;
+  color: var(--muted);
+}
+.rcp .rc-wd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sec);
+}
+.rcp .rc-wd > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rcp .rc-wd.partial,
+.rcp .rc-wd.warn,
+.rcp .rc-wd.listed {
+  color: var(--warning-text);
+}
+.rcp .rc-wd.bad {
+  color: var(--danger-text);
+}
+.rcp .rc-wd.off {
+  color: var(--faint);
+}
+.rcp .rc-ln.none {
+  align-items: baseline;
+}
+.rcp .rc-why {
+  grid-column: 2 / -1;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.rcp .rc-lw {
+  min-width: 0;
+}
+.rcp .rc-axis {
+  font-size: 10px;
+  color: var(--faint);
+}
+.rcp .rc-ax {
+  grid-column: 3;
+  display: flex;
+  justify-content: space-between;
+}
+.rcp .rc-lane {
+  position: relative;
+  height: 16px;
+}
+.rcp .rc-track {
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  transform: translateY(-50%);
+  background: var(--step);
+}
+.rcp .rc-track.off {
+  border: 1px dashed var(--border);
+  background: none;
+}
+.rcp .rc-seg,
+.rcp .rc-hit {
+  position: absolute;
+  inset-block: 0;
+  min-width: 3px;
+}
+.rcp .rc-hit {
+  border-radius: 3px;
+}
+.rcp .rc-seg[data-verdict="ok"] {
+  background: color-mix(in srgb, var(--ok) 55%, transparent);
+}
+.rcp .rc-seg[data-verdict="partial"] {
+  background: linear-gradient(var(--warning) 50%, color-mix(in srgb, var(--ok) 40%, transparent) 50%);
+}
+.rcp .rc-seg[data-verdict="warn"] {
+  background: var(--warning);
+}
+.rcp .rc-seg[data-verdict="bad"] {
+  background: var(--danger);
+}
+.rcp .rc-seg[data-verdict="listed"] {
+  background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--warning) 70%, transparent) 0 2px, color-mix(in srgb, var(--warning) 18%, transparent) 2px 6px);
+}
+.rcp .rc-seg[data-verdict="unknown"] {
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+}
+.rcp .rc-mid {
+  position: absolute;
+  inset-block: 0;
+  width: 1px;
+  background: var(--surface);
+}
+/* the hint for the IPv6 entry and the networks of a partial block */
+.rcp .rc-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--tone-mint-bg);
+  color: var(--ok);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+.rcp .rc-hint > span {
+  display: flex;
+  flex: 1 1 224px;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.rcp .rc-hint > span .i {
+  margin-top: 0;
+}
+.rcp .rc-bk {
+  max-width: 560px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warning-soft);
+}
+.rcp .rc-bk.bad {
+  background: var(--danger-soft);
+}
+.rcp ul.rc-bk {
+  background: none;
+  padding: 0;
+}
+
+/* ---- the events and the sources of the Nodes tab (L5055-5060, L5105, L5112-5113) ---- */
+.rcp .rc-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+/* L5055 */
+.rcp .rc-all {
+  margin-inline-start: auto;
+  font-size: 13px;
+}
+.rcp .rc-evs {
+  border-top: 1px solid var(--border);
+}
+.rcp .rc-ev {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding-block: 8px;
+  padding-inline: 20px 16px;
+  border-top: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.15s var(--e);
+}
+.rcp .rc-evs > .rc-ev:first-child {
+  border-top: 0;
+}
+.rcp .rc-ev:hover {
+  background: var(--step);
+}
+.rcp .rc-ev > span:not(.pv-pill) {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rcp .rc-ev b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.rcp .rc-ev em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rcp .rc-ev > .i {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+.rcp .rc-ev b span {
+  font-size: inherit;
+}
+.rcp .rc-ev .hl-tag {
+  margin-inline-start: 6px;
+}
+[dir="rtl"] .rcp .rc-ev > .i {
+  transform: scaleX(-1);
+}
+.rcp .rc-evn {
+  padding-top: 4px;
+}
+/* L5058 */
+.rcp .rc-sl {
+  border-top: 1px solid var(--border);
+}
+.rcp .rc-sl > button,
+.rcp .rc-sl > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  text-align: start;
+}
+.rcp .rc-sl > button:first-child,
+.rcp .rc-sl > div:first-child {
+  border-top: 0;
+}
+.rcp .rc-sl > button {
+  transition: background-color 0.15s var(--e);
+}
+.rcp .rc-sl > button:hover {
+  background: var(--step);
+}
+.rcp .rc-sl b {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.rcp .rc-sl em {
+  margin-inline-start: auto;
+  overflow: hidden;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rcp .rc-ownr {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ---- the Sources tab: the list and the open source (L5061-5066, L5176-5178, L5183) ---- */
+.rcp .rc-sg {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.rcp .rc-sp {
+  min-width: 0;
+}
+/* the list of the sources and the panel of each are tabs of their own, not the page's: the page's strip and body spacing (page.css) is not theirs */
+.hlp.rcp .rc-sp > [role="tabpanel"] {
+  padding-top: 0;
+  min-width: 0;
+}
+.hlp.rcp .rc-sn[role="tablist"] {
+  margin-top: 0;
+}
+.rcp .rc-sn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-snap-type: x proximity;
+}
+.rcp .rc-sn > .pp-q1 {
+  margin: 0 0 4px;
+}
+.rcp .rc-sn button {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: start;
+  scroll-snap-align: start;
+  transition:
+    border-color 0.15s var(--e),
+    background-color 0.15s var(--e);
+}
+.rcp .rc-sn button:hover {
+  border-color: color-mix(in srgb, var(--text) 26%, transparent);
+}
+.rcp .rc-sn button[aria-selected="true"] {
+  border-color: var(--accent-mark);
+  background: color-mix(in srgb, var(--accent-mark) 5%, var(--surface));
+}
+.rcp .rc-st {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+}
+.rcp .rc-st b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.rcp .rc-ph {
+  display: inline-block;
+  width: 64px;
+  height: 22px;
+}
+.rcp .rc-sm {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.rcp .rc-sm i {
+  font-style: normal;
+  color: var(--sec);
+}
+.rcp .rc-sm i::after {
+  content: " · ";
+  color: var(--muted);
+}
+.rcp .rc-sm:empty {
+  display: none;
+}
+
+/* the open source (L5063-5066) */
+.rcp .rc-sd .pp-sh {
+  flex-wrap: wrap;
+}
+.rcp .rc-sd .pp-sh h3 {
+  flex: 0 0 auto;
+}
+.rcp .rc-scope {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--step);
+  font-size: 12px;
+  line-height: 24px;
+  color: var(--sec);
+}
+.rcp .rc-sd .pp-sh .pv-pill {
+  margin-inline-start: auto;
+}
+.hlp.rcp .rc-desc {
+  max-width: 680px;
+  padding-bottom: 4px;
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--sec);
+}
+.hlp.rcp .rc-last {
+  padding-bottom: 16px;
+}
+.rcp .rc-wait {
+  padding: 8px 20px 16px;
+}
+/* the problem of a source (L5110-5114): the button of the product's own, so the board's `.btn` rule is said here */
+.hlp.rcp .rc-pb > :is(a, button) {
+  flex: none;
+  align-self: center;
+}
+/* L5067: this month's spend, and the fill that grows with it (L4143, L5113) */
+.rcp .rc-bud {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 20px 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--step);
+}
+.rcp .rc-bud > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rcp .rc-bud span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.rcp .rc-bud b {
+  font-size: 16px;
+  font-weight: 500;
+}
+.rcp .rc-bud em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--sec);
+}
+.rcp .rc-bud .rw-pg {
+  margin: 0;
+}
+/* L5903: a spent month is the crit colour (page.css has the plain and the warn fill; the board's track is the box's own step of grey) */
+.rcp .rc-bud .rw-pg.bad {
+  background: linear-gradient(90deg, var(--danger) var(--w), var(--step) 0);
+}
+[dir="rtl"] .rcp .rc-bud .rw-pg.bad {
+  background: linear-gradient(270deg, var(--danger) var(--w), var(--step) 0);
+}
+
+/* the rows of a setting (L4593-4609, L4723) */
+.rcp .pp-rows {
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 12px;
+}
+.rcp .pp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 8px 20px;
+  align-items: start;
+  min-height: 56px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.rcp .pp-rows > .pp-row:first-child {
+  border-top: 0;
+}
+.rcp .pp-row.wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+.rcp .pp-lb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  padding-top: 4px;
+}
+.rcp .pp-lb > b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.rcp .pp-lb > span {
+  flex-basis: 100%;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.rcp .pp-ct {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+/* the switch sits at the end of its row (the board's `.pp-ct .fz-sw`) */
+.rcp .pp-ct > [role="switch"] {
+  align-self: flex-end;
+  margin-top: 6px;
+}
+/* L5067: a stored secret ("set" and Replace), a field with its button */
+.rcp .rc-set {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rcp .rc-set > .mono {
+  font-size: 14px;
+  color: var(--sec);
+}
+.rcp .rc-set.edit {
+  align-items: flex-start;
+  flex-wrap: nowrap;
+}
+.rcp .rc-fld {
+  flex: 1;
+  min-width: 0;
+}
+.rcp .rc-btns {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.rcp .pp-ct > .rc-btns {
+  margin-top: 0;
+}
+.rcp .rc-sel {
+  width: 200px;
+  max-width: 100%;
+}
+
+/* the units of bsbord (L5068-5069): a tile per unit, a box, the operator, what the unit is */
+.rcp .rc-un {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+.rcp .rc-unh {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.rcp .rc-unh b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.rcp .rc-unh span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.rcp .rc-unh em {
+  flex: 1 1 100%;
+  font-style: normal;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rcp .rc-unp {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.rcp .rc-ud {
+  border-top: 1px solid var(--border);
+}
+.rcp .rc-ud > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 13px;
+  list-style: none;
+  cursor: pointer;
+}
+.rcp .rc-ud > summary::-webkit-details-marker {
+  display: none;
+}
+.rcp .rc-udn {
+  font-weight: 500;
+}
+.rcp .rc-ud > summary .mono {
+  font-size: 12px;
+  color: var(--muted);
+}
+.rcp .rc-ud[open] > summary .sb-chev {
+  transform: rotate(90deg);
+}
+[dir="rtl"] .rcp .rc-ud[open] > summary .sb-chev {
+  transform: rotate(90deg) scaleX(-1);
+}
+.rcp .rc-ung {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.rcp .rc-ung > li {
+  display: flex;
+}
+.rcp .rc-ung button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  text-align: start;
+  transition: border-color 0.15s var(--e);
+}
+.rcp .rc-ung button[aria-checked="true"] {
+  border-color: color-mix(in srgb, var(--accent-mark) 45%, var(--border));
+}
+.rcp .rc-ung button.dim {
+  opacity: 0.55;
+}
+.rcp .rc-ung button > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.rcp .rc-ung b {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.rcp .rc-ung em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rcp .rc-wl {
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--warning-soft);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--warning-text);
+}
+/* L1820-1823, L3174: the box of a tile */
+.rcp .rc-cb {
+  display: grid;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+}
+.rcp .rc-cb i {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--text) 28%, transparent);
+  color: transparent;
+  transition:
+    background-color 0.15s var(--e),
+    border-color 0.15s var(--e);
+}
+.rcp .rc-cb i .i {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+.rcp .rc-cb.on i {
+  background: var(--accent-mark);
+  border-color: var(--accent-mark);
+  color: var(--ink-on-accent);
+}
+.rcp .rc-una {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* the reports of kl!ck, the results of the probe node (L5070) */
+.rcp .rc-kl {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+.rcp .rc-kl > li {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.rcp .rc-kl > li:first-child {
+  border-top: 0;
+}
+.rcp .rc-kl > li:has(.rc-gl) {
+  padding-block: 8px;
+}
+.rcp .rc-kl span.warn {
+  color: var(--warning-text);
+}
+.rcp .rc-kl em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rcp .rc-gl {
+  grid-column: 2 / -1;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.rcp .rc-gl b {
+  font-weight: 500;
+  color: var(--text);
+}
+/* the own probes: a row each */
+.rcp .rc-pl {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+.rcp .rc-pr {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+.rcp .rc-pr:first-child {
+  border-top: 0;
+}
+.rcp .rc-pr.dim {
+  opacity: 0.6;
+}
+.rcp .rc-prh {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.rcp .rc-prh b {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.rcp .rc-prm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.rcp .rc-prm > span {
+  white-space: nowrap;
+}
+.rcp .rc-prn {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.hlp.rcp .rc-pr .rc-pb {
+  margin: 0;
+}
+.hlp.rcp .rc-pr .hl-act {
+  margin-top: 0;
+}
+/* L5071-5073: what goes where, and the foot of the card */
+.rcp .rc-go {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+.rcp .rc-go p {
+  max-width: 680px;
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--sec);
+}
+.rcp .rc-sf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+.rcp .rc-sf button,
+.rcp .rc-sf a {
+  gap: 8px;
+}
+.rcp .rc-sf .an-sp {
+  color: var(--tone-sky);
+}
+.rcp .rc-off {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+/* ---- narrower windows (the board's container is the whole panel: a media query here) ---- */
+/* L5099 (1200): the table keeps the node, the verdict and the week; the words of the sources go into the open row */
+@media (max-width: 1200px) {
+  .rcp .rc-r {
+    grid-template-columns: minmax(112px, 1fr) 152px 168px 16px;
+  }
+  .rcp .rc-r > .rc-v,
+  .rcp .rc-h > :nth-child(n + 3):nth-child(-n + 5) {
+    display: none;
+  }
+  .rcp .rc-dsrc {
+    display: grid;
+  }
+}
+/* L5099 (1100): the list of the sources is a row of tiles above the open one */
+@media (max-width: 1100px) {
+  .rcp .rc-sg {
+    grid-template-columns: 1fr;
+  }
+  .rcp .rc-sn {
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .rcp .rc-sn > .pp-q1 {
+    display: none;
+  }
+  .rcp .rc-sn button {
+    flex: 0 0 220px;
+  }
+}
+/* L5108 (900) */
+@media (max-width: 900px) {
+  .rcp .rc-two {
+    grid-template-columns: 1fr;
+  }
+}
+/* L5101, L5115, L5167 (720) */
+@media (max-width: 720px) {
+  .rcp .rc-d {
+    padding: 4px 16px 16px;
+  }
+  .rcp .rc-sum {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  .rcp .rc-sumf {
+    justify-content: flex-start;
+  }
+  .hlp.rcp .rc-pb {
+    flex-wrap: wrap;
+  }
+  .hlp.rcp .rc-pb > :is(a, button) {
+    margin-inline-start: 20px;
+  }
+  .hlp.rcp .rc-nt {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .hlp.rcp .pp-sh {
+    padding: 12px 16px 4px;
+  }
+  .hlp.rcp :is(.sb-lead, .sb-emp) {
+    padding-inline: 16px;
+  }
+  .hlp.rcp .sb-vfoot {
+    padding-inline: 16px;
+  }
+  .rcp .pp-rows {
+    padding: 0 16px 12px;
+  }
+  .rcp .pp-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .rcp .pp-lb {
+    padding-top: 0;
+  }
+  .rcp .pp-ct > [role="switch"] {
+    align-self: flex-start;
+  }
+  .hlp.rcp .rc-bud {
+    margin-inline: 16px;
+  }
+  .rcp .rc-un,
+  .rcp .rc-go,
+  .rcp .rc-sf {
+    padding-inline: 16px;
+  }
+  .rcp .rc-pr {
+    padding-inline: 16px;
+  }
+  .rcp .rc-ev {
+    padding-inline: 16px 12px;
+  }
+  .rcp .rc-sl > button,
+  .rcp .rc-sl > div {
+    padding-inline: 16px;
+  }
+  .rcp .rc-wait {
+    padding-inline: 16px;
+  }
+  .rcp .rc-set.edit {
+    flex-wrap: wrap;
+  }
+  .rcp .rc-hd {
+    align-items: flex-start;
+  }
+}
+/* L5123-5145, L5150 (600): a row of the table is a card: the node and the verdict on top, the week under them */
+@media (max-width: 600px) {
+  .rcp .rc-h {
+    display: none;
+  }
+  .rcp .rc-r {
+    grid-template-columns: 1fr auto 16px;
+    gap: 8px 12px;
+    padding: 12px 16px;
+  }
+  .rcp .rc-r > .rc-v {
+    display: none;
+  }
+  .rcp .rc-r > .rc-days {
+    grid-column: 1 / 3;
+  }
+  .rcp .rc-r > .sb-chev {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .rcp .rc-now {
+    padding-block: 0;
+    align-items: flex-end;
+  }
+  .rcp .rc-dk {
+    grid-template-columns: 1fr;
+  }
+  .rcp .rc-dk em {
+    grid-column: 1;
+  }
+  .rcp .rc-kl > li {
+    grid-template-columns: 72px minmax(0, 1fr);
+    padding: 8px 16px;
+  }
+  .rcp .rc-kl em {
+    grid-column: 2;
+  }
+  .rcp .rc-ln {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+  .rcp .rc-lw,
+  .rcp .rc-ax {
+    grid-column: 1 / -1;
+  }
+  .rcp .rc-axis > span:first-child,
+  .rcp .rc-axis > span:nth-child(2) {
+    display: none;
+  }
+  .rcp .rc-why {
+    grid-column: 2;
+  }
+}

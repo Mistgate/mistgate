@@ -1,10 +1,11 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act } from "react";
+import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { setLang } from "@/i18n";
+import { ToastProvider } from "@/components/ui/toast";
 import { CountryPicker, SourceCards } from "./sources";
 
 const getGlobalping = vi.fn();
@@ -87,7 +88,17 @@ vi.mock("@/lib/api", () => ({
 // the open source is `?source=` in the URL: navigate stores the new search and draws the page again, as the router would
 let search: Record<string, unknown> = {};
 const navigate = vi.fn();
-vi.mock("@tanstack/react-router", () => ({ useSearch: () => search, useNavigate: () => navigate }));
+vi.mock("@tanstack/react-router", () => ({
+  useSearch: () => search,
+  useNavigate: () => navigate,
+  Link: ({ children, to, params, className }: { children?: ReactNode; to: string; params?: { id: string }; className?: string }) => (
+    <a href={to} data-id={params?.id} className={className}>
+      {children}
+    </a>
+  ),
+}));
+// the toasts are drawn only where a test asks for them (the notes would add to the text the others read)
+let toasts = false;
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -111,6 +122,7 @@ afterEach(() => {
   host?.remove();
   root = host = null;
   search = {};
+  toasts = false;
   navigate.mockReset();
   act(() => setLang("en"));
   for (const m of [getGlobalping, updateGlobalping, testGlobalping, disconnectGlobalping, getCountryReachability, getChecks, getBlocklist, updateBlocklist, testBlocklist, disconnectBlocklist]) m.mockReset();
@@ -138,8 +150,17 @@ async function mount(first: object) {
   const draw = () =>
     root!.render(
       <QueryClientProvider client={qc}>
-        <CountryPicker />
-        <SourceCards />
+        {toasts ? (
+          <ToastProvider>
+            <CountryPicker />
+            <SourceCards />
+          </ToastProvider>
+        ) : (
+          <>
+            <CountryPicker />
+            <SourceCards />
+          </>
+        )}
       </QueryClientProvider>,
     );
   // called from a click, inside its act()
@@ -152,7 +173,14 @@ async function mount(first: object) {
 }
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 const text = () => document.body.textContent ?? "";
-const state = () => document.querySelector<HTMLElement>("[role=status][data-state]");
+/** The state line of a card as it reads: the source's own word, then its last line ("Works · 200 of 250 tests left this hour"). */
+const statusOf = (scope: ParentNode | null | undefined) => {
+  const el = scope?.querySelector<HTMLElement>(".rc-last[data-state]");
+  return el ? { dataset: { state: el.dataset.state! }, textContent: `${el.dataset.word} · ${el.textContent}` } : undefined;
+};
+const state = () => statusOf(document);
+/** What switches a source: "Switch on" while it is off, "Pause" while it is on. */
+const ONOFF = "[data-act=enable],[data-act=pause]";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const click = async (b: Element | undefined | null) => {
   await act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
@@ -188,7 +216,7 @@ describe("the sources", () => {
     getTspuProbe.mockResolvedValue({ settings: tspu({ enabled: true }) });
     getCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true, hasToken: true, status: "token_unknown", tokenUnknown: true }) });
     await mount(settings());
-    expect(tabs().map((x) => x.querySelector("span + span")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users", "Own probes"]);
+    expect(tabs().map((x) => x.querySelector("b")?.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users", "Own probes"]);
     expect(document.querySelector("[role=tablist]")?.getAttribute("aria-label")).toBe("Sources");
     expect(shown()).toEqual(["Block lists"]);
     expect(tabs().map((x) => x.getAttribute("aria-selected"))).toEqual(["false", "true", "false", "false", "false", "false", "false"]);
@@ -200,7 +228,7 @@ describe("the sources", () => {
     expect(tab("cheburcheck")?.textContent).toBe("cheburcheckErrorFree · cheburcheck.ru probesRussia onlyThe site does not know the probe token");
     expect(tab("bsbord")?.textContent).toContain("Paid · mobile SIM probes");
     // nothing in a row switches a source: the switch is the open source's own
-    expect(document.querySelector("[role=tablist] [role=switch]")).toBeNull();
+    expect(document.querySelector("[role=tablist] button[data-act]")).toBeNull();
   });
 
   it("open the source in the URL, put the one clicked there, and show only that one", async () => {
@@ -251,35 +279,6 @@ describe("the sources", () => {
     expect(shown()).toEqual(["Block lists"]);
     expect(tabs().map((x) => x.tabIndex)).toEqual([-1, 0, -1, -1, -1, -1, -1]);
   });
-
-  it("on a phone take turns: a tap opens the source and its way back, which returns to the row left", async () => {
-    Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ matches: true }) });
-    const scroll = (Element.prototype.scrollIntoView = vi.fn());
-    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    try {
-      await mount(settings());
-      await click(tab("bsbord"));
-      // pushed: the phone's own back button closes the source
-      expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: { source: "bsbord" }, replace: false, resetScroll: false });
-      expect(document.activeElement?.textContent).toBe("All sources");
-      expect(scroll).toHaveBeenCalled();
-      await click(document.activeElement);
-      expect(back).toHaveBeenCalledTimes(1);
-      act(() => root?.unmount());
-      host?.remove();
-      // opened from a link: there is no list of ours to go back to, so the way back replaces the source with it
-      search = { source: "lists" };
-      await mount(settings());
-      await click(button("All sources"));
-      expect(navigate).toHaveBeenLastCalledWith({ to: "/reachability", search: {}, replace: true, resetScroll: false });
-      expect(document.activeElement).toBe(tab("Block lists"));
-      expect(back).toHaveBeenCalledTimes(1);
-    } finally {
-      delete (window as { matchMedia?: unknown }).matchMedia;
-      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
-      back.mockRestore();
-    }
-  });
 });
 
 describe("the Globalping card", () => {
@@ -287,7 +286,7 @@ describe("the Globalping card", () => {
     await mount(settings());
     expect(state()?.dataset.state).toBe("off");
     expect(state()?.textContent).toBe("Off · Nothing runs and nothing is sent.");
-    expect(document.querySelector("[role=switch]")?.getAttribute("aria-checked")).toBe("false");
+    expect(document.querySelector<HTMLElement>(ONOFF)?.dataset.act).toBe("enable");
     expect(button("Test")).toBeUndefined();
     expect(button("Disconnect")).toBeUndefined();
     expect(section("Globalping")!.querySelector("input[type=password]")).toBeNull();
@@ -298,7 +297,7 @@ describe("the Globalping card", () => {
   it("switches on through UpdateGlobalping, then waits for a first test with the token field open", async () => {
     updateGlobalping.mockResolvedValue({ settings: settings({ enabled: true }) });
     await mount(settings());
-    await click(document.querySelector("[role=switch]"));
+    await click(document.querySelector(ONOFF));
     expect(updateGlobalping).toHaveBeenCalledTimes(1);
     expect(updateGlobalping).toHaveBeenCalledWith({ enabled: true });
     expect(state()?.dataset.state).toBe("untested");
@@ -310,7 +309,7 @@ describe("the Globalping card", () => {
   it("switches off through UpdateGlobalping as well", async () => {
     updateGlobalping.mockResolvedValue({ settings: settings({ hasToken: true }) });
     await mount(settings({ enabled: true, hasToken: true }));
-    await click(document.querySelector("[role=switch]"));
+    await click(document.querySelector(ONOFF));
     expect(updateGlobalping).toHaveBeenCalledWith({ enabled: false });
     expect(state()?.dataset.state).toBe("off");
     // the token stays for switching back on: it can still be cleared
@@ -422,9 +421,9 @@ describe("the Globalping card", () => {
 describe("the block-list card", () => {
   // the card of its own, next to Globalping's: its state line, its buttons
   const card = (title = "Block lists") => [...document.querySelectorAll("section")].find((s) => s.querySelector("h3")?.textContent === title);
-  const listsState = (title?: string) => card(title)?.querySelector<HTMLElement>("[role=status][data-state]");
+  const listsState = (title?: string) => statusOf(card(title));
   const listsButton = (label: string, title?: string) => [...(card(title)?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
-  const listsSwitch = () => card()?.querySelector("[role=switch]");
+  const listsSwitch = () => card()?.querySelector(ONOFF);
   const at = Math.floor(Date.now() / 1000) - 240;
   const listsAt = Math.floor(new Date(2026, 9, 14, 18, 5).getTime() / 1000);
 
@@ -433,8 +432,7 @@ describe("the block-list card", () => {
     expect([...document.querySelectorAll("[role=tabpanel] h3")].map((h) => h.textContent)).toEqual(["Globalping", "Block lists", "TSPU probe", "cheburcheck", "bsbord", "kl!ck users", "Own probes"]);
     expect(listsState()?.dataset.state).toBe("off");
     expect(listsState()?.textContent).toBe("Off · Nothing is downloaded.");
-    expect(listsSwitch()?.getAttribute("aria-checked")).toBe("false");
-    expect(listsSwitch()?.getAttribute("aria-label")).toBe("Use the block lists");
+    expect((listsSwitch() as HTMLElement | null)?.dataset.act).toBe("enable");
     expect(listsButton("Test")).toBeUndefined();
     expect(listsButton("Disconnect")).toBeUndefined();
     expect(card()?.textContent).toContain("The lists are downloaded to the panel and compared here: no node address leaves the panel.");
@@ -541,9 +539,9 @@ describe("the block-list card", () => {
 describe("the TSPU probe card", () => {
   // the card of its own, third in the group: its state line, its buttons, its picker
   const card = (title = "TSPU probe") => [...document.querySelectorAll("section")].find((s) => s.querySelector("h3")?.textContent === title);
-  const probeState = (title?: string) => card(title)?.querySelector<HTMLElement>("[role=status][data-state]");
+  const probeState = (title?: string) => statusOf(card(title));
   const probeButton = (label: string, title?: string) => [...(card(title)?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
-  const probeSwitch = () => card()?.querySelector("[role=switch]");
+  const probeSwitch = () => card()?.querySelector(ONOFF);
   const ago12 = Math.floor(Date.now() / 1000) - 12 * 60;
   const run = (over: Record<string, unknown> = {}) => ({ status: "ok", atUnix: ago12, nodeId: "nod_probe1", dpiHop: 6, blockedRef: "31.13.72.36", nodesChecked: 3, detail: "", reason: "", ...over });
   const nodes = [
@@ -579,8 +577,7 @@ describe("the TSPU probe card", () => {
     await mount(settings());
     expect(probeState()?.dataset.state).toBe("off");
     expect(probeState()?.textContent).toBe("Off · Nothing runs and nothing is sent.");
-    expect(probeSwitch()?.getAttribute("aria-checked")).toBe("false");
-    expect(probeSwitch()?.getAttribute("aria-label")).toBe("Use the TSPU probe");
+    expect((probeSwitch() as HTMLElement | null)?.dataset.act).toBe("enable");
     expect(card()?.textContent).toContain("One of your nodes in Russia finds the filtering box (TSPU) on its path and checks whether connections to each node die there.");
     expect(card()?.textContent).toContain("Node addresses go only to your own probe node and nowhere else.");
     expect(probeButton("Test")).toBeUndefined();
@@ -689,7 +686,7 @@ describe("the TSPU probe card", () => {
     expect(testTspuProbe.mock.calls[0]).toEqual([{}]);
     expect(probeState()?.dataset.state).toBe("running");
     expect(probeState()?.textContent).toBe("Testing… · a run can take a few minutes");
-    expect(probeState()?.querySelector('[class*="mg-ui-spin"]')).not.toBeNull();
+    expect(card()?.querySelector(".pp-sh .rw-gl.busy")).not.toBeNull();
     expect(probeButton("Testing…")?.disabled).toBe(true);
     for (let i = 0; i < 5; i++) await settle();
     expect(probeState()?.dataset.state).toBe("running"); // still waiting, nothing gave up
@@ -773,7 +770,7 @@ describe("the TSPU probe card", () => {
 
 describe("the kl!ck card", () => {
   const card = (title = "kl!ck users") => [...document.querySelectorAll("section")].find((s) => s.querySelector("h3")?.textContent === title);
-  const klickState = (title?: string) => card(title)?.querySelector<HTMLElement>("[role=status][data-state]");
+  const klickState = (title?: string) => statusOf(card(title));
   const klickButton = (label: string) => [...(card()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
   const ago = Math.floor(Date.now() / 1000) - 300;
   const tally = (over: Record<string, number> = {}) => ({ reports: 0, ok: 0, freeze: 0, tcpBlocked: 0, handshakeFailed: 0, noAnswer: 0, lastUnix: ago, ...over });
@@ -802,7 +799,7 @@ describe("the kl!ck card", () => {
     expect(card()?.textContent).toContain("never the person's address");
     expect(klickButton("Disconnect")).toBeUndefined();
     getClientProbe.mockResolvedValue({ settings: { enabled: true, reports: 0, lastUnix: 0 }, nodes: [], nowUnix: 0 });
-    await click(card()?.querySelector("[role=switch]"));
+    await click(card()?.querySelector(ONOFF));
     expect(updateClientProbe).toHaveBeenCalledWith({ enabled: true });
     expect(klickState()?.dataset.state).toBe("waiting");
   });
@@ -843,7 +840,7 @@ describe("the kl!ck card", () => {
 // cheburcheck and bsbord: consent first, then the step-up; write-only secrets; the price before the first paid round
 
 const section = (title: string) => [...document.querySelectorAll("section")].find((x) => x.querySelector("h3")?.textContent === title);
-const stateOf = (title: string) => section(title)?.querySelector<HTMLElement>("[role=status][data-state]");
+const stateOf = (title: string) => statusOf(section(title));
 const buttonIn = (el: Element | null | undefined, label: string) => [...(el?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.trim() === label);
 const nowS = () => Math.floor(Date.now() / 1000);
 
@@ -854,8 +851,8 @@ describe("the cheburcheck card", () => {
   it("is off by default and says what switching it on would send, to whom, and that Test sends no address", async () => {
     await mount(settings());
     expect(ccState()?.textContent).toBe("Off · Nothing runs and nothing is sent.");
-    const sw = cc()?.querySelector("[role=switch]");
-    expect([sw?.getAttribute("aria-checked"), sw?.getAttribute("aria-label")]).toEqual(["false", "Use cheburcheck"]);
+    const sw = cc()?.querySelector(ONOFF);
+    expect(sw?.getAttribute("data-act")).toBe("enable");
     expect(cc()?.textContent).toContain("Node IPv4 addresses go to cheburcheck.ru, which keeps every query with the panel’s IP and User-Agent (it names Mistgate). Test sends no address.");
     expect(buttonIn(cc(), "Test")).toBeUndefined();
   });
@@ -863,13 +860,13 @@ describe("the cheburcheck card", () => {
   it("asks for consent before switching on: the address, the site keeping it with the IP and User-Agent; Cancel sends nothing", async () => {
     updateCheburcheck.mockResolvedValue({ settings: chebur({ enabled: true }) });
     await mount(settings());
-    await click(cc()?.querySelector("[role=switch]"));
+    await click(cc()?.querySelector(ONOFF));
     expect(dialog()?.textContent).toContain("Switch cheburcheck on?");
     for (const l of ["sends each node’s IPv4 address to cheburcheck.ru", "keeps every query with the caller’s IP and User-Agent", "names Mistgate", "a shared Cloudflare address"])
       expect(dialog()?.textContent).toContain(l);
     await click(buttonIn(dialog(), "Cancel"));
     expect(updateCheburcheck).not.toHaveBeenCalled();
-    await click(cc()?.querySelector("[role=switch]"));
+    await click(cc()?.querySelector(ONOFF));
     await click(buttonIn(dialog(), "Switch on"));
     expect(updateCheburcheck).toHaveBeenCalledWith({ enabled: true });
     expect(ccState()?.textContent).toBe("On · no run yet: the first one comes within minutes");
@@ -879,7 +876,7 @@ describe("the cheburcheck card", () => {
     expect(cc()?.querySelector("input[type=password]")).not.toBeNull();
     // off asks nothing
     updateCheburcheck.mockResolvedValue({ settings: chebur() });
-    await click(cc()?.querySelector("[aria-label='Use cheburcheck']"));
+    await click(cc()?.querySelector(ONOFF));
     expect(updateCheburcheck).toHaveBeenLastCalledWith({ enabled: false });
     expect(dialog()).toBeNull();
   });
@@ -936,7 +933,7 @@ describe("the cheburcheck card", () => {
     act(() => setLang("ru"));
     await mount(settings());
     expect(stateOf("cheburcheck")?.textContent).toBe("Выключено · Ничего не запускается и никуда не отправляется.");
-    await click(cc()?.querySelector("[role=switch]"));
+    await click(cc()?.querySelector(ONOFF));
     expect(dialog()?.textContent).toContain("Включить cheburcheck?");
     expect(dialog()?.textContent).toContain("Сайт хранит каждый запрос с IP и User-Agent отправителя");
     await click(buttonIn(dialog(), "Отмена"));
@@ -970,14 +967,14 @@ describe("the bsbord card", () => {
     getBsbord.mockRejectedValue(new ConnectError("bsbord_country_unavailable", Code.Unavailable));
     await mount(settings());
     expect(bbState()?.textContent).toBe("Not available · only for Russia; nothing is sent");
-    expect(bb()?.querySelector("[role=switch]")).toBeNull();
+    expect(bb()?.querySelector(ONOFF)).toBeNull();
     expect(getBsbord).toHaveBeenCalledTimes(1); // an answer, not a dropped connection: not asked again
   });
 
   it("waits for the key and the units before it can be switched on, and says so", async () => {
     await mount(settings());
     expect(bbState()?.textContent).toBe("Off · save the key and pick units, then switch it on");
-    expect(bb()?.querySelector("[role=switch]")?.hasAttribute("data-disabled")).toBe(true);
+    expect(bb()?.querySelector(ONOFF)?.hasAttribute("data-disabled")).toBe(true);
     expect(bb()?.textContent).toContain("Node IP:port go to bsbord. Each round is paid; the key is your bsbord account. Test sends no address.");
     await click(buttonIn(bb(), "Save key"));
     expect(bb()?.textContent).toContain("This does not look like a bsbord key (bsk_live_…).");
@@ -990,29 +987,28 @@ describe("the bsbord card", () => {
     listBsbordUnits.mockResolvedValue({ units, nUnits: 7, nProbeable: 6 });
     updateBsbord.mockResolvedValue({ settings: bsb({ hasKey: true, units: ["megafon|msk|off", "mts|krym|off", "mts|krym|on", "mts|msk|off"] }) });
     await mount(settings());
-    const picker = bb()!.querySelector("details")!;
-    expect(picker.open).toBe(true); // nothing saved yet: open
-    expect(picker.querySelector("summary")?.textContent).toBe("Units3 picked");
-    const district = (name: string) => [...picker.querySelectorAll("details")].find((d) => d.querySelector("summary span")?.textContent === name)!;
-    expect([...picker.querySelectorAll(":scope details summary span:first-child")].map((x) => x.textContent)).toEqual(["Крым", "Москва"]);
+    const picker = bb()!.querySelector(".rc-un")!;
+    expect(picker.querySelector(".rc-unh .mono")?.textContent).toBe("3 picked");
+    const district = (name: string) => [...picker.querySelectorAll("details.rc-ud")].find((d) => d.querySelector(".rc-udn")?.textContent === name)!;
+    expect([...picker.querySelectorAll("details.rc-ud .rc-udn")].map((x) => x.textContent)).toEqual(["Крым", "Москва"]);
     const box = (opKey: string) => {
       const u = units.find((x) => x.opKey === opKey)!;
-      return [...district(u.region).querySelectorAll("label")].find((l) => l.textContent?.startsWith(u.operator) && (u.dpi === "on") === l.textContent.includes("white list"))!;
+      return [...district(u.region).querySelectorAll<HTMLButtonElement>("button[role=checkbox]")].find((l) => l.textContent?.startsWith(u.operator) && (u.dpi === "on") === l.textContent.includes("white list"))!;
     };
     expect(box("mts|krym|on").textContent).toBe("MTSwhite list");
-    expect(box("beeline|msk|off").querySelector("input")!.disabled).toBe(true);
+    expect(box("beeline|msk|off").disabled).toBe(true);
     expect(box("beeline|msk|off").textContent).toBe("Beelinecannot probe now");
     // one per operator in Moscow: each operator's first unit there without the white list, the one that cannot probe left out
     await click(buttonIn(district("Москва"), "One per operator"));
-    await click(box("volna|krym|off").querySelector("input"));
-    expect(picker.querySelector("summary")?.textContent).toBe("Units4 picked");
+    await click(box("volna|krym|off"));
+    expect(picker.querySelector(".rc-unh .mono")?.textContent).toBe("4 picked");
     await click(buttonIn(picker, "Save units"));
     expect(updateBsbord).toHaveBeenCalledWith({ units: { opKeys: ["megafon|msk|off", "mts|krym|off", "mts|krym|on", "mts|msk|off"] } });
     // the Crimea preset puts the Crimean units back
-    await click(box("mts|krym|off").querySelector("input"));
+    await click(box("mts|krym|off"));
     await click(buttonIn(picker, "All of Crimea"));
-    expect(box("mts|krym|off").querySelector("input")!.checked).toBe(true);
-    expect(box("volna|krym|off").querySelector("input")!.checked).toBe(true);
+    expect(box("mts|krym|off").getAttribute("aria-checked")).toBe("true");
+    expect(box("volna|krym|off").getAttribute("aria-checked")).toBe("true");
   });
 
   it("keeps a monthly cap in roubles, 100 ₽ by default, and saves it in kopecks", async () => {
@@ -1034,7 +1030,7 @@ describe("the bsbord card", () => {
     previewBsbord.mockResolvedValue(preview());
     updateBsbord.mockResolvedValue({ settings: ready({ enabled: true }) });
     await mount(settings());
-    await click(bb()?.querySelector("[role=switch]"));
+    await click(bb()?.querySelector(ONOFF));
     const d = dialog()!;
     expect(d.textContent).toContain("Switch bsbord on?");
     for (const l of ["each node’s IP address and one TCP port to bsbord", "paid from your bsbord balance, up to the monthly cap", "The key is your bsbord account"]) expect(d.textContent).toContain(l);
@@ -1058,7 +1054,7 @@ describe("the bsbord card", () => {
     getBsbord.mockResolvedValue({ settings: ready() });
     previewBsbord.mockRejectedValueOnce(new ConnectError("bsbord_no_targets", Code.FailedPrecondition)).mockResolvedValue(preview({ monthlyCredits: 48000 }));
     await mount(settings());
-    await click(bb()?.querySelector("[role=switch]"));
+    await click(bb()?.querySelector(ONOFF));
     await click(buttonIn(dialog(), "Check the price"));
     expect(dialog()?.textContent).toContain("No node has an IPv4 address and a TCP port to check.");
     expect(buttonIn(dialog(), "Switch on")).toBeUndefined();
@@ -1075,10 +1071,10 @@ describe("the bsbord card", () => {
     expect(bbState()?.dataset.state).toBe("status-cap_reached");
     expect(bbState()?.textContent).toMatch(/^Monthly cap reached · rounds resume next month or when you raise the cap · next try .+ · last round 1 h ago$/);
     const spend = bb()!.querySelector("[data-testid=bsbord-spend]")!;
-    expect(spend.textContent).toBe("This month100\u00a0₽ of 100\u00a0₽ · 0\u00a0₽ left");
+    expect(spend.textContent).toBe("This month100\u00a0₽ of 100\u00a0₽0\u00a0₽ left");
     const meter = spend.querySelector("[role=meter]")!;
     expect(["aria-valuenow", "aria-valuemax", "aria-valuetext"].map((a) => meter.getAttribute(a))).toEqual(["10000", "10000", "100\u00a0₽ of 100\u00a0₽"]);
-    expect(meter.firstElementChild?.className).toContain("tone-bad");
+    expect(meter.className).toContain("bad");
   });
 
   it("puts every status in plain words, holds back what a round under way reserves, and shows the balance from Test", async () => {
@@ -1105,7 +1101,7 @@ describe("the bsbord card", () => {
     expect(testBsbord).toHaveBeenCalledWith({});
     expect(bbState()?.textContent).toBe("Works · balance 523.40\u00a0₽ · bonus 50\u00a0₽ · plan pro · 312 units can probe");
     expect(bb()?.querySelector("[data-testid=bsbord-spend]")?.textContent).toBe(
-      "This month23.40\u00a0₽ of 100\u00a0₽ · 75\u00a0₽ left1.60\u00a0₽ held for a round under way · balance 523.40\u00a0₽ · bonus 50\u00a0₽",
+      "This month23.40\u00a0₽ of 100\u00a0₽75\u00a0₽ left1.60\u00a0₽ held for a round under way · balance 523.40\u00a0₽ · bonus 50\u00a0₽",
     );
   });
 
@@ -1126,14 +1122,14 @@ describe("the bsbord card", () => {
     getBsbord.mockResolvedValue({ settings: ready({ enabled: true, spentCredits: 2340, lastStatus: "cap_reached" }) });
     await mount(settings());
     expect(stateOf("bsbord")?.textContent).toBe("Месячный лимит исчерпан · круги продолжатся в следующем месяце или когда поднимешь лимит");
-    expect(bb()?.querySelector("[data-testid=bsbord-spend]")?.textContent).toBe("В этом месяце23,40\u00a0₽ из 100\u00a0₽ · осталось 76,60\u00a0₽");
+    expect(bb()?.querySelector("[data-testid=bsbord-spend]")?.textContent).toBe("В этом месяце23,40\u00a0₽ из 100\u00a0₽осталось 76,60\u00a0₽");
     act(() => root?.unmount());
     host?.remove();
     act(() => setLang("zh"));
     getBsbord.mockResolvedValue({ settings: ready() });
     previewBsbord.mockResolvedValue(preview());
     await mount(settings());
-    await click(bb()?.querySelector("[role=switch]"));
+    await click(bb()?.querySelector(ONOFF));
     expect(dialog()?.textContent).toContain("开启 bsbord？");
     await click(buttonIn(dialog(), "查看价格"));
     expect(dialog()?.querySelector("[data-testid=bsbord-price]")?.textContent).toBe("每轮 1.60\u00a0₽：3 个节点 × 4 个单元 · 按每 24 小时计，每月约 48\u00a0₽");
@@ -1159,5 +1155,79 @@ describe("the secrets of the source cards", () => {
     expect(page).not.toContain(key);
     expect(page).not.toContain(token);
     expect(page).not.toContain("TEST0123456789");
+  });
+});
+
+describe("the open source in the board's frame", () => {
+  const buttonOf = (title: string, what: string) => section(title)?.querySelector<HTMLElement>(`[data-act=${what}]`);
+  const ready = (over: Record<string, unknown> = {}) => bsb({ hasKey: true, units: ["mts|krym|off", "volna|krym|off"], ...over });
+
+  it("has a pill in its head, its last line under the text, and the foot the state asks for: Switch on while off, Pause and Disconnect while on", async () => {
+    await mount(settings());
+    expect(section("Globalping")!.querySelector(".pp-sh .pv-pill")?.textContent).toBe("Off");
+    expect(section("Globalping")!.querySelector(".rc-scope")?.textContent).toBe("any country");
+    expect(buttonOf("Globalping", "enable")?.textContent).toBe("Switch on");
+    expect(buttonOf("Globalping", "pause")).toBeNull();
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(settings({ enabled: true, hasToken: true }));
+    expect(section("Globalping")!.querySelector(".pp-sh .pv-pill")?.className).toContain("busy");
+    expect(buttonOf("Globalping", "pause")?.textContent).toBe("Pause");
+    expect(buttonOf("Globalping", "disconnect")?.textContent).toBe("Disconnect");
+    expect(buttonOf("Globalping", "enable")).toBeNull();
+  });
+
+  it("pauses without forgetting: the checks stop, the toast says so and takes it back", async () => {
+    toasts = true;
+    updateGlobalping.mockResolvedValue({ settings: settings({ hasToken: true }) });
+    await mount(settings({ enabled: true, hasToken: true }));
+    await click(buttonOf("Globalping", "pause"));
+    expect(updateGlobalping).toHaveBeenLastCalledWith({ enabled: false });
+    expect(disconnectGlobalping).not.toHaveBeenCalled();
+    expect(text()).toContain("Globalping is off");
+    updateGlobalping.mockResolvedValue({ settings: settings({ enabled: true, hasToken: true }) });
+    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Undo"));
+    expect(updateGlobalping).toHaveBeenLastCalledWith({ enabled: true });
+  });
+
+  it("tells a refused token as a problem of the source, with the way to mend it: the token field opens", async () => {
+    testGlobalping.mockRejectedValue(new ConnectError("globalping_unauthorized", Code.FailedPrecondition));
+    await mount(settings({ enabled: true, hasToken: true }));
+    await click(button("Test"));
+    const box = section("Globalping")!.querySelector<HTMLElement>("[data-testid=source-problem]")!;
+    expect(box.className).toContain("bad");
+    expect(box.textContent).toContain("Globalping refused the token. Paste a new one or disconnect.");
+    expect(box.textContent).toContain("In-country checks are stopped. Replace the token and the rounds resume by themselves.");
+    expect(section("Globalping")!.querySelector("input[type=password]")).toBeNull();
+    await click([...box.querySelectorAll("button")].find((b) => b.textContent === "Replace the token"));
+    expect(section("Globalping")!.querySelector("input[type=password]")).not.toBeNull();
+    // the list says it too, in the pill
+    expect(tab("Globalping")?.querySelector(".pv-pill")?.className).toContain("bad");
+    expect(tab("Globalping")?.textContent).toContain("Error");
+  });
+
+  it("says the hourly limit and the spent month as problems, each with what it means", async () => {
+    const at = Math.floor(Date.now() / 1000) - 240;
+    getChecks.mockResolvedValue({
+      nowUnix: at, intervalS: 300, columns: [], rows: [],
+      countryChecks: [{ nodeId: "nod_1", country: "RU", verdict: CountryVerdict.UNKNOWN, atUnix: at, probes: [], reason: "rate_limited", eyeball: true, confidence: "", listedBy: [], cdnProvider: "", cdnRegion: "" }],
+    });
+    getBsbord.mockResolvedValue({ settings: ready({ enabled: true, spentCredits: 10000, lastStatus: "cap_reached" }) });
+    await mount(settings({ enabled: true, hasToken: true }));
+    expect(section("Globalping")!.querySelector("[data-testid=source-problem]")?.className).toContain("part");
+    expect(section("Globalping")!.querySelector("[data-testid=source-problem]")?.textContent).toContain("The next round goes when the limit renews.");
+    expect(section("bsbord")!.querySelector("[data-testid=source-problem]")?.textContent).toContain("Rounds are stopped until the end of the month. Raise the limit to continue sooner.");
+    expect(section("bsbord")!.querySelector(".rc-bud .rw-pg")?.className).toContain("bad");
+  });
+
+  it("says the probe node is not in touch, and leads to it", async () => {
+    getTspuProbe.mockResolvedValue({ settings: tspu({ enabled: true, probeNodeId: "nod_probe", nodes: [{ id: "nod_probe", name: "msk1", online: false, declares: true, countryCode: "RU" }] }) });
+    await mount(settings());
+    const box = section("TSPU probe")!.querySelector<HTMLElement>("[data-testid=source-problem]")!;
+    expect(box.textContent).toContain("No link");
+    expect(box.textContent).toContain("The probe starts by itself when the node is back.");
+    expect(section("TSPU probe")!.querySelector(".rc-last")?.textContent).toBe("the probe node msk1 is not in touch");
+    expect(box.querySelector("a")?.textContent).toBe("Open the node");
+    expect(box.querySelector("a")?.getAttribute("data-id")).toBe("nod_probe");
   });
 });

@@ -98,7 +98,13 @@ async function mount(data: { settings?: object; probes?: object[]; scriptVersion
   for (let i = 0; i < 4; i++) await settle();
 }
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
-const state = () => document.querySelector<HTMLElement>("[role=status][data-state]");
+/** The state line of the card as it reads: the source's own word, then its last line. */
+const state = () => {
+  const el = document.querySelector<HTMLElement>(".rc-last[data-state]");
+  return el ? { dataset: { state: el.dataset.state! }, textContent: `${el.dataset.word} · ${el.textContent}` } : undefined;
+};
+/** What switches the source: "Switch on" while it is off, "Pause" while it is on. */
+const ONOFF = "[data-act=enable],[data-act=pause]";
 const rows = () => [...document.querySelectorAll<HTMLElement>("[data-testid=probe]")];
 const row = (name: string) => rows().find((r) => r.textContent?.startsWith(name))!;
 const buttons = (scope: ParentNode = document) => [...scope.querySelectorAll("button")].map((b) => b.textContent?.trim());
@@ -123,8 +129,7 @@ describe("the Own probes card: its state line", () => {
     expect(state()?.textContent).toBe("Off · nothing is asked of the probes; the ones you installed stay and wake up when you switch it on");
     expect(rows()).toHaveLength(0);
     expect(buttons()).not.toContain("Add a probe");
-    expect(document.querySelector("[role=switch]")?.getAttribute("aria-checked")).toBe("false");
-    expect(document.querySelector("[role=switch]")?.getAttribute("aria-label")).toBe("Use own probes");
+    expect(document.querySelector<HTMLElement>(ONOFF)?.dataset.act).toBe("enable");
   });
 
   it("says there is no probe yet when it is on and offers the first one", async () => {
@@ -260,7 +265,7 @@ describe("the Own probes card: what it asks and says before it acts", () => {
 
   it("switches with the settings it already has, the interval is 30 to 240 and the spare address is checked", async () => {
     await mount({ settings: settings({ enabled: false, intervalMin: 90, fallbackUrl: "https://spare.example.com" }) });
-    await click(document.querySelector("[role=switch]"));
+    await click(document.querySelector(ONOFF));
     expect(update).toHaveBeenCalledWith({ settings: { enabled: true, intervalMin: 90, fallbackUrl: "https://spare.example.com" } });
   });
 
@@ -282,7 +287,7 @@ describe("the Own probes card: what it asks and says before it acts", () => {
     expect(get).not.toHaveBeenCalled();
     expect(state()?.dataset.state).toBe("unavailable");
     expect(state()?.textContent).toBe("Not available · not in the Cloudflare edition yet; nothing is sent");
-    expect(document.querySelector("[role=switch]")).toBeNull();
+    expect(document.querySelector(ONOFF)).toBeNull();
     expect(buttons()).toEqual([]);
   });
 });
