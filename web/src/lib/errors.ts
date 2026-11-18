@@ -12,6 +12,10 @@ import { lossyVars } from "./port-check";
 export const errorCodes = [
   "name_taken",
   "group_not_empty",
+  // a change of a person's groups (UpdateUser add_group_ids / remove_group_ids): "group_in_both: group=<id>", "main_group: group=<id>", "too_many_groups"
+  "group_in_both",
+  "main_group",
+  "too_many_groups",
   "profile_deployed",
   "stale_version",
   "node_offline",

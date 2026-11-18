@@ -1,17 +1,17 @@
 import { Checkbox } from "@base-ui/react/checkbox";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { DefaultMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
-import { Notice } from "@/components/ui/notice";
+import { Menu, MenuItem, MenuLink } from "@/components/ui/menu";
 import { ProtocolTag } from "@/components/ui/protocol-tag";
 import { Segmented } from "@/components/ui/segmented";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
-import { QuotaReset, type AccessImpact, type NodeAccess, type ProfileRef } from "@/gen/mistgate/admin/v1/user_pb";
+import { QuotaReset, type NodeAccess, type ProfileRef } from "@/gen/mistgate/admin/v1/user_pb";
 import { dns, groups as groupsApi, users } from "@/lib/api";
 import { clientApiQuery } from "@/lib/clientapi";
 import { cx } from "@/lib/cx";
@@ -23,8 +23,9 @@ import { telegramOnly, trustTunnelOnly } from "@/screens/profiles/protocol-meta"
 import { catalogOf, presetName, presetSubtitle, transportKey } from "@/screens/subscriptions/model";
 import { dnsPresetsQuery, useLinkAppList, useLinkAppNames } from "@/screens/subscriptions/queries";
 import { effectiveDnsText, useDnsLabel, useInheritedDns } from "./dns-select";
-import { GB, daysLeft, nowSec } from "./format";
-import { ImpactText, wayOf } from "./groups";
+import { GB, daysLeft, groupTone, nowSec } from "./format";
+import { changeDemo, groupIdsOf, useGroupChange, type MemberKind } from "./group-membership";
+import { wayOf } from "./groups";
 import type { DetailN, UserN as User } from "./model";
 import { groupsQuery, protocolsQuery } from "./rpc";
 import { useTx } from "./t";
@@ -377,7 +378,7 @@ function GroupPick({ user, onPick }: { user: User; onPick: (g: Group) => void })
   const shown = all.filter((g) => !q || g.name.toLowerCase().includes(q.toLowerCase()));
   const dup = all.some((g) => g.name.toLowerCase() === name.trim().toLowerCase());
   const ok = name.trim().length >= 2 && !dup;
-  const sub = (g: Group) => `${t.n("up.groupPeople", g.userCount)} · ${t.n("up.groupWays", g.profileIds.length)}`;
+  const sub = (g: Group) => `${t.n("up.groupPeople", g.userCount + g.extraUserCount)} · ${t.n("up.groupWays", g.profileIds.length)}`;
 
   // a new group is a copy of this one (its ways, its DNS, its disabled nodes): the person moves into it at once, nothing changes for them
   async function create() {
@@ -437,6 +438,7 @@ function GroupPick({ user, onPick }: { user: User; onPick: (g: Group) => void })
                   <b>
                     <GroupDot id={g.id} color={g.color} />
                     {g.name}
+                    {user.extraGroupIds.includes(g.id) && <em className="up-xt">{t("up.groupExtraTag")}</em>}
                   </b>
                   <span>{sub(g)}</span>
                 </div>
@@ -497,6 +499,96 @@ function GroupPick({ user, onPick }: { user: User; onPick: (g: Group) => void })
   );
 }
 
+/**
+ * "Also in" (the board's chips and its group list): the groups the person is in besides the main one, each a chip in the group's colour
+ * with a menu (make main, open, remove), and "Add to a group" with the list of the groups they are not in. Every change goes through the
+ * server's dry run (what they get and lose) before it is made. The chips come with the person (name and colour), the list from the groups.
+ */
+function ExtraGroups({ user, onAsk }: { user: User; onAsk: (kind: MemberKind, g: Pick<Group, "id" | "name">) => void }) {
+  const t = useTx();
+  const readonly = useReadonly();
+  const list = useQuery(groupsQuery);
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const all = list.data ?? [];
+  const mine = groupIdsOf(user);
+  const free = all.filter((g) => !mine.includes(g.id));
+  const shown = free.filter((g) => !q || g.name.toLowerCase().includes(q.toLowerCase()));
+  const sub = (g: Group) => `${t.n("up.groupPeople", g.userCount + g.extraUserCount)} · ${t.n("up.groupWays", g.profileIds.length)}`;
+  return (
+    <div className="flex flex-col gap-2" data-testid="extra-groups">
+      <div className="up-xg">
+        <span className="up-xl">{t("up.extraGroups")}</span>
+        {user.extraGroupIds.map((id, i) => {
+          const g = { id, name: user.extraGroupNames[i] ?? id };
+          return (
+            <Menu
+              key={id}
+              side="bottom"
+              align="start"
+              pop
+              narrow
+              aria-label={t("up.extraMenu", { group: g.name })}
+              trigger={
+                <button type="button" className="up-xc" data-tone={groupTone(id, user.extraGroupColors[i])} aria-label={t("up.extraMenu", { group: g.name })} disabled={readonly}>
+                  <span>{g.name}</span>
+                  <G d={P.down} size={14} />
+                </button>
+              }
+            >
+              <MenuItem onClick={() => onAsk("main", g)}>{t("up.extraMake")}</MenuItem>
+              <MenuLink render={<Link to="/users/groups/$id" params={{ id }} />}>{t("up.extraOpen")}</MenuLink>
+              <MenuItem danger onClick={() => onAsk("remove", g)}>
+                {t("up.extraRemove")}
+              </MenuItem>
+            </Menu>
+          );
+        })}
+        <button type="button" className="up-xa" aria-expanded={open} aria-haspopup="listbox" disabled={readonly || (list.data !== undefined && free.length === 0)} onClick={() => (setOpen(!open), setQ(""))}>
+          <G d={P.plus} size={14} stroke={2.2} />
+          {t("up.extraAdd")}
+        </button>
+      </div>
+      {user.extraGroupIds.length === 0 && !open && <small>{t("up.extraNoneHint")}</small>}
+      {open && (
+        <div className="up-sell up-gl2" role="group" aria-label={t("up.extraAdd")}>
+          {free.length > 6 && (
+            <label className="up-gq">
+              <G d={P.search} size={16} />
+              <input type="text" placeholder={t("up.findGroup")} aria-label={t("up.findGroup")} autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} />
+            </label>
+          )}
+          <div className="up-gsc">
+            {shown.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                className="up-gadd"
+                onClick={() => {
+                  setOpen(false);
+                  onAsk("add", g);
+                }}
+              >
+                <span className="g" aria-hidden>
+                  <G d={P.plus} size={12} />
+                </span>
+                <div>
+                  <b>
+                    <GroupDot id={g.id} color={g.color} />
+                    {g.name}
+                  </b>
+                  <span>{sub(g)}</span>
+                </div>
+              </button>
+            ))}
+            {shown.length === 0 && <p className="up-empty">{free.length === 0 ? t("up.extraAddNone", { name: user.name }) : t("up.noGroup")}</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** What a way gives: the profiles of the group, by the app that takes them (tags), the board's colours. */
 function waysOf(profiles: ProfileRef[], protocols: ReturnType<typeof useProtocols>) {
   const isTg = (p: ProfileRef) => {
@@ -546,16 +638,18 @@ function GetRow({ app, state, icon, mark, title, line, tags, on, off, disabled, 
  */
 export function GivesCard({ data, actions }: { data: DetailN; actions: Actions }) {
   const t = useTx();
-  const toast = useToast();
   const readonly = useReadonly();
   const linkApps = useLinkAppNames();
   const protocols = useProtocols();
   const api = useQuery(clientApiQuery);
   const user = data.user!;
-  // kept after the dialog closes so its text does not go blank while it fades out
-  const [changing, setChanging] = useState<{ to: Group; impact: AccessImpact | null } | null>(null);
-  const [changeOpen, setChangeOpen] = useState(false);
-  const [changeError, setChangeError] = useState<string | null>(null);
+  const nodeNames = (id: string) => data.nodeAccess.find((n) => n.nodeId === id)?.nodeName ?? id;
+  const { ask, show, modal } = useGroupChange(actions.refresh, nodeNames);
+  // the dev kit's scene opens the window on made-up impact, once
+  useEffect(() => {
+    if (changeDemo.current) show({ who: user, ...changeDemo.current });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const w = waysOf(data.profiles, protocols);
   const apps = { happ: !!user.apps?.happ, amnezia: !!user.apps?.amnezia, telegram: !!user.apps?.telegram, mistgate: user.apps?.mistgate !== false };
 
@@ -564,29 +658,6 @@ export function GivesCard({ data, actions }: { data: DetailN; actions: Actions }
     if (!next.happ && !next.amnezia) return; // at least one of the two link/key apps stays on
     void actions.update({ apps: next }).catch(() => {});
   };
-  async function askChange(g: Group) {
-    try {
-      const r = await users.updateUser({ userId: user.id, groupId: g.id, dryRun: true });
-      setChangeError(null);
-      setChanging({ to: g, impact: r.impact ?? null });
-      setChangeOpen(true);
-    } catch (e) {
-      toast.error(errorText(e, t));
-    }
-  }
-  async function change() {
-    if (!changing) return;
-    setChangeError(null);
-    try {
-      await users.updateUser({ userId: user.id, groupId: changing.to.id });
-    } catch (e) {
-      setChangeError(errorText(e, t));
-      throw e;
-    }
-    await actions.refresh();
-    toast(t("users.groupChanged", { name: user.name, group: changing.to.name }));
-  }
-  const lost = changing?.impact?.lost.length ?? 0;
   const offN = (["happ", "amnezia", "telegram", "mistgate"] as const).filter((k) => !apps[k]).length;
   const globalOff = api.data ? !api.data.enabled : false;
   const mgLocked = !apps.happ;
@@ -597,7 +668,11 @@ export function GivesCard({ data, actions }: { data: DetailN; actions: Actions }
     <section className="up-card" data-testid="gives">
       <SetHead title={t("up.givesTitle")} line={t("up.givesLine")} />
       <div className="up-pad">
-        <GroupPick user={user} onPick={(g) => void askChange(g)} />
+        <span className="up-xl" title={t("up.mainGroupHint")}>
+          {t("up.mainGroup")}
+        </span>
+        <GroupPick user={user} onPick={(g) => void ask(user, "main", g)} />
+        <ExtraGroups user={user} onAsk={(kind, g) => void ask(user, kind, g)} />
       </div>
       {data.profiles.length === 0 && <p className="up-empty">{t("users.noProfiles")}</p>}
       <GetRow app="link" icon={P.link} title={linkApps} line={t("up.gets.sub")} tags={w.sub} on={apps.happ} off={!apps.happ} disabled={readonly} onFlip={(on) => flip("happ", on)} extra={drops.length > 0 && <span className="up-drops">{drops.map((p) => <FormatDrops key={p.id} formats={(p as ProfileRef).formats} t={t} />)}</span>} />
@@ -627,26 +702,10 @@ export function GivesCard({ data, actions }: { data: DetailN; actions: Actions }
         <G d={P.info} size={14} />
         <span>
           {offN > 0 && `${t("up.gets.off", { n: offN })} `}
-          {t("up.gets.note", { group: user.groupName })}
+          {t(user.extraGroupIds.length > 0 ? "up.gets.noteMore" : "up.gets.note", { group: user.groupName })}
         </span>
       </p>
-      <ConfirmModal
-        open={changeOpen}
-        onOpenChange={setChangeOpen}
-        title={t("users.groupChangeT", { name: user.name, group: changing?.to.name ?? "" })}
-        confirmLabel={t("users.groupChangeDo")}
-        danger={lost > 0}
-        onConfirm={change}
-      >
-        {changing?.impact ? (
-          <Notice className="items-start">
-            <ImpactText impact={changing.impact} who={user.name} />
-          </Notice>
-        ) : (
-          <p className="text-[13px] leading-normal text-muted">{t("users.impactSame")}</p>
-        )}
-        {changeError && <Notice tone="danger">{changeError}</Notice>}
-      </ConfirmModal>
+      {modal}
     </section>
   );
 }

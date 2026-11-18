@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/admin/v1/group.proto.
  */
 export const file_mistgate_admin_v1_group: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9ncm91cC5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEizgEKBUdyb3VwEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEwoLcHJvZmlsZV9pZHMYAyADKAkSEgoKdXNlcl9jb3VudBgEIAEoDRIVCg1kbnNfcHJlc2V0X2lkGAUgASgJEhIKCmhhcHBfbm9kZXMYBiABKA0SFQoNYW1uZXppYV9ub2RlcxgHIAEoDRINCgVjb2xvchgIIAEoCRIZChFkaXNhYmxlZF9ub2RlX2lkcxgJIAMoCRIWCg50ZWxlZ3JhbV9ub2RlcxgKIAEoDSITChFMaXN0R3JvdXBzUmVxdWVzdCI+ChJMaXN0R3JvdXBzUmVzcG9uc2USKAoGZ3JvdXBzGAEgAygLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXAieAoSQ3JlYXRlR3JvdXBSZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLcHJvZmlsZV9pZHMYAiADKAkSFQoNZG5zX3ByZXNldF9pZBgDIAEoCRINCgVjb2xvchgEIAEoCRIZChFkaXNhYmxlZF9ub2RlX2lkcxgFIAMoCSI+ChNDcmVhdGVHcm91cFJlc3BvbnNlEicKBWdyb3VwGAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXAiugIKElVwZGF0ZUdyb3VwUmVxdWVzdBIQCghncm91cF9pZBgBIAEoCRIRCgRuYW1lGAIgASgJSACIAQESNwoLcHJvZmlsZV9pZHMYAyABKAsyHS5taXN0Z2F0ZS5hZG1pbi52MS5Qcm9maWxlSWRzSAGIAQESGgoNZG5zX3ByZXNldF9pZBgEIAEoCUgCiAEBEg8KB2RyeV9ydW4YBSABKAgSEgoFY29sb3IYBiABKAlIA4gBARI6ChFkaXNhYmxlZF9ub2RlX2lkcxgHIAEoCzIaLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVJZHNIBIgBAUIHCgVfbmFtZUIOCgxfcHJvZmlsZV9pZHNCEAoOX2Ruc19wcmVzZXRfaWRCCAoGX2NvbG9yQhQKEl9kaXNhYmxlZF9ub2RlX2lkcyIcCgpQcm9maWxlSWRzEg4KBnZhbHVlcxgBIAMoCSIZCgdOb2RlSWRzEg4KBnZhbHVlcxgBIAMoCSJvChNVcGRhdGVHcm91cFJlc3BvbnNlEicKBWdyb3VwGAEgASgLMhgubWlzdGdhdGUuYWRtaW4udjEuR3JvdXASLwoGaW1wYWN0GAIgASgLMh8ubWlzdGdhdGUuYWRtaW4udjEuQWNjZXNzSW1wYWN0Ij0KEkRlbGV0ZUdyb3VwUmVxdWVzdBIQCghncm91cF9pZBgBIAEoCRIVCg1tb3ZlX3VzZXJzX3RvGAIgASgJIhUKE0RlbGV0ZUdyb3VwUmVzcG9uc2UifAoVU2V0Tm9kZVNoYXJpbmdSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSLgoEbW9kZRgCIAEoDjIgLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVTaGFyZU1vZGUSEQoJZ3JvdXBfaWRzGAMgAygJEg8KB2RyeV9ydW4YBCABKAginwEKFlNldE5vZGVTaGFyaW5nUmVzcG9uc2USLgoEbW9kZRgBIAEoDjIgLm1pc3RnYXRlLmFkbWluLnYxLk5vZGVTaGFyZU1vZGUSEQoJZ3JvdXBfaWRzGAIgAygJEhgKEHBlb3BsZV9yZWNlaXZpbmcYAyABKA0SEwoLcGVvcGxlX2dhaW4YBCABKA0SEwoLcGVvcGxlX2xvc2UYBSABKA0y6gMKDEdyb3VwU2VydmljZRJZCgpMaXN0R3JvdXBzEiQubWlzdGdhdGUuYWRtaW4udjEuTGlzdEdyb3Vwc1JlcXVlc3QaJS5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0R3JvdXBzUmVzcG9uc2USXAoLQ3JlYXRlR3JvdXASJS5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVHcm91cFJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5DcmVhdGVHcm91cFJlc3BvbnNlElwKC1VwZGF0ZUdyb3VwEiUubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlR3JvdXBSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuVXBkYXRlR3JvdXBSZXNwb25zZRJcCgtEZWxldGVHcm91cBIlLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZUdyb3VwUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkRlbGV0ZUdyb3VwUmVzcG9uc2USZQoOU2V0Tm9kZVNoYXJpbmcSKC5taXN0Z2F0ZS5hZG1pbi52MS5TZXROb2RlU2hhcmluZ1JlcXVlc3QaKS5taXN0Z2F0ZS5hZG1pbi52MS5TZXROb2RlU2hhcmluZ1Jlc3BvbnNlQsUBChVjb20ubWlzdGdhdGUuYWRtaW4udjFCCkdyb3VwUHJvdG9QAVo6Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvYWRtaW4vdjE7YWRtaW52MaICA01BWKoCEU1pc3RnYXRlLkFkbWluLlYxygIRTWlzdGdhdGVcQWRtaW5cVjHiAh1NaXN0Z2F0ZVxBZG1pblxWMVxHUEJNZXRhZGF0YeoCE01pc3RnYXRlOjpBZG1pbjo6VjFiBnByb3RvMw", [file_mistgate_admin_v1_common, file_mistgate_admin_v1_user]);
+  fileDesc("Ch1taXN0Z2F0ZS9hZG1pbi92MS9ncm91cC5wcm90bxIRbWlzdGdhdGUuYWRtaW4udjEi6AEKBUdyb3VwEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEwoLcHJvZmlsZV9pZHMYAyADKAkSEgoKdXNlcl9jb3VudBgEIAEoDRIVCg1kbnNfcHJlc2V0X2lkGAUgASgJEhIKCmhhcHBfbm9kZXMYBiABKA0SFQoNYW1uZXppYV9ub2RlcxgHIAEoDRINCgVjb2xvchgIIAEoCRIZChFkaXNhYmxlZF9ub2RlX2lkcxgJIAMoCRIWCg50ZWxlZ3JhbV9ub2RlcxgKIAEoDRIYChBleHRyYV91c2VyX2NvdW50GAsgASgNIhMKEUxpc3RHcm91cHNSZXF1ZXN0Ij4KEkxpc3RHcm91cHNSZXNwb25zZRIoCgZncm91cHMYASADKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5Hcm91cCJ4ChJDcmVhdGVHcm91cFJlcXVlc3QSDAoEbmFtZRgBIAEoCRITCgtwcm9maWxlX2lkcxgCIAMoCRIVCg1kbnNfcHJlc2V0X2lkGAMgASgJEg0KBWNvbG9yGAQgASgJEhkKEWRpc2FibGVkX25vZGVfaWRzGAUgAygJIj4KE0NyZWF0ZUdyb3VwUmVzcG9uc2USJwoFZ3JvdXAYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5Hcm91cCK6AgoSVXBkYXRlR3JvdXBSZXF1ZXN0EhAKCGdyb3VwX2lkGAEgASgJEhEKBG5hbWUYAiABKAlIAIgBARI3Cgtwcm9maWxlX2lkcxgDIAEoCzIdLm1pc3RnYXRlLmFkbWluLnYxLlByb2ZpbGVJZHNIAYgBARIaCg1kbnNfcHJlc2V0X2lkGAQgASgJSAKIAQESDwoHZHJ5X3J1bhgFIAEoCBISCgVjb2xvchgGIAEoCUgDiAEBEjoKEWRpc2FibGVkX25vZGVfaWRzGAcgASgLMhoubWlzdGdhdGUuYWRtaW4udjEuTm9kZUlkc0gEiAEBQgcKBV9uYW1lQg4KDF9wcm9maWxlX2lkc0IQCg5fZG5zX3ByZXNldF9pZEIICgZfY29sb3JCFAoSX2Rpc2FibGVkX25vZGVfaWRzIhwKClByb2ZpbGVJZHMSDgoGdmFsdWVzGAEgAygJIhkKB05vZGVJZHMSDgoGdmFsdWVzGAEgAygJIm8KE1VwZGF0ZUdyb3VwUmVzcG9uc2USJwoFZ3JvdXAYASABKAsyGC5taXN0Z2F0ZS5hZG1pbi52MS5Hcm91cBIvCgZpbXBhY3QYAiABKAsyHy5taXN0Z2F0ZS5hZG1pbi52MS5BY2Nlc3NJbXBhY3QiPQoSRGVsZXRlR3JvdXBSZXF1ZXN0EhAKCGdyb3VwX2lkGAEgASgJEhUKDW1vdmVfdXNlcnNfdG8YAiABKAkiFQoTRGVsZXRlR3JvdXBSZXNwb25zZSJ8ChVTZXROb2RlU2hhcmluZ1JlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIuCgRtb2RlGAIgASgOMiAubWlzdGdhdGUuYWRtaW4udjEuTm9kZVNoYXJlTW9kZRIRCglncm91cF9pZHMYAyADKAkSDwoHZHJ5X3J1bhgEIAEoCCKfAQoWU2V0Tm9kZVNoYXJpbmdSZXNwb25zZRIuCgRtb2RlGAEgASgOMiAubWlzdGdhdGUuYWRtaW4udjEuTm9kZVNoYXJlTW9kZRIRCglncm91cF9pZHMYAiADKAkSGAoQcGVvcGxlX3JlY2VpdmluZxgDIAEoDRITCgtwZW9wbGVfZ2FpbhgEIAEoDRITCgtwZW9wbGVfbG9zZRgFIAEoDTLqAwoMR3JvdXBTZXJ2aWNlElkKCkxpc3RHcm91cHMSJC5taXN0Z2F0ZS5hZG1pbi52MS5MaXN0R3JvdXBzUmVxdWVzdBolLm1pc3RnYXRlLmFkbWluLnYxLkxpc3RHcm91cHNSZXNwb25zZRJcCgtDcmVhdGVHcm91cBIlLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUdyb3VwUmVxdWVzdBomLm1pc3RnYXRlLmFkbWluLnYxLkNyZWF0ZUdyb3VwUmVzcG9uc2USXAoLVXBkYXRlR3JvdXASJS5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVHcm91cFJlcXVlc3QaJi5taXN0Z2F0ZS5hZG1pbi52MS5VcGRhdGVHcm91cFJlc3BvbnNlElwKC0RlbGV0ZUdyb3VwEiUubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlR3JvdXBSZXF1ZXN0GiYubWlzdGdhdGUuYWRtaW4udjEuRGVsZXRlR3JvdXBSZXNwb25zZRJlCg5TZXROb2RlU2hhcmluZxIoLm1pc3RnYXRlLmFkbWluLnYxLlNldE5vZGVTaGFyaW5nUmVxdWVzdBopLm1pc3RnYXRlLmFkbWluLnYxLlNldE5vZGVTaGFyaW5nUmVzcG9uc2VCxQEKFWNvbS5taXN0Z2F0ZS5hZG1pbi52MUIKR3JvdXBQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9hZG1pbi92MTthZG1pbnYxogIDTUFYqgIRTWlzdGdhdGUuQWRtaW4uVjHKAhFNaXN0Z2F0ZVxBZG1pblxWMeICHU1pc3RnYXRlXEFkbWluXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OkFkbWluOjpWMWIGcHJvdG8z", [file_mistgate_admin_v1_common, file_mistgate_admin_v1_user]);
 
 /**
  * @generated from message mistgate.admin.v1.Group
@@ -36,6 +36,9 @@ export type Group = Message<"mistgate.admin.v1.Group"> & {
   profileIds: string[];
 
   /**
+   * People that have this group as their main group. The ones that have it as an extra group are in extra_user_count; the two
+   * together are the people the group gives access to.
+   *
    * @generated from field: uint32 user_count = 4;
    */
   userCount: number;
@@ -84,6 +87,13 @@ export type Group = Message<"mistgate.admin.v1.Group"> & {
    * @generated from field: uint32 telegram_nodes = 10;
    */
   telegramNodes: number;
+
+  /**
+   * People that have this group as an extra group (a person is in one of the two counts, never both).
+   *
+   * @generated from field: uint32 extra_user_count = 11;
+   */
+  extraUserCount: number;
 };
 
 /**
@@ -285,7 +295,8 @@ export type UpdateGroupResponse = Message<"mistgate.admin.v1.UpdateGroupResponse
   group?: Group | undefined;
 
   /**
-   * What the new profile set does to the group's users; unset when the set stays.
+   * What the new profile set does to the group's users (main and extra members; a person whose other group holds the same
+   * profile loses less than this says); unset when the set stays.
    *
    * @generated from field: mistgate.admin.v1.AccessImpact impact = 2;
    */
@@ -309,8 +320,9 @@ export type DeleteGroupRequest = Message<"mistgate.admin.v1.DeleteGroupRequest">
   groupId: string;
 
   /**
-   * The group's users move here first, in the same transaction. Empty: refused with FAILED_PRECONDITION
-   * "group_not_empty: users=N" while users belong to the group.
+   * The people that have the group as their main group move here first, in the same transaction (one that had the target as an
+   * extra group keeps it as the main one). Empty: refused with FAILED_PRECONDITION "group_not_empty: users=N" while people have
+   * it as their main group. The extra members need no target: they leave the group.
    *
    * @generated from field: string move_users_to = 2;
    */
@@ -453,7 +465,8 @@ export const GroupService: GenService<{
     output: typeof UpdateGroupResponseSchema;
   },
   /**
-   * FAILED_PRECONDITION while users still belong to it, unless move_users_to names where they go.
+   * FAILED_PRECONDITION while people have it as their MAIN group, unless move_users_to names where they go. People that have it
+   * as an extra group just leave it (they keep their main group and lose what this group gave them).
    *
    * @generated from rpc mistgate.admin.v1.GroupService.DeleteGroup
    */

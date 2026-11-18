@@ -121,8 +121,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `path_probe` | 操作员 | 立即在你的两个节点之间发送测试流量：`from`、`to`（节点 id 或准确名称），`kind` 为 `udp`、`tcp` 或 `tls`，可选 `ports`（目标自己的部分端口；目标未提供的端口会被拒绝）。`udp`：每个端口 150 个带标记的数据报，返回发送数、到达数和结论（`ok`、`lossy`、`broken`）。`tcp`：对目标提供的每个 TCP 端口做普通连接，并给出毫秒数。`tls`：使用目标自己的名称和证书指纹握手（只有真正的监听者才是 `ours`），并给出毫秒数。`mtu_sweep: true`（或 `sizes`，最多 5 个 64 到 1472 的载荷大小）在一个端口上对每个大小发送十个禁止分片的数据报，并返回 `largest_size`，即至少一半到达的最大大小。目标始终是集群中的节点：无法指定主机或 URL。发送方需要支持探测的代理（否则为 `agent_too_old`），`udp` 还要求目标节点在线。有速率限制：同一节点对同时只能有一个探测，每个节点 5 分钟内最多 6 次，每个令牌 10 分钟内最多 12 次。结果保存 7 天。不是只读工具：它会发送流量。只返回节点名称，绝不返回地址。Cloudflare 版不提供。 |
 | `node_trace` | 操作员 | 从你的一个节点（`from`）到另一个节点（`to`）做 TTL 递增的 TCP SYN 路由追踪：每一跳的往返时间以及路由器是否应答；目标那一跳显示节点名称，其余为 `hop N`（不返回第三方路由器的地址）。与该节点对上一次追踪比较（保留最近 20 次）：`diff` 和 `changed_at_hop` 说明路由变长、变短或某一跳不再应答。长度和应答模式不变的路由变化会显示为未变化。限制与 `path_probe` 相同；仅限 Linux 节点。 |
 | `node_dns_check` | 操作员 | 节点自己的解析器：医生检查所用控制域名的查询耗时（`p50_ms`、`p95_ms`）和失败数，最新一次运行、最近 24 次运行以及 `trend`（`steady`、`slower`、`faster`，不足四次为 `unknown`）。除非 `stored_only` 为 true，否则立即运行医生的解析器检查；已保存的医生结果也会并入历史。限制与 `path_probe` 相同。 |
-| `users_search` | 只读 | 按名称片段、`filter`（`online`、`expiring`、`over_quota`）或 `group_id` 搜索用户；使用 `page_token` 分页。 |
-| `groups_list` | 只读 | 分组及其协议配置 ID、用户数量和 DNS 预设。 |
+| `users_search` | 只读 | 按名称片段、`filter`（`online`、`expiring`、`over_quota`）或 `group_id`（以其为主分组或附加分组的用户）搜索用户；使用 `page_token` 分页。每个用户有 `group_id` 和 `group`（主分组），以及 `extra_group_ids` 和 `extra_groups`（其他分组）。 |
+| `groups_list` | 只读 | 分组及其协议配置 ID、`user_count`（以其为主分组的用户数）、`extra_user_count`（以其为附加分组的用户数）和 DNS 预设。 |
 | `group_get` | 只读 | 单个分组：协议配置 ID、排除的节点、DNS 预设、颜色、用户，以及它当前提供的服务器总量。分组 API 没有备注和配额字段。 |
 | `dns_presets_list` | 只读 | DNS 预设、解析器和分流规则、实际用户数量、是否为默认、提供商目录以及客户端传输支持情况。 |
 | `dns_preset_get` | 只读 | 按 ID 返回单个 DNS 预设，含解析器和分流规则、用户数量以及是否为默认。 |
@@ -166,7 +166,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | 工具 | 权限级别 | 参数 | 需要所有者审批 |
 |---|---|---|---|
 | `user_create` | 操作员 | `name`（1 到 64 个字符，不区分大小写且唯一）、`group_id`，以及可选的 `quota_bytes`、`quota_reset`（`none`、`day`、`week`、`month`（默认值）、`rolling_month`）、`term_days`（最多 3650）、`device_limit`（最多 100）、`apps`（`happ`、`amnezia`、`telegram`）、`nodes`（`all` 或 `node_ids`）、`speed_limit_bps`（每人：其所有设备在同一节点上合计）、`device_speed_limit_bps`（每台设备）、`dns_preset_id` | 否 |
-| `user_update` | 操作员 | `user_id`，可选的 `subscription_name`（最多 64 个字符；为空时使用 `name`），以及需要更改的字段（同上，但使用 `expires_unix` 替代 `term_days`；计划会同时写明两种限速：每人在单个节点上的限速和每台设备的限速） | 否 |
+| `user_update` | 操作员 | `user_id`，可选的 `subscription_name`（最多 64 个字符；为空时使用 `name`），以及需要更改的字段（同上，但使用 `expires_unix` 替代 `term_days`；计划会同时写明两种限速：每人在单个节点上的限速和每台设备的限速）。`group_id` 是主分组。`add_group_ids` 和 `remove_group_ids` 以增量方式更改附加分组（一个用户最多属于 16 个分组；不能移出主分组）；计划会写明分组，并根据面板自己的检查写明用户将获得和失去的协议配置和节点 | 否 |
 | `user_disable` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |
 | `user_enable` | 操作员 | `user_ids`（1 到 50） | 否 |
 | `user_reset_traffic` | 操作员 | `user_ids`（1 到 50） | 超过 3 位用户时 |
@@ -184,7 +184,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `group_create` | 操作员 | `name`，可选 `profile_ids`、`dns_preset_id`（留空则使用实例默认值）、`color` 和 `disabled_node_ids`。分组没有备注和配额字段 | 否 |
 | `group_update` | 操作员 | `group_id` 以及仅需更改的字段：`name`、`profile_ids`、`dns_preset_id`、`color`、`disabled_node_ids` | 始终 |
 | `node_sharing_set` | 操作员 | 计划：`node`、`mode`（`all`、`listed` 或 `none`），`listed` 时还需 `group_ids`（来自 `groups_list`）；应用：仅 `confirm_token`。选择节点分发给哪些分组：`all` 为所有分组，包括之后新建的分组；`listed` 只给所列分组，之后新建的分组不会获得该节点；`none` 不给任何分组，直到你把它分给某个分组。计划会写明节点、将获得它的分组，以及有多少人获得和失去它（使用全部节点或选择了该节点的活跃用户）；若计划之后分发状态发生变化，应用会被拒绝。用 `group_update` 为分组打开被保留的节点会被拒绝（`node_held`）：请使用本工具。 | 始终 |
-| `group_delete` | 操作员 | 空分组的 `group_id`。仍有成员的分组会被拒绝；请先用 `user_update` 移动成员 | 否 |
+| `group_delete` | 操作员 | 无人以其为主分组的分组的 `group_id`。作为某人主分组的分组会被拒绝；请先用 `user_update` 移动成员。以其为附加分组的用户只是离开该分组（计划会统计人数） | 否 |
 | `dns_preset_create` | 管理员 | `name`、`description`、`servers`，可选 `split`、`ipv4_only`、`split_direct`、`preferred_transport`（`plain`、`dot`、`doh`）、`block_ads` | 始终 |
 | `dns_preset_update` | 管理员 | `preset_id` 以及可编辑字段：`name`、`description`、`servers`、`split`、`ipv4_only`、`split_direct`、`preferred_transport`、`block_ads` | 始终 |
 | `dns_preset_delete` | 管理员 | `preset_id`；内置预设和实例默认预设会被拒绝，用户和分组将回退到实例默认值 | 始终 |

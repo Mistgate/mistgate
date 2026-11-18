@@ -435,6 +435,8 @@ type world struct {
 	fixReqs             []*adminv1.ApplyFixRequest
 	fixGrants           []callRec
 	updateReq           []*adminv1.UpdateUserRequest
+	userDryReq          []*adminv1.UpdateUserRequest // the dry runs a plan makes of an UpdateUser (they change nobody)
+	userImpact          *adminv1.AccessImpact        // what a dry run of UpdateUser says the groups do
 	disableReq          []*adminv1.SetUsersEnabledRequest
 	startReq            []*adminv1.StartRolloutRequest
 	updateNodes         []*adminv1.NodeUpdate
@@ -972,6 +974,12 @@ func (w *world) CreateUser(_ context.Context, r *connect.Request[adminv1.CreateU
 
 func (w *world) UpdateUser(ctx context.Context, r *connect.Request[adminv1.UpdateUserRequest]) (*connect.Response[adminv1.UpdateUserResponse], error) {
 	w.mu.Lock()
+	if r.Msg.GetDryRun() {
+		w.userDryReq = append(w.userDryReq, r.Msg)
+		impact := proto.Clone(w.userImpact).(*adminv1.AccessImpact)
+		w.mu.Unlock()
+		return connect.NewResponse(&adminv1.UpdateUserResponse{User: &adminv1.User{Id: r.Msg.GetUserId()}, Impact: impact}), nil
+	}
 	w.updateReq = append(w.updateReq, r.Msg)
 	w.mu.Unlock()
 	if w.recordUserChange != nil {

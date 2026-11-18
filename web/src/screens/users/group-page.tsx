@@ -85,7 +85,7 @@ function GroupPage({ group, groups, manage, onDeleted, demo }: { group: Group; g
   const tab: TabId = tabIds.find((x) => x === search.tab) ?? "people";
   const [pick, setPick] = useState(demo?.pick ?? false);
   const counts = useQuery(groupCountsQuery(group.id)).data;
-  const all = counts?.all ?? group.userCount;
+  const all = counts?.all ?? group.userCount + group.extraUserCount;
   const online = counts?.online ?? 0;
   const setTab = (next: string) => move({ tab: next === "people" ? undefined : next, page: undefined }, { replace: true });
   const openPick = () => {
@@ -106,7 +106,10 @@ function GroupPage({ group, groups, manage, onDeleted, demo }: { group: Group; g
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <PageTitle className="break-words">{group.name}</PageTitle>
           <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-[13px] text-sec">
-            <span>{t.n("grp.count", all)}</span>
+            <span>
+              {t.n("grp.count", all)}
+              {group.extraUserCount > 0 && <span className="text-muted"> · {t("grp.countExtra", { n: group.extraUserCount })}</span>}
+            </span>
             <span className={cx("inline-flex items-center gap-1.5", online > 0 && "text-fg")}>
               <i aria-hidden className={cx("size-2 flex-none rounded-full", online > 0 ? "bg-accent-mark" : "bg-[color-mix(in_srgb,var(--text)_22%,transparent)]")} />
               {online > 0 ? t("grp.onlineN", { n: online }) : t("grp.noOnline")}

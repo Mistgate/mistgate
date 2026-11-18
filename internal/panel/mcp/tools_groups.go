@@ -21,7 +21,7 @@ func groupTools() []toolDef {
 	return slices.Concat(
 		[]toolDef{
 			readTool("group_get", ProfileReadonly, procs(adminv1connect.GroupServiceListGroupsProcedure),
-				"One user group, including its profiles, excluded nodes, DNS preset, colour, user count and the current server totals available to the group.",
+				"One user group, including its profiles, excluded nodes, DNS preset, colour, user count (people whose main group it is), extra_user_count (people that have it as an extra group) and the current server totals available to the group.",
 				func(c *call, in groupGetArgs) (any, error) {
 					g, err := c.groupByID(in.GroupID)
 					if err != nil {
@@ -65,7 +65,7 @@ func (c *call) groupByID(id string) (*adminv1.Group, error) {
 func groupView(g *adminv1.Group) groupV {
 	return groupV{ID: clean(g.GetId(), 60), Name: nm(g.GetName()), ProfileIDs: cleanIDs(g.GetProfileIds()),
 		DisabledNodeIDs: cleanIDs(g.GetDisabledNodeIds()), DNSPreset: clean(g.GetDnsPresetId(), 60), Color: clean(g.GetColor(), 20),
-		UserCount: g.GetUserCount(), HappNodes: g.GetHappNodes(), AmneziaNodes: g.GetAmneziaNodes(), TelegramNodes: g.GetTelegramNodes()}
+		UserCount: g.GetUserCount(), ExtraUserCount: g.GetExtraUserCount(), HappNodes: g.GetHappNodes(), AmneziaNodes: g.GetAmneziaNodes(), TelegramNodes: g.GetTelegramNodes()}
 }
 
 func cleanIDs(ids []string) []string {
@@ -230,7 +230,7 @@ func groupConfigHash(g *adminv1.Group) string {
 		return ""
 	}
 	x := proto.Clone(g).(*adminv1.Group)
-	x.UserCount, x.HappNodes, x.AmneziaNodes, x.TelegramNodes = 0, 0, 0, 0
+	x.UserCount, x.ExtraUserCount, x.HappNodes, x.AmneziaNodes, x.TelegramNodes = 0, 0, 0, 0, 0
 	b, _ := proto.MarshalOptions{Deterministic: true}.Marshal(x)
 	return hashText(string(b))
 }
@@ -358,12 +358,12 @@ var groupUpdate = changeSpec[groupUpdateArgs]{
 
 type groupDeleteArgs struct {
 	ReasonField
-	GroupID string `json:"group_id" jsonschema:"empty groups_list group id; groups with users cannot be deleted by this tool"`
+	GroupID string `json:"group_id" jsonschema:"a groups_list group id; a group that is the main group of anybody cannot be deleted by this tool"`
 }
 
 var groupDelete = changeSpec[groupDeleteArgs]{
 	name: "group_delete", min: ProfileOperator, procs: procs(adminv1connect.GroupServiceListGroupsProcedure, adminv1connect.GroupServiceDeleteGroupProcedure),
-	desc: "Delete an empty group. Refused while any person is in it; move people with user_update first. The tool never moves people automatically.",
+	desc: "Delete a group that is nobody's main group. Refused while any person has it as their main group; move people with user_update first. The tool never moves people automatically. People that have it as an extra group (extra_user_count) just leave it, and lose what it gave them. " + tokenUserChangeDescription,
 	plan: func(c *call, a groupDeleteArgs) (*planned, error) {
 		g, err := c.groupByID(a.GroupID)
 		if err != nil {
@@ -372,10 +372,20 @@ var groupDelete = changeSpec[groupDeleteArgs]{
 		if g.GetUserCount() != 0 {
 			return nil, failure("group_not_empty", "group has users; move them with user_update before deleting", "users", strconv.FormatUint(uint64(g.GetUserCount()), 10))
 		}
-		return &planned{Summary: "Delete the empty group. No users will be moved.", Facts: []Fact{
+		facts := []Fact{
 			{Key: "group", Value: nm(g.GetName()), Untrusted: true},
-			codedFact("users", "no users belong to this group", "users", "n", "0"),
-		}, Params: a}, nil
+			codedFact("users", "no users have this group as their main group", "users", "n", "0"),
+		}
+		var danger []string
+		if extra := g.GetExtraUserCount(); extra > 0 {
+			facts = append(facts, codedFact("extra_users", plural(int(extra), "extra member leaves the group", "extra members leave the group"), "users", "n", strconv.FormatUint(uint64(extra), 10)))
+			budget, budgetFacts, err := c.userChangeBudget(int(extra))
+			if err != nil {
+				return nil, err
+			}
+			danger, facts = budget, append(facts, budgetFacts...)
+		}
+		return &planned{Summary: "Delete the group. No users will be moved; people that have it as an extra group just leave it.", Facts: facts, Danger: danger, Params: a}, nil
 	},
 	apply: func(c *call, a groupDeleteArgs, _ Plan) (done, error) {
 		g, err := c.groupByID(a.GroupID)
@@ -388,7 +398,7 @@ var groupDelete = changeSpec[groupDeleteArgs]{
 		if _, err := c.cl.Group.DeleteGroup(c.ctx, connect.NewRequest(&adminv1.DeleteGroupRequest{GroupId: a.GroupID})); err != nil {
 			return done{}, apiError(err)
 		}
-		return doneWith("group_deleted", "Empty group deleted."), nil
+		return doneWith("group_deleted", "Group deleted."), nil
 	},
 }
 

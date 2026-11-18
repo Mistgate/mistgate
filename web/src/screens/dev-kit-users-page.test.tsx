@@ -87,6 +87,13 @@ describe("the scenes of the People screen", () => {
     if (state === "open-heidi") expect(document.querySelector("button[aria-label='heidi'][aria-expanded=true]")).not.toBeNull();
     if (state === "open-heidi") expect(document.body.textContent).toContain("None yet. They appear when the person opens the link");
     if (state === "open-ten") expect(document.body.textContent).toContain("Show all 10");
+    if (state === "extra") {
+      // alice: her main group and "+2" for the two extra ones (friends, colleagues), named in the label; the others have none
+      expect(rows()[0]!.textContent).toContain("family");
+      expect(rows()[0]!.textContent).toContain("+2");
+      expect(rows()[0]!.querySelector("[aria-label$='colleagues, friends']")).not.toBeNull();
+      expect(rows()[1]!.textContent).not.toContain("+");
+    }
     if (state === "none") expect(document.querySelectorAll("ol li")).toHaveLength(3);
     if (state === "search") expect(rows()).toHaveLength(1);
     if (state === "nomatch") expect(document.body.textContent).toContain("Nobody found");

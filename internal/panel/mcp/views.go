@@ -859,22 +859,25 @@ func nodePortsView(nodeID, nodeName string, checks []*adminv1.PortCheck, tcp []*
 // users
 
 type userV struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	GroupID     string `json:"group_id,omitempty"`
-	Group       string `json:"group,omitempty"`
-	Status      string `json:"status"`
-	Online      bool   `json:"online"`
-	DevicesUsed uint32 `json:"devices_used"`
-	DevicesIdle uint32 `json:"devices_idle"`
-	DeviceLimit uint32 `json:"device_limit"`
-	UsedBytes   uint64 `json:"used_bytes"`
-	QuotaBytes  uint64 `json:"quota_bytes"`
-	QuotaReset  string `json:"quota_reset,omitempty"`
-	ExpiresUnix int64  `json:"expires_unix"`
-	LastSeen    int64  `json:"last_seen_unix"`
-	Node        string `json:"current_node,omitempty"`
-	SpeedLimit  uint64 `json:"speed_limit_bps,omitempty"` // per person: all devices together, on one node
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	GroupID string `json:"group_id,omitempty"`
+	Group   string `json:"group,omitempty"`
+	// ExtraGroupIDs and ExtraGroups (the names, in step): the groups the person is in besides the main one; they only add access.
+	ExtraGroupIDs []string `json:"extra_group_ids,omitempty"`
+	ExtraGroups   []string `json:"extra_groups,omitempty"`
+	Status        string   `json:"status"`
+	Online        bool     `json:"online"`
+	DevicesUsed   uint32   `json:"devices_used"`
+	DevicesIdle   uint32   `json:"devices_idle"`
+	DeviceLimit   uint32   `json:"device_limit"`
+	UsedBytes     uint64   `json:"used_bytes"`
+	QuotaBytes    uint64   `json:"quota_bytes"`
+	QuotaReset    string   `json:"quota_reset,omitempty"`
+	ExpiresUnix   int64    `json:"expires_unix"`
+	LastSeen      int64    `json:"last_seen_unix"`
+	Node          string   `json:"current_node,omitempty"`
+	SpeedLimit    uint64   `json:"speed_limit_bps,omitempty"` // per person: all devices together, on one node
 	// DeviceSpeedLimit: each device alone.
 	DeviceSpeedLimit uint64 `json:"device_speed_limit_bps,omitempty"`
 	Happ             bool   `json:"app_happ"`
@@ -895,6 +898,15 @@ func userView(u *adminv1.User) userV {
 		QuotaReset: enumName("QUOTA_RESET_", u.GetQuotaReset().String()), ExpiresUnix: u.GetExpiresUnix(), LastSeen: u.GetLastSeenUnix(),
 		Node: nm(u.GetCurrentNodeName()), SpeedLimit: u.GetSpeedLimitBps(), DeviceSpeedLimit: u.GetDeviceSpeedLimitBps(), Happ: u.GetApps().GetHapp(), Amnezia: u.GetApps().GetAmnezia(),
 		Telegram: u.GetApps().GetTelegram(), Mistgate: mistgateOn(u.GetApps()), AllNodes: u.GetNodes().GetAll(), CreatedUnix: u.GetCreatedUnix(),
+	}
+	for i, id := range u.GetExtraGroupIds() {
+		if i == maxIDs {
+			break
+		}
+		v.ExtraGroupIDs = append(v.ExtraGroupIDs, clean(id, 60))
+		if i < len(u.GetExtraGroupNames()) {
+			v.ExtraGroups = append(v.ExtraGroups, nm(u.GetExtraGroupNames()[i]))
+		}
 	}
 	if !v.AllNodes {
 		for i, id := range u.GetNodes().GetNodeIds() {
@@ -944,7 +956,8 @@ type groupV struct {
 	Name            string   `json:"name"`
 	ProfileIDs      []string `json:"profile_ids,omitempty"`
 	DisabledNodeIDs []string `json:"disabled_node_ids,omitempty"`
-	UserCount       uint32   `json:"user_count"`
+	UserCount       uint32   `json:"user_count"`       // people whose main group it is
+	ExtraUserCount  uint32   `json:"extra_user_count"` // people that have it as an extra group (they only get its access)
 	DNSPreset       string   `json:"dns_preset_id,omitempty"`
 	Color           string   `json:"color,omitempty"`
 	HappNodes       uint32   `json:"happ_nodes"`
@@ -966,7 +979,7 @@ func (v *GroupsV) shrink() bool {
 func groupsView(r *adminv1.ListGroupsResponse) *GroupsV {
 	v := &GroupsV{Groups: []groupV{}}
 	for _, g := range r.GetGroups() {
-		gv := groupV{ID: g.GetId(), Name: nm(g.GetName()), UserCount: g.GetUserCount(), DNSPreset: clean(g.GetDnsPresetId(), 60),
+		gv := groupV{ID: g.GetId(), Name: nm(g.GetName()), UserCount: g.GetUserCount(), ExtraUserCount: g.GetExtraUserCount(), DNSPreset: clean(g.GetDnsPresetId(), 60),
 			Color: clean(g.GetColor(), 20), HappNodes: g.GetHappNodes(), AmneziaNodes: g.GetAmneziaNodes(), TelegramNodes: g.GetTelegramNodes()}
 		for i, id := range g.GetProfileIds() {
 			if i == maxIDs {

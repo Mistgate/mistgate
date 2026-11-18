@@ -64,7 +64,17 @@ describe("the scenes of the group page", () => {
     if (f.state === "deleted") return expect(host!.textContent).toContain("Group deleted");
     expect(host!.querySelector("h1")?.textContent).toBe("friends");
     if (f.state === "people") expect(host!.textContent).toContain("carol");
-    if (f.state === "pick") expect(host!.textContent).toContain("Move 1");
+    if (f.state === "pick") expect(host!.textContent).toContain("Add 1");
+    if (f.state === "people-extra") {
+      expect(host!.textContent).toContain("4 people");
+      expect(host!.textContent).toContain("1 extra");
+      expect(host!.textContent).toContain("alice");
+    }
+    if (f.state === "menu-extra") expect(document.body.textContent).toContain("Make “friends” their main group");
+    if (f.state === "change-remove") expect(document.body.textContent).toContain("Remove alice from “friends”?");
+    if (f.state === "change-main") expect(document.body.textContent).toContain("Make “friends” the main group of alice?");
+    if (f.state === "pick-move") expect(host!.textContent).toContain("Move 1");
+    if (f.state === "settings-extra") expect(host!.textContent).toContain("2 extra members just leave the group");
     if (f.state === "find") expect(host!.textContent).toContain("Nobody found");
     if (f.state === "empty") expect(host!.textContent).toContain("Nobody in the group yet");
     if (f.state === "access-held") {

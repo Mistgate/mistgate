@@ -70,8 +70,8 @@ export const PROTOCOLS = [
 ];
 
 export const GROUPS = [
-  { id: "grp_family", name: "Family", color: "sand", userCount: 9, profileIds: PROFILES.filter((p) => p.groups.includes("family")).map((p) => p.id) },
-  { id: "grp_friends", name: "Friends", color: "sky", userCount: 14, profileIds: PROFILES.filter((p) => p.groups.includes("friends")).map((p) => p.id) },
+  { id: "grp_family", name: "Family", color: "sand", userCount: 9, extraUserCount: 0, profileIds: PROFILES.filter((p) => p.groups.includes("family")).map((p) => p.id) },
+  { id: "grp_friends", name: "Friends", color: "sky", userCount: 14, extraUserCount: 0, profileIds: PROFILES.filter((p) => p.groups.includes("friends")).map((p) => p.id) },
 ].map((g) => ({ ...g, happNodes: 4, amneziaNodes: 2, telegramNodes: 0, disabledNodeIds: [], dnsPresetId: "" }));
 
 const hash = (s: string) => {

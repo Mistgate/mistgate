@@ -77,7 +77,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 const node = (n: number, over: Record<string, unknown> = {}) => ({ id: `nod_${n}`, name: `de${n}`, countryCode: "DE", address: `de${n}.example.com`, status: NodeStatus.ONLINE, protocols: [], awgBackend: "auto", awgPrepare: { supported: true }, ...over });
-const group = (id: string, name: string, userCount: number, profileIds: string[] = []) => ({ id, name, color: "sky", profileIds, userCount, dnsPresetId: "", happNodes: 0, amneziaNodes: 0 });
+const group = (id: string, name: string, userCount: number, profileIds: string[] = []) => ({ id, name, color: "sky", profileIds, userCount, extraUserCount: 0, dnsPresetId: "", happNodes: 0, amneziaNodes: 0 });
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

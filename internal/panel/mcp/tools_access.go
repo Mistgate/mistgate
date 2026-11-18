@@ -428,7 +428,7 @@ func (c *call) gatherUsers(in *accessInput, groupRef string) error {
 			if u.GetStatus() == adminv1.UserStatus_USER_STATUS_DISABLED {
 				continue
 			}
-			in.Users = append(in.Users, accUser{ID: clean(u.GetId(), 80), GroupID: u.GetGroupId(), AllNodes: u.GetNodes().GetAll() || u.GetNodes() == nil,
+			in.Users = append(in.Users, accUser{ID: clean(u.GetId(), 80), GroupID: u.GetGroupId(), GroupIDs: append([]string{u.GetGroupId()}, u.GetExtraGroupIds()...), AllNodes: u.GetNodes().GetAll() || u.GetNodes() == nil,
 				NodeIDs: slices.Clone(u.GetNodes().GetNodeIds()), LastSeen: u.GetLastSeenUnix()})
 		}
 		token = r.Msg.GetNextPageToken()

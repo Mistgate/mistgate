@@ -73,9 +73,9 @@ export function SetHead({ title, line }: { title: ReactNode; line?: ReactNode })
 }
 
 /** The person's group as a tag in the group's own colour; with a group page it leads there (7c's /users/groups/$id). */
-export function GroupTag({ id, name, color, link = true }: { id: string; name: string; color?: string; link?: boolean }) {
+export function GroupTag({ id, name, color, link = true, small }: { id: string; name: string; color?: string; link?: boolean; small?: boolean }) {
   const tone = groupTone(id, color);
-  const cls = "up-gtag";
+  const cls = cx("up-gtag", small && "sm");
   if (!link || !id) {
     return (
       <span data-tone={tone} className={cls}>
@@ -87,6 +87,18 @@ export function GroupTag({ id, name, color, link = true }: { id: string; name: s
     <AppLink to="/users/groups/$id" params={{ id }} className={cls} {...({ "data-tone": tone } as object)}>
       {name}
     </AppLink>
+  );
+}
+
+/** The person's group tags: the main one, then the extra ones smaller (the order the server gives, by name). */
+export function GroupTags({ user }: { user: { groupId: string; groupName: string; groupColor: string; extraGroupIds: string[]; extraGroupNames: string[]; extraGroupColors: string[] } }) {
+  return (
+    <span className="flex flex-wrap items-center justify-end gap-1.5">
+      <GroupTag id={user.groupId} name={user.groupName} color={user.groupColor} />
+      {user.extraGroupIds.map((id, i) => (
+        <GroupTag key={id} id={id} name={user.extraGroupNames[i] ?? id} color={user.extraGroupColors[i]} small />
+      ))}
+    </span>
   );
 }
 

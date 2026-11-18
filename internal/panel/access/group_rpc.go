@@ -23,7 +23,7 @@ func (s *Service) groupProtos(ctx context.Context, gs ...store.AccessGroup) ([]*
 	out := make([]*adminv1.Group, len(gs))
 	for i, g := range gs {
 		happ, amnezia, telegram := s.reachOf(g, full)
-		out[i] = &adminv1.Group{Id: g.ID, Name: g.Name, ProfileIds: g.ProfileIDs, UserCount: uint32(g.UserCount), DnsPresetId: g.DNSPresetID,
+		out[i] = &adminv1.Group{Id: g.ID, Name: g.Name, ProfileIds: g.ProfileIDs, UserCount: uint32(g.UserCount), ExtraUserCount: uint32(g.ExtraUserCount), DnsPresetId: g.DNSPresetID,
 			HappNodes: happ, AmneziaNodes: amnezia, TelegramNodes: telegram, Color: g.Color, DisabledNodeIds: g.DisabledNodeIDs}
 	}
 	return out, nil
@@ -273,7 +273,7 @@ func (s *Service) DeleteGroup(ctx context.Context, req *connect.Request[adminv1.
 	if m.MoveUsersTo != "" || g.ExtraUserCount > 0 {
 		s.notify.StateChanged()
 	}
-	s.audit(ctx, actor(ctx), "group_delete", map[string]any{"group": m.GroupId, "name": g.Name})
+	s.audit(ctx, actor(ctx), "group_delete", map[string]any{"group": m.GroupId, "name": g.Name, "extra_left": g.ExtraUserCount})
 	return connect.NewResponse(&adminv1.DeleteGroupResponse{}), nil
 }
 

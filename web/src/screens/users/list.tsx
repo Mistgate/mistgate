@@ -20,6 +20,7 @@ import { meQuery } from "@/lib/session";
 import { CreateUserModal } from "./create-user";
 import { barButton, UsersBulk, UsersPick } from "./bulk";
 import { maxBulkUsers } from "./bulk-actions";
+import { reachOf } from "./format";
 import { canManage, GroupsTab } from "./groups";
 import { LinkModal, linkTargetOf, type LinkTarget } from "./link-modal";
 import { usersPageN, type UserN as User } from "./model";
@@ -34,7 +35,7 @@ import "../nodes.css";
 
 const PAGE = 50;
 /** What the dev kit's done screen shows: the answer of a made-up create call. */
-const demoCreated = { user: { id: "usr_carol", name: "carol", groupId: "grp_friends", groupName: "friends", groupColor: "sky", status: 1, apps: { happ: true, amnezia: false }, quotaBytes: 50e9, expiresUnix: Math.floor(Date.now() / 1000) + 30 * 86400, deviceLimit: 3, accessHapp: true, accessAmnezia: false } as unknown as User, url: "https://sub.example.com/s/carol-7f3k9q", password: "" };
+const demoCreated = { user: { id: "usr_carol", name: "carol", groupId: "grp_friends", groupName: "friends", groupColor: "sky", extraGroupIds: [], extraGroupNames: [], extraGroupColors: [], status: 1, apps: { happ: true, amnezia: false }, quotaBytes: 50e9, expiresUnix: Math.floor(Date.now() / 1000) + 30 * 86400, deviceLimit: 3, accessHapp: true, accessAmnezia: false } as unknown as User, url: "https://sub.example.com/s/carol-7f3k9q", password: "" };
 const pageSizes = [25, PAGE, 100] as const;
 type FilterId = "all" | "online" | "expiring" | "over" | "devices";
 const filterValue: Record<FilterId, UserFilter> = {
@@ -255,7 +256,7 @@ function PeopleTab({ groupId, demo, onView, creating, setCreating }: { groupId: 
   if (!demoSent && demo?.send && rows.length > 0) {
     setDemoSent(true);
     const u = rows.find((r) => r.id === demo.send);
-    if (u) setLink(linkTargetOf(u, groupList.data?.find((g) => g.id === u.groupId)));
+    if (u) setLink(linkTargetOf(u, reachOf(u, groupList.data ?? [])));
   }
   const clear = useCallback(() => setPicked({}), []);
   const finishSelecting = () => {
@@ -298,7 +299,7 @@ function PeopleTab({ groupId, demo, onView, creating, setCreating }: { groupId: 
   const select = manage ? { on: selecting, picked, toggle } : undefined;
 
   const afterCreate = (u: User, url: string, password: string) => {
-    const target = linkTargetOf(u, groupList.data?.find((g) => g.id === u.groupId));
+    const target = linkTargetOf(u, reachOf(u, groupList.data ?? []));
     // what the owner sends: the link, and the page password when the page asks for one; a link that gives nothing yet is not
     // copied: the window says why first
     if (!target.access.happ && !target.access.amnezia) return void toast(t("users.createdPlain", { name: u.name }));
@@ -372,7 +373,7 @@ function PeopleTab({ groupId, demo, onView, creating, setCreating }: { groupId: 
             emptyNote={rows.length === 0 && narrowed}
             onReset={reset}
             onAdd={manage ? () => setCreating(true) : undefined}
-            onLink={(u) => setLink(linkTargetOf(u, groupList.data?.find((g) => g.id === u.groupId)))}
+            onLink={(u) => setLink(linkTargetOf(u, reachOf(u, groupList.data ?? [])))}
           />
         </>
       )}

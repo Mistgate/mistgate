@@ -4,11 +4,12 @@ import { Scramble } from "@/components/fx/scramble-react";
 import { Avatar, Check } from "@/components/ui/bits";
 import { Icon, type IconName, type Tone } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/pagination";
+import { Tip } from "@/components/ui/tooltip";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { cx } from "@/lib/cx";
 import { useFmt, type Fmt } from "@/lib/format";
-import { avatarIndex, devicesView, groupTone, noAccess, nowSec, seenText, shownStatus, termView, trafficTone, usage, viaOf, type CellTone } from "./format";
+import { avatarIndex, devicesView, groupTone, noAccess, nowSec, reachOf, seenText, shownStatus, termView, trafficTone, usage, viaOf, type CellTone, type Reach } from "./format";
 import type { UserN as User } from "./model";
 import { AppLink } from "./nav";
 import { UserExpand } from "./users-expand";
@@ -116,7 +117,7 @@ export function PeopleTable({
           <PersonRow
             key={u.id}
             u={u}
-            group={groups.find((g) => g.id === u.groupId)}
+            group={reachOf(u, groups)}
             t={t}
             fmt={fmt}
             now={now}
@@ -247,7 +248,7 @@ function PersonRow({
   onLink,
 }: {
   u: User;
-  group: Group | undefined;
+  group: Reach | undefined;
   t: Tx;
   fmt: Fmt;
   now: number;
@@ -296,10 +297,17 @@ function PersonRow({
             </span>
           </span>
         </span>
-        <span className={cx("relative z-10 flex min-w-0", groupCol, off && "opacity-50")}>
+        <span className={cx("relative z-10 flex min-w-0 items-center gap-1", groupCol, off && "opacity-50")}>
           <AppLink to="/users/groups/$id" params={{ id: u.groupId }} aria-label={t("users.groupOpen", { name: u.groupName })} className="tone-chip inline-flex h-6 max-w-full min-w-0 items-center px-2.5 text-xs font-medium hover:underline" data-tone={groupTone(u.groupId, u.groupColor)}>
             <span className="truncate">{u.groupName}</span>
           </AppLink>
+          {u.extraGroupIds.length > 0 && (
+            <Tip label={t("ul.extraTip", { names: u.extraGroupNames.join(", ") })}>
+              <span tabIndex={0} aria-label={t.n("ul.extraAria", u.extraGroupIds.length, { names: u.extraGroupNames.join(", ") })} className="inline-flex h-6 flex-none items-center rounded-chip bg-step px-1.5 font-mono text-[11px] font-medium text-sec">
+                +{u.extraGroupIds.length}
+              </span>
+            </Tip>
+          )}
         </span>
         <span title={dev.full && u.devicesUsed > u.deviceLimit ? t("users.filter.overDevices") : undefined} className={cx("flex items-center gap-2.5", devCol, off && "opacity-50")}>
           <b className={cx("min-w-9 font-mono text-[13px] font-medium", dev.full && "text-warn-text")}>

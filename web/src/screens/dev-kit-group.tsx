@@ -26,7 +26,9 @@ import { groupsQuery, profileListQuery, protocolsQuery } from "./users/rpc";
 // iframe, so the window's breakpoints answer to the frame); each frame is a page of its own, for the screenshot script and for the
 // side-by-side with the board (PnGroup):
 //   /dev-kit?only=group-page&state=<state>[&tab=access|settings][&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1]
-// states: people (friends: bob, carol, dave) | empty (nobody in the group) | pick (the panel "Who to move in", one ticked) | find (a
+// states: people (friends: bob, carol, dave) | people-extra (and alice, who has friends as an extra group) | menu-extra | change-remove |
+// change-main (the window of a change of an extra member) | pick-move (the panel on Move) | settings-extra (nobody has it as the main group,
+// two have it as an extra one) | empty (nobody in the group) | pick (the panel "Who to add", one ticked) | find (a
 // search that finds nobody) | menu (the menu of carol's row) | access | access-dirty (a profile turned off: the save bar) |
 // access-saving | access-saved | access-held (a node the owner holds back, locked) | nothing (a group with no profile: gives nothing) | settings | settings-dirty (a name typed) |
 // settings-ask-mv | settings-ask-del (a button pressed once; the empty group) | deleted | missing.
@@ -42,6 +44,7 @@ const person = (name: string, group: "friends" | "family", over: Record<string, 
   subscriptionName: "",
   groupId: `grp_${group}`,
   groupName: group,
+  extraGroupIds: [], extraGroupNames: [], extraGroupColors: [],
   groupColor: group === "friends" ? "sand" : "lavender",
   status: UserStatus.ACTIVE,
   apps: { happ: true, amnezia: false, telegram: false },
@@ -72,6 +75,9 @@ const dave = person("dave", "friends", { devicesUsed: 2, usedBytes: 91e9, expire
 const alice = person("alice", "family", { devicesUsed: 4, usedBytes: 38e9, expiresUnix: now + 41 * D, online: true, currentNodeName: "de1", lastSeenUnix: now - 60, apps: { happ: true, amnezia: true, telegram: false } });
 const erin = person("erin", "family", { devicesUsed: 3, usedBytes: 52e9, expiresUnix: now + 22 * D, lastSeenUnix: now - D });
 const members = [bob, carol, dave];
+// alice is in family, and friends is an extra group of hers: the group's page lists her too, with the pill
+const aliceExtra = { ...alice, extraGroupIds: ["grp_friends"], extraGroupNames: ["friends"], extraGroupColors: ["sand"] };
+const withExtra = (state: string) => ["people-extra", "menu-extra", "change-remove", "change-main", "pick-move"].includes(state);
 
 const counts = (all: number, online: number) => ({ all, online, expiring: all > 0 ? 1 : 0, overQuota: 0, devicesUsed: all > 0 ? 5 : 0, devicesOnline: online > 0 ? 3 : 0, overDeviceLimit: 0, telegram: 0 });
 
@@ -101,6 +107,8 @@ const preset = (id: string, name: string) => ({ id, name, description: "", built
 export function seeded(state: string, role: Role) {
   const empty = state === "empty" || state === "settings-ask-del";
   const nothing = state === "nothing";
+  const extra = withExtra(state);
+  const extraOnly = state === "settings-extra"; // nobody has friends as the main group, two have it as an extra one
   // msk1 is marked "nobody gets it": it is on the group's disabled list and the panel would refuse to switch it on
   const held = state === "access-held";
   const nodes = nodeList(held);
@@ -111,7 +119,7 @@ export function seeded(state: string, role: Role) {
   c.setQueryData(userCountQuery.queryKey, { counts: { all: 5, online: 3 } } as never);
   c.setQueryData(awaitingQuery.queryKey, { awaiting: 0 } as never);
   c.setQueryData(groupsQuery.queryKey, [
-    group("friends", { ...(empty && { userCount: 0 }), ...(nothing && { profileIds: [], happNodes: 0, amneziaNodes: 0 }), ...(held && { disabledNodeIds: ["nod_msk1"], happNodes: 3 }) }),
+    group("friends", { ...(empty && { userCount: 0 }), ...(extra && { extraUserCount: 1 }), ...(extraOnly && { userCount: 0, extraUserCount: 2 }), ...(nothing && { profileIds: [], happNodes: 0, amneziaNodes: 0 }), ...(held && { disabledNodeIds: ["nod_msk1"], happNodes: 3 }) }),
     group("family"),
   ] as never);
   c.setQueryData(profileListQuery.queryKey, profileList as never);
@@ -123,9 +131,10 @@ export function seeded(state: string, role: Role) {
   ] as never);
   c.setQueryData(dnsPresetsQuery.queryKey, { presets: [preset("dns_builtin_standard", "Cloudflare + Google"), preset("dns_builtin_adblock", "AdGuard: no ads"), preset("dns_builtin_ru_split", "Russia: .ru direct")], providers: [], clientSupport: [] } as never);
   c.setQueryData(settingsQuery.queryKey, { settings: { apps: [{ kind: App.HAPP, name: "Happ" }] }, reservedHeaderNames: [], effectiveTitle: "", samples: [], sampleGroup: "", namesLanguage: "", sharedLinkUsers: 0, linkAwgKeys: 0 } as never);
-  const list = empty ? [] : members;
-  c.setQueryData(groupCountsQuery("grp_friends").queryKey, (empty ? counts(0, 0) : counts(3, 2)) as never);
-  c.setQueryData(groupPeopleKey("grp_friends", "", 1, 50), { users: list, nextPageToken: "", counts: empty ? counts(0, 0) : counts(3, 2) } as never);
+  const list = empty ? [] : extra ? [aliceExtra, ...members] : members;
+  const figures = empty ? counts(0, 0) : extra ? counts(4, 2) : counts(3, 2);
+  c.setQueryData(groupCountsQuery("grp_friends").queryKey, figures as never);
+  c.setQueryData(groupPeopleKey("grp_friends", "", 1, 50), { users: list, nextPageToken: "", counts: figures } as never);
   c.setQueryData(groupPeopleKey("grp_friends", "zz", 1, 50), { users: [], nextPageToken: "", counts: counts(0, 0) } as never);
   c.setQueryData(["users", "group-pick", ""], { users: [alice, erin, ...members], nextPageToken: "", counts: counts(5, 3) } as never);
   return c;
@@ -134,6 +143,10 @@ export function seeded(state: string, role: Role) {
 /** What a scene starts the page with (exported for its smoke test). */
 export const demoOf: Record<string, GroupDemo> = {
   pick: { pick: true, tick: 1 },
+  "pick-move": { pick: true, tick: 1, mode: "move" },
+  "menu-extra": { menu: "extra" },
+  "change-remove": { change: { kind: "remove", group: { id: "grp_friends", name: "friends" }, impact: { users: 1, lost: [{ id: "p_awg", name: "AWG 3.1", protocol: "awg", awgDevices: 2 }], gained: [], gainedNodeIds: [], lostNodeIds: ["nod_fi1"] } as never } },
+  "change-main": { change: { kind: "main", group: { id: "grp_friends", name: "friends" }, impact: null } },
   find: { find: "zz" },
   menu: { menu: true },
   "access-dirty": { dirty: true },
@@ -177,6 +190,15 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "group-people-rail", state: "people", title: "A 900 window: the rail, the last visit goes", w: 900, h: 860 },
   { id: "group-people-phone", state: "people", title: "A phone, 400 wide", w: 400, h: 1000 },
   { id: "group-people-fa", state: "people", title: "Right to left (fa)", w: 1440, h: 860, params: "&lang=fa" },
+  { id: "group-people-extra", state: "people-extra", title: "People: alice is an extra member (the pill), the head says 4 people, 1 extra", w: 1440, h: 900 },
+  { id: "group-people-extra-light", state: "people-extra", title: "The same on the light theme", w: 1440, h: 900, params: "&theme=light" },
+  { id: "group-people-extra-phone", state: "people-extra", title: "The same on a phone", w: 400, h: 1100, params: "&tab=people" },
+  { id: "group-people-extra-fa", state: "people-extra", title: "The same right to left", w: 1440, h: 900, params: "&lang=fa" },
+  { id: "group-menu-extra", state: "menu-extra", title: "The menu of an extra member: make main, remove", w: 1440, h: 900 },
+  { id: "group-remove-ask", state: "change-remove", title: "Taking an extra member out: what they lose", w: 1440, h: 900 },
+  { id: "group-main-ask", state: "change-main", title: "Making the group the main one of an extra member", w: 1440, h: 900 },
+  { id: "group-pick-move", state: "pick-move", title: "The panel on Move", w: 1440, h: 1200 },
+  { id: "group-settings-extra", state: "settings-extra", title: "Settings: only extra members are left, the group can be deleted", w: 1440, h: 780, params: "&tab=settings" },
   { id: "group-empty", state: "empty", title: "Nobody in the group", w: 1440, h: 780 },
   { id: "group-pick", state: "pick", title: "Who to move in (one ticked)", w: 1440, h: 1100 },
   { id: "group-pick-phone", state: "pick", title: "Who to move in on a phone", w: 400, h: 1200 },

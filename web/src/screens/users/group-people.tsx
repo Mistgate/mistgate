@@ -8,6 +8,8 @@ import { Icon } from "@/components/ui/icons";
 import { IconButton } from "@/components/ui/icon-button";
 import { Menu, MenuItem, MenuLink } from "@/components/ui/menu";
 import { Pagination } from "@/components/ui/pagination";
+import { Segmented } from "@/components/ui/segmented";
+import { Tip } from "@/components/ui/tooltip";
 import { Notice } from "@/components/ui/notice";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { useToast } from "@/components/ui/toast";
@@ -22,14 +24,16 @@ import { clampPage, usePaging } from "@/lib/paging";
 import { profileListQuery } from "./rpc";
 import { avatarIndex, daysLeft, groupTone, nowSec, seenText, shownKey, shownStatus, usage } from "./format";
 import { Tick, type GroupDemo } from "./group-bits";
-import { lostProfileIds, moveUsers } from "./group-move";
+import { addUsers, lostProfileIds, moveUsers } from "./group-move";
+import { useGroupChange } from "./group-membership";
 import { usersPageN, type UserN } from "./model";
 import { useTx, type Tx } from "./t";
 import { ConfirmModal, useDebounced } from "./ui";
 import "./group.css";
 
-// The People tab of the group page (PnGroup: ug-): four figures of the group, the panel "Who to move in", the people with their
-// devices, traffic, term and last visit, and the menu of a row. The people come from ListUsers with the group's id, paged on the server.
+// The People tab of the group page (PnGroup: ug-): four figures of the group, the panel "Who to add" (or move in), the people with their
+// devices, traffic, term and last visit, and the menu of a row. The people come from ListUsers with the group's id (the ones that have it
+// as the main group and the ones that have it as an extra group, the second with a pill), paged on the server.
 
 const PAGE = 50;
 const sizes = [25, PAGE, 100] as const;
@@ -50,9 +54,9 @@ export const groupPeopleKey = (groupId: string, query: string, page: number, siz
 
 function Stats({ counts, group }: { counts: UserCounts | undefined; group: Group }) {
   const t = useTx();
-  const all = counts?.all ?? group.userCount;
+  const all = counts?.all ?? group.userCount + group.extraUserCount;
   const cells = [
-    { label: t("grp.st.people"), v: String(all), u: "", s: counts && counts.expiring > 0 ? t("grp.st.expiring", { n: counts.expiring }) : t("grp.st.noExpiring") },
+    { label: t("grp.st.people"), v: String(all), u: group.extraUserCount > 0 ? t("grp.countExtra", { n: group.extraUserCount }) : "", s: counts && counts.expiring > 0 ? t("grp.st.expiring", { n: counts.expiring }) : t("grp.st.noExpiring") },
     { label: t("grp.st.online"), v: String(counts?.online ?? 0), u: t("grp.st.of", { n: all }), s: t("grp.st.devOnline", { n: counts?.devicesOnline ?? 0 }) },
     { label: t("grp.st.devices"), v: String(counts?.devicesUsed ?? 0), u: "", s: counts && counts.overDeviceLimit > 0 ? t("grp.st.overDev", { n: counts.overDeviceLimit }) : t("grp.st.noOverDev") },
     { label: t("grp.st.quota"), v: String(counts?.overQuota ?? 0), u: "", s: counts && counts.overQuota > 0 ? t("grp.st.overQuota") : t("grp.st.noOverQuota") },
@@ -94,12 +98,17 @@ function SearchBox({ value, onChange, label, placeholder, className }: { value: 
 
 // ---- who to move in ----
 
-/** "Who to move to the group": everybody of the other groups, ticked one by one; the footer says what happens and does it. */
+/**
+ * "Who to add to the group": everybody of the other groups, ticked one by one; the footer says what happens and does it. [Add | Move]:
+ * "Add" (the one it opens with) makes the group an extra group of each, nothing is lost and their main group stays; "Move" makes it their
+ * main group, and the footer says what they lose before it does it.
+ */
 function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; groups: readonly Group[]; onClose: () => void; onMoved: (ids: string[]) => void; demo?: GroupDemo }) {
   const t = useTx();
   const fmt = useFmt();
   const toast = useToast();
   const qc = useQueryClient();
+  const [mode, setMode] = useState<"add" | "move">(demo?.mode ?? "add");
   const [find, setFind] = useState("");
   const query = useDebounced(find.trim(), 250);
   const [ticked, setTicked] = useState<Record<string, UserN>>({});
@@ -110,7 +119,8 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
     queryFn: ({ signal }) => usersApi.listUsers({ query, pageSize: PICK_LIMIT, sort: UserSort.NAME }, { signal }).then(usersPageN),
     placeholderData: keepPreviousData,
   });
-  const candidates = (list.data?.users ?? []).filter((u) => u.groupId !== group.id);
+  // who can be added: nobody that is in the group already, as the main group or as an extra one; who can be moved: everybody whose main group it is not
+  const candidates = (list.data?.users ?? []).filter((u) => u.groupId !== group.id && (mode === "move" || !u.extraGroupIds.includes(group.id)));
   // the demo ticks the first two
   const [seeded, setSeeded] = useState(false);
   if (demo?.tick && !seeded && candidates.length > 0) {
@@ -118,8 +128,12 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
     setTicked(Object.fromEntries(candidates.slice(0, demo.tick).map((u) => [u.id, u])));
   }
   const chosen = Object.values(ticked);
-  const fromGroups = chosen.map((u) => groups.find((g) => g.id === u.groupId)).filter((g) => g !== undefined);
-  const lost = lostProfileIds(fromGroups, group);
+  const adding = mode === "add";
+  // a move costs each person what only their old main group gave; their extra groups stay
+  const byId = (id: string) => groups.find((g) => g.id === id);
+  const lost = adding
+    ? []
+    : [...new Set(chosen.flatMap((u) => lostProfileIds([byId(u.groupId)].filter((g) => g !== undefined), group, u.extraGroupIds.map(byId).filter((g) => g !== undefined))))];
   const profiles = useQuery(profileListQuery).data ?? [];
   const lostNames = lost.map((id) => profiles.find((p) => p.id === id)?.name ?? id);
   const go = async () => {
@@ -129,21 +143,38 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
       return;
     }
     setBusy(1);
-    const r = await moveUsers(chosen.map((u) => u.id), group.id, (n) => setBusy(n + 1));
+    const ids = chosen.map((u) => u.id);
+    const r = await (adding ? addUsers : moveUsers)(ids, group.id, (n) => setBusy(n + 1));
     await Promise.all(["groups", "users", "subs", "profiles"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
     setBusy(0);
     if (r.error) toast.error(t("grp.moveFail", { done: r.done, total: chosen.length, error: errorText(r.error, t) }));
-    else toast(t.n("grp.moved", r.done, { name: group.name }));
-    if (r.done > 0) onMoved(chosen.map((u) => u.id));
+    else toast(t.n(adding ? "grp.added" : "grp.moved", r.done, { name: group.name }));
+    if (r.done > 0) onMoved(ids);
     onClose();
   };
   const now = nowSec();
   return (
     <section className="animate-[mg-up_0.25s_var(--e)_both] overflow-hidden rounded-card border border-line bg-surface">
       <div className="flex items-center gap-3 px-6 pt-4 pb-3 max-md:flex-wrap max-md:px-4">
-        <h3 className="me-auto text-base leading-6 font-medium">{t("grp.pick.title", { name: group.name })}</h3>
-        <SearchBox className="flex-[0_1_240px] max-md:order-3 max-md:flex-[1_1_100%]" value={find} onChange={(v) => setFind(v)} label={t("grp.find")} placeholder={t("grp.findPh")} />
-        <IconButton variant="compact" aria-label={t("common.close")} onClick={onClose}>
+        <h3 className="me-auto text-base leading-6 font-medium max-md:order-1">{t(adding ? "grp.pick.titleAdd" : "grp.pick.title", { name: group.name })}</h3>
+        {/* on a phone: the title and the close button, then [Add | Move], then the search */}
+        <div className="flex-none max-md:order-3 max-md:basis-full">
+          <Segmented
+            aria-label={t("grp.pick.mode")}
+            value={mode}
+            onValueChange={(m) => {
+              setMode(m);
+              setTicked({});
+              setSure(false);
+            }}
+            options={[
+              { value: "add", label: t("grp.mode.add") },
+              { value: "move", label: t("grp.mode.move") },
+            ]}
+          />
+        </div>
+        <SearchBox className="flex-[0_1_240px] max-md:order-4 max-md:flex-[1_1_100%]" value={find} onChange={(v) => setFind(v)} label={t("grp.find")} placeholder={t("grp.findPh")} />
+        <IconButton variant="compact" aria-label={t("common.close")} onClick={onClose} className="max-md:order-2">
           <Icon name="x" size={16} />
         </IconButton>
       </div>
@@ -152,12 +183,13 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
       ) : list.isError && !list.data ? (
         <QueryError error={list.error} compact onRetry={() => void list.refetch()} />
       ) : candidates.length === 0 ? (
-        <p className="m-0 border-t border-line px-6 pt-4 pb-5 text-[13px] leading-[18px] text-muted max-md:px-4">{query ? t("grp.noFind") : t("grp.pick.none")}</p>
+        <p className="m-0 border-t border-line px-6 pt-4 pb-5 text-[13px] leading-[18px] text-muted max-md:px-4">{query ? t("grp.noFind") : t(adding ? "grp.pick.noneAdd" : "grp.pick.none")}</p>
       ) : (
-        <div role="group" aria-label={t("grp.pick.title", { name: group.name })}>
+        <div role="group" aria-label={t(adding ? "grp.pick.titleAdd" : "grp.pick.title", { name: group.name })}>
           {candidates.map((u) => {
             const on = !!ticked[u.id];
             const g = groups.find((x) => x.id === u.groupId);
+            const extra = u.extraGroupIds.includes(group.id);
             return (
               <button
                 key={u.id}
@@ -178,8 +210,11 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
                 <Tick on={on} />
                 <Avatar name={u.name} index={avatarIndex(u.name)} size={28} />
                 <b className="truncate font-mono text-sm font-medium">{u.name}</b>
-                <span data-tone={groupTone(u.groupId, g?.color ?? u.groupColor)} className="tone-chip inline-flex h-[22px] max-w-40 items-center rounded-chip px-2 text-[11px]">
-                  <span className="truncate">{u.groupName}</span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span data-tone={groupTone(u.groupId, g?.color ?? u.groupColor)} className="tone-chip inline-flex h-[22px] max-w-40 items-center rounded-chip px-2 text-[11px]">
+                    <span className="truncate">{u.groupName}</span>
+                  </span>
+                  {extra && <ExtraPill t={t} />}
                 </span>
                 <em className="truncate text-end text-muted not-italic max-md:hidden">{seenText(u, t, now)}</em>
               </button>
@@ -194,6 +229,8 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
             <span className="text-warn-text">
               <b className="font-medium">{t.n("users.impactGroup", chosen.length)}</b> {lostNames.map((n) => t("common.quoted", { name: n })).join(", ")}. {t("grp.pick.keys")}
             </span>
+          ) : adding ? (
+            t("grp.pick.noteAdd", { name: group.name })
           ) : (
             t("grp.pick.note")
           )}
@@ -203,10 +240,21 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
         </Button>
         <Button size="md" variant={sure && lost.length > 0 ? "danger" : "primary"} aria-disabled={chosen.length === 0 || undefined} disabled={busy > 0} className={cx(chosen.length === 0 && "opacity-45")} onClick={() => void go()}>
           {busy > 0 && <span aria-hidden className="size-3.5 animate-[mg-ui-spin_0.7s_linear_infinite] rounded-full border-[1.5px] border-current border-t-transparent" />}
-          {sure && lost.length > 0 ? t("grp.pick.goAnyway", { n: chosen.length }) : chosen.length > 0 ? t("grp.pick.goN", { n: chosen.length }) : t("grp.pick.go")}
+          {sure && lost.length > 0 ? t("grp.pick.goAnyway", { n: chosen.length }) : chosen.length > 0 ? t(adding ? "grp.pick.goAddN" : "grp.pick.goN", { n: chosen.length }) : t(adding ? "grp.pick.goAdd" : "grp.pick.go")}
         </Button>
       </div>
     </section>
+  );
+}
+
+/** "extra": the group is an extra one for this person (it only adds servers); a 20 px tag. */
+function ExtraPill({ t }: { t: Tx }) {
+  return (
+    <Tip label={t("grp.extraPillTip")}>
+      <span tabIndex={0} className="inline-flex h-5 flex-none items-center rounded-chip bg-step px-1.5 text-[11px] font-medium text-sec">
+        {t("grp.extraPill")}
+      </span>
+    </Tip>
   );
 }
 
@@ -215,7 +263,8 @@ function PickPanel({ group, groups, onClose, onMoved, demo }: { group: Group; gr
 const cols =
   "grid grid-cols-[minmax(200px,1.6fr)_112px_minmax(160px,1fr)_96px_minmax(120px,0.8fr)_32px] items-center gap-4 px-6 max-[1040px]:grid-cols-[minmax(0,1.6fr)_64px_minmax(130px,1fr)_88px_32px] max-md:grid-cols-[minmax(0,1fr)_104px_32px] max-md:gap-2.5 max-md:px-4";
 
-function Member({ u, group, groups, manage, fresh, open0, onMove, t, fmt, now }: { u: UserN; open0?: boolean; group: Group; groups: readonly Group[]; manage: boolean; fresh: boolean; onMove: (u: UserN, to: Group) => void; t: Tx; fmt: ReturnType<typeof useFmt>; now: number }) {
+function Member({ u, group, groups, manage, fresh, open0, onMove, onChange, t, fmt, now }: { u: UserN; open0?: boolean; group: Group; groups: readonly Group[]; manage: boolean; fresh: boolean; onMove: (u: UserN, to: Group) => void; onChange: (u: UserN, kind: "main" | "remove") => void; t: Tx; fmt: ReturnType<typeof useFmt>; now: number }) {
+  const extra = u.groupId !== group.id; // the group is an extra one for this person
   const status = shownStatus(u);
   const expired = u.status === UserStatus.EXPIRED || (u.expiresUnix > 0 && u.expiresUnix <= now);
   const left = daysLeft(u.expiresUnix, now);
@@ -229,7 +278,10 @@ function Member({ u, group, groups, manage, fresh, open0, onMove, t, fmt, now }:
       <Link to="/users/$id" params={{ id: u.id }} className="group/n flex min-w-0 items-center gap-3 text-inherit no-underline">
         <Avatar name={u.name} index={avatarIndex(u.name)} size={32} />
         <span className="flex min-w-0 flex-col">
-          <b className="truncate font-mono font-medium group-hover/n:underline group-hover/n:underline-offset-[3px]">{u.name}</b>
+          <span className="flex min-w-0 items-center gap-2">
+            <b className="truncate font-mono font-medium group-hover/n:underline group-hover/n:underline-offset-[3px]">{u.name}</b>
+            {extra && <ExtraPill t={t} />}
+          </span>
           <span className="truncate text-xs leading-4 text-muted">{t(shownKey[status])}</span>
         </span>
       </Link>
@@ -284,7 +336,20 @@ function Member({ u, group, groups, manage, fresh, open0, onMove, t, fmt, now }:
           <Icon name="externalLink" size={16} />
           {t("grp.openPage")}
         </MenuLink>
+        {manage && extra && (
+          <>
+            <MenuItem onClick={() => onChange(u, "main")}>
+              <Icon name="check" size={16} />
+              {t("grp.makeMain", { name: group.name })}
+            </MenuItem>
+            <MenuItem danger onClick={() => onChange(u, "remove")}>
+              <Icon name="x" size={16} />
+              {t("grp.leave")}
+            </MenuItem>
+          </>
+        )}
         {manage &&
+          !extra &&
           others.map((g) => (
             <MenuItem key={g.id} onClick={() => onMove(u, g)}>
               <i aria-hidden data-tone={groupTone(g.id, g.color)} className="mx-1 size-2 flex-none rounded-full bg-(--t)" />
@@ -361,11 +426,23 @@ export function PeopleTab({ group, groups, manage, pick, setPick, demo }: { grou
     }
     toast(t.n("grp.moved", 1, { name: to.name }));
   };
+  // the person's extra groups stay when the main one changes, so what they give is not lost
+  const lostOf = (u: UserN, to: Group) =>
+    lostProfileIds([group], to, u.extraGroupIds.map((id) => groups.find((g) => g.id === id)).filter((g) => g !== undefined));
   const askMove = (u: UserN, to: Group) => {
-    if (lostProfileIds([group], to).length > 0) setAsking({ u, to });
+    if (lostOf(u, to).length > 0) setAsking({ u, to });
     else void moveOne(u, to).catch(() => {});
   };
-  const lostNames = asking ? lostProfileIds([group], asking.to).map((id) => profiles.find((p) => p.id === id)?.name ?? id) : [];
+  // an extra member: make the group their main one, or take them out of it (the server says what that costs them)
+  const { ask: askChange, show: showChange, modal: changeModal } = useGroupChange(() => undefined);
+  const demoWho = rows.find((u) => u.groupId !== group.id);
+  const demoChange = demo?.change;
+  useEffect(() => {
+    if (demoChange && demoWho) showChange({ who: demoWho, ...demoChange });
+    // the scene opens its window once the people are there
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoChange, demoWho?.id]);
+  const lostNames = asking ? lostOf(asking.u, asking.to).map((id) => profiles.find((p) => p.id === id)?.name ?? id) : [];
   const now = nowSec();
   const head = cols + " min-h-9 text-xs text-muted max-md:hidden";
 
@@ -386,7 +463,7 @@ export function PeopleTab({ group, groups, manage, pick, setPick, demo }: { grou
           <span />
         </div>
         {rows.map((u, i) => (
-          <Member key={u.id} u={u} group={group} groups={groups} manage={manage} fresh={fx && fresh.has(u.id)} open0={demo?.menu === true && i === 1} onMove={askMove} t={t} fmt={fmt} now={now} />
+          <Member key={u.id} u={u} group={group} groups={groups} manage={manage} fresh={fx && fresh.has(u.id)} open0={(demo?.menu === true && i === 1) || (demo?.menu === "extra" && u.groupId !== group.id)} onMove={askMove} onChange={(p, kind) => void askChange(p, kind, group)} t={t} fmt={fmt} now={now} />
         ))}
       </>
     );
@@ -426,6 +503,7 @@ export function PeopleTab({ group, groups, manage, pick, setPick, demo }: { grou
             </span>
           </Notice>
         </ConfirmModal>
+        {changeModal}
       </section>
       <Pagination total={total} page={page} size={paging.size} sizes={sizes} onPage={paging.setPage} onSize={paging.setSize} busy={list.isPlaceholderData} />
     </div>

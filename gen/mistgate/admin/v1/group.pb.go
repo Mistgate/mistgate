@@ -26,7 +26,9 @@ type Group struct {
 	Id         string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name       string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	ProfileIds []string               `protobuf:"bytes,3,rep,name=profile_ids,json=profileIds,proto3" json:"profile_ids,omitempty"`
-	UserCount  uint32                 `protobuf:"varint,4,opt,name=user_count,json=userCount,proto3" json:"user_count,omitempty"`
+	// People that have this group as their main group. The ones that have it as an extra group are in extra_user_count; the two
+	// together are the people the group gives access to.
+	UserCount uint32 `protobuf:"varint,4,opt,name=user_count,json=userCount,proto3" json:"user_count,omitempty"`
 	// Empty = the instance default.
 	DnsPresetId string `protobuf:"bytes,5,opt,name=dns_preset_id,json=dnsPresetId,proto3" json:"dns_preset_id,omitempty"`
 	// Nodes where the group's profiles give something right now: an enabled, pending or running inbound on an enrolled
@@ -43,8 +45,10 @@ type Group struct {
 	DisabledNodeIds []string `protobuf:"bytes,9,rep,name=disabled_node_ids,json=disabledNodeIds,proto3" json:"disabled_node_ids,omitempty"`
 	// Nodes where the group's MTProto profiles give a Telegram proxy right now (same rule as happ_nodes and amnezia_nodes).
 	TelegramNodes uint32 `protobuf:"varint,10,opt,name=telegram_nodes,json=telegramNodes,proto3" json:"telegram_nodes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// People that have this group as an extra group (a person is in one of the two counts, never both).
+	ExtraUserCount uint32 `protobuf:"varint,11,opt,name=extra_user_count,json=extraUserCount,proto3" json:"extra_user_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Group) Reset() {
@@ -143,6 +147,13 @@ func (x *Group) GetDisabledNodeIds() []string {
 func (x *Group) GetTelegramNodes() uint32 {
 	if x != nil {
 		return x.TelegramNodes
+	}
+	return 0
+}
+
+func (x *Group) GetExtraUserCount() uint32 {
+	if x != nil {
+		return x.ExtraUserCount
 	}
 	return 0
 }
@@ -540,7 +551,8 @@ type UpdateGroupResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The group after the update; with dry_run, as it is now.
 	Group *Group `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`
-	// What the new profile set does to the group's users; unset when the set stays.
+	// What the new profile set does to the group's users (main and extra members; a person whose other group holds the same
+	// profile loses less than this says); unset when the set stays.
 	Impact        *AccessImpact `protobuf:"bytes,2,opt,name=impact,proto3" json:"impact,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -593,8 +605,9 @@ func (x *UpdateGroupResponse) GetImpact() *AccessImpact {
 type DeleteGroupRequest struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	GroupId string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	// The group's users move here first, in the same transaction. Empty: refused with FAILED_PRECONDITION
-	// "group_not_empty: users=N" while users belong to the group.
+	// The people that have the group as their main group move here first, in the same transaction (one that had the target as an
+	// extra group keeps it as the main one). Empty: refused with FAILED_PRECONDITION "group_not_empty: users=N" while people have
+	// it as their main group. The extra members need no target: they leave the group.
 	MoveUsersTo   string `protobuf:"bytes,2,opt,name=move_users_to,json=moveUsersTo,proto3" json:"move_users_to,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -836,7 +849,7 @@ var File_mistgate_admin_v1_group_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_group_proto_rawDesc = "" +
 	"\n" +
-	"\x1dmistgate/admin/v1/group.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1cmistgate/admin/v1/user.proto\"\xbc\x02\n" +
+	"\x1dmistgate/admin/v1/group.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\x1a\x1cmistgate/admin/v1/user.proto\"\xe6\x02\n" +
 	"\x05Group\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
@@ -851,7 +864,8 @@ const file_mistgate_admin_v1_group_proto_rawDesc = "" +
 	"\x05color\x18\b \x01(\tR\x05color\x12*\n" +
 	"\x11disabled_node_ids\x18\t \x03(\tR\x0fdisabledNodeIds\x12%\n" +
 	"\x0etelegram_nodes\x18\n" +
-	" \x01(\rR\rtelegramNodes\"\x13\n" +
+	" \x01(\rR\rtelegramNodes\x12(\n" +
+	"\x10extra_user_count\x18\v \x01(\rR\x0eextraUserCount\"\x13\n" +
 	"\x11ListGroupsRequest\"F\n" +
 	"\x12ListGroupsResponse\x120\n" +
 	"\x06groups\x18\x01 \x03(\v2\x18.mistgate.admin.v1.GroupR\x06groups\"\xaf\x01\n" +

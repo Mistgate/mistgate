@@ -58,6 +58,7 @@ import { en as subspnEn } from "./subspn";
 import { en as subshxEn } from "./subshx";
 import { en as subsdnsEn } from "./subsdns";
 import { en as usersgroupEn } from "./usersgroup";
+import { en as usersextraEn } from "./usersextra";
 import { en as decoysitesEn } from "./decoysites";
 import { en as planwordsEn } from "./planwords";
 import { en as profilespageEn } from "./profilespage";
@@ -272,6 +273,9 @@ const core = {
   // The panel's refusal codes (src/lib/errors.ts errorCodes): what happened and what to do.
   "err.name_taken": "This name is taken. Pick another one.",
   "err.group_not_empty": "Users still in this group: {users}. Move them to another group, then delete it.",
+  "err.group_in_both": "The same group is in both lists: add it or take it away, not both.",
+  "err.main_group": "The main group cannot be taken away: make another group the main one instead.",
+  "err.too_many_groups": "A person can be in 16 groups at most.",
   "err.profile_deployed": "The profile is on nodes {nodes}. Remove it from them first.",
   "err.stale_version": "The profile was changed in another tab. Reload the page.",
   "err.node_offline": "The node is not connected. Try again when its agent is back.",
@@ -333,7 +337,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn, ...decoysitesEn, ...planwordsEn, ...nodeswaysEn, ...nodewaysEn, ...profilespageEn, ...healthpageEn, ...reachpageEn, ...profilesrvEn, ...profilenewEn, ...subspnEn, ...subshxEn, ...subsdnsEn, ...updatespageEn, ...settingspageEn, ...aipageEn, ...igpageEn, ...aspageEn, ...nodeshareEn, ...channelEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn, ...usersextraEn, ...decoysitesEn, ...planwordsEn, ...nodeswaysEn, ...nodewaysEn, ...profilespageEn, ...healthpageEn, ...reachpageEn, ...profilesrvEn, ...profilenewEn, ...subspnEn, ...subshxEn, ...subsdnsEn, ...updatespageEn, ...settingspageEn, ...aipageEn, ...igpageEn, ...aspageEn, ...nodeshareEn, ...channelEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;

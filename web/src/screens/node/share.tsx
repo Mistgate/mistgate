@@ -120,7 +120,7 @@ export function ShareCard({ node }: { node: Node }) {
                 <span className="flex min-w-0 items-center gap-2.5">
                   <i aria-hidden data-tone={groupTone(g.id, g.color)} className="size-2 flex-none rounded-full bg-(--t)" />
                   <b className={cx("truncate font-medium transition-opacity duration-200 ease-out", !on && "opacity-60")}>{g.name}</b>
-                  <span className="flex-none text-xs text-muted">{t.n("users.groupPeople", g.userCount)}</span>
+                  <span className="flex-none text-xs text-muted">{t.n("users.groupPeople", g.userCount + g.extraUserCount)}</span>
                 </span>
                 <Switch checked={on} disabled={!manage} aria-label={t("ns.switch", { name: g.name })} onCheckedChange={(v) => toggle(g.id, v)} />
               </li>

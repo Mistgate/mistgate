@@ -67,8 +67,8 @@ vi.mock("@/lib/api", async (orig) => ({
     listGroups: () =>
       Promise.resolve({
         groups: [
-          { id: "grp_all", name: "Everyone", profileIds: ["p_hy", "p_awg"], userCount: 4, dnsPresetId: "", happNodes: 1, amneziaNodes: 1 },
-          { id: "grp_f", name: "friends", profileIds: ["p_hy"], userCount: 2, dnsPresetId: "", happNodes: 1, amneziaNodes: 0 },
+          { id: "grp_all", name: "Everyone", profileIds: ["p_hy", "p_awg"], userCount: 4, extraUserCount: 0, dnsPresetId: "", happNodes: 1, amneziaNodes: 1 },
+          { id: "grp_f", name: "friends", profileIds: ["p_hy"], userCount: 2, extraUserCount: 0, dnsPresetId: "", happNodes: 1, amneziaNodes: 0 },
         ],
       }),
   },
@@ -130,6 +130,7 @@ const user = {
   subscriptionName: "",
   groupId: "grp_all",
   groupName: "Everyone",
+  extraGroupIds: [], extraGroupNames: [], extraGroupColors: [],
   status: UserStatus.ACTIVE,
   apps: { happ: true, amnezia: true },
   via: [],
@@ -393,7 +394,7 @@ describe("the user card", () => {
 
   it("asks before a new group, with what the person loses, and only the confirmation moves them", async () => {
     updateUser.mockImplementation(async (r: { dryRun?: boolean }) =>
-      r.dryRun ? { user, impact: { users: 1, lost: [{ id: "p_awg", name: "AWG 3.1", protocol: "awg", awgDevices: 1 }], gained: [] } } : { user },
+      r.dryRun ? { user, impact: { users: 1, lost: [{ id: "p_awg", name: "AWG 3.1", protocol: "awg", awgDevices: 1 }], gained: [], gainedNodeIds: [], lostNodeIds: [] } } : { user },
     );
     tab("access");
     await mount();
@@ -408,6 +409,116 @@ describe("the user card", () => {
     await click(button("Change group"));
     await settle();
     expect(updateUser).toHaveBeenLastCalledWith({ userId: "usr_1", groupId: "grp_f" });
+  });
+
+  describe("the extra groups", () => {
+    const impactOf = (over: object = {}) => ({ users: 1, lost: [], gained: [], gainedNodeIds: [], lostNodeIds: [], ...over });
+    // the person is also in "friends": the chip, its menu, and what each step asks the panel
+    const inFriends = { ...detail, user: { ...user, extraGroupIds: ["grp_f"], extraGroupNames: ["friends"], extraGroupColors: ["sky"] } };
+    const chip = () => document.querySelector<HTMLButtonElement>("[data-testid=extra-groups] button.up-xc");
+    const openChip = async () => {
+      const trigger = chip()!;
+      await act(async () => {
+        trigger.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+        trigger.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+        trigger.click();
+      });
+      for (let i = 0; i < 40 && !document.querySelector("[role=menuitem]"); i++) await settle();
+      return [...document.querySelectorAll("[role=menuitem]")];
+    };
+
+    it("says what an added group gives first, with the nodes that come, and only the confirmation adds it", async () => {
+      updateUser.mockImplementation(async (r: { dryRun?: boolean }) =>
+        r.dryRun ? { user, impact: impactOf({ gained: [{ id: "p_vl", name: "vless · xhttp", protocol: "vless", awgDevices: 0 }], gainedNodeIds: ["nod_1"] }) } : { user },
+      );
+      tab("access");
+      await mount();
+      expect(document.querySelector("[data-testid=extra-groups]")!.textContent).toContain("Also in");
+      await click(button("Add to a group"));
+      expect(document.querySelector("[data-testid=extra-groups]")!.textContent).not.toContain("Everyone"); // the main group is not offered
+      await click([...document.querySelectorAll(".up-gadd")].find((b) => b.textContent?.includes("friends")));
+      await settle();
+      expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", addGroupIds: ["grp_f"], dryRun: true });
+      const dialog = [...document.querySelectorAll("[role=dialog]")].at(-1)!;
+      expect(dialog.textContent).toContain("Add alice to “friends”?");
+      expect(dialog.textContent).toContain("Gets: “vless · xhttp”");
+      expect(dialog.textContent).toContain("New nodes: de1");
+      expect(updateUser).toHaveBeenCalledTimes(1);
+      await click(button("Add"));
+      await settle();
+      expect(updateUser).toHaveBeenLastCalledWith({ userId: "usr_1", addGroupIds: ["grp_f"] });
+    });
+
+    it("says nothing changes when the group gives the same on the same nodes", async () => {
+      updateUser.mockResolvedValue({ user });
+      tab("access");
+      await mount();
+      await click(button("Add to a group"));
+      await click([...document.querySelectorAll(".up-gadd")].find((b) => b.textContent?.includes("friends")));
+      await settle();
+      expect([...document.querySelectorAll("[role=dialog]")].at(-1)!.textContent).toContain("What alice gets stays the same");
+    });
+
+    it("shows the chips of the extra groups and takes one away after a look at what that costs", async () => {
+      updateUser.mockImplementation(async (r: { dryRun?: boolean }) =>
+        r.dryRun ? { user, impact: impactOf({ lost: [{ id: "p_awg", name: "AWG 3.1", protocol: "awg", awgDevices: 2 }], lostNodeIds: ["nod_1"] }) } : { user },
+      );
+      tab("access");
+      await mount(1, [], [], inFriends);
+      expect(document.querySelector("[data-testid=extra-groups]")!.textContent).toContain("friends");
+      const items = await openChip();
+      expect(items.map((i) => i.textContent)).toEqual(["Make main", "Remove from the group"]);
+      expect(text()).toContain("Open the group");
+      await click(items.at(-1));
+      await settle();
+      expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", removeGroupIds: ["grp_f"], dryRun: true });
+      const dialog = [...document.querySelectorAll("[role=dialog]")].at(-1)!;
+      expect(dialog.textContent).toContain("Remove alice from “friends”?");
+      expect(dialog.textContent).toContain("alice loses: “AWG 3.1” (2 AmneziaVPN keys stop working)");
+      expect(dialog.textContent).toContain("Nodes that go away: de1");
+      await click(button("Remove"));
+      await settle();
+      expect(updateUser).toHaveBeenLastCalledWith({ userId: "usr_1", removeGroupIds: ["grp_f"] });
+    });
+
+    it("makes an extra group the main one and keeps the old main group, so nothing is lost", async () => {
+      updateUser.mockResolvedValue({ user });
+      tab("access");
+      await mount(1, [], [], inFriends);
+      await click((await openChip())[0]);
+      await settle();
+      expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", groupId: "grp_f", addGroupIds: ["grp_all"], dryRun: true });
+      expect([...document.querySelectorAll("[role=dialog]")].at(-1)!.textContent).toContain("Make “friends” the main group of alice?");
+      await click(button("Make main"));
+      await settle();
+      expect(updateUser).toHaveBeenLastCalledWith({ userId: "usr_1", groupId: "grp_f", addGroupIds: ["grp_all"] });
+    });
+
+    it("picks the extra group in the main list as 'make main'", async () => {
+      updateUser.mockResolvedValue({ user });
+      tab("access");
+      await mount(1, [], [], inFriends);
+      await click(document.querySelector("button[aria-label='Group']"));
+      const row = [...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.includes("friends"))!;
+      expect(row.textContent).toContain("extra");
+      await click(row);
+      await settle();
+      expect(updateUser).toHaveBeenCalledWith({ userId: "usr_1", groupId: "grp_f", addGroupIds: ["grp_all"], dryRun: true });
+    });
+
+    it("shows the extra groups next to the main one in the facts of the Overview", async () => {
+      await mount(1, [], [], inFriends);
+      const facts = document.querySelector(".up-facts")!;
+      expect(facts.textContent).toContain("Everyone");
+      expect(facts.textContent).toContain("friends");
+    });
+
+    it("keeps an observer from changing the groups", async () => {
+      tab("access");
+      await mount(3, [], [], inFriends);
+      expect(chip()!.disabled).toBe(true);
+      expect((button("Add to a group") as HTMLButtonElement).disabled).toBe(true);
+    });
   });
 
   describe("DNS picked on the page", () => {

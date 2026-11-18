@@ -71,7 +71,7 @@ function GivesCard({ group, manage, demo }: { group: Group; manage: boolean; dem
   const save = useMutation({
     mutationFn: async (confirmed: boolean) => {
       const req = { groupId: group.id, profileIds: { values: chosen } };
-      if (!confirmed && group.userCount > 0 && base.some((id) => !chosen.includes(id))) {
+      if (!confirmed && group.userCount + group.extraUserCount > 0 && base.some((id) => !chosen.includes(id))) {
         const dry = await groupsApi.updateGroup({ ...req, dryRun: true });
         if (dry.impact && dry.impact.lost.length > 0) {
           setImpact(dry.impact);
@@ -112,7 +112,7 @@ function GivesCard({ group, manage, demo }: { group: Group; manage: boolean; dem
   const nothing = group.happNodes === 0 && group.amneziaNodes === 0;
 
   return (
-    <SvCard title={t("grp.gives")} sub={group.userCount > 0 ? t.n("grp.gives.people", group.userCount) : t("grp.gives.empty")}>
+    <SvCard title={t("grp.gives")} sub={group.userCount + group.extraUserCount > 0 ? t.n("grp.gives.people", group.userCount + group.extraUserCount) : t("grp.gives.empty")}>
       {profiles.isPending ? (
         <Pending compact className="border-t border-line px-6 py-4" />
       ) : profiles.isError ? (

@@ -29,7 +29,7 @@ const GB = 1e9;
 function cache(panelApp = true) {
   const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
   c.setQueryData(clientApiQuery.queryKey, { enabled: panelApp, stats: { people: 24, peopleOn: 17, devices: 31 } });
-  c.setQueryData(groupsQuery.queryKey, [{ id: "grp_f", name: "friends", profileIds: ["p_hy", "p_awg"], userCount: 3, dnsPresetId: "", happNodes: 2, amneziaNodes: 1 }] as never);
+  c.setQueryData(groupsQuery.queryKey, [{ id: "grp_f", name: "friends", profileIds: ["p_hy", "p_awg"], userCount: 3, extraUserCount: 0, dnsPresetId: "", happNodes: 2, amneziaNodes: 1 }] as never);
   c.setQueryData(nodesQuery.queryKey, { nodes: [{ id: "nod_de1", name: "de1", countryCode: "DE" }, { id: "nod_nl1", name: "nl1", countryCode: "NL" }] } as never);
   c.setQueryData(profileListQuery.queryKey, [{ id: "p_hy", name: "hy2 · 443", protocol: "hysteria2" }, { id: "p_awg", name: "AWG 3.1", protocol: "awg" }] as never);
   c.setQueryData(protocolsQuery.queryKey, [{ id: "hysteria2", displayName: "Hysteria2", apps: [App.HAPP] }, { id: "awg", displayName: "AmneziaWG", apps: [App.AMNEZIA] }] as never);
@@ -53,7 +53,7 @@ const monday = (() => {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + (((8 - d.getUTCDay()) % 7) || 7)) / 1000;
 })();
 const alice = {
-  id: "usr_alice", name: "alice", subscriptionName: "", groupId: "grp_f", groupName: "friends", status: UserStatus.ACTIVE, apps: { happ: true, amnezia: true }, via: [],
+  id: "usr_alice", name: "alice", subscriptionName: "", groupId: "grp_f", groupName: "friends", extraGroupIds: [], extraGroupNames: [], extraGroupColors: [], status: UserStatus.ACTIVE, apps: { happ: true, amnezia: true }, via: [],
   devicesUsed: 2, deviceLimit: 5, usedBytes: 37.4 * GB, quotaBytes: 100 * GB, quotaReset: QuotaReset.WEEK, nextResetUnix: monday, expiresUnix: NOW + 24 * DAY,
   lastSeenUnix: NOW - 300, speedLimitBps: 0, deviceSpeedLimitBps: 0, createdUnix: NOW - 60 * DAY, nodes: { all: true, nodeIds: [] }, dnsPresetId: "",
 };

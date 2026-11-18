@@ -792,7 +792,9 @@ type userUpdateArgs struct {
 	UserID           string    `json:"user_id"`
 	Name             *string   `json:"name,omitempty"`
 	SubscriptionName *string   `json:"subscription_name,omitempty" jsonschema:"name shown on the public subscription page; empty uses the account name"`
-	GroupID          *string   `json:"group_id,omitempty" jsonschema:"a group id (users_search shows the group of each user)"`
+	GroupID          *string   `json:"group_id,omitempty" jsonschema:"the MAIN group id (users_search shows it as group_id): it decides DNS, the Mihomo template, the response headers and the colour as well as access. The old main group is left unless add_group_ids names it"`
+	AddGroupIDs      []string  `json:"add_group_ids,omitempty" jsonschema:"group ids to add as EXTRA groups (groups_list): the person also gets what each gives, a profile on a node when one and the same group holds the profile and gets the node. An extra group adds access only. A group that is the main group is skipped; at most 16 groups in all"`
+	RemoveGroupIDs   []string  `json:"remove_group_ids,omitempty" jsonschema:"extra group ids to take the person out of (not the main group: change group_id for that). With group_id and add_group_ids it makes B the main group and keeps A: group_id B, add_group_ids [A]"`
 	QuotaBytes       *uint64   `json:"quota_bytes,omitempty" jsonschema:"0 = unlimited"`
 	QuotaReset       *string   `json:"quota_reset,omitempty" jsonschema:"none, day, week, month or rolling_month"`
 	ExpiresUnix      *int64    `json:"expires_unix,omitempty" jsonschema:"unix seconds; 0 = never. A future date lifts 'expired'"`
@@ -815,8 +817,8 @@ func checkSubscriptionName(name string) error {
 
 var userUpdate = changeSpec[userUpdateArgs]{
 	name: "user_update", min: ProfileOperator,
-	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceUpdateUserProcedure),
-	desc:  "Change a user's account name, public subscription-page name, group, quota, expiry, device limit, apps (Happ link, AmneziaVPN keys, Telegram proxy, Mistgate app), nodes, speed limit or DNS preset. Only the fields you give change, inside apps too. " + tokenUserChangeDescription,
+	procs: procs(adminv1connect.UserServiceGetUserProcedure, adminv1connect.UserServiceUpdateUserProcedure, adminv1connect.GroupServiceListGroupsProcedure, adminv1connect.NodeServiceListNodesProcedure),
+	desc:  "Change a user's account name, public subscription-page name, main group, extra groups (add_group_ids, remove_group_ids: the person gets what all their groups give; the plan lists the profiles and nodes they gain and lose), quota, expiry, device limit, apps (Happ link, AmneziaVPN keys, Telegram proxy, Mistgate app), nodes, speed limit or DNS preset. Only the fields you give change, inside apps too. " + tokenUserChangeDescription,
 	plan: func(c *call, a userUpdateArgs) (*planned, error) {
 		cur, err := c.getUser(a.UserID)
 		if err != nil {
@@ -850,6 +852,65 @@ var userUpdate = changeSpec[userUpdateArgs]{
 			}
 			add("group", nm(u.GetGroupName())+" -> group id "+clean(*a.GroupID, 80), true)
 			n++
+		}
+		if len(a.AddGroupIDs)+len(a.RemoveGroupIDs) > 0 {
+			addIDs, err := uniqueIDs("add_group_ids", a.AddGroupIDs, true)
+			if err != nil {
+				return nil, err
+			}
+			removeIDs, err := uniqueIDs("remove_group_ids", a.RemoveGroupIDs, true)
+			if err != nil {
+				return nil, err
+			}
+			a.AddGroupIDs, a.RemoveGroupIDs = addIDs, removeIDs
+			groups, err := c.groups()
+			if err != nil {
+				return nil, err
+			}
+			names := map[string]string{}
+			for _, g := range groups {
+				names[g.GetId()] = g.GetName()
+			}
+			list := func(ids []string) (string, error) {
+				var out []string
+				for _, id := range ids {
+					name, ok := names[id]
+					if !ok {
+						return "", fmt.Errorf("no group with id %s (group ids are in groups_list)", clean(id, 60))
+					}
+					out = append(out, nm(name))
+				}
+				return strings.Join(out, ", "), nil
+			}
+			if len(addIDs) > 0 {
+				v, err := list(addIDs)
+				if err != nil {
+					return nil, err
+				}
+				facts = append(facts, Fact{Key: "groups_added", Value: v, Untrusted: true})
+			}
+			if len(removeIDs) > 0 {
+				v, err := list(removeIDs)
+				if err != nil {
+					return nil, err
+				}
+				facts = append(facts, Fact{Key: "groups_removed", Value: v, Untrusted: true})
+			}
+			n++
+		}
+		if a.GroupID != nil || len(a.AddGroupIDs)+len(a.RemoveGroupIDs) > 0 {
+			// what the groups do to the person: the panel checks the change (refusals come as they are) and says the profiles and nodes
+			r, err := c.cl.User.UpdateUser(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.UpdateUserRequest{
+				UserId: a.UserID, GroupId: a.GroupID, AddGroupIds: a.AddGroupIDs, RemoveGroupIds: a.RemoveGroupIDs, DryRun: true,
+			}))
+			if err != nil {
+				return nil, apiError(err)
+			}
+			nodeFacts, err := c.accessImpactFacts(r.Msg.GetImpact())
+			if err != nil {
+				return nil, err
+			}
+			facts = append(facts, nodeFacts...)
 		}
 		if a.QuotaBytes != nil {
 			change("quota", fmtBytes(u.GetQuotaBytes())+" -> "+fmtBytes(*a.QuotaBytes), strconv.FormatUint(u.GetQuotaBytes(), 10), strconv.FormatUint(*a.QuotaBytes, 10))
@@ -932,7 +993,7 @@ var userUpdate = changeSpec[userUpdateArgs]{
 	},
 	apply: func(c *call, a userUpdateArgs, _ Plan) (done, error) {
 		req := &adminv1.UpdateUserRequest{
-			UserId: a.UserID, Name: a.Name, SubscriptionName: a.SubscriptionName, GroupId: a.GroupID, QuotaBytes: a.QuotaBytes, ExpiresUnix: a.ExpiresUnix,
+			UserId: a.UserID, Name: a.Name, SubscriptionName: a.SubscriptionName, GroupId: a.GroupID, AddGroupIds: a.AddGroupIDs, RemoveGroupIds: a.RemoveGroupIDs, QuotaBytes: a.QuotaBytes, ExpiresUnix: a.ExpiresUnix,
 			DeviceLimit: a.DeviceLimit, Apps: a.Apps.proto(), Nodes: a.Nodes.proto(), SpeedLimitBps: a.SpeedLimitBps, DeviceSpeedLimitBps: a.DeviceSpeedLimitBps, DnsPresetId: a.DNSPresetID,
 		}
 		if a.QuotaReset != nil {
@@ -944,6 +1005,52 @@ var userUpdate = changeSpec[userUpdateArgs]{
 		}
 		return doneWith("user_updated", "User updated."), nil
 	},
+}
+
+// accessImpactFacts words what a change of a person's groups does to their access, by name: the profiles and the nodes they
+// gain and lose (profiles_gained, nodes_gained, profiles_lost, nodes_lost). Nothing for no impact.
+func (c *call) accessImpactFacts(imp *adminv1.AccessImpact) ([]Fact, error) {
+	if imp == nil {
+		return nil, nil
+	}
+	nodeNames := map[string]string{}
+	if len(imp.GetGainedNodeIds())+len(imp.GetLostNodeIds()) > 0 {
+		nodes, err := c.listNodes()
+		if err != nil {
+			return nil, err
+		}
+		for _, n := range nodes {
+			nodeNames[n.GetId()] = n.GetName()
+		}
+	}
+	var facts []Fact
+	profiles := func(ps []*adminv1.ImpactProfile) string {
+		var out []string
+		for _, p := range ps {
+			out = append(out, nm(p.GetName()))
+		}
+		return strings.Join(out, ", ")
+	}
+	nodes := func(ids []string) string {
+		var out []string
+		for _, id := range ids {
+			out = append(out, nm(valueOrDefault(nodeNames[id], id)))
+		}
+		return strings.Join(out, ", ")
+	}
+	if v := profiles(imp.GetGained()); v != "" {
+		facts = append(facts, Fact{Key: "profiles_gained", Value: v, Untrusted: true})
+	}
+	if v := nodes(imp.GetGainedNodeIds()); v != "" {
+		facts = append(facts, Fact{Key: "nodes_gained", Value: v, Untrusted: true})
+	}
+	if v := profiles(imp.GetLost()); v != "" {
+		facts = append(facts, Fact{Key: "profiles_lost", Value: v, Untrusted: true})
+	}
+	if v := nodes(imp.GetLostNodeIds()); v != "" {
+		facts = append(facts, Fact{Key: "nodes_lost", Value: v, Untrusted: true})
+	}
+	return facts, nil
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

@@ -14,6 +14,7 @@ import { isLang, setLang, useLang } from "@/i18n";
 import { clientApiQuery } from "@/lib/clientapi";
 import { clientLogsQuery } from "@/lib/client-debug";
 import { setEffectsEnabled } from "@/lib/effects";
+import { changeDemo, type ChangeDemo } from "./users/group-membership";
 import { alertsQuery } from "@/lib/health";
 import { userConnectionQuery } from "@/lib/connections";
 import { meQuery } from "@/lib/session";
@@ -33,7 +34,9 @@ import { GoneCard, UserDetail, userTabs, type UserTab } from "./users/user-detai
 //   is taken) | groups (ten groups) | tt-off | tt-none | tt-nol (a key and no link) | tt-paused (a key on hold) | track (over the limit, only counted) |
 //   alert (an open alert about alice) | logs (devices of the Mistgate app and what came of their logs) | gone (the person was just deleted)
 // ui: dirty (a limit changed: the save bar) | group | newgroup | dns | menu | qr (the TrustTunnel QR) | link-qr | pw (the page password shown) | rotate |
-//   reset | delete | add (add a key) | hover (a day of the chart) | tgqr
+//   reset | delete | add (add a key) | hover (a day of the chart) | tgqr | extra-add (the list of groups to add) | extra-menu (the menu of a chip) |
+//   extra-confirm-add | extra-confirm-remove | extra-confirm-main | extra-confirm-none (the window of a change of groups, on made-up impact)
+// state extra: alice is in family as the main group and in colleagues and friends as extra groups.
 // Made-up data of the board: alice, family and friends, de1, fi1, nl1 and msk1, documentation addresses.
 
 const NOW = Math.floor(Date.now() / 1000);
@@ -83,7 +86,7 @@ const groupSpecs: [string, string, string, number, number][] = [
   ["grp_team", "team", "lavender", 14, 3],
   ["grp_old", "old-friends", "rose", 5, 3],
 ];
-const group = (g: (typeof groupSpecs)[number]) => ({ id: g[0], name: g[1], color: g[2], userCount: g[3], profileIds: profiles.slice(0, g[4]).map((p) => p.id), dnsPresetId: "", happNodes: 3, amneziaNodes: 2, telegramNodes: 2, disabledNodeIds: [] as string[] });
+const group = (g: (typeof groupSpecs)[number]) => ({ id: g[0], name: g[1], color: g[2], userCount: g[3], extraUserCount: g[0] === "grp_friends" ? 2 : 0, profileIds: profiles.slice(0, g[4]).map((p) => p.id), dnsPresetId: "", happNodes: 3, amneziaNodes: 2, telegramNodes: 2, disabledNodeIds: [] as string[] });
 
 const preset = (pid: string, name: string, over: object = {}) => ({ id: pid, name, description: "", builtin: true, servers: [], split: [], splitDirect: false, ipv4Only: false, users: 0, isDefault: false, ...over });
 const dnsPresets = {
@@ -125,6 +128,25 @@ const row = (over: object) => ({
 
 export type Scene = { state: string; tab: UserTab; role: Role; ui: string };
 
+/** What a `ui=extra-confirm-*` scene opens the window of a change of groups with: the kind, the group and the impact the panel's dry run would say. */
+export function changeDemoOf(ui: string): ChangeDemo | null {
+  const awg = { id: "p_awg", name: "AmneziaWG 3.1", protocol: "awg", awgDevices: 2 };
+  const hy = { id: "p_hy", name: "Hysteria2 · 443", protocol: "hysteria2", awgDevices: 0 };
+  const impact = (over: object) => ({ users: 1, lost: [], gained: [], gainedNodeIds: [], lostNodeIds: [], ...over }) as never;
+  switch (ui) {
+    case "extra-confirm-add":
+      return { kind: "add", group: { id: "grp_parents", name: "parents" }, impact: impact({ gained: [hy], gainedNodeIds: [id("msk1")] }) };
+    case "extra-confirm-remove":
+      return { kind: "remove", group: { id: "grp_friends", name: "friends" }, impact: impact({ lost: [awg], lostNodeIds: [id("fi1")] }) };
+    case "extra-confirm-main":
+      return { kind: "main", group: { id: "grp_friends", name: "friends" }, impact: null };
+    case "extra-confirm-none":
+      return { kind: "add", group: { id: "grp_parents", name: "parents" }, impact: null };
+    default:
+      return null;
+  }
+}
+
 /** The made-up detail of alice by the scene's state. */
 export function detailOf(state: string): DetailN {
   const over = state === "over";
@@ -150,6 +172,9 @@ export function detailOf(state: string): DetailN {
   const used2 = devices.length;
   const user = {
     id: "usr_alice", name: "alice", subscriptionName: "Alice", groupId: "grp_family", groupName: "family", groupColor: "sand", status,
+    ...(state === "extra"
+      ? { extraGroupIds: ["grp_colleagues", "grp_friends"], extraGroupNames: ["colleagues", "friends"], extraGroupColors: ["lavender", "sky"] }
+      : { extraGroupIds: [], extraGroupNames: [], extraGroupColors: [] }),
     apps: { happ: true, amnezia: true, telegram: true, mistgate: true, trustTunnel: state !== "tt-off" },
     via: [], devicesUsed: isNew ? 0 : full ? 5 : used2, deviceLimit: 5, devicesIdle: 0, usedBytes: used * GB, quotaBytes: 100 * GB, quotaReset: QuotaReset.MONTH, nextResetUnix: NOW + 17 * D,
     expiresUnix: NOW + days * D, lastSeenUnix: isNew ? 0 : NOW - (off || exp || over ? 2 * D : 60), online: !isNew && !off && !exp && !over, currentNodeId: id("de1"), currentNodeName: "de1", speedLimitBps: 0, deviceSpeedLimitBps: 0,
@@ -184,9 +209,9 @@ export function cacheOf(s: Scene) {
   const edge = s.state === "edge";
   const c = seeded("calm", s.role, edge);
   const d = detailOf(s.state);
-  const many = s.state === "groups" || s.ui === "group" || s.ui === "newgroup";
+  const many = s.state === "groups" || s.state === "extra" || s.ui === "group" || s.ui === "newgroup"; // the extra scenes need groups the person is not in
   c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role: s.role }, version: "0.1.71", sourceUrl: "https://github.com/example/mistgate", sourceStars: 298, stepUpUntilUnix: 0, ...(edge ? { edition: "edge" } : {}) } as never);
-  c.setQueryData(groupsQuery.queryKey, (many || s.state === "groups" ? groupSpecs : groupSpecs.slice(0, 2)).map(group) as never);
+  c.setQueryData(groupsQuery.queryKey, (many ? groupSpecs : groupSpecs.slice(0, 2)).map(group) as never);
   c.setQueryData(protocolsQuery.queryKey, protocols as never);
   c.setQueryData(settingsQuery.queryKey, settings(s.state === "track") as never);
   c.setQueryData(dnsPresetsQuery.queryKey, dnsPresets as never);
@@ -255,6 +280,8 @@ function useUi(ui: string) {
         window.setTimeout(() => press(q(".up-gnew")), 200);
       },
       dns: () => press(q(".up-dnsc .up-sel")),
+      "extra-add": () => press(q(".up-xa")),
+      "extra-menu": () => press(q(".up-xc")),
       menu: () => press(q(".up-dv .up-dotsb")),
       qr: () => press([...document.querySelectorAll<HTMLElement>(".tq-sv > div:first-child button")].at(-1)),
       tgqr: () => press([...document.querySelectorAll<HTMLElement>(".up-tg > div:first-child button")].at(-1)),
@@ -284,6 +311,7 @@ export function UserPage() {
     const theme = params.get("theme");
     if (theme === "light" || theme === "dark") setTheme(theme);
     setEffectsEnabled(params.get("fx") === "1", false);
+    changeDemo.current = changeDemoOf(ui);
     return cacheOf({ state, tab, role, ui });
   });
   useUi(ui);
@@ -343,6 +371,21 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "user-ac-dns", state: "ok", title: "The DNS list open", w: 1440, h: 900, params: "&tab=access&ui=dns" },
   { id: "user-ac-group", state: "ok", title: "The group list (two groups)", w: 1440, h: 900, params: "&tab=access&ui=group" },
   { id: "user-ac-groups", state: "groups", title: "Ten groups: the search in the list", w: 1440, h: 1100, params: "&tab=access&ui=group" },
+  { id: "user-ac-extra", state: "extra", title: "Access: the main group and two extra ones as chips", w: 1440, h: 1700, params: "&tab=access" },
+  { id: "user-ac-extra-light", state: "extra", title: "The same on the light theme", w: 1440, h: 1700, params: "&tab=access&theme=light" },
+  { id: "user-ac-extra-phone", state: "extra", title: "The same on a phone, 400 wide", w: 400, h: 3200, params: "&tab=access" },
+  { id: "user-ac-extra-fa", state: "extra", title: "The same right to left", w: 1440, h: 1700, params: "&tab=access&lang=fa" },
+  { id: "user-ac-extra-fx", state: "extra", title: "The same with the effects on (the chips rise)", w: 1440, h: 1700, params: "&tab=access&fx=1" },
+  { id: "user-ac-extra-none", state: "ok", title: "No extra group yet: the hint under Also in", w: 1440, h: 1700, params: "&tab=access" },
+  { id: "user-ac-extra-add", state: "extra", title: "Add to a group: the list of the groups the person is not in", w: 1440, h: 1700, params: "&tab=access&ui=extra-add" },
+  { id: "user-ac-extra-menu", state: "extra", title: "The menu of a chip: make main, open, remove", w: 1440, h: 1700, params: "&tab=access&ui=extra-menu" },
+  { id: "user-ac-extra-add-ask", state: "extra", title: "Add: what the person gets, new nodes", w: 1440, h: 1700, params: "&tab=access&ui=extra-confirm-add" },
+  { id: "user-ac-extra-remove-ask", state: "extra", title: "Remove: what the person loses, nodes that go (red)", w: 1440, h: 1700, params: "&tab=access&ui=extra-confirm-remove" },
+  { id: "user-ac-extra-main-ask", state: "extra", title: "Make main: nothing is lost", w: 1440, h: 1700, params: "&tab=access&ui=extra-confirm-main" },
+  { id: "user-ac-extra-same-ask", state: "extra", title: "Add a group that gives the same: nothing changes", w: 1440, h: 1700, params: "&tab=access&ui=extra-confirm-none" },
+  { id: "user-ac-extra-ask-phone", state: "extra", title: "The window of a removal on a phone", w: 400, h: 3200, params: "&tab=access&ui=extra-confirm-remove" },
+  { id: "user-ac-extra-ask-light", state: "extra", title: "The window of a removal on the light theme", w: 1440, h: 1700, params: "&tab=access&ui=extra-confirm-remove&theme=light" },
+  { id: "user-ov-extra", state: "extra", title: "Overview: the extra groups beside the main one in the facts", w: 1440, h: 900 },
   { id: "user-ac-newgroup", state: "ok", title: "A new group from the list", w: 1440, h: 1100, params: "&tab=access&ui=newgroup" },
   { id: "user-ac-readonly", state: "ok", title: "An observer: nothing changes", w: 1440, h: 1600, params: "&tab=access&role=readonly" },
   { id: "user-lg", state: "logs", title: "Logs: a request, two bundles (the owner)", w: 1440, h: 900, params: "&tab=logs" },

@@ -56,6 +56,7 @@ import { zh as subspnZh } from "./subspn";
 import { zh as subshxZh } from "./subshx";
 import { zh as subsdnsZh } from "./subsdns";
 import { zh as usersgroupZh } from "./usersgroup";
+import { zh as usersextraZh } from "./usersextra";
 import { zh as decoysitesZh } from "./decoysites";
 import { zh as planwordsZh } from "./planwords";
 import { zh as profilespageZh } from "./profilespage";
@@ -260,6 +261,9 @@ const core: CoreMessages = {
 
   "err.name_taken": "此名称已被占用。请换一个。",
   "err.group_not_empty": "分组中仍有用户：{users}。先把他们移到其他分组，再删除此分组。",
+  "err.group_in_both": "同一个分组同时出现在两个列表中：请只选择加入或移出其中一种。",
+  "err.main_group": "不能移出主分组：请改为将另一个分组设为主分组。",
+  "err.too_many_groups": "一个用户最多属于 16 个分组。",
   "err.profile_deployed": "此协议配置已部署在节点 {nodes} 上。请先从这些节点移除。",
   "err.stale_version": "此协议配置已在另一个标签页中被修改。请刷新页面。",
   "err.node_offline": "节点未连接。请在它的 Agent 重新上线后再试。",
@@ -318,4 +322,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "暂不支持为 IP 地址申请 Let’s Encrypt 证书：请使用域名或自签名证书",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...decoysitesZh, ...planwordsZh, ...nodeswaysZh, ...nodewaysZh, ...profilespageZh, ...healthpageZh, ...reachpageZh, ...profilesrvZh, ...profilenewZh, ...subspnZh, ...subshxZh, ...subsdnsZh, ...updatespageZh, ...settingspageZh, ...aipageZh, ...igpageZh, ...aspageZh, ...nodeshareZh, ...channelZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...usersextraZh, ...decoysitesZh, ...planwordsZh, ...nodeswaysZh, ...nodewaysZh, ...profilespageZh, ...healthpageZh, ...reachpageZh, ...profilesrvZh, ...profilenewZh, ...subspnZh, ...subshxZh, ...subsdnsZh, ...updatespageZh, ...settingspageZh, ...aipageZh, ...igpageZh, ...aspageZh, ...nodeshareZh, ...channelZh };

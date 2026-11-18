@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 const group = (over: Record<string, unknown> = {}) =>
-  ({ id: "grp_all", name: "Все", profileIds: ["p_hy"], userCount: 5, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, ...over }) as unknown as Group;
+  ({ id: "grp_all", name: "Все", profileIds: ["p_hy"], userCount: 5, extraUserCount: 0, dnsPresetId: "", happNodes: 2, amneziaNodes: 0, ...over }) as unknown as Group;
 const profiles = [{ id: "p_hy", name: "hy2 · 443", protocol: "hysteria2" }];
 
 async function mount(groups: Group[], ps = profiles) {

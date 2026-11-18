@@ -37,7 +37,7 @@ export function PeopleTab(ctx: TabCtx) {
   const profile = data.profile;
   const [menuOpen] = useState(variant.split(".").includes("menu"));
   const free = groups.filter((g) => !g.profileIds.includes(profile.id));
-  const sum = inGroups.reduce((n, g) => n + g.userCount, 0);
+  const sum = inGroups.reduce((n, g) => n + g.userCount + g.extraUserCount, 0);
   const refresh = () => Promise.all(["groups", "users", "subs", "profiles"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
   // The set is read from the cached list, so a concurrent edit of the same group in another tab is overwritten (as the group's own page does)
   const change = useMutation({
@@ -78,8 +78,8 @@ export function PeopleTab(ctx: TabCtx) {
           <div key={g.id} className="pp-gr">
             <i className="ug-d" style={{ background: colorOf(g) }} aria-hidden />
             <b>{g.name}</b>
-            <span className="mono">{g.userCount}</span>
-            <i className="pp-gb" style={{ ["--w" as string]: `${g.userCount > 0 ? Math.max(4, Math.min(100, Math.round((g.userCount / Math.max(1, sum)) * 100))) : 0}%`, ["--gc" as string]: colorOf(g) }} aria-hidden />
+            <span className="mono">{g.userCount + g.extraUserCount}</span>
+            <i className="pp-gb" style={{ ["--w" as string]: `${g.userCount + g.extraUserCount > 0 ? Math.max(4, Math.min(100, Math.round(((g.userCount + g.extraUserCount) / Math.max(1, sum)) * 100))) : 0}%`, ["--gc" as string]: colorOf(g) }} aria-hidden />
             <Lnk className="an-lk" to="/users/groups/$id" params={{ id: g.id }} aria-label={`${t("common.edit")}: ${g.name}`}>
               {t("common.edit")}
             </Lnk>
@@ -115,7 +115,7 @@ export function PeopleTab(ctx: TabCtx) {
                 <PfMenuItem key={g.id} onClick={() => change.mutate({ g, add: true })}>
                   <i className="ug-d" style={{ background: colorOf(g) }} aria-hidden />
                   {g.name}
-                  <em className="mono">{g.userCount}</em>
+                  <em className="mono">{g.userCount + g.extraUserCount}</em>
                 </PfMenuItem>
               ))}
             </PfMenu>

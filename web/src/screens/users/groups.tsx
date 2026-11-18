@@ -20,10 +20,14 @@ export function wayOf(protocol: string, protocols: readonly ProtocolApps[] | und
   return protocol === "awg" ? "awg" : "sub";
 }
 
-/** Lost and gained profiles of a group change, in words: "alice loses: “AWG 3.1” (2 AmneziaVPN keys stop working)". */
-export function ImpactText({ impact, who }: { impact: AccessImpact; who?: string }) {
+/**
+ * Lost and gained profiles of a group change, in words: "alice loses: “AWG 3.1” (2 AmneziaVPN keys stop working)"; and, when the change
+ * is a person's own, the nodes that come and go (`nodeName` words an id).
+ */
+export function ImpactText({ impact, who, nodeName }: { impact: AccessImpact; who?: string; nodeName?: (id: string) => string }) {
   const t = useTx();
   const name = (p: AccessImpact["lost"][number]) => `${t("common.quoted", { name: p.name })}${p.awgDevices > 0 ? ` (${t.n("users.impactKeys", p.awgDevices)})` : ""}`;
+  const nodes = (ids: readonly string[]) => ids.map((id) => nodeName?.(id) ?? id).join(", ");
   return (
     <span className="flex flex-col gap-1">
       {impact.lost.length > 0 && (
@@ -34,6 +38,16 @@ export function ImpactText({ impact, who }: { impact: AccessImpact; who?: string
       {impact.gained.length > 0 && (
         <span>
           <b>{who ? t("users.impactGains") : t("users.impactGainsGroup")}</b> {impact.gained.map((p) => t("common.quoted", { name: p.name })).join(", ")}
+        </span>
+      )}
+      {impact.gainedNodeIds.length > 0 && (
+        <span>
+          <b>{t("users.impactNodesGain")}</b> {nodes(impact.gainedNodeIds)}
+        </span>
+      )}
+      {impact.lostNodeIds.length > 0 && (
+        <span>
+          <b>{t("users.impactNodesLost")}</b> {nodes(impact.lostNodeIds)}
         </span>
       )}
     </span>

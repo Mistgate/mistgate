@@ -79,7 +79,7 @@ type doctorRefreshArg struct {
 type usersSearchArg struct {
 	Query     string `json:"query,omitempty" jsonschema:"part of a user name"`
 	Filter    string `json:"filter,omitempty" jsonschema:"online, expiring or over_quota"`
-	GroupID   string `json:"group_id,omitempty"`
+	GroupID   string `json:"group_id,omitempty" jsonschema:"people in this group: it is their main group or an extra one"`
 	PageSize  int    `json:"page_size,omitempty" jsonschema:"default 25, at most 50"`
 	PageToken string `json:"page_token,omitempty" jsonschema:"next_page_token of the previous page"`
 }
@@ -285,7 +285,7 @@ func readTools() []toolDef {
 			func(c *call, in nodePortsOptArg) (any, error) { return c.nodePorts(in.Node, in.Check) }),
 
 		readTool("users_search", ProfileReadonly, procs(adminv1connect.UserServiceListUsersProcedure),
-			"Find users by part of the name, by filter (online, expiring, over_quota) or group. Paged: pass next_page_token to continue.",
+			"Find users by part of the name, by filter (online, expiring, over_quota) or group (a person is found by their main group and by every extra group). Each user shows group_id and group (the main group) and extra_group_ids and extra_groups (the others). Paged: pass next_page_token to continue.",
 			func(c *call, in usersSearchArg) (any, error) {
 				f, err := userFilter(in.Filter)
 				if err != nil {
@@ -317,7 +317,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("groups_list", ProfileReadonly, procs(adminv1connect.GroupServiceListGroupsProcedure),
-			"The user groups: id, name, profile ids, disabled node ids (when present), user count and DNS preset. If disabled_node_ids is absent or empty, all nodes are available. Use a group id with users_search or user_create.",
+			"The user groups: id, name, profile ids, disabled node ids (when present), user_count (people whose main group it is), extra_user_count (people that have it as an extra group) and DNS preset. If disabled_node_ids is absent or empty, all nodes are available. Use a group id with users_search or user_create.",
 			func(c *call, _ noArgs) (any, error) {
 				r, err := c.cl.Group.ListGroups(c.ctx, connect.NewRequest(&adminv1.ListGroupsRequest{}))
 				if err != nil {
@@ -327,7 +327,7 @@ func readTools() []toolDef {
 			}),
 
 		readTool("user_get", ProfileReadonly, procs(adminv1connect.UserServiceGetUserProcedure),
-			"One user: limits, status, devices, profiles and node access. No subscription link and no keys.",
+			"One user: limits, status, main group and extra groups, devices, profiles and node access. No subscription link and no keys.",
 			func(c *call, in userArg) (any, error) {
 				r, err := c.getUser(in.UserID)
 				if err != nil {

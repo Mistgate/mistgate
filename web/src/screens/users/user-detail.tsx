@@ -13,7 +13,7 @@ import { cx } from "@/lib/cx";
 import { useEffectsEnabled } from "@/lib/effects";
 import { sameYear } from "@/lib/format";
 import { settingsQuery } from "@/screens/subscriptions/queries";
-import { GB, agoText, avatarIndex, daysLeft, nowSec, shownStatus } from "./format";
+import { GB, agoText, avatarIndex, daysLeft, nowSec, reachOf, shownStatus } from "./format";
 import { GroupEditModal } from "./groups";
 import { LinkModal, linkTargetOf } from "./link-modal";
 import { detailN, type DetailN } from "./model";
@@ -272,7 +272,7 @@ export function UserDetail({ data, scene, onDeleted }: { data: DetailN; scene?: 
       </header>
       <Tabs className="up-tabs" aria-label={t("up.tabs")} items={items} value={tab} onValueChange={(v) => open(v as UserTab)} />
 
-      <LinkModal target={linkOpen ? linkTargetOf(user, group) : null} onClose={() => setLinkOpen(false)} />
+      <LinkModal target={linkOpen ? linkTargetOf(user, reachOf(user, groupList.data ?? [])) : null} onClose={() => setLinkOpen(false)} />
       <GroupEditModal group={group} open={groupOpen} onOpenChange={setGroupOpen} />
       <ResetTrafficModal user={user} actions={actions} open={resetOpen} onOpenChange={setResetOpen} />
       <DeleteModal user={user} actions={actions} open={deleteOpen} onOpenChange={setDeleteOpen} onDeleted={() => (onDeleted ? onDeleted() : go("/users", { replace: true }))} />

@@ -2,7 +2,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
-import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { Avatar, avatarIndex } from "@/components/ui/bits";
 import { CopyButton } from "@/components/copy-button";
 import { QrCode, QrPending } from "@/components/qr-code";
@@ -36,7 +35,7 @@ export type LinkTarget = {
   group?: { id: string; name: string; givesNothing: boolean };
 };
 
-export const linkTargetOf = (u: UserN, group?: Group): LinkTarget & { access: { happ: boolean; amnezia: boolean } } => ({
+export const linkTargetOf = (u: UserN, group?: { happNodes: number; amneziaNodes: number }): LinkTarget & { access: { happ: boolean; amnezia: boolean } } => ({
   id: u.id,
   name: u.name,
   happ: !!u.apps?.happ,

@@ -15,7 +15,7 @@ import { useLinkAppNames } from "@/screens/subscriptions/queries";
 import { useDnsLabel } from "./dns-select";
 import { DAY, daysLeft, nowSec } from "./format";
 import { ConnectionAlerts } from "./user-connection";
-import { CopyBtn, CardHead, G, GroupTag, P } from "./user-bits";
+import { CopyBtn, CardHead, G, GroupTags, P } from "./user-bits";
 import type { DetailN, UserN as User } from "./model";
 import { protocolsQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
@@ -282,7 +282,7 @@ function FactsCard({ data, onEditNodes }: { data: DetailN; onEditNodes: () => vo
   const all = data.nodeAccess.length;
   const picked = user.nodes?.all ? all : data.nodeAccess.filter((n) => user.nodes?.nodeIds.includes(n.nodeId)).length;
   const facts: { l: string; v: React.ReactNode; c?: string }[] = [
-    { l: t("users.group"), v: <GroupTag id={user.groupId} name={user.groupName} color={user.groupColor} /> },
+    { l: t("users.group"), v: <GroupTags user={user} /> },
     { l: t("up.facts.gets"), v: apps || "—" },
     { l: t("users.term"), v: left === null ? t("users.never") : expired ? t("users.status.expired") : `${t("users.until")} ${dayFmt(t, user.expiresUnix, { day: "numeric", month: "long" })} · ${t("users.days", { n: left })}`, c: expired ? "up-crit" : left !== null && left <= 7 ? "up-warn" : "" },
     { l: t("users.devices"), v: user.deviceLimit > 0 ? t("users.devCount", { n: user.devicesUsed, limit: user.deviceLimit }) : String(user.devicesUsed), c: user.deviceLimit > 0 && user.devicesUsed >= user.deviceLimit ? "up-warn" : "" },

@@ -47,7 +47,8 @@ const now = Math.floor(Date.now() / 1000);
 const DAY = 86400;
 const GB = 1e9;
 
-type Spec = { n: string; g: "family" | "friends"; du: number; dm: number; gb: number; q: number; days: number; node?: string; last: number; st?: "over" | "soon" | "exp" | "off" | "new"; via?: App[]; devs: [string, string, boolean?][] };
+// x: the extra groups of the person, by the id of the group ("colleagues" is in moreGroups)
+type Spec = { x?: string[]; n: string; g: "family" | "friends"; du: number; dm: number; gb: number; q: number; days: number; node?: string; last: number; st?: "over" | "soon" | "exp" | "off" | "new"; via?: App[]; devs: [string, string, boolean?][] };
 
 const phone = (n: string, app = "Happ"): [string, string] => [n, app];
 const crowd: Spec[] = [
@@ -68,6 +69,8 @@ const MORE_DEVS: [string, string][] = [["Phone", "Happ"], ["Laptop", "Mistgate f
 /** States that show the ten people of the board (more than the three of the list). */
 const BIG = new Set(["many", "open-erin", "open-heidi", "ten", "open-ten", "sorted", "filter-expiring", "filter-over"]);
 const tenOf = (state: string, s: Spec): Spec => {
+  // state extra: alice is in family and, besides, in friends and colleagues (the list shows "+2" after her group)
+  if (state === "extra" && s.n === "alice") return { ...s, x: ["friends", "colleagues"] };
   if (state !== "ten" && state !== "open-ten") return s;
   const du = TEN[s.n] ?? s.du;
   return { ...s, du, dm: 10, devs: du === 0 ? [] : s.n === "alice" ? [...s.devs, ...MORE_DEVS.slice(0, du - s.devs.length)] : MORE_DEVS.slice(0, du).map(([m, c], i) => [m, c, i === 0 && !!s.node] as [string, string, boolean]) };
@@ -93,9 +96,9 @@ const protocols = [
   { id: "mtproto", displayName: "MTProto", apps: [App.TELEGRAM] },
 ];
 
-type G = { id: string; name: string; color: string; profileIds: string[]; userCount: number; happNodes: number; amneziaNodes: number; telegramNodes: number; disabledNodeIds: string[]; dnsPresetId: string };
+type G = { id: string; name: string; color: string; profileIds: string[]; userCount: number; extraUserCount: number; happNodes: number; amneziaNodes: number; telegramNodes: number; disabledNodeIds: string[]; dnsPresetId: string };
 const group = (id: string, name: string, color: string, userCount: number, profileIds = ["p_vless", "p_hy", "p_awg", "p_mt"]): G => ({
-  id: `grp_${id}`, name, color, profileIds, userCount, happNodes: profileIds.some((p) => p === "p_vless" || p === "p_hy") ? 4 : 0, amneziaNodes: profileIds.includes("p_awg") ? 4 : 0, telegramNodes: profileIds.includes("p_mt") ? 2 : 0, disabledNodeIds: [], dnsPresetId: "",
+  id: `grp_${id}`, name, color, profileIds, userCount, extraUserCount: 0, happNodes: profileIds.some((p) => p === "p_vless" || p === "p_hy") ? 4 : 0, amneziaNodes: profileIds.includes("p_awg") ? 4 : 0, telegramNodes: profileIds.includes("p_mt") ? 2 : 0, disabledNodeIds: [], dnsPresetId: "",
 });
 const twoGroups = [group("friends", "friends", "sky", 6), group("family", "family", "sand", 4)];
 const moreGroups = [
@@ -110,12 +113,17 @@ const moreGroups = [
   group("old", "old friends", "rose", 5, ["p_vless"]),
 ];
 
+/** The extra groups of a person, in the order of their names (the order the panel sends them in). */
+const extrasOf = (s: Spec) => {
+  const gs = (s.x ?? []).map((id) => moreGroups.find((g) => g.id === `grp_${id}`)!).sort((a, b) => a.name.localeCompare(b.name));
+  return { extraGroupIds: gs.map((g) => g.id), extraGroupNames: gs.map((g) => g.name), extraGroupColors: gs.map((g) => g.color) };
+};
 const userOf = (s: Spec, over: Record<string, unknown> = {}) => {
   const g = s.g === "family" ? twoGroups[1]! : twoGroups[0]!;
   const status = s.st === "off" ? UserStatus.DISABLED : s.st === "exp" ? UserStatus.EXPIRED : s.st === "over" ? UserStatus.LIMITED : UserStatus.ACTIVE;
   const online = !!s.node;
   return {
-    id: `usr_${s.n}`, name: s.n, subscriptionName: "", groupId: g.id, groupName: g.name, groupColor: g.color, status, apps: { happ: true, amnezia: !!s.via?.includes(App.AMNEZIA), telegram: false, mistgate: true },
+    id: `usr_${s.n}`, name: s.n, subscriptionName: "", groupId: g.id, groupName: g.name, groupColor: g.color, ...extrasOf(s), status, apps: { happ: true, amnezia: !!s.via?.includes(App.AMNEZIA), telegram: false, mistgate: true },
     via: s.via ?? [], devicesUsed: s.du, deviceLimit: s.dm, usedBytes: BigInt(Math.round(s.gb * GB)), quotaBytes: BigInt(s.q * GB), quotaReset: QuotaReset.MONTH, nextResetUnix: BigInt(now + 14 * DAY),
     expiresUnix: BigInt(s.days === 0 ? 0 : now + s.days * DAY), lastSeenUnix: BigInt(online ? now - 60 : s.last < 0 ? 0 : now - s.last), online, currentNodeId: s.node ? nodeIds[s.node as keyof typeof nodeIds] : "", currentNodeName: s.node ?? "",
     speedLimitBps: 0n, deviceSpeedLimitBps: 0n, createdUnix: BigInt(now - 60 * DAY), nodes: { all: true, nodeIds: [] }, dnsPresetId: "", accessHapp: true, accessAmnezia: !!s.via?.includes(App.AMNEZIA), accessTelegram: false, telegramIssued: false, devicesIdle: 0, ...over,
@@ -130,7 +138,7 @@ function fakeCalls(state: string, count: number) {
   const everyone = state === "none" ? [] : crowd.slice(0, count).map((s) => tenOf(state, s));
   api.listUsers = async (req: { filter?: UserFilter; query?: string; groupId?: string; pageSize: number; offset?: number; sort?: number; descending?: boolean }) => {
     const q = (req.query ?? "").toLowerCase();
-    let list = everyone.filter((s) => !q || s.n.includes(q) || s.g.includes(q)).filter((s) => !req.groupId || `grp_${s.g}` === req.groupId);
+    let list = everyone.filter((s) => !q || s.n.includes(q) || s.g.includes(q)).filter((s) => !req.groupId || `grp_${s.g}` === req.groupId || (s.x ?? []).some((x) => `grp_${x}` === req.groupId));
     const f = req.filter;
     list = f === UserFilter.ONLINE ? list.filter((s) => s.node) : f === UserFilter.EXPIRING ? list.filter((s) => s.st === "soon") : f === UserFilter.OVER_QUOTA ? list.filter((s) => s.st === "over") : list;
     const dir = req.descending ? -1 : 1;
@@ -164,7 +172,7 @@ export function seeded(state: string, role: Role) {
   fakeCalls(state, BIG.has(state) ? 10 : count);
   const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnWindowFocus: false, refetchInterval: false } } });
   const list = state === "none" ? [] : crowd.slice(0, BIG.has(state) ? 10 : 3).map((s) => tenOf(state, s));
-  const gs = state === "groups-empty" ? [] : state === "groups-many" ? moreGroups : twoGroups;
+  const gs = state === "groups-empty" ? [] : state === "groups-many" || state === "extra" ? moreGroups : twoGroups;
   c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", displayName: "owner", role }, version: "0.1.71", sourceUrl: "https://github.com/example/mistgate", sourceStars: 298, stepUpUntilUnix: 0 } as never);
   c.setQueryData(nodesQuery.queryKey, { nodes: nodes.map((n) => ({ ...n, location: "", provider: "", notes: "", address: "203.0.113.7", reason: undefined, protocols: [], online: [], trafficTodayBytes: 0, hasMetrics: false, cpuPct: 0, uptimeS: 0, lastSeenUnix: now })), expectedAgentVersion: "0.1.71" } as never);
   c.setQueryData(overviewQuery().queryKey, { nodesTotal: 4, nodes: nodes.map((n) => ({ id: n.id, name: n.name, countryCode: n.countryCode, location: "", status: n.status, online: [], sparkBytes: [] })), alertsActive: 0, alertsCritical: 0 } as never);
@@ -217,7 +225,7 @@ const bar = (state: string) => {
 /** The edit window of a group that a scene opens over the Groups tab (the app opens it from the user card, the profile page and "New person"). */
 export const editOf: Record<string, { group: G; demo?: GroupEditDemo }> = {
   "group-edit": { group: twoGroups[0]! },
-  "group-edit-lose": { group: twoGroups[0]!, demo: { impact: { users: 6, lost: [{ id: "p_awg", name: "AmneziaWG 3.1", protocol: "awg", awgDevices: 3 }], gained: [] } as never } },
+  "group-edit-lose": { group: twoGroups[0]!, demo: { impact: { users: 6, lost: [{ id: "p_awg", name: "AmneziaWG 3.1", protocol: "awg", awgDevices: 3 }], gained: [], gainedNodeIds: [], lostNodeIds: [] } as never } },
   // msk1 is held back and this group was not given it: it is off here, and a save that switches it on is refused
   "group-edit-held": { group: { ...twoGroups[0]!, disabledNodeIds: ["nod_msk1"] }, demo: { held: "nod_msk1" } },
 };
@@ -265,6 +273,10 @@ export function UsersPage() {
 
 export const frames: { id: string; state: string; title: string; w: number; h: number; params?: string }[] = [
   { id: "users-list", state: "list", title: "The board's three people (1440)", w: 1440, h: 720 },
+  { id: "users-extra", state: "extra", title: "Alice is in family and, besides, in friends and colleagues: the chip and +2", w: 1440, h: 720 },
+  { id: "users-extra-light", state: "extra", title: "The same on the light theme", w: 1440, h: 720, params: "&theme=light" },
+  { id: "users-extra-1000", state: "extra", title: "A 1000 window: the group column is narrower, +2 stays", w: 1000, h: 720 },
+  { id: "users-extra-phone", state: "extra", title: "A phone: the group column is gone", w: 400, h: 780 },
   { id: "users-list-light", state: "list", title: "The same on the light theme", w: 1440, h: 720, params: "&theme=light" },
   { id: "users-list-1000", state: "list", title: "A 1000 window: the rail, the card narrows (no last-online, no dots)", w: 1000, h: 720 },
   { id: "users-list-800", state: "list", title: "A 800 window: no group, no devices", w: 800, h: 720 },
