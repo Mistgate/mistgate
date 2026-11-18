@@ -1,0 +1,203 @@
+/*
+ * The reach card under the WARP card of the Exit tab (screens/node/warp-reach.tsx): a head like the WARP card's, one row a site, a quiet
+ * note where there is nothing to list. The board has no card of its own for it, so the pieces are the board's: the head (.nx-ch, .nd-wi,
+ * .nd-wt), the rows of the three-row list (.nx-li: a glyph box, the words, the state at the end), the plain line (.nx-warn). The card is
+ * a container (`nxw`, as the WARP card is), so its own width decides the rows. No effects of its own: the pills fade as they all do.
+ */
+
+.nrc > .nx-ch {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: start;
+}
+.nrc > .nx-ch > .pillw {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  margin: 0;
+}
+.nrc .nrc-wi {
+  background: var(--tone-sky-bg);
+  color: var(--tone-sky);
+}
+
+/* the sites: a framed list, a row a site */
+.nrc-ls {
+  display: flex;
+  flex-direction: column;
+  margin: 0 24px;
+  padding: 0;
+  list-style: none;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  transition: opacity 0.3s var(--e);
+}
+.nrc-ls.dim {
+  opacity: 0.55;
+}
+.nrc-li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding-block: 8px;
+  padding-inline: 10px 14px;
+}
+.nrc-li + .nrc-li {
+  border-top: 1px solid var(--border);
+}
+.nrc-li > .g {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--step);
+  color: var(--sec);
+}
+.nrc-li > .g.ok {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.nrc-li > .g.bad {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+.nrc-li > .g.warn {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+.nrc-li > .d {
+  min-width: 0;
+}
+.nrc-li > .d b {
+  display: block;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.nrc-li > .d em {
+  display: block;
+  margin-top: 1px;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.nrc-li[data-verdict="blocked"] > .d em {
+  color: var(--danger-text);
+}
+
+/* what to try, under a list with a block page in it */
+.nrc-tip {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  margin: 12px 24px 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.nrc-tip > svg {
+  margin-top: 1px;
+  color: var(--warning-text);
+}
+
+/* nothing to list: the reason, and the way on when there is one */
+.nrc-note {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin: 0 24px;
+  padding: 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.nrc-note > .g {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--sec);
+}
+.nrc-note b {
+  display: block;
+  font-weight: 500;
+  line-height: 20px;
+}
+.nrc-note > div > span {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.nrc-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.nrc .nrc-wa {
+  margin: 0 24px 12px;
+}
+
+/* the line of buttons and the link to the list */
+.nrc-act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 16px 24px 4px;
+}
+.nrc-lk {
+  margin-inline-start: auto;
+  font-size: 13px;
+  color: var(--sec);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.nrc-lk:hover {
+  color: var(--text);
+}
+.nrc .nx-warn {
+  margin-top: 16px;
+}
+
+@container nxw (max-width: 560px) {
+  .nrc-ls,
+  .nrc-note,
+  .nrc-tip,
+  .nrc .nrc-wa {
+    margin-inline: 16px;
+  }
+  .nrc-act {
+    padding: 12px 16px 0;
+  }
+  .nrc .nx-warn {
+    margin-top: 12px;
+  }
+  .nrc-li {
+    gap: 10px;
+    padding-inline: 8px 12px;
+  }
+  .nrc-note {
+    grid-template-columns: 32px minmax(0, 1fr);
+    padding: 12px;
+  }
+  .nrc-note > .g {
+    width: 32px;
+    height: 32px;
+  }
+  .nrc-lk {
+    margin-inline-start: 0;
+  }
+}

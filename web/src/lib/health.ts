@@ -132,6 +132,8 @@ export function alertWhy(t: T, fmt: Fmt, a: Alert): string {
   if (a.kind === AlertKind.UPDATE_FAILED && a.params.reason) params.reason = pauseReasonText(t, a.params.reason);
   // a stopped OS update names the step's error key (and the node's job code): say it in words
   if (a.kind === AlertKind.OS_UPDATE_FAILED) params.reason = osAlertReason(t, a.params);
+  // a run whose trace failed has no colo ("exit ."): say so in a word
+  if (a.kind === AlertKind.WARP_REACH && !params.colo) params.colo = t("warp.reach.coloNone");
   if (a.kind === AlertKind.NODE_DOWN && a.params.minutes) params.duration = fmt.duration(Number(a.params.minutes) * 60);
   if (a.kind === AlertKind.ACCESS_ENDED && Number(a.params.since) > 0) params.date = fmt.stamp(Number(a.params.since));
   if (a.kind === AlertKind.USERS_IMPACTED) params.protocol = protocolName(a.subject);
