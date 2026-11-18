@@ -5,7 +5,6 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { DeviceKind } from "@/gen/mistgate/admin/v1/user_pb";
-import { WaysOfGroup } from "./groups";
 import type { DeviceN, UserN } from "./model";
 import { TelegramSection } from "./telegram-proxy";
 import { DevicesPanel } from "./user-devices";
@@ -122,18 +121,5 @@ describe("the devices of a person with a Telegram key", () => {
     expect(text()).toContain("2 of 3");
     expect(text()).not.toContain("Apps without a device ID");
     expect(text()).toContain("Telegram key");
-  });
-});
-
-describe("the ways a person's group gives", () => {
-  it("lists MTProto in a Telegram row of its own, not in the subscription, which reads plainly with no app on the page", async () => {
-    const profiles = [
-      { id: "p_hy", name: "Main · 443", protocol: "hysteria2" },
-      { id: "p_tg", name: "Telegram · 443", protocol: "mtproto" },
-    ];
-    await mount(<WaysOfGroup profiles={profiles} compact />);
-    const lines = [...document.querySelectorAll(".items-start")].map((r) => r.textContent);
-    expect(lines[0]).toBe("SubscriptionMain · 443");
-    expect(lines.at(-1)).toBe("Telegram ProxyTelegram · 443");
   });
 });

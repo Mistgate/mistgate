@@ -1,28 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import type { AccessImpact } from "@/gen/mistgate/admin/v1/user_pb";
-import type { ProfileFormat } from "@/gen/mistgate/admin/v1/profile_pb";
-import { IconChip, type IconName, type Tone } from "@/components/ui/icons";
+import { type IconName, type Tone } from "@/components/ui/icons";
 import { cx } from "@/lib/cx";
-import { FormatDrops } from "@/screens/profiles/formats";
-import { useLinkAppList } from "@/screens/subscriptions/queries";
-import { telegramOnly, trustTunnelOnly } from "@/screens/profiles/protocol-meta";
-import { protocolsQuery } from "./rpc";
 import { useTx } from "./t";
 
 // The Groups tab of the users screen and the pieces every screen shows about a group: what it gives (the two ways,
 // "Подписка" and "Ключ AmneziaVPN"), its profiles as links. The windows to make and edit one are users-group-new.tsx.
 
 // ---- the two ways ----
-
-/** "Subscription (Happ, kl!ck)": the way by the link with the apps on it; just "Subscription" when the page lists none. */
-function useSubLabel(): string {
-  const t = useTx();
-  const names = useLinkAppList();
-  return names.length > 0 ? t("users.reachSub", { apps: names.join(", ") }) : t("users.reachSubPlain");
-}
 
 /** How a person gets a profile: by the subscription link (in any app that takes it) or by an AmneziaVPN key per device. */
 export type Way = "sub" | "awg";
@@ -50,102 +37,6 @@ export function ProfileLink({ id, name, className }: { id: string; name: string;
     >
       <span className="truncate">{name}</span>
     </Link>
-  );
-}
-
-/**
- * The profiles of a group sorted into the two ways, each a row with its tinted mark, its label (and, with `reach`, on how
- * many nodes it works now) and the profiles as links. A way without a profile says so, quietly. With `drops` (the user
- * card) a link profile that some subscription format leaves out carries the yellow mark of it ("not in sing-box: XHTTP").
- */
-export function WaysOfGroup({
-  profiles,
-  reach,
-  compact,
-  drops,
-}: {
-  profiles: { id: string; name: string; protocol: string; formats?: ProfileFormat[] }[];
-  reach?: { sub: number; awg: number };
-  compact?: boolean;
-  drops?: boolean;
-}) {
-  const t = useTx();
-  const protocols = useQuery(protocolsQuery);
-  const sub = useSubLabel();
-  // MTProto reaches people by its own tg:// links, never through the subscription: a row of its own, when the group has one
-  const tgOnly = (p: { protocol: string }) => {
-    const apps = protocols.data?.find((x) => x.id === p.protocol)?.apps;
-    return apps ? telegramOnly(apps) : p.protocol === "mtproto";
-  };
-  // TrustTunnel too: its tt:// keys are the person's own, on their page, and not in the subscription
-  const ttOnly = (p: { protocol: string }) => {
-    const apps = protocols.data?.find((x) => x.id === p.protocol)?.apps;
-    return apps ? trustTunnelOnly(apps) : p.protocol === "trusttunnel";
-  };
-  const of = (w: Way) => profiles.filter((p) => !tgOnly(p) && !ttOnly(p) && wayOf(p.protocol, protocols.data) === w);
-  const tg = profiles.filter(tgOnly);
-  const tt = profiles.filter(ttOnly);
-  return (
-    <div className={cx("flex flex-col", compact ? "gap-2.5" : "gap-3")}>
-      {(["sub", "awg"] as const).map((w) => {
-        const list = of(w);
-        const n = reach?.[w];
-        return (
-          <div key={w} className="flex items-start gap-2.5">
-            <IconChip icon={wayMark[w].icon} tone={wayMark[w].tone} size={22} className="mt-px" />
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <span className="text-xs leading-[22px] font-bold">
-                {w === "sub" ? sub : t("users.reachAwg")}
-                {n !== undefined && list.length > 0 && (
-                  <span className={cx("font-semibold", n > 0 ? "text-muted" : "text-warn-text")}> · {n > 0 ? t.n("users.reachNodes", n) : t(w === "sub" ? "users.reachNoSub" : "users.reachNoAwg")}</span>
-                )}
-                {list.length === 0 && <span className="font-semibold text-faint"> · {t("where.dash")}</span>}
-              </span>
-              {list.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {list.map((p) =>
-                    drops && w === "sub" && p.formats?.some((f) => !f.ok) ? (
-                      <span key={p.id} className="inline-flex max-w-full flex-wrap items-center gap-1">
-                        <ProfileLink id={p.id} name={p.name} />
-                        <FormatDrops formats={p.formats} t={t} />
-                      </span>
-                    ) : (
-                      <ProfileLink key={p.id} id={p.id} name={p.name} />
-                    ),
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-      {tg.length > 0 && (
-        <div className="flex items-start gap-2.5">
-          <IconChip icon="plane" tone="rose" size={22} className="mt-px" />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="text-xs leading-[22px] font-bold">{t("tgproxy.toggle")}</span>
-            <div className="flex flex-wrap gap-1.5">
-              {tg.map((p) => (
-                <ProfileLink key={p.id} id={p.id} name={p.name} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-      {tt.length > 0 && (
-        <div className="flex items-start gap-2.5">
-          <IconChip icon="tunnel" tone="sage" size={22} className="mt-px" />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="text-xs leading-[22px] font-bold">{t("tt.toggle")}</span>
-            <div className="flex flex-wrap gap-1.5">
-              {tt.map((p) => (
-                <ProfileLink key={p.id} id={p.id} name={p.name} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 
