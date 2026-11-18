@@ -4,7 +4,7 @@ import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { zh } from "@/i18n/zh";
 import { DnsCategory, DnsClient, DnsServerKind, DnsTransport } from "@/gen/mistgate/admin/v1/dns_pb";
-import { appResults, formatDescKey, formatKey, ruleFormats, catalogOf, chipCountry, chipLabel, chipOf, cleanSplit, countryName, geoChoices, toggleGeo, cutAnnounce, dnsChips, describePreset, flagOf, move, parseSuffixes, presetLook, presetName, presetProblem, presetSubtitle, previewUrl, splitFirst, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
+import { appResults, formatDescKey, formatKey, ruleFormats, catalogOf, chipCountry, chipLabel, chipOf, cleanSplit, countryName, geoChoices, toggleGeo, cutAnnounce, dnsChips, describePreset, flagOf, move, parseSuffixes, presetName, presetProblem, presetSubtitle, previewUrl, splitFirst, providerName, renderName, serverNames, serverProblem, transportOrder, unicodeSuffix, validDownload, validSupportLink, variantLabel, variantServer, type ClientSupport, type Provider } from "./model";
 
 describe("move", () => {
   it("moves one element and leaves the input alone", () => {
@@ -320,21 +320,12 @@ describe("the subtitle and the look of a catalog preset", () => {
     const custom = [{ kind: DnsServerKind.PLAIN, address: "1.1.1.1", providerVariant: "" }];
     expect(presetSubtitle({ servers: custom, split: [], splitDirect: false, preferredTransport: DnsTransport.DOH }, direct, catalog, name)).toBe("Cloudflare");
   });
-  it("takes the glyph of the category unless the preset has its own", () => {
-    expect(presetLook({ id: "dns_builtin_cloudflare_family", category: DnsCategory.FAMILY }).glyph).toBe("family");
-    expect(presetLook({ id: "dns_builtin_ru_split", category: DnsCategory.REGIONAL }).tone).toBe("sky");
-    expect(presetLook({ id: "dns_custom", category: DnsCategory.REGIONAL }).glyph).toBe("map");
-    expect(presetLook({ id: "dns_x", category: DnsCategory.UNSPECIFIED })).toEqual({ glyph: "server", tone: "muted" });
-  });
-  it("names the built-in that blocks ads on the device in the three languages and gives it the no-ads glyph", () => {
+  it("names the built-in that blocks ads on the device in the three languages", () => {
     const stock = { id: "dns_builtin_ads_device", name: "Без рекламы на устройстве" };
     expect(presetName(stock, "ru")).toBe("Без рекламы на устройстве");
     expect(presetName(stock, "en")).toBe("No ads on the device");
     expect(presetName(stock, "zh")).toBe("设备端拦截广告");
     expect(presetName({ ...stock, name: "Мой без рекламы" }, "en")).toBe("Мой без рекламы");
-    expect(presetLook({ id: stock.id, category: DnsCategory.NO_ADS }).glyph).toBe("shieldOff");
-    // it does not look like AdGuard next to it
-    expect(presetLook({ id: stock.id }).tone).not.toBe(presetLook({ id: "dns_builtin_adblock" }).tone);
     for (const dict of [en, ru, zh] as Record<string, string>[]) {
       for (const k of ["subs.dns.blockAds", "subs.dns.blockAdsHint", "subs.dns.blockAdsTag", "subs.dns.awgNoBlock"]) expect(dict[k]).toBeTruthy();
     }

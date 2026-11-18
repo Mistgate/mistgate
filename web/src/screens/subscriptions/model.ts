@@ -417,7 +417,6 @@ export function parseSuffixes(text: string): string[] {
   return [...new Set(text.toLowerCase().split(/[\s,;]+/).filter(Boolean))];
 }
 
-
 // A client-side look at a server address. It is here to tell the admin early and is lenient: the panel's own check
 // (internal/panel/dns/validate.go) has the last word.
 const hostRe = /^(?=.{1,253}$)[\p{L}\p{N}]([\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?(\.[\p{L}\p{N}]([\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?)*$/u;
@@ -542,31 +541,6 @@ export function shortAddress(kind: DnsServerKind, address: string): string {
     return address;
   }
 }
-
-/** What a card's glyph stands for: the built-in presets by id, anything else is a plain resolver. */
-export type PresetLook = { glyph: "map" | "globe" | "shieldOff" | "family" | "bugShield" | "letter" | "server"; tone: "sky" | "lavender" | "mint" | "sand" | "sage" | "rose" | "muted" };
-const looks: Record<string, PresetLook> = {
-  dns_builtin_ru_split: { glyph: "map", tone: "sky" },
-  dns_builtin_ru_proxied: { glyph: "map", tone: "lavender" },
-  dns_builtin_cn_split: { glyph: "map", tone: "mint" },
-  dns_builtin_standard: { glyph: "globe", tone: "mint" },
-  dns_builtin_adblock: { glyph: "shieldOff", tone: "sand" },
-  dns_builtin_ads_device: { glyph: "shieldOff", tone: "lavender" },
-  dns_builtin_family: { glyph: "family", tone: "sage" },
-  dns_builtin_quad9: { glyph: "bugShield", tone: "rose" },
-  dns_builtin_yandex: { glyph: "letter", tone: "sand" },
-  dns_builtin_yandex_family: { glyph: "letter", tone: "sage" },
-  dns_builtin_yandex_safe: { glyph: "letter", tone: "rose" },
-};
-const categoryLooks: Partial<Record<DnsCategory, PresetLook>> = {
-  [DnsCategory.REGIONAL]: { glyph: "map", tone: "sky" },
-  [DnsCategory.REGULAR]: { glyph: "globe", tone: "mint" },
-  [DnsCategory.NO_ADS]: { glyph: "shieldOff", tone: "sand" },
-  [DnsCategory.FAMILY]: { glyph: "family", tone: "sage" },
-  [DnsCategory.SECURITY]: { glyph: "bugShield", tone: "rose" },
-};
-/** The glyph of a preset: the first built-ins keep their own, the rest take the look of their category. */
-export const presetLook = (p: { id: string; category?: DnsCategory }): PresetLook => looks[p.id] ?? categoryLooks[p.category ?? DnsCategory.UNSPECIFIED] ?? { glyph: "server", tone: "muted" };
 
 // The built-in presets have one stored name (Russian). Any other UI language shows these while the stored name is still
 // the stock one; a name an admin edited is shown as stored. The Chinese names are the ones the user page shows
