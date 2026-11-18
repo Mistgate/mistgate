@@ -45,7 +45,9 @@ export function AddNodeShell({ open, onOpenChange, children }: { open: boolean; 
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-50 animate-[wn-fade_0.25s_var(--e)_backwards] bg-(--scrim) transition-opacity duration-200 data-ending-style:opacity-0" />
-        <Dialog.Viewport className="fixed inset-0 z-50 flex justify-center overflow-y-auto px-6 pt-14 pb-6 max-[760px]:p-3 max-[720px]:items-end max-[720px]:p-0">
+        {/* the board hangs the window 56 px from the top; on a tall screen that reads as stuck to the top, so it hangs where the
+            tallest step (about 720 px) would sit in the middle: near the middle, and the steps still do not make it jump */}
+        <Dialog.Viewport className="fixed inset-0 z-50 flex justify-center overflow-y-auto px-6 pt-[max(56px,calc((100dvh-720px)/2))] pb-6 max-[760px]:p-3 max-[720px]:items-end max-[720px]:p-0">
           <div className="an-host h-fit max-[720px]:max-w-none">
             <Dialog.Popup
               ref={popup}
