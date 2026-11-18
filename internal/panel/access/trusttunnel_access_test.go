@@ -214,7 +214,7 @@ func TestTrustTunnelRelayIsUsableOnlyInTheMistgateFormat(t *testing.T) {
 		Profile: store.AccessProfile{ID: "prf_tt", Protocol: "trusttunnel"},
 		Node:    store.AccessNode{ID: "nod_de1", State: "active"},
 	}
-	group := store.AccessGroup{ProfileIDs: []string{"prf_tt"}}
+	group := store.AccessGroups{{ProfileIDs: []string{"prf_tt"}}}
 	user := store.AccessUser{NodeIDs: []string{"nod_de1", "nod_fi1"}, AppHapp: true}
 	if !e.s.relayUsableFor(link, exit, group, user, plugin.FormatMistgate) {
 		t.Fatal("the app is refused the relay twin of a TrustTunnel server")

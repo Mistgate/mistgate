@@ -67,7 +67,7 @@ func relayStoreProof(t *testing.T, st *Store) {
 	relayExec(t, st, `INSERT INTO user_group (id, name, created_at) VALUES ('grp_a', 'a', 1)`)
 	subRelays := func(active bool) []RelayLink {
 		t.Helper()
-		d, err := st.Access().SubscriptionData(ctx, "usr_none", "grp_a", now, active, now, nil)
+		d, err := st.Access().SubscriptionData(ctx, "usr_none", now, active, now, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

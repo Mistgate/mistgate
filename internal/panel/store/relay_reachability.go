@@ -26,8 +26,10 @@ type RelayReachabilityGroup struct {
 	ProfileIDs, DisabledNodeIDs []string
 }
 
+// RelayReachabilityUser is a person with the ids of their groups (the main one first, any may be unknown to the snapshot).
 type RelayReachabilityUser struct {
-	ID, GroupID        string
+	ID                 string
+	GroupIDs           []string
 	Disabled, AllNodes bool
 	NodeIDs            []string
 }
@@ -104,17 +106,14 @@ func (r RelayReachability) UserHasHealthyRelay(userID, inboundID string) bool {
 	if !ok || u.Disabled {
 		return false
 	}
-	g, ok := r.groupsByID[u.GroupID]
-	if !ok {
-		return false
-	}
+	gs := r.groupsOf(u)
 	x, ok := r.inboundsByID[inboundID]
 	if !ok || !RelayTargetInbound(x.Protocol, x.CDN) {
 		return false
 	}
 	for _, relay := range r.relaysByInbound[inboundID] {
 		if relay.ExitID != x.NodeID || !relayReachabilityHealthy(relay, r.Input.NowUnix, r.Input.HealthIntervalS) || !relay.EntryUsable ||
-			!GroupGetsNode(g.DisabledNodeIDs, relay.EntryID) || !relayUserCanUseNode(u, relay.EntryID) {
+			!gs.Gives(x.ProfileID, x.NodeID, relay.EntryID) || !relayUserCanUseNode(u, relay.EntryID) {
 			continue
 		}
 		return true
@@ -122,18 +121,24 @@ func (r RelayReachability) UserHasHealthyRelay(userID, inboundID string) bool {
 	return false
 }
 
+// groupsOf are the person's groups the snapshot knows, as access groups with the profiles and nodes they hand out.
+func (r RelayReachability) groupsOf(u RelayReachabilityUser) AccessGroups {
+	var out AccessGroups
+	for _, id := range u.GroupIDs {
+		if g, ok := r.groupsByID[id]; ok {
+			out = append(out, AccessGroup{ID: g.ID, ProfileIDs: g.ProfileIDs, DisabledNodeIDs: g.DisabledNodeIDs})
+		}
+	}
+	return out
+}
+
 func (r RelayReachability) UserGiven(userID, inboundID string) bool {
 	u, ok := r.usersByID[userID]
 	if !ok || u.Disabled {
 		return false
 	}
-	g, ok := r.groupsByID[u.GroupID]
-	if !ok {
-		return false
-	}
 	x, ok := r.inboundsByID[inboundID]
-	if !ok || !x.Enabled || x.State == "disabled" || !slices.Contains(g.ProfileIDs, x.ProfileID) ||
-		!GroupGetsNode(g.DisabledNodeIDs, x.NodeID) || !relayUserCanUseNode(u, x.NodeID) {
+	if !ok || !x.Enabled || x.State == "disabled" || !r.groupsOf(u).Gives(x.ProfileID, x.NodeID) || !relayUserCanUseNode(u, x.NodeID) {
 		return false
 	}
 	return x.Direct || x.CDN || r.UserHasHealthyRelay(userID, inboundID)
@@ -202,10 +207,12 @@ func (a Access) RelayReachabilityUsers(ctx context.Context) ([]RelayReachability
 	for rows.Next() {
 		var u RelayReachabilityUser
 		var dis, all int
-		if err := rows.Scan(&u.ID, &u.GroupID, &dis, &all); err != nil {
+		var groupID string
+		if err := rows.Scan(&u.ID, &groupID, &dis, &all); err != nil {
 			rows.Close()
 			return nil, err
 		}
+		u.GroupIDs = []string{groupID}
 		u.Disabled, u.AllNodes = dis != 0, all != 0
 		idx[u.ID] = len(out)
 		out = append(out, u)

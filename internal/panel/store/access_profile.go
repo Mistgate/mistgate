@@ -531,6 +531,98 @@ func GroupGetsNode(disabledNodeIDs []string, nodeID string) bool {
 // GetsNode is GroupGetsNode for the group.
 func (g AccessGroup) GetsNode(nodeID string) bool { return GroupGetsNode(g.DisabledNodeIDs, nodeID) }
 
+// AccessGroups are the groups of one person: the main one first. The person gets what each of them hands out, pair by pair:
+// profile P on node N comes from a group that holds P and gets N, the same group for both. The one rule of what a person is
+// given asks Gives (in SQL the same rule is the granted pairs of DesiredCreds). A person in one group gets exactly what the
+// group hands out.
+type AccessGroups []AccessGroup
+
+// Gives reports whether some group holds the profile and gets every one of the nodes: the node of the inbound and, for a twin
+// served through a relay, its entry node as well, all through the same group.
+func (gs AccessGroups) Gives(profileID string, nodeIDs ...string) bool {
+	return slices.ContainsFunc(gs, func(g AccessGroup) bool {
+		return slices.Contains(g.ProfileIDs, profileID) && !slices.ContainsFunc(nodeIDs, func(id string) bool { return !g.GetsNode(id) })
+	})
+}
+
+// Holds reports whether some group holds the profile, wherever it is deployed.
+func (gs AccessGroups) Holds(profileID string) bool {
+	return slices.ContainsFunc(gs, func(g AccessGroup) bool { return slices.Contains(g.ProfileIDs, profileID) })
+}
+
+// ProfileIDs are the profiles of all the groups, sorted, each once.
+func (gs AccessGroups) ProfileIDs() []string {
+	var out []string
+	for _, g := range gs {
+		out = append(out, g.ProfileIDs...)
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// GroupsOf picks the person's groups out of all groups by id: the main one first. A group that is not in the map (it was
+// deleted since the person was read) is skipped.
+func GroupsOf(u AccessUser, byID map[string]AccessGroup) AccessGroups {
+	out := make(AccessGroups, 0, 1)
+	if g, ok := byID[u.GroupID]; ok {
+		out = append(out, g)
+	}
+	return out
+}
+
+// groupItem is one row of a group's profile list or disabled-node list: the group and the profile or node id.
+type groupItem struct{ group, id string }
+
+func scanGroupItem(r rowScanner) (groupItem, error) {
+	var group, id sql.NullString
+	if err := r.Scan(&group, &id); err != nil {
+		return groupItem{}, err
+	}
+	return groupItem{group.String, id.String}, nil
+}
+
+// groupsWithLists fills the groups (in the order given) with their profile and disabled-node rows, which keep their order.
+func groupsWithLists(groups []AccessGroup, profiles, disabled []groupItem) AccessGroups {
+	idx := make(map[string]int, len(groups))
+	for i := range groups {
+		groups[i].ProfileIDs, groups[i].DisabledNodeIDs = []string{}, []string{}
+		idx[groups[i].ID] = i
+	}
+	for _, p := range profiles {
+		if i, ok := idx[p.group]; ok {
+			groups[i].ProfileIDs = append(groups[i].ProfileIDs, p.id)
+		}
+	}
+	for _, d := range disabled {
+		if i, ok := idx[d.group]; ok {
+			groups[i].DisabledNodeIDs = append(groups[i].DisabledNodeIDs, d.id)
+		}
+	}
+	return groups
+}
+
+// accUserGroupIDs is the SQL list of the ids of one person's groups, where userExpr is the SQL of the person's id (a
+// placeholder, or a subquery of one).
+func accUserGroupIDs(userExpr string) string {
+	return `SELECT group_id FROM user WHERE id = ` + userExpr
+}
+
+// UserGroups reads the person's groups, the main one first; ErrNotFound when the main group is gone.
+func (a Access) UserGroups(ctx context.Context, u AccessUser) (AccessGroups, error) {
+	all, err := a.groups(ctx, []string{u.GroupID})
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[string]AccessGroup, len(all))
+	for _, g := range all {
+		byID[g.ID] = g
+	}
+	if _, ok := byID[u.GroupID]; !ok {
+		return nil, ErrNotFound
+	}
+	return GroupsOf(u, byID), nil
+}
+
 // GroupTones is the palette of a group's colour, in the order the admin offers it and the order a new group takes the least
 // used tone in (ties go to the earlier one). Sky and mint come last: they are also the Link and Keys chips.
 var GroupTones = []string{"lavender", "sand", "sage", "rose", "sky", "mint"}
@@ -595,12 +687,16 @@ func accSetGroupDisabledNodeStmts(groupID string, nodeIDs []string) []Stmt {
 
 // Groups returns all groups with their profile ids and user counts, ordered by name.
 func (a Access) Groups(ctx context.Context) ([]AccessGroup, error) {
-	return a.groups(ctx, "")
+	return a.groups(ctx, nil)
 }
 
 // Group returns one group, or ErrNotFound.
 func (a Access) Group(ctx context.Context, id string) (AccessGroup, error) {
-	gs, err := a.groups(ctx, id)
+	var ids []string
+	if id != "" {
+		ids = []string{id}
+	}
+	gs, err := a.groups(ctx, ids)
 	if err != nil {
 		return AccessGroup{}, err
 	}
@@ -610,10 +706,12 @@ func (a Access) Group(ctx context.Context, id string) (AccessGroup, error) {
 	return gs[0], nil
 }
 
-func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
+// groups reads the groups with the given ids (every group when ids is empty), ordered by name.
+func (a Access) groups(ctx context.Context, ids []string) ([]AccessGroup, error) {
+	list := accJSON(ids)
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id), g.dns_preset_id, g.color
-		 FROM user_group g WHERE (? = '' OR g.id = ?) ORDER BY g.name`, id, id)
+		 FROM user_group g WHERE (json_array_length(?1) = 0 OR g.id IN (SELECT value FROM json_each(?1))) ORDER BY g.name`, list)
 	if err != nil {
 		return nil, err
 	}
@@ -635,7 +733,7 @@ func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
 		return nil, err
 	}
 	prow, err := a.s.R.QueryContext(ctx,
-		`SELECT group_id, profile_id FROM user_group_profile WHERE (? = '' OR group_id = ?) ORDER BY profile_id`, id, id)
+		`SELECT group_id, profile_id FROM user_group_profile WHERE (json_array_length(?1) = 0 OR group_id IN (SELECT value FROM json_each(?1))) ORDER BY profile_id`, list)
 	if err != nil {
 		return nil, err
 	}
@@ -655,7 +753,7 @@ func (a Access) groups(ctx context.Context, id string) ([]AccessGroup, error) {
 	}
 	prow.Close()
 	drows, err := a.s.R.QueryContext(ctx,
-		`SELECT group_id, node_id FROM user_group_disabled_node WHERE (? = '' OR group_id = ?) ORDER BY node_id`, id, id)
+		`SELECT group_id, node_id FROM user_group_disabled_node WHERE (json_array_length(?1) = 0 OR group_id IN (SELECT value FROM json_each(?1))) ORDER BY node_id`, list)
 	if err != nil {
 		return nil, err
 	}

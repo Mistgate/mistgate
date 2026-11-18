@@ -192,7 +192,7 @@ func TestRefusalsAtTheLimitWriteNothing(t *testing.T) {
 		t.Fatalf("rows (devices, credentials, events) before %v, after %v: a refusal wrote", before, after)
 	}
 	// The same through the snapshot of a fetch: it already knows, and the store is not asked.
-	data, err := s.Access().SubscriptionData(ctx, "usr_l", "grp_link", linkNow, true, linkNow, hwidOf("usr_l", 99))
+	data, err := s.Access().SubscriptionData(ctx, "usr_l", linkNow, true, linkNow, hwidOf("usr_l", 99))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,14 +219,14 @@ func TestLinkRefusalLetsTheFirstHWIDAdoptTheSharedDevice(t *testing.T) {
 	if _, err := s.Access().EnsureLinkDevice(ctx, linkDevice("usr_l", "s", nil), 2, linkNow, linkCreds("s", "usr_l")); err != nil {
 		t.Fatal(err)
 	}
-	data, err := s.Access().SubscriptionData(ctx, "usr_l", "grp_link", linkNow, true, linkNow, hwidOf("usr_l", 1))
+	data, err := s.Access().SubscriptionData(ctx, "usr_l", linkNow, true, linkNow, hwidOf("usr_l", 1))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := data.LinkRefusal(2, true, linkNow); err != nil {
 		t.Fatalf("a first HWID at the limit with a shared device = %v, want the store to adopt", err)
 	}
-	shared, err := s.Access().SubscriptionData(ctx, "usr_l", "grp_link", linkNow, true, linkNow, nil)
+	shared, err := s.Access().SubscriptionData(ctx, "usr_l", linkNow, true, linkNow, nil)
 	if err != nil || shared.Device.ID != "dev_s" {
 		t.Fatalf("the snapshot of an app without a HWID holds %q, %v; want the shared device", shared.Device.ID, err)
 	}
@@ -257,7 +257,7 @@ func TestBlockedHashIsNeverBornAgain(t *testing.T) {
 		t.Fatal("a blocked HWID made a device")
 	}
 	// The snapshot says it too, so a refused fetch costs no store call.
-	data, err := s.Access().SubscriptionData(ctx, "usr_l", "grp_link", linkNow, true, linkNow, hash)
+	data, err := s.Access().SubscriptionData(ctx, "usr_l", linkNow, true, linkNow, hash)
 	if err != nil || !data.Blocked {
 		t.Fatalf("SubscriptionData.Blocked = %v, %v", data.Blocked, err)
 	}

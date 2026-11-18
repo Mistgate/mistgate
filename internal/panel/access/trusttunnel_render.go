@@ -12,13 +12,13 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
-func (s *Service) trustTunnelServers(ctx context.Context, u store.AccessUser, g store.AccessGroup, full []store.AccessInboundFull,
+func (s *Service) trustTunnelServers(ctx context.Context, u store.AccessUser, gs store.AccessGroups, full []store.AccessInboundFull,
 	relays []store.RelayLink, secret string, opt SubOptions) ([]SubServer, error) {
 	out := make([]SubServer, 0)
-	relaysByInbound := s.subRelays(relays, full, g, u, plugin.FormatTTLink)
+	relaysByInbound := s.subRelays(relays, full, gs, u, plugin.FormatTTLink)
 	dnsState := s.newNodeDNS(ctx, u.ID)
 	for _, f := range full {
-		if !s.usableForFormat(f, g, u, plugin.FormatTTLink) {
+		if !s.usableForFormat(f, gs, u, plugin.FormatTTLink) {
 			continue
 		}
 		proto, ok := s.reg.Get(f.Profile.Protocol)

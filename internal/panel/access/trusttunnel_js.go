@@ -27,7 +27,7 @@ func (*Service) revokeTrustTunnelKey(context.Context, string, string) error { re
 
 func (*Service) rollbackTrustTunnelKey(context.Context, string, string, bool) {}
 
-func (*Service) trustTunnelServers(context.Context, store.AccessUser, store.AccessGroup, []store.AccessInboundFull,
+func (*Service) trustTunnelServers(context.Context, store.AccessUser, store.AccessGroups, []store.AccessInboundFull,
 	[]store.RelayLink, string, SubOptions) ([]SubServer, error) {
 	return nil, nil
 }

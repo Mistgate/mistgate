@@ -148,7 +148,7 @@ func (s *Service) userProtos(ctx context.Context, users []store.AccessUser) ([]*
 		effID, effName, src := dnsLookup.Resolve(u.DNSPresetID, u.GroupDNSPresetID)
 		out[i].EffectiveDnsPresetId, out[i].EffectiveDnsPresetName, out[i].DnsSource = effID, effName, dns.Source(src).Proto()
 		out[i].GroupColor = groups[u.GroupID].Color
-		out[i].AccessHapp, out[i].AccessAmnezia, out[i].AccessTelegram, _ = s.accessOf(u, groups[u.GroupID], full)
+		out[i].AccessHapp, out[i].AccessAmnezia, out[i].AccessTelegram, _ = s.accessOf(u, store.GroupsOf(u, groups), full)
 		_, out[i].TelegramIssued = telegramKeys[u.ID]
 		if isOnline {
 			out[i].CurrentNodeId, out[i].CurrentNodeName = cur, nodeName[cur]
@@ -501,20 +501,16 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 		resp.NodeTraffic = append(resp.NodeTraffic, &adminv1.NodeTraffic{NodeId: t.NodeID, NodeName: t.NodeName, Protocol: t.Protocol, Bytes: t.Bytes})
 	}
 
-	g, err := a.Group(ctx, u.GroupID)
+	gs, err := a.UserGroups(ctx, u)
 	if err != nil {
 		return nil, s.internal("group", err)
-	}
-	inGroup := map[string]bool{}
-	for _, id := range g.ProfileIDs {
-		inGroup[id] = true
 	}
 	profs, err := a.Profiles(ctx)
 	if err != nil {
 		return nil, s.internal("profiles", err)
 	}
 	for _, p := range profs {
-		if inGroup[p.ID] {
+		if gs.Holds(p.ID) {
 			ref := &adminv1.ProfileRef{Id: p.ID, Name: p.Name, Protocol: p.Protocol}
 			if proto, ok := s.reg.Get(p.Protocol); ok {
 				if merged, err := s.mergedSettings(p); err == nil { // the formats are a hint: a profile that will not open still shows
@@ -545,7 +541,7 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 			if !slices.Contains(na.NodeProtocols, f.Profile.Protocol) {
 				na.NodeProtocols = append(na.NodeProtocols, f.Profile.Protocol)
 			}
-			if inGroup[f.Profile.ID] && g.GetsNode(n.ID) && (s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia, u.AppTelegram, u.AppTrustTunnel) || !u.AppMistgateOff && s.mistgateConsumes(f.Profile.Protocol)) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
+			if gs.Gives(f.Profile.ID, n.ID) && (s.allowed(f.Profile.Protocol, u.AppHapp, u.AppAmnezia, u.AppTelegram, u.AppTrustTunnel) || !u.AppMistgateOff && s.mistgateConsumes(f.Profile.Protocol)) && !slices.Contains(na.Protocols, f.Profile.Protocol) {
 				na.Protocols = append(na.Protocols, f.Profile.Protocol)
 			}
 		}

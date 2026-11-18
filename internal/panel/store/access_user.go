@@ -767,9 +767,10 @@ type SubscriptionData struct {
 	TrustTunnelCred AccessCred
 	// LinkMode is the stored mode of the device limit (LinkModeTrack, LinkModeEnforce or LinkModeStrict), read in the same batch.
 	// Blocked: the owner blocked the HWID this request reports (always false for a request without one).
-	LinkMode  string
-	Blocked   bool
-	Group     AccessGroup
+	LinkMode string
+	Blocked  bool
+	// Groups are the person's groups, the main one first; read for an active user only.
+	Groups    AccessGroups
 	Inbounds  []AccessInboundFull
 	LiveNodes []NodeLiveRow
 	// Relays are the relays that are switched on, with both ends (a person's twin servers follow them, access.relayUsable); read
@@ -951,7 +952,7 @@ func scanLinkDeviceCred(row rowScanner) (AccessDevice, AccessCred, bool, error) 
 
 // SubscriptionData reads everything a subscription view needs in one read batch. hwidHash selects the request's own device
 // (SubscriptionData.Device): nil for an app that sends no HWID.
-func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, since time.Time, active bool, now time.Time, hwidHash []byte) (SubscriptionData, error) {
+func (a Access) SubscriptionData(ctx context.Context, userID string, since time.Time, active bool, now time.Time, hwidHash []byte) (SubscriptionData, error) {
 	var traffic subscriptionTraffic
 	var devices []AccessDevice
 	var awgDevices []AccessAWGDevice
@@ -959,9 +960,8 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 	var specialKeys []AccessCred
 	var mode string
 	var blocked int
-	var group AccessGroup
-	var groupProfileIDs []string
-	var groupDisabledNodeIDs []string
+	var groups []AccessGroup
+	var groupProfileIDs, groupDisabledNodeIDs []groupItem
 	var inbounds []AccessInboundFull
 	var liveNodes []NodeLiveRow
 	var relays []RelayLink
@@ -989,10 +989,11 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 		r.add(oneRow(&blocked, scanCount), `SELECT count(*) AS n FROM device WHERE user_id = ? AND hwid_hash = ? AND blocked_at IS NOT NULL`, userID, hwidHash)
 	}
 	if active {
-		r.add(oneRow(&group, scanAccessGroup), `SELECT g.id, g.name, g.created_at, (SELECT count(*) FROM user u WHERE u.group_id = g.id) AS user_count,
-			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id = ?`, groupID)
-		r.add(appendRows(&groupProfileIDs, scanString), `SELECT profile_id FROM user_group_profile WHERE group_id = ? ORDER BY profile_id`, groupID)
-		r.add(appendRows(&groupDisabledNodeIDs, scanString), `SELECT node_id FROM user_group_disabled_node WHERE group_id = ? ORDER BY node_id`, groupID)
+		r.add(appendRows(&groups, scanAccessGroup), `SELECT g.id, g.name, g.created_at, 0 AS user_count,
+			coalesce(g.dns_preset_id, '') AS dns_preset_id, g.color FROM user_group g WHERE g.id IN (`+accUserGroupIDs("?1")+`)
+			ORDER BY g.id = (SELECT group_id FROM user WHERE id = ?1) DESC, g.name, g.id`, userID)
+		r.add(appendRows(&groupProfileIDs, scanGroupItem), `SELECT group_id, profile_id FROM user_group_profile WHERE group_id IN (`+accUserGroupIDs("?1")+`) ORDER BY profile_id`, userID)
+		r.add(appendRows(&groupDisabledNodeIDs, scanGroupItem), `SELECT group_id, node_id FROM user_group_disabled_node WHERE group_id IN (`+accUserGroupIDs("?1")+`) ORDER BY node_id`, userID)
 		r.add(appendRows(&inbounds, scanAccessInboundFull), `SELECT `+accInboundCols+`, `+accProfileCols+`, `+accNodeCols+`
 			FROM inbound i JOIN profile p ON p.id = i.profile_id JOIN node n ON n.id = i.node_id
 			WHERE n.state <> 'retired' ORDER BY i.created_at, i.rowid`)
@@ -1023,7 +1024,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 		}
 	}
 	out := SubscriptionData{Up: traffic.Up, Down: traffic.Down, Devices: devices, AWG: awgDevices,
-		Group: group, Inbounds: inbounds, LiveNodes: liveNodes, Relays: relays, Device: snapshot.Device, DeviceCreds: snapshot.Creds,
+		Inbounds: inbounds, LiveNodes: liveNodes, Relays: relays, Device: snapshot.Device, DeviceCreds: snapshot.Creds,
 		TelegramCred: telegram, TrustTunnelCred: trustTunnel,
 		LinkMode: LinkModeOf(mode), Blocked: blocked > 0}
 	if len(online) > 0 {
@@ -1033,8 +1034,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID, groupID string, si
 		}
 	}
 	if active {
-		out.Group.ProfileIDs = groupProfileIDs
-		out.Group.DisabledNodeIDs = groupDisabledNodeIDs
+		out.Groups = groupsWithLists(groups, groupProfileIDs, groupDisabledNodeIDs)
 	}
 	return out, nil
 }
@@ -1257,25 +1257,33 @@ type AccessDesiredCred struct {
 // and take them again when it is switched on. The credentials themselves are kept. Needs u (user) and d (device) in scope.
 const accMistgateAppOn = `(d.key_hash IS NULL OR u.app_mistgate_off = 0)`
 
-// accGroupGetsNode is GroupGetsNode in SQL: needs u (user) and i (inbound) in scope.
-const accGroupGetsNode = `NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = u.group_id AND gd.node_id = i.node_id)`
+// accGroupGetsNode is GroupGetsNode in SQL, for the group of gp (a user_group_profile row): needs gp and i (inbound) in scope.
+const accGroupGetsNode = `NOT EXISTS (SELECT 1 FROM user_group_disabled_node gd WHERE gd.group_id = gp.group_id AND gd.node_id = i.node_id)`
 
-// DesiredCreds returns the candidate credentials of every enabled inbound of a node.
-func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesiredCred, error) {
-	rows, err := a.s.R.QueryContext(ctx,
-		`SELECT i.id, c.id, c.user_id, c.device_id, c.protocol, c.data_json, u.speed_limit_bps, u.device_speed_limit_bps, u.expires_at, u.app_happ, u.app_amnezia, u.app_telegram, u.app_trusttunnel, CAST(d.key_hash IS NOT NULL AS INTEGER)
-		 FROM inbound i
+// accDesiredCredsSQL lists the candidate credentials of every enabled inbound of the node (its one placeholder). granted holds the pairs (inbound,
+// person) that a group of the person gives, each pair once whatever the number of groups that give it, so that a credential
+// is never listed twice for one inbound.
+const accDesiredCredsSQL = `WITH granted(inbound_id, user_id) AS MATERIALIZED (
+			SELECT i.id, u.id FROM inbound i
+			JOIN user_group_profile gp ON gp.profile_id = i.profile_id
+			JOIN user u ON u.group_id = gp.group_id
+			WHERE i.node_id = ? AND i.enabled = 1 AND ` + accGroupGetsNode + `
+		 )
+		 SELECT i.id, c.id, c.user_id, c.device_id, c.protocol, c.data_json, u.speed_limit_bps, u.device_speed_limit_bps, u.expires_at, u.app_happ, u.app_amnezia, u.app_telegram, u.app_trusttunnel, CAST(d.key_hash IS NOT NULL AS INTEGER)
+		 FROM granted g
+		 JOIN inbound i ON i.id = g.inbound_id
 		 JOIN profile p ON p.id = i.profile_id
-		 JOIN user_group_profile gp ON gp.profile_id = p.id
-		 JOIN user u ON u.group_id = gp.group_id AND u.status = 'active'
+		 CROSS JOIN user u ON u.id = g.user_id AND u.status = 'active'
 		      AND (u.all_nodes = 1 OR EXISTS (SELECT 1 FROM user_node un WHERE un.user_id = u.id AND un.node_id = i.node_id))
 		 JOIN device_credential c ON c.user_id = u.id AND c.protocol = p.protocol AND c.revoked_at IS NULL
 		      AND (c.profile_id IS NULL OR c.profile_id = i.profile_id)
 		 JOIN device d ON d.id = c.device_id AND d.revoked_at IS NULL
-		 WHERE i.node_id = ? AND i.enabled = 1
-		   AND `+accGroupGetsNode+`
-		   AND `+accMistgateAppOn+`
-		 ORDER BY i.id, c.id`, nodeID)
+		 WHERE ` + accMistgateAppOn + `
+		 ORDER BY i.id, c.id`
+
+// DesiredCreds returns the candidate credentials of every enabled inbound of a node.
+func (a Access) DesiredCreds(ctx context.Context, nodeID string) ([]AccessDesiredCred, error) {
+	rows, err := a.s.R.QueryContext(ctx, accDesiredCredsSQL, nodeID)
 	if err != nil {
 		return nil, err
 	}

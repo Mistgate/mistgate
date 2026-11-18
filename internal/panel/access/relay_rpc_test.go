@@ -355,7 +355,7 @@ func TestRelayUsableRule(t *testing.T) {
 	}
 	group := store.AccessGroup{ProfileIDs: []string{"prf_1"}}
 	user := store.AccessUser{NodeIDs: []string{"nod_de1", "nod_fi1"}, AppHapp: true}
-	if !e.s.relayUsable(link, exit, group, user) {
+	if !e.s.relayUsable(link, exit, store.AccessGroups{group}, user) {
 		t.Fatal("a relay everything allows is not usable")
 	}
 	for name, mutate := range map[string]func(*store.RelayLink, *store.AccessInboundFull, *store.AccessGroup, *store.AccessUser){
@@ -402,12 +402,12 @@ func TestRelayUsableRule(t *testing.T) {
 		l, f, g, u := link, exit, group, user
 		u.NodeIDs = append([]string(nil), user.NodeIDs...)
 		mutate(&l, &f, &g, &u)
-		if e.s.relayUsable(l, f, g, u) {
+		if e.s.relayUsable(l, f, store.AccessGroups{g}, u) {
 			t.Errorf("%s: the relay is usable", name)
 		}
 	}
 	user.AllNodes, user.NodeIDs = true, nil
-	if !e.s.relayUsable(link, exit, group, user) {
+	if !e.s.relayUsable(link, exit, store.AccessGroups{group}, user) {
 		t.Error("a person with every node is refused the entry")
 	}
 }

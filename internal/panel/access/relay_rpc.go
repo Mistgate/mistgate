@@ -47,22 +47,22 @@ func (s *Service) RelayHandler() (string, http.Handler) {
 // relayUsable is the rule for a person's entry of a server: the relay is switched on and its stages passed or were marked
 // unverifiable, the entry's agent holds the forward, and the person can receive the exit's server through that entry. The twin
 // servers of the subscription follow it (subRelays); candidate audiences reuse the recipient part before a relay exists.
-func (s *Service) relayUsable(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
-	return s.relayUsableFor(l, exit, g, u, plugin.FormatURIList)
+func (s *Service) relayUsable(l store.RelayLink, exit store.AccessInboundFull, gs store.AccessGroups, u store.AccessUser) bool {
+	return s.relayUsableFor(l, exit, gs, u, plugin.FormatURIList)
 }
 
 // relayUsableFor is relayUsable for a subscription of the given format (see usableForFormat).
-func (s *Service) relayUsableFor(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser, format plugin.ClientFormat) bool {
-	return relayPathUsable(l) && s.relayRecipientUsableFor(l, exit, g, u, format)
+func (s *Service) relayUsableFor(l store.RelayLink, exit store.AccessInboundFull, gs store.AccessGroups, u store.AccessUser, format plugin.ClientFormat) bool {
+	return relayPathUsable(l) && s.relayRecipientUsableFor(l, exit, gs, u, format)
 }
 
 // relayRecipientUsable is the subscriber part shared by an existing relay and a candidate with no relay state yet.
-func (s *Service) relayRecipientUsable(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser) bool {
-	return s.relayRecipientUsableFor(l, exit, g, u, plugin.FormatURIList)
+func (s *Service) relayRecipientUsable(l store.RelayLink, exit store.AccessInboundFull, gs store.AccessGroups, u store.AccessUser) bool {
+	return s.relayRecipientUsableFor(l, exit, gs, u, plugin.FormatURIList)
 }
 
-func (s *Service) relayRecipientUsableFor(l store.RelayLink, exit store.AccessInboundFull, g store.AccessGroup, u store.AccessUser, format plugin.ClientFormat) bool {
-	return s.usableForFormat(exit, g, u, format) && g.GetsNode(l.ViaNodeID) &&
+func (s *Service) relayRecipientUsableFor(l store.RelayLink, exit store.AccessInboundFull, gs store.AccessGroups, u store.AccessUser, format plugin.ClientFormat) bool {
+	return s.usableForFormat(exit, gs, u, format) && gs.Gives(exit.Profile.ID, exit.Node.ID, l.ViaNodeID) &&
 		(u.AllNodes || slices.Contains(u.NodeIDs, l.ViaNodeID))
 }
 

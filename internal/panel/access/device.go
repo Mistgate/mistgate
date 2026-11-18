@@ -125,14 +125,14 @@ func (s *Service) awgIssuer(proto protocols.Protocol, userID, deviceID, profileI
 
 // usableInbounds are the inbounds of a profile that one user can connect to now (the subscription half of the
 // effective-access rule, see usable).
-func (s *Service) usableInbounds(ctx context.Context, u store.AccessUser, g store.AccessGroup, profileID string) ([]store.AccessInboundFull, error) {
+func (s *Service) usableInbounds(ctx context.Context, u store.AccessUser, gs store.AccessGroups, profileID string) ([]store.AccessInboundFull, error) {
 	full, err := s.st.Access().InboundsFull(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 	var out []store.AccessInboundFull
 	for _, f := range full {
-		if f.Profile.ID == profileID && s.usable(f, g, u) {
+		if f.Profile.ID == profileID && s.usable(f, gs, u) {
 			out = append(out, f)
 		}
 	}
@@ -155,7 +155,7 @@ func (s *Service) checkAgents(ins []store.AccessInboundFull) error {
 // deviceScope is everything an operation on one AWG device needs, loaded once.
 type deviceScope struct {
 	user    store.AccessUser
-	group   store.AccessGroup
+	groups  store.AccessGroups
 	dev     store.AccessAWGDevice
 	profile store.AccessProfile
 	proto   protocols.Protocol
@@ -177,7 +177,7 @@ func (s *Service) loadDevice(ctx context.Context, owner, deviceID string) (*devi
 	} else if err != nil {
 		return nil, s.internal("get device", err)
 	}
-	sc := &deviceScope{user: loaded.User, group: loaded.Group, dev: loaded.Device, profile: loaded.Profile,
+	sc := &deviceScope{user: loaded.User, groups: loaded.Groups, dev: loaded.Device, profile: loaded.Profile,
 		relays: loaded.Relays, relaysKnown: true, pathCreds: map[string]store.AccessCred{}}
 	for _, c := range loaded.PathCreds {
 		sc.pathCreds[c.Path] = c
@@ -188,11 +188,11 @@ func (s *Service) loadDevice(ctx context.Context, owner, deviceID string) (*devi
 	if sc.merged, err = s.mergedSettings(sc.profile); err != nil {
 		return nil, s.internal("open profile secrets", err)
 	}
-	if !slices.Contains(sc.group.ProfileIDs, sc.dev.ProfileID) {
+	if !sc.groups.Holds(sc.dev.ProfileID) {
 		return nil, failed("profile_not_in_group")
 	}
 	for _, inbound := range loaded.Inbounds {
-		if s.usable(inbound, sc.group, sc.user) {
+		if s.usable(inbound, sc.groups, sc.user) {
 			sc.ins = append(sc.ins, inbound)
 		}
 	}
@@ -239,14 +239,14 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 	if p.Protocol != proto.ID() {
 		return store.AccessAWGDevice{}, nil, invalid("profile %q is not an AmneziaWG profile", p.Name)
 	}
-	g, err := a.Group(ctx, u.GroupID)
+	gs, err := a.UserGroups(ctx, u)
 	if err != nil {
 		return store.AccessAWGDevice{}, nil, s.internal("get group", err)
 	}
-	if !slices.Contains(g.ProfileIDs, p.ID) {
+	if !gs.Holds(p.ID) {
 		return store.AccessAWGDevice{}, nil, failed("profile_not_in_group")
 	}
-	ins, err := s.usableInbounds(ctx, u, g, p.ID)
+	ins, err := s.usableInbounds(ctx, u, gs, p.ID)
 	if err != nil {
 		return store.AccessAWGDevice{}, nil, s.internal("inbounds", err)
 	}
@@ -304,7 +304,7 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 		return store.AccessAWGDevice{}, nil, s.internal("get device", err)
 	}
 	// Created at the profile's current epoch: the configs below are the current ones.
-	cfgs, err := s.renderDeviceConfigs(ctx, &deviceScope{user: u, group: g, dev: dev, profile: p, proto: proto, merged: merged, ins: ins}, false, true)
+	cfgs, err := s.renderDeviceConfigs(ctx, &deviceScope{user: u, groups: gs, dev: dev, profile: p, proto: proto, merged: merged, ins: ins}, false, true)
 	return dev, cfgs, err
 }
 
@@ -486,7 +486,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			return nil, s.internal("read relays for device configs", err)
 		}
 	}
-	relaysOf := s.subRelays(relayLinks, sc.ins, sc.group, sc.user, plugin.FormatURIList)
+	relaysOf := s.subRelays(relayLinks, sc.ins, sc.groups, sc.user, plugin.FormatURIList)
 	maxIdx, maxIdxErr := awg.MaxPeerIndex(sc.merged)
 	version := awgVersion(sc.merged)
 	var reqs []protocols.ClientReq

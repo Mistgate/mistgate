@@ -1446,10 +1446,10 @@ func (s *Service) inboundNoWayInWarning(ctx context.Context, f store.AccessInbou
 		if err != nil {
 			return nil, err
 		}
-		group := store.AccessGroup{ProfileIDs: []string{f.Profile.ID}}
+		groups := store.AccessGroups{{ProfileIDs: []string{f.Profile.ID}}}
 		user := store.AccessUser{AllNodes: true, AppHapp: true, AppAmnezia: true, AppTelegram: true}
 		for _, link := range links {
-			if link.ViaNodeAddress != "" && s.relayUsableFor(link, f, group, user, plugin.FormatMistgate) {
+			if link.ViaNodeAddress != "" && s.relayUsableFor(link, f, groups, user, plugin.FormatMistgate) {
 				return nil, nil
 			}
 		}

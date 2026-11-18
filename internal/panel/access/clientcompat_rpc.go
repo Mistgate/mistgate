@@ -262,10 +262,10 @@ func (s *Service) CompatDevices(ctx context.Context, userID string) (devices []C
 		if ComputeStatus(u.Disabled, u.ExpiresAt, u.QuotaBytes, u.UsedBytes, now) != StatusActive {
 			continue
 		}
-		g := groupOf[u.GroupID]
+		gs := store.GroupsOf(u, groupOf)
 		var fps []string
 		for _, f := range reality {
-			if s.usable(f, g, u) && !slices.Contains(fps, fpOf[f.Inbound.ID]) {
+			if s.usable(f, gs, u) && !slices.Contains(fps, fpOf[f.Inbound.ID]) {
 				fps = append(fps, fpOf[f.Inbound.ID])
 			}
 		}

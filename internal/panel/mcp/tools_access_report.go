@@ -987,7 +987,7 @@ func (a *accessCtx) relayReachability() store.RelayReachability {
 		in.Groups = append(in.Groups, store.RelayReachabilityGroup{ID: g.ID, ProfileIDs: g.ProfileIDs, DisabledNodeIDs: g.DisabledNodes})
 	}
 	for _, u := range a.in.Users {
-		in.Users = append(in.Users, store.RelayReachabilityUser{ID: u.ID, GroupID: u.GroupID, AllNodes: u.AllNodes, NodeIDs: u.NodeIDs})
+		in.Users = append(in.Users, store.RelayReachabilityUser{ID: u.ID, GroupIDs: []string{u.GroupID}, AllNodes: u.AllNodes, NodeIDs: u.NodeIDs})
 	}
 	for _, x := range a.in.Inbounds {
 		way := a.ways[x.ID]

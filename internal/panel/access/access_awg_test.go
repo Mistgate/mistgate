@@ -891,7 +891,7 @@ func TestEnsureMihomoAWGReadsBackLiveImplicitDevice(t *testing.T) {
 	e := f.e
 	a := e.st.Access()
 	u := must(a.User(e.ctx, f.user))
-	g := must(a.Group(e.ctx, f.group))
+	g := store.AccessGroups{must(a.Group(e.ctx, f.group))}
 	full, err := a.InboundsFull(e.ctx, "")
 	if err != nil {
 		t.Fatal(err)
@@ -901,7 +901,7 @@ func TestEnsureMihomoAWGReadsBackLiveImplicitDevice(t *testing.T) {
 	if got, _ := e.s.ensureMihomoAWG(e.ctx, u, g, full, nil, DeviceHint{}, seed, store.SubscriptionData{}); !got.added {
 		t.Fatal("initial Mihomo call did not add the AWG credential")
 	}
-	wantData, err := a.SubscriptionData(e.ctx, u.ID, g.ID, e.clock, true, e.clock, nil)
+	wantData, err := a.SubscriptionData(e.ctx, u.ID, e.clock, true, e.clock, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
