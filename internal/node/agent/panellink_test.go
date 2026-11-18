@@ -421,3 +421,119 @@ func TestPrevLinkUnusedWhileTheCurrentAnswers(t *testing.T) {
 	}
 	committedTo(t, h, b, a, false)
 }
+
+// skewLinkClock makes the clock of Meta.LinkSince run ahead of the real one by the returned value (nanoseconds).
+func skewLinkClock(h *harness) *atomic.Int64 {
+	var skew atomic.Int64
+	h.a.linkClock = func() time.Time { return time.Now().Add(time.Duration(skew.Load())) }
+	return &skew
+}
+
+// nextEstablished ends the agent's current session and waits until the next one has its HelloAck (and has run what
+// follows it, such as forgetting an expired previous address).
+func nextEstablished(t *testing.T, h *harness) {
+	t.Helper()
+	eventually(t, func() bool { return h.a.cur.Load() != nil }, "a panel session")
+	old := h.a.cur.Load()
+	old.cancel()
+	eventually(t, func() bool { s := h.a.cur.Load(); return s != nil && s != old }, "the next panel session")
+}
+
+// A session over the new address 8 days after it took over: the previous address is forgotten, in agent.json too, and
+// is no longer dialled when the new one stops answering.
+func TestPrevAddressForgottenAfterTheNewOneWorked7Days(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	skew := skewLinkClock(h)
+	h.start()
+	lp.session(t)
+	committedTo(t, h, b, a, false)
+	if since := readMeta(t, h.dir).LinkSince; since == 0 || time.Since(time.Unix(since, 0)).Abs() > time.Minute {
+		t.Fatalf("link_since %d is not the commit time", since)
+	}
+
+	skew.Store(int64(8 * 24 * time.Hour))
+	nextEstablished(t, h)
+	committedTo(t, h, b, "", false)
+	raw, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(raw, []byte("prev_")) || bytes.Contains(raw, []byte("link_since")) {
+		t.Fatalf("%s keeps the previous address: %s", fileMeta, raw)
+	}
+
+	lp.refuse('b')
+	dials := lp.dialsTo('b')
+	endSession(t, h)
+	eventually(t, func() bool { return lp.dialsTo('b') >= dials+3 }, "retries of the current address")
+	if n := lp.dialsTo('a'); n != 0 {
+		t.Fatalf("forgotten previous address dialled %d times", n)
+	}
+}
+
+// A session over the new address 1 day after it took over: the previous address stays.
+func TestPrevAddressKeptWithin7Days(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	skew := skewLinkClock(h)
+	h.start()
+	lp.session(t)
+	committedTo(t, h, b, a, false)
+	since := readMeta(t, h.dir).LinkSince
+
+	skew.Store(int64(24 * time.Hour))
+	nextEstablished(t, h)
+	committedTo(t, h, b, a, false)
+	if got := readMeta(t, h.dir).LinkSince; got != since {
+		t.Fatalf("link_since %d, want %d", got, since)
+	}
+}
+
+// The new address took over 8 days ago but has not established a session since: the previous address was not
+// forgotten, and the agent goes back to it once the new one stops answering.
+func TestPrevAddressFallbackAfter7DaysWhenTheNewOneFails(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	skew := skewLinkClock(h)
+	h.start()
+	lp.session(t)
+	committedTo(t, h, b, a, false)
+
+	skew.Store(int64(8 * 24 * time.Hour))
+	lp.refuse('b')
+	endSession(t, h)
+	if got := lp.session(t); got != linkPrefix('a') {
+		t.Fatal("the next session was not on the previous address")
+	}
+	committedTo(t, h, a, "", false)
+	if since := readMeta(t, h.dir).LinkSince; since != 0 {
+		t.Fatalf("link_since %d kept without a previous address", since)
+	}
+}
+
+// A link-only agent without a previous address leaves agent.json byte for byte as it was, however old its link.
+func TestPrevAddressNoneLeavesAgentJSON(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	lp := newSessionLinkPanel(h)
+	server := httptest.NewTLSServer(lp)
+	t.Cleanup(server.Close)
+	a := linkBaseOf(server, 'a')
+	h.a.linkHTTPClient = server.Client()
+	h.a.meta.Link, h.a.cfg.LinkURL = a, a
+	if err := saveMeta(h.dir, h.a.meta); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
+	if err != nil {
+		t.Fatal(err)
+	}
+	skewLinkClock(h).Store(int64(8 * 24 * time.Hour))
+	h.start()
+	lp.session(t)
+	nextEstablished(t, h)
+	after, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatalf("%s changed:\n%s\n%s", fileMeta, before, after)
+	}
+}

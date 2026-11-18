@@ -288,7 +288,7 @@ next: mistgate-node install   (or, in the foreground: mistgate-node run)
 | `--link-url` | none | none | 面板的新连接地址，`wss://host/<secret-prefix>/`。必填。 |
 | `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | 状态目录。 |
 
-把该地址保存到 `agent.json`，作为下次尝试的地址；节点必须已注册。重启后，Agent 会轮流尝试新地址和当前地址，一旦通过新地址建立会话就保留它。Agent 会记住之前的地址，新地址不再响应时就回到之前的地址。面板可以把同样的更改发送给各 Agent（`panel_link_url`）；目前还没有任何功能发送它。此命令用于已无法连到面板的节点。命令输出 `Saved. Restart the agent: systemctl restart mistgate-node`。
+把该地址保存到 `agent.json`，作为下次尝试的地址；节点必须已注册。重启后，Agent 会轮流尝试新地址和当前地址，一旦通过新地址建立会话就保留它。Agent 会记住之前的地址，新地址不再响应时就回到之前的地址；新地址正常工作满 7 天后，Agent 会忘掉之前的地址。面板可以把同样的更改发送给各 Agent（`panel_link_url`）；目前还没有任何功能发送它。此命令用于已无法连到面板的节点。命令输出 `Saved. Restart the agent: systemctl restart mistgate-node`。
 
 ### mistgate-node install
 

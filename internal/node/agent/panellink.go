@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 )
@@ -12,6 +13,25 @@ import (
 // has, and keeps it once a session over it succeeds. The address it had stays as the previous one (Meta.PrevLink, or
 // Meta.PrevMTLS for mTLS): while the new one does not answer the agent tries the previous one every other turn, and
 // goes back to it once a session over it succeeds, so a wrong address does not cut the node off.
+//
+// The previous address is not kept for ever: its domain may later belong to someone else, and the node would keep
+// knocking on it. Once the new address has worked for prevAddressKeep the agent forgets it. "Has worked for" is
+// approximated as: a direct session over the current address establishes (HelloAck) prevAddressKeep or more after the
+// address took over (Meta.LinkSince). The previous address is then dropped at once, in memory and in agent.json, so the
+// fallback never dials an expired one. An address that has not established a session since that point (one that died
+// on day 1, however long ago it was committed) keeps its previous address, and the fallback to it still works.
+// agent.json without link_since (written before the field) counts as committed long ago.
+
+// prevAddressKeep is how long a new panel address must have worked before the agent forgets the previous one.
+const prevAddressKeep = 7 * 24 * time.Hour
+
+// linkNow is the clock of Meta.LinkSince.
+func (a *Agent) linkNow() time.Time {
+	if a.linkClock != nil {
+		return a.linkClock()
+	}
+	return a.now()
+}
 
 // linkURL is the link base address the agent dials (cfg.LinkURL, which follows Meta.Link once a new address works).
 func (a *Agent) linkURL() string {
@@ -109,6 +129,7 @@ func (a *Agent) commitNextLink(next string) {
 		return
 	}
 	a.meta.PrevLink, a.meta.PrevMTLS = a.meta.Link, a.meta.Link == "" // the address in use until now; "" = mTLS
+	a.meta.LinkSince = a.linkNow().Unix()
 	a.meta.Link, a.meta.NextLink = next, ""
 	a.cfg.LinkURL = next
 	if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
@@ -116,6 +137,37 @@ func (a *Agent) commitNextLink(next string) {
 		return
 	}
 	a.log.Info("new panel link address in use")
+}
+
+// dialCurrentLink dials the current link address. Once a session over it establishes, the previous panel address may
+// expire (forgetExpiredPrev).
+func (a *Agent) dialCurrentLink(ctx context.Context) (*websocketAgentTransport, func(), error) {
+	link := a.linkURL()
+	t, cleanup, err := a.dialLinkBase(ctx, link, "")
+	if err == nil {
+		t.onEstablished = func() { a.forgetExpiredPrev(link) }
+	}
+	return t, cleanup, err
+}
+
+// forgetExpiredPrev drops the previous panel address after a session over the current link address link established,
+// when link took over prevAddressKeep or more ago. Without a previous address it changes nothing (agent.json is not
+// rewritten).
+func (a *Agent) forgetExpiredPrev(link string) {
+	a.metaMu.Lock()
+	defer a.metaMu.Unlock()
+	if a.meta.Link != link || (a.meta.PrevLink == "" && !a.meta.PrevMTLS) {
+		return
+	}
+	if a.linkNow().Sub(time.Unix(a.meta.LinkSince, 0)) < prevAddressKeep {
+		return
+	}
+	a.meta.PrevLink, a.meta.PrevMTLS, a.meta.LinkSince = "", false, 0
+	if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
+		a.log.Error("forgotten previous panel address not saved", "err", err)
+		return
+	}
+	a.log.Info("the new panel address has worked long enough; previous address forgotten")
 }
 
 // prevSession runs a session over the previous panel address: the link base prev, or mTLS when mtls. Once its HelloAck
@@ -148,7 +200,7 @@ func (a *Agent) commitPrevAddress(prev string, mtls bool) {
 	if a.meta.PrevLink != prev || a.meta.PrevMTLS != mtls {
 		return
 	}
-	a.meta.Link, a.meta.PrevLink, a.meta.PrevMTLS = prev, "", false
+	a.meta.Link, a.meta.PrevLink, a.meta.PrevMTLS, a.meta.LinkSince = prev, "", false, 0
 	a.cfg.LinkURL = prev
 	if mtls {
 		a.cfg.LinkURL = a.configLink
