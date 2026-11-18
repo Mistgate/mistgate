@@ -6,7 +6,8 @@ import { ToastProvider } from "@/components/ui/toast";
 import { ChatRole, PlanState } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { setLang } from "@/i18n";
 import type { Msg } from "@/lib/assistant";
-import { ChatPanel, useChat, type ChatApi } from "./chat";
+import { useChat, type ChatApi } from "./chat";
+import { ChatPanel } from "./panel";
 
 const chat = vi.fn();
 const applyPlan = vi.fn();
@@ -193,16 +194,39 @@ describe("the assistant's chat", () => {
     expect(chat.mock.calls[0]![0]).toMatchObject({ provider: 0, effort: 0 });
     await click(button("Choose the agent"));
     await settle();
-    const radios = [...document.querySelectorAll("[role=menuitemradio]")];
-    expect(radios.map((r) => r.textContent)).toEqual(expect.arrayContaining([expect.stringContaining("DeepSeek"), expect.stringContaining("Thorough")]));
+    // the left column lists the connected providers (the panel's own first) and the built-in ones without a key; the right one holds the model
+    const tabs = [...document.querySelectorAll("[role=tab]")];
+    expect(tabs.map((r) => r.textContent)).toEqual(expect.arrayContaining([expect.stringContaining("Anthropic"), expect.stringContaining("DeepSeek"), expect.stringContaining("Z.ai")]));
+    expect(document.querySelector("[role=tab][aria-selected=true]")?.textContent).toContain("Anthropic");
     // a provider whose budget is spent is listed but cannot be picked
-    expect(radios.find((r) => r.textContent?.includes("budget spent"))?.getAttribute("aria-disabled")).toBe("true");
-    await click(radios.find((r) => r.textContent?.includes("DeepSeek")));
+    await click(tabs.find((r) => r.textContent?.includes("Ollama")));
+    expect(document.querySelector<HTMLButtonElement>("[role=option]")?.disabled).toBe(true);
+    expect(document.querySelector("[role=option]")?.textContent).toContain("budget spent");
+    // one that has no key says so and, for the owner, has the way to add one
+    await click(tabs.find((r) => r.textContent?.includes("Z.ai")));
+    expect(document.querySelector("[role=option]")).toBeNull();
+    expect(document.querySelector("[role=listbox]")?.textContent).toContain("No key added");
+    expect(document.querySelector("[role=listbox] a[href='/ai']")?.textContent).toBe("Connect");
+    await click(tabs.find((r) => r.textContent?.includes("DeepSeek")));
+    const model = document.querySelector("[role=option]")!;
+    expect(model.textContent).toContain("deepseek-v4.1-flash");
+    expect(document.querySelector("[role=listbox]")?.textContent).toContain("$0.3 / $1.2");
+    await click(model);
     await settle();
-    const thorough = [...document.querySelectorAll("[role=menuitemradio]")].find((r) => r.textContent?.includes("Thorough"));
-    expect(thorough).toBeDefined();
-    await click(thorough);
+    // picking a model shuts the window; the depth is a slider of three places, the panel's own (Normal) first
+    expect(document.querySelector(".as-mp")).toBeNull();
+    await click(button("Choose the agent"));
     await settle();
+    const radios = [...document.querySelectorAll("[role=radio]")];
+    expect(radios.map((r) => r.getAttribute("aria-label"))).toEqual(["Quick", "Normal", "Thorough"]);
+    expect(radios.find((r) => r.getAttribute("aria-checked") === "true")?.getAttribute("aria-label")).toBe("Normal");
+    await click(radios[2]);
+    await settle();
+    expect(document.querySelector("[role=radio][aria-checked=true]")?.getAttribute("aria-label")).toBe("Thorough");
+    expect(document.querySelector(".as-dpl")?.textContent).toContain("Thorough");
+    // Esc shuts the window of the picker, not the chat
+    await act(async () => void document.querySelector(".as-mw")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(document.querySelector(".as-mp")).toBeNull();
     await send("second");
     expect(chat.mock.calls[1]![0]).toMatchObject({ provider: 2, effort: 3 });
     expect(localStorage.getItem("assistant-provider")).toBe("2");

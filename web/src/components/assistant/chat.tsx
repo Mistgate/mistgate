@@ -1,30 +1,23 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { halo } from "@/components/fx/halo";
+import { useNavigate } from "@tanstack/react-router";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icons";
 import { Tip } from "@/components/ui/tooltip";
-import { ChatRole, PlanState } from "@/gen/mistgate/admin/v1/assistant_pb";
-import { navKey, sections, type SectionId } from "@/components/nav";
+import { ChatRole } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { assistant } from "@/lib/api";
-import { accessQuery, assistantErrorKey, conversationsQuery, followUpPoll, looksSecret, providerName, recentQuestionsQuery, type Context, type FollowUp, type LiveMsg, type LiveTool, type Msg, type Note, type Plan, type Tool } from "@/lib/assistant";
+import { accessQuery, assistantErrorKey, followUpPoll, type Context, type FollowUp, type LiveMsg, type LiveTool, type Msg, type Note, type Plan, type Tool } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
-import { useFmt } from "@/lib/format";
 import { plain } from "@/lib/plain";
-import { useIsOwner } from "@/lib/updates";
 import { readPref } from "@/lib/storage";
 import { actionOf, AUTO_OPEN_KEY, markAction } from "@/lib/ui-actions";
-import { usePick } from "./agent-picker";
-import { Composer } from "./composer";
-import { Thread } from "./thread";
+import { CatMark } from "./cat";
 
 // The floating chat of the assistant (ADR 0014): a round button at the corner of every admin page (and Ctrl/⌘+J) while the
-// assistant is open to this admin; it opens a panel beside the page (the whole screen on a phone). One turn streams at a
+// assistant is open to this admin; it opens the window on the corner of the page (a card over the phone's screen). The button and the
+// conversation's state are here, in the first load of the panel; the window itself (panel.tsx and its CSS) comes with the first opening. One turn streams at a
 // time: the answer's Markdown, a line per tool call, plan cards the admin applies or dismisses, "Remembered" notes.
 
 type ChatState = {
@@ -223,52 +216,23 @@ export function useChat() {
   return { ...s, send, stop, open, refresh, reset, apply, dismiss, forget, cancelFollowUp };
 }
 
-/**
- * While the panel is open the conversation follows what the server does without this chat: a turn running there (a follow-up's,
- * another tab's) is looked at every 4 s until it ends, and a follow-up is looked for just after its time.
- */
-function useServerTurns(chat: ChatApi) {
-  const { conversationId, running, live, refresh } = chat;
-  const followUps = chat.followUps ?? [];
-  const next = followUps.reduce((min, f) => (Number(f.dueUnix) > 0 ? Math.min(min, Number(f.dueUnix)) : min), Infinity);
-  useEffect(() => {
-    if (!conversationId || live || !refresh) return;
-    let delay: number;
-    const ahead = next * 1000 - Date.now();
-    if (running) delay = 4_000;
-    else if (!Number.isFinite(next)) return;
-    // due: the scheduler takes it within a tick; long overdue (the assistant was off), looked at now and then
-    else delay = ahead > 0 ? Math.min(ahead + 3_000, 10 * 60_000) : ahead > -120_000 ? 5_000 : 30_000;
-    const id = setTimeout(refresh, delay);
-    return () => clearTimeout(id);
-  }, [conversationId, running, live, next, refresh]);
-}
-
 export type ChatApi = ReturnType<typeof useChat>;
 
-const sectionKinds: Record<string, string> = { nodes: "node", users: "user", profiles: "profile", groups: "group" };
+// The window is its own chunk: its code and its CSS come when it is first opened (or when the pointer comes to the button).
+const loadPanel = () => import("./panel");
+const ChatPanel = lazy(() => loadPanel().then((m) => ({ default: m.ChatPanel })));
 
-/** The page the admin is on, as the chip that goes with the message. */
-function usePageContext(): Context | null {
-  const t = useT();
-  const path = useRouterState({ select: (st) => st.location.pathname });
-  const seg = path.split("/").filter(Boolean);
-  const section = seg[0] ?? "overview";
-  // only the admin's own sections go with a message (not the AI page itself, not the dev kit or a sign-in page)
-  if (section === "ai" || !sections.some((x) => x.id === section)) return null;
-  const id = seg[1] ?? "";
-  const label = t(navKey(section as SectionId));
-  return { kind: id ? (sectionKinds[section] ?? section) : section, id, label: id ? `${label} · ${id}` : label, route: path } as Context;
-}
-
-/** The round button and the panel. Mounted once in the shell; renders nothing while the assistant is not open to this admin. */
+/**
+ * The round button and the window. Mounted once in the shell; renders nothing while the assistant is not open to this admin. With the assistant on
+ * and allowed but no provider connected the button is there too, and the window says so (the board's "not connected").
+ */
 export function ChatDock() {
   // the button looks again soon after the admin's next follow-up is due: its answer lights the dot
   const access = useQuery({ ...accessQuery, refetchInterval: (q) => followUpPoll(q.state.data) });
   const [open, setOpen] = useState(false);
   const chat = useChat();
   const openConversation = chat.open;
-  const available = access.data?.available ?? false;
+  const available = (access.data?.available ?? false) || access.data?.reason === "no_provider";
 
   const [draft, setDraft] = useState<{ text: string; n: number } | undefined>();
   const resetChat = chat.reset;
@@ -306,29 +270,22 @@ export function ChatDock() {
   if (!available) return null;
   return (
     <>
-      {!open && <ChatButton onClick={() => setOpen(true)} running={chat.running} unread={access.data?.unread ?? 0} />}
-      {open && <ChatPanel key={draft?.n ?? 0} chat={chat} readOnly={access.data?.readOnly ?? false} providerLabel={access.data?.model || ""} provider={access.data?.provider} draft={draft} onClose={() => setOpen(false)} />}
+      <ChatButton onClick={() => setOpen(true)} onWarm={() => void loadPanel()} open={open} running={chat.running} unread={access.data?.unread ?? 0} />
+      {open && (
+        <Suspense fallback={null}>
+          <ChatPanel key={draft?.n ?? 0} chat={chat} readOnly={access.data?.readOnly ?? false} providerLabel={access.data?.model || ""} provider={access.data?.provider} draft={draft} onClose={() => setOpen(false)} />
+        </Suspense>
+      )}
     </>
   );
 }
 
-/** The assistant's cat: a head, two eyes and the arc of a wink (the motion is in index.css, .cat-*). Decorative. */
-function CatMark({ size = 34 }: { size?: number }) {
-  return (
-    <svg aria-hidden className="cat flex-none" width={size} height={size} viewBox="0 0 48 48">
-      <path className="cat-h" d="M24 43c-9 0-16-6-16-15 0-3.5.8-6.5 2-9L9 6l10 7c1.6-.4 3.3-.6 5-.6s3.4.2 5 .6L39 6l-1 13c1.2 2.5 2 5.5 2 9 0 9-7 15-16 15z" />
-      <ellipse className="cat-l" cx="17.5" cy="27" rx="2.6" ry="3.7" />
-      <ellipse className="cat-r" cx="30.5" cy="27" rx="2.6" ry="3.7" />
-      <path className="cat-w" d="M27.3 28.3q3.2-3.8 6.4 0" />
-    </svg>
-  );
-}
-
 /**
- * The assistant's open button: 56px, the accent, the cat. A count of answers that came while the admin was away sits on its
- * corner (and in its name); a turn that is running draws a ring round it. It floats at the end of the window, above the dock on a phone.
+ * The assistant's open button (.fab): 56px, the accent, the cat. A count of answers that came while the admin was away sits on its corner (and
+ * in its name); a turn that is running draws a ring round it. It floats at the end of the window, above the dock on a phone. While the window
+ * is open it shrinks away and cannot be reached (.fab.gone).
  */
-export function ChatButton({ onClick, running, unread = 0 }: { onClick: () => void; running: boolean; unread?: number }) {
+export function ChatButton({ onClick, running, unread = 0, open = false, onWarm }: { onClick: () => void; running: boolean; unread?: number; open?: boolean; onWarm?: () => void }) {
   const t = useT();
   // a follow-up answered while the admin was away: the count on the button, and in its name
   const label = unread > 0 ? `${t("ai.chat.open")}: ${t.n("ai.chat.unread", unread)}` : t("ai.chat.open");
@@ -338,8 +295,15 @@ export function ChatButton({ onClick, running, unread = 0 }: { onClick: () => vo
         <button
           type="button"
           onClick={onClick}
+          onPointerEnter={onWarm}
+          onFocus={onWarm}
           aria-label={label}
-          className="cat-fab relative grid size-14 place-items-center rounded-full bg-accent text-on-accent shadow-(--shadow-toast) transition-[transform,background-color] duration-200 ease-spring hover:-translate-y-0.5 hover:bg-accent-hover active:scale-[0.96]"
+          aria-expanded={open}
+          inert={open || undefined}
+          className={cx(
+            "cat-fab relative grid size-14 place-items-center rounded-full bg-accent text-on-accent shadow-(--shadow-toast) transition-[transform,background-color,opacity] duration-200 ease-spring hover:-translate-y-0.5 hover:bg-accent-hover active:scale-[0.96]",
+            open && "pointer-events-none scale-[0.6] opacity-0",
+          )}
         >
           {running && <span aria-hidden className="chat-fab-ring pointer-events-none absolute inset-0 rounded-full border-2 border-accent" />}
           <CatMark />
@@ -353,217 +317,3 @@ export function ChatButton({ onClick, running, unread = 0 }: { onClick: () => vo
     </div>
   );
 }
-
-export function ChatPanel({ chat, readOnly, providerLabel, provider, onClose, initialContext, pickerOpen, draft }: { chat: ChatApi; readOnly: boolean; providerLabel: string; provider?: number; onClose: () => void; initialContext?: Context | null; pickerOpen?: boolean; draft?: { text: string; n: number } }) {
-  const t = useT();
-  const owner = useIsOwner();
-  const pageContext = usePageContext();
-  const access = useQuery(accessQuery);
-  const [attach, setAttach] = useState(true);
-  const [text, setText] = useState(draft?.text ?? "");
-  const [askSecret, setAskSecret] = useState(false);
-  // opened with an answer that came while the admin was away and no conversation in front: the list, where it is marked
-  const [history, setHistory] = useState(() => !chat.conversationId && (access.data?.unread ?? 0) > 0);
-  useServerTurns(chat);
-  // opened again on a conversation that had follow-ups waiting (or an unread answer): it may have moved on meanwhile
-  const reopen = useRef({ chat, unread: access.data?.unread ?? 0 });
-  useEffect(() => {
-    const { chat: c, unread } = reopen.current;
-    if (c.conversationId && !c.live && ((c.followUps?.length ?? 0) > 0 || unread > 0)) c.refresh?.();
-  }, []);
-  const list = useRef<HTMLDivElement>(null);
-  const [scrolled, setScrolled] = useState(false);
-  const context = initialContext !== undefined ? initialContext : pageContext;
-  const pick = usePick({ provider, model: providerLabel });
-  // what the message box offers to finish: the questions asked in this conversation (newest first), in the others, then the examples
-  const recent = useQuery(recentQuestionsQuery).data;
-  const suggestions = useMemo(
-    () => [...chat.messages.filter((m) => m.role === ChatRole.USER).map((m) => m.text).reverse(), ...(recent ?? []), ...EXAMPLES.map((k) => t(k))].filter((q) => !looksSecret(q)),
-    [chat.messages, recent, t],
-  );
-
-  // the list follows the answer as it grows: new messages, text, tool lines, plan cards
-  const tail = chat.messages[chat.messages.length - 1];
-  const growth = chat.messages.length * 100_000 + (tail ? tail.text.length + tail.tools.length + tail.plans.length * 10 : 0);
-  useEffect(() => {
-    const el = list.current;
-    if (el && growth >= 0) el.scrollTop = el.scrollHeight;
-  }, [growth]);
-
-  // the answer is revealed word by word after its text has arrived (useSmoothText): stay at the bottom while it grows,
-  // unless the admin has scrolled up to read
-  useEffect(() => {
-    const el = list.current;
-    const content = el?.firstElementChild;
-    if (!el || !content || history || typeof ResizeObserver === "undefined") return; // the history list does not grow
-    let height = content.getBoundingClientRect().height;
-    const ro = new ResizeObserver(() => {
-      const grew = content.getBoundingClientRect().height - height;
-      height += grew;
-      if (grew > 0 && el.scrollHeight - el.scrollTop - el.clientHeight - grew < 48) el.scrollTop = el.scrollHeight;
-    });
-    ro.observe(content);
-    return () => ro.disconnect();
-  }, [history]);
-
-  // a turn watched to its end: the halo runs out from the end of the answer, inside the panel
-  const wasLive = useRef(chat.live);
-  useEffect(() => {
-    const el = list.current;
-    if (wasLive.current && !chat.live && el && tail?.end === "end") {
-      const r = el.getBoundingClientRect();
-      halo("save", { target: el, origin: { x: r.left + r.width / 2, y: r.bottom - 24 } });
-    }
-    wasLive.current = chat.live;
-  }, [chat.live, tail?.end]);
-
-  function submit(force = false) {
-    const body = text.trim();
-    if (!body || chat.running) return;
-    if (!force && looksSecret(body)) return setAskSecret(true);
-    setAskSecret(false);
-    setText("");
-    void chat.send(body, attach ? context : null, { provider: pick.provider, effort: pick.effort });
-  }
-
-  const provName = provider !== undefined ? t(providerName(provider)) : "";
-  const headBtn = "grid size-8 place-items-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-fg";
-
-  return (
-    <section
-      data-fx-halo
-      role="dialog"
-      aria-label={t("ai.chat.title")}
-      className="fixed inset-0 z-30 flex flex-col overflow-hidden bg-surface md:inset-auto md:end-4 md:top-4 md:bottom-4 md:w-[440px] md:rounded-card-lg md:border md:border-line md:shadow-(--shadow-dock)"
-    >
-      <header className={cx("flex items-center gap-1 border-b px-5 pt-4 pb-3 transition-colors duration-200", scrolled ? "border-line/70" : "border-transparent")}>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <b className="text-[15px] leading-tight font-semibold">{t("ai.chat.title")}</b>
-          {(pick.label || providerLabel) && <span className="truncate text-[11px] text-muted">{pick.label || (provName ? `${provName} · ${providerLabel}` : providerLabel)}</span>}
-        </div>
-        <button type="button" className={cx(headBtn, history && "bg-surface-2 text-fg")} aria-label={t("ai.chat.history")} title={t("ai.chat.history")} aria-pressed={history} onClick={() => setHistory((v) => !v)}>
-          <Icon name="list" size={16} />
-        </button>
-        <button type="button" className={headBtn} aria-label={t("ai.chat.new")} title={t("ai.chat.new")} onClick={() => chat.reset()}>
-          <Icon name="plus" size={16} />
-        </button>
-        {owner && (
-          <Link to="/ai" aria-label={t("ai.chat.settings")} title={t("ai.chat.settings")} className={headBtn}>
-            <Icon name="gear" size={16} />
-          </Link>
-        )}
-        <button type="button" className={headBtn} aria-label={t("ai.chat.close")} title={t("ai.chat.close")} onClick={onClose}>
-          <Icon name="x" size={16} />
-        </button>
-      </header>
-
-      {history ? (
-        <History
-          onPick={(id) => {
-            setHistory(false);
-            void chat.open(id);
-          }}
-        />
-      ) : (
-        <div ref={list} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 2)} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pt-1 pb-5">
-          {chat.messages.length === 0 && <Hello onPick={(q) => void chat.send(q, attach ? context : null)} />}
-          <Thread chat={chat} owner={owner} onNavigate={() => window.innerWidth < 768 && onClose()} />
-        </div>
-      )}
-
-      <footer className="flex flex-col gap-2 px-4 pt-1 pb-4">
-        {readOnly && <p className="text-[11px] text-muted">{t("ai.chat.readOnly")}</p>}
-        {askSecret && (
-          <div className="tone-warn tint flex flex-wrap items-center gap-2 rounded-field px-3 py-2 text-xs">
-            <span className="min-w-0 flex-1">{t("ai.chat.secretWarn", { provider: provName || "—" })}</span>
-            <Button type="button" size="xs" variant="secondary" onClick={() => submit(true)}>
-              {t("ai.chat.sendAnyway")}
-            </Button>
-          </div>
-        )}
-        <Composer text={text} onText={setText} onSubmit={() => submit()} running={chat.running} onStop={() => void chat.stop()} context={context} attached={attach} onAttach={setAttach} pick={pick} owner={owner} onNavigate={() => window.innerWidth < 768 && onClose()} pickerOpen={pickerOpen} suggestions={suggestions} />
-      </footer>
-    </section>
-  );
-}
-
-/** Example questions: the first three are the buttons of an empty chat, all of them are what the message box offers to finish. */
-const EXAMPLES = ["ai.chat.ex1", "ai.chat.ex2", "ai.chat.ex3", "ai.chat.ex4", "ai.chat.ex5", "ai.chat.ex6", "ai.chat.ex7", "ai.chat.ex8", "ai.chat.ex9"] as const;
-
-function Hello({ onPick }: { onPick: (q: string) => void }) {
-  const t = useT();
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-5 py-8 text-center">
-      <span aria-hidden className="grid size-14 place-items-center rounded-full bg-accent-soft text-accent-text">
-        <Icon name="sparkle" size={26} />
-      </span>
-      <p className="max-w-[300px] text-[13.5px] leading-relaxed text-pretty text-muted">{t("ai.chat.hello")}</p>
-      <div className="flex flex-wrap justify-center gap-2">
-        {EXAMPLES.slice(0, 3).map((k) => (
-          <button key={k} type="button" onClick={() => onPick(t(k))} className="max-w-full rounded-full bg-surface-2 px-3.5 py-2 text-[12.5px] transition-colors hover:bg-accent-soft">
-            {t(k)}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-
-
-type Conversation = NonNullable<ReturnType<typeof useConversations>["data"]>[number];
-const useConversations = (query: string) => useQuery(conversationsQuery(query));
-
-/** A conversation's title in a list, with its marks: scheduled, and the dot of an answer that came while the admin was away. */
-export function ConversationHead({ c }: { c: Conversation }) {
-  const t = useT();
-  return (
-    <span className="flex w-full items-center gap-1.5">
-      {c.unread && <span role="img" aria-label={t("ai.conv.unread")} title={t("ai.conv.unread")} data-slot="unread" className="size-2 flex-none rounded-full bg-danger" />}
-      <span className={cx("min-w-0 truncate text-[13px]", c.unread ? "font-bold" : "font-semibold")}>{c.title || t("ai.conv.untitled")}</span>
-      {c.taskId && <span className="flex-none rounded-full bg-accent-soft px-1.5 py-px text-[10px] font-semibold text-accent-text">{t("ai.conv.scheduled")}</span>}
-    </span>
-  );
-}
-
-/** When it last moved, its size, and when its next follow-up is due (the panel's time zone). */
-export function ConversationMeta({ c, tz }: { c: Conversation; tz: number }) {
-  const t = useT();
-  const fmt = useFmt();
-  const due = Number(c.followUpUnix ?? 0);
-  return (
-    <span className="text-[11px] text-muted">
-      {fmt.ago(c.updatedUnix)} · {t.n("ai.conv.messages", c.messages)}
-      {due > 0 && <> · {t("ai.conv.followUp", { time: fmt.stampAt(due, tz) })}</>}
-    </span>
-  );
-}
-
-function History({ onPick }: { onPick: (id: string) => void }) {
-  const t = useT();
-  const [query, setQuery] = useState("");
-  const q = useConversations(query.trim());
-  const tz = useQuery(accessQuery).data?.timezoneOffsetMinutes ?? 0;
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 px-3.5 py-3">
-      <input
-        aria-label={t("ai.conv.search")}
-        placeholder={t("ai.conv.search")}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="h-9 rounded-field border border-line bg-canvas px-3 text-[13px] outline-none focus:border-accent"
-      />
-      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-        {q.data?.length === 0 && <p className="py-6 text-center text-[13px] text-muted">{t("ai.conv.empty")}</p>}
-        {q.data?.map((c) => (
-          <button key={c.id} type="button" onClick={() => onPick(c.id)} className="flex flex-col items-start gap-0.5 rounded-field px-2.5 py-2 text-start hover:bg-surface-2">
-            <ConversationHead c={c} />
-            <ConversationMeta c={c} tz={tz} />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export const planIsOpen = (p: Plan) => p.state === PlanState.PROPOSED;

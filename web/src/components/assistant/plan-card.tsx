@@ -1,18 +1,18 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icons";
 import { PlanState } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { useT } from "@/i18n";
 import type { Plan } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { dangerText, factLabel, factWords, toolTitle, type Fact } from "@/lib/integrations";
+import { I, type Glyph } from "./as-icons";
 
 /**
- * A change the assistant prepared (ADR 0014), as an attachment card: what it is and what it does, the facts as a plain
- * two-column list, and the buttons. In the panel's own words, with the same facts and danger notes as an approval. Only
- * this card's button applies it; the model never can. A plan that needs the owner is approved and applied in one step by the
- * owner (with a fresh step-up), and waits in the approval inbox for anyone else.
+ * A change the assistant prepared (ADR 0014), as the board's card (.as-pl): what it is and when it runs out, the facts as a plain two-column
+ * list, what makes it risky, and the buttons; once decided, one line says how it ended. In the panel's own words, with the same facts and danger
+ * notes as an approval. Only this card's button applies it; the model never can. A plan that needs the owner is approved and applied in one step
+ * by the owner (with a fresh step-up), and waits in the approval inbox for anyone else.
  */
 export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenApproval, inline }: { plan: Plan; owner: boolean; busy: boolean; onApply: () => void; onDismiss: () => void; onOpenApproval?: () => void; inline?: ReactNode }) {
   const t = useT();
@@ -24,87 +24,87 @@ export function PlanCardView({ plan, owner, busy, onApply, onDismiss, onOpenAppr
   const openApproval = owner && !!onOpenApproval && ((open && plan.inboxOnly) || plan.state === PlanState.WAITING_OWNER);
   const [now] = useState(() => Math.floor(Date.now() / 1000));
   const left = plan.expiresUnix > 0 ? Math.max(60, plan.expiresUnix - now) : 0;
+  // the border calms down once it is decided; a plan that still waits keeps the accent line
+  const decided = plan.state !== PlanState.PROPOSED && plan.state !== PlanState.WAITING_OWNER;
+  const glyph: Glyph = plan.state === PlanState.APPLIED ? "check" : plan.state === PlanState.WAITING_OWNER ? "clock" : plan.state === PlanState.FAILED ? "warn" : plan.state === PlanState.REJECTED || plan.state === PlanState.DISMISSED ? "x" : "info";
   return (
-    <div data-slot="plan" className="chat-in flex flex-col gap-3 rounded-2xl bg-fg/[0.04] p-4 ring-1 ring-line/70">
-      <div className="flex items-start gap-3">
-        <span aria-hidden className="grid size-8 flex-none place-items-center rounded-[10px] bg-accent-soft text-accent-text">
-          <Icon name="sliders" size={15} />
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[11px] font-medium text-muted">{t("ai.plan.title")}</span>
-          <b className="text-[14px] leading-snug font-semibold">{toolTitle(t, plan.tool)}</b>
-          {plan.summary && <span className="pt-0.5 text-[13px] leading-snug text-pretty text-muted">{plan.summary}</span>}
-        </div>
+    <div data-slot="plan" className={cx("as-pl", decided && (plan.state === PlanState.APPLIED ? "ok" : "no"))}>
+      <div className="as-plh">
+        <span>{t("ai.plan.title")}</span>
+        {open && left > 0 && (
+          <span className="mono" title={t("ai.plan.expires", { time: fmt.clock(plan.expiresUnix) })}>
+            {t("as.plan.expires", { time: fmt.duration(left) })}
+          </span>
+        )}
       </div>
+      <b>{toolTitle(t, plan.tool)}</b>
+      {plan.summary && <p className="as-sum">{plan.summary}</p>}
       {plan.facts.length > 0 && (
-        <dl className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] gap-x-4 gap-y-1.5 border-t border-line/60 pt-3 text-[13px]">
+        <ul>
           {plan.facts.map((f, i) => {
             const fact = f as unknown as Fact;
             return (
-              <div key={i} className="contents">
-                <dt className="text-xs leading-5 text-muted">{factLabel(t, fact.key)}</dt>
-                <dd className="min-w-0 leading-5 text-pretty wrap-anywhere">
+              <li key={i}>
+                <span className="mono">{factLabel(t, fact.key)}</span>
+                <span>
                   {factWords(t, fmt, fact).map((p, j) =>
                     typeof p === "string" ? (
                       <span key={j}>{p}</span>
                     ) : (
                       // text a person or a node supplied: plain, with the panel's note that it is untrusted on hover
-                      <span key={j} title={t("int.ap.untrusted")} className="font-medium whitespace-pre-wrap decoration-faint decoration-dotted underline-offset-4 hover:underline">
+                      <span key={j} title={t("int.ap.untrusted")} className="as-un">
                         {p.data}
                       </span>
                     ),
                   )}
-                </dd>
-              </div>
+                </span>
+              </li>
             );
           })}
-        </dl>
+        </ul>
       )}
-      {(plan.danger.length > 0 || plan.needsApproval) && (
-        <div className="flex flex-wrap gap-1.5">
-          {plan.needsApproval && <span className="tone-warn tint rounded-full px-2.5 py-0.5 text-[11px] font-semibold">{t("ai.plan.needsOwner")}</span>}
-          {plan.danger.map((d) => (
-            <span key={d} className="rounded-full bg-fg/[0.06] px-2.5 py-0.5 text-[11px] text-muted">
-              {dangerText(t, d)}
-            </span>
-          ))}
-        </div>
+      {plan.needsApproval && (
+        <p className="as-w">
+          <I g="warn" />
+          {t("ai.plan.needsOwner")}
+        </p>
       )}
-      {open && plan.inboxOnly && <p className="text-xs leading-snug text-muted">{t("ai.plan.inbox")}</p>}
+      {plan.danger.map((d) => (
+        <p key={d} className="as-w">
+          <I g="warn" />
+          {dangerText(t, d)}
+        </p>
+      ))}
+      {open && plan.inboxOnly && <p className="as-note">{t("ai.plan.inbox")}</p>}
       {openApproval && (
-        <div className="flex flex-wrap items-center gap-2 pt-0.5">
-          <Button type="button" size="sm" variant={inline ? "ghost" : "primary"} onClick={onOpenApproval}>
-            {inline ? t("ai.plan.openWaiting") : t("ai.plan.openConfirm")}
-          </Button>
+        <div className="as-pa">
           {open && (
-            <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onDismiss}>
+            <Button type="button" size="md" disabled={busy} onClick={onDismiss}>
               {t("ai.plan.dismiss")}
             </Button>
           )}
+          <Button type="button" size="md" variant={inline ? "secondary" : "primary"} onClick={onOpenApproval}>
+            {inline ? t("ai.plan.openWaiting") : t("ai.plan.openConfirm")}
+          </Button>
         </div>
       )}
       {open && !plan.inboxOnly && (
-        <div className="flex flex-wrap items-center gap-2 pt-0.5">
-          <Button type="button" size="sm" variant="primary" disabled={busy} onClick={onApply}>
-            {plan.needsApproval && owner ? t("ai.plan.approveApply") : t("ai.plan.apply")}
-          </Button>
-          <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onDismiss}>
+        <div className="as-pa">
+          <Button type="button" size="md" disabled={busy} onClick={onDismiss}>
             {t("ai.plan.dismiss")}
           </Button>
-          {left > 0 && (
-            <span title={t("ai.plan.expires", { time: fmt.clock(plan.expiresUnix) })} className="ms-auto inline-flex items-center gap-1 rounded-full bg-fg/[0.06] px-2.5 py-1 text-[11px] text-muted">
-              <Icon name="clock" size={11} />
-              {t("ai.chat.valid", { time: fmt.duration(left) })}
-            </span>
-          )}
+          <Button type="button" size="md" variant="primary" disabled={busy} onClick={onApply}>
+            {busy && <span className="as-sp" aria-hidden />}
+            {busy ? t("as.plan.busy") : plan.needsApproval && owner ? t("ai.plan.approveApply") : t("ai.plan.apply")}
+          </Button>
         </div>
       )}
-      {openApproval && inline}
+      {openApproval && inline && <div className="as-inline">{inline}</div>}
       {!open && status && (
-        <p className={cx("flex items-center gap-2 text-[13px]", plan.state === PlanState.APPLIED ? "text-ok-text" : plan.state === PlanState.FAILED ? "text-danger-text" : "text-muted")}>
-          <Icon name={plan.state === PlanState.APPLIED ? "check" : plan.state === PlanState.WAITING_OWNER ? "clock" : plan.state === PlanState.FAILED ? "warn" : "info"} size={14} className="flex-none" />
-          <span className="min-w-0">{status}</span>
-        </p>
+        <div className={cx("as-ps", plan.state === PlanState.FAILED && "bad")}>
+          <I g={glyph} />
+          <span>{status}</span>
+        </div>
       )}
     </div>
   );

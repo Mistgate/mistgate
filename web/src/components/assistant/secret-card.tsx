@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { AssistantProvider } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { useT } from "@/i18n";
@@ -11,6 +10,7 @@ import { assistant, telegram, warp } from "@/lib/api";
 import { assistantErrorKey, providerName } from "@/lib/assistant";
 import { errorText } from "@/lib/errors";
 import { markAction, readMarks, type SecretAction } from "@/lib/ui-actions";
+import { I } from "./as-icons";
 import { SecureField } from "./secure-field";
 
 // A secret the assistant asked for (ui_secret_form): a secure field in the chat whose value goes straight to the panel's own
@@ -78,33 +78,30 @@ export function SecretCard({ toolId, action, owner }: { toolId: string; action: 
   const label = action.secret === "provider_key" ? `${t("ai.secret.provider_key")} · ${provider}` : t(`ai.secret.${action.secret}` as MessageKey);
 
   return (
-    <div data-slot="secret" data-state={done ? "done" : "ready"} className="chat-in flex w-full flex-col gap-3 rounded-2xl bg-fg/[0.04] p-4 ring-1 ring-line/70">
-      <div className="flex items-start gap-3">
-        <span aria-hidden className="grid size-8 flex-none place-items-center rounded-[10px] bg-accent-soft text-accent-text">
-          <Icon name="lock" size={15} />
+    <div data-slot="secret" data-state={done ? "done" : "ready"} className={done ? "as-cd done" : "as-cd"}>
+      <div className="as-plh">
+        <span>
+          <I g="lock" />
+          {label}
         </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <b className="text-[14px] leading-snug font-semibold">{label}</b>
-        </div>
       </div>
       {!owner ? (
-        <p className="text-xs leading-snug text-muted">{t("ai.secret.ownerOnly")}</p>
+        <p className="as-note">{t("ai.secret.ownerOnly")}</p>
       ) : done ? (
-        <p className="flex items-center gap-2 text-[13px] text-ok-text">
-          <Icon name="check" size={14} className="flex-none" />
-          {t("ai.secret.entered", { hint: done.hint })}
-        </p>
+        <div className="as-ps">
+          <I g="check" />
+          <span>{t("ai.secret.entered", { hint: done.hint })}</span>
+        </div>
       ) : (
         <form
-          className="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             if (value.trim() && !submit.isPending) submit.mutate(value);
           }}
         >
           <SecureField label={label} value={value} onChange={setValue} multiline={action.secret === "warp_license"} maxLength={action.secret === "warp_license" ? 20_000 : 512} disabled={submit.isPending} />
-          <div className="flex items-center gap-2">
-            <Button type="submit" size="sm" variant="primary" disabled={!value.trim() || submit.isPending}>
+          <div className="as-pa">
+            <Button type="submit" size="md" variant="primary" disabled={!value.trim() || submit.isPending}>
               {t("ai.secret.save")}
             </Button>
           </div>

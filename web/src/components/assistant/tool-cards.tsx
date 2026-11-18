@@ -5,11 +5,12 @@ import type { MessageKey } from "@/i18n/en";
 import type { LiveMsg, LiveTool } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
+import { I } from "./as-icons";
 
-// A turn's working, kept quiet: a "Thinking for 6s" header over what the model said between its tool rounds, and ONE soft
-// group for the tool calls: a summary line ("Used 5 tools · 2 failed · 7s") that opens to a row per call (friendly name, the
-// telling argument as a chip, a small state glyph). A row opens to the raw tool id, its input (coloured) and its output.
-// A failure is a small red glyph and tinted words, never a red box.
+// A turn's working as the board draws it (.as-rs, .as-tc): a "Thinking for 6s" line over what the model said between its tool rounds, and ONE
+// bordered group for the tool calls: a summary line ("Used 5 tools · 2 failed · 7s") that opens to a row per call (friendly name, the telling
+// argument as a chip, a state glyph that is a ring while the call works and a tick that is drawn when it is done). A row opens to the raw tool
+// id, its input (coloured) and its output. A failure is a small red glyph and tinted words, never a red box.
 
 const toolNames: Record<string, MessageKey> = {
   fleet_status: "ai.toolname.fleet_status",
@@ -128,24 +129,23 @@ export function Collapse({ open, children }: { open: boolean; children: ReactNod
   );
 }
 
-function Glyph({ tool }: { tool: LiveTool }) {
-  if (!tool.done) return <span aria-hidden className="size-3.5 flex-none animate-spin rounded-full border-2 border-faint border-t-accent" />;
-  if (tool.ok) return <Icon name="check" size={13} className="flex-none text-ok" />;
+/** The state of a call (.as-ts): a ring while it works, a tick drawn when it is done, a cross when it failed. */
+function State({ tool }: { tool: LiveTool }) {
+  const t = useT();
+  const cls = !tool.done ? "now" : tool.ok ? "done" : "bad";
   return (
-    <svg aria-hidden viewBox="0 0 16 16" className="size-3.5 flex-none text-danger">
-      <circle cx="8" cy="8" r="7" fill="currentColor" />
-      <path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8" fill="none" stroke="var(--ink-on-accent)" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
+    <span aria-hidden className={cx("as-ts", cls)} data-state={cls}>
+      <I g={tool.done && !tool.ok ? "x" : "check"} />
+      <span className="sr-only">{t("ai.tool.done", { tool: toolLabel(t, tool.tool) })}</span>
+    </span>
   );
 }
 
 function Labeled({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11px] text-muted">{label}</span>
-      <div dir="ltr" className="overflow-x-auto rounded-lg bg-canvas/70 px-3 py-2 font-mono text-[11.5px] leading-normal whitespace-nowrap [scrollbar-width:thin]">
-        {children}
-      </div>
+    <div className="as-lb">
+      <span>{label}</span>
+      <div dir="ltr">{children}</div>
     </div>
   );
 }
@@ -158,28 +158,25 @@ export function ToolRow({ tool }: { tool: LiveTool }) {
   const chips = argChips(tool.argsJson);
   const state = !tool.done ? "running" : bad ? "failed" : "ok";
   return (
-    <div data-slot="tool" data-state={state} className="chat-in">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="group flex w-full min-w-0 items-center gap-2.5 px-3 py-2 text-start transition-colors hover:bg-fg/[0.03]">
-        <Icon name={toolIcon(tool.tool)} size={14} className="flex-none text-muted" />
-        <span className="flex-none text-[13px] font-medium">{toolLabel(t, tool.tool)}</span>
-        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+    <div data-slot="tool" data-state={state} data-open={open || undefined} className="as-tr">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="as-trh">
+        <Icon name={toolIcon(tool.tool)} size={16} className="i" />
+        <b>{toolLabel(t, tool.tool)}</b>
+        <span className="as-tra">
           {chips.map((c) => (
-            <span key={c} dir="auto" className="max-w-[9rem] truncate rounded-full bg-fg/[0.07] px-2 py-0.5 text-[11px] text-muted">
+            <span key={c} dir="auto" className="tag mono">
               {c}
             </span>
           ))}
+          {bad && <span className="as-te">{tool.error}</span>}
         </span>
-        {bad && <span className="hidden max-w-[34%] truncate text-[11px] text-danger-text/80 sm:inline">{tool.error}</span>}
-        <Glyph tool={tool} />
-        <Icon name="chevronDown" size={12} className={cx("flex-none text-faint transition-transform duration-200 group-hover:text-muted", open && "rotate-180")} />
-        <span className="sr-only">{t("ai.tool.done", { tool: toolLabel(t, tool.tool) })}</span>
+        <State tool={tool} />
+        <I g="chev" />
       </button>
       <Collapse open={open}>
-        <div className="flex flex-col gap-2.5 px-3 pt-0.5 pb-3">
-          <div className="flex items-center gap-2 text-[11px] text-muted">
-            <code dir="ltr" className="font-mono">
-              {tool.tool}
-            </code>
+        <div className="as-trd">
+          <div className="as-trm">
+            <code dir="ltr">{tool.tool}</code>
             {tool.ms !== undefined && <span className="tabular-nums">· {dur(tool.ms)}</span>}
           </div>
           {tool.argsJson && (
@@ -197,8 +194,8 @@ export function ToolRow({ tool }: { tool: LiveTool }) {
 }
 
 /**
- * The tool calls of a turn in one quiet group. While the turn works it is open with the running call spinning; once the
- * turn is done it folds into its summary line. Past five calls only the last three show, with "+N earlier" above them.
+ * The tool calls of a turn in one bordered group. While the turn works it is open with the running call spinning; once the turn is done
+ * it folds into its summary line. Past five calls only the last three show, with "+N earlier" above them.
  */
 export function ToolGroup({ tools, running, workedMs }: { tools: LiveTool[]; running: boolean; workedMs?: number }) {
   const t = useT();
@@ -211,21 +208,24 @@ export function ToolGroup({ tools, running, workedMs }: { tools: LiveTool[]; run
   const fold = tools.length > 5 && !all;
   const shown = fold ? tools.slice(-3) : tools;
   return (
-    <div data-slot="tools" className="w-full overflow-hidden rounded-xl bg-fg/[0.04]">
-      <button type="button" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen} className="flex w-full items-center gap-2 px-3 py-2 text-start text-xs text-muted transition-colors hover:text-fg">
-        {live ? <span aria-hidden className="size-3 flex-none animate-spin rounded-full border-[1.5px] border-faint border-t-accent" /> : <Icon name="check" size={12} className="flex-none" />}
-        <span className="min-w-0 truncate">
+    <div data-slot="tools" className={cx("as-tc", isOpen && "open")}>
+      <button type="button" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen} className="as-tch">
+        <span aria-hidden className={cx("as-ts", live ? "now" : "done")}>
+          <I g="check" />
+        </span>
+        <span>
           {t.n(live ? "ai.grp.using" : "ai.grp.used", tools.length)}
-          {failed > 0 && <span className="text-danger-text/85"> · {t("ai.tools.failed", { n: failed })}</span>}
+          {failed > 0 && <span className="text-danger-text"> · {t("ai.tools.failed", { n: failed })}</span>}
           {!live && workedMs !== undefined && <span> · {dur(workedMs)}</span>}
         </span>
-        <span className="flex-1" />
-        <Icon name="chevronDown" size={12} className={cx("flex-none transition-transform duration-200", isOpen && "rotate-180")} />
+        <span className="as-cv">
+          <I g="chev" />
+        </span>
       </button>
       <Collapse open={isOpen}>
-        <div className="flex flex-col divide-y divide-line/60 border-t border-line/60">
+        <div>
           {fold && (
-            <button type="button" onClick={() => setAll(true)} className="px-3 py-1.5 text-start text-xs text-muted transition-colors hover:text-fg">
+            <button type="button" onClick={() => setAll(true)} className="as-more">
               {t.n("ai.tool.earlier", tools.length - 3)}
             </button>
           )}
@@ -250,7 +250,7 @@ function useElapsed(t0: number | undefined, live: boolean) {
 }
 
 /**
- * "Thinking for 6s" while the turn works, "Thought for 6s" after; it opens to what the model said between tool rounds. It is
+ * "Thinking for 6s" while the turn works, "Thought for 6s" after (.as-rs); it opens to what the model said between tool rounds. It is
  * there while the turn works or when the model said something; a finished turn without words only has its tool group.
  */
 export function Thinking({ m, running, interim }: { m: LiveMsg; running: boolean; interim: string }) {
@@ -267,7 +267,7 @@ export function Thinking({ m, running, interim }: { m: LiveMsg; running: boolean
   const label = (
     <>
       {before}
-      <b className="font-semibold text-fg">{secs}</b>
+      <b className="mono">{secs}</b>
       {after}
     </>
   );
@@ -275,20 +275,18 @@ export function Thinking({ m, running, interim }: { m: LiveMsg; running: boolean
   return (
     <div data-slot="thinking" className="flex w-full flex-col gap-2">
       {expandable ? (
-        <button type="button" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen} className="flex items-center gap-1 self-start text-xs text-muted transition-colors hover:text-fg">
+        <button type="button" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen} className="as-rs">
           {label}
-          <Icon name="chevronDown" size={12} className={cx("transition-transform duration-200", isOpen && "rotate-180")} />
+          <I g="chev" />
         </button>
       ) : (
-        <span className="text-xs text-muted">{label}</span>
+        <span className="as-rs">{label}</span>
       )}
       {expandable && (
         <Collapse open={isOpen}>
-          <div className="flex flex-col gap-2 border-s-2 border-line ps-3 text-[13px] leading-relaxed text-muted">
+          <div className="as-thought">
             {interim.split(/\n{2,}/).map((p, i) => (
-              <p key={i} className="whitespace-pre-wrap break-words">
-                {p}
-              </p>
+              <p key={i}>{p}</p>
             ))}
           </div>
         </Collapse>

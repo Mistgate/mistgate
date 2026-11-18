@@ -7,7 +7,8 @@ import { ChatRole } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { setLang } from "@/i18n";
 import { followUpPoll } from "@/lib/assistant";
 import { stampAtOffsetOf } from "@/lib/format";
-import { ChatButton, ChatPanel, useChat } from "./chat";
+import { ChatButton, useChat } from "./chat";
+import { ChatPanel } from "./panel";
 
 // The assistant's follow-ups in the chat (assistant.proto, FOLLOW-UPS): the quiet line of one that waits, with Cancel, in the
 // panel's time zone; the "On a timer" label of the turn it started; the note of one that did not run; the unread dot.

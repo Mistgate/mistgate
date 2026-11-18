@@ -1,0 +1,21 @@
+/**
+ * While the panel is open the conversation follows what the server does without this chat: a turn running there (a follow-up's,
+ * another tab's) is looked at every 4 s until it ends, and a follow-up is looked for just after its time.
+ */
+function useServerTurns(chat: ChatApi) {
+  const { conversationId, running, live, refresh } = chat;
+  const followUps = chat.followUps ?? [];
+  const next = followUps.reduce((min, f) => (Number(f.dueUnix) > 0 ? Math.min(min, Number(f.dueUnix)) : min), Infinity);
+  useEffect(() => {
+    if (!conversationId || live || !refresh) return;
+    let delay: number;
+    const ahead = next * 1000 - Date.now();
+    if (running) delay = 4_000;
+    else if (!Number.isFinite(next)) return;
+    // due: the scheduler takes it within a tick; long overdue (the assistant was off), looked at now and then
+    else delay = ahead > 0 ? Math.min(ahead + 3_000, 10 * 60_000) : ahead > -120_000 ? 5_000 : 30_000;
+    const id = setTimeout(refresh, delay);
+    return () => clearTimeout(id);
+  }, [conversationId, running, live, next, refresh]);
+}
+

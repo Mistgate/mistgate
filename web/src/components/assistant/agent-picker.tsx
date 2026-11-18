@@ -1,21 +1,22 @@
-import { Menu } from "@base-ui/react/menu";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Icon } from "@/components/ui/icons";
 import { AssistantEffort, AssistantProvider } from "@/gen/mistgate/admin/v1/assistant_pb";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
-import { accessQuery, providerName } from "@/lib/assistant";
+import { accessQuery, providerName, providers } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { readPref, writePref } from "@/lib/storage";
 import { AUTO_OPEN_KEY } from "@/lib/ui-actions";
-import { BrandMark, customProviderBrand, modelBrand, providerBrand } from "./brand-icons";
+import { BrandMark, customProviderBrand, providerBrand } from "./brand-icons";
+import { I } from "./as-icons";
 
-// The chat's agent picker: which connected provider answers this turn and how hard it thinks. The choice is the browser's
-// (localStorage) and goes with every turn (ChatRequest.provider / .effort); empty means the panel's own setting. The list of
-// connected providers (with their model and price) comes from the access the panel answers every admin.
+// The chat's agent picker (the board's "model" button and its window): which connected provider answers this turn and how hard it thinks. The
+// choice is the browser's (localStorage) and goes with every turn (ChatRequest.provider / .effort); empty means the panel's own setting. The list
+// of connected providers (with their model and price) comes from the access the panel answers every admin. A provider answers with the one model
+// the owner set for it, so its column holds that model; a provider without a key is on the list too, with the way to add one.
 
 /** The provider's own mark, or the generic one for a provider without a known mark. */
 function ProviderMark({ provider, size, url = "" }: { provider: number; size: number; url?: string }) {
@@ -24,9 +25,9 @@ function ProviderMark({ provider, size, url = "" }: { provider: number; size: nu
 }
 
 const efforts = [
-  [AssistantEffort.QUICK, "ai.effort.quick", "ai.pick.quickD"],
-  [AssistantEffort.NORMAL, "ai.effort.normal", "ai.pick.normalD"],
-  [AssistantEffort.THOROUGH, "ai.effort.thorough", "ai.pick.thoroughD"],
+  [AssistantEffort.QUICK, "ai.effort.quick", "as.dp.quick"],
+  [AssistantEffort.NORMAL, "ai.effort.normal", "as.dp.normal"],
+  [AssistantEffort.THOROUGH, "ai.effort.thorough", "as.dp.thorough"],
 ] as const satisfies readonly (readonly [AssistantEffort, MessageKey, MessageKey])[];
 
 const PROVIDER_KEY = "assistant-provider";
@@ -41,8 +42,10 @@ export type Pick = {
   setEffort: (e: number) => void;
   /** The connected providers, the panel's own first. A provider whose month's budget is spent can be seen but not picked. */
   options: { id: number; name: string; model: string; inUsd: number; outUsd: number; budgetReached: boolean; isDefault: boolean; url: string }[];
-  /** The provider and the depth in effect, in words: "Ollama Cloud · deepseek-v4.1-flash". */
+  /** The provider and the depth in effect, in words: "Ollama Cloud · deepseek-v4.1-flash · Thorough". */
   label: string;
+  /** The same without the depth: "Ollama Cloud · deepseek-v4.1-flash". */
+  name: string;
   selectedProvider: number;
   selectedEffort: number;
 };
@@ -63,7 +66,8 @@ export function usePick({ provider: accessProvider, model: accessModel }: { prov
   const modelName = chosen ? chosen.model || t("ai.prov.modelDefault") : accessModel || "";
   const providerLabel = chosen?.name ?? (accessProvider ? t(providerName(accessProvider)) : "");
   const effortLabel = stored.effort ? t(efforts.find((e) => e[0] === stored.effort)![1]) : "";
-  const label = [providerLabel && modelName ? `${providerLabel} · ${modelName}` : providerLabel || modelName, effortLabel].filter(Boolean).join(" · ");
+  const name = providerLabel && modelName ? `${providerLabel} · ${modelName}` : providerLabel || modelName;
+  const label = [name, effortLabel].filter(Boolean).join(" · ");
   return {
     provider,
     effort: stored.effort,
@@ -77,98 +81,181 @@ export function usePick({ provider: accessProvider, model: accessModel }: { prov
     },
     options,
     label,
+    name,
     selectedProvider,
     selectedEffort,
   };
 }
 
-const item = "flex w-full cursor-default items-start gap-2.5 rounded-[10px] px-2.5 py-2 text-start outline-none data-highlighted:bg-surface-2";
+/** The place of the depth on the slider: 0 quick, 1 normal, 2 thorough; normal when neither the browser nor the panel names one. */
+const depthIndex = (effort: number) => {
+  const k = efforts.findIndex((e) => e[0] === effort);
+  return k < 0 ? 1 : k;
+};
 
-export function AgentPicker({ pick, owner, onNavigate, defaultOpen }: { pick: Pick; owner: boolean; onNavigate?: () => void; defaultOpen?: boolean }) {
+type Tab = { id: number; name: string; connected: boolean; option?: Pick["options"][number]; dataKey?: MessageKey };
+
+/** What the left column lists: the connected providers as the panel orders them, then the built-in ones that have no key yet. */
+function tabsOf(pick: Pick, t: ReturnType<typeof useT>): Tab[] {
+  const known = new Map(providers.map((p) => [p.id as number, p]));
+  const out: Tab[] = pick.options.map((o) => ({ id: o.id, name: o.name, connected: true, option: o, dataKey: known.get(o.id)?.data }));
+  for (const p of providers) if (!pick.options.some((o) => o.id === p.id)) out.push({ id: p.id, name: t(p.name), connected: false, dataKey: p.data });
+  return out;
+}
+
+export function AgentPicker({ pick, owner, onNavigate, defaultOpen, disabled }: { pick: Pick; owner: boolean; onNavigate?: () => void; defaultOpen?: boolean; disabled?: boolean }) {
   const t = useT();
   const fmt = useFmt();
   const money = (n: number) => n.toLocaleString(fmt.locale, { maximumFractionDigits: 2 });
+  const [open, setOpen] = useState(!!defaultOpen && !disabled);
+  const [seen, setSeen] = useState<number | null>(null);
   // this browser's "open pages without asking": a page the assistant opens in a turn is opened at once
   const [auto, setAuto] = useState(() => readPref(AUTO_OPEN_KEY) === "1");
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const tabs = tabsOf(pick, t);
+  const cur = tabs.find((x) => x.id === pick.selectedProvider);
+  const see = tabs.find((x) => x.id === (seen ?? pick.selectedProvider)) ?? tabs[0];
+  const depth = depthIndex(pick.selectedEffort);
+
+  // a press outside shuts it, as Esc does
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
+
+  const shut = (focus = true) => {
+    setOpen(false);
+    setSeen(null);
+    if (focus) trigger.current?.focus();
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === "Escape" && open) {
+      e.stopPropagation();
+      shut();
+    }
+  };
+  const slide = (e: KeyboardEvent) => {
+    const rtl = getComputedStyle(e.currentTarget).direction === "rtl";
+    const step = e.key === "ArrowRight" ? (rtl ? -1 : 1) : e.key === "ArrowLeft" ? (rtl ? 1 : -1) : e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = Math.min(efforts.length - 1, Math.max(0, depth + step));
+    pick.setEffort(efforts[next]![0]);
+    (e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]')[next] ?? null)?.focus();
+  };
+  const tabKey = (e: KeyboardEvent) => {
+    const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+    if (!step || !see) return;
+    e.preventDefault();
+    const at = tabs.findIndex((x) => x.id === see.id);
+    const next = tabs[(at + step + tabs.length) % tabs.length]!;
+    setSeen(next.id);
+    (e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[tabs.indexOf(next)] ?? null)?.focus();
+  };
+
+  const note = see ? (see.dataKey ? t(see.dataKey) : see.option?.url || "") : "";
+  const price = see?.option && see.option.inUsd > 0 ? t("ai.prov.price", { in: money(see.option.inUsd), out: money(see.option.outUsd) }) : "";
+  const mark = (id: number, url?: string) => (
+    <span className="as-pv mono" aria-hidden>
+      <ProviderMark provider={id} size={14} url={url} />
+    </span>
+  );
+
   return (
-    <Menu.Root defaultOpen={defaultOpen}>
-      <Menu.Trigger aria-label={t("ai.pick.agent")} title={t("ai.pick.agent")} className="flex min-w-0 items-center gap-1.5 rounded-full px-2 py-1.5 text-xs text-muted transition-colors outline-none hover:bg-surface-2 hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-surface-2 data-popup-open:text-fg">
-        <ProviderMark provider={pick.selectedProvider} size={14} url={pick.options.find((o) => o.id === pick.selectedProvider)?.url} />
-        <span className="min-w-0 truncate">{pick.label || t("ai.pick.agent")}</span>
-        <Icon name="chevronDown" size={12} />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner side="top" align="start" sideOffset={8} className="z-50 outline-none">
-          <Menu.Popup className="w-[min(320px,calc(100vw-2rem))] origin-(--transform-origin) rounded-xl border border-line bg-surface p-1.5 shadow-(--shadow-toast) outline-none transition-[scale,opacity] duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0">
-            {pick.options.length > 0 && (
-              <>
-                <Menu.RadioGroup value={String(pick.selectedProvider)} onValueChange={(v) => pick.setProvider(pick.options.find((o) => String(o.id) === v)?.isDefault ? 0 : Number(v))} aria-label={t("ai.pick.agent")}>
-                  {pick.options.map((o) => (
-                    <Menu.RadioItem key={o.id} value={String(o.id)} closeOnClick={false} disabled={o.budgetReached} className={cx(item, o.budgetReached && "opacity-50")}>
-                      <span aria-hidden className="mt-0.5 grid size-7 flex-none place-items-center rounded-lg bg-surface-2 text-fg">
-                        <ProviderMark provider={o.id} size={15} url={o.url} />
-                      </span>
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="flex items-center gap-2 text-[13px] font-semibold">
-                          {o.name}
-                          {o.isDefault && <span className="rounded-full bg-surface-2 px-1.5 py-px text-[10px] font-medium text-muted">{t("ai.pick.default")}</span>}
-                        </span>
-                        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
-                          {!o.budgetReached && modelBrand(o.model) && <BrandMark brand={modelBrand(o.model)!} size={12} className="flex-none" />}
-                          <span className="truncate">{o.budgetReached ? t("ai.pick.budget") : o.model || t("ai.prov.modelDefault")}</span>
-                        </span>
-                        {!o.budgetReached && o.inUsd > 0 && <span className="text-[11px] text-faint">{t("ai.prov.price", { in: money(o.inUsd), out: money(o.outUsd) })}</span>}
-                      </span>
-                      <Menu.RadioItemIndicator className="mt-1 flex-none text-accent-text">
-                        <Icon name="check" size={14} />
-                      </Menu.RadioItemIndicator>
-                    </Menu.RadioItem>
-                  ))}
-                </Menu.RadioGroup>
-                <div role="separator" className="mx-1 my-1.5 h-px bg-line" />
-              </>
-            )}
-            <p className="px-2.5 pt-1 pb-1 text-[11px] font-medium text-muted">{t("ai.pick.depth")}</p>
-            <Menu.RadioGroup value={String(pick.selectedEffort)} onValueChange={(v) => pick.setEffort(Number(v))} aria-label={t("ai.pick.depth")}>
-              {efforts.map(([value, name, desc]) => (
-                <Menu.RadioItem key={value} value={String(value)} closeOnClick={false} className={cx(item, "items-center")}>
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="text-[13px] font-semibold">{t(name)}</span>
-                    <span className="text-xs text-muted">{t(desc)}</span>
-                  </span>
-                  <Menu.RadioItemIndicator className="flex-none text-accent-text">
-                    <Icon name="check" size={14} />
-                  </Menu.RadioItemIndicator>
-                </Menu.RadioItem>
+    <div ref={wrap} className="as-mw" onKeyDown={onKey}>
+      <button ref={trigger} type="button" className="as-md" aria-haspopup="listbox" aria-expanded={open} aria-label={t("ai.pick.agent")} title={t("ai.pick.agent")} disabled={disabled} onClick={() => (open ? shut(false) : setOpen(true))}>
+        <span className="as-pv mono" aria-hidden>
+          {pick.selectedProvider ? <ProviderMark provider={pick.selectedProvider} size={14} url={cur?.option?.url} /> : "–"}
+        </span>
+        <span>{pick.name || t("as.off.model")}</span>
+        <I g="chev" />
+      </button>
+      {open && !disabled && (
+        <div className="as-mp">
+          <div className="as-m2">
+            <div className="as-m2p" role="tablist" aria-label={t("as.pick.prov")} onKeyDown={tabKey}>
+              {tabs.map((g) => (
+                <button key={g.id} type="button" role="tab" aria-selected={g.id === see?.id} tabIndex={g.id === see?.id ? 0 : -1} className={cx("as-pt", g.id === pick.selectedProvider && "as-cur")} onClick={() => setSeen(g.id)} onMouseEnter={() => setSeen(g.id)}>
+                  {mark(g.id, g.option?.url)}
+                  <span>{g.name}</span>
+                  <i className="dot" aria-hidden />
+                </button>
               ))}
-            </Menu.RadioGroup>
-            <div role="separator" className="mx-1 my-1.5 h-px bg-line" />
-            <Menu.CheckboxItem
-              checked={auto}
-              closeOnClick={false}
-              onCheckedChange={(v) => {
-                setAuto(v);
-                writePref(AUTO_OPEN_KEY, v ? "1" : null);
-              }}
-              className={cx(item, "items-center text-[13px]")}
-            >
-              <span className="min-w-0 flex-1">{t("ai.ui.auto")}</span>
-              <Menu.CheckboxItemIndicator className="flex-none text-accent-text">
-                <Icon name="check" size={14} />
-              </Menu.CheckboxItemIndicator>
-            </Menu.CheckboxItem>
-            {owner && (
-              <>
-                <div role="separator" className="mx-1 my-1.5 h-px bg-line" />
-                <Menu.Item render={<Link to="/ai" />} onClick={onNavigate} className={cx(item, "items-center text-[13px] text-muted")}>
-                  <Icon name="gear" size={14} />
-                  {t("ai.chat.settings")}…
-                </Menu.Item>
-              </>
-            )}
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
+            </div>
+            <div className="as-m2m" role="listbox" aria-label={t("as.pick.model")}>
+              <p className="as-m2n">{[note, price].filter(Boolean).join(" · ")}</p>
+              {see?.option && (
+                <button
+                  key={see.id}
+                  type="button"
+                  role="option"
+                  aria-selected={see.id === pick.selectedProvider}
+                  className="as-mo"
+                  disabled={see.option.budgetReached}
+                  onClick={() => {
+                    pick.setProvider(see.option!.isDefault ? 0 : see.id);
+                    shut();
+                  }}
+                >
+                  <span className="mono">{see.option.model || t("ai.prov.modelDefault")}</span>
+                  <span>{see.option.budgetReached ? t("ai.pick.budget") : see.option.isDefault ? t("ai.pick.default") : ""}</span>
+                  <I g="check" />
+                </button>
+              )}
+              {see && !see.connected && (
+                <div className="as-m2e">
+                  <span>{t("as.pick.nokey")}</span>
+                  {owner && (
+                    <Link to="/ai" onClick={onNavigate} className="inline-flex h-8 items-center rounded-ctl border border-line bg-step px-3 text-[13px] font-medium text-fg hover:bg-(--step-hover)">
+                      {t("ai.prov.connect")}
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="as-dp">
+            <div className="as-dpl">
+              <span>{t("as.dp.t")}</span>
+              <b>{t(efforts[depth]![1])}</b>
+              <span className="as-dph">{t(efforts[depth]![2])}</span>
+            </div>
+            <div className={`as-sl d${depth}`} role="radiogroup" aria-label={t("ai.pick.depth")} style={{ ["--p" as string]: depth / 2 }} onKeyDown={slide}>
+              <i className="as-slf" aria-hidden />
+              <span className="as-spt" aria-hidden>
+                {Array.from({ length: 7 }, (_, k) => (
+                  <i key={k} />
+                ))}
+              </span>
+              {efforts.map(([value, name, hint], k) => (
+                <button key={value} type="button" role="radio" aria-checked={k === depth} tabIndex={k === depth ? 0 : -1} aria-label={t(name)} title={t(hint)} onClick={() => pick.setEffort(value)}>
+                  <i aria-hidden />
+                </button>
+              ))}
+              <span className="as-slt" aria-hidden />
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={auto}
+            className="as-ao"
+            onClick={() => {
+              const next = !auto;
+              setAuto(next);
+              writePref(AUTO_OPEN_KEY, next ? "1" : null);
+            }}
+          >
+            <span>{t("ai.ui.auto")}</span>
+            <span className="as-sw2" aria-hidden />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

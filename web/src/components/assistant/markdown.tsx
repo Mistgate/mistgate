@@ -3,6 +3,8 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import { Icon } from "@/components/ui/icons";
 import { cx } from "@/lib/cx";
 import { parseInline, safeHttpsUrl, type Inline } from "@/components/mini-markdown";
+import { I } from "./as-icons";
+import "./assistant.css";
 
 // The assistant's answers (ADR 0014): Markdown from a model that read untrusted data, so it is rendered like the release
 // notes (components/mini-markdown): React elements built from strings, no raw HTML, no images (an image URL would send data
@@ -29,8 +31,6 @@ type Block =
 export type ChatEntity = { name: string; id: string; dot: "ok" | "warn" | "bad" | "off" };
 
 const commonWords = new Set(["a", "an", "as", "at", "be", "by", "do", "go", "he", "if", "in", "is", "it", "me", "my", "no", "of", "on", "or", "so", "to", "up", "us", "we", "all", "and", "any", "are", "but", "can", "for", "has", "new", "not", "now", "one", "out", "the", "two", "was", "way", "edge", "home", "main", "mass", "test", "free", "fast", "next", "last"]);
-
-const dotCls = { ok: "bg-ok", warn: "bg-warn", bad: "bg-danger", off: "bg-faint" } as const;
 
 function entityPattern(list: readonly ChatEntity[]): RegExp | null {
   const names = [...new Set(list.map((e) => e.name).filter((n) => n.trim().length > 0))].sort((a, b) => b.length - a.length);
@@ -175,15 +175,10 @@ function wordSpans(text: string, key: string): ReactNode[] {
 
 function EntityChip({ e, label, onNavigate }: { e: ChatEntity; label: string; onNavigate?: () => void }) {
   return (
-    <Link
-      to="/nodes/$id"
-      params={{ id: e.id }}
-      onClick={onNavigate}
-      data-entity="node"
-      className="mx-px inline-flex items-baseline gap-1 rounded-md bg-fg/[0.07] px-1.5 py-px align-baseline font-semibold text-fg no-underline transition-colors hover:bg-accent-soft hover:text-accent-text"
-    >
-      <span aria-hidden className={cx("size-1.5 shrink-0 -translate-y-px self-center rounded-full", dotCls[e.dot])} />
+    <Link to="/nodes/$id" params={{ id: e.id }} onClick={onNavigate} data-entity="node" className="as-nc">
+      <i aria-hidden className={cx("dot", e.dot !== "ok" && e.dot)} />
       {label}
+      <I g="out" flip />
     </Link>
   );
 }
@@ -216,22 +211,20 @@ function inline(nodes: Inline[], ctx: Ctx): ReactNode[] {
         return <Fragment key={i}>{linkify(n.text, ctx, String(i))}</Fragment>;
       case "bold":
         return (
-          <strong key={i} className="font-semibold text-fg">
-            {inline(n.children, { ...ctx, bold: true })}
-          </strong>
+          <strong key={i}>{inline(n.children, { ...ctx, bold: true })}</strong>
         );
       case "em":
         return <em key={i}>{inline(n.children, ctx)}</em>;
       case "code":
         return (
-          <code key={i} className={cx("rounded-md bg-fg/[0.07] px-1.5 py-0.5 font-mono text-[0.84em] font-normal whitespace-nowrap", ctx.words && "chat-word")}>
+          <code key={i} className={ctx.words ? "chat-word" : undefined}>
             {n.text}
           </code>
         );
       case "link": {
         if (internalPath(n.href)) {
           return (
-            <Link key={i} to={n.href} onClick={onNavigate} data-internal="" className="font-semibold text-accent-text underline decoration-accent-line underline-offset-2">
+            <Link key={i} to={n.href} onClick={onNavigate} data-internal="">
               {n.text}
             </Link>
           );
@@ -240,11 +233,11 @@ function inline(nodes: Inline[], ctx: Ctx): ReactNode[] {
         if (!href) return n.text;
         return (
           <Fragment key={i}>
-            <a href={href} target="_blank" rel="noopener noreferrer" title={href} className="text-accent-text underline decoration-accent-line underline-offset-2">
+            <a href={href} target="_blank" rel="noopener noreferrer" title={href}>
               {n.text}
               <Icon name="externalLink" size={11} className="ms-0.5 inline-block align-[-1px]" />
             </a>
-            <span data-link-host="" className="ms-1 text-[0.85em] break-all text-muted">
+            <span data-link-host="">
               {new URL(href).hostname}
             </span>
           </Fragment>
@@ -265,48 +258,32 @@ export function ChatMarkdown({ text, onNavigate, entities, words }: { text: stri
   const ctx: Ctx = { onNavigate, entities, pattern, words };
   const inlineCtx = (c: Inline[]) => inline(c, ctx);
   return (
-    <div className="flex flex-col gap-3 text-[15px] leading-[1.65] font-normal text-pretty break-words">
+    <div className="as-mk">
       {parseChatMarkdown(text).map((b, i) => {
         switch (b.kind) {
           case "code":
             return (
-              <pre key={i} className="overflow-x-auto rounded-xl bg-fg/[0.06] px-3.5 py-3 font-mono text-[12.5px] leading-normal">
+              <pre key={i}>
                 <code>{b.text}</code>
               </pre>
             );
           case "heading":
-            return b.level === 1 ? (
-              <h3 key={i} className="mt-1.5 text-[16.5px] leading-snug font-bold tracking-[-0.01em] first:mt-0">
-                {inlineCtx(b.children)}
-              </h3>
-            ) : b.level === 2 ? (
-              <h4 key={i} className="mt-1 text-[15.5px] leading-snug font-bold first:mt-0">
-                {inlineCtx(b.children)}
-              </h4>
-            ) : (
-              <h5 key={i} className="mt-0.5 text-[13px] leading-snug font-bold tracking-[0.02em] text-muted uppercase first:mt-0">
-                {inlineCtx(b.children)}
-              </h5>
-            );
+            return b.level === 1 ? <h3 key={i}>{inlineCtx(b.children)}</h3> : b.level === 2 ? <h4 key={i}>{inlineCtx(b.children)}</h4> : <h5 key={i}>{inlineCtx(b.children)}</h5>;
           case "paragraph":
             return <p key={i}>{inlineCtx(b.children)}</p>;
           case "quote":
-            return (
-              <blockquote key={i} className="border-s-2 border-line ps-3 text-muted">
-                {inlineCtx(b.children)}
-              </blockquote>
-            );
+            return <blockquote key={i}>{inlineCtx(b.children)}</blockquote>;
           case "rule":
-            return <hr key={i} className="my-1 border-line" />;
+            return <hr key={i} />;
           case "list": {
             const Tag = b.ordered ? "ol" : "ul";
             return (
-              <Tag key={i} className={cx("flex flex-col gap-1.5 ps-5 marker:text-muted", b.ordered ? "list-decimal marker:tabular-nums" : "list-disc")}>
+              <Tag key={i}>
                 {b.items.map((it, j) => (
-                  <li key={j} className="ps-0.5">
+                  <li key={j}>
                     {inlineCtx(it.text)}
                     {it.children.length > 0 && (
-                      <ul className="mt-1 flex list-[circle] flex-col gap-1 ps-4 text-[14px] text-fg/85 marker:text-faint">
+                      <ul>
                         {it.children.map((c, k) => (
                           <li key={k}>{inlineCtx(c)}</li>
                         ))}
@@ -319,12 +296,12 @@ export function ChatMarkdown({ text, onNavigate, entities, words }: { text: stri
           }
           case "table":
             return (
-              <div key={i} role="region" aria-label="table" tabIndex={0} className="-mx-1 overflow-x-auto rounded-xl border border-line bg-fg/[0.025]">
-                <table className="w-full border-collapse text-[13.5px] leading-[1.5]">
+              <div key={i} role="region" aria-label="table" tabIndex={0} className="as-tb">
+                <table>
                   <thead>
-                    <tr className="border-b border-line">
+                    <tr>
                       {b.head.map((c, j) => (
-                        <th key={j} scope="col" className={cx("px-3 py-2 text-[12px] font-semibold whitespace-nowrap text-muted", alignCls[b.align[j] ?? "left"])}>
+                        <th key={j} scope="col" className={alignCls[b.align[j] ?? "left"]}>
                           {inlineCtx(c)}
                         </th>
                       ))}
@@ -332,9 +309,9 @@ export function ChatMarkdown({ text, onNavigate, entities, words }: { text: stri
                   </thead>
                   <tbody>
                     {b.rows.map((r, j) => (
-                      <tr key={j} className="border-b border-line/60 align-top last:border-0">
+                      <tr key={j}>
                         {r.map((c, k) => (
-                          <td key={k} className={cx("px-3 py-2", k === 0 && "font-semibold whitespace-nowrap", alignCls[b.align[k] ?? "left"])}>
+                          <td key={k} className={alignCls[b.align[k] ?? "left"]}>
                             {inlineCtx(c)}
                           </td>
                         ))}

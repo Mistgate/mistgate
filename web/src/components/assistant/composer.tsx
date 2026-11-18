@@ -4,13 +4,14 @@ import { Tip } from "@/components/ui/tooltip";
 import { useT } from "@/i18n";
 import { looksSecret, type Context } from "@/lib/assistant";
 import { AgentPicker, type Pick } from "./agent-picker";
+import { I } from "./as-icons";
 import { Ghost, suggest } from "./ghost";
 
 /**
- * The message box: the page the message goes with as a chip on top, the text (grows to about six lines, then scrolls softly),
- * and under it "+" (attach the page again), the agent picker and the send button, which is the stop button while a turn runs.
- * Enter sends, Shift+Enter breaks the line. A question started like an earlier one (`suggestions`) is finished in a dim colour;
- * Tab, or → at the end, takes it.
+ * The message box (the board's .as-in): the page the message goes with as a chip on top, the text (grows to about six lines, then scrolls
+ * softly), and under it the agent picker and the send button, which is the stop button while a turn runs. A "+" brings the page back after it
+ * was let go. Enter sends, Shift+Enter breaks the line. A question started like an earlier one (`suggestions`) is finished in a dim colour;
+ * Tab, or → at the end, takes it. With `off` (no provider) the box is closed and says what to do first.
  */
 export function Composer({
   text,
@@ -26,6 +27,9 @@ export function Composer({
   onNavigate,
   pickerOpen,
   suggestions,
+  off,
+  placeholder,
+  focusOnMount,
 }: {
   text: string;
   onText: (v: string) => void;
@@ -40,6 +44,9 @@ export function Composer({
   onNavigate?: () => void;
   pickerOpen?: boolean;
   suggestions?: readonly string[];
+  off?: boolean;
+  placeholder?: string;
+  focusOnMount?: boolean;
 }) {
   const t = useT();
   const area = useRef<HTMLTextAreaElement>(null);
@@ -47,7 +54,7 @@ export function Composer({
   // the suggestion just taken, while its letters land: the box's own text is hidden under them for that moment
   const [taken, setTaken] = useState<{ base: string; rest: string } | null>(null);
   const landing = taken && taken.base + taken.rest === text ? taken : null;
-  const rest = landing || running ? "" : suggest(text, suggestions ?? []);
+  const rest = landing || running || off ? "" : suggest(text, suggestions ?? []);
   const ghost = landing ?? (rest ? { base: text, rest } : null);
   const accept = () => {
     if (!rest) return;
@@ -56,6 +63,11 @@ export function Composer({
     area.current?.focus();
   };
 
+  // the window opens with the cursor in the box (the board focuses it): not on a phone, where that would raise the keyboard over the answer
+  useLayoutEffect(() => {
+    if (focusOnMount && !off && typeof matchMedia === "function" && !matchMedia("(max-width: 720px)").matches) area.current?.focus({ preventScroll: true });
+  }, [focusOnMount, off]);
+
   // grow with the text up to six lines; past that the box scrolls with a soft fade at the edge that has more
   useLayoutEffect(() => {
     const el = area.current;
@@ -63,7 +75,7 @@ export function Composer({
     el.style.height = "auto";
     el.dataset.empty = text ? "0" : "1";
     el.dataset.ghost = ghost?.rest ? "1" : "0";
-    const max = 6 * 20;
+    const max = 6 * 20 + 8;
     // the suggestion may wrap onto a line the typed text has not reached
     el.style.height = `${Math.min(Math.max(el.scrollHeight, mirror.current?.scrollHeight ?? 0), max)}px`;
     el.dataset.top = el.scrollTop > 1 ? "1" : "0";
@@ -71,34 +83,26 @@ export function Composer({
   }, [text, ghost?.rest]);
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-[18px] border border-line bg-canvas px-3 pt-2.5 pb-2 transition-colors focus-within:border-accent-line">
+    <div className="as-in">
       {context && attached && (
-        <div className="flex">
-          <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface-2 py-1 ps-2 pe-1 text-[11.5px] font-medium text-muted">
-            <Icon name="link" size={12} className="flex-none" />
-            <span className="truncate">{t("ai.chat.page", { label: context.label })}</span>
-            <button type="button" aria-label={t("ai.chat.unpage")} title={t("ai.chat.unpage")} onClick={() => onAttach(false)} className="grid size-4 flex-none place-items-center rounded-md hover:bg-surface hover:text-fg">
-              <Icon name="x" size={10} />
+        <div className="as-cr">
+          <span className="tag as-cx">
+            <I g="link" />
+            <span>{t("ai.chat.page", { label: context.label })}</span>
+            <button type="button" aria-label={t("ai.chat.unpage")} title={t("ai.chat.unpage")} onClick={() => onAttach(false)}>
+              <I g="x" />
             </button>
           </span>
         </div>
       )}
-      <div className="relative">
-        {ghost && (
-          <Ghost
-            base={ghost.base}
-            rest={ghost.rest}
-            accepted={!!landing}
-            onAccept={accept}
-            onDone={() => setTaken(null)}
-            label={t("ai.chat.accept")}
-            className="pointer-events-none absolute inset-x-0 top-0 z-10 px-1 text-[13.5px] leading-5 break-words whitespace-pre-wrap"
-          />
-        )}
+      <div className="as-tw">
+        {ghost && <Ghost base={ghost.base} rest={ghost.rest} accepted={!!landing} onAccept={accept} onDone={() => setTaken(null)} label={t("ai.chat.accept")} className="as-gh" />}
         <textarea
           ref={area}
-          aria-label={t("ai.chat.ph")}
-          placeholder={t("ai.chat.ph")}
+          aria-label={placeholder ?? t("as.ph")}
+          placeholder={placeholder ?? t("as.ph")}
+          aria-disabled={off || undefined}
+          readOnly={off}
           value={text}
           rows={1}
           onChange={(e) => onText(e.target.value)}
@@ -116,40 +120,33 @@ export function Composer({
               accept();
             }
           }}
-          className={`scroll-soft block min-h-5 w-full resize-none bg-transparent px-1 text-[13.5px] leading-5 outline-none placeholder:text-muted ${landing ? "[-webkit-text-fill-color:transparent]" : ""}`}
+          className={`as-ti scroll-soft ${landing ? "[-webkit-text-fill-color:transparent]" : ""}`}
         />
       </div>
       {looksSecret(text) && (
-        <p role="status" className="flex items-start gap-1.5 px-1 text-[11.5px] leading-snug text-warn-text">
-          <Icon name="lock" size={11} className="mt-0.5 flex-none" />
-          {t("ai.secret.warning")}
+        <p role="status" className="as-sw">
+          <Icon name="lock" size={12} className="mt-0.5 flex-none" />
+          <span>{t("ai.secret.warning")}</span>
         </p>
       )}
-      <div className="flex items-center gap-1">
-        {context && !attached && (
-          <Tip label={t("ai.chat.attach")}>
-            <button type="button" aria-label={t("ai.chat.attach")} onClick={() => onAttach(true)} className="grid size-8 flex-none place-items-center rounded-[10px] border border-line text-muted transition-colors hover:bg-surface-2 hover:text-fg">
-              <Icon name="plus" size={14} />
-            </button>
-          </Tip>
-        )}
-        <div className="flex min-w-0 flex-1">
-          <AgentPicker pick={pick} owner={owner} onNavigate={onNavigate} defaultOpen={pickerOpen} />
+      <div className="as-ir">
+        <div className="flex min-w-0 items-center gap-2">
+          {context && !attached && (
+            <Tip label={t("ai.chat.attach")}>
+              <button type="button" aria-label={t("ai.chat.attach")} onClick={() => onAttach(true)} className="as-ad">
+                <I g="plus" />
+              </button>
+            </Tip>
+          )}
+          <AgentPicker pick={pick} owner={owner} onNavigate={onNavigate} defaultOpen={pickerOpen} disabled={off} />
         </div>
         {running ? (
-          <button type="button" onClick={onStop} aria-label={t("ai.chat.stop")} title={t("ai.chat.stop")} className="grid size-8 flex-none place-items-center rounded-full bg-fg text-canvas transition-transform active:scale-95">
-            <Icon name="stop" size={14} fill="currentColor" strokeWidth={1.5} />
+          <button type="button" className="as-go stop" aria-label={t("ai.chat.stop")} title={t("ai.chat.stop")} onClick={onStop}>
+            <i aria-hidden />
           </button>
         ) : (
-          <button
-            type="button"
-            disabled={!text.trim()}
-            onClick={onSubmit}
-            aria-label={t("ai.chat.send")}
-            title={t("ai.chat.send")}
-            className="grid size-8 flex-none place-items-center rounded-full bg-fg text-canvas transition-all active:scale-95 disabled:bg-surface-2 disabled:text-faint"
-          >
-            <Icon name="arrowUp" size={15} />
+          <button type="button" className="as-go" aria-label={t("ai.chat.send")} title={t("ai.chat.send")} disabled={off || !text.trim()} onClick={onSubmit}>
+            <I g="send" />
           </button>
         )}
       </div>

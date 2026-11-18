@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { Icon } from "@/components/ui/icons";
 import { ApprovalState } from "@/gen/mistgate/admin/v1/integrations_pb";
 import { useT } from "@/i18n";
 import { approvalsQuery, useTick } from "@/lib/integrations";
 import { ApprovalCard } from "@/screens/integrations/approvals";
+import { I } from "./as-icons";
 
 /**
  * The approval of a plan that waits for the owner, right under its card: the same form as AI → Waiting for you (for a node
@@ -19,17 +19,19 @@ export function InlineApproval({ planId, onDecided }: { planId: string; onDecide
   if (!q.data || !a) return null;
   if (a.state === ApprovalState.AWAITING) {
     return (
-      <div data-slot="inline-approval" className="chat-in w-full">
+      <div data-slot="inline-approval" className="w-full">
         <ApprovalCard a={a} data={q.data} nowMs={nowMs} onDecided={onDecided} />
       </div>
     );
   }
   const approved = a.state === ApprovalState.APPROVED || a.state === ApprovalState.APPLIED;
   return (
-    <p data-slot="inline-approval" className="flex items-center gap-2 text-[13px] text-ok-text">
-      <Icon name={approved ? "check" : "info"} size={14} className="flex-none" />
-      {approved ? t("ai.plan.confirmedByOwner") : t("ai.plan.rejectedByOwner")}
-      {a.result ? <span className="text-muted">· {a.result}</span> : null}
-    </p>
+    <div data-slot="inline-approval" className="as-ps">
+      <I g={approved ? "check" : "info"} />
+      <span>
+        {approved ? t("ai.plan.confirmedByOwner") : t("ai.plan.rejectedByOwner")}
+        {a.result ? <span className="text-muted"> · {a.result}</span> : null}
+      </span>
+    </div>
   );
 }
