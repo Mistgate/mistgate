@@ -23,7 +23,6 @@ import { StaleToastView } from "@/components/stale-toast";
 import { UpdateCard } from "@/components/update-card";
 import { updatesQuery } from "@/lib/updates";
 import { UpdatesScreen } from "@/screens/updates";
-import { GroupForm } from "@/screens/users/groups";
 import { UsersScreen } from "@/screens/users/list";
 import { groupsQuery } from "@/screens/users/rpc";
 import { SettingRow } from "@/screens/users/ui";
@@ -185,11 +184,6 @@ export function PolishKit() {
         seed={[owner, [groupsQuery.queryKey, listGroups], [["users", "count"], { counts: { all: 7, online: 2 } }], [["users", "list", "all", "", ""], listPage]]}
       >
         <UsersScreen />
-      </Shot>
-      <Shot id="users-group-color" title="Group editor: the colour swatches (a radio group of 44px targets)" seed={[[groupsQuery.queryKey, listGroups]]}>
-        <div className="max-w-md rounded-card-lg border border-line bg-surface px-4">
-          <GroupForm group={listGroups[1] as never} first={false} dns={false} profiles={[]} onCancel={() => {}} onCreated={() => {}} />
-        </div>
       </Shot>
       <Shot id="polish-int" title="Integrations: one card header, history in sand, “Новый токен”" seed={[owner, [tokensQuery.queryKey, tokens], [approvalsQuery.queryKey, approvals]]}>
         <IntegrationsScreen />

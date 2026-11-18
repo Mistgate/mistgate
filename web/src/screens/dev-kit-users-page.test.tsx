@@ -6,7 +6,7 @@ import { AddNodeProvider } from "@/components/add-node";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { setLang } from "@/i18n";
-import { demoOf, frames, seeded } from "./dev-kit-users-page";
+import { demoOf, editOf, frames, SceneEdit, seeded } from "./dev-kit-users-page";
 import { UsersScreen } from "./users/list";
 
 // The scenes of /dev-kit?only=pn-users draw the real screen on made-up data: every state a scene names must draw, in every language.
@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 const states = [...new Set(frames.map((f) => f.state))].filter((s) => !s.startsWith("job-"));
-const groupsTab = (s: string) => s.startsWith("groups") || s === "group-new";
+const groupsTab = (s: string) => s.startsWith("groups") || s === "group-new" || s in editOf;
 
 async function draw(state: string, role = Role.OWNER) {
   host = document.createElement("div");
@@ -49,6 +49,7 @@ async function draw(state: string, role = Role.OWNER) {
         <ToastProvider>
           <AddNodeProvider>
             <UsersScreen demo={{ ...demoOf[state], ...(groupsTab(state) && { tab: "groups" as const }) }} />
+            <SceneEdit state={state} />
           </AddNodeProvider>
         </ToastProvider>
       </QueryClientProvider>,
@@ -76,6 +77,9 @@ describe("the scenes of the People screen", () => {
     if (state === "groups-many") expect(document.querySelectorAll("h3")).toHaveLength(10);
     if (state === "groups-none") expect(document.body.textContent).toContain("No such group");
     if (state === "group-new") expect(document.querySelector("[data-shot=new-group]")).not.toBeNull();
+    if (state === "group-edit") expect(document.querySelector<HTMLInputElement>("[data-shot=edit-group] input")?.value).toBe("friends");
+    if (state === "group-edit-lose") expect(document.querySelector("[data-shot=edit-group]")?.textContent).toContain("6 people lose: “AmneziaWG 3.1” (3 AmneziaVPN keys stop working)");
+    if (state === "group-edit-held") expect(document.querySelector("[data-shot=edit-group]")?.textContent).toContain("“msk1” is not handed out to this group");
     if (state === "person-new") expect(document.querySelector("[data-shot=create-user]")?.textContent).toContain("Result");
     if (state === "person-name") expect(document.querySelector<HTMLInputElement>("[data-shot=create-user] input")?.value).toBe("carol");
     if (state.startsWith("person-done")) expect(document.querySelector("[data-shot=create-user]")?.textContent).toContain("carol added");

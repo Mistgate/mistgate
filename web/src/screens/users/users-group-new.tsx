@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { halo } from "@/components/fx/halo";
 import { markFresh } from "@/components/fx/registry";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
 import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
+import type { AccessImpact } from "@/gen/mistgate/admin/v1/user_pb";
 import { groups as groupsApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
@@ -20,7 +21,9 @@ import { telegramOnly, trustTunnelOnly } from "@/screens/profiles/protocol-meta"
 import { useEdition } from "@/lib/edition";
 import { useLinkAppNames } from "@/screens/subscriptions/queries";
 import { DnsSelect, useInheritedDns } from "./dns-select";
-import { groupTones, leastUsedTone } from "./format";
+import { groupTone, groupTones, leastUsedTone } from "./format";
+import { HeldNote, heldNodeOf } from "./group-bits";
+import { ImpactText } from "./groups";
 import { groupsQuery, profileListQuery, protocolsQuery } from "./rpc";
 import { useTx } from "./t";
 
@@ -28,6 +31,9 @@ import { useTx } from "./t";
 // people of the group get, as four switches (the subscription, AmneziaVPN keys, the Telegram proxy, TrustTunnel), then the nodes.
 // A way is on while the group holds a profile of it; the switch puts all the profiles of the way in or out, and "Profiles one by one"
 // picks them singly. The board's "Limits for each" has no backend (a group has no limits yet) and is not here.
+// "Edit group" is the same window with the group's own values in it (the user card, the profile page and "New person" open it): no
+// "start from" choice, "Save" for the button, and the two refusals the panel gives a save: taking a profile away from people (what they
+// lose is named, and the red button does it) and switching on a node the owner holds back (the way to give it is named).
 
 type Profile = { id: string; name: string; protocol: string };
 type WayId = "sub" | "awg" | "tg" | "tt";
@@ -60,9 +66,24 @@ export function NewGroupModal({ open, onOpenChange, initialProfiles, initialName
   );
 }
 
+/** What the dev kit opens the edit window with (a refusal already shown); the app opens it with none. */
+export type GroupEditDemo = { impact?: AccessImpact; held?: string };
+
+/** "Edit group" (Groups tab, user card, profile page): the same window, prefilled, saved with UpdateGroup. Mounted only while open. */
+export function GroupEditModal({ group, open, onOpenChange, demo }: { group: Group | undefined; open: boolean; onOpenChange: (o: boolean) => void; demo?: GroupEditDemo }) {
+  const t = useTx();
+  return (
+    <Modal open={open && !!group} onOpenChange={onOpenChange} title={t("users.groupEdit")} closeLabel={t("common.close")} className="md:max-w-[920px]!" shot="edit-group">
+      {group && <GroupWindow group={group} demo={demo} onClose={() => onOpenChange(false)} />}
+    </Modal>
+  );
+}
+
 const field = "flex flex-col gap-1.5 text-[13px] text-sec";
 
-function GroupWindow({ initialProfiles, initialName, onClose, onCreated }: { initialProfiles?: string[]; initialName?: string; onClose: () => void; onCreated?: (g: Group) => void }) {
+const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x));
+
+function GroupWindow({ group, demo, initialProfiles, initialName, onClose, onCreated }: { group?: Group; demo?: GroupEditDemo; initialProfiles?: string[]; initialName?: string; onClose: () => void; onCreated?: (g: Group) => void }) {
   const t = useTx();
   const toast = useToast();
   const qc = useQueryClient();
@@ -75,30 +96,38 @@ function GroupWindow({ initialProfiles, initialName, onClose, onCreated }: { ini
   const ttOff = edition.edge || edition.off("trusttunnel");
   const nodes = (nodeList.data?.nodes ?? []).filter((n) => n.status !== NodeStatus.RETIRED).sort((a, b) => a.name.localeCompare(b.name));
 
-  const [name, setName] = useState(initialName ?? "");
+  const [name, setName] = useState(group?.name ?? initialName ?? "");
   const [color, setColor] = useState<string | null>(null);
   const [base, setBase] = useState("");
-  // null = every profile (a new group starts with all of them in, as the old form did)
-  const [chosen, setChosen] = useState<string[] | null>(initialProfiles ?? null);
-  const [allNodes, setAllNodes] = useState(true);
-  const [off, setOff] = useState<string[]>([]);
-  const [dnsPreset, setDnsPreset] = useState("");
-  const [one, setOne] = useState(initialProfiles !== undefined);
-  const [more, setMore] = useState(false);
+  // null = every profile (a new group starts with all of them in, as the old form did); an old group starts with its own
+  const [chosen, setChosen] = useState<string[] | null>(group ? (demo?.impact ? group.profileIds.slice(1) : [...group.profileIds]) : (initialProfiles ?? null));
+  const [allNodes, setAllNodes] = useState(!group || group.disabledNodeIds.length === 0);
+  const [off, setOff] = useState<string[]>(group ? [...group.disabledNodeIds] : []);
+  const [dnsPreset, setDnsPreset] = useState(group?.dnsPresetId ?? "");
+  const [one, setOne] = useState(!!group || initialProfiles !== undefined);
+  const [more, setMore] = useState(!!group?.dnsPresetId);
   const [error, setError] = useState<string | null>(null);
+  // the panel refused: people would lose a profile (what they lose, then the red button), or a node is held back (where to give it)
+  const [impact, setImpact] = useState<AccessImpact | null>(demo?.impact ?? null);
+  const [held, setHeld] = useState<string | null>(demo?.held ?? null);
   const inheritedDns = useInheritedDns();
 
   const ids = chosen ?? profiles.map((p) => p.id);
-  const shownColor = color ?? leastUsedTone(all);
-  const taken = name.trim() !== "" && all.some((g) => g.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const shownColor = color ?? (group ? groupTone(group.id, group.color) : leastUsedTone(all));
+  const taken = name.trim() !== "" && all.some((g) => g.id !== group?.id && g.name.trim().toLowerCase() === name.trim().toLowerCase());
   const ok = name.trim() !== "" && !taken;
   const byWay = Object.fromEntries(ways.map((w) => [w.id, profiles.filter((p) => wayOf(p) === w.id)])) as Record<WayId, Profile[]>;
   const onWay = (w: WayId) => byWay[w].some((p) => ids.includes(p.id));
   const needWay = profiles.length > 0;
-  const hasWay = ways.some((w) => onWay(w.id));
+  // a new group must reach people somehow; an old one that reaches nobody may still be renamed
+  const hasWay = ways.some((w) => onWay(w.id)) || (!!group && sameSet(ids, group.profileIds));
+  const pick = (next: string[]) => {
+    setImpact(null);
+    setChosen(next);
+  };
   const flip = (w: WayId, on: boolean) => {
     const rest = ids.filter((id) => !byWay[w].some((p) => p.id === id));
-    setChosen(on ? [...rest, ...byWay[w].map((p) => p.id)] : rest);
+    pick(on ? [...rest, ...byWay[w].map((p) => p.id)] : rest);
     setBase("");
   };
   const fromGroup = (g: Group | undefined) => {
@@ -110,27 +139,56 @@ function GroupWindow({ initialProfiles, initialName, onClose, onCreated }: { ini
     setDnsPreset(g.dnsPresetId);
   };
   const disabled = allNodes ? [] : off;
+  const lost = group ? group.profileIds.filter((id) => !ids.includes(id)) : [];
 
-  const create = useMutation({
-    mutationFn: async () => (await groupsApi.createGroup({ name: name.trim(), profileIds: ids, ...(disabled.length > 0 && { disabledNodeIds: disabled }), dnsPresetId: dnsPreset, ...(color !== null && { color }) })).group,
+  const save = useMutation({
+    mutationFn: async (confirmed: boolean) => {
+      if (!group) return (await groupsApi.createGroup({ name: name.trim(), profileIds: ids, ...(disabled.length > 0 && { disabledNodeIds: disabled }), dnsPresetId: dnsPreset, ...(color !== null && { color }) })).group;
+      const req = {
+        groupId: group.id,
+        name: name.trim(),
+        profileIds: { values: ids },
+        ...(!sameSet(disabled, group.disabledNodeIds) && { disabledNodeIds: { values: disabled } }),
+        dnsPresetId: dnsPreset,
+        ...(color !== null && color !== group.color && { color }),
+      };
+      // taking a profile away from people: the panel's dry run says who loses what before anything is written
+      if (!confirmed && group.userCount > 0 && lost.length > 0) {
+        const dry = await groupsApi.updateGroup({ ...req, dryRun: true });
+        if (dry.impact && dry.impact.lost.length > 0) {
+          setImpact(dry.impact);
+          return null;
+        }
+      }
+      return (await groupsApi.updateGroup(req)).group;
+    },
     onSuccess: async (g) => {
       if (!g) return;
-      markFresh("group", g.id); // the card sweeps in once
+      if (!group) markFresh("group", g.id); // a new group: its card sweeps in once
+      // a group change reaches its users' cards, devices and subscription previews, and the profiles' "where it runs"
       await Promise.all(["groups", "users", "subs", "profiles", "nodes"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
-      toast(t("users.groupCreated", { name: g.name }));
-      halo("create");
+      toast(t(group ? "users.groupSaved" : "users.groupCreated", { name: g.name }));
+      halo(group ? "save" : "create");
       onCreated?.(g);
       onClose();
     },
-    onError: (e) => setError(errorText(e, t)),
+    onError: (e) => {
+      const node = heldNodeOf(e);
+      if (node !== undefined) setHeld(node);
+      else setError(errorText(e, t));
+    },
   });
-  const ready = ok && (!needWay || hasWay) && !create.isPending;
-  const submit = () => {
+  const refused = impact !== null || held !== null || error !== null;
+  // a refusal appears below the fold of a phone's sheet, under the sticky footer: bring it into view as it comes (a stable ref: once, not on every key typed)
+  const reveal = useCallback((el: HTMLElement | null) => el?.scrollIntoView?.({ block: "nearest" }), []);
+  const ready = ok && (!needWay || hasWay) && !save.isPending;
+  const submit = (confirmed = false) => {
     if (!ready) return;
     setError(null);
-    create.mutate();
+    setHeld(null);
+    save.mutate(confirmed);
   };
-  const summary = !name.trim() ? t("ul.g.enterName") : taken ? t("ul.g.fixName") : needWay && !hasWay ? t("ul.g.needWay") : t("ul.g.sum", { n: ids.length });
+  const summary = !name.trim() ? t("ul.g.enterName") : taken ? t("ul.g.fixName") : needWay && !hasWay ? t("ul.g.needWay") : group ? t.n("users.groupEditUsers", group.userCount) : t("ul.g.sum", { n: ids.length });
   const hint = !name.trim() ? t("ul.g.nameHint") : taken ? t("ul.g.dup") : t("ul.g.free");
 
   return (
@@ -138,7 +196,9 @@ function GroupWindow({ initialProfiles, initialName, onClose, onCreated }: { ini
       className="@container/usd flex min-h-0 flex-col gap-5"
       onSubmit={(e) => {
         e.preventDefault();
-        submit();
+        // a window opened from inside another form (New person) must not submit that one as well
+        e.stopPropagation();
+        submit(impact !== null);
       }}
     >
       <div className="grid grid-cols-2 items-start gap-6 @max-[672px]/usd:grid-cols-1">
@@ -191,6 +251,7 @@ function GroupWindow({ initialProfiles, initialName, onClose, onCreated }: { ini
                 ))}
               </div>
             </div>
+            {!group && (
             <div className={field}>
               <span>{t("ul.g.base")}</span>
               <Segmented
@@ -202,6 +263,7 @@ function GroupWindow({ initialProfiles, initialName, onClose, onCreated }: { ini
                 options={[{ value: "", label: t("ul.g.scratch") }, ...all.slice(0, 2).map((g) => ({ value: g.id, label: g.name }))]}
               />
             </div>
+            )}
           </div>
         </div>
 
@@ -242,7 +304,7 @@ function GroupWindow({ initialProfiles, initialName, onClose, onCreated }: { ini
                         on={ids.includes(p.id)}
                         onClick={() => {
                           setBase("");
-                          setChosen(ids.includes(p.id) ? ids.filter((x) => x !== p.id) : [...ids, p.id]);
+                          pick(ids.includes(p.id) ? ids.filter((x) => x !== p.id) : [...ids, p.id]);
                         }}
                       >
                         {p.name}
@@ -296,15 +358,25 @@ function GroupWindow({ initialProfiles, initialName, onClose, onCreated }: { ini
           </div>
         </div>
       </div>
-      {error && <Notice tone="danger">{error}</Notice>}
+      {refused && (
+        <div ref={reveal} className="flex scroll-mb-32 flex-col gap-3">
+          {impact && (
+            <Notice className="items-start">
+              <ImpactText impact={impact} />
+            </Notice>
+          )}
+          {held !== null && <HeldNote nodeId={held} />}
+          {error !== null && <Notice tone="danger">{error}</Notice>}
+        </div>
+      )}
       <div className="sticky -bottom-px -mx-4 -mb-5 flex flex-wrap items-center gap-2 border-t border-line bg-surface px-4 py-3 md:-mx-6 md:-mb-6 md:px-6 md:py-3.5">
         <span className="me-auto min-w-0 text-xs text-muted @max-[672px]/usd:basis-full">{summary}</span>
         <Button variant="secondary" size="lg" onClick={onClose}>
           {t("users.cancel")}
         </Button>
-        <Button type="submit" variant="primary" size="lg" aria-disabled={!ready} className={cx(!ready && "opacity-45")} disabled={create.isPending}>
-          {create.isPending && <span aria-hidden className="size-3.5 animate-[mg-ui-spin_0.7s_linear_infinite] rounded-full border-[1.5px] border-current border-t-transparent" />}
-          {t("users.groupCreate")}
+        <Button type="submit" variant={impact ? "danger" : "primary"} size="lg" aria-disabled={!ready} className={cx(!ready && "opacity-45")} disabled={save.isPending}>
+          {save.isPending && <span aria-hidden className="size-3.5 animate-[mg-ui-spin_0.7s_linear_infinite] rounded-full border-[1.5px] border-current border-t-transparent" />}
+          {impact ? t.n("users.groupLoseDo", impact.users) : group ? t("common.save") : t("users.groupCreate")}
         </Button>
       </div>
     </form>

@@ -1,7 +1,13 @@
+import { Code, ConnectError } from "@connectrpc/connect";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icons";
+import { Callout } from "@/components/ui/notice";
 import { cx } from "@/lib/cx";
+import { errorCode, errorVars } from "@/lib/errors";
+import { nodesQuery } from "@/lib/queries";
 import { useTx } from "./t";
 import "./group.css";
 
@@ -125,5 +131,39 @@ export function Note({ icon, children, className }: { icon: "info" | "clock"; ch
       <Icon name={icon} size={14} className="mt-px block flex-none" />
       <span>{children}</span>
     </p>
+  );
+}
+
+/**
+ * The node a refused group update names ("node_held: node=<id>"): the owner holds it back, the group was not given it, so a group's page
+ * cannot switch it on. "" when the refusal names no node; undefined for any other failure.
+ */
+export function heldNodeOf(e: unknown): string | undefined {
+  const c = ConnectError.from(e);
+  if (c.code !== Code.FailedPrecondition || errorCode(c.rawMessage) !== "node_held") return undefined;
+  return errorVars(c.rawMessage).node ?? "";
+}
+
+/** What to do about it: the way is the node's own page, "Who gets it", not the group's. */
+export function HeldNote({ nodeId, className }: { nodeId: string; className?: string }) {
+  const t = useTx();
+  const nodes = useQuery(nodesQuery).data?.nodes;
+  const name = nodes?.find((n) => n.id === nodeId)?.name ?? "";
+  return (
+    <Callout
+      kind="warn"
+      alert
+      className={className}
+      action={
+        nodeId ? (
+          <Link to="/nodes/$id" params={{ id: nodeId }} className={buttonClass("secondary", "md")}>
+            {t("grp.held.open")}
+          </Link>
+        ) : undefined
+      }
+    >
+      <b className="block font-medium">{name ? t("grp.held.title", { node: name }) : t("grp.held.titleAny")}</b>
+      <span className="mt-0.5 block text-sec">{t("grp.held.body")}</span>
+    </Callout>
   );
 }

@@ -1,3 +1,4 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -8,12 +9,20 @@ import type { UserN } from "./model";
 import { DevicesPanel } from "./user-detail";
 
 const updateGroup = vi.fn();
+const listGroups = vi.fn().mockResolvedValue({ groups: [] });
 const listProfiles = vi.fn();
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to, params, className }: { children?: ReactNode; to: string; params?: object; className?: string }) => (
+    <a href={to} data-params={JSON.stringify(params ?? {})} className={className}>
+      {children}
+    </a>
+  ),
+}));
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
-  groups: { listGroups: () => Promise.resolve({ groups: [] }), updateGroup: (...a: unknown[]) => updateGroup(...a), createGroup: vi.fn() },
+  groups: { listGroups: (...a: unknown[]) => listGroups(...a), updateGroup: (...a: unknown[]) => updateGroup(...a), createGroup: vi.fn() },
   profiles: { listProfiles: (...a: unknown[]) => listProfiles(...a), listProtocols: () => Promise.resolve({ protocols: [] }) },
-  nodes: { listNodes: () => Promise.resolve({ nodes: [{ id: "nod_1", name: "de1" }] }) },
+  nodes: { listNodes: () => Promise.resolve({ nodes: [{ id: "nod_1", name: "de1", countryCode: "DE" }] }) },
   dns: { listDnsPresets: () => Promise.resolve({ presets: [], providers: [], clientSupport: [] }) },
   subscriptions: { getSubscriptionSettings: () => Promise.resolve({ settings: { apps: [] }, effectiveTitle: "" }) },
 }));
@@ -30,6 +39,8 @@ afterEach(() => {
   root = host = null;
   updateGroup.mockReset();
   listProfiles.mockReset();
+  listGroups.mockReset();
+  listGroups.mockResolvedValue({ groups: [] });
 });
 
 async function mount(ui: ReactNode) {
@@ -44,7 +55,7 @@ const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
-const group = { id: "grp_1", name: "тест", profileIds: ["p1"], userCount: 3, dnsPresetId: "", color: "rose" } as unknown as Group;
+const group = { id: "grp_1", name: "тест", profileIds: ["p1"], disabledNodeIds: [], userCount: 3, dnsPresetId: "", color: "rose" } as unknown as Group;
 
 describe("editing a group from the user card", () => {
   it("opens prefilled, shows the user count and saves the profile set with UpdateGroup", async () => {
@@ -57,6 +68,9 @@ describe("editing a group from the user card", () => {
     expect(button("reality")?.getAttribute("aria-pressed")).toBe("true");
     expect(button("awg-main")?.getAttribute("aria-pressed")).toBe("false");
     expect(text()).toContain("3 users are in this group");
+    // the window of a new group, with the group in it: no "take settings from"
+    expect(document.querySelector("[data-shot=edit-group]")).not.toBeNull();
+    expect(text()).not.toContain("Take settings from");
 
     await click(button("awg-main"));
     await click(button("Save"));
@@ -64,17 +78,16 @@ describe("editing a group from the user card", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("shows the group's colour in a radio group of swatches and saves a changed one", async () => {
+  it("shows the group's colour among the swatches and saves a changed one", async () => {
     listProfiles.mockResolvedValue({ profiles: [{ id: "p1", name: "reality" }] });
     updateGroup.mockResolvedValue({ group });
     await mount(<GroupEditModal group={group} open onOpenChange={vi.fn()} />);
-    const radios = [...document.querySelectorAll<HTMLElement>("[role=radiogroup][aria-label=Colour] [role=radio]")];
-    expect(radios.map((r) => r.getAttribute("aria-label"))).toEqual(["Lavender", "Sand", "Sage", "Rose", "Sky", "Mint"]);
-    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["false", "false", "false", "true", "false", "false"]);
-    expect(radios[0]!.className).toContain("size-11"); // a 44px target
+    const swatches = [...document.querySelectorAll<HTMLElement>("[role=group][aria-labelledby=ug-color] button")];
+    expect(swatches.map((r) => r.getAttribute("aria-label"))).toEqual(["Lavender", "Sand", "Sage", "Rose", "Sky", "Mint"]);
+    expect(swatches.map((r) => r.getAttribute("aria-pressed"))).toEqual(["false", "false", "false", "true", "false", "false"]);
 
-    await click(radios[4]);
-    expect(radios[4]!.getAttribute("aria-checked")).toBe("true");
+    await click(swatches[4]);
+    expect(swatches[4]!.getAttribute("aria-pressed")).toBe("true");
     await click(button("Save"));
     expect(updateGroup).toHaveBeenCalledWith(expect.objectContaining({ groupId: "grp_1", color: "sky" }));
   });
@@ -83,10 +96,40 @@ describe("editing a group from the user card", () => {
     listProfiles.mockResolvedValue({ profiles: [{ id: "p1", name: "reality" }] });
     updateGroup.mockResolvedValue({ group });
     await mount(<GroupEditModal group={group} open onOpenChange={vi.fn()} />);
+    // every node is on: the nodes can be told apart once "All nodes" is off
+    await click(document.querySelector("[role=switch][aria-label='All nodes']"));
     expect(button("de1")?.getAttribute("aria-pressed")).toBe("true");
     await click(button("de1"));
     await click(button("Save"));
     expect(updateGroup).toHaveBeenCalledWith(expect.objectContaining({ disabledNodeIds: { values: ["nod_1"] } }));
+  });
+
+  it("refuses a name another group has, and lets the group keep its own", async () => {
+    listProfiles.mockResolvedValue({ profiles: [{ id: "p1", name: "reality" }] });
+    listGroups.mockResolvedValue({ groups: [group, { id: "grp_2", name: "друзья" }] });
+    await mount(<GroupEditModal group={group} open onOpenChange={vi.fn()} />);
+    expect(text()).not.toContain("Such a group already exists");
+    const input = document.querySelector<HTMLInputElement>("[role=dialog] input")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Друзья");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(text()).toContain("Such a group already exists");
+  });
+
+  it("says where to go when the panel refuses to switch on a node the owner holds back (node_held)", async () => {
+    listProfiles.mockResolvedValue({ profiles: [{ id: "p1", name: "reality" }] });
+    updateGroup.mockRejectedValue(new ConnectError("node_held: node=nod_1", Code.FailedPrecondition));
+    const onOpenChange = vi.fn();
+    await mount(<GroupEditModal group={{ ...group, disabledNodeIds: ["nod_1"] } as Group} open onOpenChange={onOpenChange} />);
+    // the node is off for this group now; the owner switches it on and saves
+    await click(button("de1"));
+    await click(button("Save"));
+    expect(updateGroup).toHaveBeenCalledWith(expect.objectContaining({ disabledNodeIds: { values: [] } }));
+    expect(text()).toContain("“de1” is not handed out to this group");
+    expect(text()).toContain("Open the node and give it to this group");
+    expect(document.querySelector<HTMLAnchorElement>("[role=dialog] a")?.dataset.params).toBe('{"id":"nod_1"}');
+    expect(onOpenChange).not.toHaveBeenCalled(); // the window stays: nothing was saved
   });
 });
 

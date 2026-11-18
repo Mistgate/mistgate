@@ -1,3 +1,4 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -315,6 +316,22 @@ describe("the Access tab", () => {
     expect(by("checkbox", "de1")?.getAttribute("aria-checked")).toBe("false");
     await click(button("Save"));
     expect(updateGroup).toHaveBeenCalledWith({ groupId: "grp_friends", disabledNodeIds: { values: ["nod_de1"] } });
+  });
+
+  it("says where to give a node the owner holds back when the panel refuses to switch it on (node_held)", async () => {
+    // nl1 is off for this group; the node's own page is where it is given, not this one
+    listGroups.mockResolvedValue({ groups: [{ ...friends(), disabledNodeIds: ["nod_nl1"] }, family()] });
+    updateGroup.mockRejectedValue(new ConnectError("node_held: node=nod_nl1", Code.FailedPrecondition));
+    await mount();
+    await click(by("checkbox", "nl1"));
+    await click(button("Save"));
+    expect(text()).toContain("“nl1” is not handed out to this group");
+    const open = [...document.querySelectorAll<HTMLAnchorElement>("a")].find((a) => a.textContent === "Open the node");
+    expect(open?.getAttribute("href")).toBe("/nodes/$id");
+    expect(open?.dataset.params).toBe('{"id":"nod_nl1"}');
+    // a new try starts clean
+    await click(button("Cancel"));
+    expect(text()).not.toContain("is not handed out to this group");
   });
 
   it("saves the DNS preset the moment it is picked", async () => {
