@@ -14,7 +14,7 @@ import { WaysOfGroup } from "./groups";
 import { isTrustTunnelKey, splitDevices } from "./link-devices";
 import type { DeviceN, UserN } from "./model";
 import { TrustTunnelSection, pauseOf, trustTunnelShown } from "./trusttunnel-key";
-import { DevicesPanel } from "./user-detail";
+import { DevicesPanel } from "./user-devices";
 
 // The TrustTunnel key of a person on their card: the nine states of the brief, the refusals in words, a confirmation before
 // the key is revoked, the key told apart from an AmneziaVPN key, and no secret left behind.

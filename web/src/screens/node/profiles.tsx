@@ -34,7 +34,7 @@ import { meQuery } from "@/lib/session";
 import { useIsOwner } from "@/lib/updates";
 import { networkOf } from "@/lib/ways-graph";
 import { profileListQuery } from "@/screens/users/rpc";
-import { PartsLine } from "@/screens/users/user-detail";
+import { PartsLine } from "@/screens/users/user-connection";
 import { AddInbound } from "./add-inbound";
 import { AwgStatusLine } from "./awg-status";
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";

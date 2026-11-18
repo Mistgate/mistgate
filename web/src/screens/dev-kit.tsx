@@ -34,7 +34,7 @@ import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { GroupsTab, ReachLine } from "@/screens/users/groups";
 import { profileListQuery, protocolsQuery } from "@/screens/users/rpc";
-import { DevicesPanel } from "@/screens/users/user-detail";
+import { DevicesPanel } from "@/screens/users/user-devices";
 import { dnsPresetsQuery } from "@/screens/subscriptions/queries";
 import { HaloKit } from "./dev-kit-halo";
 import { FleetKit } from "./dev-kit-fleet";

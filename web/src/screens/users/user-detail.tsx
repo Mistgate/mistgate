@@ -30,12 +30,6 @@ import { DeleteModal, ResetTrafficModal, SettingsTab } from "./user-settings";
 import { users } from "@/lib/api";
 import "./user.css";
 
-// The pieces older scenes and tests of this page import by their old names.
-export { DevicesPanel } from "./user-devices";
-export { AccessPanel, DnsChoicesPanel, LimitsPanel } from "./user-access";
-export { ConnectionPanel, PartsLine } from "./user-connection";
-export { TrafficPanel } from "./user-overview";
-
 export const userTabs = ["overview", "devices", "access", "logs", "settings"] as const;
 export type UserTab = (typeof userTabs)[number];
 

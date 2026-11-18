@@ -6,7 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { GroupEditModal } from "./create-user";
 import type { UserN } from "./model";
-import { DevicesPanel } from "./user-detail";
+import { DevicesPanel } from "./user-devices";
 
 const updateGroup = vi.fn();
 const listGroups = vi.fn().mockResolvedValue({ groups: [] });

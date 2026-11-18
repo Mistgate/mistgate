@@ -156,13 +156,3 @@ export function ConnectionCounts({ userId, devices = [], nodeName = (id) => id }
     </section>
   );
 }
-
-/** The alerts about the person, then what the nodes counted (both cards, as the older single panel did). */
-export function ConnectionPanel({ userId, devices = [], nodeName = (id) => id }: { userId: string; devices?: Device[]; nodeName?: (id: string) => string }) {
-  return (
-    <div className="up-one">
-      <ConnectionAlerts userId={userId} />
-      <ConnectionCounts userId={userId} devices={devices} nodeName={nodeName} />
-    </div>
-  );
-}

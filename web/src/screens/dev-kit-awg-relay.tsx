@@ -16,7 +16,7 @@ import { ChangeRelayPort } from "@/screens/node/relays";
 import { useWays, WaysTab } from "@/screens/node/ways";
 import { settingsQuery } from "@/screens/subscriptions/queries";
 import { DeviceConfigsModal, type DeviceRef } from "@/screens/users/awg-devices";
-import { ConnectionPanel } from "@/screens/users/user-detail";
+import { ConnectionAlerts, ConnectionCounts } from "@/screens/users/user-connection";
 
 // Development only, /dev-kit?only=awg-relay&state=…: AmneziaWG through a relay (awg-relay-plan §2.3, §9), on made-up data and a
 // private query cache (no server). Names: exits de1, nl1, de2 (also in Germany), the entry msk1 (RU), the exit ru2 in Russia as
@@ -176,7 +176,10 @@ export function AwgRelayKit() {
         <Mock fill={[[userConnectionQuery("usr_alice").queryKey, connection]]}>
           <Shot id="awg-relay-history">
             <div className="max-w-xl">
-              <ConnectionPanel userId="usr_alice" devices={aliceDevices} nodeName={(id) => id.replace("nod_", "")} />
+              <div className="up-one">
+                <ConnectionAlerts userId="usr_alice" />
+                <ConnectionCounts userId="usr_alice" devices={aliceDevices} nodeName={(id) => id.replace("nod_", "")} />
+              </div>
             </div>
           </Shot>
         </Mock>

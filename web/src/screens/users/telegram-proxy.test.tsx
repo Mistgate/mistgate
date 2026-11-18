@@ -8,7 +8,7 @@ import { DeviceKind } from "@/gen/mistgate/admin/v1/user_pb";
 import { WaysOfGroup } from "./groups";
 import type { DeviceN, UserN } from "./model";
 import { TelegramSection } from "./telegram-proxy";
-import { DevicesPanel } from "./user-detail";
+import { DevicesPanel } from "./user-devices";
 
 const getTelegramLinks = vi.fn();
 const issueTelegramKey = vi.fn();

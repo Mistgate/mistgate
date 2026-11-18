@@ -11,7 +11,7 @@ import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { meQuery } from "@/lib/session";
 import type { DeviceN } from "./model";
-import { DevicesPanel } from "./user-detail";
+import { DevicesPanel } from "./user-devices";
 import { LogsTab } from "./user-logs";
 
 // The person's page, Devices: for the owner on the VPS edition, a device of the Mistgate app can be asked for its logs, says so in a

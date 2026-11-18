@@ -12,7 +12,7 @@ import { useFmt } from "@/lib/format";
 import { meQuery } from "@/lib/session";
 import { aboutText, LogViewerBody, RequestLogsModal, deviceLabel } from "@/screens/users/client-logs";
 import { useTx } from "@/screens/users/t";
-import { DevicesPanel } from "@/screens/users/user-detail";
+import { DevicesPanel } from "@/screens/users/user-devices";
 
 // Development only, /dev-kit?only=client-logs: logs for support on the person's page, on made-up data. alice-liddell has three
 // devices of the Mistgate app: the office PC has an open request (and an older refusal), the MacBook sent the logs a request
