@@ -12,9 +12,18 @@ type Color struct{ R, G, B uint8 }
 
 // SVGOptions is how SVG draws a code. The zero value is square black modules, no quiet zone, no background.
 type SVGOptions struct {
-	// Rounded draws a run of dark modules in a row as one shape whose corners have the radius of half a module where the
-	// module above (below) the end of the run is light. It is the shape of the board's page (web/src/lib/qr-path.ts).
+	// Rounded draws every connected figure of dark modules as one shape along its outline, with a corner that sticks out
+	// rounded by half a module: the shape of the board's page (roundedPath in web/src/lib/qr-path.ts). Without it the modules
+	// are squares, a run in a row one rectangle.
 	Rounded bool
+	// Fillet, with Rounded, fills a corner that goes in (a light module with a dark one on each of two sides) with a quarter
+	// of a circle of 0.3 of a module, which makes the figures look cast. Modules that touch only at a corner stay two figures,
+	// and the light module on each side of that point gets a fillet of its own.
+	Fillet bool
+	// Eyes draws the three finder patterns as rounded squares (a 7x7 ring of radius 2, its 5x5 cut-out of radius 1.2 and the
+	// 3x3 centre of radius 0.9) after the data, and leaves the modules in those squares out of the data, as the board's path
+	// does (eyes in web/src/lib/qr-path.ts).
+	Eyes bool
 	// Window is the side, in modules, of a clear square in the middle for a logo the caller lays over it (the library
 	// does not draw the logo). Every module that touches the square widened by half a module on each side is left out.
 	// 0 means no window. A window needs level Q or H, must leave the finder, timing, format and version patterns and the
@@ -86,6 +95,15 @@ func (c *Code) SVG(o SVGOptions) ([]byte, error) {
 		}
 		w.clear(o.Window, func(x, y int) { on[y*n+x] = false })
 	}
+	if o.Eyes {
+		for y := 0; y < n; y++ {
+			for x := 0; x < n; x++ {
+				if inEye(n, x, y) {
+					on[y*n+x] = false
+				}
+			}
+		}
+	}
 	total := n + 2*o.Quiet
 	perModule := 8 // a square run is about 8 bytes per module of the grid, a rounded one about 20
 	if o.Rounded {
@@ -121,7 +139,16 @@ func (c *Code) SVG(o SVGOptions) ([]byte, error) {
 		out = append(out, '"')
 	}
 	out = append(out, ` fill-rule="evenodd" d="`...)
-	out = appendPath(out, n, on, o.Rounded)
+	if o.Rounded {
+		out = appendRounded(out, n, on, o.Fillet)
+	} else {
+		out = appendRect(out, n, on)
+	}
+	if o.Eyes {
+		for _, p := range [3][2]int{{0, 0}, {n - 7, 0}, {0, n - 7}} {
+			out = appendEye(out, p[0], p[1])
+		}
+	}
 	out = append(out, `"/></svg>`...)
 	return out, nil
 }
@@ -135,53 +162,58 @@ func (c Color) appendHex(dst []byte) []byte {
 	return dst
 }
 
-// appendPath is roundedPath of web/src/lib/qr-path.ts: a run of dark modules in a row is one shape, drawn clockwise from
-// the top left; when rounded, a corner whose neighbour above (below) the run's end is light is cut by a quarter circle of
-// radius 0.5. Every coordinate is a multiple of 0.5, so it is written from a number of half modules.
-func appendPath(d []byte, n int, on []bool, rounded bool) []byte {
-	at := func(x, y int) bool { return x >= 0 && y >= 0 && x < n && y < n && on[y*n+x] }
-	for y := 0; y < n; y++ {
-		for x := 0; x < n; {
-			if !on[y*n+x] {
-				x++
-				continue
-			}
-			e := x
-			for e+1 < n && on[y*n+e+1] {
-				e++
-			}
-			x1 := e + 1
-			var tl, tr, bl, br int // 1 when the corner is rounded
-			if rounded {
-				tl, tr, bl, br = b2i(!at(x, y-1)), b2i(!at(e, y-1)), b2i(!at(x, y+1)), b2i(!at(e, y+1))
-			}
-			d = append(d, 'M')
-			d = appendHalf(d, 2*x+tl)
+// inEye reports whether the module at (x, y) is in one of the three finder patterns of a code n modules wide.
+func inEye(n, x, y int) bool {
+	return (x < 7 && y < 7) || (x >= n-7 && y < 7) || (x < 7 && y >= n-7)
+}
+
+// appendEye is eye of web/src/lib/qr-path.ts: the finder pattern at (x, y) as three rounded squares for fill-rule evenodd.
+func appendEye(d []byte, x, y int) []byte {
+	sq := func(ox, oy, s, a int) { // a square of side s (tenths of a module) with corner radius a, at (ox, oy) modules
+		x0, y0, w := ox*10, oy*10, s-2*a
+		arc := func(dx, dy int) {
+			d = append(d, 'a')
+			d = appendTenths(d, a)
 			d = append(d, ' ')
-			d = appendHalf(d, 2*y)
-			d = append(d, 'H')
-			d = appendHalf(d, 2*x1-tr)
-			if tr == 1 {
-				d = append(d, "a0.5 0.5 0 0 1 0.5 0.5"...)
-			}
-			d = append(d, 'V')
-			d = appendHalf(d, 2*y+2-br)
-			if br == 1 {
-				d = append(d, "a0.5 0.5 0 0 1 -0.5 0.5"...)
-			}
-			d = append(d, 'H')
-			d = appendHalf(d, 2*x+bl)
-			if bl == 1 {
-				d = append(d, "a0.5 0.5 0 0 1 -0.5 -0.5"...)
-			}
-			d = append(d, 'V')
-			d = appendHalf(d, 2*y+tl)
-			if tl == 1 {
-				d = append(d, "a0.5 0.5 0 0 1 0.5 -0.5"...)
-			}
-			d = append(d, 'z')
-			x = x1
+			d = appendTenths(d, a)
+			d = append(d, " 0 0 1 "...)
+			d = appendTenths(d, dx)
+			d = append(d, ' ')
+			d = appendTenths(d, dy)
 		}
+		d = append(d, 'M')
+		d = appendTenths(d, x0+a)
+		d = append(d, ' ')
+		d = appendTenths(d, y0)
+		d = append(d, 'h')
+		d = appendTenths(d, w)
+		arc(a, a)
+		d = append(d, 'v')
+		d = appendTenths(d, w)
+		arc(-a, a)
+		d = append(d, 'h')
+		d = appendTenths(d, -w)
+		arc(-a, -a)
+		d = append(d, 'v')
+		d = appendTenths(d, -w)
+		arc(a, -a)
+		d = append(d, 'z')
+	}
+	sq(x, y, 70, 20)
+	sq(x+1, y+1, 50, 12)
+	sq(x+2, y+2, 30, 9)
+	return d
+}
+
+// appendTenths writes t/10 the way JavaScript writes the number: "3", "-2.5", "0.9".
+func appendTenths(d []byte, t int) []byte {
+	if t < 0 {
+		d = append(d, '-')
+		t = -t
+	}
+	d = strconv.AppendInt(d, int64(t/10), 10)
+	if t%10 != 0 {
+		d = append(d, '.', byte('0'+t%10))
 	}
 	return d
 }

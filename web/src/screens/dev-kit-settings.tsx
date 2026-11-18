@@ -28,6 +28,7 @@ import { DnsTab } from "@/screens/subscriptions/dns";
 import { FormatsTab } from "@/screens/subscriptions/formats";
 import type { Settings } from "@/screens/subscriptions/model";
 import { clientsQuery, dnsPresetsQuery, settingsQuery, testAgentQuery } from "@/screens/subscriptions/queries";
+import { demoQr } from "@/lib/qr-demo";
 import { RulesTab } from "@/screens/subscriptions/rules";
 import { DnsSelect } from "@/screens/users/dns-select";
 import { groupsQuery, protocolsQuery } from "@/screens/users/rpc";
@@ -313,7 +314,7 @@ export function SettingsDemos() {
           <Button onClick={() => setModal("add")}>Add password and code (form)</Button>
         </div>
         {modal === "change" && <ChangePassword login="alice" onClose={() => setModal(null)} />}
-        {modal === "rebind" && <Enroll begun={{ ceremonyId: "cer_demo", uri: "otpauth://totp/mistgate:alice?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=mistgate", secret: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP" }} onClose={() => setModal(null)} />}
+        {modal === "rebind" && <Enroll begun={{ ceremonyId: "cer_demo", qr: demoQr, secret: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP" }} onClose={() => setModal(null)} />}
         {modal === "add" && <Enroll onClose={() => setModal(null)} />}
       </Demo>
       <Demo

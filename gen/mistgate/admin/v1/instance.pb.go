@@ -335,11 +335,101 @@ func (x *UpdateInstanceResponse) GetInstance() *Instance {
 	return nil
 }
 
+type EncodeQrRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1 to 4096 bytes (INVALID_ARGUMENT otherwise). A QR code holds at most 1663 bytes at the level the panel uses.
+	Text          string `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EncodeQrRequest) Reset() {
+	*x = EncodeQrRequest{}
+	mi := &file_mistgate_admin_v1_instance_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EncodeQrRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EncodeQrRequest) ProtoMessage() {}
+
+func (x *EncodeQrRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_instance_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EncodeQrRequest.ProtoReflect.Descriptor instead.
+func (*EncodeQrRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_instance_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *EncodeQrRequest) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+type EncodeQrResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Absent when the text is too long for any QR code: the caller offers the file or the text instead.
+	Qr            *QrCode `protobuf:"bytes,1,opt,name=qr,proto3" json:"qr,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EncodeQrResponse) Reset() {
+	*x = EncodeQrResponse{}
+	mi := &file_mistgate_admin_v1_instance_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EncodeQrResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EncodeQrResponse) ProtoMessage() {}
+
+func (x *EncodeQrResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_admin_v1_instance_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EncodeQrResponse.ProtoReflect.Descriptor instead.
+func (*EncodeQrResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_admin_v1_instance_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *EncodeQrResponse) GetQr() *QrCode {
+	if x != nil {
+		return x.Qr
+	}
+	return nil
+}
+
 var File_mistgate_admin_v1_instance_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_instance_proto_rawDesc = "" +
 	"\n" +
-	" mistgate/admin/v1/instance.proto\x12\x11mistgate.admin.v1\"\x84\x02\n" +
+	" mistgate/admin/v1/instance.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\x84\x02\n" +
 	"\bInstance\x12\x1d\n" +
 	"\n" +
 	"brand_head\x18\x01 \x01(\tR\tbrandHead\x12\x1d\n" +
@@ -368,10 +458,15 @@ const file_mistgate_admin_v1_instance_proto_rawDesc = "" +
 	"\t_languageB\v\n" +
 	"\t_logo_svg\"Q\n" +
 	"\x16UpdateInstanceResponse\x127\n" +
-	"\binstance\x18\x01 \x01(\v2\x1b.mistgate.admin.v1.InstanceR\binstance2\xd6\x01\n" +
+	"\binstance\x18\x01 \x01(\v2\x1b.mistgate.admin.v1.InstanceR\binstance\"%\n" +
+	"\x0fEncodeQrRequest\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"=\n" +
+	"\x10EncodeQrResponse\x12)\n" +
+	"\x02qr\x18\x01 \x01(\v2\x19.mistgate.admin.v1.QrCodeR\x02qr2\xab\x02\n" +
 	"\x0fInstanceService\x12\\\n" +
 	"\vGetInstance\x12%.mistgate.admin.v1.GetInstanceRequest\x1a&.mistgate.admin.v1.GetInstanceResponse\x12e\n" +
-	"\x0eUpdateInstance\x12(.mistgate.admin.v1.UpdateInstanceRequest\x1a).mistgate.admin.v1.UpdateInstanceResponseB\xc8\x01\n" +
+	"\x0eUpdateInstance\x12(.mistgate.admin.v1.UpdateInstanceRequest\x1a).mistgate.admin.v1.UpdateInstanceResponse\x12S\n" +
+	"\bEncodeQr\x12\".mistgate.admin.v1.EncodeQrRequest\x1a#.mistgate.admin.v1.EncodeQrResponseB\xc8\x01\n" +
 	"\x15com.mistgate.admin.v1B\rInstanceProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/admin/v1;adminv1\xa2\x02\x03MAX\xaa\x02\x11Mistgate.Admin.V1\xca\x02\x11Mistgate\\Admin\\V1\xe2\x02\x1dMistgate\\Admin\\V1\\GPBMetadata\xea\x02\x13Mistgate::Admin::V1b\x06proto3"
 
 var (
@@ -386,26 +481,32 @@ func file_mistgate_admin_v1_instance_proto_rawDescGZIP() []byte {
 	return file_mistgate_admin_v1_instance_proto_rawDescData
 }
 
-var file_mistgate_admin_v1_instance_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_mistgate_admin_v1_instance_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_mistgate_admin_v1_instance_proto_goTypes = []any{
 	(*Instance)(nil),               // 0: mistgate.admin.v1.Instance
 	(*GetInstanceRequest)(nil),     // 1: mistgate.admin.v1.GetInstanceRequest
 	(*GetInstanceResponse)(nil),    // 2: mistgate.admin.v1.GetInstanceResponse
 	(*UpdateInstanceRequest)(nil),  // 3: mistgate.admin.v1.UpdateInstanceRequest
 	(*UpdateInstanceResponse)(nil), // 4: mistgate.admin.v1.UpdateInstanceResponse
+	(*EncodeQrRequest)(nil),        // 5: mistgate.admin.v1.EncodeQrRequest
+	(*EncodeQrResponse)(nil),       // 6: mistgate.admin.v1.EncodeQrResponse
+	(*QrCode)(nil),                 // 7: mistgate.admin.v1.QrCode
 }
 var file_mistgate_admin_v1_instance_proto_depIdxs = []int32{
 	0, // 0: mistgate.admin.v1.GetInstanceResponse.instance:type_name -> mistgate.admin.v1.Instance
 	0, // 1: mistgate.admin.v1.UpdateInstanceResponse.instance:type_name -> mistgate.admin.v1.Instance
-	1, // 2: mistgate.admin.v1.InstanceService.GetInstance:input_type -> mistgate.admin.v1.GetInstanceRequest
-	3, // 3: mistgate.admin.v1.InstanceService.UpdateInstance:input_type -> mistgate.admin.v1.UpdateInstanceRequest
-	2, // 4: mistgate.admin.v1.InstanceService.GetInstance:output_type -> mistgate.admin.v1.GetInstanceResponse
-	4, // 5: mistgate.admin.v1.InstanceService.UpdateInstance:output_type -> mistgate.admin.v1.UpdateInstanceResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	7, // 2: mistgate.admin.v1.EncodeQrResponse.qr:type_name -> mistgate.admin.v1.QrCode
+	1, // 3: mistgate.admin.v1.InstanceService.GetInstance:input_type -> mistgate.admin.v1.GetInstanceRequest
+	3, // 4: mistgate.admin.v1.InstanceService.UpdateInstance:input_type -> mistgate.admin.v1.UpdateInstanceRequest
+	5, // 5: mistgate.admin.v1.InstanceService.EncodeQr:input_type -> mistgate.admin.v1.EncodeQrRequest
+	2, // 6: mistgate.admin.v1.InstanceService.GetInstance:output_type -> mistgate.admin.v1.GetInstanceResponse
+	4, // 7: mistgate.admin.v1.InstanceService.UpdateInstance:output_type -> mistgate.admin.v1.UpdateInstanceResponse
+	6, // 8: mistgate.admin.v1.InstanceService.EncodeQr:output_type -> mistgate.admin.v1.EncodeQrResponse
+	6, // [6:9] is the sub-list for method output_type
+	3, // [3:6] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_admin_v1_instance_proto_init() }
@@ -413,6 +514,7 @@ func file_mistgate_admin_v1_instance_proto_init() {
 	if File_mistgate_admin_v1_instance_proto != nil {
 		return
 	}
+	file_mistgate_admin_v1_common_proto_init()
 	file_mistgate_admin_v1_instance_proto_msgTypes[3].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -420,7 +522,7 @@ func file_mistgate_admin_v1_instance_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_admin_v1_instance_proto_rawDesc), len(file_mistgate_admin_v1_instance_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

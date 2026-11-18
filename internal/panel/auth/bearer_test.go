@@ -1008,6 +1008,7 @@ func TestTokenAllowList(t *testing.T) {
 		adminv1connect.UpdateServiceRescanBundleProcedure,
 		adminv1connect.InstanceServiceGetInstanceProcedure,
 		adminv1connect.InstanceServiceUpdateInstanceProcedure,
+		adminv1connect.InstanceServiceEncodeQrProcedure,
 		adminv1connect.AuthServiceGetSecuritySettingsProcedure,
 		adminv1connect.AuthServiceUpdateSecuritySettingsProcedure,
 		adminv1connect.AuthServiceMeProcedure,

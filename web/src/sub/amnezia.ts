@@ -1,4 +1,4 @@
-import { logoSrc } from "./brand";
+import { qrLogoSrc } from "./brand";
 import { chip } from "./connect";
 import { h, type Kid } from "./dom";
 import type { Dict } from "./i18n";
@@ -210,7 +210,7 @@ export function readyBody(c: AmzCtx, x: AwgDevice, mode: KeyMode): HTMLElement {
     left = [numbered(t.adFileSteps(app).map(say)), acts(dl, h("span", { class: "a-fname" }, filename))];
   } else if (view === "phone-qr") {
     left = [numbered(t.adQrSteps(app).map(say)), acts(dl, cp)];
-    qr = qrCard(cfg.qr, t.qrKeyAlt(app), logoSrc(d));
+    qr = qrCard(cfg.qr, t.qrKeyAlt(app), qrLogoSrc(d));
     if (!qr) meta.push(metaRow("info", t.qrTooBig));
   } else {
     left = [numbered([[t.openThereT, h("span", { class: "u-hint" }, t.openThereD)], [t.orFile, acts(dl)]])];

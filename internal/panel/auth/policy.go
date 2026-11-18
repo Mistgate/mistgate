@@ -62,6 +62,7 @@ var procedureLevels = map[string]level{
 
 	adminv1connect.InstanceServiceGetInstanceProcedure:    levelRead,
 	adminv1connect.InstanceServiceUpdateInstanceProcedure: levelOwner,
+	adminv1connect.InstanceServiceEncodeQrProcedure:       levelRead, // draws a text the caller sends; keeps nothing
 
 	adminv1connect.FleetServiceOverviewProcedure:   levelRead,
 	adminv1connect.FleetServiceListEventsProcedure: levelRead,

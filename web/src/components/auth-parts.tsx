@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
 import { AnimatedMark } from "@/components/brand";
 import { LangToggle, ThemeToggle } from "@/components/prefs";
-import { QrCode } from "@/components/qr-code";
+import { QrCard } from "@/components/qr-code";
+import type { QrBits } from "@/lib/qr-path";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/text-field";
 import { Glyph, glyphs, Halo, Spinner, WaveField } from "@/components/windows";
@@ -319,10 +320,10 @@ export function PasswordField({
 }
 
 /** QR + the secret to type by hand, for adding the account to an authenticator app. */
-export function TotpEnroll({ uri, secret, caption }: { uri: string; secret: string; caption: string }) {
+export function TotpEnroll({ qr, secret, caption }: { qr: QrBits | undefined; secret: string; caption: string }) {
   return (
     <div className="flex items-center gap-3.5 rounded-card border border-line bg-surface p-3.5">
-      <QrCode value={uri} label={caption} />
+      <QrCard code={qr} label={caption} size={152} />
       <div className="flex min-w-0 flex-col gap-1.5">
         <span className="text-[13px] leading-snug font-medium">{caption}</span>
         <span className="font-mono text-[11px] leading-snug break-all text-muted">{secret.replace(/(.{4})/g, "$1 ").trim()}</span>

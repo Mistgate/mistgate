@@ -14,7 +14,7 @@ import (
 )
 
 // path_golden.json holds, for a few texts, the modules this encoder makes and the path data web/src/lib/qr-path.ts
-// (roundedPath, with the page's window rule) makes of them; web/src/lib/qr-path.test.ts reads the same file, so the two
+// (roundedPath with eyes, and the page's window rule) makes of them; web/src/lib/qr-path.test.ts reads the same file, so the two
 // implementations of the shape are held to one another. Short paths are stored whole, the long ones by length and hash.
 type goldenPath struct {
 	Name   string   `json:"name"`
@@ -69,7 +69,7 @@ func TestPathMatchesTheBoard(t *testing.T) {
 			if got := c.FitWindow(LogoWindow(c.Size)); g.Window > 0 && got != g.Window {
 				t.Errorf("FitWindow = %v, the golden window is %v", got, g.Window)
 			}
-			svg, err := c.SVG(SVGOptions{Rounded: true, Window: g.Window})
+			svg, err := c.SVG(SVGOptions{Rounded: true, Fillet: true, Eyes: true, Window: g.Window})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -480,5 +480,50 @@ func TestPacked(t *testing.T) {
 	}
 	if pad := b[len(b)-1] & (1<<(8-(c.Size*c.Size)%8%8) - 1); (c.Size*c.Size)%8 != 0 && pad != 0 {
 		t.Errorf("the padding bits are %b", pad)
+	}
+}
+
+// shapes_golden.json: small grids and the paths web/src/lib/qr-path.ts makes of them (read by qr-path.test.ts too).
+func TestRoundedShapesMatchTheWeb(t *testing.T) {
+	raw, err := os.ReadFile("testdata/shapes_golden.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var shapes []struct {
+		Name   string   `json:"name"`
+		Rows   []string `json:"rows"`
+		Fillet bool     `json:"fillet"`
+		D      string   `json:"d"`
+	}
+	if err := json.Unmarshal(raw, &shapes); err != nil || len(shapes) < 6 {
+		t.Fatal(len(shapes), err)
+	}
+	for _, s := range shapes {
+		t.Run(s.Name, func(t *testing.T) {
+			n := len(s.Rows)
+			on := make([]bool, n*n)
+			for y, row := range s.Rows {
+				for x, ch := range row {
+					on[y*n+x] = ch == '1'
+				}
+			}
+			if got := string(appendRounded(nil, n, on, s.Fillet)); got != s.D {
+				t.Errorf("got  %s\nwant %s", got, s.D)
+			}
+		})
+	}
+}
+
+// A figure of any size is one shape, however many modules it has: no seams to show between two shapes.
+func TestRoundedFigureIsOneShape(t *testing.T) {
+	const n = 12
+	on := make([]bool, n*n)
+	for y := 1; y < 11; y++ {
+		for x := 1; x < 11; x++ {
+			on[y*n+x] = true
+		}
+	}
+	if d := appendRounded(nil, n, on, true); strings.Count(string(d), "M") != 1 {
+		t.Errorf("a 10x10 block is %d shapes", strings.Count(string(d), "M"))
 	}
 }

@@ -1,6 +1,6 @@
 import { h, type Kid } from "./dom";
 import { icon, type IconName } from "./icons";
-import { logoSrc } from "./brand";
+import { qrLogoSrc } from "./brand";
 import { safeUrl, serverName } from "./logic";
 import { qrCard } from "./qr";
 import { flag } from "./servers";
@@ -60,7 +60,7 @@ export function proxyPanel(c: Ctx, o: ProxySpec): Kid[] {
   const pane = (l: ProxyLink, i: number) => {
     const n = nameOf(c, l);
     const url = o.href(l.url);
-    const qr = url ? qrCard(l.qr, o.qrAria(n.country), logoSrc(d), { big: true }) : null;
+    const qr = url ? qrCard(l.qr, o.qrAria(n.country), qrLogoSrc(d), { big: true }) : null;
     return h(
       "section",
       { class: `u-card u-pane${qr ? "" : " noqr"}`, "aria-label": o.pane },

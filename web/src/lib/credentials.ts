@@ -1,5 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { SetupMethod, SignInFailureSchema } from "@/gen/mistgate/admin/v1/auth_pb";
+import type { QrBits } from "./qr-path";
 import { auth } from "./api";
 
 // Password + authenticator-code sign-in and first-admin setup: the alternative to a passkey. The server
@@ -35,7 +36,7 @@ export async function signInWithPassword(input: PasswordLogin): Promise<SignInRe
 }
 
 export type PasswordSetup = { setupToken: string; displayName: string; login: string; password: string; turnstileToken: string };
-export type TotpEnrolment = { ceremonyId: string; uri: string; secret: string };
+export type TotpEnrolment = { ceremonyId: string; qr: QrBits | undefined; secret: string };
 
 /** Step 1 of a password admin: the server hashes the password and issues the TOTP secret to scan. */
 export async function beginPasswordSetup(input: PasswordSetup): Promise<TotpEnrolment> {
@@ -47,7 +48,7 @@ export async function beginPasswordSetup(input: PasswordSetup): Promise<TotpEnro
     password: input.password,
     turnstileToken: input.turnstileToken,
   });
-  return { ceremonyId: r.ceremonyId, uri: r.totpUri, secret: r.totpSecret };
+  return { ceremonyId: r.ceremonyId, qr: r.totpQr, secret: r.totpSecret };
 }
 
 /** Step 2: the first code from the authenticator app proves the secret was scanned; creates the admin and signs in. */

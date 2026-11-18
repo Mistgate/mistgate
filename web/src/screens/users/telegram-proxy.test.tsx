@@ -13,6 +13,7 @@ const getTelegramLinks = vi.fn();
 const issueTelegramKey = vi.fn();
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
+  instance: { encodeQr: async () => ({ qr: (await import("@/lib/qr-demo")).demoQr }) },
   users: {
     getTelegramLinks: (...a: unknown[]) => getTelegramLinks(...a),
     issueTelegramKey: (...a: unknown[]) => issueTelegramKey(...a),

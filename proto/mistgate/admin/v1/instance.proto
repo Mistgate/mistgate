@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package mistgate.admin.v1;
 
+import "mistgate/admin/v1/common.proto";
+
 // InstanceService is the brand and look of this installation, shown on the admin sign-in
 // page, in the admin UI and (later) on the subscription page.
 //
@@ -12,6 +14,9 @@ service InstanceService {
   rpc GetInstance(GetInstanceRequest) returns (GetInstanceResponse);
   // Owner only. Absent fields are left unchanged.
   rpc UpdateInstance(UpdateInstanceRequest) returns (UpdateInstanceResponse);
+  // Any signed-in admin, closed to API tokens: encodes a text (a subscription link, a device config, a proxy link) as a QR
+  // code for the panel to draw. The text is never stored, logged or audited; it is a credential.
+  rpc EncodeQr(EncodeQrRequest) returns (EncodeQrResponse);
 }
 
 message Instance {
@@ -55,4 +60,14 @@ message UpdateInstanceRequest {
 
 message UpdateInstanceResponse {
   Instance instance = 1;
+}
+
+message EncodeQrRequest {
+  // 1 to 4096 bytes (INVALID_ARGUMENT otherwise). A QR code holds at most 1663 bytes at the level the panel uses.
+  string text = 1;
+}
+
+message EncodeQrResponse {
+  // Absent when the text is too long for any QR code: the caller offers the file or the text instead.
+  QrCode qr = 1;
 }

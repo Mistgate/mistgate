@@ -15,6 +15,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/adminqr"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/instance"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -101,6 +102,18 @@ func (a *instanceAPI) UpdateInstance(ctx context.Context, req *connect.Request[a
 		a.log.Error("audit write failed", "action", entry.Action, "err", err)
 	}
 	return connect.NewResponse(&adminv1.UpdateInstanceResponse{Instance: a.forOwner(ctx, toProtoInstance(s))}), nil
+}
+
+// EncodeQr draws a text as a QR code for the panel to draw. Any signed-in admin may (policy.go; closed to tokens as the whole
+// service is), and the text is a credential, a link or a key: it is neither logged, audited nor kept, and no error below names it.
+func (a *instanceAPI) EncodeQr(ctx context.Context, req *connect.Request[adminv1.EncodeQrRequest]) (*connect.Response[adminv1.EncodeQrResponse], error) {
+	if _, ok := auth.AdminFrom(ctx); !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("not signed in"))
+	}
+	if t := req.Msg.Text; t == "" || len(t) > adminqr.MaxText {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("the text must be 1 to 4096 bytes"))
+	}
+	return connect.NewResponse(&adminv1.EncodeQrResponse{Qr: adminqr.Encode(req.Msg.Text)}), nil
 }
 
 // NewLogoHandler serves the brand logo without a session: GET/HEAD, image/svg+xml, 404

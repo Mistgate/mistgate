@@ -250,7 +250,7 @@ function AdminStep({ token, onDone }: { token: string; onDone: () => void }) {
       )}
       {alt && totp && (
         <form onSubmit={finishWithPassword} className="flex animate-[mg-up_0.3s_var(--e)_both] flex-col gap-3">
-          <TotpEnroll uri={totp.uri} secret={totp.secret} caption={t("auth.setup.totpScan")} />
+          <TotpEnroll qr={totp.qr} secret={totp.secret} caption={t("auth.setup.totpScan")} />
           <CodeField label={t("auth.code")} value={code} onChange={(v) => { setCode(v); setBadCode(false); }} error={badCode ? t("auth.badCode") : undefined} />
           <GoButton type="submit" busy={busy} disabled={code.length < 6}>
             {busy ? t("auth.checking") : t("auth.setup.createAdmin")}

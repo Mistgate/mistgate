@@ -1,4 +1,4 @@
-import { roundedPath } from "../lib/qr-path";
+import { qrDrawing } from "../lib/qr-path";
 import type { Qr } from "./types";
 
 const ns = "http://www.w3.org/2000/svg";
@@ -15,17 +15,15 @@ const ns = "http://www.w3.org/2000/svg";
  */
 export function qrCard(code: Qr | null, label: string, logo: string, o: { big?: boolean; cls?: string } = {}): HTMLElement | null {
   if (!code) return null;
-  const { n, window: logoModules } = code;
   let bytes: Uint8Array;
   try {
     bytes = Uint8Array.from(atob(code.bits), (c) => c.charCodeAt(0));
   } catch {
     return null;
   }
-  const dark = (x: number, y: number) => x >= 0 && y >= 0 && x < n && y < n && (((bytes[(y * n + x) >> 3] ?? 0) >> (7 - ((y * n + x) & 7))) & 1) === 1;
-  const lo = (n - logoModules) / 2 - 0.5;
-  const hi = (n + logoModules) / 2 + 0.5;
-  const path = roundedPath(n, (x, y) => dark(x, y) && !(logoModules > 0 && x + 1 > lo && x < hi && y + 1 > lo && y < hi));
+  const drawing = qrDrawing({ n: code.n, bits: bytes, window: code.window });
+  if (!drawing) return null;
+  const { n, d: path, window: logoModules } = drawing;
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${n} ${n}`);
   svg.setAttribute("role", "img");

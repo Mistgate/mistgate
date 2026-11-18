@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package mistgate.admin.v1;
 
+import "mistgate/admin/v1/common.proto";
+
 // AuthService signs admins in and manages their sign-in methods and sessions.
 // Passkeys (WebAuthn) are the primary factor; "password + authenticator code" is the
 // fallback an admin may choose at setup instead.
@@ -143,6 +145,8 @@ message BeginSetupResponse {
   // PASSWORD: otpauth://totp/... for the QR code, and the same secret in base32 for typing in.
   string totp_uri = 3;
   string totp_secret = 4;
+  // PASSWORD: totp_uri as a QR code to draw; absent for PASSKEY. Setup has no session yet, so it cannot ask EncodeQr.
+  QrCode totp_qr = 5;
 }
 
 message FinishSetupRequest {
@@ -336,6 +340,8 @@ message BeginTotpEnrollmentResponse {
   // otpauth://totp/... for the QR code, and the same secret in base32 for typing in.
   string totp_uri = 2;
   string totp_secret = 3;
+  // totp_uri as a QR code to draw.
+  QrCode totp_qr = 4;
 }
 
 message FinishTotpEnrollmentRequest {

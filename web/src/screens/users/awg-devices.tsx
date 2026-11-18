@@ -238,7 +238,7 @@ function ConfigsBody({ device, initial, onClose, onChanged }: { device: DeviceRe
           {qrFailed ? (
             <p className="max-w-[220px] rounded-xl bg-surface-2 p-3 text-center text-xs leading-snug text-muted">{t("awg.cfg.qrTooLong")}</p>
           ) : (
-            <QrCode value={cfg.conf} label={t("awg.cfg.qrLabel")} size={232} onFail={() => setQrFailed(true)} />
+            <QrCode value={cfg.conf} label={t("awg.cfg.qrLabel")} size={252} onFail={() => setQrFailed(true)} />
           )}
           <span className="max-w-[240px] text-center text-[11px] leading-snug text-muted">{t("awg.cfg.qrHint")}</span>
         </div>

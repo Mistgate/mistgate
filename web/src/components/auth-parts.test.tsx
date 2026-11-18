@@ -2,7 +2,8 @@ import { act, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { en } from "@/i18n/en";
-import { CodeField, GoButton, OtherWay, PasskeyBlock } from "./auth-parts";
+import { demoQr } from "@/lib/qr-demo";
+import { CodeField, GoButton, OtherWay, PasskeyBlock, TotpEnroll } from "./auth-parts";
 
 // The six boxes of a code: what the person types, pastes and deletes ends in one string of digits, and the phone's
 // one-time-code autofill (a whole code into the first box) fills all six.
@@ -134,5 +135,21 @@ describe("the main button of the page", () => {
   it("offers another way as a divider that says whether it is open", async () => {
     await mount(<OtherWay open label="another way" onToggle={() => {}} />);
     expect(document.querySelector("button")?.getAttribute("aria-expanded")).toBe("true");
+  });
+});
+
+describe("TotpEnroll: the QR code of the secret comes from the server, drawn here", () => {
+  it("draws the code the server sent beside the secret typed by hand, in groups of four", async () => {
+    await mount(<TotpEnroll qr={demoQr} secret="JBSWY3DPEHPK3PXP" caption="Scan it" />);
+    expect(document.querySelector("svg[role=img]")!.getAttribute("aria-label")).toBe("Scan it");
+    expect(document.querySelectorAll("svg[role=img] path")).toHaveLength(1);
+    expect(host!.textContent).toContain("JBSW Y3DP EHPK 3PXP");
+  });
+
+  it("says so, in the same box, when the server sent no code (the secret is still there to type)", async () => {
+    await mount(<TotpEnroll qr={undefined} secret="JBSWY3DPEHPK3PXP" caption="Scan it" />);
+    expect(document.querySelector("svg[role=img]")).toBeNull();
+    expect(host!.textContent).toContain("Could not draw the QR code.");
+    expect(host!.textContent).toContain("JBSW Y3DP EHPK 3PXP");
   });
 });

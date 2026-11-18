@@ -39,6 +39,9 @@ const (
 	// InstanceServiceUpdateInstanceProcedure is the fully-qualified name of the InstanceService's
 	// UpdateInstance RPC.
 	InstanceServiceUpdateInstanceProcedure = "/mistgate.admin.v1.InstanceService/UpdateInstance"
+	// InstanceServiceEncodeQrProcedure is the fully-qualified name of the InstanceService's EncodeQr
+	// RPC.
+	InstanceServiceEncodeQrProcedure = "/mistgate.admin.v1.InstanceService/EncodeQr"
 )
 
 // InstanceServiceClient is a client for the mistgate.admin.v1.InstanceService service.
@@ -47,6 +50,9 @@ type InstanceServiceClient interface {
 	GetInstance(context.Context, *connect.Request[v1.GetInstanceRequest]) (*connect.Response[v1.GetInstanceResponse], error)
 	// Owner only. Absent fields are left unchanged.
 	UpdateInstance(context.Context, *connect.Request[v1.UpdateInstanceRequest]) (*connect.Response[v1.UpdateInstanceResponse], error)
+	// Any signed-in admin, closed to API tokens: encodes a text (a subscription link, a device config, a proxy link) as a QR
+	// code for the panel to draw. The text is never stored, logged or audited; it is a credential.
+	EncodeQr(context.Context, *connect.Request[v1.EncodeQrRequest]) (*connect.Response[v1.EncodeQrResponse], error)
 }
 
 // NewInstanceServiceClient constructs a client for the mistgate.admin.v1.InstanceService service.
@@ -72,6 +78,12 @@ func NewInstanceServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(instanceServiceMethods.ByName("UpdateInstance")),
 			connect.WithClientOptions(opts...),
 		),
+		encodeQr: connect.NewClient[v1.EncodeQrRequest, v1.EncodeQrResponse](
+			httpClient,
+			baseURL+InstanceServiceEncodeQrProcedure,
+			connect.WithSchema(instanceServiceMethods.ByName("EncodeQr")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -79,6 +91,7 @@ func NewInstanceServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 type instanceServiceClient struct {
 	getInstance    *connect.Client[v1.GetInstanceRequest, v1.GetInstanceResponse]
 	updateInstance *connect.Client[v1.UpdateInstanceRequest, v1.UpdateInstanceResponse]
+	encodeQr       *connect.Client[v1.EncodeQrRequest, v1.EncodeQrResponse]
 }
 
 // GetInstance calls mistgate.admin.v1.InstanceService.GetInstance.
@@ -91,12 +104,20 @@ func (c *instanceServiceClient) UpdateInstance(ctx context.Context, req *connect
 	return c.updateInstance.CallUnary(ctx, req)
 }
 
+// EncodeQr calls mistgate.admin.v1.InstanceService.EncodeQr.
+func (c *instanceServiceClient) EncodeQr(ctx context.Context, req *connect.Request[v1.EncodeQrRequest]) (*connect.Response[v1.EncodeQrResponse], error) {
+	return c.encodeQr.CallUnary(ctx, req)
+}
+
 // InstanceServiceHandler is an implementation of the mistgate.admin.v1.InstanceService service.
 type InstanceServiceHandler interface {
 	// Any signed-in admin.
 	GetInstance(context.Context, *connect.Request[v1.GetInstanceRequest]) (*connect.Response[v1.GetInstanceResponse], error)
 	// Owner only. Absent fields are left unchanged.
 	UpdateInstance(context.Context, *connect.Request[v1.UpdateInstanceRequest]) (*connect.Response[v1.UpdateInstanceResponse], error)
+	// Any signed-in admin, closed to API tokens: encodes a text (a subscription link, a device config, a proxy link) as a QR
+	// code for the panel to draw. The text is never stored, logged or audited; it is a credential.
+	EncodeQr(context.Context, *connect.Request[v1.EncodeQrRequest]) (*connect.Response[v1.EncodeQrResponse], error)
 }
 
 // NewInstanceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -118,12 +139,20 @@ func NewInstanceServiceHandler(svc InstanceServiceHandler, opts ...connect.Handl
 		connect.WithSchema(instanceServiceMethods.ByName("UpdateInstance")),
 		connect.WithHandlerOptions(opts...),
 	)
+	instanceServiceEncodeQrHandler := connect.NewUnaryHandler(
+		InstanceServiceEncodeQrProcedure,
+		svc.EncodeQr,
+		connect.WithSchema(instanceServiceMethods.ByName("EncodeQr")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.admin.v1.InstanceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case InstanceServiceGetInstanceProcedure:
 			instanceServiceGetInstanceHandler.ServeHTTP(w, r)
 		case InstanceServiceUpdateInstanceProcedure:
 			instanceServiceUpdateInstanceHandler.ServeHTTP(w, r)
+		case InstanceServiceEncodeQrProcedure:
+			instanceServiceEncodeQrHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -139,4 +168,8 @@ func (UnimplementedInstanceServiceHandler) GetInstance(context.Context, *connect
 
 func (UnimplementedInstanceServiceHandler) UpdateInstance(context.Context, *connect.Request[v1.UpdateInstanceRequest]) (*connect.Response[v1.UpdateInstanceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.InstanceService.UpdateInstance is not implemented"))
+}
+
+func (UnimplementedInstanceServiceHandler) EncodeQr(context.Context, *connect.Request[v1.EncodeQrRequest]) (*connect.Response[v1.EncodeQrResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.InstanceService.EncodeQr is not implemented"))
 }

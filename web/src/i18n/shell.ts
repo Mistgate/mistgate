@@ -16,6 +16,7 @@ export const en = {
   "shell.theme.light": "Light",
   "shell.theme.dark": "Dark",
   "shell.upd.have": "You run {current}. The panel updates after you confirm and rolls back if something goes wrong.",
+  "qr.error": "Could not draw the QR code.",
 };
 
 export const ru: typeof en = {
@@ -33,6 +34,7 @@ export const ru: typeof en = {
   "shell.theme.light": "Светлая",
   "shell.theme.dark": "Тёмная",
   "shell.upd.have": "У тебя {current}. Панель обновится с твоего подтверждения и откатится, если что-то пойдёт не так.",
+  "qr.error": "Не удалось нарисовать QR-код.",
 };
 
 export const zh: typeof en = {
@@ -50,6 +52,7 @@ export const zh: typeof en = {
   "shell.theme.light": "浅色",
   "shell.theme.dark": "深色",
   "shell.upd.have": "你当前是 {current}。面板在你确认后更新，出现问题会自动回滚。",
+  "qr.error": "无法生成二维码。",
 };
 
 export const fa: typeof en = {
@@ -67,6 +70,7 @@ export const fa: typeof en = {
   "shell.theme.light": "روشن",
   "shell.theme.dark": "تیره",
   "shell.upd.have": "نسخهٔ تو {current} است. پنل با تأیید تو به‌روز می‌شود و اگر مشکلی پیش بیاید به عقب برمی‌گردد.",
+  "qr.error": "رسم کد QR انجام نشد.",
 };
 
 export const tr: typeof en = {
@@ -84,4 +88,5 @@ export const tr: typeof en = {
   "shell.theme.light": "Açık",
   "shell.theme.dark": "Koyu",
   "shell.upd.have": "Sende {current} var. Panel sen onaylayınca güncellenir ve bir şey ters giderse geri alınır.",
+  "qr.error": "QR kod oluşturulamadı.",
 };

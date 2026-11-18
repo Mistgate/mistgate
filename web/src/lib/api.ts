@@ -37,6 +37,7 @@ import { TasksService } from "@/gen/mistgate/tasks/v1/tasks_pb";
 import { WarpReachService } from "@/gen/mistgate/warpreach/v1/warpreach_pb";
 import type { MessageKey } from "@/i18n/en";
 import { versionInterceptor } from "./stale";
+import type { QrBits } from "./qr-path";
 
 // The panel rewrites <base href> to the admin prefix (e.g. "/4hbx.../");
 // everything below derives from document.baseURI, nothing is hard-coded.
@@ -101,6 +102,8 @@ export type RecoveryLoginResult = {
   password: string;
   totpUri: string;
   totpSecret: string;
+  /** The code of the new secret, drawn by the card (the route is plain JSON: the bits come as base64). */
+  totpQr?: QrBits;
   created: boolean;
   sessionsEnded: number;
 };
@@ -120,7 +123,14 @@ export async function recoverLogin(recoveryToken: string, login: string): Promis
     error.code = typeof body.code === "string" ? body.code : "unknown"; // no code at all means the request never got an answer
     throw error;
   }
-  return body as RecoveryLoginResult;
+  const q = body.totpQr as { n?: unknown; bits?: unknown; window?: unknown } | undefined;
+  let totpQr: QrBits | undefined;
+  try {
+    if (q && typeof q.bits === "string") totpQr = { n: q.n as number, bits: Uint8Array.from(atob(q.bits), (c) => c.charCodeAt(0)), window: q.window as number };
+  } catch {
+    // not base64: no code, the secret is still shown
+  }
+  return { ...(body as Omit<RecoveryLoginResult, "totpQr">), totpQr };
 }
 
 /** URL of a file next to the admin UI (respects the secret prefix), e.g. assetUrl("brand/logo.svg"). */
