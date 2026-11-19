@@ -22,13 +22,11 @@ import (
 
 	"connectrpc.com/connect"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
-	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/decoysite/v1/decoysitev1connect"
 	opsv1 "github.com/mistgate/mistgate/gen/mistgate/ops/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/ops/v1/opsv1connect"
@@ -85,113 +83,6 @@ type fakeAuth struct {
 	tokens map[string]*fakeToken // secret -> token
 	plans  *fakePlans
 	w      *world
-}
-
-var tokenApproved = map[string]bool{
-	adminv1connect.HealthServiceApplyFixProcedure:                         true,
-	adminv1connect.UpdateServiceStartRolloutProcedure:                     true,
-	adminv1connect.UpdateServicePauseRolloutProcedure:                     true,
-	adminv1connect.UpdateServiceResumeRolloutProcedure:                    true,
-	adminv1connect.UpdateServiceCancelRolloutProcedure:                    true,
-	adminv1connect.UpdateServiceStartOsRolloutProcedure:                   true,
-	adminv1connect.UpdateServicePauseOsRolloutProcedure:                   true,
-	adminv1connect.UpdateServiceResumeOsRolloutProcedure:                  true,
-	adminv1connect.UpdateServiceCancelOsRolloutProcedure:                  true,
-	adminv1connect.UpdateServiceRollbackNodeProcedure:                     true,
-	adminv1connect.UpdateServiceScheduleNodeUpdateProcedure:               true,
-	adminv1connect.UpdateServiceCancelNodeUpdateScheduleProcedure:         true,
-	adminv1connect.UpdateServiceSetUpdateTimezoneProcedure:                true,
-	adminv1connect.UpdateServiceSetUpdateDownloadTimeoutProcedure:         true,
-	adminv1connect.ProvisioningServiceStartNodeProvisionProcedure:         true,
-	adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure:   true,
-	adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure:           true,
-	adminv1connect.ProvisioningServiceRemoveNodeServerKeyProcedure:        true,
-	adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure:          true, // planning only, in the real policy
-	adminv1connect.WarpServiceRegisterWarpProcedure:                       true,
-	adminv1connect.NodeServiceSetNodeDecoyModeProcedure:                   true,
-	adminv1connect.NodeServiceUpdateNodeProcedure:                         true,
-	adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure: true,
-	adminv1connect.ProfileServiceCreateProfileProcedure:                   true,
-	adminv1connect.ProfileServiceUpdateProfileProcedure:                   true,
-	adminv1connect.ProfileServiceDeleteProfileProcedure:                   true,
-	adminv1connect.ProfileServiceCreateInboundProcedure:                   true,
-	adminv1connect.ProfileServiceDeleteInboundProcedure:                   true,
-	adminv1connect.GroupServiceUpdateGroupProcedure:                       true,
-	adminv1connect.GroupServiceSetNodeSharingProcedure:                    true,
-	adminv1connect.ProfileServiceUpdateInboundProcedure:                   true,
-	adminv1connect.DnsServiceCreateDnsPresetProcedure:                     true,
-	adminv1connect.DnsServiceUpdateDnsPresetProcedure:                     true,
-	adminv1connect.DnsServiceDeleteDnsPresetProcedure:                     true,
-	adminv1connect.RelayServiceCreateRelayProcedure:                       true,
-	adminv1connect.RelayServiceUpdateRelayProcedure:                       true,
-	adminv1connect.RelayServiceDeleteRelayProcedure:                       true,
-	tasksv1connect.TasksServiceCreateTaskProcedure:                        true,
-	tasksv1connect.TasksServiceUpdateTaskProcedure:                        true,
-	tasksv1connect.TasksServiceDeleteTaskProcedure:                        true,
-	decoysitev1connect.DecoySiteServiceSetDecoySiteReadyProcedure:         true,
-	decoysitev1connect.DecoySiteServiceAssignDecoySiteProcedure:           true,
-	decoysitev1connect.DecoySiteServiceUnassignDecoySiteProcedure:         true,
-	decoysitev1connect.DecoySiteServiceRevertDecoySiteProcedure:           true,
-	decoysitev1connect.DecoySiteServiceDeleteDecoySiteProcedure:           true,
-}
-
-// tokenDraft is the policy's TokenAccessDraft: planning, or inside an approved plan.
-var tokenDraft = map[string]bool{decoysitev1connect.DecoySiteServiceAddDecoySiteVersionProcedure: true}
-
-var tokenPlanning = map[string]bool{
-	adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure:     true,
-	adminv1connect.WarpServiceGetWarpProcedure:                    true,
-	adminv1connect.RelayServiceListRelaysProcedure:                true,
-	adminv1connect.RelayServiceListRelayCandidatesProcedure:       true,
-	adminv1connect.RelayServiceCheckRelayProcedure:                true,
-	decoysitev1connect.DecoySiteServiceCreateDecoySiteProcedure:   true,
-	decoysitev1connect.DecoySiteServiceDownloadDecoySiteProcedure: true,
-}
-
-// planningOnly is the approved procedures that planning opens whole (no write behind them).
-var planningOnly = map[string]bool{adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure: true}
-
-// planningDry mirrors auth.planningRequest / planningDryRun: the procedures a plan may call under planning, and the flag
-// of the request that makes the call a check. A tool that plans with a procedure missing here fails its tests, as it
-// would be refused (403) in production.
-var planningDry = map[string]struct {
-	message func() proto.Message
-	dry     func(proto.Message) bool
-}{
-	adminv1connect.HealthServiceApplyFixProcedure: {func() proto.Message { return &adminv1.ApplyFixRequest{} },
-		func(m proto.Message) bool { return m.(*adminv1.ApplyFixRequest).GetDryRun() }},
-	adminv1connect.ProfileServiceUpdateProfileProcedure: {func() proto.Message { return &adminv1.UpdateProfileRequest{} },
-		func(m proto.Message) bool { return m.(*adminv1.UpdateProfileRequest).GetDryRun() }},
-	adminv1connect.ProfileServiceCreateInboundProcedure: {func() proto.Message { return &adminv1.CreateInboundRequest{} },
-		func(m proto.Message) bool { return m.(*adminv1.CreateInboundRequest).GetValidateOnly() }},
-	adminv1connect.ProfileServiceUpdateInboundProcedure: {func() proto.Message { return &adminv1.UpdateInboundRequest{} },
-		func(m proto.Message) bool { return m.(*adminv1.UpdateInboundRequest).GetValidateOnly() }},
-	adminv1connect.GroupServiceUpdateGroupProcedure: {func() proto.Message { return &adminv1.UpdateGroupRequest{} },
-		func(m proto.Message) bool { return m.(*adminv1.UpdateGroupRequest).GetDryRun() }},
-	adminv1connect.GroupServiceSetNodeSharingProcedure: {func() proto.Message { return &adminv1.SetNodeSharingRequest{} },
-		func(m proto.Message) bool { return m.(*adminv1.SetNodeSharingRequest).GetDryRun() }},
-	decoysitev1connect.DecoySiteServiceAssignDecoySiteProcedure: {func() proto.Message { return &decoysitev1.AssignDecoySiteRequest{} },
-		func(m proto.Message) bool { return m.(*decoysitev1.AssignDecoySiteRequest).GetDryRun() }},
-}
-
-// planningDryRun reads the request body (and puts it back) the way auth.planningDryRun does.
-func planningDryRun(r *http.Request) bool {
-	x, ok := planningDry[r.URL.Path]
-	if !ok {
-		return false
-	}
-	body, err := io.ReadAll(r.Body)
-	r.Body = io.NopCloser(bytes.NewReader(body))
-	if err != nil {
-		return false
-	}
-	m := x.message()
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/proto") {
-		err = proto.Unmarshal(body, m)
-	} else {
-		err = protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(body, m)
-	}
-	return err == nil && x.dry(m)
 }
 
 func (a *fakeAuth) lookup(r *http.Request) (*fakeToken, bool) {
@@ -252,6 +143,11 @@ func (a *fakeAuth) requireSession(next http.Handler) http.Handler {
 			t = &fakeToken{ID: identity.TokenID, Profile: Profile(identity.Profile)}
 		}
 		path := r.URL.Path
+		access, listed := auth.TokenAccess(path)
+		if !listed {
+			http.Error(w, `{"code":"permission_denied","message":"this call is not available to API tokens"}`, http.StatusForbidden)
+			return
+		}
 		need := auth.TokenProcedureRole(path)
 		if roleRank(profileRole(t.Profile)) < roleRank(need) {
 			http.Error(w, `{"code":"permission_denied","message":"your role cannot do this"}`, http.StatusForbidden)
@@ -260,33 +156,31 @@ func (a *fakeAuth) requireSession(next http.Handler) http.Handler {
 		ctx := r.Context()
 		planning, _ := ctx.Value(keyPlanning).(bool)
 		approved, _ := ctx.Value(keyApproved).(string)
-		if tokenApproved[path] {
-			// like the real policy: planning opens a procedure only for the request whose flag makes it a check
-			okGrant := planning && (planningOnly[path] || planningDryRun(r))
-			if approved != "" {
-				p, err := a.plans.GetMCPPlan(ctx, approved)
-				okGrant = err == nil && p.Status == StatusApplying && p.TokenID == t.ID && p.NeedsApproval && p.DecidedBy != ""
-			}
-			if !okGrant {
+		ch, _ := ctx.Value(keyChannel).(string)
+		planningOK := planning && ch == "mcp" // auth's planningAllows: planning counts on the MCP channel only
+		// the owner's approved plan, whose tool may call this procedure (auth's grantAllows)
+		granted := false
+		if approved != "" {
+			p, err := a.plans.GetMCPPlan(ctx, approved)
+			granted = err == nil && p.Status == StatusApplying && p.TokenID == t.ID && p.NeedsApproval && p.DecidedBy != "" && auth.GrantAllows(p.Tool, path)
+		}
+		// what auth.tokenDenied says for each kind of access
+		switch access {
+		case auth.TokenAccessApproved:
+			if !granted && !(planningOK && auth.PlanningDryRun(r)) {
 				http.Error(w, `{"code":"permission_denied","message":"needs the owner's approval; not available over the API"}`, http.StatusForbidden)
 				return
 			}
-		}
-		if tokenDraft[path] {
-			okGrant := planning
-			if approved != "" {
-				p, err := a.plans.GetMCPPlan(ctx, approved)
-				okGrant = err == nil && p.Status == StatusApplying && p.TokenID == t.ID && p.NeedsApproval && p.DecidedBy != ""
-			}
-			if !okGrant {
+		case auth.TokenAccessDraft:
+			if !granted && !planningOK {
 				http.Error(w, `{"code":"permission_denied","message":"this is used only while the MCP server makes a plan"}`, http.StatusForbidden)
 				return
 			}
-		}
-		ch, _ := ctx.Value(keyChannel).(string)
-		if tokenPlanning[path] && (!planning || ch != "mcp") {
-			http.Error(w, `{"code":"permission_denied","message":"this call is only available to in-process MCP reads"}`, http.StatusForbidden)
-			return
+		case auth.TokenAccessPlanning:
+			if !planningOK {
+				http.Error(w, `{"code":"permission_denied","message":"this call is only available to in-process MCP reads"}`, http.StatusForbidden)
+				return
+			}
 		}
 		a.w.record(callRec{Path: path, Token: t.ID, Channel: ch, Planning: planning, Approved: approved, Remote: r.RemoteAddr, XFF: r.Header.Get("X-Forwarded-For"), Cookie: r.Header.Get("Cookie")})
 		next.ServeHTTP(w, r.WithContext(context.WithValue(ctx, keyPrincipal, Principal{TokenID: t.ID, Profile: t.Profile})))
