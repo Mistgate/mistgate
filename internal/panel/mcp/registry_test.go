@@ -4,6 +4,10 @@ package mcp
 
 import (
 	"context"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -169,19 +173,43 @@ func TestConnectionDescriptionsExplainLimits(t *testing.T) {
 	}
 }
 
+var updateToolsByProfile = flag.Bool("update-tools-by-profile", false, "rewrite testdata/tools_by_profile.txt")
+
+// toolsByProfileFile is the tool list of every profile, one name a line under its profile's heading: a tool that appears or goes, or
+// moves to another profile, shows as a line of the diff instead of as a count that someone edits.
+func toolsByProfileFile() string {
+	var b strings.Builder
+	for _, p := range []Profile{ProfileReadonly, ProfileOperator, ProfileAdmin} {
+		fmt.Fprintf(&b, "[%s]\n", p)
+		for _, name := range ToolNames(p) {
+			b.WriteString(name + "\n")
+		}
+	}
+	return b.String()
+}
+
+// The tools each profile sees, as the golden file says, on the registry and on a running server.
 func TestToolsPerProfile(t *testing.T) {
+	path := filepath.Join("testdata", "tools_by_profile.txt")
+	want := toolsByProfileFile()
+	if *updateToolsByProfile {
+		if err := os.WriteFile(path, []byte(want), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	have, err := os.ReadFile(path)
+	if err != nil || strings.ReplaceAll(string(have), "\r\n", "\n") != want {
+		t.Fatalf("%s is out of date: a tool came or went. Refresh it with `go test ./internal/panel/mcp -run ToolsPerProfile -update-tools-by-profile` and read the diff", path)
+	}
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 50, ProfileOperator: 105, ProfileAdmin: 203}
 	got := map[Profile][]string{}
-	for p, n := range want {
+	for _, p := range []Profile{ProfileReadonly, ProfileOperator, ProfileAdmin} {
 		_, secret := e.token(p)
 		names := toolNames(t, e.session(secret))
 		got[p] = names
-		if len(names) != n {
-			t.Errorf("%s sees %d tools, want %d: %v", p, len(names), n, names)
-		}
-		if len(toolsFor(p)) != n {
-			t.Errorf("%s: registry says %d tools, want %d", p, len(toolsFor(p)), n)
+		if !slices.Equal(slices.Sorted(slices.Values(names)), ToolNames(p)) {
+			t.Errorf("%s: the server lists %d tools, the registry %d", p, len(names), len(ToolNames(p)))
 		}
 	}
 	for _, n := range got[ProfileReadonly] {

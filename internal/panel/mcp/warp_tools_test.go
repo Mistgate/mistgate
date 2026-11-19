@@ -206,17 +206,6 @@ func TestWarpReregisterRejectedOrExpiredPlanNeverRuns(t *testing.T) {
 	}
 }
 
-func TestWarpToolsProfiles(t *testing.T) {
-	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 50, ProfileOperator: 105, ProfileAdmin: 203}
-	for profile, n := range want {
-		_, secret := e.token(profile)
-		if got := len(toolNames(t, e.session(secret))); got != n {
-			t.Errorf("%s sees %d tools, want %d", profile, got, n)
-		}
-	}
-}
-
 type warpReachResult struct {
 	ReachState string `json:"reach_state"`
 	Reach      *struct {
