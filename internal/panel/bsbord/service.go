@@ -34,7 +34,6 @@ import (
 const (
 	Source = countryreach.SourceBsbord
 
-	settingCountry  = "country_reachability.country" // the country the owner checks from, owned by countryreach
 	settingEnabled  = "bsbord.enabled"
 	settingKey      = "bsbord.key"
 	settingUnits    = "bsbord.units"
@@ -335,15 +334,13 @@ func (s *Service) State(ctx context.Context) health.ExternalState {
 }
 
 // StateKeys are the settings State reads; StateFrom builds it from their values.
-func StateKeys() []string { return []string{settingEnabled, settingInterval, settingCountry} }
+func StateKeys() []string {
+	return []string{settingEnabled, settingInterval, countryreach.CountrySetting}
+}
 
 // StateFrom is State from the values of StateKeys.
 func StateFrom(kv map[string]string) health.ExternalState {
-	country := strings.ToUpper(strings.TrimSpace(kv[settingCountry]))
-	if country == "" {
-		country = countryreach.DefaultCountry
-	}
-	if country != countryreach.TSPUCountry {
+	if countryreach.ParseCountry(kv[countryreach.CountrySetting]) != countryreach.TSPUCountry {
 		return health.ExternalState{Source: Source}
 	}
 	interval := DefaultIntervalMin

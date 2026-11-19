@@ -21,12 +21,21 @@ import (
 )
 
 const (
-	settingCountry = "country_reachability.country"
+	// CountrySetting is the stored country to look from. Readers of the raw value (the sources' state reads) pass it to ParseCountry.
+	CountrySetting = "country_reachability.country"
 	// DefaultCountry is where the check looks from until the owner says otherwise.
 	DefaultCountry = "RU"
 )
 
 var countryRe = regexp.MustCompile(`^[A-Za-z]{2}$`)
+
+// ParseCountry is the country a stored value stands for, upper case; DefaultCountry when it is empty or not two letters.
+func ParseCountry(raw string) string {
+	if raw = strings.ToUpper(raw); countryRe.MatchString(raw) {
+		return raw
+	}
+	return DefaultCountry
+}
 
 // HistoryDays is the longest history GetReachabilityHistory returns: the sources keep their results for 7 days.
 const HistoryDays = 7
@@ -56,17 +65,11 @@ func New(st *store.Store, log *slog.Logger, now func() time.Time, history Histor
 
 // Country is the country to look from, upper case; the default when nothing valid is stored or the store cannot be read.
 func (s *Service) Country(ctx context.Context) string {
-	v, err := s.st.Setting(ctx, settingCountry)
-	if err != nil {
-		if !errors.Is(err, store.ErrNotFound) {
-			s.log.Warn("countryreach: read the country", "err", err)
-		}
-		return DefaultCountry
+	v, err := s.st.Setting(ctx, CountrySetting)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		s.log.Warn("countryreach: read the country", "err", err)
 	}
-	if v = strings.ToUpper(v); countryRe.MatchString(v) {
-		return v
-	}
-	return DefaultCountry
+	return ParseCountry(v)
 }
 
 // Handler is the admin CountryReachabilityService.
@@ -95,7 +98,7 @@ func (r rpc) UpdateCountryReachability(ctx context.Context, req *connect.Request
 		return nil, fail(connect.CodeInvalidArgument, "country: two letters, ISO 3166-1 alpha-2")
 	}
 	s := r.s
-	if err := s.st.SetSettings(ctx, map[string]string{settingCountry: c}); err != nil {
+	if err := s.st.SetSettings(ctx, map[string]string{CountrySetting: c}); err != nil {
 		s.log.Error("countryreach: save the country", "err", err)
 		return nil, fail(connect.CodeInternal, "internal error")
 	}
