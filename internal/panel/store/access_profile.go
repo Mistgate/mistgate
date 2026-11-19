@@ -287,25 +287,36 @@ func (a Access) InboundsOfNode(ctx context.Context, nodeID string) ([]AccessInbo
 	return a.inbounds(ctx, `WHERE i.node_id = ?`, nodeID)
 }
 
-// UpdateInbound writes the admin-editable fields and the spec version of i (matched by ID). When
-// resetState is set the state goes back to pending (enabled) or disabled, until the node reports again.
-func (a Access) UpdateInbound(ctx context.Context, i AccessInbound, resetState bool, now time.Time) error {
+// UpdateInbound writes the admin-editable fields and the spec version of i (matched by ID), provided the row still holds
+// the fields of was, the row i was made from: two edits that read the same row must not overwrite each other's field.
+// The fleet's own columns (state, certificate, health) are not compared, so a node's report never fails an edit.
+// ErrAccessVersion when the row changed since it was read, ErrNotFound when it is gone. When resetState is set the
+// state goes back to pending (enabled) or disabled, until the node reports again.
+func (a Access) UpdateInbound(ctx context.Context, i, was AccessInbound, resetState bool, now time.Time) error {
 	q := `UPDATE inbound SET port_override = ?, tls_server_name_override = ?, reality_target_override = ?, enabled = ?, direct_in_subscriptions = ?, spec_version = ?, updated_at = ?`
 	if resetState {
 		q += `, state = CASE WHEN ? = 1 THEN 'pending' ELSE 'disabled' END, last_error = ''`
 	}
-	q += ` WHERE id = ?`
+	q += ` WHERE id = ? AND port_override IS ? AND tls_server_name_override = ? AND reality_target_override = ? AND enabled = ? AND direct_in_subscriptions = ? AND spec_version = ?`
 	args := []any{accNullPort(i.PortOverride), i.TLSServerNameOverride, i.RealityTargetOverride, accBool(i.Enabled), accBool(i.DirectInSubscriptions), i.SpecVersion, unix(now)}
 	if resetState {
 		args = append(args, accBool(i.Enabled))
 	}
-	args = append(args, i.ID)
+	args = append(args, i.ID, accNullPort(was.PortOverride), was.TLSServerNameOverride, was.RealityTargetOverride, accBool(was.Enabled), accBool(was.DirectInSubscriptions), was.SpecVersion)
 	res, err := a.s.W.ExecContext(ctx, q, args...)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
+		var one int
+		err := a.s.W.QueryRowContext(ctx, `SELECT 1 FROM inbound WHERE id = ?`, i.ID).Scan(&one) // the writer: the row just read there
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		return ErrAccessVersion
 	}
 	return nil
 }

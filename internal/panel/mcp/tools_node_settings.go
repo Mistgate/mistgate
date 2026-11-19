@@ -321,17 +321,26 @@ var nodeUpdate = changeSpec[nodeUpdateArgs]{
 		for _, item := range a.Direct {
 			value := item.Included
 			if _, err := c.cl.Profile.UpdateInbound(c.ctx, connect.NewRequest(&adminv1.UpdateInboundRequest{InboundId: item.InboundID, DirectInSubscriptions: &value})); err != nil {
-				return done{}, apiError(err)
+				return done{}, inboundApplyError(err)
 			}
 		}
 		for _, item := range a.Reality {
 			target := item.Target
 			if _, err := c.cl.Profile.UpdateInbound(c.ctx, connect.NewRequest(&adminv1.UpdateInboundRequest{InboundId: item.InboundID, RealityTargetOverride: &target})); err != nil {
-				return done{}, apiError(err)
+				return done{}, inboundApplyError(err)
 			}
 		}
 		return doneWith("node_updated", "Node settings updated."), nil
 	},
+}
+
+// inboundApplyError: the panel refuses an inbound write with Aborted when the row changed after it was read (an edit in the
+// panel, or another plan); here that means the plan is out of date.
+func inboundApplyError(err error) error {
+	if connect.CodeOf(err) == connect.CodeAborted {
+		return failure("changed_since_plan", "a node inbound changed after the plan; make a new plan")
+	}
+	return apiError(err)
 }
 
 func strconvBool(v bool) string {

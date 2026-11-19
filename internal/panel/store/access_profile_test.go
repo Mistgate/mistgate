@@ -4,6 +4,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -52,8 +53,9 @@ func TestInboundDirectInSubscriptionsRoundTripsAndDefaultsTrue(t *testing.T) {
 		t.Fatalf("inbound readers missed the default: full=%+v byNode=%+v", full, byNode)
 	}
 
+	was := in
 	in.DirectInSubscriptions = false
-	if err := a.UpdateInbound(ctx, in, false, time.Unix(123, 0)); err != nil {
+	if err := a.UpdateInbound(ctx, in, was, false, time.Unix(123, 0)); err != nil {
 		t.Fatal(err)
 	}
 	got, err := a.Inbound(ctx, inboundID)
@@ -67,4 +69,62 @@ func TestInboundDirectInSubscriptionsRoundTripsAndDefaultsTrue(t *testing.T) {
 	if got.DirectInSubscriptions || fleet.DirectInSubscriptions {
 		t.Fatalf("round trip: access=%+v fleet=%+v", got, fleet)
 	}
+}
+
+// Two edits that read the same inbound row and write different fields: the second is refused and the first field stays.
+func TestUpdateInboundRefusesAStaleRead(t *testing.T) {
+	ctx := context.Background()
+	s := openTemp(t)
+	_, inboundID := fixtureInbound(t, s, "lost_update")
+	a := s.Access()
+	was, err := a.Inbound(ctx, inboundID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	first := was
+	first.RealityTargetOverride = "shop.example.com:443"
+	first.SpecVersion++
+	if err := a.UpdateInbound(ctx, first, was, true, time.Unix(200, 0)); err != nil {
+		t.Fatal(err)
+	}
+	second := was // the same read, another field
+	second.PortOverride = 4443
+	second.SpecVersion++
+	if err := a.UpdateInbound(ctx, second, was, true, time.Unix(201, 0)); !errors.Is(err, ErrAccessVersion) {
+		t.Fatalf("second write over the same read = %v, want ErrAccessVersion", err)
+	}
+	got, err := a.Inbound(ctx, inboundID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RealityTargetOverride != "shop.example.com:443" || got.PortOverride != 0 || got.SpecVersion != first.SpecVersion {
+		t.Fatalf("the first write was lost: %+v", got)
+	}
+	// the same edit on a fresh read goes through
+	if err := a.UpdateInbound(ctx, withPort(got, 4443), got, true, time.Unix(202, 0)); err != nil {
+		t.Fatal(err)
+	}
+	// a report of the node (state, certificate) in between is no reason to refuse
+	fresh, _ := a.Inbound(ctx, inboundID)
+	if err := a.SetInboundBuildError(ctx, inboundID, "boom", time.Unix(203, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.UpdateInbound(ctx, withPort(fresh, 4444), fresh, false, time.Unix(204, 0)); err != nil {
+		t.Fatalf("a node report must not refuse an edit: %v", err)
+	}
+	if err := a.UpdateInbound(ctx, was, was, false, time.Unix(205, 0)); !errors.Is(err, ErrAccessVersion) {
+		t.Fatalf("an old read = %v", err)
+	}
+	gone := was
+	gone.ID = "inb_nope"
+	if err := a.UpdateInbound(ctx, gone, gone, false, time.Unix(206, 0)); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing inbound = %v", err)
+	}
+}
+
+func withPort(i AccessInbound, port uint16) AccessInbound {
+	i.PortOverride = port
+	i.SpecVersion++
+	return i
 }

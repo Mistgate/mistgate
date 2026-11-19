@@ -20,6 +20,8 @@ export const errorCodes = [
   "too_many_groups",
   "profile_deployed",
   "stale_version",
+  // a profile on a node (UpdateInbound) that was changed by someone else between its read and its write: the page reads it again
+  "stale_inbound",
   "node_offline",
   "agent_too_old",
   "node_retired",

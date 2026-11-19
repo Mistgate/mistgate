@@ -271,6 +271,7 @@ const core: CoreMessages = {
   "err.too_many_groups": "一个用户最多属于 16 个分组。",
   "err.profile_deployed": "此协议配置已部署在节点 {nodes} 上。请先从这些节点移除。",
   "err.stale_version": "此协议配置已在另一个标签页中被修改。请刷新页面。",
+  "err.stale_inbound": "此服务器的设置刚刚在别处被修改。列表已刷新：请检查后再重复这次修改。",
   "err.node_offline": "节点未连接。请在它的 Agent 重新上线后再试。",
   "err.agent_too_old": "此节点的 Agent 版本过旧，无法执行此操作。请在「更新」页面更新它。",
   "err.node_retired": "此节点已从集群退役。",

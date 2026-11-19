@@ -143,9 +143,13 @@ func TestD1InboundDirectInSubscriptionsRoundTripsAndDefaultsTrue(t *testing.T) {
 	if len(full) != 1 || !full[0].Inbound.DirectInSubscriptions || len(byNode) != 1 || !byNode[0].DirectInSubscriptions {
 		t.Fatalf("D1 inbound readers missed the default: full=%+v byNode=%+v", full, byNode)
 	}
+	was := in
 	in.DirectInSubscriptions = false
-	if err := a.UpdateInbound(ctx, in, false, now.Add(time.Second)); err != nil {
+	if err := a.UpdateInbound(ctx, in, was, false, now.Add(time.Second)); err != nil {
 		t.Fatal(err)
+	}
+	if err := a.UpdateInbound(ctx, in, was, false, now.Add(2*time.Second)); !errors.Is(err, ErrAccessVersion) { // the same read again: D1 refuses it as SQLite does
+		t.Fatalf("D1 write over a stale read = %v", err)
 	}
 	got, err := a.Inbound(ctx, in.ID)
 	if err != nil {

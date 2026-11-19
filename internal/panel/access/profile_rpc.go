@@ -1341,6 +1341,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		return nil, s.internal("load inbound", err)
 	}
 	in := f.Inbound
+	was := in // what the write below is checked against: another edit of the row in between is refused, not overwritten
 	oldEnabled := in.Enabled
 	oldDirectInSubscriptions := in.DirectInSubscriptions
 	// The spec before the change only tells whether the port moves: an inbound that does not build now (a disabled one whose profile
@@ -1468,7 +1469,11 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 	}
 	desiredChanged := specChangedByAdmin || enabledChanged
 	if desiredChanged || directInSubscriptionsChanged {
-		if err := s.st.Access().UpdateInbound(ctx, in, desiredChanged, s.now()); err != nil {
+		if err := s.st.Access().UpdateInbound(ctx, in, was, desiredChanged, s.now()); errors.Is(err, store.ErrAccessVersion) {
+			return nil, coded(connect.CodeAborted, "stale_inbound")
+		} else if errors.Is(err, store.ErrNotFound) {
+			return nil, notFound("inbound")
+		} else if err != nil {
 			return nil, s.internal("update inbound", err)
 		}
 		if p, ok := s.reg.Get(f.Profile.Protocol); ok && specChangedByAdmin && protocols.IsPerDevice(p) {

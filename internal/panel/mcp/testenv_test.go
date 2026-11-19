@@ -515,6 +515,7 @@ type world struct {
 	dnsDeleteReq        []*adminv1.DeleteDnsPresetRequest
 	nodeUpdateReq       []*adminv1.UpdateNodeRequest
 	inboundUpdateReq    []*adminv1.UpdateInboundRequest
+	inboundStale        bool // a write of an inbound is refused as "changed since it was read"
 	warpRestarts        []*adminv1.RestartWarpRequest
 	warpRegistrations   []*adminv1.RegisterWarpRequest
 	nodeDecoyReqs       []*adminv1.SetNodeDecoyModeRequest
@@ -881,6 +882,9 @@ func (w *world) UpdateInbound(_ context.Context, r *connect.Request[adminv1.Upda
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.inboundUpdateReq = append(w.inboundUpdateReq, proto.Clone(r.Msg).(*adminv1.UpdateInboundRequest))
+	if w.inboundStale && !r.Msg.GetValidateOnly() {
+		return nil, connect.NewError(connect.CodeAborted, errors.New("stale_inbound"))
+	}
 	direct := w.inboundDirect[r.Msg.GetInboundId()]
 	if r.Msg.DirectInSubscriptions != nil {
 		direct = r.Msg.GetDirectInSubscriptions()
