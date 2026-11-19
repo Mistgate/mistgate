@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 )
@@ -96,8 +97,8 @@ func v6Harness(t *testing.T, rec *v6Rec, o harnessOpts) *harness {
 // An agent on a host that cannot hold addresses does not list ipv6-addr/1; one that can, does.
 func TestIPv6AddrCapabilityFollowsTheHost(t *testing.T) {
 	plain := newHarness(t, harnessOpts{})
-	if hello := <-plain.panel.hellos; contains(hello.Capabilities, capIPv6Addr) {
-		t.Fatalf("a host without the interface lists %s: %v", capIPv6Addr, hello.Capabilities)
+	if hello := <-plain.panel.hellos; contains(hello.Capabilities, agentcap.IPv6Addr) {
+		t.Fatalf("a host without the interface lists %s: %v", agentcap.IPv6Addr, hello.Capabilities)
 	}
 	h := v6Harness(t, &v6Rec{state: hostctl.IPv6AddrOK}, harnessOpts{})
 	if hello := <-h.panel.hellos; !contains(hello.Capabilities, "ipv6-addr/1") {

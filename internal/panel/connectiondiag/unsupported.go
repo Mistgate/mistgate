@@ -5,31 +5,15 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
-
-const Links2Capability = "links/2"
-const Links3Capability = "links/3"
-const VLESSUnknownKeysCapability = "vless-unknown-keys/1"
-const TrustTunnelCapability = "trusttunnel/1"
-
-// TrustTunnelRefusalsCapability marks agents whose TrustTunnel engine counts the tunnel requests it refused, by reason
-// (agent.proto LinkCounters tunnel_*), on the inbound's row.
-const TrustTunnelRefusalsCapability = "trusttunnel-refusals/1"
-
-// TrustTunnelTCPStallsCapability marks agents whose TrustTunnel engine counts the HTTP/2 connections that ended with data the
-// client never acknowledged (agent.proto LinkCounters tcp_stalls, tcp_stalls_16k), on the inbound's row.
-const TrustTunnelTCPStallsCapability = "trusttunnel-tcp-stalls/1"
 
 // TunnelRefusalFields are those counters, in the order of plugin.TunnelRefusal. Only TrustTunnel has them: for another protocol
 // they are zero and left out of the views, and unsupported does not name them.
 var TunnelRefusalFields = []string{"tunnel_blocked", "tunnel_no_ipv4", "tunnel_conn_refused", "tunnel_conn_unreachable", "tunnel_conn_dns",
 	"tunnel_conn_other", "tunnel_timeout", "tunnel_other_deadlines", "tunnel_other_authority", "tunnel_other_icmp", "tunnel_other_dial",
 	"tunnel_stream_closed", "tunnel_stream_cred_gone", "tunnel_stream_conn_limit"}
-
-// VLESSHelloKexCapability marks agents that count the key exchange of the ClientHellos of REALITY connections per key
-// (agent.proto LinkCounters hello_pq, hello_classic, hello_unknown).
-const VLESSHelloKexCapability = "vless-hello-kex/1"
 
 var (
 	link2Fields = []string{"client_closes", "freezes", "quiet", "accepted", "hellos_foreign", "rtt_ms", "loss_permille", "rtt_samples", "pkts_sent"}
@@ -84,11 +68,11 @@ func UnsupportedCountersForNode(protocol string, agentCaps []string) []string {
 // reasons each engine can see (agent.proto LinkCounters).
 func UnsupportedCountersFor(protocol string, agentCaps []string, v Variant) []string {
 	protocol = strings.ToLower(protocol)
-	links3 := slices.Contains(agentCaps, Links3Capability)
+	links3 := slices.Contains(agentCaps, agentcap.Links3)
 	var out []string
 	switch protocol {
 	case "hysteria2":
-		if !slices.Contains(agentCaps, Links2Capability) {
+		if !slices.Contains(agentCaps, agentcap.Links2) {
 			out = append(out, hysteria2WithoutLinks2...)
 		}
 	default:
@@ -97,7 +81,7 @@ func UnsupportedCountersFor(protocol string, agentCaps []string, v Variant) []st
 			return []string{}
 		}
 		out = append(out, values...)
-		if protocol == "vless" && slices.Contains(agentCaps, VLESSUnknownKeysCapability) {
+		if protocol == "vless" && slices.Contains(agentCaps, agentcap.VLESSUnknownKeys) {
 			out = slices.DeleteFunc(out, func(f string) bool { return f == "unknown_keys" })
 		}
 	}
@@ -105,18 +89,18 @@ func UnsupportedCountersFor(protocol string, agentCaps []string, v Variant) []st
 		supported := links3 && link3Supported(protocol, f, v)
 		// TrustTunnel's inbound-only auth_failed counter is part of its protocol capability contract, not the
 		// generic links/3 bundle. Its node capability gates both the inbound and this counter.
-		if protocol == "trusttunnel" && f == "auth_failed" && slices.Contains(agentCaps, TrustTunnelCapability) {
+		if protocol == "trusttunnel" && f == "auth_failed" && slices.Contains(agentCaps, agentcap.TrustTunnel) {
 			supported = true
 		}
 		// The TCP stalls of TrustTunnel have a capability of their own: an agent with links/3 but without it counts none.
 		if protocol == "trusttunnel" && (f == "tcp_stalls" || f == "tcp_stalls_16k") {
-			supported = slices.Contains(agentCaps, TrustTunnelTCPStallsCapability)
+			supported = slices.Contains(agentCaps, agentcap.TrustTunnelTCPStalls)
 		}
 		if !supported {
 			out = append(out, f)
 		}
 	}
-	if protocol == "trusttunnel" && !slices.Contains(agentCaps, TrustTunnelRefusalsCapability) {
+	if protocol == "trusttunnel" && !slices.Contains(agentCaps, agentcap.TrustTunnelRefusals) {
 		out = append(out, TunnelRefusalFields...)
 	}
 	if protocol == "vless" && links3 {

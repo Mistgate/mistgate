@@ -15,24 +15,18 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
-	"github.com/mistgate/mistgate/internal/node/osupdate"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 const (
-	helloTimeout    = 15 * time.Second
-	ackEvery        = time.Second
-	outQueue        = 256
-	maxFuture       = 5 * time.Minute // agent timestamps further ahead are clamped to the receive time
-	maxStatsAge     = 48 * time.Hour  // older batches are attributed to the receive hour
-	maxEventParam   = 16
-	maxEngines      = 32 // engines listed in one Hello
-	capTorrentGuard = "torrentguard/1"
-	capClientIPv6   = "client-ipv6/1" // NodeSettings.client_ipv6_disabled
-	capIPv6Addr     = "ipv6-addr/1"   // NodeSettings.ipv6_addresses
-	capWSLink       = "ws-link/1"
-	capDecoy        = "decoy/1"
-	capNetworks     = "nets/1"
+	helloTimeout  = 15 * time.Second
+	ackEvery      = time.Second
+	outQueue      = 256
+	maxFuture     = 5 * time.Minute // agent timestamps further ahead are clamped to the receive time
+	maxStatsAge   = 48 * time.Hour  // older batches are attributed to the receive hour
+	maxEventParam = 16
+	maxEngines    = 32 // engines listed in one Hello
 )
 
 type agentService struct{ f *Fleet }
@@ -577,10 +571,10 @@ func sessionCloseError(close *SessionClose) error {
 func helloInfo(h *agentv1.Hello) store.HelloInfo {
 	info := store.HelloInfo{AgentVersion: clipText(h.AgentVersion, 64), APIVersion: h.ApiVersion, Instance: h.InstanceId,
 		Built: h.Built, Caps: capabilities(h), LastUpdateJSON: lastUpdateJSON(h.LastUpdate)}
-	if slices.Contains(info.Caps, capNetworks) {
+	if slices.Contains(info.Caps, agentcap.Nets) {
 		info.NetworksDBSHA256 = validNetworksDigest(h.NetworksDbSha256)
 	}
-	if slices.Contains(info.Caps, capDecoy) {
+	if slices.Contains(info.Caps, agentcap.Decoy) {
 		switch h.DecoyMode {
 		case "builtin":
 			if h.DecoySha256 == "" {
@@ -684,22 +678,22 @@ func nodeSettingsFor(n store.NodeRow, caps []string, allowOSStatus bool) *agentv
 	s := &agentv1.NodeSettings{StatsIntervalS: defaultStatsIntervalS, KeepaliveIntervalS: defaultKeepaliveInterval,
 		KeepaliveTimeoutS: defaultKeepaliveTimeout, DialTimeoutS: uint32(n.DialTimeoutS), DnsResolvers: slices.Clone(n.DNSResolvers),
 		CountryCode: n.CountryCode}
-	if slices.Contains(caps, capAWG) {
+	if slices.Contains(caps, agentcap.AWG) {
 		s.AwgBackend = n.AwgBackend
 	}
-	if slices.Contains(caps, capTorrentGuard) {
+	if slices.Contains(caps, agentcap.TorrentGuard) {
 		s.TorrentBlockerEnabled = n.TorrentBlockerEnabled
 	}
-	if slices.Contains(caps, capClientIPv6) {
+	if slices.Contains(caps, agentcap.ClientIPv6) {
 		s.ClientIpv6Disabled = !n.ClientIPv6
 	}
-	if slices.Contains(caps, capIPv6Addr) {
+	if slices.Contains(caps, agentcap.IPv6Addr) {
 		// "managed" says the list is the truth, an empty one too; a settings message without it (an older panel) leaves the
 		// agent's addresses alone.
 		s.Ipv6AddressesManaged = true
 		s.Ipv6Addresses = ownedIPv6Addresses(n)
 	}
-	if allowOSStatus && slices.Contains(caps, capOSStatus) {
+	if allowOSStatus && slices.Contains(caps, agentcap.OSStatus) {
 		s.OsStatus = true
 	}
 	return s
@@ -880,60 +874,50 @@ func requestOfflineError(frame *agentv1.ConnectResponse) error {
 	return errNodeOffline
 }
 
-// capDebug: the agent can capture its debug log on request (agent.proto "DEBUG CAPTURE").
-const capDebug = "debug/1"
-
-// capWarpReach: the agent answers WarpReach (agent.proto "WARP REACH").
-const capWarpReach = "warp-reach/1"
-const capDebug2 = "debug/2"
-
-// capSniScan: the agent answers SniScan (agent.proto "NEIGHBOR SITES").
-const capSniScan = "sni-scan/1"
-
 func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capability, message string) {
-	updateCapability := capUpdate
+	updateCapability := agentcap.Update
 	if linkOnly {
-		updateCapability = capUpdateLink
+		updateCapability = agentcap.UpdateLink
 	}
 	switch {
 	case frame == nil:
 		return "", ""
 	case frame.GetRunDoctor() != nil, frame.GetApplyFix() != nil:
-		return capDoctor, "agent too old"
+		return agentcap.Doctor, "agent too old"
 	case frame.GetUpdateAgent() != nil, frame.GetRollbackAgent() != nil:
 		return updateCapability, "node cannot update itself"
 	case frame.GetMeasureBandwidth() != nil:
-		return capBandwidth, "agent too old"
+		return agentcap.Bandwidth, "agent too old"
 	case frame.GetPrepareAwgKernel() != nil:
-		return capAwgPrepare, "agent too old"
+		return agentcap.AWGPrepare, "agent too old"
 	case frame.GetUpdateOs() != nil:
-		return osupdate.CapabilityUpdate, "agent too old"
+		return agentcap.OSUpdate, "agent too old"
 	case frame.GetUdpCount() != nil, frame.GetUdpSend() != nil:
-		return capUDPCheck, "agent too old"
+		return agentcap.UDPCheck, "agent too old"
 	case frame.GetHttpMark() != nil, frame.GetTcpProbe() != nil:
-		return capTCPCheck, "agent too old"
+		return agentcap.TCPCheck, "agent too old"
 	case frame.GetPathTrace() != nil:
-		return capProbe, "agent too old"
+		return agentcap.Probe, "agent too old"
 	case frame.GetSpeedTest() != nil:
 		if frame.GetSpeedTest().GetSize() >= speedStepServeChannel {
-			return capSpeedChannel, "agent too old"
+			return agentcap.SpeedChannel, "agent too old"
 		}
-		return capSpeed, "agent too old"
+		return agentcap.Speed, "agent too old"
 	case frame.GetDebugCapture() != nil:
 		for _, source := range frame.GetDebugCapture().GetSources() {
 			if source == "kernel" {
-				return capDebug2, "this node's agent is too old for the kernel source: update the node"
+				return agentcap.Debug2, "this node's agent is too old for the kernel source: update the node"
 			}
 		}
-		return capDebug, "agent too old"
+		return agentcap.Debug, "agent too old"
 	case frame.GetCountryProbe() != nil:
-		return capCountryProbe, "agent too old"
+		return agentcap.CountryProbe, "agent too old"
 	case frame.GetSetDecoy() != nil:
-		return capDecoy, "agent too old"
+		return agentcap.Decoy, "agent too old"
 	case frame.GetWarpReach() != nil:
-		return capWarpReach, "agent too old"
+		return agentcap.WarpReach, "agent too old"
 	case frame.GetSniScan() != nil:
-		return capSniScan, "agent too old"
+		return agentcap.SNIScan, "agent too old"
 	default:
 		return "", ""
 	}
@@ -956,10 +940,10 @@ func (f *Fleet) readyForRequest(ctx context.Context, nodeID string, frame *agent
 	if capability, message := requestCapability(frame, f.cfg.Remote != nil); capability != "" && !slices.Contains(live.AgentCaps, capability) {
 		return live, connect.NewError(connect.CodeFailedPrecondition, errors.New(message))
 	}
-	if update := frame.GetUpdateAgent(); update != nil && len(update.Sources) > 0 && !slices.Contains(live.AgentCaps, capUpdateSources) {
+	if update := frame.GetUpdateAgent(); update != nil && len(update.Sources) > 0 && !slices.Contains(live.AgentCaps, agentcap.UpdateSources) {
 		update.Sources = nil
 	}
-	if fix := frame.GetApplyFix(); fix != nil && fix.GetFixId() == "refresh_unit" && !slices.Contains(live.AgentCaps, capUnitRefresh) {
+	if fix := frame.GetApplyFix(); fix != nil && fix.GetFixId() == "refresh_unit" && !slices.Contains(live.AgentCaps, agentcap.UnitRefresh) {
 		return live, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}
 	return live, nil

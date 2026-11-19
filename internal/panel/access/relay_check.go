@@ -14,6 +14,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -714,7 +715,7 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 		}
 		return strings.ToLower(a.ProfileName) < strings.ToLower(b.ProfileName)
 	})
-	return connect.NewResponse(&adminv1.ListRelayCandidatesResponse{Candidates: out, AgentSupported: slices.Contains(entry.AgentCaps, plugin.CapRelayForward),
+	return connect.NewResponse(&adminv1.ListRelayCandidatesResponse{Candidates: out, AgentSupported: slices.Contains(entry.AgentCaps, agentcap.RelayForward),
 		EntryCountry: hint(entry.ID)}), nil
 }
 

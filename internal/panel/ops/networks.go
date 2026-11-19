@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 
 	opsv1 "github.com/mistgate/mistgate/gen/mistgate/ops/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -67,7 +68,7 @@ func (s *Service) networkSettings(ctx context.Context) (*opsv1.GetNetworkSetting
 	}
 	response := &opsv1.GetNetworkSettingsResponse{Mode: mode}
 	for _, node := range nodes {
-		if !store.CapabilityPresent(node.AgentCaps, "nets/1") {
+		if !store.CapabilityPresent(node.AgentCaps, agentcap.Nets) {
 			continue
 		}
 		response.NodesWithNets++

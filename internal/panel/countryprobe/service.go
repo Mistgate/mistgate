@@ -28,6 +28,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/edition"
@@ -40,9 +41,6 @@ const (
 	settingNode     = "tspu.probe_node"   // the probe node's id
 	settingInterval = "tspu.interval_min" // minutes
 	settingLastRun  = "tspu.last_run"     // JSON of lastRun
-
-	// Capability is what the probe node's agent lists when it can run the probe.
-	Capability = "country-probe/1"
 
 	DefaultIntervalMin = 120
 	MinIntervalMin     = 30
@@ -92,7 +90,7 @@ type Node struct {
 	Ports                          []uint16 // the TCP ports of its enabled inbounds
 }
 
-func (n Node) declares() bool { return slices.Contains(n.Caps, Capability) }
+func (n Node) declares() bool { return slices.Contains(n.Caps, agentcap.CountryProbe) }
 
 // Config configures Service. Store, StepUp, Fleet and Nodes are required.
 type Config struct {

@@ -16,10 +16,9 @@ import (
 const Generation = 3
 
 const (
-	CapabilityRefresh = "unit-refresh/1"
-	ServiceName       = "mistgate-node.service"
-	RefreshUnitName   = "mistgate-unit-refresh"
-	RefreshAckFile    = "unit-refresh.ack"
+	ServiceName     = "mistgate-node.service"
+	RefreshUnitName = "mistgate-unit-refresh"
+	RefreshAckFile  = "unit-refresh.ack"
 )
 
 var ErrBusy = errors.New("busy")

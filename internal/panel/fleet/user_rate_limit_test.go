@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
 )
@@ -87,7 +88,7 @@ func TestPersonLimitOnlyForAgentsThatShareABucket(t *testing.T) {
 	}
 
 	// An agent with the capability: both limits as they are, and the node page does not warn.
-	c, m, _ := connectCaps(a, "new", "doctor/1", capUserRateLimit)
+	c, m, _ := connectCaps(a, "new", "doctor/1", agentcap.UserRateLimit)
 	for _, id := range []string{"crd_phone", "crd_laptop"} {
 		if got := m.in["inb_hy"].creds[id]; got.RateLimitBps != 2_000_000 || got.UserRateLimitBps != 1_000_000 {
 			t.Errorf("new agent, %s: device %d person %d, want 2000000 and 1000000", id, got.RateLimitBps, got.UserRateLimitBps)

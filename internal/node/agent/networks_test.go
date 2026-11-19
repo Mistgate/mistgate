@@ -12,6 +12,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/asndb"
 	"github.com/mistgate/mistgate/internal/node/nets"
 	"github.com/mistgate/mistgate/internal/node/netstest"
@@ -64,7 +65,7 @@ func TestNetworkTableFetchCacheReloadAndHello(t *testing.T) {
 	h.start()
 	h.waitConnected()
 	firstHello := <-h.panel.hellos
-	if !hasCapability(firstHello, capNets) || firstHello.GetNetworksDbSha256() != "" {
+	if !hasCapability(firstHello, agentcap.Nets) || firstHello.GetNetworksDbSha256() != "" {
 		t.Fatalf("initial Hello capabilities=%v table_sha=%q", firstHello.GetCapabilities(), firstHello.GetNetworksDbSha256())
 	}
 	eventually(t, func() bool { return h.a.nets.LoadedSHA() == firstSHA }, "network table fetch")
@@ -87,7 +88,7 @@ func TestNetworkTableFetchCacheReloadAndHello(t *testing.T) {
 	h.waitConnected()
 	streamsAfterRestart := h.panel.connCount()
 	secondHello := <-h.panel.hellos
-	if !hasCapability(secondHello, capNets) || (secondHello.GetNetworksDbSha256() != "" && secondHello.GetNetworksDbSha256() != firstSHA) {
+	if !hasCapability(secondHello, agentcap.Nets) || (secondHello.GetNetworksDbSha256() != "" && secondHello.GetNetworksDbSha256() != firstSHA) {
 		t.Fatalf("restart Hello capabilities=%v table_sha=%q", secondHello.GetCapabilities(), secondHello.GetNetworksDbSha256())
 	}
 	eventually(t, func() bool { return h.a.nets.LoadedSHA() == firstSHA }, "network table cache load after Hello")

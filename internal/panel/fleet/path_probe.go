@@ -20,6 +20,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/probe/v1/probev1connect"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/tcpcheck"
 	"github.com/mistgate/mistgate/internal/udpcheck"
@@ -258,16 +259,16 @@ func (f *Fleet) runPathProbe(ctx context.Context, from, to store.NodeRow, kind s
 		return pathProbeResult{Error: "failed"}
 	}
 	live := liveRowsByID(liveRows)
-	caps := []string{capProbe, capTCPCheck}
+	caps := []string{agentcap.Probe, agentcap.TCPCheck}
 	if kind == "udp" {
-		caps = []string{capProbe, capUDPCheck}
+		caps = []string{agentcap.Probe, agentcap.UDPCheck}
 	}
 	fromLive, code := f.probeLive(live, from.ID, caps...)
 	if code != "" {
 		return pathProbeResult{Error: code}
 	}
 	if kind == "udp" {
-		toLive, code := f.probeLive(live, to.ID, capUDPCheck)
+		toLive, code := f.probeLive(live, to.ID, agentcap.UDPCheck)
 		if code != "" {
 			return pathProbeResult{Error: code}
 		}
@@ -582,7 +583,7 @@ func (f *Fleet) runTrace(ctx context.Context, from, to store.NodeRow) (traceJSON
 		f.log.Warn("read live nodes for trace", "code", "store_failed", "err", err)
 		return traceJSON{}, "failed"
 	}
-	fromLive, code := f.probeLive(liveRowsByID(liveRows), from.ID, capProbe)
+	fromLive, code := f.probeLive(liveRowsByID(liveRows), from.ID, agentcap.Probe)
 	if code != "" {
 		return traceJSON{}, code
 	}
@@ -731,7 +732,7 @@ func (s probeService) NodeDnsCheck(ctx context.Context, req *connect.Request[pro
 		if err != nil {
 			return nil, internalErr(f.log.Error, "read live nodes for resolver check", err)
 		}
-		if _, code := f.probeLive(liveRowsByID(liveRows), node.ID, capDoctor); code != "" {
+		if _, code := f.probeLive(liveRowsByID(liveRows), node.ID, agentcap.Doctor); code != "" {
 			out.Error = code
 		} else if report, err := f.RunDoctor(ctx, node.ID, []string{"resolver"}, dnsRunWait); err != nil || report == nil || report.Error != "" {
 			out.Error = "failed"

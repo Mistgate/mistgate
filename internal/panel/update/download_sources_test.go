@@ -19,6 +19,7 @@ import (
 	"connectrpc.com/connect"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
 )
@@ -205,9 +206,9 @@ func TestRolloutSendsGitHubSourceOnlyToVerifiedCapableAgents(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			caps := []string{"doctor/1", capUpdate}
+			caps := []string{"doctor/1", agentcap.Update}
 			if tc.capable {
-				caps = append(caps, updateSourcesCapability)
+				caps = append(caps, agentcap.UpdateSources)
 			}
 			nodeID := e.addNode("source-check", nodeOpts{caps: caps})
 			e.startRollout(nodeID)

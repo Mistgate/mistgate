@@ -10,6 +10,7 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -26,7 +27,7 @@ const relayDirectSpeedMB = 8
 func (r relayRun) directSpeed(ctx context.Context) store.RelayStage {
 	stage := store.RelayStage{Sender: r.entry.ID, At: r.f.now().UTC().Unix()}
 	for _, id := range []string{r.entry.ID, r.exit.ID} {
-		if _, code := r.f.probeLive(r.live, id, capSpeed); code != "" {
+		if _, code := r.f.probeLive(r.live, id, agentcap.Speed); code != "" {
 			switch {
 			case code == "agent_too_old":
 				stage.Status, stage.Code = "skipped", "unsupported"

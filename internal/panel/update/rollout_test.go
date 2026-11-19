@@ -17,12 +17,13 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/asndb"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 func TestNodeState(t *testing.T) {
-	caps := []string{capUpdate}
+	caps := []string{agentcap.Update}
 	row := func(built int64, caps []string, last string) store.NodeRow {
 		return store.NodeRow{AgentBuilt: built, AgentCaps: caps, LastUpdateJSON: last}
 	}
@@ -97,7 +98,7 @@ func TestRolloutGateChecksWarpHealthForWarpEgressInbounds(t *testing.T) {
 			e.exec(`INSERT INTO warp_account (node_id, source, secret_enc, peer_public_key, endpoint_v4, address_v4, health_json, health_at, created_at, updated_at)
 				VALUES (?, 'imported', X'01', 'invented-peer-key', '198.51.100.8:2408', '172.16.0.2/32', ?, ?, 1, 1)`,
 				nodeID, tc.healthJSON, tc.healthAt.Unix())
-			e.hello(nodeID, "0.2.0-test", newBuilt, []string{"doctor/1", capUpdate, capGuard}, (store.LastUpdateRow{
+			e.hello(nodeID, "0.2.0-test", newBuilt, []string{"doctor/1", agentcap.Update, agentcap.UpdateGuard}, (store.LastUpdateRow{
 				Outcome: "ok", ToBuilt: newBuilt, AtUnix: now.Unix(),
 			}).JSON())
 			node, err := e.st.Node(e.ctx, nodeID)
@@ -982,7 +983,7 @@ func TestGateIgnoresTheCommitOfAnEarlierUpdate(t *testing.T) {
 	if _, err := e.s.rollbackNode(e.ctx, a); err != nil {
 		t.Fatal(err)
 	}
-	e.hello(a, "0.1.0-old", oldBuilt, []string{"doctor/1", capUpdate, capGuard}, "")
+	e.hello(a, "0.1.0-old", oldBuilt, []string{"doctor/1", agentcap.Update, agentcap.UpdateGuard}, "")
 	e.clk.Advance(10 * time.Second)
 	e.startRollout()
 	e.tick()
@@ -1058,7 +1059,7 @@ func TestAgentRolledItselfBack(t *testing.T) {
 		e.wantStep(a, store.StepGating, "")
 		e.clk.Advance(4 * time.Minute)
 		e.drop(a)
-		e.hello(a, "0.1.0-old", oldBuilt, []string{capUpdate}, rolled(e, "not_committed"))
+		e.hello(a, "0.1.0-old", oldBuilt, []string{agentcap.Update}, rolled(e, "not_committed"))
 		e.tick()
 		x := e.wantStep(a, store.StepRolledBack, "rolled_back_by_agent")
 		if x.Params["reason"] != "not_committed" {
@@ -1080,7 +1081,7 @@ func TestAgentRolledItselfBack(t *testing.T) {
 		e.tick()
 		e.clk.Advance(30 * time.Second)
 		e.drop(a)
-		e.hello(a, "0.1.0-old", oldBuilt, []string{capUpdate}, rolled(e, "crash_loop"))
+		e.hello(a, "0.1.0-old", oldBuilt, []string{agentcap.Update}, rolled(e, "crash_loop"))
 		e.tick()
 		x := e.wantStep(a, store.StepRolledBack, "rolled_back_by_agent")
 		if x.Params["reason"] != "crash_loop" {
@@ -1092,7 +1093,7 @@ func TestAgentRolledItselfBack(t *testing.T) {
 		e.defaultBundle()
 		stale := store.LastUpdateRow{Outcome: "rolled_back", ToBuilt: newBuilt, Reason: "crash_loop", AtUnix: e.clk.Now().Add(-time.Hour).Unix()}.JSON()
 		a := e.addNode("a", nodeOpts{})
-		e.hello(a, "0.1.0-old", oldBuilt, []string{capUpdate}, stale)
+		e.hello(a, "0.1.0-old", oldBuilt, []string{agentcap.Update}, stale)
 		e.startRollout(a)
 		e.tick()
 		e.clk.Advance(10 * time.Second)
@@ -1182,7 +1183,7 @@ func TestUpdateTimeouts(t *testing.T) {
 func TestUpdateTimeoutSnapshotSurvivesSettingChangeAndRestart(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()
-	nodeID := e.addNode("timeout_snapshot", nodeOpts{caps: []string{"doctor/1", capUpdate, updateTimeoutCapability, capGuard}})
+	nodeID := e.addNode("timeout_snapshot", nodeOpts{caps: []string{"doctor/1", agentcap.Update, agentcap.UpdateTimeout, agentcap.UpdateGuard}})
 	if err := e.st.SetSettingIfChanged(e.ctx, updateDownloadTimeoutKey, "3600"); err != nil {
 		t.Fatal(err)
 	}
@@ -1693,7 +1694,7 @@ func TestGetUpdatesMessage(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()
 	a := e.addNode("a", nodeOpts{online: 3, inbounds: 2})
-	e.addNode("b", nodeOpts{caps: []string{"doctor/1", capUpdate}, built: oldBuilt}) // no crash guard
+	e.addNode("b", nodeOpts{caps: []string{"doctor/1", agentcap.Update}, built: oldBuilt}) // no crash guard
 	c := e.addNode("c", nodeOpts{built: newBuilt})
 	e.addNode("d", nodeOpts{caps: []string{"doctor/1"}, built: 0}) // unsupported
 	e.exec(`UPDATE node SET last_update_json = ? WHERE id = ?`, store.LastUpdateRow{Outcome: "rolled_back", FromVersion: "x", ToVersion: "y", ToBuilt: newBuilt, Reason: "crash_loop", AtUnix: 5}.JSON(), a)

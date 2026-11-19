@@ -15,6 +15,7 @@ import (
 	"connectrpc.com/connect"
 
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -79,7 +80,7 @@ func (f *Fleet) channelPlanLocked(ctx context.Context, n store.NodeRow) (channel
 		return plan, err
 	}
 	live := liveRowsByID(liveRows)
-	if _, code := f.probeLive(live, n.ID, capSpeedChannel); code != "" {
+	if _, code := f.probeLive(live, n.ID, agentcap.SpeedChannel); code != "" {
 		plan.err, plan.retryAfter = code, 0
 		return plan, nil
 	}
@@ -119,7 +120,7 @@ func (f *Fleet) channelPartnersFor(ctx context.Context, n store.NodeRow, live ma
 		if c.ID == n.ID || c.State == "retired" {
 			continue
 		}
-		if _, code := f.probeLive(live, c.ID, capSpeedChannel); code != "" {
+		if _, code := f.probeLive(live, c.ID, agentcap.SpeedChannel); code != "" {
 			continue
 		}
 		if _, running := f.probes.speedBusy[c.ID]; running {

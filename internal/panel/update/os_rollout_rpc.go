@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -321,11 +322,11 @@ func (s *Service) refreshOs(ctx context.Context, nodeIDs []string) ([]*adminv1.O
 			return nil, s.internal("read node liveness", err)
 		}
 		status := s.osStatusOf(ctx, n.ID)
-		capable := slices.Contains(n.AgentCaps, osupdate.Capability)
+		capable := slices.Contains(n.AgentCaps, agentcap.OSStatus)
 		switch {
 		case !live.Connected:
 			res.Outcome = "offline"
-		case !slices.Contains(n.AgentCaps, osupdate.CapabilityUpdate) || !osUpdateSupported(capable, status):
+		case !slices.Contains(n.AgentCaps, agentcap.OSUpdate) || !osUpdateSupported(capable, status):
 			res.Outcome = "unsupported"
 		case stepsOn[n.ID] || status.GetJob().GetState() == osupdate.StateRunning:
 			res.Outcome = "running"

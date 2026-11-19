@@ -5,14 +5,14 @@ import (
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // Why the reverse way cannot carry a relay, for every reason, and the order when several hold.
 func TestReverseBlockedReasons(t *testing.T) {
-	both := []string{plugin.CapRelayForward, plugin.CapRelayReverse}
-	old := []string{plugin.CapRelayForward}
+	both := []string{agentcap.RelayForward, agentcap.RelayReverse}
+	old := []string{agentcap.RelayForward}
 	for name, tc := range map[string]struct {
 		network         string
 		entry, exit     []string
@@ -26,7 +26,7 @@ func TestReverseBlockedReasons(t *testing.T) {
 		"tcp, exit never connected":  {"tcp", both, nil, "exit_agent_old", "no capabilities on record"},
 		"udp, both new":              {"udp", both, both, "udp", "udp"},
 		"udp wins over old agents":   {"udp", old, old, "udp", "an update does not help udp"},
-		"tcp, the reverse-only exit": {"tcp", both, []string{plugin.CapRelayReverse}, "", "relay-forward is not needed at the exit"},
+		"tcp, the reverse-only exit": {"tcp", both, []string{agentcap.RelayReverse}, "", "relay-forward is not needed at the exit"},
 	} {
 		l := store.RelayLink{Relay: store.Relay{Network: tc.network}, ViaNodeCaps: tc.entry, ExitNodeCaps: tc.exit}
 		if got := reverseBlocked(l); got != tc.want {

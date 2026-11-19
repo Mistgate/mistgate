@@ -13,6 +13,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -458,15 +459,15 @@ func TestRelaysOnAHostThatCannotForward(t *testing.T) {
 func TestRelayCapabilitiesSeparateForwardHostSupportFromReverseBridge(t *testing.T) {
 	plain := newHarness(t, harnessOpts{noStart: true})
 	t.Cleanup(plain.a.closeEngines)
-	if slices.Contains(plain.a.capabilities(), plugin.CapRelayForward) || !slices.Contains(plain.a.capabilities(), plugin.CapRelayReverse) {
+	if slices.Contains(plain.a.capabilities(), agentcap.RelayForward) || !slices.Contains(plain.a.capabilities(), agentcap.RelayReverse) {
 		t.Error("reverse bridge capability must not depend on nft forward support")
 	}
 	l := newRelayLab(t)
-	if !slices.Contains(l.a.capabilities(), plugin.CapRelayForward) || !slices.Contains(l.a.capabilities(), plugin.CapRelayReverse) {
+	if !slices.Contains(l.a.capabilities(), agentcap.RelayForward) || !slices.Contains(l.a.capabilities(), agentcap.RelayReverse) {
 		t.Errorf("capabilities = %v", l.a.capabilities())
 	}
 	l.host.unsupported = true
-	if slices.Contains(l.a.capabilities(), plugin.CapRelayForward) || !slices.Contains(l.a.capabilities(), plugin.CapRelayReverse) {
+	if slices.Contains(l.a.capabilities(), agentcap.RelayForward) || !slices.Contains(l.a.capabilities(), agentcap.RelayReverse) {
 		t.Error("a host without nft must keep reverse bridge capability and drop forward capability")
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/tasks/spec"
@@ -153,7 +154,7 @@ func (s *Service) scheduleNodeUpdate(ctx context.Context, nodeID, localDateTime 
 func updatableWhenOffline(n nodeView) bool {
 	updateCap := n.updateCap
 	if updateCap == "" {
-		updateCap = capUpdate
+		updateCap = agentcap.Update
 	}
 	return updatableWhenOfflineForCap(n, updateCap)
 }

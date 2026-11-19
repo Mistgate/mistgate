@@ -15,6 +15,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/decoy"
 )
 
@@ -60,7 +61,7 @@ func TestOldAgentKeepsBuiltinAndReportsDecoyReason(t *testing.T) {
 func TestSetDecoyRequestIsCapabilityGated(t *testing.T) {
 	frame := &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_SetDecoy{SetDecoy: &agentv1.SetDecoy{Mode: decoy.ModeBuiltin}}}
 	capability, message := requestCapability(frame, false)
-	if capability != capDecoy || message != "agent too old" {
+	if capability != agentcap.Decoy || message != "agent too old" {
 		t.Fatalf("SetDecoy capability = %q, %q", capability, message)
 	}
 }
@@ -140,7 +141,7 @@ func TestDecoySyncPushesOnlyWhatTheNodeLacks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, _, _ := connectCaps(a, "inst-1", capDecoy)
+	c, _, _ := connectCaps(a, "inst-1", agentcap.Decoy)
 	set := nextSetDecoy(c)
 	if set.Mode != decoy.ModePanel || set.BundleSha256 != panel.Hash() || len(set.Files) != 1 || string(set.Files[0].Contents) != "panel site" {
 		t.Fatalf("first push = %+v", set)
@@ -154,7 +155,7 @@ func TestDecoySyncPushesOnlyWhatTheNodeLacks(t *testing.T) {
 	// Reconnect reporting the active site: nothing is pushed.
 	c2 := a.open()
 	h := hello("inst-1", 0, "")
-	h.GetHello().Capabilities = []string{capDecoy}
+	h.GetHello().Capabilities = []string{agentcap.Decoy}
 	h.GetHello().DecoyMode, h.GetHello().DecoySha256 = decoy.ModePanel, panel.Hash()
 	c2.send(0, h)
 	c2.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/tcpcheck"
@@ -200,7 +201,7 @@ func (f *Fleet) ipv6OnNodes(ctx context.Context, node store.NodeRow, addr string
 	if !f.reachable(targetLive, node.ID) {
 		return nil, "node_offline"
 	}
-	if len(udp) > 0 && !slices.Contains(targetLive.AgentCaps, capUDPCheck) {
+	if len(udp) > 0 && !slices.Contains(targetLive.AgentCaps, agentcap.UDPCheck) {
 		return nil, "agent_too_old"
 	}
 	nodes, err := f.st.Nodes(ctx, false)
@@ -231,12 +232,12 @@ func (f *Fleet) ipv6OnNodes(ctx context.Context, node store.NodeRow, addr string
 
 	run := &ipv6Run{needUDP: len(udp) > 0, needTCP: len(tcp) > 0}
 	if run.needUDP {
-		available := senders(capUDPCheck)
+		available := senders(agentcap.UDPCheck)
 		run.udpSenders = len(available)
 		run.udp, run.udpBy, run.ranUDP, run.udpCode = f.ipv6UDP(ctx, node, targetLive, available, addr, udp)
 	}
 	if run.needTCP {
-		available := senders(capTCPCheck)
+		available := senders(agentcap.TCPCheck)
 		run.tcpSenders = len(available)
 		run.tcp, run.tcpBy, run.ranTCP, run.tcpCode = f.ipv6TCP(ctx, addr, available, tcp)
 	}

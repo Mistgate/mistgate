@@ -15,13 +15,14 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	warpreachv1 "github.com/mistgate/mistgate/gen/mistgate/warpreach/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // reachNode is a node with a registered, UP WARP, connected, whose agent lists warp-reach/1.
 func (e *env) reachNode(name string) string {
 	e.t.Helper()
-	node := e.addNode(name, "doctor/1", CapWarp, CapReach)
+	node := e.addNode(name, "doctor/1", agentcap.Warp, agentcap.WarpReach)
 	if _, err := e.register(node); err != nil {
 		e.t.Fatal(err)
 	}
@@ -254,7 +255,7 @@ func TestCheckReachSkipsWhatCannotAnswer(t *testing.T) {
 	}
 
 	// an agent without the capability is told nothing, and GetWarp says why there is no reach
-	old := e.addNode("de2", "doctor/1", CapWarp)
+	old := e.addNode("de2", "doctor/1", agentcap.Warp)
 	if _, err := e.register(old); err != nil {
 		t.Fatal(err)
 	}
@@ -493,7 +494,7 @@ func TestCheckReachNowSaysWhyTheNodeCannotBeAsked(t *testing.T) {
 	e.setReachDomains()
 	expect("disabled")
 	// an agent without the capability is asked nothing
-	old := e.addNode("de2", "doctor/1", CapWarp)
+	old := e.addNode("de2", "doctor/1", agentcap.Warp)
 	if _, err := e.register(old); err != nil {
 		t.Fatal(err)
 	}
@@ -577,7 +578,7 @@ func TestCheckReachNowAndTheScheduleDoNotAskTheSameNodeTogether(t *testing.T) {
 
 func TestCheckReachNowIsIgnoredWithoutAnAccount(t *testing.T) {
 	e := newEnv(t)
-	node := e.addNode("de1", "doctor/1", CapWarp, CapReach)
+	node := e.addNode("de1", "doctor/1", agentcap.Warp, agentcap.WarpReach)
 	g, err := e.rpc().GetWarp(e.ctx, connect.NewRequest(&adminv1.GetWarpRequest{NodeId: node, CheckReachNow: true}))
 	if err != nil || g.Msg.Account != nil || g.Msg.ReachCheck != nil {
 		t.Fatalf("a node without WARP: %+v, %v", g, err)

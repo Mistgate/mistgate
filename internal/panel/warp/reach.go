@@ -11,6 +11,7 @@ import (
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	panelhealth "github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -23,8 +24,6 @@ import (
 // that was blocked twice in a row.
 
 const (
-	// CapReach is the Hello capability of an agent that answers WarpReach. The panel sends nothing to an agent without it.
-	CapReach = "warp-reach/1"
 	// SettingReach holds the owner's list as a JSON array of host names; absent = DefaultReachDomains, "[]" = the check is off.
 	SettingReach = "warp.reach_domains"
 
@@ -103,7 +102,7 @@ func (s *Service) reachView(ctx context.Context, n store.NodeRow, a store.WarpAc
 	switch {
 	case len(domains) == 0:
 		return nil, "disabled"
-	case !slices.Contains(n.AgentCaps, CapReach):
+	case !slices.Contains(n.AgentCaps, agentcap.WarpReach):
 		return nil, "agent_too_old"
 	case !have:
 		return nil, "waiting"
@@ -209,7 +208,9 @@ func (s *Service) reachOnce(ctx context.Context, a store.WarpAccountRow, domains
 	return "ok"
 }
 
-func (s *Service) supportsReach(n store.NodeRow) bool { return slices.Contains(n.AgentCaps, CapReach) }
+func (s *Service) supportsReach(n store.NodeRow) bool {
+	return slices.Contains(n.AgentCaps, agentcap.WarpReach)
+}
 
 // Conditions is the health condition source (health.Service.AddConditionSource): WARP_REACH for a site of the current list that
 // the node's runs said "blocked" twice and that has not answered "ok" since, while the result is fresh and the account is not

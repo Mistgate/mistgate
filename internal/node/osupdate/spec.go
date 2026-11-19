@@ -6,10 +6,6 @@ import (
 	"strings"
 )
 
-// CapabilityUpdate is listed in Hello.capabilities by an agent that can run OS jobs (agent.proto "OS UPDATES"). The panel
-// sends UpdateOs only to a stream that lists it.
-const CapabilityUpdate = "os-update/1"
-
 // The enumerated vocabulary of a job. Nothing else is ever accepted from the wire or the command line.
 const (
 	ActionRefresh = "refresh"

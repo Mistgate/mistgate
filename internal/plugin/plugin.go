@@ -50,10 +50,6 @@ type WarpSpec struct {
 	Backend       string // "auto" | "kernel" | "userspace"
 }
 
-// CapRelayForward is the Hello capability of an agent that can forward ports (DesiredState.relays, ApplyResult.relays).
-// The panel sends relays only to a stream that listed it.
-const CapRelayForward = "relay-forward/1"
-
 // RelayForward is one forwarded port of the node (agent.v1.RelayForward): connections to Port go, unchanged, to ToHost:ToPort.
 // ToHost is an IPv4 literal or a name the agent resolves.
 type RelayForward struct {
@@ -63,15 +59,10 @@ type RelayForward struct {
 	ToHost  string
 	ToPort  uint16
 	// Mode is "" (and "dnat": the same plain forward) or "reverse"; ExitNodeID names the exit whose bridge carries a reverse forward.
-	// Both are empty for an agent without CapRelayReverse (the omitempty keeps the JSON the panel digests of a plain forward as it was).
+	// Both are empty for an agent without agentcap.RelayReverse (the omitempty keeps the JSON the panel digests of a plain forward as it was).
 	Mode       string `json:"Mode,omitempty"`
 	ExitNodeID string `json:"ExitNodeID,omitempty"`
 }
-
-// CapRelayReverse is the Hello capability of an agent that can run the bridge of a reverse relay (RelayForward.mode,
-// DesiredState.bridge_serve and bridge_dials, ApplyResult.bridges, StatsBatch.bridges; agent.proto "REVERSE RELAY"). The panel
-// sends those fields only to a stream that listed it; a pair of agents needs it at both ends for a reverse relay.
-const CapRelayReverse = "relay-reverse/1"
 
 // BridgeHTTP2Streams is MAX_CONCURRENT_STREAMS of the bridge's site (the Go server's 250; it is part of the site's look, so it is
 // not raised), BridgePendingPairs the waiting pairs an exit keeps open on each connection (2 streams each), and BridgePeoplePerConn

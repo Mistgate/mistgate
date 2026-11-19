@@ -7,6 +7,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/logscrub"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -126,7 +127,7 @@ func satMulDuration(rate uint64, elapsed time.Duration) uint64 {
 
 // guardNetworks makes the owner switch effective even when an agent sends rows it should not send.
 func (f *Fleet) guardNetworks(st *agentv1.StatsBatch, caps []string) ([]store.FleetNetwork, []store.FleetPersonNetwork, string) {
-	if !store.CapabilityPresent(caps, capNetworks) {
+	if !store.CapabilityPresent(caps, agentcap.Nets) {
 		return nil, nil, ""
 	}
 	mode := f.NetworkMode()

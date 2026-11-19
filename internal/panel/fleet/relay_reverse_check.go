@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/tcpcheck"
 )
@@ -53,7 +54,7 @@ func (r relayRun) reverseReachAt(ctx context.Context) store.RelayStage {
 	if !r.f.reachable(live, r.exit.ID) {
 		return r.stage("fail", "exit_offline", "")
 	}
-	if !slices.Contains(live.AgentCaps, capTCPCheck) {
+	if !slices.Contains(live.AgentCaps, agentcap.TCPCheck) {
 		return r.stage("skipped", "unsupported", r.exit.ID)
 	}
 	sender := portSender{node: r.exit, live: live}

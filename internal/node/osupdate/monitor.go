@@ -15,10 +15,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Capability advertises the read-only OS snapshot stream of step S1. It is deliberately not "os-update/1": that name is
-// reserved for the write steps, so an agent of this build is never taken for one that can change the operating system.
-const Capability = "os-status/1"
-
 // Monitor runs the expensive read only when apt/dpkg/boot inputs change, and at least every six hours.
 // Fingerprinting itself is filesystem metadata only.
 type Monitor struct {

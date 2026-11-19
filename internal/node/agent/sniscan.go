@@ -10,9 +10,6 @@ import (
 	"github.com/mistgate/mistgate/internal/node/sniscan"
 )
 
-// capSniScan: the agent answers SniScan (agent.proto "NEIGHBOR SITES").
-const capSniScan = "sni-scan/1"
-
 // sniScanState is the bookkeeping of SniScan: one scan at a time, and the test seam.
 type sniScanState struct {
 	running atomic.Bool

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 )
 
 // An agent that cannot fall back by itself (no awg-fallback/1) and has no module gets the "switch to auto" offer; a new agent
@@ -25,11 +26,11 @@ func TestSwitchToAutoIsOfferedToOldAgentsOnly(t *testing.T) {
 	if param() != "1" {
 		t.Fatal("an old agent in strict kernel mode was not offered the switch")
 	}
-	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor, capAwgFallback}})
+	e.fl.set("de1", liveState{up: true, caps: []string{agentcap.Doctor, agentcap.AWGFallback}})
 	if param() != "" {
 		t.Fatal("an agent with awg-fallback/1 was offered the switch")
 	}
-	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor}})
+	e.fl.set("de1", liveState{up: true, caps: []string{agentcap.Doctor}})
 	other := res("awg_backend", dFail, "", "mode", "auto", "hint", "no_tun", "reason", "open /dev/net/tun: no such file or directory")
 	other.DetailCode = "awg_backend.unavailable"
 	e.report("de1", false, other)

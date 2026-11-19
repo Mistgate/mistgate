@@ -90,10 +90,6 @@ func TestDebugIsListedAsACapability(t *testing.T) {
 	if !contains((<-h.panel.hellos).Capabilities, "debug/1") {
 		t.Error("the agent does not list debug/1")
 	}
-	// an agent that does not list it is never asked: the panel's gate is tested in internal/panel/fleet
-	if capDebug != "debug/1" {
-		t.Errorf("capability string %q", capDebug)
-	}
 }
 
 func TestDebugCaptureRaisesTheLevelAndPutsItBackOnExpiry(t *testing.T) {

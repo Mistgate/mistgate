@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -104,27 +105,27 @@ func TestPortCheckScheduleCandidatesUseLiveStateEnabledInboundsAndStoredChecks(t
 	e.clock.Advance(now.Sub(e.clock.Now()))
 	e.node("node-a", "provider-a", true)
 	e.inbound("node-a", 8443)
-	e.fl.set("node-a", liveState{up: true, caps: []string{portCheckCapability}})
+	e.fl.set("node-a", liveState{up: true, caps: []string{agentcap.UDPCheck}})
 
 	e.node("node-b", "provider-b", true)
 	e.inbound("node-b", 8443)
-	e.fl.set("node-b", liveState{up: true, caps: []string{portCheckCapability}})
+	e.fl.set("node-b", liveState{up: true, caps: []string{agentcap.UDPCheck}})
 
 	e.node("node-c", "provider-c", false)
 	e.inbound("node-c", 8443)
-	e.fl.set("node-c", liveState{up: false, caps: []string{portCheckCapability}})
+	e.fl.set("node-c", liveState{up: false, caps: []string{agentcap.UDPCheck}})
 
 	e.node("node-d", "provider-d", true)
 	e.inbound("node-d", 8443)
-	e.fl.set("node-d", liveState{up: true, caps: []string{capDoctor}})
+	e.fl.set("node-d", liveState{up: true, caps: []string{agentcap.Doctor}})
 
 	e.node("node-e", "provider-e", true)
 	disabled := e.inbound("node-e", 8443)
 	e.exec(`UPDATE inbound SET enabled = 0 WHERE id = ?`, disabled)
-	e.fl.set("node-e", liveState{up: true, caps: []string{portCheckCapability}})
+	e.fl.set("node-e", liveState{up: true, caps: []string{agentcap.UDPCheck}})
 
 	e.node("node-f", "provider-f", true) // no enabled inbound
-	e.fl.set("node-f", liveState{up: true, caps: []string{portCheckCapability}})
+	e.fl.set("node-f", liveState{up: true, caps: []string{agentcap.UDPCheck}})
 
 	putStoredPortCheck(t, e, "node-a", 8443, now.Add(-PortCheckInterval), "panel")
 	putStoredPortCheck(t, e, "node-b", 8443, now.Add(-5*time.Hour), "node-c")
@@ -168,7 +169,7 @@ func TestPeriodicPortCheckConfirmsOnlyBadEnabledInboundPorts(t *testing.T) {
 			e.clock.Advance(now.Sub(e.clock.Now()))
 			e.node("node-a", "provider-a", true)
 			e.inbound("node-a", 8443)
-			e.fl.set("node-a", liveState{up: true, caps: []string{portCheckCapability}})
+			e.fl.set("node-a", liveState{up: true, caps: []string{agentcap.UDPCheck}})
 			calls := 0
 			e.s.cfg.CheckPorts = func(ctx context.Context, nodeID string, _ []uint16) ([]store.PortCheck, string, string) {
 				calls++
@@ -207,7 +208,7 @@ func TestPeriodicPortChecksRunOneAtATime(t *testing.T) {
 	e.clock.Advance(now.Sub(e.clock.Now()))
 	e.node("node-a", "provider-a", true)
 	e.inbound("node-a", 8443)
-	e.fl.set("node-a", liveState{up: true, caps: []string{portCheckCapability}})
+	e.fl.set("node-a", liveState{up: true, caps: []string{agentcap.UDPCheck}})
 	entered, release, done := make(chan struct{}), make(chan struct{}), make(chan bool, 1)
 	var mu sync.Mutex
 	calls := 0
@@ -241,7 +242,7 @@ func TestPeriodicPortCheckConfirmationIsUDPOnly(t *testing.T) {
 	e.clock.Advance(now.Sub(e.clock.Now()))
 	e.node("node-a", "provider-a", true)
 	e.inbound("node-a", 8443)
-	e.fl.set("node-a", liveState{up: true, caps: []string{portCheckCapability}})
+	e.fl.set("node-a", liveState{up: true, caps: []string{agentcap.UDPCheck}})
 	var full, udpOnly int
 	lossy := func(nodeID string) []store.PortCheck {
 		return []store.PortCheck{{NodeID: nodeID, Address: nodeID + ".example.com", Port: 8443, Sent: 150, Got: 100,
@@ -266,7 +267,7 @@ func TestPeriodicSourceFilteredPortCheckDoesNotRecruitConfirmationSender(t *test
 	e.clock.Advance(now.Sub(e.clock.Now()))
 	e.node("node-a", "provider-a", true)
 	inbound := e.inbound("node-a", 8443)
-	e.fl.set("node-a", liveState{up: true, caps: []string{portCheckCapability}})
+	e.fl.set("node-a", liveState{up: true, caps: []string{agentcap.UDPCheck}})
 	node, err := e.st.Node(e.ctx, "node-a")
 	if err != nil {
 		t.Fatal(err)
@@ -300,7 +301,7 @@ func TestPeriodicSourceFilteredNoSenderAttemptIsCappedAtOneDay(t *testing.T) {
 	e.clock.Advance(now.Sub(e.clock.Now()))
 	e.node("node-a", "provider-a", true)
 	e.inbound("node-a", 8443)
-	e.fl.set("node-a", liveState{up: true, caps: []string{portCheckCapability}})
+	e.fl.set("node-a", liveState{up: true, caps: []string{agentcap.UDPCheck}})
 	if err := e.st.SetUDPFilteredState(e.ctx, "node-a", now.Add(-48*time.Hour), "node-b"); err != nil {
 		t.Fatal(err)
 	}

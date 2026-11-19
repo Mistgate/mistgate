@@ -7,11 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
 )
 
 // links/3 caps of a current agent, and the unsupported list GetFleetConnections gives each kind of inbound.
-var caps3 = []string{"links/1", "links/2", connectiondiag.Links3Capability, connectiondiag.VLESSUnknownKeysCapability}
+var caps3 = []string{"links/1", "links/2", agentcap.Links3, agentcap.VLESSUnknownKeys}
 
 func un3(proto string, v connectiondiag.Variant) []string {
 	return connectiondiag.UnsupportedCountersFor(proto, caps3, v)
@@ -143,7 +144,7 @@ func TestReasonsTrustTunnelFreezeAfter16K(t *testing.T) {
 	f, _, h, _ := reasonsFx()
 	tt := f.inbound("fi1", "prf_tt", "trusttunnel", 9443)
 	f.in.Totals[h] = hy2Good()
-	ttCaps := append(slices.Clone(caps3), connectiondiag.TrustTunnelCapability, connectiondiag.TrustTunnelTCPStallsCapability)
+	ttCaps := append(slices.Clone(caps3), agentcap.TrustTunnel, agentcap.TrustTunnelTCPStalls)
 	unsupported := connectiondiag.UnsupportedCountersFor("trusttunnel", ttCaps, connectiondiag.Variant{})
 	f.in.Totals[tt] = accTotals{Protocol: "trusttunnel", Connects: 10, TCPStalls: 8, TCPStalls16K: 7, Unsupported: unsupported}
 	r := buildAccess(f.in)
@@ -163,7 +164,7 @@ func TestReasonsTrustTunnelFreezeAfter16K(t *testing.T) {
 		t.Fatalf("late stalls read as the 16 KiB freeze: %+v", c)
 	}
 	// an agent without the capability: kl!ck sees the freeze, the node cannot confirm it, and the class says so
-	old := connectiondiag.UnsupportedCountersFor("trusttunnel", append(slices.Clone(caps3), connectiondiag.TrustTunnelCapability), connectiondiag.Variant{})
+	old := connectiondiag.UnsupportedCountersFor("trusttunnel", append(slices.Clone(caps3), agentcap.TrustTunnel), connectiondiag.Variant{})
 	f.in.Totals[tt] = accTotals{Protocol: "trusttunnel", Connects: 10, Unsupported: old}
 	f.in.Klick["nod_fi1"] = &accKlick{accKlickTally: accKlickTally{Reports: 6, OK: 2, Freeze: 4}, Kinds: []accKlickKind{
 		{Kind: "trusttunnel", accKlickTally: accKlickTally{Reports: 5, OK: 1, Freeze: 4}, DLChecked: 5, DLStalled: 4}}}

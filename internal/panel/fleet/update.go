@@ -10,7 +10,6 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
-	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	panelupdate "github.com/mistgate/mistgate/internal/panel/update"
 )
@@ -19,17 +18,6 @@ import (
 // over nothing but asks two things of it (is a node mid-update, serve a bundle file), and offers it the two
 // commands that need a stream (UpdateAgent, RollbackAgent) plus the live numbers the canary choice needs. The
 // updates module imports nothing from here; cmd/mistgate connects them.
-
-// capUpdate is the Hello.capabilities entry of an agent that can replace its own binary (agent.proto "UPDATE").
-const capUpdate = "update/1"
-
-// capUpdateLink is the edge link-only agent update capability; VPS updates continue to require capUpdate.
-const capUpdateLink = "update-link/1"
-
-// capUpdateSources gates UpdateAgent.sources and UpdateProgress.source.
-const capUpdateSources = "update-sources/1"
-
-const capOSStatus = osupdate.Capability
 
 // Updates is implemented by the updates module. Its three metadata methods are cheap; Serve blocks for a download.
 type Updates interface {

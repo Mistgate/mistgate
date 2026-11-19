@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -43,7 +44,7 @@ func askReach(t *testing.T, e *env, a *agent, c *conn, result *agentv1.CommandRe
 func TestWarpReachSendsTheDomainsAndParsesTheAnswer(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("de1")
-	c, _, _ := connectCaps(a, "de1-1", capWarpReach)
+	c, _, _ := connectCaps(a, "de1-1", agentcap.WarpReach)
 	cmd, got := askReach(t, e, a, c, &agentv1.CommandResult{Ok: true, Params: map[string]string{"colo": "FRA", "r0": "ok:200:310", "r1": "blocked:403:95"}})
 	if got.err != nil {
 		t.Fatal(got.err)
@@ -61,7 +62,7 @@ func TestWarpReachSendsTheDomainsAndParsesTheAnswer(t *testing.T) {
 func TestWarpReachRefusalsAndUnreadableAnswers(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("de1")
-	c, _, _ := connectCaps(a, "de1-1", capWarpReach)
+	c, _, _ := connectCaps(a, "de1-1", agentcap.WarpReach)
 	for name, result := range map[string]*agentv1.CommandResult{
 		"warp reach: busy":              {Error: "busy"},
 		"warp reach: too_soon":          {Error: "too_soon"},

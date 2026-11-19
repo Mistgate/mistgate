@@ -102,8 +102,6 @@ func (s *Service) setUpdateDownloadSources(ctx context.Context, sources []string
 	return configured, nil
 }
 
-const updateSourcesCapability = "update-sources/1"
-
 // sourcesForStep checks the optional GitHub source outside Service.mu. An empty result keeps the legacy panel-only path.
 func (s *Service) sourcesForStep(ctx context.Context, manifestRaw []byte, supportsSources bool) []string {
 	if s.cfg.Edge || !supportsSources {

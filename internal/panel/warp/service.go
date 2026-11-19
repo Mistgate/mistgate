@@ -26,15 +26,12 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
-
-// CapWarp is the Hello capability of an agent that can run WARP. The panel registers or imports an account only for
-// a node that listed it (agent.proto, AWG AND WARP).
-const CapWarp = "warp/1"
 
 // Fleet is what the module needs from the fleet module (*fleet.Fleet implements it).
 type Fleet interface {
@@ -280,7 +277,7 @@ func (s *Service) node(ctx context.Context, id string, mutating bool) (store.Nod
 
 // supports is whether the node's agent (last Hello, or the live stream) lists warp/1.
 func (s *Service) supports(n store.NodeRow) bool {
-	return slices.Contains(n.AgentCaps, CapWarp)
+	return slices.Contains(n.AgentCaps, agentcap.Warp)
 }
 
 func (s *Service) liveNode(ctx context.Context, nodeID string) (store.NodeLiveRow, error) {
@@ -763,7 +760,7 @@ func (s *Service) AutoReregister(ctx context.Context, nodeID string) (bool, erro
 
 // Spec is the node's WarpSpec for the desired state: nil when the node has no account. An account that is paused
 // (enabled = false) is returned with Enabled false, which tears the tunnel down on the node and makes every inbound
-// with egress "warp" fail closed. The caller must send it only to a stream that listed CapWarp.
+// with egress "warp" fail closed. The caller must send it only to a stream that listed agentcap.Warp.
 func (s *Service) Spec(ctx context.Context, nodeID string) (*plugin.WarpSpec, error) {
 	a, err := s.st.WarpAccount(ctx, nodeID)
 	if errors.Is(err, store.ErrNotFound) {

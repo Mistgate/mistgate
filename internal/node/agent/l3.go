@@ -10,90 +10,23 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/awg"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
-	"github.com/mistgate/mistgate/internal/node/osupdate"
-	"github.com/mistgate/mistgate/internal/node/unit"
-	"github.com/mistgate/mistgate/internal/node/update"
 	"github.com/mistgate/mistgate/internal/node/warp"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The L3 side of the agent (agent.proto "AWG AND WARP"): the node-level WARP manager,
-// the firewall of the tunnel interfaces, the AWG health, and the capability strings. Everything here runs on the
+// the firewall of the tunnel interfaces, the AWG health, and the capability list. Everything here runs on the
 // worker goroutine like the rest of the reconcile, except the health readers, which are safe from any goroutine.
-
-// Capabilities this build can list in Hello.capabilities besides "doctor/1" and the update ones.
 const (
-	capAWG   = "awg/1"
-	capVLESS = "vless/1"
-	// capTrustTunnel marks the in-process TCP HTTP/2 TrustTunnel engine.
-	capTrustTunnel = "trusttunnel/1"
-	// capTrustTunnelH3 says this engine can accept TrustTunnel HTTP/3 on UDP at the TCP listener's port.
-	capTrustTunnelH3 = "trusttunnel-h3/1"
-	// capVLESSUnknownKeys marks agents that report VLESS unknown-user-ID attempts in links/1.
-	capVLESSUnknownKeys = "vless-unknown-keys/1"
-	// capVLESSHelloKex marks agents that count the key exchange the ClientHellos of REALITY connections offer, per key
-	// (agent.proto LinkCounters hello_pq, hello_classic, hello_unknown).
-	capVLESSHelloKex = "vless-hello-kex/1"
-	// capTrustTunnelRefusals marks the TrustTunnel engine that counts the tunnel requests it refused, by reason, on the
-	// inbound's row (agent.proto LinkCounters tunnel_*). A panel without it ignores the fields; an agent without it sends none.
-	capTrustTunnelRefusals = "trusttunnel-refusals/1"
-	// capTrustTunnelTCPStalls marks the TrustTunnel engine that counts the HTTP/2 connections that ended with data the client
-	// never acknowledged (agent.proto LinkCounters tcp_stalls, tcp_stalls_16k), on the inbound's row.
-	capTrustTunnelTCPStalls = "trusttunnel-tcp-stalls/1"
-	// capVLESSTLS: the VLESS engine terminates TLS through its certificate source before Xray receives a connection.
-	capVLESSTLS = "vless-tls/1"
-	// capVLESSSelf: the VLESS engine serves the node's own site behind REALITY (reality.target "self", design/vless.md
-	// section 7.5). An agent of v0.1.33/v0.1.34 has vless/1 and rejects that target.
-	capVLESSSelf = "vless-self/1"
-	// capVLESSTarget: the VLESS engine takes a REALITY target set on this node: the other site's name in the TLS block (mode 0, no
-	// certificate) as the one server name. An agent of vless-self/1 rejects that TLS block, so the panel withholds such an inbound from it.
-	capVLESSTarget  = "vless-target/1"
-	capWarp         = "warp/1"
-	capTorrentGuard = "torrentguard/1"
-	capUDPCheck     = "udpcheck/1"
-	capTCPCheck     = "tcpcheck/1"
-	// capProbe: UdpSend.df, the "connect" kind and the timings of TcpProbe, PathTrace (agent.proto "PATH PROBE").
-	capProbe = "probe/1"
-	capDecoy = "decoy/1"
-	// capClientIPv6: the agent follows NodeSettings.client_ipv6_disabled (the tunnel firewall and the direct egress).
-	capClientIPv6 = "client-ipv6/1"
-	capWSLink     = "ws-link/1"
-	// capTCPShare: the agent shares a TCP port between services by SNI (front.go; agent.proto "SHARED TCP PORT") and reports
-	// StatsBatch.shared_ports. Listed only when every engine that can take a route or give its site up is here.
-	capTCPShare   = "tcp-share/1"
-	capLinkCounts = "links/1"
-	// capNets enables locally mapped ASN counters. Link-only agents cannot fetch the signed table in v1.
-	capNets = "nets/1"
-	// capLinks2: the Hysteria2 connection endings, RTT and packet counters of StatsBatch.links (agent.proto LinkCounters from
-	// client_closes on). Listed with links/1, which a panel checks for the counters at all.
-	capLinks2 = "links/2"
-	// capLinks3: the handshake-failure reasons of StatsBatch.links (agent.proto LinkCounters from hs_unfinished on) and the
-	// VLESS hellos, hellos_foreign and connects. Each engine counts what it can see; the panel knows the rest from the
-	// protocol, the VLESS transport and the AWG backend.
-	capLinks3 = "links/3"
-	// capJournal sends the node's deduplicated WARN+ records in StatsBatch.journal.
-	capJournal = "journal/1"
-	// capUserRateLimit: the engines that shape traffic per credential also share a bucket per person
-	// (Credential.user_rate_limit_bps, agent.proto "SPEED LIMITS").
-	capUserRateLimit = "user-rate-limit/1"
-	// capUnit3 says the node runs from a systemd unit of generation 3: /dev/net/tun is reachable (the userspace AWG
-	// and WARP backends need it) and ExecStopPost cleans the tunnel interfaces. A node without it keeps working with
-	// the kernel backends and shows the hint "unit_outdated" on the awg_backend doctor check.
-	capUnit3 = "unit/3"
-
 	egressWarp = "warp"
 	// errWarpNotConfigured is InboundResult.error of an inbound whose egress is WARP on a node without a WARP
 	// configuration: it is not started, there is never a silent direct exit (agent.proto "AWG AND WARP").
 	errWarpNotConfigured = "egress warp: not configured on this node"
 )
-
-// capAwgFallback: a "kernel" setting runs on userspace when the module does not load (awg.BackendStatus.Fallback), the doctor
-// says awg_backend.fallback and the fix awg_module_repair moves back. An agent without it stays strict: the panel offers its
-// owner "switch to auto".
-const capAwgFallback = "awg-fallback/1"
 
 // WarpManager is what the agent needs of internal/node/warp.Manager (the real one implements it; tests use a fake).
 // The manager is handed to the engines through Config.Egress; the agent owns its lifecycle and feeds it the spec.
@@ -177,76 +110,76 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
-	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck, capDecoy, capLinkCounts, capLinks2, capLinks3, capJournal, capProbe, capSniScan, capSpeed, capSpeedChannel, capDebug}
+	caps := []string{agentcap.Doctor, agentcap.Bandwidth, agentcap.ClientIPv6, agentcap.WSLink, agentcap.TCPCheck, agentcap.Decoy, agentcap.Links, agentcap.Links2, agentcap.Links3, agentcap.Journal, agentcap.Probe, agentcap.SNIScan, agentcap.Speed, agentcap.SpeedChannel, agentcap.Debug}
 	if a.canOSUpdate() {
-		caps = append(caps, osupdate.Capability)
+		caps = append(caps, agentcap.OSStatus)
 		if a.cfg.OSUpdate != nil {
-			caps = append(caps, osupdate.CapabilityUpdate)
+			caps = append(caps, agentcap.OSUpdate)
 		}
 	}
 	if !a.linkOnly() {
-		caps = append(caps, capNets)
+		caps = append(caps, agentcap.Nets)
 	}
 	if kernelDebugSupported() {
-		caps = append(caps, capDebug2)
+		caps = append(caps, agentcap.Debug2)
 	}
 	if _, ok := a.engines[awg.Protocol]; ok {
-		caps = append(caps, capAWG, capAwgFallback)
+		caps = append(caps, agentcap.AWG, agentcap.AWGFallback)
 	}
 	if _, ok := a.engines["vless"]; ok {
-		caps = append(caps, capVLESS, capVLESSUnknownKeys, capVLESSHelloKex, capVLESSTarget)
+		caps = append(caps, agentcap.VLESS, agentcap.VLESSUnknownKeys, agentcap.VLESSHelloKex, agentcap.VLESSTarget)
 		if a.cfg.Certs != nil { // the site needs the certificate source
-			caps = append(caps, capVLESSSelf, capVLESSTLS)
+			caps = append(caps, agentcap.VLESSSelf, agentcap.VLESSTLS)
 		}
 	}
 	if _, ok := a.engines["trusttunnel"]; ok {
-		caps = append(caps, capTrustTunnel, capTrustTunnelH3, capTrustTunnelRefusals, capTrustTunnelTCPStalls)
+		caps = append(caps, agentcap.TrustTunnel, agentcap.TrustTunnelH3, agentcap.TrustTunnelRefusals, agentcap.TrustTunnelTCPStalls)
 	}
 	if a.sharesTCP() {
-		caps = append(caps, capTCPShare)
+		caps = append(caps, agentcap.TCPShare)
 	}
 	if a.appliesUserRateLimit() {
-		caps = append(caps, capUserRateLimit)
+		caps = append(caps, agentcap.UserRateLimit)
 	}
 	if a.cfg.Warp != nil {
-		caps = append(caps, capWarp, capWarpReach)
+		caps = append(caps, agentcap.Warp, agentcap.WarpReach)
 	}
 	if rh, ok := a.host.(hostctl.RelayHost); ok && rh.RelaySupported() {
-		caps = append(caps, plugin.CapRelayForward)
+		caps = append(caps, agentcap.RelayForward)
 	}
 	if a.bridgeEntry != nil {
-		caps = append(caps, plugin.CapRelayReverse)
+		caps = append(caps, agentcap.RelayReverse)
 	}
 	if hostctl.TorrentGuardSupported() {
-		caps = append(caps, capTorrentGuard)
+		caps = append(caps, agentcap.TorrentGuard)
 	}
 	if _, ok := a.host.(hostctl.UDPCounter); ok {
-		caps = append(caps, capUDPCheck)
+		caps = append(caps, agentcap.UDPCheck)
 	}
 	if a.country.canProbe() {
-		caps = append(caps, capCountryProbe)
+		caps = append(caps, agentcap.CountryProbe)
 	}
 	if a.ownedIPv6Host() != nil {
-		caps = append(caps, capIPv6Addr)
+		caps = append(caps, agentcap.IPv6Addr)
 	}
 	if a.cfg.UnitGen >= 3 {
-		caps = append(caps, capUnit3)
+		caps = append(caps, agentcap.Unit3)
 	}
 	if a.cfg.UnitRefreshLauncher != nil {
-		caps = append(caps, unit.CapabilityRefresh)
+		caps = append(caps, agentcap.UnitRefresh)
 	}
 	if a.cfg.AwgPrepare != nil && a.engines[awg.Protocol] != nil {
-		caps = append(caps, capAwgPrepare)
+		caps = append(caps, agentcap.AWGPrepare)
 	}
 	updateCaps := a.upd.Capabilities()
 	if a.linkOnly() {
-		if slices.Contains(updateCaps, update.CapUpdate) {
-			caps = append(caps, capUpdateLink)
-			if slices.Contains(updateCaps, update.CapUpdateTimeout) {
-				caps = append(caps, update.CapUpdateTimeout)
+		if slices.Contains(updateCaps, agentcap.Update) {
+			caps = append(caps, agentcap.UpdateLink)
+			if slices.Contains(updateCaps, agentcap.UpdateTimeout) {
+				caps = append(caps, agentcap.UpdateTimeout)
 			}
-			if slices.Contains(updateCaps, update.CapGuard) {
-				caps = append(caps, update.CapGuard)
+			if slices.Contains(updateCaps, agentcap.UpdateGuard) {
+				caps = append(caps, agentcap.UpdateGuard)
 			}
 		}
 		return caps

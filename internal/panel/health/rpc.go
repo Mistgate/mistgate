@@ -17,6 +17,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -179,10 +180,10 @@ func (s *Service) fixOffers(ctx context.Context) (func(store.HealthAlert) string
 		if fix == "" {
 			return ""
 		}
-		if node := live[a.NodeID]; !node.Connected || !slices.Contains(node.AgentCaps, capDoctor) {
+		if node := live[a.NodeID]; !node.Connected || !slices.Contains(node.AgentCaps, agentcap.Doctor) {
 			return ""
 		}
-		if fix == "refresh_unit" && !slices.Contains(live[a.NodeID].AgentCaps, capUnitRefresh) {
+		if fix == "refresh_unit" && !slices.Contains(live[a.NodeID].AgentCaps, agentcap.UnitRefresh) {
 			return ""
 		}
 		return fix
@@ -717,7 +718,7 @@ func (r rpc) RunDoctor(ctx context.Context, req *connect.Request[adminv1.RunDoct
 		live := indexLiveRows(liveRows)
 		var wg sync.WaitGroup
 		for _, n := range nodes {
-			if node := live[n.ID]; !node.Connected || !slices.Contains(node.AgentCaps, capDoctor) {
+			if node := live[n.ID]; !node.Connected || !slices.Contains(node.AgentCaps, agentcap.Doctor) {
 				continue // offline and old nodes keep their last report; that is not an error
 			}
 			wg.Add(1)

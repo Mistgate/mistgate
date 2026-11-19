@@ -10,6 +10,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -103,7 +104,7 @@ func TestDebugCaptureKernelSourceNeedsDebug2ButEmptySourcesKeepDebug1(t *testing
 		t.Errorf("empty-source capture stop frame = %+v", frame)
 	}
 
-	c2, _, _ := connectCaps(a, "new-kernel", append(append([]string(nil), debugCaps...), capDebug2)...)
+	c2, _, _ := connectCaps(a, "new-kernel", append(append([]string(nil), debugCaps...), agentcap.Debug2)...)
 	got := answerDebug(c2, &agentv1.CommandResult{Ok: true})
 	row, err := x.f.StartDebugCapture(x.ctx, DebugStart{NodeID: a.nodeID, Level: "debug", Sources: []string{"kernel"}, DurationS: 30})
 	if err != nil {

@@ -22,9 +22,6 @@ import (
 // the capability string, the periodic DoctorReport, RunDoctor and ApplyFix handling, and the agent-side facts
 // the checks need. Runs and fixes happen in their own goroutines, so the stream reader never waits for them.
 
-// capDoctor is listed in Hello.capabilities: the panel sends RunDoctor and ApplyFix only to agents that have it.
-const capDoctor = "doctor/1"
-
 const (
 	// First report 30 s after every connect (engines need a moment to settle), then every 10 min +-60 s.
 	doctorFirstDelay = 30 * time.Second

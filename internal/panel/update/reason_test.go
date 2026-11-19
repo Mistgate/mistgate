@@ -6,6 +6,7 @@ import (
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -15,7 +16,7 @@ func (e *env) rolledBackHello(id string) {
 	e.t.Helper()
 	lu := store.LastUpdateRow{Outcome: "rolled_back", FromVersion: "0.1.0-old", FromBuilt: oldBuilt, ToVersion: "0.2.0-new",
 		ToBuilt: newBuilt, Reason: errManual, AtUnix: e.clk.Now().Unix()}
-	e.hello(id, "0.1.0-old", oldBuilt, []string{"doctor/1", capUpdate, capGuard}, lu.JSON())
+	e.hello(id, "0.1.0-old", oldBuilt, []string{"doctor/1", agentcap.Update, agentcap.UpdateGuard}, lu.JSON())
 }
 
 func (e *env) lastUpdate(id string) *adminv1.LastUpdate {

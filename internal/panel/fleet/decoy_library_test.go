@@ -13,6 +13,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -51,7 +52,7 @@ func TestLibrarySiteAndItsNewVersionReachTheNode(t *testing.T) {
 	e := newEnv(t)
 	svc := decoySiteService{e.f}
 	a := e.enroll("nodea")
-	c, _, _ := connectCaps(a, "inst-1", capDecoy)
+	c, _, _ := connectCaps(a, "inst-1", agentcap.Decoy)
 	first := librarySite(t, "secret bakery text")
 	// a node that reports no site is first told the built-in page
 	if b := nextSetDecoy(c); b.Mode != decoy.ModeBuiltin {

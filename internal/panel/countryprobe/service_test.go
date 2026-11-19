@@ -16,6 +16,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/fleet"
@@ -91,7 +92,7 @@ func newEnv(t *testing.T, opts ...func(*env)) *env {
 	e := &env{t: t, st: st, ff: &fakeFleet{}, logs: &bytes.Buffer{}, country: "RU", now: time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)}
 	// a fleet of invented nodes: probe1 inside the country (declares the capability), de1 and nl1 abroad, de2 offline
 	e.nodes = []Node{
-		{ID: "probe1", Name: "probe1", Address: "198.51.100.1", CountryCode: "RU", Caps: []string{Capability}, Online: true, Ports: []uint16{443}},
+		{ID: "probe1", Name: "probe1", Address: "198.51.100.1", CountryCode: "RU", Caps: []string{agentcap.CountryProbe}, Online: true, Ports: []uint16{443}},
 		{ID: "de1", Name: "de1", Address: "203.0.113.10", CountryCode: "DE", Caps: []string{"tcpcheck/1"}, Online: true, Ports: []uint16{8443, 443}},
 		{ID: "nl1", Name: "nl1", Address: "203.0.113.20", CountryCode: "NL", Online: true, Ports: []uint16{443}},
 		{ID: "de2", Name: "de2", Address: "203.0.113.30", CountryCode: "DE", Online: false, Ports: []uint16{443}},
@@ -428,7 +429,7 @@ func TestScheduleDueLogicAndRestart(t *testing.T) {
 	// a different probe node has no rows: due at once
 	e.setNodes(func(ns []Node) []Node {
 		ns[0].Online = true
-		return append(ns, Node{ID: "probe2", Name: "probe2", Address: "198.51.100.2", CountryCode: "RU", Caps: []string{Capability}, Online: true, Ports: []uint16{443}})
+		return append(ns, Node{ID: "probe2", Name: "probe2", Address: "198.51.100.2", CountryCode: "RU", Caps: []string{agentcap.CountryProbe}, Online: true, Ports: []uint16{443}})
 	})
 	if _, err := e.update(&adminv1.UpdateTspuProbeRequest{ProbeNodeId: ptr("probe2")}); err != nil {
 		t.Fatal(err)
@@ -830,7 +831,7 @@ func TestEachReferenceFailsOncePerRun(t *testing.T) {
 func TestRunsRotateBatchStartWhenBudgetFitsOneBatch(t *testing.T) {
 	e := newEnv(t)
 	e.setNodes(func([]Node) []Node {
-		nodes := []Node{{ID: "probe1", Name: "probe1", Address: "198.51.100.1", CountryCode: "RU", Caps: []string{Capability}, Online: true, Ports: []uint16{443}}}
+		nodes := []Node{{ID: "probe1", Name: "probe1", Address: "198.51.100.1", CountryCode: "RU", Caps: []string{agentcap.CountryProbe}, Online: true, Ports: []uint16{443}}}
 		for i := range 17 {
 			id := "target" + strconv.Itoa(i)
 			nodes = append(nodes, Node{ID: id, Name: id, Address: "192.0.2." + strconv.Itoa(10+i), Online: true, Ports: []uint16{443}})

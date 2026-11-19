@@ -11,6 +11,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -87,7 +88,7 @@ func TestListAlerts(t *testing.T) {
 	}
 
 	// history: resolved ones, newest first, no buttons but open_node; the window is clamped at 30 days
-	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor}})
+	e.fl.set("de1", liveState{up: true, caps: []string{agentcap.Doctor}})
 	e.clock.Advance(time.Minute)
 	e.report("de1", true, res("disk_space", dOK, ""))
 	resp, _ = r.ListAlerts(e.ctx, req(&adminv1.ListAlertsRequest{HistoryWindowS: 365 * 86400}))
@@ -454,7 +455,7 @@ func TestRefreshUnitFixOfferRequiresCapability(t *testing.T) {
 	if item := getDoctor().Items[0]; item.FixId != "" {
 		t.Fatalf("old agent was offered %q", item.FixId)
 	}
-	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor, capUnitRefresh}})
+	e.fl.set("de1", liveState{up: true, caps: []string{agentcap.Doctor, agentcap.UnitRefresh}})
 	if item := getDoctor().Items[0]; item.FixId != "refresh_unit" {
 		t.Fatalf("capable agent fix = %q", item.FixId)
 	}
@@ -552,7 +553,7 @@ func TestRefreshUnitAlertActionRequiresCapability(t *testing.T) {
 	if got := strings.Join(list().Actions, ","); strings.Contains(got, "apply_fix:") {
 		t.Fatalf("old agent alert action = %s", got)
 	}
-	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor, capUnitRefresh}})
+	e.fl.set("de1", liveState{up: true, caps: []string{agentcap.Doctor, agentcap.UnitRefresh}})
 	if got := strings.Join(list().Actions, ","); !strings.Contains(got, "apply_fix:refresh_unit") {
 		t.Fatalf("capable agent alert actions = %s", got)
 	}

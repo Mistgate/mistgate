@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -58,8 +59,8 @@ func (s *Service) countryRelayReachability(ctx context.Context, sn *snapshot, no
 		}
 		in.Relays = append(in.Relays, store.RelayReachabilityRelay{ID: link.ID, InboundID: link.InboundID, EntryID: link.ViaNodeID,
 			ExitID: link.ExitNodeID, State: link.State, Enabled: link.Enabled, ExitLive: link.Live(),
-			Mode: link.Mode, ActiveMode: link.ActiveMode, AgentSupported: slices.Contains(link.ViaNodeCaps, "relay-forward/1"),
-			ReverseSupported: slices.Contains(link.ViaNodeCaps, "relay-reverse/1") && slices.Contains(link.ExitNodeCaps, "relay-reverse/1"),
+			Mode: link.Mode, ActiveMode: link.ActiveMode, AgentSupported: slices.Contains(link.ViaNodeCaps, agentcap.RelayForward),
+			ReverseSupported: slices.Contains(link.ViaNodeCaps, agentcap.RelayReverse) && slices.Contains(link.ExitNodeCaps, agentcap.RelayReverse),
 			BridgeOK:         bridgeOK, BridgeAtUnix: bridgeAt, PathOK: pathOK, Checked: hasCheck && check.At != 0,
 			CheckOK: hasCheck && check.At != 0 && check.OK, EntryUsable: link.ViaNodeState == "active",
 			MonitorAtUnix: monitorAt, MonitorFails: monitorFails})

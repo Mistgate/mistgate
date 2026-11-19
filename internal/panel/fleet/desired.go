@@ -12,38 +12,11 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
-)
-
-// Hello.capabilities strings of the L3 additions (agent.proto "AWG AND WARP"). The panel puts an awg inbound or a
-// WarpSpec into the desired state of a stream ONLY when the stream listed the string.
-const (
-	capAWG         = "awg/1"
-	capVLESS       = "vless/1"
-	capTrustTunnel = "trusttunnel/1"
-	// capTrustTunnelH3: the agent also serves TrustTunnel over HTTP/3 (UDP beside the TCP port). An agent that lists only
-	// trusttunnel/1 has the HTTP/2 engine and rejects h3:true, so such an inbound is withheld from it.
-	capTrustTunnelH3 = "trusttunnel-h3/1"
-	// capVLESSSelf: an agent that can serve the node's own site behind REALITY (target "self"). An older vless/1 agent
-	// rejects that target, and self is the default of a new VLESS profile.
-	capVLESSSelf = "vless-self/1"
-	capVLESSTLS  = "vless-tls/1"
-	// capVLESSTarget: an agent that takes the REALITY target of the node's own choice, whose name is in the TLS block with no
-	// certificate; an older vless/1 or vless-self/1 agent rejects that block, so such an inbound is withheld from it.
-	capVLESSTarget = "vless-target/1"
-	capWarp        = "warp/1"
-	// capUserRateLimit: the agent shares one bucket per person (Credential.user_rate_limit_bps, agent.proto "SPEED LIMITS").
-	capUserRateLimit = "user-rate-limit/1"
-	// capMTProto: the agent has the MTProto engine. No agent lists it: the panel derives it from Hello.engines (see
-	// capabilities), because the agents of v0.1.69 have the engine without the string, and v0.1.68 rejects the whole state
-	// for an mtproto inbound.
-	capMTProto = "mtproto/1"
-	// capTCPShare: the agent shares a TCP port between services by SNI (agent.proto "SHARED TCP PORT"). An agent without it
-	// holds one service of a port and fails the rest on bind, so it is sent only the default route of such a port.
-	capTCPShare = "tcp-share/1"
 )
 
 // protocolAWG is the plugin id of AmneziaWG. An inbound that has a Tunnel is an L3 inbound whatever the protocol.
@@ -55,29 +28,29 @@ const protocolMTProto = "mtproto"
 // requiredCap is the node capability required before the panel can send this inbound to the agent.
 func requiredCap(s plugin.InboundSpec) string {
 	if s.Protocol == protocolAWG || !s.Tunnel.IsZero() {
-		return capAWG
+		return agentcap.AWG
 	}
 	if s.Protocol == protocolMTProto {
-		return capMTProto
+		return agentcap.MTProto
 	}
 	if s.Protocol == "trusttunnel" {
 		if plugin.TrustTunnelH3(s) {
-			return capTrustTunnelH3
+			return agentcap.TrustTunnelH3
 		}
-		return capTrustTunnel
+		return agentcap.TrustTunnel
 	}
 	if s.Protocol == "vless" {
 		v, _ := plugin.VLESSOf(s)
 		if v.TLS() {
-			return capVLESSTLS
+			return agentcap.VLESSTLS
 		}
 		if v.TargetSelf() {
-			return capVLESSSelf
+			return agentcap.VLESSSelf
 		}
 		if s.TLS.ServerName != "" {
-			return capVLESSTarget // REALITY with another site: only a target set on the node has a name in its TLS block
+			return agentcap.VLESSTarget // REALITY with another site: only a target set on the node has a name in its TLS block
 		}
-		return capVLESS
+		return agentcap.VLESS
 	}
 	return ""
 }
@@ -153,7 +126,7 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 				continue
 			}
 			creds := append([]plugin.UserCred(nil), x.Creds...)
-			if !slices.Contains(caps, capUserRateLimit) {
+			if !slices.Contains(caps, agentcap.UserRateLimit) {
 				for i := range creds {
 					creds[i].RateLimitBps, creds[i].UserRateLimitBps = foldRateLimits(creds[i].RateLimitBps, creds[i].UserRateLimitBps), 0
 				}
@@ -161,7 +134,7 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 			sort.Slice(creds, func(i, j int) bool { return creds[i].CredID < creds[j].CredID })
 			st.in[x.Spec.ID] = &inboundState{spec: x.Spec, specHash: statehash.Spec(x.Spec), creds: creds}
 		}
-		if !slices.Contains(caps, capTCPShare) {
+		if !slices.Contains(caps, agentcap.TCPShare) {
 			for _, id := range unsharedLosers(st) {
 				delete(st.in, id)
 				st.withheld = append(st.withheld, id)
@@ -170,12 +143,12 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 		}
 		sort.Strings(st.withheld)
 		sort.Strings(st.withheldShare)
-		if w := f.warpModule(); w != nil && slices.Contains(caps, capWarp) {
+		if w := f.warpModule(); w != nil && slices.Contains(caps, agentcap.Warp) {
 			if st.warp, err = w.Spec(ctx, n.ID); err != nil {
 				return nil, err
 			}
 		}
-		if slices.Contains(caps, plugin.CapRelayForward) {
+		if slices.Contains(caps, agentcap.RelayForward) {
 			if st.relays, err = f.relayForwards(ctx, n, caps); err != nil {
 				return nil, err
 			}

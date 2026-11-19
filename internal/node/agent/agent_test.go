@@ -14,6 +14,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -32,26 +33,20 @@ func TestCapabilitiesAdvertiseWebSocketLink(t *testing.T) {
 }
 
 func TestCapabilitiesAdvertiseTrustTunnelHTTP3OnlyWithEngine(t *testing.T) {
-	// The panel (internal/panel/fleet desired.go) asks for these exact strings; its test pins the same literals.
-	if capTrustTunnel != "trusttunnel/1" || capTrustTunnelH3 != "trusttunnel-h3/1" {
-		t.Fatalf("capabilities are %q and %q", capTrustTunnel, capTrustTunnelH3)
-	}
 	without := (&Agent{engines: map[string]engine.Engine{}}).capabilities()
-	if slices.Contains(without, capTrustTunnel) || slices.Contains(without, capTrustTunnelH3) {
+	if slices.Contains(without, agentcap.TrustTunnel) || slices.Contains(without, agentcap.TrustTunnelH3) {
 		t.Fatalf("TrustTunnel capabilities without engine = %v", without)
 	}
 	with := (&Agent{engines: map[string]engine.Engine{"trusttunnel": newFakeEngine("trusttunnel")}}).capabilities()
-	if !slices.Contains(with, capTrustTunnel) || !slices.Contains(with, capTrustTunnelH3) {
-		t.Fatalf("TrustTunnel capabilities = %v, want %s and %s", with, capTrustTunnel, capTrustTunnelH3)
+	if !slices.Contains(with, agentcap.TrustTunnel) || !slices.Contains(with, agentcap.TrustTunnelH3) {
+		t.Fatalf("TrustTunnel capabilities = %v, want %s and %s", with, agentcap.TrustTunnel, agentcap.TrustTunnelH3)
 	}
-	// The panel (internal/panel/connectiondiag) reads the refusal counters of an agent that lists this exact string.
-	if capTrustTunnelRefusals != "trusttunnel-refusals/1" || !slices.Contains(with, capTrustTunnelRefusals) ||
-		slices.Contains(without, capTrustTunnelRefusals) {
+	if !slices.Contains(with, agentcap.TrustTunnelRefusals) ||
+		slices.Contains(without, agentcap.TrustTunnelRefusals) {
 		t.Fatalf("trusttunnel-refusals/1 must be listed with the engine and not without it: %v", with)
 	}
-	// The panel (internal/panel/connectiondiag) reads the TCP stall counters of an agent that lists this exact string.
-	if capTrustTunnelTCPStalls != "trusttunnel-tcp-stalls/1" || !slices.Contains(with, capTrustTunnelTCPStalls) ||
-		slices.Contains(without, capTrustTunnelTCPStalls) {
+	if !slices.Contains(with, agentcap.TrustTunnelTCPStalls) ||
+		slices.Contains(without, agentcap.TrustTunnelTCPStalls) {
 		t.Fatalf("trusttunnel-tcp-stalls/1 must be listed with the engine and not without it: %v", with)
 	}
 }
@@ -59,10 +54,10 @@ func TestCapabilitiesAdvertiseTrustTunnelHTTP3OnlyWithEngine(t *testing.T) {
 func TestCapabilitiesAdvertiseVLESSWhenEngineIsRegistered(t *testing.T) {
 	a := &Agent{engines: map[string]engine.Engine{"vless": newFakeEngine("vless")}}
 	caps := a.capabilities()
-	if !slices.Contains(caps, "vless/1") || !slices.Contains(caps, capVLESSUnknownKeys) {
-		t.Fatalf("Hello.capabilities = %v, want vless/1 and %s for a registered engine", caps, capVLESSUnknownKeys)
+	if !slices.Contains(caps, "vless/1") || !slices.Contains(caps, agentcap.VLESSUnknownKeys) {
+		t.Fatalf("Hello.capabilities = %v, want vless/1 and %s for a registered engine", caps, agentcap.VLESSUnknownKeys)
 	}
-	if slices.Contains((&Agent{engines: map[string]engine.Engine{}}).capabilities(), capVLESSUnknownKeys) {
+	if slices.Contains((&Agent{engines: map[string]engine.Engine{}}).capabilities(), agentcap.VLESSUnknownKeys) {
 		t.Fatal("VLESS unknown-key capability is advertised without a VLESS engine")
 	}
 	if !slices.Contains(caps, "vless-hello-kex/1") || slices.Contains((&Agent{engines: map[string]engine.Engine{}}).capabilities(), "vless-hello-kex/1") {

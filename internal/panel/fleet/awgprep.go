@@ -10,6 +10,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -20,9 +21,6 @@ import (
 // "awg_kernel_prepare_done" (the module was loaded and verified there) does the panel set awg_backend to "kernel", in one
 // transaction with the end of the record (store.AwgPrepareFinish), and then pushes the new setting. A failed, timed out
 // or interrupted build changes nothing but the record the UI shows.
-
-// capAwgPrepare is the Hello.capabilities entry of an agent that can prepare the module itself.
-const capAwgPrepare = "awg-prepare/1"
 
 // staleRunning includes the job's 45-minute hard timeout and a 15-minute window for the node to report its result.
 const staleRunning = 60 * time.Minute
@@ -42,7 +40,7 @@ func awgPrepareMsg(n store.NodeRow, caps []string, now time.Time) *adminv1.AwgPr
 	if r.State == store.AwgPrepareRunning && now.Unix()-r.Since > int64(staleRunning/time.Second) {
 		r = store.AwgPrepareRow{State: store.AwgPrepareFailed, Since: r.Since, Code: "interrupted", Reason: "the node did not report how the build ended"}
 	}
-	out := &adminv1.AwgPrepare{Supported: slices.Contains(caps, capAwgPrepare), SinceUnix: r.Since}
+	out := &adminv1.AwgPrepare{Supported: slices.Contains(caps, agentcap.AWGPrepare), SinceUnix: r.Since}
 	switch r.State {
 	case store.AwgPrepareRunning:
 		out.State = adminv1.AwgPrepareState_AWG_PREPARE_STATE_RUNNING
@@ -87,7 +85,7 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 	if !live.Connected {
 		return nil, errNodeOffline
 	}
-	if !slices.Contains(live.AgentCaps, capAwgPrepare) { // before the wish is recorded: an old agent leaves no trace
+	if !slices.Contains(live.AgentCaps, agentcap.AWGPrepare) { // before the wish is recorded: an old agent leaves no trace
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}
 	confirm := req.Msg.Confirm

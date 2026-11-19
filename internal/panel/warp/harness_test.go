@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -249,7 +250,7 @@ func (f *envFleet) StateChanged() {
 func (e *env) addNode(name string, caps ...string) string {
 	e.t.Helper()
 	if caps == nil {
-		caps = []string{"doctor/1", CapWarp}
+		caps = []string{"doctor/1", agentcap.Warp}
 	}
 	id := "nod_" + name
 	if _, err := e.st.W.ExecContext(e.ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, 'active', 1)`, id, name, name+".example.com"); err != nil {

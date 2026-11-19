@@ -14,6 +14,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/certs"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
@@ -107,7 +108,7 @@ func (r *engineRig) deploy(obfs string, withProbeCred bool) string {
 	}
 	r.exec(`INSERT INTO node (id, name, address, provider, state, created_at, last_seen_at, last_connected_at) VALUES ('nod_l', 'lo', '127.0.0.1', 'lo', 'active', 1, 1, 1)
 		ON CONFLICT (id) DO NOTHING`)
-	r.fl.set("nod_l", liveState{up: true, caps: []string{capDoctor}})
+	r.fl.set("nod_l", liveState{up: true, caps: []string{agentcap.Doctor}})
 	p, err := r.acc.CreateProfile(r.ctx, connect.NewRequest(&adminv1.CreateProfileRequest{Protocol: "hysteria2", Name: "p-" + obfs, SettingsJson: string(raw)}))
 	if err != nil {
 		r.t.Fatal(err)

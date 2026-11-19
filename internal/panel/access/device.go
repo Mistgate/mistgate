@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
@@ -145,7 +146,7 @@ func (s *Service) checkAgents(ins []store.AccessInboundFull) error {
 		return nil
 	}
 	for _, f := range ins {
-		if f.Node.LastSeenAt.IsZero() || slices.Contains(f.Node.AgentCaps, "awg/1") {
+		if f.Node.LastSeenAt.IsZero() || slices.Contains(f.Node.AgentCaps, agentcap.AWG) {
 			return nil
 		}
 	}

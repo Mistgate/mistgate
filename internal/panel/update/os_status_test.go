@@ -12,6 +12,7 @@ import (
 	"connectrpc.com/connect"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -19,7 +20,7 @@ import (
 
 func TestGetOsUpdatesUsesStoredNodeSnapshots(t *testing.T) {
 	e := newEnv(t)
-	capable := e.addNode("de1", nodeOpts{caps: []string{osupdate.Capability}, online: 2, inbounds: 2})
+	capable := e.addNode("de1", nodeOpts{caps: []string{agentcap.OSStatus}, online: 2, inbounds: 2})
 	old := e.addNode("nl1", nodeOpts{caps: []string{"doctor/1"}, online: 1})
 	now := e.clk.Now()
 	status := &agentv1.OsStatus{MeasuredUnix: now.Unix(), DistroId: "ubuntu", DistroVersion: "24.04", Pending: 2, Security: 1,
@@ -105,7 +106,7 @@ func TestBusyNodeStartRefusesWithNodeBusyReason(t *testing.T) {
 
 func TestGetOsUpdatesComparesPanelHostBootHashFromInProcessReader(t *testing.T) {
 	e := newEnv(t)
-	nodeID := e.addNode("de1", nodeOpts{caps: []string{osupdate.Capability}})
+	nodeID := e.addNode("de1", nodeOpts{caps: []string{agentcap.OSStatus}})
 	root := t.TempDir()
 	writePanelHostFixture(t, root, "/etc/os-release", "ID=ubuntu\nVERSION_ID=24.04\n")
 	writePanelHostFixture(t, root, "/proc/sys/kernel/osrelease", "6.8.0-1-generic\n")
@@ -290,8 +291,8 @@ func TestOsUpdateStateReportsStaleSnapshotsAsUnknown(t *testing.T) {
 
 func TestGetOsUpdatesMarksAStaleStoredSnapshotUnknown(t *testing.T) {
 	e := newEnv(t)
-	fresh := e.addNode("de1", nodeOpts{caps: []string{osupdate.Capability}})
-	stale := e.addNode("nl1", nodeOpts{caps: []string{osupdate.Capability}})
+	fresh := e.addNode("de1", nodeOpts{caps: []string{agentcap.OSStatus}})
+	stale := e.addNode("nl1", nodeOpts{caps: []string{agentcap.OSStatus}})
 	now := e.clk.Now()
 	put := func(nodeID string, measured time.Time) {
 		t.Helper()

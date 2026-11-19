@@ -10,8 +10,8 @@ import (
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 const (
@@ -165,8 +165,8 @@ func (s *Service) diagnoseRelay(ctx context.Context, link store.RelayLink, targe
 	checkCtx, cancel := context.WithTimeout(ctx, roundBudget)
 	defer cancel()
 	var stages []string
-	if link.Network == "tcp" && link.Mode != store.RelayModeDNAT && slices.Contains(link.ViaNodeCaps, plugin.CapRelayReverse) &&
-		slices.Contains(link.ExitNodeCaps, plugin.CapRelayReverse) {
+	if link.Network == "tcp" && link.Mode != store.RelayModeDNAT && slices.Contains(link.ViaNodeCaps, agentcap.RelayReverse) &&
+		slices.Contains(link.ExitNodeCaps, agentcap.RelayReverse) {
 		// a failed round may be the direct way failing (or freezing): the controller then needs to know, in the same pass, whether
 		// the exit reaches the entry's bridge endpoint, or it cannot move the relay before the next diagnosis, half an hour on
 		stages = []string{store.RelayStageLeg, store.RelayStagePath, store.RelayStageReverseReach}

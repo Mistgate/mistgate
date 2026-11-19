@@ -12,6 +12,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg/mimicry"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -74,7 +75,7 @@ func relayPathUsable(l store.RelayLink) bool {
 // relayAgentOK: the entry's agent can take a forward. A node that has not connected yet has no capabilities on record and
 // is not refused: its first Hello decides.
 func relayAgentOK(n store.AccessNode) bool {
-	return n.State != "active" || slices.Contains(n.AgentCaps, plugin.CapRelayForward)
+	return n.State != "active" || slices.Contains(n.AgentCaps, agentcap.RelayForward)
 }
 
 func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Relay {
@@ -83,7 +84,7 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 		ProfileId: l.ProfileID, ProfileName: l.ProfileName, Protocol: l.Protocol,
 		ViaNodeId: l.ViaNodeID, ViaNodeName: l.ViaNodeName, Network: l.Network, Port: uint32(l.Port),
 		Enabled: l.Enabled, State: inboundStates[l.State], LastError: l.LastError, ToIp: l.ToIP, ExitLive: l.Live(),
-		AgentSupported: slices.Contains(l.ViaNodeCaps, plugin.CapRelayForward), CreatedUnix: l.CreatedAt.Unix(),
+		AgentSupported: slices.Contains(l.ViaNodeCaps, agentcap.RelayForward), CreatedUnix: l.CreatedAt.Unix(),
 		Check: s.relayCheckOf(ctx, l),
 	}
 	if !l.AppliedAt.IsZero() {
