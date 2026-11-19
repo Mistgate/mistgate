@@ -239,6 +239,7 @@ func (a apiRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 var longUnary = map[string]bool{
 	adminv1connect.TspuProbeServiceTestTspuProbeProcedure: true,
 	auth.BackupDownloadProcedure:                          true, // the archive is streamed after its snapshot
+	auth.NodeSniScanProcedure:                             true, // the node walks its /24 for up to 50 s
 }
 
 // isStream reports a Connect or gRPC streaming-capable request: its response may last

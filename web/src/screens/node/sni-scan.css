@@ -1,0 +1,296 @@
+/*
+ * "Sites near the node" (screens/node/sni-scan.tsx): the card under the servers of the node's Profiles tab. It is built of the board's own
+ * pieces (PnProfile / PnNode, pn.css): the card with its 24px sides and a hairline between parts, the 36px section chip, the 40px button
+ * of a card's header, the tag chips (24px) for the labels, a figure tile like the Server tab's, the notice. The tokens are the project's.
+ * Motion belongs to the reveal animation (Settings -> Interface): it sits under [data-fx] and stands still with the reduced-motion switch.
+ */
+
+.ss {
+  overflow: hidden;
+}
+.ss-h {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 24px 16px;
+}
+.ss-hd {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ss-hd h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+}
+.ss-hd p {
+  margin: 2px 0 0;
+  max-width: 640px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+  text-wrap: pretty;
+}
+.ss-h > button {
+  flex: none;
+  gap: 8px;
+}
+.ss-n {
+  padding: 0 24px 16px;
+}
+.ss-none {
+  margin: 0;
+  padding: 14px 24px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+/* a scan is going */
+.ss-run {
+  display: grid;
+  gap: 10px;
+  padding: 18px 24px 20px;
+  border-top: 1px solid var(--border);
+}
+.ss-run-l {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.ss-run-l b {
+  flex: 1 1 auto;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--text);
+}
+.ss-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--accent-mark) 14%, transparent);
+}
+.ss-bar i {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 100%;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent-mark) 55%, transparent);
+}
+.ss-body[data-fx] .ss-bar i {
+  width: 34%;
+  background: var(--accent-mark);
+  animation: ss-slide 1.5s var(--e) infinite;
+}
+[dir="rtl"] .ss-body[data-fx] .ss-bar i {
+  animation-name: ss-slide-rtl;
+}
+@keyframes ss-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(294%);
+  }
+}
+@keyframes ss-slide-rtl {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-294%);
+  }
+}
+.ss-run small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+
+/* the result */
+.ss-res {
+  display: grid;
+  gap: 14px;
+  padding: 14px 24px 8px;
+  border-top: 1px solid var(--border);
+}
+.ss-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.ss-meta .mono {
+  color: var(--muted);
+}
+.ss-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.ss-stats > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+.ss-stats dd {
+  margin: 0;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.ss-stats dt {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.ss-stats .hot {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent-mark) 6%, transparent);
+}
+.ss-found {
+  margin: 6px 0 -8px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.ss-how {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.ss-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0 -24px;
+  padding: 0;
+  list-style: none;
+}
+.ss-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  transition: background-color 0.15s var(--e);
+}
+.ss-row:hover {
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.ss-body[data-fx] .ss-row {
+  animation: mg-up 0.25s var(--e) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+.ss-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  min-width: 0;
+}
+.ss-name b {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.ss-ip {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.ss-marks {
+  grid-column: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.ss-cp {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+.ss-foot {
+  display: grid;
+  gap: 4px;
+  margin: 0 -24px;
+  padding: 14px 24px 16px;
+  border-top: 1px solid var(--border);
+}
+.ss-foot p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.ss-res > :last-child:not(.ss-foot):not(.ss-list) {
+  margin-bottom: 6px;
+}
+
+@media (max-width: 720px) {
+  .ss-h {
+    flex-wrap: wrap;
+    padding: 16px 16px 14px;
+  }
+  .ss-hd {
+    flex-basis: calc(100% - 52px);
+  }
+  .ss-h > button {
+    flex: 1 1 100%;
+  }
+  .ss-n {
+    padding: 0 16px 14px;
+  }
+  .ss-none,
+  .ss-run {
+    padding-inline: 16px;
+  }
+  .ss-res {
+    padding-inline: 16px;
+  }
+  .ss-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ss-list,
+  .ss-foot {
+    margin-inline: -16px;
+  }
+  .ss-row,
+  .ss-foot {
+    padding-inline: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-body[data-fx] .ss-bar i {
+    animation: none;
+    width: 100%;
+    background: color-mix(in srgb, var(--accent-mark) 55%, transparent);
+  }
+  .ss-body[data-fx] .ss-row {
+    animation: none;
+  }
+}

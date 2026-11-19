@@ -1960,6 +1960,315 @@ func (x *ChannelMeasureStatusResponse) GetConfiguredMbps() uint32 {
 	return 0
 }
 
+type NodeSniScanRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	NodeId string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	// Scan now (false = read the last result kept).
+	Run           bool `protobuf:"varint,2,opt,name=run,proto3" json:"run,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeSniScanRequest) Reset() {
+	*x = NodeSniScanRequest{}
+	mi := &file_mistgate_probe_v1_probe_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeSniScanRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeSniScanRequest) ProtoMessage() {}
+
+func (x *NodeSniScanRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_probe_v1_probe_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeSniScanRequest.ProtoReflect.Descriptor instead.
+func (*NodeSniScanRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_probe_v1_probe_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *NodeSniScanRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *NodeSniScanRequest) GetRun() bool {
+	if x != nil {
+		return x.Run
+	}
+	return false
+}
+
+// One neighbour site of a scan: a name the node saw in the certificate of an address of its /24. The name is the text of a stranger's
+// certificate (a plain host name, checked by the node and again by the panel) and is shown as text only: never as a link.
+type SniCandidate struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Ip    string                 `protobuf:"bytes,1,opt,name=ip,proto3" json:"ip,omitempty"`
+	Name  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Where the node's own resolver says the name leads: "here" (this address), "subnet" (another address of the /24), "elsewhere", "none".
+	Dns string `protobuf:"bytes,3,opt,name=dns,proto3" json:"dns,omitempty"`
+	H2  bool   `protobuf:"varint,4,opt,name=h2,proto3" json:"h2,omitempty"`
+	// The certificate belongs to one site (at most two registrable domains in it), not to a shared hosting or CDN one.
+	SingleSite bool `protobuf:"varint,5,opt,name=single_site,json=singleSite,proto3" json:"single_site,omitempty"`
+	// The status of GET / (redirects not followed); 0 = no answer.
+	Http uint32 `protobuf:"varint,6,opt,name=http,proto3" json:"http,omitempty"`
+	// The TLS handshake in milliseconds.
+	Ms uint32 `protobuf:"varint,7,opt,name=ms,proto3" json:"ms,omitempty"`
+	// Days the certificate still holds.
+	Days          uint32 `protobuf:"varint,8,opt,name=days,proto3" json:"days,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SniCandidate) Reset() {
+	*x = SniCandidate{}
+	mi := &file_mistgate_probe_v1_probe_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SniCandidate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SniCandidate) ProtoMessage() {}
+
+func (x *SniCandidate) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_probe_v1_probe_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SniCandidate.ProtoReflect.Descriptor instead.
+func (*SniCandidate) Descriptor() ([]byte, []int) {
+	return file_mistgate_probe_v1_probe_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *SniCandidate) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *SniCandidate) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SniCandidate) GetDns() string {
+	if x != nil {
+		return x.Dns
+	}
+	return ""
+}
+
+func (x *SniCandidate) GetH2() bool {
+	if x != nil {
+		return x.H2
+	}
+	return false
+}
+
+func (x *SniCandidate) GetSingleSite() bool {
+	if x != nil {
+		return x.SingleSite
+	}
+	return false
+}
+
+func (x *SniCandidate) GetHttp() uint32 {
+	if x != nil {
+		return x.Http
+	}
+	return 0
+}
+
+func (x *SniCandidate) GetMs() uint32 {
+	if x != nil {
+		return x.Ms
+	}
+	return 0
+}
+
+func (x *SniCandidate) GetDays() uint32 {
+	if x != nil {
+		return x.Days
+	}
+	return 0
+}
+
+type NodeSniScanResponse struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	NodeName string                 `protobuf:"bytes,1,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	// Empty when the scan ran or a stored result is shown. Otherwise a short code: node_offline, agent_too_old (the agent lacks "sni-scan/1"),
+	// busy, too_soon (retry_after_s says when), not_my_address (the node's address is not on its own interface: a NAT or a name behind a CDN),
+	// no_ipv4 (the panel knows no IPv4 address of the node), no_roots (the node has no CA roots), failed. A refused call still carries the
+	// last stored result, if there is one.
+	Error       string `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	RetryAfterS uint32 `protobuf:"varint,3,opt,name=retry_after_s,json=retryAfterS,proto3" json:"retry_after_s,omitempty"`
+	// When the stored result was made (the panel's clock); 0 = no scan of this node was ever kept.
+	AtUnix int64 `protobuf:"varint,4,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	// The /24 that was scanned ("192.0.2.0/24").
+	Range string `protobuf:"bytes,5,opt,name=range,proto3" json:"range,omitempty"`
+	// Counts of addresses: looked at, answering on 443, TLS 1.3, with a name whose handshake chose X25519MLKEM768, with a candidate.
+	Addresses uint32 `protobuf:"varint,6,opt,name=addresses,proto3" json:"addresses,omitempty"`
+	Open      uint32 `protobuf:"varint,7,opt,name=open,proto3" json:"open,omitempty"`
+	Tls13     uint32 `protobuf:"varint,8,opt,name=tls13,proto3" json:"tls13,omitempty"`
+	Mlkem     uint32 `protobuf:"varint,9,opt,name=mlkem,proto3" json:"mlkem,omitempty"`
+	Valid     uint32 `protobuf:"varint,10,opt,name=valid,proto3" json:"valid,omitempty"`
+	// The budget ran out before every address was done.
+	Partial bool `protobuf:"varint,11,opt,name=partial,proto3" json:"partial,omitempty"`
+	// Candidates that were left out because they are this panel's own: an address or a name of one of its nodes or of the panel.
+	OwnLeftOut    uint32          `protobuf:"varint,12,opt,name=own_left_out,json=ownLeftOut,proto3" json:"own_left_out,omitempty"`
+	Candidates    []*SniCandidate `protobuf:"bytes,13,rep,name=candidates,proto3" json:"candidates,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeSniScanResponse) Reset() {
+	*x = NodeSniScanResponse{}
+	mi := &file_mistgate_probe_v1_probe_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeSniScanResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeSniScanResponse) ProtoMessage() {}
+
+func (x *NodeSniScanResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_probe_v1_probe_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeSniScanResponse.ProtoReflect.Descriptor instead.
+func (*NodeSniScanResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_probe_v1_probe_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *NodeSniScanResponse) GetNodeName() string {
+	if x != nil {
+		return x.NodeName
+	}
+	return ""
+}
+
+func (x *NodeSniScanResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *NodeSniScanResponse) GetRetryAfterS() uint32 {
+	if x != nil {
+		return x.RetryAfterS
+	}
+	return 0
+}
+
+func (x *NodeSniScanResponse) GetAtUnix() int64 {
+	if x != nil {
+		return x.AtUnix
+	}
+	return 0
+}
+
+func (x *NodeSniScanResponse) GetRange() string {
+	if x != nil {
+		return x.Range
+	}
+	return ""
+}
+
+func (x *NodeSniScanResponse) GetAddresses() uint32 {
+	if x != nil {
+		return x.Addresses
+	}
+	return 0
+}
+
+func (x *NodeSniScanResponse) GetOpen() uint32 {
+	if x != nil {
+		return x.Open
+	}
+	return 0
+}
+
+func (x *NodeSniScanResponse) GetTls13() uint32 {
+	if x != nil {
+		return x.Tls13
+	}
+	return 0
+}
+
+func (x *NodeSniScanResponse) GetMlkem() uint32 {
+	if x != nil {
+		return x.Mlkem
+	}
+	return 0
+}
+
+func (x *NodeSniScanResponse) GetValid() uint32 {
+	if x != nil {
+		return x.Valid
+	}
+	return 0
+}
+
+func (x *NodeSniScanResponse) GetPartial() bool {
+	if x != nil {
+		return x.Partial
+	}
+	return false
+}
+
+func (x *NodeSniScanResponse) GetOwnLeftOut() uint32 {
+	if x != nil {
+		return x.OwnLeftOut
+	}
+	return 0
+}
+
+func (x *NodeSniScanResponse) GetCandidates() []*SniCandidate {
+	if x != nil {
+		return x.Candidates
+	}
+	return nil
+}
+
 var File_mistgate_probe_v1_probe_proto protoreflect.FileDescriptor
 
 const file_mistgate_probe_v1_probe_proto_rawDesc = "" +
@@ -2116,7 +2425,38 @@ const file_mistgate_probe_v1_probe_proto_rawDesc = "" +
 	"\x05steps\x18\x06 \x03(\v2\x1e.mistgate.probe.v1.ChannelStepR\x05steps\x126\n" +
 	"\x06result\x18\a \x01(\v2\x1e.mistgate.probe.v1.ChannelLastR\x06result\x122\n" +
 	"\x04last\x18\b \x01(\v2\x1e.mistgate.probe.v1.ChannelLastR\x04last\x12'\n" +
-	"\x0fconfigured_mbps\x18\t \x01(\rR\x0econfiguredMbps2\xbf\a\n" +
+	"\x0fconfigured_mbps\x18\t \x01(\rR\x0econfiguredMbps\"?\n" +
+	"\x12NodeSniScanRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x10\n" +
+	"\x03run\x18\x02 \x01(\bR\x03run\"\xad\x01\n" +
+	"\fSniCandidate\x12\x0e\n" +
+	"\x02ip\x18\x01 \x01(\tR\x02ip\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
+	"\x03dns\x18\x03 \x01(\tR\x03dns\x12\x0e\n" +
+	"\x02h2\x18\x04 \x01(\bR\x02h2\x12\x1f\n" +
+	"\vsingle_site\x18\x05 \x01(\bR\n" +
+	"singleSite\x12\x12\n" +
+	"\x04http\x18\x06 \x01(\rR\x04http\x12\x0e\n" +
+	"\x02ms\x18\a \x01(\rR\x02ms\x12\x12\n" +
+	"\x04days\x18\b \x01(\rR\x04days\"\x90\x03\n" +
+	"\x13NodeSniScanResponse\x12\x1b\n" +
+	"\tnode_name\x18\x01 \x01(\tR\bnodeName\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x12\"\n" +
+	"\rretry_after_s\x18\x03 \x01(\rR\vretryAfterS\x12\x1b\n" +
+	"\aat_unix\x18\x04 \x01(\x03B\x020\x02R\x06atUnix\x12\x14\n" +
+	"\x05range\x18\x05 \x01(\tR\x05range\x12\x1c\n" +
+	"\taddresses\x18\x06 \x01(\rR\taddresses\x12\x12\n" +
+	"\x04open\x18\a \x01(\rR\x04open\x12\x14\n" +
+	"\x05tls13\x18\b \x01(\rR\x05tls13\x12\x14\n" +
+	"\x05mlkem\x18\t \x01(\rR\x05mlkem\x12\x14\n" +
+	"\x05valid\x18\n" +
+	" \x01(\rR\x05valid\x12\x18\n" +
+	"\apartial\x18\v \x01(\bR\apartial\x12 \n" +
+	"\fown_left_out\x18\f \x01(\rR\n" +
+	"ownLeftOut\x12?\n" +
+	"\n" +
+	"candidates\x18\r \x03(\v2\x1f.mistgate.probe.v1.SniCandidateR\n" +
+	"candidates2\x9d\b\n" +
 	"\fProbeService\x12V\n" +
 	"\tPathProbe\x12#.mistgate.probe.v1.PathProbeRequest\x1a$.mistgate.probe.v1.PathProbeResponse\x12V\n" +
 	"\tNodeTrace\x12#.mistgate.probe.v1.NodeTraceRequest\x1a$.mistgate.probe.v1.NodeTraceResponse\x12_\n" +
@@ -2126,7 +2466,8 @@ const file_mistgate_probe_v1_probe_proto_rawDesc = "" +
 	"\x12ChannelMeasurePlan\x12,.mistgate.probe.v1.ChannelMeasurePlanRequest\x1a-.mistgate.probe.v1.ChannelMeasurePlanResponse\x12t\n" +
 	"\x13ChannelMeasureStart\x12-.mistgate.probe.v1.ChannelMeasureStartRequest\x1a..mistgate.probe.v1.ChannelMeasureStartResponse\x12w\n" +
 	"\x14ChannelMeasureStatus\x12..mistgate.probe.v1.ChannelMeasureStatusRequest\x1a/.mistgate.probe.v1.ChannelMeasureStatusResponse\x12w\n" +
-	"\x14ChannelMeasureCancel\x12..mistgate.probe.v1.ChannelMeasureCancelRequest\x1a/.mistgate.probe.v1.ChannelMeasureCancelResponseB\xc5\x01\n" +
+	"\x14ChannelMeasureCancel\x12..mistgate.probe.v1.ChannelMeasureCancelRequest\x1a/.mistgate.probe.v1.ChannelMeasureCancelResponse\x12\\\n" +
+	"\vNodeSniScan\x12%.mistgate.probe.v1.NodeSniScanRequest\x1a&.mistgate.probe.v1.NodeSniScanResponseB\xc5\x01\n" +
 	"\x15com.mistgate.probe.v1B\n" +
 	"ProbeProtoP\x01Z:github.com/mistgate/mistgate/gen/mistgate/probe/v1;probev1\xa2\x02\x03MPX\xaa\x02\x11Mistgate.Probe.V1\xca\x02\x11Mistgate\\Probe\\V1\xe2\x02\x1dMistgate\\Probe\\V1\\GPBMetadata\xea\x02\x13Mistgate::Probe::V1b\x06proto3"
 
@@ -2142,7 +2483,7 @@ func file_mistgate_probe_v1_probe_proto_rawDescGZIP() []byte {
 	return file_mistgate_probe_v1_probe_proto_rawDescData
 }
 
-var file_mistgate_probe_v1_probe_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_mistgate_probe_v1_probe_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_mistgate_probe_v1_probe_proto_goTypes = []any{
 	(*PathProbeRequest)(nil),             // 0: mistgate.probe.v1.PathProbeRequest
 	(*PathProbePort)(nil),                // 1: mistgate.probe.v1.PathProbePort
@@ -2171,6 +2512,9 @@ var file_mistgate_probe_v1_probe_proto_goTypes = []any{
 	(*ChannelMeasureCancelResponse)(nil), // 24: mistgate.probe.v1.ChannelMeasureCancelResponse
 	(*ChannelStep)(nil),                  // 25: mistgate.probe.v1.ChannelStep
 	(*ChannelMeasureStatusResponse)(nil), // 26: mistgate.probe.v1.ChannelMeasureStatusResponse
+	(*NodeSniScanRequest)(nil),           // 27: mistgate.probe.v1.NodeSniScanRequest
+	(*SniCandidate)(nil),                 // 28: mistgate.probe.v1.SniCandidate
+	(*NodeSniScanResponse)(nil),          // 29: mistgate.probe.v1.NodeSniScanResponse
 }
 var file_mistgate_probe_v1_probe_proto_depIdxs = []int32{
 	1,  // 0: mistgate.probe.v1.PathProbeResponse.ports:type_name -> mistgate.probe.v1.PathProbePort
@@ -2190,29 +2534,32 @@ var file_mistgate_probe_v1_probe_proto_depIdxs = []int32{
 	25, // 14: mistgate.probe.v1.ChannelMeasureStatusResponse.steps:type_name -> mistgate.probe.v1.ChannelStep
 	18, // 15: mistgate.probe.v1.ChannelMeasureStatusResponse.result:type_name -> mistgate.probe.v1.ChannelLast
 	18, // 16: mistgate.probe.v1.ChannelMeasureStatusResponse.last:type_name -> mistgate.probe.v1.ChannelLast
-	0,  // 17: mistgate.probe.v1.ProbeService.PathProbe:input_type -> mistgate.probe.v1.PathProbeRequest
-	4,  // 18: mistgate.probe.v1.ProbeService.NodeTrace:input_type -> mistgate.probe.v1.NodeTraceRequest
-	7,  // 19: mistgate.probe.v1.ProbeService.NodeDnsCheck:input_type -> mistgate.probe.v1.NodeDnsCheckRequest
-	10, // 20: mistgate.probe.v1.ProbeService.PathSpeed:input_type -> mistgate.probe.v1.PathSpeedRequest
-	12, // 21: mistgate.probe.v1.ProbeService.PathSpeedResults:input_type -> mistgate.probe.v1.PathSpeedResultsRequest
-	15, // 22: mistgate.probe.v1.ProbeService.ChannelMeasurePlan:input_type -> mistgate.probe.v1.ChannelMeasurePlanRequest
-	20, // 23: mistgate.probe.v1.ProbeService.ChannelMeasureStart:input_type -> mistgate.probe.v1.ChannelMeasureStartRequest
-	21, // 24: mistgate.probe.v1.ProbeService.ChannelMeasureStatus:input_type -> mistgate.probe.v1.ChannelMeasureStatusRequest
-	22, // 25: mistgate.probe.v1.ProbeService.ChannelMeasureCancel:input_type -> mistgate.probe.v1.ChannelMeasureCancelRequest
-	3,  // 26: mistgate.probe.v1.ProbeService.PathProbe:output_type -> mistgate.probe.v1.PathProbeResponse
-	6,  // 27: mistgate.probe.v1.ProbeService.NodeTrace:output_type -> mistgate.probe.v1.NodeTraceResponse
-	9,  // 28: mistgate.probe.v1.ProbeService.NodeDnsCheck:output_type -> mistgate.probe.v1.NodeDnsCheckResponse
-	11, // 29: mistgate.probe.v1.ProbeService.PathSpeed:output_type -> mistgate.probe.v1.PathSpeedResponse
-	13, // 30: mistgate.probe.v1.ProbeService.PathSpeedResults:output_type -> mistgate.probe.v1.PathSpeedResultsResponse
-	19, // 31: mistgate.probe.v1.ProbeService.ChannelMeasurePlan:output_type -> mistgate.probe.v1.ChannelMeasurePlanResponse
-	23, // 32: mistgate.probe.v1.ProbeService.ChannelMeasureStart:output_type -> mistgate.probe.v1.ChannelMeasureStartResponse
-	26, // 33: mistgate.probe.v1.ProbeService.ChannelMeasureStatus:output_type -> mistgate.probe.v1.ChannelMeasureStatusResponse
-	24, // 34: mistgate.probe.v1.ProbeService.ChannelMeasureCancel:output_type -> mistgate.probe.v1.ChannelMeasureCancelResponse
-	26, // [26:35] is the sub-list for method output_type
-	17, // [17:26] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	28, // 17: mistgate.probe.v1.NodeSniScanResponse.candidates:type_name -> mistgate.probe.v1.SniCandidate
+	0,  // 18: mistgate.probe.v1.ProbeService.PathProbe:input_type -> mistgate.probe.v1.PathProbeRequest
+	4,  // 19: mistgate.probe.v1.ProbeService.NodeTrace:input_type -> mistgate.probe.v1.NodeTraceRequest
+	7,  // 20: mistgate.probe.v1.ProbeService.NodeDnsCheck:input_type -> mistgate.probe.v1.NodeDnsCheckRequest
+	10, // 21: mistgate.probe.v1.ProbeService.PathSpeed:input_type -> mistgate.probe.v1.PathSpeedRequest
+	12, // 22: mistgate.probe.v1.ProbeService.PathSpeedResults:input_type -> mistgate.probe.v1.PathSpeedResultsRequest
+	15, // 23: mistgate.probe.v1.ProbeService.ChannelMeasurePlan:input_type -> mistgate.probe.v1.ChannelMeasurePlanRequest
+	20, // 24: mistgate.probe.v1.ProbeService.ChannelMeasureStart:input_type -> mistgate.probe.v1.ChannelMeasureStartRequest
+	21, // 25: mistgate.probe.v1.ProbeService.ChannelMeasureStatus:input_type -> mistgate.probe.v1.ChannelMeasureStatusRequest
+	22, // 26: mistgate.probe.v1.ProbeService.ChannelMeasureCancel:input_type -> mistgate.probe.v1.ChannelMeasureCancelRequest
+	27, // 27: mistgate.probe.v1.ProbeService.NodeSniScan:input_type -> mistgate.probe.v1.NodeSniScanRequest
+	3,  // 28: mistgate.probe.v1.ProbeService.PathProbe:output_type -> mistgate.probe.v1.PathProbeResponse
+	6,  // 29: mistgate.probe.v1.ProbeService.NodeTrace:output_type -> mistgate.probe.v1.NodeTraceResponse
+	9,  // 30: mistgate.probe.v1.ProbeService.NodeDnsCheck:output_type -> mistgate.probe.v1.NodeDnsCheckResponse
+	11, // 31: mistgate.probe.v1.ProbeService.PathSpeed:output_type -> mistgate.probe.v1.PathSpeedResponse
+	13, // 32: mistgate.probe.v1.ProbeService.PathSpeedResults:output_type -> mistgate.probe.v1.PathSpeedResultsResponse
+	19, // 33: mistgate.probe.v1.ProbeService.ChannelMeasurePlan:output_type -> mistgate.probe.v1.ChannelMeasurePlanResponse
+	23, // 34: mistgate.probe.v1.ProbeService.ChannelMeasureStart:output_type -> mistgate.probe.v1.ChannelMeasureStartResponse
+	26, // 35: mistgate.probe.v1.ProbeService.ChannelMeasureStatus:output_type -> mistgate.probe.v1.ChannelMeasureStatusResponse
+	24, // 36: mistgate.probe.v1.ProbeService.ChannelMeasureCancel:output_type -> mistgate.probe.v1.ChannelMeasureCancelResponse
+	29, // 37: mistgate.probe.v1.ProbeService.NodeSniScan:output_type -> mistgate.probe.v1.NodeSniScanResponse
+	28, // [28:38] is the sub-list for method output_type
+	18, // [18:28] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_probe_v1_probe_proto_init() }
@@ -2226,7 +2573,7 @@ func file_mistgate_probe_v1_probe_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_probe_v1_probe_proto_rawDesc), len(file_mistgate_probe_v1_probe_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   27,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

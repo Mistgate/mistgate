@@ -101,6 +101,9 @@ var tokenProcedures = map[string]int{
 	ChannelMeasurePlanProcedure:   TokenAccessDirect,
 	ChannelMeasureStartProcedure:  TokenAccessApproved,
 	ChannelMeasureStatusProcedure: TokenAccessDirect,
+	// the neighbour scan (node_neighbor_sites): reads the last result or has the node walk its /24; the owner's call, and a token of the
+	// admin profile (the owner's role) only; the names it returns are text of other servers' certificates, which the MCP tool marks as such
+	NodeSniScanProcedure: TokenAccessDirect,
 	// Day-to-day changes (level write: the operator profile and up).
 	adminv1connect.UserServiceCreateUserProcedure:       TokenAccessDirect,
 	adminv1connect.UserServiceUpdateUserProcedure:       TokenAccessDirect,

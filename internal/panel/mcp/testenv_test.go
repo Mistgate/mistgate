@@ -419,6 +419,8 @@ type world struct {
 	probeReqs           []*probev1.PathProbeRequest
 	traceReqs           []*probev1.NodeTraceRequest
 	dnsReqs             []*probev1.NodeDnsCheckRequest
+	sniReqs             []*probev1.NodeSniScanRequest
+	sniError            string // the error word NodeSniScan answers with
 	speedReqs           []*probev1.PathSpeedRequest
 	speedResultReqs     []*probev1.PathSpeedResultsRequest
 	speedCode           string // the error code PathSpeed answers with

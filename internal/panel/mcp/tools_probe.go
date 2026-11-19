@@ -51,18 +51,26 @@ func probeTools() []toolDef {
 			"How fast and reliable a node's own DNS resolver is, from the doctor's resolver check: lookup timing (p50 and p95 in milliseconds) and how many of the control domains failed, for the newest run, with the history of the last 24 runs (oldest first) and a trend (steady, slower, faster, unknown until 4 runs). "+
 				"Unless stored_only is true it asks the node to run the check now (a handful of lookups of public control domains from the node, a few seconds). The stored doctor results are folded into the history too. "+probeLimits+"No addresses.",
 			func(c *call, in nodeDNSArg) (any, error) { return c.nodeDNSCheck(in) }),
+
+		neighborSitesTool(),
 	}...)
 }
 
 // probeTool is readToolWithin for a tool that acts on the network: not read-only, never destructive, not idempotent (every
 // call sends traffic), and closed to the world outside the owner's nodes.
 func probeTool[In any](name string, timeout time.Duration, procs []string, desc string, h func(c *call, in In) (any, error)) toolDef {
+	return networkTool(name, ProfileOperator, false, timeout, procs, desc, h)
+}
+
+// networkTool is probeTool for a minimum profile of its own and, when openWorld, for a tool that also reaches hosts that are not the
+// owner's (node_neighbor_sites).
+func networkTool[In any](name string, min Profile, openWorld bool, timeout time.Duration, procs []string, desc string, h func(c *call, in In) (any, error)) toolDef {
 	return toolDef{
-		name: name, min: ProfileOperator, procs: procs, free: true, desc: desc,
+		name: name, min: min, procs: procs, free: true, desc: desc,
 		add: func(s *mcp.Server, e *env, desc string) {
 			mcp.AddTool(s, &mcp.Tool{
 				Name: name, Description: desc,
-				Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false, DestructiveHint: ptr(false), IdempotentHint: false, OpenWorldHint: ptr(false)},
+				Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false, DestructiveHint: ptr(false), IdempotentHint: false, OpenWorldHint: ptr(openWorld)},
 			}, func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, any, error) {
 				c, err := e.begin(ctx, req, timeout)
 				if err != nil {

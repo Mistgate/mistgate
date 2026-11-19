@@ -42,6 +42,10 @@ service ProbeService {
   rpc ChannelMeasureStatus(ChannelMeasureStatusRequest) returns (ChannelMeasureStatusResponse);
   // Stops the run of a node: both ends close their streams at once.
   rpc ChannelMeasureCancel(ChannelMeasureCancelRequest) returns (ChannelMeasureCancelResponse);
+  // REALITY targets among the neighbours of a node: the node walks the /24 of its own address on TCP 443 (agent.proto "NEIGHBOR SITES")
+  // and the panel keeps what it found. run = false reads the last result kept; run = true scans, owner only, and the scan is
+  // refused when the last one is less than 30 minutes old. It takes up to a minute, longer than a plain unary call.
+  rpc NodeSniScan(NodeSniScanRequest) returns (NodeSniScanResponse);
 }
 
 message PathProbeRequest {
@@ -302,4 +306,53 @@ message ChannelMeasureStatusResponse {
   // The last stored measure of the node (this run included once it is done); unset when there is none.
   ChannelLast last = 8;
   uint32 configured_mbps = 9;
+}
+
+message NodeSniScanRequest {
+  string node_id = 1;
+  // Scan now (false = read the last result kept).
+  bool run = 2;
+}
+
+// One neighbour site of a scan: a name the node saw in the certificate of an address of its /24. The name is the text of a stranger's
+// certificate (a plain host name, checked by the node and again by the panel) and is shown as text only: never as a link.
+message SniCandidate {
+  string ip = 1;
+  string name = 2;
+  // Where the node's own resolver says the name leads: "here" (this address), "subnet" (another address of the /24), "elsewhere", "none".
+  string dns = 3;
+  bool h2 = 4;
+  // The certificate belongs to one site (at most two registrable domains in it), not to a shared hosting or CDN one.
+  bool single_site = 5;
+  // The status of GET / (redirects not followed); 0 = no answer.
+  uint32 http = 6;
+  // The TLS handshake in milliseconds.
+  uint32 ms = 7;
+  // Days the certificate still holds.
+  uint32 days = 8;
+}
+
+message NodeSniScanResponse {
+  string node_name = 1;
+  // Empty when the scan ran or a stored result is shown. Otherwise a short code: node_offline, agent_too_old (the agent lacks "sni-scan/1"),
+  // busy, too_soon (retry_after_s says when), not_my_address (the node's address is not on its own interface: a NAT or a name behind a CDN),
+  // no_ipv4 (the panel knows no IPv4 address of the node), no_roots (the node has no CA roots), failed. A refused call still carries the
+  // last stored result, if there is one.
+  string error = 2;
+  uint32 retry_after_s = 3;
+  // When the stored result was made (the panel's clock); 0 = no scan of this node was ever kept.
+  int64 at_unix = 4 [jstype = JS_NUMBER];
+  // The /24 that was scanned ("192.0.2.0/24").
+  string range = 5;
+  // Counts of addresses: looked at, answering on 443, TLS 1.3, with a name whose handshake chose X25519MLKEM768, with a candidate.
+  uint32 addresses = 6;
+  uint32 open = 7;
+  uint32 tls13 = 8;
+  uint32 mlkem = 9;
+  uint32 valid = 10;
+  // The budget ran out before every address was done.
+  bool partial = 11;
+  // Candidates that were left out because they are this panel's own: an address or a name of one of its nodes or of the panel.
+  uint32 own_left_out = 12;
+  repeated SniCandidate candidates = 13;
 }

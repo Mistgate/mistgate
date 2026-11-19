@@ -22,6 +22,7 @@ import type { Plain } from "@/lib/plain";
 import { nodes as nodesApi, profiles as profilesApi } from "@/lib/api";
 import { inboundConnParts, nodeConnectionsQuery, type InboundConn } from "@/lib/connections";
 import { cx } from "@/lib/cx";
+import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
 import { cellLook, checksQuery, doctorQuery } from "@/lib/health";
@@ -39,6 +40,7 @@ import { AddInbound } from "./add-inbound";
 import { AwgStatusLine } from "./awg-status";
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
+import { SniScanCard } from "./sni-scan";
 import { tcpPill, verdictPill } from "./ports";
 import { Fresh } from "@/components/fx/fresh";
 import { alsoRemovesText, useRelaysOf } from "./relays";
@@ -131,6 +133,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
   // addProfile: the profile page sent us here to add that profile: the dialog opens with it chosen
   const owner = useIsOwner(); // policy.go: a server on a node (CreateInbound, UpdateInbound, DeleteInbound) is the owner's
   const canRestart = useQuery(meQuery).data?.admin?.role === Role.HELPER || owner; // RestartInbounds is the helper's too
+  const edition = useEdition();
   const [adding, setAddingOpen] = useState(Boolean(addProfile));
   const setAdding = (open: boolean) => {
     setAddingOpen(open);
@@ -152,6 +155,8 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
   const checks = useQuery({ ...checksQuery(node.id), enabled: data.inbounds.length > 0 && node.status !== NodeStatus.RETIRED });
   const checkRow = checks.data?.rows.find((r) => r.nodeId === node.id);
   const dead = node.status === NodeStatus.DOWN;
+  // "Sites near the node": the node scans its own subnet (ProbeService, the VPS panel only) for the target of a REALITY server, the owner's call
+  const sniCard = owner && !edition.off("sni_scan") && node.status !== NodeStatus.RETIRED && data.inbounds.some((i) => i.protocol === "vless");
 
   const add = owner ? (
     <Button variant="primary" size="lg" onClick={() => setAdding(true)}>
@@ -302,6 +307,8 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
         })}
       </div>
 
+      {sniCard && <SniScanCard nodeId={node.id} nodeName={node.name} linked={linked} />}
+
       {owner && <AddInbound open={adding} onOpenChange={setAdding} data={data} initialProfile={addProfile} />}
       {editing && (
         <EditInbound key={editing.inbound.id} inbound={editing.inbound} focus={editing.focus} nodeId={node.id} nodeAddress={node.address} onClose={() => setEditing(null)} />
@@ -424,7 +431,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
             onChange={(e) => setSni(e.target.value)}
             autoFocus={focus === "sni"}
             placeholder={sniPlaceholder(t, effective?.tlsServerName, nodeAddress)}
-            hint={t("node.profiles.tlsHint")}
+            hint={inbound.protocol === "hysteria2" || inbound.protocol === "trusttunnel" ? `${t("node.profiles.tlsHint")} ${t(`sni.why.${inbound.protocol}`)}` : t("node.profiles.tlsHint")}
             error={sniError}
             mono
             autoCapitalize="off"
