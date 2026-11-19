@@ -131,9 +131,10 @@ type Fleet struct {
 	now func() time.Time
 	ca  *ca
 
-	panelLink            atomic.Pointer[string] // SetPanelLink; nil or "" = agents are sent no link address
-	fetchTokens          linkFetchTokens        // link_fetch.go
-	panelID              panelIdentity          // panel_identity.go
+	panelLink            atomic.Pointer[string]                          // SetPanelLink; nil or "" = agents are sent no link address
+	fetchTokens          linkFetchTokens                                 // link_fetch.go
+	panelID              panelIdentity                                   // panel_identity.go
+	subHostRoles         atomic.Pointer[map[string]*agentv1.SubHostRole] // SetSubHostRoles
 	networkMode          atomic.Uint32
 	networkOperator      func(string, uint32) string // optional test seam; production uses health.NetworkOperator
 	networkTableOverride networkTableReader          // optional test seam for names that need output cleaning

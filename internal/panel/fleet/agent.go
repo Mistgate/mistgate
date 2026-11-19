@@ -19,6 +19,7 @@ import (
 	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -761,6 +762,11 @@ func settingsSig(s *agentv1.NodeSettings) string {
 	if s.PanelLinkUrl != "" { // absent unless a panel link address is set: other signatures stay as they were
 		h := sha256.Sum256([]byte(s.PanelLinkUrl)) // the address holds a secret prefix; the signature stays in session state
 		sig += "|panel-link=" + hex.EncodeToString(h[:])
+	}
+	if r := s.GetSubHost(); r != nil { // absent unless the node is a host; the role holds the secret bridge path: only its hash
+		b, _ := proto.MarshalOptions{Deterministic: true}.Marshal(r)
+		h := sha256.Sum256(b)
+		sig += "|sub-host=" + hex.EncodeToString(h[:])
 	}
 	return sig
 }
