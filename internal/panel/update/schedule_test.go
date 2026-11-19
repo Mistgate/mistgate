@@ -41,7 +41,7 @@ func TestParseScheduleLocalTimeFixedOffset(t *testing.T) {
 func TestChangingScheduleTimezoneRecalculatesEnabledTaskNextRun(t *testing.T) {
 	e := newEnv(t)
 	ctx := e.ctx
-	if err := e.st.SetSettings(ctx, map[string]string{updateScheduleTimezoneKey: "180"}); err != nil {
+	if err := e.st.SetSettings(ctx, map[string]string{store.SettingPanelTimezone: "180"}); err != nil {
 		t.Fatal(err)
 	}
 	now := e.clk.Now()
@@ -310,7 +310,7 @@ func TestScheduleNodeUpdateRejectsChangedTimezoneAndRelease(t *testing.T) {
 	id := e.addNode("node", nodeOpts{})
 	b := e.s.current()
 	local := scheduleLocalAfter(e, 6*time.Hour, defaultScheduleTimezoneOffsetMin)
-	if err := e.st.SetSettings(e.ctx, map[string]string{updateScheduleTimezoneKey: "240"}); err != nil {
+	if err := e.st.SetSettings(e.ctx, map[string]string{store.SettingPanelTimezone: "240"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.s.scheduleNodeUpdate(e.ctx, id, local, defaultScheduleTimezoneOffsetMin, b.manifest.Version, b.manifest.Built); connect.CodeOf(err) != connect.CodeFailedPrecondition {

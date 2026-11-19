@@ -51,8 +51,6 @@ const (
 	followUpBusyWait  = 30 * time.Second
 	followUpRateWait  = time.Minute
 	followUpStoreWait = 2 * time.Minute
-	// timezoneSetting is the panel's time zone, the scheduled tasks' and the update schedules' (internal/panel/update/schedule.go)
-	timezoneSetting = "update_schedule_timezone_offset_minutes"
 )
 
 // FollowUpAAD is the vault's associated data of a follow-up's note.
@@ -259,16 +257,9 @@ const followUpNote = `This turn is a follow-up you set earlier with follow_up: t
 
 const followUpVerdictNote = `- End by calling follow_up_verdict once: problem=true when you found something the person should look at or act on, false when all is well; summary is one plain line of at most 200 characters (node, group or protocol names are fine), never a secret.`
 
-// panelOffset is the panel's time zone in minutes east of UTC; a missing or unusable value is UTC.
+// panelOffset is the panel's time zone in minutes east of UTC; a failed read counts as UTC.
 func (s *Service) panelOffset(ctx context.Context) int {
-	raw, err := s.st.Setting(ctx, timezoneSetting)
-	if err != nil {
-		return 0
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil || n < -12*60 || n > 14*60 || n%15 != 0 {
-		return 0
-	}
+	n, _ := s.st.PanelTimezone(ctx)
 	return n
 }
 
