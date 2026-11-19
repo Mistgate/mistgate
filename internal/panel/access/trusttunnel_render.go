@@ -51,7 +51,7 @@ func (s *Service) trustTunnelServers(ctx context.Context, u store.AccessUser, gs
 			InboundPublic: json.RawMessage(f.Inbound.PluginPublicJSON), NoIPv6Egress: !srv.IPv6Egress,
 		}
 		for _, p := range serverPaths(f.Node, spec, relaysByInbound[f.Inbound.ID]) {
-			if p.Kind == pathDirect && !f.Inbound.DirectInSubscriptions || p.Kind == pathIPv6 {
+			if p.Kind == pathDirect && !f.Inbound.DirectInSubscriptions {
 				continue
 			}
 			// A relay forwards one TCP port: a UDP forward carries no TrustTunnel path.
