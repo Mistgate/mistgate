@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { dictionaries, langs, setLang, type Lang } from "@/i18n";
 import { setEffectsEnabled } from "@/lib/effects";
-import { ruChecksOf, ruKinds, type RuKind } from "@/screens/dev-kit-node-ru";
+import { nowRoundOf, ruChecksOf, ruKinds, type NowKind, type RuKind } from "@/screens/dev-kit-node-ru";
 import { Nets } from "./ways-nets";
 import type { WaysModel } from "./ways";
 
@@ -209,5 +209,32 @@ describe("the seen-from-the-country block of a way (the board's nd-sh, nd-nets, 
     expect(seen.get("ru/partial")).toContain("открывается из 3 сетей из 4");
     expect(seen.get("zh/ok")).toContain("所有网络都能打开");
     expect(Object.keys(dictionaries)).toHaveLength(5);
+  });
+});
+
+describe("'Check now' has the country check run (the round of the node, CountryNow)", () => {
+  const round = (kind: NowKind) => nowRoundOf(kind, NOW)[0];
+  it("a round that runs puts the radar by the title and says what is rechecked; a round that has ended does not", async () => {
+    setEffectsEnabled(true);
+    await mount({}, { countryNow: round("running") });
+    expect(host!.querySelector(".wy-sh")?.classList.contains("now")).toBe(true);
+    expect(host!.querySelector("[data-line=running]")?.textContent).toBe("Rechecking now: Globalping, TSPU probe, cheburcheck, Own probes");
+    expect(host!.querySelector("[data-line=skipped]")?.textContent).toContain("bsbord — on its schedule only");
+    act(() => root?.unmount());
+    host?.remove();
+    await mount({}, { countryNow: round("done") });
+    expect(host!.querySelector(".wy-sh")?.classList.contains("now")).toBe(false);
+    expect(host!.querySelector("[data-line=done]")?.textContent).toBe("Rechecked 3 min ago: Globalping, TSPU probe, cheburcheck");
+    expect(host!.querySelector("[data-line=next]")?.textContent).toBe("Next recheck in 7 min");
+  });
+
+  it("with the effects off there is no radar, the words stay; another node's chips ('seen') carry none of it", async () => {
+    await mount({}, { countryNow: round("running") });
+    expect(host!.querySelector(".wy-sh")?.classList.contains("now")).toBe(false);
+    expect(host!.querySelector("[data-line=running]")).not.toBeNull();
+    act(() => root?.unmount());
+    host?.remove();
+    await mount({ kind: "seen" }, { countryNow: round("running") });
+    expect(host!.querySelector("[data-testid=country-now]")).toBeNull();
   });
 });

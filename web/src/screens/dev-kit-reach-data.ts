@@ -1,4 +1,5 @@
 import { CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
+import { nowKinds, nowRoundOf } from "./dev-kit-node-ru";
 import { AlertKind, AlertSeverity } from "@/gen/mistgate/admin/v1/health_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { sourceIds, type ReachTab, type SourceId } from "@/screens/reachability/search";
@@ -232,7 +233,10 @@ export function checksOf(f: Flags, srv: Srv) {
     for (const r of rows) r.vantages = [...r.vantages.filter((x) => x.network !== "Operator B"), vantage({ key: "gp:crimea", network: "MTS (Crimea)", region: "Simferopol", asn: "64499", state: "dark", icmpOk: false, tcpOk: false, kind: "mobile" })];
     for (const r of rows) if (r.nodeId !== nid("fi1")) r.verdict = CountryVerdict.PARTIAL;
   }
-  return { nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: rows, tspuRun: srv.tspu.enabled && !quiet ? { status: "ok", atUnix: NOW - 48 * 60, nodeId: nid("msk1") } : undefined };
+  // "Check now" has asked the country check for a round of the open node (flag cn<kind>: dev-kit-node-ru.ts NowKind)
+  const cn = nowKinds.find((k) => f.v.has(`cn${k}`));
+  const countryNow = cn && !quiet ? nowRoundOf(cn, NOW, nid(f.open ?? "fi1")) : [];
+  return { nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: rows, countryNow, tspuRun: srv.tspu.enabled && !quiet ? { status: "ok", atUnix: NOW - 48 * 60, nodeId: nid("msk1") } : undefined };
 }
 
 const alert = (id: string, node: string, verdict: string, openedAgo: number, closedAgo = 0, over: object = {}) => ({

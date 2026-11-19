@@ -59,7 +59,10 @@ func batchTools() []toolDef {
 			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.HealthServiceRunChecksNowProcedure, adminv1connect.HealthServiceGetChecksProcedure),
 			"Run the health checks now instead of waiting for the next round, and return the fresh results in the checks_results shape (only the inbounds that were probed; each cell has its inbound_id). node: one node, empty = every node; inbound: only that inbound's result. "+
 				"The panel runs one round per inbound at most every 30 seconds: asking again sooner is refused, then read checks_results instead. A round is the panel's own client connecting through the inbound like a person (it reads nothing from the node). "+
-				"It waits up to 25 seconds for the rounds; complete=false means some had not finished, call checks_results a little later.",
+				"It waits up to 25 seconds for the rounds; complete=false means some had not finished, call checks_results a little later. "+
+				"For one node it also asks the country check (\"From Russia\") for a round out of turn, the same as the Check now button: country says per source whether it runs (running, queued) or is skipped and why "+
+				"(off, too_early, no_budget, no_probe, held, schedule_only...). A node is asked at most once in 10 minutes (retry_after_s says when); Globalping only spends the tests left after the planned rounds' share of its hourly limit (globalping_tests_left, globalping_round_cost); "+
+				"bsbord runs on its schedule only; the block lists and kl!ck reports are read again from what the panel holds. The country round runs in the background and is not waited for: read the node's reachability later. Without node, no country round is asked.",
 			func(c *call, in checksRunArg) (any, error) { return c.checksRunNow(in) }),
 	}
 }
@@ -416,7 +419,44 @@ type ChecksRunV struct {
 	// Complete is false when the wait ended before every scheduled round had a fresh result.
 	Complete bool   `json:"complete"`
 	Note     string `json:"note,omitempty"`
+	// Country is the round of the country check asked out of turn for the node (the Check now button's): which source runs and which
+	// is skipped and why. Absent without node.
+	Country *CountryRunV `json:"country,omitempty"`
 	*ChecksV
+}
+
+// CountryRunV is RunChecksNowResponse.country_now.
+type CountryRunV struct {
+	Running bool `json:"running"`
+	// RetryAfterS is set when the press came too early: the seconds until the node may be asked again.
+	RetryAfterS uint32 `json:"retry_after_s,omitempty"`
+	// Sources are in the panel's order. state: running, queued (asked, the answer comes by itself), skipped, reread (nothing to ask: shown again
+	// from what is stored); reason says why a source is skipped.
+	Sources []CountrySourceV `json:"sources"`
+	// GlobalpingTestsLeft is what Globalping may still spend on a round by hand in this hour after the planned rounds' share; absent when not read.
+	GlobalpingTestsLeft *uint32 `json:"globalping_tests_left,omitempty"`
+	GlobalpingRoundCost uint32  `json:"globalping_round_cost,omitempty"`
+}
+
+type CountrySourceV struct {
+	Source string `json:"source"`
+	State  string `json:"state"`
+	Reason string `json:"reason,omitempty"`
+}
+
+func countryRunView(c *adminv1.CountryNow) *CountryRunV {
+	if c == nil {
+		return nil
+	}
+	v := &CountryRunV{Running: c.GetRunning(), RetryAfterS: c.GetRetryAfterS(), Sources: make([]CountrySourceV, 0, len(c.GetSources()))}
+	for _, s := range c.GetSources() {
+		v.Sources = append(v.Sources, CountrySourceV{Source: s.GetSource(), State: s.GetState(), Reason: s.GetReason()})
+	}
+	if c.GlobalpingLeft != nil {
+		left := c.GetGlobalpingLeft()
+		v.GlobalpingTestsLeft, v.GlobalpingRoundCost = &left, c.GetGlobalpingCost()
+	}
+	return v
 }
 
 func (c *call) checksRunNow(in checksRunArg) (any, error) {
@@ -468,7 +508,7 @@ func (c *call) checksRunNow(in checksRunArg) (any, error) {
 		}
 		fresh := keepFresh(r.Msg, started, in.Inbound)
 		if fresh >= want || want == 0 || !time.Now().Before(deadline) {
-			v := &ChecksRunV{Scheduled: run.Msg.GetScheduled(), Skipped: run.Msg.GetSkipped(), Complete: fresh >= want, ChecksV: checksView(r.Msg)}
+			v := &ChecksRunV{Scheduled: run.Msg.GetScheduled(), Skipped: run.Msg.GetSkipped(), Complete: fresh >= want, Country: countryRunView(run.Msg.GetCountryNow()), ChecksV: checksView(r.Msg)}
 			if want == 0 {
 				v.Note = "nothing could be probed (the node is offline or updating, the inbound is disabled, or its protocol has no client); these are the stored results"
 			}

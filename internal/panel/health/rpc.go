@@ -644,6 +644,7 @@ func (r rpc) GetChecks(ctx context.Context, req *connect.Request[adminv1.GetChec
 		return nil, s.internal("country checks", err)
 	}
 	resp.TspuRun = s.tspuState(ctx).Run
+	resp.CountryNow = s.countryNowViews(ctx, req.Msg.NodeId)
 	return connect.NewResponse(resp), nil
 }
 
@@ -660,10 +661,15 @@ func (r rpc) RunChecksNow(ctx context.Context, req *connect.Request[adminv1.RunC
 	if err != nil {
 		return nil, s.internal("run checks", err)
 	}
-	if scheduled == 0 && retry > 0 {
+	// the country check has its own limit (10 minutes a node): the round asked for it does not wait for the profiles' 30 s
+	var country *adminv1.CountryNow
+	if req.Msg.NodeId != "" {
+		country = s.RunCountryNow(ctx, req.Msg.NodeId)
+	}
+	if scheduled == 0 && retry > 0 && !country.GetRunning() {
 		return nil, connect.NewError(connect.CodeResourceExhausted, fmt.Errorf("checks ran a moment ago: try again in %d s", int(retry.Seconds())))
 	}
-	return connect.NewResponse(&adminv1.RunChecksNowResponse{Scheduled: uint32(scheduled), Skipped: uint32(skipped)}), nil
+	return connect.NewResponse(&adminv1.RunChecksNowResponse{Scheduled: uint32(scheduled), Skipped: uint32(skipped), CountryNow: country}), nil
 }
 
 // ---------------------------------------------------------------------------------------------------

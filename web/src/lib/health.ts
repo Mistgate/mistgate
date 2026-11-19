@@ -48,12 +48,16 @@ export const alertsQuery = queryOptions({
   refetchInterval: pollMs,
 });
 
+/** How often the checks are read while a country round asked by hand runs (a round takes up to a few minutes). */
+const runningPollMs = 3_000;
+
 /** Empty nodeId = every node (the Checks tab); a node id = only that node (the pills of its Overview). */
 export const checksQuery = (nodeId = "") =>
   queryOptions({
     queryKey: ["health", "checks", nodeId],
     queryFn: async ({ signal }) => plain(await health.getChecks({ nodeId }, { signal })),
-    refetchInterval: pollMs,
+    // a country round asked by hand is running: its result is picked up as soon as it is there
+    refetchInterval: (q) => (q.state.data?.countryNow?.some((c) => c.running) ? runningPollMs : pollMs),
   });
 
 /** The stored doctor reports, never a call to a node. Empty nodeId = the whole fleet. */

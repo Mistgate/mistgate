@@ -98,3 +98,41 @@ export function ruChecksOf(kind: RuKind, now: number) {
     }
   }
 }
+
+// ---------------------------------------------------------------------------------------------------
+// The round "Check now" asks of the country check for the node (health.proto CountryNow), one scene per state: the radar and the lines under
+// "From Russia". /dev-kit?only=nodepage-frame&tab=overview&ru=ok&cn=<kind> (also tab=ways and the Reachability page). Made-up numbers.
+
+export type NowKind = "running" | "done" | "early" | "nobudget" | "failed" | "off" | "partial";
+export const nowKinds: readonly NowKind[] = ["running", "done", "early", "nobudget", "failed", "off", "partial"];
+export const nowKindOf = (s: string | null): NowKind | undefined => nowKinds.find((k) => k === s);
+
+type Src = [source: string, state: string, reason?: string];
+const sourcesOf = (rows: Src[]) => rows.map(([source, state, reason]) => ({ source, state, reason: reason ?? "" }));
+
+/** The round of the node `nod_de1` for a scene. */
+export function nowRoundOf(kind: NowKind, now: number, nodeId = "nod_de1") {
+  const base = { nodeId, running: false, startedUnix: now - 3 * MIN, nextUnix: now + 7 * MIN, retryAfterS: 0, askedUnix: now - 3 * MIN, globalpingLeft: 140, globalpingCost: 12, globalpingAtUnix: now - 3 * MIN };
+  const rest: Src[] = [["bsbord", "skipped", "schedule_only"], ["lists", "reread"], ["klick", "reread"]];
+  switch (kind) {
+    case "running":
+      return [{ ...base, running: true, startedUnix: now - 20, askedUnix: now - 20, nextUnix: now + 580, globalpingAtUnix: now - 20,
+        sources: sourcesOf([["globalping", "running"], ["tspu", "running"], ["cheburcheck", "running"], ["cheburcheck_own", "skipped", "off"], ["probes", "running"], ...rest]) }];
+    case "done":
+      return [{ ...base, sources: sourcesOf([["globalping", "done"], ["tspu", "done"], ["cheburcheck", "done"], ["cheburcheck_own", "skipped", "off"], ["probes", "queued"], ...rest]) }];
+    case "early":
+      return [{ ...base, startedUnix: now - 3 * MIN, nextUnix: now + 7 * MIN, retryAfterS: 7 * MIN,
+        sources: sourcesOf([["globalping", "skipped", "too_early"], ["tspu", "skipped", "too_early"], ["cheburcheck", "skipped", "too_early"], ["cheburcheck_own", "skipped", "too_early"], ["probes", "skipped", "too_early"], ["bsbord", "skipped", "too_early"], ["lists", "skipped", "too_early"], ["klick", "skipped", "too_early"]]) }];
+    case "nobudget":
+      return [{ ...base, globalpingLeft: 4, sources: sourcesOf([["globalping", "skipped", "no_budget"], ["tspu", "done"], ["cheburcheck", "done"], ["cheburcheck_own", "skipped", "off"], ["probes", "queued"], ...rest]) }];
+    case "failed":
+      return [{ ...base, sources: sourcesOf([["globalping", "done"], ["tspu", "failed", "control_failed"], ["cheburcheck", "failed", "timeout"], ["cheburcheck_own", "skipped", "held"], ["probes", "skipped", "probe_silent"], ...rest]) }];
+    case "off":
+      // nothing could be asked: no round, no time of a round
+      return [{ nodeId, running: false, startedUnix: 0, nextUnix: 0, retryAfterS: 0, askedUnix: now - 60, globalpingLeft: undefined, globalpingCost: 0, globalpingAtUnix: 0,
+        sources: sourcesOf([["globalping", "skipped", "off"], ["tspu", "skipped", "probe_node"], ["cheburcheck", "skipped", "off"], ["cheburcheck_own", "skipped", "off"], ["probes", "skipped", "no_probe"], ["bsbord", "skipped", "off"], ["lists", "skipped", "off"], ["klick", "reread"]]) }];
+    case "partial":
+      return [{ ...base, running: true, startedUnix: now - 70, askedUnix: now - 70, nextUnix: now + 530, globalpingAtUnix: now - 70,
+        sources: sourcesOf([["globalping", "done"], ["tspu", "running"], ["cheburcheck", "done"], ["cheburcheck_own", "skipped", "held"], ["probes", "queued"], ...rest]) }];
+  }
+}

@@ -141,6 +141,8 @@ type countryDetail struct {
 	Ports   []uint16             `json:"ports,omitempty"` // the TCP ports that were tried
 	NoProbe []string             `json:"no_probe,omitempty"`
 	Asked   []string             `json:"asked,omitempty"`
+	// Manual: the round was asked out of turn (country_now.go); the schedule does not count it.
+	Manual bool `json:"manual,omitempty"`
 }
 
 type countryProbeDetail struct {
@@ -569,7 +571,7 @@ func (s *Service) CountryTick(ctx context.Context) bool {
 	if family == familyV4 {
 		wants = s.countryRoundWants(ctx, cc.Country)
 	}
-	s.countryRound(ctx, cc, src, nodes, probes, now, wants, family)
+	s.countryRound(ctx, cc, src, nodes, probes, now, wants, family, false)
 	return true
 }
 
@@ -583,7 +585,10 @@ func (s *Service) countryNoteStretch(chosen, effective time.Duration) {
 	s.countryStretched = stretched
 }
 
-func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src CountrySource, nodes []countryNode, probes int, now time.Time, wants []CountryWant, family int) {
+// countryRound measures the nodes once and stores a row each. manual marks the rows of a round asked out of turn (country_now.go):
+// the schedule does not count them (LastCountryCheckAt), so such a round never pushes the planned one back. It returns why the
+// source could not measure ("" when it did).
+func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src CountrySource, nodes []countryNode, probes int, now time.Time, wants []CountryWant, family int, manual bool) (failed string) {
 	timeout := s.cfg.CountryRoundTimeout
 	if timeout <= 0 {
 		timeout = countryRoundTime
@@ -598,7 +603,7 @@ func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src Countr
 	}
 	var rows []store.CountryCheck
 	unknown := func(n countryNode, reason string, asked []string) {
-		b, _ := json.Marshal(countryDetail{Reason: reason, Ports: n.ports, Asked: asked})
+		b, _ := json.Marshal(countryDetail{Reason: reason, Ports: n.ports, Asked: asked, Manual: manual})
 		rows = append(rows, store.CountryCheck{NodeID: n.node.ID, At: now, Country: cc.Country, Family: family, Verdict: verdictUnknown, Detail: string(b)})
 	}
 	targets := map[string]countryNode{}
@@ -644,6 +649,7 @@ func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src Countr
 				verdict, d := countryJudge(t, obs, reached)
 				d.NoProbe = obs.NoProbe
 				d.Asked = obs.Asked
+				d.Manual = manual
 				b, _ := json.Marshal(d)
 				rows = append(rows, store.CountryCheck{NodeID: t.Key, At: now, Country: cc.Country, Family: family, Verdict: verdict, Detail: string(b)})
 			}
@@ -651,7 +657,9 @@ func (s *Service) countryRound(ctx context.Context, cc CountryConfig, src Countr
 	}
 	if err := s.st.InsertCountryChecks(ctx, rows); err != nil {
 		s.log.Warn("health: store country check", "err", err)
+		return "error"
 	}
+	return failed
 }
 
 // countryFailure maps a failed round to the reason stored on its unknown rows, and starts the hold of a rate limit.

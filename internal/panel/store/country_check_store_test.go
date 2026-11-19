@@ -46,6 +46,23 @@ func countryCheckStoreProof(t *testing.T, st *Store) {
 	if at, err := st.LastCountryCheckAt(ctx, 4); err != nil || !at.Equal(base.Add(3*time.Minute)) {
 		t.Fatalf("LastCountryCheckAt = %v, %v", at, err)
 	}
+	// a round asked by hand for one node is marked "manual" and is not the schedule's: it never moves the time of the last planned round
+	if err := st.InsertCountryChecks(ctx, []CountryCheck{
+		{NodeID: "nod_de1", At: base.Add(30 * time.Minute), Country: "RU", Family: 6, Verdict: "ok", Detail: `{"manual":true}`},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if at, err := st.LastCountryCheckAt(ctx, 6); err != nil || !at.IsZero() {
+		t.Fatalf("LastCountryCheckAt(6) with a manual round only = %v, %v", at, err)
+	}
+	if err := st.InsertCountryChecks(ctx, []CountryCheck{
+		{NodeID: "nod_de1", At: base.Add(20 * time.Minute), Country: "RU", Family: 6, Verdict: "ok", Detail: `{"ports":[443]}`},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if at, err := st.LastCountryCheckAt(ctx, 6); err != nil || !at.Equal(base.Add(20*time.Minute)) {
+		t.Fatalf("LastCountryCheckAt(6) = %v, %v, want the planned round at 20 minutes", at, err)
+	}
 	n, err := st.PruneCountryChecks(ctx, base.Add(2*time.Minute))
 	if err != nil || n != 4 {
 		t.Fatalf("PruneCountryChecks = %d, %v, want 4 rows older than the cut", n, err)

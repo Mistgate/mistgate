@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { langs, setLang, type Lang } from "@/i18n";
 import { setEffectsEnabled } from "@/lib/effects";
-import { ruChecksOf, ruKinds, type RuKind } from "@/screens/dev-kit-node-ru";
+import { nowRoundOf, ruChecksOf, ruKinds, type RuKind } from "@/screens/dev-kit-node-ru";
 import { NodeRu } from "./checks-ru";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -115,17 +115,28 @@ describe("the Russia row of the node's checks card (the board's nd-ru)", () => {
 });
 
 describe("the animations of the row (the reveal animation: its switch and the system's 'reduce motion')", () => {
-  it("a round running sends a radar off the flag, with the effects on", async () => {
+  const round = (state: Parameters<typeof nowRoundOf>[0]) => nowRoundOf(state, NOW)[0] as never;
+  it("a round of the country check that is running sends a radar off the flag, with the effects on", async () => {
     setEffectsEnabled(true);
-    await mount({ check: check("ok"), now: true });
+    await mount({ check: check("ok"), round: round("running") });
     expect(row().classList.contains("now")).toBe(true);
-    await act(async () => root!.render(<NodeRu check={check("ok")} code="RU" now={false} />));
+    await act(async () => root!.render(<NodeRu check={check("ok")} code="RU" round={round("done")} />));
     expect(row().classList.contains("now")).toBe(false);
   });
 
-  it("with the effects off it stays still", async () => {
-    await mount({ check: check("ok"), now: true });
+  it("no radar for anything else: no round, a round that has ended, a press that was too early, nothing to ask", async () => {
+    setEffectsEnabled(true);
+    await mount({ check: check("ok") });
+    for (const r of [undefined, round("done"), round("early"), round("off"), round("failed"), round("nobudget")]) {
+      await act(async () => root!.render(<NodeRu check={check("ok")} code="RU" round={r} />));
+      expect(row().classList.contains("now"), JSON.stringify(r)).toBe(false);
+    }
+  });
+
+  it("with the effects off it stays still, the words are there", async () => {
+    await mount({ check: check("ok"), round: round("running") });
     expect(row().classList.contains("now")).toBe(false);
+    expect(row().textContent).toContain("Rechecking now: Globalping, TSPU probe, cheburcheck, Own probes");
   });
 
   it("a result that has come makes the words come up for two seconds", async () => {

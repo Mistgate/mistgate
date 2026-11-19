@@ -7,6 +7,7 @@ import { StatusDot } from "@/components/ui/status";
 import { useToast } from "@/components/ui/toast";
 import { CheckStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { useT } from "@/i18n";
+import { nowToast } from "@/lib/country-now";
 import { health } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
@@ -140,7 +141,12 @@ export function useRunChecks(nodeId = "", onDone?: (scheduled: number) => void) 
     mutationFn: async () => plain(await health.runChecksNow({ nodeId })),
     onSuccess: (r) => {
       onDone?.(r.scheduled);
-      toast(r.scheduled > 0 ? t.n("hl.checks.nowToast", r.scheduled) : t("hl.checks.nowNone"));
+      // the country round asked with it (one node only) has its word: asked, or when the next one may be
+      const country = nowToast(t, r.countryNow);
+      toast(r.scheduled > 0 ? t.n("hl.checks.nowToast", r.scheduled) : country || t("hl.checks.nowNone"));
+      if (r.scheduled > 0 && r.countryNow?.retryAfterS) toast(country);
+      // the country round is running (or has said why not): the card shows it at once
+      void qc.invalidateQueries({ queryKey: ["health", "checks"] });
       // the round takes a few seconds (a failing one up to 25 s): look twice
       for (const ms of [4000, 14000]) setTimeout(() => void qc.invalidateQueries({ queryKey: ["health", "checks"] }), ms);
     },

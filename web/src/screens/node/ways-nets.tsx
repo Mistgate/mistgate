@@ -9,6 +9,7 @@ import { useFmt, type Fmt } from "@/lib/format";
 import { countryIn, listName, probeReason, sourceName, type CountryCheck, type Vantage } from "@/lib/health";
 import { historyQuery } from "@/lib/reachability";
 import { hintOf } from "@/lib/ways";
+import { CountryNowNote } from "./country-now";
 import { waysDemo } from "./ways-demo";
 import type { WaysModel } from "./ways";
 import "./ways.css";
@@ -150,9 +151,11 @@ export function Nets({ w, name, check, kind }: { w: WaysModel; name: string; che
       ? t(shut === 0 ? "wy.ru.title.all" : shut === chips.length ? "wy.ru.title.none" : "wy.ru.title.some", { country })
       : t("ways.block.seen", { node: name, country });
   const expandable = kind !== "self" && !!check;
+  // the round "Check now" asked of the country is this node's: another node's chips ("seen") are not rechecked with it
+  const round = kind === "seen" ? undefined : w.countryNow;
   return (
     <>
-      <div className="wy-sh">
+      <div className={cx("wy-sh", fx && round?.running && "now")}>
         <h4>{title}</h4>
         {check && (
           <span>
@@ -165,6 +168,7 @@ export function Nets({ w, name, check, kind }: { w: WaysModel; name: string; che
           </button>
         )}
       </div>
+      {round && <CountryNowNote now={round} className="wy-hint !mt-1 !mb-2" />}
       {chips.length > 0 && (
         <div className={cx("wy-nets", more && "open")}>
           {chips.map((c) => (

@@ -8,7 +8,7 @@ import type { MessageKey } from "@/i18n/en";
 import { candidatesQuery, relaysQuery } from "@/lib/relay";
 import { setJob, type Job } from "./node/relay-job";
 import { waysDemo } from "./node/ways-demo";
-import { ruChecksOf, ruKindOf, type RuKind } from "./dev-kit-node-ru";
+import { nowKindOf, nowRoundOf, ruChecksOf, ruKindOf, type NowKind, type RuKind } from "./dev-kit-node-ru";
 import { historyQuery } from "@/lib/reachability";
 
 // Development only. The scenes of the node page's Ways in tab, /dev-kit?only=nodepage-frame&tab=ways&w=<scene>: the states of the board's
@@ -28,6 +28,7 @@ import { historyQuery } from "@/lib/reachability";
 //   job=run|done|bridge|part|bad|stopped  the run of the wizard's last step (open it with add=via:...) in that state
 //   wip=1             relays made and never turned on (the strip "Not finished"); run=1 a run in the background (the strip with its bar)
 //   used=1            every other node carries de1 already: the wizard has no entry to offer
+//   cn=<kind>         the round "Check now" asked of the country check (dev-kit-node-ru.ts: running | done | early | nobudget | failed | off | partial)
 //   ru=<kind>         what the country check says of the node whose card is open (dev-kit-node-ru.ts: ok | partial | tcp | bad | listed | unknown | none | probe | points |
 //                     conflict | old | long); more=1 opens the sources under the networks ("More")
 //   extra=spb1        a second entry for de1; pairs=2|3|4 the exits of msk1
@@ -56,6 +57,7 @@ export type WaysScene = {
   run: boolean;
   used: boolean;
   ru: RuKind | "";
+  cn: NowKind | "";
   more: boolean;
 };
 
@@ -78,6 +80,7 @@ export const waysSceneOf = (p: URLSearchParams): WaysScene => ({
   run: p.get("run") === "1",
   used: p.get("used") === "1",
   ru: ruKindOf(p.get("ru")) ?? "",
+  cn: nowKindOf(p.get("cn")) ?? "",
   more: p.get("more") === "1",
 });
 
@@ -308,7 +311,7 @@ export function seedWays(qc: QueryClient, data: Record<string, unknown>, sc: Way
         ];
     qc.setQueryData(relaysQuery("nod_de1").queryKey, relays as never);
     const cs = checks.map((c) => (c.nodeId === "nod_msk1" && sc.ways === "part" ? country("nod_msk1", [NETS[2]!]) : c));
-    qc.setQueryData(checksQuery("nod_de1").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [rowsOf("nod_de1")], countryChecks: cs } as never);
+    qc.setQueryData(checksQuery("nod_de1").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [rowsOf("nod_de1")], countryChecks: cs, countryNow: sc.cn ? nowRoundOf(sc.cn, NOW) : [] } as never);
     qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: cs } as never);
     const v6 = sc.set === "nov6" || sc.set === "dir";
     const node = data.node as Record<string, unknown>;
@@ -344,6 +347,11 @@ export function seedWays(qc: QueryClient, data: Record<string, unknown>, sc: Way
 
 /** The frames of the scene kit: [id, title, query, width, height]. */
 export const waysFrames: { id: string; title: string; q: string; w: number; h: number; state?: string }[] = [
+  { id: "ways-now-running", title: "Ways, Check now: the round of the country runs, the radar beside the title", q: "w=1&cn=running&fx=1", w: 1440, h: 1500 },
+  { id: "ways-now-done", title: "Ways, Check now: the round has ended, the own probes' job waits", q: "w=1&cn=done", w: 1440, h: 1500 },
+  { id: "ways-now-early", title: "Ways, Check now: pressed too early, the next recheck in 7 min", q: "w=1&cn=early", w: 1440, h: 1500 },
+  { id: "ways-now-nobudget", title: "Ways, Check now: Globalping skipped, the others went on", q: "w=1&cn=nobudget", w: 1440, h: 1500 },
+  { id: "ways-now-running-phone", title: "Ways, Check now: the round runs, on a phone, 400 wide", q: "w=1&cn=running&fx=1", w: 400, h: 3000 },
   { id: "ways-exit-ok", title: "Ways: de1 works direct and through msk1, three ways (forwarding)", q: "w=1", w: 1440, h: 1500 },
   { id: "ways-exit-graph", title: "Ways: the same, the graph", q: "w=1&view=graph", w: 1440, h: 1700 },
   { id: "ways-exit-relay", title: "Ways: the open way is through msk1, the servers", q: "w=1&way=via:nod_msk1", w: 1440, h: 1900 },

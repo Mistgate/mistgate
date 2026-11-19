@@ -1401,7 +1401,14 @@ func (w *world) RunChecksNow(_ context.Context, r *connect.Request[adminv1.RunCh
 		return nil, w.checksRunErr
 	}
 	w.checksRan = true
-	return connect.NewResponse(&adminv1.RunChecksNowResponse{Scheduled: 1, Skipped: 1}), nil
+	res := &adminv1.RunChecksNowResponse{Scheduled: 1, Skipped: 1}
+	if r.Msg.NodeId != "" { // the round of the country check asked out of turn, as the panel answers it
+		left := uint32(40)
+		res.CountryNow = &adminv1.CountryNow{NodeId: r.Msg.NodeId, Running: true, GlobalpingLeft: &left, GlobalpingCost: 12, Sources: []*adminv1.CountryNowSource{
+			{Source: "globalping", State: "running"}, {Source: "tspu", State: "skipped", Reason: "probe_node"},
+			{Source: "bsbord", State: "skipped", Reason: "schedule_only"}, {Source: "lists", State: "reread"}}}
+	}
+	return connect.NewResponse(res), nil
 }
 
 func (w *world) GetChecks(_ context.Context, r *connect.Request[adminv1.GetChecksRequest]) (*connect.Response[adminv1.GetChecksResponse], error) {

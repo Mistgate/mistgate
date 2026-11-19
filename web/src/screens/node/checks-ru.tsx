@@ -4,10 +4,12 @@ import { Flag } from "@/components/ui/flag";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
+import type { CountryNow } from "@/lib/country-now";
 import { useEffectsEnabled } from "@/lib/effects";
 import { useFmt } from "@/lib/format";
 import { countryIn, countryLook, type CountryCheck, type CountryLook } from "@/lib/health";
 import { CountryTip, OwnPoints, PartialBreakdown } from "@/screens/health/country";
+import { CountryNowNote } from "./country-now";
 
 type Kind = CountryLook["kind"] | "none" | "down";
 
@@ -26,10 +28,13 @@ const titleKey = {
 /**
  * What the board's checks card ends with (`.nd-ru`): the flag of the country in a 28 px square, "From Russia the node is reachable"
  * and a line under it (the networks, the probe node, the registry, when). A partial block and the owner's own probes lay their lines
- * under it, in the column of the text. `now` is the round running (a radar off the flag), a result that has just come is `fresh`
- * (the words come up). Both are the reveal animation: off with its switch and with the system's "reduce motion".
+ * under it, in the column of the text. The radar off the flag is for a round of the country check that "Check now" asked and that is
+ * running (`round.running`): not for the profile checks, which do not look from the country. Under the lines go the words of that round
+ * (CountryNowNote): what is rechecked, what is not and why, the next time, Globalping's tests. A result that has just come is `fresh` (the
+ * words come up). The radar and the reveal are animation: off with its switch and with the system's "reduce motion".
  */
-export function NodeRu({ check, code, status, now = false }: { check: CountryCheck | undefined; code: string; status?: NodeStatus; now?: boolean }) {
+export function NodeRu({ check, code, status, round }: { check: CountryCheck | undefined; code: string; status?: NodeStatus; round?: CountryNow }) {
+  const now = !!round?.running;
   const t = useT();
   const fmt = useFmt();
   const fx = useEffectsEnabled();
@@ -101,6 +106,7 @@ export function NodeRu({ check, code, status, now = false }: { check: CountryChe
           {breakdown ? <PartialBreakdown breakdown={breakdown} /> : look && <OwnPoints points={look.ownPoints} className="text-[13px]" />}
         </div>
       )}
+      <CountryNowNote now={round} className="col-start-2 mt-1.5" />
     </div>
   );
 }
