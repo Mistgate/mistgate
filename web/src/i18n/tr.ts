@@ -271,6 +271,7 @@ const core: CoreMessages = {
   "err.profile_deployed": "Profil şu düğümlere dağıtılmış: {nodes}. Önce oralardan kaldır.",
   "err.stale_version": "Profil başka bir sekmede değiştirildi. Sayfayı yenile.",
   "err.stale_inbound": "Sunucunun ayarları az önce başka bir yerde değiştirildi. Liste yenilendi: kontrol et ve değişikliği tekrarla.",
+  "err.stale_user": "Bu kişi az önce başka bir yerde değiştirildi (kapatıldı, uzatıldı veya düzenlendi). Sayfayı yenile, kişiyi kontrol et ve değişikliği tekrarla.",
   "err.node_offline": "Düğümle bağlantı yok. Ajan geri gelince yeniden dene.",
   "err.agent_too_old": "Düğümdeki ajan bunun için çok eski. Güncellemeler sayfasından güncelle.",
   "err.node_retired": "Düğüm kullanımdan kaldırıldı.",

@@ -284,6 +284,7 @@ const core = {
   "err.profile_deployed": "The profile is on nodes {nodes}. Remove it from them first.",
   "err.stale_version": "The profile was changed in another tab. Reload the page.",
   "err.stale_inbound": "The server's settings were changed somewhere else a moment ago. The list is refreshed: check it and repeat the change.",
+  "err.stale_user": "This person was changed somewhere else a moment ago (switched off, extended or edited). Reload the page, check the person and repeat the change.",
   "err.node_offline": "The node is not connected. Try again when its agent is back.",
   "err.agent_too_old": "The node’s agent is too old for this. Update it on the Updates page.",
   "err.node_retired": "The node is retired from the fleet.",

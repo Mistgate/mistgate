@@ -1040,6 +1040,9 @@ var userUpdate = changeSpec[userUpdateArgs]{
 			req.PagePasswordAction, _ = pagePasswordAction(*a.PagePassword)
 		}
 		if _, err := c.cl.User.UpdateUser(c.ctx, connect.NewRequest(req)); err != nil {
+			if connect.CodeOf(err) == connect.CodeAborted { // the panel refuses a write over a person who changed after the read (stale_user)
+				return done{}, failure("changed_since_plan", "the user changed after the plan; make a new plan")
+			}
 			return done{}, apiError(err)
 		}
 		return doneWith("user_updated", "User updated."), nil

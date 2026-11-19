@@ -21,7 +21,7 @@ func (e *env) extraGroups(userID string, add []string, remove ...string) {
 	e.t.Helper()
 	a := e.st.Access()
 	u := must(a.User(e.ctx, userID))
-	if err := a.UpdateUser(e.ctx, u, false, store.AccessGroupChange{Add: add, Remove: remove}); err != nil {
+	if err := a.UpdateUser(e.ctx, u, u, false, store.AccessGroupChange{Add: add, Remove: remove}); err != nil {
 		e.t.Fatal(err)
 	}
 }
@@ -242,8 +242,9 @@ func TestAnAWGKeyFollowsTheGroupThatHoldsTheProfile(t *testing.T) {
 	e := f.e
 	other := e.group("other") // no profile
 	u := must(e.st.Access().User(e.ctx, f.user))
+	was := u
 	u.GroupID = other
-	if err := e.st.Access().UpdateUser(e.ctx, u, false, store.AccessGroupChange{}); err != nil {
+	if err := e.st.Access().UpdateUser(e.ctx, u, was, false, store.AccessGroupChange{}); err != nil {
 		t.Fatal(err)
 	}
 	// the main group has no profile and the person has no extra group yet: no key

@@ -705,9 +705,12 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	// A request that asks for nothing but the page password does not rewrite the row from the values read above (a change made in
 	// between would be lost): the password is one statement of its own, below.
 	if changedUserFields(m) != "page_password" {
-		err = a.UpdateUser(ctx, u, setNodes, change)
+		err = a.UpdateUser(ctx, u, old, setNodes, change)
 	}
 	switch {
+	case errors.Is(err, store.ErrAccessVersion): // the person changed after the read above (switched off, extended, edited): nothing is written over it
+		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
+		return nil, coded(connect.CodeAborted, "stale_user")
 	case errors.Is(err, store.ErrAccessExists):
 		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
@@ -960,7 +963,9 @@ func (s *Service) ExtendUsers(ctx context.Context, req *connect.Request[adminv1.
 		if u.ExpiresAt.IsZero() {
 			continue
 		}
-		if err := a.SetUserExpiry(ctx, u.ID, maxTime(now, u.ExpiresAt).AddDate(0, 0, int(m.Days))); err != nil {
+		if err := extendUser(ctx, a, u, now, int(m.Days)); errors.Is(err, store.ErrAccessVersion) {
+			return nil, coded(connect.CodeAborted, "stale_user")
+		} else if err != nil {
 			return nil, s.internal("extend", err)
 		}
 	}
@@ -975,6 +980,27 @@ func (s *Service) ExtendUsers(ctx context.Context, req *connect.Request[adminv1.
 	p["days"] = m.Days
 	s.audit(ctx, actor(ctx), "users_extend", p)
 	return connect.NewResponse(&adminv1.ExtendUsersResponse{Users: users}), nil
+}
+
+// extendUser moves u's term end days further. A term end that changed since u was read (an edit, another extension) is read
+// again and the new end worked out from it: two extensions at once both count, and an edit is not written over. A person who
+// is gone or has no term end is left alone; store.ErrAccessVersion when the term end keeps changing.
+func extendUser(ctx context.Context, a store.Access, u store.AccessUser, now time.Time, days int) error {
+	for range 5 {
+		if u.ExpiresAt.IsZero() {
+			return nil
+		}
+		err := a.SetUserExpiry(ctx, u.ID, u.ExpiresAt, maxTime(now, u.ExpiresAt).AddDate(0, 0, days))
+		if !errors.Is(err, store.ErrAccessVersion) {
+			return err
+		}
+		if u, err = a.User(ctx, u.ID); errors.Is(err, store.ErrNotFound) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+	}
+	return store.ErrAccessVersion
 }
 
 // ResetUserTraffic zeroes used_bytes of the current period. The period start (so the next reset) and the traffic

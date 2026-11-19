@@ -72,6 +72,14 @@ func NewID(prefix string) string {
 
 func unix(t time.Time) int64 { return t.UTC().Unix() }
 
+// unixOrZero is unix with the zero time as 0.
+func unixOrZero(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return unix(t)
+}
+
 func fromUnix(s int64) time.Time { return time.Unix(s, 0).UTC() }
 
 // AuditEntry is one audit-log row.

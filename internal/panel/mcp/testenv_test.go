@@ -410,6 +410,7 @@ type world struct {
 	nodeUpdateReq       []*adminv1.UpdateNodeRequest
 	inboundUpdateReq    []*adminv1.UpdateInboundRequest
 	inboundStale        bool // a write of an inbound is refused as "changed since it was read"
+	userStale           bool // a write of a user is refused as "changed since it was read"
 	warpRestarts        []*adminv1.RestartWarpRequest
 	warpRegistrations   []*adminv1.RegisterWarpRequest
 	nodeDecoyReqs       []*adminv1.SetNodeDecoyModeRequest
@@ -965,7 +966,11 @@ func (w *world) UpdateUser(ctx context.Context, r *connect.Request[adminv1.Updat
 		return connect.NewResponse(&adminv1.UpdateUserResponse{User: &adminv1.User{Id: r.Msg.GetUserId()}, Impact: impact}), nil
 	}
 	w.updateReq = append(w.updateReq, r.Msg)
+	stale := w.userStale
 	w.mu.Unlock()
+	if stale {
+		return nil, connect.NewError(connect.CodeAborted, errors.New("stale_user"))
+	}
 	if w.recordUserChange != nil {
 		w.recordUserChange(ctx, 1)
 	}
