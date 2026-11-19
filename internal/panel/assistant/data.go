@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -234,18 +233,9 @@ func cleanContextLine(s string, limit int) string {
 	return strings.Join(strings.Fields(cleanContextText(s, limit)), " ")
 }
 
-var assistantCredentialLabel = regexp.MustCompile(`(?i)(^|[^[:alnum:]_])((?:password|passwd|pwd|pass|secret|token|api[\s_-]*key|private[\s_-]*key|key|license(?:[\s_-]*key)?|licence(?:[\s_-]*key)?|пароль|токен|ключ|лицензия))(\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)`)
-
 func redactUserMessage(s string) string {
 	s = mcp.ScrubText(s)
-	return redactCredentialLabels(s)
-}
-
-// HasCredentialLabel reports whether text contains a credential label with a value.
-func HasCredentialLabel(s string) bool { return assistantCredentialLabel.MatchString(s) }
-
-func redactCredentialLabels(s string) string {
-	return assistantCredentialLabel.ReplaceAllString(s, `${1}${2}${3}[removed: looks like a password]`)
+	return mcp.RedactCredentialLabels(s)
 }
 
 func safeToolArgs(raw []byte) string {

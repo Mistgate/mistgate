@@ -14,6 +14,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/assistant"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/tasks"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
@@ -116,6 +117,12 @@ var restoredSealedValueQueries = []sealedValueQuery{
 	{description: "assistant memory note", table: "assistant_memory", columns: []string{"text_enc", "id"}, aadParts: 1,
 		aadFrom: func(parts ...string) string { return assistant.MemoryAAD(parts[0]) },
 		query:   "SELECT text_enc, id FROM assistant_memory WHERE length(text_enc) > 0"},
+	{description: "scheduled task prompt", table: "scheduled_task", columns: []string{"prompt_enc", "id"}, aadParts: 1,
+		aadFrom: func(parts ...string) string { return tasks.PromptAAD(parts[0]) },
+		query:   "SELECT prompt_enc, id FROM scheduled_task WHERE length(prompt_enc) > 0"},
+	{description: "assistant follow-up note", table: "assistant_follow_up", columns: []string{"note_enc", "id"}, aadParts: 1,
+		aadFrom: func(parts ...string) string { return assistant.FollowUpAAD(parts[0]) },
+		query:   "SELECT note_enc, id FROM assistant_follow_up WHERE length(note_enc) > 0"},
 }
 
 var restoredSealedSettingKeys = []struct {

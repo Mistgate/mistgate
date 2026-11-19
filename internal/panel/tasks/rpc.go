@@ -11,7 +11,6 @@ import (
 	"connectrpc.com/connect"
 
 	tasksv1 "github.com/mistgate/mistgate/gen/mistgate/tasks/v1"
-	"github.com/mistgate/mistgate/internal/panel/assistant"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/mcp"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -222,18 +221,6 @@ func (s *Service) taskProto(t store.ScheduledTask, last *store.ScheduledTaskRun)
 	return p, nil
 }
 
-// looksSecret rejects values the scrubber would change and credential labels the scrubber leaves alone.
-func looksSecret(text string) bool {
-	if text == "" {
-		return false
-	}
-	scrubbed := mcp.ScrubText(text)
-	return scrubbed != text || assistant.HasCredentialLabel(scrubbed)
-}
-
-// LooksSecret rejects task text the scrubber would change or that carries a credential label.
-func LooksSecret(text string) bool { return looksSecret(text) }
-
 // DefinitionOf is a TaskInput as the spec package checks it.
 func DefinitionOf(in *tasksv1.TaskInput) spec.Definition {
 	if in == nil {
@@ -271,7 +258,7 @@ func validate(in *tasksv1.TaskInput, tools func() (spec.Tools, error)) (spec.Def
 			return d, coded(connect.CodeUnavailable, "tools_unavailable")
 		}
 	}
-	d, err := spec.Check(d, t, looksSecret)
+	d, err := spec.Check(d, t, mcp.LooksSecret)
 	if err != nil {
 		var e *spec.Error
 		if errors.As(err, &e) && e.Code == "tools_unavailable" {

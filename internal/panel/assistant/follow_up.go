@@ -362,7 +362,7 @@ func (s *Service) followUpTool(ctx context.Context, admin store.Admin, conversat
 		return fail("in_seconds must be from 30 to 86400 (24 hours)")
 	}
 	// the note is the model's own text, kept and sent back to it: scrubbed like any text of the assistant
-	note := cleanContextText(redactCredentialLabels(args.Note), followUpNoteRunes)
+	note := cleanContextText(mcp.RedactCredentialLabels(args.Note), followUpNoteRunes)
 	if note == "" {
 		return fail("note must say what to do then (1 to 400 characters)")
 	}
