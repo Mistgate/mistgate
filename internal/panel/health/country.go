@@ -812,19 +812,16 @@ func (s *Service) activeExternalStates(ctx context.Context) []ExternalState {
 }
 
 func externalSourcePath(source string) bool {
-	return source == countryreach.SourceCheburcheck || source == countryreach.SourceCheburcheckOwn
+	info, _ := countryreach.Info(source)
+	return info.Path
 }
 
 func externalSourceEyeball(source string, kinds ...string) bool {
-	switch source {
-	case countryreach.SourceCheburcheck, countryreach.SourceCheburcheckOwn, countryreach.SourceBsbord,
-		countryreach.SourceBsbordTunnel, countryreach.SourceBsbordGeo:
-		return true
-	case countryreach.SourceProbes:
+	if source == countryreach.SourceProbes { // the own probes are as eyeball as the point is
 		return len(kinds) > 0 && (kinds[0] == countryreach.VantageKindHome || kinds[0] == countryreach.VantageKindMobile)
-	default:
-		return false
 	}
+	info, _ := countryreach.Info(source)
+	return info.Eyeball
 }
 
 func externalVantagesEyeball(source string, vantages []countryreach.Vantage) bool {
@@ -1534,8 +1531,8 @@ func countryEvents(signals []countryAlertSignal, nodeID string) []countryEvent {
 }
 
 // The shared list Combine supplies the verdict. A full result is demoted to partial for alerts unless a country-wide source
-// says it: Globalping, public cheburcheck or the TSPU probe. The owner's cheburcheck probe and bsbord select regions or single
-// networks, so even several of them agreeing raise only the partial alert, naming their networks.
+// says it (Broad in countryreach.Sources). The owner's cheburcheck probe and bsbord select regions or single networks, so even
+// several of them agreeing raise only the partial alert, naming their networks.
 func countryAlertCombine(live []countryreach.Live) countryreach.Combined {
 	c := countryreach.Combine(live, nil)
 	if countryBad(c.Verdict) && !countryAlertHasBroadBlock(live) {
@@ -1549,8 +1546,7 @@ func countryAlertHasBroadBlock(live []countryreach.Live) bool {
 		if !countryBad(row.Verdict) {
 			continue
 		}
-		switch row.Source {
-		case countryreach.SourceTSPU, countryreach.SourceCheburcheck, countryreach.SourceGlobalping:
+		if info, _ := countryreach.Info(row.Source); info.Broad {
 			return true
 		}
 	}
@@ -1820,8 +1816,8 @@ func countryCond(n store.NodeRow, e countryEvent) cond {
 }
 
 // ReconcileCountry brings the COUNTRY_BLOCKED alerts up to date without the full evaluator, which the Cloudflare edition
-// does not run on the admin isolate. The edge calls it when the integration is switched off (globalping.Config.OnChange);
-// the cron tick's evaluator (EvaluateOnce) derives these alerts itself. Alerts of other kinds are left alone.
+// does not run on the admin isolate. Every source of the country check calls it (its Config.OnChange) when its settings change
+// or it stored a result; the cron tick's evaluator (EvaluateOnce) derives these alerts itself. Alerts of other kinds are left alone.
 func (s *Service) ReconcileCountry(ctx context.Context) {
 	s.evalMu.Lock()
 	defer s.evalMu.Unlock()
