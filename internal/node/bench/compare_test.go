@@ -199,3 +199,30 @@ func isKnown(list []string, s string) bool {
 	}
 	return false
 }
+
+// A "-front" case is held to the direct case of the same report and variant, nothing else: not to the baseline, and a front
+// case whose direct case did not run is left alone.
+func TestCompareFrontHoldsEachFrontCaseToItsDirectCase(t *testing.T) {
+	slower := baselineCase
+	slower.Tput1Mbit = 336 // 16% under baselineCase
+	r := report(map[string]Metrics{
+		"vless-tcp/clean":             baselineCase,
+		"vless-tcp-front/clean":       slower,
+		"vless-xhttp-front/clean":     slower, // no direct case: not compared
+		"vless-tcp/rtt50-loss1":       baselineCase,
+		"vless-tcp-front/rtt50-loss1": baselineCase,
+		"hysteria2/clean":             baselineCase, // not a front case
+		"hysteria2-front/clean":       baselineCase,
+		"hysteria2-front/mtu1280":     slower, // the direct variant did not run
+	})
+	res := CompareFront(r, DefaultThreshold)
+	if len(res.Regressions) != 1 || res.Regressions[0].Case != "vless-tcp-front/clean" || res.Regressions[0].Metric != "tput_1_mbit_s" {
+		t.Fatalf("regressions = %+v, want only vless-tcp-front/clean tput_1_mbit_s", res.Regressions)
+	}
+	if got := res.Regressions[0].Baseline; got != baselineCase.Tput1Mbit {
+		t.Errorf("the finding's baseline = %v, want the direct case's %v", got, baselineCase.Tput1Mbit)
+	}
+	if CompareFront(report(map[string]Metrics{"vless-tcp/clean": slower, "vless-tcp-front/clean": baselineCase}), DefaultThreshold).Failed() {
+		t.Error("a front case better than its direct case failed")
+	}
+}

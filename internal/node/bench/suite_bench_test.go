@@ -10,7 +10,9 @@ package bench
 // variants, nft for AmneziaWG) it skips with a message. Everything it creates is a namespace named mg3-awg-b-*, inside which the
 // engines run as re-executed copies of this test binary (roles_bench_test.go); nothing of the host's network is touched.
 //
-//	MISTGATE_BENCH_ENGINES   comma list of hysteria2, vless-tcp, vless-xhttp, awg   (default: all)
+//	MISTGATE_BENCH_ENGINES   comma list of hysteria2, vless-tcp, vless-xhttp, vless-tcp-front, vless-xhttp-front, awg   (default: all)
+//	                         the -front ones are the same engine with its port shared by the agent's front (internal/node/front);
+//	                         each is held to the direct case of the same run, at the same threshold, whatever the baseline says
 //	MISTGATE_BENCH_VARIANTS  comma list of clean, rtt50-loss1, mtu1280              (default: all)
 //	MISTGATE_BENCH_SECONDS   length of each throughput phase                        (default: 4)
 //	MISTGATE_BENCH_REPEAT    runs per case, the median is reported (at most 9)      (default: 1; 3 for a baseline)
@@ -18,6 +20,8 @@ package bench
 //	MISTGATE_BENCH_BASELINE  the baseline to compare with                           (default: baseline.json)
 //	MISTGATE_BENCH_UPDATE=1  write the report as the new baseline instead of comparing
 //	MISTGATE_BENCH_THRESHOLD how much worse than the baseline fails: 15, 15% or 0.15 (default: 15%)
+//	MISTGATE_BENCH_LOOPBACK=1  no namespaces, no root: the helpers are plain processes on 127.0.0.1-3 (clean variant only, no awg, no
+//	                         baseline). Only for a machine where namespaces are not wanted; the figures are not comparable with the baseline's.
 
 import (
 	"context"
@@ -39,26 +43,33 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
-const (
+// The addresses of the topology: the node, the client and the "internet". They are the loopback's in the loopback mode.
+var (
 	srvIP  = "203.0.113.10"
 	cliIP  = "203.0.113.2"
 	siteIP = "198.51.100.2"
 )
 
+var loopback = os.Getenv("MISTGATE_BENCH_LOOPBACK") == "1"
+
 func TestBench(t *testing.T) {
 	if os.Getenv("MISTGATE_BENCH") != "1" {
 		t.Skip("the engine benchmarks are off: set MISTGATE_BENCH=1 (Linux, root, a throwaway machine; see docs/en/reference/benchmarks.md)")
 	}
-	if os.Geteuid() != 0 {
-		t.Skip("the engine benchmarks need root for network namespaces")
-	}
-	for _, tool := range []string{"ip"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skipf("the engine benchmarks need %s (iproute2)", tool)
+	if loopback {
+		srvIP, cliIP, siteIP = "127.0.0.1", "127.0.0.3", "127.0.0.2"
+	} else {
+		if os.Geteuid() != 0 {
+			t.Skip("the engine benchmarks need root for network namespaces")
 		}
-	}
-	if out, err := exec.Command("ip", "netns", "list").CombinedOutput(); err != nil {
-		t.Skipf("network namespaces are not usable here: %v: %s", err, out)
+		for _, tool := range []string{"ip"} {
+			if _, err := exec.LookPath(tool); err != nil {
+				t.Skipf("the engine benchmarks need %s (iproute2)", tool)
+			}
+		}
+		if out, err := exec.Command("ip", "netns", "list").CombinedOutput(); err != nil {
+			t.Skipf("network namespaces are not usable here: %v: %s", err, out)
+		}
 	}
 	_, tcErr := exec.LookPath("tc")
 	_, nftErr := exec.LookPath("nft")
@@ -87,6 +98,9 @@ func TestBench(t *testing.T) {
 	for _, eng := range wantEngines {
 		for _, variant := range wantVariants {
 			switch {
+			case loopback && (variant != "clean" || eng == "awg"):
+				t.Logf("skip %s/%s: the loopback mode has no links to shape and no tunnel interface", eng, variant)
+				continue
 			case variant != "clean" && tcErr != nil:
 				t.Logf("skip %s/%s: tc (iproute2) is not installed, so there is no netem", eng, variant)
 				continue
@@ -98,7 +112,13 @@ func TestBench(t *testing.T) {
 			ok := t.Run(eng+"/"+variant, func(t *testing.T) {
 				var runs []Metrics
 				for i := 0; i < repeat; i++ {
-					runs = append(runs, runCase(t, eng, variant, secs))
+					var got Metrics
+					// a run of its own: its helpers end with it, so the next one finds their ports (and namespaces) free
+					if !t.Run(fmt.Sprintf("run%d", i+1), func(t *testing.T) { got = runCase(t, eng, variant, secs) }) {
+						return
+					}
+					t.Logf("%s/%s run %d: %+v", eng, variant, i+1, got)
+					runs = append(runs, got)
 				}
 				m = MedianOf(runs)
 			})
@@ -121,6 +141,17 @@ func TestBench(t *testing.T) {
 	}
 	t.Logf("report written to %s:\n%s", out, b)
 
+	// the front variants against the direct ones of this very run: the baseline need not have them, and a baseline taken on another
+	// day cannot say what the front costs
+	fres := CompareFront(report, threshold)
+	t.Logf("the shared-port front compared with the direct cases of this run, at a threshold of %.0f%%\n%s", threshold*100, fres.Summary())
+	if fres.Failed() {
+		t.Errorf("%d metrics behind the front are more than %.0f%% worse than the same engine without it", len(fres.Regressions), threshold*100)
+	}
+	if loopback {
+		t.Log("loopback mode: no baseline comparison, the figures are not the namespaces' figures")
+		return
+	}
 	basePath := envOr("MISTGATE_BENCH_BASELINE", "baseline.json")
 	if os.Getenv("MISTGATE_BENCH_UPDATE") == "1" {
 		merged := Report{Schema: SchemaVersion, Cases: map[string]Metrics{}}
@@ -159,7 +190,11 @@ func envOr(k, def string) string {
 
 func hostDescription() string {
 	kernel, _ := os.ReadFile("/proc/sys/kernel/osrelease")
-	return fmt.Sprintf("kernel %s, %d CPUs, %s %s", strings.TrimSpace(string(kernel)), runtime.NumCPU(), runtime.Version(), runtime.GOARCH)
+	mode := ""
+	if loopback {
+		mode = ", loopback (no namespaces)"
+	}
+	return fmt.Sprintf("kernel %s, %d CPUs, %s %s%s", strings.TrimSpace(string(kernel)), runtime.NumCPU(), runtime.Version(), runtime.GOARCH, mode)
 }
 
 // ---- one case ----
@@ -170,6 +205,9 @@ type topology struct{ srv, cli, inet awgtest.NS }
 // its ends; the node and the internet are joined by a clean link.
 func newTopology(t *testing.T, variant string) topology {
 	t.Helper()
+	if loopback {
+		return topology{} // the zero namespace is the host: every helper binds its own loopback address
+	}
 	tp := topology{srv: awgtest.NewNS(t, "b-s"), cli: awgtest.NewNS(t, "b-c"), inet: awgtest.NewNS(t, "b-i")}
 	awgtest.Veth(t, tp.cli, "bc0", []string{cliIP + "/24"}, tp.srv, "bs0", []string{srvIP + "/24"})
 	awgtest.Veth(t, tp.srv, "bs1", []string{"198.51.100.1/24"}, tp.inet, "bi1", []string{siteIP + "/24"})
@@ -250,7 +288,8 @@ func runCase(t *testing.T, eng, variant string, secs int) Metrics {
 
 	var awgClient *awgtest.Client
 	var awgCfg awgtest.ClientCfg
-	switch eng {
+	kind, viaFront := engineKind(eng)
+	switch kind {
 	case "hysteria2":
 		a.Port = 4433
 	case "vless-tcp", "vless-xhttp":
@@ -293,6 +332,13 @@ func runCase(t *testing.T, eng, variant string, secs int) Metrics {
 		}
 		t.Fatalf("the load: %s\nserver: %s", load.Error, server.Output())
 	}
+	if viaFront {
+		// the engine took its connections from the front, or the figures say nothing about the front
+		time.Sleep(time.Second)                  // the server prints its count twice a second
+		if frontDelivered(server.Output()) < 1 { // XHTTP carries the whole load on one connection: one is all it takes
+			t.Fatalf("the front handed the engine no connection: it was not in the path.\nserver: %s", server.Output())
+		}
+	}
 	m := Metrics{Tput1Mbit: round1(load.Tput1Mbit), Tput8Mbit: round1(load.Tput8Mbit), P50MS: round1(load.P50MS), P99MS: round1(load.P99MS),
 		RSSMB: round1(peakRSSMB(t, server.Pid()))}
 	if gb := float64(load.Bytes) / 1e9; gb > 0 {
@@ -313,6 +359,17 @@ func runCase(t *testing.T, eng, variant string, secs int) Metrics {
 		m.HandshakesPerS = round1(hs.HandshakesPerS)
 	}
 	return m
+}
+
+// frontDelivered is the last count a "-front" server printed (see frontStatsPrefix), 0 if it printed none.
+func frontDelivered(out string) int {
+	i := strings.LastIndex(out, frontStatsPrefix)
+	if i < 0 {
+		return 0
+	}
+	line, _, _ := strings.Cut(out[i+len(frontStatsPrefix):], "\n")
+	n, _ := strconv.Atoi(strings.TrimSpace(line))
+	return n
 }
 
 func round1(v float64) float64 { return math.Round(v*10) / 10 }

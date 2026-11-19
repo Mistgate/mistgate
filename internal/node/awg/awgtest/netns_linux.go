@@ -82,8 +82,11 @@ func NewNS(t testing.TB, suffix string) NS {
 	return ns
 }
 
-// Cmd builds a command that runs inside the namespace.
+// Cmd builds a command that runs inside the namespace. The zero NS is the host itself (the benchmark suite's loopback mode).
 func (n NS) Cmd(args ...string) *exec.Cmd {
+	if n.Name == "" {
+		return exec.Command(args[0], args[1:]...)
+	}
 	return exec.Command("ip", append([]string{"netns", "exec", n.Name}, args...)...)
 }
 
