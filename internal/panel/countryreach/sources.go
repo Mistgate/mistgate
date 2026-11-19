@@ -1,7 +1,5 @@
 package countryreach
 
-import "slices"
-
 // SourceKlick is the kl!ck reports a node's "Check now" reads again. It takes no part in the verdict: it has a place in Sources
 // for the list of that round only.
 const SourceKlick = "klick"
@@ -61,12 +59,13 @@ var (
 	}()
 	nowSources = func() []SourceInfo {
 		var out []SourceInfo
-		for _, s := range Sources {
-			if s.Now != NowNone {
-				out = append(out, s)
+		for mode := NowRound; mode <= NowReread; mode++ { // no sort: the generic one costs the edge Workers 13 KB
+			for _, s := range Sources {
+				if s.Now == mode {
+					out = append(out, s)
+				}
 			}
 		}
-		slices.SortStableFunc(out, func(a, b SourceInfo) int { return int(a.Now) - int(b.Now) })
 		return out
 	}()
 )
