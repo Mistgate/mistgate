@@ -520,6 +520,19 @@ package mistgate.agent.v1;
 //   - SharedPort (StatsBatch.shared_ports): one row per shared port, counters since the agent started, a snapshot of the whole
 //     list, newest batch wins (a coalescer keeps the last). No client address is ever in it.
 //
+// SUBSCRIPTION HOST (additive, protocol api_version stays 1; design/adr/0018-panel-behind-nat.md)
+//   A panel without a public address names one node the subscription host: the TLS of the subscription names on the node's TCP
+//   443 goes, untouched, to the panel, which calls the node over its bridge. TLS ends in the panel.
+//   - CAPABILITY GATE. An agent lists "sub-host/1" when it can be the host. The panel sends NodeSettings.sub_host to such an
+//     agent only; the agent keeps a copy in its state, so it routes before its first session (which runs through it).
+//   - The agent adds the subscription names as a route of the front on 443 (and its own site for site_name when no inbound
+//     there serves one), by the same plan function as the panel (internal/plugin SubHostRoutes, TCPSharePlan). A role the
+//     node's inbounds do not fit installs nothing; SubHostStatus.error says why, and the inbounds run as before.
+//   - The host's site accepts the panel by a short fleet certificate (spiffe://panel/<id>) and a signature over the TLS
+//     exporter in its own domain, inside HTTP/2 (bridge ServeConfig.Peer panel). Anything else gets the site.
+//   - A subscription connection the host cannot hand to the panel goes to the node's site, never to a reset.
+//   - The host's own link to the panel runs inside the bridge, never through its own public address.
+//
 // BANDWIDTH TEST (additive, protocol api_version stays 1)
 //   The owner does not know a node's network capacity and a VPS's virtual NIC does not report the plan limit, so the
 //   panel can ask the node to measure how fast it reaches the internet.
@@ -1061,6 +1074,7 @@ message Hello {
   // "link-fetch/1": a link-only agent fetches update files and the network table over the link with HelloAck.fetch_token
   // (see "LINK FETCH"). It does not list "nets/1" or "update/1" itself, so an older VPS panel never sends it an update it
   // cannot fetch; a VPS panel that serves the route reads "link-fetch/1" with "update-link/1" as both.
+  // "sub-host/1": the agent can be the subscription host (NodeSettings.sub_host, StatsBatch.sub_host; see "SUBSCRIPTION HOST").
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
   // Orders releases (the version string does not); the panel compares it with the bundle manifest.
@@ -1161,6 +1175,8 @@ message StatsBatch {
   // The TCP ports the agent shares between services now (agents with "tcp-share/1"; see "SHARED TCP PORT"). A full snapshot,
   // newest batch wins (a coalescer keeps the last); empty when no port is shared.
   repeated SharedPort shared_ports = 15;
+  // The subscription host's state (agents with "sub-host/1" that hold the role); unset when the node is no host.
+  SubHostStatus sub_host = 16;
 }
 
 // One TCP port shared between services by SNI, as the agent's front counts it since the agent started.
@@ -1195,6 +1211,9 @@ message SharedPort {
   // Went to the default route because the service of the name they asked for is not running (it failed, or did not accept
   // within 5 seconds). Not counted in refused: those are the connections that could not be served at all.
   uint64 default_route_down = 17;
+  // Handed back to the default route by the service of their name, which could not serve them (a subscription host without
+  // its panel or at its limits).
+  uint64 diverted = 18;
 }
 
 message SharedRoute {
@@ -2028,6 +2047,44 @@ message NodeSettings {
   // agent tries it, keeps the old address as fallback until a session on the new one succeeds, then saves it. Read only
   // by agents with "panel-link/1".
   string panel_link_url = 17;
+  // The node's subscription host role (see "SUBSCRIPTION HOST"); unset = none. Read only by agents with "sub-host/1".
+  // (Field 16 is left unused: test builds of an earlier design read it.)
+  SubHostRole sub_host = 18;
+}
+
+// A node's subscription host role (see "SUBSCRIPTION HOST").
+message SubHostRole {
+  // The subscription names whose TLS, on TCP 443, goes to the panel. Lower case, no trailing dot.
+  repeated string names = 1;
+  // The bridge path the panel calls on the host's site: random, assigned by the panel. A secret: never logged.
+  string path = 2;
+  // The name of the agent's own site on 443 (ACME, self-signed until issued), used when no inbound there serves the node's
+  // site; empty otherwise.
+  string site_name = 3;
+  // The fleet nodes' addresses as prefixes ("203.0.113.5/32", "2001:db8:1::/64"): connections from them are agents' links,
+  // which have capacity of their own.
+  repeated string link_sources = 4;
+}
+
+// What a subscription host reports (StatsBatch.sub_host). Counters since the agent started; never a client address.
+message SubHostStatus {
+  // Why the role does not run ("" = it runs): plugin.SubHostRoutes' codes (reality_foreign_target, hysteria2_site_443,
+  // port_443_unshareable, name_taken, site_name_required, site_name_conflict, names_invalid), or front_down (TCP 443 is
+  // taken by another process).
+  string error = 1;
+  // The panel's TLS connections to the host now.
+  uint32 panel_conns = 2;
+  // The SHA-256 (lowercase hex) of the leaf certificate of the agent's own site on 443; empty when an inbound serves the site.
+  string site_pin_sha256 = 3;
+  // The agent's own site has a certificate issued by ACME (publicly trusted), not its self-signed one.
+  bool site_cert_public = 4;
+  // People carried now: subscriptions and pages, agents' links.
+  uint32 clients_sub = 5;
+  uint32 clients_link = 6;
+  // Sent to the node's site instead: no panel, no free pair, or a limit (never a reset).
+  uint64 diverted = 7;
+  // Of those, over a per-source limit.
+  uint64 refused_per_source = 8;
 }
 
 message DesiredState {
