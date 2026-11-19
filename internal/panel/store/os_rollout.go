@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 )
 
@@ -166,24 +165,7 @@ func (s *Store) OsRolloutSteps(ctx context.Context, rolloutID string) ([]OsStepR
 // SetOsRolloutStatus moves a rollout to status only while it is in one of from (a compare-and-set). pauseKey and params
 // describe a pause and are cleared by any other status. It reports whether the row changed.
 func (s *Store) SetOsRolloutStatus(ctx context.Context, id string, from []string, status, pauseKey string, params map[string]string, finished time.Time) (bool, error) {
-	if len(from) == 0 {
-		return false, nil
-	}
-	if status != RolloutPaused {
-		pauseKey, params = "", nil
-	}
-	q := `UPDATE os_rollout SET status = ?, pause_key = ?, pause_params_json = ?, finished_at = ? WHERE id = ? AND status IN (?` +
-		strings.Repeat(", ?", len(from)-1) + `)`
-	args := []any{status, pauseKey, jsonMap(params), fleetUnix(finished), id}
-	for _, f := range from {
-		args = append(args, f)
-	}
-	res, err := s.W.ExecContext(ctx, q, args...)
-	if err != nil {
-		return false, err
-	}
-	n, _ := res.RowsAffected()
-	return n > 0, nil
+	return s.setRolloutStatus(ctx, "os_rollout", id, from, status, pauseKey, params, finished)
 }
 
 // SaveOsStep overwrites the mutable fields of a step. A row read by OsRolloutSteps is a compare-and-set on its state.
@@ -225,15 +207,7 @@ func (s *Store) SkipPendingOsSteps(ctx context.Context, rolloutID, errorKey stri
 // PruneOsRollouts deletes finished OS rollouts (their steps go with them) older than cutoff that are not among the newest keep
 // finished ones. An active rollout is never touched.
 func (s *Store) PruneOsRollouts(ctx context.Context, keep int, cutoff time.Time) (int64, error) {
-	res, err := s.W.ExecContext(ctx, `
-		DELETE FROM os_rollout
-		WHERE status NOT IN ('running', 'paused') AND created_at < ?
-		  AND id NOT IN (SELECT id FROM os_rollout WHERE status NOT IN ('running', 'paused')
-		                 ORDER BY created_at DESC, rowid DESC LIMIT ?)`, unix(cutoff), max(keep, 0))
-	if err != nil {
-		return 0, err
-	}
-	return res.RowsAffected()
+	return s.pruneRollouts(ctx, "os_rollout", keep, cutoff)
 }
 
 // OsRebootsSince lists, per node, when the panel's OS jobs rebooted it (os_step.reboot_at) at or after since, oldest first. A
