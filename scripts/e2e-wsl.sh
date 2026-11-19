@@ -81,6 +81,12 @@
 # --only, --quick, --long-return, --keep): a real panel, four real agents, real Xray clients and a filter that cuts the direct
 # way towards the exits by direction, one scenario per rule of the reverse-relay plan, checked on a matrix of protocols.
 #
+# --sni443 [options] (alias --sni443-only) runs the shared-443 lab alone (scripts/e2e/sni443.sh, which takes the rest of the arguments: --only,
+# --quick, --keep): a real panel, three real agents, a real Xray, the official TrustTunnel client and a Telegram-proxy client, five services
+# on one TCP 443 of a node told apart by SNI, and a probe that holds what a stranger sees there against the same service alone on a
+# reference node; the flood, the transitions between one service and a shared port, and the relay and the bridge through an entry. Plan
+# plans/tcp443-sni-plan.md, "Стенд"; isolated like --bridge (`unshare -n -m`, documentation addresses, nothing leaves).
+#
 # ISOLATION. A node agent owns things that exist once per host: TCP 443 (masquerade), the nft table
 # mistgate_node, /etc/sysctl.d/90-mistgate.conf and the journald drop-in. So the whole run happens in a private
 # network namespace (an ipvlan slave of the default interface gives it internet access without forwarding, which
@@ -93,6 +99,11 @@ set -Eeuo pipefail
 if [ "${1:-}" = --bridge ]; then
   shift
   exec bash "$(cd "$(dirname "$0")" && pwd)/e2e/bridge.sh" "$@"
+fi
+
+if [ "${1:-}" = --sni443 ] || [ "${1:-}" = --sni443-only ]; then
+  shift
+  exec bash "$(cd "$(dirname "$0")" && pwd)/e2e/sni443.sh" "$@"
 fi
 
 # --old-node <abs path>: run the whole scenario with that mistgate-node binary (built from an older commit) in
