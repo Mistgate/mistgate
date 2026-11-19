@@ -36,6 +36,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/globalping"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/tasks"
 	"github.com/mistgate/mistgate/internal/panel/telegram"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -143,6 +144,17 @@ func TestRestoreValidatesProductionSealedValues(t *testing.T) {
 	memoryID := "mem_golden_assistant"
 	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_memory(id,admin_id,text_enc,by_assistant,conversation_id,created_at,updated_at) VALUES(?,?,?,1,?,?,?)`,
 		memoryID, owner.ID, vlt.Seal([]byte("golden assistant memory"), assistant.MemoryAAD(memoryID)), conversationID, assistantNow.Unix(), assistantNow.Unix()); err != nil {
+		t.Fatal(err)
+	}
+
+	taskID := "tsk_golden"
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO scheduled_task(id,name,kind,schedule_kind,every_minutes,prompt_enc,created_by,created_at,updated_at) VALUES(?,?,'assistant','every',60,?,?,?,?)`,
+		taskID, "golden task", vlt.Seal([]byte("golden task prompt"), tasks.PromptAAD(taskID)), owner.ID, assistantNow.Unix(), assistantNow.Unix()); err != nil {
+		t.Fatal(err)
+	}
+	followUpID := "fup_golden"
+	if _, err := st.W.ExecContext(ctx, `INSERT INTO assistant_follow_up(id,conversation_id,admin_id,note_enc,created_at) VALUES(?,?,?,?,?)`,
+		followUpID, conversationID, owner.ID, vlt.Seal([]byte("golden follow-up note"), assistant.FollowUpAAD(followUpID)), assistantNow.Unix()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -447,6 +459,8 @@ func TestRestoreValidatesProductionSealedValues(t *testing.T) {
 		"assistant plan confirmation":    "SELECT count(*) FROM assistant_plan WHERE length(confirm_enc) > 0",
 		"assistant plan card":            "SELECT count(*) FROM assistant_plan WHERE length(card_enc) > 0",
 		"assistant memory note":          "SELECT count(*) FROM assistant_memory WHERE length(text_enc) > 0",
+		"scheduled task prompt":          "SELECT count(*) FROM scheduled_task WHERE length(prompt_enc) > 0",
+		"assistant follow-up note":       "SELECT count(*) FROM assistant_follow_up WHERE length(note_enc) > 0",
 		"Turnstile secret setting":       "SELECT count(*) FROM setting WHERE k = 'turnstile_secret' AND length(v) > 0",
 		"Globalping token setting":       "SELECT count(*) FROM setting WHERE k = 'globalping.token' AND length(v) > 0",
 		"Cheburcheck token setting":      "SELECT count(*) FROM setting WHERE k = 'cheburcheck.token' AND length(v) > 0",
