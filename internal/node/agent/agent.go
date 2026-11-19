@@ -1601,6 +1601,9 @@ func (a *Agent) onHelloAck(ack *pb.HelloAck) (reconnect bool) {
 			a.clientIPv6DoctorPending.Store(true)
 		}
 		reconnect = a.applyPanelLink(ack.Settings)
+		if a.applySubHost(ack.Settings) {
+			a.subHostChanged()
+		}
 	}
 	a.out.ack(ack.AckedSeq)
 	a.upd.AckOutcome(a.helloOutcome.Swap(nil)) // the panel has this outcome now; stop repeating it

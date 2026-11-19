@@ -75,6 +75,8 @@ type Meta struct {
 	PrevLink  string `json:"prev_link,omitempty"`
 	PrevMTLS  bool   `json:"prev_mtls,omitempty"`
 	LinkSince int64  `json:"link_since,omitempty"`
+	// SubHost is the node's subscription host role (subhost_role.go), kept from NodeSettings.sub_host; nil = none.
+	SubHost *SubHostMeta `json:"sub_host,omitempty"`
 }
 
 // saveMeta writes agent.json.
