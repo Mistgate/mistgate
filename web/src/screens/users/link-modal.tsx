@@ -1,3 +1,4 @@
+import { ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -12,7 +13,7 @@ import { Notice } from "@/components/ui/notice";
 import { useToast } from "@/components/ui/toast";
 import { users } from "@/lib/api";
 import { cx } from "@/lib/cx";
-import { errorText } from "@/lib/errors";
+import { errorCode, errorText } from "@/lib/errors";
 import { settingsQuery, useLinkAppNames } from "@/screens/subscriptions/queries";
 import type { UserN } from "./model";
 import { PagePasswordBlock, type PwNow } from "./page-password";
@@ -175,7 +176,17 @@ function LinkWindow({ open, target, initialUrl, initialPassword, onClose }: { op
       }
     >
       {error ? (
-        <QueryError error={fetched.error} onRetry={() => void fetched.refetch()} />
+        // no public address yet: the way out is a subscription host (or `mistgate setup`), not a retry
+        errorCode(ConnectError.from(fetched.error).rawMessage) === "sub_address_missing" ? (
+          <Notice tone="warn">
+            {t("set.domains.subHost.linkMissing")}{" "}
+            <Link to="/settings/$section" params={{ section: "domains" }} className="font-bold whitespace-nowrap text-accent-text hover:underline">
+              {t("set.domains.subHost.linkMissingGo", { settings: t("nav.settings"), tab: t("settings.domains") })}
+            </Link>
+          </Notice>
+        ) : (
+          <QueryError error={fetched.error} onRetry={() => void fetched.refetch()} />
+        )
       ) : (
         <>
           <div className="mb-1 flex flex-col items-center gap-2">
