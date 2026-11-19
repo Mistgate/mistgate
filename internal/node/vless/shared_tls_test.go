@@ -93,8 +93,15 @@ func TestSharedTLSFrontALPNAndAddress(t *testing.T) {
 		t.Fatalf("front stats = %+v", stats)
 	}
 
-	// A validation never becomes a connect, so its row keeps the network of the address the front handed over.
-	agg.Take()
+	// A validation never becomes a connect, so its row keeps the network of the address the front handed over. The two connects above
+	// (h2, http/1.1) are counted in the background once the front has dialed the inbound: they are taken first, or a late one lands in
+	// the row below.
+	for seen, deadline := uint32(0), time.Now().Add(5*time.Second); seen < 2 && time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		rows, _ := agg.Take()
+		for _, r := range rows {
+			seen += r.Connects
+		}
+	}
 	conn, err = tls.Dial("tcp", addr, &tls.Config{ServerName: tlsTestServerName, InsecureSkipVerify: true, NextProtos: []string{"acme-tls/1"}})
 	if err != nil {
 		t.Fatal(err)
