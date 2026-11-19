@@ -24,6 +24,8 @@ import { groupsQuery, profileListQuery } from "@/screens/users/rpc";
 import { useTx, type Tx } from "@/screens/users/t";
 import { asMode, AwgBackendChoice, canPrepare, useSaveAwgBackend, type AwgMode } from "./awg-backend";
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
+import { ShareFix, ShareNotes } from "./share-fix";
+import { isShareCode } from "@/lib/tcpshare";
 import { markFresh } from "@/components/fx/registry";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
 
@@ -124,6 +126,7 @@ function AddForm({
 
   const check = useInboundCheck(chosen && portOk(port) ? { kind: "create", nodeId: node.id, profileId: chosen, port, sni: noSni ? "" : sni.trim() } : null);
   const refused = check.state === "refused" ? check : null;
+  const share = refused && isShareCode(refused.code) ? { code: refused.code, vars: refused.vars } : null;
   if ((refused?.code === "port_taken" || refused?.code === "port_lossy") && port === "" && !auto && Number(refused.vars.free) > 0) {
     setAuto(refused.vars);
     setPort(refused.vars.free!);
@@ -235,6 +238,25 @@ function AddForm({
           </div>
         )}
       </div>
+      {share && (
+        <ShareFix
+          key={chosen}
+          code={share.code}
+          vars={share.vars}
+          node={node}
+          onLeave={onDone}
+          onPut={(name) => {
+            setSni(name);
+            setDomainFor(chosen); // the field of a REALITY profile on the node's own site is hidden until it is asked for
+            add.reset();
+          }}
+          onTake={(p) => {
+            setPort(String(p));
+            setAuto(null);
+            add.reset();
+          }}
+        />
+      )}
       {lossy && (
         <LossyNotice
           vars={lossy}
@@ -281,6 +303,7 @@ function AddForm({
       )}
       <WarpWarnings check={check} nodeId={node.id} nodeName={node.name} onLeave={onDone} />
       <DecoyNotice check={check} />
+      <ShareNotes check={check} node={node} />
       {add.isError && !lossyRefusal(add.error) && (
         <Notice tone="danger" className="items-start">
           {codedError(add.error, t, "awg.err")}

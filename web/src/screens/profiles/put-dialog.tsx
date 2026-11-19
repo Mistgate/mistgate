@@ -11,7 +11,7 @@ import { nodes as nodesApi, profiles as profilesApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { countryLook } from "@/lib/health";
-import { inboundErrorKind, inboundErrorText } from "@/lib/inbound-error";
+import { inboundErrorKind, inboundErrorText, nameFixes } from "@/lib/inbound-error";
 import { agentLinked } from "@/lib/node-status";
 import { portNotes } from "@/lib/port-check";
 import { nodesQuery } from "@/lib/queries";
@@ -20,6 +20,7 @@ import { asMode, AwgBackendFields, canPrepare } from "@/screens/node/awg-backend
 import { useTx } from "@/screens/users/t";
 import { G } from "@/screens/users/user-bits";
 import { refusalOf, isIp } from "./deploy";
+import { RowSharedNote, ShareRowFix } from "./share-row-fix";
 import { DlgFrame } from "./pf-frame";
 import { Gl } from "./pf-bits";
 import type { TabCtx } from "./page-types";
@@ -117,7 +118,7 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
     } catch (e) {
       const ref = refusalOf(e, t, n, profile.protocol);
       if (ref.kind === "already") return patch(id, { phase: "ok", text: t("pf.st.works") });
-      patch(id, { phase: "bad", text: ref.text, mend: ref.kind === "port" ? "port" : ref.kind === "domain" ? "domain" : "", free: ref.kind === "port" ? ref.free : undefined, lossy: ref.kind === "port" ? ref.lossy : undefined });
+      patch(id, { phase: "bad", text: ref.text, mend: ref.kind === "port" ? "port" : ref.kind === "domain" || ref.kind === "share" ? "domain" : "", free: ref.kind === "port" ? ref.free : undefined, lossy: ref.kind === "port" ? ref.lossy : undefined });
       if (ref.kind === "port" && ref.free) setFix((x) => ({ ...x, [id]: { ...f, port: ref.free } }));
     }
   }
@@ -131,7 +132,7 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
       if (i?.state === InboundState.ACTIVE) patch(id, { phase: "ok", text: t("pf.st.works") });
       else if (i?.state === InboundState.FAILED) {
         const kind = i.lastError ? inboundErrorKind(i.lastError) : "other";
-        patch(id, { phase: "bad", inboundId: i.id, text: t("ps.pt.failed", { why: inboundErrorText(tt, i.lastError, { port: i.port, protocol: profile.protocol }) }), mend: kind === "port" ? "port" : kind === "cert" ? "domain" : "" });
+        patch(id, { phase: "bad", inboundId: i.id, text: t("ps.pt.failed", { why: inboundErrorText(tt, i.lastError, { port: i.port, protocol: profile.protocol }) }), mend: kind === "port" ? "port" : nameFixes(kind) ? "domain" : "" });
       } else if (Date.now() - r.since > PATIENCE_MS) patch(id, { phase: "off", text: t("ps.pt.slow") });
     }
     return Object.values(live.current).some((r) => r.phase === "apply");
@@ -276,6 +277,16 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
                   <Lnk className="btn sm" to="/updates" onClick={onClose}>
                     {t("ps.pt.openUpdates")}
                   </Lnk>
+                </div>
+              )}
+              {phase === "pick" && !checking && r.share && (
+                <div className="pp-pnf">
+                  <ShareRowFix share={r.share} node={n} inputClass="an-i" onName={(sni) => commit(n.id, { sni })} onPort={(port) => commit(n.id, { port, anyway: false })} />
+                </div>
+              )}
+              {phase === "pick" && !checking && r.shared && (
+                <div className="pp-pnf">
+                  <RowSharedNote shared={r.shared} node={n} />
                 </div>
               )}
               {phase === "pick" && !checking && r.backend && on && (

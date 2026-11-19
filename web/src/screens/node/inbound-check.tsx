@@ -9,14 +9,19 @@ import { profiles as profilesApi } from "@/lib/api";
 import { errorCode, errorVars } from "@/lib/errors";
 import { plain, type Plain } from "@/lib/plain";
 import { decoyNote, takenNote } from "@/lib/port-check";
+import { shareCodes } from "@/lib/tcpshare";
 
 // The check before the click (CreateInbound / UpdateInbound with validate_only): asked again 300 ms after the last change
 // of the profile, the port or the domain, never written. The answer is either a coded refusal the dialog words next to the
 // field it is about, or the inbound as it would be (its real port and domain, for the placeholders), warnings and a port
 // that is free on the node.
 
-/** The refusals that stop the button: the real call would refuse the same way (port_lossy: from the stored UDP checks, never a run). */
-export const refusals = ["acme_needs_domain", "reality_needs_domain", "mtproto_needs_domain", "port_taken", "hop_taken", "port_in_hop", "sni_needs_domain", "sni_invalid", "already_on_node", "node_retired", "port_lossy"] as const;
+/**
+ * The refusals that stop the button: the real call would refuse the same way (port_lossy: from the stored UDP checks, never a run).
+ * Every one of them shows its reason and its way out in the dialog (a block that stops the button and says nothing is a bug): the share
+ * codes in screens/node/share-fix.tsx, the rest as a sentence under the field they are about or the notice at the foot of the dialog.
+ */
+export const refusals = ["acme_needs_domain", "reality_needs_domain", "mtproto_needs_domain", "port_taken", "hop_taken", "port_in_hop", "sni_needs_domain", "sni_invalid", "already_on_node", "node_retired", "port_lossy", ...shareCodes] as const;
 export type Refusal = (typeof refusals)[number];
 
 export type InboundCheck =

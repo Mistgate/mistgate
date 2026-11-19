@@ -8,6 +8,7 @@ import { errorCode } from "@/lib/errors";
 import { plain, type Plain } from "@/lib/plain";
 import type { Tx } from "@/screens/users/t";
 import { refusalOf, type Refusal } from "./deploy";
+import { heldHead, sharedHead, sharedOf, shareOfRefusal, type RowShare, type RowShared } from "./share-row";
 
 /** What a node needs typed or chosen before it can take the profile (the board's `.pp-pnf`). */
 export type Fix = { sni?: string; port?: string; anyway?: boolean; backend?: "auto" | "kernel" | "userspace" };
@@ -44,6 +45,10 @@ export type NodeRow = {
   port?: { free: string; lossy: string };
   upd: boolean;
   backend: boolean;
+  /** The name is held on a TCP port the node shares: the way out (a name of its own, a free port), or an update for an old agent. */
+  share?: RowShare;
+  /** The profile will stand beside others on a shared TCP port: what that means, and the name whose DNS record is still to be made. */
+  shared?: RowShared;
 };
 
 const warn = (a: Asked, code: string) => (a.state === "ok" ? a.warnings.find((w) => w.code === code) : undefined);
@@ -64,6 +69,7 @@ export function rowOf(a: Asked, n: NodeIn, o: { t: Tx; protocol: string; fix: Fi
       return { ...base, verdict: free ? "part" : "bad", need: !free && !fix.port, on: !n.entry && !!free, text: ref.text, port: { free, lossy: ref.lossy ?? "" } };
     }
     if (ref.kind === "domain") return { ...base, verdict: "bad", need: true, on: false, text: ref.text, dom: true };
+    if (ref.kind === "share") return { ...base, verdict: "bad", need: true, on: false, text: heldHead(t, ref), upd: ref.code === "share_agent_old", share: shareOfRefusal(ref) };
     return { ...base, verdict: "bad", need: true, on: false, text: ref.text, upd: errorCode(msg) === "agent_too_old" };
   }
   const port = a.inbound?.port ? String(a.inbound.port) : "";
@@ -73,13 +79,16 @@ export function rowOf(a: Asked, n: NodeIn, o: { t: Tx; protocol: string; fix: Fi
       ? t("ps.pt.offline")
       : n.firstAwg && awg
         ? t("ps.pt.awgFirst", { mode: t(`awg.backend.${(fix.backend ?? n.awgMode) as "auto" | "kernel" | "userspace"}`) })
-        : warn(a, "hy2_site_taken") || warn(a, "hy2_decoy_paused")
+        : warn(a, "tcp_port_shared")
+          ? sharedHead(t, warn(a, "tcp_port_shared")!)
+          : warn(a, "hy2_site_taken") || warn(a, "hy2_decoy_paused")
           ? t("ps.pt.siteYields")
           : fix.sni
             ? t("ps.pt.domainSet")
             : t("ps.pt.free", { port });
   const row: NodeRow = { ...base, verdict: n.entry || !n.linked ? "none" : "ok", text, backend: awg && n.firstAwg && n.linked };
   if (fix.port) row.port = { free: "", lossy: "" };
+  if (!n.entry && n.linked) row.shared = sharedOf(t, a.warnings, a.inbound?.tlsServerName, n.address);
   const w = warn(a, "warp_missing");
   return w ? { ...row, verdict: "part", text: t("ps.pt.warp", { node: n.name }) } : row;
 }

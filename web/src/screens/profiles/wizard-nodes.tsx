@@ -7,6 +7,7 @@ import { AppLink } from "@/screens/users/nav";
 import type { Tx } from "@/screens/users/t";
 import type { Fix, NodeRow } from "./wizard-check";
 import { Cb, Chip, State } from "./wizard-bits";
+import { RowSharedNote, ShareRowFix } from "./share-row-fix";
 
 /** One node as the step draws it: the node's own facts, what the check said about it, and what has been typed under it. */
 export type NodeVM = {
@@ -21,6 +22,8 @@ export type NodeVM = {
   fix: Fix;
   /** AmneziaWG's first profile on this node: its backend can be changed here (the node can build the kernel module itself). */
   awg?: { mode: AwgMode; auto: boolean };
+  /** The node's address, for the DNS record a name beside another service needs. */
+  address?: string;
   /** The words of the way out the profile has: "or a self-signed certificate", "or another site". */
   alt: "" | "self" | "site";
 };
@@ -92,7 +95,7 @@ export function NodesStep({
               const { row } = n;
               const port = row.port && (row.verdict !== "ok" || n.fix.port !== undefined);
               const backend = !!n.awg && row.backend && !row.need;
-              const showFix = row.dom || !!port || row.upd || backend;
+              const showFix = row.dom || !!port || row.upd || backend || !!row.share || !!row.shared;
               return (
                 <div key={n.id} className={cx("pw-pn", row.need && "need")}>
                   <button type="button" className="pw-pnh" role="checkbox" aria-checked={n.on} aria-disabled={row.need} onClick={() => onPick(n.id)}>
@@ -106,6 +109,8 @@ export function NodesStep({
                   </button>
                   {showFix && (
                     <div className="pw-pnf">
+                      {row.share && <ShareRowFix share={row.share} node={{ name: n.name, address: n.address ?? "" }} inputClass="pw-i-field" onName={(sni) => onFix(n.id, { sni })} onPort={(p) => onFix(n.id, { port: p, anyway: false })} />}
+                      {row.shared && <RowSharedNote shared={row.shared} node={{ address: n.address ?? "" }} />}
                       {row.dom && <DomainFix n={n} t={t} onFix={(p) => onFix(n.id, p)} onAlt={onAlt} />}
                       {port && (
                         <>

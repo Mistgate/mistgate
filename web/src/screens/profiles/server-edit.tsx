@@ -6,9 +6,11 @@ import { useToast } from "@/components/ui/toast";
 import { useT } from "@/i18n";
 import { profiles as profilesApi } from "@/lib/api";
 import { errorText } from "@/lib/errors";
-import { inboundErrorKind } from "@/lib/inbound-error";
+import { inboundErrorKind, nameFixes } from "@/lib/inbound-error";
 import { portNotes, withNotes } from "@/lib/port-check";
 import { portOk, sniPlaceholder, useInboundCheck, useInboundRefresh } from "@/screens/node/inbound-check";
+import { ShareFix, ShareNotes } from "@/screens/node/share-fix";
+import { isShareCode } from "@/lib/tcpshare";
 import { LossyNotice, lossyRefusal } from "@/screens/node/port-lossy";
 import { useTx } from "@/screens/users/t";
 import type { ServerRow } from "./profiles-model";
@@ -26,7 +28,7 @@ export function ServerEdit({ row, nodeAddress, focus, onClose }: { row: ServerRo
   const i = row.inbound;
   const isAwg = i.protocol === "awg";
   // a VLESS server has a name of its own to set only where it has a certificate (as the node's own window decides)
-  const named = !isAwg && (i.protocol !== "vless" || !!i.tlsServerName || !!i.tlsServerNameOverride || (!!i.lastError && inboundErrorKind(i.lastError) === "cert"));
+  const named = !isAwg && (i.protocol !== "vless" || !!i.tlsServerName || !!i.tlsServerNameOverride || (!!i.lastError && nameFixes(inboundErrorKind(i.lastError))));
   const was = { port: i.port ? String(i.port) : "", sni: i.tlsServerName };
   const [port, setPort] = useState(was.port);
   const [sni, setSni] = useState(was.sni);
@@ -55,12 +57,14 @@ export function ServerEdit({ row, nodeAddress, focus, onClose }: { row: ServerRo
     },
   });
   const refused = check.state === "refused" ? check : null;
+  const share = refused && isShareCode(refused.code) ? { code: refused.code, vars: refused.vars } : null;
   const lossy = refused?.code === "port_lossy" ? refused.vars : lossyRefusal(save.error);
   const fieldError = (codes: string[]) => (refused && codes.includes(refused.code) ? tt(`err.${refused.code}`, refused.vars) : undefined);
   const portError = !portOk(port) ? t("node.profiles.portError") : fieldError(["port_taken", "port_in_hop", "hop_taken"]);
   const sniError = fieldError(["sni_needs_domain", "sni_invalid", "acme_needs_domain", "reality_needs_domain", "mtproto_needs_domain"]);
   const effective = check.state === "ok" ? check.inbound : undefined;
   const dirty = touched.port || touched.sni;
+  const unexplained = refused && !share && !lossy && !portError && !sniError ? refused : null; // the Save button is never off in silence
   return (
     <form
       className="nq-ed pp-ed"
@@ -112,7 +116,23 @@ export function ServerEdit({ row, nodeAddress, focus, onClose }: { row: ServerRo
           </Button>
         </div>
       )}
+      {share && (
+        <ShareFix
+          code={share.code}
+          vars={share.vars}
+          node={{ name: row.nodeName, address: nodeAddress }}
+          onLeave={onClose}
+          onPut={(name) => (setSni(name), save.reset())}
+          onTake={(p) => (setPort(String(p)), save.reset())}
+        />
+      )}
       {lossy && <LossyNotice vars={lossy} busy={save.isPending} anywayLabel={tt("ports.anyway.save")} onTake={(p) => (setPort(String(p)), save.reset())} onAnyway={() => save.mutate(true)} />}
+      <ShareNotes check={check} node={{ name: row.nodeName, address: nodeAddress }} />
+      {unexplained && (
+        <Notice tone="danger" className="items-start">
+          {tt(`err.${unexplained.code}`, unexplained.vars)}
+        </Notice>
+      )}
       {save.isError && !lossyRefusal(save.error) && (
         <Notice tone="danger" className="items-start">
           {errorText(save.error, tt)}
