@@ -1,0 +1,162 @@
+hy2-empty                    hy2SitePort=443
+hy2-empty                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-null                     hy2SitePort=443
+hy2-null                     vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-obj                      hy2SitePort=443
+hy2-obj                      vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-bad                      hy2SitePort=0
+hy2-bad                      vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-port0                    hy2SitePort=0
+hy2-port0                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-neg                      hy2SitePort=0
+hy2-neg                      vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-p443                     hy2SitePort=443
+hy2-p443                     vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-p8443                    hy2SitePort=8443
+hy2-p8443                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-p65535                   hy2SitePort=65535
+hy2-p65535                   vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-p65536                   hy2SitePort=65535
+hy2-p65536                   vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-p70000                   hy2SitePort=65535
+hy2-p70000                   vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-pnull                    hy2SitePort=443
+hy2-pnull                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-pstr                     hy2SitePort=0
+hy2-pstr                     vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-none                     hy2SitePort=443
+hy2-none                     vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-none8443                 hy2SitePort=8443
+hy2-none8443                 vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-NONE                     hy2SitePort=443
+hy2-NONE                     vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-none0                    hy2SitePort=0
+hy2-none0                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-decoy                    hy2SitePort=443
+hy2-decoy                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-mode0                    hy2SitePort=0
+hy2-mode0                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+hy2-self                     hy2SitePort=443
+hy2-self                     vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-as-hy2                 hy2SitePort=0
+vless-as-hy2                 vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-empty                  hy2SitePort=0
+vless-empty                  vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-empty+sni              hy2SitePort=0
+vless-empty+sni              vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-bad                    hy2SitePort=0
+vless-bad                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-bad+sni                hy2SitePort=0
+vless-bad+sni                vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-obj                    hy2SitePort=0
+vless-obj                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-obj+sni                hy2SitePort=0
+vless-obj+sni                vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-null                   hy2SitePort=0
+vless-null                   vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-null+sni               hy2SitePort=0
+vless-null+sni               vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-tls                    hy2SitePort=0
+vless-tls                    vlessProbeName="",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls+sni                hy2SitePort=0
+vless-tls+sni                vlessProbeName="de1.example.com",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-cdn                hy2SitePort=0
+vless-tls-cdn                vlessProbeName="",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-cdn+sni            hy2SitePort=0
+vless-tls-cdn+sni            vlessProbeName="de1.example.com",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-cdn-caps           hy2SitePort=0
+vless-tls-cdn-caps           vlessProbeName="",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-cdn-caps+sni       hy2SitePort=0
+vless-tls-cdn-caps+sni       vlessProbeName="de1.example.com",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-cdn-blank          hy2SitePort=0
+vless-tls-cdn-blank          vlessProbeName="",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-cdn-blank+sni      hy2SitePort=0
+vless-tls-cdn-blank+sni      vlessProbeName="de1.example.com",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-cdn-empty          hy2SitePort=0
+vless-tls-cdn-empty          vlessProbeName="",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-cdn-empty+sni      hy2SitePort=0
+vless-tls-cdn-empty+sni      vlessProbeName="de1.example.com",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-cdn-null           hy2SitePort=0
+vless-tls-cdn-null           vlessProbeName="",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-cdn-null+sni       hy2SitePort=0
+vless-tls-cdn-null+sni       vlessProbeName="de1.example.com",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-names              hy2SitePort=0
+vless-tls-names              vlessProbeName="x.example.com",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-tls-names+sni          hy2SitePort=0
+vless-tls-names+sni          vlessProbeName="de1.example.com",true vlessTLS=true vlessTargetSelf=false vlessExternalReality=false
+vless-self                   hy2SitePort=0
+vless-self                   vlessProbeName="Self.example.com",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
+vless-self+sni               hy2SitePort=0
+vless-self+sni               vlessProbeName="de1.example.com",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
+vless-self-sp                hy2SitePort=0
+vless-self-sp                vlessProbeName="self.example.com",false vlessTLS=false vlessTargetSelf=true vlessExternalReality=true
+vless-self-sp+sni            hy2SitePort=0
+vless-self-sp+sni            vlessProbeName="self.example.com",false vlessTLS=false vlessTargetSelf=true vlessExternalReality=true
+vless-self-nonames           hy2SitePort=0
+vless-self-nonames           vlessProbeName="",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
+vless-self-nonames+sni       hy2SitePort=0
+vless-self-nonames+sni       vlessProbeName="de1.example.com",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
+vless-other                  hy2SitePort=0
+vless-other                  vlessProbeName="Www.Example.org.",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other+sni              hy2SitePort=0
+vless-other+sni              vlessProbeName="Www.Example.org.",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-sp               hy2SitePort=0
+vless-other-sp               vlessProbeName=" www.example.org ",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-sp+sni           hy2SitePort=0
+vless-other-sp+sni           vlessProbeName=" www.example.org ",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-v6               hy2SitePort=0
+vless-other-v6               vlessProbeName="www.example.org",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-v6+sni           hy2SitePort=0
+vless-other-v6+sni           vlessProbeName="www.example.org",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-ip               hy2SitePort=0
+vless-other-ip               vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-ip+sni           hy2SitePort=0
+vless-other-ip+sni           vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-nonames          hy2SitePort=0
+vless-other-nonames          vlessProbeName="www.example.org",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-nonames+sni      hy2SitePort=0
+vless-other-nonames+sni      vlessProbeName="www.example.org",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-nohost           hy2SitePort=0
+vless-other-nohost           vlessProbeName="www.example.org",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-nohost+sni       hy2SitePort=0
+vless-other-nohost+sni       vlessProbeName="www.example.org",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-multi            hy2SitePort=0
+vless-other-multi            vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-multi+sni        hy2SitePort=0
+vless-other-multi+sni        vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-blankname        hy2SitePort=0
+vless-other-blankname        vlessProbeName="  ",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-other-blankname+sni    hy2SitePort=0
+vless-other-blankname+sni    vlessProbeName="  ",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-reality-notarget       hy2SitePort=0
+vless-reality-notarget       vlessProbeName="a.example.com",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-reality-notarget+sni   hy2SitePort=0
+vless-reality-notarget+sni   vlessProbeName="a.example.com",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-reality-noblock        hy2SitePort=0
+vless-reality-noblock        vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-reality-noblock+sni    hy2SitePort=0
+vless-reality-noblock+sni    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=true
+vless-reality-cdn            hy2SitePort=0
+vless-reality-cdn            vlessProbeName="a.example.com",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
+vless-reality-cdn+sni        hy2SitePort=0
+vless-reality-cdn+sni        vlessProbeName="de1.example.com",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
+vless-nosec-self             hy2SitePort=0
+vless-nosec-self             vlessProbeName="a.example.com",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
+vless-nosec-self+sni         hy2SitePort=0
+vless-nosec-self+sni         vlessProbeName="de1.example.com",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
+vless-nosec-other            hy2SitePort=0
+vless-nosec-other            vlessProbeName="www.example.org",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-nosec-other+sni        hy2SitePort=0
+vless-nosec-other+sni        vlessProbeName="www.example.org",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-nosec-cdn              hy2SitePort=0
+vless-nosec-cdn              vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-nosec-cdn+sni          hy2SitePort=0
+vless-nosec-cdn+sni          vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-foo-self               hy2SitePort=0
+vless-foo-self               vlessProbeName="a.example.com",false vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
+vless-foo-self+sni           hy2SitePort=0
+vless-foo-self+sni           vlessProbeName="a.example.com",false vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
+vless-upper-sec              hy2SitePort=0
+vless-upper-sec              vlessProbeName="www.example.org",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
+vless-upper-sec+sni          hy2SitePort=0
+vless-upper-sec+sni          vlessProbeName="www.example.org",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
