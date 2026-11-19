@@ -100,6 +100,19 @@ type Service struct {
 
 	mu      sync.Mutex // serialises every change of an account, and therefore every call to Cloudflare
 	lastReg time.Time  // when the last registration call ended (mu)
+
+	// The checks of the reach sites in flight and how the newest ended (reach_now.go: the VPS edition's).
+	reachMu   sync.Mutex
+	reachBusy map[string]bool      // node id -> a check is on
+	reachAsk  map[string]time.Time // node id -> when the last check by hand started
+	reachLast map[string]reachEnd  // node id -> how the newest check ended
+	reachWG   sync.WaitGroup
+}
+
+// reachEnd is how a check of a node's reach sites ended: "ok", or "busy", "too_soon", "warp_down", "failed".
+type reachEnd struct {
+	how string
+	at  time.Time
 }
 
 // New builds the module. fl may be nil.

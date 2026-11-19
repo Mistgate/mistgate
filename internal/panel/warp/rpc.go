@@ -38,6 +38,7 @@ func (r rpc) GetWarp(ctx context.Context, req *connect.Request[adminv1.GetWarpRe
 	resp.Health = healthMsg(a)
 	resp.NeedsAttention, resp.AttentionReason = a.Attention != "", a.Attention
 	resp.Reach, resp.ReachState = s.reachView(ctx, n, a)
+	resp.ReachCheck = s.reachCheck(ctx, n, a, req.Msg.CheckReachNow)
 	if resp.Inbounds, err = s.warpInbounds(ctx, n.ID); err != nil {
 		return nil, s.internal("warp inbounds", err)
 	}

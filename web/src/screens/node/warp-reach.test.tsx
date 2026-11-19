@@ -3,7 +3,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { WarpSource, WarpState } from "@/gen/mistgate/admin/v1/common_pb";
+import { dictionaries, langs, setLang, type Lang } from "@/i18n";
 import { en } from "@/i18n/en";
+import { warpQuery } from "./warp-model";
 import { reachCounts, reachLook } from "./warp-reach-model";
 import { WarpReachCard } from "./warp-reach";
 
@@ -29,6 +31,7 @@ beforeAll(() => {
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
+let qc: QueryClient;
 beforeEach(() => me.mockResolvedValue({ admin: { id: "adm_1", role: 1 } }));
 afterEach(() => {
   act(() => root?.unmount());
@@ -59,7 +62,7 @@ async function mount(d: unknown, props: { down?: boolean } = {}) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await act(async () =>
     root!.render(
       <QueryClientProvider client={qc}>
@@ -116,12 +119,108 @@ describe("a result", () => {
     expect(rows()[0]!.dataset.verdict).toBe("error");
   });
 
-  it("refreshes on a press (it re-reads the panel; the node is asked on the panel's own schedule)", async () => {
+  it("asks the panel to ask the node on a press, with the flag of the call, and shows the answer it got back", async () => {
     await mount(data());
     expect(getWarp).toHaveBeenCalledTimes(1);
-    await act(async () => void button("Refresh")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(getWarp.mock.calls[0]![0]).toEqual({ nodeId: "nod_1" });
+    const fresh = data({ reach: { checkedUnix: nowS(), colo: "AMS", domains: [site("notion.com", "ok", 200, 90)] }, reachCheck: { running: true, asked: "started", retryAfterS: 0, last: "", lastUnix: 0 } });
+    getWarp.mockResolvedValue(fresh);
+    await act(async () => void button("Check now")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
-    expect(getWarp.mock.calls.length).toBeGreaterThan(1);
+    expect(getWarp).toHaveBeenCalledWith({ nodeId: "nod_1", checkReachNow: true });
+    // the check is running: the card says so, the button is busy, and the list stays as the answer has it
+    expect(document.querySelector(".nrc")?.getAttribute("data-state")).toBe("running");
+    expect(text()).toContain("Check running");
+    expect(text()).toContain(en["warp.reach.running.t"]);
+    expect(button("Check now")?.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("the check that ends (the next read says it is not running) gives the button back, the new list and the time of the result", async () => {
+    await mount(data({ reachCheck: { running: true, asked: "", retryAfterS: 0, last: "", lastUnix: 0 } }));
+    expect(document.querySelector(".nrc")?.getAttribute("data-state")).toBe("running");
+    expect(button("Check now")?.hasAttribute("disabled")).toBe(true);
+    // it is read every 2 s while it runs, and every 10 s when it does not
+    const interval = (running: boolean) => (warpQuery("nod_1").refetchInterval as (q: unknown) => number)({ state: { data: { reachCheck: { running } } } });
+    expect(interval(true)).toBe(2000);
+    expect(interval(false)).toBe(10_000);
+    getWarp.mockResolvedValue(data({ reach: { checkedUnix: nowS(), colo: "AMS", domains: [site("notion.com", "ok", 200, 80)] }, reachCheck: { running: false, asked: "", retryAfterS: 0, last: "ok", lastUnix: nowS() } }));
+    await act(async () => void (await qc.invalidateQueries({ queryKey: ["warp", "nod_1"] })));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+    expect(document.querySelector(".nrc")?.getAttribute("data-state")).toBe("ready");
+    expect(button("Check now")?.hasAttribute("disabled")).toBe(false);
+    expect(text()).toContain("Exit AMS");
+    expect(rows().map((r) => r.dataset.verdict)).toEqual(["ok"]);
+  });
+
+  it("a press that came too early says when the next check by hand may be asked; the button stays free", async () => {
+    await mount(data());
+    getWarp.mockResolvedValue(data({ reachCheck: { running: false, asked: "too_soon", retryAfterS: 75, last: "", lastUnix: 0 } }));
+    await act(async () => void button("Check now")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+    expect(document.querySelector("[data-testid=reach-ask]")?.textContent).toBe("Asked a moment ago: the next check by hand in 1 min.");
+    expect(document.querySelector(".nrc")?.getAttribute("data-state")).toBe("ready");
+    expect(button("Check now")?.hasAttribute("disabled")).toBe(false);
+  });
+
+  it.each([
+    ["node_offline", "The node is silent: there is nothing to check with."],
+    ["warp_down", "The WARP tunnel is not up or is paused: the node cannot open the sites through it."],
+    ["disabled", "The check is off: the list of sites is empty."],
+    ["agent_too_old", "The agent of this node cannot run the check: update the node."],
+  ])("a press that found the node unable (%s) says so", async (asked, words) => {
+    await mount(data());
+    getWarp.mockResolvedValue(data({ reachCheck: { running: false, asked, retryAfterS: 0, last: "", lastUnix: 0 } }));
+    await act(async () => void button("Check now")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
+    expect(document.querySelector("[data-testid=reach-ask]")?.textContent).toBe(words);
+  });
+
+  it.each([
+    ["busy", "The node was busy with a check of its own and gave no answer. Try again in a minute."],
+    ["too_soon", "The node had run a check a moment before. Try again in a minute."],
+    ["warp_down", "The WARP tunnel went down: the node could not open the sites through it."],
+    ["failed", "The node did not answer the check. Try again in a minute."],
+  ])("a check that ended badly (%s) says how, until a newer result comes or ten minutes pass", async (last, words) => {
+    await mount(data({ reachCheck: { running: false, asked: "", retryAfterS: 0, last, lastUnix: nowS() - 30 } }));
+    expect(document.querySelector("[data-testid=reach-ask]")?.textContent).toBe(words);
+    act(() => root?.unmount());
+    host?.remove();
+    // a result that is newer than the failure ends it
+    await mount(data({ reach: { checkedUnix: nowS(), colo: "FRA", domains: mixed }, reachCheck: { running: false, asked: "", retryAfterS: 0, last, lastUnix: nowS() - 30 } }));
+    expect(document.querySelector("[data-testid=reach-ask]")).toBeNull();
+    act(() => root?.unmount());
+    host?.remove();
+    // and so do ten minutes
+    await mount(data({ reachCheck: { running: false, asked: "", retryAfterS: 0, last, lastUnix: nowS() - 11 * 60 } }));
+    expect(document.querySelector("[data-testid=reach-ask]")).toBeNull();
+  });
+
+  it("a check that ended well says nothing but its result", async () => {
+    await mount(data({ reachCheck: { running: false, asked: "", retryAfterS: 0, last: "ok", lastUnix: nowS() - 20 } }));
+    expect(document.querySelector("[data-testid=reach-ask]")).toBeNull();
+    expect(document.querySelector(".nrc")?.getAttribute("data-state")).toBe("ready");
+  });
+
+  it("a check of the schedule that is on is shown the same way, and nothing on a node whose agent cannot", async () => {
+    await mount(data({ reach: undefined, reachState: "waiting", reachCheck: { running: true, asked: "", retryAfterS: 0, last: "", lastUnix: 0 } }));
+    expect(document.querySelector(".nrc")?.getAttribute("data-state")).toBe("running");
+    expect(text()).not.toContain(en["warp.reach.wait.t"]);
+    act(() => root?.unmount());
+    host?.remove();
+    await mount(data({ reach: undefined, reachState: "agent_too_old", reachCheck: { running: true, asked: "", retryAfterS: 0, last: "", lastUnix: 0 } }));
+    expect(text()).not.toContain("Check running");
+    expect(button("Check now")).toBeUndefined();
+  });
+
+  it.each(langs)("%s: every state of the button, the running note and the refusals is worded, with nothing left to fill", (lang: Lang) => {
+    const keys = ["refresh", "refreshHint", "every", "p.running", "running.t", "running.b", "ask.too_soon", "ask.node_offline", "ask.warp_down", "ask.agent_too_old", "ask.disabled", "last.busy", "last.too_soon", "last.warp_down", "last.failed"];
+    for (const k of keys) {
+      const said = (dictionaries[lang] as Record<string, string>)[`warp.reach.${k}`];
+      expect(said, `${lang} ${k}`).toBeTruthy();
+      expect(said!.replace(/\{when\}/, ""), `${lang} ${k}`).not.toMatch(/[{}]/);
+    }
+    setLang(lang);
+    setLang("en");
   });
 });
 
@@ -131,7 +230,7 @@ describe("no list", () => {
     expect(text()).toContain("Checking");
     expect(text()).toContain(en["warp.reach.wait.t"]);
     expect(rows()).toHaveLength(0);
-    expect(button("Refresh")).toBeTruthy();
+    expect(button("Check now")).toBeTruthy();
   });
 
   it("has no data when the tunnel is not up", async () => {
@@ -145,7 +244,7 @@ describe("no list", () => {
     expect(text()).toContain("Not supported");
     expect(text()).toContain(en["warp.reach.old.t"]);
     expect(link("Open Updates")).toBeTruthy();
-    expect(button("Refresh")).toBeUndefined();
+    expect(button("Check now")).toBeUndefined();
   });
 
   it("says the check is off, and gives the owner the list", async () => {

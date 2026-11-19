@@ -359,3 +359,227 @@ func (f *envFleet) WarpReach(_ context.Context, nodeID string, domains []string)
 	}
 	return reach(nodeID, domains)
 }
+
+// ---------------------------------------------------------------------------------------------------
+// "Check now" of the sites card: GetWarpRequest.check_reach_now
+
+func (e *env) checkNow(node string) *adminv1.WarpReachCheck {
+	e.t.Helper()
+	g, err := e.rpc().GetWarp(e.ctx, connect.NewRequest(&adminv1.GetWarpRequest{NodeId: node, CheckReachNow: true}))
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	return g.Msg.ReachCheck
+}
+
+func TestCheckReachNowAsksTheNodeAndTheCardReadsTheResult(t *testing.T) {
+	e := newEnv(t)
+	node := e.reachNode("de1")
+	e.setReachDomains("notes.example.com", "chat.example.com")
+	if g := e.getWarp(node); g.ReachCheck != nil {
+		t.Fatalf("a node nobody has asked has a check: %+v", g.ReachCheck)
+	}
+	release := make(chan struct{})
+	e.mu.Lock()
+	e.reach = func(_ string, domains []string) (string, []store.WarpReachItem, error) {
+		<-release // the node is opening the sites
+		items := make([]store.WarpReachItem, len(domains))
+		for i := range items {
+			items[i] = store.WarpReachItem{Verdict: "blocked", HTTPStatus: 403, Millis: 90}
+		}
+		return "AMS", items, nil
+	}
+	e.mu.Unlock()
+
+	v := e.checkNow(node)
+	if v == nil || v.Asked != "started" || !v.Running || v.RetryAfterS != 0 {
+		t.Fatalf("the press: %+v", v)
+	}
+	// the call did not wait: the old result (none) is still there and the check is on, for every read
+	if g := e.getWarp(node); g.Reach != nil || g.ReachCheck == nil || !g.ReachCheck.Running || g.ReachCheck.Asked != "" {
+		t.Fatalf("while it runs: %+v %+v", g.Reach, g.ReachCheck)
+	}
+	// a second press while it runs does not ask again
+	if v := e.checkNow(node); v.Asked != "running" || !v.Running {
+		t.Fatalf("a press during the run: %+v", v)
+	}
+	close(release)
+	e.s.reachWG.Wait()
+
+	g := e.getWarp(node)
+	if g.ReachState != "ready" || g.Reach == nil || g.Reach.Colo != "AMS" || g.Reach.Domains[0].Verdict != "blocked" || g.Reach.Domains[0].BlockedStreak != 1 {
+		t.Fatalf("after the run: %q %+v", g.ReachState, g.Reach)
+	}
+	if g.ReachCheck == nil || g.ReachCheck.Running || g.ReachCheck.Last != "ok" || g.ReachCheck.LastUnix != e.now.Unix() {
+		t.Fatalf("the check after the run: %+v", g.ReachCheck)
+	}
+	if asked := e.asked(); len(asked) != 1 {
+		t.Fatalf("the node was asked %d times: %v", len(asked), asked)
+	}
+}
+
+func TestCheckReachNowIsLimitedToOneInTwoMinutes(t *testing.T) {
+	e := newEnv(t)
+	node := e.reachNode("de1")
+	e.setReachDomains("notes.example.com")
+	e.answers("FRA", "ok")
+	if v := e.checkNow(node); v.Asked != "started" {
+		t.Fatalf("first press: %+v", v)
+	}
+	e.s.reachWG.Wait()
+
+	e.now = e.now.Add(45 * time.Second)
+	e.warpUp(node)
+	v := e.checkNow(node)
+	if v.Asked != "too_soon" || v.RetryAfterS != 75 || v.Running {
+		t.Fatalf("a press 45 s later: %+v", v)
+	}
+	e.s.reachWG.Wait()
+	if n := len(e.asked()); n != 1 {
+		t.Fatalf("a press that came too soon asked the node (%d runs)", n)
+	}
+	// the early press does not push the time back
+	e.now = e.now.Add(76 * time.Second)
+	e.warpUp(node)
+	if v := e.checkNow(node); v.Asked != "started" {
+		t.Fatalf("a press after two minutes: %+v", v)
+	}
+	e.s.reachWG.Wait()
+	if n := len(e.asked()); n != 2 {
+		t.Fatalf("%d runs, want 2", n)
+	}
+	// another node has its own time
+	other := e.reachNode("de2")
+	if v := e.checkNow(other); v.Asked != "started" {
+		t.Fatalf("another node: %+v", v)
+	}
+	e.s.reachWG.Wait()
+}
+
+func TestCheckReachNowSaysWhyTheNodeCannotBeAsked(t *testing.T) {
+	e := newEnv(t)
+	node := e.reachNode("de1")
+	e.setReachDomains("notes.example.com")
+	e.answers("FRA", "ok")
+	expect := func(want string) {
+		t.Helper()
+		e.now = e.now.Add(3 * time.Minute)
+		v := e.checkNow(node)
+		e.s.reachWG.Wait()
+		if v == nil || v.Asked != want || v.Running {
+			t.Fatalf("asked = %+v, want %q", v, want)
+		}
+		if n := len(e.asked()); n != 0 {
+			t.Fatalf("the node was asked (%d) although the answer was %q", n, want)
+		}
+	}
+	e.live[node] = false
+	expect("node_offline")
+	e.live[node] = true
+	e.warpUp(node)
+	if err := e.s.StoreHealth(e.ctx, node, &agentv1.WarpHealth{State: agentv1.WarpState_WARP_STATE_DOWN}); err != nil {
+		t.Fatal(err)
+	}
+	expect("warp_down")
+	e.warpUp(node)
+	if _, err := e.rpc().SetWarpEnabled(e.ctx, connect.NewRequest(&adminv1.SetWarpEnabledRequest{NodeId: node, Enabled: false})); err != nil {
+		t.Fatal(err)
+	}
+	expect("warp_down") // paused
+	if _, err := e.rpc().SetWarpEnabled(e.ctx, connect.NewRequest(&adminv1.SetWarpEnabledRequest{NodeId: node, Enabled: true})); err != nil {
+		t.Fatal(err)
+	}
+	e.warpUp(node)
+	e.setReachDomains()
+	expect("disabled")
+	// an agent without the capability is asked nothing
+	old := e.addNode("de2", "doctor/1", CapWarp)
+	if _, err := e.register(old); err != nil {
+		t.Fatal(err)
+	}
+	e.live[old] = true
+	e.warpUp(old)
+	e.setReachDomains("notes.example.com")
+	if v := e.checkNow(old); v.Asked != "agent_too_old" {
+		t.Fatalf("an old agent: %+v", v)
+	}
+	// none of these started the clock of the two minutes
+	e.warpUp(node)
+	if v := e.checkNow(node); v.Asked != "started" {
+		t.Fatalf("after the refusals: %+v", v)
+	}
+	e.s.reachWG.Wait()
+}
+
+func TestCheckReachNowKeepsHowTheNodeAnswered(t *testing.T) {
+	for _, tc := range []struct {
+		err  string
+		want string
+	}{{"warp reach: busy", "busy"}, {"warp reach: too_soon", "too_soon"}, {"warp reach: warp_down", "warp_down"}, {"warp reach: failed", "failed"}} {
+		e := newEnv(t)
+		node := e.reachNode("de1")
+		e.setReachDomains("notes.example.com")
+		e.answers("FRA", "ok")
+		e.s.CheckReach(e.ctx)
+		before := e.getWarp(node).Reach.CheckedUnix
+		e.now = e.now.Add(5 * time.Minute)
+		e.warpUp(node)
+		e.mu.Lock()
+		e.reach = func(string, []string) (string, []store.WarpReachItem, error) { return "", nil, errors.New(tc.err) }
+		e.mu.Unlock()
+		if v := e.checkNow(node); v.Asked != "started" {
+			t.Fatalf("%s: %+v", tc.err, v)
+		}
+		e.s.reachWG.Wait()
+		g := e.getWarp(node)
+		if g.ReachCheck == nil || g.ReachCheck.Running || g.ReachCheck.Last != tc.want || g.ReachCheck.LastUnix != e.now.Unix() {
+			t.Fatalf("%s: the check = %+v", tc.err, g.ReachCheck)
+		}
+		if g.Reach == nil || g.Reach.CheckedUnix != before {
+			t.Fatalf("%s: a node that did not answer changed the result: %+v", tc.err, g.Reach)
+		}
+	}
+}
+
+// The schedule and the button never ask one node at once: a check by hand that is on holds the schedule off the node, and the
+// other way round.
+func TestCheckReachNowAndTheScheduleDoNotAskTheSameNodeTogether(t *testing.T) {
+	e := newEnv(t)
+	node := e.reachNode("de1")
+	e.setReachDomains("notes.example.com")
+	release := make(chan struct{})
+	e.mu.Lock()
+	e.reach = func(_ string, domains []string) (string, []store.WarpReachItem, error) {
+		<-release
+		return "FRA", []store.WarpReachItem{{Verdict: "ok", HTTPStatus: 200, Millis: 10}}, nil
+	}
+	e.mu.Unlock()
+	if v := e.checkNow(node); v.Asked != "started" {
+		t.Fatalf("press: %+v", v)
+	}
+	e.s.CheckReach(e.ctx) // the schedule finds the node busy and leaves it
+	close(release)
+	e.s.reachWG.Wait()
+	if n := len(e.asked()); n != 1 {
+		t.Fatalf("the node was asked %d times", n)
+	}
+	// and a check of the schedule that is on is told so
+	if !e.s.claimReach(node) {
+		t.Fatal("the node is still held after the run")
+	}
+	e.now = e.now.Add(3 * time.Minute)
+	e.warpUp(node)
+	if v := e.checkNow(node); v.Asked != "running" || !v.Running {
+		t.Fatalf("a press during the schedule check: %+v", v)
+	}
+	e.s.releaseReach(node, "")
+}
+
+func TestCheckReachNowIsIgnoredWithoutAnAccount(t *testing.T) {
+	e := newEnv(t)
+	node := e.addNode("de1", "doctor/1", CapWarp, CapReach)
+	g, err := e.rpc().GetWarp(e.ctx, connect.NewRequest(&adminv1.GetWarpRequest{NodeId: node, CheckReachNow: true}))
+	if err != nil || g.Msg.Account != nil || g.Msg.ReachCheck != nil {
+		t.Fatalf("a node without WARP: %+v, %v", g, err)
+	}
+}

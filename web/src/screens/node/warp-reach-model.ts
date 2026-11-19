@@ -28,7 +28,14 @@ export type ReachLook = {
   paused: boolean;
   dead: boolean;
   stale: boolean;
+  /** The node is running a check of the sites now (asked by "Check now" or by the schedule). */
+  running: boolean;
+  /** How the newest check ended when it did not end well (busy, too_soon, warp_down, failed) and when; none when it did, or when the result that came since is newer. */
+  failed: { code: string; atUnix: number } | null;
 };
+
+/** How long the card keeps saying that the newest check did not end well. */
+export const reachFailedS = 10 * 60;
 
 const known = new Set<string>(["ok", "blocked", "unreachable"]);
 
@@ -43,7 +50,9 @@ export function reachLook(d: WarpData, down: boolean, now: number): ReachLook {
     streak: x.blockedStreak,
   }));
   const checked = r?.checkedUnix ?? 0;
-  const base = { rows, colo: r?.colo ?? "", checked, paused, dead: down, stale: checked > 0 && now - checked > reachStaleS };
+  const rc = d.reachCheck;
+  const failed = rc && rc.last && rc.last !== "ok" && rc.lastUnix >= checked && now - rc.lastUnix < reachFailedS ? { code: rc.last, atUnix: rc.lastUnix } : null;
+  const base = { rows, colo: r?.colo ?? "", checked, paused, dead: down, stale: checked > 0 && now - checked > reachStaleS, running: !!rc?.running, failed };
   if (d.reachState === "agent_too_old") return { ...base, state: "old" };
   if (d.reachState === "disabled") return { ...base, state: "off" };
   if (d.reachState === "ready" && r) return { ...base, state: "ready" };

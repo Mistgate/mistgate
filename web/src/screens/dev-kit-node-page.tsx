@@ -218,9 +218,21 @@ function fakeHistory(state: NState) {
 
 export type WarpKind = "ok" | "pause" | "bad" | "none" | "revoked";
 /** What the reach card under the WARP card says (?rc=): every site reachable, a mix (a block page, a bare 403, no answer), nothing yet, an agent without the check, the check off, an old result. */
-export type ReachKind = "ok" | "mixed" | "wait" | "old" | "off" | "stale";
-const reachKinds: readonly string[] = ["ok", "mixed", "wait", "old", "off", "stale"];
+export type ReachKind = "ok" | "mixed" | "wait" | "old" | "off" | "stale" | "running" | "early" | "busy" | "silent";
+const reachKinds: readonly string[] = ["ok", "mixed", "wait", "old", "off", "stale", "running", "early", "busy", "silent"];
 export const reachKindOf = (s: string | null): ReachKind | undefined => (reachKinds.includes(s ?? "") ? (s as ReachKind) : undefined);
+
+/** The state of the check of the sites that "Check now" asks for (WarpReachCheck): running (the list stays as it was), a press that came too early, a check that ended badly, a node that could not be asked. */
+const reachCheckOf = (kind: ReachKind) =>
+  kind === "running"
+    ? { running: true, asked: "started", retryAfterS: 0, last: "ok", lastUnix: NOW - 240 }
+    : kind === "early"
+      ? { running: false, asked: "too_soon", retryAfterS: 95, last: "ok", lastUnix: NOW - 25 }
+      : kind === "busy"
+        ? { running: false, asked: "", retryAfterS: 0, last: "busy", lastUnix: NOW - 20 }
+        : kind === "silent"
+          ? { running: false, asked: "node_offline", retryAfterS: 0, last: "", lastUnix: 0 }
+          : undefined;
 
 /** One site's answer, as the panel stores it (WarpReachDomain). */
 const site = (domain: string, verdict: string, httpStatus: number, latencyMs: number, blockedStreak = 0) => ({ domain, verdict, httpStatus, latencyMs, blockedStreak });
@@ -235,7 +247,7 @@ function reachOf(kind: ReachKind, wp: WarpKind) {
   if (kind === "old") return { reach: undefined, reachState: "agent_too_old" };
   if (kind === "off") return { reach: undefined, reachState: "disabled" };
   if (kind === "wait" || wp === "bad" || wp === "revoked") return { reach: undefined, reachState: "waiting" };
-  return { reach: { checkedUnix: NOW - ago, colo: "FRA", domains }, reachState: "ready" };
+  return { reach: { checkedUnix: NOW - ago, colo: "FRA", domains }, reachState: "ready", reachCheck: reachCheckOf(kind) };
 }
 
 /** The WARP card of the board's states: working, paused, not answering, none connected (the registration then plays on a press), revoked. */
@@ -488,6 +500,8 @@ export function NodePageFrame() {
         return {};
       };
     }
+    // "Check now" of the sites card: the panel answers that the node was asked, and the check is running
+    if (rc) (warpApi as unknown as Record<string, unknown>).getWarp = async () => warpOf(kind ?? "ok", "running");
     // the decoy site card: its library, and the state of the node it opens with
     const decoy = decoyScene(params.get("ds") ?? "");
     const library = installLibrary();
@@ -582,6 +596,11 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-exit-none", state: "calm", tab: "exit", q: "wp=none", title: "Exit: no WARP yet (Enable WARP plays the registration, nine seconds)", w: 1440, h: 1300 },
   { id: "node-exit-viewer", state: "viewer", tab: "exit", q: "wp=ok", title: "Exit: a read-only role", w: 1440, h: 1500 },
   { id: "node-exit-reach-mixed", state: "calm", tab: "exit", q: "wp=ok&rc=mixed", title: "Exit, the sites: a block page, a bare 403 (an error, not a block), no answer", w: 1440, h: 1600 },
+  { id: "node-exit-reach-running", state: "calm", tab: "exit", q: "wp=ok&rc=running", title: "Exit, the sites, Check now: the node is opening the sites, the list stays as it was", w: 1440, h: 1600 },
+  { id: "node-exit-reach-early", state: "calm", tab: "exit", q: "wp=ok&rc=early", title: "Exit, the sites, Check now: pressed too early, the next one in 2 min", w: 1440, h: 1500 },
+  { id: "node-exit-reach-busy", state: "calm", tab: "exit", q: "wp=ok&rc=busy", title: "Exit, the sites, Check now: the node was busy with a check of its own", w: 1440, h: 1500 },
+  { id: "node-exit-reach-silent", state: "calm", tab: "exit", q: "wp=ok&rc=silent", title: "Exit, the sites, Check now: the node could not be asked", w: 1440, h: 1500 },
+  { id: "node-exit-reach-running-phone", state: "calm", tab: "exit", q: "wp=ok&rc=running", title: "Exit, the sites, Check now: the node is opening the sites, on a phone, 400 wide", w: 400, h: 3400 },
   { id: "node-exit-reach-wait", state: "calm", tab: "exit", q: "wp=ok&rc=wait", title: "Exit, the sites: the tunnel is up, the first answer is on its way", w: 1440, h: 1500 },
   { id: "node-exit-reach-nodata", state: "alerts", tab: "exit", q: "wp=bad", title: "Exit, the sites: the tunnel is down, nothing to show", w: 1440, h: 1600 },
   { id: "node-exit-reach-old", state: "calm", tab: "exit", q: "wp=ok&rc=old", title: "Exit, the sites: the node's agent has no such check", w: 1440, h: 1500 },

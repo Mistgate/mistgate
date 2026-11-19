@@ -111,6 +111,11 @@ message WarpProbeResult {
 
 message GetWarpRequest {
   string node_id = 1;
+  // Also ask the node to check the sites of the reach settings now, out of turn ("Check now" of the sites card). The call does not
+  // wait for it: reach_check says what became of the request and, while the check runs (up to a minute), reach_check.running is set
+  // and the next reads carry the result in reach. At most once in 2 minutes per node (reach_check.asked = "too_soon"); never an error.
+  // The Cloudflare edition runs no such check and ignores the flag.
+  bool check_reach_now = 2;
 }
 
 message GetWarpResponse {
@@ -141,6 +146,26 @@ message GetWarpResponse {
   // empty, or the Cloudflare edition, which runs no check: reach is then unset) or "agent_too_old" (the node's agent lacks
   // "warp-reach/1", so the panel sends it nothing; the rest of this response is unaffected).
   string reach_state = 11;
+  // The state of the check of the sites on this node. Unset while none was asked or ran since the panel started.
+  WarpReachCheck reach_check = 12;
+}
+
+// The check of the sites on a node (the schedule's, every 15 minutes, or the one asked with GetWarpRequest.check_reach_now).
+message WarpReachCheck {
+  // A check of this node is running now: the node has been asked and has not answered yet.
+  bool running = 1;
+  // What the request of this call (check_reach_now) did, empty when it was not set: "started" (the node was asked), "running" (a check
+  // was on already), "too_soon" (asked less than 2 minutes ago: retry_after_s), "agent_too_old" (no "warp-reach/1"), "node_offline",
+  // "warp_down" (the tunnel is not up, or WARP is paused: nothing to open the sites with), "disabled" (the list is empty, or the
+  // Cloudflare edition).
+  string asked = 2;
+  // With asked = "too_soon": the seconds until the next check by hand.
+  uint32 retry_after_s = 3;
+  // How the newest check of this node ended since the panel started: "ok", or why not: "busy" (the node ran one of its own), "too_soon"
+  // (the node had run one a moment before), "warp_down", "failed" (no answer: the link was lost or the time ran out). Empty: none yet.
+  string last = 4;
+  // When it ended (unix seconds), 0 when last is empty.
+  int64 last_unix = 5 [jstype = JS_NUMBER];
 }
 
 // One site's answer in WarpReachView.

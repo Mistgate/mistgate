@@ -135,27 +135,51 @@ func (s *Service) CheckReach(ctx context.Context) {
 	}
 }
 
+// checkReach is the schedule's check of one node: it leaves a check by hand that is on (reach_now.go) to finish.
 func (s *Service) checkReach(ctx context.Context, a store.WarpAccountRow, domains []string) {
+	if !s.claimReach(a.NodeID) {
+		return
+	}
+	s.runReach(ctx, a, domains)
+}
+
+// runReach is a check of one node whose busy flag the caller holds; it lets the flag go and keeps how the check ended. A node that
+// cannot be asked at all (offline, an old agent, no tunnel) ends nothing: its last result simply stays.
+func (s *Service) runReach(ctx context.Context, a store.WarpAccountRow, domains []string) {
+	how := s.reachOnce(ctx, a, domains)
+	s.releaseReach(a.NodeID, how)
+}
+
+// reachOnce asks the node and stores the answer. It returns how that ended ("" when the node was not asked).
+func (s *Service) reachOnce(ctx context.Context, a store.WarpAccountRow, domains []string) string {
 	n, err := s.st.Node(ctx, a.NodeID)
 	if err != nil || n.State != "active" || !a.Enabled || !s.supportsReach(n) {
-		return
+		return ""
 	}
 	live, err := s.liveNode(ctx, a.NodeID)
 	if err != nil || !live.Connected || ViewState(&a, true, s.now()) != adminv1.WarpState_WARP_STATE_UP {
-		return
+		return ""
 	}
 	rf, ok := s.fl.(reachFleet)
 	if !ok {
-		return
+		return ""
 	}
 	colo, items, err := rf.WarpReach(ctx, a.NodeID, domains)
 	if err != nil {
 		// busy, too_soon and warp_down are the node's say; a lost link or a timeout is the usual end of a run too
 		s.log.Debug("warp: reach", "node", a.NodeID, "err", err)
-		return
+		switch err.Error() {
+		case "warp reach: busy":
+			return "busy"
+		case "warp reach: too_soon":
+			return "too_soon"
+		case "warp reach: warp_down":
+			return "warp_down"
+		}
+		return "failed"
 	}
 	if len(items) != len(domains) {
-		return
+		return "failed"
 	}
 	prev, _ := decodeReach(a)
 	rec := reachRecord{Colo: store.Clip(colo, 16)}
@@ -176,11 +200,13 @@ func (s *Service) checkReach(ctx context.Context, a store.WarpAccountRow, domain
 	}
 	b, err := json.Marshal(rec)
 	if err != nil {
-		return
+		return "failed"
 	}
 	if err := s.st.SetWarpReach(ctx, a.NodeID, string(b), s.now()); err != nil && !errors.Is(err, store.ErrNotFound) {
 		s.log.Warn("warp: reach: store", "code", "warp_reach_store_failed", "node", a.NodeID, "err", err)
+		return "failed"
 	}
+	return "ok"
 }
 
 func (s *Service) supportsReach(n store.NodeRow) bool { return slices.Contains(n.AgentCaps, CapReach) }

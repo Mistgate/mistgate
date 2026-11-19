@@ -115,6 +115,7 @@ description: 了解如何让协议配置的流量经 Cloudflare WARP 出口、�
 - 节点最多读取页面的 64 KiB，最多跟随一次重定向，并且解析域名后会拒绝其自身网络内的任何地址。Agent 版本过旧的节点不会应答，WARP 卡片会注明。
 - HTTP 451，或已知类型的 403 页面（Cloudflare 错误 1006 至 1012 或 1020、“Sorry, you have been blocked”、Akamai 的 “Access Denied” 页面、CloudFront 的国家屏蔽、网站自己的“在您所在国家不可用”）的结论为 `blocked`。单纯的 403、验证页面、限流和服务器错误为 `error`；没有应答为 `unreachable`。
 - 卡片和 `warp_status` 会显示该次运行时出口的 colo。某网站在两次运行中为 `blocked`、且其间没有 `ok` 时，会触发运行状况告警 `warp_reach`（每个节点和网站一条，附带 colo）；重启 WARP 可能换到另一个出口。某次运行对该网站给出 `ok`（超时或错误不算）、网站被移出清单，或结果 3 小时未更新时，告警结束。
+- 卡片上的**立即检测**会让节点提前检查（用的是卡片本来就在发的调用 `GetWarp`，带上字段 `check_reach_now`；与整个调用一样仅限所有者）。它立即返回，节点打开这些网站期间（最长一分钟）卡片显示“检测中”，随后给出新的列表。每个节点最多每 2 分钟一次，否则卡片会说明何时可再次检测；沉默的节点、隧道断开或已暂停的节点、代理过旧的节点不会收到任何请求，卡片会说明原因。最近一次检查如何结束见 `reach_check.last`（节点刚刚自己做过检查则为 `busy` 或 `too_soon`，另有 `warp_down`、`failed`）。
 - 该检查在 VPS 版本中运行。Cloudflare 版本暂时没有后台循环：卡片的 `reach_state` 为 `disabled`，两个设置调用返回 `unavailable_in_edition: feature=health_checks`。
 
 ## IPv4 和 IPv6
