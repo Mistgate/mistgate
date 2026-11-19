@@ -13,7 +13,7 @@ import (
 // in UTC+3, the old default; a new one starts at UTC; a stored choice is never changed.
 func TestUpdateTimezoneMigrationKeepsTheOldDefaultOfExistingInstallations(t *testing.T) {
 	ctx := context.Background()
-	const key = "update_schedule_timezone_offset_minutes"
+	const key = SettingPanelTimezone
 	for name, tc := range map[string]struct {
 		admin        bool
 		stored, want string

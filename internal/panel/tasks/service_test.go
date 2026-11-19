@@ -190,7 +190,7 @@ func newFixture(t *testing.T) *fixture {
 		}
 	}
 	// the panel's time zone: UTC+3
-	if err := st.SetSettings(ctx, map[string]string{timezoneSetting: "180"}); err != nil {
+	if err := st.SetSettings(ctx, map[string]string{store.SettingPanelTimezone: "180"}); err != nil {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 11, 7, 10, 0, 0, 0, time.UTC)

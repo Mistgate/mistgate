@@ -12,6 +12,7 @@ import (
 	"connectrpc.com/connect"
 
 	ownprobev1 "github.com/mistgate/mistgate/gen/mistgate/ownprobe/v1"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -21,7 +22,7 @@ type rpc struct{ s *Service }
 
 func (r rpc) Get(ctx context.Context, _ *connect.Request[ownprobev1.OwnProbeServiceGetRequest]) (*connect.Response[ownprobev1.OwnProbeServiceGetResponse], error) {
 	s := r.s
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	settings, err := s.settings(ctx)
@@ -41,7 +42,7 @@ func (r rpc) Get(ctx context.Context, _ *connect.Request[ownprobev1.OwnProbeServ
 
 func (r rpc) Update(ctx context.Context, req *connect.Request[ownprobev1.OwnProbeServiceUpdateRequest]) (*connect.Response[ownprobev1.OwnProbeServiceUpdateResponse], error) {
 	s := r.s
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +77,7 @@ func (r rpc) Update(ctx context.Context, req *connect.Request[ownprobev1.OwnProb
 
 func (r rpc) Create(ctx context.Context, req *connect.Request[ownprobev1.OwnProbeServiceCreateRequest]) (*connect.Response[ownprobev1.OwnProbeServiceCreateResponse], error) {
 	s := r.s
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,7 @@ func (r rpc) Create(ctx context.Context, req *connect.Request[ownprobev1.OwnProb
 // secret leaves with them beyond the panel's probe address that the install command carried too.
 func (r rpc) UpdateCommand(ctx context.Context, _ *connect.Request[ownprobev1.OwnProbeServiceUpdateCommandRequest]) (*connect.Response[ownprobev1.OwnProbeServiceUpdateCommandResponse], error) {
 	s := r.s
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	command, err := BuildUpdateCommand(s.cfg.PublicURL, s.cfg.ProbePrefix, ScriptHash())
@@ -137,7 +138,7 @@ func (r rpc) UpdateCommand(ctx context.Context, _ *connect.Request[ownprobev1.Ow
 
 func (r rpc) Revoke(ctx context.Context, req *connect.Request[ownprobev1.OwnProbeServiceRevokeRequest]) (*connect.Response[ownprobev1.OwnProbeServiceRevokeResponse], error) {
 	s := r.s
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +170,7 @@ func (r rpc) Revoke(ctx context.Context, req *connect.Request[ownprobev1.OwnProb
 
 func (r rpc) ConfirmNetwork(ctx context.Context, req *connect.Request[ownprobev1.OwnProbeServiceConfirmNetworkRequest]) (*connect.Response[ownprobev1.OwnProbeServiceConfirmNetworkResponse], error) {
 	s := r.s
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +200,7 @@ func (r rpc) ConfirmNetwork(ctx context.Context, req *connect.Request[ownprobev1
 
 func (r rpc) CheckNow(ctx context.Context, req *connect.Request[ownprobev1.OwnProbeServiceCheckNowRequest]) (*connect.Response[ownprobev1.OwnProbeServiceCheckNowResponse], error) {
 	s := r.s
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
@@ -217,7 +218,7 @@ func (r rpc) CheckNow(ctx context.Context, req *connect.Request[ownprobev1.OwnPr
 
 func (r rpc) Disconnect(ctx context.Context, _ *connect.Request[ownprobev1.OwnProbeServiceDisconnectRequest]) (*connect.Response[ownprobev1.OwnProbeServiceDisconnectResponse], error) {
 	s := r.s
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}

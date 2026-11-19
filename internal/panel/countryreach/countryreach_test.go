@@ -57,7 +57,7 @@ func TestUpdateStoresAnUpperCaseCountryAndRefusesTheRest(t *testing.T) {
 		t.Fatalf("audit = %+v, %v", rows, err)
 	}
 	// a damaged stored value falls back to the default
-	if err := st.SetSettings(context.Background(), map[string]string{settingCountry: "xyz"}); err != nil {
+	if err := st.SetSettings(context.Background(), map[string]string{CountrySetting: "xyz"}); err != nil {
 		t.Fatal(err)
 	}
 	if got := s.Country(context.Background()); got != DefaultCountry {
@@ -144,6 +144,14 @@ func TestGetReachabilityHistoryFamily(t *testing.T) {
 	for _, bad := range []uint32{1, 5, 46} {
 		if _, err := (rpc{s}).GetReachabilityHistory(ownerCtx(), connect.NewRequest(&adminv1.GetReachabilityHistoryRequest{Family: bad})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("family %d: %v", bad, err)
+		}
+	}
+}
+
+func TestParseCountry(t *testing.T) {
+	for raw, want := range map[string]string{"": DefaultCountry, "kz": "KZ", "BY": "BY", "xyz": DefaultCountry, "1a": DefaultCountry, " by": DefaultCountry} {
+		if got := ParseCountry(raw); got != want {
+			t.Errorf("ParseCountry(%q) = %q, want %q", raw, got, want)
 		}
 	}
 }

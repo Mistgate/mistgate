@@ -77,7 +77,7 @@ func (s *Service) download(w http.ResponseWriter, r *http.Request) {
 		writeDownloadError(w, http.StatusNotImplemented, "unavailable_in_edition", "backup downloads are available on the VPS edition")
 		return
 	}
-	if err := requireOwner(r.Context()); err != nil {
+	if _, err := auth.OwnerSession(r.Context()); err != nil {
 		writeDownloadError(w, http.StatusForbidden, "owner_required", "owner access required")
 		return
 	}

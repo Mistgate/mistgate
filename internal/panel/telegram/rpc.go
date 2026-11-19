@@ -30,17 +30,9 @@ var errInternal = fail(connect.CodeInternal, "internal error")
 
 type rpc struct{ s *Service }
 
-// self is the signed-in admin; a token (API or MCP) is refused.
-func self(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token {
-		return store.Admin{}, fail(connect.CodePermissionDenied, "a signed-in admin is required")
-	}
-	return a, nil
-}
-
+// owner keeps the answer of a token ("a signed-in admin is required") apart from that of a helper.
 func owner(ctx context.Context) (store.Admin, error) {
-	a, err := self(ctx)
+	a, err := auth.SignedInSession(ctx)
 	if err != nil {
 		return a, err
 	}
@@ -97,7 +89,7 @@ func (s *Service) respond(ctx context.Context, a store.Admin) (*adminv1.Telegram
 }
 
 func (r rpc) GetTelegram(ctx context.Context, _ *connect.Request[adminv1.GetTelegramRequest]) (*connect.Response[adminv1.GetTelegramResponse], error) {
-	a, err := self(ctx)
+	a, err := auth.SignedInSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +164,7 @@ func respondBot(ctx context.Context, s *Service, a store.Admin) (*connect.Respon
 }
 
 func (r rpc) BeginTelegramLink(ctx context.Context, _ *connect.Request[adminv1.BeginTelegramLinkRequest]) (*connect.Response[adminv1.BeginTelegramLinkResponse], error) {
-	a, err := self(ctx)
+	a, err := auth.SignedInSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +190,7 @@ func (r rpc) BeginTelegramLink(ctx context.Context, _ *connect.Request[adminv1.B
 }
 
 func (r rpc) UnlinkTelegram(ctx context.Context, _ *connect.Request[adminv1.UnlinkTelegramRequest]) (*connect.Response[adminv1.UnlinkTelegramResponse], error) {
-	a, err := self(ctx)
+	a, err := auth.SignedInSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +210,7 @@ func (r rpc) UnlinkTelegram(ctx context.Context, _ *connect.Request[adminv1.Unli
 }
 
 func (r rpc) SetTelegramAlerts(ctx context.Context, req *connect.Request[adminv1.SetTelegramAlertsRequest]) (*connect.Response[adminv1.SetTelegramAlertsResponse], error) {
-	a, err := self(ctx)
+	a, err := auth.SignedInSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +229,7 @@ func (r rpc) SetTelegramAlerts(ctx context.Context, req *connect.Request[adminv1
 }
 
 func (r rpc) SendTelegramTest(ctx context.Context, _ *connect.Request[adminv1.SendTelegramTestRequest]) (*connect.Response[adminv1.SendTelegramTestResponse], error) {
-	a, err := self(ctx)
+	a, err := auth.SignedInSession(ctx)
 	if err != nil {
 		return nil, err
 	}

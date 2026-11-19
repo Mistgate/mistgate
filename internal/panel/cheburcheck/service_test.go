@@ -83,7 +83,7 @@ func (e *testEnv) advance(d time.Duration) {
 
 func (e *testEnv) setCountry(country string) {
 	e.t.Helper()
-	if err := e.st.SetSettings(context.Background(), map[string]string{settingCountry: country}); err != nil {
+	if err := e.st.SetSettings(context.Background(), map[string]string{countryreach.CountrySetting: country}); err != nil {
 		e.t.Fatal(err)
 	}
 }

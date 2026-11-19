@@ -634,15 +634,6 @@ func fail(code connect.Code, msg string) error { return connect.NewError(code, e
 
 var errInternal = fail(connect.CodeInternal, "internal error")
 
-// owner is the signed-in owner; a token (API or MCP) is refused again here, whatever the policy table says.
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
-
 func runMsg(r lastRun) *adminv1.TspuProbeRun {
 	return &adminv1.TspuProbeRun{Status: r.Status, AtUnix: r.At, NodeId: r.Node, DpiHop: uint32(max(r.DPIHop, 0)), BlockedRef: r.Ref,
 		NodesChecked: uint32(max(r.Checked, 0)), Detail: r.Detail, Reason: r.Reason}
@@ -685,7 +676,7 @@ func (s *Service) current(ctx context.Context) (*adminv1.TspuProbeSettings, erro
 }
 
 func (r rpc) GetTspuProbe(ctx context.Context, _ *connect.Request[adminv1.GetTspuProbeRequest]) (*connect.Response[adminv1.GetTspuProbeResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	cur, err := r.s.current(ctx)
@@ -696,7 +687,7 @@ func (r rpc) GetTspuProbe(ctx context.Context, _ *connect.Request[adminv1.GetTsp
 }
 
 func (r rpc) UpdateTspuProbe(ctx context.Context, req *connect.Request[adminv1.UpdateTspuProbeRequest]) (*connect.Response[adminv1.UpdateTspuProbeResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -777,7 +768,7 @@ func checkProbeNode(nodes []Node, id string) error {
 }
 
 func (r rpc) DisconnectTspuProbe(ctx context.Context, _ *connect.Request[adminv1.DisconnectTspuProbeRequest]) (*connect.Response[adminv1.DisconnectTspuProbeResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -805,7 +796,7 @@ func (r rpc) DisconnectTspuProbe(ctx context.Context, _ *connect.Request[adminv1
 
 // TestTspuProbe runs the probe now against the fleet, whatever the schedule says, and stores the rows like a scheduled run.
 func (r rpc) TestTspuProbe(ctx context.Context, _ *connect.Request[adminv1.TestTspuProbeRequest]) (*connect.Response[adminv1.TestTspuProbeResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	s := r.s

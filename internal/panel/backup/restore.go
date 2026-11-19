@@ -83,7 +83,7 @@ func (s *Service) upload(w http.ResponseWriter, r *http.Request) {
 		writeRestoreConnectError(w, r, connect.CodeUnimplemented, "backup restore is available on the VPS edition")
 		return
 	}
-	if err := requireOwner(r.Context()); err != nil {
+	if _, err := auth.OwnerSession(r.Context()); err != nil {
 		writeRestoreConnectError(w, r, connect.CodePermissionDenied, "owner access required")
 		return
 	}
@@ -328,7 +328,7 @@ func (s *Service) prepareRestore(ctx context.Context, req *connect.Request[admin
 	if req != nil && req.Msg != nil {
 		defer clearIdentities(req.Msg)
 	}
-	if err := requireOwner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	if err := edition.Check(s.edge, edition.Backups); err != nil {
@@ -584,7 +584,7 @@ func (r rpc) PrepareRestore(ctx context.Context, req *connect.Request[adminv1.Pr
 }
 
 func (r rpc) ConfirmRestore(ctx context.Context, req *connect.Request[adminv1.ConfirmRestoreRequest]) (*connect.Response[adminv1.ConfirmRestoreResponse], error) {
-	if err := requireOwner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	if err := edition.Check(r.s.edge, edition.Backups); err != nil {
@@ -670,7 +670,7 @@ func restoreStartError(err error) error {
 
 // These two reads are owner-only without fresh step-up so the Backups page can load them every time it opens.
 func (r rpc) ListKeptData(ctx context.Context, _ *connect.Request[adminv1.ListKeptDataRequest]) (*connect.Response[adminv1.ListKeptDataResponse], error) {
-	if err := requireOwner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	if err := edition.Check(r.s.edge, edition.Backups); err != nil {
@@ -684,7 +684,7 @@ func (r rpc) ListKeptData(ctx context.Context, _ *connect.Request[adminv1.ListKe
 }
 
 func (r rpc) DeleteKeptData(ctx context.Context, req *connect.Request[adminv1.DeleteKeptDataRequest]) (*connect.Response[adminv1.DeleteKeptDataResponse], error) {
-	if err := requireOwner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	if err := edition.Check(r.s.edge, edition.Backups); err != nil {
@@ -783,7 +783,7 @@ func listKeptData(parent, dataBase string) ([]*adminv1.KeptData, error) {
 }
 
 func (r rpc) GetRestoreResult(ctx context.Context, _ *connect.Request[adminv1.GetRestoreResultRequest]) (*connect.Response[adminv1.GetRestoreResultResponse], error) {
-	if err := requireOwner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	if err := edition.Check(r.s.edge, edition.Backups); err != nil {

@@ -31,7 +31,6 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -80,8 +79,6 @@ const (
 	toolsFresh = 10 * time.Minute
 	// excerptRunes bounds the start of a tool's result kept with a run
 	excerptRunes = 2000
-	// timezoneSetting is the panel's time zone, the one of the update schedules (internal/panel/update/schedule.go)
-	timezoneSetting = "update_schedule_timezone_offset_minutes"
 )
 
 // Service is the TasksService and the scheduler.
@@ -149,16 +146,9 @@ func (s *Service) kick() {
 	}
 }
 
-// timezone is the panel's offset east of UTC in minutes; a missing or unusable value is UTC.
+// timezone is the panel's offset east of UTC in minutes; a failed read counts as UTC.
 func (s *Service) timezone(ctx context.Context) int {
-	raw, err := s.cfg.Store.Setting(ctx, timezoneSetting)
-	if err != nil {
-		return 0
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil || n < -12*60 || n > 14*60 || n%15 != 0 {
-		return 0
-	}
+	n, _ := s.cfg.Store.PanelTimezone(ctx)
 	return n
 }
 

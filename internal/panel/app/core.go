@@ -113,10 +113,9 @@ func newBase(c Config) (base, error) {
 
 // fleetConfig is the part of the fleet's configuration that every role that builds a fleet shares.
 func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]statehash.Inbound, error), onUsage func(ctx context.Context, userIDs []string)) fleet.Config {
-	agentSNIPrefix, _, _ := strings.Cut(b.in.AgentSNI, ".")
 	return fleet.Config{
 		AgentSNI:             b.in.AgentSNI,
-		JournalSecrets:       []string{b.in.AgentSNI, agentSNIPrefix, b.in.AdminPrefix, b.in.SubPrefix, b.in.LinkPrefix, b.in.ProbePrefix},
+		JournalSecrets:       b.in.logSecrets(),
 		LinkServed:           b.in.LinkPrefix != "",
 		LinkURL:              linkURL(b.in),
 		Remote:               b.c.Remote,
