@@ -551,11 +551,11 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 		if maxIdxErr != nil {
 			continue
 		}
-		if protocols.IPv6Unsupported(spec) != "" {
-			continue
-		}
-		for _, relay := range relaysOf[f.Inbound.ID] {
-			path := "relay:" + relay.ViaNodeID
+		for _, p := range serverPaths(f.Node, spec, relaysOf[f.Inbound.ID]) {
+			if p.Kind != pathRelay { // a key is issued for no other path of a static device
+				continue
+			}
+			relay, path := p.Relay, p.Key
 			cred, have := sc.pathCreds[path]
 			if !have {
 				var created bool

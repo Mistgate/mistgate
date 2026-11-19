@@ -673,7 +673,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		if _, pinOK := protocols.NormalizePin(f.Inbound.CertPinSHA256); spec.TLS.Mode == plugin.TLSSelfSigned && !pinOK {
 			continue // the node has not reported its certificate yet: a client could not verify it
 		}
-		srv := SubServer{NodeID: f.Node.ID, InboundID: f.Inbound.ID, PathKey: "direct", Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location, PublicLabel: f.Node.PublicLabel,
+		srv := SubServer{NodeID: f.Node.ID, InboundID: f.Inbound.ID, PathKey: store.PathDirect, Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location, PublicLabel: f.Node.PublicLabel,
 			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, Exit: egressOf(merged), Made: made[f.Inbound.ID]}
 		srv.IPv6Egress = ipv6Egress(f.Node, srv.Exit)
 		if usage, ok := networkUsage[f.Node.ID]; ok {
@@ -715,80 +715,59 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			in.Format = plugin.FormatTelegramLink
 		}
 		frag, ok := proto.Render(in)
+		paths := serverPaths(f.Node, spec, relaysOf[f.Inbound.ID])
 		if ok {
-			if f.Inbound.DirectInSubscriptions {
-				srv.URI = string(frag.Data)
-				var conn *SubConn
-				if !protocols.IsPerDevice(proto) { // the page lists a link by its Hysteria2 servers; the keys are counted above
-					conn = &SubConn{Way: "link", Exit: srv.Exit}
+			// The server, then its IPv6 twin, then the twins through its relays (copies of the server itself, never of the IPv6 twin).
+			for _, p := range paths {
+				if p.Kind == pathDirect {
+					if f.Inbound.DirectInSubscriptions {
+						srv.URI = string(frag.Data)
+						var conn *SubConn
+						if !protocols.IsPerDevice(proto) { // the page lists a link by its Hysteria2 servers; the keys are counted above
+							c := p.conn(srv.Exit)
+							conn = &c
+						}
+						emit(srv, conn)
+					}
+					continue
 				}
-				emit(srv, conn)
-			}
-			// The IPv6 twin of the server comes first: the node's own address over IPv6, then the twins through its relays (those
-			// are copies of the server itself, never of this twin, so a relay's twin is not doubled for IPv6).
-			if addr := ipv6EntryAddr(f.Node); addr != "" && protocols.IPv6Unsupported(spec) == "" {
-				twin := srv
-				twin.Mark, twin.PathKey = MarkIPv6, "ipv6"
-				tin := ipv6Input(in, addr)
-				renderTwin := true
+				twin := p.server(srv)
+				if p.Kind == pathRelay {
+					twin.LoadPercent = maxPercent(srv.LoadPercent, networkUsage[p.Relay.ViaNodeID].LoadPercent)
+				}
+				tin := p.input(in, f, spec)
 				if f.Profile.Protocol == awg.ID {
-					// The same server at two endpoints with one key would have its peer endpoint jump between them, so the twin has a
+					// The same server at two endpoints with one key would have its peer endpoint jump between them, so a twin has a
 					// key of its own; without one (no free address) there is no twin and the direct server is untouched.
-					pathSecret := secrets[credKey(awg.ID, f.Profile.ID, twin.PathKey)]
-					if pathSecret == "" {
-						renderTwin = false
-					} else {
-						tin.Secret, tin.Peer = pathSecret, json.RawMessage(pathSecret)
-					}
-				}
-				if renderTwin {
-					if opt.Name != nil {
-						tin.DisplayName = opt.Name(twin)
-					}
-					if tf, ok := proto.Render(tin); ok {
-						twin.URI = string(tf.Data)
-						emit(twin, &SubConn{Way: "link", Exit: srv.Exit, IPv6: true})
-					}
-				}
-			}
-			// The twins of the server, right after it: the same server through each relay of it that is usable for the person.
-			for _, l := range relaysOf[f.Inbound.ID] {
-				if protocols.IPv6Unsupported(spec) != "" {
-					break
-				}
-				twin := srv
-				twin.Mark, twin.PathKey = ViaMark(l.ViaNodeCountry), "relay:"+l.ViaNodeID
-				twin.LoadPercent = maxPercent(srv.LoadPercent, networkUsage[l.ViaNodeID].LoadPercent)
-				tin := twinInput(in, f, spec, l)
-				if f.Profile.Protocol == awg.ID {
-					pathSecret := secrets[credKey(awg.ID, f.Profile.ID, twin.PathKey)]
+					pathSecret := secrets[credKey(awg.ID, f.Profile.ID, p.Key)]
 					if pathSecret == "" {
 						continue
 					}
-					tin.Secret, tin.Peer, tin.NodeAddr = pathSecret, json.RawMessage(pathSecret), l.ViaNodeAddress
+					tin.Secret, tin.Peer = pathSecret, json.RawMessage(pathSecret)
+					if p.Kind == pathRelay {
+						tin.NodeAddr = p.Relay.ViaNodeAddress
+					}
 				}
 				if opt.Name != nil {
 					tin.DisplayName = opt.Name(twin)
 				}
 				if tf, ok := proto.Render(tin); ok {
 					twin.URI = string(tf.Data)
-					emit(twin, &SubConn{Way: "link", Exit: srv.Exit, Via: strings.ToUpper(strings.TrimSpace(l.ViaNodeCountry)), Relay: true})
+					c := p.conn(srv.Exit)
+					emit(twin, &c)
 				}
 			}
 		} else if format == plugin.FormatURIList && !protocols.IsPerDevice(proto) && !telegram {
-			// The URI list leaves out what only the Mihomo apps can use (Gecko), but it is still the person's server: the page lists it.
+			// The URI list leaves out what only the Mihomo apps can use (Gecko), but it is still the person's server, and so are its
+			// twins: the page lists them.
 			in.Format = plugin.FormatMihomo
 			if _, ok := proto.Render(in); ok {
 				n := nodeOf(f)
-				if f.Inbound.DirectInSubscriptions {
-					n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true})
-				}
-				if ipv6EntryAddr(f.Node) != "" && protocols.IPv6Unsupported(spec) == "" { // its IPv6 twin is Mihomo-only as well
-					n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true, IPv6: true})
-				}
-				for _, l := range relaysOf[f.Inbound.ID] { // its twins are Mihomo-only as well
-					if protocols.IPv6Unsupported(spec) == "" {
-						n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true, Via: strings.ToUpper(strings.TrimSpace(l.ViaNodeCountry)), Relay: true})
+				for _, p := range paths {
+					if p.Kind != pathDirect || f.Inbound.DirectInSubscriptions {
+						c := p.conn(srv.Exit)
+						c.MihomoOnly = true
+						n.Conns = append(n.Conns, c)
 					}
 				}
 			}
@@ -1187,24 +1166,18 @@ func (s *Service) awgWants(u store.AccessUser, gs store.AccessGroups, full []sto
 			seen[key] = true
 		}
 		spec, err := s.buildSpec(f, merged)
-		if err != nil || protocols.IPv6Unsupported(spec) != "" {
+		if err != nil {
 			continue
 		}
-		if ipv6EntryAddr(f.Node) != "" && protocols.IPv6Unsupported(spec) == "" {
-			key := f.Profile.ID + "\x00ipv6"
-			if !seen[key] {
-				want = append(want, store.AWGImplicitWant{ProfileID: f.Profile.ID, Path: "ipv6", MaxIdx: maxIdx, Issue: issue})
-				seen[key] = true
-			}
-		}
-		for _, l := range relays[f.Inbound.ID] {
-			path := "relay:" + l.ViaNodeID
-			key := f.Profile.ID + "\x00" + path
-			if seen[key] {
+		for _, p := range serverPaths(f.Node, spec, relays[f.Inbound.ID]) {
+			if p.Kind == pathDirect {
 				continue
 			}
-			want = append(want, store.AWGImplicitWant{ProfileID: f.Profile.ID, Path: path, MaxIdx: maxIdx, Issue: issue})
-			seen[key] = true
+			key := f.Profile.ID + "\x00" + p.Key
+			if !seen[key] {
+				want = append(want, store.AWGImplicitWant{ProfileID: f.Profile.ID, Path: p.Key, MaxIdx: maxIdx, Issue: issue})
+				seen[key] = true
+			}
 		}
 	}
 	return want

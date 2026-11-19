@@ -38,7 +38,7 @@ func (s *Service) trustTunnelServers(ctx context.Context, u store.AccessUser, gs
 			continue
 		}
 		srv := SubServer{
-			NodeID: f.Node.ID, InboundID: f.Inbound.ID, PathKey: "direct", Node: f.Node.Name,
+			NodeID: f.Node.ID, InboundID: f.Inbound.ID, PathKey: store.PathDirect, Node: f.Node.Name,
 			CountryCode: f.Node.CountryCode, Location: f.Node.Location, PublicLabel: f.Node.PublicLabel,
 			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, Exit: egressOf(merged),
 		}
@@ -50,38 +50,24 @@ func (s *Service) trustTunnelServers(ctx context.Context, u store.AccessUser, gs
 			UserID:  u.ID, UserName: u.Name, Secret: secret, DNS: dnsServers,
 			InboundPublic: json.RawMessage(f.Inbound.PluginPublicJSON), NoIPv6Egress: !srv.IPv6Egress,
 		}
-		if f.Inbound.DirectInSubscriptions {
-			appendRendered := func(server SubServer, in protocols.RenderInput) {
-				in.DisplayName = trustTunnelName(server, opt.Name)
-				frag, rendered := proto.Render(in)
-				if rendered {
-					server.URI = string(frag.Data)
-					out = append(out, server)
-				} else if frag.Note != "" {
-					server.Note = frag.Note
-					out = append(out, server)
-				}
-			}
-			appendRendered(srv, input)
-		}
-		if protocols.IPv6Unsupported(spec) != "" {
-			continue
-		}
-		for _, l := range relaysByInbound[f.Inbound.ID] {
-			if l.Network != "tcp" || l.Port == 0 || l.ViaNodeAddress == "" {
+		for _, p := range serverPaths(f.Node, spec, relaysByInbound[f.Inbound.ID]) {
+			if p.Kind == pathDirect && !f.Inbound.DirectInSubscriptions || p.Kind == pathIPv6 {
 				continue
 			}
-			twin := srv
-			twin.Mark, twin.PathKey = ViaMark(l.ViaNodeCountry), "relay:"+l.ViaNodeID
-			tin := twinInput(input, f, spec, l)
-			tin.DisplayName = trustTunnelName(twin, opt.Name)
-			frag, rendered := proto.Render(tin)
+			// A relay forwards one TCP port: a UDP forward carries no TrustTunnel path.
+			if p.Kind == pathRelay && (p.Relay.Network != "tcp" || p.Relay.Port == 0 || p.Relay.ViaNodeAddress == "") {
+				continue
+			}
+			server := p.server(srv)
+			in := p.input(input, f, spec)
+			in.DisplayName = trustTunnelName(server, opt.Name)
+			frag, rendered := proto.Render(in)
 			if rendered {
-				twin.URI = string(frag.Data)
-				out = append(out, twin)
+				server.URI = string(frag.Data)
+				out = append(out, server)
 			} else if frag.Note != "" {
-				twin.Note = frag.Note
-				out = append(out, twin)
+				server.Note = frag.Note
+				out = append(out, server)
 			}
 		}
 	}
