@@ -34,6 +34,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/ops/v1/opsv1connect"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/probe/v1/probev1connect"
+	"github.com/mistgate/mistgate/gen/mistgate/subhost/v1/subhostv1connect"
 	"github.com/mistgate/mistgate/gen/mistgate/tasks/v1/tasksv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
@@ -448,6 +449,7 @@ type world struct {
 	lib           *fakeLibrary // the decoy library (decoy_site_tools_test.go)
 	loadHours     []uint32     // GetFleetLoad windows (tools_capacity_test.go)
 	withResources bool         // GetNode of nodeA carries the resource fields of a current agent
+	subhost       fakeSubHost  // SubscriptionHostService (tools_subhost_test.go)
 
 	rotateReq           []*adminv1.RotateNodeServerPasswordRequest
 	installReq          []*adminv1.StartNodeProvisionRequest
@@ -2124,6 +2126,7 @@ func (w *world) api(a *fakeAuth) http.Handler {
 		func() (string, http.Handler) { return opsv1connect.NewOpsServiceHandler(w) },
 		func() (string, http.Handler) { return tasksv1connect.NewTasksServiceHandler(w.tasks) },
 		func() (string, http.Handler) { return decoysitev1connect.NewDecoySiteServiceHandler(w.lib) },
+		func() (string, http.Handler) { return subhostv1connect.NewSubscriptionHostServiceHandler(&w.subhost) },
 	} {
 		p, hh := h()
 		mux.Handle(p, hh)
