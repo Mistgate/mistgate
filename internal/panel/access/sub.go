@@ -836,7 +836,7 @@ func ipv6Egress(n store.AccessNode, exit string) bool {
 }
 
 // subRelays are the relays that give the person a twin server, by the exit's inbound: the ones relayUsable accepts, in the
-// order of the relays. The caller drops the ones the protocol cannot carry (protocols.IPv6Unsupported).
+// order of the relays. serverPaths drops them for a server that cannot go through another address.
 func (s *Service) subRelays(relays []store.RelayLink, full []store.AccessInboundFull, gs store.AccessGroups, u store.AccessUser, format plugin.ClientFormat) map[string][]store.RelayLink {
 	var out map[string][]store.RelayLink
 	for _, l := range relays {
