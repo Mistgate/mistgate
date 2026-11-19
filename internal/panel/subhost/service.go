@@ -82,6 +82,11 @@ type Service struct {
 
 	tun *tunnel // tunnel.go
 
+	// readiness.go; mu
+	downSince time.Time
+	downTold  bool
+	upSeam    func(nodeID string) bool // tests: whether the panel holds a connection to the host
+
 	caaMu    sync.Mutex
 	caaCache map[string]caaEntry
 	account  string // the ACME account URI, once known
@@ -141,6 +146,7 @@ func (s *Service) Run(ctx context.Context) {
 			s.syncDials(s.current())
 			s.mu.Unlock()
 		}
+		s.checkReady(ctx)
 	}
 }
 
@@ -463,6 +469,9 @@ func (s *Service) view(ctx context.Context) (*subhostv1.SubscriptionHost, error)
 		}
 	}
 	s.addLive(ctx, st, h)
+	if !h.Ready {
+		h.NotReady = s.notReady(ctx, st)
+	}
 	h.CaaRecord, h.CaaStatus = s.caa(ctx, st.Domain)
 	return h, nil
 }

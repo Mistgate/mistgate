@@ -41,6 +41,7 @@ var panelEventCodes = map[string]struct{}{
 	"os_step_passed": {}, "os_step_failed": {}, "client_logs_declined": {}, "client_logs_received": {},
 	"subscription_shared_suspect": {},
 	"relay_mode_changed":          {},
+	"sub_host_ready":              {}, "sub_host_tunnel_down": {}, "sub_host_tunnel_up": {},
 }
 
 const deviceLimitEventWindow = time.Hour
