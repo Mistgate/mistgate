@@ -147,7 +147,7 @@ func (f *Fleet) probePair(ctx context.Context, fromID, toID string) (from, to st
 // probeLive says whether a node's agent is connected here and lists a capability.
 func (f *Fleet) probeLive(live map[string]store.NodeLiveRow, id string, caps ...string) (store.NodeLiveRow, string) {
 	row := live[id]
-	if !row.Connected || (f.cfg.Remote == nil && f.session(id) == nil) {
+	if !f.reachable(row, id) {
 		return row, "node_offline"
 	}
 	for _, c := range caps {

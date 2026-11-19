@@ -50,7 +50,7 @@ func (r relayRun) reverseReachAt(ctx context.Context) store.RelayStage {
 		return r.stage("skipped", "entry_site_unavailable", "")
 	}
 	live := r.live[r.exit.ID]
-	if !live.Connected || (r.f.cfg.Remote == nil && r.f.session(r.exit.ID) == nil) {
+	if !r.f.reachable(live, r.exit.ID) {
 		return r.stage("fail", "exit_offline", "")
 	}
 	if !slices.Contains(live.AgentCaps, capTCPCheck) {

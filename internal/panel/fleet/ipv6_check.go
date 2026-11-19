@@ -197,7 +197,7 @@ func (f *Fleet) ipv6OnNodes(ctx context.Context, node store.NodeRow, addr string
 	}
 	live := liveRowsByID(liveRows)
 	targetLive := live[node.ID]
-	if !targetLive.Connected || (f.cfg.Remote == nil && f.session(node.ID) == nil) {
+	if !f.reachable(targetLive, node.ID) {
 		return nil, "node_offline"
 	}
 	if len(udp) > 0 && !slices.Contains(targetLive.AgentCaps, capUDPCheck) {

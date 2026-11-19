@@ -308,7 +308,7 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 	if !slices.Contains(targetLive.AgentCaps, capUDPCheck) {
 		return portCheckOutcome{errorCode: "agent_too_old"}
 	}
-	if f.cfg.Remote == nil && f.session(target.ID) == nil {
+	if !f.reachable(targetLive, target.ID) { // after the capability: an old agent without a session still answers agent_too_old
 		return portCheckOutcome{errorCode: "node_offline"}
 	}
 
@@ -472,10 +472,8 @@ func (f *Fleet) portSenders(target store.NodeRow, nodes []store.NodeRow, live ma
 		if node.ID == target.ID {
 			continue
 		}
-		if current := live[node.ID]; !current.Connected || !slices.Contains(current.AgentCaps, capability) {
-			continue
-		}
-		if f.cfg.Remote == nil && f.session(node.ID) == nil {
+		current := live[node.ID]
+		if !f.reachable(current, node.ID) || !slices.Contains(current.AgentCaps, capability) {
 			continue
 		}
 		eligible = append(eligible, node)

@@ -198,7 +198,7 @@ func (r relayRun) capability() string {
 func (r relayRun) online(id, code string) string {
 	l := r.live[id]
 	switch {
-	case !l.Connected || (r.f.cfg.Remote == nil && r.f.session(id) == nil):
+	case !r.f.reachable(l, id):
 		return code
 	case !slices.Contains(l.AgentCaps, r.capability()):
 		return "agent_too_old"

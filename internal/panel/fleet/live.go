@@ -44,6 +44,12 @@ func (f *Fleet) liveRowsForNode(ctx context.Context, nodeID string, view bool) (
 	return rows[0], nil
 }
 
+// reachable says the node's agent is connected and this process can talk to it: it holds the session itself, or the
+// requests go through the edge edition's Remote link, which has no session here and trusts the live row's Connected.
+func (f *Fleet) reachable(live store.NodeLiveRow, id string) bool {
+	return live.Connected && (f.cfg.Remote != nil || f.session(id) != nil)
+}
+
 // NodeLive reads one node's durable liveness projection without live_json.
 func (f *Fleet) NodeLive(ctx context.Context, nodeID string) (store.NodeLiveRow, error) {
 	return f.liveRowsForNode(ctx, nodeID, false)
