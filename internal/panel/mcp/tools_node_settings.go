@@ -36,6 +36,12 @@ type directSubscriptionArg struct {
 	Included  bool   `json:"included" jsonschema:"whether the node's own address appears in subscriptions"`
 }
 
+// realityTargetArg is the site a node shows strangers at the REALITY server of a profile, instead of the profile's own target.
+type realityTargetArg struct {
+	InboundID string `json:"inbound_id" jsonschema:"inbound id from node_get: a VLESS server with REALITY on this node"`
+	Target    string `json:"target" jsonschema:"host:port of the site this node shows strangers instead of its profile's target: a host name, not an IP address, for example one node_neighbor_sites found with dns here; empty = back to the profile's target"`
+}
+
 type nodeUpdateArgs struct {
 	ReasonField
 	Node        string                  `json:"node" jsonschema:"node id or exact name"`
@@ -45,6 +51,7 @@ type nodeUpdateArgs struct {
 	Provider    *string                 `json:"provider,omitempty" jsonschema:"operator-facing provider text, up to 100 characters"`
 	Notes       *string                 `json:"notes,omitempty" jsonschema:"operator notes, up to 500 characters"`
 	Direct      []directSubscriptionArg `json:"direct_in_subscriptions,omitempty" jsonschema:"per-inbound switch for whether the node's own address is in subscriptions"`
+	Reality     []realityTargetArg      `json:"reality_target,omitempty" jsonschema:"per-inbound site this node shows strangers at a REALITY server; the server restarts and people's apps reconnect only after they refresh the subscription"`
 	BeforeHash  string                  `json:"before_hash,omitempty" jsonschema:"-"`
 }
 
@@ -63,6 +70,55 @@ func validateNodeText(field, value string, maxRunes int, newline bool) error {
 		return err
 	}
 	return rejectSecretShaped(field, value)
+}
+
+// prepareRealityTargets keeps the targets that change something, each for a VLESS REALITY server of the node. The shape of the target
+// (a host name and a port, not this node) is the panel's to judge: the plan asks it.
+func prepareRealityTargets(items []realityTargetArg, inbounds []*adminv1.Inbound) ([]realityTargetArg, error) {
+	if len(items) > maxIDs {
+		return nil, fmt.Errorf("reality_target: at most %d inbounds", maxIDs)
+	}
+	seen := map[string]bool{}
+	var changed []realityTargetArg
+	for _, item := range items {
+		if err := validID("inbound_id", item.InboundID); err != nil {
+			return nil, err
+		}
+		item.Target = strings.TrimSpace(item.Target)
+		if err := validateNodeText("target", item.Target, 300, false); err != nil {
+			return nil, err
+		}
+		if seen[item.InboundID] {
+			return nil, errors.New("reality_target names an inbound twice")
+		}
+		seen[item.InboundID] = true
+		var found *adminv1.Inbound
+		for _, inbound := range inbounds {
+			if inbound.GetId() == item.InboundID {
+				found = inbound
+				break
+			}
+		}
+		if found == nil {
+			return nil, errors.New("inbound_id is not an inbound on this node")
+		}
+		if found.GetRealityTarget() == "" {
+			return nil, errors.New("reality_target needs a VLESS server with REALITY")
+		}
+		if found.GetRealityTargetOverride() != item.Target {
+			changed = append(changed, item)
+		}
+	}
+	return changed, nil
+}
+
+// strangersFact is what a stranger who finds the node's port gets shown: the node's own site ("self"), or the site of the target.
+func strangersFact(key, target string) Fact {
+	if target == "self" {
+		return codedFact(key, "the node's own site", "reality_own")
+	}
+	host, _, _ := strings.Cut(target, ":")
+	return Fact{Key: key, Value: clean(host, 253), Untrusted: true}
 }
 
 func prepareNodeUpdate(a nodeUpdateArgs, node *adminv1.Node, notes string, inbounds []*adminv1.Inbound) (nodeUpdateArgs, []directSubscriptionArg, error) {
@@ -123,9 +179,13 @@ func prepareNodeUpdate(a nodeUpdateArgs, node *adminv1.Node, notes string, inbou
 		}
 	}
 	a.Direct = changed
+	var err error
+	if a.Reality, err = prepareRealityTargets(a.Reality, inbounds); err != nil {
+		return a, nil, err
+	}
 	metadataChanged := (a.Name != nil && *a.Name != node.GetName()) || (a.CountryCode != nil && *a.CountryCode != node.GetCountryCode()) ||
 		(a.Location != nil && *a.Location != node.GetLocation()) || (a.Provider != nil && *a.Provider != node.GetProvider()) || (a.Notes != nil && *a.Notes != notes)
-	if !metadataChanged && len(changed) == 0 {
+	if !metadataChanged && len(changed) == 0 && len(a.Reality) == 0 {
 		return a, nil, errors.New("nothing to change: node settings already look like this")
 	}
 	return a, changed, nil
@@ -134,7 +194,7 @@ func prepareNodeUpdate(a nodeUpdateArgs, node *adminv1.Node, notes string, inbou
 func nodeSettingsHash(node *adminv1.Node, notes string, inbounds []*adminv1.Inbound) string {
 	var parts []string
 	for _, in := range inbounds {
-		parts = append(parts, in.GetId()+":"+fmt.Sprint(in.GetDirectInSubscriptions()))
+		parts = append(parts, in.GetId()+":"+fmt.Sprint(in.GetDirectInSubscriptions())+":"+in.GetRealityTargetOverride())
 	}
 	slices.Sort(parts)
 	return hashText(node.GetId() + "\x00" + node.GetName() + "\x00" + node.GetCountryCode() + "\x00" + node.GetLocation() + "\x00" + node.GetProvider() + "\x00" + notes + "\x00" + strings.Join(parts, ","))
@@ -143,7 +203,7 @@ func nodeSettingsHash(node *adminv1.Node, notes string, inbounds []*adminv1.Inbo
 var nodeUpdate = changeSpec[nodeUpdateArgs]{
 	name: "node_update", min: ProfileAdmin, danger: true,
 	procs: procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.NodeServiceGetNodeProcedure, adminv1connect.NodeServiceUpdateNodeProcedure, adminv1connect.ProfileServiceUpdateInboundProcedure),
-	desc:  "Edit a node's label, country, location, provider or notes, and set per-inbound direct-in-subscriptions switches. The tool omits the node address and every setting that changes runtime behavior. Name, country and subscription switches affect what users receive; those changes wait for owner approval.",
+	desc:  "Edit a node's label, country, location, provider or notes, set per-inbound direct-in-subscriptions switches, and set the site a node shows strangers at a REALITY server (reality_target: inbound_id and host:port, empty = the profile's own target; take the name from node_neighbor_sites, a site with dns here). The tool omits the node address and every setting that changes runtime behavior other than that target. Name, country, subscription switches and the REALITY target affect what users receive; those changes wait for owner approval. A new target restarts the server, and people's apps cannot connect through it until they refresh their subscription; the plan says what strangers see now and after.",
 	plan: func(c *call, a nodeUpdateArgs) (*planned, error) {
 		id, name, err := c.nodeRef(a.Node)
 		if err != nil {
@@ -206,10 +266,37 @@ var nodeUpdate = changeSpec[nodeUpdateArgs]{
 			df.Untrusted, df.UntrustedParams = true, []string{"profile", "protocol"}
 			facts = append(facts, df)
 		}
+		// A site of the node's own at a REALITY server: the panel judges the target (a host name, not this node, an agent that takes it)
+		// and says what strangers see now and after; the server restarts, and the apps connect again after a subscription refresh.
+		for _, item := range a.Reality {
+			target := item.Target
+			validated, err := c.cl.Profile.UpdateInbound(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.UpdateInboundRequest{InboundId: item.InboundID, RealityTargetOverride: &target, ValidateOnly: true}))
+			if err != nil {
+				return nil, apiError(err)
+			}
+			for _, warning := range validated.Msg.GetWarnings() {
+				warningFacts = append(warningFacts, statusWarningFact(warning))
+			}
+			var now *adminv1.Inbound
+			for _, in := range r.Msg.GetInbounds() {
+				if in.GetId() == item.InboundID {
+					now = in
+					break
+				}
+			}
+			facts = append(facts, Fact{Key: "reality_server", Value: nm(now.GetProfileName()), Untrusted: true},
+				strangersFact("strangers_now", now.GetRealityTarget()), strangersFact("strangers_after", validated.Msg.GetInbound().GetRealityTarget()))
+		}
+		if len(a.Reality) > 0 {
+			facts = append(facts, codedFact("reality_effect", "the server restarts; people's apps connect again once they refresh the subscription, until then they cannot connect through this server", "reality_target_effect"))
+		}
 		facts = append(facts, warningFacts...)
 		// NodeService.UpdateNode also accepts runtime-changing fields at the API boundary. The MCP tool keeps its
 		// arguments to metadata, but still requires the owner grant for this exact procedure.
 		danger := []string{dangerPage}
+		if len(a.Reality) > 0 {
+			danger = append(danger, dangerFleet)
+		}
 		a.BeforeHash = nodeSettingsHash(node, r.Msg.GetNotes(), r.Msg.GetInbounds())
 		summary := "Update node metadata or subscription-facing inbound settings. The owner must approve this change."
 		return &planned{Summary: summary, Facts: facts, Danger: danger, Params: a}, nil
@@ -231,6 +318,12 @@ var nodeUpdate = changeSpec[nodeUpdateArgs]{
 		for _, item := range a.Direct {
 			value := item.Included
 			if _, err := c.cl.Profile.UpdateInbound(c.ctx, connect.NewRequest(&adminv1.UpdateInboundRequest{InboundId: item.InboundID, DirectInSubscriptions: &value})); err != nil {
+				return done{}, apiError(err)
+			}
+		}
+		for _, item := range a.Reality {
+			target := item.Target
+			if _, err := c.cl.Profile.UpdateInbound(c.ctx, connect.NewRequest(&adminv1.UpdateInboundRequest{InboundId: item.InboundID, RealityTargetOverride: &target})); err != nil {
 				return done{}, apiError(err)
 			}
 		}
