@@ -203,20 +203,34 @@ func (s *Service) missingProtocols(happ, amnezia, telegram bool, have map[string
 	return out
 }
 
+// newCred issues the credential of p for a device and seals its secret under the credential's id. The caller puts the owner on it
+// (a key of the person is made before its device is stored).
+func (s *Service) newCred(p protocols.Protocol, userID, deviceID string) (store.AccessCred, error) {
+	iss, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
+	if err != nil {
+		return store.AccessCred{}, err
+	}
+	id := store.NewID("crd_")
+	return store.AccessCred{ID: id, Protocol: p.ID(), SecretEnc: s.vault.Seal([]byte(iss.Secret), id), DataJSON: string(iss.NodeData)}, nil
+}
+
+// deviceCred is newCred for a device that exists.
+func (s *Service) deviceCred(p protocols.Protocol, userID, deviceID string, now time.Time) (store.AccessCred, error) {
+	cred, err := s.newCred(p, userID, deviceID)
+	cred.DeviceID, cred.UserID, cred.CreatedAt = deviceID, userID, now
+	return cred, err
+}
+
 // newCreds issues a credential for every protocol missingProtocols names.
 func (s *Service) newCreds(userID, deviceID string, happ, amnezia, telegram bool, have map[string]bool) ([]store.AccessCred, error) {
 	var out []store.AccessCred
 	now := s.now()
 	for _, p := range s.missingProtocols(happ, amnezia, telegram, have) {
-		iss, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
+		cred, err := s.deviceCred(p, userID, deviceID, now)
 		if err != nil {
 			return nil, err
 		}
-		id := store.NewID("crd_")
-		out = append(out, store.AccessCred{
-			ID: id, DeviceID: deviceID, UserID: userID, Protocol: p.ID(),
-			SecretEnc: s.vault.Seal([]byte(iss.Secret), id), DataJSON: string(iss.NodeData), CreatedAt: now,
-		})
+		out = append(out, cred)
 	}
 	return out, nil
 }
@@ -233,16 +247,11 @@ func (s *Service) newEnrolledClientCreds(userID, deviceID string, happ, amnezia,
 		return out, nil
 	}
 	p, _ := s.reg.Get("trusttunnel")
-	issued, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
+	cred, err := s.deviceCred(p, userID, deviceID, s.now())
 	if err != nil {
 		return nil, err
 	}
-	id := store.NewID("crd_")
-	out = append(out, store.AccessCred{
-		ID: id, DeviceID: deviceID, UserID: userID, Protocol: p.ID(),
-		SecretEnc: s.vault.Seal([]byte(issued.Secret), id), DataJSON: string(issued.NodeData), CreatedAt: s.now(),
-	})
-	return out, nil
+	return append(out, cred), nil
 }
 
 func (s *Service) CreateUser(ctx context.Context, req *connect.Request[adminv1.CreateUserRequest]) (*connect.Response[adminv1.CreateUserResponse], error) {

@@ -36,12 +36,11 @@ func (s *Service) newTelegramCred(userID, deviceID string) (store.AccessCred, er
 	if err != nil {
 		return store.AccessCred{}, err
 	}
-	iss, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
+	cred, err := s.newCred(p, userID, deviceID)
 	if err != nil {
 		return store.AccessCred{}, s.internal("issue telegram key", err)
 	}
-	id := store.NewID("crd_")
-	return store.AccessCred{ID: id, Protocol: p.ID(), SecretEnc: s.vault.Seal([]byte(iss.Secret), id), DataJSON: string(iss.NodeData)}, nil
+	return cred, nil
 }
 
 func telegramKeyDevice(userID, deviceID string) store.AccessDevice {

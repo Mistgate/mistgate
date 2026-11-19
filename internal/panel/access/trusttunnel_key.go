@@ -34,12 +34,11 @@ func (s *Service) newTrustTunnelCred(userID, deviceID string) (store.AccessCred,
 	if err != nil {
 		return store.AccessCred{}, err
 	}
-	issued, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
+	cred, err := s.newCred(p, userID, deviceID)
 	if err != nil {
 		return store.AccessCred{}, s.internal("issue TrustTunnel key", err)
 	}
-	id := store.NewID("crd_")
-	return store.AccessCred{ID: id, Protocol: p.ID(), SecretEnc: s.vault.Seal([]byte(issued.Secret), id), DataJSON: string(issued.NodeData)}, nil
+	return cred, nil
 }
 
 func trustTunnelKeyDevice(userID, deviceID string) store.AccessDevice {
