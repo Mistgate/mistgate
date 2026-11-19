@@ -520,7 +520,7 @@ export function NodePageFrame() {
     // "Sites near the node" (tab=profiles&sni=<state>): the card in the state the panel's answer (or a click) leaves it in
     const sn = sniStateOf(params.get("sni"));
     sniDemo.current = undefined;
-    if (sn) sniScene(sn);
+    if (sn) sniScene(sn, made.data.inbounds as never);
     return made;
   });
   return (
@@ -555,6 +555,9 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-profiles-new", state: "new", tab: "profiles", title: "Profiles: none on the node yet", w: 1440, h: 700 },
   { id: "node-profiles-viewer", state: "viewer", tab: "profiles", title: "Profiles: a read-only role, no buttons", w: 1440, h: 1100 },
   ...sniStates.map((sni) => ({ id: `node-profiles-sni-${sni}`, state: (sni === "offline" ? "down" : "calm") as NState, tab: "profiles", q: `sni=${sni}`, title: `Profiles: sites near the node, ${sni}`, w: 1440, h: 1500 })),
+  ...(["apply", "apply-pick", "apply-same", "apply-old", "edit", "edit-own"] as const).flatMap((sni) => [
+    { id: `node-profiles-sni-${sni}-phone`, state: "calm" as NState, tab: "profiles", q: `sni=${sni}`, title: `Profiles: sites near the node, ${sni}, on a phone, 400 wide`, w: 400, h: 1500 },
+  ]),
   { id: "node-profiles-sni-viewer", state: "viewer", tab: "profiles", q: "sni=result", title: "Profiles: sites near the node, a read-only role has no card", w: 1440, h: 1100 },
   { id: "node-profiles-sni-edge", state: "edge", tab: "profiles", q: "sni=result", title: "Profiles: sites near the node, the Cloudflare edition has no card", w: 1440, h: 1100 },
   { id: "node-profiles-sni-phone", state: "calm", tab: "profiles", q: "sni=result", title: "Profiles: sites near the node on a phone, 400 wide", w: 400, h: 2600 },

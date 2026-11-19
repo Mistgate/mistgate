@@ -807,6 +807,72 @@ describe("the domain of a VLESS server", () => {
   });
 });
 
+describe("the site of a REALITY server on this node", () => {
+  const vless = { id: "inb_v", profileId: "prf_v", profileName: "vl", protocol: "vless", state: InboundState.ACTIVE, port: 443, tlsServerName: "", certNotAfterUnix: 0, certPinSha256: "", lastError: "", realityTarget: "www.example.org:443", realityTargetOverride: "" };
+  const field = () => input("Site on this node");
+  const edit = async (inbound: object) => {
+    updateInbound.mockResolvedValue({ inbound: {}, warnings: [], freePort: 0 });
+    await mount(data({ inbounds: [inbound] }));
+    await click(button("Edit"));
+    await settle();
+  };
+  const saves = () => updateInbound.mock.calls.filter(([r]) => !(r as { validateOnly?: boolean }).validateOnly).map(([r]) => r as Record<string, unknown>);
+
+  it("is a field where the profile shows another site, with the profile's target as its placeholder, and is sent as realityTargetOverride", async () => {
+    await edit(vless);
+    expect(field()?.placeholder).toBe("from the profile: www.example.org:443");
+    expect(input("Domain (SNI)")).toBeUndefined();
+    await type(field(), "shop.example.com:443");
+    await checked();
+    expect(updateInbound.mock.calls.some(([r]) => (r as { validateOnly?: boolean; realityTargetOverride?: string }).validateOnly && (r as { realityTargetOverride?: string }).realityTargetOverride === "shop.example.com:443")).toBe(true);
+    await submit();
+    await settle();
+    expect(saves()).toHaveLength(1);
+    expect(saves()[0]).toMatchObject({ inboundId: "inb_v", realityTargetOverride: "shop.example.com:443" });
+    expect(saves()[0]!.tlsServerNameOverride).toBeUndefined();
+  });
+
+  it("is not there for the node's own site, nor for a server that is not REALITY, and an untouched field sends nothing", async () => {
+    await edit({ ...vless, realityTarget: "self", tlsServerName: "de1.example.com" });
+    expect(field()).toBeUndefined();
+    expect(input("Domain (SNI)")).toBeDefined(); // the node's own site keeps its domain
+    act(() => root?.unmount());
+    host?.remove();
+    await edit({ ...vless, protocol: "hysteria2", realityTarget: "" });
+    expect(field()).toBeUndefined();
+  });
+
+  it("holds the site the node chose, in place of the domain, and 'Back to the profile's target' sends an empty one", async () => {
+    await edit({ ...vless, realityTarget: "shop.example.com:443", realityTargetOverride: "shop.example.com:443", tlsServerName: "shop.example.com" });
+    expect(field()?.value).toBe("shop.example.com:443");
+    expect(input("Domain (SNI)")).toBeUndefined();
+    await click(button("Back to the profile’s target"));
+    await checked();
+    expect(field()?.value).toBe("");
+    await submit();
+    await settle();
+    expect(saves()[0]).toMatchObject({ inboundId: "inb_v", realityTargetOverride: "" });
+  });
+
+  it("says why the panel refuses what is typed, and does not save it", async () => {
+    await edit(vless);
+    updateInbound.mockRejectedValue(refuse("reality_target_invalid: target=198.51.100.7:443"));
+    await type(field(), "198.51.100.7:443");
+    await checked();
+    expect(text()).toContain("“198.51.100.7:443” does not fit: write a site name and a port");
+    expect(document.querySelector<HTMLButtonElement>("[role=dialog] button[type=submit]")?.disabled).toBe(true);
+    await submit();
+    expect(saves()).toHaveLength(0);
+  });
+
+  it("leads to the card of neighbouring sites, which closes the window", async () => {
+    await edit(vless);
+    await click(button("Find sites nearby…"));
+    await settle();
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+  });
+});
+
 describe("who may change the servers on a node", () => {
   const hy = { id: "inb_1", profileId: "prf_1", profileName: "test", protocol: "hysteria2", state: InboundState.ACTIVE, port: 443, tlsServerName: "example.com", certNotAfterUnix: 0, certPinSha256: "", lastError: "" };
   const failed = { ...hy, id: "inb_2", state: InboundState.FAILED, lastError: "listen udp :443: bind: address already in use" };

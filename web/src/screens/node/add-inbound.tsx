@@ -26,6 +26,7 @@ import { asMode, AwgBackendChoice, canPrepare, useSaveAwgBackend, type AwgMode }
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
 import { markFresh } from "@/components/fx/registry";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
+import { tlsHint } from "./reality-target";
 
 type Node = NonNullable<Plain<GetNodeResponse>["node"]>;
 
@@ -257,7 +258,7 @@ function AddForm({
           value={sni}
           onChange={(e) => setSni(e.target.value)}
           placeholder={acme || realityDomain ? "vpn.example.com" : sniPlaceholder(t, effective?.tlsServerName, node.address)}
-          hint={acme || realityDomain ? undefined : t("node.profiles.tlsHint")}
+          hint={acme || realityDomain ? undefined : tlsHint(t, profile?.protocol)}
           error={sniError}
           mono
           autoFocus={realityDomain} // the field of the node's own site appears with the refusal: the cursor goes there as it does

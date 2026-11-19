@@ -15,19 +15,23 @@ import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { marksOf, minutesOf, sniScanQuery, statsOf, viewOf, type Candidate, type Mark, type Scan, type SniProblem } from "@/lib/sni-scan";
 import { useNow } from "@/lib/time";
+import type { Inbound } from "@/gen/mistgate/admin/v1/common_pb";
+import type { Plain } from "@/lib/plain";
 import { Spin } from "./parts";
+import { ApplyDialog } from "./sni-apply";
 import "./sni-scan.css";
 
 /**
  * "Sites near the node" on the node's Profiles tab, for a REALITY server that shows another site: the node itself walks the /24 of its address on
  * port 443 and the card lists what could be the target. It is the owner's action and a thing a hoster may take for scanning, so every scan
- * starts from a window that says so, with "Cancel" chosen. The card never applies a name: the owner copies it into the REALITY server's
- * settings. The names are text from other servers' certificates: they are shown as text, never as a link or an image, and nothing here asks
+ * starts from a window that says so, with "Cancel" chosen. A neighbour that DNS leads here can be applied to a REALITY server of the node
+ * ("Apply…", sni-apply.tsx: a window that says what changes and who has to refresh the subscription); any neighbour can be copied. The
+ * names are text from other servers' certificates: they are shown as text, never as a link or an image, and nothing here asks
  * the browser to open them. The card is not drawn for a helper, nor on the Cloudflare edition (the parent decides).
  */
 
 /** Development only (/dev-kit): the window starts open, a scan looks to be running, a too-early scan waits until then. */
-export const sniDemo: { current?: { warn?: boolean; running?: boolean; retryAfterS?: number } } = {};
+export const sniDemo: { current?: { warn?: boolean; running?: boolean; retryAfterS?: number; apply?: string; edit?: string } } = {};
 
 const nowS = () => Math.floor(Date.now() / 1000);
 
@@ -47,7 +51,7 @@ function useElapsed(on: boolean, from = 0) {
   return on && began > 0 ? Math.max(0, Math.floor((now - began) / 1000)) : from;
 }
 
-export function SniScanCard({ nodeId, nodeName, linked }: { nodeId: string; nodeName: string; linked: boolean }) {
+export function SniScanCard({ nodeId, nodeName, linked, servers = [] }: { nodeId: string; nodeName: string; linked: boolean; servers?: readonly Plain<Inbound>[] }) {
   const t = useT();
   const fmt = useFmt();
   const qc = useQueryClient();
@@ -56,6 +60,8 @@ export function SniScanCard({ nodeId, nodeName, linked }: { nodeId: string; node
   const titleId = useId();
   const stored = useQuery(sniScanQuery(nodeId));
   const [warn, setWarn] = useState(demo?.warn ?? false);
+  // the neighbour being applied to a REALITY server of the node (sni-apply.tsx)
+  const [applying, setApplying] = useState<string | null>(demo?.apply ?? null);
   // the second a "too early" answer said to wait until
   const [retryUntil, setRetryUntil] = useState(demo?.retryAfterS ? nowS() + demo.retryAfterS : 0);
   const run = useMutation({
@@ -74,7 +80,7 @@ export function SniScanCard({ nodeId, nodeName, linked }: { nodeId: string; node
   const label = running ? t("sni.running.short") : view.waitS > 0 ? t("sni.againIn", { minutes: minutesOf(view.waitS) }) : t(view.kept ? "sni.again" : "sni.find");
   return (
     <Card className="ss">
-      <section className="ss-body" aria-labelledby={titleId} data-testid="sni-card" data-phase={view.phase} data-fx={fx ? "" : undefined}>
+      <section id="sni-scan" className="ss-body" aria-labelledby={titleId} data-testid="sni-card" data-phase={view.phase} data-fx={fx ? "" : undefined}>
         <div className="ss-h">
           <IconChip icon="network" tone="sage" size={36} />
           <div className="ss-hd">
@@ -105,9 +111,10 @@ export function SniScanCard({ nodeId, nodeName, linked }: { nodeId: string; node
         ) : view.phase === "never" ? (
           <p className="ss-none">{t("sni.none")}</p>
         ) : (
-          scan && <Result t={t} fmt={fmt} scan={scan} phase={view.phase} />
+          scan && <Result t={t} fmt={fmt} scan={scan} phase={view.phase} canApply={servers.length > 0} onApply={setApplying} />
         )}
       </section>
+      {applying && <ApplyDialog site={applying} nodeId={nodeId} nodeName={nodeName} servers={servers} onClose={() => setApplying(null)} />}
       <Modal open={warn} onOpenChange={setWarn} title={t("sni.warn.title", { name: nodeName })} shot="sni-scan-warning"
         footer={
           <>
@@ -153,7 +160,7 @@ function Running({ t, elapsed }: { t: T; elapsed: number }) {
   );
 }
 
-function Result({ t, fmt, scan, phase }: { t: T; fmt: ReturnType<typeof useFmt>; scan: Scan; phase: "result" | "partial" | "empty" }) {
+function Result({ t, fmt, scan, phase, canApply, onApply }: { t: T; fmt: ReturnType<typeof useFmt>; scan: Scan; phase: "result" | "partial" | "empty"; canApply: boolean; onApply: (site: string) => void }) {
   const stats = statsOf(scan);
   return (
     <div className="ss-res">
@@ -179,7 +186,7 @@ function Result({ t, fmt, scan, phase }: { t: T; fmt: ReturnType<typeof useFmt>;
           <p className="ss-how">{t("sni.how")}</p>
           <ul className="ss-list">
             {scan.candidates.map((c, i) => (
-              <Row key={`${c.ip}-${c.name}`} t={t} c={c} i={i} />
+              <Row key={`${c.ip}-${c.name}`} t={t} c={c} i={i} onApply={canApply && c.dns === "here" ? onApply : undefined} />
             ))}
           </ul>
         </>
@@ -196,8 +203,8 @@ function Result({ t, fmt, scan, phase }: { t: T; fmt: ReturnType<typeof useFmt>;
 
 const chipTone: Record<NonNullable<Mark["tone"]>, Tone | undefined> = { good: "sage", warn: "sand", plain: undefined };
 
-/** One neighbour: its name and address as plain text (never a link or an image: the name is a stranger's) with its labels and "Copy". */
-function Row({ t, c, i }: { t: T; c: Candidate; i: number }) {
+/** One neighbour: its name and address as plain text (never a link or an image: the name is a stranger's) with its labels, "Copy" and, where DNS leads here, "Apply…". */
+function Row({ t, c, i, onApply }: { t: T; c: Candidate; i: number; onApply?: (site: string) => void }) {
   const marks = marksOf(c);
   return (
     <li className="ss-row" style={{ "--i": Math.min(i, 10) } as CSSProperties}>
@@ -217,6 +224,11 @@ function Row({ t, c, i }: { t: T; c: Candidate; i: number }) {
         ))}
       </div>
       <div className="ss-cp">
+        {onApply && (
+          <Button type="button" variant="secondary" size="md" title={t("sni.apply.hint")} onClick={() => onApply(c.name)}>
+            {t("sni.apply")}
+          </Button>
+        )}
         <CopyButton value={c.name} label={t("sni.copy")} size="md" iconOnly />
       </div>
     </li>
