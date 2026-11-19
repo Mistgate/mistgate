@@ -17,7 +17,7 @@ func TestFactsCopiesInHealth(t *testing.T) {
 		s := plugin.InboundSpec{ID: "x", Protocol: c.Protocol, Listen: plugin.Listen{Network: "tcp", Port: 443},
 			TLS: plugin.TLS{Mode: plugin.TLSMode(c.TLSMode), ServerName: c.SNI}, Settings: []byte(c.Settings)}
 		tg := &target{in: store.FleetInboundRow{Protocol: c.Protocol}, spec: s, settings: []byte(c.Settings)}
-		lines = append(lines, fmt.Sprintf("%-28s hy2DecoyPort=%d cdnHost=%q probeName=%q", c.ID, hy2DecoyPort(tg), cdnHost(tg), probeName(s)))
+		lines = append(lines, fmt.Sprintf("%-28s hy2DecoyPort=%d cdnHost=%q probeName=%q", c.ID, plugin.Hy2SitePort(tg.spec), cdnHost(tg), probeName(s)))
 	}
 	plugintest.Golden(t, "facts_copies_health.golden", lines)
 }

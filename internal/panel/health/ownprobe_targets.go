@@ -97,7 +97,7 @@ func (s *Service) ProbeTargets(ctx context.Context) ([]ProbeTarget, error) {
 				if !countryreach.ProbeSNI(sni) {
 					continue
 				}
-				if port := hy2DecoyPort(t); port > 0 {
+				if port := plugin.Hy2SitePort(t.spec); port > 0 {
 					tlsTargets = append(tlsTargets, ProbeTarget{NodeID: n.node.ID, IP: ip, Port: port, Kind: "tls", SNI: sni, Path: "/"})
 				}
 			}
