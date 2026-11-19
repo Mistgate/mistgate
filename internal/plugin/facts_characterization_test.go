@@ -19,7 +19,7 @@ func TestFactsCopiesInPlugin(t *testing.T) {
 		r, ok := tcpRoute(s)
 		target, name, tok := RealityTarget(s)
 		lines = append(lines,
-			fmt.Sprintf("%-28s tcpOwnSite=%v hy2SitePort=%d", c.ID, tcpOwnSite(s), hy2SitePort(s)),
+			fmt.Sprintf("%-28s tcpOwnSite=%v hy2SitePort=%d", c.ID, tcpOwnSite(s), Hy2SitePort(s)),
 			fmt.Sprintf("%-28s tcpRoute=%v reality=%v site=%v ok=%v", c.ID, r.Names, r.Reality, r.Site, ok),
 			fmt.Sprintf("%-28s RealityTarget=%q,%q,%v shown=%q", c.ID, target, name, tok, RealityTargetShown(s)))
 	}

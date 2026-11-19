@@ -25,10 +25,10 @@ hy2-p8443                    RealityTarget="","",false shown=""
 hy2-p65535                   tcpOwnSite=false hy2SitePort=65535
 hy2-p65535                   tcpRoute=[] reality=false site=false ok=false
 hy2-p65535                   RealityTarget="","",false shown=""
-hy2-p65536                   tcpOwnSite=false hy2SitePort=65535
+hy2-p65536                   tcpOwnSite=false hy2SitePort=0
 hy2-p65536                   tcpRoute=[] reality=false site=false ok=false
 hy2-p65536                   RealityTarget="","",false shown=""
-hy2-p70000                   tcpOwnSite=false hy2SitePort=65535
+hy2-p70000                   tcpOwnSite=false hy2SitePort=0
 hy2-p70000                   tcpRoute=[] reality=false site=false ok=false
 hy2-p70000                   RealityTarget="","",false shown=""
 hy2-pnull                    tcpOwnSite=false hy2SitePort=443
@@ -133,11 +133,11 @@ vless-self                   RealityTarget="","",false shown="self"
 vless-self+sni               tcpOwnSite=true hy2SitePort=0
 vless-self+sni               tcpRoute=[self.example.com] reality=true site=true ok=true
 vless-self+sni               RealityTarget="","",false shown="self"
-vless-self-sp                tcpOwnSite=false hy2SitePort=0
-vless-self-sp                tcpRoute=[self.example.com] reality=true site=false ok=true
+vless-self-sp                tcpOwnSite=true hy2SitePort=0
+vless-self-sp                tcpRoute=[self.example.com] reality=true site=true ok=true
 vless-self-sp                RealityTarget="","",false shown="self"
-vless-self-sp+sni            tcpOwnSite=false hy2SitePort=0
-vless-self-sp+sni            tcpRoute=[self.example.com] reality=true site=false ok=true
+vless-self-sp+sni            tcpOwnSite=true hy2SitePort=0
+vless-self-sp+sni            tcpRoute=[self.example.com] reality=true site=true ok=true
 vless-self-sp+sni            RealityTarget="","",false shown="self"
 vless-self-nonames           tcpOwnSite=true hy2SitePort=0
 vless-self-nonames           tcpRoute=[] reality=true site=true ok=false
