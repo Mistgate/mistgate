@@ -5,6 +5,7 @@ package subhost
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"log/slog"
 	"net/netip"
@@ -32,6 +33,7 @@ type fakeFleet struct {
 	isHost    func(string) bool
 	link      string
 	enrolLink bool
+	target    func(id, site, bootstrap string) (string, string, string, bool, bool)
 }
 
 func (f *fakeFleet) HasSession(id string) bool { f.mu.Lock(); defer f.mu.Unlock(); return f.online[id] }
@@ -54,6 +56,18 @@ func (f *fakeFleet) SetSubHostNodes(fn func(string) bool) { f.mu.Lock(); f.isHos
 func (f *fakeFleet) SetPanelLink(l string)                { f.mu.Lock(); f.link = l; f.mu.Unlock() }
 func (f *fakeFleet) SetLinkEnrollment(on bool)            { f.mu.Lock(); f.enrolLink = on; f.mu.Unlock() }
 func (f *fakeFleet) StateChanged()                        {}
+func (f *fakeFleet) PanelIdentity(time.Time) ([]byte, *ecdsa.PrivateKey, error) {
+	return nil, nil, errors.New("no CA in this test")
+}
+func (f *fakeFleet) SubHostTarget(_ context.Context, id, site, bootstrap string) (string, string, string, bool, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.target == nil {
+		return "", "", "", false, false
+	}
+	return f.target(id, site, bootstrap)
+}
+func (f *fakeFleet) SubHostStatus(string) *agentv1.SubHostStatus { return nil }
 
 type fakeResolver map[string][]netip.Addr
 
@@ -415,5 +429,61 @@ func TestRestartInTheMiddleOfAMove(t *testing.T) {
 	}
 	if len(fl.roles) != 2 || fl.roles[a] == nil || fl.roles[b] == nil || addr.PublicURL() != "https://sub.example.com" || fl.link == "" {
 		t.Fatalf("after a restart: roles %v, address %q", fl.roles, addr.PublicURL())
+	}
+}
+
+// The panel dials exactly the hosts of the state (both while moving), with the path of the state and the pin the fleet gives,
+// and stops once the role is gone; a host with nothing to verify it by is not dialled.
+func TestPanelDialsItsHosts(t *testing.T) {
+	e := newEnv(t)
+	t.Cleanup(e.svc.Close)
+	a := e.node("a", "203.0.113.1", allCaps, true)
+	b := e.node("b", "203.0.113.2", allCaps, true)
+	pin := strings.Repeat("ab", 32)
+	e.fl.target = func(id, _, _ string) (string, string, string, bool, bool) {
+		if id == b {
+			return "", "", "", false, false
+		}
+		return "127.0.0.1", "de1.example.com", pin, false, true
+	}
+	e.svc.cfg.HostPort = 1 // nothing listens: the dial fails, which is all this test needs
+	if err := e.set(a, "sub.example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	peers := func() map[string]bool {
+		out := map[string]bool{}
+		for _, d := range e.svc.tun.dialer.States() {
+			if d.Error != "no_verification" {
+				out[d.PeerNodeID] = true
+			}
+		}
+		return out
+	}
+	if p := peers(); !p[a] || p[b] {
+		t.Fatalf("dialled %v, want a only", p)
+	}
+	if _, err := e.rpc.StartSubscriptionHostMove(e.ctx, connect.NewRequest(&subhostv1.StartSubscriptionHostMoveRequest{NodeId: b})); err != nil {
+		t.Fatal(err)
+	}
+	g, err := e.rpc.GetSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.GetSubscriptionHostRequest{}))
+	if err != nil || len(g.Msg.Host.Bridges) != 2 || g.Msg.Host.Bridges[0].Up {
+		t.Fatalf("bridges %v, %v", g.Msg.GetHost().GetBridges(), err)
+	}
+	if _, err := e.rpc.DisableSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.DisableSubscriptionHostRequest{PublicUrl: "https://back.example"})); err == nil {
+		t.Fatal("a move must be finished or cancelled before turning off")
+	}
+	if _, err := e.rpc.CancelSubscriptionHostChange(e.ctx, connect.NewRequest(&subhostv1.CancelSubscriptionHostChangeRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.rpc.DisableSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.DisableSubscriptionHostRequest{PublicUrl: "https://back.example"})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.rpc.FinishSubscriptionHostChange(e.ctx, connect.NewRequest(&subhostv1.FinishSubscriptionHostChangeRequest{Force: true})); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range e.svc.tun.dialer.States() {
+		if d.Conns != 0 {
+			t.Fatalf("still connected to %s", d.PeerNodeID)
+		}
 	}
 }

@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/tls"
+	"net"
 	"net/http"
 
 	"connectrpc.com/connect"
@@ -13,4 +15,6 @@ type subHostService interface {
 	Handler(opts ...connect.HandlerOption) (string, http.Handler)
 	Load(ctx context.Context) error
 	Run(ctx context.Context)
+	PublicListener() net.Listener
+	PublicTLS() *tls.Config
 }

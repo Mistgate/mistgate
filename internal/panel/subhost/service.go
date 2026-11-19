@@ -7,6 +7,8 @@ package subhost
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -19,6 +21,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"golang.org/x/crypto/acme"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	subhostv1 "github.com/mistgate/mistgate/gen/mistgate/subhost/v1"
@@ -40,6 +43,9 @@ type Fleet interface {
 	SetPanelLink(linkURL string)
 	SetLinkEnrollment(on bool)
 	StateChanged()
+	PanelIdentity(now time.Time) ([]byte, *ecdsa.PrivateKey, error)
+	SubHostTarget(ctx context.Context, nodeID, siteName, bootstrapPin string) (host, sni, pin string, public, ok bool)
+	SubHostStatus(nodeID string) *agentv1.SubHostStatus
 }
 
 // Resolver looks up the addresses of a host (net.DefaultResolver).
@@ -57,10 +63,13 @@ type Config struct {
 	// ACMEDir is the autocert cache directory (the account key for the CAA record); "" = no account yet.
 	ACMEDir string
 	// Test seams.
-	Resolver Resolver
-	CAA      func(ctx context.Context, name string) (issue []string, found bool, err error)
-	Now      func() time.Time
-	Log      *slog.Logger
+	HostPort    uint16                                               // the hosts' port; 0 = 443
+	ACMEClient  *acme.Client                                         // nil = Let's Encrypt
+	Certificate func(*tls.ClientHelloInfo) (*tls.Certificate, error) // the subdomain's certificate instead of ACME's
+	Resolver    Resolver
+	CAA         func(ctx context.Context, name string) (issue []string, found bool, err error)
+	Now         func() time.Time
+	Log         *slog.Logger
 }
 
 // Service is the subscription host: the owner's RPCs and the routing the panel follows.
@@ -70,6 +79,8 @@ type Service struct {
 
 	cmu sync.Mutex
 	cur state // the state of the last applyRouting
+
+	tun *tunnel // tunnel.go
 
 	caaMu    sync.Mutex
 	caaCache map[string]caaEntry
@@ -90,7 +101,9 @@ func New(cfg Config) *Service {
 	if cfg.CAA == nil {
 		cfg.CAA = lookupCAA
 	}
-	return &Service{cfg: cfg, caaCache: map[string]caaEntry{}}
+	s := &Service{cfg: cfg, caaCache: map[string]caaEntry{}}
+	s.newTunnel()
+	return s
 }
 
 // Load reads the stored state and applies it (the public address, the fleet's settings). The app calls it at start, so the
@@ -109,17 +122,25 @@ func (s *Service) Load(ctx context.Context) error {
 	return nil
 }
 
-// Run refreshes the hosts' roles (the fleet's addresses change) until ctx ends.
+// Run keeps the dialer on the hosts (their pins and certificates change) and refreshes their roles (the fleet's addresses
+// change) until ctx ends.
 func (s *Service) Run(ctx context.Context) {
-	tick := time.NewTicker(30 * time.Second)
+	defer s.Close()
+	tick := time.NewTicker(10 * time.Second)
 	defer tick.Stop()
-	for {
+	for n := 1; ; n++ {
 		select {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
 		}
-		s.refresh(ctx)
+		if n%6 == 0 {
+			s.refresh(ctx)
+		} else {
+			s.mu.Lock()
+			s.syncDials(s.current())
+			s.mu.Unlock()
+		}
 	}
 }
 
@@ -389,6 +410,7 @@ func (s *Service) applyRouting(ctx context.Context, st state) {
 	s.cmu.Lock()
 	s.cur = st
 	s.cmu.Unlock()
+	s.syncDials(st)
 }
 
 // transition loads the state, lets change edit it, saves and applies it. change returns the refusal, if any.
