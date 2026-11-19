@@ -75,5 +75,5 @@ func init() {
 	grantProcedures["decoy_site_revert"] = []string{decoysitev1connect.DecoySiteServiceRevertDecoySiteProcedure}
 	grantProcedures["decoy_site_delete"] = []string{decoysitev1connect.DecoySiteServiceDeleteDecoySiteProcedure}
 	// the plan of an assignment asks what it would replace: a dry run changes nothing, even for a draft that is not ready yet
-	planningRequests[decoysitev1connect.DecoySiteServiceAssignDecoySiteProcedure] = planningCheck((*decoysitev1.AssignDecoySiteRequest).GetDryRun)
+	planningExtra[decoysitev1connect.DecoySiteServiceAssignDecoySiteProcedure] = planningCheck((*decoysitev1.AssignDecoySiteRequest).GetDryRun)
 }

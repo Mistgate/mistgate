@@ -9,7 +9,7 @@ import (
 // A dry-run call is opened by a flag of the request, so every row of the table has to name a real bool flag of its own message,
 // and has to sit on a procedure that only the owner's approval opens (a row on any other procedure would never be asked).
 func TestPlanningRequestsAreChecksOfApprovedProcedures(t *testing.T) {
-	for path, row := range planningRequests {
+	for path, row := range planningRequests() {
 		if access, ok := TokenAccess(path); !ok || access != TokenAccessApproved {
 			t.Errorf("%s has a dry-run row and token access %d (listed %v), want approved", path, access, ok)
 		}

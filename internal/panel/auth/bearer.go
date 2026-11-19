@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"maps"
 	"mime"
 	"net/http"
 	"net/netip"
@@ -270,7 +271,7 @@ func (s *Service) tokenDenied(r *http.Request, tok store.APIToken, path string) 
 // back for the handler. Anything it cannot read as such (compressed, another content type, too large) is not a dry run.
 // It is the one test of a plan's check call: the middleware applies it, and the MCP tests' stand-in for the middleware too.
 func PlanningDryRun(r *http.Request) bool {
-	x, ok := planningRequests[r.URL.Path]
+	x, ok := planningRequests()[r.URL.Path]
 	if !ok {
 		return false
 	}
@@ -310,15 +311,23 @@ func planningCheck[M proto.Message](flag func(M) bool) planningRequest {
 	}
 }
 
+// planningExtra is the dry-run requests of the services the Cloudflare edition does not link, added by their policy files.
+var planningExtra = map[string]planningRequest{}
+
 // planningRequests is the one table of the dry-run procedures: the procedures a plan may call under planning, and the flag
-// of the request that makes the call a check. The policy files of the services the Cloudflare edition does not link add theirs.
-var planningRequests = map[string]planningRequest{
-	adminv1connect.HealthServiceApplyFixProcedure:       planningCheck((*adminv1.ApplyFixRequest).GetDryRun),
-	adminv1connect.ProfileServiceUpdateProfileProcedure: planningCheck((*adminv1.UpdateProfileRequest).GetDryRun),
-	adminv1connect.ProfileServiceCreateInboundProcedure: planningCheck((*adminv1.CreateInboundRequest).GetValidateOnly),
-	adminv1connect.GroupServiceUpdateGroupProcedure:     planningCheck((*adminv1.UpdateGroupRequest).GetDryRun),
-	adminv1connect.GroupServiceSetNodeSharingProcedure:  planningCheck((*adminv1.SetNodeSharingRequest).GetDryRun),
-	adminv1connect.ProfileServiceUpdateInboundProcedure: planningCheck((*adminv1.UpdateInboundRequest).GetValidateOnly),
+// of the request that makes the call a check. It is built where it is read, not at start-up: the edge Workers that never see a
+// token's plan would otherwise carry the request types of every row.
+func planningRequests() map[string]planningRequest {
+	m := map[string]planningRequest{
+		adminv1connect.HealthServiceApplyFixProcedure:       planningCheck((*adminv1.ApplyFixRequest).GetDryRun),
+		adminv1connect.ProfileServiceUpdateProfileProcedure: planningCheck((*adminv1.UpdateProfileRequest).GetDryRun),
+		adminv1connect.ProfileServiceCreateInboundProcedure: planningCheck((*adminv1.CreateInboundRequest).GetValidateOnly),
+		adminv1connect.GroupServiceUpdateGroupProcedure:     planningCheck((*adminv1.UpdateGroupRequest).GetDryRun),
+		adminv1connect.GroupServiceSetNodeSharingProcedure:  planningCheck((*adminv1.SetNodeSharingRequest).GetDryRun),
+		adminv1connect.ProfileServiceUpdateInboundProcedure: planningCheck((*adminv1.UpdateInboundRequest).GetValidateOnly),
+	}
+	maps.Copy(m, planningExtra)
+	return m
 }
 
 // serveToken is RequireSession for a request with a Bearer header.
