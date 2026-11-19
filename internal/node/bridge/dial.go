@@ -90,6 +90,7 @@ type dialTiming struct {
 	targetTimeout  time.Duration
 	keepAlive      time.Duration
 	streamIdle     time.Duration
+	writeProgress  time.Duration
 	pendingWorkers int
 	retryJitter    func(time.Duration) time.Duration
 }
@@ -111,6 +112,7 @@ func defaultDialTiming() dialTiming {
 		targetTimeout:  BridgeTargetDialTimeout,
 		keepAlive:      BridgeKeepAlive,
 		streamIdle:     BridgeStreamIdleTimeout,
+		writeProgress:  BridgeProgressTimeout,
 		pendingWorkers: PendingWorkersPerConn,
 	}
 }
@@ -369,7 +371,7 @@ func (d *Dialer) runConnection(run *dialRun, slotCtx context.Context, index int)
 			delay = min(delay*2, d.timing.retryMax)
 			continue
 		}
-		transport := &http2.Transport{}
+		transport := newBridgeTransport()
 		cc, err := transport.NewClientConn(conn)
 		if err != nil {
 			_ = conn.Close()
@@ -956,6 +958,10 @@ func (d *Dialer) responseToTarget(ctx context.Context, run *dialRun, dst *idleCo
 		}
 		n, readErr := src.Read(buf)
 		if n > 0 {
+			// A target that stops reading for writeProgress loses the stream, as a person who stops reading does at the entry.
+			if d.timing.writeProgress > 0 {
+				_ = dst.SetWriteDeadline(time.Now().Add(d.timing.writeProgress))
+			}
 			if err := writeFull(dst, buf[:n]); err != nil {
 				return err
 			}
@@ -999,6 +1005,25 @@ func (d *Dialer) targetToDown(ctx context.Context, run *dialRun, src *idleConn, 
 
 func dialTLS(ctx context.Context, dial plugin.BridgeDial, identity DialIdentity) (net.Conn, Proof, error) {
 	return dialTLSWithTimeout(ctx, dial, identity, BridgeDialTimeout, BridgeKeepAlive, nil)
+}
+
+// The exit's HTTP/2 receive windows, set rather than left to x/net's client defaults (4 MiB a stream, 1 GiB a connection),
+// which bound nothing. They travel inside TLS, so only the entry sees them. The entry's side stays sitehttp's, as every site's.
+const (
+	bridgeStreamWindow = 1 << 20
+	bridgeConnWindow   = 16 << 20
+	bridgeWriteTimeout = BridgeProgressTimeout // a TLS connection the entry stops reading from is closed
+)
+
+// newBridgeTransport is the exit's HTTP/2 client: x/net reads the windows from a net/http Transport it is configured on.
+func newBridgeTransport() *http2.Transport {
+	t1 := &http.Transport{HTTP2: &http.HTTP2Config{MaxReceiveBufferPerStream: bridgeStreamWindow, MaxReceiveBufferPerConnection: bridgeConnWindow}}
+	t2, err := http2.ConfigureTransports(t1)
+	if err != nil { // only when t1 was configured already, which this one is not
+		t2 = &http2.Transport{}
+	}
+	t2.WriteByteTimeout = bridgeWriteTimeout
+	return t2
 }
 
 func dialTLSWithTimeout(ctx context.Context, dial plugin.BridgeDial, identity DialIdentity, timeout, keepAlive time.Duration, roots *x509.CertPool) (net.Conn, Proof, error) {
