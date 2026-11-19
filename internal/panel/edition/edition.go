@@ -22,7 +22,6 @@ const (
 	MCP          = "mcp"
 	Assistant    = "assistant"
 	HealthChecks = "health_checks"
-	AgentUpdates = "agent_updates"
 	AgentLogs    = "agent_logs"
 	PanelUpdate  = "panel_update"
 	DecoyOwn     = "decoy_own"
