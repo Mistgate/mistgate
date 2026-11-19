@@ -37,6 +37,7 @@ test('the manifest has what the generator needs, for every page and language', {
     assert.ok(m.title && m.description, `${p}/${l}: title and description (${m.todo ? 'marked todo' : 'missing'})`);
     assert.ok(m.modules.length >= 1);
     assert.equal(m.htmlAttrs['data-lg'], l.toUpperCase());
+    assert.equal(m.fetch.length, 1); assert.ok(m.fetch[0].startsWith('assets/lang-'));
   });
 });
 

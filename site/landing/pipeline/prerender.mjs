@@ -31,7 +31,7 @@ export async function prerender({ build, manifest, bundles, pages, langs, profil
       for (let i = 0; i < 200 && !html; i++) { await sleep(100); html = await chrome.ev('window.__PRE || null').catch(() => null); }
       const key = `${page}:${lang}`;
       if (!html) throw new Error(`${key}: the page did not mount (no first render in 20 s): ${w.errors.slice(0, 3).join(' | ')}`);
-      const facts = await chrome.ev(`(() => { const t = (s) => { const e = document.querySelector(s); return e ? e.textContent.replace(/\\s+/g, ' ').trim() : ''; }; return { h1: t('.hero h1'), lead: t('.hero-s'), html: document.documentElement.getAttribute('data-lg') }; })()`);
+      const facts = await chrome.ev(`(() => { const t = (s) => { const e = document.querySelector(s); return e ? e.textContent.replace(/\\s+/g, ' ').trim() : ''; }; const lines = [...document.querySelectorAll('.hero h1 .ln')].map((e) => e.textContent.replace(/\\s+/g, ' ').trim()); return { h1: lines.length ? lines.join(' ') : t('.hero h1'), lead: t('.hero-s'), html: document.documentElement.getAttribute('data-lg') }; })()`);
       fragments[key] = hostOpen(page, lang, bundles[key]) + html + '</div>';
       report[key] = { ...facts, bytes: Buffer.byteLength(fragments[key]), errors: [...w.errors] };
       if (w.errors.length) console.warn(`prerender ${key}: ${w.errors.length} console errors, first: ${w.errors[0]}`);

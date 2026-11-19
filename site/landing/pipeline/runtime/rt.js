@@ -109,7 +109,8 @@ export async function boot(name, Page, eager = {}) {
   try { localStorage.setItem('mg-lang', LG); } catch (e) { /* storage is blocked: the patch reads window.MG_LANG */ }
   document.documentElement.setAttribute('data-lg', LG);
   const bundle = host.getAttribute('data-bundle');
-  const b = bundle ? await (await fetch(bundle)).json() : {};
+  // the language bundle and the boards of the first screen are fetched together
+  const [b] = await Promise.all([bundle ? fetch(bundle).then((r) => r.json()) : {}, ...(eager[lang] || eager.all || []).map(async (n) => { registry.eager[n] = (await registry.load[n]()).default; })]);
   Object.assign(CFG, { links: b.links || {}, css: b.css || {}, pages: b.pages || {} });
   if (b.dict && registry.i18n) registry.i18n(b.dict); // the translator of the design (generated, see translate.mjs)
   window.__dcNav = (to) => {
@@ -120,8 +121,7 @@ export async function boot(name, Page, eager = {}) {
     return true;
   };
   try { const y = +sessionStorage.getItem('mg-scroll'); if (y) { sessionStorage.removeItem('mg-scroll'); setTimeout(() => window.scrollTo(0, y), 0); } } catch (e) { /* no storage */ }
-  // boards of the first screen (of the page language) are there before the first render: the pre-rendered markup is adopted as it is
-  await Promise.all((eager[lang] || eager.all || []).map(async (n) => { registry.eager[n] = (await registry.load[n]()).default; }));
+  // the boards of the first screen are there before the first render: the pre-rendered markup is adopted as it is
   render(h(Page, { ref: (i) => { window.__dcPage = i; } }), host); // the instance of the page: the stand drives its tours
   if (window.MG_I18N && window.MG_I18N.now) window.MG_I18N.now();
   if (/[?&]prerender\b/.test(location.search)) window.__PRE = host.innerHTML; // build time: the markup of the first render, before any timer

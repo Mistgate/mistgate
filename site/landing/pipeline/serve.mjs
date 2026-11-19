@@ -29,6 +29,7 @@ ${alts}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 ${(m.fonts || []).map((f) => `<link rel="preload" href="/${f}" as="font" type="font/woff2" crossorigin>`).join('\n')}
 ${m.css.map((c) => `<link rel="stylesheet" href="/${c}">`).join('\n')}
+${(m.fetch || []).map((f) => `<link rel="preload" href="/${f}" as="fetch" crossorigin>`).join('\n')}
 ${(m.preload || []).map((p) => `<link rel="modulepreload" href="/${p}">`).join('\n')}
 </head>
 <body>

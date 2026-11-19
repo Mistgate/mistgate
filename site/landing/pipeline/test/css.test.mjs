@@ -7,6 +7,7 @@ const CSS = `
 .b{color:blue}
 .a .b,.c .b{margin:0}
 .lx-sw0{x:1}.lx-sw1{x:2}.zz-0{x:3}
+.g-camera{x:4}.g-mic{x:6}.h-other{x:5}
 .d:not(.e){y:1}
 .f[data-x="1"]{y:2}
 html[data-lg=FA] .a{z:1}
@@ -20,12 +21,13 @@ html[data-lg=FA] .a{z:1}
 `;
 
 test('selectors stay when every class of them is used; keyframes by name', () => {
-  const u = usage(['<div class="a lx-sw{{i}} d f">x</div><script>cls = "lx-sw" + n; el.style.animation = "byScript 1s"</script>']);
+  const u = usage(['<div class="a lx-sw{{i}} d f">x</div><span class="gl g-{{n.g}}"></span><script>icons = [{ g: "camera" }];cls = "lx-sw" + n; el.style.animation = "byScript 1s"</script>']);
   const r = pruneCss(CSS, u).css;
   assert.match(r, /\.a\{color:red\}/);
   assert.doesNotMatch(r, /\.b\{color:blue\}/, 'an unused class goes');
   assert.doesNotMatch(r, /\.c \.b/, 'a rule whose selectors are all unused goes');
   assert.match(r, /\.lx-sw0/); assert.match(r, /\.lx-sw1/); assert.doesNotMatch(r, /\.zz-0/, 'a class assembled by a script is kept by its prefix only');
+  assert.match(r, /\.g-camera/, 'a two-letter prefix that ends in a dash counts (class="gl g-{{icon}}")'); assert.doesNotMatch(r, /\.h-other/); assert.doesNotMatch(r, /\.g-mic/, 'the rest of a class assembled from data must occur in the sources');
   assert.match(r, /\.d:not\(\.e\)/, 'a class inside :not() is not demanded');
   assert.match(r, /\.f\[data-x="1"\]/); assert.match(r, /html\[data-lg=FA\] \.a/);
   assert.match(r, /@media[^{]*\{[^}]*\.a\{w:1\}/); assert.doesNotMatch(r, /\.c\{w:2\}/);

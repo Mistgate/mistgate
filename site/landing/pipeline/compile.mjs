@@ -86,7 +86,11 @@ export function compileBoard(src, name, opts = {}) {
   const assets = [], blobs = new Set();
   logic = logic.replace(/\/_blob\/([0-9a-f]{32})/g, (_, h) => { blobs.add(h); return blobUrl(h); });
   let scoped = 0;
-  if (!opts.page) { const r = scopeLookups(logic, name); logic = r.code; scoped = r.count; }
+  if (!opts.page) {
+    const r = scopeLookups(logic, name); logic = r.code; scoped = r.count;
+    // nothing may be left (a lookup written some other way, e.g. through a variable that holds document)
+    if (/\bdocument\s*\[|\bdocument\.(querySelector|querySelectorAll|getElementById|getElementsBy\w+)\b/.test(logic)) throw new Error(`${name}: a global lookup is left after the scope rewrite`);
+  }
 
   // original case of attribute names: parse5 lowercases them on HTML elements (onClick -> onclick, defaultValue -> defaultvalue)
   const raw = src.slice(src.indexOf('<x-dc>'), src.indexOf('</x-dc>'));
