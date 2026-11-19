@@ -31,13 +31,31 @@ func cmdEnroll(args []string) int {
 	stateDir := fs.String("state-dir", envOr("MISTGATE_NODE_STATE_DIR", defaultStateDir), "state directory")
 	force := fs.Bool("force", false, "replace an existing identity")
 	resumeKey := fs.Bool("resume-key", false, "persist the pending key so an interrupted SSH enrollment can be retried safely")
+	offlineCSR := fs.Bool("offline-csr", false, "offline enrollment (a subscription host), step 1: keep a new key and print its CSR for the panel")
+	offlineFinish := fs.Bool("offline-finish", false, "offline enrollment, step 2: read the role line (JSON), then the node and the CA certificates (PEM) from stdin")
+	nodeID := fs.String("node-id", "", "with --offline-finish: the node id the panel gave")
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(), "usage: mistgate-node enroll (--panel <host:port> --sni <name> | --link-url <wss://host/prefix/>) --ca-sha256 <hex> (--token <token> | --token-stdin) [--state-dir dir]\n"+
-			"The panel prints the --token form when you add a node. Use --token-stdin to keep the token out of process arguments.\n\n")
+			"       mistgate-node enroll --offline-csr [--state-dir dir]\n"+
+			"       mistgate-node enroll --offline-finish --node-id <id> --ca-sha256 <hex> [--state-dir dir] < role-and-pem\n"+
+			"The panel prints the --token form when you add a node. Use --token-stdin to keep the token out of process arguments.\n"+
+			"The panel runs --offline-csr and --offline-finish itself when it installs a subscription host over SSH.\n\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if *offlineCSR || *offlineFinish {
+		explicit := map[string]bool{}
+		fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
+		if *offlineCSR && *offlineFinish || explicit["token"] || explicit["token-stdin"] || explicit["panel"] || explicit["sni"] || explicit["link-url"] {
+			fmt.Fprintln(os.Stderr, "enroll: --offline-csr and --offline-finish exclude each other and --token, --token-stdin, --panel, --sni and --link-url")
+			return 2
+		}
+		if *offlineCSR {
+			return enrollOfflineCSR(os.Stdout, *stateDir, *force)
+		}
+		return enrollOfflineFinish(os.Stdin, os.Stdout, agent.OfflineEnrollConfig{StateDir: *stateDir, NodeID: *nodeID, CASHA256: *pin, Force: *force})
 	}
 	resolvedToken, err := resolveEnrollmentToken(os.Stdin, *token, os.Getenv("MISTGATE_ENROLL_TOKEN"), *tokenStdin)
 	if err != nil {
