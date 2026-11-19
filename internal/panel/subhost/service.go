@@ -475,3 +475,20 @@ func (s *Service) view(ctx context.Context) (*subhostv1.SubscriptionHost, error)
 	h.CaaRecord, h.CaaStatus = s.caa(ctx, st.Domain)
 	return h, nil
 }
+
+// RoleOf is the subscription host role of a node now (the host, and the next one while moving): what its inbounds must fit.
+func (s *Service) RoleOf(nodeID string) (plugin.SubHostRole, bool) {
+	st := s.current()
+	if st.State == stateOff || nodeID == "" {
+		return plugin.SubHostRole{}, false
+	}
+	switch nodeID {
+	case st.Node:
+		return plugin.SubHostRole{Names: []string{st.Domain}, Path: st.Path, SiteName: st.SiteName}, true
+	case st.Next:
+		if st.State == stateMoving {
+			return plugin.SubHostRole{Names: []string{st.Domain}, Path: st.Path, SiteName: st.NextSiteName}, true
+		}
+	}
+	return plugin.SubHostRole{}, false
+}

@@ -23,6 +23,7 @@ func newSubHost(k *core) subHostService {
 	}
 	svc := subhost.New(subhost.Config{Store: k.st, Fleet: k.fl, Addr: k.addr, StepUp: k.authSvc.RequireStepUp,
 		LinkPrefix: k.in.LinkPrefix, ACMEDir: acmeDir, Now: k.c.Clock, Log: k.log})
+	k.acc.SetSubHostRoles(svc.RoleOf) // an inbound change that would make a host unfit is refused
 	if err := svc.Load(context.Background()); err != nil {
 		k.log.Error("subscription host: read state", "code", "sub_host_state_read_failed", "err", err)
 	}

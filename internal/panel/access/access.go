@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -78,6 +79,7 @@ type Config struct {
 // Service implements ProfileService, UserService, GroupService, DeviceService, AwgService and RelayService (adminv1connect
 // handler interfaces).
 type Service struct {
+	hostRoles     atomic.Pointer[subHostRoles] // host_guard.go
 	st            *store.Store
 	vault         *vault.Vault
 	reg           *protocols.Registry
