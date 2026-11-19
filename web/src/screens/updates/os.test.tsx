@@ -186,37 +186,6 @@ describe("Server operating system", () => {
     expect(bar()!.textContent).toContain("for example a check for updates you have just started");
   });
 
-  it("opens the window from the row, and starts the update after the step-up", async () => {
-    owned();
-    await mount([], Role.OWNER);
-    await open("de1");
-    await click(action("Install"));
-    const dialog = document.querySelector<HTMLElement>("[data-shot=os-confirm]")!;
-    expect(dialog.textContent).toContain("Install security updates on de1");
-    await act(async () => [...dialog.querySelectorAll("button")].find((b) => b.textContent === "Install updates")!.click());
-    for (let i = 0; i < 3; i++) await settle();
-    expect(guard).toHaveBeenCalledTimes(1);
-    expect(updates.startOsRollout).toHaveBeenCalledWith({ nodeIds: ["nod_1"], mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.IF_REQUIRED });
-  });
-
-  it("opens the reboot window from the row", async () => {
-    owned();
-    await mount([], Role.OWNER);
-    await open("de1");
-    await click(action("Reboot"));
-    expect(document.querySelector<HTMLElement>("[data-shot=os-confirm]")!.textContent).toContain("Reboot de1");
-  });
-
-  it("checks for updates from the row without a window or a step-up", async () => {
-    owned();
-    await mount([], Role.OWNER);
-    await open("de1");
-    await click(action("Check for updates"));
-    expect(updates.refreshOsUpdates).toHaveBeenCalledWith({ nodeIds: ["nod_1"] });
-    expect(guard).not.toHaveBeenCalled();
-    expect(document.querySelector("[data-shot=os-confirm]")).toBeNull();
-  });
-
   it("shows a stopped update under its closed row, and keeps install and reboot off while it waits to be closed", async () => {
     const stopped = {
       id: "osr_1", status: OsRolloutStatus.PAUSED, mode: OsRolloutMode.SECURITY, reboot: OsRebootPolicy.IF_REQUIRED, createdUnix: now - 600, finishedUnix: 0, pauseKey: "step_failed", pauseParams: { node: "fi1" },

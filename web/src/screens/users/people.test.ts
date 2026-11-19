@@ -4,7 +4,6 @@ import { en as profilesEn, ru as profilesRu } from "@/i18n/profiles";
 import { en as usersEn, ru as usersRu } from "@/i18n/users";
 import { avatarIndex, daysLeft, shownStatus, usage } from "./format";
 import type { UserN } from "./model";
-import { useTx } from "./t";
 
 describe("dictionaries of the people screens", () => {
   const ph = (s: string) => [...new Set([...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]))].sort().join();
@@ -27,9 +26,6 @@ describe("dictionaries of the people screens", () => {
     const keys = [...Object.keys(usersEn), ...Object.keys(profilesEn)];
     expect(new Set(keys).size).toBe(keys.length);
   });
-  it("useTx is a function", () => {
-    expect(typeof useTx).toBe("function");
-  });
 });
 
 const user = (over: Partial<UserN>): UserN =>
@@ -51,8 +47,8 @@ describe("user display helpers", () => {
   });
 
   it("gives an avatar slot from the name, as the board does: the first letter's code plus the length, around the 8 colours", () => {
-    expect(avatarIndex("carol")).toBe((99 + 5) % 8);
-    expect(avatarIndex("carol")).toBe(avatarIndex("carol"));
+    expect(avatarIndex("carol")).toBe(0);
+    expect(avatarIndex("bob")).toBe(5);
     expect(avatarIndex("")).toBeLessThan(8);
   });
 
