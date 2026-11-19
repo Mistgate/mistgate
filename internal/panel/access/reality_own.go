@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/netip"
 	"net/url"
@@ -136,7 +137,9 @@ func (s *Service) bridgeSiteWarning(ctx context.Context, nodeID, nodeName string
 		return nil, nil
 	}
 	node, err := s.st.Node(ctx, nodeID)
-	if err != nil {
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, nil // a node that is not stored has no relays
+	} else if err != nil {
 		return nil, s.internal("get node", err)
 	}
 	if node.BridgePort != 0 {
