@@ -134,13 +134,8 @@ func probeName(spec plugin.InboundSpec) string {
 	if spec.TLS.ServerName != "" {
 		return spec.TLS.ServerName
 	}
-	var settings struct {
-		Reality struct {
-			ServerNames []string `json:"server_names"`
-		} `json:"reality"`
-	}
-	if json.Unmarshal(spec.Settings, &settings) == nil && len(settings.Reality.ServerNames) > 0 {
-		return settings.Reality.ServerNames[0]
+	if v, _ := plugin.VLESSOf(spec); len(v.ServerNames) > 0 {
+		return v.ServerNames[0]
 	}
 	return ""
 }

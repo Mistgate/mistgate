@@ -2,7 +2,6 @@ package health
 
 import (
 	"context"
-	"encoding/json"
 	"maps"
 	"slices"
 	"sort"
@@ -14,6 +13,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/unit"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // Alert derivation. One evaluation computes, from the node states, the doctor rows and the check
@@ -557,19 +557,13 @@ func notStartedCond(ts []*target, t *target) cond {
 }
 
 func cdnHost(t *target) string {
-	if t == nil || t.in.Protocol != "vless" {
+	if t == nil {
 		return ""
 	}
-	var settings struct {
-		Security string `json:"security"`
-		CDN      struct {
-			Host string `json:"host"`
-		} `json:"cdn"`
+	if v, _ := plugin.VLESSOf(t.spec); v.TLS() {
+		return v.CDNHost
 	}
-	if json.Unmarshal(t.settings, &settings) != nil || settings.Security != "tls" {
-		return ""
-	}
-	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(settings.CDN.Host), "."))
+	return ""
 }
 
 // addPortLossyConds derives a port alert from each enabled inbound's current port and its latest stored verdict.
