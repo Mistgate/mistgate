@@ -460,36 +460,14 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			}
 		}
 		for _, changed := range changedPorts {
-			checks := portChecks[changed.node.ID]
-			if err := portRefusal(changed.spec, changed.node.Name, changed.others, checks, s.now(), portSubject{Profile: p.Name, Agent: changed.node.AgentCaps, Address: changed.node.Address}); err != nil {
+			warnings, override, err := s.admitInbound(ctx, inboundAdmission{node: changed.node, profile: p.Name, spec: changed.spec, others: changed.others,
+				checks: portChecks[changed.node.ID], moved: changed.portChanged, check: m.DryRun, allowLossy: m.AllowLossyPort})
+			if err != nil {
 				return nil, err
 			}
-			if !specHasUDPListen(changed.spec) {
-				continue
-			}
-			if m.DryRun {
-				if bad, ok := cachedSpecPortLossy(changed.spec, checks, s.now()); ok {
-					if changed.portChanged && !m.AllowLossyPort {
-						free := freePortFor(changed.spec, changed.others, checks, s.now())
-						return nil, portLossyRefusal(ctx, s, changed.node.Name, bad, free)
-					}
-					portWarnings = append(portWarnings, s.portLossyWarning(ctx, changed.node.Name, bad))
-				}
-				continue
-			}
-			if changed.portChanged {
-				warning, override, err := s.checkPort(ctx, changed.node, changed.spec, changed.others, checks, m.AllowLossyPort)
-				if err != nil {
-					return nil, err
-				}
-				if warning != nil {
-					portWarnings = append(portWarnings, warning)
-				}
-				if override {
-					lossyOverrides = append(lossyOverrides, changed)
-				}
-			} else if bad, ok := cachedSpecPortLossy(changed.spec, checks, s.now()); ok {
-				portWarnings = append(portWarnings, s.portLossyWarning(ctx, changed.node.Name, bad))
+			portWarnings = append(portWarnings, warnings...)
+			if override {
+				lossyOverrides = append(lossyOverrides, changed)
 			}
 		}
 	}

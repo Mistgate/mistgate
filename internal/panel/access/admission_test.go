@@ -248,3 +248,51 @@ var wantAdmission = map[string]string{
 	"profile/same/live/check=true/allow=false":    "refusal= warns= checks=0 audited=0 written=false",
 	"profile/same/live/check=true/allow=true":     "refusal= warns= checks=0 audited=0 written=false",
 }
+
+// UpdateProfile tells what the same change through the inbound would: a profile that stands where another one of the
+// node holds says so before the write, as the check of the dialog does.
+func TestUpdateProfileWarnsAsTheInboundDoes(t *testing.T) {
+	update := func(e *env, p *adminv1.ProfileSummary, settings string, dryRun bool) []*adminv1.StatusReason {
+		t.Helper()
+		r := must(e.s.UpdateProfile(e.ctx, req(&adminv1.UpdateProfileRequest{ProfileId: p.Id, ExpectedVersion: p.Version, SettingsJson: &settings, DryRun: dryRun})))
+		return r.Msg.Profile.Warnings
+	}
+	for _, dryRun := range []bool{true, false} {
+		t.Run(fmt.Sprintf("a change of Hysteria2 whose site VLESS has paused dry_run=%v", dryRun), func(t *testing.T) {
+			e := newEnv(t)
+			e.node("nod_de1", "de1", "de1.example.com", "active")
+			vless := e.vlessProfile("vless")
+			hy2 := e.profile("hy2", `{"tls_mode":"self_signed"}`)
+			e.inbound(vless.Id, "nod_de1")
+			e.inbound(hy2.Id, "nod_de1")
+			got := update(e, hy2, `{"tls_mode":"self_signed","down_mbps":50}`, dryRun)
+			if len(got) != 1 || got[0].Code != "hy2_decoy_paused" || got[0].Params["port"] != "443" || got[0].Params["hy2"] != "hy2" || got[0].Params["vless"] != "vless" {
+				t.Fatalf("warnings = %+v", got)
+			}
+		})
+		t.Run(fmt.Sprintf("VLESS moves onto the site port of Hysteria2 dry_run=%v", dryRun), func(t *testing.T) {
+			e := newEnv(t)
+			e.node("nod_de1", "de1", "de1.example.com", "active")
+			vless := must(e.s.CreateProfile(e.ctx, req(&adminv1.CreateProfileRequest{
+				Protocol: "vless", Name: "vless", SettingsJson: `{"port":8443,"reality":{"target":"www.example.org:443"}}`,
+			}))).Msg.Profile
+			hy2 := e.profile("hy2", `{"tls_mode":"self_signed"}`) // the site of the default is on 443
+			e.inbound(vless.Id, "nod_de1")
+			e.inbound(hy2.Id, "nod_de1")
+			got := update(e, vless, `{"port":443,"reality":{"target":"www.example.org:443"}}`, dryRun)
+			if len(got) != 1 || got[0].Code != "hy2_decoy_paused" || got[0].Params["port"] != "443" {
+				t.Fatalf("warnings = %+v", got)
+			}
+		})
+		t.Run(fmt.Sprintf("a WARP exit on a node without an account dry_run=%v", dryRun), func(t *testing.T) {
+			e := newEnv(t)
+			e.node("nod_de1", "de1", "de1.example.com", "active")
+			p := e.profile("main", `{"tls_mode":"self_signed","port":8443}`)
+			e.inbound(p.Id, "nod_de1")
+			got := update(e, p, `{"tls_mode":"self_signed","port":8443,"egress":"warp"}`, dryRun)
+			if len(got) != 1 || got[0].Code != "warp_missing" || got[0].Params["state"] != "none" {
+				t.Fatalf("warnings = %+v", got)
+			}
+		})
+	}
+}
