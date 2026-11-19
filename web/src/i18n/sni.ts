@@ -80,7 +80,8 @@ export const en = {
   "sni.target.find": "Find sites nearby…",
   "err.reality_target_invalid": "“{target}” does not fit: write a site name and a port, for example shop.example.com:443. An IP address does not work.",
   "err.reality_target_same_node": "“{target}” is {node} itself. Choose another site, or leave the field empty.",
-  "err.reality_target_unsupported": "Only a VLESS server with REALITY can show another site.",
+  "err.reality_target_own": "“{target}” is the address or name of one of your own servers or of the panel. Choose a site that belongs to someone else, or leave the field empty.",
+  "err.reality_target_unsupported": "“{target}” on {node}: only a VLESS server with REALITY can show another site. If the profile is being moved to TLS, reset the target on {node} first.",
   "sni.why.hysteria2": "Use your own domain here, not a stranger's name. With obfuscation (the default) the name is not visible in the packets at all; without it a stranger's name works only with a self-signed certificate, which gives the node away: a probe sees a self-signed certificate for someone else's public name.",
   "sni.why.trusttunnel": "Use your own domain here, not a stranger's name. The apps check the certificate against this name, and Let's Encrypt issues it only for your own domain; a stranger's name with a self-signed certificate gives the node away.",
 };
@@ -163,7 +164,8 @@ export const ru: typeof en = {
   "sni.target.find": "Найти сайты рядом…",
   "err.reality_target_invalid": "«{target}» не подходит: впиши имя сайта и порт, например shop.example.com:443. IP-адрес не годится.",
   "err.reality_target_same_node": "«{target}» — это сама нода {node}. Выбери другой сайт или оставь поле пустым.",
-  "err.reality_target_unsupported": "Другой сайт может показывать только сервер VLESS с REALITY.",
+  "err.reality_target_own": "«{target}» — адрес или имя твоего же сервера или самой панели. Выбери чужой сайт или оставь поле пустым.",
+  "err.reality_target_unsupported": "«{target}» на {node}: другой сайт может показывать только сервер VLESS с REALITY. Если профиль переводишь на TLS, сначала сбрось цель на {node}.",
   "sni.why.hysteria2": "Впиши сюда свой домен, а не чужое имя. С обфускацией (по умолчанию) имя в пакетах вообще не видно; без неё чужое имя возможно только с самоподписанным сертификатом, и он выдаёт ноду: зонд видит самоподписанный сертификат на чужое публичное имя.",
   "sni.why.trusttunnel": "Впиши сюда свой домен, а не чужое имя. Приложения проверяют сертификат по этому имени, а Let's Encrypt выдаёт его только на твой домен; чужое имя с самоподписанным сертификатом выдаёт ноду.",
 };
@@ -247,7 +249,8 @@ export const zh: typeof en = {
   "sni.target.find": "查找附近的站点…",
   "err.reality_target_invalid": "“{target}” 不合适：请填写站点名称和端口，例如 shop.example.com:443。不能使用 IP 地址。",
   "err.reality_target_same_node": "“{target}” 就是节点 {node} 自己。请选择其他站点，或将此栏留空。",
-  "err.reality_target_unsupported": "只有使用 REALITY 的 VLESS 服务器才能展示其他站点。",
+  "err.reality_target_own": "“{target}”是你自己的服务器或面板的地址或名称。请选择别人的站点，或将此栏留空。",
+  "err.reality_target_unsupported": "{node} 上的“{target}”：只有使用 REALITY 的 VLESS 服务器才能展示其他站点。如果要把协议配置改为 TLS，请先重置 {node} 上的目标。",
   "sni.why.hysteria2": "这里请填你自己的域名，不要填别人的名称。启用混淆（默认）时，数据包里根本看不到名称；不混淆时，别人的名称只能配自签名证书，而这会暴露节点：探测者会看到别人公开域名的自签名证书。",
   "sni.why.trusttunnel": "这里请填你自己的域名，不要填别人的名称。应用会按这个名称校验证书，而 Let's Encrypt 只为你自己的域名签发；别人的名称配自签名证书会暴露节点。",
 };
@@ -330,7 +333,8 @@ export const fa: typeof en = {
   "sni.target.find": "یافتن سایت‌های نزدیک…",
   "err.reality_target_invalid": "«{target}» مناسب نیست: نام سایت و پورت بنویس، مثلاً shop.example.com:443. نشانی IP کار نمی‌کند.",
   "err.reality_target_same_node": "«{target}» خود نود {node} است. سایت دیگری انتخاب کن یا فیلد را خالی بگذار.",
-  "err.reality_target_unsupported": "فقط سرور VLESS با REALITY می‌تواند سایت دیگری را نشان دهد.",
+  "err.reality_target_own": "«{target}» نشانی یا نام یکی از سرورهای خودت یا خود پنل است. سایتِ دیگری انتخاب کن یا فیلد را خالی بگذار.",
+  "err.reality_target_unsupported": "«{target}» روی {node}: فقط سرور VLESS با REALITY می‌تواند سایت دیگری را نشان دهد. اگر پروفایل را به TLS می‌بری، اول هدف را روی {node} بازنشانی کن.",
   "sni.why.hysteria2": "اینجا دامنهٔ خودت را بنویس، نه نام یک غریبه. با مبهم‌سازی (پیش‌فرض) نام اصلاً در بسته‌ها دیده نمی‌شود؛ بدون آن، نام غریبه فقط با گواهی خودامضا ممکن است و نود را لو می‌دهد: کاوشگر گواهی خودامضا برای نام عمومی دیگران می‌بیند.",
   "sni.why.trusttunnel": "اینجا دامنهٔ خودت را بنویس، نه نام یک غریبه. برنامه‌ها گواهی را با همین نام بررسی می‌کنند و Let's Encrypt فقط برای دامنهٔ خودت صادر می‌کند؛ نام غریبه با گواهی خودامضا نود را لو می‌دهد.",
 };
@@ -413,7 +417,8 @@ export const tr: typeof en = {
   "sni.target.find": "Yakındaki siteleri bul…",
   "err.reality_target_invalid": "“{target}” uygun değil: bir site adı ve bir port yaz, örneğin shop.example.com:443. IP adresi olmaz.",
   "err.reality_target_same_node": "“{target}”, {node} düğümünün kendisi. Başka bir site seç ya da alanı boş bırak.",
-  "err.reality_target_unsupported": "Başka bir siteyi yalnızca REALITY’li bir VLESS sunucusu gösterebilir.",
+  "err.reality_target_own": "“{target}”, kendi sunucularından birinin ya da panelin adresi veya adı. Başkasına ait bir site seç ya da alanı boş bırak.",
+  "err.reality_target_unsupported": "{node} üzerindeki “{target}”: Başka bir siteyi yalnızca REALITY’li bir VLESS sunucusu gösterebilir. Profili TLS’ye geçiriyorsan önce {node} üzerindeki hedefi sıfırla.",
   "sni.why.hysteria2": "Buraya kendi alan adını yaz, yabancı bir ad değil. Gizleme (varsayılan) açıkken ad paketlerde hiç görünmez; kapalıyken yabancı ad ancak kendinden imzalı sertifikayla olur ve düğümü ele verir: bir sonda başkasının herkese açık adı için kendinden imzalı sertifika görür.",
   "sni.why.trusttunnel": "Buraya kendi alan adını yaz, yabancı bir ad değil. Uygulamalar sertifikayı bu ada göre doğrular ve Let's Encrypt yalnızca senin alan adın için verir; yabancı ad ve kendinden imzalı sertifika düğümü ele verir.",
 };

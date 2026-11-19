@@ -335,6 +335,28 @@ describe("applying a site to a REALITY server", () => {
     expect(document.body.textContent).toContain("shop.example.com is now shown on de1");
   });
 
+  it("tells of the port it shares and of the second face before the click, and again in the message after it", async () => {
+    scanCall.mockResolvedValue(answer());
+    const warnings = [
+      { code: "tcp_port_shared", params: { node: "de1", port: "443", profiles: "“VLESS · Reality” and “TT”", default: "TT" } },
+      { code: "share_two_faces", params: { node: "de1", port: "443", profile: "VLESS · Reality", default: "TT" } },
+    ];
+    checkSays({ warnings });
+    await mountCard(true, [server({ realityTarget: "www.example.org:443" })]);
+    await click(applyButtons()[0]);
+    await act(async () => void (await new Promise((r) => setTimeout(r, 350))));
+    for (let i = 0; i < 3; i++) await settle();
+    const notes = dialog()!.querySelector("[data-testid=share-notes]")?.textContent ?? "";
+    expect(notes).toContain("TCP 443 on de1 is shared by");
+    expect(notes).toContain("“VLESS · Reality” shows another site");
+    // a name of the neighbour's is nobody's to point a DNS record at
+    expect(dialog()!.textContent).not.toContain(en["share.dnsNext"]);
+    await click(button(en["sni.apply.go"], dialog()!));
+    await settle();
+    expect(document.body.textContent).toContain("shop.example.com is now shown on de1");
+    expect(document.body.textContent).toContain("TCP 443 on de1 is shared by");
+  });
+
   it("asks which server when the node has several, and checks the one picked", async () => {
     scanCall.mockResolvedValue(answer());
     checkSays();

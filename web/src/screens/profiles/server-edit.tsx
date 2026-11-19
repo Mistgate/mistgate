@@ -28,7 +28,8 @@ export function ServerEdit({ row, nodeAddress, focus, onClose }: { row: ServerRo
   const i = row.inbound;
   const isAwg = i.protocol === "awg";
   // a VLESS server has a name of its own to set only where it has a certificate (as the node's own window decides)
-  const named = !isAwg && (i.protocol !== "vless" || !!i.tlsServerName || !!i.tlsServerNameOverride || (!!i.lastError && nameFixes(inboundErrorKind(i.lastError))));
+  // (not where the node shows a site of its own: that name is the stranger's, not a domain to set)
+  const named = !isAwg && !i.realityTargetOverride && (i.protocol !== "vless" || !!i.tlsServerName || !!i.tlsServerNameOverride || (!!i.lastError && nameFixes(inboundErrorKind(i.lastError))));
   const was = { port: i.port ? String(i.port) : "", sni: i.tlsServerName };
   const [port, setPort] = useState(was.port);
   const [sni, setSni] = useState(was.sni);

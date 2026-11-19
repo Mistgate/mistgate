@@ -4,6 +4,7 @@ import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { useT, type T } from "@/i18n";
 import { en, type MessageKey } from "@/i18n/en";
 import { minutesText } from "./format";
+import { inboundErrorKind, inboundErrorText } from "./inbound-error";
 
 // How a node's status and reason look in the UI. The server sends a NodeStatus and an optional reason
 // {code, params}; an ONLINE node with a reason is shown as "attention", "works partly" or "broken" because the agent is
@@ -104,8 +105,9 @@ export function reasonText(t: T, reason?: Reason): string {
     case "enrollment_pending":
       return t(key, { span: minutesText(t, Number(p.expires_in_minutes)) });
     case "inbound_failed":
-      // The agent's error as it came; lib/inbound-error.ts could word it here too
-      return p.profile ? t("node.reason.inbound_failed.named", { profile: p.profile, error: p.error ?? "" }) : t(key, p);
+      // The agent's error as it came, unless lib/inbound-error.ts has a sentence that says more than the code does
+      const error = inboundErrorKind(p.error ?? "") === "target" ? inboundErrorText(t, p.error ?? "") : (p.error ?? "");
+      return p.profile ? t("node.reason.inbound_failed.named", { profile: p.profile, error }) : t(key, { ...p, error });
   }
   return t(key, p);
 }

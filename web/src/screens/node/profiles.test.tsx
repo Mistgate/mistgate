@@ -854,6 +854,44 @@ describe("the site of a REALITY server on this node", () => {
     expect(saves()[0]).toMatchObject({ inboundId: "inb_v", realityTargetOverride: "" });
   });
 
+  it("is there to reset the site of a server that shows nothing now (its profile went to TLS), and sends an empty one", async () => {
+    await edit({ ...vless, state: InboundState.FAILED, realityTarget: "", realityTargetOverride: "shop.example.com:443", tlsServerName: "", lastError: "reality_target_unsupported" });
+    expect(field()?.value).toBe("shop.example.com:443");
+    await click(button("Back to the profile’s target"));
+    await checked();
+    await submit();
+    await settle();
+    expect(saves()[0]).toMatchObject({ inboundId: "inb_v", realityTargetOverride: "" });
+  });
+
+  it("takes the same site written another way for no change", async () => {
+    await edit({ ...vless, realityTarget: "shop.example.com:443", realityTargetOverride: "shop.example.com:443", tlsServerName: "shop.example.com" });
+    await type(field(), " Shop.Example.com.:0443 ");
+    await checked();
+    expect(updateInbound.mock.calls.every(([r]) => !(r as { realityTargetOverride?: string }).realityTargetOverride)).toBe(true);
+    await submit();
+    await settle();
+    expect(saves().every((r) => r.realityTargetOverride === undefined)).toBe(true);
+  });
+
+  it("tells of the port the server shares, and of a second face, when the site typed makes one", async () => {
+    await edit(vless);
+    updateInbound.mockResolvedValue({
+      inbound: {},
+      freePort: 0,
+      warnings: [
+        { code: "tcp_port_shared", params: { node: "de1", port: "443", profiles: "“vl” and “TT”", default: "TT" } },
+        { code: "share_two_faces", params: { node: "de1", port: "443", profile: "vl", default: "TT" } },
+      ],
+    });
+    await type(field(), "shop.example.com:443");
+    await checked();
+    const notes = document.querySelector("[role=dialog] [data-testid=share-notes]")?.textContent ?? "";
+    expect(notes).toContain("TCP 443 on de1 is shared by");
+    expect(notes).toContain("“vl” shows another site");
+    expect(document.querySelectorAll("[role=dialog] [data-testid=share-notes]")).toHaveLength(1); // the window's own check says it once
+  });
+
   it("says why the panel refuses what is typed, and does not save it", async () => {
     await edit(vless);
     updateInbound.mockRejectedValue(refuse("reality_target_invalid: target=198.51.100.7:443"));

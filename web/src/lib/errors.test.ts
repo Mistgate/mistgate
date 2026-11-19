@@ -17,6 +17,16 @@ describe("the panel's refusal codes", () => {
     }
   });
 
+  it("tell which node and which target stand in the way of a profile that goes to TLS, and what the target must not be", () => {
+    for (const lang of langs) {
+      const text = say("reality_target_unsupported: target=shop.example.com%3A443&node=de1", Code.InvalidArgument, lang);
+      expect(text, lang).toContain("de1");
+      expect(text, lang).toContain("shop.example.com:443");
+    }
+    expect(say("reality_target_unsupported: target=shop.example.com%3A443&node=de1", Code.InvalidArgument, "ru")).toContain("сначала сбрось цель на de1");
+    expect(say("reality_target_own: target=nl1.example.com%3A443&node=de1", Code.InvalidArgument, "ru")).toContain("«nl1.example.com:443»");
+  });
+
   it("read as our sentence, with the values the server put after the code", () => {
     expect(say("name_taken", Code.AlreadyExists, "ru")).toBe("Это имя уже занято — выбери другое.");
     expect(say("group_not_empty: users=3", Code.FailedPrecondition, "ru")).toBe("В группе ещё 3 чел. — перенеси их в другую группу, потом удаляй.");

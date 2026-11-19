@@ -143,22 +143,27 @@ export function DecoyNotice({ check }: { check: InboundCheck }) {
   const t = useT();
   if (check.state !== "ok") return null;
   const taken = check.warnings.find((x) => x.code === "hy2_site_taken" || x.code === "hy2_site_taken_mtproto");
-  if (taken) {
-    return (
-      <Notice className="items-start">
-        <span className="flex flex-col items-start gap-1.5">{takenNote(t, taken.params)}</span>
-      </Notice>
-    );
-  }
   const w = check.warnings.find((x) => x.code === "hy2_decoy_paused");
-  if (!w) return null;
+  // "bridge_site_lost": the node's own site on 443 that the bridge of reverse relays rides is replaced by another site
+  const bridge = check.warnings.find((x) => x.code === "bridge_site_lost");
   return (
-    <Notice className="items-start">
-      <span className="flex flex-col items-start gap-1.5">
-        {decoyNote(t, w.params)}
-        <VlessHy2Docs />
-      </span>
-    </Notice>
+    <>
+      {taken ? (
+        <Notice className="items-start">
+          <span className="flex flex-col items-start gap-1.5">{takenNote(t, taken.params)}</span>
+        </Notice>
+      ) : (
+        w && (
+          <Notice className="items-start">
+            <span className="flex flex-col items-start gap-1.5">
+              {decoyNote(t, w.params)}
+              <VlessHy2Docs />
+            </span>
+          </Notice>
+        )
+      )}
+      {bridge && <Notice className="items-start">{t("node.check.bridgeLost", { node: bridge.params.node ?? "", port: bridge.params.port ?? "" })}</Notice>}
+    </>
   );
 }
 

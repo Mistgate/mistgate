@@ -484,7 +484,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
         </label>
         <WarpWarnings check={check} nodeId={nodeId} onLeave={onClose} />
         <DecoyNotice check={check} />
-        <ShareNotes check={check} node={{ name: inbound.nodeName, address: nodeAddress }} />
+        {!target.touched && <ShareNotes check={check} node={{ name: inbound.nodeName, address: nodeAddress }} />}
         {unexplained && (
           <Notice tone="danger" className="items-start">
             {t(`err.${unexplained.code}`, unexplained.vars)}

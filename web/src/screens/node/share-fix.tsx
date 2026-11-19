@@ -121,15 +121,16 @@ export function ShareFix({
 /**
  * What a check that passed has to say about the port the profile stands on before the click: it shares the port (who restarts, the
  * name it answers to and the DNS record that name needs) or one of the services shows another site. Nothing when the port is its own.
+ * `foreign`: the profile shows a site of somebody else's (a target set on the node), so its name is nothing to point a DNS record at.
  */
-export function ShareNotes({ check, node }: { check: InboundCheck; node: { name: string; address: string } }) {
+export function ShareNotes({ check, node, foreign = false }: { check: InboundCheck; node: { name: string; address: string }; foreign?: boolean }) {
   const t = useT();
   if (check.state !== "ok") return null;
   const shared = check.warnings.find((w) => w.code === "tcp_port_shared");
   const faces = check.warnings.filter((w) => w.code === "share_two_faces");
   if (!shared && faces.length === 0) return null;
   const name = check.inbound?.tlsServerName ?? "";
-  const own = !name || shareName(name) === shareName(node.address);
+  const own = foreign || !name || shareName(name) === shareName(node.address);
   return (
     <div data-testid="share-notes" className="flex flex-col gap-2">
       {shared && (

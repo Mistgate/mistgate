@@ -8,12 +8,14 @@ import { networkOf } from "./ways-graph";
 
 // "share": the panel held the profile back because the node's agent cannot share a TCP port (share_agent_old); "shadowed": the agent did
 // not start it because another profile of the port holds its name (sni_shadowed)
-export type InboundErrorKind = "port" | "cert" | "warp" | "permission" | "awg" | "share" | "shadowed" | "other";
+// "target": the node refused the REALITY target set on it, which leads to the node itself or a private network (reality_target: local)
+export type InboundErrorKind = "port" | "cert" | "warp" | "permission" | "awg" | "share" | "shadowed" | "target" | "other";
 
 // order matters: "cannot build inbound: a host name is required for a Let's Encrypt certificate" is about the certificate
 const kinds: [InboundErrorKind, RegExp][] = [
   ["share", /^share_agent_old\b/i],
   ["shadowed", /^sni_shadowed\b/i],
+  ["target", /^reality_target: local\b/i],
   ["port", /address already in use/i],
   ["cert", /acme|certificate|let'?s encrypt|needs a dns name|host name is required|x509/i],
   ["permission", /permission denied|operation not permitted/i],
@@ -43,6 +45,7 @@ const sentence: Record<InboundErrorKind, MessageKey> = {
   awg: "node.inbound.err.awg",
   share: "node.inbound.err.shareOld",
   shadowed: "node.inbound.err.shadowed",
+  target: "node.inbound.err.targetLocal",
   other: "node.inbound.err.other",
 };
 

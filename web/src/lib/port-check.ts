@@ -161,6 +161,7 @@ export function portNotes(t: T, warnings: readonly Warning[] | undefined): strin
     if (w.code === "hy2_decoy_paused") out.push(decoyNote(t, w.params));
     if (w.code === "hy2_site_taken" || w.code === "hy2_site_taken_mtproto") out.push(takenNote(t, w.params));
     if (w.code === "tcp_port_shared" || w.code === "share_two_faces") out.push(sharedNote(t, w));
+    if (w.code === "bridge_site_lost") out.push(t("node.check.bridgeLost", { node: w.params.node ?? "", port: w.params.port ?? "" }));
   }
   return out;
 }

@@ -13,6 +13,8 @@ describe("why a profile did not start, in words", () => {
     expect(inboundErrorKind("egress warp: no account on this node")).toBe("warp");
     expect(inboundErrorKind("open /etc/mistgate/x: permission denied")).toBe("permission");
     expect(inboundErrorKind("awgnl: the amneziawg kernel module is not loaded")).toBe("awg");
+    expect(inboundErrorKind("reality_target: local")).toBe("target");
+    expect(inboundErrorText(t, "reality_target: local")).toBe(ru["node.inbound.err.targetLocal"]);
     expect(inboundErrorKind("something nobody has seen")).toBe("other");
   });
 

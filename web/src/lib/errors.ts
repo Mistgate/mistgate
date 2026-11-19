@@ -47,6 +47,7 @@ export const errorCodes = [
   // the site a node shows instead of its profile's REALITY target (CreateInbound / UpdateInbound reality_target_override): "reality_target_invalid: target=..."
   "reality_target_invalid",
   "reality_target_same_node",
+  "reality_target_own",
   "reality_target_unsupported",
   // a person at the device limit (an AmneziaVPN or TrustTunnel key, the app switch that makes one): "device_limit: 3/3: alice-phone, laptop"
   "device_limit",

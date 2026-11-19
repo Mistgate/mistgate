@@ -87,6 +87,10 @@ describe("truthful statuses", () => {
     expect(statusWord(t as never, n(NodeStatus.ONLINE, "inbound_failed", { error: "x" }))).toBe("Broken");
     expect(reasonText(t as never, { code: "inbound_failed", params: { error: "x" } })).toBe("a profile failed to start: x");
   });
+  it("words the node's refusal of a target that leads to itself or a private network, instead of its code", () => {
+    const local = n(NodeStatus.ONLINE, "inbound_failed", { profile: "vless", error: "reality_target: local", failed: "1", total: "1" });
+    expect(statusLine(t as never, local)).toBe(`“vless” failed to start: ${en["node.inbound.err.targetLocal"]}`);
+  });
   it("a pending node says it waits for the install and how long the command works, or that it expired", () => {
     const pending = n(NodeStatus.PENDING, "enrollment_pending", { expires_in_minutes: "57", expires_unix: "1790000000" });
     expect(nodeKind(pending)).toBe("off");

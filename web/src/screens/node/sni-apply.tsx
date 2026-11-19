@@ -11,9 +11,11 @@ import { useT } from "@/i18n";
 import { profiles as profilesApi } from "@/lib/api";
 import { errorText } from "@/lib/errors";
 import type { Plain } from "@/lib/plain";
+import { portNotes, withNotes } from "@/lib/port-check";
 import { profileListQuery } from "@/screens/users/rpc";
 import { DecoyNotice, useInboundRefresh } from "./inbound-check";
-import { asInboundCheck, hostOf, useRefusalText, useTargetCheck } from "./reality-target";
+import { ShareNotes } from "./share-fix";
+import { asInboundCheck, hostOf, normalizeTarget, useRefusalText, useTargetCheck } from "./reality-target";
 
 /**
  * "Apply…" on a neighbour of the "Sites near the node" card: show that site on a REALITY server of this node. The window says what strangers
@@ -33,14 +35,16 @@ export function ApplyDialog({ site, nodeId, nodeName, servers, onClose }: { site
   const [picked, setPicked] = useState(servers[0]?.id ?? "");
   const server = servers.find((s) => s.id === picked) ?? servers[0];
   const target = targetOf(site);
-  const same = server?.realityTargetOverride === target;
+  const same = server?.realityTargetOverride === normalizeTarget(target);
   const check = useTargetCheck(server && !same ? { inboundId: server.id, target } : null);
   const users = useQuery(profileListQuery).data?.find((p) => p.id === server?.profileId)?.userCount ?? 0;
   const save = useMutation({
     mutationFn: () => profilesApi.updateInbound({ inboundId: server!.id, realityTargetOverride: target }),
-    onSuccess: () => {
+    onSuccess: (r) => {
       onClose();
-      toast(t("sni.apply.done", { site, node: nodeName }));
+      // the port it shares with other services, and who shows another site, as the check said before the click
+      const notes = portNotes(t, r?.warnings);
+      toast(withNotes(t("sni.apply.done", { site, node: nodeName }), notes), notes.length > 0 ? { ms: 8000 } : undefined);
       refresh();
     },
   });
@@ -107,6 +111,7 @@ export function ApplyDialog({ site, nodeId, nodeName, servers, onClose }: { site
           </ul>
         )}
         <DecoyNotice check={asInboundCheck(check)} />
+        <ShareNotes check={asInboundCheck(check)} node={{ name: nodeName, address: "" }} foreign />
         {save.isError && <Notice tone="danger">{errorText(save.error, t)}</Notice>}
       </div>
     </Modal>

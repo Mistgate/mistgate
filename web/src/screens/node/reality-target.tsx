@@ -10,6 +10,7 @@ import { useEdition } from "@/lib/edition";
 import { errorCode, errorVars } from "@/lib/errors";
 import { plain, type Plain } from "@/lib/plain";
 import { DecoyNotice, useSettled, type InboundCheck } from "./inbound-check";
+import { ShareNotes } from "./share-fix";
 
 /**
  * The site a node shows strangers at a REALITY server instead of its profile's target (Inbound.reality_target_override): the check before
@@ -19,7 +20,7 @@ import { DecoyNotice, useSettled, type InboundCheck } from "./inbound-check";
  */
 
 /** The refusals that stop the button; the real call would refuse the same way. */
-export const targetRefusals = ["reality_target_invalid", "reality_target_same_node", "reality_target_unsupported", "agent_too_old"] as const;
+export const targetRefusals = ["reality_target_invalid", "reality_target_same_node", "reality_target_own", "reality_target_unsupported", "agent_too_old"] as const;
 export type TargetRefusal = (typeof targetRefusals)[number];
 
 export type TargetCheck =
@@ -30,6 +31,18 @@ export type TargetCheck =
 /** The hint under "Domain (SNI)": what it is, and for Hysteria2 and TrustTunnel why it is the owner's own domain and not a stranger's name. */
 export function tlsHint(t: T, protocol: string | undefined): string {
   return protocol === "hysteria2" || protocol === "trusttunnel" ? `${t("node.profiles.tlsHint")} ${t(`sni.why.${protocol}`)}` : t("node.profiles.tlsHint");
+}
+
+/**
+ * A target typed as text in the form the panel keeps it (plugin.NormalizeRealityTarget): trimmed, the host in lower case without a closing
+ * dot, the port as a number. The same site written another way is no change.
+ */
+export function normalizeTarget(text: string): string {
+  const s = text.trim();
+  const m = /^(\[[^\]]*\]|[^:]*):(\d+)$/.exec(s);
+  if (!m) return s;
+  const port = Number(m[2]);
+  return `${m[1]!.toLowerCase().replace(/\.$/, "")}:${port <= 65535 ? port : m[2]}`;
 }
 
 /** The host of "host:port" (the name a stranger is asked for); "self" and "" are not hosts. */
@@ -82,9 +95,10 @@ export function useRealityTargetEdit(inbound: Plain<Inbound>, leave: () => void)
   const refusalText = useRefusalText();
   const own = inbound.realityTargetOverride ?? "";
   const shown = inbound.realityTarget ?? "";
-  const active = inbound.protocol === "vless" && shown !== "" && (own !== "" || shown !== "self");
+  // a server that shows nothing now (its profile went to TLS) still has the target of the node to reset
+  const active = inbound.protocol === "vless" && (own !== "" || (shown !== "" && shown !== "self"));
   const [value, setValue] = useState(own);
-  const touched = active && value.trim() !== own;
+  const touched = active && normalizeTarget(value) !== own;
   const check = useTargetCheck(touched ? { inboundId: inbound.id, target: value.trim() } : null);
   const withCard = !edition.off("sni_scan");
   const placeholder = own ? "" : shown === "self" ? t("sni.target.own") : t("sni.target.fromProfile", { target: shown });
@@ -126,6 +140,7 @@ export function useRealityTargetEdit(inbound: Plain<Inbound>, leave: () => void)
         </div>
       ) : null}
       <DecoyNotice check={asInboundCheck(check)} />
+      <ShareNotes check={asInboundCheck(check)} node={{ name: inbound.nodeName, address: "" }} foreign />
     </>
   ) : null;
   return { field, active, own: own !== "", touched, blocked: check.state === "refused", save: touched ? value.trim() : undefined };
