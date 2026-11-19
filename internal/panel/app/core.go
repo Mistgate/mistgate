@@ -230,6 +230,7 @@ type core struct {
 	bl                 *blocklist.Service
 	cp                 *countryprobe.Service
 	own                ownProbeService // nil on the Cloudflare edition (ownprobe_wiring_js.go)
+	sub                subHostService  // nil on the Cloudflare edition (subhost_wiring_js.go)
 	hl                 *health.Service
 	upd                *update.Service
 	wsv                *warp.Service
@@ -465,6 +466,7 @@ func wireCore(c Config) (*core, error) {
 	fl.SetWarp(warpForFleet{k.wsv})
 	k.addWarpReachConditions(hl) // WARP_REACH: a site that shows a block page through a node's WARP
 	k.own = newOwnProbes(k)
+	k.sub = newSubHost(k)
 	return k, nil
 }
 
