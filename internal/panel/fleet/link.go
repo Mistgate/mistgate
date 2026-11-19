@@ -89,6 +89,10 @@ func (f *Fleet) LinkHandler() http.Handler {
 			f.linkUpdateDownload(w, r)
 			return
 		}
+		if strings.HasPrefix(r.URL.Path, "/fetch/") {
+			f.linkFetch(w, r)
+			return
+		}
 		sessions.ServeHTTP(w, r)
 	})
 }
@@ -185,7 +189,9 @@ func (f *Fleet) linkSocketHandler() http.Handler {
 		handshakeTimer.Stop()
 		cancelHandshake()
 
-		if err := (agentService{f}).runSession(ownerCtx, nodeID, pc, owner, websocketSessionStream{ctx: ownerCtx, ioCtx: r.Context(), link: agentlink.NewLink(ws, keys, false)}); err != nil {
+		stream := &fetchSessionStream{agentSessionStream: websocketSessionStream{ctx: ownerCtx, ioCtx: r.Context(), link: agentlink.NewLink(ws, keys, false)}, f: f, nodeID: nodeID, now: f.now}
+		defer stream.done()
+		if err := (agentService{f}).runSession(ownerCtx, nodeID, pc, owner, stream); err != nil {
 			if isSuperseded(err) {
 				closeStatus = websocket.StatusCode(4000)
 			} else {
