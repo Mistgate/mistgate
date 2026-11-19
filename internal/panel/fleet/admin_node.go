@@ -729,7 +729,7 @@ func (f *Fleet) inboundMsg(n store.NodeRow, row store.FleetInboundRow) *adminv1.
 	}
 	if spec, err := f.buildSpec(n, row); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
-		out.Cdn = protocols.ServerCDN(spec)
+		out.Cdn = plugin.ServerCDN(spec)
 		out.RealityTarget = plugin.RealityTargetShown(spec)
 	}
 	return out

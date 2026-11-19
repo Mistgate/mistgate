@@ -712,7 +712,7 @@ func (s *Service) inboundProto(f store.AccessInboundFull, settings json.RawMessa
 	}
 	if spec, err := s.buildSpec(f, settings); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
-		out.Cdn = protocols.ServerCDN(spec)
+		out.Cdn = plugin.ServerCDN(spec)
 		out.RealityTarget = plugin.RealityTargetShown(spec)
 	}
 	out.Awg = awgStatus(f.Inbound)
@@ -1505,12 +1505,12 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 // possible subscriber could reach this inbound. The synthetic audience permits every supported app and node; relayUsable keeps
 // this check aligned with subscription relay enablement, checks, entry state, and the live inbound rules.
 func (s *Service) inboundNoWayInWarning(ctx context.Context, f store.AccessInboundFull, spec plugin.InboundSpec) (*adminv1.StatusReason, error) {
-	if !f.Inbound.Enabled || f.Inbound.DirectInSubscriptions || protocols.ServerCDN(spec) ||
+	if !f.Inbound.Enabled || f.Inbound.DirectInSubscriptions || plugin.ServerCDN(spec) ||
 		(ipv6EntryAddr(f.Node) != "" && protocols.IPv6Unsupported(spec) == "") {
 		return nil, nil
 	}
 
-	unsupported := relayUnsupported(f.Profile.Protocol, spec)
+	unsupported := protocols.IPv6Unsupported(spec)
 	if unsupported == "" {
 		links, err := s.st.RelayLinks(ctx, store.RelayFilter{InboundID: f.Inbound.ID})
 		if err != nil {

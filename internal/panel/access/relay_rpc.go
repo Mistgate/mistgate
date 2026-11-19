@@ -12,6 +12,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg/mimicry"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -164,7 +165,7 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 	if err != nil {
 		return nil, buildRefusal(err, f.Node.Name)
 	}
-	if why := relayUnsupported(f.Profile.Protocol, spec); why != "" {
+	if why := protocols.IPv6Unsupported(spec); why != "" {
 		return nil, coded(connect.CodeFailedPrecondition, "relay_unsupported", "reason", why)
 	}
 	if existing, err := s.st.RelayLinks(ctx, store.RelayFilter{InboundID: f.Inbound.ID, ViaNodeID: entry.ID}); err != nil {

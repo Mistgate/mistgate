@@ -6,8 +6,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // countryRelayReachability reads the access state once for the evaluation; false when it cannot be read (the caller keeps
@@ -38,7 +38,7 @@ func (s *Service) countryRelayReachability(ctx context.Context, sn *snapshot, no
 	}
 	for _, full := range inbounds {
 		t := sn.targets[full.Inbound.ID]
-		cdn := t != nil && protocols.ServerCDN(t.spec)
+		cdn := t != nil && plugin.ServerCDN(t.spec)
 		in.Inbounds = append(in.Inbounds, store.RelayReachabilityInbound{ID: full.Inbound.ID, NodeID: full.Inbound.NodeID,
 			ProfileID: full.Inbound.ProfileID, Protocol: full.Profile.Protocol, State: full.Inbound.State,
 			Enabled: full.Inbound.Enabled, Direct: full.Inbound.DirectInSubscriptions, CDN: cdn})

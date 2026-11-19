@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/plugin/plugintest"
 )
@@ -15,8 +16,8 @@ func TestFactsCopiesInAccess(t *testing.T) {
 		s := plugin.InboundSpec{ID: "x", Protocol: c.Protocol, Listen: plugin.Listen{Network: "tcp", Port: 443},
 			TLS: plugin.TLS{Mode: plugin.TLSMode(c.TLSMode), ServerName: c.SNI}, Settings: []byte(c.Settings)}
 		lines = append(lines, fmt.Sprintf("%-28s hy2TCPPort=%d vlessTargetSelf=%v vlessTargetHost=%q relayUnsupported=%q",
-			c.ID, hy2TCPPort(s), vlessTargetSelf(s), vlessTargetHost(s), relayUnsupported(c.Protocol, s)))
+			c.ID, hy2TCPPort(s), vlessTargetSelf(s), vlessTargetHost(s), protocols.IPv6Unsupported(s)))
 	}
-	lines = append(lines, fmt.Sprintf("acme_ip                      relayUnsupported=%q", relayUnsupported("vless", plugin.InboundSpec{TLS: plugin.TLS{Mode: plugin.TLSAcmeIP}})))
+	lines = append(lines, fmt.Sprintf("acme_ip                      relayUnsupported=%q", protocols.IPv6Unsupported(plugin.InboundSpec{TLS: plugin.TLS{Mode: plugin.TLSAcmeIP}})))
 	plugintest.Golden(t, "facts_copies_access.golden", lines)
 }

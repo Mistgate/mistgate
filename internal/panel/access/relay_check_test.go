@@ -12,7 +12,6 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The gate of a relay and what follows the switch (relay_check.go), against a fake of the fleet's CheckRelay: the probes are
@@ -579,25 +578,6 @@ func TestCreateRelayAcceptsAWG(t *testing.T) {
 	}
 	if r.Msg.Relay.Protocol != "awg" || r.Msg.Relay.Port != 443 || r.Msg.Relay.ExitPort != 1194 {
 		t.Fatalf("AWG relay did not prefer the free QUIC disguise port: %+v", r.Msg.Relay)
-	}
-}
-
-func TestRelayUnsupportedReasons(t *testing.T) {
-	for _, tc := range []struct {
-		name, protocol, settings, want string
-		tls                            plugin.TLSMode
-	}{
-		{"plain hysteria2", "hysteria2", `{}`, "", plugin.TLSSelfSigned},
-		{"vless reality", "vless", `{"reality":{"target":"www.example.org:443"}}`, "", 0},
-		{"vless behind a CDN", "vless", `{"cdn":{"host":"cdn.example.org","port":443}}`, "cdn", plugin.TLSAcmeDomain},
-		{"vless with an empty CDN host", "vless", `{"cdn":{"host":""}}`, "", plugin.TLSAcmeDomain},
-		{"certificate on an IP", "hysteria2", `{}`, "acme_ip", plugin.TLSAcmeIP},
-		{"awg", "awg", `{}`, "", 0},
-	} {
-		spec := plugin.InboundSpec{Settings: []byte(tc.settings), TLS: plugin.TLS{Mode: tc.tls}}
-		if got := relayUnsupported(tc.protocol, spec); got != tc.want {
-			t.Errorf("%s: %q, want %q", tc.name, got, tc.want)
-		}
 	}
 }
 

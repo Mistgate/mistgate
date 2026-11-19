@@ -753,7 +753,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			}
 			// The twins of the server, right after it: the same server through each relay of it that is usable for the person.
 			for _, l := range relaysOf[f.Inbound.ID] {
-				if relayUnsupported(f.Profile.Protocol, spec) != "" {
+				if protocols.IPv6Unsupported(spec) != "" {
 					break
 				}
 				twin := srv
@@ -787,7 +787,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 					n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true, IPv6: true})
 				}
 				for _, l := range relaysOf[f.Inbound.ID] { // its twins are Mihomo-only as well
-					if relayUnsupported(f.Profile.Protocol, spec) == "" {
+					if protocols.IPv6Unsupported(spec) == "" {
 						n.Conns = append(n.Conns, SubConn{Way: "link", Exit: srv.Exit, MihomoOnly: true, Via: strings.ToUpper(strings.TrimSpace(l.ViaNodeCountry)), Relay: true})
 					}
 				}
@@ -857,7 +857,7 @@ func ipv6Egress(n store.AccessNode, exit string) bool {
 }
 
 // subRelays are the relays that give the person a twin server, by the exit's inbound: the ones relayUsable accepts, in the
-// order of the relays. The caller drops the ones the protocol cannot carry (relayUnsupported).
+// order of the relays. The caller drops the ones the protocol cannot carry (protocols.IPv6Unsupported).
 func (s *Service) subRelays(relays []store.RelayLink, full []store.AccessInboundFull, gs store.AccessGroups, u store.AccessUser, format plugin.ClientFormat) map[string][]store.RelayLink {
 	var out map[string][]store.RelayLink
 	for _, l := range relays {
@@ -1187,7 +1187,7 @@ func (s *Service) awgWants(u store.AccessUser, gs store.AccessGroups, full []sto
 			seen[key] = true
 		}
 		spec, err := s.buildSpec(f, merged)
-		if err != nil || relayUnsupported(awg.ID, spec) != "" {
+		if err != nil || protocols.IPv6Unsupported(spec) != "" {
 			continue
 		}
 		if ipv6EntryAddr(f.Node) != "" && protocols.IPv6Unsupported(spec) == "" {

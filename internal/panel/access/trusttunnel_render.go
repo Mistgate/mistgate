@@ -64,7 +64,7 @@ func (s *Service) trustTunnelServers(ctx context.Context, u store.AccessUser, gs
 			}
 			appendRendered(srv, input)
 		}
-		if relayUnsupported(f.Profile.Protocol, spec) != "" {
+		if protocols.IPv6Unsupported(spec) != "" {
 			continue
 		}
 		for _, l := range relaysByInbound[f.Inbound.ID] {
