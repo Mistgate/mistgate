@@ -268,7 +268,7 @@ mistgate edge setup-link --file FILE
 
 | 命令 | 功能 |
 |---|---|
-| `enroll` | 使用一次性令牌换取节点证书。 |
+| `enroll` | 使用一次性令牌换取节点证书，或离线注册第一个订阅主机。 |
 | `set-panel` | 保存新的面板连接地址，供 Agent 切换使用。 |
 | `install` | 写入加固配置的 systemd 单元，并启用和启动它。 |
 | `run` | 在前台运行 Agent。 |
@@ -299,6 +299,9 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 | `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | 状态目录。 |
 | `--force` | none | off | 替换现有身份。 |
 | `--resume-key` | none | off | 在状态目录中将新私钥保存在 `enroll-pending.pem`，直到注册成功；下次尝试时继续使用该密钥，以便重试中断的注册：10 分钟内使用相同令牌和密钥重复请求时，面板会返回相同证书。与 `--force` 一起使用时会生成新密钥。 |
+| `--offline-csr` | none | off | 离线注册第 1 步：在 `enroll-pending.pem` 中保存新密钥（或复用已有的），并以一行 `csr=<base64 DER>` 输出其证书请求。 |
+| `--offline-finish` | none | off | 离线注册第 2 步：从 stdin 读取一行 JSON，包含链接地址和订阅主机角色（`{"link_url":…,"sub_host":{"names":[…],"path":…,"site_name":…}}`，不放在命令行中），然后读取节点证书和面板 CA 证书（PEM），与待用密钥一起保存。角色带站点名称时输出站点证书的 `pin=<sha256>`。 |
+| `--node-id` | none | none | 与 `--offline-finish` 一起使用：面板分配的节点 id。 |
 
 必须提供 `--panel`、`--sni`、`--ca-sha256` 和令牌（`--token`、`MISTGATE_ENROLL_TOKEN` 或 `--token-stdin`）；缺少任一项时，`enroll` 都会以 2 退出。令牌只能使用一次，并且必须在面板显示的有效期内使用（默认一小时）。面板的 [SSH 安装](../getting-started/ssh-install.md)会通过 SSH 使用相同的 `enroll` 和 `install` 命令，令牌通过 stdin 传入，并带有 `--token-stdin --resume-key`。成功后会显示节点 ID 和下一步：
 
@@ -306,6 +309,8 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node
 next: mistgate-node install   (or, in the foreground: mistgate-node run)
 ```
+
+离线注册用于面板的第一个订阅主机：它此时还连不到 NAT 后的面板。面板的 SSH 安装会自己执行这两步：读取 `--offline-csr` 的请求、签发证书，并通过 stdin 把角色行和证书交给 `--offline-finish`；它只读回 `pin=` 一行。之后该节点是只通过链接连接、带订阅主机角色的 agent。`--offline-csr` 与 `--offline-finish` 互斥，也不能与 `--token`、`--token-stdin`、`--panel`、`--sni`、`--link-url` 同用；`--offline-finish` 需要 `--node-id` 和 `--ca-sha256`。CA 必须具有 `--ca-sha256` 指纹，证书必须属于待用密钥。带 `--force` 时两步都会替换已有身份。见[订阅主机](../guide/subscription-host.md)。
 
 ### mistgate-node set-panel
 

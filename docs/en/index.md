@@ -58,6 +58,7 @@ Mistgate is a self-hosted panel for your own VPN fleet: one binary for the panel
 - [DNS](guide/dns.md): DNS presets for users and groups, and the DNS of the nodes.
 - [Torrent protection](guide/torrent-protection.md): the per-node BitTorrent blocker, what it catches and what its events show.
 - [Your own decoy site](guide/decoy-site.md): replace the built-in decoy page with a small site of your own, and a ready prompt for an AI agent that invents a unique one.
+- [Panel at home behind NAT (subscription host)](guide/subscription-host.md): run the panel without a public address; one node serves the subscription address and the agents' link on a subdomain over a bridge the panel opens; requirements, readiness, moving, turning off, moving a public panel home.
 - [Assistant](guide/assistant.md): a cloud model in the admin that answers about nodes, people and errors and prepares changes you apply; providers, where the data goes, memory and limits.
 
 ### Operations

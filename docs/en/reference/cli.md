@@ -268,7 +268,7 @@ Prints `mistgate <version>`, then `built <time>` when the binary was built with 
 
 | Command | What it does |
 |---|---|
-| `enroll` | Exchanges a one-time token for a node certificate. |
+| `enroll` | Exchanges a one-time token for a node certificate, or enrolls the first subscription host offline. |
 | `set-panel` | Saves a new panel link address for the agent to switch to. |
 | `install` | Writes the hardened systemd unit, enables and starts it. |
 | `run` | Runs the agent in the foreground. |
@@ -299,6 +299,9 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 | `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | State directory. |
 | `--force` | none | off | Replace an existing identity. |
 | `--resume-key` | none | off | Keep the new private key in `enroll-pending.pem` in the state directory until enrollment succeeds and use it again on the next try, so an interrupted enrollment can be retried: the panel answers a repeat with the same token and key within 10 minutes with the same certificate. With `--force` a new key is made. |
+| `--offline-csr` | none | off | Offline enrollment, step 1: keep a new key in `enroll-pending.pem` (or reuse the one there) and print its certificate request as one line, `csr=<base64 DER>`. |
+| `--offline-finish` | none | off | Offline enrollment, step 2: read from stdin one JSON line with the link address and the subscription host role (`{"link_url":…,"sub_host":{"names":[…],"path":…,"site_name":…}}`, kept out of the command line), then the node certificate and the panel's CA certificate (PEM), and store them with the pending key. Prints `pin=<sha256>` of the site certificate when the role has a site name. |
+| `--node-id` | none | none | With `--offline-finish`: the node id the panel gave. |
 
 `--panel`, `--sni`, `--ca-sha256` and a token (`--token`, `MISTGATE_ENROLL_TOKEN` or `--token-stdin`) are required; without them `enroll` exits with 2. A token works once, within the time the panel showed (an hour by default). The panel's [SSH install](../getting-started/ssh-install.md) runs the same `enroll` and `install` over SSH, with the token on stdin and `--token-stdin --resume-key`. On success it prints the node id and the next step:
 
@@ -306,6 +309,8 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node
 next: mistgate-node install   (or, in the foreground: mistgate-node run)
 ```
+
+The offline form enrolls the panel's first subscription host, which cannot reach a panel behind NAT yet. The panel's SSH install runs both steps itself: it reads the request of `--offline-csr`, issues the certificate, and passes the role line and the certificates to `--offline-finish` on stdin; it reads back only the `pin=` line. The node is then a link-only agent with the subscription host role. `--offline-csr` and `--offline-finish` exclude each other and `--token`, `--token-stdin`, `--panel`, `--sni` and `--link-url`; `--offline-finish` needs `--node-id` and `--ca-sha256`. The CA must have the `--ca-sha256` fingerprint and the certificate must belong to the pending key. With `--force` both replace an existing identity. See [Subscription host](../guide/subscription-host.md).
 
 ### mistgate-node set-panel
 
