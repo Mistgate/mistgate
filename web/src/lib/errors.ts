@@ -33,6 +33,12 @@ export const errorCodes = [
   "reality_needs_domain",
   "mtproto_needs_domain",
   "port_taken",
+  // services that share a TCP port by SNI (plugin.TCPSharePlan): the name is held, no service shows the node's site, a service has no
+  // name, the agent is too old
+  "sni_taken",
+  "share_needs_site",
+  "share_unsupported",
+  "share_agent_old",
   "hop_taken",
   "port_in_hop",
   "sni_needs_domain",
@@ -158,6 +164,15 @@ function osVars(t: T, vars: Record<string, string>): Record<string, string> {
   return { ...vars, reason: osBlocks.includes(reason) ? t(`os.block.${reason as "offline"}`) : reason };
 }
 
+/**
+ * The sentence of a refusal about a TCP port that services share by SNI (sni_taken, share_needs_site, share_unsupported,
+ * share_agent_old): the one that names a free port when the panel found one, and no placeholder left for a value it did not send.
+ */
+export function shareRefusalText(t: T, code: string, vars: Record<string, string>): string {
+  const key = code === "sni_taken" && vars.free ? "err.sni_taken_free" : (`err.${code}` as "err.sni_taken");
+  return t(key, { protocol: "", ...vars });
+}
+
 /** Our sentence for a message whose code is listed, else undefined. */
 function known(c: ConnectError, t: T): string | undefined {
   const code = errorCode(c.rawMessage) as (typeof errorCodes)[number];
@@ -170,6 +185,7 @@ function known(c: ConnectError, t: T): string | undefined {
   }
   // a relay holds the port: the panel names it "relay" or "relay to <exit>", not a profile
   if (code === "port_taken" && /^relay($| )/.test(vars.profile ?? "")) return t("err.port_taken_relay", vars);
+  if (code === "sni_taken" || code === "share_unsupported") return shareRefusalText(t, code, vars);
   if (code === "device_limit") return t("err.device_limit", deviceLimitVars(vars));
   // where a site stands is the node ids the panel sent (a screen that knows the names words it itself: lib/decoysites.ts decoyErrorText)
   if (code === "decoy_site_in_use") return t("err.decoy_site_in_use", { where: inUseWhere(t, (vars.nodes ?? "").split(",").filter(Boolean), vars.panel === "1") });

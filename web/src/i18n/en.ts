@@ -38,6 +38,7 @@ import { en as osupdatesEn } from "./osupdates";
 import { en as fleetuiEn } from "./fleetui";
 import { en as clientlogsEn } from "./clientlogs";
 import { en as trusttunnelEn } from "./trusttunnel";
+import { en as tcpshareEn } from "./tcpshare";
 import { en as shellEn } from "./shell";
 import { en as nodesviewEn } from "./nodesview";
 import { en as nodeswaysEn } from "./nodesways";
@@ -339,7 +340,7 @@ const core = {
 
 export type CoreMessages = typeof core;
 export { core as coreEn };
-export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn, ...usersextraEn, ...decoysitesEn, ...planwordsEn, ...nodeswaysEn, ...nodewaysEn, ...profilespageEn, ...healthpageEn, ...reachpageEn, ...profilesrvEn, ...profilenewEn, ...subspnEn, ...subshxEn, ...subsrtEn, ...subsdnsEn, ...updatespageEn, ...settingspageEn, ...aipageEn, ...igpageEn, ...aspageEn, ...nodeshareEn, ...channelEn };
+export const en = { ...core, ...opsEn, ...usersEn, ...securityEn, ...profilesEn, ...subsEn, ...healthEn, ...updatesEn, ...awgEn, ...warpEn, ...integrationsEn, ...telegramEn, ...portsEn, ...editionEn, ...decoyEn, ...bulkEn, ...countryEn, ...probesEn, ...connectionsEn, ...journalEn, ...relayEn, ...waysEn, ...tgproxyEn, ...clientcompatEn, ...protocolsEn, ...aiEn, ...graphEn, ...waysgraphEn, ...fleetmapEn, ...observabilityEn, ...debugEn, ...resourcesEn, ...tasksEn, ...followupEn, ...osupdatesEn, ...fleetuiEn, ...clientlogsEn, ...trusttunnelEn, ...tcpshareEn, ...shellEn, ...overviewEn, ...nodesviewEn, ...windowsEn, ...nodepageEn, ...userslistEn, ...userspageEn, ...usersgroupEn, ...usersextraEn, ...decoysitesEn, ...planwordsEn, ...nodeswaysEn, ...nodewaysEn, ...profilespageEn, ...healthpageEn, ...reachpageEn, ...profilesrvEn, ...profilenewEn, ...subspnEn, ...subshxEn, ...subsrtEn, ...subsdnsEn, ...updatespageEn, ...settingspageEn, ...aipageEn, ...igpageEn, ...aspageEn, ...nodeshareEn, ...channelEn };
 
 export type Messages = typeof en;
 export type MessageKey = keyof Messages;
