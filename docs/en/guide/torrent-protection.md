@@ -52,6 +52,12 @@ Detection is best effort. These pass:
 
 The protection lowers the number of complaints; it does not guarantee that none come.
 
+## Torrents and a temporary block of the address
+
+There is a second reason to keep torrents away from a node, and it is not about complaints to the hoster. People in Russia report that downloading torrents through the tunnel can close the way to the node's address, or to the hoster's whole subnet, for a few minutes: the operator's filter reacts to connections with some of the addresses in the swarm. During that time new connections to the node fail for everyone behind the same operator, while the node itself runs and stays connected to the panel.
+
+When people say a node "went down" for five or ten minutes and came back by itself, and the node's events show neither a restart nor a lost link to the panel, look at the torrent protection events of that time and ask whether somebody was downloading torrents. This comes from user reports, it is not a rule Mistgate has measured: how long it lasts and what sets it off differ between operators.
+
 ## Events
 
 Every detected flow is still blocked. Strong matches (`tracker_connect`, `dht_query` and `tcp_handshake`) are reported at once as a `torrent_attempt` warning in the node's **History → Events**. A uTP SYN is weak evidence: one SYN never names a person. The agent reports it only after at least five detections to at least three destination ports for the same user and profile within 10 minutes. The five-minute event limit then applies.
