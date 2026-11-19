@@ -627,7 +627,11 @@ func (f *Fleet) connectEvents(ctx context.Context, id string, prev store.NodeRow
 		d := boot.Sub(prev.BootAt)
 		params["rebooted"] = fmt.Sprint(d > time.Minute || d < -time.Minute)
 	}
-	if code, _ := f.st.LastNodeEventCode(ctx, id, "node_down", "node_recovered"); code == "node_down" {
+	lastCode, err := f.st.LastNodeEventCode(ctx, id, "node_down", "node_recovered")
+	if err != nil { // read as "no node_down": the return is then told as a blip or a restart
+		f.log.Warn("read the last down event of a node", "code", "node_event_read_failed", "node", id, "err", err)
+	}
+	if lastCode == "node_down" {
 		f.event(ctx, 1, "node_recovered", id, params)
 	} else if gap >= time.Minute && gap < blipWindow {
 		f.event(ctx, 1, "node_blip", id, params)

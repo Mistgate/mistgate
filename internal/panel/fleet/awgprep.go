@@ -148,15 +148,9 @@ func (s nodeService) PrepareAwgKernel(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, internalErr(f.log.Error, "prepare awg kernel", err)
 	}
-	t := f.now().UTC()
-	protos, _ := f.st.FleetNodeProtocols(ctx)
-	today, _ := f.todayBytesByNode(ctx, t)
-	relayToday, _ := f.st.RelayTodayBytesByNode(ctx, todayStart(t))
-	enabled, _ := f.st.FleetEnabledInbounds(ctx)
-	panelBundle, _ := f.panelDecoyBundle()
 	return connect.NewResponse(&adminv1.PrepareAwgKernelResponse{
 		Outcome: outcome, ReasonCode: clip(res.Params["code"], 32), Reason: clip(res.Params["reason"], 200),
-		Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], relayToday[n.ID], inboundsOf(enabled, n.ID), t, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID), f.shareOf(ctx, n.ID)),
+		Node: f.nodeCardAfterWrite(ctx, n),
 	}), nil
 }
 
