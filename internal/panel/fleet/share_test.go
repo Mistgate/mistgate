@@ -3,6 +3,7 @@ package fleet
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +57,17 @@ func TestSharedPortIsWithheldFromAnAgentThatCannotShare(t *testing.T) {
 		t.Fatalf("an agent that cannot share holds %v and is withheld %v, want a and d held, b and c withheld", got, old.withheld)
 	}
 	capable := build(append(allCaps, capTCPShare)...)
+	// the two held back for the port they stand on say so with a code of their own, not the general "agent too old"
+	if !slices.Equal(old.withheldShare, []string{"inb_b", "inb_c"}) {
+		t.Fatalf("withheldShare = %v, want b and c", old.withheldShare)
+	}
+	rows := withheldApplied(old.withheld, old.withheldShare)
+	if len(rows) != 2 || !strings.HasPrefix(rows[0].Error, "share_agent_old:") || rows[0].Error != withheldShareReason {
+		t.Fatalf("results of the withheld inbounds = %+v", rows)
+	}
+	if got := withheldApplied([]string{"inb_awg", "inb_b"}, []string{"inb_b"}); got[0].Error != withheldReason || got[1].Error != withheldShareReason {
+		t.Fatalf("a protocol the agent lacks keeps the general reason: %+v", got)
+	}
 	if got := held(capable); !slices.Equal(got, []string{"inb_a", "inb_b", "inb_c", "inb_d"}) || len(capable.withheld) != 0 {
 		t.Fatalf("an agent that can share holds %v and is withheld %v, want all held", got, capable.withheld)
 	}
@@ -140,6 +152,48 @@ func TestSharedPortsSnapshotIsStoredWhenItChanges(t *testing.T) {
 	e.f.recordSharedPorts(ctx, nodeID, nil, now.Add(8*time.Minute))
 	if ports, at := read(); len(ports) != 0 || at != 0 {
 		t.Fatalf("the snapshot stayed: %v at %d", ports, at)
+	}
+}
+
+// A flood of unfinished handshakes (the front dropped some for want of room) is one event an hour, not one per snapshot.
+func TestFrontOverloadedIsToldOnceAnHour(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	nodeID, _, _ := e.createEnrollment("de1", "de1.example.com")
+	snap := func(evicted uint64) []*agentv1.SharedPort {
+		return []*agentv1.SharedPort{{Port: 443, DefaultInboundId: "inb_a", Accepted: 100, Evicted: evicted}}
+	}
+	count := func() int {
+		t.Helper()
+		rows, _, err := e.f.st.Events(ctx, store.EventFilter{NodeID: nodeID, Limit: 50})
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := 0
+		for _, r := range rows {
+			if r.Code == "front_overloaded" {
+				n++
+				if r.Params["port"] != "443" || r.Params["evicted"] == "" {
+					t.Fatalf("event params = %v", r.Params)
+				}
+			}
+		}
+		return n
+	}
+	now := time.Unix(1_800_000_000, 0)
+	e.f.recordSharedPorts(ctx, nodeID, snap(0), now)
+	e.f.recordSharedPorts(ctx, nodeID, snap(0), now.Add(time.Minute))
+	if count() != 0 {
+		t.Fatal("an event for a front that dropped nothing")
+	}
+	e.f.recordSharedPorts(ctx, nodeID, snap(40), now.Add(2*time.Minute))
+	e.f.recordSharedPorts(ctx, nodeID, snap(900), now.Add(3*time.Minute)) // the flood goes on: still the one event
+	if count() != 1 {
+		t.Fatalf("events = %d, want one for the flood", count())
+	}
+	e.f.recordSharedPorts(ctx, nodeID, snap(901), now.Add(2*time.Hour))
+	if count() != 2 {
+		t.Fatalf("events = %d, want a second one an hour later", count())
 	}
 }
 

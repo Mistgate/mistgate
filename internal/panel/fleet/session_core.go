@@ -66,6 +66,7 @@ type SessionState struct {
 	SentRevision          uint64                    `json:"q,omitempty"`
 	SentStateHash         string                    `json:"sh,omitempty"`
 	SentWithheld          []string                  `json:"wh,omitempty"`
+	SentWithheldShare     []string                  `json:"whs,omitempty"`
 	SentSettingsHash      string                    `json:"ss,omitempty"`
 	OsStatusEnabled       bool                      `json:"os_status,omitempty"`
 	DriftResent           bool                      `json:"dr,omitempty"`
@@ -1145,7 +1146,7 @@ func (c *SessionCore) applyResult(ctx context.Context, tr *coreTransition, r *ag
 		}
 		in = append(in, ia)
 	}
-	in = append(in, withheldApplied(tr.state.SentWithheld)...)
+	in = append(in, withheldApplied(tr.state.SentWithheld, tr.state.SentWithheldShare)...)
 	c.updateApplyDrift(ctx, tr, r)
 	inboundStateChanged := relayInboundStateChanged(in,
 		func() (bool, error) { return c.f.st.HasRelaysOnNode(ctx, tr.state.NodeID) },
@@ -1272,8 +1273,20 @@ func (c *SessionCore) desiredPrepared(ctx context.Context, tr *coreTransition, e
 		return errors.New("prepared desired state is required")
 	}
 	if event.Prepared.node.State != "retired" && event.Prepared.desired != nil && len(event.Prepared.desired.withheld) > 0 {
-		if err := c.f.st.FailWithheldInbounds(ctx, event.Prepared.node.ID, event.Prepared.desired.withheld, withheldReason, event.At); err != nil {
-			c.f.log.Warn("mark withheld inbounds", "code", "withheld_inbounds_failed", "node", event.Prepared.node.ID, "err", err)
+		d := event.Prepared.desired
+		for _, held := range []struct {
+			ids    []string
+			reason string
+		}{
+			{slices.DeleteFunc(slices.Clone(d.withheld), func(id string) bool { return slices.Contains(d.withheldShare, id) }), withheldReason},
+			{d.withheldShare, withheldShareReason},
+		} {
+			if len(held.ids) == 0 {
+				continue
+			}
+			if err := c.f.st.FailWithheldInbounds(ctx, event.Prepared.node.ID, held.ids, held.reason, event.At); err != nil {
+				c.f.log.Warn("mark withheld inbounds", "code", "withheld_inbounds_failed", "node", event.Prepared.node.ID, "err", err)
+			}
 		}
 	}
 	if err := c.applyPreparedDesired(ctx, tr, event.Prepared, event.At); err != nil {
@@ -1313,7 +1326,7 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 			}
 			state.SentRevision = digest.Revision
 			state.SentStateHash = want.hash
-			state.SentWithheld = slices.Clone(want.withheld)
+			state.SentWithheld, state.SentWithheldShare = slices.Clone(want.withheld), slices.Clone(want.withheldShare)
 			if err := c.helloInSync(ctx, node.ID, state); err != nil {
 				return err
 			}
@@ -1324,7 +1337,7 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 			digest.Revision == state.HelloAppliedRevision && digest.Hash == state.HelloAppliedStateHash {
 			state.SentRevision = digest.Revision
 			state.SentStateHash = digest.Hash
-			state.SentWithheld = slices.Clone(want.withheld)
+			state.SentWithheld, state.SentWithheldShare = slices.Clone(want.withheld), slices.Clone(want.withheldShare)
 		}
 	}
 	full := state.FullResendPending || state.SentRevision == 0 || digest == nil ||
@@ -1368,7 +1381,7 @@ func (c *SessionCore) applyPreparedDesired(ctx context.Context, tr *coreTransiti
 	tr.Frames = append(tr.Frames, &agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_DesiredState{DesiredState: ds}})
 	state.SentRevision = rev
 	state.SentStateHash = want.hash
-	state.SentWithheld = slices.Clone(want.withheld)
+	state.SentWithheld, state.SentWithheldShare = slices.Clone(want.withheld), slices.Clone(want.withheldShare)
 	state.SentSettingsHash = sig
 	if full {
 		state.FullResendPending = false

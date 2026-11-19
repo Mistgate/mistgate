@@ -461,7 +461,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 		}
 		for _, changed := range changedPorts {
 			checks := portChecks[changed.node.ID]
-			if err := portRefusal(changed.spec, changed.node.Name, changed.others, checks, s.now(), portSubject{Profile: p.Name, Agent: changed.node.AgentCaps}); err != nil {
+			if err := portRefusal(changed.spec, changed.node.Name, changed.others, checks, s.now(), portSubject{Profile: p.Name, Agent: changed.node.AgentCaps, Address: changed.node.Address}); err != nil {
 				return nil, err
 			}
 			if !specHasUDPListen(changed.spec) {
@@ -1265,7 +1265,7 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 			return nil, s.internal("read UDP port checks", err)
 		}
 	}
-	if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now(), portSubject{Profile: f.Profile.Name, Agent: f.Node.AgentCaps}); err != nil {
+	if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now(), portSubject{Profile: f.Profile.Name, Agent: f.Node.AgentCaps, Address: f.Node.Address}); err != nil {
 		return nil, err
 	}
 	warnings, err := s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others)
@@ -1369,7 +1369,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		}
 	}
 	if in.Enabled {
-		if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now(), portSubject{Profile: f.Profile.Name, Agent: f.Node.AgentCaps}); err != nil {
+		if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now(), portSubject{Profile: f.Profile.Name, Agent: f.Node.AgentCaps, Address: f.Node.Address}); err != nil {
 			return nil, err
 		}
 		if warnings, err = s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others); err != nil {

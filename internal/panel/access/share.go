@@ -1,6 +1,7 @@
 package access
 
 import (
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ var shareProtocols = []string{"vless", "trusttunnel", "mtproto"}
 type portSubject struct {
 	Profile string
 	Agent   []string
+	Address string // the node's address, for the name a refusal suggests
 }
 
 // isSharePeer says other is an inbound of the node that spec may share its TCP port with: both listen on the same TCP port, with no
@@ -83,7 +85,16 @@ func shareRefusal(spec plugin.InboundSpec, node string, others []nodeListen, who
 		}
 		switch p.Code {
 		case plugin.SNITaken:
-			return coded(connect.CodeAlreadyExists, plugin.SNITaken, append(kv, "name", p.Name)...)
+			kv = append(kv, "name", p.Name)
+			// The admin can put the profile beside the others under a name of its own when the name it answers to is its to
+			// set (the node's own site: the domain of the inbound; not the target of a REALITY that shows another site).
+			if r, ok := plugin.TCPRouteOf(spec); ok && r.Site {
+				kv = append(kv, "share", "1")
+				if name := suggestShareName(who.Address, after); name != "" {
+					kv = append(kv, "suggest", name)
+				}
+			}
+			return coded(connect.CodeAlreadyExists, plugin.SNITaken, kv...)
 		case plugin.ShareUnsupported:
 			// the profile named is the service that cannot be told apart, which is the one asked for or a neighbour
 			kv[5] = names[p.ID]
@@ -94,6 +105,33 @@ func shareRefusal(spec plugin.InboundSpec, node string, others []nodeListen, who
 		}
 	}
 	return nil
+}
+
+// shareWords are the first labels the panel suggests for a service that stands beside another on a port: neutral words of a site
+// with a content network, so that the names a visitor can find (certificate logs, a scan of names) say nothing about a VPN.
+var shareWords = []string{"cdn", "static", "media", "assets", "files", "img", "edge", "app"}
+
+// suggestShareName is "<word>.<address>" for the first word no service of the port answers to, "" when the node is known by an IP
+// address (a name of its own needs a domain).
+func suggestShareName(address string, specs []plugin.InboundSpec) string {
+	host := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(address), "."))
+	if _, err := netip.ParseAddr(strings.Trim(host, "[]")); err == nil || !strings.Contains(host, ".") {
+		return ""
+	}
+	taken := map[string]bool{}
+	for _, s := range specs {
+		if r, ok := plugin.TCPRouteOf(s); ok {
+			for _, n := range r.Names {
+				taken[n] = true
+			}
+		}
+	}
+	for _, w := range shareWords {
+		if name := w + "." + host; !taken[name] {
+			return name
+		}
+	}
+	return ""
 }
 
 func protocolOf(id string, spec plugin.InboundSpec, peers []nodeListen) string {

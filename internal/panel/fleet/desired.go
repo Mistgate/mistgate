@@ -115,6 +115,9 @@ type nodeState struct {
 	hash        string // statehash.StateBridge of the whole
 	// withheld are the inbounds the agent cannot take (an awg inbound for an agent without "awg/1"); the node page says why.
 	withheld []string
+	// withheldShare is the part of withheld that is held back only because the agent cannot share a TCP port between services (the
+	// rest lack a protocol): the node page tells the admin to update the agent to put them beside the default service.
+	withheldShare []string
 }
 
 // sentDigest is what the panel last sent on a node's stream, as much as the next delta needs.
@@ -173,9 +176,11 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 			for _, id := range unsharedLosers(st) {
 				delete(st.in, id)
 				st.withheld = append(st.withheld, id)
+				st.withheldShare = append(st.withheldShare, id)
 			}
 		}
 		sort.Strings(st.withheld)
+		sort.Strings(st.withheldShare)
 		if w := f.warpModule(); w != nil && slices.Contains(caps, capWarp) {
 			if st.warp, err = w.Spec(ctx, n.ID); err != nil {
 				return nil, err
