@@ -89,7 +89,7 @@ const issued = (over: Record<string, unknown> = {}) =>
     installCommand:
       "chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example.com:443 --sni q3m8x2kd7w.invalid --ca-sha256 9f2c1a6d0b7e4c3a8f5d2e1b0c9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a --token 2qgx7mbd3jc5u4yvtwnfhx6kqjz4pm2s7ylbq3e5c6a7nd8p9r0s && /root/mistgate-node install",
     caFingerprint: "sha256:9f2c1a6d0b7e4c3a8f5d2e1b0c9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a",
-    expiresUnix: BigInt(NOW + 3600),
+    expiresUnix: NOW + 3600,
     copyCommand: "scp /var/lib/mistgate/dist/mistgate-node-linux-amd64 root@se1.example.com:/root/mistgate-node",
     ...over,
   }) as unknown as NonNullable<AddNodeSeed["issued"]>;
