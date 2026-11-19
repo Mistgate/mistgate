@@ -542,11 +542,16 @@ func (s *Server) agentLinkRequest(r *http.Request) bool {
 	if strings.HasPrefix(rel, "/link/") {
 		return len(strings.TrimPrefix(rel, "/link/")) > 0 && !strings.Contains(strings.TrimPrefix(rel, "/link/"), "/")
 	}
-	if r.Method != http.MethodGet || !strings.HasPrefix(rel, "/update/") {
+	if r.Method != http.MethodGet {
 		return false
 	}
-	parts := strings.Split(strings.TrimPrefix(rel, "/update/"), "/")
-	return len(parts) == 2 && parts[0] != "" && parts[1] != ""
+	for _, route := range []string{"/update/", "/fetch/"} { // the edge's update download; a link agent's fetch (fleet/link_fetch.go)
+		if strings.HasPrefix(rel, route) {
+			parts := strings.Split(strings.TrimPrefix(rel, route), "/")
+			return len(parts) == 2 && parts[0] != "" && parts[1] != ""
+		}
+	}
+	return false
 }
 
 func isWebSocketUpgrade(r *http.Request) bool {
