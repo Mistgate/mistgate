@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -54,14 +53,6 @@ func fail(code connect.Code, msg string) error { return connect.NewError(code, e
 
 var errInternal = fail(connect.CodeInternal, "internal error")
 
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
-
 func (s *Service) current(ctx context.Context) (*adminv1.ClientApiSettings, error) {
 	v, err := s.cfg.Store.Setting(ctx, store.SettingClientAPI)
 	if errors.Is(err, store.ErrNotFound) {
@@ -90,7 +81,7 @@ func (r rpc) GetClientApi(ctx context.Context, _ *connect.Request[adminv1.GetCli
 }
 
 func (r rpc) UpdateClientApi(ctx context.Context, req *connect.Request[adminv1.UpdateClientApiRequest]) (*connect.Response[adminv1.UpdateClientApiResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -87,17 +87,8 @@ func (s *Service) GetClientCompat(ctx context.Context, _ *connect.Request[adminv
 	return connect.NewResponse(&adminv1.GetClientCompatResponse{Rules: rules, Defaults: defaults}), nil
 }
 
-// compatOwner: the owner at the panel, never a token or an MCP session (the policy says the same; this is the second lock).
-func compatOwner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, connect.NewError(connect.CodePermissionDenied, errors.New("owner access required"))
-	}
-	return a, nil
-}
-
 func (s *Service) UpdateClientCompat(ctx context.Context, req *connect.Request[adminv1.UpdateClientCompatRequest]) (*connect.Response[adminv1.UpdateClientCompatResponse], error) {
-	admin, err := compatOwner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}

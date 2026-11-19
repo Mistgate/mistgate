@@ -674,16 +674,8 @@ func fail(code connect.Code, message string) error {
 	return connect.NewError(code, errors.New(message))
 }
 
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
-
 func (r rpc) GetCheburcheck(ctx context.Context, _ *connect.Request[adminv1.GetCheburcheckRequest]) (*connect.Response[adminv1.GetCheburcheckResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	settings, err := r.s.current(ctx)
@@ -694,7 +686,7 @@ func (r rpc) GetCheburcheck(ctx context.Context, _ *connect.Request[adminv1.GetC
 }
 
 func (r rpc) UpdateCheburcheck(ctx context.Context, req *connect.Request[adminv1.UpdateCheburcheckRequest]) (*connect.Response[adminv1.UpdateCheburcheckResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -759,7 +751,7 @@ func boolSetting(v bool) string {
 }
 
 func (r rpc) DisconnectCheburcheck(ctx context.Context, _ *connect.Request[adminv1.DisconnectCheburcheckRequest]) (*connect.Response[adminv1.DisconnectCheburcheckResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -790,7 +782,7 @@ func (r rpc) DisconnectCheburcheck(ctx context.Context, _ *connect.Request[admin
 }
 
 func (r rpc) TestCheburcheck(ctx context.Context, _ *connect.Request[adminv1.TestCheburcheckRequest]) (*connect.Response[adminv1.TestCheburcheckResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	s := r.s

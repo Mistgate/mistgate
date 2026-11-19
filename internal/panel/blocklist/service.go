@@ -372,15 +372,6 @@ func fail(code connect.Code, msg string) error { return connect.NewError(code, e
 
 var errInternal = fail(connect.CodeInternal, "internal error")
 
-// owner is the signed-in owner; a token (API or MCP) is refused again here, whatever the policy table says.
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
-
 // current is the settings as an answer. The time of the last check and the date of its lists come from the stored results, so
 // they are the same on every process; an off source shows none.
 func (s *Service) current(ctx context.Context) (*adminv1.BlocklistSettings, error) {
@@ -405,7 +396,7 @@ func (s *Service) current(ctx context.Context) (*adminv1.BlocklistSettings, erro
 }
 
 func (r rpc) GetBlocklist(ctx context.Context, _ *connect.Request[adminv1.GetBlocklistRequest]) (*connect.Response[adminv1.GetBlocklistResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	cur, err := r.s.current(ctx)
@@ -416,7 +407,7 @@ func (r rpc) GetBlocklist(ctx context.Context, _ *connect.Request[adminv1.GetBlo
 }
 
 func (r rpc) UpdateBlocklist(ctx context.Context, req *connect.Request[adminv1.UpdateBlocklistRequest]) (*connect.Response[adminv1.UpdateBlocklistResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -451,7 +442,7 @@ func (r rpc) UpdateBlocklist(ctx context.Context, req *connect.Request[adminv1.U
 }
 
 func (r rpc) DisconnectBlocklist(ctx context.Context, _ *connect.Request[adminv1.DisconnectBlocklistRequest]) (*connect.Response[adminv1.DisconnectBlocklistResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -479,7 +470,7 @@ func (r rpc) DisconnectBlocklist(ctx context.Context, _ *connect.Request[adminv1
 
 // TestBlocklist downloads the lists now (conditional requests) and checks every node, storing the result. It sends no address.
 func (r rpc) TestBlocklist(ctx context.Context, _ *connect.Request[adminv1.TestBlocklistRequest]) (*connect.Response[adminv1.TestBlocklistResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	s := r.s

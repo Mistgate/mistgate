@@ -160,14 +160,6 @@ func (s *Service) audit(ctx context.Context, admin store.Admin, action string, p
 	}
 }
 
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
-
 func fail(code connect.Code, message string) error {
 	return connect.NewError(code, errors.New(message))
 }

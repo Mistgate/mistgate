@@ -62,15 +62,6 @@ func fail(code connect.Code, msg string) error { return connect.NewError(code, e
 
 var errInternal = fail(connect.CodeInternal, "internal error")
 
-// owner is the signed-in owner; a token (API or MCP) is refused again here, whatever the policy table says.
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
-
 func (s *Service) enabled(ctx context.Context) (bool, error) {
 	v, err := s.cfg.Store.Setting(ctx, store.SettingClientProbe)
 	if errors.Is(err, store.ErrNotFound) {
@@ -132,7 +123,7 @@ func (r rpc) GetClientProbe(ctx context.Context, _ *connect.Request[adminv1.GetC
 }
 
 func (r rpc) UpdateClientProbe(ctx context.Context, req *connect.Request[adminv1.UpdateClientProbeRequest]) (*connect.Response[adminv1.UpdateClientProbeResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +151,7 @@ func (r rpc) UpdateClientProbe(ctx context.Context, req *connect.Request[adminv1
 }
 
 func (r rpc) DisconnectClientProbe(ctx context.Context, _ *connect.Request[adminv1.DisconnectClientProbeRequest]) (*connect.Response[adminv1.DisconnectClientProbeResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -939,16 +939,8 @@ func fail(code connect.Code, msg string) error { return connect.NewError(code, e
 
 var errInternal = fail(connect.CodeInternal, "internal error")
 
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
-
 func (r rpc) GetBsbord(ctx context.Context, _ *connect.Request[adminv1.GetBsbordRequest]) (*connect.Response[adminv1.GetBsbordResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	if r.s.country(ctx) != countryreach.TSPUCountry {
@@ -962,7 +954,7 @@ func (r rpc) GetBsbord(ctx context.Context, _ *connect.Request[adminv1.GetBsbord
 }
 
 func (r rpc) UpdateBsbord(ctx context.Context, req *connect.Request[adminv1.UpdateBsbordRequest]) (*connect.Response[adminv1.UpdateBsbordResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1128,7 +1120,7 @@ func (s *Service) cancelPending(ctx context.Context, st settings) {
 }
 
 func (r rpc) DisconnectBsbord(ctx context.Context, _ *connect.Request[adminv1.DisconnectBsbordRequest]) (*connect.Response[adminv1.DisconnectBsbordResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1174,7 +1166,7 @@ func (r rpc) DisconnectBsbord(ctx context.Context, _ *connect.Request[adminv1.Di
 }
 
 func (r rpc) TestBsbord(ctx context.Context, _ *connect.Request[adminv1.TestBsbordRequest]) (*connect.Response[adminv1.TestBsbordResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	s := r.s
@@ -1228,7 +1220,7 @@ func (s *Service) testRate() error {
 }
 
 func (r rpc) ListBsbordUnits(ctx context.Context, _ *connect.Request[adminv1.ListBsbordUnitsRequest]) (*connect.Response[adminv1.ListBsbordUnitsResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	st, err := r.s.load(ctx)
@@ -1266,7 +1258,7 @@ func (r rpc) ListBsbordUnits(ctx context.Context, _ *connect.Request[adminv1.Lis
 }
 
 func (r rpc) PreviewBsbord(ctx context.Context, _ *connect.Request[adminv1.PreviewBsbordRequest]) (*connect.Response[adminv1.PreviewBsbordResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	s := r.s

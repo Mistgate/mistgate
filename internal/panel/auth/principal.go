@@ -2,8 +2,12 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"strings"
 	"time"
+
+	"connectrpc.com/connect"
 
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -172,4 +176,23 @@ func planningAllows(ctx context.Context) bool {
 func procedureFrom(ctx context.Context) string {
 	p, _ := ctx.Value(procedureKey{}).(string)
 	return p
+}
+
+// SignedInSession is the admin signed in with a cookie session. An API or MCP token is refused here whatever its profile
+// and whatever the procedure table says: the second lock of the RPCs that no token may reach.
+func SignedInSession(ctx context.Context) (store.Admin, error) {
+	a, ok := AdminFrom(ctx)
+	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || PrincipalFrom(ctx).Token {
+		return store.Admin{}, connect.NewError(connect.CodePermissionDenied, errors.New("a signed-in admin is required"))
+	}
+	return a, nil
+}
+
+// OwnerSession is the owner signed in with a cookie session: a helper, a readonly admin and every token are refused.
+func OwnerSession(ctx context.Context) (store.Admin, error) {
+	a, err := SignedInSession(ctx)
+	if err != nil || a.Role != store.RoleOwner {
+		return store.Admin{}, connect.NewError(connect.CodePermissionDenied, errors.New("owner access required"))
+	}
+	return a, nil
 }

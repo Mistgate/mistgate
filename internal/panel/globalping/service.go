@@ -221,15 +221,6 @@ func fail(code connect.Code, msg string) error { return connect.NewError(code, e
 
 var errInternal = fail(connect.CodeInternal, "internal error")
 
-// owner is the signed-in owner; a token (API or MCP) is refused again here, whatever the policy table says.
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
-
 // current is the settings as an answer.
 func (s *Service) current(ctx context.Context) (*adminv1.GlobalpingSettings, error) {
 	st, err := s.load(ctx)
@@ -241,7 +232,7 @@ func (s *Service) current(ctx context.Context) (*adminv1.GlobalpingSettings, err
 }
 
 func (r rpc) GetGlobalping(ctx context.Context, _ *connect.Request[adminv1.GetGlobalpingRequest]) (*connect.Response[adminv1.GetGlobalpingResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	cur, err := r.s.current(ctx)
@@ -252,7 +243,7 @@ func (r rpc) GetGlobalping(ctx context.Context, _ *connect.Request[adminv1.GetGl
 }
 
 func (r rpc) UpdateGlobalping(ctx context.Context, req *connect.Request[adminv1.UpdateGlobalpingRequest]) (*connect.Response[adminv1.UpdateGlobalpingResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +299,7 @@ func (r rpc) UpdateGlobalping(ctx context.Context, req *connect.Request[adminv1.
 }
 
 func (r rpc) DisconnectGlobalping(ctx context.Context, _ *connect.Request[adminv1.DisconnectGlobalpingRequest]) (*connect.Response[adminv1.DisconnectGlobalpingResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +323,7 @@ func (r rpc) DisconnectGlobalping(ctx context.Context, _ *connect.Request[adminv
 
 // TestGlobalping asks GET /v1/limits. It never carries an address and does not use a test.
 func (r rpc) TestGlobalping(ctx context.Context, _ *connect.Request[adminv1.TestGlobalpingRequest]) (*connect.Response[adminv1.TestGlobalpingResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	s := r.s

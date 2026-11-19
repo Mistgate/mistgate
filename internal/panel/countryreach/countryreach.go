@@ -78,24 +78,15 @@ type rpc struct{ s *Service }
 
 func fail(code connect.Code, msg string) error { return connect.NewError(code, errors.New(msg)) }
 
-// owner is the signed-in owner; a token (API or MCP) is refused again here, whatever the policy table says.
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
-
 func (r rpc) GetCountryReachability(ctx context.Context, _ *connect.Request[adminv1.GetCountryReachabilityRequest]) (*connect.Response[adminv1.GetCountryReachabilityResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&adminv1.GetCountryReachabilityResponse{Settings: &adminv1.CountryReachability{Country: r.s.Country(ctx)}}), nil
 }
 
 func (r rpc) UpdateCountryReachability(ctx context.Context, req *connect.Request[adminv1.UpdateCountryReachabilityRequest]) (*connect.Response[adminv1.UpdateCountryReachabilityResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
