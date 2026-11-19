@@ -217,6 +217,11 @@ package mistgate.agent.v1;
 //                       loaded. Params: count, max, fill_pct
 //     agent_fds         the agent's open file descriptors against its soft limit (WARN 80%, FAIL 95%); SKIP when they cannot be
 //                       read. Params: fds, limit, used_pct
+//     reality_target    the site each enabled VLESS REALITY inbound shows to strangers (target not "self"): it answers, speaks TLS 1.3,
+//                       chooses X25519MLKEM768 (FAIL: unreachable | no_tls13 | no_mlkem) and its certificate is for the server name,
+//                       trusted and has 7 days or more left (WARN: name_mismatch | untrusted | expired | expiring). A failed handshake is
+//                       retried once. SKIP while no inbound shows another site. No fix. Params: hint (= the code's tail), inbound_id (the
+//                       worst one), inbounds (all with a bad target), target (host:port), server_name, checked, days_left
 //   FIX IDS (stable; all avoid data loss; only enable_security_updates and install_nftables install a package, after
 //   owner confirmation). allow_forwarding is the only fix that edits
 //   a host-owned FORWARD chain: after owner confirmation, it inserts tagged ACCEPT rules only for new traffic from
@@ -604,6 +609,36 @@ package mistgate.agent.v1;
 //     with kind icmp (a router answered), silent (nothing within the wait), open or refused (the destination answered).
 //     The agent returns no router address. Caps: 1-32 hops, 1.5 s per hop, one trace at a time ("busy"), 60 s in all.
 //     Errors as the other probes: bad_params, unsupported_host, unsupported, no_route, busy, "failed: <short message>".
+
+// NEIGHBOR SITES (additive, protocol api_version stays 1)
+//   The node looks for REALITY targets among its neighbours: sites in the same /24 that answer on TCP 443 with TLS 1.3,
+//   X25519MLKEM768 and a certificate that holds for their name. It is outgoing traffic to addresses that are not the owner's,
+//   so the owner starts it by hand (the panel's NodeSniScan), after a warning, and the limits below are constants of the
+//   agent (internal/node/sniscan); nothing in the command widens them.
+//   - CAPABILITY GATE. An agent lists "sni-scan/1" in Hello.capabilities. The panel sends SniScan ONLY to a stream that
+//     listed it.
+//   - ASK. SniScan{request_id, address}: the node's own public IPv4 address, as the panel knows it. The agent scans the /24 of
+//     that address and nothing else, and only if the address is assigned to one of its own interfaces and is a public unicast
+//     IPv4 address (not_my_address otherwise: a name behind a CDN, a stale DNS record, a NAT). Its own addresses, .0 and .255 are
+//     left out; the connections start from that address.
+//   - LIMITS. Port 443 only. At most 10 new TCP connections a second for the whole scan and 16 addresses at a time; connect 2 s,
+//     TLS 3 s, DNS 2 s, HTTP 3 s; at most 2 names per address, so at most 3 connections per address; 50 s in all, then the
+//     result is what was done (partial = 1); at most 20 candidates. One scan at a time ("busy", also while a bandwidth or speed
+//     test runs). A cancelled stream ends the scan and sends no answer.
+//   - PER ADDRESS. Connect; a TLS handshake without a name (1.2 or 1.3, only to read the version and the names of the
+//     certificate); when it is TLS 1.3, one new connection per exact DNS name of the certificate (no masks, no addresses, at
+//     most 2) with TLS 1.3 only, that name as SNI, the chain checked against the system roots and the name, X25519MLKEM768 chosen,
+//     and 14 days or more left; for such a name the DNS answer of this node's resolver (here: this address; subnet: another
+//     address of the /24; elsewhere; none) and GET / over the same connection (HTTP/2 when chosen), redirects not followed, the
+//     body not read, at most 16 KiB of head.
+//   - ORDER. Where the name leads (here, subnet, elsewhere, none), HTTP/2, a certificate of one site (at most two registrable
+//     domains in it) over a shared one, the answer to GET / (2xx, a 3xx to the same domain, 4xx, the rest), the handshake time.
+//   - ANSWER. One CommandResult. ok = true: params{"addresses", "open", "tls13", "mlkem", "valid" (counts of addresses: looked at,
+//     answering on 443, TLS 1.3, with a name whose handshake chose X25519MLKEM768, with a candidate), "partial": "0" | "1",
+//     "candidates": a JSON array of {"ip", "name", "dns", "h2", "single_site", "http" (status, 0 = no answer), "ms", "days"}}. Of
+//     what a neighbour sends, only the host names of its certificate and these flags and numbers leave the agent.
+//   - ERRORS (CommandResult.error): busy, bad_params (not an IPv4 address), not_my_address, no_roots (this host has no CA roots, so
+//     no certificate can be judged), "failed: <short message>".
 
 // PATH SPEED (additive, protocol api_version stays 1)
 //   A bounded throughput test between two fleet nodes (the panel's path_speed, owner-approved: it moves bulk traffic).
@@ -1015,7 +1050,7 @@ message Hello {
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
   // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "links/3" (the LinkCounters fields from
   // hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "vless-hello-kex/1" (the LinkCounters fields hello_pq, hello_classic and hello_unknown), and "journal/1" (StatsBatch.journal; see
-  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "relay-reverse/1" (RelayForward.mode, DesiredState.bridge_serve, DesiredState.bridge_dials, ApplyResult.bridges, StatsBatch.bridges; see "REVERSE RELAY"), and "tcp-share/1" (StatsBatch.shared_ports; see "SHARED TCP PORT"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug), and "warp-reach/1" (WarpReach; see "WARP REACH").
+  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "relay-reverse/1" (RelayForward.mode, DesiredState.bridge_serve, DesiredState.bridge_dials, ApplyResult.bridges, StatsBatch.bridges; see "REVERSE RELAY"), and "tcp-share/1" (StatsBatch.shared_ports; see "SHARED TCP PORT"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug), and "warp-reach/1" (WarpReach; see "WARP REACH"), and "sni-scan/1" (SniScan; see "NEIGHBOR SITES").
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   // "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
   // "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
@@ -1723,7 +1758,16 @@ message ConnectResponse {
     UpdateOs update_os = 34;
     // Only sent to agents with "warp-reach/1" in Hello.capabilities (see "WARP REACH").
     WarpReach warp_reach = 42;
+    // Only sent to agents with "sni-scan/1" in Hello.capabilities (see "NEIGHBOR SITES").
+    SniScan sni_scan = 35;
   }
+}
+
+// Look for REALITY targets among the neighbours of the node's own address (see "NEIGHBOR SITES"). Answered with one CommandResult.
+message SniScan {
+  string request_id = 1;
+  // The node's own public IPv4 address; the agent scans its /24 and refuses an address that is not on one of its interfaces.
+  string address = 2;
 }
 
 // Ask the node to fetch a few sites through its WARP tunnel and say whether each shows a block page (see "WARP REACH").

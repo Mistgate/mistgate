@@ -1063,6 +1063,8 @@ export function manualSteps(i: DoctorItem): ManualStep[] {
       return [{ text: "hl.manual.reboot" }];
     case "cert_expiry":
       return p.inbound_id ? [{ text: "hl.manual.cert", open: { tab: "profiles", label: "hl.alerts.openProfiles" } }] : [];
+    case "reality_target":
+      return [{ text: "hl.manual.reality_target", open: { tab: "profiles", label: "hl.alerts.openProfiles" } }];
   }
   return [];
 }

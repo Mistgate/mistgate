@@ -129,6 +129,17 @@ const (
 	CodeNftablesMissing       = "nftables.missing"
 	CodeNftablesInstalling    = "nftables.installing"
 	CodeNftablesInstallFailed = "nftables.install_failed"
+	// reality_target: hint (= the code's tail), inbound_id (the worst one), inbounds (every one with a bad target), target
+	// (host:port), server_name, checked, days_left (expiring)
+	CodeRealityOK           = "reality_target.ok"
+	CodeRealityNone         = "reality_target.none"
+	CodeRealityUnreachable  = "reality_target.unreachable"
+	CodeRealityNoTLS13      = "reality_target.no_tls13"
+	CodeRealityNoMLKEM      = "reality_target.no_mlkem"
+	CodeRealityNameMismatch = "reality_target.name_mismatch"
+	CodeRealityUntrusted    = "reality_target.untrusted"
+	CodeRealityExpired      = "reality_target.expired"
+	CodeRealityExpiring     = "reality_target.expiring"
 	// Any check: why it did not run. skip.unsupported has reason (English, from the host probe).
 	CodeSkipUnsupported = "skip.unsupported"
 	CodeSkipTimeout     = "skip.timeout"
@@ -157,5 +168,7 @@ var Codes = []string{
 	CodeSecurityUpdatesEnabling, CodeSecurityUpdatesEnableFailed, CodeSecurityUpdatesAutoReboot,
 	CodeNftablesOn, CodeNftablesMissing, CodeNftablesInstalling, CodeNftablesInstallFailed,
 	CodeStealLoad, CodeStealCollecting, CodeConntrackFill, CodeConntrackNotLoaded, CodeFDsUsage, CodeFDsUnknown,
+	CodeRealityOK, CodeRealityNone, CodeRealityUnreachable, CodeRealityNoTLS13, CodeRealityNoMLKEM, CodeRealityNameMismatch,
+	CodeRealityUntrusted, CodeRealityExpired, CodeRealityExpiring,
 	CodeSkipUnsupported, CodeSkipTimeout, CodeSkipInternal, CodeSkipUnknown,
 }

@@ -883,6 +883,9 @@ const capDebug = "debug/1"
 const capWarpReach = "warp-reach/1"
 const capDebug2 = "debug/2"
 
+// capSniScan: the agent answers SniScan (agent.proto "NEIGHBOR SITES").
+const capSniScan = "sni-scan/1"
+
 func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capability, message string) {
 	updateCapability := capUpdate
 	if linkOnly {
@@ -925,6 +928,8 @@ func requestCapability(frame *agentv1.ConnectResponse, linkOnly bool) (capabilit
 		return capDecoy, "agent too old"
 	case frame.GetWarpReach() != nil:
 		return capWarpReach, "agent too old"
+	case frame.GetSniScan() != nil:
+		return capSniScan, "agent too old"
 	default:
 		return "", ""
 	}

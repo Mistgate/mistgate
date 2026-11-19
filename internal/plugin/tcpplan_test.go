@@ -111,3 +111,30 @@ func TestTCPSharePlan(t *testing.T) {
 		})
 	}
 }
+
+func TestRealityTarget(t *testing.T) {
+	spec := func(proto, settings string) InboundSpec {
+		return InboundSpec{Protocol: proto, Settings: []byte(settings)}
+	}
+	for _, tc := range []struct {
+		name         string
+		s            InboundSpec
+		target, host string
+		ok           bool
+	}{
+		{"another site", spec("vless", `{"security":"reality","reality":{"target":" shop.example.com:443 ","server_names":["Shop.example.com.","b.example.com"]}}`), "shop.example.com:443", "Shop.example.com", true},
+		{"own site", spec("vless", `{"security":"reality","reality":{"target":"self","server_names":["de1.example.com"]}}`), "", "", false},
+		{"tls", spec("vless", `{"security":"tls","reality":{"target":"shop.example.com:443","server_names":["shop.example.com"]}}`), "", "", false},
+		{"no names", spec("vless", `{"security":"reality","reality":{"target":"shop.example.com:443"}}`), "", "", false},
+		{"not vless", spec("hysteria2", `{"security":"reality","reality":{"target":"shop.example.com:443","server_names":["x"]}}`), "", "", false},
+		{"broken json", spec("vless", `{`), "", "", false},
+		{"empty", spec("vless", ``), "", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			target, host, ok := RealityTarget(tc.s)
+			if target != tc.target || host != tc.host || ok != tc.ok {
+				t.Fatalf("RealityTarget = %q, %q, %v", target, host, ok)
+			}
+		})
+	}
+}

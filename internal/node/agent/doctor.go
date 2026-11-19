@@ -160,6 +160,7 @@ func (a *Agent) doctorInbounds() []doctor.Inbound {
 			TLSMode: tlsModeName(sp.TLS.Mode), ServerName: sp.TLS.ServerName, State: "stopped", CertNotAfter: na[id],
 		}
 		in.TLSPort = tlsPortOf(sp)
+		in.RealityTarget, in.RealityName, _ = plugin.RealityTarget(sp)
 		for _, side := range plugin.SideListens(sp) {
 			in.SideListens = append(in.SideListens, doctor.InboundListen{Network: side.Network, Port: int(side.Port)})
 		}

@@ -506,7 +506,7 @@ describe("fixErrorText", () => {
 
 // Every key the panel and the agent send has a sentence in both languages (agent.proto "CHECK IDS" and "FIX IDS").
 describe("the server's vocabulary is covered", () => {
-  const checks = ["disk_space", "journald_size", "dstate_tasks", "time_sync", "resolver", "ipv6", "foreign_vpn", "foreign_nft", "port_conflicts", "net_baseline", "cert_expiry", "memory_pressure", "cpu_softirq", "kernel_headers", "awg_backend", "warp_path", "unit_generation", "security_updates", "nftables", "cpu_steal", "conntrack_fill", "agent_fds"];
+  const checks = ["disk_space", "journald_size", "dstate_tasks", "time_sync", "resolver", "ipv6", "foreign_vpn", "foreign_nft", "port_conflicts", "net_baseline", "cert_expiry", "memory_pressure", "cpu_softirq", "kernel_headers", "awg_backend", "warp_path", "unit_generation", "security_updates", "nftables", "cpu_steal", "conntrack_fill", "agent_fds", "reality_target"];
   const fixes = ["journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp", "refresh_unit", "allow_forwarding", "enable_security_updates", "awg_module_repair", "install_nftables"];
   const errors = ["timeout", "auth", "tls", "refused", "http_status", "exit_unreachable", "client_unsupported", "node_offline", "inbound_not_active", "inbound_failed", "inbound_disabled", "inbound_pending"];
   const kinds = ["node_down", "host_blip", "no_traffic", "check_failed", "doctor_warn", "doctor_fail", "state_drift", "cert_expiry", "quota", "subscription_shared_suspect",
@@ -595,6 +595,7 @@ describe("the server's vocabulary is covered", () => {
       cpu_steal: ["steal_pct", "steal_max_pct", "samples"],
       conntrack_fill: ["count", "max", "fill_pct"],
       agent_fds: ["fds", "limit", "used_pct"],
+      reality_target: ["hint", "inbound_id", "inbounds", "target", "server_name", "days_left", "checked"],
     };
     // what itemParams makes from them (doctor-detail.ts): the profile names and the optional pieces of a sentence
     const derived = ["profile", "profiles", "profiles_part", "server_part", "via", "colo_part", "left"];
