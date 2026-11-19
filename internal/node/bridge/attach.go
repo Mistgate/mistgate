@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"time"
 )
 
@@ -23,6 +24,8 @@ type Client struct {
 	RelayID string
 	// Idle is how long the stream may carry nothing before it is closed; 0 = BridgeStreamIdleTimeout.
 	Idle time.Duration
+	// Addr is the person's address, told to the exit when the entry passes it (ServeConfig.PassClient).
+	Addr netip.AddrPort
 }
 
 // Attach hands c to a free pair of exit exitID, as a RelayListener does with a person it accepted, and blocks until the
@@ -30,7 +33,8 @@ type Client struct {
 // client limits, ErrExitNotKnown for an exit the entry does not serve, or ctx's error before the stream began; in each of
 // these cases c is untouched. Once attached, c belongs to the stream, which closes it; ctx ending then cuts the stream.
 func (e *Entry) Attach(ctx context.Context, exitID string, c Client) error {
-	if !relayIDPattern.MatchString(c.RelayID) || !slicesContains(e.serveSnapshot().ExitNodeIDs, exitID) {
+	cfg := e.serveSnapshot()
+	if !relayIDPattern.MatchString(c.RelayID) || !slicesContains(cfg.ExitNodeIDs, exitID) {
 		return ErrExitNotKnown
 	}
 	peer := e.peer(exitID)
@@ -41,8 +45,12 @@ func (e *Entry) Attach(ctx context.Context, exitID string, c Client) error {
 		return ErrEntryBusy
 	}
 	defer e.releaseClient(peer)
+	var client netip.AddrPort
+	if cfg.PassClient {
+		client = c.Addr
+	}
 	attached := false
-	e.attachClient(ctx, peer, RelayListener{RelayID: c.RelayID, ExitNodeID: exitID}, c.Conn, c.Idle, func() { attached = true })
+	e.attachClient(ctx, peer, RelayListener{RelayID: c.RelayID, ExitNodeID: exitID}, c.Conn, client, c.Idle, func() { attached = true })
 	switch {
 	case attached:
 		return nil
@@ -82,7 +90,7 @@ func (e *Entry) DialExit(ctx context.Context, exitID, relayID string, idle time.
 		}
 		defer e.releaseClient(peer)
 		attached := false
-		e.attachClient(attachCtx, peer, RelayListener{RelayID: relayID, ExitNodeID: exitID}, remote, idle, func() {
+		e.attachClient(attachCtx, peer, RelayListener{RelayID: relayID, ExitNodeID: exitID}, remote, netip.AddrPort{}, idle, func() {
 			attached = true
 			stop() // from now on only the stream ends it
 			close(ready)

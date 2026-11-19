@@ -14,6 +14,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"sort"
 	"strconv"
@@ -143,11 +144,27 @@ type Dialer struct {
 	clock       func() time.Time
 	panelActive bool
 	closed      bool
+	localDial   LocalDial
 }
+
+// LocalTargetNetwork is the network of a target the exit reaches through its local dial (SetLocalDial) rather than a port
+// of its own: the panel's listener of a subscription host's connections lives in its process.
+const LocalTargetNetwork = "panel"
+
+// LocalDial opens a connection to target for a person the entry carries; client is the person's address, invalid when the
+// entry does not pass it.
+type LocalDial func(ctx context.Context, target plugin.BridgeTarget, client netip.AddrPort) (net.Conn, error)
 
 func NewDialer(identity func() DialIdentity) *Dialer {
 	return &Dialer{identity: identity, runs: map[string]*dialRun{}, states: map[string]DialState{},
 		timing: defaultDialTiming(), clock: time.Now}
+}
+
+// SetLocalDial sets the dial of LocalTargetNetwork targets. Call it once, before the first Sync.
+func (d *Dialer) SetLocalDial(dial LocalDial) {
+	d.mu.Lock()
+	d.localDial = dial
+	d.mu.Unlock()
 }
 
 func (d *Dialer) SetClock(now func() time.Time) {
@@ -186,7 +203,7 @@ func (d *Dialer) Sync(ctx context.Context, specs []DialSpec) {
 			delete(desired, id)
 			continue
 		}
-		normalized, code := normalizeDial(spec.Dial)
+		normalized, code := normalizeDial(spec.Dial, d.localDial != nil)
 		if code != "" {
 			delete(d.runs, id)
 			run.cancel()
@@ -216,7 +233,7 @@ func (d *Dialer) Sync(ctx context.Context, specs []DialSpec) {
 			d.states[id] = st
 			continue
 		}
-		dial, code := normalizeDial(spec.Dial)
+		dial, code := normalizeDial(spec.Dial, d.localDial != nil)
 		if code != "" {
 			st := d.states[id]
 			st.PeerNodeID, st.Conns, st.Since, st.RTT, st.Error = id, 0, time.Time{}, 0, code
@@ -270,7 +287,8 @@ func sameDial(a, b plugin.BridgeDial) bool {
 		a.SNI == b.SNI && a.PinSHA256 == b.PinSHA256 && a.Path == b.Path && a.PanelVia == b.PanelVia
 }
 
-func normalizeDial(d plugin.BridgeDial) (plugin.BridgeDial, string) {
+// normalizeDial checks a dial; local says the dialer has a local dial (SetLocalDial), so LocalTargetNetwork targets are fine.
+func normalizeDial(d plugin.BridgeDial, local bool) (plugin.BridgeDial, string) {
 	if !nodeIDPattern.MatchString(d.EntryNodeID) || d.Host == "" || d.Port == 0 || !validBridgePath(d.Path) ||
 		len(d.Targets) == 0 || len(d.Targets) > maxBridgeListeners {
 		return plugin.BridgeDial{}, "bad_config"
@@ -292,7 +310,8 @@ func normalizeDial(d plugin.BridgeDial) (plugin.BridgeDial, string) {
 	}
 	seen := map[string]bool{}
 	for _, target := range d.Targets {
-		if !relayIDPattern.MatchString(target.RelayID) || target.Network != "tcp" || target.Port == 0 || seen[target.RelayID] {
+		if !relayIDPattern.MatchString(target.RelayID) || seen[target.RelayID] ||
+			!(target.Network == "tcp" && target.Port != 0 || local && target.Network == LocalTargetNetwork) {
 			return plugin.BridgeDial{}, "target_not_local"
 		}
 		seen[target.RelayID] = true
@@ -659,6 +678,7 @@ func (d *Dialer) pingLoop(ctx context.Context, run *dialRun, cc *http2.ClientCon
 
 type pairResponses struct {
 	relayID    string
+	client     netip.AddrPort // the person's address, when the entry passes it
 	down       *http.Response
 	up         *http.Response
 	downWriter *io.PipeWriter
@@ -871,6 +891,10 @@ func (d *Dialer) openPair(ctx context.Context, cancel context.CancelFunc, dial p
 		return nil, "", errors.New("bad bridge response")
 	}
 	responses.relayID = relayID
+	// A subscription host says whom it carries (ServeConfig.PassClient); anything that is no address is left out.
+	if client, err := netip.ParseAddrPort(responses.down.Header.Get(ClientHeader)); err == nil && client.Addr().IsValid() && client.Port() != 0 {
+		responses.client = netip.AddrPortFrom(client.Addr().Unmap(), client.Port())
+	}
 	return responses, "", nil
 }
 
@@ -910,7 +934,13 @@ func (d *Dialer) serveClient(run *dialRun, cc *http2.ClientConn, tracker *connTr
 		return
 	}
 	ctx, stopIdle := context.WithCancel(run.ctx)
-	targetConn, err := dialLocalTarget(ctx, target.Port, d.timing.targetTimeout, d.timing.keepAlive)
+	var targetConn net.Conn
+	var err error
+	if target.Network == LocalTargetNetwork && d.localDial != nil {
+		targetConn, err = d.localDial(ctx, target, responses.client)
+	} else {
+		targetConn, err = dialLocalTarget(ctx, target.Port, d.timing.targetTimeout, d.timing.keepAlive)
+	}
 	if err != nil {
 		stopIdle()
 		d.setError(run, "target_connect")

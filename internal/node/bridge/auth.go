@@ -19,14 +19,17 @@ const (
 	CertificateHeader = "X-Mistgate-Bridge-Certificate"
 	SignatureHeader   = "X-Mistgate-Bridge-Signature"
 	RelayIDHeader     = "X-Mistgate-Relay-ID"
-	ErrorHeader       = "X-Mistgate-Bridge-Error"
-	ProtocolHeader    = "X-Mistgate-Bridge-Version"
-	StreamHeader      = "X-Mistgate-Bridge-Stream"
-	StreamKindHeader  = "X-Mistgate-Bridge-Kind"
-	TargetHeader      = "X-Mistgate-Bridge-Target"
-	PairIDHeader      = "X-Mistgate-Bridge-Pair-ID"
-	StreamKindPanel   = "panel"
-	protocolVersion   = "2"
+	// ClientHeader carries the address of the person a subscription host hands to the panel (ServeConfig.PassClient); it is
+	// on the answers to a proven exit only.
+	ClientHeader     = "X-Mistgate-Bridge-Client"
+	ErrorHeader      = "X-Mistgate-Bridge-Error"
+	ProtocolHeader   = "X-Mistgate-Bridge-Version"
+	StreamHeader     = "X-Mistgate-Bridge-Stream"
+	StreamKindHeader = "X-Mistgate-Bridge-Kind"
+	TargetHeader     = "X-Mistgate-Bridge-Target"
+	PairIDHeader     = "X-Mistgate-Bridge-Pair-ID"
+	StreamKindPanel  = "panel"
+	protocolVersion  = "2"
 
 	maxCertificateDER = 12 << 10
 )
