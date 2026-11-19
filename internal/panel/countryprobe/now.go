@@ -15,7 +15,7 @@ func (s *Service) NowPlan(ctx context.Context, nodeID string) (run func(context.
 	if s.cfg.Edge || censorSimManualOnly {
 		return nil, "off"
 	}
-	gen := s.generation()
+	gen := s.guard.Generation()
 	st, err := s.load(ctx)
 	if err != nil {
 		s.log.Warn("countryprobe: read settings", "code", "countryprobe_manual_read_failed", "err", err)

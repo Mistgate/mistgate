@@ -121,10 +121,10 @@ type Service struct {
 
 	runMu sync.Mutex // one run at a time
 
+	// guard keeps a run of an integration that was switched off or disconnected since it started from storing anything.
+	guard countryreach.RunGuard
+
 	mu       sync.Mutex
-	gen      uint64 // bumped when the integration is switched off or disconnected; a run of an older one stores nothing
-	inflight map[uint64]context.CancelFunc
-	next     uint64
 	lastTest time.Time
 }
 
@@ -139,7 +139,7 @@ func New(cfg Config) (*Service, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	return &Service{cfg: cfg, log: cfg.Log, now: cfg.Now, inflight: map[uint64]context.CancelFunc{}}, nil
+	return &Service{cfg: cfg, log: cfg.Log, now: cfg.Now}, nil
 }
 
 // Handler is the admin TspuProbeService.
@@ -239,43 +239,6 @@ func (s *Service) State(ctx context.Context) State {
 // The run
 
 var errSwitchedOff = errors.New("countryprobe: switched off")
-
-// generation is the version of the settings; a run takes it before it reads them.
-func (s *Service) generation() uint64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.gen
-}
-
-// track registers a run in flight so that switching the source off can cancel it. A run whose settings were read under an
-// older generation (the source was switched off or changed meanwhile) is not admitted.
-func (s *Service) track(ctx context.Context, gen uint64) (context.Context, func(), bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if gen != s.gen {
-		return nil, nil, false
-	}
-	ctx, cancel := context.WithTimeout(ctx, runBudget)
-	id := s.next
-	s.next++
-	s.inflight[id] = cancel
-	return ctx, func() {
-		s.mu.Lock()
-		delete(s.inflight, id)
-		s.mu.Unlock()
-		cancel()
-	}, true
-}
-
-// stop cancels every run in flight and keeps a run that started earlier from storing anything.
-func (s *Service) stop() {
-	s.mu.Lock()
-	s.gen++
-	for _, cancel := range s.inflight {
-		cancel()
-	}
-	s.mu.Unlock()
-}
 
 // nodeResult is what the probe saw of one node.
 type nodeResult struct {
@@ -516,23 +479,25 @@ func (s *Service) rowsOf(probe Node, batch []Node, res fleet.CountryProbeResult)
 
 // store saves rows unless the source was switched off since the run started.
 func (s *Service) store(ctx context.Context, gen uint64, rows []store.TSPUCheck) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if gen != s.gen {
+	var err error
+	if !s.guard.Do(gen, func() {
+		// a run that has just hit its budget still stores the answers it has
+		err = s.cfg.Store.InsertTSPUChecks(context.WithoutCancel(ctx), rows)
+	}) {
 		return errSwitchedOff
 	}
-	// a run that has just hit its budget still stores the answers it has
-	return s.cfg.Store.InsertTSPUChecks(context.WithoutCancel(ctx), rows)
+	return err
 }
 
 func (s *Service) saveRun(ctx context.Context, gen uint64, r lastRun) error {
 	b, _ := json.Marshal(r)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if gen != s.gen {
+	var err error
+	if !s.guard.Do(gen, func() {
+		err = s.cfg.Store.SetSettings(context.WithoutCancel(ctx), map[string]string{settingLastRun: string(b)})
+	}) {
 		return errSwitchedOff
 	}
-	return s.cfg.Store.SetSettings(context.WithoutCancel(ctx), map[string]string{settingLastRun: string(b)})
+	return err
 }
 
 // probeNode finds the chosen node among the active ones and says whether it can run the probe now.
@@ -547,7 +512,7 @@ func probeNode(nodes []Node, id string) (Node, bool) {
 
 // runNow runs the probe: runMu must be held.
 func (s *Service) runNow(ctx context.Context, gen uint64, st settings, probe Node, nodes []Node, solo bool) (outcome, error) {
-	ctx, done, admitted := s.track(ctx, gen)
+	ctx, done, admitted := s.guard.Track(ctx, gen, runBudget)
 	if !admitted {
 		return outcome{}, errSwitchedOff
 	}
@@ -582,7 +547,7 @@ func (s *Service) Tick(ctx context.Context) bool {
 	if s.cfg.Edge || censorSimManualOnly {
 		return false
 	}
-	gen := s.generation()
+	gen := s.guard.Generation()
 	st, err := s.load(ctx)
 	if err != nil {
 		s.log.Warn("countryprobe: read settings", "err", err)
@@ -734,7 +699,7 @@ func (r rpc) UpdateTspuProbe(ctx context.Context, req *connect.Request[adminv1.U
 	}
 	if len(kv) > 0 {
 		if stopRun {
-			s.stop() // a run for the old choice must not store anything
+			s.guard.Stop() // a run for the old choice must not store anything
 		}
 		if err := s.cfg.Store.SetSettings(ctx, kv); err != nil {
 			s.log.Error("countryprobe: save settings", "err", err)
@@ -776,7 +741,7 @@ func (r rpc) DisconnectTspuProbe(ctx context.Context, _ *connect.Request[adminv1
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
-	s.stop() // first: nothing new may be stored while the settings go
+	s.guard.Stop() // first: nothing new may be stored while the settings go
 	if err := s.cfg.Store.DeleteSettings(ctx, settingEnabled, settingNode, settingInterval, settingLastRun); err != nil {
 		s.log.Error("countryprobe: disconnect", "err", err)
 		return nil, errInternal
@@ -803,7 +768,7 @@ func (r rpc) TestTspuProbe(ctx context.Context, _ *connect.Request[adminv1.TestT
 	if err := edition.Check(s.cfg.Edge, edition.TSPUProbe); err != nil {
 		return nil, err
 	}
-	gen := s.generation()
+	gen := s.guard.Generation()
 	st, err := s.load(ctx)
 	if err != nil {
 		return nil, errInternal

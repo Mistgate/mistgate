@@ -91,10 +91,9 @@ type Service struct {
 	log *slog.Logger
 	now func() time.Time
 
+	guard countryreach.RunGuard
+
 	mu       sync.Mutex
-	gen      uint64
-	inflight map[uint64]context.CancelFunc
-	next     uint64
 	lastTest time.Time
 	lastCall time.Time // VPS spacing; EdgeRoundLease holds the cross-isolate edge spacing.
 }
@@ -151,7 +150,7 @@ func New(cfg Config) (*Service, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	return &Service{cfg: cfg, log: cfg.Log, now: cfg.Now, inflight: map[uint64]context.CancelFunc{}}, nil
+	return &Service{cfg: cfg, log: cfg.Log, now: cfg.Now}, nil
 }
 
 func (s *Service) Handler(opts ...connect.HandlerOption) (string, http.Handler) {
@@ -292,7 +291,7 @@ func (s *Service) Tick(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	gen := s.generation()
+	gen := s.guard.Generation()
 	st, err := s.load(ctx)
 	if err != nil {
 		return err
@@ -376,7 +375,7 @@ func (s *Service) Tick(ctx context.Context) error {
 func (s *Service) runDue(ctx context.Context, gen uint64, st settings, next dueCheck) error {
 	callCtx, cancel := context.WithTimeout(ctx, s.probeTimeout())
 	defer cancel()
-	callCtx, done, ok := s.track(callCtx, gen)
+	callCtx, done, ok := s.guard.Track(callCtx, gen, 0)
 	if !ok {
 		return nil
 	}
@@ -578,14 +577,19 @@ func (s *Service) handleFailure(ctx context.Context, gen uint64, st settings, so
 		values[settingHoldUntil] = strconv.FormatInt(s.now().Add(delay).Unix(), 10)
 		values[settingBackoff] = strconv.Itoa(next)
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if gen != s.gen || ctx.Err() != nil {
+	saved := false
+	var saveErr error
+	s.guard.Do(gen, func() {
+		if ctx.Err() == nil {
+			saved, saveErr = true, s.cfg.Store.SetSettings(ctx, values)
+		}
+	})
+	if !saved {
 		return nil
 	}
-	if err := s.cfg.Store.SetSettings(ctx, values); err != nil {
-		s.log.Warn("cheburcheck: save failure state", "code", "cheburcheck_save_state_failed", "status", values[settingStatus], "err", err)
-		return err
+	if saveErr != nil {
+		s.log.Warn("cheburcheck: save failure state", "code", "cheburcheck_save_state_failed", "status", values[settingStatus], "err", saveErr)
+		return saveErr
 	}
 	// A change of state is a warning; the same state again is a debug line until the pause has grown to its ceiling,
 	// then one warning per hold, so a site that stays shut costs one line an hour instead of one a minute.
@@ -600,58 +604,20 @@ func (s *Service) handleFailure(ctx context.Context, gen uint64, st settings, so
 }
 
 func (s *Service) storeResult(ctx context.Context, gen uint64, st settings, row store.ExtCheck, clearStatus bool) (bool, error) {
-	s.mu.Lock()
+	var stored bool
+	var err error
 	// Edge cron and admin isolates have separate generations, so an in-flight cron call can still write after an admin change.
-	if gen != s.gen {
-		s.mu.Unlock()
-		return false, nil
-	}
-	if err := s.cfg.Store.InsertExtChecks(ctx, []store.ExtCheck{row}); err != nil {
-		s.mu.Unlock()
-		return false, err
-	}
-	if clearStatus && (st.status != "" || !st.holdUntil.IsZero() || st.backoffMin != defaultBackoffMin) {
-		clear := map[string]string{settingStatus: "", settingHoldUntil: "", settingBackoff: strconv.Itoa(defaultBackoffMin)}
-		if err := s.cfg.Store.SetSettings(ctx, clear); err != nil {
-			s.mu.Unlock()
-			return true, err
+	s.guard.Do(gen, func() {
+		if err = s.cfg.Store.InsertExtChecks(ctx, []store.ExtCheck{row}); err != nil {
+			return
 		}
-	}
-	s.mu.Unlock()
-	return true, nil
-}
-
-func (s *Service) generation() uint64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.gen
-}
-
-func (s *Service) track(ctx context.Context, gen uint64) (context.Context, func(), bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if gen != s.gen {
-		return nil, nil, false
-	}
-	cctx, cancel := context.WithCancel(ctx)
-	id := s.next
-	s.next++
-	s.inflight[id] = cancel
-	return cctx, func() {
-		s.mu.Lock()
-		delete(s.inflight, id)
-		s.mu.Unlock()
-		cancel()
-	}, true
-}
-
-func (s *Service) stop() {
-	s.mu.Lock()
-	s.gen++
-	for _, cancel := range s.inflight {
-		cancel()
-	}
-	s.mu.Unlock()
+		stored = true
+		if clearStatus && (st.status != "" || !st.holdUntil.IsZero() || st.backoffMin != defaultBackoffMin) {
+			clear := map[string]string{settingStatus: "", settingHoldUntil: "", settingBackoff: strconv.Itoa(defaultBackoffMin)}
+			err = s.cfg.Store.SetSettings(ctx, clear)
+		}
+	})
+	return stored, err
 }
 
 func (s *Service) changed(ctx context.Context) {
@@ -721,7 +687,7 @@ func (r rpc) UpdateCheburcheck(ctx context.Context, req *connect.Request[adminv1
 		return nil, err
 	}
 	if len(values) > 0 {
-		s.stop()
+		s.guard.Stop()
 		if err := s.cfg.Store.SetSettings(ctx, values); err != nil {
 			s.log.Error("cheburcheck: save settings", "code", "cheburcheck_save_settings_failed", "err", err)
 			return nil, errInternal
@@ -755,7 +721,7 @@ func (r rpc) DisconnectCheburcheck(ctx context.Context, _ *connect.Request[admin
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
-	s.stop()
+	s.guard.Stop()
 	values := map[string]string{settingEnabled: "0", settingPublic: "1", settingToken: "", settingHoldUntil: "", settingBackoff: strconv.Itoa(defaultBackoffMin),
 		settingStatus: "", settingTokenUnknown: "0"}
 	if err := s.cfg.Store.SetSettings(ctx, values); err != nil {
