@@ -439,13 +439,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 6px 16px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
+/* the link goes under the tick when both do not fit the row, and never past the edge of the box */
 .an-kf > label {
   flex: 1 1 auto;
-  white-space: nowrap;
+  min-width: 0;
 }
 .an-lk {
   color: var(--text);
