@@ -48,7 +48,8 @@ describe("Avatar", () => {
   });
 
   it("takes its colour slot from the name as the board does: the first letter's code plus the length", () => {
-    expect(avatarIndex("carol")).toBe((99 + 5) % 8);
+    expect(avatarIndex("carol")).toBe(0);
+    expect(avatarIndex("alice")).toBe(6);
     expect(avatarIndex("")).toBe(0);
   });
 });

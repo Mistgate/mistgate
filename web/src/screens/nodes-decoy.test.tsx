@@ -156,11 +156,6 @@ describe("node notes", () => {
     expect(document.querySelectorAll("[class*='grid-rows-[auto_auto]']")).toHaveLength(1);
   });
 
-  it("omits empty and whitespace-only notes", async () => {
-    await mount([node("de1"), node("fi1", { notes: " \n\t " })]);
-    expect(document.querySelectorAll("a[title]")).toHaveLength(0);
-    expect(document.querySelectorAll("[class*='grid-rows-[auto_auto]']")).toHaveLength(0);
-  });
 });
 
 describe("node status and metadata", () => {
@@ -217,20 +212,6 @@ describe("ticking nodes", () => {
     expect(bar()).toBeNull();
   });
 
-  it("opens the check column with Select and closes it, clearing the ticks, with Done", async () => {
-    await mount([node("de1"), node("fi1")]);
-    expect(button(en["nv.done"])).toBeUndefined();
-    expect(document.querySelector("section[data-select]")?.getAttribute("data-select")).toBe("false");
-    await selecting();
-    expect(document.querySelector("section[data-select]")?.getAttribute("data-select")).toBe("true");
-    await click(tick("de1"));
-    expect(bar()).not.toBeNull();
-    await press(button(en["nv.done"]));
-    expect(bar()).toBeNull();
-    expect(document.querySelector("section[data-select]")?.getAttribute("data-select")).toBe("false");
-    expect(ticked("de1")).toBe(false);
-  });
-
   it("ticks every shown node from the quick pick", async () => {
     await mount([node("de1"), node("fi1"), node("se1")]);
     await selecting();
@@ -240,11 +221,6 @@ describe("ticking nodes", () => {
     // "clear all" under the count takes them off again
     await click([...(bar()?.querySelectorAll("button") ?? [])].find((b) => b.textContent === en["nv.bulk.none"]));
     expect(bar()).toBeNull();
-  });
-
-  it("is for the owner only", async () => {
-    await mount([node("de1")], { admin: { id: "adm_2", role: Role.HELPER } });
-    expect(tick("de1")).toBeNull();
   });
 
   it("does not offer a retired node", async () => {

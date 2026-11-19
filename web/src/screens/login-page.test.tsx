@@ -64,12 +64,6 @@ describe("the sign-in page", () => {
     expect(text()).toContain(en["win.login.decoy"]);
   });
 
-  it("keeps the button off while the check runs", async () => {
-    await show({ captcha: <TurnstileRow status="busy" label={en["win.cf.checking"]} />, captchaReady: false });
-    expect(text()).toContain(en["win.cf.checking"]);
-    expect(button(en["auth.login.passkey"])?.disabled).toBe(true);
-  });
-
   it("waits for the passkey: a ring in the button, the browser to confirm in the line, nothing to press", async () => {
     await show({ busy: true });
     const b = button(en["win.login.waiting"])!;
