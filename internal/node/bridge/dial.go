@@ -54,6 +54,8 @@ type DialIdentity struct {
 	NodeID         string
 	CertificateDER []byte
 	PrivateKey     *ecdsa.PrivateKey
+	// Panel: the panel calls a subscription host (its certificate is spiffe://panel/<id>); the proof is MakePanelProof.
+	Panel bool
 }
 
 type DialSpec struct {
@@ -1072,7 +1074,11 @@ func dialTLSWithTimeout(ctx context.Context, dial plugin.BridgeDial, identity Di
 		_ = conn.Close()
 		return nil, Proof{}, fmt.Errorf("tls_exporter: %w", err)
 	}
-	proof, err := MakeProof(dial.EntryNodeID, exporter, identity.CertificateDER, identity.PrivateKey)
+	makeProof := MakeProof
+	if identity.Panel {
+		makeProof = MakePanelProof
+	}
+	proof, err := makeProof(dial.EntryNodeID, exporter, identity.CertificateDER, identity.PrivateKey)
 	if err != nil {
 		_ = conn.Close()
 		return nil, Proof{}, err
