@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Mistgate · Routes</title>
+<script src="./support.js"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@500..700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="cA" data-app><div class="desk">
+<div class="mg app t-{{theme}} a-{{accent}}">
+
+  <nav class="rail" aria-label="Sections">
+    <img class="rlogo {{brLogoC}}" src="{{logo}}" alt="{{brAlt}}" width="32" height="32">
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2.2"/></svg><span class="rbl">Ana sayfa</span></a>
+    <a class="rb on" href="#app" aria-current="page"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2.6"/><circle cx="18" cy="5" r="2.6"/><path d="M8.6 19H16.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h7.9"/></svg><span class="rbl">Rotalar</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6.5 5 13 2.5-6.5H21"/></svg><span class="rbl">Tanılama</span><i class="rdot {{rdDiag}}" aria-hidden="true"></i></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="rbl">Ayarlar</span><i class="rdot {{rdSet}}" aria-hidden="true"></i></a>
+    <a class="rb sub" href="https://vpn.example.com" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"/></svg><span class="rbl">Abonelik sayfası</span></a>
+  </nav>
+
+  <div class="content">
+    <header class="tb">
+    <div class="bp-mode" role="tablist" aria-label="Mod"><a role="tab" class="on" aria-selected="true" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5.5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6z"/></svg>VPN</a><a role="tab" class="" aria-selected="false" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="15" r="2.2"/><path d="M3 15h2.2a6.8 6.8 0 0 1 13.6 0H21"/></svg>Atlatma</a></div>
+    <sc-if value="{{bn.on}}" hint-placeholder-val="{{false}}">
+    <div class="bn {{bn.tone}}" role="status">
+      <a class="bn-m" href="{{bn.href}}"><span class="gl g-{{bn.icon}}" aria-hidden="true"></span><b>{{bn.t}}</b><span class="bn-s {{bn.sC}}">{{bn.s}}</span></a>
+      <sc-if value="{{bn.hasAct}}" hint-placeholder-val="{{false}}"><a class="bn-a" href="{{bn.href}}">{{bn.act}}</a></sc-if>
+      <button class="bn-x" onClick="{{bn.close}}" aria-label="Gizle"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+    </div>
+    </sc-if>
+    <div class="tbs {{tbs.c}}">
+      <a class="tbs-s" href="#app" title="Open Home"><i class="tbs-d" aria-hidden="true"></i><span>{{tbs.t}}</span><span class="tbs-m {{tbs.mc}}">{{tbs.m}}</span></a>
+      <button class="tbs-p" onClick="{{tbs.go}}" aria-label="{{tbs.a}}" title="{{tbs.a}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg></button>
+    </div>
+    <div class="cap">
+      <button aria-label="Minimize to tray"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button aria-label="Maximize"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg></button>
+      <button aria-label="Close window"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    </header>
+
+    <main class="rt">
+      <section class="rt-l">
+        <h1 class="h1x">Rotalar</h1>
+        <p class="rt-sub">VPN’den neyin geçeceğine karar verin</p>
+        <div class="mgrp" role="radiogroup" aria-label="Routing mode">
+          <div class="mrow {{mExc}}">
+            <button class="mr-b" role="radio" aria-checked="{{isExc}}" onClick="{{setExc}}">
+              <span class="rd" aria-hidden="true"></span>
+              <span class="tx"><b>Akıllı <span class="rec">Önerilen</span></b><span>{{smartDesc}}</span></span>
+            </button>
+            <sc-if value="{{isExc}}" hint-placeholder-val="{{true}}">
+              <div class="reg">
+                <button class="regc" onClick="{{toggleReg}}" aria-expanded="{{regOpen}}" aria-haspopup="listbox" aria-label="Local sites of {{R.name}}. Change region">
+                  <sc-if value="{{R.hasFlag}}" hint-placeholder-val="{{true}}"><img class="rfl" src="{{R.flag}}" alt="" width="20" height="20"></sc-if>
+                  <sc-if value="{{R.noFlag}}" hint-placeholder-val="{{false}}"><span class="rfl none"><span class="gl g-internet" aria-hidden="true"></span></span></sc-if>
+                  <span>{{R.chip}}</span>
+                  <span class="rtag {{regAutoCls}}">Otomatik</span>
+                  <svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <p class="reg-up {{regUpCls}}">{{regUp}}</p>
+                <sc-if value="{{regOpen}}" hint-placeholder-val="{{false}}">
+                  <div class="regpop" role="listbox" aria-label="Region">
+                    <p class="pop-h">Hangi yerel siteler doğrudan kalsın</p>
+                    <sc-for list="{{regs}}" as="r" hint-placeholder-count="5">
+                      <button class="ro {{r.cls}}" role="option" aria-selected="{{r.on}}" onClick="{{r.pick}}">
+                        <sc-if value="{{r.hasFlag}}" hint-placeholder-val="{{true}}"><img class="rfl" src="{{r.flag}}" alt="" width="28" height="28"></sc-if>
+                        <sc-if value="{{r.noFlag}}" hint-placeholder-val="{{false}}"><span class="rfl none"><span class="gl g-internet" aria-hidden="true"></span></span></sc-if>
+                        <span class="tx"><b><span class="rn">{{r.name}}</span><span class="dtag {{r.detCls}}">Algılandı</span></b><span>{{r.meta}}</span></span>
+                        <svg class="i ok" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+          <div class="mrow {{mOnly}}">
+            <button class="mr-b" role="radio" aria-checked="{{isOnly}}" onClick="{{setOnly}}">
+              <span class="rd" aria-hidden="true"></span>
+              <span class="tx"><b>Yalnızca seçilenler</b><span>VPN yalnızca seçtikleriniz için</span></span>
+            </button>
+          </div>
+          <div class="mrow {{mAll}}">
+            <button class="mr-b" role="radio" aria-checked="{{isAll}}" onClick="{{setAll}}">
+              <span class="rd" aria-hidden="true"></span>
+              <span class="tx"><b>Her şey</b><span>Tüm trafik VPN üzerinden, istisnasız</span></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="chk2">
+          <label class="search chk-in"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input type="text" value="{{chk}}" placeholder="Sitenin nereden gittiğini denetle" aria-label="Sitenin nereden gittiğini denetle" spellcheck="false"><button class="cres {{res.cls}}" onClick="{{nextChk}}" title="{{res.why}}"><i aria-hidden="true"></i>{{res.short}}</button></label>
+          <p class="cwhy">{{res.why}}</p>
+        </div>
+      </section>
+
+      <section class="lcard" aria-label="Rules">
+        <sc-if value="{{notAll}}" hint-placeholder-val="{{true}}">
+          <sc-if value="{{notLists}}" hint-placeholder-val="{{true}}">
+          <div class="rh">
+            <div class="rh-t"><b>{{cardTitle}}</b></div>
+            <div class="rh-a">
+              <button class="lsb {{updCls}}" onClick="{{updateNow}}" title="Download fresh lists now · last update 2 hours ago"><svg class="i rf" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg><span>{{updBtn2}}</span></button>
+              <button class="lsb" onClick="{{openLists}}" title="Manage list sources"><span class="gl g-list" aria-hidden="true"></span><span>Listeler</span><span class="k">{{mN}}</span><svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+            </div>
+          </div>
+          <div class="utabs" role="tablist" aria-label="What to route">
+            <button class="{{vCls.col}}" role="tab" aria-selected="{{vOn.col}}" onClick="{{vPick.col}}"><span class="gl g-view-grid" aria-hidden="true"></span>Koleksiyonlar<span class="k">{{cnt}}</span></button>
+            <button class="{{vCls.apps}}" role="tab" aria-selected="{{vOn.apps}}" onClick="{{vPick.apps}}"><span class="gl g-app-window" aria-hidden="true"></span>Uygulamalar<span class="k">{{appCnt}}</span></button>
+            <button class="{{vCls.sites}}" role="tab" aria-selected="{{vOn.sites}}" onClick="{{vPick.sites}}"><span class="gl g-internet" aria-hidden="true"></span>Siteler<span class="k">{{siteCnt}}</span></button>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{isCol}}" hint-placeholder-val="{{true}}">
+            <div class="lc-row">
+              <label class="search lc-s"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input type="text" placeholder="88 koleksiyonda ara" aria-label="Search collections"></label>
+            </div>
+            <div class="cats {{catM}}" role="tablist" aria-label="Categories" style="--px:{{catX}}px;--pw:{{catW}}px">
+              <sc-for list="{{cats}}" as="c" hint-placeholder-count="6">
+                <button class="cat {{c.cls}}" role="tab" aria-selected="{{c.on}}" onClick="{{c.pick}}"><span class="gl g-{{c.g}}" aria-hidden="true"></span>{{c.label}}</button>
+              </sc-for>
+            </div>
+            <div class="grid">
+            <sc-for list="{{tiles}}" as="t" hint-placeholder-count="15">
+              <button class="tile {{t.cls}}" aria-pressed="{{t.on}}" onClick="{{t.flip}}">
+                <span class="mono {{t.tone}}"><span class="gl g-{{t.g}}" aria-hidden="true"></span><span class="ok" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span></span>
+                <span class="tx"><b>{{t.name}}</b><span class="tm"><em class="way {{t.wayC}}">{{t.way}}</em><span class="{{t.mcls}}">{{t.meta}}</span></span></span>
+              </button>
+            </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{isApps}}" hint-placeholder-val="{{false}}">
+            <div class="lc-row">
+              <label class="search lc-s"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input type="text" placeholder="{{appTotal}} uygulamada ara" aria-label="Search apps"></label>
+              <button class="lsb" title="Choose a program file"><span class="gl g-folder-plus" aria-hidden="true"></span><span>.exe ekle</span></button>
+            </div>
+            <sc-if value="{{hasApps}}" hint-placeholder-val="{{true}}">
+              <p class="found"><span class="pulse" aria-hidden="true"></span>Bu bilgisayarda {{appTotal}} uygulama bulundu · önce çalışanlar<button class="lnk">Yeniden tara</button></p>
+              <div class="grid apps {{appScroll}}">
+            <sc-for list="{{apps}}" as="a" hint-placeholder-count="15">
+              <button class="tile {{a.cls}}" aria-pressed="{{a.on}}" onClick="{{a.flip}}">
+                <span class="mono {{a.tone}}"><span class="gl g-{{a.g}}" aria-hidden="true"></span><span class="ok" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span></span>
+                <span class="tx"><b>{{a.name}}</b><span class="tm"><em class="way {{a.wayC}}">{{a.way}}</em><span class="{{a.mcls}}">{{a.meta}}</span></span></span>
+              </button>
+            </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{noApps}}" hint-placeholder-val="{{false}}">
+              <div class="empty rise">
+                <span class="e-ic"><span class="gl g-app-window" aria-hidden="true"></span></span>
+                <b>Henüz uygulama bulunamadı</b>
+                <p>Mistgate, internete bağlanan uygulamaları fark eder. Gereken uygulamayı açın veya elle ekleyin</p>
+                <div class="e-act"><button class="addb"><span class="gl g-folder-plus" aria-hidden="true"></span>.exe seç</button><button class="lsb"><svg class="i rf" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg><span>Yeniden tara</span></button></div>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{isSites}}" hint-placeholder-val="{{false}}">
+            <div class="addrow">
+              <label class="search add-in"><span class="gl g-internet" aria-hidden="true"></span><input type="text" placeholder="Site ekleyin, örn. example.com" aria-label="Add a site" spellcheck="false"></label>
+              <button class="addb"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ekle</button>
+            </div>
+            <p class="hint">Alt alan adları dahildir. Birkaçını birden yapıştırın — her satıra bir tane</p>
+            <sc-if value="{{noSites}}" hint-placeholder-val="{{false}}">
+              <div class="sempty"><span class="e-ic sm"><span class="gl g-internet" aria-hidden="true"></span></span><span class="tx"><b>Henüz site yok</b><span>Yukarıya yazın veya aşağıda fark ettiklerimizden seçin</span></span></div>
+            </sc-if>
+            <sc-if value="{{hasSites}}" hint-placeholder-val="{{true}}">
+            <p class="sec-h">Siteleriniz<span class="n">{{siteCnt}}</span></p>
+            <div class="slist">
+              <sc-for list="{{sites}}" as="s" hint-placeholder-count="2">
+                <div class="site"><span class="mono neu"><span class="gl g-internet" aria-hidden="true"></span></span><span class="tx"><b>{{s.name}}</b><span>{{s.meta}}</span></span><button class="rm" onClick="{{s.rm}}" aria-label="Remove {{s.name}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+              </sc-for>
+            </div>
+            </sc-if>
+            <p class="sec-h">Trafiğinize göre öneriler<span class="n new">otomatik</span></p>
+            <div class="slist">
+              <sc-for list="{{sugs}}" as="s" hint-placeholder-count="3">
+                <div class="site sug"><span class="mono sand"><span class="gl g-flash" aria-hidden="true"></span></span><span class="tx"><b>{{s.name}}</b><span>{{s.meta}}</span></span><button class="addb sm" onClick="{{s.add}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ekle</button></div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{isLists}}" hint-placeholder-val="{{false}}">
+            <div class="rh">
+              <button class="back" onClick="{{closeLists}}" aria-label="Geri"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+              <div class="rh-t"><b>Listeler</b></div>
+              <button class="lsb {{updCls}}" onClick="{{updateNow}}"><svg class="i rf" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg><span>{{updAll}}</span></button>
+            </div>
+            <div class="merge">
+              <div class="mg-t"><b>{{mUnique}}</b><span>benzersiz kayıt, {{mN}} listeden</span><span class="dup"><span class="gl g-copy" aria-hidden="true"></span>{{mDup}} yinelenen atlandı</span></div>
+              <div class="mg-bar" aria-hidden="true">
+                <sc-for list="{{mSegs}}" as="g" hint-placeholder-count="3"><i class="{{g.c}}" style="flex:{{g.w}}"></i></sc-for>
+              </div>
+            </div>
+            <div class="addrow">
+              <label class="search add-in"><span class="gl g-link" aria-hidden="true"></span><input type="text" placeholder="Liste bağlantısı yapıştırın — .txt, .lst, .srs, geosite" aria-label="List link" spellcheck="false"></label>
+              <button class="addb" onClick="{{addList}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ekle</button>
+            </div>
+            <p class="hint">Alan adları, IP’ler ve alt ağlar. Yinelenenler otomatik birleştirilir</p>
+            <div class="srcs">
+              <sc-for list="{{srcRows}}" as="o" hint-placeholder-count="5">
+                <div class="src {{o.cls}}">
+                  <span class="mono {{o.tone}}"><span class="gl g-{{o.g}}" aria-hidden="true"></span></span>
+                  <span class="tx"><b><span class="rn">{{o.name}}</span><span class="rtag {{o.biCls}}">Yerleşik</span></b><span class="{{o.mcls}}">{{o.meta}}<sc-if value="{{o.err}}" hint-placeholder-val="{{false}}"><button class="lnk" onClick="{{o.retry}}">Yeniden dene</button></sc-if></span></span>
+                  <sc-if value="{{o.custom}}" hint-placeholder-val="{{false}}"><button class="rm" onClick="{{o.rm}}" aria-label="Remove {{o.name}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></sc-if>
+                  <button class="sw {{o.sw}}" role="switch" aria-checked="{{o.on}}" onClick="{{o.flip}}" aria-label="Use {{o.name}}"></button>
+                </div>
+              </sc-for>
+            </div>
+            <div class="lp-auto">
+              <span class="tx"><b>Otomatik güncelle</b><span>Her gün, arka planda</span></span>
+              <button class="sw {{autoCls}}" role="switch" aria-checked="{{autoOn}}" onClick="{{toggleAuto}}" aria-label="Otomatik güncelle"></button>
+            </div>
+          </sc-if>
+        </sc-if>
+        <sc-if value="{{isAll}}" hint-placeholder-val="{{false}}">
+          <div class="rh">
+            <div class="rh-t"><b>{{allT}}</b></div>
+            <span class="rh-n {{offN}}"><i aria-hidden="true"></i>Bağlanınca başlar</span>
+          </div>
+          <div class="sch rise {{schCls}}" aria-label="Every app and site goes through the encrypted tunnel; nothing goes direct">
+            <svg viewBox="0 0 520 250" aria-hidden="true">
+              <path class="ln" d="M82 100 H164"/>
+              <path class="tube" d="M236 100 H318"/>
+              <path class="tube-in" d="M236 100 H318"/>
+              <path class="ln fan" d="M378 100 C412 100 430 35 454 35"/>
+              <path class="ln fan" d="M378 100 H454"/>
+              <path class="ln fan" d="M378 100 C412 100 430 165 454 165"/>
+              <path class="byp" d="M52 70 C52 22 84 12 124 12 H372 C400 12 410 40 410 100"/><path class="byp" d="M410 100 C428 100 436 35 454 35"/><path class="byp" d="M410 100 H454"/><path class="byp" d="M410 100 C428 100 436 165 454 165"/><circle class="pkd" r="3"><animateMotion dur="3.4s" begin="-0s" repeatCount="indefinite" path="M52 70 C52 22 84 12 124 12 H372 C400 12 410 40 410 100 C428 100 436 35 454 35"/></circle><circle class="pkd" r="3"><animateMotion dur="3.4s" begin="-1.1s" repeatCount="indefinite" path="M52 70 C52 22 84 12 124 12 H372 C400 12 410 40 410 100 H454"/></circle><circle class="pkd" r="3"><animateMotion dur="3.4s" begin="-2.2s" repeatCount="indefinite" path="M52 70 C52 22 84 12 124 12 H372 C400 12 410 40 410 100 C428 100 436 165 454 165"/></circle>
+              <circle class="pk" r="3.6"><animateMotion dur="2.6s" begin="-0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines=".45 0 .55 1" path="M82 100 L378 100 C412 100 430 35 454 35"/></circle><circle class="pk" r="3.6"><animateMotion dur="2.6s" begin="-0.45s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines=".45 0 .55 1" path="M82 100 L454 100"/></circle><circle class="pk" r="3.6"><animateMotion dur="2.6s" begin="-0.9s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines=".45 0 .55 1" path="M82 100 L378 100 C412 100 430 165 454 165"/></circle><circle class="pk" r="3.6"><animateMotion dur="2.6s" begin="-1.35s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines=".45 0 .55 1" path="M82 100 L454 100"/></circle><circle class="pk" r="3.6"><animateMotion dur="2.6s" begin="-1.8s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines=".45 0 .55 1" path="M82 100 L378 100 C412 100 430 35 454 35"/></circle><circle class="pk" r="3.6"><animateMotion dur="2.6s" begin="-2.25s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines=".45 0 .55 1" path="M82 100 L378 100 C412 100 430 165 454 165"/></circle>
+            </svg>
+            <span class="bypl">Doğrudan gider, VPN’siz</span>
+            <div class="nd pc" style="left:10%;top:40%"><span class="gl g-laptop" aria-hidden="true"></span></div>
+            <span class="nl" style="left:10%;top:61%">Bu bilgisayar<small>tüm uygulamalar</small></span>
+            <div class="nd tun" style="left:38.46%;top:40%"><span class="pulse2" aria-hidden="true"></span><img src="{{logo}}" alt="" width="34" height="34"></div>
+            <span class="nl" style="left:38.46%;top:61%">Mistgate<small>{{tunSub}}</small></span>
+            <div class="nd srv" style="left:66.9%;top:40%"><img src="/_blob/e496c2fcbf4e9bb39112cabd5bf7f493" alt=""><span class="gl g-server" aria-hidden="true"></span></div>
+            <span class="nl" style="left:66.9%;top:61%">{{srvName}}<small>{{srvSub}}</small></span>
+            <div class="bub sky" style="left:91.15%;top:14%" title="Video"><span class="gl g-play" aria-hidden="true"></span></div>
+            <div class="bub lav" style="left:91.15%;top:40%"><span class="gl g-chat-bubble" aria-hidden="true"></span></div>
+            <div class="bub mint" style="left:91.15%;top:66%"><span class="gl g-internet" aria-hidden="true"></span></div>
+          </div>
+          <div class="stats3">
+            <div class="st3"><span class="mono lav"><span class="gl g-shield-check" aria-hidden="true"></span></span><span class="tx"><b>0</b><span>istisna</span></span></div>
+            <div class="st3"><span class="mono sky"><span class="gl g-internet" aria-hidden="true"></span></span><span class="tx"><b>DNS</b><span>o da VPN üzerinden</span></span></div>
+            <div class="st3"><span class="mono {{ksTone}}"><span class="gl g-lock" aria-hidden="true"></span></span><span class="tx"><b>Kill switch</b><span>{{ksSub}}</span></span></div>
+          </div>
+          <div class="allnote">
+            <span class="tx"><b>{{allNoteT}}</b><span>{{allNote}}</span></span>
+            <button class="lsb" onClick="{{setExc}}">Akıllı moda geç</button>
+          </div>
+        </sc-if>
+      </section>
+    </main>
+  </div>
+
+</div>
+  <div lang="en" class="dev" role="toolbar" aria-label="Prototype states">
+    <div class="dg"><span class="dl">Apps</span><div class="ds"><button class="{{dv.ap_0}}" onClick="{{dvSet.ap_0}}">None</button><button class="{{dv.ap_1}}" onClick="{{dvSet.ap_1}}">Few</button><button class="{{dv.ap_2}}" onClick="{{dvSet.ap_2}}">Many</button></div></div>
+    <div class="dg"><span class="dl">Sites</span><div class="ds"><button class="{{dv.si_0}}" onClick="{{dvSet.si_0}}">None</button><button class="{{dv.si_1}}" onClick="{{dvSet.si_1}}">Some</button></div></div>
+    <div class="dg"><span class="dl">Region</span><div class="ds"><button class="{{dv.rg_ru}}" onClick="{{dvSet.rg_ru}}">Russia</button><button class="{{dv.rg_cn}}" onClick="{{dvSet.rg_cn}}">China</button><button class="{{dv.rg_other}}" onClick="{{dvSet.rg_other}}">None</button></div></div>
+    <div class="dg"><span class="dl">Theme</span><div class="ds"><button class="{{dv.th_dark}}" onClick="{{dvSet.th_dark}}">Dark</button><button class="{{dv.th_light}}" onClick="{{dvSet.th_light}}">Light</button></div></div>
+  </div>
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["except","only","all"],"default":"except","section":"State"},"view":{"editor":"enum","options":["col","apps","sites"],"default":"col","section":"State"},"cat":{"editor":"enum","options":["popular","blocked","social","media","ai","games"],"default":"popular","section":"State"},"lists":{"editor":"enum","options":["closed","open"],"default":"closed","section":"State"},"reg":{"editor":"enum","options":["ru","by","cn","ir","other"],"default":"ru","section":"State"},"region":{"editor":"enum","options":["closed","open"],"default":"closed","section":"State"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"accent":{"editor":"enum","options":["lavender","mint","sand","rose"],"default":"lavender","section":"Look"},"vpn":{"editor":"enum","options":["on","off"],"default":"on","section":"State"},"$preview":{"width":1160,"height":800}}'>
+class Component extends DCLogic {
+  st() { return this.state || {}; }
+  componentDidMount() { this.catPill(); if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.catPill()); }
+  componentDidUpdate() { this.catPill(); }
+  // плашка активной категории: ширина по тексту, поэтому положение меряем, а не считаем по номеру
+  catPill() {
+    const c = document.querySelector('.cats'), el = c && c.querySelector('.cat.on');
+    if (!el) return;
+    const rtl = getComputedStyle(c).direction === 'rtl';
+    const x = rtl ? c.clientWidth - el.offsetLeft - el.offsetWidth : el.offsetLeft, w = el.offsetWidth;
+    const s = this.st();
+    const tight = !!s.catT || c.scrollWidth > c.clientWidth + 1;      // не помещается — значки остаются только у выбранной
+    if (s.catX !== x || s.catW !== w || !!s.catT !== tight) this.setState({ catX: x, catW: w, catT: tight });
+  }
+  pick(k, v, d) { const s = this.st(); return s[k] !== undefined ? s[k] : (this.props[k] !== undefined ? this.props[k] : d); }
+  updateNow() {
+    if (this.st().upd === 'busy') return;
+    this.setState({ upd: 'busy' });
+    setTimeout(() => this.setState({ upd: 'done' }), 1600);
+  }
+  renderVals() {
+    const logos = { lavender: '/_blob/0b62512895ad639ab01894d9cfc68db6', mint: '/_blob/7e2cbe098a3f586b63d3e07c56f17a01', sand: '/_blob/12736226f7d078aa98183de30675f863', rose: '/_blob/766bb9e952957b786b037a8ba7882911' };
+    const theme = (this.st().theme || this.props.theme) === 'light' ? 'light' : 'dark';
+    const accent = logos[this.props.accent] ? this.props.accent : 'lavender';
+    const s0 = this.st();
+    // статус VPN в шапке: виден на всех экранах, кроме Главной
+    const vp = s0.vp || (this.props.vpn === 'off' ? 'off' : 'on');
+    const tbs = { c: 'v-' + vp, t: vp === 'on' ? 'Bağlı' : (vp === 'ing' ? 'Bağlanıyor…' : 'VPN kapalı'), m: vp === 'on' ? 'Almanya' : '', mc: vp === 'on' ? '' : 'hide', a: vp === 'off' ? 'VPN’e bağlan' : 'VPN’i kapat',
+      go: () => { clearTimeout(this.vt); if (vp === 'off') { this.setState({ vp: 'ing' }); this.vt = setTimeout(() => this.setState({ vp: 'on' }), 1300); } else this.setState({ vp: 'off' }); } };
+
+    const mode = s0.mode || this.props.mode || 'except';
+    const cat = s0.cat || this.props.cat || 'popular';
+    const view = s0.view || (this.props.lists === 'open' ? 'lists' : '') || this.props.view || 'col';
+    const reg = s0.reg || this.props.reg || 'ru';
+    const regOpen = s0.regOpen !== undefined ? s0.regOpen : this.props.region === 'open';
+    const listsOpen = s0.lp !== undefined ? s0.lp : this.props.lists === 'open';
+    const REG = {"ru": {"name": "Rusya", "adj": "Rus", "cc": "RU", "zones": ".ru .рф .su", "svc": "Bankalar, Gosuslugi, VK", "blk": "90.000+ site", "chk": "kinopoisk.ru", "meta": ".ru siteleri, Gosuslugi, bankalar", "flag": "/_blob/b7fc87ada36d9ca5dfc18fe7a2bc5731"}, "by": {"name": "Belarus", "adj": "Belarus", "cc": "BY", "zones": ".by .бел", "svc": "Bankalar, devlet portalları", "blk": "Belarus’ta kısıtlı", "chk": "onliner.by", "meta": ".by siteleri, bankalar, e-devlet", "flag": "/_blob/9754caebe7308258301ba71a8be3f1ba"}, "cn": {"name": "Çin", "adj": "Çin", "cc": "CN", "zones": ".cn", "svc": "WeChat, Alipay, Baidu", "blk": "GFW listesi · 5.700+", "chk": "baidu.com", "meta": ".cn siteleri, WeChat, Alipay", "flag": "/_blob/ad2b956d48d6f0dc4d05e3febe36de7f"}, "ir": {"name": "İran", "adj": "İran", "cc": "IR", "zones": ".ir", "svc": "Bankalar, devlet, yerel uygulamalar", "blk": "İran’da filtreleniyor", "chk": "digikala.com", "meta": ".ir siteleri, bankalar, uygulamalar", "flag": "/_blob/b5771f1e3a409126706db7953ab0544b"}, "other": {"name": "Yok", "adj": "", "cc": "", "zones": "", "svc": "", "blk": "", "chk": "wikipedia.org", "meta": "Yalnızca ev ağınız doğrudan", "flag": ""}};
+    const R = Object.assign({}, REG[reg], { hasFlag: reg !== 'other', noFlag: reg === 'other', chip: reg === 'other' ? 'Yerel site yok' : '%s siteleri'.replace('%s', REG[reg].adj) });
+    const S0 = {"rkn": ["RU’da engelli", "shield-check", "sand", "90.000+ site"], "geo": ["Bölge kısıtlı", "lock", "sand", "Rusya’ya kapalı"], "allblk": ["Genişletilmiş liste", "shield-search", "neu", "itdoginfo · 120k"], "rusvc": ["RU hizmetleri", "bank", "sky", "Bankalar, Gosuslugi, VK"], "rusites": ["RU siteleri", "internet", "sky", ".ru .рф .su"], "lan": ["Yerel ağ", "network", "neu", "Yazıcı, TV, NAS"], "ads": ["Reklamlar ve izleyiciler", "prohibition", "rose", "Tamamen engelli"], "yt": ["YouTube", "media-video", "rose", ""], "ig": ["Instagram", "camera", "rose", ""], "fb": ["Facebook", "community", "sky", ""], "wa": ["WhatsApp", "chat-bubble", "mint", ""], "tg": ["Telegram", "send-diagonal", "sky", ""], "dc": ["Discord", "headset", "lav", ""], "x": ["X", "hashtag", "neu", ""], "tt": ["TikTok", "music-double-note", "rose", ""], "th": ["Threads", "at-sign", "neu", ""], "rd": ["Reddit", "chat-lines", "sand", ""], "sg": ["Signal", "message-text", "sky", ""], "pin": ["Pinterest", "pin", "rose", ""], "allmedia": ["Tüm medya", "modern-tv", "lav", "12 hizmet"], "nf": ["Netflix", "movie", "rose", ""], "sp": ["Spotify", "music-note", "mint", ""], "tw": ["Twitch", "antenna-signal", "lav", ""], "dis": ["Disney+", "magic-wand", "sky", ""], "hbo": ["HBO", "cinema-old", "lav", ""], "pv": ["Prime Video", "playlist-play", "sky", ""], "sc": ["SoundCloud", "sound-high", "sand", ""], "dz": ["Deezer", "album", "lav", ""], "td": ["Tidal", "sea-waves", "neu", ""], "vm": ["Vimeo", "play", "sky", ""], "wiki": ["Wikipedia", "open-book", "neu", ""], "allai": ["Tüm yapay zekâ", "sparks", "mint", "6 hizmet"], "oai": ["ChatGPT", "brain", "mint", ""], "cl": ["Claude", "circle-spark", "sand", ""], "gem": ["Gemini", "bright-star", "sky", ""], "grok": ["Grok", "brain-electricity", "neu", ""], "ppx": ["Perplexity", "search-engine", "mint", ""], "cop": ["Copilot", "code-brackets", "lav", ""], "allgames": ["Tüm oyunlar", "gamepad", "lav", "11 hizmet"], "steam": ["Steam", "arcade", "sky", ""], "epic": ["Epic Games", "trophy", "neu", ""], "ps": ["PlayStation", "medal", "sky", ""], "xb": ["Xbox", "rocket", "mint", ""], "nin": ["Nintendo", "dice-five", "rose", ""], "bz": ["Blizzard", "potion", "sky", ""], "ea": ["EA", "soccer-ball", "rose", ""], "ubi": ["Ubisoft", "hexagon-dice", "neu", ""], "rbx": ["Roblox", "cube", "sand", ""], "quest": ["Meta Quest", "augmented-reality", "neu", ""], "bng": ["Bungie", "planet", "neu", ""], "ms": ["Microsoft", "laptop", "sky", ""], "apple": ["Apple", "smartphone-device", "neu", ""], "zoom": ["Zoom", "video-camera", "sky", ""], "gplay": ["Google Play", "shopping-bag", "mint", ""], "bsky": ["Bluesky", "cloud-sunny", "sky", ""], "md": ["Medium", "journal-page", "neu", ""], "pat": ["Patreon", "heart", "rose", ""], "hulu": ["Hulu", "tv", "mint", ""], "bbc": ["BBC", "rss-feed", "neu", ""], "tor": ["Torrentler", "download", "sand", "İzleyiciler ve DHT"]};
+    const S = Object.assign({}, S0);
+    if (reg !== 'other') {
+      S.rusites = ['%s siteleri'.replace('%s', R.cc), S0.rusites[1], S0.rusites[2], R.zones];
+      S.rusvc = ['%s hizmetleri'.replace('%s', R.cc), S0.rusvc[1], S0.rusvc[2], R.svc];
+      S.rkn = ['Engelli: %s'.replace('%s', R.cc), S0.rkn[1], S0.rkn[2], R.blk];
+      S.geo = ['Bölge kısıtlı', S0.geo[1], S0.geo[2], '%s için kapalı'.replace('%s', R.name)];
+    }
+    const REGIONAL = ["rusites", "rusvc", "rkn", "geo"];
+    const keep = (k) => reg !== 'other' || REGIONAL.indexOf(k) < 0;
+    const LIST = {"blocked": ["rkn", "geo", "allblk", "rusvc", "rusites", "ads"], "social": ["yt", "ig", "fb", "wa", "tg", "dc", "x", "tt", "th", "rd", "sg", "pin", "bsky", "md", "pat"], "media": ["allmedia", "nf", "sp", "tw", "dis", "hbo", "pv", "sc", "dz", "td", "vm", "wiki", "hulu", "bbc", "tor"], "ai": ["allai", "oai", "cl", "gem", "grok", "ppx", "cop"], "games": ["allgames", "steam", "epic", "ps", "xb", "nin", "bz", "ea", "ubi", "rbx", "quest", "bng"]};
+    const POP = {"except": ["rusites", "rusvc", "lan", "allgames", "steam", "epic", "ps", "xb", "ms", "apple", "zoom", "gplay", "bz", "rbx", "ads"], "only": ["rkn", "geo", "yt", "ig", "dc", "tg", "wa", "x", "tt", "allai", "nf", "sp", "fb", "tw", "ads"]};
+    const CATS = [["popular", "Popüler", "fire-flame"], ["blocked", "Engelli", "shield-check"], ["social", "Sosyal", "chat-bubble"], ["media", "Medya", "play"], ["ai", "Yapay zekâ", "sparks"], ["games", "Oyunlar", "gamepad"]];
+    const m = mode === 'only' ? 'only' : 'except';
+    // отмеченное в «Smart» идёт мимо VPN, в «Only selected» — через VPN: подписываем и красим по-разному
+    const WAY = m === 'only' ? 'VPN' : 'Doğrudan', WAYC = m === 'only' ? 'vpn' : 'dir', WAYT = m === 'only' ? 'w-vpn' : 'w-dir';
+    const base = {"except": ["rusites", "rusvc", "lan", "steam"], "only": ["rkn", "geo", "yt", "ig", "dc", "allai"]};
+    const selAll = Object.assign({ except: {}, only: {} }, s0.sel || {});
+    const sel = {};
+    base[m].forEach((k) => { sel[k] = true; });
+    Object.assign(sel, selAll[m]);
+    Object.keys(sel).forEach((k) => { if (!keep(k)) sel[k] = false; });
+    const list = (cat === 'popular' ? POP[m] : LIST[cat]).filter(keep);
+    const tiles = list.map((k) => ({ name: S[k][0], g: S[k][1], tone: S[k][2], meta: S[k][3], mcls: S[k][3] ? '' : 'hide', way: sel[k] ? WAY : '', wayC: sel[k] ? WAYC + (S[k][3] ? ' sep' : '') : 'hide', cls: sel[k] ? 'on ' + WAYT : '', on: sel[k] ? 'true' : 'false',
+      flip: () => this.setState({ sel: Object.assign({}, selAll, { [m]: Object.assign({}, selAll[m], { [k]: !sel[k] }) }) }) }));
+    const cats = CATS.map((c) => ({ label: c[1], g: c[2], cls: c[0] === cat ? 'on' : '', on: c[0] === cat ? 'true' : 'false', pick: () => this.setState({ cat: c[0] }) }));
+    const cnt = Object.keys(sel).filter((k) => sel[k]).length;
+    // программы
+    const APPS_ALL = [["steam", "Steam", "gamepad", "sky", 1], ["tgd", "Telegram", "send-diagonal", "sky", 1], ["dcd", "Discord", "headset", "lav", 1], ["chrome", "Chrome", "internet", "mint", 0], ["ff", "Firefox", "internet", "sand", 0], ["ya", "Yandex", "internet", "rose", 0], ["figma", "Figma", "design-nib", "lav", 0], ["zoomd", "Zoom", "video-camera", "sky", 0], ["spd", "Spotify", "music-note", "mint", 0], ["qbt", "qBittorrent", "download", "sand", 1], ["bnet", "Battle.net", "gamepad", "sky", 0], ["epicd", "Epic Games", "trophy", "neu", 0], ["obs", "OBS Studio", "video-camera", "neu", 0], ["teams", "Teams", "community", "lav", 0], ["code", "VS Code", "code-brackets", "sky", 0]].concat([["edge", "Edge", "internet", "sky", 0], ["opera", "Opera", "internet", "rose", 0], ["brave", "Brave", "internet", "sand", 0], ["slack", "Slack", "chat-bubble", "lav", 1], ["notion", "Notion", "journal-page", "neu", 0], ["obsidian", "Obsidian", "journal-page", "lav", 0], ["postman", "Postman", "code-brackets", "sand", 0], ["docker", "Docker", "cube", "sky", 0], ["parsec", "Parsec", "gamepad", "neu", 0], ["anydesk", "AnyDesk", "laptop", "rose", 0], ["viber", "Viber", "chat-bubble", "lav", 0], ["whatsd", "WhatsApp", "chat-bubble", "mint", 0]]);
+    const apN = s0.apN !== undefined ? s0.apN : 1;
+    const APPS = apN === 0 ? [] : (apN === 1 ? APPS_ALL.slice(0, 6) : APPS_ALL);
+    const aBase = {"except": ["steam", "qbt"], "only": ["tgd", "dcd", "figma"]};
+    const aAll = Object.assign({ except: {}, only: {} }, s0.asel || {});
+    const asel = {};
+    aBase[m].forEach((k) => { asel[k] = true; });
+    Object.assign(asel, aAll[m]);
+    const apps = APPS.map((a) => ({ name: a[1], g: a[2], tone: a[3], meta: a[4] ? 'Çalışıyor' : 'Yüklü', mcls: a[4] ? 'run' : '', way: asel[a[0]] ? WAY : '', wayC: asel[a[0]] ? WAYC + ' sep' : 'hide', cls: asel[a[0]] ? 'on ' + WAYT : '', on: asel[a[0]] ? 'true' : 'false',
+      flip: () => this.setState({ asel: Object.assign({}, aAll, { [m]: Object.assign({}, aAll[m], { [a[0]]: !asel[a[0]] }) }) }) }));
+    const appCnt = APPS.filter((a) => asel[a[0]]).length;
+    // сайты
+    const SITES = {"except": [["2ip.io", "8 Kasım’da eklendi"], ["corp.example.com", "21 Ekim’de eklendi"]], "only": [["chess.com", "8 Kasım’da eklendi"], ["proton.me", "30 Ekim’de eklendi"]]};
+    const SUG = {"except": [["kaspi.kz", "Bugün VPN bağlantılarını 3 kez reddetti"], ["speedtest.net", "Doğrudan gittiğinde gerçek hızınızı gösterir"], ["steamcontent.com", "Oyun indirmeleri doğrudan daha hızlı"]], "only": [["linkedin.com", "Bugün VPN olmadan açılmadı"], ["notion.so", "VPN olmadan yavaş"], ["patreon.com", "Bugün VPN olmadan açılmadı"]]};
+    const stAll = s0.sites || {};
+    const siN = s0.siN !== undefined ? s0.siN : 1;
+    const cur = stAll[m] || (siN ? SITES[m] : []);
+    const gone = (s0.sugGone || {})[m] || [];
+    const sites = cur.map((x, i) => ({ name: x[0], meta: x[1] + ' · alt alan adları dahil', rm: () => this.setState({ sites: Object.assign({}, stAll, { [m]: cur.filter((_, j) => j !== i) }) }) }));
+    const sugs = SUG[m].filter((x) => gone.indexOf(x[0]) < 0).map((x) => ({ name: x[0], meta: x[1],
+      add: () => this.setState({ sites: Object.assign({}, stAll, { [m]: cur.concat([[x[0], 'Az önce eklendi']]) }), sugGone: Object.assign({}, s0.sugGone || {}, { [m]: gone.concat([x[0]]) }) }) }));
+    // регион
+    const ORDER = ['ru', 'by', 'cn', 'ir', 'other'];
+    const regs = ORDER.map((k) => ({ name: REG[k].name, meta: REG[k].meta, flag: REG[k].flag, hasFlag: k !== 'other', noFlag: k === 'other', det: k === 'ru', detCls: k === 'ru' ? '' : 'hide',
+      cls: k === reg ? 'on' : '', on: k === reg ? 'true' : 'false', pick: () => this.setState({ reg: k, regOpen: false }) }));
+    // списки
+    const SRC = [["prov", "Sağlayıcınızdan", "Mistgate seçer ve güncel tutar", true], ["itdog", "itdoginfo/allow-domains", "Topluluk listeleri, her gün güncellenir", false], ["hoax", "hoaxisr/rulesets", "sing-box kural setleri", false], ["url", "Özel URL", "Kendi liste bağlantınız", false]];
+    const src = s0.src || 'prov';
+    const srcs = SRC.map((o) => ({ name: o[1], sub: o[2], rec: o[3], cls: o[0] === src ? 'on' : '', on: o[0] === src ? 'true' : 'false', pick: () => this.setState({ src: o[0] }) }));
+    const upd = s0.upd || 'idle';
+    const LS0 = [["prov", "Mistgate sağlayıcısı", "shield-check", "lav", 52140, "2 sa önce güncellendi", 1, 1, 0, 0], ["itdog", "itdoginfo/allow-domains", "code-brackets", "sky", 31905, "2 sa önce güncellendi", 0, 1, 0, 0], ["hoax", "hoaxisr/rulesets", "code-brackets", "mint", 12470, "Dün güncellendi", 0, 0, 0, 0], ["my", "lists.example.org/my.lst", "link", "sand", 1005, "Bağlantınız · 2 sa önce güncellendi", 0, 1, 1, 0], ["anti", "antifilter.example/domains.lst", "link", "rose", 0, "Güncellenemedi · 404", 0, 1, 1, 1]];
+    const lsList = s0.lsList || LS0;
+    const lsOn = Object.assign({}, s0.lsOn || {});
+    const fmt = (n) => n.toLocaleString('tr-TR');
+    let sum = 0, dup = 0, nOn = 0; const mSegs = [];
+    const srcRows = lsList.map((o, i) => {
+      const on = lsOn[o[0]] !== undefined ? lsOn[o[0]] : !!o[7];
+      const err = !!o[9] && !(s0.fixed || {})[o[0]];
+      const n = err ? 0 : (o[4] || 2310);
+      const d = i === 0 ? 0 : Math.round(n * 0.17);
+      if (on && !err) { sum += n; dup += d; nOn += 1; mSegs.push({ c: o[3], w: Math.max(n - d, 600) }); }
+      const meta = o[10] === 'checking' ? 'Bağlantı denetleniyor…' : (err ? o[5] : fmt(n) + ' kayıt' + (d ? ' · ' + fmt(d) + ' yinelenen' : '') + ' · ' + (s0.fixed && s0.fixed[o[0]] ? 'Az önce güncellendi' : o[5]));
+      return { name: o[1], g: o[2], tone: o[3], meta: meta, builtin: !!o[6], biCls: o[6] ? '' : 'hide', custom: !!o[8], err: err, mcls: err ? 'err' : '', cls: (on ? 'on' : 'off') + (err ? ' bad' : ''),
+        sw: on ? 'on' : '', on: on ? 'true' : 'false',
+        flip: () => this.setState({ lsOn: Object.assign({}, lsOn, { [o[0]]: !on }) }),
+        rm: () => this.setState({ lsList: lsList.filter((x) => x[0] !== o[0]) }),
+        retry: () => this.setState({ fixed: Object.assign({}, s0.fixed || {}, { [o[0]]: true }) }) };
+    });
+    const auto = s0.auto !== undefined ? s0.auto : true;
+    // проверка сайта
+    const DOM = { kp: [R.chk, reg === 'other' ? ['wiki'] : ['rusites', 'rusvc']], yt: ['youtube.com', ['yt']], ai: ['chatgpt.com', ['oai', 'allai']] };
+    const ck = s0.chk || 'kp';
+    const hit = DOM[ck][1].find((k) => sel[k]);
+    const VPN = { cls: 'vpn', where: 'VPN üzerinden gider · Almanya', short: 'VPN' }, DIR = { cls: 'dir', where: 'Doğrudan gider, VPN’siz', short: 'Doğrudan' };
+    let res;
+    if (mode === 'all') res = Object.assign({ why: 'Kural: “Her şey” modu' }, VPN);
+    else if (mode === 'only') res = hit ? Object.assign({ why: 'Kural: “%s” açık'.replace('%s', S[hit][0]) }, VPN) : Object.assign({ why: 'Kural: seçiminizde yok' }, DIR);
+    else res = hit ? Object.assign({ why: 'Kural: “%s” doğrudan gider'.replace('%s', S[hit][0]) }, DIR) : Object.assign({ why: 'Kural: istisna değil' }, VPN);
+    const tryCls = {}, tryD = {};
+    Object.keys(DOM).forEach((k) => { tryCls[k] = k === ck ? 'on' : ''; tryD[k] = () => this.setState({ chk: k }); });
+    const V = ['col', 'apps', 'sites'], vCls = {}, vOn = {}, vPick = {};
+    V.forEach((k) => { vCls[k] = k === view ? 'on' : ''; vOn[k] = k === view ? 'true' : 'false'; vPick[k] = () => this.setState({ view: k, lp: false }); });
+    const dv = {}, dvSet = {};
+    const devOpt = (k, v, on, fn) => { dv[k + '_' + v] = on ? 'on' : ''; dvSet[k + '_' + v] = fn; };
+    [0, 1, 2].forEach((v) => devOpt('ap', v, apN === v, () => this.setState({ apN: v, view: 'apps' })));
+    [0, 1].forEach((v) => devOpt('si', v, siN === v && !s0.sites, () => this.setState({ siN: v, sites: undefined, sugGone: undefined, view: 'sites' })));
+    ['ru', 'cn', 'other'].forEach((v) => devOpt('rg', v, reg === v, () => this.setState({ reg: v, mode: 'except', view: 'col' })));
+    ['dark', 'light'].forEach((v) => devOpt('th', v, theme === v, () => this.setState({ theme: v })));
+    return {
+      dv: dv, dvSet: dvSet,
+      hasApps: APPS.length > 0, noApps: APPS.length === 0, appTotal: APPS.length, appScroll: APPS.length > 15 ? 'scroll' : '',
+      hasSites: sites.length > 0, noSites: sites.length === 0,
+      modeName: mode === 'only' ? 'Yalnızca seçilenler' : 'Akıllı mod',
+      theme: theme, accent: accent, logo: logos[accent], tbs: tbs, rdDiag: '', rdSet: 'hide',
+      isExc: mode === 'except', isOnly: mode === 'only', isAll: mode === 'all', notAll: mode !== 'all',
+      mExc: mode === 'except' ? 'on' : '', mOnly: mode === 'only' ? 'on' : '', mAll: mode === 'all' ? 'on' : '',
+      setExc: () => this.setState({ mode: 'except' }), setOnly: () => this.setState({ mode: 'only' }), setAll: () => this.setState({ mode: 'all' }),
+      smartDesc: 'Yerel siteler ve ev ağınız dışında her şey için VPN',
+      allNote: reg === 'other' ? 'Yazıcılar ve diğer ev cihazlarına erişilemeyebilir' : 'Bazı %s bankaları ve hizmetleri yabancı adresleri engelliyor'.replace('%s', R.adj),
+      allT: vp === 'on' ? 'Tüm trafik VPN üzerinden gider' : 'Tüm trafik VPN üzerinden gidecek', offN: vp === 'on' ? 'hide' : '', schCls: vp === 'on' ? '' : 'idle',
+      srvName: vp === 'on' ? 'Almanya' : 'Sunucu', srvSub: vp === 'on' ? 'VLESS · TCP' : 'bağlı değil',
+      tunSub: vp === 'on' ? 'şifreli tünel' : 'tünel kapalı', ksSub: vp === 'on' ? 'açık · sızıntı yok' : 'VPN ile açılır', ksTone: vp === 'on' ? 'mint' : 'neu',
+      allNoteT: reg === 'other' ? 'Ev cihazları' : '%s siteleri'.replace('%s', R.adj),
+      cardTitle: m === 'only' ? 'VPN üzerinden gider' : 'Doğrudan gider, VPN’siz',
+      R: R, regs: regs, regOpen: !!regOpen, regUp: 'Yerel listeler bugün 09:12’de güncellendi', regUpCls: reg === 'other' ? 'hide' : '', regAuto: reg === 'ru', regAutoCls: reg === 'ru' ? '' : 'hide', toggleReg: () => this.setState({ regOpen: !regOpen }),
+      vCls: vCls, vOn: vOn, vPick: vPick, isCol: view === 'col', isApps: view === 'apps', isSites: view === 'sites',
+      cnt: cnt, cats: cats, catM: (s0.catW ? 'm' : '') + (s0.catT ? ' tight' : ''), catX: s0.catX || 0, catW: s0.catW || 0, tiles: tiles, apps: apps, appCnt: appCnt, sites: sites, sugs: sugs, siteCnt: sites.length,
+      listsOpen: !!listsOpen, toggleLists: () => this.setState({ lp: !listsOpen }), srcs: srcs,
+      updCls: upd === 'busy' ? 'busy' : (upd === 'done' ? 'done' : ''),
+      updTxt: upd === 'busy' ? 'updating' : (upd === 'done' ? 'az önce' : '2 sa önce'),
+      updLong: upd === 'busy' ? '88 koleksiyon güncelleniyor…' : (upd === 'done' ? 'Az önce güncellendi · 88 koleksiyon' : '2 saat önce güncellendi · 88 koleksiyon'),
+      updBtn: upd === 'busy' ? 'Güncelleniyor…' : 'Şimdi güncelle', updateNow: () => this.updateNow(),
+      updAll: upd === 'busy' ? 'Güncelleniyor…' : (upd === 'done' ? 'Güncellendi' : 'Tümünü güncelle'),
+      updBtn2: upd === 'busy' ? 'Güncelleniyor…' : (upd === 'done' ? 'Güncellendi' : 'Güncelle'),
+      updOv: upd === 'busy' ? 'listeler güncelleniyor…' : (upd === 'done' ? 'listeler az önce güncellendi' : 'listeler 2 sa önce güncellendi'),
+      isLists: view === 'lists', notLists: view !== 'lists',
+      openLists: () => this.setState({ view: 'lists', back: view }), closeLists: () => this.setState({ view: s0.back && s0.back !== 'lists' ? s0.back : 'col' }),
+      srcRows: srcRows, mSegs: mSegs, mUnique: fmt(sum - dup), mDup: fmt(dup), mN: nOn,
+      addList: () => { const id = 'n' + lsList.length; this.setState({ lsList: lsList.concat([[id, 'new-list.example.com/list.txt', 'link', 'sky', 2310, 'Az önce eklendi', 0, 1, 1, 0, 'checking']]) }); setTimeout(() => this.setState({ lsList: (this.st().lsList || []).map((x) => x[0] === id ? x.slice(0, 10) : x) }), 1300); },
+      autoCls: auto ? 'on' : '', autoOn: auto ? 'true' : 'false', toggleAuto: () => this.setState({ auto: !auto }),
+      chk: DOM[ck][0], tryTxt: { kp: DOM.kp[0] }, res: res, tryCls: tryCls, tryD: tryD,
+      nextChk: () => this.setState({ chk: ck === 'kp' ? 'yt' : (ck === 'yt' ? 'ai' : 'kp') }),
+    };
+  }
+}
+</script>
+</body>
+</html>

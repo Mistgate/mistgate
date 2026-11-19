@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="fa">
+<head>
+<meta charset="utf-8">
+<title>Mistgate · Diagnostics</title>
+<script src="./support.js"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@500..700&amp;family=Vazirmatn:wght@400..800&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="cAfa" data-app><div dir="rtl" class="desk">
+<div class="mg app t-{{theme}} a-{{accent}}">
+
+  <nav class="rail" aria-label="Sections">
+    <img class="rlogo {{brLogoC}}" src="{{logo}}" alt="{{brAlt}}" width="32" height="32">
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2.2"/></svg><span class="rbl">خانه</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2.6"/><circle cx="18" cy="5" r="2.6"/><path d="M8.6 19H16.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h7.9"/></svg><span class="rbl">مسیرها</span></a>
+    <a class="rb on" href="#app" aria-current="page"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6.5 5 13 2.5-6.5H21"/></svg><span class="rbl">عیب‌یابی</span><i class="rdot {{rdDiag}}" aria-hidden="true"></i></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="rbl">تنظیمات</span><i class="rdot {{rdSet}}" aria-hidden="true"></i></a>
+    <a class="rb sub" href="https://vpn.example.com" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"/></svg><span class="rbl">صفحه اشتراک</span></a>
+  </nav>
+
+  <div class="content">
+    <header class="tb">
+    <sc-if value="{{bn.on}}" hint-placeholder-val="{{false}}">
+    <div class="bn {{bn.tone}}" role="status">
+      <a class="bn-m" href="{{bn.href}}"><span class="gl g-{{bn.icon}}" aria-hidden="true"></span><b>{{bn.t}}</b><span class="bn-s {{bn.sC}}">{{bn.s}}</span></a>
+      <sc-if value="{{bn.hasAct}}" hint-placeholder-val="{{false}}"><a class="bn-a" href="{{bn.href}}">{{bn.act}}</a></sc-if>
+      <button class="bn-x" onClick="{{bn.close}}" aria-label="پنهان کردن"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+    </div>
+    </sc-if>
+    <div class="tbs {{tbs.c}}">
+      <a class="tbs-s" href="#app" title="Open Home"><i class="tbs-d" aria-hidden="true"></i><span>{{tbs.t}}</span><span class="tbs-m {{tbs.mc}}">{{tbs.m}}</span></a>
+      <button class="tbs-p" onClick="{{tbs.go}}" aria-label="{{tbs.a}}" title="{{tbs.a}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg></button>
+    </div>
+    <div class="cap">
+      <button aria-label="Minimize to tray"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button aria-label="Maximize"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg></button>
+      <button aria-label="Close window"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    </header>
+
+    <main class="dgm">
+      <section class="dg-l">
+        <h1 class="h1x">عیب‌یابی</h1>
+        <p class="rt-sub">بفهمید چرا چیزی کار نمی‌کند</p>
+        <sc-if value="{{asked}}" hint-placeholder-val="{{false}}">
+          <div class="ask rise"><span class="gl g-user-badge-check" aria-hidden="true"></span><span class="tx"><b>مدیر شما داده‌های عیب‌یابی خواسته است</b><span>برای کمک به اتصال شما</span></span><button class="addb sm2" onClick="{{openRep}}">مشاهده</button></div>
+        </sc-if>
+
+        <div class="ck">
+          <sc-if value="{{isIdle}}" hint-placeholder-val="{{false}}">
+            <div class="ck-idle rise">
+              <div class="radar" aria-hidden="true"><i></i><i></i><i></i><span class="sweep"></span><span class="gl g-activity" aria-hidden="true"></span></div>
+              <b>شبکه خود را بررسی کنید</b>
+              <p>همه سرورها را می‌آزماید و دنبال مسدودی، محدودیت سرعت و نشانی‌های جعلی می‌گردد. حدود 2٫5 دقیقه — اتصال شما برقرار می‌ماند</p>
+              <button class="cta" onClick="{{start}}">بررسی شبکه</button>
+              <p class="ck-last">هنوز در این شبکه بررسی نشده</p>
+            </div>
+          </sc-if>
+          <sc-if value="{{isRun}}" hint-placeholder-val="{{false}}">
+            <div class="ck-run rise">
+              <div class="rn-h">
+                <div class="rn-ring" style="--rp:{{runPct}}" aria-hidden="true"><span>{{runPct}}</span></div>
+                <div class="tx"><b class="shim">در حال بررسی شبکه</b><span>{{runTime}}</span></div>
+              </div>
+              <div class="tl">
+                <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+                  <div class="tl-s {{s.c}}"><span class="tl-n"><i aria-hidden="true"></i><span class="okc"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span></span><span class="tx"><b>{{s.name}}</b><span>{{s.note}}</span></span></div>
+                </sc-for>
+              </div>
+              <button class="lnk3" onClick="{{cancel}}">لغو بررسی</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{isDone}}" hint-placeholder-val="{{true}}">
+            <div class="ck-done rise">
+              <div class="vh {{R.tone}}"><span class="vh-ic"><span class="gl wi g-warning-circle" aria-hidden="true"></span><span class="gl ci g-check-circle" aria-hidden="true"></span></span><span class="tx"><b>{{R.title}}</b><span>{{R.sub}}</span></span></div>
+              <div class="sum">
+                <sc-for list="{{facts}}" as="f" hint-placeholder-count="4"><div class="sm-r"><span class="gl g-{{f.g}}" aria-hidden="true"></span><span class="k">{{f.k}}</span><span class="v {{f.c}}">{{f.v}}</span></div></sc-for>
+              </div>
+              <button class="cta ck-go" onClick="{{start}}"><svg class="i rf" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg><span class="cg-t"><b>آزمایش دوباره سرورها</b><small>بررسی کامل شبکه تا 48 دقیقه دیگر</small></span></button>
+              <div class="ck-meta"><span><span class="gl g-clock" aria-hidden="true"></span>2 دقیقه پیش بررسی شد</span><button class="lnk2 {{sumCls}}" onClick="{{copySum}}"><span class="gl g-copy" aria-hidden="true"></span>{{copyTxt2}}</button></div>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{showHelp}}" hint-placeholder-val="{{true}}">
+        <div class="help">
+          <span class="mono lav"><span class="gl g-lifebelt" aria-hidden="true"></span></span>
+          <span class="tx"><b>هنوز کار نمی‌کند؟</b><span>{{helpTxt}}</span></span>
+          <button class="lsb" onClick="{{openRep}}">{{helpBtn}}</button>
+        </div>
+        </sc-if>
+        <sc-if value="{{isMg}}" hint-placeholder-val="{{true}}">
+        <div class="anon {{anonBox}}">
+          <span class="tx"><b>کمک به یافتن مسدودی‌ها</b><span>{{anonTxt}}<sc-if value="{{anonMore}}" hint-placeholder-val="{{false}}"> <a class="anon-l" href="#app">چه چیزی ارسال می‌شود</a></sc-if></span></span>
+          <button class="sw {{anonCls}}" role="switch" aria-checked="{{anonOn}}" onClick="{{toggleAnon}}" aria-label="Help find blocks: share anonymous data with My subscription"></button>
+        </div>
+        </sc-if>
+      </section>
+
+      <section class="lcard dg-r" aria-label="نتایج">
+        <div class="utabs" role="tablist" aria-label="View">
+          <button class="{{tCls.res}}" role="tab" aria-selected="{{tOn.res}}" onClick="{{tPick.res}}"><span class="gl g-check-circle" aria-hidden="true"></span>نتایج</button>
+          <button class="{{tCls.log}}" role="tab" aria-selected="{{tOn.log}}" onClick="{{tPick.log}}"><span class="gl g-journal-page" aria-hidden="true"></span>گزارش رویدادها<span class="k">3 مورد جدید</span></button>
+        </div>
+        <sc-if value="{{isRes}}" hint-placeholder-val="{{true}}">
+          <sc-if value="{{hasRes}}" hint-placeholder-val="{{true}}">
+            <div class="dres">
+              <div class="best {{bestCls}}"><span class="gl g-star" aria-hidden="true"></span><span class="tx"><b>بهترین گزینه در شبکه شما</b><span>{{R.best}}</span></span><button class="lsb sm">استفاده</button></div>
+              <p class="sec-h">سرورها<span class="n">{{R.srvSum}}</span></p>
+              <div class="dlist">
+              <sc-for list="{{srvRows}}" as="x" hint-placeholder-count="4">
+                <div class="dr {{x.oc}}">
+                  <button class="dr-b" onClick="{{x.tog}}" aria-expanded="{{x.ox}}">
+                    <span class="mono {{x.tone}} {{x.fc}}"><img class="{{x.ic}}" src="{{x.flag}}" alt=""><span class="gl g-{{x.g}} {{x.gc}}" aria-hidden="true"></span></span>
+                    <span class="tx"><b>{{x.name}}<span class="term {{x.termC}}">{{x.term}}</span></b><span>{{x.meta}}</span></span>
+                    <span class="vchip {{x.vc}}"><span class="gl g-{{x.vi}}" aria-hidden="true"></span>{{x.vt}}</span>
+                    <svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                  <div class="dr-act {{x.actC}}"><button class="addb sm {{x.actBtnC}}" onClick="{{x.actGo}}">{{x.actT}}</button><span class="dr-ok {{x.actOkC}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg>{{x.actDone}}</span></div>
+                  <sc-if value="{{x.isOpen}}" hint-placeholder-val="{{false}}">
+                    <div class="dr-d {{x.ddc}}">
+                      <div class="hops {{x.hpc}}" aria-label="Route hops"><span class="hop {{x.hc.0}}"><i></i><small>1</small></span><span class="hop {{x.hc.1}}"><i></i><small>2</small></span><span class="hop {{x.hc.2}}"><i></i><small>3</small></span><span class="hop {{x.hc.3}}"><i></i><small>4</small></span><span class="hop {{x.hc.4}}"><i></i><small>5</small></span><span class="hop {{x.hc.5}}"><i></i><small>6</small></span><span class="hop {{x.hc.6}}"><i></i><small>7</small></span><span class="hop {{x.hc.7}}"><i></i><small>8</small></span><span class="hop {{x.hc.8}}"><i></i><small>9</small></span><span class="hop {{x.hc.9}}"><i></i><small>10</small></span><span class="hop {{x.hc.10}}"><i></i><small>11</small></span></div>
+                      <div class="pths {{x.ppc}}"><p class="pths-h">مسیرهای این سرور</p><div class="pth {{x.p0.c}}"><span class="pth-n">{{x.p0.n}}</span><span class="pth-m">{{x.p0.m}}</span><span class="vchip sm {{x.p0.vc}}"><span class="gl g-{{x.p0.vi}}" aria-hidden="true"></span>{{x.p0.vt}}</span></div><div class="pth {{x.p1.c}}"><span class="pth-n">{{x.p1.n}}</span><span class="pth-m">{{x.p1.m}}</span><span class="vchip sm {{x.p1.vc}}"><span class="gl g-{{x.p1.vi}}" aria-hidden="true"></span>{{x.p1.vt}}</span></div><div class="pth {{x.p2.c}}"><span class="pth-n">{{x.p2.n}}</span><span class="pth-m">{{x.p2.m}}</span><span class="vchip sm {{x.p2.vc}}"><span class="gl g-{{x.p2.vi}}" aria-hidden="true"></span>{{x.p2.vt}}</span></div><div class="pth {{x.p3.c}}"><span class="pth-n">{{x.p3.n}}</span><span class="pth-m">{{x.p3.m}}</span><span class="vchip sm {{x.p3.vc}}"><span class="gl g-{{x.p3.vi}}" aria-hidden="true"></span>{{x.p3.vt}}</span></div></div>
+                      <p class="dl-l {{x.l0c}}">{{x.l0}}</p><p class="dl-l {{x.l1c}}">{{x.l1}}</p>
+                      <p class="conf {{x.cc}}"><span class="gl g-community" aria-hidden="true"></span>{{x.conf}}</p>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              </div>
+              <p class="sec-h">شبکه<span class="n {{netCls}}">{{R.netSum}}</span></p>
+              <div class="dlist">
+              <sc-for list="{{netRows}}" as="x" hint-placeholder-count="4">
+                <div class="dr {{x.oc}}">
+                  <button class="dr-b" onClick="{{x.tog}}" aria-expanded="{{x.ox}}">
+                    <span class="mono {{x.tone}} {{x.fc}}"><img class="{{x.ic}}" src="{{x.flag}}" alt=""><span class="gl g-{{x.g}} {{x.gc}}" aria-hidden="true"></span></span>
+                    <span class="tx"><b>{{x.name}}<span class="term {{x.termC}}">{{x.term}}</span></b><span>{{x.meta}}</span></span>
+                    <span class="vchip {{x.vc}}"><span class="gl g-{{x.vi}}" aria-hidden="true"></span>{{x.vt}}</span>
+                    <svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                  <div class="dr-act {{x.actC}}"><button class="addb sm {{x.actBtnC}}" onClick="{{x.actGo}}">{{x.actT}}</button><span class="dr-ok {{x.actOkC}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg>{{x.actDone}}</span></div>
+                  <sc-if value="{{x.isOpen}}" hint-placeholder-val="{{false}}">
+                    <div class="dr-d {{x.ddc}}">
+                      <div class="hops {{x.hpc}}" aria-label="Route hops"><span class="hop {{x.hc.0}}"><i></i><small>1</small></span><span class="hop {{x.hc.1}}"><i></i><small>2</small></span><span class="hop {{x.hc.2}}"><i></i><small>3</small></span><span class="hop {{x.hc.3}}"><i></i><small>4</small></span><span class="hop {{x.hc.4}}"><i></i><small>5</small></span><span class="hop {{x.hc.5}}"><i></i><small>6</small></span><span class="hop {{x.hc.6}}"><i></i><small>7</small></span><span class="hop {{x.hc.7}}"><i></i><small>8</small></span><span class="hop {{x.hc.8}}"><i></i><small>9</small></span><span class="hop {{x.hc.9}}"><i></i><small>10</small></span><span class="hop {{x.hc.10}}"><i></i><small>11</small></span></div>
+                      <div class="pths {{x.ppc}}"><p class="pths-h">مسیرهای این سرور</p><div class="pth {{x.p0.c}}"><span class="pth-n">{{x.p0.n}}</span><span class="pth-m">{{x.p0.m}}</span><span class="vchip sm {{x.p0.vc}}"><span class="gl g-{{x.p0.vi}}" aria-hidden="true"></span>{{x.p0.vt}}</span></div><div class="pth {{x.p1.c}}"><span class="pth-n">{{x.p1.n}}</span><span class="pth-m">{{x.p1.m}}</span><span class="vchip sm {{x.p1.vc}}"><span class="gl g-{{x.p1.vi}}" aria-hidden="true"></span>{{x.p1.vt}}</span></div><div class="pth {{x.p2.c}}"><span class="pth-n">{{x.p2.n}}</span><span class="pth-m">{{x.p2.m}}</span><span class="vchip sm {{x.p2.vc}}"><span class="gl g-{{x.p2.vi}}" aria-hidden="true"></span>{{x.p2.vt}}</span></div><div class="pth {{x.p3.c}}"><span class="pth-n">{{x.p3.n}}</span><span class="pth-m">{{x.p3.m}}</span><span class="vchip sm {{x.p3.vc}}"><span class="gl g-{{x.p3.vi}}" aria-hidden="true"></span>{{x.p3.vt}}</span></div></div>
+                      <p class="dl-l {{x.l0c}}">{{x.l0}}</p><p class="dl-l {{x.l1c}}">{{x.l1}}</p>
+                      <p class="conf {{x.cc}}"><span class="gl g-community" aria-hidden="true"></span>{{x.conf}}</p>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{noRes}}" hint-placeholder-val="{{false}}">
+            <div class="empty">
+              <span class="e-ic"><span class="gl g-shield-search" aria-hidden="true"></span></span>
+              <b>{{emT}}</b>
+              <p>{{emS}}</p>
+              <div class="e-act {{emBtn}}"><button class="addb" onClick="{{start}}">بررسی شبکه</button></div>
+            </div>
+          </sc-if>
+        </sc-if>
+        <sc-if value="{{isLog}}" hint-placeholder-val="{{false}}">
+          <div class="lgbar">
+            <label class="search lgs"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input type="text" placeholder="جست‌وجو در گزارش" aria-label="جست‌وجو در گزارش"></label>
+            <div class="lgf" role="tablist" aria-label="Level">
+              <button class="{{lfCls.all}}" onClick="{{lfPick.all}}">همه</button>
+              <button class="{{lfCls.warn}}" onClick="{{lfPick.warn}}"><i class="lvd warn" aria-hidden="true"></i>هشدارها<span class="k">3</span></button>
+              <button class="{{lfCls.error}}" onClick="{{lfPick.error}}"><i class="lvd error" aria-hidden="true"></i>خطاها<span class="k">1</span></button>
+            </div>
+          </div>
+          <div class="lg">
+            <p class="lg-day">امروز</p>
+            <sc-for list="{{logRows}}" as="g" hint-placeholder-count="12">
+              <div class="lgl {{g.lv}}" title="{{g.lvT}}"><time>{{g.t}}</time><i class="ld" aria-hidden="true"></i><span class="lsrc">{{g.src}}</span><span class="msg">{{g.msg}}</span></div>
+            </sc-for>
+          </div>
+          <div class="lgfoot">
+            <button class="lvb {{liveCls}}" onClick="{{toggleLive}}"><i aria-hidden="true"></i>{{liveTxt}}</button>
+            <span class="lgn">‏{{logN}} مورد · 24 ساعت اخیر</span>
+            <button class="lsb sm"><span class="gl g-copy" aria-hidden="true"></span><span>کپی</span></button>
+            <button class="lsb sm"><span class="gl g-download" aria-hidden="true"></span><span>ذخیره</span></button>
+            <button class="lsb sm ghost">پاک‌کردن</button>
+          </div>
+        </sc-if>
+      </section>
+    </main>
+  </div>
+
+  <sc-if value="{{repShown}}" hint-placeholder-val="{{false}}">
+    <div class="scrim" onClick="{{closeRep}}"></div>
+    <div class="sheet" role="dialog" aria-label="از مدیر خود کمک بخواهید">
+      <sc-if value="{{repForm}}" hint-placeholder-val="{{true}}">
+        <div class="sh-h"><div class="tx"><b>{{shTitle}}</b><span>{{shSub}}</span></div><button class="back" onClick="{{closeRep}}" aria-label="بستن"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+        <p class="sh-p">{{shP}}</p>
+        <div class="parts">
+          <sc-for list="{{parts}}" as="p" hint-placeholder-count="6">
+            <button class="part {{p.cls}}" role="checkbox" aria-checked="{{p.on}}" onClick="{{p.flip}}"><span class="cb"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span><span class="gl g-{{p.g}}" aria-hidden="true"></span><span class="tx"><b>{{p.name}}</b><span>{{p.sub}}</span></span></button>
+          </sc-for>
+        </div>
+        <p class="never"><span class="gl g-lock" aria-hidden="true"></span>هرگز شامل نمی‌شود: نام رایانه، سایت‌هایی که باز می‌کنید، کلیدها، IP شما</p>
+        <label class="ta"><textarea placeholder="چه اتفاقی افتاد؟ اختیاری" aria-label="What happened"></textarea></label>
+        <div class="sh-f">
+          <button class="lnk2"><span class="gl g-eye" aria-hidden="true"></span>نمایش محتوا</button>
+          <span class="sz">{{repSize}}</span>
+          <sc-if value="{{intakeOn}}" hint-placeholder-val="{{true}}"><button class="addb" onClick="{{sendRep}}"><span class="gl g-send-diagonal" aria-hidden="true"></span>ارسال برای مدیر</button></sc-if>
+          <sc-if value="{{intakeOff}}" hint-placeholder-val="{{false}}"><button class="addb" onClick="{{closeRep}}"><span class="gl g-download" aria-hidden="true"></span>ذخیره در فایل</button></sc-if>
+        </div>
+        <sc-if value="{{offWarn}}" hint-placeholder-val="{{false}}"><p class="sh-warn"><span class="gl g-warning-circle" aria-hidden="true"></span>مدیر شما هنوز داده‌ها را در برنامه نمی‌پذیرد. فایل را ذخیره و برایش بفرستید</p></sc-if>
+      </sc-if>
+      <sc-if value="{{repSent}}" hint-placeholder-val="{{false}}">
+        <div class="sent rise">
+          <span class="sent-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span>
+          <b>برای مدیر ارسال شد</b>
+          <p>این کد را به پشتیبانی بدهید تا داده‌های شما را پیدا کنند</p>
+          <div class="code"><span>MG-7K3F</span><button class="lsb {{copyCls}}" onClick="{{copy}}"><span class="gl g-copy" aria-hidden="true"></span><span>{{copyTxt}}</span></button></div>
+          <button class="lsb" onClick="{{closeRep}}">تمام</button>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+</div>
+  <div lang="en" class="dev dtop" role="toolbar" aria-label="Prototype states">
+    <div class="dg"><span class="dl">Check</span><div class="ds"><button class="{{dv.ck_idle}}" onClick="{{dvSet.ck_idle}}">Not run</button><button class="{{dv.ck_run}}" onClick="{{dvSet.ck_run}}">Running</button><button class="{{dv.ck_issues}}" onClick="{{dvSet.ck_issues}}">Issues</button><button class="{{dv.ck_good}}" onClick="{{dvSet.ck_good}}">All good</button></div></div>
+    <div class="dg"><span class="dl">Tab</span><div class="ds"><button class="{{dv.tb_res}}" onClick="{{dvSet.tb_res}}">Results</button><button class="{{dv.tb_log}}" onClick="{{dvSet.tb_log}}">Log</button></div></div>
+  </div>
+  <div lang="en" class="dev" role="toolbar" aria-label="Report states">
+    <div class="dg"><span class="dl">Debug report</span><div class="ds"><button class="{{dv.rp_closed}}" onClick="{{dvSet.rp_closed}}">Closed</button><button class="{{dv.rp_open}}" onClick="{{dvSet.rp_open}}">Open</button><button class="{{dv.rp_sent}}" onClick="{{dvSet.rp_sent}}">Sent</button><button class="{{dv.rp_off}}" onClick="{{dvSet.rp_off}}">Intake off</button><button class="{{dv.rp_asked}}" onClick="{{dvSet.rp_asked}}">Admin asks</button></div></div>
+    <div class="dg"><span class="dl">Mode</span><div class="ds"><button class="{{dv.md_mg}}" onClick="{{dvSet.md_mg}}">Mistgate</button><button class="{{dv.md_basic}}" onClick="{{dvSet.md_basic}}">Basic</button></div></div>
+    <div class="dg"><span class="dl">Theme</span><div class="ds"><button class="{{dv.th_dark}}" onClick="{{dvSet.th_dark}}">Dark</button><button class="{{dv.th_light}}" onClick="{{dvSet.th_light}}">Light</button></div></div>
+  </div>
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"check":{"editor":"enum","options":["idle","run","issues","good"],"default":"issues","section":"State"},"tab":{"editor":"enum","options":["res","log"],"default":"res","section":"State"},"report":{"editor":"enum","options":["closed","open","sent","off","asked"],"default":"closed","section":"State"},"mode":{"editor":"enum","options":["mg","basic"],"default":"mg","section":"State"},"anon":{"editor":"enum","options":["off","on","fresh","sending","old"],"default":"off","section":"State"},"op":{"editor":"enum","options":["known","unknown"],"default":"known","section":"State"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"accent":{"editor":"enum","options":["lavender","mint","sand","rose"],"default":"lavender","section":"Look"},"$preview":{"width":1160,"height":800}}'>
+class Component extends DCLogic {
+  faDigits() {
+    if (this.faMo || typeof document === 'undefined') return;
+    const root = document.querySelector('[dir=rtl]');
+    if (!root) return;
+    const D = '۰۱۲۳۴۵۶۷۸۹';
+    const tok = (m) => ((m.match(/\./g) || []).length > 1 || m.indexOf('/') >= 0) ? m
+      : m.replace(/\.(?=\d)/g, '٫').replace(/,(?=\d{3})/g, '٬').replace(/\d/g, (d) => D[+d]);
+    const conv = (n) => {
+      const s = n.data;
+      if (!/\d/.test(s)) return;
+      if (n.parentElement && n.parentElement.closest('input,textarea,kbd,.dev,.mo,.lg,.ty-bar')) return;
+      // число остаётся латинским, если оно часть обозначения: стоит вплотную к латинице («Windows 11», «Hysteria2», «24H2») или после слова «порт»
+      const t = s.replace(/\d[\d.,:\/]*\d|\d/g, (m, i) => {
+        const before = s.slice(0, i).replace(/\s+$/, ''), after = s.charAt(i + m.length);
+        return (/[A-Za-z\-#]$/.test(before) || /[A-Za-z]/.test(after) || /(پورت|درگاه)$/.test(before)) ? m : tok(m);
+      }).replace(/([۰-۹])%/g, '$1٪');
+      if (t !== s) n.data = t;
+    };
+    const walk = (el) => { const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) conv(n); };
+    walk(root);
+    this.faMo = new MutationObserver((ms) => ms.forEach((m) => {
+      if (m.type === 'characterData') conv(m.target);
+      else m.addedNodes.forEach((x) => { if (x.nodeType === 3) conv(x); else if (x.nodeType === 1) walk(x); });
+    }));
+    this.faMo.observe(root, { subtree: true, childList: true, characterData: true });
+  }
+  componentWillUnmount() { if (this.faMo) this.faMo.disconnect(); }
+  componentDidUpdate() { this.faDigits(); }
+  componentDidMount() { this.faDigits(); }
+
+  st() { return this.state || {}; }
+  start() {
+    clearTimeout(this.tk);
+    this.setState({ ck: 'run', step: 0, t0: 0 });
+    const go = (k) => {
+      if (this.st().ck !== 'run') return;
+      if (k >= 5) { this.setState({ ck: 'issues', open: { net0: true, srv0: true } }); return; }
+      this.setState({ step: k });
+      this.tk = setTimeout(() => go(k + 1), 1300);
+    };
+    this.tk = setTimeout(() => go(0), 30);
+  }
+  renderVals() {
+    const logos = { lavender: '/_blob/0b62512895ad639ab01894d9cfc68db6', mint: '/_blob/7e2cbe098a3f586b63d3e07c56f17a01', sand: '/_blob/12736226f7d078aa98183de30675f863', rose: '/_blob/766bb9e952957b786b037a8ba7882911' };
+    const s0 = this.st();
+    const theme = (s0.theme || this.props.theme) === 'light' ? 'light' : 'dark';
+    const accent = logos[this.props.accent] ? this.props.accent : 'lavender';
+    const ck = s0.ck || this.props.check || 'issues';
+    const tab = s0.tab || this.props.tab || 'res';
+    const rep = s0.rep || this.props.report || 'closed';
+    const RES = {"issues": {"srv": [{"flag": "/_blob/e496c2fcbf4e9bb39112cabd5bf7f493", "name": "آلمان", "v": "ok", "alt": "", "meta": "با VLESS · TCP کار می‌کند — 2 راه از 4 راه عبور می‌کنند", "paths": [{"n": "‏VLESS · TCP · مستقیم", "v": "ok", "m": "38 میلی‌ثانیه · 12.4 مگابیت/ثانیه"}, {"n": "‏VLESS · TCP · از طریق رله RU", "v": "ok", "m": "61 میلی‌ثانیه · 9.8 مگابیت/ثانیه"}, {"n": "‏Hysteria2 · مستقیم", "v": "blocked", "m": "‏UDP پاسخی نمی‌گیرد"}, {"n": "‏Hysteria2 · خروجی WARP", "v": "blocked", "m": "‏UDP پاسخی نمی‌گیرد"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/e03fb05e0bdcc00f476374f00844dcf0", "name": "هلند · آمستردام", "v": "slow", "alt": "", "meta": "سرعت Hysteria2 پس از چند ثانیه افت می‌کند؛ VLESS · TCP مشکلی ندارد", "paths": [{"n": "‏Hysteria2 · مستقیم", "v": "slow", "m": "اتلاف بدون افزایش تأخیر بیشتر می‌شود · 3.1 مگابیت/ثانیه"}, {"n": "‏VLESS · TCP · مستقیم", "v": "ok", "m": "48 میلی‌ثانیه · 11.0 مگابیت/ثانیه"}, {"n": "‏AmneziaWG · مستقیم", "v": "app", "m": "‏Mistgate نتوانست این پروتکل را راه‌اندازی کند"}], "conf": "214 نفر در اپراتور شما همین را دیده‌اند", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5fcef1b651d4897d4bd86b5dfbd3e9a7", "name": "رومانی", "v": "freeze", "alt": "", "meta": "وصل می‌شود، اما دانلود پس از 64 کیلوبایت متوقف می‌شود", "paths": [{"n": "‏VLESS · TCP · مستقیم", "v": "freeze", "m": "6 ثانیه توقف پس از 64 کیلوبایت"}, {"n": "‏VLESS · XHTTP · مستقیم", "v": "freeze", "m": "6 ثانیه توقف پس از 64 کیلوبایت"}], "conf": "به نظر می‌رسد DPI اتصال‌های طولانی را قطع می‌کند", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5a45af717ce4d720751cf765c6d0a732", "name": "فنلاند · هلسینکی", "v": "down", "alt": "", "meta": "خود سرور پاسخ نمی‌دهد — این مسدودسازی نیست", "paths": [{"n": "‏AmneziaWG · مستقیم", "v": "down", "m": "سرور پاسخ نمی‌دهد"}, {"n": "‏VLESS · TCP · مستقیم", "v": "down", "m": "سرور اتصال را رد کرد"}], "conf": "دیگران هم همین را می‌بینند — ارائه‌دهنده از قبل می‌داند", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/ebb260239dba6f20ae05c4141595c5d8", "name": "لهستان", "v": "config", "alt": "", "meta": "تنظیمات این سرور در اشتراک اشتباه است. فقط ارائه‌دهنده می‌تواند آن را درست کند", "paths": [{"n": "‏VLESS · TCP · مستقیم", "v": "config", "m": "سرور کلید را نپذیرفت"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": ["اطلاع به ارائه‌دهنده", "برای ارائه‌دهنده ارسال شد"]}], "net": [{"flag": "", "name": "مسدودسازی در مسیر", "v": "blocked", "alt": "در گام 6 پیدا شد", "meta": "دانلودهای طولانی از سایت‌های خارجی ممکن است متوقف شوند. Mistgate شما را روی VLESS · TCP نگه می‌دارد", "paths": [], "conf": "1,204 نفر در اپراتور شما همین را دیده‌اند", "g": "shield-search", "tone": "sand", "hops": [{"n": "1", "c": "ok"}, {"n": "2", "c": "ok"}, {"n": "3", "c": "ok"}, {"n": "4", "c": "ok"}, {"n": "5", "c": "ok"}, {"n": "6", "c": "bad"}, {"n": "7", "c": "off"}, {"n": "8", "c": "off"}, {"n": "9", "c": "off"}, {"n": "10", "c": "off"}, {"n": "11", "c": "off"}], "lines": ["نشانی آزمایشی مسدود در گام 6 از 11 قطع می‌شود", "نشانی کنترل از همه گام‌ها می‌گذرد"], "hasFlag": false, "term": "DPI · ТСПУ", "act": []}, {"flag": "", "name": "پروتکل‌های سریع", "v": "blocked", "alt": "", "meta": "‏Hysteria2 و AmneziaWG در این شبکه کار نمی‌کنند. Mistgate به‌جای آن‌ها از VLESS · TCP استفاده می‌کند", "paths": [], "conf": "برای اینترنت همراه اپراتور شما معمول است", "g": "antenna-signal", "tone": "sky", "hops": [], "lines": ["‏QUIC و AmneziaWG پاسخی نمی‌گیرند", "‏TCP 443 روی همه سرورها کار می‌کند"], "hasFlag": false, "term": "UDP", "act": []}, {"flag": "", "name": "بازی‌ها و گفتگوی صوتی", "v": "slow", "alt": "محدود", "meta": "در برخی بازی‌ها یافتن بازی و گفتگوی صوتی ممکن است کار نکند", "paths": [], "conf": "", "g": "gamepad", "tone": "lav", "hops": [], "lines": ["نوع NAT: متوسط — برخی بازی‌ها نمی‌توانند میزبان باشند", "گفتگوی صوتی ممکن است فقط یک‌طرفه وصل شود"], "hasFlag": false, "term": "NAT", "act": ["روشن‌کردن حالت بازی", "حالت بازی روشن است"]}, {"flag": "", "name": "‏Wi-Fi شما", "v": "net", "alt": "اتلاف بسته", "meta": "حدود 8% بسته‌ها پیش از رسیدن به اپراتور از بین می‌روند — به روتر نزدیک‌تر شوید", "paths": [], "conf": "", "g": "wifi", "tone": "sky", "hops": [], "lines": ["اتلاف میان این رایانه و روتر رخ می‌دهد، نه در اپراتور", "روتر در 3 تا 140 میلی‌ثانیه پاسخ می‌دهد؛ حالت عادی زیر 10 میلی‌ثانیه است"], "hasFlag": false, "term": "", "act": []}, {"flag": "", "name": "نشانی سایت‌ها", "v": "ok", "alt": "جایگزین نمی‌شود", "meta": "کسی نشانی سایت‌هایی را که باز می‌کنید جایگزین نمی‌کند", "paths": [], "conf": "", "g": "dns", "tone": "mint", "hops": [], "lines": ["40 سایت پرطرفدار بررسی شد — هیچ پاسخی جایگزین نشده", "‏DNS از VPN می‌گذرد و اپراتور آن را نمی‌بیند"], "hasFlag": false, "term": "DNS", "act": []}, {"flag": "", "name": "محدودیت سرعت", "v": "ok", "alt": "دیده نشد", "meta": "سرعت در طول نشست ثابت می‌ماند", "paths": [], "conf": "", "g": "activity", "tone": "neu", "hops": [], "lines": ["سرعت یک دقیقه کامل روی 11 تا 12 مگابیت/ثانیه ماند", "پس از مگابایت‌های اول افتی نیست"], "hasFlag": false, "term": "کندسازی", "act": []}, {"flag": "", "name": "سایت‌های خارجی", "v": "ok", "alt": "باز می‌شوند", "meta": "سایت‌های خارجی در این شبکه قطع نشده‌اند", "paths": [], "conf": "", "g": "list", "tone": "sand", "hops": [], "lines": ["48 از 48 سایت آزمایشی خارجی باز می‌شوند", "حالت فهرست سفید موبایل اکنون فعال نیست"], "hasFlag": false, "term": "فهرست سفید", "act": []}], "title": "متصل، با محدودیت", "sub": "پروتکل‌های سریع اینجا مسدودند", "tone": "warn", "facts": [["antenna-signal", "شبکه", "موبایل · Example Mobile", ""], ["server", "سرورها", "2 از 5 کار می‌کنند", "warn"], ["shield-search", "مسدودسازی", "شناسایی شد", "bad"], ["gamepad", "بازی‌ها", "محدود", "warn"]], "srvSum": "2 از 5 کار می‌کنند", "netSum": "4 مشکل", "best": "‏VLESS · TCP به آمستردام — برای 94% کاربران اپراتور شما کار می‌کند"}, "good": {"srv": [{"flag": "/_blob/e496c2fcbf4e9bb39112cabd5bf7f493", "name": "آلمان", "v": "ok", "alt": "", "meta": "هر 4 راه کار می‌کند · سریع‌ترین با Hysteria2", "paths": [{"n": "‏Hysteria2 · مستقیم", "v": "ok", "m": "31 میلی‌ثانیه · 48.2 مگابیت/ثانیه"}, {"n": "‏Hysteria2 · خروجی WARP", "v": "ok", "m": "44 میلی‌ثانیه · 30.5 مگابیت/ثانیه"}, {"n": "‏VLESS · TCP · مستقیم", "v": "ok", "m": "36 میلی‌ثانیه · 21.0 مگابیت/ثانیه"}, {"n": "‏VLESS · TCP · از طریق رله RU", "v": "ok", "m": "58 میلی‌ثانیه · 14.2 مگابیت/ثانیه"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/e03fb05e0bdcc00f476374f00844dcf0", "name": "هلند · آمستردام", "v": "ok", "alt": "", "meta": "هر 3 راه کار می‌کند", "paths": [{"n": "‏Hysteria2 · مستقیم", "v": "ok", "m": "42 میلی‌ثانیه · 39.0 مگابیت/ثانیه"}, {"n": "‏VLESS · TCP · مستقیم", "v": "ok", "m": "47 میلی‌ثانیه · 18.3 مگابیت/ثانیه"}, {"n": "‏AmneziaWG · مستقیم", "v": "ok", "m": "45 میلی‌ثانیه · 33.1 مگابیت/ثانیه"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5fcef1b651d4897d4bd86b5dfbd3e9a7", "name": "رومانی", "v": "ok", "alt": "", "meta": "هر دو راه کار می‌کند", "paths": [{"n": "‏VLESS · TCP · مستقیم", "v": "ok", "m": "63 میلی‌ثانیه · 15.7 مگابیت/ثانیه"}, {"n": "‏VLESS · XHTTP · مستقیم", "v": "ok", "m": "66 میلی‌ثانیه · 12.2 مگابیت/ثانیه"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5a45af717ce4d720751cf765c6d0a732", "name": "فنلاند · هلسینکی", "v": "ok", "alt": "", "meta": "هر دو راه کار می‌کند", "paths": [{"n": "‏AmneziaWG · مستقیم", "v": "ok", "m": "39 میلی‌ثانیه · 35.5 مگابیت/ثانیه"}, {"n": "‏VLESS · TCP · مستقیم", "v": "ok", "m": "41 میلی‌ثانیه · 19.9 مگابیت/ثانیه"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}], "net": [{"flag": "", "name": "مسدودسازی در مسیر", "v": "ok", "alt": "یافت نشد", "meta": "نشانی‌های آزمایشی از همه گام‌ها می‌گذرند", "paths": [], "conf": "", "g": "shield-search", "tone": "sand", "hops": [{"n": "1", "c": "ok"}, {"n": "2", "c": "ok"}, {"n": "3", "c": "ok"}, {"n": "4", "c": "ok"}, {"n": "5", "c": "ok"}, {"n": "6", "c": "ok"}, {"n": "7", "c": "ok"}, {"n": "8", "c": "ok"}, {"n": "9", "c": "ok"}, {"n": "10", "c": "ok"}, {"n": "11", "c": "ok"}], "lines": ["نشانی‌های آزمایشی و کنترل از هر 11 گام می‌گذرند"], "hasFlag": false, "term": "DPI · ТСПУ", "act": []}, {"flag": "", "name": "پروتکل‌های سریع", "v": "ok", "alt": "کار می‌کنند", "meta": "‏Hysteria2 و AmneziaWG اینجا کار می‌کنند", "paths": [], "conf": "", "g": "antenna-signal", "tone": "sky", "hops": [], "lines": ["‏QUIC و AmneziaWG روی همه سرورها پاسخ می‌دهند"], "hasFlag": false, "term": "UDP", "act": []}, {"flag": "", "name": "بازی‌ها و گفتگوی صوتی", "v": "ok", "alt": "خوب کار می‌کنند", "meta": "بازی‌ها و گفتگوی صوتی عادی وصل می‌شوند", "paths": [], "conf": "", "g": "gamepad", "tone": "lav", "hops": [], "lines": ["نوع NAT: باز", "مسابقه‌ها و گفتگوی صوتی دوطرفه وصل می‌شوند"], "hasFlag": false, "term": "NAT", "act": []}, {"flag": "", "name": "نشانی سایت‌ها", "v": "ok", "alt": "جایگزین نمی‌شود", "meta": "کسی نشانی سایت‌هایی را که باز می‌کنید جایگزین نمی‌کند", "paths": [], "conf": "", "g": "dns", "tone": "mint", "hops": [], "lines": ["40 سایت پرطرفدار بررسی شد — هیچ پاسخی جایگزین نشده", "‏DNS از VPN می‌گذرد و اپراتور آن را نمی‌بیند"], "hasFlag": false, "term": "DNS", "act": []}, {"flag": "", "name": "محدودیت سرعت", "v": "ok", "alt": "دیده نشد", "meta": "سرعت در طول نشست ثابت می‌ماند", "paths": [], "conf": "", "g": "activity", "tone": "neu", "hops": [], "lines": ["سرعت یک دقیقه کامل روی 11 تا 12 مگابیت/ثانیه ماند", "پس از مگابایت‌های اول افتی نیست"], "hasFlag": false, "term": "کندسازی", "act": []}, {"flag": "", "name": "سایت‌های خارجی", "v": "ok", "alt": "باز می‌شوند", "meta": "سایت‌های خارجی در این شبکه قطع نشده‌اند", "paths": [], "conf": "", "g": "list", "tone": "sand", "hops": [], "lines": ["48 از 48 سایت آزمایشی خارجی باز می‌شوند", "حالت فهرست سفید موبایل اکنون فعال نیست"], "hasFlag": false, "term": "فهرست سفید", "act": []}], "title": "همه‌چیز کار می‌کند", "sub": "چیزی مسدود نیست، همه سرورها پاسخ می‌دهند", "tone": "ok", "facts": [["wifi", "شبکه", "Wi-Fi · Example Telecom", ""], ["server", "سرورها", "4 از 4 کار می‌کنند", "ok"], ["shield-search", "مسدودسازی", "هیچ‌کدام", "ok"], ["gamepad", "بازی‌ها", "خوب کار می‌کنند", "ok"]], "srvSum": "4 از 4 کار می‌کنند", "netSum": "بدون مشکل", "best": "‏Hysteria2 به آلمان — سریع‌ترین برای کاربران اپراتور شما"}};
+    const VD = {"ok": ["کار می‌کند", "check-circle", "ok"], "slow": ["کاهش سرعت", "dashboard-speed", "warn"], "freeze": ["فریز می‌شود", "snow-flake", "ice"], "blocked": ["مسدود", "prohibition", "bad"], "down": ["سرور از کار افتاده", "cloud-xmark", "neu"], "config": ["خطای پیکربندی", "wrench", "lav"], "net": ["شبکه شما", "wifi-off", "sand"], "app": ["خطای برنامه", "bug", "slate"]};
+    const md = s0.md || this.props.mode || 'mg';
+    // статус VPN в шапке: виден на всех экранах, кроме Главной
+    const vp = s0.vp || (this.props.vpn === 'off' ? 'off' : 'on');
+    const tbs = { c: 'v-' + vp, t: vp === 'on' ? 'متصل' : (vp === 'ing' ? 'در حال اتصال…' : '‏VPN خاموش است'), m: vp === 'on' ? 'آلمان' : '', mc: vp === 'on' ? '' : 'hide', a: vp === 'off' ? 'اتصال VPN' : 'قطع VPN',
+      go: () => { clearTimeout(this.vt); if (vp === 'off') { this.setState({ vp: 'ing' }); this.vt = setTimeout(() => this.setState({ vp: 'on' }), 1300); } else this.setState({ vp: 'off' }); } };
+
+    const opU = this.props.op === 'unknown' && md === 'mg', full = md === 'mg' && !opU;
+    const key = ck === 'good' ? 'good' : 'issues';
+    const R = RES[key];
+    const open = s0.open || (key === 'issues' ? { net0: true, srv0: true } : {});
+    const acted = s0.acted || {};
+    const mk = (arr, pfx) => arr.map((x, i) => {
+      const id = pfx + i, o = !!open[id], d = VD[x.v], hasD = !!(x.lines.length || x.hops.length || x.paths.length || (x.conf && full));
+      const ps = [0, 1, 2, 3].map((k) => { const q = x.paths[k]; if (!q) return { c: 'hide', n: '', m: '', vc: '', vi: '', vt: '' }; const dv = VD[q.v]; return { c: '', n: q.n, m: q.m, vc: dv[2], vi: dv[1], vt: dv[0] }; });
+      return Object.assign({}, x, { vt: x.alt || d[0], vi: d[1], vc: d[2], hc: x.hops.map((h) => h.c), hpc: x.hops.length ? '' : 'hide', ppc: x.paths.length ? '' : 'hide',
+        p0: ps[0], p1: ps[1], p2: ps[2], p3: ps[3], l0: x.lines[0] || '', l1: x.lines[1] || '', l0c: x.lines[0] ? '' : 'hide', l1c: x.lines[1] ? '' : 'hide',
+        cc: x.conf && (full || x.conf.indexOf('به نظر می‌رسد') === 0) ? '' : 'hide', ddc: (x.lines.length || x.hops.length || x.paths.length || x.conf) ? '' : 'hide',
+        isOpen: o && hasD, oc: (o && hasD ? 'open' : '') + (hasD ? '' : ' nod'), ox: o ? 'true' : 'false', fc: x.hasFlag ? 'flag' : '', ic: x.hasFlag ? '' : 'hide', gc: x.hasFlag ? 'hide' : '',
+        termC: x.term ? '' : 'hide', actC: x.act.length && (md === 'mg' || !x.hasFlag) ? '' : 'hide', actT: x.act[0] || '', actDone: x.act[1] || '', actBtnC: acted[id] ? 'hide' : '', actOkC: acted[id] ? '' : 'hide',
+        actGo: () => this.setState({ acted: Object.assign({}, acted, { [id]: true }) }),
+        tog: () => { if (hasD) this.setState({ open: Object.assign({}, open, { [id]: !o }) }); } });
+    });
+    const STEPS = [["server", "سرورها", "همه راه‌ها به همه سرورها"], ["shield-search", "مسدودسازی در مسیر", "در جستجوی فیلترها میان شما و سرورها"], ["antenna-signal", "پروتکل‌های سریع و بازی‌ها", "‏UDP و نوع NAT"], ["dns", "نشانی سایت‌ها", "آیا پاسخ‌های DNS جایگزین می‌شوند"], ["list", "سایت‌های خارجی", "آیا در این شبکه قطع شده‌اند"]];
+    const step = s0.step !== undefined ? s0.step : (this.props.check === 'run' ? 1 : 0);
+    const DONE = ['2 سرور از 5 سرور کار می‌کنند', 'فیلتر در گام 6 پیدا شد', 'پروتکل‌های سریع مسدود · بازی‌ها محدود', 'جایگزین نمی‌شود', 'باز می‌شوند'];
+    const steps = STEPS.map((x, i) => ({ g: x[0], name: x[1], note: i < step ? DONE[i] : x[2], c: i < step ? 'sdone' : (i === step ? 'snow' : '') }));
+    const LOG = [["14:02:11", "info", "guard", "Germany \u00b7 VLESS \u00b7 TCP is healthy, rtt 38 ms"], ["14:02:09", "info", "guard", "Netherlands \u2192 VLESS \u00b7 TCP (udp_blocked)"], ["14:02:08", "warn", "guard", "Netherlands \u00b7 Hysteria2: no QUIC answer, 3 tries"], ["14:01:58", "info", "detect", "tspuprobe: hop 6 cuts the test address, control ok"], ["14:01:41", "info", "detect", "dns: system and DoH answers match (3/3)"], ["14:01:33", "error", "path", "Romania: download stalled at 64 KiB, idle 6 s"], ["14:01:20", "info", "net", "interface: Wi-Fi \u2192 Mobile hotspot, metered"], ["14:01:19", "info", "core", "network changed, rechecking paths"], ["14:00:02", "info", "sub", "subscription synced, 8 servers, no changes"], ["13:58:52", "info", "guard", "Germany: rtt back to 41 ms"], ["13:58:47", "warn", "guard", "Germany: rtt jump 38 \u2192 210 ms, watching"], ["13:55:10", "info", "core", "connected \u00b7 Germany \u00b7 VLESS \u00b7 TCP"], ["13:55:08", "info", "core", "route found in 1.9 s (3 candidates)"], ["13:55:06", "info", "core", "connect requested by user"]];
+    const lf = s0.lf || 'all';
+    const LV = { info: 'INFO', warn: 'WARN', error: 'ERR' };
+    const logRows = LOG.filter((r) => lf === 'all' || (lf === 'warn' ? r[1] !== 'info' : r[1] === 'error')).map((r) => ({ t: r[0], lv: r[1], lvT: LV[r[1]], src: r[2], msg: r[3] }));
+    const PARTS = [["cpu", "سیستم", "نسخه‌های برنامه، سرویس و ویندوز، تنظیمات"], ["clock", "خط زمانی", "وضعیت‌های اتصال و تغییر مسیرها در 24 ساعت اخیر"], ["activity", "مسیرها", "تأخیر، اتلاف و خطاها برای هر مسیر"], ["shield-search", "بررسی‌ها", "آخرین نتایج عیب‌یابی"], ["network", "شبکه", "رابط‌ها، مسیرها، DNS، وضعیت دیوار آتش"], ["journal-page", "گزارش سرویس", "24 ساعت اخیر، اطلاعات محرمانه حذف شده"]];
+    const poff = s0.poff || {};
+    const parts = PARTS.map((p, i) => ({ g: p[0], name: p[1], sub: p[2], cls: poff[i] ? '' : 'on', on: poff[i] ? 'false' : 'true', flip: () => this.setState({ poff: Object.assign({}, poff, { [i]: !poff[i] }) }) }));
+    const kb = [38, 22, 61, 9, 14, 96];
+    const size = PARTS.reduce((a, p, i) => a + (poff[i] ? 0 : kb[i]), 0);
+    // отчёты о блокировках: выключено, включено и уже отправляли, включено и ещё не отправляли, идёт отправка, панель не принимает
+    const anonK = s0.anonK !== undefined ? s0.anonK : (this.props.anon || 'off');
+    const anon = anonK !== 'off' && anonK !== 'old';
+    const ANON = { off: 'خاموش · چیزی ارسال نمی‌شود. روشن کنید تا به‌صورت ناشناس به «اشتراک من» نشان دهید اینجا چه چیزی مسدود است', on: 'روشن · آخرین گزارش امروز 13:58 ارسال شد.', fresh: 'روشن · هنوز چیزی ارسال نشده.', sending: 'روشن · در حال ارسال گزارش…', old: 'پنل ارائه‌دهنده شما هنوز از این پشتیبانی نمی‌کند' };
+    const dv = {}, dvSet = {};
+    const devOpt = (k, v, on, fn) => { dv[k + '_' + v] = on ? 'on' : ''; dvSet[k + '_' + v] = fn; };
+    ['idle', 'run', 'issues', 'good'].forEach((v) => devOpt('ck', v, ck === v, () => { clearTimeout(this.tk); this.setState({ ck: v, step: v === 'run' ? 1 : 0, open: v === 'issues' ? { net0: true } : {} }); }));
+    ['res', 'log'].forEach((v) => devOpt('tb', v, tab === v, () => this.setState({ tab: v })));
+    ['closed', 'open', 'sent', 'off', 'asked'].forEach((v) => devOpt('rp', v, rep === v, () => this.setState({ rep: v, copied: false })));
+    ['mg', 'basic'].forEach((v) => devOpt('md', v, md === v, () => this.setState({ md: v, rep: 'closed' })));
+    ['dark', 'light'].forEach((v) => devOpt('th', v, theme === v, () => this.setState({ theme: v })));
+    const T = ['res', 'log'], tCls = {}, tOn = {}, tPick = {};
+    T.forEach((k) => { tCls[k] = k === tab ? 'on' : ''; tOn[k] = k === tab ? 'true' : 'false'; tPick[k] = () => this.setState({ tab: k }); });
+    const LF = ['all', 'warn', 'error'], lfCls = {}, lfPick = {};
+    LF.forEach((k) => { lfCls[k] = k === lf ? 'on' : ''; lfPick[k] = () => this.setState({ lf: k }); });
+    const done = ck === 'issues' || ck === 'good';
+    return {
+      dv: dv, dvSet: dvSet, theme: theme, accent: accent, logo: logos[accent],
+      isIdle: ck === 'idle', isRun: ck === 'run', isDone: done,
+      R: R, facts: R.facts.map((f, i) => ({ g: f[0], k: f[1], v: i === 0 && !full ? f[2].split(' · ')[0] + (opU ? ' · اپراتور نامشخص' : '') : f[2], c: f[3] })), srvRows: mk(R.srv, 'srv'), netRows: mk(R.net, 'net'), netCls: key === 'issues' ? 'warn' : 'okc',
+      hasRes: done, noRes: !done, emBtn: 'hide',
+      emT: ck === 'run' ? 'نتایج اینجا نمایش داده می‌شوند' : 'هنوز نتیجه‌ای نیست', emS: ck === 'run' ? 'ابتدا سرورها، سپس مسدودسازی، پروتکل‌های سریع، نشانی‌ها و سایت‌های خارجی' : 'بررسی را از سمت راست شروع کنید — نتیجه هر سرور و شبکه شما اینجا نمایش داده می‌شود',
+      ovTxt: done ? '2 دقیقه پیش بررسی شد' : (ck === 'run' ? 'در حال بررسی…' : 'هنوز بررسی نشده'), rTitle: tab === 'log' ? 'گزارش سرویس' : 'نتایج',
+      steps: steps, runPct: [10, 32, 54, 74, 90][step] + '%', runTime: 'حدود ' + ['2½ دقیقه', '1 دقیقه و 50 ثانیه', '1 دقیقه و 10 ثانیه', '40 ثانیه', '15 ثانیه'][step] + ' مانده · اتصال شما برقرار می‌ماند',
+      start: () => this.start(), cancel: () => { clearTimeout(this.tk); this.setState({ ck: 'idle' }); },
+      isRes: tab === 'res', isLog: tab === 'log', tCls: tCls, tOn: tOn, tPick: tPick,
+      logRows: logRows, lfCls: lfCls, lfPick: lfPick, logN: logRows.length,
+      liveCls: s0.paused ? 'off' : '', liveTxt: s0.paused ? 'متوقف' : 'زنده', toggleLive: () => this.setState({ paused: !s0.paused }),
+      anonCls: anon ? 'on' : '', anonOn: anon ? 'true' : 'false', toggleAnon: () => { if (anonK !== 'old') this.setState({ anonK: anon ? 'off' : 'fresh' }); }, anonBox: anonK === 'old' ? 'dis' : '', anonMore: anon,
+      repShown: rep === 'open' || rep === 'off' || rep === 'sent', repForm: rep === 'open' || rep === 'off', repSent: rep === 'sent',
+      intakeOn: rep === 'open' && md === 'mg', intakeOff: rep === 'off' || md === 'basic', offWarn: rep === 'off' && md === 'mg', asked: rep === 'asked' && md === 'mg',
+      isMg: md === 'mg', showHelp: ck !== 'good' && ck !== 'run' && !(rep === 'asked' && md === 'mg'), bestCls: full ? '' : 'hide',
+      helpTxt: md === 'mg' ? 'ارسال عیب‌یابی برای مدیر اشتراک شما' : 'عیب‌یابی را در فایل ذخیره کنید و برای کسی که کمکتان می‌کند بفرستید',
+      helpBtn: md === 'mg' ? 'درخواست کمک' : 'ذخیره فایل',
+      shTitle: md === 'mg' ? 'از مدیر خود کمک بخواهید' : 'ذخیره عیب‌یابی', shSub: md === 'mg' ? 'عیب‌یابی فقط برای مدیر vpn.example.com ارسال می‌شود' : 'تا وقتی خودتان به اشتراک نگذارید روی همین رایانه می‌ماند',
+      shP: md === 'mg' ? 'مدیر می‌بیند اتصال چطور رفتار کرده تا بتواند کمکتان کند.' : 'انتخاب کنید چه چیزی در فایل باشد. خودتان تصمیم می‌گیرید به چه کسی بدهید.',
+      anonTxt: ANON[anonK] || ANON.off,
+      copyTxt2: s0.sumCopied ? 'کپی شد' : 'کپی خلاصه', sumCls: s0.sumCopied ? 'done' : '', copySum: () => this.setState({ sumCopied: true }),
+      openRep: () => this.setState({ rep: 'open' }), closeRep: () => this.setState({ rep: 'closed' }), sendRep: () => this.setState({ rep: 'sent', copied: false }),
+      tbs: tbs, rdDiag: 'hide', rdSet: 'hide',
+      parts: parts, repSize: 'حدود ' + size + ' KB',
+      copyCls: s0.copied ? 'done' : '', copyTxt: s0.copied ? 'کپی شد' : 'کپی', copy: () => this.setState({ copied: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# pipeline output (input of the page generator) and generator output
+/build/
+/dist/
+node_modules/
+.profile/
+scratch/
