@@ -54,9 +54,9 @@ func (s *source) Name() string     { return "globalping" }
 func (s *source) HourlyLimit() int { return s.limit }
 
 func (s *source) Measure(ctx context.Context, r health.CountryRound) (health.CountryObserved, error) {
-	tctx, done, err := s.svc.track(ctx, s.gen)
-	if err != nil {
-		return health.CountryObserved{}, err
+	tctx, done, ok := s.svc.guard.Track(ctx, s.gen, 0)
+	if !ok {
+		return health.CountryObserved{}, errSwitchedOff
 	}
 	defer done()
 	obs, err := s.measure(tctx, r)
@@ -378,13 +378,11 @@ func (s *Service) ProbeTCP6(ctx context.Context, addr string, port uint16) (answ
 	if !st.Enabled {
 		return 0, 0, ErrDisabled
 	}
-	s.mu.Lock()
-	gen := s.gen
-	s.mu.Unlock()
+	gen := s.guard.Generation()
 	src := &source{svc: s, c: s.client(s.token(st)), poll: s.cfg.PollDelay, gen: gen}
-	tctx, done, err := s.track(ctx, gen)
-	if err != nil {
-		return 0, 0, err
+	tctx, done, ok := s.guard.Track(ctx, gen, 0)
+	if !ok {
+		return 0, 0, errSwitchedOff
 	}
 	defer done()
 	tctx, cancel := context.WithTimeout(tctx, 40*time.Second)

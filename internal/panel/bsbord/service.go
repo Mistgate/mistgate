@@ -86,9 +86,8 @@ type Service struct {
 	log *slog.Logger
 	now func() time.Time
 
+	guard  countryreach.RunGuard
 	mu     sync.Mutex
-	gen    uint64
-	cancel context.CancelFunc
 	tickMu sync.Mutex
 
 	lastTest time.Time
@@ -291,37 +290,6 @@ func (s *Service) observeVersion(version string) {
 	}
 }
 
-func (s *Service) generation() uint64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.gen
-}
-
-func (s *Service) track(ctx context.Context, gen uint64) (context.Context, func(), bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if gen != s.gen {
-		return nil, nil, false
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	s.cancel = cancel
-	return ctx, func() {
-		s.mu.Lock()
-		s.cancel = nil
-		s.mu.Unlock()
-		cancel()
-	}, true
-}
-
-func (s *Service) stop() {
-	s.mu.Lock()
-	s.gen++
-	if cancel := s.cancel; cancel != nil {
-		cancel()
-	}
-	s.mu.Unlock()
-}
-
 // State is the settings-only view of this source for health.Config.External: one batched settings read, no network. It is read on
 // every checks, history and evaluator pass.
 func (s *Service) State(ctx context.Context) health.ExternalState {
@@ -370,7 +338,7 @@ func (s *Service) Tick(ctx context.Context) {
 		return
 	}
 	defer s.tickMu.Unlock()
-	gen := s.generation()
+	gen := s.guard.Generation()
 	st, err := s.load(ctx)
 	if err != nil {
 		s.log.Warn("bsbord: read settings")
@@ -392,7 +360,7 @@ func (s *Service) Tick(ctx context.Context) {
 	if !s.lease(ctx) {
 		return
 	}
-	rctx, done, ok := s.track(ctx, gen)
+	rctx, done, ok := s.guard.Track(ctx, gen, 0)
 	if !ok {
 		return
 	}
@@ -425,7 +393,7 @@ func (s *Service) startRound(ctx context.Context, st settings, secret vault.Reda
 		return
 	}
 	if len(calls) == 0 {
-		if s.generation() != gen {
+		if !s.guard.Current(gen) {
 			return
 		}
 		rows := skippedRows(skippedNodes, skipped, now)
@@ -447,7 +415,7 @@ func (s *Service) startRound(ctx context.Context, st settings, secret vault.Reda
 		s.log.Warn("bsbord: create request key")
 		return
 	}
-	if s.generation() != gen {
+	if !s.guard.Current(gen) {
 		return
 	}
 	p := &pending{Key: key, Body: calls[0].Body, Targets: calls[0].Targets, At: now.Unix(), RoundAt: now.Unix(),
@@ -459,7 +427,7 @@ func (s *Service) startRound(ctx context.Context, st settings, secret vault.Reda
 
 func (s *Service) runPending(ctx context.Context, st settings, secret vault.Redacted, gen uint64, now time.Time, currentKey string) {
 	p := st.Pending
-	if p == nil || s.generation() != gen {
+	if p == nil || !s.guard.Current(gen) {
 		return
 	}
 	c := s.client(secret)
@@ -467,7 +435,7 @@ func (s *Service) runPending(ctx context.Context, st settings, secret vault.Reda
 	if !p.Sent {
 		preview, _, err := c.preview(ctx, p.Body)
 		if err != nil {
-			if s.generation() != gen {
+			if !s.guard.Current(gen) {
 				return
 			}
 			s.handleFailure(ctx, st, err, now, false, currentKey)
@@ -505,7 +473,7 @@ func (s *Service) runPending(ctx context.Context, st settings, secret vault.Reda
 		case <-timer.C:
 		}
 	}
-	if s.generation() != gen {
+	if !s.guard.Current(gen) {
 		return
 	}
 	if !s.tickCurrent(ctx, currentKey) {
@@ -522,14 +490,14 @@ func (s *Service) runPending(ctx context.Context, st settings, secret vault.Reda
 		s.log.Warn("bsbord: save request state", "err", err)
 		return
 	}
-	if s.generation() != gen {
+	if !s.guard.Current(gen) {
 		return
 	}
 	if !s.tickCurrent(ctx, p.Key) {
 		return
 	}
 	result, _, err := c.probe(ctx, p.Body, p.Key)
-	if s.generation() != gen {
+	if !s.guard.Current(gen) {
 		return
 	}
 	if err != nil {
@@ -1039,7 +1007,7 @@ func (r rpc) UpdateBsbord(ctx context.Context, req *connect.Request[adminv1.Upda
 	turningOff := m.Enabled != nil && !*m.Enabled
 	cancelPending := st.Pending != nil && (turningOff || keyChanged || unitsChanged)
 	if turningOff || cancelPending {
-		s.stop()
+		s.guard.Stop()
 	}
 	if cancelPending {
 		if st.Pending.Sent && st.Pending.Reserve > 0 {
@@ -1130,7 +1098,7 @@ func (r rpc) DisconnectBsbord(ctx context.Context, _ *connect.Request[adminv1.Di
 		return nil, err
 	}
 	old := st
-	s.stop()
+	s.guard.Stop()
 	if st.Pending != nil && st.Pending.Sent && st.Pending.Reserve > 0 {
 		st.Spend = addSpend(st.Spend, st.Pending.Reserve, s.now())
 	}

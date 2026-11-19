@@ -20,7 +20,7 @@ const nowWaitSlot = 3 * time.Minute
 // health.CountryNowSource) or returns the check, which waits for the spacing of the site's calls, then stores the result like a
 // scheduled one. The hold after a rate limit or repeated failures is kept: no call goes to the site during it.
 func (s *Service) NowPlan(ctx context.Context, nodeID, source string) (run func(context.Context) (string, string), skip string) {
-	gen := s.generation()
+	gen := s.guard.Generation()
 	st, err := s.load(ctx)
 	if err != nil {
 		s.log.Warn("cheburcheck: read settings", "code", "cheburcheck_read_settings_failed", "err", err)

@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/mistgate/mistgate/internal/panel/access"
+	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -508,31 +509,25 @@ func countryPartialReason(l L, p map[string]string) string {
 	return countrySeenBy(l, p, line)
 }
 
+// countrySourceNames is how the alert names each source that can raise it: English, Russian, Chinese. A source of
+// countryreach.Sources that raises an alert and is missing here is left out of "Seen by" (a test holds the two together).
+var countrySourceNames = map[string][3]string{
+	countryreach.SourceGlobalping:     {"Globalping", "Globalping", "Globalping"},
+	countryreach.SourceTSPU:           {"the TSPU probe on your node", "зонд ТСПУ на вашей ноде", "您节点上的 TSPU 探测"},
+	countryreach.SourceCheburcheck:    {"cheburcheck", "cheburcheck", "cheburcheck"},
+	countryreach.SourceCheburcheckOwn: {"your cheburcheck probe", "ваш зонд cheburcheck", "您的 cheburcheck 探测点"},
+	countryreach.SourceBsbord:         {"bsbord", "bsbord", "bsbord"},
+	countryreach.SourceBsbordTunnel:   {"bsbord tunnel checks", "проверки туннелей bsbord", "bsbord 隧道检查"},
+	countryreach.SourceBsbordGeo:      {"bsbord GEO", "bsbord GEO", "bsbord GEO"},
+	countryreach.SourceProbes:         {"your own probes", "ваши зонды", "您自己的探测点"},
+}
+
 func countrySeenBy(l L, p map[string]string, line string) string {
 	sources := strings.Split(p["sources"], ",")
-	has := func(name string) bool { return slices.Contains(sources, name) }
 	var seen []string
-	if has("globalping") {
-		seen = append(seen, l.pick("Globalping", "Globalping", "Globalping"))
-	}
-	if has("tspu") {
-		seen = append(seen, l.pick("the TSPU probe on your node", "зонд ТСПУ на вашей ноде", "您节点上的 TSPU 探测"))
-	}
-	for _, source := range []string{"cheburcheck", "cheburcheck_own", "bsbord", "bsbord_tunnel", "bsbord_geo"} {
-		if !has(source) {
-			continue
-		}
-		switch source {
-		case "cheburcheck":
-			seen = append(seen, l.pick("cheburcheck", "cheburcheck", "cheburcheck"))
-		case "cheburcheck_own":
-			seen = append(seen, l.pick("your cheburcheck probe", "ваш зонд cheburcheck", "您的 cheburcheck 探测点"))
-		case "bsbord":
-			seen = append(seen, l.pick("bsbord", "bsbord", "bsbord"))
-		case "bsbord_tunnel":
-			seen = append(seen, l.pick("bsbord tunnel checks", "проверки туннелей bsbord", "bsbord 隧道检查"))
-		case "bsbord_geo":
-			seen = append(seen, l.pick("bsbord GEO", "bsbord GEO", "bsbord GEO"))
+	for _, src := range countryreach.Sources {
+		if names, ok := countrySourceNames[src.ID]; ok && slices.Contains(sources, src.ID) {
+			seen = append(seen, l.pick(names[0], names[1], names[2]))
 		}
 	}
 	if len(seen) == 0 {

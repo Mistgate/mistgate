@@ -984,8 +984,8 @@ func TestStoreResultRejectsStaleGeneration(t *testing.T) {
 	id := e.addNode("de1", "203.0.113.10")
 	changes := 0
 	e.svc.cfg.OnChange = func(context.Context) { changes++ }
-	gen := e.svc.generation()
-	e.svc.stop()
+	gen := e.svc.guard.Generation()
+	e.svc.guard.Stop()
 	stored, err := e.svc.storeResult(context.Background(), gen, settings{}, store.ExtCheck{
 		NodeID: id, Source: SourcePublic, At: e.time(), Verdict: countryreach.VerdictUnknown, DetailJSON: `{"reason":"error"}`,
 	}, false)

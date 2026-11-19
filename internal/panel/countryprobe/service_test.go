@@ -351,7 +351,7 @@ func TestUpdateValidatesTheSettings(t *testing.T) {
 func TestRunWithSettingsReadBeforeDisableIsRejected(t *testing.T) {
 	e := newEnv(t)
 	e.enable()
-	gen := e.svc.generation()
+	gen := e.svc.guard.Generation()
 	st, err := e.svc.load(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -851,7 +851,7 @@ func TestRunsRotateBatchStartWhenBudgetFitsOneBatch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := e.svc.execute(context.Background(), e.svc.generation(), st, probe, nodes, false); err != nil {
+		if _, err := e.svc.execute(context.Background(), e.svc.guard.Generation(), st, probe, nodes, false); err != nil {
 			t.Fatal(err)
 		}
 	}

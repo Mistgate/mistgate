@@ -72,10 +72,8 @@ type Service struct {
 	// the downloaded lists, in memory only
 	ipsum, community, cdn *list
 
+	guard    countryreach.RunGuard // a check that started before the integration was switched off or disconnected stores nothing
 	mu       sync.Mutex
-	gen      uint64 // bumped when the integration is switched off or disconnected; a check of an older one stores nothing
-	inflight map[uint64]context.CancelFunc
-	next     uint64
 	lastTest time.Time
 }
 
@@ -94,7 +92,7 @@ func New(cfg Config) (*Service, error) {
 		cfg.Now = time.Now
 	}
 	cfg.URLs = cfg.URLs.withDefaults()
-	s := &Service{cfg: cfg, log: cfg.Log, now: cfg.Now, inflight: map[uint64]context.CancelFunc{}}
+	s := &Service{cfg: cfg, log: cfg.Log, now: cfg.Now}
 	s.reset()
 	return s, nil
 }
@@ -156,35 +154,9 @@ func (s *Service) Active(ctx context.Context) bool {
 
 var errSwitchedOff = errors.New("blocklist: switched off")
 
-// track registers a check in flight so that switching the source off can cancel it; gen is the generation to store under.
-func (s *Service) track(ctx context.Context) (context.Context, uint64, func()) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ctx, cancel := context.WithCancel(ctx)
-	id := s.next
-	s.next++
-	s.inflight[id] = cancel
-	return ctx, s.gen, func() {
-		s.mu.Lock()
-		delete(s.inflight, id)
-		s.mu.Unlock()
-		cancel()
-	}
-}
-
-// stop cancels every check in flight and keeps a check that started earlier from storing anything.
-func (s *Service) stop() {
-	s.mu.Lock()
-	s.gen++
-	for _, cancel := range s.inflight {
-		cancel()
-	}
-	s.mu.Unlock()
-}
-
 // forget stops everything and drops the downloaded lists (Disconnect): it waits for a cancelled check to end.
 func (s *Service) forget() {
-	s.stop()
+	s.guard.Stop()
 	s.runMu.Lock()
 	s.reset()
 	s.runMu.Unlock()
@@ -261,7 +233,11 @@ type result struct {
 
 // check refreshes the lists, looks every active node's address up and stores the rows. runMu must be held.
 func (s *Service) check(ctx context.Context, force bool) (result, error) {
-	ctx, gen, done := s.track(ctx)
+	gen := s.guard.Generation()
+	ctx, done, ok := s.guard.Track(ctx, gen, 0)
+	if !ok {
+		return result{}, errSwitchedOff
+	}
 	defer done()
 	nodes, err := s.activeNodes(ctx)
 	if err != nil {
@@ -294,12 +270,11 @@ func (s *Service) check(ctx context.Context, force bool) (result, error) {
 		return result{}, err
 	}
 	res.nodesChecked = len(rows)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if gen != s.gen {
+	var storeErr error
+	if !s.guard.Do(gen, func() { storeErr = s.cfg.Store.InsertBlocklistChecks(ctx, rows) }) {
 		return result{}, errSwitchedOff
 	}
-	return res, s.cfg.Store.InsertBlocklistChecks(ctx, rows)
+	return res, storeErr
 }
 
 // due says whether a node has no result yet or its newest one is older than the refresh period.
@@ -429,7 +404,7 @@ func (r rpc) UpdateBlocklist(ctx context.Context, req *connect.Request[adminv1.U
 			return nil, errInternal
 		}
 		if !*e {
-			s.stop()
+			s.guard.Stop()
 			s.release()
 		}
 	}
@@ -450,7 +425,7 @@ func (r rpc) DisconnectBlocklist(ctx context.Context, _ *connect.Request[adminv1
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
-	s.stop() // first: nothing new may be stored while the settings change
+	s.guard.Stop() // first: nothing new may be stored while the settings change
 	if err := s.cfg.Store.SetSettings(ctx, map[string]string{settingEnabled: "0", settingRetryAt: ""}); err != nil {
 		s.log.Error("blocklist: disconnect", "err", err)
 		return nil, errInternal

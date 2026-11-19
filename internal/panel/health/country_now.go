@@ -31,13 +31,8 @@ const (
 	countryNowSetting = "health.country_now"
 	countryNowBound   = 6 * time.Minute // the background work of a round ends by then; a round that runs longer is a lost one
 	countryNowKeep    = 7 * 24 * time.Hour
-	sourceKlick       = "klick"
 	nowLimitsWait     = 10 * time.Second
 )
-
-// countryNowOrder is the order of CountryNow.sources.
-var countryNowOrder = []string{countryreach.SourceGlobalping, countryreach.SourceTSPU, countryreach.SourceCheburcheck, countryreach.SourceCheburcheckOwn,
-	countryreach.SourceProbes, countryreach.SourceBsbord, countryreach.SourceLists, sourceKlick}
 
 // CountryBudget is what a country source that counts its tests can say about the window of its limit.
 type CountryBudget interface {
@@ -97,8 +92,8 @@ func (s *Service) RunCountryNow(ctx context.Context, nodeID string) *adminv1.Cou
 			v := s.nowView(nodeID, rec, now)
 			v.RetryAfterS = uint32((next.Sub(now) + time.Second - 1) / time.Second)
 			v.Sources = nil
-			for _, id := range countryNowOrder {
-				v.Sources = append(v.Sources, &adminv1.CountryNowSource{Source: id, State: "skipped", Reason: "too_early"})
+			for _, src := range countryreach.NowSources() {
+				v.Sources = append(v.Sources, &adminv1.CountryNowSource{Source: src.ID, State: "skipped", Reason: "too_early"})
 			}
 			return v
 		}
@@ -117,37 +112,40 @@ func (s *Service) RunCountryNow(ctx context.Context, nodeID string) *adminv1.Cou
 		}
 	}
 	next := nowRecord{At: now.Unix(), Asked: now.Unix()}
-	run, skip, left, cost := s.nowGlobalping(ctx, nodeID, now)
-	take(countryreach.SourceGlobalping, run, skip)
-	if left >= 0 {
-		next.Left, next.Read, next.Cost = left, now.Unix(), cost
-	}
-	for _, id := range []string{countryreach.SourceTSPU, countryreach.SourceCheburcheck, countryreach.SourceCheburcheckOwn, countryreach.SourceProbes} {
-		i := slices.IndexFunc(s.cfg.CountryNow, func(c CountryNowSource) bool { return c.Source == id })
-		if i < 0 || s.cfg.CountryNow[i].Plan == nil {
-			take(id, nil, "off")
-			continue
-		}
-		run, skip := s.cfg.CountryNow[i].Plan(ctx, nodeID)
-		take(id, run, skip)
-	}
-	bsbord := "off"
-	if s.cfg.External != nil {
-		for _, st := range s.cfg.External(ctx) {
-			if st.Source == countryreach.SourceBsbord && st.On {
-				bsbord = "schedule_only"
+	for _, src := range countryreach.NowSources() {
+		switch src.Now {
+		case countryreach.NowRound:
+			run, skip, left, cost := s.nowGlobalping(ctx, nodeID, now)
+			take(src.ID, run, skip)
+			if left >= 0 {
+				next.Left, next.Read, next.Cost = left, now.Unix(), cost
 			}
+		case countryreach.NowPlan:
+			i := slices.IndexFunc(s.cfg.CountryNow, func(c CountryNowSource) bool { return c.Source == src.ID })
+			if i < 0 || s.cfg.CountryNow[i].Plan == nil {
+				take(src.ID, nil, "off")
+				break
+			}
+			run, skip := s.cfg.CountryNow[i].Plan(ctx, nodeID)
+			take(src.ID, run, skip)
+		case countryreach.NowSchedule:
+			state := "off"
+			if s.cfg.External != nil {
+				for _, st := range s.cfg.External(ctx) {
+					if st.Source == src.ID && st.On {
+						state = "schedule_only"
+					}
+				}
+			}
+			take(src.ID, nil, state)
+		case countryreach.NowReread:
+			if src.ID == countryreach.SourceLists && (s.cfg.Lists == nil || !s.cfg.Lists(ctx)) {
+				take(src.ID, nil, "off")
+				break
+			}
+			take(src.ID, nil, "reread")
 		}
-	}
-	take(countryreach.SourceBsbord, nil, bsbord)
-	if s.cfg.Lists != nil && s.cfg.Lists(ctx) {
-		take(countryreach.SourceLists, nil, "reread")
-	} else {
-		take(countryreach.SourceLists, nil, "off")
-	}
-	take(sourceKlick, nil, "reread")
-	for _, id := range countryNowOrder {
-		next.Sources = append(next.Sources, entries[id])
+		next.Sources = append(next.Sources, entries[src.ID])
 	}
 
 	s.nowMu.Lock()
