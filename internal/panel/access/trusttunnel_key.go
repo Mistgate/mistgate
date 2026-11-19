@@ -34,12 +34,11 @@ func (s *Service) newTrustTunnelCred(userID, deviceID string) (store.AccessCred,
 	if err != nil {
 		return store.AccessCred{}, err
 	}
-	issued, err := p.IssueCredential(protocols.IssueInput{UserID: userID, DeviceID: deviceID})
+	cred, err := s.newCred(p, userID, deviceID)
 	if err != nil {
 		return store.AccessCred{}, s.internal("issue TrustTunnel key", err)
 	}
-	id := store.NewID("crd_")
-	return store.AccessCred{ID: id, Protocol: p.ID(), SecretEnc: s.vault.Seal([]byte(issued.Secret), id), DataJSON: string(issued.NodeData)}, nil
+	return cred, nil
 }
 
 func trustTunnelKeyDevice(userID, deviceID string) store.AccessDevice {
@@ -100,19 +99,6 @@ func (s *Service) revokeTrustTunnelKey(ctx context.Context, by, userID string) e
 		s.audit(ctx, by, "trusttunnel_key_revoke", map[string]any{"user": userID})
 	}
 	return nil
-}
-
-// rollbackTrustTunnelKey removes a key issued immediately before an update when that update did not persist the app switch.
-// Recheck the stored switch first: a concurrent update may already have made use of the same key.
-func (s *Service) rollbackTrustTunnelKey(ctx context.Context, by, userID string, made bool) {
-	if !made {
-		return
-	}
-	current, err := s.st.Access().User(ctx, userID)
-	if err == nil && current.AppTrustTunnel {
-		return
-	}
-	_ = s.revokeTrustTunnelKey(ctx, by, userID)
 }
 
 func (s *Service) trustTunnelKeyLinks(ctx context.Context, u store.AccessUser) (TrustTunnelKeyLinks, error) {

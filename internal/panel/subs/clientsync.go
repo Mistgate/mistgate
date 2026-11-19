@@ -517,7 +517,7 @@ func dnsEndpoints(endpoints []dns.Endpoint) []clientDNSEndpoint {
 // viaOf is how a path reaches its server, "relay" or "direct" (WARP is the caller's to add: a Telegram link has none), and for a
 // relay the country of its entry node ("" when it has none, which leaves the field out).
 func viaOf(server access.SubServer) (via, country string) {
-	if !strings.HasPrefix(server.PathKey, "relay:") {
+	if !store.IsRelayPath(server.PathKey) {
 		return "direct", ""
 	}
 	country, _ = strings.CutPrefix(server.Mark, access.MarkVia)
@@ -536,7 +536,7 @@ func clientTelegramOf(v access.SubView) []clientSyncTelegram {
 		}
 		via, viaCountry := viaOf(server)
 		out = append(out, clientSyncTelegram{ServerID: clientOpaqueID("srv", server.NodeID), Country: strings.ToUpper(server.CountryCode),
-			City: server.Location, Via: via, ViaCountry: viaCountry, IPv6: server.PathKey == "ipv6", Link: server.URI})
+			City: server.Location, Via: via, ViaCountry: viaCountry, IPv6: server.PathKey == store.PathIPv6, Link: server.URI})
 	}
 	return out
 }
@@ -561,7 +561,7 @@ func clientServersOf(servers []access.SubServer) []clientSyncServer {
 				City: server.Location, Label: strings.TrimSpace(server.PublicLabel), Paths: []clientSyncPath{}})
 			loads = append(loads, -1)
 		}
-		relay := strings.HasPrefix(server.PathKey, "relay:")
+		relay := store.IsRelayPath(server.PathKey)
 		if !relay && server.LoadPercent != nil && *server.LoadPercent > loads[idx] { // the load of the exit node itself, not of a relay's
 			loads[idx] = *server.LoadPercent
 		}
@@ -570,7 +570,7 @@ func clientServersOf(servers []access.SubServer) []clientSyncServer {
 			via = "warp"
 		}
 		out[idx].Paths = append(out[idx].Paths, clientSyncPath{ID: clientOpaqueID("pth", server.NodeID, server.InboundID, server.ProfileID, server.PathKey),
-			Protocol: server.Protocol, Label: clean(server.Profile), Via: via, ViaCountry: viaCountry, IPv6: server.PathKey == "ipv6", IPv6Egress: server.IPv6Egress, Settings: settings})
+			Protocol: server.Protocol, Label: clean(server.Profile), Via: via, ViaCountry: viaCountry, IPv6: server.PathKey == store.PathIPv6, IPv6Egress: server.IPv6Egress, Settings: settings})
 	}
 	for i, load := range loads {
 		if load >= 0 {

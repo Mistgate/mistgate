@@ -418,3 +418,61 @@ func TestTrustTunnelKeyFollowsThePersonOnTheNodes(t *testing.T) {
 		t.Fatalf("credentials on the node of a deleted person = %d, want 0", got)
 	}
 }
+
+// The node's IPv6 entry is served by TrustTunnel as by any other protocol (the engine listens on the wildcard address, TCP and the
+// UDP port of HTTP/3 alike), so the links of the official app hold the IPv6 twin next to the server, then the twins through the
+// relays, and a node without the entry has none.
+func TestTrustTunnelKeyLinksHaveTheIPv6TwinBeforeTheRelayTwins(t *testing.T) {
+	r := newTrustTunnelKeyRig(t, 5, "acme_domain")
+	e := r.e
+	e.node("nod_nl1", "nl1", "192.0.2.22", "active")
+	e.sql(`UPDATE node SET agent_caps = 'relay-forward/1', country_code = 'NL' WHERE id = 'nod_nl1'`)
+	var inboundID string
+	if err := e.st.R.QueryRowContext(e.ctx, `SELECT id FROM inbound WHERE profile_id = ? AND node_id = ?`, r.ttID, r.nodeID).Scan(&inboundID); err != nil {
+		t.Fatal(err)
+	}
+	relay := must(e.s.CreateRelay(e.ctx, req(&adminv1.CreateRelayRequest{InboundId: inboundID, ViaNodeId: "nod_nl1", Port: 8443}))).Msg.Relay
+	e.sql(`UPDATE relay SET enabled = 1, state = 'active' WHERE id = ?`, relay.Id)
+	check := store.RelayCheck{At: e.clock.Unix(), Leg: store.RelayStage{Status: "ok"}, Path: store.RelayStage{Status: "ok"}}
+	check.Settle()
+	if err := e.st.SetRelayCheck(e.ctx, relay.Id, check); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.s.issueTrustTunnelKey(e.ctx, "admin", r.user()); err != nil {
+		t.Fatal(err)
+	}
+	pathsOf := func() (keys, marks []string) {
+		links, err := e.s.trustTunnelKeyLinks(e.ctx, r.user())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, l := range links.Links {
+			keys, marks = append(keys, l.PathKey), append(marks, l.Mark)
+		}
+		return keys, marks
+	}
+	if keys, _ := pathsOf(); strings.Join(keys, " ") != "direct relay:nod_nl1" {
+		t.Fatalf("paths without the entry = %v", keys)
+	}
+
+	e.sql(`UPDATE node SET ipv6_entry = ? WHERE id = ?`, "2001:db8::5", r.nodeID)
+	keys, marks := pathsOf()
+	if strings.Join(keys, " ") != "direct ipv6 relay:nod_nl1" || marks[0] != "" || marks[1] != MarkIPv6 || !strings.HasPrefix(marks[2], MarkVia) {
+		t.Fatalf("paths with the entry = %v, marks %v; want the server, its IPv6 twin, the relay twin", keys, marks)
+	}
+	links := must(e.s.trustTunnelKeyLinks(e.ctx, r.user())).Links
+	direct, err := ttwire.DecodeDeepLink(links[0].URI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	twin, err := ttwire.DecodeDeepLink(links[1].URI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The same person, the same certificate name and port; only the address and the name of the server differ.
+	if len(twin.Addresses) != 1 || twin.Addresses[0] != "[2001:db8::5]:443" || direct.Addresses[0] != "de1.example.com:443" ||
+		twin.Hostname != direct.Hostname || twin.Username != direct.Username || twin.Password != direct.Password || twin.HasIPv6 != direct.HasIPv6 ||
+		!strings.HasSuffix(twin.Name, " · IPv6") || strings.HasSuffix(direct.Name, " · IPv6") {
+		t.Fatalf("direct %+v, IPv6 twin %+v", direct, twin)
+	}
+}
