@@ -74,6 +74,7 @@ const textKeys: Record<string, MessageKey> = {
   awg_kernel_switched: "event.awg_kernel_switched",
   bandwidth_measured: "event.bandwidth_measured",
   bandwidth_upload_missing: "event.bandwidth_upload_missing",
+  front_overloaded: "event.front_overloaded",
   port_lossy: "event.port_lossy",
   path_lossy: "event.path_lossy",
   panel_path_lossy: "event.panel_path_lossy",

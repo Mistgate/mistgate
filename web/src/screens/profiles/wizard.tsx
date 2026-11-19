@@ -251,7 +251,7 @@ function Wizard({ protocols, demo }: { protocols: ProtocolInfo[]; demo?: WizardD
     const kind = hint?.verdict === "ok" ? "ok" : hint?.verdict === "partial" ? "part" : hint?.verdict === "blocked" || hint?.verdict === "listed" ? "bad" : "none";
     const label = nin.entry ? (kind === "ok" ? t("wiz.reach.seen") : kind === "part" && hint?.dark.length ? t("wiz.reach.dark", { nets: hint.dark.join(", ") }) : kind === "bad" ? t("wiz.reach.closed") : t("wiz.reach.none")) : kind === "none" ? t("wiz.reach.none") : t("wiz.reach.direct");
     const on = !need && (picked[n.id] ?? row.on);
-    return { id: n.id, name: n.name, countryCode: n.countryCode, linked: nin.linked, entry: nin.entry, reach: { kind, label }, row: { ...row, need }, on, fix, awg: nin.firstAwg ? { mode: asMode(n.awgBackend), auto: !!n.awgPrepare?.supported } : undefined, alt: altKind };
+    return { id: n.id, name: n.name, countryCode: n.countryCode, linked: nin.linked, entry: nin.entry, reach: { kind, label }, row: { ...row, need }, on, fix, awg: nin.firstAwg ? { mode: asMode(n.awgBackend), auto: !!n.awgPrepare?.supported } : undefined, address: n.address, alt: altKind };
   });
   // "?node=": the node the profile is made for is the only one ticked at first
   const defaultOn = (v: NodeVM) => (fromNode ? v.id === fromNode && !v.row.need : v.row.on);

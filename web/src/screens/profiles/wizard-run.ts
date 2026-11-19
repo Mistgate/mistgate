@@ -11,7 +11,7 @@ import { InboundState } from "@/gen/mistgate/admin/v1/common_pb";
 import { PrepareAwgOutcome } from "@/gen/mistgate/admin/v1/node_pb";
 import { groups as groupsApi, nodes as nodesApi, profiles } from "@/lib/api";
 import { errorText } from "@/lib/errors";
-import { inboundErrorKind, inboundErrorText } from "@/lib/inbound-error";
+import { inboundErrorKind, inboundErrorText, nameFixes } from "@/lib/inbound-error";
 import { portNotes } from "@/lib/port-check";
 import { asMode } from "@/screens/node/awg-backend";
 import { fieldErrors } from "@/screens/users/rpc";
@@ -126,7 +126,7 @@ export function useRun(onCreated: (profileId: string) => void) {
     } catch (e) {
       const ref: Refusal = refusalOf(e, t, n, protocol);
       if (ref.kind === "already") return row(n.id, { phase: "ok", text: t("wiz.run.ok") });
-      row(n.id, { phase: "bad", text: ref.text, mend: ref.kind === "port" ? "port" : ref.kind === "domain" ? "domain" : "", free: ref.kind === "port" ? ref.free : undefined, lossy: ref.kind === "port" ? ref.lossy : undefined, fix: ref.kind === "port" && ref.free ? { ...fix, port: ref.free } : fix });
+      row(n.id, { phase: "bad", text: ref.text, mend: ref.kind === "port" ? "port" : ref.kind === "domain" || ref.kind === "share" ? "domain" : "", free: ref.kind === "port" ? ref.free : undefined, lossy: ref.kind === "port" ? ref.lossy : undefined, fix: ref.kind === "port" && ref.free ? { ...fix, port: ref.free } : fix });
     }
   }
 
@@ -139,7 +139,7 @@ export function useRun(onCreated: (profileId: string) => void) {
       if (i?.state === InboundState.ACTIVE) row(n.id, { phase: "ok", text: t("wiz.run.ok") });
       else if (i?.state === InboundState.FAILED) {
         const kind = i.lastError ? inboundErrorKind(i.lastError) : "other";
-        row(n.id, { phase: "bad", inboundId: i.id, text: t("wiz.run.failed", { why: inboundErrorText(t, i.lastError, { port: i.port, protocol }) }), mend: kind === "port" ? "port" : kind === "cert" ? "domain" : "" });
+        row(n.id, { phase: "bad", inboundId: i.id, text: t("wiz.run.failed", { why: inboundErrorText(t, i.lastError, { port: i.port, protocol }) }), mend: kind === "port" ? "port" : nameFixes(kind) ? "domain" : "" });
       } else if (Date.now() - n.since > PATIENCE_MS) row(n.id, { phase: "off", text: t("wiz.run.slow") });
     }
     return live.current.nodes.some((n) => n.phase === "apply");
@@ -200,7 +200,7 @@ export function useRun(onCreated: (profileId: string) => void) {
         row(nodeId, { phase: "apply", text: "" });
       } catch (e) {
         const ref = refusalOf(e, t, inp.nodes.find((x) => x.id === nodeId) ?? { name: n.name, address: "" }, inp.protocol);
-        row(nodeId, { phase: "bad", text: ref.text, mend: ref.kind === "port" ? "port" : ref.kind === "domain" ? "domain" : "" });
+        row(nodeId, { phase: "bad", text: ref.text, mend: ref.kind === "port" ? "port" : ref.kind === "domain" || ref.kind === "share" ? "domain" : "" });
       }
     } else {
       const target = inp.nodes.find((x) => x.id === nodeId);

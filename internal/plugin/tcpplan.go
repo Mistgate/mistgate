@@ -240,6 +240,10 @@ func TCPShareProblems(specs []InboundSpec, port uint16) []TCPShareProblem {
 	return out
 }
 
+// TCPRouteOf is the route a TCP inbound offers a shared port: the names it answers to and whether it serves the node's own site.
+// ok is false when it has no name to be told apart by (or is no inbound a port can be shared with).
+func TCPRouteOf(s InboundSpec) (TCPRoute, bool) { return tcpRoute(s) }
+
 // tcpRoute is what a TCP inbound offers a shared port, from its spec; ok is false when it has no name to be told apart by.
 func tcpRoute(s InboundSpec) (r TCPRoute, ok bool) {
 	r = TCPRoute{ID: s.ID, Protocol: s.Protocol, Site: tcpOwnSite(s)}

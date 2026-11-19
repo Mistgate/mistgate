@@ -1,6 +1,7 @@
 package access
 
 import (
+	"net/url"
 	"strings"
 	"testing"
 
@@ -17,6 +18,13 @@ import (
 type shareFix struct {
 	*env
 	node string
+}
+
+// errorParam is one value of a coded refusal ("sni_taken: name=...&share=1").
+func errorParam(err error, key string) string {
+	_, query, _ := strings.Cut(strings.TrimPrefix(err.Error(), connect.CodeOf(err).String()+": "), ": ")
+	v, _ := url.ParseQuery(query)
+	return v.Get(key)
 }
 
 func newShareFix(t *testing.T, caps string) *shareFix {
@@ -100,9 +108,37 @@ func TestShareTCPPort(t *testing.T) {
 		f.mustAdd(f.profileOf("vless", "reality", reality443), "")
 		// MTProto's own name is the node's address too: the name REALITY's site has
 		_, err := f.add(f.profileOf("mtproto", "telegram", mtDecoy), "")
-		wantCoded(t, err, connect.CodeAlreadyExists, "sni_taken", map[string]string{"port": "443", "node": "de1", "name": "de1.example.com", "profile": "reality", "free": "8443"})
+		wantCoded(t, err, connect.CodeAlreadyExists, "sni_taken", map[string]string{"port": "443", "node": "de1", "name": "de1.example.com", "profile": "reality", "free": "8443", "share": "1", "suggest": "cdn.de1.example.com"})
 		if n := f.count(`SELECT count(*) FROM inbound`); n != 1 {
 			t.Fatalf("a refused inbound was written: %d", n)
+		}
+	})
+
+	t.Run("the name suggested is not one a service of the port answers to, and a node known by an address has none", func(t *testing.T) {
+		f := newShareFix(t, shareCaps)
+		f.mustAdd(f.profileOf("vless", "reality", reality443), "")
+		f.mustAdd(f.profileOf("trusttunnel", "tt", ttOn443Name), "cdn.de1.example.com")
+		_, err := f.add(f.profileOf("mtproto", "telegram", mtDecoy), "")
+		wantCoded(t, err, connect.CodeAlreadyExists, "sni_taken", map[string]string{"name": "de1.example.com", "share": "1", "suggest": "static.de1.example.com"})
+
+		ip := newShareFix(t, shareCaps)
+		ip.sql(`UPDATE node SET address = '203.0.113.7' WHERE id = 'nod_de1'`)
+		ip.mustAdd(ip.profileOf("trusttunnel", "tt", ttOn443Name), "")
+		_, err = ip.add(ip.profileOf("mtproto", "telegram", mtDecoy), "tt.example.com")
+		wantCoded(t, err, connect.CodeAlreadyExists, "sni_taken", map[string]string{"share": "1"})
+		if got := errorParam(err, "suggest"); got != "" {
+			t.Fatalf("a node known by an IP address has no name to suggest: %q", got)
+		}
+	})
+
+	t.Run("a service whose name is not the admin's to set is not offered a new one", func(t *testing.T) {
+		f := newShareFix(t, shareCaps)
+		f.mustAdd(f.profileOf("mtproto", "telegram", mtSite), "")
+		// REALITY of another site answers to the target's name, which the name on the node does not change
+		_, err := f.add(f.profileOf("vless", "other", `{"port":443,"reality":{"target":"www.example.net:443"}}`), "")
+		wantCoded(t, err, connect.CodeAlreadyExists, "sni_taken", map[string]string{"name": "www.example.net", "profile": "telegram"})
+		if got := errorParam(err, "share"); got != "" {
+			t.Fatalf("share = %q", got)
 		}
 	})
 

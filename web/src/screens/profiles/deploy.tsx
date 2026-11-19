@@ -1,7 +1,8 @@
 import { ConnectError } from "@connectrpc/connect";
 import { codedError } from "@/lib/coded-error";
-import { errorCode, errorVars } from "@/lib/errors";
+import { errorCode, errorVars, shareRefusalText } from "@/lib/errors";
 import { lossyVars } from "@/lib/port-check";
+import { isShareCode, shareFreePort, shareOffer, type ShareCode, type ShareOffer } from "@/lib/tcpshare";
 import type { Tx } from "@/screens/users/t";
 
 // Why a node refused a profile (CreateInbound's coded errors), sorted by what the window that asked can offer.
@@ -10,6 +11,8 @@ import type { Tx } from "@/screens/users/t";
 export type Refusal =
   | { kind: "port"; text: string; free?: string; /** port_lossy: the port that loses packets, which "put on anyway" keeps */ lossy?: string }
   | { kind: "domain"; text: string }
+  /** A TCP port the node shares by name (sni_taken, share_needs_site, share_unsupported, share_agent_old): `offer` when the profile can stand beside the other under a name of its own. */
+  | { kind: "share"; text: string; code: ShareCode; offer: ShareOffer | null; free?: string }
   | { kind: "already"; text: string }
   | { kind: "other"; text: string };
 
@@ -38,6 +41,10 @@ export function refusalOf(e: unknown, t: Tx, node: { name: string; address: stri
     // TrustTunnel holds TCP and, with HTTP/3, the UDP port of the same number, so it says which one may be the clash
     const key = protocol === "trusttunnel" ? (free ? "where.portTakenTtFree" : "where.portTakenTt") : free ? "where.portTakenFree" : "where.portTaken";
     return { kind: "port", free, text: t(key, { port, node: node.name, profile, free: free ?? "" }) };
+  }
+  if (isShareCode(code)) {
+    const free = shareFreePort(v);
+    return { kind: "share", code, offer: shareOffer(code, v), free: free > 0 ? String(free) : undefined, text: shareRefusalText(t, code, { node: node.name, ...v }) };
   }
   if (code === "acme_needs_domain" || /host name is required for a Let's Encrypt certificate/.test(msg)) {
     return { kind: "domain", text: t("where.domainNeed", { node: node.name, address: v.address || node.address }) };

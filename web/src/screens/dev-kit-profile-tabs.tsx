@@ -42,6 +42,14 @@ function fakeCalls(state: string) {
     const node = nodeOfId(req.nodeId);
     if (req.validateOnly) {
       if (v.has("pchk")) return NEVER;
+      // "share": the port is shared by name (TCP 443 of these nodes is held under the node's own name; an IP address has no subdomain to suggest)
+      if (v.has("share")) {
+        const held = `port=${port}&node=${node}&profile=VLESS · TCP&name=`;
+        if (node === "nl2" && req.tlsServerNameOverride) return { inbound: { port, tlsServerName: req.tlsServerNameOverride }, warnings: [{ code: "tcp_port_shared", params: { node, port: String(port), profiles: "VLESS · TCP, Telegram", default: "VLESS · TCP", restarts: "VLESS · TCP" } }], freePort: 0 };
+        if (node === "nl2") throw err(`sni_taken: ${held}${NODES.find((x) => x.n === node)?.ip}&free=${port + 1}&share=1`, Code.AlreadyExists);
+        if (node === "fi3") throw err(`share_needs_site: ${held.replace("&name=", "")}`);
+        if (node === "nl3") throw err(`share_agent_old: ${held.replace("&name=", "")}`);
+      }
       if (node === "nl2") throw err(`port_taken: port=${port}&profile=VLESS · TCP&free=${port + 1}`);
       if (node === "fi3" && !req.tlsServerNameOverride && key !== "aw1") throw err(`acme_needs_domain: address=${NODES.find((x) => x.n === "fi3")?.ip}`);
       if (node === "spb1") throw err("agent_too_old: the node's agent is older than this profile needs");

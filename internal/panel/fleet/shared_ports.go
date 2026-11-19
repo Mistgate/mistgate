@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,7 +24,14 @@ const sharedPortsRefresh = 5 * time.Minute
 type sharedSeen struct {
 	shape string // the ports, their routes, the default and the bind error: what a change of is written at once
 	at    time.Time
+	// evicted is the number of unfinished handshakes the fronts of the node dropped for want of room, as of the last snapshot; a
+	// rise is a flood, which is told once an hour (overloadAt) as the event front_overloaded.
+	evicted    uint64
+	overloadAt time.Time
 }
+
+// overloadEventEvery is the longest the panel goes between two front_overloaded events of one node.
+const overloadEventEvery = time.Hour
 
 // sharedPortsOf is an agent's snapshot as the admin API says it (the field numbers are the same, the names too).
 func sharedPortsOf(rows []*agentv1.SharedPort) []*adminv1.SharedPort {
@@ -72,27 +80,53 @@ func sharedPortsShape(ports []*adminv1.SharedPort) string {
 	return strings.Join(parts, ";")
 }
 
+// evictedOf is the handshakes the fronts dropped for want of room since the agent started, and the port that dropped most of them.
+func evictedOf(ports []*adminv1.SharedPort) (total uint64, worst uint32) {
+	var most uint64
+	for _, p := range ports {
+		total += p.Evicted
+		if p.Evicted > most {
+			most, worst = p.Evicted, p.Port
+		}
+	}
+	return total, worst
+}
+
 // recordSharedPorts consumes the agent's complete snapshot of the TCP ports it shares (StatsBatch.shared_ports; the newest
 // wins). A node that has never shared a port costs nothing; a change of what is shared is written at once, a change of the counters
 // alone every five minutes. A snapshot with no port after one with some removes the stored one.
 func (f *Fleet) recordSharedPorts(ctx context.Context, nodeID string, rows []*agentv1.SharedPort, now time.Time) {
 	ports := sharedPortsOf(rows)
 	shape := sharedPortsShape(ports)
+	evicted, worst := evictedOf(ports)
 	f.sharedSeenMu.Lock()
 	prev, seen := f.sharedSeen[nodeID]
+	overloaded := evicted > prev.evicted && (prev.overloadAt.IsZero() || now.Sub(prev.overloadAt) >= overloadEventEvery)
+	if overloaded {
+		prev.overloadAt = now
+	}
+	prev.evicted = evicted
+	write := true
 	switch {
 	case !seen && len(ports) == 0:
 		f.sharedSeenMu.Unlock()
 		return
-	case seen && len(ports) > 0 && prev.shape == shape && !now.Before(prev.at) && now.Sub(prev.at) < sharedPortsRefresh:
-		f.sharedSeenMu.Unlock()
-		return
 	case len(ports) == 0:
 		delete(f.sharedSeen, nodeID)
+	case seen && prev.shape == shape && !now.Before(prev.at) && now.Sub(prev.at) < sharedPortsRefresh:
+		f.sharedSeen[nodeID] = prev
+		write = false
 	default:
-		f.sharedSeen[nodeID] = sharedSeen{shape: shape, at: now}
+		prev.shape, prev.at = shape, now
+		f.sharedSeen[nodeID] = prev
 	}
 	f.sharedSeenMu.Unlock()
+	if overloaded {
+		f.event(ctx, 2, "front_overloaded", nodeID, map[string]string{"port": strconv.Itoa(int(worst)), "evicted": strconv.FormatUint(evicted, 10)})
+	}
+	if !write {
+		return
+	}
 
 	body := ""
 	if len(ports) > 0 {

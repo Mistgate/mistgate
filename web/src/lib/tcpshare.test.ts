@@ -5,6 +5,8 @@ import { refusalOf } from "@/screens/profiles/deploy";
 import type { Tx } from "@/screens/users/t";
 import { errorCodes, errorText } from "./errors";
 import { portNotes } from "./port-check";
+import { inboundErrorKind, inboundErrorText } from "./inbound-error";
+import { describeEvent } from "./events";
 
 // Services that share a TCP port by the name in the connection: the panel's four refusals and two warnings, in all five languages.
 
@@ -46,7 +48,7 @@ describe("the refusals of a profile that cannot stand beside another on a TCP po
     const node = { name: "de1", address: "de1.example.com" };
     for (const [message, , code] of refusals) {
       const got = refusalOf(new ConnectError(message, code), t, node);
-      expect(got.kind, message).toBe("other");
+      expect(got.kind, message).toBe("share");
       expect(got.text, message).toBe(errorText(new ConnectError(message, code), t as never));
     }
   });
@@ -74,5 +76,34 @@ describe("the warnings of a profile that does stand beside another", () => {
     expect(dict(lang)["approval.value.warn.tcp_port_shared"]).toBeTruthy();
     expect(dict(lang)["approval.value.warn.share_two_faces"]).toBeTruthy();
     expect(dict(lang)["approval.fact.sni"]).toBeTruthy();
+  });
+});
+
+describe("the words of the dialogs and the card of a shared port", () => {
+  const keys = Object.keys(dictionaries.en).filter((k) => k.startsWith("share.") || k.startsWith("sp.") || k === "node.inbound.err.shareOld" || k === "node.inbound.err.shadowed" || k === "event.front_overloaded");
+  const holes = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(",");
+
+  it("has every key in all five languages, with the same values to fill in and none left over", () => {
+    expect(keys.length).toBeGreaterThan(40);
+    for (const lang of langs) {
+      for (const k of keys) {
+        const text = dict(lang)[k];
+        expect(text, `${lang} ${k}`).toBeTruthy();
+        expect(holes(text!), `${lang} ${k}`).toBe(holes(dict("en")[k]!));
+        if (lang !== "en" && !/^(share\.dns\.(type|name|value)|sp\.old\.go)$/.test(k)) expect(text, `${lang} ${k}`).not.toBe(dict("en")[k]);
+      }
+    }
+  });
+
+  it.each(langs)("words the node's reasons for a profile that does not run, and the flood, in %s", (lang) => {
+    const t = txOf(lang);
+    expect(inboundErrorKind("share_agent_old: this node's agent cannot share a TCP port")).toBe("share");
+    expect(inboundErrorKind("sni_shadowed: the name a.example.com is served by inbound inb_b")).toBe("shadowed");
+    expect(inboundErrorText(t as never, "share_agent_old: x", { port: 443 })).toBe(dict(lang)["node.inbound.err.shareOld"]);
+    expect(inboundErrorText(t as never, "sni_shadowed: x", { port: 443 })).toBe(dict(lang)["node.inbound.err.shadowed"]);
+    const e = describeEvent(t as never, { code: "front_overloaded", params: { port: "443", evicted: "1480" } } as never).text;
+    expect(e).toContain("443");
+    expect(e).toContain("1480");
+    expect(e).not.toMatch(/[{}]/);
   });
 });

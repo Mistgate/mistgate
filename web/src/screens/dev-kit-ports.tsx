@@ -37,7 +37,7 @@ const kitNodes = [
 const tcp = (over: object) => ({ port: 80, role: "acme", alpn: false, profile: "", verdict: "ours", reason: "", sender: "de2", checkedUnix: now - 3600, ...over });
 const tcpOk = [tcp({}), tcp({ port: 443, role: "vless", profile: "VLESS · 443 · Vision", alpn: true })];
 
-const baseNode = (over: object = {}) => ({
+export const baseNode = (over: object = {}) => ({
   ...kitNodes[0],
   location: "Frankfurt",
   provider: "examplehost",
@@ -47,7 +47,7 @@ const baseNode = (over: object = {}) => ({
   warp: { state: WarpState.NOT_CONFIGURED },
   ...over,
 });
-const inbound = (over: object) => ({
+export const inbound = (over: object) => ({
   id: "inb_1",
   profileId: "prf_main",
   profileName: "hy2 · 443 · Salamander",
@@ -111,10 +111,10 @@ const laterChecks = [fromDe1Only({}), fromDe1Only({ port: 2053, verdict: "broken
 const twoInbounds = [inbound({}), inbound({ id: "inb_2", profileId: "prf_warp", profileName: "hy2 · WARP · 8443", port: 8443, egress: "warp" })];
 const threeInbounds = [...twoInbounds, inbound({ id: "inb_3", profileId: "prf_awg", profileName: "AWG 3.1 · QUIC", protocol: "awg", port: 33183, tlsServerName: "", certNotAfterUnix: 0 }), inbound({ id: "inb_4", profileId: "prf_ext", profileName: "Backup", port: 51820 })];
 
-type Fill = [readonly unknown[], unknown];
+export type Fill = [readonly unknown[], unknown];
 
 /** A private cache: every query the screens ask is answered from here, nothing is fetched. */
-function Cache({ fill = [], role = Role.OWNER, children }: { fill?: Fill[]; role?: Role; children: ReactNode }) {
+export function Cache({ fill = [], role = Role.OWNER, children }: { fill?: Fill[]; role?: Role; children: ReactNode }) {
   const [qc] = useState(() => {
     const c = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchInterval: false } } });
     c.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", role } } as never);
@@ -127,7 +127,7 @@ function Cache({ fill = [], role = Role.OWNER, children }: { fill?: Fill[]; role
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-function Demo({ title, shot, children }: { title: string; shot?: string; children: ReactNode }) {
+export function Demo({ title, shot, children }: { title: string; shot?: string; children: ReactNode }) {
   return (
     <section data-shot={shot} className="flex flex-col gap-3">
       <SectionLabel>{title}</SectionLabel>

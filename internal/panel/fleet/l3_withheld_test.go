@@ -77,6 +77,21 @@ func TestSessionCoreReconcileFailsWithheldInbounds(t *testing.T) {
 	}
 }
 
+func TestApplyResultNamesTheReasonOfAPortThatCannotBeShared(t *testing.T) {
+	x, a := newL3Env(t)
+	state := SessionState{NodeID: a.nodeID, SentRevision: 7, SentStateHash: "sent-state", SentWithheld: []string{"inb_awg"}, SentWithheldShare: []string{"inb_awg"}}
+	tr := coreTransition{state: &state}
+	err := NewSessionCore(x.f).applyResult(x.ctx, &tr, &agentv1.ApplyResult{
+		Revision: state.SentRevision, StateHash: state.SentStateHash, Status: agentv1.ApplyStatus_APPLY_STATUS_APPLIED,
+	}, x.f.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row := x.inboundRow("inb_awg"); row.State != "failed" || row.LastError != withheldShareReason {
+		t.Fatalf("an inbound held back for its port after ApplyResult = %+v", row)
+	}
+}
+
 func TestApplyResultUsesSessionWithheldIds(t *testing.T) {
 	x, a := newL3Env(t)
 	state := SessionState{NodeID: a.nodeID, SentRevision: 7, SentStateHash: "sent-state", SentWithheld: []string{"inb_awg"}}

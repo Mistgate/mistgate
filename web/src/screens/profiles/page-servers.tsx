@@ -12,7 +12,7 @@ import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { countryLook } from "@/lib/health";
-import { inboundErrorKind, inboundErrorText } from "@/lib/inbound-error";
+import { inboundErrorKind, inboundErrorText, nameFixes } from "@/lib/inbound-error";
 import { agentLinked } from "@/lib/node-status";
 import { nodesQuery } from "@/lib/queries";
 import { relayState, relaysQuery, statePill } from "@/lib/relay";
@@ -137,7 +137,7 @@ export function ServersTab(ctx: TabCtx) {
   useEffect(() => {
     if (!edit) return;
     const r = rows.find((x) => x.inbound.id === edit);
-    if (r) setEditing({ id: r.inbound.id, focus: r.inbound.lastError && inboundErrorKind(r.inbound.lastError) === "cert" ? "sni" : "port" });
+    if (r) setEditing({ id: r.inbound.id, focus: r.inbound.lastError && nameFixes(inboundErrorKind(r.inbound.lastError)) ? "sni" : "port" });
     onEdit("");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the request arrives
   }, [edit]);
@@ -428,9 +428,13 @@ function WhyRow({ row, owner, onFix }: { row: ServerRow; owner: boolean; onFix: 
           <Lnk className="btn sm" to="/nodes/$id" params={{ id: row.nodeId }} search={{ tab: "exit" }} hash="warp">
             {tt("warp.open")}
           </Lnk>
+        ) : kind === "share" ? (
+          <Lnk className="btn sm" to="/updates">
+            {tt("share.openUpdates")}
+          </Lnk>
         ) : (
-          <Button size="md" onClick={() => onFix(kind === "cert" && i.protocol !== "awg" ? "sni" : "port")}>
-            {kind === "port" ? t("pf.pg.vd.port", { node: row.nodeName }) : kind === "cert" && i.protocol !== "awg" ? tt("node.profiles.setDomain") : t("pf.pg.vd.fix")}
+          <Button size="md" onClick={() => onFix(nameFixes(kind) && i.protocol !== "awg" ? "sni" : "port")}>
+            {kind === "port" ? t("pf.pg.vd.port", { node: row.nodeName }) : nameFixes(kind) && i.protocol !== "awg" ? tt("node.profiles.setDomain") : t("pf.pg.vd.fix")}
           </Button>
         ))}
     </div>

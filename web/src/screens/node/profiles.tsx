@@ -26,7 +26,7 @@ import { useEdition } from "@/lib/edition";
 import { errorText } from "@/lib/errors";
 import { useFmt, type Fmt } from "@/lib/format";
 import { cellLook, checksQuery, doctorQuery } from "@/lib/health";
-import { inboundErrorKind, inboundErrorText } from "@/lib/inbound-error";
+import { inboundErrorKind, inboundErrorText, nameFixes } from "@/lib/inbound-error";
 import { portNotes, withNotes } from "@/lib/port-check";
 import { agentLinked } from "@/lib/node-status";
 import { protocolName } from "@/lib/series";
@@ -41,6 +41,9 @@ import { AwgStatusLine } from "./awg-status";
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
 import { SniScanCard } from "./sni-scan";
+import { ShareFix, ShareNotes } from "./share-fix";
+import { SharedPortCards } from "./shared-port";
+import { isShareCode } from "@/lib/tcpshare";
 import { tcpPill, verdictPill } from "./ports";
 import { Fresh } from "@/components/fx/fresh";
 import { alsoRemovesText, useRelaysOf } from "./relays";
@@ -192,6 +195,8 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
         </>
       )}
 
+      <SharedPortCards data={data} />
+
       <div className="flex flex-col gap-3">
         {data.inbounds.map((i) => {
           const s = states[i.state] ?? states[InboundState.UNSPECIFIED];
@@ -218,10 +223,14 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
               <Button variant="primary" size="md" onClick={() => setEditing({ inbound: i, focus: "port" })}>
                 {t("node.profiles.changePort")}
               </Button>
-            ) : kind === "cert" && i.protocol !== "awg" ? (
+            ) : nameFixes(kind) && i.protocol !== "awg" ? (
               <Button variant="primary" size="md" onClick={() => setEditing({ inbound: i, focus: "sni" })}>
                 {t("node.profiles.setDomain")}
               </Button>
+            ) : kind === "share" ? (
+              <Link to="/updates" className={buttonClass("primary", "md")}>
+                {t("share.openUpdates")}
+              </Link>
             ) : kind === "warp" ? (
               <Link to="/nodes/$id" params={{ id: node.id }} search={{ tab: "exit" }} hash="warp" className={buttonClass("primary", "md")}>
                 {t("warp.open")}
@@ -326,7 +335,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
   const isAwg = inbound.protocol === "awg";
   // VLESS has a name of its own to set only where it has a certificate: the node's own site behind REALITY, or TLS (the
   // server resolved one, or the admin set one, or it could not for want of a domain); REALITY with another site has none
-  const named = inbound.protocol !== "vless" || !!inbound.tlsServerName || !!inbound.tlsServerNameOverride || (!!inbound.lastError && inboundErrorKind(inbound.lastError) === "cert");
+  const named = inbound.protocol !== "vless" || !!inbound.tlsServerName || !!inbound.tlsServerNameOverride || (!!inbound.lastError && nameFixes(inboundErrorKind(inbound.lastError)));
   const was = { port: inbound.port ? String(inbound.port) : "", sni: inbound.tlsServerName, enabled: inbound.state !== InboundState.DISABLED };
   const [port, setPort] = useState(was.port);
   const [sni, setSni] = useState(was.sni);
@@ -368,6 +377,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
   });
 
   const refused = check.state === "refused" ? check : null;
+  const share = refused && isShareCode(refused.code) ? { code: refused.code, vars: refused.vars } : null;
   // the stored checks (before the click) or the real run (the click) found the port losing packets
   const lossy = refused?.code === "port_lossy" ? refused.vars : lossyRefusal(save.error);
   const fieldError = (codes: string[]) => (refused && codes.includes(refused.code) ? t(`err.${refused.code}`, refused.vars) : undefined);
@@ -375,6 +385,8 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
   const sniError = fieldError(["sni_needs_domain", "sni_invalid", "acme_needs_domain", "reality_needs_domain", "mtproto_needs_domain"]);
   const effective = check.state === "ok" ? check.inbound : undefined;
   const dirty = touched.port || touched.sni || touched.enabled;
+  // a refusal no field above words (the Save button is off for it): a notice at the foot says why, so the button is never off in silence
+  const unexplained = refused && !share && !lossy && !portError && !sniError ? refused : null;
   return (
     <Modal open onOpenChange={(o) => !o && onClose()} title={t("node.profiles.editTitle", { name: inbound.profileName })} description={t("node.profiles.editBody")}>
       <form
@@ -410,6 +422,22 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
               {t("node.check.port.take", { port: refused.vars.free! })}
             </Button>
           </div>
+        )}
+        {share && (
+          <ShareFix
+            code={share.code}
+            vars={share.vars}
+            node={{ name: inbound.nodeName, address: nodeAddress }}
+            onLeave={onClose}
+            onPut={(name) => {
+              setSni(name);
+              save.reset();
+            }}
+            onTake={(p) => {
+              setPort(String(p));
+              save.reset();
+            }}
+          />
         )}
         {lossy && (
           <LossyNotice
@@ -447,6 +475,12 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
         </label>
         <WarpWarnings check={check} nodeId={nodeId} onLeave={onClose} />
         <DecoyNotice check={check} />
+        <ShareNotes check={check} node={{ name: inbound.nodeName, address: nodeAddress }} />
+        {unexplained && (
+          <Notice tone="danger" className="items-start">
+            {t(`err.${unexplained.code}`, unexplained.vars)}
+          </Notice>
+        )}
         {save.isError && !lossyRefusal(save.error) && (
           <Notice tone="danger" className="items-start">
             {errorText(save.error, t)}

@@ -6,16 +6,23 @@ import { networkOf } from "./ways-graph";
 // English last_error such as "listen udp :8443: bind: address already in use". This sorts it into a class with a sentence;
 // the raw text stays on screen under it. A heuristic: a text it does not know is "other", never a wrong guess.
 
-export type InboundErrorKind = "port" | "cert" | "warp" | "permission" | "awg" | "other";
+// "share": the panel held the profile back because the node's agent cannot share a TCP port (share_agent_old); "shadowed": the agent did
+// not start it because another profile of the port holds its name (sni_shadowed)
+export type InboundErrorKind = "port" | "cert" | "warp" | "permission" | "awg" | "share" | "shadowed" | "other";
 
 // order matters: "cannot build inbound: a host name is required for a Let's Encrypt certificate" is about the certificate
 const kinds: [InboundErrorKind, RegExp][] = [
+  ["share", /^share_agent_old\b/i],
+  ["shadowed", /^sni_shadowed\b/i],
   ["port", /address already in use/i],
   ["cert", /acme|certificate|let'?s encrypt|needs a dns name|host name is required|x509/i],
   ["permission", /permission denied|operation not permitted/i],
   ["awg", /amneziawg|awgnl|\bawg:/i],
   ["warp", /\bwarp\b|egress/i],
 ];
+
+/** The kinds a name fixes: the certificate cannot be made for the name, or another service of the port holds it. */
+export const nameFixes = (kind: InboundErrorKind | null): boolean => kind === "cert" || kind === "shadowed";
 
 export function inboundErrorKind(error: string): InboundErrorKind {
   return kinds.find(([, re]) => re.test(error))?.[0] ?? "other";
@@ -34,6 +41,8 @@ const sentence: Record<InboundErrorKind, MessageKey> = {
   warp: "node.inbound.err.warp",
   permission: "node.inbound.err.permission",
   awg: "node.inbound.err.awg",
+  share: "node.inbound.err.shareOld",
+  shadowed: "node.inbound.err.shadowed",
   other: "node.inbound.err.other",
 };
 
