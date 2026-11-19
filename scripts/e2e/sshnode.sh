@@ -20,7 +20,8 @@
 #
 # WHAT IT PROVES, per edition: the wizard (host key, wrong password, wrong host key), a cancelled install, a node retired
 # while the install waits for it, a truncated upload that must not be installed, and the full install: the agent comes
-# online, the subscription lists its inbound, a real Hysteria2 client uses it. On the edge also: a reload of the
+# online, the subscription lists its inbound, a real Hysteria2 client uses it. On the VPS edition also the install of the
+# first subscription host (sshn_scn_subhost). On the edge also: a reload of the
 # Provisioner's script in the middle of an upload (the job resumes), and the Go panel under load from another Durable
 # Object while a job runs. The functions of an edition set SSHN_* before calling them (see edge.sh and e2e-wsl.sh).
 
@@ -440,6 +441,70 @@ sshn_scn_full() {
   pass "retire of the installed node: agent notified, exited, its nft table removed, node RETIRED"
 }
 
+# sshn_subhost <Method> [json]: the subscription host service (mistgate.subhost.v1), which api() cannot name
+sshn_subhost() {
+  local out code
+  out=$(curl -sS -m 40 -w $'\n%{http_code}' -X POST "$ADMIN/api/mistgate.subhost.v1.SubscriptionHostService/$1" \
+    -H 'Content-Type: application/json' ${COOKIE:+-H "Cookie: $COOKIE"} -d "${2:-{\}}") || return 1
+  code=${out##*$'\n'}
+  out=${out%$'\n'*}
+  [ "$code" = 200 ] || { echo "subhost $1 -> HTTP $code: $out" | redact >&2; return 1; }
+  printf '%s' "$out"
+}
+sshn_subhost_state() { sshn_subhost GetSubscriptionHost | jq -r '.host.state // ""'; }
+sshn_subhost_on() { [ "$(sshn_subhost_state)" = SUBSCRIPTION_HOST_STATE_ON ]; }
+sshn_subhost_bridge_up() { sshn_subhost GetSubscriptionHost | jq -e --arg n "$SSHN_NODE_ID" '[(.host.bridges // [])[] | select(.nodeId == $n and .up)] | length == 1' >/dev/null; }
+
+# sshn_scn_subhost <name>: the first subscription host over SSH (design/adr/0018-panel-behind-nat.md). The host cannot reach
+# the panel, so it enrols inside the session (--offline-csr, the panel signs, --offline-finish with the role line on stdin);
+# the role turns on with the install and the panel dials the host's own site on 443 (a self-signed one for the site name,
+# verified by the pin the node printed). This stand has no ACME, so the panel never gets a certificate for the subdomain:
+# the host's own link, which runs inside the bridge, cannot finish TLS, the agent never comes online, and the job must end as
+# subscription_host_tunnel_down with the role turned off again. What it proves: the offline enrolment, the role on the host
+# (in agent.json, 0600, never in a command line), the bridge up with the panel's proof, readiness held back (the panel's
+# address does not move), and the undo of a host install that does not complete, keeping its role for a retry.
+sshn_scn_subhost() {
+  local name=$1 domain=sub.e2e.example.com site=site.e2e.example.com t0 out path events meta prev
+  sshn_reset_host
+  [ "$(sshn_subhost_state)" = SUBSCRIPTION_HOST_STATE_OFF ] || die "precondition: the subscription host is not off: $(sshn_subhost GetSubscriptionHost)"
+  prev=$(api InstanceService/GetInstance | jq -r '.instance.subscriptionBase // ""')
+  t0=$(date +%s)
+  # the check of a host install probes the subdomain (which does not resolve here) and does not fail on the unreachable panel
+  mutate ProvisioningService/CheckSSH "$(jq -nc --arg h "$SSHN_IP" --arg f "$SSHN_FP" --arg p "$SSHN_ROOT_PASS" --arg d "$domain" \
+    '{host:$h, port:22, fingerprint:$f, username:"root", password:$p, subscriptionHostDomain:$d}')" | jq -e '.preflight.panelReachable != true' >/dev/null \
+    || die "CheckSSH of a subscription host install failed or says the panel is reachable"
+  out=$(mutate ProvisioningService/StartNodeProvision "$(jq -nc --arg n "$name" --arg h "$SSHN_IP" --arg f "$SSHN_FP" --arg p "$SSHN_ROOT_PASS" --arg d "$domain" --arg s "$site" \
+    '{confirmInstall:true, name:$n, address:$h, sshHost:$h, sshPort:22, fingerprint:$f, sshUsername:"root", password:$p, installPanelKey:true,
+      subscriptionHostDomain:$d, subscriptionHostSiteName:$s, skipDnsCheck:true}')") || die "StartNodeProvision of a subscription host failed"
+  SSHN_JOB=$(jq -r .job.id <<<"$out") SSHN_NODE_ID=$(jq -r .job.nodeId <<<"$out") SSHN_NODE_NAME=$name
+  wait_for 180 "the role to turn on with the install" sshn_subhost_on || die "the subscription host never turned on: $(sshn_job) $(sshn_subhost GetSubscriptionHost)"
+  # the bridge path is a secret of the panel: from here on no log may hold it (step 11)
+  path=$($SSHN_SQL "SELECT v FROM setting WHERE k = 'sub_host_path'")
+  [ -n "$path" ] || die "the panel stored no bridge path"
+  SECRETS+=("$path")
+  meta=$(sshn_host cat /var/lib/mistgate-node/agent.json)
+  jq -e --arg d "$domain" --arg s "$site" --arg p "$path" '.sub_host.names == [$d] and .sub_host.site_name == $s and .sub_host.path == $p' <<<"$meta" >/dev/null \
+    || die "agent.json on the host lacks the role: $(jq -c '.sub_host | {names, site_name}' <<<"$meta")"
+  [ "$(sshn_host stat -c %a /var/lib/mistgate-node/agent.json)" = 600 ] || die "agent.json on the host is not 0600"
+  ! grep -qF -- "$path" "$WORK/sshn-shim.log" || die "the bridge path reached a command on the host"
+  wait_for 120 "the panel's bridge to the host" sshn_subhost_bridge_up || die "the bridge never came up: $(sshn_subhost GetSubscriptionHost | jq -c '.host.bridges')"
+  sshn_subhost GetSubscriptionHost | jq -e '.host.ready != true and (.host.notReady | index("panel_cert"))' >/dev/null \
+    || die "the host is ready without a certificate for the subdomain: $(sshn_subhost GetSubscriptionHost | jq -c '{ready: .host.ready, notReady: .host.notReady}')"
+  [ "$(api InstanceService/GetInstance | jq -r '.instance.subscriptionBase // ""')" = "$prev" ] || die "the subscription address moved before the host was ready"
+  wait_for 240 "the job to end" sshn_terminal || die "the job did not end: $(sshn_job)"
+  events=$(sshn_events | tr '\n' ' ')
+  [ "$(sshn_jstate)" = failed ] && [ "$(sshn_jcode)" = subscription_host_tunnel_down ] \
+    || die "the host install without a subdomain certificate ended as $(sshn_job) (want failed subscription_host_tunnel_down), events: $events"
+  sshn_has_event enrolling_node || die "the journal lacks enrolling_node: $events"
+  [ "$(sshn_subhost_state)" = SUBSCRIPTION_HOST_STATE_OFF ] || die "the role stayed on after the install failed: $(sshn_subhost GetSubscriptionHost)"
+  [ "$(sshn_secret_len)" -gt 0 ] || die "the failed host install kept no role for its retry"
+  [ "$($SSHN_SQL "SELECT v FROM setting WHERE k = 'sub_host_path'")" = "" ] || die "the bridge path outlived the undo"
+  pass "subscription host install in $(($(date +%s) - t0)) s: the check probed the subdomain, the node enrolled inside the session with its role in agent.json (0600, not on a command line), the panel's bridge came up, readiness held the address back without a subdomain certificate, and the job ended as subscription_host_tunnel_down with the role off again and kept for a retry"
+  sshn_retire
+  wait_for 30 "the host agent to exit" not_alive "$(cat "$SSHN_D/flags/agent.pid")" || note "the host agent did not exit after the retire (it never had a session)"
+  sshn_reset_host
+}
+
 # sshn_scn_panel_key <name>: install with the panel's public key and rotate a password through that key, including after
 # password authentication is disabled. The panel must never need a saved password to reach this host.
 sshn_scn_panel_key() {
@@ -652,6 +717,7 @@ sshn_run_vps() {
   sshn_scn_retire_waiting sshn-wait
   sshn_scn_truncated sshn-trunc
   sshn_scn_full sshn-full
+  sshn_scn_subhost sshn-host
   sshn_scn_panel_key sshn-panel-key
   sshn_scn_own_key sshn-owner-key
   sshn_scn_keys
