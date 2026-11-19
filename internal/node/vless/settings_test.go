@@ -284,3 +284,35 @@ func TestSettingsValidationAndTLSR3(t *testing.T) {
 		})
 	}
 }
+
+// A target set on the node (agent capability vless-target/1): the other site's name rides in the TLS block with no certificate (mode 0)
+// and is the one REALITY server name; anything else in that block, or another name, is refused.
+func TestParseSpecTargetOfTheNode(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		tls     plugin.TLS
+		names   string
+		wantErr string
+	}{
+		{"no name in the TLS block", plugin.TLS{}, `["de1.example.com"]`, ""},
+		{"the one name of the target", plugin.TLS{ServerName: "Shop.Example.com."}, `["shop.example.com"]`, ""},
+		{"another name than the one server name", plugin.TLS{ServerName: "shop.example.com"}, `["de1.example.com"]`, "exactly the tls server name"},
+		{"one of two names", plugin.TLS{ServerName: "shop.example.com"}, `["shop.example.com","www.example.com"]`, "exactly the tls server name"},
+		{"a certificate mode", plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "shop.example.com"}, `["shop.example.com"]`, "TLS fields are only supported"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := settingsSpec("tcp", "reality")
+			spec.TLS = tc.tls
+			spec.Settings = json.RawMessage(strings.Replace(string(spec.Settings), `["de1.example.com"]`, tc.names, 1))
+			cfg, err := parseSpec(spec)
+			switch {
+			case tc.wantErr == "" && err != nil:
+				t.Fatalf("parseSpec: %v", err)
+			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
+				t.Fatalf("parseSpec error = %v, want it to say %q", err, tc.wantErr)
+			case err == nil && cfg.reality.self:
+				t.Fatal("a target set on the node is not the node's own site")
+			}
+		})
+	}
+}

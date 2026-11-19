@@ -158,8 +158,13 @@ func parseSpec(spec plugin.InboundSpec) (settings, error) {
 			}
 			out.reality.serverNames = []string{name}
 		} else {
-			if spec.TLS.Mode != 0 || spec.TLS.ServerName != "" {
+			if spec.TLS.Mode != 0 {
 				return out, errors.New("TLS fields are only supported with security tls or reality target self")
+			}
+			// A target set on this node (vless-target/1) names the one server name in the TLS block, without a certificate.
+			ownName := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(spec.TLS.ServerName), "."))
+			if ownName != "" && (len(raw.Reality.ServerNames) != 1 || !strings.EqualFold(strings.TrimSuffix(strings.TrimSpace(raw.Reality.ServerNames[0]), "."), ownName)) {
+				return out, errors.New("reality.server_names must be exactly the tls server name for a target set on the node")
 			}
 			if err := validateTarget(out.reality.target, spec.Listen.Port); err != nil {
 				return settings{}, fmt.Errorf("reality.target: %w", err)

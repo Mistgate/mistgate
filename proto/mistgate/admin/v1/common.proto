@@ -105,6 +105,12 @@ message Inbound {
   bool direct_in_subscriptions = 18;
   // Whether clients reach this inbound through its CDN host instead of the node's address.
   bool cdn = 19;
+  // Protocol "vless", REALITY only: the target this node shows instead of the profile's, as "host:port" ("" = the profile's own; the
+  // host is also the one name REALITY accepts here, so it is the tls_server_name of this inbound).
+  string reality_target_override = 20;
+  // The target REALITY forwards strangers to as this inbound has it built: "self" (the node's own site), "host:port", or "" for an
+  // inbound that is not VLESS REALITY. The edit window and the neighbour card say what strangers see now and after a change.
+  string reality_target = 21;
 }
 
 // AmneziaWG interface state of one inbound (agent.v1.AwgHealth).

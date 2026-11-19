@@ -430,7 +430,7 @@ func (s *Service) TwinProfile(ctx context.Context, req *connect.Request[adminv1.
 	}
 	var nodes []store.AccessNode
 	network := ""
-	sni := map[string]string{}
+	sni := map[string]twinOverrides{}
 	resp := &adminv1.TwinProfileResponse{Egress: to}
 	for _, f := range full {
 		if f.Profile.ID == p.ID && f.Inbound.Enabled && !slices.Contains(m.SkipNodeIds, f.Node.ID) {
@@ -442,7 +442,7 @@ func (s *Service) TwinProfile(ctx context.Context, req *connect.Request[adminv1.
 				network = spec.Listen.Network
 			}
 			nodes = append(nodes, f.Node)
-			sni[f.Node.ID] = f.Inbound.TLSServerNameOverride
+			sni[f.Node.ID] = twinOverrides{f.Inbound.TLSServerNameOverride, f.Inbound.RealityTargetOverride}
 			resp.NodeIds = append(resp.NodeIds, f.Node.ID)
 		}
 	}
@@ -490,10 +490,13 @@ func (s *Service) TwinProfile(ctx context.Context, req *connect.Request[adminv1.
 	return connect.NewResponse(resp), nil
 }
 
+// twinOverrides are what a node's inbound has of its own, which its twin keeps: the "Domain (SNI)" and the REALITY target.
+type twinOverrides struct{ name, target string }
+
 // makeTwin creates the profile, puts it on the nodes and into the groups, through the public calls (so that every check
 // and every event of those calls happens). A failing step takes back what was made: deleting the profile also takes it
 // out of the groups.
-func (s *Service) makeTwin(ctx context.Context, src store.AccessProfile, name string, settings json.RawMessage, nodes []store.AccessNode, sni map[string]string, groups []store.AccessGroup) (*adminv1.ProfileSummary, error) {
+func (s *Service) makeTwin(ctx context.Context, src store.AccessProfile, name string, settings json.RawMessage, nodes []store.AccessNode, sni map[string]twinOverrides, groups []store.AccessGroup) (*adminv1.ProfileSummary, error) {
 	created, err := s.CreateProfile(ctx, connect.NewRequest(&adminv1.CreateProfileRequest{Protocol: src.Protocol, Name: name, SettingsJson: string(settings)}))
 	if err != nil {
 		return nil, err
@@ -513,7 +516,7 @@ func (s *Service) makeTwin(ctx context.Context, src store.AccessProfile, name st
 		return cause
 	}
 	for _, n := range nodes {
-		r, err := s.CreateInbound(ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: id, NodeId: n.ID, TlsServerNameOverride: sni[n.ID]}))
+		r, err := s.CreateInbound(ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: id, NodeId: n.ID, TlsServerNameOverride: sni[n.ID].name, RealityTargetOverride: sni[n.ID].target}))
 		if err != nil {
 			return nil, undo(err)
 		}

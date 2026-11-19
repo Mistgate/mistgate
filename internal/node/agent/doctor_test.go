@@ -410,6 +410,24 @@ func TestDoctorInboundsDescribeTheAppliedState(t *testing.T) {
 	}
 }
 
+// A REALITY inbound that shows a site chosen on its node has a name in its TLS block and no certificate mode: the doctor has no
+// certificate to read (no TLS mode, no TLS port) and checks the target by that name.
+func TestDoctorInboundsOfATargetSetOnTheNodeHaveNoCertificate(t *testing.T) {
+	h := newHarness(t, harnessOpts{extra: map[string]engine.Factory{"vless": newFakeEngine("vless").factory()}})
+	h.waitConnected()
+	state := inb("v1", 0, 0, cred("c1"))
+	state.Spec.Protocol = "vless"
+	state.Spec.Listen = &pb.Listen{Network: "tcp", Port: 443}
+	state.Spec.Tls = &pb.Tls{ServerName: "shop.example.com"}
+	state.Spec.SettingsJson = `{"transport":"tcp","security":"reality","reality":{"target":"shop.example.com:443","server_names":["shop.example.com"]}}`
+	h.panel.push(fullState(1, state))
+	h.panel.nextApply()
+	got := h.a.doctorInbounds()
+	if len(got) != 1 || got[0].TLSMode != "" || got[0].TLSPort != 0 || got[0].RealityTarget != "shop.example.com:443" || got[0].RealityName != "shop.example.com" {
+		t.Fatalf("doctor inbound = %+v, want no TLS mode or port and the target by its name", got)
+	}
+}
+
 // The doctor is told about the UDP socket that TrustTunnel's HTTP/3 adds to the TCP listener, and only while h3 is on.
 func TestDoctorInboundsCarryTheSideListenOfTrustTunnelHTTP3(t *testing.T) {
 	h := newHarness(t, harnessOpts{extra: map[string]engine.Factory{"trusttunnel": newFakeEngine("trusttunnel").factory()}})

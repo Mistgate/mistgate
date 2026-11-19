@@ -240,7 +240,9 @@ message ScoreItem {
 // "sni_needs_domain: name=1.2.3.4" (an IP where Let's Encrypt wants a domain), "sni_invalid: name=..." (neither a domain
 // nor an IP), "already_on_node", "node_retired", "port_lossy: port=8443&node=de1&sent=300&got=190&at=<unix>&sender=nl1&free=2053"
 // (FAILED_PRECONDITION: the UDP delivery check of design/udp-port-check.md found the port losing packets on that node;
-// free = a port the same run proved, else the picker's choice from stored checks, 0 = none; allow_lossy_port saves anyway).
+// free = a port the same run proved, else the picker's choice from stored checks, 0 = none; allow_lossy_port saves anyway),
+// "reality_target_unsupported" (a REALITY target override on an inbound that is not VLESS REALITY), "reality_target_invalid:
+// target=..." (not a host name and a port), "reality_target_same_node: target=...&node=de1" (the node itself at its own port).
 message CreateInboundRequest {
   string profile_id = 1;
   string node_id = 2;
@@ -259,6 +261,10 @@ message CreateInboundRequest {
   // This lets the add-profile plan run the same per-node checks without creating a temporary profile.
   string protocol = 7;
   string settings_json = 8;
+  // VLESS REALITY only: "host:port" of a site this node shows instead of the profile's target (the host is a name, not an IP);
+  // the host becomes the one name REALITY accepts there. Empty = the profile's target. Refusals: reality_target_unsupported,
+  // reality_target_invalid, reality_target_same_node (as listed above).
+  string reality_target_override = 9;
 }
 
 message CreateInboundResponse {
@@ -285,6 +291,9 @@ message UpdateInboundRequest {
   bool allow_lossy_port = 6;
   // Whether the server at the node's own address is included in subscriptions; absent = leave unchanged.
   optional bool direct_in_subscriptions = 7;
+  // As CreateInboundRequest.reality_target_override; absent = leave unchanged, "" = back to the profile's target. A change
+  // restarts the server and clients get the new name with their next subscription update.
+  optional string reality_target_override = 8;
 }
 
 message UpdateInboundResponse {

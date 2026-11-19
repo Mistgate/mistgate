@@ -584,6 +584,24 @@ func effectiveServerNames(s RealitySettings) []string {
 	return nil
 }
 
+// realityOverrideTarget cleans a target set on the node, "host:port", into the target as the node gets it and its host: a host name
+// with a dot (REALITY asks the site for that name, and an IP address has none), not this machine, and not the node's own address at
+// the listen port, which would loop.
+func realityOverrideTarget(target string, listenPort int, nodeAddress string) (clean, host string, err error) {
+	text := strings.TrimSpace(target)
+	if h, p, err := net.SplitHostPort(text); err == nil { // a name written with its closing dot is the same name
+		text = net.JoinHostPort(strings.ToLower(strings.TrimSuffix(h, ".")), p)
+	}
+	host, port, perr := targetHostPort(text)
+	if perr != nil || net.ParseIP(strings.Trim(host, "[]")) != nil || !isHostname(host) || !strings.Contains(host, ".") || localTargetHost(host) {
+		return "", "", &protocols.RealityTargetError{Reason: "invalid", Target: target}
+	}
+	if port == uint64(listenPort) && sameTargetHost(host, nodeAddress) {
+		return "", "", &protocols.RealityTargetError{Reason: "same_node", Target: target}
+	}
+	return net.JoinHostPort(host, strconv.FormatUint(port, 10)), host, nil
+}
+
 // siteName is the name of the node's own site, which is the certificate's name and the only name REALITY accepts: the
 // inbound's own server name, else the node's address when that is a host name. A name needs a dot (a certificate authority
 // does not issue for a bare label), and an IP address has none, so such a node needs an SNI (NeedsDomainError).
@@ -658,7 +676,10 @@ func (*Protocol) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, er
 	if port < 1 || port > 65535 || port == 80 {
 		return plugin.InboundSpec{}, errors.New("VLESS TCP port must be 1-65535 and not 80")
 	}
-	if s.Security == "reality" && s.Reality.kind() == targetSite {
+	if in.RealityTargetOverride != "" && s.Security != "reality" {
+		return plugin.InboundSpec{}, &protocols.RealityTargetError{Reason: "unsupported", Target: in.RealityTargetOverride}
+	}
+	if s.Security == "reality" && s.Reality.kind() == targetSite && in.RealityTargetOverride == "" {
 		targetHost, targetPort, targetErr := targetHostPort(s.Reality.Target)
 		if targetErr == nil && targetPort == uint64(port) && sameTargetHost(targetHost, in.Node.Address) {
 			return plugin.InboundSpec{}, errors.New("invalid profile settings: /reality/target same_node: target uses this node's address and listen port; choose this node's site instead")
@@ -673,7 +694,15 @@ func (*Protocol) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, er
 		}
 		privateKey = priv.Bytes()
 		target, names = strings.TrimSpace(s.Reality.Target), effectiveServerNames(s.Reality)
-		if s.Reality.kind() == targetSelf {
+		if in.RealityTargetOverride != "" {
+			// The site this node shows instead of the profile's target, whatever that is: the host is the one name REALITY accepts and
+			// rides in the TLS block (no certificate: mode 0) so that subscriptions and probes read it there.
+			clean, host, err := realityOverrideTarget(in.RealityTargetOverride, port, in.Node.Address)
+			if err != nil {
+				return plugin.InboundSpec{}, err
+			}
+			target, names, tlsSpec = clean, []string{host}, plugin.TLS{ServerName: host}
+		} else if s.Reality.kind() == targetSelf {
 			name, err := siteName(in)
 			if err != nil {
 				return plugin.InboundSpec{}, err
@@ -892,9 +921,11 @@ func ResolveClientParams(in protocols.RenderInput) (ClientParams, bool) {
 	names := effectiveServerNames(s.Reality)
 	if s.Reality.kind() == targetSelf {
 		names = nil // the node's own site: the one name the inbound was built with
-		if in.Inbound.TLSServerName != "" {
-			names = []string{in.Inbound.TLSServerName}
-		}
+	}
+	if in.Inbound.TLSServerName != "" {
+		// the inbound's own name: the node's own site, or the site this node shows instead of the profile's (a profile's site
+		// without one has no name in its TLS block)
+		names = []string{in.Inbound.TLSServerName}
 	}
 	if len(names) == 0 || len(s.Reality.ShortIDs) == 0 {
 		return ClientParams{}, false

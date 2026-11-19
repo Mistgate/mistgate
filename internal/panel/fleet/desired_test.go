@@ -28,6 +28,7 @@ func TestRequiredProtocolCapability(t *testing.T) {
 		{name: "AWG", spec: plugin.InboundSpec{Protocol: "awg"}, want: capAWG},
 		{name: "VLESS", spec: plugin.InboundSpec{Protocol: "vless"}, want: capVLESS},
 		{name: "VLESS, another site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"www.example.org:443"}}`)}, want: capVLESS},
+		{name: "VLESS, a site chosen on the node", spec: plugin.InboundSpec{Protocol: "vless", TLS: plugin.TLS{ServerName: "shop.example.com"}, Settings: []byte(`{"reality":{"target":"shop.example.com:443"}}`)}, want: capVLESSTarget},
 		{name: "VLESS, the node's own site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"self"}}`)}, want: capVLESSSelf},
 		{name: "VLESS TLS front", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"security":"tls"}`)}, want: capVLESSTLS},
 		{name: "other L3 protocol", spec: plugin.InboundSpec{Tunnel: plugin.Tunnel{MTU: 1280}}, want: capAWG},
@@ -585,6 +586,35 @@ func TestVLESSSelfInboundIsWithheldFromAnAgentWithoutTheCapability(t *testing.T)
 		sort.Strings(held)
 		if !slices.Equal(held, tc.held) || !slices.Equal(st.withheld, tc.withheld) {
 			t.Errorf("%s: held %v withheld %v, want %v and %v", tc.name, held, st.withheld, tc.held, tc.withheld)
+		}
+	}
+}
+
+// A REALITY target chosen on the node has its name in the TLS block, which an agent without vless-target/1 rejects: the inbound is
+// withheld from it (agent_too_old on its row) and a site of the profile still goes out.
+func TestVLESSTargetOfTheNodeIsWithheldFromAnAgentWithoutTheCapability(t *testing.T) {
+	site := plugin.InboundSpec{ID: "inb_site", Protocol: "vless", Enabled: true, Settings: []byte(`{"reality":{"target":"www.example.org:443"}}`)}
+	chosen := plugin.InboundSpec{ID: "inb_chosen", Protocol: "vless", Enabled: true, TLS: plugin.TLS{ServerName: "shop.example.com"},
+		Settings: []byte(`{"reality":{"target":"shop.example.com:443","server_names":["shop.example.com"]}}`)}
+	e := newEnv(t)
+	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
+		return []statehash.Inbound{{Spec: site}, {Spec: chosen}}, nil
+	}
+	node := store.NodeRow{ID: "nod_1", State: "active"}
+	for _, tc := range []struct {
+		name     string
+		caps     []string
+		withheld []string
+	}{
+		{"agent with VLESS self", []string{"vless/1", "vless-self/1", "vless-tls/1"}, []string{"inb_chosen"}},
+		{"agent with the target capability", []string{"vless/1", "vless-target/1"}, nil},
+	} {
+		st, err := e.f.buildState(context.Background(), node, tc.caps)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(st.withheld, tc.withheld) || st.in["inb_site"] == nil {
+			t.Errorf("%s: withheld %v, site held %v, want withheld %v and the site held", tc.name, st.withheld, st.in["inb_site"] != nil, tc.withheld)
 		}
 	}
 }

@@ -732,7 +732,7 @@ func (s *Service) inboundProto(f store.AccessInboundFull, settings json.RawMessa
 		NodeId: f.Node.ID, NodeName: f.Node.Name, State: inboundStates[f.Inbound.State], LastError: f.Inbound.LastError,
 		CertPinSha256: f.Inbound.CertPinSHA256, Port: uint32(f.Inbound.PortOverride), TlsServerName: f.Inbound.TLSServerNameOverride,
 		PortOverride: uint32(f.Inbound.PortOverride), TlsServerNameOverride: f.Inbound.TLSServerNameOverride, Enabled: f.Inbound.Enabled,
-		DirectInSubscriptions: f.Inbound.DirectInSubscriptions,
+		DirectInSubscriptions: f.Inbound.DirectInSubscriptions, RealityTargetOverride: f.Inbound.RealityTargetOverride,
 	}
 	if !f.Inbound.CertNotAfter.IsZero() {
 		out.CertNotAfterUnix = f.Inbound.CertNotAfter.Unix()
@@ -740,6 +740,7 @@ func (s *Service) inboundProto(f store.AccessInboundFull, settings json.RawMessa
 	if spec, err := s.buildSpec(f, settings); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
 		out.Cdn = protocols.ServerCDN(spec)
+		out.RealityTarget = plugin.RealityTargetShown(spec)
 	}
 	out.Awg = awgStatus(f.Inbound)
 	return out
@@ -921,7 +922,14 @@ func buildRefusal(err error, node string) error {
 	var domain *protocols.NeedsDomainError
 	var hop *protocols.PortInHopError
 	var name *protocols.ServerNameError
+	var target *protocols.RealityTargetError
 	switch {
+	case errors.As(err, &target) && target.Reason == "unsupported":
+		return coded(connect.CodeInvalidArgument, "reality_target_unsupported", "target", target.Target, "node", node)
+	case errors.As(err, &target) && target.Reason == "same_node":
+		return coded(connect.CodeInvalidArgument, "reality_target_same_node", "target", target.Target, "node", node)
+	case errors.As(err, &target):
+		return coded(connect.CodeInvalidArgument, "reality_target_invalid", "target", target.Target, "node", node)
 	case errors.As(err, &domain) && domain.MTProto:
 		return coded(connect.CodeInvalidArgument, "mtproto_needs_domain", "address", domain.Address, "node", node)
 	case errors.As(err, &domain) && domain.Reality:
@@ -943,7 +951,8 @@ func buildRefusal(err error, node string) error {
 func nodeBuildRefusal(err error, node string) error {
 	var domain *protocols.NeedsDomainError
 	var name *protocols.ServerNameError
-	if errors.As(err, &domain) || errors.As(err, &name) {
+	var target *protocols.RealityTargetError
+	if errors.As(err, &domain) || errors.As(err, &name) || errors.As(err, &target) {
 		return buildRefusal(err, node)
 	}
 	return invalid("node %s: %v", node, err)
@@ -1166,7 +1175,7 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	}
 	f := store.AccessInboundFull{Inbound: store.AccessInbound{
 		ID: store.NewID("inb_"), ProfileID: m.ProfileId, NodeID: m.NodeId, PortOverride: port, TLSServerNameOverride: sni,
-		Enabled: true, DirectInSubscriptions: true, SpecVersion: 1, State: "pending", CreatedAt: s.now(),
+		RealityTargetOverride: strings.TrimSpace(m.RealityTargetOverride), Enabled: true, DirectInSubscriptions: true, SpecVersion: 1, State: "pending", CreatedAt: s.now(),
 	}}
 	var proto protocols.Protocol
 	var merged json.RawMessage
@@ -1217,6 +1226,9 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	}
 	if f.Node.State != "pending" && f.Node.State != "active" {
 		return nil, coded(connect.CodeFailedPrecondition, "node_retired")
+	}
+	if err := realityTargetAgentRefusal(f.Node.AgentCaps, f.Inbound.RealityTargetOverride); err != nil {
+		return nil, err
 	}
 	others, here, err := s.nodeInbounds(ctx, f.Node.ID, "")
 	if err != nil {
@@ -1339,6 +1351,19 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		specChangedByAdmin = specChangedByAdmin || sni != in.TLSServerNameOverride
 		in.TLSServerNameOverride = sni
 	}
+	if m.RealityTargetOverride != nil {
+		target := strings.TrimSpace(*m.RealityTargetOverride)
+		if len(target) > 300 {
+			return nil, invalid("reality target override is too long")
+		}
+		if target != in.RealityTargetOverride {
+			if err := realityTargetAgentRefusal(f.Node.AgentCaps, target); err != nil {
+				return nil, err
+			}
+			specChangedByAdmin = true
+		}
+		in.RealityTargetOverride = target
+	}
 	enabledChanged := false
 	if m.Enabled != nil {
 		enabledChanged = *m.Enabled != in.Enabled
@@ -1432,7 +1457,8 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 			}
 		}
 		s.audit(ctx, actor(ctx), "inbound_update", map[string]any{"inbound": in.ID, "profile": f.Profile.Name, "node": f.Node.Name,
-			"port": spec.Listen.Port, "enabled": in.Enabled, "direct_in_subscriptions": in.DirectInSubscriptions})
+			"port": spec.Listen.Port, "enabled": in.Enabled, "direct_in_subscriptions": in.DirectInSubscriptions,
+			"reality_target": in.RealityTargetOverride})
 		if lossyOverride {
 			s.auditLossyPort(ctx, f.Node.Name, spec.Listen.Port)
 		}

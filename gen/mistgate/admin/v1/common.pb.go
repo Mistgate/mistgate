@@ -538,7 +538,13 @@ type Inbound struct {
 	// Whether the server at the node's own address is included in subscriptions. The inbound keeps running when false.
 	DirectInSubscriptions bool `protobuf:"varint,18,opt,name=direct_in_subscriptions,json=directInSubscriptions,proto3" json:"direct_in_subscriptions,omitempty"`
 	// Whether clients reach this inbound through its CDN host instead of the node's address.
-	Cdn           bool `protobuf:"varint,19,opt,name=cdn,proto3" json:"cdn,omitempty"`
+	Cdn bool `protobuf:"varint,19,opt,name=cdn,proto3" json:"cdn,omitempty"`
+	// Protocol "vless", REALITY only: the target this node shows instead of the profile's, as "host:port" ("" = the profile's own; the
+	// host is also the one name REALITY accepts here, so it is the tls_server_name of this inbound).
+	RealityTargetOverride string `protobuf:"bytes,20,opt,name=reality_target_override,json=realityTargetOverride,proto3" json:"reality_target_override,omitempty"`
+	// The target REALITY forwards strangers to as this inbound has it built: "self" (the node's own site), "host:port", or "" for an
+	// inbound that is not VLESS REALITY. The edit window and the neighbour card say what strangers see now and after a change.
+	RealityTarget string `protobuf:"bytes,21,opt,name=reality_target,json=realityTarget,proto3" json:"reality_target,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -704,6 +710,20 @@ func (x *Inbound) GetCdn() bool {
 		return x.Cdn
 	}
 	return false
+}
+
+func (x *Inbound) GetRealityTargetOverride() string {
+	if x != nil {
+		return x.RealityTargetOverride
+	}
+	return ""
+}
+
+func (x *Inbound) GetRealityTarget() string {
+	if x != nil {
+		return x.RealityTarget
+	}
+	return ""
 }
 
 // AmneziaWG interface state of one inbound (agent.v1.AwgHealth).
@@ -1820,7 +1840,7 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"A\n" +
 	"\rProtocolCount\x12\x1a\n" +
 	"\bprotocol\x18\x01 \x01(\tR\bprotocol\x12\x14\n" +
-	"\x05users\x18\x02 \x01(\rR\x05users\"\xab\x05\n" +
+	"\x05users\x18\x02 \x01(\rR\x05users\"\x8a\x06\n" +
 	"\aInbound\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1843,7 +1863,9 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x18tls_server_name_override\x18\x10 \x01(\tR\x15tlsServerNameOverride\x12\x18\n" +
 	"\aenabled\x18\x11 \x01(\bR\aenabled\x126\n" +
 	"\x17direct_in_subscriptions\x18\x12 \x01(\bR\x15directInSubscriptions\x12\x10\n" +
-	"\x03cdn\x18\x13 \x01(\bR\x03cdn\"\x8f\x03\n" +
+	"\x03cdn\x18\x13 \x01(\bR\x03cdn\x126\n" +
+	"\x17reality_target_override\x18\x14 \x01(\tR\x15realityTargetOverride\x12%\n" +
+	"\x0ereality_target\x18\x15 \x01(\tR\rrealityTarget\"\x8f\x03\n" +
 	"\x10AwgInboundStatus\x12\x18\n" +
 	"\abackend\x18\x01 \x01(\tR\abackend\x12'\n" +
 	"\x0fbackend_version\x18\x02 \x01(\tR\x0ebackendVersion\x12\x19\n" +

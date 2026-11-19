@@ -32,7 +32,10 @@ const (
 	// rejects that target, and self is the default of a new VLESS profile.
 	capVLESSSelf = "vless-self/1"
 	capVLESSTLS  = "vless-tls/1"
-	capWarp      = "warp/1"
+	// capVLESSTarget: an agent that takes the REALITY target of the node's own choice, whose name is in the TLS block with no
+	// certificate; an older vless/1 or vless-self/1 agent rejects that block, so such an inbound is withheld from it.
+	capVLESSTarget = "vless-target/1"
+	capWarp        = "warp/1"
 	// capUserRateLimit: the agent shares one bucket per person (Credential.user_rate_limit_bps, agent.proto "SPEED LIMITS").
 	capUserRateLimit = "user-rate-limit/1"
 	// capMTProto: the agent has the MTProto engine. No agent lists it: the panel derives it from Hello.engines (see
@@ -70,6 +73,9 @@ func requiredCap(s plugin.InboundSpec) string {
 		}
 		if vlessTargetSelf(s) {
 			return capVLESSSelf
+		}
+		if s.TLS.ServerName != "" {
+			return capVLESSTarget // REALITY with another site: only a target set on the node has a name in its TLS block
 		}
 		return capVLESS
 	}
@@ -407,6 +413,7 @@ func (f *Fleet) buildSpec(n store.NodeRow, row store.FleetInboundRow) (plugin.In
 		Node:                  protocols.NodeView{ID: n.ID, Name: n.Name, Address: n.Address, CountryCode: n.CountryCode},
 		PortOverride:          row.PortOverride,
 		TLSServerNameOverride: row.TLSNameOverride,
+		RealityTargetOverride: row.RealityTargetOverride,
 		SpecVersion:           row.SpecVersion,
 		Enabled:               true,
 		InboundID:             row.ID,

@@ -87,7 +87,8 @@ func (s *Service) ProbeTargets(ctx context.Context) ([]ProbeTarget, error) {
 					continue
 				}
 				kind := "tls"
-				if cfg.Security == "reality" && cfg.Reality.Target != "" && cfg.Reality.TargetKind != "self" {
+				// the spec, not the profile: a node can show a site of its own, and the node's own site is what a fetch would not get
+				if _, _, other := plugin.RealityTarget(t.spec); other {
 					kind = "fetch"
 				}
 				tlsTargets = append(tlsTargets, ProbeTarget{NodeID: n.node.ID, IP: ip, Port: t.spec.Listen.Port, Kind: kind, SNI: sni, Path: path})
