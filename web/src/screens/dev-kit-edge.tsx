@@ -86,10 +86,9 @@ const downSeed: [readonly unknown[], unknown][] = [
   ...healthRest,
 ];
 
-// ---- Updates once node updates are wired there: Me lists every gap but agent_updates. Nodes follow the panel's own signed
+// ---- Updates on the edge, where node updates are wired. Nodes follow the panel's own signed
 // release (v0.1.50), offered for download (no dist folder); nl1 runs v0.1.47, an agent without update-link/1, updated by hand
 // once. The panel row is updated with mistgate edge deploy. The VPS shots carry the same nodes on a VPS panel.
-const updMe = { ...edgeMe, unavailable: editionFeatures.filter((f) => f !== "agent_updates") };
 const REL = "v0.1.50";
 const B50 = now - 6 * 3600;
 const hex = (seed: string) => seed.repeat(64).slice(0, 64);
@@ -175,13 +174,13 @@ export function EdgeKit() {
       <Shot id="edge-updates" title="Edge: Updates (nodes and releases listed, no buttons that start anything)" seed={[[updatesQuery.queryKey, { ...available, panel: panelOffer.panel }]]}>
         <UpdatesScreen />
       </Shot>
-      <Shot id="edge-upd-outdated" title="Edge, node updates wired: de1 outdated, nl1 on v0.1.47 by hand, a newer panel release on GitHub" seed={[[updatesQuery.queryKey, edgeOutdated]]} me={updMe}>
+      <Shot id="edge-upd-outdated" title="Edge, node updates wired: de1 outdated, nl1 on v0.1.47 by hand, a newer panel release on GitHub" seed={[[updatesQuery.queryKey, edgeOutdated]]} me={edgeMe}>
         <UpdatesScreen />
       </Shot>
-      <Shot id="edge-upd-manual" title="Edge, node updates wired: only nl1 left, by hand (the panel not checked yet)" seed={[[updatesQuery.queryKey, edgeManual]]} me={updMe}>
+      <Shot id="edge-upd-manual" title="Edge, node updates wired: only nl1 left, by hand (the panel not checked yet)" seed={[[updatesQuery.queryKey, edgeManual]]} me={edgeMe}>
         <UpdatesScreen />
       </Shot>
-      <Shot id="edge-upd-running" title="Edge, node updates wired: a rollout running (no client-eye check in the gate)" seed={[[updatesQuery.queryKey, edgeRunning]]} me={updMe}>
+      <Shot id="edge-upd-running" title="Edge, node updates wired: a rollout running (no client-eye check in the gate)" seed={[[updatesQuery.queryKey, edgeRunning]]} me={edgeMe}>
         <UpdatesScreen />
       </Shot>
       <Shot id="vps-upd-outdated" title="VPS: the same nodes (unchanged)" seed={[[updatesQuery.queryKey, onVps(edgeOutdated)]]} me={vpsMe}>

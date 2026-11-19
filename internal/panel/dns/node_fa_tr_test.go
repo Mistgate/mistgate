@@ -1,10 +1,52 @@
 package dns
 
 import (
+	"bytes"
+	"encoding/json"
+	"flag"
+	"os"
 	"strings"
 	"testing"
 	"unicode"
 )
+
+var updateBuiltinNames = flag.Bool("update-builtin-names", false, "rewrite testdata/builtin_names.json")
+
+// The names of the built-in presets are written twice, here for the user page and in the admin (web/src/screens/subscriptions/model.ts
+// builtinNames). Both sides are pinned to this one file: the web test web/src/screens/subscriptions/model.test.ts reads it too.
+// A name changed here fails until the file is refreshed (go test ./internal/panel/dns -run BuiltinNamesFile -update-builtin-names),
+// and then the web test fails until the admin says the same.
+func TestBuiltinNamesFileIsTheOneListOfNames(t *testing.T) {
+	type names struct {
+		Ru string `json:"ru"`
+		En string `json:"en"`
+		Zh string `json:"zh"`
+		Fa string `json:"fa"`
+		Tr string `json:"tr"`
+	}
+	all := map[string]names{}
+	for id, n := range builtinNames {
+		all[id] = names{n.ru, n.en, n.zh, n.fa, n.tr}
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(all); err != nil {
+		t.Fatal(err)
+	}
+	const path = "testdata/builtin_names.json"
+	if *updateBuiltinNames {
+		if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	have, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(bytes.ReplaceAll(have, []byte("\r\n"), []byte("\n")), buf.Bytes()) {
+		t.Fatalf("%s is out of date (%v): refresh it with `go test ./internal/panel/dns -run BuiltinNamesFile -update-builtin-names` and give the admin the same words in web/src/screens/subscriptions/model.ts", path, err)
+	}
+}
 
 // Every built-in preset has its words on the Persian and the Turkish page: a Persian name in Persian letters (a bare brand
 // stays a brand), a Turkish one, and both descriptions, shown while the stored English one is still the stock one.

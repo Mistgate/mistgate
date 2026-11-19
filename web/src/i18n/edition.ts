@@ -2,7 +2,7 @@
 // (internal/panel/edition); the admin says so in these words instead of showing a button that does nothing. English is the
 // source of truth: `ru` is type-checked against it. The admin speaks «ты». Never rename an id: the server sends them.
 /** The feature ids MeResponse.unavailable carries (internal/panel/edition). */
-export const editionFeatures = ["backups", "mcp", "assistant", "health_checks", "agent_updates", "agent_logs", "panel_update", "decoy_own", "tspu_probe", "os_updates", "own_probes", "sni_scan", "trusttunnel"] as const;
+export const editionFeatures = ["backups", "mcp", "assistant", "health_checks", "agent_logs", "panel_update", "decoy_own", "tspu_probe", "os_updates", "own_probes", "sni_scan", "trusttunnel"] as const;
 export type EditionFeature = (typeof editionFeatures)[number];
 
 export const en = {
@@ -11,7 +11,6 @@ export const en = {
   "edition.feature.backups": "Backups",
   "edition.feature.mcp": "MCP and API tokens",
   "edition.feature.health_checks": "Tunnel checks",
-  "edition.feature.agent_updates": "Updating nodes",
   "edition.feature.agent_logs": "Node logs",
   "edition.feature.panel_update": "Updating the panel",
   "edition.feature.decoy_own": "Own decoy site",
@@ -30,7 +29,6 @@ export const ru: typeof en = {
   "edition.feature.backups": "Резервные копии",
   "edition.feature.mcp": "MCP и API-токены",
   "edition.feature.health_checks": "Проверки туннелей",
-  "edition.feature.agent_updates": "Обновление нод",
   "edition.feature.agent_logs": "Логи ноды",
   "edition.feature.panel_update": "Обновление панели",
   "edition.feature.decoy_own": "Свой сайт-ширма",
@@ -49,7 +47,6 @@ export const zh: typeof en = {
   "edition.feature.backups": "备份",
   "edition.feature.mcp": "MCP 和 API 令牌",
   "edition.feature.health_checks": "隧道检测",
-  "edition.feature.agent_updates": "更新节点",
   "edition.feature.agent_logs": "节点日志",
   "edition.feature.panel_update": "更新面板",
   "edition.feature.decoy_own": "自有伪装站点",
@@ -67,7 +64,6 @@ export const fa: typeof en = {
   "edition.feature.backups": "نسخه‌های پشتیبان",
   "edition.feature.mcp": "MCP و توکن‌های API",
   "edition.feature.health_checks": "بررسی تونل‌ها",
-  "edition.feature.agent_updates": "به‌روزرسانی نودها",
   "edition.feature.agent_logs": "لاگ‌های نود",
   "edition.feature.panel_update": "به‌روزرسانی پنل",
   "edition.feature.decoy_own": "سایت پوششی اختصاصی",
@@ -85,7 +81,6 @@ export const tr: typeof en = {
   "edition.feature.backups": "Yedekler",
   "edition.feature.mcp": "MCP ve API token'ları",
   "edition.feature.health_checks": "Tünel kontrolleri",
-  "edition.feature.agent_updates": "Düğümleri güncelleme",
   "edition.feature.agent_logs": "Düğüm günlükleri",
   "edition.feature.panel_update": "Paneli güncelleme",
   "edition.feature.decoy_own": "Kendi kamuflaj sitesi",

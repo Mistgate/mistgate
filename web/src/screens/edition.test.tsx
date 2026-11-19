@@ -239,7 +239,6 @@ describe("Updates on the edge", () => {
   // The page opens one layer at a time: a panel update is out, so it starts on the panel; ?tab=agents shows the nodes.
   it("says how the edition's panel is updated and offers no button for it", async () => {
     await mount(<UpdatesScreen />);
-    expect(text()).toContain(notice("agent_updates"));
     // the panel row says how the edition is updated instead of only that it cannot be done from here
     expect(text()).not.toContain(notice("panel_update"));
     expect(text()).toContain("This panel runs on Cloudflare. Update it from your computer");
@@ -247,15 +246,6 @@ describe("Updates on the edge", () => {
     expect(buttons().join("|")).not.toContain("Update panel");
     // the edition has two layers: nothing reads the servers' operating systems there
     expect(text()).not.toContain("Server systems");
-  });
-
-  it("lists the nodes and the release but offers no way to start an update", async () => {
-    search = { tab: "agents" };
-    await mount(<UpdatesScreen />);
-    expect(text()).toContain("de1");
-    const all = buttons().join("|");
-    expect(all).not.toMatch(/Update \d+ nodes?/);
-    expect(all).not.toContain("Read the folder again");
   });
 
   it("shows no release bundle card: the edition has no bundle, its scan would only fail", async () => {

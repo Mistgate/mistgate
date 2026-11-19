@@ -158,7 +158,6 @@ function Bar({ busy, job, panel }: { busy?: boolean; job?: Job; panel?: ReturnTy
       allShown={false}
       total={5}
       avail={avail}
-      agentOff={false}
       busy={!!busy}
       job={job ?? null}
       rows={job?.rows ?? []}

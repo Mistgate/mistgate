@@ -1130,7 +1130,6 @@ describe("What's new", () => {
 });
 
 describe("the Cloudflare edition", () => {
-  // Me after node updates were wired there: every other gap of the edition is still listed, agent_updates is not
   const edgeMe = { edition: "edge", unavailable: ["backups", "mcp", "health_checks", "agent_logs", "panel_update", "decoy_own", "tspu_probe"] };
   const base = "https://github.com/Mistgate/mistgate/releases/download/v0.2.0-bbb/";
   const sha = "9dd4c0" + "ab".repeat(29);

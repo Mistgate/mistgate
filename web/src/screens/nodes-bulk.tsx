@@ -10,7 +10,6 @@ import { useT } from "@/i18n";
 import type { Batch, Job, Row } from "@/lib/batch";
 import { maxBulkNodes } from "@/lib/decoy";
 import { cx } from "@/lib/cx";
-import { useEdition } from "@/lib/edition";
 import type { Plain } from "@/lib/plain";
 import { actionMeta, AgentDialog, availability, BindDialog, decoyOutcome, panelFor, PasswordDialog, UnbindDialog, type ActionId, type BulkRun } from "./nodes-bulk-actions";
 import { DecoyBulkDialog } from "./nodes-decoy";
@@ -35,7 +34,7 @@ const glyph: Partial<Record<ActionId, string>> = {
   panelKey: "M8 15a4 4 0 1 1 3.9-5H21v3h-2v2h-3v-2h-4.1A4 4 0 0 1 8 15z",
   agent: "M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4",
 };
-/** The buttons of the bar, the rest are in its menu. The update of the agent is left out in an edition that has none. */
+/** The buttons of the bar, the rest are in its menu. */
 const direct: ActionId[] = ["ports", "doctor", "panelKey", "agent"];
 
 /**
@@ -68,7 +67,6 @@ export function NodesBulk({
 }) {
   const t = useT();
   const [dialog, setDialog] = useState<ActionId | null>(null);
-  const agentOff = useEdition().off("agent_updates");
   const job = batch.job;
   const hidden = new Set(picked.filter((n) => !shown.has(n.id)).map((n) => n.id));
 
@@ -95,7 +93,6 @@ export function NodesBulk({
             allShown={allShown}
             total={total}
             avail={avail}
-            agentOff={agentOff}
             busy={batch.running}
             job={job}
             rows={rows}
@@ -128,7 +125,6 @@ export function BulkBar({
   allShown,
   total,
   avail,
-  agentOff,
   busy,
   job,
   rows,
@@ -146,7 +142,6 @@ export function BulkBar({
   allShown: boolean;
   total: number;
   avail: Record<ActionId, Avail>;
-  agentOff: boolean;
   /** A batch runs: a second one waits for it. */
   busy: boolean;
   job: Job | null;
@@ -217,11 +212,9 @@ export function BulkBar({
         </div>
         {!job && (
           <div className="flex gap-1">
-            {direct
-              .filter((a) => !(a === "agent" && agentOff))
-              .map((a) => (
-                <Act key={a} meta={actionMeta[a]} d={glyph[a]!} avail={avail[a]} busy={busy} onClick={() => onAction(a)} />
-              ))}
+            {direct.map((a) => (
+              <Act key={a} meta={actionMeta[a]} d={glyph[a]!} avail={avail[a]} busy={busy} onClick={() => onAction(a)} />
+            ))}
             <ActionMenu label={t("bulk.more")} items={more} busy={busy} onAction={onAction} iconOnly align="end" />
           </div>
         )}
