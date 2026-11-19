@@ -180,6 +180,7 @@ type Agent struct {
 	clientIPv6DoctorPending atomic.Bool
 	clientIPv6DoctorRunning atomic.Bool
 	linkAdvertised          atomic.Bool                                             // the last HelloAck advertised the signed link
+	fetchToken              atomic.Pointer[string]                                  // the last HelloAck's fetch_token (LINK FETCH); a secret, never logged
 	linkRetryAt             atomic.Pointer[time.Time]                               // a link attempt failed before it was established: the link is not tried again before this
 	linkHTTPClient          *http.Client                                            // test seam; nil uses normal system-root TLS verification
 	updateRootCAs           *x509.CertPool                                          // test seam for loopback source-fetch servers
@@ -1460,6 +1461,8 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, via
 		}
 	}
 	a.linkAdvertised.Store(ack.LinkSupported)
+	token := ack.FetchToken
+	a.fetchToken.Store(&token)
 	if a.onHelloAck(ack) {
 		// The panel sent a new link address: the next session tries it. This one has not started, so nothing to flush.
 		cancel()
