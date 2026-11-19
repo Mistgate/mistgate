@@ -624,6 +624,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 		c.l3Stats(ctx, tr.state, st, out.InboundIDs, now)
 		c.f.recordBridgeReports(ctx, tr.state.NodeID, st.Bridges, now)
 		c.f.recordSharedPorts(ctx, tr.state.NodeID, st.SharedPorts, now)
+		c.f.recordSubHost(tr.state.NodeID, st.GetSubHost())
 		if out.OffNode > 0 || out.Clamped > 0 {
 			c.statsAdjusted(ctx, tr.state, out.OffNode, out.Clamped, now)
 		}

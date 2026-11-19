@@ -30,11 +30,12 @@ func newSubHost(k *core) subHostService {
 	return svc
 }
 
-// addSubHost mounts the SubscriptionHostService behind the session.
+// addSubHost mounts the SubscriptionHostService behind the session, and gives the public server the subdomain's connections.
 func (k *core) addSubHost(cfg *httpserver.Config) {
 	if k.sub == nil {
 		return
 	}
 	path, handler := k.sub.Handler()
 	cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: path, Handler: handler})
+	cfg.PublicTunnel, cfg.PublicTunnelTLS = k.sub.PublicListener(), k.sub.PublicTLS() // the subdomain's connections, from the hosts
 }
