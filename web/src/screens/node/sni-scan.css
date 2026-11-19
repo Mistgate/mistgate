@@ -232,6 +232,9 @@
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .ss-foot {
   display: grid;
@@ -292,5 +295,73 @@
   }
   .ss-body[data-fx] .ss-row {
     animation: none;
+  }
+}
+
+/* "Apply…" of a neighbour (sni-apply.tsx): what strangers see now and after, and what the change costs. */
+.sa {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sa-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--sec);
+}
+.sa-change {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.sa-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.sa-side small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sa-side b {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.sa-new {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent-mark) 6%, transparent);
+}
+.sa-arrow {
+  color: var(--muted);
+}
+.sa-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+  text-wrap: pretty;
+}
+@media (max-width: 520px) {
+  .sa-change {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sa-arrow {
+    justify-self: center;
+    rotate: 90deg;
   }
 }

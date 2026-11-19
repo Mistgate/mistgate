@@ -408,11 +408,15 @@ func (s *Service) buildSpec(f store.AccessInboundFull, settings json.RawMessage)
 			return plugin.InboundSpec{}, fmt.Errorf("cannot open the inbound's key material: %w", err)
 		}
 	}
+	if f.Inbound.RealityTargetOverride != "" && f.Profile.Protocol != "vless" {
+		return plugin.InboundSpec{}, &protocols.RealityTargetError{Reason: "unsupported", Target: f.Inbound.RealityTargetOverride}
+	}
 	spec, err := proto.BuildInbound(protocols.InboundInput{
 		Profile:               protocols.ProfileView{ID: f.Profile.ID, Version: f.Profile.Version, Settings: settings},
 		Node:                  nodeView(f.Node),
 		PortOverride:          f.Inbound.PortOverride,
 		TLSServerNameOverride: f.Inbound.TLSServerNameOverride,
+		RealityTargetOverride: f.Inbound.RealityTargetOverride,
 		SpecVersion:           f.Inbound.SpecVersion,
 		Enabled:               f.Inbound.Enabled,
 		InboundID:             f.Inbound.ID,

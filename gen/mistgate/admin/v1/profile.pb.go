@@ -1273,7 +1273,9 @@ func (x *ScoreItem) GetParams() map[string]string {
 // "sni_needs_domain: name=1.2.3.4" (an IP where Let's Encrypt wants a domain), "sni_invalid: name=..." (neither a domain
 // nor an IP), "already_on_node", "node_retired", "port_lossy: port=8443&node=de1&sent=300&got=190&at=<unix>&sender=nl1&free=2053"
 // (FAILED_PRECONDITION: the UDP delivery check of design/udp-port-check.md found the port losing packets on that node;
-// free = a port the same run proved, else the picker's choice from stored checks, 0 = none; allow_lossy_port saves anyway).
+// free = a port the same run proved, else the picker's choice from stored checks, 0 = none; allow_lossy_port saves anyway),
+// "reality_target_unsupported" (a REALITY target override on an inbound that is not VLESS REALITY), "reality_target_invalid:
+// target=..." (not a host name and a port), "reality_target_same_node: target=...&node=de1" (the node itself at its own port).
 type CreateInboundRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	ProfileId string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
@@ -1291,10 +1293,14 @@ type CreateInboundRequest struct {
 	AllowLossyPort bool `protobuf:"varint,6,opt,name=allow_lossy_port,json=allowLossyPort,proto3" json:"allow_lossy_port,omitempty"`
 	// With an empty profile_id, validate_only must be true and these fields describe a new profile that is not stored.
 	// This lets the add-profile plan run the same per-node checks without creating a temporary profile.
-	Protocol      string `protobuf:"bytes,7,opt,name=protocol,proto3" json:"protocol,omitempty"`
-	SettingsJson  string `protobuf:"bytes,8,opt,name=settings_json,json=settingsJson,proto3" json:"settings_json,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Protocol     string `protobuf:"bytes,7,opt,name=protocol,proto3" json:"protocol,omitempty"`
+	SettingsJson string `protobuf:"bytes,8,opt,name=settings_json,json=settingsJson,proto3" json:"settings_json,omitempty"`
+	// VLESS REALITY only: "host:port" of a site this node shows instead of the profile's target (the host is a name, not an IP);
+	// the host becomes the one name REALITY accepts there. Empty = the profile's target. Refusals: reality_target_unsupported,
+	// reality_target_invalid, reality_target_same_node (as listed above).
+	RealityTargetOverride string `protobuf:"bytes,9,opt,name=reality_target_override,json=realityTargetOverride,proto3" json:"reality_target_override,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *CreateInboundRequest) Reset() {
@@ -1383,6 +1389,13 @@ func (x *CreateInboundRequest) GetSettingsJson() string {
 	return ""
 }
 
+func (x *CreateInboundRequest) GetRealityTargetOverride() string {
+	if x != nil {
+		return x.RealityTargetOverride
+	}
+	return ""
+}
+
 type CreateInboundResponse struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Inbound *Inbound               `protobuf:"bytes,1,opt,name=inbound,proto3" json:"inbound,omitempty"`
@@ -1462,6 +1475,9 @@ type UpdateInboundRequest struct {
 	AllowLossyPort bool `protobuf:"varint,6,opt,name=allow_lossy_port,json=allowLossyPort,proto3" json:"allow_lossy_port,omitempty"`
 	// Whether the server at the node's own address is included in subscriptions; absent = leave unchanged.
 	DirectInSubscriptions *bool `protobuf:"varint,7,opt,name=direct_in_subscriptions,json=directInSubscriptions,proto3,oneof" json:"direct_in_subscriptions,omitempty"`
+	// As CreateInboundRequest.reality_target_override; absent = leave unchanged, "" = back to the profile's target. A change
+	// restarts the server and clients get the new name with their next subscription update.
+	RealityTargetOverride *string `protobuf:"bytes,8,opt,name=reality_target_override,json=realityTargetOverride,proto3,oneof" json:"reality_target_override,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -1543,6 +1559,13 @@ func (x *UpdateInboundRequest) GetDirectInSubscriptions() bool {
 		return *x.DirectInSubscriptions
 	}
 	return false
+}
+
+func (x *UpdateInboundRequest) GetRealityTargetOverride() string {
+	if x != nil && x.RealityTargetOverride != nil {
+		return *x.RealityTargetOverride
+	}
+	return ""
 }
 
 type UpdateInboundResponse struct {
@@ -2186,7 +2209,7 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\x06params\x18\x04 \x03(\v2(.mistgate.admin.v1.ScoreItem.ParamsEntryR\x06params\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xbc\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf4\x02\n" +
 	"\x14CreateInboundRequest\x12\x1d\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\tprofileId\x12\x17\n" +
@@ -2196,11 +2219,12 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\rvalidate_only\x18\x05 \x01(\bR\fvalidateOnly\x12(\n" +
 	"\x10allow_lossy_port\x18\x06 \x01(\bR\x0eallowLossyPort\x12\x1a\n" +
 	"\bprotocol\x18\a \x01(\tR\bprotocol\x12#\n" +
-	"\rsettings_json\x18\b \x01(\tR\fsettingsJson\"\xa7\x01\n" +
+	"\rsettings_json\x18\b \x01(\tR\fsettingsJson\x126\n" +
+	"\x17reality_target_override\x18\t \x01(\tR\x15realityTargetOverride\"\xa7\x01\n" +
 	"\x15CreateInboundResponse\x124\n" +
 	"\ainbound\x18\x01 \x01(\v2\x1a.mistgate.admin.v1.InboundR\ainbound\x12;\n" +
 	"\bwarnings\x18\x02 \x03(\v2\x1f.mistgate.admin.v1.StatusReasonR\bwarnings\x12\x1b\n" +
-	"\tfree_port\x18\x03 \x01(\rR\bfreePort\"\x9f\x03\n" +
+	"\tfree_port\x18\x03 \x01(\rR\bfreePort\"\xf8\x03\n" +
 	"\x14UpdateInboundRequest\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12(\n" +
@@ -2209,12 +2233,14 @@ const file_mistgate_admin_v1_profile_proto_rawDesc = "" +
 	"\aenabled\x18\x04 \x01(\bH\x02R\aenabled\x88\x01\x01\x12#\n" +
 	"\rvalidate_only\x18\x05 \x01(\bR\fvalidateOnly\x12(\n" +
 	"\x10allow_lossy_port\x18\x06 \x01(\bR\x0eallowLossyPort\x12;\n" +
-	"\x17direct_in_subscriptions\x18\a \x01(\bH\x03R\x15directInSubscriptions\x88\x01\x01B\x10\n" +
+	"\x17direct_in_subscriptions\x18\a \x01(\bH\x03R\x15directInSubscriptions\x88\x01\x01\x12;\n" +
+	"\x17reality_target_override\x18\b \x01(\tH\x04R\x15realityTargetOverride\x88\x01\x01B\x10\n" +
 	"\x0e_port_overrideB\x1b\n" +
 	"\x19_tls_server_name_overrideB\n" +
 	"\n" +
 	"\b_enabledB\x1a\n" +
-	"\x18_direct_in_subscriptions\"\xa7\x01\n" +
+	"\x18_direct_in_subscriptionsB\x1a\n" +
+	"\x18_reality_target_override\"\xa7\x01\n" +
 	"\x15UpdateInboundResponse\x124\n" +
 	"\ainbound\x18\x01 \x01(\v2\x1a.mistgate.admin.v1.InboundR\ainbound\x12;\n" +
 	"\bwarnings\x18\x02 \x03(\v2\x1f.mistgate.admin.v1.StatusReasonR\bwarnings\x12\x1b\n" +

@@ -397,6 +397,10 @@ type inboundV struct {
 	LastError             string `json:"last_error,omitempty"`
 	DirectInSubscriptions bool   `json:"direct_in_subscriptions"`
 	CDN                   bool   `json:"cdn"`
+	// RealityTarget is what a VLESS REALITY server shows strangers: "self" (the node's own site) or host:port; RealityTargetOverride the
+	// part of it this node chose itself (empty = the profile's target).
+	RealityTarget         string `json:"reality_target,omitempty"`
+	RealityTargetOverride string `json:"reality_target_override,omitempty"`
 }
 
 type onlineUserV struct {
@@ -498,6 +502,7 @@ func nodeGetView(r *adminv1.GetNodeResponse) *NodeGetV {
 			ID: in.GetId(), Profile: nm(in.GetProfileName()), Protocol: clean(in.GetProtocol(), 40), Port: in.GetPort(),
 			State: enumName("INBOUND_STATE_", in.GetState().String()), LastError: clean(in.GetLastError(), 200),
 			DirectInSubscriptions: in.GetDirectInSubscriptions(), CDN: in.GetCdn(),
+			RealityTarget: clean(in.GetRealityTarget(), 300), RealityTargetOverride: clean(in.GetRealityTargetOverride(), 300),
 		})
 	}
 	// one row per person, protocol and device: the node reports each connection, each with the person's whole rate

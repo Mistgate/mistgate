@@ -86,6 +86,17 @@ func TestCapabilitiesAdvertiseVLESSSelfWithACertificateSource(t *testing.T) {
 	}
 }
 
+// vless-target/1 says the engine takes a REALITY target set on its node (the other site's name in the TLS block, no certificate): it
+// needs no certificate source, only the VLESS engine.
+func TestCapabilitiesAdvertiseVLESSTargetWithTheVLESSEngine(t *testing.T) {
+	if slices.Contains((&Agent{engines: map[string]engine.Engine{}}).capabilities(), "vless-target/1") {
+		t.Fatal("vless-target/1 is advertised without a VLESS engine")
+	}
+	if !slices.Contains((&Agent{engines: map[string]engine.Engine{"vless": newFakeEngine("vless")}}).capabilities(), "vless-target/1") {
+		t.Fatal("vless-target/1 is missing with a VLESS engine and no certificate source")
+	}
+}
+
 func TestCapabilitiesAdvertiseVLESSTLSWithACertificateSource(t *testing.T) {
 	a := &Agent{engines: map[string]engine.Engine{"vless": newFakeEngine("vless")}}
 	if slices.Contains(a.capabilities(), "vless-tls/1") {

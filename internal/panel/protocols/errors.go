@@ -42,3 +42,20 @@ func (e *ServerNameError) Error() string {
 	}
 	return "tls server name override: must be a host name or an IP address"
 }
+
+// RealityTargetError: the REALITY target set on the node (the inbound's override) cannot be used. Reason is the code the admin UI
+// words itself: "unsupported" (the inbound is not VLESS REALITY), "invalid" (not a host name with a port) or "same_node" (the node's
+// own address at its listen port, a loop).
+type RealityTargetError struct {
+	Reason, Target string
+}
+
+func (e *RealityTargetError) Error() string {
+	switch e.Reason {
+	case "unsupported":
+		return "reality target override: only a VLESS profile with REALITY can show another site on this node"
+	case "same_node":
+		return "reality target override: the target is this node's address and listen port; choose the node's own site instead"
+	}
+	return "reality target override: must be a host name and a port, for example shop.example.com:443"
+}

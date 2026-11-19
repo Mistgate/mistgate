@@ -8,7 +8,7 @@ import (
 
 func TestSharedAccessScannersHandleNullColumns(t *testing.T) {
 	inboundRow := []any{
-		"inb_null", "prf_null", "nod_null", nil, nil, nil, int64(1), int64(7), nil, nil,
+		"inb_null", "prf_null", "nod_null", nil, nil, nil, nil, int64(1), int64(7), nil, nil,
 		nil, nil, nil, nil, nil, nil, nil, nil,
 		"prf_null", nil, nil, nil, nil, nil, nil, nil,
 		"nod_null", nil, nil, nil, nil, nil, nil, nil, int64(0), "", nil, nil, nil, nil, nil,
@@ -25,15 +25,15 @@ func TestSharedAccessScannersHandleNullColumns(t *testing.T) {
 	if !reflect.DeepEqual(full, wantFull) {
 		t.Fatalf("scanAccessInboundFull = %#v, want %#v", full, wantFull)
 	}
-	inbound, err := scanAccessInbound(batchRow(inboundRow[:18]))
+	inbound, err := scanAccessInbound(batchRow(inboundRow[:19]))
 	if err != nil || !reflect.DeepEqual(inbound, wantFull.Inbound) {
 		t.Fatalf("scanAccessInbound = %#v, %v; want %#v", inbound, err, wantFull.Inbound)
 	}
-	profileOnly, err := scanAccessProfile(batchRow(inboundRow[18:26]))
+	profileOnly, err := scanAccessProfile(batchRow(inboundRow[19:27]))
 	if err != nil || !reflect.DeepEqual(profileOnly, wantFull.Profile) {
 		t.Fatalf("scanAccessProfile = %#v, %v; want %#v", profileOnly, err, wantFull.Profile)
 	}
-	nodeOnly, err := scanAccessNode(batchRow(inboundRow[26:]))
+	nodeOnly, err := scanAccessNode(batchRow(inboundRow[27:]))
 	if err != nil || !reflect.DeepEqual(nodeOnly, wantFull.Node) {
 		t.Fatalf("scanAccessNode = %#v, %v; want %#v", nodeOnly, err, wantFull.Node)
 	}

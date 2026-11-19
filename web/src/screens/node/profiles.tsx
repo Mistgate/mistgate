@@ -40,7 +40,8 @@ import { AddInbound } from "./add-inbound";
 import { AwgStatusLine } from "./awg-status";
 import { DecoyNotice, portOk, sniPlaceholder, useInboundCheck, useInboundRefresh, WarpWarnings } from "./inbound-check";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
-import { SniScanCard } from "./sni-scan";
+import { SniScanCard, sniDemo } from "./sni-scan";
+import { tlsHint, useRealityTargetEdit } from "./reality-target";
 import { ShareFix, ShareNotes } from "./share-fix";
 import { SharedPortCards } from "./shared-port";
 import { isShareCode } from "@/lib/tcpshare";
@@ -142,7 +143,11 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
     setAddingOpen(open);
     if (!open) onAddClosed?.();
   };
-  const [editing, setEditing] = useState<Editing | null>(null);
+  // /dev-kit: the edit window of a server opens by itself (sni=edit)
+  const [editing, setEditing] = useState<Editing | null>(() => {
+    const inbound = sniDemo.current?.edit ? data.inbounds.find((i) => i.id === sniDemo.current?.edit) : undefined;
+    return inbound ? { inbound } : null;
+  });
   const [removing, setRemoving] = useState<Plain<Inbound> | null>(null);
   const [restarting, setRestarting] = useState<Plain<Inbound> | null>(null);
   const node = data.node!;
@@ -316,7 +321,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
         })}
       </div>
 
-      {sniCard && <SniScanCard nodeId={node.id} nodeName={node.name} linked={linked} />}
+      {sniCard && <SniScanCard nodeId={node.id} nodeName={node.name} linked={linked} servers={data.inbounds.filter((i) => i.protocol === "vless" && !!i.realityTarget && i.state !== InboundState.DISABLED)} />}
 
       {owner && <AddInbound open={adding} onOpenChange={setAdding} data={data} initialProfile={addProfile} />}
       {editing && (
@@ -333,9 +338,11 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
   const toast = useToast();
   const refresh = useInboundRefresh(nodeId);
   const isAwg = inbound.protocol === "awg";
+  // the site this node shows instead of its profile's target (REALITY): its field, and its name is no domain of the node
+  const target = useRealityTargetEdit(inbound, onClose);
   // VLESS has a name of its own to set only where it has a certificate: the node's own site behind REALITY, or TLS (the
   // server resolved one, or the admin set one, or it could not for want of a domain); REALITY with another site has none
-  const named = inbound.protocol !== "vless" || !!inbound.tlsServerName || !!inbound.tlsServerNameOverride || (!!inbound.lastError && nameFixes(inboundErrorKind(inbound.lastError)));
+  const named = (inbound.protocol !== "vless" || !!inbound.tlsServerName || !!inbound.tlsServerNameOverride || (!!inbound.lastError && nameFixes(inboundErrorKind(inbound.lastError)))) && !target.own;
   const was = { port: inbound.port ? String(inbound.port) : "", sni: inbound.tlsServerName, enabled: inbound.state !== InboundState.DISABLED };
   const [port, setPort] = useState(was.port);
   const [sni, setSni] = useState(was.sni);
@@ -365,6 +372,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
         portOverride: touched.port ? (port ? Number(port) : 0) : undefined,
         tlsServerNameOverride: touched.sni ? sni.trim() : undefined,
         enabled: touched.enabled ? enabled : undefined,
+        realityTargetOverride: target.save,
         ...(allowLossy && { allowLossyPort: true }),
       }),
     onSuccess: (r) => {
@@ -384,7 +392,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
   const portError = !portOk(port) ? t("node.profiles.portError") : fieldError(["port_taken", "port_in_hop", "hop_taken"]);
   const sniError = fieldError(["sni_needs_domain", "sni_invalid", "acme_needs_domain", "reality_needs_domain", "mtproto_needs_domain"]);
   const effective = check.state === "ok" ? check.inbound : undefined;
-  const dirty = touched.port || touched.sni || touched.enabled;
+  const dirty = touched.port || touched.sni || touched.enabled || target.touched;
   // a refusal no field above words (the Save button is off for it): a notice at the foot says why, so the button is never off in silence
   const unexplained = refused && !share && !lossy && !portError && !sniError ? refused : null;
   return (
@@ -392,7 +400,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (dirty && portOk(port) && !refused) save.mutate(false);
+          if (dirty && portOk(port) && !refused && !target.blocked) save.mutate(false);
         }}
         className="flex flex-col gap-3.5"
       >
@@ -459,13 +467,14 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
             onChange={(e) => setSni(e.target.value)}
             autoFocus={focus === "sni"}
             placeholder={sniPlaceholder(t, effective?.tlsServerName, nodeAddress)}
-            hint={inbound.protocol === "hysteria2" || inbound.protocol === "trusttunnel" ? `${t("node.profiles.tlsHint")} ${t(`sni.why.${inbound.protocol}`)}` : t("node.profiles.tlsHint")}
+            hint={tlsHint(t, inbound.protocol)}
             error={sniError}
             mono
             autoCapitalize="off"
             spellCheck={false}
           />
         )}
+        {target.field}
         <label className="flex items-center gap-3">
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="text-[13px] font-bold">{t("node.profiles.enabled")}</span>
@@ -490,7 +499,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
           <Button variant="ghost" size="md" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button type="submit" variant="primary" size="md" disabled={!dirty || !portOk(port) || !!refused || save.isPending}>
+          <Button type="submit" variant="primary" size="md" disabled={!dirty || !portOk(port) || !!refused || target.blocked || save.isPending}>
             {save.isPending && touched.port && port ? t("ports.saving", { port }) : t("common.save")}
           </Button>
         </div>

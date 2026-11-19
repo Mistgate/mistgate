@@ -66,6 +66,9 @@ type InboundInput struct {
 	Node                  NodeView
 	PortOverride          uint16 // 0 = none
 	TLSServerNameOverride string
+	// RealityTargetOverride is "host:port" of the site a VLESS REALITY inbound shows on this node instead of its profile's target
+	// ("" = the profile's); the host is the one name it accepts. Any other protocol refuses it (RealityTargetError).
+	RealityTargetOverride string
 	SpecVersion           uint64
 	Enabled               bool
 	// InboundID and PluginState/PluginPublic carry what InitInbound made for this inbound (AWG: the server

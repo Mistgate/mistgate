@@ -44,6 +44,10 @@ export const errorCodes = [
   "sni_needs_domain",
   "sni_invalid",
   "already_on_node",
+  // the site a node shows instead of its profile's REALITY target (CreateInbound / UpdateInbound reality_target_override): "reality_target_invalid: target=..."
+  "reality_target_invalid",
+  "reality_target_same_node",
+  "reality_target_unsupported",
   // a person at the device limit (an AmneziaVPN or TrustTunnel key, the app switch that makes one): "device_limit: 3/3: alice-phone, laptop"
   "device_limit",
   // the UDP delivery check (design/udp-port-check.md): a port that loses packets; a twin with no clean port on all nodes

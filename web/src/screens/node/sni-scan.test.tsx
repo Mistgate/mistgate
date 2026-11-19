@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { en } from "@/i18n/en";
@@ -14,7 +15,13 @@ import { SniScanCard } from "./sni-scan";
 // "Sites near the node": the warning before every scan, the states of the card, the names as text only, and who gets the card.
 
 const scanCall = vi.fn();
-vi.mock("@/lib/api", async (orig) => ({ ...(await orig<object>()), probe: { nodeSniScan: (...a: unknown[]) => scanCall(...a) } }));
+const updateInbound = vi.fn();
+const listProfiles = vi.fn();
+vi.mock("@/lib/api", async (orig) => ({
+  ...(await orig<object>()),
+  probe: { nodeSniScan: (...a: unknown[]) => scanCall(...a) },
+  profiles: { updateInbound: (...a: unknown[]) => updateInbound(...a), listProfiles: (...a: unknown[]) => listProfiles(...a) },
+}));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, className }: { children?: ReactNode; to: string; className?: string }) => (
     <a href={to} className={className}>
@@ -42,6 +49,8 @@ afterEach(() => {
   host?.remove();
   root = host = null;
   scanCall.mockReset();
+  updateInbound.mockReset();
+  listProfiles.mockReset();
   document.querySelectorAll("[role=dialog]").forEach((d) => d.remove());
 });
 
@@ -66,7 +75,7 @@ const answer = (over: Record<string, unknown> = {}) => ({
 const never = (over: Record<string, unknown> = {}) => answer({ atUnix: 0n, range: "", addresses: 0, open: 0, tls13: 0, mlkem: 0, valid: 0, candidates: [], ...over });
 
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
-async function mountCard(linked = true) {
+async function mountCard(linked = true, servers: object[] = []) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -75,7 +84,7 @@ async function mountCard(linked = true) {
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <SniScanCard nodeId="nod_de1" nodeName="de1" linked={linked} />
+          <SniScanCard nodeId="nod_de1" nodeName="de1" linked={linked} servers={servers as never} />
         </ToastProvider>
       </QueryClientProvider>,
     ),
@@ -256,12 +265,105 @@ describe("the names are text from strangers", () => {
     expect(copied).toEqual(["shop.example.com"]);
   });
 
-  it("the card does not apply a name: it has no button that writes one into a profile", async () => {
+  it("with no REALITY server on the node there is nothing to apply a name to, and a scan only ever sends the node and run", async () => {
     scanCall.mockResolvedValue(answer());
     await mountCard();
     const labels = [...host!.querySelectorAll("button")].map((b) => b.textContent?.trim() || b.getAttribute("aria-label"));
     expect(labels.some((l) => /appl/i.test(l ?? ""))).toBe(false);
     expect(scanCall.mock.calls.every((c) => Object.keys(c[0] as object).sort().join() === "nodeId,run")).toBe(true);
+  });
+});
+
+// "Apply…": show a neighbour that DNS leads here on a REALITY server of the node
+describe("applying a site to a REALITY server", () => {
+  const server = (over: Record<string, unknown> = {}) => ({ id: "inb_v", profileId: "prf_v", profileName: "VLESS · Reality", protocol: "vless", port: 443, realityTarget: "self", realityTargetOverride: "", tlsServerName: "de1.example.com", ...over });
+  const applyButtons = () => [...host!.querySelectorAll("button")].filter((b) => b.textContent?.trim() === en["sni.apply"]);
+  /** The panel's check: the inbound as it would be, and the Hysteria2 site that yields on the way. */
+  const checkSays = (over: { warnings?: unknown[]; refuse?: string } = {}) =>
+    updateInbound.mockImplementation(async (r: { realityTargetOverride?: string; validateOnly?: boolean }) => {
+      if (over.refuse && r.validateOnly) throw new ConnectError(over.refuse, Code.InvalidArgument);
+      return { inbound: { id: "inb_v", realityTarget: r.realityTargetOverride }, warnings: over.warnings ?? [], freePort: 0 };
+    });
+  beforeEach(() => listProfiles.mockResolvedValue({ profiles: [{ id: "prf_v", name: "VLESS · Reality", userCount: 3 }] }));
+
+  it("is offered for a site that DNS leads here, and for no other", async () => {
+    scanCall.mockResolvedValue(answer({ candidates: [site("shop.example.com"), site("blog.example.net", { dns: "subnet" }), site("portal.example.com", { dns: "elsewhere" }), site("old.example.org", { dns: "none" })] }));
+    await mountCard(true, [server()]);
+    expect(applyButtons()).toHaveLength(1);
+    expect(applyButtons()[0]!.closest(".ss-row")?.textContent).toContain("shop.example.com");
+    act(() => root?.unmount());
+    host?.remove();
+    await mountCard(true, []); // no REALITY server
+    expect(applyButtons()).toHaveLength(0);
+  });
+
+  it("says what strangers see now and after, who restarts and that the apps need the subscription refreshed, and changes nothing until the click", async () => {
+    scanCall.mockResolvedValue(answer());
+    checkSays({ warnings: [{ code: "hy2_decoy_paused", params: { node: "de1", port: "443", hy2: "Hysteria2", vless: "VLESS · Reality", via: "site", target: "shop.example.com" } }] });
+    await mountCard(true, [server()]);
+    await click(applyButtons()[0]);
+    for (let i = 0; i < 2; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 350))));
+    const d = dialog()!;
+    expect(d.textContent).toContain("Show shop.example.com on de1?");
+    expect(d.textContent).toContain(`${en["sni.apply.now"]}the node’s own site`);
+    expect(d.textContent).toContain(`${en["sni.apply.after"]}shop.example.com`);
+    expect(d.textContent).toContain("The server VLESS · Reality restarts");
+    expect(d.textContent).toContain(en["sni.apply.clients"]);
+    expect(d.textContent).toContain("3 people have this server in their subscription.");
+    expect(d.textContent).toContain("Hysteria2"); // the site of the other server that yields
+    expect(d.querySelectorAll("img, a[href*='shop.example.com']")).toHaveLength(0); // the name is text; the one link is the guide's
+    // the check was asked, nothing saved
+    expect(updateInbound).toHaveBeenCalledWith({ inboundId: "inb_v", realityTargetOverride: "shop.example.com:443", validateOnly: true }, expect.anything());
+    expect(updateInbound.mock.calls.every(([r]) => (r as { validateOnly?: boolean }).validateOnly)).toBe(true);
+    expect(document.activeElement?.textContent?.trim()).toBe("Cancel");
+    await click(button("Cancel", d));
+    expect(dialog()).toBeNull();
+    expect(updateInbound.mock.calls.every(([r]) => (r as { validateOnly?: boolean }).validateOnly)).toBe(true);
+  });
+
+  it("saves the target as name:443 on the click, and says so", async () => {
+    scanCall.mockResolvedValue(answer());
+    checkSays();
+    await mountCard(true, [server({ realityTarget: "www.example.org:443" })]);
+    await click(applyButtons()[0]);
+    await act(async () => void (await new Promise((r) => setTimeout(r, 350))));
+    for (let i = 0; i < 3; i++) await settle();
+    expect(dialog()!.textContent).toContain("www.example.org"); // what they see now
+    await click(button(en["sni.apply.go"], dialog()!));
+    expect(updateInbound.mock.calls.filter(([r]) => !(r as { validateOnly?: boolean }).validateOnly).map(([r]) => r)).toEqual([{ inboundId: "inb_v", realityTargetOverride: "shop.example.com:443" }]);
+    expect(document.querySelector("[data-testid=sni-apply]")).toBeNull();
+    expect(document.body.textContent).toContain("shop.example.com is now shown on de1");
+  });
+
+  it("asks which server when the node has several, and checks the one picked", async () => {
+    scanCall.mockResolvedValue(answer());
+    checkSays();
+    await mountCard(true, [server(), server({ id: "inb_w", profileId: "prf_w", profileName: "VLESS · 8443", port: 8443, realityTarget: "www.example.org:443" })]);
+    await click(applyButtons()[0]);
+    await act(async () => void (await new Promise((r) => setTimeout(r, 350))));
+    expect(dialog()!.textContent).toContain(en["sni.apply.pick"]);
+    expect(dialog()!.textContent).toContain("VLESS · Reality");
+  });
+
+  it("does not offer to apply what the server shows already", async () => {
+    scanCall.mockResolvedValue(answer());
+    checkSays();
+    await mountCard(true, [server({ realityTarget: "shop.example.com:443", realityTargetOverride: "shop.example.com:443" })]);
+    await click(applyButtons()[0]);
+    await settle();
+    expect(dialog()!.textContent).toContain(en["sni.apply.same"]);
+    expect(disabled(button(en["sni.apply.go"], dialog()!))).toBe(true);
+  });
+
+  it("shows a refusal of the panel in words and keeps the button off", async () => {
+    scanCall.mockResolvedValue(answer());
+    checkSays({ refuse: "reality_target_same_node: target=shop.example.com:443&node=de1" });
+    await mountCard(true, [server()]);
+    await click(applyButtons()[0]);
+    await act(async () => void (await new Promise((r) => setTimeout(r, 350))));
+    for (let i = 0; i < 3; i++) await settle();
+    expect(dialog()!.textContent).toContain("“shop.example.com:443” is de1 itself.");
+    expect(disabled(button(en["sni.apply.go"], dialog()!))).toBe(true);
   });
 });
 

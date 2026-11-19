@@ -48,7 +48,10 @@ const (
 	capVLESSTLS = "vless-tls/1"
 	// capVLESSSelf: the VLESS engine serves the node's own site behind REALITY (reality.target "self", design/vless.md
 	// section 7.5). An agent of v0.1.33/v0.1.34 has vless/1 and rejects that target.
-	capVLESSSelf    = "vless-self/1"
+	capVLESSSelf = "vless-self/1"
+	// capVLESSTarget: the VLESS engine takes a REALITY target set on this node: the other site's name in the TLS block (mode 0, no
+	// certificate) as the one server name. An agent of vless-self/1 rejects that TLS block, so the panel withholds such an inbound from it.
+	capVLESSTarget  = "vless-target/1"
 	capWarp         = "warp/1"
 	capTorrentGuard = "torrentguard/1"
 	capUDPCheck     = "udpcheck/1"
@@ -192,7 +195,7 @@ func (a *Agent) capabilities() []string {
 		caps = append(caps, capAWG, capAwgFallback)
 	}
 	if _, ok := a.engines["vless"]; ok {
-		caps = append(caps, capVLESS, capVLESSUnknownKeys, capVLESSHelloKex)
+		caps = append(caps, capVLESS, capVLESSUnknownKeys, capVLESSHelloKex, capVLESSTarget)
 		if a.cfg.Certs != nil { // the site needs the certificate source
 			caps = append(caps, capVLESSSelf, capVLESSTLS)
 		}

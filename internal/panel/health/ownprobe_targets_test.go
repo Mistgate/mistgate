@@ -156,6 +156,36 @@ func TestProbeTargetsUseTheNameOfTheInbound(t *testing.T) {
 	}
 }
 
+// A node that shows a site of its own is probed as a node that shows another site (a fetch by the neighbour's name), even where the
+// profile's target is the node's own site: the spec of the inbound says it, not the profile's settings.
+func TestProbeTargetsOfATargetSetOnTheNode(t *testing.T) {
+	c := newCountryEnv(t)
+	c.node("fi1", "hoster-fi1", true)
+	c.names["fi1.example.com"] = []netip.Addr{netip.MustParseAddr("203.0.113.12")}
+	self := c.vlessInbound("fi1", 443)
+	kinds := func() []string {
+		got, err := c.s.ProbeTargets(c.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, tg := range got {
+			if tg.Kind != "tcp" {
+				out = append(out, tg.Kind+" "+tg.SNI)
+			}
+		}
+		return out
+	}
+	if got := kinds(); !reflect.DeepEqual(got, []string{"tls fi1.example.com"}) {
+		t.Fatalf("the node's own site: %v", got)
+	}
+	c.exec(`UPDATE inbound SET reality_target_override = 'shop.example.com:443' WHERE id = ?`, self)
+	c.s.invalidateSnapshot()
+	if got := kinds(); !reflect.DeepEqual(got, []string{"fetch shop.example.com"}) {
+		t.Fatalf("with a target of the node: %v", got)
+	}
+}
+
 // Two services that share 443 by SNI are probed by the name each answers to, one at a time: the node has room for one TLS target.
 func TestProbeTargetsTakeTurnsOnASharedPort(t *testing.T) {
 	c := newCountryEnv(t)

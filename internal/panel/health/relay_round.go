@@ -44,7 +44,7 @@ func relayTargetKey(t *target) string {
 	}
 	link := t.relay.link
 	key := strings.Join([]string{link.ID, link.ViaNodeID, t.relay.entry.Address, t.node.Address, t.in.ID, t.in.ProfileID, t.in.Protocol,
-		strconv.FormatUint(uint64(t.in.ProfileVersion), 10), strconv.FormatUint(t.in.SpecVersion, 10), t.in.TLSNameOverride,
+		strconv.FormatUint(uint64(t.in.ProfileVersion), 10), strconv.FormatUint(t.in.SpecVersion, 10), t.in.TLSNameOverride, t.in.RealityTargetOverride,
 		link.Network, strconv.Itoa(int(link.Port)), strconv.Itoa(int(t.relay.exitPort))}, "\x00")
 	sum := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(sum[:])

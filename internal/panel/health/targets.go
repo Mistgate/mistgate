@@ -229,6 +229,7 @@ func (s *Service) build(n store.NodeRow, row store.FleetInboundRow) (plugin.Inbo
 		Node:                  protocols.NodeView{ID: n.ID, Name: n.Name, Address: n.Address, CountryCode: n.CountryCode},
 		PortOverride:          row.PortOverride,
 		TLSServerNameOverride: row.TLSNameOverride,
+		RealityTargetOverride: row.RealityTargetOverride,
 		SpecVersion:           row.SpecVersion,
 		Enabled:               true,
 		InboundID:             row.ID,

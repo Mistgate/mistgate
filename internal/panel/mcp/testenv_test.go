@@ -478,15 +478,19 @@ type world struct {
 	awgFallback   bool
 	updateNodeErr error
 
-	subs                   *adminv1.SubscriptionSettings // the stored subscription settings
-	users                  map[string]*adminv1.GetUserResponse
-	profiles               map[string]*worldProfile
-	groups                 map[string]*adminv1.Group
-	shareReqs              []*adminv1.SetNodeSharingRequest
-	shares                 map[string]*worldShare // who a node is handed out to (node_sharing_tools_test.go)
-	dnsPresets             map[string]*adminv1.DnsPreset
-	nodePatches            map[string]*adminv1.UpdateNodeRequest
-	inboundDirect          map[string]bool
+	subs          *adminv1.SubscriptionSettings // the stored subscription settings
+	users         map[string]*adminv1.GetUserResponse
+	profiles      map[string]*worldProfile
+	groups        map[string]*adminv1.Group
+	shareReqs     []*adminv1.SetNodeSharingRequest
+	shares        map[string]*worldShare // who a node is handed out to (node_sharing_tools_test.go)
+	dnsPresets    map[string]*adminv1.DnsPreset
+	nodePatches   map[string]*adminv1.UpdateNodeRequest
+	inboundDirect map[string]bool
+	// reality: node_get lists a VLESS REALITY server "inb_vl" (the profile Files, its own site until a target is set on the node);
+	// realityOverride is the target UpdateInbound stored on it
+	reality                bool
+	realityOverride        string
 	nextProfile            int
 	inboundCreateCalls     int
 	failInboundCreateAt    int
@@ -753,6 +757,13 @@ func (w *world) GetNode(_ context.Context, r *connect.Request[adminv1.GetNodeReq
 		Id: "inb_1", ProfileName: "Main", Protocol: "hysteria2", NodeId: nodeA, Port: 443, State: adminv1.InboundState_INBOUND_STATE_ACTIVE,
 		CertPinSha256: canaryPin, LastError: "listen failed\nsee " + canaryVless, DirectInSubscriptions: direct, Cdn: true,
 	}}
+	if w.reality {
+		w.mu.Lock()
+		over := w.realityOverride
+		w.mu.Unlock()
+		inbounds = append(inbounds, &adminv1.Inbound{Id: "inb_vl", ProfileName: "Files", Protocol: "vless", NodeId: nodeA, Port: 443, State: adminv1.InboundState_INBOUND_STATE_ACTIVE,
+			Enabled: true, RealityTarget: realityShown(over), RealityTargetOverride: over})
+	}
 	if awgStatus != nil {
 		inbounds = append(inbounds, &adminv1.Inbound{Id: "inb_awg", ProfileName: "Home", Protocol: "awg", NodeId: r.Msg.GetNodeId(), Port: 51842,
 			State: adminv1.InboundState_INBOUND_STATE_ACTIVE, Awg: awgStatus})
@@ -830,7 +841,26 @@ func (w *world) UpdateInbound(_ context.Context, r *connect.Request[adminv1.Upda
 	for _, warning := range w.inboundWarnings {
 		warnings = append(warnings, proto.Clone(warning).(*adminv1.StatusReason))
 	}
+	if r.Msg.GetInboundId() == "inb_vl" {
+		over := w.realityOverride
+		if r.Msg.RealityTargetOverride != nil {
+			over = r.Msg.GetRealityTargetOverride()
+			if !r.Msg.GetValidateOnly() {
+				w.realityOverride = over
+			}
+		}
+		return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: &adminv1.Inbound{Id: "inb_vl", ProfileName: "Files", Protocol: "vless", DirectInSubscriptions: direct,
+			RealityTarget: realityShown(over), RealityTargetOverride: over}, Warnings: warnings}), nil
+	}
 	return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: &adminv1.Inbound{Id: r.Msg.GetInboundId(), ProfileName: "Main", Protocol: "hysteria2", DirectInSubscriptions: direct}, Warnings: warnings}), nil
+}
+
+// realityShown is what the node shows strangers at the REALITY server of the test world: its own site until a target is set.
+func realityShown(override string) string {
+	if override == "" {
+		return "self"
+	}
+	return override
 }
 
 func (w *world) CheckPorts(_ context.Context, r *connect.Request[adminv1.CheckPortsRequest]) (*connect.Response[adminv1.CheckPortsResponse], error) {
