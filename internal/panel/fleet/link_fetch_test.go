@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -157,5 +158,38 @@ func TestLinkFetchTokenNotLogged(t *testing.T) {
 	_ = ws.Close(websocket.StatusNormalClosure, "")
 	if token == "" || strings.Contains(logs.String(), token) {
 		t.Fatal("the fetch token reached the log")
+	}
+}
+
+// A link-only agent lists update-link/1 and link-fetch/1, never update/1 or nets/1 itself, so an older VPS panel (and the
+// edge) never sends it a VPS update it cannot fetch. A VPS panel that serves the fetch route reads the pair as both.
+func TestLinkFetchCapabilitiesOnlyOnAVPSPanel(t *testing.T) {
+	link := &agentv1.Hello{Capabilities: []string{"ws-link/1", capUpdateLink, plugin.CapLinkFetch}}
+	if caps := helloInfo(link, true).Caps; !slices.Contains(caps, capUpdate) || !slices.Contains(caps, capNetworks) {
+		t.Fatalf("VPS panel: %v, want update/1 and nets/1", caps)
+	}
+	if caps := helloInfo(link, false).Caps; slices.Contains(caps, capUpdate) || slices.Contains(caps, capNetworks) {
+		t.Fatalf("edge: %v, want neither", caps)
+	}
+	noUpdater := &agentv1.Hello{Capabilities: []string{"ws-link/1", plugin.CapLinkFetch}}
+	if caps := helloInfo(noUpdater, true).Caps; slices.Contains(caps, capUpdate) || !slices.Contains(caps, capNetworks) {
+		t.Fatalf("an unsigned link agent: %v, want nets/1 only", caps)
+	}
+	old := &agentv1.Hello{Capabilities: []string{"ws-link/1", capUpdateLink}}
+	if caps := helloInfo(old, true).Caps; slices.Contains(caps, capUpdate) || slices.Contains(caps, capNetworks) {
+		t.Fatalf("an older link agent: %v, want nothing added", caps)
+	}
+
+	e := newEnv(t)
+	e.f.cfg.LinkServed = true
+	a := e.enroll("link-fetch-caps")
+	server := httptest.NewServer(e.f.LinkHandler())
+	t.Cleanup(server.Close)
+	ws := openPanelLink(t, server.URL, a)
+	t.Cleanup(func() { _ = ws.Close(websocket.StatusNormalClosure, "") })
+	linkHelloWith(t, ws, capUpdateLink, plugin.CapLinkFetch)
+	n, err := e.f.st.Node(context.Background(), a.nodeID)
+	if err != nil || !slices.Contains(n.AgentCaps, capUpdate) || !slices.Contains(n.AgentCaps, capNetworks) {
+		t.Fatalf("stored capabilities %v, %v", n.AgentCaps, err)
 	}
 }

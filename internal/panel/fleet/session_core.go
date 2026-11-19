@@ -322,7 +322,7 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	if h.NodeId != "" && h.NodeId != tr.state.NodeID {
 		c.f.log.Warn("hello names another node than the certificate", "code", "node_identity_mismatch", "cert_node", tr.state.NodeID)
 	}
-	info := helloInfo(h)
+	info := helloInfo(h, c.f.cfg.Remote == nil)
 	prev, acked, err := c.f.st.NodeHello(ctx, tr.state.NodeID, tr.state.OwnerGeneration, info, event.At)
 	if errors.Is(err, store.ErrNodeRetired) {
 		tr.Close = &SessionClose{Class: CloseFailedPrecondition, Reason: "node retired"}

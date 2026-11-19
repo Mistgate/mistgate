@@ -174,9 +174,18 @@ func (a *Agent) capabilities() []string {
 		caps = append(caps, agentcap.AWGPrepare)
 	}
 	updateCaps := a.upd.Capabilities()
-	// A link-only agent fetches over the link with the command's token on edge or its session's token on VPS.
-	if a.linkOnly() && slices.Contains(updateCaps, agentcap.Update) {
-		caps = append(caps, agentcap.UpdateLink)
+	// A link-only agent updates over the link; a VPS panel derives update/1 and nets/1 from link-fetch/1.
+	if a.linkOnly() {
+		if slices.Contains(updateCaps, agentcap.Update) {
+			caps = append(caps, agentcap.UpdateLink)
+			if slices.Contains(updateCaps, agentcap.UpdateTimeout) {
+				caps = append(caps, agentcap.UpdateTimeout)
+			}
+			if slices.Contains(updateCaps, agentcap.UpdateGuard) {
+				caps = append(caps, agentcap.UpdateGuard)
+			}
+		}
+		return caps
 	}
 	return append(caps, updateCaps...)
 }

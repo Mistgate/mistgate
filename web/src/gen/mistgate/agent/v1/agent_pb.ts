@@ -803,7 +803,8 @@ export type Hello = Message<"mistgate.agent.v1.Hello"> & {
    * "panel-link/1" (NodeSettings.panel_link_url: a link node moves to a new panel link address on its own); only a link node
    * lists it, an mTLS node ignores the address.
    * "link-fetch/1": a link-only agent fetches update files and the network table over the link with HelloAck.fetch_token
-   * (see "LINK FETCH"); such an agent also lists "nets/1" and "update/1".
+   * (see "LINK FETCH"). It does not list "nets/1" or "update/1" itself, so an older VPS panel never sends it an update it
+   * cannot fetch; a VPS panel that serves the route reads "link-fetch/1" with "update-link/1" as both.
    *
    * @generated from field: repeated string capabilities = 11;
    */
