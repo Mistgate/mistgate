@@ -38,16 +38,7 @@ const (
 
 // dialVLESS resolves the same parameters as a subscription and starts an isolated Xray client helper.
 func dialVLESS(ctx context.Context, t Target, o DialOptions) (Tunnel, error) {
-	params, ok := panelvless.ResolveClientParams(protocols.RenderInput{
-		Settings: t.Settings,
-		Inbound: protocols.InboundView{
-			ID: t.Inbound.ID, Node: protocols.NodeView{ID: t.Node.ID, Name: t.Node.Name, Address: t.Node.Address,
-				CountryCode: t.Node.CountryCode},
-			Port: t.Spec.Listen.Port, TLSServerName: t.Spec.TLS.ServerName, TLSMode: t.Spec.TLS.Mode,
-			CertPinSHA256: t.Inbound.CertPin,
-		},
-		DeviceID: t.CredID, Secret: t.Secret, InboundPublic: []byte(t.Inbound.PluginPublic),
-	})
+	params, ok := vlessProbeParams(t)
 	if !ok {
 		return nil, errClientUnsupported
 	}
@@ -78,6 +69,22 @@ func dialVLESS(ctx context.Context, t Target, o DialOptions) (Tunnel, error) {
 	}
 	tunnel.release = func() { <-vlessHelperSlots }
 	return tunnel, nil
+}
+
+// vlessProbeParams are the client parameters of a subscription for the inbound, with the name the inbound answers to as its SNI
+// (the node's own "Domain (SNI)", the CDN host, or a server name of REALITY with another site), so that a service that shares
+// its TCP port with others by SNI is told apart from them and probed by its own route.
+func vlessProbeParams(t Target) (panelvless.ClientParams, bool) {
+	return panelvless.ResolveClientParams(protocols.RenderInput{
+		Settings: t.Settings,
+		Inbound: protocols.InboundView{
+			ID: t.Inbound.ID, Node: protocols.NodeView{ID: t.Node.ID, Name: t.Node.Name, Address: t.Node.Address,
+				CountryCode: t.Node.CountryCode},
+			Port: t.Spec.Listen.Port, TLSServerName: t.Spec.TLS.ServerName, TLSMode: t.Spec.TLS.Mode,
+			CertPinSHA256: t.Inbound.CertPin,
+		},
+		DeviceID: t.CredID, Secret: t.Secret, InboundPublic: []byte(t.Inbound.PluginPublic),
+	})
 }
 
 // vlessHelperSlots bounds the helpers running at once. ponytail: a fixed 2; make it follow the panel's memory budget
