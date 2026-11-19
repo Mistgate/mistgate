@@ -538,7 +538,9 @@ type world struct {
 	inboundDirect map[string]bool
 	// reality: node_get lists a VLESS REALITY server "inb_vl" (the profile Files, its own site until a target is set on the node);
 	// realityOverride is the target UpdateInbound stored on it
-	reality                bool
+	reality bool
+	// realityBroken: the server shows nothing now (its profile went to TLS while it kept a target of the node), so only the override is known
+	realityBroken          bool
 	realityOverride        string
 	nextProfile            int
 	inboundCreateCalls     int
@@ -811,7 +813,7 @@ func (w *world) GetNode(_ context.Context, r *connect.Request[adminv1.GetNodeReq
 		over := w.realityOverride
 		w.mu.Unlock()
 		inbounds = append(inbounds, &adminv1.Inbound{Id: "inb_vl", ProfileName: "Files", Protocol: "vless", NodeId: nodeA, Port: 443, State: adminv1.InboundState_INBOUND_STATE_ACTIVE,
-			Enabled: true, RealityTarget: realityShown(over), RealityTargetOverride: over})
+			Enabled: true, RealityTarget: realityShown(over, w.realityBroken), RealityTargetOverride: over})
 	}
 	if awgStatus != nil {
 		inbounds = append(inbounds, &adminv1.Inbound{Id: "inb_awg", ProfileName: "Home", Protocol: "awg", NodeId: r.Msg.GetNodeId(), Port: 51842,
@@ -899,13 +901,16 @@ func (w *world) UpdateInbound(_ context.Context, r *connect.Request[adminv1.Upda
 			}
 		}
 		return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: &adminv1.Inbound{Id: "inb_vl", ProfileName: "Files", Protocol: "vless", DirectInSubscriptions: direct,
-			RealityTarget: realityShown(over), RealityTargetOverride: over}, Warnings: warnings}), nil
+			RealityTarget: realityShown(over, false), RealityTargetOverride: over}, Warnings: warnings}), nil
 	}
 	return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: &adminv1.Inbound{Id: r.Msg.GetInboundId(), ProfileName: "Main", Protocol: "hysteria2", DirectInSubscriptions: direct}, Warnings: warnings}), nil
 }
 
 // realityShown is what the node shows strangers at the REALITY server of the test world: its own site until a target is set.
-func realityShown(override string) string {
+func realityShown(override string, broken bool) string {
+	if broken {
+		return ""
+	}
 	if override == "" {
 		return "self"
 	}

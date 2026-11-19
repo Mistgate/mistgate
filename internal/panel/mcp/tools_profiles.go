@@ -96,6 +96,7 @@ func profileReadTools() []toolDef {
 						PortOverride:  ib.GetPortOverride(), TLSServerNameOverride: clean(ib.GetTlsServerNameOverride(), 253),
 						Enabled: ib.GetEnabled(), State: enumName("INBOUND_STATE_", ib.GetState().String()),
 						DirectInSubscriptions: ib.GetDirectInSubscriptions(), CDN: ib.GetCdn(),
+						RealityTarget: clean(ib.GetRealityTarget(), 300), RealityTargetOverride: clean(ib.GetRealityTargetOverride(), 300),
 					})
 				}
 				return profileGetV{Profile: profileSummaryView(p, groups[p.GetId()]), Settings: settings, Inbounds: inbounds,
@@ -162,6 +163,10 @@ type profileInboundV struct {
 	State                 string `json:"state"`
 	DirectInSubscriptions bool   `json:"direct_in_subscriptions"`
 	CDN                   bool   `json:"cdn"`
+	// For a VLESS REALITY server: what it shows strangers ("self" or host:port) and the part of it that is the node's own choice. With a
+	// target of the node's own, tls_server_name is that site's name, not a domain of the owner's: nothing to point a DNS record at.
+	RealityTarget         string `json:"reality_target,omitempty"`
+	RealityTargetOverride string `json:"reality_target_override,omitempty"`
 }
 
 func profileSummaryView(p *adminv1.ProfileSummary, groups []string) profileSummaryV {

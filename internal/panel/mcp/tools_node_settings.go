@@ -3,6 +3,7 @@
 package mcp
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"regexp"
@@ -14,6 +15,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 func nodeSettingsTools() []toolDef { return append(change(nodeUpdate), change(nodeAWGBackend)...) }
@@ -102,10 +104,11 @@ func prepareRealityTargets(items []realityTargetArg, inbounds []*adminv1.Inbound
 		if found == nil {
 			return nil, errors.New("inbound_id is not an inbound on this node")
 		}
-		if found.GetRealityTarget() == "" {
+		// a server whose target cannot be built now (its profile went to TLS) still has the target of the node to reset
+		if found.GetRealityTarget() == "" && found.GetRealityTargetOverride() == "" {
 			return nil, errors.New("reality_target needs a VLESS server with REALITY")
 		}
-		if found.GetRealityTargetOverride() != item.Target {
+		if found.GetRealityTargetOverride() != plugin.NormalizeRealityTarget(item.Target) {
 			changed = append(changed, item)
 		}
 	}
@@ -285,7 +288,7 @@ var nodeUpdate = changeSpec[nodeUpdateArgs]{
 				}
 			}
 			facts = append(facts, Fact{Key: "reality_server", Value: nm(now.GetProfileName()), Untrusted: true},
-				strangersFact("strangers_now", now.GetRealityTarget()), strangersFact("strangers_after", validated.Msg.GetInbound().GetRealityTarget()))
+				strangersFact("strangers_now", cmp.Or(now.GetRealityTarget(), now.GetRealityTargetOverride())), strangersFact("strangers_after", validated.Msg.GetInbound().GetRealityTarget()))
 		}
 		if len(a.Reality) > 0 {
 			facts = append(facts, codedFact("reality_effect", "the server restarts; people's apps connect again once they refresh the subscription, until then they cannot connect through this server", "reality_target_effect"))

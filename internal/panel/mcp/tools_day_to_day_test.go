@@ -462,3 +462,24 @@ func TestSubscriptionSettingsGetShowsResponseHeaders(t *testing.T) {
 		t.Fatalf("headers: %+v", v.ResponseHeaders)
 	}
 }
+
+// A server that shows nothing now (its profile went to TLS while it kept a target of the node) can still have the target reset; and the
+// same site written another way is nothing to change.
+func TestNodeUpdateResetsABrokenTargetAndSeesTheSameSiteWrittenAnotherWay(t *testing.T) {
+	e := newTestEnv(t)
+	e.w.reality = true
+	e.w.realityOverride = "shop.example.com:443"
+	_, admin := e.token(ProfileAdmin)
+	s := e.session(admin)
+
+	mustFail(t, s, "node_update_plan", map[string]any{"node": nodeA, "reality_target": []any{map[string]any{"inbound_id": "inb_vl", "target": " Shop.Example.com.:0443 "}}})
+	if len(e.plans.byID) != 0 {
+		t.Fatal("the same site made a plan")
+	}
+
+	e.w.realityBroken = true
+	p := planOf(t, s, "node_update", map[string]any{"node": nodeA, "reality_target": []any{map[string]any{"inbound_id": "inb_vl", "target": ""}}})
+	if now := factIn(t, p.Facts, "strangers_now"); now.Value != "shop.example.com" {
+		t.Errorf("now: %+v", now)
+	}
+}
