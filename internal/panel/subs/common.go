@@ -90,10 +90,18 @@ func (c *common) title(set *adminv1.SubscriptionSettings, b instance.Settings) s
 	return c.cfg.Title
 }
 
+// baseURL is the public subscription address of the moment (Config.BaseURLFunc, else Config.BaseURL).
+func (c *common) baseURL() string {
+	if c.cfg.BaseURLFunc != nil {
+		return c.cfg.BaseURLFunc()
+	}
+	return c.cfg.BaseURL
+}
+
 // link is the subscription URL of a token.
 func (c *common) link(r *http.Request, token string) string {
-	if c.cfg.BaseURL != "" {
-		return strings.TrimRight(c.cfg.BaseURL, "/") + "/" + token
+	if base := c.baseURL(); base != "" {
+		return strings.TrimRight(base, "/") + "/" + token
 	}
 	scheme := "http"
 	if r.TLS != nil {

@@ -214,7 +214,7 @@ func (k *core) baseHTTP() httpserver.Config {
 		TrustedOrigins: k.in.RPOrigins,
 		Log:            k.log,
 		// Settings -> Domains shows the owner both addresses, read-only.
-		AdminURL: k.in.AdminURL(), SubscriptionBase: k.subBase,
+		AdminURL: k.in.AdminURL(), SubscriptionBase: k.subBase, SubscriptionBaseNow: k.subBaseNow,
 	}
 }
 

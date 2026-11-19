@@ -358,7 +358,7 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 	}
 	if _, ok := h.tokens.Get(token); ok && exists {
 		switch {
-		case h.cop.Check(r) != nil:
+		case h.checkOrigin(r) != nil:
 			if !h.confirmCachedToken(ctx, w, r, token, client) {
 				return access.SubView{}, nil, false
 			}
@@ -399,7 +399,7 @@ func (h *handler) enter(w http.ResponseWriter, r *http.Request, token, client st
 		h.decoy.ServeHTTP(w, r)
 		return access.SubView{}, nil, false
 	}
-	if err := h.cop.Check(r); err != nil {
+	if err := h.checkOrigin(r); err != nil {
 		jsonError(w, http.StatusForbidden, "cross_origin", "")
 		return access.SubView{}, nil, false
 	}

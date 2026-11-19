@@ -111,6 +111,8 @@ type Config struct {
 	// AdminURL and SubscriptionBase are where the admin is reached and the base of the subscription links, as `mistgate
 	// setup` stored them: InstanceService shows them to the owner (Settings -> Domains), read-only.
 	AdminURL, SubscriptionBase string
+	// SubscriptionBaseNow, when set, is SubscriptionBase of the moment (a public address that changes while the panel runs).
+	SubscriptionBaseNow func() string
 
 	// MCP, if set, builds the handler of the MCP endpoint from the in-process admin API: the services
 	// behind the session middleware, request paths without the "/api" prefix. The result is served at <admin>/mcp, and only
@@ -290,7 +292,7 @@ func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
 	}
 
 	authPath, authHandler := a.Handler()
-	inst := &instanceAPI{st: st, log: cfg.Log, adminURL: cfg.AdminURL, subBase: cfg.SubscriptionBase}
+	inst := &instanceAPI{st: st, log: cfg.Log, adminURL: cfg.AdminURL, subBase: cfg.SubscriptionBase, subBaseNow: cfg.SubscriptionBaseNow}
 	instPath, instHandler := inst.handler()
 	s.api = apiRouter{{authPath, authHandler}, {instPath, instHandler}}
 	seen := map[string]bool{authPath: true, instPath: true}

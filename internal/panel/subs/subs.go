@@ -103,6 +103,9 @@ type Config struct {
 	// BaseURL is the public subscription address up to and including the prefix ("https://sub.example.com/k3xq8");
 	// the user's link is BaseURL + "/" + token. Empty: derived from the request (Host, TLS), good enough for tests.
 	BaseURL string
+	// BaseURLFunc, when set, is BaseURL of the moment and wins over it: a panel whose public address changes while it runs
+	// (a subscription host, design/adr/0018-panel-behind-nat.md).
+	BaseURLFunc func() string
 
 	// Settings is the subscription settings cache (what the admin edits); nil = the built-in defaults.
 	Settings *subsettings.Cache
@@ -319,13 +322,16 @@ func Handler(src Source, decoy http.Handler, cfg Config) http.Handler {
 		readers = 8
 	}
 	h.debugReaders = make(chan struct{}, readers)
-	if o := originOf(cfg.BaseURL); o != "" {
-		// Behind a proxy that rewrites Host the Origin of a browser is still the public address.
-		if err := h.cop.AddTrustedOrigin(o); err != nil {
-			cfg.Log.Warn("subscription base URL is not a usable origin", "code", "subscription_base_origin_invalid", "err", err)
-		}
-	}
 	return h
+}
+
+// checkOrigin is the cross-origin check of a request that changes something. Behind a proxy that rewrites Host the Origin of
+// a browser is still the public address, which is trusted: the one of the moment, which can change while the panel runs.
+func (h *handler) checkOrigin(r *http.Request) error {
+	if o := r.Header.Get("Origin"); o != "" && o == originOf(h.baseURL()) {
+		return nil
+	}
+	return h.cop.Check(r)
 }
 
 // originOf is "scheme://host[:port]" of a base URL, "" when it has none.

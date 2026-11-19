@@ -33,6 +33,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/pagepass"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
+	"github.com/mistgate/mistgate/internal/panel/pubaddr"
 	"github.com/mistgate/mistgate/internal/panel/securitylimit"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
@@ -88,7 +89,25 @@ type base struct {
 	edge    bool // the edge edition: the node link is set
 	limiter securitylimit.Limiter
 	reg     *protocols.Registry
-	subBase string // the subscription links start with this
+	subBase string // the subscription links start with this, at start
+	// addr is the panel's public address of the moment: a subscription host moves it while the panel runs (subBaseNow,
+	// linkURLNow follow it).
+	addr *pubaddr.Holder
+}
+
+// subBaseNow is the start of the subscription links of the moment.
+func (b base) subBaseNow() string {
+	if u := b.addr.PublicURL(); u != "" {
+		return strings.TrimRight(u, "/") + strings.TrimRight(b.in.SubPrefix, "/")
+	}
+	return ""
+}
+
+// linkURLNow is the base of the agent link of the moment.
+func (b base) linkURLNow() string {
+	in := b.in
+	in.PublicURL = b.addr.PublicURL()
+	return linkURL(in)
 }
 
 func newBase(c Config) (base, error) {
@@ -101,7 +120,8 @@ func newBase(c Config) (base, error) {
 	if c.Clock == nil {
 		c.Clock = time.Now
 	}
-	b := base{c: c, st: c.Store, vlt: c.Vault, log: c.Logger, in: c.Instance, edge: c.Remote != nil, limiter: c.Limiter, reg: builtin.Registry()}
+	b := base{c: c, st: c.Store, vlt: c.Vault, log: c.Logger, in: c.Instance, edge: c.Remote != nil, limiter: c.Limiter, reg: builtin.Registry(),
+		addr: pubaddr.New(c.Instance.PublicURL)}
 	if b.limiter == nil {
 		b.limiter = securitylimit.NewMemory(c.Clock, 0)
 	}
@@ -126,6 +146,8 @@ func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]st
 		ExpectedAgentVersion: buildinfo.Version,
 		DecoyDir:             b.c.DecoyDir,
 		PublicURL:            b.in.PublicURL,
+		PublicURLNow:         b.addr.PublicURL,
+		LinkURLNow:           b.linkURLNow,
 		Desired:              desired,
 		OnUsage:              onUsage,
 		Log:                  b.log,
@@ -134,7 +156,7 @@ func (b base) fleetConfig(desired func(ctx context.Context, nodeID string) ([]st
 
 // accessConfig is the access service's configuration, the same in every role.
 func (b base) accessConfig(fl *fleet.Fleet, stepUp func(context.Context) error) access.Config {
-	return access.Config{SubscriptionBaseURL: b.subBase, StepUp: stepUp, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts,
+	return access.Config{SubscriptionBaseURL: b.subBase, SubscriptionBase: b.subBaseNow, StepUp: stepUp, Log: b.log, AfterResponse: b.c.AfterResponse, CheckPorts: fl.CheckPorts,
 		CheckRelay: fl.CheckRelay, Limiter: b.limiter,
 		OwnHosts: []string{b.in.PublicURL, b.in.AdminHost, b.in.AgentSNI, b.c.PanelAddr, linkURL(b.in)}}
 }
@@ -169,7 +191,7 @@ func (b base) newSubParts(migrate bool) subParts {
 	}
 	p.brand = func(ctx context.Context) (settings.Settings, error) { return settings.Load(ctx, b.st) }
 	p.cfg = subs.Config{
-		Title: b.c.Title, BaseURL: b.subBase, Settings: p.cache, Brand: p.brand,
+		Title: b.c.Title, BaseURL: b.subBase, BaseURLFunc: b.subBaseNow, Settings: p.cache, Brand: p.brand,
 		Routing: subs.HappRouting(p.dns), Events: b.st, Log: b.log,
 		Limiter: b.limiter, AfterResponse: b.c.AfterResponse, ProbeReports: b.st,
 		PageKey: b.vlt.Derive(pagepass.KeyLabel), // the page password of every user: computed from the token, nothing stored
