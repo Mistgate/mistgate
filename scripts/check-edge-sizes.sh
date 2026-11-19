@@ -89,5 +89,11 @@ for entry in "${entries[@]}"; do
     echo "::error::cmd/$name imports a template engine; see the comment above this check"
     status=1
   fi
+  # The subscription host's bridge (and the uTLS it dials with) is the VPS edition's only: the panel imports it from //go:build
+  # !js files (internal/panel/subhost), and a Worker that linked it would carry a TLS stack it can never use.
+  if GOOS=js GOARCH=wasm go list -deps "./cmd/$name" | grep -Ex 'github.com/refraction-networking/utls|github.com/mistgate/mistgate/internal/node/(bridge|subhost)'; then
+    echo "::error::cmd/$name links the node bridge or uTLS; see the comment above this check"
+    status=1
+  fi
 done
 exit $status
