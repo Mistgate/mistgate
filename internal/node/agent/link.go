@@ -218,6 +218,15 @@ func (a *Agent) newLinkHTTPClient() (*http.Client, func()) {
 	if a.directDialContext != nil {
 		dialContext = a.directDialContext
 	}
+	direct := dialContext
+	// A subscription host reaches the panel at its own subscription name through its bridge (subhost.go), never through its
+	// own public address: that fails behind 1:1 NAT, and would count against its own limits.
+	dialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if viaHost, ok := a.dialHostLink(addr); ok {
+			return viaHost(ctx, network, addr)
+		}
+		return direct(ctx, network, addr)
+	}
 	transport := &http.Transport{
 		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}},
 		DialContext:         dialContext,
