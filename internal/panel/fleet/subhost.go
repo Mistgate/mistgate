@@ -67,6 +67,9 @@ func (f *Fleet) noteLinkHost(nodeID, audience string) (done func()) {
 // mTLS endpoint is not reachable then).
 func (f *Fleet) SetLinkEnrollment(on bool) { f.sub.linkEnrollment.Store(on) }
 
+// LinkEnrollment says new nodes enrol over the link (SetLinkEnrollment).
+func (f *Fleet) LinkEnrollment() bool { return f.sub.linkEnrollment.Load() }
+
 // SetSubHostNodes tells the fleet which nodes are subscription hosts: they cannot be retired while they are.
 func (f *Fleet) SetSubHostNodes(isHost func(nodeID string) bool) { f.sub.isHost.Store(&isHost) }
 

@@ -492,3 +492,7 @@ func TestPlainTextCountsCharacters(t *testing.T) {
 		t.Fatal("validPlainText must count characters, not bytes, and refuse invalid UTF-8")
 	}
 }
+
+func (testNodeManager) EnrollInSession(context.Context, string, []byte) (string, []byte, []byte, error) {
+	return "", nil, nil, errors.New("no offline enrolment in this test")
+}

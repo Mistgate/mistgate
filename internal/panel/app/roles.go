@@ -308,6 +308,7 @@ func (k *core) newProvision() (*nodeprovision.Service, error) {
 		StepUp: k.authSvc.RequireStepUp, Nodes: k.fl, Binaries: binaries, SSH: c.SSHClient,
 		PanelAddr: c.PanelAddr, LinkURL: provisionLinkURL(k.edge, k.in), AgentSNI: k.in.AgentSNI, Log: k.log,
 	}
+	k.subHostProvision(&provCfg)
 	if c.ProvisionKick != nil {
 		provCfg.Kick = func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

@@ -5,6 +5,7 @@ package app
 import (
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/httpserver"
+	nodeprovision "github.com/mistgate/mistgate/internal/panel/provision"
 )
 
 // The Cloudflare edition has no subscription host: it has a public address of its own, and its Workers keep no connection open.
@@ -13,6 +14,8 @@ import (
 const subHostServicePath = "/mistgate.subhost.v1.SubscriptionHostService/"
 
 func newSubHost(*core) subHostService { return nil }
+
+func (k *core) subHostProvision(*nodeprovision.Config) {}
 
 func (k *core) addSubHost(cfg *httpserver.Config) {
 	refuseInEdition(cfg, subHostServicePath, edition.SubscriptionHost)
