@@ -49,7 +49,7 @@ type ScheduledOutcome struct {
 }
 
 const (
-	scheduledToolCalls = 24
+	scheduledToolCalls = maxTurnToolCalls
 	scheduledTurn      = 10 * time.Minute
 	// scheduledAttempts is how often one model call is tried on the same provider before the run gives up on it.
 	scheduledAttempts = 3
