@@ -24,6 +24,8 @@ const (
 	ChannelMeasureStartProcedure  = "/mistgate.probe.v1.ProbeService/ChannelMeasureStart"
 	ChannelMeasureStatusProcedure = "/mistgate.probe.v1.ProbeService/ChannelMeasureStatus"
 	ChannelMeasureCancelProcedure = "/mistgate.probe.v1.ProbeService/ChannelMeasureCancel"
+
+	NodeSniScanProcedure = "/mistgate.probe.v1.ProbeService/NodeSniScan"
 )
 
 // level is how much of the admin API a procedure needs.
@@ -90,10 +92,14 @@ var procedureLevels = map[string]level{
 	PathSpeedResultsProcedure: levelRead,
 	// The channel measure of a node: 8 streams for 10 s each way against up to three nodes (up to 2 GiB a direction). Starting and
 	// stopping it is the owner's; the plan and the status move nothing.
-	ChannelMeasurePlanProcedure:                            levelRead,
-	ChannelMeasureStartProcedure:                           levelOwner, // fills the links of the node and its partners: owner only, and for tokens only through an approved plan
-	ChannelMeasureStatusProcedure:                          levelRead,
-	ChannelMeasureCancelProcedure:                          levelOwner, // closed to tokens: only the owner's screen stops a run
+	ChannelMeasurePlanProcedure:   levelRead,
+	ChannelMeasureStartProcedure:  levelOwner, // fills the links of the node and its partners: owner only, and for tokens only through an approved plan
+	ChannelMeasureStatusProcedure: levelRead,
+	ChannelMeasureCancelProcedure: levelOwner, // closed to tokens: only the owner's screen stops a run
+	// The neighbour scan of a node: the node connects to up to 253 addresses of its /24 that are not the owner's, which a hoster may
+	// read as a port scan. Starting it is the owner's, like the profile it serves; a token of the admin profile reads the last result
+	// and starts a scan directly (the MCP tool node_neighbor_sites says so), the same call.
+	NodeSniScanProcedure: levelOwner,
 	adminv1connect.NodeServiceGetFleetConnectionsProcedure: levelRead,  // counts only, no address
 	adminv1connect.NodeServiceGetNetworksProcedure:         levelRead,  // ASNs and counts only, no address
 	adminv1connect.NodeServiceUpdateNodeProcedure:          levelWrite, // the handler refuses a helper that sets client_ipv6 (where people seem to come from) or moves the address: owner only

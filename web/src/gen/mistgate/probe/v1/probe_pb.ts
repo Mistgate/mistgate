@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/probe/v1/probe.proto.
  */
 export const file_mistgate_probe_v1_probe: GenFile = /*@__PURE__*/
-  fileDesc("Ch1taXN0Z2F0ZS9wcm9iZS92MS9wcm9iZS5wcm90bxIRbWlzdGdhdGUucHJvYmUudjEiaAoQUGF0aFByb2JlUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIMCgRraW5kGAMgASgJEg0KBXBvcnRzGAQgAygNEg0KBXNpemVzGAUgAygNIlUKDVBhdGhQcm9iZVBvcnQSDAoEcG9ydBgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDRIPCgd2ZXJkaWN0GAQgASgJEgoKAm1zGAUgASgNIjgKDVBhdGhQcm9iZVNpemUSDAoEc2l6ZRgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDSLhAQoRUGF0aFByb2JlUmVzcG9uc2USEQoJZnJvbV9uYW1lGAEgASgJEg8KB3RvX25hbWUYAiABKAkSDAoEa2luZBgDIAEoCRITCgdhdF91bml4GAQgASgDQgIwAhINCgVlcnJvchgFIAEoCRIvCgVwb3J0cxgGIAMoCzIgLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhQcm9iZVBvcnQSLwoFc2l6ZXMYByADKAsyIC5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoUHJvYmVTaXplEhQKDGxhcmdlc3Rfc2l6ZRgIIAEoDSI8ChBOb2RlVHJhY2VSZXF1ZXN0EhQKDGZyb21fbm9kZV9pZBgBIAEoCRISCgp0b19ub2RlX2lkGAIgASgJIkgKCFRyYWNlSG9wEgsKA3R0bBgBIAEoDRIOCgZydHRfbXMYAiABKA0SEAoIYW5zd2VyZWQYAyABKAgSDQoFbGFiZWwYBCABKAki5gEKEU5vZGVUcmFjZVJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhMKB2F0X3VuaXgYAyABKANCAjACEg0KBWVycm9yGAQgASgJEg8KB3JlYWNoZWQYBSABKAgSKQoEaG9wcxgGIAMoCzIbLm1pc3RnYXRlLnByb2JlLnYxLlRyYWNlSG9wEhYKDmNoYW5nZWRfYXRfaG9wGAcgASgNEgwKBGRpZmYYCCABKAkSGQoNcHJldmlvdXNfdW5peBgJIAEoA0ICMAISDAoEa2VwdBgKIAEoDSIzChNOb2RlRG5zQ2hlY2tSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSCwoDcnVuGAIgASgIIl4KBkRuc1J1bhITCgdhdF91bml4GAEgASgDQgIwAhIOCgZwNTBfbXMYAiABKA0SDgoGcDk1X21zGAMgASgNEg4KBmZhaWxlZBgEIAEoDRIPCgdkb21haW5zGAUgASgNIp4BChROb2RlRG5zQ2hlY2tSZXNwb25zZRIRCglub2RlX25hbWUYASABKAkSDQoFZXJyb3IYAiABKAkSKQoGbGF0ZXN0GAMgASgLMhkubWlzdGdhdGUucHJvYmUudjEuRG5zUnVuEioKB2hpc3RvcnkYBCADKAsyGS5taXN0Z2F0ZS5wcm9iZS52MS5EbnNSdW4SDQoFdHJlbmQYBSABKAkiWwoQUGF0aFNwZWVkUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIKCgJtYhgDIAEoDRIRCglkaXJlY3Rpb24YBCABKAki+gEKEVBhdGhTcGVlZFJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhEKCWRpcmVjdGlvbhgDIAEoCRIKCgJtYhgEIAEoDRITCgdhdF91bml4GAUgASgDQgIwAhINCgVlcnJvchgGIAEoCRIOCgZtYml0X3MYByABKAESEgoKY29ubmVjdF9tcxgIIAEoDRIVCg1maXJzdF9ieXRlX21zGAkgASgNEhMKC2R1cmF0aW9uX21zGAogASgNEg0KBWJ5dGVzGAsgASgEEg8KB3N0cmVhbXMYDCABKA0SDgoGY2FwcGVkGA0gASgIIjkKF1BhdGhTcGVlZFJlc3VsdHNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDQoFbGltaXQYAiABKA0ihQEKGFBhdGhTcGVlZFJlc3VsdHNSZXNwb25zZRIzCgV0ZXN0cxgBIAMoCzIkLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhTcGVlZFJlc3BvbnNlEjQKCGNoYW5uZWxzGAIgAygLMiIubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE5vZGVMYXN0IlIKD0NoYW5uZWxOb2RlTGFzdBIRCglub2RlX25hbWUYASABKAkSLAoEbGFzdBgCIAEoCzIeLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxMYXN0IiwKGUNoYW5uZWxNZWFzdXJlUGxhblJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSIyCg5DaGFubmVsUGFydG5lchIMCgRuYW1lGAEgASgJEhIKCmtub3duX21icHMYAiABKA0iVAoQQ2hhbm5lbERpcmVjdGlvbhIOCgZtYml0X3MYASABKAESDwoHcGFydG5lchgCIAEoCRIPCgdzdHJlYW1zGAMgASgNEg4KBmNhcHBlZBgEIAEoCCKYAQoLQ2hhbm5lbExhc3QSEwoHYXRfdW5peBgBIAEoA0ICMAISMQoEZG93bhgCIAEoCzIjLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxEaXJlY3Rpb24SLwoCdXAYAyABKAsyIy5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsRGlyZWN0aW9uEhAKCHBhcnRuZXJzGAQgASgNIoYCChpDaGFubmVsTWVhc3VyZVBsYW5SZXNwb25zZRIRCglub2RlX25hbWUYASABKAkSDQoFZXJyb3IYAiABKAkSMwoIcGFydG5lcnMYAyADKAsyIS5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsUGFydG5lchIXCg9jb25maWd1cmVkX21icHMYBCABKA0SDgoGbWF4X21iGAUgASgNEg4KBm1heF9nYhgGIAEoDRITCgtlc3Rfc2Vjb25kcxgHIAEoDRIVCg1yZXRyeV9hZnRlcl9zGAggASgNEiwKBGxhc3QYCSABKAsyHi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTGFzdCItChpDaGFubmVsTWVhc3VyZVN0YXJ0UmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIi4KG0NoYW5uZWxNZWFzdXJlU3RhdHVzUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIi4KG0NoYW5uZWxNZWFzdXJlQ2FuY2VsUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIl4KG0NoYW5uZWxNZWFzdXJlU3RhcnRSZXNwb25zZRI/CgZzdGF0dXMYASABKAsyLy5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTWVhc3VyZVN0YXR1c1Jlc3BvbnNlIl8KHENoYW5uZWxNZWFzdXJlQ2FuY2VsUmVzcG9uc2USPwoGc3RhdHVzGAEgASgLMi8ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVTdGF0dXNSZXNwb25zZSKAAQoLQ2hhbm5lbFN0ZXASDwoHcGFydG5lchgBIAEoCRIRCglkaXJlY3Rpb24YAiABKAkSDQoFc3RhdGUYAyABKAkSDgoGbWJpdF9zGAQgASgBEg0KBWVycm9yGAUgASgJEg8KB3N0cmVhbXMYBiABKA0SDgoGY2FwcGVkGAcgASgIIqYCChxDaGFubmVsTWVhc3VyZVN0YXR1c1Jlc3BvbnNlEhEKCW5vZGVfbmFtZRgBIAEoCRINCgVzdGF0ZRgCIAEoCRINCgVlcnJvchgDIAEoCRIVCg1yZXRyeV9hZnRlcl9zGAQgASgNEhgKDHN0YXJ0ZWRfdW5peBgFIAEoA0ICMAISLQoFc3RlcHMYBiADKAsyHi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsU3RlcBIuCgZyZXN1bHQYByABKAsyHi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTGFzdBIsCgRsYXN0GAggASgLMh4ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbExhc3QSFwoPY29uZmlndXJlZF9tYnBzGAkgASgNMr8HCgxQcm9iZVNlcnZpY2USVgoJUGF0aFByb2JlEiMubWlzdGdhdGUucHJvYmUudjEuUGF0aFByb2JlUmVxdWVzdBokLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhQcm9iZVJlc3BvbnNlElYKCU5vZGVUcmFjZRIjLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVUcmFjZVJlcXVlc3QaJC5taXN0Z2F0ZS5wcm9iZS52MS5Ob2RlVHJhY2VSZXNwb25zZRJfCgxOb2RlRG5zQ2hlY2sSJi5taXN0Z2F0ZS5wcm9iZS52MS5Ob2RlRG5zQ2hlY2tSZXF1ZXN0GicubWlzdGdhdGUucHJvYmUudjEuTm9kZURuc0NoZWNrUmVzcG9uc2USVgoJUGF0aFNwZWVkEiMubWlzdGdhdGUucHJvYmUudjEuUGF0aFNwZWVkUmVxdWVzdBokLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhTcGVlZFJlc3BvbnNlEmsKEFBhdGhTcGVlZFJlc3VsdHMSKi5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoU3BlZWRSZXN1bHRzUmVxdWVzdBorLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhTcGVlZFJlc3VsdHNSZXNwb25zZRJxChJDaGFubmVsTWVhc3VyZVBsYW4SLC5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTWVhc3VyZVBsYW5SZXF1ZXN0Gi0ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVQbGFuUmVzcG9uc2USdAoTQ2hhbm5lbE1lYXN1cmVTdGFydBItLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxNZWFzdXJlU3RhcnRSZXF1ZXN0Gi4ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVTdGFydFJlc3BvbnNlEncKFENoYW5uZWxNZWFzdXJlU3RhdHVzEi4ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVTdGF0dXNSZXF1ZXN0Gi8ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVTdGF0dXNSZXNwb25zZRJ3ChRDaGFubmVsTWVhc3VyZUNhbmNlbBIuLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxNZWFzdXJlQ2FuY2VsUmVxdWVzdBovLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxNZWFzdXJlQ2FuY2VsUmVzcG9uc2VCxQEKFWNvbS5taXN0Z2F0ZS5wcm9iZS52MUIKUHJvYmVQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9wcm9iZS92MTtwcm9iZXYxogIDTVBYqgIRTWlzdGdhdGUuUHJvYmUuVjHKAhFNaXN0Z2F0ZVxQcm9iZVxWMeICHU1pc3RnYXRlXFByb2JlXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OlByb2JlOjpWMWIGcHJvdG8z");
+  fileDesc("Ch1taXN0Z2F0ZS9wcm9iZS92MS9wcm9iZS5wcm90bxIRbWlzdGdhdGUucHJvYmUudjEiaAoQUGF0aFByb2JlUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIMCgRraW5kGAMgASgJEg0KBXBvcnRzGAQgAygNEg0KBXNpemVzGAUgAygNIlUKDVBhdGhQcm9iZVBvcnQSDAoEcG9ydBgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDRIPCgd2ZXJkaWN0GAQgASgJEgoKAm1zGAUgASgNIjgKDVBhdGhQcm9iZVNpemUSDAoEc2l6ZRgBIAEoDRIMCgRzZW50GAIgASgNEgsKA2dvdBgDIAEoDSLhAQoRUGF0aFByb2JlUmVzcG9uc2USEQoJZnJvbV9uYW1lGAEgASgJEg8KB3RvX25hbWUYAiABKAkSDAoEa2luZBgDIAEoCRITCgdhdF91bml4GAQgASgDQgIwAhINCgVlcnJvchgFIAEoCRIvCgVwb3J0cxgGIAMoCzIgLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhQcm9iZVBvcnQSLwoFc2l6ZXMYByADKAsyIC5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoUHJvYmVTaXplEhQKDGxhcmdlc3Rfc2l6ZRgIIAEoDSI8ChBOb2RlVHJhY2VSZXF1ZXN0EhQKDGZyb21fbm9kZV9pZBgBIAEoCRISCgp0b19ub2RlX2lkGAIgASgJIkgKCFRyYWNlSG9wEgsKA3R0bBgBIAEoDRIOCgZydHRfbXMYAiABKA0SEAoIYW5zd2VyZWQYAyABKAgSDQoFbGFiZWwYBCABKAki5gEKEU5vZGVUcmFjZVJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhMKB2F0X3VuaXgYAyABKANCAjACEg0KBWVycm9yGAQgASgJEg8KB3JlYWNoZWQYBSABKAgSKQoEaG9wcxgGIAMoCzIbLm1pc3RnYXRlLnByb2JlLnYxLlRyYWNlSG9wEhYKDmNoYW5nZWRfYXRfaG9wGAcgASgNEgwKBGRpZmYYCCABKAkSGQoNcHJldmlvdXNfdW5peBgJIAEoA0ICMAISDAoEa2VwdBgKIAEoDSIzChNOb2RlRG5zQ2hlY2tSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSCwoDcnVuGAIgASgIIl4KBkRuc1J1bhITCgdhdF91bml4GAEgASgDQgIwAhIOCgZwNTBfbXMYAiABKA0SDgoGcDk1X21zGAMgASgNEg4KBmZhaWxlZBgEIAEoDRIPCgdkb21haW5zGAUgASgNIp4BChROb2RlRG5zQ2hlY2tSZXNwb25zZRIRCglub2RlX25hbWUYASABKAkSDQoFZXJyb3IYAiABKAkSKQoGbGF0ZXN0GAMgASgLMhkubWlzdGdhdGUucHJvYmUudjEuRG5zUnVuEioKB2hpc3RvcnkYBCADKAsyGS5taXN0Z2F0ZS5wcm9iZS52MS5EbnNSdW4SDQoFdHJlbmQYBSABKAkiWwoQUGF0aFNwZWVkUmVxdWVzdBIUCgxmcm9tX25vZGVfaWQYASABKAkSEgoKdG9fbm9kZV9pZBgCIAEoCRIKCgJtYhgDIAEoDRIRCglkaXJlY3Rpb24YBCABKAki+gEKEVBhdGhTcGVlZFJlc3BvbnNlEhEKCWZyb21fbmFtZRgBIAEoCRIPCgd0b19uYW1lGAIgASgJEhEKCWRpcmVjdGlvbhgDIAEoCRIKCgJtYhgEIAEoDRITCgdhdF91bml4GAUgASgDQgIwAhINCgVlcnJvchgGIAEoCRIOCgZtYml0X3MYByABKAESEgoKY29ubmVjdF9tcxgIIAEoDRIVCg1maXJzdF9ieXRlX21zGAkgASgNEhMKC2R1cmF0aW9uX21zGAogASgNEg0KBWJ5dGVzGAsgASgEEg8KB3N0cmVhbXMYDCABKA0SDgoGY2FwcGVkGA0gASgIIjkKF1BhdGhTcGVlZFJlc3VsdHNSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDQoFbGltaXQYAiABKA0ihQEKGFBhdGhTcGVlZFJlc3VsdHNSZXNwb25zZRIzCgV0ZXN0cxgBIAMoCzIkLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhTcGVlZFJlc3BvbnNlEjQKCGNoYW5uZWxzGAIgAygLMiIubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE5vZGVMYXN0IlIKD0NoYW5uZWxOb2RlTGFzdBIRCglub2RlX25hbWUYASABKAkSLAoEbGFzdBgCIAEoCzIeLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxMYXN0IiwKGUNoYW5uZWxNZWFzdXJlUGxhblJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCSIyCg5DaGFubmVsUGFydG5lchIMCgRuYW1lGAEgASgJEhIKCmtub3duX21icHMYAiABKA0iVAoQQ2hhbm5lbERpcmVjdGlvbhIOCgZtYml0X3MYASABKAESDwoHcGFydG5lchgCIAEoCRIPCgdzdHJlYW1zGAMgASgNEg4KBmNhcHBlZBgEIAEoCCKYAQoLQ2hhbm5lbExhc3QSEwoHYXRfdW5peBgBIAEoA0ICMAISMQoEZG93bhgCIAEoCzIjLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxEaXJlY3Rpb24SLwoCdXAYAyABKAsyIy5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsRGlyZWN0aW9uEhAKCHBhcnRuZXJzGAQgASgNIoYCChpDaGFubmVsTWVhc3VyZVBsYW5SZXNwb25zZRIRCglub2RlX25hbWUYASABKAkSDQoFZXJyb3IYAiABKAkSMwoIcGFydG5lcnMYAyADKAsyIS5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsUGFydG5lchIXCg9jb25maWd1cmVkX21icHMYBCABKA0SDgoGbWF4X21iGAUgASgNEg4KBm1heF9nYhgGIAEoDRITCgtlc3Rfc2Vjb25kcxgHIAEoDRIVCg1yZXRyeV9hZnRlcl9zGAggASgNEiwKBGxhc3QYCSABKAsyHi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTGFzdCItChpDaGFubmVsTWVhc3VyZVN0YXJ0UmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIi4KG0NoYW5uZWxNZWFzdXJlU3RhdHVzUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIi4KG0NoYW5uZWxNZWFzdXJlQ2FuY2VsUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJIl4KG0NoYW5uZWxNZWFzdXJlU3RhcnRSZXNwb25zZRI/CgZzdGF0dXMYASABKAsyLy5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTWVhc3VyZVN0YXR1c1Jlc3BvbnNlIl8KHENoYW5uZWxNZWFzdXJlQ2FuY2VsUmVzcG9uc2USPwoGc3RhdHVzGAEgASgLMi8ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVTdGF0dXNSZXNwb25zZSKAAQoLQ2hhbm5lbFN0ZXASDwoHcGFydG5lchgBIAEoCRIRCglkaXJlY3Rpb24YAiABKAkSDQoFc3RhdGUYAyABKAkSDgoGbWJpdF9zGAQgASgBEg0KBWVycm9yGAUgASgJEg8KB3N0cmVhbXMYBiABKA0SDgoGY2FwcGVkGAcgASgIIqYCChxDaGFubmVsTWVhc3VyZVN0YXR1c1Jlc3BvbnNlEhEKCW5vZGVfbmFtZRgBIAEoCRINCgVzdGF0ZRgCIAEoCRINCgVlcnJvchgDIAEoCRIVCg1yZXRyeV9hZnRlcl9zGAQgASgNEhgKDHN0YXJ0ZWRfdW5peBgFIAEoA0ICMAISLQoFc3RlcHMYBiADKAsyHi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsU3RlcBIuCgZyZXN1bHQYByABKAsyHi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTGFzdBIsCgRsYXN0GAggASgLMh4ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbExhc3QSFwoPY29uZmlndXJlZF9tYnBzGAkgASgNIjIKEk5vZGVTbmlTY2FuUmVxdWVzdBIPCgdub2RlX2lkGAEgASgJEgsKA3J1bhgCIAEoCCJ+CgxTbmlDYW5kaWRhdGUSCgoCaXAYASABKAkSDAoEbmFtZRgCIAEoCRILCgNkbnMYAyABKAkSCgoCaDIYBCABKAgSEwoLc2luZ2xlX3NpdGUYBSABKAgSDAoEaHR0cBgGIAEoDRIKCgJtcxgHIAEoDRIMCgRkYXlzGAggASgNIpwCChNOb2RlU25pU2NhblJlc3BvbnNlEhEKCW5vZGVfbmFtZRgBIAEoCRINCgVlcnJvchgCIAEoCRIVCg1yZXRyeV9hZnRlcl9zGAMgASgNEhMKB2F0X3VuaXgYBCABKANCAjACEg0KBXJhbmdlGAUgASgJEhEKCWFkZHJlc3NlcxgGIAEoDRIMCgRvcGVuGAcgASgNEg0KBXRsczEzGAggASgNEg0KBW1sa2VtGAkgASgNEg0KBXZhbGlkGAogASgNEg8KB3BhcnRpYWwYCyABKAgSFAoMb3duX2xlZnRfb3V0GAwgASgNEjMKCmNhbmRpZGF0ZXMYDSADKAsyHy5taXN0Z2F0ZS5wcm9iZS52MS5TbmlDYW5kaWRhdGUynQgKDFByb2JlU2VydmljZRJWCglQYXRoUHJvYmUSIy5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoUHJvYmVSZXF1ZXN0GiQubWlzdGdhdGUucHJvYmUudjEuUGF0aFByb2JlUmVzcG9uc2USVgoJTm9kZVRyYWNlEiMubWlzdGdhdGUucHJvYmUudjEuTm9kZVRyYWNlUmVxdWVzdBokLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVUcmFjZVJlc3BvbnNlEl8KDE5vZGVEbnNDaGVjaxImLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVEbnNDaGVja1JlcXVlc3QaJy5taXN0Z2F0ZS5wcm9iZS52MS5Ob2RlRG5zQ2hlY2tSZXNwb25zZRJWCglQYXRoU3BlZWQSIy5taXN0Z2F0ZS5wcm9iZS52MS5QYXRoU3BlZWRSZXF1ZXN0GiQubWlzdGdhdGUucHJvYmUudjEuUGF0aFNwZWVkUmVzcG9uc2USawoQUGF0aFNwZWVkUmVzdWx0cxIqLm1pc3RnYXRlLnByb2JlLnYxLlBhdGhTcGVlZFJlc3VsdHNSZXF1ZXN0GisubWlzdGdhdGUucHJvYmUudjEuUGF0aFNwZWVkUmVzdWx0c1Jlc3BvbnNlEnEKEkNoYW5uZWxNZWFzdXJlUGxhbhIsLm1pc3RnYXRlLnByb2JlLnYxLkNoYW5uZWxNZWFzdXJlUGxhblJlcXVlc3QaLS5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTWVhc3VyZVBsYW5SZXNwb25zZRJ0ChNDaGFubmVsTWVhc3VyZVN0YXJ0Ei0ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVTdGFydFJlcXVlc3QaLi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTWVhc3VyZVN0YXJ0UmVzcG9uc2USdwoUQ2hhbm5lbE1lYXN1cmVTdGF0dXMSLi5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTWVhc3VyZVN0YXR1c1JlcXVlc3QaLy5taXN0Z2F0ZS5wcm9iZS52MS5DaGFubmVsTWVhc3VyZVN0YXR1c1Jlc3BvbnNlEncKFENoYW5uZWxNZWFzdXJlQ2FuY2VsEi4ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVDYW5jZWxSZXF1ZXN0Gi8ubWlzdGdhdGUucHJvYmUudjEuQ2hhbm5lbE1lYXN1cmVDYW5jZWxSZXNwb25zZRJcCgtOb2RlU25pU2NhbhIlLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVTbmlTY2FuUmVxdWVzdBomLm1pc3RnYXRlLnByb2JlLnYxLk5vZGVTbmlTY2FuUmVzcG9uc2VCxQEKFWNvbS5taXN0Z2F0ZS5wcm9iZS52MUIKUHJvYmVQcm90b1ABWjpnaXRodWIuY29tL21pc3RnYXRlL21pc3RnYXRlL2dlbi9taXN0Z2F0ZS9wcm9iZS92MTtwcm9iZXYxogIDTVBYqgIRTWlzdGdhdGUuUHJvYmUuVjHKAhFNaXN0Z2F0ZVxQcm9iZVxWMeICHU1pc3RnYXRlXFByb2JlXFYxXEdQQk1ldGFkYXRh6gITTWlzdGdhdGU6OlByb2JlOjpWMWIGcHJvdG8z");
 
 /**
  * @generated from message mistgate.probe.v1.PathProbeRequest
@@ -1023,13 +1023,194 @@ export const ChannelMeasureStatusResponseSchema: GenMessage<ChannelMeasureStatus
   messageDesc(file_mistgate_probe_v1_probe, 26);
 
 /**
- * On-demand probes between fleet nodes, for the MCP tools path_probe, node_trace and node_dns_check and for an operator.
+ * @generated from message mistgate.probe.v1.NodeSniScanRequest
+ */
+export type NodeSniScanRequest = Message<"mistgate.probe.v1.NodeSniScanRequest"> & {
+  /**
+   * @generated from field: string node_id = 1;
+   */
+  nodeId: string;
+
+  /**
+   * Scan now (false = read the last result kept).
+   *
+   * @generated from field: bool run = 2;
+   */
+  run: boolean;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.NodeSniScanRequest.
+ * Use `create(NodeSniScanRequestSchema)` to create a new message.
+ */
+export const NodeSniScanRequestSchema: GenMessage<NodeSniScanRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 27);
+
+/**
+ * One neighbour site of a scan: a name the node saw in the certificate of an address of its /24. The name is the text of a stranger's
+ * certificate (a plain host name, checked by the node and again by the panel) and is shown as text only: never as a link.
  *
+ * @generated from message mistgate.probe.v1.SniCandidate
+ */
+export type SniCandidate = Message<"mistgate.probe.v1.SniCandidate"> & {
+  /**
+   * @generated from field: string ip = 1;
+   */
+  ip: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * Where the node's own resolver says the name leads: "here" (this address), "subnet" (another address of the /24), "elsewhere", "none".
+   *
+   * @generated from field: string dns = 3;
+   */
+  dns: string;
+
+  /**
+   * @generated from field: bool h2 = 4;
+   */
+  h2: boolean;
+
+  /**
+   * The certificate belongs to one site (at most two registrable domains in it), not to a shared hosting or CDN one.
+   *
+   * @generated from field: bool single_site = 5;
+   */
+  singleSite: boolean;
+
+  /**
+   * The status of GET / (redirects not followed); 0 = no answer.
+   *
+   * @generated from field: uint32 http = 6;
+   */
+  http: number;
+
+  /**
+   * The TLS handshake in milliseconds.
+   *
+   * @generated from field: uint32 ms = 7;
+   */
+  ms: number;
+
+  /**
+   * Days the certificate still holds.
+   *
+   * @generated from field: uint32 days = 8;
+   */
+  days: number;
+};
+
+/**
+ * Describes the message mistgate.probe.v1.SniCandidate.
+ * Use `create(SniCandidateSchema)` to create a new message.
+ */
+export const SniCandidateSchema: GenMessage<SniCandidate> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 28);
+
+/**
+ * @generated from message mistgate.probe.v1.NodeSniScanResponse
+ */
+export type NodeSniScanResponse = Message<"mistgate.probe.v1.NodeSniScanResponse"> & {
+  /**
+   * @generated from field: string node_name = 1;
+   */
+  nodeName: string;
+
+  /**
+   * Empty when the scan ran or a stored result is shown. Otherwise a short code: node_offline, agent_too_old (the agent lacks "sni-scan/1"),
+   * busy, too_soon (retry_after_s says when), not_my_address (the node's address is not on its own interface: a NAT or a name behind a CDN),
+   * no_ipv4 (the panel knows no IPv4 address of the node), no_roots (the node has no CA roots), failed. A refused call still carries the
+   * last stored result, if there is one.
+   *
+   * @generated from field: string error = 2;
+   */
+  error: string;
+
+  /**
+   * @generated from field: uint32 retry_after_s = 3;
+   */
+  retryAfterS: number;
+
+  /**
+   * When the stored result was made (the panel's clock); 0 = no scan of this node was ever kept.
+   *
+   * @generated from field: int64 at_unix = 4 [jstype = JS_NUMBER];
+   */
+  atUnix: bigint;
+
+  /**
+   * The /24 that was scanned ("192.0.2.0/24").
+   *
+   * @generated from field: string range = 5;
+   */
+  range: string;
+
+  /**
+   * Counts of addresses: looked at, answering on 443, TLS 1.3, with a name whose handshake chose X25519MLKEM768, with a candidate.
+   *
+   * @generated from field: uint32 addresses = 6;
+   */
+  addresses: number;
+
+  /**
+   * @generated from field: uint32 open = 7;
+   */
+  open: number;
+
+  /**
+   * @generated from field: uint32 tls13 = 8;
+   */
+  tls13: number;
+
+  /**
+   * @generated from field: uint32 mlkem = 9;
+   */
+  mlkem: number;
+
+  /**
+   * @generated from field: uint32 valid = 10;
+   */
+  valid: number;
+
+  /**
+   * The budget ran out before every address was done.
+   *
+   * @generated from field: bool partial = 11;
+   */
+  partial: boolean;
+
+  /**
+   * Candidates that were left out because they are this panel's own: an address or a name of one of its nodes or of the panel.
+   *
+   * @generated from field: uint32 own_left_out = 12;
+   */
+  ownLeftOut: number;
+
+  /**
+   * @generated from field: repeated mistgate.probe.v1.SniCandidate candidates = 13;
+   */
+  candidates: SniCandidate[];
+};
+
+/**
+ * Describes the message mistgate.probe.v1.NodeSniScanResponse.
+ * Use `create(NodeSniScanResponseSchema)` to create a new message.
+ */
+export const NodeSniScanResponseSchema: GenMessage<NodeSniScanResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_probe_v1_probe, 29);
+
+/**
+ * On-demand probes between fleet nodes, for the MCP tools path_probe, node_trace and node_dns_check and for an operator.
+ * 
  * A separate package on purpose: nothing here is served or compiled on the Cloudflare edition, where the admin Worker has a
  * size limit (scripts/check-edge-sizes.sh) and no caller for these. The panel VPS mounts the service (internal/panel/fleet
  * path_probe.go); the generated code is imported by files that are not built for js/wasm only. Every procedure is operator
  * and up (role helper), open to API tokens directly (internal/panel/auth policy.go, policy_tokens.go).
- *
+ * 
  * Every target is a fleet node or one of its ports, named by node id: a caller can never name a host or a URL. The probes send
  * bounded test traffic and are rate limited (per caller, per node, one per node pair at a time). Responses carry node names,
  * counts and timings: never an address, a certificate pin or a router.
@@ -1137,6 +1318,18 @@ export const ProbeService: GenService<{
     methodKind: "unary";
     input: typeof ChannelMeasureCancelRequestSchema;
     output: typeof ChannelMeasureCancelResponseSchema;
+  },
+  /**
+   * REALITY targets among the neighbours of a node: the node walks the /24 of its own address on TCP 443 (agent.proto "NEIGHBOR SITES")
+   * and the panel keeps what it found. run = false reads the last result kept; run = true scans, owner only, and the scan is
+   * refused when the last one is less than 30 minutes old. It takes up to a minute, longer than a plain unary call.
+   *
+   * @generated from rpc mistgate.probe.v1.ProbeService.NodeSniScan
+   */
+  nodeSniScan: {
+    methodKind: "unary";
+    input: typeof NodeSniScanRequestSchema;
+    output: typeof NodeSniScanResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_probe_v1_probe, 0);

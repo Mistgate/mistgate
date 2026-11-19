@@ -22,4 +22,9 @@ type probeState struct {
 
 	// the channel measure (channel_measure.go): the newest run of each node, running or over
 	channel channelState
+
+	// the neighbour scan (sni_scan.go): a node scans once at a time, and when its last scan started (the pause is counted from the
+	// start of a scan that reached the agent, finished or not)
+	sniBusy  map[string]struct{}
+	sniStart map[string]time.Time
 }

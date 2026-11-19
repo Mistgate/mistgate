@@ -436,7 +436,7 @@ func externalReadArgs() map[string]map[string]any {
 		"profiles_list": {}, "protocols_list": {}, "relays_list": {}, "node_server_access_list": {}, "node_server_keys_list": {"node": "de1"},
 		"node_ipv6_check": {"node": "de1"}, "relay_candidates": {"node": "de1"}, "dns_preset_get": {"id": "dns_missing"}, "profile_get": {"profile_id": "prf_missing"}, "relay_check": {"relay_id": "rly_missing"},
 		"timeline": {"hours": 24}, "fleet_digest": {}, "user_diagnose": {"user_id": "usr_missing"}, "node_runtime": {}, "path_loss_matrix": {"hours": 24},
-		"path_probe": {"from": "de1", "to": "nl1", "kind": "udp"}, "node_trace": {"from": "de1", "to": "nl1"}, "node_dns_check": {"node": "de1"},
+		"path_probe": {"from": "de1", "to": "nl1", "kind": "udp"}, "node_trace": {"from": "de1", "to": "nl1"}, "node_dns_check": {"node": "de1"}, "node_neighbor_sites": {"node": "de1", "stored_only": true},
 		"panel_logs": {"min_level": "debug"}, "retention_status": {}, "access_report": {}, "block_diagnosis": {}, "node_debug_logs": {"node": "de1"}, "capacity_report": {"hours": 24}, "panel_resources": {},
 		"tasks_list": {}, "task_get": {"task_id": "tsk_missing"}, "task_runs": {"task_id": "tsk_missing"}, "task_run_now": {"task_id": "tsk_missing"},
 		"os_updates_status": {}, "client_api_settings": {}, "outdated_devices": {},
@@ -452,8 +452,9 @@ func externalFixtureTools() map[string]bool {
 		"warp_status": true, "nodes_get": true, "user_get": true, "user_traffic": true, "user_devices": true, "user_connection": true,
 		"subscription_preview": true, "group_get": true, "user_diagnose": true,
 		"task_get": true, "task_runs": true, "task_run_now": true, "backup_status": true,
-		"node_debug_logs": true, // a capture is created only by the mutating node_debug_capture tool
-		"decoy_site_get":  true, "decoy_site_file": true, "subscription_mihomo_template_get": true,
+		"node_debug_logs":     true, // a capture is created only by the mutating node_debug_capture tool
+		"node_neighbor_sites": true, // the sweep reads the stored result only; a node that was never scanned is a clean answer
+		"decoy_site_get":      true, "decoy_site_file": true, "subscription_mihomo_template_get": true,
 	}
 }
 
@@ -1042,7 +1043,7 @@ func (e *env) scenario() {
 		"node_ipv6_check": {"node": "de1"}, "relay_candidates": {"node": "de1"},
 		"timeline": {"hours": 24}, "fleet_digest": {}, "user_diagnose": {"user_id": userIDs[0]}, "node_runtime": {}, "path_loss_matrix": {"hours": 24},
 		// they send test traffic between nodes, so they are not read-only; the throwaway panel has no connected nodes (needsFixture)
-		"path_probe": {"from": "de1", "to": "nl1", "kind": "udp"}, "node_trace": {"from": "de1", "to": "nl1"}, "node_dns_check": {"node": "de1"},
+		"path_probe": {"from": "de1", "to": "nl1", "kind": "udp"}, "node_trace": {"from": "de1", "to": "nl1"}, "node_dns_check": {"node": "de1"}, "node_neighbor_sites": {"node": "de1", "stored_only": true},
 		"panel_logs": {"min_level": "debug"}, "retention_status": {}, "access_report": {}, "block_diagnosis": {}, "node_debug_logs": {}, "capacity_report": {"hours": 24}, "panel_resources": {},
 		"tasks_list": {}, "os_updates_status": {}, "client_api_settings": {}, "outdated_devices": {},
 	}
@@ -1051,7 +1052,7 @@ func (e *env) scenario() {
 	needsFixture := map[string]bool{
 		"node_metrics": true, "node_doctor": true, "checks_results": true, "checks_run_now": true, "node_ipv6_check": true, "relay_candidates": true,
 		"node_connections": true, "node_server_keys_list": true, "dns_preset_get": true, "profile_get": true, "relay_check": true, "node_ports": true,
-		"warp_status": true, "nodes_get": true, "path_probe": true, "node_trace": true, "node_dns_check": true,
+		"warp_status": true, "nodes_get": true, "path_probe": true, "node_trace": true, "node_dns_check": true, "node_neighbor_sites": true,
 		// the throwaway panel has no scheduled task: task_not_found is a clean answer
 		"task_get": true, "task_runs": true, "task_run_now": true,
 		// the throwaway panel has no Mihomo template of its own: the owner makes one through an approved plan, so the name is

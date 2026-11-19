@@ -66,7 +66,7 @@ func noCommand(t *testing.T, c *conn, d time.Duration) {
 	for {
 		select {
 		case m := <-c.in:
-			if m.GetUdpSend() != nil || m.GetUdpCount() != nil || m.GetTcpProbe() != nil || m.GetPathTrace() != nil || m.GetRunDoctor() != nil {
+			if m.GetUdpSend() != nil || m.GetUdpCount() != nil || m.GetTcpProbe() != nil || m.GetPathTrace() != nil || m.GetRunDoctor() != nil || m.GetSniScan() != nil {
 				t.Fatalf("an agent that cannot take the command was sent %v", m)
 			}
 		case <-timer:

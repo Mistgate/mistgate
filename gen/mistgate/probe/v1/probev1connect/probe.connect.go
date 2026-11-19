@@ -57,6 +57,9 @@ const (
 	// ProbeServiceChannelMeasureCancelProcedure is the fully-qualified name of the ProbeService's
 	// ChannelMeasureCancel RPC.
 	ProbeServiceChannelMeasureCancelProcedure = "/mistgate.probe.v1.ProbeService/ChannelMeasureCancel"
+	// ProbeServiceNodeSniScanProcedure is the fully-qualified name of the ProbeService's NodeSniScan
+	// RPC.
+	ProbeServiceNodeSniScanProcedure = "/mistgate.probe.v1.ProbeService/NodeSniScan"
 )
 
 // ProbeServiceClient is a client for the mistgate.probe.v1.ProbeService service.
@@ -90,6 +93,10 @@ type ProbeServiceClient interface {
 	ChannelMeasureStatus(context.Context, *connect.Request[v1.ChannelMeasureStatusRequest]) (*connect.Response[v1.ChannelMeasureStatusResponse], error)
 	// Stops the run of a node: both ends close their streams at once.
 	ChannelMeasureCancel(context.Context, *connect.Request[v1.ChannelMeasureCancelRequest]) (*connect.Response[v1.ChannelMeasureCancelResponse], error)
+	// REALITY targets among the neighbours of a node: the node walks the /24 of its own address on TCP 443 (agent.proto "NEIGHBOR SITES")
+	// and the panel keeps what it found. run = false reads the last result kept; run = true scans, owner only, and the scan is
+	// refused when the last one is less than 30 minutes old. It takes up to a minute, longer than a plain unary call.
+	NodeSniScan(context.Context, *connect.Request[v1.NodeSniScanRequest]) (*connect.Response[v1.NodeSniScanResponse], error)
 }
 
 // NewProbeServiceClient constructs a client for the mistgate.probe.v1.ProbeService service. By
@@ -157,6 +164,12 @@ func NewProbeServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(probeServiceMethods.ByName("ChannelMeasureCancel")),
 			connect.WithClientOptions(opts...),
 		),
+		nodeSniScan: connect.NewClient[v1.NodeSniScanRequest, v1.NodeSniScanResponse](
+			httpClient,
+			baseURL+ProbeServiceNodeSniScanProcedure,
+			connect.WithSchema(probeServiceMethods.ByName("NodeSniScan")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -171,6 +184,7 @@ type probeServiceClient struct {
 	channelMeasureStart  *connect.Client[v1.ChannelMeasureStartRequest, v1.ChannelMeasureStartResponse]
 	channelMeasureStatus *connect.Client[v1.ChannelMeasureStatusRequest, v1.ChannelMeasureStatusResponse]
 	channelMeasureCancel *connect.Client[v1.ChannelMeasureCancelRequest, v1.ChannelMeasureCancelResponse]
+	nodeSniScan          *connect.Client[v1.NodeSniScanRequest, v1.NodeSniScanResponse]
 }
 
 // PathProbe calls mistgate.probe.v1.ProbeService.PathProbe.
@@ -218,6 +232,11 @@ func (c *probeServiceClient) ChannelMeasureCancel(ctx context.Context, req *conn
 	return c.channelMeasureCancel.CallUnary(ctx, req)
 }
 
+// NodeSniScan calls mistgate.probe.v1.ProbeService.NodeSniScan.
+func (c *probeServiceClient) NodeSniScan(ctx context.Context, req *connect.Request[v1.NodeSniScanRequest]) (*connect.Response[v1.NodeSniScanResponse], error) {
+	return c.nodeSniScan.CallUnary(ctx, req)
+}
+
 // ProbeServiceHandler is an implementation of the mistgate.probe.v1.ProbeService service.
 type ProbeServiceHandler interface {
 	// An on-demand probe from one fleet node to another: UDP (optionally an MTU sweep), TCP connect or TLS handshake with the
@@ -249,6 +268,10 @@ type ProbeServiceHandler interface {
 	ChannelMeasureStatus(context.Context, *connect.Request[v1.ChannelMeasureStatusRequest]) (*connect.Response[v1.ChannelMeasureStatusResponse], error)
 	// Stops the run of a node: both ends close their streams at once.
 	ChannelMeasureCancel(context.Context, *connect.Request[v1.ChannelMeasureCancelRequest]) (*connect.Response[v1.ChannelMeasureCancelResponse], error)
+	// REALITY targets among the neighbours of a node: the node walks the /24 of its own address on TCP 443 (agent.proto "NEIGHBOR SITES")
+	// and the panel keeps what it found. run = false reads the last result kept; run = true scans, owner only, and the scan is
+	// refused when the last one is less than 30 minutes old. It takes up to a minute, longer than a plain unary call.
+	NodeSniScan(context.Context, *connect.Request[v1.NodeSniScanRequest]) (*connect.Response[v1.NodeSniScanResponse], error)
 }
 
 // NewProbeServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -312,6 +335,12 @@ func NewProbeServiceHandler(svc ProbeServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(probeServiceMethods.ByName("ChannelMeasureCancel")),
 		connect.WithHandlerOptions(opts...),
 	)
+	probeServiceNodeSniScanHandler := connect.NewUnaryHandler(
+		ProbeServiceNodeSniScanProcedure,
+		svc.NodeSniScan,
+		connect.WithSchema(probeServiceMethods.ByName("NodeSniScan")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.probe.v1.ProbeService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProbeServicePathProbeProcedure:
@@ -332,6 +361,8 @@ func NewProbeServiceHandler(svc ProbeServiceHandler, opts ...connect.HandlerOpti
 			probeServiceChannelMeasureStatusHandler.ServeHTTP(w, r)
 		case ProbeServiceChannelMeasureCancelProcedure:
 			probeServiceChannelMeasureCancelHandler.ServeHTTP(w, r)
+		case ProbeServiceNodeSniScanProcedure:
+			probeServiceNodeSniScanHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -375,4 +406,8 @@ func (UnimplementedProbeServiceHandler) ChannelMeasureStatus(context.Context, *c
 
 func (UnimplementedProbeServiceHandler) ChannelMeasureCancel(context.Context, *connect.Request[v1.ChannelMeasureCancelRequest]) (*connect.Response[v1.ChannelMeasureCancelResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.ChannelMeasureCancel is not implemented"))
+}
+
+func (UnimplementedProbeServiceHandler) NodeSniScan(context.Context, *connect.Request[v1.NodeSniScanRequest]) (*connect.Response[v1.NodeSniScanResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.probe.v1.ProbeService.NodeSniScan is not implemented"))
 }

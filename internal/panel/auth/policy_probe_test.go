@@ -24,6 +24,8 @@ func TestPathProbeProcedurePolicy(t *testing.T) {
 		ChannelMeasureStartProcedure:  probev1connect.ProbeServiceChannelMeasureStartProcedure,
 		ChannelMeasureStatusProcedure: probev1connect.ProbeServiceChannelMeasureStatusProcedure,
 		ChannelMeasureCancelProcedure: probev1connect.ProbeServiceChannelMeasureCancelProcedure,
+
+		NodeSniScanProcedure: probev1connect.ProbeServiceNodeSniScanProcedure,
 	} {
 		if got != want {
 			t.Errorf("policy constant %q differs from the generated procedure %q", got, want)
@@ -111,5 +113,23 @@ func TestChannelMeasureProceduresNeedTheOwnersApproval(t *testing.T) {
 		if got, ok := TokenAccess(path); !ok || got != TokenAccessDirect {
 			t.Errorf("%s: TokenAccess = %v, %v; want direct", path, got, ok)
 		}
+	}
+}
+
+// The neighbour scan makes a node connect to addresses that are not the owner's: the owner's call (a helper and a readonly admin are
+// refused), a step-up is not needed, and a token of the admin profile reaches it directly.
+func TestNodeSniScanIsTheOwners(t *testing.T) {
+	path := probev1connect.ProbeServiceNodeSniScanProcedure
+	if got := ProcedureRole(path); got != store.RoleOwner {
+		t.Errorf("ProcedureRole = %q, want owner", got)
+	}
+	if got, ok := TokenAccess(path); !ok || got != TokenAccessDirect {
+		t.Errorf("TokenAccess = %v, %v; want direct", got, ok)
+	}
+	if NeedsStepUp(path) {
+		t.Error("NodeSniScan needs a step-up")
+	}
+	if got := TokenProfileRole(store.ProfileOperator); got == store.RoleOwner {
+		t.Errorf("the operator profile acts as %q", got)
 	}
 }
