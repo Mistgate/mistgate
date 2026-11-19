@@ -9,7 +9,7 @@ export const en = {
   "profiles.f.trusttunnel.h3.hint":
     "Also listen on UDP at the same port number. Off by default: UDP 443 is usually Hysteria2’s, and a taken port stops the profile. Needs a node with a new agent. The tt:// links always use HTTP/2: HTTP/3 is for the Mistgate app.",
   "profiles.f.trusttunnel.sni.title": "Domain (SNI)",
-  "profiles.f.trusttunnel.sni.hint": "The server name in the certificate, the one the app sees. Empty: the node address; for an IP, Let's Encrypt needs a domain.",
+  "profiles.f.trusttunnel.sni.hint": "The server name in the certificate, the one the app sees. Empty: the node address; for an IP, Let's Encrypt needs a domain. Use your own domain here, not a stranger's name. The apps check the certificate against this name, and Let's Encrypt issues it only for your own domain; a stranger's name with a self-signed certificate gives the node away.",
   "profiles.f.trusttunnel.sni.placeholder": "vpn.example.com",
   "profiles.f.trusttunnel.tls_mode.title": "Certificate",
   "profiles.f.trusttunnel.tls_mode.hint":
@@ -99,7 +99,7 @@ export const ru: typeof en = {
   "profiles.f.trusttunnel.h3.hint":
     "Слушать ещё и UDP на том же номере порта. По умолчанию выключено: UDP 443 обычно занят Hysteria2, а занятый порт не даёт поставить профиль. Нужен новый агент на ноде. Ссылки tt:// всегда идут по HTTP/2: HTTP/3 нужен приложению Mistgate.",
   "profiles.f.trusttunnel.sni.title": "Домен (SNI)",
-  "profiles.f.trusttunnel.sni.hint": "Имя сервера в сертификате — его видит приложение. Пусто — адрес ноды; если там IP, для Let's Encrypt нужен домен.",
+  "profiles.f.trusttunnel.sni.hint": "Имя сервера в сертификате — его видит приложение. Пусто — адрес ноды; если там IP, для Let's Encrypt нужен домен. Впиши сюда свой домен, а не чужое имя. Приложения проверяют сертификат по этому имени, а Let's Encrypt выдаёт его только на твой домен; чужое имя с самоподписанным сертификатом выдаёт ноду.",
   "profiles.f.trusttunnel.sni.placeholder": "vpn.example.com",
   "profiles.f.trusttunnel.tls_mode.title": "Сертификат",
   "profiles.f.trusttunnel.tls_mode.hint":
@@ -183,7 +183,7 @@ export const zh: typeof en = {
   "profiles.f.trusttunnel.h3.hint":
     "同时在 UDP 上监听同一个端口号。默认关闭：UDP 443 通常已被 Hysteria2 占用，端口被占用时配置无法部署。需要代理程序足够新的节点。tt:// 链接始终使用 HTTP/2：HTTP/3 是给 Mistgate 应用用的。",
   "profiles.f.trusttunnel.sni.title": "域名 (SNI)",
-  "profiles.f.trusttunnel.sni.hint": "证书中的服务器名称，应用看到的就是它。留空：使用节点地址；若是 IP，Let's Encrypt 需要域名。",
+  "profiles.f.trusttunnel.sni.hint": "证书中的服务器名称，应用看到的就是它。留空：使用节点地址；若是 IP，Let's Encrypt 需要域名。 这里请填你自己的域名，不要填别人的名称。应用会按这个名称校验证书，而 Let's Encrypt 只为你自己的域名签发；别人的名称配自签名证书会暴露节点。",
   "profiles.f.trusttunnel.sni.placeholder": "vpn.example.com",
   "profiles.f.trusttunnel.tls_mode.title": "证书",
   "profiles.f.trusttunnel.tls_mode.hint": "Let's Encrypt 需要域名和开放的 80 或 443 端口。给官方应用的 tt:// 链接只发给使用公共证书的节点；自签名节点只能在 Mistgate 应用中使用。",
@@ -264,7 +264,7 @@ export const fa: typeof en = {
   "profiles.f.trusttunnel.h3.hint":
     "روی همان شمارهٔ پورت از UDP هم گوش بده. به‌طور پیش‌فرض خاموش است: UDP 443 معمولاً دست Hysteria2 است و پورت اشغال‌شده نمی‌گذارد پروفایل برود. به نودی با عامل (agent) تازه نیاز دارد. لینک‌های tt:// همیشه HTTP/2 هستند: HTTP/3 برای برنامهٔ Mistgate است.",
   "profiles.f.trusttunnel.sni.title": "دامنه (SNI)",
-  "profiles.f.trusttunnel.sni.hint": "نام سرور در گواهی که برنامه آن را می‌بیند. خالی: آدرس نود؛ اگر IP باشد، Let's Encrypt دامنه می‌خواهد.",
+  "profiles.f.trusttunnel.sni.hint": "نام سرور در گواهی که برنامه آن را می‌بیند. خالی: آدرس نود؛ اگر IP باشد، Let's Encrypt دامنه می‌خواهد. اینجا دامنهٔ خودت را بنویس، نه نام یک غریبه. برنامه‌ها گواهی را با همین نام بررسی می‌کنند و Let's Encrypt فقط برای دامنهٔ خودت صادر می‌کند؛ نام غریبه با گواهی خودامضا نود را لو می‌دهد.",
   "profiles.f.trusttunnel.sni.placeholder": "vpn.example.com",
   "profiles.f.trusttunnel.tls_mode.title": "گواهی",
   "profiles.f.trusttunnel.tls_mode.hint":
@@ -346,7 +346,7 @@ export const tr: typeof en = {
   "profiles.f.trusttunnel.h3.hint":
     "Aynı port numarasını UDP üzerinden de dinle. Varsayılan olarak kapalı: UDP 443'ü genellikle Hysteria2 tutar ve dolu bir port profilin konmasını engeller. Yeterince yeni ajanlı düğüm gerekir. tt:// bağlantıları her zaman HTTP/2 kullanır: HTTP/3 Mistgate uygulaması içindir.",
   "profiles.f.trusttunnel.sni.title": "Alan adı (SNI)",
-  "profiles.f.trusttunnel.sni.hint": "Sertifikadaki, uygulamanın gördüğü sunucu adı. Boş: düğümün adresi; IP ise Let's Encrypt bir alan adı ister.",
+  "profiles.f.trusttunnel.sni.hint": "Sertifikadaki, uygulamanın gördüğü sunucu adı. Boş: düğümün adresi; IP ise Let's Encrypt bir alan adı ister. Buraya kendi alan adını yaz, yabancı bir ad değil. Uygulamalar sertifikayı bu ada göre doğrular ve Let's Encrypt yalnızca senin alan adın için verir; yabancı ad ve kendinden imzalı sertifika düğümü ele verir.",
   "profiles.f.trusttunnel.sni.placeholder": "vpn.example.com",
   "profiles.f.trusttunnel.tls_mode.title": "Sertifika",
   "profiles.f.trusttunnel.tls_mode.hint":

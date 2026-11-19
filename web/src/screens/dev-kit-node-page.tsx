@@ -34,7 +34,9 @@ import { sitesQuery } from "@/lib/decoysites";
 import { cardDemo } from "./node/decoy";
 import { installLibrary } from "./dev-kit-decoys";
 import { channelScene, channelStateOf, channelStates } from "./dev-kit-channel";
+import { sniScene, sniStateOf, sniStates } from "./dev-kit-sni";
 import { channelDemo } from "./node/channel-measure";
+import { sniDemo } from "./node/sni-scan";
 import { warpQuery } from "./node/warp-model";
 import { nodeDnsOptionsQuery } from "./node/dns-options";
 import { dnsPresetsQuery } from "./subscriptions/queries";
@@ -425,7 +427,7 @@ export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | 
     sourceStars: 298,
     stepUpUntilUnix: 0,
     edition: sp.edge ? "edge" : "vps",
-    unavailable: sp.edge ? ["health_checks", "decoy_own"] : [],
+    unavailable: sp.edge ? ["health_checks", "decoy_own", "sni_scan"] : [],
   } as never);
   return { qc, data };
 }
@@ -500,6 +502,10 @@ export function NodePageFrame() {
       const sc = channelScene(cm);
       if (sc.configured) Object.assign(made.data.node, { bandwidthMbps: sc.configured });
     }
+    // "Sites near the node" (tab=profiles&sni=<state>): the card in the state the panel's answer (or a click) leaves it in
+    const sn = sniStateOf(params.get("sni"));
+    sniDemo.current = undefined;
+    if (sn) sniScene(sn);
     return made;
   });
   return (
@@ -533,6 +539,11 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-profiles-down", state: "down", tab: "profiles", title: "Profiles: the node is silent, the day of checks is dimmed", w: 1440, h: 1100 },
   { id: "node-profiles-new", state: "new", tab: "profiles", title: "Profiles: none on the node yet", w: 1440, h: 700 },
   { id: "node-profiles-viewer", state: "viewer", tab: "profiles", title: "Profiles: a read-only role, no buttons", w: 1440, h: 1100 },
+  ...sniStates.map((sni) => ({ id: `node-profiles-sni-${sni}`, state: (sni === "offline" ? "down" : "calm") as NState, tab: "profiles", q: `sni=${sni}`, title: `Profiles: sites near the node, ${sni}`, w: 1440, h: 1500 })),
+  { id: "node-profiles-sni-viewer", state: "viewer", tab: "profiles", q: "sni=result", title: "Profiles: sites near the node, a read-only role has no card", w: 1440, h: 1100 },
+  { id: "node-profiles-sni-edge", state: "edge", tab: "profiles", q: "sni=result", title: "Profiles: sites near the node, the Cloudflare edition has no card", w: 1440, h: 1100 },
+  { id: "node-profiles-sni-phone", state: "calm", tab: "profiles", q: "sni=result", title: "Profiles: sites near the node on a phone, 400 wide", w: 400, h: 2600 },
+  { id: "node-profiles-sni-phone-warn", state: "calm", tab: "profiles", q: "sni=warn", title: "Profiles: the warning before a scan on a phone, 400 wide", w: 400, h: 1700 },
   { id: "node-profiles-1100", state: "calm", tab: "profiles", title: "Profiles at 1100 wide: the cells take a row of their own", w: 1100, h: 1300 },
   { id: "node-profiles-phone", state: "calm", tab: "profiles", title: "Profiles on a phone, 400 wide", w: 400, h: 1900 },
   { id: "node-doctor-calm", state: "calm", tab: "doctor", title: "Doctor: the node is healthy, one warning accepted as normal", w: 1440, h: 1500 },
