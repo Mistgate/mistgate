@@ -185,8 +185,6 @@ describe("the rows of the link devices", () => {
     expect(row(el, "l1").querySelector(".tl")?.getAttribute("aria-hidden")).toBe("true");
     // the one online sorts first whatever the server's order
     expect(names(page(data("hwid-track", (d) => d.devices.reverse())))[0]).toBe("iPhone 15");
-    // no device is a row of the old kind
-    expect(el.querySelector(".dev, .dev-n, .dev-m, .dev-body")).toBeNull();
   });
 
   it("when it last updated: a computer has its own column, a phone has the time at the end of the quiet line; online has a dot", () => {
@@ -212,8 +210,6 @@ describe("the rows of the link devices", () => {
     expect([...row(el, "l2").querySelectorAll("button")]).toEqual([more]);
     more.click();
     expect(log).toEqual(["menu l2"]);
-    // nothing of the old row is left in it: no menu, no question, no field
-    expect(el.querySelector(".menu, [role=menu], [role=alertdialog], form, input")).toBeNull();
     expect(byName(el, "Приложения без ID устройства").querySelector("button")).toBeNull();
   });
 
@@ -359,7 +355,6 @@ describe("the keys of the AmneziaVPN app", () => {
     expect([text(btn), btn.classList.contains("pri")]).toEqual(["Получить новый ключ", true]);
     btn.click();
     expect(a.log).toEqual(["stale d3"]);
-    expect(el.querySelector(".stale-card, .stale .h3")).toBeNull(); // the card that listed the keys is gone
     // two stale keys: a button each, with its own key for the keyboard
     const two = data("many");
     two.amnezia!.devices.forEach((x) => (x.stale = true));

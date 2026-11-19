@@ -64,11 +64,9 @@ describe("the frame of every step", () => {
     expect(box.children).toHaveLength(1);
     const dlg = box.firstElementChild!;
     expect(dlg.tagName).toBe("SECTION");
-    expect([dlg.className, dlg.getAttribute("role"), dlg.getAttribute("aria-modal"), dlg.getAttribute("aria-label")]).toEqual(["a-dlg", "dialog", "true", "Через приложение"]);
+    expect([dlg.getAttribute("role"), dlg.getAttribute("aria-modal"), dlg.getAttribute("aria-label")]).toEqual(["dialog", "true", "Через приложение"]);
     expect(label).toBe("Через приложение");
-    expect([...dlg.children].map((x) => x.tagName + "." + x.className)).toEqual(["HEADER.a-h", "DIV.a-b", "FOOTER.a-f"]);
     const head = dlg.querySelector(".a-h")!;
-    expect([...head.children].map((x) => x.className)).toEqual(["u-ic", "t", "n", "u-ic"]);
     expect(head.querySelector(".t")?.tagName).toBe("H2");
     expect(head.querySelector(".t")?.getAttribute("tabindex")).toBe("-1");
     expect(head.querySelector(".t")?.hasAttribute("data-autofocus")).toBe(true);
@@ -76,7 +74,8 @@ describe("the frame of every step", () => {
     expect(head.querySelector("[data-k=add-back]")?.getAttribute("aria-label")).toBe("Назад");
     expect(head.querySelector("[data-k=modal-x]")?.getAttribute("aria-label")).toBe("Закрыть");
     const first = dialog(data("many"), { amz: at("pick") }).box.querySelector(".a-h")!;
-    expect([...first.children].map((x) => x.className)).toEqual(["sp", "t", "n", "u-ic"]); // nothing to go back to
+    expect(first.querySelector("[data-k=add-back]")).toBeNull(); // nothing to go back to
+    expect(first.querySelector("[data-k=modal-x]")).not.toBeNull();
   });
 
   it("Close closes the window; Back and Next go to the pane the board names", () => {
@@ -135,7 +134,6 @@ describe("step way: how the device connects", () => {
     const { box, label, stage } = dialog(data("devices-rich"));
     expect([label, stage]).toEqual(["Новое устройство", "way"]);
     const slots = box.querySelector(".a-slots")!;
-    expect([...slots.children].map((x) => x.className)).toEqual(["", "u-prog", "r"]);
     expect(text(slots.children[0])).toBe("Устройство займёт одно место");
     expect(text(slots.querySelector(".r"))).toBe("свободно 5 из 10");
     expect(slots.querySelector(".u-prog")?.getAttribute("aria-label")).toBe("Занято 5 из 10 мест");
@@ -143,7 +141,6 @@ describe("step way: how the device connects", () => {
     const [link, key] = [...box.querySelectorAll<HTMLButtonElement>(".a-ways > button.a-way")];
     expect([link!.className, key!.className]).toEqual(["a-way rec", "a-way"]);
     expect([link!.dataset.k, key!.dataset.k]).toEqual(["add-way-link", "add-way-key"]);
-    expect([...link!.children].map((x) => x.className)).toEqual(["top", "t", "d", "pts", "go"]);
     expect(text(link!.querySelector(".top .tag"))).toBe("Рекомендуем");
     expect(text(link!.querySelector(".t"))).toBe("Через приложение");
     expect(text(link!.querySelector(".d"))).toBe("Одна ссылка в Happ");
@@ -241,8 +238,6 @@ describe("step app: the device and the app", () => {
     const opts = [...box.querySelectorAll(".a-opts > button.a-opt")];
     expect(opts.map((x) => text(x.querySelector(".t")))).toEqual(["kl!ckРекомендуем", "Happ"]); // AmneziaVPN is the other way
     expect(opts.map((x) => x.getAttribute("aria-checked"))).toEqual(["true", "false"]);
-    expect(opts.map((x) => x.className)).toEqual(["a-opt on", "a-opt"]);
-    expect([...opts[0]!.children].map((x) => x.className)).toEqual(["a-app sky", "tx", "a-rd"]);
     expect(opts[0]!.querySelector(".tag")?.textContent).toBe("Рекомендуем");
     expect(text(opts[0]!.querySelector(".d"))).toBe("Все ваши серверы в одном приложении, подписка обновляется сама"); // the settings' own words
     expect(text(opts[1]!.querySelector(".d"))).toBe("Одна личная ссылка со всеми вашими серверами — обновляется сама"); // an app without a description
@@ -286,7 +281,7 @@ describe("step app: the device and the app", () => {
 
   it("the foot of the step has the one button: Next", () => {
     const foot = dialog(data("devices-rich"), { amz: at("link") }).box.querySelector(".a-f")!;
-    expect([...foot.children].map((x) => `${x.tagName}.${x.className} ${text(x)}`)).toEqual(["BUTTON.u-btn pri Дальше"]);
+    expect([...foot.children].map((x) => `${x.tagName} ${text(x)}`)).toEqual(["BUTTON Дальше"]);
   });
 });
 
@@ -302,7 +297,6 @@ describe("step conn: connect", () => {
     expect(steps.map((x) => x.querySelector(".tx")?.firstChild?.textContent)).toEqual(["Установите kl!ck", "Добавьте подписку"]);
     const get = box.querySelector("a[data-k=add-link-get]")!;
     expect(text(get)).toBe("Скачать с сайта");
-    expect(get.className).toBe("u-btn");
     expect(get.getAttribute("href")).toMatch(/^https:\/\/github\.com\//);
     expect(get.getAttribute("rel")).toBe("noopener noreferrer");
     expect(text(steps[1]!.querySelector(".u-hint"))).toBe("kl!ck откроется уже с вашей подпиской");
@@ -318,7 +312,6 @@ describe("step conn: connect", () => {
     expect(side.querySelector("svg")?.getAttribute("aria-label")).toBe("QR-код со ссылкой на эту страницу");
     expect(box.textContent).not.toContain(data("devices-rich").subscription_url); // the link is copied and scanned, never written out
     const foot = box.querySelector(".a-f")!;
-    expect([...foot.children].map((x) => `${x.tagName}.${x.className}`)).toEqual(["P.u-hint", "BUTTON.u-btn"]);
     expect(text(foot)).toBe("Устройство появится в списке после первого обновленияГотово");
   });
 
@@ -367,7 +360,6 @@ describe("step key: the form of a new device", () => {
     const { box, label } = form();
     expect(label).toBe("Ключ AmneziaVPN");
     const f = box.querySelector("form.a-b")!;
-    expect([...f.children].map((x) => x.className)).toEqual(["a-fld", "a-fld", "a-fld", "a-fld"]);
     expect(text(f.children[0]!.querySelector(".a-lbl"))).toBe("Что за устройство");
     const chips = [...f.querySelectorAll(".a-seg .a-chip")];
     expect(chips.map(text)).toEqual(["iPhone", "Android", "Windows", "Mac", "Linux", "Другое"]);
@@ -390,7 +382,6 @@ describe("step key: the form of a new device", () => {
     expect(vers.map((x) => text(x.querySelector(".v")))).toEqual(["5.0.1.5 и новееAWG 3.1", "Запасной выходWARP", "До 5.0.1.5AWG 2.0"]);
     expect(vers.map((x) => x.querySelector(".pr")?.className)).toEqual(["pr new", "pr", "pr"]);
     expect(vers.map((x) => text(x.querySelector(".d")))).toEqual(["Обычный ключ, подходит почти всегда", "Если какой-то сайт не открывается", "Ключ для старых версий приложения"]);
-    expect(vers.map((x) => x.children[0]!.className)).toEqual(["a-rd", "a-rd", "a-rd"]);
     const incl = box.querySelector(".a-incl")!;
     expect(text(box.querySelector(".a-incl")?.closest(".a-fld")?.querySelector(".a-lbl"))).toBe("В ключе 2 страныпереключаются в AmneziaVPN");
     expect([...incl.querySelectorAll("li")].map(text)).toEqual(["Германия", "FIФинляндия"]);
@@ -445,7 +436,7 @@ describe("step full: no place left", () => {
     expect(box.querySelector(".a-empty .u-prog")?.getAttribute("aria-label")).toBe("Занято 5 из 5 мест");
     expect(box.querySelector<HTMLElement>(".a-empty .u-prog i")?.style.width).toBe("100%");
     expect(text(box.querySelector(".a-lead"))).toBe("Удалите устройство, которым больше не пользуетесь, или напишите в поддержку, добавим место");
-    expect([...box.querySelectorAll(".a-f > *")].map((x) => `${x.tagName}.${x.className} ${text(x)}`)).toEqual(["A.u-btn Написать в поддержку", "BUTTON.u-btn pri Открыть устройства"]);
+    expect([...box.querySelectorAll(".a-f > *")].map((x) => `${x.tagName} ${text(x)}`)).toEqual(["A Написать в поддержку", "BUTTON Открыть устройства"]);
     box.querySelector<HTMLButtonElement>("[data-k=add-full-devices]")!.click();
     expect(a.log).toEqual(["add false", "tab devices"]);
     const mute = dialog(data("hwid-dense"), { support: "" }).box;

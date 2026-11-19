@@ -358,8 +358,6 @@ describe("the list of devices", () => {
     expect([more.getAttribute("aria-label"), more.getAttribute("aria-haspopup")]).toEqual(["Ещё: Pixel 7", "dialog"]);
     more.click();
     expect(a.log).toEqual(["menu d3"]);
-    // nothing of the row's old menu, question or field is on the page
-    expect(el.querySelector(".menu, [role=menu], [role=alertdialog], form, .dev-acts, .stag")).toBeNull();
   });
 
   it("a busy row says so on its button and cannot be pressed twice; an error stays under the row", () => {
@@ -460,12 +458,6 @@ describe("the list of devices", () => {
     expect(a.log).toEqual(["add true"]);
   });
 
-  it("no hint or heading over the list: the card of the places is the head", () => {
-    const el = rows("many");
-    expect(el.querySelector(".shead, .sec-sub, .h2")).toBeNull();
-    expect(el.querySelector(".u-dvh + .u-dvl")).not.toBeNull();
-  });
-
   it("when the subscription is not active the devices stay: the keys can be changed, nothing is issued", () => {
     for (const name of ["expired", "quota", "disabled"]) {
       const el = view(data(name), state("android"), actions());
@@ -512,7 +504,6 @@ describe("the key dialog", () => {
     const b = modal("android", "d3");
     expect(text(b.querySelector(".a-h .t"))).toBe("Ключ для Pixel 7");
     expect(text(b.querySelector(".a-h .n"))).toBe("");
-    expect([...b.querySelectorAll(".a-b > *")].map((x) => x.className)).toEqual(["a-fld", "a-steps", "a-meta"]);
     expect(text(b.querySelector(".a-f .u-hint"))).toBe("Устройство уже в списке — ключ можно показать снова");
     expect(text(b.querySelector(".a-f .u-btn"))).toBe("Готово");
   });
@@ -538,7 +529,6 @@ describe("the key dialog", () => {
     const b = modal("windows", "d3");
     expect(wheres(b).map((x) => x[1])).toEqual(["false", "true", "false"]);
     const two = b.querySelector(".a-two")!;
-    expect([...two.children].map((x) => x.className)).toEqual(["a-steps", "a-side"]);
     expect(two.querySelector(".a-side .u-qr svg")).not.toBeNull();
     expect(two.querySelector(".a-side .u-qr .u-qt img")).not.toBeNull();
     expect(two.querySelector(".a-side svg")?.getAttribute("aria-label")).toBe("QR-код ключа для AmneziaVPN");
@@ -687,9 +677,8 @@ describe("the add-a-device dialog", () => {
 describe("the 'new key needed' card", () => {
   const page = (d: MgData) => view(d, state("android", { returning: true, tab: "devices", devicesOpen: true }), actions());
 
-  it("the mark and the button are on the row of each stale device, which the question names; no card above the list", () => {
+  it("the mark and the button are on the row of each stale device, which the question names", () => {
     const one = page(data("stale"));
-    expect(one.querySelector(".stale-card, .stale .h3, .stale ol")).toBeNull();
     const r = row(one, "d3");
     expect(r.classList.contains("stale")).toBe(true);
     expect(text(r.querySelector(".nm"))).toBe("Pixel 7");

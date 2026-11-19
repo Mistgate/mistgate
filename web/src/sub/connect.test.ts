@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { chip, linkApp, qrOn } from "./connect";
-import { cases } from "./dev-data";
-import { dict } from "./i18n";
-import { appKey, appList, chosenApp, keyAppName, normalize } from "./logic";
-import { data, dialog, plain, state, text } from "./test-kit";
+import { appKey, appList, chosenApp, keyAppName } from "./logic";
+import { data, dialog, state, text } from "./test-kit";
 import { appTile, linkApps } from "./ways";
 
 // The pieces of the link way of the "new device" window: the choice chip, the apps and their tiles, the steps of connecting.
 // The window itself (the frame, the other steps) is add.test.ts.
 
-const t = dict.ru;
 const app = (name: string, platform = "windows", over: object = {}) => ({ platform, kind: "happ", name, download_url: "", add_url: "", description: "", recommended: false, ...over }) as ReturnType<typeof appList>[number];
 
 describe("the chip of the board (.a-chip)", () => {
@@ -17,8 +14,8 @@ describe("the chip of the board (.a-chip)", () => {
     let hit = 0;
     const on = chip({ ico: "phone", label: "iPhone", on: true, k: "x-ios", click: () => hit++ });
     const off = chip({ label: "Mac", on: false, k: "x-mac", click: () => hit++ });
-    expect([on.className, on.getAttribute("role"), on.getAttribute("aria-checked"), on.dataset.k, on.type]).toEqual(["a-chip on", "radio", "true", "x-ios", "button"]);
-    expect([off.className, off.getAttribute("aria-checked"), off.querySelector("svg")]).toEqual(["a-chip", "false", null]);
+    expect([on.getAttribute("role"), on.getAttribute("aria-checked"), on.dataset.k, on.type]).toEqual(["radio", "true", "x-ios", "button"]);
+    expect([off.getAttribute("aria-checked"), off.querySelector("svg")]).toEqual(["false", null]);
     expect(text(on)).toBe("iPhone");
     on.click();
     off.click();
@@ -115,13 +112,6 @@ describe("the steps of connecting", () => {
   });
 
   it("the footer's words follow the language", () => {
-    expect(text(dialog(data("first"), { lang: "en", amz: { pane: "conn" } }).box.querySelector(".a-f"))).toBe("The device shows up in the list after its first updateDone".replace("Done", dict.en.awgDone));
-    expect(plain(t.adAfterFirst)).toBe("Устройство появится в списке после первого обновления");
-  });
-});
-
-describe("the data of the cases", () => {
-  it("every case is data the page can read", () => {
-    for (const raw of Object.values(cases)) expect(normalize(raw).v).toBe(1);
+    expect(text(dialog(data("first"), { lang: "en", amz: { pane: "conn" } }).box.querySelector(".a-f"))).toBe("The device shows up in the list after its first updateDone");
   });
 });

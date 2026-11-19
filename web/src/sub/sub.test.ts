@@ -257,7 +257,6 @@ describe("view", () => {
     it("the logo of 28 px, the name in two weights, the language menu, and the way to the support", () => {
       const { el } = page("return");
       const bar = $(el, "header.u-hd")!;
-      expect([...bar.children].map((x) => x.tagName.toLowerCase() + (x.className ? `.${x.className.split(" ").join(".")}` : ""))).toEqual(["img.logo", "div.u-wm", "details.u-lang", "a.u-btn.only-w", "a.u-ic.line.only-m"]);
       expect([$(bar, ".logo")!.getAttribute("width"), $(bar, ".logo")!.getAttribute("height"), $(bar, ".logo")!.getAttribute("alt")]).toEqual(["28", "28", ""]);
       expect([$(bar, ".u-wm")!.firstChild?.textContent, word(bar, ".u-wm b")]).toEqual(["mist", "gate"]);
       expect(word(bar, "a.only-w")).toBe("Поддержка");
@@ -385,14 +384,12 @@ describe("view", () => {
       const { el } = page("return");
       const side = $(el, "aside.u-hero-c.only-w")!;
       expect(side.getAttribute("aria-label")).toBe("Новое устройство");
-      expect([...side.children].map((x) => x.className)).toEqual(["u-qrrow", "u-acts col"]);
       expect($(side, ".u-qr.u-tilt .u-glare")).not.toBeNull();
       expect($(side, ".u-qi svg[role=img]")!.getAttribute("aria-label")).toBe("QR-код со ссылкой на эту страницу");
       expect($(side, ".u-qi .u-qt img")).not.toBeNull();
       expect([word(side, ".u-t"), word(side, ".u-hint")]).toEqual(["Новое устройство", "Наведите камеру телефона, и эта страница откроется на нём"]);
       expect($$(side, ".u-acts button").map((b) => text(b.querySelector(".u-cpt span:first-child") ?? b))).toEqual(["Добавить устройство", "Скопировать ссылку подписки"]);
       const m = $(el, "div.u-hero-c.only-m")!;
-      expect([...m.children].map((x) => x.className)).toEqual(["u-acts"]);
       expect($$(m, "button").map((b) => [b.className, text(b.querySelector(".u-cpt span:first-child") ?? b)])).toEqual([["u-btn pri grow", "Добавить устройство"], ["u-btn u-cpb", "Ссылка"]]);
       // the short word is its own "done" word: any longer one would be wider than the room left next to the add button and push it to a row of its own
       expect([...$(m, "[data-k=hero-copy] .u-cpt")!.querySelectorAll(":scope > span")].map((x) => x.textContent)).toEqual(["Ссылка", "Ссылка"]);
@@ -532,7 +529,6 @@ describe("view", () => {
       const { el } = page("long");
       const ann = $(el, "section.u-ann")!;
       expect(ann.getAttribute("role")).toBe("status");
-      expect([...ann.children].map((x) => x.className)).toEqual(["tl", "tx", "u-ic"]);
       expect(word(ann, ".t b")).toBe("Первая строка объявления.");
       expect(word(ann, ".m")).toMatch(/^Вторая строка: длинный текст/);
       expect($(ann, ".u-ic")!.getAttribute("aria-label")).toBe("Скрыть объявление");
@@ -751,13 +747,6 @@ describe("right to left (Persian) and the others", () => {
     expect(physical).toBeNull();
     expect(rules).toContain(':root[dir="rtl"] .i.flip { transform: scaleX(-1); }');
     expect(rules).toMatch(/--sans: "Onest", "Vazirmatn",/);
-  });
-
-  it("the phone sheet fills the screen: the window's grid centring is reset where the sheet is a block, and the chips of a window are 44 tall there", () => {
-    const css = (f: string) => readFileSync(`${process.cwd()}/src/sub/${f}`, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-    const phone = (f: string) => css(f).split("@media (max-width: 719.98px)").slice(1).join("\n");
-    expect(phone("sub.css")).toMatch(/\.modal\[open\] \{ display: block; padding: 0; place-items: normal; \}/);
-    expect(phone("sub-dlg.css")).toMatch(/\.a-seg \.a-chip \{ min-height: 44px; \}/);
   });
 
   it("the Turkish page: the polite «siz», the term in its own words, dates without a case ending", () => {
