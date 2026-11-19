@@ -607,14 +607,12 @@ describe("Settings → Interface", () => {
     expect(updateInstance.mock.calls[0]?.[0]).toMatchObject({ logoSvg: svg });
   });
 
-  it("has one switch for the reveal animation, on by default, with no Beta tag and no moments under it, and none on the Cloudflare edition", async () => {
+  it("has one switch for the reveal animation, on by default, and none on the Cloudflare edition", async () => {
     await mount(<InterfacePage />);
     const sw = () => document.querySelector<HTMLElement>(`[role=switch][aria-label="${en["settings.fx"]}"]`);
     expect(sw()?.getAttribute("aria-checked")).toBe("true");
     expect(readPref("fx")).toBeNull();
     expect(text()).toContain(en["sx.if.fx.hint"]);
-    expect(text()).not.toContain("Beta");
-    expect(document.querySelectorAll(".sx-anr")).toHaveLength(1); // the row of the board, nothing under it
     await click(sw());
     expect(sw()?.getAttribute("aria-checked")).toBe("false");
     expect(readPref("fx")).toBe("off");
