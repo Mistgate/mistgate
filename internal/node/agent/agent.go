@@ -203,6 +203,7 @@ type Agent struct {
 	tcp           tcpProbeState
 	country       countryProbeState
 	pathTrace     pathTraceState
+	sniScan       sniScanState
 	speed         speedState
 	linkCounterMu sync.Mutex
 	linkVolumes   map[linkCounterKey]linkCounterVolume
@@ -1581,6 +1582,8 @@ func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {
 		a.goBusy(func() { a.speedTest(s, m.SpeedTest) })
 	case *pb.ConnectResponse_PathTrace:
 		a.goBusy(func() { a.runPathTrace(s, m.PathTrace) })
+	case *pb.ConnectResponse_SniScan:
+		a.goBusy(func() { a.runSniScan(s, m.SniScan) })
 	case *pb.ConnectResponse_CountryProbe:
 		a.goBusy(func() { a.countryProbe(s, m.CountryProbe) })
 	case *pb.ConnectResponse_SetDecoy:
