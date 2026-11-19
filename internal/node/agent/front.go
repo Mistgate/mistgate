@@ -51,7 +51,7 @@ func (a *Agent) planShares(next *model) map[uint16]plugin.TCPPortShare {
 	}
 	fronts := map[uint16]plugin.TCPPortShare{}
 	place, noRun := map[string]uint32{}, map[string]string{}
-	for port, p := range plugin.TCPSharePlan(specs) {
+	for port, p := range plugin.TCPSharePlan(specs, a.hostExtra(specs)...) {
 		if p.Front() {
 			fronts[port] = p
 			for _, r := range p.Routes {
@@ -205,6 +205,7 @@ func (a *Agent) sharedPortStats() []*pb.SharedPort {
 		if sp.f != nil {
 			s := sp.f.Stats()
 			row.Accepted, row.Timeouts, row.Evicted, row.Refused, row.NoRoute, row.Panics = s.Accepted, s.Timeouts, s.Evicted, s.Refused, s.NoRoute, s.Panics
+			row.Diverted = s.Diverted
 			row.DefaultRouteDown = s.RouteDown
 			row.DefaultNoSni, row.DefaultUnknownName, row.DefaultNotTls, row.DefaultBadHello, row.DefaultHelloTooLarge =
 				s.NoSNI, s.UnknownName, s.NotTLS, s.BadHello, s.HelloTooLarge

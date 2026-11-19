@@ -139,6 +139,9 @@ func (a *Agent) capabilities() []string {
 	}
 	if a.sharesTCP() {
 		caps = append(caps, agentcap.TCPShare)
+		if a.cfg.Certs != nil { // the host's own site needs the certificate source
+			caps = append(caps, plugin.CapSubHost)
+		}
 	}
 	if a.appliesUserRateLimit() {
 		caps = append(caps, agentcap.UserRateLimit)
