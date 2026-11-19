@@ -9,6 +9,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"google.golang.org/protobuf/proto"
 )
 
 type networkBundleInfo interface {
@@ -29,6 +30,11 @@ func (f *Fleet) nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettin
 	if l := f.panelLink.Load(); l != nil && *l != "" && store.CapabilityPresent(caps, plugin.CapPanelLink) {
 		s.PanelLinkUrl = *l
 	}
+	if roles := f.subHostRoles.Load(); roles != nil && store.CapabilityPresent(caps, plugin.CapSubHost) {
+		if r := (*roles)[n.ID]; r != nil {
+			s.SubHost = proto.Clone(r).(*agentv1.SubHostRole)
+		}
+	}
 	if !store.CapabilityPresent(caps, capNetworks) {
 		return s
 	}
@@ -41,6 +47,16 @@ func (f *Fleet) nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettin
 		}
 	}
 	return s
+}
+
+// SetSubHostRoles sets the subscription host roles by node id (internal/panel/subhost): agents with sub-host/1 are sent
+// theirs in NodeSettings.sub_host. nil or empty: no node is a host. The caller calls StateChanged.
+func (f *Fleet) SetSubHostRoles(roles map[string]*agentv1.SubHostRole) {
+	if len(roles) == 0 {
+		f.subHostRoles.Store(nil)
+		return
+	}
+	f.subHostRoles.Store(&roles)
 }
 
 // SetPanelLink sets the link address agents with panel-link/1 are told to move to; "" (the default) sends nothing.
