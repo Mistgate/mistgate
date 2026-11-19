@@ -46,6 +46,11 @@ const (
 // these inbounds (the ones to run; the panel checks a change with the inbounds it would leave). An unfit role gets no route:
 // the agent installs nothing and its inbounds run as before.
 func SubHostRoutes(role SubHostRole, specs []InboundSpec) ([]TCPExtraRoute, string) {
+	return SubHostRoutesOn(SubHostPort, role, specs)
+}
+
+// SubHostRoutesOn is SubHostRoutes for another port than 443 (tests on loopback).
+func SubHostRoutesOn(port uint16, role SubHostRole, specs []InboundSpec) ([]TCPExtraRoute, string) {
 	var names []string
 	for _, n := range role.Names {
 		if n = routeName(n); n != "" && !slices.Contains(names, n) {
@@ -57,7 +62,7 @@ func SubHostRoutes(role SubHostRole, specs []InboundSpec) ([]TCPExtraRoute, stri
 	}
 	tcpOn443, ownSite := false, false
 	for _, s := range specs {
-		if s.Listen.Network != "tcp" || s.Listen.Port != SubHostPort {
+		if s.Listen.Network != "tcp" || s.Listen.Port != port {
 			continue
 		}
 		tcpOn443 = true
@@ -75,12 +80,12 @@ func SubHostRoutes(role SubHostRole, specs []InboundSpec) ([]TCPExtraRoute, stri
 	}
 	if !tcpOn443 {
 		for _, s := range specs {
-			if hy2SitePort(s) == SubHostPort {
+			if hy2SitePort(s) == port {
 				return nil, SubHostHysteria2Site
 			}
 		}
 	}
-	routes := []TCPExtraRoute{{Port: SubHostPort, Route: TCPRoute{ID: SubHostRouteID, Protocol: "sub-host", Names: names}}}
+	routes := []TCPExtraRoute{{Port: port, Route: TCPRoute{ID: SubHostRouteID, Protocol: "sub-host", Names: names}}}
 	if ownSite {
 		return routes, ""
 	}
@@ -92,9 +97,9 @@ func SubHostRoutes(role SubHostRole, specs []InboundSpec) ([]TCPExtraRoute, stri
 		return nil, SubHostSiteNameConflict
 	}
 	for _, s := range specs {
-		if r, ok := tcpRoute(s); ok && s.Listen.Network == "tcp" && s.Listen.Port == SubHostPort && slices.Contains(r.Names, site) {
+		if r, ok := tcpRoute(s); ok && s.Listen.Network == "tcp" && s.Listen.Port == port && slices.Contains(r.Names, site) {
 			return nil, SubHostNameTaken
 		}
 	}
-	return append(routes, TCPExtraRoute{Port: SubHostPort, Route: TCPRoute{ID: SubHostSiteRouteID, Protocol: "sub-host-site", Names: []string{site}, Site: true}}), ""
+	return append(routes, TCPExtraRoute{Port: port, Route: TCPRoute{ID: SubHostSiteRouteID, Protocol: "sub-host-site", Names: []string{site}, Site: true}}), ""
 }

@@ -210,6 +210,7 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	}
 	a.syncTCPClaims(ctx, claimedTCP) // a Hysteria2 site gives its TCP port up here, before the front binds it
 	a.syncFronts(fronts)
+	a.syncHost(ctx, fronts)
 	now := a.now()
 	results := make([]*pb.InboundResult, 0, len(next.inbounds))
 	for _, id := range next.ids() {

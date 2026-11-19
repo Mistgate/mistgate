@@ -113,3 +113,6 @@ func (e *Entry) DialExit(ctx context.Context, exitID, relayID string, idle time.
 		return nil, err
 	}
 }
+
+// Serving is the entry's current configuration (SetServe), for reports and tests.
+func (e *Entry) Serving() ServeConfig { return e.serveSnapshot() }

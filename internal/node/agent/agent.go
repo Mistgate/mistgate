@@ -269,6 +269,9 @@ type Agent struct {
 	hostFirewallErr     string       // Last reported host-firewall sync failure; worker-owned.
 	relay               relayRuntime // relay forwards (relay.go); worker-owned
 	bridgeEntry         *nodebridge.Entry
+	hostEntry           *nodebridge.Entry // the subscription host's: the panel is its only exit (subhost.go)
+	hostMu              sync.Mutex        // sh
+	sh                  hostState
 	bridgeDialer        *nodebridge.Dialer
 	bridgeSite          *bridgeSiteServer
 	bridgeServeError    string
@@ -492,6 +495,8 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	a.id.Store(id)
 	a.bridgeEntry = nodebridge.NewEntry()
 	a.bridgeEntry.SetLogger(a.log.With("source", "bridge"))
+	a.hostEntry = nodebridge.NewEntry()
+	a.hostEntry.SetLogger(a.log.With("source", "sub-host"))
 	a.bridgeDialer = nodebridge.NewDialer(func() nodebridge.DialIdentity {
 		current := a.id.Load()
 		if current == nil || len(current.cert.Certificate) == 0 {
@@ -557,7 +562,12 @@ func (a *Agent) masquerade(inboundID string) http.Handler {
 	} else {
 		site = a.decoySite.Handler()
 	}
-	return a.bridgeEntry.Handler(site)
+	// The subscription host's entry first (the panel, subhost.go), then the bridge's: each passes anything not its own on.
+	site = a.bridgeEntry.Handler(site)
+	if a.hostEntry != nil {
+		site = a.hostEntry.Handler(site)
+	}
+	return site
 }
 
 // now is the agent clock corrected by the offset measured at Hello.
@@ -597,6 +607,12 @@ func (a *Agent) closeEngines() {
 		a.debug.shutdown()
 		if a.bridgeEntry != nil {
 			a.bridgeEntry.Close()
+		}
+		a.hostMu.Lock()
+		a.stopHost("")
+		a.hostMu.Unlock()
+		if a.hostEntry != nil {
+			a.hostEntry.Close()
 		}
 		if a.bridgeDialer != nil {
 			a.bridgeDialer.Close()
