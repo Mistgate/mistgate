@@ -144,7 +144,7 @@ func (s *Service) ApplyPlan(ctx context.Context, req *connect.Request[adminv1.Ap
 	}
 	defer session.Close()
 	args, _ := json.Marshal(map[string]string{"confirm_token": string(plain)})
-	result, err := session.CallTool(ctx, p.tool+"_apply", args)
+	result, err := session.CallTool(ctx, mcp.ApplyTool(p.tool), args)
 	if err != nil {
 		return nil, err
 	}

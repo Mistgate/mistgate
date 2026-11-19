@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -91,6 +92,95 @@ func ToolNames(p Profile) []string {
 		names = append(names, t.name)
 	}
 	return names
+}
+
+const (
+	planSuffix  = "_plan"
+	applySuffix = "_apply"
+)
+
+// PlanTool and ApplyTool are the names of the two tools of a change: the one place that spells the suffixes.
+func PlanTool(change string) string  { return change + planSuffix }
+func ApplyTool(change string) string { return change + applySuffix }
+
+// ChangeOf is the change a plan tool belongs to (the name the plan is stored and shown under).
+func ChangeOf(planTool string) string { return strings.TrimSuffix(planTool, planSuffix) }
+
+// ToolKind says what calling a tool does.
+type ToolKind string
+
+const (
+	KindRead  ToolKind = "read"  // changes nothing
+	KindRun   ToolKind = "run"   // does something without a plan: a probe, a run of a task, a draft saved
+	KindPlan  ToolKind = "plan"  // <change>_plan: describes a change
+	KindApply ToolKind = "apply" // <change>_apply: carries it out
+)
+
+func (t toolDef) kind() ToolKind {
+	switch {
+	case t.isPlan:
+		return KindPlan
+	case t.readOnly:
+		return KindRead
+	case strings.HasSuffix(t.name, applySuffix):
+		return KindApply
+	}
+	return KindRun
+}
+
+// ToolInfo is what the rest of the panel may know of a tool.
+type ToolInfo struct {
+	Name   string
+	Kind   ToolKind
+	Min    Profile // the lowest profile that sees the tool
+	Danger bool    // the change may need the owner's approval
+}
+
+// Tools lists every tool of the registry once, sorted by name: the one list that the assistant, the scheduled checks, the guards of
+// the prompt and of the documentation derive their own lists from.
+func Tools() []ToolInfo {
+	byName := map[string]ToolInfo{}
+	for _, t := range registry {
+		cur, ok := byName[t.name]
+		if !ok {
+			byName[t.name] = ToolInfo{Name: t.name, Kind: t.kind(), Min: t.min, Danger: t.danger}
+			continue
+		}
+		if t.min.rank() < cur.Min.rank() {
+			cur.Min = t.min
+		}
+		cur.Danger = cur.Danger || t.danger
+		byName[t.name] = cur
+	}
+	out := make([]ToolInfo, 0, len(byName))
+	for _, t := range byName {
+		out = append(out, t)
+	}
+	slices.SortFunc(out, func(a, b ToolInfo) int { return strings.Compare(a.Name, b.Name) })
+	return out
+}
+
+var kindByName = sync.OnceValue(func() map[string]ToolKind {
+	m := make(map[string]ToolKind, len(registry))
+	for _, t := range registry {
+		m[t.name] = t.kind()
+	}
+	return m
+})
+
+// KindOf is the kind of a tool of the registry. A name the registry does not have is judged by its suffix, so a plan or an apply a
+// model made up is still one; any other unknown name has no kind.
+func KindOf(name string) ToolKind {
+	if k, ok := kindByName()[name]; ok {
+		return k
+	}
+	switch {
+	case strings.HasSuffix(name, planSuffix):
+		return KindPlan
+	case strings.HasSuffix(name, applySuffix):
+		return KindApply
+	}
+	return ""
 }
 
 func (e *env) newServer(p Profile) *mcp.Server {

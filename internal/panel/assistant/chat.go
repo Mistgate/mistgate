@@ -421,7 +421,7 @@ func (s *Service) runTurn(ctx context.Context, admin store.Admin, in turnInput, 
 	tools := make([]chatTool, 0, len(registryTools)+8)
 	byName := make(map[string]chatTool, len(registryTools)+8)
 	for _, t := range registryTools {
-		if strings.HasSuffix(t.Name, "_apply") || t.Name == "" {
+		if mcp.KindOf(t.Name) == mcp.KindApply || t.Name == "" {
 			continue
 		}
 		item := chatTool{AssistantTool: t}
@@ -894,7 +894,7 @@ func (s *Service) executeMCPTool(ctx context.Context, session mcp.AssistantSessi
 	if err != nil {
 		return toolExecution{output: toolOutput{err: true, text: "tool call failed"}}
 	}
-	if strings.HasSuffix(name, "_plan") && !result.IsError {
+	if mcp.KindOf(name) == mcp.KindPlan && !result.IsError {
 		card, safe, err := s.persistPlan(ctx, admin.ID, conversationID, tokenID, name, result.Text)
 		if err != nil {
 			return toolExecution{output: toolOutput{err: true, text: "plan could not be stored; no changes were made"}}
@@ -920,7 +920,7 @@ func (s *Service) persistPlan(ctx context.Context, adminID, conversationID, toke
 		_, _ = s.st.CancelAssistantMCPPlan(context.WithoutCancel(ctx), p.PlanID, tokenID, s.now())
 		return nil, "", err
 	}
-	baseTool := strings.TrimSuffix(tool, "_plan")
+	baseTool := mcp.ChangeOf(tool)
 	inboxOnly := baseTool == auth.NodeInstallTool
 	expires := s.now().Add(time.Duration(p.ExpiresInS) * time.Second)
 	summary, err := completePlanText("summary", p.Summary, 1000)

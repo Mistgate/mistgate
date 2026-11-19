@@ -176,7 +176,7 @@ func (s *Service) RunScheduled(ctx context.Context, run ScheduledRun) ScheduledO
 	}
 	tools := make([]chatTool, 0, len(registry)+1)
 	for _, t := range registry {
-		if t.Name == "" || strings.HasSuffix(t.Name, "_apply") {
+		if t.Name == "" || mcp.KindOf(t.Name) == mcp.KindApply {
 			continue
 		}
 		tools = append(tools, chatTool{AssistantTool: t})

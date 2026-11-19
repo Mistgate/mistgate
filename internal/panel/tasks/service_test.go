@@ -823,3 +823,26 @@ func TestNoScheduledTaskCanStartAChannelMeasure(t *testing.T) {
 		t.Error("a check cannot read the kept speed figures")
 	}
 }
+
+// A step of a check is a read or a probe of the registry. The registry says what is a plan or an apply, so a tool made later is
+// judged the same way; the tools about the tasks themselves are named here and must exist there.
+func TestCheckToolNameIsJudgedByTheRegistry(t *testing.T) {
+	for name := range taskTools {
+		if k := mcp.KindOf(name); k != mcp.KindRead && k != mcp.KindRun {
+			t.Errorf("taskTools names %s, which is no read or run tool of the registry", name)
+		}
+		if CheckToolName(name) {
+			t.Errorf("a check may run %s", name)
+		}
+	}
+	for _, in := range mcp.Tools() {
+		if want := in.Kind != mcp.KindPlan && in.Kind != mcp.KindApply && !taskTools[in.Name]; CheckToolName(in.Name) != want {
+			t.Errorf("CheckToolName(%s) = %v, want %v", in.Name, !want, want)
+		}
+	}
+	for _, name := range []string{"", "no_such_tool", "no_such_tool_plan"} {
+		if CheckToolName(name) {
+			t.Errorf("a check may run %q", name)
+		}
+	}
+}

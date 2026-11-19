@@ -835,7 +835,8 @@ func contains(s []string, x string) bool {
 
 // isWrite: a plan, an apply, or a write that needs no plan (the operator's free tools): none of them is a read.
 func isWrite(n string) bool {
-	return strings.HasSuffix(n, "_plan") || strings.HasSuffix(n, "_apply") || n == "decoy_site_draft_save"
+	k := mcp.KindOf(n)
+	return k == mcp.KindPlan || k == mcp.KindApply || n == "decoy_site_draft_save"
 }
 
 // ------------------------------------------------------------------------------------------------ the scenario
