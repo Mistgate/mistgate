@@ -68,7 +68,6 @@ type UpdateAgentOptions struct {
 	Sources []string
 }
 
-const updateTimeoutCapability = "update-timeout/1"
 const bundleSendStallTimeout = 120 * time.Second
 
 // bundleNodeSlotWait is how long a request waits when another file is live or a zombie cap blocks hand-over.

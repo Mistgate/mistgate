@@ -13,8 +13,8 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/auth"
-	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
 	"github.com/mistgate/mistgate/internal/panel/protocols/vless"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -233,7 +233,7 @@ func (s *Service) CompatDevices(ctx context.Context, userID string) (devices []C
 		if fp := realityFingerprint(f); fp != "" && liveInbound(f) {
 			reality = append(reality, f)
 			fpOf[f.Inbound.ID] = fp
-			if name := f.Node.Name; !slices.Contains(f.Node.AgentCaps, connectiondiag.VLESSHelloKexCapability) && !slices.Contains(nodesWithoutHello, name) {
+			if name := f.Node.Name; !slices.Contains(f.Node.AgentCaps, agentcap.VLESSHelloKex) && !slices.Contains(nodesWithoutHello, name) {
 				nodesWithoutHello = append(nodesWithoutHello, name)
 			}
 		}

@@ -18,9 +18,6 @@ import (
 // never changes node.bandwidth_mbps, the admin chooses to use the number. The one write the panel makes by itself is the
 // first measurement of a node that has just been enrolled, and only while its capacity is still 0.
 
-// capBandwidth is the Hello.capabilities entry of an agent that can measure; the panel sends MeasureBandwidth to no other.
-const capBandwidth = "bandwidth/1"
-
 // node.bandwidth_mbps is validated to this by UpdateNode; an agent's number is held to it too.
 const maxBandwidthMbps = 1_000_000
 

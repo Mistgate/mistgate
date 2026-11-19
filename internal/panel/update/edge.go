@@ -14,6 +14,7 @@ import (
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
 	"google.golang.org/protobuf/proto"
@@ -27,14 +28,12 @@ const (
 	updatingTTL           = 10 * time.Second
 )
 
-const capLinkUpdate = "update-link/1"
-
 // updateCap is the capability the node must advertise for this edition's update transport.
 func (s *Service) updateCap() string {
 	if s.cfg.Edge {
-		return capLinkUpdate
+		return agentcap.UpdateLink
 	}
-	return capUpdate
+	return agentcap.Update
 }
 
 func (s *Service) bundleFor(ctx context.Context) *bundleState {

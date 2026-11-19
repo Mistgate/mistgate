@@ -20,6 +20,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/auth"
@@ -323,9 +324,9 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 		BandwidthMbps: uint32(n.BandwidthMbps), ClientIpv6: n.ClientIPv6, Sharing: shareMsg(n, enabled, share, now),
 	}
 	caps := live.AgentCaps
-	out.TorrentBlockerSupported = store.CapabilityPresent(caps, capTorrentGuard)
-	out.ClientIpv6Supported = store.CapabilityPresent(caps, capClientIPv6)
-	out.UserRateLimitSupported = store.CapabilityPresent(caps, capUserRateLimit)
+	out.TorrentBlockerSupported = store.CapabilityPresent(caps, agentcap.TorrentGuard)
+	out.ClientIpv6Supported = store.CapabilityPresent(caps, agentcap.ClientIPv6)
+	out.UserRateLimitSupported = store.CapabilityPresent(caps, agentcap.UserRateLimit)
 	out.BridgePort = uint32(n.BridgePort)
 	out.BridgePortReason, out.BridgePortProfileId = f.bridgePortReason(ctx, n)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
@@ -338,7 +339,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 		}
 	}
 	out.Warp = f.warpSummary(ctx, n.ID, live.Connected, now)
-	decoySupported := store.CapabilityPresent(caps, capDecoy)
+	decoySupported := store.CapabilityPresent(caps, agentcap.Decoy)
 	agentMode := n.DecoyAgentMode
 	if agentMode == "" && !decoySupported {
 		agentMode = decoy.ModeBuiltin
@@ -1054,7 +1055,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			if err != nil {
 				return nil, internalErr(f.log.Error, "update node", err)
 			}
-			if !store.CapabilityPresent(cur.AgentCaps, capTorrentGuard) {
+			if !store.CapabilityPresent(cur.AgentCaps, agentcap.TorrentGuard) {
 				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 			}
 		}
@@ -1073,7 +1074,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			if err != nil {
 				return nil, internalErr(f.log.Error, "update node", err)
 			}
-			if !store.CapabilityPresent(cur.AgentCaps, capClientIPv6) {
+			if !store.CapabilityPresent(cur.AgentCaps, agentcap.ClientIPv6) {
 				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 			}
 		}

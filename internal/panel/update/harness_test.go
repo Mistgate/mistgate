@@ -20,6 +20,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
@@ -165,7 +166,7 @@ func (f *fakeFleet) precondition(id string) error {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
 	}
 	for _, c := range f.caps[id] {
-		if c == capUpdate || c == capLinkUpdate { // the edge fleet asks link-only nodes with update-link/1
+		if c == agentcap.Update || c == agentcap.UpdateLink { // the edge fleet asks link-only nodes with update-link/1
 			return nil
 		}
 	}
@@ -179,7 +180,7 @@ func (f *fakeFleet) UpdateOs(_ context.Context, id string, req OsJobRequest, _ t
 		f.mu.Unlock()
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
 	}
-	if !slices.Contains(f.caps[id], osupdate.CapabilityUpdate) {
+	if !slices.Contains(f.caps[id], agentcap.OSUpdate) {
 		f.mu.Unlock()
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}
@@ -506,7 +507,7 @@ func (e *env) addNode(name string, o nodeOpts) string {
 		e.t.Fatal(err)
 	}
 	if o.caps == nil {
-		o.caps = []string{"doctor/1", capUpdate, capGuard}
+		o.caps = []string{"doctor/1", agentcap.Update, agentcap.UpdateGuard}
 	}
 	if o.built == 0 {
 		o.built = oldBuilt
@@ -545,7 +546,7 @@ func (e *env) hello(id, version string, built int64, caps []string, lastUpdateJS
 // upgrade plays what the agent does after a successful UpdateAgent: it re-executes and reconnects with the new build.
 func (e *env) upgrade(id string) {
 	e.t.Helper()
-	e.hello(id, "0.2.0-new", newBuilt, []string{"doctor/1", capUpdate, capGuard}, "")
+	e.hello(id, "0.2.0-new", newBuilt, []string{"doctor/1", agentcap.Update, agentcap.UpdateGuard}, "")
 }
 
 // commit plays the agent raising update_committed.

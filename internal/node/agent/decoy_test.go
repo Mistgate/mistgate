@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/node/engine"
 )
@@ -48,8 +49,8 @@ func TestDecoyModeCommandPersistsAndIsAdvertisedAfterRestart(t *testing.T) {
 	if hello.GetDecoyMode() != decoy.ModeOwn || hello.GetDecoySha256() != bundle.Hash() {
 		t.Fatalf("restarted Hello decoy = %q %q", hello.GetDecoyMode(), hello.GetDecoySha256())
 	}
-	if !contains(hello.GetCapabilities(), capDecoy) {
-		t.Fatalf("restarted capabilities %v lack %s", hello.GetCapabilities(), capDecoy)
+	if !contains(hello.GetCapabilities(), agentcap.Decoy) {
+		t.Fatalf("restarted capabilities %v lack %s", hello.GetCapabilities(), agentcap.Decoy)
 	}
 	w = httptest.NewRecorder()
 	restarted.masquerade("inb_1").ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))

@@ -9,10 +9,6 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
-// capWarpReach marks the agent that can fetch sites through its WARP tunnel and say which show a block page (agent.proto
-// "WARP REACH"). It is listed with the WARP manager: without WARP there is nothing to ask.
-const capWarpReach = "warp-reach/1"
-
 // warpReach answers one WarpReach command: the verdict for every site, and the colo of the exit that gave them. The answer is
 // one CommandResult; the work and its limits (8 sites, 64 KiB, one at a time, one per health interval, a guarded dial) are the
 // WARP manager's.

@@ -27,9 +27,6 @@ import (
 //     channelBudgetFor, so a panel that loops cannot keep a node busy;
 //   - the end of the panel's session (the link is lost) and a "stop" with the token close every stream.
 
-// capSpeedChannel is listed in Hello.capabilities: the panel sends the channel steps (size 4 and 5) only to agents that have it.
-const capSpeedChannel = "speed-channel/1"
-
 const (
 	// the size field of the UdpSend that carries the step (1 serve, 2 run, 3 stop belong to speed/1)
 	speedStepServeChannel = 4

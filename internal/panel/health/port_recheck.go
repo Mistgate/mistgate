@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -14,9 +15,8 @@ import (
 const PortCheckInterval = 6 * time.Hour
 
 const (
-	portCheckSlotWidth  = time.Minute
-	portCheckSlots      = int64(PortCheckInterval / portCheckSlotWidth)
-	portCheckCapability = "udpcheck/1"
+	portCheckSlotWidth = time.Minute
+	portCheckSlots     = int64(PortCheckInterval / portCheckSlotWidth)
 	// one look a minute: every look reads the nodes and the stored checks, and a first check waits for its minute slot
 	portCheckPollInterval = time.Minute
 )
@@ -187,7 +187,7 @@ func (s *Service) portCheckScheduleNodes(ctx context.Context, now time.Time, sn 
 			}
 		}
 		nodes = append(nodes, PortCheckScheduleNode{
-			ID: node.ID, State: node.State, Online: current.Connected, UDPCheck: slices.Contains(current.AgentCaps, portCheckCapability),
+			ID: node.ID, State: node.State, Online: current.Connected, UDPCheck: slices.Contains(current.AgentCaps, agentcap.UDPCheck),
 			HasEnabledInbound: hasEnabledInbound, LastCheckedAt: lastChecked[node.ID], UDPFilteredAt: filteredAt[node.ID],
 			UDPFilteredCheckedAt: filteredCheckedAt[node.ID],
 		})

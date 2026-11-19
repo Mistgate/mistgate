@@ -16,19 +16,13 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/udpcheck"
 )
 
 const (
-	capUDPCheck = "udpcheck/1"
-	// capProbe: UdpSend.df, the "connect" kind and timings of TcpProbe, PathTrace (agent.proto "PATH PROBE").
-	capProbe = "probe/1"
-	// capSpeed: SpeedTest (agent.proto "PATH SPEED").
-	capSpeed = "speed/1"
-	// capSpeedChannel: the 8-stream timed mode of SpeedTest (steps 4 and 5 of its size; agent.proto "CHANNEL MEASURE").
-	capSpeedChannel = "speed-channel/1"
 	// the size of a SpeedTest that is a channel step
 	speedStepServeChannel = 4
 	speedStepRunChannel   = 5
@@ -305,7 +299,7 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 	if !targetLive.Connected {
 		return portCheckOutcome{errorCode: "node_offline"}
 	}
-	if !slices.Contains(targetLive.AgentCaps, capUDPCheck) {
+	if !slices.Contains(targetLive.AgentCaps, agentcap.UDPCheck) {
 		return portCheckOutcome{errorCode: "agent_too_old"}
 	}
 	if !f.reachable(targetLive, target.ID) { // after the capability: an old agent without a session still answers agent_too_old
@@ -330,7 +324,7 @@ func (f *Fleet) runPortCheckForEdition(ctx context.Context, target store.NodeRow
 			demoted[row.SenderID] = true
 		}
 	}
-	candidates := f.portSenders(target, allNodes, live, capUDPCheck, demoted)
+	candidates := f.portSenders(target, allNodes, live, agentcap.UDPCheck, demoted)
 
 	inbounds, err := f.st.FleetInbounds(ctx, target.ID, false)
 	if err != nil {

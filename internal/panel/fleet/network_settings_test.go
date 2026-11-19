@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -41,30 +42,30 @@ func TestNetworkSettingsAndSignatureKeepOldAgentsStable(t *testing.T) {
 	if old.Networks != 0 || old.NetworksDbName != "" || old.NetworksDbSha256 != "" {
 		t.Fatalf("old agent settings contain network fields: %+v", old)
 	}
-	capable := f.nodeSettings(node, []string{capNetworks})
+	capable := f.nodeSettings(node, []string{agentcap.Nets})
 	if capable.Networks != 1 || capable.NetworksDbName != "mistgate-asndb-data-any" || capable.NetworksDbSha256 != testNetworkSHA {
 		t.Fatalf("nets/1 settings = %+v", capable)
 	}
 	oldSignature, capableSignature := settingsSig(old), settingsSig(capable)
 	f.SetNetworkMode(0)
-	off := f.nodeSettings(node, []string{capNetworks})
+	off := f.nodeSettings(node, []string{agentcap.Nets})
 	if off.Networks != 0 || off.NetworksDbName != "" || off.NetworksDbSha256 != "" || settingsSig(off) != oldSignature {
 		t.Fatalf("mode-0 nets/1 settings differ from the pre-feature settings: %+v, signature %q want %q", off, settingsSig(off), oldSignature)
 	}
 	f.SetNetworkMode(1)
 	f.SetNetworkMode(2)
-	if settingsSig(f.nodeSettings(node, []string{capNetworks})) == capableSignature {
+	if settingsSig(f.nodeSettings(node, []string{agentcap.Nets})) == capableSignature {
 		t.Fatal("mode change did not change the nets/1 settings signature")
 	}
 	if settingsSig(f.nodeSettings(node, nil)) != oldSignature {
 		t.Fatal("mode change altered the old-agent settings signature")
 	}
 	updates.setNetworkTable("mistgate-asndb-data-any", strings.Repeat("a", 64))
-	if settingsSig(f.nodeSettings(node, []string{capNetworks})) == capableSignature {
+	if settingsSig(f.nodeSettings(node, []string{agentcap.Nets})) == capableSignature {
 		t.Fatal("bundle SHA change did not change the nets/1 settings signature")
 	}
 	updates.setNetworkTable("", "")
-	withoutTable := f.nodeSettings(node, []string{capNetworks})
+	withoutTable := f.nodeSettings(node, []string{agentcap.Nets})
 	if withoutTable.Networks != 2 || withoutTable.NetworksDbName != "" || withoutTable.NetworksDbSha256 != "" {
 		t.Fatalf("settings without a table = %+v", withoutTable)
 	}
@@ -98,7 +99,7 @@ func TestNetworkModeAndBundleChangesResendSettings(t *testing.T) {
 	e.f.SetUpdates(updates)
 	updates.SetNetworkBundleChanged(e.f.StateChanged)
 	e.f.SetNetworkMode(1) // the owner switched the collection on; it is off by default
-	c, _, initial := connectCaps(a, "nets-settings", capNetworks)
+	c, _, initial := connectCaps(a, "nets-settings", agentcap.Nets)
 	if initial.Settings == nil || initial.Settings.Networks != 1 || initial.Settings.NetworksDbSha256 != testNetworkSHA {
 		t.Fatalf("initial network settings = %+v", initial.Settings)
 	}
@@ -118,7 +119,7 @@ func TestNetworkModeAndBundleChangesResendSettings(t *testing.T) {
 	if !e.f.SetNetworkMode(0) {
 		t.Fatal("mode 2 -> 0 reported no change")
 	}
-	off := e.f.nodeSettings(store.NodeRow{DialTimeoutS: 30, CountryCode: "DE"}, []string{capNetworks})
+	off := e.f.nodeSettings(store.NodeRow{DialTimeoutS: 30, CountryCode: "DE"}, []string{agentcap.Nets})
 	preFeature := nodeSettings(store.NodeRow{DialTimeoutS: 30, CountryCode: "DE"}, nil)
 	if off.Networks != 0 || off.NetworksDbName != "" || off.NetworksDbSha256 != "" || settingsSig(off) != settingsSig(preFeature) {
 		t.Fatalf("mode-0 settings/signature = %+v/%q; want network fields absent and pre-feature signature %q", off, settingsSig(off), settingsSig(preFeature))
@@ -140,7 +141,7 @@ func TestGuardNetworksCapabilitiesModesCapsAndCounters(t *testing.T) {
 		&agentv1.NetworkCounters{InboundId: "inb_nl1", Attempts: 1},
 		&agentv1.NetworkCounters{InboundId: "inb_fi1", Attempts: 1},
 		&agentv1.NetworkCounters{InboundId: "inb_de1", Attempts: 1})
-	networks, persons, gotSHA := f.guardNetworks(batch, []string{capNetworks})
+	networks, persons, gotSHA := f.guardNetworks(batch, []string{agentcap.Nets})
 	if len(networks) != 515 || len(persons) != 0 || gotSHA != sha {
 		t.Fatalf("mode 1 guard kept %d networks, %d people, sha %q; want 512 nonzero + 3 zero, no people", len(networks), len(persons), gotSHA)
 	}
@@ -160,7 +161,7 @@ func TestGuardNetworksCapabilitiesModesCapsAndCounters(t *testing.T) {
 		t.Fatalf("agent without nets/1 kept %d rows or digest %q", len(got), gotSHA)
 	}
 	f.networkMode.Store(0)
-	if got, people, gotSHA := f.guardNetworks(batch, []string{capNetworks}); len(got) != 0 || len(people) != 0 || gotSHA != sha {
+	if got, people, gotSHA := f.guardNetworks(batch, []string{agentcap.Nets}); len(got) != 0 || len(people) != 0 || gotSHA != sha {
 		t.Fatalf("off guard kept %d rows/%d people, sha %q", len(got), len(people), gotSHA)
 	}
 	f.networkMode.Store(2)
@@ -168,7 +169,7 @@ func TestGuardNetworksCapabilitiesModesCapsAndCounters(t *testing.T) {
 	for i := range batch.PersonNetworks {
 		batch.PersonNetworks[i] = &agentv1.PersonNetwork{CredId: "crd_alice", InboundId: "inb_de1", Asn: 64496, Connects: ^uint32(0)}
 	}
-	_, persons, _ = f.guardNetworks(batch, []string{capNetworks})
+	_, persons, _ = f.guardNetworks(batch, []string{agentcap.Nets})
 	if len(persons) != 2048 || persons[0].Connects != store.MaxLinkCount {
 		t.Fatalf("mode 2 guard kept %d person rows with first counter %d, want 2048 and %d", len(persons), persons[0].Connects, store.MaxLinkCount)
 	}

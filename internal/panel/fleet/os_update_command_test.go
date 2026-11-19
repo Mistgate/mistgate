@@ -7,6 +7,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	panelupdate "github.com/mistgate/mistgate/internal/panel/update"
@@ -15,7 +16,7 @@ import (
 // UpdateOs: the panel's one command for OS jobs. It reaches only an agent that listed os-update/1, carries only the enumerated
 // fields, and the node's answer comes back whole (the updates module reads params.state).
 
-var osCapsList = []string{"doctor/1", osupdate.Capability, osupdate.CapabilityUpdate}
+var osCapsList = []string{"doctor/1", agentcap.OSStatus, agentcap.OSUpdate}
 
 func TestUpdateOsReachesOnlyAnAgentThatListsTheCapability(t *testing.T) {
 	x, a := newL3Env(t)
@@ -24,7 +25,7 @@ func TestUpdateOsReachesOnlyAnAgentThatListsTheCapability(t *testing.T) {
 	if _, err := x.f.UpdateOs(x.ctx, a.nodeID, req, time.Second); err == nil || connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("an offline node: %v", err)
 	}
-	connectCaps(a, "old", "doctor/1", osupdate.Capability) // reads its OS, cannot run a job
+	connectCaps(a, "old", "doctor/1", agentcap.OSStatus) // reads its OS, cannot run a job
 	if _, err := x.f.UpdateOs(x.ctx, a.nodeID, req, time.Second); err == nil || connect.CodeOf(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: agent too old" {
 		t.Fatalf("an agent without os-update/1: %v", err)
 	}
@@ -84,7 +85,7 @@ func TestAStoredSnapshotWakesTheUpdatesModule(t *testing.T) {
 	w := osWatcher{osStatusUpdates{&fakeUpdates{}}, make(chan string, 4)}
 	e.f.SetUpdates(w)
 	h := hello("instance-wake", 0, "").GetHello()
-	h.Capabilities = []string{capOSStatus}
+	h.Capabilities = []string{agentcap.OSStatus}
 	tr := stepHello(t, core, ctx, state, now, h)
 	if _, err := coreStep(ctx, core, tr.State, SessionEvent{Kind: EventAgentFrame, At: now, Frame: osStatusFrame(1, osStatusFixture(now))}); err != nil {
 		t.Fatal(err)

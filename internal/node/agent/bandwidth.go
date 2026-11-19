@@ -15,9 +15,6 @@ import (
 // public speed server (Ookla; Cloudflare and others as fallbacks) for about half a minute (three runs, the best counts) and
 // answers with one CommandResult. Nothing is stored and no setting changes here.
 
-// capBandwidth is listed in Hello.capabilities: the panel sends MeasureBandwidth only to agents that have it.
-const capBandwidth = "bandwidth/1"
-
 // measureBandwidth answers a MeasureBandwidth. One at a time: a second request while one runs is "busy". A stream that ends
 // meanwhile ends the test too (its context), so a closed admin page does not leave the node pushing traffic.
 func (a *Agent) measureBandwidth(s *session, r *pb.MeasureBandwidth) {

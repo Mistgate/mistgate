@@ -11,6 +11,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -26,7 +27,7 @@ func linksBatch(links ...*agentv1.LinkCounters) *agentv1.ConnectRequest {
 
 // connectLinks connects an agent that lists links/1 and confirms the full state.
 func connectLinks(a *agent, instance string) *conn {
-	return connectLinksWithCaps(a, instance, capLinks)
+	return connectLinksWithCaps(a, instance, agentcap.Links)
 }
 
 func connectLinksWithCaps(a *agent, instance string, capabilities ...string) *conn {
@@ -97,7 +98,7 @@ func TestStatsLinksAreStoredAndRead(t *testing.T) {
 		hy.KeysStalled != 1 || hy.KeysTried != 2 {
 		t.Errorf("hysteria inbound = %+v", hy)
 	}
-	if !equalStrings(hy.Unsupported, connectiondiag.UnsupportedCountersForNode("hysteria2", []string{capLinks})) ||
+	if !equalStrings(hy.Unsupported, connectiondiag.UnsupportedCountersForNode("hysteria2", []string{agentcap.Links})) ||
 		len(hy.Clients) != 1 || hy.Clients[0].Client != "Happ/3.4.2" || hy.Clients[0].Platform != "android" ||
 		hy.Clients[0].Devices != 2 || hy.Clients[0].Connects != 4 {
 		t.Errorf("Hysteria2 clients/unsupported = %+v / %v", hy.Clients, hy.Unsupported)
@@ -156,7 +157,7 @@ func TestStatsLinks2QualityIsStoredAndRead(t *testing.T) {
 	e.exec(`UPDATE profile SET protocol = 'hysteria2' WHERE id = 'prf_1'`)
 	e.exec(`UPDATE device_credential SET protocol = 'hysteria2' WHERE id = 'crd_alice_hy'`)
 	e.exec(`UPDATE device SET platform = 'android', client = 'Happ/3.4.2' WHERE id = 'dev_alice'`)
-	c := connectLinksWithCaps(a, "inst2", capLinks, connectiondiag.Links2Capability)
+	c := connectLinksWithCaps(a, "inst2", agentcap.Links, agentcap.Links2)
 	c.send(1, linksBatch(
 		&agentv1.LinkCounters{CredId: "crd_alice_hy", InboundId: ids.i1, Connects: 3, ClientCloses: 1, Freezes: 2, Quiet: 3,
 			RttMsSum: 1500, RttSamples: 3, PktsSent: 1000, PktsLost: 10},
@@ -203,7 +204,7 @@ func TestStatsLinks3ReasonsAreStoredAndRead(t *testing.T) {
 	if err := e.st.SetInboundAwgHealth(e.ctx, a.nodeID, ids.i2, string(health), e.f.now()); err != nil {
 		t.Fatal(err)
 	}
-	c := connectLinksWithCaps(a, "inst3", capLinks, connectiondiag.Links2Capability, connectiondiag.Links3Capability)
+	c := connectLinksWithCaps(a, "inst3", agentcap.Links, agentcap.Links2, agentcap.Links3)
 	c.send(1, linksBatch(
 		&agentv1.LinkCounters{InboundId: ids.i1, Hellos: 40, Accepted: 20, HsUnfinished: 12, TlsAlertsSent: 2, TlsAlertsRecv: 5, TlsCertRefused: 4},
 		&agentv1.LinkCounters{CredId: "crd_alice_wg", InboundId: ids.i2, Connects: 1, Initiations: 9, Responses: 8, ResponsesUnmatched: 7},
@@ -268,7 +269,7 @@ func TestStatsTunnelRefusalsAreStoredAndRead(t *testing.T) {
 	ids := e.fixture(a.nodeID)
 	e.exec(`UPDATE profile SET protocol = CASE id WHEN 'prf_1' THEN 'trusttunnel' WHEN 'prf_2' THEN 'awg' END WHERE id IN ('prf_1', 'prf_2')`)
 	e.exec(`UPDATE device_credential SET protocol = CASE protocol WHEN 'fakehy' THEN 'trusttunnel' WHEN 'fakewg' THEN 'awg' END WHERE protocol IN ('fakehy', 'fakewg')`)
-	c := connectLinksWithCaps(a, "insttt", capLinks, connectiondiag.TrustTunnelCapability, connectiondiag.TrustTunnelRefusalsCapability)
+	c := connectLinksWithCaps(a, "insttt", agentcap.Links, agentcap.TrustTunnel, agentcap.TrustTunnelRefusals)
 	row := &agentv1.LinkCounters{InboundId: ids.i1, TunnelBlocked: 1, TunnelNoIpv4: 2, TunnelConnRefused: 3, TunnelConnUnreachable: 4, TunnelConnDns: 5,
 		TunnelConnOther: 6, TunnelTimeout: 7, TunnelOtherDeadlines: 8, TunnelOtherAuthority: 9, TunnelOtherIcmp: 10, TunnelOtherDial: 11,
 		TunnelStreamClosed: 12, TunnelStreamCredGone: 13, TunnelStreamConnLimit: 14}
@@ -316,7 +317,7 @@ func TestStatsTunnelRefusalsAreStoredAndRead(t *testing.T) {
 	b := e.enroll("nodec")
 	e.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, created_at, updated_at) VALUES ('inb_old', 'prf_1', ?, 1, unixepoch(), unixepoch())`, b.nodeID)
 	idsB := fixtureIDs{i1: "inb_old"}
-	old := connectLinksWithCaps(b, "instold", capLinks, connectiondiag.TrustTunnelCapability)
+	old := connectLinksWithCaps(b, "instold", agentcap.Links, agentcap.TrustTunnel)
 	old.send(1, linksBatch(&agentv1.LinkCounters{InboundId: idsB.i1, Connects: 1}))
 	old.wait(func(m *agentv1.ConnectResponse) bool { return m.GetAck() != nil && m.GetAck().UpToSeq >= 1 })
 	oldResp, err := node.GetNodeConnections(e.ctx, connect.NewRequest(&adminv1.GetNodeConnectionsRequest{NodeId: b.nodeID}))
@@ -351,7 +352,7 @@ func TestStatsHelloKexIsStoredAndRead(t *testing.T) {
 	e.exec(`UPDATE profile SET protocol = 'vless', settings_json = '{"security":"reality","transport":"xhttp","reality":{"target":"www.example.com:443"}}' WHERE id = 'prf_1'`)
 	e.exec(`UPDATE device_credential SET protocol = 'vless', profile_id = 'prf_1' WHERE id IN ('crd_alice_hy', 'crd_bob_hy')`)
 	e.exec(`UPDATE device SET platform = 'ios', client = 'Streisand/1.7' WHERE id = 'dev_bob'`)
-	c := connectLinksWithCaps(a, "inst-kex", capLinks, connectiondiag.Links3Capability, connectiondiag.VLESSHelloKexCapability)
+	c := connectLinksWithCaps(a, "inst-kex", agentcap.Links, agentcap.Links3, agentcap.VLESSHelloKex)
 	c.send(1, linksBatch(
 		&agentv1.LinkCounters{CredId: "crd_alice_hy", InboundId: ids.i1, HelloPq: 3, HelloClassic: 1},
 		&agentv1.LinkCounters{CredId: "crd_bob_hy", InboundId: ids.i1, HelloClassic: 2, HelloUnknown: 1},

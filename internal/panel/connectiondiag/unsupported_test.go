@@ -3,6 +3,8 @@ package connectiondiag
 import (
 	"slices"
 	"testing"
+
+	"github.com/mistgate/mistgate/internal/agentcap"
 )
 
 func TestUnsupportedCounters(t *testing.T) {
@@ -32,14 +34,14 @@ func TestVLESSUnknownKeysCapability(t *testing.T) {
 		t.Fatalf("legacy VLESS unsupported = %v, want unknown_keys", legacy)
 	}
 
-	current := UnsupportedCountersForNode("VLESS", []string{VLESSUnknownKeysCapability})
+	current := UnsupportedCountersForNode("VLESS", []string{agentcap.VLESSUnknownKeys})
 	if slices.Contains(current, "unknown_keys") {
-		t.Fatalf("VLESS agent with %s still marks unknown_keys unsupported: %v", VLESSUnknownKeysCapability, current)
+		t.Fatalf("VLESS agent with %s still marks unknown_keys unsupported: %v", agentcap.VLESSUnknownKeys, current)
 	}
 	if len(current) != len(legacy)-1 {
 		t.Fatalf("VLESS unsupported with capability = %v, want only unknown_keys removed from %v", current, legacy)
 	}
-	if !slices.Contains(UnsupportedCountersForNode("hysteria2", []string{VLESSUnknownKeysCapability}), "client_closes") {
+	if !slices.Contains(UnsupportedCountersForNode("hysteria2", []string{agentcap.VLESSUnknownKeys}), "client_closes") {
 		t.Fatal("VLESS capability changed Hysteria2's unsupported counters")
 	}
 }
@@ -49,9 +51,9 @@ func TestTrustTunnelCounters(t *testing.T) {
 	if !slices.Contains(legacy, "auth_failed") || slices.Contains(legacy, "unknown_keys") {
 		t.Fatalf("legacy TrustTunnel unsupported = %v, want auth_failed unsupported and unknown_keys supported", legacy)
 	}
-	current := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability})
+	current := UnsupportedCountersForNode("trusttunnel", []string{agentcap.TrustTunnel})
 	if slices.Contains(current, "auth_failed") || slices.Contains(current, "unknown_keys") {
-		t.Fatalf("TrustTunnel with %s unsupported = %v", TrustTunnelCapability, current)
+		t.Fatalf("TrustTunnel with %s unsupported = %v", agentcap.TrustTunnel, current)
 	}
 	if len(current) != len(legacy)-1 {
 		t.Fatalf("TrustTunnel unsupported with capability = %v, want only auth_failed removed from %v", current, legacy)
@@ -66,15 +68,15 @@ func TestTrustTunnelCounters(t *testing.T) {
 			t.Errorf("TrustTunnel reports %s, yet it is listed as unsupported: %v", f, current)
 		}
 	}
-	if !slices.Contains(UnsupportedCountersForNode("trusttunnel", []string{Links3Capability}), "auth_failed") {
+	if !slices.Contains(UnsupportedCountersForNode("trusttunnel", []string{agentcap.Links3}), "auth_failed") {
 		t.Fatal("links/3 alone incorrectly made TrustTunnel auth_failed supported")
 	}
 }
 
 // trusttunnel-tcp-stalls/1: the TCP stalls are the inbound's own, on the agents that count them; no other protocol gains them.
 func TestTrustTunnelTCPStallCounters(t *testing.T) {
-	without := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability, Links3Capability})
-	with := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability, Links3Capability, TrustTunnelTCPStallsCapability})
+	without := UnsupportedCountersForNode("trusttunnel", []string{agentcap.TrustTunnel, agentcap.Links3})
+	with := UnsupportedCountersForNode("trusttunnel", []string{agentcap.TrustTunnel, agentcap.Links3, agentcap.TrustTunnelTCPStalls})
 	for _, f := range []string{"tcp_stalls", "tcp_stalls_16k"} {
 		if !slices.Contains(without, f) || slices.Contains(with, f) {
 			t.Errorf("%s: unsupported without the capability %v, with it %v", f, slices.Contains(without, f), slices.Contains(with, f))
@@ -84,12 +86,12 @@ func TestTrustTunnelTCPStallCounters(t *testing.T) {
 		t.Fatalf("the stall capability changed other counters: %v vs %v", with, without)
 	}
 	// never on a key's row: a stall is told apart per connection, and a connection is not a key's
-	keys := UnsupportedKeyCounters("trusttunnel", []string{TrustTunnelCapability, Links3Capability, TrustTunnelTCPStallsCapability}, Variant{})
+	keys := UnsupportedKeyCounters("trusttunnel", []string{agentcap.TrustTunnel, agentcap.Links3, agentcap.TrustTunnelTCPStalls}, Variant{})
 	if !slices.Contains(keys, "tcp_stalls") {
 		t.Fatalf("a TrustTunnel key row claims TCP stalls: %v", keys)
 	}
 	for _, protocol := range []string{"hysteria2", "awg"} {
-		if !slices.Contains(UnsupportedCountersForNode(protocol, []string{Links3Capability, TrustTunnelTCPStallsCapability}), "tcp_stalls") {
+		if !slices.Contains(UnsupportedCountersForNode(protocol, []string{agentcap.Links3, agentcap.TrustTunnelTCPStalls}), "tcp_stalls") {
 			t.Errorf("%s gained tcp_stalls from the TrustTunnel capability", protocol)
 		}
 	}
@@ -97,8 +99,8 @@ func TestTrustTunnelTCPStallCounters(t *testing.T) {
 
 // trusttunnel-refusals/1: the refusal reasons are TrustTunnel's, on the agents that count them; nobody else lists them.
 func TestTrustTunnelRefusalCounters(t *testing.T) {
-	without := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability, Links3Capability})
-	with := UnsupportedCountersForNode("trusttunnel", []string{TrustTunnelCapability, TrustTunnelRefusalsCapability})
+	without := UnsupportedCountersForNode("trusttunnel", []string{agentcap.TrustTunnel, agentcap.Links3})
+	with := UnsupportedCountersForNode("trusttunnel", []string{agentcap.TrustTunnel, agentcap.TrustTunnelRefusals})
 	for _, f := range TunnelRefusalFields {
 		if !slices.Contains(without, f) || slices.Contains(with, f) {
 			t.Errorf("%s: unsupported without the capability %v, with it %v", f, slices.Contains(without, f), slices.Contains(with, f))
@@ -108,7 +110,7 @@ func TestTrustTunnelRefusalCounters(t *testing.T) {
 		t.Fatalf("the refusal capability changed other counters: %v vs %v", with, without)
 	}
 	for _, protocol := range []string{"hysteria2", "vless", "awg"} {
-		all := UnsupportedCountersForNode(protocol, []string{TrustTunnelRefusalsCapability})
+		all := UnsupportedCountersForNode(protocol, []string{agentcap.TrustTunnelRefusals})
 		for _, f := range TunnelRefusalFields {
 			if slices.Contains(all, f) {
 				t.Errorf("%s lists %s, which only TrustTunnel has", protocol, f)
@@ -119,7 +121,7 @@ func TestTrustTunnelRefusalCounters(t *testing.T) {
 
 // links/3: each engine's reasons only where it sees them; an old agent, an unknown backend or an unknown transport is "not known".
 func TestLinks3Unsupported(t *testing.T) {
-	caps := []string{"links/1", "links/2", Links3Capability, VLESSUnknownKeysCapability}
+	caps := []string{"links/1", "links/2", agentcap.Links3, agentcap.VLESSUnknownKeys}
 	supported := func(protocol string, v Variant) []string {
 		var out []string
 		all := UnsupportedCountersFor(protocol, caps, v)

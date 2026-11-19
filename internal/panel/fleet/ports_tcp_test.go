@@ -13,6 +13,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -273,7 +274,7 @@ func tcpCheckTarget(t *testing.T) (*l3Env, *agent, *conn) {
 	x.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, enabled, created_at, updated_at) VALUES
 		('inb_hy2', 'prf_hy2', ?, 1, 1, 1, 1), ('inb_vless', 'prf_vless', ?, 1, 1, 1, 1)`, target.nodeID, target.nodeID)
 	x.f.settleUDP = func(context.Context) error { return nil }
-	targetConn, _, _ := connectCaps(target, "tcp-target", capUDPCheck, capTCPCheck)
+	targetConn, _, _ := connectCaps(target, "tcp-target", agentcap.UDPCheck, agentcap.TCPCheck)
 	return x, target, targetConn
 }
 
@@ -303,7 +304,7 @@ func driveUDPPart(targetConn, senderConn *conn) {
 
 func TestCheckPortsProbesTCPAfterUDPAndStoresTheRows(t *testing.T) {
 	x, target, targetConn := tcpCheckTarget(t)
-	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 
 	driveUDPPart(targetConn, senderConn)
@@ -360,7 +361,7 @@ func TestCheckPortsProbesTCPAfterUDPAndStoresTheRows(t *testing.T) {
 
 func TestCheckPortsSaveTimeRunLeavesTheTCPHalfOut(t *testing.T) {
 	x, target, targetConn := tcpCheckTarget(t)
-	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -442,7 +443,7 @@ func TestTCPCheckWithoutAnySenderDoesNotRun(t *testing.T) {
 		t.Fatalf("no sender: rows %+v ran %v", rows, ran)
 	}
 	// a node without tcpcheck/1 is no sender
-	addPortCheckPeer(x, "old-peer", "provider-b", "DE", capUDPCheck)
+	addPortCheckPeer(x, "old-peer", "provider-b", "DE", agentcap.UDPCheck)
 	if rows, ran := x.f.runTCPCheck(x.ctx, node, false); ran || len(rows) != 0 {
 		t.Fatalf("old peer: rows %+v ran %v", rows, ran)
 	}
@@ -460,8 +461,8 @@ func TestTCPCheckTargetWithoutTheCapabilityStillGetsTLSRows(t *testing.T) {
 	x.exec(`INSERT INTO profile (id, protocol, name, settings_json, version, created_at, updated_at) VALUES
 		('prf_hy2', 'hysteria2', 'alice-hy2', '{"port":443,"network":"udp","tls":"acme","name":"node-a.example.com"}', 1, 1, 1)`)
 	x.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, enabled, created_at, updated_at) VALUES ('inb_hy2', 'prf_hy2', ?, 1, 1, 1, 1)`, target.nodeID)
-	connectCaps(target, "old-target", capUDPCheck)
-	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	connectCaps(target, "old-target", agentcap.UDPCheck)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 	node, err := x.st.Node(x.ctx, target.nodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -502,7 +503,7 @@ func TestTCPCheckPort80StatesFromTheTarget(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			x, target, targetConn := tcpCheckTarget(t)
-			_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+			_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 			node, err := x.st.Node(x.ctx, target.nodeID)
 			if err != nil {
 				t.Fatal(err)
@@ -540,8 +541,8 @@ func TestTCPCheckPort80StatesFromTheTarget(t *testing.T) {
 
 func TestTCPCheckTriesTheNextSenderWhenTheFirstCannotProbe(t *testing.T) {
 	x, target, targetConn := tcpCheckTarget(t)
-	_, firstConn := addPortCheckPeer(x, "sender-a", "provider-b", "DE", capUDPCheck, capTCPCheck)
-	_, secondConn := addPortCheckPeer(x, "sender-b", "provider-c", "FR", capUDPCheck, capTCPCheck)
+	_, firstConn := addPortCheckPeer(x, "sender-a", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
+	_, secondConn := addPortCheckPeer(x, "sender-b", "provider-c", "FR", agentcap.UDPCheck, agentcap.TCPCheck)
 	if err := x.st.PutTCPChecks(x.ctx, target.nodeID, []storeTCP{{Port: 443, Role: "site", Verdict: "ours", Sender: "panel", CheckedAt: x.f.now()}}); err != nil {
 		t.Fatal(err)
 	}
@@ -574,7 +575,7 @@ func TestTCPCheckTriesTheNextSenderWhenTheFirstCannotProbe(t *testing.T) {
 
 func TestTCPCheckEveryProbeFailingKeepsTheLastStoredResult(t *testing.T) {
 	x, target, targetConn := tcpCheckTarget(t)
-	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 	old := storeTCP{Port: 443, Role: "site", Verdict: "ours", Sender: "panel", CheckedAt: x.f.now()}
 	if err := x.st.PutTCPChecks(x.ctx, target.nodeID, []storeTCP{old}); err != nil {
 		t.Fatal(err)
@@ -658,8 +659,8 @@ func TestTCPCheckDoesNotReuseTheMarkAfterAnAmbiguousFailure(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			x, target, targetConn := tcpCheckTarget(t)
-			_, firstConn := addPortCheckPeer(x, "sender-a", "provider-b", "DE", capUDPCheck, capTCPCheck)
-			second, secondConn := addPortCheckPeer(x, "sender-b", "provider-c", "FR", capUDPCheck, capTCPCheck)
+			_, firstConn := addPortCheckPeer(x, "sender-a", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
+			second, secondConn := addPortCheckPeer(x, "sender-b", "provider-c", "FR", agentcap.UDPCheck, agentcap.TCPCheck)
 			node, err := x.st.Node(x.ctx, target.nodeID)
 			if err != nil {
 				t.Fatal(err)
@@ -730,7 +731,7 @@ func TestTCPCheckClearsRowsWhenNoTCPPortIsLeft(t *testing.T) {
 func onlyPort80Target(t *testing.T) (*l3Env, store.NodeRow, *conn) {
 	t.Helper()
 	x, target, targetConn := tcpCheckTarget(t)
-	addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 	x.exec(`UPDATE profile SET settings_json = '{"port":443,"network":"udp","tls":"acme","name":"node-a.example.com","masquerade":{"tcp_port":0}}' WHERE id = 'prf_hy2'`)
 	x.exec(`UPDATE inbound SET enabled = 0 WHERE id = 'inb_vless'`)
 	if err := x.st.PutTCPChecks(x.ctx, target.nodeID, []storeTCP{{Port: 443, Role: "site", Verdict: "ours", Sender: "panel", CheckedAt: x.f.now()}}); err != nil {
@@ -778,7 +779,7 @@ func TestTCPCheckBusyPort80IsTheWholeResultWhenNothingElseIsProbed(t *testing.T)
 
 func TestTCPCheckBusyPort80DoesNotReplaceGoodTLSRows(t *testing.T) {
 	x, target, targetConn := tcpCheckTarget(t)
-	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 	good := []storeTCP{
 		{Port: 443, Role: "site", Verdict: "ours", Sender: "panel", CheckedAt: x.f.now()},
 		{Port: 8443, Role: "vless", Verdict: "ours", Sender: "panel", CheckedAt: x.f.now()},
@@ -811,7 +812,7 @@ func TestTCPCheckBusyPort80DoesNotReplaceGoodTLSRows(t *testing.T) {
 
 func TestCheckPortsAdminCallWaitingBehindASaveTimeRunRunsItsOwnTCPHalf(t *testing.T) {
 	x, target, targetConn := tcpCheckTarget(t)
-	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 	saved := make(chan struct{})
 	go func() {
 		defer close(saved)
@@ -841,7 +842,7 @@ func TestCheckPortsAdminCallWaitingBehindASaveTimeRunRunsItsOwnTCPHalf(t *testin
 
 func TestCheckPortsSaveTimeCallWaitingBehindAFullRunTakesItsResult(t *testing.T) {
 	x, target, targetConn := tcpCheckTarget(t)
-	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 	full := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
@@ -878,7 +879,7 @@ func TestCheckPortsSaveTimeCallWaitingBehindAFullRunTakesItsResult(t *testing.T)
 
 func TestGetNodeNamesTheSendersOfUDPAndTCPRows(t *testing.T) {
 	x, target, _ := tcpCheckTarget(t)
-	peer, _ := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capTCPCheck)
+	peer, _ := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 	node, err := x.st.Node(x.ctx, target.nodeID)
 	if err != nil {
 		t.Fatal(err)

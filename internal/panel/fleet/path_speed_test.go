@@ -15,6 +15,7 @@ import (
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 )
 
 // The panel side of path_speed against fake agents: the order of the commands (serve on the target, run on the sender, stop on
@@ -63,8 +64,8 @@ func waitSpeed(c *conn, step uint32) *agentv1.UdpSend {
 func speedPair(t *testing.T, targetCaps ...string) (x *l3Env, sender, target *agent, senderConn, targetConn *conn) {
 	t.Helper()
 	x, target = newL3Env(t)
-	sender, senderConn = addPortCheckPeer(x, "sender", "provider-b", "DE", capSpeed)
-	targetConn, _, _ = connectCaps(target, "speed-target", append([]string{capSpeed}, targetCaps...)...)
+	sender, senderConn = addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.Speed)
+	targetConn, _, _ = connectCaps(target, "speed-target", append([]string{agentcap.Speed}, targetCaps...)...)
 	x.exec(`UPDATE node SET address = '203.0.113.10' WHERE id = ?`, target.nodeID)
 	return
 }
@@ -230,8 +231,8 @@ func TestPathSpeedMapsAgentErrorsToShortCodes(t *testing.T) {
 // An agent without speed/1 is sent nothing, whichever end it is; the panel's request layer names the capability too.
 func TestPathSpeedRefusesAnOldAgentOnEitherEndAndSendsItNothing(t *testing.T) {
 	x, _ := newL3Env(t)
-	modern, modernConn := addPortCheckPeer(x, "modern", "provider-a", "TR", capSpeed)
-	old, oldConn := addPortCheckPeer(x, "old", "provider-b", "DE", capProbe, capUDPCheck)
+	modern, modernConn := addPortCheckPeer(x, "modern", "provider-a", "TR", agentcap.Speed)
+	old, oldConn := addPortCheckPeer(x, "old", "provider-b", "DE", agentcap.Probe, agentcap.UDPCheck)
 	x.exec(`UPDATE node SET address = '203.0.113.10' WHERE id = ?`, modern.nodeID)
 	for _, test := range []struct {
 		name     string
@@ -256,8 +257,8 @@ func TestPathSpeedRefusesAnOldAgentOnEitherEndAndSendsItNothing(t *testing.T) {
 			}
 		}
 	}
-	if capability, _ := requestCapability(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_SpeedTest{SpeedTest: &agentv1.UdpSend{}}}, false); capability != capSpeed {
-		t.Errorf("a speed command needs %q, got %q", capSpeed, capability)
+	if capability, _ := requestCapability(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_SpeedTest{SpeedTest: &agentv1.UdpSend{}}}, false); capability != agentcap.Speed {
+		t.Errorf("a speed command needs %q, got %q", agentcap.Speed, capability)
 	}
 	if kind := requestKind(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_SpeedTest{SpeedTest: &agentv1.UdpSend{}}}); kind != PendingCommand {
 		t.Errorf("a speed command is %v, want a pending command", kind)

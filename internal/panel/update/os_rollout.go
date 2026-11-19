@@ -16,6 +16,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -175,10 +176,10 @@ func osBlockForMode(g osGlobal, n osNode, mode string) string {
 
 // osNodeOf collects the facts of one node for osBlock. nodeHost is the node's host name, "" when unknown.
 func (s *Service) osNodeOf(n store.NodeRow, connected bool, status *agentv1.OsStatus, host *agentv1.OsStatus, nodeHost string, nowUnix int64, reboots []time.Time) osNode {
-	capable := slices.Contains(n.AgentCaps, osupdate.Capability)
+	capable := slices.Contains(n.AgentCaps, agentcap.OSStatus)
 	at, code := osRebootWait(n.BootAt, reboots, time.Unix(nowUnix, 0))
 	return osNode{rebootAt: at, rebootCode: code,
-		connected: connected, updateCap: slices.Contains(n.AgentCaps, osupdate.CapabilityUpdate),
+		connected: connected, updateCap: slices.Contains(n.AgentCaps, agentcap.OSUpdate),
 		supported: osUpdateSupported(capable, status), onPanel: s.onPanelServer(status, host, nodeHost),
 		awgBuilding: n.AwgPrepare().State == store.AwgPrepareRunning,
 		busy: osUpdateState(capable, connected, status, nowUnix) == adminv1.OsUpdateState_OS_UPDATE_STATE_BUSY ||

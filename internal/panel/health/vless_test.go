@@ -28,6 +28,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	panelvless "github.com/mistgate/mistgate/internal/panel/protocols/vless"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -71,7 +72,7 @@ func newVLESSProbeRig(t *testing.T, security, transport string) *vlessProbeRig {
 		c.ProbeTimeout = 10 * time.Second
 	})
 	e.node("de1", "provider", true)
-	e.fl.set("de1", liveState{up: true, caps: []string{capDoctor, "vless/1", "vless-self/1", "vless-tls/1"}, lastSeen: e.clock.Now()})
+	e.fl.set("de1", liveState{up: true, caps: []string{agentcap.Doctor, "vless/1", "vless-self/1", "vless-tls/1"}, lastSeen: e.clock.Now()})
 
 	settingsRaw, err := panelvless.New().DefaultSettings()
 	if err != nil {

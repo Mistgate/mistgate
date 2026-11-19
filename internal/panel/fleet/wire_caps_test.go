@@ -2,6 +2,10 @@ package fleet
 
 import (
 	"context"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -145,4 +149,24 @@ func TestWireCapabilitiesThePanelRequires(t *testing.T) {
 			t.Errorf("with user-rate-limit/1 the limits stay: %+v", st.in["inb_p"].creds[0])
 		}
 	})
+}
+
+// The panel keeps at most maxCapabilities strings of a Hello and cuts the rest: an agent lists a subset of agentcap, so while the
+// package has fewer constants than the bound, no capability can be cut.
+func TestAgentCapabilitiesFitTheHelloBound(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join("..", "..", "agentcap", "agentcap.go"), nil, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, d := range file.Decls {
+		if gen, ok := d.(*ast.GenDecl); ok && gen.Tok == token.CONST {
+			for _, spec := range gen.Specs {
+				n += len(spec.(*ast.ValueSpec).Names)
+			}
+		}
+	}
+	if n == 0 || n >= maxCapabilities {
+		t.Fatalf("agentcap has %d constants, the Hello keeps %d strings: raise maxCapabilities (health.go) with the next constant", n, maxCapabilities)
+	}
 }

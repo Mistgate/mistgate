@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/warp"
 )
 
@@ -18,14 +19,11 @@ func askWarpReach(h *harness, id string, domains ...string) *pb.CommandResult {
 	return r
 }
 
-// The panel gates the command by this exact string; only an agent that runs WARP lists it.
+// The panel gates the command by this string; only an agent that runs WARP lists it.
 func TestWarpReachCapabilityFollowsTheWarpManager(t *testing.T) {
-	if capWarpReach != "warp-reach/1" {
-		t.Fatalf("capability is %q", capWarpReach)
-	}
 	for _, withWarp := range []bool{true, false} {
 		x := newL3(t, 3, withWarp)
-		if got := contains((<-x.panel.hellos).Capabilities, capWarpReach); got != withWarp {
+		if got := contains((<-x.panel.hellos).Capabilities, agentcap.WarpReach); got != withWarp {
 			t.Fatalf("WARP manager = %v but the capability is listed = %v", withWarp, got)
 		}
 	}

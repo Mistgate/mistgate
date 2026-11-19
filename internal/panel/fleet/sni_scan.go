@@ -18,6 +18,7 @@ import (
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -89,7 +90,7 @@ func (s probeService) NodeSniScan(ctx context.Context, req *connect.Request[prob
 	if err != nil {
 		return nil, internalErr(f.log.Error, "read live nodes for neighbour scan", err)
 	}
-	nodeLive, code := f.probeLive(liveRowsByID(liveRows), node.ID, capSniScan)
+	nodeLive, code := f.probeLive(liveRowsByID(liveRows), node.ID, agentcap.SNIScan)
 	if code != "" {
 		out.Error = code
 		return connect.NewResponse(out), nil

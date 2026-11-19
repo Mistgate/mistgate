@@ -16,6 +16,7 @@ import (
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 )
 
 // The panel side of the neighbour scan against a fake agent: the command and its gate, the strict reading of an answer from a node
@@ -59,7 +60,7 @@ func sniNode(t *testing.T) (*l3Env, *agent, *conn) {
 	t.Helper()
 	x, target := newL3Env(t)
 	x.exec(`UPDATE node SET address = '203.0.113.10' WHERE id = ?`, target.nodeID)
-	c, _, _ := connectCaps(target, "sni-target", capSniScan)
+	c, _, _ := connectCaps(target, "sni-target", agentcap.SNIScan)
 	return x, target, c
 }
 
@@ -309,14 +310,14 @@ func TestNodeSniScanOldAgentAndOfflineNodeAreSentNothing(t *testing.T) {
 		t.Errorf("offline: %q", got.Error)
 	}
 	// connected, without the capability
-	old, oldConn := addPortCheckPeer(x, "old", "provider-b", "DE", capProbe)
+	old, oldConn := addPortCheckPeer(x, "old", "provider-b", "DE", agentcap.Probe)
 	x.exec(`UPDATE node SET address = '203.0.113.20' WHERE id = ?`, old.nodeID)
 	if got := awaitSni(t, startSniScan(x, old.nodeID, true)); got.Error != "agent_too_old" || len(got.Candidates) != 0 {
 		t.Errorf("old agent: %+v", got)
 	}
 	noCommand(t, oldConn, 100*time.Millisecond)
 	// neither refusal used the pause: the node scans as soon as it can
-	c, _, _ := connectCaps(target, "sni-target", capSniScan)
+	c, _, _ := connectCaps(target, "sni-target", agentcap.SNIScan)
 	if got := scanOnce(t, x, c, target.nodeID, sniAnswer()); got.Error != "" || len(got.Candidates) != 0 || got.Range != "203.0.113.0/24" {
 		t.Errorf("a node that was offline: %+v", got)
 	}

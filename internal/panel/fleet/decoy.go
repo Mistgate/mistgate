@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -107,7 +108,7 @@ func (f *Fleet) decoySyncFailed(nodeID string) bool {
 // decoySweep runs with the 30 s sweep: a connected node whose reported site is not the configured one gets it again
 // (the panel's --decoy-dir changed, or an earlier push failed; a failed push waits decoyRetryAfter).
 func (f *Fleet) decoySweep(n store.NodeRow, live store.NodeLiveRow) {
-	if n.State != "active" || !live.Connected || n.DecoyMode == decoy.ModeBuiltin || !slices.Contains(live.AgentCaps, capDecoy) {
+	if n.State != "active" || !live.Connected || n.DecoyMode == decoy.ModeBuiltin || !slices.Contains(live.AgentCaps, agentcap.Decoy) {
 		return
 	}
 	want := n.DecoyBundleHash
@@ -152,7 +153,7 @@ func (f *Fleet) syncNodeDecoy(ctx context.Context, nodeID string) error {
 	if err != nil {
 		return err
 	}
-	if !live.Connected || !slices.Contains(live.AgentCaps, capDecoy) {
+	if !live.Connected || !slices.Contains(live.AgentCaps, agentcap.Decoy) {
 		return nil
 	}
 

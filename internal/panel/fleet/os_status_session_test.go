@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -26,7 +27,7 @@ func TestSessionCoreStoresOsStatusOnlyWithTheFlag(t *testing.T) {
 		caps []string
 		want bool
 	}{
-		{"capable agent", []string{capOSStatus}, true},
+		{"capable agent", []string{agentcap.OSStatus}, true},
 		{"agent without the capability", nil, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -66,7 +67,7 @@ func TestRecordOsStatusDropsOnlyTheBadEntry(t *testing.T) {
 	e, core, ctx, state, now := coreFixture(t, "osdrop")
 	e.f.SetUpdates(osStatusUpdates{&fakeUpdates{}})
 	h := hello("instance-osdrop", 0, "").GetHello()
-	h.Capabilities = []string{capOSStatus}
+	h.Capabilities = []string{agentcap.OSStatus}
 	tr := stepHello(t, core, ctx, state, now, h)
 	snapshot := osStatusFixture(now)
 	snapshot.Notable = []string{"linux-image-generic 5.15.0.125.123 5.15.0.126.125 s", "libc6\n2.35 2.36 s"}
@@ -101,7 +102,7 @@ func TestOsStatusNotAllowedOnTheEdgeEdition(t *testing.T) {
 	if e.f.osStatusAllowed() {
 		t.Fatal("the edge edition allows OS status")
 	}
-	settings := e.f.nodeSettings(store.NodeRow{DialTimeoutS: 30, CountryCode: "DE"}, []string{capOSStatus})
+	settings := e.f.nodeSettings(store.NodeRow{DialTimeoutS: 30, CountryCode: "DE"}, []string{agentcap.OSStatus})
 	if settings.GetOsStatus() {
 		t.Fatalf("the edge edition asked a capable agent for OS status: %+v", settings)
 	}

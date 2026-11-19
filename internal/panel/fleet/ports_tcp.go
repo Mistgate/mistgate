@@ -13,6 +13,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -25,7 +26,6 @@ import (
 // probes: a TLS handshake for the HTTPS ports, the marked GET for port 80.
 
 const (
-	capTCPCheck = "tcpcheck/1"
 	// tcpMarkHold is how long the target keeps the mark; the probe follows at once and takes at most 8 s.
 	tcpMarkHold = 30
 	tcpMarkWait = 5 * time.Second
@@ -215,7 +215,7 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 		f.log.Warn("list nodes for TCP port check", "node", target.ID, "err", err)
 		return nil, false
 	}
-	senders := f.portSenders(target, allNodes, live, capTCPCheck)
+	senders := f.portSenders(target, allNodes, live, agentcap.TCPCheck)
 	if len(senders) > 2 {
 		senders = senders[:2]
 	}
@@ -380,7 +380,7 @@ func validTCPVerdict(v string) bool {
 // armTCPMark asks the target to answer one marked request on port 80. It returns "serving" when armed, "off" when the node
 // has no ACME name, "busy" when another program holds port 80 (a verdict of the row), or "" with the reason for the row.
 func (f *Fleet) armTCPMark(ctx context.Context, target store.NodeRow, live store.NodeLiveRow, token, answer *[tcpcheck.MarkSize]byte) (verdict, reason string) {
-	if !slices.Contains(live.AgentCaps, capTCPCheck) {
+	if !slices.Contains(live.AgentCaps, agentcap.TCPCheck) {
 		return "", "agent_too_old"
 	}
 	if _, err := rand.Read(token[:]); err != nil {

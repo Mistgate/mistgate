@@ -14,6 +14,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/unit"
@@ -104,7 +105,7 @@ func TestHelloAdvertisesUnitRefreshOnlyWithLauncher(t *testing.T) {
 			hello := <-h.panel.hellos
 			found := false
 			for _, c := range hello.Capabilities {
-				found = found || c == unit.CapabilityRefresh
+				found = found || c == agentcap.UnitRefresh
 			}
 			if found != tc.launcher {
 				t.Fatalf("unit-refresh capability present=%v, want %v; capabilities=%v", found, tc.launcher, hello.Capabilities)

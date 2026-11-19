@@ -14,6 +14,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	accesssvc "github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
@@ -64,7 +65,7 @@ func portCheckTarget(t *testing.T) (*l3Env, *agent, *conn) {
 	x.f.reg = reg
 	x.exec(`UPDATE node SET address = '203.0.113.10', provider = 'provider-a', country_code = 'TR' WHERE id = ?`, target.nodeID)
 	x.f.settleUDP = func(context.Context) error { return nil }
-	targetConn, _, _ := connectCaps(target, "ports-target", capUDPCheck)
+	targetConn, _, _ := connectCaps(target, "ports-target", agentcap.UDPCheck)
 	return x, target, targetConn
 }
 
@@ -197,7 +198,7 @@ func waitPortCheckWaiter(t *testing.T, f *Fleet, nodeID string) {
 
 func TestCheckPortsOrdersArmSendSettleStopAndFillsGetNode(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck)
+	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck)
 	var sequence []string
 	var sequenceMu sync.Mutex
 	x.f.settleUDP = func(context.Context) error {
@@ -261,7 +262,7 @@ func TestCheckPortsOrdersArmSendSettleStopAndFillsGetNode(t *testing.T) {
 
 func TestCheckPortsAsSystemAuditsTheSystemActor(t *testing.T) {
 	x, target := newL3Env(t)
-	conn, _, _ := connectCaps(target, "ports-old-agent", capDoctor)
+	conn, _, _ := connectCaps(target, "ports-old-agent", agentcap.Doctor)
 	_ = conn
 	_, _, code := x.f.CheckPortsAsSystem(x.ctx, target.nodeID, nil)
 	if code != "agent_too_old" {
@@ -342,8 +343,8 @@ func TestUDPSourceFilteredPatternUsesTheOnePercentAndAnchorFloors(t *testing.T) 
 
 func TestSourceFilteredNodeReusesOneSenderUntilACleanRun(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	_, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", capUDPCheck)
-	second, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", capUDPCheck)
+	_, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", agentcap.UDPCheck)
+	second, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", agentcap.UDPCheck)
 	filtered := map[uint16]uint64{2053: 0, 443: udpCheckSendCount}
 	clean := map[uint16]uint64{2053: udpCheckSendCount, 443: udpCheckSendCount}
 	finish := func(sender *conn, counts map[uint16]uint64) {
@@ -388,7 +389,7 @@ func TestSourceFilteredNodeReusesOneSenderUntilACleanRun(t *testing.T) {
 		t.Fatalf("stored source-filter sender = %q, %v", filteredSender, err)
 	}
 
-	addPortCheckPeer(x, "third", "provider-c", "FR", capUDPCheck)
+	addPortCheckPeer(x, "third", "provider-c", "FR", agentcap.UDPCheck)
 	if _, err := x.st.W.ExecContext(x.ctx, `UPDATE node SET address = '203.0.113.11' WHERE id = ?`, target.nodeID); err != nil {
 		t.Fatal(err)
 	}
@@ -558,8 +559,8 @@ func TestPortSenderPreferenceByProviderThenCountry(t *testing.T) {
 
 func TestCheckPortsRetriesAnInconclusiveSenderOnce(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	first, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", capUDPCheck)
-	second, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", capUDPCheck)
+	first, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", agentcap.UDPCheck)
+	second, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", agentcap.UDPCheck)
 	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 
 	arm := waitUDPCount(targetConn, false)
@@ -620,8 +621,8 @@ func TestCheckPortsRetriesAnInconclusiveSenderOnce(t *testing.T) {
 
 func TestCheckPortsDemotesSenderFromPersistedPathLoss(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	demoted, demotedConn := addPortCheckPeer(x, "de1", "provider-b", "DE", capUDPCheck)
-	other, otherConn := addPortCheckPeer(x, "fr1", "provider-a", "TR", capUDPCheck)
+	demoted, demotedConn := addPortCheckPeer(x, "de1", "provider-b", "DE", agentcap.UDPCheck)
+	other, otherConn := addPortCheckPeer(x, "fr1", "provider-a", "TR", agentcap.UDPCheck)
 	if err := x.st.UpdateUDPPathLosses(x.ctx, target.nodeID, []string{demoted.nodeID, other.nodeID}, []store.UDPPathLoss{{
 		SenderID: demoted.nodeID, TargetID: target.nodeID, Ports: "2053", Sent: udpCheckSendCount, Got: 100,
 		OtherSenderID: other.nodeID, OtherGot: udpCheckSendCount, CheckedAt: x.f.now().Add(-time.Minute),
@@ -644,8 +645,8 @@ func TestCheckPortsDemotesSenderFromPersistedPathLoss(t *testing.T) {
 
 func TestCheckPortsBothSendersInconclusiveDoesNotStore(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	first, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", capUDPCheck)
-	_, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", capUDPCheck)
+	first, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", agentcap.UDPCheck)
+	_, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", agentcap.UDPCheck)
 	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 	for _, senderConn := range []*conn{secondConn, firstConn} {
 		arm := waitUDPCount(targetConn, false)
@@ -670,8 +671,8 @@ func TestCheckPortsBothSendersInconclusiveDoesNotStore(t *testing.T) {
 
 func TestCheckPortsFailedConfirmationKeepsFirstRunUnconfirmed(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	_, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", capUDPCheck)
-	second, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", capUDPCheck)
+	_, firstConn := addPortCheckPeer(x, "first", "provider-a", "TR", agentcap.UDPCheck)
+	second, secondConn := addPortCheckPeer(x, "second", "provider-b", "DE", agentcap.UDPCheck)
 	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 
 	arm := waitUDPCount(targetConn, false)
@@ -705,7 +706,7 @@ func TestCheckPortsFailedConfirmationKeepsFirstRunUnconfirmed(t *testing.T) {
 
 func TestCheckPortsConcurrentCallerReadsCompletedRows(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck)
 	first := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
@@ -788,7 +789,7 @@ func TestCheckPortsTargetOfflineAndAgentTooOld(t *testing.T) {
 
 func TestCheckPortsAgentBusyDoesNotSendOrStop(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck)
+	addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck)
 	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Error: "busy"})
@@ -800,7 +801,7 @@ func TestCheckPortsAgentBusyDoesNotSendOrStop(t *testing.T) {
 
 func TestCheckPortsFailedSenderStillDisarms(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck)
 	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
@@ -820,7 +821,7 @@ func TestCheckPortsFailedSenderStillDisarms(t *testing.T) {
 
 func TestCheckPortsCanceledSendStillDisarms(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck)
 	ctx, cancel := context.WithCancel(x.ctx)
 	defer cancel()
 	result := make(chan portCheckFleetResult, 1)
@@ -866,7 +867,7 @@ func TestCheckPortsSameHostReturnsCountsWithoutStoring(t *testing.T) {
 
 func TestCheckPortsInconclusiveDoesNotStore(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck)
 	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
 	arm := waitUDPCount(targetConn, false)
 	replyPortCommand(targetConn, arm.RequestId, &agentv1.CommandResult{Ok: true})
@@ -886,7 +887,7 @@ func TestCheckPortsInconclusiveDoesNotStore(t *testing.T) {
 
 func TestPortLossyEventFiresOnlyOnFirstBadRun(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck)
 	x.exec(`UPDATE profile SET settings_json = '{"port":2053}' WHERE id = 'prf_awg'`)
 	for range 2 {
 		result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)

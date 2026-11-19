@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 )
 
 func countryRequest() CountryProbeRequest {
@@ -45,7 +46,7 @@ func askCountry(t *testing.T, e *env, a *agent, c *conn, result *agentv1.Command
 func TestCountryProbeSendsTheCommandAndParsesTheAnswer(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("ru-probe")
-	c, _, _ := connectCaps(a, "ru-probe-1", capCountryProbe)
+	c, _, _ := connectCaps(a, "ru-probe-1", agentcap.CountryProbe)
 	cmd, got := askCountry(t, e, a, c, &agentv1.CommandResult{Ok: true, Params: map[string]string{
 		"dpi_hop": "4", "control": "ok", "t203.0.113.10:443": "open", "t203.0.113.10:8443": "refused", "tde2.example.net:443": "blocked",
 		"t198.51.100.99:443": "open", // not asked for: never reaches the caller
@@ -84,7 +85,7 @@ func TestCountryProbeAnswersThatAreNotVerdicts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := newEnv(t)
 			a := e.enroll("ru-probe")
-			c, _, _ := connectCaps(a, "ru-probe-1", capCountryProbe)
+			c, _, _ := connectCaps(a, "ru-probe-1", agentcap.CountryProbe)
 			_, got := askCountry(t, e, a, c, tc.result)
 			if got.err != nil || got.res.Code != tc.code || got.res.DPIHop != tc.hop || got.res.ControlOK || len(got.res.Verdicts) != 0 {
 				t.Fatalf("result = %+v, err %v; want code %q and no verdicts", got.res, got.err, tc.code)
@@ -109,7 +110,7 @@ func TestCountryProbeNoDPIHopReason(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := newEnv(t)
 			a := e.enroll("ru-probe")
-			c, _, _ := connectCaps(a, "ru-probe-1", capCountryProbe)
+			c, _, _ := connectCaps(a, "ru-probe-1", agentcap.CountryProbe)
 			_, got := askCountry(t, e, a, c, &agentv1.CommandResult{Error: "no_dpi_hop", Params: tc.params})
 			if got.err != nil || got.res.Code != "no_dpi_hop" || got.res.Reason != tc.want {
 				t.Fatalf("result = %+v, err %v; want reason %q", got.res, got.err, tc.want)
@@ -121,7 +122,7 @@ func TestCountryProbeNoDPIHopReason(t *testing.T) {
 func TestCountryProbeLeavesOutWhatIsNotAVerdict(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("ru-probe")
-	c, _, _ := connectCaps(a, "ru-probe-1", capCountryProbe)
+	c, _, _ := connectCaps(a, "ru-probe-1", agentcap.CountryProbe)
 	_, got := askCountry(t, e, a, c, &agentv1.CommandResult{Ok: true, Params: map[string]string{
 		"dpi_hop": "x", "control": "ok", "t203.0.113.10:443": "ours", "t203.0.113.10:8443": "timeout",
 	}})

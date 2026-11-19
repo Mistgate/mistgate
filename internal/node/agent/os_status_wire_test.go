@@ -9,6 +9,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 )
 
@@ -75,7 +76,7 @@ func TestOsStatusIsSentOnEnableAndOnConnect(t *testing.T) {
 		},
 	})
 	h.waitConnected()
-	if hello := h.panel.current().hello; !hasCapability(hello, osupdate.Capability) || hasCapability(hello, "os-update/1") {
+	if hello := h.panel.current().hello; !hasCapability(hello, agentcap.OSStatus) || hasCapability(hello, "os-update/1") {
 		t.Fatalf("Hello capabilities = %v, want os-status/1 and not os-update/1", hello.GetCapabilities())
 	}
 	if s := nextOsStatus(h, 400*time.Millisecond); s != nil {

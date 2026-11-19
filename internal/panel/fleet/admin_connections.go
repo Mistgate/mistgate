@@ -10,12 +10,10 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
-
-// capLinks: the agent sends connection counters (StatsBatch.links, agent.proto LinkCounters).
-const capLinks = "links/1"
 
 // GetNodeConnections: the connection counters of the node's inbounds over the last hours (agent.proto LinkCounters). A read; no
 // address is stored or returned.
@@ -31,7 +29,7 @@ func (s nodeService) GetNodeConnections(ctx context.Context, req *connect.Reques
 		return nil, internalErr(f.log.Error, "get node", err)
 	}
 	resp := &adminv1.GetNodeConnectionsResponse{SinceUnix: since.Unix(), NowUnix: now.Unix()}
-	if !store.CapabilityPresent(n.AgentCaps, capLinks) {
+	if !store.CapabilityPresent(n.AgentCaps, agentcap.Links) {
 		return connect.NewResponse(resp), nil
 	}
 	resp.Supported = true
@@ -179,11 +177,11 @@ func (s nodeService) GetFleetConnections(ctx context.Context, req *connect.Reque
 			LastHourUnix: d.LastHour.Unix()})
 	}
 	for _, n := range nodes {
-		if !slices.Contains(n.AgentCaps, connectiondiag.VLESSHelloKexCapability) && servesVLESSReality(n) {
+		if !slices.Contains(n.AgentCaps, agentcap.VLESSHelloKex) && servesVLESSReality(n) {
 			resp.HelloKexNodesWithout = append(resp.HelloKexNodesWithout, n.ID)
 		}
 		node := &adminv1.NodeConnections{NodeId: n.ID, NodeName: n.Name, CountryCode: n.CountryCode,
-			Supported: store.CapabilityPresent(n.AgentCaps, capLinks), Inbounds: []*adminv1.InboundConnections{}}
+			Supported: store.CapabilityPresent(n.AgentCaps, agentcap.Links), Inbounds: []*adminv1.InboundConnections{}}
 		if node.Supported {
 			for _, in := range n.Inbounds {
 				r := byNode[n.ID][in.ID]

@@ -6,6 +6,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -73,21 +74,21 @@ func TestClientIPv6SettingIsOwnerOnlyNeedsCapabilityAndPropagates(t *testing.T) 
 	if n.ClientIPv6 {
 		t.Fatal("the store kept the setting on")
 	}
-	oldSettings, newSettings := nodeSettings(n, nil), nodeSettings(n, []string{capClientIPv6})
+	oldSettings, newSettings := nodeSettings(n, nil), nodeSettings(n, []string{agentcap.ClientIPv6})
 	if oldSettings.ClientIpv6Disabled || !newSettings.ClientIpv6Disabled {
 		t.Fatalf("settings: old agent %v, new agent %v", oldSettings.ClientIpv6Disabled, newSettings.ClientIpv6Disabled)
 	}
 	on := n
 	on.ClientIPv6 = true
-	if settingsSig(oldSettings) != settingsSig(nodeSettings(on, nil)) || settingsSig(oldSettings) != settingsSig(nodeSettings(on, []string{capClientIPv6})) {
+	if settingsSig(oldSettings) != settingsSig(nodeSettings(on, nil)) || settingsSig(oldSettings) != settingsSig(nodeSettings(on, []string{agentcap.ClientIPv6})) {
 		t.Fatal("the signature of an agent without the setting (or with it on) changed")
 	}
-	if settingsSig(newSettings) == settingsSig(nodeSettings(on, []string{capClientIPv6})) {
+	if settingsSig(newSettings) == settingsSig(nodeSettings(on, []string{agentcap.ClientIPv6})) {
 		t.Fatal("turning the setting off did not change the settings signature")
 	}
 
 	// A connected agent that lists the capability: initial settings, then a settings-only delta on the change.
-	c, _, initial := connectCaps(a, "ipv6", capClientIPv6)
+	c, _, initial := connectCaps(a, "ipv6", agentcap.ClientIPv6)
 	if initial.Settings == nil || !initial.Settings.ClientIpv6Disabled {
 		t.Fatalf("initial settings = %v", initial.Settings)
 	}

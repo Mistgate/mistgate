@@ -23,6 +23,7 @@ import (
 	"github.com/amnezia-vpn/amneziawg-go/v3/tun/netstack"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/awg/awgcfg"
 	"github.com/mistgate/mistgate/internal/node/awg/awguapi"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
@@ -67,7 +68,7 @@ func newAWGRig(t *testing.T) *awgRig {
 	awgBind = func() conn.Bind { return pairClientBind{r.binds[0]} }
 	t.Cleanup(func() { awgBind = old })
 	r.exec(`INSERT INTO node (id, name, address, provider, state, created_at, last_seen_at, last_connected_at) VALUES (?, 'lo', '127.0.0.1', 'lo', 'active', 1, 1, 1)`, awgNode)
-	r.fl.set(awgNode, liveState{up: true, caps: []string{capDoctor}})
+	r.fl.set(awgNode, liveState{up: true, caps: []string{agentcap.Doctor}})
 	return r
 }
 

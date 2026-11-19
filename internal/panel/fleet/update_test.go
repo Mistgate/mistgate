@@ -15,6 +15,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
+	"github.com/mistgate/mistgate/internal/agentcap"
 )
 
 // fakeUpdates is the updates module as the stream sees it.
@@ -149,7 +150,7 @@ func TestUpdateSourcesAreSentOnlyToCapableAgents(t *testing.T) {
 			a := e.enroll("de1")
 			caps := []string{"update/1"}
 			if tc.capability {
-				caps = append(caps, capUpdateSources)
+				caps = append(caps, agentcap.UpdateSources)
 			}
 			c := connectUpdater(a, "inst1", 1_790_000_000, caps...)
 			defer func() { c.st.CloseRequest(); c.ended() }()

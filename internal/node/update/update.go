@@ -28,6 +28,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/release"
 )
 
@@ -41,10 +42,6 @@ const (
 	FileOutcome            = "update.outcome"
 	FilePrev               = "update.prev"
 	FileUnitRefreshPending = "unit-refresh.pending"
-	CapUpdate              = "update/1"
-	CapUpdateTimeout       = "update-timeout/1"
-	CapUpdateSources       = "update-sources/1"
-	CapGuard               = "update-guard/1"
 	CommitWindow           = 5 * time.Minute
 	DefaultIdleTimeout     = 90 * time.Second
 	probeName              = ".mistgate-write-probe"
@@ -239,9 +236,9 @@ func (u *Updater) Capabilities() []string {
 	if u == nil || u.cfg.Key == nil || u.cfg.GOOS != "linux" || u.exe == "" || u.probe() != nil {
 		return nil
 	}
-	caps := []string{CapUpdate, CapUpdateTimeout, CapUpdateSources}
+	caps := []string{agentcap.Update, agentcap.UpdateTimeout, agentcap.UpdateSources}
 	if u.cfg.UnitGen >= 2 {
-		caps = append(caps, CapGuard)
+		caps = append(caps, agentcap.UpdateGuard)
 	}
 	return caps
 }

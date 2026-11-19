@@ -16,6 +16,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -542,7 +543,7 @@ func TestCountryAlertLifecycle(t *testing.T) {
 	}
 
 	// the node goes offline: no round, the alert is held
-	c.fl.set("de1", liveState{up: false, caps: []string{capDoctor}, lastSeen: c.clock.Now()})
+	c.fl.set("de1", liveState{up: false, caps: []string{agentcap.Doctor}, lastSeen: c.clock.Now()})
 	before := c.src.calls()
 	c.tick()
 	c.tick()
@@ -552,7 +553,7 @@ func TestCountryAlertLifecycle(t *testing.T) {
 	mustHave(t, c, k, true)
 
 	// back online; one OK round is not enough, an unknown does not help, two close it
-	c.fl.set("de1", liveState{up: true, caps: []string{capDoctor}, lastSeen: c.clock.Now()})
+	c.fl.set("de1", liveState{up: true, caps: []string{agentcap.Doctor}, lastSeen: c.clock.Now()})
 	c.src.set("de1", "ok")
 	c.tick()
 	mustHave(t, c, k, true)
@@ -820,7 +821,7 @@ func TestDisconnectedNodeHoldsFullAndPartialCountryAlerts(t *testing.T) {
 		TitleKey: "health.alert.country_blocked.title", WhyKey: "health.alert.country_blocked.why.blocked"}, time.Hour, now); err != nil {
 		t.Fatal(err)
 	}
-	c.fl.set("de1", liveState{up: false, caps: []string{capDoctor}, lastSeen: now})
+	c.fl.set("de1", liveState{up: false, caps: []string{agentcap.Doctor}, lastSeen: now})
 	c.s.ReconcileCountry(c.ctx)
 	mustHave(t, c, "country_blocked/de1/", true)
 	mustHave(t, c, "country_blocked/de1/partial", true)

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -15,14 +16,14 @@ func TestIPv6AddressesNeedTheCapability(t *testing.T) {
 	n := store.NodeRow{ClientIPv6: true}
 	oldSig := settingsSig(nodeSettings(n, nil))
 
-	empty := nodeSettings(n, []string{capIPv6Addr})
+	empty := nodeSettings(n, []string{agentcap.IPv6Addr})
 	if !empty.Ipv6AddressesManaged || len(empty.Ipv6Addresses) != 0 {
 		t.Fatalf("a capable agent is told %+v", empty)
 	}
 	if settingsSig(empty) == oldSig {
 		t.Fatal("the signature of a capable agent does not say that the list is managed")
 	}
-	if settingsSig(nodeSettings(n, []string{capIPv6Addr})) != settingsSig(empty) {
+	if settingsSig(nodeSettings(n, []string{agentcap.IPv6Addr})) != settingsSig(empty) {
 		t.Fatal("the signature is not stable")
 	}
 
@@ -30,7 +31,7 @@ func TestIPv6AddressesNeedTheCapability(t *testing.T) {
 	t.Cleanup(func() { ownedIPv6Addresses = prev })
 	ownedIPv6Addresses = func(store.NodeRow) []string { return []string{"2001:db8:1::beef"} }
 
-	for _, caps := range [][]string{nil, {capClientIPv6, capAWG}} {
+	for _, caps := range [][]string{nil, {agentcap.ClientIPv6, agentcap.AWG}} {
 		old := nodeSettings(n, caps)
 		if len(old.Ipv6Addresses) != 0 || old.Ipv6AddressesManaged {
 			t.Fatalf("an agent without ipv6-addr/1 (%v) was sent %v managed=%v", caps, old.Ipv6Addresses, old.Ipv6AddressesManaged)
@@ -42,14 +43,14 @@ func TestIPv6AddressesNeedTheCapability(t *testing.T) {
 	if got := settingsSig(nodeSettings(n, nil)); got != oldSig {
 		t.Fatalf("old agent signature %q, was %q", got, oldSig)
 	}
-	cur := nodeSettings(n, []string{capIPv6Addr})
+	cur := nodeSettings(n, []string{agentcap.IPv6Addr})
 	if !cur.Ipv6AddressesManaged || !slices.Equal(cur.Ipv6Addresses, []string{"2001:db8:1::beef"}) {
 		t.Fatalf("settings of a new agent = %+v", cur)
 	}
 	if settingsSig(cur) == settingsSig(empty) {
 		t.Fatal("a new address list does not change the settings signature")
 	}
-	other := nodeSettings(n, []string{capIPv6Addr})
+	other := nodeSettings(n, []string{agentcap.IPv6Addr})
 	other.Ipv6Addresses = []string{"2001:db8:1::cafe"}
 	if settingsSig(other) == settingsSig(cur) {
 		t.Fatal("another address gives the same signature")

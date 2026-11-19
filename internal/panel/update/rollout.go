@@ -17,6 +17,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -754,7 +755,7 @@ func (p *pass) configuredAnswerWait(n store.NodeRow) time.Duration {
 }
 
 func (p *pass) downloadTimeoutFor(n store.NodeRow) time.Duration {
-	if !slices.Contains(n.AgentCaps, updateTimeoutCapability) {
+	if !slices.Contains(n.AgentCaps, agentcap.UpdateTimeout) {
 		return 0
 	}
 	return p.downloadWait
@@ -1201,7 +1202,7 @@ func (p *pass) send(x *store.StepRow, n store.NodeRow) {
 		p.sendLink(x, n, p.preFailed(x))
 		return
 	}
-	if slices.Contains(n.AgentCaps, updateSourcesCapability) {
+	if slices.Contains(n.AgentCaps, agentcap.UpdateSources) {
 		if s.preparing[x.NodeID] == p.ro.ID {
 			return
 		}
@@ -1225,7 +1226,7 @@ func (p *pass) send(x *store.StepRow, n store.NodeRow) {
 			if err != nil {
 				return
 			}
-			if !slices.Contains(currentNode.AgentCaps, updateSourcesCapability) {
+			if !slices.Contains(currentNode.AgentCaps, agentcap.UpdateSources) {
 				sources = nil
 			}
 			prepared.sendPrepared(step, currentNode, sources)

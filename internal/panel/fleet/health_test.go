@@ -12,6 +12,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -153,9 +154,9 @@ func TestRefreshUnitCommandRequiresBothCapabilities(t *testing.T) {
 		caps []string
 		want bool
 	}{
-		{"doctor only", []string{capDoctor}, false},
-		{"refresh only", []string{capUnitRefresh}, false},
-		{"doctor and refresh", []string{capDoctor, capUnitRefresh}, true},
+		{"doctor only", []string{agentcap.Doctor}, false},
+		{"refresh only", []string{agentcap.UnitRefresh}, false},
+		{"doctor and refresh", []string{agentcap.Doctor, agentcap.UnitRefresh}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := e.f.readyForRequest(e.ctx, "nodea", frame, &store.NodeLiveRow{Connected: true, AgentCaps: tc.caps})

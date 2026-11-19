@@ -13,6 +13,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/asndb"
 	"github.com/mistgate/mistgate/internal/logscrub"
 	"github.com/mistgate/mistgate/internal/panel/health"
@@ -104,7 +105,7 @@ func (s nodeService) GetNetworks(ctx context.Context, req *connect.Request[admin
 		}
 	}
 	for _, n := range selected {
-		if !store.CapabilityPresent(n.AgentCaps, capNetworks) {
+		if !store.CapabilityPresent(n.AgentCaps, agentcap.Nets) {
 			response.NodesWithoutNets = append(response.NodesWithoutNets, &adminv1.NetworkNodeRef{NodeId: n.ID, NodeName: cleanNetworkText(n.Name, 80)})
 		} else if bundleSHA == "" || n.NetworksDBSHA256 != bundleSHA {
 			response.NodesWithoutTable = append(response.NodesWithoutTable, &adminv1.NetworkNodeRef{NodeId: n.ID, NodeName: cleanNetworkText(n.Name, 80)})

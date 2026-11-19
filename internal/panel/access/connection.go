@@ -10,12 +10,10 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/connectiondiag"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
-
-// capLinks: the agent sends connection counters (StatsBatch.links, agent.proto LinkCounters).
-const capLinks = "links/1"
 
 // GetUserConnection: what the nodes saw of a person's connections over the last hours, per device, node and inbound (agent.proto
 // LinkCounters). A read; no address is stored or returned. nodes_without_counters are the nodes the person can use whose agent
@@ -47,9 +45,9 @@ func (s *Service) GetUserConnection(ctx context.Context, req *connect.Request[ad
 			continue
 		}
 		seen[f.Node.ID] = true
-		links2ByNode[f.Node.ID] = slices.Contains(f.Node.AgentCaps, connectiondiag.Links2Capability)
+		links2ByNode[f.Node.ID] = slices.Contains(f.Node.AgentCaps, agentcap.Links2)
 		capsByNode[f.Node.ID] = f.Node.AgentCaps
-		if !slices.Contains(f.Node.AgentCaps, capLinks) {
+		if !slices.Contains(f.Node.AgentCaps, agentcap.Links) {
 			resp.NodesWithoutCounters = append(resp.NodesWithoutCounters, f.Node.ID)
 		}
 	}

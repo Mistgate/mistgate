@@ -8,12 +8,10 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/logscrub"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
-
-// capJournal: the agent sends the saved warning and error journal (StatsBatch.journal, agent.proto JournalEntry).
-const capJournal = "journal/1"
 
 // GetNodeJournal reads the saved warning and error journal. Records are privacy-cleaned before storage and carry no addresses.
 func (s nodeService) GetNodeJournal(ctx context.Context, req *connect.Request[adminv1.GetNodeJournalRequest]) (*connect.Response[adminv1.GetNodeJournalResponse], error) {
@@ -43,7 +41,7 @@ func (s nodeService) GetNodeJournal(ctx context.Context, req *connect.Request[ad
 		inScope = nodes
 	}
 	for _, n := range inScope {
-		if !store.CapabilityPresent(n.AgentCaps, capJournal) {
+		if !store.CapabilityPresent(n.AgentCaps, agentcap.Journal) {
 			resp.NodesWithoutJournal = append(resp.NodesWithoutJournal, n.ID)
 		}
 	}

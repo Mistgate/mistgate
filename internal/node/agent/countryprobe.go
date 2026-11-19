@@ -10,9 +10,6 @@ import (
 	"github.com/mistgate/mistgate/internal/tspuprobe"
 )
 
-// capCountryProbe: this host can run CountryProbe (agent.proto "COUNTRY PROBE"). It needs no capability and no unit change.
-const capCountryProbe = "country-probe/1"
-
 // countryProbeState is the agent's bookkeeping for CountryProbe: one run at a time, and the test seams.
 type countryProbeState struct {
 	running atomic.Bool

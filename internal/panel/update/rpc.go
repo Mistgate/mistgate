@@ -12,7 +12,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
-	"github.com/mistgate/mistgate/internal/node/osupdate"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -261,7 +261,7 @@ func (r rpc) GetOsUpdates(ctx context.Context, _ *connect.Request[adminv1.GetOsU
 				online = uint32(len(users))
 			}
 		}
-		capable := slices.Contains(node.AgentCaps, osupdate.Capability)
+		capable := slices.Contains(node.AgentCaps, agentcap.OSStatus)
 		facts, err := s.st.NodeFacts(ctx, node.ID)
 		if err != nil {
 			return nil, s.internal("read node facts", err)
