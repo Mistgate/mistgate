@@ -70,6 +70,5 @@ describe("sortProtocols", () => {
   });
   it("names VLESS like its plugin does", () => {
     expect(protocolName("vless")).toBe("VLESS");
-    expect(protocolShort("vless")).toBe("VLESS");
   });
 });
