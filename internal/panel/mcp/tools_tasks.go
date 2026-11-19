@@ -408,7 +408,7 @@ func (c *call) checkTaskDefinition(d spec.Definition) (spec.Definition, error) {
 		}
 		tools = spec.Tools{Allowed: func(n string) bool { _, ok := schemas[n]; return ok }, SchemaOf: func(n string) json.RawMessage { return schemas[n] }}
 	}
-	out, err := spec.Check(d, tools, func(s string) bool { return s != "" && scrub(s) != s })
+	out, err := spec.Check(d, tools, LooksSecret)
 	if err != nil {
 		return d, failure(errCode(err), "the task is not valid: "+err.Error())
 	}

@@ -191,6 +191,8 @@ func TestTaskCreatePlanWaitsForTheOwner(t *testing.T) {
 	refused(check([]any{map[string]any{"tool": "fleet_digest", "conditions": []any{map[string]any{"path": "x", "op": "regex"}}}}, "daily 07:30"), "invalid_condition")
 	refused(map[string]any{"name": "Ask", "kind": "assistant", "schedule": "every 10m", "prompt": "check"}, "schedule_too_often")
 	refused(map[string]any{"name": "Ask", "kind": "assistant", "schedule": "daily 08:00", "prompt": "use sk-ant-api03-" + strings.Repeat("Zx9", 12)}, "secret_in_task")
+	refused(map[string]any{"name": "Ask", "kind": "assistant", "schedule": "daily 08:00", "prompt": "log in with password: hunter2"}, "secret_in_task")
+	refused(check([]any{map[string]any{"tool": "fleet_digest", "args": map[string]any{"hours": "token: hunter2"}}}, "daily 07:30"), "secret_in_task")
 
 	p := planOf(t, s, "task_create", map[string]any{"name": "Morning check", "kind": "check", "schedule": "daily 07:30", "notify_telegram": true, "reason": "the owner asked",
 		"steps": []any{map[string]any{"tool": "fleet_digest", "args": map[string]any{"hours": 24}, "conditions": []any{map[string]any{"path": "totals.nodes_problem_now", "op": "gt", "value": "0"}}}}})
