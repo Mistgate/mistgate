@@ -486,10 +486,12 @@ func followUpHint(card *adminv1.PlanCard) string {
 	if card == nil {
 		return ""
 	}
-	seconds, what := 0, ""
-	switch card.Tool {
-	case "node_debug_capture":
-		seconds, what = 360, "read node_debug_logs"
+	when, ok := followUpAfter[card.Tool]
+	if !ok {
+		return ""
+	}
+	seconds := when.seconds
+	if card.Tool == "node_debug_capture" {
 		for _, fact := range card.Facts {
 			if fact.Key == "duration" {
 				if n, err := strconv.Atoi(strings.TrimSuffix(strings.TrimSpace(fact.Value), " s")); err == nil && n > 0 {
@@ -497,23 +499,25 @@ func followUpHint(card *adminv1.PlanCard) string {
 				}
 			}
 		}
-	case "path_speed":
-		seconds, what = 60, "read the result"
-	case "channel_measure":
-		seconds, what = 100, "read the result with path_speed_results (the figures are an estimate at that moment, not a guarantee of the tariff)"
-	case "node_update", "node_rollback":
-		seconds, what = 300, "check that the node is back and on the right version"
-	case "rollout_start":
-		seconds, what = 900, "check the rollout"
-	case "os_rollout_start":
-		seconds, what = 1500, "check the OS update of the node: that it finished, the node is back and its profiles are up"
-	case "relay":
-		seconds, what = 180, "check that the relay carries traffic"
-	default:
-		return ""
 	}
 	return "This runs only when the person applies the plan and finishes later: call follow_up now with plan_id " + card.PlanId +
-		" and in_seconds about " + strconv.Itoa(seconds) + " to come back and " + what + " by yourself. Never promise to come back without it."
+		" and in_seconds about " + strconv.Itoa(seconds) + " to come back and " + when.what + " by yourself. Never promise to come back without it."
+}
+
+// followUpAfter are the changes (by the name their plan card carries, without _plan) that start something that ends later: how many
+// seconds after the apply to come back, and what to do then. TestFollowUpPlansAreChangesOfTheRegistry holds the names to the registry.
+var followUpAfter = map[string]struct {
+	seconds int
+	what    string
+}{
+	"node_debug_capture": {360, "read node_debug_logs"},
+	"path_speed":         {60, "read the result"},
+	"channel_measure":    {100, "read the result with path_speed_results (the figures are an estimate at that moment, not a guarantee of the tariff)"},
+	"node_update":        {300, "check that the node is back and on the right version"},
+	"node_rollback":      {300, "check that the node is back and on the right version"},
+	"rollout_start":      {900, "check the rollout"},
+	"os_rollout_start":   {1500, "check the OS update of the node: that it finished, the node is back and its profiles are up"},
+	"relay":              {180, "check that the relay carries traffic"},
 }
 
 // withFollowUpHint adds followUpHint to a plan tool's result (a JSON object) for the model.

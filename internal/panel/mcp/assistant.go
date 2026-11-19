@@ -120,7 +120,7 @@ func (s *assistantSession) ListTools(ctx context.Context) ([]AssistantTool, erro
 			return nil, errors.New("could not list panel tools")
 		}
 		for _, tool := range page.Tools {
-			if strings.HasSuffix(tool.Name, "_apply") || !assistantAllowsTool(s.identity, tool.Name) {
+			if KindOf(tool.Name) == KindApply || !assistantAllowsTool(s.identity, tool.Name) {
 				continue
 			}
 			schema, err := json.Marshal(tool.InputSchema)

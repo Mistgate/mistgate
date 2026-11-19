@@ -90,14 +90,14 @@ type nodeInstallParams struct {
 func nodeInstallPlanTool() toolDef {
 	const base = auth.NodeInstallTool
 	return toolDef{
-		name: base + "_plan", min: ProfileAdmin, procs: procs(
+		name: PlanTool(base), min: ProfileAdmin, procs: procs(
 			adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure,
 			adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure),
 		free: true, isPlan: true, danger: true,
 		desc: "Prepare installation of a Mistgate node over SSH. This reads the public SSH host key and panel public key. Never ask for or pass a server password: " +
 			"the owner compares the host key fingerprint and chooses Password or Panel key on the approval screen in the admin panel. Tell the user to approve the plan there.",
 		add: func(s *mcp.Server, e *env, desc string) {
-			mcp.AddTool(s, &mcp.Tool{Name: base + "_plan", Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
+			mcp.AddTool(s, &mcp.Tool{Name: PlanTool(base), Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in nodeInstallArgs) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, readTimeout)
 					if err != nil {
@@ -155,10 +155,10 @@ func nodeInstallPlanTool() toolDef {
 func nodeInstallApplyTool() toolDef {
 	const base = auth.NodeInstallTool
 	return toolDef{
-		name: base + "_apply", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceStartNodeProvisionProcedure),
+		name: ApplyTool(base), min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceStartNodeProvisionProcedure),
 		danger: true, desc: "Apply an owner-approved node_install plan. Takes only the confirm_token: the owner chose Password or Panel key and confirmed the host key on the approval screen. A password install also installs the panel key by default.",
 		add: func(s *mcp.Server, e *env, desc string) {
-			mcp.AddTool(s, &mcp.Tool{Name: base + "_apply", Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
+			mcp.AddTool(s, &mcp.Tool{Name: ApplyTool(base), Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in applyIn) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, applyTimeout)
 					if err != nil {
@@ -200,12 +200,12 @@ type passwordRotateParams struct{ NodeID, Name, Host, Username string }
 func passwordRotatePlanTool() toolDef {
 	const base = "node_server_password_rotate"
 	return toolDef{
-		name: base + "_plan", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure,
+		name: PlanTool(base), min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure,
 			adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure),
 		free: true, isPlan: true, danger: true,
 		desc: "Prepare to generate and install a new random SSH password for one installed node. This plan contains only the node id and public login metadata; the panel generates the password only after owner approval.",
 		add: func(s *mcp.Server, e *env, desc string) {
-			mcp.AddTool(s, &mcp.Tool{Name: base + "_plan", Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
+			mcp.AddTool(s, &mcp.Tool{Name: PlanTool(base), Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in passwordRotatePlanArgs) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, readTimeout)
 					if err != nil {
@@ -255,10 +255,10 @@ type passwordRotateApplyArgs struct {
 
 func passwordRotateApplyTool() toolDef {
 	const base = "node_server_password_rotate"
-	return toolDef{name: base + "_apply", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure, adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure), danger: true,
+	return toolDef{name: ApplyTool(base), min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure, adminv1connect.ProvisioningServiceRotateNodeServerPasswordProcedure), danger: true,
 		desc: "Apply an owner-approved SSH password rotation plan. The panel generates and installs a strong random password; it is never returned to the agent. The owner can reveal it later in node Settings after step-up verification.",
 		add: func(s *mcp.Server, e *env, desc string) {
-			mcp.AddTool(s, &mcp.Tool{Name: base + "_apply", Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
+			mcp.AddTool(s, &mcp.Tool{Name: ApplyTool(base), Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in passwordRotateApplyArgs) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, applyTimeout)
 					if err != nil {
@@ -416,12 +416,12 @@ func addServerKey(c *call, p serverKeyChangeParams) (*adminv1.NodeServerKey, err
 func nodeServerKeyAddPlanTool() toolDef {
 	const base = "node_server_key_add"
 	return toolDef{
-		name: base + "_plan", min: ProfileAdmin,
+		name: PlanTool(base), min: ProfileAdmin,
 		procs: procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure, adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure),
 		free:  true, isPlan: true, danger: true,
 		desc: "Prepare to add one public SSH key to a node. Set panel_key=true to add the panel-owned key, or provide one public_key line. Never provide a private key. The owner approves the plan before the server changes.",
 		add: func(s *mcp.Server, e *env, desc string) {
-			mcp.AddTool(s, &mcp.Tool{Name: base + "_plan", Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
+			mcp.AddTool(s, &mcp.Tool{Name: PlanTool(base), Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in serverKeyAddPlanArgs) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, readTimeout)
 					if err != nil {
@@ -474,12 +474,12 @@ type serverKeysAddParams struct {
 func nodeServerKeysAddPlanTool() toolDef {
 	const base = "node_server_keys_add"
 	return toolDef{
-		name: base + "_plan", min: ProfileAdmin,
+		name: PlanTool(base), min: ProfileAdmin,
 		procs: procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure, adminv1connect.ProvisioningServiceListNodeServerKeysProcedure, adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure),
 		free:  true, isPlan: true, danger: true,
 		desc: "Prepare to add one public SSH key to 1 to 20 selected nodes. Set panel_key=true to add the panel-owned key, or provide one public_key line. The owner approves once before any server changes.",
 		add: func(s *mcp.Server, e *env, desc string) {
-			mcp.AddTool(s, &mcp.Tool{Name: base + "_plan", Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
+			mcp.AddTool(s, &mcp.Tool{Name: PlanTool(base), Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in serverKeysAddPlanArgs) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, readTimeout)
 					if err != nil {
@@ -552,10 +552,10 @@ func nodeServerKeysAddPlanTool() toolDef {
 
 func nodeServerKeyAddApplyTool() toolDef {
 	const base = "node_server_key_add"
-	return toolDef{name: base + "_apply", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure), danger: true,
+	return toolDef{name: ApplyTool(base), min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure), danger: true,
 		desc: "Apply an owner-approved public SSH key addition. Takes only confirm_token; private keys are never accepted or returned.",
 		add: func(s *mcp.Server, e *env, desc string) {
-			mcp.AddTool(s, &mcp.Tool{Name: base + "_apply", Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
+			mcp.AddTool(s, &mcp.Tool{Name: ApplyTool(base), Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in applyIn) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, applyTimeout)
 					if err != nil {
@@ -607,10 +607,10 @@ func serverKeyAddErrorCode(err error) string {
 
 func nodeServerKeysAddApplyTool() toolDef {
 	const base = "node_server_keys_add"
-	return toolDef{name: base + "_apply", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure), danger: true,
+	return toolDef{name: ApplyTool(base), min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceAddNodeServerKeyProcedure), danger: true,
 		desc: "Apply one owner-approved SSH key addition to up to 20 nodes. Takes only confirm_token and returns each node's result.",
 		add: func(s *mcp.Server, e *env, desc string) {
-			mcp.AddTool(s, &mcp.Tool{Name: base + "_apply", Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
+			mcp.AddTool(s, &mcp.Tool{Name: ApplyTool(base), Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in applyIn) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, maxMCPNodeTargets*applyTimeout)
 					if err != nil {
@@ -675,12 +675,12 @@ func nodeServerKeysAddApplyTool() toolDef {
 func nodeServerKeyRemovePlanTool() toolDef {
 	const base = "node_server_key_remove"
 	return toolDef{
-		name: base + "_plan", min: ProfileAdmin,
+		name: PlanTool(base), min: ProfileAdmin,
 		procs: procs(adminv1connect.ProvisioningServiceListNodeServerAccessProcedure, adminv1connect.ProvisioningServiceListNodeServerKeysProcedure),
 		free:  true, isPlan: true, danger: true,
 		desc: "Prepare to remove an SSH key by its SHA256 fingerprint. The owner approves before the server changes; removing the panel key requires a saved password that the panel proves first.",
 		add: func(s *mcp.Server, e *env, desc string) {
-			mcp.AddTool(s, &mcp.Tool{Name: base + "_plan", Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
+			mcp.AddTool(s, &mcp.Tool{Name: PlanTool(base), Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in serverKeyRemovePlanArgs) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, readTimeout)
 					if err != nil {
@@ -752,10 +752,10 @@ type serverKeyRemovePlanArgs struct {
 
 func nodeServerKeyRemoveApplyTool() toolDef {
 	const base = "node_server_key_remove"
-	return toolDef{name: base + "_apply", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceRemoveNodeServerKeyProcedure), danger: true,
+	return toolDef{name: ApplyTool(base), min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceRemoveNodeServerKeyProcedure), danger: true,
 		desc: "Apply an owner-approved SSH key removal plan. Takes only confirm_token; panel-key removal requires the saved password to work before removal.",
 		add: func(s *mcp.Server, e *env, desc string) {
-			mcp.AddTool(s, &mcp.Tool{Name: base + "_apply", Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
+			mcp.AddTool(s, &mcp.Tool{Name: ApplyTool(base), Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in applyIn) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, applyTimeout)
 					if err != nil {

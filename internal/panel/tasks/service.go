@@ -224,13 +224,11 @@ func (s *Service) checkTools(ctx context.Context) ([]checkTool, error) {
 	return out, nil
 }
 
-// CheckToolName reports whether a tool of the operator profile may be a step of a check: not a plan, not an apply, not a task tool.
+// CheckToolName reports whether a tool of the operator profile may be a step of a check: a read or a probe of the registry, not a
+// plan, not an apply, not a task tool.
 func CheckToolName(name string) bool {
-	return name != "" && !taskTools[name] && !hasSuffix(name, "_plan") && !hasSuffix(name, "_apply")
-}
-
-func hasSuffix(s, suffix string) bool {
-	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
+	k := mcp.KindOf(name)
+	return (k == mcp.KindRead || k == mcp.KindRun) && !taskTools[name]
 }
 
 // checkSpec turns the tool list into the two functions spec.Steps checks steps with.
