@@ -78,7 +78,7 @@ func (s *Service) nowSave(ctx context.Context, recs map[string]nowRecord) {
 	}
 	b, _ := json.Marshal(recs)
 	if err := s.st.SetSettings(ctx, map[string]string{countryNowSetting: string(b)}); err != nil {
-		s.log.Warn("health: keep the country round asked by hand", "err", err)
+		s.log.Warn("health: keep the country round asked by hand", "code", "country_now_save_failed", "err", err)
 	}
 }
 
@@ -188,7 +188,7 @@ func (s *Service) nowWork(ctx context.Context, nodeID string, at int64, runs map
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						s.log.Error("health: a source of the country round asked by hand panicked", "source", source, "panic", r)
+						s.log.Error("health: a source of the country round asked by hand panicked", "code", "country_now_source_panicked", "source", source, "panic", r)
 					}
 				}()
 				state, reason = run(rctx)
@@ -285,7 +285,7 @@ func (s *Service) nowGlobalping(ctx context.Context, nodeID string, now time.Tim
 	}
 	nodes, err := s.countryNodes(ctx)
 	if err != nil {
-		s.log.Warn("health: country round asked by hand: nodes", "err", err)
+		s.log.Warn("health: country round asked by hand: nodes", "code", "country_now_read_failed", "err", err)
 		return nil, "error", left, 0
 	}
 	i := slices.IndexFunc(nodes, func(n countryNode) bool { return n.node.ID == nodeID })
@@ -312,7 +312,7 @@ func (s *Service) nowGlobalping(ctx context.Context, nodeID string, now time.Tim
 	remaining, resetIn, err := bud.Remaining(lctx)
 	cancel()
 	if err != nil {
-		s.log.Warn("health: country round asked by hand: Globalping limits", "err", err)
+		s.log.Warn("health: country round asked by hand: Globalping limits", "code", "country_now_limits_failed", "err", err)
 		return nil, "budget_unknown", left, 0
 	}
 	solo := []countryNode{target}

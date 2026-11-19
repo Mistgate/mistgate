@@ -18,7 +18,7 @@ func (s *Service) NowPlan(ctx context.Context, nodeID string) (run func(context.
 	gen := s.generation()
 	st, err := s.load(ctx)
 	if err != nil {
-		s.log.Warn("countryprobe: read settings", "err", err)
+		s.log.Warn("countryprobe: read settings", "code", "countryprobe_manual_read_failed", "err", err)
 		return nil, "error"
 	}
 	if !st.enabled || st.node == "" || s.unavailable(ctx) != "" {
@@ -26,7 +26,7 @@ func (s *Service) NowPlan(ctx context.Context, nodeID string) (run func(context.
 	}
 	nodes, err := s.cfg.Nodes(ctx)
 	if err != nil {
-		s.log.Warn("countryprobe: read nodes", "err", err)
+		s.log.Warn("countryprobe: read nodes", "code", "countryprobe_manual_read_failed", "err", err)
 		return nil, "error"
 	}
 	probe, fit := probeNode(nodes, st.node)
@@ -62,7 +62,7 @@ func (s *Service) NowPlan(ctx context.Context, nodeID string) (run func(context.
 		case errors.Is(err, errSwitchedOff):
 			return "failed", "off"
 		case err != nil:
-			s.log.Warn("countryprobe: run for one node failed", "err", err)
+			s.log.Warn("countryprobe: run for one node failed", "code", "countryprobe_manual_run_failed", "err", err)
 			return "failed", "error"
 		case res.run.Status != StatusOK:
 			return "failed", res.run.Status

@@ -19,7 +19,7 @@ const SilentAfter = time.Hour
 func (s *Service) NowPlan(ctx context.Context, _ string) (run func(context.Context) (string, string), skip string) {
 	settings, err := s.settings(ctx)
 	if err != nil {
-		s.cfg.Log.Warn("own probes: read settings", "err", err)
+		s.cfg.Log.Warn("own probes: read settings", "code", "ownprobe_manual_read_failed", "err", err)
 		return nil, "error"
 	}
 	if !settings.Enabled {
@@ -27,7 +27,7 @@ func (s *Service) NowPlan(ctx context.Context, _ string) (run func(context.Conte
 	}
 	probes, err := s.cfg.Store.OwnProbes(ctx)
 	if err != nil {
-		s.cfg.Log.Warn("own probes: read probes", "err", err)
+		s.cfg.Log.Warn("own probes: read probes", "code", "ownprobe_manual_read_failed", "err", err)
 		return nil, "error"
 	}
 	now := s.cfg.Now()

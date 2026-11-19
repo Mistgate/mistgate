@@ -85,7 +85,7 @@ func (s *Service) NowPlan(ctx context.Context, nodeID, source string) (run func(
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return "failed", "timeout"
 			}
-			s.log.Warn("cheburcheck: check by hand failed", "err", err)
+			s.log.Warn("cheburcheck: check by hand failed", "code", "cheburcheck_manual_check_failed", "err", err)
 			return "failed", "error"
 		}
 		// the verdict or the failure stored by the check: a result that says nothing is a failed check, not a verdict
