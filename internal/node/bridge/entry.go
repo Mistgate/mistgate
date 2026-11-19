@@ -13,6 +13,7 @@ import (
 	mrand "math/rand/v2"
 	"net"
 	"net/http"
+	"net/netip"
 	"regexp"
 	"sort"
 	"strconv"
@@ -67,6 +68,9 @@ type ServeConfig struct {
 	// Peer is who may call: the fleet's agents listed in ExitNodeIDs (the bridge), or the panel (a subscription host, whose
 	// ExitNodeIDs is just PanelPeerID; its proof is VerifyPanelProof and it never reaches the panel through the entry).
 	Peer PeerKind
+	// PassClient: the exit is told each person's address (ClientHeader on the pair's answers), so the panel sees whom a
+	// subscription host carries. An agent's bridge never passes it.
+	PassClient bool
 }
 
 // PeerKind says whose proof an Entry accepts.
@@ -161,6 +165,7 @@ type bridgePair struct {
 	err       string
 	conn      net.Conn
 	relayID   string
+	client    netip.AddrPort // set only when the entry passes it (ServeConfig.PassClient)
 	kind      string
 	budget    uint64    // control link only: bytes left in the bucket
 	budgetAt  time.Time // control link only: when the bucket was last refilled
@@ -443,7 +448,7 @@ func (e *Entry) SetServe(cfg ServeConfig) error {
 }
 
 func sameServe(a, b ServeConfig) bool {
-	if a.Peer != b.Peer || a.EntryNodeID != b.EntryNodeID || a.Path != b.Path || a.Roots != b.Roots || a.PanelVia != b.PanelVia ||
+	if a.Peer != b.Peer || a.PassClient != b.PassClient || a.EntryNodeID != b.EntryNodeID || a.Path != b.Path || a.Roots != b.Roots || a.PanelVia != b.PanelVia ||
 		a.PanelAddress != b.PanelAddress || len(a.ExitNodeIDs) != len(b.ExitNodeIDs) {
 		return false
 	}
@@ -839,6 +844,9 @@ func (e *Entry) servePairHalf(w http.ResponseWriter, r *http.Request, pair *brid
 		w.Header().Set(StreamKindHeader, StreamKindPanel)
 	} else {
 		w.Header().Set(RelayIDHeader, relayID)
+		if pair.client.IsValid() {
+			w.Header().Set(ClientHeader, pair.client.String())
+		}
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.WriteHeader(http.StatusOK)
@@ -1366,7 +1374,7 @@ func (e *Entry) listenerWorker(state *listenerState) {
 				defer state.wg.Done()
 				defer state.remove(client)
 				defer e.releaseClient(peer)
-				if !e.attachClient(state.ctx, peer, state.config, client, 0, nil) {
+				if !e.attachClient(state.ctx, peer, state.config, client, netip.AddrPort{}, 0, nil) {
 					rejectConn(client)
 				}
 			}(conn)
@@ -1391,7 +1399,7 @@ func rejectConn(conn net.Conn) {
 // attachClient hands conn to a free pair of peer and waits until its stream ends (true). False: no pair came in time or ctx
 // ended first; conn is untouched then unless it was attached. onAttached, when set, runs once conn has a pair; idle is the
 // stream's idle timeout (0 = the entry's).
-func (e *Entry) attachClient(ctx context.Context, peer *entryPeer, listener RelayListener, conn net.Conn, idle time.Duration, onAttached func()) bool {
+func (e *Entry) attachClient(ctx context.Context, peer *entryPeer, listener RelayListener, conn net.Conn, client netip.AddrPort, idle time.Duration, onAttached func()) bool {
 	deadline := time.Now().Add(ClientWaitForStream)
 	for {
 		remaining := time.Until(deadline)
@@ -1417,6 +1425,7 @@ func (e *Entry) attachClient(ctx context.Context, peer *entryPeer, listener Rela
 			}
 			pair.conn = newIdleConn(conn, idle)
 			pair.relayID = listener.RelayID
+			pair.client = client
 			peer.streams++
 			peer.lastError = ""
 			if pair.idleTimer != nil {
