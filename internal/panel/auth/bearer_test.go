@@ -852,6 +852,7 @@ func TestPlanningGrantOpensOnlyTheDryRun(t *testing.T) {
 		{adminv1connect.ProfileServiceUpdateProfileProcedure, `{"dryRun":true}`, `{"dryRun":false}`},
 		{adminv1connect.GroupServiceUpdateGroupProcedure, `{"dryRun":true}`, `{"dryRun":false}`},
 		{adminv1connect.GroupServiceSetNodeSharingProcedure, `{"dryRun":true}`, `{"dryRun":false}`},
+		{adminv1connect.ProfileServiceUpdateInboundProcedure, `{"validateOnly":true}`, `{"validateOnly":false}`},
 	} {
 		e.seen.calls = 0
 		body := []byte(tc.ok)

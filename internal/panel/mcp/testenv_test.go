@@ -22,11 +22,13 @@ import (
 
 	"connectrpc.com/connect"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/decoysite/v1/decoysitev1connect"
 	opsv1 "github.com/mistgate/mistgate/gen/mistgate/ops/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/ops/v1/opsv1connect"
@@ -146,6 +148,52 @@ var tokenPlanning = map[string]bool{
 	decoysitev1connect.DecoySiteServiceDownloadDecoySiteProcedure: true,
 }
 
+// planningOnly is the approved procedures that planning opens whole (no write behind them).
+var planningOnly = map[string]bool{adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure: true}
+
+// planningDry mirrors auth.planningRequest / planningDryRun: the procedures a plan may call under planning, and the flag
+// of the request that makes the call a check. A tool that plans with a procedure missing here fails its tests, as it
+// would be refused (403) in production.
+var planningDry = map[string]struct {
+	message func() proto.Message
+	dry     func(proto.Message) bool
+}{
+	adminv1connect.HealthServiceApplyFixProcedure: {func() proto.Message { return &adminv1.ApplyFixRequest{} },
+		func(m proto.Message) bool { return m.(*adminv1.ApplyFixRequest).GetDryRun() }},
+	adminv1connect.ProfileServiceUpdateProfileProcedure: {func() proto.Message { return &adminv1.UpdateProfileRequest{} },
+		func(m proto.Message) bool { return m.(*adminv1.UpdateProfileRequest).GetDryRun() }},
+	adminv1connect.ProfileServiceCreateInboundProcedure: {func() proto.Message { return &adminv1.CreateInboundRequest{} },
+		func(m proto.Message) bool { return m.(*adminv1.CreateInboundRequest).GetValidateOnly() }},
+	adminv1connect.ProfileServiceUpdateInboundProcedure: {func() proto.Message { return &adminv1.UpdateInboundRequest{} },
+		func(m proto.Message) bool { return m.(*adminv1.UpdateInboundRequest).GetValidateOnly() }},
+	adminv1connect.GroupServiceUpdateGroupProcedure: {func() proto.Message { return &adminv1.UpdateGroupRequest{} },
+		func(m proto.Message) bool { return m.(*adminv1.UpdateGroupRequest).GetDryRun() }},
+	adminv1connect.GroupServiceSetNodeSharingProcedure: {func() proto.Message { return &adminv1.SetNodeSharingRequest{} },
+		func(m proto.Message) bool { return m.(*adminv1.SetNodeSharingRequest).GetDryRun() }},
+	decoysitev1connect.DecoySiteServiceAssignDecoySiteProcedure: {func() proto.Message { return &decoysitev1.AssignDecoySiteRequest{} },
+		func(m proto.Message) bool { return m.(*decoysitev1.AssignDecoySiteRequest).GetDryRun() }},
+}
+
+// planningDryRun reads the request body (and puts it back) the way auth.planningDryRun does.
+func planningDryRun(r *http.Request) bool {
+	x, ok := planningDry[r.URL.Path]
+	if !ok {
+		return false
+	}
+	body, err := io.ReadAll(r.Body)
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	if err != nil {
+		return false
+	}
+	m := x.message()
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/proto") {
+		err = proto.Unmarshal(body, m)
+	} else {
+		err = protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(body, m)
+	}
+	return err == nil && x.dry(m)
+}
+
 func (a *fakeAuth) lookup(r *http.Request) (*fakeToken, bool) {
 	h := r.Header.Get("Authorization")
 	secret, ok := strings.CutPrefix(h, "Bearer ")
@@ -213,7 +261,8 @@ func (a *fakeAuth) requireSession(next http.Handler) http.Handler {
 		planning, _ := ctx.Value(keyPlanning).(bool)
 		approved, _ := ctx.Value(keyApproved).(string)
 		if tokenApproved[path] {
-			okGrant := planning
+			// like the real policy: planning opens a procedure only for the request whose flag makes it a check
+			okGrant := planning && (planningOnly[path] || planningDryRun(r))
 			if approved != "" {
 				p, err := a.plans.GetMCPPlan(ctx, approved)
 				okGrant = err == nil && p.Status == StatusApplying && p.TokenID == t.ID && p.NeedsApproval && p.DecidedBy != ""
