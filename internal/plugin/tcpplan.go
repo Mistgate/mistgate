@@ -20,7 +20,8 @@ type TCPOwner struct {
 // TCPPortOwners is the plan of the TCP ports of a node from its enabled inbounds: who holds each port, as the agent
 // settles it. The lowest id of the TCP inbounds on a port holds it. A Hysteria2 site (settings.masquerade.tcp_port, 443
 // when omitted) holds a port only when no TCP inbound does: it gives the port up to any of them (the agent's TCPClaims).
-// The panel and the agent must say the same here, so everything that asks "what answers on TCP 443" asks this.
+// A port that services share by SNI (TCPSharePlan) answers strangers with its default route. The panel and the agent must say the
+// same here, so everything that asks "what answers on TCP 443" asks this.
 func TCPPortOwners(specs []InboundSpec) map[uint16]TCPOwner {
 	sorted := slices.Clone(specs)
 	slices.SortStableFunc(sorted, func(a, b InboundSpec) int { return cmp.Compare(a.ID, b.ID) })
@@ -28,6 +29,16 @@ func TCPPortOwners(specs []InboundSpec) map[uint16]TCPOwner {
 	for _, s := range sorted {
 		if _, held := owners[s.Listen.Port]; !held && s.Listen.Network == "tcp" && s.Listen.Port != 0 {
 			owners[s.Listen.Port] = TCPOwner{ID: s.ID, Protocol: s.Protocol, Site: tcpOwnSite(s)}
+		}
+	}
+	for port, p := range TCPSharePlan(sorted) {
+		if !p.Front() {
+			continue
+		}
+		for _, r := range p.Routes {
+			if r.ID == p.Default {
+				owners[port] = TCPOwner{ID: r.ID, Protocol: r.Protocol, Site: true}
+			}
 		}
 	}
 	for _, s := range sorted {
@@ -140,30 +151,93 @@ func TCPSharePlan(specs []InboundSpec) map[uint16]TCPPortShare {
 		if len(routes) < 2 || broken[port] {
 			continue
 		}
-		p := TCPPortShare{Shadowed: map[string]TCPShadow{}}
-		holder := map[string]string{}
-	routes:
-		for _, r := range routes {
-			for _, n := range r.Names {
-				if by, taken := holder[n]; taken {
-					p.Shadowed[r.ID] = TCPShadow{Name: n, By: by}
-					continue routes
-				}
-			}
-			for _, n := range r.Names {
-				holder[n] = r.ID
-			}
-			if p.Default == "" && r.Site {
-				p.Default = r.ID
-			}
-			p.Routes = append(p.Routes, r)
-		}
-		if len(p.Shadowed) == 0 {
-			p.Shadowed = nil
-		}
-		plan[port] = p
+		plan[port] = shareOf(routes)
 	}
 	return plan
+}
+
+// shareOf settles the names of the routes of one port, which come by id: the lower id keeps a name, a route that asks for a name
+// that is kept already is shadowed and holds none of its names; the first route that serves the node's own site is the default.
+func shareOf(routes []TCPRoute) TCPPortShare {
+	p := TCPPortShare{Shadowed: map[string]TCPShadow{}}
+	holder := map[string]string{}
+routes:
+	for _, r := range routes {
+		for _, n := range r.Names {
+			if by, taken := holder[n]; taken {
+				p.Shadowed[r.ID] = TCPShadow{Name: n, By: by}
+				continue routes
+			}
+		}
+		for _, n := range r.Names {
+			holder[n] = r.ID
+		}
+		if p.Default == "" && r.Site {
+			p.Default = r.ID
+		}
+		p.Routes = append(p.Routes, r)
+	}
+	if len(p.Shadowed) == 0 {
+		p.Shadowed = nil
+	}
+	return p
+}
+
+// The codes of a port that services cannot share (the panel refuses a layout that has one, and words them: admin sentences).
+const (
+	ShareUnsupported = "share_unsupported" // a service with no name to be told apart by, or one that cannot take part
+	ShareNeedsSite   = "share_needs_site"  // none of the services answers a stranger with the node's own site
+	SNITaken         = "sni_taken"         // two services ask for the same name
+)
+
+// TCPShareProblem is one reason the TCP inbounds of a port cannot share it. It is comparable: the panel judges a change by the
+// problems it adds.
+type TCPShareProblem struct {
+	Code string
+	// ID is the inbound it is about: the one with no name (ShareUnsupported), the one that lost the name (SNITaken); "" for
+	// ShareNeedsSite.
+	ID string
+	// Name and By: the name and the inbound that holds it (SNITaken).
+	Name, By string
+}
+
+// TCPShareProblems says what stops the TCP inbounds of port from sharing it, nothing when they can, or when fewer than two of
+// them are there (one service listens alone, whatever it is). It takes the inbounds as TCPSharePlan does, and a caller that checks
+// a layout before it is enabled passes the disabled ones too. One service that cannot take part (no name, another protocol)
+// is the only problem reported: the others cannot be judged without it.
+func TCPShareProblems(specs []InboundSpec, port uint16) []TCPShareProblem {
+	sorted := slices.Clone(specs)
+	slices.SortStableFunc(sorted, func(a, b InboundSpec) int { return cmp.Compare(a.ID, b.ID) })
+	var routes []TCPRoute
+	var out []TCPShareProblem
+	n := 0
+	for _, s := range sorted {
+		if s.Listen.Network != "tcp" || s.Listen.Port != port {
+			continue
+		}
+		n++
+		if r, ok := tcpRoute(s); ok {
+			routes = append(routes, r)
+		} else {
+			out = append(out, TCPShareProblem{Code: ShareUnsupported, ID: s.ID})
+		}
+	}
+	if n < 2 {
+		return nil
+	}
+	if len(out) > 0 {
+		return out
+	}
+	p := shareOf(routes)
+	for _, r := range routes {
+		if sh, lost := p.Shadowed[r.ID]; lost {
+			out = append(out, TCPShareProblem{Code: SNITaken, ID: r.ID, Name: sh.Name, By: sh.By})
+		}
+	}
+	if p.Default == "" {
+		out = append(out, TCPShareProblem{Code: ShareNeedsSite})
+	}
+	return out
 }
 
 // tcpRoute is what a TCP inbound offers a shared port, from its spec; ok is false when it has no name to be told apart by.

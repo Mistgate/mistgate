@@ -111,3 +111,48 @@ func TestTCPSharePlan(t *testing.T) {
 		})
 	}
 }
+
+func TestTCPShareProblems(t *testing.T) {
+	tt := func(id, name string) InboundSpec {
+		return InboundSpec{ID: id, Protocol: "trusttunnel", Listen: Listen{Network: "tcp", Port: 443}, TLS: TLS{Mode: TLSAcmeDomain, ServerName: name}, Settings: []byte(`{}`)}
+	}
+	mt := func(id, settings string) InboundSpec {
+		return InboundSpec{ID: id, Protocol: "mtproto", Listen: Listen{Network: "tcp", Port: 443}, Settings: []byte(settings)}
+	}
+	realityOther := InboundSpec{ID: "r", Protocol: "vless", Listen: Listen{Network: "tcp", Port: 443}, Settings: []byte(`{"security":"reality","reality":{"target":"www.example.org:443","server_names":["www.example.org"]}}`)}
+	realityNoName := InboundSpec{ID: "r", Protocol: "vless", Listen: Listen{Network: "tcp", Port: 443}, Settings: []byte(`{"security":"reality","reality":{"target":"192.0.2.9:443"}}`)}
+	other := tt("z", "z.example.com")
+	other.Listen.Port = 8443
+	for _, tc := range []struct {
+		name  string
+		specs []InboundSpec
+		want  []TCPShareProblem
+	}{
+		{"one service is alone, whatever it is", []InboundSpec{realityNoName}, nil},
+		{"two that can share", []InboundSpec{tt("a", "a.example.com"), mt("b", `{"domains":["b.example.com"]}`)}, nil},
+		{"another port is not looked at", []InboundSpec{tt("a", "a.example.com"), other}, nil},
+		{"the same name: the higher id loses it", []InboundSpec{mt("b", `{"domains":["A.example.com"]}`), tt("a", "a.example.com")},
+			[]TCPShareProblem{{Code: SNITaken, ID: "b", Name: "a.example.com", By: "a"}}},
+		{"no name to tell it by", []InboundSpec{tt("a", "a.example.com"), realityNoName}, []TCPShareProblem{{Code: ShareUnsupported, ID: "r"}}},
+		{"a protocol that cannot share", []InboundSpec{tt("a", "a.example.com"), {ID: "f", Protocol: "fake", Listen: Listen{Network: "tcp", Port: 443}}}, []TCPShareProblem{{Code: ShareUnsupported, ID: "f"}}},
+		{"nobody serves the node's own site", []InboundSpec{realityOther, mt("b", `{"domains":["b.example.com"],"fallback":"site"}`)}, []TCPShareProblem{{Code: ShareNeedsSite}}},
+		{"a site and a REALITY of another site", []InboundSpec{realityOther, tt("t", "t.example.com")}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := TCPShareProblems(tc.specs, 443); !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("got %+v\nwant %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+// A shared port is held by its default route, not by the lowest id: that is what answers a stranger.
+func TestTCPPortOwnersOfASharedPort(t *testing.T) {
+	realityOther := InboundSpec{ID: "a", Protocol: "vless", Listen: Listen{Network: "tcp", Port: 443}, Settings: []byte(`{"security":"reality","reality":{"target":"www.example.org:443","server_names":["www.example.org"]}}`)}
+	tt := InboundSpec{ID: "b", Protocol: "trusttunnel", Listen: Listen{Network: "tcp", Port: 443}, TLS: TLS{Mode: TLSAcmeDomain, ServerName: "t.example.com"}, Settings: []byte(`{}`)}
+	hy2 := InboundSpec{ID: "c", Protocol: "hysteria2", Listen: Listen{Network: "udp", Port: 443}, TLS: TLS{Mode: TLSAcmeDomain, ServerName: "de1.example.com"}, Settings: []byte(`{}`)}
+	got := TCPPortOwners([]InboundSpec{realityOther, tt, hy2})
+	if want := (TCPOwner{ID: "b", Protocol: "trusttunnel", Site: true}); got[443] != want {
+		t.Fatalf("owner of the shared port = %+v, want %+v", got[443], want)
+	}
+}
