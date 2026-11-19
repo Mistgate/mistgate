@@ -145,6 +145,28 @@ func (a *Agent) openFront(port uint16, sp *sharedPort, routes int) {
 	a.log.Info("shared port opened", "port", port, "routes", routes)
 }
 
+// markRoutes tells each front which of its services are not running after a reconcile (a failed engine, a name it lost, a
+// bind that did not work): a visitor of such a name gets the default route, as a stranger does, instead of a closed
+// connection. The next reconcile, the sweep included, corrects it.
+func (a *Agent) markRoutes(results []*pb.InboundResult) {
+	down := make(map[string]bool, len(results))
+	for _, r := range results {
+		down[r.InboundId] = r.Error != "" || r.State == pb.InboundRunState_INBOUND_RUN_STATE_FAILED || r.State == pb.InboundRunState_INBOUND_RUN_STATE_STOPPED
+	}
+	a.frontMu.Lock()
+	defer a.frontMu.Unlock()
+	for port, sp := range a.shared {
+		if sp.f == nil {
+			continue
+		}
+		for id, place := range a.place {
+			if place == uint32(port) {
+				sp.f.SetDown(id, down[id])
+			}
+		}
+	}
+}
+
 // isNoRun says the inbound must not run now (see noRun); safe from any goroutine.
 func (a *Agent) isNoRun(id string) bool {
 	a.frontMu.Lock()
@@ -183,6 +205,7 @@ func (a *Agent) sharedPortStats() []*pb.SharedPort {
 		if sp.f != nil {
 			s := sp.f.Stats()
 			row.Accepted, row.Timeouts, row.Evicted, row.Refused, row.NoRoute, row.Panics = s.Accepted, s.Timeouts, s.Evicted, s.Refused, s.NoRoute, s.Panics
+			row.DefaultRouteDown = s.RouteDown
 			row.DefaultNoSni, row.DefaultUnknownName, row.DefaultNotTls, row.DefaultBadHello, row.DefaultHelloTooLarge =
 				s.NoSNI, s.UnknownName, s.NotTLS, s.BadHello, s.HelloTooLarge
 			for id, n := range s.Delivered {

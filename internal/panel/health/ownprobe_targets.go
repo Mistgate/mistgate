@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/protocols/hysteria2"
@@ -17,6 +18,9 @@ import (
 
 // The targets of the own probes. A file of its own, built for the VPS only: the Cloudflare edition has no probes, and its Workers
 // have a size limit (scripts/check-edge-sizes.sh).
+
+// probeTurn is how long one service of a shared port is the node's TLS target.
+const probeTurn = 15 * time.Minute
 
 // ProbeTarget is one public IPv4 measurement made by an owner-managed probe. It intentionally has no node name.
 type ProbeTarget struct {
@@ -99,7 +103,14 @@ func (s *Service) ProbeTargets(ctx context.Context) ([]ProbeTarget, error) {
 		}
 		slices.SortStableFunc(tlsTargets, func(a, b ProbeTarget) int { return cmp.Compare(a.Port, b.Port) })
 		if len(tlsTargets) > 0 && len(nodeTargets) < 2 {
-			nodeTargets = append(nodeTargets, tlsTargets[0])
+			// Services that share the lowest port by SNI are told apart by the name the probe sends; a node has room for one TLS
+			// target, so each takes its turn (ponytail: the turn follows the clock, a quarter of an hour each; a probe that
+			// compares a service with itself over time sees the same name for that long).
+			same := 1
+			for same < len(tlsTargets) && tlsTargets[same].Port == tlsTargets[0].Port {
+				same++
+			}
+			nodeTargets = append(nodeTargets, tlsTargets[int(s.now().Unix()/int64(probeTurn.Seconds()))%same])
 		}
 		out = append(out, nodeTargets...)
 	}

@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"io"
 	"math/big"
 	"net"
@@ -16,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,9 +35,14 @@ import (
 // answers a TLS client with a certificate of its own name, so the name in the certificate says who answered.
 
 // shareCerts issues a self-signed certificate for the name of the inbound, whatever mode the spec asks for.
-type shareCerts struct{}
+type shareCerts struct{ failing *sync.Map } // failing: server names that get no certificate (nil: none)
 
-func (shareCerts) Acquire(_ context.Context, id string, t plugin.TLS) (engine.Cert, error) {
+func (c shareCerts) Acquire(_ context.Context, id string, t plugin.TLS) (engine.Cert, error) {
+	if c.failing != nil {
+		if _, no := c.failing.Load(t.ServerName); no {
+			return engine.Cert{}, errors.New("no certificate for " + t.ServerName)
+		}
+	}
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return engine.Cert{}, err
@@ -58,10 +65,11 @@ func (shareCerts) Acquire(_ context.Context, id string, t plugin.TLS) (engine.Ce
 func (shareCerts) Release(string) {}
 
 type shareRig struct {
-	t    *testing.T
-	h    *harness
-	port uint16
-	rev  uint64
+	t       *testing.T
+	h       *harness
+	port    uint16
+	rev     uint64
+	failing *sync.Map // see shareCerts
 }
 
 func newShareRig(t *testing.T) *shareRig {
@@ -73,6 +81,7 @@ func newShareRig(t *testing.T) *shareRig {
 	port := uint16(l.Addr().(*net.TCPAddr).Port)
 	_ = l.Close()
 	direct := egress.New(func() []string { return nil }, egress.AllowPrivate())
+	failing := &sync.Map{}
 	h := newHarness(t, harnessOpts{
 		noStart: true,
 		extra: map[string]engine.Factory{
@@ -80,12 +89,12 @@ func newShareRig(t *testing.T) *shareRig {
 			"hysteria2": hysteria2.Factory,
 		},
 		cfg: func(c *Config) {
-			c.Certs = shareCerts{}
+			c.Certs = shareCerts{failing: failing}
 			c.Egress = func(string) (engine.Egress, error) { return direct, nil }
 		},
 	})
 	t.Cleanup(h.a.closeEngines)
-	return &shareRig{t: t, h: h, port: port}
+	return &shareRig{t: t, h: h, port: port, failing: failing}
 }
 
 func (r *shareRig) spec(id, protocol, name, settings string, creds ...*pb.Credential) *pb.InboundState {
@@ -442,6 +451,43 @@ func TestSharedPortNameTakenAfterASpecChange(t *testing.T) {
 	r.wantFailed(res, "inb_c", "sni_shadowed")
 	if got := r.cn("c.example.com"); got != "c.example.com" {
 		t.Fatalf("the new holder got %q", got)
+	}
+}
+
+// A service that did not come up (its engine failed to start) does not close the connections that ask for its name: they go
+// to the default route, as a stranger's do, at once; when the service starts, its name is its own again.
+func TestSharedPortFailedServiceNameGoesToTheDefault(t *testing.T) {
+	r := newShareRig(t)
+	r.failing.Store("b.example.com", true)
+	res := r.apply(r.mt("inb_a", "a.example.com"), r.tt("inb_b", "b.example.com"), r.wsTLS("inb_c", "c.example.com"))
+	r.wantRunning(res, "inb_a", "inb_c")
+	r.wantFailed(res, "inb_b", "no certificate")
+	if sp := r.front(); sp == nil || sp.f == nil {
+		t.Fatalf("the port is not shared: %+v", sp)
+	}
+	start := time.Now()
+	for sni, want := range map[string]string{"b.example.com": "a.example.com", "c.example.com": "c.example.com", "a.example.com": "a.example.com"} {
+		if got := r.cn(sni); got != want {
+			t.Fatalf("with b failed, %q got the certificate of %q, want %q", sni, got, want)
+		}
+	}
+	if time.Since(start) > 3*time.Second {
+		t.Fatal("the name of the failed service waited for it")
+	}
+	if got := r.h.a.sharedPortStats()[0].DefaultRouteDown; got != 1 {
+		t.Fatalf("default_route_down = %d, want 1", got)
+	}
+	// the sweep finds it failed still: the same
+	r.wantFailed(r.sweep(), "inb_b", "no certificate")
+	if got := r.cn("b.example.com"); got != "a.example.com" {
+		t.Fatalf("after a sweep b's name got %q", got)
+	}
+
+	r.failing.Delete("b.example.com")
+	res = r.sweep()
+	r.wantRunning(res, "inb_a", "inb_b", "inb_c")
+	if got := r.cn("b.example.com"); got != "b.example.com" {
+		t.Fatalf("after b started its name got %q", got)
 	}
 }
 

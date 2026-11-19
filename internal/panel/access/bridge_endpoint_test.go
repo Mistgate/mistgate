@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -156,5 +157,31 @@ func TestEnsureBridgeEndpointRidesTheSiteOfTrustTunnelAndMTProto(t *testing.T) {
 				t.Fatalf("bridge port = %d (%s), want %s", node.BridgePort, got, tc.want)
 			}
 		})
+	}
+}
+
+// Services that share 443 by SNI answer a stranger with the default one, which is what the bridge rides: a REALITY of another site
+// alone on 443 shows someone else's site and the bridge takes a port of its own, but beside a service with the node's own site the
+// bridge goes on that site, at port 0, whichever id is lower.
+func TestEnsureBridgeEndpointRidesTheDefaultRouteOfASharedPort(t *testing.T) {
+	f := newRelayFix(t)
+	f.s.reg = builtin.Registry()
+	f.sql(`UPDATE node SET agent_caps = agent_caps || ' tcp-share/1' WHERE id = 'nod_fi1'`)
+	other := must(f.s.CreateProfile(f.ctx, req(&adminv1.CreateProfileRequest{Protocol: "vless", Name: "other site", SettingsJson: `{"port":443,"reality":{"target":"www.example.org:443"}}`}))).Msg.Profile
+	f.inbound(other.Id, "nod_fi1")
+	node, err := f.s.ensureBridgeEndpoint(f.ctx, "nod_fi1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.BridgePort == 0 {
+		t.Fatal("the bridge rides a site that is someone else's")
+	}
+	tt := must(f.s.CreateProfile(f.ctx, req(&adminv1.CreateProfileRequest{Protocol: "trusttunnel", Name: "tt", SettingsJson: `{"port":443,"h3":false,"sni":"tt.example.com","tls_mode":"acme_domain","egress":"direct"}`}))).Msg.Profile
+	f.inbound(tt.Id, "nod_fi1")
+	if node, err = f.s.ensureBridgeEndpoint(f.ctx, "nod_fi1", nil); err != nil {
+		t.Fatal(err)
+	}
+	if node.BridgePort != 0 {
+		t.Fatalf("beside a service with the node's own site the bridge port = %d, want 0 (that site)", node.BridgePort)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"reflect"
 	"slices"
 	"sort"
@@ -564,6 +565,31 @@ func profileCreatePortOverrides(nodes []string, overrides map[string]uint32) (ma
 	return out, nil
 }
 
+// profileSNIOverrides checks the names the node-side "Domain (SNI)" of the added inbounds gets: only for selected nodes, a host name
+// of letters, digits, dots and hyphens that is not an IP address (the panel judges the rest: a name needs a dot, and on a port
+// that services share it must be a name no other service holds).
+func profileSNIOverrides(nodes []string, overrides map[string]string) (map[string]string, error) {
+	out := map[string]string{}
+	for id, name := range overrides {
+		if err := validID("sni_overrides node id", id); err != nil {
+			return nil, err
+		}
+		if !slices.Contains(nodes, id) {
+			return nil, errors.New("sni_overrides may name only selected nodes")
+		}
+		name = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(name), "."))
+		if name == "" || len(name) > 253 || strings.Trim(name, "abcdefghijklmnopqrstuvwxyz0123456789-.") != "" || !strings.Contains(name, ".") ||
+			strings.HasPrefix(name, ".") || strings.Contains(name, "..") {
+			return nil, errors.New("an sni override must be a host name like vpn.example.com")
+		}
+		if _, err := netip.ParseAddr(name); err == nil {
+			return nil, errors.New("an sni override must be a host name, not an IP address")
+		}
+		out[id] = name
+	}
+	return out, nil
+}
+
 type profileCreateArgs struct {
 	ReasonField
 	Protocol       string            `json:"protocol" jsonschema:"protocol id from protocols_list"`
@@ -572,6 +598,7 @@ type profileCreateArgs struct {
 	NodeIDs        []string          `json:"node_ids,omitempty" jsonschema:"nodes to deploy the new profile on"`
 	GroupIDs       []string          `json:"group_ids,omitempty" jsonschema:"groups that should receive the new profile"`
 	PortOverrides  map[string]uint32 `json:"port_overrides,omitempty" jsonschema:"node id to port override, only for selected nodes"`
+	SNIOverrides   map[string]string `json:"sni_overrides,omitempty" jsonschema:"node id to the node's own Domain (SNI) of the new inbound, only for selected nodes; services that share a TCP port (443) are told apart by it, so each needs a name no other has, and a DNS A record for it"`
 	AllowLossyPort bool              `json:"allow_lossy_port,omitempty" jsonschema:"save a port despite a lossy UDP delivery check; this requires owner approval"`
 }
 
@@ -656,6 +683,10 @@ var profileCreate = changeSpec[profileCreateArgs]{
 		if err != nil {
 			return nil, err
 		}
+		sniOverrides, err := profileSNIOverrides(nodeIDs, a.SNIOverrides)
+		if err != nil {
+			return nil, err
+		}
 		nodeList, err := c.cl.Node.ListNodes(c.ctx, connect.NewRequest(&adminv1.ListNodesRequest{}))
 		if err != nil {
 			return nil, apiError(err)
@@ -683,23 +714,26 @@ var profileCreate = changeSpec[profileCreateArgs]{
 		for _, id := range nodeIDs {
 			validated, err := c.cl.Profile.CreateInbound(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.CreateInboundRequest{
 				NodeId: id, Protocol: a.Protocol, SettingsJson: string(settingsJSON), PortOverride: portOverrides[id],
-				ValidateOnly: true, AllowLossyPort: a.AllowLossyPort,
+				TlsServerNameOverride: sniOverrides[id], ValidateOnly: true, AllowLossyPort: a.AllowLossyPort,
 			}))
 			if err != nil {
 				return nil, apiError(err)
 			}
 			warnings := profileWarnings(validated.Msg.GetWarnings())
 			facts = append(facts, Fact{Key: "node", Value: nm(nodeNames[id]), Untrusted: true},
-				Fact{Key: "port", Value: strconv.FormatUint(uint64(validated.Msg.GetInbound().GetPort()), 10)},
-				Fact{Key: "warnings", Value: warningText(warnings)})
+				Fact{Key: "port", Value: strconv.FormatUint(uint64(validated.Msg.GetInbound().GetPort()), 10)})
+			if sniOverrides[id] != "" {
+				facts = append(facts, Fact{Key: "sni", Value: sniOverrides[id], Untrusted: true})
+			}
+			facts = append(facts, Fact{Key: "warnings", Value: warningText(warnings)})
 		}
 		for _, g := range groups {
 			facts = append(facts, Fact{Key: "group", Value: g.Name, Untrusted: true}, Fact{Key: "users", Value: strconv.FormatUint(uint64(g.UserCount), 10)})
 		}
-		a.Settings, a.NodeIDs, a.GroupIDs, a.PortOverrides = settingsObj, nodeIDs, groupIDs, portOverrides
+		a.Settings, a.NodeIDs, a.GroupIDs, a.PortOverrides, a.SNIOverrides = settingsObj, nodeIDs, groupIDs, portOverrides, sniOverrides
 		return &planned{Summary: "Create one protocol profile and make the selected node and group placements.", Facts: facts, Danger: []string{dangerFleet}, Params: a,
 			AuditParams: map[string]any{"protocol": a.Protocol, "name": a.Name, "settings": a.Settings, "node_ids": a.NodeIDs,
-				"group_ids": a.GroupIDs, "port_overrides": a.PortOverrides, "allow_lossy_port": a.AllowLossyPort}}, nil
+				"group_ids": a.GroupIDs, "port_overrides": a.PortOverrides, "sni_overrides": a.SNIOverrides, "allow_lossy_port": a.AllowLossyPort}}, nil
 	},
 	apply: func(c *call, a profileCreateArgs, _ Plan) (done, error) {
 		protocols, err := c.protocols()
@@ -737,7 +771,7 @@ var profileCreate = changeSpec[profileCreateArgs]{
 		for _, nodeID := range a.NodeIDs {
 			port := a.PortOverrides[nodeID]
 			added, err := c.cl.Profile.CreateInbound(c.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{
-				ProfileId: profileID, NodeId: nodeID, PortOverride: port, AllowLossyPort: a.AllowLossyPort,
+				ProfileId: profileID, NodeId: nodeID, PortOverride: port, TlsServerNameOverride: a.SNIOverrides[nodeID], AllowLossyPort: a.AllowLossyPort,
 			}))
 			if err != nil {
 				return done{}, rollback(apiError(err))
@@ -1067,6 +1101,7 @@ type profileDeployArgs struct {
 	ProfileID      string            `json:"profile_id" jsonschema:"profile id from profiles_list"`
 	AddNodeIDs     []string          `json:"add_node_ids,omitempty" jsonschema:"nodes to add the profile to"`
 	PortOverrides  map[string]uint32 `json:"port_overrides,omitempty" jsonschema:"node id to port override for added nodes"`
+	SNIOverrides   map[string]string `json:"sni_overrides,omitempty" jsonschema:"node id to the node's own Domain (SNI) of the added inbound; services that share a TCP port (443) are told apart by it, so each needs a name no other has, and a DNS A record for it"`
 	AllowLossyPort bool              `json:"allow_lossy_port,omitempty" jsonschema:"accept a lossy UDP port check for added nodes; this requires owner approval"`
 	RemoveNodeIDs  []string          `json:"remove_node_ids,omitempty" jsonschema:"nodes to remove the profile from"`
 	AddGroupIDs    []string          `json:"add_group_ids,omitempty" jsonschema:"groups that should receive the profile"`
@@ -1123,6 +1158,10 @@ var profileDeploy = changeSpec[profileDeployArgs]{
 			}
 		}
 		portOverrides, err := profileCreatePortOverrides(adds, a.PortOverrides)
+		if err != nil {
+			return nil, err
+		}
+		sniOverrides, err := profileSNIOverrides(adds, a.SNIOverrides)
 		if err != nil {
 			return nil, err
 		}
@@ -1199,15 +1238,18 @@ var profileDeploy = changeSpec[profileDeployArgs]{
 		facts := []Fact{{Key: "user_count", Value: strconv.FormatUint(uint64(profile.GetUserCount()), 10)}}
 		for _, id := range adds {
 			validated, err := c.cl.Profile.CreateInbound(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&adminv1.CreateInboundRequest{
-				ProfileId: a.ProfileID, NodeId: id, PortOverride: portOverrides[id], ValidateOnly: true, AllowLossyPort: a.AllowLossyPort,
+				ProfileId: a.ProfileID, NodeId: id, PortOverride: portOverrides[id], TlsServerNameOverride: sniOverrides[id], ValidateOnly: true, AllowLossyPort: a.AllowLossyPort,
 			}))
 			if err != nil {
 				return nil, apiError(err)
 			}
 			warnings := profileWarnings(validated.Msg.GetWarnings())
 			facts = append(facts, Fact{Key: "add_node", Value: nm(nodeNames[id]), Untrusted: true},
-				Fact{Key: "port", Value: strconv.FormatUint(uint64(validated.Msg.GetInbound().GetPort()), 10)},
-				Fact{Key: "warnings", Value: warningText(warnings)})
+				Fact{Key: "port", Value: strconv.FormatUint(uint64(validated.Msg.GetInbound().GetPort()), 10)})
+			if sniOverrides[id] != "" {
+				facts = append(facts, Fact{Key: "sni", Value: sniOverrides[id], Untrusted: true})
+			}
+			facts = append(facts, Fact{Key: "warnings", Value: warningText(warnings)})
 		}
 		removalIDs := make([]string, 0, len(removes))
 		for _, id := range removes {
@@ -1223,7 +1265,7 @@ var profileDeploy = changeSpec[profileDeployArgs]{
 			facts = append(facts, Fact{Key: "remove_group", Value: snap.Name, Untrusted: true}, Fact{Key: "users_losing_server", Value: strconv.FormatUint(uint64(users), 10)})
 		}
 		a.AddNodeIDs, a.RemoveNodeIDs, a.AddGroupIDs, a.RemoveGroupIDs = adds, removes, addGroups, removeGroups
-		a.PortOverrides = portOverrides
+		a.PortOverrides, a.SNIOverrides = portOverrides, sniOverrides
 		stored := profileDeployStored{profileDeployArgs: a, ExpectedVersion: profile.GetVersion(), RemovalIDs: removalIDs}
 		return &planned{Summary: "Change the node and group placements of one profile.", Facts: facts, Danger: []string{dangerFleet}, Params: stored}, nil
 	},
@@ -1242,7 +1284,7 @@ var profileDeploy = changeSpec[profileDeployArgs]{
 				return fail("add_node", err)
 			}
 			_, err := c.cl.Profile.CreateInbound(c.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{
-				ProfileId: a.ProfileID, NodeId: nodeID, PortOverride: a.PortOverrides[nodeID], AllowLossyPort: a.AllowLossyPort,
+				ProfileId: a.ProfileID, NodeId: nodeID, PortOverride: a.PortOverrides[nodeID], TlsServerNameOverride: a.SNIOverrides[nodeID], AllowLossyPort: a.AllowLossyPort,
 			}))
 			if err != nil {
 				if isNotFound(err) {

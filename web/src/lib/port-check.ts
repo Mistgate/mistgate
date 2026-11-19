@@ -138,6 +138,17 @@ export function takenNote(t: T, p: Record<string, string | undefined>): string {
 }
 
 /**
+ * tcp_port_shared in words ({node, port, profiles, default, restarts?}): the profile stands beside others on a TCP port that the node
+ * shares by the name in the connection, and who restarts for it; share_two_faces ({node, port, profile, default}): one of them shows
+ * another site.
+ */
+export function sharedNote(t: T, w: Warning): string {
+  const vars = Object.fromEntries(Object.entries(w.params).map(([k, v]) => [k, v ?? ""]));
+  if (w.code === "share_two_faces") return t("node.check.twoFaces", vars);
+  return [t("node.check.shared", vars), vars.restarts ? t("node.check.sharedRestart", vars) : ""].filter(Boolean).join(" ");
+}
+
+/**
  * The sentences a saved inbound owes the admin about its port: the check could not run (port_unchecked), the port loses
  * packets and was saved anyway or did not change (port_lossy), or a VLESS profile took the Hysteria2 site's TCP port
  * (hy2_decoy_paused), or a TrustTunnel profile took it (hy2_site_taken). Empty when there is nothing to say.
@@ -149,6 +160,7 @@ export function portNotes(t: T, warnings: readonly Warning[] | undefined): strin
     if (w.code === "port_lossy") out.push(t("err.port_lossy", lossyVars(t, w.params)));
     if (w.code === "hy2_decoy_paused") out.push(decoyNote(t, w.params));
     if (w.code === "hy2_site_taken" || w.code === "hy2_site_taken_mtproto") out.push(takenNote(t, w.params));
+    if (w.code === "tcp_port_shared" || w.code === "share_two_faces") out.push(sharedNote(t, w));
   }
   return out;
 }

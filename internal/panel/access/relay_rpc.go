@@ -205,7 +205,7 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 	}
 	switch {
 	case port != 0:
-		if err := portRefusal(plugin.InboundSpec{Protocol: f.Profile.Protocol, Listen: plugin.Listen{Network: network, Port: port}}, entry.Name, others, nil, s.now()); err != nil {
+		if err := portRefusal(plugin.InboundSpec{Protocol: f.Profile.Protocol, Listen: plugin.Listen{Network: network, Port: port}}, entry.Name, others, nil, s.now(), portSubject{}); err != nil {
 			return nil, err
 		}
 	case naturalPort != 0:
@@ -351,7 +351,7 @@ func (s *Service) UpdateRelay(ctx context.Context, req *connect.Request[adminv1.
 			if err != nil {
 				return err
 			}
-			if err := portRefusal(plugin.InboundSpec{Protocol: link.Protocol, Listen: plugin.Listen{Network: link.Network, Port: *patch.Port}}, link.ViaNodeName, others, nil, s.now()); err != nil {
+			if err := portRefusal(plugin.InboundSpec{Protocol: link.Protocol, Listen: plugin.Listen{Network: link.Network, Port: *patch.Port}}, link.ViaNodeName, others, nil, s.now(), portSubject{}); err != nil {
 				return err
 			}
 		}

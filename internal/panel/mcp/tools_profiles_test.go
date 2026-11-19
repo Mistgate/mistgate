@@ -672,3 +672,86 @@ func TestProfileDeployTimeoutKeepsCompletedStepCount(t *testing.T) {
 		t.Fatalf("timeout outcome lost progress: %+v", stored)
 	}
 }
+
+// A profile put on a node under a name of its own (sni_overrides): what services that share a TCP port are told apart by. The plan
+// shows the name and the warnings, a refusal of the panel reaches the owner with its code, and the apply sends the name along.
+func TestProfileSNIOverridesForASharedPort(t *testing.T) {
+	t.Run("create and deploy carry the name to the panel", func(t *testing.T) {
+		e := newTestEnv(t)
+		e.w.inboundWarnings = []*adminv1.StatusReason{{Code: "tcp_port_shared", Params: map[string]string{"port": "443"}}}
+		_, secret := e.token(ProfileAdmin)
+		s := e.session(secret)
+		p := planOf(t, s, "profile_create", map[string]any{
+			"protocol": "hysteria2", "name": "Beside", "node_ids": []string{nodeA}, "port_overrides": map[string]any{nodeA: 443},
+			"sni_overrides": map[string]any{nodeA: " TG.Example.com. "},
+		})
+		if got := factOf(t, p, "sni"); got.Value != "tg.example.com" || !got.Untrusted {
+			t.Fatalf("the plan shows the name %+v", got)
+		}
+		if got := factOf(t, p, "warnings"); got.Value != "tcp_port_shared" {
+			t.Fatalf("warnings = %q", got.Value)
+		}
+		mustPlanApproval(t, e, p, true)
+		if out := applyOf(t, s, "profile_create", p.ConfirmToken); out.Status != StatusApplied {
+			t.Fatalf("apply: %+v", out)
+		}
+		if got := e.w.profiles["prf_created_1"].inbounds[0].GetTlsServerNameOverride(); got != "tg.example.com" {
+			t.Fatalf("the panel got the name %q", got)
+		}
+		if !strings.Contains(auditText(t, e), `"sni_overrides"`) {
+			t.Error("the audit omitted the names")
+		}
+
+		seedProfile(e, "prf_test")
+		d := planOf(t, s, "profile_deploy", map[string]any{
+			"profile_id": "prf_test", "add_node_ids": []string{nodeB}, "port_overrides": map[string]any{nodeB: 443}, "sni_overrides": map[string]any{nodeB: "vpn.example.org"},
+		})
+		if got := factOf(t, d, "sni"); got.Value != "vpn.example.org" {
+			t.Fatalf("the deploy plan shows the name %+v", got)
+		}
+		mustPlanApproval(t, e, d, true)
+		if out := applyOf(t, s, "profile_deploy", d.ConfirmToken); out.Status != StatusApplied {
+			t.Fatalf("deploy apply: %+v", out)
+		}
+		var named bool
+		for _, in := range e.w.profiles["prf_test"].inbounds {
+			named = named || in.GetNodeId() == nodeB && in.GetTlsServerNameOverride() == "vpn.example.org"
+		}
+		if !named {
+			t.Fatal("the deployed inbound has no name of its own")
+		}
+	})
+
+	t.Run("names the plan does not take", func(t *testing.T) {
+		e := newTestEnv(t)
+		_, secret := e.token(ProfileAdmin)
+		s := e.session(secret)
+		for name, sni := range map[string]map[string]any{
+			"a node that is not selected": {nodeB: "vpn.example.com"},
+			"an IP address":               {nodeA: "203.0.113.7"},
+			"no dot":                      {nodeA: "vpn"},
+			"a wildcard":                  {nodeA: "*.example.com"},
+			"a space":                     {nodeA: "a b.example.com"},
+			"an empty name":               {nodeA: ""},
+		} {
+			out := mustFail(t, s, "profile_create_plan", map[string]any{"protocol": "hysteria2", "name": "X", "node_ids": []string{nodeA}, "sni_overrides": sni})
+			if !strings.Contains(out, "sni") {
+				t.Errorf("%s: refusal = %s", name, out)
+			}
+		}
+		if len(e.w.profiles) != 0 || len(e.plans.byID) != 0 {
+			t.Fatal("a refused plan left a profile or a plan")
+		}
+	})
+
+	t.Run("a refusal of the panel keeps its code", func(t *testing.T) {
+		e := newTestEnv(t)
+		e.w.refuseInboundNode = nodeA
+		e.w.refuseInboundMessage = "sni_taken: port=443&node=de1&profile=main&name=de1.example.com&free=8443"
+		_, secret := e.token(ProfileAdmin)
+		out := mustFail(t, e.session(secret), "profile_create_plan", map[string]any{"protocol": "hysteria2", "name": "Beside", "node_ids": []string{nodeA}})
+		if !strings.Contains(out, "sni_taken") || !strings.Contains(out, "de1.example.com") {
+			t.Fatalf("refusal = %s", out)
+		}
+	})
+}

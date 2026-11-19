@@ -522,7 +522,8 @@ func TestUpdateProfileRejectsTCPPortCollisionOnEveryPlacement(t *testing.T) {
 	_, err := e.s.UpdateProfile(e.ctx, req(&adminv1.UpdateProfileRequest{
 		ProfileId: main.Id, ExpectedVersion: main.Version, SettingsJson: &settings, DryRun: true,
 	}))
-	wantCoded(t, err, connect.CodeAlreadyExists, "port_taken", map[string]string{"node": "nl1", "port": "443", "profile": "other"})
+	// two services on 443 are told apart by their names now (plugin.TCPSharePlan): REALITY of the same site twice has one name
+	wantCoded(t, err, connect.CodeAlreadyExists, "sni_taken", map[string]string{"node": "nl1", "port": "443", "profile": "other", "name": "www.example.org"})
 	if current := must(e.st.Access().Profile(e.ctx, main.Id)); current.Version != main.Version {
 		t.Fatalf("refused dry run changed profile version to %d", current.Version)
 	}

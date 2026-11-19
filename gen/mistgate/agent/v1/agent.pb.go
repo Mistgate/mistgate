@@ -2321,7 +2321,7 @@ type SharedPort struct {
 	Timeouts uint64 `protobuf:"varint,10,opt,name=timeouts,proto3" json:"timeouts,omitempty"`
 	// Closed to make room: more than 1024 connections without a complete hello, this was the oldest.
 	Evicted uint64 `protobuf:"varint,11,opt,name=evicted,proto3" json:"evicted,omitempty"`
-	// Closed: the route did not accept within 5 seconds, or went away.
+	// Closed: the route did not accept within 5 seconds and neither did the default route, or the route went away.
 	Refused uint64 `protobuf:"varint,12,opt,name=refused,proto3" json:"refused,omitempty"`
 	// Closed: no route and no default route to send it to.
 	NoRoute uint64 `protobuf:"varint,13,opt,name=no_route,json=noRoute,proto3" json:"no_route,omitempty"`
@@ -2330,9 +2330,12 @@ type SharedPort struct {
 	// The most frequent host names no route holds, most frequent first, at most 5. Names only, never addresses.
 	UnknownNames []*SharedUnknownName `protobuf:"bytes,15,rep,name=unknown_names,json=unknownNames,proto3" json:"unknown_names,omitempty"`
 	// Why the front is not up (the bind error of the port); empty when it is. Counters are zero then.
-	BindError     string `protobuf:"bytes,16,opt,name=bind_error,json=bindError,proto3" json:"bind_error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	BindError string `protobuf:"bytes,16,opt,name=bind_error,json=bindError,proto3" json:"bind_error,omitempty"`
+	// Went to the default route because the service of the name they asked for is not running (it failed, or did not accept
+	// within 5 seconds). Not counted in refused: those are the connections that could not be served at all.
+	DefaultRouteDown uint64 `protobuf:"varint,17,opt,name=default_route_down,json=defaultRouteDown,proto3" json:"default_route_down,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *SharedPort) Reset() {
@@ -2475,6 +2478,13 @@ func (x *SharedPort) GetBindError() string {
 		return x.BindError
 	}
 	return ""
+}
+
+func (x *SharedPort) GetDefaultRouteDown() uint64 {
+	if x != nil {
+		return x.DefaultRouteDown
+	}
+	return 0
 }
 
 type SharedRoute struct {
@@ -9678,7 +9688,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x0fperson_networks\x18\f \x03(\v2 .mistgate.agent.v1.PersonNetworkR\x0epersonNetworks\x12,\n" +
 	"\x12networks_db_sha256\x18\r \x01(\tR\x10networksDbSha256\x128\n" +
 	"\abridges\x18\x0e \x03(\v2\x1e.mistgate.agent.v1.BridgeStateR\abridges\x12@\n" +
-	"\fshared_ports\x18\x0f \x03(\v2\x1d.mistgate.agent.v1.SharedPortR\vsharedPorts\"\xf2\x04\n" +
+	"\fshared_ports\x18\x0f \x03(\v2\x1d.mistgate.agent.v1.SharedPortR\vsharedPorts\"\xa0\x05\n" +
 	"\n" +
 	"SharedPort\x12\x12\n" +
 	"\x04port\x18\x01 \x01(\rR\x04port\x12\x1a\n" +
@@ -9698,7 +9708,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x06panics\x18\x0e \x01(\x04R\x06panics\x12I\n" +
 	"\runknown_names\x18\x0f \x03(\v2$.mistgate.agent.v1.SharedUnknownNameR\funknownNames\x12\x1d\n" +
 	"\n" +
-	"bind_error\x18\x10 \x01(\tR\tbindError\"J\n" +
+	"bind_error\x18\x10 \x01(\tR\tbindError\x12,\n" +
+	"\x12default_route_down\x18\x11 \x01(\x04R\x10defaultRouteDown\"J\n" +
 	"\vSharedRoute\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12\x1c\n" +

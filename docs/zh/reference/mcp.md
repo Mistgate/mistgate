@@ -189,9 +189,9 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `dns_preset_create` | 管理员 | `name`、`description`、`servers`，可选 `split`、`ipv4_only`、`split_direct`、`preferred_transport`（`plain`、`dot`、`doh`）、`block_ads` | 始终 |
 | `dns_preset_update` | 管理员 | `preset_id` 以及可编辑字段：`name`、`description`、`servers`、`split`、`ipv4_only`、`split_direct`、`preferred_transport`、`block_ads` | 始终 |
 | `dns_preset_delete` | 管理员 | `preset_id`；内置预设和实例默认预设会被拒绝，用户和分组将回退到实例默认值 | 始终 |
-| `profile_create` | 管理员 | 计划：`protocol`、`name`、可选 JSON `settings`（缺少的字段使用协议默认值）、`node_ids`、现有 `group_ids`、`port_overrides`（节点 ID 到端口）、`allow_lossy_port`；执行：仅 `confirm_token`。对于标记为 `x-secret` 的敏感字段，省略该字段、使用 `"••••"` 保留原值，或使用 `"$generate"`；不得传入明文值 | 始终 |
+| `profile_create` | 管理员 | 计划：`protocol`、`name`、可选 JSON `settings`（缺少的字段使用协议默认值）、`node_ids`、现有 `group_ids`、`port_overrides`（节点 ID 到端口）、`sni_overrides`（节点 ID 到该节点上新入站的名称，用于多个服务按 SNI 共用的 TCP 端口）、`allow_lossy_port`；执行：仅 `confirm_token`。对于标记为 `x-secret` 的敏感字段，省略该字段、使用 `"••••"` 保留原值，或使用 `"$generate"`；不得传入明文值 | 始终 |
 | `profile_update` | 管理员 | 计划：`profile_id`、可选 `name`、RFC 7386 JSON Merge Patch `settings_patch`（省略的敏感字段会保留原值；拒绝补丁中的 `null` 值）、`allow_lossy_port`；执行：仅 `confirm_token`。敏感字段遵循相同规则：省略、`"••••"` 或 `"$generate"` | 始终 |
-| `profile_deploy` | 管理员 | 计划：`profile_id`、`add_node_ids`、`remove_node_ids`、现有 `add_group_ids`、`remove_group_ids`，可选 `port_overrides` 和 `allow_lossy_port`；执行：仅 `confirm_token` | 始终 |
+| `profile_deploy` | 管理员 | 计划：`profile_id`、`add_node_ids`、`remove_node_ids`、现有 `add_group_ids`、`remove_group_ids`，可选 `port_overrides`、`sni_overrides` 和 `allow_lossy_port`；执行：仅 `confirm_token` | 始终 |
 | `node_fix` | 管理员 | `node`、诊断报告中的 `fix_id`；检查项列出参数时还需提供 `params` | 始终 |
 | `node_decoy` | 管理员 | `node`、`mode`（`builtin`、`panel`、`own`）、`own` 模式下 `bundle_base64`（最多 2 MiB 的 base64 ZIP 或 TAR）与 `files`（`{path, content}` 或 `{path, content_base64}` 列表：最多 64 个文件、路径不超过 200 个字符、总计 2 MiB、根目录有 `index.html`；计划列出文件及大小和 SHA-256，不显示内容）二选一，且只能给一个 | 始终 |
 | `node_update` | 管理员 | `node` 以及仅需更改的字段：`name`、`country_code`、`location`、`provider`、`notes`，以及各入站的 `direct_in_subscriptions` 开关。不接受地址和运行时设置 | 始终 |

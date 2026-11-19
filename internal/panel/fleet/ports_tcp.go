@@ -67,6 +67,9 @@ type tcpTarget struct {
 //   - a VLESS TCP port (role vless): REALITY with another site is probed with the target's name (a valid chain proves our
 //     REALITY forwarded the hello to that site), "self" and TLS with the node's own name.
 //   - a TrustTunnel TCP port (role site): its HTTPS site answers the node's own name; a Hysteria2 site on the same port is closed.
+//   - a TCP port that services share by SNI (plugin.TCPSharePlan) has one target, the default route: the service that answers a
+//     visitor with no name or a name it does not know, which is what a probe by IP address is. The other routes are probed by
+//     the checks of their protocols, each with its own name.
 //   - an MTProto TCP port (role mtproto): only its own-site Fake TLS fallback, whose decoy answers with the node's site and
 //     certificate (an ACME one: the spec has no TLS mode, the decoy makes it for the first domain); a Fake TLS fallback to another site cannot prove that the port belongs to this node.
 func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
@@ -82,6 +85,7 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 		plain[i] = s.Spec
 	}
 	owners := plugin.TCPPortOwners(plain) // the node closes a Hysteria2 site on a TCP port another inbound holds
+	shares := plugin.TCPSharePlan(plain)  // services that share a port by SNI: the probe asks the default route
 
 	byPort := make(map[uint16]tcpTarget)
 	add := func(t tcpTarget) {
@@ -99,6 +103,9 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 	for _, s := range sorted {
 		spec := s.Spec
 		pin := pins[spec.ID]
+		if p := shares[spec.Listen.Port]; p.Front() && spec.Listen.Network == "tcp" && spec.ID != p.Default {
+			continue // one target per port: what answers there without a name is the default route's service
+		}
 		switch {
 		case spec.Protocol == "vless" && spec.Listen.Network == "tcp":
 			sni, ownName := vlessProbeName(spec)

@@ -377,6 +377,47 @@ message GetNodeResponse {
   repeated TcpCheck tcp_checks = 13;
   // Latest paired check that found source-side UDP filtering; 0 = none or a later check passed cleanly.
   int64 udp_filtered_unix = 14 [jstype = JS_NUMBER];
+  // The TCP ports of this node that services share by the SNI of the ClientHello (an agent with "tcp-share/1"), as the agent last
+  // reported them; empty when it shares none. The panel stores the snapshot when it changes and at most every 5 minutes, so the
+  // counters are as of shared_ports_unix (0 = none).
+  repeated SharedPort shared_ports = 15;
+  int64 shared_ports_unix = 16 [jstype = JS_NUMBER];
+}
+
+// One shared TCP port: counters since the agent started (StatsBatch.shared_ports of agent.proto, which says what each one counts).
+// No client address is in it, and the unknown names are what visitors asked for, at most 5.
+message SharedPort {
+  uint32 port = 1;
+  // The inbound that gets what no route claims; empty when the port has none.
+  string default_inbound_id = 2;
+  uint64 accepted = 3;
+  // By inbound id: connections handed to the service.
+  repeated SharedRoute routes = 4;
+  // Why connections went to the default route.
+  uint64 default_no_sni = 5;
+  uint64 default_unknown_name = 6;
+  uint64 default_not_tls = 7;
+  uint64 default_bad_hello = 8;
+  uint64 default_hello_too_large = 9;
+  // ... and because the service of the name asked for is not running.
+  uint64 default_route_down = 10;
+  uint64 timeouts = 11;
+  uint64 evicted = 12;
+  uint64 refused = 13;
+  uint64 no_route = 14;
+  repeated SharedUnknownName unknown_names = 15;
+  // Why the front is not up (the bind error of the port); empty when it is.
+  string bind_error = 16;
+}
+
+message SharedRoute {
+  string inbound_id = 1;
+  uint64 delivered = 2;
+}
+
+message SharedUnknownName {
+  string name = 1;
+  uint64 count = 2;
 }
 
 message CreateEnrollmentRequest {

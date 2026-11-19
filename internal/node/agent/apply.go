@@ -212,6 +212,7 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 		results = append(results, a.applyInbound(ctx, next.inbounds[id], now, force[id]))
 	}
 	a.syncTCPClaims(ctx, nextTCP)
+	a.markRoutes(results)
 	// NFQUEUE rules are installed before an AWG interface is created. Refresh its interface-index map now that
 	// the engines have applied, so packets use exact active interface identities from this point on.
 	a.syncTorrentGuardApplied(ctx, next, results)

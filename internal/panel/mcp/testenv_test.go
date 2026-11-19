@@ -1256,7 +1256,7 @@ func (w *world) CreateInbound(_ context.Context, r *connect.Request[adminv1.Crea
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("node not found"))
 	}
 	in := &adminv1.Inbound{Id: "inb_validate", ProfileId: r.Msg.GetProfileId(), NodeId: r.Msg.GetNodeId(), NodeName: nodeName,
-		Port: port, PortOverride: r.Msg.GetPortOverride(), Enabled: true, State: adminv1.InboundState_INBOUND_STATE_PENDING}
+		Port: port, PortOverride: r.Msg.GetPortOverride(), TlsServerNameOverride: r.Msg.GetTlsServerNameOverride(), Enabled: true, State: adminv1.InboundState_INBOUND_STATE_PENDING}
 	if !r.Msg.GetValidateOnly() {
 		if profile == nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("profile_id required"))

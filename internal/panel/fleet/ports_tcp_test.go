@@ -152,6 +152,41 @@ func TestTCPTargets(t *testing.T) {
 				{Port: 443, Role: "site", ALPN: true, Profile: "TrustTunnel", Kind: "tls", SNI: "node-a.example.com", Pin: pin, PublicCert: true},
 			},
 		},
+		// Services that share 443 by SNI have one target, the default route: a probe with no name gets that service.
+		"a shared port is probed through its default route, not the lowest id": {
+			specs: []tcpSpec{
+				vlessSpec("a", 443, realityOther, plugin.TLS{}),
+				{Profile: "TrustTunnel", Spec: plugin.InboundSpec{ID: "tt", Protocol: "trusttunnel", Listen: plugin.Listen{Network: "tcp", Port: 443},
+					TLS: plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "tt.example.com"}, Settings: json.RawMessage(`{"h3":false}`)}},
+			},
+			want: []tcpTarget{
+				{Port: 80, Role: "acme", Kind: "http_mark"},
+				{Port: 443, Role: "site", ALPN: true, Profile: "TrustTunnel", Kind: "tls", SNI: "tt.example.com", PublicCert: true},
+			},
+		},
+		"two sites on 443: the lower id is the default, with its own name": {
+			specs: []tcpSpec{
+				{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
+					TLS: plugin.TLS{ServerName: "tg.example.com"}, Settings: json.RawMessage(`{"domains":["tg.example.com"],"fallback":"decoy"}`)}},
+				vlessSpec("b", 443, `{"security":"reality","reality":{"target":"self","server_names":["node-a.example.com"]}}`, plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "node-a.example.com"}),
+				hy2Spec("h", plugin.TLSAcmeDomain, "hy2.example.com", ""),
+			},
+			want: []tcpTarget{
+				{Port: 80, Role: "acme", Kind: "http_mark"},
+				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-b", Kind: "tls", SNI: "node-a.example.com", PublicCert: true},
+			},
+		},
+		"a name two services ask for: the one that holds it is probed": {
+			specs: []tcpSpec{
+				vlessSpec("a", 443, `{"security":"reality","reality":{"target":"self","server_names":["x.example.com"]}}`, plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: "x.example.com"}),
+				{Profile: "Telegram", Spec: plugin.InboundSpec{ID: "mt", Protocol: "mtproto", Listen: plugin.Listen{Network: "tcp", Port: 443},
+					TLS: plugin.TLS{ServerName: "X.example.com"}, Settings: json.RawMessage(`{"domains":["X.example.com"],"fallback":"decoy"}`)}},
+			},
+			want: []tcpTarget{
+				{Port: 80, Role: "acme", Kind: "http_mark"},
+				{Port: 443, Role: "vless", ALPN: true, Profile: "vless-a", Kind: "tls", SNI: "x.example.com", PublicCert: true},
+			},
+		},
 		"a UDP inbound of another protocol is not a TCP port": {
 			specs: []tcpSpec{{Profile: "awg", Spec: plugin.InboundSpec{ID: "w", Protocol: "awg", Listen: plugin.Listen{Network: "udp", Port: 51820}}}},
 		},

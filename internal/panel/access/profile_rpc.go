@@ -461,7 +461,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 		}
 		for _, changed := range changedPorts {
 			checks := portChecks[changed.node.ID]
-			if err := portRefusal(changed.spec, changed.node.Name, changed.others, checks, s.now()); err != nil {
+			if err := portRefusal(changed.spec, changed.node.Name, changed.others, checks, s.now(), portSubject{Profile: p.Name, Agent: changed.node.AgentCaps}); err != nil {
 				return nil, err
 			}
 			if !specHasUDPListen(changed.spec) {
@@ -857,9 +857,14 @@ func (s *Service) nodeInbounds(ctx context.Context, nodeID, skip string) (listen
 
 // clashOf is the first neighbour that fights l over a listener port (listenOverlap), or nil.
 func clashOf(l plugin.Listen, others []nodeListen) *nodeListen {
+	return clashOfExcept(l, others, nil)
+}
+
+// clashOfExcept is clashOf that does not count the listener ol of a neighbour o when skip(o, ol) says so.
+func clashOfExcept(l plugin.Listen, others []nodeListen, skip func(o nodeListen, ol plugin.Listen) bool) *nodeListen {
 	for i := range others {
 		for _, other := range others[i].allListens() {
-			if listenOverlap(l, other) {
+			if listenOverlap(l, other) && (skip == nil || !skip(others[i], other)) {
 				return &others[i]
 			}
 		}
@@ -879,7 +884,10 @@ func freePortFor(spec plugin.InboundSpec, others []nodeListen, checks map[uint16
 
 // portRefusal is the coded refusal of a listen that another profile of the node fights over, or nil: "hop_taken" when
 // the inbound's own hop range is what overlaps (no port fixes that), else "port_taken" with a free port to take instead.
-func portRefusal(spec plugin.InboundSpec, node string, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) error {
+//
+// A TCP inbound that stands on the port of another TCP inbound of the node does not fight over it when the two can share it
+// (shareRefusal): the agent puts a front on the port and tells them apart by the name in the ClientHello.
+func portRefusal(spec plugin.InboundSpec, node string, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time, who portSubject) error {
 	l := spec.Listen
 	if l.HopFrom != 0 {
 		// the range alone: its start stands in for the port, so that only the range is compared
@@ -889,13 +897,15 @@ func portRefusal(spec plugin.InboundSpec, node string, others []nodeListen, chec
 		}
 	}
 	var c *nodeListen
-	for _, candidate := range inboundListens(spec) {
-		if c = clashOf(candidate, others); c != nil {
+	for i, candidate := range inboundListens(spec) {
+		if c = clashOfExcept(candidate, others, func(o nodeListen, ol plugin.Listen) bool {
+			return i == 0 && ol == o.l && isSharePeer(spec, o) // the two TCP listeners that may stand on one port
+		}); c != nil {
 			break
 		}
 	}
 	if c == nil {
-		return nil
+		return shareRefusal(spec, node, others, who, func() uint16 { return freePortFor(spec, others, checks, now) })
 	}
 	kv := []string{"port", strconv.Itoa(int(l.Port)), "profile", c.profile, "node", node,
 		"free", strconv.Itoa(int(freePortFor(spec, others, checks, now)))}
@@ -940,7 +950,8 @@ func nodeBuildRefusal(err error, node string) error {
 }
 
 // inboundWarnings is what the admin should know before adding or switching on an inbound although it does not stop it:
-// a VLESS listener that pauses a Hysteria2 site, or a WARP exit whose account is missing, paused, or down.
+// a VLESS listener that pauses a Hysteria2 site, a TCP port that services share by SNI (tcp_port_shared, share_two_faces), or a
+// WARP exit whose account is missing, paused, or down.
 func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profileName string, spec plugin.InboundSpec, others []nodeListen) ([]*adminv1.StatusReason, error) {
 	var warnings []*adminv1.StatusReason
 	var port80Err error
@@ -1007,6 +1018,7 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 	if port80Err != nil {
 		return nil, port80Err
 	}
+	warnings = append(warnings, shareWarnings(nodeName, spec, profileName, others)...)
 	if spec.Egress != "warp" {
 		return warnings, nil
 	}
@@ -1253,7 +1265,7 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 			return nil, s.internal("read UDP port checks", err)
 		}
 	}
-	if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now()); err != nil {
+	if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now(), portSubject{Profile: f.Profile.Name, Agent: f.Node.AgentCaps}); err != nil {
 		return nil, err
 	}
 	warnings, err := s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others)
@@ -1357,7 +1369,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		}
 	}
 	if in.Enabled {
-		if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now()); err != nil {
+		if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now(), portSubject{Profile: f.Profile.Name, Agent: f.Node.AgentCaps}); err != nil {
 			return nil, err
 		}
 		if warnings, err = s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others); err != nil {
