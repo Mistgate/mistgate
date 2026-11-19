@@ -53,6 +53,9 @@ type settings struct {
 
 type realitySettings struct {
 	self bool // target "self": the node's own site behind REALITY
+	// nodeTarget: the target was set on the node (vless-target/1), not in the profile. A profile's target may be a site next to the
+	// node (127.0.0.1:8443); one set on a node must be a site of the internet (checkTargetPublic).
+	nodeTarget bool
 	// dialNet and dialAddr are where REALITY forwards non-clients: the target for a site, the inbound's own site socket for
 	// self (filled in when the inbound starts).
 	dialNet, dialAddr string
@@ -166,6 +169,7 @@ func parseSpec(spec plugin.InboundSpec) (settings, error) {
 			if ownName != "" && (len(raw.Reality.ServerNames) != 1 || !strings.EqualFold(strings.TrimSuffix(strings.TrimSpace(raw.Reality.ServerNames[0]), "."), ownName)) {
 				return out, errors.New("reality.server_names must be exactly the tls server name for a target set on the node")
 			}
+			out.reality.nodeTarget = ownName != ""
 			if err := validateTarget(out.reality.target, spec.Listen.Port); err != nil {
 				return settings{}, fmt.Errorf("reality.target: %w", err)
 			}

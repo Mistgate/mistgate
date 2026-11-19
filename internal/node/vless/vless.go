@@ -262,6 +262,11 @@ func (e *eng) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plugin
 }
 
 func (in *inbound) start(ctx context.Context) error {
+	if in.cfg.reality.nodeTarget {
+		if err := checkTargetPublic(ctx, in.cfg.reality.target); err != nil {
+			return err
+		}
+	}
 	out, err := in.e.out(in.spec.Egress)
 	if err != nil {
 		return err
