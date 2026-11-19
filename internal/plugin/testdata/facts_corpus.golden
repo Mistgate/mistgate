@@ -1,243 +1,243 @@
-hy2-empty                    tcpOwnSite=false hy2SitePort=443
+hy2-empty                    tcpOwnSite=false Hy2SitePort=443 ServerCDN=false
 hy2-empty                    tcpRoute=[] reality=false site=false ok=false
 hy2-empty                    RealityTarget="","",false shown=""
-hy2-null                     tcpOwnSite=false hy2SitePort=443
+hy2-null                     tcpOwnSite=false Hy2SitePort=443 ServerCDN=false
 hy2-null                     tcpRoute=[] reality=false site=false ok=false
 hy2-null                     RealityTarget="","",false shown=""
-hy2-obj                      tcpOwnSite=false hy2SitePort=443
+hy2-obj                      tcpOwnSite=false Hy2SitePort=443 ServerCDN=false
 hy2-obj                      tcpRoute=[] reality=false site=false ok=false
 hy2-obj                      RealityTarget="","",false shown=""
-hy2-bad                      tcpOwnSite=false hy2SitePort=0
+hy2-bad                      tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 hy2-bad                      tcpRoute=[] reality=false site=false ok=false
 hy2-bad                      RealityTarget="","",false shown=""
-hy2-port0                    tcpOwnSite=false hy2SitePort=0
+hy2-port0                    tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 hy2-port0                    tcpRoute=[] reality=false site=false ok=false
 hy2-port0                    RealityTarget="","",false shown=""
-hy2-neg                      tcpOwnSite=false hy2SitePort=0
+hy2-neg                      tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 hy2-neg                      tcpRoute=[] reality=false site=false ok=false
 hy2-neg                      RealityTarget="","",false shown=""
-hy2-p443                     tcpOwnSite=false hy2SitePort=443
+hy2-p443                     tcpOwnSite=false Hy2SitePort=443 ServerCDN=false
 hy2-p443                     tcpRoute=[] reality=false site=false ok=false
 hy2-p443                     RealityTarget="","",false shown=""
-hy2-p8443                    tcpOwnSite=false hy2SitePort=8443
+hy2-p8443                    tcpOwnSite=false Hy2SitePort=8443 ServerCDN=false
 hy2-p8443                    tcpRoute=[] reality=false site=false ok=false
 hy2-p8443                    RealityTarget="","",false shown=""
-hy2-p65535                   tcpOwnSite=false hy2SitePort=65535
+hy2-p65535                   tcpOwnSite=false Hy2SitePort=65535 ServerCDN=false
 hy2-p65535                   tcpRoute=[] reality=false site=false ok=false
 hy2-p65535                   RealityTarget="","",false shown=""
-hy2-p65536                   tcpOwnSite=false hy2SitePort=0
+hy2-p65536                   tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 hy2-p65536                   tcpRoute=[] reality=false site=false ok=false
 hy2-p65536                   RealityTarget="","",false shown=""
-hy2-p70000                   tcpOwnSite=false hy2SitePort=0
+hy2-p70000                   tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 hy2-p70000                   tcpRoute=[] reality=false site=false ok=false
 hy2-p70000                   RealityTarget="","",false shown=""
-hy2-pnull                    tcpOwnSite=false hy2SitePort=443
+hy2-pnull                    tcpOwnSite=false Hy2SitePort=443 ServerCDN=false
 hy2-pnull                    tcpRoute=[] reality=false site=false ok=false
 hy2-pnull                    RealityTarget="","",false shown=""
-hy2-pstr                     tcpOwnSite=false hy2SitePort=0
+hy2-pstr                     tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 hy2-pstr                     tcpRoute=[] reality=false site=false ok=false
 hy2-pstr                     RealityTarget="","",false shown=""
-hy2-none                     tcpOwnSite=false hy2SitePort=443
+hy2-none                     tcpOwnSite=false Hy2SitePort=443 ServerCDN=false
 hy2-none                     tcpRoute=[] reality=false site=false ok=false
 hy2-none                     RealityTarget="","",false shown=""
-hy2-none8443                 tcpOwnSite=false hy2SitePort=8443
+hy2-none8443                 tcpOwnSite=false Hy2SitePort=8443 ServerCDN=false
 hy2-none8443                 tcpRoute=[] reality=false site=false ok=false
 hy2-none8443                 RealityTarget="","",false shown=""
-hy2-NONE                     tcpOwnSite=false hy2SitePort=443
+hy2-NONE                     tcpOwnSite=false Hy2SitePort=443 ServerCDN=false
 hy2-NONE                     tcpRoute=[] reality=false site=false ok=false
 hy2-NONE                     RealityTarget="","",false shown=""
-hy2-none0                    tcpOwnSite=false hy2SitePort=0
+hy2-none0                    tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 hy2-none0                    tcpRoute=[] reality=false site=false ok=false
 hy2-none0                    RealityTarget="","",false shown=""
-hy2-decoy                    tcpOwnSite=false hy2SitePort=443
+hy2-decoy                    tcpOwnSite=false Hy2SitePort=443 ServerCDN=false
 hy2-decoy                    tcpRoute=[] reality=false site=false ok=false
 hy2-decoy                    RealityTarget="","",false shown=""
-hy2-mode0                    tcpOwnSite=false hy2SitePort=0
+hy2-mode0                    tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 hy2-mode0                    tcpRoute=[] reality=false site=false ok=false
 hy2-mode0                    RealityTarget="","",false shown=""
-hy2-self                     tcpOwnSite=false hy2SitePort=443
+hy2-self                     tcpOwnSite=false Hy2SitePort=443 ServerCDN=false
 hy2-self                     tcpRoute=[] reality=false site=false ok=false
 hy2-self                     RealityTarget="","",false shown=""
-vless-as-hy2                 tcpOwnSite=false hy2SitePort=0
+vless-as-hy2                 tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-as-hy2                 tcpRoute=[] reality=true site=false ok=false
 vless-as-hy2                 RealityTarget="","",false shown=""
-vless-empty                  tcpOwnSite=false hy2SitePort=0
+vless-empty                  tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-empty                  tcpRoute=[] reality=true site=false ok=false
 vless-empty                  RealityTarget="","",false shown=""
-vless-empty+sni              tcpOwnSite=false hy2SitePort=0
+vless-empty+sni              tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-empty+sni              tcpRoute=[] reality=true site=false ok=false
 vless-empty+sni              RealityTarget="","",false shown=""
-vless-bad                    tcpOwnSite=false hy2SitePort=0
+vless-bad                    tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-bad                    tcpRoute=[] reality=false site=false ok=false
 vless-bad                    RealityTarget="","",false shown=""
-vless-bad+sni                tcpOwnSite=false hy2SitePort=0
+vless-bad+sni                tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-bad+sni                tcpRoute=[] reality=false site=false ok=false
 vless-bad+sni                RealityTarget="","",false shown=""
-vless-obj                    tcpOwnSite=false hy2SitePort=0
+vless-obj                    tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-obj                    tcpRoute=[] reality=true site=false ok=false
 vless-obj                    RealityTarget="","",false shown=""
-vless-obj+sni                tcpOwnSite=false hy2SitePort=0
+vless-obj+sni                tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-obj+sni                tcpRoute=[] reality=true site=false ok=false
 vless-obj+sni                RealityTarget="","",false shown=""
-vless-null                   tcpOwnSite=false hy2SitePort=0
+vless-null                   tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-null                   tcpRoute=[] reality=true site=false ok=false
 vless-null                   RealityTarget="","",false shown=""
-vless-null+sni               tcpOwnSite=false hy2SitePort=0
+vless-null+sni               tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-null+sni               tcpRoute=[] reality=true site=false ok=false
 vless-null+sni               RealityTarget="","",false shown=""
-vless-tls                    tcpOwnSite=true hy2SitePort=0
+vless-tls                    tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-tls                    tcpRoute=[] reality=false site=true ok=false
 vless-tls                    RealityTarget="","",false shown=""
-vless-tls+sni                tcpOwnSite=true hy2SitePort=0
+vless-tls+sni                tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-tls+sni                tcpRoute=[de1.example.com] reality=false site=true ok=true
 vless-tls+sni                RealityTarget="","",false shown=""
-vless-tls-cdn                tcpOwnSite=true hy2SitePort=0
+vless-tls-cdn                tcpOwnSite=true Hy2SitePort=0 ServerCDN=true
 vless-tls-cdn                tcpRoute=[cdn.example.com] reality=false site=true ok=true
 vless-tls-cdn                RealityTarget="","",false shown=""
-vless-tls-cdn+sni            tcpOwnSite=true hy2SitePort=0
+vless-tls-cdn+sni            tcpOwnSite=true Hy2SitePort=0 ServerCDN=true
 vless-tls-cdn+sni            tcpRoute=[de1.example.com cdn.example.com] reality=false site=true ok=true
 vless-tls-cdn+sni            RealityTarget="","",false shown=""
-vless-tls-cdn-caps           tcpOwnSite=true hy2SitePort=0
+vless-tls-cdn-caps           tcpOwnSite=true Hy2SitePort=0 ServerCDN=true
 vless-tls-cdn-caps           tcpRoute=[cdn.example.com] reality=false site=true ok=true
 vless-tls-cdn-caps           RealityTarget="","",false shown=""
-vless-tls-cdn-caps+sni       tcpOwnSite=true hy2SitePort=0
+vless-tls-cdn-caps+sni       tcpOwnSite=true Hy2SitePort=0 ServerCDN=true
 vless-tls-cdn-caps+sni       tcpRoute=[de1.example.com cdn.example.com] reality=false site=true ok=true
 vless-tls-cdn-caps+sni       RealityTarget="","",false shown=""
-vless-tls-cdn-blank          tcpOwnSite=true hy2SitePort=0
+vless-tls-cdn-blank          tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-tls-cdn-blank          tcpRoute=[] reality=false site=true ok=false
 vless-tls-cdn-blank          RealityTarget="","",false shown=""
-vless-tls-cdn-blank+sni      tcpOwnSite=true hy2SitePort=0
+vless-tls-cdn-blank+sni      tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-tls-cdn-blank+sni      tcpRoute=[de1.example.com] reality=false site=true ok=true
 vless-tls-cdn-blank+sni      RealityTarget="","",false shown=""
-vless-tls-cdn-empty          tcpOwnSite=true hy2SitePort=0
+vless-tls-cdn-empty          tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-tls-cdn-empty          tcpRoute=[] reality=false site=true ok=false
 vless-tls-cdn-empty          RealityTarget="","",false shown=""
-vless-tls-cdn-empty+sni      tcpOwnSite=true hy2SitePort=0
+vless-tls-cdn-empty+sni      tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-tls-cdn-empty+sni      tcpRoute=[de1.example.com] reality=false site=true ok=true
 vless-tls-cdn-empty+sni      RealityTarget="","",false shown=""
-vless-tls-cdn-null           tcpOwnSite=true hy2SitePort=0
+vless-tls-cdn-null           tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-tls-cdn-null           tcpRoute=[] reality=false site=true ok=false
 vless-tls-cdn-null           RealityTarget="","",false shown=""
-vless-tls-cdn-null+sni       tcpOwnSite=true hy2SitePort=0
+vless-tls-cdn-null+sni       tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-tls-cdn-null+sni       tcpRoute=[de1.example.com] reality=false site=true ok=true
 vless-tls-cdn-null+sni       RealityTarget="","",false shown=""
-vless-tls-names              tcpOwnSite=true hy2SitePort=0
+vless-tls-names              tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-tls-names              tcpRoute=[] reality=false site=true ok=false
 vless-tls-names              RealityTarget="","",false shown=""
-vless-tls-names+sni          tcpOwnSite=true hy2SitePort=0
+vless-tls-names+sni          tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-tls-names+sni          tcpRoute=[de1.example.com] reality=false site=true ok=true
 vless-tls-names+sni          RealityTarget="","",false shown=""
-vless-self                   tcpOwnSite=true hy2SitePort=0
+vless-self                   tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-self                   tcpRoute=[self.example.com] reality=true site=true ok=true
 vless-self                   RealityTarget="","",false shown="self"
-vless-self+sni               tcpOwnSite=true hy2SitePort=0
+vless-self+sni               tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-self+sni               tcpRoute=[self.example.com] reality=true site=true ok=true
 vless-self+sni               RealityTarget="","",false shown="self"
-vless-self-sp                tcpOwnSite=true hy2SitePort=0
+vless-self-sp                tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-self-sp                tcpRoute=[self.example.com] reality=true site=true ok=true
 vless-self-sp                RealityTarget="","",false shown="self"
-vless-self-sp+sni            tcpOwnSite=true hy2SitePort=0
+vless-self-sp+sni            tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-self-sp+sni            tcpRoute=[self.example.com] reality=true site=true ok=true
 vless-self-sp+sni            RealityTarget="","",false shown="self"
-vless-self-nonames           tcpOwnSite=true hy2SitePort=0
+vless-self-nonames           tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-self-nonames           tcpRoute=[] reality=true site=true ok=false
 vless-self-nonames           RealityTarget="","",false shown="self"
-vless-self-nonames+sni       tcpOwnSite=true hy2SitePort=0
+vless-self-nonames+sni       tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-self-nonames+sni       tcpRoute=[] reality=true site=true ok=false
 vless-self-nonames+sni       RealityTarget="","",false shown="self"
-vless-other                  tcpOwnSite=false hy2SitePort=0
+vless-other                  tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other                  tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-other                  RealityTarget="www.example.org:443","Www.Example.org",true shown="www.example.org:443"
-vless-other+sni              tcpOwnSite=false hy2SitePort=0
+vless-other+sni              tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other+sni              tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-other+sni              RealityTarget="www.example.org:443","Www.Example.org",true shown="www.example.org:443"
-vless-other-sp               tcpOwnSite=false hy2SitePort=0
+vless-other-sp               tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-sp               tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-other-sp               RealityTarget="www.example.org:443","www.example.org",true shown="www.example.org:443"
-vless-other-sp+sni           tcpOwnSite=false hy2SitePort=0
+vless-other-sp+sni           tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-sp+sni           tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-other-sp+sni           RealityTarget="www.example.org:443","www.example.org",true shown="www.example.org:443"
-vless-other-v6               tcpOwnSite=false hy2SitePort=0
+vless-other-v6               tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-v6               tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-other-v6               RealityTarget="[2001:db8::1]:443","www.example.org",true shown="[2001:db8::1]:443"
-vless-other-v6+sni           tcpOwnSite=false hy2SitePort=0
+vless-other-v6+sni           tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-v6+sni           tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-other-v6+sni           RealityTarget="[2001:db8::1]:443","www.example.org",true shown="[2001:db8::1]:443"
-vless-other-ip               tcpOwnSite=false hy2SitePort=0
+vless-other-ip               tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-ip               tcpRoute=[] reality=true site=false ok=false
 vless-other-ip               RealityTarget="","",false shown=""
-vless-other-ip+sni           tcpOwnSite=false hy2SitePort=0
+vless-other-ip+sni           tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-ip+sni           tcpRoute=[] reality=true site=false ok=false
 vless-other-ip+sni           RealityTarget="","",false shown=""
-vless-other-nonames          tcpOwnSite=false hy2SitePort=0
+vless-other-nonames          tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-nonames          tcpRoute=[] reality=true site=false ok=false
 vless-other-nonames          RealityTarget="","",false shown=""
-vless-other-nonames+sni      tcpOwnSite=false hy2SitePort=0
+vless-other-nonames+sni      tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-nonames+sni      tcpRoute=[] reality=true site=false ok=false
 vless-other-nonames+sni      RealityTarget="","",false shown=""
-vless-other-nohost           tcpOwnSite=false hy2SitePort=0
+vless-other-nohost           tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-nohost           tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-other-nohost           RealityTarget="www.example.org","www.example.org",true shown="www.example.org"
-vless-other-nohost+sni       tcpOwnSite=false hy2SitePort=0
+vless-other-nohost+sni       tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-nohost+sni       tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-other-nohost+sni       RealityTarget="www.example.org","www.example.org",true shown="www.example.org"
-vless-other-multi            tcpOwnSite=false hy2SitePort=0
+vless-other-multi            tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-multi            tcpRoute=[b.example.com www.example.org] reality=true site=false ok=true
 vless-other-multi            RealityTarget="www.example.org:443","",false shown=""
-vless-other-multi+sni        tcpOwnSite=false hy2SitePort=0
+vless-other-multi+sni        tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-multi+sni        tcpRoute=[b.example.com www.example.org] reality=true site=false ok=true
 vless-other-multi+sni        RealityTarget="www.example.org:443","",false shown=""
-vless-other-blankname        tcpOwnSite=false hy2SitePort=0
+vless-other-blankname        tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-blankname        tcpRoute=[] reality=true site=false ok=false
 vless-other-blankname        RealityTarget="www.example.org:443","",false shown=""
-vless-other-blankname+sni    tcpOwnSite=false hy2SitePort=0
+vless-other-blankname+sni    tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-other-blankname+sni    tcpRoute=[] reality=true site=false ok=false
 vless-other-blankname+sni    RealityTarget="www.example.org:443","",false shown=""
-vless-reality-notarget       tcpOwnSite=false hy2SitePort=0
+vless-reality-notarget       tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-reality-notarget       tcpRoute=[a.example.com] reality=true site=false ok=true
 vless-reality-notarget       RealityTarget="","",false shown=""
-vless-reality-notarget+sni   tcpOwnSite=false hy2SitePort=0
+vless-reality-notarget+sni   tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-reality-notarget+sni   tcpRoute=[a.example.com] reality=true site=false ok=true
 vless-reality-notarget+sni   RealityTarget="","",false shown=""
-vless-reality-noblock        tcpOwnSite=false hy2SitePort=0
+vless-reality-noblock        tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-reality-noblock        tcpRoute=[] reality=true site=false ok=false
 vless-reality-noblock        RealityTarget="","",false shown=""
-vless-reality-noblock+sni    tcpOwnSite=false hy2SitePort=0
+vless-reality-noblock+sni    tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-reality-noblock+sni    tcpRoute=[] reality=true site=false ok=false
 vless-reality-noblock+sni    RealityTarget="","",false shown=""
-vless-reality-cdn            tcpOwnSite=true hy2SitePort=0
+vless-reality-cdn            tcpOwnSite=true Hy2SitePort=0 ServerCDN=true
 vless-reality-cdn            tcpRoute=[a.example.com] reality=true site=true ok=true
 vless-reality-cdn            RealityTarget="","",false shown="self"
-vless-reality-cdn+sni        tcpOwnSite=true hy2SitePort=0
+vless-reality-cdn+sni        tcpOwnSite=true Hy2SitePort=0 ServerCDN=true
 vless-reality-cdn+sni        tcpRoute=[a.example.com] reality=true site=true ok=true
 vless-reality-cdn+sni        RealityTarget="","",false shown="self"
-vless-nosec-self             tcpOwnSite=true hy2SitePort=0
+vless-nosec-self             tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-nosec-self             tcpRoute=[a.example.com] reality=true site=true ok=true
 vless-nosec-self             RealityTarget="","",false shown=""
-vless-nosec-self+sni         tcpOwnSite=true hy2SitePort=0
+vless-nosec-self+sni         tcpOwnSite=true Hy2SitePort=0 ServerCDN=false
 vless-nosec-self+sni         tcpRoute=[a.example.com] reality=true site=true ok=true
 vless-nosec-self+sni         RealityTarget="","",false shown=""
-vless-nosec-other            tcpOwnSite=false hy2SitePort=0
+vless-nosec-other            tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-nosec-other            tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-nosec-other            RealityTarget="","",false shown=""
-vless-nosec-other+sni        tcpOwnSite=false hy2SitePort=0
+vless-nosec-other+sni        tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-nosec-other+sni        tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-nosec-other+sni        RealityTarget="","",false shown=""
-vless-nosec-cdn              tcpOwnSite=false hy2SitePort=0
+vless-nosec-cdn              tcpOwnSite=false Hy2SitePort=0 ServerCDN=true
 vless-nosec-cdn              tcpRoute=[] reality=true site=false ok=false
 vless-nosec-cdn              RealityTarget="","",false shown=""
-vless-nosec-cdn+sni          tcpOwnSite=false hy2SitePort=0
+vless-nosec-cdn+sni          tcpOwnSite=false Hy2SitePort=0 ServerCDN=true
 vless-nosec-cdn+sni          tcpRoute=[] reality=true site=false ok=false
 vless-nosec-cdn+sni          RealityTarget="","",false shown=""
-vless-foo-self               tcpOwnSite=false hy2SitePort=0
+vless-foo-self               tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-foo-self               tcpRoute=[a.example.com] reality=true site=false ok=true
 vless-foo-self               RealityTarget="","",false shown=""
-vless-foo-self+sni           tcpOwnSite=false hy2SitePort=0
+vless-foo-self+sni           tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-foo-self+sni           tcpRoute=[a.example.com] reality=true site=false ok=true
 vless-foo-self+sni           RealityTarget="","",false shown=""
-vless-upper-sec              tcpOwnSite=false hy2SitePort=0
+vless-upper-sec              tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-upper-sec              tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-upper-sec              RealityTarget="","",false shown=""
-vless-upper-sec+sni          tcpOwnSite=false hy2SitePort=0
+vless-upper-sec+sni          tcpOwnSite=false Hy2SitePort=0 ServerCDN=false
 vless-upper-sec+sni          tcpRoute=[www.example.org] reality=true site=false ok=true
 vless-upper-sec+sni          RealityTarget="","",false shown=""

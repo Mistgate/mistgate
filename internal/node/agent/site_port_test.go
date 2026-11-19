@@ -8,9 +8,9 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin/plugintest"
 )
 
-// What the copies of the protocol facts that live in the agent answer today, on the inputs all the copies are asked about:
+// Where the Hysteria2 site is for the agent, on the inputs the packages that read the settings are tested with (plugintest.Corpus):
 // the TCP port whose certificate the doctor reads, and the TCP ports the tunnel allowlist publishes for an enabled inbound.
-func TestFactsCopiesInAgent(t *testing.T) {
+func TestSitePortsOnTheSharedInputs(t *testing.T) {
 	var lines []string
 	for _, c := range plugintest.Corpus() {
 		network := "tcp"
@@ -28,5 +28,5 @@ func TestFactsCopiesInAgent(t *testing.T) {
 		}
 		lines = append(lines, fmt.Sprintf("%-28s tlsPortOf=%d publishedTCP=%v", c.ID, tlsPortOf(s), tcp))
 	}
-	plugintest.Golden(t, "facts_copies_agent.golden", lines)
+	plugintest.Golden(t, "site_port.golden", lines)
 }

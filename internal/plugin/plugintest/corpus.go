@@ -1,4 +1,4 @@
-// Package plugintest holds the inputs the tests of the protocol-fact copies share (it is removed with the last copy).
+// Package plugintest holds the inputs the tests of everything that reads an inbound's settings share, so each is run on the same cases.
 package plugintest
 
 import (

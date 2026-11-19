@@ -7,11 +7,11 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin/plugintest"
 )
 
-// What the copy of the protocol facts that lives in connectiondiag answers today, on the inputs all the copies are asked about.
-func TestFactsCopiesInConnectionDiag(t *testing.T) {
+// The variant of a VLESS profile, on the inputs the packages that read the settings are tested with (plugintest.Corpus).
+func TestVLESSVariantOnTheSharedInputs(t *testing.T) {
 	var lines []string
 	for _, c := range plugintest.Corpus() {
 		lines = append(lines, fmt.Sprintf("%-28s VLESSVariant=%+v", c.ID, VLESSVariant(c.Settings)))
 	}
-	plugintest.Golden(t, "facts_copies_connectiondiag.golden", lines)
+	plugintest.Golden(t, "variant.golden", lines)
 }

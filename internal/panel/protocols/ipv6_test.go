@@ -8,17 +8,17 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin/plugintest"
 )
 
-// What the copy of the CDN fact that lives in protocols answers today, on the inputs all the copies are asked about.
-func TestFactsCopiesInProtocols(t *testing.T) {
+// Why a server has no IPv6 twin, on the inputs the packages that read the settings are tested with (plugintest.Corpus).
+func TestIPv6UnsupportedOnTheSharedInputs(t *testing.T) {
 	var lines []string
 	for _, c := range plugintest.Corpus() {
 		s := plugin.InboundSpec{ID: "x", Protocol: c.Protocol, Listen: plugin.Listen{Network: "tcp", Port: 443},
 			TLS: plugin.TLS{Mode: plugin.TLSMode(c.TLSMode), ServerName: c.SNI}, Settings: []byte(c.Settings)}
-		lines = append(lines, fmt.Sprintf("%-28s ServerCDN=%v IPv6Unsupported=%q", c.ID, plugin.ServerCDN(s), IPv6Unsupported(s)))
+		lines = append(lines, fmt.Sprintf("%-28s IPv6Unsupported=%q", c.ID, IPv6Unsupported(s)))
 	}
 	// a certificate for the node's IP address
 	lines = append(lines, fmt.Sprintf("acme_ip                      IPv6Unsupported=%q", IPv6Unsupported(plugin.InboundSpec{TLS: plugin.TLS{Mode: plugin.TLSAcmeIP}})))
-	plugintest.Golden(t, "facts_copies_protocols.golden", lines)
+	plugintest.Golden(t, "ipv6.golden", lines)
 }
 
 // A server is passed on by a relay entry, and has an IPv6 twin, under one rule (the relay and the subscription ask this one).
