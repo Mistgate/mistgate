@@ -15,6 +15,7 @@ import (
 
 	"connectrpc.com/connect"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/mcp"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -291,14 +292,14 @@ func (s *Service) runTurn(ctx context.Context, admin store.Admin, in turnInput, 
 		return res, &turnRefusal{code}
 	}
 	var identity store.APIToken
+	profile := auth.AssistantProfile(admin.Role)
+	if profile == "" {
+		return res, &turnRefusal{"not_allowed"}
+	}
 	if in.followUp != nil {
-		profile := profileForFollowUpRole(admin.Role)
-		if profile == "" {
-			return res, &turnRefusal{"not_allowed"}
-		}
 		identity, err = s.st.EnsureAssistantFollowUpToken(ctx, admin.ID, profile, s.now())
 	} else {
-		identity, err = s.st.EnsureAssistantToken(ctx, admin.ID, profileForRole(admin.Role), s.now())
+		identity, err = s.st.EnsureAssistantToken(ctx, admin.ID, profile, s.now())
 	}
 	if err != nil {
 		return res, err
@@ -920,7 +921,7 @@ func (s *Service) persistPlan(ctx context.Context, adminID, conversationID, toke
 		return nil, "", err
 	}
 	baseTool := strings.TrimSuffix(tool, "_plan")
-	inboxOnly := baseTool == "node_install"
+	inboxOnly := baseTool == auth.NodeInstallTool
 	expires := s.now().Add(time.Duration(p.ExpiresInS) * time.Second)
 	summary, err := completePlanText("summary", p.Summary, 1000)
 	if err != nil {

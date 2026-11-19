@@ -126,7 +126,7 @@ func (e *env) begin(ctx context.Context, req *mcp.CallToolRequest, timeout time.
 	var header http.Header
 	var assistant *AssistantIdentity
 	if id, ok := assistantCallIdentity(ctx); ok {
-		auth, hasAssistantAuth := e.cfg.Auth.(assistantAuth)
+		_, hasAssistantAuth := e.cfg.Auth.(assistantAuth)
 		if !hasAssistantAuth || id.TokenID == "" || id.AdminID == "" {
 			return nil, errors.New("not authenticated")
 		}
@@ -134,7 +134,6 @@ func (e *env) begin(ctx context.Context, req *mcp.CallToolRequest, timeout time.
 		assistant = &identity
 		tokenID, profile = id.TokenID, Profile(id.Profile)
 		header = make(http.Header)
-		_ = auth
 	} else {
 		if ex == nil || ex.TokenInfo == nil || ex.TokenInfo.UserID == "" || len(ex.TokenInfo.Scopes) == 0 {
 			return nil, errors.New("not authenticated")

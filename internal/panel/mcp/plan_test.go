@@ -577,7 +577,7 @@ func TestUserDisableBulkNeedsTheOwner(t *testing.T) {
 	if len(e.w.disableReq) != 1 {
 		t.Error("a bulk disable ran without the owner")
 	}
-	// the operator profile has no step-up procedure to approve with: the grant would only matter for tokenApproved ones,
+	// the operator profile has no step-up procedure to approve with: the grant would only matter for the procedures that need the owner's approval,
 	// and SetUsersEnabled is a plain procedure, so after the owner's click the apply runs as an ordinary call
 	e.plans.decide(many.PlanID, true)
 	applyOf(t, s, "user_disable", many.ConfirmToken)

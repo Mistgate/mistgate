@@ -41,7 +41,7 @@ import (
 
 // The test environment: the real MCP layer over a fake admin API (the generated Connect handlers around a fixture world),
 // a stand-in for the auth package's bearer layer, and an in-memory plan store with the compare-and-swaps of the real one.
-// The fakes take the role policy from auth.ProcedureRole; the same flows run against
+// The fakes take the role policy, the token allow-list, the dry-run requests and the grants from the auth package's own tables; the same flows run against
 // the real auth, store and services in cmd/mistgate/mcp_wiring_test.go.
 
 // Canaries: values the fixtures hold that must never reach an agent. Some sit in fields no projection reads, others in
@@ -76,8 +76,8 @@ const (
 	keyAssistant
 )
 
-// fakeAuth stands in for auth.Service: it authenticates bearer tokens and enforces the role policy, the token allow-list
-// shape (token-approved procedures need a grant) and the grants.
+// fakeAuth stands in for auth.Service: it authenticates bearer tokens and enforces, from auth's tables, the role policy, the token
+// allow-list (a procedure that is not on it is refused) and the kind of access of each procedure, with the grants.
 type fakeAuth struct {
 	mu     sync.Mutex
 	tokens map[string]*fakeToken // secret -> token

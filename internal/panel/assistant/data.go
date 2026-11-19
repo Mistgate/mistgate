@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/mcp"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -168,12 +169,11 @@ func (s *Service) assistantTurnAllowed(ctx context.Context, adminID, role string
 	if current.Role != role {
 		return false, nil
 	}
-	var enabled int
-	var audience adminv1.AssistantAudience
-	if err = s.st.R.QueryRowContext(ctx, `SELECT enabled,audience FROM assistant_settings WHERE id=1`).Scan(&enabled, &audience); err != nil {
+	enabled, audience, err := s.st.AssistantAccess(ctx)
+	if err != nil {
 		return false, err
 	}
-	return enabled != 0 && audienceAllows(audience, current.Role), nil
+	return enabled && auth.AssistantAudienceAllows(adminv1.AssistantAudience(audience), current.Role), nil
 }
 
 func estimatePrice(p adminv1.AssistantProvider, model string, input, output int64) float64 {

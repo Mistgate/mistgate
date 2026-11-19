@@ -14,6 +14,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
@@ -235,7 +236,7 @@ func (a routingSetArgs) build(cur *adminv1.SubscriptionSettings, groups map[stri
 }
 
 var routingSet = changeSpec[routingSetArgs]{
-	name: "subscription_routing_set", min: ProfileOperator, danger: true, maxArgs: maxMihomoArgsJSON,
+	name: auth.RoutingProfileTool, min: ProfileOperator, danger: true, maxArgs: maxMihomoArgsJSON,
 	procs: slices.Concat(settingsProcs, procs(adminv1connect.GroupServiceListGroupsProcedure)),
 	desc: "Create, change or delete one own routing profile for the apps Happ and INCY and the groups whose people get it (by their main group; the answer of their subscription link carries it as the `routing` header, or as a line of the body when the link is too long). " +
 		"Give name and profile (what the owner pasted: a happ://routing/onadd/... or incy://... link, the base64 of the JSON, or the JSON) and/or mode, group_ids or all_groups, or name and remove. " +

@@ -4,9 +4,11 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	adminv1connect "github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -157,5 +159,28 @@ func TestAssistantFollowUpKeepsReadProfileAndRefreshesAfterRoleChange(t *testing
 	}
 	if hits != 3 {
 		t.Fatalf("helper read reached the panel API %d times", hits)
+	}
+}
+
+// The assistant's profile and audience follow the admin's role, and a role nobody knows gets nothing: no profile, no audience.
+func TestAssistantProfileAndAudienceByRole(t *testing.T) {
+	profiles := map[string]string{store.RoleOwner: store.ProfileAdmin, store.RoleHelper: store.ProfileOperator, store.RoleReadonly: store.ProfileReadonly, "": "", "guest": ""}
+	for role, want := range profiles {
+		if got := AssistantProfile(role); got != want {
+			t.Errorf("AssistantProfile(%q) = %q, want %q", role, got, want)
+		}
+	}
+	for audience, allowed := range map[adminv1.AssistantAudience][]string{
+		adminv1.AssistantAudience_ASSISTANT_AUDIENCE_EVERYONE:    {store.RoleOwner, store.RoleHelper, store.RoleReadonly},
+		adminv1.AssistantAudience_ASSISTANT_AUDIENCE_ADMINS:      {store.RoleOwner, store.RoleHelper},
+		adminv1.AssistantAudience_ASSISTANT_AUDIENCE_OWNER:       {store.RoleOwner},
+		adminv1.AssistantAudience_ASSISTANT_AUDIENCE_UNSPECIFIED: nil,
+		adminv1.AssistantAudience(99):                            nil,
+	} {
+		for role := range profiles {
+			if got, want := AssistantAudienceAllows(audience, role), slices.Contains(allowed, role); got != want {
+				t.Errorf("AssistantAudienceAllows(%v, %q) = %v, want %v", audience, role, got, want)
+			}
+		}
 	}
 }

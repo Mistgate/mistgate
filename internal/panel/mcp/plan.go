@@ -140,7 +140,7 @@ func (o Outcome) paramsJSON() string {
 type planned struct {
 	Summary  string // one English paragraph; never embeds untrusted text (that goes in Facts)
 	Facts    []Fact
-	Danger   []string // step_up | fleet | bulk: any entry makes the plan wait for the owner
+	Danger   []string // the danger codes of tools_change.go: any entry makes the plan wait for the owner
 	InnerRef string   // node_fix: the dry run's own plan id, never shown to the agent
 	// Params, when set, are the arguments as the plan resolved them (a node name became its id, "every outdated node" became
 	// the list the owner sees); they are what gets stored and applied. Nil: the arguments as given.
