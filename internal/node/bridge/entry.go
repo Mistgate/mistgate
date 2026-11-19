@@ -64,7 +64,21 @@ type ServeConfig struct {
 	PanelAddress string
 	Roots        *x509.CertPool
 	Now          func() time.Time
+	// Peer is who may call: the fleet's agents listed in ExitNodeIDs (the bridge), or the panel (a subscription host, whose
+	// ExitNodeIDs is just PanelPeerID; its proof is VerifyPanelProof and it never reaches the panel through the entry).
+	Peer PeerKind
 }
+
+// PeerKind says whose proof an Entry accepts.
+type PeerKind uint8
+
+const (
+	PeerAgents PeerKind = iota // fleet agents, by node id (VerifyProof)
+	PeerPanel                  // the fleet's panel (VerifyPanelProof): the entry is a subscription host
+)
+
+// PanelPeerID is the exit id of the panel at a subscription host's Entry.
+const PanelPeerID = "panel"
 
 type RelayListener struct {
 	RelayID    string
@@ -363,8 +377,11 @@ func (e *Entry) SetServe(cfg ServeConfig) error {
 		return errors.New("bad_config")
 	}
 	// An address that is no host:port only costs the control link: the people's bridge must not go down with it.
-	if !cfg.PanelVia || !validPanelAddress(cfg.PanelAddress) {
+	if !cfg.PanelVia || !validPanelAddress(cfg.PanelAddress) || cfg.Peer == PeerPanel {
 		cfg.PanelVia, cfg.PanelAddress = false, ""
+	}
+	if cfg.Peer == PeerPanel && (len(cfg.ExitNodeIDs) != 1 || cfg.ExitNodeIDs[0] != PanelPeerID) {
+		return errors.New("bad_config")
 	}
 	ids := append([]string(nil), cfg.ExitNodeIDs...)
 	sort.Strings(ids)
@@ -388,7 +405,7 @@ func (e *Entry) SetServe(cfg ServeConfig) error {
 		return errors.New("closed")
 	}
 	old := e.serve
-	identityChanged := old.EntryNodeID != cfg.EntryNodeID || old.Path != cfg.Path || old.Roots != cfg.Roots
+	identityChanged := old.Peer != cfg.Peer || old.EntryNodeID != cfg.EntryNodeID || old.Path != cfg.Path || old.Roots != cfg.Roots
 	panelChanged := old.PanelVia != cfg.PanelVia || old.PanelAddress != cfg.PanelAddress
 	removed := make([]string, 0)
 	var controlPairs []*bridgePair
@@ -426,7 +443,7 @@ func (e *Entry) SetServe(cfg ServeConfig) error {
 }
 
 func sameServe(a, b ServeConfig) bool {
-	if a.EntryNodeID != b.EntryNodeID || a.Path != b.Path || a.Roots != b.Roots || a.PanelVia != b.PanelVia ||
+	if a.Peer != b.Peer || a.EntryNodeID != b.EntryNodeID || a.Path != b.Path || a.Roots != b.Roots || a.PanelVia != b.PanelVia ||
 		a.PanelAddress != b.PanelAddress || len(a.ExitNodeIDs) != len(b.ExitNodeIDs) {
 		return false
 	}
@@ -484,7 +501,7 @@ func (e *Entry) Handler(site http.Handler) http.Handler {
 			allowed[id] = struct{}{}
 		}
 		now := cfg.Now()
-		exitID, err := e.verifyRequest(cfg.EntryNodeID, exporter, proof, cfg.Roots, allowed, now)
+		exitID, err := e.verifyRequest(cfg.Peer, cfg.EntryNodeID, exporter, proof, cfg.Roots, allowed, now)
 		if err != nil {
 			site.ServeHTTP(w, r)
 			return
@@ -553,7 +570,7 @@ func (e *Entry) serveSnapshot() ServeConfig {
 	return cfg
 }
 
-func (e *Entry) verifyRequest(entryID string, exporter []byte, proof Proof, roots *x509.CertPool, allowed map[string]struct{}, now time.Time) (string, error) {
+func (e *Entry) verifyRequest(peer PeerKind, entryID string, exporter []byte, proof Proof, roots *x509.CertPool, allowed map[string]struct{}, now time.Time) (string, error) {
 	key := sha256.Sum256(exporter)
 	certHash := sha256.Sum256(proof.CertificateDER)
 	sigHash := sha256.Sum256(proof.Signature)
@@ -565,6 +582,9 @@ func (e *Entry) verifyRequest(entryID string, exporter []byte, proof Proof, root
 	}
 	if cached, ok := e.authCache[key]; ok {
 		_, allowedOK := allowed[cached.exitID]
+		if peer == PeerPanel {
+			allowedOK = cached.exitID == PanelPeerID
+		}
 		certOK := subtle.ConstantTimeCompare(certHash[:], cached.certHash[:]) == 1
 		sigOK := subtle.ConstantTimeCompare(sigHash[:], cached.sigHash[:]) == 1
 		if allowedOK && certOK && sigOK && now.Before(cached.notAfter) {
@@ -579,7 +599,12 @@ func (e *Entry) verifyRequest(entryID string, exporter []byte, proof Proof, root
 	}
 	e.mu.Unlock()
 
-	exitID, err := VerifyProof(entryID, exporter, proof, roots, allowed, now)
+	exitID, err := "", error(nil)
+	if peer == PeerPanel {
+		exitID, err = PanelPeerID, VerifyPanelProof(entryID, exporter, proof, roots, now)
+	} else {
+		exitID, err = VerifyProof(entryID, exporter, proof, roots, allowed, now)
+	}
 	if err != nil {
 		return "", err
 	}

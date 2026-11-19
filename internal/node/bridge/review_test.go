@@ -499,7 +499,7 @@ func TestBridgeProofCacheExpiresWithCertificate(t *testing.T) {
 	certHash := sha256.Sum256(proof.CertificateDER)
 	sigHash := sha256.Sum256(proof.Signature)
 	e.authCache[key] = cachedProof{exitID: "nod_de1", certHash: certHash, sigHash: sigHash, notAfter: expiredLeaf.NotAfter, last: now}
-	if _, err := e.verifyRequest("nod_msk1", exporter, proof, pki.roots, map[string]struct{}{"nod_de1": {}}, now); err == nil {
+	if _, err := e.verifyRequest(PeerAgents, "nod_msk1", exporter, proof, pki.roots, map[string]struct{}{"nod_de1": {}}, now); err == nil {
 		t.Fatal("an expired proof was accepted from the authentication cache")
 	}
 }
