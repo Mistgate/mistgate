@@ -15,6 +15,7 @@ import (
 
 	"connectrpc.com/connect"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/mcp"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -626,7 +627,7 @@ func (s *Service) RunFollowUp(ctx context.Context, f store.AssistantFollowUp) Fo
 	switch {
 	case !settings.enabled:
 		return s.followUpNoteOutcome(ctx, admin, f, note, "failed", "assistant_off")
-	case !audienceAllows(settings.audience, admin.Role):
+	case !auth.AssistantAudienceAllows(settings.audience, admin.Role):
 		return s.followUpNoteOutcome(ctx, admin, f, note, "failed", "not_allowed")
 	case settings.provider == adminv1.AssistantProvider_ASSISTANT_PROVIDER_UNSPECIFIED:
 		return s.followUpNoteOutcome(ctx, admin, f, note, "failed", "no_provider")

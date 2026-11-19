@@ -124,7 +124,7 @@ func HasApprovedUserChangePlan(ctx context.Context) bool {
 	// The procedures the plan's own grant opens count too: a group or profile change reaches the user service only
 	// through the owner's approval, and counting its members would refuse an approved plan on any group of more
 	// than ten people.
-	return slices.Contains(userChangePlanProcedures[plan.Tool], procedure) || slices.Contains(grantProcedures[plan.Tool], procedure)
+	return slices.Contains(userChangePlanProcedures[plan.Tool], procedure) || GrantAllows(plan.Tool, procedure)
 }
 
 // MihomoTemplateTool is the MCP tool whose owner-approved plan may change the Mihomo templates of the subscription settings
@@ -164,8 +164,18 @@ func (s *Service) grantAllows(ctx context.Context, tokenID, procedure string) bo
 		plan.DecidedBy == "" || plan.DecidedAt.IsZero() {
 		return false
 	}
-	return slices.Contains(grantProcedures[plan.Tool], procedure)
+	return GrantAllows(plan.Tool, procedure)
 }
+
+// GrantAllows reports whether the approved plan of the MCP tool (its name without the _plan / _apply suffix) may call the
+// procedure: the one lookup of the grants table, for the middleware and for the tests that hold the tool registry against it.
+func GrantAllows(tool, procedure string) bool {
+	return slices.Contains(grantProcedures[tool], procedure)
+}
+
+// GrantedProcedures lists the procedures the approved plan of the MCP tool may call, for the tests that hold the tool registry
+// against the grants table.
+func GrantedProcedures(tool string) []string { return slices.Clone(grantProcedures[tool]) }
 
 // planningAllows reports whether ctx is an MCP planning call (WithPlanning on the MCP channel).
 func planningAllows(ctx context.Context) bool {

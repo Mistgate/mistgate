@@ -14,7 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"filippo.io/age"
+	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -192,5 +195,25 @@ func TestBackupStagesInTheDataDirectoryWithoutCopies(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir(restored); slices.ContainsFunc(entries, func(e os.DirEntry) bool { return strings.HasPrefix(e.Name(), stagePrefix) }) {
 		t.Errorf("a work directory is in the archive: %v", entries)
+	}
+}
+
+// Only the signed-in owner reads the settings of the storage; a helper and a call with no admin are refused. (What a token reads
+// is checked on the real auth in cmd/mistgate.)
+func TestGetBackupSettingsIsOwnerOnly(t *testing.T) {
+	s, _, _ := newTestService(t)
+	r := rpc{s}
+	for role, want := range map[string]connect.Code{store.RoleOwner: 0, store.RoleHelper: connect.CodePermissionDenied, store.RoleReadonly: connect.CodePermissionDenied} {
+		ctx := auth.WithAdmin(context.Background(), store.Admin{ID: "adm_" + role, Role: role})
+		resp, err := r.GetBackupSettings(ctx, connect.NewRequest(&adminv1.GetBackupSettingsRequest{}))
+		if got := connect.CodeOf(err); err != nil && got != want || err == nil && want != 0 {
+			t.Errorf("%s: %v, want code %v", role, err, want)
+		}
+		if err == nil && (resp.Msg.GetSettings().GetBucket() != "bucket" || !resp.Msg.GetSettings().GetHasSecret()) {
+			t.Errorf("the owner reads %+v", resp.Msg.GetSettings())
+		}
+	}
+	if _, err := r.GetBackupSettings(context.Background(), connect.NewRequest(&adminv1.GetBackupSettingsRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Errorf("no admin: %v", err)
 	}
 }

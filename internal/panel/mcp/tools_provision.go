@@ -18,6 +18,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/provision"
 )
 
@@ -87,7 +88,7 @@ type nodeInstallParams struct {
 }
 
 func nodeInstallPlanTool() toolDef {
-	const base = "node_install"
+	const base = auth.NodeInstallTool
 	return toolDef{
 		name: base + "_plan", min: ProfileAdmin, procs: procs(
 			adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure,
@@ -152,7 +153,7 @@ func nodeInstallPlanTool() toolDef {
 }
 
 func nodeInstallApplyTool() toolDef {
-	const base = "node_install"
+	const base = auth.NodeInstallTool
 	return toolDef{
 		name: base + "_apply", min: ProfileAdmin, procs: procs(adminv1connect.ProvisioningServiceStartNodeProvisionProcedure),
 		danger: true, desc: "Apply an owner-approved node_install plan. Takes only the confirm_token: the owner chose Password or Panel key and confirmed the host key on the approval screen. A password install also installs the panel key by default.",

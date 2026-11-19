@@ -181,15 +181,25 @@ func (s *Service) backoff(failed bool, interval time.Duration) {
 
 type rpc struct{ s *Service }
 
+// GetBackupSettings answers the signed-in owner with the settings and a token of the admin profile (the MCP's backup_status, the
+// assistant) with the status only: no account, bucket, key id, age recipient or whether a secret is set. Every other backup call
+// stays closed to tokens.
 func (r rpc) GetBackupSettings(ctx context.Context, _ *connect.Request[adminv1.GetBackupSettingsRequest]) (*connect.Response[adminv1.GetBackupSettingsResponse], error) {
-	if _, err := auth.OwnerSession(ctx); err != nil {
-		return nil, err
+	if a, ok := auth.AdminFrom(ctx); !ok || a.Role != store.RoleOwner {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("owner access required"))
 	}
 	settings, err := r.s.st.PanelBackupSettings(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errBackupInvalidSettings)
 	}
-	return connect.NewResponse(&adminv1.GetBackupSettingsResponse{Settings: r.s.settingsProto(settings)}), nil
+	out := r.s.settingsProto(settings)
+	if auth.PrincipalFrom(ctx).Token {
+		out = &adminv1.BackupSettings{
+			Enabled: out.Enabled, IntervalHours: out.IntervalHours, RetentionDays: out.RetentionDays,
+			LastSuccessUnix: out.LastSuccessUnix, LastErrorCode: out.LastErrorCode, Running: out.Running,
+		}
+	}
+	return connect.NewResponse(&adminv1.GetBackupSettingsResponse{Settings: out}), nil
 }
 
 func (r rpc) UpdateBackupSettings(ctx context.Context, req *connect.Request[adminv1.UpdateBackupSettingsRequest]) (*connect.Response[adminv1.UpdateBackupSettingsResponse], error) {

@@ -4,6 +4,10 @@ package mcp
 
 import (
 	"context"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -169,19 +173,43 @@ func TestConnectionDescriptionsExplainLimits(t *testing.T) {
 	}
 }
 
+var updateToolsByProfile = flag.Bool("update-tools-by-profile", false, "rewrite testdata/tools_by_profile.txt")
+
+// toolsByProfileFile is the tool list of every profile, one name a line under its profile's heading: a tool that appears or goes, or
+// moves to another profile, shows as a line of the diff instead of as a count that someone edits.
+func toolsByProfileFile() string {
+	var b strings.Builder
+	for _, p := range []Profile{ProfileReadonly, ProfileOperator, ProfileAdmin} {
+		fmt.Fprintf(&b, "[%s]\n", p)
+		for _, name := range ToolNames(p) {
+			b.WriteString(name + "\n")
+		}
+	}
+	return b.String()
+}
+
+// The tools each profile sees, as the golden file says, on the registry and on a running server.
 func TestToolsPerProfile(t *testing.T) {
+	path := filepath.Join("testdata", "tools_by_profile.txt")
+	want := toolsByProfileFile()
+	if *updateToolsByProfile {
+		if err := os.WriteFile(path, []byte(want), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	have, err := os.ReadFile(path)
+	if err != nil || strings.ReplaceAll(string(have), "\r\n", "\n") != want {
+		t.Fatalf("%s is out of date: a tool came or went. Refresh it with `go test ./internal/panel/mcp -run ToolsPerProfile -update-tools-by-profile` and read the diff", path)
+	}
 	e := newTestEnv(t)
-	want := map[Profile]int{ProfileReadonly: 50, ProfileOperator: 105, ProfileAdmin: 203}
 	got := map[Profile][]string{}
-	for p, n := range want {
+	for _, p := range []Profile{ProfileReadonly, ProfileOperator, ProfileAdmin} {
 		_, secret := e.token(p)
 		names := toolNames(t, e.session(secret))
 		got[p] = names
-		if len(names) != n {
-			t.Errorf("%s sees %d tools, want %d: %v", p, len(names), n, names)
-		}
-		if len(toolsFor(p)) != n {
-			t.Errorf("%s: registry says %d tools, want %d", p, len(toolsFor(p)), n)
+		if !slices.Equal(slices.Sorted(slices.Values(names)), ToolNames(p)) {
+			t.Errorf("%s: the server lists %d tools, the registry %d", p, len(names), len(ToolNames(p)))
 		}
 	}
 	for _, n := range got[ProfileReadonly] {
@@ -322,5 +350,33 @@ func TestHiddenToolIsUnknown(t *testing.T) {
 	}
 	if n := len(e.w.log); n != 0 {
 		t.Errorf("hidden tools reached the API %d times", n)
+	}
+}
+
+// The owner's approved plan of a tool opens the procedures that tool calls and nothing else (auth's grants table). A procedure of
+// an apply tool that needs the owner's approval or a step-up and that the tool's grant does not list is refused (403) on a real
+// panel, however well the tool runs against the fakes; and a grant that names a procedure the tool never calls opens it for
+// nothing. The two lists meet here, because auth cannot import the tool registry.
+func TestToolGrantsMatchTheProceduresOfTheirTools(t *testing.T) {
+	tools := map[string]toolDef{}
+	for _, td := range registry {
+		if name, ok := strings.CutSuffix(td.name, "_apply"); ok {
+			tools[name] = td
+		}
+	}
+	for name, td := range tools {
+		for _, p := range td.procs {
+			access, _ := auth.TokenAccess(p)
+			if (access == auth.TokenAccessApproved || auth.NeedsStepUp(p)) && !auth.GrantAllows(name, p) {
+				t.Errorf("%s_apply calls %s, which needs the owner's approval, and the grant of %s does not list it", name, p, name)
+			}
+		}
+	}
+	for name, td := range tools {
+		for _, p := range auth.GrantedProcedures(name) {
+			if !slices.Contains(td.procs, p) {
+				t.Errorf("the grant of %s opens %s, which %s_apply does not list among its procedures", name, p, name)
+			}
+		}
 	}
 }

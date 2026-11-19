@@ -15,6 +15,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
@@ -301,7 +302,7 @@ func (a mihomoTemplateSetArgs) build(cur *adminv1.SubscriptionSettings, groups m
 }
 
 var mihomoTemplateSet = changeSpec[mihomoTemplateSetArgs]{
-	name: "subscription_mihomo_template_set", min: ProfileOperator, danger: true, maxArgs: maxMihomoArgsJSON,
+	name: auth.MihomoTemplateTool, min: ProfileOperator, danger: true, maxArgs: maxMihomoArgsJSON,
 	procs: slices.Concat(settingsProcs, procs(adminv1connect.GroupServiceListGroupsProcedure)),
 	desc: "Create, change or delete one own Mihomo YAML template and the groups whose people get it (the Mihomo YAML answer of their subscription link is built from it; the panel puts the person's servers into `proxies` and an `Auto` group into `proxy-groups`). " +
 		"Give name and yaml (the whole text, at most 64 KiB) and/or group_ids (the whole list), or name and remove. The text is checked as the admin's save checks it, and a text that holds the scrubber's markers ([redacted], [token], [key], [link]...) is refused: read a template with subscription_mihomo_template_get only to understand it. " +

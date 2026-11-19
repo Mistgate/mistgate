@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -76,8 +77,8 @@ func TestProxyEndToEnd(t *testing.T) {
 	p := startProxy(t, base, writeTokenFile(t, string(rune(0xFEFF))+secret+"\r\nignored second line\n"))
 
 	names := toolNames(t, p.sess)
-	if len(names) != 105 {
-		t.Errorf("%d tools through the proxy: %v", len(names), names)
+	if want := ToolNames(ProfileOperator); !slices.Equal(slices.Sorted(slices.Values(names)), want) {
+		t.Errorf("%d tools through the proxy, the operator profile has %d: %v", len(names), len(want), names)
 	}
 	out := mustOK(t, p.sess, "user_get", map[string]any{"user_id": "usr_alice"})
 	if !strings.Contains(out, "usr_alice") {

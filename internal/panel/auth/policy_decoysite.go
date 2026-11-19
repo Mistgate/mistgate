@@ -3,8 +3,6 @@
 package auth
 
 import (
-	"google.golang.org/protobuf/proto"
-
 	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/decoysite/v1/decoysitev1connect"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -77,14 +75,5 @@ func init() {
 	grantProcedures["decoy_site_revert"] = []string{decoysitev1connect.DecoySiteServiceRevertDecoySiteProcedure}
 	grantProcedures["decoy_site_delete"] = []string{decoysitev1connect.DecoySiteServiceDeleteDecoySiteProcedure}
 	// the plan of an assignment asks what it would replace: a dry run changes nothing, even for a draft that is not ready yet
-	planningExtra[decoysitev1connect.DecoySiteServiceAssignDecoySiteProcedure] = struct {
-		message func() proto.Message
-		dry     func(proto.Message) bool
-	}{
-		message: func() proto.Message { return &decoysitev1.AssignDecoySiteRequest{} },
-		dry: func(m proto.Message) bool {
-			r, ok := m.(*decoysitev1.AssignDecoySiteRequest)
-			return ok && r.GetDryRun()
-		},
-	}
+	planningExtra[decoysitev1connect.DecoySiteServiceAssignDecoySiteProcedure] = planningCheck((*decoysitev1.AssignDecoySiteRequest).GetDryRun)
 }

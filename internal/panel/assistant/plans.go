@@ -10,6 +10,7 @@ import (
 
 	"connectrpc.com/connect"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/mcp"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -40,30 +41,6 @@ func (s *Service) savePlanCard(ctx context.Context, id string, card *adminv1.Pla
 	return err
 }
 
-func profileForRole(role string) string {
-	switch role {
-	case store.RoleReadonly:
-		return store.ProfileReadonly
-	case store.RoleHelper:
-		return store.ProfileOperator
-	default:
-		return store.ProfileAdmin
-	}
-}
-
-func profileForFollowUpRole(role string) string {
-	switch profileForRole(role) {
-	case store.ProfileReadonly:
-		return store.ProfileReadonly
-	case store.ProfileOperator:
-		return store.ProfileOperator
-	case store.ProfileAdmin:
-		return store.ProfileAdmin
-	default:
-		return ""
-	}
-}
-
 func (s *Service) assistantSession(ctx context.Context, admin store.Admin, tokenID string) (mcp.AssistantSession, error) {
 	s.mu.RLock()
 	runtime := s.tools
@@ -71,17 +48,19 @@ func (s *Service) assistantSession(ctx context.Context, admin store.Admin, token
 	if runtime == nil {
 		return nil, errors.New("assistant panel tools are unavailable")
 	}
-	profile := profileForRole(admin.Role)
 	if tokenID != "" && tokenID == store.ScheduledTokenID(admin.ID) {
 		// a plan a scheduled task prepared: its apply runs with the identity that made it, the operator profile
 		return runtime.OpenAssistant(ctx, mcp.AssistantIdentity{TokenID: tokenID, Profile: store.ProfileOperator, AdminID: admin.ID, AdminName: admin.DisplayName, Scheduled: true})
 	}
+	profile := auth.AssistantProfile(admin.Role)
 	if tokenID != "" && tokenID == store.FollowUpTokenID(admin.ID) {
-		profile := profileForFollowUpRole(admin.Role)
 		if profile == "" {
 			return nil, errors.New("assistant follow-up identity is not available for this admin role")
 		}
 		return runtime.OpenAssistant(ctx, mcp.AssistantIdentity{TokenID: tokenID, Profile: profile, AdminID: admin.ID, AdminName: admin.DisplayName, FollowUp: true})
+	}
+	if profile == "" {
+		return nil, errors.New("assistant identity is not available for this admin role")
 	}
 	if tokenID == "" {
 		token, err := s.st.EnsureAssistantToken(ctx, admin.ID, profile, s.now())
@@ -179,7 +158,7 @@ func (s *Service) ApplyPlan(ctx context.Context, req *connect.Request[adminv1.Ap
 	if json.Unmarshal([]byte(result.Text), &applied) != nil || applied.Status == "" {
 		return s.syncApplyCardFromMCP(ctx, p.id, card, "plan apply returned an invalid result")
 	}
-	if applied.Status == mcp.StatusApplied || applied.Status == "applied" {
+	if applied.Status == mcp.StatusApplied {
 		card.State = adminv1.PlanState_PLAN_STATE_APPLIED
 		card.Result = cleanContextText(applied.Result, 300)
 		card.Error = ""

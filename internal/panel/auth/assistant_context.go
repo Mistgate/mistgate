@@ -93,7 +93,7 @@ func (s *Service) serveAssistant(w http.ResponseWriter, r *http.Request, next ht
 		writeJSONError(w, http.StatusUnauthorized, unauthenticatedBody)
 		return
 	}
-	profile := assistantProfile(current.Role)
+	profile := AssistantProfile(current.Role)
 	if id.scheduled {
 		// a scheduled task acts with the operator profile, never more: the owner's tasks and a helper's alike (only the owner
 		// creates tasks, but a demotion must not leave a task with more than its admin has); a read-only admin's none at all
@@ -103,29 +103,11 @@ func (s *Service) serveAssistant(w http.ResponseWriter, r *http.Request, next ht
 			return
 		}
 		profile = store.ProfileOperator
-	} else if id.followUp {
-		profile = assistantFollowUpProfile(current.Role)
-		if profile == "" {
-			_ = s.st.RevokeAssistantToken(r.Context(), id.tokenID, id.adminID, s.now())
-			writeJSONError(w, http.StatusUnauthorized, unauthenticatedBody)
-			return
-		}
-		var enabled int
-		var audience int64
-		if err = s.st.R.QueryRowContext(r.Context(), `SELECT enabled,audience FROM assistant_settings WHERE id=1`).Scan(&enabled, &audience); err != nil || enabled == 0 || !assistantAudienceAllows(audience, current.Role) {
-			_ = s.st.RevokeAssistantToken(r.Context(), id.tokenID, id.adminID, s.now())
-			writeJSONError(w, http.StatusUnauthorized, unauthenticatedBody)
-			return
-		}
 	} else {
-		if profile == "" {
-			_ = s.st.RevokeAssistantToken(r.Context(), id.tokenID, id.adminID, s.now())
-			writeJSONError(w, http.StatusUnauthorized, unauthenticatedBody)
-			return
-		}
-		var enabled int
-		var audience int64
-		if err = s.st.R.QueryRowContext(r.Context(), `SELECT enabled,audience FROM assistant_settings WHERE id=1`).Scan(&enabled, &audience); err != nil || enabled == 0 || !assistantAudienceAllows(audience, current.Role) {
+		// a turn the admin is having and an unattended follow-up alike: the admin's own profile, while the assistant is on and
+		// the admin is in its audience
+		enabled, audience, err := s.st.AssistantAccess(r.Context())
+		if profile == "" || err != nil || !enabled || !AssistantAudienceAllows(adminv1.AssistantAudience(audience), current.Role) {
 			_ = s.st.RevokeAssistantToken(r.Context(), id.tokenID, id.adminID, s.now())
 			writeJSONError(w, http.StatusUnauthorized, unauthenticatedBody)
 			return
@@ -183,7 +165,8 @@ func (s *Service) serveAssistant(w http.ResponseWriter, r *http.Request, next ht
 	next.ServeHTTP(sw, r)
 }
 
-func assistantProfile(role string) string {
+// AssistantProfile is the token profile the assistant of an admin of the role acts with; "" for a role the assistant is not for.
+func AssistantProfile(role string) string {
 	switch role {
 	case store.RoleOwner:
 		return store.ProfileAdmin
@@ -196,23 +179,11 @@ func assistantProfile(role string) string {
 	}
 }
 
-func assistantFollowUpProfile(role string) string {
-	switch assistantProfile(role) {
-	case store.ProfileReadonly:
-		return store.ProfileReadonly
-	case store.ProfileOperator:
-		return store.ProfileOperator
-	case store.ProfileAdmin:
-		return store.ProfileAdmin
-	default:
-		return ""
-	}
-}
-
-func assistantAudienceAllows(audience int64, role string) bool {
-	switch adminv1.AssistantAudience(audience) {
+// AssistantAudienceAllows reports whether an admin of the role is in the audience the owner set for the assistant.
+func AssistantAudienceAllows(audience adminv1.AssistantAudience, role string) bool {
+	switch audience {
 	case adminv1.AssistantAudience_ASSISTANT_AUDIENCE_EVERYONE:
-		return assistantProfile(role) != ""
+		return AssistantProfile(role) != ""
 	case adminv1.AssistantAudience_ASSISTANT_AUDIENCE_ADMINS:
 		return role == store.RoleOwner || role == store.RoleHelper
 	case adminv1.AssistantAudience_ASSISTANT_AUDIENCE_OWNER:

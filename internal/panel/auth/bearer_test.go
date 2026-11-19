@@ -920,8 +920,18 @@ func TestTokenAllowList(t *testing.T) {
 			approved[path] = true
 		}
 	}
-	if len(approved) != 49 {
-		t.Errorf("%d procedures need approval, want 49: %v", len(approved), approved)
+	// every procedure that needs the owner's approval is opened by the grant of some tool: one that no grant lists is dead, and
+	// a tool added for it gets its grant in the same change (the tool registry is held against the grants in internal/panel/mcp)
+	granted := map[string]bool{}
+	for _, procedures := range grantProcedures {
+		for _, p := range procedures {
+			granted[p] = true
+		}
+	}
+	for path := range approved {
+		if !granted[path] {
+			t.Errorf("%s needs the owner's approval and no tool's grant opens it", path)
+		}
 	}
 	if got, ok := TokenAccess(adminv1connect.WarpServiceRegisterWarpProcedure); !ok || got != TokenAccessApproved {
 		t.Errorf("RegisterWarp token access = %d, %v; want approved", got, ok)
