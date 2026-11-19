@@ -3,7 +3,6 @@ package agent
 import (
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"net/netip"
 	"slices"
@@ -377,22 +376,9 @@ func tunnelPublishedPorts(next *model, sshPorts []uint16) []hostctl.PublishedPor
 				seen[hostctl.PublishedPort{Network: side.Network, Port: uint32(side.Port)}] = true
 			}
 		}
-		if spec.Protocol == "hysteria2" {
-			var settings struct {
-				Masquerade struct {
-					TCPPort *int `json:"tcp_port"`
-				} `json:"masquerade"`
-			}
-			if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
-				continue
-			}
-			port := 443 // hysteria2's HTTPS masquerade default; TCP 443 is also kept unconditionally by hostctl
-			if settings.Masquerade.TCPPort != nil {
-				port = *settings.Masquerade.TCPPort // zero disables the HTTPS listener
-			}
-			if port > 0 && port <= 65535 && !ssh[uint16(port)] {
-				seen[hostctl.PublishedPort{Network: "tcp", Port: uint32(port)}] = true
-			}
+		// the HTTPS site of Hysteria2 (TCP 443 is also kept unconditionally by hostctl)
+		if port := plugin.Hy2SitePort(spec); port != 0 && !ssh[port] {
+			seen[hostctl.PublishedPort{Network: "tcp", Port: uint32(port)}] = true
 		}
 	}
 	ports := make([]hostctl.PublishedPort, 0, len(seen))
