@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -68,10 +67,11 @@ func requiredCap(s plugin.InboundSpec) string {
 		return capTrustTunnel
 	}
 	if s.Protocol == "vless" {
-		if vlessTLS(s) {
+		v, _ := plugin.VLESSOf(s)
+		if v.TLS() {
 			return capVLESSTLS
 		}
-		if vlessTargetSelf(s) {
+		if v.TargetSelf() {
 			return capVLESSSelf
 		}
 		if s.TLS.ServerName != "" {
@@ -80,23 +80,6 @@ func requiredCap(s plugin.InboundSpec) string {
 		return capVLESS
 	}
 	return ""
-}
-
-func vlessTLS(s plugin.InboundSpec) bool {
-	var settings struct {
-		Security string `json:"security"`
-	}
-	return json.Unmarshal(s.Settings, &settings) == nil && settings.Security == "tls"
-}
-
-// vlessTargetSelf: the REALITY target of a VLESS inbound is the node's own site (wire value "self").
-func vlessTargetSelf(s plugin.InboundSpec) bool {
-	var settings struct {
-		Reality struct {
-			Target string `json:"target"`
-		} `json:"reality"`
-	}
-	return json.Unmarshal(s.Settings, &settings) == nil && strings.TrimSpace(settings.Reality.Target) == "self"
 }
 
 // inboundState is one inbound as the node must hold it.

@@ -5,12 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"net"
 	"net/netip"
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -133,7 +131,7 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 			add(tcpTarget{Port: spec.Listen.Port, Role: tcpRoleMTProto, Profile: s.Profile, Kind: tcpcheck.KindTLS,
 				SNI: spec.TLS.ServerName, Pin: pin, PublicCert: hasPublicCertificate(spec.TLS) || spec.TLS.Mode == 0})
 		case spec.Protocol == "hysteria2":
-			port := uint16(hy2SitePort(spec))
+			port := plugin.Hy2SitePort(spec)
 			if port == 0 || owners[port].Protocol != "hysteria2" {
 				continue
 			}
@@ -165,56 +163,27 @@ func hasPublicCertificate(tls plugin.TLS) bool {
 // vlessProbeName is the TLS name to send to a VLESS listener, and whether it is the node's own name ("self" REALITY or a
 // TLS front, where the node holds the certificate itself) rather than the name of another site REALITY forwards to.
 func vlessProbeName(spec plugin.InboundSpec) (name string, own bool) {
-	var settings struct {
-		Security string `json:"security"`
-		Reality  struct {
-			Target      string   `json:"target"`
-			ServerNames []string `json:"server_names"`
-		} `json:"reality"`
-	}
-	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
+	v, ok := plugin.VLESSOf(spec)
+	if !ok {
 		return "", false
 	}
-	if settings.Security == "tls" || (settings.Security == "reality" || settings.Security == "") && settings.Reality.Target == "self" {
+	if v.OwnSite() {
 		if spec.TLS.ServerName != "" {
 			return spec.TLS.ServerName, true
 		}
-		if len(settings.Reality.ServerNames) > 0 {
-			return settings.Reality.ServerNames[0], true
+		if len(v.ServerNames) > 0 {
+			return v.ServerNames[0], true
 		}
 		return "", true
 	}
-	if len(settings.Reality.ServerNames) > 0 {
-		return settings.Reality.ServerNames[0], false
+	if len(v.ServerNames) > 0 {
+		return v.ServerNames[0], false
 	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(settings.Reality.Target))
-	if err != nil {
-		return "", false
-	}
+	host := v.TargetHost()
 	if _, err := netip.ParseAddr(host); err == nil { // an IP address is no name to send
 		return "", false
 	}
 	return host, false
-}
-
-// hy2SitePort is the TCP port of a Hysteria2 inbound's HTTPS site: settings.masquerade.tcp_port, 443 when omitted, 0 = no
-// site (the node's own rule, internal/node/hysteria2/settings.go).
-func hy2SitePort(spec plugin.InboundSpec) int {
-	if spec.Protocol != "hysteria2" || spec.TLS.Mode == 0 {
-		return 0
-	}
-	var settings struct {
-		Masquerade struct {
-			TCPPort *int `json:"tcp_port"`
-		} `json:"masquerade"`
-	}
-	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
-		return 0
-	}
-	if settings.Masquerade.TCPPort != nil {
-		return min(max(*settings.Masquerade.TCPPort, 0), 65535)
-	}
-	return 443
 }
 
 // runTCPCheck runs the TCP half for a node whose agent is connected. ran is false when there was nothing to do or nobody to

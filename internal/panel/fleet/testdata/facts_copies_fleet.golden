@@ -16,9 +16,9 @@ hy2-p8443                    hy2SitePort=8443
 hy2-p8443                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
 hy2-p65535                   hy2SitePort=65535
 hy2-p65535                   vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
-hy2-p65536                   hy2SitePort=65535
+hy2-p65536                   hy2SitePort=0
 hy2-p65536                   vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
-hy2-p70000                   hy2SitePort=65535
+hy2-p70000                   hy2SitePort=0
 hy2-p70000                   vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
 hy2-pnull                    hy2SitePort=443
 hy2-pnull                    vlessProbeName="",false vlessTLS=false vlessTargetSelf=false vlessExternalReality=false
@@ -89,9 +89,9 @@ vless-self                   vlessProbeName="Self.example.com",true vlessTLS=fal
 vless-self+sni               hy2SitePort=0
 vless-self+sni               vlessProbeName="de1.example.com",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
 vless-self-sp                hy2SitePort=0
-vless-self-sp                vlessProbeName="self.example.com",false vlessTLS=false vlessTargetSelf=true vlessExternalReality=true
+vless-self-sp                vlessProbeName="self.example.com",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
 vless-self-sp+sni            hy2SitePort=0
-vless-self-sp+sni            vlessProbeName="self.example.com",false vlessTLS=false vlessTargetSelf=true vlessExternalReality=true
+vless-self-sp+sni            vlessProbeName="de1.example.com",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
 vless-self-nonames           hy2SitePort=0
 vless-self-nonames           vlessProbeName="",true vlessTLS=false vlessTargetSelf=true vlessExternalReality=false
 vless-self-nonames+sni       hy2SitePort=0
