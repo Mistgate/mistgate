@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
-import { CheckStatus, CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
+import { CheckStatus } from "@/gen/mistgate/admin/v1/health_pb";
 import { currentLang, dictionaries, fill, langs, pickForm, setLang, type Lang, type T } from "@/i18n";
 import { nowLook, nowToast, type CountryNow } from "@/lib/country-now";
 import { setEffectsEnabled } from "@/lib/effects";
@@ -256,6 +256,5 @@ describe("the verdict that the panel sent is unchanged by the round", () => {
     getChecks.mockResolvedValue(checksOf([round("running")]));
     await mountCard();
     expect(ru().dataset.kind).toBe("ok");
-    expect(CountryVerdict.OK).toBeDefined();
   });
 });

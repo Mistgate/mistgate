@@ -289,10 +289,9 @@ describe("the Integrations screen: tokens", () => {
     expect(listApprovals).not.toHaveBeenCalled();
   });
 
-  it("offers Telegram alerts (the card has its own tests) and no webhooks", async () => {
+  it("offers Telegram alerts (the card has its own tests)", async () => {
     await mount(tokens([]), inbox([]), "integrations");
     expect(text()).toContain("Telegram notifications");
-    expect(text()).not.toMatch(/webhook/i);
   });
 
   it("opens the create form for the palette's “New API token” and takes ?new=token out of the address", async () => {

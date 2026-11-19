@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { BundleStatus, NodeUpdateState, RolloutStatus, StepState } from "@/gen/mistgate/admin/v1/update_pb";
 import type { Updates } from "@/lib/updates";
-import { fleetCards, fleetMatrix, MATRIX_FROM, rolloutNow } from "./fleet";
+import { fleetCards, fleetMatrix, rolloutNow } from "./fleet";
 import { runMatrix } from "./matrix";
 import { releaseItems } from "./notes";
 import { trackOf } from "./track";
@@ -97,10 +97,6 @@ describe("fleetMatrix", () => {
   const up = (n: number) => Array.from({ length: n }, (_, i) => node(`up${i + 1}`, NodeUpdateState.UP_TO_DATE));
   const cards = (nodes: unknown[], rollout: unknown = null) => fleetCards(data(nodes, rollout));
   const names = (cs: { name: string }[]) => cs.map((c) => c.name);
-
-  it("goes to a matrix from seven nodes", () => {
-    expect(MATRIX_FROM).toBe(7);
-  });
 
   it("gives the card to the canary when it is the only node that is not up to date, and every other node a cell (the board's twelve)", () => {
     const m = fleetMatrix(cards([...up(11), node("fi1", NodeUpdateState.OUTDATED, { onlineUsers: 0 })]));

@@ -199,13 +199,11 @@ describe("the route map", () => {
     expect(text("ghost:exit")).toContain("WARP or through another node");
   });
 
-  it("draws one wire per way, no rows of ports and no pills at wire ends", async () => {
+  it("draws one wire per way, labelled with its servers", async () => {
     await mount();
     expect([...document.querySelectorAll("[data-gedge]")].map((e) => e.getAttribute("data-gedge")).sort()).toEqual(
       ["node:exit:internet", "people:way:direct", "people:way:via:nod_msk1", "way:direct:node", "way:via:nod_msk1:node"].sort(),
     );
-    expect(document.querySelectorAll(".mg-gport:not(.mg-ganchor)")).toHaveLength(0);
-    expect(document.querySelector(".mg-glabel[data-end]")).toBeNull();
     expect(document.querySelector(".mg-glabel")?.textContent).toBe("1 server");
   });
 

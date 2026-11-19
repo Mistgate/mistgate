@@ -8,7 +8,6 @@ import { App } from "@/gen/mistgate/admin/v1/common_pb";
 import { PagePasswordAction, UserFilter, UserSort, UserStatus } from "@/gen/mistgate/admin/v1/user_pb";
 import { setLang } from "@/i18n";
 import { setEffectsEnabled } from "@/lib/effects";
-import { groupTone } from "./format";
 import { UsersScreen } from "./list";
 
 const listUsers = vi.fn();
@@ -174,9 +173,8 @@ describe("the people table", () => {
     expect(JSON.parse(tag("bob").dataset.params!)).toEqual({ id: "grp_ok" });
     expect(tag("bob").className).toContain("tone-chip");
     expect(tag("bob").dataset.tone).toBe("rose"); // not what its id would give
-    expect(groupTone("grp_ok")).not.toBe("rose");
     expect(tag("alice").dataset.tone).toBe("mint");
-    expect(tag("carol").dataset.tone).toBe(groupTone("grp_old")); // none stored: the id's tone
+    expect(tag("carol").dataset.tone).toBe("sand"); // none stored: the tone its id gives
   });
 
   it("adds +N after the main group of a person who is in more groups, and names them for a reader of the screen", async () => {

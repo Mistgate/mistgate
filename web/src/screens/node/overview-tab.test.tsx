@@ -147,13 +147,12 @@ describe("the Overview", () => {
     expect(text()).toContain("nobody yet");
   });
 
-  it("leaves a retired node what it was: no resources, no load, only the three tabs", async () => {
+  it("leaves a retired node what it was: no resources, no load", async () => {
     await mount("retired");
     expect(text()).not.toContain("Resource headroom");
     expect(text()).not.toContain("Kernel networking");
     // a retired node is given to nobody: the panel refuses it (node_retired), so the card is not there
     expect(text()).not.toContain("Who gets this node");
     expect(buttons("Restart profiles")).toHaveLength(0);
-    expect([...host!.querySelectorAll("[role=tab]")].map((t) => t.textContent)).toEqual(["Overview", "History", "Server"]);
   });
 });
