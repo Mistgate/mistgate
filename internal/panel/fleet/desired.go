@@ -39,6 +39,9 @@ const (
 	// capabilities), because the agents of v0.1.69 have the engine without the string, and v0.1.68 rejects the whole state
 	// for an mtproto inbound.
 	capMTProto = "mtproto/1"
+	// capTCPShare: the agent shares a TCP port between services by SNI (agent.proto "SHARED TCP PORT"). An agent without it
+	// holds one service of a port and fails the rest on bind, so it is sent only the default route of such a port.
+	capTCPShare = "tcp-share/1"
 )
 
 // protocolAWG is the plugin id of AmneziaWG. An inbound that has a Tunnel is an L3 inbound whatever the protocol.
@@ -166,6 +169,12 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 			sort.Slice(creds, func(i, j int) bool { return creds[i].CredID < creds[j].CredID })
 			st.in[x.Spec.ID] = &inboundState{spec: x.Spec, specHash: statehash.Spec(x.Spec), creds: creds}
 		}
+		if !slices.Contains(caps, capTCPShare) {
+			for _, id := range unsharedLosers(st) {
+				delete(st.in, id)
+				st.withheld = append(st.withheld, id)
+			}
+		}
 		sort.Strings(st.withheld)
 		if w := f.warpModule(); w != nil && slices.Contains(caps, capWarp) {
 			if st.warp, err = w.Spec(ctx, n.ID); err != nil {
@@ -183,6 +192,31 @@ func (f *Fleet) buildState(ctx context.Context, n store.NodeRow, caps []string) 
 	}
 	st.hash = statehash.StateBridge(st.list(), st.warp, st.relays, st.bridgeServe, st.bridgeDials)
 	return st, nil
+}
+
+// unsharedLosers are the inbounds of the ports that services share by SNI (plugin.TCPSharePlan) that an agent which cannot share
+// must not be sent: all but the default route, which then listens alone, as the lowest id did before ports were shared. A port
+// without a default route is not shared by any agent: the old rule holds there.
+func unsharedLosers(st *nodeState) []string {
+	specs := make([]plugin.InboundSpec, 0, len(st.in))
+	for _, id := range st.ids() {
+		specs = append(specs, st.in[id].spec)
+	}
+	var out []string
+	for _, p := range plugin.TCPSharePlan(specs) {
+		if !p.Front() {
+			continue
+		}
+		for _, r := range p.Routes {
+			if r.ID != p.Default {
+				out = append(out, r.ID)
+			}
+		}
+		for id := range p.Shadowed {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // foldRateLimits is the limit an agent without "user-rate-limit/1" gets: it cannot share a bucket between devices, so it

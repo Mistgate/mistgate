@@ -166,6 +166,8 @@ type Fleet struct {
 	portCheckLocks  map[string]*portCheckLock
 	bridgeSeenMu    sync.Mutex
 	bridgeSeen      map[string]bridgeSeen
+	sharedSeenMu    sync.Mutex
+	sharedSeen      map[string]sharedSeen
 	bridgeControlMu sync.RWMutex
 	relayControl    func(context.Context, string)
 	decoySyncMu     sync.Mutex
@@ -266,6 +268,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 		statsBudgets:         map[string]*statsBudgetEntry{},
 		portCheckLocks:       map[string]*portCheckLock{},
 		bridgeSeen:           map[string]bridgeSeen{},
+		sharedSeen:           map[string]sharedSeen{},
 		decoySyncing:         map[string]bool{},
 		decoySyncDirty:       map[string]bool{},
 		decoyAttempts:        map[string]decoyAttempt{},

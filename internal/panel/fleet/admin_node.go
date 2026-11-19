@@ -542,6 +542,9 @@ func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.G
 	}
 	resp.PortChecks, _ = portCheckMessages(names, portChecks, "", "")
 	resp.TcpChecks = tcpCheckMessages(names, tcpChecks)
+	if resp.SharedPorts, resp.SharedPortsUnix, err = f.storedSharedPorts(ctx, n.ID); err != nil {
+		return nil, internalErr(f.log.Error, "node shared ports", err)
+	}
 	live, err := f.liveRowsForNode(ctx, n.ID, true)
 	if err != nil {
 		return nil, internalErr(f.log.Error, "node live", err)
