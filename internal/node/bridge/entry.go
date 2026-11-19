@@ -1366,7 +1366,7 @@ func (e *Entry) listenerWorker(state *listenerState) {
 				defer state.wg.Done()
 				defer state.remove(client)
 				defer e.releaseClient(peer)
-				if !e.attachClient(state.ctx, peer, state.config, client) {
+				if !e.attachClient(state.ctx, peer, state.config, client, 0, nil) {
 					rejectConn(client)
 				}
 			}(conn)
@@ -1388,7 +1388,10 @@ func rejectConn(conn net.Conn) {
 	_ = conn.Close()
 }
 
-func (e *Entry) attachClient(ctx context.Context, peer *entryPeer, listener RelayListener, conn net.Conn) bool {
+// attachClient hands conn to a free pair of peer and waits until its stream ends (true). False: no pair came in time or ctx
+// ended first; conn is untouched then unless it was attached. onAttached, when set, runs once conn has a pair; idle is the
+// stream's idle timeout (0 = the entry's).
+func (e *Entry) attachClient(ctx context.Context, peer *entryPeer, listener RelayListener, conn net.Conn, idle time.Duration, onAttached func()) bool {
 	deadline := time.Now().Add(ClientWaitForStream)
 	for {
 		remaining := time.Until(deadline)
@@ -1409,7 +1412,10 @@ func (e *Entry) attachClient(ctx context.Context, peer *entryPeer, listener Rela
 		e.mu.Lock()
 		attached := !pair.finished && pair.paired && pair.conn == nil
 		if attached {
-			pair.conn = newIdleConn(conn, e.timing.streamIdle)
+			if idle <= 0 {
+				idle = e.timing.streamIdle
+			}
+			pair.conn = newIdleConn(conn, idle)
 			pair.relayID = listener.RelayID
 			peer.streams++
 			peer.lastError = ""
@@ -1420,6 +1426,9 @@ func (e *Entry) attachClient(ctx context.Context, peer *entryPeer, listener Rela
 			close(pair.attached)
 		}
 		e.mu.Unlock()
+		if attached && onAttached != nil {
+			onAttached()
+		}
 		if !attached {
 			continue
 		}
