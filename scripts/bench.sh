@@ -4,7 +4,7 @@
 # Windows (Git Bash, PowerShell) or macOS it runs itself in WSL as root. Read docs/en/reference/benchmarks.md first.
 #
 #   scripts/bench.sh [options]
-#     --engines  hysteria2,vless-tcp,vless-xhttp,awg   (default: all)
+#     --engines  hysteria2,vless-tcp,vless-xhttp,vless-tcp-front,vless-xhttp-front,awg   (default: all)
 #     --variants clean,rtt50-loss1,mtu1280             (default: all)
 #     --seconds  N         length of each throughput phase, default 4
 #     --repeat   N         runs per case, the median is reported (default 1; use 3 for a baseline)
@@ -68,7 +68,7 @@ export MISTGATE_BENCH_JSON=${out:-$(pwd)/bench-report.json}
 export MISTGATE_BENCH_BASELINE=$(pwd)/internal/node/bench/baseline.json
 
 if [ -n "$list" ]; then
-  echo "engines:  ${engines:-hysteria2,vless-tcp,vless-xhttp,awg}"
+  echo "engines:  ${engines:-hysteria2,vless-tcp,vless-xhttp,vless-tcp-front,vless-xhttp-front,awg}"
   echo "variants: ${variants:-clean,rtt50-loss1,mtu1280}"
   echo "report:   $MISTGATE_BENCH_JSON"
   echo "baseline: $MISTGATE_BENCH_BASELINE"

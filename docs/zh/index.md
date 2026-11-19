@@ -44,6 +44,7 @@ Mistgate 是供你管理自己的 VPN 集群的自托管面板：一个二进制
 - [Hysteria2](guide/hysteria2.md)：Hysteria2 协议配置设置、证书和混淆。
 - [VLESS REALITY](guide/vless.md)：TCP 和 XHTTP 上的 VLESS 协议配置、何时选择它而不是 Hysteria2、如何选择 REALITY 目标、端口和应用。
 - [同一节点上的 VLESS 与 Hysteria2](guide/vless-and-hysteria2.md)：分别由什么监听端口、VLESS 占用 TCP 443 时 Hysteria2 站点和 Let’s Encrypt 会发生什么，以及如何让少数用户试用 VLESS。
+- [一个 443，多个服务共用](guide/shared-port.md)：VLESS、TrustTunnel 和 MTProto 如何按名称共用同一节点的 TCP 443、哪些不能共用、陌生访问者会看到什么、DNS 记录、在管理后台和通过 MCP 的设置方法、端口卡片及其限制。
 - [MTProto（Telegram 代理）](guide/mtproto.md)：仅供 Telegram 应用使用的代理（实验性）：握手中名称的两种选择、用户的密钥和链接、中转，以及它的局限。
 - [TrustTunnel](guide/trusttunnel.md)：运行在普通 HTTPS 之上、各平台都有官方应用的 VPN（实验性）：它需要什么、各项设置、用户的 `tt://` 密钥，以及它的局限。
 - [AmneziaWG](guide/amneziawg.md)：AmneziaWG 2.0 和 3.1 协议配置、用户态或内核模块、设备和密钥。

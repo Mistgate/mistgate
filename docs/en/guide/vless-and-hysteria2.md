@@ -14,7 +14,7 @@ A node can run Hysteria2 and VLESS side by side. They use different transports (
 | TCP, the profile's port (443 by default) | VLESS | The tunnel |
 | TCP 80 | The node | Let's Encrypt, when nothing else holds the port |
 
-Two profiles cannot take the same port and network of one node, but UDP 443 and TCP 443 are different ports, and a VLESS profile on another TCP port touches nothing of Hysteria2.
+Two profiles cannot take the same port and network of one node, except TCP services that are told apart by name ([One 443 for everyone](shared-port.md)). UDP 443 and TCP 443 are different ports, and a VLESS profile on another TCP port touches nothing of Hysteria2.
 
 When a VLESS profile on TCP 443 is switched on, the node closes the Hysteria2 HTTPS site on that port and opens it again when the port is free, that is when the VLESS profile is removed, switched off or moved to another port. Hysteria2 itself, on UDP, and its HTTP/3 site keep working. Anyone who opens `https://de1.example.com` on TCP 443 now reaches REALITY, which passes everyone who is not a VLESS client to the REALITY target. With the node's own site as the target (the default) they see the same site Hysteria2 shows, with the node's own certificate. With another site as the target they see that site, with its certificate.
 

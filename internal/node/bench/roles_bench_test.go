@@ -30,6 +30,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -57,6 +58,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/certs"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
+	"github.com/mistgate/mistgate/internal/node/front"
 	"github.com/mistgate/mistgate/internal/node/hysteria2"
 	"github.com/mistgate/mistgate/internal/node/vless"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -85,9 +87,14 @@ const (
 	benchUUID      = "5783a3e7-e373-51cd-8642-c83782b807c5"
 )
 
+// engineKind splits "vless-tcp-front" into "vless-tcp" and true: the same engine, with its port shared by the agent's front.
+func engineKind(name string) (base string, viaFront bool) {
+	return strings.CutSuffix(name, FrontSuffix)
+}
+
 // roleArgs is what the suite tells a helper process.
 type roleArgs struct {
-	Engine   string
+	Engine   string // an engine of the suite, with FrontSuffix for the shared-port variant
 	Dest     string // ip:port of the plain server, as the engine's egress and the tunnel clients dial it
 	Target   string // ip:port of the TLS site (REALITY)
 	Server   string // ip of the node, as the client dials it
@@ -243,6 +250,33 @@ func benchEnv() engine.Env {
 
 func hy2Token() string { return "token-bench-0123456789abcdef" }
 
+// The routes of the front in the "-front" variants: what the agent builds for a node that shares 443 between a site of its own
+// (the default route, nothing runs behind it here) and a REALITY inbound with a name of its own, the way agent.frontRoute
+// does for REALITY: no TCP keepalive, as Xray listens when it listens alone.
+const siteRouteID = "inb_site"
+
+// startFront binds the engine's port the way the agent does for a shared port and returns the engine's route of it.
+func startFront(port uint16) (setEnv func(*engine.Env), delivered func() uint64, stop func(), err error) {
+	ln, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	f := front.New(ln, nil)
+	f.SetRoutes([]front.Route{
+		{ID: siteRouteID},
+		{ID: "inb_bench", Names: []string{benchSNI}, KeepAlive: &net.KeepAliveConfig{Enable: false}},
+	}, siteRouteID)
+	return func(e *engine.Env) {
+			e.SharedListener = func(id string, _ uint16) net.Listener { return f.Listener(id) }
+		},
+		func() uint64 { return f.Stats().Delivered["inb_bench"] },
+		func() { _ = f.Close() }, nil
+}
+
+// frontStatsPrefix starts the line a front server prints every half second while its count grows: the suite reads the last one,
+// so a "-front" case that did not go through the front fails instead of passing as a fast direct one.
+const frontStatsPrefix = "MGFRONT delivered="
+
 func runServer(a roleArgs, ready func(any)) {
 	fail := func(err error) { ready(readyInfo{Error: err.Error()}) }
 	ctx := context.Background()
@@ -250,9 +284,29 @@ func runServer(a roleArgs, ready func(any)) {
 	var err error
 	var spec plugin.InboundSpec
 	var creds []plugin.UserCred
-	switch a.Engine {
+	env := benchEnv()
+	kind, viaFront := engineKind(a.Engine)
+	if viaFront {
+		setEnv, delivered, stop, err := startFront(a.Port)
+		if err != nil {
+			fail(err)
+			return
+		}
+		defer stop()
+		setEnv(&env)
+		go func() {
+			var last uint64
+			for range time.Tick(500 * time.Millisecond) {
+				if n := delivered(); n != last {
+					last = n
+					fmt.Println(frontStatsPrefix + strconv.FormatUint(n, 10))
+				}
+			}
+		}()
+	}
+	switch kind {
 	case "hysteria2":
-		e, err = hysteria2.New(benchEnv())
+		e, err = hysteria2.New(env)
 		sum := sha256.Sum256([]byte(hy2Token()))
 		creds = []plugin.UserCred{{CredID: "crd_bench", UserID: "usr_bench", DeviceID: "dev_bench",
 			Data: json.RawMessage(fmt.Sprintf(`{"auth_sha256":%q}`, hex.EncodeToString(sum[:])))}}
@@ -261,19 +315,19 @@ func runServer(a roleArgs, ready func(any)) {
 			Egress: "direct", Settings: json.RawMessage(`{"masquerade":{"tcp_port":8444}}`)}
 	case "vless-tcp", "vless-xhttp":
 		transport := "tcp"
-		if a.Engine == "vless-xhttp" {
+		if kind == "vless-xhttp" {
 			transport = "xhttp"
 		}
 		for alpn := range 3 { // REALITY measures its target once per process; this one would make the first client wait 5 s
 			xtlsreality.GlobalPostHandshakeRecordsLens.Store(a.Target+" "+benchSNI+" "+strconv.Itoa(alpn), []int{})
 		}
-		e, err = vless.New(benchEnv())
+		e, err = vless.New(env)
 		creds = []plugin.UserCred{{CredID: "crd_bench", UserID: "usr_bench", Data: json.RawMessage(fmt.Sprintf(`{"id":%q}`, benchUUID))}}
 		spec = plugin.InboundSpec{ID: "inb_bench", Protocol: vless.Protocol, Enabled: true, Listen: plugin.Listen{Network: "tcp", Port: a.Port},
 			Settings: json.RawMessage(fmt.Sprintf(`{"transport":%q,"security":"reality","flow":"","reality":{"target":%q,"server_names":[%q],"short_ids":["6ba85179"],"private_key":%q},"xhttp":{"path":"/q8x2kd7w","host":"","mode":"auto","x_padding_bytes":"100-200"}}`,
 				transport, a.Target, benchSNI, realityPrivate))}
 	case "awg":
-		e, err = awg.NewWithOptions(benchEnv(), awg.Options{Backend: "userspace"})
+		e, err = awg.NewWithOptions(env, awg.Options{Backend: "userspace"})
 		if a.Spec != nil {
 			spec, creds = *a.Spec, a.Creds
 		}
@@ -304,7 +358,8 @@ type dialer struct {
 }
 
 func newDialer(a roleArgs) (*dialer, error) {
-	switch a.Engine {
+	kind, _ := engineKind(a.Engine) // the client does not know there is a front: it dials the port
+	switch kind {
 	case "hysteria2":
 		newClient := func() (client.Client, error) {
 			c, _, err := client.NewClient(&client.Config{
@@ -378,7 +433,7 @@ func startXray(a roleArgs) (socks string, closeFn func(), err error) {
 	transportName := "tcp"
 	transportSettings := []*internet.TransportConfig{{ProtocolName: "tcp", Settings: serial.ToTypedMessage(&tcpcfg.Config{})}}
 	flow := "xtls-rprx-vision"
-	if a.Engine == "vless-xhttp" {
+	if kind, _ := engineKind(a.Engine); kind == "vless-xhttp" {
 		transportName, flow = "splithttp", ""
 		transportSettings = []*internet.TransportConfig{{ProtocolName: "splithttp", Settings: serial.ToTypedMessage(&splithttp.Config{
 			Path: "/q8x2kd7w", Mode: "auto", XPaddingBytes: &splithttp.RangeConfig{From: 100, To: 200}})}}

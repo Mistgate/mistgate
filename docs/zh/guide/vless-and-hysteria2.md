@@ -14,7 +14,7 @@ description: 了解 Hysteria2 和 VLESS 在同一节点上使用哪些端口、�
 | TCP，协议配置使用的端口（默认为 443） | VLESS | 隧道 |
 | TCP 80 | 节点 | Let’s Encrypt；端口未被其他程序占用时使用 |
 
-节点上的两个协议配置不能使用相同网络上的相同端口；但 UDP 443 和 TCP 443 是不同端口。VLESS 协议配置使用其他 TCP 端口时，不会影响 Hysteria2。
+节点上的两个协议配置不能使用相同网络上的相同端口，但按名称区分的 TCP 服务除外（[一个 443，多个服务共用](shared-port.md)）；UDP 443 和 TCP 443 是不同端口。VLESS 协议配置使用其他 TCP 端口时，不会影响 Hysteria2。
 
 启用节点上使用 TCP 443 的 VLESS 协议配置时，节点会关闭该端口上的 Hysteria2 HTTPS 站点；VLESS 协议配置移除、停用或改用其他端口后，节点会重新开放该站点。Hysteria2 本身和其 HTTP/3 站点仍会通过 UDP 正常工作。现在，通过 TCP 443 打开 `https://de1.example.com` 的访问者会连接到 REALITY；它会将非 VLESS 客户端转发到 REALITY 目标。目标为节点自身站点（默认值）时，访问者会看到 Hysteria2 所显示的同一站点及节点自身的证书。目标为其他站点时，访问者会看到该站点及其证书。
 

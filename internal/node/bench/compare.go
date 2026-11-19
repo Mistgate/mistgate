@@ -29,9 +29,13 @@ const ThresholdEnv = "MISTGATE_BENCH_THRESHOLD"
 
 // The engines and the network variants of the suite; a case is "<engine>/<variant>".
 var (
-	engines  = []string{"hysteria2", "vless-tcp", "vless-xhttp", "awg"}
+	engines  = []string{"hysteria2", "vless-tcp", "vless-xhttp", "vless-tcp-front", "vless-xhttp-front", "awg"}
 	variants = []string{"clean", "rtt50-loss1", "mtu1280"}
 )
+
+// FrontSuffix marks an engine run behind the agent's shared-port front (internal/node/front): "vless-tcp-front" is "vless-tcp" with
+// the front in front of it, and the front may cost at most the threshold against the direct case of the same run.
+const FrontSuffix = "-front"
 
 // Metrics is what one case measured. A zero value is "not measured" (a case that could not measure it) and is never compared.
 type Metrics struct {
@@ -211,6 +215,24 @@ func Compare(baseline, got Report, threshold float64) Result {
 		}
 	}
 	return res
+}
+
+// CompareFront checks every "<engine>-front/<variant>" case of one report against "<engine>/<variant>" of the same report
+// (the baseline in each finding is the direct figure). A front case without its direct case is left out.
+func CompareFront(r Report, threshold float64) Result {
+	direct := Report{Schema: r.Schema, Cases: map[string]Metrics{}}
+	via := Report{Schema: r.Schema, Cases: map[string]Metrics{}}
+	for name, m := range r.Cases {
+		eng, variant, _ := strings.Cut(name, "/")
+		base, ok := strings.CutSuffix(eng, FrontSuffix)
+		if !ok {
+			continue
+		}
+		if d, ok := r.Cases[base+"/"+variant]; ok {
+			direct.Cases[name], via.Cases[name] = d, m
+		}
+	}
+	return Compare(direct, via, threshold)
 }
 
 // Failed says whether the comparison found a regression.

@@ -44,6 +44,7 @@ Mistgate — панель для собственного VPN-флота: оди
 - [Hysteria2](guide/hysteria2.md): настройки профиля Hysteria2, сертификаты и обфускация.
 - [VLESS REALITY](guide/vless.md): профили VLESS по TCP и XHTTP, когда выбирать их вместо Hysteria2, как выбрать цель REALITY, порты и приложения.
 - [VLESS и Hysteria2 на одной ноде](guide/vless-and-hysteria2.md): кто где слушает, что происходит с сайтом Hysteria2 и с Let's Encrypt, когда VLESS занимает TCP 443, и как попробовать VLESS на нескольких людях.
+- [Один 443 для всех](guide/shared-port.md): как VLESS, TrustTunnel и MTProto делят TCP 443 одной ноды по имени, что делить нельзя, что видит посторонний, какие нужны DNS-записи, как это поставить в админке и через MCP, карточка порта и ограничения.
 - [MTProto (прокси для Telegram)](guide/mtproto.md): прокси только для приложения Telegram (экспериментально): два варианта имени в рукопожатии, ключ и ссылка человека, ретрансляции и пределы.
 - [TrustTunnel](guide/trusttunnel.md): VPN поверх обычного HTTPS с официальными приложениями на всех платформах (экспериментально): что ему нужно, настройки, ключ `tt://` человека и пределы.
 - [AmneziaWG](guide/amneziawg.md): профили AmneziaWG 2.0 и 3.1, userspace или модуль ядра, устройства и ключи.
