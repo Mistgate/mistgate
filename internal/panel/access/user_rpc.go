@@ -575,6 +575,18 @@ func (s *Service) GetUser(ctx context.Context, req *connect.Request[adminv1.GetU
 	return connect.NewResponse(resp), nil
 }
 
+// takeBackKey revokes a key that UpdateUser made just before its write was refused. The stored switch is read again first: a
+// concurrent update may have switched the app on in the meantime and now holds the same key.
+func (s *Service) takeBackKey(ctx context.Context, by, userID string, made bool, appOn func(store.AccessUser) bool, revoke func(context.Context, string, string) error) {
+	if !made {
+		return
+	}
+	if current, err := s.st.Access().User(ctx, userID); err == nil && appOn(current) {
+		return
+	}
+	_ = revoke(ctx, by, userID)
+}
+
 func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.UpdateUserRequest]) (*connect.Response[adminv1.UpdateUserResponse], error) {
 	m := req.Msg
 	a := s.st.Access()
@@ -690,15 +702,21 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 		return nil, err
 	}
 	defer reservation.finish()
+	// The keys of the apps this update switches on are made before it writes (a person with the app on and no key has no link), and
+	// taken back when the write is refused or a later key is.
+	var telegramKeyMade, trustTunnelKeyMade bool
+	takeBackKeys := func() {
+		s.takeBackKey(ctx, actor(ctx), u.ID, telegramKeyMade, func(p store.AccessUser) bool { return p.AppTelegram }, s.revokeTelegramKey)
+		s.takeBackKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade, func(p store.AccessUser) bool { return p.AppTrustTunnel }, s.revokeTrustTunnelKey)
+	}
 	if u.AppTelegram && !old.AppTelegram {
-		// Before the update, so that an update that fails leaves no person with Telegram on and no key.
-		if _, err := s.issueTelegramKey(ctx, actor(ctx), u); err != nil {
+		if telegramKeyMade, err = s.issueTelegramKey(ctx, actor(ctx), u); err != nil {
 			return nil, err
 		}
 	}
-	trustTunnelKeyMade := false
 	if u.AppTrustTunnel && u.Status == StatusActive && (!old.AppTrustTunnel || old.Status != StatusActive) {
 		if trustTunnelKeyMade, err = s.issueTrustTunnelKey(ctx, actor(ctx), u); err != nil {
+			takeBackKeys()
 			return nil, err
 		}
 	}
@@ -709,16 +727,16 @@ func (s *Service) UpdateUser(ctx context.Context, req *connect.Request[adminv1.U
 	}
 	switch {
 	case errors.Is(err, store.ErrAccessVersion): // the person changed after the read above (switched off, extended, edited): nothing is written over it
-		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
+		takeBackKeys()
 		return nil, coded(connect.CodeAborted, "stale_user")
 	case errors.Is(err, store.ErrAccessExists):
-		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
+		takeBackKeys()
 		return nil, coded(connect.CodeAlreadyExists, "name_taken")
 	case errors.Is(err, store.ErrNotFound):
-		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
+		takeBackKeys()
 		return nil, notFound("user, group or node")
 	case err != nil:
-		s.rollbackTrustTunnelKey(ctx, actor(ctx), u.ID, trustTunnelKeyMade)
+		takeBackKeys()
 		return nil, s.internal("update user", err)
 	}
 	if pageAction != "" {

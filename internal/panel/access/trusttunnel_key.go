@@ -102,19 +102,6 @@ func (s *Service) revokeTrustTunnelKey(ctx context.Context, by, userID string) e
 	return nil
 }
 
-// rollbackTrustTunnelKey removes a key issued immediately before an update when that update did not persist the app switch.
-// Recheck the stored switch first: a concurrent update may already have made use of the same key.
-func (s *Service) rollbackTrustTunnelKey(ctx context.Context, by, userID string, made bool) {
-	if !made {
-		return
-	}
-	current, err := s.st.Access().User(ctx, userID)
-	if err == nil && current.AppTrustTunnel {
-		return
-	}
-	_ = s.revokeTrustTunnelKey(ctx, by, userID)
-}
-
 func (s *Service) trustTunnelKeyLinks(ctx context.Context, u store.AccessUser) (TrustTunnelKeyLinks, error) {
 	out := TrustTunnelKeyLinks{Links: []SubServer{}}
 	dev, cred, err := s.st.Access().TrustTunnelKey(ctx, u.ID)
