@@ -1690,6 +1690,8 @@ type Hello struct {
 	// "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
 	// by an agent that can also run OS jobs; the panel sends UpdateOs only when it is listed.
 	// "panel-link/1" (NodeSettings.panel_link_url: the agent switches to a new panel link address on its own).
+	// "link-fetch/1": a link-only agent fetches update files and the network table over the link with HelloAck.fetch_token
+	// (see "LINK FETCH"); such an agent also lists "nets/1" and "update/1".
 	Capabilities []string `protobuf:"bytes,11,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	// Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
 	// Orders releases (the version string does not); the panel compares it with the bundle manifest.
@@ -6681,6 +6683,10 @@ type HelloAck struct {
 	Settings       *NodeSettings `protobuf:"bytes,3,opt,name=settings,proto3" json:"settings,omitempty"`
 	// The panel supports the signed WebSocket link transport. An agent uses it only when configured with a link URL.
 	LinkSupported bool `protobuf:"varint,4,opt,name=link_supported,json=linkSupported,proto3" json:"link_supported,omitempty"`
+	// LINK FETCH. A token for GET <link prefix>/fetch/<node id>/<file name>?offset=N, sent by a VPS panel on a link session to
+	// an agent that listed "link-fetch/1". The answer is the bytes FetchUpdate streams (from offset). The token is valid for
+	// this node while this session lasts and a short while after. A secret: never logged. Empty = none.
+	FetchToken    string `protobuf:"bytes,5,opt,name=fetch_token,json=fetchToken,proto3" json:"fetch_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6741,6 +6747,13 @@ func (x *HelloAck) GetLinkSupported() bool {
 		return x.LinkSupported
 	}
 	return false
+}
+
+func (x *HelloAck) GetFetchToken() string {
+	if x != nil {
+		return x.FetchToken
+	}
+	return ""
 }
 
 // Signed WebSocket link handshake. Each message is a separate binary protobuf frame.
@@ -10121,12 +10134,14 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x06action\x18\x02 \x01(\tR\x06action\x12\x12\n" +
 	"\x04mode\x18\x03 \x01(\tR\x04mode\x12\x16\n" +
 	"\x06reboot\x18\x04 \x01(\tR\x06reboot\x12\x15\n" +
-	"\x06job_id\x18\x05 \x01(\tR\x05jobId\"\xb5\x01\n" +
+	"\x06job_id\x18\x05 \x01(\tR\x05jobId\"\xd6\x01\n" +
 	"\bHelloAck\x12\x1b\n" +
 	"\tacked_seq\x18\x01 \x01(\x04R\backedSeq\x12(\n" +
 	"\x10server_time_unix\x18\x02 \x01(\x03R\x0eserverTimeUnix\x12;\n" +
 	"\bsettings\x18\x03 \x01(\v2\x1f.mistgate.agent.v1.NodeSettingsR\bsettings\x12%\n" +
-	"\x0elink_supported\x18\x04 \x01(\bR\rlinkSupported\"A\n" +
+	"\x0elink_supported\x18\x04 \x01(\bR\rlinkSupported\x12\x1f\n" +
+	"\vfetch_token\x18\x05 \x01(\tR\n" +
+	"fetchToken\"A\n" +
 	"\rLinkChallenge\x12\x14\n" +
 	"\x05nonce\x18\x01 \x01(\fR\x05nonce\x12\x1a\n" +
 	"\baudience\x18\x02 \x01(\tR\baudience\"W\n" +
