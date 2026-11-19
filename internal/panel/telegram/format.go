@@ -147,6 +147,7 @@ var checkTitles = map[string]localizedText{
 	"cpu_steal":       {en: "CPU steal", ru: "CPU steal", zh: "CPU 窃取时间"},
 	"conntrack_fill":  {en: "Connection tracking", ru: "Таблица соединений", zh: "连接跟踪表"},
 	"agent_fds":       {en: "Agent's open files", ru: "Открытые файлы агента", zh: "Agent 打开的文件"},
+	"reality_target":  {en: "REALITY target site", ru: "Сайт-цель REALITY", zh: "REALITY 目标站点"},
 	"kernel_headers":  {en: "Kernel headers", ru: "Заголовки ядра", zh: "内核头文件"},
 	"awg_backend":     {en: "AmneziaWG module", ru: "Модуль AmneziaWG", zh: "AmneziaWG 模块"},
 	"warp_path":       {en: "WARP is down", ru: "WARP не работает", zh: "WARP 异常"},

@@ -77,6 +77,7 @@ const (
 	CheckCPUSteal        = "cpu_steal"
 	CheckConntrackFill   = "conntrack_fill"
 	CheckAgentFDs        = "agent_fds"
+	CheckRealityTarget   = "reality_target"
 )
 
 // Fix ids (agent.proto "FIX IDS").
@@ -150,6 +151,7 @@ var checks = []check{
 	{CheckCPUSteal, checkCPUSteal},
 	{CheckConntrackFill, checkConntrackFill},
 	{CheckAgentFDs, checkAgentFDs},
+	{CheckRealityTarget, checkRealityTarget},
 }
 
 // CheckIDs returns every check id in report order.

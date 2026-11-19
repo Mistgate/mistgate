@@ -87,4 +87,15 @@ const (
 	// new outbound connections fail with EMFILE.
 	fdsWarnPct = 80
 	fdsFailPct = 95
+
+	// reality_target: the check's own 10 s budget must hold the worst case of one target, 2 x realityAttempt + realityRetryGap
+	// (9 s); targets run in parallel, so their number does not add to it. At most maxRealityTargets different ones are probed.
+	realityCertWarn   = 7 * 24 * time.Hour
+	maxRealityTargets = 8
+)
+
+// Variables only so a test can shorten them.
+var (
+	realityAttempt  = 4 * time.Second
+	realityRetryGap = time.Second
 )

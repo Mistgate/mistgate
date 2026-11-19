@@ -53,6 +53,7 @@ export const checkMarks: Record<string, { icon: IconName; tone: Tone }> = {
   conntrack_fill: { icon: "network", tone: "sky" },
   warp_path: { icon: "bolt", tone: "sky" },
   cert_expiry: { icon: "lock", tone: "lavender" },
+  reality_target: { icon: "lock", tone: "lavender" },
   awg_backend: { icon: "shield", tone: "sage" },
 };
 

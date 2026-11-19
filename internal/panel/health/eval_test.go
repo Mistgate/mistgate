@@ -928,6 +928,34 @@ func TestCertExpiryFromDoctorNeverDuplicatesAsDoctorAlert(t *testing.T) {
 	}
 }
 
+// reality_target (doctor Ш5): a broken target is a doctor alert like any other, worded by the hint; a report of an agent
+// that does not have the check yet has no such row and raises nothing, and drops what an older report of a newer agent
+// raised, exactly as for every other check.
+func TestRealityTargetFromDoctor(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	e.report("de1", false, res("disk_space", dOK, ""), res("resolver", dOK, "")) // an older agent: no such check
+	want(t, e.active())
+
+	e.report("de1", false, res("disk_space", dOK, ""), withCode(res("reality_target", dFail, "", "hint", "no_mlkem", "inbound_id", "inb_x", "target", "a.example.com:443", "server_name", "a.example.com"), "reality_target.no_mlkem"))
+	got := e.active()
+	want(t, got, "doctor_fail/de1/reality_target")
+	al := got["doctor_fail/de1/reality_target"]
+	if al.Severity != sevCritical || al.WhyKey != "health.doctor.reality_target.why.no_mlkem" || al.Params["target"] != "a.example.com:443" || al.Params["detail_code"] != "reality_target.no_mlkem" {
+		t.Fatalf("alert: %+v", al)
+	}
+
+	e.report("de1", false, res("reality_target", dWarn, "", "hint", "expiring", "days_left", "4"))
+	got = e.active()
+	want(t, got, "doctor_warn/de1/reality_target")
+	if got["doctor_warn/de1/reality_target"].WhyKey != "health.doctor.reality_target.why.expiring" || got["doctor_warn/de1/reality_target"].Severity != sevWarning {
+		t.Fatalf("alert: %+v", got["doctor_warn/de1/reality_target"])
+	}
+
+	e.report("de1", false, res("disk_space", dOK, "")) // the full report of an agent without the check replaces the rows
+	want(t, e.active())
+}
+
 func TestKernelHeadersIsInfoWithoutAmneziaWG(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "hetzner", true)
@@ -1438,7 +1466,7 @@ func TestGuardSupersedesEarlierNodeAlerts(t *testing.T) {
 // The doctor list is shown in the order of agent.proto CHECK IDS, the L3 checks included; an id the panel does not
 // know yet goes after them.
 func TestDoctorRowsFollowTheCheckIDOrder(t *testing.T) {
-	ids := []string{"warp_path", "aa_new", "awg_backend", "kernel_headers", "disk_space"}
+	ids := []string{"reality_target", "warp_path", "aa_new", "awg_backend", "kernel_headers", "disk_space"}
 	rows := make([]store.DoctorRow, len(ids))
 	for i, id := range ids {
 		rows[i].CheckID = id
@@ -1448,7 +1476,7 @@ func TestDoctorRowsFollowTheCheckIDOrder(t *testing.T) {
 	for _, r := range rows {
 		got = append(got, r.CheckID)
 	}
-	if want := "disk_space kernel_headers awg_backend warp_path aa_new"; strings.Join(got, " ") != want {
+	if want := "disk_space kernel_headers awg_backend warp_path reality_target aa_new"; strings.Join(got, " ") != want {
 		t.Fatalf("order %v, want %s", got, want)
 	}
 }

@@ -55,6 +55,10 @@ type Env struct {
 	LookupVia func(ctx context.Context, server, host string) error
 	// ServedCert returns the leaf certificate a TLS listener at addr (host:port) serves for sni.
 	ServedCert func(ctx context.Context, addr, sni string) (*x509.Certificate, error)
+	// ProbeTarget handshakes TLS 1.3 with a REALITY target (reality_target check); nil = the real handshake.
+	ProbeTarget func(ctx context.Context, addr, serverName string) TargetFacts
+	// TargetRoots are the roots a target's certificate must lead to; nil = the system roots.
+	TargetRoots *x509.CertPool
 	// Docker lists the containers through the read-only socket API; an error means "no docker here".
 	Docker func(ctx context.Context) ([]Container, error)
 
@@ -166,6 +170,9 @@ type Inbound struct {
 	TLSPort int
 	// TLSDown is why the engine says that listener is not up ("masq_tcp: ... address already in use"), "" = up.
 	TLSDown string
+	// RealityTarget and RealityName are the site a VLESS REALITY inbound shows to strangers ("host:port") and the name it is
+	// asked for; both "" for every inbound that shows the node's own site or has no REALITY.
+	RealityTarget, RealityName string
 }
 
 // InboundListen is an auxiliary socket owned by the inbound, such as TrustTunnel's same-number UDP HTTP/3 listener.

@@ -217,6 +217,11 @@ package mistgate.agent.v1;
 //                       loaded. Params: count, max, fill_pct
 //     agent_fds         the agent's open file descriptors against its soft limit (WARN 80%, FAIL 95%); SKIP when they cannot be
 //                       read. Params: fds, limit, used_pct
+//     reality_target    the site each enabled VLESS REALITY inbound shows to strangers (target not "self"): it answers, speaks TLS 1.3,
+//                       chooses X25519MLKEM768 (FAIL: unreachable | no_tls13 | no_mlkem) and its certificate is for the server name,
+//                       trusted and has 7 days or more left (WARN: name_mismatch | untrusted | expired | expiring). A failed handshake is
+//                       retried once. SKIP while no inbound shows another site. No fix. Params: hint (= the code's tail), inbound_id (the
+//                       worst one), inbounds (all with a bad target), target (host:port), server_name, checked, days_left
 //   FIX IDS (stable; all avoid data loss; only enable_security_updates and install_nftables install a package, after
 //   owner confirmation). allow_forwarding is the only fix that edits
 //   a host-owned FORWARD chain: after owner confirmation, it inserts tagged ACCEPT rules only for new traffic from
