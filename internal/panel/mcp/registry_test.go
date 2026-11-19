@@ -324,3 +324,31 @@ func TestHiddenToolIsUnknown(t *testing.T) {
 		t.Errorf("hidden tools reached the API %d times", n)
 	}
 }
+
+// The owner's approved plan of a tool opens the procedures that tool calls and nothing else (auth's grants table). A procedure of
+// an apply tool that needs the owner's approval or a step-up and that the tool's grant does not list is refused (403) on a real
+// panel, however well the tool runs against the fakes; and a grant that names a procedure the tool never calls opens it for
+// nothing. The two lists meet here, because auth cannot import the tool registry.
+func TestToolGrantsMatchTheProceduresOfTheirTools(t *testing.T) {
+	tools := map[string]toolDef{}
+	for _, td := range registry {
+		if name, ok := strings.CutSuffix(td.name, "_apply"); ok {
+			tools[name] = td
+		}
+	}
+	for name, td := range tools {
+		for _, p := range td.procs {
+			access, _ := auth.TokenAccess(p)
+			if (access == auth.TokenAccessApproved || auth.NeedsStepUp(p)) && !auth.GrantAllows(name, p) {
+				t.Errorf("%s_apply calls %s, which needs the owner's approval, and the grant of %s does not list it", name, p, name)
+			}
+		}
+	}
+	for name, td := range tools {
+		for _, p := range auth.GrantedProcedures(name) {
+			if !slices.Contains(td.procs, p) {
+				t.Errorf("the grant of %s opens %s, which %s_apply does not list among its procedures", name, p, name)
+			}
+		}
+	}
+}
