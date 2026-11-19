@@ -1496,12 +1496,28 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		was := u
 		u.Name, u.AllNodes, u.NodeIDs = "After", false, []string{"nod_update_user"}
-		if err := st.Access().UpdateUser(ctx, u, true, AccessGroupChange{}); err != nil {
+		if err := st.Access().UpdateUser(ctx, u, was, true, AccessGroupChange{}); err != nil {
 			t.Fatal(err)
 		}
 		if got, err := st.Access().User(ctx, u.ID); err != nil || got.Name != "After" || len(got.NodeIDs) != 1 || got.NodeIDs[0] != "nod_update_user" {
 			t.Fatalf("user = %+v, %v", got, err)
+		}
+		// the same read again: the row and the node list have moved on, so nothing is written over them
+		if err := st.Access().UpdateUser(ctx, u, was, true, AccessGroupChange{}); !errors.Is(err, ErrAccessVersion) {
+			t.Fatalf("write over an old read = %v, want ErrAccessVersion", err)
+		}
+		gone := u
+		gone.ID = "usr_nope"
+		if err := st.Access().UpdateUser(ctx, gone, gone, false, AccessGroupChange{}); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("missing person = %v, want ErrNotFound", err)
+		}
+		if err := st.Access().SetUserExpiry(ctx, u.ID, time.Time{}, time.Unix(1_900_000_000, 0)); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.Access().SetUserExpiry(ctx, u.ID, time.Time{}, time.Unix(1_900_000_001, 0)); !errors.Is(err, ErrAccessVersion) {
+			t.Fatalf("extension over an old term end = %v, want ErrAccessVersion", err)
 		}
 	})
 	t.Run("EnsureImplicitDeviceWithoutCredentials", func(t *testing.T) {

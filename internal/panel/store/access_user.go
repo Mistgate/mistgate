@@ -740,28 +740,72 @@ func accExtraGroupStmts(userID string, change AccessGroupChange) []Stmt {
 	return stmts
 }
 
-// UpdateUser writes every admin-editable column of u (matched by ID) and its status. setNodes also
-// replaces the explicit node list with u.NodeIDs. Usage counters are left alone (the fleet increments them). The main group
-// is u.GroupID; the extra groups change by change only (u.ExtraGroupIDs is not written), and the group that becomes the main
-// one leaves them in the same batch.
-// ErrAccessExists on a name clash, ErrNotFound when the user, group or a node does not exist.
-func (a Access) UpdateUser(ctx context.Context, u AccessUser, setNodes bool, change AccessGroupChange) error {
-	stmts := []Stmt{
-		guard(`EXISTS (SELECT 1 FROM user WHERE id = ?)`, u.ID),
-		{Query: `UPDATE user SET name = ?, subscription_name = ?, group_id = ?, disabled = ?, status = ?, app_happ = ?, app_amnezia = ?, app_telegram = ?, app_trusttunnel = ?, app_mistgate_off = ?, all_nodes = ?,
-			   quota_bytes = ?, quota_reset = ?, period_start = ?, expires_at = ?, device_limit = ?, speed_limit_bps = ?, device_speed_limit_bps = ?,
-			   dns_preset_id = ?
-			 WHERE id = ?`,
-			Args: []any{u.Name, u.SubscriptionName, u.GroupID, int64(accBool(u.Disabled)), u.Status, int64(accBool(u.AppHapp)), int64(accBool(u.AppAmnezia)), int64(accBool(u.AppTelegram)), int64(accBool(u.AppTrustTunnel)), int64(accBool(u.AppMistgateOff)), int64(accBool(u.AllNodes)),
-				int64(u.QuotaBytes), u.QuotaReset, unix(u.PeriodStart), accNullUnix(u.ExpiresAt), int64(u.DeviceLimit), int64(u.SpeedLimitBps), int64(u.DeviceSpeedLimitBps), accNullStr(u.DNSPresetID), u.ID}},
+// UpdateUser writes every admin-editable column of u (matched by ID) and its status, provided the row still holds the
+// columns of was, the row u was made from: another admin's switch-off, extension or new period between the read and the write
+// must not be written back with the old value. The usage counters, the last-seen fields, the subscription token and the
+// page password are not written here (the fleet and the page-password calls own them), and status is written but not
+// compared: the minute sweep recomputes it all the time. setNodes also replaces the explicit node list with u.NodeIDs, and
+// then the stored list must be the one of was too. The main group is u.GroupID; the extra groups change by change only
+// (u.ExtraGroupIDs is not written; they are deltas on the stored rows), and the group that becomes the main one leaves them
+// in the same batch.
+// ErrAccessVersion when the row changed since it was read, ErrAccessExists on a name clash, ErrNotFound when the user, group
+// or a node does not exist.
+func (a Access) UpdateUser(ctx context.Context, u, was AccessUser, setNodes bool, change AccessGroupChange) error {
+	flag := func(v bool) any { return int64(accBool(v)) }
+	// Per column: the value to write, the stored column as the row was read (a NULL as the zero value, a name as typed: the
+	// column itself folds case) and the value that read gave.
+	edits := []struct {
+		col, stored string
+		now, was    any
+	}{
+		{"name", "name COLLATE BINARY", u.Name, was.Name},
+		{"subscription_name", "subscription_name", u.SubscriptionName, was.SubscriptionName},
+		{"group_id", "group_id", u.GroupID, was.GroupID},
+		{"disabled", "disabled", flag(u.Disabled), flag(was.Disabled)},
+		{"app_happ", "app_happ", flag(u.AppHapp), flag(was.AppHapp)},
+		{"app_amnezia", "app_amnezia", flag(u.AppAmnezia), flag(was.AppAmnezia)},
+		{"app_telegram", "app_telegram", flag(u.AppTelegram), flag(was.AppTelegram)},
+		{"app_trusttunnel", "app_trusttunnel", flag(u.AppTrustTunnel), flag(was.AppTrustTunnel)},
+		{"app_mistgate_off", "app_mistgate_off", flag(u.AppMistgateOff), flag(was.AppMistgateOff)},
+		{"all_nodes", "all_nodes", flag(u.AllNodes), flag(was.AllNodes)},
+		{"quota_bytes", "quota_bytes", int64(u.QuotaBytes), int64(was.QuotaBytes)},
+		{"quota_reset", "quota_reset", u.QuotaReset, was.QuotaReset},
+		{"period_start", "period_start", unix(u.PeriodStart), unix(was.PeriodStart)},
+		{"expires_at", "coalesce(expires_at, 0)", accNullUnix(u.ExpiresAt), unixOrZero(was.ExpiresAt)},
+		{"device_limit", "device_limit", int64(u.DeviceLimit), int64(was.DeviceLimit)},
+		{"speed_limit_bps", "speed_limit_bps", int64(u.SpeedLimitBps), int64(was.SpeedLimitBps)},
+		{"device_speed_limit_bps", "device_speed_limit_bps", int64(u.DeviceSpeedLimitBps), int64(was.DeviceSpeedLimitBps)},
+		{"dns_preset_id", "coalesce(dns_preset_id, '')", accNullStr(u.DNSPresetID), was.DNSPresetID},
 	}
+	set, same := []string{"status = ?"}, []string{"id = ?"}
+	setArgs, sameArgs := []any{u.Status}, []any{u.ID}
+	for _, e := range edits {
+		set, setArgs = append(set, e.col+" = ?"), append(setArgs, e.now)
+		same, sameArgs = append(same, e.stored+" = ?"), append(sameArgs, e.was)
+	}
+	var stmts []Stmt
+	if setNodes {
+		// as many rows as were read, none of them a node that was not (the pair is the key, so no node twice)
+		stmts = append(stmts, guard(`(SELECT count(*) FROM user_node WHERE user_id = ?1) = json_array_length(?2)
+			AND NOT EXISTS (SELECT 1 FROM user_node WHERE user_id = ?1 AND node_id NOT IN (SELECT value FROM json_each(?2)))`, u.ID, accJSON(was.NodeIDs)))
+	}
+	stmts = append(stmts,
+		guard(`EXISTS (SELECT 1 FROM user WHERE `+strings.Join(same, " AND ")+`)`, sameArgs...),
+		Stmt{Query: `UPDATE user SET ` + strings.Join(set, ", ") + ` WHERE id = ?`, Args: append(setArgs, u.ID)})
 	stmts = append(stmts, accExtraGroupStmts(u.ID, change)...)
 	if setNodes {
 		stmts = append(stmts, accSetUserNodeStmts(u.ID, u.NodeIDs)...)
 	}
 	_, err := a.s.batch(ctx, stmts...)
 	if errors.Is(err, errGuard) {
-		return ErrNotFound
+		var one int
+		switch readErr := a.s.R.QueryRowContext(ctx, `SELECT 1 FROM user WHERE id = ?`, u.ID).Scan(&one); {
+		case errors.Is(readErr, sql.ErrNoRows):
+			return ErrNotFound
+		case readErr != nil:
+			return readErr
+		}
+		return ErrAccessVersion
 	}
 	switch {
 	case accIsUnique(err):
@@ -812,8 +856,8 @@ func (a Access) SetSubToken(ctx context.Context, id string, hash, enc []byte) er
 	return nil
 }
 
-// AddUsage adds bytes to a user's usage in the current period. The fleet module does the same inside its
-// stats transaction; this exists for callers that have no transaction of their own.
+// AddUsage adds bytes to a user's usage in the current period. Only tests call it: the fleet adds usage inside its stats
+// transaction (IngestStats).
 func (a Access) AddUsage(ctx context.Context, id string, bytes uint64) error {
 	_, err := a.s.W.ExecContext(ctx, `UPDATE user SET used_bytes = used_bytes + ? WHERE id = ?`, int64(bytes), id)
 	return err
@@ -1457,8 +1501,15 @@ func (a Access) HasUserCredentialOnNode(ctx context.Context, nodeID, userID stri
 	return found, err
 }
 
-// SetUserExpiry sets a user's term end (zero = never).
-func (a Access) SetUserExpiry(ctx context.Context, id string, t time.Time) error {
-	_, err := a.s.W.ExecContext(ctx, `UPDATE user SET expires_at = ? WHERE id = ?`, accNullUnix(t), id)
-	return err
+// SetUserExpiry moves a user's term end (zero = never) from was to t. ErrAccessVersion when the term end is no longer was
+// (an edit or another extension got there first) or the person is gone: the caller reads again and works t out anew.
+func (a Access) SetUserExpiry(ctx context.Context, id string, was, t time.Time) error {
+	res, err := a.s.W.ExecContext(ctx, `UPDATE user SET expires_at = ? WHERE id = ? AND coalesce(expires_at, 0) = ?`, accNullUnix(t), id, unixOrZero(was))
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrAccessVersion
+	}
+	return nil
 }

@@ -4,6 +4,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -34,16 +35,16 @@ func TestExtraGroupNeverTheMainGroupUnderRace(t *testing.T) {
 		var wg sync.WaitGroup
 		start := make(chan struct{})
 		for _, run := range []func() error{
-			func() error { return w.a.UpdateUser(ctx, toMain, false, AccessGroupChange{}) },
+			func() error { return w.a.UpdateUser(ctx, toMain, stale, false, AccessGroupChange{}) },
 			func() error {
-				return w.a.UpdateUser(ctx, addExtra, false, AccessGroupChange{Add: []string{"grp_home"}})
+				return w.a.UpdateUser(ctx, addExtra, stale, false, AccessGroupChange{Add: []string{"grp_home"}})
 			},
 		} {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				<-start
-				if err := run(); err != nil {
+				if err := run(); err != nil && !errors.Is(err, ErrAccessVersion) { // the writer that read before the other one wrote may be refused
 					t.Error(err)
 				}
 			}()
@@ -128,7 +129,7 @@ func TestIngestStatsBooksTheTrafficOfAPersonWithAnExtraGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Access().UpdateUser(ctx, u, false, AccessGroupChange{Add: []string{"grp_xg"}}); err != nil {
+	if err := s.Access().UpdateUser(ctx, u, u, false, AccessGroupChange{Add: []string{"grp_xg"}}); err != nil {
 		t.Fatal(err)
 	}
 	if out := ingest(2); out.OffNode != 0 || out.Skipped != 0 {

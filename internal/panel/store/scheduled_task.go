@@ -134,14 +134,6 @@ func zeroUnix(s int64) time.Time {
 	return fromUnix(s)
 }
 
-// unixOrZero is unix with the zero time as 0.
-func unixOrZero(t time.Time) int64 {
-	if t.IsZero() {
-		return 0
-	}
-	return unix(t)
-}
-
 // nonNilBlob is b, or an empty blob: a nil slice is NULL to the driver, and the columns are NOT NULL.
 func nonNilBlob(b []byte) []byte {
 	if b == nil {

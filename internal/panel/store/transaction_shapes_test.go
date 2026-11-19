@@ -81,7 +81,7 @@ var transactionShape1 = map[string]string{
 }
 
 var transactionShape2 = map[string]string{
-	"access_user.go:UpdateUser":                      "A user guard precedes the update and optional node replacement in one atomic batch.",
+	"access_user.go:UpdateUser":                      "A guard on the row as it was read (and on the node list when it is replaced) precedes the update, the extra-group deltas and the optional node replacement in one atomic batch.",
 	"access_awg.go:AddAWGDevice":                     "A guarded batch retries if the device limit, profile epoch, or candidate peer allocation changed.",
 	"access_telegram.go:AddTelegramKey":              "A guarded batch retries if the person got a key, the device limit was reached, or the user changed meanwhile.",
 	"access_telegram.go:RotateTelegramKey":           "A guarded batch retries if the live Telegram credential it replaces was revoked or replaced meanwhile.",

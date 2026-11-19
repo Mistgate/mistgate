@@ -22,6 +22,8 @@ export const errorCodes = [
   "stale_version",
   // a profile on a node (UpdateInbound) that was changed by someone else between its read and its write: the page reads it again
   "stale_inbound",
+  // a person (UpdateUser) who was changed by someone else (switched off, extended, edited) between its read and its write: nothing is written
+  "stale_user",
   "node_offline",
   "agent_too_old",
   "node_retired",

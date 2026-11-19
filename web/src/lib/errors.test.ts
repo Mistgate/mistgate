@@ -33,6 +33,7 @@ describe("the panel's refusal codes", () => {
     expect(say("profile_deployed: nodes=de1%2C+nl1", Code.FailedPrecondition, "ru")).toBe("Профиль стоит на нодах de1, nl1 — сначала убери его с них.");
     expect(say("stale_version", Code.Aborted)).toBe(en["err.stale_version"]);
     for (const lang of langs) expect(say("stale_inbound", Code.Aborted, lang), lang).not.toBe("stale_inbound"); // the refusal of an inbound edit over a newer one reads in every language
+    for (const lang of langs) expect(say("stale_user", Code.Aborted, lang), lang).not.toBe("stale_user"); // the refusal of an edit of a person over a newer state
     expect(say("agent too old", Code.FailedPrecondition)).toBe(en["err.agent_too_old"]); // the older spelling of the code
     expect(errorVars("device_limit: 5/5").detail).toBe("5/5"); // the older "code: detail" keeps its detail
   });

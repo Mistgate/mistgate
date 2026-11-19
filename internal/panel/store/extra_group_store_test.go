@@ -85,10 +85,11 @@ func (w *egWorld) change(userID, mainGroup string, c AccessGroupChange) error {
 	if err != nil {
 		w.t.Fatal(err)
 	}
+	was := u
 	if mainGroup != "" {
 		u.GroupID = "grp_" + mainGroup
 	}
-	return w.a.UpdateUser(context.Background(), u, false, c)
+	return w.a.UpdateUser(context.Background(), u, was, false, c)
 }
 
 func (w *egWorld) addExtra(userID string, groups ...string) {
@@ -522,7 +523,7 @@ func extraGroupRuleProperty(t *testing.T, open func(*testing.T) *Store, worlds i
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := a.UpdateUser(ctx, stored, false, AccessGroupChange{Add: add}); err != nil {
+			if err := a.UpdateUser(ctx, stored, stored, false, AccessGroupChange{Add: add}); err != nil {
 				t.Fatal(err)
 			}
 			userIDs = append(userIDs, u.ID)

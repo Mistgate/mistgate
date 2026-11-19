@@ -68,8 +68,9 @@ func TestMistgateAppSwitchAndStats(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	wasBob := bob
 	bob.AppMistgateOff = true
-	if err := s.Access().UpdateUser(ctx, bob, false, AccessGroupChange{}); err != nil {
+	if err := s.Access().UpdateUser(ctx, bob, wasBob, false, AccessGroupChange{}); err != nil {
 		t.Fatal(err)
 	}
 	if back, _ := s.Access().User(ctx, "usr_bob"); !back.AppMistgateOff {
@@ -77,8 +78,9 @@ func TestMistgateAppSwitchAndStats(t *testing.T) {
 	}
 	// cara has the subscription link off (and AmneziaVPN on): the app rides on the link, so she is not counted
 	cara, _ := s.Access().User(ctx, "usr_cara")
+	wasCara := cara
 	cara.AppHapp = false
-	if err := s.Access().UpdateUser(ctx, cara, false, AccessGroupChange{}); err != nil {
+	if err := s.Access().UpdateUser(ctx, cara, wasCara, false, AccessGroupChange{}); err != nil {
 		t.Fatal(err)
 	}
 
