@@ -519,6 +519,7 @@ var countrySourceNames = map[string][3]string{
 	countryreach.SourceBsbord:         {"bsbord", "bsbord", "bsbord"},
 	countryreach.SourceBsbordTunnel:   {"bsbord tunnel checks", "проверки туннелей bsbord", "bsbord 隧道检查"},
 	countryreach.SourceBsbordGeo:      {"bsbord GEO", "bsbord GEO", "bsbord GEO"},
+	countryreach.SourceProbes:         {"your own probes", "ваши зонды", "您自己的探测点"},
 }
 
 func countrySeenBy(l L, p map[string]string, line string) string {
