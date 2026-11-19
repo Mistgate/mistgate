@@ -33,7 +33,10 @@ async function show(nodeList: { id: string; name: string }[]) {
   const root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await act(async () => root.render(<QueryClientProvider client={qc}><NodeScreen /></QueryClientProvider>));
-  await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+  // until the page has settled either way: a fixed pause is too short on a loaded machine
+  for (let i = 0; i < 150 && navigate.mock.calls.length === 0 && !(host.textContent ?? "").includes("No such node"); i++) {
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+  }
   return { text: host.textContent ?? "", done: () => { act(() => root.unmount()); host.remove(); } };
 }
 
