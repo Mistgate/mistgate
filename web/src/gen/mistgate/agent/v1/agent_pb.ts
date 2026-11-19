@@ -802,7 +802,8 @@ export type Hello = Message<"mistgate.agent.v1.Hello"> & {
    * by an agent that can also run OS jobs; the panel sends UpdateOs only when it is listed.
    * "panel-link/1" (NodeSettings.panel_link_url: the agent switches to a new panel link address on its own).
    * "link-fetch/1": a link-only agent fetches update files and the network table over the link with HelloAck.fetch_token
-   * (see "LINK FETCH"); such an agent also lists "nets/1" and "update/1".
+   * (see "LINK FETCH"). It does not list "nets/1" or "update/1" itself, so an older VPS panel never sends it an update it
+   * cannot fetch; a VPS panel that serves the route reads "link-fetch/1" with "update-link/1" as both.
    *
    * @generated from field: repeated string capabilities = 11;
    */

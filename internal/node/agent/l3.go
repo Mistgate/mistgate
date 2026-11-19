@@ -186,7 +186,9 @@ func (a *Agent) capabilities() []string {
 			caps = append(caps, osupdate.CapabilityUpdate)
 		}
 	}
-	caps = append(caps, capNets) // a link-only agent fetches the table over the link (LINK FETCH)
+	if !a.linkOnly() {
+		caps = append(caps, capNets)
+	}
 	if kernelDebugSupported() {
 		caps = append(caps, capDebug2)
 	}
@@ -239,10 +241,20 @@ func (a *Agent) capabilities() []string {
 		caps = append(caps, capAwgPrepare)
 	}
 	updateCaps := a.upd.Capabilities()
-	// A link-only agent fetches over the link: with the command's token on the edge (update-link/1), with its session's token
-	// on a VPS panel (link-fetch/1, update/1), so it lists both.
-	if a.linkOnly() && slices.Contains(updateCaps, update.CapUpdate) {
-		caps = append(caps, capUpdateLink)
+	// A link-only agent updates over the link: the edge sends a token with the command (update-link/1); a VPS panel that
+	// serves the link fetch route reads link-fetch/1 as update/1 and nets/1 (fleet.helloInfo). It lists neither itself, so an
+	// older VPS panel never sends it what it could not fetch.
+	if a.linkOnly() {
+		if slices.Contains(updateCaps, update.CapUpdate) {
+			caps = append(caps, capUpdateLink)
+			if slices.Contains(updateCaps, update.CapUpdateTimeout) {
+				caps = append(caps, update.CapUpdateTimeout)
+			}
+			if slices.Contains(updateCaps, update.CapGuard) {
+				caps = append(caps, update.CapGuard)
+			}
+		}
+		return caps
 	}
 	return append(caps, updateCaps...)
 }
