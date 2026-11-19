@@ -55,12 +55,28 @@ export function makeTr(i18nSrc, dict, { subset = false, onHit } = {}) {
   return (s, lang) => sandbox.window.MG_I18N.tr(s, lang);
 }
 
-/** every string a board can put on screen: text nodes, attribute values and script text of the sources */
+/** the zones the translator of the design leaves alone: the mock-up state controls, boards written in their language, marked text */
+const SKIPPED = (n) => (n.attrs || []).some((a) => (a.name === 'class' && /(^|\s)(demo|an-demo)(\s|$)/.test(a.value)) || a.name === 'data-app' || a.name === 'data-noi18n');
+
+/** every string a board can put on screen: text nodes and attribute values of the markup outside the skipped zones, and the text of the script
+ *  (the scripts assemble strings on the fly, so all of it counts) */
+export function stringsOf(sources) {
+  const out = [];
+  const go = (n, inScript) => {
+    if (n.nodeName === '#text') { out.push(n.value); return; }
+    const script = n.tagName === 'script';
+    if (n.tagName && !script && SKIPPED(n)) return;
+    for (const a of n.attrs || []) out.push(a.value);
+    for (const c of n.childNodes || []) go(c, inScript || script);
+    if (n.content) go(n.content, inScript);
+  };
+  for (const src of sources) go(parse(src), false);
+  return out;
+}
+
 export function corpusOf(sources) {
-  const parts = [];
-  for (const src of sources) walk(parse(src), (n) => { if (n.nodeName === '#text') parts.push(n.value); for (const a of n.attrs || []) parts.push(a.value); });
   const NUM = /\d+(?:[.,]\d+)?/g;
-  const flat = parts.join('\n').replace(/[ \t\r\f\v]*\n[ \t\r\f\v]*/g, '\n').replace(/[ \t]+/g, ' ');
+  const flat = stringsOf(sources).join('\n').replace(/[ \t\r\f\v]*\n[ \t\r\f\v]*/g, '\n').replace(/[ \t]+/g, ' ');
   return { flat, flatN: flat.replace(NUM, '#'), words: new Set(flat.match(/[А-Яа-яЁё]+/g) || []) };
 }
 

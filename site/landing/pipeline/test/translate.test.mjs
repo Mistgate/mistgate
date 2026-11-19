@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { parse } from 'parse5';
-import { parseI18n, patchTranslator, makeTr, corpusOf, subsetKeys, keysUsedFor, langDict, LANGS } from '../translate.mjs';
+import { parseI18n, patchTranslator, makeTr, corpusOf, stringsOf, subsetKeys, keysUsedFor, langDict, LANGS } from '../translate.mjs';
 import { closure } from '../sync.mjs';
 
 const DESIGN = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', 'design');
@@ -12,7 +11,6 @@ const have = existsSync(join(DESIGN, 'land.i18n.js'));
 const i18n = have ? readFileSync(join(DESIGN, 'land.i18n.js'), 'utf8') : '';
 const read = (n) => readFileSync(join(DESIGN, n), 'utf8');
 const isApp = (n) => /^App(Main|Routes|Diag|Set|Byp)(En|Zh|Fa|Tr)?$/.test(n);
-const walk = (n, f) => { f(n); for (const c of n.childNodes || []) walk(c, f); if (n.content) walk(n.content, f); };
 
 test('the design translator patches apply (exactly once each)', { skip: !have }, () => {
   const { code } = parseI18n(i18n);
@@ -36,8 +34,7 @@ test('the subset of the dictionary gives the same text as the full one', { skip:
   const harvestFile = join(DESIGN, '..', 'pipeline', 'harvest.json');
   const harvest = existsSync(harvestFile) ? JSON.parse(readFileSync(harvestFile, 'utf8')).strings.main || [] : [];
   const keys = subsetKeys(dict, corpusOf(sources), [...keysUsedFor(i18n, dict, harvest)]);
-  const strings = new Set(harvest);
-  for (const src of sources) walk(parse(src), (n) => { if (n.nodeName === '#text') strings.add(n.value.trim()); for (const a of n.attrs || []) if (['placeholder', 'aria-label', 'title'].includes(a.name)) strings.add(a.value.trim()); });
+  const strings = new Set([...harvest, ...stringsOf(sources).map((x) => x.trim())]);
   const cyr = [...strings].filter((s) => /[А-Яа-яЁё]/.test(s) && s.length < 400);
   assert.ok(cyr.length > 500, 'there are strings to compare: ' + cyr.length);
   const full = makeTr(i18n, dict);
