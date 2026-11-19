@@ -468,9 +468,9 @@
   align-items: end;
   gap: 12px;
 }
+/* the ways share the row by what each needs, not in thirds: "Panel key" is longer than "Password" and wrapped in a third */
 .an-ws {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
   gap: 2px;
   height: 40px;
   padding: 3px;
@@ -482,11 +482,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
   gap: 8px;
   height: 100%;
   padding: 0 8px;
   border-radius: 8px;
   font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--sec);
   cursor: pointer;
   transition:
@@ -497,6 +502,7 @@
   color: var(--text);
 }
 .an-ws [role="radio"] svg {
+  flex: none;
   color: var(--muted);
 }
 .an-ws [role="radio"][aria-checked="true"] {
