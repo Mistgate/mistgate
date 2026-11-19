@@ -138,6 +138,9 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.85`�
     - title: 在生产环境中测试封锁诊断
       section: health
       text: "v0.1.81 新增。`block_diagnosis` 和 `access_report` 对节点的计数和国家视角检测应用固定规则；两种原因看起来一样时，它们会如实说明，并标明低置信度。每次发布涉及诊断的版本之前，模拟封锁实验环境都会检验其中七类（地址、端口、UDP、TCP 冻结、白名单、单一运营商、节点故障）；协议识别和地区只在人为构造的计数上测试过。握手计数需要 Agent v0.1.81。迁移用户之前，请先读一遍它列出的依据。参见[助手](../guide/assistant.md#排查哪些连不上)。"
+    - title: 在家中 NAT 后运行面板
+      section: settings
+      text: "新功能，尚未在生产环境中试用：一个节点作为订阅主机，在子域名上承载订阅地址和 agent 链接，面板主动向节点自有站点建立桥接，因此面板无需公网地址。仅限 VPS 版；所有 agent 都需要 `ws-link/1` 和 `panel-link/1`，要从这样的面板更新还需要 `link-fetch/1`。请先用一个备用节点试用。见[在家中 NAT 后运行面板](../guide/subscription-host.md)。"
 - status: next
   title: 下一步
   lead: 队列中的下一批计划。
