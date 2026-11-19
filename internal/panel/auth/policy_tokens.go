@@ -54,7 +54,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.SubscriptionServiceListClientsProcedure:             TokenAccessDirect,
 	adminv1connect.SubscriptionServiceTestUserAgentProcedure:           TokenAccessDirect,
 	adminv1connect.DnsServiceListDnsPresetsProcedure:                   TokenAccessDirect,
-	adminv1connect.BackupServiceGetBackupSettingsProcedure:             TokenAccessDirect,
+	adminv1connect.BackupServiceGetBackupSettingsProcedure:             TokenAccessDirect, // the status only: the handler leaves the storage out of a token's answer (backup_status)
 	adminv1connect.UpdateServiceGetUpdatesProcedure:                    TokenAccessDirect,
 	adminv1connect.UpdateServiceGetOsUpdatesProcedure:                  TokenAccessDirect,
 	adminv1connect.WarpServiceGetWarpProcedure:                         TokenAccessPlanning,
