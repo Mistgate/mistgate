@@ -62,7 +62,7 @@ func (t toolDef) description() string {
 var registry = slices.Concat(
 	readTools(), ownerReadTools(), changeTools(), nodeProvisionTools(), subscriptionTools(),
 	groupTools(), dnsTools(), nodeSettingsTools(), profileTools(), relayTools(), ipv6Tools(), batchTools(), insightTools(), dataTools(), probeTools(), observabilityTools(), accessTools(),
-	capacityTools(), taskTools(), decoySiteTools(),
+	capacityTools(), taskTools(), decoySiteTools(), subscriptionHostTools(),
 )
 
 // toolsFor lists the tools a profile sees, by name.

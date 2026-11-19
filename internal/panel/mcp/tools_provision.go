@@ -80,11 +80,18 @@ type nodeInstallArgs struct {
 	CountryCode string `json:"country_code,omitempty" jsonschema:"two-letter country code"`
 	Location    string `json:"location,omitempty" jsonschema:"city or region"`
 	Provider    string `json:"provider,omitempty" jsonschema:"hosting provider"`
+	// The first subscription host (a panel behind NAT): the node enrols inside the SSH session and serves the subdomain; the
+	// owner's approval of this plan covers that too.
+	SubscriptionHostDomain string `json:"subscription_host_domain,omitempty" jsonschema:"optional subdomain whose DNS points at this server: the panel's public address moves onto it once the node is ready (for a panel the server cannot reach)"`
+	SiteName               string `json:"site_name,omitempty" jsonschema:"with subscription_host_domain: a second name pointing at the server, for the node's own site on 443"`
+	SkipDNSCheck           bool   `json:"skip_dns_check,omitempty" jsonschema:"with subscription_host_domain: skip the DNS check when DNS is proxied or not yet visible"`
 }
 
 type nodeInstallParams struct {
 	Host, Username, Name, Address, CountryCode, Location, Provider, Fingerprint string
+	SubscriptionHostDomain, SiteName                                            string
 	Port                                                                        uint32
+	SkipDNSCheck                                                                bool
 }
 
 func nodeInstallPlanTool() toolDef {
@@ -127,6 +134,20 @@ func nodeInstallPlanTool() toolDef {
 					resolved := nodeInstallParams{Host: fingerprint.Msg.GetHost(), Port: fingerprint.Msg.GetPort(), Username: in.Username,
 						Name: strings.ToLower(in.Name), Address: in.Address, CountryCode: strings.ToUpper(in.CountryCode),
 						Location: in.Location, Provider: in.Provider, Fingerprint: fingerprint.Msg.GetFingerprint()}
+					if in.SubscriptionHostDomain != "" {
+						if resolved.SubscriptionHostDomain, err = subHostDomain(in.SubscriptionHostDomain); err != nil {
+							return nil, nil, errors.New("subscription_host_domain: give a subdomain such as sub.example.com")
+						}
+						if resolved.SiteName, err = subHostSiteName(in.SiteName); err != nil {
+							return nil, nil, err
+						}
+						if resolved.SiteName == "" || resolved.SiteName == resolved.SubscriptionHostDomain {
+							return nil, nil, errors.New("site_name: give a second name pointing at the server, other than the subdomain")
+						}
+						resolved.SkipDNSCheck = in.SkipDNSCheck
+					} else if in.SkipDNSCheck || in.SiteName != "" {
+						return nil, nil, errors.New("site_name and skip_dns_check apply only with subscription_host_domain")
+					}
 					params, err := json.Marshal(resolved)
 					if err != nil {
 						return nil, nil, errors.New("could not store the plan")
@@ -141,6 +162,13 @@ func nodeInstallPlanTool() toolDef {
 							{Key: "panel_ssh_key", Value: panelKey.Msg.GetPublicKey()},
 							{Key: "address", Value: nm(resolved.Address), Untrusted: true}, {Key: "installation", Value: "signed current agent bundle; waits for the new node to connect"}},
 						Danger: []string{dangerStepUp, dangerFleet}, Params: resolved,
+					}
+					if resolved.SubscriptionHostDomain != "" {
+						planned.Facts = append(planned.Facts, Fact{Key: "subscription_host", Value: resolved.SubscriptionHostDomain, Untrusted: true},
+							Fact{Key: "site_name", Value: resolved.SiteName, Untrusted: true})
+						if resolved.SkipDNSCheck {
+							planned.Facts = append(planned.Facts, Fact{Key: "dns", Value: "check skipped: the names may not point at this server"})
+						}
 					}
 					out, err := e.createPlan(c, base, params, reason, planned)
 					if err != nil {
@@ -174,6 +202,7 @@ func nodeInstallApplyTool() toolDef {
 						started, err := c.cl.Provisioning.StartNodeProvision(c.ctx, connect.NewRequest(&adminv1.StartNodeProvisionRequest{
 							ConfirmInstall: true, Name: p.Name, Address: p.Address, CountryCode: p.CountryCode, Location: p.Location, Provider: p.Provider,
 							SshHost: p.Host, SshPort: p.Port, SshUsername: p.Username, Fingerprint: p.Fingerprint, PlanId: pl.ID,
+							SubscriptionHostDomain: p.SubscriptionHostDomain, SubscriptionHostSiteName: p.SiteName, SkipDnsCheck: p.SkipDNSCheck,
 						}))
 						if err != nil {
 							return done{}, apiError(err)

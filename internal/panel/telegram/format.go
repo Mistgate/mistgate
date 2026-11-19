@@ -943,6 +943,9 @@ var toolTitles = map[string]localizedText{
 	"task_update":                      {en: "Change a scheduled task", ru: "Изменить задачу по расписанию", zh: "修改计划任务"},
 	"warp_reregister":                  {en: "Register a new WARP device", ru: "Зарегистрировать новое устройство WARP", zh: "注册新的 WARP 设备"},
 	"warp_restart":                     {en: "Restart WARP on a node", ru: "Перезапустить WARP на ноде", zh: "重启节点上的 WARP"},
+	"subscription_host_set":       {en: "Move the panel address onto a node subdomain", ru: "Перенести адрес панели на поддомен ноды", zh: "将面板地址迁移到节点子域名"},
+	"subscription_host_move":      {en: "Change the subscription host’s node", ru: "Сменить ноду хоста подписок", zh: "更换订阅主机的节点"},
+	"subscription_host_disable":   {en: "Turn the subscription host off", ru: "Отключить хост подписок", zh: "关闭订阅主机"},
 }
 
 // planWaitingText says an agent's plan waits for the owner. It never says what the plan contains beyond the tool's title:
