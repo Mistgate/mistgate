@@ -515,19 +515,27 @@ func TestBridgeIsLostWhenTheEntrysSiteOn443BecomesAnotherSite(t *testing.T) {
 	x.givePath(0)
 	x.reverseRelay("rly_a", relayInbound, 7443, store.RelayModeReverse)
 	x.entrySelfSignedSite()
-	x.exec(`UPDATE inbound SET cert_pin_sha256 = ? WHERE id = 'inb_entry_self'`, bridgePin)
 	connectCaps(x.exit, "exit", plugin.CapRelayReverse, capVLESSTLS)
 	connectCaps(x.entry, "entry", plugin.CapRelayForward, plugin.CapRelayReverse, capVLESSTLS)
 	exitNode, err := x.st.Node(x.ctx, x.exit.nodeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, dials, err := x.f.bridgeDesired(x.ctx, exitNode, exitNode.AgentCaps)
+	// the entry's "applied" report is taken in the background and writes the server's certificate facts: the pin is set again until it stays
+	pin := func() { x.exec(`UPDATE inbound SET cert_pin_sha256 = ? WHERE id = 'inb_entry_self'`, bridgePin) }
+	var dials []plugin.BridgeDial
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		pin()
+		if _, dials, err = x.f.bridgeDesired(x.ctx, exitNode, exitNode.AgentCaps); err != nil || len(dials) == 1 || time.Now().After(deadline) {
+			break
+		}
+	}
 	if err != nil || len(dials) != 1 || dials[0].Port != 443 || dials[0].SNI != "entry.example.com" {
 		t.Fatalf("with the entry's own site: %+v, err %v", dials, err)
 	}
 	// what the VLESS plugin builds for that server once the node shows another site (the test fleet builds from the profile's settings)
 	x.exec(`UPDATE profile SET settings_json = '{"port":443,"security":"reality","reality":{"target":"shop.example.com:443","server_names":["shop.example.com"]}}' WHERE id = 'prf_entry_self'`)
+	pin()
 	if _, dials, err = x.f.bridgeDesired(x.ctx, exitNode, exitNode.AgentCaps); err != nil || len(dials) != 0 {
 		t.Fatalf("with another site on 443: %+v, err %v", dials, err)
 	}
