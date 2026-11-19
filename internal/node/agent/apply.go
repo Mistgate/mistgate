@@ -71,6 +71,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	a.clearChangedApplyMarkers(ds, next)
 	if ds.Settings != nil {
 		a.settings.Store(ds.Settings)
+		a.applySubHost(ds.Settings) // before the fronts are planned below
 		if ds.Settings.GetOsStatus() {
 			a.wakeOsStatusReader()
 		}

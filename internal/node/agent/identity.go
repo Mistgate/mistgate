@@ -80,6 +80,8 @@ type Meta struct {
 	// LinkHealthy records a session that held for healthyAfter after HelloAck. Until then PrevLink remains the last
 	// known-good address, even if another candidate is committed or the agent restarts.
 	LinkHealthy bool `json:"link_healthy,omitempty"`
+	// SubHost is the node's subscription host role (subhost_role.go), kept from NodeSettings.sub_host; nil = none.
+	SubHost *SubHostMeta `json:"sub_host,omitempty"`
 }
 
 // SetPanelLink saves linkURL as the panel link address the agent tries next (Meta.NextLink); the running agent reads it
