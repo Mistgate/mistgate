@@ -589,6 +589,21 @@ describe("the key dialog", () => {
     expect(text(open("renew", 0).querySelector("ol.a-steps > .a-st:last-child .tx"))).toContain("«Германия»");
   });
 
+  it("a key to the IPv6 entry is told like a key through an entry: its own chip, one note, and the connection to delete is the one named IPv6", () => {
+    const v6 = awgConfig({ node_id: "de1", ipv6: true, label: "Германия · Франкфурт · IPv6", country_code: "DE", version: "3.1", conf: "[Interface]\nPrivateKey = z\n", vpn_key: "vpn://v6", filename: "mistgate-de-ipv6.conf" });
+    expect([v6.ipv6, v6.via_node_id, cfg("de1").ipv6]).toEqual([true, "", false]);
+    const open = (mode: "open" | "renew", pick: number) =>
+      modal("android", "d3", mode, (s) => {
+        s.configs.d3 = [cfg("de1"), v6];
+        s.node.d3 = pick;
+      });
+    const notes = (b: HTMLElement) => [...b.querySelectorAll(".a-meta p")].map(text);
+    expect(notes(open("open", 0)).some((x) => x.startsWith("Это отдельный ключ"))).toBe(false);
+    expect(notes(open("open", 1))).toContain("Это отдельный ключ для пути IPv6: импортируйте его в AmneziaVPN как новый сервер.");
+    expect([...open("open", 1).querySelectorAll(".a-steps > .a-fld .a-chip.on")].map(text)).toEqual(["Германия · Франкфурт · IPv6"]);
+    expect(text(open("renew", 1).querySelector("ol.a-steps > .a-st:last-child .tx"))).toContain("«Германия · Франкфурт · IPv6»");
+  });
+
   it("the new key of a stale device: what to add, and which old connection goes (by country, never by the panel's node)", () => {
     const b = modal("android", "d3", "renew", () => {}, "stale");
     expect(text(b.querySelector(".a-h .t"))).toBe("Новый ключ для Pixel 7");

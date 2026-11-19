@@ -151,5 +151,7 @@ describe("configKey", () => {
     expect(configKey({ nodeId: "nod_de1", viaNodeId: "" })).toBe("nod_de1");
     expect(configKey({ nodeId: "nod_de1", viaNodeId: "nod_msk1" })).toBe("nod_de1|nod_msk1");
     expect(configKey({ nodeId: "nod_de1", viaNodeId: "nod_msk1" })).not.toBe(configKey({ nodeId: "nod_de1", viaNodeId: "" }));
+    expect(configKey({ nodeId: "nod_de1", viaNodeId: "", ipv6: true })).toBe("nod_de1|ipv6");
+    expect(configKey({ nodeId: "nod_de1", viaNodeId: "", ipv6: true })).not.toBe(configKey({ nodeId: "nod_de1", viaNodeId: "" }));
   });
 });

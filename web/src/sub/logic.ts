@@ -93,6 +93,7 @@ export function awgConfig(raw: unknown): AwgConfig {
     node_id: str(c.node_id),
     via_node_id: str(c.via_node_id),
     via_country: str(c.via_node_id) ? str(c.via_country).trim().toUpperCase() : "",
+    ipv6: c.ipv6 === true,
     label: str(c.label),
     country_code: str(c.country_code),
     version: str(c.version),

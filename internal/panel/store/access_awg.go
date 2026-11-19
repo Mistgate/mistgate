@@ -239,10 +239,11 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 	return resultUserID, nil
 }
 
-// EnsureKeyPathCred gives a static AWG device one peer for a relay entry of its profile. The direct key must still be live,
-// and the relay is checked in the guarded insert so a concurrent delete cannot leave a new orphan path key behind.
+// EnsureKeyPathCred gives a static AWG device one peer for the IPv6 entry or a relay entry of its profile. The direct key must
+// still be live, and the entry or the relay is checked in the guarded insert so a concurrent change cannot leave a new orphan
+// path key behind.
 func (a Access) EnsureKeyPathCred(ctx context.Context, deviceID, profileID, path string, maxIdx int, now time.Time, issue AWGIssue) (AccessCred, bool, error) {
-	if deviceID == "" || profileID == "" || !IsRelayPath(path) || path == relayPathPre || issue == nil {
+	if deviceID == "" || profileID == "" || (path != PathIPv6 && !IsRelayPath(path)) || path == relayPathPre || issue == nil {
 		return AccessCred{}, false, errors.New("store: invalid AWG path credential request")
 	}
 	cutoff := unix(now.Add(-awgQuarantine))

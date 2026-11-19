@@ -175,8 +175,8 @@ export function readyBody(c: AmzCtx, x: AwgDevice, mode: KeyMode): HTMLElement {
   const where: Where = opts.some((o) => o.id === want) ? want : (opts[0]?.id ?? "other");
   const view = keyView(x.platform, s.amz.here, where);
   // the old connection in the app is called by the country, as the new keys are named (a key through an entry is a connection
-  // of its own, named as the page names it: "Germany · via RU")
-  const oldConn = cfg.via_node_id ? cfg.label : countryName(cfg.country_code, s.lang) || cfg.label;
+  // of its own, named as the page names it: "Germany · via RU", "Germany · IPv6")
+  const oldConn = cfg.via_node_id || cfg.ipv6 ? cfg.label : countryName(cfg.country_code, s.lang) || cfg.label;
   const [pasteStep, deleteStep] = t.renewSteps(app, oldConn);
 
   const dl = h("button", { class: "u-btn", type: "button", "data-k": `amz-dl-${x.id}`, on: { click: () => a.download(filename, cfg.conf) } }, icon("file"), t.downloadFile);
@@ -198,7 +198,7 @@ export function readyBody(c: AmzCtx, x: AwgDevice, mode: KeyMode): HTMLElement {
   const versions = versionsFor(x.platform, cfg.min_clients.length ? cfg.min_clients : x.min_clients);
   if (versions.length > 0) meta.push(metaRow("info", t.needApp(versions)));
   // the key through an entry is another server in the app: said once, where it is picked
-  if (cfg.via_node_id) meta.push(metaRow("info", t.viaKeyNote(t.chipVia(cfg.via_country), app)));
+  if (cfg.via_node_id || cfg.ipv6) meta.push(metaRow("info", t.viaKeyNote(cfg.via_node_id ? t.chipVia(cfg.via_country) : "IPv6", app)));
   if (view === "this-desktop" && cfg.warnings.includes("amnezia_desktop_mtu")) meta.push(metaRow("warn", t.desktopFileOnly));
   if (renew && view !== "this-phone") meta.push(metaRow("info", deleteStep));
 
