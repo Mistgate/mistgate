@@ -473,15 +473,22 @@ const profileRank = (p: AwgProfile) => (p.version === "2.0" ? 2 : p.egress === "
 
 /**
  * "Add a device" names a profile by what a friend can tell apart, never by the panel's name: the countries of the main
- * one, "the spare exit" for a WARP one, "for old versions" for 2.0. The main one (3.x, direct) first; a label that repeats
- * gets a number. `kind` says which of the three it is, for the line under the choice.
+ * one, "the spare exit" for a WARP one, "for old versions" for 2.0; several of one kind are told apart by their countries
+ * (an old one that leaves through WARP says so). The main one (3.x, direct) first; a label that still repeats gets a
+ * number. `kind` says which of the three it is, for the line under the choice.
  */
 export function profileChoices(profiles: AwgProfile[], t: Dict, lang: Lang, app: string, flags = true): { id: string; label: string; kind: "main" | "warp" | "old"; countries: string[] }[] {
   const sorted = [...profiles].sort((a, b) => profileRank(a) - profileRank(b));
   const seen = new Map<string, number>();
   return sorted.map((p) => {
-    const base =
-      p.version === "2.0" ? t.profileOld(app) : p.egress === "warp" ? t.profileWarp : p.countries.map((c) => countryLabel(c, lang, flags)).filter(Boolean).join(", ") || t.profileMain;
+    // the countries tell two profiles of one kind apart; an old one that also leaves through WARP says so, or two old profiles
+    // of the same countries would differ by a number only
+    const place = p.countries.map((c) => countryLabel(c, lang, flags)).filter(Boolean).join(", ");
+    const old = p.version === "2.0";
+    const many = sorted.filter((x) => profileRank(x) === profileRank(p)).length > 1;
+    const base = old
+      ? many ? (place || t.profileOld(app)) + (p.egress === "warp" ? ` · ${t.adVerWarp}` : "") : t.profileOld(app)
+      : p.egress === "warp" ? (many && place) || t.profileWarp : place || t.profileMain;
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);
     return { id: p.id, label: n > 1 ? `${base} (${n})` : base, kind: p.version === "2.0" ? "old" : p.egress === "warp" ? "warp" : "main", countries: p.countries };

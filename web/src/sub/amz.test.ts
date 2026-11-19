@@ -106,6 +106,13 @@ describe("names and choices a friend can read", () => {
       { id: "b", name: "y", version: "3.1", egress: "direct" as const, countries: [] },
     ];
     expect(profileChoices(two, t, "ru", "A").map((c) => c.label)).toEqual(["Основной", "Основной (2)"]);
+    // several old profiles are told apart by their countries and by the spare exit, not by a number alone
+    const olds = [
+      { id: "o1", name: "x", version: "2.0", egress: "direct" as const, countries: ["DE", "EE"] },
+      { id: "o2", name: "y", version: "2.0", egress: "direct" as const, countries: ["EE"] },
+      { id: "o3", name: "z", version: "2.0", egress: "warp" as const, countries: ["EE"] },
+    ];
+    expect(profileChoices(olds, t, "ru", "A", false).map((c) => c.label)).toEqual(["Германия, Эстония", "Эстония", "Эстония · Запасной выход"]);
     expect(profileChoices(d.amnezia!.profiles, t, "ru", "AmneziaVPN", false)[0]!.label).toBe("Германия, Финляндия");
   });
 
