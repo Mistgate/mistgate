@@ -22,7 +22,7 @@ Keep it as one more way to connect, mainly for the official apps and routers, ne
 ## What it needs
 
 - **A domain and a public certificate**, for the `tt://` links of the official apps. The app checks the server's certificate the usual way, so the node needs a name and a Let's Encrypt certificate for it. Without a domain only the Mistgate app can connect (see [A self-signed certificate](#a-self-signed-certificate)).
-- **A free TCP port**, 443 by default. It carries HTTP/2.
+- **A TCP port**, 443 by default, free or shared by name with another service ([One 443 for everyone](shared-port.md)). It carries HTTP/2.
 - **A free UDP port of the same number for HTTP/3**, if you turn HTTP/3 on. UDP 443 is usually taken by Hysteria2, so HTTP/3 is **off by default**. It starts only on a node whose agent is new enough; the panel does not send the profile to an older agent, and the server shows as not started.
 
 ## Settings
@@ -39,7 +39,7 @@ The editor shows the settings under **Basics** and **Advanced**. Critical settin
 
 Use your own domain for the SNI override, not a stranger's name: the apps check the certificate against this name, and Let's Encrypt issues it only for your own domain; a stranger's name with a self-signed certificate gives the node away. Picking a neighbour's name is only for the REALITY target of a VLESS profile, see [VLESS](vless.md#finding-a-site-near-the-node).
 
-TrustTunnel is a TCP profile, so it cannot share a port with another TCP profile of the same node (VLESS, for example). The built-in site that Hysteria2 shows on TCP 443 gives way to TrustTunnel: the panel warns with `hy2_site_taken` ("The Hysteria2 site on this TCP port gave way to TrustTunnel"), the certificate of that site keeps renewing, and Hysteria2 itself is not touched.
+TrustTunnel's HTTP/2 stands on a TCP port, and VLESS or MTProto can stand on the same port beside it when each has a name of its own (its **Domain (SNI)**) and one of them shows the node's own site: see [One 443 for everyone](shared-port.md). HTTP/3 is UDP and is never shared. The built-in site that Hysteria2 shows on TCP 443 gives way to TrustTunnel, shared port or not: the panel warns with `hy2_site_taken` ("The Hysteria2 site on this TCP port gave way to TrustTunnel"), the certificate of that site keeps renewing, and Hysteria2 itself is not touched.
 
 ## Add a profile
 

@@ -136,7 +136,7 @@ XHTTP 停滞时，CDN 可能正在缓存完整请求正文：请保留 **Packet 
 
 TCP 443 也用于 Hysteria2 协议配置提供网站。同一节点上的 VLESS 协议配置若使用 TCP 443，且目标为其他站点，会暂停该站点；目标为节点自身站点时，REALITY 仍会显示同一站点，不会造成损失。两种情况都不会影响通过 UDP 运行的 Hysteria2。操作前请阅读[在同一节点上运行 VLESS 和 Hysteria2](vless-and-hysteria2.md)。
 
-节点上的两个协议配置不能监听同一 TCP 端口。TCP 和 UDP 使用相同编号的端口不会冲突。
+节点上的两个协议配置不能监听同一 TCP 端口，只有一个例外：VLESS、TrustTunnel 和 MTProto 在每个服务都有自己的名称、且其中一个展示节点自己的站点时，可以共用同一个 TCP 端口，例如 443（见[一个 443，多个服务共用](shared-port.md)）。TCP 和 UDP 使用相同编号的端口不会冲突。
 
 ## 节点如何处理目标地址
 

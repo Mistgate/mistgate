@@ -136,7 +136,7 @@ The default is TCP 443. The node opens the port in UFW itself, with the comment 
 
 TCP 443 is also where a Hysteria2 profile serves its web site. A VLESS profile with another site as the target on TCP 443 of the same node pauses that site; with the node's own site as the target, REALITY shows the same site, and nothing is lost. Hysteria2 itself, on UDP, is not affected either way. Read [VLESS and Hysteria2 on one node](vless-and-hysteria2.md) before you do that.
 
-Two profiles cannot listen on the same TCP port of a node. A TCP port and a UDP port with the same number do not clash.
+Two profiles cannot listen on the same TCP port of a node, with one exception: VLESS, TrustTunnel and MTProto can stand together on one TCP port, 443 for example, when each has a name of its own and one of them shows the node's own site (see [One 443 for everyone](shared-port.md)). A TCP port and a UDP port with the same number do not clash.
 
 ## How the node handles destinations
 

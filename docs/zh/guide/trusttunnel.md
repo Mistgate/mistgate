@@ -22,7 +22,7 @@ TrustTunnel 是一种运行在普通 HTTPS（HTTP/2，也可按需启用 HTTP/3�
 ## 它需要什么
 
 - **域名和公共证书**，用于官方应用的 `tt://` 链接。应用按通常方式校验服务器证书，所以节点需要一个域名和对应的 Let's Encrypt 证书。没有域名时只有 Mistgate 应用能连接（见[自签名证书](#自签名证书)）。
-- **一个空闲的 TCP 端口**，默认 443，承载 HTTP/2。
+- **一个 TCP 端口**，默认 443：可以是空闲的，也可以按名称与另一个服务共用（[一个 443，多个服务共用](shared-port.md)），承载 HTTP/2。
 - **一个编号相同的空闲 UDP 端口用于 HTTP/3**（如果启用 HTTP/3）。UDP 443 通常被 Hysteria2 占用，所以 HTTP/3 **默认关闭**。只有 Agent 足够新的节点才会启动它；面板不会把该协议配置下发给较旧的 Agent，服务器显示为未启动。
 
 ## 设置
@@ -39,7 +39,7 @@ TrustTunnel 是一种运行在普通 HTTPS（HTTP/2，也可按需启用 HTTP/3�
 
 在 SNI 覆盖中请填你自己的域名，不要填别人的名称：应用会按这个名称校验证书，而 Let's Encrypt 只为你自己的域名签发；别人的名称配自签名证书会暴露节点。挑选邻居的名称只用于 VLESS 协议配置的 REALITY 目标，见 [VLESS](vless.md#查找节点附近的站点)。
 
-TrustTunnel 是 TCP 协议配置，所以不能与同一节点上的另一个 TCP 协议配置（例如 VLESS）共用端口。Hysteria2 在 TCP 443 上显示的内置站点会让位给 TrustTunnel：面板会用 `hy2_site_taken` 警告（“该 TCP 端口上的 Hysteria2 站点已让位给 TrustTunnel”），该站点的证书继续续期，Hysteria2 本身不受影响。
+TrustTunnel 的 HTTP/2 使用 TCP 端口；当每个服务都有自己的名称（其**域名 (SNI)**）、且其中一个展示节点自己的站点时，VLESS 或 MTProto 可以放在同一端口上与它并排：见[一个 443，多个服务共用](shared-port.md)。HTTP/3 属于 UDP，永远不共用。Hysteria2 在 TCP 443 上显示的内置站点会让位给 TrustTunnel，无论端口是否共用：面板会用 `hy2_site_taken` 警告（“该 TCP 端口上的 Hysteria2 站点已让位给 TrustTunnel”），该站点的证书继续续期，Hysteria2 本身不受影响。
 
 ## 添加协议配置
 

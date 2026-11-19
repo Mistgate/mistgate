@@ -93,7 +93,7 @@ The first AmneziaWG profile on a node also asks which AmneziaWG backend the node
 
 ### Ports and the free-port suggestion
 
-Two profiles cannot listen on the same port of one node, and a port cannot sit inside another profile's port-hopping range. When the port is taken, the dialog puts in a free one at once and says so ("Port 443 is taken by "Main": the free port 8443 is filled in. You can type your own."), and **Take 8443** brings it back if you typed something else. For Hysteria2 the panel tries 8443, 4443, 2053, 2083, 2087 and 2096 first, then random ports between 10000 and 60000; for AmneziaWG only random ones. Hop ranges count as taken.
+Two profiles cannot listen on the same port of one node, except VLESS, TrustTunnel and MTProto on a TCP port, which can share it by name ([One 443 for everyone](shared-port.md)). A port cannot sit inside another profile's port-hopping range either. When the port is taken, the dialog puts in a free one at once and says so ("Port 443 is taken by "Main": the free port 8443 is filled in. You can type your own."), and **Take 8443** brings it back if you typed something else. For Hysteria2 the panel tries 8443, 4443, 2053, 2083, 2087 and 2096 first, then random ports between 10000 and 60000; for AmneziaWG only random ones. Hop ranges count as taken.
 
 A port can also be held by a program outside Mistgate. The panel cannot see that before the profile starts: the profile then fails with "Port 443 is taken by another program", the doctor names the process when it can, and **Change port** opens the dialog on a free port.
 
@@ -125,7 +125,7 @@ While you fill in the add-profile dialog (and the per-node edit dialog), the pan
 |:--|:--|:--|
 | `acme_needs_domain` | Let's Encrypt and no domain on an IP node | The Let's Encrypt block with **Enter a domain** and the self-signed ways. |
 | `mtproto_needs_domain` | An MTProto profile with the node's own name, on a node that has only an IP address | The message asks for a domain for the profile on that node, or for the choice of **Another site**. |
-| `port_taken` | Another profile of the node listens there, or the port lies in its hop range | "Port 443 on de1 is already taken by the profile "Main"." A free port is filled in; **Take N**. |
+| `port_taken` | Another profile of the node listens there (not a TCP service that can share the port), or the port lies in its hop range | "Port 443 on de1 is already taken by the profile "Main"." A free port is filled in; **Take N**. |
 | `hop_taken` | This profile's own hop range overlaps another profile on the node | The overlap, and **Open the profile**: only changing the range helps. |
 | `port_in_hop` | The port lies inside the profile's own hop range | "The port must be outside the profile's hop range (20000–30000)." |
 | `sni_needs_domain` | An IP typed into **Domain (SNI)** of a Let's Encrypt profile | "Let's Encrypt needs a domain here, and "…" is not one." |
@@ -135,27 +135,20 @@ While you fill in the add-profile dialog (and the per-node edit dialog), the pan
 
 The UDP delivery check runs when you save a new or changed port and can take about 8 seconds; **validate only** stays cache-only. If the selected port loses packets, saving stops and offers a port that passed the same check. You can choose **Add anyway** to save it, and Mistgate records that choice in the audit log. The picker hides ports that lost packets in the last 30 days, so they are not offered; a fresh passing result is suggested first, then unchecked ports.
 
-A warning does not stop the button. Today there are two:
+A warning does not stop the button. These are the ones:
 
 - `warp_missing`, when the profile exits through WARP and the node has no WARP account, WARP is paused there, or the node's last report says the tunnel is down. The dialog says that the profile will not pass traffic there and links to the node's WARP card.
 - `hy2_decoy_paused`, when a VLESS profile on a TCP port is added next to a Hysteria2 profile whose site uses that port (TCP 443 by default), or the other way round. The dialog names both profiles and says that the Hysteria2 site is off while VLESS holds the port. See [VLESS and Hysteria2 on one node](vless-and-hysteria2.md).
+- `hy2_site_taken` and `hy2_site_taken_mtproto`, when TrustTunnel or MTProto on a TCP port is added next to a Hysteria2 profile whose site uses that port, or the other way round. The Hysteria2 site gives the port up to them.
+- `tcp_port_shared` and `share_two_faces`, when the profile stands on a TCP port that other services share by name, and when one of them shows another site. See [One 443 for everyone](shared-port.md).
 
 The same codes come back from the API and the MCP server, as "code: key=value&key=value", so scripts can read them too. See [API](../reference/api.md).
 
 ## Two services on one TCP port
 
-A node can run several TCP services on the same port, TCP 443 for example: VLESS REALITY, TrustTunnel and MTProto at once. The node's agent tells them apart by the **name** the client asks for in the first bytes of the connection (the SNI), so every service needs a name of its own. A visitor who sends no name, an unknown one, or something that is not TLS gets the node's own site, from the service that serves it (the default one). A Hysteria2 site is not one of them: it still gives its TCP port up. UDP is not shared: a TrustTunnel with HTTP/3 beside Hysteria2 on UDP 443 is still refused.
+A node can run several TCP services on the same port, TCP 443 for example: VLESS REALITY, VLESS over TLS, TrustTunnel and MTProto at once. The agent tells them apart by the **name** the client asks for in the first bytes of the connection (the SNI), so every service needs a name of its own, with a DNS record, and one of them must show the node's own site: it answers everyone who names nothing or a name nobody holds. A Hysteria2 site is not one of them: it still gives its TCP port up. UDP is not shared.
 
-What you need:
-
-- **A name for each service**, a subdomain of the node's address is the usual choice: `cdn.de1.example.com`, `static.de1.example.com`. The panel proposes a neutral one when you put a second service on a taken port. Set it in the **Domain (SNI)** field of the server on the node.
-- **A DNS record for it**, with no proxy (the grey cloud on Cloudflare): an `A` record to the node's IPv4 address, or a `CNAME` to the node's host name. The dialog shows the record as type, name and value, with a **Copy record** button. The node asks Let's Encrypt for the certificate by itself once the name leads to it.
-- **At least one service with the node's own site** (REALITY on the node's own site, VLESS with TLS, TrustTunnel, MTProto with the decoy): it is the default one. Services that show another site cannot be the only ones on a shared port.
-- **A current agent**: the node must list `tcp-share/1`. On an older agent only the default service is sent; the others show **share_agent_old** and the node's Profiles tab says to update the agent.
-
-How to do it: on the node's **Profiles** tab choose **Add profile** (or **Edit** on a profile, or **Put on nodes** on the profile page) and pick the taken port. When the name is held the dialog says so and offers **Put beside on 443** with a name you can edit, and **Take 8443** for the old way out. Put beside runs the check again with the name; if it passes, the dialog tells who restarts (the service that stood alone on the port restarts and its open connections reconnect) and shows the DNS record, and only then you press **Add** or **Save**.
-
-The **TCP 443 is shared** card on the node's Profiles tab shows who shares the port, which name leads to which service, who is the default, and what the node counted since its agent started: accepted, sent to the default one, refused, service down, silent for 10 s, dropped when the port was flooded. A flood is also an event, **front_overloaded**, at most once an hour. A profile whose name another profile of the port holds does not start and says **sni_shadowed**; give it a name of its own.
+When the port is taken, the dialog offers **Put beside on 443** with a name you can edit (a subdomain of the node's address), shows the DNS record to add and says who restarts; **Take 8443** is the old way out. The **TCP 443 is shared** card on the node's Profiles tab shows who shares the port, the names and the counters. Everything about it, from what a stranger sees to the limits, is on one page: [One 443 for everyone](shared-port.md).
 
 ## Errors the editor explains
 

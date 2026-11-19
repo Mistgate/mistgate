@@ -52,7 +52,7 @@ The editor shows the settings under **Basics**. Critical settings change the lin
 
 On a node the profile can have its own **Port**, and, with **This node's name**, its own **Domain (SNI)**, which is then the name in the handshake.
 
-MTProto is a TCP profile. It cannot share a port with another TCP profile of the same node, VLESS for example; if the node already has VLESS on 443, put MTProto on another port. Telegram accepts any port. The built-in site that Hysteria2 shows on TCP 443 gives way to MTProto, as it does to VLESS ([VLESS and Hysteria2 on one node](vless-and-hysteria2.md)); with **This node's name** the visitor of that port still sees the node's site.
+MTProto is a TCP profile. On a TCP port that another TCP profile of the node already holds, VLESS for example, it can stand beside it only when each of them has a name of its own and one of them shows the node's own site: see [One 443 for everyone](shared-port.md). The panel proposes the new name for the profile you add, so a service that already stands on the port keeps its name and its `tg://` links. Otherwise put MTProto on another port; Telegram accepts any port. The built-in site that Hysteria2 shows on TCP 443 gives way to MTProto, as it does to VLESS ([VLESS and Hysteria2 on one node](vless-and-hysteria2.md)); with **This node's name** the visitor of that port still sees the node's site.
 
 The node's clock matters here. The handshake carries the client's time, and the node accepts it within about five minutes of its own clock. A node whose clock is off refuses every client; the doctor's **Clock** check warns about it (see [Health](../operations/health.md)).
 
