@@ -62,6 +62,8 @@ Rules:
 
 The domain, the certificate and how they interact with the node address are described in [Profiles](profiles.md). In short: Let's Encrypt needs a domain whose A record points to the node and ports 80 and 443 reachable; a self-signed certificate works on an IP, and the app checks its fingerprint.
 
+**Use your own domain here, not a stranger's name.** With obfuscation (the default) the name is not visible in the packets at all, so a borrowed name gives nothing. Without obfuscation a stranger's name works only with a self-signed certificate, and then a probe sees a self-signed certificate for someone else's public name, which gives the node away more than your own domain does. Picking a neighbour's name is only for the REALITY target of a VLESS profile, see [VLESS](vless.md#finding-a-site-near-the-node).
+
 ## How the node handles the traffic
 
 - **Sniffing.** The node reads the first bytes for HTTP Host or TLS SNI. Sniffing remains enabled; request attribution and torrent blocking continue to work. If the app asks for a literal IP, the node keeps that IP as the destination; a sniffed name never replaces it.

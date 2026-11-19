@@ -37,6 +37,8 @@ The editor shows the settings under **Basics** and **Advanced**. Critical settin
 | **Certificate** | Let's Encrypt | yes | **Let's Encrypt**, or **Self-signed (pinned)**. See below. |
 | **Exit** | Direct | yes | **Direct** or **WARP**: how the node reaches the sites people open ([WARP](warp.md)). |
 
+Use your own domain for the SNI override, not a stranger's name: the apps check the certificate against this name, and Let's Encrypt issues it only for your own domain; a stranger's name with a self-signed certificate gives the node away. Picking a neighbour's name is only for the REALITY target of a VLESS profile, see [VLESS](vless.md#finding-a-site-near-the-node).
+
 TrustTunnel is a TCP profile, so it cannot share a port with another TCP profile of the same node (VLESS, for example). The built-in site that Hysteria2 shows on TCP 443 gives way to TrustTunnel: the panel warns with `hy2_site_taken` ("The Hysteria2 site on this TCP port gave way to TrustTunnel"), the certificate of that site keeps renewing, and Hysteria2 itself is not touched.
 
 ## Add a profile

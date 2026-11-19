@@ -106,6 +106,30 @@ When a server starts, the node tries the target once with a TLS 1.3 handshake th
 
 > **Note:** after the agent starts, or when a new target or server name appears for the first time, the first client can wait 5 to 10 seconds to connect. The node measures how the target answers once, then every later connection is quick.
 
+## Finding a site near the node
+
+A site from the node's own subnet is the most natural target: the same network, a millisecond away, a name whose address really is next door. The node can look for such sites by itself. On the node's page, the **Profiles** tab shows a card **Sites near the node** under the servers (the owner's, on the VPS panel, on a node that has a VLESS server).
+
+**What the node does.** Only when you press the button, and only after a window that says what follows: the node walks up to 253 neighbouring addresses of its own /24 subnet on **port 443**, with one or two TLS connections to each, at most 10 new connections a second and about a minute in all. The sites see connections from the node's address, and to a hoster this looks like scanning: some send a complaint or limit the server for a while. The same node can be scanned again no sooner than in 30 minutes. Nothing else is scanned: no other port, no IPv6, no wider network, and never on a schedule. The node scans only when its address is on one of its own network interfaces; a node behind NAT, or one known by a name behind a CDN, answers that it cannot, and the card says so.
+
+**What it keeps.** A site that speaks TLS 1.3, chooses **X25519MLKEM768**, has a certificate valid for its name and for more than 14 more days. The best come first: those whose DNS leads to this very address, then HTTP/2, then a certificate of one site (not a hosting's or a CDN's shared one), then a good answer to `GET /`, then the fastest handshake. The card counts what it went through: checked, answering on 443, TLS 1.3, with MLKEM, suitable.
+
+**How to read the labels.**
+
+- **DNS leads here:** the name resolves to this very address, the site really lives here. **DNS: in the subnet:** another address of the same subnet. **DNS: elsewhere:** another network, usually a CDN or a load balancer, a weaker target. **No DNS record:** the node's resolver does not know the name.
+- **HTTP/2** and **own certificate** are good news; **shared certificate** means the certificate of a hosting or a CDN that names many unrelated sites.
+- **HTTP 200** and the like: the answer to `GET /` without following redirects; **certificate for N d**: days left; **N ms**: the handshake time.
+
+**The names are other people's text.** They come from the certificates of other servers and are shown as plain text, never as a link. Do not open them from your own machine: only the node connects to them, neither the panel nor your browser does. The card leaves out your own nodes and the panel: they are no target (see above).
+
+**Apply…** is offered for sites whose DNS leads here. The window asks which REALITY server of this node should show it (when there are several), says what strangers see now and what they will see after, which server restarts, and that people get the new name only with their next subscription refresh: until then their apps cannot connect through this server. If a Hysteria2 profile stands on TCP 443 of the node, the window also says that its site gives way there, see [VLESS and Hysteria2 on one node](vless-and-hysteria2.md). Nothing is saved before the click. **Copy** puts the name on the clipboard, and you can write it as the target `name:443` of the profile yourself.
+
+**A site on this node.** The target of a profile is one for every node it stands on, and a neighbour belongs to a node. So **Apply…** sets a **site on this node** for that one server: in the **Edit** window of a REALITY server the field **Site on this node** holds `host:port` of the site, with the profile's target as the placeholder. The host is a name (not an IP address), and it becomes the one name REALITY accepts on that server. A profile that shows the node's own site shows the neighbour on this node instead, so a node with no domain can have a working target too. **Back to the profile's target** (or an empty field) undoes it; other nodes of the profile are not touched. The panel refuses an IP address, a target with no port, and the node itself at its own port.
+
+Older agents do not know a site set on a node: the panel withholds that server from them, and it shows as failed with the reason "agent too old" until you update the node. The MCP tool `node_neighbor_sites` reads the same list, and `node_update` sets the site; see [MCP](../reference/mcp.md).
+
+**Hysteria2 and TrustTunnel get no such pick.** With obfuscation (the default) Hysteria2 does not show a name in its packets at all; without it, a stranger's name works only with a self-signed certificate, which gives the node away. TrustTunnel's apps check the certificate against the name, and Let's Encrypt issues it only for your own domain. Use your own domain there, see [Hysteria2](hysteria2.md) and [TrustTunnel](trusttunnel.md).
+
 ## Ports
 
 The default is TCP 443. The node opens the port in UFW itself, with the comment `mistgate-node-managed-tcp-v1-<port>`; on firewalld, or in your provider's firewall, you open it. Port 80 is refused: it is kept for Let's Encrypt.

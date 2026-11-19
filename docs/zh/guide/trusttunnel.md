@@ -37,6 +37,8 @@ TrustTunnel 是一种运行在普通 HTTPS（HTTP/2，也可按需启用 HTTP/3�
 | **证书** | Let's Encrypt | 是 | **Let's Encrypt** 或**自签名（固定指纹）**。见下文。 |
 | **出口** | 直连 | 是 | **直连**或 **WARP**：节点如何访问用户打开的网站（[WARP](warp.md)）。 |
 
+在 SNI 覆盖中请填你自己的域名，不要填别人的名称：应用会按这个名称校验证书，而 Let's Encrypt 只为你自己的域名签发；别人的名称配自签名证书会暴露节点。挑选邻居的名称只用于 VLESS 协议配置的 REALITY 目标，见 [VLESS](vless.md#查找节点附近的站点)。
+
 TrustTunnel 是 TCP 协议配置，所以不能与同一节点上的另一个 TCP 协议配置（例如 VLESS）共用端口。Hysteria2 在 TCP 443 上显示的内置站点会让位给 TrustTunnel：面板会用 `hy2_site_taken` 警告（“该 TCP 端口上的 Hysteria2 站点已让位给 TrustTunnel”），该站点的证书继续续期，Hysteria2 本身不受影响。
 
 ## 添加协议配置
