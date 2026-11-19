@@ -109,9 +109,12 @@ func TestLinkOnlyAgentListsLinkUpdateCapability(t *testing.T) {
 	}
 	a.meta.Link = "wss://de1.example.com/" + strings.Repeat("p", 24) + "/"
 	caps := a.capabilities()
-	if !contains(caps, "update-link/1") || contains(caps, "update/1") || contains(caps, "update-sources/1") || !contains(caps, "update-guard/1") ||
-		!contains(caps, "doctor/1") || !contains(caps, "ws-link/1") {
-		t.Errorf("a link-only agent lists %v", caps)
+	// The edge reads update-link/1 (the command's token); a VPS panel update/1 and nets/1, fetched with the session's token
+	// (link-fetch/1).
+	for _, want := range []string{"update-link/1", "update/1", "update-guard/1", "link-fetch/1", "nets/1", "doctor/1", "ws-link/1"} {
+		if !contains(caps, want) {
+			t.Errorf("a link-only agent lists %v, without %s", caps, want)
+		}
 	}
 }
 

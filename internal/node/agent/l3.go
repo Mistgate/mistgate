@@ -110,7 +110,7 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
-	caps := []string{agentcap.Doctor, agentcap.Bandwidth, agentcap.ClientIPv6, agentcap.WSLink, agentcap.TCPCheck, agentcap.Decoy, agentcap.Links, agentcap.Links2, agentcap.Links3, agentcap.Journal, agentcap.Probe, agentcap.SNIScan, agentcap.Speed, agentcap.SpeedChannel, agentcap.Debug}
+	caps := []string{agentcap.Doctor, agentcap.Bandwidth, agentcap.ClientIPv6, agentcap.WSLink, agentcap.TCPCheck, agentcap.Decoy, agentcap.Links, agentcap.Links2, agentcap.Links3, agentcap.Journal, agentcap.Probe, agentcap.SNIScan, agentcap.Speed, agentcap.SpeedChannel, agentcap.Debug, plugin.CapLinkFetch}
 	if a.canOSUpdate() {
 		caps = append(caps, agentcap.OSStatus)
 		if a.cfg.OSUpdate != nil {
@@ -174,17 +174,9 @@ func (a *Agent) capabilities() []string {
 		caps = append(caps, agentcap.AWGPrepare)
 	}
 	updateCaps := a.upd.Capabilities()
-	if a.linkOnly() {
-		if slices.Contains(updateCaps, agentcap.Update) {
-			caps = append(caps, agentcap.UpdateLink)
-			if slices.Contains(updateCaps, agentcap.UpdateTimeout) {
-				caps = append(caps, agentcap.UpdateTimeout)
-			}
-			if slices.Contains(updateCaps, agentcap.UpdateGuard) {
-				caps = append(caps, agentcap.UpdateGuard)
-			}
-		}
-		return caps
+	// A link-only agent fetches over the link with the command's token on edge or its session's token on VPS.
+	if a.linkOnly() && slices.Contains(updateCaps, agentcap.Update) {
+		caps = append(caps, agentcap.UpdateLink)
 	}
 	return append(caps, updateCaps...)
 }
