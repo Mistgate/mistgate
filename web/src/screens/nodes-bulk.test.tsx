@@ -233,19 +233,14 @@ const goKeys = [
 ] as const;
 
 describe("the bar", () => {
-  it("shows with the first tick, counts in words, and is the owner's only", async () => {
+  // the owner-only side (no Select, no ticks for a helper) is nodes-list.test.tsx "selecting"
+  it("shows with the first tick and counts in words", async () => {
     await mount();
     expect(bar()).toBeNull();
     await pick("de1");
     expect(bar()?.textContent).toContain("1 node selected");
     await pick("nl1");
     expect(bar()?.textContent).toContain("2 nodes selected");
-    act(() => root?.unmount());
-    host?.remove();
-
-    await mount({ me: { admin: { id: "adm_2", role: Role.HELPER } } });
-    expect(tick("de1")).toBeNull();
-    expect(button(en["nv.select"])).toBeUndefined();
   });
 
   it("says how much of the selection the filter hides", async () => {
