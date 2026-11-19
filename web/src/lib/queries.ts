@@ -1,7 +1,7 @@
 import { keepPreviousData, queryOptions, useQuery } from "@tanstack/react-query";
 import { OverviewRange } from "@/gen/mistgate/admin/v1/fleet_pb";
 import { UserFilter } from "@/gen/mistgate/admin/v1/user_pb";
-import { fleet, nodes, users } from "./api";
+import { fleet, nodes, subHost, users } from "./api";
 import { plain } from "./plain";
 
 // Everything the screens read. The fleet changes under you, so every list polls every 10 s (agents report
@@ -17,6 +17,13 @@ export const overviewQuery = (range: OverviewRange = OverviewRange.OVERVIEW_RANG
     // switching 24 h / 7 d keeps the old chart on screen until the new one is there
     placeholderData: keepPreviousData,
   });
+
+/** The subscription host, polled every 5 s while a page shows it: the bridge and readiness change on their own. */
+export const subHostQuery = queryOptions({
+  queryKey: ["subhost"],
+  queryFn: async ({ signal }) => (await subHost.getSubscriptionHost({}, { signal })).host ?? null,
+  refetchInterval: 5_000,
+});
 
 export const nodesQuery = queryOptions({
   queryKey: ["nodes"],

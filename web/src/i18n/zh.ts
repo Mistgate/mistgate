@@ -37,6 +37,7 @@ import { zh as fleetuiZh } from "./fleetui";
 import { zh as clientlogsZh } from "./clientlogs";
 import { zh as trusttunnelZh } from "./trusttunnel";
 import { zh as tcpshareZh } from "./tcpshare";
+import { zh as subhostZh } from "./subhost";
 import { zh as shellZh } from "./shell";
 import { zh as nodesviewZh } from "./nodesview";
 import { zh as nodeswaysZh } from "./nodesways";
@@ -328,4 +329,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "暂不支持为 IP 地址申请 Let’s Encrypt 证书：请使用域名或自签名证书",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...tcpshareZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...usersextraZh, ...decoysitesZh, ...planwordsZh, ...nodeswaysZh, ...nodewaysZh, ...profilespageZh, ...healthpageZh, ...reachpageZh, ...profilesrvZh, ...profilenewZh, ...subspnZh, ...subshxZh, ...subsrtZh, ...subsdnsZh, ...updatespageZh, ...settingspageZh, ...aipageZh, ...igpageZh, ...aspageZh, ...nodeshareZh, ...channelZh, ...countrynowZh, ...sniZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...tcpshareZh, ...subhostZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...usersextraZh, ...decoysitesZh, ...planwordsZh, ...nodeswaysZh, ...nodewaysZh, ...profilespageZh, ...healthpageZh, ...reachpageZh, ...profilesrvZh, ...profilenewZh, ...subspnZh, ...subshxZh, ...subsrtZh, ...subsdnsZh, ...updatespageZh, ...settingspageZh, ...aipageZh, ...igpageZh, ...aspageZh, ...nodeshareZh, ...channelZh, ...countrynowZh, ...sniZh };
