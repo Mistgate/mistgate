@@ -419,7 +419,7 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 		}
 		if spec.Protocol == "vless" && spec.Listen.Network == "tcp" && spec.Listen.Port == 443 {
 			vless443 = true
-			if vlessExternalReality(spec) {
+			if v, _ := plugin.VLESSOf(spec); v.Security == "reality" && !v.TargetSelf() {
 				return "reality_external_target", row.ProfileID
 			}
 		}
@@ -427,7 +427,7 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 	}
 	for _, inbound := range specs {
 		spec := inbound.spec
-		if spec.Protocol == "hysteria2" && hy2SitePort(spec) == 443 {
+		if spec.Protocol == "hysteria2" && plugin.Hy2SitePort(spec) == 443 {
 			if !vless443 {
 				return "", ""
 			}
@@ -451,19 +451,6 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 		}
 	}
 	return "", ""
-}
-
-func vlessExternalReality(spec plugin.InboundSpec) bool {
-	var settings struct {
-		Security string `json:"security"`
-		Reality  struct {
-			Target string `json:"target"`
-		} `json:"reality"`
-	}
-	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
-		return false
-	}
-	return settings.Security == "reality" && settings.Reality.Target != "self"
 }
 
 func fleetUnix(t time.Time) int64 {
@@ -729,7 +716,7 @@ func (f *Fleet) inboundMsg(n store.NodeRow, row store.FleetInboundRow) *adminv1.
 	}
 	if spec, err := f.buildSpec(n, row); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
-		out.Cdn = protocols.ServerCDN(spec)
+		out.Cdn = plugin.ServerCDN(spec)
 		out.RealityTarget = plugin.RealityTargetShown(spec)
 	}
 	return out

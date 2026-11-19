@@ -312,7 +312,7 @@ func TestCheckIPv6MissingHalfWithOtherSendersIsNoVerifier(t *testing.T) {
 func TestIPv6CheckTargetsSkipUnsupportedServers(t *testing.T) {
 	specs := []tcpSpec{
 		hy2Spec("ip", plugin.TLSAcmeIP, "node-a.example.com", ""),
-		hy2Spec("cdn", plugin.TLSSelfSigned, "node-a.example.com", `{"cdn":{"host":"cdn.example.com"}}`),
+		vlessSpec("cdn", 443, `{"security":"tls","cdn":{"host":"cdn.example.com"}}`, plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: "node-a.example.com"}),
 	}
 	tcp, udp := ipv6CheckTargets(specs, nil)
 	if len(tcp) != 0 || len(udp) != 0 {

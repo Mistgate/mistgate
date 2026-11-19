@@ -271,3 +271,35 @@ func TestVLESSProbesSendTheNameOfTheirRoute(t *testing.T) {
 		}
 	}
 }
+
+// A Hysteria2 inbound that shows no decoy page (masquerade type none) still listens on its site port and answers there, with a plain
+// 404: the check from the country and the own probes try that port as they try the site of any other.
+func TestHysteria2WithNoDecoyPageIsStillReachedOnItsSitePort(t *testing.T) {
+	c := newCountryEnv(t)
+	c.node("de1", "hoster-de1", true)
+	c.names["de1.example.com"] = []netip.Addr{netip.MustParseAddr("203.0.113.10")}
+	id := c.inbound("de1", 8443)
+	c.exec(`UPDATE profile SET settings_json = json_set(settings_json, '$.masquerade.type', 'none') WHERE id = (SELECT profile_id FROM inbound WHERE id = ?)`, id)
+	c.s.invalidateSnapshot()
+
+	got, err := c.s.CountryTargets(c.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || !reflect.DeepEqual(got[0].Ports, []uint16{443}) || got[0].PreferredPort != 443 {
+		t.Fatalf("country targets = %+v, want TCP 443 (the site port), preferred", got)
+	}
+	probes, err := c.s.ProbeTargets(c.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tls []string
+	for _, tg := range probes {
+		if tg.Kind == "tls" {
+			tls = append(tls, fmt.Sprintf("%d %s", tg.Port, tg.SNI))
+		}
+	}
+	if !reflect.DeepEqual(tls, []string{"443 de1.example.com"}) {
+		t.Fatalf("own probe TLS targets = %v, want the site port with the node's name", tls)
+	}
+}

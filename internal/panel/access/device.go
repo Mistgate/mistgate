@@ -551,7 +551,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 		if maxIdxErr != nil {
 			continue
 		}
-		if relayUnsupported(awg.ID, spec) != "" {
+		if protocols.IPv6Unsupported(spec) != "" {
 			continue
 		}
 		for _, relay := range relaysOf[f.Inbound.ID] {

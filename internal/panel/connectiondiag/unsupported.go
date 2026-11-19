@@ -2,9 +2,10 @@
 package connectiondiag
 
 import (
-	"encoding/json"
 	"slices"
 	"strings"
+
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 const Links2Capability = "links/2"
@@ -61,17 +62,11 @@ type Variant struct {
 
 // VLESSVariant reads the variant from a VLESS profile's settings_json (no secret is in it); anything unreadable is "".
 func VLESSVariant(settingsJSON string) Variant {
-	var s struct {
-		Security  string `json:"security"`
-		Transport string `json:"transport"`
-		CDN       struct {
-			Host string `json:"host"`
-		} `json:"cdn"`
-	}
-	if json.Unmarshal([]byte(settingsJSON), &s) != nil {
+	v, ok := plugin.VLESSOf(plugin.InboundSpec{Protocol: "vless", Settings: []byte(settingsJSON)})
+	if !ok {
 		return Variant{}
 	}
-	return Variant{Security: s.Security, Transport: s.Transport, CDN: s.CDN.Host != ""}
+	return Variant{Security: v.Security, Transport: v.Transport, CDN: v.CDNHost != ""}
 }
 
 // UnsupportedCounters returns protocol-level counters this protocol does not report. A fresh slice keeps callers from mutating

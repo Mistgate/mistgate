@@ -17,6 +17,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The country check: "does the node answer from inside a country". The panel's server is not in that country, so its own
@@ -253,32 +254,9 @@ func countryReached(obs CountryObserved, targets []CountryTarget, icmpOnly bool)
 // ---------------------------------------------------------------------------------------------------
 // Targets
 
-// hy2DecoyPort is the TCP port of a Hysteria2 inbound's HTTPS decoy (443 unless the profile says otherwise, 0 = none), the
-// same rule as the agent's doctor.
-func hy2DecoyPort(t *target) uint16 {
-	if t.spec.TLS.Mode == 0 {
-		return 0
-	}
-	var j struct {
-		Masquerade struct {
-			Type    string `json:"type"`
-			TCPPort *int   `json:"tcp_port"`
-		} `json:"masquerade"`
-	}
-	if len(t.settings) > 0 && json.Unmarshal(t.settings, &j) != nil {
-		return 0
-	}
-	if strings.EqualFold(j.Masquerade.Type, "none") {
-		return 0
-	}
-	if p := j.Masquerade.TCPPort; p != nil {
-		return uint16(max(0, min(*p, 65535)))
-	}
-	return 443
-}
-
 // countryPorts are the distinct TCP ports a node answers on: the ports of its active TCP inbounds (VLESS) and the HTTPS
-// decoy of its Hysteria2 ones. A node with only UDP inbounds and no decoy has none and is checked by ICMP alone.
+// site of its Hysteria2 ones (the decoy page, or the plain 404 of masquerade type none). A node with only UDP inbounds and no site has
+// none and is checked by ICMP alone.
 func countryPorts(ts []*target) []uint16 {
 	var ports []uint16
 	add := func(p uint16) {
@@ -294,7 +272,7 @@ func countryPorts(ts []*target) []uint16 {
 		case t.spec.Listen.Network == "tcp":
 			add(t.spec.Listen.Port)
 		case t.in.Protocol == "hysteria2":
-			add(hy2DecoyPort(t))
+			add(plugin.Hy2SitePort(t.spec))
 		}
 	}
 	slices.Sort(ports)
@@ -313,7 +291,7 @@ func countryPreferredPort(ts []*target) uint16 {
 		var p uint16
 		switch {
 		case t.in.Protocol == "hysteria2":
-			p = hy2DecoyPort(t)
+			p = plugin.Hy2SitePort(t.spec)
 		case t.in.Protocol == "vless" && t.spec.Listen.Network == "tcp":
 			var settings struct {
 				Security string `json:"security"`

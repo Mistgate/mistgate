@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"slices"
 	"strconv"
 	"strings"
@@ -712,7 +711,7 @@ func (s *Service) inboundProto(f store.AccessInboundFull, settings json.RawMessa
 	}
 	if spec, err := s.buildSpec(f, settings); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
-		out.Cdn = protocols.ServerCDN(spec)
+		out.Cdn = plugin.ServerCDN(spec)
 		out.RealityTarget = plugin.RealityTargetShown(spec)
 	}
 	out.Awg = awgStatus(f.Inbound)
@@ -1013,11 +1012,12 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 	appendDecoyWarning := func(port int, hy2, vless string, vlessSpec, hy2Spec plugin.InboundSpec) {
 		// via self: REALITY shows the node's own site, so the Hysteria2 site stays and nothing is borrowed; via site: another
 		// site is shown, which is named by target
+		view, _ := plugin.VLESSOf(vlessSpec)
 		via := "site"
-		if vlessTargetSelf(vlessSpec) {
+		if view.TargetSelf() {
 			via = "self"
 		}
-		params := map[string]string{"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "vless": vless, "via": via, "target": vlessTargetHost(vlessSpec)}
+		params := map[string]string{"node": nodeName, "port": strconv.Itoa(port), "hy2": hy2, "vless": vless, "via": via, "target": view.TargetHost()}
 		// only an ACME certificate renews through the site port, so only then does TCP 80 become its sole way (§7.1)
 		if m := hy2Spec.TLS.Mode; m == plugin.TLSAcmeDomain || m == plugin.TLSAcmeIP {
 			params["port80"], port80Err = s.port80State(ctx, nodeID)
@@ -1038,7 +1038,7 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 	}
 	if (spec.Protocol == "trusttunnel" || spec.Protocol == "mtproto") && spec.Listen.Network == "tcp" {
 		for _, other := range others {
-			if other.enabled && other.protocol == "hysteria2" && hy2TCPPort(other.spec) == int(spec.Listen.Port) {
+			if other.enabled && other.protocol == "hysteria2" && plugin.Hy2SitePort(other.spec) == spec.Listen.Port {
 				appendTakenWarning(int(spec.Listen.Port), other.profile, profileName, spec.Protocol)
 				break
 			}
@@ -1046,14 +1046,14 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 	}
 	if spec.Protocol == "vless" && spec.Listen.Network == "tcp" {
 		for _, other := range others {
-			if !other.enabled || other.protocol != "hysteria2" || hy2TCPPort(other.spec) != int(spec.Listen.Port) {
+			if !other.enabled || other.protocol != "hysteria2" || plugin.Hy2SitePort(other.spec) != spec.Listen.Port {
 				continue
 			}
 			appendDecoyWarning(int(spec.Listen.Port), other.profile, profileName, spec, other.spec)
 			break
 		}
 	} else if spec.Protocol == "hysteria2" {
-		port := hy2TCPPort(spec)
+		port := int(plugin.Hy2SitePort(spec))
 		if port > 0 {
 			for _, other := range others {
 				if !other.enabled || other.l.Network != "tcp" || int(other.l.Port) != port {
@@ -1121,57 +1121,6 @@ func (s *Service) port80State(ctx context.Context, nodeID string) (string, error
 		}
 	}
 	return "unchecked", nil
-}
-
-// hy2TCPPort matches the node's Hysteria2 site rule: omitted means 443 and zero disables the site.
-func hy2TCPPort(spec plugin.InboundSpec) int {
-	if spec.Protocol != "hysteria2" || spec.TLS.Mode == 0 {
-		return 0
-	}
-	var settings struct {
-		Masquerade struct {
-			TCPPort *int `json:"tcp_port"`
-		} `json:"masquerade"`
-	}
-	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
-		return 0
-	}
-	if settings.Masquerade.TCPPort != nil {
-		return max(*settings.Masquerade.TCPPort, 0)
-	}
-	return 443
-}
-
-// vlessTargetSelf: the VLESS inbound's REALITY target is the node's own site (wire value "self").
-func vlessTargetSelf(spec plugin.InboundSpec) bool {
-	if spec.Protocol != "vless" {
-		return false
-	}
-	var settings struct {
-		Reality struct {
-			Target string `json:"target"`
-		} `json:"reality"`
-	}
-	return json.Unmarshal(spec.Settings, &settings) == nil && strings.TrimSpace(settings.Reality.Target) == "self"
-}
-
-func vlessTargetHost(spec plugin.InboundSpec) string {
-	if spec.Protocol != "vless" {
-		return ""
-	}
-	var settings struct {
-		Reality struct {
-			Target string `json:"target"`
-		} `json:"reality"`
-	}
-	if json.Unmarshal(spec.Settings, &settings) != nil {
-		return ""
-	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(settings.Reality.Target))
-	if err != nil {
-		return ""
-	}
-	return strings.Trim(host, "[]")
 }
 
 // warpDown: the node's last WARP report says the tunnel does not work (down, or no backend to run it on).
@@ -1505,12 +1454,12 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 // possible subscriber could reach this inbound. The synthetic audience permits every supported app and node; relayUsable keeps
 // this check aligned with subscription relay enablement, checks, entry state, and the live inbound rules.
 func (s *Service) inboundNoWayInWarning(ctx context.Context, f store.AccessInboundFull, spec plugin.InboundSpec) (*adminv1.StatusReason, error) {
-	if !f.Inbound.Enabled || f.Inbound.DirectInSubscriptions || protocols.ServerCDN(spec) ||
+	if !f.Inbound.Enabled || f.Inbound.DirectInSubscriptions || plugin.ServerCDN(spec) ||
 		(ipv6EntryAddr(f.Node) != "" && protocols.IPv6Unsupported(spec) == "") {
 		return nil, nil
 	}
 
-	unsupported := relayUnsupported(f.Profile.Protocol, spec)
+	unsupported := protocols.IPv6Unsupported(spec)
 	if unsupported == "" {
 		links, err := s.st.RelayLinks(ctx, store.RelayFilter{InboundID: f.Inbound.ID})
 		if err != nil {

@@ -42,7 +42,7 @@ func TCPPortOwners(specs []InboundSpec) map[uint16]TCPOwner {
 		}
 	}
 	for _, s := range sorted {
-		if port := hy2SitePort(s); port != 0 {
+		if port := Hy2SitePort(s); port != 0 {
 			if _, held := owners[port]; !held {
 				owners[port] = TCPOwner{ID: s.ID, Protocol: s.Protocol, Site: true}
 			}
@@ -57,16 +57,8 @@ func tcpOwnSite(s InboundSpec) bool {
 	case "trusttunnel":
 		return true
 	case "vless":
-		var j struct {
-			Security string `json:"security"`
-			Reality  struct {
-				Target string `json:"target"`
-			} `json:"reality"`
-		}
-		if len(s.Settings) > 0 && json.Unmarshal(s.Settings, &j) != nil {
-			return false
-		}
-		return j.Security == "tls" || (j.Security == "reality" || j.Security == "") && j.Reality.Target == "self"
+		v, ok := VLESSOf(s)
+		return ok && v.OwnSite()
 	case "mtproto":
 		var j struct {
 			Fallback string `json:"fallback"`
@@ -77,26 +69,6 @@ func tcpOwnSite(s InboundSpec) bool {
 		return j.Fallback == "" || j.Fallback == "decoy"
 	}
 	return false
-}
-
-// hy2SitePort is the TCP port of a Hysteria2 inbound's HTTPS site, 0 = none (the node's own rule,
-// internal/node/hysteria2/settings.go).
-func hy2SitePort(s InboundSpec) uint16 {
-	if s.Protocol != "hysteria2" || s.TLS.Mode == 0 {
-		return 0
-	}
-	var j struct {
-		Masquerade struct {
-			TCPPort *int `json:"tcp_port"`
-		} `json:"masquerade"`
-	}
-	if len(s.Settings) > 0 && json.Unmarshal(s.Settings, &j) != nil {
-		return 0
-	}
-	if j.Masquerade.TCPPort != nil {
-		return uint16(min(max(*j.Masquerade.TCPPort, 0), 65535))
-	}
-	return 443
 }
 
 // TCPRoute is one service on a TCP port that services share by the SNI of the first ClientHello.
@@ -262,22 +234,14 @@ func tcpRoute(s InboundSpec) (r TCPRoute, ok bool) {
 	case "vless":
 		// What the engine reads (internal/node/vless/settings.go): the TLS name and the CDN host of a TLS inbound; the server
 		// names of REALITY, which for the node's own site are its TLS name and for another site the names the target is asked for.
-		var j struct {
-			Security string `json:"security"`
-			Reality  struct {
-				ServerNames []string `json:"server_names"`
-			} `json:"reality"`
-			CDN struct {
-				Host string `json:"host"`
-			} `json:"cdn"`
-		}
-		if len(s.Settings) > 0 && json.Unmarshal(s.Settings, &j) != nil {
+		v, ok := VLESSOf(s)
+		if !ok {
 			return r, false
 		}
-		if j.Security == "tls" {
-			names = []string{s.TLS.ServerName, j.CDN.Host}
+		if v.TLS() {
+			names = []string{s.TLS.ServerName, v.CDNHost}
 		} else {
-			names, r.Reality = j.Reality.ServerNames, true
+			names, r.Reality = v.ServerNames, true
 		}
 	default:
 		return r, false

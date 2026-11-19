@@ -97,7 +97,7 @@ func (s *Service) ProbeTargets(ctx context.Context) ([]ProbeTarget, error) {
 				if !countryreach.ProbeSNI(sni) {
 					continue
 				}
-				if port := hy2DecoyPort(t); port > 0 {
+				if port := plugin.Hy2SitePort(t.spec); port > 0 {
 					tlsTargets = append(tlsTargets, ProbeTarget{NodeID: n.node.ID, IP: ip, Port: port, Kind: "tls", SNI: sni, Path: "/"})
 				}
 			}
@@ -134,13 +134,8 @@ func probeName(spec plugin.InboundSpec) string {
 	if spec.TLS.ServerName != "" {
 		return spec.TLS.ServerName
 	}
-	var settings struct {
-		Reality struct {
-			ServerNames []string `json:"server_names"`
-		} `json:"reality"`
-	}
-	if json.Unmarshal(spec.Settings, &settings) == nil && len(settings.Reality.ServerNames) > 0 {
-		return settings.Reality.ServerNames[0]
+	if v, _ := plugin.VLESSOf(spec); len(v.ServerNames) > 0 {
+		return v.ServerNames[0]
 	}
 	return ""
 }

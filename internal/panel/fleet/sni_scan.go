@@ -19,6 +19,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The neighbour scan of a node (ProbeService.NodeSniScan, the MCP tool node_neighbor_sites; agent.proto "NEIGHBOR SITES"): the node
@@ -396,21 +397,14 @@ func (f *Fleet) ownSniNames(ctx context.Context) (*ownSni, error) {
 		}
 		for _, s := range specs {
 			own.add(s.Spec.TLS.ServerName)
-			var settings struct {
-				Reality struct {
-					Target      string   `json:"target"`
-					ServerNames []string `json:"server_names"`
-				} `json:"reality"`
-			}
-			if len(s.Spec.Settings) == 0 || json.Unmarshal(s.Spec.Settings, &settings) != nil {
+			v, ok := plugin.VLESSOf(s.Spec)
+			if !ok {
 				continue
 			}
-			for _, name := range settings.Reality.ServerNames {
+			for _, name := range v.ServerNames {
 				own.add(name)
 			}
-			if host, _, err := net.SplitHostPort(strings.TrimSpace(settings.Reality.Target)); err == nil {
-				own.add(host)
-			}
+			own.add(v.TargetHost())
 		}
 	}
 	own.addURL(f.cfg.PublicURL)
