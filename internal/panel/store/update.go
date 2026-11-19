@@ -270,13 +270,19 @@ func (s *Store) RolloutSteps(ctx context.Context, rolloutID string) ([]StepRow, 
 // callers cannot both win). pauseKey and params describe a pause and are cleared by any other status. It
 // reports whether the row changed; finished is recorded for the terminal statuses.
 func (s *Store) SetRolloutStatus(ctx context.Context, id string, from []string, status, pauseKey string, params map[string]string, finished time.Time) (bool, error) {
+	return s.setRolloutStatus(ctx, "update_rollout", id, from, status, pauseKey, params, finished)
+}
+
+// setRolloutStatus is the compare-and-set of the agent and the OS rollout tables, the same in both. table is one of the
+// two names, never a caller's text.
+func (s *Store) setRolloutStatus(ctx context.Context, table, id string, from []string, status, pauseKey string, params map[string]string, finished time.Time) (bool, error) {
 	if len(from) == 0 {
 		return false, nil
 	}
 	if status != RolloutPaused {
 		pauseKey, params = "", nil
 	}
-	q := `UPDATE update_rollout SET status = ?, pause_key = ?, pause_params_json = ?, finished_at = ? WHERE id = ? AND status IN (?` +
+	q := `UPDATE ` + table + ` SET status = ?, pause_key = ?, pause_params_json = ?, finished_at = ? WHERE id = ? AND status IN (?` +
 		strings.Repeat(", ?", len(from)-1) + `)`
 	args := []any{status, pauseKey, jsonMap(params), fleetUnix(finished), id}
 	for _, f := range from {
@@ -431,10 +437,15 @@ func (s *Store) SkipPendingSteps(ctx context.Context, rolloutID, errorKey string
 // PruneRollouts deletes finished rollouts (their steps go with them) that are older than cutoff and are not among
 // the newest keep finished ones. An active rollout is never touched. It returns how many were removed.
 func (s *Store) PruneRollouts(ctx context.Context, keep int, cutoff time.Time) (int64, error) {
+	return s.pruneRollouts(ctx, "update_rollout", keep, cutoff)
+}
+
+// pruneRollouts is the pruning of both rollout tables. table is one of the two names, never a caller's text.
+func (s *Store) pruneRollouts(ctx context.Context, table string, keep int, cutoff time.Time) (int64, error) {
 	res, err := s.W.ExecContext(ctx, `
-		DELETE FROM update_rollout
+		DELETE FROM `+table+`
 		WHERE status NOT IN ('running', 'paused') AND created_at < ?
-		  AND id NOT IN (SELECT id FROM update_rollout WHERE status NOT IN ('running', 'paused')
+		  AND id NOT IN (SELECT id FROM `+table+` WHERE status NOT IN ('running', 'paused')
 		                 ORDER BY created_at DESC, rowid DESC LIMIT ?)`, unix(cutoff), max(keep, 0))
 	if err != nil {
 		return 0, err

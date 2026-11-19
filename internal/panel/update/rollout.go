@@ -624,9 +624,10 @@ func (p *pass) finish(x *store.StepRow, state, key string, params map[string]str
 	return true
 }
 
-// finishAndPause keeps the VPS handler's historical pause behavior, while an edge pass pauses only after it wins the step CAS.
+// finishAndPause ends a step and pauses the rollout for it. A pass that did not win the write of its step (the step was
+// decided meanwhile) pauses nothing.
 func (p *pass) finishAndPause(x *store.StepRow, state, key string, params map[string]string, pauseCode, reason string) {
-	if p.finish(x, state, key, params) || !p.s.cfg.Edge {
+	if p.finish(x, state, key, params) {
 		p.pause(pauseCode, x, reason)
 	}
 }
@@ -655,11 +656,12 @@ func (p *pass) event(x *store.StepRow, state, key string) {
 
 // pause stops the rollout because of a step; a pause by the owner gives way to a failure, a failure stays as the first said it.
 func (p *pass) pause(code string, x *store.StepRow, reason string) {
-	if p.ro.Status != store.RolloutRunning && p.ro.PauseKey != pauseOwner {
+	if p.ro.Status != store.RolloutRunning && !(p.ro.Status == store.RolloutPaused && p.ro.PauseKey == pauseOwner) {
 		return
 	}
 	params := map[string]string{"node": x.NodeName, "node_id": x.NodeID, "reason": reason}
-	ok, err := p.s.st.SetRolloutStatus(p.ctx, p.ro.ID, []string{store.RolloutRunning, store.RolloutPaused}, store.RolloutPaused, code, params, time.Time{})
+	// only from the status this pass read: a rollout paused or resumed meanwhile keeps what the other writer made of it
+	ok, err := p.s.st.SetRolloutStatus(p.ctx, p.ro.ID, []string{p.ro.Status}, store.RolloutPaused, code, params, time.Time{})
 	if err != nil {
 		p.s.log.Warn("update: pause rollout", "rollout", p.ro.ID, "err", err)
 		return
