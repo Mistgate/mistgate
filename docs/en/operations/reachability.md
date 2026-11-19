@@ -17,6 +17,15 @@ The client-eye checks run on the panel's server, which is not inside the country
 
 **Health → Checks** still shows the verdict as its last column, *From Russia* (a row per node on a phone), and the node page as a row of its client-eye checks. Both are hidden while every source is off, and their titles lead to this section. The API has the week as `CountryReachabilityService.GetReachabilityHistory`: at most 7 days, readable like `GetChecks` by every role and by API tokens.
 
+## Check now
+
+**Check now** on a node (its Overview, or `checks_run_now` with a node) also asks the country check for a round of that node out of turn. The answer says per source whether it runs or is skipped and why, and the page shows it under the *From Russia* line, with a radar only while a round is going on.
+
+- **Globalping** measures that node once, but only from the tests left in the current window of its hourly limit after the rounds the schedule still needs in that window have been set aside (the planned rounds have priority; a round by hand never eats their budget). The credits that pay for tests above the limit are never touched. Not enough left: Globalping is skipped (`no_budget`) and the other sources go on. The limit is hourly; the panel has no daily counter of its own.
+- **The TSPU probe**, **cheburcheck** (public and with your token) and **your own probes** are asked for that node: the probe node tests it, cheburcheck checks it out of turn (not during its hold after a refusal), and every own probe that has been heard from in the last hour takes a job at its next sync, up to 15 minutes. A probe silent for longer is not asked.
+- **bsbord** is paid and runs only on its schedule. The **block lists** and the **kl!ck reports** are read again from what the panel holds, with no request to anyone.
+- A node is asked at most once in 10 minutes; a press that comes sooner is no error: it says when the next recheck may be asked (`retry_after_s`). The rows of a round by hand are marked and do not move the schedule of the planned rounds.
+
 ## Globalping
 
 The first source asks probes inside the country (home and mobile networks first) to ping every online node and to open TCP connections to its ports, and compares the answers. It uses [Globalping](https://globalping.io), a free network of probes. Switching it on sends the IPv4 address of each online node to Globalping and to nobody else; with the IPv6 switch on (the default), also the IPv6 address of each node whose IPv6 works.

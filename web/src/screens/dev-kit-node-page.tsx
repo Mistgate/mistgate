@@ -17,7 +17,7 @@ import { relaysQuery } from "@/lib/relay";
 import { meQuery } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { seeded } from "./dev-kit-overview";
-import { ruChecksOf, ruKindOf, ruKinds, type RuKind } from "./dev-kit-node-ru";
+import { nowKindOf, nowKinds, nowRoundOf, ruChecksOf, ruKindOf, ruKinds, type NowKind, type RuKind } from "./dev-kit-node-ru";
 import { seedWays, waysFrames, waysSceneOf } from "./dev-kit-node-ways";
 import { Shot } from "./dev-kit-redesign";
 import { ShellLayout } from "./shell";
@@ -218,9 +218,21 @@ function fakeHistory(state: NState) {
 
 export type WarpKind = "ok" | "pause" | "bad" | "none" | "revoked";
 /** What the reach card under the WARP card says (?rc=): every site reachable, a mix (a block page, a bare 403, no answer), nothing yet, an agent without the check, the check off, an old result. */
-export type ReachKind = "ok" | "mixed" | "wait" | "old" | "off" | "stale";
-const reachKinds: readonly string[] = ["ok", "mixed", "wait", "old", "off", "stale"];
+export type ReachKind = "ok" | "mixed" | "wait" | "old" | "off" | "stale" | "running" | "early" | "busy" | "silent";
+const reachKinds: readonly string[] = ["ok", "mixed", "wait", "old", "off", "stale", "running", "early", "busy", "silent"];
 export const reachKindOf = (s: string | null): ReachKind | undefined => (reachKinds.includes(s ?? "") ? (s as ReachKind) : undefined);
+
+/** The state of the check of the sites that "Check now" asks for (WarpReachCheck): running (the list stays as it was), a press that came too early, a check that ended badly, a node that could not be asked. */
+const reachCheckOf = (kind: ReachKind) =>
+  kind === "running"
+    ? { running: true, asked: "started", retryAfterS: 0, last: "ok", lastUnix: NOW - 240 }
+    : kind === "early"
+      ? { running: false, asked: "too_soon", retryAfterS: 95, last: "ok", lastUnix: NOW - 25 }
+      : kind === "busy"
+        ? { running: false, asked: "", retryAfterS: 0, last: "busy", lastUnix: NOW - 20 }
+        : kind === "silent"
+          ? { running: false, asked: "node_offline", retryAfterS: 0, last: "", lastUnix: 0 }
+          : undefined;
 
 /** One site's answer, as the panel stores it (WarpReachDomain). */
 const site = (domain: string, verdict: string, httpStatus: number, latencyMs: number, blockedStreak = 0) => ({ domain, verdict, httpStatus, latencyMs, blockedStreak });
@@ -235,7 +247,7 @@ function reachOf(kind: ReachKind, wp: WarpKind) {
   if (kind === "old") return { reach: undefined, reachState: "agent_too_old" };
   if (kind === "off") return { reach: undefined, reachState: "disabled" };
   if (kind === "wait" || wp === "bad" || wp === "revoked") return { reach: undefined, reachState: "waiting" };
-  return { reach: { checkedUnix: NOW - ago, colo: "FRA", domains }, reachState: "ready" };
+  return { reach: { checkedUnix: NOW - ago, colo: "FRA", domains }, reachState: "ready", reachCheck: reachCheckOf(kind) };
 }
 
 /** The WARP card of the board's states: working, paused, not answering, none connected (the registration then plays on a press), revoked. */
@@ -259,7 +271,7 @@ function warpOf(kind: WarpKind, rc: ReachKind = "ok") {
   };
 }
 
-export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | "done"; wp?: WarpKind; rc?: ReachKind; ru?: RuKind; long?: boolean } = {}) {
+export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | "done"; wp?: WarpKind; rc?: ReachKind; ru?: RuKind; cn?: NowKind; long?: boolean } = {}) {
   const sp = specs[state];
   const lo = sp.load;
   const status = sp.retired ? NodeStatus.RETIRED : sp.down ? NodeStatus.DOWN : sp.fresh ? NodeStatus.ONLINE : NodeStatus.ONLINE;
@@ -381,9 +393,10 @@ export function nodePageData(state: NState, extra: { os?: OsKind; dbg?: "rec" | 
             },
           ],
       countryChecks: extra.ru ? ruChecksOf(extra.ru, NOW) : [],
+      countryNow: extra.cn ? nowRoundOf(extra.cn, NOW) : [],
     } as never,
   );
-  qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns, rows: [], countryChecks: extra.ru ? ruChecksOf(extra.ru, NOW) : [] } as never);
+  qc.setQueryData(checksQuery("").queryKey, { nowUnix: NOW, intervalS: 300, columns, rows: [], countryChecks: extra.ru ? ruChecksOf(extra.ru, NOW) : [], countryNow: extra.cn ? nowRoundOf(extra.cn, NOW) : [] } as never);
   qc.setQueryData(doctorQuery("nod_de1").queryKey, { nowUnix: NOW, nodes: [{ nodeId: "nod_de1", nodeName: "de1", nodeStatus: status, agentSupported: true, hasReport: !sp.fresh, receivedUnix: sp.down ? NOW - 14 * 60 : NOW - 5 * 60, ageS: sp.down ? 14 * 60 : 5 * 60, stale: false, items: sp.fresh ? [] : doctorItems(state) }] } as never);
   qc.setQueryData(overviewQuery().queryKey, { nowUnix: NOW, nodes: [{ id: "nod_de1", name: "de1", sparkBytes: Array.from({ length: 24 }, (_, i) => Math.round((0.4 + Math.sin(i / 3.2) * 0.3 + (i > 17 ? 0.5 : 0)) * 2.1e9)) }], traffic: [], online: [], events: [], topConsumers: [] } as never);
   qc.setQueryData(overviewQuery(OverviewRange.OVERVIEW_RANGE_24H).queryKey, qc.getQueryData(overviewQuery().queryKey) as never);
@@ -474,9 +487,9 @@ export function NodePageFrame() {
     const kind = wp === "ok" || wp === "pause" || wp === "bad" || wp === "none" || wp === "revoked" ? wp : undefined;
     if (params.get("tab") === "history") fakeHistory(state);
     const rc = reachKindOf(params.get("rc"));
-    const made = nodePageData(state, { long: params.get("long") === "1", os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined, wp: kind, rc, ru: ruKindOf(params.get("ru")) });
+    const made = nodePageData(state, { long: params.get("long") === "1", os: os === "ok" || os === "upd" || os === "boot" ? os : undefined, dbg: dbg === "rec" || dbg === "done" ? dbg : undefined, wp: kind, rc, ru: ruKindOf(params.get("ru")), cn: nowKindOf(params.get("cn")) });
     // "Check now": the round is scheduled, and the cells do not change (the card keeps looking until the panel gives up waiting)
-    (health as unknown as Record<string, unknown>).runChecksNow = async () => ({ scheduled: 3, skipped: 0 });
+    (health as unknown as Record<string, unknown>).runChecksNow = async () => ({ scheduled: 3, skipped: 0, countryNow: params.get("cn") === "early" ? nowRoundOf("early", Math.floor(Date.now() / 1000))[0] : nowRoundOf("running", Math.floor(Date.now() / 1000))[0] });
     // the Ways in tab: the scene's relays, checks and ports (w=1 and the switches of dev-kit-node-ways.tsx)
     if (params.get("w")) made.data = seedWays(made.qc, made.data as never, waysSceneOf(params), (made.data.node as { status: NodeStatus }).status) as never;
     // no WARP yet: the registration the scene plays takes nine seconds (four steps), then the account is there
@@ -487,6 +500,8 @@ export function NodePageFrame() {
         return {};
       };
     }
+    // "Check now" of the sites card: the panel answers that the node was asked, and the check is running
+    if (rc) (warpApi as unknown as Record<string, unknown>).getWarp = async () => warpOf(kind ?? "ok", "running");
     // the decoy site card: its library, and the state of the node it opens with
     const decoy = decoyScene(params.get("ds") ?? "");
     const library = installLibrary();
@@ -581,6 +596,11 @@ const frames: { id: string; state: NState; tab: string; title: string; w: number
   { id: "node-exit-none", state: "calm", tab: "exit", q: "wp=none", title: "Exit: no WARP yet (Enable WARP plays the registration, nine seconds)", w: 1440, h: 1300 },
   { id: "node-exit-viewer", state: "viewer", tab: "exit", q: "wp=ok", title: "Exit: a read-only role", w: 1440, h: 1500 },
   { id: "node-exit-reach-mixed", state: "calm", tab: "exit", q: "wp=ok&rc=mixed", title: "Exit, the sites: a block page, a bare 403 (an error, not a block), no answer", w: 1440, h: 1600 },
+  { id: "node-exit-reach-running", state: "calm", tab: "exit", q: "wp=ok&rc=running", title: "Exit, the sites, Check now: the node is opening the sites, the list stays as it was", w: 1440, h: 1600 },
+  { id: "node-exit-reach-early", state: "calm", tab: "exit", q: "wp=ok&rc=early", title: "Exit, the sites, Check now: pressed too early, the next one in 2 min", w: 1440, h: 1500 },
+  { id: "node-exit-reach-busy", state: "calm", tab: "exit", q: "wp=ok&rc=busy", title: "Exit, the sites, Check now: the node was busy with a check of its own", w: 1440, h: 1500 },
+  { id: "node-exit-reach-silent", state: "calm", tab: "exit", q: "wp=ok&rc=silent", title: "Exit, the sites, Check now: the node could not be asked", w: 1440, h: 1500 },
+  { id: "node-exit-reach-running-phone", state: "calm", tab: "exit", q: "wp=ok&rc=running", title: "Exit, the sites, Check now: the node is opening the sites, on a phone, 400 wide", w: 400, h: 3400 },
   { id: "node-exit-reach-wait", state: "calm", tab: "exit", q: "wp=ok&rc=wait", title: "Exit, the sites: the tunnel is up, the first answer is on its way", w: 1440, h: 1500 },
   { id: "node-exit-reach-nodata", state: "alerts", tab: "exit", q: "wp=bad", title: "Exit, the sites: the tunnel is down, nothing to show", w: 1440, h: 1600 },
   { id: "node-exit-reach-old", state: "calm", tab: "exit", q: "wp=ok&rc=old", title: "Exit, the sites: the node's agent has no such check", w: 1440, h: 1500 },
@@ -618,6 +638,22 @@ const ruTitles: Record<RuKind, string> = {
   long: "live data: twelve networks, long names, four ports, three own probes",
 };
 frames.push(...ruKinds.map((k) => ({ id: `node-overview-ru-${k}`, state: "calm" as NState, tab: "overview", title: `Overview, from Russia: ${ruTitles[k]}`, w: 1440, h: 2000, q: `ru=${k}` })));
+// "Check now" has the country check run out of turn: the radar only while it runs, the lines under "From Russia" for every state of the round
+const nowTitles: Record<NowKind, string> = {
+  running: "the round runs: the radar, what is asked and what is not, Globalping's tests",
+  done: "the round has ended: what was rechecked, the own probes' job waits, when the next one may be asked",
+  early: "pressed too early: every source skipped, the next recheck in 7 min",
+  nobudget: "Globalping is skipped (too few tests left after the planned rounds), the others went on",
+  failed: "two sources did not work, one is on hold, the probes are silent",
+  off: "nothing could be asked: why, source by source, and no time of a round",
+  partial: "one source is still running, two have answered",
+};
+frames.push(...nowKinds.map((k) => ({ id: `node-overview-now-${k}`, state: "calm" as NState, tab: "overview", title: `Overview, Check now: ${nowTitles[k]}`, w: 1440, h: 2000, q: `ru=ok&cn=${k}&fx=1` })));
+frames.push(
+  { id: "node-overview-now-running-phone", state: "calm", tab: "overview", title: "Overview, Check now: the round runs, on a phone, 400 wide", w: 400, h: 3400, q: "ru=ok&cn=running&fx=1" },
+  { id: "node-overview-now-failed-phone", state: "calm", tab: "overview", title: "Overview, Check now: sources that failed, on a phone, 400 wide", w: 400, h: 3400, q: "ru=ok&cn=failed" },
+  { id: "node-overview-now-down", state: "down", tab: "overview", title: "Overview, Check now: the node is silent, the sources say so", w: 1440, h: 1800, q: "ru=ok&cn=off" },
+);
 frames.push(
   { id: "node-overview-ru-down", state: "down", tab: "overview", title: "Overview, from Russia: the node is silent", w: 1440, h: 1800, q: "ru=ok" },
   { id: "node-overview-ru-long-phone", state: "calm", tab: "overview", title: "Overview, from Russia: the long data on a phone, 400 wide", w: 400, h: 3600, q: "ru=long" },

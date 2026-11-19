@@ -8,6 +8,7 @@ import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
 import { countryQuery } from "@/lib/globalping";
+import type { CountryNow } from "@/lib/country-now";
 import { checksQuery, countryIn, listOf, sourceName, type CountryCheck } from "@/lib/health";
 import { nodesQuery } from "@/lib/queries";
 import { darkEverywhere, history6Query, historyQuery, ipv6Helps, tallyOf, type DarkEverywhere, type Lane } from "@/lib/reachability";
@@ -62,6 +63,8 @@ export function ReachabilityScreen({ scene }: { scene?: { filter?: State; open?:
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((n) => ({ id: n.id, name: n.name, countryCode: n.countryCode, ipv6: n.ipv6 }));
   const byNode = new Map((checks.data?.countryChecks ?? []).map((c) => [c.nodeId, c]));
+  // the rounds "Check now" asked of the country check, per node: the row's radar and the words under the verdict
+  const rounds = new Map((checks.data?.countryNow ?? []).map((c) => [c.nodeId, c]));
   const lanes = new Map((h?.nodes ?? []).map((n) => [n.nodeId, new Map<string, Lane>(n.lanes.map((l) => [l.source, l]))]));
   const lanes6 = new Map((v6On ? (h6.data?.nodes ?? []) : []).flatMap((n) => n.lanes.filter((l) => l.source === "globalping").map((l) => [n.nodeId, l] as const)));
   const sources = h?.sources ?? [];
@@ -98,6 +101,7 @@ export function ReachabilityScreen({ scene }: { scene?: { filter?: State; open?:
             <NodesTab
               nodes={nodes}
               byNode={byNode}
+              rounds={rounds}
               lanes={lanes}
               lanes6={lanes6}
               sources={sources}
@@ -154,6 +158,7 @@ export function ReachabilityScreen({ scene }: { scene?: { filter?: State; open?:
 function NodesTab(p: {
   nodes: NodeRow[];
   byNode: Map<string, CountryCheck>;
+  rounds: Map<string, CountryNow>;
   lanes: Map<string, Map<string, Lane>>;
   lanes6: Map<string, Lane>;
   sources: string[];
@@ -263,6 +268,7 @@ function NodesTab(p: {
       <NodesTable
         nodes={p.nodes}
         checks={p.byNode}
+        rounds={p.rounds}
         lanes={p.lanes}
         lanes6={p.lanes6}
         sources={p.sources}

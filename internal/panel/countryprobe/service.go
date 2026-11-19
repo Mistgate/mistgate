@@ -419,7 +419,10 @@ func transportDetail(err error) string {
 
 // execute runs the probe against the targets, batch after batch, and stores each batch's rows as its answer comes in. gen is
 // the generation the run started under: once the source is switched off or disconnected, nothing more is stored.
-func (s *Service) execute(ctx context.Context, gen uint64, st settings, probe Node, nodes []Node) (outcome, error) {
+//
+// solo is a run for one node asked by hand (now.go): nodes is the probe node and that node, the run is not the schedule's, so it
+// leaves the rotation of batches and the status of the newest run as they are.
+func (s *Service) execute(ctx context.Context, gen uint64, st settings, probe Node, nodes []Node, solo bool) (outcome, error) {
 	refs, ok := ReferencesFor(s.country(ctx))
 	if !ok {
 		return outcome{}, errors.New("countryprobe: no references for the country")
@@ -434,7 +437,7 @@ func (s *Service) execute(ctx context.Context, gen uint64, st settings, probe No
 	out.run.Status = StatusOK
 	batchList := batches(targetsOf(probe, nodes))
 	start := 0
-	if len(batchList) > 0 {
+	if len(batchList) > 0 && !solo {
 		start = st.last.BatchCursor
 		if start < 0 {
 			start = 0
@@ -479,6 +482,9 @@ func (s *Service) execute(ctx context.Context, gen uint64, st settings, probe No
 		out.nodes = append(out.nodes, results...)
 	}
 	out.run.Checked, out.run.At = len(out.nodes), s.now().Unix()
+	if solo {
+		return out, nil
+	}
 	if err := s.saveRun(ctx, gen, out.run); err != nil {
 		return outcome{}, err
 	}
@@ -540,13 +546,13 @@ func probeNode(nodes []Node, id string) (Node, bool) {
 }
 
 // runNow runs the probe: runMu must be held.
-func (s *Service) runNow(ctx context.Context, gen uint64, st settings, probe Node, nodes []Node) (outcome, error) {
+func (s *Service) runNow(ctx context.Context, gen uint64, st settings, probe Node, nodes []Node, solo bool) (outcome, error) {
 	ctx, done, admitted := s.track(ctx, gen)
 	if !admitted {
 		return outcome{}, errSwitchedOff
 	}
 	defer done()
-	return s.execute(ctx, gen, st, probe, nodes)
+	return s.execute(ctx, gen, st, probe, nodes, solo)
 }
 
 // due says whether the next run is due: the newest row of this probe node is older than the interval (read from the store, so a
@@ -603,7 +609,7 @@ func (s *Service) Tick(ctx context.Context) bool {
 	if !fit {
 		return false
 	}
-	if _, err := s.runNow(ctx, gen, st, probe, nodes); err != nil {
+	if _, err := s.runNow(ctx, gen, st, probe, nodes, false); err != nil {
 		if ctx.Err() == nil && !errors.Is(err, errSwitchedOff) {
 			s.log.Warn("countryprobe: run failed", "err", err)
 		}
@@ -845,7 +851,7 @@ func (r rpc) TestTspuProbe(ctx context.Context, _ *connect.Request[adminv1.TestT
 	// HTTP server lifts its write deadline for this procedure (httpserver.longUnary).
 	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), runBudget)
 	defer cancel()
-	res, err := s.runNow(rctx, gen, st, probe, nodes)
+	res, err := s.runNow(rctx, gen, st, probe, nodes, false)
 	switch {
 	case errors.Is(err, errSwitchedOff):
 		return nil, fail(connect.CodeFailedPrecondition, "tspu_off")

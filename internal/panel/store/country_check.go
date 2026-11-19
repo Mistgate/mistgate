@@ -103,10 +103,12 @@ func (s *Store) CountryVerdictChanges(ctx context.Context, country string, famil
 	return out, rows.Err()
 }
 
-// LastCountryCheckAt is the time of the newest stored round of any node in one address family, zero when there is none.
+// LastCountryCheckAt is the time of the newest stored round of any node in one address family, zero when there is none. A round
+// asked by hand for one node ("manual" in its detail) is not the schedule's round and is left out, so it never delays the next
+// planned one.
 func (s *Store) LastCountryCheckAt(ctx context.Context, family int) (time.Time, error) {
 	var at int64
-	if err := s.R.QueryRowContext(ctx, `SELECT COALESCE(MAX(at), 0) FROM country_check WHERE family = ?`, family).Scan(&at); err != nil {
+	if err := s.R.QueryRowContext(ctx, `SELECT COALESCE(MAX(at), 0) FROM country_check WHERE family = ? AND detail_json NOT LIKE '%"manual":true%'`, family).Scan(&at); err != nil {
 		return time.Time{}, err
 	}
 	if at == 0 {

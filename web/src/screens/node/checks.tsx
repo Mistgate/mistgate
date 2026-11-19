@@ -10,6 +10,7 @@ import { useT } from "@/i18n";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
+import { nowOf } from "@/lib/country-now";
 import { cellLook, checksQuery, countryColumn, type CheckCell } from "@/lib/health";
 import type { Plain } from "@/lib/plain";
 import { nodeTicks } from "@/screens/overview-checks";
@@ -131,7 +132,7 @@ export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: re
           </Fragment>
         );
       })}
-      {country && <NodeRu check={country.byNode.get(nodeId)} code={country.code} status={row?.nodeStatus} now={busy} />}
+      {country && <NodeRu check={country.byNode.get(nodeId)} code={country.code} status={row?.nodeStatus} round={nowOf(q.data?.countryNow, nodeId)} />}
     </section>
   );
 }

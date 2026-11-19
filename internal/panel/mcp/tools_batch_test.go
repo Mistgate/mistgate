@@ -126,6 +126,11 @@ func TestChecksRunNow(t *testing.T) {
 	if len(e.w.runChecksReqs) != 1 || e.w.runChecksReqs[0].NodeId != nodeA {
 		t.Errorf("RunChecksNow requests: %+v", e.w.runChecksReqs)
 	}
+	// the same answer by source as the button's: which source runs, which is skipped and why, what Globalping may still spend
+	if c := v.Country; c == nil || !c.Running || len(c.Sources) != 4 || c.Sources[1] != (CountrySourceV{Source: "tspu", State: "skipped", Reason: "probe_node"}) ||
+		c.Sources[2].Reason != "schedule_only" || c.Sources[3].State != "reread" || c.GlobalpingTestsLeft == nil || *c.GlobalpingTestsLeft != 40 || c.GlobalpingRoundCost != 12 {
+		t.Fatalf("country: %+v", c)
+	}
 	// an inbound alone: its node is found in the matrix
 	v = decode[ChecksRunV](t, mustOK(t, s, "checks_run_now", map[string]any{"inbound": "inb_1"}))
 	if !v.Complete || len(v.Rows) != 1 || e.w.runChecksReqs[1].NodeId != nodeA {
@@ -133,7 +138,12 @@ func TestChecksRunNow(t *testing.T) {
 	}
 	mustFail(t, s, "checks_run_now", map[string]any{"inbound": "inb_nope"})
 	mustFail(t, s, "checks_run_now", map[string]any{"node": "nope"})
-	noCanary(t, "checks_run_now", mustOK(t, s, "checks_run_now", map[string]any{}))
+	out := mustOK(t, s, "checks_run_now", map[string]any{})
+	noCanary(t, "checks_run_now", out)
+	// the whole fleet asks for no round of the country check
+	if v := decode[ChecksRunV](t, out); v.Country != nil {
+		t.Errorf("a fleet-wide run asked a country round: %+v", v.Country)
+	}
 }
 
 func TestChecksRunNowRateLimited(t *testing.T) {

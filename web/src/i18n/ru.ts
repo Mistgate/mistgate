@@ -49,6 +49,7 @@ import { ru as igpageRu } from "./igpage";
 import { ru as aspageRu } from "./aspage";
 import { ru as nodeshareRu } from "./nodeshare";
 import { ru as channelRu } from "./channel";
+import { ru as countrynowRu } from "./countrynow";
 import { ru as overviewRu } from "./overview";
 import { ru as windowsRu } from "./windows";
 import { ru as nodepageRu } from "./nodepage";
@@ -329,4 +330,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "Сертификат Let’s Encrypt на IP-адрес пока недоступен: возьми домен или самоподписанный",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...probesRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu, ...osupdatesRu, ...fleetuiRu, ...clientlogsRu, ...trusttunnelRu, ...tcpshareRu, ...shellRu, ...overviewRu, ...nodesviewRu, ...windowsRu, ...nodepageRu, ...userslistRu, ...userspageRu, ...usersgroupRu, ...usersextraRu, ...decoysitesRu, ...planwordsRu, ...nodeswaysRu, ...nodewaysRu, ...profilespageRu, ...healthpageRu, ...reachpageRu, ...profilesrvRu, ...profilenewRu, ...subspnRu, ...subshxRu, ...subsrtRu, ...subsdnsRu, ...updatespageRu, ...settingspageRu, ...aipageRu, ...igpageRu, ...aspageRu, ...nodeshareRu, ...channelRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...probesRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu, ...osupdatesRu, ...fleetuiRu, ...clientlogsRu, ...trusttunnelRu, ...tcpshareRu, ...shellRu, ...overviewRu, ...nodesviewRu, ...windowsRu, ...nodepageRu, ...userslistRu, ...userspageRu, ...usersgroupRu, ...usersextraRu, ...decoysitesRu, ...planwordsRu, ...nodeswaysRu, ...nodewaysRu, ...profilespageRu, ...healthpageRu, ...reachpageRu, ...profilesrvRu, ...profilenewRu, ...subspnRu, ...subshxRu, ...subsrtRu, ...subsdnsRu, ...updatespageRu, ...settingspageRu, ...aipageRu, ...igpageRu, ...aspageRu, ...nodeshareRu, ...channelRu, ...countrynowRu };

@@ -8,6 +8,8 @@ import type { MessageKey } from "@/i18n/en";
 import { clientProbeQuery } from "@/lib/clientprobe";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
+import type { CountryNow } from "@/lib/country-now";
+import { useEffectsEnabled } from "@/lib/effects";
 import { countryLook, type Alert, type CountryCheck, type CountryLook } from "@/lib/health";
 import { ipv6State, segmentsOf, shownSources, verdictKind, type Lane, type ReachSource } from "@/lib/reachability";
 import type { Ipv6Entry } from "@/lib/ways";
@@ -98,11 +100,14 @@ export function NodesTable({
   onShowAll,
   alerts = [],
   open: openGiven,
+  rounds,
   first = false,
   stale,
 }: {
   nodes: readonly NodeRow[];
   checks: ReadonlyMap<string, CountryCheck>;
+  /** The round of the country check that "Check now" asked for a node: its radar and its words. */
+  rounds?: ReadonlyMap<string, CountryNow>;
   lanes: ReadonlyMap<string, ReadonlyMap<string, Lane>>;
   /** Globalping's IPv6 lane of each node */
   lanes6: ReadonlyMap<string, Lane>;
@@ -128,6 +133,7 @@ export function NodesTable({
 }) {
   const t = useT();
   const fmt = useFmt();
+  const fx = useEffectsEnabled();
   const [chosen, setChosen] = useState<string | null>(openGiven ?? null);
   const holdOf = (s: ReachSource): Hold => (stale?.has(s) ? "stale" : first ? "wait" : "");
   const klick = useQuery({ ...clientProbeQuery, enabled: owner });
@@ -182,6 +188,7 @@ export function NodesTable({
                     <b className="mono">{n.name}</b>
                   </span>
                   <span className="rc-now">
+                    {fx && rounds?.get(n.id)?.running && <i className="rc-radar" data-testid="reach-radar" aria-hidden="true" />}
                     <CountryPill check={c} node={n.name} code={country} tag={c?.ipv6 ? "IPv4" : ""} inButton />
                     {v6 === "data" && c?.ipv6 && <CountryPill check={c.ipv6} node={n.name} code={country} tag="IPv6" inButton />}
                   </span>
@@ -219,6 +226,7 @@ export function NodesTable({
                     reportsOn={!!reports}
                     holdOf={holdOf}
                     alert={alerts.find((a) => a.nodeId === n.id && a.resolvedAtUnix === 0)}
+                    round={rounds?.get(n.id)}
                   />
                 )}
               </div>

@@ -23,6 +23,7 @@ import { cx } from "@/lib/cx";
 import { errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { countryQuery } from "@/lib/globalping";
+import { nowOf, type CountryNow } from "@/lib/country-now";
 import { checksQuery, countryColumn, countryIn, doctorQuery, type CountryCheck } from "@/lib/health";
 import { nodeLoad } from "@/lib/node-load";
 import type { Plain } from "@/lib/plain";
@@ -66,6 +67,8 @@ export type WaysModel = Ways & {
   cc: string;
   /** The node seen from it, and every other node (once there is a relay to judge). */
   country?: CountryCheck;
+  /** The round of the country check that "Check now" asked for this node, running or done. */
+  countryNow?: CountryNow;
   countryOf: (nodeId: string) => CountryCheck | undefined;
   ipv6: Ipv6Fact;
   /** The IPv6 entry (Node.ipv6): on, or whether and why the node can take one. */
@@ -105,7 +108,7 @@ export function useWays(data: Data): WaysModel {
     entry: entryState(v6),
   });
   const readError = owner && live && relays.isError ? { stale: relays.data !== undefined, retry: () => void relays.refetch() } : null;
-  return { ...ways, owner, ready: !owner || !live || relays.data !== undefined || relays.isError, cc: column?.code || asked || "RU", country, countryOf, ipv6, v6, readError };
+  return { ...ways, owner, ready: !owner || !live || relays.data !== undefined || relays.isError, cc: column?.code || asked || "RU", country, countryNow: nowOf(own.data?.countryNow, node.id), countryOf, ipv6, v6, readError };
 }
 
 // ---- words of a lane ----

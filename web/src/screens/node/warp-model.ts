@@ -10,7 +10,8 @@ export const warpQuery = (nodeId: string) =>
   queryOptions({
     queryKey: ["warp", nodeId],
     queryFn: async ({ signal }) => plain(await warpApi.getWarp({ nodeId }, { signal })),
-    refetchInterval: pollMs,
+    // a check of the sites that the node is running (asked by "Check now" or by the panel's schedule) is read every 2 s until it is done
+    refetchInterval: (q) => (q.state.data?.reachCheck?.running ? 2_000 : pollMs),
   });
 
 export type WarpData = Plain<GetWarpResponse>;

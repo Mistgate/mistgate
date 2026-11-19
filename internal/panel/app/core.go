@@ -336,6 +336,7 @@ func wireCore(c Config) (*core, error) {
 		ControlRelay: acc.ControlRelay,
 		Country:      k.gp.Country,
 		Lists:        k.bl.Active,
+		CountryNow:   countryNowSources(k),
 		// One read for both external sources: the evaluator asks on every pass, also while both are off.
 		External: func(ctx context.Context) []health.ExternalState {
 			kv, err := st.SettingValues(ctx, append(cheburcheck.StateKeys(), bsbord.StateKeys()...))

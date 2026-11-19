@@ -14,3 +14,8 @@ import (
 func (s *Service) reachView(context.Context, store.NodeRow, store.WarpAccountRow) (*adminv1.WarpReachView, string) {
 	return nil, "disabled"
 }
+
+// reachCheck is the state of the check on a node (reach_now.go): none here, and a request for one is ignored.
+func (s *Service) reachCheck(context.Context, store.NodeRow, store.WarpAccountRow, bool) *adminv1.WarpReachCheck {
+	return nil
+}

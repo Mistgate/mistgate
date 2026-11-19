@@ -1,11 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button, buttonClass } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/status";
 import { useT } from "@/i18n";
+import { warp as warpApi } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { useIsOwner } from "@/lib/updates";
+import { useFmt } from "@/lib/format";
+import { plain } from "@/lib/plain";
 import { useNow } from "@/lib/time";
 import { Glyph, glyphs } from "@/screens/overview-parts";
 import { useTx } from "@/screens/users/t";
@@ -34,20 +37,42 @@ const verdictTone: Record<ReachVerdict, string> = { ok: "ok", blocked: "bad", un
 /** The node's WARP and the sites it is checked against. Nothing without a WARP account: the WARP card above says what to do. */
 export function WarpReachCard({ nodeId, down }: { nodeId: string; down?: boolean }) {
   const q = useQuery(warpQuery(nodeId));
+  const qc = useQueryClient();
   const now = Math.floor(useNow(30_000) / 1000);
+  // what the last press found when the node could not be asked: the words stay until the next press
+  const [refused, setRefused] = useState<{ asked: string; retryS: number } | null>(null);
+  // "Check now" asks the panel to ask the node out of turn (GetWarpRequest.check_reach_now); the answer comes back at once and the card reads the result with its usual reads
+  const check = useMutation({
+    mutationFn: async () => plain(await warpApi.getWarp({ nodeId, checkReachNow: true })),
+    onSuccess: (d) => {
+      qc.setQueryData(warpQuery(nodeId).queryKey, d);
+      const asked = d.reachCheck?.asked ?? "";
+      setRefused(asked === "" || asked === "started" || asked === "running" ? null : { asked, retryS: d.reachCheck?.retryAfterS ?? 0 });
+    },
+  });
   const d = q.data;
   if (!d?.account) return null;
   const look = reachLook(d, !!down, now);
+  const running = look.running || check.isPending;
   return (
-    <section className="nx-warp nrc relative rounded-card border border-line bg-surface" aria-label="WARP reach" data-state={look.state} aria-busy={q.isFetching || undefined}>
-      <Body look={look} fetching={q.isFetching} onRefresh={() => void q.refetch()} />
+    <section className="nx-warp nrc relative rounded-card border border-line bg-surface" aria-label="WARP reach" data-state={running ? "running" : look.state} aria-busy={running || q.isFetching || undefined}>
+      <Body look={look} running={running} refused={refused} onCheck={() => check.mutate()} />
     </section>
   );
 }
 
-function Body({ look, fetching, onRefresh }: { look: ReachLook; fetching: boolean; onRefresh: () => void }) {
+/** What the panel said when a press found the node unable to check: the sentence and, with "too soon", the time to wait. */
+function refusedText(t: ReturnType<typeof useTx>, fmt: ReturnType<typeof useFmt>, r: { asked: string; retryS: number }): string {
+  if (r.asked === "too_soon") return t("warp.reach.ask.too_soon", { when: fmt.duration(Math.max(r.retryS, 1)) });
+  return t.opt(`warp.reach.ask.${r.asked}`) ?? t("warp.reach.last.failed");
+}
+/** How the newest check ended when it did not end well, in words. */
+const lastText = (t: ReturnType<typeof useTx>, code: string) => t(code === "busy" ? "warp.reach.last.busy" : code === "too_soon" ? "warp.reach.last.too_soon" : code === "warp_down" ? "warp.reach.last.warp_down" : "warp.reach.last.failed");
+
+function Body({ look, running, refused, onCheck }: { look: ReachLook; running: boolean; refused: { asked: string; retryS: number } | null; onCheck: () => void }) {
   const t = useTx();
   const np = useT();
+  const fmt = useFmt();
   const age = useAge();
   const owner = useIsOwner();
   const { state, rows, colo, checked, paused, dead, stale } = look;
@@ -64,6 +89,8 @@ function Body({ look, fetching, onRefresh }: { look: ReachLook; fetching: boolea
       <StatusPill kind="off" label={t("warp.reach.p.paused")} />
     ) : dead ? (
       <StatusPill kind="bad" label={np("np.wp.state.dead")} />
+    ) : running ? (
+      <StatusPill kind="busy" label={t("warp.reach.p.running")} />
     ) : state === "wait" ? (
       <StatusPill kind="busy" label={t("warp.reach.p.wait")} />
     ) : state === "nodata" ? (
@@ -107,7 +134,8 @@ function Body({ look, fetching, onRefresh }: { look: ReachLook; fetching: boolea
           )}
         </Note>
       )}
-      {(state === "wait" || state === "nodata") && !paused && !dead && <Note title={t(state === "wait" ? "warp.reach.wait.t" : "warp.reach.nodata.t")} body={t(state === "wait" ? "warp.reach.wait.b" : "warp.reach.nodata.b")} busy={state === "wait"} />}
+      {running && state !== "old" && state !== "off" && <Note title={t("warp.reach.running.t")} body={t("warp.reach.running.b")} busy />}
+      {(state === "wait" || state === "nodata") && !paused && !dead && !running && <Note title={t(state === "wait" ? "warp.reach.wait.t" : "warp.reach.nodata.t")} body={t(state === "wait" ? "warp.reach.wait.b" : "warp.reach.nodata.b")} busy={state === "wait"} />}
 
       {state !== "old" && state !== "off" && paused && (
         <Wa tone="warn" title={t("warp.reach.paused.t")} className="nrc-wa">
@@ -142,8 +170,8 @@ function Body({ look, fetching, onRefresh }: { look: ReachLook; fetching: boolea
 
       {state !== "old" && state !== "off" && (
         <div className="nrc-act">
-          <Button variant="secondary" size="lg" className={ctl} disabled={fetching} title={t("warp.reach.refreshHint")} onClick={onRefresh}>
-            {fetching ? <Spin /> : <Glyph d={iconRefresh} size={16} stroke={1.5} />}
+          <Button variant="secondary" size="lg" className={ctl} disabled={running} title={t("warp.reach.refreshHint")} onClick={onCheck} data-testid="reach-check">
+            {running ? <Spin /> : <Glyph d={iconRefresh} size={16} stroke={1.5} />}
             {t("warp.reach.refresh")}
           </Button>
           {owner && (
@@ -152,6 +180,13 @@ function Body({ look, fetching, onRefresh }: { look: ReachLook; fetching: boolea
             </Link>
           )}
         </div>
+      )}
+
+      {state !== "old" && state !== "off" && !running && (refused || look.failed) && (
+        <p className="nrc-tip" role="status" data-testid="reach-ask">
+          <Glyph d={iconInfo} size={16} stroke={1.5} />
+          <span>{refused ? refusedText(t, fmt, refused) : lastText(t, look.failed!.code)}</span>
+        </p>
       )}
 
       <p className="nx-warn">

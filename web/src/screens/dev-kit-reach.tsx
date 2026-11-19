@@ -364,6 +364,12 @@ export const frames: Frame[] = [
   frame("reach-nodes-1000", "nodes", "A 1000 window: the rail, the words of the sources go into the open row", 1000, 1100),
   frame("reach-nodes-phone", "nodes", "A phone, 400 wide: a row is a card", 400, 1700),
   frame("reach-nodes-fa", "nodes", "Right to left (fa)", 1440, 1100, "&lang=fa"),
+  // "Check now" has the country check run out of turn for a node: its radar in the row and the words under its verdict
+  frame("reach-now-running", "nodes.open.fi1.cnrunning", "Check now: the round runs, the radar in the row, what is asked and what is not under the verdict", 1440, 1500, "&fx=1"),
+  frame("reach-now-done", "nodes.open.fi1.cndone", "Check now: the round has ended, the own probes' job waits", 1440, 1500),
+  frame("reach-now-early", "nodes.open.fi1.cnearly", "Check now: pressed too early, the next recheck in 7 min", 1440, 1500),
+  frame("reach-now-nobudget", "nodes.open.fi1.cnnobudget", "Check now: Globalping skipped for the tests left, the others went on", 1440, 1500),
+  frame("reach-now-running-phone", "nodes.open.fi1.cnrunning", "Check now: the round runs, on a phone, 400 wide", 400, 2600, "&fx=1"),
   frame("reach-events", "events", "Events: the week's alerts of the country"),
   frame("reach-events-light", "events", "The same on the light theme", 1440, 700, "&theme=light"),
   frame("reach-events-phone", "events", "Events on a phone", 400, 800),

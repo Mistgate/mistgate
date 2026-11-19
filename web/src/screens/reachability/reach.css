@@ -1488,3 +1488,41 @@
     grid-column: 2;
   }
 }
+
+/* "Check now" has the country check running for the node: a radar goes off beside its verdict (the board's nd-ru.now, the same ring) */
+.rcp .rc-now {
+  position: relative;
+}
+.rcp .rc-radar {
+  position: relative;
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.rcp .rc-radar::before,
+.rcp .rc-radar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--tone-sky);
+  animation: rc-radar 1s var(--e) infinite;
+}
+.rcp .rc-radar::after {
+  animation-delay: 0.3s;
+}
+@keyframes rc-radar {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rcp .rc-radar {
+    display: none;
+  }
+}

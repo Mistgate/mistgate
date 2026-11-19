@@ -36,7 +36,8 @@ service HealthService {
   rpc GetChecks(GetChecksRequest) returns (GetChecksResponse);
   // "Check now": schedule an immediate round for every inbound of one node (or of the fleet). Returns at
   // once; the results show up in GetChecks within seconds. Rate limit: one round per inbound per 30 s
-  // (RESOURCE_EXHAUSTED with the seconds left in the message).
+  // (RESOURCE_EXHAUSTED with the seconds left in the message). For one node it also asks the country check ("From Russia")
+  // for a round out of turn, see RunChecksNowResponse.country_now.
   rpc RunChecksNow(RunChecksNowRequest) returns (RunChecksNowResponse);
 
   // The last DoctorReport of one node, or of every node, with its age. Never contacts a node.
@@ -425,6 +426,9 @@ message GetChecksResponse {
   // The newest run of the TSPU probe (tspu_probe.proto): its status, time, probe node and dpi_hop. Unset while that source is
   // off or has not run yet. The per-node rows are in country_checks.
   TspuProbeRun tspu_run = 7;
+  // The state of the last round of the country check that "Check now" asked out of turn, for every node that had one (with
+  // node_id only that node). A running round has running set. Empty on the Cloudflare edition.
+  repeated CountryNow country_now = 8;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -557,6 +561,48 @@ message RunChecksNowResponse {
   uint32 scheduled = 1;
   // Inbounds skipped by the rate limit, node offline or protocol without a client.
   uint32 skipped = 2;
+  // The round of the country check asked out of turn for the node of the request: which source runs and which is skipped and
+  // why. Unset for a request of the whole fleet (it asks no country round) and on the Cloudflare edition. A press that came
+  // too early is not an error: every source is skipped with the reason "too_early" and retry_after_s says when to ask again.
+  CountryNow country_now = 3;
+}
+
+// A round of the country check out of turn, asked by RunChecksNow for one node, and what became of it. The panel keeps
+// the time of the last one per node: a node is asked at most once in 10 minutes. Globalping, which counts its tests, only
+// takes the tests left after the planned rounds of the rest of its hour have been set aside (it never eats their budget).
+// The TSPU probe, cheburcheck and the owner's own probes are asked for the node; bsbord only runs on its schedule; the
+// block lists and the kl!ck reports are read again from what the panel already holds, with no request to anyone.
+message CountryNow {
+  string node_id = 1;
+  // A round is running in the background now.
+  bool running = 2;
+  // When the last round started (unix seconds); 0 = none yet.
+  int64 started_unix = 3 [jstype = JS_NUMBER];
+  // The earliest the next one may start (unix seconds); 0 = now.
+  int64 next_unix = 4 [jstype = JS_NUMBER];
+  // Set only in the answer of a press that came too early: the seconds until next_unix.
+  uint32 retry_after_s = 5;
+  // One entry per source, in a fixed order (globalping, tspu, cheburcheck, cheburcheck_own, probes, bsbord, lists, klick).
+  repeated CountryNowSource sources = 6;
+  // Globalping tests left for a round out of turn when the last round was asked (after the planned rounds' reserve), what the
+  // round of this node costs and when that was read (unix seconds). Unset until Globalping has been asked.
+  optional uint32 globalping_left = 7;
+  uint32 globalping_cost = 8;
+  int64 globalping_at_unix = 9 [jstype = JS_NUMBER];
+  // When the sources above were last asked, unix seconds. It is later than started_unix when the last press found nothing to ask
+  // (every source off, no budget): the sources then say why.
+  int64 asked_unix = 10 [jstype = JS_NUMBER];
+}
+
+message CountryNowSource {
+  // A source id of the combined verdict (countryreach: globalping, tspu, cheburcheck, cheburcheck_own, probes, bsbord, lists)
+  // or "klick".
+  string source = 1;
+  // "running", "done", "failed", "skipped" or "reread" (nothing to ask: what is stored is shown again).
+  string state = 2;
+  // Why it was skipped or failed: off, too_early, no_budget, budget_unknown, rate_limited, no_probe, probe_node, busy, held, node_offline,
+  // no_address, no_ports, schedule_only, interrupted, error. Empty otherwise.
+  string reason = 3;
 }
 
 // ---------------------------------------------------------------------------------------------------

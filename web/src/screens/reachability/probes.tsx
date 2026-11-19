@@ -117,14 +117,23 @@ function ProbeRow(p: {
     live ? t.n("pr.checks", probe.checksDay) : "",
     probe.version && !quiet ? <span key="v" className="font-mono text-[11px]">{t("pr.version", { v: probe.version })}</span> : "",
   ].filter(Boolean);
+  // the tooltip of the state: the version of the script the probe runs (and that the panel has a newer one) and when it last synced
+  const tip = [
+    probe.version && look !== "revoked" ? [t("pr.tip.version", { v: probe.version }), p.outdated ? t("pr.tip.outdated") : ""].filter(Boolean).join(", ") : "",
+    probe.lastSeenUnix > 0 && look !== "pending" && look !== "revoked" ? t("pr.tip.sync", { time: fmt.stamp(probe.lastSeenUnix) }) : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
   return (
     <li data-testid="probe" data-look={look} className={cx("rc-pr", look === "revoked" && "dim")}>
       <div className="rc-prh">
         <b>{probe.name}</b>
         <span className="rc-scope">{kindWord(t, probe.kind)}</span>
-        <Pill kind={pillOf[pill.kind].kind} glyph={pillOf[pill.kind].glyph}>
-          {word}
-        </Pill>
+        <span title={tip || undefined} data-testid="probe-state">
+          <Pill kind={pillOf[pill.kind].kind} glyph={pillOf[pill.kind].glyph}>
+            {word}
+          </Pill>
+        </span>
         {p.outdated && (
           <span title={t("pr.outdated.hint")} data-testid="probe-outdated">
             <Pill kind="part" glyph="part">
@@ -174,7 +183,7 @@ function ProbeRow(p: {
           </Button>
         </div>
       )}
-      {p.asked && <p className="rc-prn">{t("pr.checkNow.note")}</p>}
+      {p.asked && <p className="rc-prn" data-testid="probe-asked">{look === "offline" ? t("pr.checkNow.silent", { time: fmt.stamp(probe.lastSeenUnix) }) : t("pr.checkNow.note")}</p>}
     </li>
   );
 }

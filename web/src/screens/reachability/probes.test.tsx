@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
-import { setLang } from "@/i18n";
+import { dictionaries, langs, setLang, type Lang } from "@/i18n";
 import { en } from "@/i18n/en";
 import { meQuery } from "@/lib/session";
 import { ProbesCard } from "./sources";
@@ -235,6 +235,48 @@ describe("the Own probes card: what it asks and says before it acts", () => {
     await click(button("Check now"));
     expect(checkNow).toHaveBeenCalledWith({ id: "prb_0123456789abcdef01234567" });
     expect(row("kitchen").textContent).toContain("The probe picks it up within 15 minutes.");
+  });
+
+  it("a probe that has been silent longer than the card calls 'no contact' takes the job when it is back: the note says since when, and where the restart is", async () => {
+    await mount({ probes: [probe({ lastSeenUnix: NOW - 8 * 3600 })] });
+    expect(row("kitchen").dataset.look).toBe("offline");
+    await click(button("Check now"));
+    expect(checkNow).toHaveBeenCalledWith({ id: "prb_0123456789abcdef01234567" });
+    const note = row("kitchen").querySelector("[data-testid=probe-asked]")!.textContent!;
+    expect(note).toMatch(/^The probe has not been in touch since .+; it will take the job when it is back\. The update command, run on the router or server, restarts it\.$/);
+    expect(note).not.toContain("within 15 minutes");
+  });
+
+  it("a probe that is heard from keeps the old promise, however long its last result is", async () => {
+    await mount({ probes: [probe({ lastSeenUnix: NOW - 59 * min, lastResultUnix: NOW - 9 * 3600 })] });
+    expect(row("kitchen").dataset.look).toBe("online");
+    await click(button("Check now"));
+    expect(row("kitchen").querySelector("[data-testid=probe-asked]")?.textContent).toBe("The probe picks it up within 15 minutes.");
+  });
+
+  it("the tooltip of the state has the script version, that it is outdated, and the last sync", async () => {
+    await mount({ probes: [probe({ version: "111111111111", lastSeenUnix: NOW - 8 * 3600 }), office] });
+    const tip = (name: string) => row(name).querySelector("[data-testid=probe-state]")!.getAttribute("title")!;
+    expect(tip("kitchen")).toMatch(/^Probe script: version 111111111111, outdated, the panel has a newer one\nLast sync: .+$/);
+    expect(tip("office")).toMatch(/^Probe script: version 0a1b2c3d4e5f\nLast sync: .+$/);
+    expect(tip("office")).not.toContain("outdated");
+  });
+
+  it("no tooltip for a probe that has not synced yet, and none for a revoked one", async () => {
+    await mount({ probes: [waiting, probe({ id: "prb_dead", name: "old", state: "revoked" })] });
+    for (const r of rows()) expect(r.querySelector("[data-testid=probe-state]")?.hasAttribute("title")).toBe(false);
+  });
+
+  it.each(langs)("%s: the note of a silent probe and the tooltip say it in the language, with nothing left to fill", async (lang: Lang) => {
+    setLang(lang);
+    await mount({ probes: [probe({ lastSeenUnix: NOW - 8 * 3600, version: "111111111111" })] });
+    await click(document.querySelector<HTMLButtonElement>("[data-testid=probe] .hl-act button")!);
+    const note = row("kitchen").querySelector("[data-testid=probe-asked]")!.textContent!;
+    expect(note.length).toBeGreaterThan(30);
+    expect(note).not.toMatch(/[{}]/);
+    expect(note).not.toBe(dictionaries[lang]["pr.checkNow.note"]);
+    expect(row("kitchen").querySelector("[data-testid=probe-state]")!.getAttribute("title")).not.toMatch(/[{}]/);
+    setLang("en");
   });
 
   it("asks before it revokes, says it cannot be undone, and revokes only on the second click", async () => {

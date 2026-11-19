@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { StepUpProvider } from "@/components/step-up";
 import { SectionLabel } from "@/components/ui/bits";
 import { ToastProvider } from "@/components/ui/toast";
@@ -85,6 +85,10 @@ const calls = { n: 0 };
 function fakeCalls() {
   const stub = (client: object, methods: Record<string, (...a: never[]) => unknown>) => Object.assign(client as Record<string, unknown>, methods);
   stub(ownProbe, {
+    checkNow: (async () => {
+      await wait(150);
+      return {};
+    }) as never,
     create: (async (req: { name: string; city: string; kind: string }) => {
       await wait(500);
       calls.n++;
@@ -162,6 +166,20 @@ function AddScene({ preset }: { preset?: Issued }) {
 }
 
 
+/** The card after a press of "Check now" on every probe that can be asked: each row says what the press did. */
+function AskedScene() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => ref.current?.querySelectorAll<HTMLButtonElement>("[data-testid=probe] .hl-act button:first-child").forEach((b) => b.click()), 400);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return (
+    <div ref={ref}>
+      <ProbesCard />
+    </div>
+  );
+}
+
 const scenes: { id: string; title: string; seed: Seed; render: () => ReactNode; wide?: boolean }[] = [
   { id: "off", title: "Off", seed: { settings: settings({ enabled: false }), probes: [kitchen] }, render: () => <ProbesCard /> },
   { id: "empty", title: "On, no probes yet", seed: {}, render: () => <ProbesCard /> },
@@ -178,6 +196,12 @@ const scenes: { id: string; title: string; seed: Seed; render: () => ReactNode; 
     title: "No contact",
     seed: { probes: [probe({ lastSeenUnix: now - 7 * 3600, lastResultUnix: now - 7 * 3600 }), probe({ ...office, lastSeenUnix: now - 26 * 3600, lastResultUnix: now - 26 * 3600 })] },
     render: () => <ProbesCard />,
+  },
+  {
+    id: "asked",
+    title: "Check now: a probe that is in touch takes the job within 15 minutes, a silent one when it is back (its state says the script and the last sync on hover)",
+    seed: { probes: [probe({ version: "111111111111" }), probe({ ...office, lastSeenUnix: now - 8 * 3600, lastResultUnix: now - 8 * 3600 })] },
+    render: () => <AskedScene />,
   },
   {
     id: "nofilter",

@@ -373,6 +373,11 @@ func (s *Service) Tick(ctx context.Context) error {
 	if next == nil || !s.takeCallSlot(ctx, now) {
 		return nil
 	}
+	return s.runDue(ctx, gen, st, *next)
+}
+
+// runDue checks one node on one source and stores the result: the call slot is already taken.
+func (s *Service) runDue(ctx context.Context, gen uint64, st settings, next dueCheck) error {
 	callCtx, cancel := context.WithTimeout(ctx, s.probeTimeout())
 	defer cancel()
 	callCtx, done, ok := s.track(callCtx, gen)
@@ -380,7 +385,7 @@ func (s *Service) Tick(ctx context.Context) error {
 		return nil
 	}
 	defer done()
-	run, phase, runErr := s.run(callCtx, *next)
+	run, phase, runErr := s.run(callCtx, next)
 	finished := s.now()
 	if runErr != nil {
 		if err := s.handleFailure(ctx, gen, st, next.source, phase, runErr); err != nil {
@@ -390,7 +395,7 @@ func (s *Service) Tick(ctx context.Context) error {
 			return nil
 		}
 		if phase != "probe" || (len(run.Results) == 0 && !isDeadline(runErr, callCtx)) {
-			return s.storeUnknown(ctx, gen, st, *next, finished, failureReason(runErr))
+			return s.storeUnknown(ctx, gen, st, next, finished, failureReason(runErr))
 		}
 	}
 	if callCtx.Err() != nil && ctx.Err() != nil {

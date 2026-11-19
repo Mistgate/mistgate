@@ -1610,3 +1610,44 @@ button.wy-nm:hover b {
 [dir="rtl"] .wy-wg > svg {
   transform: scaleX(-1);
 }
+
+/* the Russia block of a way while "Check now" has the country check running: a radar goes off beside the title (the board's nd-ru.now, the same ring) */
+.wy-sh h4 {
+  position: relative;
+}
+.wy-sh.now h4 {
+  padding-inline-end: 24px;
+}
+.wy-sh.now h4::before,
+.wy-sh.now h4::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: 0;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 50%;
+  border: 1px solid var(--tone-sky);
+  animation: wy-radar 1s var(--e) infinite;
+}
+.wy-sh.now h4::after {
+  animation-delay: 0.3s;
+}
+@keyframes wy-radar {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wy-sh.now h4::before,
+  .wy-sh.now h4::after {
+    animation: none;
+    display: none;
+  }
+}

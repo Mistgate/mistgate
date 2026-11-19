@@ -5,10 +5,12 @@ import { useT, type T } from "@/i18n";
 import { groupText, troubleText, type ClientProbeNode } from "@/lib/clientprobe";
 import { cx } from "@/lib/cx";
 import { useFmt } from "@/lib/format";
+import type { CountryNow } from "@/lib/country-now";
 import { countryIn, ipv6Why, type Alert, type CountryCheck, type CountryLook } from "@/lib/health";
 import { ipv6Helps, ipv6State, shownSources, type Lane, type ReachSource } from "@/lib/reachability";
 import { entryOffered } from "@/lib/ways";
 import { Dot, Gl, P } from "@/screens/health/page-parts";
+import { CountryNowNote } from "@/screens/node/country-now";
 import { glyphOf, networksOf, sayOf, sourceKey, startedAt, verdictText, weekBar, type Hold } from "./detail-model";
 import type { NodeRow, State } from "./nodes";
 import "./reach.css";
@@ -35,6 +37,8 @@ type Props = {
   reportsOn: boolean;
   holdOf: (s: ReachSource) => Hold;
   alert: Alert | undefined;
+  /** The round of the country check that "Check now" asked for this node: its words under the verdict. */
+  round?: CountryNow;
 };
 
 const DAY = 86400;
@@ -61,6 +65,7 @@ export function NodeDetail(p: Props) {
           <div>
             <b>{verdict.title}</b>
             {verdict.sub && <span>{verdict.sub}</span>}
+            <CountryNowNote now={p.round} className="mt-1" />
           </div>
         </div>
         {facts.length > 0 && (

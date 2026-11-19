@@ -78,7 +78,8 @@ type HealthServiceClient interface {
 	GetChecks(context.Context, *connect.Request[v1.GetChecksRequest]) (*connect.Response[v1.GetChecksResponse], error)
 	// "Check now": schedule an immediate round for every inbound of one node (or of the fleet). Returns at
 	// once; the results show up in GetChecks within seconds. Rate limit: one round per inbound per 30 s
-	// (RESOURCE_EXHAUSTED with the seconds left in the message).
+	// (RESOURCE_EXHAUSTED with the seconds left in the message). For one node it also asks the country check ("From Russia")
+	// for a round out of turn, see RunChecksNowResponse.country_now.
 	RunChecksNow(context.Context, *connect.Request[v1.RunChecksNowRequest]) (*connect.Response[v1.RunChecksNowResponse], error)
 	// The last DoctorReport of one node, or of every node, with its age. Never contacts a node.
 	GetDoctor(context.Context, *connect.Request[v1.GetDoctorRequest]) (*connect.Response[v1.GetDoctorResponse], error)
@@ -256,7 +257,8 @@ type HealthServiceHandler interface {
 	GetChecks(context.Context, *connect.Request[v1.GetChecksRequest]) (*connect.Response[v1.GetChecksResponse], error)
 	// "Check now": schedule an immediate round for every inbound of one node (or of the fleet). Returns at
 	// once; the results show up in GetChecks within seconds. Rate limit: one round per inbound per 30 s
-	// (RESOURCE_EXHAUSTED with the seconds left in the message).
+	// (RESOURCE_EXHAUSTED with the seconds left in the message). For one node it also asks the country check ("From Russia")
+	// for a round out of turn, see RunChecksNowResponse.country_now.
 	RunChecksNow(context.Context, *connect.Request[v1.RunChecksNowRequest]) (*connect.Response[v1.RunChecksNowResponse], error)
 	// The last DoctorReport of one node, or of every node, with its age. Never contacts a node.
 	GetDoctor(context.Context, *connect.Request[v1.GetDoctorRequest]) (*connect.Response[v1.GetDoctorResponse], error)

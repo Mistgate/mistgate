@@ -367,7 +367,7 @@ func TestRunWithSettingsReadBeforeDisableIsRejected(t *testing.T) {
 	if _, err := e.update(&adminv1.UpdateTspuProbeRequest{Enabled: ptr(false)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.runNow(context.Background(), gen, st, probe, nodes); !errors.Is(err, errSwitchedOff) {
+	if _, err := e.svc.runNow(context.Background(), gen, st, probe, nodes, false); !errors.Is(err, errSwitchedOff) {
 		t.Fatalf("run with stale settings = %v, want switched off", err)
 	}
 	if len(e.ff.sent()) != 0 || len(e.rows()) != 0 || e.lastRun().At != 0 {
@@ -851,7 +851,7 @@ func TestRunsRotateBatchStartWhenBudgetFitsOneBatch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := e.svc.execute(context.Background(), e.svc.generation(), st, probe, nodes); err != nil {
+		if _, err := e.svc.execute(context.Background(), e.svc.generation(), st, probe, nodes, false); err != nil {
 			t.Fatal(err)
 		}
 	}

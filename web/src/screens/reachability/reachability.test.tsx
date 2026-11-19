@@ -6,6 +6,8 @@ import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { AlertKind, AlertSeverity, CountryVerdict } from "@/gen/mistgate/admin/v1/health_pb";
 import { setLang } from "@/i18n";
+import { setEffectsEnabled } from "@/lib/effects";
+import { nowRoundOf, type NowKind } from "@/screens/dev-kit-node-ru";
 import { ReachabilityScreen } from "./index";
 
 const getHistory = vi.fn();
@@ -941,5 +943,40 @@ describe("the Reachability page while Globalping does not check IPv6", () => {
     await open("de1");
     expect(words(document.querySelector("[data-testid=week-ipv6]")?.children[1])).toBe("no data");
     expect(document.querySelector("[data-testid=ipv6-helps]")).toBeNull();
+  });
+});
+
+describe("'Check now' has the country check run for a node (CountryNow of the checks)", () => {
+  const rounds = (kind: NowKind) => nowRoundOf(kind, NOW, "nod_fi1");
+  const withRound = (kind: NowKind) => getChecks.mockResolvedValue({ nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks, countryNow: rounds(kind), tspuRun: { status: "ok", atUnix: NOW - 700, nodeId: "nod_probe1" } });
+
+  it("a round that runs puts a radar in the row of its node and its words under the verdict of the open row", async () => {
+    setEffectsEnabled(true);
+    withRound("running");
+    await mount();
+    await open("fi1");
+    expect(row("fi1").querySelector("[data-testid=reach-radar]")).not.toBeNull();
+    expect(rows().filter((r) => r.querySelector("[data-testid=reach-radar]")).map((r) => r.querySelector(".hl-cnode b")?.textContent)).toEqual(["fi1"]);
+    expect(detail("fi1").querySelector("[data-line=running]")?.textContent).toBe("Rechecking now: Globalping, TSPU probe, cheburcheck, Own probes");
+    expect(detail("fi1").querySelector("[data-line=skipped]")?.textContent).toContain("bsbord — on its schedule only");
+  });
+
+  it("a round that has ended has no radar; it says what came and when the next may be asked", async () => {
+    setEffectsEnabled(true);
+    withRound("done");
+    await mount();
+    await open("fi1");
+    expect(document.querySelector("[data-testid=reach-radar]")).toBeNull();
+    expect(detail("fi1").querySelector("[data-line=done]")?.textContent).toBe("Rechecked 3 min ago: Globalping, TSPU probe, cheburcheck");
+    expect(detail("fi1").querySelector("[data-line=next]")?.textContent).toMatch(/^Next recheck in [67] min$/); // the clock of this page is the real one
+  });
+
+  it("no radar with the effects off, and none for a node nobody asked", async () => {
+    setEffectsEnabled(false);
+    withRound("running");
+    await mount();
+    expect(document.querySelector("[data-testid=reach-radar]")).toBeNull();
+    await open("de1");
+    expect(detail("de1").querySelector("[data-testid=country-now]")).toBeNull();
   });
 });

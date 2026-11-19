@@ -130,6 +130,9 @@ type Config struct {
 	// RoundLease, when set, must grant a due edge pass before it runs, for ttl. The Cloudflare edition takes a D1 lease
 	// (store.TakeLease): cron ticks can overlap in two isolates, each with its own local mutex. Nil on the VPS.
 	RoundLease func(ctx context.Context, name string, ttl time.Duration) bool
+	// CountryNow are the sources besides Globalping that "Check now" of a node asks for a round of the country check out of turn
+	// (country_now.go): the TSPU probe, cheburcheck and the owner's own probes. Empty on the Cloudflare edition.
+	CountryNow []CountryNowSource
 	// OnTransition is called after an alert was opened or resolved (notifications attach here).
 	OnTransition func(Transition)
 	Log          *slog.Logger
@@ -180,6 +183,11 @@ type Service struct {
 
 	countryMu        sync.Mutex // one country round at a time
 	countryStretched bool       // the stretched interval was logged
+
+	nowAsk     sync.Mutex           // one ask of a round at a time: the plan of a source may call out
+	nowMu      sync.Mutex           // the rounds of the country check asked out of turn (country_now.go)
+	nowRunning map[string]time.Time // node id -> when its round started
+	nowWG      sync.WaitGroup
 
 	evalMu sync.Mutex // serialises evaluate
 	kick   chan struct{}
@@ -250,6 +258,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, fl Fleet, cfg
 		creds: map[string]store.ProbeCredRow{}, cells: map[string]*cell{}, sched: map[string]*schedule{},
 		work: make(chan string, 1024), queued: map[string]bool{}, kick: make(chan struct{}, 1),
 		portCheckRun: make(chan struct{}, 1), portCheckAttempts: map[string]int64{},
+		nowRunning: map[string]time.Time{},
 		nodeHealth: map[string]nodeHealth{}, waiters: map[string][]chan struct{}{},
 		plans: map[string]fixPlan{}, fixBusy: map[string]bool{}, recentFix: map[string]time.Time{},
 	}
