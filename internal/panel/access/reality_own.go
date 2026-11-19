@@ -51,7 +51,7 @@ func (o ownHosts) add(raw string) {
 // accepts at another site are not in it: they are somebody else's. skip is the inbound that is being changed.
 func (s *Service) ownHostsOf(ctx context.Context, skip string) (ownHosts, error) {
 	own := ownHosts{}
-	own.add(s.cfg.SubscriptionBaseURL)
+	own.add(s.subscriptionBase())
 	for _, h := range s.cfg.OwnHosts {
 		own.add(h)
 	}

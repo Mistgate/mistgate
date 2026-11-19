@@ -144,7 +144,7 @@ func (s decoySiteService) siteMessage(ctx context.Context, id string) (*decoysit
 // httpserver.libraryDecoy) when the site chosen for it is gone or is a draft, and a chosen directory it does not have is the built-in page.
 func (f *Fleet) panelState(ctx context.Context, chosen string) (*decoysitev1.DecoyPanelState, error) {
 	out := &decoysitev1.DecoyPanelState{Serving: chosen}
-	if u, err := url.Parse(f.cfg.PublicURL); err == nil {
+	if u, err := url.Parse(f.publicURL()); err == nil {
 		out.Address = u.Host
 	}
 	rest := "builtin"

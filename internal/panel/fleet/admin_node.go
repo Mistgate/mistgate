@@ -734,7 +734,7 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 	f := s.f
 	m := req.Msg
 	linkOnly := f.cfg.Remote != nil // the edge edition: agents enrol and run over the link (no mTLS endpoint)
-	if linkOnly && f.cfg.LinkURL == "" {
+	if linkOnly && f.linkURL() == "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("link address is not configured"))
 	}
 	if !linkOnly && f.cfg.PanelAddr == "" {
@@ -797,7 +797,7 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 	f.audit(ctx, "node.create_enrollment", audit)
 	install := installCommand(f.cfg.PanelAddr, f.cfg.AgentSNI, f.ca.fingerprint, token)
 	if linkOnly {
-		install = linkInstallCommand(f.cfg.LinkURL, f.ca.fingerprint, token)
+		install = linkInstallCommand(f.linkURL(), f.ca.fingerprint, token)
 	}
 	return connect.NewResponse(&adminv1.CreateEnrollmentResponse{
 		Node:           f.nodeMsg(ctx, n, nil, 0, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle, store.NodeHealthSummary{}, store.IPv6Doctor{}, f.shareOf(ctx, n.ID)), // pending: no checks yet

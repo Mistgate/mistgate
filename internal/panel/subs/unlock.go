@@ -129,7 +129,7 @@ func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, cli
 		jsonError(w, http.StatusInternalServerError, "internal", "")
 		return
 	}
-	if err := h.cop.Check(r); err != nil {
+	if err := h.checkOrigin(r); err != nil {
 		jsonError(w, http.StatusForbidden, "cross_origin", "")
 		return
 	}
@@ -172,7 +172,7 @@ func (h *handler) serveUnlock(w http.ResponseWriter, r *http.Request, token, cli
 	http.SetCookie(w, &http.Cookie{
 		Name: cookieName, Value: pagepass.Cookie(h.cfg.PageKey, token, v.Page.Gen), Path: h.linkPath(r, token), MaxAge: cookieMaxAge,
 		// Secure unless the instance's public URL is plain http: a browser drops a Secure cookie from an http page.
-		HttpOnly: true, Secure: !strings.HasPrefix(h.cfg.BaseURL, "http://"),
+		HttpOnly: true, Secure: !strings.HasPrefix(h.baseURL(), "http://"),
 		// Lax, not Strict: a link opened from a messenger is a cross-site navigation and must still carry the cookie.
 		SameSite: http.SameSiteLaxMode,
 	})

@@ -56,6 +56,9 @@ type Config struct {
 	// SubscriptionBaseURL is the public subscription address up to and including the secret prefix, e.g.
 	// "https://sub.example.com/k3xq8"; the user's token is appended after a slash.
 	SubscriptionBaseURL string
+	// SubscriptionBase, when set, is SubscriptionBaseURL of the moment and wins over it (a panel whose public address changes
+	// while it runs).
+	SubscriptionBase func() string
 	// StepUp is auth.Service.RequireStepUp. A nil callback denies destructive user deletion.
 	StepUp        func(context.Context) error
 	Log           *slog.Logger
