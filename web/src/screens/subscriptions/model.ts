@@ -544,9 +544,10 @@ export function shortAddress(kind: DnsServerKind, address: string): string {
 
 // The built-in presets have one stored name (Russian). Any other UI language shows these while the stored name is still
 // the stock one; a name an admin edited is shown as stored. The Chinese names are the ones the user page shows
-// (internal/panel/dns/node.go builtinNames). The Persian ".ru" starts with a left-to-right mark: a leading dot would
-// otherwise take the right-to-left side of the Persian around it.
-const builtinNames: Record<string, { ru: string; en: string; zh: string; fa: string; tr: string }> = {
+// (internal/panel/dns/node.go builtinNames); model.test.ts holds both to internal/panel/dns/testdata/builtin_names.json.
+// The Persian ".ru" starts with a left-to-right mark: a leading dot would otherwise take the right-to-left side of the
+// Persian around it.
+export const builtinNames: Record<string, { ru: string; en: string; zh: string; fa: string; tr: string }> = {
   dns_builtin_ru_split: { ru: "Россия: .ru напрямую", en: "Russia: .ru direct", zh: "俄罗斯：.ru 直连", fa: "روسیه: \u200E.ru مستقیم", tr: "Rusya: .ru doğrudan" },
   dns_builtin_ru_proxied: { ru: "Россия: всё через VPN", en: "Russia: all through VPN", zh: "俄罗斯：全部经 VPN", fa: "روسیه: همه‌چیز از راه VPN", tr: "Rusya: her şey VPN üzerinden" },
   dns_builtin_cn_split: { ru: "Китай: китайские сайты напрямую", en: "China: Chinese sites direct", zh: "中国：国内网站直连", fa: "چین: سایت‌های چینی مستقیم", tr: "Çin: Çin siteleri doğrudan" },
