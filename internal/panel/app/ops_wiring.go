@@ -3,8 +3,6 @@
 package app
 
 import (
-	"strings"
-
 	"github.com/mistgate/mistgate/internal/panel/httpserver"
 	"github.com/mistgate/mistgate/internal/panel/ops"
 	"github.com/mistgate/mistgate/internal/panel/rpcstat"
@@ -42,7 +40,6 @@ func (k *core) addOps(cfg *httpserver.Config) {
 	if k.c.Ops != nil {
 		oc = *k.c.Ops
 	}
-	agentSNIPrefix, _, _ := strings.Cut(k.in.AgentSNI, ".")
 	_, fleetH := k.fl.FleetHandler()
 	_, healthH := k.hl.Handler()
 	_, relayH := k.acc.RelayHandler()
@@ -50,7 +47,7 @@ func (k *core) addOps(cfg *httpserver.Config) {
 	cfg.RPCStats = calls
 	svc := ops.New(ops.Config{
 		Store: k.st, Ring: oc.Ring, Level: oc.Level, DefaultLevel: oc.DefaultLevel, Format: oc.Format,
-		Secrets: []string{k.in.AgentSNI, agentSNIPrefix, k.in.AdminPrefix, k.in.SubPrefix, k.in.LinkPrefix, k.in.ProbePrefix},
+		Secrets: k.in.logSecrets(),
 		StepUp:  k.authSvc.RequireStepUp,
 		Fleet:   fleetH, Health: healthH, Relay: relayH,
 		Debug: k.fl,

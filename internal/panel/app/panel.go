@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -44,6 +45,12 @@ type InstanceConfig struct {
 	SubPrefix   string
 	LinkPrefix  string // secret path prefix of the signed agent WebSocket link; empty = not served by this handler
 	ProbePrefix string // secret path prefix of the owner-managed probe endpoint
+}
+
+// logSecrets are the values that name a hidden path or host of this instance: the log scrubbers cut them out of every line.
+func (in InstanceConfig) logSecrets() []string {
+	agentSNIPrefix, _, _ := strings.Cut(in.AgentSNI, ".")
+	return []string{in.AgentSNI, agentSNIPrefix, in.AdminPrefix, in.SubPrefix, in.LinkPrefix, in.ProbePrefix}
 }
 
 // linkURL is the base of the signed agent link (and of link-only enrolment): wss:// + the public host + the secret
