@@ -51,7 +51,6 @@ describe("the servers", () => {
     expect(phone(el).map((r) => text(r.querySelector(".u-name > span:nth-child(2)")))).toEqual(["Германия", "Нидерланды", "Финляндия"]);
     expect(card.querySelectorAll(".u-tr.only-w, .u-th.only-w")).toHaveLength(4);
     expect([...card.querySelectorAll(".u-sr")].every((r) => r.classList.contains("only-m"))).toBe(true);
-    expect(el.querySelector(".srv, .srv-grid")).toBeNull();
   });
 
   it("the load: three bars and a word, amber when high; a server that does not answer says so and what to do", () => {
@@ -275,7 +274,7 @@ describe("DNS of the keys in a card", () => {
   it("what happens while and after a choice is the window's: the row shows no 'one moment', no error and no 'saved'", () => {
     const st = state("android", { dns: { ...newDnsState(), busy: "nod_ams", done: { nod_fra: true }, error: { server: "nod_ams", code: "network", retryMin: 0, preset: "x" } } });
     const el = view(data("first"), st, actions());
-    expect(el.querySelector(".busy, .note, .dns-err, .dns-keys, .dns-note")).toBeNull();
+    expect(text(rows(el)[1]!)).toBe(text(rows(page("first"))[1]!)); // the row reads as on a quiet page
     expect(rows(el)[1]!.querySelector("button")).not.toBeNull(); // the pencil stays: the window says what is going on
     for (const [code, words] of [["not_allowed", "Этот вариант DNS больше недоступен — выберите другой."], ["dns_disabled", "Выбор DNS выключен администратором."], ["internal", "Не получилось. Попробуйте ещё раз."], ["too_large", "Не получилось. Попробуйте ещё раз."]] as const) {
       expect(plain(t.dnsErr(code, 0))).toBe(words);

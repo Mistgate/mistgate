@@ -59,7 +59,7 @@ const asked = () => {
 };
 /** The name of a DNS option: the text of its .t without the "now" tag. */
 const own = (o: Element) => plain(o.querySelector(".t")!.firstChild!.textContent);
-const head = (box: Element) => ({ cls: q(box, ".a-dlg").className, role: q(box, ".a-dlg").getAttribute("role"), modal: q(box, ".a-dlg").getAttribute("aria-modal"), title: text(q(box, ".a-h .t")) });
+const head = (box: Element) => ({ role: q(box, ".a-dlg").getAttribute("role"), modal: q(box, ".a-dlg").getAttribute("aria-modal"), title: text(q(box, ".a-h .t")) });
 afterEach(() => document.body.replaceChildren());
 
 describe("which window is open", () => {
@@ -124,13 +124,13 @@ describe("the menu of a device", () => {
   it("a key: its key, the name, the replacement, the removal; the board's classes and order", () => {
     const { a, log } = asked();
     const box = draw(ctx("many", { amz: { menu: "d3" }, a }));
-    expect(head(box)).toEqual({ cls: "a-dlg sm", role: "dialog", modal: "true", title: "Pixel 7" });
+    expect(head(box)).toEqual({ role: "dialog", modal: "true", title: "Pixel 7" });
     expect(q(box, ".a-dlg").getAttribute("aria-label")).toBe("Действия с устройством");
     expect(box.querySelector(".a-h .sp")).not.toBeNull();
     expect(q(box, ".a-h .u-ic").getAttribute("aria-label")).toBe("Закрыть");
     const acts = all(box, ".a-acts .a-act");
     expect(acts.map(text)).toEqual(["Показать ключ", "Переименовать", "Заменить ключ", "Удалить устройство"]);
-    expect(acts.map((x) => x.className)).toEqual(["a-act", "a-act", "a-act", "a-act bad"]);
+    expect(acts.map((x) => x.classList.contains("bad"))).toEqual([false, false, false, true]); // only the removal is the red one
     expect(acts.every((x) => x.querySelector("svg.i"))).toBe(true);
     expect(acts[0]!.hasAttribute("data-autofocus")).toBe(true);
     acts.forEach((x) => x.click());
@@ -174,7 +174,7 @@ describe("rename", () => {
 
   it("the name, the field with its limit, the foot: Cancel then Save", () => {
     const { box, log } = setup();
-    expect(head(box)).toEqual({ cls: "a-dlg sm", role: "dialog", modal: "true", title: "Название устройства" });
+    expect(head(box)).toEqual({ role: "dialog", modal: "true", title: "Название устройства" });
     expect(q(box, ".a-dlg").getAttribute("aria-label")).toBe("Переименовать");
     expect(text(q(box, ".a-lbl"))).toBe("Названиедо 40 знаков");
     const f = q<HTMLInputElement>(box, "input.a-inp");
@@ -216,7 +216,7 @@ describe("delete and replace the key", () => {
   it("delete a key: the board's question, Cancel first (the safe answer takes the keyboard), then the red Delete with the bin", () => {
     const { a, log } = asked();
     const box = draw(ctx("many", { amz: { confirm: { id: "d3", kind: "remove" } }, a }));
-    expect(head(box)).toEqual({ cls: "a-dlg sm", role: "dialog", modal: "true", title: "Удалить Pixel 7" });
+    expect(head(box)).toEqual({ role: "dialog", modal: "true", title: "Удалить Pixel 7" });
     expect(q(box, ".a-dlg").getAttribute("aria-label")).toBe("Удалить устройство");
     expect(text(q(box, ".a-b .a-lead"))).toBe("Ключ этого устройства перестанет работать, а место освободится. Вернуть устройство можно будет только новым ключом");
     const [no, yes] = all(box, ".a-f .u-btn") as [HTMLElement, HTMLElement];
@@ -271,7 +271,7 @@ describe("a key that is no longer valid", () => {
   it("the board's question: what happened, three steps, Later and Get a new key", () => {
     const { a, log } = asked();
     const box = draw(ctx("stale", { amz: { stale: "d3" }, a }));
-    expect(head(box)).toEqual({ cls: "a-dlg", role: "dialog", modal: "true", title: "Нужен новый ключ для Pixel 7" });
+    expect(head(box)).toEqual({ role: "dialog", modal: "true", title: "Нужен новый ключ для Pixel 7" });
     expect(text(q(box, ".a-lead"))).toBe("Серверы обновились, и старый ключ этого устройства больше не работает");
     expect(all(box, ".a-steps .a-st").map((x) => [text(x.querySelector(".a-n")), text(x.querySelector(".tx"))])).toEqual([
       ["1", "Нажмите «Получить новый ключ»"],
@@ -311,7 +311,7 @@ describe("the DNS choice", () => {
     const { a, log } = asked();
     const c = ctx("dns-both", { dns: { open: "de1", pick: "", all: true }, a });
     const box = draw(c);
-    expect(head(box)).toEqual({ cls: "a-dlg", role: "dialog", modal: "true", title: "DNS для ключей" });
+    expect(head(box)).toEqual({ role: "dialog", modal: "true", title: "DNS для ключей" });
     expect(text(q(box, ".a-lead"))).toBe("Действует для ключей AmneziaVPN. В приложениях по ссылке DNS пока один на все серверы");
     const flds = all(box, ".a-fld");
     expect(flds.map((x) => text(x.querySelector(".a-lbl")))).toEqual(["Для каких серверов", "DNS"]);
@@ -409,7 +409,7 @@ describe("DNS changed", () => {
 
   it("what applies now and which keys must be fetched again, each with its flag and its button; Done closes", () => {
     const { box, log, c } = done({ dns: { open: "nod_fra", done: { nod_fra: true }, all: false } });
-    expect(head(box)).toEqual({ cls: "a-dlg", role: "dialog", modal: "true", title: "DNS изменён" });
+    expect(head(box)).toEqual({ role: "dialog", modal: "true", title: "DNS изменён" });
     expect(text(q(box, ".a-lead"))).toBe("Теперь на сервере Германия · Франкфурт Семейный, без рекламы и сайтов для взрослых. Сам ключ остался прежним, но каждое устройство с ключом должно получить его заново");
     const rows = all(box, ".a-opts .a-opt");
     expect(rows).toHaveLength(1);

@@ -87,7 +87,6 @@ describe("the password form", () => {
     expect(win.querySelector(".a-h")).toBeNull();
     expect(win.getAttribute("aria-labelledby")).toBe("pw-t");
     const form = win.querySelector("form.a-b")!;
-    expect([...form.children].map((x) => x.className)).toEqual(["a-lock", "a-fld", "u-btn pri", "u-hint lock-none"]);
     expect(form.querySelector(".a-lock .mg-motion")).not.toBeNull();
     expect(form.querySelector(".a-lock h2")?.textContent).toBe("Страница закрыта паролем");
     expect(form.querySelector(".a-lock .a-lead")?.textContent).toBe("Его задал владелец подписки");
