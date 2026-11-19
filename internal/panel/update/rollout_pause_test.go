@@ -108,32 +108,30 @@ func TestAgentRolloutPauseOutcomes(t *testing.T) {
 		e.wantRollout(store.RolloutPaused, pauseGateFailed)
 	})
 
-	t.Run("the step was closed under the pass: it loses its write", func(t *testing.T) {
+	t.Run("the step was closed under the pass: it loses its write and does not pause", func(t *testing.T) {
 		e, a := notBackNode(t)
 		e.afterNextLoad(`UPDATE update_step SET state = 'skipped', error_key = 'cancelled' WHERE node_id = ?`, a)
 		e.tick()
 		e.wantStep(a, store.StepSkipped, "cancelled")
-		// D12, as it is: the pass that did not win its step pauses all the same, with its own reason
-		e.wantRollout(store.RolloutPaused, pauseGateFailed)
+		e.wantRollout(store.RolloutRunning, "")
 	})
 
-	t.Run("the owner pauses in the middle of a pass", func(t *testing.T) {
+	t.Run("the owner pauses in the middle of a pass: the pause stays the owner's", func(t *testing.T) {
 		e, a := notBackNode(t)
 		e.afterNextLoad(`UPDATE update_rollout SET status = 'paused', pause_key = 'owner' WHERE id = ?`, e.rollout().ID)
 		e.tick()
 		e.wantStep(a, store.StepFailed, errNotReconnected)
-		// D12, as it is: the pass read the rollout as running, and its pause write takes the owner's pause over
-		e.wantRollout(store.RolloutPaused, pauseGateFailed)
+		e.wantRollout(store.RolloutPaused, pauseOwner)
 	})
 
-	t.Run("another failure paused the rollout in the middle of a pass", func(t *testing.T) {
+	t.Run("another failure paused the rollout in the middle of a pass: the first reason stays", func(t *testing.T) {
 		e, a := notBackNode(t)
 		e.afterNextLoad(`UPDATE update_rollout SET status = 'paused', pause_key = 'step_failed',
 			pause_params_json = '{"node":"nl1","reason":"hash_mismatch"}' WHERE id = ?`, e.rollout().ID)
 		e.tick()
 		e.wantStep(a, store.StepFailed, errNotReconnected)
-		ro := e.wantRollout(store.RolloutPaused, pauseGateFailed) // D12, as it is: the reason written first is overwritten
-		if ro.PauseParams["reason"] != errNotReconnected {
+		ro := e.wantRollout(store.RolloutPaused, pauseStepFailed)
+		if ro.PauseParams["reason"] != "hash_mismatch" {
 			t.Fatalf("pause params %v", ro.PauseParams)
 		}
 	})
@@ -240,12 +238,11 @@ func TestEdgeRolloutPauseOutcomes(t *testing.T) {
 		e.wantStep(a, store.StepSkipped, "cancelled")
 		e.wantRollout(store.RolloutRunning, "")
 	})
-	t.Run("the owner pauses in the middle of a pass", func(t *testing.T) {
+	t.Run("the owner pauses in the middle of a pass: the pause stays the owner's", func(t *testing.T) {
 		e, a := overdue(t)
 		e.afterNextLoad(`UPDATE update_rollout SET status = 'paused', pause_key = 'owner' WHERE id = ?`, e.rollout().ID)
 		edgeTick(e)
 		e.wantStep(a, store.StepFailed, errNoAnswer)
-		// D12, as it is: the pass read the rollout as running, and its pause write takes the owner's pause over
-		e.wantRollout(store.RolloutPaused, pauseGateFailed)
+		e.wantRollout(store.RolloutPaused, pauseOwner)
 	})
 }
