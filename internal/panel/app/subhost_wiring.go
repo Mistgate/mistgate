@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/mistgate/mistgate/internal/panel/httpserver"
+	nodeprovision "github.com/mistgate/mistgate/internal/panel/provision"
 	"github.com/mistgate/mistgate/internal/panel/subhost"
 )
 
@@ -39,4 +40,21 @@ func (k *core) addSubHost(cfg *httpserver.Config) {
 	path, handler := k.sub.Handler()
 	cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: path, Handler: handler})
 	cfg.PublicTunnel, cfg.PublicTunnelTLS = k.sub.PublicListener(), k.sub.PublicTLS() // the subdomain's connections, from the hosts
+}
+
+// subHostProvision lets the SSH install put the first subscription host on, and enrol ordinary nodes over the subdomain's link
+// while it is the panel's address.
+func (k *core) subHostProvision(cfg *nodeprovision.Config) {
+	sub, ok := k.sub.(nodeprovision.SubHostAPI)
+	if k.sub == nil || !ok {
+		return
+	}
+	cfg.SubHost, cfg.LinkPrefix = sub, k.in.LinkPrefix
+	fl := k.fl
+	cfg.EnrollLinkURL = func() string {
+		if fl.LinkEnrollment() {
+			return k.linkURLNow()
+		}
+		return ""
+	}
 }

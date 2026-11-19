@@ -35,6 +35,9 @@ const (
 
 var provisionNodeName = regexp.MustCompile(`^[a-z0-9-]{2,24}$`)
 
+// subHostDomainPattern is a lower-case DNS name of at least two labels (the subscription host service checks it fully).
+var subHostDomainPattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
 // NodeSpec is the node metadata reserved by one provisioning job.
 type NodeSpec struct {
 	ID, Name, Address, CountryCode, Location, Provider string
@@ -46,6 +49,22 @@ type NodeSpec struct {
 type NodeManager interface {
 	CreateProvisionEnrollment(context.Context, NodeSpec, string, time.Time, time.Time) (token, caFingerprint string, err error)
 	ProvisionNodeState(context.Context, string) (state string, connected bool, err error)
+	// EnrollInSession exchanges the token for a node certificate of csrDER without the node dialling the panel: the first
+	// subscription host enrols inside the SSH session, before it can reach the panel.
+	EnrollInSession(ctx context.Context, token string, csrDER []byte) (nodeID string, certPEM, caPEM []byte, err error)
+}
+
+// SubHostAPI is the panel's subscription host (internal/panel/subhost) as the SSH install of the first host sees it
+// (design/adr/0018-panel-behind-nat.md).
+type SubHostAPI interface {
+	// PrepareInstall checks that a first host may be installed for domain (and siteName, the node's own site on 443) on the
+	// server sshHost, and returns the bridge path the role will have (a secret). Nothing is stored.
+	PrepareInstall(ctx context.Context, sshHost, domain, siteName string, skipDNS bool) (path string, err error)
+	// ActivateInstalled turns the role on for the installed node (off -> on); pin is its site's leaf, which the panel
+	// verifies it by until the node reports one. Doing it again for the same install is no change.
+	ActivateInstalled(ctx context.Context, nodeID, domain, siteName, path, pin string) error
+	// DeactivateInstalled turns the role off again after an install that did not complete (on -> off, never once ready).
+	DeactivateInstalled(ctx context.Context, nodeID string) error
 }
 
 // BinarySource returns a node binary from the currently trusted release, its size and the sha256 (hex) in the signed
@@ -66,6 +85,13 @@ type Config struct {
 	// endpoint (--link-url, no --panel or --sni), and its host:port is what the node's reachability probe dials. Set by
 	// the edge edition only; PanelAddr is then unused. With neither, installs say panel_address_not_configured.
 	LinkURL string
+	// LinkPrefix is the secret path prefix of the panel's agent link ("/<prefix>/"): the first subscription host enrols with
+	// wss://<domain><LinkPrefix>. SubHost installs that host; nil (the edge edition) refuses such installs.
+	LinkPrefix string
+	SubHost    SubHostAPI
+	// EnrollLinkURL, when set and non-empty, is the link an ordinary node enrols over while the panel's address is its
+	// subscription host's (its mTLS endpoint is not reachable then).
+	EnrollLinkURL func() string
 	// Kick, when set, is called instead of waking the in-process worker loop whenever a job is queued: a host without
 	// a loop (the edge alarm) wakes its own runner. It runs inside the request that queued the job, so it must not block.
 	Kick       func()
@@ -99,6 +125,10 @@ type credentials struct {
 	EnrollmentToken  string `json:"enrollment_token,omitempty"`
 	CAFingerprint    string `json:"ca_fingerprint,omitempty"`
 	TokenExpiresUnix int64  `json:"token_expires_unix,omitempty"`
+	// The install of the first subscription host: its domain, its site name and the bridge path of its role.
+	SubHostDomain   string `json:"subscription_host_domain,omitempty"`
+	SubHostSiteName string `json:"subscription_host_site_name,omitempty"`
+	SubHostPath     string `json:"subscription_host_path,omitempty"`
 }
 
 // NewService builds the provisioning API and its background worker.
@@ -140,13 +170,25 @@ func NewService(st *store.Store, vlt *vault.Vault, cfg Config) (*Service, error)
 	return &Service{st: st, vault: vlt, cfg: cfg, ssh: cfg.SSH, work: make(chan struct{}, 1), active: make(map[string]context.CancelFunc)}, nil
 }
 
+// enrollLink is the link a node enrols over: the edge edition's, else the subscription host's while there is one.
+func (c Config) enrollLink() string {
+	if c.LinkURL != "" {
+		return c.LinkURL
+	}
+	if c.EnrollLinkURL != nil {
+		return c.EnrollLinkURL()
+	}
+	return ""
+}
+
 // panelAddress is the host:port a node must be able to reach: the link's when it enrols over the link, else the panel
 // address of the mTLS endpoint. Empty: neither is configured.
 func (c Config) panelAddress() string {
-	if c.LinkURL == "" {
+	link := c.enrollLink()
+	if link == "" {
 		return c.PanelAddr
 	}
-	u, err := url.Parse(c.LinkURL)
+	u, err := url.Parse(link)
 	if err != nil || u.Hostname() == "" {
 		return ""
 	}
@@ -155,6 +197,19 @@ func (c Config) panelAddress() string {
 		port = "443"
 	}
 	return net.JoinHostPort(u.Hostname(), port)
+}
+
+// subHostLink is the link URL the subscription host for domain enrols with: the panel's link prefix behind the domain.
+func (c Config) subHostLink(domain string) string {
+	if c.LinkPrefix == "" || domain == "" {
+		return ""
+	}
+	return "wss://" + domain + c.LinkPrefix
+}
+
+// subHostDomain is the requested subscription host domain, lower case; "" = an ordinary node.
+func subHostDomain(raw string) string {
+	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(raw), "."))
 }
 
 // Handler mounts the owner-only ProvisioningService Connect handler.
@@ -196,7 +251,20 @@ func (s *Service) CheckSSH(ctx context.Context, req *connect.Request[adminv1.Che
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
-	if s.cfg.panelAddress() == "" {
+	// The first subscription host: the server need not reach the panel (it is what will make the panel reachable), nor need
+	// the panel's address be set; its own domain is probed instead, for information.
+	domain := subHostDomain(req.Msg.SubscriptionHostDomain)
+	host := domain != ""
+	probeAddr := s.cfg.panelAddress()
+	if host {
+		if s.cfg.SubHost == nil {
+			return nil, connect.NewError(connect.CodeUnimplemented, errors.New("subscription_host_unavailable"))
+		}
+		if !subHostDomainPattern.MatchString(domain) || len(domain) > 253 {
+			return nil, invalidArgument("invalid subscription host domain")
+		}
+		probeAddr = net.JoinHostPort(domain, "443")
+	} else if probeAddr == "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel_address_not_configured"))
 	}
 	target, err := NewTarget(req.Msg.Host, req.Msg.Port)
@@ -233,11 +301,11 @@ func (s *Service) CheckSSH(ctx context.Context, req *connect.Request[adminv1.Che
 		return nil, sshConnectError(err)
 	}
 	defer conn.Close()
-	remote, err := readPreflight(ctx, conn, s.cfg.panelAddress())
+	remote, err := readPreflightFor(ctx, conn, probeAddr, host)
 	if err != nil {
 		return nil, preflightConnectError(err)
 	}
-	if _, code := supportedPreflight(remote.facts); code != "" {
+	if _, code := supportedPreflightFor(remote.facts, host); code != "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New(code))
 	}
 	return connect.NewResponse(&adminv1.CheckSSHResponse{Preflight: remote.facts}), nil
@@ -255,7 +323,16 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 	if !req.Msg.ConfirmInstall {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("confirm_install_required"))
 	}
-	if s.cfg.panelAddress() == "" {
+	domain := subHostDomain(req.Msg.SubscriptionHostDomain)
+	if domain != "" {
+		// The first subscription host enrols inside the SSH session: the panel need not be reachable from it.
+		if s.cfg.SubHost == nil {
+			return nil, connect.NewError(connect.CodeUnimplemented, errors.New("subscription_host_unavailable"))
+		}
+		if s.cfg.LinkPrefix == "" {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel_link_not_configured"))
+		}
+	} else if s.cfg.panelAddress() == "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("panel_address_not_configured"))
 	}
 	fromPlan := req.Msg.PlanId != ""
@@ -321,6 +398,18 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 	if method == "password" && !validPassword(password) {
 		return nil, invalidArgument("invalid SSH credentials or target")
 	}
+	var hostPath, siteName string
+	if domain != "" {
+		siteName = subHostDomain(req.Msg.SubscriptionHostSiteName)
+		if hostPath, err = s.cfg.SubHost.PrepareInstall(ctx, target.Host(), domain, siteName, req.Msg.SkipDnsCheck); err != nil {
+			var connectErr *connect.Error
+			if errors.As(err, &connectErr) {
+				return nil, connectErr
+			}
+			s.cfg.Log.Error("prepare the subscription host install", "code", "sub_host_prepare_failed", "err", err)
+			return nil, internalConnectError()
+		}
+	}
 	now := s.cfg.Now().UTC()
 	job := store.NodeProvisionJob{
 		ID: store.NewID("prv_"), NodeID: store.NewID("nod_"), Name: name, Address: req.Msg.Address,
@@ -330,6 +419,7 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 	}
 	secret, err := s.sealCredentials(job.ID, credentials{
 		Method: method, Username: username, Password: password, PrivateKey: privateKey, InstallPanelKey: installPanelKey,
+		SubHostDomain: domain, SubHostSiteName: siteName, SubHostPath: hostPath,
 	})
 	if err != nil {
 		return nil, internalConnectError()
@@ -435,9 +525,12 @@ func (s *Service) RetryNodeProvision(ctx context.Context, req *connect.Request[a
 	} else if state == "retired" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node_retired"))
 	}
+	// A failed subscription host install kept its role (residualSecret): the retry is one too.
+	hostFields := s.hostFields(job.ID, job.Secret)
 	secret, err := s.sealCredentials(job.ID, credentials{
 		Method: method, Username: username, Password: req.Msg.Password, PrivateKey: privateKey,
-		InstallPanelKey: installPanelKey,
+		InstallPanelKey: installPanelKey, SubHostDomain: hostFields.SubHostDomain, SubHostSiteName: hostFields.SubHostSiteName,
+		SubHostPath: hostFields.SubHostPath,
 	})
 	if err != nil {
 		return nil, internalConnectError()
@@ -603,6 +696,27 @@ func (s *Service) openCredentials(jobID string, ciphertext []byte) (credentials,
 		}
 	}
 	return secret, nil
+}
+
+// hostFields reads only the subscription host fields of a job secret, also of the residual a failed host install keeps
+// (residualSecret), which holds no login.
+func (s *Service) hostFields(jobID string, ciphertext []byte) credentials {
+	if len(ciphertext) == 0 {
+		return credentials{}
+	}
+	plain, err := s.vault.Open(ciphertext, store.NodeProvisionCredentialsAAD(jobID))
+	if err != nil {
+		return credentials{}
+	}
+	defer clearBytes(plain)
+	var fields credentials
+	if json.Unmarshal(plain, &fields) != nil {
+		return credentials{}
+	}
+	out := credentials{SubHostDomain: fields.SubHostDomain, SubHostSiteName: fields.SubHostSiteName, SubHostPath: fields.SubHostPath}
+	fields.Password, fields.EnrollmentToken = "", ""
+	clear(fields.PrivateKey)
+	return out
 }
 
 func sshUsername(value string) string {

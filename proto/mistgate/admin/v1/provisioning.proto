@@ -58,6 +58,9 @@ message CheckSSHRequest {
   // An owner's private key is used only for this check. It is never retained.
   string private_key = 7;
   string private_key_passphrase = 8;
+  // The first subscription host (design/adr/0018-panel-behind-nat.md): the server need not reach the panel, and the preflight
+  // probes this domain on 443 instead (informational). Empty = an ordinary node. Not offered by the Cloudflare edition.
+  string subscription_host_domain = 9;
 }
 
 message NodePreflight {
@@ -104,6 +107,12 @@ message StartNodeProvisionRequest {
   string private_key_passphrase = 16;
   // Who the new node is handed out to once installed (see CreateEnrollmentRequest.sharing); unset = the panel decides.
   NodeSharing sharing = 17;
+  // The first subscription host: its subdomain (A/AAAA records pointing at the server), the name of the node's own site on 443
+  // (a second name pointing at it, ACME), and whether to skip the DNS check of both. The node enrols inside the SSH session.
+  // Empty domain = an ordinary node. Not offered by the Cloudflare edition.
+  string subscription_host_domain = 18;
+  string subscription_host_site_name = 19;
+  bool skip_dns_check = 20;
 }
 
 message RetryNodeProvisionRequest {

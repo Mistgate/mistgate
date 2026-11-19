@@ -620,6 +620,14 @@ func errorLabel(code string) string {
 		return "На сервере недостаточно свободного места для агента."
 	case "node_not_connected":
 		return "Агент установлен, но не подключился к панели вовремя."
+	case "subscription_host_unavailable":
+		return "Хост подписок здесь не устанавливается: эта панель его не поддерживает или у неё нет адреса ссылки агентов."
+	case "subscription_host_activation_failed":
+		return "Агент установлен, но панель не смогла включить хост подписок. Проверьте журнал панели и повторите установку."
+	case "subscription_host_tunnel_down":
+		return "Агент установлен, но панель не смогла подключиться к хосту подписок: проверьте, что порт 443 сервера открыт для панели."
+	case "panel_link_not_configured":
+		return "У панели нет адреса ссылки агентов: хост подписок без него не установить."
 	case "ssh_connection_failed", "ssh_connection_canceled":
 		return "SSH-подключение прервано. Проверьте сервер и повторите установку."
 	case "ssh_connection_refused", "ssh_connection_unavailable":

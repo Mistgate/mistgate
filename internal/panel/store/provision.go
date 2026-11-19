@@ -571,3 +571,29 @@ func (s *Store) NodeProvisionEvents(ctx context.Context, jobID string, after int
 	}
 	return out, next, rows.Err()
 }
+
+// RunningNodeProvisionJobs returns the jobs in state running (what RequeueNodeProvisionJobs is about to recover).
+func (s *Store) RunningNodeProvisionJobs(ctx context.Context) ([]NodeProvisionJob, error) {
+	rows, err := s.R.QueryContext(ctx, `SELECT `+nodeProvisionJobCols+` FROM node_provision_job WHERE state = 'running'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []NodeProvisionJob
+	for rows.Next() {
+		job, err := scanNodeProvisionJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, job)
+	}
+	return out, rows.Err()
+}
+
+// KeepInterruptedNodeProvisionSecret stores secret on a job RequeueNodeProvisionJobs failed with job_interrupted: what a
+// retry must still know (the caller passes no login and no token). It changes no other job.
+func (s *Store) KeepInterruptedNodeProvisionSecret(ctx context.Context, id string, secret []byte) error {
+	_, err := s.batch(ctx, Stmt{Query: `UPDATE node_provision_job SET secret = ?
+		WHERE id = ? AND state = 'failed' AND error_code = 'job_interrupted'`, Args: []any{secret, id}})
+	return err
+}
