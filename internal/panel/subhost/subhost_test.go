@@ -6,11 +6,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"crypto/tls"
 	"errors"
 	"log/slog"
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,6 +36,7 @@ type fakeFleet struct {
 	link      string
 	enrolLink bool
 	target    func(id, site, bootstrap string) (string, string, string, bool, bool)
+	status    map[string]*agentv1.SubHostStatus
 }
 
 func (f *fakeFleet) HasSession(id string) bool { f.mu.Lock(); defer f.mu.Unlock(); return f.online[id] }
@@ -67,7 +70,11 @@ func (f *fakeFleet) SubHostTarget(_ context.Context, id, site, bootstrap string)
 	}
 	return f.target(id, site, bootstrap)
 }
-func (f *fakeFleet) SubHostStatus(string) *agentv1.SubHostStatus { return nil }
+func (f *fakeFleet) SubHostStatus(id string) *agentv1.SubHostStatus {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.status[id]
+}
 
 type fakeResolver map[string][]netip.Addr
 
@@ -89,6 +96,8 @@ type env struct {
 	svc  *Service
 	rpc  rpc
 	logs *bytes.Buffer
+	// clock is the service's clock (unix seconds): the dialer reads it from its own goroutines.
+	clock atomic.Int64
 }
 
 var allCaps = []string{plugin.CapSubHost, plugin.CapPanelLink, capWSLink}
@@ -110,8 +119,9 @@ func newEnv(t *testing.T) *env {
 	}
 	e := &env{t: t, ctx: ctx, st: st, fl: &fakeFleet{online: map[string]bool{}, hosts: map[string]string{}, specs: map[string][]plugin.InboundSpec{}},
 		res: fakeResolver{}, addr: pubaddr.New("https://old.example"), now: time.Unix(1_800_000_000, 0), logs: &bytes.Buffer{}}
+	e.clock.Store(e.now.Unix())
 	e.svc = New(Config{Store: st, Fleet: e.fl, Addr: e.addr, StepUp: func(context.Context) error { return nil }, LinkPrefix: "/lnk0123456789abcdef/",
-		Resolver: e.res, Now: func() time.Time { return e.now }, Log: slog.New(slog.NewTextHandler(e.logs, nil)),
+		Resolver: e.res, Now: func() time.Time { return time.Unix(e.clock.Load(), 0) }, Log: slog.New(slog.NewTextHandler(e.logs, nil)),
 		CAA: func(context.Context, string) ([]string, bool, error) { return nil, false, nil }})
 	e.rpc = rpc{e.svc}
 	return e
@@ -485,5 +495,66 @@ func TestPanelDialsItsHosts(t *testing.T) {
 		if d.Conns != 0 {
 			t.Fatalf("still connected to %s", d.PeerNodeID)
 		}
+	}
+}
+
+// The panel moves to the subdomain only once every condition holds, says what is missing until then, and does not move back
+// when the host's connection drops later; the owner hears of a connection down for 30 seconds, and of its return.
+func TestReadiness(t *testing.T) {
+	e := newEnv(t)
+	a := e.node("a", "203.0.113.1", allCaps, true)
+	public, up := false, false
+	e.fl.target = func(string, string, string) (string, string, string, bool, bool) {
+		return "127.0.0.1", "de1.example.com", "", public, true
+	}
+	e.svc.upSeam = func(string) bool { return up }
+	e.fl.status = map[string]*agentv1.SubHostStatus{}
+	if err := e.set(a, "sub.example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	notReady := func() string {
+		g, err := e.rpc.GetSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.GetSubscriptionHostRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.Join(g.Msg.Host.NotReady, ",")
+	}
+	if got := notReady(); got != "host_error,site_cert,bridge,panel_cert" {
+		t.Fatalf("not ready: %q", got)
+	}
+	e.fl.status[a] = &agentv1.SubHostStatus{}
+	public, up = true, true
+	e.svc.cfg.Certificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return nil, errors.New("unused") }
+	e.fl.online[a] = false
+	e.svc.checkReady(e.ctx)
+	if e.state().ReadyAt != "" || notReady() != "host_offline" {
+		t.Fatalf("offline host made ready: %+v", e.state())
+	}
+	e.fl.online[a] = true
+	e.svc.checkReady(e.ctx)
+	if st := e.state(); st.ReadyAt == "" || st.PublicURL != "https://sub.example.com" || e.addr.PublicURL() != "https://sub.example.com" ||
+		e.fl.link != "wss://sub.example.com/lnk0123456789abcdef/" || !e.fl.enrolLink {
+		t.Fatalf("ready: %+v, link %q", st, e.fl.link)
+	}
+	up = false
+	e.svc.checkReady(e.ctx)
+	e.clock.Add(31) // seconds
+	e.svc.checkReady(e.ctx)
+	e.svc.checkReady(e.ctx)
+	up = true
+	e.svc.checkReady(e.ctx)
+	rows, _, err := e.st.Events(e.ctx, store.EventFilter{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var codes []string
+	for _, r := range rows {
+		codes = append(codes, r.Code)
+	}
+	if strings.Join(codes, ",") != "sub_host_tunnel_up,sub_host_tunnel_down,sub_host_ready" {
+		t.Fatalf("events %v", codes)
+	}
+	if e.addr.PublicURL() != "https://sub.example.com" {
+		t.Fatal("a connection that dropped must not move the panel back")
 	}
 }
