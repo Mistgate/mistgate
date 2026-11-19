@@ -271,6 +271,8 @@ Each row has:
 
 **Add profile** opens the dialog that puts a profile on this node: see [Profiles](profiles.md). When the panel has no profile at all, the dialog offers to create a Hysteria2 profile on port 443 (or the first free port) and put it on the node in one go, with **Set up by hand** as the other way.
 
+When two services or more stand on one TCP port, a **TCP 443 is shared** card sits above the rows: who shares the port, which name leads to which service, who is the default and what the node counted. See [Two services on one TCP port](profiles.md#two-services-on-one-tcp-port).
+
 ### Exit
 
 Where people's traffic leaves the node. Top to bottom: the WARP card, **People's traffic** and **DNS choice on the user page** (on a wide screen it stands on the right). WARP is described in [WARP](warp.md); the WARP chip in the node's header and every **Open WARP** in the panel lead to its card.

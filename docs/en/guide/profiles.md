@@ -142,6 +142,21 @@ A warning does not stop the button. Today there are two:
 
 The same codes come back from the API and the MCP server, as "code: key=value&key=value", so scripts can read them too. See [API](../reference/api.md).
 
+## Two services on one TCP port
+
+A node can run several TCP services on the same port, TCP 443 for example: VLESS REALITY, TrustTunnel and MTProto at once. The node's agent tells them apart by the **name** the client asks for in the first bytes of the connection (the SNI), so every service needs a name of its own. A visitor who sends no name, an unknown one, or something that is not TLS gets the node's own site, from the service that serves it (the default one). A Hysteria2 site is not one of them: it still gives its TCP port up. UDP is not shared: a TrustTunnel with HTTP/3 beside Hysteria2 on UDP 443 is still refused.
+
+What you need:
+
+- **A name for each service**, a subdomain of the node's address is the usual choice: `cdn.de1.example.com`, `static.de1.example.com`. The panel proposes a neutral one when you put a second service on a taken port. Set it in the **Domain (SNI)** field of the server on the node.
+- **A DNS record for it**, with no proxy (the grey cloud on Cloudflare): an `A` record to the node's IPv4 address, or a `CNAME` to the node's host name. The dialog shows the record as type, name and value, with a **Copy record** button. The node asks Let's Encrypt for the certificate by itself once the name leads to it.
+- **At least one service with the node's own site** (REALITY on the node's own site, VLESS with TLS, TrustTunnel, MTProto with the decoy): it is the default one. Services that show another site cannot be the only ones on a shared port.
+- **A current agent**: the node must list `tcp-share/1`. On an older agent only the default service is sent; the others show **share_agent_old** and the node's Profiles tab says to update the agent.
+
+How to do it: on the node's **Profiles** tab choose **Add profile** (or **Edit** on a profile, or **Put on nodes** on the profile page) and pick the taken port. When the name is held the dialog says so and offers **Put beside on 443** with a name you can edit, and **Take 8443** for the old way out. Put beside runs the check again with the name; if it passes, the dialog tells who restarts (the service that stood alone on the port restarts and its open connections reconnect) and shows the DNS record, and only then you press **Add** or **Save**.
+
+The **TCP 443 is shared** card on the node's Profiles tab shows who shares the port, which name leads to which service, who is the default, and what the node counted since its agent started: accepted, sent to the default one, refused, service down, silent for 10 s, dropped when the port was flooded. A flood is also an event, **front_overloaded**, at most once an hour. A profile whose name another profile of the port holds does not start and says **sni_shadowed**; give it a name of its own.
+
 ## Errors the editor explains
 
 A field the server refuses gets a sentence next to it. The editor has its own words for these; for any other field and code it shows the server's short English text.
