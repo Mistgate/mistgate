@@ -1028,6 +1028,11 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 		return nil, port80Err
 	}
 	warnings = append(warnings, shareWarnings(nodeName, spec, profileName, others)...)
+	if w, err := s.bridgeSiteWarning(ctx, nodeID, nodeName, spec, others); err != nil {
+		return nil, err
+	} else if w != nil {
+		warnings = append(warnings, w)
+	}
 	if spec.Egress != "warp" {
 		return warnings, nil
 	}
@@ -1270,6 +1275,14 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	if err != nil {
 		return nil, buildRefusal(err, f.Node.Name)
 	}
+	if f.Inbound.RealityTargetOverride != "" {
+		if clean := plugin.RealityTargetShown(spec); clean != "" && clean != "self" {
+			f.Inbound.RealityTargetOverride = clean // as the node gets it, so that a later "same site" compares equal
+		}
+	}
+	if err := s.realityTargetOwnRefusal(ctx, f, spec); err != nil {
+		return nil, err
+	}
 	var portChecks portCheckCache
 	if specHasUDPListen(spec) {
 		portChecks, err = s.readPortChecks(ctx, f.Node.ID)
@@ -1330,10 +1343,10 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 	in := f.Inbound
 	oldEnabled := in.Enabled
 	oldDirectInSubscriptions := in.DirectInSubscriptions
-	oldSpec, err := s.buildSpec(f, merged)
-	if err != nil {
-		return nil, buildRefusal(err, f.Node.Name)
-	}
+	// The spec before the change only tells whether the port moves: an inbound that does not build now (a disabled one whose profile
+	// went to TLS while it kept a target of the node) must still be editable, or its target could never be reset.
+	oldSpec, oldErr := s.buildSpec(f, merged)
+	storedTarget := in.RealityTargetOverride
 	specChangedByAdmin := false
 	if m.PortOverride != nil {
 		port, _, err := checkOverrides(*m.PortOverride, "")
@@ -1360,7 +1373,6 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 			if err := realityTargetAgentRefusal(f.Node.AgentCaps, target); err != nil {
 				return nil, err
 			}
-			specChangedByAdmin = true
 		}
 		in.RealityTargetOverride = target
 	}
@@ -1378,6 +1390,21 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 	spec, err := s.buildSpec(f, merged)
 	if err != nil {
 		return nil, buildRefusal(err, f.Node.Name)
+	}
+	if m.RealityTargetOverride != nil && in.RealityTargetOverride != "" {
+		// kept as the node gets it, so that the same site written another way (Shop.Example.com.:443) is no change and no restart
+		if clean := plugin.RealityTargetShown(spec); clean != "" && clean != "self" {
+			in.RealityTargetOverride = clean
+			f.Inbound = in
+		}
+	}
+	if in.RealityTargetOverride != storedTarget {
+		specChangedByAdmin = true
+	}
+	if in.RealityTargetOverride != "" && in.RealityTargetOverride != storedTarget { // a target of the node's own is being set: not one of the fleet's own names
+		if err := s.realityTargetOwnRefusal(ctx, f, spec); err != nil {
+			return nil, err
+		}
 	}
 	others, _, err := s.nodeInbounds(ctx, f.Node.ID, f.Inbound.ID)
 	if err != nil {
@@ -1409,7 +1436,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 				warnings = append(warnings, warning)
 			}
 		}
-		portChanged := oldSpec.Listen.Port != spec.Listen.Port
+		portChanged := oldErr != nil || oldSpec.Listen.Port != spec.Listen.Port
 		switchedOn := !oldEnabled && in.Enabled
 		if m.ValidateOnly {
 			if bad, ok := cachedSpecPortLossy(spec, portChecks[f.Node.ID], s.now()); ok {

@@ -1275,7 +1275,10 @@ func (x *ScoreItem) GetParams() map[string]string {
 // (FAILED_PRECONDITION: the UDP delivery check of design/udp-port-check.md found the port losing packets on that node;
 // free = a port the same run proved, else the picker's choice from stored checks, 0 = none; allow_lossy_port saves anyway),
 // "reality_target_unsupported" (a REALITY target override on an inbound that is not VLESS REALITY), "reality_target_invalid:
-// target=..." (not a host name and a port), "reality_target_same_node: target=...&node=de1" (the node itself at its own port).
+// target=..." (not a host name and a port), "reality_target_same_node: target=...&node=de1" (the node itself at its own port),
+// "reality_target_own: target=...&node=de1" (the host is one of the panel's own: the address of a node, the panel, a name a service of the
+// fleet holds a certificate for). A warning that is not a refusal: "bridge_site_lost: node=fi1&port=443" (the node's own site on 443, which
+// the bridge of reverse relays rides, would give way to another site).
 type CreateInboundRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	ProfileId string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
@@ -1297,7 +1300,7 @@ type CreateInboundRequest struct {
 	SettingsJson string `protobuf:"bytes,8,opt,name=settings_json,json=settingsJson,proto3" json:"settings_json,omitempty"`
 	// VLESS REALITY only: "host:port" of a site this node shows instead of the profile's target (the host is a name, not an IP);
 	// the host becomes the one name REALITY accepts there. Empty = the profile's target. Refusals: reality_target_unsupported,
-	// reality_target_invalid, reality_target_same_node (as listed above).
+	// reality_target_invalid, reality_target_same_node, reality_target_own (as listed above).
 	RealityTargetOverride string `protobuf:"bytes,9,opt,name=reality_target_override,json=realityTargetOverride,proto3" json:"reality_target_override,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache

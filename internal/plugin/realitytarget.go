@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"encoding/json"
+	"net"
+	"strconv"
 	"strings"
 )
 
@@ -49,4 +51,19 @@ func RealityTargetShown(s InboundSpec) string {
 		return "self"
 	}
 	return ""
+}
+
+// NormalizeRealityTarget is a REALITY target typed as text in the form the panel keeps it: trimmed, the host in lower case without
+// a closing dot, the port as a number ("Shop.Example.com.:0443" is "shop.example.com:443"). Text that is not "host:port" comes back
+// trimmed, for the panel to refuse.
+func NormalizeRealityTarget(text string) string {
+	text = strings.TrimSpace(text)
+	host, port, err := net.SplitHostPort(text)
+	if err != nil {
+		return text
+	}
+	if n, err := strconv.ParseUint(port, 10, 16); err == nil {
+		port = strconv.FormatUint(n, 10)
+	}
+	return net.JoinHostPort(strings.ToLower(strings.TrimSuffix(host, ".")), port)
 }

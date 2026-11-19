@@ -67,6 +67,9 @@ type Config struct {
 	CheckRelay func(ctx context.Context, relayID string, stages ...string) (store.RelayCheck, error)
 	// Limiter is the shared backend for token user-change budgets and their refusal-event gate.
 	Limiter securitylimit.Limiter
+	// OwnHosts are the hosts and URLs of the panel itself (its site, admin and agent addresses): a REALITY target set on a node is never one
+	// of them (reality_own.go).
+	OwnHosts []string
 }
 
 // Service implements ProfileService, UserService, GroupService, DeviceService, AwgService and RelayService (adminv1connect

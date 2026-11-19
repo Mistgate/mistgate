@@ -588,10 +588,7 @@ func effectiveServerNames(s RealitySettings) []string {
 // with a dot (REALITY asks the site for that name, and an IP address has none), not this machine, and not the node's own address at
 // the listen port, which would loop.
 func realityOverrideTarget(target string, listenPort int, nodeAddress string) (clean, host string, err error) {
-	text := strings.TrimSpace(target)
-	if h, p, err := net.SplitHostPort(text); err == nil { // a name written with its closing dot is the same name
-		text = net.JoinHostPort(strings.ToLower(strings.TrimSuffix(h, ".")), p)
-	}
+	text := plugin.NormalizeRealityTarget(target) // a name written with its closing dot is the same name
 	host, port, perr := targetHostPort(text)
 	if perr != nil || net.ParseIP(strings.Trim(host, "[]")) != nil || !isHostname(host) || !strings.Contains(host, ".") || localTargetHost(host) {
 		return "", "", &protocols.RealityTargetError{Reason: "invalid", Target: target}
