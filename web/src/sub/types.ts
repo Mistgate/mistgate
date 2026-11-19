@@ -134,6 +134,8 @@ export type AwgConfig = {
   /** A config through an entry node (a relay): that node's id and country code ("" for the direct config, which shares node_id). */
   via_node_id: string;
   via_country: string;
+  /** A config to the node's IPv6 entry (a key of its own); the page names it by `label` ("Germany · IPv6"). */
+  ipv6: boolean;
   /** The server as the page names it ("Germany · Frankfurt", "Server"), never the panel's node name. It is also what the connection is called in the app. */
   label: string;
   country_code: string;

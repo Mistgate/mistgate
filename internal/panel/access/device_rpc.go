@@ -34,7 +34,7 @@ func configProtos(cfgs []DeviceConfig) []*adminv1.DeviceConfig {
 	for i, c := range cfgs {
 		m := &adminv1.DeviceConfig{
 			InboundId: c.InboundID, NodeId: c.NodeID, NodeName: c.NodeName, CountryCode: c.CountryCode,
-			ViaCountry: c.ViaCountry, ViaNodeId: c.ViaNodeID,
+			ViaCountry: c.ViaCountry, ViaNodeId: c.ViaNodeID, Ipv6: c.IPv6,
 			ProfileName: c.ProfileName, AwgVersion: c.AWGVersion, Conf: c.Conf, VpnKey: c.VPNKey,
 			Stale: c.Stale, Warnings: c.Warnings, ConfFilename: c.ConfFilename,
 		}

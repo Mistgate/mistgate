@@ -100,6 +100,8 @@ message DeviceConfig {
   string via_country = 13;
   // See via_country.
   string via_node_id = 14;
+  // The config goes to the node's IPv6 entry (its own key and tunnel address); via_* are empty.
+  bool ipv6 = 15;
 }
 
 message ClientRequirement {

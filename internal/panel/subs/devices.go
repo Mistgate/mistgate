@@ -161,6 +161,7 @@ type configJSON struct {
 	Label       string          `json:"label"`
 	CountryCode string          `json:"country_code"`
 	ViaCountry  string          `json:"via_country,omitempty"`
+	IPv6        bool            `json:"ipv6,omitempty"` // the config goes to the node's IPv6 entry
 	Version     string          `json:"version"`
 	Conf        string          `json:"conf"`    // the .conf text (AmneziaVPN and the AmneziaWG apps import it; one QR)
 	VPNKey      string          `json:"vpn_key"` // vpn:// for AmneziaVPN
@@ -196,7 +197,7 @@ func configsOf(cfgs []access.DeviceConfig) []configJSON {
 	out := make([]configJSON, 0, len(cfgs))
 	for _, c := range cfgs {
 		out = append(out, configJSON{
-			NodeID: c.NodeID, ViaNodeID: c.ViaNodeID, Label: c.Server, CountryCode: c.CountryCode, ViaCountry: c.ViaCountry,
+			NodeID: c.NodeID, ViaNodeID: c.ViaNodeID, Label: c.Server, CountryCode: c.CountryCode, ViaCountry: c.ViaCountry, IPv6: c.IPv6,
 			Version: c.AWGVersion, Conf: c.Conf, VPNKey: c.VPNKey,
 			Filename: c.ConfFilename, Stale: c.Stale, Warnings: nonNil(c.Warnings), MinClients: minClientsJSON(c.MinClients), QR: pageQROf(c.Conf),
 		})

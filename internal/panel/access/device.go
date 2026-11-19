@@ -27,7 +27,8 @@ import (
 // DeviceConfig is the config of a device on one node.
 type DeviceConfig struct {
 	InboundID, NodeID, NodeName, CountryCode string
-	ViaCountry, ViaNodeID                    string
+	ViaCountry, ViaNodeID                    string // a config through a relay's entry; empty for the direct and the IPv6 one
+	IPv6                                     bool   // the config goes to the node's IPv6 entry
 	Server                                   string // the public name of the node ("Germany 2"): the user page shows this, never NodeName
 	ProfileName, AWGVersion                  string // "3.1" | "2.0"
 	Conf                                     string // WireGuard-style .conf (AmneziaVPN and AmneziaWG import it)
@@ -553,10 +554,10 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			continue
 		}
 		for _, p := range serverPaths(f.Node, spec, relaysOf[f.Inbound.ID]) {
-			if p.Kind != pathRelay { // a key is issued for no other path of a static device
+			if p.Kind == pathDirect {
 				continue
 			}
-			relay, path := p.Relay, p.Key
+			path := p.Key
 			cred, have := sc.pathCreds[path]
 			if !have {
 				var created bool
@@ -564,15 +565,15 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 				cred, created, err = s.st.Access().EnsureKeyPathCred(ctx, sc.dev.ID, sc.profile.ID, path, maxIdx, s.now(),
 					s.awgIssuer(sc.proto, sc.user.ID, sc.dev.ID, sc.profile.ID, sc.merged))
 				if errors.Is(err, store.ErrAccessSubnetFull) {
-					s.log.Warn("access: AWG relay key network is full for a static device", "code", "awg_path_network_full", "user", sc.user.ID,
+					s.log.Warn("access: AWG path key network is full for a static device", "code", "awg_path_network_full", "user", sc.user.ID,
 						"device", sc.dev.ID, "profile", sc.profile.ID, "path", path, "err", err)
 					continue
 				}
 				if errors.Is(err, store.ErrNotFound) {
-					continue // the device or relay ceased to be eligible while its configs were being rendered
+					continue // the device, the entry or the relay ceased to be eligible while its configs were being rendered
 				}
 				if err != nil {
-					s.log.Warn("access: cannot issue an AWG relay key for a static device", "code", "awg_path_credential_issue_failed", "user", sc.user.ID,
+					s.log.Warn("access: cannot issue an AWG path key for a static device", "code", "awg_path_credential_issue_failed", "user", sc.user.ID,
 						"device", sc.dev.ID, "profile", sc.profile.ID, "path", path, "err", err)
 					continue
 				}
@@ -584,34 +585,42 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			}
 			pathSecret, err := s.vault.Open(cred.SecretEnc, cred.ID)
 			if err != nil {
-				s.log.Error("access: cannot open an AWG relay key for a static device", "code", "awg_path_credential_open_failed", "device", sc.dev.ID, "path", path, "err", err)
+				s.log.Error("access: cannot open an AWG path key for a static device", "code", "awg_path_credential_open_failed", "device", sc.dev.ID, "path", path, "err", err)
 				continue
 			}
-			viaMark := viaLabel(relay.ViaNodeCountry)
-			pathInput := twinInput(in, f, spec, relay)
-			pathInput.Secret, pathInput.Peer, pathInput.NodeAddr = string(pathSecret), pathSecret, relay.ViaNodeAddress
-			pathInput.DisplayName = names[i] + viaMark
+			// The IPv6 twin is the same server at the entry's address; a twin through a relay is the exit's server at the entry node.
+			mark, suffix := " · IPv6", "-ipv6"
+			cfg := DeviceConfig{
+				InboundID: f.Inbound.ID, NodeID: f.Node.ID, NodeName: f.Node.Name, CountryCode: f.Node.CountryCode,
+				IPv6: p.Kind == pathIPv6, ProfileName: f.Profile.Name, AWGVersion: version,
+				Stale: sc.dev.Stale(), MinClients: reqs, Warnings: warnings,
+			}
+			pathInput := p.input(in, f, spec)
+			if p.Kind == pathRelay {
+				// the entry's country names the config, never its node name
+				mark, suffix = viaLabel(p.Relay.ViaNodeCountry), "-via-"+cmp.Or(slug(p.Relay.ViaNodeCountry), "entry")
+				pathInput.NodeAddr = p.Relay.ViaNodeAddress
+				cfg.ViaCountry, cfg.ViaNodeID = p.Relay.ViaNodeCountry, p.Relay.ViaNodeID
+			}
+			pathInput.Secret, pathInput.Peer = string(pathSecret), pathSecret
+			pathInput.DisplayName = names[i] + mark
 			pathInput.Format = plugin.FormatAWGConf
 			pathConf, confOK := sc.proto.Render(pathInput)
 			pathInput.Format = plugin.FormatAmneziaVPN
 			pathKey, keyOK := sc.proto.Render(pathInput)
 			if !confOK || !keyOK {
-				s.log.Error("access: cannot render an AWG relay config", "code", "awg_path_config_render_failed", "inbound", f.Inbound.ID, "device", sc.dev.ID, "via", relay.ViaNodeID)
+				s.log.Error("access: cannot render an AWG path config", "code", "awg_path_config_render_failed", "inbound", f.Inbound.ID, "device", sc.dev.ID, "path", path)
 				continue
 			}
-			// The file is named by the entry's country, never by its node name; a second entry of that country gets a number.
-			base := strings.TrimSuffix(files[i], ".conf") + "-via-" + cmp.Or(slug(relay.ViaNodeCountry), "entry")
+			// A second path of the same name gets a number.
+			base := strings.TrimSuffix(files[i], ".conf") + suffix
 			filename := base + ".conf"
 			for k := 2; fileUsed[filename]; k++ {
 				filename = base + "-" + strconv.Itoa(k) + ".conf"
 			}
 			fileUsed[filename] = true
-			out = append(out, DeviceConfig{
-				InboundID: f.Inbound.ID, NodeID: f.Node.ID, NodeName: f.Node.Name, CountryCode: f.Node.CountryCode,
-				ViaCountry: relay.ViaNodeCountry, ViaNodeID: relay.ViaNodeID, Server: public[i] + viaMark,
-				ProfileName: f.Profile.Name, AWGVersion: version, Conf: string(pathConf.Data), VPNKey: string(pathKey.Data),
-				ConfFilename: filename, Stale: sc.dev.Stale(), MinClients: reqs, Warnings: warnings,
-			})
+			cfg.Server, cfg.Conf, cfg.VPNKey, cfg.ConfFilename = public[i]+mark, string(pathConf.Data), string(pathKey.Data), filename
+			out = append(out, cfg)
 		}
 	}
 	if len(out) == 0 {

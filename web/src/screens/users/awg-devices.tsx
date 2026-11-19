@@ -220,9 +220,10 @@ function ConfigsBody({ device, initial, onClose, onChanged }: { device: DeviceRe
   if (data.state === "error") return <Notice tone="danger">{deviceError(data.error, t)}</Notice>;
   if (!cfg) return <Notice>{t("awg.cfg.none")}</Notice>;
 
-  // the path through an entry sits right under the direct config of its node, named "de1 · via RU"
-  const via = cfg.viaNodeId ? viaLabel(t, cfg.viaCountry) : "";
-  const nameOf = (c: DeviceConfig) => (c.viaNodeId ? `${c.nodeName} · ${viaLabel(t, c.viaCountry)}` : c.nodeName);
+  // the path through an entry sits right under the direct config of its node, named "de1 · via RU"; the IPv6 one is "de1 · IPv6"
+  const pathOf = (c: DeviceConfig) => (c.viaNodeId ? viaLabel(t, c.viaCountry) : c.ipv6 ? "IPv6" : "");
+  const via = pathOf(cfg);
+  const nameOf = (c: DeviceConfig) => (pathOf(c) ? `${c.nodeName} · ${pathOf(c)}` : c.nodeName);
   const nodeOptions = configs.map((c) => ({ value: configKey(c), label: nameOf(c), icon: c.countryCode ? <Flag code={c.countryCode} /> : undefined }));
   return (
     <div className="flex flex-col gap-3.5">

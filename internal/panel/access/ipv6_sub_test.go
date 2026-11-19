@@ -227,8 +227,8 @@ func TestNoIPv6TwinWithoutAUsableEntry(t *testing.T) {
 	}
 }
 
-// A link device that gets an AmneziaWG IPv6 twin uses a separate key and tunnel address; static configs keep their direct endpoint
-// because this page does not render an IPv6 twin for them.
+// A link device that gets an AmneziaWG IPv6 twin uses a separate key and tunnel address; a static device's direct config keeps its
+// direct endpoint and its IPv6 config is a separate one.
 func TestIPv6EntryUsesSeparateAmneziaWGKeyForMihomo(t *testing.T) {
 	f := newRelayFix(t)
 	f.entry("nod_de1", entryAddr)
@@ -247,20 +247,20 @@ func TestIPv6EntryUsesSeparateAmneziaWGKeyForMihomo(t *testing.T) {
 		awgPrivateKey(t, m.Lines[0]) == awgPrivateKey(t, m.Lines[1]) || awgTunnelAddress(t, m.Lines[0]) == awgTunnelAddress(t, m.Lines[1]) {
 		t.Fatalf("Mihomo direct and IPv6 paths must have different private keys and tunnel addresses:\n%s", strings.Join(m.Lines, "\n"))
 	}
-	// the key (.conf and vpn://) of the device: the node's own address
+	// the key (.conf and vpn://) of the device: the direct config goes to the node's own address, the IPv6 one (a key of its own,
+	// see awg_static_ipv6_test.go) to the entry
 	d := must(f.s.CreateAwgDevice(f.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: u.Id, ProfileId: awg.Id, Platform: "ios", Label: "phone"}))).Msg
-	if len(d.Configs) == 0 {
-		t.Fatal("no key was made")
+	if len(d.Configs) != 2 || d.Configs[0].Ipv6 || !d.Configs[1].Ipv6 {
+		t.Fatalf("configs = %+v; want the direct one, then the IPv6 one", d.Configs)
 	}
-	for _, c := range d.Configs {
-		for _, text := range []string{c.Conf, c.VpnKey} {
-			if strings.Contains(text, entryAddr) || strings.Contains(text, "2001:db8") {
-				t.Errorf("a static key carries the IPv6 entry: %s", text)
-			}
+	direct, v6 := d.Configs[0], d.Configs[1]
+	for _, text := range []string{direct.Conf, direct.VpnKey} {
+		if strings.Contains(text, entryAddr) || strings.Contains(text, "2001:db8") {
+			t.Errorf("the direct static key carries the IPv6 entry: %s", text)
 		}
-		if !strings.Contains(c.Conf, "Endpoint = de1.example.com:") {
-			t.Errorf(".conf endpoint: %s", c.Conf)
-		}
+	}
+	if !strings.Contains(direct.Conf, "Endpoint = de1.example.com:") || !strings.Contains(v6.Conf, "Endpoint = "+entryBracket+":") {
+		t.Errorf(".conf endpoints: direct %s, IPv6 %s", direct.Conf, v6.Conf)
 	}
 }
 

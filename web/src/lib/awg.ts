@@ -37,10 +37,10 @@ export function minClientLabel(app: string, min: string, only20 = "2.0 only"): s
 }
 
 /**
- * What picks one config of a device: the node and the entry it goes through. A config through an entry has the SAME node id
- * as the direct one, so the node alone does not tell them apart.
+ * What picks one config of a device: the node and the entry it goes through (or its IPv6 entry). A config through an entry or to
+ * the IPv6 entry has the SAME node id as the direct one, so the node alone does not tell them apart.
  */
-export const configKey = (c: { nodeId: string; viaNodeId: string }) => (c.viaNodeId ? `${c.nodeId}|${c.viaNodeId}` : c.nodeId);
+export const configKey = (c: { nodeId: string; viaNodeId: string; ipv6?: boolean }) => (c.viaNodeId ? `${c.nodeId}|${c.viaNodeId}` : c.ipv6 ? `${c.nodeId}|ipv6` : c.nodeId);
 
 export const asVersion =(v: unknown): AwgVersion => (v === "2.0" ? "2.0" : "3.1");
 

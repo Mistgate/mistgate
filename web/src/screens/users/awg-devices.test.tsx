@@ -15,6 +15,7 @@ const config = (over: Partial<DeviceConfig>) =>
   }) as unknown as DeviceConfig;
 const direct = config({});
 const throughRu = config({ conf: "[Interface]\nPrivateKey = via\n", vpnKey: "vpn://via", confFilename: "de1-31-via-ru.conf", viaCountry: "RU", viaNodeId: "nod_msk1" });
+const throughIPv6 = config({ conf: "[Interface]\nPrivateKey = v6\n", vpnKey: "vpn://v6", confFilename: "de1-31-ipv6.conf", ipv6: true });
 const device: DeviceRef = { id: "dev_1", label: "Pixel", platform: "android", profileName: "AWG 3.1", version: "3.1", address: "10.66.4.5", stale: false };
 
 vi.mock("@/lib/api", async (orig) => ({ ...(await orig<object>()), devices: { getDeviceConfigs: vi.fn() }, users: { revokeDevice: vi.fn() } }));
@@ -79,5 +80,19 @@ describe("the configs of an AmneziaWG device", () => {
     const note = en["awg.cfg.viaNote"].replace("{via}", "via RU");
     expect(dialog().textContent?.split(note).length).toBe(2);
     expect(dialog().querySelector('button[aria-label="Node"]')!.textContent).toContain("de1 · via RU");
+  });
+
+  it("a config to the IPv6 entry is picked apart from the direct one and from one through an entry, named \"de1 · IPv6\", with its own QR code and the same note", async () => {
+    await mount([direct, throughIPv6, throughRu]);
+    const trigger = dialog().querySelector<HTMLElement>('button[aria-label="Node"]')!;
+    await act(async () => void trigger.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await settle();
+    const options = [...document.querySelectorAll<HTMLElement>("[role=option]")];
+    expect(options.map((o) => o.textContent)).toEqual(["de1", "de1 · IPv6", "de1 · via RU"]);
+    await act(async () => options[1]!.click());
+    await settle();
+    expect(qr()).toContain("v6");
+    const note = en["awg.cfg.viaNote"].replace("{via}", "IPv6");
+    expect(dialog().textContent?.split(note).length).toBe(2);
   });
 });
