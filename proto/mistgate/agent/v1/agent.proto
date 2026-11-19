@@ -1059,6 +1059,8 @@ message Hello {
   // by an agent that can also run OS jobs; the panel sends UpdateOs only when it is listed.
   // "panel-link/1" (NodeSettings.panel_link_url: a link node moves to a new panel link address on its own); only a link node
   // lists it, an mTLS node ignores the address.
+  // "link-fetch/1": a link-only agent fetches update files and the network table over the link with HelloAck.fetch_token
+  // (see "LINK FETCH"); such an agent also lists "nets/1" and "update/1".
   repeated string capabilities = 11;
   // Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
   // Orders releases (the version string does not); the panel compares it with the bundle manifest.
@@ -1950,6 +1952,10 @@ message HelloAck {
   NodeSettings settings = 3;
   // The panel supports the signed WebSocket link transport. An agent uses it only when configured with a link URL.
   bool link_supported = 4;
+  // LINK FETCH. A token for GET <link prefix>/fetch/<node id>/<file name>?offset=N, sent by a VPS panel on a link session to
+  // an agent that listed "link-fetch/1". The answer is the bytes FetchUpdate streams (from offset). The token is valid for
+  // this node while this session lasts and a short while after. A secret: never logged. Empty = none.
+  string fetch_token = 5;
 }
 
 // Signed WebSocket link handshake. Each message is a separate binary protobuf frame.
