@@ -91,9 +91,15 @@ func (e *Entry) DialExit(ctx context.Context, exitID, relayID string, idle time.
 		defer e.releaseClient(peer)
 		attached := false
 		e.attachClient(attachCtx, peer, RelayListener{RelayID: relayID, ExitNodeID: exitID}, remote, netip.AddrPort{}, idle, func() {
-			attached = true
-			stop() // from now on only the stream ends it
-			close(ready)
+			if e.paired != nil {
+				e.paired()
+			}
+			// From now on only the stream ends it, unless ctx ended first: then the stream is already cancelled and the
+			// caller gets ctx's error, not a finished connection.
+			if stop() {
+				attached = true
+				close(ready)
+			}
 		})
 		if !attached {
 			if err := ctx.Err(); err != nil {

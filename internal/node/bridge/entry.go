@@ -322,6 +322,7 @@ type Entry struct {
 	logged        map[string]time.Time
 	log           *slog.Logger
 	timing        entryTiming
+	paired        func() // tests: runs when DialExit's stream got its pair, before DialExit takes it
 
 	listenerSyncMu sync.Mutex
 	listenerMu     sync.Mutex
