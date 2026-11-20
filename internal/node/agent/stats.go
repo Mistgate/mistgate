@@ -126,7 +126,7 @@ func (a *Agent) buildBatch(ctx context.Context, start, end time.Time) *pb.StatsB
 	if a.nets != nil {
 		networksSHA = a.nets.LoadedSHA()
 	}
-	b := &pb.StatsBatch{IntervalStartUnix: start.Unix(), IntervalEndUnix: end.Unix(), NetworksDbSha256: networksSHA, Bridges: a.bridgeResults(), SharedPorts: a.sharedPortStats()}
+	b := &pb.StatsBatch{IntervalStartUnix: start.Unix(), IntervalEndUnix: end.Unix(), NetworksDbSha256: networksSHA, Bridges: a.bridgeResults(), SharedPorts: a.sharedPortStats(), SubHost: a.subHostStatus()}
 	off := time.Duration(a.offset.Load()) * time.Second
 	var links []plugin.LinkStat
 	for _, p := range a.protocols {

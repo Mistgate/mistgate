@@ -464,6 +464,9 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			if err := portRefusal(changed.spec, changed.node.Name, changed.others, checks, s.now(), portSubject{Profile: p.Name, Agent: changed.node.AgentCaps, Address: changed.node.Address}); err != nil {
 				return nil, err
 			}
+			if err := s.hostRefusalOf(ctx, changed.node.ID, changed.node.Name, changed.spec, true); err != nil {
+				return nil, err
+			}
 			if !specHasUDPListen(changed.spec) {
 				continue
 			}
@@ -1293,6 +1296,9 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now(), portSubject{Profile: f.Profile.Name, Agent: f.Node.AgentCaps, Address: f.Node.Address}); err != nil {
 		return nil, err
 	}
+	if err := s.hostRefusalOf(ctx, f.Node.ID, f.Node.Name, spec, true); err != nil {
+		return nil, err
+	}
 	warnings, err := s.inboundWarnings(ctx, f.Node.ID, f.Node.Name, f.Profile.Name, spec, others)
 	if err != nil {
 		return nil, err
@@ -1420,6 +1426,9 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		if err != nil {
 			return nil, s.internal("read UDP port checks", err)
 		}
+	}
+	if err := s.hostRefusalOf(ctx, f.Node.ID, f.Node.Name, spec, in.Enabled); err != nil {
+		return nil, err
 	}
 	if in.Enabled {
 		if err := portRefusal(spec, f.Node.Name, others, portChecks[f.Node.ID], s.now(), portSubject{Profile: f.Profile.Name, Agent: f.Node.AgentCaps, Address: f.Node.Address}); err != nil {
@@ -1562,6 +1571,12 @@ func (s *Service) DeleteInbound(ctx context.Context, req *connect.Request[adminv
 			return nil, nil
 		}
 		return s.vault.Seal(state, store.RetainedKeyAAD(profileID, nodeID)), nil
+	}
+	if ierr == nil {
+		node, _ := a.Node(ctx, in.NodeID)
+		if err := s.hostRefusalOfDelete(ctx, in.NodeID, node.Name, in.ID); err != nil {
+			return nil, err
+		}
 	}
 	relays, err := s.st.RelayLinks(ctx, store.RelayFilter{InboundID: req.Msg.InboundId}) // they go with the server (foreign key)
 	if err != nil {

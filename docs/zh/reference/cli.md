@@ -17,6 +17,7 @@ Mistgate 有两个二进制文件：`mistgate` 是面板，`mistgate-node` 是�
 | `backup restore` | 在离线状态下将下载的面板备份解密到新的数据目录。 |
 | `auth turnstile off` | 关闭登录页和设置页上的 Cloudflare 人机验证。 |
 | `auth reset-login` | 为管理员设置新密码和身份验证器应用，或添加密码登录方式。 |
+| `admin-address` | 当管理后台的公开地址不再可用时，将其移到单独的监听地址。 |
 | `mcp` | 为无法使用 HTTP 的智能体客户端提供连接面板 MCP 端点的本地 stdio 代理。 |
 | `release keygen` | 生成所有者的发布密钥。 |
 | `release build` | 以唯一可复现的方式构建发布二进制文件（CI 和 `make build` 都使用此命令）。 |
@@ -148,6 +149,20 @@ mistgate auth reset-login [<login>] [--admin ID] [--qr-invert] [--data-dir DIR]
 mistgate auth reset-login alice
 ```
 
+### mistgate admin-address
+
+```text
+mistgate admin-address --admin-listen host:port [--data-dir DIR]
+```
+
+| 标志 | 环境变量 | 默认值 | 含义 |
+|---|---|---|---|
+| `--admin-listen` | none | none | 单独的管理后台监听地址 `host:port`，例如 `127.0.0.1:8443`，通过 SSH 隧道访问。必填。 |
+| `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | 数据目录。若目录中没有面板数据库，命令会拒绝执行。 |
+| `--dev` | `MISTGATE_DEV` | off | 开发安装：数据位于 `./.data`。 |
+
+将管理后台移到单独的监听地址，并去掉管理后台主机名和私密管理前缀，效果与 `mistgate setup --admin-listen` 的设置相同。当管理后台的公开地址不再可用时，可用它重新进入面板。公开 URL、Agent SNI 以及订阅、连接和探测的私密前缀保持不变。命令会输出新的管理后台地址（`http://localhost:<port>/`），并提醒为原地址注册的通行密钥在此处不再可用：请使用密码和身份验证器代码登录，然后添加新的通行密钥。之后使用相同的 `--admin-listen` 重启面板。
+
 ### mistgate mcp
 
 此本地 MCP 服务器通过标准输入和标准输出与只能启动命令的智能体客户端交互。它会将每条消息转发到面板的 MCP 端点（管理后台 URL 加上 `mcp`），自身不作任何判断：面板会根据令牌权限级别响应。
@@ -242,7 +257,8 @@ mistgate edge setup-link --file FILE
 
 | 命令 | 功能 |
 |---|---|
-| `enroll` | 使用一次性令牌换取节点证书。 |
+| `enroll` | 使用一次性令牌换取节点证书，或离线注册第一个订阅主机。 |
+| `set-panel` | 保存新的面板连接地址，供 Agent 切换使用。 |
 | `install` | 写入加固配置的 systemd 单元，并启用和启动它。 |
 | `run` | 在前台运行 Agent。 |
 | `cleanup-net` | 移除 Agent 的隧道接口、WARP 路由和 nftables 表。 |
@@ -272,6 +288,9 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 | `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | 状态目录。 |
 | `--force` | none | off | 替换现有身份。 |
 | `--resume-key` | none | off | 在状态目录中将新私钥保存在 `enroll-pending.pem`，直到注册成功；下次尝试时继续使用该密钥，以便重试中断的注册：10 分钟内使用相同令牌和密钥重复请求时，面板会返回相同证书。与 `--force` 一起使用时会生成新密钥。 |
+| `--offline-csr` | none | off | 离线注册第 1 步：在 `enroll-pending.pem` 中保存新密钥（或复用已有的），并以一行 `csr=<base64 DER>` 输出其证书请求。 |
+| `--offline-finish` | none | off | 离线注册第 2 步：从 stdin 读取一行 JSON，包含链接地址和订阅主机角色（`{"link_url":…,"sub_host":{"names":[…],"path":…,"site_name":…}}`，不放在命令行中），然后读取节点证书和面板 CA 证书（PEM），与待用密钥一起保存。角色带站点名称时输出站点证书的 `pin=<sha256>`。 |
+| `--node-id` | none | none | 与 `--offline-finish` 一起使用：面板分配的节点 id。 |
 
 必须提供 `--panel`、`--sni`、`--ca-sha256` 和令牌（`--token`、`MISTGATE_ENROLL_TOKEN` 或 `--token-stdin`）；缺少任一项时，`enroll` 都会以 2 退出。令牌只能使用一次，并且必须在面板显示的有效期内使用（默认一小时）。面板的 [SSH 安装](../getting-started/ssh-install.md)会通过 SSH 使用相同的 `enroll` 和 `install` 命令，令牌通过 stdin 传入，并带有 `--token-stdin --resume-key`。成功后会显示节点 ID 和下一步：
 
@@ -279,6 +298,17 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node
 next: mistgate-node install   (or, in the foreground: mistgate-node run)
 ```
+
+离线注册用于面板的第一个订阅主机：它此时还连不到 NAT 后的面板。面板的 SSH 安装会自己执行这两步：读取 `--offline-csr` 的请求、签发证书，并通过 stdin 把角色行和证书交给 `--offline-finish`；它只读回 `pin=` 一行。之后该节点是只通过链接连接、带订阅主机角色的 agent。`--offline-csr` 与 `--offline-finish` 互斥，也不能与 `--token`、`--token-stdin`、`--panel`、`--sni`、`--link-url` 同用；`--offline-finish` 需要 `--node-id` 和 `--ca-sha256`。CA 必须具有 `--ca-sha256` 指纹，证书必须属于待用密钥。带 `--force` 时两步都会替换已有身份。见[订阅主机](../guide/subscription-host.md)。
+
+### mistgate-node set-panel
+
+| 标志 | 环境变量 | 默认值 | 含义 |
+|---|---|---|---|
+| `--link-url` | none | none | 面板的新连接地址，`wss://host/<secret-prefix>/`。必填。 |
+| `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | 状态目录。 |
+
+把该地址保存到 `agent.json`，作为下次尝试的地址；节点必须已注册。重启后，Agent 会轮流尝试新地址和当前地址，一旦通过新地址建立会话就保留它。Agent 会记住之前的地址，新地址不再响应时就回到之前的地址；新地址正常工作满 7 天后，Agent 会忘掉之前的地址。面板可以把同样的更改发送给各 Agent（`panel_link_url`）；目前还没有任何功能发送它。此命令用于已无法连到面板的节点。命令输出 `Saved. Restart the agent: systemctl restart mistgate-node`。
 
 ### mistgate-node install
 

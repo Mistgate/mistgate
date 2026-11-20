@@ -451,13 +451,46 @@ func TestUpdateLinkSlowRange200PrefixKeepsIdleTimerAlive(t *testing.T) {
 	}
 }
 
-func TestUpdateLinkFetchRequiresToken(t *testing.T) {
+// Without the command's token and before a session gave one, there is nothing to ask with: retry later, no request.
+func TestUpdateLinkFetchWithoutTokenRetriesLater(t *testing.T) {
 	var calls atomic.Int32
 	a, _, _ := newLinkUpdateAgent(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		calls.Add(1)
 	}))
 	_, err := (updSource{a: a}).Fetch(context.Background(), binName, 0, io.Discard)
-	if !errors.Is(err, update.ErrPermanent) || calls.Load() != 0 {
-		t.Fatalf("Fetch error=%v requests=%d, want permanent error without a request", err, calls.Load())
+	var failure *update.FetchFailure
+	if !errors.As(err, &failure) || failure.Code != "busy" || calls.Load() != 0 {
+		t.Fatalf("Fetch error=%v requests=%d, want a busy (retry-later) failure without a request", err, calls.Load())
+	}
+}
+
+// With the session's fetch token (a VPS panel), a file comes from the /fetch/ route, resumed by Range.
+func TestLinkFetchUsesTheSessionToken(t *testing.T) {
+	const sessionToken = "session-fetch-token-that-must-not-be-logged"
+	content := []byte("network table bytes")
+	requests := make(chan *http.Request, 2)
+	a, _, _ := newLinkUpdateAgent(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests <- r.Clone(r.Context())
+		if r.Header.Get("Range") == "bytes=8-" {
+			w.Header().Set("Content-Range", "bytes 8-18/19")
+			w.WriteHeader(http.StatusPartialContent)
+			_, _ = w.Write(content[8:])
+			return
+		}
+		_, _ = w.Write(content)
+	}))
+	token := sessionToken
+	a.fetchToken.Store(&token)
+	var got bytes.Buffer
+	if _, err := (updSource{a: a}).Fetch(context.Background(), networksBundleName, 0, &got); err != nil || !bytes.Equal(got.Bytes(), content) {
+		t.Fatalf("Fetch = %q, %v", got.String(), err)
+	}
+	r := <-requests
+	if r.URL.Path != "/"+strings.Repeat("p", 24)+"/fetch/nod_alice/"+networksBundleName || r.Header.Get("Authorization") != "Bearer "+sessionToken {
+		t.Fatalf("request %s with %q", r.URL.Path, r.Header.Get("Authorization"))
+	}
+	got.Reset()
+	if _, err := (updSource{a: a}).Fetch(context.Background(), networksBundleName, 8, &got); err != nil || got.String() != string(content[8:]) {
+		t.Fatalf("resumed Fetch = %q, %v", got.String(), err)
 	}
 }

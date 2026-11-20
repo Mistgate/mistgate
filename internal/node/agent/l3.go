@@ -178,7 +178,8 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
-	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck, capDecoy, capLinkCounts, capLinks2, capLinks3, capJournal, capProbe, capSniScan, capSpeed, capSpeedChannel, capDebug}
+	caps := []string{capDoctor, capBandwidth, capClientIPv6, capWSLink, capTCPCheck, capDecoy, capLinkCounts, capLinks2, capLinks3, capJournal, capProbe, capSniScan, capSpeed, capSpeedChannel, capDebug,
+		plugin.CapPanelLink, plugin.CapLinkFetch}
 	if a.canOSUpdate() {
 		caps = append(caps, osupdate.Capability)
 		if a.cfg.OSUpdate != nil {
@@ -205,6 +206,9 @@ func (a *Agent) capabilities() []string {
 	}
 	if a.sharesTCP() {
 		caps = append(caps, capTCPShare)
+		if a.cfg.Certs != nil { // the host's own site needs the certificate source
+			caps = append(caps, plugin.CapSubHost)
+		}
 	}
 	if a.appliesUserRateLimit() {
 		caps = append(caps, capUserRateLimit)
@@ -240,6 +244,9 @@ func (a *Agent) capabilities() []string {
 		caps = append(caps, capAwgPrepare)
 	}
 	updateCaps := a.upd.Capabilities()
+	// A link-only agent updates over the link: the edge sends a token with the command (update-link/1); a VPS panel that
+	// serves the link fetch route reads link-fetch/1 as update/1 and nets/1 (fleet.helloInfo). It lists neither itself, so an
+	// older VPS panel never sends it what it could not fetch.
 	if a.linkOnly() {
 		if slices.Contains(updateCaps, update.CapUpdate) {
 			caps = append(caps, capUpdateLink)

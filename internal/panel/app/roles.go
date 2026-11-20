@@ -214,7 +214,7 @@ func (k *core) baseHTTP() httpserver.Config {
 		TrustedOrigins: k.in.RPOrigins,
 		Log:            k.log,
 		// Settings -> Domains shows the owner both addresses, read-only.
-		AdminURL: k.in.AdminURL(), SubscriptionBase: k.subBase,
+		AdminURL: k.in.AdminURL(), SubscriptionBase: k.subBase, SubscriptionBaseNow: k.subBaseNow,
 	}
 }
 
@@ -267,6 +267,7 @@ func (k *core) adminConfig(parts subParts, prov *nodeprovision.Service, bkp *bac
 	k.addOps(&cfg)
 	k.addTasks(&cfg)
 	k.addTrustTunnel(&cfg)
+	k.addSubHost(&cfg)
 	k.addDecoySite(&cfg)
 	k.addWarpReach(&cfg)
 	return cfg
@@ -306,6 +307,7 @@ func (k *core) newProvision() (*nodeprovision.Service, error) {
 		StepUp: k.authSvc.RequireStepUp, Nodes: k.fl, Binaries: binaries, SSH: c.SSHClient,
 		PanelAddr: c.PanelAddr, LinkURL: provisionLinkURL(k.edge, k.in), AgentSNI: k.in.AgentSNI, Log: k.log,
 	}
+	k.subHostProvision(&provCfg)
 	if c.ProvisionKick != nil {
 		provCfg.Kick = func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

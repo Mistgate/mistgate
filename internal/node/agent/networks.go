@@ -55,7 +55,7 @@ func (a *Agent) configureNetworks(st *pb.NodeSettings) {
 		st = &pb.NodeSettings{}
 	}
 	target := &networkTableTarget{mode: st.GetNetworks(), name: st.GetNetworksDbName(), sha: st.GetNetworksDbSha256()}
-	if target.mode > 2 || a.linkOnly() {
+	if target.mode > 2 {
 		target.mode = 0
 	}
 	var cancel context.CancelFunc
@@ -64,7 +64,7 @@ func (a *Agent) configureNetworks(st *pb.NodeSettings) {
 	changed := !equalNetworkTableTarget(previous, target)
 	a.networkTarget.Store(target)
 	a.nets.SetMode(target.mode)
-	if (a.linkOnly() || target.mode == 0 || target.sha == "") && a.nets.LoadedSHA() != "" {
+	if (target.mode == 0 || target.sha == "") && a.nets.LoadedSHA() != "" {
 		a.nets.ClearTable()
 	}
 	if changed {
@@ -85,7 +85,7 @@ func (a *Agent) configureNetworks(st *pb.NodeSettings) {
 
 // loadCachedNetworkTable accepts only the exact file digest in NodeSettings. A malformed matching file is permanent.
 func (a *Agent) loadCachedNetworkTable(target *networkTableTarget) (bool, error) {
-	if a == nil || a.nets == nil || target == nil || target.sha == "" || a.linkOnly() {
+	if a == nil || a.nets == nil || target == nil || target.sha == "" {
 		return false, nil
 	}
 	path := filepath.Join(a.cfg.StateDir, networksFileName)
@@ -107,7 +107,8 @@ func (a *Agent) loadCachedNetworkTable(target *networkTableTarget) (bool, error)
 	return a.installNetworkTable(target, db), nil
 }
 
-// networkTableLoop fetches a missing or changed table over the existing mTLS FetchUpdate route and retries failures.
+// networkTableLoop fetches a missing or changed table from the panel (FetchUpdate over mTLS, or the link's fetch route for a
+// link-only agent: updSource.fetchPanelSource) and retries failures.
 func (a *Agent) networkTableLoop(ctx context.Context) {
 	var activeTarget, failedTarget *networkTableTarget
 	minDelay := a.backoffMin
@@ -133,7 +134,7 @@ waitForTarget:
 			delay = minDelay
 			failedTarget = nil
 		}
-		if target == nil || target.mode == 0 || target.sha == "" || a.linkOnly() {
+		if target == nil || target.mode == 0 || target.sha == "" {
 			continue
 		}
 		if failedTarget != nil && equalNetworkTableTarget(failedTarget, target) {

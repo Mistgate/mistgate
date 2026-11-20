@@ -1,0 +1,229 @@
+//go:build !js
+
+package subhost
+
+import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"net"
+	"net/netip"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
+
+	subhostv1 "github.com/mistgate/mistgate/gen/mistgate/subhost/v1"
+	"github.com/mistgate/mistgate/internal/node/bridge"
+	"github.com/mistgate/mistgate/internal/plugin"
+)
+
+// The panel is the exit of each host's bridge: it calls the host's site on 443 with its short fleet certificate
+// (Fleet.PanelIdentity) and keeps request pairs open there; the host hands each subscription connection to a pair, and the
+// pair's bytes come out here, on an in-process listener (PublicListener) that the public server serves with the subdomain's
+// certificate (PublicTLS), issued by Let's Encrypt through the host (TLS-ALPN-01).
+
+// Relay ids of the two targets the host names (internal/node/subhost): both reach the same listener.
+const (
+	relaySub  = "sub"
+	relayLink = "link"
+)
+
+// dialPool is how many TLS connections the panel keeps to a host: the most the bridge allows.
+const dialPool = bridge.MaxPoolSize
+
+// tunnel is the panel's side of the bridges to its hosts.
+type tunnel struct {
+	dialer *bridge.Dialer
+	pub    *chanListener
+	acme   *autocert.Manager
+	tlsCfg *tls.Config
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	mu       sync.Mutex
+	certSeen bool // the subdomain's certificate was handed to a visitor (not only an ACME challenge)
+}
+
+func (s *Service) newTunnel() {
+	ctx, cancel := context.WithCancel(context.Background())
+	t := &tunnel{pub: newChanListener(), ctx: ctx, cancel: cancel}
+	t.dialer = bridge.NewDialer(func() bridge.DialIdentity {
+		der, key, err := s.cfg.Fleet.PanelIdentity(s.cfg.Now())
+		if err != nil {
+			return bridge.DialIdentity{}
+		}
+		return bridge.DialIdentity{NodeID: bridge.PanelPeerID, CertificateDER: der, PrivateKey: key, Panel: true}
+	})
+	t.dialer.SetLocalDial(t.localDial)
+	t.acme = &autocert.Manager{Prompt: autocert.AcceptTOS, HostPolicy: s.acmeHostPolicy}
+	if s.cfg.ACMEDir != "" {
+		t.acme.Cache = autocert.DirCache(s.cfg.ACMEDir)
+	}
+	if s.cfg.ACMEClient != nil {
+		t.acme.Client = s.cfg.ACMEClient
+	}
+	get := t.acme.GetCertificate
+	if s.cfg.Certificate != nil {
+		get = s.cfg.Certificate
+	}
+	t.tlsCfg = &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"h2", "http/1.1", acme.ALPNProto},
+		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			cert, err := get(hello)
+			if err == nil && !(len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto) {
+				t.mu.Lock()
+				t.certSeen = true
+				t.mu.Unlock()
+			}
+			return cert, err
+		}}
+	s.tun = t
+}
+
+// acmeHostPolicy lets autocert ask for the subdomain only while a host serves it.
+func (s *Service) acmeHostPolicy(_ context.Context, host string) error {
+	st := s.current()
+	if st.State == stateOff || !strings.EqualFold(strings.TrimSuffix(host, "."), st.Domain) {
+		return errors.New("not the subscription host's domain")
+	}
+	return nil
+}
+
+// PublicListener yields the connections of the subdomain the hosts carry: the public server serves them with PublicTLS.
+func (s *Service) PublicListener() net.Listener { return s.tun.pub }
+
+// PublicTLS is the TLS of the subdomain: its Let's Encrypt certificate, and the TLS-ALPN-01 answers for it.
+func (s *Service) PublicTLS() *tls.Config { return s.tun.tlsCfg }
+
+// Close stops dialling the hosts and closes the listener.
+func (s *Service) Close() {
+	s.tun.cancel()
+	s.tun.dialer.Close()
+	_ = s.tun.pub.Close()
+}
+
+// localDial is the exit's target: a pipe whose other end the public server accepts, as from the person's address.
+func (t *tunnel) localDial(ctx context.Context, target plugin.BridgeTarget, client netip.AddrPort) (net.Conn, error) {
+	mine, theirs := net.Pipe()
+	var from net.Addr = hostAddr{}
+	if client.IsValid() {
+		from = net.TCPAddrFromAddrPort(client)
+	}
+	if !t.pub.push(fromConn{Conn: theirs, from: from}, ctx) {
+		_ = mine.Close()
+		_ = theirs.Close()
+		return nil, net.ErrClosed
+	}
+	return mine, nil
+}
+
+// syncDials makes the dialer call exactly the hosts of st. Call with mu held (from applyRouting) or from Run.
+func (s *Service) syncDials(st state) {
+	var specs []bridge.DialSpec
+	add := func(nodeID, siteName string) {
+		if nodeID == "" {
+			return
+		}
+		host, sni, pin, _, ok := s.cfg.Fleet.SubHostTarget(s.tun.ctx, nodeID, siteName, st.BootstrapPin)
+		if !ok {
+			return
+		}
+		port := s.cfg.HostPort
+		if port == 0 {
+			port = plugin.SubHostPort
+		}
+		specs = append(specs, bridge.DialSpec{Dial: plugin.BridgeDial{EntryNodeID: nodeID, Host: host, Port: port, SNI: sni, PinSHA256: pin,
+			Path: st.Path, Pool: dialPool, Targets: []plugin.BridgeTarget{
+				{RelayID: relaySub, Network: bridge.LocalTargetNetwork}, {RelayID: relayLink, Network: bridge.LocalTargetNetwork}}}})
+	}
+	if st.State != stateOff && st.Path != "" {
+		add(st.Node, st.SiteName)
+		if st.State == stateMoving {
+			add(st.Next, st.NextSiteName)
+		}
+	}
+	s.tun.dialer.Sync(s.tun.ctx, specs)
+}
+
+// addLive adds what the panel sees of its hosts now to h: its connections to them.
+func (s *Service) addLive(_ context.Context, st state, h *subhostv1.SubscriptionHost) {
+	byNode := map[string]bridge.DialState{}
+	for _, d := range s.tun.dialer.States() {
+		byNode[d.PeerNodeID] = d
+	}
+	for _, id := range []string{st.Node, st.Next} {
+		if id == "" {
+			continue
+		}
+		d := byNode[id]
+		b := &subhostv1.SubscriptionHostBridge{NodeId: id, Up: d.Conns > 0, RttMs: uint32(d.RTT / time.Millisecond), DownReason: d.Error}
+		if !d.Since.IsZero() {
+			b.SinceUnix = d.Since.Unix()
+		}
+		if d.Conns > 0 {
+			b.DownReason = ""
+		}
+		if b.DownReason == "" && !b.Up {
+			b.DownReason = "unreachable"
+		}
+		h.Bridges = append(h.Bridges, b)
+	}
+	sort.Slice(h.Bridges, func(i, j int) bool { return h.Bridges[i].NodeId < h.Bridges[j].NodeId })
+}
+
+// chanListener is a net.Listener fed by the bridge.
+type chanListener struct {
+	ch   chan net.Conn
+	done chan struct{}
+	once sync.Once
+}
+
+func newChanListener() *chanListener {
+	return &chanListener{ch: make(chan net.Conn), done: make(chan struct{})}
+}
+
+// push hands c to Accept; false once the listener is closed or ctx ends first.
+func (l *chanListener) push(c net.Conn, ctx context.Context) bool {
+	select {
+	case <-l.done:
+		return false
+	case <-ctx.Done():
+		return false
+	case l.ch <- c:
+		return true
+	}
+}
+
+func (l *chanListener) Accept() (net.Conn, error) {
+	select {
+	case <-l.done:
+		return nil, net.ErrClosed
+	case c := <-l.ch:
+		return c, nil
+	}
+}
+
+func (l *chanListener) Close() error {
+	l.once.Do(func() { close(l.done) })
+	return nil
+}
+
+func (l *chanListener) Addr() net.Addr { return hostAddr{} }
+
+// hostAddr is the address of a connection whose person the host did not name (the host's own link).
+type hostAddr struct{}
+
+func (hostAddr) Network() string { return "tcp" }
+func (hostAddr) String() string  { return "0.0.0.0:0" }
+
+// fromConn is a connection whose RemoteAddr is the person's, as the host told the panel.
+type fromConn struct {
+	net.Conn
+	from net.Addr
+}
+
+func (c fromConn) RemoteAddr() net.Addr { return c.from }

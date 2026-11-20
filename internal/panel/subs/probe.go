@@ -45,7 +45,7 @@ func (h *handler) serveProbe(w http.ResponseWriter, r *http.Request, token, clie
 	if !h.confirmCachedToken(ctx, w, r, token, client) {
 		return
 	}
-	if err := h.cop.Check(r); err != nil {
+	if err := h.checkOrigin(r); err != nil {
 		jsonError(w, http.StatusForbidden, "cross_origin", "")
 		return
 	}

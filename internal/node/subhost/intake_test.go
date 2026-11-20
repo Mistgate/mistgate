@@ -1,0 +1,219 @@
+package subhost
+
+import (
+	"context"
+	"net"
+	"net/netip"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/mistgate/mistgate/internal/node/bridge"
+)
+
+// fakeEntry holds every attached connection until release is closed.
+type fakeEntry struct {
+	connected atomic.Bool
+	attachErr error
+	mu        sync.Mutex
+	relays    []string
+	addrs     []netip.AddrPort
+	release   chan struct{}
+}
+
+func (e *fakeEntry) Connected(string) bool { return e.connected.Load() }
+
+func (e *fakeEntry) Attach(ctx context.Context, exitID string, c bridge.Client) error {
+	if e.attachErr != nil {
+		return e.attachErr
+	}
+	e.mu.Lock()
+	e.relays, e.addrs = append(e.relays, c.RelayID), append(e.addrs, c.Addr)
+	e.mu.Unlock()
+	select {
+	case <-e.release:
+	case <-ctx.Done():
+	}
+	_ = c.Conn.Close()
+	return nil
+}
+
+func (e *fakeEntry) DialExit(context.Context, string, string, time.Duration) (net.Conn, error) {
+	a, b := net.Pipe()
+	go func() { <-e.release; _ = b.Close() }()
+	return a, nil
+}
+
+type fakeFront struct {
+	diverted atomic.Int32
+	mu       sync.Mutex
+	down     []bool
+}
+
+func (f *fakeFront) Divert(conn net.Conn) bool { f.diverted.Add(1); _ = conn.Close(); return true }
+func (f *fakeFront) SetDown(_ string, down bool) {
+	f.mu.Lock()
+	f.down = append(f.down, down)
+	f.mu.Unlock()
+}
+
+// fromConn is a person's connection from addr.
+type fromConn struct {
+	net.Conn
+	addr net.Addr
+}
+
+func (c fromConn) RemoteAddr() net.Addr { return c.addr }
+
+func person(ip string, port int) net.Conn {
+	a, _ := net.Pipe()
+	return fromConn{Conn: a, addr: &net.TCPAddr{IP: net.ParseIP(ip), Port: port}}
+}
+
+func newTestIntake(t *testing.T) (*Intake, *fakeEntry, *fakeFront) {
+	t.Helper()
+	e := &fakeEntry{release: make(chan struct{})}
+	e.connected.Store(true)
+	f := &fakeFront{}
+	in := New(e, f, "~sub-host", nil)
+	t.Cleanup(func() {
+		select {
+		case <-e.release:
+		default:
+			close(e.release)
+		}
+		in.Close()
+	})
+	return in, e, f
+}
+
+func eventually(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
+		if cond() {
+			return
+		}
+	}
+	t.Fatalf("timed out: %s", what)
+}
+
+func TestIntakeLimitsByClassAndSource(t *testing.T) {
+	in, e, f := newTestIntake(t)
+	in.SetSources([]netip.Prefix{netip.MustParsePrefix("203.0.113.0/24")})
+	in.SetLimits(Limits{MaxClients: 6, LinkReserve: 2, SubPerSource: 2, LinkPerSource: 1})
+	start := func(c net.Conn) { in.wg.Add(1); go func() { defer in.wg.Done(); in.handle(c) }() }
+
+	// one IPv6 /64 is one source: the third connection from it goes to the site
+	start(person("2001:db8:1::1", 1))
+	start(person("2001:db8:1::2", 2))
+	eventually(t, "two subscriptions", func() bool { return in.Stats().ClientsSub == 2 })
+	start(person("2001:db8:1::3", 3))
+	eventually(t, "a per-source divert", func() bool { return f.diverted.Load() == 1 && in.Stats().RefusedPerSource == 1 })
+
+	// subscriptions stop at MaxClients-LinkReserve; the reserve stays for links
+	start(person("198.51.100.1", 4))
+	start(person("198.51.100.2", 5))
+	eventually(t, "four subscriptions", func() bool { return in.Stats().ClientsSub == 4 })
+	start(person("198.51.100.3", 6))
+	eventually(t, "the subscription class is full", func() bool { return f.diverted.Load() == 2 })
+	start(person("203.0.113.5", 7))
+	start(person("203.0.113.6", 8))
+	eventually(t, "two links in the reserve", func() bool { return in.Stats().ClientsLink == 2 })
+	start(person("203.0.113.6", 9)) // over the total, and over the link source's one
+	eventually(t, "full", func() bool { return f.diverted.Load() == 3 })
+
+	e.mu.Lock()
+	var links int
+	for i, r := range e.relays {
+		if r == RelayLink {
+			links++
+		}
+		if !e.addrs[i].IsValid() {
+			t.Error("the person's address was not passed")
+		}
+	}
+	e.mu.Unlock()
+	if links != 2 {
+		t.Fatalf("relays %v", e.relays)
+	}
+	close(e.release)
+	eventually(t, "everyone left", func() bool { s := in.Stats(); return s.ClientsSub == 0 && s.ClientsLink == 0 })
+}
+
+// Without the panel the route is down (the front sends the names to the site at once), and a connection that came anyway, or
+// that the entry cannot attach, goes to the site.
+func TestIntakeWithoutThePanel(t *testing.T) {
+	in, e, f := newTestIntake(t)
+	e.connected.Store(false)
+	ln := newPipeListener()
+	go in.Serve(ln)
+	eventually(t, "the route is down", func() bool {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		return len(f.down) == 1 && f.down[0]
+	})
+	ln.ch <- person("198.51.100.9", 1)
+	eventually(t, "diverted", func() bool { return f.diverted.Load() == 1 })
+
+	e.connected.Store(true)
+	eventually(t, "the route is up again", func() bool {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		return len(f.down) == 2 && !f.down[1]
+	})
+	e.attachErr = bridge.ErrNoPair
+	ln.ch <- person("198.51.100.9", 2)
+	eventually(t, "no pair: diverted", func() bool { return f.diverted.Load() == 2 })
+	if s := in.Stats(); s.ClientsSub != 0 || s.RefusedPerSource != 0 || s.Diverted != 2 {
+		t.Fatalf("stats %+v", s)
+	}
+}
+
+// The host's own link counts as a link and is released when it is closed; closing the intake cuts what it carries.
+func TestIntakeDialLinkAndClose(t *testing.T) {
+	in, _, _ := newTestIntake(t)
+	conn, err := in.DialLink(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Stats().ClientsLink != 1 {
+		t.Fatal("the host's own link is not counted")
+	}
+	_ = conn.Close()
+	_ = conn.Close()
+	if in.Stats().ClientsLink != 0 {
+		t.Fatal("a closed link is still counted")
+	}
+	in.wg.Add(1)
+	go func() { defer in.wg.Done(); in.handle(person("198.51.100.1", 1)) }()
+	eventually(t, "carried", func() bool { return in.Stats().ClientsSub == 1 })
+	done := make(chan struct{})
+	go func() { in.Close(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close did not cut the streams")
+	}
+}
+
+type pipeListener struct {
+	ch   chan net.Conn
+	done chan struct{}
+	once sync.Once
+}
+
+func newPipeListener() *pipeListener {
+	return &pipeListener{ch: make(chan net.Conn), done: make(chan struct{})}
+}
+
+func (l *pipeListener) Accept() (net.Conn, error) {
+	select {
+	case c := <-l.ch:
+		return c, nil
+	case <-l.done:
+		return nil, net.ErrClosed
+	}
+}
+func (l *pipeListener) Close() error   { l.once.Do(func() { close(l.done) }); return nil }
+func (l *pipeListener) Addr() net.Addr { return &net.TCPAddr{} }

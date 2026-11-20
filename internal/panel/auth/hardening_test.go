@@ -414,9 +414,9 @@ func TestEveryProcedureHasAPolicy(t *testing.T) {
 	registered := map[string]bool{}
 	// mistgate.probe.v1 (ProbeService), mistgate.ops.v1 (OpsService, policy_ops.go), mistgate.ownprobe.v1 (OwnProbeService,
 	// policy_ownprobe.go), mistgate.tasks.v1 (TasksService, policy_tasks.go), mistgate.trusttunnel.v1 (TrustTunnelService,
-	// policy_trusttunnel.go) mistgate.decoysite.v1 (DecoySiteService, policy_decoysite.go) and mistgate.warpreach.v1 (WarpReachService, policy_warpreach.go) are the VPS edition's own service packages, kept out of the Cloudflare Workers; their procedures
+	// policy_trusttunnel.go) mistgate.decoysite.v1 (DecoySiteService, policy_decoysite.go) mistgate.warpreach.v1 (WarpReachService, policy_warpreach.go) and mistgate.subhost.v1 (SubscriptionHostService, policy_subhost.go) are the VPS edition's own service packages, kept out of the Cloudflare Workers; their procedures
 	// need a level too.
-	for _, pkg := range []protoreflect.FullName{"mistgate.admin.v1", "mistgate.probe.v1", "mistgate.ops.v1", "mistgate.tasks.v1", "mistgate.ownprobe.v1", "mistgate.trusttunnel.v1", "mistgate.decoysite.v1", "mistgate.warpreach.v1"} {
+	for _, pkg := range []protoreflect.FullName{"mistgate.admin.v1", "mistgate.probe.v1", "mistgate.ops.v1", "mistgate.tasks.v1", "mistgate.ownprobe.v1", "mistgate.trusttunnel.v1", "mistgate.decoysite.v1", "mistgate.warpreach.v1", "mistgate.subhost.v1"} {
 		protoregistry.GlobalFiles.RangeFilesByPackage(pkg, func(fd protoreflect.FileDescriptor) bool {
 			for i := 0; i < fd.Services().Len(); i++ {
 				svc := fd.Services().Get(i)

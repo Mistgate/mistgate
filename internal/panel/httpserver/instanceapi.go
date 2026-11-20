@@ -26,12 +26,16 @@ type instanceAPI struct {
 	st                *store.Store
 	log               *slog.Logger
 	adminURL, subBase string // shown to the owner only
+	subBaseNow        func() string
 }
 
 // forOwner adds the addresses an owner may see to an Instance.
 func (a *instanceAPI) forOwner(ctx context.Context, in *adminv1.Instance) *adminv1.Instance {
 	if admin, ok := auth.AdminFrom(ctx); ok && admin.Role == store.RoleOwner {
 		in.AdminUrl, in.SubscriptionBase = a.adminURL, a.subBase
+		if a.subBaseNow != nil {
+			in.SubscriptionBase = a.subBaseNow()
+		}
 	}
 	return in
 }

@@ -143,6 +143,15 @@ type Agent struct {
 	awgKmodAttempted atomic.Bool
 	decoySite        *decoy.Site
 
+	// A new panel link address (panellink.go). meta.Link, meta.NextLink, meta.PrevLink, meta.PrevMTLS, meta.LinkSince and
+	// cfg.LinkURL change at run time and are guarded by metaMu; the rest of meta is fixed at start.
+	metaMu        sync.Mutex
+	triedNext     bool             // connectLoop only: the last session tried meta.NextLink
+	currentFailed bool             // connectLoop only: the last session over the current link did not establish
+	switchPending atomic.Bool      // the current session ends to try a new panel link address
+	configLink    string           // cfg.LinkURL as configured, before agent.json's link replaced it: an mTLS agent's own link
+	linkClock     func() time.Time // the clock of meta.LinkSince; nil = a.now (tests move it days ahead)
+
 	engines            map[string]engine.Engine
 	protocols          []string // sorted keys of engines
 	closeOnce          sync.Once
@@ -171,6 +180,7 @@ type Agent struct {
 	clientIPv6DoctorPending atomic.Bool
 	clientIPv6DoctorRunning atomic.Bool
 	linkAdvertised          atomic.Bool                                             // the last HelloAck advertised the signed link
+	fetchToken              atomic.Pointer[string]                                  // the last HelloAck's fetch_token (LINK FETCH); a secret, never logged
 	linkRetryAt             atomic.Pointer[time.Time]                               // a link attempt failed before it was established: the link is not tried again before this
 	linkHTTPClient          *http.Client                                            // test seam; nil uses normal system-root TLS verification
 	updateRootCAs           *x509.CertPool                                          // test seam for loopback source-fetch servers
@@ -259,6 +269,9 @@ type Agent struct {
 	hostFirewallErr     string       // Last reported host-firewall sync failure; worker-owned.
 	relay               relayRuntime // relay forwards (relay.go); worker-owned
 	bridgeEntry         *nodebridge.Entry
+	hostEntry           *nodebridge.Entry // the subscription host's: the panel is its only exit (subhost.go)
+	hostMu              sync.Mutex        // sh
+	sh                  hostState
 	bridgeDialer        *nodebridge.Dialer
 	bridgeSite          *bridgeSiteServer
 	bridgeServeError    string
@@ -427,6 +440,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	if siteErr != nil {
 		site = decoy.BuiltinSite(cfg.StateDir)
 	}
+	configLink := cfg.LinkURL
 	if id.meta.Link != "" { // enrolled over the link: that address is the only way to the panel
 		if _, err := parseLinkBase(id.meta.Link); err != nil {
 			return nil, fmt.Errorf("%s link: %w", fileMeta, err)
@@ -444,7 +458,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	journal := newJournal()
 	dbg := newDebugState(cfg.Level, time.Now)
 	a := &Agent{
-		cfg: cfg, startedAt: time.Now(), ring: ring, journal: journal, debug: dbg, host: host, meta: id.meta,
+		cfg: cfg, configLink: configLink, startedAt: time.Now(), ring: ring, journal: journal, debug: dbg, host: host, meta: id.meta,
 		decoySite:     site,
 		nets:          nets.New(0),
 		networkWake:   make(chan struct{}, 1),
@@ -481,6 +495,8 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	a.id.Store(id)
 	a.bridgeEntry = nodebridge.NewEntry()
 	a.bridgeEntry.SetLogger(a.log.With("source", "bridge"))
+	a.hostEntry = nodebridge.NewEntry()
+	a.hostEntry.SetLogger(a.log.With("source", "sub-host"))
 	a.bridgeDialer = nodebridge.NewDialer(func() nodebridge.DialIdentity {
 		current := a.id.Load()
 		if current == nil || len(current.cert.Certificate) == 0 {
@@ -546,7 +562,12 @@ func (a *Agent) masquerade(inboundID string) http.Handler {
 	} else {
 		site = a.decoySite.Handler()
 	}
-	return a.bridgeEntry.Handler(site)
+	// The subscription host's entry first (the panel, subhost.go), then the bridge's: each passes anything not its own on.
+	site = a.bridgeEntry.Handler(site)
+	if a.hostEntry != nil {
+		site = a.hostEntry.Handler(site)
+	}
+	return site
 }
 
 // now is the agent clock corrected by the offset measured at Hello.
@@ -586,6 +607,12 @@ func (a *Agent) closeEngines() {
 		a.debug.shutdown()
 		if a.bridgeEntry != nil {
 			a.bridgeEntry.Close()
+		}
+		a.hostMu.Lock()
+		a.stopHost("")
+		a.hostMu.Unlock()
+		if a.hostEntry != nil {
+			a.hostEntry.Close()
 		}
 		if a.bridgeDialer != nil {
 			a.bridgeDialer.Close()
@@ -1034,7 +1061,7 @@ func (a *Agent) sessionViaBridge(ctx context.Context, entryNodeID string) error 
 	if a.linkOnly() {
 		return a.linkSessionVia(ctx, entryNodeID)
 	}
-	if a.cfg.LinkURL != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
+	if a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
 		err := a.linkSessionVia(ctx, entryNodeID)
 		if !errors.Is(err, errLinkNotEstablished) || ctx.Err() != nil {
 			return err
@@ -1053,7 +1080,7 @@ func (a *Agent) probeDirectPanel(ctx context.Context) error {
 	if a.probeFn != nil {
 		return a.probeFn(ctx)
 	}
-	if a.linkOnly() || (a.cfg.LinkURL != "" && a.linkAdvertised.Load() && a.linkWait() <= 0) {
+	if a.linkOnly() || (a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0) {
 		stream, cleanup, err := a.dialLink(ctx)
 		if err != nil {
 			return err
@@ -1154,10 +1181,11 @@ type agentTransport interface {
 }
 
 type connectAgentTransport struct {
-	ctx       context.Context
-	stream    *connect.BidiStreamForClient[pb.ConnectRequest, pb.ConnectResponse]
-	sendOnce  sync.Once
-	closeOnce sync.Once
+	ctx           context.Context
+	stream        *connect.BidiStreamForClient[pb.ConnectRequest, pb.ConnectResponse]
+	sendOnce      sync.Once
+	closeOnce     sync.Once
+	onEstablished func() // runs once the HelloAck arrived (the previous panel address is then current again: panellink.go)
 }
 
 func (s *connectAgentTransport) Context() context.Context              { return s.ctx }
@@ -1285,14 +1313,37 @@ func (s *session) writer() {
 
 // linkOnly reports an agent that enrolled over the link: it always dials the link (no mTLS, no hold period, whatever
 // the panel advertises).
-func (a *Agent) linkOnly() bool { return a.meta.Link != "" }
+func (a *Agent) linkOnly() bool {
+	a.metaMu.Lock()
+	defer a.metaMu.Unlock()
+	return a.meta.Link != ""
+}
 
+// session runs one panel session: every other turn a new link address the panel sent (panellink.go); after a turn on
+// which the current link did not answer, the previous panel address (panellink.go); else the link or mTLS as before.
 func (a *Agent) session(ctx context.Context) error {
-	if a.linkOnly() {
-		return a.linkSession(ctx)
+	if next := a.nextLink(); next != "" && !a.triedNext {
+		a.triedNext = true
+		err := a.nextLinkSession(ctx, next)
+		if a.linkURL() == next {
+			a.currentFailed = false // a new current link: the old one's failure says nothing about it
+		}
+		return err
 	}
-	if a.cfg.LinkURL != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
-		err := a.linkSession(ctx)
+	a.triedNext = false
+	if a.currentFailed {
+		a.currentFailed = false
+		if prev, mtls := a.prevAddress(); prev != "" || mtls {
+			return a.prevSession(ctx, prev, mtls)
+		}
+	}
+	if a.linkOnly() {
+		err := a.linkSession(ctx, a.dialCurrentLink)
+		a.currentFailed = errors.Is(err, errLinkNotEstablished) && ctx.Err() == nil
+		return err
+	}
+	if a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
+		err := a.linkSession(ctx, a.dialLink)
 		if errors.Is(err, errLinkNotEstablished) && ctx.Err() == nil {
 			hold := a.linkHoldFor
 			if hold == 0 {
@@ -1311,6 +1362,12 @@ func (a *Agent) mtlsSession(ctx context.Context) error {
 }
 
 func (a *Agent) mtlsSessionVia(ctx context.Context, viaNodeID string) error {
+	return a.mtlsSessionOn(ctx, viaNodeID, nil)
+}
+
+// mtlsSessionOn runs a mTLS session, through the panel bridge of entry node viaNodeID when set; onEstablished, when
+// set, runs once the HelloAck arrived.
+func (a *Agent) mtlsSessionOn(ctx context.Context, viaNodeID string, onEstablished func()) error {
 	st := a.settings.Load()
 	client := newHTTPClient(a.mtlsConfig(), dialTimeout(st), &http.HTTP2Config{
 		SendPingTimeout: secs(st.KeepaliveIntervalS, 20*time.Second),
@@ -1328,16 +1385,24 @@ func (a *Agent) mtlsSessionVia(ctx context.Context, viaNodeID string) error {
 	sctx, cancel := context.WithCancel(ctx)
 	stream := agentv1connect.NewAgentServiceClient(client, "https://"+a.meta.Panel,
 		connect.WithReadMaxBytes(64<<20)).Connect(sctx)
-	return a.runSession(cancel, &connectAgentTransport{ctx: sctx, stream: stream}, viaNodeID)
+	return a.runSession(cancel, &connectAgentTransport{ctx: sctx, stream: stream, onEstablished: onEstablished}, viaNodeID)
 }
 
-func (a *Agent) linkSession(ctx context.Context) error {
-	return a.linkSessionVia(ctx, "")
+// linkSession runs a session over the signed WebSocket link that dial opens.
+func (a *Agent) linkSession(ctx context.Context, dial func(context.Context) (*websocketAgentTransport, func(), error)) error {
+	return a.linkSessionOn(ctx, dial, "")
 }
 
+// linkSessionVia runs a link session through the panel bridge of entry node viaNodeID.
 func (a *Agent) linkSessionVia(ctx context.Context, viaNodeID string) error {
+	return a.linkSessionOn(ctx, func(ctx context.Context) (*websocketAgentTransport, func(), error) {
+		return a.dialLinkVia(ctx, viaNodeID)
+	}, viaNodeID)
+}
+
+func (a *Agent) linkSessionOn(ctx context.Context, dial func(context.Context) (*websocketAgentTransport, func(), error), viaNodeID string) error {
 	sctx, cancel := context.WithCancel(ctx)
-	stream, cleanup, err := a.dialLinkVia(sctx, viaNodeID)
+	stream, cleanup, err := dial(sctx)
 	if err != nil {
 		cancel()
 		return fmt.Errorf("%w: %w", errLinkNotEstablished, err)
@@ -1400,14 +1465,29 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, via
 		return errors.New("first panel message is not HelloAck")
 	}
 	a.sessionEpoch.Add(1)
-	if link, ok := stream.(*websocketAgentTransport); ok {
-		link.established = true
+	switch t := stream.(type) {
+	case *websocketAgentTransport:
+		t.established = true
+		if t.onEstablished != nil {
+			t.onEstablished()
+		}
+	case *connectAgentTransport:
+		if t.onEstablished != nil {
+			t.onEstablished()
+		}
 	}
 	a.linkAdvertised.Store(ack.LinkSupported)
-	a.onHelloAck(ack)
+	token := ack.FetchToken
+	a.fetchToken.Store(&token)
+	if a.onHelloAck(ack) {
+		// The panel sent a new link address: the next session tries it. This one has not started, so nothing to flush.
+		cancel()
+		_ = stream.Close()
+		return errSwitchTransport
+	}
 	_, isConnect := stream.(*connectAgentTransport)
 	var holdFor time.Duration // > 0: this mTLS session stays although the panel offers the link, for this long
-	if isConnect && a.cfg.LinkURL != "" && ack.LinkSupported {
+	if isConnect && a.linkURL() != "" && ack.LinkSupported {
 		if holdFor = a.linkWait(); holdFor <= 0 {
 			// This mTLS stream only discovered link support. Close it so the reconnect loop can choose the link.
 			cancel()
@@ -1453,6 +1533,9 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, via
 		msg, err := stream.Receive()
 		if err != nil {
 			if holdExpired.Load() { // the end of the stream is endHeldSession's (its drain, then its cancel), not a real error
+				return errSwitchTransport
+			}
+			if a.switchPending.Swap(false) { // ended by endForNewLink (panellink.go) for a new link address
 				return errSwitchTransport
 			}
 			if errors.Is(err, io.EOF) {
@@ -1510,7 +1593,8 @@ func (a *Agent) panelBridgeDial(entryNodeID string) func(context.Context, string
 	}
 }
 
-func (a *Agent) onHelloAck(ack *pb.HelloAck) {
+// onHelloAck takes in what the HelloAck carries. reconnect: the panel sent a new link address to try now.
+func (a *Agent) onHelloAck(ack *pb.HelloAck) (reconnect bool) {
 	off := ack.ServerTimeUnix - time.Now().Unix()
 	if ack.ServerTimeUnix == 0 {
 		off = 0
@@ -1532,6 +1616,10 @@ func (a *Agent) onHelloAck(ack *pb.HelloAck) {
 		if changed {
 			a.clientIPv6DoctorPending.Store(true)
 		}
+		reconnect = a.applyPanelLink(ack.Settings)
+		if a.applySubHost(ack.Settings) {
+			a.subHostChanged()
+		}
 	}
 	a.out.ack(ack.AckedSeq)
 	a.upd.AckOutcome(a.helloOutcome.Swap(nil)) // the panel has this outcome now; stop repeating it
@@ -1543,6 +1631,7 @@ func (a *Agent) onHelloAck(ack *pb.HelloAck) {
 	} else {
 		a.skewed.Store(false)
 	}
+	return reconnect
 }
 
 func (a *Agent) dispatch(s *session, msg *pb.ConnectResponse) {

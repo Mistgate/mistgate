@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/sha256"
 	"crypto/subtle"
 	"crypto/tls"
@@ -18,14 +19,17 @@ const (
 	CertificateHeader = "X-Mistgate-Bridge-Certificate"
 	SignatureHeader   = "X-Mistgate-Bridge-Signature"
 	RelayIDHeader     = "X-Mistgate-Relay-ID"
-	ErrorHeader       = "X-Mistgate-Bridge-Error"
-	ProtocolHeader    = "X-Mistgate-Bridge-Version"
-	StreamHeader      = "X-Mistgate-Bridge-Stream"
-	StreamKindHeader  = "X-Mistgate-Bridge-Kind"
-	TargetHeader      = "X-Mistgate-Bridge-Target"
-	PairIDHeader      = "X-Mistgate-Bridge-Pair-ID"
-	StreamKindPanel   = "panel"
-	protocolVersion   = "2"
+	// ClientHeader carries the address of the person a subscription host hands to the panel (ServeConfig.PassClient); it is
+	// on the answers to a proven exit only.
+	ClientHeader     = "X-Mistgate-Bridge-Client"
+	ErrorHeader      = "X-Mistgate-Bridge-Error"
+	ProtocolHeader   = "X-Mistgate-Bridge-Version"
+	StreamHeader     = "X-Mistgate-Bridge-Stream"
+	StreamKindHeader = "X-Mistgate-Bridge-Kind"
+	TargetHeader     = "X-Mistgate-Bridge-Target"
+	PairIDHeader     = "X-Mistgate-Bridge-Pair-ID"
+	StreamKindPanel  = "panel"
+	protocolVersion  = "2"
 
 	maxCertificateDER = 12 << 10
 )
@@ -77,36 +81,74 @@ func proofFromHeaders(certText, sigText string) (Proof, error) {
 
 // VerifyProof checks fleet trust, the node id in the certificate, and the connection-bound signature.
 func VerifyProof(entryNodeID string, exporter []byte, proof Proof, roots *x509.CertPool, allowed map[string]struct{}, now time.Time) (string, error) {
-	if entryNodeID == "" || len(exporter) != 32 || roots == nil || len(proof.CertificateDER) == 0 || len(proof.CertificateDER) > maxCertificateDER || len(proof.Signature) != 64 {
-		return "", errBadProof
-	}
-	leaf, err := x509.ParseCertificate(proof.CertificateDER)
+	leaf, pub, err := verifyLeaf(entryNodeID, exporter, proof, roots, now)
 	if err != nil {
-		return "", errBadProof
+		return "", err
 	}
-	exitNodeID := nodeIDFromCertificate(leaf)
-	if !nodeIDPattern.MatchString(exitNodeID) {
-		return "", errBadProof
-	}
-	if _, ok := allowed[exitNodeID]; !ok {
-		return "", errBadProof
-	}
-	if _, err := leaf.Verify(x509.VerifyOptions{Roots: roots, CurrentTime: now, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}); err != nil {
-		return "", errBadProof
-	}
-	pub, ok := leaf.PublicKey.(*ecdsa.PublicKey)
-	if !ok || pub.Curve.Params().BitSize != 256 || !agentlink.Verify(pub, agentlink.BridgeDigest(entryNodeID, exporter), proof.Signature) {
+	exitNodeID := idFromCertificate(leaf, "agent")
+	if _, ok := allowed[exitNodeID]; !ok || !agentlink.Verify(pub, agentlink.BridgeDigest(entryNodeID, exporter), proof.Signature) {
 		return "", errBadProof
 	}
 	return exitNodeID, nil
 }
 
-func nodeIDFromCertificate(leaf *x509.Certificate) string {
+// VerifyPanelProof checks that the panel of this fleet calls subscription host hostNodeID over this connection: a certificate
+// of the fleet CA with the one URI spiffe://panel/<id> and ClientAuth, and a signature over the connection's exporter in the
+// panel's own domain (agentlink.PanelBridgeDigest). An agent's certificate or a bridge proof never passes.
+func VerifyPanelProof(hostNodeID string, exporter []byte, proof Proof, roots *x509.CertPool, now time.Time) error {
+	leaf, pub, err := verifyLeaf(hostNodeID, exporter, proof, roots, now)
+	if err != nil {
+		return err
+	}
+	if idFromCertificate(leaf, PanelURIHost) == "" || !agentlink.Verify(pub, agentlink.PanelBridgeDigest(hostNodeID, exporter), proof.Signature) {
+		return errBadProof
+	}
+	return nil
+}
+
+// MakePanelProof is MakeProof in the panel's own domain (VerifyPanelProof).
+func MakePanelProof(hostNodeID string, exporter []byte, certificateDER []byte, key *ecdsa.PrivateKey) (Proof, error) {
+	if hostNodeID == "" || len(exporter) != 32 || len(certificateDER) == 0 || len(certificateDER) > maxCertificateDER || key == nil || key.Curve != elliptic.P256() {
+		return Proof{}, errBadProof
+	}
+	sig, err := agentlink.Sign(key, agentlink.PanelBridgeDigest(hostNodeID, exporter))
+	if err != nil {
+		return Proof{}, err
+	}
+	return Proof{CertificateDER: append([]byte(nil), certificateDER...), Signature: sig}, nil
+}
+
+// verifyLeaf checks what every proof needs: a P-256 ClientAuth certificate of the fleet that is valid now.
+func verifyLeaf(entryNodeID string, exporter []byte, proof Proof, roots *x509.CertPool, now time.Time) (*x509.Certificate, *ecdsa.PublicKey, error) {
+	if entryNodeID == "" || len(exporter) != 32 || roots == nil || len(proof.CertificateDER) == 0 || len(proof.CertificateDER) > maxCertificateDER || len(proof.Signature) != 64 {
+		return nil, nil, errBadProof
+	}
+	leaf, err := x509.ParseCertificate(proof.CertificateDER)
+	if err != nil {
+		return nil, nil, errBadProof
+	}
+	if _, err := leaf.Verify(x509.VerifyOptions{Roots: roots, CurrentTime: now, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}); err != nil {
+		return nil, nil, errBadProof
+	}
+	pub, ok := leaf.PublicKey.(*ecdsa.PublicKey)
+	if !ok || pub.Curve.Params().BitSize != 256 {
+		return nil, nil, errBadProof
+	}
+	return leaf, pub, nil
+}
+
+// PanelURIHost is the host of the panel's URI, spiffe://panel/<id> (internal/panel/fleet/ca.go issues it).
+const PanelURIHost = "panel"
+
+func nodeIDFromCertificate(leaf *x509.Certificate) string { return idFromCertificate(leaf, "agent") }
+
+// idFromCertificate is the <id> of the certificate's one URI spiffe://<host>/<id>, "" when it has another shape.
+func idFromCertificate(leaf *x509.Certificate, host string) string {
 	if leaf == nil || len(leaf.URIs) != 1 {
 		return ""
 	}
 	u := leaf.URIs[0]
-	if u.Scheme != "spiffe" || u.Host != "agent" || u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
+	if u.Scheme != "spiffe" || u.Host != host || u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
 		!strings.HasPrefix(u.Path, "/") || strings.Contains(strings.TrimPrefix(u.Path, "/"), "/") {
 		return ""
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/decoysite/v1/decoysitev1connect"
 	"github.com/mistgate/mistgate/gen/mistgate/ops/v1/opsv1connect"
 	"github.com/mistgate/mistgate/gen/mistgate/probe/v1/probev1connect"
+	"github.com/mistgate/mistgate/gen/mistgate/subhost/v1/subhostv1connect"
 	"github.com/mistgate/mistgate/gen/mistgate/tasks/v1/tasksv1connect"
 )
 
@@ -72,6 +73,7 @@ type clients struct {
 	Ops          opsv1connect.OpsServiceClient
 	Tasks        tasksv1connect.TasksServiceClient
 	DecoySite    decoysitev1connect.DecoySiteServiceClient
+	SubHost      subhostv1connect.SubscriptionHostServiceClient
 }
 
 func newClients(h http.Handler, header http.Header, remote string) *clients {
@@ -100,6 +102,7 @@ func newClients(h http.Handler, header http.Header, remote string) *clients {
 		Ops:          opsv1connect.NewOpsServiceClient(hc, base),
 		Tasks:        tasksv1connect.NewTasksServiceClient(hc, base),
 		DecoySite:    decoysitev1connect.NewDecoySiteServiceClient(hc, base),
+		SubHost:      subhostv1connect.NewSubscriptionHostServiceClient(hc, base),
 	}
 }
 

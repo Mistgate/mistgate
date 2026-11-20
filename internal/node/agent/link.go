@@ -29,6 +29,8 @@ type websocketAgentTransport struct {
 	link        *agentlink.Link
 	closeOnce   sync.Once
 	established bool
+	// onEstablished runs once the HelloAck arrived over this link (a new link address is then committed: panellink.go).
+	onEstablished func()
 }
 
 func (s *websocketAgentTransport) Context() context.Context { return s.ctx }
@@ -75,8 +77,15 @@ func (a *Agent) dialLink(ctx context.Context) (*websocketAgentTransport, func(),
 	return a.dialLinkVia(ctx, "")
 }
 
+// dialLinkVia dials the panel's link at its current address, through the panel bridge of entry node viaNodeID when set.
 func (a *Agent) dialLinkVia(ctx context.Context, viaNodeID string) (*websocketAgentTransport, func(), error) {
-	base, err := parseLinkBase(a.cfg.LinkURL)
+	return a.dialLinkBase(ctx, a.linkURL(), viaNodeID)
+}
+
+// dialLinkBase dials the link of the panel at the link base address raw (wss://host/<secret-prefix>/), through the panel
+// bridge of entry node viaNodeID when set.
+func (a *Agent) dialLinkBase(ctx context.Context, raw, viaNodeID string) (*websocketAgentTransport, func(), error) {
+	base, err := parseLinkBase(raw)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -208,6 +217,15 @@ func (a *Agent) newLinkHTTPClient() (*http.Client, func()) {
 	dialContext := (&net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second}).DialContext
 	if a.directDialContext != nil {
 		dialContext = a.directDialContext
+	}
+	direct := dialContext
+	// A subscription host reaches the panel at its own subscription name through its bridge (subhost.go), never through its
+	// own public address: that fails behind 1:1 NAT, and would count against its own limits.
+	dialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if viaHost, ok := a.dialHostLink(addr); ok {
+			return viaHost(ctx, network, addr)
+		}
+		return direct(ctx, network, addr)
 	}
 	transport := &http.Transport{
 		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}},

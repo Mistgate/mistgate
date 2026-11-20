@@ -1,9 +1,12 @@
 package provision
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -129,9 +132,33 @@ type remotePreflight struct {
 
 var nodeIDPattern = regexp.MustCompile(`^nod_[a-z2-7]{26}$`)
 
+// requeue recovers the jobs a dead process left running (store.RequeueNodeProvisionJobs). A subscription host install that
+// fails there with job_interrupted keeps its role (residualSecret), so a retry is a host install again.
+func (s *Service) requeue(ctx context.Context) error {
+	running, err := s.st.RunningNodeProvisionJobs(ctx)
+	if err != nil {
+		return err
+	}
+	keep := map[string][]byte{}
+	for _, job := range running {
+		if residual := s.residualSecret(job); len(residual) > 0 {
+			keep[job.ID] = residual
+		}
+	}
+	if err := s.st.RequeueNodeProvisionJobs(ctx, s.cfg.Now()); err != nil {
+		return err
+	}
+	for id, residual := range keep {
+		if err := s.st.KeepInterruptedNodeProvisionSecret(ctx, id, residual); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Run recovers interrupted jobs and executes queued installations serially.
 func (s *Service) Run(ctx context.Context) error {
-	if err := s.st.RequeueNodeProvisionJobs(ctx, s.cfg.Now()); err != nil {
+	if err := s.requeue(ctx); err != nil {
 		return fmt.Errorf("provision: recover jobs: %w", err)
 	}
 	ticker := time.NewTicker(time.Second)
@@ -165,7 +192,7 @@ func (s *Service) Drain(ctx context.Context) (more, busy bool, err error) {
 	}
 	defer s.drainMu.Unlock()
 	if !s.recovered {
-		if err := s.st.RequeueNodeProvisionJobs(ctx, s.cfg.Now()); err != nil {
+		if err := s.requeue(ctx); err != nil {
 			return false, false, fmt.Errorf("provision: recover jobs: %w", err)
 		}
 		s.recovered = true
@@ -178,7 +205,7 @@ func (s *Service) Drain(ctx context.Context) (more, busy bool, err error) {
 		// forever (this process will not recover it again). The attempt counter still bounds how often that can happen.
 		recoverCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		if err := s.st.RequeueNodeProvisionJobs(recoverCtx, s.cfg.Now()); err != nil {
+		if err := s.requeue(recoverCtx); err != nil {
 			return false, false, fmt.Errorf("provision: recover jobs: %w", err)
 		}
 	}
@@ -239,6 +266,13 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		clear(secret.PrivateKey)
 		secret.EnrollmentToken = ""
 	}()
+	// The first subscription host (design/adr/0018-panel-behind-nat.md): it enrols inside this SSH session, and the role turns
+	// on with the install.
+	host := secret.SubHostDomain != ""
+	if host && (s.cfg.SubHost == nil || s.cfg.subHostLink(secret.SubHostDomain) == "" || secret.SubHostPath == "") {
+		s.failJob(ctx, job, "subscription_host_unavailable")
+		return
+	}
 	target, err := NewTarget(job.SSHHost, uint32(job.SSHPort))
 	if err != nil {
 		s.failJob(ctx, job, "ssh_target_invalid")
@@ -269,7 +303,12 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 	if err := s.setPhase(ctx, &job, "preflight", "checking_host", secret); err != nil {
 		return
 	}
-	remote, err := readPreflight(ctx, conn, s.cfg.panelAddress())
+	// A subscription host need not reach the panel: the probe of its own domain is informational.
+	probeAddr := s.cfg.panelAddress()
+	if host {
+		probeAddr = net.JoinHostPort(secret.SubHostDomain, "443")
+	}
+	remote, err := readPreflightFor(ctx, conn, probeAddr, host)
 	if err != nil {
 		if ctx.Err() == nil {
 			s.failJob(ctx, job, publicPreflightCode(err))
@@ -284,7 +323,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		s.failJob(ctx, job, "node_identity_unreadable")
 		return
 	}
-	arch, code := supportedPreflight(remote.facts)
+	arch, code := supportedPreflightFor(remote.facts, host)
 	if code != "" {
 		s.failJob(ctx, job, code)
 		return
@@ -425,19 +464,47 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		return
 	}
 
-	if !remote.facts.AlreadyEnrolled {
+	var sitePin string
+	if !remote.facts.AlreadyEnrolled || host { // a host enrols again: the role and its site's pin come with the enrolment
 		if err := s.setPhase(ctx, &job, "enrollment", "enrolling_node", secret); err != nil {
 			return
 		}
 		if !s.mayContinue(ctx, &job) {
 			return
 		}
-		if err := runEnrollment(ctx, conn, s.cfg, secret.CAFingerprint, secret.EnrollmentToken); err != nil {
+		if host {
+			sitePin, err = s.runSessionEnrollment(ctx, conn, job, secret, remote.facts.AlreadyEnrolled)
+		} else {
+			err = runEnrollment(ctx, conn, s.cfg, secret.CAFingerprint, secret.EnrollmentToken)
+		}
+		if err != nil {
 			if ctx.Err() == nil {
 				s.failJob(ctx, job, "node_enrollment_failed")
 			}
 			return
 		}
+	}
+	if host {
+		if !s.mayContinue(ctx, &job) {
+			return
+		}
+		if err := s.cfg.SubHost.ActivateInstalled(ctx, job.NodeID, secret.SubHostDomain, secret.SubHostSiteName, secret.SubHostPath, sitePin); err != nil {
+			if ctx.Err() == nil {
+				s.cfg.Log.Warn("subscription host not activated", "code", "sub_host_activation_failed", "job_id", job.ID, "err", err)
+				s.failJob(ctx, job, "subscription_host_activation_failed")
+			}
+			return
+		}
+		// From here a job that does not complete turns the role off again: the panel would otherwise dial a host whose agent
+		// may never run.
+		defer func() {
+			if job.Phase == "completed" {
+				return
+			}
+			if err := s.cfg.SubHost.DeactivateInstalled(context.WithoutCancel(ctx), job.NodeID); err != nil {
+				s.cfg.Log.Error("subscription host not deactivated after a failed install", "code", "sub_host_deactivation_failed", "job_id", job.ID, "err", err)
+			}
+		}()
 	}
 
 	if err := s.setPhase(ctx, &job, "install", "starting_agent", secret); err != nil {
@@ -459,13 +526,18 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		if ctx.Err() == nil {
 			if errors.Is(err, store.ErrNodeRetired) {
 				s.failJob(ctx, job, "node_retired")
+			} else if host {
+				// The host's agent reaches the panel only inside the bridge the panel dials: the fault is on that path.
+				s.failJob(ctx, job, "subscription_host_tunnel_down")
 			} else {
 				s.failJob(ctx, job, "node_not_connected")
 			}
 		}
 		return
 	}
-	s.finishJob(ctx, job, secret, panelFingerprint)
+	if s.finishJob(ctx, job, secret, panelFingerprint) {
+		job.Phase = "completed"
+	}
 }
 
 func (s *Service) watchWorkerCancellation(ctx context.Context, jobID string, stop <-chan struct{}, cancel context.CancelFunc) {
@@ -539,12 +611,13 @@ func (s *Service) failJob(ctx context.Context, job store.NodeProvisionJob, code 
 		return
 	}
 	now := s.cfg.Now().UTC()
-	if err := s.st.UpdateRunningNodeProvisionJobWithEvent(ctx, job.ID, "failed", "failed", code, []byte{}, code, now); err != nil {
+	residual := s.residualSecret(job)
+	if err := s.st.UpdateRunningNodeProvisionJobWithEvent(ctx, job.ID, "failed", "failed", code, residual, code, now); err != nil {
 		if errors.Is(err, store.ErrConflict) {
 			return // A cancellation or another terminal transition won the race.
 		}
 		s.cfg.Log.Error("mark node provisioning failed", "job_id", job.ID, "error_code", code, "err", err)
-		if fallbackErr := s.st.UpdateRunningNodeProvisionJob(ctx, job.ID, "failed", "failed", code, []byte{}, now); fallbackErr != nil {
+		if fallbackErr := s.st.UpdateRunningNodeProvisionJob(ctx, job.ID, "failed", "failed", code, residual, now); fallbackErr != nil {
 			s.cfg.Log.Error("clear failed node provisioning job secret", "job_id", job.ID, "err", fallbackErr)
 		}
 		return
@@ -552,7 +625,22 @@ func (s *Service) failJob(ctx context.Context, job store.NodeProvisionJob, code 
 	s.cfg.Log.Warn("node provisioning failed", "job_id", job.ID, "error_code", code)
 }
 
-func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, secret credentials, panelFingerprint string) {
+// residualSecret is what a failed job keeps of its secret for a retry: of a subscription host install its role (no login, no
+// token); of any other job nothing.
+func (s *Service) residualSecret(job store.NodeProvisionJob) []byte {
+	fields := s.hostFields(job.ID, job.Secret)
+	if fields.SubHostDomain == "" {
+		return []byte{}
+	}
+	sealed, err := s.sealCredentials(job.ID, fields)
+	if err != nil {
+		return []byte{}
+	}
+	return sealed
+}
+
+// finishJob completes the job; false: it could not (the job is failed instead).
+func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, secret credentials, panelFingerprint string) bool {
 	now := s.cfg.Now().UTC()
 	access := store.NodeServerAccess{
 		NodeID: job.NodeID, NodeName: job.Name, SSHHost: job.SSHHost, SSHPort: job.SSHPort,
@@ -561,7 +649,7 @@ func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, sec
 	if secret.Method == "panel_key" || secret.Method == "private_key" {
 		if panelFingerprint == "" {
 			s.failJob(ctx, job, "ssh_panel_key_not_accepted")
-			return
+			return false
 		}
 		access.Password = []byte{}
 	} else {
@@ -573,11 +661,12 @@ func (s *Service) finishJob(ctx context.Context, job store.NodeProvisionJob, sec
 	if err := s.st.CompleteNodeProvisionJob(ctx, job.ID, access, now); err != nil {
 		s.cfg.Log.Error("complete node provisioning job", "job_id", job.ID, "err", err)
 		s.failJob(ctx, job, "job_state_unavailable")
-		return
+		return false
 	}
 	_ = s.auditAs(context.WithoutCancel(ctx), job.CreatedBy, "node.ssh_provision_complete", map[string]string{"job_id": job.ID, "node_id": job.NodeID, "name": job.Name})
 	secret.Password, secret.EnrollmentToken = "", ""
 	clear(secret.PrivateKey)
+	return true
 }
 
 func (s *Service) recordAccessEvent(ctx context.Context, job store.NodeProvisionJob, code string) error {
@@ -624,6 +713,12 @@ func (s *Service) waitOnline(ctx context.Context, nodeID string) error {
 }
 
 func readPreflight(ctx context.Context, conn *Connection, panelAddr string) (*remotePreflight, error) {
+	return readPreflightFor(ctx, conn, panelAddr, false)
+}
+
+// readPreflightFor reads the host's facts; allowUnreachable: a panel the host cannot reach is a fact, not a failure (the first
+// subscription host, which is what makes the panel reachable).
+func readPreflightFor(ctx context.Context, conn *Connection, panelAddr string, allowUnreachable bool) (*remotePreflight, error) {
 	command, err := preflightCommand(panelAddr)
 	if err != nil {
 		return nil, preflightFailure("panel_address_not_configured")
@@ -632,7 +727,7 @@ func readPreflight(ctx context.Context, conn *Connection, panelAddr string) (*re
 	if err != nil {
 		return nil, err
 	}
-	return parsePreflightOutput(output)
+	return parsePreflightFacts(output, allowUnreachable)
 }
 
 // installNftables runs remoteNftablesInstallScript. The timeout is the lock wait (5 minutes) plus two apt-get runs on a
@@ -651,6 +746,10 @@ func prepareHostFirewall(ctx context.Context, conn *Connection, sshPort uint16) 
 }
 
 func parsePreflightOutput(output []byte) (*remotePreflight, error) {
+	return parsePreflightFacts(output, false)
+}
+
+func parsePreflightFacts(output []byte, allowUnreachable bool) (*remotePreflight, error) {
 	values := make(map[string]string, 12)
 	allowed := map[string]struct{}{
 		"distribution": {}, "version": {}, "kernel": {}, "architecture": {}, "cpu_count": {},
@@ -732,7 +831,7 @@ func parsePreflightOutput(output []byte) (*remotePreflight, error) {
 	if !ok || panelReachable != "yes" && panelReachable != "no" {
 		return nil, invalidPreflightFacts()
 	}
-	if panelReachable != "yes" {
+	if panelReachable != "yes" && !allowUnreachable {
 		return nil, preflightFailure("panel_unreachable")
 	}
 	return &remotePreflight{
@@ -773,6 +872,10 @@ printf 'panel_reachable=%s\n' "$panel_reachable"
 }
 
 func supportedPreflight(facts *adminv1.NodePreflight) (string, string) {
+	return supportedPreflightFor(facts, false)
+}
+
+func supportedPreflightFor(facts *adminv1.NodePreflight, allowUnreachable bool) (string, string) {
 	if facts == nil {
 		return "", "ssh_preflight_failed"
 	}
@@ -793,7 +896,7 @@ func supportedPreflight(facts *adminv1.NodePreflight) (string, string) {
 	if facts.CpuCount == 0 || facts.MemoryBytes < 256<<20 {
 		return "", "insufficient_resources"
 	}
-	if !facts.PanelReachable {
+	if !facts.PanelReachable && !allowUnreachable {
 		return "", "panel_unreachable"
 	}
 	arch, ok := supportedArchitecture(facts.Architecture)
@@ -850,8 +953,8 @@ func uploadBinary(ctx context.Context, conn *Connection, binary io.Reader, size 
 // public link when the panel has one (the edge edition, whose agents have no mTLS endpoint to dial), else over mTLS.
 func enrollCommand(cfg Config, caFingerprint string) string {
 	command := "/root/mistgate-node enroll "
-	if cfg.LinkURL != "" {
-		command += "--link-url " + shellQuote(cfg.LinkURL)
+	if link := cfg.enrollLink(); link != "" {
+		command += "--link-url " + shellQuote(link)
 	} else {
 		command += "--panel " + shellQuote(cfg.PanelAddr) + " --sni " + shellQuote(cfg.AgentSNI)
 	}
@@ -1019,4 +1122,83 @@ func validCAFingerprint(value string) bool {
 
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
+// runSessionEnrollment enrols the first subscription host without the node dialling the panel: the node keeps its key in
+// enroll-pending.pem and hands over a CSR (an interrupted job gets a CSR of the same key again), the panel issues the
+// certificate here, and the node stores it with the role. The role and the link address (both hold secrets) go on stdin, never
+// in the command line (sudo logs it, /proc shows it). Of the node's output only the CSR line and the pin line are read; nothing
+// of it is logged. again: the server is enrolled already (an earlier attempt): it enrols again, replacing that identity.
+func (s *Service) runSessionEnrollment(ctx context.Context, conn *Connection, job store.NodeProvisionJob, secret credentials, again bool) (string, error) {
+	force := ""
+	if again {
+		force = " --force"
+	}
+	output, err := runSSHCapture(ctx, conn, "/root/mistgate-node enroll --offline-csr"+force, nil, 30*time.Second, 4<<10)
+	if err != nil {
+		return "", err
+	}
+	csr, err := parseOfflineCSR(output)
+	if err != nil {
+		return "", err
+	}
+	nodeID, certPEM, caPEM, err := s.cfg.Nodes.EnrollInSession(ctx, secret.EnrollmentToken, csr)
+	if err != nil {
+		return "", err
+	}
+	if nodeID != job.NodeID {
+		return "", errors.New("provision: the enrolment token belongs to another node")
+	}
+	role, err := json.Marshal(offlineRole{LinkURL: s.cfg.subHostLink(secret.SubHostDomain), SubHost: offlineSubHost{
+		Names: []string{secret.SubHostDomain}, Path: secret.SubHostPath, SiteName: secret.SubHostSiteName}})
+	if err != nil {
+		return "", err
+	}
+	in := append(append(append(role, '\n'), certPEM...), caPEM...)
+	command := "/root/mistgate-node enroll --offline-finish --node-id " + shellQuote(nodeID) + " --ca-sha256 " + shellQuote(secret.CAFingerprint) + force
+	out, err := runSSHCapture(ctx, conn, command, bytes.NewReader(in), 45*time.Second, 1<<10)
+	clear(in)
+	if err != nil {
+		return "", err
+	}
+	return parseSitePin(out), nil
+}
+
+// offlineRole is the role line of `enroll --offline-finish` (internal/node/agent OfflineRole).
+type offlineRole struct {
+	LinkURL string         `json:"link_url"`
+	SubHost offlineSubHost `json:"sub_host"`
+}
+
+type offlineSubHost struct {
+	Names    []string `json:"names"`
+	Path     string   `json:"path"`
+	SiteName string   `json:"site_name,omitempty"`
+}
+
+// parseOfflineCSR reads the `csr=<base64 DER>` line of `enroll --offline-csr`.
+func parseOfflineCSR(output []byte) ([]byte, error) {
+	for _, line := range strings.Split(string(output), "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(line), "csr="); ok {
+			der, err := base64.StdEncoding.DecodeString(v)
+			if err != nil || len(der) == 0 {
+				return nil, errors.New("provision: unreadable CSR from the node")
+			}
+			return der, nil
+		}
+	}
+	return nil, errors.New("provision: no CSR from the node")
+}
+
+// parseSitePin reads the `pin=<sha256 hex>` line of `enroll --offline-finish`; "" when there is none (the node's site on 443 is
+// an inbound's, whose pin the node reports itself).
+func parseSitePin(output []byte) string {
+	for _, line := range strings.Split(string(output), "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(line), "pin="); ok && len(v) == 64 {
+			if _, err := hex.DecodeString(v); err == nil {
+				return strings.ToLower(v)
+			}
+		}
+	}
+	return ""
 }

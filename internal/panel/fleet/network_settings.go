@@ -8,6 +8,8 @@ import (
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
+	"google.golang.org/protobuf/proto"
 )
 
 type networkBundleInfo interface {
@@ -21,10 +23,18 @@ type networkTableReader interface {
 }
 
 // nodeSettings is what one agent is sent: the node's own settings, the operating-system status request for agents
-// with os-status/1 and the network settings for agents with nets/1. An agent without a capability gets nothing of it,
-// so its settings and their signature stay what they were.
+// with os-status/1, the network settings for agents with nets/1 and a set panel link address for agents with
+// panel-link/1. An agent without a capability gets nothing of it, so its settings and their signature stay what they were.
 func (f *Fleet) nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
 	s := nodeSettingsFor(n, caps, f.osStatusAllowed())
+	if l := f.panelLink.Load(); l != nil && *l != "" && store.CapabilityPresent(caps, plugin.CapPanelLink) {
+		s.PanelLinkUrl = *l
+	}
+	if roles := f.subHostRoles.Load(); roles != nil && store.CapabilityPresent(caps, plugin.CapSubHost) {
+		if r := (*roles)[n.ID]; r != nil {
+			s.SubHost = proto.Clone(r).(*agentv1.SubHostRole)
+		}
+	}
 	if !store.CapabilityPresent(caps, capNetworks) {
 		return s
 	}
@@ -38,6 +48,20 @@ func (f *Fleet) nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettin
 	}
 	return s
 }
+
+// SetSubHostRoles sets the subscription host roles by node id (internal/panel/subhost): agents with sub-host/1 are sent
+// theirs in NodeSettings.sub_host. nil or empty: no node is a host. The caller calls StateChanged.
+func (f *Fleet) SetSubHostRoles(roles map[string]*agentv1.SubHostRole) {
+	if len(roles) == 0 {
+		f.subHostRoles.Store(nil)
+		return
+	}
+	f.subHostRoles.Store(&roles)
+}
+
+// SetPanelLink sets the link address agents with panel-link/1 are told to move to; "" (the default) sends nothing.
+// The caller calls StateChanged so connected agents get their new settings.
+func (f *Fleet) SetPanelLink(linkURL string) { f.panelLink.Store(&linkURL) }
 
 // NetworkMode returns the in-memory operator setting. The edge edition always returns zero.
 func (f *Fleet) NetworkMode() uint32 { return f.networkMode.Load() }

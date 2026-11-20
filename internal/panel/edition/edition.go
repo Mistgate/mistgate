@@ -33,6 +33,9 @@ const (
 	SNIScan = "sni_scan"
 	// TrustTunnel is the VPS edition's own protocol: the edge edition has no plugin and no keys for it.
 	TrustTunnel = "trusttunnel"
+	// SubscriptionHost puts a panel behind NAT on a node's subdomain (internal/panel/subhost): the edge has a public address,
+	// and its Workers keep no connection open.
+	SubscriptionHost = "subscription_host"
 )
 
 // Code is the refusal code of Refuse; the admin has a sentence for it ("err.unavailable_in_edition").
@@ -40,7 +43,7 @@ const Code = "unavailable_in_edition"
 
 // edgeUnavailable is the source of truth for the edge. internal/panel/app keeps a test that every deferred edge job
 // maps onto ids here and every id here has a job.
-var edgeUnavailable = []string{Backups, MCP, Assistant, HealthChecks, AgentLogs, PanelUpdate, DecoyOwn, TSPUProbe, OSUpdates, OwnProbes, SNIScan, TrustTunnel}
+var edgeUnavailable = []string{Backups, MCP, Assistant, HealthChecks, AgentLogs, PanelUpdate, DecoyOwn, TSPUProbe, OSUpdates, OwnProbes, SNIScan, TrustTunnel, SubscriptionHost}
 
 // Unavailable is the feature ids the edition lacks: none on the VPS. The result is a copy.
 func Unavailable(isEdge bool) []string {

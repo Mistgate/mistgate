@@ -181,8 +181,16 @@ func (s *Service) resolveNodes(ctx context.Context, sel *adminv1.NodeSelection) 
 	return false, ids, nil
 }
 
+// subscriptionBase is the public subscription address of the moment.
+func (s *Service) subscriptionBase() string {
+	if s.cfg.SubscriptionBase != nil {
+		return s.cfg.SubscriptionBase()
+	}
+	return s.cfg.SubscriptionBaseURL
+}
+
 func (s *Service) subscriptionURL(token string) (string, error) {
-	base := strings.TrimRight(s.cfg.SubscriptionBaseURL, "/")
+	base := strings.TrimRight(s.subscriptionBase(), "/")
 	if base == "" {
 		return "", coded(connect.CodeFailedPrecondition, "sub_address_missing")
 	}

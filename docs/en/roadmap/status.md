@@ -138,6 +138,9 @@ Mistgate is in **beta**; the current release is `v0.1.85`. It runs in production
     - title: Blocking diagnosis in production
       section: health
       text: "New in v0.1.81. `block_diagnosis` and `access_report` apply fixed rules to the nodes' counters and the country checks; where two causes look alike they say so, with low confidence. A lab of staged blocking checks seven of the classes before each release that touches them (an address, a port, UDP, a TCP freeze, a whitelist, one operator, a broken node); protocol fingerprinting and regional are tested on constructed counters only. The handshake counters need the agent v0.1.81. Read the evidence they list before you move people. See [Assistant](../guide/assistant.md#work-out-what-does-not-open)."
+    - title: A panel at home behind NAT
+      section: settings
+      text: "New and not yet tried in production: one node is the subscription host and carries the subscription address and the agents' link on a subdomain, over a bridge the panel opens to the node's own site, so the panel needs no public address. VPS edition only; every agent needs `ws-link/1` and `panel-link/1`, and `link-fetch/1` to update from such a panel. Try it with a spare node first. See [Panel at home behind NAT](../guide/subscription-host.md)."
 - status: next
   title: Next
   lead: The next items in the queue.

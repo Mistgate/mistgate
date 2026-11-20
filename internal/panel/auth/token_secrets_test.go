@@ -67,6 +67,8 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.Device.enrol_link_stale":                           "a bool: the person's link changed after the device enrolled; no hash is returned",
 		"mistgate.ops.v1.NodeLoad.link_seen_mbps":                             "a number: the Mbit/s the node was seen to carry, not a link",
 		"mistgate.ops.v1.RetentionItem.key":                                   "the name of a retention setting (journal_days ...), not a key",
+		"mistgate.subhost.v1.SubscriptionHost.public_url":                     "the panel's public address, which every subscription link and agent already shows",
+		"mistgate.subhost.v1.SubscriptionHost.lacking_link":                   "node ids and names whose agent lacks the link capabilities",
 	}
 	seen := map[protoreflect.FullName]bool{}
 	var walk func(md protoreflect.MessageDescriptor, via string)

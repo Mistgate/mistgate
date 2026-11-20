@@ -77,6 +77,9 @@ type Config struct {
 	DecoyDir string
 	// PublicURL is the panel's public address (its public listener shows the panel's decoy site there). Empty = not known.
 	PublicURL string
+	// PublicURLNow and LinkURLNow, when set, are PublicURL and LinkURL of the moment and win over them: a panel whose public
+	// address changes while it runs (a subscription host, design/adr/0018-panel-behind-nat.md).
+	PublicURLNow, LinkURLNow func() string
 	// Debounce is the StateChanged coalescing window. Default 200 ms.
 	Debounce time.Duration
 	// Desired is the desired-state source, required: it returns the enabled inbounds of a node with their
@@ -128,6 +131,11 @@ type Fleet struct {
 	now func() time.Time
 	ca  *ca
 
+	panelLink            atomic.Pointer[string]                          // SetPanelLink; nil or "" = agents are sent no link address
+	fetchTokens          linkFetchTokens                                 // link_fetch.go
+	panelID              panelIdentity                                   // panel_identity.go
+	subHostRoles         atomic.Pointer[map[string]*agentv1.SubHostRole] // SetSubHostRoles
+	sub                  subHostHooks                                    // subhost.go
 	networkMode          atomic.Uint32
 	networkOperator      func(string, uint32) string // optional test seam; production uses health.NetworkOperator
 	networkTableOverride networkTableReader          // optional test seam for names that need output cleaning
@@ -613,4 +621,20 @@ func (f *Fleet) allowStatsRejectEvent(ctx context.Context, nodeID string) bool {
 		return false
 	}
 	return d.Allowed
+}
+
+// publicURL is the panel's public address of the moment (Config.PublicURLNow, else Config.PublicURL).
+func (f *Fleet) publicURL() string {
+	if f.cfg.PublicURLNow != nil {
+		return f.cfg.PublicURLNow()
+	}
+	return f.cfg.PublicURL
+}
+
+// linkURL is the link base of the moment (Config.LinkURLNow, else Config.LinkURL).
+func (f *Fleet) linkURL() string {
+	if f.cfg.LinkURLNow != nil {
+		return f.cfg.LinkURLNow()
+	}
+	return f.cfg.LinkURL
 }

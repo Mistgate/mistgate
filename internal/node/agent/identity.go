@@ -64,6 +64,55 @@ type Meta struct {
 	// Link is the wss://host/<secret-prefix>/ the agent enrolled through. Set = link-only: the agent never dials mTLS
 	// (Panel and SNI are empty), renews over its link session and lists no self-update.
 	Link string `json:"link,omitempty"`
+	// NextLink is a new link address the panel sent (NodeSettings.panel_link_url) or `set-panel` saved. The agent tries it
+	// in turn with its current one and makes it Link once a session over it succeeds.
+	NextLink string `json:"next_link,omitempty"`
+	// PrevLink and PrevMTLS are the address the agent used before its last new link address took over (PrevMTLS: it was
+	// on mTLS, which an empty PrevLink alone could not tell from "none"). While the current link does not answer, the
+	// agent tries the previous address every other turn and makes it current again once a session over it succeeds.
+	// LinkSince (unix seconds) is when Link took over from it; the agent forgets the previous address once Link has
+	// worked for prevAddressKeep (panellink.go). All three are empty when there is no previous address.
+	PrevLink  string `json:"prev_link,omitempty"`
+	PrevMTLS  bool   `json:"prev_mtls,omitempty"`
+	LinkSince int64  `json:"link_since,omitempty"`
+	// SubHost is the node's subscription host role (subhost_role.go), kept from NodeSettings.sub_host; nil = none.
+	SubHost *SubHostMeta `json:"sub_host,omitempty"`
+}
+
+// saveMeta writes agent.json.
+func saveMeta(dir string, m Meta) error {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(filepath.Join(dir, fileMeta), b, 0o600)
+}
+
+// SetPanelLink saves linkURL as the panel link address the agent tries next (Meta.NextLink); the running agent reads it
+// at its next start.
+func SetPanelLink(stateDir, linkURL string) error {
+	if _, err := parseLinkBase(linkURL); err != nil {
+		return fmt.Errorf("--link-url: %w", err)
+	}
+	if !IsEnrolled(stateDir) {
+		return errors.New("node is not enrolled")
+	}
+	raw, err := os.ReadFile(filepath.Join(stateDir, fileMeta))
+	if errors.Is(err, os.ErrNotExist) {
+		return errors.New("node is not enrolled")
+	} else if err != nil {
+		return err
+	}
+	var m Meta
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return fmt.Errorf("%s: %w", fileMeta, err)
+	}
+	if linkURL == m.Link {
+		m.NextLink = ""
+	} else {
+		m.NextLink = linkURL
+	}
+	return saveMeta(stateDir, m)
 }
 
 type identity struct {

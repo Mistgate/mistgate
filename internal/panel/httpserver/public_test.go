@@ -373,6 +373,35 @@ func TestAgentLinkRoutesOnlyWellFormedUpdateAssetGets(t *testing.T) {
 	sameResponse(t, "VPS update asset route", vpsDecoy, update)
 }
 
+// A link agent's fetch (fleet/link_fetch.go) is routed like the edge's update download: GET, two segments, nothing else.
+func TestAgentLinkRoutesOnlyWellFormedFetchGets(t *testing.T) {
+	prefix := "/" + strings.Repeat("f", 24) + "/"
+	var hits atomic.Int32
+	e := newTestEnv(t, func(c *Config) {
+		c.AgentLinkPrefix = prefix
+		c.AgentLinkHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			w.WriteHeader(http.StatusOK)
+		})
+	})
+	if got := do(t, http.MethodGet, e.public.URL, prefix+"fetch/nod_test/mistgate-asndb-data-any", nil); got.status != http.StatusOK || hits.Load() != 1 {
+		t.Fatalf("valid fetch route: status=%d hits=%d", got.status, hits.Load())
+	}
+	decoy := do(t, http.MethodGet, e.public.URL, "/nothing", nil)
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodPost, prefix + "fetch/nod_test/f"},
+		{http.MethodGet, prefix + "fetch/nod_test"},
+		{http.MethodGet, prefix + "fetch/nod_test/f/extra"},
+		{http.MethodGet, prefix + "fetch//f"},
+	} {
+		before := hits.Load()
+		sameResponse(t, tc.method+" "+tc.path, decoy, do(t, tc.method, e.public.URL, tc.path, nil))
+		if hits.Load() != before {
+			t.Errorf("malformed fetch route %s reached the handler", tc.path)
+		}
+	}
+}
+
 func TestAgentLinkPrefixMustBeSeparateAndSecret(t *testing.T) {
 	for name, mutate := range map[string]func(*Config){
 		"short":         func(c *Config) { c.AgentLinkPrefix = "/short/" },

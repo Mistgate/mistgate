@@ -413,9 +413,9 @@ func (f *Fleet) ownSniNames(ctx context.Context) (*ownSni, error) {
 			}
 		}
 	}
-	own.addURL(f.cfg.PublicURL)
+	own.addURL(f.publicURL())
 	own.addURL(f.cfg.PanelAddr)
-	own.addURL(f.cfg.LinkURL)
+	own.addURL(f.linkURL())
 	return own, nil
 }
 
