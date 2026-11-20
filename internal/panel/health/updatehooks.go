@@ -6,6 +6,7 @@ import (
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // The two small hooks of the updates module (internal/panel/update): a
@@ -78,6 +79,30 @@ func (s *Service) NodeChecksSince(ctx context.Context, nodeID string, since time
 func (s *Service) NodeChecksPending(ctx context.Context, nodeID string, since time.Time) ([]string, error) {
 	_, _, _, _, _, pending, err := s.checksSince(ctx, nodeID, since)
 	return pending, err
+}
+
+// NodeLastRounds returns the newest stored round (inbound id, time, status, error code) of every inbound of the node that the
+// checker can probe right now and has probed at least once. The rollout reads from it which profiles were already failing before
+// an update, and which ones did not pass after it and why.
+func (s *Service) NodeLastRounds(ctx context.Context, nodeID string) ([]store.CheckSample, error) {
+	sn, err := s.snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	live, err := s.liveNode(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	var out []store.CheckSample
+	for _, t := range sn.byNode[nodeID] {
+		if s.skipReason(t, live) != "" {
+			continue
+		}
+		if c := s.cellOf(ctx, t.in.ID); c.last != nil {
+			out = append(out, store.CheckSample{InboundID: t.in.ID, At: c.last.At, Status: int(c.last.Status), ErrorCode: c.last.ErrorCode})
+		}
+	}
+	return out, nil
 }
 
 func (s *Service) checksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, timeoutsOnly bool, failedFor time.Duration, pending []string, err error) {

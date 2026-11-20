@@ -258,3 +258,37 @@ func TestOsUpdateFailedConditionOpensAndClearsAnAlert(t *testing.T) {
 		t.Fatalf("history %+v", h)
 	}
 }
+
+// NodeLastRounds gives the rollout the newest round of each probeable inbound (what the baseline before an update and the names
+// of the failed profiles after it are read from); an inbound with no round yet and one that is not probeable have none.
+func TestNodeLastRounds(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	a, b, c := e.inbound("de1", 443), e.inbound("de1", 8443), e.inbound("de1", 9443)
+	e.pass(a)
+	e.fail(b, "timeout")
+	e.pass(b)
+	e.fail(b, "refused") // the newest round of b
+	got, err := e.s.NodeLastRounds(e.ctx, "de1")
+	if err != nil || len(got) != 2 {
+		t.Fatalf("rounds %+v, err %v", got, err)
+	}
+	by := map[string]store.CheckSample{}
+	for _, r := range got {
+		by[r.InboundID] = r
+	}
+	if r := by[a]; r.Status != int(adminv1.CheckStatus_CHECK_STATUS_OK) || r.ErrorCode != "" {
+		t.Fatalf("round of the healthy inbound %+v", r)
+	}
+	if r := by[b]; r.Status != int(adminv1.CheckStatus_CHECK_STATUS_FAILED) || r.ErrorCode != "refused" {
+		t.Fatalf("round of the failing inbound %+v", r)
+	}
+	if _, has := by[c]; has {
+		t.Fatal("an inbound that was never probed has a round")
+	}
+	e.exec(`UPDATE inbound SET state = 'pending' WHERE id = ?`, b)
+	e.s.invalidateSnapshot()
+	if got, err := e.s.NodeLastRounds(e.ctx, "de1"); err != nil || len(got) != 1 || got[0].InboundID != a {
+		t.Fatalf("an inbound that is not active is listed: %+v, %v", got, err)
+	}
+}

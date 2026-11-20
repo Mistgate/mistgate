@@ -627,6 +627,9 @@ func (s *Service) finishOsIfDone(ctx context.Context, ro store.OsRolloutRow, ste
 		s.log.Warn("update: finish OS rollout", "code", "update_os_finish_os_rollout", "rollout", ro.ID, "err", err)
 		return false
 	}
+	if ok {
+		s.startNodeBundleSyncLocked() // an agent bundle that waited for the OS update is fetched now
+	}
 	return ok
 }
 
@@ -956,17 +959,7 @@ func (p *osPass) retryNotBefore(nodeID, code string) time.Time {
 }
 
 func (p *osPass) preFailed(x *store.OsStepRow) []string {
-	in, err := p.s.st.FleetInbounds(p.ctx, x.NodeID, true)
-	if err != nil {
-		return x.PreFailed
-	}
-	var failed []string
-	for _, inbound := range in {
-		if inbound.State == "failed" {
-			failed = append(failed, inbound.ID)
-		}
-	}
-	return failed
+	return p.s.preFailedOf(p.ctx, x.NodeID, p.now, x.PreFailed)
 }
 
 // stepPassOs loads the active OS rollout and the step of the node if it is still the one the goroutine started with.

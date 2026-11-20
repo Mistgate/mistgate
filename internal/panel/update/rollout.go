@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -541,6 +542,9 @@ func (s *Service) finishIfDone(ctx context.Context, ro store.RolloutRow, steps [
 		s.log.Warn("update: finish rollout", "rollout", ro.ID, "err", err)
 		return false
 	}
+	if ok {
+		s.startNodeBundleSyncLocked() // the bundle the rollout kept waiting is fetched now, not at the next poll
+	}
 	return ok
 }
 
@@ -666,6 +670,7 @@ func (p *pass) event(x *store.StepRow, state, key string) {
 	if key != "" {
 		params["reason"] = key
 	}
+	maps.Copy(params, failedProfileNotes(x.Params))
 	if err := p.s.st.InsertEvent(p.ctx, store.EventRow{Time: p.now, Severity: sev, Code: code, Source: "panel", NodeID: x.NodeID, Params: params}); err != nil {
 		p.s.log.Warn("update: step event", "node", x.NodeID, "err", err)
 	}
@@ -677,6 +682,7 @@ func (p *pass) pause(code string, x *store.StepRow, reason string) {
 		return
 	}
 	params := map[string]string{"node": x.NodeName, "node_id": x.NodeID, "reason": reason}
+	maps.Copy(params, failedProfileNotes(x.Params)) // the profiles that did not pass: the owner reads them on the pause too
 	// only over the status and the pause this pass read: a rollout paused or resumed meanwhile keeps what the other writer made of it
 	ok, err := p.s.st.PauseRollout(p.ctx, p.ro.ID, p.ro.Status, p.ro.PauseKey, code, params)
 	if err != nil {
@@ -892,17 +898,26 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 		if err != nil {
 			miss(errProbeFailed)
 		} else if probeable > 0 && ok < probeable {
-			miss(errProbeFailed)
-			pathLooksLossy = ok+failed == probeable && timeoutsOnly && failedFor >= vantageMinFailing
+			listed := false
 			if l, can := s.hl.(interface {
 				NodeChecksPending(ctx context.Context, nodeID string, since time.Time) ([]string, error)
 			}); can {
 				if ids, err := l.NodeChecksPending(ctx, nodeID, since); err == nil {
-					pending = append(pending, ids...)
+					pending, listed = ids, true
 				}
 			}
-			if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
-				s.log.Warn("update: run checks", "node", nodeID, "err", err)
+			// A profile whose check was already failing when the step was sent is not what this update broke: it is left out of the
+			// count, and when nothing else fails the step passes and says which profiles it did not hold against the update.
+			var skipped []string
+			pending, skipped = withoutProbeSick(pending, preFailed)
+			if listed && len(pending) == 0 && len(skipped) > 0 {
+				skippedProfileParams(with, skipped, label)
+			} else {
+				miss(errProbeFailed)
+				pathLooksLossy = ok+failed == probeable && timeoutsOnly && failedFor >= vantageMinFailing
+				if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
+					s.log.Warn("update: run checks", "node", nodeID, "err", err)
+				}
 			}
 		}
 	}
@@ -916,6 +931,11 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 		wait = v.verdict == ""
 		if v.verdict == vantageOK {
 			soft = ""
+		}
+	}
+	if soft == errProbeFailed { // what the owner reads: which profiles did not pass, and the error of the last round of each
+		for k, v := range s.failedProfileParams(ctx, nodeID, pending, label, since) {
+			with[k] = v
 		}
 	}
 	var waiting []string
@@ -1301,17 +1321,7 @@ func (p *pass) sendPrepared(x *store.StepRow, n store.NodeRow, sources []string)
 }
 
 func (p *pass) preFailed(x *store.StepRow) []string {
-	in, err := p.s.st.FleetInbounds(p.ctx, x.NodeID, true)
-	if err != nil {
-		return x.PreFailed
-	}
-	var preFailed []string
-	for _, inbound := range in {
-		if inbound.State == "failed" {
-			preFailed = append(preFailed, inbound.ID)
-		}
-	}
-	return preFailed
+	return p.s.preFailedOf(p.ctx, x.NodeID, p.now, x.PreFailed)
 }
 
 func (p *pass) sendLink(x *store.StepRow, n store.NodeRow, preFailed []string) {
