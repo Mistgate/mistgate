@@ -2,9 +2,9 @@
 
 The user and operator documentation of [Mistgate](../README.md), a self-hosted panel for your own VPN fleet, in English ([`en/`](en/index.md)), Russian ([`ru/`](ru/index.md)) and Simplified Chinese ([`zh/`](zh/index.md)). Every page exists in all three languages under the same path. The same pages, with search and a sidebar, are published at **[mistgate.app](https://mistgate.app/)** (Russian: [mistgate.app/ru](https://mistgate.app/ru/), Chinese: [mistgate.app/zh](https://mistgate.app/zh/)); this directory is their source and reads the same on GitHub.
 
-Документация на русском: [ru/index.md](ru/index.md) или [mistgate.app/ru](https://mistgate.app/ru/).
+Документация на русском: [ru/index.md](ru/index.md) или [mistgate.app/ru](https://mistgate.app/ru/docs/).
 
-简体中文文档：[zh/index.md](zh/index.md) 或 [mistgate.app/zh](https://mistgate.app/zh/)。
+简体中文文档：[zh/index.md](zh/index.md) 或 [mistgate.app/zh](https://mistgate.app/zh/docs/)。
 
 ## What is where
 

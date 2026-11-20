@@ -23,6 +23,7 @@
   },
   "byText": {
     "mistgate": "@main",
+    "Начало работы": "getting-started/overview",
     "План развития": "roadmap/status",
     "Руководство": "guide/nodes",
     "Эксплуатация": "operations/health",

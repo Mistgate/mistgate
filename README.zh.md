@@ -15,7 +15,7 @@
 <a href="go.mod"><img alt="Go 版本" src="https://img.shields.io/github/go-mod/go-version/Mistgate/mistgate"></a>
 </p>
 
-<p><a href="https://mistgate.app/zh/"><b>文档</b></a> · <a href="#快速开始"><b>安装</b></a> · <a href="#协议"><b>协议</b></a> · <a href="#稳定性如何"><b>稳定性如何</b></a> · <a href="#与其他面板的对比"><b>对比</b></a> · <a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.fa.md">فارسی</a> · <a href="README.tr.md">Türkçe</a></p>
+<p><a href="https://mistgate.app/zh/docs/"><b>文档</b></a> · <a href="#快速开始"><b>安装</b></a> · <a href="#协议"><b>协议</b></a> · <a href="#稳定性如何"><b>稳定性如何</b></a> · <a href="#与其他面板的对比"><b>对比</b></a> · <a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.fa.md">فارسی</a> · <a href="README.tr.md">Türkçe</a></p>
 
 <p><sub><b>测试版。</b>1.0 之前仍会有变化。<a href="https://mistgate.app/zh/roadmap/status/">状态和路线图</a></sub></p>
 
@@ -136,7 +136,7 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 
 ## 文档
 
-全部内容在 [mistgate.app](https://mistgate.app/zh/) 和 [`docs/`](docs/README.md) 中。可以从这里开始：
+全部内容在 [mistgate.app](https://mistgate.app/zh/docs/) 和 [`docs/`](docs/README.md) 中。可以从这里开始：
 
 - [概览](docs/zh/getting-started/overview.md)和[要求](docs/zh/getting-started/requirements.md)
 - [安装面板](docs/zh/getting-started/install-panel.md)、[通过 SSH 安装节点](docs/zh/getting-started/ssh-install.md)、[首批用户](docs/zh/getting-started/first-users.md)

@@ -15,7 +15,7 @@ Hysteria2, VLESS and AmneziaWG. Two Go binaries, SQLite and systemd.</p>
 <a href="go.mod"><img alt="Go version" src="https://img.shields.io/github/go-mod/go-version/Mistgate/mistgate"></a>
 </p>
 
-<p><a href="https://mistgate.app/"><b>Docs</b></a> · <a href="#quick-start"><b>Install</b></a> · <a href="#protocols"><b>Protocols</b></a> · <a href="#is-it-stable"><b>Is it stable?</b></a> · <a href="#compared-with-other-panels"><b>Compare</b></a> · <a href="README.ru.md">Русский</a> · <a href="README.zh.md">简体中文</a> · <a href="README.fa.md">فارسی</a> · <a href="README.tr.md">Türkçe</a></p>
+<p><a href="https://mistgate.app/docs/"><b>Docs</b></a> · <a href="#quick-start"><b>Install</b></a> · <a href="#protocols"><b>Protocols</b></a> · <a href="#is-it-stable"><b>Is it stable?</b></a> · <a href="#compared-with-other-panels"><b>Compare</b></a> · <a href="README.ru.md">Русский</a> · <a href="README.zh.md">简体中文</a> · <a href="README.fa.md">فارسی</a> · <a href="README.tr.md">Türkçe</a></p>
 
 <p><sub><b>Beta.</b> Expect changes before 1.0. <a href="https://mistgate.app/roadmap/status/">Status and roadmap</a></sub></p>
 
@@ -136,7 +136,7 @@ Others are ahead in protocol breadth, community size and full Telegram bots. The
 
 ## Documentation
 
-Everything is at [mistgate.app](https://mistgate.app/) and in [`docs/`](docs/README.md). Good places to start:
+Everything is at [mistgate.app](https://mistgate.app/docs/) and in [`docs/`](docs/README.md). Good places to start:
 
 - [Overview](docs/en/getting-started/overview.md) and [Requirements](docs/en/getting-started/requirements.md)
 - [Install the panel](docs/en/getting-started/install-panel.md), [Install a node over SSH](docs/en/getting-started/ssh-install.md), [First users](docs/en/getting-started/first-users.md)

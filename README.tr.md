@@ -15,7 +15,7 @@ Hysteria2, VLESS ve AmneziaWG. İki Go ikili dosyası, SQLite ve systemd.</p>
 <a href="go.mod"><img alt="Go sürümü" src="https://img.shields.io/github/go-mod/go-version/Mistgate/mistgate"></a>
 </p>
 
-<p><a href="https://mistgate.app/"><b>Belgeler</b></a> · <a href="#hızlı-başlangıç"><b>Kurulum</b></a> · <a href="#protokoller"><b>Protokoller</b></a> · <a href="#kararlı-mı"><b>Kararlı mı?</b></a> · <a href="#diğer-panellerle-karşılaştırma"><b>Karşılaştırma</b></a> · <a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh.md">简体中文</a> · <a href="README.fa.md">فارسی</a></p>
+<p><a href="https://mistgate.app/docs/"><b>Belgeler</b></a> · <a href="#hızlı-başlangıç"><b>Kurulum</b></a> · <a href="#protokoller"><b>Protokoller</b></a> · <a href="#kararlı-mı"><b>Kararlı mı?</b></a> · <a href="#diğer-panellerle-karşılaştırma"><b>Karşılaştırma</b></a> · <a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh.md">简体中文</a> · <a href="README.fa.md">فارسی</a></p>
 
 <p><sub><b>Beta.</b> 1.0'a kadar değişiklikler olabilir. <a href="https://mistgate.app/roadmap/status/">Durum ve yol haritası</a></sub></p>
 
@@ -136,7 +136,7 @@ Protokol çeşitliliğinde, topluluk büyüklüğünde ve tam Telegram botların
 
 ## Belgeler
 
-Her şey [mistgate.app](https://mistgate.app/) adresinde ve [`docs/`](docs/README.md) klasöründe. Belgeler İngilizce, Rusça ve Çince yazılmıştır; aşağıdaki bağlantılar İngilizce sürüme gider. Başlamak için iyi yerler:
+Her şey [mistgate.app](https://mistgate.app/docs/) adresinde ve [`docs/`](docs/README.md) klasöründe. Belgeler İngilizce, Rusça ve Çince yazılmıştır; aşağıdaki bağlantılar İngilizce sürüme gider. Başlamak için iyi yerler:
 
 - [Genel bakış](docs/en/getting-started/overview.md) ve [Gereksinimler](docs/en/getting-started/requirements.md)
 - [Paneli kurma](docs/en/getting-started/install-panel.md), [SSH ile düğüm kurma](docs/en/getting-started/ssh-install.md), [İlk kullanıcılar](docs/en/getting-started/first-users.md)
