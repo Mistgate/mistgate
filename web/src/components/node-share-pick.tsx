@@ -1,7 +1,5 @@
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
 import { useQuery } from "@tanstack/react-query";
-import { Check } from "@/components/ui/bits";
+import { WayCards } from "@/components/add-node-frame";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { Pending, QueryError } from "@/components/ui/query-error";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
@@ -11,8 +9,8 @@ import { nodesQuery } from "@/lib/queries";
 import { groupTone } from "@/screens/users/format";
 import { groupsQuery } from "@/screens/users/rpc";
 
-// "Who gets this node" in the New node window: three ways (everyone, some groups, nobody yet) in the window's own switch, the groups to
-// tick under the second. The first node of the panel goes to everyone, so the window only says so; from the second node on the choice
+// "Who gets this node" in the New node window: three ways (everyone, some groups, nobody yet) as cards (.an-wc), the groups to
+// press as chips (.an-gr) under the second. The first node of the panel goes to everyone, so the window only says so; from the second node on the choice
 // starts at the last one the person made (lib/node-share.ts), else "nobody yet". The panel decides when the window sends nothing.
 
 const icons: Record<ShareMode, IconName> = { all: "globe", listed: "people", none: "eyeOff" };
@@ -57,17 +55,16 @@ export function SharePick({ share, onChange }: { share: NodeShare; onChange: (c:
   const set = (mode: ShareMode) => onChange(mode === "listed" ? { mode, groupIds: choice.mode === "listed" ? choice.groupIds : [] } : { mode, groupIds: [] });
   const toggle = (id: string, on: boolean) => onChange({ mode: "listed", groupIds: on ? [...choice.groupIds, id] : choice.groupIds.filter((x) => x !== id) });
   return (
-    <fieldset className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0" data-testid="node-share">
-      <div className="an-lb">{t("ns.pick.title")}</div>
-      <RadioGroup aria-label={t("ns.pick.title")} value={choice.mode} onValueChange={(v) => set(v as ShareMode)} className="an-ws">
-        {shareModes.map((m) => (
-          <Radio.Root key={m} value={m}>
-            <Icon name={icons[m]} size={16} />
-            {t(`ns.mode.${m}`)}
-          </Radio.Root>
-        ))}
-      </RadioGroup>
-      <p className="text-xs leading-4 text-muted">{t(`ns.pick.${choice.mode}`)}</p>
+    <fieldset className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0" data-testid="node-share">
+      <div className="flex flex-col gap-1.5">
+        <div className="an-lb">{t("ns.pick.title")}</div>
+        <WayCards
+          label={t("ns.pick.title")}
+          value={choice.mode}
+          onValueChange={set}
+          options={shareModes.map((m) => ({ value: m, label: t(`ns.mode.${m}`), hint: t(`ns.opt.${m}`), icon: <Icon name={icons[m]} size={16} /> }))}
+        />
+      </div>
       {choice.mode === "listed" &&
         (groups.isPending ? (
           <Pending compact />
@@ -76,14 +73,12 @@ export function SharePick({ share, onChange }: { share: NodeShare; onChange: (c:
         ) : list.length === 0 ? (
           <p className="text-[13px] text-muted">{t("ns.pick.noGroups")}</p>
         ) : (
-          <div role="group" aria-label={t("ns.pick.groups")} className="wn-scroll max-h-[196px] overflow-y-auto rounded-field border border-line">
+          <div role="group" aria-label={t("ns.pick.groups")} className="an-gr">
             {list.map((g) => (
-              <label key={g.id} className="flex min-h-10 cursor-pointer items-center gap-2.5 border-t border-line px-3 text-sm first:border-t-0 hover:bg-step">
-                <Check checked={choice.groupIds.includes(g.id)} onCheckedChange={(on) => toggle(g.id, on)} aria-label={g.name} />
-                <i aria-hidden data-tone={groupTone(g.id, g.color)} className="size-2 flex-none rounded-full bg-(--t)" />
-                <span className="min-w-0 flex-1 truncate">{g.name}</span>
-                <span className="flex-none text-xs text-muted">{t.n("users.groupPeople", g.userCount + g.extraUserCount)}</span>
-              </label>
+              <button key={g.id} type="button" aria-pressed={choice.groupIds.includes(g.id)} title={t.n("users.groupPeople", g.userCount + g.extraUserCount)} onClick={() => toggle(g.id, !choice.groupIds.includes(g.id))}>
+                <i aria-hidden data-tone={groupTone(g.id, g.color)} className="an-gd" />
+                <span>{g.name}</span>
+              </button>
             ))}
           </div>
         ))}

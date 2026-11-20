@@ -70,7 +70,7 @@ describe("the scenes of who gets a node", () => {
     }
     expect(body).toContain(en["ns.pick.title"]);
     if (state === "win-cmd-pick") expect(body).toContain(en["ns.pick.pickOne"]);
-    if (state === "win-cmd-listed") expect(document.querySelectorAll("[role=group] [role=checkbox][aria-checked=true]").length).toBe(2);
+    if (state === "win-cmd-listed") expect(document.querySelectorAll("[role=group] button[aria-pressed=true]").length).toBe(2);
     if (state === "win-cmd-load") expect(body).toContain(en["common.loading"]);
   });
 
