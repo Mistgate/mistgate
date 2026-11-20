@@ -813,6 +813,8 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lpe .emb.ph .pwin-s .pnr:not(.an-host){height:var(--bh,740px);overflow:hidden}
 .lpe .emb.ph .pnr:not(.an-host)>.pn{min-height:var(--bh,740px)}
 .lpe .emb.ph .pnr:not(.an-host)>.pn>.an-scrim{bottom:auto;height:var(--bh,740px)}
+/* Safari misplaces a sticky box inside a scaled frame: the sheet sits at the end of the column without it */
+.lpe .emb.ph .pnr:not(.an-host)>.pn>.an-scrim>.an-pos{position:relative;bottom:auto}
 .lpe .emb.ph,.lpe .emb.pwin.ph{max-width:400px;margin-left:auto;margin-right:auto;border-radius:32px;border:1px solid rgba(243,243,245,.14);box-shadow:0 0 0 6px #141417,0 0 0 7px rgba(243,243,245,.09)}
 /* the bezel ring is 7px outside the box and the hero clips its overflow */
 .lpe.hero-e .emb.pwin.ph{margin-top:8px}
@@ -831,6 +833,8 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lp .lx-bg{display:none;width:36px;padding:0}
 .lp .lx-ins .i{display:none}
 .lp .lx-mn{position:absolute;top:68px;left:0;right:0;z-index:30;display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:16px;border:1px solid var(--hair);background:var(--raise);animation:lp-up .25s var(--e) both}
+/* the narrow rule that hides the header nav is stronger than .lp .lx-mn and hid this menu too */
+.lp .top nav.lx-mn{display:flex}
 .lp .lx-mn a{display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 12px;border-radius:10px;font-size:16px;color:var(--text)}
 .lp .lx-mn a:hover{background:var(--step)}
 .lp .lx-mn a .i{color:var(--muted)}

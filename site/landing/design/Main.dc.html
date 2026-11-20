@@ -387,8 +387,8 @@ class Component extends DCLogic {
         const tw = Math.sin(t * 1.6 + p[2]); if (tw > .95) a += (tw - .95) * 6;
         const g1 = (d - r1) / 44, g2 = (d - r2) / 44; a += Math.exp(-g1 * g1) * .78 * f1 + Math.exp(-g2 * g2) * .78 * f2;
         const qx = p[0] - px, qy = p[1] - py, q = qx * qx + qy * qy; if (q < 40000) a += Math.exp(-q / 9000) * .4;
-        const ex = (p[0] - tx) / rx, ey = (p[1] - ty) / ry, e = ex * ex + ey * ey; if (e < 1.5) a *= e < .8 ? .06 : .06 + .94 * (e - .8) / .7;
-        const ed = Math.min(p[0], W - p[0]) / 180, eb = (H - p[1]) / 200; if (ed < 1) a *= ed * ed; if (eb < 1) a *= eb * eb;
+        const ex = (p[0] - tx) / rx, ey = (p[1] - ty) / ry, e = ex * ex + ey * ey; const mk = W < 600 ? .3 : .06; if (e < 1.5) a *= e < .8 ? mk : mk + (1 - mk) * (e - .8) / .7;
+        const ed = Math.min(p[0], W - p[0]) / Math.min(180, W * .125), eb = (H - p[1]) / Math.min(200, H * .2); if (ed < 1) a *= ed * ed; if (eb < 1) a *= eb * eb;
         if (a < .03) continue; if (a > 1) a = 1;
         const hot = a > .34, s = hot ? .9 + a * .8 : 1;
         ctx.fillStyle = hot ? 'rgba(125,211,160,' + a.toFixed(3) + ')' : 'rgba(243,243,245,' + a.toFixed(3) + ')';
