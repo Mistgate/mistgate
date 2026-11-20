@@ -107,12 +107,19 @@ pub fn run(o: &Options) -> Result<Report, String> {
             // a page with no title yet (todo) borrows the English one, so that a preview still reads sensibly
             let en = &by_lang["en"];
             let pick = |own: &str, other: &str, last: &str| if !own.trim().is_empty() { own.to_string() } else if e.todo && !other.trim().is_empty() { other.to_string() } else { last.to_string() };
-            let (mut fonts, mut module_preloads) = (Vec::new(), Vec::new());
-            for p in &e.preload {
+            let lg = l.code.to_uppercase();
+            for (k, v) in &e.html_attrs {
+                if k != "data-lg" || *v != lg {
+                    bad.push(format!("manifest.json: pages.{page}.{}: \"htmlAttrs\" {k}={v:?}: only data-lg={lg:?} is known", l.code));
+                }
+            }
+            let (mut fonts, mut module_preloads, mut fetches) = (Vec::new(), Vec::new(), Vec::new());
+            for p in e.preload.iter().chain(&e.fonts).chain(&e.fetch) {
                 match p.rsplit('.').next() {
                     Some("woff2") => fonts.push(format!("/{p}")),
                     Some("js" | "mjs") => module_preloads.push(format!("/{p}")),
-                    _ => bad.push(format!("manifest.json: pages.{page}.{}: \"preload\" entry {p} is neither a .woff2 font nor a .js module", l.code)),
+                    Some("json") => fetches.push(format!("/{p}")),
+                    _ => bad.push(format!("manifest.json: pages.{page}.{}: preloaded {p} is not a .woff2 font, a .js module or a .json file", l.code)),
                 }
             }
             let mut alternates: Vec<_> = langs.iter().map(|a| doc::Alternate { hreflang: a.hreflang.into(), href: format!("{}{}", manifest::SITE, manifest::page_url(a.code, page)) }).collect();
@@ -120,7 +127,7 @@ pub fn run(o: &Options) -> Result<Report, String> {
             let rendered = doc::render(doc::Page {
                 html_lang: l.html_lang.into(),
                 dir: if l.rtl { "rtl" } else { "ltr" }.into(),
-                data_lg: l.code.to_uppercase(),
+                data_lg: lg,
                 head: doc::Head {
                     title: pick(&e.title, &en.title, "Mistgate"),
                     description: pick(&e.description, &en.description, ""),
@@ -129,6 +136,7 @@ pub fn run(o: &Options) -> Result<Report, String> {
                     alternates,
                     fonts,
                     module_preloads,
+                    fetches,
                     css: e.css.iter().map(|c| format!("/{c}")).collect(),
                     modules: e.modules.iter().map(|c| format!("/{c}")).collect(),
                 },

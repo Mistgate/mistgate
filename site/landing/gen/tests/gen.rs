@@ -286,7 +286,7 @@ fn manifest_problems_are_listed_together() {
     let build = fixture_build("bad-preload");
     edit_manifest(&build, |v| v["pages"]["app"]["zh"]["preload"] = serde_json::json!(["assets/logo.1a2b3c4d.svg"]));
     let e = err(generate(&build, &dist_of(&build)));
-    assert!(e.contains("pages.app.zh") && e.contains("neither a .woff2 font nor a .js module"), "{e}");
+    assert!(e.contains("pages.app.zh") && e.contains("is not a .woff2 font, a .js module or a .json file"), "{e}");
 }
 
 #[test]

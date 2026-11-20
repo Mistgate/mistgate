@@ -25,6 +25,8 @@ pub struct Head {
     pub fonts: Vec<String>,
     /// root-relative URLs of modules to `modulepreload`
     pub module_preloads: Vec<String>,
+    /// root-relative URLs of `.json` files the page fetches at once
+    pub fetches: Vec<String>,
     pub css: Vec<String>,
     pub modules: Vec<String>,
 }
@@ -75,6 +77,7 @@ fn HeadTags(head: Head) -> impl IntoView {
         <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
         {head.fonts.into_iter().map(|f| view! { <link rel="preload" href=f r#as="font" type="font/woff2" crossorigin=""/> }).collect_view()}
         {head.module_preloads.into_iter().map(|m| view! { <link rel="modulepreload" href=m/> }).collect_view()}
+        {head.fetches.into_iter().map(|f| view! { <link rel="preload" href=f r#as="fetch" crossorigin=""/> }).collect_view()}
         {head.css.into_iter().map(|c| view! { <link rel="stylesheet" href=c/> }).collect_view()}
         {head.modules.into_iter().map(|m| view! { <script type="module" src=m></script> }).collect_view()}
         </head>

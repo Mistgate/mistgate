@@ -64,6 +64,15 @@ pub struct PageEntry {
     pub modules: Vec<String>,
     #[serde(default)]
     pub preload: Vec<String>,
+    /// `.woff2` files of the first screen, preloaded
+    #[serde(default)]
+    pub fonts: Vec<String>,
+    /// data the page fetches at once (its language pack), preloaded
+    #[serde(default)]
+    pub fetch: Vec<String>,
+    /// what the pipeline expects on `<html>`; only `data-lg`, and it must agree with the language
+    #[serde(default, rename = "htmlAttrs")]
+    pub html_attrs: BTreeMap<String, String>,
     #[serde(default)]
     pub dir: Option<String>,
     #[serde(default)]
@@ -144,7 +153,7 @@ pub fn validate(m: &Manifest, build: &Path) -> Vec<String> {
             } else if !build.join(&e.body).is_file() {
                 bad.push(format!("{at}: fragment {} does not exist", e.body));
             }
-            for (field, list) in [("css", &e.css), ("modules", &e.modules), ("preload", &e.preload)] {
+            for (field, list) in [("css", &e.css), ("modules", &e.modules), ("preload", &e.preload), ("fonts", &e.fonts), ("fetch", &e.fetch)] {
                 for a in list {
                     if !safe_rel(a) || !a.starts_with("assets/") {
                         bad.push(format!("{at}: \"{field}\" entry {a:?} is not a path under assets/"));
