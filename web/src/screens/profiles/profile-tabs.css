@@ -1806,3 +1806,61 @@
     padding-inline-start: 42px;
   }
 }
+/* "Put a profile on a node" (the node page's window): 600 wide, the list scrolls inside, the rows are profiles with their port at the end */
+.pf-dr > .an-scrim > .an-pos > .us-dlg.ug-dlg.nd-pa {
+  max-width: 600px;
+  max-height: min(760px,calc(100vh - 96px));
+}
+.pf .nd-pa .us-db {
+  min-height: 0;
+  overflow-y: auto;
+}
+.pf .nd-pa .us-db>* {
+  flex: none;
+}
+@media (max-width: 760px) {
+  .pf-dr > .an-scrim > .an-pos > .us-dlg.ug-dlg.nd-pa {
+    max-height: calc(100vh - 24px);
+  }
+}
+.pf .nd-pap {
+  font-size: 12px;
+  color: var(--sec);
+  white-space: nowrap;
+}
+.pf .pt-pf .pt-h .pv-g {
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+.pf .pt-r.go .pv-g,.pf .pt-r.no .pv-g {
+  opacity: .6;
+}
+.pf .nd-panew {
+  margin-inline-end: auto;
+  font-size: 13px;
+}
+.pf .nd-pa .us-db>p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--sec);
+}
+/* a row of profiles with a way to its form next to it: the tick and the name take the width, the link keeps its own */
+.pf .pt-hw {
+  display: flex;
+  align-items: center;
+}
+.pf .pt-hw .pt-h {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.pf .pt-set {
+  flex: none;
+  padding-inline-end: 14px;
+  font-size: 13px;
+  color: var(--sec);
+  white-space: nowrap;
+}
