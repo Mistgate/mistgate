@@ -47,10 +47,14 @@ func (f *Fleet) InboundSpecs(ctx context.Context, nodeID string) ([]plugin.Inbou
 // SessionHost is the host name a node's link session dialled (lower case, no port), "" when it has none or runs over mTLS.
 func (f *Fleet) SessionHost(nodeID string) string {
 	if v, ok := f.sub.linkHosts.Load(nodeID); ok {
-		return v.(string)
+		return v.(*linkHost).host
 	}
 	return ""
 }
+
+// linkHost is one link session's host: a session's done removes its own entry, never the one of a session that replaced it
+// (two sessions through the same host have equal names, so the entries are compared by identity).
+type linkHost struct{ host string }
 
 // noteLinkHost records the host a link session dialled until the session ends (done).
 func (f *Fleet) noteLinkHost(nodeID, audience string) (done func()) {
@@ -59,8 +63,9 @@ func (f *Fleet) noteLinkHost(nodeID, audience string) (done func()) {
 		host = h
 	}
 	host = strings.TrimSuffix(strings.ToLower(host), ".")
-	f.sub.linkHosts.Store(nodeID, host)
-	return func() { f.sub.linkHosts.CompareAndDelete(nodeID, host) }
+	mine := &linkHost{host: host}
+	f.sub.linkHosts.Store(nodeID, mine)
+	return func() { f.sub.linkHosts.CompareAndDelete(nodeID, mine) }
 }
 
 // SetLinkEnrollment makes new nodes enrol over the link (true while a subscription host is the panel's address: the panel's

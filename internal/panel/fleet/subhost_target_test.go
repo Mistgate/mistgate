@@ -38,3 +38,19 @@ func TestSubHostTargetOfTheAgentsSite(t *testing.T) {
 		t.Fatal("a node that reports no role has no status")
 	}
 }
+
+// An agent that reconnects through the same subdomain: the old session unwinds after the new one noted its host, and must not
+// erase the new session's entry (two equal host names are still two sessions).
+func TestSessionHostSurvivesTheSessionItReplaced(t *testing.T) {
+	e := newEnv(t)
+	old := e.f.noteLinkHost("nod_a", "sub.example.com:443")
+	replaced := e.f.noteLinkHost("nod_a", "Sub.Example.com.")
+	old()
+	if got := e.f.SessionHost("nod_a"); got != "sub.example.com" {
+		t.Fatalf("after the old session ended: %q", got)
+	}
+	replaced()
+	if got := e.f.SessionHost("nod_a"); got != "" {
+		t.Fatalf("after the live session ended: %q", got)
+	}
+}
