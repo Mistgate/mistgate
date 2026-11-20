@@ -20,6 +20,7 @@ import {
   pauseText,
   progressOf,
   reasonText,
+  rescanText,
   skippedProfilesNote,
   slowPollMs,
   stagesOf,
@@ -292,6 +293,22 @@ describe("the words of server keys", () => {
     expect(stepErrorText(t, "updates.step.err.inbound_failed", one)).toBe(en["updates.step.err.inbound_failed"]);
   });
 
+  it("tells the owner what \"read the folder again\" did about the bundle of a newer release", () => {
+    const answer = (params: Record<string, string>) => ({ bundle: { params } });
+    expect(rescanText(t, answer({ sync: "fresh" }))).toBe(en["up.bundle.sync.fresh"]);
+    expect(rescanText(t, answer({ sync: "installed" }))).toBe(en["up.bundle.sync.installed"]);
+    expect(rescanText(t, answer({ sync: "downloading" }))).toBe(en["up.bundle.sync.downloading"]);
+    expect(rescanText(t, answer({ sync: "failed" }))).toBe(en["up.bundle.sync.failed"]);
+    expect(rescanText(t, answer({ sync: "waiting", sync_wait: "rollout" }))).toBe(en["up.bundle.sync.wait.rollout"]);
+    expect(rescanText(t, answer({ sync: "waiting", sync_wait: "os_rollout" }))).toBe(en["up.bundle.sync.wait.os_rollout"]);
+    expect(rescanText(t, answer({ sync: "waiting", sync_wait: "panel_update" }))).toBe(en["up.bundle.sync.wait.panel_update"]);
+    expect(rescanText(t, answer({ sync: "waiting", sync_wait: "something_new" }))).toBe(en["up.bundle.sync.wait.other"]);
+    // a panel with no source, or an answer without params: only the folder was read
+    expect(rescanText(t, answer({}))).toBe(en["up.bundle.rescanned"]);
+    expect(rescanText(t, {})).toBe(en["up.bundle.rescanned"]);
+    expect(rescanText(t, answer({ sync: "something_new" }))).toBe(en["up.bundle.rescanned"]);
+  });
+
   it("says which profiles were not held against the update because they did not work before it", () => {
     expect(skippedProfilesNote(t, { skipped_profiles: JSON.stringify(["Main", "Backup"]) })).toBe("Not held against the update, these did not work before it: “Main”, “Backup”.");
     expect(skippedProfilesNote(t, { skipped_profiles: JSON.stringify(["Main"]), skipped_more: "2" })).toContain("“Main”, and 2 more");
@@ -416,7 +433,8 @@ describe("dictionary", () => {
 
   it("has the words of a profile failure in every language", () => {
     const keys = ["updates.step.profiles", "updates.step.profiles.more", "updates.step.skipped", "updates.pause.why.profiles",
-      ...["timeout", "refused", "auth", "tls", "http_status", "exit_unreachable", "no_round", "failed"].map((c) => `updates.step.profile.why.${c}`)];
+      ...["timeout", "refused", "auth", "tls", "http_status", "exit_unreachable", "no_round", "failed"].map((c) => `updates.step.profile.why.${c}`),
+      ...["fresh", "installed", "downloading", "failed", "wait.rollout", "wait.os_rollout", "wait.panel_update", "wait.other"].map((c) => `up.bundle.sync.${c}`)];
     for (const k of keys) {
       expect(en, k).toHaveProperty([k]);
       expect(ru, k).toHaveProperty([k]);

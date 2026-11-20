@@ -542,6 +542,9 @@ func (s *Service) finishIfDone(ctx context.Context, ro store.RolloutRow, steps [
 		s.log.Warn("update: finish rollout", "rollout", ro.ID, "err", err)
 		return false
 	}
+	if ok {
+		s.startNodeBundleSyncLocked() // the bundle the rollout kept waiting is fetched now, not at the next poll
+	}
 	return ok
 }
 

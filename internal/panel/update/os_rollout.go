@@ -627,6 +627,9 @@ func (s *Service) finishOsIfDone(ctx context.Context, ro store.OsRolloutRow, ste
 		s.log.Warn("update: finish OS rollout", "code", "update_os_finish_os_rollout", "rollout", ro.ID, "err", err)
 		return false
 	}
+	if ok {
+		s.startNodeBundleSyncLocked() // an agent bundle that waited for the OS update is fetched now
+	}
 	return ok
 }
 

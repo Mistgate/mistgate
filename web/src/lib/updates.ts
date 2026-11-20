@@ -282,6 +282,18 @@ export function vantageNote(t: T, node: string, params: Params, passed: boolean)
   return "";
 }
 
+/**
+ * What "read the folder again" did, from the answer's bundle params (internal/panel/update/bundle_auto.go): the folder was read, and
+ * the bundle of a newer release was already the newest, was downloaded, is on its way, could not be checked, or waits for a job.
+ * A panel with no GitHub source says only that the folder was read.
+ */
+export function rescanText(t: T, answer: unknown): string {
+  const params = (answer as { bundle?: { params?: Params } } | undefined)?.bundle?.params ?? {};
+  const outcome = params.sync;
+  if (outcome === "waiting") return known(t, `up.bundle.sync.wait.${params.sync_wait}`) ?? t("up.bundle.sync.wait.other");
+  return (outcome && known(t, `up.bundle.sync.${outcome}`)) || t("up.bundle.rescanned");
+}
+
 /** Why the rollout waits ("updates.pause.<code>"). */
 export function pauseText(t: T, key: string, params: Params = {}): string {
   if (!key) return "";
@@ -515,11 +527,11 @@ export function useUpdateActions() {
     onError: (e) => toast.error(callErrorText(e, t)),
   });
 
-  /** Runs one call; resolves true when it went through (the dialogs close on it). */
-  const run = (fn: () => Promise<unknown>, done?: string) =>
+  /** Runs one call; resolves true when it went through (the dialogs close on it). `done` may read the answer. */
+  const run = (fn: () => Promise<unknown>, done?: string | ((answer: unknown) => string)) =>
     call.mutateAsync(fn).then(
-      () => {
-        if (done) toast(done);
+      (answer) => {
+        if (done) toast(typeof done === "function" ? done(answer) : done);
         return true;
       },
       () => false,
@@ -551,7 +563,7 @@ export function useUpdateActions() {
     resume: (id: string) => run(() => updates.resumeRollout({ rolloutId: id }), t("up.toast.resumed")),
     cancel: (id: string) => run(() => updates.cancelRollout({ rolloutId: id }), t("up.toast.cancelled")),
     rollback: (n: { id: string; name: string }) => run(() => updates.rollbackNode({ nodeId: n.id }), t("up.toast.rollback", { name: n.name })),
-    rescan: () => run(() => updates.rescanBundle({}), t("up.bundle.rescanned")),
+    rescan: () => run(() => updates.rescanBundle({}), (answer) => rescanText(t, answer)),
     checkPanel: () => checkPanel.mutateAsync().then(() => true, () => false),
     /** Installs exactly the signed release the owner saw (its version and this architecture's SHA-256). */
     installPanel: (release: { version: string; sha256: string }) =>
