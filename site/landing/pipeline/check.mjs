@@ -24,6 +24,8 @@ const path = (page, lang) => (lang === 'en' ? '' : '/' + lang) + (page === 'app'
 
 // ---- page side: helpers installed into every document ----
 const PAGE_JS = String.raw`(() => {
+  // layout shifts of the load (the sum of the ones no input caused): the stand loads every page with the processor 4 times slower, where a layout the page does late shows
+  window.__cls = 0; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch (e) { /* no such entries */ }
   window.__csp = []; window.__FULLWAIT = ${process.env.FULLWAIT ? 'true' : 'false'};
   // the page's own tour engine stays still while the smoke drives the tours: its kick is switched off the moment the page instance exists
   Object.defineProperty(window, "__dcPage", { configurable: true, set(v) { if (v) v.tourKick = () => {}; window.__dcPageV = v; }, get() { return window.__dcPageV; } }); document.addEventListener('securitypolicyviolation', (e) => window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));
@@ -139,11 +141,17 @@ try {
     const height = width < 500 ? 844 : width < 1000 ? 1024 : 900;
     await chrome.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 500 });
     await chrome.send('Page.navigate', { url: 'about:blank' }); await sleep(150);
+    await chrome.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await chrome.send('Page.navigate', { url: `http://127.0.0.1:${web.port}${path(page, lang)}` });
     let up = false;
     for (let i = 0; i < 100 && !up; i++) { await sleep(150); up = await chrome.ev('!!(window.__dcPage && document.querySelector("[data-board][data-ready]"))').catch(() => false); }
     if (!up) { fail(`${key}: the page did not come up`); run.errors.push(...w.errors); report.runs.push(run); continue; }
     await sleep(900);
+    await sleep(2500); // the late layouts of a slow device
+    const cls = await chrome.ev('window.__cls');
+    await chrome.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    run.cls = +cls.toFixed(3);
+    if (cls >= 0.1) fail(`${key}: the page jumps while it loads (layout shift ${cls.toFixed(2)} with the processor 4x slower, the limit is 0.1)`); else console.log(`  layout shift while loading (cpu x4): ${cls.toFixed(3)}`);
     // 1. every frame mounts when it is scrolled to
     const total = await chrome.ev(`(() => { const h = document.documentElement.scrollHeight; return h; })()`);
     for (let y = 0; y < total + 800; y += Math.round(height * 0.7)) { await chrome.ev(`window.scrollTo(0, ${y})`); await sleep(260); }
