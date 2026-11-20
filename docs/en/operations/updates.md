@@ -138,7 +138,7 @@ Each update is pinned to a release:
    - the new build has committed: it connected and applied its configuration without a failed profile;
    - the configuration the node applied is the panel's;
    - no profile that worked before the update has failed (a profile that stays failed for 30 seconds fails the gate at once);
-   - every profile the panel can check has passed a [client-eye check](health.md) since the node came back (the panel starts a round at once). The [Cloudflare edition](#on-the-cloudflare-edition) leaves this one out.
+   - every profile the panel can check has passed a [client-eye check](health.md) since the node came back (the panel starts a round at once). A profile whose check was already failing in the 15 minutes before the step was sent is left out: it was not working before the update, so the update is not blamed for it. If that leaves nothing to check, the step passes and says which profiles it skipped. The [Cloudflare edition](#on-the-cloudflare-edition) leaves this one out.
    - on a node with an enabled profile that exits through WARP, the WARP tunnel has been up since the node came back.
 4. When the gate passes, the step is done. A failed gate names the condition that did not hold: the new build did not confirm the update, the node did not apply its configuration, the panel could not read the node's profiles, a profile failed, or WARP did not come up. When it fails, the panel sends the node a rollback (the previous binary comes back), the step ends as "rolled back" and the rollout pauses.
 

@@ -892,17 +892,26 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 		if err != nil {
 			miss(errProbeFailed)
 		} else if probeable > 0 && ok < probeable {
-			miss(errProbeFailed)
-			pathLooksLossy = ok+failed == probeable && timeoutsOnly && failedFor >= vantageMinFailing
+			listed := false
 			if l, can := s.hl.(interface {
 				NodeChecksPending(ctx context.Context, nodeID string, since time.Time) ([]string, error)
 			}); can {
 				if ids, err := l.NodeChecksPending(ctx, nodeID, since); err == nil {
-					pending = append(pending, ids...)
+					pending, listed = ids, true
 				}
 			}
-			if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
-				s.log.Warn("update: run checks", "node", nodeID, "err", err)
+			// A profile whose check was already failing when the step was sent is not what this update broke: it is left out of the
+			// count, and when nothing else fails the step passes and says which profiles it did not hold against the update.
+			var skipped []string
+			pending, skipped = withoutProbeSick(pending, preFailed)
+			if listed && len(pending) == 0 && len(skipped) > 0 {
+				skippedProfileParams(with, skipped, label)
+			} else {
+				miss(errProbeFailed)
+				pathLooksLossy = ok+failed == probeable && timeoutsOnly && failedFor >= vantageMinFailing
+				if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
+					s.log.Warn("update: run checks", "node", nodeID, "err", err)
+				}
 			}
 		}
 	}
@@ -1301,17 +1310,7 @@ func (p *pass) sendPrepared(x *store.StepRow, n store.NodeRow, sources []string)
 }
 
 func (p *pass) preFailed(x *store.StepRow) []string {
-	in, err := p.s.st.FleetInbounds(p.ctx, x.NodeID, true)
-	if err != nil {
-		return x.PreFailed
-	}
-	var preFailed []string
-	for _, inbound := range in {
-		if inbound.State == "failed" {
-			preFailed = append(preFailed, inbound.ID)
-		}
-	}
-	return preFailed
+	return p.s.preFailedOf(p.ctx, x.NodeID, p.now, x.PreFailed)
 }
 
 func (p *pass) sendLink(x *store.StepRow, n store.NodeRow, preFailed []string) {

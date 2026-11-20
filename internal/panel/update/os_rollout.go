@@ -956,17 +956,7 @@ func (p *osPass) retryNotBefore(nodeID, code string) time.Time {
 }
 
 func (p *osPass) preFailed(x *store.OsStepRow) []string {
-	in, err := p.s.st.FleetInbounds(p.ctx, x.NodeID, true)
-	if err != nil {
-		return x.PreFailed
-	}
-	var failed []string
-	for _, inbound := range in {
-		if inbound.State == "failed" {
-			failed = append(failed, inbound.ID)
-		}
-	}
-	return failed
+	return p.s.preFailedOf(p.ctx, x.NodeID, p.now, x.PreFailed)
 }
 
 // stepPassOs loads the active OS rollout and the step of the node if it is still the one the goroutine started with.
