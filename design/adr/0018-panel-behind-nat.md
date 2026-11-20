@@ -78,8 +78,16 @@ and waits while nodes move there; the owner finishes, forcing it if needed. The 
 
 - A home panel needs no public address, no port forwarding and no dynamic DNS; the fleet stays reachable as long as the
   host node is. The host is a single point for subscriptions and links; the owner can move it.
-- Seizing the host yields no subscriptions, tokens or keys: TLS it cannot decrypt, the bridge path, and the role.
+- Seizing the host yields no stored subscriptions, tokens or keys: TLS it cannot decrypt, the bridge path, and the role.
+  It does not keep the subdomain safe, though: the subdomain points at the host, so whoever holds it can pass an ACME
+  challenge for the name and get a certificate of their own, then terminate the people's TLS and read their
+  subscriptions while it keeps the role. Only a CAA record that names this panel's ACME account (`accounturi`) and
+  challenge method stops that, and only at authorities that honour it; the panel shows the record but does not enforce
+  it yet.
 - What the bridge cannot hide remains: one to four long connections from the panel's address to the node's 443, pings
   every 15 s, a new connection about every hour. A subdomain visitor during an outage sees the node's certificate.
+- The extra hop is measurable: a subscription or a link through the host takes the panel–host round trip on top of the
+  person–host one, and its first bytes wait for a free pair. A prober that compares the subdomain's timing with the node's
+  own site can tell the subdomain is relayed.
 - The panel's subdomain certificate is renewed through the host: a host that stays down long enough lets it expire.
 - The agent protocol only grows (`sub-host/1`, `link-fetch/1`); fleets without a host see no change.
