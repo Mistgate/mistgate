@@ -62,7 +62,7 @@ func relayTools() []toolDef {
 		readTool("relay_candidates", ProfileReadonly,
 			procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.RelayServiceListRelayCandidatesProcedure),
 			"The servers of other nodes that an entry node could relay, with what the panel knows about reaching them. node is the entry (id or exact name). "+
-				"Per server: its inbound_id (what relay_plan create takes), exit node, profile, protocol, network and port; unsupported (empty: it can be relayed; else cdn, acme_ip or build_failed); "+
+				"Per server: its inbound_id (what relay_plan create takes), exit node, profile, protocol, network and port; unsupported (empty: it can be relayed; else cdn, acme_ip, webproxy or build_failed); "+
 				"hop (the server has a hop range, a relay passes one port); relay_id (this entry already relays it); "+
 				"exit_country_check (how people inside the country see the exit: verdict ok, partial, blocked, listed or no_data, and the dark networks); "+
 				"entry_reaches_exit (does the entry itself reach the exit: reach, partial, blocked or no_data, from the TSPU probe when it ran from that entry); "+

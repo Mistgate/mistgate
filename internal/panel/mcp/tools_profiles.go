@@ -29,7 +29,7 @@ func profileTools() []toolDef { return slices.Concat(profileReadTools(), profile
 func profileReadTools() []toolDef {
 	return []toolDef{
 		readTool("protocols_list", ProfileReadonly, procs(adminv1connect.ProfileServiceListProtocolsProcedure),
-			"List protocol plugins, their client apps, compact settings schemas, and default settings. Secret fields in schemas and defaults are masked.",
+			"List protocol plugins, their client apps, compact settings schemas, and default settings. Secret fields in schemas and defaults are masked. MTProto has a mode setting: fake_tls (default) or web, the Telegram Web Proxy (port 443, the node's own name given as sni_overrides, no relays or IPv6 twin; an agent needs mtproto-web/1).",
 			func(c *call, _ struct{}) (any, error) {
 				r, err := c.cl.Profile.ListProtocols(c.ctx, connect.NewRequest(&adminv1.ListProtocolsRequest{}))
 				if err != nil {

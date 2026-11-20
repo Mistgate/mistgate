@@ -6,11 +6,20 @@ package mtproto
 // default) or another site the owner names, which also decides what a stranger on the port
 // sees (the node's own site, or that site). The editor hides the domain unless the kind is
 // another site (web/src/screens/profiles/mtproto-form.ts).
+// The mode (Fake TLS, or the Web Proxy of Telegram Web) comes first; Web fixes the port to 443 and
+// the name to the node's own.
 const settingsSchema = `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "MTProto",
   "type": "object",
   "properties": {
+    "mode": {
+      "type": "string", "enum": ["fake_tls", "web"], "default": "fake_tls",
+      "x-enum-labels": {"fake_tls": "Fake TLS", "web": "Web"},
+      "title": "Mode",
+      "description": "Fake TLS is the proxy of the Telegram apps (tg://proxy). Web is the proxy of Telegram Web in a browser: it has a name of its own on this node (the node needs a domain), is served on port 443 and uses the node's own site as its cover. The person's Telegram key is the same in both.",
+      "x-widget": "segmented", "x-order": 5, "x-critical": true
+    },
     "port": {
       "type": "integer", "minimum": 1, "maximum": 65535, "default": 443,
       "title": "TCP port", "description": "Port the node listens on for Telegram clients.",

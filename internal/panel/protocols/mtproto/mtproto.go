@@ -22,6 +22,7 @@ const ID = "mtproto"
 
 const (
 	defaultPort = 443
+	webPort     = 443 // the Web Proxy is https: the browser reaches it on 443 only
 	keyLen      = 16
 )
 
@@ -32,11 +33,21 @@ const (
 	nameSite = "site"
 )
 
+// The two ways a profile serves Telegram: the Fake TLS proxy of tg://proxy, and the Web Proxy of tg://webproxy (Telegram Web in a
+// browser tab, carried over https to a name of the node). A document without a mode is Fake TLS.
+const (
+	modeFakeTLS = "fake_tls"
+	modeWeb     = "web"
+)
+
 // Settings is the merged profile settings document.
 type Settings struct {
 	Port    int          `json:"port"`
+	Mode    string       `json:"mode,omitempty"`
 	FakeTLS FakeTLSNames `json:"fake_tls"`
 }
+
+func (s Settings) web() bool { return s.Mode == modeWeb }
 
 // FakeTLSNames is where the name inside the Fake TLS handshake (the domain at the end of the ee secret) comes from. Kind own:
 // the node's own host name, or the one set on the inbound; a node with only an IP address cannot use it. Kind site: Domain,
@@ -65,10 +76,12 @@ const (
 
 // NodeSettings is the JSON the node engine receives in InboundSpec.Settings. Domains are the names a client may put in the
 // Fake TLS handshake (one today); Fallback is FallbackDecoy for the node's own name and FallbackSite for another site, which
-// the node reaches at Domains[0]:443. Field order is deterministic because the bytes feed the state hash.
+// the node reaches at Domains[0]:443. Mode is "web" for the Web Proxy and absent for Fake TLS: the bytes of a Fake TLS inbound
+// stay what they were, so its spec hash does not change. Field order is deterministic because the bytes feed the state hash.
 type NodeSettings struct {
 	Domains  []string `json:"domains"`
 	Fallback string   `json:"fallback"`
+	Mode     string   `json:"mode,omitempty"`
 }
 
 type Protocol struct{}
@@ -118,6 +131,18 @@ func validate(s Settings) []protocols.FieldError {
 	var errs []protocols.FieldError
 	if s.Port < 1 || s.Port > 65535 {
 		errs = append(errs, fe("/port", "out_of_range", "port must be 1-65535"))
+	}
+	switch s.Mode {
+	case "", modeFakeTLS:
+	case modeWeb:
+		if s.Port != 0 && s.Port != webPort { // 0 is reported above
+			errs = append(errs, fe("/port", "invalid", "the Web Proxy is served on port 443"))
+		}
+		if s.FakeTLS.kind() != nameOwn {
+			errs = append(errs, fe("/fake_tls/kind", "invalid", "the Web Proxy uses the node's own name: another site cannot serve it"))
+		}
+	default:
+		errs = append(errs, fe("/mode", "invalid_enum", "mode must be fake_tls or web"))
 	}
 	switch s.FakeTLS.kind() {
 	case nameOwn: // the node's name comes from the node or the inbound (BuildInbound)
@@ -170,6 +195,9 @@ func (p *Protocol) Summary(raw json.RawMessage) string {
 	if errs != nil {
 		return ""
 	}
+	if s.web() {
+		return fmt.Sprintf("TCP %d · Web Proxy", s.Port)
+	}
 	if s.FakeTLS.kind() == nameSite && validSite(s.FakeTLS.Domain) {
 		return fmt.Sprintf("TCP %d · Fake TLS · %s", s.Port, strings.ToLower(strings.TrimSpace(s.FakeTLS.Domain)))
 	}
@@ -188,11 +216,18 @@ func (*Protocol) BuildInbound(in protocols.InboundInput) (plugin.InboundSpec, er
 	if in.PortOverride != 0 {
 		port = int(in.PortOverride)
 	}
+	if s.web() && port != webPort {
+		return plugin.InboundSpec{}, fmt.Errorf("the Web Proxy is served on port 443, not %d: take the port override off", port)
+	}
 	name, fallback, err := fakeName(s, in)
 	if err != nil {
 		return plugin.InboundSpec{}, err
 	}
-	settings, err := json.Marshal(NodeSettings{Domains: []string{name}, Fallback: fallback})
+	ns := NodeSettings{Domains: []string{name}, Fallback: fallback}
+	if s.web() {
+		ns.Mode = modeWeb
+	}
+	settings, err := json.Marshal(ns)
 	if err != nil {
 		return plugin.InboundSpec{}, err
 	}
@@ -231,11 +266,14 @@ func (*Protocol) Clients() []plugin.ClientSupport {
 
 func (*Protocol) Doctor() []protocols.Check { return nil }
 
-// Render returns one tg://proxy link, for FormatTelegramLink only. Every subscription format answers false: a
-// tg:// line would be a bogus server in Happ and in every other app of the link.
+// Render returns one tg://proxy link (tg://webproxy for the Web Proxy), for FormatTelegramLink only. Every subscription format
+// answers false: a tg:// line would be a bogus server in Happ and in every other app of the link.
 func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 	if in.Format != plugin.FormatTelegramLink {
 		return plugin.Fragment{}, false
+	}
+	if s, errs := parse(in.Settings); errs == nil && s.web() {
+		return renderWeb(in)
 	}
 	host := in.NodeAddr
 	if host == "" {
@@ -276,5 +314,38 @@ func (*Protocol) Render(in protocols.RenderInput) (plugin.Fragment, bool) {
 		Format: plugin.FormatTelegramLink,
 		Name:   label,
 		Data:   []byte(link),
+	}, true
+}
+
+// renderWeb is the Web Proxy's link: the server is the name of the inbound on the node (the browser reaches the proxy by it, over
+// https), not the node's address, and the secret is the same key of the person with the dd prefix.
+func renderWeb(in protocols.RenderInput) (plugin.Fragment, bool) {
+	host := in.Inbound.TLSServerName
+	if host == "" || strings.ContainsAny(host, " \t\r\n/#?") {
+		return plugin.Fragment{}, false
+	}
+	secret := in.Secret
+	if in.MaskSecrets {
+		secret = protocols.MaskedSecret
+	} else if key, err := hex.DecodeString(secret); err != nil || len(key) != keyLen {
+		return plugin.Fragment{}, false
+	} else {
+		secret = "dd" + secret
+	}
+	q := url.Values{}
+	q.Set("server", host)
+	q.Set("port", strconv.Itoa(int(in.Inbound.Port)))
+	q.Set("secret", secret)
+	name := in.DisplayName
+	if name == "" {
+		name = in.Inbound.Node.Name
+	}
+	if name == "" {
+		name = host
+	}
+	return plugin.Fragment{
+		Format: plugin.FormatTelegramLink,
+		Name:   name + " - Telegram Web",
+		Data:   []byte("tg://webproxy?" + q.Encode()),
 	}, true
 }

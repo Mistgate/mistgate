@@ -173,6 +173,7 @@ type syncBody struct {
 		Via        string
 		ViaCountry string `json:"via_country"`
 		IPv6       bool
+		Web        bool
 		Link       string
 	}
 	raw string

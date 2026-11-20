@@ -33,6 +33,8 @@ func TestIPv6UnsupportedReasons(t *testing.T) {
 		{"vless with an empty CDN host", "vless", `{"cdn":{"host":""}}`, "", plugin.TLSAcmeDomain},
 		{"certificate on an IP", "hysteria2", `{}`, "acme_ip", plugin.TLSAcmeIP},
 		{"awg", "awg", `{}`, "", 0},
+		{"mtproto, Fake TLS", "mtproto", `{"domains":["tg.example.com"],"fallback":"decoy"}`, "", 0},
+		{"mtproto, Web Proxy", "mtproto", `{"domains":["tg.example.com"],"fallback":"decoy","mode":"web"}`, "webproxy", 0},
 	} {
 		spec := plugin.InboundSpec{Protocol: tc.protocol, Settings: []byte(tc.settings), TLS: plugin.TLS{Mode: tc.tls}}
 		if got := IPv6Unsupported(spec); got != tc.want {
