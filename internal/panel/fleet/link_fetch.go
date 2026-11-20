@@ -116,7 +116,9 @@ func (s *fetchSessionStream) Send(m *agentv1.ConnectResponse) error {
 func (s *fetchSessionStream) done() { s.f.fetchTokens.end(s.token, s.now()) }
 
 // linkFetch serves GET /fetch/<node id>/<file name> with Range: bytes=<offset>- (200 from the start, 206 from an offset).
-// Anything wrong is a 404, as for a path nobody serves; a busy bundle is a 503.
+// A missing, unknown or expired token is a 401, which the agent retries later (tokens live in memory: a panel restart or the end
+// of the grace ends them, and the agent's next session brings a new one); anything else wrong is a 404, as for a path nobody
+// serves; a busy bundle is a 503.
 func (f *Fleet) linkFetch(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/fetch/"), "/")
 	if f.cfg.Remote != nil || r.Method != http.MethodGet || len(parts) != 2 || !validLinkNodeID(parts[0]) || parts[1] == "" {
@@ -126,7 +128,7 @@ func (f *Fleet) linkFetch(w http.ResponseWriter, r *http.Request) {
 	nodeID, name := parts[0], parts[1]
 	credentials := strings.Fields(r.Header.Get("Authorization"))
 	if len(credentials) != 2 || !strings.EqualFold(credentials[0], "Bearer") || !f.fetchTokens.check(credentials[1], nodeID, f.now()) {
-		http.NotFound(w, r)
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 	if n, err := f.st.Node(r.Context(), nodeID); err != nil || n.State == "retired" {

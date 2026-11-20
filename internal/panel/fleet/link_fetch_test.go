@@ -56,7 +56,7 @@ func fetchGET(h http.Handler, path, token, rangeHeader string) *httptest.Respons
 }
 
 // A link session of a link-fetch/1 agent gets a token; with it the agent fetches a file from the start and from an offset,
-// only as itself. Without the capability, on the edge, or with another node's or no token, the route is a 404.
+// only as itself. Without the capability or on the edge the route is a 404; with another node's or no token a 401.
 func TestLinkFetchServesTheSessionsNode(t *testing.T) {
 	e := newEnv(t)
 	e.f.cfg.LinkServed = true
@@ -91,10 +91,17 @@ func TestLinkFetchServesTheSessionsNode(t *testing.T) {
 	if got.Code != http.StatusPartialContent || got.Body.String() != "456789" || got.Header().Get("Content-Range") != "bytes 4-9/10" {
 		t.Fatalf("from offset 4 = %d %q %v", got.Code, got.Body.String(), got.Header())
 	}
+	// a token the panel does not know (a panel restart, the end of the grace, another node's) is a 401: the agent retries later
 	for name, c := range map[string]struct{ path, token, rng string }{
-		"no token":      {path, "", ""},
-		"wrong token":   {path, strings.Repeat("x", len(token)), ""},
-		"other node":    {"/fetch/" + other.nodeID + "/mistgate-asndb-data-any", token, ""},
+		"no token":    {path, "", ""},
+		"wrong token": {path, strings.Repeat("x", len(token)), ""},
+		"other node":  {"/fetch/" + other.nodeID + "/mistgate-asndb-data-any", token, ""},
+	} {
+		if w := fetchGET(h, c.path, c.token, c.rng); w.Code != http.StatusUnauthorized {
+			t.Errorf("%s: %d, want 401", name, w.Code)
+		}
+	}
+	for name, c := range map[string]struct{ path, token, rng string }{
 		"no file":       {"/fetch/" + a.nodeID, token, ""},
 		"extra segment": {path + "/x", token, ""},
 	} {

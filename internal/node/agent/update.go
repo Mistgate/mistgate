@@ -121,6 +121,11 @@ func (s updSource) fetchLink(ctx context.Context, name string, offset uint64, w 
 			return parseRangedContentRange(value, offset, 0, false)
 		},
 		statusError: func(status int) error {
+			// the session's token is unknown to the panel (it restarted, or the grace after the session ended): the next
+			// session brings a new one, so this is for later, never a failed file
+			if status == http.StatusUnauthorized && s.token == "" {
+				return fmt.Errorf("%w: the panel does not know the link fetch token", update.ErrRetryLater)
+			}
 			return &httpStatusError{status: status}
 		},
 		requestError: func(err error) error {

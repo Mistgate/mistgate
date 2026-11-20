@@ -3668,9 +3668,11 @@ export type HelloAck = Message<"mistgate.agent.v1.HelloAck"> & {
   linkSupported: boolean;
 
   /**
-   * LINK FETCH. A token for GET <link prefix>/fetch/<node id>/<file name>?offset=N, sent by a VPS panel on a link session to
-   * an agent that listed "link-fetch/1". The answer is the bytes FetchUpdate streams (from offset). The token is valid for
-   * this node while this session lasts and a short while after. A secret: never logged. Empty = none.
+   * LINK FETCH. A token for GET <link prefix>/fetch/<node id>/<file name> with "Authorization: Bearer <token>" and
+   * "Range: bytes=N-", sent by a VPS panel on a link session to an agent that listed "link-fetch/1". The answer is the bytes
+   * FetchUpdate streams: 200 from the start, 206 with Content-Range from an offset, 503 while the bundle is busy, 401 for a
+   * token the panel does not know (the agent retries later; its next session brings a new one), 404 for anything else. The
+   * token is valid for this node while this session lasts and a short while after. A secret: never logged. Empty = none.
    *
    * @generated from field: string fetch_token = 5;
    */

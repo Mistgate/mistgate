@@ -6704,9 +6704,11 @@ type HelloAck struct {
 	Settings       *NodeSettings `protobuf:"bytes,3,opt,name=settings,proto3" json:"settings,omitempty"`
 	// The panel supports the signed WebSocket link transport. An agent uses it only when configured with a link URL.
 	LinkSupported bool `protobuf:"varint,4,opt,name=link_supported,json=linkSupported,proto3" json:"link_supported,omitempty"`
-	// LINK FETCH. A token for GET <link prefix>/fetch/<node id>/<file name>?offset=N, sent by a VPS panel on a link session to
-	// an agent that listed "link-fetch/1". The answer is the bytes FetchUpdate streams (from offset). The token is valid for
-	// this node while this session lasts and a short while after. A secret: never logged. Empty = none.
+	// LINK FETCH. A token for GET <link prefix>/fetch/<node id>/<file name> with "Authorization: Bearer <token>" and
+	// "Range: bytes=N-", sent by a VPS panel on a link session to an agent that listed "link-fetch/1". The answer is the bytes
+	// FetchUpdate streams: 200 from the start, 206 with Content-Range from an offset, 503 while the bundle is busy, 401 for a
+	// token the panel does not know (the agent retries later; its next session brings a new one), 404 for anything else. The
+	// token is valid for this node while this session lasts and a short while after. A secret: never logged. Empty = none.
 	FetchToken    string `protobuf:"bytes,5,opt,name=fetch_token,json=fetchToken,proto3" json:"fetch_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
