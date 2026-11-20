@@ -427,6 +427,8 @@ fn the_fixtures_links_exist_in_the_real_docs() {
     // and the real index knows what is not there
     let idx = check::DocsIndex::load(Path::new(&dist)).unwrap();
     assert!(idx.has("/getting-started/overview/") && !idx.has("/getting-started/overview"));
+    // the start page of the docs is /docs/; / is the landing's
+    assert!(idx.has("/docs/") && idx.has("/ru/docs/") && !idx.has("/"));
     assert!(idx.has_id("/ru/getting-started/install-panel/", "установка-одной-командой"));
     assert!(!idx.has("/ru/guide/no-such-page/"));
 }

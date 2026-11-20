@@ -6,7 +6,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const slugify = (s) => s.trim().toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s+/g, '-') || 'section'; // as site/src/markdown.mjs
-export const pageUrl = (lang, key) => `${lang === 'en' ? '' : '/' + lang}/${key}/`;
+export const pageUrl = (lang, key) => `${lang === 'en' ? '' : '/' + lang}/${key === 'index' ? 'docs' : key}/`; // the start page of the docs is /docs/
 export const homeUrl = (lang) => (lang === 'en' ? '/' : `/${lang}/`);
 export const appUrl = (lang) => (lang === 'en' ? '/app/' : `/${lang}/app/`);
 

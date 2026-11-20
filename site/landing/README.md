@@ -5,8 +5,8 @@ is not part of this: it is still built by the old generator, `site/build.mjs`, a
 its pages.
 
 **The folder to publish** is made by one command, `pnpm --dir site build:all` (`site/merge.mjs`): the docs, the pipeline,
-the generator, then the merge into `site/public/`. The landing takes over the five home pages the docs generator wrote
-(`/`, `/ru/`, `/zh/`, `/fa/`, `/tr/`); every other address stays the docs'. The merge refuses a path both sides write,
+the generator, then the merge into `site/public/`. The docs' start page is `/docs/` (`/ru/docs/`, …), so the language homes
+(`/`, `/ru/`, `/zh/`, `/fa/`, `/tr/`) are the landing's alone; every other address stays the docs'. The merge refuses a path both sides write,
 merges `_headers` (the docs' policy under `/*`, the landing's in the rule of each of its addresses, after `! Content-Security-Policy`)
 and `sitemap.xml`, and fails on a broken link, a page whose policy forbids its inline script, or a sitemap that does not
 match the pages. `node site/merge.mjs --no-build` merges what `site/dist/` and `site/landing/dist/` already hold.
@@ -117,7 +117,8 @@ Chrome is taken from `CHROME`, or from the usual places. The shots of `check` go
 * **Languages**: the design translates Russian text in the DOM by a dictionary; the pipeline runs the design's own translator at build
   time (the pre-render) and in the browser (what scripts assemble on the fly), over the part of the dictionary the page can show, in one language.
 * **CSS** of the design is cut to the classes the page's boards can use; fonts are the ones of `web/src/fonts`.
-* **Links** of the design (`Docs.dc.html#…`) are resolved by `links.json` to the pages the docs generator builds.
+* **Links** of the design (`Docs.dc.html#…`) are resolved by `links.json` to the pages the docs generator builds; a bare `Docs.dc.html` is the start page of the docs, `/docs/`.
+* **Title and description** of the home page (not of the app page) per language are in `pipeline/meta.json`.
 * **Images** the design refers to as `/_blob/<hash>` are the files of `design/blobs/<hash>.svg` (copied by `sync`); a file is named in `assets/` by its content, so copies of one picture are one file. A hash with no file gets a stand-in drawn by the build (flags, logos), listed in `build/report.json` (`standIns`) and in the build output.
 
 ## What the generator gets beyond the contract

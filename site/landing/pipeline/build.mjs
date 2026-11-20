@@ -170,18 +170,8 @@ for (const page of PAGES) for (const lang of LANGS) {
 }
 lap('dictionaries: ' + PAGES.map((pg) => `${pg} ${subsets[pg].length} keys`).join(', '));
 
-// ---- 5. page titles of the current site (site/src/landing.mjs) ----
-function siteMeta() {
-  const src = readFileSync(join(REPO, 'site', 'src', 'landing.mjs'), 'utf8'), meta = {};
-  for (const l of ALL_LANGS) {
-    const a = src.indexOf(`\n  ${l}: {`); if (a < 0) continue;
-    const b = src.indexOf('\n  },', a), blk = src.slice(a, b < 0 ? undefined : b);
-    const get = (k) => { const m = new RegExp(`\\n    ${k}: ("(?:[^"\\\\]|\\\\.)*")`).exec(blk); return m ? JSON.parse(m[1]) : null; };
-    meta[l] = { description: get('meta'), h1: get('h1') };
-  }
-  return meta;
-}
-const sm = siteMeta();
+// ---- 5. title and description of the home page: meta.json ----
+const sm = JSON.parse(readFileSync(p('meta.json'), 'utf8'));
 
 // ---- 6. manifest (without the fragments), the shells for the pre-render ----
 const manifest = { v: 1, designVersion, langs: LANGS, pages: {}, assets: [] };
@@ -198,7 +188,7 @@ for (const page of PAGES) for (const lang of LANGS) {
     body: `pages/${page}.${lang}.html`, title: '', description: '', css: blocking, modules: [rel(js.main)], preload: js.pre.map(rel), dir: lang === 'fa' ? 'rtl' : 'ltr',
     htmlAttrs: { 'data-lg': lang.toUpperCase() }, fonts: siteFonts(lang), fetch: [bundles[`${page}:${lang}`]],
   });
-  if (page === 'main') { const s = sm[lang]; m.title = s?.h1 ? `Mistgate — ${s.h1}` : ''; m.description = s?.description || ''; if (!s?.description) { m.todo = true; warn(`main/${lang}: no title/description in site/src/landing.mjs`); } }
+  if (page === 'main') { const s = sm[lang]; m.title = s?.h1 ? `Mistgate — ${s.h1}` : ''; m.description = s?.description || ''; if (!s?.description) { m.todo = true; warn(`main/${lang}: no title/description in meta.json`); } }
 }
 writeFileSync(join(BUILD, 'manifest.json'), JSON.stringify(manifest, null, 2));
 lap('manifest written');

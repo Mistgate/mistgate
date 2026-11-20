@@ -13,9 +13,26 @@ const dist = join(siteRoot, "dist");
 
 function page(lang, key) {
   const prefix = lang === "en" ? "" : `${lang}/`;
-  const path = key === "index" ? `${prefix}index.html` : `${prefix}${key}/index.html`;
+  const path = `${prefix}${key === "index" ? "docs" : key}/index.html`;
   return readFileSync(join(dist, path), "utf8");
 }
+
+test("the docs home is /docs/ in each language: the logo leads to the landing, Home and the crumbs to the docs home", () => {
+  for (const [lang, base] of [["en", ""], ["ru", "/ru"], ["zh", "/zh"], ["fa", "/fa"], ["tr", "/tr"]]) {
+    const home = page(lang, "index"), inner = page(lang, "getting-started/overview");
+    assert.ok(home.includes(`<link rel="canonical" href="https://mistgate.app${base}/docs/">`), `${lang}: canonical`);
+    assert.ok(home.includes(`<link rel="alternate" hreflang="x-default" href="https://mistgate.app/docs/">`), `${lang}: x-default`);
+    assert.ok(!home.includes('class="crumbs"') && !home.includes('class="pns"'), `${lang}: no crumbs and no previous/next on the home`);
+    for (const html of [home, inner]) {
+      assert.equal(html.match(new RegExp(`<a class="brand" href="${base}/"`, "g"))?.length, 2, `${lang}: the logo of the header and of the sidebar lead to the landing`);
+      assert.ok(html.includes(`<a class="nav-link" href="${base}/docs/"`), `${lang}: Home in the sidebar`);
+    }
+    assert.ok(inner.includes(`<nav class="crumbs"`) && inner.includes(`<a href="${base}/docs/">`), `${lang}: the first crumb`);
+    assert.ok(!existsSync(join(dist, base.slice(1), "index.html")), `${lang}: the docs write no landing page`);
+    assert.ok(JSON.parse(readFileSync(join(dist, base.slice(1), "search-index.json"), "utf8")).some((p) => p.u === `${base}/docs/`), `${lang}: the search finds the docs home`);
+  }
+  assert.ok(readFileSync(join(dist, "404.html"), "utf8").includes('<a class="btn btn--primary" href="/docs/">'));
+});
 
 test("the install script is published at the stable URL as plain text", () => {
   const published = readFileSync(join(dist, "install.sh"));

@@ -1,17 +1,15 @@
 // One folder for mistgate.app: the documentation (build.mjs -> dist/) and the new landing (landing/ -> landing/dist/).
 //   node merge.mjs              build both, merge, check, write public/        (pnpm build:all)
 //   node merge.mjs --no-build   merge what dist/ and landing/dist/ already hold
-// The landing takes the five home pages the docs generator used to write (REPLACED); every other path may come from
+// The docs write their start page at /docs/ (and /ru/docs/ ...), the landing the home pages /, /ru/ ...; a path may come from
 // one side only. _headers and sitemap.xml are merged, not copied. Any problem: nothing is written, exit 1.
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, copyFileSync, existsSync, statSync } from "node:fs";
 import { join, dirname, relative, posix } from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { SITE, LANGS, pageUrl } from "./src/urls.mjs";
+import { SITE } from "./src/urls.mjs";
 
-/** The docs home pages the landing replaces: /, /ru/, ... (docs/<lang>/index.md still gives the docs their sidebar). */
-export const REPLACED = LANGS.map((l) => pageUrl(l, "index").slice(1) + "index.html");
 /** Files the merged folder must have: the landing's <head> points at the icons and og.png, which only the docs write. */
 const REQUIRED = ["favicon.svg", "favicon-32.png", "apple-touch-icon.png", "og.png", "mistgate-badge.svg", "robots.txt", "sitemap.xml", "404.html", "_headers", "_redirects", "install.sh"];
 const SECURITY = ["x-content-type-options", "x-frame-options", "referrer-policy", "permissions-policy", "content-security-policy"];
@@ -64,10 +62,9 @@ export function mergeHeaders(docs, landing, errors) {
   return showHeaders(out);
 }
 
-// ---- sitemap: the docs' without the replaced homes, plus every landing page with its hreflang set
+// ---- sitemap: the docs', plus every landing page with its hreflang set
 export function mergeSitemap(docs, landingPages) {
-  const gone = new Set(REPLACED.map((p) => SITE + "/" + p.replace(/index\.html$/, "")));
-  const kept = docs.match(/<url>[\s\S]*?<\/url>/g).filter((b) => !gone.has(/<loc>([^<]+)<\/loc>/.exec(b)[1]));
+  const kept = docs.match(/<url>[\s\S]*?<\/url>/g);
   const added = landingPages.map((html) => {
     const alts = tagsOf(html, "link").filter((t) => attr(t, "rel") === "alternate" && attr(t, "hreflang"));
     const loc = attr(tagsOf(html, "link").find((t) => attr(t, "rel") === "canonical"), "href");
@@ -143,7 +140,7 @@ export function merge(docs, landing) {
   const errors = [], files = new Map(docs), lower = new Map([...docs.keys()].map((p) => [p.toLowerCase(), p]));
   for (const [p, e] of landing) {
     if (p === "_headers") continue;
-    if (files.has(p) && !REPLACED.includes(p)) errors.push(`both the docs and the landing write ${p}`);
+    if (files.has(p)) errors.push(`both the docs and the landing write ${p}`);
     else if (lower.has(p.toLowerCase()) && lower.get(p.toLowerCase()) !== p) errors.push(`${p} and ${lower.get(p.toLowerCase())} differ only in case`);
     else files.set(p, { ...e, landing: true });
   }

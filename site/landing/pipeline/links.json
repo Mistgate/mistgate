@@ -3,7 +3,7 @@
   "map": {
     "Main.dc.html": "@main",
     "AppPage.dc.html": "@app",
-    "Docs.dc.html": "getting-started/overview",
+    "Docs.dc.html": "index",
     "Docs.dc.html#panel": "getting-started/install-panel",
     "DocHy2.dc.html": "guide/hysteria2",
     "Docs.dc.html#vless/": "guide/vless",

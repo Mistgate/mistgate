@@ -1,7 +1,6 @@
 // HTML templates and UI strings. No dependencies: plain template literals.
-import { SITE, GITHUB, pageUrl, editUrl } from "./urls.mjs";
+import { SITE, GITHUB, pageUrl, landingUrl, editUrl } from "./urls.mjs";
 import { icon, NAV } from "./icons.mjs";
-import { renderLanding } from "./landing.mjs";
 
 export const T = {
   en: {
@@ -154,7 +153,7 @@ export function langMenu({ lang, t, langLinks }) {
 function header({ lang, t, langLinks, stars }) {
   return `<header class="top"><div class="top__in">
 <a class="ib menu-btn" href="#nav" data-menu aria-controls="nav" aria-label="${esc(t.menu)}">${icon("menu", 18)}</a>
-<a class="brand" href="${pageUrl(lang, "index")}" aria-label="Mistgate — ${esc(t.docs)}"><img src="/mistgate-badge.svg" width="32" height="32" alt="">${wordmark}</a>
+<a class="brand" href="${landingUrl(lang)}" aria-label="Mistgate — ${esc(t.docs)}"><img src="/mistgate-badge.svg" width="32" height="32" alt="">${wordmark}</a>
 <span class="chip tag">${esc(t.docs)}</span>
 <span class="grow"></span>
 <button class="search-btn js-only" type="button" data-search-open aria-label="${esc(t.search)}" aria-keyshortcuts="Control+K Meta+K /">${icon("search", 16)}<span class="search-btn__t">${esc(t.search)}</span><span class="kbds"><kbd data-mod>Ctrl</kbd><kbd>K</kbd></span></button>
@@ -171,7 +170,7 @@ function sidebar({ lang, t, nav, current }) {
   };
   const groups = nav.map((g) => `<div class="grp"><div class="grp__label">${esc(g.title)}</div>${g.items.map(link).join("")}</div>`).join("");
   return `<nav class="side" id="nav" aria-label="${esc(t.navLabel)}">
-<div class="side__head"><a class="brand" href="${pageUrl(lang, "index")}" aria-label="Mistgate — ${esc(t.docs)}"><img src="/mistgate-badge.svg" width="28" height="28" alt="">${wordmark}</a><a class="ib" href="#content" data-menu-close aria-label="${esc(t.closeMenu)}">${icon("x", 18)}</a></div>
+<div class="side__head"><a class="brand" href="${landingUrl(lang)}" aria-label="Mistgate — ${esc(t.docs)}"><img src="/mistgate-badge.svg" width="28" height="28" alt="">${wordmark}</a><a class="ib" href="#content" data-menu-close aria-label="${esc(t.closeMenu)}">${icon("x", 18)}</a></div>
 <div class="side__scroll"><div class="grp">${link({ url: pageUrl(lang, "index"), title: t.home, key: "index" })}</div>${groups}
 <div class="side__tools"><button class="ib js-only" type="button" data-theme-toggle aria-label="${esc(t.theme)}"><span class="theme-ico theme-ico--sun">${icon("sun", 18)}</span><span class="theme-ico theme-ico--moon">${icon("moon", 18)}</span></button><a class="ib" href="${GITHUB}" aria-label="${esc(t.github)}" rel="noopener">${GH}</a></div></div>
 </nav><a class="backdrop" href="#content" data-menu-close tabindex="-1" aria-hidden="true"></a>`;
@@ -201,19 +200,16 @@ export function renderDoc(ctx) {
   const isHome = page.key === "index";
   const st = pageStyle(page.key);
   const toc = page.headings.filter((h) => h.level <= 3 && h.toc !== false);
-  const showToc = !isHome && toc.length >= 2;
-  const home = isHome ? renderLanding({ lang, t, nav, name: (p) => pageName(t, p), langNames: (langLinks ?? []).map((l) => T[l.lang].name), section: (key) => (NOT_IN_ADMIN.has(key) ? "start" : PAGE_SECTION[key] ?? null) }) : null;
+  const showToc = toc.length >= 2;
   const crumbs = isHome ? "" : `<nav class="crumbs" aria-label="${esc(t.crumbs)}"><a href="${pageUrl(lang, "index")}">${esc(t.docs)}</a>${crumbGroup ? `<span aria-hidden="true">/</span><span>${esc(crumbGroup)}</span>` : ""}<span aria-hidden="true">/</span><span aria-current="page">${esc(page.title)}</span></nav>`;
-  const hero = isHome
-    ? home.hero
-    : `<header class="doc-head">${crumbs}${st.inAdmin ? `<p class="eyebrow"><span class="id-chip" data-tone="${st.tone}">${icon(st.icon, 14)}</span><span>${esc(t.inAdmin)}${t.inAdminSep ?? ": "}${esc(t.sections[st.section])}</span></p>` : ""}<h1 class="doc-h1">${esc(page.title)}</h1><p class="doc-lead">${esc(page.description)}</p></header>`;
+  const hero = `<header class="doc-head">${crumbs}${st.inAdmin ? `<p class="eyebrow"><span class="id-chip" data-tone="${st.tone}">${icon(st.icon, 14)}</span><span>${esc(t.inAdmin)}${t.inAdminSep ?? ": "}${esc(t.sections[st.section])}</span></p>` : ""}<h1 class="doc-h1">${esc(page.title)}</h1><p class="doc-lead">${esc(page.description)}</p></header>`;
   const inlineToc = showToc ? `<details class="toc-inline"><summary>${esc(t.onPage)}</summary>${tocHtml(toc)}</details>` : "";
   const pn = (x, dir) => x ? `<a class="pn pn--${dir}" href="${x.url}" rel="${dir}"><span class="label">${dir === "prev" ? icon("back", 12) : ""}${esc(t[dir])}${dir === "next" ? icon("chevronRight", 12) : ""}</span><span class="pn__t">${pageName(t, x)}</span></a>` : "<span></span>";
   const edit = `<p class="edit"><a href="${editUrl(lang, page.key)}" rel="noopener">${icon("externalLink", 14)}${esc(t.edit)}</a></p>`;
   return `<!doctype html>
 <html lang="${t.htmlLang}"${t.dir ? ` dir="${t.dir}"` : ""}>
 <head>
-${head({ lang, t, title: page.title, description: isHome ? home.description : page.description, canonical: page.url, alternates, assets, home: isHome })}
+${head({ lang, t, title: page.title, description: page.description, canonical: page.url, alternates, assets, home: isHome })}
 </head>
 <body class="mg" data-t="${bodyData(t)}"${st.tone ? ` data-tone="${st.tone}"` : ""}>
 <a class="skip" href="#content">${esc(t.skip)}</a>
@@ -221,11 +217,13 @@ ${header({ lang, t, langLinks, stars })}
 <div class="shell">
 ${sidebar({ lang, t, nav, current: page.key })}
 <main class="main" id="content" tabindex="-1">
-<article class="doc${isHome ? " doc--home" : ""}">
+<article class="doc">
 ${hero}
 ${inlineToc}
-${isHome ? `<div class="home">${home.body}</div>` : `<div class="prose">\n${page.html}\n</div>`}
-${isHome ? "" : edit}
+<div class="prose">
+${page.html}
+</div>
+${edit}
 ${isHome ? "" : `<nav class="pns" aria-label="${esc(t.docs)}">${pn(prev, "prev")}${pn(next, "next")}</nav>`}
 </article>
 </main>
@@ -255,7 +253,7 @@ ${head({ lang: "en", t, title: t.notFound, description: t.notFoundText, canonica
 <h1 class="doc-h1">${esc(t.notFound)}</h1>
 <p class="doc-lead">${esc(t.notFoundText)}</p>
 ${others.map((l) => `<p class="doc-lead" lang="${T[l].htmlLang}"${T[l].dir ? ` dir="${T[l].dir}"` : ""}>${esc(T[l].notFoundText)}</p>`).join("")}
-<div class="hero__cta"><a class="btn btn--primary" href="/">${esc(t.toHome)}${icon("chevronRight", 14)}</a>${others.map((l) => `<a class="btn btn--secondary" href="${pageUrl(l, "index")}" lang="${T[l].htmlLang}"${T[l].dir ? ` dir="${T[l].dir}"` : ""}>${esc(T[l].toHome)}</a>`).join("")}</div>
+<div class="hero__cta"><a class="btn btn--primary" href="${pageUrl("en", "index")}">${esc(t.toHome)}${icon("chevronRight", 14)}</a>${others.map((l) => `<a class="btn btn--secondary" href="${pageUrl(l, "index")}" lang="${T[l].htmlLang}"${T[l].dir ? ` dir="${T[l].dir}"` : ""}>${esc(T[l].toHome)}</a>`).join("")}</div>
 </main>
 ${footer({ lang: "en", t })}
 </body>

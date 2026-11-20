@@ -96,7 +96,6 @@ main:focus { outline: none; }
 .chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: var(--r-ctl); background: var(--surface-2); color: var(--muted); font-size: 12px; font-weight: 500; white-space: nowrap; }
 /* the panel's IconChip: a tinted square with a tone-stroked icon; a tone names a section, never a state */
 .id-chip { display: inline-grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: var(--r-chip); background: var(--tone-bg); color: var(--tone); }
-.id-chip--lg { width: 28px; height: 28px; }
 .eyebrow { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; line-height: 20px; font-weight: 500; color: var(--muted); }
 .ico { display: block; flex: none; }
 /* right to left, the glyphs that point along the line (back, next) turn round; the rest keep their drawing */
@@ -168,7 +167,7 @@ a.lang__item:hover { background: var(--surface-2); }
 /* a page this language has not translated yet: a quiet EN after its name (the link opens the English page); in the
    sidebar and the section cards the marks line up at the end of the row */
 .en-mark { display: inline-flex; flex: none; align-items: center; height: 16px; margin-inline-start: 8px; padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font: 500 10px/1 var(--font-mono); vertical-align: 0.12em; }
-:is(.nav-link, .sec-card li a) .en-mark { margin-inline-start: auto; }
+.nav-link .en-mark { margin-inline-start: auto; }
 .nav-link:hover .en-mark { border-color: var(--faint); }
 .toc { flex: 0 0 200px; position: sticky; top: var(--hh); max-height: calc(100vh - var(--hh)); max-height: calc(100dvh - var(--hh)); overflow-y: auto; padding: 40px 0; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; }
 .toc ul, .toc-inline ul { list-style: none; margin: 0; padding: 0; }
@@ -382,91 +381,13 @@ tbody tr:hover td { background: color-mix(in oklab, var(--surface-2) 85%, var(--
 .pn__t { font-size: 16px; font-weight: 600; line-height: 1.3; }
 @media (max-width: 539px) { .pns { grid-template-columns: 1fr; } .pn--next, .pn--prev { grid-column: 1; text-align: start; align-items: flex-start; } .pn--next { order: -1; } }
 
-/* ---------- home ---------- */
-.doc--home { max-width: 1040px; }
-/* the hero: what it is, two ways in, the spec line, then the product itself running */
-.hero { position: relative; isolation: isolate; display: flex; flex-direction: column; align-items: flex-start; }
-/* the gate: the mark's arch drawn in hairlines behind the hero's corner, fading out downwards */
-.hero__arch { position: absolute; z-index: -1; inset-inline-end: 0; top: -8px; width: 300px; height: 260px; pointer-events: none; -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%); mask-image: linear-gradient(to bottom, #000 45%, transparent 100%); }
-[dir="rtl"] .hero__arch { scale: -1 1; }
-.hero__eyebrow { margin: 0 0 16px; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--muted); }
-.hero__h1 { margin: 0; max-width: 17ch; font-size: clamp(36px, 5vw, 56px); line-height: 1.06; font-weight: 600; letter-spacing: -0.03em; text-wrap: balance; }
-.hero__lead { margin: 20px 0 0; max-width: 60ch; font-size: 18px; line-height: 1.6; color: var(--muted); text-wrap: pretty; }
+/* ---------- a product video in a page, the buttons of the 404 ---------- */
 .hero__cta { display: flex; flex-wrap: wrap; gap: 8px; }
-.hero .hero__cta { margin-top: 32px; }
-/* what it runs and on what, one pill each; the last pill holds the languages */
-.facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 0; padding: 0; list-style: none; }
-.facts li { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--muted); font: 500 12px var(--font-mono); white-space: nowrap; }
 .shot { width: 100%; margin: 0 0 24px; border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; background: var(--surface); }
-.shot img, .shot video { display: block; width: 100%; height: auto; }
+.shot video { display: block; width: 100%; height: auto; }
 .shot--video { aspect-ratio: 16 / 9; background: #0d0d10; }
-.shot__dark { display: none !important; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme]) .shot__light { display: none !important; } :root:not([data-theme]) .shot__dark { display: block !important; } }
-:root[data-theme="dark"] .shot__light { display: none !important; }
-:root[data-theme="dark"] .shot__dark { display: block !important; }
-.hero .shot { margin: 40px 0 0; }
-
-.home-sec { margin-top: 80px; }
-.home-sec h2 { margin: 0 0 12px; font-size: 28px; line-height: 1.2; font-weight: 600; letter-spacing: -0.015em; }
-.home-sec h3 { margin: 0; font-size: 16px; line-height: 1.3; font-weight: 600; }
-.home-p { margin: 0 0 24px; max-width: 64ch; color: var(--muted); text-wrap: pretty; }
-.home a:not(.btn, .proof__card) { text-decoration: underline; text-decoration-color: var(--accent-line); text-underline-offset: 3px; }
-.home a:not(.btn, .proof__card):hover { text-decoration-color: currentColor; }
-.home code { padding: 0.1em 0.38em; border-radius: var(--r-chip); background: var(--surface-2); font-size: 0.88em; }
 .id-chip--plain { background: var(--surface-2); color: var(--muted); }
-
-/* why: four reasons in two columns, then the two pages that back them with numbers */
-.why { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; margin: 24px 0 32px; padding: 0; list-style: none; }
-.why li { display: flex; gap: 16px; align-items: flex-start; }
-.why p { margin: 4px 0 0; font-size: 15px; line-height: 1.6; color: var(--muted); text-wrap: pretty; }
-.why p a { color: var(--accent-text); font-weight: 500; white-space: nowrap; }
-.proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.proof__card { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; align-content: start; padding: 20px; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); color: var(--text); transition: border-color 0.15s var(--ease); }
-.proof__card:hover { border-color: var(--border-hover); }
-.proof__t { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 600; }
-.proof__t .ico { color: var(--muted); }
-.proof__p { grid-column: 1 / -1; font-size: 14px; line-height: 1.55; color: var(--muted); }
-/* protocols: cards two by two (the base grid); the comparison: a short table that scrolls sideways on a phone instead of becoming cards */
-.proof--protos { margin: 24px 0; }
-.cmp { margin: 24px 0 16px; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); scrollbar-width: thin; }
-.cmp td:first-child { min-width: 11em; }
-.cmp td:not(:first-child) { white-space: nowrap; }
-.cmp + .home-p { font-size: 14px; }
-
-/* quick start: the panel's stepper */
-.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
-.steps > li { counter-increment: step; position: relative; display: flex; flex-direction: column; gap: 8px; padding: 20px; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); }
-.steps > li::before { content: counter(step); display: grid; place-items: center; width: 28px; height: 28px; margin-bottom: 4px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font: 500 12px var(--font-mono); }
-.steps p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted); text-wrap: pretty; }
-.steps strong { color: var(--text); font-weight: 600; }
-.steps__links { display: flex; flex-direction: column; gap: 0; margin-top: auto !important; padding-top: 8px; }
-.steps__links a { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; color: var(--accent-text); font-size: 14px; font-weight: 500; }
-.home .steps__links a, .home .sec-card a { text-decoration: none; }
-.home .steps__links a:hover, .home .sec-card a:hover { text-decoration: underline; text-underline-offset: 3px; }
-
-/* the docs by admin section: one card per section of the panel's sidebar */
-.sec-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-.sec-card { display: flex; flex-direction: column; gap: 8px; padding: 20px 20px 12px; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); }
-.sec-card h3 { display: flex; align-items: center; gap: 12px; }
-.sec-card p { margin: 0; font-size: 14px; line-height: 20px; color: var(--muted); }
-.sec-card ul { margin: 8px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
-.sec-card li a { display: flex; align-items: center; min-height: 36px; padding: 6px 0; line-height: 20px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 14px; font-weight: 500; }
-.sec-card li:last-child a { border-bottom: 0; }
-.sec-card li a:hover { color: var(--accent-text); }
-.home-status { margin: 32px 0 0; padding: 16px 20px; border-radius: var(--r-field); background: var(--surface-2); font-size: 14px; color: var(--muted); }
-.home-status a { color: var(--accent-text); font-weight: 500; }
-
-@media (max-width: 1099px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 719px) {
-  .hero__arch { display: none; }
-  .hero__lead { font-size: 16px; line-height: 26px; }
-  .home-sec { margin-top: 56px; }
-  .home-sec h2 { font-size: 24px; }
-  .why, .proof, .steps { grid-template-columns: 1fr; }
-  .why { gap: 24px; }
-  .prose h2 { font-size: 24px; margin-top: 48px; }
-}
-@media (pointer: coarse) { .steps__links a, .sec-card li a { min-height: 44px; } }
+@media (max-width: 719px) { .prose h2 { font-size: 24px; margin-top: 48px; } }
 
 /* ---------- footer, 404 ---------- */
 .foot { border-top: 1px solid var(--border); }
@@ -602,12 +523,9 @@ dialog.search::backdrop { background: var(--backdrop); }
 }
 /* ---------- Chinese (html lang="zh-CN"): wider leading, no negative tracking (it crowds the glyphs), labels not shrunk to 11 px ---------- */
 body.mg:lang(zh) { line-height: 1.75; }
-:lang(zh) .doc-h1, :lang(zh) .hero__h1, :lang(zh) .prose h2, :lang(zh) .prose h3, :lang(zh) .prose h4, :lang(zh) .home-sec h2, :lang(zh) .home-sec h3,
-:lang(zh) .pn__t, :lang(zh) .proof__t, :lang(zh) .rm-nav__t, :lang(zh) .rm-card h3 { letter-spacing: 0; line-height: 1.35; }
-/* Han text wraps between any two characters: the headline wraps only at its phrase marks (U+200B in LANDING.zh.h1), a little
-   smaller than the Latin one and measured in em, since 17ch holds only nine Han characters */
-:lang(zh) .hero__h1 { max-width: 11em; font-size: clamp(32px, 4.6vw, 50px); word-break: keep-all; overflow-wrap: anywhere; }
-:lang(zh) .prose p, :lang(zh) .prose li, :lang(zh) .doc-lead, :lang(zh) .hero__lead, :lang(zh) .why p, :lang(zh) .steps p, :lang(zh) .sec-card p, :lang(zh) .callout__body, :lang(zh) .rm-card p, :lang(zh) .rm-points { line-height: 1.8; }
+:lang(zh) .doc-h1, :lang(zh) .prose h2, :lang(zh) .prose h3, :lang(zh) .prose h4,
+:lang(zh) .pn__t, :lang(zh) .rm-nav__t, :lang(zh) .rm-card h3 { letter-spacing: 0; line-height: 1.35; }
+:lang(zh) .prose p, :lang(zh) .prose li, :lang(zh) .doc-lead, :lang(zh) .callout__body, :lang(zh) .rm-card p, :lang(zh) .rm-points { line-height: 1.8; }
 :lang(zh) .prose p, :lang(zh) .prose li { text-align: left; overflow-wrap: break-word; }
 
 /* ---------- Persian (html lang="fa" dir="rtl") ----------
@@ -616,12 +534,11 @@ body.mg:lang(zh) { line-height: 1.75; }
    tears them apart), and the 12 px labels are a size larger. */
 body.mg:lang(fa) { line-height: 1.8; }
 :lang(fa) :not(.wordmark, .wordmark *), :lang(fa) ::before, :lang(fa) ::after { letter-spacing: 0 !important; }
-:lang(fa) :is(.doc-h1, .hero__h1) { line-height: 1.4; }
-:lang(fa) :is(.prose h2, .prose h3, .prose h4, .home-sec h2, .prose .rm-phase__head h2) { line-height: 1.5; }
-:lang(fa) :is(.home-sec h3, .pn__t, .proof__t, .prose .rm-card h3, .sec-card h3, .nav-link, .toc a, .toc-inline a, .search__list .t) { line-height: 1.6; }
-:lang(fa) :is(.prose p, .prose li, .home-p, .why p, .steps p, .sec-card p, .proof__p, .callout__body, .prose .rm-card p, .prose .rm .rm-points) { line-height: 1.85; }
-:lang(fa) :is(.doc-lead, .hero__lead) { line-height: 1.75; }
+:lang(fa) .doc-h1 { line-height: 1.4; }
+:lang(fa) :is(.prose h2, .prose h3, .prose h4, .prose .rm-phase__head h2) { line-height: 1.5; }
+:lang(fa) :is(.pn__t, .prose .rm-card h3, .nav-link, .toc a, .toc-inline a, .search__list .t) { line-height: 1.6; }
+:lang(fa) :is(.prose p, .prose li, .callout__body, .prose .rm-card p, .prose .rm .rm-points) { line-height: 1.85; }
+:lang(fa) .doc-lead { line-height: 1.75; }
 :lang(fa) :is(.label, .grp__label, .code__lang, .code__kind, .table-wrap td[data-label]:not(:first-child)::before) { font-size: 13px; }
-:lang(fa) .hero__h1 { max-width: 13em; }
 
 @media print { .top, .side, .toc, .toc-inline, .foot, .pns, .edit, .backdrop { display: none !important; } .shell { display: block; } }

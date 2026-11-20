@@ -19,13 +19,13 @@ const url = (p) => "/" + p.replace(/index\.html$/, "");
 const tree = (pages, extra = {}) => new Map(Object.entries({ ...Object.fromEntries(Object.entries(pages).map(([p, v]) => [p, page(url(p), v.body ?? v, v)])), ...extra }));
 
 const docs = () => tree({
-  "index.html": { body: '<a href="/guide/x/">x</a>', inline: INIT },
+  "docs/index.html": { body: '<a href="/guide/x/">x</a><a href="/">landing</a>', inline: INIT },
   "guide/x/index.html": { body: '<a href="/">home</a><a href="/app/">app</a><a href="#sec">s</a><img src="/og.png">', inline: INIT, ids: ["sec"] },
 }, {
   "404.html": { data: `<a href="/">h</a><script>${INIT}</script>` },
   "favicon.svg": { data: "" }, "favicon-32.png": { data: "" }, "apple-touch-icon.png": { data: "" }, "og.png": { data: "" }, "mistgate-badge.svg": { data: "" }, "install.sh": { data: "" },
   "robots.txt": { data: `Sitemap: ${SITE}/sitemap.xml\n` }, "_redirects": { data: "/old/ /guide/x/ 301\n" }, "_headers": { data: DOCS_HEADERS },
-  "sitemap.xml": { data: `<urlset>\n<url><loc>${SITE}/</loc></url>\n<url><loc>${SITE}/guide/x/</loc></url>\n</urlset>\n` },
+  "sitemap.xml": { data: `<urlset>\n<url><loc>${SITE}/docs/</loc></url>\n<url><loc>${SITE}/guide/x/</loc></url>\n</urlset>\n` },
 });
 const landing = () => tree({
   "index.html": { body: '<a href="/guide/x/#sec">docs</a><a href="/app/#made-by-script">app</a><link href="/assets/a.css"><script type="application/json">{"a":1}</script>' },
@@ -33,10 +33,10 @@ const landing = () => tree({
 }, { "_headers": { data: LAND_HEADERS }, "assets/a.css": { data: "" } });
 const run = (d = docs(), l = landing()) => merge(d, l);
 
-test("a clean pair merges: the landing replaces the docs home, nothing else of the docs moves", () => {
+test("a clean pair merges: the landing is at /, the docs' start page at /docs/, nothing of the docs moves", () => {
   const { files, errors } = run();
   assert.deepEqual(errors, []);
-  assert.ok(files.get("index.html").landing && !files.get("guide/x/index.html").landing);
+  assert.ok(files.get("index.html").landing && !files.get("docs/index.html").landing && !files.get("guide/x/index.html").landing);
   assert.ok(files.get("favicon.svg") && files.get("404.html") && files.get("_redirects"));
 });
 
@@ -59,12 +59,13 @@ test("Pages semantics: a rule unsets before it sets; a name set twice is joined"
   assert.equal(headersFor(rules, "/y/").get("a"), "1");
 });
 
-test("the sitemap has the landing pages with hreflang and not the replaced docs home", () => {
+test("the sitemap has the docs' pages and the landing pages with hreflang", () => {
   const sm = run().files.get("sitemap.xml").data;
   assert.match(sm, /<loc>https:\/\/mistgate\.app\/app\/<\/loc>/);
   assert.match(sm, /hreflang="en" href="https:\/\/mistgate\.app\/"/);
   assert.equal(sm.match(/<loc>https:\/\/mistgate\.app\/<\/loc>/g).length, 1);
   assert.match(sm, /guide\/x\//);
+  assert.match(sm, /<loc>https:\/\/mistgate\.app\/docs\/<\/loc>/);
 });
 
 const refused = (d, l, re) => assert.match(run(d, l).errors.join("\n"), re);
@@ -85,6 +86,8 @@ test("two writers of one path are refused, and so is a case-only twin", () => {
   refused(docs(), l, /both the docs and the landing write guide\/x\/index\.html/);
   const c = landing(); c.set("Guide/x/index.html", page("/Guide/x/", ""));
   refused(docs(), c, /differ only in case/);
+  const h = landing(); h.set("docs/index.html", page("/docs/", ""));
+  refused(docs(), h, /both the docs and the landing write docs\/index\.html/);
   const a = landing(); a.set("robots.txt", { data: "" });
   refused(docs(), a, /both the docs and the landing write robots\.txt/);
 });
