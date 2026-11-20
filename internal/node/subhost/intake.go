@@ -84,6 +84,7 @@ type Intake struct {
 	perNet    map[netip.Addr]int // subscriptions by network key (networkKey)
 	down      bool               // what the front was last told
 	told      bool               // the front was told at all (the first syncDown always tells it)
+	closed    bool               // Close ran: nothing new is started (track)
 
 	diverted, refusedPerSource atomic.Uint64
 }
@@ -116,9 +117,15 @@ func (in *Intake) SetLimits(l Limits) {
 // Serve accepts from ln until it is closed or the intake is. While the panel holds no connection the route is down: the
 // front sends the subscription names to the site at once, without waiting for a pair.
 func (in *Intake) Serve(ln net.Listener) {
-	in.wg.Add(1)
-	go in.watch()
 	defer func() { _ = ln.Close() }()
+	if !in.track() { // closed already
+		return
+	}
+	defer in.wg.Done()
+	if !in.track() {
+		return
+	}
+	go in.watch()
 	stop := context.AfterFunc(in.ctx, func() { _ = ln.Close() })
 	defer stop()
 	for {
@@ -129,7 +136,10 @@ func (in *Intake) Serve(ln net.Listener) {
 			}
 			continue
 		}
-		in.wg.Add(1)
+		if !in.track() {
+			_ = conn.Close()
+			return
+		}
 		go func() {
 			defer in.wg.Done()
 			in.handle(conn)
@@ -166,8 +176,23 @@ func (in *Intake) syncDown() {
 // Close ends the intake: the streams it carries are cut (their people reconnect, to the site or to a new host) and it
 // waits for them.
 func (in *Intake) Close() {
+	in.mu.Lock()
+	in.closed = true
+	in.mu.Unlock()
 	in.cancel()
 	in.wg.Wait()
+}
+
+// track counts one more goroutine Close must wait for; false once Close ran (the WaitGroup is never added to while Close
+// waits on it).
+func (in *Intake) track() bool {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	if in.closed {
+		return false
+	}
+	in.wg.Add(1)
+	return true
 }
 
 // Stats returns the counters.

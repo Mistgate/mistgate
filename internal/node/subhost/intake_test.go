@@ -267,3 +267,45 @@ func TestIntakeTellsTheFrontAtOnce(t *testing.T) {
 		t.Fatalf("front told %v, want [false] once", f.down)
 	}
 }
+
+// Serve and Close may race: Close waits for everything Serve started, nothing is started after it (the front hears nothing
+// more), and a Serve after Close returns at once and closes its listener (L5).
+func TestIntakeServeAndCloseRace(t *testing.T) {
+	for range 20 {
+		e := &fakeEntry{release: make(chan struct{})}
+		f := &fakeFront{}
+		in := New(e, f, "~sub-host", nil)
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		served := make(chan struct{})
+		go func() { in.Serve(ln); close(served) }()
+		in.Close()
+		f.mu.Lock()
+		told := len(f.down)
+		f.mu.Unlock()
+		time.Sleep(10 * time.Millisecond)
+		f.mu.Lock()
+		if len(f.down) != told {
+			t.Fatal("the front was told after Close")
+		}
+		f.mu.Unlock()
+		select {
+		case <-served:
+		case <-time.After(5 * time.Second):
+			t.Fatal("Serve did not end after Close")
+		}
+		close(e.release)
+	}
+	in := New(&fakeEntry{release: make(chan struct{})}, &fakeFront{}, "~sub-host", nil)
+	in.Close()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.Serve(ln)
+	if _, err := ln.Accept(); err == nil {
+		t.Fatal("a Serve after Close left its listener open")
+	}
+}
