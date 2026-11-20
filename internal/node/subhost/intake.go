@@ -83,6 +83,7 @@ type Intake struct {
 	perSource map[netip.Addr]int // by source key (sourceKey)
 	perNet    map[netip.Addr]int // subscriptions by network key (networkKey)
 	down      bool               // what the front was last told
+	told      bool               // the front was told at all (the first syncDown always tells it)
 
 	diverted, refusedPerSource atomic.Uint64
 }
@@ -154,8 +155,8 @@ func (in *Intake) watch() {
 func (in *Intake) syncDown() {
 	down := !in.entry.Connected(bridge.PanelPeerID)
 	in.mu.Lock()
-	changed := down != in.down
-	in.down = down
+	changed := down != in.down || !in.told
+	in.down, in.told = down, true
 	in.mu.Unlock()
 	if changed {
 		in.front.SetDown(in.routeID, down)

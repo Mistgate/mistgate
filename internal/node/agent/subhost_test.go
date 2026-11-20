@@ -101,3 +101,27 @@ func TestSubHostRoleRoutesBeforeAnyState(t *testing.T) {
 		t.Fatalf("front after a sweep %+v", sp)
 	}
 }
+
+// The host's route is the intake's to mark down (the panel away): a reconcile does not bring it back up behind its back, so
+// a subscription name goes straight to the site, never through the intake's admit-then-divert (L3).
+func TestReconcileLeavesTheHostRouteToTheIntake(t *testing.T) {
+	r := newShareRig(t)
+	withSubHostPort(t, r.port)
+	a := r.h.a
+	a.applySubHost(&pb.NodeSettings{SubHost: &pb.SubHostRole{Names: []string{"sub.example.test"}, Path: "/sub-host-bridge-path", SiteName: "site.example.test"}})
+	r.apply()
+	diverted := func() uint64 {
+		a.hostMu.Lock()
+		defer a.hostMu.Unlock()
+		return a.sh.intake.Stats().Diverted
+	}
+	eventually(t, func() bool { _ = r.cn("site.example.test"); return true }, "the site")
+	r.apply() // a reconcile: markRoutes runs
+	before := diverted()
+	if got := r.cn("sub.example.test"); got != "site.example.test" {
+		t.Fatalf("subscription name answered by %q", got)
+	}
+	if after := diverted(); after != before {
+		t.Fatalf("the route was up again after a reconcile: the intake admitted and diverted (%d -> %d)", before, after)
+	}
+}

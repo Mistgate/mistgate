@@ -254,3 +254,16 @@ func (l *pipeListener) Accept() (net.Conn, error) {
 }
 func (l *pipeListener) Close() error   { l.once.Do(func() { close(l.done) }); return nil }
 func (l *pipeListener) Addr() net.Addr { return &net.TCPAddr{} }
+
+// The first look at the panel's connection always tells the front, also when it says "up" (a front left with a down route
+// by an earlier intake).
+func TestIntakeTellsTheFrontAtOnce(t *testing.T) {
+	in, _, f := newTestIntake(t)
+	in.syncDown()
+	in.syncDown()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.down) != 1 || f.down[0] {
+		t.Fatalf("front told %v, want [false] once", f.down)
+	}
+}

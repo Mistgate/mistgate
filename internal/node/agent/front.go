@@ -160,7 +160,9 @@ func (a *Agent) markRoutes(results []*pb.InboundResult) {
 			continue
 		}
 		for id, place := range a.place {
-			if place == uint32(port) {
+			// a "~" route is the agent's own (the host's subscription route, its site): its owner says whether it is down
+			// (the intake follows the panel's connection), never an inbound result
+			if place == uint32(port) && !strings.HasPrefix(id, "~") {
 				sp.f.SetDown(id, down[id])
 			}
 		}
