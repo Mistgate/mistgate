@@ -5,6 +5,7 @@ package subhost
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -62,13 +63,11 @@ func (s *Service) bridgeUp(nodeID string) bool {
 	return false
 }
 
-// panelCert says the panel has the subdomain's certificate: a visitor was handed it, or the ACME cache holds it.
+// panelCert says the panel has the certificate of this domain: a visitor was handed it, the panel obtained it, or the ACME
+// cache holds it.
 func (s *Service) panelCert(ctx context.Context, domain string) bool {
-	if s.cfg.Certificate != nil {
-		return true
-	}
 	s.tun.mu.Lock()
-	seen := s.tun.certSeen
+	seen := s.tun.certSeen[strings.ToLower(domain)]
 	s.tun.mu.Unlock()
 	if seen {
 		return true
@@ -103,7 +102,13 @@ func (s *Service) checkReady(ctx context.Context) {
 		s.downTold = true
 		s.event(ctx, 2, "sub_host_tunnel_down", st.Node, nil)
 	}
-	if st.ReadyAt != "" || (st.State != stateOn && st.State != stateMoving) || len(s.notReady(ctx, st)) > 0 {
+	if st.ReadyAt != "" || (st.State != stateOn && st.State != stateMoving) {
+		return
+	}
+	if s.bridgeUp(st.Node) && !s.panelCert(ctx, st.Domain) {
+		s.obtainCert(st.Domain)
+	}
+	if len(s.notReady(ctx, st)) > 0 {
 		return
 	}
 	stored, err := loadState(ctx, s.cfg.Store)

@@ -45,13 +45,17 @@ type tunnel struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	mu       sync.Mutex
-	certSeen bool // the subdomain's certificate was handed to a visitor (not only an ACME challenge)
+	get func(*tls.ClientHelloInfo) (*tls.Certificate, error) // the subdomain's certificate: autocert, or Config.Certificate
+
+	mu        sync.Mutex
+	certSeen  map[string]bool // domains whose certificate the panel holds: handed to a visitor (not only an ACME challenge) or obtained
+	obtaining bool            // obtainCert runs
+	lastTry   time.Time       // when obtainCert last started
 }
 
 func (s *Service) newTunnel() {
 	ctx, cancel := context.WithCancel(context.Background())
-	t := &tunnel{pub: newChanListener(), ctx: ctx, cancel: cancel}
+	t := &tunnel{pub: newChanListener(), ctx: ctx, cancel: cancel, certSeen: map[string]bool{}}
 	t.dialer = bridge.NewDialer(func() bridge.DialIdentity {
 		der, key, err := s.cfg.Fleet.PanelIdentity(s.cfg.Now())
 		if err != nil {
@@ -67,17 +71,15 @@ func (s *Service) newTunnel() {
 	if s.cfg.ACMEClient != nil {
 		t.acme.Client = s.cfg.ACMEClient
 	}
-	get := t.acme.GetCertificate
+	t.get = t.acme.GetCertificate
 	if s.cfg.Certificate != nil {
-		get = s.cfg.Certificate
+		t.get = s.cfg.Certificate
 	}
 	t.tlsCfg = &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"h2", "http/1.1", acme.ALPNProto},
 		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			cert, err := get(hello)
+			cert, err := t.get(hello)
 			if err == nil && !(len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto) {
-				t.mu.Lock()
-				t.certSeen = true
-				t.mu.Unlock()
+				t.seen(hello.ServerName)
 			}
 			return cert, err
 		}}
@@ -227,3 +229,51 @@ type fromConn struct {
 }
 
 func (c fromConn) RemoteAddr() net.Addr { return c.from }
+
+// seen records that the panel holds the certificate of domain.
+func (t *tunnel) seen(domain string) {
+	domain = strings.ToLower(strings.TrimSuffix(domain, "."))
+	if domain == "" {
+		return
+	}
+	t.mu.Lock()
+	t.certSeen[domain] = true
+	t.mu.Unlock()
+}
+
+// certRetry is how long the panel waits before it asks for the subdomain's certificate again after a try.
+const certRetry = time.Minute
+
+// obtainCert asks for the subdomain's certificate in the background, at most once a minute: Let's Encrypt validates it through
+// the host (TLS-ALPN-01), so the panel asks once its bridge is up instead of waiting for a visitor.
+func (s *Service) obtainCert(domain string) {
+	t := s.tun
+	now := s.cfg.Now()
+	t.mu.Lock()
+	if t.obtaining || (!t.lastTry.IsZero() && now.Sub(t.lastTry) < certRetry) {
+		t.mu.Unlock()
+		return
+	}
+	t.obtaining, t.lastTry = true, now
+	t.mu.Unlock()
+	go func() {
+		defer func() {
+			t.mu.Lock()
+			t.obtaining = false
+			t.mu.Unlock()
+		}()
+		if t.ctx.Err() != nil {
+			return
+		}
+		// an ECDSA-capable hello, so that autocert issues a P-256 certificate
+		hello := &tls.ClientHelloInfo{ServerName: domain, SignatureSchemes: []tls.SignatureScheme{tls.ECDSAWithP256AndSHA256},
+			SupportedCurves: []tls.CurveID{tls.CurveP256}, CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
+			SupportedVersions: []uint16{tls.VersionTLS13, tls.VersionTLS12}}
+		if _, err := t.get(hello); err != nil {
+			s.cfg.Log.Warn("subscription host: no certificate for the subdomain yet", "code", "sub_host_cert_pending", "domain", domain, "err", err)
+			return
+		}
+		t.seen(domain)
+		s.cfg.Log.Info("subscription host: the panel has the subdomain's certificate", "domain", domain)
+	}()
+}

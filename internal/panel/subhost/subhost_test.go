@@ -532,11 +532,20 @@ func TestReadiness(t *testing.T) {
 	}
 	e.fl.status[a] = &agentv1.SubHostStatus{}
 	public, up = true, true
-	e.svc.cfg.Certificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return nil, errors.New("unused") }
+	// the panel asks for the subdomain's certificate itself once the bridge is up (Let's Encrypt validates through the host)
+	var asked atomic.Int32
+	e.svc.tun.get = func(h *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		if h.ServerName != "sub.example.com" {
+			return nil, errors.New("wrong name")
+		}
+		asked.Add(1)
+		return &tls.Certificate{}, nil
+	}
 	e.fl.online[a] = false
 	e.svc.checkReady(e.ctx)
-	if e.state().ReadyAt != "" || notReady() != "host_offline" {
-		t.Fatalf("offline host made ready: %+v", e.state())
+	waitUntil(t, "the panel obtains the subdomain's certificate", func() bool { return e.svc.panelCert(e.ctx, "sub.example.com") })
+	if e.state().ReadyAt != "" || notReady() != "host_offline" || asked.Load() != 1 {
+		t.Fatalf("offline host made ready: %+v (asked %d)", e.state(), asked.Load())
 	}
 	e.fl.online[a] = true
 	e.svc.checkReady(e.ctx)
@@ -565,4 +574,37 @@ func TestReadiness(t *testing.T) {
 	if e.addr.PublicURL() != "https://sub.example.com" {
 		t.Fatal("a connection that dropped must not move the panel back")
 	}
+}
+
+// The certificate the panel holds is per domain (M3): a host turned off and set again for another domain is not ready until the
+// panel has that domain's certificate, and a failed request is not retried within a minute.
+func TestPanelCertIsPerDomain(t *testing.T) {
+	e := newEnv(t)
+	var asked atomic.Int32
+	fail := true
+	e.svc.tun.get = func(h *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		asked.Add(1)
+		if fail {
+			return nil, errors.New("no order yet")
+		}
+		return &tls.Certificate{}, nil
+	}
+	e.svc.tun.seen("old.example.com")
+	if !e.svc.panelCert(e.ctx, "old.example.com") || e.svc.panelCert(e.ctx, "new.example.com") {
+		t.Fatal("the certificate of one domain counts for another")
+	}
+	e.svc.obtainCert("new.example.com")
+	waitUntil(t, "the first try", func() bool {
+		e.svc.tun.mu.Lock()
+		defer e.svc.tun.mu.Unlock()
+		return asked.Load() == 1 && !e.svc.tun.obtaining
+	})
+	fail = false
+	e.svc.obtainCert("new.example.com") // within the minute: not again
+	if asked.Load() != 1 || e.svc.panelCert(e.ctx, "new.example.com") {
+		t.Fatal("asked again within a minute")
+	}
+	e.clock.Add(61)
+	e.svc.obtainCert("new.example.com")
+	waitUntil(t, "the certificate", func() bool { return e.svc.panelCert(e.ctx, "new.example.com") })
 }
