@@ -42,13 +42,31 @@ const PAGE_JS = String.raw`(() => {
     for (let pass = 0; pass < 3; pass++) {
       const list = [...document.querySelectorAll('[aria-selected],[aria-pressed],.stp,.lx-aib')].filter((e) => !e.closest('.lx-lg,.langs,.lx-lgm,.lx-mn'));
       for (const e of list) {
-        if (e.closest('.demo') && /^[01]$/.test(e.textContent.trim())) continue; // fleet of 0 or 1: a known error of the panel board
         try { e.click(); } catch (er) { /* a state the board cannot draw */ }
         await sleep(80); await window.__grab(); n++;
       }
     }
     const x = document.querySelector('.lx-aix'); if (x) x.click();
     return n;
+  };
+  // the nodes board (PnNodes) with 0 and with 1 node: every state control of the mock-up in turn, then a "paths" state of a bigger fleet carried
+  // over to the small one. The exceptions are caught by the stand's watcher; here a board that went blank counts too.
+  window.__fleet = async () => {
+    const f = document.querySelector('[data-board="PnNodes"]');
+    if (!f || !f.querySelector('.demo')) return JSON.stringify({ n: 0, bad: ['no PnNodes board with its state controls on the page'] });
+    f.scrollIntoView({ block: 'center' }); await sleep(400);
+    const groups = () => [...f.querySelector('.demo').querySelectorAll('.dl')].map((l) => ({ g: l.textContent.trim(), bs: [...l.nextElementSibling.querySelectorAll('button')] }));
+    const press = async (g, t) => { const b = (groups().find((x) => x.g === g) || { bs: [] }).bs.find((x) => x.textContent.trim() === t); if (!b) return false; b.click(); await sleep(120); await window.__grab(); return true; };
+    const names = groups().map((x) => [x.g, x.bs.map((b) => b.textContent.trim())]), bad = [];
+    let n = 0;
+    const blank = (what) => { n++; if (f.innerText.length < 300) bad.push(what + ': the board is empty'); };
+    for (const fl of ['0', '1']) {
+      if (!(await press('Ноды', fl))) { bad.push('no fleet button ' + fl); continue; }
+      for (const [g, ts] of names) if (g !== 'Ноды') for (const t of ts) { await press(g, t); blank('fleet ' + fl + ', ' + g + ' = ' + t); }
+    }
+    for (const t of (names.find((x) => x[0] === 'Пути') || ['', []])[1]) for (const fl of ['0', '1']) { await press('Ноды', '4'); await press('Пути', t); await press('Ноды', fl); blank('state ' + t + ' carried to fleet ' + fl); }
+    await press('Ноды', '4');
+    return JSON.stringify({ n, bad: bad.slice(0, 5) });
   };
   window.__bag = new Set();
   window.__classes = new Set();
@@ -137,6 +155,13 @@ try {
     }
     // 6. tours
     if (TOURS) await smokeTours(page, lang, width, key, run);
+    // 6b. the nodes board with no fleet and with one node (every state control of the mock-up in each), and with a state left over from a bigger fleet
+    if (page === 'main' && width === 1440 && (lang === 'ru' || lang === 'en')) {
+      const e0 = w.errors.length, r = JSON.parse(await chrome.ev('window.__fleet()').catch((e) => JSON.stringify({ n: 0, bad: ['eval: ' + e.message.slice(0, 120)] })));
+      const thrown = w.errors.splice(e0).filter((x) => /^exception/.test(x));
+      if (thrown.length || r.bad.length) fail(`${key}: the nodes board breaks with 0 or 1 nodes: ${[...r.bad, ...thrown.slice(0, 2).map((x) => x.replace(/\s+/g, ' ').slice(0, 140))].join('; ')}`);
+      else console.log(`  nodes board with 0 and 1 nodes: ${r.n} states drawn, no errors`);
+    }
     if (HARVEST && lang === 'ru') { const n = await chrome.ev('window.__sweep()').catch((e) => { console.log('  sweep: ' + e.message.slice(0, 120)); return 0; }); console.log(`  swept ${n} state controls`); }
     // 7. Russian left on screen (non-ru), the strings for the harvest (ru)
     await chrome.ev('window.__grab()');

@@ -14,7 +14,7 @@ import * as esbuild from 'esbuild';
 import { compileBoard } from './compile.mjs';
 import { closure } from './sync.mjs';
 import { PATCHES } from './patches.mjs';
-import { scanBlobs, blobAsset } from './blobs.mjs';
+import { scanBlobs, blobAsset, loadBlobs } from './blobs.mjs';
 import { parseI18n, translatorModule, makeTr, corpusOf, subsetKeys, keysUsedFor, langDict } from './translate.mjs';
 import { usage, pruneCss } from './css.mjs';
 import { resolveLinks, homeUrl, appUrl } from './links.mjs';
@@ -67,7 +67,8 @@ const compiled = {}, images = new Map(), standIns = [];
 // the brand mark: the svg the panel boards embed as a data: URI (the /_blob/ of the brand links is the same picture)
 const logoSvg = names.map((n) => { const m = /src="data:image\/svg\+xml;base64,([^"]+)"/.exec(sources[n]); return m && Buffer.from(m[1], 'base64').toString(); }).find((x) => x && /aria-label="Mistgate"/.test(x)) || '';
 if (!logoSvg) warn('the brand mark (the data: svg of the panel boards) was not found; the logo stand-in is empty');
-const blobUrl = (h) => { const a = blobAsset(h, info, logoSvg); images.set(a.file, a.body); if (a.standIn && !standIns.some((x) => x.hash === h)) standIns.push({ hash: h, kind: a.kind, cc: a.cc, file: a.file }); return '/assets/' + a.file; };
+const realBlobs = loadBlobs(join(DESIGN, 'blobs')), usedBlobs = new Set(); // design/blobs/<hash>.svg: the real pictures; a hash without one gets a stand-in
+const blobUrl = (h) => { usedBlobs.add(h); const a = blobAsset(h, info, logoSvg, realBlobs); images.set(a.file, a.body); if (a.standIn && !standIns.some((x) => x.hash === h)) standIns.push({ hash: h, kind: a.kind, cc: a.cc, file: a.file }); return '/assets/' + a.file; };
 let patchCount = 0;
 for (const n of names) {
   const page = n === 'Main' || n === 'AppPage';
@@ -221,9 +222,10 @@ manifest.assets = readdirSync(join(BUILD, 'assets')).sort().map((f) => 'assets/'
 writeFileSync(join(BUILD, 'manifest.json'), JSON.stringify(manifest, null, 2));
 if (!args.includes('--keep-shell')) rmSync(join(BUILD, '_pre'), { recursive: true, force: true });
 rmSync(join(BUILD, '_gen'), { recursive: true, force: true });
-const report = { designVersion, boards: names, compile: Object.fromEntries(names.map((n) => [n, { patches: compiled[n].patches, scoped: compiled[n].stats.scoped }])), standIns, css: cssStats, prunedClasses: Object.fromEntries(Object.entries(prunedClasses).map(([k, v]) => [k, { dropped: [...v.dropped].filter((x) => !v.kept.has(x)).sort() }])), dictKeys: Object.fromEntries(PAGES.map((pg) => [pg, subsets[pg].length])), warnings, prerender: pre.report };
+const report = { designVersion, boards: names, compile: Object.fromEntries(names.map((n) => [n, { patches: compiled[n].patches, scoped: compiled[n].stats.scoped }])), standIns, blobs: { real: [...usedBlobs].filter((h) => realBlobs.has(h)).length, standIn: standIns.length, files: new Set([...usedBlobs].map((h) => blobAsset(h, info, logoSvg, realBlobs).file)).size, unusedFiles: [...realBlobs.keys()].filter((h) => !usedBlobs.has(h)) }, css: cssStats, prunedClasses: Object.fromEntries(Object.entries(prunedClasses).map(([k, v]) => [k, { dropped: [...v.dropped].filter((x) => !v.kept.has(x)).sort() }])), dictKeys: Object.fromEntries(PAGES.map((pg) => [pg, subsets[pg].length])), warnings, prerender: pre.report };
 report.budgets = budgets({ BUILD, manifest, out, outByEntry, closureOf, eagerOf, jsOf, entry, cssStats, cssOut, bundles, pages: PAGES, langs: LANGS, brLen, rel, boardsFor, names, isAppBoard, langOfBoard, fontFiles });
 writeFileSync(join(BUILD, 'report.json'), JSON.stringify(report, null, 1));
 lap('done');
-if (standIns.length) console.log(`image stand-ins (the export has no /_blob/ files): ${standIns.length} (${[...new Set(standIns.map((s) => s.kind))].join(', ')}), see report.json`);
+console.log(`images: ${report.blobs.real} of ${usedBlobs.size} /_blob/ hashes have a real file (${report.blobs.files} files in assets/)` + (report.blobs.unusedFiles.length ? `; ${report.blobs.unusedFiles.length} real files no board uses` : ''));
+if (standIns.length) console.log(`image stand-ins (no file in design/blobs/ for these /_blob/ hashes): ${standIns.length} (${[...new Set(standIns.map((s) => s.kind))].join(', ')}), see report.json`);
 if (report.budgets.over.length) process.exitCode = 0; // warnings only: the table says what is over

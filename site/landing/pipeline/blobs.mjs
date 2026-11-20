@@ -1,7 +1,9 @@
 // blobs.mjs: the design refers to images as /_blob/<hash> (flags of the server lists, the accent-coloured logos, the support
-// avatar), and the export does not carry them. Each one is replaced by a stand-in drawn here, so the page has no broken
-// image; the owner can drop the real files in later (the report names every stand-in).
+// avatar). The real files are the export's blobs/<hash>.svg (sync copies them to design/blobs/). A hash with no file there
+// is replaced by a stand-in drawn here, so the page has no broken image; the report names every stand-in.
 import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const FLAG_W = 30, FLAG_H = 20;
 const hs = (cols, w = cols.map(() => 1)) => { const t = w.reduce((a, b) => a + b, 0); let y = 0; return cols.map((c, i) => { const h = FLAG_H * w[i] / t, r = `<rect y="${y.toFixed(2)}" width="${FLAG_W}" height="${h.toFixed(2)}" fill="${c}"/>`; y += h; return r; }).join(''); };
@@ -32,10 +34,40 @@ export function scanBlobs(sources) {
   return info;
 }
 
-/** the stand-in file of a blob: {file, body, standIn}. logoSvg: the brand mark (the badge the Pn boards embed) */
-export function blobAsset(hash, info, logoSvg) {
-  const i = info.get(hash) || { kind: 'unknown' };
+/** the file of a blob: {file, body, standIn}. real: hash -> {body, ext} from design/blobs, used when there is one; the stand-in only when not.
+ *  logoSvg: the brand mark (the badge the Pn boards embed). A file is named by its content: hashes that are copies of one picture share one file. */
+export function blobAsset(hash, info, logoSvg, real = new Map()) {
+  const i = info.get(hash) || { kind: 'unknown' }, r = real.get(hash);
+  if (r) return { file: 'img-' + createHash('sha1').update(r.body).digest('hex').slice(0, 10) + '.' + r.ext, body: r.body, kind: i.kind, cc: i.cc || null, standIn: false };
   let body = i.kind === 'flag' ? flagSvg(i.cc) : i.kind === 'unknown' ? svg('<rect width="20" height="20" fill="#6b6b73"/>', '0 0 20 20') : logoSvg;
   body = Buffer.from(body);
   return { file: 'img-' + createHash('sha1').update(body).digest('hex').slice(0, 10) + '.svg', body, kind: i.kind, cc: i.cc || null, standIn: i.kind !== 'brand' };
+}
+
+/** why an svg is not safe to ship as an image of the site (script, handler, foreign content, anything that loads from outside), or '' */
+export function unsafeSvg(s) {
+  const bad = [
+    [/<\s*(script|foreignObject|iframe|object|embed|link)\b/i, 'script or foreign content'],
+    [/\son[a-z]+\s*=/i, 'event handler'],
+    [/javascript\s*:/i, 'javascript: url'],
+    [/(?:xlink:)?href\s*=\s*["'](?!#)/i, 'reference that leaves the file'],
+    [/url\(\s*["']?(?!#)/i, 'url() that leaves the file'],
+    [/@import|<!ENTITY|<!DOCTYPE/i, 'import or entity'],
+  ];
+  const hit = bad.find(([re]) => re.test(s));
+  return hit ? hit[1] : '';
+}
+
+/** design/blobs: hash -> {body, ext} (files named <32 hex>.svg; anything else is not a blob) */
+export function loadBlobs(dir) {
+  const out = new Map();
+  if (!existsSync(dir)) return out;
+  for (const f of readdirSync(dir)) {
+    const m = /^([0-9a-f]{32})\.svg$/.exec(f);
+    if (!m) continue;
+    const body = readFileSync(join(dir, f)), why = unsafeSvg(body.toString('utf8'));
+    if (why) throw new Error(`design/blobs/${f}: ${why}`);
+    out.set(m[1], { body, ext: 'svg' });
+  }
+  return out;
 }

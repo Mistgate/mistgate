@@ -18,3 +18,28 @@ test('the privacy scan: real-looking addresses, e-mails and local paths are find
   assert.ok(kinds.includes('review-host:some-vpn-provider.net'));
   for (const ok of ['203.0.113.7', '198.51.100.2', '10.0.0.1', '192.168.1.2', '5.0.1.5', 'example.com', 'mail@example.org', 't.me']) assert.ok(!kinds.some((k) => k.endsWith(':' + ok)), ok + ' is not a finding');
 });
+
+test('images of the canvas go through the same scan, and an svg that carries a script or loads from outside is blocking', () => {
+  const files = {
+    'ok.svg': '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 3 2"><defs><clipPath id="a"><path d="M0 0h3v2z"/></clipPath></defs><use xlink:href="#a"/><rect fill="url(#a)"/></svg>',
+    'script.svg': '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+    'handler.svg': '<svg xmlns="http://www.w3.org/2000/svg" onload="x()"></svg>',
+    'remote.svg': '<svg xmlns="http://www.w3.org/2000/svg"><image href="https://tracker.example/p.png"/></svg>',
+    'css.svg': '<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:url(https://tracker.example/x)"/></svg>',
+    'path.svg': '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0L95.216.1.2z"/></svg>',
+  };
+  const f = scan(Object.keys(files), (n) => files[n]);
+  const bad = new Set(f.filter((x) => x.kind === 'unsafe-svg').map((x) => x.file));
+  assert.deepEqual([...bad].sort(), ['css.svg', 'handler.svg', 'remote.svg', 'script.svg']);
+  assert.ok(!f.some((x) => x.file === 'ok.svg'));
+});
+
+test('a blob has a real file: the real file is used and named by its content; the stand-in only when there is none', async () => {
+  const { blobAsset, loadBlobs } = await import('../blobs.mjs');
+  const real = new Map([['a'.repeat(32), { body: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), ext: 'svg' }], ['b'.repeat(32), { body: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), ext: 'svg' }]]);
+  const info = new Map([['a'.repeat(32), { kind: 'flag', cc: 'de' }], ['c'.repeat(32), { kind: 'flag', cc: 'de' }]]);
+  const a = blobAsset('a'.repeat(32), info, '', real), b = blobAsset('b'.repeat(32), info, '', real), c = blobAsset('c'.repeat(32), info, '', real);
+  assert.equal(a.standIn, false); assert.equal(a.file, b.file, 'two hashes of one picture are one file');
+  assert.equal(c.standIn, true); assert.notEqual(c.file, a.file);
+  assert.equal(loadBlobs('Z:/no/such/folder').size, 0);
+});

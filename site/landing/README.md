@@ -89,7 +89,7 @@ dist/        OUTPUT of the generator (not in git)
 
 | | |
 |---|---|
-| `pnpm sync <design export folder>` | copy the needed boards, stylesheets and the dictionary into `design/`, after a privacy scan (`MG_DESIGN_SRC` instead of the argument) |
+| `pnpm sync <design export folder> [<blobs folder>]` | copy the needed boards, stylesheets and the dictionary into `design/`, and the images (`<hash>.svg`) into `design/blobs/`, after a privacy scan and a check that no svg has a script or loads from outside (`MG_DESIGN_SRC`, `MG_DESIGN_BLOBS` instead of the arguments) |
 | `pnpm build` | design -> `build/`: compile, bundle, translate, prune the css, pre-render the first screen of every page in every language, check the size budgets |
 | `pnpm stand` | serve `build/` on http://127.0.0.1:8790 with the CSP of the site (`/`, `/ru/`, `/app/`, `/ru/app/`, ...) |
 | `pnpm check` | headless Chrome over the stand: 390, 820 and 1440 px in ru, en and fa; console, CSP, boards, tours, shots (`--help` in the file header) |
@@ -111,7 +111,7 @@ Chrome is taken from `CHROME`, or from the usual places. The shots of `check` go
   time (the pre-render) and in the browser (what scripts assemble on the fly), over the part of the dictionary the page can show, in one language.
 * **CSS** of the design is cut to the classes the page's boards can use; fonts are the ones of `web/src/fonts`.
 * **Links** of the design (`Docs.dc.html#…`) are resolved by `links.json` to the pages the docs generator builds.
-* **Images** the design refers to as `/_blob/<hash>` are not in the export; the build draws stand-ins (flags, logos) and lists them in `build/report.json`.
+* **Images** the design refers to as `/_blob/<hash>` are the files of `design/blobs/<hash>.svg` (copied by `sync`); a file is named in `assets/` by its content, so copies of one picture are one file. A hash with no file gets a stand-in drawn by the build (flags, logos), listed in `build/report.json` (`standIns`) and in the build output.
 
 ## What the generator gets beyond the contract
 

@@ -41,11 +41,6 @@
     "Подробнее|Сайт-ширма": "guide/decoy-site"
   },
   "page": {
-    "app": "@app",
-    "hysteria2": "guide/hysteria2",
-    "vless": "guide/vless",
-    "amneziawg": "guide/amneziawg",
-    "trusttunnel": "guide/trusttunnel",
-    "mtproto": "guide/mtproto"
+    "app": "@app"
   }
 }

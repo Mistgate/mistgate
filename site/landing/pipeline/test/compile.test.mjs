@@ -66,3 +66,11 @@ test('/_blob/ images go through the resolver', () => {
   const r = compileBoard(board(`<img src="/_blob/${h}" alt="">`, `class Component extends DCLogic { renderVals() { return { f: '/_blob/${h}' }; } }`), 'I', { patches: false, blob: (x) => '/assets/' + x.slice(0, 4) + '.svg' });
   assert.match(r.code, /src:"\/assets\/aaaa\.svg"/); assert.match(r.code, /f: '\/assets\/aaaa\.svg'/);
 });
+
+test('a link from a hole that holds an outside address (the protocol button to its repository) is left as it is, and is not a link of the design', async () => {
+  const { href } = await import('../runtime/rt.js');
+  assert.equal(href('https://github.com/example/repo', null, 'Страница протокола', 'Card'), 'https://github.com/example/repo');
+  assert.equal(href('', null, 'x', 'y'), '');
+  const r = compileBoard(board('<article><h3>Card</h3><a href="{{repo}}">Page</a></article>', LOGIC), 'R', { page: true, patches: false });
+  assert.match(r.code, /\$H\(\$v\.repo,null,"Page","Card"\)/);
+});
