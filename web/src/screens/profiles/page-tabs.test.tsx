@@ -123,6 +123,16 @@ describe("put on nodes", () => {
     expect(row("spb1").querySelector("[role=checkbox]")?.getAttribute("aria-disabled")).toBe("true");
   });
 
+  it("keeps an entry out of the tick-all link, and still takes a tick by hand", async () => {
+    await draw("hy1.servers.put");
+    const box = () => row("msk1").querySelector("[role=checkbox]")!;
+    await click(btn(E["ps.pt.pickNone"]));
+    await click(btn(E["ps.pt.pickAll"]));
+    expect(box().getAttribute("aria-checked")).toBe("false");
+    await click(box());
+    expect(box().getAttribute("aria-checked")).toBe("true");
+  });
+
   it("offers to retry a node that failed, and to take the profile off where it failed", async () => {
     await draw("hy1.servers.put.run.fail.on-de2+fi2");
     await settle(30);
