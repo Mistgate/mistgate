@@ -40,7 +40,8 @@ export type AmzState = {
   node: Record<string, number>;
   /** Where each key is being added ("this", "phone", "other"): the dialog's switch; absent = the default for the device. */
   where: Record<string, string>;
-  form: { profile: string; platform: string; label: string };
+  /** The form of a new device; `list`: the servers of the chosen key are unfolded under the choice. */
+  form: { profile: string; platform: string; label: string; list: boolean };
   /** The platform this page is open on ("" unknown): a key for this very device is copied or downloaded, not scanned. */
   here: string;
 };
@@ -62,7 +63,7 @@ export const newAmzState = (platform: string, profile: string, here = ""): AmzSt
   configs: {},
   node: {},
   where: {},
-  form: { profile, platform, label: "" },
+  form: { profile, platform, label: "", list: false },
   here,
 });
 

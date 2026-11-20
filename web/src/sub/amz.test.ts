@@ -5,7 +5,7 @@ import { amzActions, type Api } from "./amz-actions";
 import { ApiError, endpoint } from "./api";
 import { cases, sampleQr } from "./dev-data";
 import { dict } from "./i18n";
-import { awgConfig, awgDevice, defaultLabel, mainProfile, normalize, otherDevices, profileChoices, selfServe, versionsFor } from "./logic";
+import { awgConfig, awgDevice, defaultLabel, mainProfile, keyVersions, normalize, otherDevices, selfServe, versionsFor } from "./logic";
 import { actions, amzNoop, data, dialog, plain, state, text } from "./test-kit";
 import type { MgData } from "./types";
 import { view } from "./view";
@@ -91,29 +91,35 @@ describe("names and choices a friend can read", () => {
     expect(defaultLabel("other", [], dict.en)).toBe("Device");
   });
 
-  it("the connection options: the main one first and by its countries, the WARP one as the spare exit, 2.0 for old apps", () => {
-    const d = normalize(cases.many);
-    const choices = profileChoices(d.amnezia!.profiles, t, "ru", "AmneziaVPN");
-    expect(choices.map((c) => [c.id, c.label, c.kind])).toEqual([
-      ["p31", "🇩🇪 Германия, 🇫🇮 Финляндия", "main"],
-      ["pw", "WARP (выход через Cloudflare)", "warp"],
-      ["p20", "Для старых версий AmneziaVPN (до 5.0.1.5)", "old"],
+  it("the key's choices: the new version first, inside it the keys with the servers they hold, as the Servers table names them", () => {
+    const vs = keyVersions(normalize(cases["key-many"]!), "ru");
+    expect(vs.map((v) => [v.kind, v.awg, v.sets.map((x) => [x.id, x.name, x.warp, x.servers.length])])).toEqual([
+      ["new", "3.1", [["p31", "AWG3.1", false, 10], ["p31b", "AWG 3.1 (new)", false, 2]]],
+      ["old", "2.0", [["p20", "AWG2", false, 10], ["p20b", "AWG 2.0 (new)", false, 2], ["p20w", "AWG 2.0 (new) · WARP", true, 1]]],
     ]);
+    // a server is its country, the mark that tells it from its country's others (place, else the number) and the domain it is reached by
+    expect(vs[0]!.sets[0]!.servers.map((x) => [x.cc, x.country, x.mark, x.host])).toEqual([
+      ["BY", "Беларусь", "", "by1.example.com"],
+      ["DE", "Германия", "DE-1", "de1.example.com"],
+      ["DE", "Германия", "DE-2", "de2.example.com"],
+      ["DE", "Германия", "DE-3", "203.0.113.24"],
+      ["EE", "Эстония", "EE-1", "est1.example.com"],
+      ["EE", "Эстония", "EE-2", "est2.example.com"],
+      ["NL", "Нидерланды", "", "nl1.example.com"],
+      ["PL", "Польша", "", "pl1.example.com"],
+      ["RO", "Румыния", "Бухарест", "ro1.example.com"],
+      ["RU", "Россия", "RU-1", "msk1.example.com"],
+    ]);
+    expect(vs[0]!.sets[0]!.countries).toEqual(["BY", "DE", "EE", "NL", "PL", "RO", "RU"]); // once each
+    expect(vs[1]!.sets[2]!.servers.map((x) => x.mark)).toEqual(["EE-2"]);
+    // the other states of the page: the main profile first, the spare exit after it; no server says it carries the profile
+    const d = normalize(cases.many!);
+    expect(keyVersions(d, "ru").map((v) => [v.kind, v.sets.map((x) => [x.id, x.warp])])).toEqual([["new", [["p31", false], ["pw", true]]], ["old", [["p20", false]]]]);
     expect(mainProfile(d.amnezia!.profiles)).toBe("p31");
-    // the same label twice gets a number; without a country the main one is "Main"; without flags (Windows) the names only
-    const two = [
-      { id: "a", name: "x", version: "3.1", egress: "direct" as const, countries: [] },
-      { id: "b", name: "y", version: "3.1", egress: "direct" as const, countries: [] },
-    ];
-    expect(profileChoices(two, t, "ru", "A").map((c) => c.label)).toEqual(["Основной", "Основной (2)"]);
-    // several old profiles are told apart by their countries and by the spare exit, not by a number alone
-    const olds = [
-      { id: "o1", name: "x", version: "2.0", egress: "direct" as const, countries: ["DE", "EE"] },
-      { id: "o2", name: "y", version: "2.0", egress: "direct" as const, countries: ["EE"] },
-      { id: "o3", name: "z", version: "2.0", egress: "warp" as const, countries: ["EE"] },
-    ];
-    expect(profileChoices(olds, t, "ru", "A", false).map((c) => c.label)).toEqual(["Германия, Эстония", "Эстония", "Эстония · Запасной выход"]);
-    expect(profileChoices(d.amnezia!.profiles, t, "ru", "AmneziaVPN", false)[0]!.label).toBe("Германия, Финляндия");
+    expect(keyVersions(d, "ru")[0]!.sets.map((x) => x.servers.map((y) => y.mark))).toEqual([["Франкфурт", ""], []]);
+    const bare = normalize({ ...cases.many!, servers: [] });
+    expect(keyVersions(bare, "ru")[0]!.sets.map((x) => [x.servers.length, x.countries])).toEqual([[0, ["DE", "FI"]], [0, ["DE", "FI"]]]);
+    expect(keyVersions(normalize({ ...cases.many!, amnezia: null }), "ru")).toEqual([]);
   });
 
   it("the app versions a key needs, for the device's platform only", () => {
@@ -566,16 +572,28 @@ describe("the key dialog", () => {
     expect(log).toEqual(["d3 other"]);
   });
 
-  it("the country choice: the names the app shows, one chip each, and it explains itself", () => {
+  it("the server choice: one chip each, the flag and the name the page gives it; it counts them and explains itself", () => {
     const fld = modal("android", "d3").querySelector(".a-b > .a-steps > .a-fld")!;
-    expect(text(fld.querySelector(".a-lbl"))).toBe("Страна");
-    expect([...fld.querySelectorAll(".a-chip")].map((x) => [text(x), x.getAttribute("aria-checked")])).toEqual([["Германия · Франкфурт", "true"], ["Финляндия", "false"]]);
+    expect(text(fld.querySelector(".a-lbl"))).toBe("Серверв ключе 2 сервера");
+    // these configs name no server of the page (another node id): the name the panel gave them, with the flag
+    expect([...fld.querySelectorAll(".a-chip")].map((x) => [text(x), x.getAttribute("aria-checked")])).toEqual([["Германия · Франкфурт", "true"], ["FIФинляндия", "false"]]);
+    expect([...fld.querySelectorAll(".a-chip .fl2")].map((x) => x.className)).toEqual(["fl2 de", "fl2 cc"]);
     expect(text(fld.querySelector(".u-hint"))).toBe("Каждая страна — отдельное подключение. Добавьте одну; перестанет работать — добавьте другую.");
     const log: number[] = [];
     const r = withKey({ a: actions({ amz: { ...amzNoop, node: (_id, i) => log.push(i) } }) }, [cfg("de1"), cfg("fi1", "FI")]);
     r.box.querySelector<HTMLButtonElement>("[data-k=amz-node-d3-1]")!.click();
     expect(log).toEqual([1]);
-    expect(modal("android", "d3", "open", (s) => (s.configs.d3 = [cfg("de1")])).querySelector("[id^=k-c-]")).toBeNull(); // one country: no choice
+    expect(modal("android", "d3", "open", (s) => (s.configs.d3 = [cfg("de1")])).querySelector("[id^=k-c-]")).toBeNull(); // one server: no choice
+  });
+
+  it("the server chips are told apart as the Servers table tells the servers apart: the number among twins, the place", () => {
+    const d = data("key-many", (x) => x.amnezia!.devices.push(awgDevice({ id: "d3", platform: "windows", label: "PC", profile_id: "p31", version: "3.1" })));
+    const node = (slug: string, cc: string) => awgConfig({ node_id: `nod_${slug}`, label: `${cc} ${slug}`, country_code: cc, version: "3.1", conf: "[Interface]\nPrivateKey = x\n", vpn_key: "vpn://k", filename: `${slug}.conf`, qr: sampleQr });
+    const configs = [node("by1", "BY"), node("de1", "DE"), node("de2", "DE"), node("est1", "EE"), node("ro1", "RO"), node("rus1", "RU")];
+    const { box } = dialog(d, { platform: "windows", amz: { open: "d3", configs: { d3: configs }, here: "windows" } });
+    const fld = box.querySelector(".a-steps > .a-fld")!;
+    expect(text(fld.querySelector(".a-lbl"))).toBe("Серверв ключе 6 серверов");
+    expect([...fld.querySelectorAll(".a-chip")].map(text)).toEqual(["Беларусь", "ГерманияDE-1", "ГерманияDE-2", "ЭстонияEE-1", "РумынияБухарест", "РоссияRU-1"]);
   });
 
   it("a key through an entry shares the node of the direct one: it is named as the app names it, says once that it is a new server, and is the connection to delete when renewed", () => {
@@ -662,23 +680,27 @@ describe("the key dialog", () => {
 describe("the add-a-device dialog", () => {
   const form = (name = "many", amz: Partial<AmzState> = {}) => dialog(data(name), { amz: { pane: "key", ...amz } });
 
-  it("the device (six choices), its name, and the version of the app only when there is a choice, with the countries of the chosen one", () => {
+  it("the device (six choices), its name, and the version of the app: a choice when there are two, a line when there is one", () => {
     const { box: b } = form();
     expect(text(b.querySelector(".a-h .t"))).toBe("Ключ AmneziaVPN");
     expect([...b.querySelectorAll(".a-chip")].map(text)).toEqual(["iPhone", "Android", "Windows", "Mac", "Linux", "Другое"]);
     expect(b.querySelector<HTMLElement>(".a-chip.on")?.textContent).toBe("iPhone");
     expect(b.querySelector<HTMLInputElement>("[data-k=amz-label]")?.placeholder).toBe("Например, телефон мамы");
-    expect([...b.querySelectorAll(".a-ver .d")].map(text)).toEqual(["Обычный ключ, подходит почти всегда", "Если какой-то сайт не открывается", "Ключ для старых версий приложения"]);
-    expect([...b.querySelectorAll(".a-incl li")].map(text)).toEqual(["Германия", "FIФинляндия"]);
+    expect([...b.querySelectorAll(".a-ver .d")].map(text)).toEqual(["Подходит почти всегда", "Для старых версий приложения"]);
+    expect([...b.querySelectorAll(".a-set .t")].map(text)).toEqual(["Main", "Main · WARPЗапасной выход"]);
     expect(b.querySelector("[data-k=modal-create]")?.textContent).toBe("Создать ключ");
     expect(form("both").box.querySelector(".a-vers")).toBeNull();
+    expect(form("both").box.querySelector(".a-vone")).not.toBeNull();
   });
 
-  it("two profiles of one kind are told apart by their countries", () => {
+  it("two profiles of one version are told apart by their name, and by the servers they hold", () => {
     const d = data("many", (x) => x.amnezia!.profiles.push({ id: "p31b", name: "Second", version: "3.1", egress: "direct", countries: ["NL"] }));
     const { box } = dialog(d, { amz: { pane: "key" } });
-    const main = [...box.querySelectorAll(".a-ver")].filter((x) => text(x.querySelector(".v")).startsWith("5.0.1.5"));
-    expect(main.map((x) => text(x.querySelector(".d")))).toEqual(["Германия, Финляндия", "Нидерланды"]);
+    expect([...box.querySelectorAll(".a-set")].map((x) => [text(x.querySelector(".t")), text(x.querySelector(".d"))])).toEqual([
+      ["Main", "2 сервера в 2 странах"],
+      ["Second", "В ключе 1 страна"],
+      ["Main · WARPЗапасной выход", "В ключе 2 страны"],
+    ]);
   });
 
   it("busy: 'One moment', and the button waits", () => {

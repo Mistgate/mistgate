@@ -3,11 +3,12 @@ import { chip } from "./connect";
 import { h, type Kid } from "./dom";
 import type { Dict } from "./i18n";
 import { icon, type IconName } from "./icons";
-import { addPlatforms, countryName, deviceIcon, isDesktop, isPhone, keyAppName, platformWord, profileChoices, versionsFor } from "./logic";
+import { addPlatforms, countryName, deviceIcon, isDesktop, isPhone, keyAppName, keyVersions, platformWord, serverMark, serverName, serversOf, versionsFor, type KeySet, type KeyVersion } from "./logic";
 import { qrCard } from "./qr";
+import { flag } from "./servers";
 import type { AmzActions, AmzState, Tools } from "./state";
 import { rich } from "./ui";
-import type { AwgDevice, Lang, MgData, Platform } from "./types";
+import type { AwgConfig, AwgDevice, Lang, MgData, Platform } from "./types";
 
 export { newAmzState } from "./state";
 export type { AmzActions, AmzState, Tools } from "./state";
@@ -28,39 +29,85 @@ export { copyButton };
 
 // ---- step "key": the form of a new device ----
 
-/** The flags the board draws in CSS (sub-a.css); any other country shows its two letters on the same box. */
-const cssFlags = new Set(["de", "nl", "ru", "ee", "pl", "ro", "by"]);
-const flagBox = (cc: string) => {
-  const l = cc.trim().toLowerCase();
-  return cssFlags.has(l) ? h("span", { class: `fl2 ${l}`, "aria-hidden": "true" }) : h("span", { class: "fl2 cc", "aria-hidden": "true" }, l.toUpperCase());
-};
+/** The flags a key's card draws: a computer eight, a phone four; the rest is a count ("+3"). sub-b.css shows the one end that fits (.only-w, .only-m). */
+function flagRow(c: AmzCtx, ccs: string[]): HTMLElement {
+  const one = (cc: string, i: number) => {
+    const f = flag(c, { country_code: cc, place: "", label: "" }, true);
+    if (i >= 4) f.classList.add("only-w");
+    return f;
+  };
+  const more = (n: number, cls: string) => n > 0 && h("span", { class: `x ${cls}` }, `+${n}`);
+  return h("span", { class: "a-fls", "aria-hidden": "true" }, ...ccs.slice(0, 8).map(one), more(ccs.length - 8, "only-w"), more(ccs.length - 4, "only-m"));
+}
 
-/** The form: what device, its name, the version of the app (when the profiles differ), the countries the key holds. */
+/** The form: what device, its name, the version of the app (when the profiles differ), the key to make and the servers it holds. */
 export function keyBody(c: AmzCtx): HTMLElement {
   const { d, s, a, t } = c;
-  const am = d.amnezia!;
   const app = keyAppName(d, null);
   const f = s.amz.form;
   const busy = s.amz.busy === "add";
-  const choices = profileChoices(am.profiles, t, s.lang, app, false);
-  const chosen = choices.find((p) => p.id === f.profile) ?? choices[0];
+  const versions = keyVersions(d, s.lang);
+  const cur = versions.find((v) => v.sets.some((x) => x.id === f.profile)) ?? versions[0];
+  const set = cur?.sets.find((x) => x.id === f.profile) ?? cur?.sets[0];
   const err = s.amz.error && s.amz.errorAt === "add" ? s.amz.error : "";
-  const sameKind = (k: string) => choices.filter((p) => p.kind === k).length;
-  const ver = (p: (typeof choices)[number]) => {
-    const on = p.id === chosen?.id;
-    const awg = am.profiles.find((x) => x.id === p.id)?.version ?? "";
-    const word = p.kind === "old" ? t.adVerOld : p.kind === "warp" ? t.adVerWarp : t.adVerNew;
-    // two profiles of one kind differ by their countries: those say which is which
-    const about = sameKind(p.kind) > 1 ? p.label : p.kind === "old" ? t.adVerOldD : p.kind === "warp" ? t.profileSub.warp : t.adVerNewD;
+  const word = (v: KeyVersion) => (v.kind === "old" ? t.adVerOld : t.adVerNew);
+  const badge = (v: KeyVersion) => h("span", { class: `pr${v.kind === "new" ? " new" : ""}` }, `AWG ${v.awg}`);
+  // the servers of a key said in a line; a key no server is known on says its countries
+  const about = (x: KeySet) => (x.servers.length > 0 ? t.adSetD(x.servers.length, x.countries.length, x.servers[0]!.country) : x.countries.length > 0 ? t.adInclT(x.countries.length) : "");
+
+  const ver = (v: KeyVersion) => {
+    const on = v === cur;
     return h(
       "button",
-      { class: `a-ver${on ? " on" : ""}`, type: "button", role: "radio", "aria-checked": on, "data-k": `amz-ver-${p.id}`, on: { click: () => a.amz.form({ profile: p.id }, true) } },
+      { class: `a-ver${on ? " on" : ""}`, type: "button", role: "radio", "aria-checked": on, "data-k": `amz-ver-${v.kind}`, on: { click: () => a.amz.form({ profile: on ? f.profile : v.sets[0]!.id }, true) } },
       h("span", { class: "a-rd" }),
-      h("span", { class: "v" }, word, h("span", { class: `pr${p.kind === "main" ? " new" : ""}` }, p.kind === "warp" ? "WARP" : `AWG ${awg}`)),
-      h("span", { class: "d" }, about),
+      h("span", { class: "v" }, word(v), badge(v)),
+      h("span", { class: "d" }, v.kind === "old" ? t.adVerOldD : t.adVerNewD),
     );
   };
-  const countries = (chosen?.countries ?? []).map((cc) => ({ cc, name: countryName(cc, s.lang) })).filter((x) => x.name);
+  const versionField =
+    cur &&
+    h(
+      "div",
+      { class: "a-fld" },
+      h("p", { class: "a-lbl", id: "nd-v" }, t.adVerT(app), h("span", null, t.adVerH)),
+      versions.length > 1
+        ? h("div", { class: "a-vers", role: "radiogroup", "aria-labelledby": "nd-v" }, ...versions.map(ver))
+        : h("p", { class: "a-vone", role: "group", "aria-labelledby": "nd-v" }, h("span", { class: "v" }, word(cur)), badge(cur), h("span", { class: "d" }, cur.kind === "old" ? t.adVerOldD : t.adVerOnly)),
+    );
+
+  const multi = !!cur && cur.sets.length > 1;
+  const card = (x: KeySet) => {
+    const on = x.id === set?.id;
+    const tag = x.warp && h("span", { class: "u-tag warp" }, t.adVerWarp);
+    const body = [h("span", { class: "tx" }, h("span", { class: "t" }, multi ? x.name || about(x) : about(x), tag), multi && h("span", { class: "d" }, about(x))), flagRow(c, x.countries)];
+    return multi
+      ? h("button", { class: `a-set${on ? " on" : ""}`, type: "button", role: "radio", "aria-checked": on, "data-k": `amz-set-${x.id}`, on: { click: () => a.amz.form({ profile: x.id }, true) } }, h("span", { class: "a-rd" }), ...body)
+      : h("div", { class: "a-set" }, ...body);
+  };
+  const more = !!set && set.servers.length > 0;
+  const setsField =
+    cur &&
+    set &&
+    (multi || set.countries.length > 0) &&
+    h(
+      "div",
+      { class: "a-fld" },
+      h(
+        "p",
+        { class: "a-lbl", id: "nd-s" },
+        multi ? t.adSetsT : t.adSrvT,
+        more && h("button", { class: `a-lnk a-more${f.list ? " on" : ""}`, type: "button", "aria-expanded": f.list, "data-k": "amz-srv-more", on: { click: () => a.amz.form({ list: !f.list }, true) } }, f.list ? t.adLess : t.adMore, icon("chev")),
+      ),
+      h("div", { class: `a-sets${multi ? "" : " solo"}`, role: multi ? "radiogroup" : "group", "aria-labelledby": "nd-s" }, ...cur.sets.map(card)),
+      more &&
+        f.list &&
+        h(
+          "ul",
+          { class: "a-srv" },
+          ...set.servers.map((x) => h("li", null, flag(c, { country_code: x.cc, place: "", label: x.country }, true), h("span", { class: "nm" }, h("bdi", null, x.country), x.mark && h("span", { class: "id" }, x.mark)), x.host && h("span", { class: "dom" }, x.host))),
+        ),
+    );
   return h(
     "form",
     {
@@ -85,20 +132,8 @@ export function keyBody(c: AmzCtx): HTMLElement {
       h("label", { class: "a-lbl", for: "a-nm" }, t.awgName, h("span", null, t.optional)),
       h("input", { class: "a-inp", id: "a-nm", "data-k": "amz-label", type: "text", dir: "auto", maxlength: 40, autocomplete: "off", placeholder: t.awgNamePh[f.platform as keyof typeof t.awgNamePh], value: f.label, on: { input: (e) => a.amz.form({ label: (e.target as HTMLInputElement).value }) } }),
     ),
-    choices.length > 1 &&
-      h(
-        "div",
-        { class: "a-fld" },
-        h("p", { class: "a-lbl", id: "nd-v" }, t.adVerT(app), h("span", null, t.adVerH)),
-        h("div", { class: "a-vers", role: "radiogroup", "aria-labelledby": "nd-v" }, ...choices.map(ver)),
-      ),
-    countries.length > 0 &&
-      h(
-        "div",
-        { class: "a-fld" },
-        h("p", { class: "a-lbl" }, t.adInclT(countries.length), h("span", null, t.adInclH(app))),
-        h("ul", { class: "a-incl" }, ...countries.map((x) => h("li", null, flagBox(x.cc), h("span", null, x.name)))),
-      ),
+    versionField,
+    setsField,
     err && h("p", { class: "a-err", role: "alert" }, icon("warn"), t.err(err, s.amz.retryMin)),
   );
 }
@@ -183,14 +218,28 @@ export function readyBody(c: AmzCtx, x: AwgDevice, mode: KeyMode): HTMLElement {
   const cp = copyButton(a, { text: cfg.vpn_key, label: t.copyKey, done: t.copiedShort, toast: t.keyCopied, cls: "u-btn", key: `amz-key-${x.id}` });
   const acts = (...b: Kid[]) => h("div", { class: "u-acts" }, ...b);
 
-  const labels = list.map((l, k) => l.label || String(k + 1));
+  // one chip a server of the key: its flag, its country and what tells it from the others of its country (the Servers table's mark);
+  // a path through an entry or the IPv6 one is a connection of its own, named as the page names it
+  const all = serversOf(d);
+  const chipOf = (l: AwgConfig, k: number) => {
+    const srv = l.via_node_id || l.ipv6 ? undefined : all.find((y) => y.id === l.node_id);
+    const mark = srv ? serverMark(all, srv) : "";
+    return chip({
+      pre: flag({ t, s }, srv ?? { country_code: l.country_code, place: "", label: l.label }, true),
+      label: srv ? serverName(srv, s.lang).country : l.label || String(k + 1),
+      post: mark && h("span", { class: "id" }, mark),
+      on: i === k,
+      k: `amz-node-${x.id}-${k}`,
+      click: () => a.amz.node(x.id, k),
+    });
+  };
   const countries =
     list.length > 1 &&
     h(
       "div",
       { class: "a-fld" },
-      h("p", { class: "a-lbl", id: `k-c-${x.id}` }, t.country),
-      h("div", { class: "a-seg", role: "radiogroup", "aria-labelledby": `k-c-${x.id}` }, ...labels.map((l, k) => chip({ label: l, on: i === k, k: `amz-node-${x.id}-${k}`, click: () => a.amz.node(x.id, k) }))),
+      h("p", { class: "a-lbl", id: `k-c-${x.id}` }, t.adSrvL, h("span", null, t.adKeyHas(list.length))),
+      h("div", { class: "a-seg a-rsv", role: "radiogroup", "aria-labelledby": `k-c-${x.id}` }, ...list.map(chipOf)),
       h("p", { class: "u-hint" }, t.countryH),
     );
 

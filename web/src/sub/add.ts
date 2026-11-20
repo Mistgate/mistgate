@@ -152,7 +152,7 @@ export function deviceModal(c: Ctx): Kid[] {
   return [
     h(
       "section",
-      { class: "a-dlg", role: "dialog", "aria-modal": "true", "aria-label": name },
+      { class: `a-dlg${st.id === "key" ? " key" : ""}`, role: "dialog", "aria-modal": "true", "aria-label": name },
       h(
         "header",
         { class: "a-h" },

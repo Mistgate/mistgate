@@ -108,6 +108,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       am().errorAt = "";
       const profiles = data.amnezia?.profiles ?? [];
       if (open && !profiles.some((p) => p.id === am().form.profile)) am().form.profile = mainProfile(profiles);
+      if (open) am().form.list = false;
       render();
       if (!open && was) reveal(`amz-row-${was}`);
     },

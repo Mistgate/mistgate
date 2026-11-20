@@ -17,8 +17,8 @@ import { annKey, openTab, view } from "./view";
 // `tab` the tab that is open (the first when not said), `stage` the window that is open (null: none), `has` / `lacks` pieces of the page,
 // `in` / `notIn` pieces of the window.
 
-type Scene = { name: string; q: string; w: 1280 | 390; tab?: Tab; stage?: string | null; has?: string[]; lacks?: string[]; in?: string[]; notIn?: string[] };
-const S = (name: string, q: string, w: 1280 | 390, o: Partial<Scene> = {}): Scene => ({ name, q, w, ...o });
+type Scene = { name: string; q: string; w: 1280 | 820 | 390; tab?: Tab; stage?: string | null; has?: string[]; lacks?: string[]; in?: string[]; notIn?: string[] };
+const S = (name: string, q: string, w: 1280 | 820 | 390, o: Partial<Scene> = {}): Scene => ({ name, q, w, ...o });
 
 export const scenes: Scene[] = [
   // ---- the states of the subscription ----
@@ -82,12 +82,24 @@ export const scenes: Scene[] = [
   S("new device, connecting, a phone", "case=both&sheet=conn&as=android", 390, { stage: "conn" }),
   S("new device, the key form", "case=both&sheet=key&as=windows", 1280, { stage: "key" }),
   S("new device, the key form, a phone", "case=both&sheet=key&as=ios", 390, { stage: "key" }),
+  S("key form, one profile", "case=key-one&sheet=key&as=windows", 1280, { stage: "key", in: [".a-vone", ".a-sets.solo"], notIn: [".a-vers", ".a-srv"] }),
+  S("key form, one profile, servers unfolded", "case=key-one&sheet=key&as=windows&list=1", 1280, { stage: "key", in: [".a-srv li"] }),
+  S("key form, one profile, a phone", "case=key-one&sheet=key&as=ios", 390, { stage: "key", in: [".a-vone", ".a-sets.solo"] }),
+  S("key form, a key of each version", "case=key-pair&sheet=key&as=windows", 1280, { stage: "key", in: [".a-vers", ".a-sets.solo"] }),
+  S("key form, a key of each version, a phone", "case=key-pair&sheet=key&as=ios", 390, { stage: "key", in: [".a-vers", ".a-sets.solo"] }),
+  S("key form, several keys of a version", "case=key-many&sheet=key&as=windows", 1280, { stage: "key", in: [".a-vers", ".a-sets:not(.solo) .a-set"], notIn: [".a-srv"] }),
+  S("key form, several keys of a version, a tablet", "case=key-many&sheet=key&as=windows", 820, { stage: "key", in: [".a-vers", ".a-sets:not(.solo) .a-set"] }),
+  S("key form, several keys of a version, a phone", "case=key-many&sheet=key&as=ios", 390, { stage: "key", in: [".a-vers", ".a-sets:not(.solo) .a-set"] }),
+  S("key form, ten servers unfolded", "case=key-many&sheet=key&as=windows&list=1", 1280, { stage: "key", in: [".a-srv li"] }),
+  S("key form, ten servers unfolded, a phone", "case=key-many&sheet=key&as=ios&list=1", 390, { stage: "key", in: [".a-srv li"] }),
+  S("key form, the old version with the spare exit", "case=key-many&sheet=key&as=windows&profile=p20w&list=1", 1280, { stage: "key", in: [".a-set.on .u-tag.warp", ".a-srv li"] }),
   S("new device, no place left (the link refuses)", "case=dev-20&sheet=pick&as=windows", 1280, { stage: "full" }),
   S("new device, no place left (said by the panel)", "case=return&sheet=full&as=windows", 1280, { stage: "full" }),
   S("new device, no place left, a phone", "case=dev-20&sheet=pick&as=ios", 390, { stage: "full" }),
   // ---- the key, in each of its kinds ----
   S("the key just made, on a phone", "case=both&sheet=made&as=ios", 390, { stage: "ready:dev_new:created" }),
   S("the key just made, on a computer", "case=both&sheet=made&as=windows", 1280, { stage: "ready:dev_new:created" }),
+  S("the key just made, several keys of a version (the dev server gives a config for each server)", "case=key-many&sheet=made&as=windows", 1280, { stage: "ready:dev_new:created" }),
   S("the key of a device, on this phone", "case=amnezia&key=d3&as=android", 390, { stage: "ready:d3:shown" }),
   S("the key of a device, on this computer", "case=amnezia&key=d3&as=windows", 1280, { stage: "ready:d3:shown" }),
   S("the key of a device, scanned from another", "case=amnezia&key=d3&as=macos", 1280, { stage: "ready:d3:shown" }),
@@ -175,7 +187,7 @@ async function open(q: string) {
   return { d, st, a, c, params };
 }
 
-const known = ["case", "lang", "as", "theme", "tab", "more", "proxy", "sheet", "key", "country", "renew", "menu", "rename", "ask", "stale", "dns", "dnsall", "dnsdone", "dnsskip", "lockerr", "fail"];
+const known = ["case", "lang", "as", "theme", "tab", "more", "proxy", "sheet", "profile", "list", "key", "country", "renew", "menu", "rename", "ask", "stale", "dns", "dnsall", "dnsdone", "dnsskip", "lockerr", "fail"];
 
 describe("the scenes of the page", () => {
   it("each one names a case that exists and parameters the page reads", () => {

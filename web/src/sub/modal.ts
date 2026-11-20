@@ -67,7 +67,13 @@ export function createModal({ onClose, refocus, label, lastUsed }: ModalDeps): M
       const scrolled = (e: Event) => (e.currentTarget as HTMLElement).classList.toggle("scrolled", (e.currentTarget as HTMLElement).scrollTop > 0);
       const still = had && stage === shown;
       shown = stage;
+      // a window whose middle scrolls (the key form: the head and the foot stay) keeps its place through a draw of the same step
+      const top = still ? (el.querySelector<HTMLElement>(".a-b")?.scrollTop ?? 0) : 0;
       el.replaceChildren(h("div", { class: `mbox${still ? " still" : ""}`, on: { scroll: scrolled } }, ...content));
+      if (top > 0) {
+        const body = el.querySelector<HTMLElement>(".a-b");
+        if (body) body.scrollTop = top;
+      }
       if (!el.isConnected) document.body.append(el);
       if (!had) {
         opener = (document.activeElement as HTMLElement | null)?.dataset?.k || lastUsed?.() || "";

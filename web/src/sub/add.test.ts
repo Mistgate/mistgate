@@ -112,7 +112,7 @@ describe("the frame of every step", () => {
     const stage = (amz: object, platform: "ios" | "windows" = "ios") => dialog(d, { platform, amz }).stage;
     expect([stage(at("pick")), stage(at("link")), stage(at("conn")), stage(at("key"))]).toEqual(["way", "app", "conn", "key"]);
     expect(stage(at("link"), "windows")).toBe(stage(at("link"))); // another platform chosen in the same step
-    expect(stage({ pane: "key", form: { profile: "p31", platform: "android", label: "x" } })).toBe("key");
+    expect(stage({ pane: "key", form: { profile: "p31", platform: "android", label: "x", list: false } })).toBe("key");
     const keyOf = (id: string, mode: "open" | "renew" | "created") => stage({ [mode]: id, configs: { [id]: [cfg()] } });
     expect(keyOf("d3", "open")).toBe("ready:d3:shown");
     expect(keyOf("d7", "open")).toBe("ready:d7:shown");
@@ -356,7 +356,7 @@ describe("step conn: connect", () => {
 describe("step key: the form of a new device", () => {
   const form = (name = "many", amz: object = {}, platform: "ios" | "windows" = "ios") => dialog(data(name), { platform, amz: { pane: "key", ...amz } });
 
-  it("what device, its name, the version of the app, the countries; the foot makes the key", () => {
+  it("what device, its name, the version of the app, the key to make; the foot makes the key", () => {
     const { box, label } = form();
     expect(label).toBe("Ключ AmneziaVPN");
     const f = box.querySelector("form.a-b")!;
@@ -368,35 +368,131 @@ describe("step key: the form of a new device", () => {
     const name = f.querySelector<HTMLInputElement>("input.a-inp")!;
     expect([name.maxLength, name.id, name.placeholder, name.getAttribute("dir")]).toEqual([40, "a-nm", "Например, телефон мамы", "auto"]);
     expect(text(f.querySelector("label.a-lbl[for=a-nm]"))).toBe("Названиенеобязательно");
+    // two versions: the new one first, as the page orders them; the spare exit is a key of the new version, not a version
     const vers = [...f.querySelectorAll(".a-vers > button.a-ver")];
-    expect(vers.map((x) => x.className)).toEqual(["a-ver on", "a-ver", "a-ver"]); // the main one first, as the page orders them
-    expect(vers.map((x) => x.getAttribute("role"))).toEqual(["radio", "radio", "radio"]);
+    expect(vers.map((x) => x.className)).toEqual(["a-ver on", "a-ver"]);
+    expect(vers.map((x) => x.getAttribute("role"))).toEqual(["radio", "radio"]);
     expect(text(f.querySelector("#nd-v"))).toBe("Версия AmneziaVPN на устройствеуказана в настройках приложения");
     expect(box.querySelector(".a-f button.u-btn.pri[data-k=modal-create]")).not.toBeNull();
     expect(text(box.querySelector(".a-f"))).toBe("Создать ключ");
   });
 
-  it("the versions say what they are: new, the spare exit, old; the countries of the chosen one are the ones the key holds", () => {
-    const { box } = form("many", { form: { profile: "p31", platform: "windows", label: "" } });
-    const vers = [...box.querySelectorAll(".a-vers > .a-ver")];
-    expect(vers.map((x) => text(x.querySelector(".v")))).toEqual(["5.0.1.5 и новееAWG 3.1", "Запасной выходWARP", "До 5.0.1.5AWG 2.0"]);
-    expect(vers.map((x) => x.querySelector(".pr")?.className)).toEqual(["pr new", "pr", "pr"]);
-    expect(vers.map((x) => text(x.querySelector(".d")))).toEqual(["Обычный ключ, подходит почти всегда", "Если какой-то сайт не открывается", "Ключ для старых версий приложения"]);
-    const incl = box.querySelector(".a-incl")!;
-    expect(text(box.querySelector(".a-incl")?.closest(".a-fld")?.querySelector(".a-lbl"))).toBe("В ключе 2 страныпереключаются в AmneziaVPN");
-    expect([...incl.querySelectorAll("li")].map(text)).toEqual(["Германия", "FIФинляндия"]);
-    expect([...incl.querySelectorAll("li .fl2")].map((x) => x.className)).toEqual(["fl2 de", "fl2 cc"]); // the flags drawn in CSS, the two letters for the rest
+  it("the window of the key step is the frame that scrolls inside (.key), no other step is", () => {
+    const frame = (amz: object) => dialog(data("many"), { amz }).box.querySelector("section.a-dlg")!.className;
+    expect(frame(at("key"))).toBe("a-dlg key");
+    expect(frame(at("pick"))).toBe("a-dlg");
+    expect(frame({ created: "d3", configs: { d3: [cfg()] } })).toBe("a-dlg");
   });
 
-  it("a page with one profile has no choice of versions; the choice goes to the page", () => {
-    const one = form("devices-rich").box;
-    expect(one.querySelector(".a-vers")).toBeNull();
-    expect(one.querySelector(".a-incl")).not.toBeNull();
+  it("the versions say what they are; inside a version the keys are told apart by name, by the servers and countries they hold", () => {
+    const { box } = form("key-many", { form: { profile: "p31", platform: "windows", label: "", list: false } });
+    const vers = [...box.querySelectorAll(".a-vers > .a-ver")];
+    expect(vers.map((x) => text(x.querySelector(".v")))).toEqual(["5.0.1.5 и новееAWG 3.1", "До 5.0.1.5AWG 2.0"]);
+    expect(vers.map((x) => x.querySelector(".pr")?.className)).toEqual(["pr new", "pr"]);
+    expect(vers.map((x) => text(x.querySelector(".d")))).toEqual(["Подходит почти всегда", "Для старых версий приложения"]);
+    const fld = box.querySelector(".a-sets")!.closest(".a-fld")!;
+    expect(text(fld.querySelector(".a-lbl"))).toBe("Какой ключ создатьПоказать серверы");
+    const sets = [...fld.querySelectorAll(".a-sets > button.a-set")];
+    expect(sets.map((x) => [text(x.querySelector(".t")), text(x.querySelector(".d")), x.getAttribute("aria-checked")])).toEqual([
+      ["AWG3.1", "10 серверов в 7 странах", "true"],
+      ["AWG 3.1 (new)", "2 сервера, Эстония", "false"],
+    ]);
+    expect(fld.querySelector(".a-sets")?.getAttribute("role")).toBe("radiogroup");
+    // the flags of the countries, once each, drawn in CSS or as the two letters; no list until it is asked for
+    expect([...sets[0]!.querySelectorAll(".a-fls .fl2")].map((x) => x.className.replace(" only-w", ""))).toEqual(["fl2 by", "fl2 de", "fl2 ee", "fl2 nl", "fl2 pl", "fl2 ro", "fl2 ru"]);
+    expect(fld.querySelector(".a-srv")).toBeNull();
+    // the old version: three keys, the last through the spare exit
+    const old = form("key-many", { form: { profile: "p20w", platform: "windows", label: "", list: false } }).box;
+    expect([...old.querySelectorAll(".a-sets > button.a-set")].map((x) => [text(x.querySelector(".t")), x.querySelector(".u-tag.warp") !== null, x.classList.contains("on")])).toEqual([
+      ["AWG2", false, false],
+      ["AWG 2.0 (new)", false, false],
+      ["AWG 2.0 (new) · WARPЗапасной выход", true, true],
+    ]);
+    expect(text(old.querySelector(".a-vers .a-ver.on .v"))).toBe("До 5.0.1.5AWG 2.0");
+  });
+
+  it("the servers of the chosen key unfold under the choice: the country, what tells it from the others, the domain", () => {
+    const open = form("key-many", { form: { profile: "p31", platform: "windows", label: "", list: true } }).box;
+    const more = open.querySelector<HTMLButtonElement>("[data-k=amz-srv-more]")!;
+    expect([text(more), more.getAttribute("aria-expanded"), more.classList.contains("on")]).toEqual(["Скрыть серверы", "true", true]);
+    expect([...open.querySelectorAll(".a-srv li")].map(text)).toEqual([
+      "Беларусьby1.example.com",
+      "ГерманияDE-1de1.example.com",
+      "ГерманияDE-2de2.example.com",
+      "ГерманияDE-3203.0.113.24",
+      "ЭстонияEE-1est1.example.com",
+      "ЭстонияEE-2est2.example.com",
+      "Нидерландыnl1.example.com",
+      "Польшаpl1.example.com",
+      "РумынияБухарестro1.example.com",
+      "РоссияRU-1msk1.example.com",
+    ]);
+    // the second key of the version holds two servers only; the list follows the choice
+    const second = form("key-many", { form: { profile: "p31b", platform: "windows", label: "", list: true } }).box;
+    expect([...second.querySelectorAll(".a-srv li")].map(text)).toEqual(["ЭстонияEE-1est1.example.com", "ЭстонияEE-2est2.example.com"]);
+    expect(second.querySelector("[data-k=amz-set-p31b]")?.classList.contains("on")).toBe(true);
+    expect(text(form("key-many").box.querySelector("[data-k=amz-srv-more]"))).toBe("Показать серверы");
+  });
+
+  it("one profile: the version is told, not chosen, and the one key is a card with nothing to press", () => {
+    const { box } = form("key-one", { form: { profile: "p31", platform: "windows", label: "", list: false } });
+    expect(box.querySelector(".a-vers")).toBeNull();
+    expect(text(box.querySelector(".a-vone"))).toBe("5.0.1.5 и новееAWG 3.1Для более старых версий приложения ключа нет");
+    const fld = box.querySelector(".a-sets")!.closest(".a-fld")!;
+    expect(text(fld.querySelector(".a-lbl"))).toBe("Серверы в ключеПоказать серверы");
+    expect(fld.querySelector(".a-sets")?.className).toBe("a-sets solo");
+    expect(fld.querySelector(".a-sets")?.getAttribute("role")).toBe("group");
+    const card = fld.querySelector(".a-set")!;
+    expect([card.tagName, text(card), card.querySelector(".a-rd")]).toEqual(["DIV", "1 сервер, Эстония", null]);
+    // a mark is there only when the person has twins: the only server of Estonia is "Estonia" alone
+    const open = form("key-one", { form: { profile: "p31", platform: "windows", label: "", list: true } }).box;
+    expect([...open.querySelectorAll(".a-srv li")].map(text)).toEqual(["Эстонияest1.example.com"]);
+  });
+
+  it("the only profile of the old app says so, and gives no choice", () => {
+    const d = data("key-one", (x) => (x.amnezia!.profiles[0]!.version = "2.0"));
+    const { box } = dialog(d, { amz: { pane: "key" } });
+    expect(text(box.querySelector(".a-vone"))).toBe("До 5.0.1.5AWG 2.0Для старых версий приложения");
+    expect(box.querySelector(".a-vone .pr.new")).toBeNull();
+  });
+
+  it("a person with one profile of each version sees the choice of version and one card of each", () => {
+    const { box } = form("key-pair", { form: { profile: "p20", platform: "windows", label: "", list: false } });
+    expect([...box.querySelectorAll(".a-vers > .a-ver")].map((x) => x.className)).toEqual(["a-ver", "a-ver on"]);
+    const fld = box.querySelector(".a-sets")!.closest(".a-fld")!;
+    expect(text(fld.querySelector(".a-lbl"))).toBe("Серверы в ключеПоказать серверы");
+    expect(text(fld.querySelector(".a-set"))).toBe("3 сервера в 3 странах");
+    expect(text(form("key-pair").box.querySelector(".a-set"))).toBe("4 сервера в 4 странах");
+  });
+
+  it("an older panel names no servers: the key says its countries, with no list to show", () => {
+    const d = data("key-pair", (x) => {
+      x.servers = [];
+      x.amnezia!.profiles[0]!.countries = ["DE", "EE"];
+    });
+    const { box } = dialog(d, { amz: { pane: "key" } });
+    expect(text(box.querySelector(".a-set"))).toBe("В ключе 2 страны");
+    expect(box.querySelector("[data-k=amz-srv-more]")).toBeNull();
+    // no countries either: nothing to say about the servers
+    const none = dialog(data("key-one", (x) => ((x.servers = []), (x.amnezia!.profiles[0]!.countries = []))), { amz: { pane: "key" } }).box;
+    expect(none.querySelector(".a-sets")).toBeNull();
+  });
+
+  it("the choices go to the page as they do elsewhere", () => {
     const forms: object[] = [];
-    const r = dialog(data("many"), { a: actions({ amz: { ...amzNoop, form: (p: object) => forms.push(p) } }), amz: at("key") });
+    const r = dialog(data("key-many"), { a: actions({ amz: { ...amzNoop, form: (p: object) => forms.push(p) } }), amz: at("key") });
     r.box.querySelector<HTMLButtonElement>("[data-k=amz-platform-android]")!.click();
-    r.box.querySelector<HTMLButtonElement>("[data-k=amz-ver-p20]")!.click();
-    expect(forms).toEqual([{ platform: "android" }, { profile: "p20" }]);
+    r.box.querySelector<HTMLButtonElement>("[data-k=amz-ver-old]")!.click();
+    r.box.querySelector<HTMLButtonElement>("[data-k=amz-ver-new]")!.click(); // the version that is on: the choice of its key stays
+    r.box.querySelector<HTMLButtonElement>("[data-k=amz-set-p31b]")!.click();
+    r.box.querySelector<HTMLButtonElement>("[data-k=amz-srv-more]")!.click();
+    expect(forms).toEqual([{ platform: "android" }, { profile: "p20" }, { profile: "p31" }, { profile: "p31b" }, { list: true }]);
+  });
+
+  it("the profile of a device chosen before is not on the page any more: the first key is shown", () => {
+    const { box } = form("key-many", { form: { profile: "gone", platform: "windows", label: "", list: false } });
+    expect(text(box.querySelector(".a-ver.on .v"))).toBe("5.0.1.5 и новееAWG 3.1");
+    expect(text(box.querySelector(".a-set.on .t"))).toBe("AWG3.1");
   });
 
   it("'Create' asks the page once; busy says so and waits; an error stays in the form by its code", () => {
@@ -420,7 +516,7 @@ describe("step key: the form of a new device", () => {
   });
 
   it("a name is text, never markup", () => {
-    const { box } = form("many", { form: { profile: "p31", platform: "ios", label: '<img src=x onerror="alert(1)">' } });
+    const { box } = form("many", { form: { profile: "p31", platform: "ios", label: '<img src=x onerror="alert(1)">', list: false } });
     expect(box.querySelector("img")).toBeNull();
     expect(box.querySelector<HTMLInputElement>("input")!.value).toBe('<img src=x onerror="alert(1)">');
   });
