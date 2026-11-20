@@ -12,11 +12,11 @@ const memo = new Map(); // text -> {tokens: Set, prefixes: Set}: a source is rea
 function scanText(s) {
   let r = memo.get(s);
   if (r) return r;
-  r = { tokens: new Set(), prefixes: new Set() };
+  r = { tokens: new Set(), prefixes: new Set(), short: new Set() };
   s = s.replace(/base64,[A-Za-z0-9+/=]{200,}/g, ""); // an embedded picture is not a class
   for (const m of s.matchAll(TOKEN)) r.tokens.add(m[0]);
-  const pre = (x) => { if (x.length >= 3 || /[-_]$/.test(x)) r.prefixes.add(x); }; // 'g-' + icon is a prefix, 'fl' + x is too short to say anything
-  for (const m of s.matchAll(/['"`]([A-Za-z][\w-]{1,40})['"`]\s*\+/g)) pre(m[1]); // 'lx-sw' + n
+  const pre = (x) => { if (x.length >= 3 || /[-_]$/.test(x)) r.prefixes.add(x); else r.short.add(x); }; // 'g-' + icon is a prefix; 'fl' + x is too short to say anything, but 's' + step is the class s1 (digits only, see isUsed)
+  for (const m of s.matchAll(/['"`]([A-Za-z][\w-]{0,40})['"`]\s*\+/g)) pre(m[1]); // 'lx-sw' + n
   for (const m of s.matchAll(/\bclass="([^"]*)"/g)) for (const x of m[1].matchAll(/([A-Za-z][\w-]{1,40})\{\{/g)) pre(x[1]); // class="g-{{icon}}"
   for (const m of s.matchAll(/([A-Za-z][\w-]{1,40})\$\{/g)) pre(m[1]); // `x-${i}`
   memo.set(s, r);
@@ -24,13 +24,13 @@ function scanText(s) {
 }
 /** tokens of some source text, and the prefixes of the class names it assembles */
 export function usage(texts) {
-  const tokens = new Set(), prefixes = new Set();
-  for (const s of texts) { const r = scanText(s); r.tokens.forEach((x) => tokens.add(x)); r.prefixes.forEach((x) => prefixes.add(x)); }
-  return { tokens, prefixes: [...prefixes] };
+  const tokens = new Set(), prefixes = new Set(), short = new Set();
+  for (const s of texts) { const r = scanText(s); r.tokens.forEach((x) => tokens.add(x)); r.prefixes.forEach((x) => prefixes.add(x)); r.short.forEach((x) => short.add(x)); }
+  return { tokens, prefixes: [...prefixes], short: [...short] };
 }
 
 // a class assembled from a prefix and data ('g-' + icon): kept when the rest is a number or a word that occurs in the sources (the data is there)
-const isUsed = (name, u) => u.tokens.has(name) || u.prefixes.some((p) => { if (!name.startsWith(p)) return false; const rest = name.slice(p.length); return !rest || /^\d+$/.test(rest) || u.tokens.has(rest); });
+const isUsed = (name, u) => u.tokens.has(name) || (u.short || []).some((p) => name.startsWith(p) && /^\d+$/.test(name.slice(p.length))) || u.prefixes.some((p) => { if (!name.startsWith(p)) return false; const rest = name.slice(p.length); return !rest || /^\d+$/.test(rest) || u.tokens.has(rest); });
 
 /** the class and id names a selector demands (those inside :not() and friends with arguments are not demands) */
 function demands(sel) {

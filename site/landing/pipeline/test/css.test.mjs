@@ -42,3 +42,9 @@ test('the names cut away are reported', () => {
   const r = pruneCss('.a{x:1}.b{x:2}', usage(['a']));
   assert.deepEqual([...r.dropped], ['b']);
 });
+
+test("a class a script assembles from a one-letter prefix and a number ('s' + step) is kept, a longer rest is not", () => {
+  const u = usage(["<div class=\"box\"></div><script>el.className = 'box ' + 's' + Math.min(step, 3)</script>"]);
+  const r = pruneCss('.box.s1{a:1}.box.s2{a:2}.box.sx{a:3}.box.t1{a:4}', u).css;
+  assert.match(r, /\.s1/); assert.match(r, /\.s2/); assert.doesNotMatch(r, /\.sx/); assert.doesNotMatch(r, /\.t1/);
+});
