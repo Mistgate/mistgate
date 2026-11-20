@@ -137,7 +137,7 @@ export function deviceModal(c: Ctx): Kid[] {
       back = both ? q("pick") : undefined;
       break;
     case "ready":
-      body = readyBody(c, st.x.x, st.x.mode);
+      body = readyBody(c, st.x.x);
       foot = readyFoot(c, st.x.mode);
       back = st.x.mode === "created" ? q("key") : undefined;
       break;

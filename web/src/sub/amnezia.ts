@@ -3,11 +3,10 @@ import { chip } from "./connect";
 import { h, type Kid } from "./dom";
 import type { Dict } from "./i18n";
 import { icon, type IconName } from "./icons";
-import { addPlatforms, countryName, deviceIcon, isDesktop, isPhone, keyAppName, keyVersions, platformWord, serverMark, serverName, serversOf, versionsFor, type KeySet, type KeyVersion } from "./logic";
+import { addPlatforms, deviceIcon, keyAppName, keyVersions, platformWord, serverMark, serverName, serversOf, versionsFor, type KeySet, type KeyVersion } from "./logic";
 import { qrCard } from "./qr";
 import { flag } from "./servers";
 import type { AmzActions, AmzState, Tools } from "./state";
-import { rich } from "./ui";
 import type { AwgConfig, AwgDevice, Lang, MgData, Platform } from "./types";
 
 export { newAmzState } from "./state";
@@ -24,8 +23,6 @@ export type AmzCtx = { d: MgData; s: { lang: Lang; amz: AmzState }; a: { amz: Am
 /** The name of a device: its label, else its platform's word, else "Device". */
 export const label = (x: AwgDevice, t: Dict) => x.label || platformWord(x.platform, t) || t.devGeneric;
 
-import { copyButton } from "./ui";
-export { copyButton };
 
 // ---- step "key": the form of a new device ----
 
@@ -150,8 +147,6 @@ export function keyFoot(c: AmzCtx): HTMLElement {
 
 // ---- step "ready": the key of one device ----
 
-export type KeyView = "this-phone" | "this-desktop" | "phone-qr" | "other-desktop";
-export type Where = "this" | "phone" | "other";
 export type KeyMode = "shown" | "created" | "renew";
 
 /** The device whose key the window shows: the new key of a stale one, the one just made, or the one asked for ("Show key"). */
@@ -166,57 +161,21 @@ export function shownKey(c: Pick<AmzCtx, "d" | "s">): { x: AwgDevice; mode: KeyM
   return o ? { x: o, mode: "shown" } : null;
 }
 
-/** What "where to add it" offers: on a phone this phone or another device; on a computer this computer, a phone or another computer. */
-export function whereOptions(here: string, t: Dict): { id: Where; label: string }[] {
-  if (isPhone(here)) return [{ id: "this", label: t.whereThisPhone }, { id: "other", label: t.whereOther }];
-  if (isDesktop(here)) return [{ id: "this", label: t.whereThisPc }, { id: "phone", label: t.wherePhone }, { id: "other", label: t.whereOtherPc }];
-  return [{ id: "phone", label: t.wherePhone }, { id: "other", label: t.whereOtherPc }];
-}
-
-/** Where a key is added by default: on this very device when the key is for it, on a phone when it is a phone's key, else on another computer. */
-export function defaultWhere(platform: string, here: string): Where {
-  if (here && platform === here) return "this";
-  if (isPhone(here)) return "other";
-  return isPhone(platform) ? "phone" : "other";
-}
-
-/** How a key is set up: on this very phone it is copied, on this very computer the file is downloaded, a phone scans a code, another computer is told to open the page there. */
-export function keyView(platform: string, here: string, where: Where): KeyView {
-  if (where === "this") return isPhone(here) ? "this-phone" : "this-desktop";
-  if (where === "phone") return "phone-qr";
-  return isPhone(here) ? (isDesktop(platform) ? "other-desktop" : "phone-qr") : "other-desktop";
-}
-
-const whereIcon = (id: Where, here: string): IconName => (id === "this" ? (isPhone(here) ? "phone" : "monitor") : id === "phone" ? "phone" : "laptop");
-
-const numbered = (steps: Kid[][]) => h("ol", { class: "a-steps", style: { gap: "12px" } }, ...steps.map((kids, i) => h("li", { class: "a-st" }, h("span", { class: "a-n" }, String(i + 1)), h("div", { class: "tx" }, ...kids))));
-/** A step's words as one flex item of the step (the board's .tx is a column: its pieces would stack): the «quoted» names stay whole. */
-const say = (s: string): Kid[] => [h("span", null, ...rich(s))];
 const metaRow = (ico: IconName, ...kids: Kid[]) => h("p", null, icon(ico), h("span", null, ...kids));
 
-/** The key: where to add it, then (a country, the steps, the buttons, the QR code) as that place needs, and what the person must know. */
-export function readyBody(c: AmzCtx, x: AwgDevice, mode: KeyMode): HTMLElement {
+/**
+ * The key: which server of the key (when it holds several), the three ways to take it (the file, the text of the file, the key
+ * line) beside the code a phone scans, and what the person must know. The same for every device and every place it is added.
+ */
+export function readyBody(c: AmzCtx, x: AwgDevice): HTMLElement {
   const { d, s, a, t } = c;
   const app = keyAppName(d, x.platform as Platform);
-  const renew = mode === "renew";
   const list = s.amz.configs[x.id];
   if (!list || list.length === 0) return h("div", { class: "a-b" }, h("p", { class: "u-hint" }, list ? t.noProfile : t.awgBusy));
 
   const i = Math.min(s.amz.node[x.id] ?? 0, list.length - 1);
   const cfg = list[i]!;
   const filename = cfg.filename || "amnezia.conf";
-  const opts = whereOptions(s.amz.here, t);
-  const want = (s.amz.where[x.id] as Where | undefined) ?? defaultWhere(x.platform, s.amz.here);
-  const where: Where = opts.some((o) => o.id === want) ? want : (opts[0]?.id ?? "other");
-  const view = keyView(x.platform, s.amz.here, where);
-  // the old connection in the app is called by the country, as the new keys are named (a key through an entry is a connection
-  // of its own, named as the page names it: "Germany · via RU", "Germany · IPv6")
-  const oldConn = cfg.via_node_id || cfg.ipv6 ? cfg.label : countryName(cfg.country_code, s.lang) || cfg.label;
-  const [pasteStep, deleteStep] = t.renewSteps(app, oldConn);
-
-  const dl = h("button", { class: "u-btn", type: "button", "data-k": `amz-dl-${x.id}`, on: { click: () => a.download(filename, cfg.conf) } }, icon("file"), t.downloadFile);
-  const cp = copyButton(a, { text: cfg.vpn_key, label: t.copyKey, done: t.copiedShort, toast: t.keyCopied, cls: "u-btn", key: `amz-key-${x.id}` });
-  const acts = (...b: Kid[]) => h("div", { class: "u-acts" }, ...b);
 
   // one chip a server of the key: its flag, its country and what tells it from the others of its country (the Servers table's mark);
   // a path through an entry or the IPv6 one is a connection of its own, named as the page names it
@@ -233,48 +192,44 @@ export function readyBody(c: AmzCtx, x: AwgDevice, mode: KeyMode): HTMLElement {
       click: () => a.amz.node(x.id, k),
     });
   };
-  const countries =
+  const servers =
     list.length > 1 &&
     h(
       "div",
       { class: "a-fld" },
       h("p", { class: "a-lbl", id: `k-c-${x.id}` }, t.adSrvL, h("span", null, t.adKeyHas(list.length))),
       h("div", { class: "a-seg a-rsv", role: "radiogroup", "aria-labelledby": `k-c-${x.id}` }, ...list.map(chipOf)),
-      h("p", { class: "u-hint" }, t.countryH),
     );
+
+  // the board's .a-act: a tile with the icon, the name of the way and a line under it
+  const act = (ico: IconName, k: string, title: string, line: Kid[], click: (btn: HTMLButtonElement) => void) => {
+    const btn = h("button", { class: "a-act", type: "button", "data-k": k }, h("span", { class: "ic", "aria-hidden": "true" }, icon(ico)), h("span", { class: "tx" }, h("span", { class: "t" }, title), h("span", { class: "d" }, ...line)));
+    btn.addEventListener("click", () => click(btn));
+    return btn;
+  };
+  // "The line vpn:// for AmneziaVPN": the scheme in the file's own face, wherever the language puts it
+  const [lead, tail] = t.adActKeyD(app).split("vpn://");
+  const acts = h(
+    "div",
+    { class: "a-acts3" },
+    act("file", `amz-dl-${x.id}`, t.adActFile, [h("span", { class: "m" }, filename)], () => a.download(filename, cfg.conf)),
+    act("copy", `amz-conf-${x.id}`, t.adActConf, [t.adActConfD], (btn) => a.copy(cfg.conf, t.confCopied, undefined, btn)),
+    act("key", `amz-key-${x.id}`, t.copyKey, [lead ?? "", h("span", { class: "m" }, "vpn://"), tail ?? ""], (btn) => a.copy(cfg.vpn_key, t.keyCopied, undefined, btn)),
+  );
+  const qr = qrCard(cfg.qr, t.qrKeyAlt(app), qrLogoSrc(d));
 
   const meta: Kid[] = [metaRow("shield", t.adSecret)];
   const versions = versionsFor(x.platform, cfg.min_clients.length ? cfg.min_clients : x.min_clients);
-  if (versions.length > 0) meta.push(metaRow("info", t.needApp(versions)));
+  if (cfg.version === "2.0") meta.push(metaRow("info", t.adNeedOld(app)));
+  else if (versions.length > 0) meta.push(metaRow("info", t.needApp(versions)));
   // the key through an entry is another server in the app: said once, where it is picked
   if (cfg.via_node_id || cfg.ipv6) meta.push(metaRow("info", t.viaKeyNote(cfg.via_node_id ? t.chipVia(cfg.via_country) : "IPv6", app)));
-  if (view === "this-desktop" && cfg.warnings.includes("amnezia_desktop_mtu")) meta.push(metaRow("warn", t.desktopFileOnly));
-  if (renew && view !== "this-phone") meta.push(metaRow("info", deleteStep));
-
-  let left: Kid[];
-  let qr: HTMLElement | null = null;
-  if (view === "this-phone") {
-    left = [numbered((renew ? [pasteStep, deleteStep] : t.phoneSteps(app)).map(say)), acts(cp)];
-  } else if (view === "this-desktop") {
-    left = [numbered(t.adFileSteps(app).map(say)), acts(dl, h("span", { class: "a-fname" }, filename))];
-  } else if (view === "phone-qr") {
-    left = [numbered(t.adQrSteps(app).map(say)), acts(dl, cp)];
-    qr = qrCard(cfg.qr, t.qrKeyAlt(app), qrLogoSrc(d));
-    if (!qr) meta.push(metaRow("info", t.qrTooBig));
-  } else {
-    left = [numbered([[t.openThereT, h("span", { class: "u-hint" }, t.openThereD)], [t.orFile, acts(dl)]])];
-  }
-  const col = h("div", { class: "a-steps" }, countries, ...left);
+  if (!qr) meta.push(metaRow("info", t.qrTooBig));
   return h(
     "div",
     { class: "a-b" },
-    h(
-      "div",
-      { class: "a-fld" },
-      h("p", { class: "a-lbl", id: `k-w-${x.id}` }, t.where),
-      h("div", { class: "a-seg", role: "radiogroup", "aria-labelledby": `k-w-${x.id}` }, ...opts.map((o) => chip({ ico: whereIcon(o.id, s.amz.here), label: o.label, on: where === o.id, k: `amz-where-${o.id}`, click: () => a.amz.where(x.id, o.id) }))),
-    ),
-    qr ? h("div", { class: "a-two" }, col, h("div", { class: "a-side" }, qr)) : col,
+    servers,
+    qr ? h("div", { class: "a-two a-got" }, acts, h("div", { class: "a-side" }, qr, h("p", { class: "u-hint" }, t.adScan(app)))) : acts,
     h("div", { class: "a-meta" }, ...meta),
   );
 }

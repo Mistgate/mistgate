@@ -180,10 +180,6 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       am().node[id] = i;
       render();
     },
-    where(id, w) {
-      am().where[id] = w;
-      render();
-    },
     ask(c) {
       const was = am().confirm;
       am().confirm = c;
