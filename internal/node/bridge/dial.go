@@ -391,7 +391,7 @@ func (d *Dialer) runConnection(run *dialRun, slotCtx context.Context, index int)
 			delay = min(delay*2, d.timing.retryMax)
 			continue
 		}
-		transport := newBridgeTransport()
+		transport := newBridgeTransport(identity.Panel)
 		cc, err := transport.NewClientConn(conn)
 		if err != nil {
 			_ = conn.Close()
@@ -988,6 +988,12 @@ func (d *Dialer) bridgeLocal(ctx context.Context, run *dialRun, target plugin.Br
 
 func (d *Dialer) responseToTarget(ctx context.Context, run *dialRun, dst *idleConn, src io.Reader, tracker *connTracker) error {
 	buf := make([]byte, 32<<10)
+	// Only the panel's exit (a subscription host's in-memory targets) bounds a target's write progress; an agent's exit
+	// keeps the behaviour it always had.
+	progress := time.Duration(0)
+	if d.identity().Panel {
+		progress = d.timing.writeProgress
+	}
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -995,8 +1001,8 @@ func (d *Dialer) responseToTarget(ctx context.Context, run *dialRun, dst *idleCo
 		n, readErr := src.Read(buf)
 		if n > 0 {
 			// A target that stops reading for writeProgress loses the stream, as a person who stops reading does at the entry.
-			if d.timing.writeProgress > 0 {
-				_ = dst.SetWriteDeadline(time.Now().Add(d.timing.writeProgress))
+			if progress > 0 {
+				_ = dst.SetWriteDeadline(time.Now().Add(progress))
 			}
 			if err := writeFull(dst, buf[:n]); err != nil {
 				return err
@@ -1051,8 +1057,13 @@ const (
 	bridgeWriteTimeout = BridgeProgressTimeout // a TLS connection the entry stops reading from is closed
 )
 
-// newBridgeTransport is the exit's HTTP/2 client: x/net reads the windows from a net/http Transport it is configured on.
-func newBridgeTransport() *http2.Transport {
+// newBridgeTransport is the exit's HTTP/2 client. The panel's exit (a subscription host's people, up to 400 on four
+// connections) announces explicit windows and a write timeout; x/net reads the windows from a net/http Transport it is
+// configured on. An agent's exit keeps x/net's defaults, as it always had.
+func newBridgeTransport(panel bool) *http2.Transport {
+	if !panel {
+		return &http2.Transport{}
+	}
 	t1 := &http.Transport{HTTP2: &http.HTTP2Config{MaxReceiveBufferPerStream: bridgeStreamWindow, MaxReceiveBufferPerConnection: bridgeConnWindow}}
 	t2, err := http2.ConfigureTransports(t1)
 	if err != nil { // only when t1 was configured already, which this one is not

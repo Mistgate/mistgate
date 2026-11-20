@@ -52,7 +52,7 @@ func (d *Dialer) DialPanel(ctx context.Context, entryNodeID string) (net.Conn, e
 		release()
 		return nil, err
 	}
-	transport := newBridgeTransport()
+	transport := newBridgeTransport(identity.Panel)
 	cc, err := transport.NewClientConn(conn)
 	if err != nil {
 		_ = conn.Close()
