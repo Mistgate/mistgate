@@ -1,0 +1,51 @@
+{
+  "_": "Links of the design -> pages of the real site. Keys of `map` are what the design writes in href (the .dc.html files stand for design pages). A value is a docs page key (docs/<lang>/<key>.md, a language without the page gets the English one), `@main` / `@app` for the pages of the new site, or {key, heading} to jump to the heading number `heading` (## level) of a docs page: the anchor comes from the real heading, so it exists only where the page has it. `byText` refines by the Russian text of the link (\"text\") or of the link and the heading of its card (\"text|heading\"); a key ending in * matches a prefix. `page` is what the design calls data-page on the protocol buttons.",
+  "map": {
+    "Main.dc.html": "@main",
+    "AppPage.dc.html": "@app",
+    "Docs.dc.html": "getting-started/overview",
+    "Docs.dc.html#panel": "getting-started/install-panel",
+    "DocHy2.dc.html": "guide/hysteria2",
+    "Docs.dc.html#vless/": "guide/vless",
+    "Docs.dc.html#amneziawg/": "guide/amneziawg",
+    "Docs.dc.html#trusttunnel/": "guide/trusttunnel",
+    "Docs.dc.html#mtproto/": "guide/mtproto",
+    "Docs.dc.html#warp/": "guide/warp",
+    "Docs.dc.html#relays/": "guide/relays",
+    "Docs.dc.html#operations/health/": "operations/health",
+    "Docs.dc.html#operations/reachability/": "operations/reachability",
+    "Docs.dc.html#operations/updates/": "operations/updates",
+    "Docs.dc.html#getting-started/add-node/": "getting-started/add-node",
+    "Docs.dc.html#getting-started/first-users/": "getting-started/first-users",
+    "Docs.dc.html#установка-mistgate-с-ai-агентом": { "key": "getting-started/ai-agents", "heading": 0 },
+    "Docs.dc.html#ноды-и-флот-через-mcp": { "key": "getting-started/ai-agents", "heading": 1 },
+    "Docs.dc.html#доработка-кода-с-coding-агентом": { "key": "getting-started/ai-agents", "heading": 2 }
+  },
+  "byText": {
+    "mistgate": "@main",
+    "План развития": "roadmap/status",
+    "Руководство": "guide/nodes",
+    "Эксплуатация": "operations/health",
+    "Справочник": "reference/cli",
+    "Сравнение и бенчмарки": "reference/comparison",
+    "Полная таблица с источниками*": "reference/comparison",
+    "Подробнее|Проверки глазами клиента": "operations/health",
+    "Подробнее|Два бинарника на Go": "reference/architecture",
+    "Подробнее|Доктор на каждой ноде": "operations/health",
+    "Подробнее|Видно ли изнутри страны": "operations/reachability",
+    "Подробнее|Обновления с канарейкой": "operations/updates",
+    "Подробнее|Ретрансляции и карта флота": "guide/relays",
+    "Подробнее|Ассистент и MCP": "guide/assistant",
+    "Подробнее|Квоты, сроки и устройства": "guide/users-and-groups",
+    "Подробнее|Алерты в Telegram": "operations/telegram-alerts",
+    "Подробнее|Сайт-ширма": "guide/decoy-site"
+  },
+  "page": {
+    "app": "@app",
+    "hysteria2": "guide/hysteria2",
+    "vless": "guide/vless",
+    "amneziawg": "guide/amneziawg",
+    "trusttunnel": "guide/trusttunnel",
+    "mtproto": "guide/mtproto"
+  }
+}

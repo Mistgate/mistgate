@@ -1,0 +1,30 @@
+{
+  "name": "mistgate-landing-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Board pipeline for the new mistgate.app: design boards (.dc.html) -> ES modules, translated and pre-rendered page fragments, hashed assets",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "sync": "node sync.mjs",
+    "build": "node build.mjs",
+    "stand": "node serve.mjs",
+    "check": "node check.mjs",
+    "check:quick": "node check.mjs --langs ru,en --widths 1440 --no-shots",
+    "harvest": "node check.mjs --harvest --langs ru --widths 1440",
+    "all": "node build.mjs && node check.mjs",
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "acorn": "8.15.0",
+    "esbuild": "0.28.2",
+    "parse5": "8.0.1",
+    "postcss": "8.5.6",
+    "postcss-selector-parser": "7.1.0",
+    "preact": "10.29.8"
+  }
+}

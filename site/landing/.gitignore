@@ -2,3 +2,6 @@
 /build/
 /dist/
 /gen/target/
+node_modules/
+.profile/
+scratch/

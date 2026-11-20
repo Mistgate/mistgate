@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Mistgate · Diagnostics</title>
+<script src="./support.js"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@500..700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="cA" data-app><div class="desk">
+<div class="mg app t-{{theme}} a-{{accent}}">
+
+  <nav class="rail" aria-label="Sections">
+    <img class="rlogo {{brLogoC}}" src="{{logo}}" alt="{{brAlt}}" width="32" height="32">
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2.2"/></svg><span class="rbl">Главная</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2.6"/><circle cx="18" cy="5" r="2.6"/><path d="M8.6 19H16.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h7.9"/></svg><span class="rbl">Маршруты</span></a>
+    <a class="rb on" href="#app" aria-current="page"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6.5 5 13 2.5-6.5H21"/></svg><span class="rbl">Диагностика</span><i class="rdot {{rdDiag}}" aria-hidden="true"></i></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="rbl">Настройки</span><i class="rdot {{rdSet}}" aria-hidden="true"></i></a>
+    <a class="rb sub" href="https://vpn.example.com" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"/></svg><span class="rbl">Страница подписки</span></a>
+  </nav>
+
+  <div class="content">
+    <header class="tb">
+    <sc-if value="{{bn.on}}" hint-placeholder-val="{{false}}">
+    <div class="bn {{bn.tone}}" role="status">
+      <a class="bn-m" href="{{bn.href}}"><span class="gl g-{{bn.icon}}" aria-hidden="true"></span><b>{{bn.t}}</b><span class="bn-s {{bn.sC}}">{{bn.s}}</span></a>
+      <sc-if value="{{bn.hasAct}}" hint-placeholder-val="{{false}}"><a class="bn-a" href="{{bn.href}}">{{bn.act}}</a></sc-if>
+      <button class="bn-x" onClick="{{bn.close}}" aria-label="Скрыть"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+    </div>
+    </sc-if>
+    <div class="tbs {{tbs.c}}">
+      <a class="tbs-s" href="#app" title="Open Home"><i class="tbs-d" aria-hidden="true"></i><span>{{tbs.t}}</span><span class="tbs-m {{tbs.mc}}">{{tbs.m}}</span></a>
+      <button class="tbs-p" onClick="{{tbs.go}}" aria-label="{{tbs.a}}" title="{{tbs.a}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg></button>
+    </div>
+    <div class="cap">
+      <button aria-label="Minimize to tray"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button aria-label="Maximize"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg></button>
+      <button aria-label="Close window"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    </header>
+
+    <main class="dgm">
+      <section class="dg-l">
+        <h1 class="h1x">Диагностика</h1>
+        <p class="rt-sub">Узнайте, почему что-то не работает</p>
+        <sc-if value="{{asked}}" hint-placeholder-val="{{false}}">
+          <div class="ask rise"><span class="gl g-user-badge-check" aria-hidden="true"></span><span class="tx"><b>Администратор просит данные диагностики</b><span>Чтобы помочь с вашим подключением</span></span><button class="addb sm2" onClick="{{openRep}}">Посмотреть</button></div>
+        </sc-if>
+
+        <div class="ck">
+          <sc-if value="{{isIdle}}" hint-placeholder-val="{{false}}">
+            <div class="ck-idle rise">
+              <div class="radar" aria-hidden="true"><i></i><i></i><i></i><span class="sweep"></span><span class="gl g-activity" aria-hidden="true"></span></div>
+              <b>Проверьте сеть</b>
+              <p>Проверяет каждый сервер, ищет блокировки, ограничение скорости и подмену адресов. Около 2½ минут — соединение не прерывается</p>
+              <button class="cta" onClick="{{start}}">Проверить сеть</button>
+              <p class="ck-last">В этой сети ещё не проверяли</p>
+            </div>
+          </sc-if>
+          <sc-if value="{{isRun}}" hint-placeholder-val="{{false}}">
+            <div class="ck-run rise">
+              <div class="rn-h">
+                <div class="rn-ring" style="--rp:{{runPct}}" aria-hidden="true"><span>{{runPct}}</span></div>
+                <div class="tx"><b class="shim">Проверяем сеть</b><span>{{runTime}}</span></div>
+              </div>
+              <div class="tl">
+                <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+                  <div class="tl-s {{s.c}}"><span class="tl-n"><i aria-hidden="true"></i><span class="okc"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span></span><span class="tx"><b>{{s.name}}</b><span>{{s.note}}</span></span></div>
+                </sc-for>
+              </div>
+              <button class="lnk3" onClick="{{cancel}}">Отменить проверку</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{isDone}}" hint-placeholder-val="{{true}}">
+            <div class="ck-done rise">
+              <div class="vh {{R.tone}}"><span class="vh-ic"><span class="gl wi g-warning-circle" aria-hidden="true"></span><span class="gl ci g-check-circle" aria-hidden="true"></span></span><span class="tx"><b>{{R.title}}</b><span>{{R.sub}}</span></span></div>
+              <div class="sum">
+                <sc-for list="{{facts}}" as="f" hint-placeholder-count="4"><div class="sm-r"><span class="gl g-{{f.g}}" aria-hidden="true"></span><span class="k">{{f.k}}</span><span class="v {{f.c}}">{{f.v}}</span></div></sc-for>
+              </div>
+              <button class="cta ck-go" onClick="{{start}}"><svg class="i rf" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg><span class="cg-t"><b>Перепроверить серверы</b><small>Полная проверка сети — через 48 мин</small></span></button>
+              <div class="ck-meta"><span><span class="gl g-clock" aria-hidden="true"></span>2 мин назад</span><button class="lnk2 {{sumCls}}" onClick="{{copySum}}"><span class="gl g-copy" aria-hidden="true"></span>{{copyTxt2}}</button></div>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{showHelp}}" hint-placeholder-val="{{true}}">
+        <div class="help">
+          <span class="mono lav"><span class="gl g-lifebelt" aria-hidden="true"></span></span>
+          <span class="tx"><b>Всё ещё не работает?</b><span>{{helpTxt}}</span></span>
+          <button class="lsb" onClick="{{openRep}}">{{helpBtn}}</button>
+        </div>
+        </sc-if>
+        <sc-if value="{{isMg}}" hint-placeholder-val="{{true}}">
+        <div class="anon {{anonBox}}">
+          <span class="tx"><b>Помогать находить блокировки</b><span>{{anonTxt}}<sc-if value="{{anonMore}}" hint-placeholder-val="{{false}}"> <a class="anon-l" href="#app">Что отправляется</a></sc-if></span></span>
+          <button class="sw {{anonCls}}" role="switch" aria-checked="{{anonOn}}" onClick="{{toggleAnon}}" aria-label="Help find blocks: share anonymous data with My subscription"></button>
+        </div>
+        </sc-if>
+      </section>
+
+      <section class="lcard dg-r" aria-label="Результаты">
+        <div class="utabs" role="tablist" aria-label="View">
+          <button class="{{tCls.res}}" role="tab" aria-selected="{{tOn.res}}" onClick="{{tPick.res}}"><span class="gl g-check-circle" aria-hidden="true"></span>Результаты</button>
+          <button class="{{tCls.log}}" role="tab" aria-selected="{{tOn.log}}" onClick="{{tPick.log}}"><span class="gl g-journal-page" aria-hidden="true"></span>Журнал<span class="k">3 новых</span></button>
+        </div>
+        <sc-if value="{{isRes}}" hint-placeholder-val="{{true}}">
+          <sc-if value="{{hasRes}}" hint-placeholder-val="{{true}}">
+            <div class="dres">
+              <div class="best {{bestCls}}"><span class="gl g-star" aria-hidden="true"></span><span class="tx"><b>Лучше всего в вашей сети</b><span>{{R.best}}</span></span><button class="lsb sm">Использовать</button></div>
+              <p class="sec-h">Серверы<span class="n">{{R.srvSum}}</span></p>
+              <div class="dlist">
+              <sc-for list="{{srvRows}}" as="x" hint-placeholder-count="4">
+                <div class="dr {{x.oc}}">
+                  <button class="dr-b" onClick="{{x.tog}}" aria-expanded="{{x.ox}}">
+                    <span class="mono {{x.tone}} {{x.fc}}"><img class="{{x.ic}}" src="{{x.flag}}" alt=""><span class="gl g-{{x.g}} {{x.gc}}" aria-hidden="true"></span></span>
+                    <span class="tx"><b>{{x.name}}<span class="term {{x.termC}}">{{x.term}}</span></b><span>{{x.meta}}</span></span>
+                    <span class="vchip {{x.vc}}"><span class="gl g-{{x.vi}}" aria-hidden="true"></span>{{x.vt}}</span>
+                    <svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                  <div class="dr-act {{x.actC}}"><button class="addb sm {{x.actBtnC}}" onClick="{{x.actGo}}">{{x.actT}}</button><span class="dr-ok {{x.actOkC}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg>{{x.actDone}}</span></div>
+                  <sc-if value="{{x.isOpen}}" hint-placeholder-val="{{false}}">
+                    <div class="dr-d {{x.ddc}}">
+                      <div class="hops {{x.hpc}}" aria-label="Route hops"><span class="hop {{x.hc.0}}"><i></i><small>1</small></span><span class="hop {{x.hc.1}}"><i></i><small>2</small></span><span class="hop {{x.hc.2}}"><i></i><small>3</small></span><span class="hop {{x.hc.3}}"><i></i><small>4</small></span><span class="hop {{x.hc.4}}"><i></i><small>5</small></span><span class="hop {{x.hc.5}}"><i></i><small>6</small></span><span class="hop {{x.hc.6}}"><i></i><small>7</small></span><span class="hop {{x.hc.7}}"><i></i><small>8</small></span><span class="hop {{x.hc.8}}"><i></i><small>9</small></span><span class="hop {{x.hc.9}}"><i></i><small>10</small></span><span class="hop {{x.hc.10}}"><i></i><small>11</small></span></div>
+                      <div class="pths {{x.ppc}}"><p class="pths-h">Пути к этому серверу</p><div class="pth {{x.p0.c}}"><span class="pth-n">{{x.p0.n}}</span><span class="pth-m">{{x.p0.m}}</span><span class="vchip sm {{x.p0.vc}}"><span class="gl g-{{x.p0.vi}}" aria-hidden="true"></span>{{x.p0.vt}}</span></div><div class="pth {{x.p1.c}}"><span class="pth-n">{{x.p1.n}}</span><span class="pth-m">{{x.p1.m}}</span><span class="vchip sm {{x.p1.vc}}"><span class="gl g-{{x.p1.vi}}" aria-hidden="true"></span>{{x.p1.vt}}</span></div><div class="pth {{x.p2.c}}"><span class="pth-n">{{x.p2.n}}</span><span class="pth-m">{{x.p2.m}}</span><span class="vchip sm {{x.p2.vc}}"><span class="gl g-{{x.p2.vi}}" aria-hidden="true"></span>{{x.p2.vt}}</span></div><div class="pth {{x.p3.c}}"><span class="pth-n">{{x.p3.n}}</span><span class="pth-m">{{x.p3.m}}</span><span class="vchip sm {{x.p3.vc}}"><span class="gl g-{{x.p3.vi}}" aria-hidden="true"></span>{{x.p3.vt}}</span></div></div>
+                      <p class="dl-l {{x.l0c}}">{{x.l0}}</p><p class="dl-l {{x.l1c}}">{{x.l1}}</p>
+                      <p class="conf {{x.cc}}"><span class="gl g-community" aria-hidden="true"></span>{{x.conf}}</p>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              </div>
+              <p class="sec-h">Сеть<span class="n {{netCls}}">{{R.netSum}}</span></p>
+              <div class="dlist">
+              <sc-for list="{{netRows}}" as="x" hint-placeholder-count="4">
+                <div class="dr {{x.oc}}">
+                  <button class="dr-b" onClick="{{x.tog}}" aria-expanded="{{x.ox}}">
+                    <span class="mono {{x.tone}} {{x.fc}}"><img class="{{x.ic}}" src="{{x.flag}}" alt=""><span class="gl g-{{x.g}} {{x.gc}}" aria-hidden="true"></span></span>
+                    <span class="tx"><b>{{x.name}}<span class="term {{x.termC}}">{{x.term}}</span></b><span>{{x.meta}}</span></span>
+                    <span class="vchip {{x.vc}}"><span class="gl g-{{x.vi}}" aria-hidden="true"></span>{{x.vt}}</span>
+                    <svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                  <div class="dr-act {{x.actC}}"><button class="addb sm {{x.actBtnC}}" onClick="{{x.actGo}}">{{x.actT}}</button><span class="dr-ok {{x.actOkC}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg>{{x.actDone}}</span></div>
+                  <sc-if value="{{x.isOpen}}" hint-placeholder-val="{{false}}">
+                    <div class="dr-d {{x.ddc}}">
+                      <div class="hops {{x.hpc}}" aria-label="Route hops"><span class="hop {{x.hc.0}}"><i></i><small>1</small></span><span class="hop {{x.hc.1}}"><i></i><small>2</small></span><span class="hop {{x.hc.2}}"><i></i><small>3</small></span><span class="hop {{x.hc.3}}"><i></i><small>4</small></span><span class="hop {{x.hc.4}}"><i></i><small>5</small></span><span class="hop {{x.hc.5}}"><i></i><small>6</small></span><span class="hop {{x.hc.6}}"><i></i><small>7</small></span><span class="hop {{x.hc.7}}"><i></i><small>8</small></span><span class="hop {{x.hc.8}}"><i></i><small>9</small></span><span class="hop {{x.hc.9}}"><i></i><small>10</small></span><span class="hop {{x.hc.10}}"><i></i><small>11</small></span></div>
+                      <div class="pths {{x.ppc}}"><p class="pths-h">Пути к этому серверу</p><div class="pth {{x.p0.c}}"><span class="pth-n">{{x.p0.n}}</span><span class="pth-m">{{x.p0.m}}</span><span class="vchip sm {{x.p0.vc}}"><span class="gl g-{{x.p0.vi}}" aria-hidden="true"></span>{{x.p0.vt}}</span></div><div class="pth {{x.p1.c}}"><span class="pth-n">{{x.p1.n}}</span><span class="pth-m">{{x.p1.m}}</span><span class="vchip sm {{x.p1.vc}}"><span class="gl g-{{x.p1.vi}}" aria-hidden="true"></span>{{x.p1.vt}}</span></div><div class="pth {{x.p2.c}}"><span class="pth-n">{{x.p2.n}}</span><span class="pth-m">{{x.p2.m}}</span><span class="vchip sm {{x.p2.vc}}"><span class="gl g-{{x.p2.vi}}" aria-hidden="true"></span>{{x.p2.vt}}</span></div><div class="pth {{x.p3.c}}"><span class="pth-n">{{x.p3.n}}</span><span class="pth-m">{{x.p3.m}}</span><span class="vchip sm {{x.p3.vc}}"><span class="gl g-{{x.p3.vi}}" aria-hidden="true"></span>{{x.p3.vt}}</span></div></div>
+                      <p class="dl-l {{x.l0c}}">{{x.l0}}</p><p class="dl-l {{x.l1c}}">{{x.l1}}</p>
+                      <p class="conf {{x.cc}}"><span class="gl g-community" aria-hidden="true"></span>{{x.conf}}</p>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{noRes}}" hint-placeholder-val="{{false}}">
+            <div class="empty">
+              <span class="e-ic"><span class="gl g-shield-search" aria-hidden="true"></span></span>
+              <b>{{emT}}</b>
+              <p>{{emS}}</p>
+              <div class="e-act {{emBtn}}"><button class="addb" onClick="{{start}}">Проверить сеть</button></div>
+            </div>
+          </sc-if>
+        </sc-if>
+        <sc-if value="{{isLog}}" hint-placeholder-val="{{false}}">
+          <div class="lgbar">
+            <label class="search lgs"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input type="text" placeholder="Поиск по журналу" aria-label="Поиск по журналу"></label>
+            <div class="lgf" role="tablist" aria-label="Level">
+              <button class="{{lfCls.all}}" onClick="{{lfPick.all}}">Все</button>
+              <button class="{{lfCls.warn}}" onClick="{{lfPick.warn}}"><i class="lvd warn" aria-hidden="true"></i>Предупреждения<span class="k">3</span></button>
+              <button class="{{lfCls.error}}" onClick="{{lfPick.error}}"><i class="lvd error" aria-hidden="true"></i>Ошибки<span class="k">1</span></button>
+            </div>
+          </div>
+          <div class="lg">
+            <p class="lg-day">Сегодня</p>
+            <sc-for list="{{logRows}}" as="g" hint-placeholder-count="12">
+              <div class="lgl {{g.lv}}" title="{{g.lvT}}"><time>{{g.t}}</time><i class="ld" aria-hidden="true"></i><span class="lsrc">{{g.src}}</span><span class="msg">{{g.msg}}</span></div>
+            </sc-for>
+          </div>
+          <div class="lgfoot">
+            <button class="lvb {{liveCls}}" onClick="{{toggleLive}}"><i aria-hidden="true"></i>{{liveTxt}}</button>
+            <span class="lgn">записей: {{logN}} · за 24 часа</span>
+            <button class="lsb sm"><span class="gl g-copy" aria-hidden="true"></span><span>Копировать</span></button>
+            <button class="lsb sm"><span class="gl g-download" aria-hidden="true"></span><span>Сохранить</span></button>
+            <button class="lsb sm ghost">Очистить</button>
+          </div>
+        </sc-if>
+      </section>
+    </main>
+  </div>
+
+  <sc-if value="{{repShown}}" hint-placeholder-val="{{false}}">
+    <div class="scrim" onClick="{{closeRep}}"></div>
+    <div class="sheet" role="dialog" aria-label="Попросить помощи у администратора">
+      <sc-if value="{{repForm}}" hint-placeholder-val="{{true}}">
+        <div class="sh-h"><div class="tx"><b>{{shTitle}}</b><span>{{shSub}}</span></div><button class="back" onClick="{{closeRep}}" aria-label="Закрыть"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+        <p class="sh-p">{{shP}}</p>
+        <div class="parts">
+          <sc-for list="{{parts}}" as="p" hint-placeholder-count="6">
+            <button class="part {{p.cls}}" role="checkbox" aria-checked="{{p.on}}" onClick="{{p.flip}}"><span class="cb"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span><span class="gl g-{{p.g}}" aria-hidden="true"></span><span class="tx"><b>{{p.name}}</b><span>{{p.sub}}</span></span></button>
+          </sc-for>
+        </div>
+        <p class="never"><span class="gl g-lock" aria-hidden="true"></span>Никогда не включаем: имя компьютера, сайты, которые вы открываете, ключи, ваш IP</p>
+        <label class="ta"><textarea placeholder="Что случилось? Необязательно" aria-label="What happened"></textarea></label>
+        <div class="sh-f">
+          <button class="lnk2"><span class="gl g-eye" aria-hidden="true"></span>Что внутри</button>
+          <span class="sz">{{repSize}}</span>
+          <sc-if value="{{intakeOn}}" hint-placeholder-val="{{true}}"><button class="addb" onClick="{{sendRep}}"><span class="gl g-send-diagonal" aria-hidden="true"></span>Отправить</button></sc-if>
+          <sc-if value="{{intakeOff}}" hint-placeholder-val="{{false}}"><button class="addb" onClick="{{closeRep}}"><span class="gl g-download" aria-hidden="true"></span>Сохранить файлом</button></sc-if>
+        </div>
+        <sc-if value="{{offWarn}}" hint-placeholder-val="{{false}}"><p class="sh-warn"><span class="gl g-warning-circle" aria-hidden="true"></span>Администратор пока не принимает данные из приложения. Сохраните файл и отправьте ему</p></sc-if>
+      </sc-if>
+      <sc-if value="{{repSent}}" hint-placeholder-val="{{false}}">
+        <div class="sent rise">
+          <span class="sent-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span>
+          <b>Отправлено администратору</b>
+          <p>Назовите этот код поддержке — по нему найдут ваши данные</p>
+          <div class="code"><span>MG-7K3F</span><button class="lsb {{copyCls}}" onClick="{{copy}}"><span class="gl g-copy" aria-hidden="true"></span><span>{{copyTxt}}</span></button></div>
+          <button class="lsb" onClick="{{closeRep}}">Готово</button>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+</div>
+  <div lang="en" class="dev dtop" role="toolbar" aria-label="Prototype states">
+    <div class="dg"><span class="dl">Check</span><div class="ds"><button class="{{dv.ck_idle}}" onClick="{{dvSet.ck_idle}}">Not run</button><button class="{{dv.ck_run}}" onClick="{{dvSet.ck_run}}">Running</button><button class="{{dv.ck_issues}}" onClick="{{dvSet.ck_issues}}">Issues</button><button class="{{dv.ck_good}}" onClick="{{dvSet.ck_good}}">All good</button></div></div>
+    <div class="dg"><span class="dl">Tab</span><div class="ds"><button class="{{dv.tb_res}}" onClick="{{dvSet.tb_res}}">Results</button><button class="{{dv.tb_log}}" onClick="{{dvSet.tb_log}}">Log</button></div></div>
+  </div>
+  <div lang="en" class="dev" role="toolbar" aria-label="Report states">
+    <div class="dg"><span class="dl">Debug report</span><div class="ds"><button class="{{dv.rp_closed}}" onClick="{{dvSet.rp_closed}}">Closed</button><button class="{{dv.rp_open}}" onClick="{{dvSet.rp_open}}">Open</button><button class="{{dv.rp_sent}}" onClick="{{dvSet.rp_sent}}">Sent</button><button class="{{dv.rp_off}}" onClick="{{dvSet.rp_off}}">Intake off</button><button class="{{dv.rp_asked}}" onClick="{{dvSet.rp_asked}}">Admin asks</button></div></div>
+    <div class="dg"><span class="dl">Mode</span><div class="ds"><button class="{{dv.md_mg}}" onClick="{{dvSet.md_mg}}">Mistgate</button><button class="{{dv.md_basic}}" onClick="{{dvSet.md_basic}}">Basic</button></div></div>
+    <div class="dg"><span class="dl">Theme</span><div class="ds"><button class="{{dv.th_dark}}" onClick="{{dvSet.th_dark}}">Dark</button><button class="{{dv.th_light}}" onClick="{{dvSet.th_light}}">Light</button></div></div>
+  </div>
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"check":{"editor":"enum","options":["idle","run","issues","good"],"default":"issues","section":"State"},"tab":{"editor":"enum","options":["res","log"],"default":"res","section":"State"},"report":{"editor":"enum","options":["closed","open","sent","off","asked"],"default":"closed","section":"State"},"mode":{"editor":"enum","options":["mg","basic"],"default":"mg","section":"State"},"anon":{"editor":"enum","options":["off","on","fresh","sending","old"],"default":"off","section":"State"},"op":{"editor":"enum","options":["known","unknown"],"default":"known","section":"State"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"accent":{"editor":"enum","options":["lavender","mint","sand","rose"],"default":"lavender","section":"Look"},"$preview":{"width":1160,"height":800}}'>
+class Component extends DCLogic {
+  st() { return this.state || {}; }
+  start() {
+    clearTimeout(this.tk);
+    this.setState({ ck: 'run', step: 0, t0: 0 });
+    const go = (k) => {
+      if (this.st().ck !== 'run') return;
+      if (k >= 5) { this.setState({ ck: 'issues', open: { net0: true, srv0: true } }); return; }
+      this.setState({ step: k });
+      this.tk = setTimeout(() => go(k + 1), 1300);
+    };
+    this.tk = setTimeout(() => go(0), 30);
+  }
+  renderVals() {
+    const logos = { lavender: '/_blob/0b62512895ad639ab01894d9cfc68db6', mint: '/_blob/7e2cbe098a3f586b63d3e07c56f17a01', sand: '/_blob/12736226f7d078aa98183de30675f863', rose: '/_blob/766bb9e952957b786b037a8ba7882911' };
+    const s0 = this.st();
+    const theme = (s0.theme || this.props.theme) === 'light' ? 'light' : 'dark';
+    const accent = logos[this.props.accent] ? this.props.accent : 'lavender';
+    const ck = s0.ck || this.props.check || 'issues';
+    const tab = s0.tab || this.props.tab || 'res';
+    const rep = s0.rep || this.props.report || 'closed';
+    const RES = {"issues": {"srv": [{"flag": "/_blob/e496c2fcbf4e9bb39112cabd5bf7f493", "name": "Германия", "v": "ok", "alt": "", "meta": "Работает через VLESS · TCP — проходят 2 пути из 4", "paths": [{"n": "VLESS · TCP · напрямую", "v": "ok", "m": "38 мс · 12,4 Мбит/с"}, {"n": "VLESS · TCP · через RU-релей", "v": "ok", "m": "61 мс · 9,8 Мбит/с"}, {"n": "Hysteria2 · напрямую", "v": "blocked", "m": "UDP не получает ответа"}, {"n": "Hysteria2 · выход через WARP", "v": "blocked", "m": "UDP не получает ответа"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/e03fb05e0bdcc00f476374f00844dcf0", "name": "Нидерланды · Амстердам", "v": "slow", "alt": "", "meta": "Скорость Hysteria2 падает через несколько секунд; VLESS · TCP в порядке", "paths": [{"n": "Hysteria2 · напрямую", "v": "slow", "m": "Потери растут без задержки · 3,1 Мбит/с"}, {"n": "VLESS · TCP · напрямую", "v": "ok", "m": "48 мс · 11,0 Мбит/с"}, {"n": "AmneziaWG · напрямую", "v": "app", "m": "Mistgate не смог запустить этот протокол"}], "conf": "Видят 214 человек у вашего оператора", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5fcef1b651d4897d4bd86b5dfbd3e9a7", "name": "Румыния", "v": "freeze", "alt": "", "meta": "Подключается, но загрузки обрываются после 64 КБ", "paths": [{"n": "VLESS · TCP · напрямую", "v": "freeze", "m": "Простой 6 с после 64 КБ"}, {"n": "VLESS · XHTTP · напрямую", "v": "freeze", "m": "Простой 6 с после 64 КБ"}], "conf": "Похоже, DPI обрывает долгие соединения", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5a45af717ce4d720751cf765c6d0a732", "name": "Финляндия · Хельсинки", "v": "down", "alt": "", "meta": "Не отвечает сам сервер — это не блокировка", "paths": [{"n": "AmneziaWG · напрямую", "v": "down", "m": "Сервер не отвечает"}, {"n": "VLESS · TCP · напрямую", "v": "down", "m": "Сервер отклонил подключение"}], "conf": "У других то же самое — провайдер уже знает", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/ebb260239dba6f20ae05c4141595c5d8", "name": "Польша", "v": "config", "alt": "", "meta": "В подписке неверные настройки этого сервера. Исправить может только провайдер", "paths": [{"n": "VLESS · TCP · напрямую", "v": "config", "m": "Сервер отклонил ключ"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": ["Сообщить провайдеру", "Отправлено провайдеру"]}], "net": [{"flag": "", "name": "Блокировки на маршруте", "v": "blocked", "alt": "Найдены на 6-м узле", "meta": "Долгие загрузки с зарубежных сайтов могут зависать. Mistgate держит вас на VLESS · TCP", "paths": [], "conf": "Видят 1 204 человека у вашего оператора", "g": "shield-search", "tone": "sand", "hops": [{"n": "1", "c": "ok"}, {"n": "2", "c": "ok"}, {"n": "3", "c": "ok"}, {"n": "4", "c": "ok"}, {"n": "5", "c": "ok"}, {"n": "6", "c": "bad"}, {"n": "7", "c": "off"}, {"n": "8", "c": "off"}, {"n": "9", "c": "off"}, {"n": "10", "c": "off"}, {"n": "11", "c": "off"}], "lines": ["Заблокированный тестовый адрес обрывается на 6-м узле из 11", "Контрольный адрес проходит все узлы"], "hasFlag": false, "term": "DPI · ТСПУ", "act": []}, {"flag": "", "name": "Быстрые протоколы", "v": "blocked", "alt": "", "meta": "Hysteria2 и AmneziaWG в этой сети не работают. Mistgate использует VLESS · TCP", "paths": [], "conf": "Типично для мобильного интернета вашего оператора", "g": "antenna-signal", "tone": "sky", "hops": [], "lines": ["QUIC и AmneziaWG не получают ответа", "TCP 443 работает на всех серверах"], "hasFlag": false, "term": "UDP", "act": []}, {"flag": "", "name": "Игры и голосовой чат", "v": "slow", "alt": "Ограничены", "meta": "В некоторых играх могут не работать подбор матчей и голосовой чат", "paths": [], "conf": "", "g": "gamepad", "tone": "lav", "hops": [], "lines": ["Тип NAT: умеренный — в некоторых играх нельзя создать матч", "Голосовой чат может соединяться только в одну сторону"], "hasFlag": false, "term": "NAT", "act": ["Включить режим для игр", "Режим для игр включён"]}, {"flag": "", "name": "Ваш Wi-Fi", "v": "net", "alt": "Теряются пакеты", "meta": "Около 8% пакетов теряется ещё до оператора — подойдите ближе к роутеру", "paths": [], "conf": "", "g": "wifi", "tone": "sky", "hops": [], "lines": ["Потери возникают между этим ПК и роутером, а не у оператора", "Роутер отвечает за 3–140 мс, в норме — до 10 мс"], "hasFlag": false, "term": "", "act": []}, {"flag": "", "name": "Адреса сайтов", "v": "ok", "alt": "Не подменяют", "meta": "Адреса сайтов, которые вы открываете, никто не подменяет", "paths": [], "conf": "", "g": "dns", "tone": "mint", "hops": [], "lines": ["Проверили 40 популярных сайтов — ни один ответ не подменён", "DNS идёт через VPN, оператор его не видит"], "hasFlag": false, "term": "DNS", "act": []}, {"flag": "", "name": "Ограничения скорости", "v": "ok", "alt": "Не замечены", "meta": "Скорость остаётся ровной всю сессию", "paths": [], "conf": "", "g": "activity", "tone": "neu", "hops": [], "lines": ["Скорость держалась на 11–12 Мбит/с целую минуту", "После первых мегабайт скорость не падает"], "hasFlag": false, "term": "Замедление", "act": []}, {"flag": "", "name": "Зарубежные сайты", "v": "ok", "alt": "Открываются", "meta": "Зарубежные сайты в этой сети не отрезаны", "paths": [], "conf": "", "g": "list", "tone": "sand", "hops": [], "lines": ["Открываются 48 из 48 зарубежных тестовых сайтов", "Режим белых списков мобильного интернета сейчас не включён"], "hasFlag": false, "term": "Белые списки", "act": []}], "title": "Подключено, с ограничениями", "sub": "Быстрые протоколы здесь блокируют", "tone": "warn", "facts": [["antenna-signal", "Сеть", "Мобильная · Example Mobile", ""], ["server", "Серверы", "2 из 5 работают", "warn"], ["shield-search", "Блокировки", "Обнаружены", "bad"], ["gamepad", "Игры", "Ограничены", "warn"]], "srvSum": "2 из 5 работают", "netSum": "4 проблемы", "best": "VLESS · TCP в Амстердам — работает у 94% людей у вашего оператора"}, "good": {"srv": [{"flag": "/_blob/e496c2fcbf4e9bb39112cabd5bf7f493", "name": "Германия", "v": "ok", "alt": "", "meta": "Работают все 4 пути · быстрее всего через Hysteria2", "paths": [{"n": "Hysteria2 · напрямую", "v": "ok", "m": "31 мс · 48,2 Мбит/с"}, {"n": "Hysteria2 · выход через WARP", "v": "ok", "m": "44 мс · 30,5 Мбит/с"}, {"n": "VLESS · TCP · напрямую", "v": "ok", "m": "36 мс · 21,0 Мбит/с"}, {"n": "VLESS · TCP · через RU-релей", "v": "ok", "m": "58 мс · 14,2 Мбит/с"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/e03fb05e0bdcc00f476374f00844dcf0", "name": "Нидерланды · Амстердам", "v": "ok", "alt": "", "meta": "Работают все 3 пути", "paths": [{"n": "Hysteria2 · напрямую", "v": "ok", "m": "42 мс · 39,0 Мбит/с"}, {"n": "VLESS · TCP · напрямую", "v": "ok", "m": "47 мс · 18,3 Мбит/с"}, {"n": "AmneziaWG · напрямую", "v": "ok", "m": "45 мс · 33,1 Мбит/с"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5fcef1b651d4897d4bd86b5dfbd3e9a7", "name": "Румыния", "v": "ok", "alt": "", "meta": "Работают оба пути", "paths": [{"n": "VLESS · TCP · напрямую", "v": "ok", "m": "63 мс · 15,7 Мбит/с"}, {"n": "VLESS · XHTTP · напрямую", "v": "ok", "m": "66 мс · 12,2 Мбит/с"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5a45af717ce4d720751cf765c6d0a732", "name": "Финляндия · Хельсинки", "v": "ok", "alt": "", "meta": "Работают оба пути", "paths": [{"n": "AmneziaWG · напрямую", "v": "ok", "m": "39 мс · 35,5 Мбит/с"}, {"n": "VLESS · TCP · напрямую", "v": "ok", "m": "41 мс · 19,9 Мбит/с"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}], "net": [{"flag": "", "name": "Блокировки на маршруте", "v": "ok", "alt": "Не найдены", "meta": "Тестовые адреса проходят все узлы", "paths": [], "conf": "", "g": "shield-search", "tone": "sand", "hops": [{"n": "1", "c": "ok"}, {"n": "2", "c": "ok"}, {"n": "3", "c": "ok"}, {"n": "4", "c": "ok"}, {"n": "5", "c": "ok"}, {"n": "6", "c": "ok"}, {"n": "7", "c": "ok"}, {"n": "8", "c": "ok"}, {"n": "9", "c": "ok"}, {"n": "10", "c": "ok"}, {"n": "11", "c": "ok"}], "lines": ["Тестовый и контрольный адреса проходят все 11 узлов"], "hasFlag": false, "term": "DPI · ТСПУ", "act": []}, {"flag": "", "name": "Быстрые протоколы", "v": "ok", "alt": "Работают", "meta": "Hysteria2 и AmneziaWG здесь работают", "paths": [], "conf": "", "g": "antenna-signal", "tone": "sky", "hops": [], "lines": ["QUIC и AmneziaWG отвечают на всех серверах"], "hasFlag": false, "term": "UDP", "act": []}, {"flag": "", "name": "Игры и голосовой чат", "v": "ok", "alt": "Работают", "meta": "Игры и голосовой чат подключаются нормально", "paths": [], "conf": "", "g": "gamepad", "tone": "lav", "hops": [], "lines": ["Тип NAT: открытый", "Матчи и голосовой чат соединяются в обе стороны"], "hasFlag": false, "term": "NAT", "act": []}, {"flag": "", "name": "Адреса сайтов", "v": "ok", "alt": "Не подменяют", "meta": "Адреса сайтов, которые вы открываете, никто не подменяет", "paths": [], "conf": "", "g": "dns", "tone": "mint", "hops": [], "lines": ["Проверили 40 популярных сайтов — ни один ответ не подменён", "DNS идёт через VPN, оператор его не видит"], "hasFlag": false, "term": "DNS", "act": []}, {"flag": "", "name": "Ограничения скорости", "v": "ok", "alt": "Не замечены", "meta": "Скорость остаётся ровной всю сессию", "paths": [], "conf": "", "g": "activity", "tone": "neu", "hops": [], "lines": ["Скорость держалась на 11–12 Мбит/с целую минуту", "После первых мегабайт скорость не падает"], "hasFlag": false, "term": "Замедление", "act": []}, {"flag": "", "name": "Зарубежные сайты", "v": "ok", "alt": "Открываются", "meta": "Зарубежные сайты в этой сети не отрезаны", "paths": [], "conf": "", "g": "list", "tone": "sand", "hops": [], "lines": ["Открываются 48 из 48 зарубежных тестовых сайтов", "Режим белых списков мобильного интернета сейчас не включён"], "hasFlag": false, "term": "Белые списки", "act": []}], "title": "Всё работает", "sub": "Ничего не блокируют, все серверы отвечают", "tone": "ok", "facts": [["wifi", "Сеть", "Wi-Fi · Example Telecom", ""], ["server", "Серверы", "4 из 4 работают", "ok"], ["shield-search", "Блокировки", "Нет", "ok"], ["gamepad", "Игры", "Работают", "ok"]], "srvSum": "4 из 4 работают", "netSum": "всё чисто", "best": "Hysteria2 в Германию — самый быстрый путь у вашего оператора"}};
+    const VD = {"ok": ["Работает", "check-circle", "ok"], "slow": ["Режут скорость", "dashboard-speed", "warn"], "freeze": ["Заморозка", "snow-flake", "ice"], "blocked": ["Блокируют", "prohibition", "bad"], "down": ["Сбой сервера", "cloud-xmark", "neu"], "config": ["Ошибка конфигурации", "wrench", "lav"], "net": ["Ваша сеть", "wifi-off", "sand"], "app": ["Ошибка приложения", "bug", "slate"]};
+    const md = s0.md || this.props.mode || 'mg';
+    // статус VPN в шапке: виден на всех экранах, кроме Главной
+    const vp = s0.vp || (this.props.vpn === 'off' ? 'off' : 'on');
+    const tbs = { c: 'v-' + vp, t: vp === 'on' ? 'Подключено' : (vp === 'ing' ? 'Подключаемся…' : 'VPN выключен'), m: vp === 'on' ? 'Германия' : '', mc: vp === 'on' ? '' : 'hide', a: vp === 'off' ? 'Подключить VPN' : 'Отключить VPN',
+      go: () => { clearTimeout(this.vt); if (vp === 'off') { this.setState({ vp: 'ing' }); this.vt = setTimeout(() => this.setState({ vp: 'on' }), 1300); } else this.setState({ vp: 'off' }); } };
+
+    const opU = this.props.op === 'unknown' && md === 'mg', full = md === 'mg' && !opU;
+    const key = ck === 'good' ? 'good' : 'issues';
+    const R = RES[key];
+    const open = s0.open || (key === 'issues' ? { net0: true, srv0: true } : {});
+    const acted = s0.acted || {};
+    const mk = (arr, pfx) => arr.map((x, i) => {
+      const id = pfx + i, o = !!open[id], d = VD[x.v], hasD = !!(x.lines.length || x.hops.length || x.paths.length || (x.conf && full));
+      const ps = [0, 1, 2, 3].map((k) => { const q = x.paths[k]; if (!q) return { c: 'hide', n: '', m: '', vc: '', vi: '', vt: '' }; const dv = VD[q.v]; return { c: '', n: q.n, m: q.m, vc: dv[2], vi: dv[1], vt: dv[0] }; });
+      return Object.assign({}, x, { vt: x.alt || d[0], vi: d[1], vc: d[2], hc: x.hops.map((h) => h.c), hpc: x.hops.length ? '' : 'hide', ppc: x.paths.length ? '' : 'hide',
+        p0: ps[0], p1: ps[1], p2: ps[2], p3: ps[3], l0: x.lines[0] || '', l1: x.lines[1] || '', l0c: x.lines[0] ? '' : 'hide', l1c: x.lines[1] ? '' : 'hide',
+        cc: x.conf && (full || x.conf.indexOf('Похоже') === 0) ? '' : 'hide', ddc: (x.lines.length || x.hops.length || x.paths.length || x.conf) ? '' : 'hide',
+        isOpen: o && hasD, oc: (o && hasD ? 'open' : '') + (hasD ? '' : ' nod'), ox: o ? 'true' : 'false', fc: x.hasFlag ? 'flag' : '', ic: x.hasFlag ? '' : 'hide', gc: x.hasFlag ? 'hide' : '',
+        termC: x.term ? '' : 'hide', actC: x.act.length && (md === 'mg' || !x.hasFlag) ? '' : 'hide', actT: x.act[0] || '', actDone: x.act[1] || '', actBtnC: acted[id] ? 'hide' : '', actOkC: acted[id] ? '' : 'hide',
+        actGo: () => this.setState({ acted: Object.assign({}, acted, { [id]: true }) }),
+        tog: () => { if (hasD) this.setState({ open: Object.assign({}, open, { [id]: !o }) }); } });
+    });
+    const STEPS = [["server", "Серверы", "Каждый путь к каждому серверу"], ["shield-search", "Блокировки на маршруте", "Ищем фильтры между вами и серверами"], ["antenna-signal", "Быстрые протоколы и игры", "UDP и тип NAT"], ["dns", "Адреса сайтов", "Не подменяют ли ответы DNS"], ["list", "Зарубежные сайты", "Не отрезаны ли они в этой сети"]];
+    const step = s0.step !== undefined ? s0.step : (this.props.check === 'run' ? 1 : 0);
+    const DONE = ['Работают 2 из 5 серверов', 'Фильтр найден на 6-м узле', 'Быстрые протоколы блокируют · игры ограничены', 'Не подменяют', 'Открываются'];
+    const steps = STEPS.map((x, i) => ({ g: x[0], name: x[1], note: i < step ? DONE[i] : x[2], c: i < step ? 'sdone' : (i === step ? 'snow' : '') }));
+    const LOG = [["14:02:11", "info", "guard", "Germany \u00b7 VLESS \u00b7 TCP is healthy, rtt 38 ms"], ["14:02:09", "info", "guard", "Netherlands \u2192 VLESS \u00b7 TCP (udp_blocked)"], ["14:02:08", "warn", "guard", "Netherlands \u00b7 Hysteria2: no QUIC answer, 3 tries"], ["14:01:58", "info", "detect", "tspuprobe: hop 6 cuts the test address, control ok"], ["14:01:41", "info", "detect", "dns: system and DoH answers match (3/3)"], ["14:01:33", "error", "path", "Romania: download stalled at 64 KiB, idle 6 s"], ["14:01:20", "info", "net", "interface: Wi-Fi \u2192 Mobile hotspot, metered"], ["14:01:19", "info", "core", "network changed, rechecking paths"], ["14:00:02", "info", "sub", "subscription synced, 8 servers, no changes"], ["13:58:52", "info", "guard", "Germany: rtt back to 41 ms"], ["13:58:47", "warn", "guard", "Germany: rtt jump 38 \u2192 210 ms, watching"], ["13:55:10", "info", "core", "connected \u00b7 Germany \u00b7 VLESS \u00b7 TCP"], ["13:55:08", "info", "core", "route found in 1.9 s (3 candidates)"], ["13:55:06", "info", "core", "connect requested by user"]];
+    const lf = s0.lf || 'all';
+    const LV = { info: 'INFO', warn: 'WARN', error: 'ERR' };
+    const logRows = LOG.filter((r) => lf === 'all' || (lf === 'warn' ? r[1] !== 'info' : r[1] === 'error')).map((r) => ({ t: r[0], lv: r[1], lvT: LV[r[1]], src: r[2], msg: r[3] }));
+    const PARTS = [["cpu", "Система", "Версии приложения, службы и Windows, настройки"], ["clock", "Хронология", "Состояния подключения и смена маршрутов за 24 ч"], ["activity", "Пути", "Задержка, потери и ошибки по каждому маршруту"], ["shield-search", "Проверки", "Последние результаты диагностики"], ["network", "Сеть", "Интерфейсы, маршруты, DNS, состояние брандмауэра"], ["journal-page", "Журнал службы", "Последние 24 ч, секреты уже удалены"]];
+    const poff = s0.poff || {};
+    const parts = PARTS.map((p, i) => ({ g: p[0], name: p[1], sub: p[2], cls: poff[i] ? '' : 'on', on: poff[i] ? 'false' : 'true', flip: () => this.setState({ poff: Object.assign({}, poff, { [i]: !poff[i] }) }) }));
+    const kb = [38, 22, 61, 9, 14, 96];
+    const size = PARTS.reduce((a, p, i) => a + (poff[i] ? 0 : kb[i]), 0);
+    // отчёты о блокировках: выключено, включено и уже отправляли, включено и ещё не отправляли, идёт отправка, панель не принимает
+    const anonK = s0.anonK !== undefined ? s0.anonK : (this.props.anon || 'off');
+    const anon = anonK !== 'off' && anonK !== 'old';
+    const ANON = { off: 'Выкл · ничего не отправляется. Включите, чтобы анонимно показывать «Моей подписке», что здесь блокируют', on: 'Вкл · последний отчёт отправлен сегодня в 13:58.', fresh: 'Вкл · пока ничего не отправлялось.', sending: 'Вкл · отправляем отчёт…', old: 'Панель вашего провайдера это пока не поддерживает' };
+    const dv = {}, dvSet = {};
+    const devOpt = (k, v, on, fn) => { dv[k + '_' + v] = on ? 'on' : ''; dvSet[k + '_' + v] = fn; };
+    ['idle', 'run', 'issues', 'good'].forEach((v) => devOpt('ck', v, ck === v, () => { clearTimeout(this.tk); this.setState({ ck: v, step: v === 'run' ? 1 : 0, open: v === 'issues' ? { net0: true } : {} }); }));
+    ['res', 'log'].forEach((v) => devOpt('tb', v, tab === v, () => this.setState({ tab: v })));
+    ['closed', 'open', 'sent', 'off', 'asked'].forEach((v) => devOpt('rp', v, rep === v, () => this.setState({ rep: v, copied: false })));
+    ['mg', 'basic'].forEach((v) => devOpt('md', v, md === v, () => this.setState({ md: v, rep: 'closed' })));
+    ['dark', 'light'].forEach((v) => devOpt('th', v, theme === v, () => this.setState({ theme: v })));
+    const T = ['res', 'log'], tCls = {}, tOn = {}, tPick = {};
+    T.forEach((k) => { tCls[k] = k === tab ? 'on' : ''; tOn[k] = k === tab ? 'true' : 'false'; tPick[k] = () => this.setState({ tab: k }); });
+    const LF = ['all', 'warn', 'error'], lfCls = {}, lfPick = {};
+    LF.forEach((k) => { lfCls[k] = k === lf ? 'on' : ''; lfPick[k] = () => this.setState({ lf: k }); });
+    const done = ck === 'issues' || ck === 'good';
+    return {
+      dv: dv, dvSet: dvSet, theme: theme, accent: accent, logo: logos[accent],
+      isIdle: ck === 'idle', isRun: ck === 'run', isDone: done,
+      R: R, facts: R.facts.map((f, i) => ({ g: f[0], k: f[1], v: i === 0 && !full ? f[2].split(' · ')[0] + (opU ? ' · оператор неизвестен' : '') : f[2], c: f[3] })), srvRows: mk(R.srv, 'srv'), netRows: mk(R.net, 'net'), netCls: key === 'issues' ? 'warn' : 'okc',
+      hasRes: done, noRes: !done, emBtn: 'hide',
+      emT: ck === 'run' ? 'Результаты появятся здесь' : 'Результатов пока нет', emS: ck === 'run' ? 'Сначала серверы, затем блокировки, быстрые протоколы, адреса и зарубежные сайты' : 'Запустите проверку слева — здесь появятся вердикты по каждому серверу и по вашей сети',
+      ovTxt: done ? '2 мин назад' : (ck === 'run' ? 'Проверяем…' : 'Ещё не проверялось'), rTitle: tab === 'log' ? 'Журнал службы' : 'Результаты',
+      steps: steps, runPct: [10, 32, 54, 74, 90][step] + '%', runTime: 'Около ' + ['2½ мин', '1 мин 50 с', '1 мин 10 с', '40 с', '15 с'][step] + ' осталось · VPN остаётся включён',
+      start: () => this.start(), cancel: () => { clearTimeout(this.tk); this.setState({ ck: 'idle' }); },
+      isRes: tab === 'res', isLog: tab === 'log', tCls: tCls, tOn: tOn, tPick: tPick,
+      logRows: logRows, lfCls: lfCls, lfPick: lfPick, logN: logRows.length,
+      liveCls: s0.paused ? 'off' : '', liveTxt: s0.paused ? 'Пауза' : 'Вживую', toggleLive: () => this.setState({ paused: !s0.paused }),
+      anonCls: anon ? 'on' : '', anonOn: anon ? 'true' : 'false', toggleAnon: () => { if (anonK !== 'old') this.setState({ anonK: anon ? 'off' : 'fresh' }); }, anonBox: anonK === 'old' ? 'dis' : '', anonMore: anon,
+      repShown: rep === 'open' || rep === 'off' || rep === 'sent', repForm: rep === 'open' || rep === 'off', repSent: rep === 'sent',
+      intakeOn: rep === 'open' && md === 'mg', intakeOff: rep === 'off' || md === 'basic', offWarn: rep === 'off' && md === 'mg', asked: rep === 'asked' && md === 'mg',
+      isMg: md === 'mg', showHelp: ck !== 'good' && ck !== 'run' && !(rep === 'asked' && md === 'mg'), bestCls: full ? '' : 'hide',
+      helpTxt: md === 'mg' ? 'Отправьте диагностику администратору' : 'Сохраните диагностику в файл и отправьте тому, кто вам помогает',
+      helpBtn: md === 'mg' ? 'Помощь' : 'Сохранить файл',
+      shTitle: md === 'mg' ? 'Попросить помощи у администратора' : 'Сохранить диагностику', shSub: md === 'mg' ? 'Диагностика уходит только администратору vpn.example.com' : 'Остаётся на этом компьютере, пока вы сами не поделитесь',
+      shP: md === 'mg' ? 'Администратор увидит, как вело себя подключение, и сможет помочь.' : 'Выберите, что попадёт в файл. Вы сами решаете, кому его отправить.',
+      anonTxt: ANON[anonK] || ANON.off,
+      copyTxt2: s0.sumCopied ? 'Скопировано' : 'Копировать сводку', sumCls: s0.sumCopied ? 'done' : '', copySum: () => this.setState({ sumCopied: true }),
+      openRep: () => this.setState({ rep: 'open' }), closeRep: () => this.setState({ rep: 'closed' }), sendRep: () => this.setState({ rep: 'sent', copied: false }),
+      tbs: tbs, rdDiag: 'hide', rdSet: 'hide',
+      parts: parts, repSize: 'Около ' + size + ' КБ',
+      copyCls: s0.copied ? 'done' : '', copyTxt: s0.copied ? 'Скопировано' : 'Копировать', copy: () => this.setState({ copied: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

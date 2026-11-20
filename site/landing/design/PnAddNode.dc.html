@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Панель · Новая нода</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./pn.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0;background:#0c0c0e}</style>
+</helmet>
+<div class="pnr an-host">
+<div class="{{rootCls}}">
+<div class="an {{anCls}}" role="dialog" aria-modal="true" aria-label="Новая нода">
+
+  <!-- слева: способ и шаги с тем, что уже введено -->
+  <aside class="an-s">
+    <div class="an-t">Новая нода</div>
+    <div class="seg an-seg" role="group" aria-label="Способ установки"><button type="button" aria-pressed="{{mSsh}}" onClick="{{pickSsh}}">По SSH</button><button type="button" aria-pressed="{{mCmd}}" onClick="{{pickCmd}}">Командой</button></div>
+    <ol class="an-st">
+      <sc-for list="{{steps}}" as="p" hint-placeholder-count="4">
+        <li class="{{p.cls}}"><button type="button" onClick="{{p.go}}" aria-current="{{p.cur}}"><span class="an-g" aria-hidden="true"><sc-if value="{{p.done}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"></path></svg></sc-if><sc-if value="{{p.num}}" hint-placeholder-val="{{true}}"><span class="mono">{{p.n}}</span></sc-if></span><span class="an-sl"><b>{{p.t}}</b><span class="mono">{{p.s}}</span></span></button></li>
+      </sc-for>
+    </ol>
+    <p class="an-n"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.500-3 8-7 10-4-2-7-5.500-7-10V6z"></path></svg>{{railNote}}</p>
+  </aside>
+
+  <div class="an-m">
+    <button type="button" class="ic an-x" aria-label="Закрыть" onClick="{{close}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+
+    <!-- 1. сервер -->
+    <sc-if value="{{isSrv}}" hint-placeholder-val="{{true}}">
+      <div class="an-p">
+        <header class="an-h"><span class="an-e">Шаг 1 из 4</span><h2>Какой сервер добавить</h2><p>Чистый Linux-сервер с публичным IPv4. Подойдут Ubuntu 22.04+ и Debian 12+, amd64 или arm64</p></header>
+        <div class="an-b">
+          <div class="an-r an-r2">
+            <label class="an-f"><span>Адрес SSH-сервера</span><input class="an-i mono" data-f="addr" defaultValue="{{dAddr}}" placeholder="IP или домен" onInput="{{onF}}" spellcheck="false" autocomplete="off"></label>
+            <label class="an-f"><span>Порт SSH</span><input class="an-i mono" data-f="port" defaultValue="{{dPort}}" placeholder="22" onInput="{{onF}}" inputmode="numeric" autocomplete="off"></label>
+          </div>
+          <div class="an-r an-r1">
+            <label class="an-f {{nameCls}}"><span>Имя</span><input class="an-i mono" data-f="name" defaultValue="{{dName}}" placeholder="de1" onInput="{{onF}}" spellcheck="false" autocomplete="off"><small>a–z, 0–9 и дефис, от 2 до 24 символов</small></label>
+            <label class="an-f"><span>Адрес для клиентов</span><input class="an-i mono" data-f="pub" defaultValue="{{dPub}}" placeholder="de1.example.com" onInput="{{onF}}" spellcheck="false" autocomplete="off"><small>Домен или IP без https:// и порта, попадёт во все подписки</small></label>
+          </div>
+          <div class="an-opt {{optCls}}">
+            <button type="button" class="an-optb" aria-expanded="{{optOn}}" onClick="{{toggleOpt}}"><span>Страна, город, провайдер</span><em>необязательно</em><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"></path></svg></button>
+            <div class="an-lb">Необязательно</div>
+            <div class="an-r an-r3">
+              <div class="an-f an-cc">
+                <span>Страна</span>
+                <button type="button" class="an-i an-sel" aria-haspopup="listbox" aria-expanded="{{ccOn}}" onClick="{{toggleCc}}"><i class="fl {{ccFl}}" aria-hidden="true"></i><span class="{{ccCls}}">{{ccName}}</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"></path></svg></button>
+                <sc-if value="{{cc}}" hint-placeholder-val="{{false}}">
+                  <div class="an-pop">
+                    <label class="an-q"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"></path></svg><input placeholder="Найти страну" onInput="{{onQ}}" aria-label="Найти страну" autocomplete="off"></label>
+                    <div class="an-ls" role="listbox" aria-label="Страна">
+                      <sc-for list="{{ccs}}" as="c" hint-placeholder-count="6"><button type="button" role="option" aria-selected="{{c.on}}" onClick="{{c.pick}}"><i class="fl {{c.f}}" aria-hidden="true"></i><span>{{c.t}}</span><span class="mono">{{c.code}}</span></button></sc-for>
+                      <sc-if value="{{ccNone}}" hint-placeholder-val="{{false}}"><p>Такой страны в списке нет</p></sc-if>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+              <label class="an-f"><span>Регион или город</span><input class="an-i" data-f="city" defaultValue="{{dCity}}" placeholder="Франкфурт" onInput="{{onF}}" autocomplete="off"></label>
+              <label class="an-f"><span>Провайдер</span><input class="an-i" data-f="prov" defaultValue="{{dProv}}" placeholder="examplehost" onInput="{{onF}}" autocomplete="off"></label>
+            </div>
+          </div>
+        </div>
+        <footer class="an-a">
+          <span class="an-an"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z"></path></svg>{{srvHint}}</span>
+          <button type="button" class="btn pri {{busyCls}}" aria-disabled="{{probeOff}}" onClick="{{probe}}"><sc-if value="{{busy}}" hint-placeholder-val="{{false}}"><span class="an-sp" aria-hidden="true"></span></sc-if>{{probeT}}</button>
+        </footer>
+      </div>
+    </sc-if>
+
+    <!-- 2. вход -->
+    <sc-if value="{{isAuth}}" hint-placeholder-val="{{false}}">
+      <div class="an-p">
+        <header class="an-h"><span class="an-e">Шаг 2 из 4</span><h2>Вход на сервер</h2><p>Сверьте ключ сервера и выберите, как панель будет входить</p></header>
+        <div class="an-b">
+          <section class="an-k {{okCls}}">
+            <div class="an-kh"><b>Ключ сервера</b><span class="tag mono">ssh-ed25519</span><span class="tag mono">SHA-256</span><button type="button" class="btn sm" onClick="{{copyFp}}">{{fpT}}</button></div>
+            <div class="an-fp mono" aria-label="SHA256:Vq3n0cX9Lr2bT8kM1pZs6YwE4hJ7uGdA5fNiQoRlKe0"><sc-for list="{{fp}}" as="c" hint-placeholder-count="11"><span>{{c.t}}</span></sc-for></div>
+            <sc-if value="{{where}}" hint-placeholder-val="{{false}}">
+              <div class="an-kc"><span>Отпечаток показывает консоль хостера. Или выполните на сервере</span><div class="an-code"><code class="mono">ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub</code><button type="button" class="btn sm" onClick="{{copyKg}}">{{kgT}}</button></div></div>
+            </sc-if>
+            <div class="an-kf"><button type="button" class="an-c" role="checkbox" aria-checked="{{okOn}}" onClick="{{toggleOk}}"><span class="an-cb" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"></path></svg></span>Я сверил отпечаток, он принадлежит моему серверу</button><button type="button" class="an-lk" aria-expanded="{{whereOn}}" onClick="{{toggleWhere}}">{{whereT}}</button></div>
+          </section>
+
+          <div class="an-r an-rw">
+            <div class="an-f"><span>Способ входа</span><div class="seg an-ws" role="radiogroup" aria-label="Способ входа"><sc-for list="{{ways}}" as="w" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{w.on}}" aria-pressed="{{w.on}}" onClick="{{w.pick}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="{{w.d}}"></path></svg>{{w.t}}</button></sc-for></div></div>
+            <label class="an-f"><span>SSH-логин</span><input class="an-i mono" data-f="login" defaultValue="{{dLogin}}" placeholder="root" spellcheck="false" autocomplete="off"></label>
+          </div>
+
+          <sc-if value="{{aKey}}" hint-placeholder-val="{{true}}">
+            <div class="an-box">
+              <div class="an-code"><code class="mono">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK7f2mQ9xW4bN1cR8vT3yL6pZ0sJ5hD2gF9aE7uK4oM mistgate-panel</code><button type="button" class="btn sm" onClick="{{copyKey}}">{{keyT}}</button></div>
+              <p>Без пароля. Ключ должен уже лежать на сервере: добавьте его в аккаунт хостера один раз, и новые серверы будут создаваться с ним. <button type="button" class="an-lk" aria-expanded="{{helpOn}}" onClick="{{toggleHelp}}">{{helpT}}</button></p>
+              <sc-if value="{{help}}" hint-placeholder-val="{{false}}">
+                <ol class="an-ol">
+                  <li>В панели хостера откройте раздел SSH-ключей и нажмите «Добавить SSH-ключ»</li>
+                  <li>Назовите его mistgate, вставьте ключ и оставьте включённым «Сохранить ключ в аккаунте»</li>
+                  <li>Создайте сервер с этим ключом или переустановите с ним существующий</li>
+                </ol>
+                <p>Сервер уже работает? Выполните под SSH-логином</p>
+                <div class="an-code an-cw"><code class="mono">mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh &amp;&amp; echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK7f2mQ9xW4bN1cR8vT3yL6pZ0sJ5hD2gF9aE7uK4oM mistgate-panel' >> ~/.ssh/authorized_keys &amp;&amp; chmod 600 ~/.ssh/authorized_keys</code><button type="button" class="btn sm" onClick="{{copyCmd}}">{{cmdT}}</button></div>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{aPw}}" hint-placeholder-val="{{false}}">
+            <div class="an-box">
+              <label class="an-f"><span>Пароль SSH</span><input class="an-i mono" type="password" defaultValue="{{dPw}}" placeholder="Пароль от этого логина" autocomplete="off"></label>
+              <button type="button" class="an-c" role="checkbox" aria-checked="{{addKeyOn}}" onClick="{{toggleAddKey}}"><span class="an-cb" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"></path></svg></span>Заодно добавить на сервер ключ панели</button>
+              <p>Пароль хранится зашифрованным. После установки он останется сохранённым доступом ноды</p>
+            </div>
+          </sc-if>
+          <sc-if value="{{aOwn}}" hint-placeholder-val="{{false}}">
+            <div class="an-box">
+              <label class="an-f"><span>Закрытый ключ</span><textarea class="an-i an-ta mono" rows="4" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" spellcheck="false"></textarea></label>
+            </div>
+          </sc-if>
+        </div>
+        <footer class="an-a">
+          <button type="button" class="btn" onClick="{{backSrv}}">Назад</button>
+          <span class="an-an an-ar">{{authHint}}</span>
+          <button type="button" class="btn pri" aria-disabled="{{nextOff}}" onClick="{{toChk}}">Продолжить</button>
+        </footer>
+      </div>
+    </sc-if>
+
+    <!-- 3. проверка -->
+    <sc-if value="{{isChk}}" hint-placeholder-val="{{false}}">
+      <div class="an-p">
+        <header class="an-h"><span class="an-e">Шаг 3 из 4</span><h2>{{chkH}}</h2><p>{{chkP}}</p></header>
+        <div class="an-b">
+          <div class="an-fx">
+            <sc-for list="{{facts}}" as="f" hint-placeholder-count="8">
+              <div class="an-fr {{f.cls}}"><span class="an-ck" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"></path></svg></span><span>{{f.k}}</span><b class="mono">{{f.v}}</b></div>
+            </sc-for>
+          </div>
+          <sc-if value="{{chkReady}}" hint-placeholder-val="{{false}}">
+            <div class="an-lb">Что сделает установка</div>
+            <div class="an-pl">
+              <div><span class="an-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16v12H4zM4 12h16M9 6v6M15 12v6"></path></svg></span><div><b>Откроет в UFW порты <span class="mono">22/tcp</span>, <span class="mono">80/tcp</span>, <span class="mono">443/tcp</span> и <span class="mono">443/udp</span></b><span>Firewall на сервере включён. Остальные правила панель не трогает</span></div></div>
+              <div><span class="an-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l8 4.500v9L12 21l-8-4.500v-9zM4 7.500l8 4.500 8-4.500M12 12v9"></path></svg></span><div><b>Передаст подписанный агент и запустит его под systemd</b><span class="mono">mistgate-node.service</span></div></div>
+              <div><span class="an-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4"></path></svg></span><div><b>Применит базовую настройку хоста</b><span>BBR, UDP-буферы, журнал и защита SSH</span></div></div>
+            </div>
+          </sc-if>
+        </div>
+        <footer class="an-a">
+          <button type="button" class="btn" onClick="{{backAuth}}">Назад</button>
+          <span class="an-an an-ar"></span>
+          <button type="button" class="btn pri" aria-disabled="{{busyOn}}" onClick="{{start}}">Запустить установку</button>
+        </footer>
+      </div>
+    </sc-if>
+
+    <!-- 4. установка -->
+    <sc-if value="{{isRun}}" hint-placeholder-val="{{false}}">
+      <div class="an-p">
+        <header class="an-h"><span class="an-e">{{runE}}</span><h2>{{runH}}</h2><p>{{runP}}</p></header>
+        <div class="an-b">
+          <div class="an-bar {{runCls}}" role="progressbar" aria-valuemin="0" aria-valuemax="7" aria-valuenow="{{stageN}}"><i style="--w: {{barW}}"></i></div>
+          <ol class="an-sg">
+            <sc-for list="{{stages}}" as="g" hint-placeholder-count="7">
+              <li class="{{g.cls}}"><span class="an-si" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="{{g.d}}"></path></svg></span><b>{{g.t}}</b><span>{{g.s}}</span></li>
+            </sc-for>
+          </ol>
+        </div>
+        <footer class="an-a">
+          <sc-if value="{{running}}" hint-placeholder-val="{{true}}">
+            <button type="button" class="btn" onClick="{{cancel}}">Отменить</button>
+            <span class="an-an an-ar"></span>
+            <button type="button" class="btn" onClick="{{close}}">Закрыть, оставить установку в фоне</button>
+          </sc-if>
+          <sc-if value="{{failed}}" hint-placeholder-val="{{false}}">
+            <button type="button" class="btn" onClick="{{backAuth}}">Сменить способ входа</button>
+            <span class="an-an an-ar">Сервер не менялся</span>
+            <button type="button" class="btn pri" onClick="{{start}}">Повторить</button>
+          </sc-if>
+        </footer>
+      </div>
+    </sc-if>
+
+    <!-- готово -->
+    <sc-if value="{{isDone}}" hint-placeholder-val="{{false}}">
+      <div class="an-p an-dn">
+        <div class="wave" aria-hidden="true"><i></i></div>
+        <div class="an-ok" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"></path></svg></div>
+        <h2>Нода установлена и подключена</h2>
+        <p class="mono">{{doneLine}}</p>
+        <div class="an-nx"><span class="an-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 4.500l8.500 14.500h-17zM12 10.500v4M12 17v.01"></path></svg></span><div><b>Профилей пока нет</b><span>Пока на ноде нет профиля, люди её не получат</span></div></div>
+        <div class="an-da"><button type="button" class="btn pri"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Добавить профиль</button><button type="button" class="btn" onClick="{{close}}">Открыть ноду</button></div>
+      </div>
+    </sc-if>
+
+    <!-- командой: данные -->
+    <sc-if value="{{isCmdForm}}" hint-placeholder-val="{{false}}">
+      <div class="an-p">
+        <header class="an-h"><span class="an-e">Шаг 1 из 3</span><h2>Установка одной командой</h2><p>Панель даст команду, вы выполните её на сервере от root. SSH-доступ панели не нужен</p></header>
+        <div class="an-b">
+          <div class="an-r an-r1">
+            <label class="an-f"><span>Имя</span><input class="an-i mono" data-f="name" defaultValue="{{dName}}" placeholder="de1" onInput="{{onF}}" spellcheck="false" autocomplete="off"><small>a–z, 0–9 и дефис, от 2 до 24 символов</small></label>
+            <label class="an-f"><span>Страна <em>необязательно</em></span><input class="an-i" defaultValue="{{ccNameV}}" placeholder="Не выбрана" autocomplete="off"><small>Нужна для подсказок DNS</small></label>
+          </div>
+          <label class="an-f"><span>Адрес</span><input class="an-i mono" data-f="pub" defaultValue="{{dPub}}" placeholder="de1.example.com" onInput="{{onF}}" spellcheck="false" autocomplete="off"><small>Домен или IP без https:// и порта, попадёт во все подписки. Для Hysteria2 с Let’s Encrypt нужен домен с A-записью на сервер</small></label>
+        </div>
+        <footer class="an-a"><span class="an-an"></span><button type="button" class="btn pri" aria-disabled="{{cmdOff}}" onClick="{{getCmd}}">Получить команду установки</button></footer>
+      </div>
+    </sc-if>
+
+    <!-- командой: команда и ожидание -->
+    <sc-if value="{{isCmdRun}}" hint-placeholder-val="{{false}}">
+      <div class="an-p">
+        <header class="an-h"><span class="an-e">Шаг 2 из 3</span><h2>Три шага на сервере</h2><p>Дальше нода подключится сама, окно обновится</p></header>
+        <div class="an-b">
+          <ol class="an-ms">
+            <li><span class="an-g mono" aria-hidden="true">1</span><div><b>Положите агент на сервер</b><div class="an-code"><code class="mono">scp /var/lib/mistgate/dist/mistgate-node-linux-amd64 root@{{dPub}}:/root/mistgate-node</code><button type="button" class="btn sm" onClick="{{copyKey}}">{{keyT}}</button></div><span>Выполните на сервере панели. Для ARM замените amd64 на arm64</span></div></li>
+            <li><span class="an-g mono" aria-hidden="true">2</span><div><b>Зайдите на сервер по SSH от root и вставьте команду</b><div class="an-code an-cw"><code class="mono">chmod +x /root/mistgate-node &amp;&amp; /root/mistgate-node enroll --panel panel.example.com:443 --sni q3m8x2kd7w.invalid --ca-sha256 9f2c1a6d0b7e4c3a8f5d2e1b0c9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a --token 2qgx7mbd3jc5u4yvtwnfhx6kqjz4pm2s7ylbq3e5c6a7nd8p9r0s &amp;&amp; /root/mistgate-node install</code><button type="button" class="btn sm" onClick="{{copyCmd}}">{{cmdT}}</button></div><span>Работает один раз и истекает через час</span></div></li>
+            <li><span class="an-g mono" aria-hidden="true">3</span><div><b>Нода появится сама</b><span class="an-wt"><span class="an-sp" aria-hidden="true"></span>Ждёт установки</span></div></li>
+          </ol>
+        </div>
+        <footer class="an-a"><button type="button" class="btn" onClick="{{getCmd}}">Новая команда установки</button><span class="an-an an-ar"></span><button type="button" class="btn" onClick="{{close}}">Закрыть</button></footer>
+      </div>
+    </sc-if>
+  </div>
+</div>
+
+<sc-if value="{{solo}}" hint-placeholder-val="{{true}}">
+  <!-- переключатель состояний макета, в продукт не идёт -->
+  <div class="an-demo" role="group" aria-label="Состояния макета">
+    <span class="dl">Состояние</span>
+    <div class="seg"><sc-for list="{{demo}}" as="o" hint-placeholder-count="7"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div>
+    <span class="dl">Поля</span>
+    <div class="seg"><button type="button" aria-pressed="{{fillOff}}" onClick="{{pickBlank}}">пусто</button><button type="button" aria-pressed="{{fillOn}}" onClick="{{pickFull}}">заполнено</button></div>
+    <span class="dl">Тема</span>
+    <div class="seg"><button type="button" aria-pressed="{{thD}}" onClick="{{setDark}}">тёмная</button><button type="button" aria-pressed="{{thL}}" onClick="{{setLight}}">светлая</button></div>
+  </div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","options":["srv","auth","chk","run","done","fail","cmd"],"default":"srv","section":"Состояние"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Вид"},"embedded":{"editor":null},"onClose":{"editor":null},"$preview":{"width":960,"height":760}}'>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    const f = !!p.embedded;
+    this.state = { view: null, busy: false, ok: false, auth: 'key', help: false, where: false, addKey: true, stage: 0, chk: 8, copied: '', fill: f, cc: false, q: '', opt: false, v: f ? this.full() : this.blank() };
+  }
+  full() { return { addr: '203.0.113.24', port: '22', name: 'se1', pub: 'se1.example.com', country: 'se', city: 'Стокгольм', prov: '', login: 'root', pw: 'correct-horse-battery' }; }
+  blank() { return { addr: '', port: '22', name: '', pub: '', country: '', city: '', prov: '', login: 'root', pw: '' }; }
+  componentWillUnmount() { clearTimeout(this._t); clearInterval(this._i); clearTimeout(this._c); }
+  renderVals() {
+    const s = this.state, v = s.v;
+    const view = s.view || this.props.view || 'srv';
+    const stat = !s.view; // состояние пришло из свойства: кадр стоит на месте
+    const stage = view === 'done' ? 7 : (view === 'fail' ? 0 : (stat && view === 'run' ? 3 : s.stage));
+    const ok = s.ok || (stat && view !== 'srv' && view !== 'auth');
+    const read = (e) => { const o = Object.assign({}, v); try { e.currentTarget.closest('.an').querySelectorAll('[data-f]').forEach((el) => { o[el.getAttribute('data-f')] = el.value.trim(); }); } catch (er) {} return o; };
+    const CC = [['de', 'Германия'], ['nl', 'Нидерланды'], ['fi', 'Финляндия'], ['se', 'Швеция'], ['fr', 'Франция'], ['pl', 'Польша'], ['at', 'Австрия'], ['ee', 'Эстония'], ['lv', 'Латвия'], ['lt', 'Литва'], ['it', 'Италия'], ['ru', 'Россия']];
+    const ccNow = CC.find((c) => c[0] === v.country), ccList = CC.filter((c) => !s.q || c[1].toLowerCase().indexOf(s.q.toLowerCase()) === 0 || c[0] === s.q.toLowerCase());
+    const nameBad = !!v.name && !/^[a-z0-9-]{2,24}$/.test(v.name), srvOk = !!v.addr && !!v.name && !nameBad && !!v.pub;
+    const setFill = (on, e) => { const o = on ? this.full() : this.blank(); try { e.currentTarget.closest('.an-w').querySelectorAll('[data-f]').forEach((el) => { const k = el.getAttribute('data-f'); if (k in o) el.value = o[k]; }); } catch (er) {} this.setState({ fill: on, v: o, cc: false, q: '' }); };
+    const stop = () => { clearTimeout(this._t); clearInterval(this._i); };
+    const check = (o) => { stop(); this.setState(Object.assign({ view: 'chk', busy: true, chk: 0, cc: false }, o)); this._t = setTimeout(() => { this._i = setInterval(() => { const n = this.state.chk + 1; if (n >= 8) { stop(); this.setState({ chk: 8 }); this._t = setTimeout(() => this.setState({ busy: false }), 350); } else this.setState({ chk: n }); }, 190); }, 450); };
+    const chkN = stat ? 8 : s.chk;
+    const go = (o) => { stop(); this.setState(Object.assign({ busy: false, chk: 8 }, o)); };
+    const run = () => { stop(); this.setState({ view: 'run', stage: 0, busy: false, cc: false }); this._i = setInterval(() => { const n = this.state.stage + 1; if (n >= 7) { stop(); this.setState({ view: 'done', stage: 7 }); } else this.setState({ stage: n }); }, 850); };
+    const copy = (k, text) => (e) => { try { const c = e.currentTarget.parentElement.querySelector('code'); navigator.clipboard.writeText(text || (c ? c.textContent : '')); } catch (er) {} this.setState({ copied: k }); clearTimeout(this._c); this._c = setTimeout(() => this.setState({ copied: '' }), 1400); };
+    const ct = (k, t) => (s.copied === k ? 'Скопировано' : t);
+    const authName = { key: 'ключ панели', pw: 'пароль', own: 'свой ключ' }[s.auth];
+    const cmd = view === 'cmd' || view === 'cmd2';
+    const order = cmd ? ['cmd', 'cmd2', 'cmd3'] : ['srv', 'auth', 'chk', 'run'];
+    const at = view === 'done' ? 4 : (view === 'fail' ? 3 : order.indexOf(view));
+    const names = cmd ? ['Данные', 'Команда', 'Подключение'] : ['Сервер', 'Вход', 'Проверка', 'Установка'];
+    const sums = cmd ? [at > 0 ? v.name + ' · ' + v.pub : '', at > 0 ? 'истекает через час' : '', '']
+      : [at > 0 ? v.addr + ':' + v.port : '', at > 1 ? v.login + ' · ' + authName : '', at > 2 ? 'Ubuntu 24.04 · amd64' : '', view === 'done' ? 'подключена' : (view === 'fail' ? 'не удалось' : (view === 'run' ? 'этап ' + Math.min(7, stage + 1) + ' из 7' : ''))];
+    const locked = view === 'run' || view === 'done';
+    const SG = ['Подключение по SSH', 'Проверка сервера', 'Настройка firewall сервера', 'Передача агента', 'Регистрация ноды', 'Запуск агента', 'Ожидание подключения ноды'];
+    const CK = 'M5 12.500l4.500 4.500L19 7.500', DOT = 'M12 12h.01', ERR = 'M7 7l10 10M17 7L7 17';
+    const facts = [['Система', 'Ubuntu 24.04'], ['Архитектура', 'amd64'], ['Ядро', '6.8.0'], ['Процессоры', '2'], ['Память', '1,9 ГиБ'], ['Свободно в /root', '17,4 ГиБ'], ['systemd', 'есть'], ['Связь с панелью', 'есть']];
+    return {
+      thD: (s.th || this.props.theme) === 'light' ? 'false' : 'true', thL: (s.th || this.props.theme) === 'light' ? 'true' : 'false', setDark: () => this.setState({ th: 'dark' }), setLight: () => this.setState({ th: 'light' }),
+      rootCls: this.props.embedded ? 'an-w' : 'pn an-solo an-w' + ((s.th || this.props.theme) === 'light' ? ' light' : ''),
+      solo: !this.props.embedded,
+      anCls: cmd ? 'cmd' : '',
+      close: () => { if (this.props.onClose) this.props.onClose(); else go({ view: 'srv', ok: false, stage: 0 }); },
+      mSsh: cmd ? 'false' : 'true', mCmd: cmd ? 'true' : 'false',
+      pickSsh: () => { if (cmd) go({ view: 'srv' }); }, pickCmd: () => { if (!cmd && !locked) go({ view: 'cmd' }); },
+      steps: names.map((t, i) => ({ t: t, n: String(i + 1), s: sums[i], done: i < at, num: i >= at, cls: (i < at ? 'done' : (i === at ? 'now' : '')) + (view === 'fail' && i === 3 ? ' now err' : ''), cur: i === at ? 'step' : 'false', go: () => { if (i < at && !locked && !cmd) go({ view: order[i] }); } })),
+      railNote: cmd ? 'Нода доверяет панели только по отпечатку её CA, он уже в команде' : (view === 'run' || view === 'done' ? 'Туннели не зависят от панели: нода работает, даже когда панель лежит' : (view === 'fail' ? 'Задание остановлено, временные SSH-данные удалены' : 'Пока вы не запустите установку, сервер не меняется')),
+      isSrv: view === 'srv', isAuth: view === 'auth', isChk: view === 'chk', isRun: view === 'run' || view === 'fail', isDone: view === 'done', isCmdForm: view === 'cmd', isCmdRun: view === 'cmd2',
+      busy: s.busy, busyCls: s.busy ? 'busy' : '', busyOn: s.busy ? 'true' : 'false',
+      probeT: s.busy ? 'Читаю ключ сервера' : 'Проверить сервер',
+      optCls: s.opt ? 'open' : '', optOn: s.opt ? 'true' : 'false', toggleOpt: () => this.setState({ opt: !s.opt, cc: false }),
+      srvHint: srvOk ? 'Логин и пароль на этом шаге не отправляются' : (nameBad ? 'В имени только a–z, 0–9 и дефис' : 'Заполните адрес сервера, имя и адрес для клиентов'), probeOff: srvOk ? 'false' : 'true', nameCls: nameBad ? 'bad' : '',
+      dAddr: v.addr, dPort: v.port, dName: v.name, dPub: v.pub, dCity: v.city, dProv: v.prov, dLogin: v.login, dPw: v.pw,
+      onF: (e) => { const o = Object.assign({}, this.state.v); o[e.currentTarget.getAttribute('data-f')] = e.currentTarget.value.trim(); this.setState({ v: o }); },
+      cc: s.cc, ccOn: s.cc ? 'true' : 'false', toggleCc: () => this.setState({ cc: !s.cc, q: '' }), onQ: (e) => this.setState({ q: e.currentTarget.value.trim() }),
+      cmdOff: v.name && !nameBad && v.pub ? 'false' : 'true',
+      ccNameV: ccNow ? ccNow[1] : '',
+      ccFl: ccNow ? ccNow[0] : 'none', ccName: ccNow ? ccNow[1] : 'Не выбрана', ccCls: ccNow ? '' : 'ph', ccNone: ccList.length === 0,
+      ccs: ccList.map((c) => ({ f: c[0], t: c[1], code: c[0].toUpperCase(), on: c[0] === v.country ? 'true' : 'false', pick: () => this.setState({ v: Object.assign({}, this.state.v, { country: c[0] }), cc: false, q: '' }) })),
+      probe: (e) => { if (s.busy || !srvOk) return; const o = Object.assign({}, v, read(e)); this.setState({ busy: true, v: o, cc: false }); this._t = setTimeout(() => this.setState({ view: 'auth', busy: false }), 900); },
+      fp: 'Vq3n0cX9Lr2bT8kM1pZs6YwE4hJ7uGdA5fNiQoRlKe0'.match(/.{1,4}/g).map((t) => ({ t: t })),
+      okCls: ok ? 'ok' : '', okOn: ok ? 'true' : 'false', toggleOk: () => this.setState({ ok: !ok }),
+      fpT: ct('fp', 'Скопировать'), copyFp: copy('fp', 'SHA256:Vq3n0cX9Lr2bT8kM1pZs6YwE4hJ7uGdA5fNiQoRlKe0'),
+      keyT: ct('key', cmd ? 'Копировать' : 'Скопировать ключ'), copyKey: copy('key', ''),
+      cmdT: ct('cmd', 'Скопировать команду'), copyCmd: copy('cmd', ''),
+      where: s.where, whereOn: s.where ? 'true' : 'false', whereT: s.where ? 'Скрыть' : 'Где его посмотреть', toggleWhere: () => this.setState({ where: !s.where }), kgT: ct('kg', 'Скопировать'), copyKg: copy('kg', ''),
+      ways: [['key', 'Ключ панели', 'Без пароля, один ключ на все ноды', 'M8 15a4 4 0 1 1 3.900-5H21v3h-2v2h-3v-2h-4.100A4 4 0 0 1 8 15z'], ['pw', 'Пароль', 'Логин и пароль SSH', 'M4 9h16v6H4zM8 12h.01M12 12h.01M16 12h.01'], ['own', 'Свой ключ', 'Ваш собственный SSH-ключ', 'M4 5h16v14H4zM7 9l3 3-3 3M12 15h5']].map((w) => ({ t: w[1], s: w[2], d: w[3], on: s.auth === w[0] ? 'true' : 'false', pick: () => this.setState({ auth: w[0] }) })),
+      aKey: s.auth === 'key', aPw: s.auth === 'pw', aOwn: s.auth === 'own',
+      help: s.help, helpOn: s.help ? 'true' : 'false', helpT: s.help ? 'Скрыть инструкцию' : 'Как добавить у хостера', toggleHelp: () => this.setState({ help: !s.help }),
+      addKeyOn: s.addKey ? 'true' : 'false', toggleAddKey: () => this.setState({ addKey: !s.addKey }),
+      authHint: ok ? '' : 'Чтобы продолжить, подтвердите ключ сервера', nextOff: ok ? 'false' : 'true',
+      backSrv: () => go({ view: 'srv' }), backAuth: () => go({ view: 'auth' }),
+      toChk: (e) => { if (!ok) return; const o = Object.assign({}, v, read(e)); check({ v: o, ok: true }); },
+      chkH: s.busy ? 'Проверяю сервер' : 'Сервер подходит', chkP: s.busy ? 'Панель вошла на сервер и читает его параметры' : 'Панель вошла на сервер и ничего на нём не меняла',
+      chkReady: !s.busy, facts: facts.map((f, i) => ({ k: f[0], v: f[1], cls: i < chkN ? 'done' : (i === chkN ? 'now' : 'wait') })),
+      start: () => { if (s.busy) return; run(); }, cancel: () => go({ view: 'chk' }),
+      running: view === 'run', failed: view === 'fail',
+      runE: view === 'fail' ? 'Шаг 4 из 4 · остановлено' : 'Шаг 4 из 4',
+      runH: view === 'fail' ? 'Сервер не принял ключ панели' : 'Ставлю ноду ' + v.name,
+      runP: view === 'fail' ? 'Добавьте ключ панели в ~/.ssh/authorized_keys на сервере и повторите' : 'Окно можно закрыть, установка продолжится в фоне',
+      runCls: view === 'fail' ? 'err' : '', stageN: String(stage), barW: (view === 'fail' ? 4 : Math.round((stage + 0.5) / 7 * 100)) + '%',
+      stages: SG.map((t, i) => { const err = view === 'fail' && i === 0, done = !err && i < stage, now = !err && view === 'run' && i === stage; return { t: t, cls: err ? 'err' : (done ? 'done' : (now ? 'now' : '')), d: err ? ERR : (done ? CK : DOT), s: err ? 'вход отклонён' : (now ? (i === 6 ? 'до 2 минут' : 'идёт') : '') }; }),
+      doneLine: [v.name, v.city, v.addr].filter(Boolean).join(' · '),
+      getCmd: (e) => { if (!v.name || nameBad || !v.pub) return; const o = Object.assign({}, v, read(e)); go({ view: 'cmd2', v: o }); },
+      fillOn: s.fill ? 'true' : 'false', fillOff: s.fill ? 'false' : 'true', pickBlank: (e) => setFill(false, e), pickFull: (e) => setFill(true, e),
+      demo: [['srv', 'Сервер'], ['auth', 'Вход'], ['chk', 'Проверка'], ['run', 'Установка'], ['done', 'Готово'], ['fail', 'Ошибка'], ['cmd', 'Командой']].map((d) => ({ t: d[1], on: (view === d[0] || (d[0] === 'cmd' && view === 'cmd2')) ? 'true' : 'false', pick: () => { if (d[0] !== 'srv' && d[0] !== 'cmd' && !this.state.v.addr) this.setState({ v: this.full(), fill: true }); if (d[0] === 'run') { this.setState({ ok: true }); run(); } else if (d[0] === 'chk') check({ ok: true }); else go({ view: d[0], ok: d[0] !== 'srv' && d[0] !== 'auth' ? true : s.ok, stage: 0 }); } }))
+    };
+  }
+}
+</script>
+</body>
+</html>
