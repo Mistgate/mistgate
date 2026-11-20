@@ -173,12 +173,12 @@ jobs:
       - run: pnpm --dir site build:all
       - run: pnpm --dir site/landing/pipeline test # after the build: its output tests run only when build/ exists
       - name: Private names in the built site
-        # the pattern is a repository variable, not a line of this public file; without it the step only says so
+        # the pattern is a repository secret, not a line of this public file (a variable would be printed in the public log); without it the step only says so
         env:
-          PRIVATE_NAMES_PATTERN: ${{ vars.PRIVATE_NAMES_PATTERN }}
+          PRIVATE_NAMES_PATTERN: ${{ secrets.PRIVATE_NAMES_PATTERN }}
         run: |
-          if [ -z "$PRIVATE_NAMES_PATTERN" ]; then echo "::notice::vars.PRIVATE_NAMES_PATTERN is not set: the private-names scan did not run"; exit 0; fi
-          if grep -rIiE "$PRIVATE_NAMES_PATTERN" site/public; then echo "private names in the built site" >&2; exit 1; fi
+          if [ -z "$PRIVATE_NAMES_PATTERN" ]; then echo "::notice::secrets.PRIVATE_NAMES_PATTERN is not set: the private-names scan did not run"; exit 0; fi
+          if grep -rIilE "$PRIVATE_NAMES_PATTERN" site/public; then echo "private names in the built site" >&2; exit 1; fi
 
   watcher-worker:
     runs-on: ubuntu-24.04

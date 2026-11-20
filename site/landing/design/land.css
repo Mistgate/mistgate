@@ -946,6 +946,9 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lp .lx-aic{position:relative;direction:ltr;text-align:left;padding:16px 20px;border-radius:12px;border:1px solid var(--hair);background:var(--bg);font:500 12px/20px var(--mono);color:var(--sec);overflow:hidden;white-space:pre}
 .lp .lx-aic::after{content:"";position:absolute;left:0;right:0;bottom:0;height:56px;background:linear-gradient(transparent,var(--bg));pointer-events:none}
 .lp .lx-aic>div{overflow:hidden;text-overflow:ellipsis;min-height:20px}
+.lp .lx-aic.full{overflow:auto;max-height:min(320px,34vh)}
+.lp .lx-aic.full::after{display:none}
+.lp .lx-aic.full>div{overflow:visible}
 .lp .lx-aim>div{min-width:0}
 .lp .lx-aic .hd{color:var(--acc)}
 .lp .lx-aic .kv>span{color:var(--text)}
