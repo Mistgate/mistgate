@@ -814,6 +814,8 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lpe .emb.ph .pnr:not(.an-host)>.pn{min-height:var(--bh,740px)}
 .lpe .emb.ph .pnr:not(.an-host)>.pn>.an-scrim{bottom:auto;height:var(--bh,740px)}
 .lpe .emb.ph,.lpe .emb.pwin.ph{max-width:400px;margin-left:auto;margin-right:auto;border-radius:32px;border:1px solid rgba(243,243,245,.14);box-shadow:0 0 0 6px #141417,0 0 0 7px rgba(243,243,245,.09)}
+/* the bezel ring is 7px outside the box and the hero clips its overflow */
+.lpe.hero-e .emb.pwin.ph{margin-top:8px}
 .lpe .lx-shw .emb.ph{width:100%}
 .lpe .emb.sub.ph::after{height:96px}
 .lp .lx-dv{margin-top:8px;align-self:flex-start;display:inline-flex;gap:2px;padding:3px;border-radius:12px;border:1px solid var(--hair);background:var(--surface)}
