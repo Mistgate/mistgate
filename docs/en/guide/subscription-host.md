@@ -76,6 +76,8 @@ Both the move and turning the host off happen in two phases, and you finish each
 
 ## Turning it off
 
+A host that never became ready turns off at once: nothing moved to it, so the panel keeps its address.
+
 1. Under **Address the panel goes back to**, enter `https://host[:port]`. Leave it empty only if the panel will have no public address: the panel asks first, since it then hands out no subscription links and nodes cannot reach it.
 2. Press **Turn off**. The panel is back on that address, and its agents move their link there.
 3. The card lists the nodes **Not yet on the new address**. When the list is empty, press **Finish**. If some nodes stay on the old address, the panel asks whether to finish anyway. Those nodes lose the panel until they get its new address (see [Offline nodes](#offline-nodes)). **Cancel** keeps the host on.

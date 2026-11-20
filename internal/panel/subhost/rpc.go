@@ -276,6 +276,13 @@ func (r rpc) DisableSubscriptionHost(ctx context.Context, req *connect.Request[s
 		if st.State != stateOn {
 			return wrongState()
 		}
+		if st.ReadyAt == "" {
+			// Never ready: nothing moved to the subdomain, so the panel stays on the address it has and no agent has to come
+			// back. The role goes at once.
+			params["domain"], params["node_id"], params["from"] = st.Domain, st.Node, "not_ready"
+			*st = state{PublicURL: st.PrevURL}
+			return nil
+		}
 		if back == "" && !req.Msg.Force {
 			nodes, err := s.cfg.Store.Nodes(ctx, false)
 			if err != nil {

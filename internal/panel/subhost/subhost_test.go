@@ -493,10 +493,8 @@ func TestPanelDialsItsHosts(t *testing.T) {
 	if _, err := e.rpc.CancelSubscriptionHostChange(e.ctx, connect.NewRequest(&subhostv1.CancelSubscriptionHostChangeRequest{})); err != nil {
 		t.Fatal(err)
 	}
+	// never ready: turning off ends at once
 	if _, err := e.rpc.DisableSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.DisableSubscriptionHostRequest{PublicUrl: "https://back.example"})); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := e.rpc.FinishSubscriptionHostChange(e.ctx, connect.NewRequest(&subhostv1.FinishSubscriptionHostChangeRequest{Force: true})); err != nil {
 		t.Fatal(err)
 	}
 	for _, d := range e.svc.tun.dialer.States() {
@@ -607,4 +605,24 @@ func TestPanelCertIsPerDomain(t *testing.T) {
 	e.clock.Add(61)
 	e.svc.obtainCert("new.example.com")
 	waitUntil(t, "the certificate", func() bool { return e.svc.panelCert(e.ctx, "new.example.com") })
+}
+
+// Turning off a host that never became ready keeps the address the panel uses (never an empty public_url, never the return
+// address pushed to agents that never moved) and ends at once.
+func TestDisableANeverReadyHost(t *testing.T) {
+	e := newEnv(t)
+	a := e.node("a", "203.0.113.1", allCaps, true)
+	e.node("b", "203.0.113.2", allCaps, true)
+	if err := e.set(a, "sub.example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.rpc.DisableSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.DisableSubscriptionHostRequest{})); err != nil {
+		t.Fatal(err)
+	}
+	if st := e.state(); st.State != stateOff || st.PublicURL != "https://old.example" || st.Path != "" {
+		t.Fatalf("after turning off: %+v", st)
+	}
+	if e.addr.PublicURL() != "https://old.example" || e.fl.link != "" || len(e.fl.roles) != 0 {
+		t.Fatalf("address %q, link %q, roles %v", e.addr.PublicURL(), e.fl.link, e.fl.roles)
+	}
 }
