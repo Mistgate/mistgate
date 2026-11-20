@@ -396,8 +396,8 @@ func (s *Service) applyRouting(ctx context.Context, st state) {
 	if st.State != stateOff && st.Domain != "" && st.Path != "" {
 		sources := s.linkSources(ctx)
 		roles[st.Node] = &agentv1.SubHostRole{Names: []string{st.Domain}, Path: st.Path, SiteName: st.SiteName, LinkSources: sources}
-		if st.State == stateMoving && st.Next != "" {
-			roles[st.Next] = &agentv1.SubHostRole{Names: []string{st.Domain}, Path: st.Path, SiteName: st.NextSiteName, LinkSources: sources}
+		if st.State == stateMoving && st.Next != "" && st.NextPath != "" {
+			roles[st.Next] = &agentv1.SubHostRole{Names: []string{st.Domain}, Path: st.NextPath, SiteName: st.NextSiteName, LinkSources: sources}
 		}
 	}
 	s.cfg.Fleet.SetSubHostRoles(roles)
@@ -487,7 +487,7 @@ func (s *Service) RoleOf(nodeID string) (plugin.SubHostRole, bool) {
 		return plugin.SubHostRole{Names: []string{st.Domain}, Path: st.Path, SiteName: st.SiteName}, true
 	case st.Next:
 		if st.State == stateMoving {
-			return plugin.SubHostRole{Names: []string{st.Domain}, Path: st.Path, SiteName: st.NextSiteName}, true
+			return plugin.SubHostRole{Names: []string{st.Domain}, Path: st.NextPath, SiteName: st.NextSiteName}, true
 		}
 	}
 	return plugin.SubHostRole{}, false

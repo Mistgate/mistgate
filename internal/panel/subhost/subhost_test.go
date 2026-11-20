@@ -236,24 +236,28 @@ func TestTransitions(t *testing.T) {
 	if err := move(b); err != nil {
 		t.Fatal(err)
 	}
-	if st := e.state(); st.State != stateMoving || st.Next != b || len(e.fl.roles) != 2 || e.fl.roles[b].Path != e.fl.roles[a].Path || !e.fl.isHost(b) {
+	// the next node gets a bridge path of its own: the old host never learns its successor's
+	if st := e.state(); st.State != stateMoving || st.Next != b || len(e.fl.roles) != 2 || e.fl.roles[b].Path == e.fl.roles[a].Path ||
+		e.fl.roles[b].Path != st.NextPath || e.fl.roles[a].Path != st.Path || !e.fl.isHost(b) {
 		t.Fatalf("moving: %+v %+v", st, e.fl.roles)
 	}
 	if err := cancel(); err != nil {
 		t.Fatal(err)
 	}
-	if st := e.state(); st.State != stateOn || st.Next != "" || len(e.fl.roles) != 1 {
+	if st := e.state(); st.State != stateOn || st.Next != "" || st.NextPath != "" || len(e.fl.roles) != 1 {
 		t.Fatalf("cancelled move: %+v", st)
 	}
 	if err := move(b); err != nil {
 		t.Fatal(err)
 	}
+	oldPath, nextPath := e.state().Path, e.state().NextPath
 	wantCode(t, finish(false), "sub_host_dns_mismatch") // the record still names a
 	e.res["sub.example.com"] = []netip.Addr{netip.MustParseAddr("203.0.113.2")}
 	if err := finish(false); err != nil {
 		t.Fatal(err)
 	}
-	if st := e.state(); st.State != stateOn || st.Node != b || st.Next != "" || e.fl.roles[a] != nil || e.fl.roles[b] == nil {
+	if st := e.state(); st.State != stateOn || st.Node != b || st.Next != "" || e.fl.roles[a] != nil || e.fl.roles[b] == nil ||
+		st.Path != nextPath || st.Path == oldPath || st.NextPath != "" || e.fl.roles[b].Path != nextPath {
 		t.Fatalf("moved: %+v", st)
 	}
 	if e.fl.link != "wss://sub.example.com/lnk0123456789abcdef/" {
@@ -290,6 +294,10 @@ func TestTransitions(t *testing.T) {
 	}
 	if st := e.state(); st != (state{PublicURL: "https://back.example"}) {
 		t.Fatalf("off: %+v", st)
+	}
+	// off: the path is gone (a host set later gets a new one), and the old host is sent no role, which clears its agent.json
+	if st := e.state(); st.Path != "" || st.NextPath != "" {
+		t.Errorf("off keeps a bridge path")
 	}
 	if len(e.fl.roles) != 0 || e.fl.isHost(b) || e.fl.link != "" {
 		t.Errorf("off: roles %v, link %q", e.fl.roles, e.fl.link)

@@ -23,6 +23,7 @@ const (
 	keyPath         = "sub_host_path"
 	keySiteName     = "sub_host_site_name"
 	keyNextSiteName = "sub_host_next_site_name"
+	keyNextPath     = "sub_host_next_path"
 	keyBootstrapPin = "sub_host_bootstrap_pin"
 	keyReadyAt      = "sub_host_ready_at"
 	keyPublicURL    = "public_url"
@@ -39,6 +40,7 @@ const (
 type state struct {
 	State, Domain, Node, Next, PrevURL string
 	Path, SiteName, NextSiteName       string
+	NextPath                           string // the next node's own bridge path during a move: a host never learns another's
 	BootstrapPin                       string // the host site's pin from the SSH install, until its agent reports one
 	ReadyAt                            string // unix seconds: when the host was first ready ("" = not yet)
 	PublicURL                          string
@@ -61,7 +63,7 @@ func loadState(ctx context.Context, st *store.Store) (state, error) {
 func (s *state) ptrs() map[string]*string {
 	return map[string]*string{
 		keyState: &s.State, keyDomain: &s.Domain, keyNode: &s.Node, keyNext: &s.Next, keyPrevURL: &s.PrevURL,
-		keyPath: &s.Path, keySiteName: &s.SiteName, keyNextSiteName: &s.NextSiteName, keyBootstrapPin: &s.BootstrapPin,
+		keyPath: &s.Path, keySiteName: &s.SiteName, keyNextSiteName: &s.NextSiteName, keyNextPath: &s.NextPath, keyBootstrapPin: &s.BootstrapPin,
 		keyReadyAt: &s.ReadyAt, keyPublicURL: &s.PublicURL,
 	}
 }

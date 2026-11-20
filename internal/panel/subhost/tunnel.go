@@ -124,7 +124,7 @@ func (t *tunnel) localDial(ctx context.Context, target plugin.BridgeTarget, clie
 // syncDials makes the dialer call exactly the hosts of st. Call with mu held (from applyRouting) or from Run.
 func (s *Service) syncDials(st state) {
 	var specs []bridge.DialSpec
-	add := func(nodeID, siteName string) {
+	add := func(nodeID, siteName, path string) {
 		if nodeID == "" {
 			return
 		}
@@ -137,13 +137,13 @@ func (s *Service) syncDials(st state) {
 			port = plugin.SubHostPort
 		}
 		specs = append(specs, bridge.DialSpec{Dial: plugin.BridgeDial{EntryNodeID: nodeID, Host: host, Port: port, SNI: sni, PinSHA256: pin,
-			Path: st.Path, Pool: dialPool, Targets: []plugin.BridgeTarget{
+			Path: path, Pool: dialPool, Targets: []plugin.BridgeTarget{
 				{RelayID: relaySub, Network: bridge.LocalTargetNetwork}, {RelayID: relayLink, Network: bridge.LocalTargetNetwork}}}})
 	}
 	if st.State != stateOff && st.Path != "" {
-		add(st.Node, st.SiteName)
-		if st.State == stateMoving {
-			add(st.Next, st.NextSiteName)
+		add(st.Node, st.SiteName, st.Path)
+		if st.State == stateMoving && st.NextPath != "" {
+			add(st.Next, st.NextSiteName, st.NextPath)
 		}
 	}
 	s.tun.dialer.Sync(s.tun.ctx, specs)

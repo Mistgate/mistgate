@@ -149,7 +149,8 @@ func (r rpc) StartSubscriptionHostMove(ctx context.Context, req *connect.Request
 			return err
 		}
 		from = st.Node
-		st.State, st.Next, st.NextSiteName = stateMoving, n.ID, siteName
+		// The next node gets a bridge path of its own: the old host never learns the path its successor serves.
+		st.State, st.Next, st.NextSiteName, st.NextPath = stateMoving, n.ID, siteName, newPath()
 		return nil
 	})
 	if err != nil {
@@ -187,7 +188,8 @@ func (r rpc) FinishSubscriptionHostChange(ctx context.Context, req *connect.Requ
 					return dnsMismatch(c)
 				}
 			}
-			st.State, st.Node, st.SiteName, st.Next, st.NextSiteName, st.BootstrapPin = stateOn, st.Next, st.NextSiteName, "", "", ""
+			st.State, st.Node, st.SiteName, st.Path = stateOn, st.Next, st.NextSiteName, st.NextPath
+			st.Next, st.NextSiteName, st.NextPath, st.BootstrapPin = "", "", "", ""
 			params["node_id"] = st.Node
 		case stateLeaving:
 			params["from"] = "leaving"
@@ -235,7 +237,7 @@ func (r rpc) CancelSubscriptionHostChange(ctx context.Context, _ *connect.Reques
 		switch st.State {
 		case stateMoving:
 			params["from"], params["next_node_id"] = "moving", st.Next
-			st.State, st.Next, st.NextSiteName = stateOn, "", ""
+			st.State, st.Next, st.NextSiteName, st.NextPath = stateOn, "", "", ""
 		case stateLeaving:
 			params["from"] = "leaving"
 			st.State = stateOn
