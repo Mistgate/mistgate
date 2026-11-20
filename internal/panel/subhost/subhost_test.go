@@ -680,3 +680,36 @@ func TestNoHostNoChange(t *testing.T) {
 		t.Fatal("a refresh that changed nothing pushed the fleet again")
 	}
 }
+
+// While a host is set, public_url stays the panel's own address (what the CLI reads at the next start: the agents' mTLS
+// address, the admin URL a restore prints), and the effective one is kept apart; a host turned off leaves public_url on the
+// address the owner returns to (L2).
+func TestPublicURLStaysThePanelsOwn(t *testing.T) {
+	e := newEnv(t)
+	a := e.node("a", "203.0.113.1", allCaps, true)
+	e.node("b", "203.0.113.2", allCaps, true)
+	setting := func(k string) string {
+		v, _ := e.st.Setting(e.ctx, k)
+		return v
+	}
+	if err := e.set(a, "sub.example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	e.ready()
+	if setting("public_url") != "https://old.example" || setting("sub_host_public_url") != "https://sub.example.com" ||
+		e.addr.PublicURL() != "https://sub.example.com" || e.state().PublicURL != "https://sub.example.com" {
+		t.Fatalf("ready: public_url %q, effective %q, holder %q", setting("public_url"), setting("sub_host_public_url"), e.addr.PublicURL())
+	}
+	if _, err := e.rpc.DisableSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.DisableSubscriptionHostRequest{PublicUrl: "https://back.example"})); err != nil {
+		t.Fatal(err)
+	}
+	if setting("public_url") != "https://old.example" || e.addr.PublicURL() != "https://back.example" {
+		t.Fatalf("leaving: public_url %q, holder %q", setting("public_url"), e.addr.PublicURL())
+	}
+	if _, err := e.rpc.FinishSubscriptionHostChange(e.ctx, connect.NewRequest(&subhostv1.FinishSubscriptionHostChangeRequest{Force: true})); err != nil {
+		t.Fatal(err)
+	}
+	if setting("public_url") != "https://back.example" || setting("sub_host_public_url") != "" {
+		t.Fatalf("off: public_url %q, effective %q", setting("public_url"), setting("sub_host_public_url"))
+	}
+}
