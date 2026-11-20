@@ -149,6 +149,7 @@ type Agent struct {
 	triedNext        bool             // connectLoop only: the last session tried meta.NextLink
 	currentFailed    bool             // connectLoop only: the last session over the current link did not establish
 	panelLinkIgnored atomic.Bool      // an mTLS node has logged that it does not follow a panel link address
+	nextAnswered     atomic.Bool      // a direct probe from the bridge reached meta.NextLink: the next session tries it
 	linkClock        func() time.Time // the clock of meta.LinkSince; nil = a.now (tests move it days ahead)
 
 	engines            map[string]engine.Engine
@@ -1061,16 +1062,16 @@ func (a *Agent) probeDirectPanel(ctx context.Context) error {
 	if a.probeFn != nil {
 		return a.probeFn(ctx)
 	}
+	if next := a.nextLink(); next != "" {
+		// A bridged node whose current link is gone comes back over the new address: the session that follows tries
+		// it first (session) and commits it after its HelloAck, like any session over a new address.
+		if a.probeLink(ctx, next) == nil {
+			a.nextAnswered.Store(true)
+			return nil
+		}
+	}
 	if a.linkOnly() || (a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0) {
-		stream, cleanup, err := a.dialLink(ctx)
-		if err != nil {
-			return err
-		}
-		_ = stream.Close()
-		if cleanup != nil {
-			cleanup()
-		}
-		return nil
+		return a.probeLink(ctx, a.linkURL())
 	}
 	host, _, err := net.SplitHostPort(a.meta.Panel)
 	if err != nil || host == "" {
@@ -1095,6 +1096,19 @@ func (a *Agent) probeDirectPanel(ctx context.Context) error {
 	}
 	if !a.linkOnly() && tlsConn.ConnectionState().NegotiatedProtocol != "h2" {
 		return errors.New("panel did not negotiate h2")
+	}
+	return nil
+}
+
+// probeLink opens the signed link at the link base address raw and closes it at once: the panel answers there.
+func (a *Agent) probeLink(ctx context.Context, raw string) error {
+	stream, cleanup, err := a.dialLinkBase(ctx, raw, "")
+	if err != nil {
+		return err
+	}
+	_ = stream.Close()
+	if cleanup != nil {
+		cleanup()
 	}
 	return nil
 }
@@ -1299,10 +1313,12 @@ func (a *Agent) linkOnly() bool {
 	return a.meta.Link != ""
 }
 
-// session runs one panel session: every other turn a new link address the panel sent (panellink.go); after a turn on
-// which the current link did not answer, the previous panel address (panellink.go); else the link or mTLS as before.
+// session runs one panel session: every other turn a new link address the panel sent (panellink.go), and at once when
+// a direct probe from the bridge reached it; after a turn on which the current link did not answer, the previous panel
+// address (panellink.go); else the link or mTLS as before.
 func (a *Agent) session(ctx context.Context) error {
-	if next := a.nextLink(); next != "" && !a.triedNext {
+	nextAnswered := a.nextAnswered.Swap(false)
+	if next := a.nextLink(); next != "" && (!a.triedNext || nextAnswered) {
 		a.triedNext = true
 		err := a.nextLinkSession(ctx, next)
 		if a.linkURL() == next {
