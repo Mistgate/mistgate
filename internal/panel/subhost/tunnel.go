@@ -110,7 +110,7 @@ func (s *Service) Close() {
 
 // localDial is the exit's target: a pipe whose other end the public server accepts, as from the person's address.
 func (t *tunnel) localDial(ctx context.Context, target plugin.BridgeTarget, client netip.AddrPort) (net.Conn, error) {
-	mine, theirs := net.Pipe()
+	mine, theirs := duplexPipe()
 	var from net.Addr = hostAddr{}
 	if client.IsValid() {
 		from = net.TCPAddrFromAddrPort(client)
@@ -277,3 +277,41 @@ func (s *Service) obtainCert(domain string) {
 		s.cfg.Log.Info("subscription host: the panel has the subdomain's certificate", "domain", domain)
 	}()
 }
+
+// duplexPipe is net.Pipe with a half-close: two pipes, one a direction, so that a person who ends what they send (FIN, which
+// the bridge passes on as CloseWrite) still gets the reply. Deadlines go to the pipe of their direction.
+func duplexPipe() (a, b net.Conn) {
+	aToB, bFromA := net.Pipe()
+	bToA, aFromB := net.Pipe()
+	return &duplexConn{r: aFromB, w: aToB}, &duplexConn{r: bFromA, w: bToA}
+}
+
+type duplexConn struct {
+	r, w net.Conn // r: the pipe this side reads; w: the pipe it writes
+}
+
+func (c *duplexConn) Read(p []byte) (int, error)  { return c.r.Read(p) }
+func (c *duplexConn) Write(p []byte) (int, error) { return c.w.Write(p) }
+
+// CloseWrite ends this side's writing: the other side reads EOF and can still answer.
+func (c *duplexConn) CloseWrite() error { return c.w.Close() }
+
+func (c *duplexConn) Close() error {
+	err := c.w.Close()
+	if rerr := c.r.Close(); err == nil {
+		err = rerr
+	}
+	return err
+}
+
+func (c *duplexConn) LocalAddr() net.Addr  { return c.r.LocalAddr() }
+func (c *duplexConn) RemoteAddr() net.Addr { return c.r.RemoteAddr() }
+func (c *duplexConn) SetDeadline(t time.Time) error {
+	err := c.r.SetReadDeadline(t)
+	if werr := c.w.SetWriteDeadline(t); err == nil {
+		err = werr
+	}
+	return err
+}
+func (c *duplexConn) SetReadDeadline(t time.Time) error  { return c.r.SetReadDeadline(t) }
+func (c *duplexConn) SetWriteDeadline(t time.Time) error { return c.w.SetWriteDeadline(t) }

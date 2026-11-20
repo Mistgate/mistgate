@@ -8,6 +8,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/tls"
 	"errors"
+	"io"
+	"os"
 	"log/slog"
 	"net/netip"
 	"strings"
@@ -711,5 +713,32 @@ func TestPublicURLStaysThePanelsOwn(t *testing.T) {
 	}
 	if setting("public_url") != "https://back.example" || setting("sub_host_public_url") != "" {
 		t.Fatalf("off: public_url %q, effective %q", setting("public_url"), setting("sub_host_public_url"))
+	}
+}
+
+// The in-memory target keeps a half-close: a person who ends what they send still gets the reply (L6).
+func TestDuplexPipeHalfClose(t *testing.T) {
+	exit, server := duplexPipe()
+	defer exit.Close()
+	defer server.Close()
+	go func() {
+		_, _ = exit.Write([]byte("request"))
+		_ = exit.(interface{ CloseWrite() error }).CloseWrite()
+	}()
+	got, err := io.ReadAll(server)
+	if err != nil || string(got) != "request" {
+		t.Fatalf("server read %q, %v", got, err)
+	}
+	go func() { _, _ = server.Write([]byte("reply")); _ = server.Close() }()
+	reply, err := io.ReadAll(exit)
+	if err != nil || string(reply) != "reply" {
+		t.Fatalf("the reply after a half-close: %q, %v", reply, err)
+	}
+	idle, peer := duplexPipe()
+	defer idle.Close()
+	defer peer.Close()
+	_ = idle.SetReadDeadline(time.Now().Add(20 * time.Millisecond))
+	if _, err := idle.Read(make([]byte, 1)); !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("a read past its deadline: %v", err)
 	}
 }
