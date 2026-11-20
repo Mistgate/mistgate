@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"sync"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -54,6 +55,7 @@ type tcpTarget struct {
 	SNI        string
 	Pin        string // lower-case hex sha256 of the leaf the node reported, "" = none
 	PublicCert bool   // an ACME certificate; a name without a pin can be checked by the node's system roots
+	Inbound    string // the REALITY inbound whose port this is: REALITY counts a TLS check of it as a wrong key (ownProbes)
 }
 
 // tcpTargets lists the ports to probe on a node from its enabled inbounds, 80 first and then by port, at most
@@ -111,6 +113,9 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 				PublicCert: hasPublicCertificate(spec.TLS)}
 			if ownName {
 				t.ALPN = alpn(t.Port, spec.TLS)
+			}
+			if v, _ := plugin.VLESSOf(spec); !v.TLS() { // settings that name no security are REALITY
+				t.Inbound = spec.ID
 			}
 			add(t)
 		case spec.Protocol == "trusttunnel" && spec.Listen.Network == "tcp":
@@ -423,6 +428,7 @@ func (f *Fleet) probeTCPTargets(ctx context.Context, host string, sender portSen
 			probes[i].Token, probes[i].Answer = token, answer
 			wire[i].Token, wire[i].Answer = token, answer
 		}
+		f.noteOwnProbe(t)
 	}
 	if sender.panel {
 		probe := f.probeTCP
@@ -476,4 +482,62 @@ func tcpCheckMessages(names map[string]string, rows []store.TCPCheck) []*adminv1
 			Verdict: row.Verdict, Reason: row.Reason, Sender: sender, CheckedUnix: row.CheckedAt.Unix()})
 	}
 	return out
+}
+
+// ownProbeTTL is how long a TLS check the panel ordered may wait for its count: the node reports in batches of 10 s, so a check
+// that has not come back in this time never reached the node (a refused or lost connection) and takes nothing off later counters.
+// ownProbeMax bounds the list of one inbound.
+const (
+	ownProbeTTL = 2 * time.Minute
+	ownProbeMax = 256
+)
+
+// ownProbes remembers, per REALITY inbound, the TLS checks of its port the panel ordered (probeTCPTargets, pathProbeTCP). Such a
+// check says the profile's name and holds no key, so REALITY counts it as a fallback and a failed authentication, which the page
+// shows as "wrong REALITY key". The node cannot tell the panel's senders from a stranger, so the panel takes its own checks off the
+// inbound's counters when they arrive (guardLinks). Its zero value is ready; a restart forgets the checks of the last two minutes.
+type ownProbes struct {
+	mu sync.Mutex
+	at map[string][]time.Time // inbound id to when each check was ordered, oldest first
+}
+
+// noteOwnProbe records a TLS check about to be sent to the port of a REALITY inbound, before it leaves: the count comes back in a
+// batch that may overtake the answer.
+func (f *Fleet) noteOwnProbe(t tcpTarget) {
+	if t.Inbound != "" && t.Kind == tcpcheck.KindTLS {
+		f.ownProbes.add(t.Inbound, f.now())
+	}
+}
+
+// dropStale cuts the checks older than ownProbeTTL off the front of at.
+func dropStale(at []time.Time, now time.Time) []time.Time {
+	i := 0
+	for i < len(at) && now.Sub(at[i]) > ownProbeTTL {
+		i++
+	}
+	return at[i:]
+}
+
+func (o *ownProbes) add(inbound string, now time.Time) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.at == nil {
+		o.at = make(map[string][]time.Time)
+	}
+	at := append(dropStale(o.at[inbound], now), now)
+	o.at[inbound] = at[max(0, len(at)-ownProbeMax):]
+}
+
+// take uses up to want of the inbound's fresh checks and says how many it used.
+func (o *ownProbes) take(inbound string, want uint32, now time.Time) uint32 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	at := dropStale(o.at[inbound], now)
+	n := min(len(at), int(want))
+	if at = at[n:]; len(at) == 0 {
+		delete(o.at, inbound)
+	} else {
+		o.at[inbound] = at
+	}
+	return uint32(n)
 }

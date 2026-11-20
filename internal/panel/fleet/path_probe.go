@@ -469,6 +469,7 @@ func (f *Fleet) pathProbeTCP(ctx context.Context, from store.NodeRow, fromLive s
 		wire[i] = &agentv1.TcpTarget{Port: uint32(t.Port), Kind: tcpcheck.KindConnect}
 		if kind == "tls" && t.Kind == tcpcheck.KindTLS {
 			wire[i] = &agentv1.TcpTarget{Port: uint32(t.Port), Kind: tcpcheck.KindTLS, Sni: t.SNI, PinSha256: t.Pin}
+			f.noteOwnProbe(t)
 		}
 	}
 	result, err := f.commandWithLive(ctx, from.ID, tcpProbeWait, func(reqID string) *agentv1.ConnectResponse {
