@@ -415,10 +415,21 @@ button.a-set:hover { background: color-mix(in srgb, var(--text) 3%, transparent)
 .a-act + .a-act { border-top: 1px solid var(--hair); }
 .a-act:hover { background: color-mix(in srgb, var(--text) 3%, transparent); }
 .a-act .ic { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--step); color: var(--sec); }
-.a-act[data-cp="done"] .ic { background: var(--accent-soft, var(--step)); color: var(--accent-text); }
 .a-act .tx { display: flex; flex-direction: column; min-width: 0; }
 .a-act .t { font-size: 15px; line-height: 20px; font-weight: 500; }
 .a-act .d { font-size: 13px; line-height: 20px; color: var(--sec); }
+/* a tile that did its work (.done, two seconds): the tick over the icon, the done word in place of the line */
+.a-act:active { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.a-act:active .ic { transform: scale(0.94); }
+.a-act .ic { position: relative; transition: background-color 0.2s var(--e), color 0.2s var(--e), transform 0.12s var(--e); }
+.a-act .ic .i { transition: opacity 0.16s var(--e), transform 0.2s var(--e); }
+.a-act .ic .ok { position: absolute; inset: 0; margin: auto; opacity: 0; transform: scale(0.6); color: var(--accent-text); }
+.a-act .dd { display: none; color: var(--accent-text); }
+.a-act.done .ic { background: var(--accent-soft); color: var(--accent-text); }
+.a-act.done .ic .i:not(.ok) { opacity: 0; transform: scale(0.6); }
+.a-act.done .ic .ok { opacity: 1; transform: none; }
+.a-act.done .d:not(.dd) { display: none; }
+.a-act.done .dd { display: block; animation: u-rise 0.2s var(--e) both; }
 .a-act .m { font-family: var(--mono); font-size: 12px; direction: ltr; unicode-bidi: isolate; overflow-wrap: anywhere; }
 .a-side .u-hint { max-width: 200px; }
 .a-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
@@ -559,6 +570,7 @@ button.a-set:hover { background: color-mix(in srgb, var(--text) 3%, transparent)
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .a-act .ic, .a-act .ic .i, .a-act.done .dd { transition: none; animation: none; }
   .enter, .u-ann, .u-menu, .u-toast, .a-dlg, .a-b > *, .a-srv, .modal::backdrop { animation: none; }
   .a-more .i { transition: none; }
   .u-anim .u-ann, .u-anim .u-hero, .u-anim .u-hero .u-h1, .u-anim .u-stat, .u-anim .u-qrrow, .u-anim .u-hero-c .u-acts > *, .u-anim .u-tabs, .u-anim .u-tbl, .u-anim .u-tabs ~ section, .u-anim .u-tabs ~ div, .u-anim .u-tbl .u-tr:not(.u-th), .u-anim .u-meter i { animation: none; }

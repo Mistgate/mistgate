@@ -201,45 +201,34 @@ export function readyBody(c: AmzCtx, x: AwgDevice): HTMLElement {
       h("div", { class: "a-seg a-rsv", role: "radiogroup", "aria-labelledby": `k-c-${x.id}` }, ...list.map(chipOf)),
     );
 
-  // the board's .a-act: a tile with the icon, the name of the way and a line under it
-  const act = (ico: IconName, k: string, title: string, line: Kid[], click: (btn: HTMLButtonElement) => void) => {
-    const btn = h("button", { class: "a-act", type: "button", "data-k": k }, h("span", { class: "ic", "aria-hidden": "true" }, icon(ico)), h("span", { class: "tx" }, h("span", { class: "t" }, title), h("span", { class: "d" }, ...line)));
-    btn.addEventListener("click", () => click(btn));
-    return btn;
-  };
-  // a tile that copies answers in place: its icon turns into a tick and its name into the done word for a moment (a toast would
-  // stand on the tile above it)
-  const copyAct = (ico: IconName, k: string, title: string, done: string, line: Kid[], text: string) => {
-    let timer = 0;
-    return act(ico, k, title, line, (btn) =>
-      a.copy(
-        text,
-        "",
-        () => {
-          const ic = btn.querySelector(".ic")!;
-          const name = btn.querySelector(".t")!;
-          ic.replaceChildren(icon("check"));
-          name.textContent = done;
-          btn.dataset.cp = "done";
-          clearTimeout(timer);
-          timer = window.setTimeout(() => {
-            ic.replaceChildren(icon(ico));
-            name.textContent = title;
-            delete btn.dataset.cp;
-          }, 1800);
-        },
-        btn,
-      ),
+  // the board's .a-act: a tile with the icon, the name of the way and a line under it. A tile that did its work says so in place
+  // for two seconds (.done): the icon turns into a tick and the line into the done word; a toast would stand on the tile above.
+  const act = (ico: IconName, k: string, title: string, done: string, line: Kid[], click: (ok: () => void, btn: HTMLButtonElement) => void) => {
+    const tick = icon("check");
+    tick.classList.add("ok");
+    const btn = h(
+      "button",
+      { class: "a-act", type: "button", "data-k": k },
+      h("span", { class: "ic", "aria-hidden": "true" }, icon(ico), tick),
+      h("span", { class: "tx" }, h("span", { class: "t" }, title), h("span", { class: "d" }, ...line), h("span", { class: "d dd", "aria-live": "polite" }, done)),
     );
+    let timer = 0;
+    const ok = () => {
+      btn.classList.add("done");
+      clearTimeout(timer);
+      timer = window.setTimeout(() => btn.classList.remove("done"), 2000);
+    };
+    btn.addEventListener("click", () => click(ok, btn));
+    return btn;
   };
   // "The line vpn:// for AmneziaVPN": the scheme in the file's own face, wherever the language puts it
   const [lead, tail] = t.adActKeyD(app).split("vpn://");
   const acts = h(
     "div",
     { class: "a-acts3" },
-    act("file", `amz-dl-${x.id}`, t.adActFile, [h("span", { class: "m" }, filename)], () => a.download(filename, cfg.conf)),
-    copyAct("copy", `amz-conf-${x.id}`, t.adActConf, t.confCopied, [t.adActConfD], cfg.conf),
-    copyAct("key", `amz-key-${x.id}`, t.copyKey, t.keyCopied, [lead ?? "", h("span", { class: "m" }, "vpn://"), tail ?? ""], cfg.vpn_key),
+    act("file", `amz-dl-${x.id}`, t.adActFile, t.adFileDone, [h("span", { class: "m" }, filename)], (ok) => (a.download(filename, cfg.conf), ok())),
+    act("copy", `amz-conf-${x.id}`, t.adActConf, t.confCopied, [t.adActConfD], (ok, btn) => a.copy(cfg.conf, "", ok, btn)),
+    act("key", `amz-key-${x.id}`, t.copyKey, t.keyCopied, [lead ?? "", h("span", { class: "m" }, "vpn://"), tail ?? ""], (ok, btn) => a.copy(cfg.vpn_key, "", ok, btn)),
   );
   const qr = qrCard(cfg.qr, t.qrKeyAlt(app), qrLogoSrc(d));
 
