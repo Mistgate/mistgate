@@ -148,7 +148,6 @@ type Agent struct {
 	metaMu        sync.Mutex
 	triedNext     bool             // connectLoop only: the last session tried meta.NextLink
 	currentFailed bool             // connectLoop only: the last session over the current link did not establish
-	switchPending atomic.Bool      // the current session ends to try a new panel link address
 	configLink    string           // cfg.LinkURL as configured, before agent.json's link replaced it: an mTLS agent's own link
 	linkClock     func() time.Time // the clock of meta.LinkSince; nil = a.now (tests move it days ahead)
 
@@ -1461,7 +1460,8 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, via
 	}
 	a.linkAdvertised.Store(ack.LinkSupported)
 	if a.onHelloAck(ack) {
-		// The panel sent a new link address: the next session tries it. This one has not started, so nothing to flush.
+		// The panel sent a new link address: the next session tries it. This one has not started: no job ran, and what
+		// the HelloAck did not ack stays queued for the next session.
 		cancel()
 		_ = stream.Close()
 		return errSwitchTransport
@@ -1514,9 +1514,6 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, via
 		msg, err := stream.Receive()
 		if err != nil {
 			if holdExpired.Load() { // the end of the stream is endHeldSession's (its drain, then its cancel), not a real error
-				return errSwitchTransport
-			}
-			if a.switchPending.Swap(false) { // ended by endForNewLink (panellink.go) for a new link address
 				return errSwitchTransport
 			}
 			if errors.Is(err, io.EOF) {

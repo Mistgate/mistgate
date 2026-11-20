@@ -29,8 +29,10 @@ import (
 type sessionLinkPanel struct {
 	h        *harness
 	hellos   chan string
-	sessions chan string      // the link prefix of every session that got as far as the Hello
-	settings *pb.NodeSettings // the HelloAck's; nil = empty
+	sessions chan string              // the link prefix of every session that got as far as the Hello
+	settings *pb.NodeSettings         // the HelloAck's; nil = empty
+	push     chan *pb.ConnectResponse // sent on the session that is up
+	applies  chan *pb.ApplyResult     // every ApplyResult the agent sent
 
 	mu      sync.Mutex
 	refused map[string]bool
@@ -39,6 +41,7 @@ type sessionLinkPanel struct {
 
 func newSessionLinkPanel(h *harness) *sessionLinkPanel {
 	return &sessionLinkPanel{h: h, hellos: make(chan string, 8), sessions: make(chan string, 32),
+		push: make(chan *pb.ConnectResponse, 8), applies: make(chan *pb.ApplyResult, 8),
 		refused: map[string]bool{}, dials: map[string]int{}}
 }
 
@@ -115,9 +118,26 @@ func (p *sessionLinkPanel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}}}) != nil {
 		return
 	}
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case m := <-p.push:
+				if link.Write(ctx, m) != nil {
+					return
+				}
+			}
+		}
+	}()
 	for {
-		if _, _, err := link.Read(ctx); err != nil {
+		_, frame, err := link.Read(ctx)
+		if err != nil {
 			return
+		}
+		var req pb.ConnectRequest
+		if proto.Unmarshal(frame, &req) == nil && req.GetApplyResult() != nil {
+			p.applies <- req.GetApplyResult()
 		}
 	}
 }
@@ -166,10 +186,10 @@ func TestApplyPanelLink(t *testing.T) {
 		t.Fatal("an empty link address was taken")
 	}
 	if !a.applyPanelLink(&pb.NodeSettings{PanelLinkUrl: newLink}) || a.nextLink() != newLink || readMeta(t, h.dir).NextLink != newLink {
-		t.Fatal("a new link address: no reconnect, or not saved")
+		t.Fatal("a new link address: not reported fresh, or not saved")
 	}
 	if a.applyPanelLink(&pb.NodeSettings{PanelLinkUrl: newLink}) {
-		t.Fatal("the same new address asked for a second reconnect")
+		t.Fatal("the same new address was reported fresh twice")
 	}
 	if a.applyPanelLink(&pb.NodeSettings{PanelLinkUrl: oldLink}) || a.nextLink() != "" || readMeta(t, h.dir).NextLink != "" {
 		t.Fatal("the current address did not clear the new one")
@@ -259,6 +279,43 @@ func TestNextLinkCommitsAfterASession(t *testing.T) {
 	if m := readMeta(t, h.dir); m.Link != next || m.NextLink != "" {
 		t.Fatalf("saved link=%q next=%q", m.Link, m.NextLink)
 	}
+}
+
+// A new link address in a DesiredState is saved and tried at the next reconnect: the session it came in reports the
+// apply and goes on.
+func TestNextLinkFromADesiredStateWaitsForTheNextSession(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	h.a.meta.NextLink = ""
+	h.start()
+	if got := lp.session(t); got != linkPrefix('a') {
+		t.Fatal("the first session was not on the current address")
+	}
+	eventually(t, func() bool { return h.a.cur.Load() != nil }, "a panel session")
+	s := h.a.cur.Load()
+	ds := fullState(1)
+	ds.Settings = &pb.NodeSettings{PanelLinkUrl: b}
+	lp.push <- &pb.ConnectResponse{Message: &pb.ConnectResponse_DesiredState{DesiredState: ds}}
+	select {
+	case r := <-lp.applies:
+		if r.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED || r.Revision != 1 {
+			t.Fatalf("apply result %v revision %d", r.Status, r.Revision)
+		}
+	case <-time.After(8 * time.Second):
+		t.Fatal("no ApplyResult for the desired state")
+	}
+	if h.a.nextLink() != b || readMeta(t, h.dir).NextLink != b {
+		t.Fatal("the new address was not saved")
+	}
+	time.Sleep(300 * time.Millisecond)
+	if h.a.cur.Load() != s || len(lp.sessions) != 0 {
+		t.Fatal("the session ended for the new address")
+	}
+
+	endSession(t, h)
+	if got := lp.session(t); got != linkPrefix('b') {
+		t.Fatal("the next session was not on the new address")
+	}
+	committedTo(t, h, b, a, false)
 }
 
 func TestSetPanelLink(t *testing.T) {
