@@ -815,6 +815,11 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lpe .emb.ph .pnr:not(.an-host)>.pn>.an-scrim{bottom:auto;height:var(--bh,740px)}
 /* Safari misplaces a sticky box inside a scaled frame: the sheet sits at the end of the column without it */
 .lpe .emb.ph .pnr:not(.an-host)>.pn>.an-scrim>.an-pos{position:relative;bottom:auto}
+/* Safari takes the scrollport of a bottom-sticky box from the scaled frame, so the tab bar, the button and the toast sat (1-scale) of the height too high: dock them from the top instead, the same place at every scroll */
+.lpe .emb.ph .pnr:not(.an-host)>.pn{padding-bottom:96px}
+.lpe .emb.ph .pnr:not(.an-host)>.pn>:is(.side,.fab,.toast){grid-row:1;align-self:start;bottom:auto;translate:0 -100%;margin-block:0 -200px}
+.lpe .emb.ph .pnr:not(.an-host)>.pn>.side{top:calc(var(--bh,740px) - 14px)}
+.lpe .emb.ph .pnr:not(.an-host)>.pn>:is(.fab,.toast){top:calc(var(--bh,740px) - 104px)}
 .lpe .emb.ph,.lpe .emb.pwin.ph{max-width:400px;margin-left:auto;margin-right:auto;border-radius:32px;border:1px solid rgba(243,243,245,.14);box-shadow:0 0 0 6px #141417,0 0 0 7px rgba(243,243,245,.09)}
 /* the bezel ring is 7px outside the box and the hero clips its overflow */
 .lpe.hero-e .emb.pwin.ph{margin-top:8px}
