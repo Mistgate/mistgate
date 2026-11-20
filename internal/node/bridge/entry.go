@@ -845,7 +845,7 @@ func (e *Entry) servePairHalf(w http.ResponseWriter, r *http.Request, pair *brid
 		w.Header().Set(StreamKindHeader, StreamKindPanel)
 	} else {
 		w.Header().Set(RelayIDHeader, relayID)
-		if pair.client.IsValid() {
+		if passableClient(pair.client) {
 			w.Header().Set(ClientHeader, pair.client.String())
 		}
 	}

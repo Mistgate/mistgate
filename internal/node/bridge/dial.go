@@ -891,8 +891,9 @@ func (d *Dialer) openPair(ctx context.Context, cancel context.CancelFunc, dial p
 		return nil, "", errors.New("bad bridge response")
 	}
 	responses.relayID = relayID
-	// A subscription host says whom it carries (ServeConfig.PassClient); anything that is no address is left out.
-	if client, err := netip.ParseAddrPort(responses.down.Header.Get(ClientHeader)); err == nil && client.Addr().IsValid() && client.Port() != 0 {
+	// A subscription host says whom it carries (ServeConfig.PassClient); anything that is no global unicast address (a
+	// loopback, link-local, multicast or unspecified one) is left out.
+	if client, err := netip.ParseAddrPort(responses.down.Header.Get(ClientHeader)); err == nil && passableClient(client) {
 		responses.client = netip.AddrPortFrom(client.Addr().Unmap(), client.Port())
 	}
 	return responses, "", nil
@@ -1328,4 +1329,11 @@ func (t *connTracker) noteTaken(now time.Time) int {
 	}
 	t.taken = append(kept, now)
 	return len(t.taken)
+}
+
+// passableClient: a person's address an entry tells its exit (ClientHeader): a global unicast address with a port. Anything
+// else (loopback, link-local, multicast, unspecified, a zone) is never sent nor taken.
+func passableClient(client netip.AddrPort) bool {
+	a := client.Addr().Unmap()
+	return a.IsValid() && a.Zone() == "" && a.IsGlobalUnicast() && client.Port() != 0
 }

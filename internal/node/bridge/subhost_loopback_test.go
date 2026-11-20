@@ -213,10 +213,11 @@ func TestSubHostLoopback(t *testing.T) {
 		return len(s) == 1 && s[0].Conns == 2 && l.host.Connected(PanelPeerID)
 	}, "the panel did not connect to the host")
 
-	// The subscription name goes to the panel, which sees whom the host carries.
-	shown, body, local := l.visit(t, loopSubName)
-	if shown != loopSubName || body != "panel saw "+local {
-		t.Fatalf("subscription name: shown %q, body %q, want the panel to see %s", shown, body, local)
+	// The subscription name goes to the panel. A loopback visitor's address is not passed on (only a global unicast one is:
+	// TestLocalDialAndClientAddress), so the panel sees none.
+	shown, body, _ := l.visit(t, loopSubName)
+	if shown != loopSubName || body != "panel saw :0" {
+		t.Fatalf("subscription name: shown %q, body %q, want the panel to see no address", shown, body)
 	}
 	// Any other name is the node's site, untouched.
 	if shown, _, _ := l.visit(t, loopSiteName); shown != loopSiteName {

@@ -212,14 +212,15 @@ func TestSubscriptionHostEndToEnd(t *testing.T) {
 	svc.mu.Unlock()
 	waitUntil(t, "the panel connects to the host", func() bool { return svc.bridgeUp(a) && host.entry.Connected(bridge.PanelPeerID) })
 
-	// A person's subscription goes to the panel, which sees whom the host carries; the node's own name is its site. (The intake
+	// A person's subscription goes to the panel; the node's own name is its site. (The intake
 	// looks at the panel's connection once a second: until then the subdomain was the site.)
 	var shown, body string
 	waitUntil(t, "the route comes up", func() bool {
 		shown, body = host.get(t, e2eDomain, ca.pool)
 		return shown == e2eDomain
 	})
-	if shown != e2eDomain || !strings.HasPrefix(body, "panel saw 127.0.0.1:") {
+	// (a loopback visitor's address is not passed on: only a global unicast one is, internal/node/bridge passableClient)
+	if shown != e2eDomain || body != "panel saw 0.0.0.0:0" {
 		t.Fatalf("subscription: shown %q, body %q", shown, body)
 	}
 	if shown, body := host.get(t, e2eSite, ca.pool); shown != e2eSite || body != "node site" {

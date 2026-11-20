@@ -32,8 +32,10 @@ func TestLocalDialAndClientAddress(t *testing.T) {
 	dialer.Sync(context.Background(), []DialSpec{spec})
 	waitFor(t, 10*time.Second, func() bool { return entry.Connected("nod_de1") }, "dialer did not connect")
 
+	var throughFrom func(netip.AddrPort) netip.AddrPort
 	person := netip.MustParseAddrPort("[2001:db8::7]:40000")
-	through := func() netip.AddrPort {
+	through := func() netip.AddrPort { return throughFrom(person) }
+	throughFrom = func(person netip.AddrPort) netip.AddrPort {
 		t.Helper()
 		mine, accepted := net.Pipe()
 		go func() {
@@ -64,6 +66,27 @@ func TestLocalDialAndClientAddress(t *testing.T) {
 	}
 	if got := through(); got != person {
 		t.Fatalf("the exit learnt %v, want %v", got, person)
+	}
+	if got := throughFrom(netip.MustParseAddrPort("[::ffff:198.51.100.9]:5")); got != netip.MustParseAddrPort("198.51.100.9:5") {
+		t.Fatalf("a mapped IPv4 address: the exit learnt %v", got)
+	}
+	// Only a global unicast address is passed on.
+	for _, odd := range []string{"127.0.0.1:40000", "[::1]:40000", "[fe80::1]:40000", "169.254.1.1:40000", "[ff02::1]:40000", "0.0.0.0:40000", "[::]:40000", "198.51.100.9:0"} {
+		if got := throughFrom(netip.MustParseAddrPort(odd)); got.IsValid() {
+			t.Fatalf("from %s the exit learnt %v", odd, got)
+		}
+	}
+}
+
+func TestPassableClient(t *testing.T) {
+	for addr, want := range map[string]bool{"[2001:db8::7]:1": true, "203.0.113.5:1": true, "[::ffff:203.0.113.5]:1": true,
+		"127.0.0.1:1": false, "[fe80::1%eth0]:1": false, "[ff02::1]:1": false, "[::]:1": false, "203.0.113.5:0": false} {
+		if got := passableClient(netip.MustParseAddrPort(addr)); got != want {
+			t.Errorf("passableClient(%s) = %v", addr, got)
+		}
+	}
+	if passableClient(netip.AddrPort{}) {
+		t.Error("the zero address passes")
 	}
 }
 
