@@ -79,6 +79,12 @@ function addCss(url) {
 }
 function cssFor(name) { return /^App/.test(name) ? CFG.css.app || [] : /^Sub/.test(name) ? CFG.css.sub || [] : []; }
 
+// The page of the design lays out its frames (a tour box, a shot: where the board sits in its window) at the start, when every board is
+// already there; here a board arrives later, so the page is asked to lay out again once it has arrived (a few times: a board that
+// switches its own tab first needs a moment to show what the shot is cut to).
+let refitT = [];
+function refit() { refitT.forEach(clearTimeout); refitT = [0, 150, 600, 1500].map((ms) => setTimeout(() => { const p = window.__dcPage; if (p && p._fit) p._fit(); }, ms)); }
+
 /** <dc-import> of a page: a frame (display: contents) that gets its board when the screen comes near. n: board, e: first screen, p: props */
 export class Lazy extends Component {
   constructor(p) { super(p); this.state = { B: (p.e && registry.eager[p.n]) || null }; } // only the frame of the first screen is filled at once, even if the module of another one is loaded
@@ -89,6 +95,7 @@ export class Lazy extends Component {
     this._io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { this._io.disconnect(); this.fetch(); } }, { rootMargin: '100% 0px' });
     this._io.observe(box);
   }
+  componentDidUpdate(_, prev) { if (this.state.B && !prev.B) refit(); }
   componentWillUnmount() { if (this._io) this._io.disconnect(); this._gone = true; }
   fetch() {
     const n = this.props.n, go = registry.load[n];

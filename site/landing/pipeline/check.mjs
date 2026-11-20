@@ -68,6 +68,22 @@ const PAGE_JS = String.raw`(() => {
     await press('Ноды', '4');
     return JSON.stringify({ n, bad: bad.slice(0, 5) });
   };
+  // every shot of the page (a board seen through a window, cut to the part its data-sel names): the board is there, the element is found and
+  // the part of the board that shows in the window is not empty. Waits up to 6 s for the boards that arrive late (the lazy frames).
+  window.__shots = async () => {
+    const bs = [...document.querySelectorAll('[data-shot]')];
+    const look = () => bs.map((b) => {
+      const s = b.querySelector('.pwin-s'), sel = b.getAttribute('data-sel'), br = b.getBoundingClientRect();
+      let el = null; try { el = s && s.querySelector(sel); } catch (e) { /* a selector the browser rejects */ }
+      let ov = 0;
+      if (el && br.width && br.height) { const r = el.getBoundingClientRect(); ov = Math.max(0, Math.min(r.right, br.right) - Math.max(r.left, br.left)) * Math.max(0, Math.min(r.bottom, br.bottom) - Math.max(r.top, br.top)) / (br.width * br.height); }
+      const why = !s ? 'no window' : !br.width || !br.height ? 'the frame has no size' : !s.querySelector('[data-board][data-ready="1"]') ? 'the board is not there' : !el ? 'nothing matches ' + sel : !b.classList.contains('rdy') ? 'the page did not lay it out' : ov < 0.3 ? 'only ' + Math.round(ov * 100) + '% of the frame shows the part (' + sel + ')' : '';
+      return { sel, why };
+    });
+    let r = look();
+    for (let t = 0; t < 60 && r.some((x) => x.why); t++) { await sleep(100); r = look(); }
+    return JSON.stringify({ n: bs.length, bad: r.filter((x) => x.why).map((x) => x.sel + ': ' + x.why) });
+  };
   window.__bag = new Set();
   window.__classes = new Set();
   // the translator runs a frame after the DOM changes: a Russian string counts as left over only if it is still there 150 ms later (one in transit does not)
@@ -140,6 +156,9 @@ try {
     const scope = await chrome.ev(`(() => { const bad = []; let n = 0; for (const r of window.__dcBoards || []) { const b = r.deref(); if (!b || !b.base || !b.base.isConnected) continue; n++; const host = (b.base.nodeType === 1 ? b.base : b.base.parentElement).closest('[data-board]'); const probe = b.$d.querySelector('[class]'); if (probe && probe.closest('[data-board]') !== host) bad.push(b.constructor.displayName); } return { n, bad }; })()`);
     run.scope = scope;
     if (scope.bad.length) fail(`${key}: boards that look outside their frame: ${scope.bad.join(', ')}`); else console.log(`  scope: ${scope.n} board instances look only inside their own frame`);
+    // 2b. the shots: the part of the board every frame is cut to shows
+    { const r = JSON.parse(await chrome.ev('window.__shots()'));
+      if (r.bad.length) fail(`${key}: shots with nothing to see: ${r.bad.join('; ')}`); else if (!r.n && page === 'main') fail(`${key}: no shots on the page`); else if (r.n) console.log(`  shots: ${r.n} frames, each shows its part of the board`); }
     // 3. the hotkeys of the browser
     const keys = await chrome.ev(`(() => ['k', 'j'].map((k) => { const e = new KeyboardEvent('keydown', { key: k, ctrlKey: true, cancelable: true, bubbles: true }); window.dispatchEvent(e); return e.defaultPrevented; }))()`);
     if (keys.some(Boolean)) fail(`${key}: Ctrl+K / Ctrl+J are taken from the browser`);

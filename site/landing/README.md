@@ -92,7 +92,7 @@ dist/        OUTPUT of the generator (not in git)
 | `pnpm sync <design export folder> [<blobs folder>]` | copy the needed boards, stylesheets and the dictionary into `design/`, and the images (`<hash>.svg`) into `design/blobs/`, after a privacy scan and a check that no svg has a script or loads from outside (`MG_DESIGN_SRC`, `MG_DESIGN_BLOBS` instead of the arguments) |
 | `pnpm build` | design -> `build/`: compile, bundle, translate, prune the css, pre-render the first screen of every page in every language, check the size budgets |
 | `pnpm stand` | serve `build/` on http://127.0.0.1:8790 with the CSP of the site (`/`, `/ru/`, `/app/`, `/ru/app/`, ...) |
-| `pnpm check` | headless Chrome over the stand: 390, 820 and 1440 px in ru, en and fa; console, CSP, boards, tours, shots (`--help` in the file header) |
+| `pnpm check` | headless Chrome over the stand: 390, 820 and 1440 px in ru, en and fa; console, CSP, boards, every shot frame shows its part of the board, the nodes board with 0 and 1 node, tours, shots (`--help` in the file header) |
 | `pnpm check:quick` | the same for ru and en at 1440 px, no shots |
 | `pnpm all` | `build` and `check` |
 | `pnpm harvest` | `check` on the Russian pages at all three widths (a narrow layout shows strings the wide one does not), writing `harvest.json`: the strings the live screens show, which the dictionary subset is cut by |
