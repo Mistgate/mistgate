@@ -805,7 +805,7 @@ func TestRequeueNodeProvisionJobsRaceWritesOneEvent(t *testing.T) {
 	for range 2 {
 		go func() {
 			<-start
-			results <- s.RequeueNodeProvisionJobs(ctx, t0.Add(time.Minute))
+			results <- s.RequeueNodeProvisionJobs(ctx, t0.Add(time.Minute), nil)
 		}()
 	}
 	close(start)
@@ -834,7 +834,7 @@ func TestRequestCancelNodeProvisionJobRaceChangesOnce(t *testing.T) {
 	for range 2 {
 		go func() {
 			<-start
-			state, changed, err := s.RequestCancelNodeProvisionJob(ctx, "job_cancel_race", t0.Add(time.Minute))
+			state, changed, err := s.RequestCancelNodeProvisionJob(ctx, "job_cancel_race", t0.Add(time.Minute), nil)
 			results <- result{state, changed, err}
 		}()
 	}
@@ -867,7 +867,7 @@ func TestFinishCancelledNodeProvisionJobRaceFinishesOnce(t *testing.T) {
 	for range 2 {
 		go func() {
 			<-start
-			finished, err := s.FinishCancelledNodeProvisionJob(ctx, "job_finish_race", t0.Add(time.Minute))
+			finished, err := s.FinishCancelledNodeProvisionJob(ctx, "job_finish_race", t0.Add(time.Minute), nil)
 			results <- result{finished, err}
 		}()
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"sort"
 	"time"
 )
 
@@ -191,8 +192,8 @@ const MaxProvisionAttempts = 3
 // RequeueNodeProvisionJobs restores interrupted work after a panel restart: a running job goes back to the queue, unless
 // it has already been claimed MaxProvisionAttempts times, in which case it fails with job_interrupted and its secret is
 // erased like on any other failure.
-func (s *Store) RequeueNodeProvisionJobs(ctx context.Context, now time.Time) error {
-	_, err := s.batch(ctx,
+func (s *Store) RequeueNodeProvisionJobs(ctx context.Context, now time.Time, keep map[string][]byte) error {
+	stmts := []Stmt{
 		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
 			SELECT id, 'failed', 'job_interrupted', ? FROM node_provision_job WHERE state = 'running' AND attempt >= ?`,
 			Args: []any{unix(now), MaxProvisionAttempts}},
@@ -207,13 +208,29 @@ func (s *Store) RequeueNodeProvisionJobs(ctx context.Context, now time.Time) err
 		Stmt{Query: `UPDATE node_provision_job
 			SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown', secret = X'', updated_at = ?
 			WHERE state = 'cancel_requested'`, Args: []any{unix(now)}},
-	)
+	}
+	// What a job failed or cancelled here must keep for a retry (a subscription host install's role, no login), in the same
+	// batch: a crash in between cannot lose it.
+	ids := make([]string, 0, len(keep))
+	for id := range keep {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		stmts = append(stmts, Stmt{Query: `UPDATE node_provision_job SET secret = ?
+			WHERE id = ? AND ((state = 'failed' AND error_code = 'job_interrupted') OR (state = 'cancelled' AND error_code = 'remote_outcome_unknown'))`,
+			Args: []any{keep[id], id}})
+	}
+	_, err := s.batch(ctx, stmts...)
 	return err
 }
 
 // RequestCancelNodeProvisionJob atomically stops queued work or requests cancellation
 // of the active worker. The returned state is either cancelled or cancel_requested.
-func (s *Store) RequestCancelNodeProvisionJob(ctx context.Context, id string, now time.Time) (state string, changed bool, err error) {
+func (s *Store) RequestCancelNodeProvisionJob(ctx context.Context, id string, now time.Time, residual []byte) (state string, changed bool, err error) {
+	if residual == nil {
+		residual = []byte{}
+	}
 	results, err := s.batch(ctx,
 		Stmt{Query: `SELECT state FROM node_provision_job WHERE id = ?`, Args: []any{id}, Returning: true},
 		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
@@ -224,9 +241,9 @@ func (s *Store) RequestCancelNodeProvisionJob(ctx context.Context, id string, no
 			state = CASE WHEN state = 'queued' THEN 'cancelled' ELSE 'cancel_requested' END,
 			phase = CASE WHEN state = 'queued' THEN 'cancelled' ELSE 'cancelling' END,
 			error_code = CASE WHEN state = 'queued' THEN 'cancelled_before_start' ELSE 'cancel_requested' END,
-			secret = CASE WHEN state = 'queued' THEN X'' ELSE secret END, updated_at = ?
+			secret = CASE WHEN state = 'queued' THEN ? ELSE secret END, updated_at = ?
 			WHERE id = ? AND state IN ('queued', 'running') RETURNING state`,
-			Args: []any{unix(now), id}, Returning: true},
+			Args: []any{residual, unix(now), id}, Returning: true},
 	)
 	if err != nil {
 		return "", false, err
@@ -249,16 +266,19 @@ func (s *Store) RequestCancelNodeProvisionJob(ctx context.Context, id string, no
 	}
 }
 
-// FinishCancelledNodeProvisionJob clears credentials after an active worker stops.
-// The remote host may already have received some installation commands.
-func (s *Store) FinishCancelledNodeProvisionJob(ctx context.Context, id string, now time.Time) (bool, error) {
+// FinishCancelledNodeProvisionJob clears credentials after an active worker stops, keeping only residual (what a retry
+// must still know, without a login; nil for nothing). The remote host may already have received some installation commands.
+func (s *Store) FinishCancelledNodeProvisionJob(ctx context.Context, id string, now time.Time, residual []byte) (bool, error) {
+	if residual == nil {
+		residual = []byte{}
+	}
 	results, err := s.batch(ctx,
 		Stmt{Query: `INSERT INTO node_provision_event (job_id, phase, code, created_at)
 			SELECT id, 'cancelled', 'remote_outcome_unknown', ? FROM node_provision_job
 			WHERE id = ? AND state = 'cancel_requested'`, Args: []any{unix(now), id}},
 		Stmt{Query: `UPDATE node_provision_job
-			SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown', secret = X'', updated_at = ?
-			WHERE id = ? AND state = 'cancel_requested'`, Args: []any{unix(now), id}},
+			SET state = 'cancelled', phase = 'cancelled', error_code = 'remote_outcome_unknown', secret = ?, updated_at = ?
+			WHERE id = ? AND state = 'cancel_requested'`, Args: []any{residual, unix(now), id}},
 	)
 	if err != nil {
 		return false, err
@@ -572,9 +592,9 @@ func (s *Store) NodeProvisionEvents(ctx context.Context, jobID string, after int
 	return out, next, rows.Err()
 }
 
-// RunningNodeProvisionJobs returns the jobs in state running (what RequeueNodeProvisionJobs is about to recover).
+// RunningNodeProvisionJobs returns the jobs running or asked to cancel (what RequeueNodeProvisionJobs is about to recover).
 func (s *Store) RunningNodeProvisionJobs(ctx context.Context) ([]NodeProvisionJob, error) {
-	rows, err := s.R.QueryContext(ctx, `SELECT `+nodeProvisionJobCols+` FROM node_provision_job WHERE state = 'running'`)
+	rows, err := s.R.QueryContext(ctx, `SELECT `+nodeProvisionJobCols+` FROM node_provision_job WHERE state IN ('running', 'cancel_requested')`)
 	if err != nil {
 		return nil, err
 	}
@@ -588,12 +608,4 @@ func (s *Store) RunningNodeProvisionJobs(ctx context.Context) ([]NodeProvisionJo
 		out = append(out, job)
 	}
 	return out, rows.Err()
-}
-
-// KeepInterruptedNodeProvisionSecret stores secret on a job RequeueNodeProvisionJobs failed with job_interrupted: what a
-// retry must still know (the caller passes no login and no token). It changes no other job.
-func (s *Store) KeepInterruptedNodeProvisionSecret(ctx context.Context, id string, secret []byte) error {
-	_, err := s.batch(ctx, Stmt{Query: `UPDATE node_provision_job SET secret = ?
-		WHERE id = ? AND state = 'failed' AND error_code = 'job_interrupted'`, Args: []any{secret, id}})
-	return err
 }

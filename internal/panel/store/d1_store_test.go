@@ -2314,10 +2314,10 @@ func TestD1RewrittenHealthProvisionUpdateMethods(t *testing.T) {
 		st := newStore(t)
 		seedJob(t, st, "job_running", "node_run", "node-run", "running", now)
 		seedJob(t, st, "job_cancel", "node_cancel", "node-cancel", "cancel_requested", now)
-		if err := st.RequeueNodeProvisionJobs(ctx, now.Add(time.Minute)); err != nil {
+		if err := st.RequeueNodeProvisionJobs(ctx, now.Add(time.Minute), nil); err != nil {
 			t.Fatal(err)
 		}
-		if err := st.RequeueNodeProvisionJobs(ctx, now.Add(2*time.Minute)); err != nil {
+		if err := st.RequeueNodeProvisionJobs(ctx, now.Add(2*time.Minute), nil); err != nil {
 			t.Fatal(err)
 		}
 		state1, _ := st.NodeProvisionJobState(ctx, "job_running")
@@ -2329,16 +2329,16 @@ func TestD1RewrittenHealthProvisionUpdateMethods(t *testing.T) {
 	t.Run("RequestCancelNodeProvisionJob", func(t *testing.T) {
 		st := newStore(t)
 		seedJob(t, st, "job_cancel", "node_cancel", "node-cancel", "queued", now)
-		state, changed, err := st.RequestCancelNodeProvisionJob(ctx, "job_cancel", now.Add(time.Minute))
+		state, changed, err := st.RequestCancelNodeProvisionJob(ctx, "job_cancel", now.Add(time.Minute), nil)
 		if err != nil || !changed || state != "cancelled" {
 			t.Fatalf("cancel queued: %q %v %v", state, changed, err)
 		}
-		state, changed, err = st.RequestCancelNodeProvisionJob(ctx, "job_cancel", now.Add(2*time.Minute))
+		state, changed, err = st.RequestCancelNodeProvisionJob(ctx, "job_cancel", now.Add(2*time.Minute), nil)
 		if err != nil || changed || state != "cancelled" || countEvents(t, st, "job_cancel") != 1 {
 			t.Fatalf("cancel again: %q %v %v events=%d", state, changed, err, countEvents(t, st, "job_cancel"))
 		}
 		seedJob(t, st, "job_cancel_running", "node_cancel_running", "node-cancel-running", "running", now)
-		state, changed, err = st.RequestCancelNodeProvisionJob(ctx, "job_cancel_running", now.Add(time.Minute))
+		state, changed, err = st.RequestCancelNodeProvisionJob(ctx, "job_cancel_running", now.Add(time.Minute), nil)
 		if err != nil || !changed || state != "cancel_requested" || countEvents(t, st, "job_cancel_running") != 1 {
 			t.Fatalf("cancel running: %q %v %v events=%d", state, changed, err, countEvents(t, st, "job_cancel_running"))
 		}
@@ -2346,11 +2346,11 @@ func TestD1RewrittenHealthProvisionUpdateMethods(t *testing.T) {
 	t.Run("FinishCancelledNodeProvisionJob", func(t *testing.T) {
 		st := newStore(t)
 		seedJob(t, st, "job_finish", "node_finish", "node-finish", "cancel_requested", now)
-		finished, err := st.FinishCancelledNodeProvisionJob(ctx, "job_finish", now.Add(time.Minute))
+		finished, err := st.FinishCancelledNodeProvisionJob(ctx, "job_finish", now.Add(time.Minute), nil)
 		if err != nil || !finished {
 			t.Fatalf("finish cancellation: %v %v", finished, err)
 		}
-		finished, err = st.FinishCancelledNodeProvisionJob(ctx, "job_finish", now.Add(2*time.Minute))
+		finished, err = st.FinishCancelledNodeProvisionJob(ctx, "job_finish", now.Add(2*time.Minute), nil)
 		if err != nil || finished || countEvents(t, st, "job_finish") != 1 {
 			t.Fatalf("finish twice: %v %v events=%d", finished, err, countEvents(t, st, "job_finish"))
 		}

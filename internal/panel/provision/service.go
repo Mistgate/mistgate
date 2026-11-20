@@ -570,7 +570,8 @@ func (s *Service) CancelNodeProvision(ctx context.Context, jobID string) (string
 		s.cfg.Log.Error("read node provisioning job before cancellation", "err", err)
 		return "", internalConnectError()
 	}
-	state, changed, err := s.st.RequestCancelNodeProvisionJob(ctx, jobID, s.cfg.Now().UTC())
+	// A queued subscription host install keeps its role when it is cancelled (residualSecret): its retry is a host install.
+	state, changed, err := s.st.RequestCancelNodeProvisionJob(ctx, jobID, s.cfg.Now().UTC(), s.residualSecret(job))
 	if errors.Is(err, store.ErrConflict) {
 		return "", connect.NewError(connect.CodeFailedPrecondition, errors.New("provision_job_not_cancellable"))
 	}

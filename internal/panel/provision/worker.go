@@ -132,8 +132,8 @@ type remotePreflight struct {
 
 var nodeIDPattern = regexp.MustCompile(`^nod_[a-z2-7]{26}$`)
 
-// requeue recovers the jobs a dead process left running (store.RequeueNodeProvisionJobs). A subscription host install that
-// fails there with job_interrupted keeps its role (residualSecret), so a retry is a host install again.
+// requeue recovers the jobs a dead process left running or cancelling (store.RequeueNodeProvisionJobs). A subscription host
+// install that fails or is cancelled there keeps its role (residualSecret), so a retry is a host install again.
 func (s *Service) requeue(ctx context.Context) error {
 	running, err := s.st.RunningNodeProvisionJobs(ctx)
 	if err != nil {
@@ -145,15 +145,7 @@ func (s *Service) requeue(ctx context.Context) error {
 			keep[job.ID] = residual
 		}
 	}
-	if err := s.st.RequeueNodeProvisionJobs(ctx, s.cfg.Now()); err != nil {
-		return err
-	}
-	for id, residual := range keep {
-		if err := s.st.KeepInterruptedNodeProvisionSecret(ctx, id, residual); err != nil {
-			return err
-		}
-	}
-	return nil
+	return s.st.RequeueNodeProvisionJobs(ctx, s.cfg.Now(), keep)
 }
 
 // Run recovers interrupted jobs and executes queued installations serially.
@@ -252,7 +244,7 @@ func (s *Service) runNext(ctx context.Context) (ran bool, err error) {
 }
 
 func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
-	defer s.finishCancellation(job.ID)
+	defer func() { s.finishCancellation(job) }()
 	if !s.mayContinue(ctx, &job) {
 		return
 	}
@@ -676,10 +668,13 @@ func (s *Service) recordAccessEvent(ctx context.Context, job store.NodeProvision
 	return s.st.UpdateRunningNodeProvisionJobWithEvent(ctx, job.ID, "running", "access", "", job.Secret, code, s.cfg.Now().UTC())
 }
 
-func (s *Service) finishCancellation(jobID string) {
+// finishCancellation ends a job whose cancel was asked while it ran. A subscription host install keeps its role
+// (residualSecret): a retry of it is a host install again.
+func (s *Service) finishCancellation(job store.NodeProvisionJob) {
+	jobID := job.ID
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	changed, err := s.st.FinishCancelledNodeProvisionJob(ctx, jobID, s.cfg.Now().UTC())
+	changed, err := s.st.FinishCancelledNodeProvisionJob(ctx, jobID, s.cfg.Now().UTC(), s.residualSecret(job))
 	if err != nil {
 		s.cfg.Log.Error("finish cancelled node provisioning job", "job_id", jobID, "err", err)
 		return

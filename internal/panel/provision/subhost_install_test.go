@@ -329,7 +329,7 @@ func TestSubscriptionHostCancelDuringSessionEnrollLeavesTheRoleOff(t *testing.T)
 	release := make(chan struct{})
 	t.Cleanup(func() { close(release) })
 	node.onCSR = func() {
-		if _, _, err := st.RequestCancelNodeProvisionJob(context.Background(), subHostTestJob, drainT0); err != nil {
+		if _, _, err := st.RequestCancelNodeProvisionJob(context.Background(), subHostTestJob, drainT0, nil); err != nil {
 			t.Error(err)
 		}
 		select { // hold the command until the worker gives up on it
@@ -524,5 +524,67 @@ func TestSubscriptionHostRetryAfterTheServerEnrolled(t *testing.T) {
 	}
 	if activated, _, state := sub.calls(); len(activated) != 2 || state != "on" {
 		t.Fatalf("activated %v state %q", activated, state)
+	}
+}
+
+// A host install cancelled before it ran, or while it ran, keeps its role (no login): its retry is a host install again,
+// never an ordinary one.
+func TestSubscriptionHostCancelledJobRetriesAsAHostInstall(t *testing.T) {
+	for _, running := range []bool{false, true} {
+		manager := &e2eNodeManager{}
+		sub := &fakeSubHost{}
+		node := newHostNode(t, manager)
+		var st *store.Store
+		var svc *Service
+		if running {
+			hold := make(chan struct{})
+			t.Cleanup(func() {
+				select {
+				case <-hold:
+				default:
+					close(hold)
+				}
+			})
+			node.onCSR = func() {
+				if _, err := svc.CancelNodeProvision(context.Background(), subHostTestJob); err != nil {
+					t.Error(err)
+				}
+				select {
+				case <-hold:
+				case <-time.After(3 * time.Second):
+				}
+			}
+		}
+		st, svc = subHostService(t, node, manager, sub)
+		if running {
+			drainOnce(t, svc)
+		} else if _, err := svc.CancelNodeProvision(context.Background(), subHostTestJob); err != nil {
+			t.Fatal(err)
+		}
+		job := jobState(t, st, subHostTestJob)
+		if job.State != "cancelled" {
+			t.Fatalf("running=%v: job = %q %q", running, job.State, job.ErrorCode)
+		}
+		if kept := svc.hostFields(job.ID, job.Secret); kept.SubHostDomain != subHostTestDomain || kept.SubHostPath != subHostTestPath {
+			t.Fatalf("running=%v: the cancelled job kept %+v", running, kept)
+		}
+		if creds, err := svc.openCredentials(job.ID, job.Secret); err == nil && creds.Password != "" {
+			t.Fatalf("running=%v: the cancelled job kept a login", running)
+		}
+		node.installNode.mu.Lock()
+		node.onCSR = nil
+		node.installNode.mu.Unlock()
+		if _, err := svc.RetryNodeProvision(context.Background(), connect.NewRequest(&adminv1.RetryNodeProvisionRequest{
+			JobId: subHostTestJob, ConfirmInstall: true, Password: authTestPassword, SshUsername: "root",
+		})); err != nil {
+			t.Fatal(err)
+		}
+		drainOnce(t, svc)
+		if job := jobState(t, st, subHostTestJob); job.State != "completed" {
+			t.Fatalf("running=%v: retry = %q %q; events %v", running, job.State, job.ErrorCode, eventCodes(t, st, subHostTestJob))
+		}
+		if activated, _, _ := sub.calls(); len(activated) != 1 {
+			t.Fatalf("running=%v: the retry was no host install (activated %v)", running, activated)
+		}
 	}
 }

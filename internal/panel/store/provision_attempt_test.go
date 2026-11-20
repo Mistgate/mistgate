@@ -52,7 +52,7 @@ func checkProvisionAttemptCap(t *testing.T, st *Store) {
 		if got := jobAttempts(t, st, "cap"); got != n {
 			t.Fatalf("attempt after claim %d = %d", n, got)
 		}
-		if err := st.RequeueNodeProvisionJobs(ctx, t0.Add(time.Duration(n)*time.Minute+time.Second)); err != nil {
+		if err := st.RequeueNodeProvisionJobs(ctx, t0.Add(time.Duration(n)*time.Minute+time.Second), nil); err != nil {
 			t.Fatal(err)
 		}
 		state, err := st.NodeProvisionJobState(ctx, "cap")
@@ -94,7 +94,7 @@ func checkProvisionAttemptCap(t *testing.T, st *Store) {
 	if _, ok, err := st.ClaimNodeProvisionJob(ctx, t0.Add(3*time.Hour)); err != nil || !ok {
 		t.Fatalf("claim after retry: ok=%v err=%v", ok, err)
 	}
-	if err := st.RequeueNodeProvisionJobs(ctx, t0.Add(4*time.Hour)); err != nil {
+	if err := st.RequeueNodeProvisionJobs(ctx, t0.Add(4*time.Hour), nil); err != nil {
 		t.Fatal(err)
 	}
 	if state, _ := st.NodeProvisionJobState(ctx, "cap"); state != "queued" || jobAttempts(t, st, "cap") != 1 {
@@ -115,7 +115,7 @@ func checkProvisionRequeueLeavesOtherStates(t *testing.T, st *Store) {
 	if _, err := st.W.ExecContext(ctx, `UPDATE node_provision_job SET state = 'cancel_requested', attempt = ? WHERE id = 'cancelling'`, MaxProvisionAttempts); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.RequeueNodeProvisionJobs(ctx, t0.Add(time.Minute)); err != nil {
+	if err := st.RequeueNodeProvisionJobs(ctx, t0.Add(time.Minute), nil); err != nil {
 		t.Fatal(err)
 	}
 	if state, _ := st.NodeProvisionJobState(ctx, "queued"); state != "queued" {
@@ -154,11 +154,11 @@ func checkProvisionPending(t *testing.T, st *Store) {
 		t.Fatalf("claim: ok=%v err=%v", ok, err)
 	}
 	expect("running", true, false)
-	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, "pend", t0); err != nil {
+	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, "pend", t0, nil); err != nil {
 		t.Fatal(err)
 	}
 	expect("cancel requested", true, false)
-	if _, err := st.FinishCancelledNodeProvisionJob(ctx, "pend", t0); err != nil {
+	if _, err := st.FinishCancelledNodeProvisionJob(ctx, "pend", t0, nil); err != nil {
 		t.Fatal(err)
 	}
 	expect("cancelled", false, false)

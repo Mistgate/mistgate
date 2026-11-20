@@ -256,7 +256,7 @@ func TestRetryNodeProvisionTakesCancelledJobsButNotRetiredNodes(t *testing.T) {
 	if err := retry(); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("retry of a queued job = %v", err)
 	}
-	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now); err != nil {
+	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := retry(); err != nil {
@@ -265,7 +265,7 @@ func TestRetryNodeProvisionTakesCancelledJobsButNotRetiredNodes(t *testing.T) {
 	if got, _ := st.NodeProvisionJob(ctx, job.ID); got.State != "queued" || len(got.Secret) == 0 {
 		t.Fatalf("retried job = %+v", got)
 	}
-	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now); err != nil {
+	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now, nil); err != nil {
 		t.Fatal(err)
 	}
 	manager.state = "retired"
