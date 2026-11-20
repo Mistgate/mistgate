@@ -75,9 +75,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 			a.wakeOsStatusReader()
 		}
 		a.configureNetworks(ds.Settings)
-		if a.applyPanelLink(ds.Settings) {
-			a.endForNewLink()
-		}
+		a.applyPanelLink(ds.Settings) // a new address is tried at the next reconnect: this session and its work go on
 	}
 	a.startAwgKmod(ctx, next)
 	if ds.StateHash != "" && ds.StateHash != next.hash() {

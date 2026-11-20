@@ -53,9 +53,10 @@ func (a *Agent) prevAddress() (link string, mtls bool) {
 	return a.meta.PrevLink, a.meta.PrevMTLS
 }
 
-// applyPanelLink takes in NodeSettings.panel_link_url. reconnect: the current session should end so that the next one
-// tries the new link address. An empty field changes nothing.
-func (a *Agent) applyPanelLink(st *pb.NodeSettings) (reconnect bool) {
+// applyPanelLink takes in NodeSettings.panel_link_url, from a HelloAck or a DesiredState. A new address is saved as
+// Meta.NextLink and tried at the next reconnect; the session it came in goes on. fresh: a new address was saved (a
+// HelloAck session then ends at once, before it started any work: runSession). An empty field changes nothing.
+func (a *Agent) applyPanelLink(st *pb.NodeSettings) (fresh bool) {
 	raw := st.GetPanelLinkUrl()
 	if raw == "" {
 		return false
@@ -76,7 +77,7 @@ func (a *Agent) applyPanelLink(st *pb.NodeSettings) (reconnect bool) {
 	default:
 		a.meta.NextLink = raw
 		dirty = true
-		reconnect = true
+		fresh = true
 	}
 	if dirty {
 		if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
@@ -84,25 +85,10 @@ func (a *Agent) applyPanelLink(st *pb.NodeSettings) (reconnect bool) {
 		}
 	}
 	a.metaMu.Unlock()
-	if reconnect {
-		a.log.Info("the panel sent a new link address; reconnecting")
+	if fresh {
+		a.log.Info("the panel sent a new link address; the next session tries it")
 	}
-	return reconnect
-}
-
-// endForNewLink ends the current session, after what it has queued is written, so the next one tries the new link address.
-func (a *Agent) endForNewLink() {
-	s := a.cur.Load()
-	if s == nil {
-		return
-	}
-	a.switchPending.Store(true)
-	go func() {
-		wait := durOr(a.heldFlush, heldFlushWait)
-		s.flush(wait)
-		s.drain(wait)
-		s.cancel()
-	}()
+	return fresh
 }
 
 // nextLinkSession runs a session over the new link address. Once its HelloAck arrives the address replaces the old one
