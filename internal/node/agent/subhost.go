@@ -46,6 +46,20 @@ type hostState struct {
 	selfID      string
 	acmeCert    func() bool // the site's ACME certificate is issued
 	err         string
+
+	later []func() // what stopping left to close (an intake waits for its streams, a site up to 3 s): run without hostMu
+}
+
+// hostTeardown runs what stopping the role's parts left to close, after hostMu is released: an intake waits for its
+// streams and a site for its connections, and nothing else of the role must wait on that.
+func (a *Agent) hostTeardown() {
+	a.hostMu.Lock()
+	later := a.sh.later
+	a.sh.later = nil
+	a.hostMu.Unlock()
+	for _, f := range later {
+		f()
+	}
 }
 
 const (
@@ -73,6 +87,7 @@ func (a *Agent) hostExtra(specs []plugin.InboundSpec) []plugin.TCPExtraRoute {
 
 // syncHost brings the host's entry, intake and site to the role and the fronts just synced.
 func (a *Agent) syncHost(ctx context.Context, fronts map[uint16]plugin.TCPPortShare) {
+	defer a.hostTeardown() // after the unlock below
 	a.hostMu.Lock()
 	defer a.hostMu.Unlock()
 	role, ok := a.hostRole()
@@ -107,7 +122,7 @@ func (a *Agent) syncHost(ctx context.Context, fronts map[uint16]plugin.TCPPortSh
 	}
 	if a.sh.intake == nil || a.sh.intakeFront != f {
 		if a.sh.intake != nil {
-			a.sh.intake.Close()
+			a.sh.later = append(a.sh.later, a.sh.intake.Close)
 		}
 		in := subhost.New(a.hostEntry, f, plugin.SubHostRouteID, a.log.With("source", "sub-host"))
 		go in.Serve(f.Listener(plugin.SubHostRouteID))
@@ -165,7 +180,7 @@ func (a *Agent) syncHostSite(ctx context.Context, f *front.Front, name string) e
 
 func (a *Agent) stopHostSite() {
 	if a.sh.site != nil {
-		a.sh.site.close()
+		a.sh.later = append(a.sh.later, a.sh.site.close)
 		a.sh.site, a.sh.siteFront, a.sh.siteName, a.sh.acmeCert = nil, nil, "", nil
 	}
 	if a.cfg.Certs != nil {
@@ -179,10 +194,11 @@ func (a *Agent) stopHostSite() {
 	a.sh.acmeID, a.sh.selfID = "", ""
 }
 
-// stopHost stops everything of the role; reason is what SubHostStatus.error says ("" = no role). hostMu is held.
+// stopHost stops everything of the role; reason is what SubHostStatus.error says ("" = no role). hostMu is held; the closing
+// itself runs in hostTeardown, after it is released.
 func (a *Agent) stopHost(reason string) {
 	if a.sh.intake != nil {
-		a.sh.intake.Close()
+		a.sh.later = append(a.sh.later, a.sh.intake.Close)
 		a.sh.intake, a.sh.intakeFront = nil, nil
 	}
 	a.stopHostSite()

@@ -621,6 +621,7 @@ func (a *Agent) closeEngines() {
 		a.hostMu.Lock()
 		a.stopHost("")
 		a.hostMu.Unlock()
+		a.hostTeardown()
 		if a.hostEntry != nil {
 			a.hostEntry.Close()
 		}
