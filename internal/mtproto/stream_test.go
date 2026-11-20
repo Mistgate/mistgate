@@ -271,6 +271,31 @@ func TestServeStreamDeadlineForStalledHeader(t *testing.T) {
 	}
 }
 
+func TestServeStreamRejectsUnknownCredential(t *testing.T) {
+	h := newStreamTestHarness(t, 0, 2*time.Second)
+	r := h.run(t, func(conn net.Conn) error {
+		return h.srv.ServeStream(context.Background(), conn, "unknown")
+	})
+	if err := r.wait(t); !errors.Is(err, errUnknownCredential) {
+		t.Fatalf("ServeStream = %v, want unknown credential", err)
+	}
+	if got := h.dialed.Load(); got != 0 {
+		t.Fatalf("datacenter dial count = %d", got)
+	}
+}
+
+func TestServeStreamFailedHeadersReleaseHandshakeSlots(t *testing.T) {
+	h := newStreamTestHarness(t, 0, 2*time.Second)
+	for i := 0; i < 40; i++ {
+		r, _ := h.open(t, testKey(9), mtprototest.TagPadded, 2)
+		if err := r.wait(t); err == nil {
+			t.Fatalf("failed stream %d unexpectedly succeeded", i)
+		} else if errors.Is(err, ErrBusy) {
+			t.Fatalf("failed stream %d exhausted handshake slots: %v", i, err)
+		}
+	}
+}
+
 func TestServeStreamClosesOnCredentialRemovalAndKick(t *testing.T) {
 	for _, action := range []string{"remove", "kick"} {
 		t.Run(action, func(t *testing.T) {

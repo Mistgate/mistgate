@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -67,6 +68,7 @@ type manualRelayClock struct {
 	mu      sync.Mutex
 	now     time.Time
 	timers  map[*manualRelayTimer]struct{}
+	created map[time.Duration]int
 	changed chan struct{}
 }
 
@@ -82,6 +84,7 @@ func newManualRelayClock() *manualRelayClock {
 	return &manualRelayClock{
 		now:     time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC),
 		timers:  make(map[*manualRelayTimer]struct{}),
+		created: make(map[time.Duration]int),
 		changed: make(chan struct{}, 1),
 	}
 }
@@ -92,8 +95,9 @@ func (c *manualRelayClock) Now() time.Time {
 	return c.now
 }
 
-func (c *manualRelayClock) NewTimer(d time.Duration) RelayTimer {
+func (c *manualRelayClock) NewTimer(d time.Duration) relayTimer {
 	c.mu.Lock()
+	c.created[d]++
 	timer := &manualRelayTimer{clock: c, deadline: c.now.Add(d), ch: make(chan time.Time, 1)}
 	if d <= 0 {
 		timer.fired = true
@@ -104,6 +108,28 @@ func (c *manualRelayClock) NewTimer(d time.Duration) RelayTimer {
 	c.mu.Unlock()
 	signal(c.changed)
 	return timer
+}
+
+func (c *manualRelayClock) timerCalls(d time.Duration) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.created[d]
+}
+
+func (c *manualRelayClock) waitForTimerCalls(t *testing.T, d time.Duration, want int) {
+	t.Helper()
+	deadline := time.NewTimer(testWait)
+	defer deadline.Stop()
+	for {
+		if c.timerCalls(d) >= want {
+			return
+		}
+		select {
+		case <-c.changed:
+		case <-deadline.C:
+			t.Fatalf("relay registered %d timers of %s, want %d", c.timerCalls(d), d, want)
+		}
+	}
 }
 
 func (t *manualRelayTimer) C() <-chan time.Time { return t.ch }
@@ -236,13 +262,13 @@ func TestRelayClientEchoHashAndConcurrentStreams(t *testing.T) {
 }
 
 func TestRelayUpAndDownReplayAndLostResponses(t *testing.T) {
-	r, handler, capability := newRelayFixture(t, echoBackend, nil, nil)
+	_, handler, capability := newRelayFixture(t, echoBackend, nil, nil)
 	bootstrap, token := rawSession(t, handler, capability)
 	_ = bootstrap
 	upLost := &lostResponseTransport{base: relayTransport{handler: handler}, path: "/api/v1/up"}
 	upClient := &http.Client{Transport: upLost}
-	open, _ := AppendFrame(nil, Frame{Type: FrameOpen, StreamID: 1})
-	open, _ = AppendFrame(open, Frame{Type: FrameData, StreamID: 1, Payload: []byte("de1-first")})
+	open, _ := appendFrame(nil, frame{Type: frameOpen, StreamID: 1})
+	open, _ = appendFrame(open, frame{Type: frameData, StreamID: 1, Payload: []byte("de1-first")})
 	if err := postUpRaw(upClient, token, 1, open); err == nil {
 		t.Fatal("uplink response was not dropped")
 	}
@@ -250,12 +276,6 @@ func TestRelayUpAndDownReplayAndLostResponses(t *testing.T) {
 	if err != nil || ack != 1 {
 		t.Fatalf("repeated uplink ack = %d, err=%v", ack, err)
 	}
-
-	var session *transportSession
-	r.mu.Lock()
-	session = r.sessions[token]
-	r.mu.Unlock()
-	waitForOutput(t, session)
 
 	downLost := &lostResponseTransport{base: relayTransport{handler: handler}, path: "/api/v1/down"}
 	downClient := &http.Client{Transport: downLost}
@@ -270,13 +290,13 @@ func TestRelayUpAndDownReplayAndLostResponses(t *testing.T) {
 	if !bytes.Equal(gotBatch, wantBatch) || gotHeaders.Get(headerDownCursor) != wantHeaders.Get(headerDownCursor) {
 		t.Fatal("repeated downlink cursor did not replay the same batch")
 	}
-	frames, err := readFrameBatch(gotBatch)
+	frames, err := parseFrameBatch(gotBatch)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var echoed int
 	for _, frame := range frames {
-		if frame.Type == FrameData && bytes.Equal(frame.Payload, []byte("de1-first")) {
+		if frame.Type == frameData && bytes.Equal(frame.Payload, []byte("de1-first")) {
 			echoed++
 		}
 	}
@@ -297,7 +317,7 @@ func TestRelayBootstrapRepeatReturnsSameSession(t *testing.T) {
 	page := httptest.NewRecorder()
 	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "http://example.com/?bridge="+capability, nil))
 	bootstrap := page.Header().Get(headerBootstrap)
-	hello, _ := AppendFrame(nil, Frame{Type: FrameHello, Payload: AppendHelloPayload(nil)})
+	hello, _ := appendFrame(nil, frame{Type: frameHello, Payload: appendHelloPayload(nil)})
 	var firstBody []byte
 	var firstHeaders http.Header
 	for attempt := 0; attempt < 2; attempt++ {
@@ -331,15 +351,18 @@ func TestRelayPendingPressureRetriesWithoutCommittingSequence(t *testing.T) {
 	r, handler, capability := newRelayFixture(t, echoBackend, nil, nil)
 	_, token := rawSession(t, handler, capability)
 	client := &http.Client{Transport: relayTransport{handler: handler}}
-	open, _ := AppendFrame(nil, Frame{Type: FrameOpen, StreamID: 7})
+	open, _ := appendFrame(nil, frame{Type: frameOpen, StreamID: 7})
 	if _, err := postUpRawResponse(client, token, 1, open); err != nil {
 		t.Fatal(err)
 	}
-	pressure := int64(MaxPendingBytes) - r.pendingBytes.Load()
-	if pressure <= 0 || !r.reservePending(pressure) {
+	r.pendingMu.Lock()
+	used := r.pendingByCredential["alice"]
+	r.pendingMu.Unlock()
+	pressure := maxPendingPerCredential - used
+	if pressure <= 0 || !r.reservePending("alice", pendingUp, pressure) {
 		t.Fatal("could not create test pressure")
 	}
-	data, _ := AppendFrame(nil, Frame{Type: FrameData, StreamID: 7, Payload: []byte("a")})
+	data, _ := appendFrame(nil, frame{Type: frameData, StreamID: 7, Payload: []byte("a")})
 	status, headers, err := postUpStatus(client, token, 2, data)
 	if err != nil {
 		t.Fatal(err)
@@ -347,15 +370,166 @@ func TestRelayPendingPressureRetriesWithoutCommittingSequence(t *testing.T) {
 	if status != http.StatusServiceUnavailable || headers.Get("Retry-After") != "1" {
 		t.Fatalf("pressure response = %d, Retry-After %q", status, headers.Get("Retry-After"))
 	}
-	r.releasePending(pressure)
+	r.releasePending("alice", pendingUp, pressure)
 	ack, err := postUpRawResponse(client, token, 2, data)
 	if err != nil || ack != 2 {
 		t.Fatalf("retried uplink ack = %d, err=%v", ack, err)
 	}
 }
 
-func TestRelayPassThroughPreservesRequestAndBody(t *testing.T) {
+func TestRelayPendingBudgetsSeparateCredentialsAndDirections(t *testing.T) {
 	r, _, _ := newRelayFixture(t, echoBackend, nil, nil)
+	share := int64(maxPendingPerCredential)
+	for _, id := range []string{"alice", "bob", "carol", "dave"} {
+		if !r.reservePending(id, pendingUp, share) {
+			t.Fatalf("could not reserve uplink share for %s", id)
+		}
+	}
+	if r.reservePending("alice", pendingUp, 1) || r.reservePending("alice", pendingDown, 1) {
+		t.Fatal("one credential exceeded its shared byte allowance")
+	}
+	if r.reservePending("eve", pendingUp, 1) {
+		t.Fatal("uplink exceeded its directional allowance")
+	}
+	if !r.reservePending("eve", pendingDown, share) {
+		t.Fatal("uplink pressure consumed the separate downlink allowance")
+	}
+	for _, id := range []string{"alice", "bob", "carol", "dave"} {
+		r.releasePending(id, pendingUp, share)
+	}
+	r.releasePending("eve", pendingDown, share)
+}
+
+func TestRelayPendingShareBackpressureResumesAfterPollAcknowledgement(t *testing.T) {
+	const streamCount = 5
+	controls := make([]chan struct{}, streamCount)
+	for i := range controls {
+		controls[i] = make(chan struct{})
+	}
+	started := make(chan int, streamCount)
+	attempted := make(chan int, 300)
+	wrote := make(chan int, 300)
+	var nextBackend atomic.Int32
+	chunk := bytes.Repeat([]byte{'x'}, backendChunkSize)
+	backend := func(ctx context.Context, conn net.Conn, _ string) error {
+		id := int(nextBackend.Add(1) - 1)
+		started <- id
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-controls[id]:
+			}
+			attempted <- id
+			n, err := conn.Write(chunk)
+			if err != nil {
+				return err
+			}
+			if n != len(chunk) {
+				return io.ErrShortWrite
+			}
+			wrote <- id
+		}
+	}
+	r, handler, capability := newRelayFixture(t, backend, nil, nil)
+	_, token := rawSession(t, handler, capability)
+	client := &http.Client{Transport: relayTransport{handler: handler}}
+	open := make([]byte, 0, streamCount*frameHeaderSize)
+	for id := uint32(1); id <= streamCount; id++ {
+		open, _ = appendFrame(open, frame{Type: frameOpen, StreamID: id})
+	}
+	if _, err := postUpRawResponse(client, token, 1, open); err != nil {
+		t.Fatal(err)
+	}
+	seen := make(map[int]bool, streamCount)
+	for len(seen) < streamCount {
+		select {
+		case id := <-started:
+			seen[id] = true
+		case <-time.After(testWait):
+			t.Fatal("not all backend streams started")
+		}
+	}
+	grant := func(id int) {
+		t.Helper()
+		select {
+		case controls[id] <- struct{}{}:
+		case <-time.After(testWait):
+			t.Fatalf("backend %d did not accept a write grant", id)
+		}
+		select {
+		case got := <-attempted:
+			if got != id {
+				t.Fatalf("backend write attempt = %d, want %d", got, id)
+			}
+		case <-time.After(testWait):
+			t.Fatalf("backend %d did not attempt its granted write", id)
+		}
+		select {
+		case got := <-wrote:
+			if got != id {
+				t.Fatalf("backend write completed on %d, want %d", got, id)
+			}
+		case <-time.After(testWait):
+			t.Fatalf("backend %d write did not complete", id)
+		}
+	}
+	for i := 0; i < 254; i++ {
+		grant(i % streamCount)
+	}
+	grant(0) // This read cannot enter the budget; it leaves the backend blocked on its next write.
+	select {
+	case controls[0] <- struct{}{}:
+	case <-time.After(testWait):
+		t.Fatal("blocked backend did not accept its next write grant")
+	}
+	select {
+	case id := <-attempted:
+		if id != 0 {
+			t.Fatalf("blocked write attempt = %d, want 0", id)
+		}
+	case <-time.After(testWait):
+		t.Fatal("backend did not reach the write blocked by the pending budget")
+	}
+	r.pendingMu.Lock()
+	pending := r.pendingByCredential["alice"]
+	globalPending := r.pendingBytes.Load()
+	upPending, downPending := r.pendingUpBytes, r.pendingDownBytes
+	r.pendingMu.Unlock()
+	if pending > maxPendingPerCredential || pending < maxPendingPerCredential-8*dataFrameCharge(backendChunkSize) {
+		t.Fatalf("pending share = %d, want within %d and near its limit", pending, maxPendingPerCredential)
+	}
+	if globalPending > maxPendingBytes || upPending > maxPendingUpBytes || downPending > maxPendingDownBytes {
+		t.Fatal("pending accounting exceeded a relay or directional limit")
+	}
+
+	body, headers, err := postDownRaw(client, token, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frames, err := parseFrameBatch(body)
+	if err != nil || len(frames) == 0 {
+		t.Fatalf("first downlink batch has %d frames, err=%v", len(frames), err)
+	}
+	cursor, err := parseCanonicalUint(headers.Get(headerDownCursor))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := postDownRaw(client, token, cursor); err != nil {
+		t.Fatalf("acknowledging the first downlink batch: %v", err)
+	}
+	select {
+	case got := <-wrote:
+		if got != 0 {
+			t.Fatalf("resumed backend %d, want blocked backend 0", got)
+		}
+	case <-time.After(testWait):
+		t.Fatal("backend did not resume after poll acknowledgement")
+	}
+}
+
+func TestRelayPassThroughPreservesRequestAndBody(t *testing.T) {
+	r, _, capability := newRelayFixture(t, echoBackend, nil, nil)
 	wrongCapability := base64.RawURLEncoding.EncodeToString(make([]byte, 32))
 	unknownToken := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x91}, tokenSize))
 	type observed struct {
@@ -379,6 +553,10 @@ func TestRelayPassThroughPreservesRequestAndBody(t *testing.T) {
 	}{
 		{method: http.MethodGet, path: "/", query: "bridge=" + wrongCapability, body: "bridge-body"},
 		{method: http.MethodPost, path: "/api/v1/up", header: "Bearer " + unknownToken, body: "unknown-token-body"},
+		{method: http.MethodHead, path: "/", query: "bridge=" + capability, body: "head-body"},
+		{method: http.MethodGet, path: "/", query: "bridge=" + capability + "&bridge=" + capability, body: "duplicate-bridge-body"},
+		{method: http.MethodGet, path: "/", query: "other=1&bridge=" + capability, body: "reordered-query-body"},
+		{method: http.MethodPost, path: "/foreign", body: "bridge=" + capability},
 		{method: http.MethodPost, path: "/foreign", body: "foreign-body"},
 		{method: http.MethodGet, path: "/api/v1/up", body: "wrong-method-body"},
 	}
@@ -410,6 +588,46 @@ func TestRelayPassThroughPreservesRequestAndBody(t *testing.T) {
 	}
 }
 
+func TestRelayEvictsOldestUnusedBootstrapPerCredential(t *testing.T) {
+	r, handler, capability := newRelayFixture(t, echoBackend, nil, nil)
+	tokens := make([]string, maxUnusedBootstraps+1)
+	for i := range tokens {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/?bridge="+capability, nil)
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("bridge %d returned %d", i, rec.Code)
+		}
+		tokens[i] = rec.Header().Get(headerBootstrap)
+	}
+	r.mu.Lock()
+	if len(r.unusedBootstrap["alice"]) != maxUnusedBootstraps {
+		t.Fatalf("unused bootstraps = %d, want %d", len(r.unusedBootstrap["alice"]), maxUnusedBootstraps)
+	}
+	_, oldestRetained := r.bootstrap[tokens[0]]
+	_, newestRetained := r.bootstrap[tokens[len(tokens)-1]]
+	r.mu.Unlock()
+	if oldestRetained || !newestRetained {
+		t.Fatal("bootstrap eviction did not discard the oldest token")
+	}
+
+	hello, _ := appendFrame(nil, frame{Type: frameHello, Payload: appendHelloPayload(nil)})
+	requestSession := func(token string) int {
+		req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", bytes.NewReader(hello))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/octet-stream")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	if got := requestSession(tokens[0]); got != http.StatusNotFound {
+		t.Fatalf("evicted bootstrap returned %d, want pass-through 404", got)
+	}
+	if got := requestSession(tokens[len(tokens)-1]); got != http.StatusOK {
+		t.Fatalf("newest bootstrap returned %d, want 200", got)
+	}
+}
+
 func TestRelayExpiredBootstrapPassesThroughAndIdleExpiryClosesSession(t *testing.T) {
 	clock := newManualRelayClock()
 	r, handler, capability := newRelayFixture(t, echoBackend, clock, nil)
@@ -418,7 +636,7 @@ func TestRelayExpiredBootstrapPassesThroughAndIdleExpiryClosesSession(t *testing
 	handler.ServeHTTP(bootstrapRec, bootstrapReq)
 	bootstrapToken := bootstrapRec.Header().Get(headerBootstrap)
 	clock.waitForTimer(t)
-	clock.Advance(BootstrapTokenTTL)
+	clock.Advance(bootstrapTokenTTL)
 	var observed *http.Request
 	var body string
 	next := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -442,12 +660,82 @@ func TestRelayExpiredBootstrapPassesThroughAndIdleExpiryClosesSession(t *testing
 	session := r2.sessions[token]
 	r2.mu.Unlock()
 	clock2.waitForTimer(t)
-	clock2.Advance(RelayIdleTimeout)
+	clock2.Advance(relayIdleTimeout)
 	select {
 	case <-session.done:
 	case <-time.After(testWait):
 		t.Fatal("idle session did not close")
 	}
+}
+
+func TestRelayPollTakeoverWakesReplacementPoll(t *testing.T) {
+	clock := newManualRelayClock()
+	backend := func(ctx context.Context, _ net.Conn, _ string) error {
+		<-ctx.Done()
+		return nil
+	}
+	r, handler, capability := newRelayFixture(t, backend, clock, nil)
+	_, token := rawSession(t, handler, capability)
+	client := &http.Client{Transport: relayTransport{handler: handler}}
+	open, _ := appendFrame(nil, frame{Type: frameOpen, StreamID: 1})
+	if _, err := postUpRawResponse(client, token, 1, open); err != nil {
+		t.Fatal(err)
+	}
+	r.mu.Lock()
+	session := r.sessions[token]
+	r.mu.Unlock()
+
+	baseline := clock.timerCalls(downLongPollTimeout)
+	oldResponse, oldDone, cancelOld := startDownPoll(handler, token, 0)
+	t.Cleanup(cancelOld)
+	clock.waitForTimerCalls(t, downLongPollTimeout, baseline+1)
+	newResponse, newDone, cancelNew := startDownPoll(handler, token, 0)
+	t.Cleanup(cancelNew)
+	clock.waitForTimerCalls(t, downLongPollTimeout, baseline+2)
+
+	payload := []byte("wake")
+	charge := dataFrameCharge(len(payload))
+	if !r.reservePending("alice", pendingDown, charge) {
+		t.Fatal("could not reserve test data")
+	}
+	if !session.enqueueReserved(frame{Type: frameData, StreamID: 1, Payload: payload}, charge) {
+		t.Fatal("could not enqueue test data")
+	}
+	select {
+	case <-oldDone:
+	case <-time.After(testWait):
+		t.Fatal("replaced poll did not return")
+	}
+	if oldResponse.Code != http.StatusNoContent || oldResponse.Header().Get(headerDownCursor) != "0" {
+		t.Fatalf("replaced poll returned %d at cursor %q", oldResponse.Code, oldResponse.Header().Get(headerDownCursor))
+	}
+	select {
+	case <-newDone:
+	case <-time.After(testWait):
+		t.Fatal("replacement poll did not receive queued data")
+	}
+	if newResponse.Code != http.StatusOK || newResponse.Header().Get(headerDownCursor) != "1" {
+		t.Fatalf("replacement poll returned %d at cursor %q", newResponse.Code, newResponse.Header().Get(headerDownCursor))
+	}
+	frames, err := parseFrameBatch(newResponse.Body.Bytes())
+	if err != nil || len(frames) != 1 || frames[0].Type != frameData || !bytes.Equal(frames[0].Payload, payload) {
+		t.Fatalf("replacement poll data = %#v, err=%v", frames, err)
+	}
+}
+
+func startDownPoll(handler http.Handler, token string, cursor uint64) (*httptest.ResponseRecorder, <-chan struct{}, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/down", nil).WithContext(ctx)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set(headerDownCursor, strconv.FormatUint(cursor, 10))
+	response := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		handler.ServeHTTP(response, req)
+		close(done)
+	}()
+	return response, done, cancel
 }
 
 func TestRelayCredentialRemovalClosesStreamsAndSession(t *testing.T) {
@@ -501,6 +789,148 @@ func TestRelayCredentialRemovalClosesStreamsAndSession(t *testing.T) {
 	}
 }
 
+func TestRelayCredentialRotationRetiresSessionAndBootstrapWithoutWaiting(t *testing.T) {
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+	backend := func(context.Context, net.Conn, string) error {
+		started <- struct{}{}
+		<-release
+		return nil
+	}
+	r, handler, oldCapability := newRelayFixture(t, backend, nil, nil)
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	_, token := rawSession(t, handler, oldCapability)
+	client := &http.Client{Transport: relayTransport{handler: handler}}
+	open, _ := appendFrame(nil, frame{Type: frameOpen, StreamID: 1})
+	if _, err := postUpRawResponse(client, token, 1, open); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-started:
+	case <-time.After(testWait):
+		t.Fatal("backend did not start before credential rotation")
+	}
+	r.mu.Lock()
+	session := r.sessions[token]
+	r.mu.Unlock()
+	unusedPage := httptest.NewRecorder()
+	handler.ServeHTTP(unusedPage, httptest.NewRequest(http.MethodGet, "http://example.com/?bridge="+oldCapability, nil))
+	unusedBootstrap := unusedPage.Header().Get(headerBootstrap)
+
+	newSecret := []byte("bob1234567890123")
+	newCapability, err := DeriveCapability("example.com", newSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rotated := make(chan error, 1)
+	go func() {
+		rotated <- r.SetCredentials([]Credential{{ID: "alice", Secret: newSecret}})
+	}()
+	select {
+	case err := <-rotated:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(testWait):
+		t.Fatal("SetCredentials waited for the backend worker")
+	}
+	if session.ctx.Err() == nil {
+		t.Fatal("credential rotation did not cancel the old session")
+	}
+	r.mu.Lock()
+	_, bootstrapExists := r.bootstrap[unusedBootstrap]
+	_, sessionExists := r.sessions[token]
+	r.mu.Unlock()
+	if bootstrapExists {
+		t.Fatal("credential rotation retained an unused bootstrap")
+	}
+	if sessionExists {
+		t.Fatal("credential rotation retained the old transport session")
+	}
+	select {
+	case <-session.done:
+		t.Fatal("SetCredentials waited for the blocked backend worker")
+	default:
+	}
+	oldRequest := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", strings.NewReader("untouched"))
+	oldRequest.Header.Set("Authorization", "Bearer "+unusedBootstrap)
+	oldRequest.Header.Set("Content-Type", "application/octet-stream")
+	oldResponse := httptest.NewRecorder()
+	var passedBody string
+	oldHandler := r.Handler(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		data, _ := io.ReadAll(req.Body)
+		passedBody = string(data)
+		http.NotFound(w, req)
+	}))
+	oldHandler.ServeHTTP(oldResponse, oldRequest)
+	if oldResponse.Code != http.StatusNotFound || passedBody != "untouched" {
+		t.Fatalf("old bootstrap response = %d passed body %q", oldResponse.Code, passedBody)
+	}
+	newPage := httptest.NewRecorder()
+	handler.ServeHTTP(newPage, httptest.NewRequest(http.MethodGet, "http://example.com/?bridge="+newCapability, nil))
+	if newPage.Code != http.StatusOK {
+		t.Fatalf("new capability returned HTTP %d", newPage.Code)
+	}
+	close(release)
+	select {
+	case <-session.done:
+	case <-time.After(testWait):
+		t.Fatal("rotated session did not finish after backend release")
+	}
+}
+
+func TestRelayCloseCredentialReturnsBeforeBackendWorker(t *testing.T) {
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	backend := func(context.Context, net.Conn, string) error {
+		started <- struct{}{}
+		<-release
+		return nil
+	}
+	r, handler, capability := newRelayFixture(t, backend, nil, nil)
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	_, token := rawSession(t, handler, capability)
+	client := &http.Client{Transport: relayTransport{handler: handler}}
+	open, _ := appendFrame(nil, frame{Type: frameOpen, StreamID: 1})
+	if _, err := postUpRawResponse(client, token, 1, open); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-started:
+	case <-time.After(testWait):
+		t.Fatal("backend did not start before credential close")
+	}
+	r.mu.Lock()
+	session := r.sessions[token]
+	r.mu.Unlock()
+	closed := make(chan struct{})
+	go func() {
+		r.CloseCredential("alice")
+		close(closed)
+	}()
+	select {
+	case <-closed:
+	case <-time.After(testWait):
+		t.Fatal("CloseCredential waited for the backend worker")
+	}
+	if session.ctx.Err() != nil {
+		t.Fatal("CloseCredential cancelled the transport session")
+	}
+	close(release)
+}
+
 func TestRelayCloseCredentialKeepsTransportSession(t *testing.T) {
 	r, _, capability := newRelayFixture(t, echoBackend, nil, nil)
 	client := newTestClient(t, capability, r)
@@ -545,6 +975,37 @@ func TestRelayCloseCredentialKeepsTransportSession(t *testing.T) {
 	}
 }
 
+func TestRelayBackendReceivesOpenRequestRemoteAddress(t *testing.T) {
+	remote := make(chan net.Addr, 1)
+	backend := func(ctx context.Context, conn net.Conn, _ string) error {
+		remote <- conn.RemoteAddr()
+		<-ctx.Done()
+		return nil
+	}
+	_, handler, capability := newRelayFixture(t, backend, nil, nil)
+	_, token := rawSession(t, handler, capability)
+	open, _ := appendFrame(nil, frame{Type: frameOpen, StreamID: 1})
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/up", bytes.NewReader(open))
+	req.RemoteAddr = "203.0.113.44:3456"
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set(headerUpSequence, "1")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("open returned HTTP %d", rec.Code)
+	}
+	select {
+	case addr := <-remote:
+		tcpAddr, ok := addr.(*net.TCPAddr)
+		if !ok || tcpAddr.String() != req.RemoteAddr {
+			t.Fatalf("backend RemoteAddr = %T %v, want *net.TCPAddr %s", addr, addr, req.RemoteAddr)
+		}
+	case <-time.After(testWait):
+		t.Fatal("backend did not receive OPEN")
+	}
+}
+
 func TestRelayStreamAndSessionLimits(t *testing.T) {
 	backend := func(ctx context.Context, conn net.Conn, credentialID string) error {
 		<-ctx.Done()
@@ -552,7 +1013,7 @@ func TestRelayStreamAndSessionLimits(t *testing.T) {
 	}
 	r, handler, capability := newRelayFixture(t, backend, nil, nil)
 	var firstSession *transportSession
-	for i := 0; i < MaxSessionsPerCredential+1; i++ {
+	for i := 0; i < maxSessionsPerCredential+1; i++ {
 		_, token := rawSession(t, handler, capability)
 		if i == 0 {
 			r.mu.Lock()
@@ -568,14 +1029,14 @@ func TestRelayStreamAndSessionLimits(t *testing.T) {
 	r.mu.Lock()
 	owned := len(r.byCredential["alice"])
 	r.mu.Unlock()
-	if owned != MaxSessionsPerCredential {
-		t.Fatalf("credential has %d sessions, want %d", owned, MaxSessionsPerCredential)
+	if owned != maxSessionsPerCredential {
+		t.Fatalf("credential has %d sessions, want %d", owned, maxSessionsPerCredential)
 	}
 
 	_, token := rawSession(t, handler, capability)
-	streamFrames := make([]byte, 0, (MaxStreamsPerSession+1)*FrameHeaderSize)
-	for id := uint32(1); id <= MaxStreamsPerSession+1; id++ {
-		streamFrames, _ = AppendFrame(streamFrames, Frame{Type: FrameOpen, StreamID: id})
+	streamFrames := make([]byte, 0, (maxStreamsPerSession+1)*frameHeaderSize)
+	for id := uint32(1); id <= maxStreamsPerSession+1; id++ {
+		streamFrames, _ = appendFrame(streamFrames, frame{Type: frameOpen, StreamID: id})
 	}
 	client := &http.Client{Transport: relayTransport{handler: handler}}
 	if _, err := postUpRawResponse(client, token, 1, streamFrames); err != nil {
@@ -586,16 +1047,13 @@ func TestRelayStreamAndSessionLimits(t *testing.T) {
 	r.mu.Unlock()
 	session.mu.Lock()
 	count := len(session.streams)
-	_, excessClosed := session.tombstones[MaxStreamsPerSession+1]
+	_, excessClosed := session.tombstones[maxStreamsPerSession+1]
 	session.mu.Unlock()
-	if count != MaxStreamsPerSession || !excessClosed {
+	if count != maxStreamsPerSession || !excessClosed {
 		t.Fatalf("active streams=%d, excess stream tombstoned=%t", count, excessClosed)
 	}
 	if err := r.Close(); err != nil {
 		t.Fatal(err)
-	}
-	if got := r.ActiveGoroutines(); got != 0 {
-		t.Fatalf("relay left %d owned goroutines", got)
 	}
 }
 
@@ -605,7 +1063,7 @@ func TestRelayGlobalSessionLimitAndCloseWaits(t *testing.T) {
 		return nil
 	}
 	r, handler, _ := newRelayFixture(t, backend, nil, nil)
-	credentials := make([]Credential, MaxSessionsPerRelay/MaxSessionsPerCredential+1)
+	credentials := make([]Credential, maxSessionsPerRelay/maxSessionsPerCredential+1)
 	capabilities := make([]string, len(credentials))
 	for i := range credentials {
 		id := fmt.Sprintf("alice-%02d", i)
@@ -622,8 +1080,8 @@ func TestRelayGlobalSessionLimitAndCloseWaits(t *testing.T) {
 		t.Fatal(err)
 	}
 	var finalStatus int
-	for i := 0; i < MaxSessionsPerRelay; i++ {
-		capIndex := i / MaxSessionsPerCredential
+	for i := 0; i < maxSessionsPerRelay; i++ {
+		capIndex := i / maxSessionsPerCredential
 		_, _ = rawSession(t, handler, capabilities[capIndex])
 	}
 	status, headers, _ := rawSessionStatus(t, handler, capabilities[len(capabilities)-1])
@@ -634,8 +1092,83 @@ func TestRelayGlobalSessionLimitAndCloseWaits(t *testing.T) {
 	if err := r.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.ActiveGoroutines(); got != 0 {
-		t.Fatalf("relay left %d owned goroutines after Close", got)
+}
+
+func TestRelaySilentStreamsDoNotReservePendingOrStarveNeighbor(t *testing.T) {
+	const (
+		quietSessionCount = maxSessionsPerCredential
+		quietPerSession   = maxStreamsPerSession
+		otherQuietCount   = 52
+		quietTotal        = quietSessionCount*quietPerSession + otherQuietCount
+	)
+	started := make(chan struct{}, quietTotal)
+	backend := func(ctx context.Context, conn net.Conn, credentialID string) error {
+		if credentialID == "healthy" {
+			_, err := io.Copy(conn, conn)
+			return err
+		}
+		started <- struct{}{}
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	r, handler, _ := newRelayFixture(t, backend, nil, nil)
+	credentials := []Credential{
+		{ID: "silent-a", Secret: []byte("silent-a12345678")},
+		{ID: "silent-b", Secret: []byte("silent-b12345678")},
+		{ID: "healthy", Secret: []byte("healthy123456789")},
+	}
+	if err := r.SetCredentials(credentials); err != nil {
+		t.Fatal(err)
+	}
+	capabilities := make(map[string]string, len(credentials))
+	for _, credential := range credentials {
+		capabilities[credential.ID], _ = DeriveCapability("example.com", credential.Secret)
+	}
+	client := &http.Client{Transport: relayTransport{handler: handler}}
+	openSessions := func(capability string, count, streamsPerSession int) {
+		for i := 0; i < count; i++ {
+			_, token := rawSession(t, handler, capability)
+			frames := make([]byte, 0, streamsPerSession*frameHeaderSize)
+			for id := uint32(1); id <= uint32(streamsPerSession); id++ {
+				frames, _ = appendFrame(frames, frame{Type: frameOpen, StreamID: id})
+			}
+			if _, err := postUpRawResponse(client, token, 1, frames); err != nil {
+				t.Fatalf("opening silent streams: %v", err)
+			}
+		}
+	}
+	openSessions(capabilities["silent-a"], quietSessionCount, quietPerSession)
+	openSessions(capabilities["silent-b"], 1, otherQuietCount)
+	timer := time.NewTimer(testWait)
+	defer timer.Stop()
+	for i := 0; i < quietTotal; i++ {
+		select {
+		case <-started:
+		case <-timer.C:
+			t.Fatalf("only %d of %d quiet backends started", i, quietTotal)
+		}
+	}
+	if got := r.pendingBytes.Load(); got != 0 {
+		t.Fatalf("silent streams reserved %d pending bytes", got)
+	}
+
+	clientConn := newTestClient(t, capabilities["healthy"], r)
+	if err := clientConn.Bootstrap(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	stream, err := clientConn.OpenStream(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stream.Write([]byte("neighbor")); err != nil {
+		t.Fatal(err)
+	}
+	got := make([]byte, len("neighbor"))
+	if _, err := io.ReadFull(stream, got); err != nil || string(got) != "neighbor" {
+		t.Fatalf("neighbor echo = %q, err=%v", got, err)
+	}
+	if err := clientConn.DeleteSession(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -694,7 +1227,7 @@ func echoBackend(_ context.Context, conn net.Conn, _ string) error {
 	return err
 }
 
-func newRelayFixture(t *testing.T, backend Backend, clock RelayClock, onAuth func(*http.Request)) (*Relay, http.Handler, string) {
+func newRelayFixture(t *testing.T, backend Backend, clock relayClock, onAuth func(*http.Request)) (*Relay, http.Handler, string) {
 	t.Helper()
 	secret := []byte("alice01234567890")
 	capability, err := DeriveCapability("example.com", secret)
@@ -718,8 +1251,8 @@ func newRelayFixture(t *testing.T, backend Backend, clock RelayClock, onAuth fun
 	}
 	t.Cleanup(func() {
 		_ = r.Close()
-		if got := r.ActiveGoroutines(); got != 0 {
-			t.Errorf("relay left %d owned goroutines", got)
+		if got := r.pendingBytes.Load(); got != 0 {
+			t.Errorf("relay retained %d pending bytes after Close", got)
 		}
 	})
 	return r, r.Handler(http.NotFoundHandler()), capability
@@ -765,10 +1298,10 @@ func rawSessionStatus(t *testing.T, handler http.Handler, capability string) (in
 	pageRec := httptest.NewRecorder()
 	handler.ServeHTTP(pageRec, pageReq)
 	bootstrap := pageRec.Header().Get(headerBootstrap)
-	if pageRec.Code != http.StatusOK || !validTokenText(bootstrap) {
+	if pageRec.Code != http.StatusOK || !canonicalBase64URL(bootstrap, tokenSize) {
 		t.Fatalf("bridge returned %d without bootstrap token", pageRec.Code)
 	}
-	hello, _ := AppendFrame(nil, Frame{Type: FrameHello, Payload: AppendHelloPayload(nil)})
+	hello, _ := appendFrame(nil, frame{Type: frameHello, Payload: appendHelloPayload(nil)})
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", bytes.NewReader(hello))
 	req.Header.Set("Authorization", "Bearer "+bootstrap)
 	req.Header.Set("Content-Type", "application/octet-stream")
@@ -830,31 +1363,4 @@ func postDownRaw(client *http.Client, token string, cursor uint64) ([]byte, http
 		return nil, resp.Header.Clone(), fmt.Errorf("downlink returned HTTP %d", resp.StatusCode)
 	}
 	return body, resp.Header.Clone(), nil
-}
-
-func waitForOutput(t *testing.T, session *transportSession) {
-	t.Helper()
-	timer := time.NewTimer(testWait)
-	defer timer.Stop()
-	for {
-		session.mu.Lock()
-		hasData := false
-		for _, queued := range session.outQueue {
-			if queued.typeID == FrameData {
-				hasData = true
-				break
-			}
-		}
-		if hasData {
-			session.mu.Unlock()
-			return
-		}
-		wake := session.outSignal
-		session.mu.Unlock()
-		select {
-		case <-wake:
-		case <-timer.C:
-			t.Fatal("backend produced no downlink data")
-		}
-	}
 }

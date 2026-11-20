@@ -6,7 +6,6 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"strings"
-	"sync"
 )
 
 const (
@@ -27,12 +26,11 @@ const (
 	errInvalidSecret       capabilityError = "invalid secret"
 	errInvalidCredential   capabilityError = "invalid credential"
 	errDuplicateCapability capabilityError = "ambiguous credential capability"
-	errNilCapabilityIndex  capabilityError = "nil capability index"
 )
 
-// NormalizeHost lowercases a canonical ASCII/IDNA hostname. Unicode names must
+// normalizeHost lowercases a canonical ASCII/IDNA hostname. Unicode names must
 // be converted to their ASCII IDNA form before they reach this package.
-func NormalizeHost(host string) (string, error) {
+func normalizeHost(host string) (string, error) {
 	if len(host) == 0 || len(host) > 253 {
 		return "", errInvalidHost
 	}
@@ -61,17 +59,15 @@ func NormalizeHost(host string) (string, error) {
 // DeriveCapability returns the unpadded base64url HMAC capability for host and
 // secret. A secret is either 16 raw bytes or 0xdd followed by those 16 bytes.
 func DeriveCapability(host string, secret []byte) (string, error) {
-	normalizedHost, err := NormalizeHost(host)
+	normalizedHost, err := normalizeHost(host)
 	if err != nil {
 		return "", err
 	}
 	if !validSecret(secret) {
 		return "", errInvalidSecret
 	}
-	mac := hmac.New(sha256.New, secret)
-	_, _ = mac.Write([]byte(capabilityDomain))
-	_, _ = mac.Write([]byte(normalizedHost))
-	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+	derived := deriveCapabilityBytes(normalizedHost, secret)
+	return string(derived[:]), nil
 }
 
 type Credential struct {
@@ -84,38 +80,26 @@ type capabilityEntry struct {
 	credentialID string
 }
 
-// CapabilityIndex holds the capabilities for one hostname. Rebuild atomically
-// replaces the snapshot while readers can continue using the previous one.
-type CapabilityIndex struct {
-	mu      sync.RWMutex
+// capabilityIndex is immutable after publication through Relay.index.
+type capabilityIndex struct {
 	host    string
 	entries []capabilityEntry
 }
 
-func NewCapabilityIndex(host string) (*CapabilityIndex, error) {
-	normalizedHost, err := NormalizeHost(host)
+func buildCapabilityIndex(host string, credentials []Credential) (*capabilityIndex, error) {
+	normalizedHost, err := normalizeHost(host)
 	if err != nil {
 		return nil, err
 	}
-	return &CapabilityIndex{host: normalizedHost}, nil
-}
-
-// Rebuild replaces all entries. Each credential accepts the plain and dd-prefixed
-// forms derived from its same underlying 16-byte secret.
-func (idx *CapabilityIndex) Rebuild(credentials []Credential) error {
-	if idx == nil {
-		return errNilCapabilityIndex
-	}
-
 	entries := make([]capabilityEntry, 0)
 	seen := make(map[[capabilityTextSize]byte]string)
 	for _, credential := range credentials {
 		if credential.ID == "" {
-			return errInvalidCredential
+			return nil, errInvalidCredential
 		}
 		plain, ok := plainSecret(credential.Secret)
 		if !ok {
-			return errInvalidSecret
+			return nil, errInvalidSecret
 		}
 
 		var prefixed [ddSecretSize]byte
@@ -123,10 +107,10 @@ func (idx *CapabilityIndex) Rebuild(credentials []Credential) error {
 		copy(prefixed[1:], plain[:])
 		forms := [2][]byte{plain[:], prefixed[:]}
 		for _, secret := range forms {
-			encoded := deriveCapabilityBytes(idx.host, secret)
+			encoded := deriveCapabilityBytes(normalizedHost, secret)
 			if previousID, exists := seen[encoded]; exists {
 				if previousID != credential.ID {
-					return errDuplicateCapability
+					return nil, errDuplicateCapability
 				}
 				continue
 			}
@@ -135,21 +119,16 @@ func (idx *CapabilityIndex) Rebuild(credentials []Credential) error {
 		}
 	}
 
-	idx.mu.Lock()
-	idx.entries = entries
-	idx.mu.Unlock()
-	return nil
+	return &capabilityIndex{host: normalizedHost, entries: entries}, nil
 }
 
-// Lookup scans every stored capability and compares each fixed-width value in
+// lookup scans every stored capability and compares each fixed-width value in
 // constant time with respect to the bytes of a canonical 43-character input.
-func (idx *CapabilityIndex) Lookup(capability string) (string, bool) {
+func (idx *capabilityIndex) lookup(capability string) (string, bool) {
 	if idx == nil || len(capability) != capabilityTextSize {
 		return "", false
 	}
 	candidate := []byte(capability)
-	idx.mu.RLock()
-	defer idx.mu.RUnlock()
 
 	found := 0
 	selected := uint64(0)
@@ -194,4 +173,12 @@ func deriveCapabilityBytes(host string, secret []byte) [capabilityTextSize]byte 
 	var value [capabilityTextSize]byte
 	copy(value[:], encoded)
 	return value
+}
+
+func canonicalBase64URL(value string, size int) bool {
+	if len(value) != base64.RawURLEncoding.EncodedLen(size) {
+		return false
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(value)
+	return err == nil && len(decoded) == size && base64.RawURLEncoding.EncodeToString(decoded) == value
 }

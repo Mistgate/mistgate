@@ -3,43 +3,46 @@ package webproxy
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
-	"io"
 	"net"
+	"net/netip"
+	"strconv"
 	"sync"
-	"time"
+	"sync/atomic"
 )
 
 type transportSession struct {
 	relay        *Relay
 	credentialID string
 	token        string
-	createdAt    time.Time
 	ordinal      uint64
 	ctx          context.Context
 	cancel       context.CancelFunc
 	done         chan struct{}
 
-	mu            sync.Mutex
-	closed        bool
-	lastPoll      time.Time
-	streams       map[uint32]*webStream
-	tombstones    map[uint32]struct{}
-	tombstoneIDs  []uint32
-	upSeq         uint64
-	upInFlight    uint64
-	lastUpBody    []byte
-	outQueue      []*queuedFrame
-	outSignal     chan struct{}
-	ackedCursor   uint64
-	lastBatch     []byte
-	lastBatchFrom uint64
-	lastBatchTo   uint64
-	lastBatchCost int64
-	hasLastBatch  bool
-	activePoll    *downPoll
-	children      sync.WaitGroup
+	mu             sync.Mutex
+	closed         bool
+	lastPoll       atomic.Int64
+	streams        map[uint32]*webStream
+	tombstones     map[uint32]struct{}
+	tombstoneIDs   []uint32
+	upSeq          uint64
+	upInFlight     bool
+	lastUpHash     [sha256.Size]byte
+	outQueue       []*queuedFrame
+	outSignal      chan struct{}
+	pendingWindows map[uint32]uint32
+	pendingCloses  map[uint32]struct{}
+	ackedCursor    uint64
+	lastBatch      []byte
+	lastBatchFrom  uint64
+	lastBatchTo    uint64
+	lastBatchCost  int64
+	hasLastBatch   bool
+	activePoll     *downPoll
+	children       sync.WaitGroup
 }
 
 type webStream struct {
@@ -71,7 +74,6 @@ type queuedFrame struct {
 	encoded  []byte
 	charge   int64
 	streamID uint32
-	typeID   FrameType
 }
 
 type downPoll struct {
@@ -91,7 +93,7 @@ const (
 
 type upAction struct {
 	kind   upActionKind
-	frame  Frame
+	frame  frame
 	stream *webStream
 }
 
@@ -99,6 +101,7 @@ type streamShadow struct {
 	stream     *webStream
 	new        bool
 	alive      bool
+	dead       bool
 	recvCredit uint64
 	sendCredit uint64
 }
@@ -115,13 +118,13 @@ func (s *transportSession) run() {
 		s.markStreamClosedLocked(stream, false)
 		streams = append(streams, stream)
 	}
-	var release int64
+	var releaseDown int64
 	for _, chunk := range s.outQueue {
-		release += chunk.charge
+		releaseDown += chunk.charge
 	}
 	s.outQueue = nil
 	if s.hasLastBatch {
-		release += s.lastBatchCost
+		releaseDown += s.lastBatchCost
 		s.lastBatch = nil
 		s.lastBatchCost = 0
 		s.hasLastBatch = false
@@ -131,8 +134,8 @@ func (s *transportSession) run() {
 		s.activePoll = nil
 	}
 	s.mu.Unlock()
-	if release > 0 {
-		s.relay.releasePending(release)
+	if releaseDown > 0 {
+		s.relay.releasePending(s.credentialID, pendingDown, releaseDown)
 	}
 	s.relay.removeSession(s)
 	for _, stream := range streams {
@@ -167,79 +170,87 @@ func (s *transportSession) startStream(stream *webStream) {
 	}
 }
 
-func (s *transportSession) applyUp(seq uint64, body []byte, frames []Frame) (uint64, bool, []*webStream, error) {
+func (s *transportSession) applyUp(seq uint64, body []byte, frames []frame, remoteAddr string) (uint64, error) {
+	bodyHash := sha256.Sum256(body)
 	s.mu.Lock()
 	if s.closed || s.ctx.Err() != nil {
 		s.mu.Unlock()
-		return 0, false, nil, errRelayClosed
+		return 0, errRelayClosed
 	}
 	if seq == 0 {
 		s.mu.Unlock()
-		return 0, false, nil, errInvalidUp
+		return 0, errInvalidUp
 	}
 	if seq == s.upSeq {
-		if bytes.Equal(body, s.lastUpBody) {
+		if bodyHash == s.lastUpHash {
 			ack := s.upSeq
 			s.mu.Unlock()
-			return ack, true, nil, nil
+			return ack, nil
 		}
 		s.mu.Unlock()
-		return 0, false, nil, errInvalidUp
+		return 0, errInvalidUp
 	}
 	if seq != s.upSeq+1 || s.upSeq == ^uint64(0) {
 		s.mu.Unlock()
-		return 0, false, nil, errInvalidUp
+		return 0, errInvalidUp
 	}
 
-	shadows := make(map[uint32]*streamShadow, len(s.streams)+len(frames))
-	for id, stream := range s.streams {
-		shadows[id] = &streamShadow{stream: stream, alive: true, recvCredit: stream.recvCredit, sendCredit: stream.sendCredit}
-	}
-	dead := make(map[uint32]struct{}, len(s.tombstones))
-	for id := range s.tombstones {
-		dead[id] = struct{}{}
+	shadows := make(map[uint32]*streamShadow, len(frames))
+	deadAdded := make(map[uint32]struct{})
+	shadowFor := func(id uint32) *streamShadow {
+		if shadow, exists := shadows[id]; exists {
+			return shadow
+		}
+		shadow := &streamShadow{}
+		if stream := s.streams[id]; stream != nil {
+			shadow.stream = stream
+			shadow.alive = true
+			shadow.recvCredit = stream.recvCredit
+			shadow.sendCredit = stream.sendCredit
+		} else if _, dead := s.tombstones[id]; dead {
+			shadow.dead = true
+		}
+		shadows[id] = shadow
+		return shadow
 	}
 	activeCount := len(s.streams)
 	actions := make([]upAction, 0, len(frames))
 	var pendingCharge int64
-	closeCount := 0
 	closeShadow := func(id uint32, shadow *streamShadow) {
 		if shadow != nil && shadow.alive {
 			shadow.alive = false
+			shadow.dead = true
 			activeCount--
-			dead[id] = struct{}{}
-			closeCount++
+			deadAdded[id] = struct{}{}
 		}
 	}
 	for _, frame := range frames {
 		var shadow *streamShadow
 		if frame.StreamID != 0 {
-			shadow = shadows[frame.StreamID]
+			shadow = shadowFor(frame.StreamID)
 		}
 		switch frame.Type {
-		case FrameOpen:
+		case frameOpen:
 			if shadow != nil && shadow.alive {
 				closeShadow(frame.StreamID, shadow)
 				actions = append(actions, upAction{kind: upClose, frame: frame, stream: shadow.stream})
 				continue
 			}
-			if _, exists := dead[frame.StreamID]; exists {
-				closeCount++
+			if shadow.dead {
 				actions = append(actions, upAction{kind: upClose, frame: frame})
 				continue
 			}
-			dead[frame.StreamID] = struct{}{}
-			if activeCount >= MaxStreamsPerSession {
-				closeCount++
+			if activeCount >= maxStreamsPerSession {
+				shadow.dead = true
+				deadAdded[frame.StreamID] = struct{}{}
 				actions = append(actions, upAction{kind: upClose, frame: frame})
 				continue
 			}
-			delete(dead, frame.StreamID)
-			shadow = &streamShadow{new: true, alive: true, recvCredit: InitialStreamWindow, sendCredit: InitialStreamWindow}
+			shadow = &streamShadow{new: true, alive: true, recvCredit: initialStreamWindow, sendCredit: initialStreamWindow}
 			shadows[frame.StreamID] = shadow
 			activeCount++
 			actions = append(actions, upAction{kind: upOpen, frame: frame})
-		case FrameData:
+		case frameData:
 			if shadow != nil && shadow.alive {
 				if uint64(len(frame.Payload)) > shadow.recvCredit {
 					closeShadow(frame.StreamID, shadow)
@@ -251,17 +262,17 @@ func (s *transportSession) applyUp(seq uint64, body []byte, frames []Frame) (uin
 				actions = append(actions, upAction{kind: upData, frame: frame, stream: shadow.stream})
 				continue
 			}
-			if _, exists := dead[frame.StreamID]; !exists {
-				dead[frame.StreamID] = struct{}{}
-				closeCount++
+			if !shadow.dead {
+				shadow.dead = true
+				deadAdded[frame.StreamID] = struct{}{}
 				actions = append(actions, upAction{kind: upClose, frame: frame})
 			} else {
 				actions = append(actions, upAction{kind: upIgnore, frame: frame})
 			}
-		case FrameWindow:
-			credit, _ := ParseWindowPayload(frame.Payload)
+		case frameWindow:
+			credit, _ := parseWindowPayload(frame.Payload)
 			if shadow != nil && shadow.alive {
-				if shadow.sendCredit+uint64(credit) > InitialStreamWindow {
+				if shadow.sendCredit+uint64(credit) > initialStreamWindow {
 					closeShadow(frame.StreamID, shadow)
 					actions = append(actions, upAction{kind: upClose, frame: frame, stream: shadow.stream})
 					continue
@@ -270,47 +281,45 @@ func (s *transportSession) applyUp(seq uint64, body []byte, frames []Frame) (uin
 				actions = append(actions, upAction{kind: upWindow, frame: frame, stream: shadow.stream})
 				continue
 			}
-			if _, exists := dead[frame.StreamID]; !exists {
-				dead[frame.StreamID] = struct{}{}
-				closeCount++
+			if !shadow.dead {
+				shadow.dead = true
+				deadAdded[frame.StreamID] = struct{}{}
 				actions = append(actions, upAction{kind: upClose, frame: frame})
 			} else {
 				actions = append(actions, upAction{kind: upIgnore, frame: frame})
 			}
-		case FrameClose:
+		case frameClose:
 			if shadow != nil && shadow.alive {
 				closeShadow(frame.StreamID, shadow)
 				actions = append(actions, upAction{kind: upClose, frame: frame, stream: shadow.stream})
 				continue
 			}
-			if _, exists := dead[frame.StreamID]; !exists {
-				dead[frame.StreamID] = struct{}{}
-				closeCount++
+			if !shadow.dead {
+				shadow.dead = true
+				deadAdded[frame.StreamID] = struct{}{}
 				actions = append(actions, upAction{kind: upClose, frame: frame})
 			} else {
 				actions = append(actions, upAction{kind: upIgnore, frame: frame})
 			}
-		case FramePong:
+		case framePong:
 			actions = append(actions, upAction{kind: upIgnore, frame: frame})
 		default:
 			s.mu.Unlock()
-			return 0, false, nil, errInvalidUp
+			return 0, errInvalidUp
 		}
 	}
-	closeCharge := int64(closeCount * (FrameHeaderSize + pendingFrameOverhead))
-	if !s.relay.reservePending(pendingCharge + closeCharge) {
+	if !s.relay.reservePending(s.credentialID, pendingUp, pendingCharge) {
 		s.mu.Unlock()
-		return 0, false, nil, errPendingCapacity
+		return 0, errPendingCapacity
 	}
 	if s.ctx.Err() != nil {
-		s.relay.releasePending(pendingCharge + closeCharge)
+		s.relay.releasePending(s.credentialID, pendingUp, pendingCharge)
 		s.mu.Unlock()
-		return 0, false, nil, errRelayClosed
+		return 0, errRelayClosed
 	}
 
 	newStreams := make([]*webStream, 0)
 	stopStreams := make([]*webStream, 0)
-	reservedClose := closeCharge
 	for _, action := range actions {
 		switch action.kind {
 		case upOpen:
@@ -322,10 +331,10 @@ func (s *transportSession) applyUp(seq uint64, body []byte, frames []Frame) (uin
 				ctx:          streamCtx,
 				cancel:       cancel,
 				local:        local,
-				backend:      backend,
+				backend:      remoteAddressConn{Conn: backend, remote: tcpRemoteAddr(remoteAddr)},
 				done:         make(chan struct{}),
-				recvCredit:   InitialStreamWindow,
-				sendCredit:   InitialStreamWindow,
+				recvCredit:   initialStreamWindow,
+				sendCredit:   initialStreamWindow,
 				incomingWake: make(chan struct{}, 1),
 				windowWake:   make(chan struct{}, 1),
 			}
@@ -339,10 +348,9 @@ func (s *transportSession) applyUp(seq uint64, body []byte, frames []Frame) (uin
 			}
 			if stream == nil || stream.closed {
 				charge := dataFrameCharge(len(action.frame.Payload))
-				s.relay.releasePending(charge)
+				s.relay.releasePending(s.credentialID, pendingUp, charge)
 				continue
 			}
-			stream.recvCredit -= uint64(len(action.frame.Payload))
 			stream.incoming = append(stream.incoming, &inboundChunk{
 				data:   append([]byte(nil), action.frame.Payload...),
 				charge: dataFrameCharge(len(action.frame.Payload)),
@@ -350,8 +358,6 @@ func (s *transportSession) applyUp(seq uint64, body []byte, frames []Frame) (uin
 			signal(stream.incomingWake)
 		case upWindow:
 			if action.stream != nil && !action.stream.closed {
-				credit, _ := ParseWindowPayload(action.frame.Payload)
-				action.stream.sendCredit += uint64(credit)
 				signal(action.stream.windowWake)
 			}
 		case upClose:
@@ -364,11 +370,7 @@ func (s *transportSession) applyUp(seq uint64, body []byte, frames []Frame) (uin
 				stopStreams = append(stopStreams, stream)
 			}
 			s.addTombstoneLocked(action.frame.StreamID)
-			encoded, _ := AppendFrame(nil, Frame{Type: FrameClose, StreamID: action.frame.StreamID})
-			charge := int64(FrameHeaderSize + pendingFrameOverhead)
-			s.outQueue = append(s.outQueue, &queuedFrame{encoded: encoded, charge: charge, streamID: action.frame.StreamID, typeID: FrameClose})
-			reservedClose -= charge
-			signal(s.outSignal)
+			s.queueCloseLocked(action.frame.StreamID)
 		case upIgnore:
 		}
 	}
@@ -385,11 +387,13 @@ func (s *transportSession) applyUp(seq uint64, body []byte, frames []Frame) (uin
 			}
 		}
 	}
-	if reservedClose > 0 {
-		s.relay.releasePending(reservedClose)
+	for id := range deadAdded {
+		if shadow := shadows[id]; shadow == nil || !shadow.alive {
+			s.addTombstoneLocked(id)
+		}
 	}
 	s.upSeq = seq
-	s.lastUpBody = append([]byte(nil), body...)
+	s.lastUpHash = bodyHash
 	for _, stream := range newStreams {
 		if s.streams[stream.id] != stream {
 			stream.stop()
@@ -405,36 +409,31 @@ func (s *transportSession) applyUp(seq uint64, body []byte, frames []Frame) (uin
 			s.startStream(stream)
 		}
 	}
-	return seq, false, newStreams, nil
+	return seq, nil
 }
 
-func (s *transportSession) beginUp(seq uint64) (bool, error) {
+func (s *transportSession) beginUp(seq uint64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.ctx.Err() != nil {
-		return false, errRelayClosed
+		return errRelayClosed
+	}
+	if s.upInFlight {
+		return errPendingCapacity
 	}
 	if seq == 0 {
-		return false, errInvalidUp
+		return errInvalidUp
 	}
-	if seq == s.upSeq {
-		return false, nil
+	if seq != s.upSeq && (s.upSeq == ^uint64(0) || seq != s.upSeq+1) {
+		return errInvalidUp
 	}
-	if s.upSeq == ^uint64(0) || seq != s.upSeq+1 {
-		return false, errInvalidUp
-	}
-	if s.upInFlight != 0 {
-		return false, errPendingCapacity
-	}
-	s.upInFlight = seq
-	return true, nil
+	s.upInFlight = true
+	return nil
 }
 
-func (s *transportSession) finishUp(seq uint64) {
+func (s *transportSession) finishUp() {
 	s.mu.Lock()
-	if s.upInFlight == seq {
-		s.upInFlight = 0
-	}
+	s.upInFlight = false
 	s.mu.Unlock()
 }
 
@@ -455,26 +454,50 @@ func (s *transportSession) markStreamClosedLocked(stream *webStream, sendClose b
 	}
 	s.addTombstoneLocked(stream.id)
 	for _, chunk := range stream.incoming {
-		s.relay.releasePending(chunk.charge)
+		s.relay.releasePending(s.credentialID, pendingUp, chunk.charge)
 	}
 	stream.incoming = nil
 	queued := s.outQueue[:0]
 	for _, item := range s.outQueue {
-		if item.streamID == stream.id && item.typeID != FrameClose {
-			s.relay.releasePending(item.charge)
+		if item.streamID == stream.id {
+			s.relay.releasePending(s.credentialID, pendingDown, item.charge)
 			continue
 		}
 		queued = append(queued, item)
 	}
 	s.outQueue = queued
+	delete(s.pendingWindows, stream.id)
 	if sendClose {
-		encoded, _ := AppendFrame(nil, Frame{Type: FrameClose, StreamID: stream.id})
-		charge := int64(FrameHeaderSize + pendingFrameOverhead)
-		if s.relay.reservePending(charge) {
-			s.outQueue = append(s.outQueue, &queuedFrame{encoded: encoded, charge: charge, streamID: stream.id, typeID: FrameClose})
-			signal(s.outSignal)
-		}
+		s.queueCloseLocked(stream.id)
 	}
+}
+
+func (s *transportSession) queueCloseLocked(streamID uint32) {
+	if _, exists := s.pendingCloses[streamID]; exists || len(s.pendingCloses) >= maxStreamsPerSession {
+		return
+	}
+	s.pendingCloses[streamID] = struct{}{}
+	s.signalOutputLocked()
+}
+
+func (s *transportSession) queueWindowLocked(streamID, credit uint32) {
+	if credit == 0 {
+		return
+	}
+	if stream := s.streams[streamID]; stream == nil || stream.closed {
+		return
+	}
+	if current := s.pendingWindows[streamID]; uint64(current)+uint64(credit) <= initialStreamWindow {
+		s.pendingWindows[streamID] = current + credit
+	} else {
+		return
+	}
+	s.signalOutputLocked()
+}
+
+func (s *transportSession) signalOutputLocked() {
+	close(s.outSignal)
+	s.outSignal = make(chan struct{})
 }
 
 func (s *transportSession) closeUnstartedLocked(stream *webStream) {
@@ -498,7 +521,7 @@ func (s *transportSession) addTombstoneLocked(id uint32) {
 	}
 }
 
-func (s *transportSession) closeAllStreams(sendClose bool) []*webStream {
+func (s *transportSession) closeAllStreams(sendClose bool) {
 	s.mu.Lock()
 	streams := make([]*webStream, 0, len(s.streams))
 	for _, stream := range s.streams {
@@ -509,7 +532,6 @@ func (s *transportSession) closeAllStreams(sendClose bool) []*webStream {
 	for _, stream := range streams {
 		stream.stop()
 	}
-	return streams
 }
 
 func (s *transportSession) finishStream(stream *webStream, sendClose bool) {
@@ -522,39 +544,34 @@ func (s *transportSession) finishStream(stream *webStream, sendClose bool) {
 	stream.stop()
 }
 
-func (s *transportSession) enqueueReserved(f Frame, charge int64) bool {
-	encoded, err := AppendFrame(nil, f)
+func (s *transportSession) enqueueReserved(f frame, charge int64) bool {
+	encoded, err := appendFrame(nil, f)
 	if err != nil {
-		s.relay.releasePending(charge)
+		s.relay.releasePending(s.credentialID, pendingDown, charge)
 		return false
 	}
 	s.mu.Lock()
 	if s.closed || s.ctx.Err() != nil {
 		s.mu.Unlock()
-		s.relay.releasePending(charge)
+		s.relay.releasePending(s.credentialID, pendingDown, charge)
 		return false
 	}
 	if f.StreamID != 0 {
 		stream := s.streams[f.StreamID]
 		if stream == nil || stream.closed {
 			s.mu.Unlock()
-			s.relay.releasePending(charge)
+			s.relay.releasePending(s.credentialID, pendingDown, charge)
 			return false
 		}
 	}
-	s.outQueue = append(s.outQueue, &queuedFrame{encoded: encoded, charge: charge, streamID: f.StreamID, typeID: f.Type})
-	signal(s.outSignal)
+	s.outQueue = append(s.outQueue, &queuedFrame{encoded: encoded, charge: charge, streamID: f.StreamID})
+	s.signalOutputLocked()
 	s.mu.Unlock()
 	return true
 }
 
-func (s *transportSession) closeHTTP() {
-	s.cancel()
-	<-s.done
-}
-
 func (s *transportSession) down(cursor uint64, requestCtx context.Context) ([]byte, uint64, bool, error) {
-	var release int64
+	var releaseDown int64
 	s.mu.Lock()
 	if s.closed || s.ctx.Err() != nil {
 		s.mu.Unlock()
@@ -569,8 +586,6 @@ func (s *transportSession) down(cursor uint64, requestCtx context.Context) ([]by
 		s.mu.Unlock()
 		return nil, cursor, false, errInvalidUp
 	}
-	s.lastPoll = s.relay.clock.Now()
-	s.relay.signalExpiry()
 	poll := &downPoll{cursor: cursor, takeover: make(chan struct{})}
 	if s.activePoll != nil {
 		close(s.activePoll.takeover)
@@ -584,27 +599,31 @@ func (s *transportSession) down(cursor uint64, requestCtx context.Context) ([]by
 		return body, to, true, nil
 	}
 	if s.hasLastBatch && cursor == s.lastBatchTo {
-		release += s.lastBatchCost
+		releaseDown += s.lastBatchCost
 		s.hasLastBatch = false
 		s.lastBatch = nil
 		s.lastBatchCost = 0
 		s.ackedCursor = cursor
+		s.lastPoll.Store(s.relay.clock.Now().UnixNano())
 	}
 	if body, to, ok := s.takeBatchLocked(cursor); ok {
 		s.activePoll = nil
 		s.mu.Unlock()
-		if release > 0 {
-			s.relay.releasePending(release)
+		if releaseDown > 0 {
+			s.relay.releasePending(s.credentialID, pendingDown, releaseDown)
 		}
 		return body, to, true, nil
 	}
-	s.mu.Unlock()
-	if release > 0 {
-		s.relay.releasePending(release)
+	if releaseDown == 0 {
+		s.lastPoll.Store(s.relay.clock.Now().UnixNano())
 	}
-	s.relay.signalExpiry()
+	wake := s.outSignal
+	s.mu.Unlock()
+	if releaseDown > 0 {
+		s.relay.releasePending(s.credentialID, pendingDown, releaseDown)
+	}
 
-	timer := s.relay.clock.NewTimer(DownLongPollTimeout)
+	timer := s.relay.clock.NewTimer(downLongPollTimeout)
 	defer timer.Stop()
 	for {
 		select {
@@ -615,13 +634,19 @@ func (s *transportSession) down(cursor uint64, requestCtx context.Context) ([]by
 			s.clearPoll(poll)
 			return nil, cursor, false, errRelayClosed
 		case <-poll.takeover:
+			s.mu.Lock()
+			if s.activePoll != nil {
+				s.signalOutputLocked()
+			}
+			s.mu.Unlock()
 			return nil, cursor, false, nil
 		case <-timer.C():
 			s.clearPoll(poll)
 			return nil, cursor, false, nil
-		case <-s.outSignal:
+		case <-wake:
 			s.mu.Lock()
 			if s.activePoll != poll {
+				s.signalOutputLocked()
 				s.mu.Unlock()
 				return nil, cursor, false, nil
 			}
@@ -630,13 +655,14 @@ func (s *transportSession) down(cursor uint64, requestCtx context.Context) ([]by
 				s.mu.Unlock()
 				return body, to, true, nil
 			}
+			wake = s.outSignal
 			s.mu.Unlock()
 		}
 	}
 }
 
 func (s *transportSession) takeBatchLocked(cursor uint64) ([]byte, uint64, bool) {
-	if len(s.outQueue) == 0 || cursor == ^uint64(0) {
+	if len(s.outQueue) == 0 && len(s.pendingWindows) == 0 && len(s.pendingCloses) == 0 || cursor == ^uint64(0) {
 		return nil, cursor, false
 	}
 	var batch bytes.Buffer
@@ -645,7 +671,7 @@ func (s *transportSession) takeBatchLocked(cursor uint64) ([]byte, uint64, bool)
 	consumed := 0
 	for consumed < len(s.outQueue) && count < maxDownFramesPerBatch {
 		item := s.outQueue[consumed]
-		if batch.Len()+len(item.encoded) > MaxDownBatch {
+		if batch.Len()+len(item.encoded) > maxDownBatch {
 			break
 		}
 		_, _ = batch.Write(item.encoded)
@@ -653,10 +679,44 @@ func (s *transportSession) takeBatchLocked(cursor uint64) ([]byte, uint64, bool)
 		consumed++
 		count++
 	}
-	if consumed == 0 {
+	var windows []uint32
+	for streamID, credit := range s.pendingWindows {
+		if count >= maxDownFramesPerBatch {
+			break
+		}
+		var payload [4]byte
+		binary.BigEndian.PutUint32(payload[:], credit)
+		encoded, err := appendFrame(nil, frame{Type: frameWindow, StreamID: streamID, Payload: payload[:]})
+		if err != nil || batch.Len()+len(encoded) > maxDownBatch {
+			break
+		}
+		_, _ = batch.Write(encoded)
+		windows = append(windows, streamID)
+		count++
+	}
+	var closes []uint32
+	for streamID := range s.pendingCloses {
+		if count >= maxDownFramesPerBatch {
+			break
+		}
+		encoded, err := appendFrame(nil, frame{Type: frameClose, StreamID: streamID})
+		if err != nil || batch.Len()+len(encoded) > maxDownBatch {
+			break
+		}
+		_, _ = batch.Write(encoded)
+		closes = append(closes, streamID)
+		count++
+	}
+	if count == 0 {
 		return nil, cursor, false
 	}
 	s.outQueue = append([]*queuedFrame(nil), s.outQueue[consumed:]...)
+	for _, streamID := range windows {
+		delete(s.pendingWindows, streamID)
+	}
+	for _, streamID := range closes {
+		delete(s.pendingCloses, streamID)
+	}
 	s.lastBatch = append([]byte(nil), batch.Bytes()...)
 	s.lastBatchFrom = cursor
 	s.lastBatchTo = cursor + 1
@@ -695,11 +755,17 @@ func (st *webStream) run() {
 		}
 		return true
 	}
-	if !launch(st.backendLoop) || !launch(st.incomingLoop) || !launch(st.outgoingLoop) {
+	if !launch(st.incomingLoop) {
 		st.session.finishStream(st, true)
+		return
 	}
+	if !launch(st.outgoingLoop) {
+		st.session.finishStream(st, true)
+		workers.Wait()
+		return
+	}
+	st.backendLoop()
 	workers.Wait()
-	st.session.finishStream(st, true)
 }
 
 func (st *webStream) backendLoop() {
@@ -739,37 +805,29 @@ func (st *webStream) incomingLoop() {
 			if written > 0 {
 				chunk.offset += written
 				chunk.charge -= int64(written)
-				st.session.relay.releasePending(int64(written))
+				st.session.relay.releasePending(st.session.credentialID, pendingUp, int64(written))
 				st.session.mu.Lock()
 				if !st.closed {
 					st.recvCredit += uint64(written)
-					if st.recvCredit > InitialStreamWindow {
-						st.recvCredit = InitialStreamWindow
+					if st.recvCredit > initialStreamWindow {
+						st.recvCredit = initialStreamWindow
 					}
 				}
+				st.session.queueWindowLocked(st.id, uint32(written))
 				st.session.mu.Unlock()
-				var payload [4]byte
-				binary.BigEndian.PutUint32(payload[:], uint32(written))
-				frame := Frame{Type: FrameWindow, StreamID: st.id, Payload: payload[:]}
-				charge := framePendingCharge(len(frame.Payload))
-				if st.session.relay.waitForPending(st.ctx, charge) {
-					st.session.enqueueReserved(frame, charge)
-				} else {
-					st.session.relay.releasePending(chunk.charge)
-					return
-				}
 			}
 			if err != nil || written == 0 {
-				st.session.relay.releasePending(chunk.charge)
+				st.session.relay.releasePending(st.session.credentialID, pendingUp, chunk.charge)
 				st.session.finishStream(st, true)
 				return
 			}
 		}
-		st.session.relay.releasePending(chunk.charge)
+		st.session.relay.releasePending(st.session.credentialID, pendingUp, chunk.charge)
 	}
 }
 
 func (st *webStream) outgoingLoop() {
+	buffer := make([]byte, backendChunkSize)
 	for {
 		st.session.mu.Lock()
 		if st.closed || st.ctx.Err() != nil {
@@ -785,29 +843,24 @@ func (st *webStream) outgoingLoop() {
 				continue
 			}
 		}
-		want := uint64(BackendChunkSize)
+		want := uint64(backendChunkSize)
 		if st.sendCredit < want {
 			want = st.sendCredit
 		}
 		st.sendCredit -= want
 		st.session.mu.Unlock()
 
-		reserved := framePendingCharge(int(want))
-		if !st.session.relay.waitForPending(st.ctx, reserved) {
-			st.restoreCredit(want)
-			return
-		}
-		buffer := make([]byte, int(want))
-		read, err := st.local.Read(buffer)
-		if read < int(want) {
-			st.session.relay.releasePending(int64(int(want) - read))
-		}
+		read, err := st.local.Read(buffer[:int(want)])
 		if read > 0 {
 			st.restoreCredit(want - uint64(read))
-			frame := Frame{Type: FrameData, StreamID: st.id, Payload: buffer[:read]}
-			st.session.enqueueReserved(frame, framePendingCharge(read))
+			frame := frame{Type: frameData, StreamID: st.id, Payload: buffer[:read]}
+			charge := dataFrameCharge(read)
+			if st.session.relay.waitForPending(st.ctx, st.session.credentialID, pendingDown, charge) {
+				st.session.enqueueReserved(frame, charge)
+			} else {
+				return
+			}
 		} else {
-			st.session.relay.releasePending(FrameHeaderSize + pendingFrameOverhead)
 			st.restoreCredit(want)
 		}
 		if err != nil || read == 0 {
@@ -824,8 +877,8 @@ func (st *webStream) restoreCredit(amount uint64) {
 	st.session.mu.Lock()
 	if !st.closed {
 		st.sendCredit += amount
-		if st.sendCredit > InitialStreamWindow {
-			st.sendCredit = InitialStreamWindow
+		if st.sendCredit > initialStreamWindow {
+			st.sendCredit = initialStreamWindow
 		}
 	}
 	st.session.mu.Unlock()
@@ -840,10 +893,8 @@ func (st *webStream) stop() {
 }
 
 func dataFrameCharge(payloadBytes int) int64 {
-	return int64(payloadBytes + FrameHeaderSize + pendingFrameOverhead)
+	return int64(payloadBytes + frameHeaderSize + pendingFrameOverhead)
 }
-
-func framePendingCharge(payloadBytes int) int64 { return dataFrameCharge(payloadBytes) }
 
 func signal(ch chan struct{}) {
 	select {
@@ -852,17 +903,14 @@ func signal(ch chan struct{}) {
 	}
 }
 
-func readFrameBatch(body []byte) ([]Frame, error) {
+func parseFrameBatch(body []byte) ([]frame, error) {
 	if len(body) == 0 || len(body) > maxUpBatchBytes {
 		return nil, errInvalidUp
 	}
-	decoder := NewDecoder(bytes.NewReader(body))
-	frames := make([]Frame, 0, 16)
-	for {
-		frame, err := decoder.ReadFrame()
-		if err == io.EOF {
-			break
-		}
+	rest := body
+	frames := make([]frame, 0, 16)
+	for len(rest) > 0 {
+		frame, next, err := parseFrame(rest)
 		if err != nil {
 			return nil, errInvalidUp
 		}
@@ -870,6 +918,30 @@ func readFrameBatch(body []byte) ([]Frame, error) {
 		if len(frames) > maxDownFramesPerBatch {
 			return nil, errInvalidUp
 		}
+		rest = next
 	}
 	return frames, nil
+}
+
+type remoteAddressConn struct {
+	net.Conn
+	remote *net.TCPAddr
+}
+
+func (c remoteAddressConn) RemoteAddr() net.Addr { return c.remote }
+
+func tcpRemoteAddr(value string) *net.TCPAddr {
+	host, portText, err := net.SplitHostPort(value)
+	if err != nil {
+		return &net.TCPAddr{}
+	}
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return &net.TCPAddr{}
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < 0 || port > 65535 {
+		return &net.TCPAddr{}
+	}
+	return &net.TCPAddr{IP: net.IP(addr.AsSlice()), Port: port, Zone: addr.Zone()}
 }

@@ -3,13 +3,13 @@ package webproxy
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -23,6 +23,8 @@ const (
 
 // Handler routes only canonical bridge and carrier requests into the relay.
 // Every other request is passed to next as the same request with its body intact.
+// This fallback is safe for requests carrying a genuine token only when next
+// remains inside this process; it must not forward those requests to another host.
 func (r *Relay) Handler(next http.Handler) http.Handler {
 	if next == nil {
 		next = http.NotFoundHandler()
@@ -60,8 +62,9 @@ func (r *Relay) Handler(next http.Handler) http.Handler {
 				next.ServeHTTP(w, req)
 				return
 			}
-			r.authenticated(req)
+			w = r.authenticated(w, req)
 			defer r.endHandler()
+			defer clearWriteDeadline(w)
 			r.serveSession(w, req, entry)
 		case path == "/api/v1/up" && req.Method == http.MethodPost:
 			session, ok := r.authenticateSession(req.Header)
@@ -69,8 +72,9 @@ func (r *Relay) Handler(next http.Handler) http.Handler {
 				next.ServeHTTP(w, req)
 				return
 			}
-			r.authenticated(req)
+			w = r.authenticated(w, req)
 			defer r.endHandler()
+			defer clearWriteDeadline(w)
 			r.serveUp(w, req, session)
 		case path == "/api/v1/down" && req.Method == http.MethodPost:
 			session, ok := r.authenticateSession(req.Header)
@@ -78,8 +82,9 @@ func (r *Relay) Handler(next http.Handler) http.Handler {
 				next.ServeHTTP(w, req)
 				return
 			}
-			r.authenticated(req)
+			w = r.authenticated(w, req)
 			defer r.endHandler()
+			defer clearWriteDeadline(w)
 			r.serveDown(w, req, session)
 		case path == "/api/v1/session" && req.Method == http.MethodDelete:
 			session, ok := r.authenticateSession(req.Header)
@@ -87,8 +92,9 @@ func (r *Relay) Handler(next http.Handler) http.Handler {
 				next.ServeHTTP(w, req)
 				return
 			}
-			r.authenticated(req)
+			w = r.authenticated(w, req)
 			defer r.endHandler()
+			defer clearWriteDeadline(w)
 			r.serveDelete(w, req, session)
 		default:
 			next.ServeHTTP(w, req)
@@ -106,21 +112,37 @@ func (r *Relay) serveBridge(w http.ResponseWriter, req *http.Request) bool {
 	if len(capability) != capabilityTextSize {
 		return false
 	}
-	r.mu.Lock()
-	if r.closed {
+	var credentialID string
+	var snapshot *capabilityIndex
+	var ok bool
+	for {
+		index := r.index.Load()
+		credentialID, ok = index.lookup(capability)
+		if !ok {
+			return false
+		}
+		r.mu.Lock()
+		if r.closed {
+			r.mu.Unlock()
+			return false
+		}
+		if r.index.Load() != index {
+			r.mu.Unlock()
+			continue
+		}
+		if !r.beginHandlerLocked() {
+			r.mu.Unlock()
+			return false
+		}
+		snapshot = index
 		r.mu.Unlock()
-		return false
+		break
 	}
-	credentialID, ok := r.index.Lookup(capability)
-	if !ok || !r.beginHandlerLocked() {
-		r.mu.Unlock()
-		return false
-	}
-	r.mu.Unlock()
 	defer r.endHandler()
-	r.authenticated(req)
+	w = r.authenticated(w, req)
+	defer clearWriteDeadline(w)
 
-	token, err := r.issueBootstrap(credentialID)
+	token, err := r.issueBootstrap(credentialID, snapshot)
 	if err != nil {
 		writeUnavailable(w)
 		return true
@@ -139,8 +161,7 @@ func (r *Relay) authenticateBootstrap(token string) (*bootstrapState, bool) {
 	entry, ok := r.bootstrap[token]
 	if !ok || r.closed || !r.clock.Now().Before(entry.expiresAt) {
 		if ok {
-			delete(r.bootstrap, token)
-			r.tokens.Delete(token)
+			r.removeBootstrapLocked(token, entry)
 		}
 		return nil, false
 	}
@@ -151,11 +172,8 @@ func (r *Relay) authenticateBootstrap(token string) (*bootstrapState, bool) {
 		return nil, false
 	}
 	if !entry.authenticated {
-		if _, valid := r.tokens.Use(token, TokenBootstrap); !valid {
-			r.endHandler()
-			return nil, false
-		}
 		entry.authenticated = true
+		r.removeUnusedBootstrapLocked(entry)
 	}
 	return entry, true
 }
@@ -174,16 +192,17 @@ func (r *Relay) authenticateSession(headers http.Header) (*transportSession, boo
 	if session == nil || session.ctx.Err() != nil {
 		return nil, false
 	}
-	if _, valid := r.tokens.Use(token, TokenSession); !valid || !r.beginHandlerLocked() {
+	if !r.beginHandlerLocked() {
 		return nil, false
 	}
 	return session, true
 }
 
-func (r *Relay) authenticated(req *http.Request) {
+func (r *Relay) authenticated(w http.ResponseWriter, req *http.Request) http.ResponseWriter {
 	if r.onAuthenticated != nil {
 		r.onAuthenticated(req)
 	}
+	return &deadlineResponseWriter{ResponseWriter: w}
 }
 
 func (r *Relay) serveSession(w http.ResponseWriter, req *http.Request, entry *bootstrapState) {
@@ -195,13 +214,13 @@ func (r *Relay) serveSession(w http.ResponseWriter, req *http.Request, entry *bo
 		writeLocalError(w, http.StatusBadRequest)
 		return
 	}
-	body, err := readBounded(req.Body, 64)
+	body, err := readAuthenticatedBody(w, req.Body, 64)
 	if err != nil {
 		writeLocalError(w, http.StatusRequestEntityTooLarge)
 		return
 	}
-	frame, rest, err := ParseFrame(body)
-	if err != nil || len(rest) != 0 || frame.Type != FrameHello || frame.StreamID != 0 || ParseHelloPayload(frame.Payload) != nil {
+	hello, rest, err := parseFrame(body)
+	if err != nil || len(rest) != 0 || hello.Type != frameHello || hello.StreamID != 0 || parseHelloPayload(hello.Payload) != nil {
 		r.forgetBootstrapEntry(entry)
 		writeLocalError(w, http.StatusBadRequest)
 		return
@@ -242,11 +261,6 @@ func (r *Relay) serveSession(w http.ResponseWriter, req *http.Request, entry *bo
 			writeSessionResponse(w, sessionToken, response)
 			return
 		}
-		if entry.finished {
-			r.mu.Unlock()
-			writeLocalError(w, http.StatusNotFound)
-			return
-		}
 		if entry.body == nil {
 			entry.body = append([]byte(nil), body...)
 		}
@@ -254,13 +268,20 @@ func (r *Relay) serveSession(w http.ResponseWriter, req *http.Request, entry *bo
 		entry.ready = make(chan struct{})
 		r.mu.Unlock()
 
-		session, sessionToken, createErr := r.createSession(entry.credentialID)
-		response, _ := AppendFrame(nil, Frame{Type: FrameWelcome})
+		session, sessionToken, createErr := r.createSession(entry.credentialID, entry.credentialSecret)
+		response, _ := appendFrame(nil, frame{Type: frameWelcome})
 		r.mu.Lock()
 		if createErr == nil {
-			entry.session = session
-			entry.sessionToken = sessionToken
-			entry.responseBody = response
+			currentSecrets := r.credentials[entry.credentialID]
+			if r.bootstrap[entry.token] != entry || !sameSecrets(currentSecrets, entry.credentialSecret) || session.ctx.Err() != nil {
+				r.detachSessionLocked(session)
+				session.cancel()
+				createErr = errCredentialGone
+			} else {
+				entry.session = session
+				entry.sessionToken = sessionToken
+				entry.responseBody = response
+			}
 		}
 		entry.processing = false
 		close(entry.ready)
@@ -283,8 +304,7 @@ func (r *Relay) forgetBootstrapEntry(entry *bootstrapState) {
 	r.mu.Lock()
 	for token, current := range r.bootstrap {
 		if current == entry {
-			delete(r.bootstrap, token)
-			r.tokens.Delete(token)
+			r.removeBootstrapLocked(token, current)
 			break
 		}
 	}
@@ -321,33 +341,41 @@ func (r *Relay) serveUp(w http.ResponseWriter, req *http.Request, session *trans
 		writeLocalError(w, http.StatusBadRequest)
 		return
 	}
-	ownsSequence, err := session.beginUp(sequence)
-	if errors.Is(err, errPendingCapacity) {
+	length := req.ContentLength
+	if length < 0 {
+		length = maxUpBatchBytes
+	}
+	if length > maxUpBatchBytes {
+		writeLocalError(w, http.StatusRequestEntityTooLarge)
+		return
+	}
+	if err := session.beginUp(sequence); errors.Is(err, errPendingCapacity) {
 		writeUnavailable(w)
 		return
-	}
-	if errors.Is(err, errRelayClosed) {
+	} else if errors.Is(err, errRelayClosed) {
 		writeLocalError(w, http.StatusNotFound)
 		return
-	}
-	if err != nil {
+	} else if err != nil {
 		writeLocalError(w, http.StatusBadRequest)
 		return
 	}
-	if ownsSequence {
-		defer session.finishUp(sequence)
+	defer session.finishUp()
+	if !r.reservePending(session.credentialID, pendingUp, length) {
+		writeUnavailable(w)
+		return
 	}
-	body, err := readBounded(req.Body, maxUpBatchBytes)
+	defer r.releasePending(session.credentialID, pendingUp, length)
+	body, err := readAuthenticatedBody(w, req.Body, maxUpBatchBytes)
 	if err != nil {
 		writeLocalError(w, http.StatusRequestEntityTooLarge)
 		return
 	}
-	frames, err := readFrameBatch(body)
+	frames, err := parseFrameBatch(body)
 	if err != nil {
 		writeLocalError(w, http.StatusBadRequest)
 		return
 	}
-	ack, _, _, err := session.applyUp(sequence, body, frames)
+	ack, err := session.applyUp(sequence, body, frames, req.RemoteAddr)
 	if errors.Is(err, errPendingCapacity) {
 		writeUnavailable(w)
 		return
@@ -374,7 +402,7 @@ func (r *Relay) serveDown(w http.ResponseWriter, req *http.Request, session *tra
 		writeLocalError(w, http.StatusBadRequest)
 		return
 	}
-	body, err := readBounded(req.Body, 0)
+	body, err := readAuthenticatedBody(w, req.Body, 0)
 	if err != nil || len(body) != 0 {
 		writeLocalError(w, http.StatusBadRequest)
 		return
@@ -417,12 +445,13 @@ func (r *Relay) serveDelete(w http.ResponseWriter, req *http.Request, session *t
 		writeLocalError(w, http.StatusNotFound)
 		return
 	}
-	body, err := readBounded(req.Body, 0)
+	body, err := readAuthenticatedBody(w, req.Body, 0)
 	if err != nil || len(body) != 0 {
 		writeLocalError(w, http.StatusBadRequest)
 		return
 	}
-	session.closeHTTP()
+	session.cancel()
+	<-session.done
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -444,11 +473,7 @@ func bearerToken(headers http.Header) (string, bool) {
 		return "", false
 	}
 	token := strings.TrimPrefix(value, "Bearer ")
-	if len(token) != tokenTextSize {
-		return "", false
-	}
-	decoded, err := base64.RawURLEncoding.DecodeString(token)
-	if err != nil || len(decoded) != tokenSize || base64.RawURLEncoding.EncodeToString(decoded) != token {
+	if !canonicalBase64URL(token, tokenSize) {
 		return "", false
 	}
 	return token, true
@@ -456,12 +481,10 @@ func bearerToken(headers http.Header) (string, bool) {
 
 func oneHeader(headers http.Header, name string) (string, bool) {
 	values := headers.Values(name)
-	return func() (string, bool) {
-		if len(values) != 1 {
-			return "", false
-		}
-		return values[0], true
-	}()
+	if len(values) != 1 {
+		return "", false
+	}
+	return values[0], true
 }
 
 func validBinaryContentType(headers http.Header) bool {
@@ -498,4 +521,44 @@ func readBounded(body io.Reader, limit int64) ([]byte, error) {
 		return nil, io.ErrShortBuffer
 	}
 	return data, nil
+}
+
+const authenticatedRequestTimeout = 30 * time.Second
+
+func readAuthenticatedBody(w http.ResponseWriter, body io.Reader, limit int64) ([]byte, error) {
+	controller := http.NewResponseController(w)
+	_ = controller.SetReadDeadline(time.Now().Add(authenticatedRequestTimeout))
+	defer controller.SetReadDeadline(time.Time{})
+	return readBounded(body, limit)
+}
+
+type deadlineResponseWriter struct {
+	http.ResponseWriter
+	set bool
+}
+
+func (w *deadlineResponseWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+func (w *deadlineResponseWriter) WriteHeader(status int) {
+	w.setDeadline()
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *deadlineResponseWriter) Write(body []byte) (int, error) {
+	w.setDeadline()
+	return w.ResponseWriter.Write(body)
+}
+
+func (w *deadlineResponseWriter) setDeadline() {
+	if w.set {
+		return
+	}
+	w.set = true
+	_ = http.NewResponseController(w.ResponseWriter).SetWriteDeadline(time.Now().Add(authenticatedRequestTimeout))
+}
+
+func clearWriteDeadline(w http.ResponseWriter) {
+	if _, ok := w.(*deadlineResponseWriter); ok {
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
+	}
 }

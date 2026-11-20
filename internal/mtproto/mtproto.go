@@ -10,10 +10,11 @@
 // decrypting one leg and encrypting the other; the plaintext between them is the MTProto transport, and its size is
 // what the Observer counts.
 //
-// Whatever is not an authenticated client of a configured domain (another SNI, a failed HMAC, a replayed hello, a hello
-// outside the clock window, plain HTTP, a browser) goes to Config.Fallback with every byte already read, so a prober
-// talks to the real site the caller puts there. Plain obfuscated2 without Fake TLS is not served: on a node whose
-// port 443 also shows a website it would be a stream of noise nothing else on the port explains.
+// Whatever is not an authenticated Fake TLS client of a configured domain (another SNI, a failed HMAC, a replayed hello,
+// a hello outside the clock window, plain HTTP, a browser) goes to Config.Fallback with every byte already read, so a
+// prober talks to the real site the caller puts there. A caller that has already identified a credential can serve a
+// plain obfuscated2 connection through Server.ServeStream; that entry point uses the same registration, limits and
+// relay as the Fake TLS path.
 //
 // Sources and the reasons for the limits: design/adr/0010-mtproto.md.
 package mtproto

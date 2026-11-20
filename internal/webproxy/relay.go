@@ -3,8 +3,10 @@ package webproxy
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -13,45 +15,52 @@ import (
 )
 
 const (
-	MaxSessionsPerCredential = 8
-	MaxStreamsPerSession     = 256
-	MaxSessionsPerRelay      = 512
-	MaxPendingBytes          = 128 << 20
-	MaxDownBatch             = 1 << 20
-	InitialStreamWindow      = 4 << 20
-	BackendChunkSize         = 64 << 10
-	RelayIdleTimeout         = 2 * time.Minute
-	DownLongPollTimeout      = 25 * time.Second
-
-	maxUpBatchBytes       = 2 << 20
-	maxTombstones         = 4096
-	maxTokenEntries       = 1 << 16
-	maxDownFramesPerBatch = 4096
-	pendingFrameOverhead  = 256
+	maxSessionsPerCredential = 8
+	maxStreamsPerSession     = 256
+	maxSessionsPerRelay      = 512
+	maxPendingBytes          = 128 << 20
+	maxPendingUpBytes        = 64 << 20
+	maxPendingDownBytes      = 64 << 20
+	maxPendingPerCredential  = 16 << 20
+	maxDownBatch             = 1 << 20
+	initialStreamWindow      = 4 << 20
+	backendChunkSize         = 64 << 10
+	relayIdleTimeout         = 2 * time.Minute
+	downLongPollTimeout      = 25 * time.Second
+	bootstrapTokenTTL        = 2 * time.Minute
+	maxUnusedBootstraps      = 8
+	tokenSize                = 32
+	tokenTextSize            = 43
+	maxUpBatchBytes          = 2 << 20
+	maxTombstones            = 4096
+	maxTokenRetries          = 8
+	maxDownFramesPerBatch    = 4096
+	pendingFrameOverhead     = 256
 )
 
 const carrierModeHTTPS = "https"
 
 var (
-	errRelayClosed      = errors.New("webproxy relay is closed")
-	errCredentialGone   = errors.New("webproxy credential is unavailable")
-	errSessionCapacity  = errors.New("webproxy session capacity reached")
-	errPendingCapacity  = errors.New("webproxy pending byte capacity reached")
-	errInvalidBootstrap = errors.New("invalid bootstrap request")
+	errRelayClosed     = errors.New("webproxy relay is closed")
+	errCredentialGone  = errors.New("webproxy credential is unavailable")
+	errSessionCapacity = errors.New("webproxy session capacity reached")
+	errPendingCapacity = errors.New("webproxy pending byte capacity reached")
+	errTokenRandom     = errors.New("unable to generate token")
+	errTokenCollision  = errors.New("unable to generate unique token")
 )
 
 type Backend func(context.Context, net.Conn, string) error
 
 type BridgePage func(bootstrapToken string) []byte
 
-type RelayTimer interface {
+type relayTimer interface {
 	C() <-chan time.Time
 	Stop() bool
 }
 
-type RelayClock interface {
+type relayClock interface {
 	Now() time.Time
-	NewTimer(time.Duration) RelayTimer
+	NewTimer(time.Duration) relayTimer
 }
 
 type RelayOptions struct {
@@ -59,46 +68,52 @@ type RelayOptions struct {
 	Backend         Backend
 	BridgePage      BridgePage
 	Random          io.Reader
-	Clock           RelayClock
+	Clock           relayClock
 	OnAuthenticated func(*http.Request)
 }
 
 type Relay struct {
-	mu               sync.Mutex
-	setMu            sync.Mutex
-	closed           bool
-	host             string
-	index            *CapabilityIndex
-	credentials      map[string]struct{}
-	bootstrap        map[string]*bootstrapState
-	sessions         map[string]*transportSession
-	byCredential     map[string]map[*transportSession]struct{}
-	sessionOrdinal   uint64
-	tokens           *TokenStore
-	backend          Backend
-	bridgePage       BridgePage
-	onAuthenticated  func(*http.Request)
-	clock            RelayClock
-	stop             chan struct{}
-	expiryWake       chan struct{}
-	wg               sync.WaitGroup
-	activeGoroutines atomic.Int64
-	pendingBytes     atomic.Int64
-	pendingChanged   chan struct{}
+	mu                     sync.Mutex
+	setMu                  sync.Mutex
+	closed                 bool
+	host                   string
+	index                  atomic.Pointer[capabilityIndex]
+	credentials            map[string]map[[plainSecretSize]byte]struct{}
+	bootstrap              map[string]*bootstrapState
+	unusedBootstrap        map[string][]*bootstrapState
+	sessions               map[string]*transportSession
+	byCredential           map[string]map[*transportSession]struct{}
+	sessionOrdinal         uint64
+	random                 io.Reader
+	backend                Backend
+	bridgePage             BridgePage
+	onAuthenticated        func(*http.Request)
+	clock                  relayClock
+	stop                   chan struct{}
+	expiryWake             chan struct{}
+	wg                     sync.WaitGroup
+	pendingBytes           atomic.Int64
+	pendingMu              sync.Mutex
+	pendingUpBytes         int64
+	pendingDownBytes       int64
+	pendingByCredential    map[string]int64
+	pendingChanged         chan struct{}
+	pendingUnderflow       atomic.Bool
+	pendingUnderflowLogged atomic.Bool
 }
 
 type bootstrapState struct {
-	token         string
-	credentialID  string
-	expiresAt     time.Time
-	authenticated bool
-	processing    bool
-	ready         chan struct{}
-	body          []byte
-	responseBody  []byte
-	sessionToken  string
-	session       *transportSession
-	finished      bool
+	token            string
+	credentialID     string
+	credentialSecret map[[plainSecretSize]byte]struct{}
+	expiresAt        time.Time
+	authenticated    bool
+	processing       bool
+	ready            chan struct{}
+	body             []byte
+	responseBody     []byte
+	sessionToken     string
+	session          *transportSession
 }
 
 type realRelayClock struct{}
@@ -107,7 +122,7 @@ type realRelayTimer struct{ timer *time.Timer }
 
 func (realRelayClock) Now() time.Time { return time.Now() }
 
-func (realRelayClock) NewTimer(d time.Duration) RelayTimer {
+func (realRelayClock) NewTimer(d time.Duration) relayTimer {
 	return realRelayTimer{timer: time.NewTimer(d)}
 }
 
@@ -119,7 +134,7 @@ func NewRelay(options RelayOptions) (*Relay, error) {
 	if options.Backend == nil || options.BridgePage == nil {
 		return nil, errors.New("webproxy relay requires a backend and bridge page")
 	}
-	index, err := NewCapabilityIndex(options.Host)
+	index, err := buildCapabilityIndex(options.Host, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -129,26 +144,24 @@ func NewRelay(options RelayOptions) (*Relay, error) {
 	if options.Clock == nil {
 		options.Clock = realRelayClock{}
 	}
-	tokens, err := NewTokenStore(maxTokenEntries, options.Random, options.Clock.Now)
-	if err != nil {
-		return nil, err
-	}
 	r := &Relay{
-		host:            index.host,
-		index:           index,
-		credentials:     make(map[string]struct{}),
-		bootstrap:       make(map[string]*bootstrapState),
-		sessions:        make(map[string]*transportSession),
-		byCredential:    make(map[string]map[*transportSession]struct{}),
-		tokens:          tokens,
-		backend:         options.Backend,
-		bridgePage:      options.BridgePage,
-		onAuthenticated: options.OnAuthenticated,
-		clock:           options.Clock,
-		stop:            make(chan struct{}),
-		expiryWake:      make(chan struct{}, 1),
-		pendingChanged:  make(chan struct{}, 1),
+		host:                index.host,
+		credentials:         make(map[string]map[[plainSecretSize]byte]struct{}),
+		bootstrap:           make(map[string]*bootstrapState),
+		unusedBootstrap:     make(map[string][]*bootstrapState),
+		sessions:            make(map[string]*transportSession),
+		byCredential:        make(map[string]map[*transportSession]struct{}),
+		random:              options.Random,
+		backend:             options.Backend,
+		bridgePage:          options.BridgePage,
+		onAuthenticated:     options.OnAuthenticated,
+		clock:               options.Clock,
+		stop:                make(chan struct{}),
+		expiryWake:          make(chan struct{}, 1),
+		pendingByCredential: make(map[string]int64),
+		pendingChanged:      make(chan struct{}),
 	}
+	r.index.Store(index)
 	r.mu.Lock()
 	r.spawnLocked(r.expiryLoop)
 	r.mu.Unlock()
@@ -164,49 +177,71 @@ func (r *Relay) SetCredentials(credentials []Credential) error {
 	r.setMu.Lock()
 	defer r.setMu.Unlock()
 
-	index, err := NewCapabilityIndex(r.host)
+	copyCredentials := make([]Credential, len(credentials))
+	identities := make(map[string]map[[plainSecretSize]byte]struct{}, len(credentials))
+	for i, credential := range credentials {
+		copyCredentials[i] = Credential{ID: credential.ID, Secret: append([]byte(nil), credential.Secret...)}
+		plain, ok := plainSecret(credential.Secret)
+		if !ok {
+			return errInvalidSecret
+		}
+		if identities[credential.ID] == nil {
+			identities[credential.ID] = make(map[[plainSecretSize]byte]struct{})
+		}
+		identities[credential.ID][plain] = struct{}{}
+	}
+	index, err := buildCapabilityIndex(r.host, copyCredentials)
 	if err != nil {
 		return err
 	}
-	copyCredentials := make([]Credential, len(credentials))
-	ids := make(map[string]struct{}, len(credentials))
-	for i, credential := range credentials {
-		copyCredentials[i] = Credential{ID: credential.ID, Secret: append([]byte(nil), credential.Secret...)}
-		ids[credential.ID] = struct{}{}
-	}
-	if err := index.Rebuild(copyCredentials); err != nil {
-		return err
-	}
 
-	var retiring []*transportSession
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
 		return errRelayClosed
 	}
-	r.index = index
-	r.credentials = ids
+	if len(r.credentials) == len(identities) {
+		unchanged := true
+		for id, oldSecrets := range r.credentials {
+			if newSecrets, exists := identities[id]; !exists || !sameSecrets(oldSecrets, newSecrets) {
+				unchanged = false
+				break
+			}
+		}
+		if unchanged {
+			r.mu.Unlock()
+			return nil
+		}
+	}
+	changed := make(map[string]struct{})
+	for id, oldSecrets := range r.credentials {
+		newSecrets, exists := identities[id]
+		if exists && !sameSecrets(oldSecrets, newSecrets) {
+			changed[id] = struct{}{}
+		}
+	}
+	r.index.Store(index)
+	r.credentials = identities
 	for token, entry := range r.bootstrap {
-		if _, ok := ids[entry.credentialID]; !ok {
-			delete(r.bootstrap, token)
-			r.tokens.Delete(token)
+		_, exists := identities[entry.credentialID]
+		_, rotated := changed[entry.credentialID]
+		if !exists || rotated {
+			r.removeBootstrapLocked(token, entry)
 		}
 	}
 	for credentialID, sessions := range r.byCredential {
-		if _, ok := ids[credentialID]; ok {
+		_, exists := identities[credentialID]
+		_, rotated := changed[credentialID]
+		if exists && !rotated {
 			continue
 		}
 		for session := range sessions {
 			r.detachSessionLocked(session)
 			session.cancel()
-			retiring = append(retiring, session)
 		}
 	}
 	r.mu.Unlock()
 	r.signalExpiry()
-	for _, session := range retiring {
-		<-session.done
-	}
 	return nil
 }
 
@@ -223,12 +258,8 @@ func (r *Relay) CloseCredential(credentialID string) {
 	}
 	r.mu.Unlock()
 
-	var streams []*webStream
 	for _, session := range sessions {
-		streams = append(streams, session.closeAllStreams(true)...)
-	}
-	for _, stream := range streams {
-		<-stream.done
+		session.closeAllStreams(true)
 	}
 }
 
@@ -253,23 +284,13 @@ func (r *Relay) Close() error {
 	return nil
 }
 
-// ActiveGoroutines reports relay-owned workers that have not returned yet.
-func (r *Relay) ActiveGoroutines() int64 {
-	if r == nil {
-		return 0
-	}
-	return r.activeGoroutines.Load()
-}
-
 func (r *Relay) spawnLocked(fn func()) bool {
 	if r.closed {
 		return false
 	}
 	r.wg.Add(1)
-	r.activeGoroutines.Add(1)
 	go func() {
 		defer r.wg.Done()
-		defer r.activeGoroutines.Add(-1)
 		fn()
 	}()
 	return true
@@ -286,51 +307,134 @@ func (r *Relay) beginHandlerLocked() bool {
 		return false
 	}
 	r.wg.Add(1)
-	r.activeGoroutines.Add(1)
 	return true
 }
 
 func (r *Relay) endHandler() {
-	r.activeGoroutines.Add(-1)
 	r.wg.Done()
 }
 
-func (r *Relay) issueBootstrap(credentialID string) (string, error) {
+func (r *Relay) issueBootstrap(credentialID string, snapshot *capabilityIndex) (string, error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.closed {
+		r.mu.Unlock()
 		return "", errRelayClosed
 	}
-	if _, ok := r.credentials[credentialID]; !ok {
+	if r.index.Load() != snapshot {
+		r.mu.Unlock()
 		return "", errCredentialGone
 	}
-	token, err := r.tokens.Issue(TokenBootstrap, BootstrapTokenTTL)
+	if _, ok := r.credentials[credentialID]; !ok {
+		r.mu.Unlock()
+		return "", errCredentialGone
+	}
+	token, err := r.newTokenLocked()
 	if err != nil {
+		r.mu.Unlock()
 		return "", err
 	}
-	r.bootstrap[token] = &bootstrapState{
-		token:        token,
-		credentialID: credentialID,
-		expiresAt:    r.clock.Now().Add(BootstrapTokenTTL),
+	unused := r.unusedBootstrap[credentialID]
+	for len(unused) > 0 && !r.clock.Now().Before(unused[0].expiresAt) {
+		oldest := unused[0]
+		r.removeBootstrapLocked(oldest.token, oldest)
+		unused = r.unusedBootstrap[credentialID]
 	}
-	r.signalExpiryLocked()
+	if len(unused) >= maxUnusedBootstraps {
+		oldest := unused[0]
+		r.removeBootstrapLocked(oldest.token, oldest)
+	}
+	entry := &bootstrapState{
+		token:            token,
+		credentialID:     credentialID,
+		credentialSecret: r.credentials[credentialID],
+		expiresAt:        r.clock.Now().Add(bootstrapTokenTTL),
+	}
+	r.bootstrap[token] = entry
+	r.unusedBootstrap[credentialID] = append(r.unusedBootstrap[credentialID], entry)
+	r.mu.Unlock()
+	r.signalExpiry()
 	return token, nil
 }
 
-func (r *Relay) createSession(credentialID string) (*transportSession, string, error) {
+func randomToken(random io.Reader) (string, error) {
+	var raw [tokenSize]byte
+	if _, err := io.ReadFull(random, raw[:]); err != nil {
+		return "", errTokenRandom
+	}
+	return base64.RawURLEncoding.EncodeToString(raw[:]), nil
+}
+
+func (r *Relay) newTokenLocked() (string, error) {
+	for attempt := 0; attempt < maxTokenRetries; attempt++ {
+		token, err := randomToken(r.random)
+		if err != nil {
+			return "", err
+		}
+		if _, exists := r.bootstrap[token]; exists {
+			continue
+		}
+		if _, exists := r.sessions[token]; exists {
+			continue
+		}
+		return token, nil
+	}
+	return "", errTokenCollision
+}
+
+func sameSecrets(left, right map[[plainSecretSize]byte]struct{}) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for secret := range left {
+		if _, exists := right[secret]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *Relay) removeBootstrapLocked(token string, entry *bootstrapState) {
+	if r.bootstrap[token] == entry {
+		delete(r.bootstrap, token)
+	}
+	r.removeUnusedBootstrapLocked(entry)
+}
+
+func (r *Relay) removeUnusedBootstrapLocked(entry *bootstrapState) {
+	if entry == nil || entry.authenticated {
+		return
+	}
+	entries := r.unusedBootstrap[entry.credentialID]
+	for i, current := range entries {
+		if current == entry {
+			copy(entries[i:], entries[i+1:])
+			entries[len(entries)-1] = nil
+			entries = entries[:len(entries)-1]
+			if len(entries) == 0 {
+				delete(r.unusedBootstrap, entry.credentialID)
+			} else {
+				r.unusedBootstrap[entry.credentialID] = entries
+			}
+			return
+		}
+	}
+}
+
+func (r *Relay) createSession(credentialID string, credentialSecret map[[plainSecretSize]byte]struct{}) (*transportSession, string, error) {
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
 		return nil, "", errRelayClosed
 	}
-	if _, ok := r.credentials[credentialID]; !ok {
+	currentSecrets, ok := r.credentials[credentialID]
+	if !ok || !sameSecrets(currentSecrets, credentialSecret) {
 		r.mu.Unlock()
 		return nil, "", errCredentialGone
 	}
 
 	var evicted *transportSession
 	owned := r.byCredential[credentialID]
-	if len(owned) >= MaxSessionsPerCredential {
+	if len(owned) >= maxSessionsPerCredential {
 		for session := range owned {
 			if evicted == nil || session.ordinal < evicted.ordinal {
 				evicted = session
@@ -341,37 +445,33 @@ func (r *Relay) createSession(credentialID string) (*transportSession, string, e
 			evicted.cancel()
 		}
 	}
-	if len(r.sessions) >= MaxSessionsPerRelay {
+	if len(r.sessions) >= maxSessionsPerRelay {
 		r.mu.Unlock()
-		if evicted != nil {
-			<-evicted.done
-		}
 		return nil, "", errSessionCapacity
 	}
-	token, err := r.tokens.Issue(TokenSession, 100*365*24*time.Hour)
+	token, err := r.newTokenLocked()
 	if err != nil {
 		r.mu.Unlock()
-		if evicted != nil {
-			<-evicted.done
-		}
-		return nil, "", errSessionCapacity
+		return nil, "", err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	r.sessionOrdinal++
 	session := &transportSession{
-		relay:        r,
-		credentialID: credentialID,
-		token:        token,
-		createdAt:    r.clock.Now(),
-		ordinal:      r.sessionOrdinal,
-		lastPoll:     r.clock.Now(),
-		ctx:          ctx,
-		cancel:       cancel,
-		done:         make(chan struct{}),
-		streams:      make(map[uint32]*webStream),
-		tombstones:   make(map[uint32]struct{}),
-		outSignal:    make(chan struct{}, 1),
+		relay:          r,
+		credentialID:   credentialID,
+		token:          token,
+		ordinal:        r.sessionOrdinal,
+		lastPoll:       atomic.Int64{},
+		ctx:            ctx,
+		cancel:         cancel,
+		done:           make(chan struct{}),
+		streams:        make(map[uint32]*webStream),
+		tombstones:     make(map[uint32]struct{}),
+		outSignal:      make(chan struct{}),
+		pendingWindows: make(map[uint32]uint32),
+		pendingCloses:  make(map[uint32]struct{}),
 	}
+	session.lastPoll.Store(r.clock.Now().UnixNano())
 	r.sessions[token] = session
 	if r.byCredential[credentialID] == nil {
 		r.byCredential[credentialID] = make(map[*transportSession]struct{})
@@ -385,9 +485,6 @@ func (r *Relay) createSession(credentialID string) (*transportSession, string, e
 	}
 	r.mu.Unlock()
 	r.signalExpiry()
-	if evicted != nil {
-		<-evicted.done
-	}
 	return session, token, nil
 }
 
@@ -399,16 +496,14 @@ func (r *Relay) detachSessionLocked(session *transportSession) {
 		return
 	}
 	delete(r.sessions, session.token)
-	r.tokens.Delete(session.token)
 	owned := r.byCredential[session.credentialID]
 	delete(owned, session)
 	if len(owned) == 0 {
 		delete(r.byCredential, session.credentialID)
 	}
-	for _, entry := range r.bootstrap {
+	for token, entry := range r.bootstrap {
 		if entry.session == session {
-			entry.session = nil
-			entry.finished = true
+			r.removeBootstrapLocked(token, entry)
 		}
 	}
 }
@@ -420,54 +515,106 @@ func (r *Relay) removeSession(session *transportSession) {
 	r.signalExpiry()
 }
 
-func (r *Relay) reservePending(bytes int64) bool {
+type pendingDirection uint8
+
+const (
+	pendingUp pendingDirection = iota
+	pendingDown
+)
+
+func (r *Relay) reservePending(credentialID string, direction pendingDirection, bytes int64) bool {
 	if bytes <= 0 {
 		return true
 	}
-	for {
-		current := r.pendingBytes.Load()
-		if bytes > MaxPendingBytes-current {
-			return false
-		}
-		if r.pendingBytes.CompareAndSwap(current, current+bytes) {
-			r.notifyPending()
-			return true
-		}
+	r.pendingMu.Lock()
+	defer r.pendingMu.Unlock()
+	if !r.canReservePendingLocked(credentialID, direction, bytes) {
+		return false
 	}
+	r.addPendingLocked(credentialID, direction, bytes)
+	return true
 }
 
-func (r *Relay) releasePending(bytes int64) {
+func (r *Relay) releasePending(credentialID string, direction pendingDirection, bytes int64) {
 	if bytes <= 0 {
 		return
 	}
-	remaining := r.pendingBytes.Add(-bytes)
-	if remaining < 0 {
-		panic("webproxy pending byte accounting underflow")
+	r.pendingMu.Lock()
+	underflow := false
+	used := r.pendingByCredential[credentialID]
+	if bytes > used {
+		bytes = used
+		underflow = true
 	}
-	r.notifyPending()
+	var directionUsed *int64
+	if direction == pendingUp {
+		directionUsed = &r.pendingUpBytes
+	} else {
+		directionUsed = &r.pendingDownBytes
+	}
+	if bytes > *directionUsed {
+		bytes = *directionUsed
+		underflow = true
+	}
+	*directionUsed -= bytes
+	if used-bytes == 0 {
+		delete(r.pendingByCredential, credentialID)
+	} else {
+		r.pendingByCredential[credentialID] = used - bytes
+	}
+	r.pendingBytes.Add(-bytes)
+	r.notifyPendingLocked()
+	r.pendingMu.Unlock()
+	if underflow && r.pendingUnderflow.CompareAndSwap(false, true) {
+		r.signalExpiry()
+	}
 }
 
-func (r *Relay) notifyPending() {
-	select {
-	case r.pendingChanged <- struct{}{}:
-	default:
-	}
-}
-
-func (r *Relay) waitForPending(ctx context.Context, bytes int64) bool {
+func (r *Relay) waitForPending(ctx context.Context, credentialID string, direction pendingDirection, bytes int64) bool {
 	for {
+		r.pendingMu.Lock()
 		if ctx.Err() != nil {
+			r.pendingMu.Unlock()
 			return false
 		}
-		if r.reservePending(bytes) {
+		if r.canReservePendingLocked(credentialID, direction, bytes) {
+			r.addPendingLocked(credentialID, direction, bytes)
+			r.pendingMu.Unlock()
 			return true
 		}
+		changed := r.pendingChanged
+		r.pendingMu.Unlock()
 		select {
 		case <-ctx.Done():
 			return false
-		case <-r.pendingChanged:
+		case <-changed:
 		}
 	}
+}
+
+func (r *Relay) canReservePendingLocked(credentialID string, direction pendingDirection, bytes int64) bool {
+	if bytes > maxPendingBytes-r.pendingBytes.Load() || bytes > maxPendingPerCredential-r.pendingByCredential[credentialID] {
+		return false
+	}
+	if direction == pendingUp {
+		return bytes <= maxPendingUpBytes-r.pendingUpBytes
+	}
+	return bytes <= maxPendingDownBytes-r.pendingDownBytes
+}
+
+func (r *Relay) addPendingLocked(credentialID string, direction pendingDirection, bytes int64) {
+	if direction == pendingUp {
+		r.pendingUpBytes += bytes
+	} else {
+		r.pendingDownBytes += bytes
+	}
+	r.pendingByCredential[credentialID] += bytes
+	r.pendingBytes.Add(bytes)
+}
+
+func (r *Relay) notifyPendingLocked() {
+	close(r.pendingChanged)
+	r.pendingChanged = make(chan struct{})
 }
 
 func (r *Relay) signalExpiry() {
@@ -477,8 +624,6 @@ func (r *Relay) signalExpiry() {
 	}
 }
 
-func (r *Relay) signalExpiryLocked() { r.signalExpiry() }
-
 func (r *Relay) expiryLoop() {
 	for {
 		r.mu.Lock()
@@ -486,8 +631,7 @@ func (r *Relay) expiryLoop() {
 		var earliest time.Time
 		for token, entry := range r.bootstrap {
 			if !now.Before(entry.expiresAt) {
-				delete(r.bootstrap, token)
-				r.tokens.Delete(token)
+				r.removeBootstrapLocked(token, entry)
 				continue
 			}
 			if earliest.IsZero() || entry.expiresAt.Before(earliest) {
@@ -498,9 +642,7 @@ func (r *Relay) expiryLoop() {
 			if session.ctx.Err() != nil {
 				continue
 			}
-			session.mu.Lock()
-			deadline := session.lastPoll.Add(RelayIdleTimeout)
-			session.mu.Unlock()
+			deadline := time.Unix(0, session.lastPoll.Load()).Add(relayIdleTimeout)
 			if !now.Before(deadline) {
 				session.cancel()
 				continue
@@ -511,6 +653,9 @@ func (r *Relay) expiryLoop() {
 		}
 		closed := r.closed
 		r.mu.Unlock()
+		if r.pendingUnderflow.Load() && r.pendingUnderflowLogged.CompareAndSwap(false, true) {
+			log.Printf("webproxy: pending-byte accounting underflow; clamped to zero")
+		}
 		if closed {
 			return
 		}

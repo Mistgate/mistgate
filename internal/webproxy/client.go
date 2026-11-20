@@ -3,7 +3,6 @@ package webproxy
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Client struct {
@@ -52,7 +52,7 @@ type ClientStream struct {
 // NewClient creates an HTTPS carrier client. baseURL may be an origin or a
 // complete http(s) URL; the latter is useful with in-memory test transports.
 func NewClient(baseURL, capability string, transport http.RoundTripper) (*Client, error) {
-	if !validCapabilityText(capability) {
+	if !canonicalBase64URL(capability, 32) {
 		return nil, errors.New("invalid bridge capability")
 	}
 	if !strings.Contains(baseURL, "://") {
@@ -105,10 +105,10 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 		return fmt.Errorf("bridge page returned HTTP %d", pageResp.StatusCode)
 	}
 	bootstrapToken := pageResp.Header.Get(headerBootstrap)
-	if !validTokenText(bootstrapToken) {
+	if !canonicalBase64URL(bootstrapToken, tokenSize) {
 		return errors.New("bridge page did not provide a bootstrap token")
 	}
-	hello, _ := AppendFrame(nil, Frame{Type: FrameHello, Payload: AppendHelloPayload(nil)})
+	hello, _ := appendFrame(nil, frame{Type: frameHello, Payload: appendHelloPayload(nil)})
 	var resp *http.Response
 	for attempt := 0; attempt < 3; attempt++ {
 		req, requestErr := c.newRequest(ctx, http.MethodPost, "/api/v1/session", bootstrapToken, hello)
@@ -135,15 +135,12 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 		return fmt.Errorf("carrier session returned HTTP %d", resp.StatusCode)
 	}
 	sessionToken := resp.Header.Get(headerSessionToken)
-	if !validTokenText(sessionToken) || resp.Header.Get(headerCarrierMode) != carrierModeHTTPS {
+	if !canonicalBase64URL(sessionToken, tokenSize) || resp.Header.Get(headerCarrierMode) != carrierModeHTTPS {
 		return errors.New("invalid carrier session response")
 	}
-	frame, rest, err := ParseFrame(body)
-	if err != nil || len(rest) != 0 || frame.Type != FrameWelcome || frame.StreamID != 0 {
+	frame, rest, err := parseFrame(body)
+	if err != nil || len(rest) != 0 || frame.Type != frameWelcome || frame.StreamID != 0 {
 		return errors.New("invalid carrier welcome frame")
-	}
-	if err := ParseWelcomePayload(frame.Payload); err != nil {
-		return err
 	}
 	c.mu.Lock()
 	if c.closed {
@@ -165,7 +162,7 @@ func (c *Client) OpenStream(ctx context.Context) (*ClientStream, error) {
 		c.mu.Unlock()
 		return nil, errors.New("carrier session is not active")
 	}
-	if c.nextStream == MaxStreamID {
+	if c.nextStream == maxStreamID {
 		c.mu.Unlock()
 		return nil, errors.New("carrier stream id space exhausted")
 	}
@@ -176,11 +173,11 @@ func (c *Client) OpenStream(ctx context.Context) (*ClientStream, error) {
 		id:         id,
 		readWake:   make(chan struct{}, 1),
 		creditWake: make(chan struct{}, 1),
-		sendCredit: InitialStreamWindow,
+		sendCredit: initialStreamWindow,
 	}
 	c.streams[id] = stream
 	c.mu.Unlock()
-	if err := c.sendFrames(ctx, Frame{Type: FrameOpen, StreamID: id}); err != nil {
+	if err := c.sendFrames(ctx, frame{Type: frameOpen, StreamID: id}); err != nil {
 		stream.setError(err)
 		return nil, err
 	}
@@ -241,11 +238,11 @@ func (c *Client) newRequest(ctx context.Context, method, path, token string, bod
 	return req, nil
 }
 
-func (c *Client) sendFrames(ctx context.Context, frames ...Frame) error {
+func (c *Client) sendFrames(ctx context.Context, frames ...frame) error {
 	var body []byte
 	for _, frame := range frames {
 		var err error
-		body, err = AppendFrame(body, frame)
+		body, err = appendFrame(body, frame)
 		if err != nil {
 			return err
 		}
@@ -316,9 +313,16 @@ func (c *Client) pollLoop() {
 			if ctx.Err() != nil {
 				return
 			}
+			timer := time.NewTimer(100 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
 			continue
 		}
-		body, readErr := readBounded(resp.Body, MaxDownBatch)
+		body, readErr := readBounded(resp.Body, maxDownBatch)
 		_ = resp.Body.Close()
 		if readErr != nil {
 			c.setPollError(readErr)
@@ -340,7 +344,7 @@ func (c *Client) pollLoop() {
 			c.setPollError(errors.New("invalid downlink cursor"))
 			return
 		}
-		frames, decodeErr := readFrameBatch(body)
+		frames, decodeErr := parseFrameBatch(body)
 		if decodeErr != nil {
 			c.setPollError(decodeErr)
 			return
@@ -354,19 +358,19 @@ func (c *Client) pollLoop() {
 	}
 }
 
-func (c *Client) deliver(frame Frame) {
+func (c *Client) deliver(frame frame) {
 	c.mu.Lock()
 	stream := c.streams[frame.StreamID]
 	c.mu.Unlock()
-	if frame.Type == FrameWindow && stream != nil {
-		credit, err := ParseWindowPayload(frame.Payload)
+	if frame.Type == frameWindow && stream != nil {
+		credit, err := parseWindowPayload(frame.Payload)
 		if err != nil {
 			c.setPollError(err)
 			return
 		}
 		stream.mu.Lock()
 		stream.sendCredit += uint64(credit)
-		if stream.sendCredit > InitialStreamWindow {
+		if stream.sendCredit > initialStreamWindow {
 			stream.readErr = errInvalidUp
 			stream.closed = true
 		}
@@ -374,7 +378,7 @@ func (c *Client) deliver(frame Frame) {
 		stream.mu.Unlock()
 		return
 	}
-	if frame.Type == FrameData && stream != nil {
+	if frame.Type == frameData && stream != nil {
 		stream.mu.Lock()
 		if !stream.closed {
 			stream.incoming = append(stream.incoming, append([]byte(nil), frame.Payload...))
@@ -383,7 +387,7 @@ func (c *Client) deliver(frame Frame) {
 		stream.mu.Unlock()
 		return
 	}
-	if frame.Type == FrameClose && stream != nil {
+	if frame.Type == frameClose && stream != nil {
 		stream.mu.Lock()
 		stream.closed = true
 		stream.incoming = nil
@@ -436,15 +440,15 @@ func (s *ClientStream) Write(data []byte) (int, error) {
 			return written, io.ErrClosedPipe
 		}
 		amount := uint64(len(data))
-		if amount > MaxFramePayload {
-			amount = MaxFramePayload
+		if amount > maxFramePayload {
+			amount = maxFramePayload
 		}
 		if amount > s.sendCredit {
 			amount = s.sendCredit
 		}
 		s.sendCredit -= amount
 		s.mu.Unlock()
-		frame := Frame{Type: FrameData, StreamID: s.id, Payload: data[:int(amount)]}
+		frame := frame{Type: frameData, StreamID: s.id, Payload: data[:int(amount)]}
 		if err := s.client.sendFrames(s.client.ctx, frame); err != nil {
 			return written, err
 		}
@@ -472,7 +476,7 @@ func (s *ClientStream) Read(output []byte) (int, error) {
 			s.mu.Unlock()
 			var payload [4]byte
 			binary.BigEndian.PutUint32(payload[:], uint32(n))
-			if err := s.client.sendFrames(s.client.ctx, Frame{Type: FrameWindow, StreamID: s.id, Payload: payload[:]}); err != nil {
+			if err := s.client.sendFrames(s.client.ctx, frame{Type: frameWindow, StreamID: s.id, Payload: payload[:]}); err != nil {
 				return n, err
 			}
 			return n, nil
@@ -503,7 +507,7 @@ func (s *ClientStream) Close() error {
 		return nil
 	}
 	s.mu.Unlock()
-	err := s.client.sendFrames(s.client.ctx, Frame{Type: FrameClose, StreamID: s.id})
+	err := s.client.sendFrames(s.client.ctx, frame{Type: frameClose, StreamID: s.id})
 	s.mu.Lock()
 	s.closed = true
 	s.incoming = nil
@@ -523,20 +527,4 @@ func (s *ClientStream) setError(err error) {
 	signal(s.readWake)
 	signal(s.creditWake)
 	s.mu.Unlock()
-}
-
-func validTokenText(token string) bool {
-	if len(token) != tokenTextSize {
-		return false
-	}
-	decoded, err := base64.RawURLEncoding.DecodeString(token)
-	return err == nil && len(decoded) == tokenSize && base64.RawURLEncoding.EncodeToString(decoded) == token
-}
-
-func validCapabilityText(capability string) bool {
-	if len(capability) != capabilityTextSize {
-		return false
-	}
-	decoded, err := base64.RawURLEncoding.DecodeString(capability)
-	return err == nil && len(decoded) == 32 && base64.RawURLEncoding.EncodeToString(decoded) == capability
 }
