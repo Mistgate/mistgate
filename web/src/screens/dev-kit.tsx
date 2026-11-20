@@ -63,6 +63,7 @@ import { QrKit } from "./dev-kit-qr";
 import { BridgeKit } from "./dev-kit-bridge";
 import { FoundationKit } from "./dev-kit-foundation";
 import { NodePageFrame, NodePageKit } from "./dev-kit-node-page";
+import { NodeAddPage } from "./dev-kit-node-add";
 import { NodeShareKit, NodeSharePage } from "./dev-kit-node-share";
 import { OverviewKit, OverviewPage } from "./dev-kit-overview";
 import { ShellKit, ShellPage } from "./dev-kit-shell";
@@ -248,6 +249,7 @@ export default function DevKit() {
   if (which === "windows-page") return <WindowsPage />;
   if (which === "nodepage-frame") return <NodePageFrame />;
   if (which === "node-share-page") return <NodeSharePage />;
+  if (which === "node-add-page") return <NodeAddPage />;
   if (which === "bulk-page") return <BulkPage />;
   if (which === "bulk-users-page") return <UsersBulkPage />;
   const only = { dns: DnsLinkKit, ads: DnsAdsKit, edge: EdgeKit, node: NodeDemos, health: HealthWarpKit, users: UsersKit, approvals: ProfileApprovalsKit, fleet: FleetKit, ipv6: Ipv6Kit, ports: PortsKit, share: ShareKit, ssh: SSHKit, os: OsKit, "os-fleet": OsFleetKit, "os-page": OsPageKit, "client-logs": ClientLogsKit, bulk: BulkKit, "bulk-users": UsersBulkKit, release: ReleaseKit, restore: RestoreKit, ai: AiKit, graph: GraphKit, "awg-relay": AwgRelayKit, qr: QrKit, probes: ProbesKit, bridge: BridgeKit, foundation: FoundationKit, shell: ShellKit, overview: OverviewKit, nodes: NodesKit, windows: WindowsKit, nodepage: NodePageKit, "node-share": NodeShareKit, "pn-users": PnUsersKit, "pn-user": UserKit, "pn-group": GroupKit, decoys: DecoysKit, "pn-profiles": PnProfilesKit, "pn-profile": PnProfileKit, "pn-profile-new": PnProfileNewKit, "pn-health": PnHealthKit, "pn-reach": PnReachKit, subs: SubsScenesKit, "subs-scenes": SubsScenesKit, "pn-settings": SettingsKit, "pn-updates": PnUpdatesKit, "pn-ai": PnAiKit, "pn-assistant": PnAssistantKit, "pn-integrations": PnIntegrationsKit }[which];

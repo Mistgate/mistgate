@@ -2,7 +2,7 @@ import { ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { CloseX, CodeBox, CopyChip, CountryField, FootNote, noCountry, Panel, PanelFoot, PanelHead, Rail, WaySwitch, type NodeDraft, type RailStep } from "@/components/add-node-frame";
+import { CheckNote, CloseX, CodeBox, CopyChip, CountryField, FootNote, noCountry, Panel, PanelFoot, PanelHead, Rail, WayCards, type NodeDraft, type RailStep } from "@/components/add-node-frame";
 import { markFresh } from "@/components/fx/registry";
 import { authorizedKeysFile, usePanelKeyInUse, usePanelSSHKey } from "@/components/panel-ssh-key";
 import { Fingerprint, OwnKeyField, useSSHLogin, type LoginMethod } from "@/components/ssh-login";
@@ -192,6 +192,10 @@ export type InstallSeed = Partial<{
   failure: string;
   /** How many rows of the check have answered (the dev kit stops the check at a row). */
   answered: number;
+  /** The rows of the check unfolded or folded behind their summary (without it: open for a remark, folded when all is well). */
+  checksOpen: boolean;
+  /** The words about the firewall unfolded. */
+  firewallOpen: boolean;
 }>;
 
 type Props = {
@@ -202,7 +206,10 @@ type Props = {
   seed?: InstallSeed;
 };
 
-type Fact = { key: string; label: string; value: string; bad?: boolean };
+type Fact = { key: string; label: string; value: string; bad?: boolean; warn?: boolean; note?: string };
+
+/** The "!" of a remark in the round mark of a check row (the board's WRN). */
+const warnMark = "M12 7v6M12 16.5v.01";
 
 export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props) {
   const t = useT();
@@ -232,6 +239,9 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
   const [whereOpen, setWhereOpen] = useState(seed?.whereOpen ?? false);
   // the answers of the server check come in one by one: how many have
   const [answered, setAnswered] = useState(seed?.answered ?? (seed?.preflight ? 99 : 0));
+  // the rows of the check hide behind one line once they are all in, unless one of them has a remark; null: the person has not chosen
+  const [checksOpen, setChecksOpen] = useState<boolean | null>(seed?.checksOpen ?? null);
+  const [firewallOpen, setFirewallOpen] = useState(seed?.firewallOpen ?? false);
   // the panel key is the default once it logs in to some node, else the password; the owner's own key never is
   const keyInUse = usePanelKeyInUse();
   const login = useSSHLogin(seed?.method ?? (keyInUse ? "key" : "password"));
@@ -332,6 +342,8 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
     // the page of the check opens at once: its rows wait for the answer
     setPreflight(null);
     setAnswered(0);
+    setChecksOpen(null);
+    setFirewallOpen(false);
     setStep(2);
     try {
       const response = await guard(
@@ -473,6 +485,11 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
     return () => clearTimeout(id);
   }, [preflight, answered, factList.length]);
   const checked = !!preflight && answered > factList.length;
+  // a remark (the image has no nft) or a row that says no keeps the rows open; all well: one line "9 checks passed"
+  const remarks = factList.filter((f) => f.warn).length;
+  const failed = factList.filter((f) => f.bad).length;
+  const rowsOpen = !checked || (checksOpen ?? (remarks + failed > 0));
+  const passed = factList.length - remarks - failed;
 
   const view: "srv" | "auth" | "chk" | "run" | "done" = jobDone ? "done" : step === 0 ? "srv" : step === 1 ? "auth" : step === 2 ? "chk" : "run";
   const railAt = view === "done" ? 4 : step;
@@ -619,7 +636,7 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
                     <CodeBox code={keygenCommand(algorithm)} />
                   </div>
                 )}
-                <div className="an-kf">
+                <div className="an-kf an-kf2">
                   <Check label={t("node.ssh.confirmKey")} checked={confirmedKey} onCheckedChange={(v) => setConfirmedKey(v)} />
                   <button type="button" className="an-lk" aria-expanded={whereOpen} onClick={() => setWhereOpen((v) => !v)}>
                     {whereOpen ? t("win.node.hide") : t("win.node.keyWhereLink")}
@@ -627,35 +644,34 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
                 </div>
               </section>
 
-              <div className="an-rw">
-                <div className="an-f flex min-w-0 flex-col gap-1.5">
-                  <span className="text-[13px] text-sec">{t("node.ssh.method")}</span>
-                  <WaySwitch
-                    label={t("node.ssh.method")}
-                    value={login.method}
-                    onValueChange={(m: LoginMethod) => {
-                      login.pick(m);
-                      setFailure("");
-                    }}
-                    options={[
-                      { value: "key", label: t("panelKey.title"), d: glyphs.key },
-                      { value: "password", label: t("node.ssh.methodPassword"), d: glyphs.password },
-                      { value: "own", label: t("node.ssh.methodOwn"), d: glyphs.terminal },
-                    ]}
-                  />
-                </div>
-                <TextField
-                  className="an-f"
-                  label={t("node.ssh.login")}
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="root"
-                  mono
-                  autoComplete="off"
-                  spellCheck={false}
-                  maxLength={32}
-                  pattern={usernamePattern.source}
-                  error={usernameError}
+              <TextField
+                className="an-f an-lg"
+                label={t("node.ssh.login")}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="root"
+                mono
+                autoComplete="off"
+                spellCheck={false}
+                maxLength={32}
+                pattern={usernamePattern.source}
+                error={usernameError}
+              />
+
+              <div className="an-f flex min-w-0 flex-col gap-1.5">
+                <span className="text-[13px] text-sec">{t("node.ssh.method")}</span>
+                <WayCards
+                  label={t("node.ssh.method")}
+                  value={login.method}
+                  onValueChange={(m: LoginMethod) => {
+                    login.pick(m);
+                    setFailure("");
+                  }}
+                  options={[
+                    { value: "key", label: t("panelKey.title"), hint: t("win.node.wayKey"), icon: <Glyph d={glyphs.key} /> },
+                    { value: "password", label: t("node.ssh.methodPassword"), hint: t("win.node.wayPassword"), icon: <Glyph d={glyphs.password} /> },
+                    { value: "own", label: t("node.ssh.methodOwn"), hint: t("win.node.wayOwn"), icon: <Glyph d={glyphs.terminal} /> },
+                  ]}
                 />
               </div>
 
@@ -673,9 +689,11 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
                     autoComplete="new-password"
                     maxLength={1024}
                   />
-                  <Check label={t("node.ssh.installPanelKey")} checked={login.installPanelKey} onCheckedChange={(v) => login.setInstallPanelKey(v)} />
-                  <p>{t("win.node.passwordNote")}</p>
-                  <p>{t("node.ssh.installPanelKeyHint")}</p>
+                  <CheckNote label={t("node.ssh.installPanelKey")} hint={t("node.ssh.installPanelKeyHint")} checked={login.installPanelKey} onCheckedChange={(v) => login.setInstallPanelKey(v)} />
+                  <p className="an-nt">
+                    <Glyph d={glyphs.lock} />
+                    {t("win.node.passwordNote")}
+                  </p>
                 </div>
               )}
               {login.method === "own" && (
@@ -698,26 +716,51 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
 
         {view === "chk" && (
           <Panel key="chk" onSubmit={(e) => void startInstall(e)}>
-            <PanelHead eyebrow={t("auth.step", { n: 3, total: 4 })} title={checked ? t("win.node.chkOk") : t("win.node.chkBusy")}>
+            <PanelHead eyebrow={t("auth.step", { n: 3, total: 4 })} title={checked ? t(remarks > 0 ? "win.node.chkWarnTitle" : "win.node.chkOk") : t("win.node.chkBusy")}>
               {checked ? t("win.node.chkOkBody") : t("win.node.chkBusyBody")}
             </PanelHead>
             <div className="an-b">
               {failure && <FailureNotice failure={failure} />}
-              <div className="an-fx" aria-busy={!checked}>
-                {factList.map((f, i) => (
-                  <div key={f.key} className={cx("an-fr", i < answered ? "done" : i === answered ? "now" : "wait", f.bad && i < answered && "bad")}>
-                    <span className="an-ck" aria-hidden>
-                      <Icon name="check" />
-                    </span>
-                    <span>{f.label}</span>
-                    <b>{i < answered ? f.value : "—"}</b>
-                  </div>
-                ))}
-              </div>
+              {checked && (
+                <button type="button" className={cx("an-sum", remarks > 0 && "warn", rowsOpen && "open")} aria-expanded={rowsOpen} onClick={() => setChecksOpen(!rowsOpen)}>
+                  <span className="an-ck" aria-hidden>
+                    <Glyph d={remarks > 0 ? warnMark : glyphs.check} strokeWidth={2.5} />
+                  </span>
+                  <b>{t.n(remarks > 0 ? "win.node.chkSumWarn" : "win.node.chkSum", passed)}</b>
+                  <span className="an-mono">{factSummary(preflight, fmt)}</span>
+                  <em>{rowsOpen ? t("win.node.hide") : t("win.node.chkShow")}</em>
+                  <Glyph className="an-cv" d={glyphs.chevron} />
+                </button>
+              )}
+              {rowsOpen && (
+                <div className="an-fx" aria-busy={!checked}>
+                  {factList.map((f, i) => (
+                    <div key={f.key} className={cx("an-fr", i < answered ? "done" : i === answered ? "now" : "wait", f.bad && i < answered && "bad", f.warn && i < answered && "warn")}>
+                      <span className="an-ck" aria-hidden>
+                        {f.warn && i < answered ? <Glyph d={warnMark} strokeWidth={2.5} /> : <Icon name="check" />}
+                      </span>
+                      <span>{f.label}</span>
+                      <b>{i < answered ? f.value : "—"}</b>
+                      {f.note && i < answered && <small>{f.note}</small>}
+                    </div>
+                  ))}
+                </div>
+              )}
               {checked && preflight && (
                 <>
                   <div className="an-lb">{t("win.node.planTitle")}</div>
                   <div className="an-pl">
+                    {!preflight.nftables && (
+                      <div>
+                        <span className="an-pi" aria-hidden>
+                          <Glyph d={glyphs.package} />
+                        </span>
+                        <div>
+                          <b>{t("win.node.planNftables")}</b>
+                          <span>{t("win.node.planNftablesBody")}</span>
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <span className="an-pi" aria-hidden>
                         <Glyph d={glyphs.firewall} />
@@ -727,17 +770,6 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
                         <span>{t("win.node.planFirewallBody")}</span>
                       </div>
                     </div>
-                    {!preflight.nftables && (
-                      <div>
-                        <span className="an-pi" aria-hidden>
-                          <Glyph d={glyphs.package} />
-                        </span>
-                        <div>
-                          <b>{t("win.node.planNftables")}</b>
-                          <span>{t("node.ssh.nftablesNote")}</span>
-                        </div>
-                      </div>
-                    )}
                     <div>
                       <span className="an-pi" aria-hidden>
                         <Glyph d={glyphs.agent} />
@@ -748,7 +780,12 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
                       </div>
                     </div>
                   </div>
-                  <p className="text-xs leading-4 text-muted">{t("node.ssh.firewallHint")}</p>
+                  <p className="an-fwq">
+                    <button type="button" className="an-lk" aria-expanded={firewallOpen} onClick={() => setFirewallOpen((v) => !v)}>
+                      {firewallOpen ? t("win.node.fwLess") : t("win.node.fwMore")}
+                    </button>
+                  </p>
+                  {firewallOpen && <p className="an-fwt">{t("node.ssh.firewallHint")}</p>}
                   <SharePick share={share} onChange={(c) => onDraft({ share: c })} />
                   {login.method === "password" && (
                     <TextField
@@ -765,15 +802,19 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
                     />
                   )}
                   {login.method === "own" && <OwnKeyField login={login} warn={false} plain />}
-                  <Check label={t("node.ssh.confirmInstall")} checked={confirmedInstall} onCheckedChange={(v) => setConfirmedInstall(v)} />
                 </>
               )}
             </div>
+            {checked && preflight && (
+              <div className="an-ag">
+                <CheckNote label={t("win.node.agreeTitle")} hint={t("win.node.agreeBody")} checked={confirmedInstall} onCheckedChange={(v) => setConfirmedInstall(v)} />
+              </div>
+            )}
             <PanelFoot>
               <Button type="button" variant="secondary" size="lg" onClick={() => back(1)} disabled={busy !== null}>
                 {t("node.ssh.back")}
               </Button>
-              <FootNote end />
+              <FootNote end>{checked && !confirmedInstall ? t("win.node.agreeHint") : ""}</FootNote>
               <Button type="submit" variant="primary" size="lg" disabled={busy !== null || !checked || !confirmedInstall || !login.ready || !share.valid}>
                 {busy === "start" && <Spinner />}
                 {busy === "start" ? t("node.ssh.starting") : t("node.ssh.startInstall")}
@@ -899,11 +940,21 @@ function FailureNotice({ failure, onManual }: { failure: string; onManual?: () =
   );
 }
 
-/** The rows of the server check, in the board's order (nftables after systemd: the install adds its own step when it is missing); systemd and the panel's way back are the ones that can say "no". Without the answer the values are dashes. */
+/** The line of the folded check, in mono: the system, the architecture and the memory. */
+function factSummary(p: NodePreflight | null, fmt: ReturnType<typeof useFmt>): string {
+  if (!p) return "";
+  return [[p.distribution, p.version].filter(Boolean).join(" "), p.architecture, fmt.bytes(Number(p.memoryBytes), 1024)].filter(Boolean).join(" · ");
+}
+
+/**
+ * The rows of the server check, in the board's order (nftables after systemd); systemd and the panel's way back are the ones that can say "no".
+ * A server without nft is a remark, not a refusal (the install adds the package): its row goes first and says so under itself.
+ * Without the answer the values are dashes.
+ */
 function factRows(p: NodePreflight | null, t: T, fmt: ReturnType<typeof useFmt>): Fact[] {
   const no = t("node.ssh.unavailable");
   const yes = t("node.ssh.available");
-  return [
+  const rows: Fact[] = [
     { key: "system", label: t("node.ssh.system"), value: (p && [p.distribution, p.version].filter(Boolean).join(" ")) || "—" },
     { key: "arch", label: t("node.ssh.architecture"), value: p?.architecture || "—" },
     { key: "kernel", label: t("node.ssh.kernel"), value: p?.kernel || "—" },
@@ -911,9 +962,11 @@ function factRows(p: NodePreflight | null, t: T, fmt: ReturnType<typeof useFmt>)
     { key: "memory", label: t("node.ssh.memory"), value: p ? fmt.bytes(Number(p.memoryBytes), 1024) : "—" },
     { key: "disk", label: t("node.ssh.disk"), value: p ? fmt.bytes(Number(p.diskAvailableBytes), 1024) : "—" },
     { key: "systemd", label: t("node.ssh.systemd"), value: p ? (p.systemd ? yes : no) : "—", bad: !!p && !p.systemd },
-    { key: "nftables", label: t("node.ssh.nftables"), value: p ? (p.nftables ? yes : t("node.ssh.nftablesWillInstall")) : "—" },
+    { key: "nftables", label: t("node.ssh.nftables"), value: p ? (p.nftables ? yes : t("node.ssh.nftablesWillInstall")) : "—", warn: !!p && !p.nftables, note: p && !p.nftables ? t("win.node.chkNftNote") : undefined },
     { key: "panel", label: t("node.ssh.panelReachable"), value: p ? (p.panelReachable ? yes : no) : "—", bad: !!p && !p.panelReachable },
   ];
+  const lack = rows.findIndex((r) => r.warn);
+  return lack > 0 ? [rows[lack]!, ...rows.filter((_, i) => i !== lack)] : rows;
 }
 
 /** The panel's own key as a way in (.an-box): the key to copy, how to put it on a server, the fingerprint of the key. */

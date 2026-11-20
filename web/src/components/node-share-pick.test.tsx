@@ -60,10 +60,11 @@ afterEach(() => {
 const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label) as HTMLButtonElement | undefined;
-const radio = (label: string) => [...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === label);
+const radio = (label: string) => [...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => (r.querySelector("b") ?? r).textContent === label);
 const checked = (label: string) => radio(label)?.getAttribute("aria-checked") === "true";
 const click = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-const box = (name: string) => document.querySelector<HTMLElement>(`[role=group] [role=checkbox][aria-label="${name}"]`);
+// a group is a chip that is pressed or not
+const box = (name: string) => [...document.querySelectorAll<HTMLElement>("[role=group] button[aria-pressed]")].find((b) => b.textContent === name);
 
 const second = [{ id: "nod_de1", name: "de1", status: NodeStatus.ONLINE }];
 
@@ -120,7 +121,7 @@ describe("who gets a new node", () => {
     localStorage.setItem("nodes.share", JSON.stringify({ mode: "all", groupIds: [] }));
     await open("win-cmd-none");
     expect(checked(en["ns.mode.all"])).toBe(true);
-    expect(text()).toContain(en["ns.pick.all"]);
+    expect(text()).toContain(en["ns.opt.all"]);
   });
 
   it("some groups need a group: the button waits, and the ticked ones go in the request", async () => {

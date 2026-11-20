@@ -2,7 +2,8 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Popover } from "@base-ui/react/popover";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
+import { Check } from "@/components/ui/bits";
 import { Flag } from "@/components/ui/flag";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -114,7 +115,7 @@ export function Rail({
               </span>
               <span className="an-sl">
                 <b>{s.label}</b>
-                <span className="an-sum">{s.sum}</span>
+                <span className="an-rs">{s.sum}</span>
               </span>
             </button>
           </li>
@@ -210,28 +211,41 @@ export function CodeBox({ code, label, wrap, testId }: { code: string; label?: s
   );
 }
 
-/** One way in the "how to log in" row (.an-ws): an icon and a word; the one chosen is a step lighter. */
-export function WaySwitch<V extends string>({
+/**
+ * A choice of one of a few, drawn as cards on one grid (.an-wc): the radio circle in the corner, an icon, a word and a line under it. The
+ * words wrap, so the length of a word in any language does not matter; on a narrow window the cards go one under the other.
+ */
+export function WayCards<V extends string>({
   value,
   onValueChange,
   options,
   label,
+  className,
 }: {
   value: V;
   onValueChange: (v: V) => void;
-  options: readonly { value: V; label: string; d: string }[];
+  options: readonly { value: V; label: string; hint: string; icon: ReactNode }[];
   label: string;
+  className?: string;
 }) {
+  const id = useId();
   return (
-    <RadioGroup aria-label={label} value={value} onValueChange={(v) => onValueChange(v as V)} className="an-ws">
+    <RadioGroup aria-label={label} value={value} onValueChange={(v) => onValueChange(v as V)} className={cx("an-wc", className)}>
       {options.map((o) => (
-        <Radio.Root key={o.value} value={o.value}>
-          <Glyph d={o.d} />
-          {o.label}
+        <Radio.Root key={o.value} value={o.value} aria-labelledby={`${id}${o.value}`} aria-describedby={`${id}${o.value}-h`}>
+          <span className="an-rd" aria-hidden />
+          {o.icon}
+          <b id={`${id}${o.value}`}>{o.label}</b>
+          <span id={`${id}${o.value}-h`}>{o.hint}</span>
         </Radio.Root>
       ))}
     </RadioGroup>
   );
+}
+
+/** A tick with a line under its label (.an-c2): what it is in the label's weight, what it means in the muted line below. */
+export function CheckNote({ label, hint, className, ...rest }: Omit<ComponentProps<typeof Check>, "label" | "className"> & { label: ReactNode; hint: ReactNode; className?: string }) {
+  return <Check className={cx("an-c an-c2", className)} label={<span className="an-c2t"><b>{label}</b><span>{hint}</span></span>} {...rest} />;
 }
 
 const none = "none";
