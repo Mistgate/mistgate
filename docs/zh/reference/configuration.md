@@ -158,7 +158,7 @@ setup 在各种模式下生成的值：
 | `identity.pem` | 节点的私钥和面板 CA 签发的证书，保存在同一文件中。文件存在表示节点「已注册」。 |
 | `enroll-pending.pem` | 使用 `--resume-key` 发起注册（SSH 安装）时生成的私钥，只保留到注册成功为止。 |
 | `ca.pem` | 面板 CA：Agent 唯一信任的证书颁发机构。 |
-| `agent.json` | 面板地址、私密 TLS 名称和节点 ID。 |
+| `agent.json` | 面板地址、私密 TLS 名称和节点 ID。通过连接注册的节点还保存其连接地址（`link`）；面板的连接地址变更后，还会有 `next_link`（新地址，Agent 会一直尝试，直到通过它建立会话）、`prev_link`（之前使用的地址，新地址不响应时 Agent 会回到它）和 `link_since`（当前 `link` 开始使用的 Unix 时间；当它正常工作满 7 天后，`prev_link` 和 `link_since` 会被删除）。每个连接字段都包含私密前缀。 |
 | `state.json` | 最近应用的状态，因此即使面板不可用，服务器也会在节点重启后恢复运行。文件中包含协议配置密钥（混淆密码、服务器密钥、WARP 密钥）和节点验证用户所需的内容（Hysteria2 令牌哈希、AmneziaWG 公钥和预共享密钥），绝不包含客户端私钥或原始令牌。 |
 | `certs/` | 节点上服务器使用的证书：Let’s Encrypt 状态和自签名证书。 |
 | `last_version` | 上次启动的版本。 |
