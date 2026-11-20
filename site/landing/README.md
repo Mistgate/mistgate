@@ -95,7 +95,7 @@ dist/        OUTPUT of the generator (not in git)
 | `pnpm check` | headless Chrome over the stand: 390, 820 and 1440 px in ru, en and fa; console, CSP, boards, tours, shots (`--help` in the file header) |
 | `pnpm check:quick` | the same for ru and en at 1440 px, no shots |
 | `pnpm all` | `build` and `check` |
-| `pnpm harvest` | `check` on the Russian pages, writing `harvest.json`: the strings the live screens show, which the dictionary subset is cut by |
+| `pnpm harvest` | `check` on the Russian pages at all three widths (a narrow layout shows strings the wide one does not), writing `harvest.json`: the strings the live screens show, which the dictionary subset is cut by |
 | `pnpm test` | unit tests (`node --test`) |
 
 Chrome is taken from `CHROME`, or from the usual places. The shots of `check` go to `MG_SHOTS` (outside the repository).

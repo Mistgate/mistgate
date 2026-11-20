@@ -15,7 +15,7 @@
     "stand": "node serve.mjs",
     "check": "node check.mjs",
     "check:quick": "node check.mjs --langs ru,en --widths 1440 --no-shots",
-    "harvest": "node check.mjs --harvest --langs ru --widths 1440",
+    "harvest": "node check.mjs --harvest --langs ru --widths 390,820,1440 --no-shots",
     "all": "node build.mjs && node check.mjs",
     "test": "node --test \"test/*.test.mjs\""
   },
