@@ -139,6 +139,52 @@ type cipherStream interface {
 	XORKeyStream(dst, src []byte)
 }
 
+// StreamClient is an obfuscated2 client over an already-open plain byte stream. It sends its header without Fake TLS
+// records and encrypts the stream in both directions.
+type StreamClient struct {
+	rw  io.ReadWriter
+	enc cipherStream
+	dec cipherStream
+}
+
+// StartStreamClient writes a plain obfuscated2 header to rw and returns a client for the encrypted stream that follows.
+func StartStreamClient(rw io.ReadWriter, key [keyLen]byte, tag uint32, dc int16) (*StreamClient, error) {
+	if rw == nil {
+		return nil, errors.New("mtproto: nil stream")
+	}
+	h, enc, dec, err := buildObfuscated2Header(key, tag, dc)
+	if err != nil {
+		return nil, err
+	}
+	if err := writeFull(rw, h[:]); err != nil {
+		return nil, err
+	}
+	return &StreamClient{rw: rw, enc: enc, dec: dec}, nil
+}
+
+// Write encrypts stream bytes and writes them without Fake TLS record framing.
+func (c *StreamClient) Write(p []byte) (int, error) {
+	if c == nil || c.rw == nil || c.enc == nil {
+		return 0, errors.New("mtproto: obfuscated2 stream is closed")
+	}
+	buf := bytes.Clone(p)
+	c.enc.XORKeyStream(buf, buf)
+	if err := writeFull(c.rw, buf); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+// Read reads and decrypts stream bytes without Fake TLS record framing.
+func (c *StreamClient) Read(p []byte) (int, error) {
+	if c == nil || c.rw == nil || c.dec == nil {
+		return 0, errors.New("mtproto: obfuscated2 stream is closed")
+	}
+	n, err := c.rw.Read(p)
+	c.dec.XORKeyStream(p[:n], p[:n])
+	return n, err
+}
+
 // StartClient sends the Fake TLS hello and validates the keyed ServerHello answer.
 func StartClient(conn net.Conn, key [keyLen]byte, hello []byte) (*Client, error) {
 	if err := writeFull(conn, hello); err != nil {
@@ -205,9 +251,18 @@ func (c *Client) SendHeader(tag uint32, dc int16) error {
 	if c == nil || c.Conn == nil || c.enc != nil {
 		return errors.New("mtproto: obfuscated2 header already sent or client is closed")
 	}
-	var h [64]byte
-	if _, err := io.ReadFull(rand.Reader, h[:]); err != nil {
+	h, enc, dec, err := buildObfuscated2Header(c.key, tag, dc)
+	if err != nil {
 		return err
+	}
+	c.enc, c.dec = enc, dec
+	c.HeaderKeys = bytes.Clone(h[8:56])
+	return c.writeRecords(h[:])
+}
+
+func buildObfuscated2Header(key [keyLen]byte, tag uint32, dc int16) (h [64]byte, enc, dec cipherStream, err error) {
+	if _, err = io.ReadFull(rand.Reader, h[:]); err != nil {
+		return h, nil, nil, err
 	}
 	binary.LittleEndian.PutUint32(h[56:], tag)
 	binary.LittleEndian.PutUint16(h[60:], uint16(dc))
@@ -215,13 +270,12 @@ func (c *Client) SendHeader(tag uint32, dc int16) error {
 	for i := range h {
 		rev[i] = h[63-i]
 	}
-	c.enc = clientCTR(proxyKey(h[8:40], &c.key), h[40:56])
-	c.dec = clientCTR(proxyKey(rev[8:40], &c.key), rev[40:56])
+	enc = clientCTR(proxyKey(h[8:40], &key), h[40:56])
+	dec = clientCTR(proxyKey(rev[8:40], &key), rev[40:56])
 	var sealed [64]byte
-	c.enc.XORKeyStream(sealed[:], h[:])
+	enc.XORKeyStream(sealed[:], h[:])
 	copy(h[56:], sealed[56:])
-	c.HeaderKeys = bytes.Clone(h[8:56])
-	return c.writeRecords(h[:])
+	return h, enc, dec, nil
 }
 
 // Write sends encrypted bytes in Fake TLS application data records.

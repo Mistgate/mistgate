@@ -177,7 +177,7 @@ type session struct {
 	info     SessionInfo
 	key      [KeyLen]byte
 	client   net.Conn
-	tc       *tlsConn
+	tc       io.ReadWriter
 	fromCli  cipher.Stream
 	toCli    cipher.Stream
 	upstream net.Conn // set and read under Server.mu until the relay starts
@@ -417,6 +417,11 @@ func (s *Server) serve(ctx context.Context, conn net.Conn, a admission) error {
 		_ = conn.Close()
 		return err
 	}
+	return s.serveSession(ctx, conn, sess, deadline)
+}
+
+// serveSession runs the common path after a transport has authenticated and registered a session.
+func (s *Server) serveSession(ctx context.Context, conn net.Conn, sess *session, deadline time.Time) error {
 	toDC, fromDC, err := s.connect(ctx, sess, deadline)
 	if err != nil {
 		s.finish(sess)
