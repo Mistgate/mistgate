@@ -800,7 +800,7 @@ export type Hello = Message<"mistgate.agent.v1.Hello"> & {
    * "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
    * "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
    * by an agent that can also run OS jobs; the panel sends UpdateOs only when it is listed.
-   * "panel-link/1" (NodeSettings.panel_link_url: the agent switches to a new panel link address on its own).
+   * "panel-link/1" (NodeSettings.panel_link_url: a link node moves to a new panel link address on its own).
    *
    * @generated from field: repeated string capabilities = 11;
    */
@@ -3870,9 +3870,12 @@ export type NodeSettings = Message<"mistgate.agent.v1.NodeSettings"> & {
   osStatus: boolean;
 
   /**
-   * The panel's link address the agent should use from now on (the base URL, as at enrollment). Empty = no change. The
-   * agent tries it, keeps the old address as fallback until a session on the new one succeeds, then saves it. Read only
-   * by agents with "panel-link/1".
+   * A new link address of the panel (the base URL wss://host/<secret-prefix>/, as at enrollment). Empty = no change.
+   * The panel sends it, in HelloAck and DesiredState settings, only to agents with "panel-link/1", and only once the
+   * owner set an address. Only a link node (one enrolled over the link) follows it; an mTLS node ignores it. The agent
+   * saves it as its next address and tries it at its next reconnect: in a HelloAck that session ends at once, in a
+   * DesiredState the session goes on. The new address is committed only after a HelloAck over it, on a session the
+   * panel's CA signed; until then and while it does not answer, the agent keeps using its current address.
    *
    * @generated from field: string panel_link_url = 17;
    */

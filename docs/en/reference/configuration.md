@@ -158,7 +158,7 @@ The database is migrated forward automatically whenever `serve`, `setup`, an `au
 | `identity.pem` | The node's private key and its certificate from the panel CA, in one file. Its presence means "enrolled". |
 | `enroll-pending.pem` | The private key of an enrollment started with `--resume-key` (the SSH install), kept only until it succeeds. |
 | `ca.pem` | The panel CA: the only certificate authority the agent trusts. |
-| `agent.json` | The panel address, the secret TLS name and the node id. |
+| `agent.json` | The panel address, the secret TLS name and the node id. A node enrolled over the link also has its link address (`link`) and, after the panel's link address changed, `next_link` (the new address, tried until a session over it succeeds), `prev_link` (the address it used before, to go back to while the new one does not answer) and `link_since` (unix time the current `link` took over; `prev_link` and `link_since` are dropped once it has worked for 7 days). Every link field holds a secret prefix. |
 | `state.json` | The last applied state, so servers come back after a restart without the panel. It holds profile secrets (obfuscation passwords, server keys, the WARP key) and what the node needs to verify users (hashes of Hysteria2 tokens, AmneziaWG public keys and preshared keys), never a client's private key or raw token. |
 | `certs/` | The certificates of the servers on the node: Let's Encrypt state and self-signed certificates. |
 | `last_version` | The version that started last. |
