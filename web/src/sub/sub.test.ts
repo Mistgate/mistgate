@@ -9,7 +9,7 @@ import { figures } from "./status";
 import type { Ctx, State } from "./state";
 import { actions, amzNoop, data, plain, state, text } from "./test-kit";
 import type { Lang, MgData } from "./types";
-import { copyButton } from "./ui";
+import { copyButton, placeToast } from "./ui";
 import { annKey, openTab, pageHeader, tabsOf, view } from "./view";
 
 const now = 1_800_000_000;
@@ -884,6 +884,21 @@ describe("the copy button", () => {
   it("without a label it is the icon alone and its name is given", () => {
     const btn = copyButton(actions(), { text: "x", toast: "T", cls: "u-ic", aria: "Copy the link" });
     expect([btn.className, btn.getAttribute("aria-label"), btn.querySelector(".u-cpt")]).toEqual(["u-ic u-cpb", "Copy the link", null]);
+  });
+  it("the toast of a control in an open window lives in the window, and goes back to the page after", () => {
+    const toast = document.createElement("div");
+    const win = document.createElement("dialog");
+    win.setAttribute("open", "");
+    const inside = win.appendChild(document.createElement("button"));
+    const outside = document.body.appendChild(document.createElement("button"));
+    document.body.append(win);
+    placeToast(toast, inside);
+    expect([toast.parentElement, toast.classList.contains("in")]).toEqual([win, true]);
+    placeToast(toast, outside);
+    expect([toast.parentElement, toast.classList.contains("in")]).toEqual([document.body, false]);
+    win.remove();
+    outside.remove();
+    toast.remove();
   });
   it("the card's buttons are such buttons", () => {
     const btn = $(page("return").el, "aside [data-k=hero-copy]")!;

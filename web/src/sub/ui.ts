@@ -64,3 +64,17 @@ export function copyButton(a: Tools, o: { text: string; label?: string; done?: s
   );
   return btn;
 }
+
+/**
+ * Where the page's toast stands: 56 px above the control that was pressed (the top of the page when there is none). An open
+ * window is in the top layer, above everything in the body, so the toast of a control inside it lives in the window and is
+ * measured from the screen (.u-toast.in).
+ */
+export function placeToast(toast: HTMLElement, from?: HTMLElement) {
+  const win = from?.closest("dialog[open]") ?? null;
+  const host = win ?? document.body;
+  if (toast.parentElement !== host) host.append(toast);
+  toast.classList.toggle("in", !!win);
+  const y = from?.isConnected ? from.getBoundingClientRect().top + (win ? 0 : window.scrollY) - 56 : 16;
+  toast.style.top = `${Math.max(16, Math.round(y))}px`;
+}

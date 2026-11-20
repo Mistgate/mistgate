@@ -277,6 +277,7 @@ button.u-stat:hover .n { color: var(--text); }
 /* the toast: .u-toast (it stands above the control that was used; main.ts puts it) */
 .u-toast { position: absolute; top: 16px; left: 50%; z-index: 60; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border: 1px solid var(--hair); border-radius: 10px; background: var(--step); font-size: 13px; line-height: 20px; white-space: nowrap; transform: translateX(-50%); animation: u-rise 0.3s var(--e) both; }
 .u-toast .i { color: var(--accent-text); }
+.u-toast.in { position: fixed; } /* inside an open window: measured from the screen */
 .u-toast:not(.show) { display: none; }
 
 /* the dialog: the board's .a-desk + .a-dlg (a native <dialog> over the page) */
