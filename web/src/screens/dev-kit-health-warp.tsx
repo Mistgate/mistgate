@@ -122,6 +122,18 @@ const warpCards = [
     data: warp({ health: health({ state: WarpState.DOWN, warpFlag: "off", lastError: "warp_flag_off", consecutiveFailures: 5, probeOtherOk: false, probeOther: dead }), needsAttention: true, attentionReason: "revoked" }),
   },
   {
+    id: "nod_w_plus",
+    name: "de3",
+    title: "Plus: a WARP+ key is set (Details: Change WARP+ key)",
+    data: warp({ account: account({ accountType: "plus", hasLicense: true }) }),
+  },
+  {
+    id: "nod_w_plus_refused",
+    name: "de4",
+    title: "Registered again: Cloudflare would not take the WARP+ key",
+    data: warp({ account: account({ hasLicense: true, licenseError: "license_device_limit" }) }),
+  },
+  {
     id: "nod_w_paused",
     name: "nl1",
     title: "Paused (Resume needs no question)",

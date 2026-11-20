@@ -7,11 +7,11 @@ import "mistgate/admin/v1/common.proto";
 // WARP egress of a node. One Cloudflare WARP
 // account per node; inbounds whose egress is "warp" leave through it, and fail closed when the tunnel is down.
 //
-// Everything here is owner-only. RegisterWarp, ImportWarp (it carries a private key) and DeleteWarp also
-// require a fresh step-up (auth.Service.RequireStepUp), like showing a server password.
+// Everything here is owner-only. RegisterWarp, ImportWarp (it carries a private key), SetWarpLicense (it carries a
+// WARP+ key) and DeleteWarp also require a fresh step-up (auth.Service.RequireStepUp), like showing a server password.
 //
-// The panel talks to Cloudflare only when the owner clicks (RegisterWarp, RefreshWarp, DeleteWarp of a
-// registered account), when a node whose recovery ladder ran out of endpoints asks it to read the account again
+// The panel talks to Cloudflare only when the owner clicks (RegisterWarp, ImportWarp with a token, RefreshWarp,
+// SetWarpLicense, DeleteWarp of a registered account), when a node whose recovery ladder ran out of endpoints asks it to read the account again
 // (what RefreshWarp does, read only, at most once per 10 minutes per node), or when the stored setting
 // auto_reregister is on (off by default). Registering creates an
 // anonymous device account, without e-mail or password, from the panel's address and accepts the Cloudflare
@@ -21,7 +21,10 @@ import "mistgate/admin/v1/common.proto";
 // ERRORS. FAILED_PRECONDITION: "agent too old" (the node has no "warp/1"), account_exists (one account per
 // node: delete first), no_account, tos_not_accepted. INVALID_ARGUMENT: a file that is not a wgcf profile.
 // RESOURCE_EXHAUSTED: Cloudflare answered 429 (import a wgcf profile instead). UNAVAILABLE: Cloudflare not
-// reachable from the panel.
+// reachable from the panel. SetWarpLicense: INVALID_ARGUMENT license_invalid (the key is malformed or Cloudflare does
+// not accept it), FAILED_PRECONDITION license_device_limit (the key is on as many devices as it allows), no_token,
+// account_revoked; RESOURCE_EXHAUSTED license_rate_limited; UNAVAILABLE license_rejected (any other answer of
+// Cloudflare), cloudflare_unreachable.
 service WarpService {
   // Account summary (no secrets), the node's last WarpHealth and whether the node has applied the account.
   rpc GetWarp(GetWarpRequest) returns (GetWarpResponse);
@@ -39,6 +42,11 @@ service WarpService {
   // Re-reads the account from Cloudflare (endpoint, addresses, client id); needs the access token, so an
   // imported profile without wgcf-account.toml cannot refresh. Creates nothing.
   rpc RefreshWarp(RefreshWarpRequest) returns (RefreshWarpResponse);
+  // Binds a paid WARP+ license key to the node's device at Cloudflare, reads the account back (its type becomes "plus"
+  // when Cloudflare takes the key) and keeps the key sealed with the account's other secrets: a re-registration binds
+  // the same key to the new device. Needs the access token (a profile imported without wgcf-account.toml has none).
+  // The key is never returned. Step-up.
+  rpc SetWarpLicense(SetWarpLicenseRequest) returns (SetWarpLicenseResponse);
   // Deletes the device at Cloudflare when a token is known, then the local account; the node loses WARP
   // (a full desired state is sent). Step-up.
   rpc DeleteWarp(DeleteWarpRequest) returns (DeleteWarpResponse);
@@ -75,6 +83,12 @@ message WarpAccount {
   string registered_with = 17;
   int64 created_unix = 18 [jstype = JS_NUMBER];
   int64 updated_unix = 19 [jstype = JS_NUMBER];
+  // The owner gave a WARP+ license key (SetWarpLicense); the key itself is never sent out.
+  bool has_license = 20;
+  // Why the key of the replaced account was not bound to the new device by a re-registration, which went through and
+  // left the account "free" (license_invalid, license_device_limit, license_rate_limited, account_revoked,
+  // license_rejected, cloudflare_unreachable); empty = nothing to report.
+  string license_error = 21;
 }
 
 // agent.v1.WarpHealth as the panel last stored it.
@@ -226,6 +240,16 @@ message ImportWarpRequest {
 }
 
 message ImportWarpResponse {
+  WarpAccount account = 1;
+}
+
+message SetWarpLicenseRequest {
+  string node_id = 1;
+  // The WARP+ license key (secret). Trimmed; 16 to 64 letters, digits and dashes.
+  string license_key = 2;
+}
+
+message SetWarpLicenseResponse {
   WarpAccount account = 1;
 }
 

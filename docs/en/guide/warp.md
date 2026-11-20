@@ -12,7 +12,7 @@ By default a profile's traffic leaves a node from the node's own address. With W
 - **The exit is a profile setting.** **Exit** (in **Advanced** for Hysteria2 and VLESS, in **Basics** for AmneziaWG) is **Direct** or **WARP**.
 - **The account belongs to a node.** It is set up on the WARP card of the node: node → **Exit**, the first card. The WARP chip in the node's header leads there too.
 - **A profile with the WARP exit needs an account on every node it runs on.** The editor lists the nodes of the profile that have no working WARP, each a link to its WARP card.
-- **MCP tools.** `warp_status` reads the account and the node's last probes. With an Admin token, `warp_restart_plan` / `_apply` restart the tunnel; `warp_reregister_plan` / `_apply` replace the account after the owner approves the plan and sees the terms link.
+- **MCP tools.** `warp_status` reads the account and the node's last probes. With an Admin token, `warp_restart_plan` / `_apply` restart the tunnel; `warp_reregister_plan` / `_apply` replace the account after the owner approves the plan and sees the terms link; a WARP+ key set on the account is bound to the new device. There is no tool for setting the key: it never goes through an agent.
 
 To offer people both exits, make a twin of the profile with the other exit ("WARP copy"): see [Profiles](profiles.md).
 
@@ -98,6 +98,7 @@ After the last step it rests for 10 minutes, still trying the next address after
 | **Restart WARP** | The account is on and not revoked; the main button when the tunnel is down | Pauses and resumes in one step: the node tears the tunnel down and brings it up again with the ladder from the start. If the node did not confirm the pause in time, the resume goes out anyway: "WARP is on again, but the node did not confirm the pause: look again in a minute". |
 | **Register again** | Always; the main button when Cloudflare no longer knows the account (revoked) | Registers a new account and puts it in the old one's place in one step; the old device is deleted at Cloudflare. Same terms window as **Enable WARP**. Use it, not **Delete account** followed by a new registration, to get a fresh device for a slow or flaky exit: the node keeps its WARP until the new account arrives, so nothing stops and no alert opens. |
 | **Read from Cloudflare again** | The account has an access token | Re-reads the endpoint, addresses and client id from Cloudflare. Creates nothing. |
+| **Set WARP+ key** / **Change WARP+ key** | Under **Details**; the account has an access token | Binds your paid WARP+ license key to the node's device. See [WARP+ license key](#warp-license-key). |
 | **Pause** / **Resume** | Always | Pause tears the tunnel down. The window names the profiles that stop and how many connections go through them now. A paused account is resumed, not restarted. |
 | **Delete account** | Always | Type the node name to confirm; needs a step-up. The node loses WARP; WARP-exit profiles stop. The device is deleted at Cloudflare too when a token is stored. You can register or import another account afterwards. |
 
@@ -107,6 +108,15 @@ Some problems need you, not a button. The card names them:
 - another program uses the routing-rule priorities WARP needs (90 and 110);
 - a network interface named `mgwarp` already exists and is not WARP's;
 - the node could not apply the account: the reason is in the node's events.
+
+## WARP+ license key
+
+A node's account is a free one unless you give it a paid WARP+ license key. On the WARP card open **Details** and press **Set WARP+ key** (owner only, with a fresh step-up). The panel binds the key to the node's device at Cloudflare, the same request the 1.1.1.1 app and `wgcf update --license-key` make (`PUT /reg/{id}/account`), reads the account back and shows its type: when Cloudflare reports a WARP+ account the card gets a **Plus** badge and `warp=plus` shows in the probe details.
+
+- **The key is a secret.** It is stored encrypted with the account's other secrets and never shown again. It does not appear in the API (the account only says "key set" and its type), the logs, the audit log (which records that a key was set, on which node, and the account type) or MCP. MCP has no tool for it: an agent must never see a key.
+- **It needs an access token:** an account registered here, or imported with `wgcf-account.toml`. An imported account's type is read from Cloudflare when you import it (and by **Read from Cloudflare again**); an import without the token stays untyped.
+- **Register again keeps the key.** The same key is bound to the new device by itself, also by the automatic re-registration. If Cloudflare refuses it (for example the key is already on all the devices it allows), the re-registration still goes through: the account stays `free`, the card says why and the audit entry records the outcome. Free a device or set another key, then press **Set WARP+ key** again.
+- **Refusals are worded.** The window says whether the key is not accepted, is already on as many devices as it allows, whether Cloudflare is limiting requests from the panel's address or does not answer, or whether the account itself was revoked. Cloudflare's own texts for these are not documented, so an answer the panel cannot place reads "Cloudflare refused without saying why".
 
 ## Sites that refuse WARP
 

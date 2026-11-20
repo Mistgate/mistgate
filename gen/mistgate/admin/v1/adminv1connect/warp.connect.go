@@ -47,6 +47,9 @@ const (
 	WarpServiceRestartWarpProcedure = "/mistgate.admin.v1.WarpService/RestartWarp"
 	// WarpServiceRefreshWarpProcedure is the fully-qualified name of the WarpService's RefreshWarp RPC.
 	WarpServiceRefreshWarpProcedure = "/mistgate.admin.v1.WarpService/RefreshWarp"
+	// WarpServiceSetWarpLicenseProcedure is the fully-qualified name of the WarpService's
+	// SetWarpLicense RPC.
+	WarpServiceSetWarpLicenseProcedure = "/mistgate.admin.v1.WarpService/SetWarpLicense"
 	// WarpServiceDeleteWarpProcedure is the fully-qualified name of the WarpService's DeleteWarp RPC.
 	WarpServiceDeleteWarpProcedure = "/mistgate.admin.v1.WarpService/DeleteWarp"
 	// WarpServiceGetWarpRegistrationParamsProcedure is the fully-qualified name of the WarpService's
@@ -75,6 +78,11 @@ type WarpServiceClient interface {
 	// Re-reads the account from Cloudflare (endpoint, addresses, client id); needs the access token, so an
 	// imported profile without wgcf-account.toml cannot refresh. Creates nothing.
 	RefreshWarp(context.Context, *connect.Request[v1.RefreshWarpRequest]) (*connect.Response[v1.RefreshWarpResponse], error)
+	// Binds a paid WARP+ license key to the node's device at Cloudflare, reads the account back (its type becomes "plus"
+	// when Cloudflare takes the key) and keeps the key sealed with the account's other secrets: a re-registration binds
+	// the same key to the new device. Needs the access token (a profile imported without wgcf-account.toml has none).
+	// The key is never returned. Step-up.
+	SetWarpLicense(context.Context, *connect.Request[v1.SetWarpLicenseRequest]) (*connect.Response[v1.SetWarpLicenseResponse], error)
 	// Deletes the device at Cloudflare when a token is known, then the local account; the node loses WARP
 	// (a full desired state is sent). Step-up.
 	DeleteWarp(context.Context, *connect.Request[v1.DeleteWarpRequest]) (*connect.Response[v1.DeleteWarpResponse], error)
@@ -131,6 +139,12 @@ func NewWarpServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(warpServiceMethods.ByName("RefreshWarp")),
 			connect.WithClientOptions(opts...),
 		),
+		setWarpLicense: connect.NewClient[v1.SetWarpLicenseRequest, v1.SetWarpLicenseResponse](
+			httpClient,
+			baseURL+WarpServiceSetWarpLicenseProcedure,
+			connect.WithSchema(warpServiceMethods.ByName("SetWarpLicense")),
+			connect.WithClientOptions(opts...),
+		),
 		deleteWarp: connect.NewClient[v1.DeleteWarpRequest, v1.DeleteWarpResponse](
 			httpClient,
 			baseURL+WarpServiceDeleteWarpProcedure,
@@ -160,6 +174,7 @@ type warpServiceClient struct {
 	setWarpEnabled               *connect.Client[v1.SetWarpEnabledRequest, v1.SetWarpEnabledResponse]
 	restartWarp                  *connect.Client[v1.RestartWarpRequest, v1.RestartWarpResponse]
 	refreshWarp                  *connect.Client[v1.RefreshWarpRequest, v1.RefreshWarpResponse]
+	setWarpLicense               *connect.Client[v1.SetWarpLicenseRequest, v1.SetWarpLicenseResponse]
 	deleteWarp                   *connect.Client[v1.DeleteWarpRequest, v1.DeleteWarpResponse]
 	getWarpRegistrationParams    *connect.Client[v1.GetWarpRegistrationParamsRequest, v1.GetWarpRegistrationParamsResponse]
 	updateWarpRegistrationParams *connect.Client[v1.UpdateWarpRegistrationParamsRequest, v1.UpdateWarpRegistrationParamsResponse]
@@ -195,6 +210,11 @@ func (c *warpServiceClient) RefreshWarp(ctx context.Context, req *connect.Reques
 	return c.refreshWarp.CallUnary(ctx, req)
 }
 
+// SetWarpLicense calls mistgate.admin.v1.WarpService.SetWarpLicense.
+func (c *warpServiceClient) SetWarpLicense(ctx context.Context, req *connect.Request[v1.SetWarpLicenseRequest]) (*connect.Response[v1.SetWarpLicenseResponse], error) {
+	return c.setWarpLicense.CallUnary(ctx, req)
+}
+
 // DeleteWarp calls mistgate.admin.v1.WarpService.DeleteWarp.
 func (c *warpServiceClient) DeleteWarp(ctx context.Context, req *connect.Request[v1.DeleteWarpRequest]) (*connect.Response[v1.DeleteWarpResponse], error) {
 	return c.deleteWarp.CallUnary(ctx, req)
@@ -228,6 +248,11 @@ type WarpServiceHandler interface {
 	// Re-reads the account from Cloudflare (endpoint, addresses, client id); needs the access token, so an
 	// imported profile without wgcf-account.toml cannot refresh. Creates nothing.
 	RefreshWarp(context.Context, *connect.Request[v1.RefreshWarpRequest]) (*connect.Response[v1.RefreshWarpResponse], error)
+	// Binds a paid WARP+ license key to the node's device at Cloudflare, reads the account back (its type becomes "plus"
+	// when Cloudflare takes the key) and keeps the key sealed with the account's other secrets: a re-registration binds
+	// the same key to the new device. Needs the access token (a profile imported without wgcf-account.toml has none).
+	// The key is never returned. Step-up.
+	SetWarpLicense(context.Context, *connect.Request[v1.SetWarpLicenseRequest]) (*connect.Response[v1.SetWarpLicenseResponse], error)
 	// Deletes the device at Cloudflare when a token is known, then the local account; the node loses WARP
 	// (a full desired state is sent). Step-up.
 	DeleteWarp(context.Context, *connect.Request[v1.DeleteWarpRequest]) (*connect.Response[v1.DeleteWarpResponse], error)
@@ -280,6 +305,12 @@ func NewWarpServiceHandler(svc WarpServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(warpServiceMethods.ByName("RefreshWarp")),
 		connect.WithHandlerOptions(opts...),
 	)
+	warpServiceSetWarpLicenseHandler := connect.NewUnaryHandler(
+		WarpServiceSetWarpLicenseProcedure,
+		svc.SetWarpLicense,
+		connect.WithSchema(warpServiceMethods.ByName("SetWarpLicense")),
+		connect.WithHandlerOptions(opts...),
+	)
 	warpServiceDeleteWarpHandler := connect.NewUnaryHandler(
 		WarpServiceDeleteWarpProcedure,
 		svc.DeleteWarp,
@@ -312,6 +343,8 @@ func NewWarpServiceHandler(svc WarpServiceHandler, opts ...connect.HandlerOption
 			warpServiceRestartWarpHandler.ServeHTTP(w, r)
 		case WarpServiceRefreshWarpProcedure:
 			warpServiceRefreshWarpHandler.ServeHTTP(w, r)
+		case WarpServiceSetWarpLicenseProcedure:
+			warpServiceSetWarpLicenseHandler.ServeHTTP(w, r)
 		case WarpServiceDeleteWarpProcedure:
 			warpServiceDeleteWarpHandler.ServeHTTP(w, r)
 		case WarpServiceGetWarpRegistrationParamsProcedure:
@@ -349,6 +382,10 @@ func (UnimplementedWarpServiceHandler) RestartWarp(context.Context, *connect.Req
 
 func (UnimplementedWarpServiceHandler) RefreshWarp(context.Context, *connect.Request[v1.RefreshWarpRequest]) (*connect.Response[v1.RefreshWarpResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.WarpService.RefreshWarp is not implemented"))
+}
+
+func (UnimplementedWarpServiceHandler) SetWarpLicense(context.Context, *connect.Request[v1.SetWarpLicenseRequest]) (*connect.Response[v1.SetWarpLicenseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.admin.v1.WarpService.SetWarpLicense is not implemented"))
 }
 
 func (UnimplementedWarpServiceHandler) DeleteWarp(context.Context, *connect.Request[v1.DeleteWarpRequest]) (*connect.Response[v1.DeleteWarpResponse], error) {

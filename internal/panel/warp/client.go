@@ -17,7 +17,7 @@ import (
 )
 
 // Client is the Cloudflare client API (the one the 1.1.1.1 app and wgcf talk to), limited to what the panel
-// needs: register a device, read it back, delete it. Every call is made on the owner's click (see the package
+// needs: register a device, read it back, bind a WARP+ license key to it, delete it. Every call is made on the owner's click (see the package
 // comment). It never logs a body, a header or a token.
 type Client struct {
 	base string
@@ -126,6 +126,22 @@ func (c *Client) Get(ctx context.Context, p Params, id, token string) (Registrat
 	return c.do(ctx, p, http.MethodGet, "/reg/"+url.PathEscape(id), token, nil)
 }
 
+// SetLicense binds a WARP+ license key to our device: PUT /reg/{id}/account with {"license": key}, the request the
+// 1.1.1.1 app makes when a key is typed in and that wgcf's "update --license-key" makes. The answer (the account) is
+// not read: callers Get the device afterwards. The key is the only secret of the call: a copy of it in Cloudflare's
+// error text is cut out before the error leaves, so no log line can carry it.
+func (c *Client) SetLicense(ctx context.Context, p Params, id, token, key string) error {
+	body, _ := json.Marshal(struct {
+		License string `json:"license"`
+	}{key})
+	_, err := c.roundTrip(ctx, p, http.MethodPut, "/reg/"+url.PathEscape(id)+"/account", token, body)
+	var ae *APIError
+	if errors.As(err, &ae) {
+		ae.Message = strings.ReplaceAll(ae.Message, key, "[key]")
+	}
+	return err
+}
+
 // Delete removes our own device. An answer of 404 (already gone) is success.
 func (c *Client) Delete(ctx context.Context, p Params, id, token string) error {
 	_, err := c.roundTrip(ctx, p, http.MethodDelete, "/reg/"+url.PathEscape(id), token, nil)
@@ -226,7 +242,7 @@ func apiError(status int, raw []byte) *APIError {
 
 // registration checks and normalises an answer: the peer key, an IPv4 endpoint literal, the addresses.
 func (r regResponse) registration() (Registration, error) {
-	out := Registration{ID: r.ID, Token: r.Token, License: r.Account.License, AccountType: r.Account.AccountType,
+	out := Registration{ID: r.ID, Token: r.Token, License: r.Account.License, AccountType: normalAccountType(r.Account.AccountType),
 		ClientID: r.Config.ClientID}
 	if out.ID == "" || out.Token == "" {
 		return Registration{}, errors.New("cloudflare answer has no device id or token")
@@ -265,6 +281,16 @@ func (r regResponse) registration() (Registration, error) {
 		}
 	}
 	return out, nil
+}
+
+// normalAccountType maps Cloudflare's account_type to what the panel shows: "free", or "plus" for every paid or
+// quota kind ("unlimited" is WARP+, "limited" is WARP+ with a data quota). Anything else (an unknown kind) passes through.
+func normalAccountType(t string) string {
+	switch t = strings.ToLower(strings.TrimSpace(t)); t {
+	case "unlimited", "limited", "premium":
+		return "plus"
+	}
+	return t
 }
 
 // endpointIP turns "162.159.192.1:0" or "[2606:4700:d0::a29f:c001]:0" into the bare address. v4 selects the family.

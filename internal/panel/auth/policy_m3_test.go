@@ -29,6 +29,7 @@ func TestM3ServiceRolePolicy(t *testing.T) {
 		{"GetWarp", adminv1connect.WarpServiceGetWarpProcedure, owner},
 		{"RegisterWarp", adminv1connect.WarpServiceRegisterWarpProcedure, owner},
 		{"ImportWarp", adminv1connect.WarpServiceImportWarpProcedure, owner},
+		{"SetWarpLicense", adminv1connect.WarpServiceSetWarpLicenseProcedure, owner},
 		{"SetWarpEnabled", adminv1connect.WarpServiceSetWarpEnabledProcedure, owner},
 		{"RefreshWarp", adminv1connect.WarpServiceRefreshWarpProcedure, owner},
 		{"DeleteWarp", adminv1connect.WarpServiceDeleteWarpProcedure, owner},
