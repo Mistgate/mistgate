@@ -692,7 +692,7 @@ func (p *pass) pause(code string, x *store.StepRow, reason string) {
 	// close or launch on the old reading); one that is running again, resumed after the pass read it paused, still pauses.
 	ro, err := p.s.st.Rollout(p.ctx, p.ro.ID)
 	if err != nil {
-		p.s.log.Warn("update: reload rollout", "rollout", p.ro.ID, "err", err)
+		p.s.log.Warn("update: reload rollout", "code", "update_rollout_reload_failed", "rollout", p.ro.ID, "err", err)
 		return
 	}
 	resumed := p.ro.Status != store.RolloutRunning && ro.Status == store.RolloutRunning

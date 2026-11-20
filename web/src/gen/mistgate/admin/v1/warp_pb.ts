@@ -1018,10 +1018,10 @@ export const UpdateWarpRegistrationParamsResponseSchema: GenMessage<UpdateWarpRe
 /**
  * WARP egress of a node. One Cloudflare WARP
  * account per node; inbounds whose egress is "warp" leave through it, and fail closed when the tunnel is down.
- * 
+ *
  * Everything here is owner-only. RegisterWarp, ImportWarp (it carries a private key), SetWarpLicense (it carries a
  * WARP+ key) and DeleteWarp also require a fresh step-up (auth.Service.RequireStepUp), like showing a server password.
- * 
+ *
  * The panel talks to Cloudflare only when the owner clicks (RegisterWarp, ImportWarp with a token, RefreshWarp,
  * SetWarpLicense, DeleteWarp of a registered account), when a node whose recovery ladder ran out of endpoints asks it to read the account again
  * (what RefreshWarp does, read only, at most once per 10 minutes per node), or when the stored setting
@@ -1029,7 +1029,7 @@ export const UpdateWarpRegistrationParamsResponseSchema: GenMessage<UpdateWarpRe
  * anonymous device account, without e-mail or password, from the panel's address and accepts the Cloudflare
  * WARP terms on the owner's behalf: the UI links the terms and the request must say accept_tos. An imported
  * wgcf profile is the fallback when the registration endpoint answers 429.
- * 
+ *
  * ERRORS. FAILED_PRECONDITION: "agent too old" (the node has no "warp/1"), account_exists (one account per
  * node: delete first), no_account, tos_not_accepted. INVALID_ARGUMENT: a file that is not a wgcf profile.
  * RESOURCE_EXHAUSTED: Cloudflare answered 429 (import a wgcf profile instead). UNAVAILABLE: Cloudflare not
