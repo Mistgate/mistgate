@@ -82,6 +82,11 @@ func TestOfflineEnrollment(t *testing.T) {
 	if code := enrollOfflineFinish(bytes.NewReader(append([]byte("not json\n"), leaf...)), &out, cfg); code != 2 {
 		t.Fatalf("no role line: %d", code)
 	}
+	wrongNode := cfg
+	wrongNode.NodeID = "nod_zzzzzzzzzzzzzzzzzzzzzzzzzz"
+	if code := enrollOfflineFinish(stdin(leaf, ca), &out, wrongNode); code != 1 || agent.IsEnrolled(dir) {
+		t.Fatalf("a certificate of another node: %d", code)
+	}
 	out.Reset()
 	if code := enrollOfflineFinish(stdin(leaf, ca), &out, cfg); code != 0 || !agent.IsEnrolled(dir) {
 		t.Fatalf("--offline-finish: %d", code)

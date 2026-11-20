@@ -100,8 +100,12 @@ func EnrollOffline(cfg OfflineEnrollConfig) (Meta, error) {
 	}
 	pool := x509.NewCertPool()
 	pool.AddCert(caCert)
-	if _, err := checkLeaf(certPEM, key, pool); err != nil {
+	leaf, err := checkLeaf(certPEM, key, pool)
+	if err != nil {
 		return Meta{}, fmt.Errorf("node certificate: %w", err)
+	}
+	if !leafNamesNode(leaf, cfg.NodeID) {
+		return Meta{}, errors.New("node certificate: it is not issued for --node-id")
 	}
 	meta := Meta{NodeID: cfg.NodeID, Link: cfg.Role.LinkURL, SubHost: host}
 	metaJSON, err := json.Marshal(meta)
@@ -138,4 +142,13 @@ func validLinkNodeID(id string) bool {
 		}
 	}
 	return true
+}
+
+// leafNamesNode says the node certificate names nodeID: its one URI is spiffe://agent/<nodeID> (internal/panel/fleet/ca.go).
+func leafNamesNode(leaf *x509.Certificate, nodeID string) bool {
+	if leaf == nil || len(leaf.URIs) != 1 {
+		return false
+	}
+	u := leaf.URIs[0]
+	return u.Scheme == "spiffe" && u.Host == "agent" && u.User == nil && u.RawQuery == "" && u.Fragment == "" && u.Path == "/"+nodeID
 }

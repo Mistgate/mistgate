@@ -2053,8 +2053,9 @@ message NodeSettings {
   // address is committed only after a HelloAck over it on a session the panel's CA signed.
   string panel_link_url = 17;
   // The node's subscription host role (see "SUBSCRIPTION HOST"); unset = none. Read only by agents with "sub-host/1".
-  // (Field 16 is left unused: test builds of an earlier design read it.)
   SubHostRole sub_host = 18;
+  // Test builds of an earlier design read field 16.
+  reserved 16;
 }
 
 // A node's subscription host role (see "SUBSCRIPTION HOST").

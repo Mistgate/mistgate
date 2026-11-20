@@ -59,8 +59,12 @@ func enrollOfflineFinish(in io.Reader, stdout io.Writer, cfg agent.OfflineEnroll
 		// self-signed certificates by name).
 		cert, err := certs.New(filepath.Join(cfg.StateDir, "certs")).Acquire(context.Background(), "offline-enroll",
 			plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: name})
-		if err != nil || cert.Info == nil {
+		if err != nil {
 			fmt.Fprintln(os.Stderr, "enroll: the site certificate could not be made:", err)
+			return 1
+		}
+		if cert.Info == nil {
+			fmt.Fprintln(os.Stderr, "enroll: the site certificate has no pin")
 			return 1
 		}
 		fmt.Fprintln(stdout, "pin="+cert.Info().PinSHA256)

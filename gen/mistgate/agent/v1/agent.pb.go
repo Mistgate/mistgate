@@ -7036,7 +7036,6 @@ type NodeSettings struct {
 	// panel's CA signed; until then and while it does not answer, the agent keeps using its current address.
 	PanelLinkUrl string `protobuf:"bytes,17,opt,name=panel_link_url,json=panelLinkUrl,proto3" json:"panel_link_url,omitempty"`
 	// The node's subscription host role (see "SUBSCRIPTION HOST"); unset = none. Read only by agents with "sub-host/1".
-	// (Field 16 is left unused: test builds of an earlier design read it.)
 	SubHost       *SubHostRole `protobuf:"bytes,18,opt,name=sub_host,json=subHost,proto3" json:"sub_host,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -10377,7 +10376,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"LinkAccept\x12\x1c\n" +
 	"\tsignature\x18\x01 \x01(\fR\tsignature\"!\n" +
 	"\x03Ack\x12\x1a\n" +
-	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\xe2\x05\n" +
+	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\xe8\x05\n" +
 	"\fNodeSettings\x12(\n" +
 	"\x10stats_interval_s\x18\x01 \x01(\rR\x0estatsIntervalS\x120\n" +
 	"\x14keepalive_interval_s\x18\x02 \x01(\rR\x12keepaliveIntervalS\x12.\n" +
@@ -10397,7 +10396,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\x12networks_db_sha256\x18\x0e \x01(\tR\x10networksDbSha256\x12\x1b\n" +
 	"\tos_status\x18\x0f \x01(\bR\bosStatus\x12$\n" +
 	"\x0epanel_link_url\x18\x11 \x01(\tR\fpanelLinkUrl\x129\n" +
-	"\bsub_host\x18\x12 \x01(\v2\x1e.mistgate.agent.v1.SubHostRoleR\asubHost\"w\n" +
+	"\bsub_host\x18\x12 \x01(\v2\x1e.mistgate.agent.v1.SubHostRoleR\asubHostJ\x04\b\x10\x10\x11\"w\n" +
 	"\vSubHostRole\x12\x14\n" +
 	"\x05names\x18\x01 \x03(\tR\x05names\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1b\n" +
