@@ -27,9 +27,12 @@ const (
 // Limits are the intake's bounds. The panel's bridge carries about 400 people at once (four HTTP/2 connections, two streams a
 // person, 250 streams a connection, less the waiting pairs): past that, pairs run out anyway.
 type Limits struct {
-	MaxClients    int // people carried at once, both classes
-	LinkReserve   int // of those, kept for agents' links: subscriptions take at most MaxClients-LinkReserve
-	SubPerSource  int // subscriptions carried at once from one address (an IPv6 one by its /64)
+	MaxClients   int // people carried at once, both classes
+	LinkReserve  int // of those, kept for agents' links: subscriptions take at most MaxClients-LinkReserve
+	SubPerSource int // subscriptions carried at once from one address (an IPv6 one by its /64)
+	// SubPerNetwork: subscriptions carried at once from one network, an IPv4 /24 or an IPv6 /48, so that a few dozen
+	// addresses of one network cannot fill the subscription class. 0 = no such bound.
+	SubPerNetwork int
 	LinkPerSource int // links carried at once from one node's address
 	SubIdle       time.Duration
 	LinkIdle      time.Duration // agents ping every 20 s
@@ -37,7 +40,7 @@ type Limits struct {
 
 // DefaultLimits are the limits for a fleet of linkSources node addresses.
 func DefaultLimits(linkSources int) Limits {
-	return Limits{MaxClients: 400, LinkReserve: min(256, 2*linkSources+16), SubPerSource: 16, LinkPerSource: 4,
+	return Limits{MaxClients: 400, LinkReserve: min(256, 2*linkSources+16), SubPerSource: 16, SubPerNetwork: 64, LinkPerSource: 4,
 		SubIdle: time.Minute, LinkIdle: 2 * time.Minute}
 }
 
@@ -59,7 +62,7 @@ type Stats struct {
 	ClientsSub, ClientsLink uint32
 	PanelConnected          bool
 	Diverted                uint64 // sent to the node's site instead
-	RefusedPerSource        uint64 // of those, over a per-source limit
+	RefusedPerSource        uint64 // of those, over a per-source or per-network limit
 }
 
 // Intake serves one route of a front. It is safe for concurrent use.
@@ -78,6 +81,7 @@ type Intake struct {
 	sources   []netip.Prefix
 	sub, link int
 	perSource map[netip.Addr]int // by source key (sourceKey)
+	perNet    map[netip.Addr]int // subscriptions by network key (networkKey)
 	down      bool               // what the front was last told
 
 	diverted, refusedPerSource atomic.Uint64
@@ -90,7 +94,7 @@ func New(entry Entry, front Front, routeID string, log *slog.Logger) *Intake {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Intake{entry: entry, front: front, routeID: routeID, log: log, ctx: ctx, cancel: cancel,
-		limits: DefaultLimits(0), perSource: map[netip.Addr]int{}}
+		limits: DefaultLimits(0), perSource: map[netip.Addr]int{}, perNet: map[netip.Addr]int{}}
 }
 
 // SetSources sets the fleet nodes' addresses (the link class) and the limits that follow from their number.
@@ -208,11 +212,12 @@ func (in *Intake) divert(conn net.Conn) {
 	}
 }
 
-// admit counts a person in, by class and source; release is nil when a limit is reached (perSource: the source's).
+// admit counts a person in, by class, source and (a subscription) network; release is nil when a limit is reached
+// (perSource: the source's or the network's).
 func (in *Intake) admit(addr netip.AddrPort) (link bool, release func(), perSource bool) {
 	in.mu.Lock()
 	defer in.mu.Unlock()
-	key := sourceKey(addr.Addr())
+	key, network := sourceKey(addr.Addr()), networkKey(addr.Addr())
 	for _, p := range in.sources {
 		if addr.IsValid() && p.Contains(addr.Addr().Unmap()) {
 			link = true
@@ -225,7 +230,8 @@ func (in *Intake) admit(addr netip.AddrPort) (link bool, release func(), perSour
 		return link, nil, false
 	case !link && in.sub >= l.MaxClients-l.LinkReserve:
 		return link, nil, false
-	case link && in.perSource[key] >= l.LinkPerSource, !link && in.perSource[key] >= l.SubPerSource:
+	case link && in.perSource[key] >= l.LinkPerSource, !link && in.perSource[key] >= l.SubPerSource,
+		!link && l.SubPerNetwork > 0 && in.perNet[network] >= l.SubPerNetwork:
 		return link, nil, true
 	}
 	in.perSource[key]++
@@ -233,11 +239,12 @@ func (in *Intake) admit(addr netip.AddrPort) (link bool, release func(), perSour
 		in.link++
 	} else {
 		in.sub++
+		in.perNet[network]++
 	}
-	return link, func() { in.leave(key, link) }, false
+	return link, func() { in.leave(key, network, link) }, false
 }
 
-func (in *Intake) leave(key netip.Addr, link bool) {
+func (in *Intake) leave(key, network netip.Addr, link bool) {
 	in.mu.Lock()
 	defer in.mu.Unlock()
 	if in.perSource[key]--; in.perSource[key] <= 0 {
@@ -245,8 +252,11 @@ func (in *Intake) leave(key netip.Addr, link bool) {
 	}
 	if link {
 		in.link--
-	} else {
-		in.sub--
+		return
+	}
+	in.sub--
+	if in.perNet[network]--; in.perNet[network] <= 0 {
+		delete(in.perNet, network)
 	}
 }
 
@@ -294,6 +304,17 @@ func sourceKey(a netip.Addr) netip.Addr {
 		return p.Addr()
 	}
 	return a
+}
+
+// networkKey is what the per-network limit counts by: the /24 of an IPv4 address, the /48 of an IPv6 one.
+func networkKey(a netip.Addr) netip.Addr {
+	a = a.Unmap()
+	bits := 24
+	if a.Is6() {
+		bits = 48
+	}
+	p, _ := a.Prefix(bits)
+	return p.Addr()
 }
 
 func remoteAddrPort(conn net.Conn) netip.AddrPort {

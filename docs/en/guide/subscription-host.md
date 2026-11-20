@@ -56,7 +56,7 @@ Once all hold, the panel records `sub_host_ready` and switches at run time, with
 
 While the host is on, the card shows the domain, the site name, the node, the bridge (*bridge up* or *bridge down* with the reason, and since when) and the CAA record. The panel records `sub_host_tunnel_down` when the bridge stays down and `sub_host_tunnel_up` when it is back.
 
-What a visitor sees: a connection for the subdomain that the panel cannot take (no bridge, or the host is full) goes to the node's own site, never to a reset. The host lets at most 400 people through at once, 16 per address (an IPv6 address counts by its /64), and keeps a reserve for the agents' links.
+What a visitor sees: a connection for the subdomain that the panel cannot take (no bridge, or the host is full) goes to the node's own site, never to a reset. The host lets at most 400 people through at once, 16 per address (an IPv6 address counts by its /64) and 64 per network (an IPv4 /24 or an IPv6 /48), and keeps a reserve for the agents' links.
 
 ## CAA record
 

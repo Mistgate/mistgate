@@ -59,7 +59,8 @@ own public address. A link-only agent keeps the per-network statistics and its s
 table and update files over the link with a token of its link session (`link-fetch/1`).
 
 **Limits.** The front keeps no per-source limits on purpose. The host's intake does: at most 400 people at once through
-the bridge (what four HTTP/2 connections carry), 16 per source address (an IPv6 one by its /64), and a reserve for the
+the bridge (what four HTTP/2 connections carry), 16 per source address (an IPv6 one by its /64), 64 subscriptions per
+network (an IPv4 /24, an IPv6 /48, so a few dozen /64s of one network cannot fill the class), and a reserve for the
 agents' links, recognised by the fleet nodes' addresses the panel sends: the subdomain is one name and the path is
 inside TLS, so the source address is the only thing the host can tell them by.
 

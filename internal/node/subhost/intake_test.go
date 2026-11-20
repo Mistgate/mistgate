@@ -141,6 +141,43 @@ func TestIntakeLimitsByClassAndSource(t *testing.T) {
 	eventually(t, "everyone left", func() bool { s := in.Stats(); return s.ClientsSub == 0 && s.ClientsLink == 0 })
 }
 
+// A network (an IPv4 /24, an IPv6 /48) is bounded as a whole: many /64s of one /48 cannot fill the subscription class, and a
+// link from a fleet node's address is not counted against its network.
+func TestIntakeLimitsByNetwork(t *testing.T) {
+	in, e, f := newTestIntake(t)
+	in.SetSources([]netip.Prefix{netip.MustParsePrefix("198.51.100.7/32")})
+	in.SetLimits(Limits{MaxClients: 20, LinkReserve: 2, SubPerSource: 2, SubPerNetwork: 3, LinkPerSource: 2})
+	start := func(c net.Conn) { in.wg.Add(1); go func() { defer in.wg.Done(); in.handle(c) }() }
+
+	start(person("2001:db8:1:1::1", 1))
+	start(person("2001:db8:1:2::1", 2))
+	start(person("2001:db8:1:3::1", 3))
+	eventually(t, "three /64s of one /48", func() bool { return in.Stats().ClientsSub == 3 })
+	start(person("2001:db8:1:4::1", 4)) // a fourth /64 of the same /48
+	eventually(t, "the /48 is full", func() bool { return f.diverted.Load() == 1 && in.Stats().RefusedPerSource == 1 })
+	start(person("2001:db8:2::1", 5)) // another /48
+	eventually(t, "another network", func() bool { return in.Stats().ClientsSub == 4 })
+
+	start(person("198.51.100.1", 6))
+	start(person("198.51.100.2", 7))
+	eventually(t, "two of one /24", func() bool { return in.Stats().ClientsSub == 6 })
+	start(person("198.51.100.7", 8)) // a fleet node in that /24: a link, not counted against the network
+	eventually(t, "the node's link", func() bool { return in.Stats().ClientsLink == 1 })
+	start(person("198.51.100.3", 9))
+	eventually(t, "the third of the /24", func() bool { return in.Stats().ClientsSub == 7 })
+	start(person("198.51.100.4", 10))
+	eventually(t, "the /24 is full", func() bool { return f.diverted.Load() == 2 })
+
+	close(e.release)
+	eventually(t, "everyone left", func() bool { s := in.Stats(); return s.ClientsSub == 0 && s.ClientsLink == 0 })
+	in.mu.Lock()
+	left := len(in.perNet) + len(in.perSource)
+	in.mu.Unlock()
+	if left != 0 {
+		t.Fatalf("counters left: %d", left)
+	}
+}
+
 // Without the panel the route is down (the front sends the names to the site at once), and a connection that came anyway, or
 // that the entry cannot attach, goes to the site.
 func TestIntakeWithoutThePanel(t *testing.T) {
