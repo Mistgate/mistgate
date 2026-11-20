@@ -415,6 +415,7 @@ button.a-set:hover { background: color-mix(in srgb, var(--text) 3%, transparent)
 .a-act + .a-act { border-top: 1px solid var(--hair); }
 .a-act:hover { background: color-mix(in srgb, var(--text) 3%, transparent); }
 .a-act .ic { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--step); color: var(--sec); }
+.a-act[data-cp="done"] .ic { background: var(--accent-soft, var(--step)); color: var(--accent-text); }
 .a-act .tx { display: flex; flex-direction: column; min-width: 0; }
 .a-act .t { font-size: 15px; line-height: 20px; font-weight: 500; }
 .a-act .d { font-size: 13px; line-height: 20px; color: var(--sec); }
