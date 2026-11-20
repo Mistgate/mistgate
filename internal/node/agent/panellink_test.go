@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"cmp"
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/json"
@@ -52,6 +53,13 @@ func (p *sessionLinkPanel) refuse(c byte) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.refused[linkPrefix(c)] = true
+}
+
+// answer makes the link address with prefix linkPrefix(c) answer again.
+func (p *sessionLinkPanel) answer(c byte) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.refused, linkPrefix(c))
 }
 
 func (p *sessionLinkPanel) dialsTo(c byte) int {
@@ -578,4 +586,29 @@ func TestPrevAddressNoneLeavesAgentJSON(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Fatalf("%s changed:\n%s\n%s", fileMeta, before, after)
 	}
+}
+
+// A node on the bridge whose current link is gone and whose new address starts to answer: the direct probe reaches the
+// new address, the node leaves the bridge and commits the new address after a session over it.
+func TestNextLinkMovesABridgedNode(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	lp.refuse('a')
+	lp.refuse('b')
+	var bridged atomic.Int32
+	h.a.panelEntryFn = func() string { return "nod_de1" }
+	h.a.bridgedFn = func(ctx context.Context, _ string) error {
+		bridged.Add(1)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	h.a.bridgeFallbackAfter, h.a.bridgeFallbackAttempts = time.Hour, 2
+	h.a.bridgeProbeEvery, h.a.bridgeProbeTimeout = 20*time.Millisecond, 2*time.Second
+	h.start()
+	eventually(t, func() bool { return bridged.Load() > 0 }, "the node on the bridge")
+
+	lp.answer('b')
+	if got := lp.session(t); got != linkPrefix('b') {
+		t.Fatal("the node did not come back over the new address")
+	}
+	committedTo(t, h, b, a)
 }
