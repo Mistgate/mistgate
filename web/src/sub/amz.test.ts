@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { deviceModal } from "./add";
 import { newAmzState, type AmzState } from "./amnezia";
 import { amzActions, type Api } from "./amz-actions";
@@ -624,6 +624,23 @@ describe("the key dialog", () => {
     expect(a.log).toEqual(["download mistgate-de.conf", "copy [Interface]\nPrivateKey = x\n", "copy vpn://k"]);
     box.querySelector<HTMLButtonElement>("[data-k=modal-done]")!.click();
     expect(a.log.at(-1)).toBe("add false");
+  });
+
+  it("a tile that copied says so in place for a moment: a tick and the done word, no toast", () => {
+    vi.useFakeTimers();
+    try {
+      const { box, a } = withKey();
+      const tile = box.querySelector<HTMLButtonElement>("[data-k=amz-key-d3]")!;
+      const name = () => text(tile.querySelector(".t"));
+      expect([name(), tile.dataset.cp]).toEqual(["Скопировать ключ", undefined]);
+      tile.click();
+      expect(a.log.at(-1)).toBe("copy vpn://k");
+      expect([name(), tile.dataset.cp]).toEqual(["Ключ скопирован", "done"]);
+      vi.advanceTimersByTime(1801);
+      expect([name(), tile.dataset.cp]).toEqual(["Скопировать ключ", undefined]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("five languages: the key reads the same way, none of the words missing", () => {

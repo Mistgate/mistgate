@@ -207,14 +207,39 @@ export function readyBody(c: AmzCtx, x: AwgDevice): HTMLElement {
     btn.addEventListener("click", () => click(btn));
     return btn;
   };
+  // a tile that copies answers in place: its icon turns into a tick and its name into the done word for a moment (a toast would
+  // stand on the tile above it)
+  const copyAct = (ico: IconName, k: string, title: string, done: string, line: Kid[], text: string) => {
+    let timer = 0;
+    return act(ico, k, title, line, (btn) =>
+      a.copy(
+        text,
+        "",
+        () => {
+          const ic = btn.querySelector(".ic")!;
+          const name = btn.querySelector(".t")!;
+          ic.replaceChildren(icon("check"));
+          name.textContent = done;
+          btn.dataset.cp = "done";
+          clearTimeout(timer);
+          timer = window.setTimeout(() => {
+            ic.replaceChildren(icon(ico));
+            name.textContent = title;
+            delete btn.dataset.cp;
+          }, 1800);
+        },
+        btn,
+      ),
+    );
+  };
   // "The line vpn:// for AmneziaVPN": the scheme in the file's own face, wherever the language puts it
   const [lead, tail] = t.adActKeyD(app).split("vpn://");
   const acts = h(
     "div",
     { class: "a-acts3" },
     act("file", `amz-dl-${x.id}`, t.adActFile, [h("span", { class: "m" }, filename)], () => a.download(filename, cfg.conf)),
-    act("copy", `amz-conf-${x.id}`, t.adActConf, [t.adActConfD], (btn) => a.copy(cfg.conf, t.confCopied, undefined, btn)),
-    act("key", `amz-key-${x.id}`, t.copyKey, [lead ?? "", h("span", { class: "m" }, "vpn://"), tail ?? ""], (btn) => a.copy(cfg.vpn_key, t.keyCopied, undefined, btn)),
+    copyAct("copy", `amz-conf-${x.id}`, t.adActConf, t.confCopied, [t.adActConfD], cfg.conf),
+    copyAct("key", `amz-key-${x.id}`, t.copyKey, t.keyCopied, [lead ?? "", h("span", { class: "m" }, "vpn://"), tail ?? ""], cfg.vpn_key),
   );
   const qr = qrCard(cfg.qr, t.qrKeyAlt(app), qrLogoSrc(d));
 
