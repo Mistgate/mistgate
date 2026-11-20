@@ -120,7 +120,7 @@ func TestMetadataConsumedIntentCannotBeResurrected(t *testing.T) {
 	}
 }
 
-func TestMetadataMTLSSetPanelUnchanged(t *testing.T) {
+func TestMetadataMTLSSetPanelPreservesEnrollment(t *testing.T) {
 	dir := t.TempDir()
 	m := Meta{Panel: "panel.example.com:443", SNI: "agent.example.com", NodeID: "node"}
 	if err := saveMeta(dir, &m); err != nil {
@@ -129,19 +129,15 @@ func TestMetadataMTLSSetPanelUnchanged(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, fileIdentity), []byte("enrolled"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	before, err := os.ReadFile(filepath.Join(dir, fileMeta))
-	if err != nil {
+	if err := SetPanelLink(dir, metadataNewLink); err != nil {
 		t.Fatal(err)
 	}
-	if err := SetPanelLink(dir, metadataNewLink); err == nil {
-		t.Fatal("mTLS node accepted a link")
+	after := readMeta(t, dir)
+	if after.NodeID != m.NodeID || after.Panel != m.Panel || after.SNI != m.SNI || after.Link != "" {
+		t.Fatal("set-panel changed the mTLS enrollment")
 	}
-	after, err := os.ReadFile(filepath.Join(dir, fileMeta))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(before, after) {
-		t.Fatal("mTLS metadata changed")
+	if after.NextLink != metadataNewLink || after.NextLinkRevision == "" {
+		t.Fatal("set-panel did not persist a revisioned next link")
 	}
 }
 

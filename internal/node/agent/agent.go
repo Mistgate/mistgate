@@ -143,7 +143,7 @@ type Agent struct {
 	awgKmodAttempted atomic.Bool
 	decoySite        *decoy.Site
 
-	// A new panel link address (panellink.go). meta.Link, meta.NextLink, meta.PrevLink, meta.LinkSince and cfg.LinkURL
+	// A new panel link address (panellink.go). meta.Link, meta.NextLink, meta.PrevLink, meta.PrevMTLS, meta.LinkSince and cfg.LinkURL
 	// change at run time and are guarded by metaMu; the rest of meta is fixed at start.
 	metaMu sync.Mutex
 	// leftLink (guarded by metaMu) is the link address this run rolled back from: it did not hold, and the node is on its
@@ -158,6 +158,7 @@ type Agent struct {
 	panelLinkIgnored atomic.Bool      // an mTLS node has logged that it does not follow a panel link address
 	nextAnswered     atomic.Bool      // a direct probe from the bridge reached meta.NextLink: the next session tries it
 	linkClock        func() time.Time // the clock of meta.LinkSince; nil = a.now (tests move it days ahead)
+	configLink string // the configured optional link restored when returning to mTLS
 
 	engines            map[string]engine.Engine
 	protocols          []string // sorted keys of engines
@@ -449,6 +450,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	if siteErr != nil {
 		site = decoy.BuiltinSite(cfg.StateDir)
 	}
+	configLink := cfg.LinkURL
 	if id.meta.Link != "" { // enrolled over the link: that address is the only way to the panel
 		if _, err := parseLinkBase(id.meta.Link); err != nil {
 			return nil, fmt.Errorf("%s link: %w", fileMeta, err)
@@ -466,7 +468,7 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	journal := newJournal()
 	dbg := newDebugState(cfg.Level, time.Now)
 	a := &Agent{
-		cfg: cfg, startedAt: time.Now(), ring: ring, journal: journal, debug: dbg, host: host, meta: id.meta,
+		cfg: cfg, configLink: configLink, startedAt: time.Now(), ring: ring, journal: journal, debug: dbg, host: host, meta: id.meta,
 		decoySite:     site,
 		nets:          nets.New(0),
 		networkWake:   make(chan struct{}, 1),
@@ -1221,10 +1223,11 @@ type agentTransport interface {
 }
 
 type connectAgentTransport struct {
-	ctx       context.Context
-	stream    *connect.BidiStreamForClient[pb.ConnectRequest, pb.ConnectResponse]
-	sendOnce  sync.Once
-	closeOnce sync.Once
+	ctx           context.Context
+	stream        *connect.BidiStreamForClient[pb.ConnectRequest, pb.ConnectResponse]
+	sendOnce      sync.Once
+	closeOnce     sync.Once
+	onEstablished func() error // runs once the HelloAck arrived (the previous panel address is then current again: panellink.go)
 }
 
 func (s *connectAgentTransport) Context() context.Context              { return s.ctx }
@@ -1365,6 +1368,11 @@ func (a *Agent) session(ctx context.Context) error {
 	if a.linkOnly() {
 		return a.linkNodeSession(ctx, "")
 	}
+	if next := a.nextLink(); next != "" && !a.triedNext {
+		a.triedNext = true
+		return a.nextLinkSession(ctx, next, "")
+	}
+	a.triedNext = false
 	if a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
 		err := a.linkSession(ctx, a.dialLink)
 		if errors.Is(err, errLinkNotEstablished) && ctx.Err() == nil {
@@ -1385,6 +1393,12 @@ func (a *Agent) mtlsSession(ctx context.Context) error {
 }
 
 func (a *Agent) mtlsSessionVia(ctx context.Context, viaNodeID string) error {
+	return a.mtlsSessionOn(ctx, viaNodeID, nil)
+}
+
+// mtlsSessionOn runs a mTLS session, through the panel bridge of entry node viaNodeID when set; onEstablished, when
+// set, runs once the HelloAck arrived.
+func (a *Agent) mtlsSessionOn(ctx context.Context, viaNodeID string, onEstablished func() error) error {
 	st := a.settings.Load()
 	client := newHTTPClient(a.mtlsConfig(), dialTimeout(st), &http.HTTP2Config{
 		SendPingTimeout: secs(st.KeepaliveIntervalS, 20*time.Second),
@@ -1402,7 +1416,7 @@ func (a *Agent) mtlsSessionVia(ctx context.Context, viaNodeID string) error {
 	sctx, cancel := context.WithCancel(ctx)
 	stream := agentv1connect.NewAgentServiceClient(client, "https://"+a.meta.Panel,
 		connect.WithReadMaxBytes(64<<20)).Connect(sctx)
-	return a.runSession(cancel, &connectAgentTransport{ctx: sctx, stream: stream}, viaNodeID)
+	return a.runSession(cancel, &connectAgentTransport{ctx: sctx, stream: stream, onEstablished: onEstablished}, viaNodeID)
 }
 
 // linkSession runs a session over the signed WebSocket link that dial opens.
@@ -1501,10 +1515,17 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, via
 	}
 	a.sessionEpoch.Add(1)
 	a.sessionAckAt = time.Now()
-	if link, ok := stream.(*websocketAgentTransport); ok {
-		link.established = true
-		if link.onEstablished != nil {
-			if err := link.onEstablished(); err != nil {
+	switch t := stream.(type) {
+	case *websocketAgentTransport:
+		t.established = true
+		if t.onEstablished != nil {
+			if err := t.onEstablished(); err != nil {
+				return err
+			}
+		}
+	case *connectAgentTransport:
+		if t.onEstablished != nil {
+			if err := t.onEstablished(); err != nil {
 				return err
 			}
 		}

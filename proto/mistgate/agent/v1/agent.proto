@@ -2045,11 +2045,10 @@ message NodeSettings {
   // False is the default; old panels leave the agent silent and running no apt simulation.
   bool os_status = 15;
   // A new link address of the panel (the base URL wss://host/<secret-prefix>/, as at enrollment). Empty = no change.
-  // The panel sends it, in HelloAck and DesiredState settings, only to agents with "panel-link/1", and only once the
-  // owner set an address. Only a link node (one enrolled over the link) lists "panel-link/1" and follows it; an mTLS node
-  // ignores it. The agent saves it as its next address and tries it at its next reconnect: in a HelloAck that session ends
-  // at once, in a DesiredState the session goes on. The new address is committed only after a HelloAck over it, on a
-  // session the panel's CA signed; until then and while it does not answer, the agent keeps using its current address.
+  // The panel sends it in HelloAck and DesiredState settings only to agents with "panel-link/1" when its subscription host
+  // is ready or when returning from it to a public address. An mTLS node ignores the setting. The agent saves the address
+  // to try at the next reconnect: in a HelloAck that session ends at once, in a DesiredState the session goes on. The new
+  // address is committed only after a HelloAck over it on a session the panel's CA signed.
   string panel_link_url = 17;
   // The node's subscription host role (see "SUBSCRIPTION HOST"); unset = none. Read only by agents with "sub-host/1".
   // (Field 16 is left unused: test builds of an earlier design read it.)

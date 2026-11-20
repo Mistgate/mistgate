@@ -65,7 +65,7 @@ type Meta struct {
 	// (Panel and SNI are empty), renews over its link session and lists no self-update.
 	Link string `json:"link,omitempty"`
 	// NextLink is a new link address the panel sent (NodeSettings.panel_link_url) or `set-panel` saved. The agent tries it
-	// in turn with its current one and makes it Link once a session over it succeeds. Only a link node (Link set) has one.
+	// in turn with its current one and makes it Link once a session over it succeeds.
 	NextLink string `json:"next_link,omitempty"`
 	// NextLinkRevision identifies the last persisted next-link intent, including an explicit clear. Writers compare it
 	// under the metadata lock so an old agent snapshot cannot consume or replace a newer set-panel request.
@@ -76,6 +76,7 @@ type Meta struct {
 	// agent forgets the previous address once Link has worked for prevAddressKeep (panellink.go). Both are empty when there
 	// is no previous address.
 	PrevLink  string `json:"prev_link,omitempty"`
+	PrevMTLS  bool   `json:"prev_mtls,omitempty"` // an mTLS fallback, distinct from no previous address
 	LinkSince int64  `json:"link_since,omitempty"`
 	// LinkHealthy records a session that held for healthyAfter after HelloAck. Until then PrevLink remains the last
 	// known-good address, even if another candidate is committed or the agent restarts.
@@ -85,8 +86,7 @@ type Meta struct {
 }
 
 // SetPanelLink saves linkURL as the panel link address the agent tries next (Meta.NextLink); the running agent reads it
-// at its next start. Only a node enrolled over the link takes one: following a link address would make an mTLS node
-// link-only.
+// at its next start.
 func SetPanelLink(stateDir, linkURL string) error {
 	if _, err := parseLinkBase(linkURL); err != nil {
 		return fmt.Errorf("--link-url: %w", err)
@@ -100,9 +100,6 @@ func SetPanelLink(stateDir, linkURL string) error {
 			return errors.New("node is not enrolled")
 		} else if err != nil {
 			return err
-		}
-		if m.Link == "" {
-			return errors.New("this node connects to the panel over mTLS (agent.json has no link); only a node enrolled with --link-url can change its panel link address")
 		}
 		if linkURL == m.Link {
 			m.NextLink = ""
