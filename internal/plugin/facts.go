@@ -97,6 +97,15 @@ func ServerCDN(s InboundSpec) bool {
 	return ok && v.CDNHost != ""
 }
 
+// MTProtoWeb says an MTProto inbound is a Telegram Web Proxy (settings.mode "web"); every other protocol, an absent mode and
+// settings that cannot be read are the Fake TLS proxy. The agent, the panel and the edge all ask this.
+func MTProtoWeb(s InboundSpec) bool {
+	var j struct {
+		Mode string `json:"mode"`
+	}
+	return s.Protocol == "mtproto" && len(s.Settings) > 0 && json.Unmarshal(s.Settings, &j) == nil && j.Mode == "web"
+}
+
 // SharesTCPPort says the TCP inbounds of the protocol can stand on one port, told apart by the name in the first ClientHello
 // (TCPSharePlan). A TCP inbound of any other protocol keeps the port to itself.
 func SharesTCPPort(protocol string) bool {
