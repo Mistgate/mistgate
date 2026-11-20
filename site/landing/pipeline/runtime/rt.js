@@ -81,9 +81,10 @@ function cssFor(name) { return /^App/.test(name) ? CFG.css.app || [] : /^Sub/.te
 
 // The page of the design lays out its frames (a tour box, a shot: where the board sits in its window) at the start, when every board is
 // already there; here a board arrives later, so the page is asked to lay out again once it has arrived (a few times: a board that
-// switches its own tab first needs a moment to show what the shot is cut to).
+// switches its own tab first needs a moment to show what the shot is cut to). The board is translated first: laying out Russian text that is
+// about to be replaced would make the browser fetch the Cyrillic fonts for a page in another language.
 let refitT = [];
-function refit() { refitT.forEach(clearTimeout); refitT = [0, 150, 600, 1500].map((ms) => setTimeout(() => { const p = window.__dcPage; if (p && p._fit) p._fit(); }, ms)); }
+function refit() { refitT.forEach(clearTimeout); refitT = [0, 150, 600, 1500].map((ms) => setTimeout(() => { if (window.MG_I18N && window.MG_I18N.now) window.MG_I18N.now(); const p = window.__dcPage; if (p && p._fit) p._fit(); }, ms)); }
 
 /** <dc-import> of a page: a frame (display: contents) that gets its board when the screen comes near. n: board, e: first screen, p: props */
 export class Lazy extends Component {
@@ -93,7 +94,9 @@ export class Lazy extends Component {
     const el = this.base, box = el && (el.closest('.pwin-s,.lx-shot,.emb,.lx-app') || el.parentElement);
     if (typeof IntersectionObserver === 'undefined' || !box) { this.fetch(); return; }
     this._io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { this._io.disconnect(); this.fetch(); } }, { rootMargin: '100% 0px' });
-    this._io.observe(box);
+    // not before the first frame is out: a board that arrives earlier (its script is run, then laid out) delays what the person is waiting for
+    const watch = () => { if (!this._gone) this._io.observe(box); };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(watch, 0)); else watch();
   }
   componentDidUpdate(_, prev) { if (this.state.B && !prev.B) refit(); }
   componentWillUnmount() { if (this._io) this._io.disconnect(); this._gone = true; }
