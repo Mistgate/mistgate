@@ -19,6 +19,7 @@ dist/        OUTPUT of the generator (not in git)
 | `pnpm build` | design -> `build/`: compile, bundle, translate, prune the css, pre-render the first screen of every page in every language, check the size budgets |
 | `pnpm stand` | serve `build/` on http://127.0.0.1:8790 with the CSP of the site (`/`, `/ru/`, `/app/`, `/ru/app/`, ...) |
 | `pnpm check` | headless Chrome over the stand: 390, 820 and 1440 px in ru, en and fa; console, CSP, boards, tours, shots (`--help` in the file header) |
+| `pnpm check:quick` | the same for ru and en at 1440 px, no shots |
 | `pnpm all` | `build` and `check` |
 | `pnpm harvest` | `check` on the Russian pages, writing `harvest.json`: the strings the live screens show, which the dictionary subset is cut by |
 | `pnpm test` | unit tests (`node --test`) |
@@ -37,3 +38,7 @@ Chrome is taken from `CHROME`, or from the usual places. The shots of `check` go
 * **CSS** of the design is cut to the classes the page's boards can use; fonts are the ones of `web/src/fonts`.
 * **Links** of the design (`Docs.dc.html#…`) are resolved by `links.json` to the pages the docs generator builds.
 * **Images** the design refers to as `/_blob/<hash>` are not in the export; the build draws stand-ins (flags, logos) and lists them in `build/report.json`.
+
+## What the generator gets beyond the contract
+
+`build/manifest.json` is what the page generator reads: for every page and language the fragment (`body`), `title`, `description`, `css`, `modules`, `preload` and `dir`. Each page entry also has three keys the generator may use: `htmlAttrs` (attributes of `<html>`: `data-lg`, which the stylesheets of the design select by), `fonts` (woff2 files to preload) and `fetch` (the language bundle: preload it `as=fetch crossorigin`). `pipeline/serve.mjs` shows the document the generator is expected to write (`renderDocument`).

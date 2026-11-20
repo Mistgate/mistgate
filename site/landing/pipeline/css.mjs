@@ -83,5 +83,6 @@ export function pruneCss(css, u, { keepKeyframes = () => false } = {}) {
   root.walkAtRules(/keyframes$/i, (a) => { if (!named.has(a.params.trim()) && !u.tokens.has(a.params.trim()) && !keepKeyframes(a.params.trim())) a.remove(); });
   const out = root.toString();
   stats.bytesOut = out.length;
-  return { css: out, stats, dropped: new Set([...seen].filter((x) => !kept.has(x))), kept };
+  // dropped: names that no source mentions, cut with their rules. A class that is used but whose rule asks for another one nobody uses is not "dropped"
+  return { css: out, stats, dropped: new Set([...seen].filter((x) => !kept.has(x) && !isUsedC(x))), kept };
 }

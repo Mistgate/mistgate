@@ -1,4 +1,4 @@
-// The output of the pipeline against the contract (plans/site-contract.md): run `pnpm build` first; without build/ these tests skip.
+// The output of the pipeline against the contract with the page generator (the manifest, the fragments, the assets): run `pnpm build` first; without build/ these tests skip.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';

@@ -1,4 +1,4 @@
-// budgets.mjs: the size budgets of plans/site-leptos-plan.md §7, measured on the build, printed as a table (fact / target / red).
+// budgets.mjs: the size budgets of the plan of the new site, measured on the build, printed as a table (fact / target / red).
 // Over the target: a warning with the name of the culprit; over the red line: RED. The build does not fail on it, it does not stay quiet either.
 import { readFileSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';

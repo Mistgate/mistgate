@@ -1,4 +1,4 @@
-// build.mjs: the board pipeline. One command: design/ -> build/ (the input of the page generator, see plans/site-contract.md)
+// build.mjs: the board pipeline. One command: design/ -> build/ (the input of the page generator)
 //   node build.mjs [--no-prerender] [--pages main,app] [--langs en,ru,...] [--keep-shell]
 //   design/*.dc.html  --compile-->  ES modules  --esbuild-->  assets/*.js (hashed, split: the page, one chunk per board)
 //   design/*.css      --prune by the sources of the page, minify-->  assets/*.css      (+ fonts of the repository)

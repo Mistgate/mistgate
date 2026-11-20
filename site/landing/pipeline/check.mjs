@@ -44,7 +44,7 @@ const PAGE_JS = String.raw`(() => {
       for (const e of list) {
         if (e.closest('.demo') && /^[01]$/.test(e.textContent.trim())) continue; // fleet of 0 or 1: a known error of the panel board
         try { e.click(); } catch (er) { /* a state the board cannot draw */ }
-        await sleep(80); window.__grab(); n++;
+        await sleep(80); await window.__grab(); n++;
       }
     }
     const x = document.querySelector('.lx-aix'); if (x) x.click();
@@ -52,7 +52,13 @@ const PAGE_JS = String.raw`(() => {
   };
   window.__bag = new Set();
   window.__classes = new Set();
-  window.__grab = () => { window.__cyr(document.body, window.__bag); document.querySelectorAll("[class]").forEach((e) => { if (e.classList) e.classList.forEach((c) => window.__classes.add(c)); }); };
+  // the translator runs a frame after the DOM changes: a Russian string counts as left over only if it is still there 150 ms later (one in transit does not)
+  window.__grab = async () => {
+    const now = new Set(); window.__cyr(document.body, now); let keep = now;
+    if (window.MG_LANG !== 'RU' && now.size) { await sleep(150); const again = new Set(); window.__cyr(document.body, again); keep = new Set([...now].filter((x) => again.has(x))); } // a string the translator has not reached yet is not left over
+    keep.forEach((x) => window.__bag.add(x));
+    document.querySelectorAll('[class]').forEach((e) => { if (e.classList) e.classList.forEach((c) => window.__classes.add(c)); });
+  };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   window.__sleep = sleep;
   const src = (e) => ((window.MG_I18N && window.MG_I18N.ru ? window.MG_I18N.ru(e) : e.textContent) || '').trim();
@@ -74,7 +80,7 @@ const PAGE_JS = String.raw`(() => {
       else el.click();
       rows.push({ i, d: desc(sp), ok: true, aw: (box.querySelector('.an-w') || {}).textContent ? box.querySelector('.an-w').textContent.replace(/\s+/g, ' ').slice(40, 100) : '-' });
       await sleep(140);
-      if (harvest) window.__grab();
+      if (harvest) await window.__grab();
     }
     return { ok, rows };
   };
