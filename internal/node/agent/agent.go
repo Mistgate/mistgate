@@ -719,7 +719,10 @@ func (a *Agent) restore(ctx context.Context) {
 		a.configureNetworks(m.settings)
 	}
 	a.startAwgKmod(ctx, m)
-	if m.revision == 0 && len(m.inbounds) == 0 && len(m.relays) == 0 && m.bridgeServe == nil && len(m.bridgeDials) == 0 {
+	// A subscription host freshly installed over SSH has its role in agent.json and no state yet: it must route at once,
+	// since its first session runs through the role it serves.
+	_, host := a.hostRole()
+	if m.revision == 0 && len(m.inbounds) == 0 && len(m.relays) == 0 && m.bridgeServe == nil && len(m.bridgeDials) == 0 && !host {
 		return
 	}
 	a.syncOwnedIPv6(ctx) // the addresses come back with the agent, without the panel
@@ -2037,8 +2040,15 @@ func (a *Agent) handle(ctx context.Context, j job) {
 		}
 		a.syncOwnedIPv6(ctx)
 		a.persistModel(nil, true)
-		if m := a.snapshotModel(); m.revision != 0 {
+		// at revision 0 only a subscription host has something to run (its role, before the panel sent anything)
+		if m := a.snapshotModel(); m != nil && m.revision != 0 {
 			a.reconcile(ctx, m, nil)
+		} else if _, host := a.hostRole(); host {
+			if m == nil {
+				m = &model{}
+			}
+			a.reconcile(ctx, m, nil)
+			a.setModel(m)
 		}
 		if a.clientIPv6DoctorPending.Load() {
 			a.startClientIPv6Doctor(j.s)

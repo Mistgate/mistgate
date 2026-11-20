@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"testing"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -71,5 +72,32 @@ func TestSubHostRoleOnTheAgent(t *testing.T) {
 	}
 	if cfg := a.hostEntry.Serving(); cfg.Path != "" {
 		t.Fatal("the host entry still serves")
+	}
+}
+
+// A host freshly installed over SSH has its role in agent.json and no state: the agent routes at its start, before the panel
+// sent anything (its first session runs through that role), and a sweep at revision 0 keeps it.
+func TestSubHostRoleRoutesBeforeAnyState(t *testing.T) {
+	r := newShareRig(t)
+	withSubHostPort(t, r.port)
+	a := r.h.a
+	role := &pb.SubHostRole{Names: []string{"sub.example.test"}, Path: "/sub-host-bridge-path", SiteName: "site.example.test"}
+	a.applySubHost(&pb.NodeSettings{SubHost: role})
+	if m := a.snapshotModel(); m != nil && m.revision != 0 {
+		t.Fatalf("precondition: revision %d", m.revision)
+	}
+	a.restore(context.Background())
+	if sp := r.front(); sp == nil || sp.def != plugin.SubHostSiteRouteID {
+		t.Fatalf("front after restore %+v, want the agent's site", sp)
+	}
+	if cfg := a.hostEntry.Serving(); cfg.Path != role.Path {
+		t.Fatal("the host entry does not serve after restore")
+	}
+	if got := r.cn("site.example.test"); got != "site.example.test" {
+		t.Fatalf("site answered by %q", got)
+	}
+	a.handle(context.Background(), job{sweep: true})
+	if sp := r.front(); sp == nil || sp.def != plugin.SubHostSiteRouteID {
+		t.Fatalf("front after a sweep %+v", sp)
 	}
 }
