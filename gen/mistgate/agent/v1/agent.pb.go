@@ -1689,6 +1689,7 @@ type Hello struct {
 	// "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
 	// "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
 	// by an agent that can also run OS jobs; the panel sends UpdateOs only when it is listed.
+	// "panel-link/1" (NodeSettings.panel_link_url: a link node moves to a new panel link address on its own).
 	Capabilities []string `protobuf:"bytes,11,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	// Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
 	// Orders releases (the version string does not); the panel compares it with the bundle manifest.
@@ -6989,7 +6990,14 @@ type NodeSettings struct {
 	NetworksDbSha256 string `protobuf:"bytes,14,opt,name=networks_db_sha256,json=networksDbSha256,proto3" json:"networks_db_sha256,omitempty"`
 	// The panel explicitly asks a capable agent to read local apt/dpkg/kernel state and send OsStatus snapshots.
 	// False is the default; old panels leave the agent silent and running no apt simulation.
-	OsStatus      bool `protobuf:"varint,15,opt,name=os_status,json=osStatus,proto3" json:"os_status,omitempty"`
+	OsStatus bool `protobuf:"varint,15,opt,name=os_status,json=osStatus,proto3" json:"os_status,omitempty"`
+	// A new link address of the panel (the base URL wss://host/<secret-prefix>/, as at enrollment). Empty = no change.
+	// The panel sends it, in HelloAck and DesiredState settings, only to agents with "panel-link/1", and only once the
+	// owner set an address. Only a link node (one enrolled over the link) follows it; an mTLS node ignores it. The agent
+	// saves it as its next address and tries it at its next reconnect: in a HelloAck that session ends at once, in a
+	// DesiredState the session goes on. The new address is committed only after a HelloAck over it, on a session the
+	// panel's CA signed; until then and while it does not answer, the agent keeps using its current address.
+	PanelLinkUrl  string `protobuf:"bytes,17,opt,name=panel_link_url,json=panelLinkUrl,proto3" json:"panel_link_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7127,6 +7135,13 @@ func (x *NodeSettings) GetOsStatus() bool {
 		return x.OsStatus
 	}
 	return false
+}
+
+func (x *NodeSettings) GetPanelLinkUrl() string {
+	if x != nil {
+		return x.PanelLinkUrl
+	}
+	return ""
 }
 
 type DesiredState struct {
@@ -10126,7 +10141,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"LinkAccept\x12\x1c\n" +
 	"\tsignature\x18\x01 \x01(\fR\tsignature\"!\n" +
 	"\x03Ack\x12\x1a\n" +
-	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\x81\x05\n" +
+	"\tup_to_seq\x18\x01 \x01(\x04R\aupToSeq\"\xa7\x05\n" +
 	"\fNodeSettings\x12(\n" +
 	"\x10stats_interval_s\x18\x01 \x01(\rR\x0estatsIntervalS\x120\n" +
 	"\x14keepalive_interval_s\x18\x02 \x01(\rR\x12keepaliveIntervalS\x12.\n" +
@@ -10144,7 +10159,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\bnetworks\x18\f \x01(\rR\bnetworks\x12(\n" +
 	"\x10networks_db_name\x18\r \x01(\tR\x0enetworksDbName\x12,\n" +
 	"\x12networks_db_sha256\x18\x0e \x01(\tR\x10networksDbSha256\x12\x1b\n" +
-	"\tos_status\x18\x0f \x01(\bR\bosStatus\"\x89\x04\n" +
+	"\tos_status\x18\x0f \x01(\bR\bosStatus\x12$\n" +
+	"\x0epanel_link_url\x18\x11 \x01(\tR\fpanelLinkUrl\"\x89\x04\n" +
 	"\fDesiredState\x12\x1a\n" +
 	"\brevision\x18\x01 \x01(\x04R\brevision\x12#\n" +
 	"\rbase_revision\x18\x02 \x01(\x04R\fbaseRevision\x12\x1d\n" +
