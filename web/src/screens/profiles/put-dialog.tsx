@@ -1,7 +1,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { markFresh } from "@/components/fx/registry";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
@@ -25,7 +25,8 @@ import { DlgFrame } from "./pf-frame";
 import { Gl } from "./pf-bits";
 import type { TabCtx } from "./page-types";
 import { useServers } from "./profiles-data";
-import { askNode, rowOf, type Asked, type Fix, type NodeRow, type Verdict } from "./put-check";
+import { askNode, rowOf, shapeOf, type Asked, type Fix, type NodeRow, type PtGroup, type Verdict } from "./put-check";
+import { PtBar, PtHead, PtWhy, type PtTab } from "./pt-bits";
 import "./profile-tabs.css";
 
 const Lnk = Link as unknown as (props: Record<string, unknown>) => ReactNode;
@@ -65,6 +66,9 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
   const [typed, setTyped] = useState<Record<string, { sni: string; port: string }>>({});
   const [backendOpen, setBackendOpen] = useState<Record<string, boolean>>({});
   const [phase, setPhase] = useState<"pick" | "run" | "done">("pick");
+  const [flt, setFlt] = useState<PtTab>("all");
+  const [search, setSearch] = useState("");
+  const lastGroup = useRef<Record<string, PtGroup>>({});
   const [runIds, setRunIds] = useState<string[]>([]);
   const [rows, setRows] = useState<Record<string, Run>>({});
   const live = useRef(rows);
@@ -93,7 +97,14 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
     const k = c ? countryLook(tt, fmt, c).kind : "";
     const g: Verdict = !c ? "none" : k === "ok" ? "ok" : k === "partial" || k === "warn" ? "part" : k === "bad" || k === "listed" ? "bad" : "none";
     const chip = ni.entry ? (g === "ok" ? t("pf.ru.seen") : t("ps.pt.entryChip")) : g === "none" ? t("pf.ru.none") : t("ps.sv.direct");
-    return { n, ni, r, on, g, chip };
+    const pending = askedOf(i).state === "pending";
+    const shape = shapeOf(r, ni);
+    // a row that is being checked again (a domain was typed) keeps its section until the answer comes
+    const group: PtGroup = pending ? (lastGroup.current[n.id] ?? "can") : shape.group;
+    return { n, ni, r, on, g, chip, pending, shape, group };
+  });
+  useEffect(() => {
+    for (const v of view) if (!v.pending) lastGroup.current[v.n.id] = v.shape.group;
   });
   const chosen = view.filter((v) => v.on && phase === "pick");
   const shown = phase === "pick" ? view : view.filter((v) => runIds.includes(v.n.id));
@@ -192,6 +203,23 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
   const commit = (id: string, p: Partial<Fix>) => setFix((x) => ({ ...x, [id]: { ...x[id], ...p } }));
   const typedOf = (id: string) => typed[id] ?? { sni: "", port: "" };
 
+  // ---- the list as the board draws it: three sections (can be put / needs an action / cannot), filters over them, a search for a long list
+  const flat = picking && (list.isPending || (view.length > 0 && view.every((v) => v.pending)));
+  const sections: PtGroup[] = ["can", "act", "no"];
+  const tabCounts: Record<PtTab, number> = { all: view.length, can: 0, act: 0, no: 0 };
+  for (const v of view) tabCounts[v.group]++;
+  const find = search.toLowerCase();
+  const listed = picking
+    ? flat
+      ? view
+      : view
+          .filter((v) => (flt === "all" || v.group === flt) && (!find || `${v.n.name} ${v.n.location}`.toLowerCase().includes(find)))
+          .sort((a, b) => sections.indexOf(a.group) - sections.indexOf(b.group))
+    : shown;
+  const tickable = view.filter((v) => !v.r.need && !v.pending);
+  const allOn = tickable.length > 0 && tickable.every((v) => v.on);
+  const sectionTitle = { can: t("ps.pt.gCan"), act: t("ps.pt.gAct"), no: t("ps.pt.gNo") } as const;
+
   return (
     <DlgFrame
       open
@@ -219,130 +247,153 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
         </>
       }
     >
-      <div className="us-db pp-db">
-        {phase === "pick" && <p className="rw-lead">{t("ps.pt.lead")}</p>}
+      <div className="us-db pp-db pt-db">
+        {picking && !flat && cands.length > 0 && <PtBar counts={tabCounts} value={flt} onValue={setFlt} query={search} onQuery={setSearch} nodes={cands.length > 8} />}
         {phase !== "pick" && (
-          <>
+          <div className="pt-run">
             <div className="rw-rh">
               <b>{title}</b>
             </div>
             <i className={cx("rw-pg", failed.length > 0 && phase === "done" && "bad")} style={{ ["--w" as string]: `${w}%` }} aria-hidden />
-          </>
+          </div>
         )}
         {cands.length === 0 && !list.isPending && <p>{t("where.noNodeLeft")}</p>}
-        {shown.map(({ n, ni, r, on, g, chip }) => {
-          const run = rows[n.id];
-          const f = fix[n.id] ?? {};
-          const ph = run?.phase;
-          const mend = ph === "bad" && !run?.inboundId ? run?.mend : "";
-          const showDom = phase === "pick" ? r.dom : mend === "domain";
-          const showPort = phase === "pick" ? !!r.port && r.need : mend === "port";
-          const nd = typedOf(n.id);
-          const lossy = phase === "pick" ? r.port?.lossy : run?.lossy;
-          return (
-            <div key={n.id} className={cx("pp-pn", r.need && phase === "pick" && "need", phase !== "pick" && ph && (ph === "bad" ? "bad" : ph === "ok" ? "ok" : ph === "off" || ph === "wait" ? "none" : "busy"))}>
-              <button
-                type="button"
-                className="pp-pnh"
-                role="checkbox"
-                aria-checked={on || !picking}
-                aria-disabled={r.need || phase !== "pick"}
-                onClick={() => phase === "pick" && !r.need && setPicked((x) => ({ ...x, [n.id]: !on }))}
-              >
-                {phase === "pick" ? (
-                  <span className={cx("fz-cb us-cb", on && "on")} aria-hidden>
-                    <i>
-                      <G d={TICK} size={14} stroke={2.5} />
-                    </i>
-                  </span>
-                ) : (
-                  <Gl k={gOf[ph ?? "wait"]} />
-                )}
-                <Flag code={n.countryCode} size={14} />
-                <b className="mono">{n.name}</b>
-                {ni.entry && <i className="rw-role">{t("ps.pt.entryRole")}</i>}
-                <span className={cx("rw-chip", g)}>
-                  <Gl k={g} />
-                  {chip}
-                </span>
-                <em className={phase === "pick" ? (checking ? "" : r.verdict === "none" ? "" : r.verdict) : ph === "ok" ? "ok" : ph === "bad" ? "bad" : ""}>{phase === "pick" ? (checking ? t("ps.pt.check") : r.text) : (run?.text || (ph === "wait" ? t("ps.pt.wait") : ph === "put" ? t("ps.pt.putting") : ph === "apply" ? t("ps.pt.applying") : ph === "ok" ? t("pf.st.works") : ""))}</em>
-              </button>
-              {phase !== "pick" && run?.notes?.map((note) => (
-                <div key={note} className="pp-pnf">
-                  <small>{note}</small>
-                </div>
-              ))}
-              {phase === "pick" && !checking && r.upd && (
-                <div className="pp-pnf">
-                  <Lnk className="btn sm" to="/updates" onClick={onClose}>
-                    {t("ps.pt.openUpdates")}
-                  </Lnk>
-                </div>
-              )}
-              {phase === "pick" && !checking && r.share && (
-                <div className="pp-pnf">
-                  <ShareRowFix share={r.share} node={n} inputClass="an-i" onName={(sni) => commit(n.id, { sni })} onPort={(port) => commit(n.id, { port, anyway: false })} />
-                </div>
-              )}
-              {phase === "pick" && !checking && r.shared && (
-                <div className="pp-pnf">
-                  <RowSharedNote shared={r.shared} node={n} />
-                </div>
-              )}
-              {phase === "pick" && !checking && r.backend && on && (
-                <div className="pp-pnf" style={{ flexDirection: "column" }}>
-                  <span>
-                    {t("where.awgFirst", { node: n.name, mode: tt(`awg.backend.${f.backend ?? asMode(n.awgBackend)}`) })}{" "}
-                    {!backendOpen[n.id] && (
-                      <button type="button" className="an-lk" onClick={() => setBackendOpen((x) => ({ ...x, [n.id]: true }))}>
-                        {t("where.awgChange")}
+        <div className="pt-l">
+          {listed.map((v, i) => {
+            const { n, ni, r, on, g, chip } = v;
+            const run = rows[n.id];
+            const f = fix[n.id] ?? {};
+            const ph = run?.phase;
+            const mend = ph === "bad" && !run?.inboundId ? run?.mend : "";
+            const showDom = picking ? r.dom : mend === "domain";
+            const showPort = picking ? !!r.port && r.need : mend === "port";
+            const nd = typedOf(n.id);
+            const lossy = picking ? r.port?.lossy : run?.lossy;
+            const sh = v.shape;
+            const settled = picking && !v.pending;
+            const head = picking && !flat && v.group !== listed[i - 1]?.group ? v.group : null;
+            const can = picking && !r.need && !v.pending;
+            const why = settled && sh.why ? sh.why : "";
+            const acts = settled && (r.upd || r.share || r.shared || (r.backend && on) || showDom || showPort);
+            const runActs = !picking && (run?.notes?.length || showDom || showPort || (phase === "done" && ph === "bad" && run?.inboundId));
+            return (
+              <Fragment key={n.id}>
+                {head && (
+                  <PtHead title={sectionTitle[head]} count={tabCounts[head]} hint={head === "act" ? t("ps.pt.gActHint") : undefined}>
+                    {head === "can" && tickable.length > 0 && (
+                      <button type="button" className="an-lk" onClick={() => setPicked((x) => ({ ...x, ...Object.fromEntries(tickable.map((tv) => [tv.n.id, !allOn])) }))}>
+                        {allOn ? t("ps.pt.pickNone") : t("ps.pt.pickAll")}
                       </button>
                     )}
-                  </span>
-                  {backendOpen[n.id] && <AwgBackendFields mode={f.backend ?? asMode(n.awgBackend)} onChange={(m) => commit(n.id, { backend: m })} label={tt("awg.backend.title")} auto={canPrepare(n)} />}
-                </div>
-              )}
-              {showDom && (
-                <div className="pp-pnf">
-                  <input className="an-i mono" type="text" placeholder="vpn.example.com" aria-label={t("where.domainLabel", { node: n.name })} value={nd.sni} autoCapitalize="off" spellCheck={false} onChange={(e) => setTyped((x) => ({ ...x, [n.id]: { ...nd, sni: e.target.value.trim() } }))} />
-                  <Button size="md" aria-disabled={!/\./.test(nd.sni) || isIp(nd.sni)} onClick={() => /\./.test(nd.sni) && !isIp(nd.sni) && commit(n.id, { sni: nd.sni })}>
-                    {t("ps.pt.setDomain")}
-                  </Button>
-                </div>
-              )}
-              {showPort && (
-                <div className="pp-pnf">
-                  <input className="an-i mono" type="text" inputMode="numeric" aria-label={t("where.portLabel", { node: n.name })} placeholder={t("where.portLabel", { node: n.name })} value={nd.port} onChange={(e) => setTyped((x) => ({ ...x, [n.id]: { ...nd, port: e.target.value.replace(/\D/g, "").slice(0, 5) } }))} />
-                  <Button size="md" aria-disabled={!nd.port} onClick={() => nd.port && commit(n.id, { port: nd.port, anyway: false })}>
-                    {t("ps.pt.tryPort")}
-                  </Button>
-                  {lossy && !(f.anyway && f.port === lossy) && (
-                    <Button size="md" onClick={() => commit(n.id, { port: lossy, anyway: true })}>
-                      {tt("ports.anyway.put")} · {lossy}
-                    </Button>
+                  </PtHead>
+                )}
+                <div className={cx("pt-r", picking && (flat || v.pending ? "" : sh.kind), !picking && ph && (ph === "bad" ? "bad" : ph === "ok" ? "ok" : ph === "off" || ph === "wait" ? "none" : "busy"))}>
+                  <button type="button" className="pt-h" role="checkbox" aria-checked={on || !picking} aria-disabled={!can} onClick={() => can && setPicked((x) => ({ ...x, [n.id]: !on }))}>
+                    {picking ? (
+                      <span className={cx("fz-cb us-cb", on && "on", !can && "dis")} aria-hidden>
+                        <i>
+                          <G d={TICK} size={14} stroke={2.5} />
+                        </i>
+                      </span>
+                    ) : (
+                      <Gl k={gOf[ph ?? "wait"]} />
+                    )}
+                    <Flag code={n.countryCode} size={14} />
+                    <b className="mono">{n.name}</b>
+                    {ni.entry && <i className="rw-role">{t("ps.pt.entryRole")}</i>}
+                    <span className="pt-ct">{n.location}</span>
+                    {picking ? (
+                      <>
+                        {v.pending && <em>{t("ps.pt.check")}</em>}
+                        <span className={cx("rw-chip", g)}>
+                          <Gl k={g} />
+                          {chip}
+                        </span>
+                      </>
+                    ) : (
+                      <em className={ph === "ok" ? "ok" : ph === "bad" ? "bad" : ""}>{run?.text || (ph === "wait" ? t("ps.pt.wait") : ph === "put" ? t("ps.pt.putting") : ph === "apply" ? t("ps.pt.applying") : ph === "ok" ? t("pf.st.works") : "")}</em>
+                    )}
+                  </button>
+                  {why && (
+                    <PtWhy kind={sh.kind} clock={sh.clock}>
+                      {why}
+                    </PtWhy>
+                  )}
+                  {(acts || runActs) && (
+                    <div className="pt-act">
+                      {!picking && run?.notes?.map((note) => <small key={note}>{note}</small>)}
+                      {settled && r.upd && (
+                        <Lnk className="btn sm" to="/updates" onClick={onClose}>
+                          {t("ps.pt.openUpdates")}
+                        </Lnk>
+                      )}
+                      {settled && r.share && <ShareRowFix share={r.share} node={n} inputClass="an-i" onName={(sni) => commit(n.id, { sni })} onPort={(port) => commit(n.id, { port, anyway: false })} />}
+                      {settled && r.shared && <RowSharedNote shared={r.shared} node={n} />}
+                      {settled && r.backend && on && (
+                        <div className="flex min-w-0 flex-1 flex-col gap-2">
+                          <span>
+                            {t("where.awgFirst", { node: n.name, mode: tt(`awg.backend.${f.backend ?? asMode(n.awgBackend)}`) })}{" "}
+                            {!backendOpen[n.id] && (
+                              <button type="button" className="an-lk" onClick={() => setBackendOpen((x) => ({ ...x, [n.id]: true }))}>
+                                {t("where.awgChange")}
+                              </button>
+                            )}
+                          </span>
+                          {backendOpen[n.id] && <AwgBackendFields mode={f.backend ?? asMode(n.awgBackend)} onChange={(m) => commit(n.id, { backend: m })} label={tt("awg.backend.title")} auto={canPrepare(n)} />}
+                        </div>
+                      )}
+                      {showDom && (
+                        <>
+                          <input className="an-i mono" type="text" placeholder="vpn.example.com" aria-label={t("where.domainLabel", { node: n.name })} value={nd.sni} autoCapitalize="off" spellCheck={false} onChange={(e) => setTyped((x) => ({ ...x, [n.id]: { ...nd, sni: e.target.value.trim() } }))} />
+                          <Button size="md" aria-disabled={!/\./.test(nd.sni) || isIp(nd.sni)} onClick={() => /\./.test(nd.sni) && !isIp(nd.sni) && commit(n.id, { sni: nd.sni })}>
+                            {t("ps.pt.setDomain")}
+                          </Button>
+                        </>
+                      )}
+                      {showPort && (
+                        <>
+                          <input className="an-i mono" type="text" inputMode="numeric" aria-label={t("where.portLabel", { node: n.name })} placeholder={t("where.portLabel", { node: n.name })} value={nd.port} onChange={(e) => setTyped((x) => ({ ...x, [n.id]: { ...nd, port: e.target.value.replace(/\D/g, "").slice(0, 5) } }))} />
+                          <Button size="md" aria-disabled={!nd.port} onClick={() => nd.port && commit(n.id, { port: nd.port, anyway: false })}>
+                            {t("ps.pt.tryPort")}
+                          </Button>
+                          {lossy && !(f.anyway && f.port === lossy) && (
+                            <Button size="md" onClick={() => commit(n.id, { port: lossy, anyway: true })}>
+                              {tt("ports.anyway.put")} · {lossy}
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      {phase === "done" && ph === "bad" && run?.inboundId && (
+                        <Button
+                          size="md"
+                          onClick={() => {
+                            onClose();
+                            ctx.onEdit(run.inboundId!);
+                            ctx.goTab("servers");
+                          }}
+                        >
+                          {t("pf.pg.vd.port", { node: n.name })}
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-              {phase === "done" && ph === "bad" && run?.inboundId && (
-                <div className="pp-pnf">
-                  <Button
-                    size="md"
-                    onClick={() => {
-                      onClose();
-                      ctx.onEdit(run.inboundId!);
-                      ctx.goTab("servers");
-                    }}
-                  >
-                    {t("pf.pg.vd.port", { node: n.name })}
-                  </Button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+              </Fragment>
+            );
+          })}
+        </div>
+        {picking && !flat && cands.length > 0 && listed.length === 0 && <p className="pt-none">{t("ps.pt.none")}</p>}
         {checking && cands.length === 0 && <p className="rw-lead">{t("ps.pt.checkingNodes")}</p>}
+        {picking && !flat && cands.length > 0 && (
+          <p className="pt-leg">
+            <span className="rw-chip ok">
+              <Gl k="ok" />
+              {t("pf.ru.seen")}
+            </span>
+            {t("ps.pt.legend")}
+          </p>
+        )}
       </div>
     </DlgFrame>
   );
 }
-

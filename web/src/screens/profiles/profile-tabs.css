@@ -881,72 +881,6 @@
 .pf .pp-imp .rw-later {
   margin-inline-start: 6px;
 }
-/* L4713 */
-.pf .pp-pn {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-/* L4714 */
-.pf .pp-pnh {
-  display: grid;
-  grid-template-columns: auto 20px 48px auto auto minmax(0,1fr);
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 48px;
-  padding: 0 14px;
-  text-align: start;
-}
-/* L4715 */
-.pf .pp-pnh .fl {
-  width: 20px;
-  height: 14px;
-  border-radius: 3px;
-}
-/* L4715 */
-.pf .pp-pnh b {
-  font-weight: 500;
-}
-/* L4716 */
-.pf .pp-pnh em {
-  font-style: normal;
-  font-size: 13px;
-  color: var(--sec);
-  text-align: end;
-}
-/* L4716 */
-.pf .pp-pnh em.bad {
-  color: var(--danger-text);
-}
-/* L4716 */
-.pf .pp-pnh em.part {
-  color: var(--warning-text);
-}
-/* L4716 */
-.pf .pp-pnh em.ok {
-  color: var(--sec);
-}
-/* L4717 */
-.pf .pp-pnh[aria-disabled="true"] {
-  cursor: default;
-}
-/* L4717 */
-.pf .pp-pn.need .pp-pnh>b,.pf .pp-pn.need .fl {
-  opacity: .6;
-}
-/* L4718 */
-.pf .pp-pnf {
-  display: flex;
-  gap: 8px;
-  padding-block: 0 12px;
-  padding-inline: 44px 14px;
-}
-/* L4718 */
-.pf .pp-pnf .an-i {
-  height: 36px;
-  flex: 1;
-  min-width: 0;
-}
 /* L4719 */
 .pf .pp-dlg footer .an-lk {
   font-size: 13px;
@@ -1073,52 +1007,9 @@
     grid-row: 2;
   }
 }
-/* L4725 */
-@media (max-width: 720px) {
-  .pf .pp-pnh {
-    grid-template-columns: auto 20px 48px minmax(0,1fr);
-    row-gap: 2px;
-    padding: 8px 12px;
-  }
-}
-/* L4725 */
-@media (max-width: 720px) {
-  .pf .pp-pnh em {
-    grid-column: 3/-1;
-    text-align: start;
-  }
-}
-/* L4725 */
-@media (max-width: 720px) {
-  .pf .pp-pnh .rw-chip {
-    justify-self: start;
-  }
-}
 /* L4733 */
 .pf .pp-s1>.pv-pill,.pf .pp-rl>.pv-pill {
   justify-self: start;
-}
-/* L4735 */
-.pf .pp-pnh {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-}
-/* L4736 */
-.pf .pp-pnh>b {
-  min-width: 40px;
-}
-/* L4736 */
-.pf .pp-pnh em {
-  margin-inline-start: auto;
-}
-/* L4737 */
-@media (max-width: 720px) {
-  .pf .pp-pnh em {
-    flex: 1 1 100%;
-    margin-inline-start: 30px;
-    text-align: start;
-  }
 }
 /* L4833 */
 .pf .pp-sksv {
@@ -1577,4 +1468,341 @@
 }
 .pf .btn .an-sp {
   color: var(--tone-sky);
+}
+
+/* ---- "Put on nodes" and "Put a profile on a node" in the board's rows of 20 November 2026 (pn.css, from the block "правки по спеке 20 ноября 2026" on, the block "Поставить на ноды": the
+   sections, the line under a row, the actions under it). A container query is the window's own width (.us-dlg is the container), as on the board ---- */
+.pf .pt-db {
+  gap: 0;
+  padding-top: 0;
+}
+.pf .pt-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  padding: 8px 0 12px;
+  background: var(--surface);
+}
+.pf .pt-fl {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.pf .pt-fl button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--sec);
+  cursor: pointer;
+  transition: background-color .15s var(--e),color .15s var(--e);
+}
+.pf .pt-fl button:hover {
+  color: var(--text);
+}
+.pf .pt-fl button.on {
+  background: var(--step);
+  color: var(--text);
+}
+.pf .pt-fl i {
+  font: 400 12px/1 var(--font-mono);
+  font-style: normal;
+  color: var(--muted);
+}
+.pf .pt-q {
+  flex: 1 1 140px;
+  min-width: 0;
+  height: 32px;
+}
+.pf .pt-bar .an-lk {
+  margin-inline-start: auto;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.pf .pt-run {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 12px;
+}
+.pf .pt-l {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.pf .pt-gh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb,var(--text) 3%,transparent);
+  font-size: 12px;
+  color: var(--muted);
+}
+.pf .pt-gh:first-child {
+  border-top: 0;
+}
+.pf .pt-gh b {
+  font-weight: 500;
+  color: var(--sec);
+}
+.pf .pt-gh em {
+  margin-inline-start: auto;
+  font-style: normal;
+}
+.pf .pt-r {
+  border-top: 1px solid var(--border);
+}
+.pf .pt-r:first-child {
+  border-top: 0;
+}
+.pf .pt-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  text-align: start;
+}
+.pf .pt-h .fl {
+  flex: none;
+  width: 20px;
+  height: 14px;
+  border-radius: 3px;
+}
+.pf .pt-h b {
+  font-weight: 500;
+}
+.pf .pt-h .rw-role {
+  margin: 0;
+}
+.pf .pt-ct {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pf .pt-h em {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--sec);
+  white-space: nowrap;
+}
+.pf .pt-h em.bad {
+  color: var(--danger-text);
+}
+.pf .pt-h[aria-disabled="true"] {
+  cursor: default;
+}
+.pf .pt-h .us-cb.dis {
+  opacity: .3;
+}
+.pf .pt-r.no .pt-h>b,.pf .pt-r.no .fl,.pf .pt-r.go .pt-h>b,.pf .pt-r.go .fl {
+  opacity: .6;
+}
+.pf .pt-why {
+  display: flex;
+  gap: 8px;
+  max-width: calc(64ch + 68px);
+  margin: -6px 0 0;
+  padding-block: 0 12px;
+  padding-inline: 44px 14px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.pf .pt-why svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--muted);
+}
+.pf .pt-why.warn svg {
+  color: var(--warning-text);
+}
+.pf .pt-why.act {
+  color: var(--text);
+}
+.pf .pt-why.act svg {
+  color: var(--accent-mark);
+}
+.pf .pt-why.go svg,.pf .pt-why.no svg {
+  color: var(--danger-text);
+}
+.pf .pt-why.ok svg {
+  display: none;
+}
+.pf .pt-act {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-block: 0 12px;
+  padding-inline: 68px 14px;
+}
+.pf .pt-act small {
+  flex: 1 1 100%;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.pf .pt-act .an-i {
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 320px;
+  height: 36px;
+}
+.pf .pt-none {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+.pf .pt-leg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+@container (max-width: 520px) {
+  .pf .pt-ct {
+    visibility: hidden;
+  }
+  .pf .pt-h {
+    padding: 0 12px;
+  }
+  .pf .pt-why {
+    padding-inline: 42px 12px;
+  }
+  .pf .pt-act {
+    flex-direction: column;
+    padding-inline: 42px 12px;
+  }
+  .pf .pt-act .an-i {
+    flex: none;
+    max-width: none;
+    width: 100%;
+    height: 44px;
+  }
+  .pf .pt-act .btn,.pf .pt-act button {
+    width: 100%;
+    height: 44px;
+  }
+  .pf .pt-bar .an-lk {
+    margin-inline-start: 0;
+  }
+  .pf .pt-gh em {
+    display: none;
+  }
+}
+.pf .pt-gh .an-lk {
+  margin-inline-start: auto;
+  font-size: 12px;
+}
+.pf .pt-gh em+.an-lk {
+  margin-inline-start: 12px;
+}
+.pf .hl-dlg .us-db p.pt-why {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.pf .hl-dlg .us-db p.pt-why.act {
+  color: var(--text);
+}
+@container (max-width: 520px) {
+  /* the phone: the filters scroll sideways, the search is a row of its own, the actions are big */
+  .pf .pt-bar {
+    flex-wrap: nowrap;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+  .pf .pt-fl {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-inline: -16px;
+    padding-inline: 16px;
+  }
+  .pf .pt-fl button {
+    flex: none;
+    height: 36px;
+  }
+  .pf .pt-q {
+    flex: none;
+    width: 100%;
+    height: 40px;
+  }
+  .pf .pt-h {
+    height: 52px;
+  }
+  .pf .pt-act {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pf .pt-act .btn,.pf .pt-act button {
+    flex: 1 1 auto;
+    width: auto;
+    height: 40px;
+    padding-inline: 12px;
+    white-space: nowrap;
+  }
+  .pf .pt-gh em+.an-lk {
+    margin-inline-start: auto;
+  }
+  .pf .pt-act .an-i {
+    flex: 1 1 100%;
+    height: 40px;
+  }
+  .pf .pt-why {
+    font-size: 13px;
+    line-height: 18px;
+  }
+}
+/* the rows of profiles (the node's window): a taller row, the name whole, the port at the end */
+.pf .pt-pf .pt-h {
+  height: 52px;
+}
+.pf .pt-pf .pt-h>b {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pf .pt-pf .pt-why {
+  padding-inline-start: 44px;
+}
+.pf .pt-pf .pt-act {
+  padding-inline-start: 68px;
+}
+@container (max-width: 520px) {
+  .pf .pt-pf .pt-ct {
+    visibility: visible;
+  }
+  .pf .pt-pf .pt-act {
+    padding-inline-start: 42px;
+  }
 }

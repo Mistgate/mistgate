@@ -49,14 +49,32 @@ export type NodeRow = {
   share?: RowShare;
   /** The profile will stand beside others on a shared TCP port: what that means, and the name whose DNS record is still to be made. */
   shared?: RowShared;
+  /** Nothing to say beyond "it works": the row needs no line of words under it (the board says only what is not plain). */
+  plain: boolean;
 };
 
 const warn = (a: Asked, code: string) => (a.state === "ok" ? a.warnings.find((w) => w.code === code) : undefined);
 
+/** What a row says of itself in the board's three sections and five kinds of line: "Can be put" (ticked or not), "Needs an action" (a field or a choice under it), "Cannot" (an update, a refusal). */
+export type PtGroup = "can" | "act" | "no";
+export type PtKind = "ok" | "warn" | "act" | "go" | "no";
+export type PtShape = { group: PtGroup; kind: PtKind; why: string; /** The line is about a node out of touch (a clock, not a triangle). */ clock?: boolean };
+
+export function shapeOf(r: NodeRow, n: NodeIn): PtShape {
+  if (r.need) {
+    if (r.upd) return { group: "no", kind: "go", why: r.text };
+    return r.dom || r.share || r.port ? { group: "act", kind: "act", why: r.text } : { group: "no", kind: "no", why: r.text };
+  }
+  if (n.entry) return { group: "can", kind: "ok", why: r.text };
+  if (!n.linked) return { group: "can", kind: "warn", why: r.text, clock: true };
+  if (r.verdict === "part" || r.shared) return { group: "can", kind: "warn", why: r.text };
+  return { group: "can", kind: "ok", why: r.plain ? "" : r.text };
+}
+
 /** One node's row: the check's answer and the node's own facts put into the board's words. */
 export function rowOf(a: Asked, n: NodeIn, o: { t: Tx; protocol: string; fix: Fix }): NodeRow {
   const { t, protocol, fix } = o;
-  const base: NodeRow = { verdict: "ok", text: "", need: false, on: !n.entry, dom: false, upd: false, backend: false };
+  const base: NodeRow = { verdict: "ok", text: "", need: false, on: !n.entry, dom: false, upd: false, backend: false, plain: false };
   const awg = protocol === "awg";
   if (a.state === "pending") return { ...base, verdict: "none", text: t("ps.pt.check") };
   if (a.state === "error") return { ...base, verdict: "none", text: n.linked ? t("ps.pt.unchecked") : t("ps.pt.offline") };
@@ -87,6 +105,8 @@ export function rowOf(a: Asked, n: NodeIn, o: { t: Tx; protocol: string; fix: Fi
             ? t("ps.pt.domainSet")
             : t("ps.pt.free", { port });
   const row: NodeRow = { ...base, verdict: n.entry || !n.linked ? "none" : "ok", text, backend: awg && n.firstAwg && n.linked };
+  // a linked node that is not an entry, with nothing to add (no first AmneziaWG, no shared port, no yielding site, nothing typed): "it works"
+  row.plain = !n.entry && n.linked && !row.backend && !warn(a, "tcp_port_shared") && !warn(a, "hy2_site_taken") && !warn(a, "hy2_decoy_paused") && !fix.sni && !fix.port && !warn(a, "warp_missing");
   if (fix.port) row.port = { free: "", lossy: "" };
   if (!n.entry && n.linked) row.shared = sharedOf(t, a.warnings, a.inbound?.tlsServerName, n.address);
   const w = warn(a, "warp_missing");

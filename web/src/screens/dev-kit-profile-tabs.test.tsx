@@ -206,14 +206,16 @@ describe("the scenes of the Servers and People tabs and the windows", () => {
 
   it("checks every node before the click and ticks the ones that will work", async () => {
     await draw("hy1.servers.put");
-    const rows = qa(".pp-pn");
+    const rows = qa(".pt-r");
     expect(rows).toHaveLength(9);
     const by = (n: string) => rows.find((r) => r.querySelector("b")?.textContent === n)!;
-    expect(by("de2").querySelector("em")?.textContent).toBe("Possible · port 443 is free");
+    expect(by("de2").querySelector(".pt-why")).toBeNull(); // it works as it is: nothing to say under it
     expect(by("de2").querySelector("[role=checkbox]")?.getAttribute("aria-checked")).toBe("true");
-    expect(by("nl2").querySelector("em")?.textContent).toContain("444");
-    expect(by("fi3").querySelector(".pp-pnf input")).not.toBeNull();
-    expect(by("fi3").className).toContain("need");
+    expect(by("nl2").querySelector(".pt-why")?.textContent).toContain("444");
+    expect(by("fi3").querySelector(".pt-act input")).not.toBeNull();
+    expect(by("fi3").className).toContain("act");
+    // the three sections of the board, with how many rows each has
+    expect(qa(".pt-gh").map((h) => [h.querySelector("b")?.textContent, h.querySelector(".mono")?.textContent])).toEqual([["Can be put", "7"], ["Needs an action", "1"], ["Cannot be put", "1"]]);
     expect(by("msk1").querySelector(".rw-role")).not.toBeNull();
     expect(by("msk1").querySelector("[role=checkbox]")?.getAttribute("aria-checked")).toBe("false");
     expect(by("spb1").textContent).toContain("Open updates");
@@ -234,7 +236,7 @@ describe("the scenes of the Servers and People tabs and the windows", () => {
     await draw("hy1.servers.put.run.out.on-de2+nl3+fi2");
     expect(q(".rw-rh b")?.textContent).toBe("Running on 2 of 3: nl3 starts when it is back");
     expect(btn("Done")).toBeDefined();
-    expect(qa(".pp-pn em").map((e) => e.textContent)).toContain("Running");
+    expect(qa(".pt-r .pt-h em").map((e) => e.textContent)).toContain("Running");
     act(() => root?.unmount());
     host?.remove();
     await draw("hy1.servers.put.run.fail.on-de2+fi2");

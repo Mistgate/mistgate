@@ -83,7 +83,7 @@ async function type(input: Element | null, value: string) {
   await settle(6);
 }
 const spy = <T extends object>(o: T, k: string) => vi.spyOn(o as never, k as never) as unknown as ReturnType<typeof vi.fn>;
-const row = (name: string) => qa(".pp-pn").find((r) => r.querySelector("b")?.textContent === name)!;
+const row = (name: string) => qa(".pt-r").find((r) => r.querySelector("b")?.textContent === name)!;
 
 describe("put on nodes", () => {
   it("puts the profile on the ticked nodes, one CreateInbound each, and says each one's result", async () => {
@@ -95,7 +95,7 @@ describe("put on nodes", () => {
     expect(real.map((r: { nodeId: string }) => r.nodeId).sort()).toEqual(["nod_de2", "nod_de3", "nod_fi2", "nod_msk2", "nod_nl2", "nod_nl3"]);
     expect(real.every((r: { profileId: string }) => r.profileId === "prf_hy1")).toBe(true);
     expect(q("[role=dialog] .rw-rh b")?.textContent).toBe("Running on 6 of 6");
-    expect(qa(".pp-pn em").map((e) => e.textContent)).toEqual(Array(6).fill("Running"));
+    expect(qa(".pt-r .pt-h em").map((e) => e.textContent)).toEqual(Array(6).fill("Running"));
   });
 
   it("asks for a domain where Let's Encrypt cannot work on an IP, checks again with it and ticks the node", async () => {
@@ -103,10 +103,10 @@ describe("put on nodes", () => {
     expect(row("fi3").querySelector("[role=checkbox]")?.getAttribute("aria-checked")).toBe("false");
     const set = btn(E["ps.pt.setDomain"]);
     expect(set?.getAttribute("aria-disabled")).toBe("true");
-    await type(row("fi3").querySelector("input"), "vpn.example.com");
+    await type(row("fi3").querySelector(".pt-act input"), "vpn.example.com");
     await click(btn(E["ps.pt.setDomain"]));
     await settle(10);
-    expect(row("fi3").querySelector("em")?.textContent).toBe("Possible · domain set");
+    expect(row("fi3").querySelector(".pt-why")?.textContent).toBe("Possible · domain set");
     expect(row("fi3").querySelector("[role=checkbox]")?.getAttribute("aria-checked")).toBe("true");
     expect(btn("Put on 7 nodes")).toBeDefined();
   });
@@ -114,7 +114,7 @@ describe("put on nodes", () => {
   it("takes the free port a refusal names, so the node is ticked from the start", async () => {
     await draw("hy1.servers.put");
     expect(row("nl2").querySelector("[role=checkbox]")?.getAttribute("aria-checked")).toBe("true");
-    expect(row("nl2").querySelector("em")?.textContent).toContain("444 is free");
+    expect(row("nl2").querySelector(".pt-why")?.textContent).toContain("444");
   });
 
   it("leaves a node that is an entry unticked, and one with an old agent not tickable", async () => {
