@@ -416,11 +416,14 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		return
 	}
 
-	if !remote.facts.AlreadyEnrolled {
+	if !remote.facts.AlreadyEnrolled || host {
 		// A used token is replayable only briefly. If the panel recorded enrollment but the
 		// node did not finish writing its identity, rotate the token and retry with the same
-		// persisted CSR key.
-		if nodeState == "active" || secret.EnrollmentToken == "" || secret.TokenExpiresUnix <= s.cfg.Now().Unix() || secret.CAFingerprint == "" {
+		// persisted CSR key. A subscription host enrols again on every attempt (its role and its
+		// site's pin come with the enrolment): once the server is enrolled, its token is spent
+		// on a key --offline-csr --force replaces, so it always gets a new one.
+		if nodeState == "active" || secret.EnrollmentToken == "" || secret.TokenExpiresUnix <= s.cfg.Now().Unix() || secret.CAFingerprint == "" ||
+			(host && remote.facts.AlreadyEnrolled) {
 			spec := NodeSpec{ID: job.NodeID, Name: job.Name, Address: job.Address, CountryCode: job.CountryCode, Location: job.Location, Provider: job.Provider, Sharing: job.Sharing}
 			now := s.cfg.Now().UTC()
 			expires := now.Add(defaultEnrollmentTTL)

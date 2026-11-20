@@ -85,6 +85,7 @@ type hostNode struct {
 	neverOnline  bool // the agent installs but never connects (the panel's tunnel does not come up)
 	onCSR        func()
 	order        []string
+	enrolled     bool // identity.pem is there (an --offline-finish succeeded): the preflight says so
 }
 
 func newHostNode(t *testing.T, manager *e2eNodeManager) *hostNode {
@@ -99,13 +100,17 @@ func (n *hostNode) execute(command string, channel ssh.Channel) ([]byte, error) 
 	case strings.Contains(command, "panel_reachable=%s"):
 		n.installNode.mu.Lock()
 		n.cmds = append(n.cmds, command)
+		enrolled, existing := "no", ""
+		if n.enrolled {
+			enrolled, existing = "yes", e2eSessionNodeID
+		}
 		n.installNode.mu.Unlock()
 		return []byte(strings.Join([]string{
 			"distribution=ubuntu", "version=22.04", "kernel=6.8.0", "architecture=x86_64",
 			"cpu_count=4", "memory_bytes=1073741824", "disk_available_bytes=1073741824",
-			"systemd=yes", "nftables=yes", "already_enrolled=no", "existing_node_id=", "panel_reachable=no", "",
+			"systemd=yes", "nftables=yes", "already_enrolled=" + enrolled, "existing_node_id=" + existing, "panel_reachable=no", "",
 		}, "\n")), nil
-	case command == "/root/mistgate-node enroll --offline-csr":
+	case command == "/root/mistgate-node enroll --offline-csr" || command == "/root/mistgate-node enroll --offline-csr --force":
 		n.installNode.mu.Lock()
 		n.order = append(n.order, "csr")
 		if n.pending == "" {
@@ -128,7 +133,7 @@ func (n *hostNode) execute(command string, channel ssh.Channel) ([]byte, error) 
 			n.finishFails--
 			return nil, errors.New("connection lost")
 		}
-		n.pending = "" // the identity is written, enroll-pending.pem is gone
+		n.pending, n.enrolled = "", true // the identity is written, enroll-pending.pem is gone
 		return []byte("pin=" + subHostTestPin + "\n"), err
 	case command == "/root/mistgate-node install" && n.installFails:
 		return nil, errors.New("systemd refused")
@@ -482,5 +487,42 @@ func TestParseOfflineOutput(t *testing.T) {
 		if pin := parseSitePin([]byte(bad)); pin != "" {
 			t.Fatalf("pin of %q = %q", bad, pin)
 		}
+	}
+}
+
+// A host install that failed after the server enrolled (here systemd refused the agent) is retried: the server is enrolled
+// now, so the retry enrols again with --force and a new token (the first one is spent), and completes.
+func TestSubscriptionHostRetryAfterTheServerEnrolled(t *testing.T) {
+	manager := &e2eNodeManager{}
+	sub := &fakeSubHost{}
+	node := newHostNode(t, manager)
+	node.installFails = true
+	st, svc := subHostService(t, node, manager, sub)
+	drainOnce(t, svc)
+	if job := jobState(t, st, subHostTestJob); job.State != "failed" || job.ErrorCode != "systemd_install_failed" {
+		t.Fatalf("first attempt = %q %q", job.State, job.ErrorCode)
+	}
+	node.installNode.mu.Lock()
+	node.installFails = false
+	node.installNode.mu.Unlock()
+	if _, err := svc.RetryNodeProvision(context.Background(), connect.NewRequest(&adminv1.RetryNodeProvisionRequest{
+		JobId: subHostTestJob, ConfirmInstall: true, Password: authTestPassword, SshUsername: "root",
+	})); err != nil {
+		t.Fatal(err)
+	}
+	drainOnce(t, svc)
+	if job := jobState(t, st, subHostTestJob); job.State != "completed" {
+		t.Fatalf("retry = %q %q; events %v", job.State, job.ErrorCode, eventCodes(t, st, subHostTestJob))
+	}
+	node.installNode.mu.Lock()
+	defer node.installNode.mu.Unlock()
+	if manager.enrollments != 2 || len(manager.sessionCSRs) != 2 {
+		t.Fatalf("tokens %d, CSRs %d: the retry must enrol again with a new token", manager.enrollments, len(manager.sessionCSRs))
+	}
+	if !strings.HasSuffix(node.finish.command, " --force") {
+		t.Fatalf("the retry's finish %q does not replace the identity", node.finish.command)
+	}
+	if activated, _, state := sub.calls(); len(activated) != 2 || state != "on" {
+		t.Fatalf("activated %v state %q", activated, state)
 	}
 }
