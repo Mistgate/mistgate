@@ -164,6 +164,8 @@ type SubServer struct {
 	// Mark labels a server that is not the node's plain one: a twin through a relay (ViaMark) or the node's IPv6 entry (MarkIPv6).
 	// The name builder writes it after the server's name in the language of the subscription; "" for an ordinary server.
 	Mark string
+	// Web says a Telegram link is the Web Proxy's (tg://webproxy), not the Fake TLS proxy's (tg://proxy).
+	Web bool
 }
 
 // MarkIPv6 is SubServer.Mark of the twin that connects to the node's IPv6 entry.
@@ -675,7 +677,8 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			continue // the node has not reported its certificate yet: a client could not verify it
 		}
 		srv := SubServer{NodeID: f.Node.ID, InboundID: f.Inbound.ID, PathKey: store.PathDirect, Node: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location, PublicLabel: f.Node.PublicLabel,
-			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, Exit: egressOf(merged), Made: made[f.Inbound.ID]}
+			Profile: f.Profile.Name, Protocol: f.Profile.Protocol, ProfileID: f.Profile.ID, Exit: egressOf(merged), Made: made[f.Inbound.ID],
+			Web: plugin.MTProtoWeb(spec)}
 		srv.IPv6Egress = ipv6Egress(f.Node, srv.Exit)
 		if usage, ok := networkUsage[f.Node.ID]; ok {
 			srv.LoadPercent = usage.LoadPercent

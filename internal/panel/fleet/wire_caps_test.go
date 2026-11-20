@@ -27,6 +27,7 @@ func TestWireCapabilitiesThePanelRequires(t *testing.T) {
 			{"awg", plugin.InboundSpec{Protocol: "awg"}, "awg/1"},
 			{"any tunnel", plugin.InboundSpec{Tunnel: plugin.Tunnel{MTU: 1280}}, "awg/1"},
 			{"mtproto", plugin.InboundSpec{Protocol: "mtproto"}, "mtproto/1"},
+			{"mtproto web", plugin.InboundSpec{Protocol: "mtproto", Settings: []byte(`{"mode":"web"}`)}, "mtproto-web/1"},
 			{"trusttunnel", plugin.InboundSpec{Protocol: "trusttunnel"}, "trusttunnel/1"},
 			{"trusttunnel h3", plugin.InboundSpec{Protocol: "trusttunnel", Settings: []byte(`{"h3":true}`)}, "trusttunnel-h3/1"},
 			{"vless", plugin.InboundSpec{Protocol: "vless"}, "vless/1"},

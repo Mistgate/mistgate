@@ -42,6 +42,9 @@ const (
 	// MTProto: the agent has the MTProto engine. No agent lists it: the panel derives it from Hello.engines, because the agents of
 	// v0.1.69 have the engine without the string, and v0.1.68 rejects the whole state for an mtproto inbound.
 	MTProto = "mtproto/1"
+	// MTProtoWeb: the MTProto engine also serves the Telegram Web Proxy (settings.mode "web"). An agent without it ignores the mode and
+	// would start a Fake TLS proxy under the name of the web one, so such an inbound is withheld from it.
+	MTProtoWeb = "mtproto-web/1"
 	// Warp: the agent can run WARP; the panel registers or imports an account only for a node that listed it.
 	Warp = "warp/1"
 	// WarpReach: the agent answers WarpReach (agent.proto "WARP REACH").

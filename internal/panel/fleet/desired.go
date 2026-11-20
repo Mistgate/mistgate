@@ -31,6 +31,9 @@ func requiredCap(s plugin.InboundSpec) string {
 		return agentcap.AWG
 	}
 	if s.Protocol == protocolMTProto {
+		if plugin.MTProtoWeb(s) {
+			return agentcap.MTProtoWeb
+		}
 		return agentcap.MTProto
 	}
 	if s.Protocol == "trusttunnel" {

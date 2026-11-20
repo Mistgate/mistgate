@@ -34,6 +34,8 @@ func TestRequiredProtocolCapability(t *testing.T) {
 		{name: "VLESS TLS front", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"security":"tls"}`)}, want: agentcap.VLESSTLS},
 		{name: "other L3 protocol", spec: plugin.InboundSpec{Tunnel: plugin.Tunnel{MTU: 1280}}, want: agentcap.AWG},
 		{name: "MTProto", spec: plugin.InboundSpec{Protocol: "mtproto"}, want: agentcap.MTProto},
+		{name: "MTProto, Fake TLS", spec: plugin.InboundSpec{Protocol: "mtproto", Settings: []byte(`{"domains":["tg.example.com"],"fallback":"decoy"}`)}, want: agentcap.MTProto},
+		{name: "MTProto, Web Proxy", spec: plugin.InboundSpec{Protocol: "mtproto", Settings: []byte(`{"domains":["tg.example.com"],"fallback":"decoy","mode":"web"}`)}, want: agentcap.MTProtoWeb},
 		{name: "TrustTunnel", spec: plugin.InboundSpec{Protocol: "trusttunnel"}, want: agentcap.TrustTunnel},
 		{name: "TrustTunnel HTTP/2", spec: plugin.InboundSpec{Protocol: "trusttunnel", Settings: []byte(`{"h3":false}`)}, want: agentcap.TrustTunnel},
 		{name: "TrustTunnel HTTP/3", spec: plugin.InboundSpec{Protocol: "trusttunnel", Settings: []byte(`{"h3":true}`)}, want: agentcap.TrustTunnelH3},
@@ -99,6 +101,40 @@ func TestTrustTunnelHTTP3NeedsItsOwnCapability(t *testing.T) {
 		}
 		if _, held := st.in[tt.ID]; held != tc.held || slices.Contains(st.withheld, tt.ID) == tc.held {
 			t.Errorf("%s: held=%v withheld=%v, want held=%v", tc.name, held, st.withheld, tc.held)
+		}
+	}
+}
+
+// An agent with the MTProto engine alone (mtproto/1) ignores settings.mode and would start a Fake TLS proxy under the name of the
+// Web Proxy: the panel keeps that inbound from it, and sends the agent's Fake TLS inbounds as before.
+func TestMTProtoWebInboundIsWithheldWithoutCapability(t *testing.T) {
+	fake := plugin.InboundSpec{ID: "inb_fake", Protocol: "mtproto", Enabled: true, Listen: plugin.Listen{Network: "tcp", Port: 8443},
+		Settings: []byte(`{"domains":["de1.example.com"],"fallback":"decoy"}`)}
+	web := plugin.InboundSpec{ID: "inb_web", Protocol: "mtproto", Enabled: true, Listen: plugin.Listen{Network: "tcp", Port: 443},
+		Settings: []byte(`{"domains":["tg.example.com"],"fallback":"decoy","mode":"web"}`)}
+	e := newEnv(t)
+	e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) {
+		return []statehash.Inbound{{Spec: fake}, {Spec: web}}, nil
+	}
+	node := store.NodeRow{ID: "nod_1", State: "active"}
+	for _, tc := range []struct {
+		name          string
+		caps          []string
+		held, wasHeld []string
+	}{
+		{name: "Fake TLS engine", caps: []string{agentcap.MTProto, agentcap.TCPShare}, held: []string{"inb_fake"}, wasHeld: []string{"inb_web"}},
+		{name: "Web Proxy engine", caps: []string{agentcap.MTProto, agentcap.MTProtoWeb, agentcap.TCPShare}, held: []string{"inb_fake", "inb_web"}},
+		{name: "no MTProto engine", caps: []string{agentcap.TCPShare}, wasHeld: []string{"inb_fake", "inb_web"}},
+	} {
+		st, err := e.f.buildState(context.Background(), node, tc.caps)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := st.ids(); !slices.Equal(got, tc.held) {
+			t.Errorf("%s: sent %v, want %v", tc.name, got, tc.held)
+		}
+		if got := slices.Sorted(slices.Values(st.withheld)); !slices.Equal(got, tc.wasHeld) {
+			t.Errorf("%s: withheld %v, want %v", tc.name, got, tc.wasHeld)
 		}
 	}
 }

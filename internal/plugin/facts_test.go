@@ -126,3 +126,25 @@ func TestSharesTCPPortIsTheProtocolsOfTCPRoute(t *testing.T) {
 		}
 	}
 }
+
+func TestMTProtoWeb(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		spec InboundSpec
+		want bool
+	}{
+		{"the Web Proxy", InboundSpec{Protocol: "mtproto", Settings: []byte(`{"domains":["tg.example.com"],"fallback":"decoy","mode":"web"}`)}, true},
+		{"Fake TLS without a mode", InboundSpec{Protocol: "mtproto", Settings: []byte(`{"domains":["tg.example.com"],"fallback":"decoy"}`)}, false},
+		{"Fake TLS, written out", InboundSpec{Protocol: "mtproto", Settings: []byte(`{"domains":["tg.example.com"],"mode":"fake_tls"}`)}, false},
+		{"another mode", InboundSpec{Protocol: "mtproto", Settings: []byte(`{"mode":"Web"}`)}, false},
+		{"no settings", InboundSpec{Protocol: "mtproto"}, false},
+		{"unreadable settings", InboundSpec{Protocol: "mtproto", Settings: []byte(`{`)}, false},
+		{"another protocol", InboundSpec{Protocol: "vless", Settings: []byte(`{"mode":"web"}`)}, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MTProtoWeb(tt.spec); got != tt.want {
+				t.Fatalf("MTProtoWeb = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -657,6 +657,8 @@ message TelegramProxyLink {
   bool ipv6 = 6;
   bool relay = 7;
   string via = 8;
+  // The Telegram Web Proxy's link (tg://webproxy, for a browser tab), not the apps' tg://proxy.
+  bool web = 9;
 }
 
 message GetTelegramLinksResponse {

@@ -182,10 +182,12 @@ type pageTelegramLink struct {
 	Label       string `json:"label"`
 	CountryCode string `json:"country_code"`
 	Place       string `json:"place"`
-	// IPv6: the node's IPv6 entry. Relay: the link goes through a relay of an entry node whose country code is Via.
+	// IPv6: the node's IPv6 entry. Relay: the link goes through a relay of an entry node whose country code is Via. Web: the link is
+	// Telegram Web's proxy (tg://webproxy, for a browser tab), not the apps' tg://proxy.
 	IPv6  bool    `json:"ipv6,omitempty"`
 	Relay bool    `json:"relay,omitempty"`
 	Via   string  `json:"via,omitempty"`
+	Web   bool    `json:"web,omitempty"`
 	URL   string  `json:"url"`
 	QR    *pageQR `json:"qr"` // the code of URL
 }
