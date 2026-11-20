@@ -4,6 +4,13 @@ The pages of the new landing site (`/`, `/ru/`, `/zh/`, `/fa/`, `/tr/` and `/app
 is not part of this: it is still built by the old generator, `site/build.mjs`, and the landing's "Docs" links lead to
 its pages.
 
+**The folder to publish** is made by one command, `pnpm --dir site build:all` (`site/merge.mjs`): the docs, the pipeline,
+the generator, then the merge into `site/public/`. The landing takes over the five home pages the docs generator wrote
+(`/`, `/ru/`, `/zh/`, `/fa/`, `/tr/`); every other address stays the docs'. The merge refuses a path both sides write,
+merges `_headers` (the docs' policy under `/*`, the landing's in the rule of each of its addresses, after `! Content-Security-Policy`)
+and `sitemap.xml`, and fails on a broken link, a page whose policy forbids its inline script, or a sitemap that does not
+match the pages. `node site/merge.mjs --no-build` merges what `site/dist/` and `site/landing/dist/` already hold.
+
 ```
 site/landing/
   pipeline/   (another package) design boards -> build/
