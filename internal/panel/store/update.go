@@ -270,12 +270,18 @@ func (s *Store) RolloutSteps(ctx context.Context, rolloutID string) ([]StepRow, 
 // callers cannot both win). pauseKey and params describe a pause and are cleared by any other status. It
 // reports whether the row changed; finished is recorded for the terminal statuses.
 func (s *Store) SetRolloutStatus(ctx context.Context, id string, from []string, status, pauseKey string, params map[string]string, finished time.Time) (bool, error) {
-	return s.setRolloutStatus(ctx, "update_rollout", id, from, status, pauseKey, params, finished)
+	return s.setRolloutStatus(ctx, "update_rollout", id, from, nil, status, pauseKey, params, finished)
+}
+
+// PauseRollout pauses a rollout only while it is in the status and under the pause key the caller read (a compare-and-set
+// on both: a pause the caller did not read is another writer's). It reports whether the row changed.
+func (s *Store) PauseRollout(ctx context.Context, id, status, key, code string, params map[string]string) (bool, error) {
+	return s.setRolloutStatus(ctx, "update_rollout", id, []string{status}, &key, RolloutPaused, code, params, time.Time{})
 }
 
 // setRolloutStatus is the compare-and-set of the agent and the OS rollout tables, the same in both. table is one of the
-// two names, never a caller's text.
-func (s *Store) setRolloutStatus(ctx context.Context, table, id string, from []string, status, pauseKey string, params map[string]string, finished time.Time) (bool, error) {
+// two names, never a caller's text. A non-nil fromKey also requires that pause key.
+func (s *Store) setRolloutStatus(ctx context.Context, table, id string, from []string, fromKey *string, status, pauseKey string, params map[string]string, finished time.Time) (bool, error) {
 	if len(from) == 0 {
 		return false, nil
 	}
@@ -287,6 +293,10 @@ func (s *Store) setRolloutStatus(ctx context.Context, table, id string, from []s
 	args := []any{status, pauseKey, jsonMap(params), fleetUnix(finished), id}
 	for _, f := range from {
 		args = append(args, f)
+	}
+	if fromKey != nil {
+		q += ` AND pause_key = ?`
+		args = append(args, *fromKey)
 	}
 	res, err := s.W.ExecContext(ctx, q, args...)
 	if err != nil {

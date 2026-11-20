@@ -789,8 +789,8 @@ func (p *osPass) pause(code string, x *store.OsStepRow, reason string) {
 		return
 	}
 	params := map[string]string{"node": x.NodeName, "node_id": x.NodeID, "reason": reason, "code": x.Params["code"], "mode": p.ro.Mode}
-	previous := p.ro.Status
-	ok, err := p.s.st.SetOsRolloutStatus(p.ctx, p.ro.ID, []string{previous}, store.RolloutPaused, code, params, time.Time{})
+	// only over the status and the pause this pass read: a rollout paused or resumed meanwhile keeps what the other writer made of it
+	ok, err := p.s.st.PauseOsRollout(p.ctx, p.ro.ID, p.ro.Status, p.ro.PauseKey, code, params)
 	if err != nil {
 		p.s.log.Warn("update: pause OS rollout", "code", "update_os_pause_os_rollout", "rollout", p.ro.ID, "err", err)
 		return
@@ -798,6 +798,19 @@ func (p *osPass) pause(code string, x *store.OsStepRow, reason string) {
 	if ok {
 		p.ro.Status, p.ro.PauseKey, p.ro.PauseParams = store.RolloutPaused, code, params
 		p.s.log.Warn("update: OS rollout paused", "code", "update_os_rollout_paused", "rollout", p.ro.ID, "reason", code, "node", x.NodeName, "detail", reason)
+		return
+	}
+	// The write was lost: the rollout is not what this pass read. Go on with what is stored (the rest of the pass must not
+	// close or launch on the old reading); one that is running again, resumed after the pass read it paused, still pauses.
+	ro, err := p.s.st.OsRollout(p.ctx, p.ro.ID)
+	if err != nil {
+		p.s.log.Warn("update: reload OS rollout", "code", "update_os_reload_os_rollout", "rollout", p.ro.ID, "err", err)
+		return
+	}
+	resumed := p.ro.Status != store.RolloutRunning && ro.Status == store.RolloutRunning
+	p.ro = ro
+	if resumed {
+		p.pause(code, x, reason)
 	}
 }
 
