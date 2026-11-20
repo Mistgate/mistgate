@@ -14,7 +14,8 @@ const usage = `usage: mistgate-node <command> [flags]
 commands:
   enroll    exchange a one-time token for a node certificate (--panel and --sni, or --link-url; --ca-sha256, --token;
             the panel shows this command when you add a node)
-  set-panel save a new panel link address (--link-url); the agent switches to it once it works
+  set-panel save a new panel link address (--link-url) on a node enrolled over the link; the agent switches to it
+            once it works
   install   write a hardened systemd unit, enable and start it (root, Linux; -h for --state-dir, --bin, --no-start).
             It needs the nft command (the nftables package): without it nothing is changed and it exits with status 3
   run       run the agent in the foreground: what the systemd unit does, and the way to try it without systemd
