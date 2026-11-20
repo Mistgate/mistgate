@@ -34,7 +34,7 @@ const page = (name: string, st = state("android", { returning: true }), f: (d: R
 describe("the servers", () => {
   const rows = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>(".u-tbl .u-tr:not(.u-th)")];
   const phone = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>(".u-tbl .u-sr")];
-  const country = (r: HTMLElement) => text(r.querySelector(".u-name > span:nth-child(2)"));
+  const country = (r: HTMLElement) => text(r.querySelector(".u-name .l1 > span:first-child"));
   const byName = (el: HTMLElement, n: string) => rows(el).find((r) => country(r) === n)!;
 
   it("one card with a table: the head, then a row each, the working ones first; the same list as rows for a phone", () => {
@@ -48,7 +48,7 @@ describe("the servers", () => {
     expect(text(rows(el)[0]!.querySelector(".u-name small"))).toBe("Франкфурт");
     expect(rows(el).map((r) => r.classList.contains("off"))).toEqual([false, false, true]);
     // the same servers, in the same order, as the rows of a phone
-    expect(phone(el).map((r) => text(r.querySelector(".u-name > span:nth-child(2)")))).toEqual(["Германия", "Нидерланды", "Финляндия"]);
+    expect(phone(el).map((r) => text(r.querySelector(".u-name .l1 > span:first-child")))).toEqual(["Германия", "Нидерланды", "Финляндия"]);
     expect(card.querySelectorAll(".u-tr.only-w, .u-th.only-w")).toHaveLength(4);
     expect([...card.querySelectorAll(".u-sr")].every((r) => r.classList.contains("only-m"))).toBe(true);
   });
@@ -110,6 +110,22 @@ describe("the servers", () => {
     const el = view(d, state("android"), actions());
     expect(rows(el).map((r) => text(r.querySelector(".u-name .id")))).toEqual(["DE-1", "DE-2", "DE-3"]);
     expect(rows(page("first")).map((r) => r.querySelector(".id"))).toEqual([null, null, null]);
+  });
+
+  it("the domain of the server stands under its name, in both layouts; a panel that sends none draws no second line", () => {
+    const el = page("first");
+    expect(rows(el).map((r) => text(r.querySelector(".u-name .nx .dom")))).toEqual(["fra1.example.com", "ams1.example.com", "hel1.example.com"]);
+    expect(phone(el).map((r) => text(r.querySelector(".u-name .nx .dom")))).toEqual(["fra1.example.com", "ams1.example.com", "hel1.example.com"]);
+    expect(text(rows(el)[0]!.querySelector(".u-name .nx"))).toBe("ГерманияФранкфуртfra1.example.com");
+    // the name line and the domain line are the two children of one block next to the flag
+    expect([...rows(el)[0]!.querySelector(".u-name")!.children].map((x) => x.className)).toEqual(["fl2 de", "nx"]);
+    expect([...rows(el)[0]!.querySelector(".u-name .nx")!.children].map((x) => x.className)).toEqual(["l1", "dom"]);
+    const old = page("first", undefined, (d) => d.servers.forEach((x) => (x.host = "")));
+    expect(old.querySelectorAll(".u-name .dom")).toHaveLength(0);
+    expect(rows(old).map((r) => text(r.querySelector(".u-name .nx")))).toEqual(["ГерманияФранкфурт", "Нидерланды", "Финляндия"]);
+    // what the panel sends is read as text, trimmed
+    expect(normalize({ servers: [{ id: "n", country_code: "de", label: "Germany", host: "  de1.example.com " }] }).servers[0]!.host).toBe("de1.example.com");
+    expect(normalize({ servers: [{ id: "n", country_code: "de", label: "Germany", host: 5 }] }).servers[0]!.host).toBe("");
   });
 
   it("the names in the apps are the hint of the name, so a person can find the server there", () => {
@@ -201,7 +217,7 @@ describe("the servers", () => {
 describe("DNS of the keys in a card", () => {
   const rows = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>(".u-tbl .u-tr:not(.u-th)")];
   const phone = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>(".u-tbl .u-sr")];
-  const nameOf = (r: HTMLElement) => text(r.querySelector(".u-name > span:nth-child(2)"));
+  const nameOf = (r: HTMLElement) => text(r.querySelector(".u-name .l1 > span:first-child"));
 
   it("a column named by the keys, with what applies and a pencil; a server that is down has neither", () => {
     const r = rows(page("first"));

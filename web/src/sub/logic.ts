@@ -142,6 +142,7 @@ export function serverEntry(raw: unknown): ServerEntry {
     country_code: str(s.country_code).trim().toUpperCase(),
     place: str(s.place),
     label: str(s.label),
+    host: str(s.host).trim(),
     app_names: strs(s.app_names),
     connections: list(s.connections).map(conn),
     online: s.online === true,
@@ -420,7 +421,6 @@ export const platformWord = (platform: string, t: Dict) => (platform && platform
 
 // --- countries and servers ---------------------------------------------------------------------------------
 
-const flagOf = (cc: string) => String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
 const validCc = (cc: string) => /^[A-Z]{2}$/.test(cc.trim().toUpperCase());
 
 /** The country's name in the page language; the code when the browser has no region names. "" for no country. */
@@ -432,18 +432,6 @@ export function countryName(cc: string, lang: Lang): string {
   } catch {
     return code;
   }
-}
-
-/** The flag emoji of a country code; "" for none. (The page shows the code instead where the system draws no flags.) */
-export const flagEmoji = (cc: string) => (validCc(cc) ? flagOf(cc.trim().toUpperCase()) : "");
-
-/**
- * "🇩🇪 Германия": the flag and the country in the page language; "" for no country. `flags` off where the system has no
- * flag emoji (Windows draws the two letters, "DE Германия"): the name alone reads better there.
- */
-export function countryLabel(cc: string, lang: Lang, flags = true): string {
-  const name = countryName(cc, lang);
-  return name && flags ? `${flagEmoji(cc)} ${name}` : name;
 }
 
 /** A server's name split the way the card writes it: the country, and the owner's place after a dot ("Германия" "Франкфурт"). */
@@ -466,33 +454,51 @@ export function serverText(s: ServerEntry, lang: Lang): string {
  */
 export function serversOf(d: MgData): ServerEntry[] {
   if (d.servers.length > 0) return [...d.servers.filter((s) => s.online), ...d.servers.filter((s) => !s.online)];
-  return d.server_loads.map((s) => ({ id: "", country_code: "", place: "", label: s.name, app_names: [], connections: [], online: true, load: s.level, dns: null }));
+  return d.server_loads.map((s) => ({ id: "", country_code: "", place: "", label: s.name, host: "", app_names: [], connections: [], online: true, load: s.level, dns: null }));
 }
 
-const profileRank = (p: AwgProfile) => (p.version === "2.0" ? 2 : p.egress === "warp" ? 1 : 0);
+/** The number a server has among the ones of its country ("DE-2"), when it has twins and no place of its own to tell it apart. "" otherwise. */
+export function serverNum(all: ServerEntry[], x: ServerEntry): string {
+  const cc = x.country_code.trim().toUpperCase();
+  if (!cc || x.place) return "";
+  const same = all.filter((y) => y.country_code.trim().toUpperCase() === cc && !y.place);
+  if (same.length < 2) return "";
+  // the panel names the twins "Germany 2": its number is the server's; else the order in the subscription
+  const n = /\s(\d{1,2})$/.exec(x.label.trim());
+  return `${cc}-${n ? n[1] : same.indexOf(x) + 1}`;
+}
+
+/** What tells a server from the others of its country: the owner's place, else its number among the twins, else "". */
+export const serverMark = (all: ServerEntry[], x: ServerEntry): string => x.place || serverNum(all, x);
+
+const profileRank =(p: AwgProfile) => (p.version === "2.0" ? 2 : p.egress === "warp" ? 1 : 0);
+
+/** A server of a key as the window lists it: the country, what tells it from the others of its country, the domain it is reached by. */
+export type KeyServer = { cc: string; country: string; mark: string; host: string };
+/** One profile the person can make a key on: the owner's name for it, whether it leaves through the spare exit (WARP), the servers the key holds. */
+export type KeySet = { id: string; name: string; warp: boolean; servers: KeyServer[]; countries: string[] };
+/** The profiles of one app version: "new" (5.0.1.5 and newer, AWG 3.x) or "old" (AWG 2.0); `awg` is the protocol version the badge names. */
+export type KeyVersion = { kind: "new" | "old"; awg: string; sets: KeySet[] };
 
 /**
- * "Add a device" names a profile by what a friend can tell apart, never by the panel's name: the countries of the main
- * one, "the spare exit" for a WARP one, "for old versions" for 2.0; several of one kind are told apart by their countries
- * (an old one that leaves through WARP says so). The main one (3.x, direct) first; a label that still repeats gets a
- * number. `kind` says which of the three it is, for the line under the choice.
+ * What "New device → key" offers, by what a person can choose between: the app's version first (the new one, then the old one),
+ * and inside a version, when the owner made several, the profiles, each with the servers its key holds (the servers that carry
+ * the profile, in the order of the Servers table, marked as the table marks them). A profile no server says it is on (an older
+ * panel sends no `servers[]`) lists the countries the panel names for it instead, and no server count.
  */
-export function profileChoices(profiles: AwgProfile[], t: Dict, lang: Lang, app: string, flags = true): { id: string; label: string; kind: "main" | "warp" | "old"; countries: string[] }[] {
-  const sorted = [...profiles].sort((a, b) => profileRank(a) - profileRank(b));
-  const seen = new Map<string, number>();
-  return sorted.map((p) => {
-    // the countries tell two profiles of one kind apart; an old one that also leaves through WARP says so, or two old profiles
-    // of the same countries would differ by a number only
-    const place = p.countries.map((c) => countryLabel(c, lang, flags)).filter(Boolean).join(", ");
-    const old = p.version === "2.0";
-    const many = sorted.filter((x) => profileRank(x) === profileRank(p)).length > 1;
-    const base = old
-      ? many ? (place || t.profileOld(app)) + (p.egress === "warp" ? ` · ${t.adVerWarp}` : "") : t.profileOld(app)
-      : p.egress === "warp" ? (many && place) || t.profileWarp : place || t.profileMain;
-    const n = (seen.get(base) ?? 0) + 1;
-    seen.set(base, n);
-    return { id: p.id, label: n > 1 ? `${base} (${n})` : base, kind: p.version === "2.0" ? "old" : p.egress === "warp" ? "warp" : "main", countries: p.countries };
-  });
+export function keyVersions(d: MgData, lang: Lang): KeyVersion[] {
+  const all = serversOf(d);
+  const out: KeyVersion[] = [];
+  for (const p of [...(d.amnezia?.profiles ?? [])].sort((a, b) => profileRank(a) - profileRank(b))) {
+    const kind = p.version === "2.0" ? "old" : "new";
+    const servers = all
+      .filter((x) => x.connections.some((k) => k.way === "key" && k.profile_id === p.id))
+      .map((x) => ({ cc: x.country_code, country: serverName(x, lang).country, mark: serverMark(all, x), host: x.host }));
+    let v = out.find((x) => x.kind === kind);
+    if (!v) out.push((v = { kind, awg: p.version, sets: [] }));
+    v.sets.push({ id: p.id, name: p.name.trim(), warp: p.egress === "warp", servers, countries: servers.length > 0 ? [...new Set(servers.map((x) => x.cc))] : p.countries });
+  }
+  return out;
 }
 
 /** The profile "add a device" starts on: the main one. */

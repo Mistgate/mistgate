@@ -14,13 +14,15 @@ import {
   countryName,
   presetName,
   serverName,
+  serverNum,
   serversOf,
   serverText,
   showsKeyDns,
   usesKeys,
 } from "./logic";
+import type { Dict } from "./i18n";
 import type { Ctx } from "./state";
-import type { LoadLevel, Platform, ServerEntry } from "./types";
+import type { Lang, LoadLevel, Platform, ServerEntry } from "./types";
 
 // The servers of the person, as the board draws them: a card with a table (a computer) or a list of rows (a phone). The bar over it
 // says whether the servers work, how busy they are, and (for the apps that use the link) which DNS they get, with the way to
@@ -38,7 +40,7 @@ const drawn = new Set(["de", "nl", "ru", "ee", "pl", "ro", "by"]);
  * The flag of a server (or of a proxy link): the board's .fl2 (a flag in CSS for the countries the boards draw, the two letters of
  * the code for any other, a plain tile for a server with no country). `decor`: the name stands beside it, so it says nothing.
  */
-export function flag(c: Ctx, s: Pick<ServerEntry, "country_code" | "place" | "label">, decor = false): HTMLElement {
+export function flag(c: { t: Dict; s: { lang: Lang } }, s: Pick<ServerEntry, "country_code" | "place" | "label">, decor = false): HTMLElement {
   const cc = s.country_code.trim().toLowerCase();
   const ok = /^[a-z]{2}$/.test(cc);
   const named = ok && !decor;
@@ -48,17 +50,6 @@ export function flag(c: Ctx, s: Pick<ServerEntry, "country_code" | "place" | "la
 
 /** "In the app": the names the apps show this server under, without repeats. */
 const appNamesOf = (s: ServerEntry): string[] => [...new Set((s.connections.some((x) => x.way === "link" && x.app_name) ? s.connections.filter((x) => x.way === "link").map((x) => x.app_name) : s.app_names).filter(Boolean))];
-
-/** The number a server has among the ones of its country ("DE-2"), when it has twins and no place of its own to tell it apart. "" otherwise. */
-function numOf(all: ServerEntry[], x: ServerEntry): string {
-  const cc = x.country_code.trim().toUpperCase();
-  if (!cc || x.place) return "";
-  const same = all.filter((y) => y.country_code.trim().toUpperCase() === cc && !y.place);
-  if (same.length < 2) return "";
-  // the panel names the twins "Germany 2": its number is the server's; else the order in the subscription
-  const n = /\s(\d{1,2})$/.exec(x.label.trim());
-  return `${cc}-${n ? n[1] : same.indexOf(x) + 1}`;
-}
 
 /** How a server is reached, besides the plain way: the countries of the nodes it is entered through, the spare WARP exit. */
 function routeOf(x: ServerEntry) {
@@ -87,19 +78,22 @@ function dnsText(c: Ctx, x: ServerEntry): string {
 
 const meter = (level: LoadLevel) => h("span", { class: `u-meter${level === "high" ? " hi" : ""}`, "aria-hidden": "true" }, ...[1, 2, 3].map((n) => h("i", { class: n <= fills[level] ? "f" : "" })));
 
-/** The name cell of a row: the flag, the country, the owner's place, the number among the twins. `inApp` is what the apps call it (a hint). */
+/** The name cell of a row: the flag, then the country, the owner's place and the number among the twins, and under them the domain the keys connect to (when the panel says it). */
 function nameCell(c: Ctx, all: ServerEntry[], x: ServerEntry, phone: boolean): HTMLElement {
   const { t, s } = c;
   const n = serverName(x, s.lang);
   const names = appNamesOf(x);
-  const num = numOf(all, x);
+  const num = serverNum(all, x);
   return h(
     phone ? "span" : "div",
     { class: "u-name", title: names.length > 0 ? `${t.inApp}: ${names.join(", ")}` : false },
     flag(c, x, phone),
-    h("span", null, h("bdi", null, n.country)),
-    n.place && h("small", null, h("bdi", null, n.place)),
-    num && h("span", { class: "id" }, num),
+    h(
+      "span",
+      { class: "nx" },
+      h("span", { class: "l1" }, h("span", null, h("bdi", null, n.country)), n.place && h("small", null, h("bdi", null, n.place)), num && h("span", { class: "id" }, num)),
+      x.host && h("span", { class: "dom" }, x.host),
+    ),
   );
 }
 
@@ -127,7 +121,7 @@ function deskRow(c: Ctx, all: ServerEntry[], x: ServerEntry, dnsCol: boolean): H
 function phoneRow(c: Ctx, all: ServerEntry[], x: ServerEntry): HTMLElement {
   const { t, a } = c;
   const label = serverText(x, c.s.lang);
-  const num = numOf(all, x);
+  const num = serverNum(all, x);
   const state = x.online ? [t.up, x.load ? t.srvLoad(t.loadLevel[x.load]) : ""].filter(Boolean).join(t.listSep) : t.down;
   const kids: Kid[] = [nameCell(c, all, x, true), ...(x.online ? tags(c, x, true) : []), x.online ? x.load && meter(x.load) : h("span", { class: "u-dim" }, t.down)];
   const edit = editable(c, x);

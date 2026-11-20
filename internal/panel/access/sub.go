@@ -108,6 +108,7 @@ const (
 type SubNode struct {
 	ID          string
 	Name        string // the panel's node name: never emitted as user-facing text
+	Address     string // the node's own address, as its direct link and keys give it (store.AccessNode.Address; not a relay's entry)
 	CountryCode string
 	Location    string
 	// Online: the node's agent is connected (a live session, or a network sample not older than 90 seconds).
@@ -617,7 +618,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 		if !ok {
 			i = len(v.Nodes)
 			nodeAt[f.Node.ID] = i
-			n := SubNode{ID: f.Node.ID, Name: f.Node.Name, CountryCode: f.Node.CountryCode, Location: f.Node.Location}
+			n := SubNode{ID: f.Node.ID, Name: f.Node.Name, Address: f.Node.Address, CountryCode: f.Node.CountryCode, Location: f.Node.Location}
 			if usage, ok := networkUsage[f.Node.ID]; ok {
 				n.LoadPercent = usage.LoadPercent
 			}

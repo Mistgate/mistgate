@@ -67,6 +67,8 @@ export type ServerEntry = {
   country_code: string;
   place: string;
   label: string;
+  /** The domain (or address) the person's own keys and links connect to; "" when the panel does not say (an older one). */
+  host: string;
   app_names: string[];
   connections: ServerConn[];
   online: boolean;
