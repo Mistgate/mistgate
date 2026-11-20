@@ -406,6 +406,16 @@ func (f *Front) Divert(conn net.Conn) bool {
 		return false
 	}
 	f.diverted.Add(1)
+	// the default route's keepalive, as if the connection had been routed there in the first place
+	if t.def.ka != nil {
+		inner := conn
+		if r, ok := conn.(*replayConn); ok {
+			inner = r.Conn
+		}
+		if tcp, ok := inner.(*net.TCPConn); ok {
+			_ = tcp.SetKeepAliveConfig(*t.def.ka)
+		}
+	}
 	ok, refused := f.deliver(conn, t.def, nil)
 	if refused {
 		f.refused.Add(1)

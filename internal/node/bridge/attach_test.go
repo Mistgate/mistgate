@@ -122,3 +122,17 @@ func TestEntryDialExitCancelledAtAttach(t *testing.T) {
 	}
 	echoOver(t, conn, pki)
 }
+
+// DialExit to an exit the entry does not serve leaves no peer state behind.
+func TestEntryDialExitUnknownLeavesNoPeer(t *testing.T) {
+	entry := NewEntry()
+	t.Cleanup(entry.Close)
+	if _, err := entry.DialExit(context.Background(), "nod_unknown", "rly_a", 0); !errors.Is(err, ErrExitNotKnown) {
+		t.Fatalf("an unknown exit: %v", err)
+	}
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	if _, ok := entry.peers["nod_unknown"]; ok {
+		t.Fatal("a peer was made for an exit the entry does not serve")
+	}
+}

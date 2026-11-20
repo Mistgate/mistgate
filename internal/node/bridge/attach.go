@@ -79,8 +79,13 @@ func (e *Entry) DialExit(ctx context.Context, exitID, relayID string, idle time.
 	result := make(chan error, 1)
 	go func() {
 		defer cancel()
+		// the exit must be served before its peer state is made: an unknown id leaves nothing behind
+		if !slicesContains(e.serveSnapshot().ExitNodeIDs, exitID) || !relayIDPattern.MatchString(relayID) {
+			result <- ErrExitNotKnown
+			return
+		}
 		peer := e.peer(exitID)
-		if peer == nil || !slicesContains(e.serveSnapshot().ExitNodeIDs, exitID) || !relayIDPattern.MatchString(relayID) {
+		if peer == nil {
 			result <- ErrExitNotKnown
 			return
 		}

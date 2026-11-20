@@ -778,7 +778,7 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
             <div className="an-b">
               {failure && <FailureNotice failure={failure} />}
               {dnsMismatch && (
-                <Button type="button" variant="outline" size="md" className="self-start" disabled={busy !== null} onClick={() => void startInstall(undefined, true)}>
+                <Button type="button" variant="outline" size="md" className="self-start" disabled={busy !== null || !confirmedInstall || !login.ready} onClick={() => void startInstall(undefined, true)}>
                   {t("set.domains.subHost.continueAnyway")}
                 </Button>
               )}
