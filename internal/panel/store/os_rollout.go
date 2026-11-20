@@ -165,7 +165,12 @@ func (s *Store) OsRolloutSteps(ctx context.Context, rolloutID string) ([]OsStepR
 // SetOsRolloutStatus moves a rollout to status only while it is in one of from (a compare-and-set). pauseKey and params
 // describe a pause and are cleared by any other status. It reports whether the row changed.
 func (s *Store) SetOsRolloutStatus(ctx context.Context, id string, from []string, status, pauseKey string, params map[string]string, finished time.Time) (bool, error) {
-	return s.setRolloutStatus(ctx, "os_rollout", id, from, status, pauseKey, params, finished)
+	return s.setRolloutStatus(ctx, "os_rollout", id, from, nil, status, pauseKey, params, finished)
+}
+
+// PauseOsRollout is PauseRollout for the OS rollout table.
+func (s *Store) PauseOsRollout(ctx context.Context, id, status, key, code string, params map[string]string) (bool, error) {
+	return s.setRolloutStatus(ctx, "os_rollout", id, []string{status}, &key, RolloutPaused, code, params, time.Time{})
 }
 
 // SaveOsStep overwrites the mutable fields of a step. A row read by OsRolloutSteps is a compare-and-set on its state.

@@ -12,6 +12,7 @@ import {
   bundleErrorText,
   heroOf,
   isActive,
+  isCancelWait,
   isFailurePause,
 
   pausedStep,
@@ -110,6 +111,8 @@ function Paused({ d, owner, actions, onCancel }: { d: Updates; owner: boolean; a
   const r = d.rollout!;
   const failed = isFailurePause(r.pauseKey);
   const culprit = failed ? pausedStep(r) : undefined;
+  // a cancel that waits for the node in flight ends by itself (resume is refused): no way on and nothing more to cancel
+  const canAct = owner && !isCancelWait(r.pauseKey);
   return (
     <Bar
       bad={failed}
@@ -120,12 +123,12 @@ function Paused({ d, owner, actions, onCancel }: { d: Updates; owner: boolean; a
               {t("up.openNode", { name: culprit.nodeName })}
             </Link>
           )}
-          {owner && (
+          {canAct && (
             <Button variant="secondary" size="md" disabled={actions.busy} onClick={() => void actions.resume(r.id)}>
               {t("up.resume")}
             </Button>
           )}
-          {owner && (
+          {canAct && (
             <Button variant="secondary" size="md" disabled={actions.busy} onClick={onCancel}>
               {t("up.cancel")}
             </Button>

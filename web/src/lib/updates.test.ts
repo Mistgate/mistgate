@@ -380,7 +380,7 @@ describe("dictionary", () => {
   // the codes the panel and the agents produce
   const stepCodes = ["bad_signature", "unsigned_build", "bad_manifest", "expired", "downgrade", "no_file_for_platform", "download_failed", "size_mismatch", "hash_mismatch", "not_writable", "busy", "no_answer", "not_reconnected", "not_committed", "state_not_applied", "inbounds_unreadable", "warp_down", "inbound_failed", "probe_failed", "rolled_back_by_agent", "manual", "offline", "unsupported", "up_to_date", "cancelled", "agent_failed", "rollback_failed", "failed"];
   const bundleCodes = ["no_manifest", "no_signature", "bad_manifest", "unsupported_schema", "bad_signature", "expired", "file_missing", "file_mismatch"];
-  const pause = ["owner", "step_failed", "gate_failed", "bundle_changed", "panel_restart_ambiguous"];
+  const pause = ["owner", "step_failed", "gate_failed", "bundle_changed", "panel_restart_ambiguous", "cancel_wait"];
   // the agent's own codes, and the panel's names for who sent a rollback (update/reason.go)
   const reason = ["not_committed", "built_mismatch", "crash_loop", "apply_failed", "manual", "interrupted", "gate", "gate_probe_failed", "gate_inbound_failed", "gate_not_committed", "gate_state_not_applied", "gate_inbounds_unreadable", "gate_warp_down", "command"];
   // the gate's codes, which a pause names in a short form

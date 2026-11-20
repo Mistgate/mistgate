@@ -622,6 +622,13 @@ describe("the Updates screen", () => {
     expect([...document.querySelectorAll("a")].some((a) => a.textContent?.startsWith("Open "))).toBe(false);
   });
 
+  it("offers neither Resume nor Cancel while a cancel waits for the node in flight, and says why", async () => {
+    await mount(page({ nodes: [node({ name: "de1", state: NodeUpdateState.UPDATING })], rollout: rollout({ status: RolloutStatus.PAUSED, pauseKey: "updates.pause.cancel_wait", steps: [step({ state: StepState.SENT })] }) }));
+    expect(text()).toContain("Being cancelled: it ends as soon as the node that is updating now is decided.");
+    expect(button("Resume")).toBeUndefined();
+    expect(button("Cancel rollout")).toBeUndefined();
+  });
+
   it("marks the stage of nodes that were passed over with a dash, not a tick", async () => {
     await mount(
       page({

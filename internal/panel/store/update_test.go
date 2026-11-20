@@ -171,6 +171,19 @@ func TestRolloutStore(t *testing.T) {
 	if ro.Status != RolloutPaused || ro.PauseKey != "gate_failed" || ro.PauseParams["node"] != "a" || !ro.Active() {
 		t.Fatalf("paused rollout: %+v", ro)
 	}
+	// a pause is written only over the status and the pause key the caller read
+	if ok, _ := s.PauseRollout(ctx, "rol_1", RolloutPaused, "owner", "step_failed", nil); ok {
+		t.Fatal("a pause under another key must not be taken over")
+	}
+	if ok, _ := s.PauseRollout(ctx, "rol_1", RolloutRunning, "gate_failed", "step_failed", nil); ok {
+		t.Fatal("a pause of a running rollout read as running must not win over a paused one")
+	}
+	if ok, err := s.PauseRollout(ctx, "rol_1", RolloutPaused, "gate_failed", "step_failed", map[string]string{"node": "b"}); err != nil || !ok {
+		t.Fatalf("pause over the pause that was read: %v %v", ok, err)
+	}
+	if ok, _ := s.SetRolloutStatus(ctx, "rol_1", []string{RolloutPaused}, RolloutPaused, "gate_failed", map[string]string{"node": "a"}, time.Time{}); !ok {
+		t.Fatal("restore the first pause")
+	}
 	// a step is saved in place
 	got[0].State, got[0].ErrorKey, got[0].PreFailed, got[0].SentAt = StepFailed, "hash_mismatch", []string{"inb_1"}, t0
 	if err := s.SaveStep(ctx, &got[0]); err != nil {
