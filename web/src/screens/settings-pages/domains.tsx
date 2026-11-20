@@ -304,7 +304,7 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
         <p className="sb-lead">{t("set.domains.subHost.changeRecord", { address: nodeList.find((n) => n.id === host.nextNodeId)?.address ?? "" })}</p>
         {record.data && <RecordCheck r={record.data} />}
         {error}
-        {failure?.code === "sub_host_dns_mismatch" && force}
+        {(failure?.code === "sub_host_dns_mismatch" || failure?.code === "sub_host_next_not_ready") && force}
         {actions}
       </>
     );

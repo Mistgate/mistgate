@@ -187,6 +187,12 @@ func (r rpc) FinishSubscriptionHostChange(ctx context.Context, req *connect.Requ
 				if !c.matches {
 					return dnsMismatch(c)
 				}
+				// the next node must be able to carry the subdomain before it gets it: online, its role running, its site
+				// publicly certified and the panel's bridge to it up
+				next := state{State: stateOn, Domain: st.Domain, Node: st.Next, SiteName: st.NextSiteName}
+				if missing := s.notReadyHost(ctx, next); len(missing) > 0 {
+					return coded(connect.CodeFailedPrecondition, "sub_host_next_not_ready", "not_ready", strings.Join(missing, ","))
+				}
 			}
 			st.State, st.Node, st.SiteName, st.Path = stateOn, st.Next, st.NextSiteName, st.NextPath
 			st.Next, st.NextSiteName, st.NextPath, st.BootstrapPin = "", "", "", ""

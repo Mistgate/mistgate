@@ -126,11 +126,11 @@ func (t *tunnel) localDial(ctx context.Context, target plugin.BridgeTarget, clie
 // syncDials makes the dialer call exactly the hosts of st. Call with mu held (from applyRouting) or from Run.
 func (s *Service) syncDials(st state) {
 	var specs []bridge.DialSpec
-	add := func(nodeID, siteName, path string) {
+	add := func(nodeID, siteName, path, bootstrapPin string) {
 		if nodeID == "" {
 			return
 		}
-		host, sni, pin, _, ok := s.cfg.Fleet.SubHostTarget(s.tun.ctx, nodeID, siteName, st.BootstrapPin)
+		host, sni, pin, _, ok := s.cfg.Fleet.SubHostTarget(s.tun.ctx, nodeID, siteName, bootstrapPin)
 		if !ok {
 			return
 		}
@@ -143,9 +143,9 @@ func (s *Service) syncDials(st state) {
 				{RelayID: relaySub, Network: bridge.LocalTargetNetwork}, {RelayID: relayLink, Network: bridge.LocalTargetNetwork}}}})
 	}
 	if st.State != stateOff && st.Path != "" {
-		add(st.Node, st.SiteName, st.Path)
+		add(st.Node, st.SiteName, st.Path, st.BootstrapPin)
 		if st.State == stateMoving && st.NextPath != "" {
-			add(st.Next, st.NextSiteName, st.NextPath)
+			add(st.Next, st.NextSiteName, st.NextPath, "") // the install's pin is the first host's, never the next one's
 		}
 	}
 	s.tun.dialer.Sync(s.tun.ctx, specs)

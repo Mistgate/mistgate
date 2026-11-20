@@ -72,7 +72,7 @@ Both the move and turning the host off happen in two phases, and you finish each
 
 1. Under **Move to another node**, choose the node (and its **Site name** if it needs one) and press **Start the move**. The panel dials both nodes and the card shows both bridges.
 2. Change the subdomain's A (and AAAA) record to the new node's address. The card shows where the record points now.
-3. Press **Finish** once the record points at the new node. If it does not yet, the panel asks whether to finish anyway. **Cancel** drops the move, and the host stays on the current node.
+3. Press **Finish** once the record points at the new node and the new node can carry the subdomain (online, its role running, its site publicly certified, the panel's bridge to it up). If either is not so yet, the panel says what is missing and asks whether to finish anyway. **Cancel** drops the move, and the host stays on the current node.
 
 ## Turning it off
 

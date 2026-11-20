@@ -137,6 +137,8 @@ export const errorCodes = [
   "sub_host_same_node",
   "sub_host_in_use",
   "sub_host_inbound_unfit",
+  // finishing a move before the next node can carry the subdomain: "sub_host_next_not_ready: not_ready=<steps, comma-separated>"
+  "sub_host_next_not_ready",
 ] as const;
 
 /**
@@ -203,6 +205,8 @@ export function shareRefusalText(t: T, code: string, vars: Record<string, string
   return t(key, { protocol: "", ...vars });
 }
 
+const subHostSteps = ["host_offline", "host_error", "site_cert", "bridge", "panel_cert"];
+
 export const subHostUnfit = [
   "retired",
   "offline",
@@ -228,6 +232,11 @@ function subHostVars(t: T, vars: Record<string, string>): Record<string, string>
     ...vars,
     reason: subHostUnfit.includes(reason) ? t(`subhost.unfit.${reason as "offline"}`) : reason,
     nodes: list(vars.nodes),
+    not_ready: (vars.not_ready ?? "")
+      .split(",")
+      .filter(Boolean)
+      .map((s) => (subHostSteps.includes(s) ? t(`set.domains.subHost.step.${s as "bridge"}`) : s))
+      .join("; "),
     found: list(vars.found) || "—",
     expected: list(vars.expected) || "—",
   };

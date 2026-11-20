@@ -27,11 +27,8 @@ const (
 // tunnelDownAfter is how long the panel's connection to the host may stay down before the owner hears of it.
 const tunnelDownAfter = 30 * time.Second
 
-// notReady lists what keeps the host of st from being ready; empty = ready.
-func (s *Service) notReady(ctx context.Context, st state) []string {
-	if st.State == stateOff || st.Node == "" {
-		return nil
-	}
+// notReadyHost lists what keeps the node st.Node from carrying the subdomain (all of readiness but the panel's certificate).
+func (s *Service) notReadyHost(ctx context.Context, st state) []string {
 	var out []string
 	if !s.cfg.Fleet.HasSession(st.Node) {
 		out = append(out, notReadyOffline)
@@ -45,6 +42,15 @@ func (s *Service) notReady(ctx context.Context, st state) []string {
 	if !s.bridgeUp(st.Node) {
 		out = append(out, notReadyBridge)
 	}
+	return out
+}
+
+// notReady lists what keeps the host of st from being ready; empty = ready.
+func (s *Service) notReady(ctx context.Context, st state) []string {
+	if st.State == stateOff || st.Node == "" {
+		return nil
+	}
+	out := s.notReadyHost(ctx, st)
 	if !s.panelCert(ctx, st.Domain) {
 		out = append(out, notReadyPanelCert)
 	}

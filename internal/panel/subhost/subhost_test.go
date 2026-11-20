@@ -253,9 +253,23 @@ func TestTransitions(t *testing.T) {
 	oldPath, nextPath := e.state().Path, e.state().NextPath
 	wantCode(t, finish(false), "sub_host_dns_mismatch") // the record still names a
 	e.res["sub.example.com"] = []netip.Addr{netip.MustParseAddr("203.0.113.2")}
+	// the record is right, but b cannot carry the subdomain yet: no role report, no public site certificate, no bridge
+	var ce *connect.Error
+	if err := finish(false); !errors.As(err, &ce) || ce.Message() != "sub_host_next_not_ready: not_ready=host_error%2Csite_cert%2Cbridge" {
+		t.Fatalf("finish before b is ready: %v", err)
+	}
+	e.fl.mu.Lock()
+	if e.fl.status == nil {
+		e.fl.status = map[string]*agentv1.SubHostStatus{}
+	}
+	e.fl.status[b] = &agentv1.SubHostStatus{}
+	e.fl.target = func(id, _, _ string) (string, string, string, bool, bool) { return "203.0.113.2", "b.example.com", "", id == b, true }
+	e.fl.mu.Unlock()
+	e.svc.upSeam = func(id string) bool { return id == b }
 	if err := finish(false); err != nil {
 		t.Fatal(err)
 	}
+	e.svc.upSeam = nil
 	if st := e.state(); st.State != stateOn || st.Node != b || st.Next != "" || e.fl.roles[a] != nil || e.fl.roles[b] == nil ||
 		st.Path != nextPath || st.Path == oldPath || st.NextPath != "" || e.fl.roles[b].Path != nextPath {
 		t.Fatalf("moved: %+v", st)
