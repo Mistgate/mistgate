@@ -200,6 +200,7 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.ProvisioningServiceAttachNodeServerAccessProcedure:   true,
 	adminv1connect.WarpServiceRegisterWarpProcedure:                     true,
 	adminv1connect.WarpServiceImportWarpProcedure:                       true,
+	adminv1connect.WarpServiceSetWarpLicenseProcedure:                   true,
 	adminv1connect.WarpServiceDeleteWarpProcedure:                       true,
 	adminv1connect.ApiTokenServiceCreateApiTokenProcedure:               true,
 	adminv1connect.ApiTokenServiceSetApiTokenBulkProcedure:              true,
