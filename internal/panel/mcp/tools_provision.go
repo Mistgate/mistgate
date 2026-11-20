@@ -19,6 +19,8 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	subhostv1 "github.com/mistgate/mistgate/gen/mistgate/subhost/v1"
+	"github.com/mistgate/mistgate/gen/mistgate/subhost/v1/subhostv1connect"
 	"github.com/mistgate/mistgate/internal/panel/provision"
 )
 
@@ -99,7 +101,9 @@ func nodeInstallPlanTool() toolDef {
 	return toolDef{
 		name: PlanTool(base), min: ProfileAdmin, procs: procs(
 			adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure,
-			adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure),
+			adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure,
+			subhostv1connect.SubscriptionHostServiceGetSubscriptionHostProcedure,
+			subhostv1connect.SubscriptionHostServiceCheckSubscriptionHostDomainProcedure),
 		free: true, isPlan: true, danger: true,
 		desc: "Prepare installation of a Mistgate node over SSH. This reads the public SSH host key and panel public key. Never ask for or pass a server password: " +
 			"the owner compares the host key fingerprint and chooses Password or Panel key on the approval screen in the admin panel. Tell the user to approve the plan there.",
@@ -145,6 +149,28 @@ func nodeInstallPlanTool() toolDef {
 							return nil, nil, errors.New("site_name: give a second name pointing at the server, other than the subdomain")
 						}
 						resolved.SkipDNSCheck = in.SkipDNSCheck
+						// what the panel would refuse at apply, said now: the owner's typed password is not spent on it
+						h, err := c.subHost()
+						if err != nil {
+							return nil, nil, scrubError(err)
+						}
+						if h.GetState() != subhostv1.SubscriptionHostState_SUBSCRIPTION_HOST_STATE_OFF {
+							return nil, nil, errors.New("the panel already has a subscription host (" + subHostState(h.GetState()) + "); install an ordinary node")
+						}
+						if len(h.GetLackingLink()) > 0 {
+							return nil, nil, errors.New("update the agent on the nodes that cannot follow the panel to a new link address first (see subscription_host_get)")
+						}
+						if !resolved.SkipDNSCheck {
+							r, err := c.cl.SubHost.CheckSubscriptionHostDomain(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&subhostv1.CheckSubscriptionHostDomainRequest{
+								Address: resolved.Host, Domain: resolved.SubscriptionHostDomain, SiteName: resolved.SiteName}))
+							if err != nil {
+								return nil, nil, scrubError(apiError(err))
+							}
+							if !r.Msg.GetMatches() {
+								return nil, nil, errors.New("the names do not point at the server yet (found " + clean(strings.Join(r.Msg.GetFound(), ", "), 300) +
+									"; expected " + clean(strings.Join(r.Msg.GetExpected(), ", "), 300) + "); fix the DNS records or set skip_dns_check")
+							}
+						}
 					} else if in.SkipDNSCheck || in.SiteName != "" {
 						return nil, nil, errors.New("site_name and skip_dns_check apply only with subscription_host_domain")
 					}

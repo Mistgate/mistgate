@@ -140,6 +140,9 @@ message CheckSubscriptionHostDomainRequest {
   string node_id = 1;
   string domain = 2;
   string site_name = 3;
+  // Instead of node_id: the address of a server not in the fleet yet (an SSH install of the first host). Only the A records
+  // are compared then; the install checks the AAAA records once it knows the server's IPv6.
+  string address = 4;
 }
 
 message CheckSubscriptionHostDomainResponse {

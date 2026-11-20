@@ -4,10 +4,9 @@ package subhost
 
 import (
 	"context"
+	"net/netip"
 
 	"connectrpc.com/connect"
-
-	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // The first subscription host is installed over SSH (internal/panel/provision): a panel behind NAT cannot be reached by the new
@@ -46,26 +45,52 @@ func (s *Service) PrepareInstall(ctx context.Context, sshHost, domain, siteName 
 		return "", coded(connect.CodeFailedPrecondition, "sub_host_nodes_lack_link", "nodes", refIDs(lacking))
 	}
 	if !skipDNS {
-		c, err := s.dnsOf(ctx, store.NodeRow{Address: sshHost}, domain, siteName)
-		if err != nil {
-			return "", s.internal("read node facts", err)
-		}
-		if !c.matches {
+		// Only the A records here: the server's IPv6 is known once the install has looked at it (CheckInstallDNS).
+		if c := s.installDNS(ctx, s.addressesOf(ctx, sshHost), domain, siteName, false); !c.matches {
 			return "", dnsMismatch(c)
 		}
 	}
 	return newPath(), nil
 }
 
-// ActivateInstalled turns the role on for the node the install enrolled: off -> on, not ready. Running it again for the same
-// install (the panel died in it, or its undo was refused) finds the role on for that node, domain and path, and is no change.
-func (s *Service) ActivateInstalled(ctx context.Context, nodeID, domain, siteName, path, pin string) error {
+// CheckInstallDNS checks, once the install read the server's global IPv6 addresses, that both names point at the server: the
+// A records at sshHost, the AAAA records (when there are any) at one of ipv6.
+func (s *Service) CheckInstallDNS(ctx context.Context, sshHost, domain, siteName string, ipv6 []netip.Addr) error {
 	domain, err := normDomain(domain)
 	if err != nil {
 		return err
 	}
 	if siteName, err = normSiteName(siteName); err != nil {
 		return err
+	}
+	if c := s.installDNS(ctx, append(s.addressesOf(ctx, sshHost), ipv6...), domain, siteName, true); !c.matches {
+		return dnsMismatch(c)
+	}
+	return nil
+}
+
+func (s *Service) installDNS(ctx context.Context, want []netip.Addr, domain, siteName string, check6 bool) dnsCheck {
+	c := s.compareDNS(ctx, want, domain, check6)
+	if !c.matches || siteName == "" {
+		return c
+	}
+	return s.compareDNS(ctx, want, siteName, check6)
+}
+
+// ActivateInstalled turns the role on for the node the install enrolled: off -> on, not ready. Running it again for the same
+// install (the panel died in it, or its undo was refused) finds the role on for that node, domain and path, and is no change.
+func (s *Service) ActivateInstalled(ctx context.Context, actor, nodeID, domain, siteName, path, pin string) error {
+	domain, err := normDomain(domain)
+	if err != nil {
+		return err
+	}
+	if siteName, err = normSiteName(siteName); err != nil {
+		return err
+	}
+	if pin == "" {
+		// the panel would have nothing to verify the host's site by until its agent reports, which it can do only through
+		// the bridge that pin verifies
+		return coded(connect.CodeFailedPrecondition, "sub_host_no_site_pin")
 	}
 	again := false
 	err = s.transition(ctx, func(st *state) error {
@@ -84,14 +109,14 @@ func (s *Service) ActivateInstalled(ctx context.Context, nodeID, domain, siteNam
 		return nil
 	})
 	if err == nil && !again {
-		s.audit(ctx, "sub_host_set", map[string]string{"domain": domain, "node_id": nodeID, "site_name": siteName, "via": "install"})
+		s.auditAs(ctx, actor, "sub_host_set", map[string]string{"domain": domain, "node_id": nodeID, "site_name": siteName, "via": "install"})
 	}
 	return err
 }
 
 // DeactivateInstalled turns the role off again after an install that did not complete. A host that is ready is in use:
 // it is left alone (sub_host_in_use).
-func (s *Service) DeactivateInstalled(ctx context.Context, nodeID string) error {
+func (s *Service) DeactivateInstalled(ctx context.Context, actor, nodeID string) error {
 	done := false
 	err := s.transition(ctx, func(st *state) error {
 		if st.State != stateOn || st.Node != nodeID {
@@ -104,7 +129,7 @@ func (s *Service) DeactivateInstalled(ctx context.Context, nodeID string) error 
 		return nil
 	})
 	if err == nil && done {
-		s.audit(ctx, "sub_host_unset", map[string]string{"node_id": nodeID, "via": "install"})
+		s.auditAs(ctx, actor, "sub_host_unset", map[string]string{"node_id": nodeID, "via": "install"})
 	}
 	return err
 }

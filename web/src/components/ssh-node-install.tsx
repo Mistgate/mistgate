@@ -69,6 +69,7 @@ const codeText: Record<string, MessageKey> = {
   node_not_connected: "node.ssh.error.notConnected",
   // the first subscription host (provision/worker.go): it enrols in the session, and the panel dials it once it is installed
   subscription_host_tunnel_down: "node.ssh.error.hostTunnel",
+  subscription_host_dns_mismatch: "node.ssh.error.hostDNS",
   subscription_host_activation_failed: "node.ssh.error.hostActivation",
   subscription_host_unavailable: "node.ssh.error.hostUnavailable",
   panel_link_not_configured: "node.ssh.error.hostNoLink",

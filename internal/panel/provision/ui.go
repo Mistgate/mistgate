@@ -620,6 +620,8 @@ func errorLabel(code string) string {
 		return "На сервере недостаточно свободного места для агента."
 	case "node_not_connected":
 		return "Агент установлен, но не подключился к панели вовремя."
+	case "subscription_host_dns_mismatch":
+		return "Поддомен или имя сайта не указывают на сервер (A-записи на его адрес, AAAA — на его IPv6). Исправь DNS-записи и повтори установку."
 	case "subscription_host_unavailable":
 		return "Хост подписок здесь не устанавливается: эта панель его не поддерживает или у неё нет адреса ссылки агентов."
 	case "subscription_host_activation_failed":

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
@@ -50,6 +51,8 @@ printf 'systemd=%s\n' "$systemd"
 printf 'nftables=%s\n' "$nftables"
 printf 'already_enrolled=%s\n' "$enrolled"
 printf 'existing_node_id=%s\n' "$node_id"
+ipv6="$(ip -6 -o addr show scope global 2>/dev/null | awk '{split($4, a, "/"); print a[1]}' | head -n 4 | paste -sd, - || true)"
+printf 'ipv6=%s\n' "$ipv6"
 `
 
 // remoteNftablesInstallScript puts the nftables package on a server without the nft command (a cloud image of Debian 13
@@ -128,6 +131,7 @@ func (e preflightFailure) Error() string { return string(e) }
 type remotePreflight struct {
 	facts  *adminv1.NodePreflight
 	nodeID string
+	ipv6   []netip.Addr // the server's global IPv6 addresses (at most 4)
 }
 
 var nodeIDPattern = regexp.MustCompile(`^nod_[a-z2-7]{26}$`)
@@ -320,6 +324,15 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		s.failJob(ctx, job, code)
 		return
 	}
+	if host && !secret.SubHostSkipDNS {
+		// both names must point at the server, the AAAA records at its IPv6 now that the preflight told it
+		if err := s.cfg.SubHost.CheckInstallDNS(ctx, job.SSHHost, secret.SubHostDomain, secret.SubHostSiteName, remote.ipv6); err != nil {
+			if ctx.Err() == nil {
+				s.failJob(ctx, job, "subscription_host_dns_mismatch")
+			}
+			return
+		}
+	}
 
 	binary, size, digest, err := s.cfg.Binaries.OpenNodeBinary(ctx, "linux", arch)
 	if err != nil || binary == nil {
@@ -483,7 +496,11 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 		if !s.mayContinue(ctx, &job) {
 			return
 		}
-		if err := s.cfg.SubHost.ActivateInstalled(ctx, job.NodeID, secret.SubHostDomain, secret.SubHostSiteName, secret.SubHostPath, sitePin); err != nil {
+		if sitePin == "" { // the node printed no pin for its site: the panel could never verify the host
+			s.failJob(ctx, job, "node_enrollment_failed")
+			return
+		}
+		if err := s.cfg.SubHost.ActivateInstalled(ctx, job.CreatedBy, job.NodeID, secret.SubHostDomain, secret.SubHostSiteName, secret.SubHostPath, sitePin); err != nil {
 			if ctx.Err() == nil {
 				s.cfg.Log.Warn("subscription host not activated", "code", "sub_host_activation_failed", "job_id", job.ID, "err", err)
 				s.failJob(ctx, job, "subscription_host_activation_failed")
@@ -496,7 +513,7 @@ func (s *Service) runJob(ctx context.Context, job store.NodeProvisionJob) {
 			if job.Phase == "completed" {
 				return
 			}
-			if err := s.cfg.SubHost.DeactivateInstalled(context.WithoutCancel(ctx), job.NodeID); err != nil {
+			if err := s.cfg.SubHost.DeactivateInstalled(context.WithoutCancel(ctx), job.CreatedBy, job.NodeID); err != nil {
 				s.cfg.Log.Error("subscription host not deactivated after a failed install", "code", "sub_host_deactivation_failed", "job_id", job.ID, "err", err)
 			}
 		}()
@@ -752,7 +769,7 @@ func parsePreflightFacts(output []byte, allowUnreachable bool) (*remotePreflight
 	allowed := map[string]struct{}{
 		"distribution": {}, "version": {}, "kernel": {}, "architecture": {}, "cpu_count": {},
 		"memory_bytes": {}, "disk_available_bytes": {}, "systemd": {}, "already_enrolled": {},
-		"existing_node_id": {}, "panel_reachable": {}, "nftables": {},
+		"existing_node_id": {}, "panel_reachable": {}, "nftables": {}, "ipv6": {},
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
 		key, value, ok := strings.Cut(strings.TrimSuffix(line, "\r"), "=")
@@ -832,6 +849,16 @@ func parsePreflightFacts(output []byte, allowUnreachable bool) (*remotePreflight
 	if panelReachable != "yes" && !allowUnreachable {
 		return nil, preflightFailure("panel_unreachable")
 	}
+	var ipv6 []netip.Addr
+	if v, _ := get("ipv6"); v != "" {
+		for _, f := range strings.Split(v, ",") {
+			a, err := netip.ParseAddr(f)
+			if err != nil || !a.Is6() || a.Is4In6() || a.Zone() != "" || len(ipv6) >= 4 {
+				return nil, invalidPreflightFacts()
+			}
+			ipv6 = append(ipv6, a)
+		}
+	}
 	return &remotePreflight{
 		facts: &adminv1.NodePreflight{
 			Distribution: distribution, Version: version, Kernel: kernel, Architecture: architecture,
@@ -839,6 +866,7 @@ func parsePreflightFacts(output []byte, allowUnreachable bool) (*remotePreflight
 			Systemd: systemd == "yes", AlreadyEnrolled: enrolled == "yes", PanelReachable: panelReachable == "yes", Nftables: nftables == "yes",
 		},
 		nodeID: nodeID,
+		ipv6:   ipv6,
 	}, nil
 }
 

@@ -234,6 +234,11 @@ func (s *Service) audit(ctx context.Context, action string, params map[string]st
 	if a, ok := auth.AdminFrom(ctx); ok {
 		actor = a.ID
 	}
+	s.auditAs(ctx, actor, action, params)
+}
+
+// auditAs writes an audit row for actor (the SSH install acts for the admin who started it, not for a request).
+func (s *Service) auditAs(ctx context.Context, actor, action string, params map[string]string) {
 	raw, _ := json.Marshal(params)
 	if err := s.cfg.Store.Audit(ctx, s.cfg.Now(), store.AuditEntry{Actor: actor, Action: action, Params: string(raw), Result: "ok"}); err != nil {
 		s.cfg.Log.Warn("subscription host audit", "code", "sub_host_audit_failed", "action", action, "err", err)

@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+
+	subhostv1 "github.com/mistgate/mistgate/gen/mistgate/subhost/v1"
 )
 
 // node_install: the plan reads the host key under the planning grant and shows it with its type; the owner enters the
@@ -243,5 +245,39 @@ func TestPasswordRotationTargetsTheLiveNodeAndThePanelGenerates(t *testing.T) {
 
 	if out := mustFail(t, s, "node_server_password_rotate_plan", map[string]any{"node": nodeRetired}); !strings.Contains(out, "retired") {
 		t.Fatalf("plan for a retired node: %s", out)
+	}
+}
+
+// A first-host install is checked when it is planned, not only at apply: a panel with a host already, or names that do not
+// point at the server, refuse the plan (the owner's typed password is not spent on an install the panel would refuse).
+func TestNodeInstallPlanChecksTheSubscriptionHost(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	args := map[string]any{"host": "203.0.113.30", "username": "root", "name": "host-1", "address": "203.0.113.30",
+		"subscription_host_domain": "sub.example.com", "site_name": "www.example.com"}
+
+	e.w.subhost.dnsMismatch = true
+	if out := mustFail(t, s, "node_install_plan", args); !strings.Contains(out, "skip_dns_check") {
+		t.Fatalf("a DNS mismatch was planned: %s", out)
+	}
+	args["skip_dns_check"] = true
+	if p := planOf(t, s, "node_install", args); !p.NeedsApproval {
+		t.Fatalf("plan with the check skipped: %+v", p)
+	}
+	e.w.subhost.dnsMismatch = false
+	delete(args, "skip_dns_check")
+	if p := planOf(t, s, "node_install", args); !p.NeedsApproval {
+		t.Fatalf("plan: %+v", p)
+	}
+	if calls := e.w.calls("/mistgate.subhost.v1.SubscriptionHostService/CheckSubscriptionHostDomain"); len(calls) == 0 || !calls[len(calls)-1].Planning {
+		t.Fatalf("the names were not checked under the planning grant: %+v", calls)
+	}
+
+	e.w.subhost.mu.Lock()
+	e.w.subhost.state = subhostv1.SubscriptionHostState_SUBSCRIPTION_HOST_STATE_ON
+	e.w.subhost.mu.Unlock()
+	if out := mustFail(t, s, "node_install_plan", args); !strings.Contains(out, "already has a subscription host") {
+		t.Fatalf("a second host was planned: %s", out)
 	}
 }

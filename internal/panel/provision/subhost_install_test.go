@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/netip"
 	"slices"
 	"strings"
 	"sync"
@@ -37,15 +38,19 @@ type fakeSubHost struct {
 	activated   []string // node ids
 	deactivated []string
 	deactErr    error
+	actors      []string       // ActivateInstalled's actor
+	dnsChecks   [][]netip.Addr // CheckInstallDNS's ipv6
+	dnsErr      error
 }
 
 func (f *fakeSubHost) PrepareInstall(context.Context, string, string, string, bool) (string, error) {
 	return subHostTestPath, nil
 }
 
-func (f *fakeSubHost) ActivateInstalled(_ context.Context, nodeID, domain, siteName, path, pin string) error {
+func (f *fakeSubHost) ActivateInstalled(_ context.Context, actor, nodeID, domain, siteName, path, pin string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.actors = append(f.actors, actor)
 	if domain != subHostTestDomain || siteName != subHostTestSite || path != subHostTestPath {
 		return errors.New("wrong domain, site or path")
 	}
@@ -55,7 +60,14 @@ func (f *fakeSubHost) ActivateInstalled(_ context.Context, nodeID, domain, siteN
 	return nil
 }
 
-func (f *fakeSubHost) DeactivateInstalled(_ context.Context, nodeID string) error {
+func (f *fakeSubHost) CheckInstallDNS(_ context.Context, sshHost, domain, siteName string, ipv6 []netip.Addr) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.dnsChecks = append(f.dnsChecks, ipv6)
+	return f.dnsErr
+}
+
+func (f *fakeSubHost) DeactivateInstalled(_ context.Context, actor, nodeID string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.deactivated = append(f.deactivated, nodeID)
@@ -108,7 +120,8 @@ func (n *hostNode) execute(command string, channel ssh.Channel) ([]byte, error) 
 		return []byte(strings.Join([]string{
 			"distribution=ubuntu", "version=22.04", "kernel=6.8.0", "architecture=x86_64",
 			"cpu_count=4", "memory_bytes=1073741824", "disk_available_bytes=1073741824",
-			"systemd=yes", "nftables=yes", "already_enrolled=" + enrolled, "existing_node_id=" + existing, "panel_reachable=no", "",
+			"systemd=yes", "nftables=yes", "already_enrolled=" + enrolled, "existing_node_id=" + existing, "panel_reachable=no",
+			"ipv6=2001:db8::10", "",
 		}, "\n")), nil
 	case command == "/root/mistgate-node enroll --offline-csr" || command == "/root/mistgate-node enroll --offline-csr --force":
 		n.installNode.mu.Lock()
@@ -585,6 +598,60 @@ func TestSubscriptionHostCancelledJobRetriesAsAHostInstall(t *testing.T) {
 		}
 		if activated, _, _ := sub.calls(); len(activated) != 1 {
 			t.Fatalf("running=%v: the retry was no host install (activated %v)", running, activated)
+		}
+	}
+}
+
+// The install checks the names once it knows the server's IPv6 (the preflight's ipv6 line), and a mismatch stops it before the
+// role turns on; with skip_dns_check it does not look. The role's audit rows are the admin's who started the job (L9).
+func TestSubscriptionHostInstallDNSAndActor(t *testing.T) {
+	manager := &e2eNodeManager{}
+	sub := &fakeSubHost{dnsErr: errors.New("sub_host_dns_mismatch")}
+	node := newHostNode(t, manager)
+	st, svc := subHostService(t, node, manager, sub)
+	drainOnce(t, svc)
+	if job := jobState(t, st, subHostTestJob); job.State != "failed" || job.ErrorCode != "subscription_host_dns_mismatch" {
+		t.Fatalf("job = %q %q", job.State, job.ErrorCode)
+	}
+	sub.mu.Lock()
+	checks, activated := sub.dnsChecks, len(sub.activated)
+	sub.dnsErr = nil
+	sub.mu.Unlock()
+	if len(checks) != 1 || len(checks[0]) != 1 || checks[0][0] != netip.MustParseAddr("2001:db8::10") || activated != 0 {
+		t.Fatalf("checks %v, activated %d", checks, activated)
+	}
+	if _, err := svc.RetryNodeProvision(context.Background(), connect.NewRequest(&adminv1.RetryNodeProvisionRequest{
+		JobId: subHostTestJob, ConfirmInstall: true, Password: authTestPassword, SshUsername: "root",
+	})); err != nil {
+		t.Fatal(err)
+	}
+	drainOnce(t, svc)
+	if job := jobState(t, st, subHostTestJob); job.State != "completed" {
+		t.Fatalf("retry = %q %q", job.State, job.ErrorCode)
+	}
+	sub.mu.Lock()
+	defer sub.mu.Unlock()
+	if len(sub.actors) != 1 || sub.actors[0] != "adm_test" {
+		t.Fatalf("activated as %v, want the job's creator", sub.actors)
+	}
+}
+
+func TestParsePreflightIPv6(t *testing.T) {
+	base := "distribution=ubuntu\nversion=22.04\nkernel=6.8.0\narchitecture=x86_64\ncpu_count=4\nmemory_bytes=1073741824\n" +
+		"disk_available_bytes=1073741824\nsystemd=yes\nnftables=yes\nalready_enrolled=no\nexisting_node_id=\npanel_reachable=no\n"
+	r, err := parsePreflightFacts([]byte(base+"ipv6=2001:db8::1,2001:db8::2\n"), true)
+	if err != nil || len(r.ipv6) != 2 {
+		t.Fatalf("two addresses: %v %v", r, err)
+	}
+	if r, err := parsePreflightFacts([]byte(base+"ipv6=\n"), true); err != nil || len(r.ipv6) != 0 {
+		t.Fatalf("none: %v %v", r, err)
+	}
+	if r, err := parsePreflightFacts([]byte(base), true); err != nil || len(r.ipv6) != 0 {
+		t.Fatalf("an older answer without the line: %v %v", r, err)
+	}
+	for _, bad := range []string{"ipv6=203.0.113.1", "ipv6=nope", "ipv6=2001:db8::1,2001:db8::2,2001:db8::3,2001:db8::4,2001:db8::5"} {
+		if _, err := parsePreflightFacts([]byte(base+bad+"\n"), true); err == nil {
+			t.Errorf("accepted %q", bad)
 		}
 	}
 }

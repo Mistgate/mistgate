@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -62,9 +63,13 @@ type SubHostAPI interface {
 	PrepareInstall(ctx context.Context, sshHost, domain, siteName string, skipDNS bool) (path string, err error)
 	// ActivateInstalled turns the role on for the installed node (off -> on); pin is its site's leaf, which the panel
 	// verifies it by until the node reports one. Doing it again for the same install is no change.
-	ActivateInstalled(ctx context.Context, nodeID, domain, siteName, path, pin string) error
+	// actor is the admin who started the install (its audit rows name them). An empty pin is refused.
+	ActivateInstalled(ctx context.Context, actor, nodeID, domain, siteName, path, pin string) error
 	// DeactivateInstalled turns the role off again after an install that did not complete (on -> off, never once ready).
-	DeactivateInstalled(ctx context.Context, nodeID string) error
+	DeactivateInstalled(ctx context.Context, actor, nodeID string) error
+	// CheckInstallDNS checks, once the install read the server's global IPv6 addresses, that both names point at the server:
+	// the A records at sshHost, the AAAA records at one of ipv6. PrepareInstall checked only the A records.
+	CheckInstallDNS(ctx context.Context, sshHost, domain, siteName string, ipv6 []netip.Addr) error
 }
 
 // BinarySource returns a node binary from the currently trusted release, its size and the sha256 (hex) in the signed
@@ -129,6 +134,7 @@ type credentials struct {
 	SubHostDomain   string `json:"subscription_host_domain,omitempty"`
 	SubHostSiteName string `json:"subscription_host_site_name,omitempty"`
 	SubHostPath     string `json:"subscription_host_path,omitempty"`
+	SubHostSkipDNS  bool   `json:"subscription_host_skip_dns,omitempty"` // the owner skipped the DNS check
 }
 
 // NewService builds the provisioning API and its background worker.
@@ -419,7 +425,7 @@ func (s *Service) StartNodeProvision(ctx context.Context, req *connect.Request[a
 	}
 	secret, err := s.sealCredentials(job.ID, credentials{
 		Method: method, Username: username, Password: password, PrivateKey: privateKey, InstallPanelKey: installPanelKey,
-		SubHostDomain: domain, SubHostSiteName: siteName, SubHostPath: hostPath,
+		SubHostDomain: domain, SubHostSiteName: siteName, SubHostPath: hostPath, SubHostSkipDNS: domain != "" && req.Msg.SkipDnsCheck,
 	})
 	if err != nil {
 		return nil, internalConnectError()
@@ -530,7 +536,7 @@ func (s *Service) RetryNodeProvision(ctx context.Context, req *connect.Request[a
 	secret, err := s.sealCredentials(job.ID, credentials{
 		Method: method, Username: username, Password: req.Msg.Password, PrivateKey: privateKey,
 		InstallPanelKey: installPanelKey, SubHostDomain: hostFields.SubHostDomain, SubHostSiteName: hostFields.SubHostSiteName,
-		SubHostPath: hostFields.SubHostPath,
+		SubHostPath: hostFields.SubHostPath, SubHostSkipDNS: hostFields.SubHostSkipDNS,
 	})
 	if err != nil {
 		return nil, internalConnectError()
@@ -714,7 +720,8 @@ func (s *Service) hostFields(jobID string, ciphertext []byte) credentials {
 	if json.Unmarshal(plain, &fields) != nil {
 		return credentials{}
 	}
-	out := credentials{SubHostDomain: fields.SubHostDomain, SubHostSiteName: fields.SubHostSiteName, SubHostPath: fields.SubHostPath}
+	out := credentials{SubHostDomain: fields.SubHostDomain, SubHostSiteName: fields.SubHostSiteName, SubHostPath: fields.SubHostPath,
+		SubHostSkipDNS: fields.SubHostSkipDNS}
 	fields.Password, fields.EnrollmentToken = "", ""
 	clear(fields.PrivateKey)
 	return out

@@ -54,6 +54,13 @@ func (r rpc) CheckSubscriptionHostDomain(ctx context.Context, req *connect.Reque
 	if err != nil {
 		return nil, err
 	}
+	if req.Msg.NodeId == "" && req.Msg.Address != "" {
+		if len(req.Msg.Address) > 253 {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid address"))
+		}
+		c := s.installDNS(ctx, s.addressesOf(ctx, req.Msg.Address), domain, siteName, false)
+		return connect.NewResponse(&subhostv1.CheckSubscriptionHostDomainResponse{Matches: c.matches, Found: c.found, Expected: c.expected}), nil
+	}
 	n, err := s.cfg.Store.Node(ctx, req.Msg.NodeId)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("node not found"))

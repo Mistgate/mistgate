@@ -965,10 +965,13 @@ func (x *DisableSubscriptionHostResponse) GetHost() *SubscriptionHost {
 }
 
 type CheckSubscriptionHostDomainRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	Domain        string                 `protobuf:"bytes,2,opt,name=domain,proto3" json:"domain,omitempty"`
-	SiteName      string                 `protobuf:"bytes,3,opt,name=site_name,json=siteName,proto3" json:"site_name,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	NodeId   string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Domain   string                 `protobuf:"bytes,2,opt,name=domain,proto3" json:"domain,omitempty"`
+	SiteName string                 `protobuf:"bytes,3,opt,name=site_name,json=siteName,proto3" json:"site_name,omitempty"`
+	// Instead of node_id: the address of a server not in the fleet yet (an SSH install of the first host). Only the A records
+	// are compared then; the install checks the AAAA records once it knows the server's IPv6.
+	Address       string `protobuf:"bytes,4,opt,name=address,proto3" json:"address,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1020,6 +1023,13 @@ func (x *CheckSubscriptionHostDomainRequest) GetDomain() string {
 func (x *CheckSubscriptionHostDomainRequest) GetSiteName() string {
 	if x != nil {
 		return x.SiteName
+	}
+	return ""
+}
+
+func (x *CheckSubscriptionHostDomainRequest) GetAddress() string {
+	if x != nil {
+		return x.Address
 	}
 	return ""
 }
@@ -1149,11 +1159,12 @@ const file_mistgate_subhost_v1_subhost_proto_rawDesc = "" +
 	"public_url\x18\x01 \x01(\tR\tpublicUrl\x12\x14\n" +
 	"\x05force\x18\x02 \x01(\bR\x05force\"\\\n" +
 	"\x1fDisableSubscriptionHostResponse\x129\n" +
-	"\x04host\x18\x01 \x01(\v2%.mistgate.subhost.v1.SubscriptionHostR\x04host\"r\n" +
+	"\x04host\x18\x01 \x01(\v2%.mistgate.subhost.v1.SubscriptionHostR\x04host\"\x8c\x01\n" +
 	"\"CheckSubscriptionHostDomainRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x16\n" +
 	"\x06domain\x18\x02 \x01(\tR\x06domain\x12\x1b\n" +
-	"\tsite_name\x18\x03 \x01(\tR\bsiteName\"q\n" +
+	"\tsite_name\x18\x03 \x01(\tR\bsiteName\x12\x18\n" +
+	"\aaddress\x18\x04 \x01(\tR\aaddress\"q\n" +
 	"#CheckSubscriptionHostDomainResponse\x12\x18\n" +
 	"\amatches\x18\x01 \x01(\bR\amatches\x12\x14\n" +
 	"\x05found\x18\x02 \x03(\tR\x05found\x12\x1a\n" +
