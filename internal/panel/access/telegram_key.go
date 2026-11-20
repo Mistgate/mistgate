@@ -91,7 +91,7 @@ func (s *Service) telegramProxy(ctx context.Context, u store.AccessUser) (*admin
 		}
 		link := &adminv1.TelegramProxyLink{
 			NodeId: srv.NodeID, NodeName: srv.Node, ProfileId: srv.ProfileID, ProfileName: srv.Profile, Url: srv.URI,
-			Ipv6: srv.Mark == MarkIPv6,
+			Ipv6: srv.Mark == MarkIPv6, Web: srv.Web,
 		}
 		link.Via, link.Relay = strings.CutPrefix(srv.Mark, MarkVia)
 		link.Via = strings.TrimSpace(link.Via)

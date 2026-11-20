@@ -3726,9 +3726,11 @@ type TelegramProxyLink struct {
 	Url         string                 `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`
 	// A twin of the node's link: its IPv6 entry, or a relay of an entry node whose country code is `via`. Both false: the link
 	// to the node itself. The owner sees node_name and profile_name; the person's page never does.
-	Ipv6          bool   `protobuf:"varint,6,opt,name=ipv6,proto3" json:"ipv6,omitempty"`
-	Relay         bool   `protobuf:"varint,7,opt,name=relay,proto3" json:"relay,omitempty"`
-	Via           string `protobuf:"bytes,8,opt,name=via,proto3" json:"via,omitempty"`
+	Ipv6  bool   `protobuf:"varint,6,opt,name=ipv6,proto3" json:"ipv6,omitempty"`
+	Relay bool   `protobuf:"varint,7,opt,name=relay,proto3" json:"relay,omitempty"`
+	Via   string `protobuf:"bytes,8,opt,name=via,proto3" json:"via,omitempty"`
+	// The Telegram Web Proxy's link (tg://webproxy, for a browser tab), not the apps' tg://proxy.
+	Web           bool `protobuf:"varint,9,opt,name=web,proto3" json:"web,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3817,6 +3819,13 @@ func (x *TelegramProxyLink) GetVia() string {
 		return x.Via
 	}
 	return ""
+}
+
+func (x *TelegramProxyLink) GetWeb() bool {
+	if x != nil {
+		return x.Web
+	}
+	return false
 }
 
 type GetTelegramLinksResponse struct {
@@ -4465,7 +4474,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12#\n" +
 	"\rpage_password\x18\x02 \x01(\tR\fpagePassword\"2\n" +
 	"\x17GetTelegramLinksRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xd9\x01\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xeb\x01\n" +
 	"\x11TelegramProxyLink\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x1d\n" +
@@ -4475,7 +4484,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x03url\x18\x05 \x01(\tR\x03url\x12\x12\n" +
 	"\x04ipv6\x18\x06 \x01(\bR\x04ipv6\x12\x14\n" +
 	"\x05relay\x18\a \x01(\bR\x05relay\x12\x10\n" +
-	"\x03via\x18\b \x01(\tR\x03via\"\xbf\x01\n" +
+	"\x03via\x18\b \x01(\tR\x03via\x12\x10\n" +
+	"\x03web\x18\t \x01(\bR\x03web\"\xbf\x01\n" +
 	"\x18GetTelegramLinksResponse\x12:\n" +
 	"\x05links\x18\x01 \x03(\v2$.mistgate.admin.v1.TelegramProxyLinkR\x05links\x12\x17\n" +
 	"\ahas_key\x18\x02 \x01(\bR\x06hasKey\x12\"\n" +

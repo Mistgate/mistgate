@@ -401,6 +401,7 @@ type clientSyncTelegram struct {
 	Via        string `json:"via"`
 	ViaCountry string `json:"via_country,omitempty"`
 	IPv6       bool   `json:"ipv6"`
+	Web        bool   `json:"web,omitempty"` // the Web Proxy's link (tg://webproxy), not the apps' tg://proxy
 	Link       string `json:"link"`
 }
 
@@ -536,7 +537,7 @@ func clientTelegramOf(v access.SubView) []clientSyncTelegram {
 		}
 		via, viaCountry := viaOf(server)
 		out = append(out, clientSyncTelegram{ServerID: clientOpaqueID("srv", server.NodeID), Country: strings.ToUpper(server.CountryCode),
-			City: server.Location, Via: via, ViaCountry: viaCountry, IPv6: server.PathKey == store.PathIPv6, Link: server.URI})
+			City: server.Location, Via: via, ViaCountry: viaCountry, IPv6: server.PathKey == store.PathIPv6, Web: server.Web, Link: server.URI})
 	}
 	return out
 }
