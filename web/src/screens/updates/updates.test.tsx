@@ -775,6 +775,17 @@ describe("the folds of the Updates screen", () => {
     expect(text()).toContain("Failed: de1's profiles did not answer the panel, and not from nl2 either.");
   });
 
+  it("names the profile that did not pass and the profiles it did not hold against the update", async () => {
+    const failed = step({
+      state: StepState.ROLLED_BACK,
+      errorKey: "updates.step.err.probe_failed",
+      params: { failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "timeout" }]), skipped_profiles: JSON.stringify(["Backup"]) },
+    });
+    await mount(page({ nodes: [node()], rollout: rollout({ status: RolloutStatus.FAILED, steps: [failed] }) }));
+    expect(text()).toContain("The client-eye check failed after the update for the profile “Main”: no answer.");
+    expect(text()).toContain("these did not work before it: “Backup”.");
+  });
+
   it("shows a running rollout as rows, one per node, and as a card per node above", async () => {
     await mount(page({ nodes: [node({ state: NodeUpdateState.UPDATING })], rollout: rollout({ steps: [step({ nodeName: "de1", state: StepState.GATING })] }) }));
     const rows = [...document.querySelectorAll(".uq-ls > div")].map((r) => r.textContent);

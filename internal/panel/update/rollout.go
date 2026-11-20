@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -666,6 +667,7 @@ func (p *pass) event(x *store.StepRow, state, key string) {
 	if key != "" {
 		params["reason"] = key
 	}
+	maps.Copy(params, failedProfileNotes(x.Params))
 	if err := p.s.st.InsertEvent(p.ctx, store.EventRow{Time: p.now, Severity: sev, Code: code, Source: "panel", NodeID: x.NodeID, Params: params}); err != nil {
 		p.s.log.Warn("update: step event", "node", x.NodeID, "err", err)
 	}
@@ -677,6 +679,7 @@ func (p *pass) pause(code string, x *store.StepRow, reason string) {
 		return
 	}
 	params := map[string]string{"node": x.NodeName, "node_id": x.NodeID, "reason": reason}
+	maps.Copy(params, failedProfileNotes(x.Params)) // the profiles that did not pass: the owner reads them on the pause too
 	// only over the status and the pause this pass read: a rollout paused or resumed meanwhile keeps what the other writer made of it
 	ok, err := p.s.st.PauseRollout(p.ctx, p.ro.ID, p.ro.Status, p.ro.PauseKey, code, params)
 	if err != nil {
@@ -925,6 +928,11 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 		wait = v.verdict == ""
 		if v.verdict == vantageOK {
 			soft = ""
+		}
+	}
+	if soft == errProbeFailed { // what the owner reads: which profiles did not pass, and the error of the last round of each
+		for k, v := range s.failedProfileParams(ctx, nodeID, pending, label, since) {
+			with[k] = v
 		}
 	}
 	var waiting []string

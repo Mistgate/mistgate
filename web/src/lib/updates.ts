@@ -220,9 +220,53 @@ export function pauseReasonText(t: T, code: string): string {
 
 const last = (key: string) => key.slice(key.lastIndexOf(".") + 1);
 
+/** One profile a failed gate names (the step's and the pause's `failed_profiles`, written by internal/panel/update/gate_profiles.go). */
+type GateProfile = { name: string; code: string };
+
+/** The profiles that did not pass, from `failed_profiles` (JSON); none when the param is absent or unreadable. `more` = how many were left out. */
+function gateProfiles(params: Params): { list: GateProfile[]; more: number } {
+  try {
+    const raw: unknown = JSON.parse(params.failed_profiles ?? "[]");
+    const list = Array.isArray(raw)
+      ? raw.flatMap((p: unknown) => {
+          const { name, code } = (p ?? {}) as Record<string, unknown>;
+          return typeof name === "string" && typeof code === "string" ? [{ name, code }] : [];
+        })
+      : [];
+    return { list, more: list.length > 0 ? Number(params.failed_more) || 0 : 0 };
+  } catch {
+    return { list: [], more: 0 };
+  }
+}
+
+/** "“Main”: no answer; “Backup”: not checked yet", or "" when the gate named no profile. Returns the plural count too. */
+function profileList(t: T, params: Params): { text: string; n: number } {
+  const { list, more } = gateProfiles(params);
+  const items = list.map((p) => `“${p.name}”: ${known(t, `updates.step.profile.why.${p.code}`) ?? p.code}`);
+  if (more > 0) items.push(t("updates.step.profiles.more", { n: more }));
+  return { text: items.join("; "), n: list.length + more };
+}
+
+/** The profiles a gate did not hold against the update because they did not work before it (`skipped_profiles`, JSON names), as a sentence; "" when none. */
+export function skippedProfilesNote(t: T, params: Params): string {
+  try {
+    const raw: unknown = JSON.parse(params.skipped_profiles ?? "[]");
+    const names = Array.isArray(raw) ? raw.filter((n): n is string => typeof n === "string").map((n) => `“${n}”`) : [];
+    if (names.length === 0) return "";
+    if (Number(params.skipped_more) > 0) names.push(t("updates.step.profiles.more", { n: Number(params.skipped_more) }));
+    return t("updates.step.skipped", { names: names.join(", ") });
+  } catch {
+    return "";
+  }
+}
+
 /** Why a step failed, was rolled back or skipped. `key` arrives whole ("updates.step.err.<code>"). */
 export function stepErrorText(t: T, key: string, params: Params = {}): string {
   if (!key) return "";
+  if (last(key) === "probe_failed") {
+    const { text, n } = profileList(t, params);
+    if (text) return t.n("updates.step.profiles", n, { list: text });
+  }
   return known(t, key, withSentences(t, params)) ?? t("up.err.other", { code: last(key) });
 }
 
@@ -241,7 +285,12 @@ export function vantageNote(t: T, node: string, params: Params, passed: boolean)
 /** Why the rollout waits ("updates.pause.<code>"). */
 export function pauseText(t: T, key: string, params: Params = {}): string {
   if (!key) return "";
-  return known(t, key, params.reason ? { ...params, reason: pauseReasonText(t, params.reason) } : params) ?? last(key);
+  let reason = params.reason ? pauseReasonText(t, params.reason) : "";
+  if (params.reason === "probe_failed") {
+    const { text, n } = profileList(t, params); // the pause names the profiles when the gate did
+    if (text) reason = t.n("updates.pause.why.profiles", n, { list: text });
+  }
+  return known(t, key, params.reason ? { ...params, reason } : params) ?? last(key);
 }
 
 /** Pauses that a failing node caused (not the owner, not a changed bundle): the owner looks at that node before going on. */

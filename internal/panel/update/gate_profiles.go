@@ -2,8 +2,10 @@ package update
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -22,11 +24,22 @@ const (
 	probeSickAge    = 15 * time.Minute // three rounds of a healthy profile; an older round says nothing about the moment of the send
 )
 
-// Step params the gate adds (admin update.proto RolloutStep.params).
+// Step params the gate adds (admin update.proto RolloutStep.params; the pause and the rolled-back event carry the first two too).
 const (
+	keyFailedProfiles  = "failed_profiles"  // JSON [{"id","name","code"}]: the profiles that did not pass, with the error code of their last round
+	keyFailedMore      = "failed_more"      // how many more than listed
 	keySkippedProfiles = "skipped_profiles" // JSON ["name"]: profiles that did not work before the update and were not held against it
 	keySkippedMore     = "skipped_more"
 )
+
+// codeNoRound is the "code" of a profile that has had no check round since the node was back.
+const codeNoRound = "no_round"
+
+type failedProfile struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Code string `json:"code"`
+}
 
 // lastRounds lists the newest round of each probeable inbound of the node; nothing when the health module cannot say.
 func (s *Service) lastRounds(ctx context.Context, nodeID string) []store.CheckSample {
@@ -94,6 +107,42 @@ func shown[T any](list []T) ([]T, int) {
 	return list[:n], len(list) - n
 }
 
+// failedProfileParams are the step params that name the profiles still failing (ids), with the error code of the newest round of
+// each: "no_round" when there is none since the node was back. The names come from the owner's own profile settings; the codes
+// are the checker's short words, never an address or a key.
+func (s *Service) failedProfileParams(ctx context.Context, nodeID string, ids []string, label map[string]string, since time.Time) map[string]string {
+	if len(ids) == 0 {
+		return nil
+	}
+	codes := map[string]string{}
+	for _, r := range s.lastRounds(ctx, nodeID) {
+		if r.At.Before(since) {
+			continue
+		}
+		if r.Status != int(adminv1.CheckStatus_CHECK_STATUS_OK) {
+			codes[r.InboundID] = agentCode(r.ErrorCode)
+		}
+	}
+	list := make([]failedProfile, 0, len(ids))
+	for _, id := range ids {
+		code := codes[id]
+		if code == "" {
+			code = codeNoRound
+		}
+		list = append(list, failedProfile{ID: id, Name: truncateRunes(label[id], gateNameLn), Code: code})
+	}
+	slices.SortFunc(list, func(a, b failedProfile) int {
+		return strings.Compare(a.Name+"\x00"+a.ID, b.Name+"\x00"+b.ID)
+	})
+	head, more := shown(list)
+	b, _ := json.Marshal(head)
+	out := map[string]string{keyFailedProfiles: string(b)}
+	if more > 0 {
+		out[keyFailedMore] = strconv.Itoa(more)
+	}
+	return out
+}
+
 // skippedProfileParams says which profiles were not held against the update because their checks were failing before it.
 func skippedProfileParams(with map[string]string, ids []string, label map[string]string) {
 	head, more := shown(profileNames(ids, label))
@@ -101,4 +150,15 @@ func skippedProfileParams(with map[string]string, ids []string, label map[string
 	if more > 0 {
 		with[keySkippedMore] = strconv.Itoa(more)
 	}
+}
+
+// failedProfileNotes are the params of a decided step that go with it to the rolled-back event and to the pause.
+func failedProfileNotes(params map[string]string) map[string]string {
+	out := map[string]string{}
+	for _, k := range []string{keyFailedProfiles, keyFailedMore} {
+		if v := params[k]; v != "" {
+			out[k] = v
+		}
+	}
+	return out
 }

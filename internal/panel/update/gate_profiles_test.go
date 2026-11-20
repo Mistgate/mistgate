@@ -1,6 +1,7 @@
 package update
 
 import (
+	"encoding/json"
 	"slices"
 	"testing"
 	"time"
@@ -36,6 +37,15 @@ func (e *env) reachGate(node string) {
 	e.clk.Advance(2 * time.Minute)
 }
 
+func failedList(t *testing.T, params map[string]string) []failedProfile {
+	t.Helper()
+	var list []failedProfile
+	if err := json.Unmarshal([]byte(params[keyFailedProfiles]), &list); err != nil {
+		t.Fatalf("failed_profiles %q: %v", params[keyFailedProfiles], err)
+	}
+	return list
+}
+
 // A profile whose check was failing before the node was touched is not what the update broke: the step passes and says so.
 func TestGateDoesNotHoldAProfileThatFailedBeforeTheUpdate(t *testing.T) {
 	e := newEnv(t)
@@ -58,9 +68,9 @@ func TestGateDoesNotHoldAProfileThatFailedBeforeTheUpdate(t *testing.T) {
 	}
 }
 
-// A profile that worked before and fails after is the update's fault: the step is rolled back even though another profile of the
-// node was already failing before and is left out.
-func TestGateStillRollsBackAProfileThatWorkedBefore(t *testing.T) {
+// A profile that worked before and fails after is the update's fault: the step is rolled back, and the step, the event and the pause
+// name the profile and the error of its last round. A profile that was already failing is not named.
+func TestGateNamesTheProfileThatFailedAfterTheUpdate(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()
 	a := e.addNode("de1", nodeOpts{inbounds: 3})
@@ -85,7 +95,17 @@ func TestGateStillRollsBackAProfileThatWorkedBefore(t *testing.T) {
 	e.wantStep(a, store.StepGating, "")
 	e.clk.Advance(3*time.Minute + time.Second)
 	e.tick()
-	e.wantStep(a, store.StepRolledBack, "probe_failed")
+	x := e.wantStep(a, store.StepRolledBack, "probe_failed")
+	want := []failedProfile{{ID: "inb_de1_1", Name: "Main", Code: "refused"}}
+	if got := failedList(t, x.Params); !slices.Equal(got, want) {
+		t.Fatalf("step names %+v, want %+v", got, want)
+	}
+	if got := failedList(t, e.wantEvent(a, "update_step_rolled_back").Params); !slices.Equal(got, want) {
+		t.Fatalf("event names %+v, want %+v", got, want)
+	}
+	if got := failedList(t, e.wantRollout(store.RolloutPaused, "gate_failed").PauseParams); !slices.Equal(got, want) {
+		t.Fatalf("pause names %+v, want %+v", got, want)
+	}
 }
 
 // Every profile was sick before and still is: nothing is left to hold the step for, and it passes at once, saying which were skipped.
