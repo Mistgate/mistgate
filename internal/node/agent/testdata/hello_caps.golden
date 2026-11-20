@@ -45,6 +45,7 @@ vless-hello-kex/1
 vless-target/1
 vless-self/1
 vless-tls/1
+mtproto-web/1
 trusttunnel/1
 trusttunnel-h3/1
 trusttunnel-refusals/1
@@ -133,6 +134,7 @@ vless-hello-kex/1
 vless-target/1
 vless-self/1
 vless-tls/1
+mtproto-web/1
 trusttunnel/1
 trusttunnel-h3/1
 trusttunnel-refusals/1
@@ -176,6 +178,7 @@ vless-hello-kex/1
 vless-target/1
 vless-self/1
 vless-tls/1
+mtproto-web/1
 trusttunnel/1
 trusttunnel-h3/1
 trusttunnel-refusals/1

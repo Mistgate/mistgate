@@ -132,6 +132,9 @@ func (a *Agent) capabilities() []string {
 			caps = append(caps, agentcap.VLESSSelf, agentcap.VLESSTLS)
 		}
 	}
+	if _, ok := a.engines["mtproto"]; ok && a.cfg.Certs != nil {
+		caps = append(caps, agentcap.MTProtoWeb)
+	}
 	if _, ok := a.engines["trusttunnel"]; ok {
 		caps = append(caps, agentcap.TrustTunnel, agentcap.TrustTunnelH3, agentcap.TrustTunnelRefusals, agentcap.TrustTunnelTCPStalls)
 	}

@@ -36,16 +36,29 @@ import (
 // which the certificate source routes by name) is answered here too: an MTProto inbound on 443 does not cost the node
 // its certificate renewals. It is an http.Server whose listener is fed by the core.
 type decoySite struct {
-	srv   *http.Server
-	conns chan net.Conn
-	done  chan struct{}
-	once  sync.Once
+	srv       *http.Server
+	conns     chan net.Conn
+	done      chan struct{}
+	serveDone chan struct{}
+	once      sync.Once
 }
 
-func (in *inbound) startDecoy(ctx context.Context) (*decoySite, error) {
+// siteHandler is the same node site used by the Fake TLS decoy and by a Web inbound's pass-through requests.
+func (in *inbound) siteHandler() http.Handler {
+	if in.e.env.Masquerade != nil {
+		if h := in.e.env.Masquerade(in.spec.ID); h != nil {
+			return h
+		}
+	}
+	return decoy.Handler()
+}
+
+// siteCertificate is shared by both MTProto modes, so an inbound uses the same certificate policy and TLS-ALPN-01 route
+// whether its listener accepts Fake TLS or HTTPS.
+func (in *inbound) siteCertificate(ctx context.Context) (func(*tls.ClientHelloInfo) (*tls.Certificate, error), error) {
 	src := in.e.env.Certs
 	if src == nil {
-		return nil, errors.New("the decoy site needs a certificate source")
+		return nil, errors.New("the inbound site needs a certificate source")
 	}
 	t := in.spec.TLS
 	if t.Mode == 0 {
@@ -64,19 +77,15 @@ func (in *inbound) startDecoy(ctx context.Context) (*decoySite, error) {
 		}
 		get = certs.SiteCertificate(main, self)
 	}
-	var h http.Handler
-	if in.e.env.Masquerade != nil {
-		h = in.e.env.Masquerade(in.spec.ID)
-	}
-	if h == nil {
-		h = decoy.Handler()
-	}
-	d := &decoySite{conns: make(chan net.Conn), done: make(chan struct{})}
-	d.srv = &http.Server{
-		Handler: h,
+	return get, nil
+}
+
+func newSiteHTTPServer(handler http.Handler, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)) (*http.Server, error) {
+	srv := &http.Server{
+		Handler: handler,
 		TLSConfig: &tls.Config{
 			MinVersion:     tls.VersionTLS12,
-			GetCertificate: get,
+			GetCertificate: getCertificate,
 			NextProtos:     []string{"h2", "http/1.1", acme.ALPNProto},
 		},
 		// The bounds of the other decoy sites: this one faces scanners too.
@@ -87,10 +96,26 @@ func (in *inbound) startDecoy(ctx context.Context) (*decoySite, error) {
 		MaxHeaderBytes:    16 << 10,
 		ErrorLog:          log.New(io.Discard, "", 0),
 	}
-	if err := sitehttp.ConfigureSiteHTTP2(d.srv); err != nil {
+	if err := sitehttp.ConfigureSiteHTTP2(srv); err != nil {
 		return nil, fmt.Errorf("configure HTTPS site: %w", err)
 	}
-	go d.srv.ServeTLS(d, "", "")
+	return srv, nil
+}
+
+func (in *inbound) startDecoy(ctx context.Context) (*decoySite, error) {
+	getCertificate, err := in.siteCertificate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	srv, err := newSiteHTTPServer(in.siteHandler(), getCertificate)
+	if err != nil {
+		return nil, err
+	}
+	d := &decoySite{srv: srv, conns: make(chan net.Conn), done: make(chan struct{}), serveDone: make(chan struct{})}
+	go func() {
+		defer close(d.serveDone)
+		_ = d.srv.ServeTLS(d, "", "")
+	}()
 	return d, nil
 }
 
@@ -125,7 +150,9 @@ func (d *decoySite) Addr() net.Addr { return &net.TCPAddr{} }
 // shutdown stops the site and closes its connections.
 func (d *decoySite) shutdown() {
 	_ = d.Close()
+	_ = d.srv.Shutdown(context.Background())
 	_ = d.srv.Close()
+	<-d.serveDone
 }
 
 // prefixConn reads head before the connection.

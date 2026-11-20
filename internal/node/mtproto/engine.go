@@ -1,8 +1,7 @@
-// Package mtproto is the node's Telegram MTProto proxy engine: one TCP listener per inbound, Fake TLS authentication
-// and a direct relay to a Telegram DC (the protocol is internal/mtproto). Whoever connects without a valid Fake TLS
-// hello gets a real website, so the port looks like an ordinary HTTPS server: the node's own decoy site (fallback
-// "decoy", the domain is the node's) or someone else's site, spliced through raw (fallback "site", the domain is that
-// site's). See fallback.go.
+// Package mtproto is the node's Telegram MTProto proxy engine: one TCP listener per inbound and a direct relay to a
+// Telegram DC (the protocol is internal/mtproto). Fake TLS inbounds authenticate on the raw listener and send strangers
+// to the node's decoy site or a forwarded site. Web inbounds serve the node's HTTPS site on that listener and carry
+// authenticated streams through the in-process Web Proxy relay. See fallback.go.
 package mtproto
 
 import (
@@ -15,6 +14,7 @@ import (
 	"log/slog"
 	"maps"
 	"net"
+	"net/http"
 	"net/netip"
 	"slices"
 	"sort"
@@ -27,8 +27,10 @@ import (
 	mp "github.com/mistgate/mistgate/internal/mtproto"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/nets"
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
+	"github.com/mistgate/mistgate/internal/webproxy"
 )
 
 const Protocol = "mtproto"
@@ -60,6 +62,8 @@ type Engine struct {
 	log *slog.Logger
 	now func() time.Time
 
+	// opMu serializes control-plane transitions. Data-plane handlers and observer callbacks never take it.
+	opMu     sync.Mutex
 	mu       sync.Mutex
 	inbounds map[string]*inbound
 	closed   bool
@@ -90,11 +94,11 @@ type settings struct {
 	preferIPv6       bool
 	domains          []string // lower case, no trailing dot; the first one is the certificate's and the default target
 	fallback         string
+	web              bool
 }
 
-// settingsJSON is InboundSpec.Settings. domains are the Fake TLS domains clients may name (the domain in the "ee"
-// secret of the links); fallback says whose they are: "decoy" (the default) the node's own, so strangers get the
-// node's decoy site; "site" someone else's, so strangers are spliced to that site's port 443.
+// settingsJSON is InboundSpec.Settings. domains are the name of the Fake TLS links or Web inbound site; fallback says
+// whose site Fake TLS strangers see: "decoy" (the default) the node's own, or "site" someone else's, spliced to port 443.
 type settingsJSON struct {
 	HandshakeTimeoutSecs int      `json:"handshake_timeout_secs"`
 	IdleTimeoutSecs      int      `json:"idle_timeout_secs"`
@@ -155,6 +159,7 @@ func parseSpec(spec plugin.InboundSpec) (settings, error) {
 	}
 	s.ignoreTimeSkew = j.IgnoreTimeSkew
 	s.preferIPv6 = j.PreferIPv6
+	s.web = plugin.MTProtoWeb(spec)
 	for _, d := range j.Domains {
 		d = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(d), "."))
 		if d == "" {
@@ -165,6 +170,9 @@ func parseSpec(spec plugin.InboundSpec) (settings, error) {
 		}
 	}
 	if spec.Enabled && len(s.domains) == 0 {
+		if s.web {
+			return s, errors.New("settings: domains is empty: Web Proxy needs the inbound domain")
+		}
 		return s, errors.New("settings: domains is empty: Fake TLS needs the domain of the links")
 	}
 	switch j.Fallback {
@@ -273,10 +281,13 @@ type inbound struct {
 	cancel    context.CancelFunc
 	server    *mp.Server
 	ln        net.Listener
+	siteSrv   *http.Server
+	relay     *webproxy.Relay
 	decoy     *decoySite
 	forwarder *forwarder
 	certHeld  bool
 	wg        sync.WaitGroup
+	stopOnce  sync.Once
 
 	smu      sync.Mutex
 	sessions map[uint64]sessionEntry
@@ -325,15 +336,16 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 	for i, err := range skipped {
 		warnings[i] = err.Error()
 	}
-	mpCreds := make([]mp.Credential, len(parsed))
-	for i, p := range parsed {
-		mpCreds[i] = mp.Credential{ID: p.cred.CredID, Key: p.key}
-	}
+	mpCreds := coreCredentials(parsed)
+	webCreds := relayCredentials(parsed)
 	sh := statehash.Spec(spec)
 
+	e.opMu.Lock()
+	defer e.opMu.Unlock()
+
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	if e.closed {
+		e.mu.Unlock()
 		return engine.ApplyReport{}, errors.New("mtproto: engine is closed")
 	}
 	old := e.inbounds[spec.ID]
@@ -342,7 +354,6 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 		restarts := uint32(0)
 		if old != nil {
 			restarts = old.restarts
-			e.stop(old)
 		}
 		in := &inbound{
 			e: e, spec: spec, specHash: sh, creds: cloneCreds(creds), cfg: cfg,
@@ -350,6 +361,10 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 		}
 		in.idx.Store(&credIndex{current: map[string]*credState{}})
 		e.inbounds[spec.ID] = in
+		e.mu.Unlock()
+		if old != nil {
+			e.appendPending(e.stop(old))
+		}
 		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Warnings: warnings}, nil
 	}
 
@@ -357,12 +372,28 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 		// The index first, so a session the server opens under a new credential finds its state; the server then drops
 		// the removed credentials and closes their sessions in one step.
 		prev := old.idx.Load()
+		prevCreds := cloneCreds(old.creds)
 		old.idx.Store(buildIndex(old.spec.ID, prev, parsed))
 		if err := old.server.SetCredentials(mpCreds); err != nil {
 			old.idx.Store(prev)
+			e.mu.Unlock()
 			return engine.ApplyReport{SpecHash: sh}, fmt.Errorf("mtproto inbound %q credentials: %w", spec.ID, err)
 		}
+		e.mu.Unlock()
+		if old.relay != nil {
+			if err := old.relay.SetCredentials(webCreds); err != nil {
+				previousParsed, _ := parseCreds(prevCreds)
+				_ = old.relay.SetCredentials(relayCredentials(previousParsed))
+				e.mu.Lock()
+				old.idx.Store(prev)
+				_ = old.server.SetCredentials(coreCredentials(previousParsed))
+				e.mu.Unlock()
+				return engine.ApplyReport{SpecHash: sh}, fmt.Errorf("mtproto inbound %q relay credentials: %w", spec.ID, err)
+			}
+		}
+		e.mu.Lock()
 		old.creds = cloneCreds(creds)
+		e.mu.Unlock()
 		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds), Warnings: warnings}, nil
 	}
 
@@ -372,7 +403,6 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 		if restarted {
 			restarts++
 		}
-		e.stop(old)
 	}
 
 	in := &inbound{
@@ -381,8 +411,12 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 	}
 	in.idx.Store(buildFreshIndex(spec.ID, parsed))
 	e.inbounds[spec.ID] = in
-	if err := e.start(ctx, in, mpCreds); err != nil {
-		e.stop(in)
+	e.mu.Unlock()
+	if old != nil {
+		e.appendPending(e.stop(old))
+	}
+	if err := e.start(ctx, in, mpCreds, webCreds); err != nil {
+		e.appendPending(e.stop(in))
 		in.setState(plugin.RunFailed, err.Error())
 		e.log.Error("mtproto inbound failed to start", "inbound", spec.ID, "err", err)
 		return engine.ApplyReport{SpecHash: sh, CredCount: len(creds)}, fmt.Errorf("mtproto inbound %q: %w", spec.ID, err)
@@ -392,13 +426,42 @@ func (e *Engine) Apply(ctx context.Context, spec plugin.InboundSpec, creds []plu
 }
 
 func (e *Engine) Remove(ctx context.Context, inboundID string) error {
+	e.opMu.Lock()
+	defer e.opMu.Unlock()
+
 	e.mu.Lock()
-	defer e.mu.Unlock()
-	if in := e.inbounds[inboundID]; in != nil {
-		e.stop(in)
-		delete(e.inbounds, inboundID)
+	in := e.inbounds[inboundID]
+	delete(e.inbounds, inboundID)
+	e.mu.Unlock()
+	if in != nil {
+		e.appendPending(e.stop(in))
 	}
 	return nil
+}
+
+func (e *Engine) appendPending(traffic []plugin.UserTraffic) {
+	if len(traffic) == 0 {
+		return
+	}
+	e.mu.Lock()
+	e.pending = append(e.pending, traffic...)
+	e.mu.Unlock()
+}
+
+func coreCredentials(parsed []parsedCred) []mp.Credential {
+	credentials := make([]mp.Credential, len(parsed))
+	for i, p := range parsed {
+		credentials[i] = mp.Credential{ID: p.cred.CredID, Key: p.key}
+	}
+	return credentials
+}
+
+func relayCredentials(parsed []parsedCred) []webproxy.Credential {
+	credentials := make([]webproxy.Credential, len(parsed))
+	for i, p := range parsed {
+		credentials[i] = webproxy.Credential{ID: p.cred.CredID, Secret: append([]byte(nil), p.key[:]...)}
+	}
+	return credentials
 }
 
 func buildFreshIndex(inboundID string, parsed []parsedCred) *credIndex {
@@ -448,22 +511,24 @@ func buildIndex(inboundID string, old *credIndex, parsed []parsedCred) *credInde
 	return ix
 }
 
-func (e *Engine) start(ctx context.Context, in *inbound, creds []mp.Credential) error {
+func (e *Engine) start(ctx context.Context, in *inbound, creds []mp.Credential, webCreds []webproxy.Credential) error {
 	in.smu.Lock()
 	in.sessions = make(map[uint64]sessionEntry)
 	in.smu.Unlock()
 	log := e.log.With("inbound", in.spec.ID)
 	var fallback func(context.Context, net.Conn, []byte) error
-	if in.cfg.fallback == fallbackSite {
-		in.forwarder = newForwarder(in.cfg.domains, log)
-		fallback = in.forwarder.serve
-	} else {
-		d, err := in.startDecoy(ctx)
-		if err != nil {
-			return fmt.Errorf("decoy site: %w", err)
+	if !in.cfg.web {
+		if in.cfg.fallback == fallbackSite {
+			in.forwarder = newForwarder(in.cfg.domains, log)
+			fallback = in.forwarder.serve
+		} else {
+			d, err := in.startDecoy(ctx)
+			if err != nil {
+				return fmt.Errorf("decoy site: %w", err)
+			}
+			in.decoy = d
+			fallback = d.serve
 		}
-		in.decoy = d
-		fallback = d.serve
 	}
 	port := in.spec.Listen.Port
 	addr := ":" + strconv.Itoa(int(port))
@@ -498,6 +563,40 @@ func (e *Engine) start(ctx context.Context, in *inbound, creds []mp.Credential) 
 	}
 	in.ctx, in.cancel = context.WithCancel(context.Background())
 	in.server, in.ln = srv, ln
+	if in.cfg.web {
+		getCertificate, err := in.siteCertificate(ctx)
+		if err != nil {
+			return fmt.Errorf("web site: %w", err)
+		}
+		relay, err := webproxy.NewRelay(webproxy.RelayOptions{
+			Host: in.cfg.domains[0],
+			Backend: func(ctx context.Context, conn net.Conn, credID string) error {
+				return srv.ServeStream(ctx, conn, credID)
+			},
+			BridgePage: bootstrapPage,
+			OnAuthenticated: func(r *http.Request) {
+				sitehttp.MarkAuthenticated(r.Context())
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("web relay: %w", err)
+		}
+		in.relay = relay
+		if err := relay.SetCredentials(webCreds); err != nil {
+			return fmt.Errorf("web relay credentials: %w", err)
+		}
+		in.siteSrv, err = newSiteHTTPServer(relay.Handler(in.siteHandler()), getCertificate)
+		if err != nil {
+			return err
+		}
+		siteServer := in.siteSrv
+		in.wg.Add(1)
+		go func() {
+			defer in.wg.Done()
+			_ = siteServer.ServeTLS(ln, "", "")
+		}()
+		return nil
+	}
 	in.wg.Add(1)
 	go func() {
 		defer in.wg.Done()
@@ -509,42 +608,58 @@ func (e *Engine) start(ctx context.Context, in *inbound, creds []mp.Credential) 
 // dcAddress is a seam for the tests (a fake DC); nil in production.
 var dcAddress func(dc int16) (string, bool)
 
-func (e *Engine) stop(in *inbound) {
-	if in.cancel != nil {
-		in.cancel()
+func (e *Engine) stop(in *inbound) (pending []plugin.UserTraffic) {
+	if in == nil {
+		return nil
 	}
-	if in.server != nil {
-		in.server.CloseAll()
-	}
-	if in.ln != nil {
-		_ = in.ln.Close()
-	}
-	if in.decoy != nil {
-		in.decoy.shutdown()
-		in.decoy = nil
-	}
-	if in.forwarder != nil {
-		in.forwarder.shutdown()
-		in.forwarder = nil
-	}
-	// Every connection is closed now; once their goroutines are done, the sessions have made their last AddTraffic and
-	// what the counters hold is final. It is owed to the panel like any delta, so it waits in pending for the next
-	// Collect instead of going away with the inbound.
-	in.wg.Wait()
-	ix := in.idx.Load()
-	for _, cs := range append(slices.Collect(maps.Values(ix.current)), ix.retired...) {
-		if up, down := cs.up.Swap(0), cs.down.Swap(0); up != 0 || down != 0 {
-			e.pending = append(e.pending, plugin.UserTraffic{CredID: cs.id, InboundID: in.spec.ID, Up: up, Down: down})
+	in.stopOnce.Do(func() {
+		if in.cancel != nil {
+			in.cancel()
 		}
-	}
-	if in.certHeld {
-		e.env.Certs.Release(in.spec.ID)
-		in.certHeld = false
-	}
-	in.smu.Lock()
-	in.sessions = nil
-	in.smu.Unlock()
+		if in.server != nil {
+			in.server.CloseAll()
+		}
+		if in.ln != nil {
+			_ = in.ln.Close()
+			in.ln = nil
+		}
+		if in.relay != nil {
+			_ = in.relay.Close()
+			in.relay = nil
+		}
+		if in.siteSrv != nil {
+			_ = in.siteSrv.Shutdown(context.Background())
+			_ = in.siteSrv.Close()
+			in.siteSrv = nil
+		}
+		if in.decoy != nil {
+			in.decoy.shutdown()
+			in.decoy = nil
+		}
+		if in.forwarder != nil {
+			in.forwarder.shutdown()
+			in.forwarder = nil
+		}
+		// Every connection is closed now; once their goroutines are done, the sessions have made their last AddTraffic and
+		// what the counters hold is final. It is owed to the panel like any delta, so it waits in pending for the next
+		// Collect instead of going away with the inbound.
+		in.wg.Wait()
+		ix := in.idx.Load()
+		for _, cs := range append(slices.Collect(maps.Values(ix.current)), ix.retired...) {
+			if up, down := cs.up.Swap(0), cs.down.Swap(0); up != 0 || down != 0 {
+				pending = append(pending, plugin.UserTraffic{CredID: cs.id, InboundID: in.spec.ID, Up: up, Down: down})
+			}
+		}
+		if in.certHeld {
+			e.env.Certs.Release(in.spec.ID)
+			in.certHeld = false
+		}
+		in.smu.Lock()
+		in.sessions = nil
+		in.smu.Unlock()
+	})
 	in.setState(plugin.RunStopped, "")
+	return pending
 }
 
 type inboundObserver struct{ in *inbound }
@@ -562,7 +677,7 @@ func (o inboundObserver) Opened(info mp.SessionInfo) {
 	o.in.sessions[info.ID] = sessionEntry{info: info, cs: cs}
 	o.in.smu.Unlock()
 
-	// Opened follows Fake TLS authentication. MTProto exposes no separate failed-handshake or broken-close event.
+	// Opened follows MTProto authentication through Fake TLS or ServeStream. The core exposes no separate failed-handshake event.
 	if agg := o.in.e.env.Nets; agg != nil && agg.Enabled() {
 		asn := agg.Lookup(mtprotoClientAddr(info.Remote))
 		userID := ""
@@ -686,10 +801,14 @@ func (e *Engine) Collect(ctx context.Context) (engine.Collected, error) {
 }
 
 func (e *Engine) Kick(ctx context.Context, credIDs []string) (int, error) {
+	e.opMu.Lock()
+	defer e.opMu.Unlock()
+
 	e.mu.Lock()
-	defer e.mu.Unlock()
+	inbounds := e.sorted()
+	e.mu.Unlock()
 	hit := map[string]struct{}{}
-	for _, in := range e.sorted() {
+	for _, in := range inbounds {
 		if in.server == nil {
 			continue
 		}
@@ -699,6 +818,9 @@ func (e *Engine) Kick(ctx context.Context, credIDs []string) (int, error) {
 			}
 			if in.server.CloseCredential(id) > 0 {
 				hit[id] = struct{}{}
+			}
+			if in.relay != nil {
+				in.relay.CloseCredential(id)
 			}
 		}
 	}
@@ -732,11 +854,15 @@ func (e *Engine) Health() []plugin.EngineHealth {
 }
 
 func (e *Engine) Close(ctx context.Context) error {
+	e.opMu.Lock()
+	defer e.opMu.Unlock()
+
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	e.closed = true
-	for _, in := range e.sorted() {
-		e.stop(in)
+	inbounds := e.sorted()
+	e.mu.Unlock()
+	for _, in := range inbounds {
+		e.appendPending(e.stop(in))
 	}
 	return nil
 }

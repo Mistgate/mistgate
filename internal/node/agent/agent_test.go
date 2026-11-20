@@ -106,6 +106,23 @@ func TestCapabilitiesAdvertiseVLESSTLSWithACertificateSource(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesAdvertiseMTProtoWebWithACertificateSource(t *testing.T) {
+	withoutEngine := (&Agent{cfg: Config{Certs: &markCerts{}}, engines: map[string]engine.Engine{}}).capabilities()
+	if slices.Contains(withoutEngine, agentcap.MTProtoWeb) {
+		t.Fatal("mtproto-web/1 is advertised without the MTProto engine")
+	}
+
+	withoutCertificates := (&Agent{engines: map[string]engine.Engine{"mtproto": newFakeEngine("mtproto")}}).capabilities()
+	if slices.Contains(withoutCertificates, agentcap.MTProtoWeb) {
+		t.Fatal("mtproto-web/1 is advertised without a certificate source")
+	}
+
+	with := (&Agent{cfg: Config{Certs: &markCerts{}}, engines: map[string]engine.Engine{"mtproto": newFakeEngine("mtproto")}}).capabilities()
+	if !slices.Contains(with, agentcap.MTProtoWeb) {
+		t.Fatalf("capabilities %v lack %s", with, agentcap.MTProtoWeb)
+	}
+}
+
 func TestConfiguredLinkUsesMTLSWhenPanelDoesNotAdvertiseSupport(t *testing.T) {
 	h := newHarness(t, harnessOpts{cfg: func(c *Config) { c.LinkURL = "wss://example.com/abcdefghijklmnop" }})
 	h.waitConnected()

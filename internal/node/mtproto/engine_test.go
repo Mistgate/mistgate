@@ -27,16 +27,20 @@ import (
 	"time"
 
 	mp "github.com/mistgate/mistgate/internal/mtproto"
+	mtclient "github.com/mistgate/mistgate/internal/mtproto/client"
 	"github.com/mistgate/mistgate/internal/mtproto/mtprototest"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/nets"
 	"github.com/mistgate/mistgate/internal/node/netstest"
+	"github.com/mistgate/mistgate/internal/node/sitehttp/sitehttptest"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"github.com/mistgate/mistgate/internal/webproxy"
 )
 
 const (
 	ownDomain   = "de1.example.com"
 	otherDomain = "fi1.example.com"
+	webDomain   = "tg.example.com"
 )
 
 func TestParseSpec(t *testing.T) {
@@ -50,6 +54,11 @@ func TestParseSpec(t *testing.T) {
 	}
 	if len(s.domains) != 1 || s.domains[0] != ownDomain || s.fallback != fallbackDecoy {
 		t.Fatalf("settings %+v", s)
+	}
+	web := base
+	web.Settings = json.RawMessage(`{"domains":["tg.example.com"],"fallback":"decoy","mode":"web"}`)
+	if s, err := parseSpec(web); err != nil || !s.web || s.domains[0] != webDomain {
+		t.Fatalf("web: %+v %v", s, err)
 	}
 	site := base
 	site.Settings = json.RawMessage(`{"domains":["fi1.example.com"],"fallback":"site","idle_timeout_secs":300}`)
@@ -229,6 +238,10 @@ func (f *fixture) client(k [16]byte, domain string) *mtprototest.Client {
 
 // get fetches / over TLS with SNI name and returns the body and the certificate's name.
 func (f *fixture) get(name string) (string, string) {
+	return f.getPath(name, "/")
+}
+
+func (f *fixture) getPath(name, path string) (string, string) {
 	f.t.Helper()
 	var cn string
 	client := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{
@@ -238,13 +251,109 @@ func (f *fixture) get(name string) (string, string) {
 		}},
 	}}
 	defer client.CloseIdleConnections()
-	resp, err := client.Get("https://" + f.addr + "/")
+	resp, err := client.Get("https://" + f.addr + path)
 	if err != nil {
 		f.t.Fatalf("GET: %v", err)
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	return string(body), cn
+}
+
+func newWebClient(t *testing.T, f *fixture, secret [16]byte, host string) *webproxy.Client {
+	t.Helper()
+	capability, err := webproxy.DeriveCapability(host, secret[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport := &http.Transport{
+		TLSClientConfig:   &tls.Config{ServerName: host, InsecureSkipVerify: true},
+		ForceAttemptHTTP2: true,
+		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, f.addr)
+		},
+	}
+	client, err := webproxy.NewClient("https://"+host, capability, transport)
+	if err != nil {
+		transport.CloseIdleConnections()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = client.Close()
+		transport.CloseIdleConnections()
+	})
+	return client
+}
+
+func openWebStream(t *testing.T, client *webproxy.Client, secret [16]byte) (*webproxy.ClientStream, *mtclient.StreamClient) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	stream, err := client.OpenStream(ctx)
+	if err != nil {
+		t.Fatalf("open web stream: %v", err)
+	}
+	mt, err := mtclient.StartStreamClient(stream, secret, mtprototest.TagPadded, 2)
+	if err != nil {
+		_ = stream.Close()
+		t.Fatalf("start obfuscated2 stream: %v", err)
+	}
+	return stream, mt
+}
+
+func webRoundTrip(t *testing.T, mt *mtclient.StreamClient) {
+	t.Helper()
+	if _, err := mt.Write([]byte("x")); err != nil {
+		t.Fatalf("write to fake DC: %v", err)
+	}
+	got := make([]byte, 4)
+	if _, err := io.ReadFull(mt, got); err != nil || string(got) != "dc:x" {
+		t.Fatalf("fake DC response = %q, %v", got, err)
+	}
+}
+
+func waitWebStreamClosed(t *testing.T, stream *webproxy.ClientStream) {
+	t.Helper()
+	closed := make(chan error, 1)
+	go func() {
+		var one [1]byte
+		_, err := stream.Read(one[:])
+		closed <- err
+	}()
+	select {
+	case err := <-closed:
+		if err == nil {
+			t.Fatal("web stream stayed open")
+		}
+	case <-time.After(5 * time.Second):
+		_ = stream.Close()
+		t.Fatal("web stream did not close")
+	}
+}
+
+func waitForWebTraffic(t *testing.T, f *fixture) {
+	t.Helper()
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		collected, err := f.e.Collect(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(collected.Traffic) != 0 {
+			if len(collected.Traffic) != 1 || collected.Traffic[0].CredID != "alice" || collected.Traffic[0].Up == 0 || collected.Traffic[0].Down == 0 {
+				t.Fatalf("web traffic = %+v", collected.Traffic)
+			}
+			return
+		}
+		select {
+		case <-ticker.C:
+		case <-timer.C:
+			t.Fatal("Web traffic was not collected after its stream closed")
+		}
+	}
 }
 
 func TestEngineLifecycle(t *testing.T) {
@@ -353,6 +462,120 @@ func TestDecoyFallback(t *testing.T) {
 	_ = c.Conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	if _, err := c.Read(make([]byte, 1)); err == nil || errors.Is(err, os.ErrDeadlineExceeded) {
 		t.Fatalf("the session of a removed credential stayed open: %v", err)
+	}
+}
+
+func TestWebInboundServesSiteAndStreamsThroughCore(t *testing.T) {
+	certs := &fakeCerts{acme: testCert(t, "acme."+webDomain), self: testCert(t, webDomain)}
+	agg := nets.New(2)
+	db, err := netstest.LoopbackDB(64500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agg.SetTable(db, "web-fixture-sha")
+	var siteHits atomic.Int32
+	cred := credential("alice", key(1))
+	cred.UserID = "alice"
+	f := newFixture(t, engine.Env{
+		Certs: certs,
+		Nets:  agg,
+		Masquerade: func(id string) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				siteHits.Add(1)
+				_, _ = io.WriteString(w, "decoy of "+id)
+			})
+		},
+	}, `{"domains":["tg.example.com"],"fallback":"decoy","mode":"web"}`, cred)
+	in := f.inbound()
+	if !in.cfg.web || in.decoy != nil || in.siteSrv == nil || in.relay == nil {
+		t.Fatalf("web inbound state: mode=%v decoy=%v site=%v relay=%v", in.cfg.web, in.decoy != nil, in.siteSrv != nil, in.relay != nil)
+	}
+
+	for _, path := range []string{"/", "/?bridge=" + strings.Repeat("A", 43), "/other", "/some/path?x=1"} {
+		body, cn := f.getPath(webDomain, path)
+		if body != "decoy of i1" || cn != webDomain {
+			t.Fatalf("stranger GET %q got %q from %q", path, body, cn)
+		}
+	}
+	if siteHits.Load() != 4 {
+		t.Fatalf("masquerade saw %d stranger requests, want 4", siteHits.Load())
+	}
+	sitehttptest.Check(t, "MTProto Web", f.dial())
+
+	alpn, err := tls.Dial("tcp", f.addr, &tls.Config{ServerName: webDomain, NextProtos: []string{"acme-tls/1"}, InsecureSkipVerify: true})
+	if err != nil {
+		t.Fatalf("TLS-ALPN-01: %v", err)
+	}
+	state := alpn.ConnectionState()
+	_ = alpn.Close()
+	if state.NegotiatedProtocol != "acme-tls/1" || state.PeerCertificates[0].Subject.CommonName != "acme."+webDomain {
+		t.Fatalf("TLS-ALPN-01 got %q from %q", state.NegotiatedProtocol, state.PeerCertificates[0].Subject.CommonName)
+	}
+
+	client := newWebClient(t, f, key(1), webDomain)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := client.Bootstrap(ctx); err != nil {
+		cancel()
+		t.Fatalf("bootstrap web client: %v", err)
+	}
+	cancel()
+	stream, mt := openWebStream(t, client, key(1))
+	webRoundTrip(t, mt)
+
+	collected, err := f.e.Collect(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(collected.Sessions) != 1 || collected.Sessions[0].CredID != "alice" {
+		t.Fatalf("web sessions = %+v", collected.Sessions)
+	}
+	_ = stream.Close() // the core reports final traffic when the stream ends
+	waitForWebTraffic(t, f)
+	_, people := agg.Take()
+	if len(people) != 1 || people[0].CredId != "alice" || people[0].Asn != 64500 {
+		t.Fatalf("web ASN counters = %+v", people)
+	}
+
+	stream, mt = openWebStream(t, client, key(1))
+	webRoundTrip(t, mt)
+	if n, err := f.e.Kick(context.Background(), []string{"alice"}); err != nil || n != 1 {
+		t.Fatalf("kick alice = %d, %v", n, err)
+	}
+	waitWebStreamClosed(t, stream)
+	stream, mt = openWebStream(t, client, key(1))
+	webRoundTrip(t, mt) // a kick closes streams but keeps the Web transport session
+
+	rotated := credential("alice", key(3))
+	rotated.UserID = "alice"
+	if _, err := f.e.Apply(context.Background(), f.spec, []plugin.UserCred{rotated}); err != nil {
+		t.Fatalf("rotate alice: %v", err)
+	}
+	waitWebStreamClosed(t, stream)
+	newClient := newWebClient(t, f, key(3), webDomain)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	if err := newClient.Bootstrap(ctx); err != nil {
+		cancel()
+		t.Fatalf("bootstrap rotated key: %v", err)
+	}
+	cancel()
+	stream, mt = openWebStream(t, newClient, key(3))
+	webRoundTrip(t, mt)
+
+	if _, err := f.e.Apply(context.Background(), f.spec, nil); err != nil {
+		t.Fatalf("remove alice: %v", err)
+	}
+	waitWebStreamClosed(t, stream)
+	if _, err := newClient.OpenStream(context.Background()); err == nil {
+		t.Fatal("a removed key kept its Web transport session")
+	}
+	collected, err = f.e.Collect(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, session := range collected.Sessions {
+		if session.CredID == "alice" {
+			t.Fatalf("removed Web key still has a core session: %+v", session)
+		}
 	}
 }
 
