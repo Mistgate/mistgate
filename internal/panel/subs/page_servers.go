@@ -13,15 +13,17 @@ import (
 )
 
 // The servers of the page and the DNS of each of them (the user page's "Servers" and "DNS for each server"). Everything
-// here is data about the person's own servers: no node name, no address, no rate.
+// here is data about the person's own servers: no node name, no internal address, no rate.
 
 // pageNode is one server (one node) of the person. label is the country and the place, the name the page and the keys
 // give a server, never the panel's node name. app_names are what the apps that take the link call it (the owner's name
 // template): empty when the template has {node}, because the node name must not reach the page.
 type pageNode struct {
-	ID          string     `json:"id"`
-	CountryCode string     `json:"country_code"`
-	Place       string     `json:"place"`
+	ID          string `json:"id"`
+	CountryCode string `json:"country_code"`
+	Place       string `json:"place"`
+	// Host: the node's own public address, the one its links and keys carry (never the node's name, never a relay's entry).
+	Host        string     `json:"host"`
 	Label       string     `json:"label"`
 	AppNames    []string   `json:"app_names"`
 	Connections []pageConn `json:"connections"`
@@ -110,7 +112,7 @@ func pageServers(v access.SubView, set *adminv1.SubscriptionSettings, lang strin
 	labels := serverLabels(v, lang)
 	for _, n := range v.Nodes {
 		p := pageNode{
-			ID: n.ID, CountryCode: strings.ToUpper(strings.TrimSpace(n.CountryCode)), Place: place(n.Location),
+			ID: n.ID, CountryCode: strings.ToUpper(strings.TrimSpace(n.CountryCode)), Place: place(n.Location), Host: n.Address,
 			Label: labels[n.ID], AppNames: []string{}, Connections: []pageConn{}, Online: n.Online,
 		}
 		if n.LoadPercent != nil {

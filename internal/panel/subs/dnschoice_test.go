@@ -102,6 +102,16 @@ func serverByID(d map[string]any, id string) map[string]any {
 	return nil
 }
 
+// takeHost is the one place a node's address may stand in an answer: the host of its server. The host must be the node's
+// address; it is taken out, so the leak checks that follow see the rest of the answer and nothing of the address.
+func takeHost(t *testing.T, srv map[string]any, want string) {
+	t.Helper()
+	if srv["host"] != want {
+		t.Fatalf("host = %v, want %q", srv["host"], want)
+	}
+	delete(srv, "host")
+}
+
 func TestServersOnThePage(t *testing.T) {
 	r := newDNSRig(t, nil)
 	_, tok := r.newUser("alice", nil)
@@ -141,6 +151,18 @@ func TestServersOnThePage(t *testing.T) {
 	if d["server_count"] != float64(2) {
 		t.Errorf("server_count = %v", d["server_count"])
 	}
+	// The node's address is allowed in one place: the host of its server. Here the host is checked and taken out; the checks below
+	// run on what is left, and the address stands in the page data exactly twice (one host per node).
+	takeHost(t, de, "de1.example.com")
+	takeHost(t, nl, "nl1.example.com")
+	if n := strings.Count(raw, "de1.example.com") + strings.Count(raw, "nl1.example.com"); n != 2 {
+		t.Errorf("the page data holds the addresses %d times, want 2 (the hosts)", n)
+	}
+	cleaned, err := json.Marshal(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = string(cleaned) // the IP check below reads the page without its hosts
 	// No node name, operator notes, address, or sample rate as a JSON value, and no private rate fields.
 	for _, leak := range []string{de1Name, nl1Name, nodeNotes, "de1.example.com", "nl1.example.com", "85000000"} {
 		if jsonHasExactScalar(d, leak) {
@@ -236,6 +258,35 @@ func jsonHasField(v any, want string) bool {
 		}
 	}
 	return false
+}
+
+// A node added by its IP: its host is the IP, and the IP stands nowhere else on the page (nor the node's name or notes).
+func TestServerByIPHostIsTheIP(t *testing.T) {
+	r := newDNSRig(t, nil)
+	if _, err := r.st.W.Exec(`UPDATE node SET address = '203.0.113.24' WHERE id = 'nod_2'`); err != nil {
+		t.Fatal(err)
+	}
+	_, tok := r.newUser("alice", nil)
+	d, raw := r.page(tok, "Accept-Language", "en")
+	de, nl := serverByID(d, "nod_1"), serverByID(d, "nod_2")
+	if n := strings.Count(raw, "203.0.113.24"); n != 1 {
+		t.Errorf("the page data holds the IP %d times, want 1 (the host)", n)
+	}
+	takeHost(t, nl, "203.0.113.24")
+	takeHost(t, de, "de1.example.com")
+	cleaned, err := json.Marshal(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clean := string(cleaned)
+	if m := regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`).FindString(clean); m != "" {
+		t.Errorf("the page data holds an IP address outside host: %s", m)
+	}
+	for _, leak := range []string{de1Name, nl1Name, nodeNotes, "de1.example.com", "nl1.example.com"} {
+		if strings.Contains(clean, leak) {
+			t.Errorf("the page data without the hosts holds %q", leak)
+		}
+	}
 }
 
 // A server that no node offers anything on has no DNS row; with nothing offered anywhere there is nothing to name.
@@ -393,8 +444,17 @@ func TestPickingADNS(t *testing.T) {
 		strings.Join(strs(dd["keys_to_refresh"]), ",") != dev || len(ans.StaleDevices) != 1 || ans.StaleDevices[0] != dev {
 		t.Errorf("answer = %+v", ans)
 	}
-	if strings.Contains(rec.Body.String(), de1Name) || strings.Contains(rec.Body.String(), "de1.example.com") {
-		t.Errorf("the answer carries a node name: %s", rec.Body.String())
+	// The node's address is allowed in one place: the host of the server. Taken out, the answer holds no node name and no address.
+	takeHost(t, ans.Server, "de1.example.com")
+	clean, err := json.Marshal(ans)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(clean), de1Name) || strings.Contains(string(clean), "de1.example.com") {
+		t.Errorf("the answer carries a node name or an address outside host: %s", clean)
+	}
+	if n := strings.Count(rec.Body.String(), "de1.example.com"); n != 1 {
+		t.Errorf("the answer holds the address %d times, want 1 (the host)", n)
 	}
 
 	// The page lists the key as stale because of the DNS, and the server as having a key to refresh.

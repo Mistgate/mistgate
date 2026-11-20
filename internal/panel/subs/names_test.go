@@ -316,6 +316,22 @@ func TestServerLoads(t *testing.T) {
 	}
 }
 
+// Each server's host is its node's own address, as its links and keys give it; the node's name is never the host.
+func TestServerHostIsTheNodesAddress(t *testing.T) {
+	v := access.SubView{Nodes: []access.SubNode{
+		{ID: "id-de1", Name: "de1", CountryCode: "DE", Address: "de1.example.com"},
+		{ID: "id-x1", Name: "x1", Address: "203.0.113.24"},
+	}}
+	servers := pageServers(v, &adminv1.SubscriptionSettings{}, "en")
+	if len(servers) != 2 || servers[0].Host != "de1.example.com" || servers[1].Host != "203.0.113.24" {
+		t.Errorf("hosts = %+v", servers)
+	}
+	b, _ := json.Marshal(servers[0])
+	if !strings.Contains(string(b), `"host":"de1.example.com"`) {
+		t.Errorf("page row = %s", b)
+	}
+}
+
 // A subscription that does not work says why in the words of the user page, in the instance language.
 func TestStateNote(t *testing.T) {
 	now := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
