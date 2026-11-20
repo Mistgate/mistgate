@@ -37,6 +37,7 @@ type fakeFleet struct {
 	enrolLink bool
 	target    func(id, site, bootstrap string) (string, string, string, bool, bool)
 	status    map[string]*agentv1.SubHostStatus
+	pushes    int // StateChanged calls
 }
 
 func (f *fakeFleet) HasSession(id string) bool { f.mu.Lock(); defer f.mu.Unlock(); return f.online[id] }
@@ -58,7 +59,7 @@ func (f *fakeFleet) SetSubHostRoles(r map[string]*agentv1.SubHostRole) {
 func (f *fakeFleet) SetSubHostNodes(fn func(string) bool) { f.mu.Lock(); f.isHost = fn; f.mu.Unlock() }
 func (f *fakeFleet) SetPanelLink(l string)                { f.mu.Lock(); f.link = l; f.mu.Unlock() }
 func (f *fakeFleet) SetLinkEnrollment(on bool)            { f.mu.Lock(); f.enrolLink = on; f.mu.Unlock() }
-func (f *fakeFleet) StateChanged()                        {}
+func (f *fakeFleet) StateChanged()                        { f.mu.Lock(); f.pushes++; f.mu.Unlock() }
 func (f *fakeFleet) PanelIdentity(time.Time) ([]byte, *ecdsa.PrivateKey, error) {
 	return nil, nil, errors.New("no CA in this test")
 }
@@ -263,7 +264,9 @@ func TestTransitions(t *testing.T) {
 		e.fl.status = map[string]*agentv1.SubHostStatus{}
 	}
 	e.fl.status[b] = &agentv1.SubHostStatus{}
-	e.fl.target = func(id, _, _ string) (string, string, string, bool, bool) { return "203.0.113.2", "b.example.com", "", id == b, true }
+	e.fl.target = func(id, _, _ string) (string, string, string, bool, bool) {
+		return "203.0.113.2", "b.example.com", "", id == b, true
+	}
 	e.fl.mu.Unlock()
 	e.svc.upSeam = func(id string) bool { return id == b }
 	if err := finish(false); err != nil {
@@ -638,5 +641,42 @@ func TestDisableANeverReadyHost(t *testing.T) {
 	}
 	if e.addr.PublicURL() != "https://old.example" || e.fl.link != "" || len(e.fl.roles) != 0 {
 		t.Fatalf("address %q, link %q, roles %v", e.addr.PublicURL(), e.fl.link, e.fl.roles)
+	}
+}
+
+// A panel without a host changes nothing at run time: loading pushes no settings, the tunnel's server does not start; a host
+// set starts it, and a refresh that changes nothing pushes nothing (L1, L8).
+func TestNoHostNoChange(t *testing.T) {
+	e := newEnv(t)
+	a := e.node("a", "203.0.113.1", allCaps, true)
+	if err := e.svc.Load(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	e.svc.refresh(e.ctx)
+	pushes := func() int { e.fl.mu.Lock(); defer e.fl.mu.Unlock(); return e.fl.pushes }
+	if pushes() != 0 {
+		t.Fatalf("a panel without a host pushed settings %d times", pushes())
+	}
+	select {
+	case <-e.svc.PublicTunnelReady():
+		t.Fatal("the tunnel is ready without a host")
+	default:
+	}
+	if err := e.set(a, "sub.example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-e.svc.PublicTunnelReady():
+	default:
+		t.Fatal("the tunnel is not ready once a host is set")
+	}
+	after := pushes()
+	if after != 1 {
+		t.Fatalf("setting a host pushed %d times", after)
+	}
+	e.svc.refresh(e.ctx)
+	e.svc.refresh(e.ctx)
+	if pushes() != after {
+		t.Fatal("a refresh that changed nothing pushed the fleet again")
 	}
 }

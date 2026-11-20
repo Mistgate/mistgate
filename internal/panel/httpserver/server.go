@@ -115,6 +115,8 @@ type Config struct {
 	// their TLS: they get the public handler, but never the admin or the mTLS agent endpoint. nil = none.
 	PublicTunnel    net.Listener
 	PublicTunnelTLS *tls.Config
+	// PublicTunnelReady closes once a subscription host is set: the tunnel's server starts then, never on a panel without one.
+	PublicTunnelReady <-chan struct{}
 	// SubscriptionBaseNow, when set, is SubscriptionBase of the moment (a public address that changes while the panel runs).
 	SubscriptionBaseNow func() string
 
@@ -745,9 +747,24 @@ func (s *Server) Serve(ctx context.Context, o ServeOptions) error {
 		srv.ConnContext = func(ctx context.Context, _ net.Conn) context.Context {
 			return context.WithValue(ctx, tunnelConnKey{}, true)
 		}
-		s.cfg.Log.Info("listening", "listener", "public-tunnel", "tls", true)
-		go func() { errc <- srv.Serve(tls.NewListener(s.cfg.PublicTunnel, s.cfg.PublicTunnelTLS)) }()
+		stopped := make(chan struct{})
+		go func() {
+			if s.cfg.PublicTunnelReady != nil {
+				select {
+				case <-s.cfg.PublicTunnelReady:
+				case <-stopped:
+					return
+				}
+			}
+			s.cfg.Log.Info("listening", "listener", "public-tunnel", "tls", true)
+			err := srv.Serve(tls.NewListener(s.cfg.PublicTunnel, s.cfg.PublicTunnelTLS))
+			if errors.Is(err, net.ErrClosed) { // the service closed its listener on the way out: a clean stop
+				err = http.ErrServerClosed
+			}
+			errc <- err
+		}()
 		defer func() {
+			close(stopped)
 			sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			srv.Shutdown(sctx)

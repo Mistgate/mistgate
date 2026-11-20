@@ -29,6 +29,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/pubaddr"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"google.golang.org/protobuf/proto"
 )
 
 const capWSLink = "ws-link/1"
@@ -90,6 +91,16 @@ type Service struct {
 	caaMu    sync.Mutex
 	caaCache map[string]caaEntry
 	account  string // the ACME account URI, once known
+
+	// What the fleet was last told (applyRouting; mu): a push only when it changes, so a panel without a host, and a host
+	// whose roles did not change, cause no settings round to the agents.
+	sentRoles map[string]*agentv1.SubHostRole
+	sentLink  string
+	sentEnrol bool
+
+	wake      chan struct{} // a host was set: Run starts ticking
+	ready     chan struct{} // closed once a host was set: the tunnel's server starts (PublicTunnelReady)
+	readyOnce sync.Once
 }
 
 // New builds the service; Load applies the stored state.
@@ -106,7 +117,7 @@ func New(cfg Config) *Service {
 	if cfg.CAA == nil {
 		cfg.CAA = lookupCAA
 	}
-	s := &Service{cfg: cfg, caaCache: map[string]caaEntry{}}
+	s := &Service{cfg: cfg, caaCache: map[string]caaEntry{}, wake: make(chan struct{}, 1), ready: make(chan struct{})}
 	s.newTunnel()
 	return s
 }
@@ -128,12 +139,31 @@ func (s *Service) Load(ctx context.Context) error {
 }
 
 // Run keeps the dialer on the hosts (their pins and certificates change) and refreshes their roles (the fleet's addresses
-// change) until ctx ends.
+// change) until ctx ends. Without a host it only waits for one to be set.
 func (s *Service) Run(ctx context.Context) {
 	defer s.Close()
-	tick := time.NewTicker(10 * time.Second)
-	defer tick.Stop()
+	var tick *time.Ticker
+	defer func() {
+		if tick != nil {
+			tick.Stop()
+		}
+	}()
 	for n := 1; ; n++ {
+		if s.current().State == stateOff {
+			if tick != nil {
+				tick.Stop()
+				tick = nil
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-s.wake:
+			}
+			continue
+		}
+		if tick == nil {
+			tick = time.NewTicker(10 * time.Second)
+		}
 		select {
 		case <-ctx.Done():
 			return
@@ -400,19 +430,29 @@ func (s *Service) applyRouting(ctx context.Context, st state) {
 			roles[st.Next] = &agentv1.SubHostRole{Names: []string{st.Domain}, Path: st.NextPath, SiteName: st.NextSiteName, LinkSources: sources}
 		}
 	}
-	s.cfg.Fleet.SetSubHostRoles(roles)
-	s.cfg.Fleet.SetSubHostNodes(func(id string) bool { return roles[id] != nil })
 	if s.cfg.Addr != nil {
 		s.cfg.Addr.Set(st.PublicURL)
 	}
 	hosted := (st.State == stateOn || st.State == stateMoving) && st.ReadyAt != ""
+	link := ""
 	if hosted || st.State == stateLeaving {
-		s.cfg.Fleet.SetPanelLink(linkURL(st.PublicURL, s.cfg.LinkPrefix))
-	} else {
-		s.cfg.Fleet.SetPanelLink("")
+		link = linkURL(st.PublicURL, s.cfg.LinkPrefix)
 	}
-	s.cfg.Fleet.SetLinkEnrollment(hosted)
-	s.cfg.Fleet.StateChanged()
+	if !sameRoles(roles, s.sentRoles) || link != s.sentLink || hosted != s.sentEnrol {
+		s.cfg.Fleet.SetSubHostRoles(roles)
+		s.cfg.Fleet.SetSubHostNodes(func(id string) bool { return roles[id] != nil })
+		s.cfg.Fleet.SetPanelLink(link)
+		s.cfg.Fleet.SetLinkEnrollment(hosted)
+		s.cfg.Fleet.StateChanged()
+		s.sentRoles, s.sentLink, s.sentEnrol = roles, link, hosted
+	}
+	if st.State != stateOff {
+		s.readyOnce.Do(func() { close(s.ready) })
+		select {
+		case s.wake <- struct{}{}:
+		default:
+		}
+	}
 	s.cmu.Lock()
 	s.cur = st
 	s.cmu.Unlock()
@@ -491,4 +531,20 @@ func (s *Service) RoleOf(nodeID string) (plugin.SubHostRole, bool) {
 		}
 	}
 	return plugin.SubHostRole{}, false
+}
+
+// PublicTunnelReady closes once a host was set: the public server starts serving the tunnel's connections then.
+func (s *Service) PublicTunnelReady() <-chan struct{} { return s.ready }
+
+// sameRoles says two role sets are the same (the fleet then needs no push).
+func sameRoles(a, b map[string]*agentv1.SubHostRole) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for id, r := range a {
+		if !proto.Equal(r, b[id]) {
+			return false
+		}
+	}
+	return true
 }

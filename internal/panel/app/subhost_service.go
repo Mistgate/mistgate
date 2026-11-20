@@ -17,4 +17,5 @@ type subHostService interface {
 	Run(ctx context.Context)
 	PublicListener() net.Listener
 	PublicTLS() *tls.Config
+	PublicTunnelReady() <-chan struct{}
 }

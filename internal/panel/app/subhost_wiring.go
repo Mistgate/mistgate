@@ -40,6 +40,7 @@ func (k *core) addSubHost(cfg *httpserver.Config) {
 	path, handler := k.sub.Handler()
 	cfg.AdminHandlers = append(cfg.AdminHandlers, httpserver.AdminHandler{Path: path, Handler: handler})
 	cfg.PublicTunnel, cfg.PublicTunnelTLS = k.sub.PublicListener(), k.sub.PublicTLS() // the subdomain's connections, from the hosts
+	cfg.PublicTunnelReady = k.sub.PublicTunnelReady()                                 // its server starts with the first host
 }
 
 // subHostProvision lets the SSH install put the first subscription host on, and enrol ordinary nodes over the subdomain's link
