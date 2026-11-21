@@ -969,7 +969,10 @@ func breakProse(r *rng, text string) string {
 	return out.String()
 }
 
-var looseSpace = []string{"", "", " ", "\n", "\n  ", "\n\t"}
+var (
+	looseSpace = []string{"", "", " ", "\n", "\n  ", "\n\t"}
+	commaSpace = []string{"", "", " ", " ", "\n", "  "}
+)
 
 // loosen varies the white space after ; { and } of a stylesheet or script, outside strings, for the same reason as shake.
 func loosen(r *rng, s string) string {
@@ -990,6 +993,8 @@ func loosen(r *rng, s string) string {
 			quote = c
 		case (c == ';' || c == '{' || c == '}') && i+1 < len(s) && s[i+1] != '\n' && s[i+1] != ' ':
 			out.WriteString(looseSpace[r.n(len(looseSpace))])
+		case c == ',' && i+1 < len(s) && s[i+1] != '\n' && s[i+1] != ' ':
+			out.WriteString(commaSpace[r.n(len(commaSpace))]) // long font stacks and selector lists are where runs would hide
 		}
 	}
 	return out.String()

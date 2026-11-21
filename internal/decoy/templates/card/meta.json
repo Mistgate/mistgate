@@ -1,0 +1,10 @@
+{
+  "title": {"en": "Personal card page", "ru": "Личная визитка со ссылками"},
+  "layouts": 3,
+  "pages": [
+    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
+    {"name": "about", "tmpl": "about.html.tmpl", "paths": ["about.html", "about/index.html", "me/index.html", "hello.html"], "nav": "nav_about", "desc": "desc_about"},
+    {"name": "projects", "tmpl": "projects.html.tmpl", "paths": ["projects.html", "work/index.html", "projects/index.html", "things.html"], "nav": "nav_projects", "desc": "desc_projects"},
+    {"name": "now", "tmpl": "now.html.tmpl", "paths": ["now.html", "now/index.html", "lately/index.html", "currently.html"], "nav": "nav_now", "desc": "desc_now"}
+  ]
+}

@@ -1,0 +1,34 @@
+{{define "profile"}}<div class="__me__">
+<span class="__avatar__" aria-hidden="true">{{.Initial}}</span>
+<p class="__hello__">{{.L.hello}}</p>
+<h1>{{.Brand}}</h1>
+<p class="__role__">{{.L.role}}</p>
+<p class="__bio__">{{.L.bio}}</p>
+</div>
+{{end}}
+{{define "facts"}}<ul class="__facts__ __mini__">{{range .L.facts}}<li>{{icon "check"}} {{.}}</li>{{end}}</ul>
+{{end}}
+{{define "links"}}<ul class="__links__">{{range $i, $n := .Nav}}{{if gt $i 0}}<li><a href="{{$n.Href}}"><span class="__lt__"><strong>{{$n.Label}}</strong><span>{{index $.L.link_d (sub $i 1)}}</span></span>{{icon "arrow"}}</a></li>{{end}}{{end}}</ul>
+{{end}}
+{{template "head" .}}<body>
+{{if eq .Layout 0}}<main class="__single__">
+{{template "profile" .}}
+{{template "links" .}}
+{{template "facts" .}}
+<p class="__tiny__">{{.L.footer}}</p>
+</main>
+{{else if eq .Layout 1}}{{template "header" .}}
+<main class="__wrap__ __left__">
+{{template "profile" .}}
+{{template "links" .}}
+{{template "facts" .}}
+</main>
+{{template "footer" .}}
+{{else}}{{template "header" .}}
+<main class="__wrap__ __duo__">
+<section class="__card__ __sticky__">{{template "profile" .}}</section>
+<section>{{template "links" .}}{{template "facts" .}}</section>
+</main>
+{{template "footer" .}}
+{{end}}</body>
+</html>

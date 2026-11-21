@@ -1,0 +1,69 @@
+{
+  "ui": {
+    "en": {
+      "vars": {
+        "brand": {"join": [["Marian", "Tomas", "Elin", "Rosalind", "Hugo", "Greta", "Jonas", "Ida", "Maeve", "Kasper", "Lotte", "Anselm"], ["Ashdown", "Marlow", "Fenwick", "Thorne", "Quillen", "Hallam", "Redfern", "Wyld", "Larkin", "Pennick", "Ellery", "Thackeray"]], "sep": " "},
+        "city": ["Ashwell", "Harrowby", "Lindenmere", "Pellworth", "Oakhaven", "Stanmoor", "Wexcombe", "Fenbridge"],
+        "month": ["January", "March", "May", "September"],
+        "upd": ["August", "September", "October", "November"]
+      },
+      "nav_label": "Main", "footer": "Made by hand. No cookies, no tracking.",
+      "nav_home": "Card", "nav_about": "About", "nav_projects": "Projects", "nav_now": "Now", "home_title": "Hello",
+      "desc_about": "More about {brand}.", "desc_projects": "Selected projects by {brand}.", "desc_now": "What {brand} is doing at the moment.",
+      "nf_title": "Nothing here", "nf_text": "There is no page at this address. Try the card on the start page.", "nf_back": "Back to the card",
+      "link_d": ["Who I am and how I work", "A few things I have made", "What I am doing at the moment"],
+      "about_h": "About", "facts_h": "In short", "projects_h": "Projects", "projects_intro": "A few things I am glad to have made, newest first.", "now_h": "Now", "updated": "Updated {upd} 2026",
+      "now_intro": "This is a now page: what I am up to at the moment, as opposed to what I once said I would do.", "hello": "Hello, I am"
+    }
+  },
+  "bundles": [
+    {
+      "lang": "en", "role": "Illustrator and printmaker", "tagline": "Pictures for books, posters and the odd birthday card.",
+      "desc": "{brand}: illustrator and printmaker in {city}. Picture books, posters and linocuts.",
+      "bio": "I draw pictures for picture books and posters, and cut linocuts for anyone who asks politely.",
+      "about": ["I draw for a living, mostly for picture books and the occasional poster. I work from a small room in {city} with a window onto a car park, which I draw as if it were a lake.", "Before illustration I studied textile printing, and the habit of thinking in layers never quite left. Most of my pictures are built from three or four flat colours."],
+      "facts": ["Based in {city}", "Working with pen, ink and linocut", "Taking new commissions from {month}"],
+      "projects": [
+        {"t": "Field Notes", "y": "2025", "d": "A picture book about a year in one small field, made with a local press."},
+        {"t": "The Market Series", "y": "2024", "d": "Twelve linocuts of stalls, shoppers and one very smug pigeon."},
+        {"t": "Birthday cards for a bookshop", "y": "2023", "d": "Six cards, printed by hand in editions of two hundred."}],
+      "now": ["Finishing the last spreads of a picture book about weather", "Learning to cut a four-colour linocut without losing my temper", "Looking for a larger press"]
+    },
+    {
+      "lang": "en", "role": "Translator, German into English", "tagline": "Careful translations of fiction, essays and the occasional manual.",
+      "desc": "{brand}: translator from German into English, working on fiction and essays from {city}.",
+      "bio": "I translate German into English, mostly fiction and essays, and read everything aloud twice.",
+      "about": ["I translate from German into English, mostly fiction and essays, and sometimes the instruction manual of a thing that deserves better writing.", "I work slowly, read everything aloud twice and send a note about every sentence I could not decide on. Editors tell me this is either charming or maddening."],
+      "facts": ["Based in {city}", "Translating German into English", "Open to new projects from {month}"],
+      "projects": [
+        {"t": "A novel about a lighthouse keeper", "y": "2025", "d": "Four hundred pages of weather and regret, translated over fourteen months."},
+        {"t": "Essays on walking", "y": "2024", "d": "A collection of short pieces by a writer who went everywhere on foot."},
+        {"t": "A museum catalogue", "y": "2023", "d": "Texts for an exhibition of textiles, with more adjectives than I would have chosen."}],
+      "now": ["Revising the translation of a long novel", "Reading essays I might suggest to a publisher", "Updating my glossary of nautical terms"]
+    },
+    {
+      "lang": "en", "role": "Potter", "tagline": "Plain bowls, mugs and plates, made in small batches.",
+      "desc": "{brand}: potter in {city}. Everyday stoneware, thrown on the wheel.",
+      "bio": "I throw plain stoneware on the wheel and fire it in small batches.",
+      "about": ["I make functional pottery in a studio shared with three other makers in {city}. Everything is thrown on the wheel and fired to stoneware.", "I like pots that disappear into daily use: a mug that fits the hand, a bowl that does not tip. The glazes are mostly iron and ash, and they change a little in every firing."],
+      "facts": ["Based in {city}", "Throwing stoneware on the wheel", "New pots most {month}"],
+      "projects": [
+        {"t": "Everyday set", "y": "2025", "d": "Plates, bowls and mugs in an oatmeal glaze that did not come out the same twice."},
+        {"t": "Tea bowls", "y": "2024", "d": "Thirty small bowls, each a little different, made for a tea house."},
+        {"t": "A tile commission", "y": "2023", "d": "A wall of hand-pressed tiles for a kitchen, in four greens."}],
+      "now": ["Testing an ash glaze made from a neighbour's bonfire", "Throwing larger plates", "Making room on the kiln shelves for winter orders"]
+    },
+    {
+      "lang": "en", "role": "Software developer, small tools", "tagline": "Small, quiet programs that do one thing and stay out of the way.",
+      "desc": "{brand}: developer of small tools in {city}. A notes app, a calendar and a few command line programs.",
+      "bio": "I write small tools for people who work with words and numbers, and try to ship them finished.",
+      "about": ["I write small tools for people who work with words and numbers: a notes app, a few command line programs, a calendar that only shows what matters today.", "I build things slowly and try to ship them finished. Most of what I make has fewer features than it could, which is on purpose."],
+      "facts": ["Based in {city}", "Writing in a few boring languages", "Available for small projects from {month}"],
+      "projects": [
+        {"t": "A notes app for the desktop", "y": "2025", "d": "Plain text files, fast search and no account."},
+        {"t": "A calendar for one day", "y": "2024", "d": "Shows today and nothing else, which turns out to be enough."},
+        {"t": "A time tracker", "y": "2023", "d": "One button and a weekly summary, for people who dislike timesheets."}],
+      "now": ["Tidying the code of the notes app", "Writing a short manual", "Thinking about a smaller version of everything"]
+    }
+  ]
+}

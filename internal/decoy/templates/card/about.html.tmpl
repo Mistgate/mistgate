@@ -1,0 +1,11 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __text__">
+<h1>{{.L.about_h}}</h1>
+{{range .L.about}}<p>{{.}}</p>
+{{end}}<h2>{{.L.facts_h}}</h2>
+<ul class="__facts__">{{range .L.facts}}<li>{{icon "check"}} {{.}}</li>{{end}}</ul>
+</main>
+{{template "footer" .}}
+</body>
+</html>
