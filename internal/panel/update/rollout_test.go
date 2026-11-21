@@ -1345,7 +1345,7 @@ func TestCancelWaitsForTheStepInFlight(t *testing.T) {
 	e.startRollout()
 	e.tick()
 	got, err := e.s.cancel(e.ctx, "")
-	if err != nil || got.Status != store.RolloutRunning {
+	if err != nil || got.Status != store.RolloutPaused || got.PauseKey != pauseCancelWait {
 		t.Fatalf("cancel with a step in flight: %+v %v", got, err)
 	}
 	e.wantStep(b, store.StepSkipped, "cancelled")
@@ -1356,19 +1356,21 @@ func TestCancelWaitsForTheStepInFlight(t *testing.T) {
 	e.wantStep(a, store.StepPassed, "")
 	e.wantRollout(store.RolloutCancelled, "")
 
-	// the same with a step that fails: FAILED wins over CANCELLED
+	// a failed in-flight step still leaves the rollout cancelled
 	e2 := newEnv(t)
 	e2.defaultBundle()
 	c := e2.addNode("c", nodeOpts{online: 0})
 	e2.addNode("d", nodeOpts{online: 1})
 	e2.startRollout()
 	e2.tick()
-	e2.s.cancel(e2.ctx, "")
+	if _, err := e2.s.cancel(e2.ctx, ""); err != nil {
+		t.Fatal(err)
+	}
 	e2.upgrade(c)
 	e2.tick()
 	e2.clk.Advance(6 * time.Minute)
 	e2.tick()
-	e2.wantRollout(store.RolloutFailed, "")
+	e2.wantRollout(store.RolloutCancelled, "")
 }
 
 // A rollout paused by a failed step with nothing left pending (a fleet of one) still ends when the owner cancels it,
@@ -1387,7 +1389,7 @@ func TestCancelEndsAPausedRolloutWithNothingPending(t *testing.T) {
 	if len(e.s.Conditions(e.ctx)) != 1 {
 		t.Fatalf("a gate failure raises the alert: %+v", e.s.Conditions(e.ctx))
 	}
-	if got, err := e.s.cancel(e.ctx, ""); err != nil || got.Status != store.RolloutFailed {
+	if got, err := e.s.cancel(e.ctx, ""); err != nil || got.Status != store.RolloutCancelled {
 		t.Fatalf("cancel a paused rollout with nothing pending: %+v %v", got, err)
 	}
 	if conds := e.s.Conditions(e.ctx); len(conds) != 0 {

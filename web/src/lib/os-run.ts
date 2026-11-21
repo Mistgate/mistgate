@@ -11,7 +11,7 @@ import { minutesText } from "./format";
 import { kernelBlock, kernelWhyKey, parseKernelBlock } from "./os-kernels";
 import { osUpdatesQuery, type OsRow, type OsRun, type OsStepRow } from "./os-updates";
 import { plain } from "./plain";
-import { failedProfilesText } from "./updates";
+import { failedProfilesText, isCancelWait } from "./updates";
 
 // The run of an OS update on one node: install the security updates and/or reboot (UpdateService.StartOsRollout), watch
 // the step, close a stopped run (CancelOsRollout), refresh the package lists (RefreshOsUpdates). The data is in
@@ -160,6 +160,7 @@ export function pauseCode(pauseKey: string, params: Record<string, string> = {})
 
 /** The banner of a stopped run: "os.pause.<code>" with the node's name. `params` = the pause's own (reason, mode). */
 export function pauseText(t: T, pauseKey: string, node: string, params: Record<string, string> = {}): string {
+  if (isCancelWait(pauseKey, params)) return t("updates.pause.cancel_wait");
   const key = `os.pause.${pauseCode(pauseKey, params)}`;
   return t(hasKey(key) ? key : "os.pause.step_failed", { node });
 }

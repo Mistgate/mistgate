@@ -963,6 +963,17 @@ func TestRolloutPauseNeedsRunning(t *testing.T) {
 	}
 }
 
+func TestRolloutCancelPlanExplainsInFlightWait(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	e.w.rolloutStat = adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING
+	p := planOf(t, s, "rollout_cancel", map[string]any{"rollout_id": "rol_1"})
+	if !p.NeedsApproval || !strings.Contains(p.Summary, "step already in progress finishes and is checked") || !strings.Contains(p.Summary, "steps that have not started are skipped") {
+		t.Fatalf("cancel plan does not describe the in-flight rule: %+v", p)
+	}
+}
+
 func TestNodeRollbackAndOtherChanges(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileAdmin)

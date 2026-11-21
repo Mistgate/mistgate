@@ -37,9 +37,6 @@ const (
 	pauseGateFailed    = "gate_failed"
 	pauseBundleChanged = "bundle_changed"
 	pausePanelRestart  = "panel_restart_ambiguous"
-	// pauseCancelWait is a cancelled rollout that waits for the step still in flight. A cancel that skips no step leaves no
-	// other mark of itself, and the step's failure would pause the rollout for ever.
-	pauseCancelWait = "cancel_wait"
 )
 
 // Step error codes the panel itself produces (the agent's own codes come through as they are).
@@ -450,7 +447,7 @@ func (s *Service) resume(ctx context.Context, id string) (store.RolloutRow, erro
 	if ro.Status != store.RolloutPaused {
 		return ro, precondition("rollout is not paused")
 	}
-	if ro.PauseKey == pauseCancelWait {
+	if isCancelWait(ro.PauseKey, nil) {
 		return ro, precondition("rollout cancellation is waiting for a node to finish")
 	}
 	steps, err := s.st.RolloutSteps(ctx, ro.ID)
@@ -483,23 +480,20 @@ func (s *Service) cancel(ctx context.Context, id string) (store.RolloutRow, erro
 	if err != nil {
 		return ro, s.internal("load steps", err)
 	}
-	skipped := slices.ContainsFunc(steps, func(x store.StepRow) bool { return x.State == store.StepSkipped && x.ErrorKey == errCancelled })
-	switch {
-	case !skipped && slices.ContainsFunc(steps, func(x store.StepRow) bool { return !x.Decided() }):
-		// nothing was skipped and a step is in flight: no step carries the cancel, so the rollout does
+	if cancelMustWaitForStep(steps, func(x store.StepRow) bool { return x.State == store.StepSent || x.State == store.StepGating }) {
 		if _, err := s.st.SetRolloutStatus(ctx, ro.ID, []string{ro.Status}, store.RolloutPaused, pauseCancelWait, nil, time.Time{}); err != nil {
 			return ro, s.internal("cancel rollout", err)
 		}
 		ro.Status, ro.PauseKey = store.RolloutPaused, pauseCancelWait
-	case ro.Status == store.RolloutPaused:
-		// finishIfDone ends a PAUSED rollout only when it is cancelled. With nothing in flight (a fleet of one whose step
-		// failed) it would stay paused for ever, with its alert: a cancelled rollout waits for nobody.
-		if _, err := s.st.SetRolloutStatus(ctx, ro.ID, []string{store.RolloutPaused}, store.RolloutRunning, "", nil, time.Time{}); err != nil {
+	} else {
+		ok, err := s.st.SetRolloutStatus(ctx, ro.ID, []string{ro.Status}, store.RolloutCancelled, "", nil, s.now())
+		if err != nil {
 			return ro, s.internal("cancel rollout", err)
 		}
-		ro.Status = store.RolloutRunning
+		if ok {
+			s.startNodeBundleSyncLocked()
+		}
 	}
-	s.finishIfDone(ctx, ro, steps) // nothing in flight: ends now; else when the steps in flight are decided
 	s.loadUpdating(ctx)
 	return s.reload(ctx, ro.ID)
 }
@@ -516,7 +510,7 @@ func (s *Service) reload(ctx context.Context, id string) (store.RolloutRow, erro
 // CANCELLED (the owner cancelled). A PAUSED rollout is only ended this way after a cancel: otherwise the pause (and
 // its alert) waits for the owner.
 func (s *Service) finishIfDone(ctx context.Context, ro store.RolloutRow, steps []store.StepRow) bool {
-	cancelled, bad := ro.Status == store.RolloutPaused && ro.PauseKey == pauseCancelWait, false
+	cancelled, bad := ro.Status == store.RolloutPaused && isCancelWait(ro.PauseKey, nil), false
 	for _, x := range steps {
 		switch {
 		case !x.Decided():
@@ -532,10 +526,10 @@ func (s *Service) finishIfDone(ctx context.Context, ro store.RolloutRow, steps [
 	}
 	status := store.RolloutDone
 	switch {
-	case bad:
-		status = store.RolloutFailed
 	case cancelled:
 		status = store.RolloutCancelled
+	case bad:
+		status = store.RolloutFailed
 	}
 	ok, err := s.st.SetRolloutStatus(ctx, ro.ID, []string{store.RolloutRunning, store.RolloutPaused}, status, "", nil, s.now())
 	if err != nil {
@@ -683,28 +677,16 @@ func (p *pass) pause(code string, x *store.StepRow, reason string) {
 	}
 	params := map[string]string{"node": x.NodeName, "node_id": x.NodeID, "reason": reason}
 	maps.Copy(params, failedProfileNotes(x.Params)) // the profiles that did not pass: the owner reads them on the pause too
-	// only over the status and the pause this pass read: a rollout paused or resumed meanwhile keeps what the other writer made of it
-	ok, err := p.s.st.PauseRollout(p.ctx, p.ro.ID, p.ro.Status, p.ro.PauseKey, code, params)
+	// A second writer must keep a pause it recorded unless an owner resumed after this pass read the old one.
+	ro, ok, err := pauseOverRead(p.ctx, p.ro.ID, p.ro, code, params, rolloutPauseState, rolloutPauseCAS{p.s.st})
 	if err != nil {
 		p.s.log.Warn("update: pause rollout", "rollout", p.ro.ID, "err", err)
 		return
 	}
+	p.ro = ro
 	if ok {
 		p.ro.Status, p.ro.PauseKey, p.ro.PauseParams = store.RolloutPaused, code, params
 		p.s.log.Warn("update: rollout paused", "rollout", p.ro.ID, "reason", code, "node", x.NodeName, "detail", reason)
-		return
-	}
-	// The write was lost: the rollout is not what this pass read. Go on with what is stored (the rest of the pass must not
-	// close or launch on the old reading); one that is running again, resumed after the pass read it paused, still pauses.
-	ro, err := p.s.st.Rollout(p.ctx, p.ro.ID)
-	if err != nil {
-		p.s.log.Warn("update: reload rollout", "code", "update_rollout_reload_failed", "rollout", p.ro.ID, "err", err)
-		return
-	}
-	resumed := p.ro.Status != store.RolloutRunning && ro.Status == store.RolloutRunning
-	p.ro = ro
-	if resumed {
-		p.pause(code, x, reason)
 	}
 }
 

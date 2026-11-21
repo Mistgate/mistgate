@@ -178,7 +178,7 @@ func (p *osPass) waitTryLater(x *store.OsStepRow, code string, retryAt time.Time
 
 // cancelRequested: the owner cancelled while a job was still running, so nothing may be queued again.
 func (p *osPass) cancelRequested() bool {
-	return p.ro.PauseParams["cancel_requested"] == "true" ||
+	return isCancelWait(p.ro.PauseKey, p.ro.PauseParams) ||
 		slices.ContainsFunc(p.steps, func(x store.OsStepRow) bool { return x.State == store.OsStepSkipped && x.ErrorKey == errCancelled })
 }
 
