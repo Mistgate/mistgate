@@ -15,6 +15,7 @@
 <ul class="__hours__">{{range .L.hours}}<li>{{hrs .from .to .open .close}}</li>{{end}}{{if .L.hours_note}}<li>{{.L.hours_note}}</li>{{end}}</ul>
 </div>
 </section>
+{{template "contactmap" .}}
 <h2>{{.L.directions_h}}</h2>
 <p>{{.L.directions}}</p>
 <p class="__mu__">{{.L.contact_note}}</p>
