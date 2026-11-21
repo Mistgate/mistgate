@@ -301,18 +301,25 @@ func TestBridgeAllowsTwoExitsAndUsesFourConnectionsForBusyRelay(t *testing.T) {
 		{PeerNodeId: second.nodeID, Conns: 2, SinceUnix: time.Now().Unix() - 60, SiteCertPinSha256: bridgePin}}
 	x.f.recordBridgeReports(x.ctx, x.entry.nodeID, entryConn.bridges, time.Now())
 	x.f.StateChanged()
-	entryState := entryConn.next(entryModel)
 	wantExits := []string{x.exit.nodeID, second.nodeID}
 	if wantExits[0] > wantExits[1] {
 		wantExits[0], wantExits[1] = wantExits[1], wantExits[0]
 	}
+	// The setup above kicks the recompute more than once; a delta from before the second relay existed may come first.
+	entryState := entryConn.nextUntil(entryModel, func(ds *agentv1.DesiredState) bool {
+		return ds.BridgeServe != nil && len(ds.BridgeServe.ExitNodeIds) == len(wantExits)
+	})
 	if entryState.BridgeServe == nil || len(entryState.BridgeServe.ExitNodeIds) != len(wantExits) ||
 		entryState.BridgeServe.ExitNodeIds[0] != wantExits[0] || entryState.BridgeServe.ExitNodeIds[1] != wantExits[1] {
 		t.Fatalf("entry allowed exits = %v", entryState.BridgeServe)
 	}
 	assertAgentBridgeValid(t, entryState, x.pool)
-	firstState := exitConn.next(exitModel)
-	secondState := secondConn.next(secondModel)
+	firstState := exitConn.nextUntil(exitModel, func(ds *agentv1.DesiredState) bool {
+		return ds.BridgeDials != nil && len(ds.BridgeDials.Items) == 1 && ds.BridgeDials.Items[0].Pool == 4
+	})
+	secondState := secondConn.nextUntil(secondModel, func(ds *agentv1.DesiredState) bool {
+		return ds.BridgeDials != nil && len(ds.BridgeDials.Items) == 1
+	})
 	if firstState.BridgeDials == nil || len(firstState.BridgeDials.Items) != 1 || firstState.BridgeDials.Items[0].Pool != 4 ||
 		len(firstState.BridgeDials.Items[0].Targets) != 1 || firstState.BridgeDials.Items[0].Targets[0].RelayId != "rly_a" {
 		t.Fatalf("busy exit's bridge dials = %v", firstState.BridgeDials)
