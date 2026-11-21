@@ -337,6 +337,10 @@ func artSVG(r *rng, kind string, hue float64, w, h int, id string, standalone bo
 		b.WriteString(svgOpen(r, vb, par, `role="img"`, `aria-hidden="true"`, `class="__art__"`))
 	}
 	W, H := float64(w), float64(h)
+	if drawSubject(&b, r, kind, hue, W, H, id) {
+		b.WriteString("</svg>")
+		return b.String()
+	}
 	fw := func(lo, hi float64) float64 { return lo + r.float()*(hi-lo) }
 	switch kind {
 	case "landscape":

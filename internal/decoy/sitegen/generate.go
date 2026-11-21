@@ -1056,36 +1056,6 @@ func (s *site) fmonth(t time.Time) string {
 // gives the same answer, whichever page is made first. funcMap(nil) is only the list of names.
 func funcMap(c *ctx) map[string]tmplFunc {
 	key := func(k string) *rng { return c.r.sub("k:" + k) }
-	argStr := func(a []any, i int) string {
-		if i >= len(a) {
-			fail("a function is missing argument %d", i+1)
-		}
-		s, ok := a[i].(string)
-		if !ok {
-			fail("argument %d should be a string, not %T", i+1, a[i])
-		}
-		return s
-	}
-	argInt := func(a []any, i int) int {
-		if i >= len(a) {
-			fail("a function is missing argument %d", i+1)
-		}
-		n, ok := a[i].(int)
-		if !ok {
-			fail("argument %d should be a number, not %T", i+1, a[i])
-		}
-		return n
-	}
-	argList := func(a []any, i int) []any {
-		if i >= len(a) {
-			fail("a function is missing argument %d", i+1)
-		}
-		l, ok := a[i].([]any)
-		if !ok || len(l) == 0 {
-			fail("argument %d should be a list that is not empty", i+1)
-		}
-		return l
-	}
 	fm := map[string]tmplFunc{
 		"one": func(a []any) any {
 			k, l := argStr(a, 0), argList(a, 1)
@@ -1244,5 +1214,6 @@ func funcMap(c *ctx) map[string]tmplFunc {
 			return b.String()
 		},
 	}
+	maps.Copy(fm, drawFuncs(c))
 	return fm
 }
