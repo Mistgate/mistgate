@@ -6,7 +6,7 @@ package mtproto
 // default) or another site the owner names, which also decides what a stranger on the port
 // sees (the node's own site, or that site). The editor hides the domain unless the kind is
 // another site (web/src/screens/profiles/mtproto-form.ts).
-// The mode (Fake TLS, or the Web Proxy of Telegram Web) comes first; Web fixes the port to 443 and
+// The mode (Fake TLS, or the Web Proxy the Telegram apps reach as an HTTPS site) comes first; Web fixes the port to 443 and
 // the name to the node's own.
 const settingsSchema = `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",

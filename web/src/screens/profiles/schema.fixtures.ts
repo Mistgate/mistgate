@@ -318,7 +318,7 @@ export const mtproto = JSON.stringify({
       default: "fake_tls",
       "x-enum-labels": { fake_tls: "Fake TLS", web: "Web" },
       title: "Mode",
-      description: "Fake TLS is the proxy of the Telegram apps (tg://proxy). Web is the proxy of Telegram Web in a browser.",
+      description: "Fake TLS is the usual Telegram proxy (tg://proxy). Web is a newer kind (tg://webproxy): the Telegram app reaches the proxy as an ordinary HTTPS site.",
       "x-widget": "segmented",
       "x-order": 5,
       "x-critical": true,

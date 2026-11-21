@@ -1,10 +1,10 @@
 // What the MTProto form does that the generic schema form does not know: the site is asked for only when the Fake TLS name is
 // "another site" (the node's own name needs nothing typed), as the REALITY target is for VLESS (vless-form.ts); and the mode Web
-// (the proxy of Telegram Web) fixes the port to 443 and the name to the node's own, so those rows leave or stop being editable.
+// (the proxy the Telegram apps reach as an HTTPS site) fixes the port to 443 and the name to the node's own, so those rows leave or stop being editable.
 
 import { getAt, setAt, type Field, type Group, type Settings } from "./schema";
 
-/** The Web Proxy of Telegram Web instead of the Fake TLS proxy of the apps. */
+/** The Web Proxy (tg://webproxy) instead of the Fake TLS proxy. */
 export function mtprotoWeb(s: Settings): boolean {
   return String(getAt(s, ["mode"]) ?? "") === "web";
 }

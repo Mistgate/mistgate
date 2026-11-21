@@ -401,7 +401,7 @@ describe("the Web mode of an MTProto profile", () => {
     await click(radio("Web"));
     expect(tcpPort().disabled).toBe(true);
     expect(tcpPort().value).toBe("443");
-    expect(text()).toContain("Fixed: Telegram Web reaches the proxy over HTTPS, and that is port 443 only.");
+    expect(text()).toContain("Fixed: the Telegram app reaches a Web proxy over HTTPS, and that is port 443 only.");
     expect(text()).toContain("Needs a subdomain of its own on the node");
     expect(text()).toContain("calls do not work through it");
     expect(radio("This node’s name")).toBeUndefined();

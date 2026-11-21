@@ -521,7 +521,7 @@ const tgLinks = [tgFra, { ...tgFra, ipv6: true, url: tgUrl("[2001:db8::7]") }, {
 // the person's Telegram key among the devices: issued by the admin, used by Telegram two hours ago
 const tgKey = { ...dev("tg1", "", "Telegram proxy", "telegram", 2 * hour, false, "telegram"), can_remove: false, can_rename: false };
 cases.telegram = { ...returning, access: { ...returning.access, telegram: true }, telegram: { links: tgLinks }, devices: [...returning.devices, tgKey] };
-// the Web Proxy of Telegram Web (tg://webproxy, its own name on the node) beside the Fake TLS proxy of the same node: tagged "Web"
+// a Web Proxy (tg://webproxy, its own name on the node) beside the Fake TLS proxy of the same node: tagged "Web"
 const tgWebUrl = (host: string) => `tg://webproxy?server=${host}&port=443&secret=dd0123456789abcdef0123456789abcdef`;
 cases["telegram-web"] = { ...cases.telegram!, telegram: { links: [tgFra, { ...tgFra, web: true, url: tgWebUrl("web.de1.example.com") }, tgLinks[3]!] } };
 // a first visit with Telegram on: the steps first, then the servers and the proxy

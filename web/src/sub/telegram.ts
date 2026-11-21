@@ -45,7 +45,7 @@ const chosen: Record<string, number> = {};
 /** The dev server's `&proxy=<n>`: the n-th proxy of the panel ("tg", "tt") is the chosen one. */
 export const pickProxy = (key: "tg" | "tt", n: number) => void (chosen[key] = n);
 
-/** The marks of a proxy: IPv6, a twin through a node of another country, and the Web Proxy of Telegram Web (tg://webproxy). */
+/** The marks of a proxy: IPv6, a twin through a node of another country, and a Web Proxy (tg://webproxy). */
 const marks = (c: Ctx, l: ProxyLink): HTMLElement[] => [l.web && h("span", { class: "u-tag", title: c.t.tgWebHint }, c.t.tgWeb), l.ipv6 && h("span", { class: "u-tag dir" }, "IPv6"), l.relay && h("span", { class: "u-tag ru", title: c.t.viaHint(l.via) }, c.t.chipVia(l.via))].filter((x): x is HTMLElement => !!x);
 
 const nameOf = (c: Ctx, l: ProxyLink) => serverName(l, c.s.lang);

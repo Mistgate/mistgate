@@ -1,9 +1,9 @@
 ---
 title: MTProto (Telegram proxy)
-description: "The MTProto profile: a proxy for the Telegram app only, behind Fake TLS. When it helps and where it does not, the two choices of the name in the handshake, adding a profile, giving a person the link, re-issuing and revoking the key, relays, what the health check proves, and what is not built yet."
+description: "The MTProto profile: a proxy for the Telegram app only, behind Fake TLS. When it helps and where it does not, the two choices of the name in the handshake, adding a profile, giving a person the link, re-issuing and revoking the key, relays, what the health check proves, the experimental Web mode (the Web Proxy, in development), and what is not built yet."
 ---
 
-MTProto is Telegram's own proxy protocol. A Mistgate MTProto profile makes every node it runs on a proxy server for the **Telegram app and nothing else**: the person taps a link, Telegram adds the proxy to its settings, and Telegram's traffic goes through the node. It is not a VPN: other apps do not use it, and no VPN app reads it. This page lists the settings of an MTProto profile and how a person gets the link; how a profile is made and put on nodes is on [Profiles](profiles.md).
+MTProto is Telegram's own proxy protocol. A Mistgate MTProto profile makes every node it runs on a proxy server for the **Telegram app and nothing else**: the person taps a link, Telegram adds the proxy to its settings, and Telegram's traffic goes through the node. It is not a VPN: other apps do not use it, and no VPN app reads it. This page lists the settings of an MTProto profile and how a person gets the link; how a profile is made and put on nodes is on [Profiles](profiles.md). A profile can also run in the **Web** mode, which gives people a different kind of link; it is described under [Web Proxy](#web-proxy).
 
 ![The Telegram proxy: a new MTProto profile, its form and a person's Telegram links](../../images/video/telegram-poster-en.webp)
 
@@ -46,8 +46,9 @@ The editor shows the settings under **Basics**. Critical settings change the lin
 
 | Setting | Default | Critical | What it does |
 |:--|:--|:--|:--|
-| **TCP port** | 443 | yes | The TCP port the node listens on, 1 to 65535. |
-| **Name in the TLS handshake** | This node's name | yes | **This node's name** or **Another site**. See above. |
+| **Mode** | Fake TLS | yes | **Fake TLS** or **Web**. Web is the [Web Proxy](#web-proxy): the port is fixed at 443 and the name is the node's own. The rest of this page is about Fake TLS unless it says otherwise. |
+| **TCP port** | 443 | yes | The TCP port the node listens on, 1 to 65535. In the Web mode it is fixed at 443. |
+| **Name in the TLS handshake** | This node's name | yes | **This node's name** or **Another site**. See above. The Web mode has no such choice: the editor hides it. |
 | **Site** | empty | yes | Another site only: the host name of that site. |
 
 On a node the profile can have its own **Port**, and, with **This node's name**, its own **Domain (SNI)**, which is then the name in the handshake.
@@ -105,6 +106,8 @@ A person's Telegram links follow the same rules as other servers (see [Subscript
 - if the node has an [IPv6 entry](nodes.md#ipv6-entry), there is a second link at its IPv6 address, marked **IPv6**;
 - for each working [relay](relays.md) of the node there is another link through the entry node, marked **via RU** (the entry's country). The relay passes the connection on unchanged, so the key and the name in the handshake stay those of the exit.
 
+A Web Proxy link has neither an IPv6 twin nor a relay: see [Web Proxy](#web-proxy).
+
 ## What the health check proves
 
 The panel checks every MTProto profile as Telegram would use it, with a hidden key of its own that belongs to no person ([Health](../operations/health.md#mtproto)):
@@ -115,9 +118,99 @@ The panel checks every MTProto profile as Telegram would use it, with a hidden k
 
 A green cell therefore proves that the node accepts a client, can reach Telegram, and that Telegram answers through it. It does not prove that a network inside a country that blocks MTProto lets the traffic through. When it fails, the cell says at which step.
 
+## Web Proxy
+
+> **Warning:** The **Web** mode is **in development** and has not been tried on live Telegram apps yet: the page the app loads from the node is still a stub, and no real Telegram app has been checked against it. Do not give Web links to people yet. This section describes what the panel and the node do today.
+
+A profile in the **Web** mode serves another kind of Telegram link, `tg://webproxy`. There is no Fake TLS handshake: the Telegram app visits a name of the node over HTTPS, as a browser visits a site, and carries its traffic over that connection. Anyone who visits the name without a key sees the node's own site.
+
+A Web Proxy is a proxy for the **Telegram apps** (Desktop, Android and iOS), like every other proxy on this page. It is not Telegram Web in a browser: a browser tab does not use it. Support in the apps is still uneven: it is in recent versions of Telegram Desktop, and on phones it arrives as the apps get it. An app that does not know `tg://webproxy` cannot use the link.
+
+### How it differs from Fake TLS
+
+| | Fake TLS | Web |
+|:--|:--|:--|
+| Link | `tg://proxy`, the secret starts with `ee` | `tg://webproxy`, the secret starts with `dd` |
+| What the connection looks like | A TLS 1.3 handshake with a site, then Telegram's own protocol | An HTTPS visit to a host name, with that name's real certificate |
+| Port | Any TCP port, 443 by default | 443 only |
+| The name | In the secret: the node's name or another site | The node's own name; another site is not possible |
+| What a stranger sees | The node's decoy site, or the other site you named | The node's own site |
+| Relays and IPv6 twin | Yes | No |
+| The node's agent | v0.1.69 or newer | One that lists `mtproto-web/1` |
+
+The person's Telegram key is the same for both: one key per person, so re-issuing or revoking it ends both kinds of link at once.
+
+### When to choose it
+
+The Web mode is newer than Fake TLS and unproven, so treat it as a second way beside Fake TLS, not a replacement. It suits a node where you want the proxy to look like a visit to an ordinary site under a name of its own, for people whose Telegram app supports it. Give the same people a Fake TLS profile as well: a person gets the links of every MTProto profile on the nodes they may use, and when one kind fails on their network, the other may still work.
+
+Choose Fake TLS when you need a port other than 443, a relay or an IPv6 twin, or when your people's apps do not know `tg://webproxy` yet.
+
+### What it needs
+
+- **A name of its own for the profile on the node.** A host name with a dot, such as `tg.example.com`, with a DNS record that leads to the node (an `A` record with the value `192.0.2.10`), without a proxy (the grey cloud on Cloudflare). It is the node's own host name, or the **Domain (SNI)** you give the profile on that node. Prefer a name of its own: where another service already stands on TCP 443 under the node's name, a second one cannot take the same name (`sni_taken`). A node known only by an IP address needs the name in any case. The node asks Let's Encrypt for the name's certificate by itself once the name leads to it; until then clients cannot connect, and the health check says the certificate is not issued yet.
+- **TCP 443 of the node, free or shared.** The Web profile takes TCP 443 for itself, or stands beside VLESS, TrustTunnel and Fake TLS MTProto on the shared port, each under its own name: see [One 443 for everyone](shared-port.md). It shows the node's own site, so the node's other services can share the port with it.
+- **A node agent that lists `mtproto-web/1`.** An older agent would ignore the mode and start a Fake TLS server under the same profile, so the panel does not send it the profile (see Limits below).
+
+### Turn it on
+
+1. Prepare the name and add its DNS record, as above.
+2. Open **Profiles**, press **New profile** and pick the **MTProto** card.
+3. Set **Mode** to **Web**. The editor sets the **TCP port** to 443 and locks it, hides **Name in the TLS handshake**, and says under **Mode** that the profile needs a subdomain of its own on the node. **Mode** is a critical setting: on an existing profile, changing it changes the links people have (see [Profiles](profiles.md)).
+4. Name the profile, put it on nodes and add it to a group, then **Create profile**. When TCP 443 on a node is already held by another service, the window asks for the name and shows the DNS record (**Put beside on 443**, see [One 443 for everyone](shared-port.md#in-the-admin)). Otherwise type the name into **Domain (SNI)** for that node, or leave it empty to use the node's host name.
+5. Add the DNS record. Once the certificate is issued, the profile's cell in [Health](../operations/health.md) turns green.
+
+If a profile has a port of its own on a node that is not 443, it does not start there. The editor warns about it before you save: take that port off on the profile's **Servers on nodes** tab. A node with only an IP address and no **Domain (SNI)** refuses the profile with the reason, as it does for Fake TLS.
+
+### What the person sees
+
+Nothing changes in how Telegram is given to a person: the same switch, the same key. The **Telegram proxy** block of their page and the same block in the admin show a Web link as a row marked **Web**; the hint on the mark says it is a Web Proxy link. It is named by the server's country and place, like the others, and has **Open in Telegram** and **Copy link** (and a QR code in the admin). A link looks like this:
+
+```ini
+tg://webproxy?server=tg.example.com&port=443&secret=dd<key>
+```
+
+Here `server` is the profile's name on the node, not the node's address, and the key is the person's Telegram key. The link is the key, as with Fake TLS.
+
+### What a stranger sees
+
+Anyone who does not hold a key gets the node's own site ([Your own decoy site](decoy-site.md)): on every path, also on a request that looks like the app's but carries a wrong or revoked key, and with the name's real certificate. Only the holder of a key gets the hidden page that the app uses; after the key is re-issued or revoked, the old link meets the site. This is not invisibility: the name is listed in public certificate logs like every Let's Encrypt name, and a visitor who knows it finds an ordinary site there.
+
+### Limits
+
+- **Telegram apps only**, and only those that support the Web Proxy. A browser tab does not use it.
+- **No calls.** Calls do not work through a Web Proxy; this is a limit of the Web Proxy of the Telegram apps, not of Mistgate.
+- **Port 443 only.** The profile's port cannot be changed, and a port of its own on a node is refused.
+- **No relays and no IPv6 twin.** The link carries a name, not an address, so a twin at another address would be a copy of the same link. A relay is refused with the reason `webproxy`: in the admin, "Web Proxy works only straight on the node", and in MCP `relay_candidates` lists the server as unsupported.
+- **A fresh node agent.** The panel sends the profile only to an agent that lists `mtproto-web/1`. On an older one the server shows as not started, with a note that the node's agent is older than this profile needs and a request to update the node on the **Updates** page; everything else on the node keeps updating.
+- **The same limits per key as Fake TLS:** up to 64 connections at once.
+- **Experimental**, like the whole protocol.
+
+### How the panel checks it
+
+The panel checks a Web profile with a client of its own, not with a Telegram app, using the profile's hidden check key:
+
+1. connects over TCP to port 443 of the node, with the profile's name in the TLS hello, and checks the certificate of the name;
+2. asks for the hidden page the way the app does, and gets it only if the node accepts the key;
+3. opens a session and a stream through the node;
+4. asks Telegram's data centre 2 for a first message (`req_pq_multi`) and checks that a valid answer comes back;
+5. closes the session.
+
+A green cell proves that the node, the certificate, the Web Proxy service on the node's site and Telegram's data centre work. It does not prove that a Telegram app accepts the page, or that a network inside a country that blocks MTProto lets the traffic through. When it fails, the cell says at which step. The codes, and the cell's own words for them:
+
+| Code | The cell says | What it means for the Web Proxy |
+|:--|:--|:--|
+| `refused` | Connection refused: nothing listens on the port | The TCP connection to port 443 failed: the profile did not start, or a firewall is in the way |
+| `timeout` | No answer in time: the handshake or the first request did not complete … | A step did not answer in time: the connection, the page, the session or Telegram's data centre |
+| `tls` | Certificate or domain does not match | The secure connection to the name failed: the certificate is not issued yet (the DNS record is missing or new), it is for another name, or the connection broke before the page came |
+| `auth` | The node refused the panel's check account | The node answered with its site instead of the hidden page: it does not accept the check key, for example because the profile was just changed and the node has not applied it |
+| `session` | The node could not create the Web Proxy carrier session | The page came, but the node did not create the session or open the stream |
+| `exit_unreachable` | The tunnel works, but the node's exit to the internet does not | The session works, but Telegram's data centre 2 did not answer with a valid `resPQ`: the node cannot reach Telegram's addresses |
+
 ## What is not built yet
 
 - **A middle proxy and the promoted channel.** The node talks to Telegram's data centres directly. Telegram's own proxy configuration, and with it the sponsor tag that proxies can show, are not supported.
 - **Speed limits per person and per device.** The limits on the user card apply to Hysteria2 and VLESS, not to the Telegram proxy.
 - **People with Telegram only.** Telegram goes together with Happ or AmneziaVPN; a person cannot have the proxy and nothing else.
 - **Shaping the fake answer after the real site.** The node does not yet measure the real handshake of the site and copy its shape.
+- **More for the Web Proxy.** Only the HTTPS carrier is built: there is no WebSocket and no carrier per stream. Relays through an entry node are not built either (see Limits above).
