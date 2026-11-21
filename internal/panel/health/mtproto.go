@@ -19,6 +19,7 @@ import (
 	mp "github.com/mistgate/mistgate/internal/mtproto"
 	mtclient "github.com/mistgate/mistgate/internal/mtproto/client"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 const (
@@ -36,6 +37,19 @@ type mtprotoNodeSettings struct {
 // dialMTProto performs the complete client-eye check. MTProto is not a generic TCP tunnel, so the req_pq_multi request
 // and its resPQ response are part of dialing; the returned tunnel carries those measurements for attempt to store.
 func dialMTProto(ctx context.Context, t Target, o DialOptions) (Tunnel, error) {
+	if plugin.MTProtoWeb(t.Spec) {
+		return dialMTProtoWeb(ctx, t, o)
+	}
+	return dialMTProtoFakeTLS(ctx, t, o)
+}
+
+// DialMTProto runs the panel's client-eye check against an MTProto inbound. It is exported for
+// cross-package integration tests that exercise it against the in-process node engine.
+func DialMTProto(ctx context.Context, t Target, o DialOptions) (Tunnel, error) {
+	return dialMTProto(ctx, t, o)
+}
+
+func dialMTProtoFakeTLS(ctx context.Context, t Target, o DialOptions) (Tunnel, error) {
 	start := time.Now()
 	handshakeTimeout := o.HandshakeTimeout
 	if handshakeTimeout <= 0 {
@@ -94,11 +108,6 @@ func dialMTProto(ctx context.Context, t Target, o DialOptions) (Tunnel, error) {
 		return nil, mtprotoDCError(ctx, "obfuscated2 handshake", err)
 	}
 
-	var nonce [16]byte
-	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
-		return nil, &ProbeError{Code: "exit_unreachable", Detail: "cannot prepare the MTProto request"}
-	}
-	request := reqPQMessage(nonce)
 	responseDeadline := time.Now().Add(probeTimeout)
 	if d, ok := ctx.Deadline(); ok && d.Before(responseDeadline) {
 		responseDeadline = d
@@ -106,24 +115,54 @@ func dialMTProto(ctx context.Context, t Target, o DialOptions) (Tunnel, error) {
 	if err := conn.SetDeadline(responseDeadline); err != nil {
 		return nil, &ProbeError{Code: "exit_unreachable", Detail: "cannot set the DC response deadline"}
 	}
-	responseStart := time.Now()
-	if _, err := client.Write(abridgedFrame(request)); err != nil {
-		return nil, mtprotoDCError(ctx, "req_pq_multi write", err)
-	}
-	response, err := readAbridged(client)
+	responseMS, err := exchangeMTProtoProbe(client)
 	if err != nil {
-		return nil, mtprotoDCError(ctx, "req_pq_multi response", err)
-	}
-	if err := validateResPQ(response, nonce); err != nil {
-		return nil, &ProbeError{Code: "exit_unreachable", Detail: "DC 2 did not return a valid resPQ response"}
+		var exchangeErr *mtprotoExchangeError
+		if errors.As(err, &exchangeErr) {
+			if exchangeErr.stage == "resPQ validation" {
+				return nil, &ProbeError{Code: "exit_unreachable", Detail: "DC 2 did not return a valid resPQ response"}
+			}
+			return nil, mtprotoDCError(ctx, exchangeErr.stage, exchangeErr.err)
+		}
+		return nil, mtprotoDCError(ctx, "req_pq_multi exchange", err)
 	}
 
 	result := Result{
 		Status: adminv1.CheckStatus_CHECK_STATUS_OK, LatencyMS: elapsedMS(start), ConnectMS: connectMS,
-		ResponseMS: elapsedMS(responseStart),
+		ResponseMS: responseMS,
 	}
 	keep = true
 	return &mtprotoTunnel{conn: conn, result: result}, nil
+}
+
+type mtprotoExchangeError struct {
+	stage string
+	err   error
+}
+
+func (e *mtprotoExchangeError) Error() string { return e.err.Error() }
+func (e *mtprotoExchangeError) Unwrap() error { return e.err }
+
+// exchangeMTProtoProbe is the shared client-eye exchange used by Fake TLS and Web inbounds. Both paths
+// send one abridged req_pq_multi packet and require a nonce-matching resPQ from DC 2.
+func exchangeMTProtoProbe(rw io.ReadWriter) (uint32, error) {
+	var nonce [16]byte
+	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+		return 0, &mtprotoExchangeError{stage: "request preparation", err: err}
+	}
+	request := reqPQMessage(nonce)
+	responseStart := time.Now()
+	if _, err := rw.Write(abridgedFrame(request)); err != nil {
+		return 0, &mtprotoExchangeError{stage: "req_pq_multi write", err: err}
+	}
+	response, err := readAbridged(rw)
+	if err != nil {
+		return 0, &mtprotoExchangeError{stage: "req_pq_multi response", err: err}
+	}
+	if err := validateResPQ(response, nonce); err != nil {
+		return 0, &mtprotoExchangeError{stage: "resPQ validation", err: err}
+	}
+	return elapsedMS(responseStart), nil
 }
 
 type mtprotoTunnel struct {

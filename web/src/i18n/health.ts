@@ -276,6 +276,8 @@ export const en = {
     "The node is up and the agent answers, but every profile fails the client-eye check, each in its own way. Open the node and read the errors under the profiles.",
   "health.alert.no_traffic.why.auth":
     "The node is up, but every profile refuses the panel’s check account. The node probably has not received the latest configuration yet: restart the profiles.",
+  "health.alert.no_traffic.why.session":
+    "Every profile failed while creating its Web Proxy session. Restart the profiles; if it persists, check the node’s logs.",
   "health.alert.no_traffic.why.tls":
     "The node is up, but the certificate of every profile does not match what clients expect. Check the domain and the certificate in the node’s profiles.",
   "health.alert.no_traffic.why.refused": "The node is up, but nothing listens on the profiles’ ports. Restart the profiles; if that does not help, look for a process holding the port.",
@@ -289,6 +291,7 @@ export const en = {
     "The direct profile of this node works, but “{profile}” does not: its WARP exit is dead. The WARP card of the node shows the handshake, the probes and the last error.",
   "health.alert.check_failed.why.timeout": "“{profile}” does not complete the handshake on port {port}. The profile may be down or the port blocked. Restart it; if that does not help, look at the node.",
   "health.alert.check_failed.why.auth": "“{profile}” refuses the panel’s check account. The node may have an old configuration: restart the profile.",
+  "health.alert.check_failed.why.session": "“{profile}” could not create a Web Proxy session on the node. Restart the profile; if it persists, check the node’s logs.",
   "health.alert.check_failed.why.via_cdn": "“{profile}” fails the check through the CDN {cdn_host} (port {port}). The node itself may be fine: check the CDN settings and that the CDN reaches the node. This profile does not count toward the node’s “no traffic” alert.",
   "health.alert.check_failed.why.tls": "“{profile}” presents a certificate that does not match: the domain, the pin or the certificate itself changed. Check it in the node’s profiles.",
   "health.alert.check_failed.why.refused": "Nothing listens on port {port} of “{profile}”. Restart the profile; if it fails to start, something else holds the port.",
@@ -629,6 +632,7 @@ export const en = {
   // ---- check errors (health.check.err.<code>)
   "health.check.err.timeout": "No answer in time: the handshake or the first request did not complete (for Hysteria2 and AmneziaWG this usually means UDP does not arrive)",
   "health.check.err.auth": "The node refused the panel’s check account",
+  "health.check.err.session": "The node could not create the Web Proxy carrier session",
   "health.check.err.tls": "Certificate or domain does not match",
   "health.check.err.refused": "Connection refused: nothing listens on the port",
   "health.check.err.http_status": "The test sites answer with an error",
@@ -902,6 +906,8 @@ export const ru: typeof en = {
     "Нода жива и агент отвечает, но каждый профиль не проходит проверку глазами клиента, и каждый по-своему. Открой ноду и прочитай ошибки под профилями.",
   "health.alert.no_traffic.why.auth":
     "Нода жива, но каждый профиль отклоняет проверочную учётку панели. Похоже, нода не получила свежую конфигурацию: перезапусти профили.",
+  "health.alert.no_traffic.why.session":
+    "Каждый профиль не смог создать сессию Web Proxy. Перезапусти профили; если проблема останется, проверь лог ноды.",
   "health.alert.no_traffic.why.tls":
     "Нода жива, но сертификат каждого профиля не совпадает с тем, что ждут клиенты. Проверь домен и сертификат в профилях ноды.",
   "health.alert.no_traffic.why.refused": "Нода жива, но на портах профилей никто не слушает. Перезапусти профили; если не помогло, поищи процесс, который держит порт.",
@@ -915,6 +921,7 @@ export const ru: typeof en = {
     "Прямой профиль этой ноды работает, а «{profile}» нет: мёртв его выход через WARP. Карточка WARP ноды показывает рукопожатие, проверки и последнюю ошибку.",
   "health.alert.check_failed.why.timeout": "«{profile}» не завершает рукопожатие на порту {port}. Профиль мог упасть, либо порт закрыт. Перезапусти его; не поможет — загляни на ноду.",
   "health.alert.check_failed.why.auth": "«{profile}» отклоняет проверочную учётку панели. На ноде может быть старая конфигурация: перезапусти профиль.",
+  "health.alert.check_failed.why.session": "«{profile}» не смог создать сессию Web Proxy на ноде. Перезапусти профиль; если проблема останется, проверь лог ноды.",
   "health.alert.check_failed.why.via_cdn": "«{profile}» не проходит проверку через CDN {cdn_host} (порт {port}). Сама нода может быть в порядке: проверь настройки CDN и что CDN достаёт до ноды. В алерте ноды «трафик не идёт» этот профиль не учитывается.",
   "health.alert.check_failed.why.tls": "«{profile}» показывает сертификат, который не подходит: поменялись домен, отпечаток или сам сертификат. Проверь это в профилях ноды.",
   "health.alert.check_failed.why.refused": "На порту {port} профиля «{profile}» никто не слушает. Перезапусти профиль; если он не стартует, порт занят чем-то другим.",
@@ -1248,6 +1255,7 @@ export const ru: typeof en = {
   // ---- check errors
   "health.check.err.timeout": "Нет ответа вовремя: рукопожатие или первый запрос не завершились (у Hysteria2 и AmneziaWG обычно это значит, что не доходит UDP)",
   "health.check.err.auth": "Нода отклонила проверочную учётку панели",
+  "health.check.err.session": "Нода не смогла создать сессию Web Proxy",
   "health.check.err.tls": "Сертификат или домен не совпадает",
   "health.check.err.refused": "Соединение отклонено: на порту никто не слушает",
   "health.check.err.http_status": "Тестовые сайты отвечают ошибкой",
@@ -1503,6 +1511,7 @@ export const zh: typeof en = {
   "health.alert.no_traffic.why.udp_all_blocked": "所有端口均超时（{ports}）：服务商似乎封锁了全部入站 UDP。请检查服务商控制面板中的防火墙，或联系其技术支持。",
   "health.alert.no_traffic.why.mixed": "节点在线，Agent 也有响应，但所有协议配置都未通过客户端视角检测，且各有各的原因。请打开节点，查看各协议配置下的错误。",
   "health.alert.no_traffic.why.auth": "节点在线，但所有协议配置都拒绝了面板的检测账户。节点可能还没有收到最新配置：请重启协议配置。",
+  "health.alert.no_traffic.why.session": "所有协议配置都未能创建 Web Proxy 会话。请重启协议配置；如果问题仍在，请检查节点日志。",
   "health.alert.no_traffic.why.tls": "节点在线，但所有协议配置的证书都与客户端期望的不符。请在节点的协议配置中检查域名和证书。",
   "health.alert.no_traffic.why.refused": "节点在线，但协议配置的端口上没有程序在监听。请重启协议配置；如果没有帮助，找出占用该端口的进程。",
   "health.alert.no_traffic.why.exit_unreachable": "隧道能建立，但节点无法通过隧道访问互联网。请检查节点的 DNS；如果协议配置经 WARP 出口，还要检查 WARP 连接。",
@@ -1512,6 +1521,7 @@ export const zh: typeof en = {
   "health.alert.check_failed.why.warp_path": "此节点的直连协议配置正常，但「{profile}」不正常：它的 WARP 出口已失效。节点的 WARP 卡片会显示握手、探测和最近一次错误。",
   "health.alert.check_failed.why.timeout": "「{profile}」在端口 {port} 上无法完成握手。协议配置可能已停止，或端口被封锁。请重启它；如果没有帮助，再检查节点。",
   "health.alert.check_failed.why.auth": "「{profile}」拒绝了面板的检测账户。节点上的配置可能是旧的：请重启该协议配置。",
+  "health.alert.check_failed.why.session": "「{profile}」无法在节点上创建 Web Proxy 会话。请重启该协议配置；如果问题仍在，请检查节点日志。",
   "health.alert.check_failed.why.via_cdn": "「{profile}」通过 CDN {cdn_host}（端口 {port}）检测失败。节点本身可能没问题：请检查 CDN 设置，以及 CDN 能否连到节点。此协议配置不计入节点的「无流量」告警。",
   "health.alert.check_failed.why.tls": "「{profile}」出示的证书不匹配：域名、固定的指纹或证书本身发生了变化。请在节点的协议配置中检查。",
   "health.alert.check_failed.why.refused": "「{profile}」的端口 {port} 上没有程序在监听。请重启该协议配置；如果无法启动，说明端口被别的程序占用。",
@@ -1800,6 +1810,7 @@ export const zh: typeof en = {
 
   "health.check.err.timeout": "未在规定时间内应答：握手或首个请求没有完成（对 Hysteria2 和 AmneziaWG，这通常意味着 UDP 到不了）",
   "health.check.err.auth": "节点拒绝了面板的检测账户",
+  "health.check.err.session": "节点无法创建 Web Proxy 传输会话",
   "health.check.err.tls": "证书或域名不匹配",
   "health.check.err.refused": "连接被拒绝：端口上没有程序在监听",
   "health.check.err.http_status": "测试网站返回错误",
@@ -2047,6 +2058,7 @@ export const fa: typeof en = {
   "health.alert.no_traffic.why.udp_all_blocked": "روی همهٔ پورت‌ها تایم‌اوت می‌شود ({ports}): به‌نظر می‌رسد سرویس‌دهنده UDP ورودی را کلاً مسدود می‌کند. فایروال را در پنل سرویس‌دهنده ببین یا به پشتیبانی‌اش بنویس.",
   "health.alert.no_traffic.why.mixed": "نود روشن است و ایجنت جواب می‌دهد، ولی همهٔ پروفایل‌ها در بررسی از دید کلاینت رد می‌شوند، هرکدام به شکلی. نود را باز کن و خطاهای زیر پروفایل‌ها را بخوان.",
   "health.alert.no_traffic.why.auth": "نود روشن است، ولی همهٔ پروفایل‌ها حساب بررسی پنل را رد می‌کنند. احتمالاً نود هنوز آخرین پیکربندی را نگرفته: پروفایل‌ها را راه‌اندازی دوباره کن.",
+  "health.alert.no_traffic.why.session": "همهٔ پروفایل‌ها در ساخت نشست Web Proxy شکست خوردند. پروفایل‌ها را راه‌اندازی دوباره کن؛ اگر مشکل ماند، لاگ نود را ببین.",
   "health.alert.no_traffic.why.tls": "نود روشن است، ولی گواهی همهٔ پروفایل‌ها با چیزی که کلاینت‌ها انتظار دارند نمی‌خواند. دامنه و گواهی را در پروفایل‌های نود ببین.",
   "health.alert.no_traffic.why.refused": "نود روشن است، ولی روی پورت پروفایل‌ها کسی گوش نمی‌دهد. پروفایل‌ها را راه‌اندازی دوباره کن؛ اگر کمک نکرد، دنبال پردازه‌ای بگرد که پورت را گرفته.",
   "health.alert.no_traffic.why.exit_unreachable": "تونل‌ها بالا می‌آیند، ولی نود از طریق آن‌ها به اینترنت نمی‌رسد. DNS نود را ببین و، اگر پروفایل از راه WARP خارج می‌شود، اتصال WARP را.",
@@ -2056,6 +2068,7 @@ export const fa: typeof en = {
   "health.alert.check_failed.why.warp_path": "پروفایل مستقیم این نود کار می‌کند، اما «{profile}» نه: خروجی WARP آن از کار افتاده است. کارت WARP نود دست‌دهی، بررسی‌ها و آخرین خطا را نشان می‌دهد.",
   "health.alert.check_failed.why.timeout": "«{profile}» روی پورت {port} دست‌دهی را کامل نمی‌کند. شاید پروفایل از کار افتاده یا پورت بسته است. آن را راه‌اندازی دوباره کن؛ اگر کمک نکرد، نود را ببین.",
   "health.alert.check_failed.why.auth": "«{profile}» حساب بررسی پنل را رد می‌کند. شاید پیکربندی نود قدیمی باشد: پروفایل را راه‌اندازی دوباره کن.",
+  "health.alert.check_failed.why.session": "«{profile}» نتوانست روی نود نشست Web Proxy بسازد. پروفایل را راه‌اندازی دوباره کن؛ اگر مشکل ماند، لاگ نود را ببین.",
   "health.alert.check_failed.why.via_cdn": "«{profile}» در بررسی از طریق CDN {cdn_host} (پورت {port}) رد می‌شود. شاید خود نود سالم باشد: تنظیمات CDN را ببین و اینکه CDN به نود می‌رسد. این پروفایل در هشدار «بدون ترافیک» نود حساب نمی‌شود.",
   "health.alert.check_failed.why.tls": "«{profile}» گواهی‌ای ارائه می‌دهد که نمی‌خواند: دامنه، اثرانگشت یا خود گواهی عوض شده. آن را در پروفایل‌های نود ببین.",
   "health.alert.check_failed.why.refused": "روی پورت {port} از «{profile}» کسی گوش نمی‌دهد. پروفایل را راه‌اندازی دوباره کن؛ اگر بالا نیامد، چیز دیگری پورت را گرفته است.",
@@ -2333,6 +2346,7 @@ export const fa: typeof en = {
   "health.fix.install_nftables.plan": "در پس‌زمینه: بستهٔ nftables از منبع‌های apt خود سرور نصب می‌شود، پس از پایان apt دیگری که شاید در حال اجرا باشد (تا 20 دقیقه). چیز دیگری به‌روز نمی‌شود و هیچ سرویسی دوباره راه‌اندازی نمی‌شود: ایجنت ظرف یک دقیقه خودش nft را پیدا می‌کند و محافظ SSH، پرش پورت و مسیریابی WARP را راه می‌اندازد.",
   "health.check.err.timeout": "جوابی به‌موقع نیامد: دست‌دهی یا اولین درخواست کامل نشد (برای Hysteria2 و AmneziaWG معمولاً یعنی UDP نمی‌رسد)",
   "health.check.err.auth": "نود حساب بررسی پنل را رد کرد",
+  "health.check.err.session": "نود نتوانست نشست انتقال Web Proxy را بسازد",
   "health.check.err.tls": "گواهی یا دامنه نمی‌خواند",
   "health.check.err.refused": "اتصال رد شد: روی پورت کسی گوش نمی‌دهد",
   "health.check.err.http_status": "سایت‌های آزمایشی با خطا جواب می‌دهند",
@@ -2580,6 +2594,7 @@ export const tr: typeof en = {
   "health.alert.no_traffic.why.udp_all_blocked": "Tüm portlarda zaman aşımı ({ports}): sağlayıcı gelen UDP'yi tamamen kesiyor gibi. Sağlayıcının panelinde güvenlik duvarına bak ya da destek ekibine yaz.",
   "health.alert.no_traffic.why.mixed": "Düğüm ayakta ve ajan yanıt veriyor ama her profil istemci gözüyle kontrolü geçemiyor, üstelik her biri kendi nedeniyle. Düğümü aç ve profillerin altındaki hataları oku.",
   "health.alert.no_traffic.why.auth": "Düğüm ayakta ama her profil panelin kontrol hesabını reddediyor. Düğüm büyük olasılıkla en son yapılandırmayı henüz almadı: profilleri yeniden başlat.",
+  "health.alert.no_traffic.why.session": "Her profil Web Proxy oturumunu oluşturamadı. Profilleri yeniden başlat; sorun sürerse düğüm günlüklerine bak.",
   "health.alert.no_traffic.why.tls": "Düğüm ayakta ama her profilin sertifikası istemcilerin beklediğiyle uyuşmuyor. Düğümün profillerinde alan adını ve sertifikayı kontrol et.",
   "health.alert.no_traffic.why.refused": "Düğüm ayakta ama profillerin portlarını dinleyen yok. Profilleri yeniden başlat; yardımcı olmazsa portu tutan bir süreç ara.",
   "health.alert.no_traffic.why.exit_unreachable": "Tüneller kalkıyor ama düğüm onlar üzerinden internete çıkamıyor. Düğümün DNS'ini ve profil WARP üzerinden çıkıyorsa WARP bağlantısını kontrol et.",
@@ -2589,6 +2604,7 @@ export const tr: typeof en = {
   "health.alert.check_failed.why.warp_path": "Bu düğümün doğrudan profili çalışıyor ama “{profile}” çalışmıyor: WARP çıkışı ölü. Düğümün WARP kartında el sıkışma, yoklamalar ve son hata görünür.",
   "health.alert.check_failed.why.timeout": "“{profile}” {port} portunda el sıkışmayı tamamlamıyor. Profil çökmüş ya da port kapalı olabilir. Yeniden başlat; işe yaramazsa düğüme bak.",
   "health.alert.check_failed.why.auth": "“{profile}” panelin kontrol hesabını reddediyor. Düğümde eski bir yapılandırma olabilir: profili yeniden başlat.",
+  "health.alert.check_failed.why.session": "“{profile}” düğümde bir Web Proxy oturumu oluşturamadı. Profili yeniden başlat; sorun sürerse düğüm günlüklerine bak.",
   "health.alert.check_failed.why.via_cdn": "“{profile}” CDN {cdn_host} üzerinden (port {port}) kontrolü geçemiyor. Düğümün kendisi sağlam olabilir: CDN ayarlarına ve CDN'nin düğüme ulaşıp ulaşmadığına bak. Bu profil, düğümün “trafik akmıyor” uyarısında sayılmaz.",
   "health.alert.check_failed.why.tls": "“{profile}” uyuşmayan bir sertifika sunuyor: alan adı, sabitlenmiş parmak izi ya da sertifikanın kendisi değişti. Düğümün profillerinde kontrol et.",
   "health.alert.check_failed.why.refused": "“{profile}” profilinin {port} portunu dinleyen yok. Profili yeniden başlat; başlamazsa portu başka bir şey tutuyordur.",
@@ -2866,6 +2882,7 @@ export const tr: typeof en = {
   "health.fix.install_nftables.plan": "Arka planda: çalışan başka bir apt varsa bitmesi beklenir (en çok 20 dakika), sonra nftables paketi sunucunun kendi apt kaynaklarından kurulur. Başka hiçbir şey güncellenmez, hiçbir şey yeniden başlatılmaz: ajan nft'yi bir dakika içinde kendisi bulur ve SSH korumasını, port atlamayı ve WARP yönlendirmesini kurar.",
   "health.check.err.timeout": "Zamanında yanıt yok: el sıkışma ya da ilk istek tamamlanmadı (Hysteria2 ve AmneziaWG için bu genelde UDP'nin ulaşmadığı anlamına gelir)",
   "health.check.err.auth": "Düğüm panelin kontrol hesabını reddetti",
+  "health.check.err.session": "Düğüm Web Proxy taşıma oturumunu oluşturamadı",
   "health.check.err.tls": "Sertifika veya alan adı uyuşmuyor",
   "health.check.err.refused": "Bağlantı reddedildi: portu dinleyen yok",
   "health.check.err.http_status": "Test siteleri hata ile yanıt veriyor",

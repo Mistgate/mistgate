@@ -33,6 +33,26 @@ type Client struct {
 	closed     bool
 }
 
+type BootstrapStage string
+
+const (
+	BootstrapStageBridge  BootstrapStage = "bridge"
+	BootstrapStageSession BootstrapStage = "session"
+)
+
+// BootstrapError identifies which part of client bootstrap failed without exposing request URLs or tokens.
+type BootstrapError struct {
+	Stage BootstrapStage
+	err   error
+}
+
+func (e *BootstrapError) Error() string { return "webproxy: " + string(e.Stage) + " bootstrap failed" }
+func (e *BootstrapError) Unwrap() error { return e.err }
+
+func bootstrapError(stage BootstrapStage, err error) error {
+	return &BootstrapError{Stage: stage, err: err}
+}
+
 type ClientStream struct {
 	client *Client
 	id     uint32
@@ -75,8 +95,13 @@ func NewClient(baseURL, capability string, transport http.RoundTripper) (*Client
 	return &Client{
 		baseURL:    strings.TrimRight(parsed.String(), "/"),
 		capability: capability,
-		http:       &http.Client{Transport: transport},
-		streams:    make(map[uint32]*ClientStream),
+		http: &http.Client{
+			Transport: transport,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
+		streams: make(map[uint32]*ClientStream),
 	}, nil
 }
 
@@ -102,45 +127,45 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 	_, _ = io.Copy(io.Discard, pageResp.Body)
 	_ = pageResp.Body.Close()
 	if pageResp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bridge page returned HTTP %d", pageResp.StatusCode)
+		return bootstrapError(BootstrapStageBridge, fmt.Errorf("bridge page returned HTTP %d", pageResp.StatusCode))
 	}
 	bootstrapToken := pageResp.Header.Get(headerBootstrap)
 	if !canonicalBase64URL(bootstrapToken, tokenSize) {
-		return errors.New("bridge page did not provide a bootstrap token")
+		return bootstrapError(BootstrapStageBridge, errors.New("bridge page did not provide a bootstrap token"))
 	}
 	hello, _ := appendFrame(nil, frame{Type: frameHello, Payload: appendHelloPayload(nil)})
 	var resp *http.Response
 	for attempt := 0; attempt < 3; attempt++ {
 		req, requestErr := c.newRequest(ctx, http.MethodPost, "/api/v1/session", bootstrapToken, hello)
 		if requestErr != nil {
-			return requestErr
+			return bootstrapError(BootstrapStageSession, requestErr)
 		}
 		resp, err = c.http.Do(req)
 		if err == nil {
 			break
 		}
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return bootstrapError(BootstrapStageSession, ctx.Err())
 		}
 	}
 	if err != nil {
-		return err
+		return bootstrapError(BootstrapStageSession, err)
 	}
 	body, readErr := readBounded(resp.Body, 64)
 	_ = resp.Body.Close()
 	if readErr != nil {
-		return readErr
+		return bootstrapError(BootstrapStageSession, readErr)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("carrier session returned HTTP %d", resp.StatusCode)
+		return bootstrapError(BootstrapStageSession, fmt.Errorf("carrier session returned HTTP %d", resp.StatusCode))
 	}
 	sessionToken := resp.Header.Get(headerSessionToken)
 	if !canonicalBase64URL(sessionToken, tokenSize) || resp.Header.Get(headerCarrierMode) != carrierModeHTTPS {
-		return errors.New("invalid carrier session response")
+		return bootstrapError(BootstrapStageSession, errors.New("invalid carrier session response"))
 	}
 	frame, rest, err := parseFrame(body)
 	if err != nil || len(rest) != 0 || frame.Type != frameWelcome || frame.StreamID != 0 {
-		return errors.New("invalid carrier welcome frame")
+		return bootstrapError(BootstrapStageSession, errors.New("invalid carrier welcome frame"))
 	}
 	c.mu.Lock()
 	if c.closed {

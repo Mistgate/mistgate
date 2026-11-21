@@ -508,11 +508,11 @@ describe("fixErrorText", () => {
 describe("the server's vocabulary is covered", () => {
   const checks = ["disk_space", "journald_size", "dstate_tasks", "time_sync", "resolver", "ipv6", "foreign_vpn", "foreign_nft", "port_conflicts", "net_baseline", "cert_expiry", "memory_pressure", "cpu_softirq", "kernel_headers", "awg_backend", "warp_path", "unit_generation", "security_updates", "nftables", "cpu_steal", "conntrack_fill", "agent_fds", "reality_target"];
   const fixes = ["journald_vacuum", "apply_baseline", "restart_inbound", "set_resolver", "reconnect_warp", "refresh_unit", "allow_forwarding", "enable_security_updates", "awg_module_repair", "install_nftables"];
-  const errors = ["timeout", "auth", "tls", "refused", "http_status", "exit_unreachable", "client_unsupported", "node_offline", "inbound_not_active", "inbound_failed", "inbound_disabled", "inbound_pending"];
+  const errors = ["timeout", "auth", "session", "tls", "refused", "http_status", "exit_unreachable", "client_unsupported", "node_offline", "inbound_not_active", "inbound_failed", "inbound_disabled", "inbound_pending"];
   const kinds = ["node_down", "host_blip", "no_traffic", "check_failed", "doctor_warn", "doctor_fail", "state_drift", "cert_expiry", "quota", "subscription_shared_suspect",
     "access_ended", "user_connection", "users_impacted", "country_blocked"];
-  const whyNoTraffic = ["udp_blocked", "udp_all_blocked", "mixed", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown"];
-  const whyCheck = ["udp_blocked", "warp_path", "timeout", "auth", "tls", "refused", "exit_unreachable", "http_status", "unknown", "panel_egress", "probe_path", "via_cdn", "not_started"];
+  const whyNoTraffic = ["udp_blocked", "udp_all_blocked", "mixed", "auth", "session", "tls", "refused", "exit_unreachable", "http_status", "unknown"];
+  const whyCheck = ["udp_blocked", "warp_path", "timeout", "auth", "session", "tls", "refused", "exit_unreachable", "http_status", "unknown", "panel_egress", "probe_path", "via_cdn", "not_started"];
   const expected = [
     ...checks.flatMap((c) => [`doctor.${c}.title`, `health.doctor.${c}.why`]),
     "health.doctor.dstate_tasks.why.qxl_ttm",

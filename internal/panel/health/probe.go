@@ -3,6 +3,7 @@ package health
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -53,7 +54,8 @@ type Target struct {
 type DialOptions struct {
 	HandshakeTimeout time.Duration
 	ProbeTimeout     time.Duration
-	testTLSPin       []byte // loopback TLS test only; deployed probes verify the normal certificate chain
+	ProbeTLS         *tls.Config // trust roots for TLS probes; nil uses the system roots
+	testTLSPin       []byte      // loopback TLS test only; deployed probes verify the normal certificate chain
 }
 
 // Dialer connects to an inbound as a client. It returns a *ProbeError for the failures it can name and
@@ -158,7 +160,7 @@ func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped b
 		dialNode = t.relay.entry
 	}
 	tn, err := s.cfg.Dialers[t.in.Protocol](rctx, Target{Node: dialNode, Inbound: t.in, Spec: t.spec, Settings: t.settings, CredID: cred.CredID, Secret: secret},
-		DialOptions{HandshakeTimeout: s.cfg.HandshakeTimeout, ProbeTimeout: s.cfg.ProbeTimeout})
+		DialOptions{HandshakeTimeout: s.cfg.HandshakeTimeout, ProbeTimeout: s.cfg.ProbeTimeout, ProbeTLS: s.cfg.ProbeTLS})
 	if err != nil {
 		var pe *ProbeError
 		if errors.As(err, &pe) && pe.Skip {

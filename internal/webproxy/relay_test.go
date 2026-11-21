@@ -262,7 +262,26 @@ func TestRelayClientEchoHashAndConcurrentStreams(t *testing.T) {
 }
 
 func TestRelayUpAndDownReplayAndLostResponses(t *testing.T) {
-	_, handler, capability := newRelayFixture(t, echoBackend, nil, nil)
+	backendEchoed := make(chan struct{}, 1)
+	backend := func(_ context.Context, conn net.Conn, _ string) error {
+		buffer := make([]byte, 4096)
+		for {
+			n, err := conn.Read(buffer)
+			if n > 0 {
+				if _, writeErr := conn.Write(buffer[:n]); writeErr != nil {
+					return writeErr
+				}
+				select {
+				case backendEchoed <- struct{}{}:
+				default:
+				}
+			}
+			if err != nil {
+				return err
+			}
+		}
+	}
+	_, handler, capability := newRelayFixture(t, backend, nil, nil)
 	bootstrap, token := rawSession(t, handler, capability)
 	_ = bootstrap
 	upLost := &lostResponseTransport{base: relayTransport{handler: handler}, path: "/api/v1/up"}
@@ -275,6 +294,11 @@ func TestRelayUpAndDownReplayAndLostResponses(t *testing.T) {
 	ack, err := postUpRawResponse(upClient, token, 1, open)
 	if err != nil || ack != 1 {
 		t.Fatalf("repeated uplink ack = %d, err=%v", ack, err)
+	}
+	select {
+	case <-backendEchoed:
+	case <-time.After(testWait):
+		t.Fatal("fake backend did not echo the applied uplink")
 	}
 
 	downLost := &lostResponseTransport{base: relayTransport{handler: handler}, path: "/api/v1/down"}
