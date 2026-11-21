@@ -24,6 +24,8 @@ import (
 var (
 	decoyDump  = flag.String("decoy-dump", "", "write sample sites of every kind into this folder, one subfolder per country and site, for looking at them")
 	decoyDumpN = flag.Int("decoy-dump-n", 2, "how many seeds of every kind -decoy-dump writes")
+	// decoyDumpNew makes the kinds that are still "legacy" in meta.json in the style of their palettes, to look at the palettes.
+	decoyDumpNew = flag.Bool("decoy-dump-new", false, "with -decoy-dump: draw every kind in its new style (palettes, fonts, ranges of meta.json) even where legacy is on")
 	// decoyDumpCC are the countries -decoy-dump writes sites for.
 	decoyDumpCC = flag.String("decoy-dump-cc", DefaultCountry, "the countries (codes, separated by spaces) -decoy-dump writes sites for")
 )
@@ -430,6 +432,13 @@ func TestGenerateIndependentOfOrder(t *testing.T) {
 func TestDumpSites(t *testing.T) {
 	if *decoyDump == "" {
 		t.Skip("no -decoy-dump")
+	}
+	if *decoyDumpNew {
+		eachKind(t, func(id string, d *kindDef) {
+			if sd := d.meta.Style; sd != nil {
+				sd.Legacy = false
+			}
+		})
 	}
 	for _, cc := range strings.Fields(*decoyDumpCC) {
 		for _, kind := range kindIDs(t) {

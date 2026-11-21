@@ -10,6 +10,7 @@ import (
 	"maps"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -127,14 +128,20 @@ type metaDef struct {
 	// search words (PhotoQ) its numbered slots take in turn. A site has photos only where this and the words both exist.
 	PhotoSlots map[string][]int `json:"photo_slots"`
 	PhotoQ     []string         `json:"photo_q"` // the search words of every variant that has none of its own
+	// Style is the kind's look: its palettes, font sets and the ranges of its shapes (generate_style.go). A kind without one gets
+	// the old random look.
+	Style *styleDef `json:"style"`
 }
 
 // bundleDef is a variant of a kind, the part of it that does not depend on the language.
 type bundleDef struct {
-	ID     string         `json:"id"`
-	Weight int            `json:"weight"`
-	PhotoQ []string       `json:"photo_q"` // English: the photo search is English whatever the site's language
-	Fixed  map[string]any `json:"fixed"`   // merged under the texts of the variant
+	ID     string   `json:"id"`
+	Weight int      `json:"weight"`
+	PhotoQ []string `json:"photo_q"` // English: the photo search is English whatever the site's language
+	// Art is the subject of the pictures of this variant (one of the kinds artSVG draws), for {{art "k" "" W H}} and for the
+	// pictures of lists; without one the pictures are drawn in the old four subjects at random.
+	Art   string         `json:"art"`
+	Fixed map[string]any `json:"fixed"` // merged under the texts of the variant
 }
 
 // langText is the texts of a kind in one language.
@@ -209,6 +216,16 @@ func parseKind(id string, rawMeta []byte) (*kindDef, error) {
 	}
 	if d.meta.Layouts < 1 {
 		d.meta.Layouts = 1
+	}
+	if sd := d.meta.Style; sd != nil {
+		if err := sd.build(d.meta.Layouts); err != nil {
+			return nil, fmt.Errorf("meta.json style: %w", err)
+		}
+	}
+	for _, b := range d.bundles {
+		if b.Art != "" && !slices.Contains(allArtKinds, b.Art) {
+			return nil, fmt.Errorf("data.json: variant %s has the picture subject %q, which is not drawn", b.ID, b.Art)
+		}
 	}
 	if home := d.meta.Pages[0]; home.Name != "home" || len(home.Paths) != 1 || home.Paths[0] != "index.html" {
 		return nil, errors.New(`the first page must be "home" at index.html`)
@@ -320,6 +337,9 @@ type site struct {
 	V                          map[string]string
 	Layout, Head, Foot         int
 	P                          palette
+	Scheme                     string // light, dark or both
+	Theme                      string // the colour of the browser's own bars
+	Art                        string // the subject of the variant's pictures, "" for the old random four
 	S                          style
 	Fnt                        fonts
 	Year, Since                string
@@ -354,7 +374,8 @@ func (s *site) data() map[string]any {
 	}
 	return map[string]any{
 		"Kind": s.Kind, "Lang": s.Lang, "Brand": s.Brand, "Initial": s.Initial, "L": s.L, "V": vars, "Layout": s.Layout, "Head": s.Head,
-		"Foot": s.Foot, "P": map[string]any{"L": s.P.L.data(), "D": s.P.D.data()}, "S": s.S.data(), "Fnt": s.Fnt.data(), "Year": s.Year,
+		"Foot": s.Foot, "P": map[string]any{"L": s.P.L.data(), "D": s.P.D.data()}, "Pm": s.P.prim(s.Scheme).data(), "Scheme": s.Scheme,
+		"ColorScheme": colorScheme(s.Scheme), "Theme": s.Theme, "Art": s.Art, "S": s.S.data(), "Fnt": s.Fnt.data(), "Year": s.Year,
 		"Since": s.Since, "CSS": s.CSS, "JS": s.JS, "Icon": s.Icon, "Mark": s.Mark, "Lists": lists, "Order": order, "DateFmt": s.DateFmt,
 	}
 }
@@ -635,9 +656,19 @@ func (d *kindDef) newSite(c *ctx, r *rng, country *countryDef, shared map[string
 	s := &site{
 		Kind: d.id, Lang: country.HTML, Brand: brand, Initial: initialOf(brand), L: L, V: vars, country: country,
 		Layout: look.sub("layout").n(d.meta.Layouts), Head: look.sub("head").n(3), Foot: look.sub("foot").n(3),
-		P: newPalette(look.sub("palette")), S: newStyle(look.sub("style")), Fnt: newFonts(look.sub("fonts")),
+		Scheme: "both", Art: b.Art,
 		Year: "2026", Since: fmt.Sprint(2015 + look.sub("since").n(10)), titleStyle: look.sub("title").n(4),
 		Lists: map[string][]map[string]any{}, photoSlots: d.meta.PhotoSlots,
+	}
+	if sd := d.meta.Style; sd != nil && !sd.Legacy {
+		s.Scheme = sd.Scheme
+		s.P = sd.pal[look.sub("pal").n(len(sd.pal))]
+		s.S = sd.shape(look.sub("shape"))
+		s.Fnt = sd.fonts(look.sub("fnt"), hasCyrillic(country.Lang))
+		s.Theme = s.P.prim(s.Scheme).BG
+	} else {
+		s.P, s.S, s.Fnt = newPalette(look.sub("palette")), legacyStyle(newStyle(look.sub("style"))), legacyFonts(newFonts(look.sub("fonts")))
+		s.Theme = s.P.L.Acc
 	}
 	s.photoQ = d.photoWords(b)
 	c.s = s // the lists below may ask for photos
@@ -939,6 +970,9 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 		it["n"] = i + 1
 		if ld.Art {
 			kind := artKinds[ar.n(len(artKinds))]
+			if s.Art != "" {
+				kind = s.Art
+			}
 			dir := imgDirs[r.sub("imgdir").n(len(imgDirs))]
 			p := fmt.Sprintf("%s/%s-%s.svg", dir, sl, hex6(ar))
 			it["img"] = "/" + p
@@ -954,6 +988,17 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 		}
 	}
 	return items, nil
+}
+
+// artKind is the subject of a picture: the one the template names, else the variant's own, else one of the old four at random.
+func (c *ctx) artKind(r *rng, kind string) string {
+	switch {
+	case kind != "":
+		return kind
+	case c.s.Art != "":
+		return c.s.Art
+	}
+	return artKinds[r.n(len(artKinds))]
 }
 
 var slugBad = regexp.MustCompile(`[^a-z0-9]+`)
@@ -1041,7 +1086,7 @@ func funcMap(c *ctx) map[string]tmplFunc {
 		}
 		return l
 	}
-	return map[string]tmplFunc{
+	fm := map[string]tmplFunc{
 		"one": func(a []any) any {
 			k, l := argStr(a, 0), argList(a, 1)
 			if v, ok := c.memo["one:"+k]; ok {
@@ -1156,9 +1201,7 @@ func funcMap(c *ctx) map[string]tmplFunc {
 		"art": func(a []any) any {
 			k, kind := argStr(a, 0), argStr(a, 1)
 			r := key("art:" + k)
-			if kind == "" {
-				kind = artKinds[r.n(len(artKinds))]
-			}
+			kind = c.artKind(r, kind)
 			c.artN++
 			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, argInt(a, 2), argInt(a, 3), fmt.Sprintf("%s%d", c.artID, c.artN), false)
 		},
@@ -1169,9 +1212,7 @@ func funcMap(c *ctx) map[string]tmplFunc {
 				return photoTag(k, p, w, h)
 			}
 			r := key("art:" + k)
-			if kind == "" {
-				kind = artKinds[r.n(len(artKinds))]
-			}
+			kind = c.artKind(r, kind)
 			c.artN++
 			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, w, h, fmt.Sprintf("%s%d", c.artID, c.artN), false)
 		},
@@ -1203,4 +1244,5 @@ func funcMap(c *ctx) map[string]tmplFunc {
 			return b.String()
 		},
 	}
+	return fm
 }

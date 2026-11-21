@@ -1,4 +1,57 @@
 {
+ "style": {
+  "legacy": true,
+  "scheme": "light",
+  "palettes": [
+   {
+    "name": "cream-terracotta",
+    "l": {"bg": "#fbefd3", "fg": "#3a2417", "ac": "#b5472a", "a2": "#3a6a4a"}
+   },
+   {
+    "name": "cream-olive",
+    "l": {"bg": "#f6f0dc", "fg": "#2c2a17", "ac": "#5b6b1f", "a2": "#b5472a"}
+   },
+   {
+    "name": "milk-blue",
+    "l": {"bg": "#f4f1ea", "fg": "#1c2433", "ac": "#2a58a8", "a2": "#b5472a"}
+   },
+   {
+    "name": "blush-berry",
+    "l": {"bg": "#fbeeea", "fg": "#3a1c26", "ac": "#9d2a52", "a2": "#3a6a4a"}
+   },
+   {
+    "name": "sand-teal",
+    "l": {"bg": "#f3ecdc", "fg": "#1d2b2a", "ac": "#1f6f68", "a2": "#c0612b"}
+   },
+   {
+    "name": "linen-plum",
+    "l": {"bg": "#f5eee8", "fg": "#2d1f2f", "ac": "#6d3a8a", "a2": "#c0612b"}
+   },
+   {
+    "name": "wheat-brown",
+    "l": {"bg": "#f7ecd2", "fg": "#2e1f10", "ac": "#8c5a1e", "a2": "#2f6f4f"}
+   }
+  ],
+  "fonts": [
+   {"head": "old", "body": "sans", "fw": 700, "ls": "-.045em", "lh": ".95"},
+   {"head": "bookish", "body": "sans", "fw": 700, "ls": "-.03em", "lh": "1"},
+   {"head": "georgia", "body": "sans", "fw": 700, "ls": "-.03em", "lh": "1"}
+  ],
+  "radius": [24, 40],
+  "radius_s": [14, 24],
+  "radius_b": [36, 48],
+  "density": [0.95, 1.1],
+  "width": [1200, 1280],
+  "measure": [640, 720],
+  "base": [17, 18],
+  "scale": [1.33, 1.45],
+  "lh": [1.55, 1.65],
+  "stroke": [1.7, 2.1],
+  "border": [1, 2],
+  "shadows": [
+   "none"
+  ]
+ },
   "title": {"en": "Small business site", "ru": "Сайт маленькой фирмы (мастерская, пекарня и т. п.)"},
   "layouts": 3,
   "pages": [
