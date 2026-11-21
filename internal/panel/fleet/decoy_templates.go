@@ -5,11 +5,15 @@ package fleet
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"connectrpc.com/connect"
@@ -17,7 +21,9 @@ import (
 	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/decoy/sitegen"
+	"github.com/mistgate/mistgate/internal/panel/decoyphotos"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/vault"
 )
 
 // Sites made from the panel's built-in templates (internal/decoy Generate). A preview hands the client the seed it was made from;
@@ -34,14 +40,133 @@ func (s decoySiteService) ListDecoyTemplates(_ context.Context, _ *connect.Reque
 	return connect.NewResponse(out), nil
 }
 
-// generated is one rendered site: its bundle, the brand its pages print and the seed it came from.
+// generated is one rendered site: its bundle, the brand its pages print, the seed it came from and whether it has photos (the
+// reasons of PreviewDecoyTemplateResponse.photos).
 type generated struct {
-	bundle      *decoy.Bundle
-	brand, seed string
+	bundle             *decoy.Bundle
+	brand, seed, photo string
 }
 
-// render makes the site of a kind from a seed; an empty seed takes a new random one.
-func (s decoySiteService) render(kind, seed string) (generated, error) {
+const (
+	photoNoKey       = "no_key"
+	photoNoneForKind = "none_for_kind"
+
+	// A preview is kept for this long and this many, so that "Create" saves the very site that was shown (photos and all).
+	previewKeep    = 15 * time.Minute
+	previewEntries = 8
+	// One site's photos may take this long to fetch.
+	photoBudget = 40 * time.Second
+
+	photoKeySetting = "decoy.photos.key" // base64 of the vault-sealed Pexels key
+	photoKeyAAD     = "setting/decoy.photos.key"
+	photoKeyMin     = 8
+	photoKeyMax     = 256
+)
+
+type previewEntry struct {
+	at time.Time
+	g  generated
+}
+
+// templateState is what the template calls remember between calls: the sites just previewed and the Pexels client.
+type templateState struct {
+	mu       sync.Mutex
+	previews map[string]previewEntry
+	maker    *decoyphotos.Maker
+}
+
+func (f *Fleet) templateState() *templateState {
+	f.panelDecoyMu.Lock()
+	defer f.panelDecoyMu.Unlock()
+	if st, ok := f.decoyTemplates.(*templateState); ok {
+		return st
+	}
+	st := &templateState{previews: map[string]previewEntry{}, maker: decoyphotos.NewMaker(f.photoTransport, f.now)}
+	f.decoyTemplates = st
+	return st
+}
+
+func (st *templateState) get(kind, seed string, now time.Time) (generated, bool) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	e, ok := st.previews[kind+"/"+seed]
+	if !ok || now.Sub(e.at) > previewKeep {
+		delete(st.previews, kind+"/"+seed)
+		return generated{}, false
+	}
+	return e.g, true
+}
+
+func (st *templateState) put(kind, seed string, g generated, now time.Time) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	for k, e := range st.previews { // the expired go first, then the oldest
+		if now.Sub(e.at) > previewKeep {
+			delete(st.previews, k)
+		}
+	}
+	for len(st.previews) >= previewEntries {
+		var oldest string
+		for k, e := range st.previews {
+			if oldest == "" || e.at.Before(st.previews[oldest].at) {
+				oldest = k
+			}
+		}
+		delete(st.previews, oldest)
+	}
+	st.previews[kind+"/"+seed] = previewEntry{at: now, g: g}
+}
+
+// photoKey is the owner's Pexels key; "" when there is none (or the stored one cannot be opened: another master key).
+func (f *Fleet) photoKey(ctx context.Context) vault.Redacted {
+	raw, err := f.st.Setting(ctx, photoKeySetting)
+	if err != nil || raw == "" {
+		return ""
+	}
+	sealed, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		return ""
+	}
+	b, err := f.v.Open(sealed, photoKeyAAD)
+	if err != nil {
+		f.log.Warn("decoy photos: the stored key cannot be opened; it is ignored")
+		return ""
+	}
+	return vault.Redacted(b)
+}
+
+func (s decoySiteService) GetDecoyPhotos(ctx context.Context, _ *connect.Request[decoysitev1.GetDecoyPhotosRequest]) (*connect.Response[decoysitev1.GetDecoyPhotosResponse], error) {
+	return connect.NewResponse(&decoysitev1.GetDecoyPhotosResponse{HasKey: s.f.photoKey(ctx) != ""}), nil
+}
+
+func (s decoySiteService) SetDecoyPhotosKey(ctx context.Context, req *connect.Request[decoysitev1.SetDecoyPhotosKeyRequest]) (*connect.Response[decoysitev1.SetDecoyPhotosKeyResponse], error) {
+	f := s.f
+	key := vault.Redacted(strings.TrimSpace(req.Msg.Key))
+	value := ""
+	if key != "" {
+		if len(key) < photoKeyMin || len(key) > photoKeyMax || strings.IndexFunc(key.Reveal(), func(r rune) bool { return unicode.IsControl(r) || unicode.IsSpace(r) || r > unicode.MaxASCII }) >= 0 {
+			return nil, invalid("decoy_photos_key_invalid")
+		}
+		value = base64.StdEncoding.EncodeToString(f.v.Seal([]byte(key.Reveal()), photoKeyAAD))
+	}
+	if err := f.st.SetSettings(ctx, map[string]string{photoKeySetting: value}); err != nil {
+		return nil, s.fail("save the Pexels key", err)
+	}
+	st := f.templateState()
+	st.mu.Lock() // sites made with the old key (or without one) are not the ones the next "Create" should save
+	st.previews = map[string]previewEntry{}
+	st.mu.Unlock()
+	if key == "" {
+		f.audit(ctx, "decoy_photos.key_remove", map[string]string{})
+	} else {
+		f.audit(ctx, "decoy_photos.key_set", map[string]string{})
+	}
+	return connect.NewResponse(&decoysitev1.SetDecoyPhotosKeyResponse{HasKey: key != ""}), nil
+}
+
+// render makes the site of a kind from a seed; an empty seed takes a new random one. A site previewed in the last quarter of
+// an hour comes back as it was.
+func (s decoySiteService) render(ctx context.Context, kind, seed string) (generated, error) {
 	if seed == "" {
 		raw := make([]byte, 8)
 		if _, err := rand.Read(raw); err != nil {
@@ -52,23 +177,52 @@ func (s decoySiteService) render(kind, seed string) (generated, error) {
 	if !seedPattern.MatchString(seed) {
 		return generated{}, invalid("decoy_template_seed")
 	}
+	st := s.f.templateState()
+	if g, ok := st.get(kind, seed, s.f.now()); ok {
+		return g, nil
+	}
 	raw, _ := hex.DecodeString(seed)
-	files, brand, err := sitegen.GenerateNamed(kind, raw)
+	plan, err := sitegen.Plan(kind, raw)
 	if errors.Is(err, sitegen.ErrUnknownKind) {
 		return generated{}, invalid("decoy_template_unknown")
 	}
 	if err != nil {
+		return generated{}, s.fail("plan decoy site", err)
+	}
+	// Photos are an extra: whatever goes wrong with them, the site is made with drawings.
+	why, photos := photoNoneForKind, map[string][]byte(nil)
+	if len(plan) > 0 {
+		if key := s.f.photoKey(ctx); key == "" {
+			why = photoNoKey
+		} else {
+			fetchCtx, cancel := context.WithTimeout(ctx, photoBudget)
+			res := st.maker.Make(fetchCtx, key, raw, plan)
+			cancel()
+			why, photos = res.Reason, res.Photos
+		}
+	}
+	files, brand, err := sitegen.GenerateWith(kind, raw, sitegen.Options{Photos: photos})
+	if err != nil {
 		return generated{}, s.fail("generate decoy site", err)
 	}
 	b, err := decoy.FromFiles(files)
+	if err != nil && len(photos) > 0 { // the photos made it too big or odd for the library: draw the site instead
+		files, brand, err = sitegen.GenerateNamed(kind, raw)
+		if err == nil {
+			why = decoyphotos.ReasonUnavailable
+			b, err = decoy.FromFiles(files)
+		}
+	}
 	if err != nil {
 		return generated{}, s.fail("bundle generated decoy site", err)
 	}
-	return generated{bundle: b, brand: fitName(brand), seed: seed}, nil
+	g := generated{bundle: b, brand: fitName(brand), seed: seed, photo: why}
+	st.put(kind, seed, g, s.f.now())
+	return g, nil
 }
 
-func (s decoySiteService) PreviewDecoyTemplate(_ context.Context, req *connect.Request[decoysitev1.PreviewDecoyTemplateRequest]) (*connect.Response[decoysitev1.PreviewDecoyTemplateResponse], error) {
-	g, err := s.render(req.Msg.Kind, req.Msg.Seed)
+func (s decoySiteService) PreviewDecoyTemplate(ctx context.Context, req *connect.Request[decoysitev1.PreviewDecoyTemplateRequest]) (*connect.Response[decoysitev1.PreviewDecoyTemplateResponse], error) {
+	g, err := s.render(ctx, req.Msg.Kind, req.Msg.Seed)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +230,7 @@ func (s decoySiteService) PreviewDecoyTemplate(_ context.Context, req *connect.R
 	if err != nil {
 		return nil, s.fail("preview generated decoy site", err)
 	}
-	return connect.NewResponse(&decoysitev1.PreviewDecoyTemplateResponse{Html: doc, Seed: g.seed, Name: g.brand}), nil
+	return connect.NewResponse(&decoysitev1.PreviewDecoyTemplateResponse{Html: doc, Seed: g.seed, Name: g.brand, Photos: g.photo}), nil
 }
 
 // fitName is a name the library takes: trimmed, at most 60 characters.
@@ -99,7 +253,7 @@ func numbered(name string, n int) string {
 
 func (s decoySiteService) GenerateDecoySite(ctx context.Context, req *connect.Request[decoysitev1.GenerateDecoySiteRequest]) (*connect.Response[decoysitev1.GenerateDecoySiteResponse], error) {
 	f, m := s.f, req.Msg
-	g, err := s.render(m.Kind, m.Seed)
+	g, err := s.render(ctx, m.Kind, m.Seed)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +291,7 @@ func (s decoySiteService) GenerateDecoySite(ctx context.Context, req *connect.Re
 	if err != nil {
 		return nil, s.fail("read decoy site", err)
 	}
-	return connect.NewResponse(&decoysitev1.GenerateDecoySiteResponse{Site: site}), nil
+	return connect.NewResponse(&decoysitev1.GenerateDecoySiteResponse{Site: site, Photos: g.photo}), nil
 }
 
 // templateLabelOf keeps the source_label of a generated site on its copy; any other label stays the copier's name.

@@ -39,8 +39,8 @@ func TestDecoySiteServiceIsOwnerOnlyForAdmins(t *testing.T) {
 			t.Errorf("%s reaches a helper or a read-only admin", path)
 		}
 	}
-	if n != 20 {
-		t.Fatalf("decoy library procedures with a level = %d, want 20", n)
+	if n != 22 {
+		t.Fatalf("decoy library procedures with a level = %d, want 22", n)
 	}
 }
 

@@ -12,7 +12,7 @@ import "mistgate/admin/v1/node.proto";
 // Refusals are FAILED_PRECONDITION / INVALID_ARGUMENT / NOT_FOUND / ALREADY_EXISTS whose message is a stable code, optionally
 // followed by ": key=value" (values URL-escaped): decoy_site_not_found, decoy_name_taken, decoy_name_invalid, decoy_note_invalid,
 // decoy_library_full, decoy_site_in_use (nodes=<ids>, panel=1), decoy_site_draft, decoy_site_not_draft, decoy_version_not_found,
-// decoy_file_not_found, decoy_file_binary, decoy_page_not_found, decoy_preview_too_large, decoy_template_unknown, decoy_template_seed, node_not_assigned, node_retired,
+// decoy_file_not_found, decoy_file_binary, decoy_page_not_found, decoy_preview_too_large, decoy_template_unknown, decoy_template_seed, decoy_photos_key_invalid, node_not_assigned, node_retired,
 // panel_unavailable / panel_too_large / panel_no_index / panel_invalid, and decoy_bundle_<reason> (with ": path=<entry>") for an
 // archive the bundle rules refuse (empty, bad_archive, too_large, too_many_files, bad_path, not_static, no_index, duplicate).
 service DecoySiteService {
@@ -61,6 +61,12 @@ service DecoySiteService {
   // Makes a site of a kind from a seed and saves it to the library as a new ready site (source "upload", source_label
   // "template:<kind>"). The name defaults to the site's own brand, the note to the kind's name. Limits as CreateDecoySite.
   rpc GenerateDecoySite(GenerateDecoySiteRequest) returns (GenerateDecoySiteResponse);
+  // Photos for generated sites come from Pexels (pexels.com) with the owner's own free API key. Whether a key is stored; the
+  // key itself never comes back. Owner only.
+  rpc GetDecoyPhotos(GetDecoyPhotosRequest) returns (GetDecoyPhotosResponse);
+  // Stores the Pexels key, or removes it when key is empty. Owner only; the audit log records that it was set or removed, never
+  // the value. Without a key every generated site is drawn, as before.
+  rpc SetDecoyPhotosKey(SetDecoyPhotosKeyRequest) returns (SetDecoyPhotosKeyResponse);
 }
 
 // One check of a site's version. level "required" (a failed one cannot exist: the version would not have been saved) or "warning".
@@ -379,6 +385,11 @@ message PreviewDecoyTemplateResponse {
   string seed = 2;
   // The name GenerateDecoySite would give the site.
   string name = 3;
+  // Whether the preview has photographs: "used", or why not: "no_key" (none stored), "bad_key" (Pexels refused it), "limit"
+  // (Pexels asked to wait), "unavailable" (no answer, nothing found, a broken file), "none_for_kind" (this kind or variant shows
+  // none). Without photos the site is drawn and everything else works. GenerateDecoySite saves the previewed site (photos
+  // included) for 15 minutes after the preview.
+  string photos = 4;
 }
 
 message GenerateDecoySiteRequest {
@@ -393,4 +404,22 @@ message GenerateDecoySiteRequest {
 
 message GenerateDecoySiteResponse {
   DecoySite site = 1;
+  // As PreviewDecoyTemplateResponse.photos, for the site that was saved: after the preview's 15 minutes the site is made again,
+  // and its photos may differ.
+  string photos = 2;
+}
+
+message GetDecoyPhotosRequest {}
+
+message GetDecoyPhotosResponse {
+  bool has_key = 1;
+}
+
+message SetDecoyPhotosKeyRequest {
+  // A Pexels API key, 8 to 256 characters without spaces; write-only. "" removes it.
+  string key = 1;
+}
+
+message SetDecoyPhotosKeyResponse {
+  bool has_key = 1;
 }

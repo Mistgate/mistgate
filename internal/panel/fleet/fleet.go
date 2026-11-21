@@ -175,17 +175,21 @@ type Fleet struct {
 	decoySyncDirty  map[string]bool
 	decoyAttempts   map[string]decoyAttempt
 
-	panelDecoyMu  sync.Mutex
-	panelDecoyDir string
-	panelDecoyAt  time.Time
-	panelDecoyB   *decoy.Bundle
-	panelDecoyErr error
-	sendUDP       func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
-	probeTCP      func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
-	settleUDP     func(context.Context) error
-	probes        probeState                 // on-demand probes between nodes (path_probe.go); its zero value is ready
-	ownProbes     ownProbes                  // the panel's own TLS checks of REALITY ports, taken off the counters (ports_tcp.go)
-	panelIPv6     func(context.Context) bool // tests: whether the panel itself can send over IPv6; default panelHasIPv6
+	// The previews of sites made from templates and the Pexels client (decoy_templates.go; nothing is made in the Cloudflare edition,
+	// so the state is an any here). Guarded by panelDecoyMu. photoTransport carries the client's requests: a test seam.
+	decoyTemplates any
+	photoTransport http.RoundTripper
+	panelDecoyMu   sync.Mutex
+	panelDecoyDir  string
+	panelDecoyAt   time.Time
+	panelDecoyB    *decoy.Bundle
+	panelDecoyErr  error
+	sendUDP        func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
+	probeTCP       func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
+	settleUDP      func(context.Context) error
+	probes         probeState                 // on-demand probes between nodes (path_probe.go); its zero value is ready
+	ownProbes      ownProbes                  // the panel's own TLS checks of REALITY ports, taken off the counters (ports_tcp.go)
+	panelIPv6      func(context.Context) bool // tests: whether the panel itself can send over IPv6; default panelHasIPv6
 }
 
 // SetRelayControl attaches the access module's mode controller after both services are built.

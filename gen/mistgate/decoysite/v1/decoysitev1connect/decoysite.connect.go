@@ -93,6 +93,12 @@ const (
 	// DecoySiteServiceGenerateDecoySiteProcedure is the fully-qualified name of the DecoySiteService's
 	// GenerateDecoySite RPC.
 	DecoySiteServiceGenerateDecoySiteProcedure = "/mistgate.decoysite.v1.DecoySiteService/GenerateDecoySite"
+	// DecoySiteServiceGetDecoyPhotosProcedure is the fully-qualified name of the DecoySiteService's
+	// GetDecoyPhotos RPC.
+	DecoySiteServiceGetDecoyPhotosProcedure = "/mistgate.decoysite.v1.DecoySiteService/GetDecoyPhotos"
+	// DecoySiteServiceSetDecoyPhotosKeyProcedure is the fully-qualified name of the DecoySiteService's
+	// SetDecoyPhotosKey RPC.
+	DecoySiteServiceSetDecoyPhotosKeyProcedure = "/mistgate.decoysite.v1.DecoySiteService/SetDecoyPhotosKey"
 )
 
 // DecoySiteServiceClient is a client for the mistgate.decoysite.v1.DecoySiteService service.
@@ -142,6 +148,12 @@ type DecoySiteServiceClient interface {
 	// Makes a site of a kind from a seed and saves it to the library as a new ready site (source "upload", source_label
 	// "template:<kind>"). The name defaults to the site's own brand, the note to the kind's name. Limits as CreateDecoySite.
 	GenerateDecoySite(context.Context, *connect.Request[v1.GenerateDecoySiteRequest]) (*connect.Response[v1.GenerateDecoySiteResponse], error)
+	// Photos for generated sites come from Pexels (pexels.com) with the owner's own free API key. Whether a key is stored; the
+	// key itself never comes back. Owner only.
+	GetDecoyPhotos(context.Context, *connect.Request[v1.GetDecoyPhotosRequest]) (*connect.Response[v1.GetDecoyPhotosResponse], error)
+	// Stores the Pexels key, or removes it when key is empty. Owner only; the audit log records that it was set or removed, never
+	// the value. Without a key every generated site is drawn, as before.
+	SetDecoyPhotosKey(context.Context, *connect.Request[v1.SetDecoyPhotosKeyRequest]) (*connect.Response[v1.SetDecoyPhotosKeyResponse], error)
 }
 
 // NewDecoySiteServiceClient constructs a client for the mistgate.decoysite.v1.DecoySiteService
@@ -275,6 +287,18 @@ func NewDecoySiteServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(decoySiteServiceMethods.ByName("GenerateDecoySite")),
 			connect.WithClientOptions(opts...),
 		),
+		getDecoyPhotos: connect.NewClient[v1.GetDecoyPhotosRequest, v1.GetDecoyPhotosResponse](
+			httpClient,
+			baseURL+DecoySiteServiceGetDecoyPhotosProcedure,
+			connect.WithSchema(decoySiteServiceMethods.ByName("GetDecoyPhotos")),
+			connect.WithClientOptions(opts...),
+		),
+		setDecoyPhotosKey: connect.NewClient[v1.SetDecoyPhotosKeyRequest, v1.SetDecoyPhotosKeyResponse](
+			httpClient,
+			baseURL+DecoySiteServiceSetDecoyPhotosKeyProcedure,
+			connect.WithSchema(decoySiteServiceMethods.ByName("SetDecoyPhotosKey")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -300,6 +324,8 @@ type decoySiteServiceClient struct {
 	listDecoyTemplates   *connect.Client[v1.ListDecoyTemplatesRequest, v1.ListDecoyTemplatesResponse]
 	previewDecoyTemplate *connect.Client[v1.PreviewDecoyTemplateRequest, v1.PreviewDecoyTemplateResponse]
 	generateDecoySite    *connect.Client[v1.GenerateDecoySiteRequest, v1.GenerateDecoySiteResponse]
+	getDecoyPhotos       *connect.Client[v1.GetDecoyPhotosRequest, v1.GetDecoyPhotosResponse]
+	setDecoyPhotosKey    *connect.Client[v1.SetDecoyPhotosKeyRequest, v1.SetDecoyPhotosKeyResponse]
 }
 
 // ListDecoySites calls mistgate.decoysite.v1.DecoySiteService.ListDecoySites.
@@ -402,6 +428,16 @@ func (c *decoySiteServiceClient) GenerateDecoySite(ctx context.Context, req *con
 	return c.generateDecoySite.CallUnary(ctx, req)
 }
 
+// GetDecoyPhotos calls mistgate.decoysite.v1.DecoySiteService.GetDecoyPhotos.
+func (c *decoySiteServiceClient) GetDecoyPhotos(ctx context.Context, req *connect.Request[v1.GetDecoyPhotosRequest]) (*connect.Response[v1.GetDecoyPhotosResponse], error) {
+	return c.getDecoyPhotos.CallUnary(ctx, req)
+}
+
+// SetDecoyPhotosKey calls mistgate.decoysite.v1.DecoySiteService.SetDecoyPhotosKey.
+func (c *decoySiteServiceClient) SetDecoyPhotosKey(ctx context.Context, req *connect.Request[v1.SetDecoyPhotosKeyRequest]) (*connect.Response[v1.SetDecoyPhotosKeyResponse], error) {
+	return c.setDecoyPhotosKey.CallUnary(ctx, req)
+}
+
 // DecoySiteServiceHandler is an implementation of the mistgate.decoysite.v1.DecoySiteService
 // service.
 type DecoySiteServiceHandler interface {
@@ -450,6 +486,12 @@ type DecoySiteServiceHandler interface {
 	// Makes a site of a kind from a seed and saves it to the library as a new ready site (source "upload", source_label
 	// "template:<kind>"). The name defaults to the site's own brand, the note to the kind's name. Limits as CreateDecoySite.
 	GenerateDecoySite(context.Context, *connect.Request[v1.GenerateDecoySiteRequest]) (*connect.Response[v1.GenerateDecoySiteResponse], error)
+	// Photos for generated sites come from Pexels (pexels.com) with the owner's own free API key. Whether a key is stored; the
+	// key itself never comes back. Owner only.
+	GetDecoyPhotos(context.Context, *connect.Request[v1.GetDecoyPhotosRequest]) (*connect.Response[v1.GetDecoyPhotosResponse], error)
+	// Stores the Pexels key, or removes it when key is empty. Owner only; the audit log records that it was set or removed, never
+	// the value. Without a key every generated site is drawn, as before.
+	SetDecoyPhotosKey(context.Context, *connect.Request[v1.SetDecoyPhotosKeyRequest]) (*connect.Response[v1.SetDecoyPhotosKeyResponse], error)
 }
 
 // NewDecoySiteServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -579,6 +621,18 @@ func NewDecoySiteServiceHandler(svc DecoySiteServiceHandler, opts ...connect.Han
 		connect.WithSchema(decoySiteServiceMethods.ByName("GenerateDecoySite")),
 		connect.WithHandlerOptions(opts...),
 	)
+	decoySiteServiceGetDecoyPhotosHandler := connect.NewUnaryHandler(
+		DecoySiteServiceGetDecoyPhotosProcedure,
+		svc.GetDecoyPhotos,
+		connect.WithSchema(decoySiteServiceMethods.ByName("GetDecoyPhotos")),
+		connect.WithHandlerOptions(opts...),
+	)
+	decoySiteServiceSetDecoyPhotosKeyHandler := connect.NewUnaryHandler(
+		DecoySiteServiceSetDecoyPhotosKeyProcedure,
+		svc.SetDecoyPhotosKey,
+		connect.WithSchema(decoySiteServiceMethods.ByName("SetDecoyPhotosKey")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.decoysite.v1.DecoySiteService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DecoySiteServiceListDecoySitesProcedure:
@@ -621,6 +675,10 @@ func NewDecoySiteServiceHandler(svc DecoySiteServiceHandler, opts ...connect.Han
 			decoySiteServicePreviewDecoyTemplateHandler.ServeHTTP(w, r)
 		case DecoySiteServiceGenerateDecoySiteProcedure:
 			decoySiteServiceGenerateDecoySiteHandler.ServeHTTP(w, r)
+		case DecoySiteServiceGetDecoyPhotosProcedure:
+			decoySiteServiceGetDecoyPhotosHandler.ServeHTTP(w, r)
+		case DecoySiteServiceSetDecoyPhotosKeyProcedure:
+			decoySiteServiceSetDecoyPhotosKeyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -708,4 +766,12 @@ func (UnimplementedDecoySiteServiceHandler) PreviewDecoyTemplate(context.Context
 
 func (UnimplementedDecoySiteServiceHandler) GenerateDecoySite(context.Context, *connect.Request[v1.GenerateDecoySiteRequest]) (*connect.Response[v1.GenerateDecoySiteResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.decoysite.v1.DecoySiteService.GenerateDecoySite is not implemented"))
+}
+
+func (UnimplementedDecoySiteServiceHandler) GetDecoyPhotos(context.Context, *connect.Request[v1.GetDecoyPhotosRequest]) (*connect.Response[v1.GetDecoyPhotosResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.decoysite.v1.DecoySiteService.GetDecoyPhotos is not implemented"))
+}
+
+func (UnimplementedDecoySiteServiceHandler) SetDecoyPhotosKey(context.Context, *connect.Request[v1.SetDecoyPhotosKeyRequest]) (*connect.Response[v1.SetDecoyPhotosKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.decoysite.v1.DecoySiteService.SetDecoyPhotosKey is not implemented"))
 }

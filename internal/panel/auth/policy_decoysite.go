@@ -21,6 +21,7 @@ import (
 //
 // EditDecoySiteFile, UpdateDecoySite, CopyDecoySite, SetPanelDecoySource, ListDecoyPages / GetDecoyPagePreview and the three template
 // calls (ListDecoyTemplates, PreviewDecoyTemplate, GenerateDecoySite) stay the owner's own: an agent makes its sites its own way.
+// So do the two calls about the Pexels key for photos (GetDecoyPhotos, SetDecoyPhotosKey): an agent cannot read or change a key.
 func init() {
 	for _, p := range []string{
 		decoysitev1connect.DecoySiteServiceListDecoySitesProcedure,
@@ -43,6 +44,8 @@ func init() {
 		decoysitev1connect.DecoySiteServiceListDecoyTemplatesProcedure,
 		decoysitev1connect.DecoySiteServicePreviewDecoyTemplateProcedure,
 		decoysitev1connect.DecoySiteServiceGenerateDecoySiteProcedure,
+		decoysitev1connect.DecoySiteServiceGetDecoyPhotosProcedure,
+		decoysitev1connect.DecoySiteServiceSetDecoyPhotosKeyProcedure,
 	} {
 		procedureLevels[p] = levelOwner
 	}
