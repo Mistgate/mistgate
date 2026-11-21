@@ -10,6 +10,7 @@
   "inbound_pending",
   "node_offline",
   "refused",
+  "session",
   "timeout",
   "tls"
 ]
