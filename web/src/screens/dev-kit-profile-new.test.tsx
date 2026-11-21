@@ -68,7 +68,7 @@ describe("the scenes of the new-profile wizard", () => {
     if (state === "loading" || state === "noschema" || state === "helper" || state === "readonly") return;
     expect(document.querySelector("h1")?.textContent).toBe("New profile");
     expect(document.querySelectorAll(".pw-steps li")).toHaveLength(5);
-    if (state.startsWith("t-")) expect(document.querySelectorAll("[role=radiogroup] [role=radio]")).toHaveLength(state === "t-few" ? 4 : 7);
+    if (state.startsWith("t-")) expect(document.querySelectorAll("[role=radiogroup] [role=radio]")).toHaveLength(state === "t-few" ? 3 : 6);
     if (state === "t-fast") expect(document.querySelector("[role=radio][aria-checked=true]")?.textContent).toContain("Fast, for most people");
     if (state.startsWith("s2-")) expect(document.querySelector("input[data-w=name]")).not.toBeNull();
     if (state.startsWith("s3-") && state !== "s3-none") expect(nodeRows()).toHaveLength(12);
