@@ -74,10 +74,13 @@ func TestSplitRuleNeedsSuffixesOrGeo(t *testing.T) {
 	}
 }
 
-// The known lists are the single place for names: cn and ir, with the geosite names the data files use.
+// The known lists are the single place for names: cn, ir and ru, with the geosite names the data files use.
 func TestGeoLists(t *testing.T) {
-	if got := GeoCodes(); !slices.Equal(got, []string{"cn", "ir"}) {
+	if got := GeoCodes(); !slices.Equal(got, []string{"cn", "ir", "ru"}) {
 		t.Errorf("codes = %v", got)
+	}
+	if geositeTag("ru") != "geosite-category-ru" || geoipTag("ru") != "geoip-ru" {
+		t.Error("ru tags")
 	}
 	if geositeTag("ir") != "geosite-category-ir" || geoipTag("ir") != "geoip-ir" || geositeTag("cn") != "geosite-cn" || geoipTag("cn") != "geoip-cn" {
 		t.Error("tags")
@@ -263,5 +266,46 @@ func TestChinaCatalog(t *testing.T) {
 	}
 	if c := (Preset{Servers: variantServers("alidns/standard")}); CategoryOf(c) != CategoryRegional || CountryOf(c) != "CN" {
 		t.Error("a custom preset takes the category and country of its first catalog server")
+	}
+}
+
+// The built-in "Russia: Russian sites direct (community list)" in the four client formats: the stock suffixes plus the lists of "ru".
+func TestGeoRenderRussiaBuiltin(t *testing.T) {
+	p := builtin(t, "dns_builtin_ru_geo")
+	if !p.SplitDirect || len(p.Split) != 1 || !slices.Equal(p.Split[0].Geo, []string{"ru"}) || len(p.Split[0].Suffixes) != 10 {
+		t.Fatalf("preset = %+v", p)
+	}
+
+	m := mustDNS(t, p, "G")
+	if len(m.Providers) != 2 || m.Providers[0].URL != "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/category-ru.mrs" ||
+		m.Providers[1].URL != "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/ru.mrs" {
+		t.Errorf("providers = %+v", m.Providers)
+	}
+	goldenJSON(t, "mihomo_dns_russia_geo.json", map[string]any{"policy": m.Policy, "direct": m.Direct, "providers": m.Providers, "rules": rulesOf(m.Providers), "notes": m.Notes})
+
+	x, err := p.XrayDNS()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(x.DirectGeo) != 1 || x.DirectGeo[0] != (XrayGeo{Site: "geosite:category-ru", IP: "geoip:ru"}) {
+		t.Errorf("xray geo = %v", x.DirectGeo)
+	}
+	goldenJSON(t, "xray_dns_russia_geo.json", map[string]any{"dns": x.Section, "direct": x.Direct, "directGeo": x.DirectGeo, "directIPs": x.DirectIPs, "notes": x.Notes})
+
+	sb, err := p.SingboxDNS("Mistgate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(sb.DirectSets, []string{"geosite-category-ru", "geoip-ru"}) {
+		t.Errorf("sing-box sets = %v", sb.DirectSets)
+	}
+	goldenJSON(t, "singbox_dns_russia_geo.json", map[string]any{"dns": sb.Section, "direct": sb.Direct, "ruleSets": sb.RuleSets, "directSets": sb.DirectSets, "notes": sb.Notes})
+
+	h, err := HappRouting(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := decode(t, h); !strings.Contains(got, `"DirectSites":["domain:ru","domain:su","domain:xn--p1ai","domain:yandex.com","domain:yandex.net","domain:yastatic.net","domain:vk.com","domain:userapi.com","domain:sberbank.com","domain:vtb.com","geosite:category-ru"],"DirectIp":["geoip:ru"]`) {
+		t.Errorf("happ: %s", got)
 	}
 }

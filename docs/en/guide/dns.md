@@ -44,9 +44,9 @@ A split rule is a list of suffixes (type one and press Enter: `.ru`, `gosuslugi.
 
 ### Country lists
 
-Next to suffixes (or instead of them) a split rule can name a whole country by a code: `cn` is China, the sites of the country's geosite list and the addresses of its geoip list, thousands of domains that no hand-made list of suffixes would hold. The panel also knows `ir` (Iran), but no built-in preset uses it. A rule needs suffixes or a country list; an unknown code is refused ("unknown country list"). The built-in **China: Chinese sites direct** is such a rule.
+Next to suffixes (or instead of them) a split rule can name a whole country by a code: `cn` is China and `ru` is Russia, the sites of the country's geosite list and the addresses of its geoip list, thousands of domains that no hand-made list of suffixes would hold. The panel also knows `ir` (Iran), but no built-in preset uses it. A rule needs suffixes or a country list; an unknown code is refused ("unknown country list"). The built-ins **China: Chinese sites direct** and **Russia: Russian sites direct (community list)** are such rules. The Russian list (`category-ru` and `ru`, in the `geosite.dat` and `geoip.dat` files of Xray and Happ) holds the well-known Russian services, not every site: what is not in it goes through the VPN.
 
-In the editor, **All sites of a country** under a rule's suffixes switches a country on. For now it offers **China** only: the one with a built-in preset and resolvers checked from inside the country. A rule that already names another code (set through the API, `DnsService`) shows it too, so it can be turned off. A rule with a country and no suffixes is complete: its suffix field just stays empty.
+In the editor, **All sites of a country** under a rule's suffixes switches a country on. It offers **China** and **Russia**: the ones with a built-in preset and resolvers checked from inside the country. A rule that already names another code (set through the API, `DnsService`) shows it too, so it can be turned off. A rule with a country and no suffixes is complete: its suffix field just stays empty.
 
 With **Split domains go direct, bypassing the VPN** on, the country's sites are asked at the rule's servers and open directly. The address lists decide only connections made to an address: a domain is never looked up just to be checked against them. What each app does:
 
@@ -93,6 +93,7 @@ Built-in presets exist on every install. They can be edited, not deleted.
 | Russia | **Russia: all through VPN** | Everything through the VPN, Cloudflare and Google for every domain. For people abroad. |
 | Russia | **Yandex DNS** | Yandex DNS for everything. |
 | China | **China: Chinese sites direct** | The sites of the Chinese lists (see "Country lists") are asked at AliDNS and DNSPod and open directly, bypassing the VPN; everything else goes through the VPN to Cloudflare and Google. For people inside China. Not the default: choose it as the default for everyone, or give it to a group. AliDNS and DNSPod are in the catalog with plain DNS only. |
+| Russia | **Russia: Russian sites direct (community list)** | The same suffixes and Yandex DNS as **Russia: .ru direct**, plus the `ru` country list: the known Russian services of a community list (not every site) open directly, bypassing the VPN, and the app downloads and refreshes the list itself. Everything else goes through the VPN to Cloudflare and Google. Not the default; **Russia: .ru direct** is left as it was. Xray and Happ need the code `category-ru` in the app's `geosite.dat`: an app without it cannot start the config. AmneziaWG keys and the plain link list carry no rules. |
 | Regular | **Cloudflare + Google** | Cloudflare and Google for everything. |
 | Regular | **Cloudflare: no filtering**, **Google: no filtering**, **DNS.SB: no filtering** | One provider, no filtering. |
 | No ads | **AdGuard: no ads** | Blocks ads and trackers. |
@@ -100,7 +101,7 @@ Built-in presets exist on every install. They can be edited, not deleted.
 | For kids | **AdGuard Family: no ads, no 18+**, **Cloudflare Family: no malware, no 18+**, **Yandex Family: no 18+**, **OpenDNS FamilyShield: no 18+** | Blocks adult content (and ads or malware, as the name says). |
 | Security | **Quad9: malware blocking**, **Cloudflare Security: malware blocking**, **Yandex Safe: malware blocking** | Blocks known malware and phishing domains. |
 
-**How to choose?** on the tab gives the short answer: people in Russia: **Russia: .ru direct**; people abroad: **Russia: all through VPN**; no ads: **AdGuard: no ads**. People inside China: **China: Chinese sites direct**. No ads in the apps themselves, whatever the DNS servers: **No ads on the device**. **AdGuard: no ads** filters at the DNS server, so it works in AmneziaWG keys too; **No ads on the device** works with any servers and next to a split, but only in Mihomo, sing-box, Xray JSON and Happ.
+**How to choose?** on the tab gives the short answer: people in Russia: **Russia: .ru direct**; people abroad: **Russia: all through VPN**; no ads: **AdGuard: no ads**. People inside China: **China: Chinese sites direct**. People inside Russia who want the list of known services instead of the suffixes alone: **Russia: Russian sites direct (community list)**. No ads in the apps themselves, whatever the DNS servers: **No ads on the device**. **AdGuard: no ads** filters at the DNS server, so it works in AmneziaWG keys too; **No ads on the device** works with any servers and next to a split, but only in Mihomo, sing-box, Xray JSON and Happ.
 
 ## The DNS tab
 

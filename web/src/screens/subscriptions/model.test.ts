@@ -369,6 +369,7 @@ describe("DNS chips", () => {
     expect(presetName({ id: "dns_builtin_cn_split", name: "Китай: китайские сайты напрямую" }, "en")).toBe("China: Chinese sites direct");
     expect(presetName({ id: "dns_builtin_cn_split", name: "Китай: китайские сайты напрямую" }, "zh")).toBe("中国：国内网站直连");
     expect(presetName({ id: "dns_builtin_cn_split", name: "Китай: китайские сайты напрямую" }, "ru")).toBe("Китай: китайские сайты напрямую");
+    expect(presetName({ id: "dns_builtin_ru_geo", name: "Россия: российские сайты напрямую (список сообщества)" }, "en")).toBe("Russia: Russian sites direct (community list)");
   });
 });
 
@@ -396,10 +397,10 @@ describe("format labels", () => {
 
 describe("the country lists of a split rule in the editor", () => {
   const server = { kind: DnsServerKind.PLAIN, address: "223.5.5.5", providerVariant: "" };
-  it("offers China, and any other code a rule already holds so it can be turned off", () => {
-    expect(geoChoices([])).toEqual(["cn"]);
-    expect(geoChoices(["cn"])).toEqual(["cn"]);
-    expect(geoChoices(["ir"])).toEqual(["cn", "ir"]);
+  it("offers China and Russia, and any other code a rule already holds so it can be turned off", () => {
+    expect(geoChoices([])).toEqual(["cn", "ru"]);
+    expect(geoChoices(["cn"])).toEqual(["cn", "ru"]);
+    expect(geoChoices(["ir"])).toEqual(["cn", "ru", "ir"]);
   });
   it("switches a country on and off without touching the others, and comes back to the same list", () => {
     expect(toggleGeo([], "cn")).toEqual(["cn"]);

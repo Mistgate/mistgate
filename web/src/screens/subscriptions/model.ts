@@ -115,11 +115,11 @@ export function chipLabel(chip: string, t: Tx): string {
 }
 
 /**
- * The country lists the split-rule editor offers: China only, the one with a built-in preset and resolvers checked from
+ * The country lists the split-rule editor offers: China and Russia, the ones with a built-in preset and resolvers checked from
  * inside the country. The panel knows "ir" too (internal/panel/dns/geo.go); a rule that already holds it, or any other
  * code, shows it as well so it can be seen and turned off.
  */
-const geoOffered = ["cn"];
+const geoOffered = ["cn", "ru"];
 export const geoChoices = (have: readonly string[]): string[] => [...new Set([...geoOffered, ...have])];
 /** The country lists of a rule with `code` switched on (added at the end) or off; the others keep their order. */
 export const toggleGeo = (geo: readonly string[], code: string): string[] => (geo.includes(code) ? geo.filter((g) => g !== code) : [...geo, code]);
@@ -549,6 +549,7 @@ export function shortAddress(kind: DnsServerKind, address: string): string {
 // Persian around it.
 export const builtinNames: Record<string, { ru: string; en: string; zh: string; fa: string; tr: string }> = {
   dns_builtin_ru_split: { ru: "Россия: .ru напрямую", en: "Russia: .ru direct", zh: "俄罗斯：.ru 直连", fa: "روسیه: \u200E.ru مستقیم", tr: "Rusya: .ru doğrudan" },
+  dns_builtin_ru_geo: { ru: "Россия: российские сайты напрямую (список сообщества)", en: "Russia: Russian sites direct (community list)", zh: "俄罗斯：俄罗斯网站直连（社区列表）", fa: "روسیه: سایت‌های روسی مستقیم (فهرست جامعه)", tr: "Rusya: Rus siteleri doğrudan (topluluk listesi)" },
   dns_builtin_ru_proxied: { ru: "Россия: всё через VPN", en: "Russia: all through VPN", zh: "俄罗斯：全部经 VPN", fa: "روسیه: همه‌چیز از راه VPN", tr: "Rusya: her şey VPN üzerinden" },
   dns_builtin_cn_split: { ru: "Китай: китайские сайты напрямую", en: "China: Chinese sites direct", zh: "中国：国内网站直连", fa: "چین: سایت‌های چینی مستقیم", tr: "Çin: Çin siteleri doğrudan" },
   dns_builtin_standard: { ru: "Cloudflare + Google", en: "Cloudflare + Google", zh: "Cloudflare + Google", fa: "Cloudflare + Google", tr: "Cloudflare + Google" },

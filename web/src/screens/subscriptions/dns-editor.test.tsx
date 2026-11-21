@@ -129,6 +129,7 @@ describe("the country lists of a split rule", () => {
     const pills = [...document.querySelectorAll('[role=group][aria-label="Rule 1 · All sites of a country"] button')];
     expect(pills.map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([
       ["China", "false"],
+      ["Russia", "false"],
       ["Iran", "true"],
     ]);
   });

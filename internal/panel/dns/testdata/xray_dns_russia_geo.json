@@ -1,0 +1,77 @@
+{
+  "direct": [
+    "ru",
+    "su",
+    "xn--p1ai",
+    "yandex.com",
+    "yandex.net",
+    "yastatic.net",
+    "vk.com",
+    "userapi.com",
+    "sberbank.com",
+    "vtb.com"
+  ],
+  "directGeo": [
+    {
+      "Site": "geosite:category-ru",
+      "IP": "geoip:ru"
+    }
+  ],
+  "directIPs": [
+    "77.88.8.8",
+    "77.88.8.1"
+  ],
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "servers": [
+      {
+        "address": "1.1.1.1"
+      },
+      {
+        "address": "8.8.8.8"
+      },
+      {
+        "address": "1.0.0.1"
+      },
+      {
+        "address": "8.8.4.4"
+      },
+      {
+        "address": "77.88.8.8",
+        "domains": [
+          "domain:ru",
+          "domain:su",
+          "domain:xn--p1ai",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:yastatic.net",
+          "domain:vk.com",
+          "domain:userapi.com",
+          "domain:sberbank.com",
+          "domain:vtb.com",
+          "geosite:category-ru"
+        ],
+        "skipFallback": true
+      },
+      {
+        "address": "77.88.8.1",
+        "domains": [
+          "domain:ru",
+          "domain:su",
+          "domain:xn--p1ai",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:yastatic.net",
+          "domain:vk.com",
+          "domain:userapi.com",
+          "domain:sberbank.com",
+          "domain:vtb.com",
+          "geosite:category-ru"
+        ],
+        "skipFallback": true
+      }
+    ]
+  },
+  "notes": null
+}

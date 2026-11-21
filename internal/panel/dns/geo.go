@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Geo lists: a split rule may name whole countries ("cn") instead of, or next to, domain suffixes. The names of the lists
+// Geo lists: a split rule may name whole countries ("cn", "ru") instead of, or next to, domain suffixes. The names of the lists
 // and the places clients download them from are written here and nowhere else.
 //
 // What a client does with a country code, per format (docs/en/guide/dns.md):
@@ -30,6 +30,7 @@ type geoList struct {
 var geoLists = map[string]geoList{
 	"cn": {Site: "cn", IP: "cn"},
 	"ir": {Site: "category-ir", IP: "ir"},
+	"ru": {Site: "category-ru", IP: "ru"},
 }
 
 // adsSite is the geosite list of ad and tracker domains that a preset with BlockAds makes the apps drop (v2fly/domain-list-community
