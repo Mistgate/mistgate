@@ -98,6 +98,7 @@ export const errorCodes = [
   "decoy_preview_too_large",
   // a site from a template (GenerateDecoySite, PreviewDecoyTemplate): InvalidArgument
   "decoy_template_unknown",
+  "decoy_template_country",
   "decoy_template_seed",
   "decoy_photos_key_invalid",
   // relays (relay.proto): CreateRelay / UpdateRelay / CheckRelay

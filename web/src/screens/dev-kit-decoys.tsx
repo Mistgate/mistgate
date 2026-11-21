@@ -31,7 +31,7 @@ import { ShellLayout } from "./shell";
 //   /dev-kit?only=decoys-page&state=<state>[&lang=en|ru|zh|fa|tr][&theme=light|dark][&fx=1]
 // list states: list | list-delivery | list-panel-fb | list-empty | list-many | list-full | list-load | list-err | list-deny | list-edge | list-draft |
 //   list-used | list-free | list-find | list-nomatch
-// the windows of the list: dlg-new | dlg-tpl | dlg-tpl-wait | dlg-tpl-view | dlg-tpl-run | dlg-tpl-err | dlg-tpl-nokey | dlg-tpl-keyform | dlg-tpl-photos | dlg-tpl-limit | dlg-up | dlg-up-drag | dlg-up-run | dlg-up-ready | dlg-up-draft | dlg-up-taken | dlg-up-big |
+// the windows of the list: dlg-new | dlg-tpl | dlg-tpl-nl | dlg-tpl-wait | dlg-tpl-view | dlg-tpl-run | dlg-tpl-err | dlg-tpl-nokey | dlg-tpl-keyform | dlg-tpl-photos | dlg-tpl-limit | dlg-up | dlg-up-drag | dlg-up-run | dlg-up-ready | dlg-up-draft | dlg-up-taken | dlg-up-big |
 //   dlg-up-many | dlg-up-unsafe | dlg-up-fmt | dlg-up-noindex | dlg-mcp
 // page states: site-used | site-ready | site-template | site-draft | site-bad | site-builtin | site-dir | site-dir-off | site-way | site-fail | site-off |
 //   site-old | site-phone | site-404 | site-page | site-edit | site-menu | site-checks | site-copied | site-css | site-img | site-deny |
@@ -211,7 +211,7 @@ function installFake(w: World) {
       const page = notFound ? (s.has404 ? 404 : "nf") : i === 0 ? 0 : i === pages.length - 1 ? 2 : 1;
       return { html: pageDoc(siteId.replace("dsi_", ""), page, 0), path };
     },
-    listDecoyTemplates: async () => ({ templates: templateKinds.map(([id, nameEn]) => ({ id, nameEn, nameRu: nameEn })) }),
+    listDecoyTemplates: async () => templateAnswer,
     previewDecoyTemplate: async ({ kind, seed }: { kind: string; seed: string }) => {
       if (w.fail === "preview") throw new ConnectError("unavailable", Code.Unavailable);
       if (!seed) variant += 1;
@@ -271,7 +271,7 @@ function seeded(w: World) {
   if (!w.hang && !w.fail) {
     c.setQueryData(sitesQuery.queryKey, libraryOf(w) as never);
     c.setQueryData(photosQuery.queryKey, { hasKey: w.photosKey } as never);
-    c.setQueryData(templatesQuery.queryKey, templateKinds.map(([id, nameEn]) => ({ id, nameEn, nameRu: nameEn })) as never);
+    c.setQueryData(templatesQuery.queryKey, templateAnswer as never);
     for (const s of w.sites.slice(0, 12)) {
       const d = detailOf(s, w);
       c.setQueryData(siteQuery(s.id).queryKey, d as never);
@@ -298,12 +298,19 @@ const uploads: Record<string, UploadDemo> = {
 };
 // ---- the made-up window "From a template": the kinds the panel names, and which made-up look stands for each in the preview
 const templateKinds: [string, string][] = [["status", "Service status page"], ["files", "File transfer (upload page)"], ["login", "Sign-in page"], ["blog", "Personal blog"], ["portfolio", "Photo / illustration portfolio"], ["business", "Small business site"], ["docs", "Project documentation"], ["card", "Personal card page"], ["club", "Club / society / event"], ["project", "Open-source project page"]];
+// the countries the panel builds sites for, and the kinds that have texts in each country's language (the Dutch and the Swedish have two)
+const templateCountries = ["us", "gb", "de", "at", "ch", "ru", "nl", "se"];
+const templateAnswer = {
+  countries: templateCountries,
+  templates: templateKinds.map(([id, nameEn]) => ({ id, nameEn, nameRu: nameEn, countries: id === "files" || id === "login" ? templateCountries : templateCountries.slice(0, 6) })),
+};
 const templateLook: Record<string, string> = { blog: "tpl", business: "bk", portfolio: "ph", card: "wd", club: "boat", status: "bike", docs: "gd" };
 let variant = 0;
 const templates: Record<string, TemplateDemo> = {
   "dlg-tpl": { phase: "pick" },
+  "dlg-tpl-nl": { phase: "pick", country: "nl" },
   "dlg-tpl-wait": { phase: "view", kind: "blog" },
-  "dlg-tpl-view": { phase: "view", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader" },
+  "dlg-tpl-view": { phase: "view", kind: "blog", country: "de", html: pageDoc("tpl", 0), name: "Rainy Reader" },
   "dlg-tpl-run": { phase: "run", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader" },
   "dlg-tpl-err": { phase: "err", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader", error: "decoy_library_full" },
   // the photos of a site: no key (drawn), the key being typed, a site with photos, Pexels asked to wait
