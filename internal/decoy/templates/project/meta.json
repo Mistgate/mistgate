@@ -1,0 +1,15 @@
+{
+  "title": {"en": "Open-source project page", "ru": "Страница open-source проекта (с журналом изменений)"},
+  "layouts": 3,
+  "pages": [
+    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
+    {"name": "changelog", "tmpl": "changelog.html.tmpl", "paths": ["changelog.html", "changelog/index.html", "releases/index.html", "history.html"], "nav": "nav_changelog", "desc": "desc_changelog"},
+    {"name": "download", "tmpl": "download.html.tmpl", "paths": ["download.html", "download/index.html", "get/index.html", "install.html"], "nav": "nav_download", "desc": "desc_download"},
+    {"name": "roadmap", "tmpl": "roadmap.html.tmpl", "paths": ["roadmap.html", "roadmap/index.html", "plans/index.html", "next.html"], "nav": "nav_roadmap", "desc": "desc_roadmap"}
+  ],
+  "home_blocks": ["features", "start", "latest"],
+  "home_fixed": 0,
+  "lists": [
+    {"name": "releases", "min": 5, "max": 7, "semver": true, "dates": {"end": "2026-10-20", "gap_min": 14, "gap_max": 70}, "sub": [{"field": "notes", "from": "changes", "min": 2, "max": 4}]}
+  ]
+}

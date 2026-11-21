@@ -2,9 +2,7 @@ package decoy
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"embed"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,7 +27,15 @@ import (
 //	*.tmpl      one template per page, style.css.tmpl and, for a kind with scripts, script.js.tmpl
 //
 // Templates may use "__name__" for CSS classes and ids and "$$name" for JS identifiers: both are renamed per seed.
-// templates/shared holds what every kind uses (head, header, footer, the base stylesheet, the 404 page).
+// templates/shared holds what every kind uses (head, header, footer, the base stylesheet, the 404 page); a kind may override
+// any of those by defining the same template or file name.
+//
+// A bundle picks the language and the theme; its "vars" (a list, a number range, or one word from each of several lists)
+// fill the {name} marks of every text, and {cmd} is the brand as a command line name. The texts that the shared parts print
+// must exist in every bundle or its language's "ui": nav_label, tagline, footer, desc, home_title, nf_title, nf_text, nf_back,
+// and the "nav" and "desc" keys the pages name. Templates see the site (.L texts, .V vars, .Layout, .Lists, .Nav, .Page) and
+// the functions of funcMap. Texts are printed as they are, never escaped: write them so they are safe in a double-quoted
+// attribute (no double quotes, no "<").
 
 //go:embed templates
 var templateFS embed.FS
@@ -180,78 +186,6 @@ func Generate(kind string, seed []byte) ([]File, error) {
 		return nil, fmt.Errorf("decoy: unknown site kind %q", kind)
 	}
 	return d.render(seed)
-}
-
-// rng is a deterministic stream of numbers from a seed: SHA-256 in counter mode, so the sequence cannot change with a Go
-// release the way the standard generators' algorithms may.
-type rng struct {
-	key  [32]byte
-	ctr  uint64
-	buf  [4]uint64
-	left int
-}
-
-func newRNG(parts ...[]byte) *rng {
-	h := sha256.New()
-	for _, p := range parts {
-		var l [4]byte
-		binary.BigEndian.PutUint32(l[:], uint32(len(p)))
-		h.Write(l[:])
-		h.Write(p)
-	}
-	r := &rng{}
-	h.Sum(r.key[:0])
-	return r
-}
-
-// sub is an independent stream named by label, so one draw does not depend on how many others came before it.
-func (r *rng) sub(label string) *rng { return newRNG(r.key[:], []byte(label)) }
-
-func (r *rng) u64() uint64 {
-	if r.left == 0 {
-		var in [40]byte
-		copy(in[:32], r.key[:])
-		binary.BigEndian.PutUint64(in[32:], r.ctr)
-		r.ctr++
-		sum := sha256.Sum256(in[:])
-		for i := range r.buf {
-			r.buf[i] = binary.BigEndian.Uint64(sum[i*8:])
-		}
-		r.left = len(r.buf)
-	}
-	r.left--
-	return r.buf[r.left]
-}
-
-// n is a number in [0, n).
-func (r *rng) n(n int) int {
-	if n <= 1 {
-		return 0
-	}
-	return int(r.u64() % uint64(n))
-}
-
-// between is a number in [lo, hi].
-func (r *rng) between(lo, hi int) int {
-	if hi <= lo {
-		return lo
-	}
-	return lo + r.n(hi-lo+1)
-}
-
-func (r *rng) chance(pct int) bool { return r.n(100) < pct }
-func (r *rng) float() float64      { return float64(r.u64()>>11) / (1 << 53) }
-
-func (r *rng) perm(n int) []int {
-	p := make([]int, n)
-	for i := range p {
-		p[i] = i
-	}
-	for i := n - 1; i > 0; i-- {
-		j := r.n(i + 1)
-		p[i], p[j] = p[j], p[i]
-	}
-	return p
 }
 
 type navItem struct {
@@ -806,202 +740,6 @@ func (s *site) fdate(iso string) string {
 		months = monthNames["en"]
 	}
 	return strings.NewReplacer("{d}", fmt.Sprint(t.Day()), "{m}", months[t.Month()-1], "{y}", fmt.Sprint(t.Year())).Replace(s.DateFmt)
-}
-
-// robotsFor is a robots.txt of its own for each site: the crawlers the shared file turns away, in the site's own order, and a
-// few lines a hand-written file might have.
-func robotsFor(r *rng, assetDir string) []byte {
-	var agents []string
-	for _, l := range strings.Split(strings.SplitN(robotsTXT, "\n\n", 2)[0], "\n") {
-		if strings.HasPrefix(l, "User-agent: ") {
-			agents = append(agents, l)
-		}
-	}
-	var b strings.Builder
-	if r.chance(40) {
-		b.WriteString("# crawlers we do not feed\n")
-	}
-	order := r.perm(len(agents))
-	groups := 1 + r.n(3)
-	for i, j := range order {
-		b.WriteString(agents[j] + "\n")
-		if (i+1)*groups/len(order) != (i*groups)/len(order) || i == len(order)-1 {
-			b.WriteString("Disallow: /\n\n")
-		}
-	}
-	b.WriteString("User-agent: *\n")
-	if r.chance(50) && assetDir != "." && assetDir != "/" {
-		b.WriteString("Disallow: " + assetDir + "/\n")
-	}
-	if r.chance(35) {
-		fmt.Fprintf(&b, "Crawl-delay: %d\n", 2+r.n(9))
-	}
-	b.WriteString("Allow: /\n")
-	return []byte(b.String())
-}
-
-// namer renames the "__name__" classes and ids and the "$$name" script identifiers of a site. The style is chosen per site,
-// the names per seed, so a stylesheet cannot be matched by its selectors.
-type namer struct {
-	r      *rng
-	style  int
-	prefix string
-	used   map[string]bool
-	css    map[string]string
-	js     map[string]string
-}
-
-func newNamer(r *rng) *namer {
-	n := &namer{r: r, style: r.n(3), used: map[string]bool{}, css: map[string]string{}, js: map[string]string{}}
-	n.prefix = n.word(2, 3)
-	return n
-}
-
-func (n *namer) word(lo, hi int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz"
-	b := make([]byte, n.r.between(lo, hi))
-	for i := range b {
-		b[i] = letters[n.r.n(len(letters))]
-	}
-	return string(b)
-}
-
-func (n *namer) unique(make func() string) string {
-	for {
-		if s := make(); !n.used[s] {
-			n.used[s] = true
-			return s
-		}
-	}
-}
-
-func (n *namer) cssName(name string) string {
-	if v, ok := n.css[name]; ok {
-		return v
-	}
-	v := n.unique(func() string {
-		switch n.style {
-		case 0:
-			return n.prefix + "-" + name
-		case 1:
-			return name + "-" + n.word(2, 3) + fmt.Sprint(n.r.n(10))
-		}
-		return n.word(3, 5) + fmt.Sprint(n.r.n(100))
-	})
-	n.css[name] = v
-	return v
-}
-
-func (n *namer) jsName(name string) string {
-	if v, ok := n.js[name]; ok {
-		return v
-	}
-	v := n.unique(func() string { return "_" + n.word(1, 2) + fmt.Sprint(n.r.n(1000)) })
-	n.js[name] = v
-	return v
-}
-
-var (
-	cssMark = regexp.MustCompile(`__([a-z][a-z0-9]*(?:-[a-z0-9]+)*)__`)
-	jsMark  = regexp.MustCompile(`\$\$([a-z][A-Za-z0-9]*)`)
-)
-
-func (n *namer) rewrite(b []byte) []byte {
-	b = cssMark.ReplaceAllFunc(b, func(m []byte) []byte { return []byte(n.cssName(string(m[2 : len(m)-2]))) })
-	return jsMark.ReplaceAllFunc(b, func(m []byte) []byte { return []byte(n.jsName(string(m[2:]))) })
-}
-
-// blockEnd are the elements whose closing tag may be followed by a line break and some indentation of the seed's choosing.
-var blockEnd = map[string]bool{"li": true, "p": true, "h1": true, "h2": true, "h3": true, "h4": true, "div": true, "section": true, "ul": true, "ol": true,
-	"tr": true, "td": true, "th": true, "dt": true, "dd": true, "article": true, "header": true, "footer": true, "main": true, "nav": true, "figure": true,
-	"figcaption": true, "blockquote": true, "table": true, "aside": true}
-
-var indents = []string{"", " ", "  ", "   ", "    ", "     ", "      ", "        ", "\t", "\t\t", "\n", "\n  "}
-
-// shake changes a page in ways nobody sees so that two sites made from one vocabulary never share a long literal run, even
-// where they happen to say the same thing: an invisible <wbr> inside long runs of prose, and a line break or indentation after
-// block elements. The places are the seed's choice.
-func shake(r *rng, h string) string {
-	var out strings.Builder
-	raw := map[string]bool{"script": true, "style": true, "pre": true, "svg": true, "title": true, "textarea": true}
-	for len(h) > 0 {
-		i := strings.IndexByte(h, '<')
-		if i < 0 {
-			out.WriteString(breakProse(r, h))
-			break
-		}
-		out.WriteString(breakProse(r, h[:i]))
-		j := strings.IndexByte(h[i:], '>')
-		if j < 0 {
-			out.WriteString(h[i:])
-			break
-		}
-		tag := h[i : i+j+1]
-		out.WriteString(tag)
-		h = h[i+j+1:]
-		var name string
-		if f := strings.Fields(strings.TrimSuffix(tag[1:len(tag)-1], "/")); len(f) > 0 {
-			name = strings.ToLower(strings.TrimLeft(f[0], "/"))
-		}
-		closing := strings.HasPrefix(tag, "</")
-		if raw[name] && !closing && !strings.HasSuffix(tag, "/>") {
-			if k := strings.Index(strings.ToLower(h), "</"+name); k >= 0 {
-				out.WriteString(h[:k])
-				h = h[k:]
-			}
-		}
-		if (closing && blockEnd[name]) || (!closing && (name == "meta" || name == "link")) {
-			h = strings.TrimPrefix(h, "\n")
-			out.WriteString("\n" + indents[r.n(len(indents))])
-		}
-	}
-	return out.String()
-}
-
-func breakProse(r *rng, text string) string {
-	if len(text) < 45 {
-		return text
-	}
-	// Every space may take a break, each on its own chance: two sites that say the same thing then break it in different places.
-	var out strings.Builder
-	for i := 0; i < len(text); i++ {
-		out.WriteByte(text[i])
-		if text[i] == ' ' && i > 6 && i < len(text)-8 && r.n(7) == 0 {
-			out.WriteString("<wbr>")
-		}
-	}
-	return out.String()
-}
-
-var (
-	looseSpace = []string{"", "", " ", "\n", "\n  ", "\n\t"}
-	commaSpace = []string{"", "", " ", " ", "\n", "  "}
-)
-
-// loosen varies the white space after ; { and } of a stylesheet or script, outside strings, for the same reason as shake.
-func loosen(r *rng, s string) string {
-	var out strings.Builder
-	var quote byte
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		out.WriteByte(c)
-		switch {
-		case quote != 0:
-			if c == '\\' && i+1 < len(s) {
-				i++
-				out.WriteByte(s[i])
-			} else if c == quote {
-				quote = 0
-			}
-		case c == '"' || c == '\'':
-			quote = c
-		case (c == ';' || c == '{' || c == '}') && i+1 < len(s) && s[i+1] != '\n' && s[i+1] != ' ':
-			out.WriteString(looseSpace[r.n(len(looseSpace))])
-		case c == ',' && i+1 < len(s) && s[i+1] != '\n' && s[i+1] != ' ':
-			out.WriteString(commaSpace[r.n(len(commaSpace))]) // long font stacks and selector lists are where runs would hide
-		}
-	}
-	return out.String()
 }
 
 func funcMap(c *ctx) template.FuncMap {
