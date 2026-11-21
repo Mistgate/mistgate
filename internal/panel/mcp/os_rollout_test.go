@@ -317,7 +317,7 @@ func TestOsUpdatesViewMarksNodeNotesUntrustedAndExposesTypedRetryFields(t *testi
 	}
 }
 
-func TestOsRolloutCancelPlanIsOnlyOfferedWhenItCanWork(t *testing.T) {
+func TestOsRolloutCancelPlanAllowsJobsAlreadyInFlight(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileAdmin)
 	s := e.session(secret)
@@ -333,16 +333,20 @@ func TestOsRolloutCancelPlanIsOnlyOfferedWhenItCanWork(t *testing.T) {
 	if got := mustFail(t, s, "os_rollout_cancel_plan", args); !strings.Contains(got, "nothing to cancel") {
 		t.Errorf("a finished rollout: %q", got)
 	}
-	// a job that is running on the node cannot be stopped: the panel would refuse, so the owner is not asked
+	// A job already on the node is allowed to finish while the cancellation waits.
 	for _, st := range []adminv1.OsStepState{adminv1.OsStepState_OS_STEP_STATE_SENT, adminv1.OsStepState_OS_STEP_STATE_REBOOTING, adminv1.OsStepState_OS_STEP_STATE_GATING} {
-		e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_RUNNING, Steps: step(st)})
-		if got := mustFail(t, s, "os_rollout_cancel_plan", args); !strings.Contains(got, "cannot be stopped") {
-			t.Errorf("%v: %q", st, got)
+		if !osCancelable(&adminv1.OsRollout{Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_RUNNING, Steps: step(st)}) {
+			t.Errorf("%v: running step blocked the cancel plan", st)
 		}
+	}
+	e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_RUNNING, Steps: step(adminv1.OsStepState_OS_STEP_STATE_SENT)})
+	p := planOf(t, s, "os_rollout_cancel", args)
+	if !p.NeedsApproval || !strings.Contains(p.Summary, "job already in progress finishes and is checked") || !strings.Contains(p.Summary, "jobs that have not started are skipped") {
+		t.Errorf("cancel plan = %+v", p)
 	}
 
 	e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_PAUSED, Steps: step(adminv1.OsStepState_OS_STEP_STATE_FAILED)})
-	p := planOf(t, s, "os_rollout_cancel", args)
+	p = planOf(t, s, "os_rollout_cancel", args)
 	if !p.NeedsApproval || len(p.Danger) != 2 {
 		t.Fatalf("plan: %+v", p)
 	}
@@ -362,7 +366,7 @@ func TestOsRolloutCancelPlanIsOnlyOfferedWhenItCanWork(t *testing.T) {
 	// the rollout changed between the plan and the approval
 	p = planOf(t, s, "os_rollout_cancel", args)
 	e.plans.decide(p.PlanID, true)
-	e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_RUNNING, Steps: step(adminv1.OsStepState_OS_STEP_STATE_SENT)})
+	e.setOsRollout(&adminv1.OsRollout{Id: "osr_1", Status: adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_DONE, Steps: step(adminv1.OsStepState_OS_STEP_STATE_PASSED)})
 	if got := applyError(t, s, "os_rollout_cancel", p.ConfirmToken); !strings.Contains(got, "changed since the plan") {
 		t.Errorf("apply after the rollout moved on: %q", got)
 	}

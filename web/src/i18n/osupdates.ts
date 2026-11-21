@@ -256,7 +256,6 @@ export const en = {
 
   // ---- the panel's refusal codes
   "err.os_blocked": "The OS update cannot start: {reason}",
-  "err.os_cancel_inflight": "A job is running on the node and cannot be stopped. Wait until it ends.",
   "err.node_updating": "The node is being updated. Wait until it finishes.",
 };
 
@@ -504,7 +503,6 @@ export const ru: Record<keyof typeof en, string> = {
   "health.alert.os_update_failed.why.node_lost": "{node} пропала из сети, пока панель проверяла её после обновления. Посмотри на сервер: открой консоль хостера, если он не отвечает, потом закрой обновление.",
 
   "err.os_blocked": "Нельзя начать обновление ОС: {reason}",
-  "err.os_cancel_inflight": "На ноде идёт задание, его нельзя остановить. Дождись конца.",
   "err.node_updating": "На ноде идёт обновление, подожди его конца.",
 };
 
@@ -752,7 +750,6 @@ export const zh: Record<keyof typeof en, string> = {
   "health.alert.os_update_failed.why.node_lost": "面板在更新后检查 {node} 时，它从网络中消失了。请查看服务器：如果它没有响应，请打开服务商控制台，然后关闭此更新。",
 
   "err.os_blocked": "无法开始系统更新：{reason}",
-  "err.os_cancel_inflight": "节点上有任务在运行，无法停止。请等它结束。",
   "err.node_updating": "节点正在更新，请等它完成。",
 };
 
@@ -1000,7 +997,6 @@ export const fa: Record<keyof typeof en, string> = {
   "health.alert.os_update_failed.why.node_lost": "{node} در حالی که پنل بعد از به‌روزرسانی آن را بررسی می‌کرد از شبکه ناپدید شد. سرور را ببین: اگر پاسخ نمی‌دهد، کنسول سرویس‌دهنده را باز کن، بعد به‌روزرسانی را ببند.",
 
   "err.os_blocked": "به‌روزرسانی سیستم‌عامل شروع نمی‌شود: {reason}",
-  "err.os_cancel_inflight": "روی نود کاری در جریان است و نمی‌شود متوقفش کرد. صبر کن تمام شود.",
   "err.node_updating": "نود در حال به‌روزرسانی است. صبر کن تمام شود.",
 };
 
@@ -1248,6 +1244,5 @@ export const tr: Record<keyof typeof en, string> = {
   "health.alert.os_update_failed.why.node_lost": "Panel güncellemeden sonra {node} düğümünü denetlerken düğüm ağdan düştü. Sunucuya bak: yanıt vermiyorsa sağlayıcının konsolunu aç, sonra güncellemeyi kapat.",
 
   "err.os_blocked": "İşletim sistemi güncellemesi başlamıyor: {reason}",
-  "err.os_cancel_inflight": "Düğümde bir iş çalışıyor ve durdurulamaz. Bitmesini bekle.",
   "err.node_updating": "Düğüm güncelleniyor. Bitmesini bekle.",
 };

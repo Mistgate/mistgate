@@ -116,7 +116,6 @@ export const errorCodes = [
   "debug_busy",
   // an OS update of a node (update.proto StartOsRollout / CancelOsRollout), "os_blocked: reason=<key of os.block.*>"; and a node being updated (awgprep)
   "os_blocked",
-  "os_cancel_inflight",
   "node_updating",
   // the root update helper follows /etc/mistgate/panel-update-channel (InstallPanelUpdate, FailedPrecondition): "channel=<selected>&allowed=<policy>"
   "panel_update_channel_not_allowed",

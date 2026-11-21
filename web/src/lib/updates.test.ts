@@ -14,6 +14,7 @@ import {
   fastPollMs,
   heroOf,
   isFailurePause,
+  isCancelWait,
   lastUpdateView,
   manualCommands,
   nodeStateKind,
@@ -396,6 +397,13 @@ describe("the words of server keys", () => {
     expect(pausedStep(r)?.nodeId).toBe("nod_2");
     expect(isFailurePause("updates.pause.owner")).toBe(false);
     expect(isFailurePause("updates.pause.bundle_changed")).toBe(false);
+  });
+
+  it("recognizes the shared cancel-wait marker and the stored OS marker", () => {
+    expect(isCancelWait("updates.pause.cancel_wait")).toBe(true);
+    expect(isCancelWait("os.pause.cancel_wait")).toBe(true);
+    expect(isCancelWait("owner", { cancel_requested: "true" })).toBe(true);
+    expect(isCancelWait("owner")).toBe(false);
   });
 });
 

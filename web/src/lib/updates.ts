@@ -314,8 +314,8 @@ export function pauseText(t: T, key: string, params: Params = {}): string {
 /** Pauses that a failing node caused (not the owner, not a changed bundle): the owner looks at that node before going on. */
 export const isFailurePause = (pauseKey: string) => ["gate_failed", "step_failed", "panel_restart_ambiguous"].includes(last(pauseKey));
 
-/** A cancel that waits for the node in flight: it ends by itself, so there is nothing to resume and nothing to cancel again. */
-export const isCancelWait = (pauseKey: string) => last(pauseKey) === "cancel_wait";
+/** A cancel that waits for work already on a node, including OS rows that still carry the legacy cancel_requested field. */
+export const isCancelWait = (pauseKey: string, legacyParams: Params = {}) => last(pauseKey) === "cancel_wait" || legacyParams.cancel_requested === "true";
 
 /** The step of the node a pause names (its params carry the name; the link to the node needs the id). */
 export const pausedStep = (r: Pick<Rollout, "pauseParams" | "steps">): Step | undefined => r.steps.find((s) => s.nodeName === r.pauseParams.node);

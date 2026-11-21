@@ -138,15 +138,15 @@ func TestAgentRolloutPauseOutcomes(t *testing.T) {
 		}
 	})
 
-	t.Run("cancel with the step in flight: the step ends it and the rollout fails", func(t *testing.T) {
+	t.Run("cancel with the step in flight: the step ends and the rollout is cancelled", func(t *testing.T) {
 		e, a := notBackNode(t)
 		if _, err := e.s.cancel(e.ctx, ""); err != nil {
 			t.Fatal(err)
 		}
-		e.wantRollout(store.RolloutRunning, "")
+		e.wantRollout(store.RolloutPaused, pauseCancelWait)
 		e.tick()
 		e.wantStep(a, store.StepFailed, errNotReconnected)
-		e.wantRollout(store.RolloutFailed, "")
+		e.wantRollout(store.RolloutCancelled, "")
 	})
 }
 
@@ -249,10 +249,8 @@ func TestEdgeRolloutPauseOutcomes(t *testing.T) {
 	})
 }
 
-// A cancel that skips nothing (the only step, or every other step, is already decided) must still end the rollout when the
-// step in flight is decided: as FAILED when the step fails, as for a fleet of many. It used to leave the rollout paused
-// by the failure for ever.
-func TestCancelWithNothingToSkipEndsTheRolloutWithItsStep(t *testing.T) {
+// A cancellation stays authoritative while a step is in flight, including when that step fails.
+func TestCancelWithNothingToSkipEndsAfterTheStep(t *testing.T) {
 	inFlight := func(t *testing.T) (*env, string) {
 		t.Helper()
 		e := newEnv(t)
@@ -277,7 +275,7 @@ func TestCancelWithNothingToSkipEndsTheRolloutWithItsStep(t *testing.T) {
 		}
 		e.tick()
 		e.wantStep(a, store.StepFailed, errNotReconnected)
-		e.wantRollout(store.RolloutFailed, "")
+		e.wantRollout(store.RolloutCancelled, "")
 		if conds := e.s.Conditions(e.ctx); len(conds) != 0 {
 			t.Fatalf("the alert outlives the rollout: %+v", conds)
 		}
@@ -305,7 +303,7 @@ func TestCancelWithNothingToSkipEndsTheRolloutWithItsStep(t *testing.T) {
 		}
 		e.tick()
 		e.wantStep(a, store.StepFailed, errNotReconnected)
-		e.wantRollout(store.RolloutFailed, "")
+		e.wantRollout(store.RolloutCancelled, "")
 	})
 	t.Run("it cannot be resumed while it waits", func(t *testing.T) {
 		e, _ := inFlight(t)
@@ -320,7 +318,7 @@ func TestCancelWithNothingToSkipEndsTheRolloutWithItsStep(t *testing.T) {
 }
 
 // The edge pass has no lock either, and the cancel is the same code.
-func TestEdgeCancelWithNothingToSkipFailsTheRollout(t *testing.T) {
+func TestEdgeCancelWithNothingToSkipCancelsAfterTheStep(t *testing.T) {
 	e, _ := newEdgeFixture(t, edgeReleaseTag, fakeReleaseOptions{})
 	a := edgeNode(e, "de1", 0)
 	startEdgeRollout(e, 0, a)
@@ -332,7 +330,7 @@ func TestEdgeCancelWithNothingToSkipFailsTheRollout(t *testing.T) {
 	}
 	edgeTick(e)
 	e.wantStep(a, store.StepFailed, errNoAnswer)
-	e.wantRollout(store.RolloutFailed, "")
+	e.wantRollout(store.RolloutCancelled, "")
 }
 
 // The owner pauses in the middle of a pass that ends the last undecided step of the rollout: the pause stays the owner's.

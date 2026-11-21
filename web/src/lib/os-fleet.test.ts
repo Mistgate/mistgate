@@ -121,7 +121,8 @@ describe("a run in progress", () => {
     expect(fleetPhase(run([passed, step({ stage: 1 })]))).toBe("running");
     expect(fleetPhase(run([passed, step({ stage: 1 })], { status: OsRolloutStatus.PAUSED, pauseKey: "owner" }))).toBe("paused");
     expect(fleetPhase(run([passed, failed], { status: OsRolloutStatus.PAUSED, pauseKey: "reboot_held" }))).toBe("stopped");
-    expect(fleetPhase(run([passed, failed], { status: OsRolloutStatus.PAUSED, pauseKey: "cancel_wait" }))).toBe("cancelling");
+    expect(fleetPhase(run([passed, failed], { status: OsRolloutStatus.PAUSED, pauseKey: "os.pause.cancel_wait" }))).toBe("cancelling");
+    expect(fleetPhase(run([passed, failed], { status: OsRolloutStatus.PAUSED, pauseKey: "owner", pauseParams: { cancel_requested: "true" } }))).toBe("cancelling");
     expect(fleetPhase(run([passed], { status: OsRolloutStatus.DONE }))).toBe("done");
     expect(fleetPhase(run([passed], { status: OsRolloutStatus.CANCELLED }))).toBe("cancelled");
     expect(fleetPhase(run([passed, failed], { status: OsRolloutStatus.FAILED }))).toBe("failed");

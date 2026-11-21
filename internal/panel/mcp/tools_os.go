@@ -38,9 +38,7 @@ func osNodeOfID(r *adminv1.GetOsUpdatesResponse, id string) *adminv1.NodeOs {
 	return nil
 }
 
-// osCancelable: the panel would accept a cancel. A stopped rollout is closed; a running one only while a step has not been sent. A
-// job already on the node cannot be stopped, and the panel refuses (os_cancel_inflight): a plan that is certain to be refused is not
-// offered for approval.
+// A running job can finish while cancellation waits, so its presence does not make a plan futile.
 func osCancelable(r *adminv1.OsRollout) bool {
 	switch r.GetStatus() {
 	case adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_FAILED:
@@ -48,17 +46,7 @@ func osCancelable(r *adminv1.OsRollout) bool {
 	case adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_PAUSED:
 		return true
 	case adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_RUNNING:
-		inFlight := false
-		for _, s := range r.GetSteps() {
-			if s.GetState() == adminv1.OsStepState_OS_STEP_STATE_PENDING {
-				return true
-			}
-			if s.GetState() == adminv1.OsStepState_OS_STEP_STATE_SENT || s.GetState() == adminv1.OsStepState_OS_STEP_STATE_REBOOTING ||
-				s.GetState() == adminv1.OsStepState_OS_STEP_STATE_GATING {
-				inFlight = true
-			}
-		}
-		return !inFlight
+		return true
 	}
 	return false
 }
@@ -385,7 +373,7 @@ type osRolloutCancelArgs struct {
 var osRolloutCancel = changeSpec[osRolloutCancelArgs]{
 	name: "os_rollout_cancel", min: ProfileAdmin, danger: true,
 	procs: procs(adminv1connect.UpdateServiceGetOsUpdatesProcedure, adminv1connect.UpdateServiceCancelOsRolloutProcedure),
-	desc:  "Cancel a running, queued, paused, or stopped OS rollout. A job already running on a node finishes and is checked; no later jobs start. Needs the owner's approval in the admin panel.",
+	desc:  "Cancel a running, queued, paused, or stopped OS rollout. A job already running on a node finishes and is checked; jobs that have not started are skipped. Needs the owner's approval in the admin panel.",
 	plan: func(c *call, a osRolloutCancelArgs) (*planned, error) {
 		if err := validID("rollout_id", a.RolloutID); err != nil {
 			return nil, err
@@ -398,17 +386,14 @@ var osRolloutCancel = changeSpec[osRolloutCancelArgs]{
 		if ro == nil || ro.GetId() != a.RolloutID {
 			return nil, errors.New("no such OS rollout (only the active or last one is known)")
 		}
-		if !osRolloutActive(ro) && ro.GetStatus() != adminv1.OsRolloutStatus_OS_ROLLOUT_STATUS_FAILED {
-			return nil, errors.New("the OS rollout is " + enumName("OS_ROLLOUT_STATUS_", ro.GetStatus().String()) + ": nothing to cancel")
-		}
 		if !osCancelable(ro) {
-			return nil, errors.New("a job is running on the node and cannot be stopped; there is nothing to cancel until it ends or fails")
+			return nil, errors.New("the OS rollout is " + enumName("OS_ROLLOUT_STATUS_", ro.GetStatus().String()) + ": nothing to cancel")
 		}
 		facts := []Fact{{Key: "rollout", Value: clean(ro.GetId(), 60)}, codedFact("action", "cancel", "cancel")}
 		for _, s := range ro.GetSteps() {
 			facts = append(facts, Fact{Key: "node", Value: nm(s.GetNodeName()), Untrusted: true})
 		}
-		return &planned{Summary: "Cancel the OS rollout. Any job already running on a node will finish before it closes. The owner has to approve it first.", Facts: facts, Danger: rolloutDanger}, nil
+		return &planned{Summary: "Cancel the OS rollout. Any job already in progress finishes and is checked; jobs that have not started are skipped. The owner has to approve it first.", Facts: facts, Danger: rolloutDanger}, nil
 	},
 	apply: func(c *call, a osRolloutCancelArgs, _ Plan) (done, error) {
 		r, err := c.osUpdates()
