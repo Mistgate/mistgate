@@ -157,9 +157,9 @@ Mistgate is in **beta**; the current release is `v0.1.85`. It runs in production
     - title: A new IPv6 address in one click
       section: nodes
       text: "The IPv6 entry and the reachability checks over IPv6 are in the releases since v0.1.65. The node agent already keeps an extra address on the server's uplink; the panel's half is missing: replacing the entry's address with a new one from the server's own /64 in one click. See [IPv6 entry](../guide/nodes.md#ipv6-entry)."
-    - title: A relay that picks its best exit
+    - title: One entry, several exits
       section: nodes
-      text: "Today a relay forwards to one exit server, and the app chooses between whole paths (direct, or through each relay) with the Auto group. Next, a relay gets a group of exits and the panel moves it to the one with the best link, from the loss and delay it already measures between nodes: not more often than a set interval, with the reason and the history on the relay's page, and with a manual pin. See [Relays](../guide/relays.md). Requested in [#47](https://github.com/Mistgate/mistgate/issues/47)."
+      text: "Today a relay forwards to one exit server, and the app chooses between whole paths (direct, or through each relay) with the Auto group. Several relays from one entry to different exits already work this way, each on its own port of the entry. Next, the entry's page creates them in one step: pick the exits, and the app's Auto group keeps choosing the fastest path, also when the panel is offline. The panel does not switch the exit of a relay itself: a path through a relay carries the keys of its exit, so apps would lose the path until their next subscription update. See [Relays](../guide/relays.md). Requested in [#47](https://github.com/Mistgate/mistgate/issues/47)."
     - title: Where your people are
       section: settings
       text: "A region in the first-run setup and in Settings: DNS presets, \"direct\" lists, recommended apps and reachability checks follow the countries you choose. China's pieces are already in (Chinese sites direct since v0.1.64; AliDNS, DNSPod and a Baidu check in the node doctor since v0.1.78); the setting itself is not."
