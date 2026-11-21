@@ -13,6 +13,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	panelupdate "github.com/mistgate/mistgate/internal/panel/update"
 	"github.com/mistgate/mistgate/internal/release"
 )
 
@@ -2613,32 +2614,32 @@ func safeSourcesFailedProjection(raw string) string {
 	return release.SanitizeSourceFailures(raw)
 }
 
-// failedProfilesView reads the profiles a gate failure names (step and pause params "failed_profiles" and "failed_more"; the
-// writer is internal/panel/update, gate_profiles.go). The names are the owner's text, the codes the checker's short words: both go
-// through clean, and at most 5 entries are taken whatever the stored value says.
+// failedProfilesView reads the profiles a gate failure names (the step and pause params of internal/panel/update, gate_profiles.go,
+// under the same keys). The names are the owner's text, the codes the checker's short words: both go through clean, and at most
+// panelupdate.GateShown entries are taken whatever the stored value says.
 func failedProfilesView(params map[string]string) ([]profileFailV, int) {
-	var list []struct{ ID, Name, Code string }
-	if json.Unmarshal([]byte(params["failed_profiles"]), &list) != nil {
+	var list []panelupdate.FailedProfile
+	if json.Unmarshal([]byte(params[panelupdate.KeyFailedProfiles]), &list) != nil {
 		return nil, 0
 	}
-	out := make([]profileFailV, 0, min(len(list), 5))
-	for _, p := range list[:min(len(list), 5)] {
+	out := make([]profileFailV, 0, min(len(list), panelupdate.GateShown))
+	for _, p := range list[:min(len(list), panelupdate.GateShown)] {
 		out = append(out, profileFailV{InboundID: clean(p.ID, 80), Profile: nm(p.Name), Error: clean(p.Code, 40)})
 	}
-	return out, moreCount(params["failed_more"])
+	return out, moreCount(params[panelupdate.KeyFailedMore])
 }
 
 // skippedProfilesView reads the names of the profiles that were failing before the update and were not held against it.
 func skippedProfilesView(params map[string]string) ([]string, int) {
 	var list []string
-	if json.Unmarshal([]byte(params["skipped_profiles"]), &list) != nil {
+	if json.Unmarshal([]byte(params[panelupdate.KeySkippedProfiles]), &list) != nil {
 		return nil, 0
 	}
-	out := make([]string, 0, min(len(list), 5))
-	for _, name := range list[:min(len(list), 5)] {
+	out := make([]string, 0, min(len(list), panelupdate.GateShown))
+	for _, name := range list[:min(len(list), panelupdate.GateShown)] {
 		out = append(out, nm(name))
 	}
-	return out, moreCount(params["skipped_more"])
+	return out, moreCount(params[panelupdate.KeySkippedMore])
 }
 
 func moreCount(s string) int {

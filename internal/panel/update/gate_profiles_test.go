@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"os"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -41,11 +43,11 @@ func (e *env) reachGate(node string) {
 	e.clk.Advance(2 * time.Minute)
 }
 
-func failedList(t *testing.T, params map[string]string) []failedProfile {
+func failedList(t *testing.T, params map[string]string) []FailedProfile {
 	t.Helper()
-	var list []failedProfile
-	if err := json.Unmarshal([]byte(params[keyFailedProfiles]), &list); err != nil {
-		t.Fatalf("failed_profiles %q: %v", params[keyFailedProfiles], err)
+	var list []FailedProfile
+	if err := json.Unmarshal([]byte(params[KeyFailedProfiles]), &list); err != nil {
+		t.Fatalf("failed_profiles %q: %v", params[KeyFailedProfiles], err)
 	}
 	return list
 }
@@ -67,7 +69,7 @@ func TestGateDoesNotHoldAProfileThatFailedBeforeTheUpdate(t *testing.T) {
 	e.reachGate(a)
 	e.tick()
 	x := e.wantStep(a, store.StepPassed, "")
-	if x.Params[keySkippedProfiles] != `["Main"]` {
+	if x.Params[KeySkippedProfiles] != `["Main"]` {
 		t.Fatalf("params %v: the profile that did not work before is not named", x.Params)
 	}
 }
@@ -100,7 +102,7 @@ func TestGateNamesTheProfileThatFailedAfterTheUpdate(t *testing.T) {
 	e.clk.Advance(3*time.Minute + time.Second)
 	e.tick()
 	x := e.wantStep(a, store.StepRolledBack, "probe_failed")
-	want := []failedProfile{{ID: "inb_de1_1", Name: "Main", Code: "refused"}}
+	want := []FailedProfile{{ID: "inb_de1_1", Name: "Main", Code: "refused"}}
 	if got := failedList(t, x.Params); !slices.Equal(got, want) {
 		t.Fatalf("step names %+v, want %+v", got, want)
 	}
@@ -126,7 +128,7 @@ func TestGatePassesWhenEveryProfileWasSickBefore(t *testing.T) {
 	e.reachGate(a)
 	e.tick()
 	x := e.wantStep(a, store.StepPassed, "")
-	if x.Params[keySkippedProfiles] != `["Backup","Main"]` {
+	if x.Params[KeySkippedProfiles] != `["Backup","Main"]` {
 		t.Fatalf("params %v", x.Params)
 	}
 }
@@ -228,7 +230,7 @@ func TestOsGateNamesTheProfileThatFailedAfterTheJob(t *testing.T) {
 	e.clk.Advance(9 * time.Minute)
 	e.osTick()
 	x = e.wantOsStep(id, store.OsStepFailed, "probe_failed")
-	want := []failedProfile{{ID: "inb_de1_1", Name: "Backup", Code: "refused"}}
+	want := []FailedProfile{{ID: "inb_de1_1", Name: "Backup", Code: "refused"}}
 	if got := failedList(t, x.Params); !slices.Equal(got, want) {
 		t.Fatalf("step names %+v, want %+v", got, want)
 	}
@@ -237,5 +239,33 @@ func TestOsGateNamesTheProfileThatFailedAfterTheJob(t *testing.T) {
 	}
 	if got := failedList(t, e.wantOsRollout(store.RolloutPaused, "gate_failed").PauseParams); !slices.Equal(got, want) {
 		t.Fatalf("pause names %+v, want %+v", got, want)
+	}
+}
+
+// The keys and the shape of the gate's profile params are read elsewhere: the MCP views use the exported constants, the admin
+// (web/src/lib/updates.ts) has its own copy of the words. testdata/gate_params.json is what both are held to; the web test
+// (web/src/lib/updates.test.ts) builds the params from it and expects the screens to name the profiles.
+func TestGateParamKeysArePinnedForTheWeb(t *testing.T) {
+	var fields []string
+	for i := range reflect.TypeFor[FailedProfile]().NumField() {
+		fields = append(fields, strings.Split(reflect.TypeFor[FailedProfile]().Field(i).Tag.Get("json"), ",")[0])
+	}
+	want := map[string]any{
+		"failed_profiles": KeyFailedProfiles, "failed_more": KeyFailedMore, "skipped_profiles": KeySkippedProfiles, "skipped_more": KeySkippedMore,
+		"profile_fields": fields, "shown": GateShown,
+	}
+	raw, err := os.ReadFile("testdata/gate_params.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	wantJSON, _ := json.Marshal(want)
+	var wantNorm map[string]any
+	_ = json.Unmarshal(wantJSON, &wantNorm)
+	if !reflect.DeepEqual(got, wantNorm) {
+		t.Fatalf("testdata/gate_params.json = %v, the code says %v: a key or the shape of a gate param changed, so the readers (internal/panel/mcp/views.go, web/src/lib/updates.ts) must change with it", got, wantNorm)
 	}
 }

@@ -1,4 +1,5 @@
 import { Code, ConnectError } from "@connectrpc/connect";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BundleStatus, NodeUpdateState, RolloutStatus, StepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { fill, pickForm, type T } from "@/i18n";
@@ -294,6 +295,29 @@ describe("the words of server keys", () => {
     expect(stepErrorText(t, "updates.step.err.probe_failed", { failed_profiles: "{not json" })).toBe(en["updates.step.err.probe_failed"]);
     expect(stepErrorText(t, "updates.step.err.probe_failed", {})).toBe(en["updates.step.err.probe_failed"]);
     expect(stepErrorText(t, "updates.step.err.inbound_failed", one)).toBe(en["updates.step.err.inbound_failed"]);
+  });
+
+  it("reads the gate's profile params under the keys and in the shape the panel writes them", () => {
+    // internal/panel/update/testdata/gate_params.json is what the Go side (gate_profiles_test.go) holds its constants to
+    const golden = JSON.parse(readFileSync(`${process.cwd()}/../internal/panel/update/testdata/gate_params.json`, "utf8")) as {
+      failed_profiles: string;
+      failed_more: string;
+      skipped_profiles: string;
+      skipped_more: string;
+      profile_fields: string[];
+    };
+    expect(golden.profile_fields).toEqual(["id", "name", "code"]);
+    const [id, name, code] = golden.profile_fields as [string, string, string];
+    const params = {
+      [golden.failed_profiles]: JSON.stringify([{ [id]: "inb_1", [name]: "Main", [code]: "timeout" }]),
+      [golden.failed_more]: "2",
+      [golden.skipped_profiles]: JSON.stringify(["Old"]),
+      [golden.skipped_more]: "1",
+    };
+    const sentence = stepErrorText(t, "updates.step.err.probe_failed", params);
+    expect(sentence).toContain("“Main”");
+    expect(sentence).toContain("and 2 more");
+    expect(skippedProfilesNote(t, params)).toContain("“Old”, and 1 more");
   });
 
   it("quotes the profiles a gate names in the language's own quotes", () => {

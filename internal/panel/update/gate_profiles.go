@@ -25,17 +25,19 @@ const (
 )
 
 // Step params the gate adds (admin update.proto RolloutStep.params; the pause and the rolled-back event carry the first two too).
+// The readers (the MCP views, web/src/lib/updates.ts) use these keys and this shape: testdata/gate_params.json pins them for the web.
 const (
-	keyFailedProfiles  = "failed_profiles"  // JSON [{"id","name","code"}]: the profiles that did not pass, with the error code of their last round
-	keyFailedMore      = "failed_more"      // how many more than listed
-	keySkippedProfiles = "skipped_profiles" // JSON ["name"]: profiles that did not work before the update and were not held against it
-	keySkippedMore     = "skipped_more"
+	KeyFailedProfiles  = "failed_profiles"  // JSON [{"id","name","code"}]: the profiles that did not pass, with the error code of their last round
+	KeyFailedMore      = "failed_more"      // how many more than listed
+	KeySkippedProfiles = "skipped_profiles" // JSON ["name"]: profiles that did not work before the update and were not held against it
+	KeySkippedMore     = "skipped_more"
 )
 
 // codeNoRound is the "code" of a profile that has had no check round since the node was back.
 const codeNoRound = "no_round"
 
-type failedProfile struct {
+// FailedProfile is one entry of the KeyFailedProfiles list.
+type FailedProfile struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Code string `json:"code"`
@@ -100,9 +102,9 @@ func profileNames(ids []string, label map[string]string) []string {
 	return names
 }
 
-// shown cuts a list to gateShown entries and says how many were left out.
+// shown cuts a list to GateShown entries and says how many were left out.
 func shown[T any](list []T) ([]T, int) {
-	n := min(len(list), gateShown)
+	n := min(len(list), GateShown)
 	return list[:n], len(list) - n
 }
 
@@ -122,22 +124,22 @@ func (s *Service) failedProfileParams(ctx context.Context, nodeID string, ids []
 			codes[r.InboundID] = agentCode(r.ErrorCode)
 		}
 	}
-	list := make([]failedProfile, 0, len(ids))
+	list := make([]FailedProfile, 0, len(ids))
 	for _, id := range ids {
 		code := codes[id]
 		if code == "" {
 			code = codeNoRound
 		}
-		list = append(list, failedProfile{ID: id, Name: truncateRunes(label[id], gateNameLn), Code: code})
+		list = append(list, FailedProfile{ID: id, Name: truncateRunes(label[id], gateNameLn), Code: code})
 	}
-	slices.SortFunc(list, func(a, b failedProfile) int {
+	slices.SortFunc(list, func(a, b FailedProfile) int {
 		return strings.Compare(a.Name+"\x00"+a.ID, b.Name+"\x00"+b.ID)
 	})
 	head, more := shown(list)
 	b, _ := json.Marshal(head)
-	out := map[string]string{keyFailedProfiles: string(b)}
+	out := map[string]string{KeyFailedProfiles: string(b)}
 	if more > 0 {
-		out[keyFailedMore] = strconv.Itoa(more)
+		out[KeyFailedMore] = strconv.Itoa(more)
 	}
 	return out
 }
@@ -145,16 +147,16 @@ func (s *Service) failedProfileParams(ctx context.Context, nodeID string, ids []
 // skippedProfileParams says which profiles were not held against the update because their checks were failing before it.
 func skippedProfileParams(with map[string]string, ids []string, label map[string]string) {
 	head, more := shown(profileNames(ids, label))
-	with[keySkippedProfiles] = jsonStringList(head)
+	with[KeySkippedProfiles] = jsonStringList(head)
 	if more > 0 {
-		with[keySkippedMore] = strconv.Itoa(more)
+		with[KeySkippedMore] = strconv.Itoa(more)
 	}
 }
 
 // failedProfileNotes are the params of a decided step that go with it to the rolled-back event and to the pause.
 func failedProfileNotes(params map[string]string) map[string]string {
 	out := map[string]string{}
-	for _, k := range []string{keyFailedProfiles, keyFailedMore} {
+	for _, k := range []string{KeyFailedProfiles, KeyFailedMore} {
 		if v := params[k]; v != "" {
 			out[k] = v
 		}
