@@ -33,6 +33,24 @@ const (
 	KeySkippedMore     = "skipped_more"
 )
 
+// What a gate param shows of the profiles: at most GateShown entries (the rest is counted in "more"), each name cut to gateNameLn runes.
+const (
+	GateShown  = 5
+	gateNameLn = 40
+)
+
+func truncateRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n-1]) + "…"
+	}
+	return s
+}
+
+func jsonStringList(in []string) string {
+	b, _ := json.Marshal(in)
+	return string(b)
+}
+
 // codeNoRound is the "code" of a profile that has had no check round since the node was back.
 const codeNoRound = "no_round"
 

@@ -2,7 +2,6 @@ package update
 
 import (
 	"context"
-	"encoding/json"
 	"slices"
 	"strconv"
 	"strings"
@@ -220,12 +219,10 @@ func clearOsRetryWait(params map[string]string) map[string]string {
 
 // gate_* params of a GATING step (admin update.proto OsStep.params).
 const (
-	gateFor    = "gate_for"
-	gateNames  = "gate_names"
-	gateMore   = "gate_more"
-	gateMaxS   = "gate_max_s"
-	GateShown  = 5 // the most profiles a gate param lists; the rest is counted in "more"
-	gateNameLn = 40
+	gateFor   = "gate_for"
+	gateNames = "gate_names"
+	gateMore  = "gate_more"
+	gateMaxS  = "gate_max_s"
 )
 
 var gateKeys = []string{gateFor, gateNames, gateMore, gateMaxS}
@@ -287,16 +284,4 @@ func withoutGateWait(params map[string]string) map[string]string {
 		delete(params, k)
 	}
 	return params
-}
-
-func truncateRunes(s string, n int) string {
-	if r := []rune(s); len(r) > n {
-		return string(r[:n-1]) + "…"
-	}
-	return s
-}
-
-func jsonStringList(in []string) string {
-	b, _ := json.Marshal(in)
-	return string(b)
 }

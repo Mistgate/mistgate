@@ -68,15 +68,6 @@ func (s *Service) reserveNodeBundleSync(ctx context.Context) bool {
 	return s.reserveNodeBundleSyncLocked(ctx) == ""
 }
 
-// syncNodeBundle is the synchronous form used by tests and callers that need to wait for the result.
-func (s *Service) syncNodeBundle(ctx context.Context) bool {
-	if !s.reserveNodeBundleSync(ctx) {
-		return false
-	}
-	changed, _ := s.runNodeBundleSync(ctx)
-	return changed
-}
-
 // startNodeBundleSync reserves synchronously so rollout starts see the refusal before the worker leaves the loop,
 // then runs network and disk work outside the update loop.
 func (s *Service) startNodeBundleSync(ctx context.Context) {
