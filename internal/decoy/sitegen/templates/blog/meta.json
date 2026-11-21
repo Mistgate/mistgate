@@ -8,5 +8,6 @@
   ],
   "lists": [
     {"name": "posts", "from": "posts", "min": 4, "max": 5, "dates": {"end": "2026-10-28", "gap_min": 8, "gap_max": 40}}
-  ]
+  ],
+  "photo_slots": {"t":[0,1,2]}
 }

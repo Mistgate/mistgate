@@ -19,7 +19,7 @@
   },
   "bundles": [
     {
-      "lang": "en",
+      "lang": "en", "photo_q": ["chess board pieces","wooden chess pieces"],
       "vars": {"brand": {"join": [["{city} Chess Club", "{city} Chess Society", "{city} Chess Circle"]]}},
       "kicker": "Chess club", "tagline": "Friendly chess, every Thursday evening",
       "desc": "{brand} meets every Thursday evening. Friendly games for every strength, from beginners to the club champion.",
@@ -44,7 +44,7 @@
         {"q": "Do you play in a league?", "a": "We enter one team in the county league. If you want to play, tell the captain."}]
     },
     {
-      "lang": "en",
+      "lang": "en", "photo_q": ["hiking trail countryside","footpath hills landscape"],
       "vars": {"brand": {"join": [["{city} Walking Group", "{city} Ramblers", "{city} Hill Walkers"]]}},
       "kicker": "Walking group", "tagline": "Walks in the hills and along the river",
       "desc": "{brand} walks every Sunday in the hills and along the river. All welcome, no experience needed.",
@@ -69,7 +69,7 @@
         {"q": "What if it rains?", "a": "We walk anyway. The pub stop is longer."}]
     },
     {
-      "lang": "en",
+      "lang": "en", "photo_q": ["empty concert hall","sheet music stand"],
       "vars": {"brand": {"join": [["{city} Community Choir", "{city} Singers", "{city} Voices"]]}},
       "kicker": "Community choir", "tagline": "Singing together on Wednesday evenings",
       "desc": "{brand} rehearses on Wednesday evenings. No auditions, no need to read music, just a wish to sing.",
@@ -94,7 +94,7 @@
         {"q": "What if I miss a week?", "a": "Then you miss a week. Nobody will mind, and the recordings are shared online."}]
     },
     {
-      "lang": "en",
+      "lang": "en", "photo_q": ["night sky stars","telescope night sky"],
       "vars": {"brand": {"join": [["{city} Astronomy Society", "{city} Stargazers", "{city} Sky Watchers"]]}},
       "kicker": "Astronomy society", "tagline": "Looking up, together",
       "desc": "{brand} meets monthly for talks and observing nights. Beginners and telescope owners alike are welcome.",

@@ -19,7 +19,7 @@
   },
   "bundles": [
     {
-      "lang": "en", "weight": 2,
+      "lang": "en", "photo_q": ["bakery bread loaves","sourdough bread crust","pastry display counter"], "weight": 2,
       "vars": {"brand": {"join": [["Rye", "Honey", "Oat", "Barley", "Fennel", "Crumb", "Hearth", "Sunday", "Sesame", "Plum"], ["Wren", "Finch", "Sparrow", "Linnet", "Thrush", "Robin", "Swift", "Lark"]], "sep": " & "}},
       "tagline": "Bread and cakes, baked in {city}", "nav_services": "Our bakes",
       "desc": "A neighbourhood bakery in {city}: sourdough, rolls and cakes, baked every morning.", "desc_services": "Breads, buns and cakes, with prices.", "desc_about": "The story of {brand}, a small bakery in {city}.", "desc_contact": "Opening hours and address of {brand} in {city}.",
@@ -35,7 +35,7 @@
       "hours": ["Tuesday to Friday: 7:00 to 16:00", "Saturday: 7:00 to 14:00", "Sunday and Monday: closed"]
     },
     {
-      "lang": "en", "weight": 2,
+      "lang": "en", "photo_q": ["bicycle repair workshop","bicycle wheel spokes","bicycle chain gears"], "weight": 2,
       "vars": {"brand": {"join": [["Spoke", "Chain", "Cog", "Pedal", "Crank", "Wheel", "Gear", "Frame", "Hub", "Rim"], ["Works", "Repair", "Shed", "Garage", "Bench", "Stand", "Service", "Workshop"]], "sep": " "}},
       "tagline": "Bicycle repairs in {city}", "nav_services": "Prices",
       "desc": "Bicycle repairs and servicing in {city}, done while you wait or by the next day.", "desc_services": "Repairs and servicing for bicycles, with prices.", "desc_about": "About {brand}, a small bicycle workshop in {city}.", "desc_contact": "Opening hours and address of {brand} in {city}.",
@@ -51,7 +51,7 @@
       "hours": ["Monday to Friday: 8:30 to 17:30", "Saturday: 9:00 to 15:00", "Sunday: closed"]
     },
     {
-      "lang": "en", "weight": 2,
+      "lang": "en", "photo_q": ["sewing machine fabric","fabric rolls shelf","sewing thread spools"], "weight": 2,
       "vars": {"brand": {"join": [["Needle", "Thimble", "Button", "Hem", "Seam", "Cuff", "Collar", "Pleat", "Bobbin", "Selvedge"], ["& Pin", "Alterations", "Tailoring", "Atelier", "Mending", "Fitting", "& Thread", "Studio"]], "sep": " "}},
       "tagline": "Alterations and mending in {city}", "nav_services": "Alterations",
       "desc": "Clothing alterations and repairs in {city}: hems, zips, fittings and mending.", "desc_services": "Alterations and repairs for clothes, with prices.", "desc_about": "About {brand}, a small tailoring workshop in {city}.", "desc_contact": "Opening hours and address of {brand} in {city}.",
@@ -67,7 +67,7 @@
       "hours": ["Tuesday to Friday: 9:30 to 17:00", "Saturday: 10:00 to 14:00", "Sunday and Monday: closed"]
     },
     {
-      "lang": "en", "weight": 2,
+      "lang": "en", "photo_q": ["clock repair workshop","antique clock dial","watch mechanism gears"], "weight": 2,
       "vars": {"brand": {"join": [["Pendulum", "Balance", "Spring", "Escape", "Cog", "Dial", "Chime", "Winder", "Anchor", "Jewel"], ["& Son", "Clockworks", "Watch Repair", "Horology", "Bench", "Timepieces", "Workshop", "Services"]], "sep": " "}},
       "tagline": "Watch and clock repair in {city}", "nav_services": "Repairs",
       "desc": "Watch and clock repair in {city}: servicing, batteries, straps and restoration.", "desc_services": "Watch and clock repairs, with prices.", "desc_about": "About {brand}, a small watch and clock workshop in {city}.", "desc_contact": "Opening hours and address of {brand} in {city}.",
@@ -83,7 +83,7 @@
       "hours": ["Tuesday to Friday: 10:00 to 17:00", "Saturday: 10:00 to 13:00", "Sunday and Monday: closed"]
     },
     {
-      "lang": "en", "weight": 2,
+      "lang": "en", "photo_q": ["picture frames wall","frame moulding workshop","wooden frame corner"], "weight": 2,
       "vars": {"brand": {"join": [["Gilt", "Mount", "Mitre", "Rabbet", "Glaze", "Hanger", "Bevel", "Easel", "Linen", "Moulding"], ["& Frame", "Framing", "Gallery", "Workshop", "Studio", "Mounts", "House", "Works"]], "sep": " "}},
       "tagline": "Picture framing in {city}", "nav_services": "Framing",
       "desc": "Picture framing in {city}: mounts, glass, box frames and restoration.", "desc_services": "Framing, mounting and hanging, with prices.", "desc_about": "About {brand}, a small framing workshop in {city}.", "desc_contact": "Opening hours and address of {brand} in {city}.",
@@ -99,7 +99,7 @@
       "hours": ["Monday to Friday: 9:00 to 17:00", "Saturday: 10:00 to 14:00", "Sunday: closed"]
     },
     {
-      "lang": "en", "weight": 2,
+      "lang": "en", "photo_q": ["piano keys close up","upright piano interior","piano strings hammers"], "weight": 2,
       "vars": {"brand": {"join": [["Octave", "Treble", "Cadence", "Minor", "Fifth", "Harmony", "Sonata", "Pitch", "Legato", "Fugue"], ["Tuning", "Pianos", "Keys", "Studio", "Services", "Workshop", "Care", "Restoration"]], "sep": " "}},
       "tagline": "Piano tuning and care in {city}", "nav_services": "Services",
       "desc": "Piano tuning, small repairs and advice in {city} and the surrounding villages.", "desc_services": "Piano tuning and repair services, with prices.", "desc_about": "About {brand}, a piano tuner in {city}.", "desc_contact": "How to book {brand} in {city}.",

@@ -11,7 +11,7 @@
   },
   "bundles": [
     {
-      "lang": "en", "tagline": "Notes from an allotment",
+      "lang": "en", "photo_q": ["vegetable garden raised beds","garden tools soil","seedlings greenhouse"], "tagline": "Notes from an allotment",
       "vars": {
         "brand": {"join": [["Slow", "Quiet", "Honest", "Little", "Wild", "Mossy", "Patient", "Muddy", "Green", "Early"], ["Soil", "Beds", "Patch", "Plot", "Trowel", "Rows", "Hedgerow", "Shed", "Furrow", "Seasons"]], "sep": " "},
         "first": ["Marian", "Tomas", "Elin", "Rosalind", "Hugo", "Greta"]
@@ -49,7 +49,7 @@
       ]
     },
     {
-      "lang": "en", "tagline": "Rides and repairs",
+      "lang": "en", "photo_q": ["gravel road bicycle","bicycle touring countryside","bicycle saddle bag"], "tagline": "Rides and repairs",
       "vars": {
         "brand": {"join": [["Long", "Steady", "Wet", "Back", "Flat", "Gravel", "Early", "Slow", "Cold", "Open"], ["Gear", "Spokes", "Miles", "Lanes", "Chain", "Wheel", "Ride", "Road", "Hills", "Cadence"]], "sep": " "},
         "first": ["Jonas", "Maeve", "Kasper", "Ida", "Lewin", "Nora"]
@@ -87,7 +87,7 @@
       ]
     },
     {
-      "lang": "en", "tagline": "Notes from a small kitchen",
+      "lang": "en", "photo_q": ["home kitchen cooking","rustic bread table","cast iron pan"], "tagline": "Notes from a small kitchen",
       "vars": {
         "brand": {"join": [["Salt", "Butter", "Plain", "Cast", "Small", "Sunday", "Honest", "Warm", "Slow", "Quick"], ["Spoon", "Pan", "Notes", "Table", "Kitchen", "Dough", "Bowl", "Pot", "Oven", "Supper"]], "sep": " "},
         "first": ["Anneke", "Pavel", "Sofia", "Ruben", "Clara", "Oskar"]
@@ -125,7 +125,7 @@
       ]
     },
     {
-      "lang": "en", "tagline": "Notes on books",
+      "lang": "en", "photo_q": ["books reading desk","bookshelf library","open book coffee"], "tagline": "Notes on books",
       "vars": {
         "brand": {"join": [["Dog-eared", "Margin", "Second", "Late", "Paper", "Quiet", "Open", "Slow", "Winter", "Rainy"], ["Pages", "Notes", "Shelf", "Chapters", "Stack", "Reader", "Binding", "Spine", "Lines", "Hours"]], "sep": " "},
         "first": ["Ines", "Matthias", "Leona", "Arvid", "Philippa", "Theo"]

@@ -39,6 +39,13 @@ import (
 // the functions of funcMap. Texts are printed as they are, never escaped: write them so they are safe in a double-quoted
 // attribute (no double quotes, no "<").
 //
+// Photos (generate_photo.go) are optional. meta.json's "photo_slots" names the places that may hold one: a slot is a name with a
+// number ("t3"), its group is the name without the number, and the group maps to indexes into the search words. The words are
+// "photo_q" in a bundle (or in meta.json for every bundle that has none): at most three, plain things and places, never people.
+// A template writes {{photo "slot" "" W H}} where it used to write {{art ...}}: it prints the photo when the caller has one and
+// the same drawing as before when it has not. {{hasphoto "slot" W H}} guards markup that only makes sense around a photo and
+// {{nphotos}} counts them, for the stylesheet. A list with "photo_max" is cut to that many items when the site has photos.
+//
 // The template language is the small subset of Go's text/template that generate_tmpl.go interprets (text/template itself is
 // not used: it would keep every method of the program in the edge builds): fields, variables, if / else if / else, range,
 // with, define and template, parentheses and the functions, trim markers and comments, but no pipes. A field or function that
@@ -84,8 +91,10 @@ type listDef struct {
 	Max    int      `json:"max"`
 	Dates  *dateDef `json:"dates"`
 	Semver bool     `json:"semver"`
-	Art    bool     `json:"art"` // every item gets a generated picture file (field "img")
-	Sub    []subDef `json:"sub"`
+	Art    bool     `json:"art"` // every item gets a generated picture file (field "img"), or a photo when the site has them
+	// PhotoMax caps the list at this many items when the site has photos, so that each one can have its own.
+	PhotoMax int      `json:"photo_max"`
+	Sub      []subDef `json:"sub"`
 }
 
 type dateDef struct {
@@ -101,6 +110,10 @@ type metaDef struct {
 	Blocks  []string          `json:"home_blocks"`
 	Fixed   int               `json:"home_fixed"` // how many leading blocks keep their place
 	Lists   []listDef         `json:"lists"`
+	// PhotoSlots names the places that may hold a photo: a slot's name without its trailing number, then the indexes into the
+	// search words (PhotoQ) its numbered slots take in turn. A site has photos only where this and the words both exist.
+	PhotoSlots map[string][]int `json:"photo_slots"`
+	PhotoQ     []string         `json:"photo_q"` // the search words of every bundle that has none of its own
 }
 
 type kindDef struct {
@@ -208,15 +221,7 @@ func Generate(kind string, seed []byte) ([]File, error) {
 
 // GenerateNamed is Generate that also returns the brand the pages print (the site's own name, for naming it in the library).
 func GenerateNamed(kind string, seed []byte) ([]File, string, error) {
-	kinds, err := loadKinds()
-	if err != nil {
-		return nil, "", err
-	}
-	d := kinds[kind]
-	if d == nil {
-		return nil, "", fmt.Errorf("%w %q", ErrUnknownKind, kind)
-	}
-	return d.render(seed)
+	return GenerateWith(kind, seed, Options{})
 }
 
 type navItem struct {
@@ -245,6 +250,8 @@ type site struct {
 	Order                      []string
 	DateFmt                    string
 	titleStyle                 int
+	photoQ                     []string
+	photoSlots                 map[string][]int
 }
 
 // data is what a template sees as dot: the site and the page, as maps, which is all the interpreter reads.
@@ -289,6 +296,7 @@ func pageData(base map[string]any, pg page, nav []navItem) map[string]any {
 }
 
 type ctx struct {
+	ph    *photos
 	r     *rng
 	s     *site
 	t     *tmplSet
@@ -329,9 +337,9 @@ func weightOf(b map[string]any) int {
 	return 1
 }
 
-func (d *kindDef) render(seed []byte) ([]File, string, error) {
+func (d *kindDef) render(seed []byte, ph *photos) ([]File, string, error) {
 	r := newRNG([]byte(d.id), seed)
-	c := &ctx{r: r, memo: map[string]any{}, files: map[string][]byte{}, artID: "a" + hex6(r.sub("artid"))}
+	c := &ctx{r: r, ph: ph, memo: map[string]any{}, files: map[string][]byte{}, artID: "a" + hex6(r.sub("artid"))}
 	s, err := d.newSite(c, r)
 	if err != nil {
 		return nil, "", err
@@ -512,7 +520,7 @@ func (d *kindDef) newSite(c *ctx, r *rng) (*site, error) {
 	L := map[string]any{}
 	for _, src := range []map[string]any{d.ui[lang], b} {
 		for k, v := range src {
-			if k != "lang" && k != "weight" && k != "vars" {
+			if k != "lang" && k != "weight" && k != "vars" && k != "photo_q" {
 				L[k] = v
 			}
 		}
@@ -525,8 +533,10 @@ func (d *kindDef) newSite(c *ctx, r *rng) (*site, error) {
 		Layout: look.sub("layout").n(d.meta.Layouts), Head: look.sub("head").n(3), Foot: look.sub("foot").n(3),
 		P: newPalette(look.sub("palette")), S: newStyle(look.sub("style")), Fnt: newFonts(look.sub("fonts")),
 		Year: "2026", Since: fmt.Sprint(2015 + look.sub("since").n(10)), titleStyle: look.sub("title").n(4),
-		Lists: map[string][]map[string]any{},
+		Lists: map[string][]map[string]any{}, photoSlots: d.meta.PhotoSlots,
 	}
+	s.photoQ = d.photoWords(b)
+	c.s = s // the lists below may ask for photos
 	if fm := dateFormats[lang]; len(fm) > 0 {
 		s.DateFmt = fm[look.sub("datefmt").n(len(fm))]
 	} else {
@@ -681,6 +691,9 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 	if pool != nil && n > len(pool) {
 		n = len(pool)
 	}
+	if ld.PhotoMax > 0 && c.ph != nil && len(s.photoQ) > 0 {
+		n = min(n, ld.PhotoMax)
+	}
 	items := make([]map[string]any, n)
 	perm := r.sub("perm").perm(max(len(pool), n))
 	for i := range items {
@@ -770,7 +783,12 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 			it["art_kind"] = kind
 			size := [][2]int{{480, 360}, {360, 480}, {480, 480}, {480, 320}, {400, 500}}[ar.n(5)]
 			it["w"], it["h"] = size[0], size[1]
-			c.files[p] = []byte(artSVG(ar, kind, s.P.Hue+float64(ar.n(120))-60, size[0], size[1], "g"+hex6(ar), true))
+			svg := []byte(artSVG(ar, kind, s.P.Hue+float64(ar.n(120))-60, size[0], size[1], "g"+hex6(ar), true))
+			if pp, ok := c.photoFile(fmt.Sprintf("w%d", i+1), 4, 3, dir); ok { // a photo takes the picture's place
+				it["img"], it["w"], it["h"] = pp, 640, 480
+			} else {
+				c.files[p] = svg
+			}
 		}
 	}
 	return items, nil
@@ -919,6 +937,36 @@ func funcMap(c *ctx) map[string]tmplFunc {
 			}
 			c.artN++
 			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, argInt(a, 2), argInt(a, 3), fmt.Sprintf("%s%d", c.artID, c.artN), false)
+		},
+		// photo is the photo of a slot as an <img>, or the picture "art" would draw with the same arguments when the slot has none.
+		"photo": func(a []any) any {
+			k, kind, w, h := argStr(a, 0), argStr(a, 1), argInt(a, 2), argInt(a, 3)
+			if p, ok := c.photoFile(k, w, h, ""); ok {
+				return photoTag(k, p, w, h)
+			}
+			r := key("art:" + k)
+			if kind == "" {
+				kind = artKinds[r.n(len(artKinds))]
+			}
+			c.artN++
+			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, w, h, fmt.Sprintf("%s%d", c.artID, c.artN), false)
+		},
+		// hasphoto is whether the slot has a photo, for markup that only makes sense around one.
+		"hasphoto": func(a []any) any {
+			_, ok := c.photoFile(argStr(a, 0), argInt(a, 1), argInt(a, 2), "")
+			return ok
+		},
+		// nphotos is how many photos the pages have asked for and got so far; the stylesheet is made last.
+		"nphotos": func(a []any) any {
+			n := 0
+			if c.ph != nil {
+				for _, p := range c.ph.path {
+					if p != "" {
+						n++
+					}
+				}
+			}
+			return n
 		},
 		"blk": func(a []any) any {
 			if len(a) != 2 {

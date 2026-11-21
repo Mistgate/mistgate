@@ -8,5 +8,6 @@
     {"name": "contact", "tmpl": "contact.html.tmpl", "paths": ["contact.html", "contact/index.html", "find-us/index.html", "visit.html"], "nav": "nav_contact", "desc": "desc_contact"}
   ],
   "home_blocks": ["feat", "prices", "visit"],
-  "home_fixed": 0
+  "home_fixed": 0,
+  "photo_slots": {"hero":[0],"about":[1],"g":[2]}
 }

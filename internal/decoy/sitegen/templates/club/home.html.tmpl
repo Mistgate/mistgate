@@ -5,7 +5,8 @@
 <p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{.L.join_cta}}</a></p>
 </div>
 {{end}}
-{{define "why"}}<ul class="__feats__">{{range .L.why}}<li><span class="__fi__">{{icon .icon}}</span><div><h3>{{.h}}</h3><p>{{.p}}</p></div></li>{{end}}</ul>
+{{define "cover"}}{{if hasphoto "cover" 1200 400}}<figure class="__cov__">{{photo "cover" "" 1200 400}}</figure>
+{{end}}{{end}}{{define "why"}}<ul class="__feats__">{{range .L.why}}<li><span class="__fi__">{{icon .icon}}</span><div><h3>{{.h}}</h3><p>{{.p}}</p></div></li>{{end}}</ul>
 {{end}}
 {{define "upcoming"}}<section class="__sec__">
 <h2>{{.L.upcoming_h}}</h2>
@@ -30,7 +31,8 @@
 </div>
 {{template "meet" .}}
 </section>
-<div class="__wrap__ __cols__">
+{{if hasphoto "cover" 1200 400}}<div class="__wrap__">{{template "cover" .}}</div>
+{{end}}<div class="__wrap__ __cols__">
 <div>{{template "upcoming" .}}</div>
 <div>{{template "latest" .}}</div>
 </div>
@@ -44,7 +46,7 @@
 </div>
 </section>
 <div class="__wrap__">
-<div class="__sec__">{{template "meet" .}}</div>
+{{template "cover" .}}<div class="__sec__">{{template "meet" .}}</div>
 <div class="__sec__">{{template "why" .}}</div>
 {{template "upcoming" .}}
 {{template "latest" .}}
@@ -56,7 +58,7 @@
 <h1>{{.Brand}}</h1>
 <p class="__lede__">{{.L.intro}}</p>
 </section>
-{{template "why" .}}
+{{template "cover" .}}{{template "why" .}}
 {{template "upcoming" .}}
 {{template "latest" .}}
 </div>

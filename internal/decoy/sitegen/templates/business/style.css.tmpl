@@ -23,7 +23,8 @@
 .__prose__ p{max-width:620px;font-size:1.06rem}
 .__figure__{margin:0;overflow:hidden;border-radius:var(--r)}
 .__figure__ .__art__{height:auto;aspect-ratio:4/3}
-.__hero__ h1{margin-bottom:.35em;font-size:clamp(2rem,5.4vw,3.2rem)}
+{{if hasphoto "g2" 640 480}}.__pics__{display:grid;gap:20px;grid-template-columns:repeat(2,minmax(0,1fr));margin:8px 0 48px}
+{{end}}.__hero__ h1{margin-bottom:.35em;font-size:clamp(2rem,5.4vw,3.2rem)}
 {{if eq .Layout 0}}.__split__{display:grid;gap:40px;align-items:center;grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding-top:56px;padding-bottom:8px}
 {{else if eq .Layout 1}}.__band__{background:var(--so)}
 .__centre__{padding-top:72px;padding-bottom:64px;text-align:center}

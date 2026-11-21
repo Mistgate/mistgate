@@ -35,8 +35,9 @@
 <section class="__card__ __up__">{{template "dropzone" .}}</section>
 </main>
 {{else}}<main>
-<section class="__band__">
-<div class="__wrap__">
+<section class="__band__{{if hasphoto "cover" 1280 480}} __ph__{{end}}">
+{{if hasphoto "cover" 1280 480}}<div class="__bgp__">{{photo "cover" "" 1280 480}}</div>
+{{end}}<div class="__wrap__">
 <p class="__kicker__">{{.L.kicker}}</p>
 <h1>{{.L.hero_h}}</h1>
 <p class="__lead__">{{.L.hero_p}}</p>

@@ -5,7 +5,8 @@
 <p class="__meta__"><a href="/">{{.L.back_all}}</a> · <time datetime="{{.Page.Item.date_iso}}">{{.Page.Item.date}}</time> · {{num (printf "mr%s" .Page.Item.slug) 3 7}} {{.L.min_read}} · <span class="__pill__">{{.Page.Item.tag}}</span></p>
 <h1>{{.Page.Item.title}}</h1>
 <p class="__lede__">{{.Page.Item.excerpt}}</p>
-{{range .Page.Item.body}}<p>{{.}}</p>
+{{if hasphoto (printf "t%d" .Page.Item.n) 480 300}}<figure class="__pcov__">{{photo (printf "t%d" .Page.Item.n) "" 480 300}}</figure>
+{{end}}{{range .Page.Item.body}}<p>{{.}}</p>
 {{end}}</article>
 <aside class="__more__">
 <h2 class="__sectitle__">{{.L.more_h}}</h2>

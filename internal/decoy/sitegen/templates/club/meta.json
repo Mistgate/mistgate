@@ -10,5 +10,6 @@
   "lists": [
     {"name": "events", "from": "events", "min": 5, "max": 5},
     {"name": "news", "from": "news", "min": 3, "max": 4, "dates": {"end": "2026-10-30", "gap_min": 12, "gap_max": 50}}
-  ]
+  ],
+  "photo_slots": {"cover":[0,1]}
 }

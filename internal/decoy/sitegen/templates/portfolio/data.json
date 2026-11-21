@@ -19,7 +19,7 @@
   },
   "bundles": [
     {
-      "lang": "en", "tagline": "Photographs of quiet places",
+      "lang": "en", "photo_q": ["quiet landscape hills","misty field morning","empty beach shore"], "tagline": "Photographs of quiet places",
       "vars": {"brand": {"join": [["Hollow", "Pale", "Open", "Still", "Long", "Soft", "Thin", "Early", "Narrow", "Distant"], ["Light", "Frame", "Field", "Hour", "Horizon", "Exposure", "Plate", "Shutter", "Aperture", "Print"]], "sep": " "}},
       "desc": "Landscape and still-life photography from {city}. Prints and commissions.", "desc_work": "Selected photographs, newest first.", "desc_about": "About the photographer and the studio in {city}.", "desc_contact": "Where to find the studio in {city} and when it is open.",
       "intro": "Landscape and still-life photography from {city}. Prints and a few commissions each year.",

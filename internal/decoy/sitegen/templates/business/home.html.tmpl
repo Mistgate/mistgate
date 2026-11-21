@@ -26,7 +26,7 @@
 <p class="__lede__">{{.L.intro}}</p>
 <p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.see_services}}</a></p>
 </div>
-<figure class="__figure__">{{art "hero" "" 640 480}}</figure>
+<figure class="__figure__">{{photo "hero" "" 640 480}}</figure>
 </section>
 {{else if eq .Layout 1}}<section class="__band__">
 <div class="__wrap__ __hero__ __centre__">
@@ -36,7 +36,7 @@
 </div>
 </section>
 {{else}}<section class="__cover__">
-{{art "hero" "" 1200 560}}
+{{photo "hero" "" 1200 560}}
 <div class="__wrap__ __coverin__">
 <h1>{{.L.hero_h}}</h1>
 <p class="__lede__">{{.L.intro}}</p>
@@ -45,7 +45,8 @@
 </section>
 {{end}}<div class="__wrap__">
 {{range .Order}}{{blk . $}}{{end}}
-</div>
+{{if hasphoto "g1" 640 480}}{{if hasphoto "g2" 640 480}}<div class="__pics__"><figure class="__figure__">{{photo "g1" "" 640 480}}</figure><figure class="__figure__">{{photo "g2" "" 640 480}}</figure></div>
+{{end}}{{end}}</div>
 </main>
 {{template "footer" .}}
 </body>

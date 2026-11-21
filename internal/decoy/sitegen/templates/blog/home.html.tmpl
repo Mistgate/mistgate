@@ -9,7 +9,7 @@
 <div class="__feed__">
 <h2 class="__sectitle__">{{.L.latest_h}}</h2>
 {{range .Lists.posts}}<article class="__entry__">
-{{if eq $.Layout 2}}<a class="__thumb__" href="{{.href}}" tabindex="-1" aria-hidden="true">{{art (printf "t%d" .n) "" 480 300}}</a>{{end}}
+{{if eq $.Layout 2}}<a class="__thumb__" href="{{.href}}" tabindex="-1" aria-hidden="true">{{photo (printf "t%d" .n) "" 480 300}}</a>{{end}}
 <div class="__ebody__">
 <p class="__meta__"><time datetime="{{.date_iso}}">{{.date}}</time> · <span class="__pill__">{{.tag}}</span></p>
 <h2><a href="{{.href}}">{{.title}}</a></h2>

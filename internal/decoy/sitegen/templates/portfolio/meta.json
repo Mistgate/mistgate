@@ -9,5 +9,6 @@
   ],
   "lists": [
     {"name": "works", "from": "works", "min": 7, "max": 9, "art": true}
-  ]
+  ],
+  "photo_slots": {"w":[0,1,2]}
 }

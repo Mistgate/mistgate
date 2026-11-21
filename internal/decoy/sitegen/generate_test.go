@@ -539,6 +539,7 @@ func TestNoTemplateEngineImported(t *testing.T) {
 // panel's own build may depend on this package.
 func TestGeneratorOnlyInThePanel(t *testing.T) {
 	const self = "github.com/mistgate/mistgate/internal/decoy/sitegen"
+	const photos = "github.com/mistgate/mistgate/internal/panel/decoyphotos" // the Pexels client and the picture work: the same rule
 	const mod = "github.com/mistgate/mistgate/cmd/"
 	edges := []string{"mistgate-edge", "mistgate-edge-admin", "mistgate-edge-jobs", "mistgate-edge-link", "mistgate-edge-provision", "mistgate-edge-public"}
 	check := func(target string, env ...string) {
@@ -549,8 +550,8 @@ func TestGeneratorOnlyInThePanel(t *testing.T) {
 			t.Skipf("go list is not available: %v", err)
 		}
 		for _, pkg := range strings.Fields(string(out)) {
-			if pkg == self {
-				t.Errorf("cmd/%s depends on the site generator (%s)", target, self)
+			if pkg == self || pkg == photos {
+				t.Errorf("cmd/%s depends on %s", target, pkg)
 			}
 		}
 	}
@@ -558,4 +559,18 @@ func TestGeneratorOnlyInThePanel(t *testing.T) {
 		check(e, "GOOS=js", "GOARCH=wasm")
 	}
 	check("mistgate-node", "GOOS=linux", "GOARCH=amd64")
+}
+
+// The generator takes finished photos and never fetches any: it must not reach the client of Pexels, or any code that opens a
+// connection of its own.
+func TestGeneratorHasNoNetworkClient(t *testing.T) {
+	out, err := exec.Command("go", "list", "-deps", ".").Output()
+	if err != nil {
+		t.Skipf("go list is not available: %v", err)
+	}
+	for _, pkg := range strings.Fields(string(out)) {
+		if strings.HasSuffix(pkg, "/internal/panel/decoyphotos") {
+			t.Errorf("the generator depends on %s", pkg)
+		}
+	}
 }
