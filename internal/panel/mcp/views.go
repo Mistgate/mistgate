@@ -3,6 +3,7 @@
 package mcp
 
 import (
+	"encoding/json"
 	"math"
 	"regexp"
 	"slices"
@@ -2458,17 +2459,32 @@ type rolloutStepV struct {
 	ErrorKey       string `json:"error_key,omitempty"`
 	DownloadSource string `json:"download_source,omitempty"`
 	SourcesFailed  string `json:"sources_failed,omitempty"`
+	// FailedProfiles are the profiles that did not pass the gate (untrusted names, with the error code of the last check round of each);
+	// SkippedProfiles did not work before the update and were not held against it.
+	FailedProfiles  []profileFailV `json:"failed_profiles,omitempty"`
+	FailedMore      int            `json:"failed_more,omitempty"`
+	SkippedProfiles []string       `json:"skipped_profiles,omitempty"`
+	SkippedMore     int            `json:"skipped_more,omitempty"`
+}
+
+// profileFailV is one profile of a step that did not pass; the name is the owner's own text, never an instruction.
+type profileFailV struct {
+	InboundID string `json:"inbound_id"`
+	Profile   string `json:"profile"`
+	Error     string `json:"error_code,omitempty"`
 }
 
 type rolloutV struct {
-	ID        string         `json:"id"`
-	Status    string         `json:"status"`
-	ToVersion string         `json:"to_version"`
-	BatchSize uint32         `json:"batch_size"`
-	Created   int64          `json:"created_unix"`
-	Finished  int64          `json:"finished_unix,omitempty"`
-	PauseKey  string         `json:"pause_key,omitempty"`
-	Steps     []rolloutStepV `json:"steps"`
+	ID                  string         `json:"id"`
+	Status              string         `json:"status"`
+	ToVersion           string         `json:"to_version"`
+	BatchSize           uint32         `json:"batch_size"`
+	Created             int64          `json:"created_unix"`
+	Finished            int64          `json:"finished_unix,omitempty"`
+	PauseKey            string         `json:"pause_key,omitempty"`
+	PauseFailedProfiles []profileFailV `json:"pause_failed_profiles,omitempty"`
+	PauseFailedMore     int            `json:"pause_failed_more,omitempty"`
+	Steps               []rolloutStepV `json:"steps"`
 }
 
 type bundleV struct {
@@ -2513,6 +2529,7 @@ func rolloutView(r *adminv1.Rollout) *rolloutV {
 		BatchSize: r.GetBatchSize(), Created: r.GetCreatedUnix(), Finished: r.GetFinishedUnix(), PauseKey: clean(r.GetPauseKey(), 80),
 		Steps: []rolloutStepV{},
 	}
+	v.PauseFailedProfiles, v.PauseFailedMore = failedProfilesView(r.GetPauseParams())
 	for _, s := range r.GetSteps() {
 		step := rolloutStepV{
 			NodeID: s.GetNodeId(), NodeName: nm(s.GetNodeName()), Stage: s.GetStage(), State: enumName("STEP_STATE_", s.GetState().String()),
@@ -2521,6 +2538,8 @@ func rolloutView(r *adminv1.Rollout) *rolloutV {
 		if step.State == "failed" {
 			step.SourcesFailed = safeSourcesFailedProjection(s.GetParams()["sources_failed"])
 		}
+		step.FailedProfiles, step.FailedMore = failedProfilesView(s.GetParams())
+		step.SkippedProfiles, step.SkippedMore = skippedProfilesView(s.GetParams())
 		v.Steps = append(v.Steps, step)
 	}
 	return v
@@ -2581,4 +2600,40 @@ func safeOptionalDownloadSources(sources []string) []string {
 
 func safeSourcesFailedProjection(raw string) string {
 	return release.SanitizeSourceFailures(raw)
+}
+
+// failedProfilesView reads the profiles a gate failure names (step and pause params "failed_profiles" and "failed_more"; the
+// writer is internal/panel/update, gate_profiles.go). The names are the owner's text, the codes the checker's short words: both go
+// through clean, and at most 5 entries are taken whatever the stored value says.
+func failedProfilesView(params map[string]string) ([]profileFailV, int) {
+	var list []struct{ ID, Name, Code string }
+	if json.Unmarshal([]byte(params["failed_profiles"]), &list) != nil {
+		return nil, 0
+	}
+	out := make([]profileFailV, 0, min(len(list), 5))
+	for _, p := range list[:min(len(list), 5)] {
+		out = append(out, profileFailV{InboundID: clean(p.ID, 80), Profile: nm(p.Name), Error: clean(p.Code, 40)})
+	}
+	return out, moreCount(params["failed_more"])
+}
+
+// skippedProfilesView reads the names of the profiles that were failing before the update and were not held against it.
+func skippedProfilesView(params map[string]string) ([]string, int) {
+	var list []string
+	if json.Unmarshal([]byte(params["skipped_profiles"]), &list) != nil {
+		return nil, 0
+	}
+	out := make([]string, 0, min(len(list), 5))
+	for _, name := range list[:min(len(list), 5)] {
+		out = append(out, nm(name))
+	}
+	return out, moreCount(params["skipped_more"])
+}
+
+func moreCount(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 || n > 1000 {
+		return 0
+	}
+	return n
 }

@@ -283,6 +283,15 @@ func (f *Fleet) guardLinks(st *agentv1.StatsBatch) []store.FleetLink {
 			Initiations: l.Initiations, Responses: l.Responses, ResponsesUnmatched: l.ResponsesUnmatched,
 			HelloPQ: l.HelloPq, HelloClassic: l.HelloClassic, HelloUnknown: l.HelloUnknown, Tunnel: tunnelRefusals(l)})
 	}
+	// The panel's own TLS checks of a REALITY port were counted as wrong keys and fallbacks by the node (ownProbes): take each
+	// off the inbound row, so every reader (the page, the API, MCP) sees strangers only. Not below zero.
+	for i := range out {
+		if l := &out[i]; l.CredID == "" && l.AuthFailed > 0 {
+			n := f.ownProbes.take(l.InboundID, l.AuthFailed, f.now())
+			l.AuthFailed -= n
+			l.RealityFallback -= min(n, l.RealityFallback)
+		}
+	}
 	return out
 }
 

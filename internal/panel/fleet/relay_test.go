@@ -135,6 +135,18 @@ func (c *conn) next(m *model) *agentv1.DesiredState {
 	return ds
 }
 
+// nextUntil is next for a state that several debounced recomputes may lead to: the setup of a test kicks the recompute more than
+// once, and on a loaded machine one of them can fire before the setup is done and send a delta of the half-built fleet first.
+// It applies and acknowledges deltas until ok accepts one (c.wait fails the test when none ever does).
+func (c *conn) nextUntil(m *model, ok func(*agentv1.DesiredState) bool) *agentv1.DesiredState {
+	c.t.Helper()
+	for {
+		if ds := c.next(m); ok(ds) {
+			return ds
+		}
+	}
+}
+
 // A node without the capability never gets forwards, and its hash is the hash of a state that has none; one with it does.
 func TestRelaysReachOnlyAgentsThatListTheCapability(t *testing.T) {
 	x := newRelayEnv(t)

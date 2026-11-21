@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -36,6 +37,9 @@ const (
 	pauseGateFailed    = "gate_failed"
 	pauseBundleChanged = "bundle_changed"
 	pausePanelRestart  = "panel_restart_ambiguous"
+	// pauseCancelWait is a cancelled rollout that waits for the step still in flight. A cancel that skips no step leaves no
+	// other mark of itself, and the step's failure would pause the rollout for ever.
+	pauseCancelWait = "cancel_wait"
 )
 
 // Step error codes the panel itself produces (the agent's own codes come through as they are).
@@ -446,6 +450,9 @@ func (s *Service) resume(ctx context.Context, id string) (store.RolloutRow, erro
 	if ro.Status != store.RolloutPaused {
 		return ro, precondition("rollout is not paused")
 	}
+	if ro.PauseKey == pauseCancelWait {
+		return ro, precondition("rollout cancellation is waiting for a node to finish")
+	}
 	steps, err := s.st.RolloutSteps(ctx, ro.ID)
 	if err != nil {
 		return ro, s.internal("load steps", err)
@@ -472,17 +479,27 @@ func (s *Service) cancel(ctx context.Context, id string) (store.RolloutRow, erro
 		return ro, s.internal("cancel rollout", err)
 	}
 	s.audit(ctx, "update_rollout_cancel", map[string]string{"rollout_id": ro.ID})
-	if ro.Status == store.RolloutPaused {
-		// finishIfDone ends a PAUSED rollout only when this cancel skipped a step. With nothing pending (a fleet of one,
-		// or the last step failed) it would stay paused for ever, with its alert: a cancelled rollout waits for nobody.
+	steps, err := s.st.RolloutSteps(ctx, ro.ID)
+	if err != nil {
+		return ro, s.internal("load steps", err)
+	}
+	skipped := slices.ContainsFunc(steps, func(x store.StepRow) bool { return x.State == store.StepSkipped && x.ErrorKey == errCancelled })
+	switch {
+	case !skipped && slices.ContainsFunc(steps, func(x store.StepRow) bool { return !x.Decided() }):
+		// nothing was skipped and a step is in flight: no step carries the cancel, so the rollout does
+		if _, err := s.st.SetRolloutStatus(ctx, ro.ID, []string{ro.Status}, store.RolloutPaused, pauseCancelWait, nil, time.Time{}); err != nil {
+			return ro, s.internal("cancel rollout", err)
+		}
+		ro.Status, ro.PauseKey = store.RolloutPaused, pauseCancelWait
+	case ro.Status == store.RolloutPaused:
+		// finishIfDone ends a PAUSED rollout only when it is cancelled. With nothing in flight (a fleet of one whose step
+		// failed) it would stay paused for ever, with its alert: a cancelled rollout waits for nobody.
 		if _, err := s.st.SetRolloutStatus(ctx, ro.ID, []string{store.RolloutPaused}, store.RolloutRunning, "", nil, time.Time{}); err != nil {
 			return ro, s.internal("cancel rollout", err)
 		}
 		ro.Status = store.RolloutRunning
 	}
-	if steps, err := s.st.RolloutSteps(ctx, ro.ID); err == nil {
-		s.finishIfDone(ctx, ro, steps) // nothing in flight: ends now; else when the steps in flight are decided
-	}
+	s.finishIfDone(ctx, ro, steps) // nothing in flight: ends now; else when the steps in flight are decided
 	s.loadUpdating(ctx)
 	return s.reload(ctx, ro.ID)
 }
@@ -499,7 +516,7 @@ func (s *Service) reload(ctx context.Context, id string) (store.RolloutRow, erro
 // CANCELLED (the owner cancelled). A PAUSED rollout is only ended this way after a cancel: otherwise the pause (and
 // its alert) waits for the owner.
 func (s *Service) finishIfDone(ctx context.Context, ro store.RolloutRow, steps []store.StepRow) bool {
-	cancelled, bad := false, false
+	cancelled, bad := ro.Status == store.RolloutPaused && ro.PauseKey == pauseCancelWait, false
 	for _, x := range steps {
 		switch {
 		case !x.Decided():
@@ -524,6 +541,9 @@ func (s *Service) finishIfDone(ctx context.Context, ro store.RolloutRow, steps [
 	if err != nil {
 		s.log.Warn("update: finish rollout", "rollout", ro.ID, "err", err)
 		return false
+	}
+	if ok {
+		s.startNodeBundleSyncLocked() // the bundle the rollout kept waiting is fetched now, not at the next poll
 	}
 	return ok
 }
@@ -650,6 +670,7 @@ func (p *pass) event(x *store.StepRow, state, key string) {
 	if key != "" {
 		params["reason"] = key
 	}
+	maps.Copy(params, failedProfileNotes(x.Params))
 	if err := p.s.st.InsertEvent(p.ctx, store.EventRow{Time: p.now, Severity: sev, Code: code, Source: "panel", NodeID: x.NodeID, Params: params}); err != nil {
 		p.s.log.Warn("update: step event", "node", x.NodeID, "err", err)
 	}
@@ -661,8 +682,9 @@ func (p *pass) pause(code string, x *store.StepRow, reason string) {
 		return
 	}
 	params := map[string]string{"node": x.NodeName, "node_id": x.NodeID, "reason": reason}
-	// only from the status this pass read: a rollout paused or resumed meanwhile keeps what the other writer made of it
-	ok, err := p.s.st.SetRolloutStatus(p.ctx, p.ro.ID, []string{p.ro.Status}, store.RolloutPaused, code, params, time.Time{})
+	maps.Copy(params, failedProfileNotes(x.Params)) // the profiles that did not pass: the owner reads them on the pause too
+	// only over the status and the pause this pass read: a rollout paused or resumed meanwhile keeps what the other writer made of it
+	ok, err := p.s.st.PauseRollout(p.ctx, p.ro.ID, p.ro.Status, p.ro.PauseKey, code, params)
 	if err != nil {
 		p.s.log.Warn("update: pause rollout", "rollout", p.ro.ID, "err", err)
 		return
@@ -670,6 +692,19 @@ func (p *pass) pause(code string, x *store.StepRow, reason string) {
 	if ok {
 		p.ro.Status, p.ro.PauseKey, p.ro.PauseParams = store.RolloutPaused, code, params
 		p.s.log.Warn("update: rollout paused", "rollout", p.ro.ID, "reason", code, "node", x.NodeName, "detail", reason)
+		return
+	}
+	// The write was lost: the rollout is not what this pass read. Go on with what is stored (the rest of the pass must not
+	// close or launch on the old reading); one that is running again, resumed after the pass read it paused, still pauses.
+	ro, err := p.s.st.Rollout(p.ctx, p.ro.ID)
+	if err != nil {
+		p.s.log.Warn("update: reload rollout", "code", "update_rollout_reload_failed", "rollout", p.ro.ID, "err", err)
+		return
+	}
+	resumed := p.ro.Status != store.RolloutRunning && ro.Status == store.RolloutRunning
+	p.ro = ro
+	if resumed {
+		p.pause(code, x, reason)
 	}
 }
 
@@ -863,17 +898,26 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 		if err != nil {
 			miss(errProbeFailed)
 		} else if probeable > 0 && ok < probeable {
-			miss(errProbeFailed)
-			pathLooksLossy = ok+failed == probeable && timeoutsOnly && failedFor >= vantageMinFailing
+			listed := false
 			if l, can := s.hl.(interface {
 				NodeChecksPending(ctx context.Context, nodeID string, since time.Time) ([]string, error)
 			}); can {
 				if ids, err := l.NodeChecksPending(ctx, nodeID, since); err == nil {
-					pending = append(pending, ids...)
+					pending, listed = ids, true
 				}
 			}
-			if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
-				s.log.Warn("update: run checks", "node", nodeID, "err", err)
+			// A profile whose check was already failing when the step was sent is not what this update broke: it is left out of the
+			// count, and when nothing else fails the step passes and says which profiles it did not hold against the update.
+			var skipped []string
+			pending, skipped = withoutProbeSick(pending, preFailed)
+			if listed && len(pending) == 0 && len(skipped) > 0 {
+				skippedProfileParams(with, skipped, label)
+			} else {
+				miss(errProbeFailed)
+				pathLooksLossy = ok+failed == probeable && timeoutsOnly && failedFor >= vantageMinFailing
+				if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
+					s.log.Warn("update: run checks", "node", nodeID, "err", err)
+				}
 			}
 		}
 	}
@@ -887,6 +931,11 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 		wait = v.verdict == ""
 		if v.verdict == vantageOK {
 			soft = ""
+		}
+	}
+	if soft == errProbeFailed { // what the owner reads: which profiles did not pass, and the error of the last round of each
+		for k, v := range s.failedProfileParams(ctx, nodeID, pending, label, since) {
+			with[k] = v
 		}
 	}
 	var waiting []string
@@ -1272,17 +1321,7 @@ func (p *pass) sendPrepared(x *store.StepRow, n store.NodeRow, sources []string)
 }
 
 func (p *pass) preFailed(x *store.StepRow) []string {
-	in, err := p.s.st.FleetInbounds(p.ctx, x.NodeID, true)
-	if err != nil {
-		return x.PreFailed
-	}
-	var preFailed []string
-	for _, inbound := range in {
-		if inbound.State == "failed" {
-			preFailed = append(preFailed, inbound.ID)
-		}
-	}
-	return preFailed
+	return p.s.preFailedOf(p.ctx, x.NodeID, p.now, x.PreFailed)
 }
 
 func (p *pass) sendLink(x *store.StepRow, n store.NodeRow, preFailed []string) {

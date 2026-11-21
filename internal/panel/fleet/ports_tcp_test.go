@@ -194,6 +194,9 @@ func TestTCPTargets(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			got := tcpTargets(tc.specs, tc.pins)
+			for i := range got {
+				got[i].Inbound = "" // whose counters a check is taken off: own_probes_test.go
+			}
 			if len(got) == 0 && len(tc.want) == 0 {
 				return
 			}

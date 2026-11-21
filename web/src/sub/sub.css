@@ -277,6 +277,7 @@ button.u-stat:hover .n { color: var(--text); }
 /* the toast: .u-toast (it stands above the control that was used; main.ts puts it) */
 .u-toast { position: absolute; top: 16px; left: 50%; z-index: 60; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border: 1px solid var(--hair); border-radius: 10px; background: var(--step); font-size: 13px; line-height: 20px; white-space: nowrap; transform: translateX(-50%); animation: u-rise 0.3s var(--e) both; }
 .u-toast .i { color: var(--accent-text); }
+.u-toast.in { position: fixed; } /* inside an open window: measured from the screen */
 .u-toast:not(.show) { display: none; }
 
 /* the dialog: the board's .a-desk + .a-dlg (a native <dialog> over the page) */
@@ -417,6 +418,18 @@ button.a-set:hover { background: color-mix(in srgb, var(--text) 3%, transparent)
 .a-act .tx { display: flex; flex-direction: column; min-width: 0; }
 .a-act .t { font-size: 15px; line-height: 20px; font-weight: 500; }
 .a-act .d { font-size: 13px; line-height: 20px; color: var(--sec); }
+/* a tile that did its work (.done, two seconds): the tick over the icon, the done word in place of the line */
+.a-act:active { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.a-act:active .ic { transform: scale(0.94); }
+.a-act .ic { position: relative; transition: background-color 0.2s var(--e), color 0.2s var(--e), transform 0.12s var(--e); }
+.a-act .ic .i { transition: opacity 0.16s var(--e), transform 0.2s var(--e); }
+.a-act .ic .ok { position: absolute; inset: 0; margin: auto; opacity: 0; transform: scale(0.6); color: var(--accent-text); }
+.a-act .dd { display: none; color: var(--accent-text); }
+.a-act.done .ic { background: var(--accent-soft); color: var(--accent-text); }
+.a-act.done .ic .i:not(.ok) { opacity: 0; transform: scale(0.6); }
+.a-act.done .ic .ok { opacity: 1; transform: none; }
+.a-act.done .d:not(.dd) { display: none; }
+.a-act.done .dd { display: block; animation: u-rise 0.2s var(--e) both; }
 .a-act .m { font-family: var(--mono); font-size: 12px; direction: ltr; unicode-bidi: isolate; overflow-wrap: anywhere; }
 .a-side .u-hint { max-width: 200px; }
 .a-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
@@ -557,6 +570,7 @@ button.a-set:hover { background: color-mix(in srgb, var(--text) 3%, transparent)
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .a-act .ic, .a-act .ic .i, .a-act.done .dd { transition: none; animation: none; }
   .enter, .u-ann, .u-menu, .u-toast, .a-dlg, .a-b > *, .a-srv, .modal::backdrop { animation: none; }
   .a-more .i { transition: none; }
   .u-anim .u-ann, .u-anim .u-hero, .u-anim .u-hero .u-h1, .u-anim .u-stat, .u-anim .u-qrrow, .u-anim .u-hero-c .u-acts > *, .u-anim .u-tabs, .u-anim .u-tbl, .u-anim .u-tabs ~ section, .u-anim .u-tabs ~ div, .u-anim .u-tbl .u-tr:not(.u-th), .u-anim .u-meter i { animation: none; }

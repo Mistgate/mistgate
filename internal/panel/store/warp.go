@@ -158,6 +158,13 @@ func (s *Store) UpdateWarpRefresh(ctx context.Context, nodeID string, r WarpRefr
 		b2i(r.UseReserved), r.AccountType, unix(now), nodeID)
 }
 
+// SetWarpSecret replaces the sealed secrets of the account and its type (a WARP+ key was bound). ErrNotFound when the
+// node has no account.
+func (s *Store) SetWarpSecret(ctx context.Context, nodeID string, secretEnc []byte, accountType string, now time.Time) error {
+	return s.warpExec(ctx, `UPDATE warp_account SET secret_enc = ?, account_type = ?, updated_at = ? WHERE node_id = ?`,
+		secretEnc, accountType, unix(now), nodeID)
+}
+
 // SetWarpEnabled pauses or resumes the account. ErrNotFound when the node has no account.
 func (s *Store) SetWarpEnabled(ctx context.Context, nodeID string, enabled bool, now time.Time) error {
 	return s.warpExec(ctx, `UPDATE warp_account SET enabled = ?, updated_at = ? WHERE node_id = ?`, b2i(enabled), unix(now), nodeID)

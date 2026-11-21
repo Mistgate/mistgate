@@ -302,9 +302,10 @@ type fakeHealth struct {
 	runs      map[string]int
 	since     map[string]time.Time
 	errors    map[string]error
-	timeouts  map[string]bool          // every failed round was a timeout
-	lasted    map[string]time.Duration // how long the failures have lasted
-	pending   map[string][]string      // inbound ids without an OK round, for NodeChecksPending
+	timeouts  map[string]bool                // every failed round was a timeout
+	lasted    map[string]time.Duration       // how long the failures have lasted
+	pending   map[string][]string            // inbound ids without an OK round, for NodeChecksPending
+	rounds    map[string][]store.CheckSample // the newest round of each probeable inbound, for NodeLastRounds
 }
 
 func newFakeHealth() *fakeHealth {
@@ -655,4 +656,20 @@ func (e *env) nodeState(id string) adminv1.NodeUpdateState {
 	}
 	e.t.Fatalf("node %s is not listed", id)
 	return 0
+}
+
+func (h *fakeHealth) NodeLastRounds(_ context.Context, id string) ([]store.CheckSample, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.rounds[id]), h.errors[id]
+}
+
+// setRounds sets the newest round of each probeable inbound of the node (what NodeLastRounds returns).
+func (h *fakeHealth) setRounds(id string, rounds ...store.CheckSample) {
+	h.mu.Lock()
+	if h.rounds == nil {
+		h.rounds = map[string][]store.CheckSample{}
+	}
+	h.rounds[id] = rounds
+	h.mu.Unlock()
 }

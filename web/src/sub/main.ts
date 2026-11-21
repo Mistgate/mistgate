@@ -11,6 +11,7 @@ import { lockActions, lockView, type LockState } from "./lock";
 import { addPlatforms, asPlatform, asTheme, detectPlatform, isHex, isReturning, mainProfile, normalize, pickPlatform, safeUrl } from "./logic";
 import { createModal } from "./modal";
 import { newAmzState, newDnsState, type Actions, type Ctx, type State } from "./state";
+import { placeToast } from "./ui";
 import type { Lang, Theme } from "./types";
 import { annKey, brandName, logoSrc, view } from "./view";
 
@@ -80,7 +81,7 @@ let toastTimer = 0;
 // the board's toast stands 56 px above the control that was pressed (top of the page when there is none)
 function flash(message: string, from?: HTMLElement) {
   toast.replaceChildren(icon("check", 16), message);
-  toast.style.top = `${from?.isConnected ? Math.max(16, Math.round(from.getBoundingClientRect().top + window.scrollY - 56)) : 16}px`;
+  placeToast(toast, from);
   toast.classList.remove("show");
   void toast.offsetWidth; // the toast rises again when it is shown again
   toast.classList.add("show");
@@ -91,7 +92,7 @@ function flash(message: string, from?: HTMLElement) {
 // Clipboard API needs a secure context and a user gesture; the textarea path covers plain http and old WebViews.
 function copy(text: string, message: string, done?: () => void, from?: HTMLElement) {
   const ok = () => {
-    flash(message, from);
+    if (message) flash(message, from); // "" = the control says it itself
     done?.();
   };
   const fallback = () => {

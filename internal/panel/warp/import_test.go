@@ -125,8 +125,9 @@ func TestImport(t *testing.T) {
 		a.TosAcceptedUnix != 0 || a.UseReserved || len(a.Ports) != 4 || a.Ports[0] != 2408 {
 		t.Errorf("account = %+v", a)
 	}
-	if n := len(e.cf.callLog()); n != 0 {
-		t.Errorf("an import called Cloudflare %d times", n)
+	// The one call of an import with a token: the type of the account (this device is unknown to the fake, so it stays empty).
+	if calls := e.cf.callLog(); len(calls) != 1 || calls[0] != "GET /reg/dev-SECRET-import" || a.AccountType != "" {
+		t.Errorf("an import called Cloudflare %v, type %q", calls, a.AccountType)
 	}
 	if e.kicks != 1 {
 		t.Errorf("recompute asked %d times", e.kicks)

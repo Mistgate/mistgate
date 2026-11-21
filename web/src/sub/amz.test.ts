@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { deviceModal } from "./add";
 import { newAmzState, type AmzState } from "./amnezia";
 import { amzActions, type Api } from "./amz-actions";
@@ -509,7 +509,7 @@ describe("the key dialog", () => {
     for (const [b, id] of [[modal("android", "d3"), "d3"], [modal("windows", "d3"), "d3"], [modal("windows", "d4"), "d4"]] as const) {
       expect([...b.querySelectorAll(".a-b > .a-fld")].map((x) => text(x.querySelector(".a-lbl")))).toEqual(["Серверв ключе 2 сервера"]);
       const two = b.querySelector(".a-b > .a-two.a-got")!;
-      expect([...two.querySelectorAll(".a-acts3 > .a-act")].map(text)).toEqual(["Скачать конфигmistgate-de.conf", "Скопировать конфигТекст того же файла", "Скопировать ключСтрока vpn:// для AmneziaVPN"]);
+      expect([...two.querySelectorAll(".a-acts3 > .a-act")].map((x) => text(x.querySelector(".t")) + text(x.querySelector(".d:not(.dd)")))).toEqual(["Скачать конфигmistgate-de.conf", "Скопировать конфигТекст того же файла", "Скопировать ключСтрока vpn:// для AmneziaVPN"]);
       expect([...two.querySelectorAll(".a-act")].map((x) => x.getAttribute("data-k"))).toEqual([`amz-dl-${id}`, `amz-conf-${id}`, `amz-key-${id}`]);
       // the file name and the scheme of the key stand in the file's own face
       expect([...two.querySelectorAll(".a-act .m")].map(text)).toEqual(["mistgate-de.conf", "vpn://"]);
@@ -624,6 +624,25 @@ describe("the key dialog", () => {
     expect(a.log).toEqual(["download mistgate-de.conf", "copy [Interface]\nPrivateKey = x\n", "copy vpn://k"]);
     box.querySelector<HTMLButtonElement>("[data-k=modal-done]")!.click();
     expect(a.log.at(-1)).toBe("add false");
+  });
+
+  it("a tile that did its work says so in place for two seconds: a tick and the done word under the same name, no toast", () => {
+    vi.useFakeTimers();
+    try {
+      const { box, a } = withKey();
+      const done = (k: string) => box.querySelector<HTMLButtonElement>(`[data-k=${k}]`)!.classList.contains("done");
+      const tile = box.querySelector<HTMLButtonElement>("[data-k=amz-key-d3]")!;
+      expect([text(tile.querySelector(".t")), text(tile.querySelector(".dd")), tile.querySelector(".dd")!.getAttribute("aria-live"), done("amz-key-d3")]).toEqual(["Скопировать ключ", "Ключ скопирован", "polite", false]);
+      tile.click();
+      expect(a.log.at(-1)).toBe("copy vpn://k");
+      expect([text(tile.querySelector(".t")), done("amz-key-d3"), done("amz-conf-d3")]).toEqual(["Скопировать ключ", true, false]);
+      box.querySelector<HTMLButtonElement>("[data-k=amz-dl-d3]")!.click();
+      expect([text(box.querySelector("[data-k=amz-dl-d3] .dd")), done("amz-dl-d3")]).toEqual(["Файл скачан", true]);
+      vi.advanceTimersByTime(2001);
+      expect([done("amz-key-d3"), done("amz-dl-d3")]).toEqual([false, false]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("five languages: the key reads the same way, none of the words missing", () => {

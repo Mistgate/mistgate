@@ -184,6 +184,7 @@ type Fleet struct {
 	probeTCP      func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
 	settleUDP     func(context.Context) error
 	probes        probeState                 // on-demand probes between nodes (path_probe.go); its zero value is ready
+	ownProbes     ownProbes                  // the panel's own TLS checks of REALITY ports, taken off the counters (ports_tcp.go)
 	panelIPv6     func(context.Context) bool // tests: whether the panel itself can send over IPv6; default panelHasIPv6
 }
 

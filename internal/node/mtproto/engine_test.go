@@ -721,13 +721,24 @@ func TestSiteFallbackBounds(t *testing.T) {
 		_, _ = c.Write([]byte("GET / HTTP/1.1\r\n\r\n"))
 	}
 	waitFor(t, "the forwards", func() bool { return busy() == siteMaxPerPeer })
+	// A forward is counted when it is admitted, before it dials, and the site counts it when its accept loop gets to it:
+	// wait for the idle forward and the held ones to arrive, so that anything after them is one the limit should have stopped.
+	waitFor(t, "the site to accept the forwards", func() bool { return site.accepted.Load() == siteMaxPerPeer+1 })
 	conn = f.dial()
 	_, _ = conn.Write([]byte("GET / HTTP/1.1\r\n\r\n"))
 	if _, err := conn.Read(make([]byte, 1)); err == nil || errors.Is(err, os.ErrDeadlineExceeded) {
 		t.Fatalf("a forward over the per-peer limit: %v", err)
 	}
-	if n := site.accepted.Load(); n != siteMaxPerPeer+1 {
-		t.Fatalf("the site accepted %d connections", n)
+	// The site's accept queue is first in, first out: once it has accepted a connection made after the refusal, it has
+	// accepted every dial the refused forward could have made before it.
+	marker, err := net.Dial("tcp", site.addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer marker.Close()
+	waitFor(t, "the site to accept the marker", func() bool { return site.accepted.Load() >= siteMaxPerPeer+2 })
+	if n := site.accepted.Load(); n != siteMaxPerPeer+2 {
+		t.Fatalf("the site accepted %d connections, want the idle forward, %d held ones and the marker", n, siteMaxPerPeer)
 	}
 }
 

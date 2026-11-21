@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
+
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -245,4 +247,163 @@ func TestEdgeRolloutPauseOutcomes(t *testing.T) {
 		e.wantStep(a, store.StepFailed, errNoAnswer)
 		e.wantRollout(store.RolloutPaused, pauseOwner)
 	})
+}
+
+// A cancel that skips nothing (the only step, or every other step, is already decided) must still end the rollout when the
+// step in flight is decided: as FAILED when the step fails, as for a fleet of many. It used to leave the rollout paused
+// by the failure for ever.
+func TestCancelWithNothingToSkipEndsTheRolloutWithItsStep(t *testing.T) {
+	inFlight := func(t *testing.T) (*env, string) {
+		t.Helper()
+		e := newEnv(t)
+		e.defaultBundle()
+		a := e.addNode("de1", nodeOpts{})
+		e.startRollout()
+		e.tick()
+		if x := e.step(a); x.State != store.StepSent || x.AckedAt.IsZero() {
+			t.Fatalf("step after the send: %+v", x)
+		}
+		return e, a
+	}
+	t.Run("the step fails", func(t *testing.T) {
+		e, a := inFlight(t)
+		e.clk.Advance(e.s.cfg.ReconnectWait + time.Second)
+		if _, err := e.s.cancel(e.ctx, ""); err != nil {
+			t.Fatal(err)
+		}
+		e.wantRollout(store.RolloutPaused, "cancel_wait")
+		if conds := e.s.Conditions(e.ctx); len(conds) != 0 {
+			t.Fatalf("a cancelling rollout raises no alert: %+v", conds)
+		}
+		e.tick()
+		e.wantStep(a, store.StepFailed, errNotReconnected)
+		e.wantRollout(store.RolloutFailed, "")
+		if conds := e.s.Conditions(e.ctx); len(conds) != 0 {
+			t.Fatalf("the alert outlives the rollout: %+v", conds)
+		}
+	})
+	t.Run("the step passes", func(t *testing.T) {
+		e, a := inFlight(t)
+		if _, err := e.s.cancel(e.ctx, ""); err != nil {
+			t.Fatal(err)
+		}
+		e.upgrade(a)
+		e.tick()
+		e.commit(a)
+		e.tick()
+		e.wantStep(a, store.StepPassed, "")
+		e.wantRollout(store.RolloutCancelled, "")
+	})
+	t.Run("the owner had paused it", func(t *testing.T) {
+		e, a := inFlight(t)
+		if _, err := e.s.pauseByOwner(e.ctx, ""); err != nil {
+			t.Fatal(err)
+		}
+		e.clk.Advance(e.s.cfg.ReconnectWait + time.Second)
+		if _, err := e.s.cancel(e.ctx, ""); err != nil {
+			t.Fatal(err)
+		}
+		e.tick()
+		e.wantStep(a, store.StepFailed, errNotReconnected)
+		e.wantRollout(store.RolloutFailed, "")
+	})
+	t.Run("it cannot be resumed while it waits", func(t *testing.T) {
+		e, _ := inFlight(t)
+		if _, err := e.s.cancel(e.ctx, ""); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.s.resume(e.ctx, ""); connectCode(err) != connect.CodeFailedPrecondition {
+			t.Fatalf("resume of a cancelling rollout: %v", err)
+		}
+		e.wantRollout(store.RolloutPaused, "cancel_wait")
+	})
+}
+
+// The edge pass has no lock either, and the cancel is the same code.
+func TestEdgeCancelWithNothingToSkipFailsTheRollout(t *testing.T) {
+	e, _ := newEdgeFixture(t, edgeReleaseTag, fakeReleaseOptions{})
+	a := edgeNode(e, "de1", 0)
+	startEdgeRollout(e, 0, a)
+	edgeTick(e)
+	e.wantStep(a, store.StepSent, "")
+	e.clk.Advance(e.s.cfg.AnswerWait + e.s.cfg.ReconnectWait + time.Second)
+	if _, err := e.s.cancel(e.ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	edgeTick(e)
+	e.wantStep(a, store.StepFailed, errNoAnswer)
+	e.wantRollout(store.RolloutFailed, "")
+}
+
+// The owner pauses in the middle of a pass that ends the last undecided step of the rollout: the pause stays the owner's.
+// The pass used to go on with the rollout it had read as running and close it FAILED.
+func TestOwnerPauseInTheMiddleOfThePassThatEndsTheLastStep(t *testing.T) {
+	t.Run("agent rollout", func(t *testing.T) {
+		e := newEnv(t)
+		e.defaultBundle()
+		a := e.addNode("de1", nodeOpts{})
+		e.startRollout()
+		e.tick()
+		e.clk.Advance(e.s.cfg.ReconnectWait + time.Second)
+		e.afterNextLoad(`UPDATE update_rollout SET status = 'paused', pause_key = 'owner' WHERE id = ?`, e.rollout().ID)
+		e.tick()
+		e.wantStep(a, store.StepFailed, errNotReconnected)
+		e.wantRollout(store.RolloutPaused, pauseOwner)
+	})
+	t.Run("OS rollout", func(t *testing.T) {
+		e := newEnv(t)
+		a := e.osNode("de1")
+		e.startOs(a, store.OsModeSecurity, store.OsRebootIfRequired)
+		e.osTick()
+		if x := e.osStep(a); x.State != store.OsStepSent || x.AckedAt.IsZero() {
+			t.Fatalf("OS step after the send: %+v", x)
+		}
+		e.clk.Advance(e.s.cfg.OsJobWait + time.Second)
+		e.afterNextLoad(`UPDATE os_rollout SET status = 'paused', pause_key = 'owner' WHERE id = ?`, e.osRollout().ID)
+		e.osTick()
+		e.wantOsStep(a, store.OsStepFailed, errNoAnswer)
+		e.wantOsRollout(store.RolloutPaused, pauseOwner)
+	})
+	t.Run("edge rollout", func(t *testing.T) {
+		e, _ := newEdgeFixture(t, edgeReleaseTag, fakeReleaseOptions{})
+		a := edgeNode(e, "de1", 0)
+		startEdgeRollout(e, 0, a)
+		edgeTick(e)
+		e.wantStep(a, store.StepSent, "")
+		e.clk.Advance(e.s.cfg.AnswerWait + e.s.cfg.ReconnectWait + time.Second)
+		e.afterNextLoad(`UPDATE update_rollout SET status = 'paused', pause_key = 'owner' WHERE id = ?`, e.rollout().ID)
+		edgeTick(e)
+		e.wantStep(a, store.StepFailed, errNoAnswer)
+		e.wantRollout(store.RolloutPaused, pauseOwner)
+	})
+}
+
+// A pause is written only over the pause the pass read, not over another one with the same status: here the owner resumed
+// the rollout and a failure paused it again in the middle of the pass, and its reason stays.
+func TestPauseKeepsAPauseThatChangedKeyUnderThePass(t *testing.T) {
+	e := newEnv(t)
+	e.defaultBundle()
+	a := e.addNode("de1", nodeOpts{})
+	e.startRollout()
+	e.tick()
+	e.clk.Advance(e.s.cfg.ReconnectWait + time.Second)
+	if _, err := e.s.pauseByOwner(e.ctx, ""); err != nil { // the pass reads PAUSED by the owner
+		t.Fatal(err)
+	}
+	e.afterNextLoad(`UPDATE update_rollout SET pause_key = 'bundle_changed' WHERE id = ?`, e.rollout().ID)
+	e.tick()
+	e.wantStep(a, store.StepFailed, errNotReconnected)
+	e.wantRollout(store.RolloutPaused, pauseBundleChanged)
+}
+
+// The owner resumed the rollout in the middle of a pass that read it paused: the failure of the step still pauses it.
+func TestResumeInTheMiddleOfThePassStillPausesForTheFailure(t *testing.T) {
+	e, a := notBackNode(t)
+	if _, err := e.s.pauseByOwner(e.ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	e.afterNextLoad(`UPDATE update_rollout SET status = 'running', pause_key = '' WHERE id = ?`, e.rollout().ID)
+	e.tick()
+	e.wantStep(a, store.StepFailed, errNotReconnected)
+	e.wantRollout(store.RolloutPaused, pauseGateFailed)
 }

@@ -7,7 +7,7 @@ import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
 import { useFmt } from "@/lib/format";
 import { triedText } from "@/lib/update-sources";
-import { heroOf, isActive, progressOf, rolloutInfo, stagesOf, stepErrorText, stepInfo, vantageNote, type Rollout, type Step, type UpdateActions, type Updates } from "@/lib/updates";
+import { heroOf, isActive, progressOf, rolloutInfo, skippedProfilesNote, stagesOf, stepErrorText, stepInfo, vantageNote, type Rollout, type Step, type UpdateActions, type Updates } from "@/lib/updates";
 import { BundleDetails, bundleStates } from "./cards";
 import { CardHead, D, NodeName, Pill, gk, useFlags, w } from "./bits";
 
@@ -123,6 +123,7 @@ function Stages({ rollout }: { rollout: Rollout }) {
             const info = stepInfo(s.state);
             const label = s.state === StepState.PASSED ? t("up.step.to", { version: rollout.toVersion }) : t(info.key);
             const note = vantageNote(t, s.nodeName, s.params, s.state === StepState.PASSED);
+            const skipped = skippedProfilesNote(t, s.params);
             const sentence = s.errorKey ? stepErrorText(t, s.errorKey, s.params) : "";
             const tried = s.errorKey.endsWith(".download_failed") ? triedText(t, s.params.sources_failed) : "";
             return (
@@ -135,6 +136,7 @@ function Stages({ rollout }: { rollout: Rollout }) {
                   {sentence && <small className={info.kind === "bad" ? "bad" : undefined}>{sentence}</small>}
                   {tried && <small>{tried}</small>}
                   {note && <small>{note}</small>}
+                  {skipped && <small>{skipped}</small>}
                 </span>
               </div>
             );

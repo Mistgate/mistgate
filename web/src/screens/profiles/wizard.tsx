@@ -201,7 +201,7 @@ function Wizard({ protocols, demo }: { protocols: ProtocolInfo[]; demo?: WizardD
   const relaysQ = useQuery({ ...relaysQuery(""), enabled: true });
   const checksQ = useQuery(checksQuery(""));
   const live = (nodesQ.data?.nodes ?? []).filter((n) => n.status !== NodeStatus.RETIRED);
-  const entries = new Set((relaysQ.data ?? []).map((r) => r.viaNodeId));
+  const entries = new Set((relaysQ.data ?? []).filter((r) => r.enabled).map((r) => r.viaNodeId));
   const column = countryColumn(checksQ.data?.countryChecks);
   const nodeIn = (n: (typeof live)[number]): NodeIn => ({ id: n.id, name: n.name, address: n.address, linked: agentLinked(n.status), entry: entries.has(n.id), firstAwg: info?.id === "awg" && !n.protocols.includes("awg"), awgMode: n.awgBackend });
   const asks = useQueries({

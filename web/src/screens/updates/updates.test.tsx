@@ -622,6 +622,13 @@ describe("the Updates screen", () => {
     expect([...document.querySelectorAll("a")].some((a) => a.textContent?.startsWith("Open "))).toBe(false);
   });
 
+  it("offers neither Resume nor Cancel while a cancel waits for the node in flight, and says why", async () => {
+    await mount(page({ nodes: [node({ name: "de1", state: NodeUpdateState.UPDATING })], rollout: rollout({ status: RolloutStatus.PAUSED, pauseKey: "updates.pause.cancel_wait", steps: [step({ state: StepState.SENT })] }) }));
+    expect(text()).toContain("Being cancelled: it ends as soon as the node that is updating now is decided.");
+    expect(button("Resume")).toBeUndefined();
+    expect(button("Cancel rollout")).toBeUndefined();
+  });
+
   it("marks the stage of nodes that were passed over with a dash, not a tick", async () => {
     await mount(
       page({
@@ -766,6 +773,17 @@ describe("the folds of the Updates screen", () => {
     await mount(page({ nodes: [node()], rollout: rollout({ status: RolloutStatus.FAILED, steps: [failed] }) }));
     expect(text()).toContain("The client-eye check failed after the update.");
     expect(text()).toContain("Failed: de1's profiles did not answer the panel, and not from nl2 either.");
+  });
+
+  it("names the profile that did not pass and the profiles it did not hold against the update", async () => {
+    const failed = step({
+      state: StepState.ROLLED_BACK,
+      errorKey: "updates.step.err.probe_failed",
+      params: { failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "timeout" }]), skipped_profiles: JSON.stringify(["Backup"]) },
+    });
+    await mount(page({ nodes: [node()], rollout: rollout({ status: RolloutStatus.FAILED, steps: [failed] }) }));
+    expect(text()).toContain("The client-eye check failed after the update for the profile “Main”: no answer.");
+    expect(text()).toContain("these did not work before it: “Backup”.");
   });
 
   it("shows a running rollout as rows, one per node, and as a card per node above", async () => {

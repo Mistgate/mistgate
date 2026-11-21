@@ -298,6 +298,7 @@ var procedureLevels = map[string]level{
 	adminv1connect.WarpServiceGetWarpProcedure:                      levelOwner,
 	adminv1connect.WarpServiceRegisterWarpProcedure:                 levelOwner, // also needs a step-up
 	adminv1connect.WarpServiceImportWarpProcedure:                   levelOwner, // also needs a step-up
+	adminv1connect.WarpServiceSetWarpLicenseProcedure:               levelOwner, // also needs a step-up
 	adminv1connect.WarpServiceSetWarpEnabledProcedure:               levelOwner,
 	adminv1connect.WarpServiceRestartWarpProcedure:                  levelOwner,
 	adminv1connect.WarpServiceRefreshWarpProcedure:                  levelOwner,

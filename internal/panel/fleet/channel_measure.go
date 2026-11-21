@@ -292,6 +292,18 @@ func (s probeService) ChannelMeasureCancel(ctx context.Context, req *connect.Req
 // channelStatus is the status message of a run (nil = none since the panel started) and the node's stored last measure.
 func (f *Fleet) channelStatus(ctx context.Context, n store.NodeRow, run *channelRun) *probev1.ChannelMeasureStatusResponse {
 	out := &probev1.ChannelMeasureStatusResponse{NodeName: n.Name, State: "idle", ConfiguredMbps: uint32(min(max(n.BandwidthMbps, 0), maxBandwidthMbps))}
+	// The run is read before the store: a run says "done" only after its result is stored, so a status that says done finds it there.
+	if run != nil {
+		run.mu.Lock()
+		out.State, out.Error, out.StartedUnix = run.state, run.err, run.started.Unix()
+		for _, s := range run.steps {
+			out.Steps = append(out.Steps, &probev1.ChannelStep{Partner: s.Partner, Direction: s.Direction, State: s.State, MbitS: s.MbitS, Error: s.Error, Streams: s.Streams, Capped: s.Capped})
+		}
+		if run.state == "done" {
+			out.Result = lastMessage(&run.result, run.started)
+		}
+		run.mu.Unlock()
+	}
 	if row, ok, err := f.st.ChannelMeasure(ctx, n.ID); err != nil {
 		f.log.Warn("read the channel measure", "code", "store_failed", "err", err)
 	} else if ok && row.ResultJSON != "" {
@@ -299,18 +311,6 @@ func (f *Fleet) channelStatus(ctx context.Context, n store.NodeRow, run *channel
 		if json.Unmarshal([]byte(row.ResultJSON), &last) == nil {
 			out.Last = lastMessage(&last, row.At)
 		}
-	}
-	if run == nil {
-		return out
-	}
-	run.mu.Lock()
-	defer run.mu.Unlock()
-	out.State, out.Error, out.StartedUnix = run.state, run.err, run.started.Unix()
-	for _, s := range run.steps {
-		out.Steps = append(out.Steps, &probev1.ChannelStep{Partner: s.Partner, Direction: s.Direction, State: s.State, MbitS: s.MbitS, Error: s.Error, Streams: s.Streams, Capped: s.Capped})
-	}
-	if run.state == "done" {
-		out.Result = lastMessage(&run.result, run.started)
 	}
 	return out
 }

@@ -199,7 +199,9 @@ func TestApplySourcesMarksSlowAndReturnsToFastestWhenAllAreSlow(t *testing.T) {
 
 func TestApplySourcesRechecksSlowSourceAfterOtherSourceFails(t *testing.T) {
 	e := newEnv(t)
-	content := bytes.Repeat([]byte("x"), 1<<20)
+	// Small enough that a panel never given up for the other source would end the transfer in seconds and fail on the call
+	// counts, large enough that it cannot end before the slow check has run.
+	content := bytes.Repeat([]byte("x"), 128<<10)
 	panelCalls, githubCalls := 0, 0
 	transferSlowly := func(ctx context.Context, offset uint64, w io.Writer) error {
 		for offset < uint64(len(content)) {
@@ -236,9 +238,11 @@ func TestApplySourcesRechecksSlowSourceAfterOtherSourceFails(t *testing.T) {
 		}},
 	}}
 	u := sourceUpdater(e, func(c *Config) {
-		c.Timeout = 250 * time.Millisecond
+		// What this test is about is the rate check below; the whole-download and stall limits only have to stay out of the way
+		// of a slow machine, so they are far from the tens of milliseconds the flow takes.
+		c.Timeout = time.Minute
 		c.SourceBackoff = []time.Duration{time.Millisecond}
-		c.SourceStallTimeout = 500 * time.Millisecond
+		c.SourceStallTimeout = time.Minute
 		c.SourceSlowAfter = 20 * time.Millisecond
 		c.SourceSlowWindow = 20 * time.Millisecond
 		c.SourceSlowInterval = 2 * time.Millisecond

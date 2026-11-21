@@ -18,6 +18,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 // rpc is the admin UpdateService (update.proto). Roles are decided by auth/policy.go before a call gets here;
@@ -459,8 +460,28 @@ func (r rpc) RescanBundle(ctx context.Context, _ *connect.Request[adminv1.Rescan
 	} else {
 		b = r.s.rescanForRequest()
 	}
-	r.s.audit(ctx, "update_rescan", map[string]string{"status": b.view.Status.String()})
-	return connect.NewResponse(&adminv1.RescanBundleResponse{Bundle: b.view}), nil
+	view := b.view
+	audit := map[string]string{"status": b.view.Status.String()}
+	if !r.s.cfg.Edge {
+		// Reading the folder is not all: the bundle of a new release also has to be fetched from its source, and the owner is told
+		// honestly whether that is done, going on, or waiting for something (Bundle.params "sync", "sync_wait").
+		if outcome, wait := r.s.syncBundleOnRequest(ctx); outcome != "" {
+			if cur := r.s.current(); cur != nil {
+				b = cur // a bundle installed by the sync is the one to show
+			}
+			view = proto.Clone(b.view).(*adminv1.Bundle)
+			if view.Params == nil {
+				view.Params = map[string]string{}
+			}
+			view.Params["sync"] = outcome
+			audit["sync"] = outcome
+			if wait != "" {
+				view.Params["sync_wait"], audit["sync_wait"] = wait, wait
+			}
+		}
+	}
+	r.s.audit(ctx, "update_rescan", audit)
+	return connect.NewResponse(&adminv1.RescanBundleResponse{Bundle: view}), nil
 }
 
 func (r rpc) ScheduleNodeUpdate(ctx context.Context, req *connect.Request[adminv1.ScheduleNodeUpdateRequest]) (*connect.Response[adminv1.ScheduleNodeUpdateResponse], error) {

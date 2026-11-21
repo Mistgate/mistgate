@@ -402,6 +402,18 @@ type holdLinkServer struct {
 	fail int
 	deaf int           // the next `deaf` established links stop reading after HelloAck: no pong ever comes back, like a frozen panel host
 	stop chan struct{} // ends the deaf handlers
+	live []*websocket.Conn
+}
+
+// dropLinks closes the established links from the panel's side, as a panel that went away does.
+func (s *holdLinkServer) dropLinks() {
+	s.mu.Lock()
+	live := s.live
+	s.live = nil
+	s.mu.Unlock()
+	for _, ws := range live {
+		_ = ws.CloseNow()
+	}
 }
 
 func newHoldLinkServer(t *testing.T, h *harness, fail int) *holdLinkServer {
@@ -449,6 +461,9 @@ func newHoldLinkServer(t *testing.T, h *harness, fail int) *holdLinkServer {
 			}
 			return
 		}
+		s.mu.Lock()
+		s.live = append(s.live, ws)
+		s.mu.Unlock()
 		for {
 			if _, _, err := agentlink.ReadFrame(r.Context(), ws); err != nil {
 				return
@@ -763,7 +778,7 @@ func TestAgentLongHeldSessionResetsBackoffDelay(t *testing.T) {
 	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) {
 		c.LinkURL = "wss://example.com/" + strings.Repeat("x", 24) + "/"
 	}})
-	ls := newHoldLinkServer(t, h, 1<<30)
+	ls := newHoldLinkServer(t, h, 1) // the first link attempt fails, the second is established and stays up
 	h.a.backoffMin, h.a.backoffMax = 100*time.Millisecond, 800*time.Millisecond
 	h.a.resetAfter, h.a.linkHoldFor = 300*time.Millisecond, 400*time.Millisecond
 	logs := &lockedLogBuffer{}
@@ -778,8 +793,9 @@ func TestAgentLongHeldSessionResetsBackoffDelay(t *testing.T) {
 		}
 		h.panel.dropConn()
 	}
-	// The first held session lives the whole hold period, which resets the delay; the second is the one dropped.
-	eventually(t, func() bool { return len(ls.attempts()) == 2 && sessionOnMTLS(h.a) }, "second held mTLS session")
+	// The held session lives the whole hold period, which resets the delay; the link that follows is the one dropped. A second
+	// held session would be a window of one hold period that a loaded machine can miss; an established link stays up.
+	eventually(t, func() bool { return len(ls.attempts()) == 2 && sessionOnLink(h.a) }, "the link session after the held one")
 	lost := func() []string {
 		var out []string
 		for _, l := range strings.Split(logs.String(), "\n") {
@@ -790,7 +806,7 @@ func TestAgentLongHeldSessionResetsBackoffDelay(t *testing.T) {
 		return out
 	}
 	before := len(lost())
-	h.panel.dropConn()
+	ls.dropLinks()
 	eventually(t, func() bool { return len(lost()) > before }, "the drop is logged")
 	line := lost()[before]
 	i := strings.Index(line, "retry_in=")

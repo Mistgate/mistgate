@@ -105,7 +105,7 @@ func (s *Service) accountMsg(a store.WarpAccountRow) *adminv1.WarpAccount {
 		m.TosAcceptedUnix = a.TOSAcceptedAt.Unix()
 	}
 	if x, err := s.open(a); err == nil {
-		m.HasToken = x.hasToken()
+		m.HasToken, m.HasLicense, m.LicenseError = x.hasToken(), x.PlusKey != "", x.LicenseError
 	} else {
 		s.log.Error("warp: open secrets (wrong master key?)", "node", a.NodeID)
 	}

@@ -216,7 +216,8 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
           .filter((v) => (flt === "all" || v.group === flt) && (!find || `${v.n.name} ${v.n.location}`.toLowerCase().includes(find)))
           .sort((a, b) => sections.indexOf(a.group) - sections.indexOf(b.group))
     : shown;
-  const tickable = view.filter((v) => !v.r.need && !v.pending);
+  // "all" leaves the entries alone, as the wizard does: an entry is ticked by hand only
+  const tickable = view.filter((v) => !v.r.need && !v.pending && !srv.entries.has(v.n.id));
   const allOn = tickable.length > 0 && tickable.every((v) => v.on);
   const sectionTitle = { can: t("ps.pt.gCan"), act: t("ps.pt.gAct"), no: t("ps.pt.gNo") } as const;
 
