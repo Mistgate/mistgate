@@ -784,7 +784,7 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 			size := [][2]int{{480, 360}, {360, 480}, {480, 480}, {480, 320}, {400, 500}}[ar.n(5)]
 			it["w"], it["h"] = size[0], size[1]
 			svg := []byte(artSVG(ar, kind, s.P.Hue+float64(ar.n(120))-60, size[0], size[1], "g"+hex6(ar), true))
-			if pp, ok := c.photoFile(fmt.Sprintf("w%d", i+1), 4, 3, dir); ok { // a photo takes the picture's place
+			if pp, ok := c.photoFile(fmt.Sprintf("w%d", i+1), 4, 3, dir, true); ok { // a photo takes the picture's place
 				it["img"], it["w"], it["h"] = pp, 640, 480
 			} else {
 				c.files[p] = svg
@@ -941,7 +941,7 @@ func funcMap(c *ctx) map[string]tmplFunc {
 		// photo is the photo of a slot as an <img>, or the picture "art" would draw with the same arguments when the slot has none.
 		"photo": func(a []any) any {
 			k, kind, w, h := argStr(a, 0), argStr(a, 1), argInt(a, 2), argInt(a, 3)
-			if p, ok := c.photoFile(k, w, h, ""); ok {
+			if p, ok := c.photoFile(k, w, h, "", true); ok {
 				return photoTag(k, p, w, h)
 			}
 			r := key("art:" + k)
@@ -953,7 +953,7 @@ func funcMap(c *ctx) map[string]tmplFunc {
 		},
 		// hasphoto is whether the slot has a photo, for markup that only makes sense around one.
 		"hasphoto": func(a []any) any {
-			_, ok := c.photoFile(argStr(a, 0), argInt(a, 1), argInt(a, 2), "")
+			_, ok := c.photoFile(argStr(a, 0), argInt(a, 1), argInt(a, 2), "", false)
 			return ok
 		},
 		// nphotos is how many photos the pages have asked for and got so far; the stylesheet is made last.

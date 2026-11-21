@@ -157,8 +157,10 @@ func TestGenerateWithPhotos(t *testing.T) {
 							}
 						}
 					}
-					if jpgs != len(ph) {
-						t.Errorf("seed %d: %d photos in the site, gave %d", i, jpgs, len(ph))
+					// every photo given is in the site when all of the plan was given; a photo that no page can show (a gallery of two with
+					// one of them missing) is left out
+					if jpgs > len(ph) || len(ph) == len(plan) && jpgs != len(ph) {
+						t.Errorf("seed %d: %d photos in the site, gave %d of %d", i, jpgs, len(ph), len(plan))
 					}
 					for _, f := range files {
 						if path.Ext(f.Path) == ".jpg" && !strings.Contains(html, f.Path) {

@@ -29,11 +29,12 @@ type Options struct {
 
 // photos is the state of one render: the slots it was asked for, and the files it was given or is only counting.
 type photos struct {
-	have  map[string][]byte // nil while planning
-	asked []string          // slot names in the order they were first asked for
-	slots map[string]Slot
-	path  map[string]string // "" when a slot has no photo
-	dir   string
+	have   map[string][]byte // nil while planning
+	asked  []string          // slot names in the order they were first asked for
+	slots  map[string]Slot
+	path   map[string]string // "" when a slot has no photo
+	placed map[string]bool   // the slots whose file is in the site
+	dir    string
 }
 
 // GenerateWith is GenerateNamed with Options.
@@ -107,17 +108,22 @@ func (s *site) query(name string) string {
 	return s.photoQ[idx[max(n-1, 0)%len(idx)]%len(s.photoQ)]
 }
 
-// photoFile is the path of the photo of a slot and whether there is one. The first ask fixes the slot's shape; the photo is put
-// into the site's files once. dir is the folder to put it in, "" for the site's own.
-func (c *ctx) photoFile(name string, w, h int, dir string) (string, bool) {
+// photoFile is the path of the photo of a slot and whether there is one. The first ask fixes the slot's shape. With place the photo
+// is also put into the site's files, once: a question (hasphoto) leaves the site as it is, so that a photo no page shows is not kept.
+// dir is the folder to put it in, "" for the site's own.
+func (c *ctx) photoFile(name string, w, h int, dir string, place bool) (string, bool) {
 	ph := c.ph
 	if ph == nil {
 		return "", false
 	}
 	if ph.path == nil {
-		ph.path, ph.slots = map[string]string{}, map[string]Slot{}
+		ph.path, ph.slots, ph.placed = map[string]string{}, map[string]Slot{}, map[string]bool{}
 	}
 	if p, ok := ph.path[name]; ok {
+		if place && p != "" && ph.have != nil && !ph.placed[name] {
+			ph.placed[name] = true
+			c.files[strings.TrimPrefix(p, "/")] = ph.have[name]
+		}
 		return p, p != ""
 	}
 	if len(ph.asked) >= MaxPhotos {
@@ -147,7 +153,8 @@ func (c *ctx) photoFile(name string, w, h int, dir string) (string, bool) {
 	}
 	p := fmt.Sprintf("%s/%s-%s.jpg", dir, name, hex6(c.r.sub("photo:"+name)))
 	ph.path[name] = "/" + p
-	if ph.have != nil {
+	if place && ph.have != nil {
+		ph.placed[name] = true
 		c.files[p] = data
 	}
 	return "/" + p, true
