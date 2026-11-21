@@ -1,0 +1,12 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<div class="__wrap__ __docs__">
+{{if eq .Layout 0}}{{template "sidenav" .}}{{end}}<article class="__doc__">
+<h1>{{.L.faq_h}}</h1>
+{{range .L.faq}}<h2>{{.q}}</h2>
+<p>{{.a}}</p>
+{{end}}</article>
+{{if eq .Layout 1}}{{template "facts" .}}{{end}}</div>
+{{template "footer" .}}
+</body>
+</html>

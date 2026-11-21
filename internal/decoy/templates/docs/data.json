@@ -1,0 +1,114 @@
+{
+  "ui": {
+    "en": {
+      "vars": {"ver": ["0.8", "1.2", "1.4", "2.0", "2.3", "3.1"]},
+      "nav_label": "Documentation", "footer": "Documentation for version {ver}.",
+      "nav_home": "Overview", "nav_install": "Install", "nav_usage": "Usage", "nav_faq": "FAQ", "home_title": "Overview",
+      "desc_install": "How to install {brand} {ver} on Linux, macOS and Windows.", "desc_usage": "How to use {brand}: common tasks with examples.", "desc_faq": "Frequently asked questions about {brand}.",
+      "nf_title": "Page not found", "nf_text": "This page is not part of the documentation. It may have been renamed in a newer version.", "nf_back": "Back to the overview",
+      "quick_h": "Quick start", "features_h": "What it does", "out_h": "Output", "install_h": "Installation", "steps_h": "Steps",
+      "usage_h": "Usage", "opts_h": "Options", "opt_col": "Option", "desc_col": "Description", "faq_h": "Frequently asked questions",
+      "next": "Next", "facts_h": "At a glance", "menu_h": "Documentation",
+      "facts": [{"k": "Version", "v": "{ver}"}, {"k": "Platforms", "v": "Linux, macOS and Windows"}, {"k": "Licence", "v": "MIT"}, {"k": "Dependencies", "v": "None"}],
+      "install_check": "If the version number is printed, the installation worked."
+    }
+  },
+  "bundles": [
+    {
+      "lang": "en",
+      "vars": {"brand": {"join": [["Tally", "Gauge", "Digest", "Skim", "Ledger", "Quarry", "Tidy", "Scribe"], ["log", "scan", "sum", "view", "cut", "peek"]]}},
+      "tagline": "A log summariser for the command line",
+      "desc": "{brand} reads plain text log files and prints a short summary of what is in them.",
+      "overview": "{brand} reads plain text log files and prints a short summary: how many lines there are, which levels they use and which messages repeat the most. It is one small binary with no dependencies.",
+      "features": ["Reads files, directories and standard input", "Groups similar messages without any configuration", "Prints text, JSON or a small HTML report"],
+      "quick": "{cmd} summary app.log",
+      "quick_out": "app.log: 48 211 lines, 3 levels\n  info   46 902\n  warn    1 190\n  error     119\ntop message: cache miss for key (9 413 times)",
+      "install_intro": "{brand} is distributed as a single binary. There is nothing to configure before the first run.",
+      "install_steps": ["Download the archive that matches your system.", "Unpack it and copy the binary to a directory on your PATH.", "Run the version command to check that it works."],
+      "install_code": "tar xf {cmd}-{ver}-linux-amd64.tar.gz\nsudo mv {cmd} /usr/local/bin/\n{cmd} --version",
+      "usage": [
+        {"h": "Summarise a file", "p": "Point {brand} at a file, a directory or a pipe. Directories are read recursively and compressed files are unpacked on the fly.", "code": "{cmd} summary app.log\n{cmd} summary /var/log/myapp/\ncat app.log | {cmd} summary -"},
+        {"h": "Look at a time range", "p": "Use --since and --until to narrow the summary to a time range. Times can be absolute or relative to now.", "code": "{cmd} summary --since 2h app.log\n{cmd} summary --since 2025-03-01 --until 2025-03-02 app.log"},
+        {"h": "Choose an output format", "p": "The default output is plain text. JSON is stable and meant for scripts; the HTML report is a single file you can send to a colleague.", "code": "{cmd} summary --format json app.log\n{cmd} summary --format html app.log"}
+      ],
+      "options": [{"o": "--since", "d": "Only lines after this time, absolute or such as 2h."}, {"o": "--until", "d": "Only lines before this time."}, {"o": "--level", "d": "Only lines of this level or above."}, {"o": "--top", "d": "How many repeated messages to list. Default 5."}, {"o": "--format", "d": "text, json or html. Default text."}],
+      "faq": [
+        {"q": "Which log formats are supported?", "a": "Anything line based. {brand} recognises common timestamp and level styles and falls back to plain lines when it does not."},
+        {"q": "Does it modify my files?", "a": "Never. Files are opened read-only."},
+        {"q": "How big a file can it read?", "a": "Files are streamed, so size is limited only by time. A gigabyte takes a few seconds on a laptop."}
+      ]
+    },
+    {
+      "lang": "en",
+      "vars": {"brand": {"join": [["Plain", "Slate", "Chalk", "Folio", "Quill", "Mason", "Press", "Ink"], ["site", "page", "build", "gen", "sheet"]]}},
+      "tagline": "A small static site builder",
+      "desc": "{brand} turns a folder of Markdown files and a few templates into a static website.",
+      "overview": "{brand} turns a folder of Markdown files and a few templates into a static website. There is no database, no runtime and nothing to keep up to date on the server.",
+      "features": ["Markdown with front matter", "Templates in plain HTML", "A local preview that rebuilds on every save"],
+      "quick": "{cmd} init notes\ncd notes\n{cmd} serve",
+      "quick_out": "Serving notes at localhost:4000 (press Ctrl+C to stop)",
+      "install_intro": "{brand} is a single executable. Put it on your PATH and you are done.",
+      "install_steps": ["Download the archive that matches your system.", "Unpack it and copy the executable to a directory on your PATH.", "Run the version command to check that it works."],
+      "install_code": "tar xf {cmd}-{ver}-linux-amd64.tar.gz\nsudo mv {cmd} /usr/local/bin/\n{cmd} --version",
+      "usage": [
+        {"h": "Start a new site", "p": "The init command creates a folder with a config file, a layout and one example page.", "code": "{cmd} init notes\ncd notes\nls"},
+        {"h": "Write a page", "p": "Pages are Markdown files. The front matter at the top sets the title and the date; everything below it is the content.", "code": "title: First note\ndate: 2025-03-14\n---\nSome words about the first note."},
+        {"h": "Build for publishing", "p": "The build command writes the finished site to the public folder. Copy that folder to any web server.", "code": "{cmd} build\nls public"}
+      ],
+      "options": [{"o": "--out", "d": "Folder for the finished site. Default public."}, {"o": "--drafts", "d": "Include pages marked as drafts."}, {"o": "--port", "d": "Port for the preview server. Default 4000."}, {"o": "--watch", "d": "Rebuild when a file changes."}, {"o": "--quiet", "d": "Print errors only."}],
+      "faq": [
+        {"q": "Can I use my own templates?", "a": "Yes. Templates are plain HTML files with a few placeholders, and the folder layout is yours to change."},
+        {"q": "Does it need a database?", "a": "No. The output is plain files that any web server can serve."},
+        {"q": "How do I add a new kind of page?", "a": "Add a folder under pages with its own layout file and {brand} will pick it up on the next build."}
+      ]
+    },
+    {
+      "lang": "en",
+      "vars": {"brand": {"join": [["Clock", "Errand", "Chore", "Rota", "Tick", "Cadence", "Turn", "Nudge"], ["work", "list", "run", "do", "bell"]]}},
+      "tagline": "Recurring jobs without a crontab",
+      "desc": "{brand} runs small recurring jobs on one machine and tells you when one of them fails.",
+      "overview": "{brand} runs small recurring jobs on one machine and tells you when one of them fails. It is a friendlier alternative to a crontab you have to keep in your head.",
+      "features": ["Schedules written in plain words", "A log for every run", "One line of output per job, so failures stand out"],
+      "quick": "{cmd} add backup 'every day at 03:00' 'tar czf notes.tgz notes'\n{cmd} list",
+      "quick_out": "backup   every day at 03:00   last run: ok (4 s)",
+      "install_intro": "{brand} is a single executable plus a small background process that checks the schedule once a minute.",
+      "install_steps": ["Download the archive that matches your system.", "Unpack it and copy the executable to a directory on your PATH.", "Start the background process with your system's service manager."],
+      "install_code": "tar xf {cmd}-{ver}-linux-amd64.tar.gz\nsudo mv {cmd} /usr/local/bin/\n{cmd} --version",
+      "usage": [
+        {"h": "Add a job", "p": "A job has a name, a schedule and a command. Schedules are written in plain words.", "code": "{cmd} add backup 'every day at 03:00' 'tar czf notes.tgz notes'\n{cmd} add tidy 'every monday' 'rm -r tmp/old'"},
+        {"h": "See what ran", "p": "The list command shows every job with the result of its last run. The history command shows the runs of one job with their duration and output.", "code": "{cmd} list\n{cmd} history backup"},
+        {"h": "Pause and resume", "p": "Pausing keeps the job and its history but stops it from running. Useful while you move house or restore a backup.", "code": "{cmd} pause backup\n{cmd} resume backup"}
+      ],
+      "options": [{"o": "--dir", "d": "Where jobs and logs are kept. Default is a folder in your home."}, {"o": "--quiet", "d": "Print only failures."}, {"o": "--limit", "d": "How many runs history shows. Default 10."}, {"o": "--json", "d": "Machine readable output."}, {"o": "--now", "d": "Run a job right away as well as on schedule."}],
+      "faq": [
+        {"q": "Does it need to run as a service?", "a": "Yes, a small background process checks the schedule once a minute. The install page shows what to start."},
+        {"q": "What happens if the computer is off?", "a": "A job that was due while the machine was off runs once when it starts again."},
+        {"q": "Can jobs depend on each other?", "a": "Not yet. Chain the commands in a single job for now."}
+      ]
+    },
+    {
+      "lang": "en",
+      "vars": {"brand": {"join": [["Column", "Grid", "Cell", "Row", "Sheet", "Tab", "Comma", "Field"], ["cut", "fix", "join", "tidy", "sift", "wrangle"]]}},
+      "tagline": "Select, sort and join CSV files",
+      "desc": "{brand} selects, sorts, joins and cleans CSV files from the command line.",
+      "overview": "{brand} selects, sorts, joins and cleans CSV files from the command line. It handles large files without loading them into memory and never changes the input.",
+      "features": ["Select and rename columns", "Sort, filter and join files", "Fix common problems such as stray quotes and mixed line endings"],
+      "quick": "{cmd} select name,city people.csv\n{cmd} sort --by city people.csv",
+      "quick_out": "name,city\nMira,Leeds\nOtto,York",
+      "install_intro": "{brand} is a single executable with no dependencies.",
+      "install_steps": ["Download the archive that matches your system.", "Unpack it and copy the executable to a directory on your PATH.", "Run the version command to check that it works."],
+      "install_code": "tar xf {cmd}-{ver}-linux-amd64.tar.gz\nsudo mv {cmd} /usr/local/bin/\n{cmd} --version",
+      "usage": [
+        {"h": "Pick columns", "p": "The select command prints only the columns you name, in the order you give them. A column can be renamed with an equals sign.", "code": "{cmd} select name,city people.csv\n{cmd} select id,town=city people.csv"},
+        {"h": "Filter rows", "p": "The filter command keeps the rows that match a simple condition. Several conditions can be combined.", "code": "{cmd} filter 'city = York' people.csv\n{cmd} filter 'age > 30' people.csv"},
+        {"h": "Join two files", "p": "The join command combines two files on a column they share. Rows without a match are dropped unless you ask for them.", "code": "{cmd} join --on id people.csv orders.csv"}
+      ],
+      "options": [{"o": "--delimiter", "d": "Field separator. Default is a comma."}, {"o": "--header", "d": "Set to false if the first row is data."}, {"o": "--output", "d": "Write to a file instead of the screen."}, {"o": "--by", "d": "Column to sort by."}, {"o": "--on", "d": "Column to join on."}],
+      "faq": [
+        {"q": "How large a file can it handle?", "a": "Files are processed as a stream, so memory use stays small. Sorting large files uses temporary space on disk."},
+        {"q": "Does it change my files?", "a": "No. Output goes to the screen or to a new file."},
+        {"q": "What about other separators?", "a": "Use the delimiter option for tabs, semicolons or any single character."}
+      ]
+    }
+  ]
+}

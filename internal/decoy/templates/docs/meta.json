@@ -1,0 +1,10 @@
+{
+  "title": {"en": "Project documentation", "ru": "Документация проекта (вики)"},
+  "layouts": 3,
+  "pages": [
+    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
+    {"name": "install", "tmpl": "install.html.tmpl", "paths": ["install.html", "install/index.html", "docs/install/index.html", "getting-started.html"], "nav": "nav_install", "desc": "desc_install"},
+    {"name": "usage", "tmpl": "usage.html.tmpl", "paths": ["usage.html", "usage/index.html", "docs/usage/index.html", "guide.html"], "nav": "nav_usage", "desc": "desc_usage"},
+    {"name": "faq", "tmpl": "faq.html.tmpl", "paths": ["faq.html", "faq/index.html", "docs/faq/index.html", "questions.html"], "nav": "nav_faq", "desc": "desc_faq"}
+  ]
+}

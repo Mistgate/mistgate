@@ -499,6 +499,14 @@ func (d *kindDef) newSite(c *ctx, r *rng) (*site, error) {
 	if brand == "" {
 		return nil, fmt.Errorf("decoy kind %s: a bundle has no brand var", d.id)
 	}
+	if _, ok := vars["cmd"]; !ok { // the name as a command line tool would be typed
+		vars["cmd"] = strings.Map(func(r rune) rune {
+			if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+				return r
+			}
+			return -1
+		}, strings.ToLower(brand))
+	}
 	L := map[string]any{}
 	for _, src := range []map[string]any{d.ui[lang], b} {
 		for k, v := range src {

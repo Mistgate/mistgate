@@ -1,0 +1,29 @@
+{{define "sidenav"}}<nav class="__sidenav__" aria-label="{{.L.menu_h}}">
+<strong>{{.Brand}} <span class="__mu__">{{.V.ver}}</span></strong>
+<ul>{{range .Nav}}<li><a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a></li>{{end}}</ul>
+</nav>
+{{end}}
+{{define "facts"}}<aside class="__facts__">
+<h2>{{.L.facts_h}}</h2>
+<dl>{{range .L.facts}}<dt>{{.k}}</dt><dd>{{.v}}</dd>{{end}}</dl>
+</aside>
+{{end}}
+{{template "head" .}}<body>
+{{template "header" .}}
+<div class="__wrap__ __docs__">
+{{if eq .Layout 0}}{{template "sidenav" .}}{{end}}<article class="__doc__">
+<h1>{{.Brand}}</h1>
+<p class="__lede__">{{.L.tagline}}</p>
+<p>{{.L.overview}}</p>
+<h2>{{.L.features_h}}</h2>
+<ul>{{range .L.features}}<li>{{.}}</li>{{end}}</ul>
+<h2>{{.L.quick_h}}</h2>
+<pre><code>{{.L.quick}}</code></pre>
+<p class="__mu__">{{.L.out_h}}</p>
+<pre><code>{{.L.quick_out}}</code></pre>
+<p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.next}}: {{(index .Nav 1).Label}} {{icon "arrow"}}</a></p>
+</article>
+{{if eq .Layout 1}}{{template "facts" .}}{{end}}</div>
+{{template "footer" .}}
+</body>
+</html>

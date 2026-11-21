@@ -1,0 +1,13 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __page__">
+<h1>{{.L.about_h}}</h1>
+<div class="__aboutgrid__">
+<div class="__prose__">{{range .L.about}}<p>{{.}}</p>
+{{end}}</div>
+<figure class="__figure__">{{art "about" "" 520 420}}</figure>
+</div>
+</main>
+{{template "footer" .}}
+</body>
+</html>

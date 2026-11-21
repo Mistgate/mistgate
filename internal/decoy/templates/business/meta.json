@@ -1,0 +1,12 @@
+{
+  "title": {"en": "Small business site", "ru": "Сайт маленькой фирмы (мастерская, пекарня и т. п.)"},
+  "layouts": 3,
+  "pages": [
+    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
+    {"name": "services", "tmpl": "services.html.tmpl", "paths": ["services.html", "prices/index.html", "services/index.html", "menu.html"], "nav": "nav_services", "desc": "desc_services"},
+    {"name": "about", "tmpl": "about.html.tmpl", "paths": ["about.html", "about/index.html", "our-story/index.html", "who-we-are.html"], "nav": "nav_about", "desc": "desc_about"},
+    {"name": "contact", "tmpl": "contact.html.tmpl", "paths": ["contact.html", "contact/index.html", "find-us/index.html", "visit.html"], "nav": "nav_contact", "desc": "desc_contact"}
+  ],
+  "home_blocks": ["feat", "prices", "visit"],
+  "home_fixed": 0
+}

@@ -1,0 +1,52 @@
+{{define "b_feat"}}<section class="__sec__">
+<ul class="__feats__">{{range .L.features}}<li><span class="__fi__">{{icon .icon}}</span><div><h3>{{.h}}</h3><p>{{.p}}</p></div></li>{{end}}</ul>
+</section>{{end}}
+{{define "b_prices"}}<section class="__sec__">
+<h2>{{.L.services_h}}</h2>
+<ul class="__price__">{{range $i, $s := .L.services}}{{if lt $i 3}}<li><div><strong>{{$s.t}}</strong><span>{{$s.d}}</span></div><em>{{$s.p}}</em></li>{{end}}{{end}}</ul>
+<p><a href="{{(index .Nav 1).Href}}">{{.L.all_prices}} {{icon "arrow"}}</a></p>
+</section>{{end}}
+{{define "b_visit"}}<section class="__sec__ __visit__">
+<div class="__card__">
+<h2>{{.L.visit_h}}</h2>
+<p>{{icon "pin"}} {{.V.n}} {{.V.street}}, {{.V.city}}</p>
+<p>{{icon "phone"}} 555-0{{.V.ph}}</p>
+</div>
+<div class="__card__">
+<h2>{{.L.hours_h}}</h2>
+<ul class="__hours__">{{range .L.hours}}<li>{{.}}</li>{{end}}</ul>
+</div>
+</section>{{end}}
+{{template "head" .}}<body>
+{{template "header" .}}
+<main>
+{{if eq .Layout 0}}<section class="__wrap__ __hero__ __split__">
+<div>
+<h1>{{.L.hero_h}}</h1>
+<p class="__lede__">{{.L.intro}}</p>
+<p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.see_services}}</a></p>
+</div>
+<figure class="__figure__">{{art "hero" "" 640 480}}</figure>
+</section>
+{{else if eq .Layout 1}}<section class="__band__">
+<div class="__wrap__ __hero__ __centre__">
+<h1>{{.L.hero_h}}</h1>
+<p class="__lede__">{{.L.intro}}</p>
+<p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.see_services}}</a></p>
+</div>
+</section>
+{{else}}<section class="__cover__">
+{{art "hero" "" 1200 560}}
+<div class="__wrap__ __coverin__">
+<h1>{{.L.hero_h}}</h1>
+<p class="__lede__">{{.L.intro}}</p>
+<p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.see_services}}</a></p>
+</div>
+</section>
+{{end}}<div class="__wrap__">
+{{range .Order}}{{blk . $}}{{end}}
+</div>
+</main>
+{{template "footer" .}}
+</body>
+</html>

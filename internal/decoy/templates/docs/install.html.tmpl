@@ -1,0 +1,16 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<div class="__wrap__ __docs__">
+{{if eq .Layout 0}}{{template "sidenav" .}}{{end}}<article class="__doc__">
+<h1>{{.L.install_h}}</h1>
+<p class="__lede__">{{.L.install_intro}}</p>
+<h2>{{.L.steps_h}}</h2>
+<ol>{{range .L.install_steps}}<li>{{.}}</li>{{end}}</ol>
+<pre><code>{{.L.install_code}}</code></pre>
+<p>{{.L.install_check}}</p>
+<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{.L.next}}: {{(index .Nav 2).Label}} {{icon "arrow"}}</a></p>
+</article>
+{{if eq .Layout 1}}{{template "facts" .}}{{end}}</div>
+{{template "footer" .}}
+</body>
+</html>
