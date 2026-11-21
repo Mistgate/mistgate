@@ -1,0 +1,77 @@
+(function () {
+  var $$zone = document.getElementById('__d__');
+  var $$input = document.getElementById('__in__');
+  var $$pick = document.getElementById('__pick__');
+  var $$state = document.getElementById('__s__');
+  var $$name = document.getElementById('__fn__');
+  var $$size = document.getElementById('__fz__');
+  var $$bar = document.getElementById('__bi__');
+  var $$msg = document.getElementById('__m__');
+  var $$again = document.getElementById('__again__');
+  var $$busy = false;
+
+  function $$fmt(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  function $$take(file) {
+    if (!file || $$busy) return;
+    $$busy = true;
+    $$name.textContent = file.name;
+    $$size.textContent = $$fmt(file.size);
+    $$msg.textContent = '{{js .L.uploading}}';
+    $$msg.classList.remove('__fail__');
+    $$again.hidden = true;
+    $$zone.hidden = true;
+    $$state.hidden = false;
+    $$bar.style.width = '3%';
+    requestAnimationFrame(function () {
+      $$bar.style.width = 28 + Math.random() * 45 + '%';
+    });
+    setTimeout(function () {
+      $$busy = false;
+      $$msg.textContent = '{{js (one "efull" .L.e_full)}}';
+      $$msg.classList.add('__fail__');
+      $$again.hidden = false;
+    }, 600 + Math.random() * 1200);
+  }
+
+  function $$open() {
+    if (!$$busy) $$input.click();
+  }
+
+  $$pick.addEventListener('click', function (e) {
+    e.stopPropagation();
+    $$open();
+  });
+  $$zone.addEventListener('click', $$open);
+  $$zone.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $$open();
+    }
+  });
+  $$zone.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    $$zone.classList.add('__over__');
+  });
+  $$zone.addEventListener('dragleave', function () {
+    $$zone.classList.remove('__over__');
+  });
+  $$zone.addEventListener('drop', function (e) {
+    e.preventDefault();
+    $$zone.classList.remove('__over__');
+    $$take(e.dataTransfer.files[0]);
+  });
+  $$input.addEventListener('change', function () {
+    $$take($$input.files[0]);
+  });
+  $$again.addEventListener('click', function () {
+    $$input.value = '';
+    $$bar.style.width = '0';
+    $$state.hidden = true;
+    $$zone.hidden = false;
+  });
+})();

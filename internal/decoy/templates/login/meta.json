@@ -1,0 +1,9 @@
+{
+  "title": {"en": "Sign-in page", "ru": "Страница входа в сервис"},
+  "layouts": 3,
+  "pages": [
+    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
+    {"name": "help", "tmpl": "help.html.tmpl", "paths": ["help.html", "help/index.html", "support/index.html", "trouble.html"], "nav": "nav_help", "desc": "desc_help"},
+    {"name": "privacy", "tmpl": "privacy.html.tmpl", "paths": ["privacy.html", "privacy/index.html", "legal/privacy.html", "data.html"], "nav": "nav_privacy", "desc": "desc_privacy"}
+  ]
+}

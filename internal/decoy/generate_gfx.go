@@ -1,0 +1,309 @@
+package decoy
+
+import (
+	"fmt"
+	"math"
+	"strings"
+)
+
+// Colours, fonts, favicons and the small generated pictures of a generated site. Everything is drawn from the site's rng, so one
+// seed always gives the same pictures and two seeds never share a favicon.
+
+// tone is one colour scheme (light or dark) of a site.
+type tone struct {
+	BG, Surface, FG, Muted, Line, Acc, AccInk, Acc2, Soft, Ok, Warn, Bad string
+}
+
+type palette struct {
+	L, D tone
+	Hue  float64
+}
+
+// style is the shape of a site's typography and boxes. Fields are strings or ints so a template can print them as they are.
+type style struct {
+	R, RS  int    // corner radius of boxes and of small controls, px
+	W      int    // content width, px
+	FS     int    // body font size, px
+	LH     string // body line height
+	Shadow string // box-shadow value of cards
+	Stroke string // stroke width of the icons
+}
+
+type fonts struct{ Body, Head, Mono string }
+
+const monoStack = `ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace`
+
+var fontStacks = map[string]string{
+	"sans":      `system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif`,
+	"humanist":  `Seravek,"Gill Sans Nova",Ubuntu,Calibri,"DejaVu Sans",sans-serif`,
+	"grotesque": `"Helvetica Neue",Helvetica,Arial,"Liberation Sans",sans-serif`,
+	"charter":   `Charter,"Bitstream Charter","Sitka Text",Cambria,serif`,
+	"old":       `"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",serif`,
+	"georgia":   `Georgia,"Times New Roman",Times,serif`,
+}
+
+var fontPairs = [][2]string{
+	{"sans", "sans"}, {"sans", "charter"}, {"charter", "sans"}, {"old", "humanist"}, {"humanist", "humanist"},
+	{"grotesque", "grotesque"}, {"georgia", "grotesque"}, {"humanist", "old"}, {"charter", "charter"}, {"sans", "old"},
+}
+
+func newFonts(r *rng) fonts {
+	p := fontPairs[r.n(len(fontPairs))]
+	return fonts{Body: fontStacks[p[0]], Head: fontStacks[p[1]], Mono: monoStack}
+}
+
+func newStyle(r *rng) style {
+	radii := [][2]int{{0, 0}, {3, 2}, {6, 4}, {10, 6}, {16, 8}, {22, 10}}
+	rad := radii[r.n(len(radii))]
+	shadow := "none"
+	if r.chance(45) {
+		shadow = "0 1px 2px rgba(0,0,0,.06),0 6px 20px rgba(0,0,0,.06)"
+	}
+	return style{
+		R: rad[0], RS: rad[1],
+		W:      []int{940, 1000, 1060, 1120}[r.n(4)],
+		FS:     []int{16, 17, 18}[r.n(3)],
+		LH:     []string{"1.5", "1.55", "1.6", "1.65"}[r.n(4)],
+		Shadow: shadow,
+		Stroke: []string{"1.5", "1.6", "1.7", "1.8", "1.9", "2", "2.1", "2.2"}[r.n(8)],
+	}
+}
+
+// rgb is HSL (h in degrees, s and l in percent) as 0..1 channels.
+func rgb(h, s, l float64) [3]float64 {
+	h = math.Mod(math.Mod(h, 360)+360, 360)
+	s, l = s/100, l/100
+	c := (1 - math.Abs(2*l-1)) * s
+	x := c * (1 - math.Abs(math.Mod(h/60, 2)-1))
+	m := l - c/2
+	var r, g, b float64
+	switch {
+	case h < 60:
+		r, g, b = c, x, 0
+	case h < 120:
+		r, g, b = x, c, 0
+	case h < 180:
+		r, g, b = 0, c, x
+	case h < 240:
+		r, g, b = 0, x, c
+	case h < 300:
+		r, g, b = x, 0, c
+	default:
+		r, g, b = c, 0, x
+	}
+	return [3]float64{r + m, g + m, b + m}
+}
+
+func toHex(c [3]float64) string {
+	f := func(v float64) int { return int(math.Round(math.Min(1, math.Max(0, v)) * 255)) }
+	return fmt.Sprintf("#%02x%02x%02x", f(c[0]), f(c[1]), f(c[2]))
+}
+
+func hsl(h, s, l float64) string { return toHex(rgb(h, s, l)) }
+
+func lum(c [3]float64) float64 {
+	f := func(v float64) float64 {
+		if v <= 0.03928 {
+			return v / 12.92
+		}
+		return math.Pow((v+0.055)/1.055, 2.4)
+	}
+	return 0.2126*f(c[0]) + 0.7152*f(c[1]) + 0.0722*f(c[2])
+}
+
+func contrast(a, b [3]float64) float64 {
+	la, lb := lum(a), lum(b)
+	if la < lb {
+		la, lb = lb, la
+	}
+	return (la + 0.05) / (lb + 0.05)
+}
+
+// ink is the text colour (near-white or near-black) that reads best on c.
+func ink(c [3]float64) string {
+	white, black := [3]float64{1, 1, 1}, rgb(220, 25, 8)
+	if contrast(c, white) >= contrast(c, black) {
+		return "#ffffff"
+	}
+	return toHex(black)
+}
+
+func newPalette(r *rng) palette {
+	h := float64(r.n(360))
+	sat := float64(52 + r.n(34))
+	// The accent carries white text in the light scheme: darken it until the pair reads (4.5:1).
+	l := float64(38 + r.n(12))
+	acc := rgb(h, sat, l)
+	for contrast(acc, [3]float64{1, 1, 1}) < 4.5 && l > 20 {
+		l -= 2
+		acc = rgb(h, sat, l)
+	}
+	h2 := h + float64(140+r.n(80))
+	if r.chance(40) {
+		h2 = h + float64(20+r.n(30))
+	}
+	// Neutrals follow the accent hue, or a warm paper tone.
+	hn := h
+	if r.chance(35) {
+		hn = float64(30 + r.n(30))
+	}
+	sn := float64(6 + r.n(18))
+	bgL := float64(96 + r.n(4))
+	surface := "#ffffff"
+	if r.chance(35) {
+		surface = hsl(hn, sn, bgL+0.8)
+	}
+	light := tone{
+		BG: hsl(hn, sn, bgL), Surface: surface, FG: hsl(hn, sn+8, float64(11+r.n(7))), Muted: hsl(hn, sn, float64(38+r.n(7))),
+		Line: hsl(hn, sn, float64(86+r.n(5))), Acc: toHex(acc), AccInk: ink(acc), Acc2: hsl(h2, float64(50+r.n(25)), float64(38+r.n(10))),
+		Soft: hsl(h, float64(45+r.n(30)), float64(93+r.n(4))),
+		Ok:   hsl(float64(140+r.n(20)), float64(50+r.n(14)), float64(28+r.n(6))), Warn: hsl(float64(30+r.n(12)), float64(86+r.n(10)), float64(33+r.n(6))), Bad: hsl(float64(358+r.n(10)), float64(64+r.n(12)), float64(41+r.n(6))),
+	}
+	dl := float64(58 + r.n(10))
+	dacc := rgb(h, sat-8, dl)
+	dark := tone{
+		BG: hsl(hn, sn+4, float64(8+r.n(5))), Surface: hsl(hn, sn+4, float64(12+r.n(5))), FG: hsl(hn, sn, float64(91+r.n(5))),
+		Muted: hsl(hn, sn, float64(62+r.n(6))), Line: hsl(hn, sn+4, float64(21+r.n(5))), Acc: toHex(dacc), AccInk: ink(dacc),
+		Acc2: hsl(h2, float64(50+r.n(25)), float64(62+r.n(8))), Soft: hsl(h, float64(25+r.n(25)), float64(15+r.n(4))),
+		Ok: hsl(float64(140+r.n(20)), float64(44+r.n(12)), float64(52+r.n(8))), Warn: hsl(float64(36+r.n(12)), float64(84+r.n(10)), float64(54+r.n(8))), Bad: hsl(float64(358+r.n(10)), float64(74+r.n(10)), float64(62+r.n(8))),
+	}
+	return palette{L: light, D: dark, Hue: h}
+}
+
+// icons are 24x24 stroke icons; short on purpose so no two sites share a long literal.
+var icons = map[string]string{
+	"check":    `<path d="M5 12.5l4.5 4.5L19 7.5"/>`,
+	"alert":    `<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5v.01"/>`,
+	"clock":    `<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>`,
+	"calendar": `<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>`,
+	"file":     `<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/>`,
+	"upload":   `<path d="M12 16V5M7.5 9.5L12 5l4.5 4.5M5 19h14"/>`,
+	"download": `<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14"/>`,
+	"lock":     `<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>`,
+	"user":     `<circle cx="12" cy="8" r="4"/><path d="M4 20c1-4 4-6 8-6s7 2 8 6"/>`,
+	"users":    `<circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 19c.8-3.500 3.200-5 6.500-5s5.700 1.500 6.500 5M16 14c3 0 4.500 1.500 5.500 4.500"/>`,
+	"arrow":    `<path d="M5 12h14M13 6l6 6-6 6"/>`,
+	"star":     `<path d="M12 3.5l2.600 5.400 5.900.8-4.300 4.100 1 5.900L12 16.900 6.800 19.700l1-5.900L3.500 9.700l5.900-.8z"/>`,
+	"leaf":     `<path d="M5 19c0-9 5-14 14-14 0 9-5 14-14 14zM5 19l7-7"/>`,
+	"book":     `<path d="M4 5h6a2 2 0 012 2v12a2 2 0 00-2-2H4zM20 5h-6a2 2 0 00-2 2v12a2 2 0 012-2h6z"/>`,
+	"pin":      `<path d="M12 21s7-6 7-11a7 7 0 00-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.500"/>`,
+	"phone":    `<path d="M6 4h3l2 5-2 1.500a11 11 0 005 5L15.500 13.500 20 15.500V19a2 2 0 01-2 2A15 15 0 013 6a2 2 0 013-2z"/>`,
+	"shield":   `<path d="M12 3l7 3v6c0 4.500-3 7.500-7 9-4-1.500-7-4.500-7-9V6z"/>`,
+	"code":     `<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.500 5l-3 14"/>`,
+	"terminal": `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10l3 2-3 2M12 15h5"/>`,
+	"music":    `<path d="M9 18V6l10-2v12"/><circle cx="6.500" cy="18" r="2.500"/><circle cx="16.500" cy="16" r="2.500"/>`,
+	"heart":    `<path d="M12 20s-8-5-8-11a4.500 4.500 0 018-2.500A4.500 4.500 0 0120 9c0 6-8 11-8 11z"/>`,
+	"mail":     `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.500 7l8.500 6 8.500-6"/>`,
+	"eye":      `<path d="M2.500 12S6 5.500 12 5.500 21.500 12 21.500 12 18 18.500 12 18.500 2.500 12 2.500 12z"/><circle cx="12" cy="12" r="3"/>`,
+	"bolt":     `<path d="M13 3L5 13.500h6L10 21l8-10.500h-6z"/>`,
+	"globe":    `<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>`,
+	"layers":   `<path d="M12 4l9 5-9 5-9-5zM3 14l9 5 9-5"/>`,
+	"sun":      `<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.600 5.600L7 7M17 17l1.400 1.400M5.600 18.400L7 17M17 7l1.400-1.400"/>`,
+	"tool":     `<path d="M14.500 6.500a4 4 0 005 5L20 14l-6 6-9-9 6-6z"/>`,
+	"gift":     `<rect x="4" y="9" width="16" height="11" rx="1.500"/><path d="M12 9v11M3 9h18M12 9c-3 0-4.500-4-1.500-4S12 9 12 9zm0 0c3 0 4.500-4 1.500-4S12 9 12 9z"/>`,
+}
+
+func iconSVG(name string) string {
+	body, ok := icons[name]
+	if !ok {
+		body = icons["check"]
+	}
+	return `<svg class="__ic__" viewBox="0 0 24 24" aria-hidden="true">` + body + `</svg>`
+}
+
+// faviconMark is the inside of the site's favicon (64x64) and, at 28px, the logo next to the name: a shape from a fixed set,
+// with the initial of the name, in the site's colours.
+func faviconMark(r *rng, p palette, initial string) string {
+	a, b, ac := p.L.Acc, p.L.Acc2, p.L.AccInk
+	rx := 8 + r.n(24)
+	letter := fmt.Sprintf(`<text x="32" y="%d" text-anchor="middle" font-family="system-ui,sans-serif" font-size="%d" font-weight="700" fill="%s">%s</text>`, 43+r.n(3), 32+r.n(6), ac, initial)
+	switch r.n(7) {
+	case 0:
+		return fmt.Sprintf(`<rect width="64" height="64" rx="%d" fill="%s"/>%s`, rx, a, letter)
+	case 1:
+		return fmt.Sprintf(`<circle cx="32" cy="32" r="30" fill="%s"/><circle cx="32" cy="32" r="%d" fill="none" stroke="%s" stroke-width="%d" opacity=".55"/>%s`, a, 18+r.n(6), ac, 2+r.n(3), letter)
+	case 2:
+		return fmt.Sprintf(`<circle cx="%d" cy="%d" r="%d" fill="%s"/><circle cx="%d" cy="%d" r="%d" fill="%s" opacity=".85"/>`, 24+r.n(4), 26+r.n(6), 18+r.n(5), a, 40-r.n(4), 38+r.n(6), 16+r.n(6), b)
+	case 3:
+		w1, w2, w3 := 28+r.n(30), 20+r.n(30), 12+r.n(30)
+		return fmt.Sprintf(`<rect x="%d" y="10" width="%d" height="12" rx="6" fill="%s"/><rect x="%d" y="26" width="%d" height="12" rx="6" fill="%s"/><rect x="%d" y="42" width="%d" height="12" rx="6" fill="%s"/>`, 4+r.n(4), w1, a, 4+r.n(10), w2, b, 4+r.n(14), w3, a)
+	case 4:
+		return fmt.Sprintf(`<path d="M32 3 61 32 32 61 3 32z" fill="%s"/>%s`, a, letter)
+	case 5:
+		return fmt.Sprintf(`<rect width="64" height="64" rx="%d" fill="%s"/><path d="M0 %d L%d %d L64 %d V64 H0z" fill="%s" opacity=".9"/><circle cx="%d" cy="%d" r="%d" fill="%s"/>`, rx, a, 46+r.n(8), 20+r.n(20), 30+r.n(14), 44+r.n(10), b, 40+r.n(14), 16+r.n(8), 6+r.n(4), ac)
+	default:
+		return fmt.Sprintf(`<path d="M12 8h%dv48H12z" fill="%s"/><path d="M%d 8h%d v48h-%d z" fill="%s"/>%s`, 22+r.n(6), a, 40+r.n(4), 12+r.n(4), 12+r.n(4), b, "")
+	}
+}
+
+func faviconSVG(mark string) string {
+	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">` + mark + `</svg>`
+}
+
+// inlineMark is the mark as an inline logo; its size comes from the stylesheet.
+func inlineMark(mark string) string {
+	return `<svg class="__mark__" viewBox="0 0 64 64" aria-hidden="true">` + mark + `</svg>`
+}
+
+// Pictures: abstract "photos" and header art. kind is one of artKinds; w, h the viewBox.
+var artKinds = []string{"landscape", "blobs", "tiles", "waves"}
+
+func artSVG(r *rng, kind string, hue float64, w, h int, id string, standalone bool) string {
+	var b strings.Builder
+	open := fmt.Sprintf(`<svg viewBox="0 0 %d %d" preserveAspectRatio="xMidYMid slice" role="img" aria-hidden="true"`, w, h)
+	if standalone {
+		open = fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" preserveAspectRatio="xMidYMid slice"`, w, h)
+	} else {
+		open += ` class="__art__"`
+	}
+	b.WriteString(open + ">")
+	W, H := float64(w), float64(h)
+	fw := func(lo, hi float64) float64 { return lo + r.float()*(hi-lo) }
+	switch kind {
+	case "landscape":
+		fmt.Fprintf(&b, `<defs><linearGradient id="%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s"/><stop offset="1" stop-color="%s"/></linearGradient></defs>`,
+			id, hsl(hue+fw(-12, 12), 58, fw(66, 78)), hsl(hue+fw(15, 40), 70, fw(86, 93)))
+		fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="url(#%s)"/>`, w, h, id)
+		fmt.Fprintf(&b, `<circle cx="%.0f" cy="%.0f" r="%.0f" fill="%s"/>`, fw(0.15, 0.85)*W, fw(0.18, 0.4)*H, fw(0.06, 0.12)*H*1.6, hsl(hue+fw(25, 70), fw(55, 78), fw(74, 84)))
+		for i := 0; i < 3; i++ {
+			y := H * (0.5 + 0.12*float64(i) + fw(-0.04, 0.04))
+			cx := fw(0.2, 0.8) * W
+			fmt.Fprintf(&b, `<path d="M0 %.0f Q%.0f %.0f %.0f %.0f T%d %.0f V%d H0z" fill="%s"/>`, y, cx/2, y-fw(0.08, 0.22)*H, cx, y-fw(0, 0.06)*H, w, y+fw(-0.02, 0.03)*H, h, hsl(hue+float64(i)*fw(8, 20), fw(28, 45), 58-float64(i)*13+fw(-4, 4)))
+		}
+	case "blobs":
+		fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="%s"/>`, w, h, hsl(hue+fw(-10, 10), fw(35, 55), fw(88, 94)))
+		for i, n := 0, 4+r.n(4); i < n; i++ {
+			fmt.Fprintf(&b, `<circle cx="%.0f" cy="%.0f" r="%.0f" fill="%s" opacity="%.2f"/>`, fw(0, 1)*W, fw(0, 1)*H, fw(0.1, 0.34)*H, hsl(hue+fw(-70, 70), fw(50, 78), fw(48, 72)), fw(0.5, 0.9))
+		}
+	case "tiles":
+		cols, rows := 4, 3
+		if w < h {
+			cols, rows = 3, 4
+		}
+		cw, ch := W/float64(cols), H/float64(rows)
+		pal := []string{hsl(hue, 60, 52), hsl(hue+fw(25, 60), 65, 62), hsl(hue+fw(160, 200), 60, 58), hsl(hue, 30, 92), hsl(hue, 45, 28)}
+		for y := 0; y < rows; y++ {
+			for x := 0; x < cols; x++ {
+				x0, y0 := float64(x)*cw, float64(y)*ch
+				fmt.Fprintf(&b, `<rect x="%.0f" y="%.0f" width="%.0f" height="%.0f" fill="%s"/>`, x0, y0, cw+1, ch+1, pal[r.n(len(pal))])
+				switch r.n(3) {
+				case 0:
+					fmt.Fprintf(&b, `<circle cx="%.0f" cy="%.0f" r="%.0f" fill="%s"/>`, x0+cw/2, y0+ch/2, math.Min(cw, ch)*fw(0.22, 0.42), pal[r.n(len(pal))])
+				case 1:
+					fmt.Fprintf(&b, `<path d="M%.0f %.0f h%.0f a%.0f %.0f 0 0 1 -%.0f %.0f z" fill="%s"/>`, x0+cw, y0, -cw, cw, cw, -cw, cw, pal[r.n(len(pal))])
+				}
+			}
+		}
+	default: // waves
+		fmt.Fprintf(&b, `<defs><linearGradient id="%s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%s"/><stop offset="1" stop-color="%s"/></linearGradient></defs>`,
+			id, hsl(hue, 62, fw(42, 54)), hsl(hue+fw(30, 70), 66, fw(50, 66)))
+		fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="url(#%s)"/>`, w, h, id)
+		for i := 0; i < 4; i++ {
+			y := H * (0.35 + 0.16*float64(i))
+			a := fw(0.05, 0.14) * H
+			fmt.Fprintf(&b, `<path d="M0 %.0f C%.0f %.0f %.0f %.0f %d %.0f V%d H0z" fill="#fff" opacity="%.2f"/>`, y, W*0.3, y-a, W*0.65, y+a, w, y, h, 0.1+0.06*float64(i))
+		}
+	}
+	b.WriteString("</svg>")
+	return b.String()
+}

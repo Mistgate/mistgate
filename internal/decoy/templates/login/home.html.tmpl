@@ -1,0 +1,46 @@
+{{define "loginform"}}<form class="__form__" id="__f__" onsubmit="return false" novalidate>
+<div class="__fld__"><label for="__u__">{{.L.f_user}}</label><input id="__u__" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
+<div class="__fld__"><label for="__p__">{{.L.f_pass}}</label><input id="__p__" type="password" autocomplete="current-password"></div>
+<div class="__row__"><label class="__chk__"><input type="checkbox"><span>{{.L.f_remember}}</span></label><a href="{{(index .Nav 1).Href}}">{{.L.f_forgot}}</a></div>
+<p class="__err__" id="__e__" role="alert" hidden></p>
+<button class="__btn__ __wide__" id="__b__" type="button">{{.L.f_submit}}</button>
+</form>
+{{end}}
+{{if eq .Layout 1}}{{template "head" .}}<body>
+<main class="__split__">
+<aside class="__side__">
+{{art "side" "" 640 900}}
+<div class="__sidein__">
+<a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span></a>
+<ul class="__points__">{{range .L.bullets}}<li>{{icon "check"}}<span>{{.}}</span></li>{{end}}</ul>
+</div>
+</aside>
+<section class="__main__">
+<div class="__box__">
+<p class="__kicker__">{{.L.kicker}}</p>
+<h1>{{.L.welcome}}</h1>
+<p class="__mu__">{{.L.lead}}</p>
+{{template "loginform" .}}
+<nav class="__ftnav__">{{range .Nav}}{{if not .Cur}}<a href="{{.Href}}">{{.Label}}</a>{{end}}{{end}}</nav>
+</div>
+</section>
+</main>
+<script src="{{.JS}}" defer></script>
+</body>
+</html>
+{{else}}{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __auth__">
+<div class="{{if eq .Layout 0}}__card__ __box__{{else}}__box__ __flat__{{end}}">
+<p class="__kicker__">{{.L.kicker}}</p>
+<h1>{{.L.welcome}}</h1>
+<p class="__mu__">{{.L.lead}}</p>
+{{template "loginform" .}}
+</div>
+<ul class="__points__">{{range .L.bullets}}<li>{{icon "check"}}<span>{{.}}</span></li>{{end}}</ul>
+</main>
+{{template "footer" .}}
+<script src="{{.JS}}" defer></script>
+</body>
+</html>
+{{end}}

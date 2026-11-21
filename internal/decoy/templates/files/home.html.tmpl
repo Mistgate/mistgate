@@ -1,0 +1,52 @@
+{{define "dropzone"}}<div class="__drop__" id="__d__" tabindex="0" role="button" aria-label="{{.L.drop_h}}">
+{{icon "upload"}}
+<strong>{{.L.drop_h}}</strong>
+<span class="__mu__">{{.L.drop_hint}}</span>
+<button class="__btn__" id="__pick__" type="button">{{.L.pick}}</button>
+<input type="file" id="__in__" hidden>
+</div>
+<div class="__state__" id="__s__" role="status" hidden>
+<div class="__fileline__"><span class="__fname__" id="__fn__"></span><span class="__mu__" id="__fz__"></span></div>
+<div class="__bar__"><i id="__bi__"></i></div>
+<p class="__msg__" id="__m__"></p>
+<button class="__btn__ __ghost__" id="__again__" type="button" hidden>{{.L.retry}}</button>
+</div>
+{{end}}
+{{define "feats"}}<ul class="__feats__">{{range .L.feats}}<li><span class="__fi__">{{icon .icon}}</span><div><h3>{{.h}}</h3><p>{{.p}}</p></div></li>{{end}}</ul>
+{{end}}
+{{template "head" .}}<body>
+{{template "header" .}}
+{{if eq .Layout 0}}<main class="__wrap__">
+<section class="__hero__">
+<p class="__kicker__">{{.L.kicker}}</p>
+<h1>{{.L.hero_h}}</h1>
+<p class="__lead__">{{.L.hero_p}}</p>
+<div class="__card__ __up__">{{template "dropzone" .}}</div>
+</section>
+{{template "feats" .}}
+</main>
+{{else if eq .Layout 1}}<main class="__wrap__ __two__">
+<section>
+<p class="__kicker__">{{.L.kicker}}</p>
+<h1>{{.L.hero_h}}</h1>
+<p class="__lead__">{{.L.hero_p}}</p>
+{{template "feats" .}}
+</section>
+<section class="__card__ __up__">{{template "dropzone" .}}</section>
+</main>
+{{else}}<main>
+<section class="__band__">
+<div class="__wrap__">
+<p class="__kicker__">{{.L.kicker}}</p>
+<h1>{{.L.hero_h}}</h1>
+<p class="__lead__">{{.L.hero_p}}</p>
+<div class="__up__">{{template "dropzone" .}}</div>
+</div>
+</section>
+<div class="__wrap__">{{template "feats" .}}</div>
+</main>
+{{end}}
+{{template "footer" .}}
+<script src="{{.JS}}" defer></script>
+</body>
+</html>
