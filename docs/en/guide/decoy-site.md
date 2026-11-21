@@ -43,6 +43,18 @@ The plan lists every file with its size, the total and the SHA-256 of the bundle
 
 The built-in [assistant](assistant.md) can make the site itself: ask it in the chat ("make a decoy site for the node alpha"). It writes a few small pages and a style sheet, and shows a **Proposed change** card with the list of files; you approve it as any other change. A model's answer is length-capped, so a site made this way stays small, about 20 KB in all, which is enough for the three to five pages described below.
 
+## A site from a template
+
+The quickest way to a site of your own: the panel builds it from a built-in template. On the **Decoy sites** page press **+ Site**, choose **From a template**, then one of ten kinds: a service status page, a file transfer page, a sign-in page, a personal blog, a portfolio, a small-business site, project documentation, a personal card, a club or society, an open-source project page.
+
+The panel shows the home page of the site it built. **Another variant** builds a different site of the same kind; nothing reaches the library until you press **Create the site**. The new site is no different from an uploaded archive: it is ready at once, has several pages and its own `404.html`, and can be opened, renamed, downloaded and put on a node or on the panel. Its card says "Template · kind", and its note holds the name of the kind.
+
+What to know:
+
+- **Every node needs a site of its own.** A site is built afresh on every press: two sites of the same kind differ in name, look, texts, file names and 404 page. So press **From a template** separately for each node and do not put one site on several nodes: two identical sites link the nodes together just as one built-in page does. If you still put one site on nodes of different domains, the panel warns you.
+- **The forms send nothing.** The sign-in form always answers "wrong username or password", and the file transfer page refuses once a file is picked; what is typed and the file that is chosen stay in the visitor's browser and go nowhere. That is why the checks show a warning about scripts or forms for these two kinds: it is by design.
+- **Templates grow with the releases.** New kinds appear in the list after the panel is updated; sites that already exist do not change.
+
 ## What a good decoy looks like
 
 - **A few static pages**, three to five, on a plausible and boring topic that fits the domain name: a small local business or a hobby project. A home page, an "about" page, a page with services or prices, a contact page with an address and opening hours.
