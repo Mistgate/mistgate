@@ -15,6 +15,12 @@ describe("why a profile did not start, in words", () => {
     expect(inboundErrorKind("awgnl: the amneziawg kernel module is not loaded")).toBe("awg");
     expect(inboundErrorKind("reality_target: local")).toBe("target");
     expect(inboundErrorText(t, "reality_target: local")).toBe(ru["node.inbound.err.targetLocal"]);
+    // the agent lacks the capability of the protocol or of its mode (mtproto-web/1): the panel held the profile back
+    const old = "agent_too_old: this node's agent does not list a capability this inbound needs (its protocol, or sharing a TCP port between services by SNI), update the agent";
+    expect(inboundErrorKind(old)).toBe("agent");
+    expect(inboundErrorKind("share_agent_old: this node's agent cannot share a TCP port")).toBe("share");
+    expect(inboundErrorText(t, old)).toBe(ru["node.inbound.err.agentOld"]);
+    expect(inboundErrorText(t, old)).toContain("Агент ноды старше");
     expect(inboundErrorKind("something nobody has seen")).toBe("other");
   });
 

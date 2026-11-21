@@ -91,6 +91,10 @@ describe("truthful statuses", () => {
     const local = n(NodeStatus.ONLINE, "inbound_failed", { profile: "vless", error: "reality_target: local", failed: "1", total: "1" });
     expect(statusLine(t as never, local)).toBe(`“vless” failed to start: ${en["node.inbound.err.targetLocal"]}`);
   });
+  it("words the held-back profile of an old agent (the Web Proxy needs a newer one), instead of its code", () => {
+    const old = n(NodeStatus.ONLINE, "inbound_failed", { profile: "telegram web", error: "agent_too_old: this node's agent does not list a capability this inbound needs", failed: "1", total: "1" });
+    expect(statusLine(t as never, old)).toBe(`“telegram web” failed to start: ${en["node.inbound.err.agentOld"]}`);
+  });
   it("a pending node says it waits for the install and how long the command works, or that it expired", () => {
     const pending = n(NodeStatus.PENDING, "enrollment_pending", { expires_in_minutes: "57", expires_unix: "1790000000" });
     expect(nodeKind(pending)).toBe("off");

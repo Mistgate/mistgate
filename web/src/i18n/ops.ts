@@ -429,6 +429,7 @@ export const en = {
   "node.inbound.err.awg": "AmneziaWG did not start on the node: see “AmneziaWG backend” on the node's Server tab",
   "node.inbound.err.other": "The profile did not start",
   "node.inbound.err.targetLocal": "The site chosen for this server leads to the node itself or to a private network, so the server did not start. Choose another site.",
+  "node.inbound.err.agentOld": "The node’s agent is older than this profile needs: update the node on the Updates page.",
 
   // the add-profile dialog: what the check before the click found (validate_only)
   "node.check.acme.title": "Let’s Encrypt will not issue a certificate for an IP",
@@ -1589,6 +1590,7 @@ export const ru: typeof en = {
   "node.inbound.err.awg": "AmneziaWG не запустился на ноде: посмотри «Бэкенд AmneziaWG» на вкладке «Сервер»",
   "node.inbound.err.other": "Профиль не запустился",
   "node.inbound.err.targetLocal": "Выбранный для сервера сайт ведёт на саму ноду или во внутреннюю сеть, поэтому сервер не запустился. Выбери другой сайт.",
+  "node.inbound.err.agentOld": "Агент ноды старше, чем нужно этому профилю: обнови ноду на странице «Обновления».",
 
   "node.check.acme.title": "Let's Encrypt не выдаст сертификат на IP",
   "node.check.acme.body": "У {node} адрес — IP {address}, а Let's Encrypt выдаёт сертификат только на домен. Впиши в «Домен (SNI)» домен, у которого A-запись указывает на {address}.",
@@ -2741,6 +2743,7 @@ export const zh: typeof en = {
   "node.inbound.err.awg": "AmneziaWG 未能在节点上启动：请查看节点「服务器」中的「AmneziaWG 后端」",
   "node.inbound.err.other": "协议配置未能启动",
   "node.inbound.err.targetLocal": "为该服务器选择的站点指向节点自身或内部网络，所以服务器没有启动。请选择其他站点。",
+  "node.inbound.err.agentOld": "节点的 Agent 版本低于此协议配置的要求：请在「更新」页面更新节点。",
 
   "node.check.acme.title": "Let’s Encrypt 不会为 IP 签发证书",
   "node.check.acme.body": "{node} 的地址是 IP {address}，而 Let’s Encrypt 只为域名签发证书。请在「域名（SNI）」中填写一个 A 记录指向 {address} 的域名。",
@@ -3878,6 +3881,7 @@ export const fa: typeof en = {
   "node.inbound.err.awg": "AmneziaWG روی نود راه نیفتاد: «بک‌اند AmneziaWG» را در زبانهٔ «سرور» نود ببین",
   "node.inbound.err.other": "پروفایل راه نیفتاد",
   "node.inbound.err.targetLocal": "سایتی که برای این سرور انتخاب شده به خود نود یا یک شبکهٔ داخلی می‌رسد، برای همین سرور راه نیفتاد. سایت دیگری انتخاب کن.",
+  "node.inbound.err.agentOld": "ایجنت نود از چیزی که این پروفایل لازم دارد قدیمی‌تر است: نود را در صفحهٔ «به‌روزرسانی‌ها» به‌روز کن.",
   "node.check.acme.title": "Let’s Encrypt برای IP گواهی نمی‌دهد",
   "node.check.acme.body": "آدرس {node} یک IP است: {address}، و Let’s Encrypt فقط برای دامنه گواهی صادر می‌کند. در «دامنه (SNI)» دامنه‌ای وارد کن که رکورد A آن به {address} اشاره می‌کند.",
   "node.check.acme.enter": "وارد کردن دامنه",
@@ -5003,6 +5007,7 @@ export const tr: typeof en = {
   "node.inbound.err.awg": "AmneziaWG düğümde başlamadı: düğümün Sunucu sekmesindeki “AmneziaWG arka ucu” bölümüne bak",
   "node.inbound.err.other": "Profil başlatılamadı",
   "node.inbound.err.targetLocal": "Bu sunucu için seçilen site düğümün kendisine ya da özel bir ağa çıkıyor, bu yüzden sunucu başlamadı. Başka bir site seç.",
+  "node.inbound.err.agentOld": "Düğümün ajanı bu profilin gerektirdiğinden eski: düğümü Güncellemeler sayfasından güncelle.",
   "node.check.acme.title": "Let’s Encrypt bir IP için sertifika vermez",
   "node.check.acme.body": "{node} düğümünün adresi {address} IP'si; Let’s Encrypt ise yalnızca alan adlarına sertifika verir. “Alan adı (SNI)” alanına A kaydı {address} adresini gösteren bir alan adı yaz.",
   "node.check.acme.enter": "Alan adı gir",
