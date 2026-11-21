@@ -96,7 +96,7 @@ function Wizard({ protocols, demo }: { protocols: ProtocolInfo[]; demo?: WizardD
   const { node: fromNode = "", protocol: urlProtocol = "", task: urlTask = "" } = useSearch({ strict: false }) as { node?: string; protocol?: string; task?: string };
   const known = demo ? undefined : protocols.find((p) => p.id === urlProtocol);
 
-  const shown = tasks.filter((k) => k.protocol === "" || protocols.some((p) => p.id === k.protocol));
+  const shown = tasks.filter((k) => protocols.some((p) => p.id === k.protocol));
   // VLESS is two tasks: REALITY for phones, or behind a CDN (?task=cdn)
   const urlTaskId = (): TaskId => (known && urlTask === "cdn" && known.id === "vless" ? "cdn" : known ? taskOfProtocol(known.id) : "fast");
   const [pick, setPick] = useState<TaskId>(demo?.task ?? urlTaskId());

@@ -150,8 +150,8 @@ describe("step 1, the task", () => {
     search = { node: "nod_1" };
     await mount();
     expect(document.querySelector("[role=radiogroup]")?.getAttribute("aria-label")).toBe("Task");
-    // the tasks of the board that have a protocol here, and "I'll pick it myself" (the DNS tunnel has no backend: no card)
-    expect(cards().map((c) => c.querySelector("b")?.textContent)).toEqual(["Fast, for most people", "For phones in Russia", "For a router and AmneziaVPN", "Via a CDN", "Telegram without a VPN", "I’ll pick the protocol myself"]);
+    // the tasks that have a protocol here (the DNS tunnel has no backend: no card); step 2 lists every protocol, so there is no "pick it myself" card
+    expect(cards().map((c) => c.querySelector("b")?.textContent)).toEqual(["Fast, for most people", "For phones in Russia", "For a router and AmneziaVPN", "Via a CDN", "Telegram without a VPN"]);
     expect(text()).not.toContain("DNS tunnel");
     expect(card("Fast, for most people").getAttribute("aria-checked")).toBe("true");
     expect(card("Fast, for most people").textContent).toContain("Start with this one");
@@ -176,7 +176,7 @@ describe("step 1, the task", () => {
     await click(button("Change"));
     await settle();
     expect(search).toEqual({});
-    expect(cards()).toHaveLength(6);
+    expect(cards()).toHaveLength(5);
     expect(card("For phones in Russia").getAttribute("aria-checked")).toBe("true");
   });
 
@@ -196,7 +196,7 @@ describe("step 1, the task", () => {
   it("opens on the tasks when the URL names a protocol there is none of", async () => {
     search = { protocol: "nope" };
     await mount();
-    expect(cards()).toHaveLength(6);
+    expect(cards()).toHaveLength(5);
   });
 
   it("is the owner's: the others get the reason and the way back", async () => {

@@ -193,7 +193,7 @@
 /* ---- step 1: the tasks ---- */
 .pw-tasks {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 .pw-task {
@@ -1036,11 +1036,6 @@
 }
 
 /* ---- narrower windows (the board's container queries, here the window's own width) ---- */
-@media (max-width: 1180px) {
-  .pw-tasks {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
 @media (max-width: 1040px) {
   .pw-grid {
     grid-template-columns: minmax(0, 1fr);
