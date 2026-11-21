@@ -141,18 +141,25 @@ type osStepV struct {
 	NoteUntrusted  bool   `json:"note_untrusted,omitempty"`
 	RetryCount     uint32 `json:"retry_count,omitempty"`
 	RetryCode      string `json:"retry_code,omitempty"`
+	// As in rolloutStepV: the profiles that did not pass the gate after the job, and those not held against it.
+	FailedProfiles  []profileFailV `json:"failed_profiles,omitempty"`
+	FailedMore      int            `json:"failed_more,omitempty"`
+	SkippedProfiles []string       `json:"skipped_profiles,omitempty"`
+	SkippedMore     int            `json:"skipped_more,omitempty"`
 }
 
 // osRolloutV is the active OS rollout, else the last one. Names and packages are untrusted input.
 type osRolloutV struct {
-	ID       string    `json:"id"`
-	Status   string    `json:"status"`
-	Mode     string    `json:"mode"`
-	Reboot   string    `json:"reboot"`
-	PauseKey string    `json:"pause_key,omitempty"`
-	Created  int64     `json:"created_unix"`
-	Finished int64     `json:"finished_unix,omitempty"`
-	Steps    []osStepV `json:"steps"`
+	ID                  string         `json:"id"`
+	Status              string         `json:"status"`
+	Mode                string         `json:"mode"`
+	Reboot              string         `json:"reboot"`
+	PauseKey            string         `json:"pause_key,omitempty"`
+	PauseFailedProfiles []profileFailV `json:"pause_failed_profiles,omitempty"`
+	PauseFailedMore     int            `json:"pause_failed_more,omitempty"`
+	Created             int64          `json:"created_unix"`
+	Finished            int64          `json:"finished_unix,omitempty"`
+	Steps               []osStepV      `json:"steps"`
 }
 
 // OsUpdatesV is the os_updates_status result; package and node strings are untrusted input.
@@ -272,6 +279,7 @@ func osUpdatesView(r *adminv1.GetOsUpdatesResponse) *OsUpdatesV {
 	if ro := r.GetRollout(); ro != nil {
 		rv := &osRolloutV{ID: clean(ro.GetId(), 60), Status: enumName("OS_ROLLOUT_STATUS_", ro.GetStatus().String()), Mode: enumName("OS_ROLLOUT_MODE_", ro.GetMode().String()),
 			Reboot: enumName("OS_REBOOT_POLICY_", ro.GetReboot().String()), PauseKey: clean(ro.GetPauseKey(), 32), Created: ro.GetCreatedUnix(), Finished: ro.GetFinishedUnix(), Steps: []osStepV{}}
+		rv.PauseFailedProfiles, rv.PauseFailedMore = failedProfilesView(ro.GetPauseParams())
 		for _, st := range ro.GetSteps() {
 			p := st.GetParams()
 			note := noAddr(clean(p["note"], 160))
@@ -284,11 +292,14 @@ func osUpdatesView(r *adminv1.GetOsUpdatesResponse) *OsUpdatesV {
 			if p["note_code"] == "security_leftover_failed" {
 				noteCode = p["note_code"]
 			}
-			rv.Steps = append(rv.Steps, osStepV{NodeID: clean(st.GetNodeId(), 80), Name: nm(st.GetNodeName()), State: enumName("OS_STEP_STATE_", st.GetState().String()),
+			step := osStepV{NodeID: clean(st.GetNodeId(), 80), Name: nm(st.GetNodeName()), State: enumName("OS_STEP_STATE_", st.GetState().String()),
 				JobID: clean(st.GetJobId(), 60), Phase: clean(st.GetPhase(), 24), KernelFrom: noAddr(clean(st.GetKernelFrom(), 128)), KernelTo: noAddr(clean(st.GetKernelTo(), 128)),
 				Sent: st.GetSentUnix(), Finished: st.GetFinishedUnix(), Error: clean(st.GetErrorKey(), 32), Code: clean(p["code"], 32), Package: noAddr(clean(p["package"], 64)),
 				Upgraded: clean(p["upgraded"], 8), Reboot: clean(p["reboot"], 16), AptLockHolder: lockHolder, AptLockMinutes: uint32(lockMinutes),
-				NoteCode: noteCode, Note: note, NoteUntrusted: p["note"] != "", RetryCount: st.GetRetryCount(), RetryCode: clean(st.GetRetryCode(), 32)})
+				NoteCode: noteCode, Note: note, NoteUntrusted: p["note"] != "", RetryCount: st.GetRetryCount(), RetryCode: clean(st.GetRetryCode(), 32)}
+			step.FailedProfiles, step.FailedMore = failedProfilesView(p)
+			step.SkippedProfiles, step.SkippedMore = skippedProfilesView(p)
+			rv.Steps = append(rv.Steps, step)
 		}
 		v.Rollout = rv
 	}

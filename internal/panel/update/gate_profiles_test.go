@@ -207,3 +207,35 @@ func TestLastRoundsUnreadableIsLogged(t *testing.T) {
 		t.Fatalf("log = %q, want a warning with code update_last_rounds_unreadable", out)
 	}
 }
+
+// The OS update names the profile that did not pass on its step, on the event and on the pause, as the agent update does.
+func TestOsGateNamesTheProfileThatFailedAfterTheJob(t *testing.T) {
+	e := newEnv(t)
+	id := e.addNode("de1", nodeOpts{caps: osCaps, inbounds: 2})
+	e.nameProfiles("de1", "Main", "Backup")
+	e.osBoot(id, e.clk.Now().Add(-48*time.Hour), kernelOld)
+	e.osStatus(id, nil)
+	e.hl.setRounds(id, e.round("inb_de1_0", checkOK, "", time.Minute), e.round("inb_de1_1", checkOK, "", time.Minute))
+	e.startOs(id, store.OsModeSecurity, store.OsRebootNever)
+	e.osTick()
+	x := e.osStep(id)
+	e.hl.set(id, 2, 1, 1)
+	e.hl.setPending(id, "inb_de1_1")
+	e.hl.setRounds(id, e.round("inb_de1_0", checkOK, "", 0), e.round("inb_de1_1", checkFail, "refused", 0))
+	e.osEvent(id, "os_update_done", map[string]string{"job_id": x.JobID, "upgraded": "2", "reboot": "not_asked"})
+	e.osTick()
+	e.osTick()
+	e.clk.Advance(9 * time.Minute)
+	e.osTick()
+	x = e.wantOsStep(id, store.OsStepFailed, "probe_failed")
+	want := []failedProfile{{ID: "inb_de1_1", Name: "Backup", Code: "refused"}}
+	if got := failedList(t, x.Params); !slices.Equal(got, want) {
+		t.Fatalf("step names %+v, want %+v", got, want)
+	}
+	if got := failedList(t, e.wantEvent(id, "os_step_failed").Params); !slices.Equal(got, want) {
+		t.Fatalf("event names %+v, want %+v", got, want)
+	}
+	if got := failedList(t, e.wantOsRollout(store.RolloutPaused, "gate_failed").PauseParams); !slices.Equal(got, want) {
+		t.Fatalf("pause names %+v, want %+v", got, want)
+	}
+}

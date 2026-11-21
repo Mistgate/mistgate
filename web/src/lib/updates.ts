@@ -260,12 +260,18 @@ export function skippedProfilesNote(t: T, params: Params): string {
   }
 }
 
+/** "The client-eye check failed after the update for the profile “Main”: …", or "" when the gate named no profile (agent and OS steps alike). */
+export function failedProfilesText(t: T, params: Params): string {
+  const { text, n } = profileList(t, params);
+  return text ? t.n("updates.step.profiles", n, { list: text }) : "";
+}
+
 /** Why a step failed, was rolled back or skipped. `key` arrives whole ("updates.step.err.<code>"). */
 export function stepErrorText(t: T, key: string, params: Params = {}): string {
   if (!key) return "";
   if (last(key) === "probe_failed") {
-    const { text, n } = profileList(t, params);
-    if (text) return t.n("updates.step.profiles", n, { list: text });
+    const named = failedProfilesText(t, params);
+    if (named) return named;
   }
   return known(t, key, withSentences(t, params)) ?? t("up.err.other", { code: last(key) });
 }
