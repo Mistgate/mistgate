@@ -1,11 +1,10 @@
 {
  "style": {
-  "legacy": true,
   "scheme": "light",
   "palettes": [
    {
     "name": "cream-terracotta",
-    "l": {"bg": "#fbefd3", "fg": "#3a2417", "ac": "#b5472a", "a2": "#3a6a4a"}
+    "l": {"bg": "#fbefd3", "fg": "#3a2417", "ac": "#b5472a", "a2": "#3a6a4a", "sf": "#fff8ea", "so": "#f3d9a4"}
    },
    {
     "name": "cream-olive",
@@ -60,7 +59,7 @@
     {"name": "about", "tmpl": "about.html.tmpl", "paths": ["about.html", "about/index.html", "our-story/index.html", "who-we-are.html"], "nav": "nav_about", "desc": "desc_about"},
     {"name": "contact", "tmpl": "contact.html.tmpl", "paths": ["contact.html", "contact/index.html", "find-us/index.html", "visit.html"], "nav": "nav_contact", "desc": "desc_contact"}
   ],
-  "home_blocks": ["feat", "prices", "visit"],
-  "home_fixed": 0,
-  "photo_slots": {"hero":[0],"about":[1],"g":[2]}
+  "home_blocks": ["feat", "prices", "about", "visit"],
+  "home_fixed": 1,
+  "photo_slots": {"hero": [0, 1], "about": [1, 2], "g": [2, 0]}
 }

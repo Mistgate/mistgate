@@ -1,70 +1,81 @@
-{{define "meet"}}<div class="__card__ __meet__">
-<h2>{{.L.meet_h}}</h2>
-<p>{{icon "clock"}} <span><strong>{{.L.when_l}}</strong> {{.L.when}}</span></p>
-<p>{{icon "pin"}} <span><strong>{{.L.where_l}}</strong> {{.L.where}}</span></p>
-<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{.L.join_cta}}</a></p>
+{{define "header"}}<header class="__hd__">
+<div class="__wrap__"><div class="__nv__">
+<a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span></a>
+<nav class="__nav__" aria-label="{{.L.nav_label}}">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</nav>
+<a class="__btn__ __topbtn__" href="{{(index .Nav 2).Href}}">{{.L.join_cta}}</a>
+{{template "menu" .}}
+</div></div>
+</header>
+{{end}}
+{{define "footer"}}<footer class="__foot__">
+<div class="__wrap__">
+<div class="__fg__">
+<div class="__fbrand__"><a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span></a><p class="__fdesc__">{{.L.desc}}</p></div>
+<div class="__fcol__"><h6 class="__fh6__">{{.L.kicker}}</h6>{{range .Nav}}<a class="__fa__" href="{{.Href}}">{{.Label}}</a>{{end}}</div>
+<div class="__fcol__"><h6 class="__fh6__">{{.L.join_h}}</h6><a class="__fa__" href="{{(index .Nav 2).Href}}">{{.L.join_cta}}</a><a class="__fa__" href="{{(index .Nav 2).Href}}">{{.L.faq_h}}</a><a class="__fa__" href="{{(index .Nav 2).Href}}">{{.L.cf_h}}</a></div>
+<div class="__fcol__"><h6 class="__fh6__">{{.L.find_h}}</h6><p class="__fp__">{{.L.where}}</p><p class="__fp__">{{.V.address}}</p>{{if .V.phone}}<p class="__fp__">{{.V.phone}}</p>{{end}}</div>
 </div>
+<div class="__fb__"><span class="__fs__">{{.L.footer}}</span><span class="__fs__">© {{.Since}}–{{.Year}} {{.Brand}}</span></div>
+</div>
+</footer>
 {{end}}
-{{define "cover"}}{{if hasphoto "cover" 1200 400}}<figure class="__cov__">{{photo "cover" "" 1200 400}}</figure>
-{{end}}{{end}}{{define "why"}}<ul class="__feats__">{{range .L.why}}<li><span class="__fi__">{{icon .icon}}</span><div><h3>{{.h}}</h3><p>{{.p}}</p></div></li>{{end}}</ul>
-{{end}}
-{{define "upcoming"}}<section class="__sec__">
-<h2>{{.L.upcoming_h}}</h2>
-<ul class="__ev__">{{range $i, $e := .Lists.events}}{{if lt $i 3}}<li><span class="__when__">{{$e.w}}</span><div><strong>{{$e.t}}</strong><p>{{$e.p}}</p></div></li>{{end}}{{end}}</ul>
-<p><a href="{{(index .Nav 1).Href}}">{{.L.all_events}} {{icon "arrow"}}</a></p>
-</section>
-{{end}}
-{{define "latest"}}<section class="__sec__">
-<h2>{{.L.latest_h}}</h2>
-{{range $i, $n := .Lists.news}}{{if lt $i 2}}<article class="__post__"><p class="__mu__"><time datetime="{{$n.date_iso}}">{{$n.date}}</time></p><h3>{{$n.title}}</h3><p>{{$n.text}}</p></article>{{end}}{{end}}
-<p><a href="{{(index .Nav 3).Href}}">{{.L.all_news}} {{icon "arrow"}}</a></p>
-</section>
-{{end}}
+{{define "b_info"}}<section class="__wrap__ __info__">
+<div class="__icc__"><div class="__lab__">{{icon "clock"}}{{.L.when_l}}</div><p>{{.L.when}}</p></div>
+<div class="__icc__"><div class="__lab__">{{icon "pin"}}{{.L.where_l}}</div><p>{{.L.where}}</p></div>
+<div class="__icc__ __fee__"><div class="__lab__">{{.L.join_h}}</div><p>{{.L.join_fee}}</p></div>
+</section>{{end}}
+{{define "b_why"}}<section class="__wrap__ __sec__">
+<div class="__why__">{{range .L.why}}<div class="__wc__"><span class="__wi__">{{icon .icon}}</span><div><h3>{{.h}}</h3><p>{{.p}}</p></div></div>{{end}}</div>
+</section>{{end}}
+{{define "b_upcoming"}}<section class="__wrap__ __sec__">
+<div class="__sh__"><h2>{{.L.upcoming_h}}</h2><a class="__more__" href="{{(index .Nav 1).Href}}">{{.L.all_events}} {{icon "arrow"}}</a></div>
+<div class="__evl__ __cut__">{{range $i, $e := .Lists.events}}{{if lt $i 4}}<div class="__er__"><div class="__dt__"><b>0{{add $i 1}}</b></div><div><h3>{{$e.t}}</h3><div class="__wh__">{{$e.w}}</div></div><p>{{$e.p}}</p></div>{{end}}{{end}}</div>
+</section>{{end}}
+{{define "b_season"}}<section class="__wrap__ __sec__">
+<div class="__sh__"><h2>{{.L.season_h}}</h2></div>
+<div class="__ss__ __cut__">{{range $i, $s := .Lists.sessions}}{{if lt $i 4}}<div class="__sc__"><figure class="__ph__">{{photo (printf "s%d" (add $i 1)) "" 480 360}}</figure><div class="__sb__"><p class="__dd__"><time datetime="{{$s.date_iso}}">{{$s.date}}</time></p><h3>{{$s.t}}</h3><p>{{$s.p}}</p></div></div>{{end}}{{end}}</div>
+</section>{{end}}
+{{define "b_news"}}<section class="__wrap__ __sec__">
+<div class="__sh__"><h2>{{.L.latest_h}}</h2><a class="__more__" href="{{(index .Nav 3).Href}}">{{.L.all_news}} {{icon "arrow"}}</a></div>
+<div class="__nw__">{{range $i, $n := .Lists.news}}{{if lt $i 3}}<div class="__nc__"><p class="__dd__"><time datetime="{{$n.date_iso}}">{{$n.date}}</time></p><h3>{{$n.title}}</h3><p>{{$n.text}}</p></div>{{end}}{{end}}</div>
+</section>{{end}}
+{{define "b_join"}}<section class="__wrap__ __sec__">
+<div class="__sh__"><h2>{{.L.join_h}}</h2></div>
+<div class="__jn__">
+<div class="__jb__"><h3>{{.L.steps_h}}</h3>{{range .L.join}}<p>{{.}}</p>
+{{end}}<ol class="__st__">{{range .L.steps}}<li>{{.}}</li>{{end}}</ol></div>
+<div class="__jb__"><h3>{{.L.faq_h}}</h3>{{range $i, $q := .L.faq}}<details class="__qd__"{{if eq $i 0}} open{{end}}><summary>{{$q.q}}</summary><p>{{$q.a}}</p></details>{{end}}</div>
+</div>
+</section>{{end}}
+{{define "b_find"}}<section class="__wrap__ __sec__ __fd__">
+<div class="__map__">{{mapsvg "find" 600 440}}<div class="__pin__"><b>{{.L.find_h}}</b>{{.L.where}}, {{.V.address}}</div></div>
+{{if .V.phone}}<div class="__jb__"><h3>{{.L.phone_l}}</h3><p class="__tel__">{{icon "phone"}} {{.V.phone}}</p><p>{{.L.when}}</p></div>
+{{else}}{{template "contactform" .}}
+<script src="{{.JS}}" defer></script>
+{{end}}</section>{{end}}
+{{define "hero_copy"}}<div class="__hl__">
+<span class="__kick__">{{.L.kicker}}</span>
+<h1>{{.L.tagline}}</h1>
+<p class="__lead__">{{.L.intro}}</p>
+<p class="__bs__"><a class="__btn__" href="{{(index .Nav 2).Href}}">{{.L.join_cta}}</a><a class="__btn__ __gh__" href="{{(index .Nav 1).Href}}">{{.L.all_events}}</a></p>
+</div>{{end}}
 {{template "head" .}}<body>
 {{template "header" .}}
 <main>
-{{if eq .Layout 0}}<section class="__wrap__ __hero__ __split__">
-<div>
-<p class="__kicker__">{{.L.kicker}}</p>
-<h1>{{.Brand}}</h1>
-<p class="__lede__">{{.L.intro}}</p>
-</div>
-{{template "meet" .}}
-</section>
-{{if hasphoto "cover" 1200 400}}<div class="__wrap__">{{template "cover" .}}</div>
-{{end}}<div class="__wrap__ __cols__">
-<div>{{template "upcoming" .}}</div>
-<div>{{template "latest" .}}</div>
-</div>
-<div class="__wrap__ __sec__">{{template "why" .}}</div>
-{{else if eq .Layout 1}}<section class="__band__">
-<div class="__wrap__ __hero__ __centre__">
-<p class="__kicker__">{{.L.kicker}}</p>
-<h1>{{.Brand}}</h1>
-<p class="__lede__">{{.L.intro}}</p>
-<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{.L.join_cta}}</a></p>
-</div>
-</section>
-<div class="__wrap__">
-{{template "cover" .}}<div class="__sec__">{{template "meet" .}}</div>
-<div class="__sec__">{{template "why" .}}</div>
-{{template "upcoming" .}}
-{{template "latest" .}}
-</div>
-{{else}}<div class="__wrap__ __duo__">
-<div>
-<section class="__hero__">
-<p class="__kicker__">{{.L.kicker}}</p>
-<h1>{{.Brand}}</h1>
-<p class="__lede__">{{.L.intro}}</p>
-</section>
-{{template "cover" .}}{{template "why" .}}
-{{template "upcoming" .}}
-{{template "latest" .}}
-</div>
-<aside class="__sticky__">{{template "meet" .}}</aside>
-</div>
-{{end}}</main>
+{{if eq .Layout 0}}<div class="__wrap__"><section class="__hero__">
+{{template "hero_copy" .}}
+<div class="__hr__">{{photo "cover" "" 640 620}}</div>
+</section></div>
+{{else if eq .Layout 1}}<div class="__wrap__"><section class="__hero__ __hero1__">
+<div class="__band1__">{{photo "cover" "" 1200 360}}</div>
+{{template "hero_copy" .}}
+</section></div>
+{{else}}<div class="__wrap__"><section class="__hero__ __hero2__">
+<div class="__bg2__">{{photo "cover" "" 1200 620}}</div>
+{{template "hero_copy" .}}
+</section></div>
+{{end}}{{range .Order}}{{blk . $}}{{end}}
+</main>
 {{template "footer" .}}
 </body>
 </html>

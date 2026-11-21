@@ -1,18 +1,18 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __pf__ __text__">
-<h1>{{.L.about_h}}</h1>
-{{range .L.about}}<p>{{.}}</p>
-{{end}}<div class="__two__">
-<section>
-<h2>{{.L.services_h}}</h2>
-<ul>{{range .L.services}}<li>{{.}}</li>{{end}}</ul>
+<main>
+<section class="__wrap__ __hero__ __hero3__">
+<div class="__g__"><span class="__lab__">{{.L.tagline}}</span><h1>{{.L.about_h}}</h1></div>
 </section>
-<section>
-<h2>{{.L.shows_h}}</h2>
-<ul class="__shows__">{{range .L.shows}}<li><strong>{{.y}}</strong> {{.t}}</li>{{end}}</ul>
+{{blk "about" .}}
+<section class="__wrap__ __sec__">
+<div class="__team__"><figure class="__tph__">{{photo "about" "" 640 800}}</figure>
+<div class="__tx__"><div class="__sh__ __sh0__"><div class="__g__"><span class="__lab__ __cnt__"></span></div></div>
+<p class="__tbig__">{{.L.visit_text}}</p>
+<div class="__sw__">{{range $i, $h := .L.hours}}<div><b>{{if eq $i 0}}{{$.L.visit_h}}{{end}}</b><span>{{hrs $h.from $h.to $h.open $h.close}}</span></div>{{end}}<div><b></b><span>{{.L.hours_note}}</span></div></div></div></div>
 </section>
-</div>
+{{blk "services" .}}
+{{blk "shows" .}}
 </main>
 {{template "footer" .}}
 </body>

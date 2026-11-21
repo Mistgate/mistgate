@@ -12,6 +12,7 @@
  "bundles": [
   {
    "id": "photo",
+   "art": "topo",
    "photo_q": [
     "quiet landscape hills",
     "misty field morning",
@@ -19,10 +20,12 @@
    ]
   },
   {
-   "id": "illustration"
+   "id": "illustration",
+   "art": "botanical"
   },
   {
-   "id": "graphic"
+   "id": "graphic",
+   "art": "poster"
   }
  ]
 }

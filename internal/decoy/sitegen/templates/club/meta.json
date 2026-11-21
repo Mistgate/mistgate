@@ -1,11 +1,10 @@
 {
  "style": {
-  "legacy": true,
   "scheme": "dark",
   "palettes": [
    {
     "name": "night-amber",
-    "d": {"bg": "#0c1228", "sf": "#151d44", "fg": "#f6efe0", "ac": "#ffb347", "a2": "#9fb0ff"}
+    "d": {"bg": "#0c1228", "sf": "#151d44", "fg": "#f6efe0", "ac": "#ffb347", "a2": "#9fb0ff", "band": "#111838", "sf2": "#232c5f", "so": "#2a2447"}
    },
    {
     "name": "night-coral",
@@ -131,10 +130,10 @@
    }
   }
  ],
+ "home_blocks": ["info", "why", "upcoming", "season", "news", "join", "find"],
+ "home_fixed": 2,
  "photo_slots": {
-  "cover": [
-   0,
-   1
-  ]
+  "cover": [0, 1],
+  "s": [1, 0]
  }
 }

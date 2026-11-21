@@ -1,52 +1,80 @@
-{{define "b_feat"}}<section class="__sec__">
-<ul class="__feats__">{{range .L.features}}<li><span class="__fi__">{{icon .icon}}</span><div><h3>{{.h}}</h3><p>{{.p}}</p></div></li>{{end}}</ul>
+{{define "header"}}<div class="__strip__">{{.L.footer}}</div>
+<header class="__hd__">
+<div class="__wrap__ __nv__">
+<a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span></a>
+<nav class="__nav__" aria-label="{{.L.nav_label}}">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</nav>
+<a class="__btn__ __topbtn__" href="{{(index .Nav 3).Href}}">{{.L.hours_h}}</a>
+{{template "menu" .}}
+</div>
+</header>
+{{end}}
+{{define "footer"}}<footer class="__foot__">
+<div class="__wrap__">
+<div class="__fg__">
+<div class="__fbrand__"><a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span></a><p class="__fdesc__">{{.L.desc}}</p></div>
+<div class="__fcol__"><h6 class="__fh6__">{{.L.services_h}}</h6>{{range $i, $s := .L.services}}{{if lt $i 3}}<a class="__fa__" href="{{(index $.Nav 1).Href}}">{{$s.t}}</a>{{end}}{{end}}</div>
+<div class="__fcol__"><h6 class="__fh6__">{{.L.visit_h}}</h6><a class="__fa__" href="{{(index .Nav 3).Href}}">{{.L.hours_h}}</a><a class="__fa__" href="{{(index .Nav 3).Href}}">{{.L.directions_h}}</a><a class="__fa__" href="{{(index .Nav 2).Href}}">{{.L.about_h}}</a></div>
+<div class="__fcol__"><h6 class="__fh6__">{{.L.address_l}}</h6><p class="__fp__">{{.V.address}}</p>{{if .V.phone}}<h6 class="__fh6__">{{.L.phone_l}}</h6><p class="__fp__">{{.V.phone}}</p>{{end}}</div>
+</div>
+<div class="__fb__"><span class="__fs__">© {{.Since}}–{{.Year}} {{.Brand}}</span><span class="__fs__">{{.L.tagline}}</span></div>
+</div>
+</footer>
+{{end}}
+{{define "b_feat"}}<section class="__band__">
+<div class="__wrap__"><ul class="__g__">{{range .L.features}}<li><span class="__fi__">{{icon .icon}}</span><div><h3>{{.h}}</h3><p>{{.p}}</p></div></li>{{end}}</ul></div>
 </section>{{end}}
-{{define "b_prices"}}<section class="__sec__">
+{{define "b_prices"}}<section class="__wrap__ __sec__ __menu__">
+<figure class="__archm__">{{photo "g1" "" 600 800}}</figure>
+<div>
 <h2>{{.L.services_h}}</h2>
-<ul class="__price__">{{range $i, $s := .L.services}}{{if lt $i 3}}<li><div><strong>{{$s.t}}</strong><span>{{$s.d}}</span></div><em>{{if $s.from}}{{$.L.from_l}} {{end}}{{money $s.price}}</em></li>{{end}}{{end}}</ul>
-<p><a href="{{(index .Nav 1).Href}}">{{.L.all_prices}} {{icon "arrow"}}</a></p>
-</section>{{end}}
-{{define "b_visit"}}<section class="__sec__ __visit__">
-<div class="__card__">
-<h2>{{.L.visit_h}}</h2>
-<p>{{icon "pin"}} {{.V.address}}</p>
-{{if .V.phone}}<p>{{icon "phone"}} {{.V.phone}}</p>
-{{end}}</div>
-<div class="__card__">
-<h2>{{.L.hours_h}}</h2>
-<ul class="__hours__">{{range .L.hours}}<li>{{hrs .from .to .open .close}}</li>{{end}}{{if .L.hours_note}}<li>{{.L.hours_note}}</li>{{end}}</ul>
+<p class="__sub__">{{.L.services_intro}}</p>
+<ul class="__it__">{{range .L.services}}<li><h3>{{.t}}</h3><b>{{if .from}}{{$.L.from_l}} {{end}}{{money .price}}</b><p>{{.d}}</p></li>{{end}}</ul>
+<p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.all_prices}}</a></p>
 </div>
 </section>{{end}}
+{{define "b_about"}}<section class="__wrap__ __sec__ __ab__">
+<div class="__pair__"><figure>{{photo "about" "" 480 640}}</figure><figure>{{photo "about2" "" 480 580}}</figure></div>
+<div>
+<h2>{{.L.about_h}}</h2>
+{{range $i, $p := .L.about}}<p{{if eq $i 0}} class="__lead2__"{{end}}>{{$p}}</p>
+{{end}}</div>
+</section>{{end}}
+{{define "b_visit"}}<section class="__wrap__ __sec__">
+<h2>{{.L.visit_h}}</h2>
+<div class="__vis__">
+<div class="__card__ __dkc__"><h3>{{.L.hours_h}}</h3>
+<ul class="__hr__">{{range .L.hours}}<li>{{hrs .from .to .open .close}}</li>{{end}}{{if .L.hours_note}}<li>{{.L.hours_note}}</li>{{end}}</ul></div>
+<div class="__card__ __soft__">{{mapsvg "visit" 360 360}}
+<h3>{{.L.directions_h}}</h3>
+<b>{{.L.address_l}}</b><p>{{.V.address}}</p>
+{{if .V.phone}}<b>{{.L.phone_l}}</b><p>{{.V.phone}}</p>
+{{end}}<p>{{.L.directions}}</p></div>
+</div>
+</section>{{end}}
+{{define "hero_copy"}}<div class="__hcopy__">
+<h1>{{.L.hero_h}}</h1>
+<p class="__lead__">{{.L.intro}}</p>
+<p class="__bs__"><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.see_services}}</a><a class="__btn__ __bo__" href="{{(index .Nav 1).Href}}">{{.L.all_prices}}</a></p>
+</div>{{end}}
+{{define "hero_stamp"}}{{$f := index .L.features 0}}<span class="__badge__">{{stamp "badge" $f.h 160}}</span>{{end}}
 {{template "head" .}}<body>
 {{template "header" .}}
 <main>
-{{if eq .Layout 0}}<section class="__wrap__ __hero__ __split__">
-<div>
-<h1>{{.L.hero_h}}</h1>
-<p class="__lede__">{{.L.intro}}</p>
-<p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.see_services}}</a></p>
-</div>
-<figure class="__figure__">{{photo "hero" "" 640 480}}</figure>
+{{if eq .Layout 0}}<section class="__wrap__ __hero__">
+{{template "hero_copy" .}}
+<div class="__ar__"><figure class="__arch__">{{photo "hero" "" 640 800}}</figure><figure class="__sm__">{{photo "hero2" "" 320 320}}</figure>{{template "hero_stamp" .}}</div>
 </section>
-{{else if eq .Layout 1}}<section class="__band__">
-<div class="__wrap__ __hero__ __centre__">
-<h1>{{.L.hero_h}}</h1>
-<p class="__lede__">{{.L.intro}}</p>
-<p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.see_services}}</a></p>
-</div>
+{{else if eq .Layout 1}}<section class="__wrap__ __hero1__">
+{{template "hero_copy" .}}
+<div class="__wide__"><figure class="__stadium__">{{photo "hero" "" 1280 520}}</figure>{{template "hero_stamp" .}}</div>
 </section>
-{{else}}<section class="__cover__">
-{{photo "hero" "" 1200 560}}
-<div class="__wrap__ __coverin__">
-<h1>{{.L.hero_h}}</h1>
-<p class="__lede__">{{.L.intro}}</p>
-<p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.see_services}}</a></p>
+{{else}}<section class="__dark__">
+<div class="__wrap__ __hero__ __hero2__">
+<div class="__ar__"><figure class="__arch__">{{photo "hero" "" 640 800}}</figure><figure class="__sm__">{{photo "hero2" "" 320 320}}</figure>{{template "hero_stamp" .}}</div>
+{{template "hero_copy" .}}
 </div>
 </section>
-{{end}}<div class="__wrap__">
-{{range .Order}}{{blk . $}}{{end}}
-{{if hasphoto "g1" 640 480}}{{if hasphoto "g2" 640 480}}<div class="__pics__"><figure class="__figure__">{{photo "g1" "" 640 480}}</figure><figure class="__figure__">{{photo "g2" "" 640 480}}</figure></div>
-{{end}}{{end}}</div>
+{{end}}{{range .Order}}{{blk . $}}{{end}}
 </main>
 {{template "footer" .}}
 </body>

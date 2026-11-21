@@ -1,17 +1,20 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __pf__">
-<article class="__piece__">
-<p class="__mu__"><a href="{{(index .Nav 1).Href}}">{{.L.work_back}}</a></p>
-<h1>{{.Page.Item.title}}</h1>
-<figure class="__big__"><img src="{{.Page.Item.img}}" alt="{{.Page.Item.title}}" width="{{.Page.Item.w}}" height="{{.Page.Item.h}}"></figure>
-<p class="__lede__">{{.Page.Item.note}}</p>
-<p>{{.Page.Item.text}}</p>
-<p class="__mu__">{{.Page.Item.caption}}</p>
-<p><a class="__btn__" href="{{(index .Nav 3).Href}}">{{.L.work_ask}}</a></p>
-</article>
-<h2 class="__sectitle__">{{.L.work_more}}</h2>
-<div class="__others__">{{range .Lists.works}}{{if ne .slug $.Page.Item.slug}}<a href="{{.href}}"><img src="{{.img}}" alt="{{.title}}" width="{{.w}}" height="{{.h}}" loading="lazy"><span>{{.title}}</span></a>{{end}}{{end}}</div>
+<main class="__wrap__">
+<div class="__hero__ __hero3__"><div class="__g__"><span class="__lab__"><a href="{{(index .Nav 1).Href}}">{{icon "back"}} {{.L.work_back}}</a></span><h1 class="__h1p__">{{.Page.Item.title}}</h1></div></div>
+<div class="__pc__">
+<figure class="__pcart__"><img src="{{.Page.Item.img}}" alt="{{.Page.Item.title}}" width="{{.Page.Item.w}}" height="{{.Page.Item.h}}"></figure>
+<aside class="__pcinfo__">
+<p class="__note__">{{.Page.Item.note}}</p>
+<p class="__txt__">{{.Page.Item.text}}</p>
+<dl><div><dt>0{{.Page.Item.n}}</dt><dd>{{.Page.Item.caption}}</dd></div></dl>
+<a class="__btn__ __btnr__" href="{{(index .Nav 3).Href}}">{{.L.work_ask}} {{icon "arrowc"}}</a>
+</aside>
+</div>
+<section class="__sec__">
+<div class="__sh__"><div class="__g__"><span class="__lab__ __cnt__"></span><h2>{{.L.work_more}}</h2><a href="{{(index .Nav 1).Href}}">{{.L.all_work}} {{icon "arrowc"}}</a></div></div>
+<div class="__mw__">{{$k := 0}}{{range .Lists.works}}{{if ne .slug $.Page.Item.slug}}{{if lt $k 3}}<a class="__mwi__" href="{{.href}}"><span class="__img__"><img src="{{.img}}" alt="{{.title}}" width="{{.w}}" height="{{.h}}" loading="lazy"></span><b>{{.title}}</b><span class="__mwc__">{{.caption}}</span></a>{{$k = add $k 1}}{{end}}{{end}}{{end}}</div>
+</section>
 </main>
 {{template "footer" .}}
 </body>
