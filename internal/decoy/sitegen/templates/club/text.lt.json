@@ -163,11 +163,20 @@
     "brand": {
      "join": [
       [
-       "Šachmatų klubas „Bokštas“",
-       "Šachmatininkų draugija „Žirgas“",
-       "Šachmatų ratelis „Ėjimas“"
+       "Šachmatų klubas",
+       "Šachmatininkų draugija",
+       "Šachmatų ratelis"
+      ],
+      [
+       "„Bokštas“",
+       "„Žirgas“",
+       "„Ėjimas“",
+       "„Rikis“",
+       "„Karalius“",
+       "„Valdovė“"
       ]
-     ]
+     ],
+     "sep": " "
     }
    }
   },
@@ -293,11 +302,20 @@
     "brand": {
      "join": [
       [
-       "Žygeivių klubas „Takas“",
-       "Žygių draugija „Žingsnis“",
-       "Žygeivių būrelis „Miškas“"
+       "Žygeivių klubas",
+       "Žygių draugija",
+       "Žygeivių būrelis"
+      ],
+      [
+       "„Takas“",
+       "„Žingsnis“",
+       "„Miškas“",
+       "„Kelias“",
+       "„Kalva“",
+       "„Kuprinė“"
       ]
-     ]
+     ],
+     "sep": " "
     }
    }
   },
@@ -423,11 +441,20 @@
     "brand": {
      "join": [
       [
-       "Bendruomenės choras „Aidas“",
-       "Choras „Gaida“",
-       "Choras „Giesmė“"
+       "Bendruomenės choras",
+       "Choras",
+       "Mišrus choras"
+      ],
+      [
+       "„Aidas“",
+       "„Gaida“",
+       "„Giesmė“",
+       "„Daina“",
+       "„Balsas“",
+       "„Varpas“"
       ]
-     ]
+     ],
+     "sep": " "
     }
    }
   }
