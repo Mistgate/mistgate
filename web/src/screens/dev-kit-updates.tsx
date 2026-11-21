@@ -57,7 +57,7 @@ import { ShellLayout } from "./shell";
 //   | curjust (the canary has just finished) | off (a node is offline) | none (no nodes) | paused (the owner paused) | nobundle | untrusted | manual | edge.
 //   n<count> (any of them with more nodes: the board's twelve are "ag.new.n12"; from seven nodes the cards give way to the matrix) | wait (every third node of the
 //   extra ones waits for the update) | mix (one of each state a node can be in, a rollout running) | open (the matrix unfolded).
-//   what is open: last (the stages of the last rollout) | pkbusy (the folder is read) | dlg-roll | dlg-sch (the window of fi1: its schedule) | dlg-sch-now | dlg-sch-new
+//   what is open: last (the stages of the last rollout) | pkbusy (the folder is read) | named (ag.fail: the gate names the profiles that did not pass) | rs-<answer> (a click on "read the folder again" answered: fresh | installed | downloading | failed | wait-rollout | wait-os_rollout | wait-panel_update | wait-other) | dlg-roll | dlg-sch (the window of fi1: its schedule) | dlg-sch-now | dlg-sch-new
 //   (no schedule yet, "now") | dlg-sch-new-at | dlg-rollback | dlg-cancel | howto.
 // os.<state>: new (de1 needs a reboot, nl1 has security updates; de1 open) | calm | fail (the install stopped) | off (nl1 offline) | busy (installing) | just (just done)
 //   what is open: closed (no row open) | tick (two ticked) | dlg-sec | dlg-reboot (the windows of de1).
@@ -160,9 +160,13 @@ export function build(p: Parsed): { data: unknown; os: unknown; scene: UpdatesSc
       if (i === 2) d.nodes = allCur().map((n) => (n && (n as { name: string }).name === "fi1" ? { ...(n as object), state: NodeUpdateState.UPDATING } : n));
     } else if (kind === "fail") {
       d.nodes = [others[0], fi1Old({ state: NodeUpdateState.ROLLED_BACK, scheduledUnix: 0, onlineUsers: 0, lastUpdate: { outcome: "rolled_back", fromVersion: "v0.1.70", fromBuilt: 0, toVersion: CUR, toBuilt: 0, reason: "gate_probe_failed", atUnix: NOW - 6 * 60 } }), others[1], others[2]];
-      d.rollout = rollout(RolloutStatus.PAUSED, [fiStep(StepState.ROLLED_BACK, { errorKey: "updates.step.err.probe_failed", finishedUnix: NOW - 6 * 60 })], {
+      // "named": the gate says which profiles did not pass (and which were not held against the update), as gate_profiles.go writes them
+      const named = mods.has("named")
+        ? { failed_profiles: JSON.stringify([{ name: "Main · 443", code: "timeout" }, { name: "Backup", code: "no_round" }]), failed_more: "2", skipped_profiles: JSON.stringify(["Old VLESS"]), skipped_more: "1" }
+        : {};
+      d.rollout = rollout(RolloutStatus.PAUSED, [fiStep(StepState.ROLLED_BACK, { errorKey: "updates.step.err.probe_failed", params: named, finishedUnix: NOW - 6 * 60 })], {
         pauseKey: "updates.pause.gate_failed",
-        pauseParams: { node: "fi1", reason: "probe_failed" },
+        pauseParams: { node: "fi1", reason: "probe_failed", ...named },
         createdUnix: NOW - 12 * 60,
       });
     } else if (kind === "cur" || kind === "curjust") {
@@ -235,6 +239,14 @@ export function fakeCalls(built: ReturnType<typeof build>, mods: Set<string>) {
     api[name] = async () => {
       await sleep(900);
       return {};
+    };
+  }
+  // "read the folder again" answers with what the download did: `rs-fresh|installed|downloading|failed` or `rs-wait-rollout|os_rollout|panel_update|other`
+  const rs = [...mods].find((m) => m.startsWith("rs-"))?.slice(3);
+  if (rs) {
+    api.rescanBundle = async () => {
+      await sleep(900);
+      return { bundle: { params: rs.startsWith("wait-") ? { sync: "waiting", sync_wait: rs.slice(5) } : { sync: rs } } };
     };
   }
   api.refreshOsUpdates = async ({ nodeIds }: { nodeIds: string[] }) => {

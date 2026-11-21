@@ -274,7 +274,8 @@ export function PutDialog({ ctx, onClose, preselect, autorun }: { ctx: TabCtx; o
             const settled = picking && !v.pending;
             const head = picking && !flat && v.group !== listed[i - 1]?.group ? v.group : null;
             const can = picking && !r.need && !v.pending;
-            const why = settled && sh.why ? sh.why : "";
+            // the backend line under the row says the same with its "Change" link: one of the two
+            const why = settled && sh.why && !(r.backend && on) ? sh.why : "";
             const acts = settled && (r.upd || r.share || r.shared || (r.backend && on) || showDom || showPort);
             const runActs = !picking && (run?.notes?.length || showDom || showPort || (phase === "done" && ph === "bad" && run?.inboundId));
             return (

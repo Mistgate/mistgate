@@ -517,10 +517,12 @@
 }
 .an-code.an-cw {
   align-items: flex-start;
+  /* the bottom space is here, not in the clamped line box: padding below a line-clamp lets half of the next line show */
+  padding-block-end: 10px;
 }
 .an-code.an-cw code {
   display: -webkit-box;
-  padding: 6px 0;
+  padding: 6px 0 0;
   white-space: normal;
   word-break: break-all;
   -webkit-line-clamp: 3;
@@ -1113,7 +1115,8 @@
     gap: 8px;
     background: var(--surface);
   }
-  .an-a button {
+  .an-a button,
+  .an-a a {
     flex: 1 1 auto;
     height: 48px;
     border-radius: 12px;
