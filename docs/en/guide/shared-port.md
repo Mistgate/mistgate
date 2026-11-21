@@ -17,6 +17,7 @@ A node with one service on a port works as before: the agent starts the extra li
 | TrustTunnel, HTTP/2 | The **Domain (SNI)** | Yes. It shows the node's own site |
 | MTProto, **This node's name** | Its domain: the node's name or the **Domain (SNI)** | Yes. It shows the node's own decoy site |
 | MTProto, **Another site** | The domain of that site | Yes, if another service shows the node's own site. A visitor with that name gets the other site |
+| MTProto, **Web** mode | Its own name: the node's name or the **Domain (SNI)** | Yes. It shows the node's own decoy site; only a holder of a key gets the bridge page. See [Web Proxy](mtproto.md#web-proxy) |
 | Hysteria2, its HTTPS site on TCP | None | No. The site gives its TCP port up to any TCP profile, as before: [VLESS and Hysteria2 on one node](vless-and-hysteria2.md) |
 | Hysteria2, AmneziaWG, TrustTunnel HTTP/3 | None (UDP) | No. A UDP port is never shared: TrustTunnel with HTTP/3 beside Hysteria2 on UDP 443 is still refused |
 

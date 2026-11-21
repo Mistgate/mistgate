@@ -17,6 +17,7 @@ description: VLESS、TrustTunnel 和 MTProto 如何按客户端请求的名称�
 | TrustTunnel，HTTP/2 | **域名 (SNI)** | 可以。展示节点自己的站点 |
 | MTProto，**本节点的名称** | 它的域名：节点的名称或**域名 (SNI)** | 可以。展示节点自己的伪装站点 |
 | MTProto，**其他站点** | 该站点的域名 | 可以，前提是另有服务展示节点自己的站点。使用该名称的访问者会看到别人的站点 |
+| MTProto，**Web** 模式 | 它自己的名称：节点的名称或**域名 (SNI)** | 可以。展示节点自己的伪装站点；只有持有密钥的人才会拿到桥页面。参见 [Web Proxy](mtproto.md#web-proxy) |
 | Hysteria2，它在 TCP 上的 HTTPS 站点 | 无 | 不可以。站点仍会把自己的 TCP 端口让给任何 TCP 协议配置：[同一节点上的 VLESS 与 Hysteria2](vless-and-hysteria2.md) |
 | Hysteria2、AmneziaWG、带 HTTP/3 的 TrustTunnel | 无（UDP） | 不可以。UDP 端口永远不共用：TrustTunnel 开启 HTTP/3 后与 Hysteria2 同占 UDP 443 仍会被拒绝 |
 

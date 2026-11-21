@@ -132,6 +132,9 @@ Mistgate is in **beta**; the current release is `v0.1.85`. It runs in production
     - title: MTProto in production
       section: profiles
       text: "New in v0.1.69 and experimental. It has not been tried against real blocking yet: give the link to one or two people first and check that Telegram connects from their networks before you hand it out widely. See [MTProto](../guide/mtproto.md)."
+    - title: Telegram Web Proxy in development
+      section: profiles
+      text: "An experimental **Web** mode of the MTProto profile: the Telegram app reaches the proxy as an ordinary HTTPS site on a name of the node, and a stranger sees the node's own site. The panel and the node side are built and checked with the panel's own client; it has not been tried on real Telegram apps yet, and the page the app loads is still a stub. Do not hand it out to people yet. See [Web Proxy](../guide/mtproto.md#web-proxy)."
     - title: The assistant in production
       section: integrations
       text: "New in v0.1.81. It sends the conversation and what its tools read to the provider you choose, so read where each provider's data goes before you connect one, and set a monthly budget. Start with **Only me** under **Who may use it**, and read a plan card's wording before you press **Apply**. See [Providers and where your data goes](../guide/assistant.md#providers-and-where-your-data-goes)."

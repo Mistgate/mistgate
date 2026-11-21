@@ -132,6 +132,9 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.85`�
     - title: 在生产环境中使用 MTProto
       section: profiles
       text: "v0.1.69 新增，实验性。它尚未在真实封锁环境中验证过：先把链接给一两个人，确认 Telegram 能从他们的网络连上，再大范围分发。参见 [MTProto](../guide/mtproto.md)。"
+    - title: Telegram Web Proxy 开发中
+      section: profiles
+      text: "MTProto 协议配置的实验性 **Web** 模式：Telegram 应用像访问普通 HTTPS 网站一样，通过节点上的一个名称连接代理，陌生访问者看到的是节点自己的站点。面板侧和节点侧已经做好，并用面板自己的客户端检验过；尚未在真实的 Telegram 应用上试过，应用加载的页面目前还只是占位。请先不要把它分发给用户。参见 [Web Proxy](../guide/mtproto.md#web-proxy)。"
     - title: 在生产环境中使用助手
       section: integrations
       text: "v0.1.81 新增。它会把对话和工具读取的内容发给你选择的提供商，所以连接提供商之前请先看清它的数据去向，并设置月度预算。先在**谁可以使用**中选择**仅我自己**，按下**应用**之前先读一遍计划卡片的措辞。参见[提供商与数据去向](../guide/assistant.md#提供商与数据去向)。"
