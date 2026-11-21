@@ -1,0 +1,124 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     ["Alt", "Bel", "Kor", "Dor", "Lum", "Mar", "Nor", "Sol", "Wal", "Wer", "Ari", "Ode"],
+     ["ana", "ia", "ora", "ys", "ona", "is", "eo", "ara", "ura", "ik"]
+    ]
+   }
+  },
+  "nav_label": "Nawigacja",
+  "tagline": "Bezpieczny dostęp do konta",
+  "footer": "Wszelkie prawa zastrzeżone.",
+  "nav_home": "Logowanie",
+  "nav_help": "Pomoc",
+  "nav_privacy": "Prywatność",
+  "home_title": "Logowanie",
+  "desc": "Zaloguj się do swojego konta w {brand}.",
+  "desc_help": "Pomoc w logowaniu do {brand}.",
+  "desc_privacy": "Jak {brand} postępuje z Twoimi danymi.",
+  "nf_title": "Nie znaleziono strony",
+  "nf_text": "Strona, której szukasz, nie istnieje albo została przeniesiona.",
+  "nf_back": "Wróć do logowania",
+  "f_user": "Login lub adres e-mail",
+  "f_pass": "Hasło",
+  "f_remember": "Nie wylogowuj mnie",
+  "f_forgot": "Nie pamiętasz hasła?",
+  "f_submit": "Zaloguj się",
+  "f_busy": "Logowanie…",
+  "e_empty": "Wpisz login i hasło.",
+  "e_bad": [
+   "Nieprawidłowy login lub hasło.",
+   "Wpisany login lub hasło jest nieprawidłowe. Spróbuj jeszcze raz.",
+   "Nie udało się zalogować na podstawie tych danych."
+  ],
+  "help_h": "Masz problem z logowaniem?",
+  "help_intro": "Większość problemów z logowaniem ma prostą przyczynę. Zanim z kimś się skontaktujesz, sprawdź po kolei poniższe rzeczy.",
+  "help_steps": [
+   "Sprawdź, czy nie masz włączonego Caps Locka. W hasłach ma znaczenie wielkość liter.",
+   "Sprawdź, czy na początku lub na końcu loginu nie ma przypadkowej spacji.",
+   "Spróbuj jeszcze raz w nowym oknie przeglądarki, bez zapisanych danych formularzy.",
+   "Jeśli kilka prób nie pomogło, odczekaj dziesięć minut."
+  ],
+  "help_contact_h": "Nadal nie działa?",
+  "help_contact": "Poproś osobę, która zarządza serwisem {brand} w Twojej firmie lub placówce, o zresetowanie hasła. Ze względów bezpieczeństwa nie robimy tego przez telefon ani e-mailem.",
+  "help_back": "Wróć do logowania",
+  "privacy_h": "Polityka prywatności",
+  "privacy_intro": "Przechowujemy o Tobie jak najmniej i dbamy o to, co mamy. Poniżej krótko opisujemy, co to jest i po co.",
+  "privacy": [
+   {
+    "h": "Co przechowujemy",
+    "p": "Twój login, daty logowań i dane przypisane do konta. Nic więcej."
+   },
+   {
+    "h": "Do czego to służy",
+    "p": "Żeby można było się zalogować i żeby nikt inny nie wszedł na Twoje konto. Nie sprzedajemy żadnych informacji o naszych użytkownikach."
+   },
+   {
+    "h": "Pliki cookie",
+    "p": "Używamy tylko tych plików cookie, które są potrzebne do działania serwisu. Nie ma reklamowych ani analitycznych plików cookie."
+   },
+   {
+    "h": "Twoje prawa",
+    "p": "Możesz poprosić o wgląd w dane, które o Tobie mamy, o ich poprawienie lub usunięcie. Zwróć się do osoby, która zarządza Twoim kontem."
+   }
+  ]
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Konto klienta",
+   "welcome": "Miło Cię znowu widzieć",
+   "lead": "Zaloguj się, żeby zobaczyć faktury, zmienić swoje dane i zarządzać abonamentem.",
+   "bullets": [
+    "Przeglądanie i pobieranie faktur",
+    "Zmiana danych kontaktowych",
+    "Śledzenie otwartych zgłoszeń"
+   ]
+  },
+  "staff": {
+   "kicker": "Strefa pracownika",
+   "welcome": "Logowanie dla pracowników",
+   "lead": "Zaloguj się kontem służbowym, żeby zobaczyć grafiki, komunikaty i wspólne dokumenty.",
+   "bullets": [
+    "Zmiany i grafiki",
+    "Komunikaty dla zespołu",
+    "Wspólne dokumenty"
+   ],
+   "f_user": "Numer pracownika lub adres e-mail"
+  },
+  "learning": {
+   "kicker": "Platforma szkolna",
+   "welcome": "Zaloguj się do przestrzeni swojej klasy",
+   "lead": "Uczniowie, rodzice i nauczyciele logują się tutaj, żeby znaleźć plany lekcji, zadania domowe i wiadomości.",
+   "bullets": [
+    "Plan lekcji i zadania domowe",
+    "Wiadomości od nauczycieli",
+    "Terminy ferii i wycieczek"
+   ],
+   "f_user": "Login"
+  },
+  "archive": {
+   "kicker": "Archiwum dokumentów",
+   "welcome": "Otwórz swoje archiwum",
+   "lead": "Umowy, rachunki i listy są tu przechowywane dla Ciebie i nikt poza Tobą ich nie zobaczy.",
+   "bullets": [
+    "Umowy i rachunki",
+    "Wszystkie listy w jednym miejscu",
+    "Dostęp, który sam kontrolujesz"
+   ],
+   "f_user": "Adres e-mail"
+  },
+  "bookings": {
+   "kicker": "Rezerwacje",
+   "welcome": "Zarządzaj swoimi rezerwacjami",
+   "lead": "Zaloguj się, żeby zmienić rezerwację, dodać gości albo sprawdzić, co jest przed Tobą.",
+   "bullets": [
+    "Zmiana lub odwołanie rezerwacji",
+    "Dodawanie gości",
+    "Nadchodzące terminy"
+   ],
+   "f_user": "E-mail użyty przy rezerwacji"
+  }
+ }
+}

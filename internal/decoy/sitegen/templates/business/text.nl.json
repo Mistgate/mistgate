@@ -1,0 +1,513 @@
+{
+ "ui": {
+  "nav_label": "Hoofdmenu",
+  "footer": "Zelfstandig en lokaal.",
+  "nav_home": "Home",
+  "nav_about": "Over ons",
+  "nav_contact": "Hier vindt u ons",
+  "home_title": "Welkom",
+  "nf_title": "Pagina niet gevonden",
+  "nf_text": "We konden deze pagina niet vinden. Misschien is hij verhuisd, of hebben we hem nooit gehad.",
+  "nf_back": "Terug naar de startpagina",
+  "see_services": "Bekijk wat we doen",
+  "all_prices": "Volledige prijslijst",
+  "visit_h": "Kom langs",
+  "hours_h": "Openingstijden",
+  "address_l": "Adres",
+  "phone_l": "Telefoon",
+  "about_h": "Over ons",
+  "services_h": "Wat we doen",
+  "services_intro": "Prijzen zijn een richtlijn; we praten graag met u door wat u nodig hebt.",
+  "contact_h": "Hier vindt u ons",
+  "contact_intro": "Kom gerust langs tijdens de openingstijden of neem contact op. We praten graag met u door wat u nodig hebt voordat u iets besluit.",
+  "contact_note": "Parkeren gaat het makkelijkst in de volgende straat. Is de deur tijdens de openingstijden dicht, dan zitten we waarschijnlijk achter; klop en wacht even.",
+  "from_l": "vanaf",
+  "col_service": "Dienst",
+  "col_desc": "Wat het inhoudt",
+  "col_price": "Prijs",
+  "hours_note": "",
+  "directions_h": "Zo vindt u ons",
+  "directions": "U vindt ons op {address}. Het is een korte wandeling vanaf het centrum, en bij de deur staat een fietsenrek.",
+  "services_note": "Blijkt een klus meer te vragen dan we hadden afgesproken, dan vragen we het u voordat we beginnen."
+ },
+ "bundles": {
+  "bakery": {
+   "tagline": "Brood en gebak, gebakken in {city}",
+   "nav_services": "Ons brood",
+   "desc": "Een bakkerij in de buurt in {city}: zuurdesembrood, broodjes en gebak, elke ochtend vers gebakken.",
+   "desc_services": "Broden, broodjes en gebak, met prijzen.",
+   "desc_about": "Het verhaal van {brand}, een kleine bakkerij in {city}.",
+   "desc_contact": "Openingstijden en adres van {brand} in {city}.",
+   "hero_h": "Brood op de langzame manier",
+   "intro": "Een kleine buurtbakkerij. Zuurdesembrood, broodjes en gebak, elke ochtend gebakken voordat de winkel opengaat.",
+   "about": [
+    "{brand} begon in een gehuurde keuken achter een winkel in {city}, met één oven en een flinke dosis optimisme.",
+    "We bakken nog steeds in kleine porties, met meel van een molen een uur verderop en een zuurdesemstarter die ouder is dan onze jongste bakker.",
+    "Kom vroeg voor de broodjes, blijf voor de koffie en zeg het ons als uw brood niet goed was. We willen het liever weten."
+   ],
+   "features": [
+    {
+     "h": "Elke ochtend gebakken",
+     "p": "Er blijft niets van gisteren over."
+    },
+    {
+     "h": "Eerlijke ingrediënten",
+     "p": "Meel, water, zout en tijd."
+    },
+    {
+     "h": "Bestellen kan",
+     "p": "Taarten en grotere bestellingen in overleg."
+    }
+   ],
+   "services": [
+    {
+     "t": "Boerenbrood op zuurdesem",
+     "d": "Langzaam gerezen, met een dikke korst en een luchtige kruim."
+    },
+    {
+     "t": "Roggebrood met zaden",
+     "d": "Compact, donker en heerlijk met kaas."
+    },
+    {
+     "t": "Zachte broodjes, zes",
+     "d": "Om vijf uur gebakken en meestal om tien uur op."
+    },
+    {
+     "t": "Krentenbollen",
+     "d": "Met de hand gerold en nog warm geglazuurd."
+    },
+    {
+     "t": "Feesttaart",
+     "d": "Bestel graag drie dagen van tevoren; de smaken stemmen we met u af."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Rogge",
+       "Honing",
+       "Haver",
+       "Gerst",
+       "Venkel",
+       "Kruim",
+       "Haard",
+       "Zondag",
+       "Sesam",
+       "Pruim"
+      ],
+      [
+       "Merel",
+       "Vink",
+       "Mus",
+       "Putter",
+       "Lijster",
+       "Roodborstje",
+       "Gierzwaluw",
+       "Leeuwerik"
+      ]
+     ],
+     "sep": " & "
+    }
+   }
+  },
+  "bike": {
+   "tagline": "Fietsen repareren in {city}",
+   "nav_services": "Prijzen",
+   "desc": "Fietsreparatie en onderhoud in {city}, terwijl u wacht of de volgende dag klaar.",
+   "desc_services": "Reparatie en onderhoud van fietsen, met prijzen.",
+   "desc_about": "Over {brand}, een kleine fietsenmakerij in {city}.",
+   "desc_contact": "Openingstijden en adres van {brand} in {city}.",
+   "hero_h": "Uw fiets rijdt weer als vanouds",
+   "intro": "Een kleine werkplaats voor gewone fietsen. We repareren wat stuk is, stellen af wat niet helemaal goed zit en zeggen eerlijk wat het geld niet waard is.",
+   "about": [
+    "{brand} begon in een tuinschuurtje in {city}, waar we de fietsen van de buren repareerden voor de prijs van een kop koffie.",
+    "Nu hebben we een echte werkplaats, een heel lange werkbank en een muur vol onderdelen die alleen wij begrijpen. Repareren vinden we nog steeds mooier dan vervangen.",
+    "Neem alles mee met twee wielen. Kunnen we het niet maken, dan vertellen we u wie het wel kan."
+   ],
+   "features": [
+    {
+     "h": "Terwijl u wacht",
+     "p": "De meeste kleine reparaties duren minder dan een uur."
+    },
+    {
+     "h": "Eerlijk advies",
+     "p": "We zeggen het als iets het repareren niet waard is."
+    },
+    {
+     "h": "Onderhoud tot de volgende dag",
+     "p": "Breng hem 's ochtends, haal hem morgen op."
+    }
+   ],
+   "services": [
+    {
+     "t": "Bandenreparatie",
+     "d": "Binnenband vervangen en gecontroleerd, buitenband nagekeken op de dader."
+    },
+    {
+     "t": "Kleine beurt",
+     "d": "Remmen en versnellingen afgesteld, ketting schoongemaakt en gesmeerd, banden en bouten gecontroleerd."
+    },
+    {
+     "t": "Grote beurt",
+     "d": "Aandrijving uit elkaar, ontvet en opnieuw gemonteerd, met nieuwe kabels waar nodig."
+    },
+    {
+     "t": "Wiel richten",
+     "d": "Slagen eruit en de spaakspanning gelijkgetrokken."
+    },
+    {
+     "t": "Wintercontrole",
+     "d": "Verlichting, remmen, banden en spatborden, zodat de donkere maanden minder risico zijn."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Spaak",
+       "Ketting",
+       "Tandwiel",
+       "Pedaal",
+       "Trapas",
+       "Wiel",
+       "Naaf",
+       "Velg",
+       "Zadel",
+       "Stuur"
+      ],
+      [
+       "fietsen",
+       "herstel",
+       "werk",
+       "garage",
+       "werkbank",
+       "service"
+      ]
+     ]
+    }
+   }
+  },
+  "tailor": {
+   "tagline": "Vermaak en herstel in {city}",
+   "nav_services": "Vermaak",
+   "desc": "Kleding vermaken en herstellen in {city}: zomen, ritsen, passen en stoppen.",
+   "desc_services": "Vermaak en herstel van kleding, met prijzen.",
+   "desc_about": "Over {brand}, een klein vermaakatelier in {city}.",
+   "desc_contact": "Openingstijden en adres van {brand} in {city}.",
+   "hero_h": "Kleding die langer past",
+   "intro": "Zomen, ritsen, passen en herstel, met de hand en op de machine, in een klein atelier boven de winkels.",
+   "about": [
+    "{brand} is een atelier van twee mensen op de eerste verdieping van een pand in {city}, boven een winkel die wol verkoopt.",
+    "We leerden het vak van mensen die het veertig jaar deden, en we hebben een paar van hun gewoonten overgehouden, zoals altijd twee keer spelden.",
+    "Weet u niet zeker of iets het vermaken waard is, neem het dan mee. We zeggen het u eerlijk."
+   ],
+   "features": [
+    {
+     "h": "Met zorg hersteld",
+     "p": "Elk kledingstuk bekijken we goed voordat we beginnen."
+    },
+    {
+     "h": "Op uw maat",
+     "p": "We spelden het op u, niet op een pop."
+    },
+    {
+     "h": "Klaar zoals beloofd",
+     "p": "We noemen u een dag en houden ons eraan."
+    }
+   ],
+   "services": [
+    {
+     "t": "Broek of rok korter maken",
+     "d": "Op uw lengte gezoomd, met de oorspronkelijke afwerking waar mogelijk."
+    },
+    {
+     "t": "Colbert innemen",
+     "d": "Zijkanten en mouwen aangepast zodat hij goed hangt."
+    },
+    {
+     "t": "Rits vervangen",
+     "d": "In kleur en gewicht passend gekozen, netjes ingezet."
+    },
+    {
+     "t": "Jaszak en voering herstellen",
+     "d": "Een gescheurde voering vervangen of hersteld, zakken inbegrepen."
+    },
+    {
+     "t": "Stoppen en verstellen",
+     "d": "Zichtbaar of onzichtbaar, zoals u wilt."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Naald",
+       "Vingerhoed",
+       "Zoom",
+       "Naad",
+       "Manchet",
+       "Kraag",
+       "Plooi",
+       "Spoel",
+       "Band",
+       "Garen"
+      ],
+      [
+       "& Speld",
+       "& Draad",
+       "& Knoop",
+       "& Schaar",
+       "& Lint",
+       "& Zijde",
+       "& Co",
+       "& Dochter"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "clock": {
+   "tagline": "Horloges en klokken repareren in {city}",
+   "nav_services": "Reparaties",
+   "desc": "Horloges en klokken repareren in {city}: onderhoud, batterijen, bandjes en restauratie.",
+   "desc_services": "Reparatie van horloges en klokken, met prijzen.",
+   "desc_about": "Over {brand}, een kleine werkplaats voor horloges en klokken in {city}.",
+   "desc_contact": "Openingstijden en adres van {brand} in {city}.",
+   "hero_h": "De tijd weer op orde",
+   "intro": "Een kleine werkbank waar horloges en klokken worden schoongemaakt, afgesteld en weer goed de tijd bijhouden.",
+   "about": [
+    "{brand} is een werkbank voor één persoon in een hoek van {city}, met een heel goede lamp en een la vol piepkleine schroefjes.",
+    "Het meeste dat binnenkomt is geërfd: het horloge van een grootvader, een klok van een schoorsteenmantel. We proberen het te herstellen en te laten zoals het was.",
+    "We verkopen geen nieuwe horloges. We laten alleen de oude weer lopen."
+   ],
+   "features": [
+    {
+     "h": "Zorgvuldig werk",
+     "p": "Elk uurwerk wordt geopend, schoongemaakt en gecontroleerd."
+    },
+    {
+     "h": "Met garantie",
+     "p": "Op onderhoud zit twaalf maanden garantie."
+    },
+    {
+     "h": "Eerlijke offertes",
+     "p": "U hoort de prijs voordat er iets wordt aangeraakt."
+    }
+   ],
+   "services": [
+    {
+     "t": "Onderhoud mechanisch horloge",
+     "d": "Uurwerk schoongemaakt, gesmeerd, afgesteld en meerdere dagen getest."
+    },
+    {
+     "t": "Batterij vervangen",
+     "d": "Nieuwe batterij geplaatst en de afdichting gecontroleerd."
+    },
+    {
+     "t": "Klok reviseren",
+     "d": "Schoorsteen- en wandklokken uit elkaar gehaald, hersteld en weer aan de gang gebracht."
+    },
+    {
+     "t": "Bandje vervangen",
+     "d": "Leren, stoffen en metalen bandjes terwijl u wacht."
+    },
+    {
+     "t": "Kast reinigen",
+     "d": "Voorzichtig oppoetsen van kasten en armbanden, zonder het karakter weg te halen."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Slinger",
+       "Onrust",
+       "Veer",
+       "Anker",
+       "Tandrad",
+       "Wijzerplaat",
+       "Klokkenspel",
+       "Opwinder",
+       "Gangwerk",
+       "Robijn"
+      ],
+      [
+       "& Zoon",
+       "Uurwerken",
+       "Horlogerie",
+       "Tijdwerk",
+       "Werkbank",
+       "Tijdmeters",
+       "Werkplaats",
+       "Service"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "framing": {
+   "tagline": "Lijsten maken in {city}",
+   "nav_services": "Inlijsten",
+   "desc": "Inlijsten in {city}: passepartouts, glas, objectlijsten en restauratie.",
+   "desc_services": "Inlijsten, opplakken en ophangen, met prijzen.",
+   "desc_about": "Over {brand}, een kleine lijstenmakerij in {city}.",
+   "desc_contact": "Openingstijden en adres van {brand} in {city}.",
+   "hero_h": "Lijsten op maat",
+   "intro": "Een lijstenmakerij voor prenten, foto's, textiel en dingen die helemaal niet in een lijst passen.",
+   "about": [
+    "{brand} is een kleine werkplaats in {city} die al verstekken zaagt sinds lang voordat iemand in het gebouw geboren was.",
+    "We lijsten veel kindertekeningen in en een paar heel oude kaarten. Beide krijgen dezelfde aandacht en hetzelfde zuurvrije karton.",
+    "Breng ons iets waar u om geeft en we vinden de lijst waar het op wacht."
+   ],
+   "features": [
+    {
+     "h": "Op maat gemaakt",
+     "p": "Elke lijst wordt in onze werkplaats gezaagd en in elkaar gezet."
+    },
+    {
+     "h": "Zorgvuldige keuzes",
+     "p": "We helpen u een passepartout en een lijst te kiezen die bij het werk passen."
+    },
+    {
+     "h": "Museumglas",
+     "p": "Verkrijgbaar voor werk dat lang mee moet."
+    }
+   ],
+   "services": [
+    {
+     "t": "Standaardlijst, A4",
+     "d": "Een eenvoudige lijst, een passepartout en helder glas."
+    },
+    {
+     "t": "Grote lijst",
+     "d": "Voor affiches en grote prenten, met lichter glas."
+    },
+    {
+     "t": "Objectlijst",
+     "d": "Voor medailles, schelpen, kaartjes en andere kleine dingen die het bewaren waard zijn."
+    },
+    {
+     "t": "Een oude lijst herstellen",
+     "d": "Herstel, opnieuw vergulden en een nieuwe achterkant."
+    },
+    {
+     "t": "Ophangservice",
+     "d": "We brengen de schilderijen mee en hangen ze recht."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Verguld",
+       "Passe-partout",
+       "Verstek",
+       "Sponning",
+       "Glas",
+       "Ophanger",
+       "Afschuining",
+       "Ezel",
+       "Linnen",
+       "Lijst"
+      ],
+      [
+       "& Lijst",
+       "Lijstenmakerij",
+       "Galerie",
+       "Werkplaats",
+       "Studio",
+       "Passepartouts",
+       "Huis",
+       "Atelier"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "piano": {
+   "tagline": "Piano's stemmen en onderhouden in {city}",
+   "nav_services": "Diensten",
+   "desc": "Piano's stemmen, kleine reparaties en advies in {city} en de omliggende dorpen.",
+   "desc_services": "Piano's stemmen en repareren, met prijzen.",
+   "desc_about": "Over {brand}, een pianostemmer in {city}.",
+   "desc_contact": "Hoe u {brand} in {city} kunt boeken.",
+   "hero_h": "Een piano die klinkt als een piano",
+   "intro": "Stemmen, kleine reparaties en eerlijk advies voor pianino's en vleugels in {city} en de dorpen eromheen.",
+   "about": [
+    "{brand} is één persoon met een koffer vol stemgereedschap en een oude stationwagen, werkzaam in {city} en de dorpen eromheen.",
+    "De meeste piano's die ik zie, zijn jaren niet gestemd en klinken nog beter dan hun eigenaars verwachten. Met wat geduld kom je een heel eind.",
+    "Ik zeg u eerlijk wat een piano nodig heeft en wat hij kan missen."
+   ],
+   "features": [
+    {
+     "h": "Bezoek aan huis",
+     "p": "We stemmen waar de piano staat."
+    },
+    {
+     "h": "Zonder haast",
+     "p": "Een stembeurt duurt zo lang als nodig is."
+    },
+    {
+     "h": "Duidelijke antwoorden",
+     "p": "Is een piano het repareren niet waard, dan zeggen we dat."
+    }
+   ],
+   "services": [
+    {
+     "t": "Piano stemmen",
+     "d": "Een gewone stembeurt op concertstemming, ongeveer negentig minuten."
+    },
+    {
+     "t": "Stemmen en lichte regulatie",
+     "d": "Stemmen plus kleine aanpassingen zodat de toetsen gelijkmatiger spelen."
+    },
+    {
+     "t": "Stemming optrekken",
+     "d": "Voor piano's die na jaren zonder aandacht te laag zijn gaan staan."
+    },
+    {
+     "t": "Reparaties en offertes",
+     "d": "Klemmende toetsen, losse pedalen en snerpende snaren."
+    },
+    {
+     "t": "Advies voor de koop",
+     "d": "Een bezoek om een tweedehands piano te bekijken voordat u koopt."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Octaaf",
+       "Discant",
+       "Cadans",
+       "Mineur",
+       "Kwint",
+       "Harmonie",
+       "Sonate",
+       "Toonhoogte",
+       "Legato",
+       "Fuga"
+      ],
+      [
+       "Stemmen",
+       "Piano's",
+       "Toetsen",
+       "Studio",
+       "Service",
+       "Werkplaats",
+       "Zorg",
+       "Restauratie"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "hours_note": "Bezoeken op afspraak. Boek graag een paar dagen van tevoren."
+  }
+ }
+}

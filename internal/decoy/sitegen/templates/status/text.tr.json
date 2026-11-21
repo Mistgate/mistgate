@@ -1,0 +1,229 @@
+{
+ "ui": {
+  "nav_label": "Ana menü",
+  "tagline": "Hizmet durumu",
+  "footer": "Tüm saatler UTC olarak gösterilir.",
+  "nav_home": "Durum",
+  "nav_history": "Olay geçmişi",
+  "nav_about": "Hakkında",
+  "home_title": "Güncel durum",
+  "desc": "{brand} hizmetlerinin güncel durumu ve çalışma süresi.",
+  "desc_history": "{brand} hizmetlerinde yaşanan geçmiş olaylar ve nasıl çözüldükleri.",
+  "desc_about": "{brand} çalışma süresini nasıl ölçüyor ve olayları nasıl bildiriyor.",
+  "nf_title": "Sayfa bulunamadı",
+  "nf_text": "Bu adreste bir şey yok. Durum sayfası ana sayfadadır.",
+  "nf_back": "Durum sayfasına git",
+  "banner_ok": "Tüm sistemler çalışıyor",
+  "banner_sub": "Tüm {brand} hizmetleri normal şekilde çalışıyor.",
+  "comps_h": "Hizmetler",
+  "op": "Çalışıyor",
+  "up_label": "çalışma süresi",
+  "days_ago_l": "60 gün önce",
+  "days_ago_r": "Bugün",
+  "m_uptime": "Çalışma süresi, son 90 gün",
+  "m_resp": "Ortanca yanıt süresi",
+  "m_inc": "Kayıtlı olay sayısı",
+  "recent_h": "Son olaylar",
+  "all_inc": "Tüm olay geçmişi",
+  "history_h": "Olay geçmişi",
+  "history_intro": "Geçen aylarda neyin ters gittiği ve nasıl düzeltildiği, en yeniden en eskiye doğru.",
+  "st_inv": "İnceleniyor",
+  "st_ident": "Neden bulundu",
+  "st_res": "Çözüldü",
+  "imp_minor": "Küçük",
+  "imp_major": "Büyük",
+  "imp_maint": "Bakım",
+  "dur_l": "Süre",
+  "about_h": "Bu sayfa hakkında",
+  "about": [
+   {
+    "h": "Bu sayfa neyi gösterir",
+    "p": "Bu sayfa {brand} hizmetlerinin anlık durumunu ve geçmiş olayların kaydını gösterir. Sayfayı hizmetleri işleten ekip güncel tutar."
+   },
+   {
+    "h": "Çalışma süresi nasıl ölçülür",
+    "p": "Her hizmet birkaç yerden dakikada bir kontrol edilir. Kontrollerin yarısından fazlası başarısız olursa o dakika kesinti sayılır."
+   },
+   {
+    "h": "Olayları nasıl bildiriyoruz",
+    "p": "Bir sorunu incelemeye başladığımızda, nedenini bulduğumuzda ve sorun çözüldüğünde bir güncelleme yayımlarız. Büyük olaylar için sonradan kısa bir değerlendirme yazarız."
+   },
+   {
+    "h": "Planlı bakım",
+    "p": "Planlı çalışmalar burada en az üç gün önceden duyurulur ve sakin saatlerde yapılır."
+   }
+  ],
+  "incidents": [
+   {
+    "title": "Hata oranında artış",
+    "impact": "major",
+    "dur": "38 dakika",
+    "a": "Başarısız isteklerin oranı normalden yüksek. Nedenini araştırıyoruz.",
+    "b": "Hatalı bir yapılandırma değişikliği bulundu ve geri alınıyor.",
+    "c": "Değişiklik geri alındı, hata oranları normale döndü. Nasıl gözden kaçtığını inceleyeceğiz."
+   },
+   {
+    "title": "Bildirimlerde gecikme",
+    "impact": "minor",
+    "dur": "1 saat 12 dakika",
+    "a": "Bildirimler birkaç dakika gecikmeyle ulaşıyor.",
+    "b": "Bildirimleri işleyen kuyrukta bir birikme olduğu görüldü.",
+    "c": "Birikme temizlendi, teslimat süreleri yeniden normal."
+   },
+   {
+    "title": "Sayfalar yavaş açılıyor",
+    "impact": "minor",
+    "dur": "26 dakika",
+    "a": "Bazı kullanıcılar sayfaların yavaş açıldığını bildiriyor. İnceliyoruz.",
+    "b": "Bir veritabanı sunucusu aşırı ısınmıştı ve devreden çıkarıldı.",
+    "c": "Sayfa açılış süreleri normale döndü."
+   },
+   {
+    "title": "Planlı bakım uzadı",
+    "impact": "maint",
+    "dur": "planlanandan 40 dakika uzun",
+    "a": "Ana veritabanımızdaki bakım planlanandan uzun sürüyor.",
+    "b": "Yükseltmenin son adımının bitmesi için birkaç dakika daha gerekiyor.",
+    "c": "Bakım tamamlandı, tüm hizmetler normal çalışıyor."
+   },
+   {
+    "title": "Tek bir bölgede kısmi kesinti",
+    "impact": "major",
+    "dur": "54 dakika",
+    "a": "Bir bölgedeki kullanıcılar hizmete ulaşamıyor. Barındırma sağlayıcımızla çalışıyoruz.",
+    "b": "Sağlayıcı, o bölgedeki sunucularımızı etkileyen bir ağ arızası olduğunu doğruladı.",
+    "c": "Ağ arızası giderildi, bölge yeniden trafik alıyor."
+   },
+   {
+    "title": "Arama sonuçları güncel değil",
+    "impact": "minor",
+    "dur": "2 saat 5 dakika",
+    "a": "Yeni kayıtlar arama sonuçlarında görünmüyor.",
+    "b": "Dizinleme işi başarısız bir yayından sonra durmuştu, yeniden başlatıldı.",
+    "c": "Dizinleme yetişti, arama yeniden güncel."
+   },
+   {
+    "title": "Bazı kullanıcılar giriş yapamıyor",
+    "impact": "major",
+    "dur": "19 dakika",
+    "a": "Bazı kullanıcılar giriş yapamıyor, diğerleri etkilenmiyor.",
+    "b": "Giriş hizmetindeki süresi dolmuş bir sertifika bulundu.",
+    "c": "Sertifika yenilendi, giriş herkes için yeniden çalışıyor."
+   },
+   {
+    "title": "Yüklemeler ara sıra başarısız oluyor",
+    "impact": "minor",
+    "dur": "47 dakika",
+    "a": "Yüklemelerin küçük bir kısmı başarısız oluyor, yeniden denemek gerekiyor.",
+    "b": "Diski dolmuş bir depolama sunucusu bulundu.",
+    "c": "Kapasite artırıldı, yüklemeler yeniden başarılı oluyor."
+   },
+   {
+    "title": "API yanıtları yavaş",
+    "impact": "minor",
+    "dur": "31 dakika",
+    "a": "API'ye gelen bazı istekler her zamankinden geç yanıtlanıyor. İnceliyoruz.",
+    "b": "Sunuculardan birinde bir arka plan işi çok fazla bellek kullanıyordu.",
+    "c": "İş bellek sınırıyla yeniden başlatıldı, yanıt süreleri normale döndü."
+   },
+   {
+    "title": "Webhook teslimatları gecikti",
+    "impact": "minor",
+    "dur": "52 dakika",
+    "a": "Webhook'lar hedeflerine birkaç dakika geç ulaşıyor.",
+    "b": "Webhook'ları gönderen kuyruk, veritabanına yavaş bir bağlantıyı bekliyordu.",
+    "c": "Bağlantı düzeltildi, kuyruk temizlendi ve webhook'lar yeniden zamanında geliyor."
+   },
+   {
+    "title": "Yönetim paneli açılmıyor",
+    "impact": "major",
+    "dur": "22 dakika",
+    "a": "Yönetim paneli herkese bir hata sayfası gösteriyor. Diğer hizmetler etkilenmiyor.",
+    "b": "Son sürümün açılış kodunda bir hata vardı ve bulundu.",
+    "c": "Sürüm geri alındı, yönetim paneli yeniden açılıyor."
+   },
+   {
+    "title": "Planlı bakım: veritabanı yükseltmesi",
+    "impact": "maint",
+    "dur": "1 saat",
+    "a": "Planlı bakım sürüyor. Bazı özellikler bitene kadar salt okunur.",
+    "b": "Yükseltmenin yarısı tamamlandı, plana uygun ilerliyor.",
+    "c": "Bakım tamamlandı, her şey normal çalışıyor."
+   }
+  ],
+  "inc_back": "Olay geçmişi",
+  "inc_more": "Diğer olaylar",
+  "status_l": "Durum",
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Kuzey",
+      "Kıyı",
+      "Kobalt",
+      "Ateş",
+      "Çınar",
+      "Ardıç",
+      "Nehir",
+      "Zümrüt",
+      "Rüzgâr",
+      "Meşe",
+      "Yıldız",
+      "Işık"
+     ],
+     [
+      "Bulut",
+      "Köprü",
+      "Hat",
+      "Kapı",
+      "Atölye",
+      "Panel",
+      "Ağ",
+      "Merkez",
+      "Servis",
+      "Bağ"
+     ]
+    ],
+    "sep": " "
+   }
+  }
+ },
+ "bundles": {
+  "saas": {
+   "components": [
+    "Genel API",
+    "Yönetim paneli",
+    "Webhook'lar",
+    "Kimlik doğrulama",
+    "Arka plan işleri",
+    "Veri dışa aktarma",
+    "Faturalama",
+    "Belge sitesi"
+   ]
+  },
+  "photos": {
+   "components": [
+    "Görsel yükleme",
+    "Görsel dağıtımı",
+    "Albümler ve paylaşım",
+    "Web uygulaması",
+    "Mobil eşitleme",
+    "Arama",
+    "Bildirimler",
+    "Hesap ve giriş"
+   ]
+  },
+  "mail": {
+   "components": [
+    "E-posta gönderimi",
+    "SMS gönderimi",
+    "Mesaj şablonları",
+    "Teslimat raporları",
+    "REST API",
+    "Yönetim paneli",
+    "Abonelikten çıkış sayfaları",
+    "Zamanlama"
+   ]
+  }
+ }
+}

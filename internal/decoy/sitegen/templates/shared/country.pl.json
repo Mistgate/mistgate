@@ -1,0 +1,278 @@
+{
+ "order": 10,
+ "lang": "pl",
+ "html_lang": "pl-PL",
+ "date": [
+  "{d} {m} {y}",
+  "{dd}.{mm}.{y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "{n} zł",
+  "group": " ",
+  "scale": 3.6,
+  "round": 5
+ },
+ "address": "ul. {street} {no}, {zip} {city}",
+ "zip_tail": "XXX",
+ "cities": [
+  {
+   "name": "Warszawa",
+   "in": "w Warszawie",
+   "zip": [
+    "00-",
+    "01-",
+    "02-"
+   ]
+  },
+  {
+   "name": "Kraków",
+   "in": "w Krakowie",
+   "zip": [
+    "30-",
+    "31-"
+   ]
+  },
+  {
+   "name": "Łódź",
+   "in": "w Łodzi",
+   "zip": [
+    "90-",
+    "91-",
+    "93-"
+   ]
+  },
+  {
+   "name": "Wrocław",
+   "in": "we Wrocławiu",
+   "zip": [
+    "50-",
+    "51-",
+    "53-"
+   ]
+  },
+  {
+   "name": "Poznań",
+   "in": "w Poznaniu",
+   "zip": [
+    "60-",
+    "61-"
+   ]
+  },
+  {
+   "name": "Gdańsk",
+   "in": "w Gdańsku",
+   "zip": [
+    "80-"
+   ]
+  },
+  {
+   "name": "Szczecin",
+   "in": "w Szczecinie",
+   "zip": [
+    "70-",
+    "71-"
+   ]
+  },
+  {
+   "name": "Bydgoszcz",
+   "in": "w Bydgoszczy",
+   "zip": [
+    "85-"
+   ]
+  },
+  {
+   "name": "Lublin",
+   "in": "w Lublinie",
+   "zip": [
+    "20-"
+   ]
+  },
+  {
+   "name": "Białystok",
+   "in": "w Białymstoku",
+   "zip": [
+    "15-"
+   ]
+  },
+  {
+   "name": "Katowice",
+   "in": "w Katowicach",
+   "zip": [
+    "40-"
+   ]
+  },
+  {
+   "name": "Gdynia",
+   "in": "w Gdyni",
+   "zip": [
+    "81-"
+   ]
+  },
+  {
+   "name": "Częstochowa",
+   "in": "w Częstochowie",
+   "zip": [
+    "42-"
+   ]
+  },
+  {
+   "name": "Radom",
+   "in": "w Radomiu",
+   "zip": [
+    "26-"
+   ]
+  },
+  {
+   "name": "Toruń",
+   "in": "w Toruniu",
+   "zip": [
+    "87-"
+   ]
+  },
+  {
+   "name": "Rzeszów",
+   "in": "w Rzeszowie",
+   "zip": [
+    "35-"
+   ]
+  },
+  {
+   "name": "Kielce",
+   "in": "w Kielcach",
+   "zip": [
+    "25-"
+   ]
+  },
+  {
+   "name": "Olsztyn",
+   "in": "w Olsztynie",
+   "zip": [
+    "10-"
+   ]
+  },
+  {
+   "name": "Opole",
+   "in": "w Opolu",
+   "zip": [
+    "45-"
+   ]
+  },
+  {
+   "name": "Gliwice",
+   "in": "w Gliwicach",
+   "zip": [
+    "44-"
+   ]
+  },
+  {
+   "name": "Bielsko-Biała",
+   "in": "w Bielsku-Białej",
+   "zip": [
+    "43-"
+   ]
+  },
+  {
+   "name": "Zielona Góra",
+   "in": "w Zielonej Górze",
+   "zip": [
+    "65-"
+   ]
+  }
+ ],
+ "streets": [
+  "Długa",
+  "Krótka",
+  "Szkolna",
+  "Kościelna",
+  "Ogrodowa",
+  "Lipowa",
+  "Polna",
+  "Leśna",
+  "Słoneczna",
+  "Kwiatowa",
+  "Dworcowa",
+  "Parkowa",
+  "Spacerowa",
+  "Wiejska",
+  "Zielona",
+  "Mickiewicza",
+  "Sienkiewicza",
+  "Słowackiego",
+  "Piaskowa",
+  "Brzozowa"
+ ],
+ "first": [
+  "Jakub",
+  "Anna:f",
+  "Antoni",
+  "Maria:f",
+  "Szymon",
+  "Zofia:f",
+  "Jan",
+  "Julia:f",
+  "Michał",
+  "Katarzyna:f",
+  "Piotr",
+  "Agnieszka:f",
+  "Paweł",
+  "Magdalena:f",
+  "Tomasz",
+  "Ewa:f",
+  "Marcin",
+  "Joanna:f",
+  "Krzysztof",
+  "Małgorzata:f",
+  "Łukasz",
+  "Aleksandra:f",
+  "Adam",
+  "Monika:f",
+  "Wojciech",
+  "Barbara:f",
+  "Kamil",
+  "Natalia:f",
+  "Mateusz",
+  "Marta:f",
+  "Rafał",
+  "Beata:f",
+  "Grzegorz",
+  "Hanna:f"
+ ],
+ "last": [
+  "Nowak",
+  "Kowalski/Kowalska",
+  "Wiśniewski/Wiśniewska",
+  "Wójcik",
+  "Kowalczyk",
+  "Kamiński/Kamińska",
+  "Lewandowski/Lewandowska",
+  "Zieliński/Zielińska",
+  "Szymański/Szymańska",
+  "Woźniak",
+  "Dąbrowski/Dąbrowska",
+  "Kozłowski/Kozłowska",
+  "Jankowski/Jankowska",
+  "Mazur",
+  "Kwiatkowski/Kwiatkowska",
+  "Krawczyk",
+  "Piotrowski/Piotrowska",
+  "Grabowski/Grabowska",
+  "Pawłowski/Pawłowska",
+  "Michalski/Michalska",
+  "Król",
+  "Wieczorek",
+  "Jabłoński/Jabłońska",
+  "Wróbel",
+  "Nowakowski/Nowakowska",
+  "Majewski/Majewska",
+  "Olszewski/Olszewska",
+  "Stępień",
+  "Malinowski/Malinowska",
+  "Jaworski/Jaworska",
+  "Adamczyk",
+  "Dudek",
+  "Zając",
+  "Pietrzak",
+  "Sikora"
+ ]
+}

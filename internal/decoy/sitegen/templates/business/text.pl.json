@@ -1,0 +1,143 @@
+{
+ "ui": {
+  "nav_label": "Nawigacja",
+  "footer": "Niezależnie i lokalnie.",
+  "nav_home": "Strona główna",
+  "nav_about": "O nas",
+  "nav_contact": "Jak nas znaleźć",
+  "home_title": "Witamy",
+  "nf_title": "Nie znaleziono strony",
+  "nf_text": "Nie znaleźliśmy tej strony. Mogła zmienić adres albo nigdy jej u nas nie było.",
+  "nf_back": "Wróć na stronę główną",
+  "see_services": "Zobacz, co oferujemy",
+  "all_prices": "Pełny cennik",
+  "visit_h": "Odwiedź nas",
+  "hours_h": "Godziny otwarcia",
+  "address_l": "Adres",
+  "phone_l": "Telefon",
+  "about_h": "O nas",
+  "services_h": "Co oferujemy",
+  "services_intro": "Ceny są orientacyjne. Chętnie porozmawiamy o tym, czego potrzebujesz.",
+  "contact_h": "Jak nas znaleźć",
+  "contact_intro": "Wpadnij w godzinach otwarcia albo napisz do nas. Chętnie porozmawiamy o tym, czego potrzebujesz, zanim cokolwiek zdecydujesz.",
+  "contact_note": "Najłatwiej zaparkować w sąsiedniej ulicy. Jeśli w godzinach otwarcia drzwi są zamknięte, jesteśmy pewnie na zapleczu. Zapukaj i chwilę poczekaj.",
+  "from_l": "od",
+  "col_service": "Usługa",
+  "col_desc": "Co obejmuje",
+  "col_price": "Cena",
+  "hours_note": "",
+  "directions_h": "Jak do nas trafić",
+  "directions": "Znajdziesz nas pod adresem {address}. To kilka minut spacerem od centrum, a przy drzwiach stoi stojak na rowery.",
+  "services_note": "Jeśli okaże się, że praca wymaga więcej, niż wyceniliśmy, zapytamy Cię, zanim zaczniemy."
+ },
+ "bundles": {
+  "bakery": {
+   "tagline": "Chleb i ciasta, pieczone {city_in}",
+   "nav_services": "Nasze wypieki",
+   "desc": "Osiedlowa piekarnia {city_in}: chleb na zakwasie, bułki i ciasta, pieczone każdego ranka.",
+   "desc_services": "Chleby, bułki i ciasta z cenami.",
+   "desc_about": "Historia piekarni {brand} {city_in}.",
+   "desc_contact": "Godziny otwarcia i adres piekarni {brand} {city_in}.",
+   "hero_h": "Chleb pieczony powoli",
+   "intro": "Mała osiedlowa piekarnia. Chleb na zakwasie, bułki i ciasta, pieczone każdego ranka, zanim otworzymy sklep.",
+   "about": [
+    "Początki {brand} to wynajęta kuchnia na zapleczu sklepu {city_in}, jeden piec i spora dawka optymizmu.",
+    "Nadal pieczemy małymi partiami, z mąki z młyna oddalonego o godzinę drogi i na zakwasie starszym niż nasz najmłodszy piekarz.",
+    "Przyjdź wcześnie po bułki, zostań na kawę i powiedz nam, jeśli chleb nie był taki, jak trzeba. Wolimy to wiedzieć."
+   ],
+   "features": [
+    {"h": "Pieczone każdego ranka", "p": "Nic nie zostaje z poprzedniego dnia."},
+    {"h": "Uczciwe składniki", "p": "Mąka, woda, sól i czas."},
+    {"h": "Zamówienia mile widziane", "p": "Ciasta i większe zamówienia na życzenie."}
+   ],
+   "services": [
+    {"t": "Chleb wiejski na zakwasie", "d": "Długo rośnie, ma grubą skórkę i miękki, dziurkowany miąższ."},
+    {"t": "Chleb żytni z ziarnami", "d": "Gęsty, ciemny i bardzo dobry z serem."},
+    {"t": "Bułki poranne, sześć sztuk", "d": "Miękkie bułki, pieczone o piątej i zwykle wyprzedane przed dziesiątą."},
+    {"t": "Drożdżówka z serem", "d": "Zwijana ręcznie i lukrowana jeszcze ciepła."},
+    {"t": "Tort okolicznościowy", "d": "Zamów go z trzydniowym wyprzedzeniem. Smaki ustalimy razem z Tobą."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Żyto", "Miód", "Owies", "Jęczmień", "Koper", "Okruch", "Piec", "Niedziela", "Sezam", "Śliwka"],
+      ["Wróbel", "Jaskółka", "Skowronek", "Gil", "Szpak", "Rudzik", "Sikorka", "Kos"]
+     ],
+     "sep": " & "
+    }
+   }
+  },
+  "bike": {
+   "tagline": "Naprawa rowerów {city_in}",
+   "nav_services": "Cennik",
+   "desc": "Naprawa i serwis rowerów {city_in}, na miejscu albo do następnego dnia.",
+   "desc_services": "Naprawa i serwis rowerów z cenami.",
+   "desc_about": "O serwisie {brand}, małym warsztacie rowerowym {city_in}.",
+   "desc_contact": "Godziny otwarcia i adres serwisu {brand} {city_in}.",
+   "hero_h": "Twój rower znów jak należy",
+   "intro": "Mały warsztat dla rowerów na co dzień. Naprawiamy to, co się zepsuło, regulujemy to, co nie działa jak trzeba, i szczerze mówimy, czego nie warto naprawiać.",
+   "about": [
+    "Początki {brand} to ogrodowa szopa {city_in}, w której naprawiano sąsiadom rowery za cenę kawy.",
+    "Dziś mamy prawdziwy warsztat, bardzo długi stół i ścianę części zamiennych, które rozumiemy tylko my. Nadal wolimy naprawiać niż wymieniać.",
+    "Przynieś wszystko, co ma dwa koła. Jeśli czegoś nie naprawimy, powiemy, kto to zrobi."
+   ],
+   "features": [
+    {"h": "Na miejscu", "p": "Większość drobnych napraw zajmuje mniej niż godzinę."},
+    {"h": "Uczciwa rada", "p": "Powiemy wprost, jeśli coś nie jest warte naprawy."},
+    {"h": "Serwis na następny dzień", "p": "Zostaw rower rano, odbierz jutro."}
+   ],
+   "services": [
+    {"t": "Naprawa przebitej dętki", "d": "Nowa dętka założona i sprawdzona, a opona obejrzana pod kątem przyczyny."},
+    {"t": "Przegląd podstawowy", "d": "Regulacja hamulców i przerzutek, czyszczenie i smarowanie łańcucha, kontrola opon i śrub."},
+    {"t": "Przegląd pełny", "d": "Rozebranie, odtłuszczenie i złożenie napędu, w razie potrzeby z nowymi linkami."},
+    {"t": "Centrowanie koła", "d": "Usuwamy bicie i wyrównujemy naprężenie szprych."},
+    {"t": "Przegląd zimowy", "d": "Oświetlenie, hamulce, opony i błotniki, żeby ciemne miesiące były mniej ryzykowne."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Serwis", "Warsztat", "Pracownia", "Garaż", "Szopa", "Skład", "Kącik", "Punkt"],
+      ["Szprycha", "Łańcuch", "Zębatka", "Pedał", "Korba", "Koło", "Przerzutka", "Rama", "Piasta", "Obręcz"]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "tailor": {
+   "tagline": "Poprawki krawieckie {city_in}",
+   "nav_services": "Poprawki",
+   "desc": "Poprawki i naprawa ubrań {city_in}: skracanie, zamki, przymiarki i cerowanie.",
+   "desc_services": "Poprawki i naprawy ubrań z cenami.",
+   "desc_about": "O pracowni {brand}, małym zakładzie krawieckim {city_in}.",
+   "desc_contact": "Godziny otwarcia i adres pracowni {brand} {city_in}.",
+   "hero_h": "Ubrania, które leżą dobrze, dłużej",
+   "intro": "Skracanie, zamki, przymiarki i cerowanie, robione ręcznie i na maszynie w małej pracowni nad sklepami.",
+   "about": [
+    "{brand} to pracownia dwóch osób na pierwszym piętrze kamienicy {city_in}, nad sklepem z włóczką.",
+    "Zawodu uczyliśmy się od ludzi, którzy robili to od czterdziestu lat, i zachowaliśmy część ich nawyków, na przykład zawsze przypinamy dwa razy.",
+    "Jeśli nie wiesz, czy coś warto poprawiać, przynieś to. Powiemy Ci szczerze."
+   ],
+   "features": [
+    {"h": "Naprawiane z troską", "p": "Każde ubranie dokładnie oglądamy, zanim zaczniemy."},
+    {"h": "Dopasowane do Ciebie", "p": "Przypinamy na Tobie, a nie na manekinie."},
+    {"h": "Gotowe w terminie", "p": "Podajemy dzień i go dotrzymujemy."}
+   ],
+   "services": [
+    {"t": "Skrócenie spodni lub spódnicy", "d": "Rąbek na wybraną długość, z zachowaniem oryginalnego wykończenia, jeśli się da."},
+    {"t": "Zwężenie marynarki", "d": "Boki i rękawy dopasowane tak, żeby dobrze leżała."},
+    {"t": "Wymiana zamka", "d": "Dobrany do koloru i grubości, starannie wszyty."},
+    {"t": "Naprawa podszewki płaszcza", "d": "Podarta podszewka wymieniona albo naprawiona, razem z kieszeniami."},
+    {"t": "Cerowanie i łatanie", "d": "Widoczne lub niewidoczne, jak wolisz."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Igła", "Naparstek", "Guzik", "Rąbek", "Szew", "Mankiet", "Kołnierz", "Plisa", "Szpulka", "Brzeg"],
+      ["& Szpilka", "Poprawki", "Krawiectwo", "Pracownia", "Cerowanie", "Przymiarka", "& Nić", "Studio"]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

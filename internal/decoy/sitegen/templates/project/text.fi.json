@@ -1,0 +1,387 @@
+{
+ "ui": {
+  "nav_label": "Päävalikko",
+  "footer": "Julkaistu MIT-lisenssillä.",
+  "nav_home": "Yleiskatsaus",
+  "nav_changelog": "Muutosloki",
+  "nav_install": "Asennus",
+  "nav_roadmap": "Tiekartta",
+  "home_title": "Yleiskatsaus",
+  "desc_changelog": "Jokainen {brand}-julkaisu ja se, mitä siinä muuttui.",
+  "desc_install": "Näin asennat {brand}: jakelupaketit, kääntäminen lähdekoodista ja jokaisen julkaisun tarkistussummat.",
+  "desc_roadmap": "Mitä {brand}-ylläpitäjät tekevät ja mitä on tulossa.",
+  "nf_title": "Sivua ei löytynyt",
+  "nf_text": "Tätä sivua ei ole, tai se on siirtynyt edellisen julkaisun jälkeen.",
+  "nf_back": "Takaisin yleiskatsaukseen",
+  "features_h": "Miksi {brand}",
+  "start_h": "Aloita",
+  "latest_h": "Uusin julkaisu",
+  "all_releases": "Kaikki julkaisut",
+  "get_it": "Asenna",
+  "read_log": "Lue muutosloki",
+  "changelog_h": "Muutosloki",
+  "changelog_intro": "Jokainen julkaisu, uusin ensin. Versionumerot noudattavat tavallista pää-, väli- ja korjausnumerointia.",
+  "released": "Julkaistu",
+  "install_h": "Asenna",
+  "install_intro": "{brand} ei tule valmiina ohjelmatiedostona. Jakelut paketoivat sen, ja lähdearkistosta kääntäminen kestää muutaman minuutin.",
+  "pkg_h": "Omasta jakelustasi",
+  "pkg_note": "Pakettien versiot voivat olla uusimman julkaisun perässä muutaman viikon; alempi taulukko kertoo, minkä version voit odottaa lähdearkistosta.",
+  "src_h": "Käännä lähdekoodista",
+  "src_intro": "Tarvitset C-kääntäjän ja maken. Kääntäminen kestää noin minuutin. Jokaisen julkaisun lähdearkisto on nimetty version mukaan.",
+  "sums_h": "Versiot ja tarkistussummat",
+  "sums_intro": "Jokaisella julkaisulla on lähdearkisto. Tarkista sen SHA-256-tarkistussumma ennen kääntämistä.",
+  "col_ver": "Versio",
+  "col_date": "Julkaistu",
+  "col_sum": "Lähdearkiston SHA-256",
+  "roadmap_h": "Tiekartta",
+  "roadmap_intro": "Mitä ylläpitäjät tekevät, suunnilleen järjestyksessä. Suunnitelmat muuttuvat; muutosloki on kirjaus siitä, mitä todella tapahtui.",
+  "now_h": "Nyt",
+  "next_h": "Seuraavaksi",
+  "later_h": "Myöhemmin",
+  "licence_h": "Lisenssi",
+  "licence_p": "{brand} on vapaa ohjelmisto, julkaistu MIT-lisenssillä. Käytä sitä, muokkaa sitä ja jaa sitä.",
+  "rel_back": "Kaikki julkaisut",
+  "rel_more": "Muut julkaisut",
+  "rel_src_h": "Lähdearkisto",
+  "pkgs": [
+   {
+    "s": "Debian ja Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS ja Homebrew"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kivi",
+       "Suo",
+       "Lyhty",
+       "Kuoppa",
+       "Hiillos",
+       "Taru",
+       "Tiira",
+       "Nokkonen",
+       "Liuske",
+       "Sammal"
+      ],
+      [
+       "watch",
+       "tail",
+       "glance",
+       "notice",
+       "sentry",
+       "peek"
+      ]
+     ]
+    }
+   },
+   "tagline": "Aja komento, kun tiedostosi muuttuvat",
+   "desc": "{brand} tarkkailee kansiota ja ajaa komennon aina, kun siinä jokin muuttuu.",
+   "overview": "{brand} tarkkailee kansiota ja ajaa komennon aina, kun siinä jokin muuttuu. Se on pieni ja nopea ohjelma ihmisille, jotka ovat väsyneet tallentamaan tiedoston ja vaihtamaan sitten toiseen ikkunaan.",
+   "features": [
+    {
+     "h": "Nopea aloittaa",
+     "p": "Yksi komento eikä asetustiedostoa."
+    },
+    {
+     "h": "Järkevät oletukset",
+     "p": "Ohittaa editorien väliaikaistiedostot, versionhallintakansiot ja käännöstulosteen."
+    },
+    {
+     "h": "Toimii kaikkialla",
+     "p": "Linux, macOS ja Windows, samoilla valitsimilla."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {
+     "k": "Uusi",
+     "t": "Tuki usean kansion tarkkailulle yhtä aikaa."
+    },
+    {
+     "k": "Uusi",
+     "t": "Viiveasetus, jolla odotetaan rauhallista hetkeä ennen ajoa."
+    },
+    {
+     "k": "Uusi",
+     "t": "Väri tulosteessa, kun pääte tukee sitä."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Harvinainen kaatuminen, kun tarkkailtu kansio poistettiin."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Päällekkäiset ajot, kun editori tallensi tiedoston kahdessa vaiheessa."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Välilyöntejä sisältävät polut Windowsissa."
+    },
+    {
+     "k": "Muutos",
+     "t": "Oletusviive on nyt 200 millisekuntia 50:n sijaan."
+    },
+    {
+     "k": "Muutos",
+     "t": "Ohituskuviot noudattavat samoja sääntöjä kuin useimmat versionhallintatyökalut."
+    },
+    {
+     "k": "Uusi",
+     "t": "Once-valitsin, joka ajaa komennon vain kerran ja lopettaa."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Muistinkäytön hidas kasvu erittäin suuria kansioita tarkkailtaessa."
+    },
+    {
+     "k": "Muutos",
+     "t": "Virheilmoitukset kertovat nyt, mikä kansio ne aiheutti."
+    },
+    {
+     "k": "Uusi",
+     "t": "Komentotulkkien automaattinen täydennys yleisimmille tulkeille."
+    }
+   ],
+   "now": [
+    "Nopeampi käynnistys suurissa kansioissa",
+    "Paremmat ilmoitukset, kun komento epäonnistuu"
+   ],
+   "next": [
+    "Asetustiedosto projektikohtaisille asetuksille",
+    "Paketit tärkeimmille Linux-jakeluille"
+   ],
+   "later": [
+    "Hiljainen tila skriptejä varten",
+    "Verkkolevyjen luotettava tarkkailu"
+   ]
+  },
+  "images": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pikseli",
+       "Laatta",
+       "Rae",
+       "Kehys",
+       "Suljin",
+       "Linssi",
+       "Tarkennus",
+       "Rajaus",
+       "Seepia",
+       "Himmeä"
+      ],
+      [
+       "fit",
+       "trim",
+       "shrink",
+       "pack",
+       "batch",
+       "scale"
+      ]
+     ]
+    }
+   },
+   "tagline": "Pienennä kansiollinen kuvia yhdellä kertaa",
+   "desc": "{brand} muuttaa kuvien kokoa ja pakkaa niitä joukolla, eikä koske alkuperäisiin.",
+   "overview": "{brand} muuttaa kuvien kokoa ja pakkaa niitä joukolla. Osoita kansio ja kerro, kuinka suuria tuloksia haluat; se tekee loput eikä koske alkuperäisiin.",
+   "features": [
+    {
+     "h": "Ensin erät",
+     "p": "Satoja tiedostoja kerralla, kaikki ytimet käytössä."
+    },
+    {
+     "h": "Säilyttää alkuperäiset",
+     "p": "Tulokset menevät uuteen kansioon."
+    },
+    {
+     "h": "Ennustettava tulos",
+     "p": "Sama syöte antaa aina samat tavut."
+    }
+   ],
+   "quick": "{cmd} photos --width 1600 --out small",
+   "changes": [
+    {
+     "k": "Uusi",
+     "t": "Tuki WebP-tulosteelle."
+    },
+    {
+     "k": "Uusi",
+     "t": "Laatuasetus JPEG- ja WebP-kuville."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Pystykuvina otetut valokuvat tulivat ulos kyljellään."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Kaatuminen tiedostoille, joilla ei ole päätettä."
+    },
+    {
+     "k": "Muutos",
+     "t": "Tulostiedostot säilyttävät alkuperäisen muokkausajan."
+    },
+    {
+     "k": "Uusi",
+     "t": "Kuivaharjoitusvalitsin, joka listaa, mitä tehtäisiin."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Hidas edistymisen raportointi suurissa erissä."
+    },
+    {
+     "k": "Muutos",
+     "t": "Pienempi muistinkäyttö erittäin suuria kuvia pienennettäessä."
+    },
+    {
+     "k": "Uusi",
+     "t": "Koon muutos enimmäiskorkeuden mukaan leveyden lisäksi."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Väärät värit kuvissa, joissa on upotettu profiili."
+    },
+    {
+     "k": "Muutos",
+     "t": "Ohjeteksti sisältää nyt esimerkkejä."
+    },
+    {
+     "k": "Uusi",
+     "t": "Liiteasetus (suffix), jolla pienennetyt tiedostot nimetään."
+    }
+   ],
+   "now": [
+    "Nopeampi JPEG-purku",
+    "Edistymispalkki, joka ei ole tiellä"
+   ],
+   "next": [
+    "Rajaus kiinteään kuvasuhteeseen",
+    "Paketit tärkeimmille Linux-jakeluille"
+   ],
+   "later": [
+    "Tuki animoiduille kuville",
+    "Pieni esikatselutila"
+   ]
+  },
+  "backup": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Ullakko",
+       "Kellari",
+       "Hylly",
+       "Laatikko",
+       "Kaappi",
+       "Arkku",
+       "Aitta",
+       "Varasto",
+       "Komero",
+       "Matkalaukku"
+      ],
+      [
+       "copy",
+       "keep",
+       "stash",
+       "save",
+       "mirror",
+       "store"
+      ]
+     ]
+    }
+   },
+   "tagline": "Yksinkertaiset ja luotettavat kansion varmuuskopiot",
+   "desc": "{brand} kopioi kansion toiseen paikkaan ja säilyttää vanhemmat versiot tavallisina tiedostoina.",
+   "overview": "{brand} kopioi kansion toiseen paikkaan ja säilyttää vanhemmat versiot, jotta viime tiistain virheen voi vielä perua. Varmuuskopiot ovat tavallisia tiedostoja, jotka voit avata ilman ohjelmaa {brand}.",
+   "features": [
+    {
+     "h": "Tavallisia tiedostoja",
+     "p": "Ei erityistä muotoa, jota pitäisi myöhemmin avata."
+    },
+    {
+     "h": "Versiot",
+     "p": "Säilytä niin monta tilannevedosta kuin haluat."
+    },
+    {
+     "h": "Tarkistaa itse itsensä",
+     "p": "Verify-komento vertaa varmuuskopiota lähteeseensä."
+    }
+   ],
+   "quick": "{cmd} notes /backups/notes",
+   "changes": [
+    {
+     "k": "Uusi",
+     "t": "Verify-komento, joka vertaa varmuuskopiota lähteeseensä."
+    },
+    {
+     "k": "Uusi",
+     "t": "Tilannevedoksia voi säilyttää tietyn päivämäärän tai kopiomäärän verran."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Varmuuskopioinnin aikana muuttuneet tiedostot kopioitiin kahdesti."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Väärät oikeudet palautetuille tiedostoille."
+    },
+    {
+     "k": "Muutos",
+     "t": "Muuttumattomia tiedostoja ei enää kopioida uudelleen."
+    },
+    {
+     "k": "Uusi",
+     "t": "Restore-komento, jossa on kuivaharjoitustila."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Kaatuminen kansioissa, joiden polut ovat erittäin pitkiä."
+    },
+    {
+     "k": "Muutos",
+     "t": "Edistyminen näytetään vain, kun tuloste on pääte."
+    },
+    {
+     "k": "Uusi",
+     "t": "List-komento, joka näyttää varmuuskopion tilannevedokset."
+    },
+    {
+     "k": "Korjattu",
+     "t": "Verkkolevyille tehtävät varmuuskopiot pysähtyivät aikakatkaisun jälkeen."
+    },
+    {
+     "k": "Muutos",
+     "t": "Tilannevedokset nimetään nyt päivämäärän eikä numeron mukaan."
+    },
+    {
+     "k": "Uusi",
+     "t": "Valitsin, jolla tiedostoja voi jättää pois kuvion mukaan."
+    }
+   ],
+   "now": [
+    "Monen pienen tiedoston nopeampi kopiointi",
+    "Selkeämpi verify-raportti"
+   ],
+   "next": [
+    "Varmuuskopioiden salaus levossa",
+    "Varmuuskopiointi toiseen sijaintiin yhdellä vaiheella"
+   ],
+   "later": [
+    "Graafinen palautustyökalu",
+    "Sisäänrakennettu ajastus"
+   ]
+  }
+ }
+}

@@ -1,0 +1,461 @@
+{
+ "ui": {
+  "nav_label": "Hoofdmenu",
+  "footer": "Met de hand geschreven, rustig gepubliceerd.",
+  "nav_home": "Notities",
+  "nav_about": "Over mij",
+  "home_title": "Notities",
+  "nf_title": "Hier is niets",
+  "nf_text": "Op dit adres staat geen notitie. Misschien heeft hij een andere naam gekregen, of is hij nooit geschreven.",
+  "nf_back": "Terug naar de notities",
+  "latest_h": "Nieuwste notities",
+  "read_more": "Lees de notitie",
+  "min_read": "min. lezen",
+  "more_h": "Meer notities",
+  "back_all": "Alle notities",
+  "about_h": "Over mij",
+  "now_h": "Op dit moment",
+  "tags_h": "Onderwerpen",
+  "by": "Geschreven door",
+  "nav_archive": "Archief",
+  "desc_archive": "Alle notities van {brand}, maand voor maand.",
+  "archive_h": "Archief",
+  "archive_intro": "Alle notities tot nu toe, de nieuwste eerst, per maand gegroepeerd.",
+  "all_posts": "Alle notities",
+  "newer": "Nieuwer"
+ },
+ "bundles": {
+  "garden": {
+   "tagline": "Notities van een volkstuin",
+   "desc": "Notities van een kleine volkstuin in {city}: wat er groeide, wat niet en wat ik volgend jaar anders doe.",
+   "desc_about": "Wie {brand} schrijft en waarom.",
+   "intro": "Notities van een kleine volkstuin in {city}: wat er groeide, wat niet en wat ik volgend jaar anders ga doen.",
+   "about": [
+    "Ik ben {first}. Ik heb al negen jaar een volkstuin in {city}, vooral voor groenten en een paar koppige rozen.",
+    "In dit schrift schrijf ik op wat de tuin me leert, vooral om te voorkomen dat ik dezelfde fouten steeds in een andere volgorde maak.",
+    "Reageren kan niet. Heb je een tip, vertel die dan aan degene die de tuin naast de jouwe heeft; zo heb ik het meeste van wat ik weet geleerd."
+   ],
+   "now": [
+    "Tuinbonen zaaien onder een koepeltje",
+    "De deur van het tuinhuisje weer repareren",
+    "Lezen over het vlechten van een haag"
+   ],
+   "posts": [
+    {
+     "title": "Waarom ik niet meer spit",
+     "tag": "Grond",
+     "excerpt": "Drie seizoenen zonder schep, en wat er met de bedden gebeurde.",
+     "body": [
+      "Jarenlang spitte ik de bedden elke herfst om, omdat de vorige gebruiker van de tuin dat deed en omdat de boeken uit mijn jeugd het zeiden. Drie seizoenen geleden ben ik gestopt en heb ik de bedden bedekt met een dikke laag compost.",
+      "Het eerste voorjaar viel tegen. De grond zag er rommelig uit en de slakken vierden feest. Het tweede jaar hadden de wormen het meeste werk gedaan, brokkelde de grond tussen mijn vingers en was ik elke oktober een zaterdag minder met de bedden bezig.",
+      "Een wonder noem ik het niet, en een paar onkruiden die ik voorgoed kwijt dacht te zijn, kwamen terug. Maar mijn rug is dankbaar, en de wortels werden rechter dan ooit toen ik nog spitte."
+     ]
+    },
+    {
+     "title": "Bonen voor mensen die vergeten water te geven",
+     "tag": "Groenten",
+     "excerpt": "Vier soorten die me een droge juli vergaven.",
+     "body": [
+      "Vorige juli regende het negentien dagen niet en was ik er elf van weg. Toen ik terugkwam, was de sla doorgeschoten en zagen de courgettes eruit alsof ze het hadden opgegeven. De bonen waren prima.",
+      "Stokbonen met diepe wortels en een dikke laag mulch eromheen redden zich in twee droge weken beter dan bijna alles wat ik teel. Ik zaai ze nu langs de noordkant, waar de schaduw voorkomt dat de grond uitdroogt.",
+      "Ben je zo'n tuinder die van plan is elke dag water te geven en het twee keer per week haalt, plant dan bonen en blijf kalm."
+     ]
+    },
+    {
+     "title": "Een kasje van oude ramen",
+     "tag": "Bouwen",
+     "excerpt": "Hoe de container van een buurman in één lang weekend een kas werd.",
+     "body": [
+      "Een buurvrouw liet haar ramen vervangen en de oude stonden twee dagen in een container. Ik vroeg of ik ze mocht meenemen, en zij vroeg of ik de container ook wilde meenemen, als dat lukte.",
+      "Ik maakte een frame van hergebruikt hout, afgestemd op het grootste raam, en zette de rest erom heen. Niets is haaks en de deur klemt bij nat weer, maar de tomatenplantjes blijven vorstvrij.",
+      "Het hele ding kostte me een doos schroeven en een zak stopverf. De volgende keer meet ik twee keer voordat ik iets zaag, en dat meen ik."
+     ]
+    },
+    {
+     "title": "Wat je in maart op de tuin doet",
+     "tag": "Seizoenen",
+     "excerpt": "Een korte lijst voor de maand waarin alles mogelijk lijkt en de grond nog koud is.",
+     "body": [
+      "Maart houdt iedereen voor de gek. De dagen zijn helder en je wilt zaaien, maar de grond is koud en te vroeg gezaaide zaden blijven liggen en rotten. Ik laat mezelf wachten tot de aarde niet meer koud aanvoelt tegen mijn hand.",
+      "Intussen is er genoeg te doen: het zaadblik sorteren, de potten schrobben, de rozen snoeien en de eerste aardappels op een lichte plek laten voorkiemen. Die klusjes voelen als vooruitgang zonder risico.",
+      "Eind van de maand gun ik mezelf meestal één rij erwten onder een koepeltje. Verstandig is het niet, maar ik geniet ervan."
+     ]
+    },
+    {
+     "title": "Compost, eerlijk gezegd",
+     "tag": "Grond",
+     "excerpt": "Wat er op mijn hoop gaat, wat niet, en waarom die nooit op tijd klaar is.",
+     "body": [
+      "Mijn hoop heeft drie regels: niets gekookts, niets zieks en niets waar ik niet zeker van ben. Gras gaat in dunne lagen, gescheurd karton gaat erbij, en alles wordt omgezet wanneer ik eraan denk.",
+      "Het gaat trager dan in de boeken. Een jaar is eerlijker dan de zes weken die op de zak beloofd worden, en de klare compost zit altijd vol verrassingen, zoals een aardappel waar ik al niet meer op rekende.",
+      "Ik vind het niet erg. Een hoop die de tijd neemt, heeft geen slecht geweten over de keukenresten."
+     ]
+    },
+    {
+     "title": "Slakken, bierbakjes en andere nederlagen",
+     "tag": "Plagen",
+     "excerpt": "Wat werkte, wat niet, en waarom ik nu iets extra plant.",
+     "body": [
+      "Ik heb bierbakjes geprobeerd, eierschalen, koperband en 's avonds met een zaklamp op pad gaan. Elk werkte ongeveer een week. Wat het best werkt, is meer telen dan ik nodig heb en accepteren dat de slakken hun deel nemen.",
+      "De zaailingen zijn het echte risico, dus ik trek ze binnen voor en zet ze pas buiten als ze stevig genoeg zijn om een hapje te overleven."
+     ]
+    },
+    {
+     "title": "Zaad bewaren van de bonen",
+     "tag": "Zaden",
+     "excerpt": "Een beetje geduld in oktober geeft je de bonen van volgend jaar voor niets.",
+     "body": [
+      "Ik laat de mooiste peulen aan de planten hangen tot ze droog zijn en rammelen. Dan dop ik ze aan de keukentafel, leg de bonen op een bakje en zet ze een week ergens warm.",
+      "Ze gaan in papieren envelopjes met de naam en het jaar op de voorkant. In plastic gaan ze zweten, en ik heb de beschimmelde bonen om het te bewijzen."
+     ]
+    },
+    {
+     "title": "Een korte inventaris van het tuinhuisje",
+     "tag": "Gereedschap",
+     "excerpt": "Elf dingen die ik gebruik en heel veel die ik niet gebruik.",
+     "body": [
+      "Een schep, een riek, een schoffel, twee tuinschepjes, een handhark en een snoeischaar doen bijna al het werk. De rest van het huisje bevat jampotten, touw, een kapotte kruiwagen en een verzameling zaaibakjes.",
+      "Elk voorjaar beloof ik het uit te zoeken. Elk voorjaar regent het op de dag dat ik het wilde doen, en eigenlijk ben ik daar blij om."
+     ]
+    },
+    {
+     "title": "Een slecht jaar voor tomaten",
+     "tag": "Groenten",
+     "excerpt": "In augustus kwam de aardappelziekte en nam alles mee. Aantekeningen voor de volgende keer.",
+     "body": [
+      "De bladeren werden in een week bruin en de vruchten volgden. Ik heb de planten eruit gehaald, in een zak gedaan en niet op de composthoop gegooid, de enige regel waar iedereen het over eens is.",
+      "Volgend jaar teel ik minder planten, geef ik ze meer ruimte en geef ik water aan de grond in plaats van aan de bladeren. Ik onthoud ook dat een slecht tomatenjaar een goede reden is voor chutney."
+     ]
+    },
+    {
+     "title": "Van bladeren naar bladaarde",
+     "tag": "Grond",
+     "excerpt": "Twee jaar wachten, en het beste wat er op de tuin ligt.",
+     "body": [
+      "In november hark ik de bladeren in een kooi van gaas in de hoek en loop weg. Er is niets om te keren en niets om toe te voegen, en dat past me goed.",
+      "Na twee jaar is het donker, kruimelig en ruikt het naar het bos. Ik gebruik het om de bedden aan te vullen en om zaailingen op te kweken, en niets anders wat ik maak komt in de buurt."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Trage",
+       "Stille",
+       "Eerlijke",
+       "Kleine",
+       "Wilde",
+       "Mossige",
+       "Geduldige",
+       "Modderige",
+       "Groene",
+       "Vroege"
+      ],
+      [
+       "Grond",
+       "Bedden",
+       "Hoekjes",
+       "Tuinen",
+       "Scheppen",
+       "Rijen",
+       "Hagen",
+       "Schuurtjes",
+       "Voren",
+       "Seizoenen"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "cycling": {
+   "tagline": "Ritten en reparaties",
+   "desc": "Ritten, reparaties en af en toe een verkeerde afslag rond {city}.",
+   "desc_about": "Wie {brand} schrijft en waarom.",
+   "intro": "Ritten, reparaties en af en toe een verkeerde afslag op de weggetjes rond {city}.",
+   "about": [
+    "Ik ben {first}. Ik fiets bijna elke dag naar mijn werk en op zondag verder, meestal over weggetjes rond {city} die niemand anders lijkt te kennen.",
+    "Ik ben niet snel en ik houd geen snelheden bij. Wat ik wel bijhoud zijn notities over routes, over dingen die kapotgingen en over wat ik de volgende keer meeneem.",
+    "Er is geen reactieveld. Weet je een betere weg naar huis vanaf de dijk, schrijf het dan op een ansichtkaart."
+   ],
+   "now": [
+    "Het stuurlint opnieuw omwikkelen",
+    "Een tweedaagse ronde voor mei plannen",
+    "Leren een wiel te centreren"
+   ],
+   "posts": [
+    {
+     "title": "De ronde van zestig kilometer waar ik steeds naar terugkom",
+     "tag": "Routes",
+     "excerpt": "Vooral vlak, één echte helling en een café dat eerder sluit dan je hoopt.",
+     "body": [
+      "De ronde verlaat {city} aan de oostkant, volgt veertien kilometer het kanaal en slaat dan af naar een weggetje dat niemand heeft opnieuw geasfalteerd sinds ik fiets. Er is één echte helling, ruim een kilometer, en daarom kom ik steeds terug.",
+      "Halverwege is een café dat om negen uur opent en om twee uur sluit, wat te vroeg of net op tijd is, afhankelijk van hoe de ochtend is gegaan. Ik heb geleerd een koek mee te nemen.",
+      "Ik heb de ronde in elke maand van het jaar gereden. Het is nooit twee keer dezelfde ronde, en dat is het mooiste wat ik over een route kan zeggen."
+     ]
+    },
+    {
+     "title": "Een lekke band in de regen",
+     "tag": "Reparaties",
+     "excerpt": "Elf minuten, één koude duim en een les over een reserveband.",
+     "body": [
+      "Het gebeurt altijd op die ene afdaling waar je lekker opschoot. Ik ging onder een bushokje staan, haalde het wiel eruit en ontdekte dat het gaatje aan de binnenkant van het velglint zat, wat betekende dat het terug zou komen.",
+      "De oplossing is saai en staat op het deksel van mijn tasje: band controleren, de doorn zoeken, het velglint controleren, de reserveband erin, harder oppompen dan redelijk lijkt. In de regen kost elke stap twee keer zoveel tijd.",
+      "De les, die ik elke winter opnieuw leer, is dat een reserveband minder weegt dan een goed humeur en aanzienlijk meer waard is."
+     ]
+    },
+    {
+     "title": "Waarom ik het hele jaar in dezelfde jas fiets",
+     "tag": "Kleding",
+     "excerpt": "Een lang pleidooi voor één licht lelijke, felgele jas.",
+     "body": [
+      "In juni is hij te warm en in januari net niet warm genoeg, en toch pak ik hem steeds. Hij is felgeel, vouwt op in zijn eigen zakje en heeft twee valpartijen en een wasmachine overleefd.",
+      "Ik heb betere geprobeerd. Elk daarvan was uitstekend tot ik moest beslissen of ik hem meenam, en dan bleef hij aan de haak hangen. De beste kleding is de kleding die je echt meeneemt.",
+      "Lagen doen de rest. Een dun wollen hemd kost minder dan een nieuwe jas en doet meer voor me dan elke stof met een naam."
+     ]
+    },
+    {
+     "title": "Winterfiets, zomerfiets",
+     "tag": "Fietsen",
+     "excerpt": "Twee fietsen is een luxe, maar een van de twee mag vies zijn.",
+     "body": [
+      "Jarenlang had ik één fiets en reed ik die elke winter kapot, om er elk voorjaar voor te betalen. Twee seizoenen geleden vond ik op een rommelmarkt een oud stalen frame en bouwde dat op tot winterfiets.",
+      "Hij heeft spatborden, brede banden en een ketting die ik zonder pijn vervang. Hij is zwaar en traag en ik ben er dol op, vooral omdat niemand, ikzelf ook niet, verwacht dat hij schoon is.",
+      "De zomerfiets staat van november tot maart in de gang en kijkt me verwijtend aan. Ik zeg hem dat hij geduld moet hebben."
+     ]
+    },
+    {
+     "title": "Bewust langzamer",
+     "tag": "Gedachten",
+     "excerpt": "Wat er gebeurde toen ik niet meer naar mijn snelheid keek.",
+     "body": [
+      "Een jaar lang fietste ik met een computertje op het stuur en mat ik alles. Ik werd iets sneller en merkbaar prikkelbaarder, en ik zag de weggetjes waar ik langs reed niet meer.",
+      "Toen was in maart de batterij leeg en heb ik die niet vervangen. De eerste rit zonder getallen voelde ongeveer tien minuten vreemd, en daarna voelde hij als toen ik net leerde fietsen.",
+      "Ik weet niet meer goed wat ik wilde bewijzen. Ik weet nu waar de mooiste hagen staan, en dat lijkt me beter om te weten."
+     ]
+    },
+    {
+     "title": "Een week in het donker naar mijn werk",
+     "tag": "Kleding",
+     "excerpt": "Lampjes, reflectiebandjes en een verstandige houding tegenover plassen.",
+     "body": [
+      "Als de klok terug gaat, schakel ik over op twee lampjes voor en twee achter, van elk één knipperend. Het lijkt veel, maar automobilisten zien je, en daar gaat het om.",
+      "Ik heb ook altijd reservebatterijen in mijn tasje. Een lamp die uitvalt op een donker weggetje is een fout die je maar één keer maakt."
+     ]
+    },
+    {
+     "title": "Het café boven op de dijk",
+     "tag": "Routes",
+     "excerpt": "De klim waard, als je er bent voordat de appeltaart op is.",
+     "body": [
+      "Het staat boven aan de lange klim, in een ruimte die vroeger waarschijnlijk een schuur was. De thee komt in een kannetje en de appeltaart in punten zo groot als een pocket.",
+      "Vroeger haastte ik me omhoog om de lunchdrukte voor te zijn. Nu ga ik langzaam en kom ik met klagende benen aan, en smaakt de taart beter."
+     ]
+    },
+    {
+     "title": "Hoe ik van spatborden ging houden",
+     "tag": "Kleding",
+     "excerpt": "Tien jaar met een natte rug, en toen een setje plastic strips.",
+     "body": [
+      "Jarenlang dacht ik dat spatborden voor mensen waren die fietsen niet serieus namen. Toen monteerde ik een stel en waren mijn schoenen droog tijdens de eerste natte rit.",
+      "Ze voegen een beetje gewicht toe en ze rammelen als je ze slecht monteert. Beide problemen zijn klein vergeleken met op je werk aankomen met een streep over je rug."
+     ]
+    },
+    {
+     "title": "Eten op de fiets",
+     "tag": "Eten",
+     "excerpt": "Wat er in het zakje gaat, en waar ik spijt van heb.",
+     "body": [
+      "De regel is eten voordat je honger hebt. Op een lange rit eet ik elke veertig minuten iets kleins: een banaan, een koek, een handvol dadels.",
+      "Ik heb één keer gels geprobeerd en besloten dat ik een boterham-type ben. Het is een beetje rommelig, en het werkt."
+     ]
+    },
+    {
+     "title": "De trein naar huis nemen",
+     "tag": "Gedachten",
+     "excerpt": "Er is geen schande in een lift als de wind tegen zit.",
+     "body": [
+      "Soms is de heenrit heerlijk en is de terugrit de hele weg tegenwind. Op zulke dagen zet ik de fiets in de trein en lees ik.",
+      "Vroeger zag ik het als opgeven. Nu zie ik het als de reden dat ik de volgende dag weer op pad ga."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Lange",
+       "Rustige",
+       "Natte",
+       "Vlakke",
+       "Grindige",
+       "Vroege",
+       "Trage",
+       "Koude",
+       "Wijde",
+       "Zachte"
+      ],
+      [
+       "Versnellingen",
+       "Spaken",
+       "Kilometers",
+       "Dijken",
+       "Kettingen",
+       "Wielen",
+       "Ritten",
+       "Wegen",
+       "Heuvels",
+       "Trappers"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "kitchen": {
+   "tagline": "Notities uit een kleine keuken",
+   "desc": "Recepten die lukken, fouten waar ik iets van leerde, en wat er eten is in {city}.",
+   "desc_about": "Wie {brand} schrijft en waarom.",
+   "intro": "Recepten die lukken, fouten waar ik iets van leerde, en wat er eten is in {city}.",
+   "about": [
+    "Ik ben {first}. Ik kook voor een gezin van vier in een keuken in {city} die kleiner is dan de meeste badkamers, en ik zou er niets aan veranderen.",
+    "Ik schrijf op wat gelukt is, in de vorm waarin ik het echt kook: met minder hoeveelheden en meer bijvoeglijke naamwoorden dan in een echt recept.",
+    "Ik fotografeer geen eten. Als een gerecht er goed genoeg uitziet voor een foto, heb ik het waarschijnlijk te lang laten wachten."
+   ],
+   "now": [
+    "Een nieuwe zuurdesem voeden",
+    "Citroenen inzouten voor het voorjaar",
+    "Vrede sluiten met de ovendeur"
+   ],
+   "posts": [
+    {
+     "title": "Een brood dat je vergeeft",
+     "tag": "Brood",
+     "excerpt": "Bloem, water, zout en een heel geduldige zondagmiddag.",
+     "body": [
+      "Dit is het brood dat ik bak als ik vergeten ben dat ik brood wilde bakken. Er gaat bijna geen gist in, het rust lang en je hoeft niet te kneden, en het vindt het niet erg als je het een uur langer laat staan dan gepland.",
+      "Roer bloem, water en zout 's avonds door elkaar tot er geen droge plekken meer zijn, dek de kom af en laat hem op het aanrecht staan. 's Ochtends is het bobbelig en ruikt het een beetje naar bier, en dat is precies goed.",
+      "Vouw het een paar keer, vorm het grof en bak het in een hete pan met deksel. Het ziet er onvolmaakt uit en smaakt beter dan het mag."
+     ]
+    },
+    {
+     "title": "Wat je kookt als de koelkast bijna leeg is",
+     "tag": "Doordeweeks",
+     "excerpt": "Vijf blikken, drie uien en een stuk kaas: een avondeten.",
+     "body": [
+      "Elke donderdag open ik de koelkast en zie ik een halve ui, een slappe prei en een potje waarvan ik me niet herinner dat ik het geopend heb. Dat voelde vroeger als falen. Nu zie ik het als de ene avond per week waarop de voorraadkast aan de beurt is.",
+      "Bak de uien langzaam tot ze het opgeven. Voeg de bonen toe die je hebt, een blik tomaten en een lepel iets scherps: mosterd, azijn, een ingelegd pepertje. Laat het pruttelen terwijl je een korstje brood zoekt.",
+      "Eet het met geraspte kaas erover. Niemand heeft ooit gevraagd wat erin zat, en ik ben gestopt het te vertellen."
+     ]
+    },
+    {
+     "title": "De enige soep die ik in november maak",
+     "tag": "Soep",
+     "excerpt": "Gebakken pompoen, één appel en geduld met de staafmixer.",
+     "body": [
+      "Als de eerste echt koude week komt, bak ik een pompoen, met de snijkant naar beneden, met een hele knoflook en een appel die zacht is geworden. Het duurt veertig minuten en het hele huis ruikt naar het begin van de winter.",
+      "Schep alles in een pan, voeg bouillon toe en pureer tot het ophoudt met tegenspreken. Een beetje room is lekker maar hoeft niet; een lepel van de zoetheid van de appel doet bijna hetzelfde werk.",
+      "Ik serveer het met geroosterde pitten en brood van gisteren. Het is niet slim, en ik maak het elk jaar."
+     ]
+    },
+    {
+     "title": "Inleggen zonder paniek",
+     "tag": "Inmaken",
+     "excerpt": "Waarom een potje snelle zuurtjes het makkelijkste is wat er in de keuken bestaat.",
+     "body": [
+      "Mensen worden afgeschrikt door het woord inmaken, dat klinkt alsof er gesteriliseerd moet worden, met grote pannen en een verloren dag. Een snelle pickle vraagt een pot, een waterkoker en ongeveer tien minuten.",
+      "Snijd wat er in de la ligt, stop het in een schone pot en giet er een hete mix van azijn, water, zout en een beetje suiker over. Doe er een laurierblad bij als je dat hebt. Laat het tot morgen staan.",
+      "Ze blijven een paar weken goed in de koelkast en maken een gewone maaltijd bewust. Ik heb dit nog nooit gedaan zonder dat het goed uitpakte."
+     ]
+    },
+    {
+     "title": "Aangebrand, en wat ik leerde",
+     "tag": "Fouten",
+     "excerpt": "Een korte catalogus van mislukte diners en de ene les die elk daarvan bracht.",
+     "body": [
+      "De karamel leerde me dat suiker niets geeft om mijn telefoon. De risotto leerde me dat bouillon heet moet zijn. De gebakken aardappels leerden me dat een bakplaat te vol kan zijn, en dat niemand een bleke aardappel vergeeft.",
+      "Het ergste was de verjaardagstaart die ik te vroeg eruit haalde en te laat terugzette. Hij zakte in het midden in als een waardig oud gebouw, en we aten hem met een lepel en vla.",
+      "Ik houd een lijst bij van wat er misging aan de binnenkant van een kastdeur. Hij is langer dan mijn lijst van wat goed ging, en veel nuttiger."
+     ]
+    },
+    {
+     "title": "Een pan, een lepel en een woensdag",
+     "tag": "Doordeweeks",
+     "excerpt": "Eén pan, twintig minuten en weinig afwas.",
+     "body": [
+      "Op woensdag ben ik moe en heeft iedereen honger, dus het avondeten moet uit één pan komen. Uien, een blik bonen, een beetje paprikapoeder en welke groente er ook in de koelkast ligt.",
+      "Aan het eind leg ik er een ei op en noem het avondeten. Het is meer een gewoonte dan een recept, en het heeft me nog nooit in de steek gelaten."
+     ]
+    },
+    {
+     "title": "Havermoutpap, zoals het hoort",
+     "tag": "Ontbijt",
+     "excerpt": "Haver, water, zout en tien minuten niet wegsloffen.",
+     "body": [
+      "Week de haver de avond van tevoren, als je eraan denkt. 's Ochtends voeg je water en een snufje zout toe en roer je terwijl het indikt, wat ongeveer net zo lang duurt als de waterkoker.",
+      "Ik eet de mijne met een lepel jam of een paar gesneden appels. Wie suiker door de pap doet, heeft geen ongelijk, maar mist iets."
+     ]
+    },
+    {
+     "title": "Overgebleven rijst, op drie manieren",
+     "tag": "Doordeweeks",
+     "excerpt": "Gebakken, in een cake of door de soep.",
+     "body": [
+      "Koude rijst is beter dan verse om te bakken, omdat de korrels los blijven. Een hete pan, een beetje olie, een ei en wat bosui is alles wat het nodig heeft.",
+      "Door de soep geroerd maakt het de bouillon dikker, en met kaas in een vorm geduwd en gebakken wordt het iets wat lijkt op een hartige cake."
+     ]
+    },
+    {
+     "title": "Waarom ik mijn bloem weeg",
+     "tag": "Brood",
+     "excerpt": "Een keukenweegschaal veranderde mijn bakken meer dan welk recept ook.",
+     "body": [
+      "Een kop bloem kan alles wegen tussen de 120 en 160 gram, afhankelijk van hoe je schept. Dat is het verschil tussen een brood en een baksteen.",
+      "Nu weeg ik alles, ook het water. Het voelt een week lang precies, en daarna voelt het als de enige verstandige manier om te bakken."
+     ]
+    },
+    {
+     "title": "Een verjaardagscake zonder recept",
+     "tag": "Bakken",
+     "excerpt": "Van alles evenveel, en een beetje geduld met de oven.",
+     "body": [
+      "De cake van mijn oma is evenveel boter, suiker, eieren en bloem, met een beetje vanille. Ze schreef het nooit op, want dat hoefde nooit.",
+      "Ik maak hem voor elke verjaardag in de familie. Hij is eenvoudig en een beetje scheef, en niemand heeft ooit om een andere gevraagd."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Zoute",
+       "Romige",
+       "Gewone",
+       "Gietijzeren",
+       "Kleine",
+       "Zondagse",
+       "Eerlijke",
+       "Warme",
+       "Trage",
+       "Snelle"
+      ],
+      [
+       "Lepels",
+       "Pannen",
+       "Notities",
+       "Tafels",
+       "Keukens",
+       "Deeg",
+       "Kommen",
+       "Potten",
+       "Ovens",
+       "Maaltijden"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

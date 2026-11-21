@@ -1,0 +1,195 @@
+{
+ "ui": {
+  "nav_label": "Hoofdmenu",
+  "footer": "Met de hand gemaakt. Geen cookies, geen tracking.",
+  "nav_home": "Kaartje",
+  "nav_about": "Over mij",
+  "nav_projects": "Projecten",
+  "nav_now": "Nu",
+  "home_title": "Hallo",
+  "desc_about": "Meer over {brand}.",
+  "desc_projects": "Geselecteerde projecten van {brand}.",
+  "desc_now": "Waar {brand} op dit moment mee bezig is.",
+  "nf_title": "Hier is niets",
+  "nf_text": "Op dit adres staat geen pagina. Probeer het kaartje op de startpagina.",
+  "nf_back": "Terug naar het kaartje",
+  "link_d": [
+   "Wie ik ben en hoe ik werk",
+   "Een paar dingen die ik heb gemaakt",
+   "Waar ik op dit moment mee bezig ben"
+  ],
+  "about_h": "Over mij",
+  "facts_h": "In het kort",
+  "projects_h": "Projecten",
+  "projects_intro": "Een paar dingen die ik graag heb gemaakt, de nieuwste eerst.",
+  "now_h": "Nu",
+  "updated": "Bijgewerkt in {upd} 2026",
+  "now_intro": "Dit is een nu-pagina: waar ik op dit moment mee bezig ben, in plaats van wat ik ooit zei te gaan doen.",
+  "hello": "Hallo, ik ben",
+  "vars": {
+   "brand": "{name}",
+   "month": [
+    "januari",
+    "maart",
+    "mei",
+    "september"
+   ],
+   "upd": [
+    "augustus",
+    "september",
+    "oktober",
+    "november"
+   ]
+  }
+ },
+ "bundles": {
+  "illustrator": {
+   "role": "Illustrator en linosnijder",
+   "tagline": "Plaatjes voor boeken, affiches en af en toe een verjaardagskaart.",
+   "desc": "{brand}: illustrator en linosnijder in {city}. Prentenboeken, affiches en linosneden.",
+   "bio": "Ik teken plaatjes voor prentenboeken en affiches, en snijd linosneden voor wie er vriendelijk om vraagt.",
+   "about": [
+    "Ik teken voor mijn werk, vooral voor prentenboeken en af en toe een affiche. Ik werk in een klein kamertje in {city} met uitzicht op een parkeerplaats, die ik teken alsof het een meer is.",
+    "Voor de illustratie studeerde ik textieldruk, en die gewoonte om in lagen te denken is nooit helemaal verdwenen. De meeste van mijn tekeningen zijn opgebouwd uit drie of vier vlakke kleuren."
+   ],
+   "facts": [
+    "Woont in {city}",
+    "Werkt met pen, inkt en linosnede",
+    "Neemt vanaf {month} nieuwe opdrachten aan"
+   ],
+   "projects": [
+    {
+     "t": "Veldnotities",
+     "y": "2025",
+     "d": "Een prentenboek over een jaar in één klein veld, gemaakt met een lokale uitgeverij."
+    },
+    {
+     "t": "De Marktreeks",
+     "y": "2024",
+     "d": "Twaalf linosneden van kramen, klanten en één zeer zelfvoldane duif."
+    },
+    {
+     "t": "Verjaardagskaarten voor een boekhandel",
+     "y": "2023",
+     "d": "Zes kaarten, met de hand gedrukt in oplagen van tweehonderd."
+    }
+   ],
+   "now": [
+    "De laatste pagina's afmaken van een prentenboek over het weer",
+    "Leren een linosnede in vier kleuren te snijden zonder mijn geduld te verliezen",
+    "Op zoek naar een grotere pers"
+   ]
+  },
+  "translator": {
+   "role": "Vertaler, Duits naar Nederlands",
+   "tagline": "Zorgvuldige vertalingen van romans, essays en af en toe een handleiding.",
+   "desc": "{brand}: vertaler uit het Duits in het Nederlands, werkt vanuit {city} aan romans en essays.",
+   "bio": "Ik vertaal Duits naar Nederlands, vooral romans en essays, en lees alles twee keer hardop.",
+   "about": [
+    "Ik vertaal uit het Duits in het Nederlands, vooral romans en essays, en soms de handleiding van een apparaat dat beter geschreven tekst verdient.",
+    "Ik werk langzaam, lees alles twee keer hardop en stuur bij elke zin waarover ik niet kon beslissen een aantekening mee. Redacteuren zeggen dat dat charmant of tergend is."
+   ],
+   "facts": [
+    "Woont in {city}",
+    "Vertaalt Duits naar Nederlands",
+    "Open voor nieuwe projecten vanaf {month}"
+   ],
+   "projects": [
+    {
+     "t": "Een roman over een vuurtorenwachter",
+     "y": "2025",
+     "d": "Vierhonderd bladzijden weer en spijt, in veertien maanden vertaald."
+    },
+    {
+     "t": "Essays over wandelen",
+     "y": "2024",
+     "d": "Een bundel korte stukken van een schrijver die overal te voet naartoe ging."
+    },
+    {
+     "t": "Een museumcatalogus",
+     "y": "2023",
+     "d": "Teksten voor een tentoonstelling over textiel, met meer bijvoeglijke naamwoorden dan ik zelf had gekozen."
+    }
+   ],
+   "now": [
+    "De vertaling van een lange roman nalopen",
+    "Essays lezen die ik een uitgever zou kunnen voorstellen",
+    "Mijn woordenlijst met scheepvaarttermen bijwerken"
+   ]
+  },
+  "potter": {
+   "role": "Pottenbakker",
+   "tagline": "Eenvoudige kommen, mokken en borden, in kleine oplagen gemaakt.",
+   "desc": "{brand}: pottenbakker in {city}. Gebruiksaardewerk, op de draaischijf gedraaid.",
+   "bio": "Ik draai eenvoudig steengoed op de schijf en stook het in kleine porties.",
+   "about": [
+    "Ik maak gebruiksaardewerk in een atelier dat ik in {city} deel met drie andere makers. Alles wordt op de draaischijf gedraaid en tot steengoed gestookt.",
+    "Ik houd van potten die opgaan in het dagelijks gebruik: een mok die in de hand ligt, een kom die niet omvalt. De glazuren zijn meestal ijzer en as, en ze veranderen een beetje bij elke stook."
+   ],
+   "facts": [
+    "Woont in {city}",
+    "Draait steengoed op de schijf",
+    "Nieuwe potten meestal vanaf {month}"
+   ],
+   "projects": [
+    {
+     "t": "Dagelijkse servieset",
+     "y": "2025",
+     "d": "Borden, kommen en mokken in een havermoutkleurig glazuur dat nooit twee keer hetzelfde werd."
+    },
+    {
+     "t": "Theekommen",
+     "y": "2024",
+     "d": "Dertig kleine kommen, elk een beetje anders, gemaakt voor een theehuis."
+    },
+    {
+     "t": "Een opdracht voor tegels",
+     "y": "2023",
+     "d": "Een wand van met de hand geperste tegels voor een keuken, in vier tinten groen."
+    }
+   ],
+   "now": [
+    "Een asglazuur testen van het vuur van een buurman",
+    "Grotere borden draaien",
+    "Ruimte maken op de ovenplanken voor de winterbestellingen"
+   ]
+  },
+  "developer": {
+   "role": "Softwareontwikkelaar, kleine hulpmiddelen",
+   "tagline": "Kleine, rustige programma's die één ding doen en niet in de weg zitten.",
+   "desc": "{brand}: ontwikkelaar van kleine hulpmiddelen in {city}. Een notitie-app, een agenda en een paar programma's voor de opdrachtregel.",
+   "bio": "Ik schrijf kleine hulpmiddelen voor mensen die met woorden en cijfers werken, en probeer ze af te leveren.",
+   "about": [
+    "Ik schrijf kleine hulpmiddelen voor mensen die met woorden en cijfers werken: een notitie-app, een paar programma's voor de opdrachtregel, een agenda die alleen laat zien wat vandaag telt.",
+    "Ik bouw langzaam en probeer dingen af te leveren. Het meeste wat ik maak heeft minder functies dan het zou kunnen, en dat is met opzet."
+   ],
+   "facts": [
+    "Woont in {city}",
+    "Schrijft in een paar saaie programmeertalen",
+    "Beschikbaar voor kleine projecten vanaf {month}"
+   ],
+   "projects": [
+    {
+     "t": "Een notitie-app voor de computer",
+     "y": "2025",
+     "d": "Gewone tekstbestanden, snel zoeken en geen account."
+    },
+    {
+     "t": "Een agenda voor één dag",
+     "y": "2024",
+     "d": "Toont vandaag en verder niets, en dat blijkt genoeg."
+    },
+    {
+     "t": "Een urenregistratie",
+     "y": "2023",
+     "d": "Eén knop en een weekoverzicht, voor mensen die een hekel hebben aan urenstaten."
+    }
+   ],
+   "now": [
+    "De code van de notitie-app opruimen",
+    "Een korte handleiding schrijven",
+    "Nadenken over een kleinere versie van alles"
+   ]
+  }
+ }
+}

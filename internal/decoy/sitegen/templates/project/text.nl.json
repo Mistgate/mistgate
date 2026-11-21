@@ -1,0 +1,495 @@
+{
+ "ui": {
+  "nav_label": "Hoofdmenu",
+  "footer": "Uitgebracht onder de MIT-licentie.",
+  "nav_home": "Overzicht",
+  "nav_changelog": "Wijzigingen",
+  "nav_install": "Installeren",
+  "nav_roadmap": "Plannen",
+  "home_title": "Overzicht",
+  "desc_changelog": "Elke versie van {brand}, met wat er in is veranderd.",
+  "desc_install": "Zo installeer je {brand}: pakketten van je distributie, zelf bouwen uit de broncode en controlesommen van elke versie.",
+  "desc_roadmap": "Waar de beheerders van {brand} mee bezig zijn en wat er daarna komt.",
+  "nf_title": "Pagina niet gevonden",
+  "nf_text": "Deze pagina bestaat niet, of is sinds de laatste versie verplaatst.",
+  "nf_back": "Terug naar het overzicht",
+  "features_h": "Waarom {brand}",
+  "start_h": "Aan de slag",
+  "latest_h": "Laatste versie",
+  "all_releases": "Alle versies",
+  "get_it": "Installeren",
+  "read_log": "Lees de wijzigingen",
+  "changelog_h": "Wijzigingen",
+  "changelog_intro": "Elke versie, de nieuwste bovenaan. De versienummers volgen het gebruikelijke schema van hoofdversie, tussenversie en patch.",
+  "released": "Uitgebracht",
+  "install_h": "Installeren",
+  "install_intro": "{brand} wordt niet als kant-en-klaar programma geleverd. Distributies maken er pakketten van, en zelf bouwen uit het broncodearchief kost een paar minuten.",
+  "pkg_h": "Via je distributie",
+  "pkg_note": "Pakketversies kunnen een paar weken achterlopen op de nieuwste versie; in de tabel hieronder staat welke versie je in het broncodearchief vindt.",
+  "src_h": "Zelf bouwen",
+  "src_intro": "Je hebt een C-compiler en make nodig. Het bouwen duurt ongeveer een minuut. Het broncodearchief van elke versie is naar het versienummer genoemd.",
+  "sums_h": "Versies en controlesommen",
+  "sums_intro": "Elke versie heeft een broncodearchief. Controleer de SHA-256-som ervan voordat je gaat bouwen.",
+  "col_ver": "Versie",
+  "col_date": "Uitgebracht",
+  "col_sum": "SHA-256 van het broncodearchief",
+  "roadmap_h": "Plannen",
+  "roadmap_intro": "Waar de beheerders aan werken, ongeveer op volgorde. Plannen veranderen; de wijzigingen zijn het verslag van wat er echt gebeurd is.",
+  "now_h": "Nu",
+  "next_h": "Straks",
+  "later_h": "Later",
+  "licence_h": "Licentie",
+  "licence_p": "{brand} is vrije software, uitgebracht onder de MIT-licentie. Gebruik het, pas het aan en deel het.",
+  "rel_back": "Alle versies",
+  "rel_more": "Andere versies",
+  "rel_src_h": "Broncodearchief",
+  "pkgs": [
+   {
+    "s": "Debian en Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS met Homebrew"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kiezel",
+       "Moeras",
+       "Lantaarn",
+       "Holte",
+       "Gloed",
+       "Fabel",
+       "Stern",
+       "Netel",
+       "Leisteen",
+       "Mos"
+      ],
+      [
+       "kijk",
+       "staart",
+       "blik",
+       "let",
+       "wacht",
+       "loer"
+      ]
+     ]
+    }
+   },
+   "tagline": "Voer een opdracht uit als je bestanden veranderen",
+   "desc": "{brand} houdt een map in de gaten en voert een opdracht uit zodra er iets in verandert.",
+   "overview": "{brand} houdt een map in de gaten en voert een opdracht uit zodra er iets in verandert. Het is een klein, snel programma voor mensen die het zat zijn om een bestand op te slaan en dan naar een ander venster te schakelen.",
+   "features": [
+    {
+     "h": "Snel begonnen",
+     "p": "Eén opdracht en geen configuratiebestand."
+    },
+    {
+     "h": "Verstandige standaardwaarden",
+     "p": "Negeert wisselbestanden van editors, mappen van versiebeheer en bouwresultaat."
+    },
+    {
+     "h": "Werkt overal",
+     "p": "Linux, macOS en Windows, met dezelfde opties."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {
+     "k": "Toegevoegd",
+     "t": "Ondersteuning voor het volgen van meerdere mappen tegelijk."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een vertragingsoptie om op een rustig moment te wachten voordat de opdracht draait."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Kleur in de uitvoer als de terminal dat ondersteunt."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Een zeldzame crash als een gevolgde map werd verwijderd."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Dubbele uitvoeringen als een editor een bestand in twee stappen opsloeg."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Paden met spaties onder Windows."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "De standaardvertraging is nu 200 milliseconden in plaats van 50."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "Negeerpatronen volgen dezelfde regels als de meeste hulpmiddelen voor versiebeheer."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een vlag once die de opdracht één keer uitvoert en dan stopt."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Het geheugengebruik dat langzaam groeide bij het volgen van zeer grote mappen."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "Foutmeldingen vertellen nu welke map de fout veroorzaakte."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Aanvulling met de tab-toets voor de gangbare shells."
+    }
+   ],
+   "now": [
+    "Sneller starten bij grote mappen",
+    "Duidelijkere meldingen als een opdracht mislukt"
+   ],
+   "next": [
+    "Een configuratiebestand voor instellingen per project",
+    "Pakketten voor de belangrijkste Linux-distributies"
+   ],
+   "later": [
+    "Een stille modus voor gebruik in scripts",
+    "Netwerkschijven betrouwbaar volgen"
+   ]
+  },
+  "images": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pixel",
+       "Tegel",
+       "Korrel",
+       "Lijst",
+       "Sluiter",
+       "Lens",
+       "Focus",
+       "Snede",
+       "Sepia",
+       "Mat"
+      ],
+      [
+       "pas",
+       "knip",
+       "krimp",
+       "pak",
+       "reeks",
+       "schaal"
+      ]
+     ]
+    }
+   },
+   "tagline": "Maak een hele map met foto's in één keer kleiner",
+   "desc": "{brand} verkleint en comprimeert foto's in bulk en laat de originelen met rust.",
+   "overview": "{brand} verkleint en comprimeert foto's in bulk. Wijs het naar een map en zeg hoe groot je de resultaten wilt; de rest doet het zelf, en de originelen blijven ongemoeid.",
+   "features": [
+    {
+     "h": "Eerst bulk",
+     "p": "Honderden bestanden tegelijk, met alle processorkernen."
+    },
+    {
+     "h": "Bewaart de originelen",
+     "p": "Resultaten komen in een nieuwe map."
+    },
+    {
+     "h": "Voorspelbare uitvoer",
+     "p": "Dezelfde invoer geeft altijd dezelfde bytes."
+    }
+   ],
+   "quick": "{cmd} fotos --width 1600 --out klein",
+   "changes": [
+    {
+     "k": "Toegevoegd",
+     "t": "Ondersteuning voor WebP als uitvoer."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een kwaliteitsoptie voor JPEG en WebP."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Staande foto's die gekanteld uit de bus kwamen."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Een crash bij bestanden zonder extensie."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "Uitvoerbestanden behouden de oorspronkelijke wijzigingsdatum."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een vlag voor een proefrun die laat zien wat er zou gebeuren."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Trage voortgangsmeldingen bij grote reeksen."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "Minder geheugengebruik bij het verkleinen van zeer grote foto's."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Verkleinen naar een maximale hoogte, naast een breedte."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Verkeerde kleuren bij foto's met een ingebed profiel."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "De hulptekst bevat nu voorbeelden."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een suffix-optie om de verkleinde bestanden een naam te geven."
+    }
+   ],
+   "now": [
+    "Sneller JPEG's inlezen",
+    "Een voortgangsbalk die niet in de weg zit"
+   ],
+   "next": [
+    "Bijsnijden naar een vaste verhouding",
+    "Pakketten voor de belangrijkste Linux-distributies"
+   ],
+   "later": [
+    "Ondersteuning voor bewegende afbeeldingen",
+    "Een kleine voorbeeldmodus"
+   ]
+  },
+  "markdown": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Plat",
+       "Komma",
+       "Veer",
+       "Marge",
+       "Glans",
+       "Proza",
+       "Schets",
+       "Proef",
+       "Kern",
+       "Letter"
+      ],
+      [
+       "keur",
+       "check",
+       "veeg",
+       "speur",
+       "lees",
+       "wis"
+      ]
+     ]
+    }
+   },
+   "tagline": "Vang kleine foutjes in Markdown voordat lezers ze zien",
+   "desc": "{brand} controleert Markdown-bestanden op kapotte links, overgeslagen kopniveaus en andere kleine foutjes.",
+   "overview": "{brand} controleert Markdown-bestanden op kapotte links, overgeslagen kopniveaus, spaties aan het einde van regels en al die andere kleinigheden waardoor een document slordig oogt. Het doorloopt een hele documentatiemap in een seconde.",
+   "features": [
+    {
+     "h": "Snel",
+     "p": "Duizend bestanden in ongeveer een seconde."
+    },
+    {
+     "h": "Rustig",
+     "p": "Meldt alleen waar het zeker van is."
+    },
+    {
+     "h": "Instelbaar",
+     "p": "Zet elke regel uit, of maak hem strenger."
+    }
+   ],
+   "quick": "{cmd} docs/",
+   "changes": [
+    {
+     "k": "Toegevoegd",
+     "t": "Een regel voor koppen die een niveau overslaan."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een regel voor links naar bestanden die niet bestaan."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Onterechte meldingen bij links met een anker."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Een crash bij bestanden met een byte order mark."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "Meldingen worden nu gesorteerd op bestand en regel."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een optie om eenvoudige problemen automatisch te herstellen."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "Regelnamen zijn korter en makkelijker te typen."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Verkeerde regelnummers na de front matter."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Uitvoer als JSON voor gebruik in andere programma's."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Trage controle van zeer lange regels."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "Het configuratiebestand mag nu in elke bovenliggende map staan."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een regel voor herhaalde woorden."
+    }
+   ],
+   "now": [
+    "Meer regels voor tabellen",
+    "Betere ondersteuning voor front matter"
+   ],
+   "next": [
+    "Links naar koppen in andere documenten controleren",
+    "Een plug-inkoppeling voor eigen regels"
+   ],
+   "later": [
+    "Een koppeling met editors",
+    "Vertalingen van de meldingen"
+   ]
+  },
+  "backup": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Zolder",
+       "Kelder",
+       "Plank",
+       "Lade",
+       "Kluis",
+       "Kist",
+       "Voorraad",
+       "Kast",
+       "Schuur",
+       "Koffer"
+      ],
+      [
+       "kopie",
+       "bewaar",
+       "berg",
+       "sla",
+       "spiegel",
+       "opslag"
+      ]
+     ]
+    }
+   },
+   "tagline": "Gewone, betrouwbare back-ups van een map",
+   "desc": "{brand} kopieert een map naar een andere plek en bewaart oudere versies als gewone bestanden.",
+   "overview": "{brand} kopieert een map naar een andere plek en bewaart oudere versies, zodat een vergissing van vorige dinsdag nog ongedaan kan worden gemaakt. Back-ups zijn gewone bestanden die je ook zonder {brand} kunt openen.",
+   "features": [
+    {
+     "h": "Gewone bestanden",
+     "p": "Geen apart formaat dat je later moet ontgrendelen."
+    },
+    {
+     "h": "Versies",
+     "p": "Bewaar zoveel momentopnamen als je wilt."
+    },
+    {
+     "h": "Controleert zichzelf",
+     "p": "Met de opdracht verify vergelijk je een back-up met de bron."
+    }
+   ],
+   "quick": "{cmd} notities /backups/notities",
+   "changes": [
+    {
+     "k": "Toegevoegd",
+     "t": "Een opdracht verify die een back-up met de bron vergelijkt."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Momentopnamen kunnen een aantal dagen of een aantal kopieën bewaard blijven."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Bestanden die tijdens een back-up veranderden en dubbel werden gekopieerd."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Verkeerde rechten op teruggezette bestanden."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "Ongewijzigde bestanden worden niet meer opnieuw gekopieerd."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een opdracht restore met een proefmodus."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Een crash bij mappen met zeer lange padnamen."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "Voortgang wordt alleen getoond als de uitvoer een terminal is."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een opdracht list die de momentopnamen van een back-up toont."
+    },
+    {
+     "k": "Opgelost",
+     "t": "Back-ups naar netwerkschijven die na een time-out stopten."
+    },
+    {
+     "k": "Gewijzigd",
+     "t": "Momentopnamen worden op datum benoemd in plaats van op nummer."
+    },
+    {
+     "k": "Toegevoegd",
+     "t": "Een optie om bestanden op patroon over te slaan."
+    }
+   ],
+   "now": [
+    "Sneller kopiëren van veel kleine bestanden",
+    "Een duidelijker rapport bij verify"
+   ],
+   "next": [
+    "Versleuteling van opgeslagen back-ups",
+    "In één keer naar een tweede plek back-uppen"
+   ],
+   "later": [
+    "Een grafisch hulpmiddel om terug te zetten",
+    "Ingebouwd plannen"
+   ]
+  }
+ }
+}

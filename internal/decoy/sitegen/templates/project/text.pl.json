@@ -1,0 +1,198 @@
+{
+ "ui": {
+  "nav_label": "Nawigacja",
+  "footer": "Udostępniane na licencji MIT.",
+  "nav_home": "Przegląd",
+  "nav_changelog": "Lista zmian",
+  "nav_install": "Instalacja",
+  "nav_roadmap": "Plany",
+  "home_title": "Przegląd",
+  "desc_changelog": "Wszystkie wersje programu {brand} wraz z tym, co się w nich zmieniło.",
+  "desc_install": "Jak zainstalować program {brand}: pakiety dystrybucji, budowanie ze źródeł i sumy kontrolne każdej wersji.",
+  "desc_roadmap": "Nad czym pracują opiekunowie programu {brand} i co będzie dalej.",
+  "nf_title": "Nie znaleziono strony",
+  "nf_text": "Ta strona nie istnieje albo została przeniesiona od czasu ostatniej wersji.",
+  "nf_back": "Wróć do przeglądu",
+  "features_h": "Dlaczego {brand}",
+  "start_h": "Na początek",
+  "latest_h": "Ostatnia wersja",
+  "all_releases": "Wszystkie wersje",
+  "get_it": "Zainstaluj",
+  "read_log": "Zobacz listę zmian",
+  "changelog_h": "Lista zmian",
+  "changelog_intro": "Wszystkie wersje, od najnowszej. Numery wersji mają zwykły układ: główna, poboczna i poprawka.",
+  "released": "Wydano",
+  "install_h": "Instalacja",
+  "install_intro": "{brand} nie jest dostarczany jako gotowy plik binarny. Pakują go dystrybucje, a zbudowanie go z archiwum źródeł zajmuje kilka minut.",
+  "pkg_h": "Z Twojej dystrybucji",
+  "pkg_note": "Wersje pakietów mogą nadążać za najnowszą wersją z kilkutygodniowym opóźnieniem. Tabela niżej pokazuje, jakiej wersji można się spodziewać z archiwum źródeł.",
+  "src_h": "Budowanie ze źródeł",
+  "src_intro": "Potrzebujesz kompilatora C i programu make. Budowanie trwa około minuty. Archiwum źródeł każdej wersji nosi nazwę zgodną z numerem wersji.",
+  "sums_h": "Wersje i sumy kontrolne",
+  "sums_intro": "Każda wersja ma archiwum źródeł. Przed budowaniem sprawdź jego sumę kontrolną SHA-256.",
+  "col_ver": "Wersja",
+  "col_date": "Data wydania",
+  "col_sum": "SHA-256 archiwum źródeł",
+  "roadmap_h": "Plany",
+  "roadmap_intro": "Nad czym pracują opiekunowie, mniej więcej po kolei. Plany się zmieniają, a lista zmian jest zapisem tego, co naprawdę się wydarzyło.",
+  "now_h": "Teraz",
+  "next_h": "Następnie",
+  "later_h": "Później",
+  "licence_h": "Licencja",
+  "licence_p": "{brand} to wolne oprogramowanie, udostępniane na licencji MIT. Możesz go używać, zmieniać i przekazywać dalej.",
+  "rel_back": "Wszystkie wersje",
+  "rel_more": "Inne wersje",
+  "rel_src_h": "Archiwum źródeł",
+  "pkgs": [
+   {
+    "s": "Debian i Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS z Homebrew"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "vars": {
+    "brand": {
+     "join": [
+      ["Kamyk", "Bagno", "Lampa", "Zar", "Bajka", "Rybitwa", "Pokrzywa", "Mech", "Wrzos", "Lipa"],
+      ["watch", "tail", "glance", "notice", "sentry", "peek"]
+     ]
+    }
+   },
+   "tagline": "Uruchom polecenie, gdy pliki się zmienią",
+   "desc": "{brand} obserwuje katalog i uruchamia polecenie za każdym razem, gdy coś się w nim zmieni.",
+   "overview": "{brand} obserwuje katalog i uruchamia polecenie za każdym razem, gdy coś się w nim zmieni. To mały, szybki program dla tych, którzy mają dość zapisywania pliku i przełączania się do innego okna.",
+   "features": [
+    {
+     "h": "Szybki start",
+     "p": "Jedno polecenie i żadnego pliku konfiguracyjnego."
+    },
+    {
+     "h": "Rozsądne ustawienia domyślne",
+     "p": "Pomija pliki tymczasowe edytorów, katalogi systemów kontroli wersji i efekty budowania."
+    },
+    {
+     "h": "Działa wszędzie",
+     "p": "Linux, macOS i Windows, z tymi samymi opcjami."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {"k": "Dodano", "t": "Obserwowanie kilku katalogów jednocześnie."},
+    {"k": "Dodano", "t": "Opcję opóźnienia, która czeka na spokojną chwilę przed uruchomieniem polecenia."},
+    {"k": "Dodano", "t": "Kolory w wyniku, jeśli terminal je obsługuje."},
+    {"k": "Naprawiono", "t": "Rzadki błąd zamykający program po usunięciu obserwowanego katalogu."},
+    {"k": "Naprawiono", "t": "Podwójne uruchomienia, gdy edytor zapisywał plik w dwóch krokach."},
+    {"k": "Naprawiono", "t": "Ścieżki ze spacjami w systemie Windows."},
+    {"k": "Zmieniono", "t": "Domyślne opóźnienie: teraz 200 milisekund zamiast 50."},
+    {"k": "Zmieniono", "t": "Wzorce pomijania: działają teraz według tych samych zasad co w większości narzędzi do kontroli wersji."},
+    {"k": "Dodano", "t": "Opcję once, która uruchamia polecenie jeden raz i kończy działanie."},
+    {"k": "Naprawiono", "t": "Powolny wzrost zużycia pamięci przy obserwowaniu bardzo dużych katalogów."},
+    {"k": "Zmieniono", "t": "Komunikaty o błędach: podają teraz, który katalog je wywołał."},
+    {"k": "Dodano", "t": "Podpowiadanie poleceń w popularnych powłokach."}
+   ],
+   "now": ["Szybszy start w dużych katalogach", "Lepsze komunikaty, gdy polecenie się nie powiedzie"],
+   "next": ["Plik konfiguracyjny z ustawieniami dla każdego projektu", "Pakiety dla głównych dystrybucji Linuksa"],
+   "later": ["Tryb cichy do użycia w skryptach", "Niezawodne obserwowanie dysków sieciowych"]
+  },
+  "images": {
+   "vars": {
+    "brand": {
+     "join": [
+      ["Piksel", "Kafel", "Ziarno", "Ramka", "Migawka", "Obiektyw", "Kadr", "Sepia", "Matowy", "Klatka"],
+      ["fit", "trim", "shrink", "pack", "batch", "scale"]
+     ]
+    }
+   },
+   "tagline": "Zmniejsz cały katalog zdjęć za jednym razem",
+   "desc": "{brand} zmienia rozmiar i kompresuje obrazy hurtem, a oryginały zostawia w spokoju.",
+   "overview": "{brand} zmienia rozmiar i kompresuje obrazy hurtem. Wskaż katalog i powiedz, jak duże mają być wyniki, a resztę zrobi sam, zostawiając oryginały nietknięte.",
+   "features": [
+    {
+     "h": "Najpierw hurt",
+     "p": "Setki plików naraz, z wykorzystaniem wszystkich rdzeni."
+    },
+    {
+     "h": "Oryginały zostają",
+     "p": "Wyniki trafiają do nowego katalogu."
+    },
+    {
+     "h": "Przewidywalny wynik",
+     "p": "Te same dane wejściowe zawsze dają te same bajty."
+    }
+   ],
+   "quick": "{cmd} zdjecia --width 1600 --out male",
+   "changes": [
+    {"k": "Dodano", "t": "Obsługę formatu WebP na wyjściu."},
+    {"k": "Dodano", "t": "Opcję jakości dla JPEG i WebP."},
+    {"k": "Naprawiono", "t": "Zdjęcia robione w pionie, które wychodziły położone na boku."},
+    {"k": "Naprawiono", "t": "Błąd zamykający program na plikach bez rozszerzenia."},
+    {"k": "Zmieniono", "t": "Pliki wynikowe: zachowują oryginalną datę modyfikacji."},
+    {"k": "Dodano", "t": "Opcję próbnego przebiegu, która wypisuje, co zostałoby zrobione."},
+    {"k": "Naprawiono", "t": "Powolne wyświetlanie postępu przy dużych partiach."},
+    {"k": "Zmieniono", "t": "Mniejsze zużycie pamięci przy zmniejszaniu bardzo dużych obrazów."},
+    {"k": "Dodano", "t": "Zmniejszanie do maksymalnej wysokości, a nie tylko szerokości."},
+    {"k": "Naprawiono", "t": "Błędne kolory w obrazach z osadzonym profilem."},
+    {"k": "Zmieniono", "t": "Pomoc: zawiera teraz przykłady."},
+    {"k": "Dodano", "t": "Opcję przyrostka do nazywania zmniejszonych plików."}
+   ],
+   "now": ["Szybsze dekodowanie JPEG", "Pasek postępu, który nie przeszkadza"],
+   "next": ["Przycinanie do stałych proporcji", "Pakiety dla głównych dystrybucji Linuksa"],
+   "later": ["Obsługa obrazów animowanych", "Mały tryb podglądu"]
+  },
+  "backup": {
+   "vars": {
+    "brand": {
+     "join": [
+      ["Strych", "Piwnica", "Szuflada", "Skrytka", "Kufer", "Szafa", "Regal", "Komoda", "Schowek", "Skarbiec"],
+      ["copy", "keep", "stash", "save", "mirror", "store"]
+     ]
+    }
+   },
+   "tagline": "Zwykłe, niezawodne kopie zapasowe katalogu",
+   "desc": "{brand} kopiuje katalog w inne miejsce i zachowuje starsze wersje jako zwykłe pliki.",
+   "overview": "{brand} kopiuje katalog w inne miejsce i zachowuje starsze wersje, żeby pomyłkę z zeszłego wtorku dało się jeszcze cofnąć. Kopie to zwykłe pliki, które można otworzyć bez programu {brand}.",
+   "features": [
+    {
+     "h": "Zwykłe pliki",
+     "p": "Żadnego specjalnego formatu, który trzeba będzie później odblokowywać."
+    },
+    {
+     "h": "Wersje",
+     "p": "Zachowuj tyle migawek, ile chcesz."
+    },
+    {
+     "h": "Sam się sprawdza",
+     "p": "Polecenie verify porównuje kopię z jej źródłem."
+    }
+   ],
+   "quick": "{cmd} notatki /kopie/notatki",
+   "changes": [
+    {"k": "Dodano", "t": "Polecenie verify, które porównuje kopię z jej źródłem."},
+    {"k": "Dodano", "t": "Migawki można przechowywać przez określoną liczbę dni albo w określonej liczbie kopii."},
+    {"k": "Naprawiono", "t": "Pliki zmienione w trakcie kopiowania, które były kopiowane dwa razy."},
+    {"k": "Naprawiono", "t": "Błędne uprawnienia przywróconych plików."},
+    {"k": "Zmieniono", "t": "Niezmienione pliki: nie są już kopiowane ponownie."},
+    {"k": "Dodano", "t": "Polecenie restore z trybem próbnym."},
+    {"k": "Naprawiono", "t": "Błąd zamykający program w katalogach z bardzo długimi nazwami ścieżek."},
+    {"k": "Zmieniono", "t": "Postęp: wyświetla się tylko wtedy, gdy wynik trafia do terminala."},
+    {"k": "Dodano", "t": "Polecenie list, które pokazuje migawki kopii."},
+    {"k": "Naprawiono", "t": "Kopie na dyski sieciowe, które zatrzymywały się po przekroczeniu czasu."},
+    {"k": "Zmieniono", "t": "Migawki: nazywane są datą, a nie numerem."},
+    {"k": "Dodano", "t": "Opcję pomijania plików według wzorca."}
+   ],
+   "now": ["Szybsze kopiowanie wielu małych plików", "Czytelniejszy raport weryfikacji"],
+   "next": ["Szyfrowanie kopii zapasowych", "Kopiowanie do drugiej lokalizacji w jednym kroku"],
+   "later": ["Graficzne narzędzie do przywracania", "Wbudowane planowanie"]
+  }
+ }
+}

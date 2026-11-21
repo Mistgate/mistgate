@@ -1,0 +1,465 @@
+{
+ "ui": {
+  "nav_label": "Belgeler",
+  "footer": "{ver} sürümü belgeleri.",
+  "nav_home": "Genel bakış",
+  "nav_install": "Kurulum",
+  "nav_usage": "Kullanım",
+  "nav_faq": "SSS",
+  "home_title": "Genel bakış",
+  "desc_install": "{brand} {ver} Linux, macOS ve Windows'ta nasıl kurulur.",
+  "desc_usage": "{brand} nasıl kullanılır: örneklerle yaygın görevler.",
+  "desc_faq": "{brand} hakkında sık sorulan sorular.",
+  "nf_title": "Sayfa bulunamadı",
+  "nf_text": "Bu sayfa belgelerin parçası değil. Daha yeni bir sürümde yeniden adlandırılmış olabilir.",
+  "nf_back": "Genel bakışa dön",
+  "quick_h": "Hızlı başlangıç",
+  "features_h": "Ne yapar",
+  "out_h": "Çıktı",
+  "install_h": "Kurulum",
+  "steps_h": "Adımlar",
+  "usage_h": "Kullanım",
+  "opts_h": "Seçenekler",
+  "opt_col": "Seçenek",
+  "desc_col": "Açıklama",
+  "faq_h": "Sık sorulan sorular",
+  "next": "Sonraki",
+  "facts_h": "Bir bakışta",
+  "menu_h": "Belgeler",
+  "facts": [
+   {
+    "k": "Sürüm",
+    "v": "{ver}"
+   },
+   {
+    "k": "Platformlar",
+    "v": "Linux, macOS ve Windows"
+   },
+   {
+    "k": "Lisans",
+    "v": "MIT"
+   },
+   {
+    "k": "Bağımlılıklar",
+    "v": "Yok"
+   }
+  ],
+  "install_check": "Sürüm numarası yazdırılıyorsa kurulum çalışmıştır.",
+  "nav_config": "Yapılandırma",
+  "nav_recipes": "Tarifler",
+  "nav_trouble": "Sorun giderme",
+  "desc_config": "{brand} yapılandırma dosyası ve ayarları.",
+  "desc_recipes": "{brand} ile günlük işler için kısa tarifler.",
+  "desc_trouble": "{brand} kullanırken en sık karşılaşılan sorunların çözümleri.",
+  "config_h": "Yapılandırma",
+  "config_col_key": "Anahtar",
+  "config_col_default": "Varsayılan",
+  "config_col_desc": "Ne yapar",
+  "config_file_h": "Örnek",
+  "recipes_h": "Tarifler",
+  "recipes_intro": "En sık sorulan işlere kısa yanıtlar.",
+  "trouble_h": "Sorun giderme",
+  "trouble_intro": "En sık karşılaşılan sorunlar ve genellikle neyin işe yaradığı.",
+  "ver_l": "Sürüm",
+  "prev": "Önceki"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "Komut satırı için günlük özetleyici",
+   "desc": "{brand} düz metin günlük dosyalarını okur ve içlerindekilerin kısa bir özetini yazdırır.",
+   "overview": "{brand} düz metin günlük dosyalarını okur ve kısa bir özet yazdırır: kaç satır olduğu, hangi düzeyleri kullandıkları ve hangi iletilerin en çok tekrarlandığı. Bağımlılığı olmayan tek bir küçük çalıştırılabilir dosyadır.",
+   "features": [
+    "Dosyaları, dizinleri ve standart girdiyi okur",
+    "Benzer iletileri hiçbir ayar yapmadan gruplar",
+    "Metin, JSON ya da küçük bir HTML raporu yazdırır"
+   ],
+   "quick_out": "app.log: 48.211 satır, 3 düzey\n  info   46.902\n  warn    1.190\n  error     119\nen sık ileti: cache miss for key (9.413 kez)",
+   "install_intro": "{brand} tek bir çalıştırılabilir dosya olarak dağıtılır. İlk çalıştırmadan önce ayarlanacak bir şey yok.",
+   "install_steps": [
+    "Sisteminize uygun arşivi indirin.",
+    "Arşivi açın ve çalıştırılabilir dosyayı PATH üzerindeki bir dizine kopyalayın.",
+    "Çalıştığını doğrulamak için sürüm komutunu çalıştırın."
+   ],
+   "faq": [
+    {
+     "q": "Hangi günlük biçimleri destekleniyor?",
+     "a": "Satır tabanlı her şey. {brand} yaygın zaman damgası ve düzey biçimlerini tanır, tanıyamazsa düz satırlara döner."
+    },
+    {
+     "q": "Dosyalarımı değiştiriyor mu?",
+     "a": "Asla. Dosyalar salt okunur açılır."
+    },
+    {
+     "q": "Ne kadar büyük bir dosyayı okuyabilir?",
+     "a": "Dosyalar akış olarak okunur, yani boyutu yalnızca süre sınırlar. Bir gigabayt dizüstü bilgisayarda birkaç saniye sürer."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Bir dosyayı özetleyin",
+     "p": "Bir dosya, dizin ya da boru hattı verin; {brand} onu okur. Dizinler alt dizinleriyle okunur ve sıkıştırılmış dosyalar anında açılır."
+    },
+    {
+     "h": "Bir zaman aralığına bakın",
+     "p": "Özeti bir zaman aralığıyla daraltmak için --since ve --until kullanın. Zamanlar mutlak ya da şimdiye göreli olabilir."
+    },
+    {
+     "h": "Çıktı biçimini seçin",
+     "p": "Varsayılan çıktı düz metindir. JSON kararlıdır ve betikler içindir; HTML raporu, bir meslektaşınıza gönderebileceğiniz tek bir dosyadır."
+    }
+   ],
+   "options": [
+    {
+     "d": "Yalnızca bu zamandan sonraki satırlar; mutlak ya da 2h gibi."
+    },
+    {
+     "d": "Yalnızca bu zamandan önceki satırlar."
+    },
+    {
+     "d": "Yalnızca bu düzeydeki ve üstündeki satırlar."
+    },
+    {
+     "d": "Kaç tekrarlanan ileti listeleneceği. Varsayılan 5."
+    },
+    {
+     "d": "text, json veya html. Varsayılan text."
+    }
+   ],
+   "config_intro": "{brand}, yapılandırma klasörünüzde config.toml adlı isteğe bağlı bir dosya okur. Her anahtar komut satırında da verilebilir; komut satırı önceliklidir.",
+   "config_rows": [
+    {
+     "d": "Kaç tekrarlanan ileti listeleneceği."
+    },
+    {
+     "d": "Çıktı biçimi: text, json veya html."
+    },
+    {
+     "d": "Dışarıda bırakılacak iletiler, düz metin olarak eşleştirilir."
+    },
+    {
+     "d": "Yalnızca bu zamandan sonraki satırlar okunur."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "En gürültülü saati bulun",
+     "p": "Günlüğün en yoğun olduğu zamanı görmek için özeti saate göre gruplayın."
+    },
+    {
+     "h": "İki günü karşılaştırın",
+     "p": "İki dosya arasında hangi iletilerin yeni olduğunu, hangilerinin kaybolduğunu gösterin."
+    },
+    {
+     "h": "Dolaştırmak için rapor hazırlayın",
+     "p": "HTML raporunu bir dosyaya yazın ve bir mesaja ekleyin."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Özet boş çıkıyor",
+     "a": "Dosyada satır başına bir ileti olduğundan emin olun. {brand} tarafından tanınmayan bir biçimde sıkıştırılmışsa önce açın."
+    },
+    {
+     "q": "Zamanlar yanlış görünüyor",
+     "a": "Saat dilimi olmayan satırlar UTC olarak okunur. Hangi dilimde olduklarını --tz ile belirtin."
+    },
+    {
+     "q": "Rapor çok uzun",
+     "a": "--top değerini düşürün ya da en gürültülü iletileri yapılandırma dosyasındaki yok sayma listesine ekleyin."
+    },
+    {
+     "q": "Ağ sürücüsünde yavaş",
+     "a": "Dosyayı önce yerel diske kopyalayın. Yavaş bir bağlantı üzerinden satır satır okumak genellikle nedendir."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Ayna",
+       "Sayaç",
+       "Katip",
+       "Süzgeç",
+       "Tarak",
+       "Defter",
+       "Ocak",
+       "Kütük"
+      ],
+      [
+       "log",
+       "scan",
+       "sum",
+       "view",
+       "cut",
+       "peek"
+      ]
+     ]
+    }
+   }
+  },
+  "site": {
+   "tagline": "Küçük bir statik site oluşturucu",
+   "desc": "{brand}, bir klasör dolusu Markdown dosyasını ve birkaç şablonu statik bir web sitesine dönüştürür.",
+   "overview": "{brand}, bir klasör dolusu Markdown dosyasını ve birkaç şablonu statik bir web sitesine dönüştürür. Veritabanı yok, çalışma zamanı yok, sunucuda güncel tutulacak hiçbir şey yok.",
+   "features": [
+    "Başlık bilgisi (front matter) içeren Markdown",
+    "Düz HTML ile şablonlar",
+    "Her kaydedişte yeniden derlenen yerel önizleme"
+   ],
+   "quick_out": "notes klasörü localhost:4000 adresinde sunuluyor (durdurmak için Ctrl+C)",
+   "install_intro": "{brand} tek bir çalıştırılabilir dosyadır. PATH üzerine koyun, işiniz bitti.",
+   "install_steps": [
+    "Sisteminize uygun arşivi indirin.",
+    "Arşivi açın ve çalıştırılabilir dosyayı PATH üzerindeki bir dizine kopyalayın.",
+    "Çalıştığını doğrulamak için sürüm komutunu çalıştırın."
+   ],
+   "faq": [
+    {
+     "q": "Kendi şablonlarımı kullanabilir miyim?",
+     "a": "Evet. Şablonlar birkaç yer tutucu içeren düz HTML dosyalarıdır, klasör düzenini de istediğiniz gibi değiştirebilirsiniz."
+    },
+    {
+     "q": "Veritabanı gerekiyor mu?",
+     "a": "Hayır. Çıktı, her web sunucusunun sunabileceği düz dosyalardır."
+    },
+    {
+     "q": "Yeni bir sayfa türü nasıl eklerim?",
+     "a": "pages altına kendi düzen dosyasıyla bir klasör ekleyin; {brand} bir sonraki derlemede onu alır."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Yeni bir site başlatın",
+     "p": "init komutu; bir yapılandırma dosyası, bir düzen ve bir örnek sayfa içeren bir klasör oluşturur."
+    },
+    {
+     "h": "Sayfa yazın",
+     "p": "Sayfalar Markdown dosyalarıdır. En üstteki başlık bilgisi başlığı ve tarihi belirler; altındaki her şey içeriktir."
+    },
+    {
+     "h": "Yayın için derleyin",
+     "p": "build komutu bitmiş siteyi public klasörüne yazar. O klasörü herhangi bir web sunucusuna kopyalayın."
+    }
+   ],
+   "options": [
+    {
+     "d": "Bitmiş site için klasör. Varsayılan public."
+    },
+    {
+     "d": "Taslak işaretli sayfaları da dahil et."
+    },
+    {
+     "d": "Önizleme sunucusunun portu. Varsayılan 4000."
+    },
+    {
+     "d": "Bir dosya değişince yeniden derle."
+    },
+    {
+     "d": "Yalnızca hataları yazdır."
+    }
+   ],
+   "config_intro": "site.toml dosyası klasörünüzün kökünde durur. Eksik bir anahtar varsayılanına döner, bu yüzden yeni bir site için dosyaya hiç gerek yoktur.",
+   "config_rows": [
+    {
+     "d": "Sayfa başlığında ve başlıkta gösterilen ad."
+    },
+    {
+     "d": "Sitenizin bulunduğu adres. Kökteki bir site için / kullanın."
+    },
+    {
+     "d": "Sitenin görünümü: plain, slate veya folio."
+    },
+    {
+     "d": "Taslak işaretli sayfaların derlenip derlenmeyeceği."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Yeni bir sayfa ekleyin",
+     "p": "En üstte başlık ve tarih olan bir Markdown dosyası oluşturun."
+    },
+    {
+     "h": "Taslakları önizleyin",
+     "p": "Bitmemiş sayfalar da dahil olacak şekilde siteyi yerelde sunun."
+    },
+    {
+     "h": "Bir klasöre yayınlayın",
+     "p": "Tüm siteyi herhangi bir web sunucusuna kopyalayabileceğiniz tek bir klasöre derleyin."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Bir sayfa derlemede yok",
+     "a": "Başlığında draft: true olan sayfalar atlanır. Kaldırın ya da --drafts ile derleyin."
+    },
+    {
+     "q": "Yayından sonra bağlantılar bozuluyor",
+     "a": "base_url değerini sitenin yayınlandığı klasörün adresine ayarlayın."
+    },
+    {
+     "q": "Önizleme güncellenmiyor",
+     "a": "Bazı düzenleyiciler eski dosyayı değiştirmek yerine yeni bir dosya yazar. Önizlemeyi yeniden başlatın ya da düzenleyicide güvenli yazmayı kapatın."
+    },
+    {
+     "q": "Görseller görünmüyor",
+     "a": "Bunları static klasörüne koyun. İçindeki her şey olduğu gibi kopyalanır."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Sade",
+       "Kireç",
+       "Tebeşir",
+       "Yaprak",
+       "Kalem",
+       "Taş",
+       "Baskı",
+       "Mürekkep"
+      ],
+      [
+       "site",
+       "page",
+       "build",
+       "gen",
+       "sheet"
+      ]
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Crontab olmadan yinelenen işler",
+   "desc": "{brand}, tek bir makinede küçük yinelenen işleri çalıştırır ve biri başarısız olduğunda sizi uyarır.",
+   "overview": "{brand}, tek bir makinede küçük yinelenen işleri çalıştırır ve biri başarısız olduğunda sizi uyarır. Aklınızda tutmak zorunda olduğunuz bir crontab'a göre daha dost bir seçenektir.",
+   "features": [
+    "Düz sözcüklerle yazılan zamanlamalar",
+    "Her çalıştırma için bir günlük",
+    "İş başına tek satır çıktı, böylece hatalar göze çarpar"
+   ],
+   "quick_out": "backup   her gün 03:00   son çalıştırma: tamam (4 sn)",
+   "install_intro": "{brand}, tek bir çalıştırılabilir dosya ile zamanlamayı dakikada bir kontrol eden küçük bir arka plan işleminden oluşur.",
+   "install_steps": [
+    "Sisteminize uygun arşivi indirin.",
+    "Arşivi açın ve çalıştırılabilir dosyayı PATH üzerindeki bir dizine kopyalayın.",
+    "Arka plan işlemini sisteminizin hizmet yöneticisiyle başlatın."
+   ],
+   "faq": [
+    {
+     "q": "Bir hizmet olarak çalışması gerekiyor mu?",
+     "a": "Evet, küçük bir arka plan işlemi zamanlamayı dakikada bir kontrol eder. Kurulum sayfası neyin başlatılacağını gösterir."
+    },
+    {
+     "q": "Bilgisayar kapalıysa ne olur?",
+     "a": "Makine kapalıyken zamanı gelen bir iş, makine yeniden açıldığında bir kez çalışır."
+    },
+    {
+     "q": "İşler birbirine bağlı olabilir mi?",
+     "a": "Henüz değil. Şimdilik komutları tek bir işte zincirleyin."
+    }
+   ],
+   "usage": [
+    {
+     "h": "İş ekleyin",
+     "p": "Bir işin adı, zamanlaması ve komutu vardır. Zamanlamalar düz sözcüklerle yazılır."
+    },
+    {
+     "h": "Neyin çalıştığını görün",
+     "p": "list komutu her işi son çalıştırmasının sonucuyla gösterir. history komutu bir işin çalıştırmalarını süresi ve çıktısıyla gösterir."
+    },
+    {
+     "h": "Duraklatın ve sürdürün",
+     "p": "Duraklatmak işi ve geçmişini korur ama çalışmasını durdurur. Taşınırken ya da bir yedeği geri yüklerken işe yarar."
+    }
+   ],
+   "options": [
+    {
+     "d": "İşlerin ve günlüklerin tutulduğu yer. Varsayılan, ev klasörünüzdeki bir klasördür."
+    },
+    {
+     "d": "Yalnızca hataları yazdır."
+    },
+    {
+     "d": "Geçmişin kaç çalıştırmayı gösterdiği. Varsayılan 10."
+    },
+    {
+     "d": "Makinenin okuyabileceği çıktı."
+    },
+    {
+     "d": "Bir işi zamanlamasının yanı sıra hemen de çalıştır."
+    }
+   ],
+   "config_intro": "{brand}, yapılandırma klasörünüzden jobs.toml dosyasını okur. İşlerin kendisi ayrı tutulur, bu yüzden dosyada yalnızca ayarlar bulunur.",
+   "config_rows": [
+    {
+     "d": "Komutları çalıştıran kabuk."
+    },
+    {
+     "d": "Her çalıştırmanın çıktısının tutulduğu yer."
+    },
+    {
+     "d": "Başarısız bir işin kaç kez yeniden deneneceği."
+    },
+    {
+     "d": "Başarısız bir işin ayrıca bildirim gönderip göndermeyeceği."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Bir işi şimdi, bir kez çalıştırın",
+     "p": "Bir işi zamanlaması dışında başlatın, örneğin yeni bir komutu denemek için."
+    },
+    {
+     "h": "Bir işin neden başarısız olduğunu görün",
+     "p": "Bir işin son çalıştırmasının çıktısını yazdırın."
+    },
+    {
+     "h": "Yolculuktayken her şeyi duraklatın",
+     "p": "Siz sürdürene kadar tüm zamanlamaları durdurun."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Bir iş hiç çalışmıyor",
+     "a": "Programın çalıştığını list komutuyla kontrol edin. İşler yalnızca program çalışırken çalışır."
+    },
+    {
+     "q": "Bir iş iki kez çalışıyor",
+     "a": "Programın iki kopyası çalışıyor. Birini durdurun; kilit dosyası günlük klasöründedir."
+    },
+    {
+     "q": "Komut benim kabuğumda çalışıyor ama burada çalışmıyor",
+     "a": "İşler kabuğunuzun başlangıç dosyalarını okumaz. Tam yolları kullanın ya da ortamı işin içinde ayarlayın."
+    },
+    {
+     "q": "Saatler bir saat kayık",
+     "a": "{brand} sistem saatini ve saat dilimini izler. Bunları işte değil, sistemde değiştirin."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Saat",
+       "İş",
+       "Görev",
+       "Nöbet",
+       "Tık",
+       "Ritim",
+       "Sıra",
+       "Dürtü"
+      ],
+      [
+       "work",
+       "list",
+       "run",
+       "do",
+       "bell"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

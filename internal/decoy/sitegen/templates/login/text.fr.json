@@ -1,0 +1,124 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     ["Alt", "Bel", "Cor", "Dor", "Lum", "Mar", "Nor", "Sol", "Val", "Ver", "Ari", "Ode"],
+     ["ance", "ia", "ora", "ys", "one", "is", "eo", "ane", "ura", "ine"]
+    ]
+   }
+  },
+  "nav_label": "Navigation",
+  "tagline": "Accès sécurisé à votre compte",
+  "footer": "Tous droits réservés.",
+  "nav_home": "Connexion",
+  "nav_help": "Aide",
+  "nav_privacy": "Confidentialité",
+  "home_title": "Connexion",
+  "desc": "Connectez-vous à votre compte {brand}.",
+  "desc_help": "De l'aide pour vous connecter à {brand}.",
+  "desc_privacy": "Comment {brand} traite vos informations.",
+  "nf_title": "Page introuvable",
+  "nf_text": "La page que vous cherchez n'existe pas ou a été déplacée.",
+  "nf_back": "Retour à la connexion",
+  "f_user": "Identifiant ou adresse e-mail",
+  "f_pass": "Mot de passe",
+  "f_remember": "Rester connecté",
+  "f_forgot": "Mot de passe oublié ?",
+  "f_submit": "Se connecter",
+  "f_busy": "Connexion en cours…",
+  "e_empty": "Saisissez votre identifiant et votre mot de passe.",
+  "e_bad": [
+   "Identifiant ou mot de passe incorrect.",
+   "L'identifiant ou le mot de passe saisi n'est pas correct. Merci de réessayer.",
+   "Nous n'avons pas pu vous connecter avec ces informations."
+  ],
+  "help_h": "Un problème de connexion ?",
+  "help_intro": "La plupart des problèmes de connexion ont une cause simple. Passez ces vérifications en revue avant de contacter quelqu'un.",
+  "help_steps": [
+   "Vérifiez que le verrouillage des majuscules est désactivé : les mots de passe tiennent compte des majuscules et des minuscules.",
+   "Cherchez un espace en trop au début ou à la fin de votre identifiant.",
+   "Réessayez dans une nouvelle fenêtre de navigation, sans données de formulaire enregistrées.",
+   "Patientez dix minutes si vous avez essayé plusieurs fois sans succès."
+  ],
+  "help_contact_h": "Toujours bloqué ?",
+  "help_contact": "Demandez à la personne qui gère {brand} dans votre structure de réinitialiser votre mot de passe. Pour des raisons de sécurité, nous ne pouvons pas le faire par téléphone ni par e-mail.",
+  "help_back": "Retour à la connexion",
+  "privacy_h": "Politique de confidentialité",
+  "privacy_intro": "Nous conservons le moins possible d'informations sur vous et nous prenons soin de ce que nous gardons. Voici, en bref, ce que c'est et pourquoi.",
+  "privacy": [
+   {
+    "h": "Ce que nous conservons",
+    "p": "Votre identifiant, les dates de vos connexions et les informations liées à votre compte. Rien d'autre."
+   },
+   {
+    "h": "À quoi cela sert",
+    "p": "À vous permettre de vous connecter et à protéger votre compte contre toute autre personne. Nous ne vendons aucune information sur nos utilisateurs."
+   },
+   {
+    "h": "Cookies",
+    "p": "Nous n'utilisons que les cookies nécessaires au fonctionnement du service. Il n'y a ni cookie publicitaire ni cookie de mesure d'audience."
+   },
+   {
+    "h": "Vos droits",
+    "p": "Vous pouvez demander à consulter, corriger ou supprimer les informations que nous détenons sur vous. Adressez-vous à la personne qui gère votre compte."
+   }
+  ]
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Espace client",
+   "welcome": "Bon retour parmi nous",
+   "lead": "Connectez-vous pour consulter vos factures, mettre à jour vos coordonnées et gérer votre abonnement.",
+   "bullets": [
+    "Consulter et télécharger vos factures",
+    "Mettre à jour vos coordonnées",
+    "Suivre vos demandes en cours"
+   ]
+  },
+  "staff": {
+   "kicker": "Espace du personnel",
+   "welcome": "Connexion du personnel",
+   "lead": "Utilisez votre compte professionnel pour accéder aux plannings, aux notes de service et aux documents partagés.",
+   "bullets": [
+    "Plannings et horaires",
+    "Notes de service pour l'équipe",
+    "Documents partagés"
+   ],
+   "f_user": "Matricule ou adresse e-mail"
+  },
+  "learning": {
+   "kicker": "Espace numérique de travail",
+   "welcome": "Connectez-vous à l'espace de votre classe",
+   "lead": "Élèves, parents et enseignants se connectent ici pour retrouver les emplois du temps, les devoirs et les messages.",
+   "bullets": [
+    "Emplois du temps et devoirs",
+    "Messages des enseignants",
+    "Dates des vacances et des sorties"
+   ],
+   "f_user": "Identifiant"
+  },
+  "archive": {
+   "kicker": "Coffre-fort de documents",
+   "welcome": "Ouvrez votre coffre-fort",
+   "lead": "Contrats, justificatifs et courriers sont conservés ici pour vous, à l'abri des regards.",
+   "bullets": [
+    "Contrats et justificatifs",
+    "Vos courriers au même endroit",
+    "Un accès que vous contrôlez"
+   ],
+   "f_user": "Adresse e-mail"
+  },
+  "bookings": {
+   "kicker": "Réservations",
+   "welcome": "Gérez vos réservations",
+   "lead": "Connectez-vous pour modifier une réservation, ajouter des personnes ou voir ce qui est à venir.",
+   "bullets": [
+    "Modifier ou annuler une réservation",
+    "Ajouter des personnes",
+    "Voir les dates à venir"
+   ],
+   "f_user": "E-mail de réservation"
+  }
+ }
+}

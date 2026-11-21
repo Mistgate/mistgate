@@ -1,0 +1,185 @@
+{
+ "ui": {
+  "nav_label": "Nawigacja",
+  "footer": "Zrobione ręcznie. Bez ciasteczek i śledzenia.",
+  "nav_home": "Wizytówka",
+  "nav_about": "O mnie",
+  "nav_projects": "Projekty",
+  "nav_now": "Teraz",
+  "home_title": "Cześć",
+  "desc_about": "Więcej o: {brand}.",
+  "desc_projects": "Wybrane projekty: {brand}.",
+  "desc_now": "Czym obecnie zajmuje się {brand}.",
+  "nf_title": "Tu nic nie ma",
+  "nf_text": "Pod tym adresem nie ma żadnej strony. Wróć do wizytówki na stronie głównej.",
+  "nf_back": "Wróć do wizytówki",
+  "link_d": [
+   "Kim jestem i jak pracuję",
+   "Kilka rzeczy mojego autorstwa",
+   "Czym zajmuję się teraz"
+  ],
+  "about_h": "O mnie",
+  "facts_h": "W skrócie",
+  "projects_h": "Projekty",
+  "projects_intro": "Kilka prac wartych pokazania, od najnowszych.",
+  "now_h": "Teraz",
+  "updated": "Aktualizacja: {upd} 2026",
+  "now_intro": "To strona „teraz”: czym zajmuję się w tej chwili, a nie tym, co kiedyś miało zostać zrobione.",
+  "hello": "Cześć, nazywam się",
+  "vars": {
+   "brand": "{name}",
+   "month": ["stycznia", "marca", "maja", "września"],
+   "upd": ["sierpień", "wrzesień", "październik", "listopad"]
+  }
+ },
+ "bundles": {
+  "illustrator": {
+   "role": "Ilustracje i linoryty",
+   "tagline": "Obrazki do książek, plakaty i czasem kartka urodzinowa.",
+   "desc": "{brand}: ilustracje i linoryty {city_in}. Książki obrazkowe, plakaty i grafiki.",
+   "bio": "Rysuję do książek obrazkowych i na plakaty, a linoryty wycinam dla każdego, kto grzecznie poprosi.",
+   "about": [
+    "Żyję z rysowania, głównie do książek obrazkowych i czasem na plakat. Pracuję w małym pokoju {city_in}, z oknem na parking, który rysuję tak, jakby był jeziorem.",
+    "Zanim rysowanie stało się pracą, był druk na tkaninie, a nawyk myślenia warstwami został do dziś. Większość moich obrazów składa się z trzech lub czterech płaskich kolorów."
+   ],
+   "facts": [
+    "Pracownia {city_in}",
+    "Pióro, tusz i linoryt",
+    "Przyjmuję nowe zlecenia od {month}"
+   ],
+   "projects": [
+    {
+     "t": "Zeszyt z pola",
+     "y": "2025",
+     "d": "Książka obrazkowa o jednym roku na małym polu, wydana w lokalnej drukarni."
+    },
+    {
+     "t": "Seria targowa",
+     "y": "2024",
+     "d": "Dwanaście linorytów ze straganami, kupującymi i jednym bardzo zadowolonym z siebie gołębiem."
+    },
+    {
+     "t": "Kartki urodzinowe dla księgarni",
+     "y": "2023",
+     "d": "Sześć kartek drukowanych ręcznie w nakładzie po dwieście sztuk."
+    }
+   ],
+   "now": [
+    "Kończę ostatnie rozkładówki książki o pogodzie",
+    "Uczę się wycinać czterokolorowy linoryt bez tracenia cierpliwości",
+    "Szukam większej prasy"
+   ]
+  },
+  "translator": {
+   "role": "Tłumaczenia z niemieckiego na polski",
+   "tagline": "Staranne tłumaczenia prozy, esejów i czasem instrukcji obsługi.",
+   "desc": "{brand}: tłumaczenia z niemieckiego na polski, proza i eseje, {city_in}.",
+   "bio": "Tłumaczę z niemieckiego na polski, głównie prozę i eseje, a wszystko czytam na głos dwa razy.",
+   "about": [
+    "Tłumaczę z niemieckiego na polski, głównie prozę i eseje, a czasem instrukcję obsługi jakiegoś przedmiotu, który zasługuje na lepszy tekst.",
+    "Pracuję powoli, wszystko czytam na głos dwa razy i do każdego zdania, które budzi wątpliwości, dołączam notatkę. Redaktorzy mówią, że to albo urocze, albo doprowadzające do szału."
+   ],
+   "facts": [
+    "Biuro {city_in}",
+    "Z niemieckiego na polski",
+    "Nowe zlecenia od {month}"
+   ],
+   "projects": [
+    {
+     "t": "Powieść o latarniku",
+     "y": "2025",
+     "d": "Czterysta stron pogody i żalu, tłumaczone czternaście miesięcy."
+    },
+    {
+     "t": "Eseje o chodzeniu",
+     "y": "2024",
+     "d": "Zbiór krótkich tekstów pisarza, który wszędzie chodził pieszo."
+    },
+    {
+     "t": "Katalog muzealny",
+     "y": "2023",
+     "d": "Teksty na wystawę tkanin, z większą liczbą przymiotników, niż wymagałby tego dobry smak."
+    }
+   ],
+   "now": [
+    "Redaguję przekład długiej powieści",
+    "Czytam eseje, które warto zaproponować wydawcy",
+    "Uzupełniam słowniczek terminów żeglarskich"
+   ]
+  },
+  "potter": {
+   "role": "Ceramika",
+   "tagline": "Zwykłe miski, kubki i talerze, robione w małych seriach.",
+   "desc": "{brand}: ceramika {city_in}. Codzienna kamionka toczona na kole.",
+   "bio": "Toczę zwykłą kamionkę na kole i wypalam ją w małych seriach.",
+   "about": [
+    "Robię użytkową ceramikę w pracowni, którą dzielę z trzema innymi twórcami {city_in}. Wszystko jest toczone na kole i wypalane jako kamionka.",
+    "Lubię naczynia, które znikają w codziennym użyciu: kubek, który dobrze leży w dłoni, miskę, która się nie przewraca. Szkliwa są głównie żelazowe i popiołowe i przy każdym wypale wychodzą trochę inaczej."
+   ],
+   "facts": [
+    "Pracownia {city_in}",
+    "Kamionka wypalana w 1260 stopniach",
+    "Nowe naczynia od {month}"
+   ],
+   "projects": [
+    {
+     "t": "Zestaw na co dzień",
+     "y": "2025",
+     "d": "Talerze, miski i kubki w szkliwie koloru płatków owsianych, które nigdy nie wyszło dwa razy tak samo."
+    },
+    {
+     "t": "Miseczki do herbaty",
+     "y": "2024",
+     "d": "Trzydzieści małych miseczek, każda trochę inna, zrobionych dla herbaciarni."
+    },
+    {
+     "t": "Zamówienie na kafle",
+     "y": "2023",
+     "d": "Ściana ręcznie odciskanych kafli do kuchni, w czterech odcieniach zieleni."
+    }
+   ],
+   "now": [
+    "Testuję szkliwo popiołowe z popiołu z sąsiedzkiego ogniska",
+    "Toczę większe talerze",
+    "Robię miejsce na półkach w piecu na zimowe zamówienia"
+   ]
+  },
+  "developer": {
+   "role": "Programowanie małych narzędzi",
+   "tagline": "Małe, ciche programy, które robią jedną rzecz i nikomu nie przeszkadzają.",
+   "desc": "{brand}: małe narzędzia {city_in}. Aplikacja do notatek, kalendarz i kilka programów w wierszu poleceń.",
+   "bio": "Piszę małe narzędzia dla ludzi, którzy pracują ze słowami i liczbami, i staram się oddawać je dokończone.",
+   "about": [
+    "Piszę małe narzędzia dla ludzi, którzy pracują ze słowami i liczbami: aplikację do notatek, kilka programów w wierszu poleceń, kalendarz pokazujący tylko to, co dziś ważne.",
+    "Robię rzeczy powoli i staram się oddawać je dokończone. Większość moich programów ma mniej funkcji, niż mogłaby mieć, i to celowo."
+   ],
+   "facts": [
+    "Biuro {city_in}",
+    "Piszę w kilku nudnych językach",
+    "Terminy na małe projekty od {month}"
+   ],
+   "projects": [
+    {
+     "t": "Aplikacja do notatek na komputer",
+     "y": "2025",
+     "d": "Zwykłe pliki tekstowe, szybkie wyszukiwanie i żadnego konta."
+    },
+    {
+     "t": "Kalendarz na jeden dzień",
+     "y": "2024",
+     "d": "Pokazuje dzisiaj i nic więcej, co okazuje się wystarczające."
+    },
+    {
+     "t": "Licznik czasu pracy",
+     "y": "2023",
+     "d": "Jeden przycisk i tygodniowe podsumowanie, dla tych, którzy nie lubią ewidencji godzin."
+    }
+   ],
+   "now": [
+    "Porządkuję kod aplikacji do notatek",
+    "Piszę krótką instrukcję obsługi",
+    "Myślę o mniejszej wersji wszystkiego"
+   ]
+  }
+ }
+}

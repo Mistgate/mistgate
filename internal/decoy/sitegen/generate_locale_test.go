@@ -341,7 +341,7 @@ func addressRE(c *countryDef) *regexp.Regexp {
 		cities = append(cities, ci.Name)
 	}
 	re := regexp.QuoteMeta(c.Address)
-	re = strings.NewReplacer(`\{street\}`, "(?:"+alt(c.Streets)+")", `\{no\}`, `\d+`, `\{zip\}`, `[0-9A-Z]+(?: [0-9A-Z]+)?`,
+	re = strings.NewReplacer(`\{street\}`, "(?:"+alt(c.Streets)+")", `\{no\}`, `\d+`, `\{zip\}`, `[0-9A-Z-]+(?: [0-9A-Z]+)?`,
 		`\{city\}`, "(?P<city>"+alt(cities)+")", `\{state\}`, `[A-Z]{2}`).Replace(re)
 	return regexp.MustCompile(re)
 }
@@ -577,9 +577,6 @@ func contains(cs []CountryInfo, cc, kind string) bool {
 func TestKindNeedsItsLanguage(t *testing.T) {
 	if _, err := Generate("blog", []byte("x")); err != nil {
 		t.Fatal(err)
-	}
-	if _, _, err := GenerateWith("blog", []byte("x"), Options{Country: "nl"}); err == nil {
-		t.Error("a blog was made for the Netherlands, which has no Dutch blog texts")
 	}
 	if _, _, err := GenerateWith("blog", []byte("x"), Options{Country: "zz"}); err == nil {
 		t.Error("a site was made for a country that does not exist")

@@ -1,0 +1,176 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Çakıl",
+      "Mermer",
+      "Liman",
+      "Fener",
+      "Kayın",
+      "Kalem",
+      "Akçaağaç",
+      "Kırlangıç",
+      "Yonca",
+      "Kehribar"
+     ],
+     [
+      "gönder",
+      "paylaş",
+      "aktar",
+      "kutu",
+      "ver",
+      "yolla"
+     ]
+    ]
+   },
+   "limit": [
+    "500 MB",
+    "1 GB",
+    "2 GB",
+    "5 GB"
+   ]
+  },
+  "nav_label": "Ana menü",
+  "tagline": "Basit dosya aktarımı",
+  "footer": "Dosyalar bağlantının süresi dolduğunda otomatik olarak silinir.",
+  "nav_home": "Dosya gönder",
+  "nav_how": "Nasıl çalışır",
+  "nav_limits": "Sınırlar ve SSS",
+  "home_title": "Dosya gönder",
+  "desc": "{brand} ile {limit} boyutuna kadar dosyaları tek bir bağlantıyla paylaşın.",
+  "desc_how": "{brand} dosya aktarımı nasıl çalışıyor.",
+  "desc_limits": "{brand} için dosya boyutları, bağlantı süreleri ve sık sorulan sorular.",
+  "nf_title": "Sayfa bulunamadı",
+  "nf_text": "Aradığınız sayfa yok ya da başka bir yere taşınmış.",
+  "nf_back": "Ana sayfaya dön",
+  "drop_h": "Dosyayı buraya bırakın",
+  "drop_hint": "ya da cihazınızdan seçin, en fazla {limit}",
+  "pick": "Dosya seç",
+  "uploading": "Yükleniyor…",
+  "e_full": [
+   "Depolama alanı dolu. Lütfen daha sonra tekrar deneyin.",
+   "Yükleme başarısız: depolama alanımız şu anda dolu.",
+   "Depolama alanı dolu olduğu için şu anda yeni dosya kabul edemiyoruz."
+  ],
+  "retry": "Tekrar dene",
+  "how_h": "Nasıl çalışır",
+  "how_intro": "Üç adım, kurulacak bir şey yok.",
+  "steps": [
+   {
+    "h": "Dosyayı seçin",
+    "p": "Dosyayı ana sayfaya bırakın ya da cihazınızdan seçin."
+   },
+   {
+    "h": "Bağlantıyı alın",
+    "p": "Yükleme bitince kopyalayabileceğiniz bir bağlantı elde edersiniz."
+   },
+   {
+    "h": "Bağlantıyı paylaşın",
+    "p": "Bağlantıya sahip olan herkes, süresi dolana kadar dosyayı indirebilir."
+   }
+  ],
+  "limits_h": "Sınırlar ve SSS",
+  "limits_intro": "Önemli rakamlar tek yerde.",
+  "limits": [
+   {
+    "k": "En büyük dosya",
+    "v": "{limit}"
+   },
+   {
+    "k": "Bağlantı süresi",
+    "v": "{days} gün"
+   },
+   {
+    "k": "Yükleme başına dosya",
+    "v": "Bir (birden fazla dosyayı zip içinde toplayın)"
+   },
+   {
+    "k": "Bağlantı başına indirme",
+    "v": "Süresi dolana kadar sınırsız"
+   }
+  ],
+  "faq_h": "Sık sorulan sorular",
+  "faq": [
+   {
+    "q": "Hesap gerekli mi?",
+    "a": "Hayır. {limit} boyutuna kadar dosyaları giriş yapmadan gönderebilirsiniz."
+   },
+   {
+    "q": "Bağlantım ne kadar süre çalışır?",
+    "a": "Bağlantılar {days} gün çalışır. Sonrasında dosya silinir ve bağlantı çalışmaz."
+   },
+   {
+    "q": "Alıcı adımı görebilir mi?",
+    "a": "Siz söylemedikçe hayır. İndirme sayfasında sizinle ilgili hiçbir şey görünmez."
+   },
+   {
+    "q": "Bağlantının süresi dolunca dosyama ne olur?",
+    "a": "Depolamadan silinir. Kopyasını tutmuyoruz."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Süresi dolan bağlantılar",
+    "p": "Her bağlantı {days} gün çalışır, böylece ortada bir şey kalmaz."
+   },
+   {
+    "h": "Kayıt yok",
+    "p": "{limit} boyutuna kadar dosyalar hesapsız gönderilebilir."
+   },
+   {
+    "h": "Sade ve hızlı",
+    "p": "Dosyayı ekleyin, bağlantıyı kopyalayın, iletin. Hepsi bu."
+   }
+  ],
+  "nav_privacy": "Gizlilik",
+  "desc_privacy": "{brand} dosyalarınıza ve bilgilerinize ne yapıyor.",
+  "privacy_h": "Gizlilik bildirimi",
+  "privacy_intro": "Dosyanıza ve aktarımınızın ayrıntılarına ne olduğunun kısa bir anlatımı.",
+  "privacy": [
+   {
+    "h": "Neleri tutuyoruz",
+    "p": "Yüklediğiniz dosyayı ve yükleme zamanını. Adınızı sormayız, dosyayı indirenlerin listesini de tutmayız."
+   },
+   {
+    "h": "Ne kadar tutuyoruz",
+    "p": "Bağlantının süresi dolana kadar. Sonrasında dosya depolamadan silinir ve geri getirilemez."
+   },
+   {
+    "h": "Kimler görebilir",
+    "p": "Bağlantıya sahip olan herkes. Dosyalarınızı açmayız ve okumayız; bu yüzden bağlantıyı yalnızca dosyayı alması gereken kişilerle paylaşın."
+   },
+   {
+    "h": "Çerezler",
+    "p": "Yalnızca sayfanın çalışması için gerekenleri kullanırız. Reklam ya da izleme çerezi yoktur."
+   },
+   {
+    "h": "Dosyayı erken kaldırmak",
+    "p": "Bağlantısının süresi dolmadan bir dosyanın kaldırılması için kurumunuzda {brand} hizmetine bakan kişiye başvurun."
+   }
+  ]
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "Dosya aktarımı",
+   "hero_h": "Herkese dosya gönderin",
+   "hero_p": "Dosyayı ekleyin, bağlantıyı alın, paylaşın. {limit} boyutuna kadar dosyalar için hesap gerekmez."
+  },
+  "print": {
+   "kicker": "Baskı dosyaları",
+   "hero_h": "Çalışmanızı yükleyin",
+   "hero_p": "Siparişiniz için baskıya hazır dosyalarınızı bize gönderin. {limit} boyutuna kadar PDF, TIFF ve ZIP dosyaları uygundur."
+  },
+  "photos": {
+   "kicker": "Fotoğraf paylaşımı",
+   "hero_h": "Fotoğraflarınızı paylaşın",
+   "hero_p": "Bir klasör dolusu fotoğrafı {limit} boyutuna kadar tek bir zip dosyası olarak gönderin. Aileniz ve arkadaşlarınızın yalnızca bağlantıya ihtiyacı var."
+  },
+  "assignments": {
+   "kicker": "Ödevler",
+   "hero_h": "Ödevinizi teslim edin",
+   "hero_p": "Ödevinizi son teslim tarihinden önce buraya yükleyin. Tek dosya, en fazla {limit}."
+  }
+ }
+}

@@ -1,0 +1,513 @@
+{
+ "ui": {
+  "nav_label": "Huvudmeny",
+  "footer": "Fristående och lokalt.",
+  "nav_home": "Hem",
+  "nav_about": "Om oss",
+  "nav_contact": "Hitta hit",
+  "home_title": "Välkommen",
+  "nf_title": "Sidan hittades inte",
+  "nf_text": "Vi hittade inte sidan. Den kan ha flyttat, eller så har vi aldrig haft den.",
+  "nf_back": "Tillbaka till startsidan",
+  "see_services": "Se vad vi erbjuder",
+  "all_prices": "Hela prislistan",
+  "visit_h": "Besök oss",
+  "hours_h": "Öppettider",
+  "address_l": "Adress",
+  "phone_l": "Telefon",
+  "about_h": "Om oss",
+  "services_h": "Vad vi erbjuder",
+  "services_intro": "Priserna är riktvärden; vi pratar gärna igenom vad du behöver.",
+  "contact_h": "Hitta hit",
+  "contact_intro": "Titta in under öppettiderna eller hör av dig. Vi pratar gärna igenom vad du behöver innan du bestämmer dig.",
+  "contact_note": "Det är enklast att parkera på gatan intill. Är dörren stängd under öppettiderna är vi troligen i bakrummet; knacka och vänta en stund.",
+  "from_l": "från",
+  "col_service": "Tjänst",
+  "col_desc": "Vad som ingår",
+  "col_price": "Pris",
+  "hours_note": "",
+  "directions_h": "Så hittar du hit",
+  "directions": "Du hittar oss på {address}. Det är en kort promenad från centrum, och det finns ett cykelställ vid dörren.",
+  "services_note": "Visar sig ett jobb kräva mer än vi offererat frågar vi dig innan vi sätter igång."
+ },
+ "bundles": {
+  "bakery": {
+   "tagline": "Bröd och bakverk, bakade i {city}",
+   "nav_services": "Våra bakverk",
+   "desc": "Ett bageri i kvarteret i {city}: surdegsbröd, frallor och bakverk, bakade varje morgon.",
+   "desc_services": "Bröd, bullar och tårtor, med priser.",
+   "desc_about": "Historien om {brand}, ett litet bageri i {city}.",
+   "desc_contact": "Öppettider och adress till {brand} i {city}.",
+   "hero_h": "Bröd på det långsamma sättet",
+   "intro": "Ett litet kvartersbageri. Surdegsbröd, frallor och bakverk, bakade varje morgon innan butiken öppnar.",
+   "about": [
+    "{brand} började i ett hyrt kök bakom en butik i {city}, med en ugn och en rejäl dos optimism.",
+    "Vi bakar fortfarande i små satser, med mjöl från en kvarn en timme bort och en surdegsgrund som är äldre än vår yngsta bagare.",
+    "Kom tidigt för frallorna, stanna för kaffet och säg till om ditt bröd inte blev bra. Vi vill hellre veta."
+   ],
+   "features": [
+    {
+     "h": "Bakat varje morgon",
+     "p": "Inget sparas från i går."
+    },
+    {
+     "h": "Ärliga råvaror",
+     "p": "Mjöl, vatten, salt och tid."
+    },
+    {
+     "h": "Beställningar välkomna",
+     "p": "Tårtor och större beställningar efter överenskommelse."
+    }
+   ],
+   "services": [
+    {
+     "t": "Lantbröd på surdeg",
+     "d": "Långsamt jäst, med tjock skorpa och en mjuk, luftig krumma."
+    },
+    {
+     "t": "Rågbröd med frön",
+     "d": "Kompakt, mörkt och väldigt gott med ost."
+    },
+    {
+     "t": "Frallor, sex stycken",
+     "d": "Mjuka frallor, bakade klockan fem och oftast slut före tio."
+    },
+    {
+     "t": "Kardemummabullar",
+     "d": "Tvinnade för hand och glaserade medan de är varma."
+    },
+    {
+     "t": "Festtårta",
+     "d": "Beställ gärna tre dagar i förväg; vi kommer överens om smakerna med dig."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Råg",
+       "Honung",
+       "Havre",
+       "Korn",
+       "Fänkål",
+       "Smula",
+       "Härd",
+       "Söndag",
+       "Sesam",
+       "Plommon"
+      ],
+      [
+       "Trast",
+       "Fink",
+       "Sparv",
+       "Hämpling",
+       "Taltrast",
+       "Rödhake",
+       "Tornsvala",
+       "Lärka"
+      ]
+     ],
+     "sep": " & "
+    }
+   }
+  },
+  "bike": {
+   "tagline": "Cykelreparationer i {city}",
+   "nav_services": "Priser",
+   "desc": "Cykelreparationer och service i {city}, klart medan du väntar eller till nästa dag.",
+   "desc_services": "Reparation och service av cyklar, med priser.",
+   "desc_about": "Om {brand}, en liten cykelverkstad i {city}.",
+   "desc_contact": "Öppettider och adress till {brand} i {city}.",
+   "hero_h": "Din cykel rullar som den ska igen",
+   "intro": "En liten verkstad för vardagscyklar. Vi lagar det som är trasigt, justerar det som inte riktigt sitter och säger ärligt vad som inte är värt pengarna.",
+   "about": [
+    "{brand} började i ett trädgårdsskjul i {city}, där vi lagade grannarnas cyklar för en kopp kaffe.",
+    "Nu har vi en riktig verkstad, en mycket lång bänk och en vägg full av reservdelar som bara vi förstår. Vi föredrar fortfarande att laga framför att byta.",
+    "Ta med allt som har två hjul. Kan vi inte laga det, säger vi vem som kan."
+   ],
+   "features": [
+    {
+     "h": "Klart medan du väntar",
+     "p": "De flesta små reparationer tar mindre än en timme."
+    },
+    {
+     "h": "Ärliga råd",
+     "p": "Vi säger till om något inte är värt att laga."
+    },
+    {
+     "h": "Service till nästa dag",
+     "p": "Lämna in den på morgonen, hämta den i morgon."
+    }
+   ],
+   "services": [
+    {
+     "t": "Punkteringsreparation",
+     "d": "Slang monterad och kontrollerad, däcket undersökt efter orsaken."
+    },
+    {
+     "t": "Enkel service",
+     "d": "Bromsar och växlar justerade, kedjan rengjord och oljad, däck och bultar kontrollerade."
+    },
+    {
+     "t": "Stor service",
+     "d": "Drivlinan tas isär, avfettas och monteras ihop, med nya vajrar där det behövs."
+    },
+    {
+     "t": "Centrering av hjul",
+     "d": "Slag borttagna och ekerspänningen jämnad ut."
+    },
+    {
+     "t": "Vinterkontroll",
+     "d": "Lyktor, bromsar, däck och stänkskydd, så att de mörka månaderna blir mindre riskabla."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Eker",
+       "Kedja",
+       "Kugg",
+       "Pedal",
+       "Vev",
+       "Hjul",
+       "Nav",
+       "Fälg",
+       "Sadel",
+       "Styre"
+      ],
+      [
+       "cyklar",
+       "reparation",
+       "verkstad",
+       "garage",
+       "bänk",
+       "service"
+      ]
+     ]
+    }
+   }
+  },
+  "tailor": {
+   "tagline": "Ändringar och lagning i {city}",
+   "nav_services": "Ändringar",
+   "desc": "Ändring och lagning av kläder i {city}: fållar, blixtlås, provning och lagning.",
+   "desc_services": "Ändringar och lagning av kläder, med priser.",
+   "desc_about": "Om {brand}, en liten skrädderiverkstad i {city}.",
+   "desc_contact": "Öppettider och adress till {brand} i {city}.",
+   "hero_h": "Kläder som passar längre",
+   "intro": "Fållar, blixtlås, provning och lagning, för hand och på maskin, i en liten ateljé ovanför butikerna.",
+   "about": [
+    "{brand} är en ateljé för två personer på andra våningen i ett hus i {city}, ovanför en butik som säljer garn.",
+    "Vi lärde oss yrket av folk som gjort det i fyrtio år, och vi har behållit några av deras vanor, som att alltid nåla två gånger.",
+    "Är du osäker på om något är värt att ändra, ta med det. Vi säger som det är."
+   ],
+   "features": [
+    {
+     "h": "Lagat med omsorg",
+     "p": "Varje plagg undersöks ordentligt innan vi börjar."
+    },
+    {
+     "h": "Anpassat efter dig",
+     "p": "Vi nålar på dig, inte på en provdocka."
+    },
+    {
+     "h": "Klart som utlovat",
+     "p": "Vi ger dig en dag och håller den."
+    }
+   ],
+   "services": [
+    {
+     "t": "Korta byxor eller kjol",
+     "d": "Fållat till din längd, med originalavslutningen kvar där det går."
+    },
+    {
+     "t": "Ta in en kavaj",
+     "d": "Sidor och ärmar justerade så att den hänger rätt."
+    },
+    {
+     "t": "Byta blixtlås",
+     "d": "Matchat i färg och tjocklek, snyggt isytt."
+    },
+    {
+     "t": "Laga fodret i en kappa",
+     "d": "Ett sönderrivet foder byts eller lagas, fickor inkluderade."
+    },
+    {
+     "t": "Stoppning och lappning",
+     "d": "Synligt eller osynligt, som du vill."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Nål",
+       "Fingerborg",
+       "Fåll",
+       "Söm",
+       "Manschett",
+       "Krage",
+       "Veck",
+       "Spole",
+       "Band",
+       "Garn"
+      ],
+      [
+       "& Knappnål",
+       "& Tråd",
+       "& Sax",
+       "& Resår",
+       "& Silke",
+       "& Co",
+       "& Dotter",
+       "& Knapp"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "clock": {
+   "tagline": "Klockreparationer i {city}",
+   "nav_services": "Reparationer",
+   "desc": "Reparation av armbandsur och klockor i {city}: service, batterier, armband och restaurering.",
+   "desc_services": "Reparation av armbandsur och klockor, med priser.",
+   "desc_about": "Om {brand}, en liten urmakarverkstad i {city}.",
+   "desc_contact": "Öppettider och adress till {brand} i {city}.",
+   "hero_h": "Tiden i ordning igen",
+   "intro": "En liten arbetsbänk där ur och klockor rengörs, justeras och får gå rätt igen.",
+   "about": [
+    "{brand} är en bänk för en person i ett hörn av {city}, med en mycket bra lampa och en låda full av små skruvar.",
+    "Det mesta som kommer in är ärvt: en farfars klocka, ett ur från en byrå. Vi försöker laga det och behålla det som det var.",
+    "Vi säljer inga nya klockor. Vi får bara de gamla att gå."
+   ],
+   "features": [
+    {
+     "h": "Noggrant arbete",
+     "p": "Varje urverk öppnas, rengörs och kontrolleras."
+    },
+    {
+     "h": "Garanti",
+     "p": "Service ges med tolv månaders garanti."
+    },
+    {
+     "h": "Rättvisa offerter",
+     "p": "Du får priset innan något rörs."
+    }
+   ],
+   "services": [
+    {
+     "t": "Service av mekaniskt ur",
+     "d": "Urverket rengjort, oljat, justerat och tidtaget under flera dygn."
+    },
+    {
+     "t": "Batteribyte",
+     "d": "Nytt batteri och kontroll av tätningen."
+    },
+    {
+     "t": "Översyn av klocka",
+     "d": "Bords- och väggur tas isär, lagas och sätts i gång igen."
+    },
+    {
+     "t": "Byte av armband",
+     "d": "Läder-, tyg- och metallarmband monteras medan du väntar."
+    },
+    {
+     "t": "Rengöring av boett",
+     "d": "Varsam polering av boettar och armband, utan att ta bort karaktären."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pendel",
+       "Balans",
+       "Fjäder",
+       "Spärr",
+       "Kugg",
+       "Urtavla",
+       "Klockspel",
+       "Uppdragare",
+       "Ankare",
+       "Rubin"
+      ],
+      [
+       "& Son",
+       "Urverk",
+       "Urmakeri",
+       "Tidmätare",
+       "Bänk",
+       "Tidsverk",
+       "Verkstad",
+       "Service"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "framing": {
+   "tagline": "Inramning i {city}",
+   "nav_services": "Inramning",
+   "desc": "Inramning i {city}: passepartouter, glas, objektramar och restaurering.",
+   "desc_services": "Inramning, montering och upphängning, med priser.",
+   "desc_about": "Om {brand}, en liten inramningsverkstad i {city}.",
+   "desc_contact": "Öppettider och adress till {brand} i {city}.",
+   "hero_h": "Ramar efter mått",
+   "intro": "En inramningsverkstad för tryck, fotografier, textilier och saker som inte alls passar i en ram.",
+   "about": [
+    "{brand} är en liten verkstad i {city} som har sågat geringar sedan långt innan någon i huset var född.",
+    "Vi ramar in många barnteckningar och några mycket gamla kartor. Båda får samma uppmärksamhet och samma syrafria kartong.",
+    "Ta med något du bryr dig om så hittar vi den ram det har väntat på."
+   ],
+   "features": [
+    {
+     "h": "Gjort efter mått",
+     "p": "Varje ram sågas och fogas i vår verkstad."
+    },
+    {
+     "h": "Genomtänkta val",
+     "p": "Vi hjälper dig välja passepartout och list som passar bilden."
+    },
+    {
+     "h": "Konserveringsglas",
+     "p": "Finns för verk som ska hålla."
+    }
+   ],
+   "services": [
+    {
+     "t": "Standardram, A4",
+     "d": "En enkel list, ett passepartout och klart glas."
+    },
+    {
+     "t": "Stor ram",
+     "d": "För affischer och stora tryck, med lättare glas."
+    },
+    {
+     "t": "Objektram",
+     "d": "För medaljer, snäckor, biljetter och andra små saker värda att spara."
+    },
+    {
+     "t": "Restaurering av en gammal ram",
+     "d": "Lagning, ny förgyllning och ny baksida."
+    },
+    {
+     "t": "Uppsättning på vägg",
+     "d": "Vi kommer med tavlorna och hänger upp dem rakt."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Förgyllt",
+       "Passepartout",
+       "Gering",
+       "Falsen",
+       "Glas",
+       "Hängare",
+       "Fas",
+       "Staffli",
+       "Linne",
+       "List"
+      ],
+      [
+       "& Ram",
+       "Inramning",
+       "Galleri",
+       "Verkstad",
+       "Studio",
+       "Passepartouter",
+       "Hus",
+       "Ateljé"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "piano": {
+   "tagline": "Pianostämning och skötsel i {city}",
+   "nav_services": "Tjänster",
+   "desc": "Pianostämning, små reparationer och råd i {city} och byarna runtomkring.",
+   "desc_services": "Pianostämning och reparationer, med priser.",
+   "desc_about": "Om {brand}, en pianostämmare i {city}.",
+   "desc_contact": "Så bokar du {brand} i {city}.",
+   "hero_h": "Ett piano som låter som ett piano",
+   "intro": "Stämning, små reparationer och ärliga råd för pianon och flyglar i {city} och byarna runtomkring.",
+   "about": [
+    "{brand} är en person med en väska full av stämverktyg och en gammal kombi, verksam i {city} och byarna runtomkring.",
+    "De flesta pianon jag ser har inte stämts på flera år och låter ändå bättre än ägarna väntat sig. Lite tålamod gör mycket.",
+    "Jag säger ärligt vad ett piano behöver och vad det klarar sig utan."
+   ],
+   "features": [
+    {
+     "h": "Hembesök",
+     "p": "Stämningen görs där pianot står."
+    },
+    {
+     "h": "Utan brådska",
+     "p": "En stämning tar den tid den behöver."
+    },
+    {
+     "h": "Raka svar",
+     "p": "Är ett piano inte värt att laga säger vi det."
+    }
+   ],
+   "services": [
+    {
+     "t": "Pianostämning",
+     "d": "En vanlig stämning till normal tonhöjd, ungefär nittio minuter."
+    },
+    {
+     "t": "Stämning och lätt justering",
+     "d": "Stämning plus små justeringar så att tangenterna känns jämnare."
+    },
+    {
+     "t": "Höjning av tonhöjden",
+     "d": "För pianon som sjunkit efter år utan skötsel."
+    },
+    {
+     "t": "Reparationer och offerter",
+     "d": "Kärvande tangenter, lösa pedaler och skrällande strängar."
+    },
+    {
+     "t": "Råd före köp",
+     "d": "Ett besök för att titta på ett begagnat piano innan du bestämmer dig."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Oktav",
+       "Diskant",
+       "Kadens",
+       "Moll",
+       "Kvint",
+       "Harmoni",
+       "Sonat",
+       "Tonhöjd",
+       "Legato",
+       "Fuga"
+      ],
+      [
+       "Stämning",
+       "Pianon",
+       "Tangenter",
+       "Studio",
+       "Service",
+       "Verkstad",
+       "Vård",
+       "Restaurering"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "hours_note": "Besök efter överenskommelse. Boka gärna några dagar i förväg."
+  }
+ }
+}

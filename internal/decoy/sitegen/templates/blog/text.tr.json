@@ -1,0 +1,271 @@
+{
+ "ui": {
+  "nav_label": "Ana menü",
+  "footer": "Elle yazılır, yavaş yayımlanır.",
+  "nav_home": "Notlar",
+  "nav_about": "Hakkında",
+  "home_title": "Notlar",
+  "nf_title": "Burada bir şey yok",
+  "nf_text": "Bu adreste bir not yok. Adı değişmiş ya da hiç yazılmamış olabilir.",
+  "nf_back": "Notlara dön",
+  "latest_h": "Son notlar",
+  "read_more": "Notu oku",
+  "min_read": "dk okuma",
+  "more_h": "Diğer notlar",
+  "back_all": "Tüm notlar",
+  "about_h": "Hakkında",
+  "now_h": "Şu sıralar",
+  "tags_h": "Konular",
+  "by": "Yazan",
+  "nav_archive": "Arşiv",
+  "desc_archive": "{brand} üzerindeki tüm notlar, ay ay.",
+  "archive_h": "Arşiv",
+  "archive_intro": "Şimdiye kadarki her not, en yenisi başta, aylara göre gruplanmış.",
+  "all_posts": "Tüm notlar",
+  "newer": "Daha yeni"
+ },
+ "bundles": {
+  "garden": {
+   "tagline": "Bir hobi bahçesinden notlar",
+   "desc": "{city_in} küçük bir hobi bahçesinden notlar: ne yetişti, ne yetişmedi ve gelecek yıl neyi farklı yapardım.",
+   "desc_about": "{brand} kim tarafından ve neden yazılıyor.",
+   "intro": "{city_in} küçük bir hobi bahçesinden notlar: ne yetişti, ne yetişmedi ve gelecek yıl neyi farklı yapacağım.",
+   "about": [
+    "Ben {first}. {city_in} dokuz yıldır bir hobi bahçesi kiralıyorum; çoğunlukla sebze ve birkaç inatçı gül yetiştiriyorum.",
+    "Bu defter, bahçenin bana öğrettiklerini yazdığım yer; çoğunlukla aynı hataları bu kez başka bir sırayla yapmayayım diye.",
+    "Yorumlar kapalı. Bir ipucunuz varsa yan parselinizdeki komşunuza söyleyin; bildiklerimin çoğunu ben de öyle öğrendim."
+   ],
+   "now": [
+    "Fasulyeleri örtü altında ekiyorum",
+    "Kulübenin kapısını yine tamir ediyorum",
+    "Eski bir bahçecilik kitabını okuyorum"
+   ],
+   "posts": [
+    {
+     "title": "Neden artık kazmıyorum",
+     "tag": "Toprak",
+     "excerpt": "Üç sezondur küreksiz ve yataklara olanlar.",
+     "body": [
+      "Yıllarca her sonbahar yatakları kazdım; çünkü parselin önceki sahibi öyle yapardı, çocukluğumdaki kitaplar da öyle derdi. Üç sezon önce bıraktım ve yatakların üstüne kalın bir kompost tabakası serdim.",
+      "İlk bahar hayal kırıklığıydı; toprak dağınık göründü, salyangozlar çok sevindi. İkinci yıl solucanlar işin çoğunu yaptı, toprak elimde ufalandı ve her ekimde yataklara bir cumartesi daha az ayırdım. Mucize demem; birkaç yabani ot geri geldi. Ama belim memnun, havuçlar da kazdığım yıllardan daha düz çıktı."
+     ]
+    },
+    {
+     "title": "Sulamayı unutanlar için fasulye",
+     "tag": "Sebzeler",
+     "excerpt": "Kurak bir temmuzu bana bağışlayan dört çeşit.",
+     "body": [
+      "Geçen temmuz on dokuz gün yağmur yağmadı ve ben bunun on birinde evde yoktum. Döndüğümde marullar çiçeğe kalkmış, kabaklar pes etmiş gibiydi. Fasulyeler ise iyiydi.",
+      "Kökü derin ve etrafına kalın malç serilmiş fasulye, yetiştirdiğim hemen her şeyden iyi dayanıyor. Artık onları, gölgenin toprağı kurutmadığı kuzey kenarına ekiyorum. Her gün sulamayı planlayıp haftada iki kez başarabilen biriyseniz, fasulye ekin ve sakin kalın."
+     ]
+    },
+    {
+     "title": "Eski pencerelerden küçük bir sera",
+     "tag": "Yapım",
+     "excerpt": "Komşunun hurdasından, uzun bir hafta sonunda bir sera.",
+     "body": [
+      "Bir komşum pencerelerini değiştirdi ve eskiler iki gün bir konteynerin içinde durdu. Alabilir miyim diye sordum; o da konteyneri de alabilirsem alsam dedi.",
+      "Eski tahtalardan, en büyük pencereye göre bir iskelet yaptım, kalanları çevresine yerleştirdim. Hiçbir şey dik değil, kapı yağmurda sıkışıyor ama domates fidelerini dondan koruyor. Hepsine bir kutu vida ve bir torba macun verdim. Bir dahaki sefere kesmeden önce iki kez ölçeceğim, ciddiyim."
+     ]
+    },
+    {
+     "title": "Mart ayında bahçede ne yapılır",
+     "tag": "Mevsimler",
+     "excerpt": "Her şeyin mümkün göründüğü ama toprağın hâlâ soğuk olduğu ay için kısa bir liste.",
+     "body": [
+      "Mart herkesi kandırır. Günler parlak, ekmek istiyorsunuz ama toprak soğuk ve çok erken ekilen tohumlar yerinde çürür. Toprağın elimin üstüne soğuk gelmemesini bekliyorum.",
+      "Bu arada yapacak çok iş var: tohum kutusunu ayıklamak, saksıları yıkamak, gülleri budamak ve ilk patatesleri aydınlık bir yere çimlenmeye koymak. Bu işler hiçbir risk almadan ilerleme gibi hissettirir. Ay sonuna doğru kendime örtü altında bir sıra bezelye izni veriyorum; mantıklı değil ama hoşuma gidiyor."
+     ]
+    },
+    {
+     "title": "Kompost, dürüstçe",
+     "tag": "Toprak",
+     "excerpt": "Yığınıma ne giriyor, ne girmiyor ve neden benimki hiç zamanında hazır olmuyor.",
+     "body": [
+      "Yığınımın üç kuralı var: pişmiş bir şey yok, hastalıklı bir şey yok ve emin olmadığım hiçbir şey yok. Çim kırpıntıları ince tabakalar hâlinde girer, yırtılmış karton onlarla gider ve aklıma geldikçe hepsi karıştırılır.",
+      "Kitapların söylediğinden yavaş. Bir yıl, torbada vaat edilen altı haftadan daha dürüst bir süre; bitmiş kompost da hep sürprizle gelir, mesela vazgeçtiğim bir patates. Aldırmıyorum: vaktini alan bir yığın, mutfak artıklarına küsmemiş bir yığındır."
+     ]
+    },
+    {
+     "title": "Salyangozlar, bira tuzakları ve diğer yenilgiler",
+     "tag": "Zararlılar",
+     "excerpt": "Neyin işe yaradığı, neyin yaramadığı ve neden artık biraz fazla ekiyorum.",
+     "body": [
+      "Bira tuzaklarını, yumurta kabuklarını, bakır bandı ve karanlıkta fenerle dışarı çıkmayı denedim. Hepsi bir hafta kadar işe yaradı. En iyisi ihtiyacımdan fazla yetiştirmek ve salyangozların payını almasına razı olmak.",
+      "Asıl risk fideler; bu yüzden onları içeride başlatıp, bir kemirmeye dayanacak kadar sağlam olunca dışarı çıkarıyorum."
+     ]
+    },
+    {
+     "title": "Fasulyeden tohum saklamak",
+     "tag": "Tohumlar",
+     "excerpt": "Ekimde biraz sabır, gelecek yılın fasulyesini bedavaya getirir.",
+     "body": [
+      "En iyi baklaları kuruyup şıkırdayana kadar bitkide bırakıyorum. Sonra mutfak masasında ayıklıyor, taneleri bir tepsiye yayıp bir hafta sıcak bir yerde bekletiyorum.",
+      "Ön yüzüne ad ve yıl yazılı kâğıt zarflara koyuyorum. Plastik terler; küflenmiş fasulyelerim buna kanıt."
+     ]
+    },
+    {
+     "title": "Kulübenin kısa bir envanteri",
+     "tag": "Aletler",
+     "excerpt": "Kullandığım on bir şey ve kullanmadığım pek çok şey.",
+     "body": [
+      "Bir kürek, bir çatal, bir çapa, iki mala, bir el tırmığı ve bir çift budama makasıyla işin hemen hemen hepsi yapılır. Kulübenin geri kalanında kavanozlar, ip, bozuk bir el arabası ve bir tohum tepsisi koleksiyonu var.",
+      "Her ilkbahar düzenleyeceğime söz veriyorum. Her ilkbahar tam o gün yağmur yağıyor ve buna oldukça seviniyorum."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Yavaş",
+       "Sessiz",
+       "Dürüst",
+       "Küçük",
+       "Yabani",
+       "Yosunlu",
+       "Sabırlı",
+       "Çamurlu",
+       "Yeşil",
+       "Erken"
+      ],
+      [
+       "Toprak",
+       "Tarla",
+       "Bahçe",
+       "Sıra",
+       "Mala",
+       "Fidan",
+       "Çit",
+       "Kulübe",
+       "Çizgi",
+       "Mevsim"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "kitchen": {
+   "tagline": "Küçük bir mutfaktan notlar",
+   "desc": "İşe yarayan tarifler, bir şey öğreten hatalar ve {city_in} akşam yemeği.",
+   "desc_about": "{brand} kim tarafından ve neden yazılıyor.",
+   "intro": "İşe yarayan tarifler, bana bir şey öğreten hatalar ve {city_in} akşam yemeğinde ne var.",
+   "about": [
+    "Ben {first}. {city_in} dört kişilik bir aile için, çoğu insanın banyosundan küçük bir mutfakta yemek yapıyorum ve değiştirmezdim.",
+    "İşe yarayanı, gerçekte pişirdiğim biçimde yazıyorum; yani düzgün bir tariften daha az ölçü ve daha çok sıfatla.",
+    "Yemeklerin fotoğrafını çekmem. Bir yemek fotoğraf çekilecek kadar güzel görünüyorsa, muhtemelen onu bekletmişimdir."
+   ],
+   "now": [
+    "Ekşi mayamı besliyorum",
+    "Bahar için limon turşusu kuruyorum",
+    "Fırın kapağıyla barışıyorum"
+   ],
+   "posts": [
+    {
+     "title": "Affedici bir somun",
+     "tag": "Ekmek",
+     "excerpt": "Un, su, tuz ve çok sabırlı bir pazar öğleden sonrası.",
+     "body": [
+      "Ekmek yapacağımı unuttuğumda yaptığım ekmek bu. Neredeyse hiç maya kullanmıyor, uzun bir dinlenme istiyor, hiç yoğurma yok ve planladığınızdan bir saat fazla beklese de aldırmıyor.",
+      "Akşam un, su ve tuzu kuru yer kalmayana kadar karıştırın, kabı örtüp tezgâhta bırakın. Sabah köpüklü ve hafif bira kokuludur; olması gereken de budur. Birkaç kez katlayın, kabaca şekil verin ve kapağı kapalı sıcak bir tencerede pişirin. Kusurlu görünür, hak ettiğinden güzel tadı vardır."
+     ]
+    },
+    {
+     "title": "Buzdolabı neredeyse boşken ne pişirilir",
+     "tag": "Hafta içi",
+     "excerpt": "Beş konserve, üç soğan ve bir parça peynir: bir akşam yemeği.",
+     "body": [
+      "Her perşembe buzdolabını açıyorum: yarım soğan, solmuş bir pırasa ve ne zaman açtığımı hatırlamadığım bir kavanoz. Eskiden bu başarısızlık gibi gelirdi. Şimdi haftada bir gece dolabın sırasının geldiği zaman olarak görüyorum.",
+      "Soğanları pes edene kadar yavaşça kızartın. Elinizdeki kuru fasulyeyi, bir kutu domatesi ve ekşi bir şeyden bir kaşık ekleyin: hardal, sirke, turşu biber. Ekmeği bulana kadar kaynasın. Üstüne rendelenmiş peynirle yiyin. Kimse içinde ne olduğunu sormadı, ben de anlatmayı bıraktım."
+     ]
+    },
+    {
+     "title": "Kasımda yaptığım tek çorba",
+     "tag": "Çorba",
+     "excerpt": "Kırmızı mercimek, bir soğan ve bir limon.",
+     "body": [
+      "İlk gerçekten soğuk hafta geldiğinde kırmızı mercimek çorbası pişiriyorum. Bir soğan, bir havuç, bir su bardağı mercimek; yarım saatte bütün ev kışın başlangıcı gibi kokuyor.",
+      "Hepsini bir tencerede yumuşatın, sıcak suyla açın ve blenderdan geçirin. Üstüne tereyağında pul biber kızdırıp gezdirin, yanında bir dilim limon ve dünkü ekmek olsun. Akıllıca bir şey değil, her yıl yapıyorum."
+     ]
+    },
+    {
+     "title": "Telaşsız turşu",
+     "tag": "Kışlık",
+     "excerpt": "Bir kavanoz hızlı turşunun mutfaktaki en kolay iş olmasının nedeni.",
+     "body": [
+      "İnsanlar kışlık sözcüğünden ürküyor; sanki kaynatmak, büyük tencereler ve kaybedilmiş bir gün gerektirir. Hızlı turşu ise bir kavanoz, bir su ısıtıcısı ve on dakikadır.",
+      "Çekmecede ne varsa dilimleyin, temiz bir kavanoza doldurun ve üzerine sirke, su, tuz ve biraz şekerden hazırlanmış sıcak karışımı dökün. Varsa bir defne yaprağı ekleyin; yarına kadar bekletin. Buzdolabında birkaç hafta durur ve sade bir akşam yemeğini bilerek hazırlanmış gibi gösterir."
+     ]
+    },
+    {
+     "title": "Yanan şeyler ve onlardan öğrendiklerim",
+     "tag": "Hatalar",
+     "excerpt": "Berbat olmuş yemeklerin kısa bir kataloğu ve her birinin öğrettiği tek şey.",
+     "body": [
+      "Karamel, şekerin telefonumu umursamadığını öğretti. Pilav, suyun sıcak olması gerektiğini. Fırın patatesleri, bir tepsinin fazla dolu olabileceğini ve kimsenin soluk bir patatesi affetmediğini.",
+      "En kötüsü, erken çıkarıp geç geri koyduğum doğum günü pastasıydı. Ortası, onurlu eski bir bina gibi çöktü; biz de onu kaşıkla ve muhallebiyle yedik. Ters giden şeylerin listesini bir dolap kapağının içine yazıyorum. Doğru giden şeylerin listesinden uzun ve çok daha faydalı."
+     ]
+    },
+    {
+     "title": "Bir tava, bir kaşık ve bir çarşamba",
+     "tag": "Hafta içi",
+     "excerpt": "Tek tava, yirmi dakika ve çok az bulaşık.",
+     "body": [
+      "Çarşambaları yorgunum ve herkes aç; bu yüzden akşam yemeği tek tavadan çıkmalı. Soğan, bir kutu fasulye, biraz isli biber ve buzdolabındaki yeşillikler.",
+      "En sonunda üstüne bir yumurta kırıyorum ve buna akşam yemeği diyorum. Bir tarif olmaktan çok bir alışkanlık; bugüne kadar beni yarı yolda bırakmadı."
+     ]
+    },
+    {
+     "title": "Menemen, düzgünce",
+     "tag": "Kahvaltı",
+     "excerpt": "Domates, biber, yumurta ve on dakika tavanın başından ayrılmamak.",
+     "body": [
+      "Biberleri zeytinyağında yumuşayana kadar kavurun, rendelenmiş ya da doğranmış domatesi ekleyin ve suyunu çekene kadar pişirin. Yumurtaları en sonda ekleyip çok fazla karıştırmadan, hâlâ biraz akışkanken ocaktan alın.",
+      "Soğan konusunda herkesin bir fikri var; benimki de var ama kimseyle tartışmam. Yanına bol ekmek koyun."
+     ]
+    },
+    {
+     "title": "Artan pilavla üç yemek",
+     "tag": "Hafta içi",
+     "excerpt": "Kızartma, kek gibi fırınlama ya da çorbaya katma.",
+     "body": [
+      "Soğuk pilav kızartma için taze pilavdan iyidir; taneler birbirine yapışmaz. Sıcak bir tava, biraz yağ, bir yumurta ve birkaç dal yeşil soğan yeter.",
+      "Çorbaya karıştırılırsa suyu koyulaştırır; peynirle bir kalıba bastırılıp fırınlanırsa tuzlu bir keke yaklaşır."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Tuz",
+       "Tereyağı",
+       "Sade",
+       "Dökme",
+       "Küçük",
+       "Pazar",
+       "Dürüst",
+       "Sıcak",
+       "Yavaş",
+       "Çabuk"
+      ],
+      [
+       "Kaşık",
+       "Tava",
+       "Notlar",
+       "Sofra",
+       "Mutfak",
+       "Hamur",
+       "Kase",
+       "Tencere",
+       "Fırın",
+       "Akşam"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}
