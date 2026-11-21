@@ -28,13 +28,13 @@ var (
 	decoyDumpCC = flag.String("decoy-dump-cc", DefaultCountry, "the countries (codes, separated by spaces) -decoy-dump writes sites for")
 )
 
-// seedsFor is how many seeds a kind is made from for a country: the default country gets the full 200, the others fewer (their
-// pages differ from it in text and data, not in structure, and there are many more of them).
+// seedsFor is how many seeds a kind is made from for a country: the default country gets the full 200, the others 40 (their pages
+// differ from it in text and data, not in structure, and there are seven more countries: the whole run took 4 times as long with 60).
 func seedsFor(c tcase) int {
 	if c.cc == DefaultCountry {
 		return 200
 	}
-	return 60
+	return 40
 }
 
 var titleTag = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)

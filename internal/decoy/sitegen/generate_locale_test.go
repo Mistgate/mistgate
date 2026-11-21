@@ -256,8 +256,8 @@ func TestCountryData(t *testing.T) {
 		t.Fatalf("%d countries", len(loc.countries))
 	}
 	for cc, c := range loc.countries {
-		if n := len(c.Cities); n < 15 || n > 40 {
-			t.Errorf("%s: %d cities, want 15 to 40", cc, n)
+		if n := len(c.Cities); n < 15 || n > 30 {
+			t.Errorf("%s: %d cities, want 15 to 30", cc, n)
 		}
 		if len(c.Streets) < 12 || len(c.First) < 30 || len(c.Last) < 30 {
 			t.Errorf("%s: %d streets, %d first and %d last names", cc, len(c.Streets), len(c.First), len(c.Last))
