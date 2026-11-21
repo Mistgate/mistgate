@@ -119,8 +119,11 @@ export type DnsActions = {
   scope(all: boolean): void;
 };
 
-/** What the page offers its parts: copy (with a callback for the button's own "copied" state) and download. */
-export type Tools = { copy(text: string, message: string, done?: () => void, from?: HTMLElement): void; download(filename: string, text: string): void };
+/**
+ * What the page offers its parts: copy and download. `done` runs when the clipboard took the text (the control's own "copied"
+ * state); `message` is a toast above `from`, for a control that has no state of its own to say it.
+ */
+export type Tools = { copy(text: string, done?: () => void, message?: string, from?: HTMLElement): void; download(filename: string, text: string): void };
 
 /** The tabs under the status: the servers, the Telegram proxies, TrustTunnel, the devices. */
 export type Tab = "servers" | "telegram" | "trusttunnel" | "devices";

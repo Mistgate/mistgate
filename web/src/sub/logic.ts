@@ -471,7 +471,7 @@ export function serverNum(all: ServerEntry[], x: ServerEntry): string {
 /** What tells a server from the others of its country: the owner's place, else its number among the twins, else "". */
 export const serverMark = (all: ServerEntry[], x: ServerEntry): string => x.place || serverNum(all, x);
 
-const profileRank =(p: AwgProfile) => (p.version === "2.0" ? 2 : p.egress === "warp" ? 1 : 0);
+const profileRank = (p: AwgProfile) => (p.version === "2.0" ? 2 : p.egress === "warp" ? 1 : 0);
 
 /** A server of a key as the window lists it: the country, what tells it from the others of its country, the domain it is reached by. */
 export type KeyServer = { cc: string; country: string; mark: string; host: string };
