@@ -1,0 +1,19 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __st__">
+<h1>{{.L.history_h}}</h1>
+<p class="__mu__">{{.L.history_intro}}</p>
+{{range .Lists.incidents}}<article class="__inc__">
+<div class="__rh__"><h2>{{.title}}</h2><span class="__pill__ {{if eq .impact "major"}}__imp2__{{else if eq .impact "maint"}}__imp3__{{else}}__imp1__{{end}}">{{if eq .impact "major"}}{{$.L.imp_major}}{{else if eq .impact "maint"}}{{$.L.imp_maint}}{{else}}{{$.L.imp_minor}}{{end}}</span></div>
+<p class="__mu__"><time datetime="{{.date_iso}}">{{.date}}</time> · {{$.L.dur_l}}: {{.dur}}</p>
+<ol class="__tl__">
+<li><strong>{{$.L.st_res}}</strong><p>{{.c}}</p></li>
+<li><strong>{{$.L.st_ident}}</strong><p>{{.b}}</p></li>
+<li><strong>{{$.L.st_inv}}</strong><p>{{.a}}</p></li>
+</ol>
+</article>
+{{end}}
+</main>
+{{template "footer" .}}
+</body>
+</html>

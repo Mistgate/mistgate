@@ -1,0 +1,15 @@
+{
+  "title": {"en": "Service status page", "ru": "Страница статуса сервиса"},
+  "layouts": 3,
+  "pages": [
+    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
+    {"name": "history", "tmpl": "history.html.tmpl", "paths": ["history.html", "incidents/index.html", "past/index.html", "history/index.html"], "nav": "nav_history", "desc": "desc_history"},
+    {"name": "about", "tmpl": "about.html.tmpl", "paths": ["about.html", "about/index.html", "info/index.html", "faq.html"], "nav": "nav_about", "desc": "desc_about"}
+  ],
+  "home_blocks": ["comps", "metrics", "recent"],
+  "home_fixed": 0,
+  "lists": [
+    {"name": "comps", "from": "components", "min": 4, "max": 6},
+    {"name": "incidents", "from": "incidents", "min": 5, "max": 7, "dates": {"end": "2026-11-14", "gap_min": 4, "gap_max": 26}}
+  ]
+}

@@ -1021,7 +1021,7 @@ func funcMap(c *ctx) template.FuncMap {
 			v := key(k).between(lo, hi)
 			return fmt.Sprintf("%d.%02d", v/100, v%100)
 		},
-		// rolls is n days: 0 is a good one, 1 a bad one (warn per mille), 2 a very bad one (bad per mille).
+		// rolls is n days: 1 a bad one (warn per mille), 2 a very bad one (bad per mille), 3 to 5 a good one in three shades.
 		"rolls": func(k string, n, warn, bad int) []int {
 			r := key(k)
 			out := make([]int, n)
@@ -1031,6 +1031,8 @@ func funcMap(c *ctx) template.FuncMap {
 					out[i] = 2
 				case v < bad+warn:
 					out[i] = 1
+				default:
+					out[i] = 3 + r.n(3)
 				}
 			}
 			return out
@@ -1056,7 +1058,7 @@ func funcMap(c *ctx) template.FuncMap {
 			c.artN++
 			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, w, h, fmt.Sprintf("%s%d", c.artID, c.artN), false)
 		},
-		"block": func(name string, data any) (string, error) {
+		"blk": func(name string, data any) (string, error) {
 			var b bytes.Buffer
 			err := c.t.ExecuteTemplate(&b, "b_"+name, data)
 			return b.String(), err

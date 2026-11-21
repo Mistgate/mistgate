@@ -1,0 +1,36 @@
+{{define "b_comps"}}<section class="__sec__">
+<h2>{{.L.comps_h}}</h2>
+<ul class="__comps__">{{range $i, $c := .Lists.comps}}<li class="__comp__">
+<div class="__ch__"><span class="__cn__">{{$c.text}}</span><span class="__cs__">{{icon "check"}}{{$.L.op}}</span></div>
+<div class="__bars__" aria-hidden="true">{{range rolls (printf "bars%d" $i) 60 45 14}}<i{{if eq . 1}} class="__w__"{{else if eq . 2}} class="__x__"{{else if eq . 3}} class="__o1__"{{else if eq . 4}} class="__o2__"{{end}}></i>{{end}}</div>
+<div class="__cf__"><span>{{$.L.days_ago_l}}</span><span>{{pct (printf "up%d" $i) 9950 9999}}% {{$.L.up_label}}</span><span>{{$.L.days_ago_r}}</span></div>
+</li>{{end}}</ul>
+</section>{{end}}
+{{define "b_metrics"}}<section class="__sec__">
+<div class="__metrics__">
+<div class="__card__"><span class="__mv__">{{pct "upall" 9965 9999}}%</span><span class="__ml__">{{.L.m_uptime}}</span></div>
+<div class="__card__"><span class="__mv__">{{num "resp" 88 340}} ms</span><span class="__ml__">{{.L.m_resp}}</span></div>
+<div class="__card__"><span class="__mv__">{{len .Lists.incidents}}</span><span class="__ml__">{{.L.m_inc}}</span></div>
+</div>
+</section>{{end}}
+{{define "b_recent"}}<section class="__sec__">
+<h2>{{.L.recent_h}}</h2>
+<ul class="__recent__">{{range $i, $x := .Lists.incidents}}{{if lt $i 3}}<li>
+<div class="__rh__"><strong>{{$x.title}}</strong><span class="__pill__ {{if eq $x.impact "major"}}__imp2__{{else if eq $x.impact "maint"}}__imp3__{{else}}__imp1__{{end}}">{{if eq $x.impact "major"}}{{$.L.imp_major}}{{else if eq $x.impact "maint"}}{{$.L.imp_maint}}{{else}}{{$.L.imp_minor}}{{end}}</span></div>
+<p class="__mu__">{{$x.date}} · {{$.L.st_res}}</p>
+<p>{{$x.c}}</p>
+</li>{{end}}{{end}}</ul>
+<p><a href="{{(index .Nav 1).Href}}">{{.L.all_inc}} {{icon "arrow"}}</a></p>
+</section>{{end}}
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __st__">
+<section class="__banner__">
+<span class="__tick__">{{icon "check"}}</span>
+<div><h1>{{.L.banner_ok}}</h1><p>{{.L.banner_sub}}</p></div>
+</section>
+{{range .Order}}{{blk . $}}{{end}}
+</main>
+{{template "footer" .}}
+</body>
+</html>

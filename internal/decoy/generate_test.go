@@ -50,7 +50,7 @@ func kindIDs(t *testing.T) []string {
 }
 
 func TestKinds(t *testing.T) {
-	want := []string{"files", "login"}
+	want := []string{"files", "login", "status"}
 	var got []string
 	for _, k := range Kinds() {
 		got = append(got, k.ID)
