@@ -135,12 +135,12 @@
     "c": "Bağlantı düzeltildi, kuyruk temizlendi ve webhook'lar yeniden zamanında geliyor."
    },
    {
-    "title": "Yönetim paneli açılmıyor",
+    "title": "Yönetim sayfası açılmıyor",
     "impact": "major",
     "dur": "22 dakika",
-    "a": "Yönetim paneli herkese bir hata sayfası gösteriyor. Diğer hizmetler etkilenmiyor.",
+    "a": "Yönetim sayfası herkese bir hata sayfası gösteriyor. Diğer hizmetler etkilenmiyor.",
     "b": "Son sürümün açılış kodunda bir hata vardı ve bulundu.",
-    "c": "Sürüm geri alındı, yönetim paneli yeniden açılıyor."
+    "c": "Sürüm geri alındı, yönetim sayfası yeniden açılıyor."
    },
    {
     "title": "Planlı bakım: veritabanı yükseltmesi",
@@ -177,7 +177,7 @@
       "Hat",
       "Kapı",
       "Atölye",
-      "Panel",
+      "Pano",
       "Ağ",
       "Merkez",
       "Servis",
@@ -192,7 +192,7 @@
   "saas": {
    "components": [
     "Genel API",
-    "Yönetim paneli",
+    "Yönetim sayfası",
     "Webhook'lar",
     "Kimlik doğrulama",
     "Arka plan işleri",
@@ -220,7 +220,7 @@
     "Mesaj şablonları",
     "Teslimat raporları",
     "REST API",
-    "Yönetim paneli",
+    "Yönetim sayfası",
     "Abonelikten çıkış sayfaları",
     "Zamanlama"
    ]

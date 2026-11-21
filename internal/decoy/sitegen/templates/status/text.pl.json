@@ -135,12 +135,12 @@
     "c": "Połączenie zostało przywrócone, kolejkę opróżniono i webhooki znów docierają na czas."
    },
    {
-    "title": "Panel niedostępny",
+    "title": "Strona konta niedostępna",
     "impact": "major",
     "dur": "22 minuty",
-    "a": "Panel wyświetla wszystkim stronę z błędem. Pozostałe usługi działają.",
+    "a": "Strona konta wyświetla wszystkim stronę z błędem. Pozostałe usługi działają.",
     "b": "Ostatnia wersja miała usterkę w kodzie uruchamiającym i już ją znaleźliśmy.",
-    "c": "Cofnęliśmy wersję i panel jest znów dostępny."
+    "c": "Cofnęliśmy wersję i strona konta jest znów dostępna."
    },
    {
     "title": "Planowane prace: aktualizacja bazy danych",
@@ -191,7 +191,7 @@
   "saas": {
    "components": [
     "Publiczne API",
-    "Panel użytkownika",
+    "Konto użytkownika",
     "Webhooki",
     "Uwierzytelnianie",
     "Zadania w tle",
@@ -219,7 +219,7 @@
     "Szablony wiadomości",
     "Raporty doręczeń",
     "REST API",
-    "Panel użytkownika",
+    "Konto użytkownika",
     "Strony wypisania z listy",
     "Planowanie wysyłek"
    ]

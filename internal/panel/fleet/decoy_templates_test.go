@@ -75,7 +75,7 @@ func TestPreviewAndGenerateTakeACountry(t *testing.T) {
 	if again, err := preview("blog", "de", de.Seed); err != nil || again.Html != de.Html {
 		t.Fatalf("the German preview came back different (%v)", err)
 	}
-	for _, c := range []struct{ kind, country string }{{"blog", "zz"}, {"blog", "nl"}, {"business", "se"}} {
+	for _, c := range []struct{ kind, country string }{{"blog", "zz"}, {"status", "zz"}} {
 		if _, err := preview(c.kind, c.country, ""); refusalOf(err) != "invalid_argument decoy_template_country" {
 			t.Errorf("%s for %s = %v, want decoy_template_country", c.kind, c.country, err)
 		}
@@ -92,8 +92,8 @@ func TestPreviewAndGenerateTakeACountry(t *testing.T) {
 	if err != nil || got.Msg.Site.BundleSha256 != want.Hash() || got.Msg.Site.Note != "Template · Blog · Germany" {
 		t.Fatalf("the saved site is not the German one that was shown (%v): %+v", err, got.Msg.Site)
 	}
-	if _, err := svc.GenerateDecoySite(e.ctx, connect.NewRequest(&decoysitev1.GenerateDecoySiteRequest{Kind: "blog", Country: "nl"})); refusalOf(err) != "invalid_argument decoy_template_country" {
-		t.Errorf("a blog for the Netherlands = %v", err)
+	if _, err := svc.GenerateDecoySite(e.ctx, connect.NewRequest(&decoysitev1.GenerateDecoySiteRequest{Kind: "blog", Country: "zz"})); refusalOf(err) != "invalid_argument decoy_template_country" {
+		t.Errorf("a blog for a country that does not exist = %v", err)
 	}
 }
 
