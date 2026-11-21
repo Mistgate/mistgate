@@ -267,7 +267,7 @@ func TestPreviewWithKeyHasPhotosAndCreateSavesTheSameSite(t *testing.T) {
 	if err != nil || saved.Msg.Html != a.Html {
 		t.Fatalf("the saved site is not the one that was shown (%v)", err)
 	}
-	b, _ := e.f.templateState().get(kind, seed, e.f.now())
+	b, _ := e.f.templateState().get(previewKey(sitegen.DefaultCountry, kind, seed), e.f.now())
 	if site.BundleSha256 != b.bundle.Hash() || photoCount(t, b.bundle) == 0 || b.bundle.Size() > decoy.MaxBundleBytes {
 		t.Fatalf("saved hash %s, %d photos, %d bytes", site.BundleSha256, photoCount(t, b.bundle), b.bundle.Size())
 	}
@@ -283,11 +283,11 @@ func TestPreviewExpiresAfterFifteenMinutesAndTheCacheIsSmall(t *testing.T) {
 	seed := seedWithPhotos(t, "business")
 	preview(t, e, svc, "business", seed)
 	st := e.f.templateState()
-	if _, ok := st.get("business", seed, now.Add(14*time.Minute)); !ok {
+	if _, ok := st.get(previewKey(sitegen.DefaultCountry, "business", seed), now.Add(14*time.Minute)); !ok {
 		t.Fatal("a preview was forgotten within 15 minutes")
 	}
 	now = now.Add(16 * time.Minute)
-	if _, ok := st.get("business", seed, now); ok {
+	if _, ok := st.get(previewKey(sitegen.DefaultCountry, "business", seed), now); ok {
 		t.Fatal("a preview was kept for 16 minutes")
 	}
 	_, files := p.counts()
@@ -309,10 +309,10 @@ func TestPreviewExpiresAfterFifteenMinutesAndTheCacheIsSmall(t *testing.T) {
 	if n != previewEntries {
 		t.Fatalf("%d previews kept, want %d", n, previewEntries)
 	}
-	if _, ok := st.get("card", fmt.Sprintf("%016x", 0xaaaa0000+11), now); !ok {
+	if _, ok := st.get(previewKey(sitegen.DefaultCountry, "card", fmt.Sprintf("%016x", 0xaaaa0000+11)), now); !ok {
 		t.Fatal("the newest preview was dropped")
 	}
-	if _, ok := st.get("card", fmt.Sprintf("%016x", 0xaaaa0000), now); ok {
+	if _, ok := st.get(previewKey(sitegen.DefaultCountry, "card", fmt.Sprintf("%016x", 0xaaaa0000)), now); ok {
 		t.Fatal("the oldest preview was kept")
 	}
 }
@@ -418,7 +418,7 @@ func TestEveryPhotoKindFitsTheLibrary(t *testing.T) {
 			t.Errorf("%s: %q", kind, got.Photos)
 			continue
 		}
-		b, _ := e.f.templateState().get(kind, seed, e.f.now())
+		b, _ := e.f.templateState().get(previewKey(sitegen.DefaultCountry, kind, seed), e.f.now())
 		if b.bundle == nil || photoCount(t, b.bundle) == 0 || b.bundle.Size() > decoy.MaxBundleBytes {
 			t.Errorf("%s: %d photos", kind, photoCount(t, b.bundle))
 		}

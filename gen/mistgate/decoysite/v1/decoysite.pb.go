@@ -2614,9 +2614,12 @@ func (x *GetDecoyFileResponse) GetTruncated() bool {
 type DecoyTemplate struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The folder of the kind: "status", "blog", ...
-	Id            string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	NameEn        string `protobuf:"bytes,2,opt,name=name_en,json=nameEn,proto3" json:"name_en,omitempty"`
-	NameRu        string `protobuf:"bytes,3,opt,name=name_ru,json=nameRu,proto3" json:"name_ru,omitempty"`
+	Id     string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	NameEn string `protobuf:"bytes,2,opt,name=name_en,json=nameEn,proto3" json:"name_en,omitempty"`
+	NameRu string `protobuf:"bytes,3,opt,name=name_ru,json=nameRu,proto3" json:"name_ru,omitempty"`
+	// The countries (lower case ISO 3166 codes, in the order of ListDecoyTemplatesResponse.countries) the kind can be made for:
+	// the ones whose language it has texts in.
+	Countries     []string `protobuf:"bytes,4,rep,name=countries,proto3" json:"countries,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2672,6 +2675,13 @@ func (x *DecoyTemplate) GetNameRu() string {
 	return ""
 }
 
+func (x *DecoyTemplate) GetCountries() []string {
+	if x != nil {
+		return x.Countries
+	}
+	return nil
+}
+
 type ListDecoyTemplatesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -2709,8 +2719,10 @@ func (*ListDecoyTemplatesRequest) Descriptor() ([]byte, []int) {
 }
 
 type ListDecoyTemplatesResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Templates     []*DecoyTemplate       `protobuf:"bytes,1,rep,name=templates,proto3" json:"templates,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Templates []*DecoyTemplate       `protobuf:"bytes,1,rep,name=templates,proto3" json:"templates,omitempty"`
+	// Every country the templates know, in the order the window shows them ("us", "gb", "de", ...). The first is the default.
+	Countries     []string `protobuf:"bytes,2,rep,name=countries,proto3" json:"countries,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2752,11 +2764,21 @@ func (x *ListDecoyTemplatesResponse) GetTemplates() []*DecoyTemplate {
 	return nil
 }
 
+func (x *ListDecoyTemplatesResponse) GetCountries() []string {
+	if x != nil {
+		return x.Countries
+	}
+	return nil
+}
+
 type PreviewDecoyTemplateRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Kind  string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
 	// From an earlier answer; empty = a new random one. Opaque to the client.
-	Seed          string `protobuf:"bytes,2,opt,name=seed,proto3" json:"seed,omitempty"`
+	Seed string `protobuf:"bytes,2,opt,name=seed,proto3" json:"seed,omitempty"`
+	// The country the site is made for: its language, cities, addresses, money and phone numbers. Empty = "us".
+	// decoy_template_country when the panel does not know the country or the kind has no texts for it.
+	Country       string `protobuf:"bytes,3,opt,name=country,proto3" json:"country,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2801,6 +2823,13 @@ func (x *PreviewDecoyTemplateRequest) GetKind() string {
 func (x *PreviewDecoyTemplateRequest) GetSeed() string {
 	if x != nil {
 		return x.Seed
+	}
+	return ""
+}
+
+func (x *PreviewDecoyTemplateRequest) GetCountry() string {
+	if x != nil {
+		return x.Country
 	}
 	return ""
 }
@@ -2887,7 +2916,9 @@ type GenerateDecoySiteRequest struct {
 	// Empty = the site's own brand (made unique with " 2", " 3" when taken). A name that is given and taken is refused.
 	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	// Empty = the kind's name in English.
-	Note          string `protobuf:"bytes,4,opt,name=note,proto3" json:"note,omitempty"`
+	Note string `protobuf:"bytes,4,opt,name=note,proto3" json:"note,omitempty"`
+	// As PreviewDecoyTemplateRequest.country; the site is the one of the preview of this kind, seed and country.
+	Country       string `protobuf:"bytes,5,opt,name=country,proto3" json:"country,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2946,6 +2977,13 @@ func (x *GenerateDecoySiteRequest) GetName() string {
 func (x *GenerateDecoySiteRequest) GetNote() string {
 	if x != nil {
 		return x.Note
+	}
+	return ""
+}
+
+func (x *GenerateDecoySiteRequest) GetCountry() string {
+	if x != nil {
+		return x.Country
 	}
 	return ""
 }
@@ -3364,27 +3402,31 @@ const file_mistgate_decoysite_v1_decoysite_proto_rawDesc = "" +
 	"\x14GetDecoyFileResponse\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12\x16\n" +
 	"\x04size\x18\x02 \x01(\x04B\x020\x02R\x04size\x12\x1c\n" +
-	"\ttruncated\x18\x03 \x01(\bR\ttruncated\"Q\n" +
+	"\ttruncated\x18\x03 \x01(\bR\ttruncated\"o\n" +
 	"\rDecoyTemplate\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\aname_en\x18\x02 \x01(\tR\x06nameEn\x12\x17\n" +
-	"\aname_ru\x18\x03 \x01(\tR\x06nameRu\"\x1b\n" +
-	"\x19ListDecoyTemplatesRequest\"`\n" +
+	"\aname_ru\x18\x03 \x01(\tR\x06nameRu\x12\x1c\n" +
+	"\tcountries\x18\x04 \x03(\tR\tcountries\"\x1b\n" +
+	"\x19ListDecoyTemplatesRequest\"~\n" +
 	"\x1aListDecoyTemplatesResponse\x12B\n" +
-	"\ttemplates\x18\x01 \x03(\v2$.mistgate.decoysite.v1.DecoyTemplateR\ttemplates\"E\n" +
+	"\ttemplates\x18\x01 \x03(\v2$.mistgate.decoysite.v1.DecoyTemplateR\ttemplates\x12\x1c\n" +
+	"\tcountries\x18\x02 \x03(\tR\tcountries\"_\n" +
 	"\x1bPreviewDecoyTemplateRequest\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x12\n" +
-	"\x04seed\x18\x02 \x01(\tR\x04seed\"r\n" +
+	"\x04seed\x18\x02 \x01(\tR\x04seed\x12\x18\n" +
+	"\acountry\x18\x03 \x01(\tR\acountry\"r\n" +
 	"\x1cPreviewDecoyTemplateResponse\x12\x12\n" +
 	"\x04html\x18\x01 \x01(\tR\x04html\x12\x12\n" +
 	"\x04seed\x18\x02 \x01(\tR\x04seed\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
-	"\x06photos\x18\x04 \x01(\tR\x06photos\"j\n" +
+	"\x06photos\x18\x04 \x01(\tR\x06photos\"\x84\x01\n" +
 	"\x18GenerateDecoySiteRequest\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x12\n" +
 	"\x04seed\x18\x02 \x01(\tR\x04seed\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
-	"\x04note\x18\x04 \x01(\tR\x04note\"i\n" +
+	"\x04note\x18\x04 \x01(\tR\x04note\x12\x18\n" +
+	"\acountry\x18\x05 \x01(\tR\acountry\"i\n" +
 	"\x19GenerateDecoySiteResponse\x124\n" +
 	"\x04site\x18\x01 \x01(\v2 .mistgate.decoysite.v1.DecoySiteR\x04site\x12\x16\n" +
 	"\x06photos\x18\x02 \x01(\tR\x06photos\"\x17\n" +

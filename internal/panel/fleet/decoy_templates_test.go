@@ -28,9 +28,72 @@ func TestListDecoyTemplatesNamesEveryKind(t *testing.T) {
 		t.Fatalf("templates = %d, kinds = %d", len(got.Msg.Templates), len(kinds))
 	}
 	for i, k := range kinds {
-		if g := got.Msg.Templates[i]; g.Id != k.ID || g.NameEn == "" || g.NameRu == "" {
-			t.Errorf("template %d = %+v, want %s with both names", i, g, k.ID)
+		if g := got.Msg.Templates[i]; g.Id != k.ID || g.NameEn == "" || g.NameRu == "" || len(g.Countries) == 0 {
+			t.Errorf("template %d = %+v, want %s with both names and its countries", i, g, k.ID)
 		}
+	}
+	countries := got.Msg.Countries
+	if len(countries) < 6 || countries[0] != sitegen.DefaultCountry {
+		t.Fatalf("countries = %v, want the default first", countries)
+	}
+	known := map[string]bool{}
+	for _, c := range countries {
+		known[c] = true
+	}
+	for _, g := range got.Msg.Templates {
+		for _, c := range g.Countries {
+			if !known[c] {
+				t.Errorf("%s names the country %q, which the list does not", g.Id, c)
+			}
+		}
+	}
+}
+
+// The country the site is made for is part of what a preview is: another country is another site, in its language, and a kind with
+// no texts there is refused with a code of its own.
+func TestPreviewAndGenerateTakeACountry(t *testing.T) {
+	e := newEnv(t)
+	svc := decoySiteService{e.f}
+	preview := func(kind, country, seed string) (*decoysitev1.PreviewDecoyTemplateResponse, error) {
+		got, err := svc.PreviewDecoyTemplate(e.ctx, connect.NewRequest(&decoysitev1.PreviewDecoyTemplateRequest{Kind: kind, Seed: seed, Country: country}))
+		if err != nil {
+			return nil, err
+		}
+		return got.Msg, nil
+	}
+	de, err := preview("blog", "de", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	us, err := preview("blog", "us", de.Seed)
+	if err != nil || us.Html == de.Html {
+		t.Fatalf("the same seed made the same page for two countries (%v)", err)
+	}
+	if def, err := preview("blog", "", de.Seed); err != nil || def.Html != us.Html {
+		t.Fatalf("an empty country is not the default country (%v)", err)
+	}
+	if again, err := preview("blog", "de", de.Seed); err != nil || again.Html != de.Html {
+		t.Fatalf("the German preview came back different (%v)", err)
+	}
+	for _, c := range []struct{ kind, country string }{{"blog", "zz"}, {"blog", "nl"}, {"business", "se"}} {
+		if _, err := preview(c.kind, c.country, ""); refusalOf(err) != "invalid_argument decoy_template_country" {
+			t.Errorf("%s for %s = %v, want decoy_template_country", c.kind, c.country, err)
+		}
+	}
+	if _, err := preview("files", "nl", ""); err != nil {
+		t.Fatalf("the Dutch file transfer page: %v", err)
+	}
+	got, err := svc.GenerateDecoySite(e.ctx, connect.NewRequest(&decoysitev1.GenerateDecoySiteRequest{Kind: "blog", Seed: de.Seed, Country: "de", Note: "Template · Blog · Germany"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, _, _ := sitegen.GenerateWith("blog", mustHex(t, de.Seed), sitegen.Options{Country: "de"})
+	want, err := decoy.FromFiles(files)
+	if err != nil || got.Msg.Site.BundleSha256 != want.Hash() || got.Msg.Site.Note != "Template · Blog · Germany" {
+		t.Fatalf("the saved site is not the German one that was shown (%v): %+v", err, got.Msg.Site)
+	}
+	if _, err := svc.GenerateDecoySite(e.ctx, connect.NewRequest(&decoysitev1.GenerateDecoySiteRequest{Kind: "blog", Country: "nl"})); refusalOf(err) != "invalid_argument decoy_template_country" {
+		t.Errorf("a blog for the Netherlands = %v", err)
 	}
 }
 

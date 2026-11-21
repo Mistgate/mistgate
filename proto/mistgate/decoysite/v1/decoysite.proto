@@ -365,18 +365,26 @@ message DecoyTemplate {
   string id = 1;
   string name_en = 2;
   string name_ru = 3;
+  // The countries (lower case ISO 3166 codes, in the order of ListDecoyTemplatesResponse.countries) the kind can be made for:
+  // the ones whose language it has texts in.
+  repeated string countries = 4;
 }
 
 message ListDecoyTemplatesRequest {}
 
 message ListDecoyTemplatesResponse {
   repeated DecoyTemplate templates = 1;
+  // Every country the templates know, in the order the window shows them ("us", "gb", "de", ...). The first is the default.
+  repeated string countries = 2;
 }
 
 message PreviewDecoyTemplateRequest {
   string kind = 1;
   // From an earlier answer; empty = a new random one. Opaque to the client.
   string seed = 2;
+  // The country the site is made for: its language, cities, addresses, money and phone numbers. Empty = "us".
+  // decoy_template_country when the panel does not know the country or the kind has no texts for it.
+  string country = 3;
 }
 
 message PreviewDecoyTemplateResponse {
@@ -400,6 +408,8 @@ message GenerateDecoySiteRequest {
   string name = 3;
   // Empty = the kind's name in English.
   string note = 4;
+  // As PreviewDecoyTemplateRequest.country; the site is the one of the preview of this kind, seed and country.
+  string country = 5;
 }
 
 message GenerateDecoySiteResponse {

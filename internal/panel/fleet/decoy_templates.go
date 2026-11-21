@@ -34,8 +34,11 @@ var seedPattern = regexp.MustCompile(`^(?:[0-9a-f]{2}){8,32}$`)
 
 func (s decoySiteService) ListDecoyTemplates(_ context.Context, _ *connect.Request[decoysitev1.ListDecoyTemplatesRequest]) (*connect.Response[decoysitev1.ListDecoyTemplatesResponse], error) {
 	out := &decoysitev1.ListDecoyTemplatesResponse{}
+	for _, c := range sitegen.Countries() {
+		out.Countries = append(out.Countries, c.Code)
+	}
 	for _, k := range sitegen.Kinds() {
-		out.Templates = append(out.Templates, &decoysitev1.DecoyTemplate{Id: k.ID, NameEn: k.NameEN, NameRu: k.NameRU})
+		out.Templates = append(out.Templates, &decoysitev1.DecoyTemplate{Id: k.ID, NameEn: k.NameEN, NameRu: k.NameRU, Countries: k.Countries})
 	}
 	return connect.NewResponse(out), nil
 }
@@ -43,8 +46,8 @@ func (s decoySiteService) ListDecoyTemplates(_ context.Context, _ *connect.Reque
 // generated is one rendered site: its bundle, the brand its pages print, the seed it came from and whether it has photos (the
 // reasons of PreviewDecoyTemplateResponse.photos).
 type generated struct {
-	bundle             *decoy.Bundle
-	brand, seed, photo string
+	bundle                      *decoy.Bundle
+	brand, seed, photo, country string
 }
 
 const (
@@ -86,18 +89,21 @@ func (f *Fleet) templateState() *templateState {
 	return st
 }
 
-func (st *templateState) get(kind, seed string, now time.Time) (generated, bool) {
+// previewKey names a preview: the country, the kind and the seed make one site.
+func previewKey(country, kind, seed string) string { return country + "/" + kind + "/" + seed }
+
+func (st *templateState) get(key string, now time.Time) (generated, bool) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	e, ok := st.previews[kind+"/"+seed]
+	e, ok := st.previews[key]
 	if !ok || now.Sub(e.at) > previewKeep {
-		delete(st.previews, kind+"/"+seed)
+		delete(st.previews, key)
 		return generated{}, false
 	}
 	return e.g, true
 }
 
-func (st *templateState) put(kind, seed string, g generated, now time.Time) {
+func (st *templateState) put(key string, g generated, now time.Time) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	for k, e := range st.previews { // the expired go first, then the oldest
@@ -114,7 +120,7 @@ func (st *templateState) put(kind, seed string, g generated, now time.Time) {
 		}
 		delete(st.previews, oldest)
 	}
-	st.previews[kind+"/"+seed] = previewEntry{at: now, g: g}
+	st.previews[key] = previewEntry{at: now, g: g}
 }
 
 // photoKey is the owner's Pexels key; "" when there is none (or the stored one cannot be opened: another master key).
@@ -164,9 +170,12 @@ func (s decoySiteService) SetDecoyPhotosKey(ctx context.Context, req *connect.Re
 	return connect.NewResponse(&decoysitev1.SetDecoyPhotosKeyResponse{HasKey: key != ""}), nil
 }
 
-// render makes the site of a kind from a seed; an empty seed takes a new random one. A site previewed in the last quarter of
-// an hour comes back as it was.
-func (s decoySiteService) render(ctx context.Context, kind, seed string) (generated, error) {
+// render makes the site of a kind for a country from a seed; an empty seed takes a new random one, an empty country is
+// sitegen.DefaultCountry. A site previewed in the last quarter of an hour comes back as it was.
+func (s decoySiteService) render(ctx context.Context, kind, country, seed string) (generated, error) {
+	if country == "" {
+		country = sitegen.DefaultCountry
+	}
 	if seed == "" {
 		raw := make([]byte, 8)
 		if _, err := rand.Read(raw); err != nil {
@@ -178,15 +187,18 @@ func (s decoySiteService) render(ctx context.Context, kind, seed string) (genera
 		return generated{}, invalid("decoy_template_seed")
 	}
 	st := s.f.templateState()
-	if g, ok := st.get(kind, seed, s.f.now()); ok {
+	pk := previewKey(country, kind, seed)
+	if g, ok := st.get(pk, s.f.now()); ok {
 		return g, nil
 	}
 	raw, _ := hex.DecodeString(seed)
-	plan, err := sitegen.Plan(kind, raw)
-	if errors.Is(err, sitegen.ErrUnknownKind) {
+	plan, err := sitegen.PlanFor(kind, raw, country)
+	switch {
+	case errors.Is(err, sitegen.ErrUnknownKind):
 		return generated{}, invalid("decoy_template_unknown")
-	}
-	if err != nil {
+	case errors.Is(err, sitegen.ErrUnknownCountry), errors.Is(err, sitegen.ErrNotInCountry):
+		return generated{}, invalid("decoy_template_country")
+	case err != nil:
 		return generated{}, s.fail("plan decoy site", err)
 	}
 	// Photos are an extra: whatever goes wrong with them, the site is made with drawings.
@@ -201,13 +213,13 @@ func (s decoySiteService) render(ctx context.Context, kind, seed string) (genera
 			why, photos = res.Reason, res.Photos
 		}
 	}
-	files, brand, err := sitegen.GenerateWith(kind, raw, sitegen.Options{Photos: photos})
+	files, brand, err := sitegen.GenerateWith(kind, raw, sitegen.Options{Country: country, Photos: photos})
 	if err != nil {
 		return generated{}, s.fail("generate decoy site", err)
 	}
 	b, err := decoy.FromFiles(files)
 	if err != nil && len(photos) > 0 { // the photos made it too big or odd for the library: draw the site instead
-		files, brand, err = sitegen.GenerateNamed(kind, raw)
+		files, brand, err = sitegen.GenerateWith(kind, raw, sitegen.Options{Country: country})
 		if err == nil {
 			why = decoyphotos.ReasonUnavailable
 			b, err = decoy.FromFiles(files)
@@ -216,13 +228,13 @@ func (s decoySiteService) render(ctx context.Context, kind, seed string) (genera
 	if err != nil {
 		return generated{}, s.fail("bundle generated decoy site", err)
 	}
-	g := generated{bundle: b, brand: fitName(brand), seed: seed, photo: why}
-	st.put(kind, seed, g, s.f.now())
+	g := generated{bundle: b, brand: fitName(brand), seed: seed, photo: why, country: country}
+	st.put(pk, g, s.f.now())
 	return g, nil
 }
 
 func (s decoySiteService) PreviewDecoyTemplate(ctx context.Context, req *connect.Request[decoysitev1.PreviewDecoyTemplateRequest]) (*connect.Response[decoysitev1.PreviewDecoyTemplateResponse], error) {
-	g, err := s.render(ctx, req.Msg.Kind, req.Msg.Seed)
+	g, err := s.render(ctx, req.Msg.Kind, req.Msg.Country, req.Msg.Seed)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +265,7 @@ func numbered(name string, n int) string {
 
 func (s decoySiteService) GenerateDecoySite(ctx context.Context, req *connect.Request[decoysitev1.GenerateDecoySiteRequest]) (*connect.Response[decoysitev1.GenerateDecoySiteResponse], error) {
 	f, m := s.f, req.Msg
-	g, err := s.render(ctx, m.Kind, m.Seed)
+	g, err := s.render(ctx, m.Kind, m.Country, m.Seed)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +298,7 @@ func (s decoySiteService) GenerateDecoySite(ctx context.Context, req *connect.Re
 	if err != nil {
 		return nil, s.fail("create generated decoy site", err)
 	}
-	f.audit(ctx, "decoy_site.create", map[string]string{"site_id": row.ID, "name": row.Name, "source": row.Source, "state": row.State, "template": m.Kind, "bundle_sha256": row.BundleHash})
+	f.audit(ctx, "decoy_site.create", map[string]string{"site_id": row.ID, "name": row.Name, "source": row.Source, "state": row.State, "template": m.Kind, "country": g.country, "bundle_sha256": row.BundleHash})
 	site, err := s.siteMessage(ctx, row.ID)
 	if err != nil {
 		return nil, s.fail("read decoy site", err)
