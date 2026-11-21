@@ -247,6 +247,7 @@ func TestWorkerDoesNotSpinWhenSleepFails(t *testing.T) {
 		c := l.cmd([]string{"FAKE_SLEEP_BROKEN=1"}, "worker")
 		cc := exec.CommandContext(ctx, c.Path, c.Args[1:]...)
 		cc.Dir, cc.Env = c.Dir, c.Env
+		l.own(cc)
 		err := runCmd(cc)
 		ee, ok := err.(*exec.ExitError)
 		if !ok || ee.ExitCode() != 1 {

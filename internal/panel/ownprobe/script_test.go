@@ -488,6 +488,7 @@ func TestPrivilegeHygiene(t *testing.T) {
 		argv := append(append([]string{}, sh.argv[1:]...), l.script, "status")
 		c := exec.Command(sh.argv[0], argv...)
 		c.Env = []string{"PATH=" + evil + ":" + os.Getenv("PATH"), "HOME=" + evil, "FAKE_DIR=" + l.fake}
+		l.own(c)
 		out, _ := combinedOutput(c)
 		if _, err := os.Stat(trap); err == nil {
 			t.Errorf("a program from the caller's PATH was run: %s", out)
@@ -943,6 +944,28 @@ func TestInstallRunUpgradeUninstall(t *testing.T) {
 			if strings.Contains(p, "mistgate") {
 				t.Errorf("left after uninstall: %s", p)
 			}
+		}
+	})
+}
+
+// The lab ends what a test started in it before the directory of the test is removed: here a loop that keeps writing there,
+// left in the background the way the script leaves a worker's curls. A lab that only removed its directory failed with
+// "directory not empty", or the loop made the directory again.
+func TestLabEndsWhatItStarted(t *testing.T) {
+	t.Parallel()
+	forShells(t, func(t *testing.T, sh shellSpec) {
+		t.Parallel()
+		root := ""
+		t.Run("lab", func(t *testing.T) {
+			l := newLab(t, sh, labOptions{})
+			root = l.root
+			out, _ := l.shellScript(`( while :; do mkdir -p "$FAKE_DIR/calls/x"; rmdir "$FAKE_DIR/calls/x"; done ) >/dev/null 2>&1 & echo $!`)
+			if pid, _ := strconv.Atoi(strings.TrimSpace(out)); !procAlive(pid) {
+				t.Fatalf("the loop did not start: %s", out)
+			}
+		})
+		if _, err := os.Stat(root); err == nil {
+			t.Error("a process of the lab outlived it and made its directory again")
 		}
 	})
 }
