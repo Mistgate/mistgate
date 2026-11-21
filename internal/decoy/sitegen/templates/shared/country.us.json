@@ -1,0 +1,387 @@
+{
+ "order": 1,
+ "lang": "en-US",
+ "html_lang": "en-US",
+ "date": [
+  "{m} {d}, {y}",
+  "{mm}/{dd}/{y}"
+ ],
+ "clock": "12h",
+ "money": {
+  "fmt": "${n}",
+  "group": ",",
+  "scale": 1,
+  "round": 5
+ },
+ "address": "{no} {street}, {city}, {state} {zip}",
+ "zip_tail": "XX",
+ "cities": [
+  {
+   "name": "New York",
+   "zip": [
+    "100",
+    "101",
+    "102"
+   ],
+   "state": "NY",
+   "phone": "(212) 555-01XX"
+  },
+  {
+   "name": "Los Angeles",
+   "zip": [
+    "900",
+    "901"
+   ],
+   "state": "CA",
+   "phone": "(213) 555-01XX"
+  },
+  {
+   "name": "Chicago",
+   "zip": [
+    "606",
+    "607"
+   ],
+   "state": "IL",
+   "phone": "(312) 555-01XX"
+  },
+  {
+   "name": "Houston",
+   "zip": [
+    "770",
+    "772"
+   ],
+   "state": "TX",
+   "phone": "(713) 555-01XX"
+  },
+  {
+   "name": "Phoenix",
+   "zip": [
+    "850",
+    "852"
+   ],
+   "state": "AZ",
+   "phone": "(602) 555-01XX"
+  },
+  {
+   "name": "Philadelphia",
+   "zip": [
+    "191",
+    "190"
+   ],
+   "state": "PA",
+   "phone": "(215) 555-01XX"
+  },
+  {
+   "name": "San Antonio",
+   "zip": [
+    "782",
+    "781"
+   ],
+   "state": "TX",
+   "phone": "(210) 555-01XX"
+  },
+  {
+   "name": "San Diego",
+   "zip": [
+    "921",
+    "919"
+   ],
+   "state": "CA",
+   "phone": "(619) 555-01XX"
+  },
+  {
+   "name": "Dallas",
+   "zip": [
+    "752",
+    "753"
+   ],
+   "state": "TX",
+   "phone": "(214) 555-01XX"
+  },
+  {
+   "name": "San Jose",
+   "zip": [
+    "951",
+    "950"
+   ],
+   "state": "CA",
+   "phone": "(408) 555-01XX"
+  },
+  {
+   "name": "Austin",
+   "zip": [
+    "787",
+    "786"
+   ],
+   "state": "TX",
+   "phone": "(512) 555-01XX"
+  },
+  {
+   "name": "Jacksonville",
+   "zip": [
+    "322",
+    "320"
+   ],
+   "state": "FL",
+   "phone": "(904) 555-01XX"
+  },
+  {
+   "name": "Columbus",
+   "zip": [
+    "432",
+    "431"
+   ],
+   "state": "OH",
+   "phone": "(614) 555-01XX"
+  },
+  {
+   "name": "Charlotte",
+   "zip": [
+    "282",
+    "281"
+   ],
+   "state": "NC",
+   "phone": "(704) 555-01XX"
+  },
+  {
+   "name": "Indianapolis",
+   "zip": [
+    "462",
+    "461"
+   ],
+   "state": "IN",
+   "phone": "(317) 555-01XX"
+  },
+  {
+   "name": "Seattle",
+   "zip": [
+    "981",
+    "980"
+   ],
+   "state": "WA",
+   "phone": "(206) 555-01XX"
+  },
+  {
+   "name": "Denver",
+   "zip": [
+    "802",
+    "801"
+   ],
+   "state": "CO",
+   "phone": "(303) 555-01XX"
+  },
+  {
+   "name": "Boston",
+   "zip": [
+    "021",
+    "022"
+   ],
+   "state": "MA",
+   "phone": "(617) 555-01XX"
+  },
+  {
+   "name": "Nashville",
+   "zip": [
+    "372",
+    "370"
+   ],
+   "state": "TN",
+   "phone": "(615) 555-01XX"
+  },
+  {
+   "name": "Portland",
+   "zip": [
+    "972",
+    "971"
+   ],
+   "state": "OR",
+   "phone": "(503) 555-01XX"
+  },
+  {
+   "name": "Atlanta",
+   "zip": [
+    "303",
+    "302"
+   ],
+   "state": "GA",
+   "phone": "(404) 555-01XX"
+  },
+  {
+   "name": "Minneapolis",
+   "zip": [
+    "554",
+    "553"
+   ],
+   "state": "MN",
+   "phone": "(612) 555-01XX"
+  },
+  {
+   "name": "Pittsburgh",
+   "zip": [
+    "152",
+    "151"
+   ],
+   "state": "PA",
+   "phone": "(412) 555-01XX"
+  },
+  {
+   "name": "Milwaukee",
+   "zip": [
+    "532",
+    "531"
+   ],
+   "state": "WI",
+   "phone": "(414) 555-01XX"
+  },
+  {
+   "name": "Kansas City",
+   "zip": [
+    "641",
+    "640"
+   ],
+   "state": "MO",
+   "phone": "(816) 555-01XX"
+  },
+  {
+   "name": "Raleigh",
+   "zip": [
+    "276",
+    "275"
+   ],
+   "state": "NC",
+   "phone": "(919) 555-01XX"
+  },
+  {
+   "name": "Salt Lake City",
+   "zip": [
+    "841",
+    "840"
+   ],
+   "state": "UT",
+   "phone": "(801) 555-01XX"
+  },
+  {
+   "name": "Sacramento",
+   "zip": [
+    "958",
+    "957"
+   ],
+   "state": "CA",
+   "phone": "(916) 555-01XX"
+  },
+  {
+   "name": "Baltimore",
+   "zip": [
+    "212",
+    "211"
+   ],
+   "state": "MD",
+   "phone": "(410) 555-01XX"
+  },
+  {
+   "name": "Detroit",
+   "zip": [
+    "482",
+    "481"
+   ],
+   "state": "MI",
+   "phone": "(313) 555-01XX"
+  }
+ ],
+ "streets": [
+  "Main Street",
+  "Oak Street",
+  "Maple Avenue",
+  "Washington Street",
+  "Park Avenue",
+  "Elm Street",
+  "Cedar Street",
+  "Lake Street",
+  "Pine Street",
+  "Church Street",
+  "Market Street",
+  "Walnut Street",
+  "Second Street",
+  "Center Street",
+  "Highland Avenue",
+  "Jefferson Avenue",
+  "Franklin Street",
+  "Spring Street"
+ ],
+ "first": [
+  "James",
+  "Mary:f",
+  "Robert",
+  "Patricia:f",
+  "John",
+  "Jennifer:f",
+  "Michael",
+  "Linda:f",
+  "David",
+  "Elizabeth:f",
+  "William",
+  "Barbara:f",
+  "Richard",
+  "Susan:f",
+  "Joseph",
+  "Jessica:f",
+  "Thomas",
+  "Sarah:f",
+  "Daniel",
+  "Karen:f",
+  "Matthew",
+  "Nancy:f",
+  "Andrew",
+  "Emily:f",
+  "Ryan",
+  "Laura:f",
+  "Brian",
+  "Megan:f",
+  "Kevin",
+  "Rachel:f",
+  "Eric",
+  "Hannah:f",
+  "Nathan",
+  "Olivia:f",
+  "Samuel",
+  "Grace:f"
+ ],
+ "last": [
+  "Smith",
+  "Johnson",
+  "Williams",
+  "Bennett",
+  "Jones",
+  "Miller",
+  "Davis",
+  "Wilson",
+  "Anderson",
+  "Taylor",
+  "Thomas",
+  "Moore",
+  "Martin",
+  "Foster",
+  "Thompson",
+  "White",
+  "Harris",
+  "Clark",
+  "Lewis",
+  "Walker",
+  "Hall",
+  "Allen",
+  "Young",
+  "King",
+  "Wright",
+  "Scott",
+  "Green",
+  "Baker",
+  "Adams",
+  "Nelson",
+  "Hill",
+  "Campbell",
+  "Mitchell",
+  "Roberts",
+  "Carter",
+  "Turner"
+ ]
+}

@@ -1,0 +1,435 @@
+{
+ "ui": {
+  "nav_label": "Hauptmenü",
+  "footer": "Ehrenamtlich geführt und offen für alle.",
+  "nav_home": "Start",
+  "nav_events": "Programm",
+  "nav_join": "Mitmachen",
+  "nav_news": "Neuigkeiten",
+  "home_title": "Willkommen",
+  "desc_events": "Regelmäßige Treffen und besondere Veranstaltungen von {brand}.",
+  "desc_join": "Wie Sie bei {brand} mitmachen, was es kostet und was Sie erwartet.",
+  "desc_news": "Neuigkeiten und Mitteilungen von {brand}.",
+  "nf_title": "Seite nicht gefunden",
+  "nf_text": "Diese Seite haben wir nicht gefunden. Vielleicht wurde sie nach der Veranstaltung, um die es ging, entfernt.",
+  "nf_back": "Zurück zur Startseite",
+  "meet_h": "Wann wir uns treffen",
+  "when_l": "Wann",
+  "where_l": "Wo",
+  "upcoming_h": "Demnächst",
+  "latest_h": "Neueste Nachrichten",
+  "all_events": "Das ganze Programm",
+  "all_news": "Alle Neuigkeiten",
+  "join_cta": "So machen Sie mit",
+  "events_h": "Programm",
+  "events_intro": "Unsere regelmäßigen Treffen und was wir in dieser Saison bisher gemacht haben, Monat für Monat.",
+  "join_h": "Machen Sie mit",
+  "steps_h": "So machen Sie mit",
+  "faq_h": "Fragen",
+  "join_fee": "Der Mitgliedsbeitrag beträgt {fee} im Jahr, für Jugendliche und Studierende gibt es einen ermäßigten Satz. Wenn Geld ein Problem ist, sagen Sie es der Kassenwartin oder dem Kassenwart ganz leise, und es wird nie wieder erwähnt.",
+  "steps": [
+   "Kommen Sie zu einem beliebigen Treffen und sagen Sie Hallo.",
+   "Probieren Sie es einen Monat aus, bevor Sie etwas entscheiden.",
+   "Zahlen Sie den Beitrag, wenn Sie sich entschieden haben."
+  ],
+  "news_h": "Neuigkeiten",
+  "news_intro": "Mitteilungen des Vorstands und Berichte von den letzten Treffen, die neuesten zuerst.",
+  "regular_h": "Regelmäßige Treffen",
+  "season_h": "Diese Saison bisher",
+  "find_h": "So finden Sie uns",
+  "contact_h": "Kontakt",
+  "phone_l": "Telefon"
+ },
+ "bundles": {
+  "chess": {
+   "kicker": "Schachclub",
+   "tagline": "Gemütliches Schach, jeden Donnerstagabend",
+   "desc": "{brand} trifft sich jeden Donnerstagabend. Freundliche Partien für jede Spielstärke, vom Anfänger bis zum Clubmeister.",
+   "intro": "Wir treffen uns jeden Donnerstag, um zu spielen, unsere Partien zu analysieren und zu viel Tee zu trinken. Alle Spielstärken sind willkommen, vom ersten Zug bis zum Clubmeister.",
+   "when": "Donnerstags, {19:30} bis {22:00}",
+   "where": "Der Raum im Obergeschoss des Gemeindehauses",
+   "why": [
+    {
+     "h": "Alle Spielstärken",
+     "p": "Anfänger sitzen neben alten Hasen, und niemand stört sich daran."
+    },
+    {
+     "h": "Jeden Donnerstag",
+     "p": "Keine Anmeldung. Kommen Sie, wann Sie können."
+    },
+    {
+     "h": "Bretter sind da",
+     "p": "Sätze und Uhren gehören dem Verein; den Tee kochen Sie selbst."
+    }
+   ],
+   "events": [
+    {
+     "t": "Spielabend",
+     "w": "Jeden Donnerstag, {19:30}",
+     "p": "Freies Spiel, mit einem Lehrtisch für Anfänger."
+    },
+    {
+     "t": "Schnellschachturnier",
+     "w": "Jeden ersten Samstag im Monat, {14:00}",
+     "p": "Sieben Runden zu je fünfzehn Minuten. Das Startgeld ist eine kleine Spende für die Teekasse."
+    },
+    {
+     "t": "Anfängerabend",
+     "w": "Jeden zweiten Dienstag im Monat, {19:00}",
+     "p": "Die Regeln lernen und ein paar einfache Eröffnungen."
+    },
+    {
+     "t": "Simultanspiel",
+     "w": "Einmal pro Saison",
+     "p": "Der Clubmeister spielt gegen zwanzig Bretter gleichzeitig. Bringen Sie eine Freundin und einen Plan mit."
+    },
+    {
+     "t": "Jahresessen",
+     "w": "Ende November",
+     "p": "Ein Essen, eine Rede und die Übergabe eines sehr kleinen Pokals."
+    }
+   ],
+   "news": [
+    {
+     "title": "Eine neue Saison beginnt",
+     "text": "Die Herbstsaison beginnt nächste Woche mit der Clubmeisterschaft. Neue Mitglieder sind an jedem Abend willkommen."
+    },
+    {
+     "title": "Danke an alle, die zum Schnellschach gekommen sind",
+     "text": "Sechsundzwanzig Spielerinnen und Spieler, vierzehn Tassen Tee pro Runde und ein Finale, das auf der Uhr entschieden wurde."
+    },
+    {
+     "title": "Wir haben neue Bretter",
+     "text": "Acht Holzbretter mit Figuren, gekauft vom Erlös der Sommertombola."
+    },
+    {
+     "title": "Die Jugendgruppe startet wieder",
+     "text": "Kinder ab sieben Jahren sind dienstagnachmittags willkommen, beim ersten Besuch mit einem Elternteil."
+    }
+   ],
+   "join": [
+    "Wir sind ein freundlicher Verein mit etwa vierzig Mitgliedern zwischen neun und vierundachtzig Jahren. Die meisten von uns spielen nicht besonders gut, und damit haben wir unseren Frieden gemacht.",
+    "Sie brauchen kein eigenes Brett und keine Theorie. Wenn Sie die Figuren ziehen können, können Sie am Donnerstag mitspielen."
+   ],
+   "faq": [
+    {
+     "q": "Muss ich gut spielen können?",
+     "a": "Nein. Die meisten Mitglieder können es nicht, und der Abend ist so organisiert, dass jeder eine Partie gegen jemanden seiner Spielstärke bekommt."
+    },
+    {
+     "q": "Dürfen Kinder kommen?",
+     "a": "Ja, dienstagnachmittags und, mit einem Elternteil, auch donnerstags."
+    },
+    {
+     "q": "Spielen Sie in einer Liga?",
+     "a": "Wir stellen eine Mannschaft in der Kreisliga. Wenn Sie mitspielen möchten, sprechen Sie den Mannschaftsführer an."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Eröffnungsabend",
+     "p": "Ein kurzer Vortrag über die Eröffnung, die jeder spielt und kaum jemand versteht."
+    },
+    {
+     "t": "Clubmeisterschaft, erste Runde",
+     "p": "Ausgelost, und eine erste Runde, die nie wie geplant verläuft."
+    },
+    {
+     "t": "Endspielwerkstatt",
+     "p": "Könige, Bauern und die Geduld, sie vorwärtszubringen."
+    },
+    {
+     "t": "Quiz und Schach",
+     "p": "Zehn Fragen zum Schach, zehn zu allem anderen."
+    },
+    {
+     "t": "Schnellschachturnier",
+     "p": "Sieben Runden zu je fünfzehn Minuten und sehr viel Tee."
+    },
+    {
+     "t": "Analyseabend",
+     "p": "Wir suchen uns eine Partie vom Spielabend aus und streiten darüber."
+    },
+    {
+     "t": "Simultanspiel",
+     "p": "Der Clubmeister tritt gegen zwanzig Bretter gleichzeitig an."
+    },
+    {
+     "t": "Lehrtisch für Jugendliche",
+     "p": "Unsere jüngsten Mitglieder zeigen den Großen ein paar Tricks."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Schachclub {city}",
+       "Schachverein {city}",
+       "Schachfreunde {city}"
+      ]
+     ]
+    }
+   }
+  },
+  "walking": {
+   "kicker": "Wandergruppe",
+   "tagline": "Wandern in den Hügeln und am Fluss",
+   "desc": "{brand} wandert sonntags in der Umgebung, mit Rucksack, Brotzeit und ohne Eile.",
+   "intro": "Wir wandern am Sonntag in den Hügeln und am Fluss, mal zehn Kilometer, mal zwanzig, immer mit einer Pause. Wer gern geht und gern redet, passt gut zu uns.",
+   "when": "Sonntags, {9:30}",
+   "where": "Der alte Bahnhofsparkplatz",
+   "why": [
+    {
+     "h": "Für jede Kondition",
+     "p": "Es gibt immer eine kurze und eine lange Strecke."
+    },
+    {
+     "h": "Jeden Sonntag",
+     "p": "Keine Anmeldung. Kommen Sie mit festen Schuhen."
+    },
+    {
+     "h": "Mit Einkehr",
+     "p": "Wir gehen langsam genug, um zu reden, und schnell genug, um anzukommen."
+    }
+   ],
+   "events": [
+    {
+     "t": "Sonntagswanderung",
+     "w": "Jeden Sonntag, {9:30}",
+     "p": "Zwölf bis zwanzig Kilometer, mit Pause und Einkehr."
+    },
+    {
+     "t": "Kurze Wanderung",
+     "w": "Jeden ersten Mittwoch im Monat, {10:00}",
+     "p": "Ein ruhiger Vormittag, etwa sechs Kilometer, auch für Anfänger."
+    },
+    {
+     "t": "Wochenendfahrt",
+     "w": "Einmal im Jahr, im Frühling",
+     "p": "Zwei Tage in einer anderen Gegend, mit gemeinsamer Unterkunft."
+    },
+    {
+     "t": "Kartenlesen",
+     "w": "Einmal pro Saison",
+     "p": "Ein Abend mit Karte, Kompass und gutem Willen."
+    },
+    {
+     "t": "Müllsammeln",
+     "w": "Letzter Samstag im April",
+     "p": "Handschuhe, Säcke und überraschend viele Tennisbälle."
+    }
+   ],
+   "news": [
+    {
+     "title": "Das Frühjahrsprogramm ist da",
+     "text": "Alle Termine bis Juni stehen im Programm. Neue Mitglieder sind bei jeder Wanderung willkommen."
+    },
+    {
+     "title": "Der Weg an der Mühle ist wieder offen",
+     "text": "Nach der Sperrung wegen eines Erdrutschs ist der Pfad wieder begehbar."
+    },
+    {
+     "title": "Wanderführer gesucht",
+     "text": "Wer gern eine Strecke vorbereitet, meldet sich bei der Vorsitzenden."
+    },
+    {
+     "title": "Danke für die Suppe",
+     "text": "Zum Abschluss der Saison gab es Suppe für alle, gekocht von drei Mitgliedern."
+    }
+   ],
+   "join": [
+    "Wir sind etwa dreißig Leute und gehen seit vielen Jahren zusammen. Manche kommen jeden Sonntag, andere zweimal im Jahr, und beides ist in Ordnung.",
+    "Sie brauchen feste Schuhe, etwas zu trinken und ein wenig Lust. Alles andere findet sich unterwegs."
+   ],
+   "faq": [
+    {
+     "q": "Wie lang sind die Strecken?",
+     "a": "Zwischen sechs und zwanzig Kilometern. Im Programm steht bei jeder Wanderung, wie lang sie ist."
+    },
+    {
+     "q": "Darf ich einen Hund mitbringen?",
+     "a": "Ja, an der Leine und wenn er andere Hunde mag."
+    },
+    {
+     "q": "Was passiert bei schlechtem Wetter?",
+     "a": "Wir gehen bei Regen, aber nicht bei Gewitter oder Glatteis. Im Zweifel steht es am Samstagabend auf der Seite."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Wanderung am Fluss",
+     "p": "Zwölf Kilometer auf ebenem Weg, mit einer Pause an der alten Schleuse."
+    },
+    {
+     "t": "Hügelwanderung mit Aussicht",
+     "p": "Sechzehn Kilometer und ein richtiger Anstieg. Bringen Sie eine Thermoskanne mit."
+    },
+    {
+     "t": "Kartenleseabend",
+     "p": "Koordinaten, Höhenlinien und ein Kompass, der in die falsche Richtung zeigt."
+    },
+    {
+     "t": "Kurze Wanderung mit Einkehr",
+     "p": "Sechs Kilometer bis zu einem Gasthaus mit gutem Kachelofen."
+    },
+    {
+     "t": "Herbstfarben",
+     "p": "Eine Waldstrecke, am schönsten morgens, wenn das Licht durch die Blätter fällt."
+    },
+    {
+     "t": "Müllsammeln",
+     "p": "Handschuhe, Säcke und überraschend viele Tennisbälle."
+    },
+    {
+     "t": "Abendspaziergang",
+     "p": "Eine ruhige Stunde in der Dämmerung, danach Tee am Küchentisch."
+    },
+    {
+     "t": "Nachtwanderung",
+     "p": "Taschenlampen aus, Augen auf und ein Vortrag über die Sterne."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Wandergruppe {city}",
+       "Wanderfreunde {city}",
+       "Wanderverein {city}"
+      ]
+     ]
+    }
+   }
+  },
+  "choir": {
+   "kicker": "Chor",
+   "tagline": "Gemeinsam singen, mittwochs abends",
+   "desc": "{brand} probt mittwochs abends. Gemischter Chor für alle, die gern singen, mit oder ohne Notenkenntnis.",
+   "intro": "Wir proben jeden Mittwochabend, singen Lieder aus mehreren Jahrhunderten und geben ein paar Konzerte im Jahr. Notenkenntnis ist hilfreich, aber keine Bedingung.",
+   "when": "Mittwochs, {19:00} bis {21:00}",
+   "where": "Der Saal im Gemeindehaus am Anger",
+   "why": [
+    {
+     "h": "Ohne Vorsingen",
+     "p": "Kommen Sie vorbei und singen Sie mit. Zuhören ist beim ersten Mal auch erlaubt."
+    },
+    {
+     "h": "Jeden Mittwoch",
+     "p": "Eine Probe, ein Pausengetränk und ein Lied zum Schluss."
+    },
+    {
+     "h": "Alle Stimmen",
+     "p": "Sopran, Alt, Tenor und Bass, und alles dazwischen."
+    }
+   ],
+   "events": [
+    {
+     "t": "Wöchentliche Probe",
+     "w": "Jeden Mittwoch, {19:00}",
+     "p": "Einsingen, ein neues Stück und die Wiederholung vom letzten."
+    },
+    {
+     "t": "Offener Abend",
+     "w": "Erster Mittwoch im September",
+     "p": "Alle sind eingeladen, einen Abend lang mitzusingen."
+    },
+    {
+     "t": "Wintermusik",
+     "w": "Zweiter Samstag im Dezember",
+     "p": "Ein Konzert in der Kirche mit Liedern zur Jahreszeit."
+    },
+    {
+     "t": "Sommerkonzert",
+     "w": "Ende Juni",
+     "p": "Ein Programm im Freien, wenn das Wetter hält."
+    },
+    {
+     "t": "Singtag",
+     "w": "Einmal im Jahr",
+     "p": "Ein ganzer Samstag mit Gastdirigent."
+    }
+   ],
+   "news": [
+    {
+     "title": "Das Herbstsemester beginnt",
+     "text": "Die Proben beginnen am ersten Mittwoch im September. Neue Stimmen sind herzlich willkommen."
+    },
+    {
+     "title": "Ein großes Dankeschön nach dem Sommerkonzert",
+     "text": "Über zweihundert Zuhörer und ein Chor, der nach dem Applaus erst richtig laut wurde."
+    },
+    {
+     "title": "Wir suchen Tenöre",
+     "text": "Der Tenor ist dünn besetzt. Wer ihn verstärken möchte, ist willkommen."
+    },
+    {
+     "title": "Neue Noten sind angekommen",
+     "text": "Die Mappen für das Wintermusikprogramm liegen bei der Probe bereit."
+    }
+   ],
+   "join": [
+    "Wir sind etwa fünfunddreißig Sängerinnen und Sänger und proben seit über zwanzig Jahren zusammen. Der Chor ist gemischt und singt in der Regel vierstimmig.",
+    "Sie müssen weder vorsingen noch Noten lesen können. Wenn Sie Lust haben, kommen Sie einfach zur nächsten Probe."
+   ],
+   "faq": [
+    {
+     "q": "Muss ich Noten lesen können?",
+     "a": "Nein. Viele von uns lernen die Stücke nach Gehör, und die Chorleitung hilft bei allem Weiteren."
+    },
+    {
+     "q": "Gibt es ein Vorsingen?",
+     "a": "Nein. Wir hören Sie bei der ersten Probe und finden gemeinsam den richtigen Platz."
+    },
+    {
+     "q": "Wie oft treten Sie auf?",
+     "a": "Zwei- bis dreimal im Jahr, meist im Dezember und im Juni."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Offener Abend",
+     "p": "Kommen Sie und singen Sie einen Kanon mit, ohne Vorsingen und ohne Druck."
+    },
+    {
+     "t": "Beginn des neuen Semesters",
+     "p": "Einsingen, ein neues Stück und viel Wiedersehen."
+    },
+    {
+     "t": "Stimmprobe",
+     "p": "Alt und Tenor im Saal, Sopran und Bass in der Küche."
+    },
+    {
+     "t": "Singtag",
+     "p": "Ein ganzer Samstag mit Gastdirigent."
+    },
+    {
+     "t": "Konzert in der Kirche",
+     "p": "Zwei Hälften, eine Tombola und Plätzchen in der Pause."
+    },
+    {
+     "t": "Weihnachtslieder auf dem Markt",
+     "p": "Kalte Finger und warme Stimmen auf dem Marktplatz."
+    },
+    {
+     "t": "Probe mit Pianist",
+     "p": "Zum ersten Mal klingt das Stück nach Musik."
+    },
+    {
+     "t": "Mitsingabend",
+     "p": "Lieder, die jeder kennt, und ein paar, an die sich keiner erinnert."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Chor {city}",
+       "Singkreis {city}",
+       "Stimmen aus {city}"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

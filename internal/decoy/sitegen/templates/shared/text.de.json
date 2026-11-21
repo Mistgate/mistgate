@@ -1,0 +1,101 @@
+{
+ "nav_label": "Hauptmenü",
+ "nf_title": "Seite nicht gefunden",
+ "nf_text": "Die gesuchte Seite existiert nicht oder wurde verschoben.",
+ "nf_back": "Zur Startseite",
+ "months": [
+  "Januar",
+  "Februar",
+  "März",
+  "April",
+  "Mai",
+  "Juni",
+  "Juli",
+  "August",
+  "September",
+  "Oktober",
+  "November",
+  "Dezember"
+ ],
+ "months_gen": [
+  "Januar",
+  "Februar",
+  "März",
+  "April",
+  "Mai",
+  "Juni",
+  "Juli",
+  "August",
+  "September",
+  "Oktober",
+  "November",
+  "Dezember"
+ ],
+ "weekdays": [
+  "Montag",
+  "Dienstag",
+  "Mittwoch",
+  "Donnerstag",
+  "Freitag",
+  "Samstag",
+  "Sonntag"
+ ],
+ "weekdays_short": [
+  "Mo",
+  "Di",
+  "Mi",
+  "Do",
+  "Fr",
+  "Sa",
+  "So"
+ ],
+ "am": "vormittags",
+ "pm": "nachmittags",
+ "closed": "geschlossen",
+ "hrs_fmt": "%days%: %time%",
+ "ms": "ms",
+ "units": [
+  "B",
+  "KB",
+  "MB"
+ ],
+ "cf_h": "Schreiben Sie uns",
+ "cf_intro": "Schicken Sie uns eine Nachricht, wir antworten so schnell wie möglich.",
+ "cf_name": "Ihr Name",
+ "cf_email": "Ihre E-Mail-Adresse",
+ "cf_msg": "Nachricht",
+ "cf_send": "Nachricht senden",
+ "cf_busy": "Wird gesendet …",
+ "cf_empty": "Bitte schreiben Sie zuerst eine Nachricht.",
+ "cf_fail": "Die Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es später noch einmal.",
+ "nav_terms": "Nutzungsbedingungen",
+ "desc_terms": "Die Bedingungen für die Nutzung von {brand}.",
+ "terms_h": "Nutzungsbedingungen",
+ "terms_intro": "Bitte lesen Sie diese Bedingungen, bevor Sie {brand} nutzen. Sie sind kurz und gelten ab der ersten Nutzung.",
+ "terms": [
+  {
+   "h": "Nutzung des Dienstes",
+   "p": "{brand} wird so bereitgestellt, wie er ist. Mit der Nutzung stimmen Sie diesen Bedingungen zu. Wenn Sie nicht zustimmen, nutzen Sie den Dienst bitte nicht."
+  },
+  {
+   "h": "Ihre Pflichten",
+   "p": "Nutzen Sie den Dienst rechtmäßig und nur für sich oder Ihre Organisation. Geben Sie Ihre Zugangsdaten nicht weiter und informieren Sie uns, wenn Sie vermuten, dass jemand anderes sie kennt."
+  },
+  {
+   "h": "Was nicht erlaubt ist",
+   "p": "Versuchen Sie nicht, den Dienst zu stören, zu überlasten oder auf Bereiche zuzugreifen, die nicht für Sie bestimmt sind. Wir können Zugriffe sperren, die anderen schaden."
+  },
+  {
+   "h": "Verfügbarkeit",
+   "p": "Wir sorgen dafür, dass der Dienst läuft, können aber nicht versprechen, dass er immer erreichbar ist. Teile davon können wir ändern, unterbrechen oder einstellen."
+  },
+  {
+   "h": "Haftung",
+   "p": "Soweit das Gesetz es erlaubt, haften wir nicht für Schäden, die durch die Nutzung des Dienstes oder dadurch entstehen, dass er nicht genutzt werden kann."
+  },
+  {
+   "h": "Änderungen",
+   "p": "Wir können diese Bedingungen von Zeit zu Zeit anpassen. Wenn Sie den Dienst nach einer Änderung weiter nutzen, gelten die neuen Bedingungen für Sie."
+  }
+ ]
+}

@@ -9,6 +9,12 @@
 <h2>{{.L.faq_h}}</h2>
 {{range .L.faq}}<h3>{{.q}}</h3>
 <p>{{.a}}</p>
+{{end}}<h2>{{.L.find_h}}</h2>
+<p>{{icon "clock"}} {{.L.when}}</p>
+<p>{{icon "pin"}} {{.L.where}}, {{.V.address}}</p>
+{{if .V.phone}}<p>{{icon "phone"}} {{.L.phone_l}}: {{.V.phone}}</p>
+{{else}}{{template "contactform" .}}
+<script src="{{.JS}}" defer></script>
 {{end}}</main>
 {{template "footer" .}}
 </body>

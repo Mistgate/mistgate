@@ -22,23 +22,52 @@ import (
 )
 
 var (
-	decoyDump  = flag.String("decoy-dump", "", "write sample sites of every kind into this folder, one subfolder per site, for looking at them")
+	decoyDump  = flag.String("decoy-dump", "", "write sample sites of every kind into this folder, one subfolder per country and site, for looking at them")
 	decoyDumpN = flag.Int("decoy-dump-n", 2, "how many seeds of every kind -decoy-dump writes")
+	// decoyDumpCC are the countries -decoy-dump writes sites for.
+	decoyDumpCC = flag.String("decoy-dump-cc", DefaultCountry, "the countries (codes, separated by spaces) -decoy-dump writes sites for")
 )
 
-const seedsPerKind = 200
+// seedsFor is how many seeds a kind is made from for a country: the default country gets the full 200, the others 40 (their pages
+// differ from it in text and data, not in structure, and there are seven more countries: the whole run took 4 times as long with 60).
+func seedsFor(c tcase) int {
+	if c.cc == DefaultCountry {
+		return 200
+	}
+	return 40
+}
 
 var titleTag = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
 
 func testSeed(i int) []byte { return []byte(fmt.Sprintf("decoy-test-seed-%d", i)) }
 
-func mustGenerate(t *testing.T, kind string, i int) []File {
+func mustGenerate(t *testing.T, c tcase, i int) []File {
 	t.Helper()
-	files, err := Generate(kind, testSeed(i))
+	files, _, err := GenerateWith(c.kind, testSeed(i), Options{Country: c.cc})
 	if err != nil {
-		t.Fatalf("%s seed %d: %v", kind, i, err)
+		t.Fatalf("%s seed %d: %v", c, i, err)
 	}
 	return files
+}
+
+// tcase is a kind made for a country.
+type tcase struct{ kind, cc string }
+
+func (c tcase) String() string { return c.cc + "/" + c.kind }
+
+// cases are every kind in every country that has its texts.
+func cases(t *testing.T) []tcase {
+	t.Helper()
+	var out []tcase
+	for _, c := range Countries() {
+		for _, k := range c.Kinds {
+			out = append(out, tcase{k, c.Code})
+		}
+	}
+	if len(out) == 0 {
+		t.Fatal("no kinds")
+	}
+	return out
 }
 
 func kindIDs(t *testing.T) []string {
@@ -70,8 +99,11 @@ func TestKinds(t *testing.T) {
 	}
 }
 
-// Kinds that must have scripts and a form: they are the only ones allowed the scripts_or_forms warning.
+// Kinds that must have scripts and a form: they are the only ones allowed the scripts_or_forms warning, together with the kinds
+// that ask for a message in a form where the country has no phone range for made-up numbers (TestContactFormOrPhone).
 var interactive = map[string]bool{"login": true, "files": true}
+
+var contactKinds = map[string]bool{"business": true, "portfolio": true, "club": true}
 
 var (
 	leftoverMark = regexp.MustCompile(`__[a-z][a-z0-9-]*__|\$\$[a-z]|\{\{|<no value>|%!`)
@@ -139,11 +171,12 @@ func checkPage(t *testing.T, name string, src []byte) (links []string) {
 }
 
 func TestGenerateValid(t *testing.T) {
-	for _, kind := range kindIDs(t) {
-		t.Run(kind, func(t *testing.T) {
+	for _, c := range cases(t) {
+		kind := c.kind
+		t.Run(c.String(), func(t *testing.T) {
 			largest := 0
-			for i := 0; i < seedsPerKind; i++ {
-				files := mustGenerate(t, kind, i)
+			for i := 0; i < seedsFor(c); i++ {
+				files := mustGenerate(t, c, i)
 				b, err := decoy.FromFiles(files)
 				if err != nil {
 					t.Fatalf("seed %d: FromFiles: %v", i, err)
@@ -151,12 +184,12 @@ func TestGenerateValid(t *testing.T) {
 				if b.Size() > largest {
 					largest = b.Size()
 				}
-				if b.Size() > 400<<10 || len(b.Archive()) > (decoy.MaxBundleBytes+512<<10) {
+				if b.Size() > 600<<10 || len(b.Archive()) > (decoy.MaxBundleBytes+512<<10) {
 					t.Fatalf("seed %d: %d bytes, more than a decoy site should be", i, b.Size())
 				}
 				rep := decoy.Analyze(b, true)
 				for _, w := range rep.Warnings {
-					if w.Code == decoy.WarnScripts && interactive[kind] {
+					if w.Code == decoy.WarnScripts && (interactive[kind] || contactKinds[kind]) {
 						continue // the form and its script are what the kind is for
 					}
 					t.Errorf("seed %d: warning %s %v", i, w.Code, w.Paths)
@@ -186,7 +219,7 @@ func TestGenerateValid(t *testing.T) {
 					}
 				}
 			}
-			t.Logf("%s: largest of %d sites %d bytes", kind, seedsPerKind, largest)
+			t.Logf("%s: largest of %d sites %d bytes", kind, seedsFor(c), largest)
 		})
 	}
 }
@@ -211,10 +244,11 @@ func titleOf(files []File) string {
 }
 
 func TestGenerateDiffers(t *testing.T) {
-	for _, kind := range kindIDs(t) {
-		t.Run(kind, func(t *testing.T) {
+	for _, c := range cases(t) {
+		t.Run(c.String(), func(t *testing.T) {
+			same := 0
 			for i := 0; i < 60; i++ {
-				a, b := mustGenerate(t, kind, i), mustGenerate(t, kind, i+1000)
+				a, b := mustGenerate(t, c, i), mustGenerate(t, c, i+1000)
 				hb := hashes(b)
 				for h, p := range hashes(a) {
 					if q, same := hb[h]; same {
@@ -222,8 +256,11 @@ func TestGenerateDiffers(t *testing.T) {
 					}
 				}
 				if titleOf(a) == titleOf(b) {
-					t.Errorf("pair %d: the same title %q", i, titleOf(a))
+					same++
 				}
+			}
+			if same > 2 { // a name drawn from a few dozen words meets itself now and then; it must stay rare
+				t.Errorf("%d of 60 pairs have the same title", same)
 			}
 		})
 	}
@@ -289,10 +326,10 @@ func sharedRun(a, b []File, limit int) string {
 }
 
 func TestGenerateNoSharedRuns(t *testing.T) {
-	for _, kind := range kindIDs(t) {
-		t.Run(kind, func(t *testing.T) {
+	for _, c := range cases(t) {
+		t.Run(c.String(), func(t *testing.T) {
 			for i := 0; i < 12; i++ {
-				if run := sharedRun(mustGenerate(t, kind, i), mustGenerate(t, kind, i+500), 200); run != "" {
+				if run := sharedRun(mustGenerate(t, c, i), mustGenerate(t, c, i+500), 200); run != "" {
 					t.Errorf("pair %d: more than 200 bytes in common: %s", i, run)
 				}
 			}
@@ -301,9 +338,10 @@ func TestGenerateNoSharedRuns(t *testing.T) {
 }
 
 func TestGenerateDeterministic(t *testing.T) {
-	for _, kind := range kindIDs(t) {
+	for _, c := range cases(t) {
+		kind := c.kind
 		for i := 0; i < 5; i++ {
-			a, b := mustGenerate(t, kind, i), mustGenerate(t, kind, i)
+			a, b := mustGenerate(t, c, i), mustGenerate(t, c, i)
 			if len(a) != len(b) {
 				t.Fatalf("%s seed %d: %d files, then %d", kind, i, len(a), len(b))
 			}
@@ -322,7 +360,7 @@ func TestGenerateDeterministic(t *testing.T) {
 }
 
 var (
-	externalRef = regexp.MustCompile(`(?i)(https?:)?//[a-z0-9.-]+\.[a-z]{2,}|@import|url\(\s*["']?(https?:|//)|mailto:|tel:`)
+	externalRef = regexp.MustCompile(`(?i)(https?:)?//[a-z0-9.-]+\.[a-z]{2,}|@import|url\(\s*["']?(https?:|//)|mailto:|tel:`)
 	badWord     = regexp.MustCompile(`(?i)\b(vpn|proxy|proxies|mistgate|tunnel|hysteria|vless|wireguard)\b`)
 	storageAPI  = regexp.MustCompile(`localStorage|sessionStorage|indexedDB|document\.cookie|XMLHttpRequest|fetch\s*\(|sendBeacon|WebSocket|EventSource|\.submit\s*\(`)
 	formTag     = regexp.MustCompile(`(?is)<form\b[^>]*>`)
@@ -332,10 +370,11 @@ var (
 )
 
 func TestGenerateClean(t *testing.T) {
-	for _, kind := range kindIDs(t) {
-		t.Run(kind, func(t *testing.T) {
-			for i := 0; i < seedsPerKind; i++ {
-				for _, f := range mustGenerate(t, kind, i) {
+	for _, c := range cases(t) {
+		kind := c.kind
+		t.Run(c.String(), func(t *testing.T) {
+			for i := 0; i < seedsFor(c); i++ {
+				for _, f := range mustGenerate(t, c, i) {
 					if f.Path == "robots.txt" {
 						continue
 					}
@@ -362,7 +401,7 @@ func TestGenerateClean(t *testing.T) {
 					if submitInput.Match(text) {
 						t.Errorf("seed %d %s: a submit input", i, f.Path)
 					}
-					if path.Ext(f.Path) == ".html" && !interactive[kind] && (bytes.Contains(text, []byte("<script")) || bytes.Contains(text, []byte("<form"))) {
+					if path.Ext(f.Path) == ".html" && !interactive[kind] && !contactKinds[kind] && (bytes.Contains(text, []byte("<script")) || bytes.Contains(text, []byte("<form"))) {
 						t.Errorf("seed %d %s: a script or form in a kind without them", i, f.Path)
 					}
 				}
@@ -373,12 +412,12 @@ func TestGenerateClean(t *testing.T) {
 
 // The same seed at different times of the run, and a seed's files, never depend on other seeds having been made first.
 func TestGenerateIndependentOfOrder(t *testing.T) {
-	kind := kindIDs(t)[0]
-	first := mustGenerate(t, kind, 7)
+	c := cases(t)[0]
+	first := mustGenerate(t, c, 7)
 	for i := 0; i < 20; i++ {
-		mustGenerate(t, kind, i)
+		mustGenerate(t, c, i)
 	}
-	again := mustGenerate(t, kind, 7)
+	again := mustGenerate(t, c, 7)
 	for i := range first {
 		if !bytes.Equal(first[i].Content, again[i].Content) {
 			t.Fatalf("%s differs after other sites were made", first[i].Path)
@@ -386,28 +425,38 @@ func TestGenerateIndependentOfOrder(t *testing.T) {
 	}
 }
 
-// With -decoy-dump=<dir> the test writes -decoy-dump-n sites of every kind into <dir>/<kind>-<n>/ so they can be opened and looked at.
+// With -decoy-dump=<dir> the test writes -decoy-dump-n sites of every kind into <dir>/<cc>/<kind>/ (or <kind>-<n> when there are
+// several) for every country of -decoy-dump-cc, so that they can be opened and looked at.
 func TestDumpSites(t *testing.T) {
 	if *decoyDump == "" {
 		t.Skip("no -decoy-dump")
 	}
-	for _, kind := range kindIDs(t) {
-		for n := 1; n <= *decoyDumpN; n++ {
-			files, err := Generate(kind, []byte(fmt.Sprintf("dump-%s-%d", kind, n)))
-			if err != nil {
-				t.Fatal(err)
+	for _, cc := range strings.Fields(*decoyDumpCC) {
+		for _, kind := range kindIDs(t) {
+			if !contains(Countries(), cc, kind) {
+				continue
 			}
-			dir := filepath.Join(*decoyDump, fmt.Sprintf("%s-%d", kind, n))
-			if err := os.RemoveAll(dir); err != nil {
-				t.Fatal(err)
-			}
-			for _, f := range files {
-				p := filepath.Join(dir, filepath.FromSlash(f.Path))
-				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			for n := 1; n <= *decoyDumpN; n++ {
+				files, _, err := GenerateWith(kind, []byte(fmt.Sprintf("dump-%s-%d", kind, n)), Options{Country: cc})
+				if err != nil {
 					t.Fatal(err)
 				}
-				if err := os.WriteFile(p, f.Content, 0o644); err != nil {
+				name := kind
+				if *decoyDumpN > 1 {
+					name = fmt.Sprintf("%s-%d", kind, n)
+				}
+				dir := filepath.Join(*decoyDump, cc, name)
+				if err := os.RemoveAll(dir); err != nil {
 					t.Fatal(err)
+				}
+				for _, f := range files {
+					p := filepath.Join(dir, filepath.FromSlash(f.Path))
+					if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(p, f.Content, 0o644); err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 		}

@@ -1,0 +1,228 @@
+{
+ "ui": {
+  "nav_label": "Main",
+  "tagline": "Service status",
+  "footer": "All times are shown in UTC.",
+  "nav_home": "Status",
+  "nav_history": "Incident history",
+  "nav_about": "About",
+  "home_title": "Current status",
+  "desc": "Current status and uptime of the {brand} services.",
+  "desc_history": "Past incidents at {brand} and how they were resolved.",
+  "desc_about": "How {brand} measures uptime and reports incidents.",
+  "nf_title": "Page not found",
+  "nf_text": "There is nothing at this address. The status page is on the start page.",
+  "nf_back": "Go to the status page",
+  "banner_ok": "All systems operational",
+  "banner_sub": "Every {brand} service is running normally.",
+  "comps_h": "Services",
+  "op": "Operational",
+  "up_label": "uptime",
+  "days_ago_l": "60 days ago",
+  "days_ago_r": "Today",
+  "m_uptime": "Uptime, last 90 days",
+  "m_resp": "Median response time",
+  "m_inc": "Incidents on record",
+  "recent_h": "Recent incidents",
+  "all_inc": "Full incident history",
+  "history_h": "Incident history",
+  "history_intro": "What went wrong in the past months and how it was fixed, newest first.",
+  "st_inv": "Investigating",
+  "st_ident": "Identified",
+  "st_res": "Resolved",
+  "imp_minor": "Minor",
+  "imp_major": "Major",
+  "imp_maint": "Maintenance",
+  "dur_l": "Duration",
+  "about_h": "About this page",
+  "about": [
+   {
+    "h": "What this page shows",
+    "p": "This page shows the live state of the {brand} services and a record of past incidents. It is kept up to date by the team that runs them."
+   },
+   {
+    "h": "How uptime is measured",
+    "p": "Every service is checked from several places once a minute. A minute counts as down when more than half of the checks fail."
+   },
+   {
+    "h": "How we report incidents",
+    "p": "We post an update when we start looking into a problem, when we find the cause and when it is resolved. Larger incidents get a short write-up afterwards."
+   },
+   {
+    "h": "Planned maintenance",
+    "p": "Planned work is announced here at least three days ahead and takes place at quiet hours."
+   }
+  ],
+  "incidents": [
+   {
+    "title": "Elevated error rates",
+    "impact": "major",
+    "dur": "38 minutes",
+    "a": "We are seeing a higher than usual rate of failed requests and are looking into the cause.",
+    "b": "A faulty configuration change was found and is being rolled back.",
+    "c": "The change was rolled back and error rates are back to normal. We will review how it got through."
+   },
+   {
+    "title": "Delayed notifications",
+    "impact": "minor",
+    "dur": "1 hour 12 minutes",
+    "a": "Notifications are being delivered with a delay of several minutes.",
+    "b": "A backlog in the queue that handles notifications was found.",
+    "c": "The backlog has been cleared and delivery times are normal again."
+   },
+   {
+    "title": "Slow page loads",
+    "impact": "minor",
+    "dur": "26 minutes",
+    "a": "Some users report that pages load slowly. We are investigating.",
+    "b": "A database node was running hot and has been taken out of rotation.",
+    "c": "Page load times have returned to normal."
+   },
+   {
+    "title": "Scheduled maintenance overran",
+    "impact": "maint",
+    "dur": "40 minutes longer than planned",
+    "a": "Maintenance on our primary database is taking longer than planned.",
+    "b": "The final step of the upgrade needs a few more minutes to finish.",
+    "c": "Maintenance is complete and all services are running normally."
+   },
+   {
+    "title": "Partial outage in one region",
+    "impact": "major",
+    "dur": "54 minutes",
+    "a": "Users in one region cannot reach the service. We are working with our hosting provider.",
+    "b": "The provider has confirmed a network fault affecting our servers in that region.",
+    "c": "The network fault is fixed and the region is serving traffic again."
+   },
+   {
+    "title": "Search results out of date",
+    "impact": "minor",
+    "dur": "2 hours 5 minutes",
+    "a": "New items are not showing up in search results.",
+    "b": "The indexing job stopped after a failed deployment and has been restarted.",
+    "c": "Indexing has caught up and search is up to date."
+   },
+   {
+    "title": "Login failures for some users",
+    "impact": "major",
+    "dur": "19 minutes",
+    "a": "Some users are unable to sign in. Others are not affected.",
+    "b": "An expired certificate in the sign-in service was identified.",
+    "c": "The certificate was replaced and sign-in works for everyone again."
+   },
+   {
+    "title": "Uploads failing intermittently",
+    "impact": "minor",
+    "dur": "47 minutes",
+    "a": "A small share of uploads fail and need to be retried.",
+    "b": "A storage node with a full disk was identified.",
+    "c": "Capacity was added and uploads are succeeding again."
+   },
+   {
+    "title": "Slow API responses",
+    "impact": "minor",
+    "dur": "31 minutes",
+    "a": "Some requests to the API take longer than usual to answer. We are looking into it.",
+    "b": "A background job was using too much memory on one of the servers.",
+    "c": "The job was restarted with a memory limit and response times are back to normal."
+   },
+   {
+    "title": "Webhook deliveries delayed",
+    "impact": "minor",
+    "dur": "52 minutes",
+    "a": "Webhooks are reaching their destinations several minutes late.",
+    "b": "The queue that sends them was waiting on a slow connection to the database.",
+    "c": "The connection was restored, the queue has been cleared and webhooks are on time again."
+   },
+   {
+    "title": "Dashboard unavailable",
+    "impact": "major",
+    "dur": "22 minutes",
+    "a": "The dashboard shows an error page for everyone. Other services are not affected.",
+    "b": "A recent release contained a fault in its start-up code, and we have found it.",
+    "c": "The release was rolled back and the dashboard is available again."
+   },
+   {
+    "title": "Planned maintenance: database upgrade",
+    "impact": "maint",
+    "dur": "1 hour",
+    "a": "Planned maintenance is under way. Some features are read-only until it is done.",
+    "b": "The upgrade is half finished and going as planned.",
+    "c": "Maintenance is complete and everything is working normally."
+   }
+  ],
+  "inc_back": "Incident history",
+  "inc_more": "Other incidents",
+  "status_l": "Status",
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Bright",
+      "Kestrel",
+      "Northwind",
+      "Cobalt",
+      "Tidal",
+      "Ember",
+      "Juniper",
+      "Lumen",
+      "Sable",
+      "Fable",
+      "Wren",
+      "Quartz"
+     ],
+     [
+      "stack",
+      "base",
+      "works",
+      "cloud",
+      "loop",
+      "desk",
+      "hub",
+      "gate",
+      "ly",
+      "kit"
+     ]
+    ]
+   }
+  }
+ },
+ "bundles": {
+  "saas": {
+   "components": [
+    "Public API",
+    "Dashboard",
+    "Webhooks",
+    "Authentication",
+    "Background jobs",
+    "Data exports",
+    "Billing",
+    "Documentation site"
+   ]
+  },
+  "photos": {
+   "components": [
+    "Image uploads",
+    "Image delivery",
+    "Albums and sharing",
+    "Web app",
+    "Mobile sync",
+    "Search",
+    "Notifications",
+    "Account and sign-in"
+   ]
+  },
+  "mail": {
+   "components": [
+    "Email delivery",
+    "SMS delivery",
+    "Message templates",
+    "Delivery reports",
+    "REST API",
+    "Dashboard",
+    "Unsubscribe pages",
+    "Scheduling"
+   ]
+  }
+ }
+}

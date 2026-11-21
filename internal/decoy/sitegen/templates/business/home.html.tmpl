@@ -3,18 +3,18 @@
 </section>{{end}}
 {{define "b_prices"}}<section class="__sec__">
 <h2>{{.L.services_h}}</h2>
-<ul class="__price__">{{range $i, $s := .L.services}}{{if lt $i 3}}<li><div><strong>{{$s.t}}</strong><span>{{$s.d}}</span></div><em>{{$s.p}}</em></li>{{end}}{{end}}</ul>
+<ul class="__price__">{{range $i, $s := .L.services}}{{if lt $i 3}}<li><div><strong>{{$s.t}}</strong><span>{{$s.d}}</span></div><em>{{if $s.from}}{{$.L.from_l}} {{end}}{{money $s.price}}</em></li>{{end}}{{end}}</ul>
 <p><a href="{{(index .Nav 1).Href}}">{{.L.all_prices}} {{icon "arrow"}}</a></p>
 </section>{{end}}
 {{define "b_visit"}}<section class="__sec__ __visit__">
 <div class="__card__">
 <h2>{{.L.visit_h}}</h2>
-<p>{{icon "pin"}} {{.V.n}} {{.V.street}}, {{.V.city}}</p>
-<p>{{icon "phone"}} 555-0{{.V.ph}}</p>
-</div>
+<p>{{icon "pin"}} {{.V.address}}</p>
+{{if .V.phone}}<p>{{icon "phone"}} {{.V.phone}}</p>
+{{end}}</div>
 <div class="__card__">
 <h2>{{.L.hours_h}}</h2>
-<ul class="__hours__">{{range .L.hours}}<li>{{.}}</li>{{end}}</ul>
+<ul class="__hours__">{{range .L.hours}}<li>{{hrs .from .to .open .close}}</li>{{end}}{{if .L.hours_note}}<li>{{.L.hours_note}}</li>{{end}}</ul>
 </div>
 </section>{{end}}
 {{template "head" .}}<body>

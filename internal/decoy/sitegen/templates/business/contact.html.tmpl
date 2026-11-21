@@ -6,17 +6,21 @@
 <section class="__visit__">
 <div class="__card__">
 <h2>{{.L.address_l}}</h2>
-<p>{{icon "pin"}} {{.V.n}} {{.V.street}}, {{.V.city}}</p>
-<h2>{{.L.phone_l}}</h2>
-<p>{{icon "phone"}} 555-0{{.V.ph}}</p>
-</div>
+<p>{{icon "pin"}} {{.V.address}}</p>
+{{if .V.phone}}<h2>{{.L.phone_l}}</h2>
+<p>{{icon "phone"}} {{.V.phone}}</p>
+{{end}}</div>
 <div class="__card__">
 <h2>{{.L.hours_h}}</h2>
-<ul class="__hours__">{{range .L.hours}}<li>{{.}}</li>{{end}}</ul>
+<ul class="__hours__">{{range .L.hours}}<li>{{hrs .from .to .open .close}}</li>{{end}}{{if .L.hours_note}}<li>{{.L.hours_note}}</li>{{end}}</ul>
 </div>
 </section>
+<h2>{{.L.directions_h}}</h2>
+<p>{{.L.directions}}</p>
 <p class="__mu__">{{.L.contact_note}}</p>
-</main>
+{{if not .V.phone}}{{template "contactform" .}}
+<script src="{{.JS}}" defer></script>
+{{end}}</main>
 {{template "footer" .}}
 </body>
 </html>

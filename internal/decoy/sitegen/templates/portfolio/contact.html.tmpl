@@ -5,18 +5,22 @@
 <div class="__two__">
 <section class="__card__">
 <h2>{{.L.visit_h}}</h2>
-<p>{{icon "pin"}} {{.V.n}} Mill Lane, {{.V.city}}</p>
-<p>{{icon "phone"}} {{.L.phone_l}}: 555-0{{.V.ph}}</p>
-<h3>{{.L.hours_h}}</h3>
-<ul>{{range .L.hours}}<li>{{.}}</li>{{end}}</ul>
+<p>{{icon "pin"}} {{.V.address}}</p>
+{{if .V.phone}}<p>{{icon "phone"}} {{.L.phone_l}}: {{.V.phone}}</p>
+{{end}}<h3>{{.L.hours_h}}</h3>
+<ul>{{range .L.hours}}<li>{{hrs .from .to .open .close}}</li>{{end}}<li>{{.L.hours_note}}</li></ul>
 </section>
 <section>
 <p>{{.L.visit_text}}</p>
 <h2>{{.L.commission_h}}</h2>
 <p>{{.L.commission_text}}</p>
+<h2>{{.L.directions_h}}</h2>
+<p>{{.L.directions}}</p>
 </section>
 </div>
-</main>
+{{if not .V.phone}}{{template "contactform" .}}
+<script src="{{.JS}}" defer></script>
+{{end}}</main>
 {{template "footer" .}}
 </body>
 </html>

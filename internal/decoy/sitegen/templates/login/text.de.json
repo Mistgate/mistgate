@@ -1,0 +1,119 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Nord",
+      "Lind",
+      "Eich",
+      "Berg",
+      "Wald",
+      "Brunn",
+      "Rosen",
+      "Linden"
+     ],
+     [
+      "feld",
+      "tal",
+      "hof",
+      "werk",
+      "blick",
+      "stein",
+      "wiese",
+      "bach"
+     ]
+    ]
+   }
+  },
+  "nav_label": "Hauptmenü",
+  "tagline": "Sicherer Kontozugang",
+  "footer": "Alle Rechte vorbehalten.",
+  "nav_home": "Anmelden",
+  "nav_help": "Hilfe",
+  "nav_privacy": "Datenschutz",
+  "home_title": "Anmelden",
+  "desc": "Melden Sie sich bei Ihrem Konto bei {brand} an.",
+  "desc_help": "Hilfe bei der Anmeldung bei {brand}.",
+  "desc_privacy": "Wie {brand} mit Ihren Daten umgeht.",
+  "nf_title": "Seite nicht gefunden",
+  "nf_text": "Die gesuchte Seite existiert nicht oder wurde verschoben.",
+  "nf_back": "Zur Anmeldung",
+  "f_user": "Benutzername oder E-Mail",
+  "f_pass": "Passwort",
+  "f_remember": "Angemeldet bleiben",
+  "f_forgot": "Passwort vergessen?",
+  "f_submit": "Anmelden",
+  "f_busy": "Anmeldung läuft …",
+  "e_empty": "Bitte geben Sie Benutzername und Passwort ein.",
+  "e_bad": [
+   "Benutzername oder Passwort ist falsch.",
+   "Die Anmeldedaten sind nicht korrekt. Bitte versuchen Sie es erneut."
+  ],
+  "help_h": "Probleme bei der Anmeldung?",
+  "help_intro": "Die meisten Anmeldeprobleme haben eine einfache Ursache. Gehen Sie diese Schritte durch, bevor Sie sich an jemanden wenden.",
+  "help_steps": [
+   "Prüfen Sie, ob die Feststelltaste aktiviert ist; Passwörter unterscheiden Groß- und Kleinschreibung.",
+   "Achten Sie auf ein Leerzeichen am Anfang oder Ende des Benutzernamens.",
+   "Versuchen Sie es in einem neuen Browserfenster ohne gespeicherte Formulardaten.",
+   "Warten Sie zehn Minuten, wenn Sie es mehrmals vergeblich versucht haben."
+  ],
+  "help_contact_h": "Immer noch kein Zugang?",
+  "help_contact": "Bitten Sie die Person, die {brand} in Ihrer Organisation verwaltet, Ihr Passwort zurückzusetzen. Aus Sicherheitsgründen geschieht das weder am Telefon noch per E-Mail.",
+  "help_back": "Zurück zur Anmeldung",
+  "privacy_h": "Datenschutzhinweis",
+  "privacy_intro": "Wir speichern so wenig wie möglich über Sie und gehen mit dem Gespeicherten sorgfältig um. Hier steht kurz, was das ist und warum.",
+  "privacy": [
+   {
+    "h": "Was wir speichern",
+    "p": "Ihren Benutzernamen, Ihre Anmeldezeiten und die Angaben, die zu Ihrem Konto gehören. Mehr nicht."
+   },
+   {
+    "h": "Wofür wir es nutzen",
+    "p": "Damit Sie sich anmelden können und wir Ihr Konto vor Fremden schützen können. Wir verkaufen keine Daten unserer Nutzer."
+   },
+   {
+    "h": "Cookies",
+    "p": "Wir verwenden nur die Cookies, die der Dienst zum Funktionieren braucht. Werbe- oder Analyse-Cookies gibt es nicht."
+   },
+   {
+    "h": "Ihre Rechte",
+    "p": "Sie können Auskunft, Berichtigung oder Löschung Ihrer Daten verlangen. Wenden Sie sich an die Verwaltung Ihres Kontos."
+   }
+  ]
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Kundenkonto",
+   "welcome": "Willkommen zurück",
+   "lead": "Melden Sie sich an, um Rechnungen einzusehen, Ihre Daten zu ändern und Ihren Tarif zu verwalten.",
+   "bullets": [
+    "Rechnungen ansehen und laden",
+    "Kontaktdaten ändern",
+    "Offene Anfragen verfolgen"
+   ]
+  },
+  "staff": {
+   "kicker": "Mitarbeiterbereich",
+   "welcome": "Anmeldung für Mitarbeitende",
+   "lead": "Mit Ihrem Arbeitskonto erreichen Sie Dienstpläne, Mitteilungen und gemeinsame Dokumente.",
+   "bullets": [
+    "Dienstpläne",
+    "Mitteilungen des Teams",
+    "Gemeinsame Dokumente"
+   ],
+   "f_user": "Personalnummer oder E-Mail"
+  },
+  "learning": {
+   "kicker": "Lernplattform",
+   "welcome": "Melden Sie sich in Ihrem Klassenraum an",
+   "lead": "Schülerinnen, Schüler, Eltern und Lehrkräfte finden hier Stundenpläne, Hausaufgaben und Nachrichten.",
+   "bullets": [
+    "Stundenpläne und Hausaufgaben",
+    "Nachrichten der Lehrkräfte",
+    "Termine und Ausflüge"
+   ],
+   "f_user": "Benutzername"
+  }
+ }
+}

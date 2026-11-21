@@ -1,0 +1,108 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Björk",
+      "Ek",
+      "Lind",
+      "Strand",
+      "Fjäll",
+      "Ängs",
+      "Klint",
+      "Rönn"
+     ],
+     [
+      "vik",
+      "holm",
+      "berg",
+      "gård",
+      "näs",
+      "udde",
+      "lund",
+      "sund"
+     ]
+    ]
+   }
+  },
+  "nav_label": "Huvudmeny",
+  "tagline": "Säker inloggning",
+  "footer": "Alla rättigheter förbehållna.",
+  "nav_home": "Logga in",
+  "nav_help": "Hjälp",
+  "nav_privacy": "Integritet",
+  "home_title": "Logga in",
+  "desc": "Logga in på ditt konto hos {brand}.",
+  "desc_help": "Hjälp med att logga in hos {brand}.",
+  "desc_privacy": "Så hanterar {brand} dina uppgifter.",
+  "nf_title": "Sidan hittades inte",
+  "nf_text": "Sidan du söker finns inte eller har flyttats.",
+  "nf_back": "Tillbaka till inloggningen",
+  "f_user": "Användarnamn eller e-post",
+  "f_pass": "Lösenord",
+  "f_remember": "Håll mig inloggad",
+  "f_forgot": "Glömt lösenordet?",
+  "f_submit": "Logga in",
+  "f_busy": "Loggar in …",
+  "e_empty": "Fyll i både användarnamn och lösenord.",
+  "e_bad": [
+   "Fel användarnamn eller lösenord.",
+   "Uppgifterna stämmer inte. Försök igen."
+  ],
+  "help_h": "Problem med att logga in?",
+  "help_intro": "De flesta inloggningsproblem har en enkel orsak. Gå igenom stegen nedan innan du kontaktar någon.",
+  "help_steps": [
+   "Kontrollera att Caps Lock inte är på; lösenord skiljer mellan stora och små bokstäver.",
+   "Se upp med ett mellanslag i början eller slutet av användarnamnet.",
+   "Prova i ett nytt webbläsarfönster utan sparade formulärdata.",
+   "Vänta tio minuter om du har försökt flera gånger utan resultat."
+  ],
+  "help_contact_h": "Kommer du fortfarande inte in?",
+  "help_contact": "Be den som administrerar {brand} för din organisation att återställa ditt lösenord. Av säkerhetsskäl görs det varken per telefon eller e-post.",
+  "help_back": "Tillbaka till inloggningen",
+  "privacy_h": "Integritetspolicy",
+  "privacy_intro": "Vi sparar så lite som möjligt om dig och tar hand om det vi sparar. Här står kort vad det är och varför.",
+  "privacy": [
+   {
+    "h": "Vad vi sparar",
+    "p": "Ditt användarnamn, dina inloggningstider och de uppgifter som hör till ditt konto. Inget mer."
+   },
+   {
+    "h": "Vad vi använder det till",
+    "p": "För att du ska kunna logga in och för att vi ska kunna skydda ditt konto från andra. Vi säljer inga uppgifter om våra användare."
+   },
+   {
+    "h": "Cookies",
+    "p": "Vi använder bara de cookies som tjänsten behöver för att fungera. Det finns inga reklam- eller analyscookies."
+   },
+   {
+    "h": "Dina rättigheter",
+    "p": "Du kan begära utdrag, rättelse eller radering av dina uppgifter. Kontakta den som administrerar ditt konto."
+   }
+  ]
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Kundkonto",
+   "welcome": "Välkommen tillbaka",
+   "lead": "Logga in för att se fakturor, ändra dina uppgifter och hantera ditt abonnemang.",
+   "bullets": [
+    "Se och ladda ner fakturor",
+    "Ändra kontaktuppgifter",
+    "Följ pågående ärenden"
+   ]
+  },
+  "staff": {
+   "kicker": "Personalyta",
+   "welcome": "Inloggning för personal",
+   "lead": "Med ditt arbetskonto når du scheman, meddelanden och delade dokument.",
+   "bullets": [
+    "Scheman",
+    "Meddelanden till teamet",
+    "Delade dokument"
+   ],
+   "f_user": "Anställningsnummer eller e-post"
+  }
+ }
+}

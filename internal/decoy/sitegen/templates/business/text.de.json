@@ -1,0 +1,275 @@
+{
+ "ui": {
+  "nav_label": "Hauptmenü",
+  "footer": "Unabhängig und aus der Nachbarschaft.",
+  "nav_home": "Start",
+  "nav_about": "Über uns",
+  "nav_contact": "So finden Sie uns",
+  "home_title": "Willkommen",
+  "nf_title": "Seite nicht gefunden",
+  "nf_text": "Diese Seite haben wir nicht gefunden. Vielleicht ist sie umgezogen, oder wir hatten sie nie.",
+  "nf_back": "Zurück zur Startseite",
+  "see_services": "Unser Angebot ansehen",
+  "all_prices": "Alle Preise",
+  "visit_h": "Besuchen Sie uns",
+  "hours_h": "Öffnungszeiten",
+  "address_l": "Adresse",
+  "phone_l": "Telefon",
+  "about_h": "Über uns",
+  "services_h": "Unser Angebot",
+  "services_intro": "Die Preise sind Richtwerte; wir besprechen gern in Ruhe, was Sie brauchen.",
+  "contact_h": "So finden Sie uns",
+  "contact_intro": "Kommen Sie in den Öffnungszeiten vorbei oder melden Sie sich bei uns. Wir besprechen gern, was Sie brauchen, bevor Sie sich entscheiden.",
+  "contact_note": "Am leichtesten parken Sie in der nächsten Straße. Ist die Tür in den Öffnungszeiten geschlossen, sind wir vermutlich hinten beschäftigt; klopfen Sie und warten Sie einen Moment.",
+  "from_l": "ab",
+  "col_service": "Leistung",
+  "col_desc": "Was dazugehört",
+  "col_price": "Preis",
+  "hours_note": "",
+  "directions_h": "So kommen Sie zu uns",
+  "directions": "Sie finden uns hier: {address}. Vom Zentrum sind es nur ein paar Schritte, und neben der Tür steht ein Fahrradständer.",
+  "services_note": "Wenn eine Arbeit mehr kostet als angegeben, fragen wir vorher bei Ihnen nach."
+ },
+ "bundles": {
+  "bakery": {
+   "tagline": "Brot und Kuchen, gebacken in {city}",
+   "nav_services": "Unser Gebäck",
+   "desc": "Eine Bäckerei in der Nachbarschaft in {city}: Sauerteigbrot, Brötchen und Kuchen, jeden Morgen frisch gebacken.",
+   "desc_services": "Brot, Brötchen und Kuchen mit Preisen.",
+   "desc_about": "Die Geschichte von {brand}, einer kleinen Bäckerei in {city}.",
+   "desc_contact": "Öffnungszeiten und Adresse von {brand} in {city}.",
+   "hero_h": "Brot, das sich Zeit nimmt",
+   "intro": "Eine kleine Bäckerei im Viertel. Sauerteigbrot, Brötchen und Kuchen, jeden Morgen gebacken, bevor der Laden öffnet.",
+   "about": [
+    "{brand} begann in einer gemieteten Küche hinter einem Laden in {city}, mit einem Ofen und ziemlich viel Zuversicht.",
+    "Wir backen immer noch in kleinen Mengen, mit Mehl aus einer Mühle, eine Stunde talabwärts, und mit einem Sauerteig, der älter ist als unser jüngster Bäcker.",
+    "Kommen Sie früh für die Brötchen, bleiben Sie für den Kaffee, und sagen Sie uns, wenn Ihr Brot nicht gelungen war. Wir wollen es wissen."
+   ],
+   "features": [
+    {
+     "h": "Jeden Morgen frisch",
+     "p": "Nichts wird von gestern aufgehoben."
+    },
+    {
+     "h": "Ehrliche Zutaten",
+     "p": "Mehl, Wasser, Salz und Zeit."
+    },
+    {
+     "h": "Bestellungen willkommen",
+     "p": "Torten und größere Bestellungen nach Absprache."
+    }
+   ],
+   "services": [
+    {
+     "t": "Landbrot mit Sauerteig",
+     "d": "Langsam gegangen, mit dicker Kruste und weicher, offener Krume."
+    },
+    {
+     "t": "Roggenbrot mit Saaten",
+     "d": "Dicht, dunkel und sehr gut mit Käse."
+    },
+    {
+     "t": "Frühstücksbrötchen, sechs Stück",
+     "d": "Weiche Brötchen, um fünf gebacken und meist vor zehn weg."
+    },
+    {
+     "t": "Kardamomschnecken",
+     "d": "Von Hand gedreht und noch warm glasiert."
+    },
+    {
+     "t": "Festtagstorte",
+     "d": "Bitte drei Tage vorher bestellen; wir besprechen die Sorten mit Ihnen."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Roggen",
+       "Honig",
+       "Hafer",
+       "Gersten",
+       "Fenchel",
+       "Krume",
+       "Ofen",
+       "Sonntags",
+       "Sesam",
+       "Pflaumen"
+      ],
+      [
+       "Spatz",
+       "Fink",
+       "Lerche",
+       "Drossel",
+       "Amsel",
+       "Meise",
+       "Schwalbe",
+       "Star"
+      ]
+     ],
+     "sep": " & "
+    }
+   }
+  },
+  "bike": {
+   "tagline": "Fahrradreparatur in {city}",
+   "nav_services": "Preise",
+   "desc": "Fahrradreparatur und Inspektion in {city}, während Sie warten oder bis zum nächsten Tag.",
+   "desc_services": "Reparaturen und Inspektionen für Fahrräder mit Preisen.",
+   "desc_about": "Über {brand}, eine kleine Fahrradwerkstatt in {city}.",
+   "desc_contact": "Öffnungszeiten und Adresse von {brand} in {city}.",
+   "hero_h": "Ihr Rad läuft wieder richtig",
+   "intro": "Eine kleine Werkstatt für Alltagsräder. Wir reparieren, was kaputt ist, stellen ein, was nicht ganz stimmt, und sagen ehrlich, was das Geld nicht wert ist.",
+   "about": [
+    "{brand} fing in einem Gartenhaus in {city} an, wo wir Nachbarn die Räder für den Preis eines Kaffees repariert haben.",
+    "Heute haben wir eine richtige Werkstatt, eine sehr lange Werkbank und eine Wand voller Ersatzteile, die nur wir verstehen. Wir reparieren immer noch lieber, als zu ersetzen.",
+    "Bringen Sie alles, was zwei Räder hat. Wenn wir es nicht reparieren können, sagen wir Ihnen, wer es kann."
+   ],
+   "features": [
+    {
+     "h": "Reparatur, während Sie warten",
+     "p": "Die meisten kleinen Reparaturen dauern weniger als eine Stunde."
+    },
+    {
+     "h": "Ehrliche Beratung",
+     "p": "Wir sagen es, wenn sich eine Reparatur nicht lohnt."
+    },
+    {
+     "h": "Inspektion bis morgen",
+     "p": "Morgens abgeben, am nächsten Tag abholen."
+    }
+   ],
+   "services": [
+    {
+     "t": "Platten flicken",
+     "d": "Schlauch ersetzt und geprüft, Mantel nach der Ursache abgesucht."
+    },
+    {
+     "t": "Kleine Inspektion",
+     "d": "Bremsen und Gänge eingestellt, Kette gereinigt und geölt, Reifen und Schrauben geprüft."
+    },
+    {
+     "t": "Große Inspektion",
+     "d": "Antrieb zerlegt, entfettet und neu aufgebaut, bei Bedarf mit neuen Zügen."
+    },
+    {
+     "t": "Laufrad zentrieren",
+     "d": "Seitenschlag beseitigt und Speichenspannung angeglichen."
+    },
+    {
+     "t": "Wintercheck",
+     "d": "Licht, Bremsen, Reifen und Schutzbleche, damit die dunklen Monate weniger riskant sind."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Speichen",
+       "Ketten",
+       "Ritzel",
+       "Pedal",
+       "Kurbel",
+       "Rad",
+       "Gang",
+       "Rahmen",
+       "Naben",
+       "Felgen"
+      ],
+      [
+       "werk",
+       "garage",
+       "schmiede",
+       "stube",
+       "bank",
+       "dienst",
+       "hof",
+       "ständer"
+      ]
+     ],
+     "sep": ""
+    }
+   }
+  },
+  "tailor": {
+   "tagline": "Änderungen und Reparaturen in {city}",
+   "nav_services": "Änderungen",
+   "desc": "Kleideränderungen und Reparaturen in {city}: Säume, Reißverschlüsse, Anproben und Ausbesserungen.",
+   "desc_services": "Änderungen und Reparaturen für Kleidung mit Preisen.",
+   "desc_about": "Über {brand}, eine kleine Änderungsschneiderei in {city}.",
+   "desc_contact": "Öffnungszeiten und Adresse von {brand} in {city}.",
+   "hero_h": "Kleidung, die länger passt",
+   "intro": "Säume, Reißverschlüsse, Anproben und Ausbesserungen, von Hand und mit der Maschine in einer kleinen Werkstatt über den Läden.",
+   "about": [
+    "{brand} ist eine Werkstatt zu zweit im ersten Stock eines Hauses in {city}, über einem Laden für Wolle.",
+    "Wir haben das Handwerk von Leuten gelernt, die es vierzig Jahre lang gemacht haben, und ein paar ihrer Gewohnheiten behalten, zum Beispiel immer zweimal zu stecken.",
+    "Wenn Sie nicht sicher sind, ob sich eine Änderung lohnt, bringen Sie das Stück vorbei. Wir sagen Ihnen ehrlich, was wir davon halten."
+   ],
+   "features": [
+    {
+     "h": "Mit Sorgfalt ausgebessert",
+     "p": "Jedes Stück wird zuerst gründlich angesehen."
+    },
+    {
+     "h": "Auf Sie angepasst",
+     "p": "Wir stecken an Ihnen, nicht an einer Puppe."
+    },
+    {
+     "h": "Fertig wie versprochen",
+     "p": "Wir nennen Ihnen einen Tag und halten ihn ein."
+    }
+   ],
+   "services": [
+    {
+     "t": "Hose oder Rock kürzen",
+     "d": "Auf Ihre Länge gesäumt, die ursprüngliche Verarbeitung bleibt, wo möglich, erhalten."
+    },
+    {
+     "t": "Jacke enger machen",
+     "d": "Seiten und Ärmel angepasst, damit sie richtig fällt."
+    },
+    {
+     "t": "Reißverschluss ersetzen",
+     "d": "In Farbe und Stärke abgestimmt und sauber eingenäht."
+    },
+    {
+     "t": "Mantelfutter ausbessern",
+     "d": "Ein gerissenes Futter ersetzt oder repariert, samt Taschen."
+    },
+    {
+     "t": "Stopfen und Flicken",
+     "d": "Sichtbar oder unsichtbar, ganz wie Sie möchten."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Nadel",
+       "Fingerhut",
+       "Knopf",
+       "Saum",
+       "Naht",
+       "Manschette",
+       "Kragen",
+       "Falte",
+       "Spulen",
+       "Borte"
+      ],
+      [
+       "& Faden",
+       "Änderungen",
+       "Schneiderei",
+       "Atelier",
+       "Nähstube",
+       "Anprobe",
+       "& Garn",
+       "Werkstatt"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

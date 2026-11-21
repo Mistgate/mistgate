@@ -1,0 +1,14 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<div class="__wrap__ __docs__">
+{{template "sidenav" .}}<article class="__doc__">
+<h1>{{.L.trouble_h}}</h1>
+<p class="__lede__">{{.L.trouble_intro}}</p>
+{{range .L.trouble}}<h2>{{.q}}</h2>
+<p>{{.a}}</p>
+{{end}}<p><a class="__btn__" href="{{(index .Nav 6).Href}}">{{.L.next}}: {{(index .Nav 6).Label}} {{icon "arrow"}}</a></p>
+</article>
+{{if eq .Layout 1}}{{template "facts" .}}{{end}}</div>
+{{template "footer" .}}
+</body>
+</html>

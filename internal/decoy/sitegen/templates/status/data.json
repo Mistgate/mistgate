@@ -1,73 +1,16 @@
 {
-  "ui": {
-    "en": {
-      "vars": {"brand": {"join": [["Bright", "Kestrel", "Northwind", "Cobalt", "Tidal", "Ember", "Juniper", "Lumen", "Sable", "Fable", "Wren", "Quartz"], ["stack", "base", "works", "cloud", "loop", "desk", "hub", "gate", "ly", "kit"]]}},
-      "nav_label": "Main", "tagline": "Service status", "footer": "All times are shown in UTC.",
-      "nav_home": "Status", "nav_history": "Incident history", "nav_about": "About", "home_title": "Current status",
-      "desc": "Current status and uptime of the {brand} services.", "desc_history": "Past incidents at {brand} and how they were resolved.", "desc_about": "How {brand} measures uptime and reports incidents.",
-      "nf_title": "Page not found", "nf_text": "There is nothing at this address. The status page is on the start page.", "nf_back": "Go to the status page",
-      "banner_ok": "All systems operational", "banner_sub": "Every {brand} service is running normally.",
-      "comps_h": "Services", "op": "Operational", "up_label": "uptime", "days_ago_l": "60 days ago", "days_ago_r": "Today",
-      "m_uptime": "Uptime, last 90 days", "m_resp": "Median response time", "m_inc": "Incidents on record",
-      "recent_h": "Recent incidents", "all_inc": "Full incident history",
-      "history_h": "Incident history", "history_intro": "What went wrong in the past months and how it was fixed, newest first.",
-      "st_inv": "Investigating", "st_ident": "Identified", "st_res": "Resolved",
-      "imp_minor": "Minor", "imp_major": "Major", "imp_maint": "Maintenance", "dur_l": "Duration",
-      "about_h": "About this page",
-      "about": [
-        {"h": "What this page shows", "p": "This page shows the live state of the {brand} services and a record of past incidents. It is kept up to date by the team that runs them."},
-        {"h": "How uptime is measured", "p": "Every service is checked from several places once a minute. A minute counts as down when more than half of the checks fail."},
-        {"h": "How we report incidents", "p": "We post an update when we start looking into a problem, when we find the cause and when it is resolved. Larger incidents get a short write-up afterwards."},
-        {"h": "Planned maintenance", "p": "Planned work is announced here at least three days ahead and takes place at quiet hours."}
-      ],
-      "incidents": [
-        {"title": "Elevated error rates", "impact": "major", "dur": "38 minutes", "a": "We are seeing a higher than usual rate of failed requests and are looking into the cause.", "b": "A faulty configuration change was found and is being rolled back.", "c": "The change was rolled back and error rates are back to normal. We will review how it got through."},
-        {"title": "Delayed notifications", "impact": "minor", "dur": "1 hour 12 minutes", "a": "Notifications are being delivered with a delay of several minutes.", "b": "A backlog in the queue that handles notifications was found.", "c": "The backlog has been cleared and delivery times are normal again."},
-        {"title": "Slow page loads", "impact": "minor", "dur": "26 minutes", "a": "Some users report that pages load slowly. We are investigating.", "b": "A database node was running hot and has been taken out of rotation.", "c": "Page load times have returned to normal."},
-        {"title": "Scheduled maintenance overran", "impact": "maint", "dur": "40 minutes longer than planned", "a": "Maintenance on our primary database is taking longer than planned.", "b": "The final step of the upgrade needs a few more minutes to finish.", "c": "Maintenance is complete and all services are running normally."},
-        {"title": "Partial outage in one region", "impact": "major", "dur": "54 minutes", "a": "Users in one region cannot reach the service. We are working with our hosting provider.", "b": "The provider has confirmed a network fault affecting our servers in that region.", "c": "The network fault is fixed and the region is serving traffic again."},
-        {"title": "Search results out of date", "impact": "minor", "dur": "2 hours 5 minutes", "a": "New items are not showing up in search results.", "b": "The indexing job stopped after a failed deployment and has been restarted.", "c": "Indexing has caught up and search is up to date."},
-        {"title": "Login failures for some users", "impact": "major", "dur": "19 minutes", "a": "Some users are unable to sign in. Others are not affected.", "b": "An expired certificate in the sign-in service was identified.", "c": "The certificate was replaced and sign-in works for everyone again."},
-        {"title": "Uploads failing intermittently", "impact": "minor", "dur": "47 minutes", "a": "A small share of uploads fail and need to be retried.", "b": "A storage node with a full disk was identified.", "c": "Capacity was added and uploads are succeeding again."}
-      ]
-    },
-    "de": {
-      "vars": {"brand": {"join": [["Nordlicht", "Kiesel", "Kobalt", "Tide", "Funken", "Wacholder", "Lumen", "Rabe", "Schwalbe", "Quarz"], ["stack", "basis", "werk", "wolke", "kreis", "dienst", "hub", "tor", "ly", "kit"]]}},
-      "nav_label": "Hauptmenü", "tagline": "Dienststatus", "footer": "Alle Zeiten in UTC.",
-      "nav_home": "Status", "nav_history": "Störungsverlauf", "nav_about": "Über diese Seite", "home_title": "Aktueller Status",
-      "desc": "Aktueller Status und Verfügbarkeit der Dienste von {brand}.", "desc_history": "Frühere Störungen bei {brand} und wie sie behoben wurden.", "desc_about": "Wie {brand} die Verfügbarkeit misst und Störungen meldet.",
-      "nf_title": "Seite nicht gefunden", "nf_text": "Unter dieser Adresse gibt es nichts. Die Statusanzeige finden Sie auf der Startseite.", "nf_back": "Zur Statusseite",
-      "banner_ok": "Alle Systeme laufen", "banner_sub": "Alle Dienste von {brand} arbeiten normal.",
-      "comps_h": "Dienste", "op": "In Betrieb", "up_label": "Verfügbarkeit", "days_ago_l": "vor 60 Tagen", "days_ago_r": "Heute",
-      "m_uptime": "Verfügbarkeit, letzte 90 Tage", "m_resp": "Mittlere Antwortzeit", "m_inc": "Erfasste Störungen",
-      "recent_h": "Letzte Störungen", "all_inc": "Gesamter Störungsverlauf",
-      "history_h": "Störungsverlauf", "history_intro": "Was in den vergangenen Monaten schiefging und wie es behoben wurde, die neueste zuerst.",
-      "st_inv": "Wird untersucht", "st_ident": "Ursache gefunden", "st_res": "Behoben",
-      "imp_minor": "Gering", "imp_major": "Schwer", "imp_maint": "Wartung", "dur_l": "Dauer",
-      "about_h": "Über diese Seite",
-      "about": [
-        {"h": "Was diese Seite zeigt", "p": "Diese Seite zeigt den aktuellen Zustand der Dienste von {brand} und eine Liste früherer Störungen. Sie wird vom Betriebsteam gepflegt."},
-        {"h": "Wie die Verfügbarkeit gemessen wird", "p": "Jeder Dienst wird einmal pro Minute von mehreren Orten aus geprüft. Eine Minute gilt als Ausfall, wenn mehr als die Hälfte der Prüfungen fehlschlägt."},
-        {"h": "Wie wir Störungen melden", "p": "Wir melden uns, wenn wir ein Problem untersuchen, wenn wir die Ursache gefunden haben und wenn es behoben ist. Zu größeren Störungen folgt eine kurze Nachbetrachtung."},
-        {"h": "Geplante Wartung", "p": "Geplante Arbeiten kündigen wir mindestens drei Tage vorher hier an; sie finden zu ruhigen Zeiten statt."}
-      ],
-      "incidents": [
-        {"title": "Erhöhte Fehlerrate", "impact": "major", "dur": "38 Minuten", "a": "Wir sehen eine ungewöhnlich hohe Zahl fehlgeschlagener Anfragen und suchen die Ursache.", "b": "Eine fehlerhafte Konfigurationsänderung wurde gefunden und wird zurückgenommen.", "c": "Die Änderung wurde zurückgenommen, die Fehlerrate ist wieder normal. Wir prüfen, wie sie durchrutschen konnte."},
-        {"title": "Verzögerte Benachrichtigungen", "impact": "minor", "dur": "1 Stunde 12 Minuten", "a": "Benachrichtigungen kommen mit einigen Minuten Verspätung an.", "b": "Ein Rückstau in der Warteschlange für Benachrichtigungen wurde gefunden.", "c": "Der Rückstau ist abgebaut, die Zustellung läuft wieder normal."},
-        {"title": "Langsame Seitenaufrufe", "impact": "minor", "dur": "26 Minuten", "a": "Einige Nutzer melden langsam ladende Seiten. Wir untersuchen das.", "b": "Ein Datenbankknoten war überlastet und wurde aus dem Betrieb genommen.", "c": "Die Ladezeiten sind wieder normal."},
-        {"title": "Wartung länger als geplant", "impact": "maint", "dur": "40 Minuten länger als geplant", "a": "Die Wartung an unserer Hauptdatenbank dauert länger als geplant.", "b": "Der letzte Schritt des Updates braucht noch einige Minuten.", "c": "Die Wartung ist abgeschlossen, alle Dienste laufen normal."},
-        {"title": "Teilausfall in einer Region", "impact": "major", "dur": "54 Minuten", "a": "Nutzer in einer Region erreichen den Dienst nicht. Wir arbeiten mit unserem Hosting-Anbieter zusammen.", "b": "Der Anbieter bestätigt eine Netzstörung bei unseren Servern in dieser Region.", "c": "Die Netzstörung ist behoben, die Region wird wieder bedient."},
-        {"title": "Veraltete Suchergebnisse", "impact": "minor", "dur": "2 Stunden 5 Minuten", "a": "Neue Einträge erscheinen nicht in den Suchergebnissen.", "b": "Der Indexierungsauftrag war nach einer fehlgeschlagenen Bereitstellung stehen geblieben und wurde neu gestartet.", "c": "Die Indexierung hat aufgeholt, die Suche ist aktuell."},
-        {"title": "Anmeldefehler bei einigen Nutzern", "impact": "major", "dur": "19 Minuten", "a": "Einige Nutzer können sich nicht anmelden, andere sind nicht betroffen.", "b": "Ein abgelaufenes Zertifikat im Anmeldedienst wurde als Ursache gefunden.", "c": "Das Zertifikat wurde ersetzt, die Anmeldung funktioniert wieder für alle."},
-        {"title": "Uploads schlagen sporadisch fehl", "impact": "minor", "dur": "47 Minuten", "a": "Ein kleiner Teil der Uploads schlägt fehl und muss wiederholt werden.", "b": "Ein Speicherknoten mit vollem Datenträger wurde gefunden.", "c": "Es wurde Kapazität ergänzt, Uploads funktionieren wieder."}
-      ]
-    }
+ "bundles": [
+  {
+   "id": "saas",
+   "weight": 2
   },
-  "bundles": [
-    {"lang": "en", "weight": 2, "components": ["Public API", "Dashboard", "Webhooks", "Authentication", "Background jobs", "Data exports", "Billing", "Documentation site"]},
-    {"lang": "en", "weight": 2, "components": ["Image uploads", "Image delivery", "Albums and sharing", "Web app", "Mobile sync", "Search", "Notifications", "Account and sign-in"]},
-    {"lang": "en", "weight": 2, "components": ["Email delivery", "SMS delivery", "Message templates", "Delivery reports", "REST API", "Dashboard", "Unsubscribe pages", "Scheduling"]},
-    {"lang": "de", "weight": 2, "components": ["Öffentliche API", "Dashboard", "Webhooks", "Anmeldung", "Hintergrundjobs", "Datenexporte", "Abrechnung", "Dokumentation"]},
-    {"lang": "de", "weight": 2, "components": ["Bild-Uploads", "Bildauslieferung", "Alben und Freigaben", "Web-App", "Mobile Synchronisation", "Suche", "Benachrichtigungen", "Konto und Anmeldung"]}
-  ]
+  {
+   "id": "photos",
+   "weight": 2
+  },
+  {
+   "id": "mail",
+   "weight": 2
+  }
+ ]
 }

@@ -7,9 +7,9 @@
 </section>
 <div class="__list__">
 {{range .Lists.works}}<article class="__item__">
-<img src="{{.img}}" alt="{{.title}}" width="{{.w}}" height="{{.h}}" loading="lazy">
+<a href="{{.href}}"><img src="{{.img}}" alt="{{.title}}" width="{{.w}}" height="{{.h}}" loading="lazy"></a>
 <div class="__idesc__">
-<h2>{{.title}}</h2>
+<h2><a href="{{.href}}">{{.title}}</a></h2>
 <p class="__mu__">{{.caption}}</p>
 <p>{{.note}}</p>
 </div>

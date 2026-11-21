@@ -1,0 +1,218 @@
+{
+ "order": 7,
+ "lang": "nl",
+ "html_lang": "nl-NL",
+ "date": [
+  "{d} {m} {y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "€ {n}",
+  "group": ".",
+  "scale": 0.9,
+  "round": 5
+ },
+ "address": "{street} {no}, {zip} {city}",
+ "zip_tail": "XX AA",
+ "zip_letters": "ABCDEFGHJKLMNPRTVWXZ",
+ "cities": [
+  {
+   "name": "Amsterdam",
+   "zip": [
+    "10"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Rotterdam",
+   "zip": [
+    "30"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Den Haag",
+   "zip": [
+    "25"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Utrecht",
+   "zip": [
+    "35"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Eindhoven",
+   "zip": [
+    "56"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Groningen",
+   "zip": [
+    "97"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Tilburg",
+   "zip": [
+    "50"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Almere",
+   "zip": [
+    "13"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Breda",
+   "zip": [
+    "48"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Nijmegen",
+   "zip": [
+    "65"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Apeldoorn",
+   "zip": [
+    "73"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Haarlem",
+   "zip": [
+    "20"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Arnhem",
+   "zip": [
+    "68"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Zwolle",
+   "zip": [
+    "80"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Maastricht",
+   "zip": [
+    "62"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Leiden",
+   "zip": [
+    "23"
+   ],
+   "phone": ""
+  }
+ ],
+ "streets": [
+  "Hoofdstraat",
+  "Dorpsstraat",
+  "Kerkstraat",
+  "Stationsweg",
+  "Molenweg",
+  "Schoolstraat",
+  "Julianastraat",
+  "Wilhelminastraat",
+  "Industrieweg",
+  "Beatrixlaan",
+  "Oranjestraat",
+  "Nieuwstraat"
+ ],
+ "first": [
+  "Daan",
+  "Emma:f",
+  "Sem",
+  "Julia:f",
+  "Lucas",
+  "Sophie:f",
+  "Finn",
+  "Anna:f",
+  "Bram",
+  "Eva:f",
+  "Milan",
+  "Tess:f",
+  "Thijs",
+  "Lotte:f",
+  "Jesse",
+  "Fleur:f",
+  "Ruben",
+  "Sanne:f",
+  "Tim",
+  "Noor:f",
+  "Joris",
+  "Lisa:f",
+  "Pieter",
+  "Marieke:f",
+  "Jan",
+  "Femke:f",
+  "Hendrik",
+  "Anouk:f",
+  "Willem",
+  "Iris:f",
+  "Koen",
+  "Maaike:f",
+  "Gerrit",
+  "Saskia:f"
+ ],
+ "last": [
+  "de Jong",
+  "Jansen",
+  "de Vries",
+  "van den Berg",
+  "van Dijk",
+  "Bakker",
+  "Janssen",
+  "Visser",
+  "Smit",
+  "Meijer",
+  "de Boer",
+  "Mulder",
+  "de Groot",
+  "Bos",
+  "Vos",
+  "Peters",
+  "Hendriks",
+  "van Leeuwen",
+  "Dekker",
+  "Brouwer",
+  "de Wit",
+  "Dijkstra",
+  "Smits",
+  "de Graaf",
+  "van der Meer",
+  "van der Linden",
+  "Kok",
+  "Jacobs",
+  "de Haan",
+  "Vermeulen",
+  "van den Heuvel",
+  "van der Veen",
+  "van den Broek",
+  "de Bruijn"
+ ]
+}

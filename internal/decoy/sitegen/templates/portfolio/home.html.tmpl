@@ -8,8 +8,8 @@
 <h2 class="__sectitle__">{{.L.sel_h}}</h2>
 <div class="__gal__">
 {{$lim := 6}}{{if eq .Layout 2}}{{$lim = 7}}{{end}}{{range $i, $w := .Lists.works}}{{if lt $i $lim}}<figure class="__fig__">
-<a class="__pic__" href="{{(index $.Nav 1).Href}}"><img src="{{$w.img}}" alt="{{$w.title}}" width="{{$w.w}}" height="{{$w.h}}" loading="lazy"></a>
-<figcaption><strong>{{$w.title}}</strong><span>{{$w.caption}}</span></figcaption>
+<a class="__pic__" href="{{$w.href}}"><img src="{{$w.img}}" alt="{{$w.title}}" width="{{$w.w}}" height="{{$w.h}}" loading="lazy"></a>
+<figcaption><strong><a href="{{$w.href}}">{{$w.title}}</a></strong><span>{{$w.caption}}</span></figcaption>
 </figure>
 {{end}}{{end}}</div>
 <p class="__more__"><a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.all_work}} {{icon "arrow"}}</a></p>

@@ -659,6 +659,31 @@
   font-size: 13px;
   color: var(--muted);
 }
+/* the country of the window "From a template": a line of words and the list of countries */
+.dz-cc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 260px);
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.dz-cc .tx b {
+  font-size: 13px;
+  font-weight: 500;
+}
+.dz-cc .tx > span {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+}
+.dz-uf .cc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 /* the row of the Pexels key in the window "From a template" */
 .dz-ph {
   display: grid;
@@ -1550,7 +1575,8 @@ div.dz-asl > * {
   .dz-grid,
   .dz-ways,
   .dz-ways:not(.one),
-  .dz-ways.tpl {
+  .dz-ways.tpl,
+  .dz-cc {
     grid-template-columns: minmax(0, 1fr);
   }
   .dz-first {

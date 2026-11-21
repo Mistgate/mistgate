@@ -55,7 +55,7 @@ export function PhotoRow({ status, onChanged, demo }: { status?: string; onChang
       {!form && (
         <div className="act">
           <Button variant="secondary" size="md" disabled={set.isPending} onClick={() => setForm(true)}>
-            {t("dz.ph.add")}
+            {t(hasKey ? "dz.ph.change" : "dz.ph.add")}
           </Button>
           {hasKey && (
             <button type="button" className="dz-lk" disabled={set.isPending} onClick={() => set.mutate("")}>

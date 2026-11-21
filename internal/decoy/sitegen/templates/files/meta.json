@@ -1,11 +1,75 @@
 {
-  "title": {"en": "File transfer (upload page)", "ru": "Файлообменник (загрузка файла)"},
-  "layouts": 3,
-  "pages": [
-    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
-    {"name": "how", "tmpl": "how.html.tmpl", "paths": ["how-it-works.html", "how/index.html", "about/index.html", "guide.html"], "nav": "nav_how", "desc": "desc_how"},
-    {"name": "limits", "tmpl": "limits.html.tmpl", "paths": ["limits.html", "faq/index.html", "help/index.html", "faq.html"], "nav": "nav_limits", "desc": "desc_limits"}
-  ],
-  "photo_slots": {"cover":[0]},
-  "photo_q": ["mountain lake landscape"]
+ "title": {
+  "en": "File transfer (upload page)",
+  "ru": "Файлообменник (загрузка файла)"
+ },
+ "layouts": 3,
+ "pages": [
+  {
+   "name": "home",
+   "tmpl": "home.html.tmpl",
+   "paths": [
+    "index.html"
+   ],
+   "nav": "nav_home",
+   "title": "home_title",
+   "desc": "desc"
+  },
+  {
+   "name": "how",
+   "tmpl": "how.html.tmpl",
+   "paths": [
+    "how-it-works.html",
+    "how/index.html",
+    "about/index.html",
+    "guide.html"
+   ],
+   "nav": "nav_how",
+   "desc": "desc_how"
+  },
+  {
+   "name": "limits",
+   "tmpl": "limits.html.tmpl",
+   "paths": [
+    "limits.html",
+    "faq/index.html",
+    "help/index.html",
+    "faq.html"
+   ],
+   "nav": "nav_limits",
+   "desc": "desc_limits"
+  },
+  {
+   "name": "privacy",
+   "tmpl": "privacy.html.tmpl",
+   "paths": [
+    "privacy.html",
+    "privacy/index.html",
+    "legal/privacy.html",
+    "data.html"
+   ],
+   "nav": "nav_privacy",
+   "desc": "desc_privacy"
+  },
+  {
+   "name": "terms",
+   "tmpl": "terms.html.tmpl",
+   "paths": [
+    "terms.html",
+    "terms/index.html",
+    "legal/terms.html",
+    "conditions.html"
+   ],
+   "nav": "nav_terms",
+   "desc": "desc_terms"
+  }
+ ],
+ "photo_slots": {
+  "cover": [
+   0
+  ]
+ },
+ "photo_q": [
+  "mountain lake landscape"
+ ]
 }

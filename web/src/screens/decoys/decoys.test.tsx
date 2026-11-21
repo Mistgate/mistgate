@@ -279,25 +279,65 @@ describe("the list", () => {
   });
 });
 
+// the panel lists the kinds by id; the window puts them in its own order. The Netherlands has only two of them.
+const countries = ["us", "de", "nl"];
+const kindOf = (id: string) => ({ id, nameEn: `Kind ${id}`, nameRu: `Вид ${id}`, countries: id === "files" || id === "login" ? countries : ["us", "de"] });
+const listed = (templates: ReturnType<typeof kindOf>[]) => ({ templates, countries });
+
 describe("a site from a template", () => {
-  const kinds = ["status", "files", "login", "blog", "portfolio", "business", "docs", "card", "club", "project"].map((id) => ({ id, nameEn: `Kind ${id}`, nameRu: `Вид ${id}` }));
+  const kinds = ["blog", "business", "card", "club", "docs", "files", "login", "portfolio", "project", "status"].map(kindOf);
   const shown = (n: number) => ({ html: `<p>page ${n}</p>`, seed: `${n}`.padStart(16, "0"), name: `Brand ${n}` });
   const open = async (lib = library([site("a")])) => {
-    api.listDecoyTemplates.mockResolvedValue({ templates: kinds });
+    api.listDecoyTemplates.mockResolvedValue(listed(kinds));
     await mountUi(list(), { lib, nodes: [node("de1")] });
     await click(button(en["dz.new"]));
     await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.way.tpl"])));
   };
   const frame = () => document.querySelector(".dz-fr iframe")?.getAttribute("srcdoc");
 
-  it("offers the ten kinds with a name and a line each, and asks for no preview before one is chosen", async () => {
+  it("offers the ten kinds in the window's order with a name and a line each, and asks for no preview before one is chosen", async () => {
     await open();
     expect(text()).toContain(en["dz.d.tpl"]);
     const cardsOf = [...document.querySelectorAll(".dz-ways.tpl .dz-way")];
     expect(cardsOf).toHaveLength(10);
+    expect(cardsOf.map((c) => c.querySelector("b")?.textContent)).toEqual(
+      ["status", "login", "files", "docs", "project", "blog", "club", "portfolio", "business", "card"].map((k) => en[`dz.tpl.${k}` as keyof typeof en]),
+    );
     expect(cardsOf[0]!.textContent).toBe(`${en["dz.tpl.status"]}${en["dz.tpl.status.text"]}`);
     expect(api.previewDecoyTemplate).not.toHaveBeenCalled();
     expect(button(en["dz.tpl.create"])).toBeUndefined();
+  });
+
+  it("starts with the country most of the nodes that show a shared page stand in, with its flag, and the first country when there is none", async () => {
+    api.listDecoyTemplates.mockResolvedValue(listed(kinds));
+    const open2 = async (nodes: ReturnType<typeof node>[]) => {
+      document.body.innerHTML = "";
+      await mountUi(list(), { lib: library([site("a")]), nodes });
+      await click(button(en["dz.new"]));
+      await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.way.tpl"])));
+      return document.querySelector(".dz-cc");
+    };
+    let row = await open2([node("nl1", { countryCode: "NL" }), node("de1"), node("de2"), node("fi1", { countryCode: "FI" })]);
+    expect(row?.textContent).toContain(en["dz.tpl.country"]);
+    expect(row?.querySelector("[role=combobox]")?.textContent).toContain("Germany");
+    expect(row?.querySelector("svg")).not.toBeNull(); // the flag
+    // a node with a site of its own does not vote, and a country the panel has no template for does not either
+    row = await open2([node("nl1", { countryCode: "NL" }), node("de1", { decoyMode: "own", decoySiteId: "dsi_a" }), node("de2", { decoyMode: "own", decoySiteId: "dsi_a" }), node("fi1", { countryCode: "FI" })]);
+    expect(row?.querySelector("[role=combobox]")?.textContent).toContain("Netherlands");
+    row = await open2([node("fi1", { countryCode: "FI" })]);
+    expect(row?.querySelector("[role=combobox]")?.textContent).toContain("United States");
+  });
+
+  it("shows only the kinds that have texts for the country, and asks for the previews of that country", async () => {
+    api.listDecoyTemplates.mockResolvedValue(listed(kinds));
+    api.previewDecoyTemplate.mockResolvedValue(shown(1));
+    await mountUi(list({ dialog: "tpl", template: { phase: "pick", country: "nl" } }), { lib: library([site("a")]), nodes: [node("de1")] });
+    const names = () => [...document.querySelectorAll(".dz-ways.tpl .dz-way b")].map((b) => b.textContent);
+    expect(names()).toEqual([en["dz.tpl.login"], en["dz.tpl.files"]]);
+    expect(document.querySelector(".dz-cc [role=combobox]")?.textContent).toContain("Netherlands");
+    await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.tpl.files"])));
+    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "files", seed: "", country: "nl" });
+    expect(document.querySelector(".dz-uf")?.textContent).toContain("Netherlands");
   });
 
   it("previews the chosen kind, another variant asks for a new one, and Create saves the variant in view", async () => {
@@ -305,17 +345,18 @@ describe("a site from a template", () => {
     api.generateDecoySite.mockResolvedValue({ site: site("new", { id: "dsi_new" }) });
     await open();
     await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.tpl.blog"])));
-    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: "" });
+    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: "", country: "de" });
     expect(frame()).toBe("<p>page 1</p>");
     expect(text()).toContain(en["dz.tpl.footView"].replace("{name}", "Brand 1"));
     expect(api.generateDecoySite).not.toHaveBeenCalled(); // a preview saves nothing
     await click(button(en["dz.tpl.another"]));
     expect(api.previewDecoyTemplate).toHaveBeenCalledTimes(2);
-    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: "" });
+    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: "", country: "de" });
     expect(frame()).toBe("<p>page 2</p>");
     await click(button(en["dz.tpl.create"]));
     expect(api.generateDecoySite).toHaveBeenCalledTimes(1);
-    expect(api.generateDecoySite).toHaveBeenCalledWith({ kind: "blog", seed: shown(2).seed, note: en["dz.tpl.blog"] });
+    // the note says what it is made of: "Template · kind · country"
+    expect(api.generateDecoySite).toHaveBeenCalledWith({ kind: "blog", seed: shown(2).seed, note: `${en["dz.tpl.noteLead"]} · ${en["dz.tpl.blog"]} · Germany`, country: "de" });
     expect(navigate).toHaveBeenCalledWith({ to: "/decoys/$id", params: { id: "dsi_new" } });
   });
 
@@ -350,7 +391,7 @@ describe("a site from a template", () => {
   });
 
   it("names a kind this screen does not know yet by the panel's own name, and shows it in every language", async () => {
-    api.listDecoyTemplates.mockResolvedValue({ templates: [...kinds, { id: "newkind", nameEn: "A new kind", nameRu: "Новый вид" }] });
+    api.listDecoyTemplates.mockResolvedValue(listed([...kinds, { ...kindOf("newkind"), nameEn: "A new kind", nameRu: "Новый вид" }]));
     await mountUi(list(), { lib: library([]), nodes: [node("de1")] });
     await click(button(en["dz.new"]));
     await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.way.tpl"])));
@@ -369,11 +410,11 @@ describe("a site from a template", () => {
 });
 
 describe("the photos of a generated site", () => {
-  const kinds = ["blog", "card"].map((id) => ({ id, nameEn: `Kind ${id}`, nameRu: `Вид ${id}` }));
+  const kinds = ["blog", "card"].map(kindOf);
   const seeded = (n: number, photos: string) => ({ html: `<p>page ${n}</p>`, seed: `${n}`.padStart(16, "0"), name: `Brand ${n}`, photos });
   const SECRET = "pexels-test-key-0123456789abcdef";
   const view = async (photos = "no_key") => {
-    api.listDecoyTemplates.mockResolvedValue({ templates: kinds });
+    api.listDecoyTemplates.mockResolvedValue(listed(kinds));
     api.previewDecoyTemplate.mockResolvedValue(seeded(7, photos));
     await mountUi(list(), { lib: library([site("a")]), nodes: [node("de1")] });
     await click(button(en["dz.new"]));
@@ -383,7 +424,7 @@ describe("the photos of a generated site", () => {
   const row = () => document.querySelector(".dz-ph");
 
   it("shows whether a key is set on the page of the kinds as well, with the link Pexels asks for", async () => {
-    api.listDecoyTemplates.mockResolvedValue({ templates: kinds });
+    api.listDecoyTemplates.mockResolvedValue(listed(kinds));
     await mountUi(list(), { lib: library([site("a")]), nodes: [node("de1")] });
     await click(button(en["dz.new"]));
     await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.way.tpl"])));
@@ -423,12 +464,15 @@ describe("the photos of a generated site", () => {
     await click(button(en["dz.ph.save"]));
     expect(api.setDecoyPhotosKey).toHaveBeenCalledWith({ key: SECRET });
     // the site in view is made again from its own seed, so that it comes back with its photos
-    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: seeded(7, "").seed });
+    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: seeded(7, "").seed, country: "de" });
     expect(row()?.querySelector("input")).toBeNull();
     expect(text()).not.toContain(SECRET);
     expect(row()?.textContent).toContain(en["dz.ph.on"]);
     expect(row()?.querySelector(".ft")?.textContent).toContain(en["dz.ph.st.used"]);
     expect(button(en["dz.ph.remove"])).toBeDefined();
+    // with a key set the button that opens the form says so
+    expect(button(en["dz.ph.add"])).toBeUndefined();
+    expect(button(en["dz.ph.change"])).toBeDefined();
   });
 
   it("removes the key with one press, and a refused key is said in words and stays in the field to be fixed", async () => {
@@ -440,6 +484,7 @@ describe("the photos of a generated site", () => {
     expect(api.setDecoyPhotosKey).toHaveBeenCalledWith({ key: "" });
     expect(row()?.textContent).toContain(en["dz.ph.off"]);
     expect(button(en["dz.ph.remove"])).toBeUndefined();
+    expect(button(en["dz.ph.add"])).toBeDefined(); // the key is gone: the button asks for one again
 
     api.setDecoyPhotosKey.mockReset().mockRejectedValue(new ConnectError("decoy_photos_key_invalid", Code.InvalidArgument));
     await click(button(en["dz.ph.add"]));
@@ -452,7 +497,7 @@ describe("the photos of a generated site", () => {
   });
 
   it("is worded in every language", () => {
-    const keys = Object.keys(en).filter((k) => k.startsWith("dz.ph.") || k === "err.decoy_photos_key_invalid");
+    const keys = Object.keys(en).filter((k) => k.startsWith("dz.ph.") || k === "err.decoy_photos_key_invalid" || k === "err.decoy_template_country" || /^dz\.tpl\.(country|countryText|noteLead)$/.test(k));
     expect(keys.length).toBeGreaterThanOrEqual(20);
     for (const lang of ["ru", "zh", "fa", "tr"] as const) {
       for (const k of keys) {

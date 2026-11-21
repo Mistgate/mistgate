@@ -22,6 +22,8 @@ type Slot struct {
 
 // Options are what Generate may be given besides a kind and a seed.
 type Options struct {
+	// Country is the code of the country the site is made for ("" is DefaultCountry): its language, cities, money and formats.
+	Country string
 	// Photos maps Slot.Name to a JPEG that already has the shape of its slot. Nil keeps every picture drawn; an empty map does
 	// the same, a slot missing from it stays drawn.
 	Photos map[string][]byte
@@ -47,18 +49,21 @@ func GenerateWith(kind string, seed []byte, o Options) ([]File, string, error) {
 	if len(o.Photos) > 0 {
 		ph = &photos{have: o.Photos}
 	}
-	return d.render(seed, ph)
+	return d.render(seed, o.Country, ph)
 }
 
-// Plan lists the photos a site of this kind and seed would like, in the order its pages ask for them, at most MaxPhotos. It is
-// empty when the kind or the variant the seed chose shows none (a card, a docs site, an illustrator's portfolio).
-func Plan(kind string, seed []byte) ([]Slot, error) {
+// Plan lists the photos a site of this kind and seed would like for DefaultCountry; see PlanFor.
+func Plan(kind string, seed []byte) ([]Slot, error) { return PlanFor(kind, seed, "") }
+
+// PlanFor lists the photos a site of this kind, seed and country would like, in the order its pages ask for them, at most
+// MaxPhotos. It is empty when the kind or the variant the seed chose shows none (a card, a docs site, an illustrator's portfolio).
+func PlanFor(kind string, seed []byte, country string) ([]Slot, error) {
 	d, err := kindOf(kind)
 	if err != nil {
 		return nil, err
 	}
 	ph := &photos{}
-	if _, _, err := d.render(seed, ph); err != nil {
+	if _, _, err := d.render(seed, country, ph); err != nil {
 		return nil, err
 	}
 	out := make([]Slot, 0, len(ph.asked))
@@ -82,15 +87,15 @@ func kindOf(kind string) (*kindDef, error) {
 	return d, nil
 }
 
-// photoWords are the search words of a bundle: its own, or the kind's.
-func (d *kindDef) photoWords(b map[string]any) []string {
+// photoWords are the search words of a variant: its own, or the kind's.
+func (d *kindDef) photoWords(b bundleDef) []string {
 	var out []string
-	if l, ok := b["photo_q"].([]any); ok {
-		for _, v := range l {
-			if s := strings.TrimSpace(str(v)); s != "" {
-				out = append(out, s)
-			}
+	for _, v := range b.PhotoQ {
+		if s := strings.TrimSpace(v); s != "" {
+			out = append(out, s)
 		}
+	}
+	if len(out) > 0 {
 		return out
 	}
 	return d.meta.PhotoQ

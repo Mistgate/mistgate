@@ -1,0 +1,108 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Veen",
+      "Linde",
+      "Duin",
+      "Wiel",
+      "Hoeve",
+      "Beuk",
+      "Es",
+      "Vlier"
+     ],
+     [
+      "dal",
+      "zicht",
+      "burg",
+      "hof",
+      "poort",
+      "kamp",
+      "wijk",
+      "water"
+     ]
+    ]
+   }
+  },
+  "nav_label": "Hoofdmenu",
+  "tagline": "Veilig inloggen",
+  "footer": "Alle rechten voorbehouden.",
+  "nav_home": "Inloggen",
+  "nav_help": "Hulp",
+  "nav_privacy": "Privacy",
+  "home_title": "Inloggen",
+  "desc": "Log in op uw account bij {brand}.",
+  "desc_help": "Hulp bij het inloggen bij {brand}.",
+  "desc_privacy": "Hoe {brand} met uw gegevens omgaat.",
+  "nf_title": "Pagina niet gevonden",
+  "nf_text": "De pagina die u zoekt bestaat niet of is verplaatst.",
+  "nf_back": "Terug naar inloggen",
+  "f_user": "Gebruikersnaam of e-mailadres",
+  "f_pass": "Wachtwoord",
+  "f_remember": "Ingelogd blijven",
+  "f_forgot": "Wachtwoord vergeten?",
+  "f_submit": "Inloggen",
+  "f_busy": "Bezig met inloggen…",
+  "e_empty": "Vul uw gebruikersnaam en wachtwoord in.",
+  "e_bad": [
+   "Gebruikersnaam of wachtwoord is onjuist.",
+   "De ingevoerde gegevens kloppen niet. Probeer het opnieuw."
+  ],
+  "help_h": "Problemen met inloggen?",
+  "help_intro": "De meeste inlogproblemen hebben een eenvoudige oorzaak. Loop deze stappen door voordat u contact opneemt.",
+  "help_steps": [
+   "Controleer of Caps Lock uitstaat; wachtwoorden zijn hoofdlettergevoelig.",
+   "Let op een spatie aan het begin of einde van de gebruikersnaam.",
+   "Probeer het in een nieuw browservenster zonder opgeslagen formuliergegevens.",
+   "Wacht tien minuten als u het meerdere keren tevergeefs hebt geprobeerd."
+  ],
+  "help_contact_h": "Lukt het nog steeds niet?",
+  "help_contact": "Vraag degene die {brand} voor uw organisatie beheert om uw wachtwoord opnieuw in te stellen. Om veiligheidsredenen gebeurt dat niet telefonisch of per e-mail.",
+  "help_back": "Terug naar inloggen",
+  "privacy_h": "Privacyverklaring",
+  "privacy_intro": "Wij bewaren zo min mogelijk over u en gaan zorgvuldig om met wat we bewaren. Hieronder staat kort wat dat is en waarom.",
+  "privacy": [
+   {
+    "h": "Wat we bewaren",
+    "p": "Uw gebruikersnaam, uw inlogmomenten en de gegevens die bij uw account horen. Meer niet."
+   },
+   {
+    "h": "Waarvoor we het gebruiken",
+    "p": "Zodat u kunt inloggen en wij uw account kunnen beschermen tegen anderen. We verkopen geen gegevens van onze gebruikers."
+   },
+   {
+    "h": "Cookies",
+    "p": "We gebruiken alleen de cookies die de dienst nodig heeft om te werken. Er zijn geen reclame- of analysecookies."
+   },
+   {
+    "h": "Uw rechten",
+    "p": "U kunt vragen om inzage, correctie of verwijdering van uw gegevens. Neem contact op met de beheerder van uw account."
+   }
+  ]
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Klantaccount",
+   "welcome": "Welkom terug",
+   "lead": "Log in om uw facturen te bekijken, uw gegevens aan te passen en uw abonnement te beheren.",
+   "bullets": [
+    "Facturen bekijken en downloaden",
+    "Contactgegevens aanpassen",
+    "Openstaande verzoeken volgen"
+   ]
+  },
+  "learning": {
+   "kicker": "Leeromgeving",
+   "welcome": "Log in op uw klas",
+   "lead": "Leerlingen, ouders en docenten loggen hier in voor roosters, huiswerk en berichten.",
+   "bullets": [
+    "Roosters en huiswerk",
+    "Berichten van docenten",
+    "Vakanties en uitjes"
+   ],
+   "f_user": "Gebruikersnaam"
+  }
+ }
+}

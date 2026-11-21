@@ -1,13 +1,74 @@
 {
-  "title": {"en": "Personal blog", "ru": "Личный блог (заметки)"},
-  "layouts": 3,
-  "pages": [
-    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
-    {"name": "about", "tmpl": "about.html.tmpl", "paths": ["about.html", "about/index.html", "me/index.html", "hello.html"], "nav": "nav_about", "desc": "desc_about"},
-    {"name": "post", "tmpl": "post.html.tmpl", "paths": ["notes/{slug}.html", "posts/{slug}/index.html", "{slug}.html", "journal/{slug}/index.html"], "each": "posts"}
-  ],
-  "lists": [
-    {"name": "posts", "from": "posts", "min": 4, "max": 5, "dates": {"end": "2026-10-28", "gap_min": 8, "gap_max": 40}}
-  ],
-  "photo_slots": {"t":[0,1,2]}
+ "title": {
+  "en": "Personal blog",
+  "ru": "Личный блог (заметки)"
+ },
+ "layouts": 3,
+ "pages": [
+  {
+   "name": "home",
+   "tmpl": "home.html.tmpl",
+   "paths": [
+    "index.html"
+   ],
+   "nav": "nav_home",
+   "title": "home_title",
+   "desc": "desc"
+  },
+  {
+   "name": "about",
+   "tmpl": "about.html.tmpl",
+   "paths": [
+    "about.html",
+    "about/index.html",
+    "me/index.html",
+    "hello.html"
+   ],
+   "nav": "nav_about",
+   "desc": "desc_about"
+  },
+  {
+   "name": "archive",
+   "tmpl": "archive.html.tmpl",
+   "paths": [
+    "archive.html",
+    "archive/index.html",
+    "all/index.html",
+    "index-of-notes.html"
+   ],
+   "nav": "nav_archive",
+   "desc": "desc_archive"
+  },
+  {
+   "name": "post",
+   "tmpl": "post.html.tmpl",
+   "paths": [
+    "notes/{slug}.html",
+    "posts/{slug}/index.html",
+    "{slug}.html",
+    "journal/{slug}/index.html"
+   ],
+   "each": "posts"
+  }
+ ],
+ "lists": [
+  {
+   "name": "posts",
+   "from": "posts",
+   "min": 8,
+   "max": 12,
+   "dates": {
+    "end": "2026-11-10",
+    "gap_min": 6,
+    "gap_max": 22
+   }
+  }
+ ],
+ "photo_slots": {
+  "t": [
+   0,
+   1,
+   2
+  ]
+ }
 }

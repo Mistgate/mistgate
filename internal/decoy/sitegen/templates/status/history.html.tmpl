@@ -3,8 +3,9 @@
 <main class="__wrap__ __st__">
 <h1>{{.L.history_h}}</h1>
 <p class="__mu__">{{.L.history_intro}}</p>
-{{range .Lists.incidents}}<article class="__inc__">
-<div class="__rh__"><h2>{{.title}}</h2><span class="__pill__ {{if eq .impact "major"}}__imp2__{{else if eq .impact "maint"}}__imp3__{{else}}__imp1__{{end}}">{{if eq .impact "major"}}{{$.L.imp_major}}{{else if eq .impact "maint"}}{{$.L.imp_maint}}{{else}}{{$.L.imp_minor}}{{end}}</span></div>
+{{$m := ""}}{{range .Lists.incidents}}{{if ne .month $m}}{{$m = .month}}<h2 class="__mh__">{{.month_label}}</h2>
+{{end}}<article class="__inc__">
+<div class="__rh__"><h3><a href="{{.href}}">{{.title}}</a></h3><span class="__pill__ {{if eq .impact "major"}}__imp2__{{else if eq .impact "maint"}}__imp3__{{else}}__imp1__{{end}}">{{if eq .impact "major"}}{{$.L.imp_major}}{{else if eq .impact "maint"}}{{$.L.imp_maint}}{{else}}{{$.L.imp_minor}}{{end}}</span></div>
 <p class="__mu__"><time datetime="{{.date_iso}}">{{.date}}</time> · {{$.L.dur_l}}: {{.dur}}</p>
 <ol class="__tl__">
 <li><strong>{{$.L.st_res}}</strong><p>{{.c}}</p></li>

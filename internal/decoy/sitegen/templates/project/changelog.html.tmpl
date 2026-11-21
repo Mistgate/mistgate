@@ -4,7 +4,7 @@
 <h1>{{.L.changelog_h}}</h1>
 <p class="__lede__">{{.L.changelog_intro}}</p>
 {{range .Lists.releases}}<article class="__rel__">
-<h2>{{.version}} <span class="__mu__"><time datetime="{{.date_iso}}">{{.date}}</time></span></h2>
+<h2><a href="{{.href}}">{{.version}}</a> <span class="__mu__"><time datetime="{{.date_iso}}">{{.date}}</time></span></h2>
 <ul class="__notes__">{{range .notes}}<li><span class="__k__">{{.k}}</span> {{.t}}</li>{{end}}</ul>
 </article>
 {{end}}</main>

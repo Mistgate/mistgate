@@ -1,0 +1,344 @@
+{
+ "order": 2,
+ "lang": "en-GB",
+ "html_lang": "en-GB",
+ "date": [
+  "{d} {m} {y}"
+ ],
+ "clock": "12h",
+ "money": {
+  "fmt": "£{n}",
+  "group": ",",
+  "scale": 0.8,
+  "round": 5
+ },
+ "address": "{no} {street}, {city} {zip}",
+ "zip_tail": " XAA",
+ "zip_letters": "ABDEFGHJLNPQRSTUWXYZ",
+ "phone": "01632 960XXX",
+ "cities": [
+  {
+   "name": "London",
+   "zip": [
+    "E1",
+    "E8",
+    "N1",
+    "N7",
+    "SE1",
+    "SE15",
+    "SW1",
+    "SW9",
+    "W1",
+    "W6",
+    "NW1",
+    "NW5",
+    "WC1",
+    "EC1"
+   ],
+   "phone": "020 7946 0XXX"
+  },
+  {
+   "name": "Birmingham",
+   "zip": [
+    "B1",
+    "B2",
+    "B5",
+    "B13",
+    "B15",
+    "B29"
+   ],
+   "phone": "0121 496 0XXX"
+  },
+  {
+   "name": "Manchester",
+   "zip": [
+    "M1",
+    "M2",
+    "M3",
+    "M14",
+    "M20"
+   ],
+   "phone": "0161 496 0XXX"
+  },
+  {
+   "name": "Leeds",
+   "zip": [
+    "LS1",
+    "LS2",
+    "LS6",
+    "LS7"
+   ],
+   "phone": "0113 496 0XXX"
+  },
+  {
+   "name": "Glasgow",
+   "zip": [
+    "G1",
+    "G2",
+    "G3",
+    "G12"
+   ],
+   "phone": "0141 496 0XXX"
+  },
+  {
+   "name": "Liverpool",
+   "zip": [
+    "L1",
+    "L2",
+    "L8",
+    "L17"
+   ],
+   "phone": "0151 496 0XXX"
+  },
+  {
+   "name": "Bristol",
+   "zip": [
+    "BS1",
+    "BS2",
+    "BS6",
+    "BS8"
+   ],
+   "phone": "0117 496 0XXX"
+  },
+  {
+   "name": "Sheffield",
+   "zip": [
+    "S1",
+    "S2",
+    "S6",
+    "S10"
+   ],
+   "phone": "0114 496 0XXX"
+  },
+  {
+   "name": "Edinburgh",
+   "zip": [
+    "EH1",
+    "EH2",
+    "EH3",
+    "EH9"
+   ],
+   "phone": "0131 496 0XXX"
+  },
+  {
+   "name": "Cardiff",
+   "zip": [
+    "CF10",
+    "CF11",
+    "CF14",
+    "CF24"
+   ],
+   "phone": "029 2018 0XXX"
+  },
+  {
+   "name": "Leicester",
+   "zip": [
+    "LE1",
+    "LE2",
+    "LE3"
+   ],
+   "phone": "0116 496 0XXX"
+  },
+  {
+   "name": "Nottingham",
+   "zip": [
+    "NG1",
+    "NG2",
+    "NG7"
+   ],
+   "phone": "0115 496 0XXX"
+  },
+  {
+   "name": "Newcastle upon Tyne",
+   "zip": [
+    "NE1",
+    "NE2",
+    "NE4",
+    "NE6"
+   ],
+   "phone": "0191 498 0XXX"
+  },
+  {
+   "name": "Reading",
+   "zip": [
+    "RG1",
+    "RG2",
+    "RG30"
+   ],
+   "phone": "0118 496 0XXX"
+  },
+  {
+   "name": "Oxford",
+   "zip": [
+    "OX1",
+    "OX2",
+    "OX4"
+   ]
+  },
+  {
+   "name": "Cambridge",
+   "zip": [
+    "CB1",
+    "CB2",
+    "CB4"
+   ]
+  },
+  {
+   "name": "York",
+   "zip": [
+    "YO1",
+    "YO10",
+    "YO24"
+   ]
+  },
+  {
+   "name": "Norwich",
+   "zip": [
+    "NR1",
+    "NR2",
+    "NR3"
+   ]
+  },
+  {
+   "name": "Brighton",
+   "zip": [
+    "BN1",
+    "BN2"
+   ]
+  },
+  {
+   "name": "Bath",
+   "zip": [
+    "BA1",
+    "BA2"
+   ]
+  },
+  {
+   "name": "Exeter",
+   "zip": [
+    "EX1",
+    "EX2",
+    "EX4"
+   ]
+  },
+  {
+   "name": "Southampton",
+   "zip": [
+    "SO14",
+    "SO15",
+    "SO17"
+   ]
+  },
+  {
+   "name": "Plymouth",
+   "zip": [
+    "PL1",
+    "PL4"
+   ]
+  },
+  {
+   "name": "Aberdeen",
+   "zip": [
+    "AB10",
+    "AB11",
+    "AB24"
+   ]
+  }
+ ],
+ "streets": [
+  "High Street",
+  "Station Road",
+  "Church Lane",
+  "Victoria Road",
+  "Park Road",
+  "Mill Lane",
+  "Green Lane",
+  "Manor Road",
+  "Queens Road",
+  "Kings Road",
+  "London Road",
+  "The Avenue",
+  "Albert Road",
+  "York Road",
+  "Grove Road",
+  "North Street",
+  "West Street",
+  "Church Road"
+ ],
+ "first": [
+  "Oliver",
+  "Amelia:f",
+  "George",
+  "Olivia:f",
+  "Harry",
+  "Isla:f",
+  "Jack",
+  "Emily:f",
+  "Charlie",
+  "Sophie:f",
+  "Thomas",
+  "Grace:f",
+  "William",
+  "Charlotte:f",
+  "Henry",
+  "Lucy:f",
+  "Edward",
+  "Hannah:f",
+  "Alfie",
+  "Megan:f",
+  "James",
+  "Chloe:f",
+  "Daniel",
+  "Freya:f",
+  "Joshua",
+  "Ella:f",
+  "Arthur",
+  "Poppy:f",
+  "Samuel",
+  "Rebecca:f",
+  "Callum",
+  "Eleanor:f",
+  "Rhys",
+  "Holly:f",
+  "Euan",
+  "Catherine:f"
+ ],
+ "last": [
+  "Smith",
+  "Jones",
+  "Taylor",
+  "Brown",
+  "Williams",
+  "Wilson",
+  "Johnson",
+  "Davies",
+  "Robinson",
+  "Wright",
+  "Thompson",
+  "Evans",
+  "Walker",
+  "White",
+  "Roberts",
+  "Green",
+  "Hall",
+  "Wood",
+  "Jackson",
+  "Clarke",
+  "Patel",
+  "Khan",
+  "Lewis",
+  "James",
+  "Phillips",
+  "Mason",
+  "Mitchell",
+  "Turner",
+  "Cooper",
+  "Hughes",
+  "Edwards",
+  "Morris",
+  "Harrison",
+  "Ward",
+  "Murray",
+  "Campbell"
+ ]
+}

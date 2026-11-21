@@ -116,7 +116,7 @@ func TestGenerateWithPhotos(t *testing.T) {
 			for i := 0; i < 40; i++ {
 				seed := testSeed(i)
 				plan, _ := Plan(kind, seed)
-				plain := mustGenerate(t, kind, i)
+				plain := mustGenerate(t, tcase{kind, DefaultCountry}, i)
 				for _, o := range []Options{{}, {Photos: map[string][]byte{}}} {
 					files, _, err := GenerateWith(kind, seed, o)
 					if err != nil || !sameFiles(files, plain) {

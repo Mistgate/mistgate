@@ -3,8 +3,12 @@
 <main class="__wrap__ __page__">
 <h1>{{.L.events_h}}</h1>
 <p class="__lede__">{{.L.events_intro}}</p>
-<ul class="__ev__ __full__">{{range .Lists.events}}<li><span class="__when__">{{.w}}</span><div><h2>{{.t}}</h2><p>{{.p}}</p></div></li>{{end}}</ul>
-<p>{{icon "pin"}} {{.L.where}}</p>
+<h2>{{.L.regular_h}}</h2>
+<ul class="__ev__ __full__">{{range .Lists.events}}<li><span class="__when__">{{.w}}</span><div><h3>{{.t}}</h3><p>{{.p}}</p></div></li>{{end}}</ul>
+<h2>{{.L.season_h}}</h2>
+{{$m := ""}}{{range .Lists.sessions}}{{if ne .month $m}}{{$m = .month}}<h3 class="__mh__">{{.month_label}}</h3>
+{{end}}<ul class="__ev__ __full__"><li><span class="__when__">{{.date}}</span><div><strong>{{.t}}</strong><p>{{.p}}</p></div></li></ul>
+{{end}}<p>{{icon "pin"}} {{.L.where}}</p>
 </main>
 {{template "footer" .}}
 </body>

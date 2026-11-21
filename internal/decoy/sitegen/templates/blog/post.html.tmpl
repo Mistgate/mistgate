@@ -11,6 +11,7 @@
 <aside class="__more__">
 <h2 class="__sectitle__">{{.L.more_h}}</h2>
 <ul>{{range .Lists.posts}}{{if ne .slug $.Page.Item.slug}}<li><a href="{{.href}}">{{.title}}</a> <span class="__mu__">{{.date}}</span></li>{{end}}{{end}}</ul>
+<p><a href="{{(index .Nav 2).Href}}">{{.L.all_posts}} {{icon "arrow"}}</a></p>
 </aside>
 </main>
 {{template "footer" .}}

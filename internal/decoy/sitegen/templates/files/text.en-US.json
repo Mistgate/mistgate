@@ -1,0 +1,177 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Pebble",
+      "Marble",
+      "Harbor",
+      "Lantern",
+      "Birch",
+      "Quill",
+      "Maple",
+      "Tern",
+      "Clover",
+      "Amber"
+     ],
+     [
+      "drop",
+      "send",
+      "share",
+      "post",
+      "pass",
+      "move",
+      "hand"
+     ]
+    ]
+   },
+   "limit": [
+    "500 MB",
+    "1 GB",
+    "2 GB",
+    "5 GB"
+   ]
+  },
+  "nav_label": "Main",
+  "tagline": "Simple file transfer",
+  "footer": "Files are removed automatically when the link expires.",
+  "nav_home": "Send a file",
+  "nav_how": "How it works",
+  "nav_limits": "Limits and FAQ",
+  "home_title": "Send a file",
+  "desc": "Share files up to {limit} with a single link, from {brand}.",
+  "desc_how": "How file transfer works at {brand}.",
+  "desc_limits": "File sizes, link lifetimes and common questions about {brand}.",
+  "nf_title": "Page not found",
+  "nf_text": "The page you were looking for does not exist or has moved.",
+  "nf_back": "Back to the start page",
+  "drop_h": "Drop a file here",
+  "drop_hint": "or choose one from your device, up to {limit}",
+  "pick": "Choose file",
+  "uploading": "Uploading…",
+  "e_full": [
+   "Storage is full. Please try again later.",
+   "Upload failed: our storage is full right now.",
+   "We cannot store more files at the moment because the storage is full."
+  ],
+  "retry": "Try again",
+  "how_h": "How it works",
+  "how_intro": "Three steps, nothing to set up.",
+  "steps": [
+   {
+    "h": "Choose a file",
+    "p": "Drop the file on the start page or pick it from your device."
+   },
+   {
+    "h": "Get a link",
+    "p": "When the upload is done you get a link that you can copy."
+   },
+   {
+    "h": "Share the link",
+    "p": "Anyone who has the link can download the file until it expires."
+   }
+  ],
+  "limits_h": "Limits and FAQ",
+  "limits_intro": "The numbers that matter, in one place.",
+  "limits": [
+   {
+    "k": "Largest file",
+    "v": "{limit}"
+   },
+   {
+    "k": "Link lifetime",
+    "v": "{days} days"
+   },
+   {
+    "k": "Files per upload",
+    "v": "One (zip several files together)"
+   },
+   {
+    "k": "Downloads per link",
+    "v": "Unlimited until it expires"
+   }
+  ],
+  "faq_h": "Common questions",
+  "faq": [
+   {
+    "q": "Do I need an account?",
+    "a": "No. You can send files up to {limit} without signing in."
+   },
+   {
+    "q": "How long does my link last?",
+    "a": "Links work for {days} days. After that the file is deleted and the link stops working."
+   },
+   {
+    "q": "Can the recipient see my name?",
+    "a": "Only if you tell them. The download page shows nothing about you."
+   },
+   {
+    "q": "What happens to my file once the link expires?",
+    "a": "It is removed from storage. We do not keep a copy."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Links that expire",
+    "p": "Every link works for {days} days, so nothing is left lying around."
+   },
+   {
+    "h": "No sign-up",
+    "p": "Files up to {limit} can be sent without an account."
+   },
+   {
+    "h": "Plain and quick",
+    "p": "Add a file, copy the link, pass it on. That is all there is to it."
+   }
+  ],
+  "nav_privacy": "Privacy",
+  "desc_privacy": "What happens to your files and your details at {brand}.",
+  "privacy_h": "Privacy notice",
+  "privacy_intro": "A short account of what happens to your file and to the details of your transfer.",
+  "privacy": [
+   {
+    "h": "What we keep",
+    "p": "The file you upload and the time you uploaded it. We do not ask for your name, and we do not keep a list of the people who download it."
+   },
+   {
+    "h": "How long we keep it",
+    "p": "Until the link expires. After that the file is deleted from storage and cannot be recovered."
+   },
+   {
+    "h": "Who can see it",
+    "p": "Anyone who has the link. We do not open or read your files, so share the link only with the people who should have the file."
+   },
+   {
+    "h": "Cookies",
+    "p": "We use only what the page needs in order to work. There are no advertising or tracking cookies."
+   },
+   {
+    "h": "Removing a file early",
+    "p": "Ask the person who looks after {brand} for your organization to remove a file before its link expires."
+   }
+  ]
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "File transfer",
+   "hero_h": "Send a file to anyone",
+   "hero_p": "Add a file, get a link and share it. No account is needed for files up to {limit}."
+  },
+  "print": {
+   "kicker": "Print files",
+   "hero_h": "Upload your artwork",
+   "hero_p": "Send us print-ready files for your order. PDF, TIFF and ZIP files up to {limit} are fine."
+  },
+  "photos": {
+   "kicker": "Photo sharing",
+   "hero_h": "Share your photos",
+   "hero_p": "Send a folder of pictures as one zipped file of up to {limit}. Friends and family only need the link."
+  },
+  "assignments": {
+   "kicker": "Assignments",
+   "hero_h": "Hand in your work",
+   "hero_p": "Upload your assignment here before the deadline. One file, up to {limit}."
+  }
+ }
+}

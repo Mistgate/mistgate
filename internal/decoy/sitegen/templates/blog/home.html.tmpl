@@ -8,7 +8,7 @@
 <div class="__cols__">
 <div class="__feed__">
 <h2 class="__sectitle__">{{.L.latest_h}}</h2>
-{{range .Lists.posts}}<article class="__entry__">
+{{range $i, $p := .Lists.posts}}{{if lt $i 6}}{{with $p}}<article class="__entry__">
 {{if eq $.Layout 2}}<a class="__thumb__" href="{{.href}}" tabindex="-1" aria-hidden="true">{{photo (printf "t%d" .n) "" 480 300}}</a>{{end}}
 <div class="__ebody__">
 <p class="__meta__"><time datetime="{{.date_iso}}">{{.date}}</time> · <span class="__pill__">{{.tag}}</span></p>
@@ -17,7 +17,8 @@
 <a class="__readmore__" href="{{.href}}">{{$.L.read_more}} {{icon "arrow"}}</a>
 </div>
 </article>
-{{end}}</div>
+{{end}}{{end}}{{end}}<p><a class="__readmore__" href="{{(index .Nav 2).Href}}">{{.L.all_posts}} {{icon "arrow"}}</a></p>
+</div>
 {{if eq .Layout 1}}<aside class="__side__">
 <h2 class="__sectitle__">{{.L.about_h}}</h2>
 <p>{{index .L.about 0}}</p>

@@ -22,21 +22,32 @@ import (
 // Generated decoy sites: a kind (a folder of templates under templates/) and a seed give a small, believable static site that
 // is different for every seed. A kind is added by dropping a folder: Kinds finds it, Generate renders it, no code changes.
 //
-// Layout of a kind folder:
+// A site is made for a country (cc) and written in the language of that country (lang). The two are different files, so that a
+// new language or a new country is new data and no code:
 //
-//	meta.json   names (en, ru), the pages and their possible paths, lists drawn from the vocabulary, number of layouts
-//	data.json   the vocabulary: "ui" strings by language and "bundles" (a language plus the texts of one theme)
-//	*.tmpl      one template per page, style.css.tmpl and, for a kind with scripts, script.js.tmpl
+//	templates/shared/country.<cc>.json   the country: its language, date and clock, money, address and postcode format, phone
+//	                                     ranges, cities, streets, names (see countryDef)
+//	templates/shared/text.<lang>.json    the words every kind prints: menu, months, weekdays, 404, the contact form, the legal pages
+//	templates/<kind>/meta.json           names (en, ru), the pages and their possible paths, lists drawn from the texts, layouts
+//	templates/<kind>/data.json           what does not depend on the language: "ui" (kind-wide), "bundles" (the variants: id, weight,
+//	                                     English search words of the photos, "fixed" values such as icons, prices and code samples)
+//	templates/<kind>/text.<lang>.json    the texts of the kind in one language: "ui" (kind-wide) and "bundles" by variant id
+//	templates/<kind>/*.tmpl              one template per page, style.css.tmpl and, for a kind with scripts, script.js.tmpl
+//
+// A kind is available for a country when it has a text file for the country's language; a language may write only some of the
+// kind's variants. Every variant that a language writes has the same keys as in every other language (a test keeps that). A text
+// file is merged over the fixed values: a list of objects in both is joined item by item.
 //
 // Templates may use "__name__" for CSS classes and ids and "$$name" for JS identifiers: both are renamed per seed.
-// templates/shared holds what every kind uses (head, header, footer, the base stylesheet, the 404 page); a kind may override
-// any of those by defining the same template or file name.
+// templates/shared holds what every kind uses (head, header, footer, the base stylesheet, the 404 page, the contact form); a kind
+// may override any of those by defining the same template or file name. No word is written in a template: every word is a text.
 //
-// A bundle picks the language and the theme; its "vars" (a list, a number range, or one word from each of several lists)
-// fill the {name} marks of every text, and {cmd} is the brand as a command line name. The texts that the shared parts print
-// must exist in every bundle or its language's "ui": nav_label, tagline, footer, desc, home_title, nf_title, nf_text, nf_back,
-// and the "nav" and "desc" keys the pages name. Templates see the site (.L texts, .V vars, .Layout, .Lists, .Nav, .Page) and
-// the functions of funcMap. Texts are printed as they are, never escaped: write them so they are safe in a double-quoted
+// A variant's "vars" (a list, a number range, or one word from each of several lists) fill the {name} marks of every text. The
+// country adds {city}, {city_in}, {state}, {street}, {no}, {zip}, {address}, {phone} (empty where the country has no range of
+// numbers made up for stories), {first}, {last} and {name}; {cmd} is the brand as a command line name. The texts that the shared
+// parts print must exist in the shared text or in the kind's: nav_label, tagline, footer, desc, home_title, nf_title, nf_text,
+// nf_back, and the "nav" and "desc" keys the pages name. Templates see the site (.L texts, .V vars, .Layout, .Lists, .Nav, .Page)
+// and the functions of funcMap. Texts are printed as they are, never escaped: write them so they are safe in a double-quoted
 // attribute (no double quotes, no "<").
 //
 // Photos (generate_photo.go) are optional. meta.json's "photo_slots" names the places that may hold one: a slot is a name with a
@@ -65,6 +76,8 @@ type KindInfo struct {
 	ID     string `json:"id"`
 	NameEN string `json:"name_en"`
 	NameRU string `json:"name_ru"`
+	// Countries are the codes of the countries the kind can be made for (it has texts in their language), in the order of Countries().
+	Countries []string `json:"countries"`
 }
 
 type pageDef struct {
@@ -86,7 +99,7 @@ type subDef struct {
 
 type listDef struct {
 	Name   string   `json:"name"`
-	From   string   `json:"from"` // vocabulary key of the pool; empty means items made only of the generated fields
+	From   string   `json:"from"` // text key of the pool; empty means items made only of the generated fields
 	Min    int      `json:"min"`
 	Max    int      `json:"max"`
 	Dates  *dateDef `json:"dates"`
@@ -113,14 +126,29 @@ type metaDef struct {
 	// PhotoSlots names the places that may hold a photo: a slot's name without its trailing number, then the indexes into the
 	// search words (PhotoQ) its numbered slots take in turn. A site has photos only where this and the words both exist.
 	PhotoSlots map[string][]int `json:"photo_slots"`
-	PhotoQ     []string         `json:"photo_q"` // the search words of every bundle that has none of its own
+	PhotoQ     []string         `json:"photo_q"` // the search words of every variant that has none of its own
+}
+
+// bundleDef is a variant of a kind, the part of it that does not depend on the language.
+type bundleDef struct {
+	ID     string         `json:"id"`
+	Weight int            `json:"weight"`
+	PhotoQ []string       `json:"photo_q"` // English: the photo search is English whatever the site's language
+	Fixed  map[string]any `json:"fixed"`   // merged under the texts of the variant
+}
+
+// langText is the texts of a kind in one language.
+type langText struct {
+	UI      map[string]any            `json:"ui"`
+	Bundles map[string]map[string]any `json:"bundles"`
 }
 
 type kindDef struct {
 	id      string
 	meta    metaDef
-	ui      map[string]map[string]any
-	bundles []map[string]any
+	fixedUI map[string]any
+	bundles []bundleDef
+	texts   map[string]*langText // by language
 	tpl     *tmplSet
 	hasJS   bool
 }
@@ -149,7 +177,7 @@ var loadKinds = sync.OnceValues(func() (map[string]*kindDef, error) {
 })
 
 func parseKind(id string, rawMeta []byte) (*kindDef, error) {
-	d := &kindDef{id: id}
+	d := &kindDef{id: id, texts: map[string]*langText{}}
 	if err := json.Unmarshal(rawMeta, &d.meta); err != nil {
 		return nil, err
 	}
@@ -158,21 +186,56 @@ func parseKind(id string, rawMeta []byte) (*kindDef, error) {
 		return nil, err
 	}
 	var data struct {
-		UI      map[string]map[string]any `json:"ui"`
-		Bundles []map[string]any          `json:"bundles"`
+		UI      map[string]any `json:"ui"`
+		Bundles []bundleDef    `json:"bundles"`
 	}
 	if err := json.Unmarshal(rawData, &data); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("data.json: %w", err)
 	}
-	d.ui, d.bundles = data.UI, data.Bundles
+	d.fixedUI, d.bundles = data.UI, data.Bundles
 	if len(d.bundles) == 0 || d.meta.Title["en"] == "" || d.meta.Title["ru"] == "" || len(d.meta.Pages) == 0 {
 		return nil, errors.New("meta.json or data.json is incomplete")
+	}
+	ids := map[string]bool{}
+	for i := range d.bundles {
+		b := &d.bundles[i]
+		if b.ID == "" || ids[b.ID] {
+			return nil, fmt.Errorf("data.json: variant %d has no id or a repeated one", i)
+		}
+		ids[b.ID] = true
+		if b.Weight < 1 {
+			b.Weight = 1
+		}
 	}
 	if d.meta.Layouts < 1 {
 		d.meta.Layouts = 1
 	}
 	if home := d.meta.Pages[0]; home.Name != "home" || len(home.Paths) != 1 || home.Paths[0] != "index.html" {
 		return nil, errors.New(`the first page must be "home" at index.html`)
+	}
+	files, err := fs.ReadDir(templateFS, "templates/"+id)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range files {
+		lang, ok := textLang(f.Name())
+		if !ok {
+			continue
+		}
+		raw, err := fs.ReadFile(templateFS, "templates/"+id+"/"+f.Name())
+		if err != nil {
+			return nil, err
+		}
+		lt := &langText{}
+		if err := json.Unmarshal(raw, lt); err != nil {
+			return nil, fmt.Errorf("%s: %w", f.Name(), err)
+		}
+		for bid := range lt.Bundles {
+			if !ids[bid] {
+				return nil, fmt.Errorf("%s: variant %q is not in data.json", f.Name(), bid)
+			}
+		}
+		d.texts[lang] = lt
 	}
 	t := newTmplSet(funcMap(nil))
 	for _, dir := range []string{"shared", id} { // a kind may replace a template of the shared part
@@ -198,22 +261,38 @@ func parseKind(id string, rawMeta []byte) (*kindDef, error) {
 	return d, nil
 }
 
+// textLang is the language of a file called text.<lang>.json.
+func textLang(name string) (string, bool) {
+	lang, ok := strings.CutPrefix(name, "text.")
+	if !ok {
+		return "", false
+	}
+	lang, ok = strings.CutSuffix(lang, ".json")
+	return lang, ok && lang != ""
+}
+
 // Kinds lists the kinds of generated site, sorted by id.
 func Kinds() []KindInfo {
 	kinds, err := loadKinds()
 	if err != nil {
 		return nil
 	}
+	byKind := map[string][]string{}
+	for _, c := range Countries() {
+		for _, k := range c.Kinds {
+			byKind[k] = append(byKind[k], c.Code)
+		}
+	}
 	out := make([]KindInfo, 0, len(kinds))
 	for id, d := range kinds {
-		out = append(out, KindInfo{ID: id, NameEN: d.meta.Title["en"], NameRU: d.meta.Title["ru"]})
+		out = append(out, KindInfo{ID: id, NameEN: d.meta.Title["en"], NameRU: d.meta.Title["ru"], Countries: byKind[id]})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
 }
 
-// Generate makes the files of a site of the given kind. The same kind and seed always give the same files, byte for byte; the
-// result is meant for FromFiles.
+// Generate makes the files of a site of the given kind for DefaultCountry. The same kind and seed always give the same files,
+// byte for byte; the result is meant for FromFiles.
 func Generate(kind string, seed []byte) ([]File, error) {
 	files, _, err := GenerateNamed(kind, seed)
 	return files, err
@@ -252,6 +331,7 @@ type site struct {
 	titleStyle                 int
 	photoQ                     []string
 	photoSlots                 map[string][]int
+	country                    *countryDef
 }
 
 // data is what a template sees as dot: the site and the page, as maps, which is all the interpreter reads.
@@ -315,32 +395,41 @@ var (
 	imgDirs   = []string{"img", "images", "assets/img", "gallery", "media", "static/img", "assets/images", "pictures"}
 )
 
-func (d *kindDef) pickBundle(r *rng) map[string]any {
+// pickBundle draws a variant among those written in the language.
+func (d *kindDef) pickBundle(r *rng, lt *langText) bundleDef {
+	var have []bundleDef
 	total := 0
 	for _, b := range d.bundles {
-		total += weightOf(b)
+		if _, ok := lt.Bundles[b.ID]; ok {
+			have = append(have, b)
+			total += b.Weight
+		}
 	}
 	roll := r.sub("bundle").n(total)
-	for _, b := range d.bundles {
-		if roll < weightOf(b) {
+	for _, b := range have {
+		if roll < b.Weight {
 			return b
 		}
-		roll -= weightOf(b)
+		roll -= b.Weight
 	}
-	return d.bundles[0]
+	return have[0]
 }
 
-func weightOf(b map[string]any) int {
-	if w, ok := b["weight"].(float64); ok && w >= 1 {
-		return int(w)
+func (d *kindDef) render(seed []byte, cc string, ph *photos) ([]File, string, error) {
+	loc, err := loadLocales()
+	if err != nil {
+		return nil, "", err
 	}
-	return 1
-}
-
-func (d *kindDef) render(seed []byte, ph *photos) ([]File, string, error) {
+	country, err := loc.country(cc)
+	if err != nil {
+		return nil, "", err
+	}
+	if !d.available(country.Lang) {
+		return nil, "", fmt.Errorf("%w: %s in %s", ErrNotInCountry, d.id, country.Code)
+	}
 	r := newRNG([]byte(d.id), seed)
 	c := &ctx{r: r, ph: ph, memo: map[string]any{}, files: map[string][]byte{}, artID: "a" + hex6(r.sub("artid"))}
-	s, err := d.newSite(c, r)
+	s, err := d.newSite(c, r, country, loc.shared[country.Lang])
 	if err != nil {
 		return nil, "", err
 	}
@@ -431,7 +520,7 @@ func (d *kindDef) render(seed []byte, ph *photos) ([]File, string, error) {
 		return nil, "", err
 	}
 	c.files[strings.TrimPrefix(s.CSS, "/")] = []byte(css)
-	if d.hasJS {
+	if d.hasJS && c.referenced(s.JS) { // a kind whose script serves a block that this site has no use for gets no script file
 		js, err := render("script.js.tmpl", assets)
 		if err != nil {
 			return nil, "", err
@@ -447,6 +536,16 @@ func (d *kindDef) render(seed []byte, ph *photos) ([]File, string, error) {
 	c.files[strings.TrimPrefix(s.Icon, "/")] = []byte(faviconSVG(s.mark))
 	c.files["robots.txt"] = robotsFor(r.sub("robots"), path.Dir(s.CSS))
 	return c.finish(), s.Brand, nil
+}
+
+// referenced is whether a page of the site loads the file at this address.
+func (c *ctx) referenced(addr string) bool {
+	for p, body := range c.files {
+		if strings.HasSuffix(p, ".html") && bytes.Contains(body, []byte(`"`+addr+`"`)) {
+			return true
+		}
+	}
+	return false
 }
 
 // finish renames the "__x__" and "$$x" names, breaks up long runs of prose and returns the files sorted by path.
@@ -475,28 +574,31 @@ func (c *ctx) finish() []File {
 	return out
 }
 
-func (d *kindDef) newSite(c *ctx, r *rng) (*site, error) {
-	b := d.pickBundle(r)
-	lang := "en"
-	if l, ok := b["lang"].(string); ok && l != "" {
-		lang = l
-	}
-	// Variables first: they fill the {name} marks of every text.
-	vars := map[string]string{"year": "2026"}
-	vs := map[string]any{} // the language's variables, then the bundle's own
-	for _, src := range []any{d.ui[lang]["vars"], b["vars"]} {
-		m, _ := src.(map[string]any)
-		for k, v := range m {
-			vs[k] = v
+func (d *kindDef) newSite(c *ctx, r *rng, country *countryDef, shared map[string]any) (*site, error) {
+	lang := country.Lang
+	lt := d.texts[lang]
+	b := d.pickBundle(r, lt)
+	// The layers of the texts, the last one wins: the language's shared words, the kind's fixed and written words, the variant's.
+	merged := map[string]any{}
+	layers := []map[string]any{shared, d.fixedUI, lt.UI, b.Fixed, lt.Bundles[b.ID]}
+	for i, l := range layers {
+		if err := mergeText(merged, l); err != nil {
+			return nil, fmt.Errorf("decoy kind %s: variant %s, layer %d: %w", d.id, b.ID, i, err)
 		}
 	}
+	// Variables first: they fill the {name} marks of every text. The country's come first, a text may name its own.
+	vars := map[string]string{"year": "2026", "cc": strings.ToUpper(country.Code)}
+	for k, v := range country.geo(r.sub("geo")) {
+		vars[k] = v
+	}
+	vs, _ := merged["vars"].(map[string]any)
 	names := make([]string, 0, len(vs))
 	for k := range vs {
 		names = append(names, k)
 	}
 	sort.Strings(names)
 	for _, k := range names {
-		v, err := drawVar(r.sub("var:"+k), vs[k])
+		v, err := drawVar(r.sub("var:"+k), vs[k], country)
 		if err != nil {
 			return nil, fmt.Errorf("decoy kind %s: var %s: %w", d.id, k, err)
 		}
@@ -505,9 +607,14 @@ func (d *kindDef) newSite(c *ctx, r *rng) (*site, error) {
 	for _, k := range names { // a variable may name another one, one level deep: "{city} Chess Club"
 		vars[k] = fill(vars[k], vars).(string)
 	}
+	if country.rep != nil {
+		for k, v := range vars {
+			vars[k] = country.rep.Replace(v)
+		}
+	}
 	brand := vars["brand"]
 	if brand == "" {
-		return nil, fmt.Errorf("decoy kind %s: a bundle has no brand var", d.id)
+		return nil, fmt.Errorf("decoy kind %s: a variant has no brand var", d.id)
 	}
 	if _, ok := vars["cmd"]; !ok { // the name as a command line tool would be typed
 		vars["cmd"] = strings.Map(func(r rune) rune {
@@ -517,19 +624,16 @@ func (d *kindDef) newSite(c *ctx, r *rng) (*site, error) {
 			return -1
 		}, strings.ToLower(brand))
 	}
-	L := map[string]any{}
-	for _, src := range []map[string]any{d.ui[lang], b} {
-		for k, v := range src {
-			if k != "lang" && k != "weight" && k != "vars" && k != "photo_q" {
-				L[k] = v
-			}
-		}
+	delete(merged, "vars")
+	L := fill(replaceText(country.rep, merged), vars).(map[string]any)
+	L = fillTimes(L, country, str(L["am"]), str(L["pm"])).(map[string]any)
+	if left := leftoverVar(L); left != "" {
+		return nil, fmt.Errorf("decoy kind %s: variant %s: the text %q has a variable that is not defined", d.id, b.ID, left)
 	}
-	L = fill(L, vars).(map[string]any)
 
 	look := r.sub("look")
 	s := &site{
-		Kind: d.id, Lang: lang, Brand: brand, Initial: initialOf(brand), L: L, V: vars,
+		Kind: d.id, Lang: country.HTML, Brand: brand, Initial: initialOf(brand), L: L, V: vars, country: country,
 		Layout: look.sub("layout").n(d.meta.Layouts), Head: look.sub("head").n(3), Foot: look.sub("foot").n(3),
 		P: newPalette(look.sub("palette")), S: newStyle(look.sub("style")), Fnt: newFonts(look.sub("fonts")),
 		Year: "2026", Since: fmt.Sprint(2015 + look.sub("since").n(10)), titleStyle: look.sub("title").n(4),
@@ -537,11 +641,7 @@ func (d *kindDef) newSite(c *ctx, r *rng) (*site, error) {
 	}
 	s.photoQ = d.photoWords(b)
 	c.s = s // the lists below may ask for photos
-	if fm := dateFormats[lang]; len(fm) > 0 {
-		s.DateFmt = fm[look.sub("datefmt").n(len(fm))]
-	} else {
-		s.DateFmt = "{d} {m} {y}"
-	}
+	s.DateFmt = country.Date[look.sub("datefmt").n(len(country.Date))]
 	fr := r.sub("files")
 	s.CSS = "/" + withHash(cssNames[fr.sub("css").n(len(cssNames))], fr.sub("csshash"))
 	s.JS = "/" + withHash(jsNames[fr.sub("js").n(len(jsNames))], fr.sub("jshash"))
@@ -558,6 +658,52 @@ func (d *kindDef) newSite(c *ctx, r *rng) (*site, error) {
 	}
 	s.Order = d.order(r.sub("order"))
 	return s, nil
+}
+
+var timeMark = regexp.MustCompile(`\{(\d{1,2}:\d{2})\}`)
+
+// fillTimes writes the times of the texts the way the country does: "{19:30}" becomes "19:30" or "7:30 pm".
+func fillTimes(v any, c *countryDef, am, pm string) any {
+	switch x := v.(type) {
+	case string:
+		return timeMark.ReplaceAllStringFunc(x, func(m string) string { return c.clock(m[1:len(m)-1], am, pm) })
+	case []any:
+		out := make([]any, len(x))
+		for i, e := range x {
+			out[i] = fillTimes(e, c, am, pm)
+		}
+		return out
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, e := range x {
+			out[k] = fillTimes(e, c, am, pm)
+		}
+		return out
+	}
+	return v
+}
+
+// leftoverVar is a text with a {name} mark that no variable filled, "" when there is none.
+func leftoverVar(v any) string {
+	switch x := v.(type) {
+	case string:
+		if varMark.MatchString(x) {
+			return x
+		}
+	case []any:
+		for _, e := range x {
+			if s := leftoverVar(e); s != "" {
+				return s
+			}
+		}
+	case map[string]any:
+		for _, e := range x {
+			if s := leftoverVar(e); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
 }
 
 func (d *kindDef) order(r *rng) []string {
@@ -622,14 +768,23 @@ func (s *site) fullTitle(t string) string {
 }
 
 // drawVar picks a variable's value: one of a list, a number in a range, or one word from each of several lists joined together.
-func drawVar(r *rng, v any) (string, error) {
+func drawVar(r *rng, v any, c *countryDef) (string, error) {
 	switch x := v.(type) {
+	case string:
+		return x, nil
 	case []any:
 		if len(x) == 0 {
 			return "", errors.New("empty list")
 		}
 		return str(x[r.n(len(x))]), nil
 	case map[string]any:
+		if prices, ok := x["money"].([]any); ok && len(prices) > 0 { // one of several prices, in the country's money
+			p, ok := number(prices[r.n(len(prices))])
+			if !ok {
+				return "", errors.New("a price is not a number")
+			}
+			return c.money(p), nil
+		}
 		if parts, ok := x["join"].([]any); ok {
 			sep := str(x["sep"])
 			var out []string
@@ -688,6 +843,9 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 		}
 	}
 	n := r.sub("n").between(ld.Min, ld.Max)
+	if pool != nil && len(pool) < ld.Min {
+		return nil, fmt.Errorf("decoy kind %s: list %s: the pool %q has %d items, %d are the least", d.id, ld.Name, ld.From, len(pool), ld.Min)
+	}
 	if pool != nil && n > len(pool) {
 		n = len(pool)
 	}
@@ -720,6 +878,8 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 		for _, it := range items {
 			it["date_iso"] = t.Format("2006-01-02")
 			it["date"] = s.fdate(t.Format("2006-01-02"))
+			it["month"] = t.Format("2006-01")
+			it["month_label"] = s.fmonth(t)
 			t = t.AddDate(0, 0, -dr.between(ld.Dates.GapMin, ld.Dates.GapMax))
 		}
 	}
@@ -740,6 +900,8 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 		}
 		for i, it := range items { // oldest version first was drawn; the list is newest first
 			it["version"] = vers[n-1-i]
+			it["title"] = vers[n-1-i]
+			it["slug"] = "v" + strings.ReplaceAll(vers[n-1-i], ".", "-")
 		}
 	}
 	for _, sd := range ld.Sub {
@@ -796,32 +958,49 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 
 var slugBad = regexp.MustCompile(`[^a-z0-9]+`)
 
+// translit is how slugify writes the letters that a web address does not take.
+var translit = strings.NewReplacer("ä", "a", "ö", "o", "ü", "u", "ß", "ss", "å", "a", "é", "e", "è", "e", "ê", "e", "à", "a", "ç", "c", "ñ", "n",
+	"а", "a", "б", "b", "в", "v", "г", "g", "д", "d", "е", "e", "ё", "e", "ж", "zh", "з", "z", "и", "i", "й", "y", "к", "k", "л", "l",
+	"м", "m", "н", "n", "о", "o", "п", "p", "р", "r", "с", "s", "т", "t", "у", "u", "ф", "f", "х", "kh", "ц", "ts", "ч", "ch", "ш", "sh",
+	"щ", "shch", "ъ", "", "ы", "y", "ь", "", "э", "e", "ю", "yu", "я", "ya")
+
 func slugify(s string) string {
-	s = strings.NewReplacer("ä", "a", "ö", "o", "ü", "u", "ß", "ss", "å", "a", "é", "e", "è", "e").Replace(strings.ToLower(s))
+	s = translit.Replace(strings.ToLower(s))
 	return strings.Trim(slugBad.ReplaceAllString(s, "-"), "-")
 }
 
-var monthNames = map[string][12]string{
-	"en": {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"},
-	"de": {"Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"},
-	"nl": {"januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"},
-	"sv": {"januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"},
+// textList is a list of words of the site's language (months, weekdays) or nil.
+func (s *site) textList(key string) []any {
+	l, _ := s.L[key].([]any)
+	return l
 }
 
-var dateFormats = map[string][]string{
-	"en": {"{d} {m} {y}", "{m} {d}, {y}"}, "de": {"{d}. {m} {y}"}, "nl": {"{d} {m} {y}"}, "sv": {"{d} {m} {y}"},
+func nameAt(l []any, i int) string {
+	if i < 0 || i >= len(l) {
+		return ""
+	}
+	return str(l[i])
 }
 
+// fdate writes a date the way the site's country does, with the months and days of its language.
 func (s *site) fdate(iso string) string {
 	t, err := time.Parse("2006-01-02", iso)
 	if err != nil {
 		return iso
 	}
-	months, ok := monthNames[s.Lang]
-	if !ok {
-		months = monthNames["en"]
+	months := s.textList("months")
+	of := s.textList("months_gen") // the month of a date, where the language bends it
+	if of == nil {
+		of = months
 	}
-	return strings.NewReplacer("{d}", fmt.Sprint(t.Day()), "{m}", months[t.Month()-1], "{y}", fmt.Sprint(t.Year())).Replace(s.DateFmt)
+	wd := nameAt(s.textList("weekdays"), (int(t.Weekday())+6)%7)
+	return strings.NewReplacer("{dd}", fmt.Sprintf("%02d", t.Day()), "{mm}", fmt.Sprintf("%02d", int(t.Month())), "{d}", fmt.Sprint(t.Day()),
+		"{mn}", nameAt(months, int(t.Month())-1), "{m}", nameAt(of, int(t.Month())-1), "{y}", fmt.Sprint(t.Year()), "{wd}", wd).Replace(s.DateFmt)
+}
+
+// fmonth is a month and a year, "October 2026".
+func (s *site) fmonth(t time.Time) string {
+	return nameAt(s.textList("months"), int(t.Month())-1) + " " + fmt.Sprint(t.Year())
 }
 
 // The functions of the templates, other than the builtins of the interpreter. They are keyed draws: the same key in two places
@@ -929,6 +1108,43 @@ func funcMap(c *ctx) map[string]tmplFunc {
 			return iconSVG(argStr(a, 0), c.r.sub(fmt.Sprint("icon", c.iconN)))
 		},
 		"fdate": func(a []any) any { return c.s.fdate(argStr(a, 0)) },
+		// money is a price of the kind's data in the money of the site's country.
+		"money": func(a []any) any {
+			if len(a) != 1 {
+				fail("money takes a price")
+			}
+			v, ok := number(a[0])
+			if !ok {
+				fail("money takes a number, not %T", a[0])
+			}
+			return c.s.country.money(v)
+		},
+		// hrs is a line of opening hours: the days from..to (1 is Monday), then the hours as "08:00" "18:00", or "" for a closed day.
+		"hrs": func(a []any) any {
+			if len(a) != 4 {
+				fail("hrs takes the first day, the last day, the opening and the closing time")
+			}
+			from, ok1 := number(a[0])
+			to, ok2 := number(a[1])
+			if !ok1 || !ok2 || from < 1 || to > 7 || to < from {
+				fail("hrs: the days are %v to %v", a[0], a[1])
+			}
+			long, short := c.s.textList("weekdays"), c.s.textList("weekdays_short")
+			days := nameAt(long, int(from)-1)
+			if to > from {
+				days = nameAt(short, int(from)-1) + "–" + nameAt(short, int(to)-1)
+			}
+			when := str(c.s.L["closed"])
+			if open, shut := str(a[2]), str(a[3]); open != "" && shut != "" {
+				cl := c.s.country
+				when = cl.clock(open, str(c.s.L["am"]), str(c.s.L["pm"])) + "–" + cl.clock(shut, str(c.s.L["am"]), str(c.s.L["pm"]))
+			}
+			f := str(c.s.L["hrs_fmt"])
+			if f == "" {
+				f = "%days%: %time%"
+			}
+			return strings.NewReplacer("%days%", days, "%time%", when).Replace(f)
+		},
 		"art": func(a []any) any {
 			k, kind := argStr(a, 0), argStr(a, 1)
 			r := key("art:" + k)

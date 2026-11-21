@@ -1,0 +1,495 @@
+{
+ "ui": {
+  "nav_label": "Main",
+  "footer": "Released under the MIT license.",
+  "nav_home": "Overview",
+  "nav_changelog": "Changelog",
+  "nav_install": "Install",
+  "nav_roadmap": "Roadmap",
+  "home_title": "Overview",
+  "desc_changelog": "Every release of {brand}, with what changed in it.",
+  "desc_install": "How to install {brand}: distribution packages, building from source, and checksums for every release.",
+  "desc_roadmap": "What the maintainers of {brand} are working on and what comes next.",
+  "nf_title": "Page not found",
+  "nf_text": "This page does not exist, or it has moved since the last release.",
+  "nf_back": "Back to the overview",
+  "features_h": "Why {brand}",
+  "start_h": "Get started",
+  "latest_h": "Latest release",
+  "all_releases": "All releases",
+  "get_it": "Install",
+  "read_log": "Read the changelog",
+  "changelog_h": "Changelog",
+  "changelog_intro": "Every release, newest first. Version numbers follow the usual major, minor, patch scheme.",
+  "released": "Released",
+  "install_h": "Install",
+  "install_intro": "{brand} is not shipped as a ready-made binary. Distributions package it, and building it from the source archive takes a few minutes.",
+  "pkg_h": "From your distribution",
+  "pkg_note": "Package versions can trail the latest release by a few weeks; the table further down says which version to expect from the source archive.",
+  "src_h": "Build from source",
+  "src_intro": "You need a C compiler and make. The build takes about a minute. The source archive of each release is named after the version.",
+  "sums_h": "Versions and checksums",
+  "sums_intro": "Every release has a source archive. Check its SHA-256 checksum before you build it.",
+  "col_ver": "Version",
+  "col_date": "Released",
+  "col_sum": "SHA-256 of the source archive",
+  "roadmap_h": "Roadmap",
+  "roadmap_intro": "What the maintainers are working on, in rough order. Plans change; the changelog is the record of what actually happened.",
+  "now_h": "Now",
+  "next_h": "Next",
+  "later_h": "Later",
+  "licence_h": "License",
+  "licence_p": "{brand} is free software, released under the MIT license. Use it, change it and share it.",
+  "rel_back": "All releases",
+  "rel_more": "Other releases",
+  "rel_src_h": "Source archive",
+  "pkgs": [
+   {
+    "s": "Debian and Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS with Homebrew"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pebble",
+       "Marsh",
+       "Lantern",
+       "Hollow",
+       "Ember",
+       "Fable",
+       "Tern",
+       "Nettle",
+       "Slate",
+       "Moss"
+      ],
+      [
+       "watch",
+       "tail",
+       "glance",
+       "notice",
+       "sentry",
+       "peek"
+      ]
+     ]
+    }
+   },
+   "tagline": "Run a command when your files change",
+   "desc": "{brand} watches a folder and runs a command whenever something in it changes.",
+   "overview": "{brand} watches a folder and runs a command whenever something in it changes. It is a small, fast program for people who are tired of saving a file and then switching to another window.",
+   "features": [
+    {
+     "h": "Quick to start",
+     "p": "One command and no configuration file."
+    },
+    {
+     "h": "Sensible by default",
+     "p": "Ignores editor swap files, version control folders and build output."
+    },
+    {
+     "h": "Works everywhere",
+     "p": "Linux, macOS and Windows, with the same flags."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {
+     "k": "Added",
+     "t": "Support for watching several folders at once."
+    },
+    {
+     "k": "Added",
+     "t": "A delay option to wait for a quiet moment before running."
+    },
+    {
+     "k": "Added",
+     "t": "Color in the output when the terminal supports it."
+    },
+    {
+     "k": "Fixed",
+     "t": "A rare crash when a watched folder was deleted."
+    },
+    {
+     "k": "Fixed",
+     "t": "Duplicate runs when an editor saved a file in two steps."
+    },
+    {
+     "k": "Fixed",
+     "t": "Paths with spaces on Windows."
+    },
+    {
+     "k": "Changed",
+     "t": "The default delay is now 200 milliseconds instead of 50."
+    },
+    {
+     "k": "Changed",
+     "t": "Ignore patterns follow the same rules as most version control tools."
+    },
+    {
+     "k": "Added",
+     "t": "A once flag that runs the command a single time and exits."
+    },
+    {
+     "k": "Fixed",
+     "t": "Memory use growing slowly when watching very large folders."
+    },
+    {
+     "k": "Changed",
+     "t": "Error messages now say which folder caused them."
+    },
+    {
+     "k": "Added",
+     "t": "Shell completions for the common shells."
+    }
+   ],
+   "now": [
+    "Faster start-up on large folders",
+    "Better messages when a command fails"
+   ],
+   "next": [
+    "A configuration file for per-project settings",
+    "Packages for the main Linux distributions"
+   ],
+   "later": [
+    "A quiet mode for use in scripts",
+    "Watching network drives reliably"
+   ]
+  },
+  "images": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pixel",
+       "Tile",
+       "Grain",
+       "Frame",
+       "Shutter",
+       "Lens",
+       "Focus",
+       "Crop",
+       "Sepia",
+       "Matte"
+      ],
+      [
+       "fit",
+       "trim",
+       "shrink",
+       "pack",
+       "batch",
+       "scale"
+      ]
+     ]
+    }
+   },
+   "tagline": "Resize a folder of pictures in one go",
+   "desc": "{brand} resizes and compresses pictures in bulk and leaves the originals alone.",
+   "overview": "{brand} resizes and compresses pictures in bulk. Point it at a folder and say how big you want the results; it does the rest and leaves the originals alone.",
+   "features": [
+    {
+     "h": "Batch first",
+     "p": "Hundreds of files at once, using every core."
+    },
+    {
+     "h": "Keeps the originals",
+     "p": "Results go to a new folder."
+    },
+    {
+     "h": "Predictable output",
+     "p": "The same input always gives the same bytes."
+    }
+   ],
+   "quick": "{cmd} photos --width 1600 --out small",
+   "changes": [
+    {
+     "k": "Added",
+     "t": "Support for WebP output."
+    },
+    {
+     "k": "Added",
+     "t": "A quality option for JPEG and WebP."
+    },
+    {
+     "k": "Fixed",
+     "t": "Photos taken in portrait mode coming out sideways."
+    },
+    {
+     "k": "Fixed",
+     "t": "A crash on files with no extension."
+    },
+    {
+     "k": "Changed",
+     "t": "Output files keep the original modification time."
+    },
+    {
+     "k": "Added",
+     "t": "A dry-run flag that lists what would be done."
+    },
+    {
+     "k": "Fixed",
+     "t": "Slow progress reporting on large batches."
+    },
+    {
+     "k": "Changed",
+     "t": "Smaller memory use when resizing very large pictures."
+    },
+    {
+     "k": "Added",
+     "t": "Resizing to a maximom height as well as a width."
+    },
+    {
+     "k": "Fixed",
+     "t": "Wrong colors on pictures with an embedded profile."
+    },
+    {
+     "k": "Changed",
+     "t": "The help text now has examples."
+    },
+    {
+     "k": "Added",
+     "t": "A suffix option to name the resized files."
+    }
+   ],
+   "now": [
+    "Faster JPEG decoding",
+    "A progress bar that stays out of the way"
+   ],
+   "next": [
+    "Cropping to a fixed ratio",
+    "Packages for the main Linux distributions"
+   ],
+   "later": [
+    "Support for animated images",
+    "A small preview mode"
+   ]
+  },
+  "markdown": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Plain",
+       "Comma",
+       "Quill",
+       "Margin",
+       "Gloss",
+       "Prose",
+       "Draft",
+       "Proof",
+       "Kern",
+       "Serif"
+      ],
+      [
+       "lint",
+       "check",
+       "tidy",
+       "scout",
+       "read",
+       "sweep"
+      ]
+     ]
+    }
+   },
+   "tagline": "Catch small mistakes in Markdown before readers do",
+   "desc": "{brand} checks Markdown files for broken links, skipped headings and other small mistakes.",
+   "overview": "{brand} checks Markdown files for broken links, skipped heading levels, trailing spaces and the other small things that make a document look careless. It runs in a second on a whole documentation folder.",
+   "features": [
+    {
+     "h": "Fast",
+     "p": "A thousand files in about a second."
+    },
+    {
+     "h": "Quiet",
+     "p": "Reports only what it is sure about."
+    },
+    {
+     "h": "Configurable",
+     "p": "Switch any rule off, or make it stricter."
+    }
+   ],
+   "quick": "{cmd} docs/",
+   "changes": [
+    {
+     "k": "Added",
+     "t": "A rule for headings that skip a level."
+    },
+    {
+     "k": "Added",
+     "t": "A rule for links that point to missing files."
+    },
+    {
+     "k": "Fixed",
+     "t": "False reports for links with anchors."
+    },
+    {
+     "k": "Fixed",
+     "t": "A crash on files with a byte order mark."
+    },
+    {
+     "k": "Changed",
+     "t": "Reports are now sorted by file and line."
+    },
+    {
+     "k": "Added",
+     "t": "An option to fix simple problems automatically."
+    },
+    {
+     "k": "Changed",
+     "t": "Rule names are shorter and easier to type."
+    },
+    {
+     "k": "Fixed",
+     "t": "Wrong line numbers after front matter."
+    },
+    {
+     "k": "Added",
+     "t": "Output as JSON for use in other tools."
+    },
+    {
+     "k": "Fixed",
+     "t": "Slow checking of very long lines."
+    },
+    {
+     "k": "Changed",
+     "t": "The configuration file can now live in any parent folder."
+    },
+    {
+     "k": "Added",
+     "t": "A rule for repeated words."
+    }
+   ],
+   "now": [
+    "More rules for tables",
+    "Better support for front matter"
+   ],
+   "next": [
+    "Checking links to headings in other documents",
+    "A plugin interface for custom rules"
+   ],
+   "later": [
+    "An editor integration",
+    "Translations of the messages"
+   ]
+  },
+  "backup": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Attic",
+       "Cellar",
+       "Shelf",
+       "Drawer",
+       "Locker",
+       "Chest",
+       "Pantry",
+       "Larder",
+       "Cabinet",
+       "Trunk"
+      ],
+      [
+       "copy",
+       "keep",
+       "stash",
+       "save",
+       "mirror",
+       "store"
+      ]
+     ]
+    }
+   },
+   "tagline": "Plain, dependable backups of a folder",
+   "desc": "{brand} copies a folder to another place and keeps older versions as ordinary files.",
+   "overview": "{brand} copies a folder to another place and keeps older versions, so that a mistake last Tuesday can still be undone. Backups are ordinary files that you can open without {brand}.",
+   "features": [
+    {
+     "h": "Ordinary files",
+     "p": "No special format to unlock later."
+    },
+    {
+     "h": "Versions",
+     "p": "Keep as many snapshots as you like."
+    },
+    {
+     "h": "Checks itself",
+     "p": "A verify command compares a backup with its source."
+    }
+   ],
+   "quick": "{cmd} notes /backups/notes",
+   "changes": [
+    {
+     "k": "Added",
+     "t": "A verify command that compares a backup with its source."
+    },
+    {
+     "k": "Added",
+     "t": "Snapshots can be kept for a number of days or a number of copies."
+    },
+    {
+     "k": "Fixed",
+     "t": "Files changed during a backup being copied twice."
+    },
+    {
+     "k": "Fixed",
+     "t": "Wrong permissions on restored files."
+    },
+    {
+     "k": "Changed",
+     "t": "Unchanged files are no longer copied again."
+    },
+    {
+     "k": "Added",
+     "t": "A restore command with a dry-run mode."
+    },
+    {
+     "k": "Fixed",
+     "t": "A crash on folders with very long path names."
+    },
+    {
+     "k": "Changed",
+     "t": "Progress is shown only when the output is a terminal."
+    },
+    {
+     "k": "Added",
+     "t": "A list command that shows the snapshots of a backup."
+    },
+    {
+     "k": "Fixed",
+     "t": "Backups to network drives stopping after a timeout."
+    },
+    {
+     "k": "Changed",
+     "t": "Snapshots are named by date rather than by number."
+    },
+    {
+     "k": "Added",
+     "t": "An option to leave out files by pattern."
+    }
+   ],
+   "now": [
+    "Faster copying of many small files",
+    "A clearer verify report"
+   ],
+   "next": [
+    "Encryption of backups at rest",
+    "Backing up to a second location in one step"
+   ],
+   "later": [
+    "A graphical restore tool",
+    "Scheduling built in"
+   ]
+  }
+ }
+}

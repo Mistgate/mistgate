@@ -9,7 +9,7 @@
 {{define "b_metrics"}}<section class="__sec__">
 <div class="__metrics__">
 <div class="__card__"><span class="__mv__">{{pct "upall" 9965 9999}}%</span><span class="__ml__">{{.L.m_uptime}}</span></div>
-<div class="__card__"><span class="__mv__">{{num "resp" 88 340}} ms</span><span class="__ml__">{{.L.m_resp}}</span></div>
+<div class="__card__"><span class="__mv__">{{num "resp" 88 340}} {{.L.ms}}</span><span class="__ml__">{{.L.m_resp}}</span></div>
 <div class="__card__"><span class="__mv__">{{len .Lists.incidents}}</span><span class="__ml__">{{.L.m_inc}}</span></div>
 </div>
 </section>{{end}}

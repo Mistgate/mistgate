@@ -1,0 +1,598 @@
+{
+ "ui": {
+  "nav_label": "Documentation",
+  "footer": "Documentation for version {ver}.",
+  "nav_home": "Overview",
+  "nav_install": "Install",
+  "nav_usage": "Usage",
+  "nav_faq": "FAQ",
+  "home_title": "Overview",
+  "desc_install": "How to install {brand} {ver} on Linux, macOS and Windows.",
+  "desc_usage": "How to use {brand}: common tasks with examples.",
+  "desc_faq": "Frequently asked questions about {brand}.",
+  "nf_title": "Page not found",
+  "nf_text": "This page is not part of the documentation. It may have been renamed in a newer version.",
+  "nf_back": "Back to the overview",
+  "quick_h": "Quick start",
+  "features_h": "What it does",
+  "out_h": "Output",
+  "install_h": "Installation",
+  "steps_h": "Steps",
+  "usage_h": "Usage",
+  "opts_h": "Options",
+  "opt_col": "Option",
+  "desc_col": "Description",
+  "faq_h": "Frequently asked questions",
+  "next": "Next",
+  "facts_h": "At a glance",
+  "menu_h": "Documentation",
+  "facts": [
+   {
+    "k": "Version",
+    "v": "{ver}"
+   },
+   {
+    "k": "Platforms",
+    "v": "Linux, macOS and Windows"
+   },
+   {
+    "k": "License",
+    "v": "MIT"
+   },
+   {
+    "k": "Dependencies",
+    "v": "None"
+   }
+  ],
+  "install_check": "If the version number is printed, the installation worked.",
+  "nav_config": "Configuration",
+  "nav_recipes": "Recipes",
+  "nav_trouble": "Troubleshooting",
+  "desc_config": "Configuration file and settings of {brand}.",
+  "desc_recipes": "Short recipes for everyday jobs with {brand}.",
+  "desc_trouble": "Fixes for the problems people meet most often with {brand}.",
+  "config_h": "Configuration",
+  "config_col_key": "Key",
+  "config_col_default": "Default",
+  "config_col_desc": "What it does",
+  "config_file_h": "Example",
+  "recipes_h": "Recipes",
+  "recipes_intro": "Short answers to the jobs people ask about most.",
+  "trouble_h": "Troubleshooting",
+  "trouble_intro": "The problems people meet most often, and what usually fixes them.",
+  "ver_l": "Version",
+  "prev": "Previous"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "A log summarizer for the command line",
+   "desc": "{brand} reads plain text log files and prints a short summary of what is in them.",
+   "overview": "{brand} reads plain text log files and prints a short summary: how many lines there are, which levels they use and which messages repeat the most. It is one small binary with no dependencies.",
+   "features": [
+    "Reads files, directories and standard input",
+    "Groups similar messages without any configuration",
+    "Prints text, JSON or a small HTML report"
+   ],
+   "quick_out": "app.log: 48 211 lines, 3 levels\n  info   46 902\n  warn    1 190\n  error     119\ntop message: cache miss for key (9 413 times)",
+   "install_intro": "{brand} is distributed as a single binary. There is nothing to configure before the first run.",
+   "install_steps": [
+    "Download the archive that matches your system.",
+    "Unpack it and copy the binary to a directory on your PATH.",
+    "Run the version command to check that it works."
+   ],
+   "faq": [
+    {
+     "q": "Which log formats are supported?",
+     "a": "Anything line based. {brand} recognizes common timestamp and level styles and falls back to plain lines when it does not."
+    },
+    {
+     "q": "Does it modify my files?",
+     "a": "Never. Files are opened read-only."
+    },
+    {
+     "q": "How big a file can it read?",
+     "a": "Files are streamed, so size is limited only by time. A gigabyte takes a few seconds on a laptop."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Summarize a file",
+     "p": "Point {brand} at a file, a directory or a pipe. Directories are read recursively and compressed files are unpacked on the fly."
+    },
+    {
+     "h": "Look at a time range",
+     "p": "Use --since and --until to narrow the summary to a time range. Times can be absolute or relative to now."
+    },
+    {
+     "h": "Choose an output format",
+     "p": "The default output is plain text. JSON is stable and meant for scripts; the HTML report is a single file you can send to a colleague."
+    }
+   ],
+   "options": [
+    {
+     "d": "Only lines after this time, absolute or such as 2h."
+    },
+    {
+     "d": "Only lines before this time."
+    },
+    {
+     "d": "Only lines of this level or above."
+    },
+    {
+     "d": "How many repeated messages to list. Default 5."
+    },
+    {
+     "d": "text, json or html. Default text."
+    }
+   ],
+   "config_intro": "{brand} reads an optional file called config.toml in your configuration folder. Every key can also be given on the command line, and the command line wins.",
+   "config_rows": [
+    {
+     "d": "How many repeated messages to list."
+    },
+    {
+     "d": "The output format: text, json or html."
+    },
+    {
+     "d": "Messages to leave out, matched as plain text."
+    },
+    {
+     "d": "Only read lines after this time."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Find the noisiest hour",
+     "p": "Group the summary by hour to see when the log was busiest."
+    },
+    {
+     "h": "Compare two days",
+     "p": "Show which messages are new, and which went away, between two files."
+    },
+    {
+     "h": "Make a report to send round",
+     "p": "Write the HTML report to a file and attach it to a message."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "The summary is empty",
+     "a": "Check that the file has one message per line. If it is compressed in a format {brand} does not know, unpack it first."
+    },
+    {
+     "q": "Times look wrong",
+     "a": "Lines without a time zone are read as UTC. Use --tz to say which zone they are in."
+    },
+    {
+     "q": "The report is too long",
+     "a": "Lower --top, or add the noisiest messages to the ignore list in the configuration file."
+    },
+    {
+     "q": "It is slow on a network drive",
+     "a": "Copy the file to a local disk first. Reading line by line over a slow link is the usual cause."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Tally",
+       "Gauge",
+       "Digest",
+       "Skim",
+       "Ledger",
+       "Quarry",
+       "Tidy",
+       "Scribe"
+      ],
+      [
+       "log",
+       "scan",
+       "sum",
+       "view",
+       "cut",
+       "peek"
+      ]
+     ]
+    }
+   }
+  },
+  "site": {
+   "tagline": "A small static site builder",
+   "desc": "{brand} turns a folder of Markdown files and a few templates into a static website.",
+   "overview": "{brand} turns a folder of Markdown files and a few templates into a static website. There is no database, no runtime and nothing to keep up to date on the server.",
+   "features": [
+    "Markdown with front matter",
+    "Templates in plain HTML",
+    "A local preview that rebuilds on every save"
+   ],
+   "quick_out": "Serving notes at localhost:4000 (press Ctrl+C to stop)",
+   "install_intro": "{brand} is a single executable. Put it on your PATH and you are done.",
+   "install_steps": [
+    "Download the archive that matches your system.",
+    "Unpack it and copy the executable to a directory on your PATH.",
+    "Run the version command to check that it works."
+   ],
+   "faq": [
+    {
+     "q": "Can I use my own templates?",
+     "a": "Yes. Templates are plain HTML files with a few placeholders, and the folder layout is yours to change."
+    },
+    {
+     "q": "Does it need a database?",
+     "a": "No. The output is plain files that any web server can serve."
+    },
+    {
+     "q": "How do I add a new kind of page?",
+     "a": "Add a folder under pages with its own layout file and {brand} will pick it up on the next build."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Start a new site",
+     "p": "The init command creates a folder with a config file, a layout and one example page."
+    },
+    {
+     "h": "Write a page",
+     "p": "Pages are Markdown files. The front matter at the top sets the title and the date; everything below it is the content."
+    },
+    {
+     "h": "Build for publishing",
+     "p": "The build command writes the finished site to the public folder. Copy that folder to any web server."
+    }
+   ],
+   "options": [
+    {
+     "d": "Folder for the finished site. Default public."
+    },
+    {
+     "d": "Include pages marked as drafts."
+    },
+    {
+     "d": "Port for the preview server. Default 4000."
+    },
+    {
+     "d": "Rebuild when a file changes."
+    },
+    {
+     "d": "Print errors only."
+    }
+   ],
+   "config_intro": "The file site.toml sits in the root of your folder. A missing key falls back to its default, so a new site needs no file at all.",
+   "config_rows": [
+    {
+     "d": "The name shown in the page header and in the title."
+    },
+    {
+     "d": "The address your site lives at. Use / for a site at the root."
+    },
+    {
+     "d": "The look of the site: plain, slate or folio."
+    },
+    {
+     "d": "Whether pages marked as drafts are built."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Add a new page",
+     "p": "Create a Markdown file with a title and a date at the top."
+    },
+    {
+     "h": "Preview drafts",
+     "p": "Serve the site locally with the unfinished pages included."
+    },
+    {
+     "h": "Publish to a folder",
+     "p": "Build the whole site into one folder that you can copy to any web server."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "A page is missing from the build",
+     "a": "Pages with draft: true in their header are skipped. Remove it or build with --drafts."
+    },
+    {
+     "q": "Links break after publishing",
+     "a": "Set base_url to the address of the folder the site is published in."
+    },
+    {
+     "q": "The preview does not update",
+     "a": "Some editors write a new file instead of changing the old one. Restart the preview, or turn off safe write in the editor."
+    },
+    {
+     "q": "Images are not shown",
+     "a": "Put them in the static folder. Everything in it is copied unchanged."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Plain",
+       "Slate",
+       "Chalk",
+       "Folio",
+       "Quill",
+       "Mason",
+       "Press",
+       "Ink"
+      ],
+      [
+       "site",
+       "page",
+       "build",
+       "gen",
+       "sheet"
+      ]
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Recurring jobs without a crontab",
+   "desc": "{brand} runs small recurring jobs on one machine and tells you when one of them fails.",
+   "overview": "{brand} runs small recurring jobs on one machine and tells you when one of them fails. It is a friendlier alternative to a crontab you have to keep in your head.",
+   "features": [
+    "Schedules written in plain words",
+    "A log for every run",
+    "One line of output per job, so failures stand out"
+   ],
+   "quick_out": "backup   every day at 03:00   last run: ok (4 s)",
+   "install_intro": "{brand} is a single executable plus a small background process that checks the schedule once a minute.",
+   "install_steps": [
+    "Download the archive that matches your system.",
+    "Unpack it and copy the executable to a directory on your PATH.",
+    "Start the background process with your system's service manager."
+   ],
+   "faq": [
+    {
+     "q": "Does it need to run as a service?",
+     "a": "Yes, a small background process checks the schedule once a minute. The install page shows what to start."
+    },
+    {
+     "q": "What happens if the computer is off?",
+     "a": "A job that was due while the machine was off runs once when it starts again."
+    },
+    {
+     "q": "Can jobs depend on each other?",
+     "a": "Not yet. Chain the commands in a single job for now."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Add a job",
+     "p": "A job has a name, a schedule and a command. Schedules are written in plain words."
+    },
+    {
+     "h": "See what ran",
+     "p": "The list command shows every job with the result of its last run. The history command shows the runs of one job with their duration and output."
+    },
+    {
+     "h": "Pause and resume",
+     "p": "Pausing keeps the job and its history but stops it from running. Useful while you move house or restore a backup."
+    }
+   ],
+   "options": [
+    {
+     "d": "Where jobs and logs are kept. Default is a folder in your home."
+    },
+    {
+     "d": "Print only failures."
+    },
+    {
+     "d": "How many runs history shows. Default 10."
+    },
+    {
+     "d": "Machine readable output."
+    },
+    {
+     "d": "Run a job right away as well as on schedule."
+    }
+   ],
+   "config_intro": "{brand} reads jobs.toml from your configuration folder. The jobs themselves are kept separately, so the file only holds settings.",
+   "config_rows": [
+    {
+     "d": "The shell that runs the commands."
+    },
+    {
+     "d": "Where the output of every run is kept."
+    },
+    {
+     "d": "How many times a failed job is tried again."
+    },
+    {
+     "d": "Whether a failed job also sends a notice."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Run a job once, now",
+     "p": "Start a job outside its schedule, for instance to test a new command."
+    },
+    {
+     "h": "See why a job failed",
+     "p": "Print the output of the last run of a job."
+    },
+    {
+     "h": "Pause everything while you travel",
+     "p": "Stop all schedules until you resume them."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "A job never runs",
+     "a": "Check that the program is running with the list command. Jobs only run while it is."
+    },
+    {
+     "q": "A job runs twice",
+     "a": "Two copies of the program are running. Stop one of them; the lock file is in the log folder."
+    },
+    {
+     "q": "The command works in my shell but not here",
+     "a": "Jobs do not read your shell startup files. Use full paths, or set the environment in the job."
+    },
+    {
+     "q": "Times are an hour out",
+     "a": "{brand} follows the system clock and time zone. Change them there, not in the job."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Clock",
+       "Errand",
+       "Chore",
+       "Rota",
+       "Tick",
+       "Cadence",
+       "Turn",
+       "Nudge"
+      ],
+      [
+       "work",
+       "list",
+       "run",
+       "do",
+       "bell"
+      ]
+     ]
+    }
+   }
+  },
+  "csv": {
+   "tagline": "Select, sort and join CSV files",
+   "desc": "{brand} selects, sorts, joins and cleans CSV files from the command line.",
+   "overview": "{brand} selects, sorts, joins and cleans CSV files from the command line. It handles large files without loading them into memory and never changes the input.",
+   "features": [
+    "Select and rename columns",
+    "Sort, filter and join files",
+    "Fix common problems such as stray quotes and mixed line endings"
+   ],
+   "quick_out": "name,city\nMira,Leeds\nOtto,York",
+   "install_intro": "{brand} is a single executable with no dependencies.",
+   "install_steps": [
+    "Download the archive that matches your system.",
+    "Unpack it and copy the executable to a directory on your PATH.",
+    "Run the version command to check that it works."
+   ],
+   "faq": [
+    {
+     "q": "How large a file can it handle?",
+     "a": "Files are processed as a stream, so memory use stays small. Sorting large files uses temporary space on disk."
+    },
+    {
+     "q": "Does it change my files?",
+     "a": "No. Output goes to the screen or to a new file."
+    },
+    {
+     "q": "What about other separators?",
+     "a": "Use the delimiter option for tabs, semicolons or any single character."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Pick columns",
+     "p": "The select command prints only the columns you name, in the order you give them. A column can be renamed with an equals sign."
+    },
+    {
+     "h": "Filter rows",
+     "p": "The filter command keeps the rows that match a simple condition. Several conditions can be combined."
+    },
+    {
+     "h": "Join two files",
+     "p": "The join command combines two files on a column they share. Rows without a match are dropped unless you ask for them."
+    }
+   ],
+   "options": [
+    {
+     "d": "Field separator. Default is a comma."
+    },
+    {
+     "d": "Set to false if the first row is data."
+    },
+    {
+     "d": "Write to a file instead of the screen."
+    },
+    {
+     "d": "Column to sort by."
+    },
+    {
+     "d": "Column to join on."
+    }
+   ],
+   "config_intro": "Put a file called .{cmd}rc in your home folder to change the defaults. Options on the command line always win.",
+   "config_rows": [
+    {
+     "d": "The character that separates columns."
+    },
+    {
+     "d": "Whether the first row holds column names."
+    },
+    {
+     "d": "The text encoding of input and output."
+    },
+    {
+     "d": "What an empty cell is written as in the output."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Pick and rename columns",
+     "p": "Keep two columns and give one of them a new name."
+    },
+    {
+     "h": "Join two files on a key",
+     "p": "Combine the rows of two files that share an id."
+    },
+    {
+     "h": "Remove duplicate rows",
+     "p": "Keep the first of every group of identical rows."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Accents look broken",
+     "a": "The file is probably not UTF-8. Set the encoding in the configuration file or with --encoding."
+    },
+    {
+     "q": "A column is missing",
+     "a": "If the first row is data and not names, run with --no-header and refer to columns by number."
+    },
+    {
+     "q": "Numbers are sorted as text",
+     "a": "Say so with --numeric, or {brand} sorts them the way they look."
+    },
+    {
+     "q": "A join gives no rows",
+     "a": "The key has different spacing or case in the two files. Run tidy on both and try again."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Column",
+       "Grid",
+       "Cell",
+       "Row",
+       "Sheet",
+       "Tab",
+       "Comma",
+       "Field"
+      ],
+      [
+       "cut",
+       "fix",
+       "join",
+       "tidy",
+       "sift",
+       "wrangle"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}
