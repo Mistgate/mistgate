@@ -42,7 +42,21 @@
   "licence_p": "{brand} ist freie Software unter der MIT-Lizenz. Sie dürfen es verwenden, ändern und weitergeben.",
   "rel_back": "Alle Versionen",
   "rel_more": "Weitere Versionen",
-  "rel_src_h": "Quellarchiv"
+  "rel_src_h": "Quellarchiv",
+  "pkgs": [
+   {
+    "s": "Debian und Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS mit Homebrew"
+   }
+  ]
  },
  "bundles": {
   "watch": {

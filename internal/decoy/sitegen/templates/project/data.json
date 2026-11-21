@@ -2,19 +2,15 @@
  "ui": {
   "pkgs": [
    {
-    "s": "Debian and Ubuntu",
     "c": "sudo apt install {cmd}"
    },
    {
-    "s": "Fedora",
     "c": "sudo dnf install {cmd}"
    },
    {
-    "s": "Arch Linux",
     "c": "sudo pacman -S {cmd}"
    },
    {
-    "s": "macOS with Homebrew",
     "c": "brew install {cmd}"
    }
   ],

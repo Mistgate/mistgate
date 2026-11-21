@@ -42,7 +42,21 @@
   "licence_p": "{brand} is free software, released under the MIT licence. Use it, change it and share it.",
   "rel_back": "All releases",
   "rel_more": "Other releases",
-  "rel_src_h": "Source archive"
+  "rel_src_h": "Source archive",
+  "pkgs": [
+   {
+    "s": "Debian and Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS with Homebrew"
+   }
+  ]
  },
  "bundles": {
   "watch": {
