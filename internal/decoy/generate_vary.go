@@ -119,19 +119,19 @@ var blockEnd = map[string]bool{"li": true, "p": true, "h1": true, "h2": true, "h
 
 var indents = []string{"", " ", "  ", "   ", "    ", "     ", "      ", "        ", "\t", "\t\t", "\n", "\n  "}
 
-// shake changes a page in ways nobody sees so that two sites made from one vocabulary never share a long literal run, even
-// where they happen to say the same thing: an invisible <wbr> inside long runs of prose, and a line break or indentation after
-// block elements. The places are the seed's choice.
+// shake varies the layout of the markup of a page, so that two sites made from one template do not share a long run of it: a
+// line break and some indentation after block elements and after meta and link tags. The text is never touched: two sites
+// may say the same thing, but they do not look the same in the source.
 func shake(r *rng, h string) string {
 	var out strings.Builder
 	raw := map[string]bool{"script": true, "style": true, "pre": true, "svg": true, "title": true, "textarea": true}
 	for len(h) > 0 {
 		i := strings.IndexByte(h, '<')
 		if i < 0 {
-			out.WriteString(breakProse(r, h))
+			out.WriteString(h)
 			break
 		}
-		out.WriteString(breakProse(r, h[:i]))
+		out.WriteString(h[:i])
 		j := strings.IndexByte(h[i:], '>')
 		if j < 0 {
 			out.WriteString(h[i:])
@@ -154,21 +154,6 @@ func shake(r *rng, h string) string {
 		if (closing && blockEnd[name]) || (!closing && (name == "meta" || name == "link")) {
 			h = strings.TrimPrefix(h, "\n")
 			out.WriteString("\n" + indents[r.n(len(indents))])
-		}
-	}
-	return out.String()
-}
-
-func breakProse(r *rng, text string) string {
-	if len(text) < 45 {
-		return text
-	}
-	// Every space may take a break, each on its own chance: two sites that say the same thing then break it in different places.
-	var out strings.Builder
-	for i := 0; i < len(text); i++ {
-		out.WriteByte(text[i])
-		if text[i] == ' ' && i > 6 && i < len(text)-8 && r.n(7) == 0 {
-			out.WriteString("<wbr>")
 		}
 	}
 	return out.String()

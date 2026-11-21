@@ -225,8 +225,47 @@ func TestGenerateDiffers(t *testing.T) {
 	}
 }
 
-// sharedRun is the longest run of bytes (over limit) two sites have in common, or "".
+// markupOnly is the body of an HTML page without its text: the tags with their attributes and the white space between them.
+// Two sites may say the same thing; what must differ is how the page is built. The head (doctype, meta) is a fixed preamble
+// and does not count.
+func markupOnly(src []byte) []byte {
+	var out bytes.Buffer
+	z := html.NewTokenizer(bytes.NewReader(src))
+	inBody := false
+	for {
+		tt := z.Next()
+		if tt == html.ErrorToken {
+			return out.Bytes()
+		}
+		raw := append([]byte(nil), z.Raw()...)
+		if tt == html.StartTagToken {
+			if name, _ := z.TagName(); string(name) == "body" {
+				inBody = true
+			}
+		}
+		if !inBody {
+			continue
+		}
+		if tt == html.TextToken && len(bytes.TrimSpace(raw)) > 0 {
+			continue
+		}
+		out.Write(raw)
+	}
+}
+
+// sharedRun is the longest run of bytes (over limit) two sites have in common, or "". The text of the pages does not count.
 func sharedRun(a, b []File, limit int) string {
+	strip := func(files []File) []File {
+		out := make([]File, len(files))
+		for i, f := range files {
+			out[i] = f
+			if path.Ext(f.Path) == ".html" {
+				out[i].Content = markupOnly(f.Content)
+			}
+		}
+		return out
+	}
+	a, b = strip(a), strip(b)
 	seed := maphash.MakeSeed()
 	win := limit + 1
 	seen := map[uint64][]byte{}
