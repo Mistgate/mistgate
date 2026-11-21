@@ -129,7 +129,7 @@ func (f *Fleet) photoKey(ctx context.Context) vault.Redacted {
 	}
 	b, err := f.v.Open(sealed, photoKeyAAD)
 	if err != nil {
-		f.log.Warn("decoy photos: the stored key cannot be opened; it is ignored")
+		f.log.Warn("decoy photos: the stored key cannot be opened; it is ignored", "code", "decoy_photos_key_unreadable")
 		return ""
 	}
 	return vault.Redacted(b)
