@@ -5,7 +5,7 @@ import { InboundState, NodeStatus, WarpState } from "@/gen/mistgate/admin/v1/com
 import { groups as groupsApi, health as healthApi, nodes as nodesApi, profiles as profilesApi } from "@/lib/api";
 import { checksQuery } from "@/lib/health";
 import { nodesQuery } from "@/lib/queries";
-import { GROUPS, NODES, NOW, nid, nodeRows, PROFILES } from "@/screens/dev-kit-profiles-data";
+import { GROUPS, NODES, NOW, nid, nodeRows, SCENE_PROFILES as PROFILES } from "@/screens/dev-kit-profiles-data";
 import type { Frame } from "@/screens/dev-kit-profile";
 import type { PageData } from "@/screens/profiles/page-types";
 import { twinPlanKey } from "@/screens/profiles/twin";
@@ -90,6 +90,8 @@ export function tabsData(data: PageData, state: string): PageData {
     if (v.has("apply") && k === 0) o.state = InboundState.PENDING;
     if (i.protocol === "awg") o.awg = { backend: k === 0 ? "userspace" : "kernel", backendVersion: "", ifaceUp: true, peers: k === 0 ? 12 : 2, peersHandshaken: 12, peersOnline: k === 0 ? 7 : 1, newestHandshakeUnix: NOW - (k === 0 ? 60 : 360), udpRxPackets: 100, unknownPeerEvents: 0, reportedUnix: NOW };
     if (v.has("cert") && o.certNotAfterUnix) o.certNotAfterUnix = NOW + 5 * 86400;
+    // a Telegram server with a port of its own on one node (the Web mode serves 443 only)
+    if (v.has("override") && i.protocol === "mtproto" && k === 1) o.portOverride = 8443;
     if (v.has("own") && k === 0) o.portOverride = 8444;
     if (v.has("own") && k === 0) o.port = 8444;
     if (v.has("own") && k === 1) o.directInSubscriptions = false;
@@ -99,7 +101,8 @@ export function tabsData(data: PageData, state: string): PageData {
     }
     return o;
   });
-  const settingsJson = v.has("warp") ? JSON.stringify({ ...JSON.parse(data.initial.settingsJson), egress: "warp" }) : data.initial.settingsJson;
+  // "fake": the Telegram profile as it is saved in the Fake TLS mode (a scene then switches it to Web)
+  const settingsJson = v.has("warp") ? JSON.stringify({ ...JSON.parse(data.initial.settingsJson), egress: "warp" }) : v.has("fake") ? JSON.stringify({ ...JSON.parse(data.initial.settingsJson), mode: "fake_tls" }) : data.initial.settingsJson;
   return { ...data, inbounds: inbounds as never, initial: { ...data.initial, settingsJson } };
 }
 

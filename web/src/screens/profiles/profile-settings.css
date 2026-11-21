@@ -395,3 +395,8 @@
   flex: 1;
   text-align: center;
 }
+/* a value the profile fixes (the Web mode's port 443): it reads, it does not take typing */
+.pf .pp-ct .an-i:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}

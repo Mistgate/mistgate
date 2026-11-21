@@ -10,6 +10,7 @@ import { fieldErrors, isCode } from "@/screens/users/rpc";
 import { useTx } from "@/screens/users/t";
 import { useDebounced } from "@/screens/users/ui";
 import type { PageData } from "./page-types";
+import { mtprotoGroups } from "./mtproto-form";
 import { allFields, changedFields, parseSchema, parseSettings, type Field, type Settings } from "./schema";
 import type { Problem } from "./schema-form";
 
@@ -27,7 +28,7 @@ export function useProfileForm(data: PageData, readOnly: boolean, onStale: () =>
   const toast = useToast();
   const qc = useQueryClient();
   const { profile, info, initial } = data;
-  const groups = useMemo(() => parseSchema(info.settingsSchemaJson), [info.settingsSchemaJson]);
+  const groups = useMemo(() => (info.id === "mtproto" ? mtprotoGroups(parseSchema(info.settingsSchemaJson)) : parseSchema(info.settingsSchemaJson)), [info.id, info.settingsSchemaJson]);
   const fields = useMemo(() => allFields(groups), [groups]);
   const base = useMemo(() => parseSettings(initial.settingsJson), [initial.settingsJson]);
   const [settings, setSettings] = useState<Settings>(() => seed?.settings?.(base) ?? base);

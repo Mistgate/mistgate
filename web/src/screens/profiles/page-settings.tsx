@@ -17,7 +17,7 @@ import { asVersion, minClients, type AwgVersion } from "@/lib/awg";
 import { ConfLine } from "./conf-preview";
 import { EgressNote } from "./egress-note";
 import { dropsOf, dropWords, nameOf } from "./formats";
-import { mtprotoHidden, mtprotoOn443 } from "./mtproto-form";
+import { mtprotoEdited, mtprotoHidden, mtprotoLocked, mtprotoNodesText, mtprotoOn443, mtprotoWeb, mtprotoWebOverrides } from "./mtproto-form";
 import type { ProfileForm } from "./page-form";
 import { PageFields } from "./page-fields";
 import { DlgFrame } from "./pf-frame";
@@ -80,6 +80,9 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
   const mtprotoHiddenIds = useMemo<ReadonlySet<string>>(() => (isMtproto ? mtprotoHidden(fields, settings) : new Set()), [isMtproto, fields, settings]);
   const hidden = isVless && vlessHiddenIds.size > 0 ? vlessHiddenIds : isMtproto && mtprotoHiddenIds.size > 0 ? mtprotoHiddenIds : undefined;
   const nodeIds = [...new Set(ctx.data.inbounds.map((i) => i.nodeId))];
+  // the Web mode serves port 443 only: a node where the profile has a port of its own would not build it
+  const webOverrides = isMtproto ? mtprotoWebOverrides(ctx.data.inbounds, settings) : [];
+  const web = isMtproto && mtprotoWeb(settings);
   const extra = (f: Field): ReactNode => {
     const note = (text: ReactNode, tone?: "warn") => <span className={cx("pp-q1", tone === "warn" && "part")}>{text}</span>;
     if (isMtproto && f.id === "fake_tls.domain") {
@@ -90,6 +93,8 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
         </>
       );
     }
+    if (isMtproto && f.id === "mode" && web) return note(t("mtproto.web.dns"));
+    if (isMtproto && f.id === "port" && web) return note(t("mtproto.web.port"));
     if (f.id === "egress" && getAt(settings, f.path) === "warp") return <EgressNote nodeIds={nodeIds} />;
     // behind a CDN the mode "auto" is sent to clients as packet-up (the panel does it too)
     if (isVless && f.id === "xhttp.mode" && getAt(settings, ["security"]) === "tls" && String(getAt(settings, ["cdn", "host"]) ?? "").trim() !== "" && getAt(settings, f.path) === "auto") return note(t("profiles.vless.mode.cdn"));
@@ -107,7 +112,7 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
     if (info.id === "hysteria2" && f.id === "masquerade.type") return <VlessHy2Docs />;
     return null;
   };
-  const onChange = isAwg ? (n: typeof settings) => form.edit(handTyped(settings, n)) : isVless ? (n: typeof settings) => form.edit(vlessEdited(settings, n)) : form.edit;
+  const onChange = isAwg ? (n: typeof settings) => form.edit(handTyped(settings, n)) : isVless ? (n: typeof settings) => form.edit(vlessEdited(settings, n)) : isMtproto ? (n: typeof settings) => form.edit(mtprotoEdited(settings, n)) : form.edit;
 
   // the remarks: what the form cannot be saved with, then what the server only warns about
   const warns: Remark[] = (preview.data?.warnings ?? []).map((w: FieldError, i) => {
@@ -122,6 +127,7 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
     return r;
   });
   const errs: Remark[] = problems.map((p: Problem, i) => ({ id: `e${i}`, g: "bad", text: ((p.code && (t.opt(`field.${info.id}${p.pointer.replaceAll("/", ".")}.${p.code}`) ?? undefined)) || p.message), pointer: p.pointer }));
+  if (webOverrides.length > 0) warns.push({ id: "web-port", g: "part", text: t("mtproto.web.override", { nodes: mtprotoNodesText(webOverrides) }), pointer: "/mode" });
   const remarks = [...errs, ...warns];
 
   const nameRow = (
@@ -239,7 +245,7 @@ export function SettingsTab({ ctx, form, readOnly, saved }: { ctx: TabCtx; form:
               scene={ctx.variant ? new Set(ctx.variant.split(".")) : undefined}
             />
           ) : (
-            <PageFields protocol={info.id} groups={groups} settings={settings} base={form.base} problems={problems} onChange={onChange} hidden={hidden} offers={isVless ? vlessOffers : undefined} extra={extra} lead={nameRow} />
+            <PageFields protocol={info.id} groups={groups} settings={settings} base={form.base} problems={problems} onChange={onChange} hidden={hidden} readOnly={isMtproto ? mtprotoLocked(settings) : undefined} offers={isVless ? vlessOffers : undefined} extra={extra} lead={nameRow} />
           )}
         </div>
         {ctx.owner && (
@@ -388,6 +394,7 @@ function ImpactDialog({ ctx, form, t }: { ctx: TabCtx; form: ProfileForm; t: Tx 
           : t("profiles.crit.headNone");
   const bad = !!i && (i.devicesNeedReissue > 0 || broken);
   const nameChanged = form.name !== data.initial.name;
+  const webOverrides = info.id === "mtproto" ? mtprotoWebOverrides(data.inbounds, form.settings) : [];
   const where = ctx.servers.length > 0 ? t("pf.st.whereOn", { n: new Set(ctx.servers.map((x) => x.nodeId)).size, list: ctx.servers.map((x) => x.nodeName).join(", ") }) : t("pf.st.whereNone");
   const [busy, setBusy] = useState(false);
   const go = async () => {
@@ -459,6 +466,14 @@ function ImpactDialog({ ctx, form, t }: { ctx: TabCtx; form: ProfileForm; t: Tx 
               <Gl k="none" />
               <div>
                 <span>{t(byTg ? "profiles.crit.tgAdvice" : byTt ? "profiles.crit.ttAdvice" : "profiles.crit.subAdvice")}</span>
+              </div>
+            </div>
+          )}
+          {webOverrides.length > 0 && (
+            <div className="pp-imp none">
+              <Gl k="part" />
+              <div>
+                <span>{t("mtproto.web.override", { nodes: mtprotoNodesText(webOverrides) })}</span>
               </div>
             </div>
           )}

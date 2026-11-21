@@ -143,7 +143,7 @@ export function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirt
     case "number":
       control = (
         <div className={cx("pf-ib", !after && "pp-short")}>
-          <NumberInput label={label} value={getAt(settings, f.path)} integer={f.integer} invalid={invalid} describedBy={describedBy} masked={masked} onChange={(v) => onChange(f.path, v)} className="an-i mono" />
+          <NumberInput label={label} value={getAt(settings, f.path)} integer={f.integer} invalid={invalid} describedBy={describedBy} masked={masked} disabled={locked} onChange={(v) => onChange(f.path, v)} className="an-i mono" />
           {unit && <em>{unit}</em>}
           {after}
         </div>
