@@ -121,7 +121,7 @@ const profileRows = [
   { id: "prf_main", name: "Main · 443", protocol: "hysteria2" },
   { id: "prf_site", name: "Site · 443", protocol: "vless" },
 ];
-const group = (gid: string, name: string, color: string, userCount: number, profileIds: string[]) => ({ id: `grp_${gid}`, name, color, profileIds, userCount, happNodes: 4, amneziaNodes: 0, telegramNodes: 0, disabledNodeIds: [] as string[], dnsPresetId: "" });
+const group = (gid: string, name: string, color: string, userCount: number, profileIds: string[]) => ({ id: `grp_${gid}`, name, color, profileIds, userCount, extraUserCount: 0, happNodes: 4, amneziaNodes: 0, telegramNodes: 0, disabledNodeIds: [] as string[], dnsPresetId: "" });
 const groupRows = [group("friends", "friends", "sky", 14, []), group("family", "family", "sand", 9, ["prf_main"])];
 
 const preview = (protocol: string, settingsJson: string) => {
