@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { AlertKind, AlertSeverity, CheckStatus, CountryVerdict, DoctorStatus } from "@/gen/mistgate/admin/v1/health_pb";
@@ -570,6 +571,13 @@ describe("the server's vocabulary is covered", () => {
       expect(hasKey(k), k).toBe(true);
       for (const lang of langs) expect(dictionaries[lang][k as keyof typeof ru], `${lang} ${k}`).toBeTruthy();
     }
+  });
+  it("words every error code a check can end with, in every language", () => {
+    // the codes the Go scan finds in internal/panel/health (error_codes_test.go pins the file); the update screens word the code of
+    // a profile that did not pass from these too
+    const codes = JSON.parse(readFileSync(`${process.cwd()}/../internal/panel/health/testdata/error_codes.json`, "utf8")) as string[];
+    expect(codes.length).toBeGreaterThan(8);
+    for (const c of codes) for (const lang of langs) expect((dictionaries[lang] as Record<string, string>)[`health.check.err.${c}`], `${lang} ${c}`).toBeTruthy();
   });
   it("has every placeholder of the why texts among the params the node or the panel sends", () => {
     const sent: Record<string, string[]> = {
