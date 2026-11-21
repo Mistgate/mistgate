@@ -920,7 +920,7 @@ func TestEdgeLinkLivenessCloseByAlarm(t *testing.T) {
 		return ag.eng.has("inb_edge") && rev > 0 && r.session() == 1 && agentFirstUnacked(ag.a) == 0
 	}, "connected, applied and acknowledged: the agent has nothing more to say")
 
-	r.em.advance(16 * time.Second)
+	r.em.advanceBetweenSteps(r.nodeID, 16*time.Second)
 	r.em.runAlarm(r.nodeID)
 
 	steps := r.em.steps(r.nodeID)
@@ -991,7 +991,7 @@ func TestEdgeLinkRetireByAlarmWithSilentClient(t *testing.T) {
 	}
 
 	// The client says nothing and does not close. Five seconds later the core closes the session.
-	r.em.advance(6 * time.Second)
+	r.em.advanceBetweenSteps(r.nodeID, 6*time.Second)
 	r.em.runAlarm(r.nodeID)
 	closes := r.em.closes(r.nodeID)
 	if len(closes) != 1 || closes[0].Code != 1008 || closes[0].Reason != "node retired" {
@@ -1320,7 +1320,7 @@ func TestEdgeLinkHandshakeRefusalsStoreNothing(t *testing.T) {
 	if st := r.em.storage(r.nodeID); st.Sockets != 1 || st.Gen != 0 || st.Live != 0 || st.HasState || st.AlarmAt != 0 || !st.AlarmSet {
 		t.Errorf("storage with a silent socket = %+v, want only the handshake alarm", st)
 	}
-	r.em.advance(11 * time.Second)
+	r.em.advanceBetweenSteps(r.nodeID, 11*time.Second)
 	r.em.runAlarm(r.nodeID)
 	if ce := closedWith(silent); ce.Code != 1008 || ce.Reason != "handshake timeout" {
 		t.Errorf("silent socket closed with %v %q, want 1008 \"handshake timeout\"", ce.Code, ce.Reason)
@@ -1351,7 +1351,7 @@ func TestEdgeLinkNoHelloKeepsItsDeadlineAndIsClosedByAlarm(t *testing.T) {
 		t.Errorf("alarm moved from %d to %d: a step that does nothing must keep the Hello deadline", before.AlarmAt, after.AlarmAt)
 	}
 
-	r.em.advance(16 * time.Second)
+	r.em.advanceBetweenSteps(r.nodeID, 16*time.Second)
 	r.em.runAlarm(r.nodeID)
 	if closes := r.em.closes(r.nodeID); len(closes) != 1 || closes[0].Code != 1008 || closes[0].Reason != "no Hello" {
 		t.Fatalf("closes = %+v, want one 1008 \"no Hello\"", closes)
