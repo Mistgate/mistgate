@@ -46,6 +46,7 @@ const paths = {
   warn: "M12 4l9 16H3L12 4zM12 10v4M12 17h.01",
   traffic: "M8 4v16M8 4L4 8M8 4l4 4M16 20V4M16 20l-4-4M16 20l4-4",
   gauge: "M4 17a8 8 0 1 1 16 0M12 17l4-5M7 17h.01",
+  image: "M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15.5 9.5h.01",
   key: "M8 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 12l9-9M16 7l3 3M14 9l2 2",
   phone: "M7 3h10v18H7zM11 18h2",
   // the platforms of a device: phone (iPhone), android, tablet (iPad), monitor (Windows), laptop (Mac), terminal (Linux)

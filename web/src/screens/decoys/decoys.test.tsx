@@ -37,6 +37,8 @@ const api = {
   listDecoyTemplates: vi.fn(),
   previewDecoyTemplate: vi.fn(),
   generateDecoySite: vi.fn(),
+  getDecoyPhotos: vi.fn(),
+  setDecoyPhotosKey: vi.fn(),
 };
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
@@ -63,6 +65,7 @@ beforeEach(() => {
   setLang("en");
   for (const f of Object.values(api)) f.mockReset();
   navigate.mockReset();
+  api.getDecoyPhotos.mockResolvedValue({ hasKey: false });
   api.getDecoyPagePreview.mockResolvedValue({ html: "<p>home</p>", path: "" });
   api.listDecoyPages.mockResolvedValue({ pages: ["index.html", "about.html"], files: [], has404: true });
   api.getDecoyFile.mockResolvedValue({ text: "<h1>Hi</h1>", size: 11, truncated: false });
@@ -361,6 +364,102 @@ describe("a site from a template", () => {
       await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(dictionaries[lang]["dz.way.tpl"])));
       expect(document.querySelectorAll(".dz-ways.tpl .dz-way"), lang).toHaveLength(11);
       expect(text(), lang).toContain(dictionaries[lang]["dz.tpl.blog"]);
+    }
+  });
+});
+
+describe("the photos of a generated site", () => {
+  const kinds = ["blog", "card"].map((id) => ({ id, nameEn: `Kind ${id}`, nameRu: `Вид ${id}` }));
+  const seeded = (n: number, photos: string) => ({ html: `<p>page ${n}</p>`, seed: `${n}`.padStart(16, "0"), name: `Brand ${n}`, photos });
+  const SECRET = "pexels-test-key-0123456789abcdef";
+  const view = async (photos = "no_key") => {
+    api.listDecoyTemplates.mockResolvedValue({ templates: kinds });
+    api.previewDecoyTemplate.mockResolvedValue(seeded(7, photos));
+    await mountUi(list(), { lib: library([site("a")]), nodes: [node("de1")] });
+    await click(button(en["dz.new"]));
+    await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.way.tpl"])));
+    await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.tpl.blog"])));
+  };
+  const row = () => document.querySelector(".dz-ph");
+
+  it("shows whether a key is set on the page of the kinds as well, with the link Pexels asks for", async () => {
+    api.listDecoyTemplates.mockResolvedValue({ templates: kinds });
+    await mountUi(list(), { lib: library([site("a")]), nodes: [node("de1")] });
+    await click(button(en["dz.new"]));
+    await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.way.tpl"])));
+    expect(row()?.textContent).toContain(en["dz.ph.title"]);
+    expect(row()?.textContent).toContain(en["dz.ph.off"]);
+    expect(button(en["dz.ph.add"])).toBeDefined();
+    expect(button(en["dz.ph.remove"])).toBeUndefined();
+    const credit = row()?.querySelector(".ft a");
+    expect(credit?.getAttribute("href")).toBe("https://www.pexels.com");
+    expect(credit?.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("says one line about the preview's photos, for every answer the panel gives", async () => {
+    for (const photos of ["used", "no_key", "bad_key", "limit", "unavailable", "none_for_kind"]) {
+      document.body.innerHTML = "";
+      await view(photos);
+      expect(row()?.querySelector(".ft")?.textContent, photos).toContain(en[`dz.ph.st.${photos}` as "dz.ph.st.used"]);
+    }
+    // a word this screen does not know is not shown as a key of the dictionary
+    document.body.innerHTML = "";
+    await view("something_new");
+    expect(text()).not.toContain("dz.ph.st.");
+  });
+
+  it("takes the key in a password field, builds the same site again with it, and never shows the key again", async () => {
+    api.setDecoyPhotosKey.mockResolvedValue({ hasKey: true });
+    await view();
+    await click(button(en["dz.ph.add"]));
+    const field = row()?.querySelector("input") as HTMLInputElement;
+    expect(field.type).toBe("password");
+    expect(field.autocomplete).toBe("off");
+    expect(row()?.textContent).toContain(en["dz.ph.lead"]);
+    expect(row()?.querySelector(".frm a")?.getAttribute("href")).toBe("https://www.pexels.com/api/");
+    expect(button(en["dz.ph.save"])!.disabled).toBe(true); // nothing typed
+    await type(field, `  ${SECRET} `);
+    api.previewDecoyTemplate.mockResolvedValue(seeded(7, "used"));
+    await click(button(en["dz.ph.save"]));
+    expect(api.setDecoyPhotosKey).toHaveBeenCalledWith({ key: SECRET });
+    // the site in view is made again from its own seed, so that it comes back with its photos
+    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: seeded(7, "").seed });
+    expect(row()?.querySelector("input")).toBeNull();
+    expect(text()).not.toContain(SECRET);
+    expect(row()?.textContent).toContain(en["dz.ph.on"]);
+    expect(row()?.querySelector(".ft")?.textContent).toContain(en["dz.ph.st.used"]);
+    expect(button(en["dz.ph.remove"])).toBeDefined();
+  });
+
+  it("removes the key with one press, and a refused key is said in words and stays in the field to be fixed", async () => {
+    api.getDecoyPhotos.mockResolvedValue({ hasKey: true });
+    api.setDecoyPhotosKey.mockResolvedValue({ hasKey: false });
+    await view("used");
+    expect(row()?.textContent).toContain(en["dz.ph.on"]);
+    await click(button(en["dz.ph.remove"]));
+    expect(api.setDecoyPhotosKey).toHaveBeenCalledWith({ key: "" });
+    expect(row()?.textContent).toContain(en["dz.ph.off"]);
+    expect(button(en["dz.ph.remove"])).toBeUndefined();
+
+    api.setDecoyPhotosKey.mockReset().mockRejectedValue(new ConnectError("decoy_photos_key_invalid", Code.InvalidArgument));
+    await click(button(en["dz.ph.add"]));
+    await type(row()?.querySelector("input") as HTMLInputElement, "bad key");
+    await click(button(en["dz.ph.save"]));
+    expect(row()?.textContent).toContain(en["err.decoy_photos_key_invalid"]);
+    expect((row()?.querySelector("input") as HTMLInputElement | null)?.value).toBe("bad key");
+    await click(button(en["dz.ph.cancel"]));
+    expect(row()?.querySelector("input")).toBeNull();
+  });
+
+  it("is worded in every language", () => {
+    const keys = Object.keys(en).filter((k) => k.startsWith("dz.ph.") || k === "err.decoy_photos_key_invalid");
+    expect(keys.length).toBeGreaterThanOrEqual(20);
+    for (const lang of ["ru", "zh", "fa", "tr"] as const) {
+      for (const k of keys) {
+        const w = dictionaries[lang][k as keyof typeof en];
+        expect(w, `${lang} ${k}`).toBeTruthy();
+        if (!/^(dz\.ph\.credit|dz\.ph\.title)$/.test(k)) expect(w, `${lang} ${k} is the English text`).not.toBe(en[k as keyof typeof en]);
+      }
     }
   });
 });

@@ -46,6 +46,7 @@ async function draw(state: string) {
   for (let i = 0; i < 6; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
 }
 const text = () => document.body.textContent ?? "";
+const buttonOf = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 
 describe("the scenes of the Decoy sites screens", () => {
   it.each(states)("%s draws", async (state) => {
@@ -80,6 +81,29 @@ describe("the scenes of the Decoy sites screens", () => {
     if (state === "dlg-tpl-view") expect(text()).toContain(en["dz.tpl.footView"].replace("{name}", "Rainy Reader"));
     if (state === "dlg-tpl-run") expect(text()).toContain(en["dz.tpl.footRun"]);
     if (state === "dlg-tpl-err") expect(text()).toContain(en["err.decoy_library_full"]);
+    if (state === "dlg-tpl-nokey") {
+      expect(text()).toContain(en["dz.ph.off"]);
+      expect(text()).toContain(en["dz.ph.st.no_key"]);
+      expect(buttonOf(en["dz.ph.add"])).toBeDefined();
+      expect(buttonOf(en["dz.ph.remove"])).toBeUndefined();
+    }
+    if (state === "dlg-tpl-keyform") {
+      expect(document.querySelector(".dz-ph input[type=password]")).not.toBeNull();
+      expect(text()).toContain(en["dz.ph.lead"]);
+      expect(document.querySelector(".dz-ph .frm a")?.getAttribute("href")).toBe("https://www.pexels.com/api/");
+    }
+    if (state === "dlg-tpl-photos") {
+      expect(text()).toContain(en["dz.ph.on"]);
+      expect(text()).toContain(en["dz.ph.st.used"]);
+      expect(buttonOf(en["dz.ph.remove"])).toBeDefined();
+      expect(document.querySelector(".dz-fr iframe")?.getAttribute("srcdoc")).toContain("data:image/jpeg;base64,");
+    }
+    if (state === "dlg-tpl-limit") expect(text()).toContain(en["dz.ph.st.limit"]);
+    if (state.startsWith("dlg-tpl")) {
+      const credit = document.querySelector(".dz-ph .ft a");
+      expect(credit?.getAttribute("href")).toBe("https://www.pexels.com");
+      expect(credit?.getAttribute("rel")).toContain("noopener");
+    }
     if (state === "dlg-mcp") expect(document.querySelector(".dz-task")?.textContent).toContain("decoy_site_draft_save");
     if (state === "site-used") expect(document.querySelector("[data-shot=decoy-placement]")?.querySelectorAll(".dz-plr")).toHaveLength(2);
     if (state === "site-draft") expect(text()).toContain(en["dz.act.ready"]);

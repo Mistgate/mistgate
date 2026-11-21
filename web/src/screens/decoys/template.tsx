@@ -13,6 +13,7 @@ import { decoyErrorText, sitesQuery, templateIcon, templatesQuery, templateWords
 import { plain } from "@/lib/plain";
 import { dialogWidth } from "./create";
 import { Msg } from "./parts";
+import { type PhotoDemo, PhotoRow } from "./photos";
 import { PreviewCard } from "./site-preview";
 
 // "From a template": the window that makes a site from one of the panel's built-in templates. Pick a kind, see the home page of a site
@@ -28,10 +29,13 @@ export type TemplateDemo = {
   name?: string;
   /** The code of the refusal of "err". */
   error?: string;
+  /** What the preview says about its photos ("used", "no_key", ...), and how the row of the Pexels key starts. */
+  photos?: string;
+  key?: PhotoDemo;
 };
 
-/** What a preview answered: the page, the seed it was made from (opaque) and the name the site would get. */
-type Shown = { html: string; seed: string; name: string };
+/** What a preview answered: the page, the seed it was made from (opaque), the name the site would get and why it has photos or not. */
+type Shown = { html: string; seed: string; name: string; photos: string };
 
 export function TemplateDialog({ onClose, demo }: { onClose: () => void; demo?: TemplateDemo }) {
   const t = useT();
@@ -39,13 +43,13 @@ export function TemplateDialog({ onClose, demo }: { onClose: () => void; demo?: 
   const navigate = useNavigate();
   const templates = useQuery(templatesQuery);
   const [kind, setKind] = useState(demo?.kind ?? "");
-  const [shown, setShown] = useState<Shown | undefined>(demo?.html ? { html: demo.html, seed: "demo", name: demo.name ?? "" } : undefined);
+  const [shown, setShown] = useState<Shown | undefined>(demo?.html ? { html: demo.html, seed: "demo", name: demo.name ?? "", photos: demo.photos ?? "" } : undefined);
   const [problem, setProblem] = useState(demo?.error ? t(`err.${demo.error}` as MessageKey) : "");
   const info = templates.data?.find((x) => x.id === kind);
   const words = templateWords(t, kind, info?.nameEn);
 
   const preview = useMutation({
-    mutationFn: async (k: string) => plain(await decoySites.previewDecoyTemplate({ kind: k, seed: "" })),
+    mutationFn: async (v: { kind: string; seed: string }) => plain(await decoySites.previewDecoyTemplate(v)),
     onSuccess: setShown,
   });
   const create = useMutation({
@@ -69,12 +73,18 @@ export function TemplateDialog({ onClose, demo }: { onClose: () => void; demo?: 
     setKind(k);
     setShown(undefined);
     setProblem("");
-    preview.mutate(k);
+    preview.mutate({ kind: k, seed: "" });
   };
   const another = () => {
     setShown(undefined);
     setProblem("");
-    preview.mutate(kind);
+    preview.mutate({ kind, seed: "" });
+  };
+  // a key was added or removed: the same site again (its seed), now with or without its photos
+  const keyChanged = () => {
+    if (!view || !shown) return;
+    setShown(undefined);
+    preview.mutate({ kind, seed: shown.seed });
   };
   const back = () => {
     setKind("");
@@ -136,6 +146,7 @@ export function TemplateDialog({ onClose, demo }: { onClose: () => void; demo?: 
               })}
             </div>
           )}
+          <PhotoRow demo={demo?.key} />
         </>
       ) : (
         <>
@@ -151,6 +162,7 @@ export function TemplateDialog({ onClose, demo }: { onClose: () => void; demo?: 
               {t("dz.tpl.back")}
             </Button>
           </div>
+          <PhotoRow status={making ? undefined : shown?.photos} onChanged={keyChanged} demo={demo?.key} />
           {problem && (
             <Msg kind="bad" role="alert" title={t("dz.tpl.errTitle")}>
               <span>{problem}</span>

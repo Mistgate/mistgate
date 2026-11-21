@@ -11,13 +11,14 @@ import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { isLang, setLang, useLang } from "@/i18n";
 import { decoySites } from "@/lib/api";
 import { accessQuery } from "@/lib/assistant";
-import { pagesQuery, siteQuery, sitesQuery, templatesQuery, type Site } from "@/lib/decoysites";
+import { pagesQuery, photosQuery, siteQuery, sitesQuery, templatesQuery, type Site } from "@/lib/decoysites";
 import { setEffectsEnabled } from "@/lib/effects";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { setTheme, useTheme } from "@/lib/theme";
 import { Shot } from "@/screens/dev-kit-redesign";
 import { demoNodes, demoSites, fileText, fillerSites, looks, pageDoc, type DemoSite } from "./dev-kit-decoys-data";
+import { PHOTO_STUBS } from "./dev-kit-decoys-photos";
 import type { UploadDemo } from "./decoys/create";
 import type { TemplateDemo } from "./decoys/template";
 import { DecoysScreen, type DecoysDemo } from "./decoys/list";
@@ -30,7 +31,7 @@ import { ShellLayout } from "./shell";
 //   /dev-kit?only=decoys-page&state=<state>[&lang=en|ru|zh|fa|tr][&theme=light|dark][&fx=1]
 // list states: list | list-delivery | list-panel-fb | list-empty | list-many | list-full | list-load | list-err | list-deny | list-edge | list-draft |
 //   list-used | list-free | list-find | list-nomatch
-// the windows of the list: dlg-new | dlg-tpl | dlg-tpl-wait | dlg-tpl-view | dlg-tpl-run | dlg-tpl-err | dlg-up | dlg-up-drag | dlg-up-run | dlg-up-ready | dlg-up-draft | dlg-up-taken | dlg-up-big |
+// the windows of the list: dlg-new | dlg-tpl | dlg-tpl-wait | dlg-tpl-view | dlg-tpl-run | dlg-tpl-err | dlg-tpl-nokey | dlg-tpl-keyform | dlg-tpl-photos | dlg-tpl-limit | dlg-up | dlg-up-drag | dlg-up-run | dlg-up-ready | dlg-up-draft | dlg-up-taken | dlg-up-big |
 //   dlg-up-many | dlg-up-unsafe | dlg-up-fmt | dlg-up-noindex | dlg-mcp
 // page states: site-used | site-ready | site-template | site-draft | site-bad | site-builtin | site-dir | site-dir-off | site-way | site-fail | site-off |
 //   site-old | site-phone | site-404 | site-page | site-edit | site-menu | site-checks | site-copied | site-css | site-img | site-deny |
@@ -58,6 +59,8 @@ type World = {
   fail: "" | "list" | "site-nf" | "preview" | "generate";
   /** Twelve nodes in all (the grid of "showing now" with a last row that is not full). */
   many: boolean;
+  /** The owner has put a Pexels key in. */
+  photosKey: boolean;
 };
 
 const moreNodes = ["be1", "se1", "pl1", "fr1", "uk1", "at1", "cz1", "no1"].map((name, i) => ({ id: `nod_${name}`, name, cc: ["BE", "SE", "PL", "FR", "GB", "AT", "CZ", "NO"][i]!, address: `${name}.example.com` }));
@@ -74,6 +77,7 @@ function worldOf(state: string): World {
     hang: state === "list-load" ? "list" : state === "site-load" ? "site" : "",
     fail: state === "list-err" ? "list" : state === "site-nf" ? "site-nf" : "",
     many: state === "list-many",
+    photosKey: state === "dlg-tpl-photos" || state === "dlg-tpl-limit",
   };
   if (state === "list-empty" || state === "dlg-new" || state === "dlg-mcp") {
     if (state === "list-empty") {
@@ -208,10 +212,22 @@ function installFake(w: World) {
       return { html: pageDoc(siteId.replace("dsi_", ""), page, 0), path };
     },
     listDecoyTemplates: async () => ({ templates: templateKinds.map(([id, nameEn]) => ({ id, nameEn, nameRu: nameEn })) }),
-    previewDecoyTemplate: async ({ kind }: { kind: string; seed: string }) => {
+    previewDecoyTemplate: async ({ kind, seed }: { kind: string; seed: string }) => {
       if (w.fail === "preview") throw new ConnectError("unavailable", Code.Unavailable);
-      variant += 1;
-      return { html: pageDoc(templateLook[kind] ?? "tpl", 0, variant), seed: `${(variant + 0x1000).toString(16)}0000000000000000`.slice(0, 16), name: looks[templateLook[kind] ?? "tpl"]!.brand };
+      if (!seed) variant += 1;
+      const n = seed ? Number.parseInt(seed.slice(0, 4), 16) - 0x1000 : variant;
+      const look = templateLook[kind] ?? "tpl";
+      return {
+        html: pageDoc(look, 0, n, w.photosKey ? PHOTO_STUBS : undefined),
+        seed: seed || `${(variant + 0x1000).toString(16)}0000000000000000`.slice(0, 16),
+        name: looks[look]!.brand,
+        photos: w.photosKey ? "used" : "no_key",
+      };
+    },
+    getDecoyPhotos: async () => ({ hasKey: w.photosKey }),
+    setDecoyPhotosKey: async ({ key }: { key: string }) => {
+      w.photosKey = key !== "";
+      return { hasKey: w.photosKey };
     },
     generateDecoySite: async ({ kind }: { kind: string }) => {
       if (w.fail === "generate") throw new ConnectError("decoy_library_full", Code.FailedPrecondition);
@@ -254,6 +270,7 @@ function seeded(w: World) {
   c.setQueryData(nodesQuery.queryKey, { nodes: (w.many ? [...demoNodes, ...moreNodes] : demoNodes).map((n) => nodeRow(n, w)), expectedAgentVersion: "0.1.71" } as never);
   if (!w.hang && !w.fail) {
     c.setQueryData(sitesQuery.queryKey, libraryOf(w) as never);
+    c.setQueryData(photosQuery.queryKey, { hasKey: w.photosKey } as never);
     c.setQueryData(templatesQuery.queryKey, templateKinds.map(([id, nameEn]) => ({ id, nameEn, nameRu: nameEn })) as never);
     for (const s of w.sites.slice(0, 12)) {
       const d = detailOf(s, w);
@@ -289,6 +306,11 @@ const templates: Record<string, TemplateDemo> = {
   "dlg-tpl-view": { phase: "view", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader" },
   "dlg-tpl-run": { phase: "run", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader" },
   "dlg-tpl-err": { phase: "err", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader", error: "decoy_library_full" },
+  // the photos of a site: no key (drawn), the key being typed, a site with photos, Pexels asked to wait
+  "dlg-tpl-nokey": { phase: "view", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader", photos: "no_key" },
+  "dlg-tpl-keyform": { phase: "view", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader", photos: "no_key", key: { form: true } },
+  "dlg-tpl-photos": { phase: "view", kind: "blog", html: pageDoc("tpl", 0, 0, PHOTO_STUBS), name: "Rainy Reader", photos: "used" },
+  "dlg-tpl-limit": { phase: "view", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader", photos: "limit" },
 };
 const listDemos = (state: string): DecoysDemo | undefined => {
   if (templates[state]) return { dialog: "tpl", template: templates[state] };
@@ -401,6 +423,19 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "decoys-dlg-tpl-view-fa", state: "dlg-tpl-view", title: "Window: from a template, a preview, right to left (fa)", w: 1440, h: 1100, params: "&lang=fa" },
   { id: "decoys-dlg-tpl-run", state: "dlg-tpl-run", title: "Window: from a template, the site is being saved", w: 1440, h: 1100 },
   { id: "decoys-dlg-tpl-err", state: "dlg-tpl-err", title: "Window: from a template, the library is full", w: 1440, h: 1100 },
+  { id: "decoys-dlg-tpl-nokey", state: "dlg-tpl-nokey", title: "Window: from a template, a preview without a Pexels key", w: 1440, h: 1200 },
+  { id: "decoys-dlg-tpl-nokey-light", state: "dlg-tpl-nokey", title: "Window: from a template, no Pexels key, the light theme", w: 1440, h: 1200, params: "&theme=light" },
+  { id: "decoys-dlg-tpl-nokey-phone", state: "dlg-tpl-nokey", title: "Window: from a template, no Pexels key, a phone", w: 400, h: 1300 },
+  { id: "decoys-dlg-tpl-nokey-fa", state: "dlg-tpl-nokey", title: "Window: from a template, no Pexels key, right to left (fa)", w: 1440, h: 1200, params: "&lang=fa" },
+  { id: "decoys-dlg-tpl-keyform", state: "dlg-tpl-keyform", title: "Window: from a template, the Pexels key being typed", w: 1440, h: 1300 },
+  { id: "decoys-dlg-tpl-keyform-rail", state: "dlg-tpl-keyform", title: "Window: from a template, the key form in a 820 window", w: 820, h: 1300 },
+  { id: "decoys-dlg-tpl-keyform-phone", state: "dlg-tpl-keyform", title: "Window: from a template, the key form on a phone", w: 400, h: 1400 },
+  { id: "decoys-dlg-tpl-photos", state: "dlg-tpl-photos", title: "Window: from a template, a preview with photos", w: 1440, h: 1200 },
+  { id: "decoys-dlg-tpl-photos-light", state: "dlg-tpl-photos", title: "Window: from a template, with photos, the light theme", w: 1440, h: 1200, params: "&theme=light" },
+  { id: "decoys-dlg-tpl-photos-rail", state: "dlg-tpl-photos", title: "Window: from a template, with photos, a 820 window", w: 820, h: 1200 },
+  { id: "decoys-dlg-tpl-photos-phone", state: "dlg-tpl-photos", title: "Window: from a template, with photos, a phone", w: 400, h: 1300 },
+  { id: "decoys-dlg-tpl-limit", state: "dlg-tpl-limit", title: "Window: from a template, without photos, Pexels limit", w: 1440, h: 1200 },
+  { id: "decoys-dlg-tpl-limit-fa", state: "dlg-tpl-limit", title: "Window: from a template, Pexels limit, right to left (fa)", w: 1440, h: 1200, params: "&lang=fa" },
   { id: "decoys-dlg-up", state: "dlg-up", title: "Window: upload an archive", w: 1440, h: 900 },
   { id: "decoys-dlg-up-drag", state: "dlg-up-drag", title: "Window: a file is over the drop zone", w: 1440, h: 900 },
   { id: "decoys-dlg-up-run", state: "dlg-up-run", title: "Window: the upload runs", w: 1440, h: 900 },

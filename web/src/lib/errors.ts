@@ -99,6 +99,7 @@ export const errorCodes = [
   // a site from a template (GenerateDecoySite, PreviewDecoyTemplate): InvalidArgument
   "decoy_template_unknown",
   "decoy_template_seed",
+  "decoy_photos_key_invalid",
   // relays (relay.proto): CreateRelay / UpdateRelay / CheckRelay
   "relay_exists",
   "same_node",

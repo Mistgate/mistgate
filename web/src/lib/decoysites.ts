@@ -90,6 +90,22 @@ export const templatesQuery = queryOptions({
   staleTime: Infinity,
 });
 
+/** Whether the owner has put a Pexels key in (the key itself never comes back): the photos of generated sites need it. */
+export const photosQuery = queryOptions({
+  queryKey: ["decoy-photos"],
+  queryFn: async ({ signal }) => plain(await decoySites.getDecoyPhotos({}, { signal })),
+  staleTime: Infinity,
+});
+
+/** The page where a free Pexels API key is made, and the site the credit line points to. */
+export const PEXELS_KEY_URL = "https://www.pexels.com/api/";
+export const PEXELS_URL = "https://www.pexels.com";
+
+/** What a preview says about its photos (PreviewDecoyTemplateResponse.photos); a word the panel adds later is not shown. */
+export const photoStates = ["used", "no_key", "bad_key", "limit", "unavailable", "none_for_kind"] as const;
+export type PhotoState = (typeof photoStates)[number];
+export const photoStateKey = (s: string): MessageKey | undefined => ((photoStates as readonly string[]).includes(s) ? (`dz.ph.st.${s}` as MessageKey) : undefined);
+
 /** What an assignment would replace, and the warnings, without doing it (a dry run). `picks` is the sorted node ids and "panel". */
 export const assignPreviewQuery = (id: string, picks: readonly string[]) =>
   queryOptions({
