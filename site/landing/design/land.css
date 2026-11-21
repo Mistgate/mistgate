@@ -796,6 +796,8 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lx-go .lpe.hero-e .emb.pwin{animation:lx-win 1.3s cubic-bezier(.22,1,.36,1) .6s both}
 @media (prefers-reduced-motion:reduce){.lx-go .lp .top,.lx-go .lp .hero h1 .ln>span,.lx-go .lp .hero-s,.lx-go .lp .hero-a,.lx-go .lp .hero-m,.lx-go .lp .lx-mx,.lx-go .lp .lx-halo,.lx-go .lpe.hero-e .emb.pwin{animation:none}}
 .lp .hero{overflow:visible}
+/* the hero field is taller than the hero and fades out behind the panel window */
+.lp:has(>.wrap>.hero){overflow-x:clip;overflow-y:visible}
 .lp .top{z-index:6}
 /* адаптив */
 .lpe .lx-phc{display:none}
