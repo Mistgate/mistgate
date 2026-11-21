@@ -129,9 +129,11 @@ export function useRealityTargetEdit(inbound: Plain<Inbound>, leave: () => void)
               variant="ghost"
               size="sm"
               onClick={() => {
+                // the card stands under the servers: once the window is gone, bring it into view. Found now and not in the timer, which
+                // outlives this window and may outlive the page (a test's document is gone by then)
+                const card = document.getElementById("sni-scan");
                 leave();
-                // the card stands under the servers: once the window is gone, bring it into view
-                setTimeout(() => document.getElementById("sni-scan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+                setTimeout(() => card?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 120);
               }}
             >
               {t("sni.target.find")}
