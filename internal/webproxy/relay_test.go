@@ -314,14 +314,27 @@ func TestRelayUpAndDownReplayAndLostResponses(t *testing.T) {
 	if !bytes.Equal(gotBatch, wantBatch) || gotHeaders.Get(headerDownCursor) != wantHeaders.Get(headerDownCursor) {
 		t.Fatal("repeated downlink cursor did not replay the same batch")
 	}
-	frames, err := parseFrameBatch(gotBatch)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// The echo reaches the downlink queue a moment after the backend wrote it, so the first batch may not hold it yet.
 	var echoed int
-	for _, frame := range frames {
-		if frame.Type == frameData && bytes.Equal(frame.Payload, []byte("de1-first")) {
-			echoed++
+	for deadline := time.Now().Add(testWait); ; {
+		frames, err := parseFrameBatch(gotBatch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, frame := range frames {
+			if frame.Type == frameData && bytes.Equal(frame.Payload, []byte("de1-first")) {
+				echoed++
+			}
+		}
+		if echoed > 0 || time.Now().After(deadline) {
+			break
+		}
+		cursor, err := strconv.ParseUint(gotHeaders.Get(headerDownCursor), 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gotBatch, gotHeaders, err = postDownRaw(downClient, token, cursor); err != nil {
+			t.Fatal(err)
 		}
 	}
 	if echoed != 1 {
