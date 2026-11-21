@@ -81,6 +81,10 @@ type Health interface {
 	// NodeChecksSince counts probeable inbounds and rounds ended at or after since; read errors are returned to the gate.
 	// timeoutsOnly: something failed and every failed round since was a timeout; failedFor: how long the failures have lasted.
 	NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, timeoutsOnly bool, failedFor time.Duration, err error)
+	// NodeChecksPending lists the probeable inbounds NodeChecksSince does not count as ok (no OK round ended at or after since).
+	NodeChecksPending(ctx context.Context, nodeID string, since time.Time) ([]string, error)
+	// NodeLastRounds returns the newest stored round of each probeable inbound of the node: what was failing before an update, and why.
+	NodeLastRounds(ctx context.Context, nodeID string) ([]store.CheckSample, error)
 }
 
 // Timing of the module. The zero value is production; tests shorten what they need.

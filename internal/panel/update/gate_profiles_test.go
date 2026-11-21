@@ -1,8 +1,12 @@
 package update
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -187,4 +191,19 @@ func TestOsGateIgnoresAProfileWhoseCheckFailedBeforeTheJob(t *testing.T) {
 	e.clk.Advance(time.Minute)
 	e.osTick()
 	e.wantOsStep(id, store.OsStepPassed, "")
+}
+
+// When the health module cannot say what the newest rounds were, the baseline is empty (the update is judged as it was before the
+// rule), and that is not silent: the warning carries its code.
+func TestLastRoundsUnreadableIsLogged(t *testing.T) {
+	e := newEnv(t)
+	var buf bytes.Buffer
+	e.s.log = slog.New(slog.NewTextHandler(&buf, nil))
+	e.hl.setError("de1", errors.New("snapshot failed"))
+	if got := e.s.lastRounds(e.ctx, "de1"); got != nil {
+		t.Fatalf("rounds = %v, want none", got)
+	}
+	if out := buf.String(); !strings.Contains(out, "code=update_last_rounds_unreadable") || !strings.Contains(out, "level=WARN") {
+		t.Fatalf("log = %q, want a warning with code update_last_rounds_unreadable", out)
+	}
 }

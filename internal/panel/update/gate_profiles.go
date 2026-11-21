@@ -41,16 +41,15 @@ type failedProfile struct {
 	Code string `json:"code"`
 }
 
-// lastRounds lists the newest round of each probeable inbound of the node; nothing when the health module cannot say.
+// lastRounds lists the newest round of each probeable inbound of the node; nothing when there is no health module or it cannot say
+// (the update is then judged without the baseline, as every profile's fault, so the failure is logged).
 func (s *Service) lastRounds(ctx context.Context, nodeID string) []store.CheckSample {
-	l, ok := s.hl.(interface {
-		NodeLastRounds(ctx context.Context, nodeID string) ([]store.CheckSample, error)
-	})
-	if !ok {
+	if s.hl == nil {
 		return nil
 	}
-	rounds, err := l.NodeLastRounds(ctx, nodeID)
+	rounds, err := s.hl.NodeLastRounds(ctx, nodeID)
 	if err != nil {
+		s.log.Warn("update: last check rounds unreadable", "code", "update_last_rounds_unreadable", "node", nodeID, "err", err)
 		return nil
 	}
 	return rounds

@@ -899,12 +899,8 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 			miss(errProbeFailed)
 		} else if probeable > 0 && ok < probeable {
 			listed := false
-			if l, can := s.hl.(interface {
-				NodeChecksPending(ctx context.Context, nodeID string, since time.Time) ([]string, error)
-			}); can {
-				if ids, err := l.NodeChecksPending(ctx, nodeID, since); err == nil {
-					pending, listed = ids, true
-				}
+			if ids, err := s.hl.NodeChecksPending(ctx, nodeID, since); err == nil {
+				pending, listed = ids, true
 			}
 			// A profile whose check was already failing when the step was sent is not what this update broke: it is left out of the
 			// count, and when nothing else fails the step passes and says which profiles it did not hold against the update.

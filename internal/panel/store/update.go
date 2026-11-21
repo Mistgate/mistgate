@@ -79,7 +79,7 @@ type StepRow struct {
 	DownloadSHA                 string
 	FromVersion                 string
 	FromBuilt                   int64
-	PreFailed                   []string // inbound ids that were FAILED before the update
+	PreFailed                   []string // the baseline: inbound ids that were FAILED before the update, and "probe:<id>" for profiles whose newest check round failed then (update/gate_profiles.go)
 	SentAt, AckedAt             time.Time
 	AnswerWait                  time.Duration // effective command wait captured when the step was sent
 	ProgressPhase               string
