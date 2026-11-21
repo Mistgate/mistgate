@@ -242,7 +242,7 @@ function gateProfiles(params: Params): { list: GateProfile[]; more: number } {
 /** "“Main”: no answer; “Backup”: not checked yet", or "" when the gate named no profile. Returns the plural count too. */
 function profileList(t: T, params: Params): { text: string; n: number } {
   const { list, more } = gateProfiles(params);
-  const items = list.map((p) => `“${p.name}”: ${known(t, `updates.step.profile.why.${p.code}`) ?? p.code}`);
+  const items = list.map((p) => `${t("doctor.tok.quoted", { name: p.name })}: ${known(t, `updates.step.profile.why.${p.code}`) ?? p.code}`);
   if (more > 0) items.push(t("updates.step.profiles.more", { n: more }));
   return { text: items.join("; "), n: list.length + more };
 }
@@ -251,7 +251,7 @@ function profileList(t: T, params: Params): { text: string; n: number } {
 export function skippedProfilesNote(t: T, params: Params): string {
   try {
     const raw: unknown = JSON.parse(params.skipped_profiles ?? "[]");
-    const names = Array.isArray(raw) ? raw.filter((n): n is string => typeof n === "string").map((n) => `“${n}”`) : [];
+    const names = Array.isArray(raw) ? raw.filter((n): n is string => typeof n === "string").map((n) => t("doctor.tok.quoted", { name: n })) : [];
     if (names.length === 0) return "";
     if (Number(params.skipped_more) > 0) names.push(t("updates.step.profiles.more", { n: Number(params.skipped_more) }));
     return t("updates.step.skipped", { names: names.join(", ") });

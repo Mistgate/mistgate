@@ -76,6 +76,13 @@
     "fa": "Quad9: مسدودسازی بدافزار",
     "tr": "Quad9: zararlı yazılım engeli"
   },
+  "dns_builtin_ru_geo": {
+    "ru": "Россия: российские сайты напрямую (список сообщества)",
+    "en": "Russia: Russian sites direct (community list)",
+    "zh": "俄罗斯：俄罗斯网站直连（社区列表）",
+    "fa": "روسیه: سایت‌های روسی مستقیم (فهرست جامعه)",
+    "tr": "Rusya: Rus siteleri doğrudan (topluluk listesi)"
+  },
   "dns_builtin_ru_proxied": {
     "ru": "Россия: всё через VPN",
     "en": "Russia: all through VPN",

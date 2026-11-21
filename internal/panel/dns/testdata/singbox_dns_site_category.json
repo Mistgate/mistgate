@@ -1,0 +1,62 @@
+{
+  "direct": null,
+  "directSets": [
+    "geosite-category-media-ru",
+    "geosite-telegram"
+  ],
+  "dns": {
+    "servers": [
+      {
+        "type": "udp",
+        "tag": "remote",
+        "server": "1.1.1.1",
+        "detour": "Mistgate"
+      },
+      {
+        "type": "udp",
+        "tag": "split-1",
+        "server": "77.88.8.8"
+      },
+      {
+        "type": "local",
+        "tag": "local"
+      }
+    ],
+    "rules": [
+      {
+        "rule_set": [
+          "geosite-category-media-ru"
+        ],
+        "action": "route",
+        "server": "split-1"
+      },
+      {
+        "rule_set": [
+          "geosite-telegram"
+        ],
+        "action": "route",
+        "server": "split-1"
+      }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
+  "notes": [
+    "1 fallback resolver(s) dropped: sing-box takes one main resolver",
+    "split rule 1: 1 fallback resolver(s) dropped: sing-box takes one resolver per rule"
+  ],
+  "ruleSets": [
+    {
+      "type": "remote",
+      "tag": "geosite-category-media-ru",
+      "format": "binary",
+      "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-media-ru.srs"
+    },
+    {
+      "type": "remote",
+      "tag": "geosite-telegram",
+      "format": "binary",
+      "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-telegram.srs"
+    }
+  ]
+}

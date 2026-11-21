@@ -54,7 +54,7 @@ const preset = (p: Make): Preset => ({
 });
 
 /** The ids the board's "Как выбрать" names. */
-export const ids = { cf: "dns_builtin_cloudflare", q9: "dns_builtin_quad9", ag: "dns_builtin_adblock", fam: "dns_builtin_cloudflare_family", ru: "dns_builtin_ru_split", proxied: "dns_builtin_ru_proxied", ads: "dns_builtin_ads_device", office: "dns_own_office", long: "dns_own_long", cn: "dns_own_cn" } as const;
+export const ids = { cf: "dns_builtin_cloudflare", q9: "dns_builtin_quad9", ag: "dns_builtin_adblock", fam: "dns_builtin_cloudflare_family", ru: "dns_builtin_ru_split", proxied: "dns_builtin_ru_proxied", ruGeo: "dns_builtin_ru_geo", geoOwn: "dns_own_geo", ads: "dns_builtin_ads_device", office: "dns_own_office", long: "dns_own_long", cn: "dns_own_cn" } as const;
 
 /** The board's five presets of the list (Cloudflare the default, "Россия" with the split), under the panel's own ids and names. */
 export const boardPresets: Preset[] = [
@@ -81,6 +81,19 @@ export const cnSplit = preset({
   servers: [cat("cloudflare/standard")], split: [rule([], [cat("alidns/standard")], ["cn"])], splitDirect: true, category: DnsCategory.REGIONAL, country: "CN",
 });
 
+/** The built-in "Russia: Russian sites direct (community list)": the suffixes of the stock split plus the country list "ru". */
+const ruGeo = preset({
+  id: ids.ruGeo, name: "Россия: российские сайты напрямую (список сообщества)",
+  description: "Известные российские сервисы напрямую по списку сообщества, не все сайты; приложение само скачивает и обновляет список\nKnown Russian services direct by a community list, not every site; the app downloads and updates the list itself",
+  servers: [cat("cloudflare/standard"), cat("google/standard")], splitDirect: true, category: DnsCategory.REGIONAL, country: "RU",
+  split: [rule([".ru", ".su", ".xn--p1ai", "yandex.com", "yandex.net", "yastatic.net", "vk.com", "userapi.com", "sberbank.com", "vtb.com"], [cat("yandex/basic")], ["ru"])],
+});
+/** An own preset with a split by site category: two country lists and two geosite categories (the chips of the field "Site category"). */
+export const geoOwn = preset({
+  id: ids.geoOwn, name: "Мессенджеры напрямую", description: "Telegram и российские медиа через Яндекс", builtin: false, servers: [cat("cloudflare/standard")],
+  split: [rule([".ru"], [cat("yandex/basic")], ["ru", "ir", "geosite:telegram", "geosite:category-media-ru"])], splitDirect: true, category: DnsCategory.UNSPECIFIED,
+});
+
 /** An own preset: the Office (a catalog server, a plain one, a split to Yandex, ads blocked), the one that has a person or two. */
 export const office = preset({
   id: ids.office, name: "Офис", description: "Для офиса в Москве", builtin: false, servers: [cat("quad9/standard"), own("203.0.113.53")], split: [rule([".ru", ".рф"], [own("203.0.113.77")])],
@@ -90,10 +103,12 @@ export const office = preset({
 /** What the panel shows when it has been used a while: the board's five, the other built-ins, and presets of its own with people on them. */
 export const manyPresets: Preset[] = [
   ...boardPresets.map((p, i) => (i === 0 ? { ...p, userCount: 14 } : p)),
+  ruGeo,
   proxied,
   adsDevice,
   cnSplit,
   office,
+  geoOwn,
   preset({ id: "dns_own_kids", name: "Детский", description: "Для детей и школы", builtin: false, servers: [cat("cloudflare/family"), cat("yandex/family")], preferredTransport: DnsTransport.DOT, userCount: 6, category: DnsCategory.UNSPECIFIED }),
   preset({ id: "dns_own_spare", name: "Запасной", description: "", builtin: false, servers: [own("203.0.113.9")], category: DnsCategory.UNSPECIFIED }),
 ];

@@ -146,6 +146,7 @@ func (s *Service) EffectiveOnNode(ctx context.Context, userID, nodeID string) (P
 var builtinNames = map[string]struct{ ru, en, zh, fa, tr string }{
 	"dns_builtin_ru_split":   {"Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连", "روسیه: ‎.ru مستقیم", "Rusya: .ru doğrudan"},
 	"dns_builtin_ru_proxied": {"Россия: всё через VPN", "Russia: all through VPN", "俄罗斯：全部经 VPN", "روسیه: همه‌چیز از راه VPN", "Rusya: her şey VPN üzerinden"},
+	"dns_builtin_ru_geo":     {"Россия: российские сайты напрямую (список сообщества)", "Russia: Russian sites direct (community list)", "俄罗斯：俄罗斯网站直连（社区列表）", "روسیه: سایت‌های روسی مستقیم (فهرست جامعه)", "Rusya: Rus siteleri doğrudan (topluluk listesi)"},
 	"dns_builtin_cn_split":   {"Китай: китайские сайты напрямую", "China: Chinese sites direct", "中国：国内网站直连", "چین: سایت‌های چینی مستقیم", "Çin: Çin siteleri doğrudan"},
 	"dns_builtin_standard":   {"Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google"},
 	"dns_builtin_adblock":    {"AdGuard: без рекламы", "AdGuard: no ads", "AdGuard：无广告", "AdGuard: بدون تبلیغ", "AdGuard: reklamsız"},
@@ -190,6 +191,7 @@ func (p Preset) NameIn(lang string) string {
 var builtinDescriptions = map[string]struct{ en, zh, fa, tr string }{
 	"dns_builtin_ru_split":   {"Russian sites direct, everything else through the VPN", "俄罗斯网站直连，其余走 VPN", "سایت‌های روسی مستقیم، بقیه از طریق VPN", "Rus siteleri doğrudan, geri kalan her şey VPN üzerinden"},
 	"dns_builtin_ru_proxied": {"Everything through the VPN, Russian sites via a Russian node", "全部走 VPN，俄罗斯网站经由俄罗斯节点", "همه از طریق VPN، سایت‌های روسی از طریق سروری در روسیه", "Her şey VPN üzerinden, Rus siteleri Rusya'daki bir sunucu üzerinden"},
+	"dns_builtin_ru_geo":     {"Known Russian services direct by a community list, not every site; the app downloads and updates the list itself", "按社区列表直连已知的俄罗斯服务，并非所有网站；列表由应用自行下载和更新", "سرویس‌های شناخته‌شدهٔ روسی طبق فهرست جامعه، نه همهٔ سایت‌ها؛ برنامه فهرست را خودش دانلود و به‌روز می‌کند", "Topluluk listesine göre bilinen Rus hizmetleri, tüm siteler değil; liste uygulama tarafından indirilir ve güncellenir"},
 	"dns_builtin_cn_split":   {"Chinese sites direct, everything else through the VPN", "国内网站直连，其余走 VPN", "سایت‌های چینی مستقیم، بقیه از طریق VPN", "Çin siteleri doğrudan, geri kalan her şey VPN üzerinden"},
 	"dns_builtin_standard":   {"Cloudflare and Google for everything", "全部使用 Cloudflare 和 Google", "Cloudflare و Google برای همه‌چیز", "Her şey için Cloudflare ve Google"},
 	"dns_builtin_adblock":    {"AdGuard DNS: no ads, no trackers", "AdGuard DNS：无广告，无跟踪器", "AdGuard DNS: بدون تبلیغات و ردیاب", "AdGuard DNS: reklam yok, izleyici yok"},

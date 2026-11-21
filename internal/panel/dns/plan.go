@@ -12,7 +12,8 @@ type SplitPlan struct {
 	// Suffixes are the bodies (lower-case punycode, no leading dot) not claimed by an earlier rule: the first rule
 	// that names a suffix wins, like Happ's DirectSites. May be empty when every suffix was claimed earlier.
 	Suffixes []string
-	// Geo are the codes of the country lists (geo.go) not claimed by an earlier rule, first rule wins as with suffixes.
+	// Geo are the codes of the country lists and site categories (geo.go) not claimed by an earlier rule, first rule wins as with
+	// suffixes. A category alone has no address list.
 	Geo []string
 }
 
@@ -35,7 +36,8 @@ func (p Preset) ClientPlan(c Client) (main []Endpoint, split []SplitPlan, notes 
 	if !p.SplitDirect {
 		return main, nil, notes, nil
 	}
-	var claimed, claimedGeo []string
+	var claimed []string
+	claimedGeo := map[string]string{} // geosite list name -> the code that took it
 	for i, r := range p.Split {
 		eps, enotes := p.planEndpoints(c, r.Servers)
 		notes = append(notes, enotes...)
@@ -57,14 +59,19 @@ func (p Preset) ClientPlan(c Client) (main []Endpoint, split []SplitPlan, notes 
 			sp.Suffixes = append(sp.Suffixes, body)
 		}
 		for _, code := range r.Geo {
-			if _, ok := geoLists[code]; !ok {
+			l, ok := geoListOf(code)
+			if !ok {
 				notes = append(notes, fmt.Sprintf("country list %q skipped: unknown", code))
 				continue
 			}
-			if slices.Contains(claimedGeo, code) {
+			// claimed by the site list: a country and the category of the same name would be one rule set twice
+			if by, taken := claimedGeo[l.Site]; taken {
+				if by != code && l.IP != "" {
+					notes = append(notes, fmt.Sprintf("country list %q skipped: its geosite list is used by an earlier rule", code))
+				}
 				continue
 			}
-			claimedGeo = append(claimedGeo, code)
+			claimedGeo[l.Site] = code
 			sp.Geo = append(sp.Geo, code)
 		}
 		split = append(split, sp)

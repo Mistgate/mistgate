@@ -1691,6 +1691,17 @@
   .pf .pt-h {
     padding: 0 12px;
   }
+  /* what a node answers in a run ("Did not start: Port udp/443 is taken by another program") is longer than the row: it wraps instead of being cut */
+  .pf .pt-r .pt-h {
+    height: auto;
+    min-height: 52px;
+    padding-block: 8px;
+  }
+  .pf .pt-h em {
+    min-width: 0;
+    white-space: normal;
+    text-align: end;
+  }
   .pf .pt-why {
     padding-inline: 42px 12px;
   }

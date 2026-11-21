@@ -18,7 +18,7 @@ import (
 //   - nameserver-policy: the split rules' suffixes -> the split rule's servers, WITHOUT "#group" (they are queried
 //     directly), and only when the preset's SplitDirect is on (the same switch as Happ: only then do the split's domains
 //     bypass the VPN; off = the split is ignored). The same suffixes become DOMAIN-SUFFIX,<s>,DIRECT rules.
-//   - a country list of a split rule (geo.go) is two rule providers (mrs, downloaded through the tunnel group), a
+//   - a country list of a split rule (geo.go; a category alone has the geosite provider only) is two rule providers (mrs, downloaded through the tunnel group), a
 //     nameserver-policy entry "rule-set:geosite-<name>" and two RULE-SET rules to DIRECT, the geoip one with no-resolve
 //     (a domain is not looked up to be checked against it). Not GEOSITE,<name>: the core fetches geosite.dat itself at start,
 //     with no way to say through what, and from a censored network that does not work.
@@ -106,11 +106,13 @@ func (p Preset) MihomoDNS(group string) (MihomoDNS, error) {
 			out.Policy = append(out.Policy, MihomoPolicy{Domain: "+." + body, Servers: servers})
 		}
 		for _, code := range sp.Geo {
-			site, ip := geositeTag(code), geoipTag(code)
+			l, _ := geoListOf(code)
+			site := geositeTag(code)
 			out.Policy = append(out.Policy, MihomoPolicy{Domain: "rule-set:" + site, Servers: servers})
-			out.Providers = append(out.Providers,
-				MihomoProvider{Name: site, Behavior: "domain", URL: fmt.Sprintf(mihomoGeositeURL, geoLists[code].Site)},
-				MihomoProvider{Name: ip, Behavior: "ipcidr", URL: fmt.Sprintf(mihomoGeoipURL, geoLists[code].IP)})
+			out.Providers = append(out.Providers, MihomoProvider{Name: site, Behavior: "domain", URL: fmt.Sprintf(mihomoGeositeURL, l.Site)})
+			if l.IP != "" {
+				out.Providers = append(out.Providers, MihomoProvider{Name: geoipTag(code), Behavior: "ipcidr", URL: fmt.Sprintf(mihomoGeoipURL, l.IP)})
+			}
 		}
 	}
 	if p.BlockAds {

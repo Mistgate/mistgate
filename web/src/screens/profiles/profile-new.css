@@ -1001,7 +1001,7 @@
 /* ---- the bar of the buttons ---- */
 .pw-bar {
   position: sticky;
-  bottom: 24px;
+  bottom: 64px;
   z-index: 6;
   display: flex;
   align-items: center;
@@ -1137,6 +1137,8 @@
   .pw-bar {
     bottom: 88px;
     flex-wrap: wrap;
+    /* the assistant's button floats over this corner on a phone: the bar keeps its own buttons clear of it */
+    padding-inline-end: 68px;
   }
   .pw-bar > span {
     flex: 1 1 100%;

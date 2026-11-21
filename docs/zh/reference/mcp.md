@@ -190,7 +190,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `group_update` | 操作员 | `group_id` 以及仅需更改的字段：`name`、`profile_ids`、`dns_preset_id`、`color`、`disabled_node_ids` | 始终 |
 | `node_sharing_set` | 操作员 | 计划：`node`、`mode`（`all`、`listed` 或 `none`），`listed` 时还需 `group_ids`（来自 `groups_list`）；应用：仅 `confirm_token`。选择节点分发给哪些分组：`all` 为所有分组，包括之后新建的分组；`listed` 只给所列分组，之后新建的分组不会获得该节点；`none` 不给任何分组，直到你把它分给某个分组。计划会写明节点、将获得它的分组，以及有多少人获得和失去它（使用全部节点或选择了该节点的活跃用户）；若计划之后分发状态发生变化，应用会被拒绝。用 `group_update` 为分组打开被保留的节点会被拒绝（`node_held`）：请使用本工具。 | 始终 |
 | `group_delete` | 操作员 | 无人以其为主分组的分组的 `group_id`。作为某人主分组的分组会被拒绝；请先用 `user_update` 移动成员。以其为附加分组的用户只是离开该分组（计划会统计人数） | 否 |
-| `dns_preset_create` | 管理员 | `name`、`description`、`servers`，可选 `split`、`ipv4_only`、`split_direct`、`preferred_transport`（`plain`、`dot`、`doh`）、`block_ads` | 始终 |
+| `dns_preset_create` | 管理员 | `name`、`description`、`servers`，可选 `split`（规则由 `suffixes`、`geo` 和 `servers` 组成；`geo` 可填 `cn`、`ru` 等国家代码，或写成 `geosite:<名称>` 的网站分类，例如 `geosite:telegram`：面板只检查名称的格式，名称不存在时由应用提示）、`ipv4_only`、`split_direct`、`preferred_transport`（`plain`、`dot`、`doh`）、`block_ads` | 始终 |
 | `dns_preset_update` | 管理员 | `preset_id` 以及可编辑字段：`name`、`description`、`servers`、`split`、`ipv4_only`、`split_direct`、`preferred_transport`、`block_ads` | 始终 |
 | `dns_preset_delete` | 管理员 | `preset_id`；内置预设和实例默认预设会被拒绝，用户和分组将回退到实例默认值 | 始终 |
 | `profile_create` | 管理员 | 计划：`protocol`、`name`、可选 JSON `settings`（缺少的字段使用协议默认值）、`node_ids`、现有 `group_ids`、`port_overrides`（节点 ID 到端口）、`sni_overrides`（节点 ID 到该节点上新入站的名称，用于多个服务按 SNI 共用的 TCP 端口）、`allow_lossy_port`；执行：仅 `confirm_token`。对于标记为 `x-secret` 的敏感字段，省略该字段、使用 `"••••"` 保留原值，或使用 `"$generate"`；不得传入明文值 | 始终 |

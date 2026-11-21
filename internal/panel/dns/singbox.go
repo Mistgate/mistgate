@@ -19,7 +19,7 @@ import (
 //     first endpoint of the rule, queried directly (no detour). Only with SplitDirect on.
 //   - a DoH/DoT resolver is written as its IPv4 address plus tls.server_name (the host name), so that it needs no
 //     lookup of its own. The assembler also needs "local" (the system resolver) for route.default_domain_resolver.
-//   - a country list of a split rule (geo.go) is two remote binary rule sets (route.rule_set), a DNS rule {rule_set: the
+//   - a country list of a split rule (geo.go; a category alone has the geosite set only) is two remote binary rule sets (route.rule_set), a DNS rule {rule_set: the
 //     geosite one} to the split resolver and a route rule {rule_set: both} to direct. No download_detour: sing-box 1.14
 //     deprecates it, and without it the implicit client downloads through the default outbound (route.final, the selector),
 //     that is through the tunnel. The geoip set decides only connections made to an address.
@@ -127,11 +127,15 @@ func (p Preset) SingboxDNS(group string) (SingboxDNS, error) {
 			out.Direct = append(out.Direct, sp.Suffixes...)
 		}
 		for _, code := range sp.Geo {
-			site, ip := geositeTag(code), geoipTag(code)
-			out.RuleSets = append(out.RuleSets,
-				SingboxRuleSet{Type: "remote", Tag: site, Format: "binary", URL: fmt.Sprintf(singboxGeositeURL, geoLists[code].Site)},
-				SingboxRuleSet{Type: "remote", Tag: ip, Format: "binary", URL: fmt.Sprintf(singboxGeoipURL, geoLists[code].IP)})
-			out.DirectSets = append(out.DirectSets, site, ip)
+			l, _ := geoListOf(code)
+			site := geositeTag(code)
+			out.RuleSets = append(out.RuleSets, SingboxRuleSet{Type: "remote", Tag: site, Format: "binary", URL: fmt.Sprintf(singboxGeositeURL, l.Site)})
+			out.DirectSets = append(out.DirectSets, site)
+			if l.IP != "" {
+				ip := geoipTag(code)
+				out.RuleSets = append(out.RuleSets, SingboxRuleSet{Type: "remote", Tag: ip, Format: "binary", URL: fmt.Sprintf(singboxGeoipURL, l.IP)})
+				out.DirectSets = append(out.DirectSets, ip)
+			}
 			out.Section.Rules = append(out.Section.Rules, SingboxDNSRule{RuleSet: []string{site}, Action: "route", Server: tag})
 		}
 	}
