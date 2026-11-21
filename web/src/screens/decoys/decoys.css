@@ -1034,6 +1034,18 @@
 [dir="rtl"] .dz-fr iframe {
   direction: ltr;
 }
+.dz-pv.vph .dz-fr {
+  width: 390px;
+  max-width: 100%;
+  height: 640px;
+  aspect-ratio: auto;
+  border-radius: 24px;
+}
+.dz-pv.vph .dz-fr iframe {
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
 .dz-pv.nodoc .dz-fr {
   aspect-ratio: auto;
   height: 200px;
@@ -1625,6 +1637,9 @@ div.dz-asl > * {
   }
   .dz-stage {
     padding: 12px;
+  }
+  .dz-pv.vph .dz-fr {
+    height: 560px;
   }
   .dz-fsb {
     grid-template-columns: minmax(0, 1fr);
