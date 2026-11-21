@@ -1,0 +1,19 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __st__">
+<p class="__mu__"><a href="{{(index .Nav 1).Href}}">{{.L.inc_back}}</a></p>
+{{with .Page.Item}}<h1>{{.title}}</h1>
+<p class="__mu__"><span class="__pill__ {{if eq .impact "major"}}__imp2__{{else if eq .impact "maint"}}__imp3__{{else}}__imp1__{{end}}">{{if eq .impact "major"}}{{$.L.imp_major}}{{else if eq .impact "maint"}}{{$.L.imp_maint}}{{else}}{{$.L.imp_minor}}{{end}}</span> <time datetime="{{.date_iso}}">{{.date}}</time> · {{$.L.dur_l}}: {{.dur}}</p>
+<article class="__inc__">
+<ol class="__tl__">
+<li><strong>{{$.L.st_res}}</strong><p>{{.c}}</p></li>
+<li><strong>{{$.L.st_ident}}</strong><p>{{.b}}</p></li>
+<li><strong>{{$.L.st_inv}}</strong><p>{{.a}}</p></li>
+</ol>
+</article>{{end}}
+<h2>{{.L.inc_more}}</h2>
+<ul>{{range .Lists.incidents}}{{if ne .slug $.Page.Item.slug}}<li><a href="{{.href}}">{{.title}}</a> <span class="__mu__">{{.date}}</span></li>{{end}}{{end}}</ul>
+</main>
+{{template "footer" .}}
+</body>
+</html>

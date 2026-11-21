@@ -1,0 +1,101 @@
+{
+ "nav_label": "Huvudmeny",
+ "nf_title": "Sidan hittades inte",
+ "nf_text": "Sidan du söker finns inte eller har flyttats.",
+ "nf_back": "Till startsidan",
+ "months": [
+  "januari",
+  "februari",
+  "mars",
+  "april",
+  "maj",
+  "juni",
+  "juli",
+  "augusti",
+  "september",
+  "oktober",
+  "november",
+  "december"
+ ],
+ "months_gen": [
+  "januari",
+  "februari",
+  "mars",
+  "april",
+  "maj",
+  "juni",
+  "juli",
+  "augusti",
+  "september",
+  "oktober",
+  "november",
+  "december"
+ ],
+ "weekdays": [
+  "måndag",
+  "tisdag",
+  "onsdag",
+  "torsdag",
+  "fredag",
+  "lördag",
+  "söndag"
+ ],
+ "weekdays_short": [
+  "mån",
+  "tis",
+  "ons",
+  "tors",
+  "fre",
+  "lör",
+  "sön"
+ ],
+ "am": "fm",
+ "pm": "em",
+ "closed": "stängt",
+ "hrs_fmt": "%days%: %time%",
+ "ms": "ms",
+ "units": [
+  "B",
+  "KB",
+  "MB"
+ ],
+ "cf_h": "Skriv till oss",
+ "cf_intro": "Skicka ett meddelande så svarar vi så snart vi kan.",
+ "cf_name": "Ditt namn",
+ "cf_email": "Din e-postadress",
+ "cf_msg": "Meddelande",
+ "cf_send": "Skicka meddelande",
+ "cf_busy": "Skickar …",
+ "cf_empty": "Skriv ett meddelande först.",
+ "cf_fail": "Meddelandet kunde inte skickas. Försök igen senare.",
+ "nav_terms": "Användarvillkor",
+ "desc_terms": "Villkoren för att använda {brand}.",
+ "terms_h": "Användarvillkor",
+ "terms_intro": "Läs de här villkoren innan du använder {brand}. De är korta och gäller från första gången du använder tjänsten.",
+ "terms": [
+  {
+   "h": "Att använda tjänsten",
+   "p": "{brand} tillhandahålls i befintligt skick. När du använder tjänsten godkänner du villkoren. Om du inte godkänner dem ska du inte använda tjänsten."
+  },
+  {
+   "h": "Din del",
+   "p": "Använd tjänsten lagligt och bara för dig själv eller din organisation. Håll dina uppgifter för dig själv och berätta för oss om du tror att någon annan känner till dem."
+  },
+  {
+   "h": "Vad som inte är tillåtet",
+   "p": "Försök inte störa eller överbelasta tjänsten, och gå inte in på delar som inte är till för dig. Vi kan stänga av åtkomst som skadar andra."
+  },
+  {
+   "h": "Tillgänglighet",
+   "p": "Vi arbetar för att tjänsten ska fungera, men kan inte lova att den alltid är tillgänglig. Delar av den kan vi ändra, pausa eller avsluta."
+  },
+  {
+   "h": "Ansvar",
+   "p": "I den utsträckning lagen tillåter ansvarar vi inte för förluster som beror på att du använt tjänsten eller inte har kunnat använda den."
+  },
+  {
+   "h": "Ändringar",
+   "p": "Vi kan uppdatera villkoren då och då. Om du fortsätter använda tjänsten efter en ändring godkänner du de nya villkoren."
+  }
+ ]
+}

@@ -10,15 +10,12 @@
 <p class="__mu__">{{.L.pkg_note}}</p>
 <h2>{{.L.src_h}}</h2>
 <p>{{.L.src_intro}}</p>
-{{$v := (index .Lists.releases 0).version}}<pre><code>tar xf {{.V.cmd}}-{{$v}}.tar.gz
-cd {{.V.cmd}}-{{$v}}
-make
-sudo make install</code></pre>
+{{$v := (index .Lists.releases 0).version}}<pre><code>{{printf .L.src_code $v}}</code></pre>
 <h2>{{.L.sums_h}}</h2>
 <p>{{.L.sums_intro}}</p>
 <div class="__tbl__"><table>
 <thead><tr><th>{{.L.col_ver}}</th><th>{{.L.col_date}}</th><th>{{.L.col_sum}}</th></tr></thead>
-<tbody>{{range $i, $r := .Lists.releases}}<tr><td>{{$r.version}}</td><td>{{$r.date}}</td><td><code class="__sum__">{{hexs (printf "sum%d" $i) 64}}</code></td></tr>{{end}}</tbody>
+<tbody>{{range $i, $r := .Lists.releases}}<tr><td><a href="{{$r.href}}">{{$r.version}}</a></td><td>{{$r.date}}</td><td><code class="__sum__">{{hexs (printf "sum%d" $i) 64}}</code></td></tr>{{end}}</tbody>
 </table></div>
 <h2>{{.L.licence_h}}</h2>
 <p>{{.L.licence_p}}</p>

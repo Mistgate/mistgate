@@ -1,0 +1,13 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __blogmain__ __single__">
+<article class="__post__">
+<h1>{{.L.archive_h}}</h1>
+<p class="__lede__">{{.L.archive_intro}}</p>
+{{$m := ""}}{{range .Lists.posts}}{{if ne .month $m}}{{$m = .month}}<h2 class="__mh__">{{.month_label}}</h2>
+{{end}}<p class="__ar__"><a href="{{.href}}">{{.title}}</a> <span class="__mu__">{{.date}} · {{.tag}}</span></p>
+{{end}}</article>
+</main>
+{{template "footer" .}}
+</body>
+</html>

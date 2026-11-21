@@ -1,0 +1,101 @@
+{
+ "nav_label": "Hoofdmenu",
+ "nf_title": "Pagina niet gevonden",
+ "nf_text": "De pagina die u zoekt bestaat niet of is verplaatst.",
+ "nf_back": "Naar de startpagina",
+ "months": [
+  "januari",
+  "februari",
+  "maart",
+  "april",
+  "mei",
+  "juni",
+  "juli",
+  "augustus",
+  "september",
+  "oktober",
+  "november",
+  "december"
+ ],
+ "months_gen": [
+  "januari",
+  "februari",
+  "maart",
+  "april",
+  "mei",
+  "juni",
+  "juli",
+  "augustus",
+  "september",
+  "oktober",
+  "november",
+  "december"
+ ],
+ "weekdays": [
+  "maandag",
+  "dinsdag",
+  "woensdag",
+  "donderdag",
+  "vrijdag",
+  "zaterdag",
+  "zondag"
+ ],
+ "weekdays_short": [
+  "ma",
+  "di",
+  "wo",
+  "do",
+  "vr",
+  "za",
+  "zo"
+ ],
+ "am": "am",
+ "pm": "pm",
+ "closed": "gesloten",
+ "hrs_fmt": "%days%: %time%",
+ "ms": "ms",
+ "units": [
+  "B",
+  "KB",
+  "MB"
+ ],
+ "cf_h": "Stuur ons een bericht",
+ "cf_intro": "Stuur ons een bericht, dan antwoorden we zo snel mogelijk.",
+ "cf_name": "Uw naam",
+ "cf_email": "Uw e-mailadres",
+ "cf_msg": "Bericht",
+ "cf_send": "Bericht versturen",
+ "cf_busy": "Bezig met versturen…",
+ "cf_empty": "Schrijf eerst een bericht.",
+ "cf_fail": "Het bericht is niet verstuurd. Probeer het later opnieuw.",
+ "nav_terms": "Gebruiksvoorwaarden",
+ "desc_terms": "De voorwaarden voor het gebruik van {brand}.",
+ "terms_h": "Gebruiksvoorwaarden",
+ "terms_intro": "Lees deze voorwaarden voordat u {brand} gebruikt. Ze zijn kort en gelden vanaf het eerste gebruik.",
+ "terms": [
+  {
+   "h": "Gebruik van de dienst",
+   "p": "{brand} wordt geleverd zoals het is. Door de dienst te gebruiken gaat u akkoord met deze voorwaarden. Bent u het er niet mee eens, gebruik de dienst dan niet."
+  },
+  {
+   "h": "Uw rol",
+   "p": "Gebruik de dienst op een rechtmatige manier en alleen voor uzelf of uw organisatie. Houd uw gegevens voor uzelf en laat het ons weten als u denkt dat iemand anders ze kent."
+  },
+  {
+   "h": "Wat niet mag",
+   "p": "Probeer de dienst niet te verstoren of te overbelasten en ga niet naar onderdelen die niet voor u bedoeld zijn. Toegang die anderen schaadt, mogen we blokkeren."
+  },
+  {
+   "h": "Beschikbaarheid",
+   "p": "We doen ons best om de dienst draaiend te houden, maar kunnen niet beloven dat hij altijd beschikbaar is. Onderdelen kunnen we wijzigen, pauzeren of stopzetten."
+  },
+  {
+   "h": "Aansprakelijkheid",
+   "p": "Voor zover de wet het toestaat zijn we niet aansprakelijk voor schade door het gebruik van de dienst of doordat u hem niet kon gebruiken."
+  },
+  {
+   "h": "Wijzigingen",
+   "p": "We kunnen deze voorwaarden van tijd tot tijd aanpassen. Als u de dienst na een wijziging blijft gebruiken, gaat u akkoord met de nieuwe voorwaarden."
+  }
+ ]
+}

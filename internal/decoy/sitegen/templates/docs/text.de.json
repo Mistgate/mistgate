@@ -1,0 +1,465 @@
+{
+ "ui": {
+  "nav_label": "Dokumentation",
+  "footer": "Dokumentation für Version {ver}.",
+  "nav_home": "Überblick",
+  "nav_install": "Installation",
+  "nav_usage": "Verwendung",
+  "nav_faq": "FAQ",
+  "home_title": "Überblick",
+  "desc_install": "So installieren Sie {brand} {ver} unter Linux, macOS und Windows.",
+  "desc_usage": "So verwenden Sie {brand}: häufige Aufgaben mit Beispielen.",
+  "desc_faq": "Häufig gestellte Fragen zu {brand}.",
+  "nf_title": "Seite nicht gefunden",
+  "nf_text": "Diese Seite gehört nicht zur Dokumentation. In einer neueren Version wurde sie vielleicht umbenannt.",
+  "nf_back": "Zurück zum Überblick",
+  "quick_h": "Schnellstart",
+  "features_h": "Was es kann",
+  "out_h": "Ausgabe",
+  "install_h": "Installation",
+  "steps_h": "Schritte",
+  "usage_h": "Verwendung",
+  "opts_h": "Optionen",
+  "opt_col": "Option",
+  "desc_col": "Beschreibung",
+  "faq_h": "Häufig gestellte Fragen",
+  "next": "Weiter",
+  "facts_h": "Auf einen Blick",
+  "menu_h": "Dokumentation",
+  "facts": [
+   {
+    "k": "Version",
+    "v": "{ver}"
+   },
+   {
+    "k": "Plattformen",
+    "v": "Linux, macOS und Windows"
+   },
+   {
+    "k": "Lizenz",
+    "v": "MIT"
+   },
+   {
+    "k": "Abhängigkeiten",
+    "v": "Keine"
+   }
+  ],
+  "install_check": "Wird die Versionsnummer ausgegeben, hat die Installation funktioniert.",
+  "nav_config": "Konfiguration",
+  "nav_recipes": "Rezepte",
+  "nav_trouble": "Fehlerbehebung",
+  "desc_config": "Konfigurationsdatei und Einstellungen von {brand}.",
+  "desc_recipes": "Kurze Rezepte für alltägliche Aufgaben mit {brand}.",
+  "desc_trouble": "Lösungen für die Probleme, auf die man bei {brand} am häufigsten stößt.",
+  "config_h": "Konfiguration",
+  "config_col_key": "Schlüssel",
+  "config_col_default": "Standard",
+  "config_col_desc": "Wirkung",
+  "config_file_h": "Beispiel",
+  "recipes_h": "Rezepte",
+  "recipes_intro": "Kurze Antworten auf die Aufgaben, nach denen am häufigsten gefragt wird.",
+  "trouble_h": "Fehlerbehebung",
+  "trouble_intro": "Die Probleme, auf die man am häufigsten stößt, und was meistens hilft.",
+  "ver_l": "Version",
+  "prev": "Zurück"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "Ein Log-Zusammenfasser für die Kommandozeile",
+   "desc": "{brand} liest Logdateien im Klartext und gibt eine kurze Zusammenfassung ihres Inhalts aus.",
+   "overview": "{brand} liest Logdateien im Klartext und gibt eine kurze Zusammenfassung aus: wie viele Zeilen es sind, welche Stufen vorkommen und welche Meldungen sich am häufigsten wiederholen. Es ist ein kleines Programm ohne Abhängigkeiten.",
+   "features": [
+    "Liest Dateien, Verzeichnisse und die Standardeingabe",
+    "Fasst ähnliche Meldungen ohne Konfiguration zusammen",
+    "Gibt Text, JSON oder einen kleinen HTML-Bericht aus"
+   ],
+   "quick_out": "app.log: 48.211 Zeilen, 3 Stufen\n  info   46.902\n  warn    1.190\n  error     119\nhäufigste Meldung: Cache-Treffer fehlt für Schlüssel (9.413 Mal)",
+   "install_intro": "{brand} wird als einzelne ausführbare Datei geliefert. Vor dem ersten Start ist nichts einzurichten.",
+   "install_steps": [
+    "Laden Sie das Archiv herunter, das zu Ihrem System passt.",
+    "Entpacken Sie es und kopieren Sie die Datei in ein Verzeichnis im PATH.",
+    "Rufen Sie den Versionsbefehl auf, um zu prüfen, ob es funktioniert."
+   ],
+   "usage": [
+    {
+     "h": "Eine Datei zusammenfassen",
+     "p": "Richten Sie {brand} auf eine Datei, ein Verzeichnis oder eine Pipe. Verzeichnisse werden rekursiv gelesen, komprimierte Dateien beim Lesen entpackt."
+    },
+    {
+     "h": "Einen Zeitraum ansehen",
+     "p": "Mit --since und --until beschränken Sie die Zusammenfassung auf einen Zeitraum. Zeiten können absolut oder relativ zu jetzt angegeben werden."
+    },
+    {
+     "h": "Ein Ausgabeformat wählen",
+     "p": "Standard ist Klartext. JSON ist stabil und für Skripte gedacht; der HTML-Bericht ist eine einzelne Datei, die Sie weitergeben können."
+    }
+   ],
+   "options": [
+    {
+     "d": "Nur Zeilen nach diesem Zeitpunkt, absolut oder etwa 2h."
+    },
+    {
+     "d": "Nur Zeilen vor diesem Zeitpunkt."
+    },
+    {
+     "d": "Nur Zeilen dieser Stufe oder höher."
+    },
+    {
+     "d": "Wie viele wiederholte Meldungen aufgelistet werden. Standard 5."
+    },
+    {
+     "d": "text, json oder html. Standard text."
+    }
+   ],
+   "faq": [
+    {
+     "q": "Welche Logformate werden unterstützt?",
+     "a": "Alles, was zeilenweise aufgebaut ist. {brand} erkennt gängige Zeit- und Stufenformate und fällt sonst auf reine Zeilen zurück."
+    },
+    {
+     "q": "Verändert es meine Dateien?",
+     "a": "Nie. Dateien werden nur lesend geöffnet."
+    },
+    {
+     "q": "Wie große Dateien kann es lesen?",
+     "a": "Dateien werden gestreamt, die Größe ist also nur durch die Zeit begrenzt. Ein Gigabyte dauert auf einem Laptop wenige Sekunden."
+    }
+   ],
+   "config_intro": "{brand} liest eine optionale Datei config.toml aus Ihrem Konfigurationsordner. Jeder Schlüssel lässt sich auch auf der Kommandozeile angeben, und die Kommandozeile hat Vorrang.",
+   "config_rows": [
+    {
+     "d": "Wie viele wiederholte Meldungen aufgelistet werden."
+    },
+    {
+     "d": "Das Ausgabeformat: text, json oder html."
+    },
+    {
+     "d": "Meldungen, die ausgelassen werden, als einfacher Text verglichen."
+    },
+    {
+     "d": "Nur Zeilen nach diesem Zeitpunkt lesen."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Die lauteste Stunde finden",
+     "p": "Gruppieren Sie die Zusammenfassung nach Stunden und sehen Sie, wann im Log am meisten los war."
+    },
+    {
+     "h": "Zwei Tage vergleichen",
+     "p": "Zeigen Sie, welche Meldungen zwischen zwei Dateien neu sind und welche verschwunden."
+    },
+    {
+     "h": "Einen Bericht zum Weitergeben erstellen",
+     "p": "Schreiben Sie den HTML-Bericht in eine Datei und hängen Sie sie an eine Nachricht an."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Die Zusammenfassung ist leer",
+     "a": "Prüfen Sie, ob die Datei eine Meldung pro Zeile enthält. Ist sie in einem Format komprimiert, das {brand} nicht kennt, entpacken Sie sie zuerst."
+    },
+    {
+     "q": "Die Zeiten sehen falsch aus",
+     "a": "Zeilen ohne Zeitzone werden als UTC gelesen. Geben Sie mit --tz an, in welcher Zeitzone sie stehen."
+    },
+    {
+     "q": "Der Bericht ist zu lang",
+     "a": "Verringern Sie --top oder tragen Sie die lautesten Meldungen in die Ignorierliste der Konfigurationsdatei ein."
+    },
+    {
+     "q": "Auf einem Netzlaufwerk ist es langsam",
+     "a": "Kopieren Sie die Datei zuerst auf eine lokale Platte. Zeilenweises Lesen über eine langsame Verbindung ist meist die Ursache."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Tally",
+       "Pegel",
+       "Auszug",
+       "Skim",
+       "Kladde",
+       "Bruch",
+       "Tidy",
+       "Schreiber"
+      ],
+      [
+       "log",
+       "scan",
+       "sum",
+       "view",
+       "cut",
+       "peek"
+      ]
+     ]
+    }
+   }
+  },
+  "site": {
+   "tagline": "Ein kleiner Generator für statische Seiten",
+   "desc": "{brand} macht aus einem Ordner mit Markdown-Dateien und ein paar Vorlagen eine statische Website.",
+   "overview": "{brand} macht aus einem Ordner mit Markdown-Dateien und ein paar Vorlagen eine statische Website. Es gibt keine Datenbank, keine Laufzeitumgebung und nichts, was auf dem Server aktuell gehalten werden muss.",
+   "features": [
+    "Markdown mit Kopfdaten",
+    "Vorlagen in einfachem HTML",
+    "Eine lokale Vorschau, die bei jedem Speichern neu baut"
+   ],
+   "quick_out": "Notizen werden unter localhost:4000 bereitgestellt (Strg+C beendet)",
+   "install_intro": "{brand} ist eine einzelne ausführbare Datei. Legen Sie sie in den PATH, und Sie sind fertig.",
+   "install_steps": [
+    "Laden Sie das Archiv herunter, das zu Ihrem System passt.",
+    "Entpacken Sie es und kopieren Sie die Datei in ein Verzeichnis im PATH.",
+    "Rufen Sie den Versionsbefehl auf, um zu prüfen, ob es funktioniert."
+   ],
+   "usage": [
+    {
+     "h": "Eine neue Website beginnen",
+     "p": "Der Befehl init legt einen Ordner mit einer Konfigurationsdatei, einem Layout und einer Beispielseite an."
+    },
+    {
+     "h": "Eine Seite schreiben",
+     "p": "Seiten sind Markdown-Dateien. Die Kopfdaten oben legen Titel und Datum fest, alles darunter ist der Inhalt."
+    },
+    {
+     "h": "Zum Veröffentlichen bauen",
+     "p": "Der Befehl build schreibt die fertige Seite in den Ordner public. Kopieren Sie diesen Ordner auf einen beliebigen Webserver."
+    }
+   ],
+   "options": [
+    {
+     "d": "Ordner für die fertige Seite. Standard public."
+    },
+    {
+     "d": "Auch als Entwurf markierte Seiten einbeziehen."
+    },
+    {
+     "d": "Port des Vorschauservers. Standard 4000."
+    },
+    {
+     "d": "Neu bauen, wenn sich eine Datei ändert."
+    },
+    {
+     "d": "Nur Fehler ausgeben."
+    }
+   ],
+   "faq": [
+    {
+     "q": "Kann ich eigene Vorlagen verwenden?",
+     "a": "Ja. Vorlagen sind einfache HTML-Dateien mit ein paar Platzhaltern, und die Ordnerstruktur können Sie ändern."
+    },
+    {
+     "q": "Braucht es eine Datenbank?",
+     "a": "Nein. Das Ergebnis sind einfache Dateien, die jeder Webserver ausliefern kann."
+    },
+    {
+     "q": "Wie füge ich eine neue Art von Seite hinzu?",
+     "a": "Legen Sie unter pages einen Ordner mit eigener Layoutdatei an, und {brand} nimmt ihn beim nächsten Bau auf."
+    }
+   ],
+   "config_intro": "Die Datei site.toml liegt im Hauptordner Ihrer Website. Fehlt ein Schlüssel, gilt sein Standardwert, eine neue Website braucht also gar keine Datei.",
+   "config_rows": [
+    {
+     "d": "Der Name in der Kopfzeile und im Titel."
+    },
+    {
+     "d": "Die Adresse Ihrer Website. Verwenden Sie /, wenn sie im Wurzelverzeichnis liegt."
+    },
+    {
+     "d": "Das Aussehen der Seite: plain, slate oder folio."
+    },
+    {
+     "d": "Ob als Entwurf markierte Seiten gebaut werden."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Eine neue Seite anlegen",
+     "p": "Legen Sie eine Markdown-Datei mit Titel und Datum in den Kopfdaten an."
+    },
+    {
+     "h": "Entwürfe ansehen",
+     "p": "Starten Sie die Vorschau lokal, einschließlich der unfertigen Seiten."
+    },
+    {
+     "h": "In einen Ordner veröffentlichen",
+     "p": "Bauen Sie die ganze Website in einen einzigen Ordner, den Sie auf jeden Webserver kopieren können."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Eine Seite fehlt im Ergebnis",
+     "a": "Seiten mit draft: true in den Kopfdaten werden übersprungen. Entfernen Sie die Zeile oder bauen Sie mit --drafts."
+    },
+    {
+     "q": "Nach dem Veröffentlichen sind Links kaputt",
+     "a": "Setzen Sie base_url auf die Adresse des Ordners, in dem die Website liegt."
+    },
+    {
+     "q": "Die Vorschau aktualisiert sich nicht",
+     "a": "Manche Editoren schreiben eine neue Datei, statt die alte zu ändern. Starten Sie die Vorschau neu oder schalten Sie das sichere Speichern im Editor aus."
+    },
+    {
+     "q": "Bilder werden nicht angezeigt",
+     "a": "Legen Sie sie in den Ordner static. Alles darin wird unverändert kopiert."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Schlicht",
+       "Schiefer",
+       "Kreide",
+       "Folio",
+       "Feder",
+       "Maurer",
+       "Presse",
+       "Tinte"
+      ],
+      [
+       "site",
+       "page",
+       "build",
+       "gen",
+       "sheet"
+      ]
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Wiederkehrende Aufgaben ohne Crontab",
+   "desc": "{brand} führt kleine, wiederkehrende Aufgaben auf einem Rechner aus und meldet, wenn eine davon fehlschlägt.",
+   "overview": "{brand} führt kleine, wiederkehrende Aufgaben auf einem Rechner aus und meldet, wenn eine davon fehlschlägt. Es ist eine freundlichere Alternative zu einer Crontab, die man im Kopf behalten muss.",
+   "features": [
+    "Zeitpläne in einfachen Worten",
+    "Ein Protokoll für jeden Lauf",
+    "Eine Ausgabezeile pro Aufgabe, damit Fehler auffallen"
+   ],
+   "quick_out": "backup   jeden Tag um 03:00   letzter Lauf: ok (4 s)",
+   "install_intro": "{brand} besteht aus einer ausführbaren Datei und einem kleinen Hintergrundprozess, der einmal pro Minute den Zeitplan prüft.",
+   "install_steps": [
+    "Laden Sie das Archiv herunter, das zu Ihrem System passt.",
+    "Entpacken Sie es und kopieren Sie die Datei in ein Verzeichnis im PATH.",
+    "Starten Sie den Hintergrundprozess mit dem Dienstmanager Ihres Systems."
+   ],
+   "usage": [
+    {
+     "h": "Eine Aufgabe hinzufügen",
+     "p": "Eine Aufgabe hat einen Namen, einen Zeitplan und einen Befehl. Zeitpläne schreibt man in einfachen Worten."
+    },
+    {
+     "h": "Sehen, was lief",
+     "p": "Der Befehl list zeigt jede Aufgabe mit dem Ergebnis ihres letzten Laufs. Der Befehl history zeigt die Läufe einer Aufgabe mit Dauer und Ausgabe."
+    },
+    {
+     "h": "Anhalten und fortsetzen",
+     "p": "Beim Anhalten bleiben Aufgabe und Verlauf erhalten, sie läuft nur nicht mehr. Praktisch beim Umzug oder beim Einspielen einer Sicherung."
+    }
+   ],
+   "options": [
+    {
+     "d": "Wo Aufgaben und Protokolle liegen. Standard ist ein Ordner im Home-Verzeichnis."
+    },
+    {
+     "d": "Nur Fehlschläge ausgeben."
+    },
+    {
+     "d": "Wie viele Läufe history zeigt. Standard 10."
+    },
+    {
+     "d": "Maschinenlesbare Ausgabe."
+    },
+    {
+     "d": "Eine Aufgabe sofort und zusätzlich zum Zeitplan ausführen."
+    }
+   ],
+   "faq": [
+    {
+     "q": "Muss es als Dienst laufen?",
+     "a": "Ja, ein kleiner Hintergrundprozess prüft einmal pro Minute den Zeitplan. Auf der Installationsseite steht, was zu starten ist."
+    },
+    {
+     "q": "Was passiert, wenn der Rechner aus ist?",
+     "a": "Eine Aufgabe, die fällig war, während der Rechner aus war, läuft einmal nach dem Start."
+    },
+    {
+     "q": "Können Aufgaben voneinander abhängen?",
+     "a": "Noch nicht. Verketten Sie die Befehle vorerst in einer einzigen Aufgabe."
+    }
+   ],
+   "config_intro": "{brand} liest jobs.toml aus Ihrem Konfigurationsordner. Die Aufgaben selbst liegen getrennt, die Datei enthält also nur Einstellungen.",
+   "config_rows": [
+    {
+     "d": "Die Shell, die die Befehle ausführt."
+    },
+    {
+     "d": "Wo die Ausgabe jedes Laufs aufbewahrt wird."
+    },
+    {
+     "d": "Wie oft eine fehlgeschlagene Aufgabe erneut versucht wird."
+    },
+    {
+     "d": "Ob eine fehlgeschlagene Aufgabe auch eine Benachrichtigung sendet."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Eine Aufgabe einmal sofort ausführen",
+     "p": "Starten Sie eine Aufgabe außerhalb ihres Zeitplans, zum Beispiel um einen neuen Befehl zu testen."
+    },
+    {
+     "h": "Sehen, warum eine Aufgabe fehlgeschlagen ist",
+     "p": "Geben Sie die Ausgabe des letzten Laufs einer Aufgabe aus."
+    },
+    {
+     "h": "Alles anhalten, solange Sie verreist sind",
+     "p": "Halten Sie alle Zeitpläne an, bis Sie sie fortsetzen."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Eine Aufgabe läuft nie",
+     "a": "Prüfen Sie mit dem Befehl list, ob das Programm läuft. Aufgaben laufen nur, solange es läuft."
+    },
+    {
+     "q": "Eine Aufgabe läuft doppelt",
+     "a": "Es laufen zwei Kopien des Programms. Beenden Sie eine; die Sperrdatei liegt im Protokollordner."
+    },
+    {
+     "q": "Der Befehl funktioniert in meiner Shell, aber nicht hier",
+     "a": "Aufgaben lesen Ihre Shell-Startdateien nicht. Verwenden Sie vollständige Pfade oder setzen Sie die Umgebung in der Aufgabe."
+    },
+    {
+     "q": "Die Zeiten sind eine Stunde daneben",
+     "a": "{brand} folgt der Systemuhr und der Zeitzone. Ändern Sie sie dort, nicht in der Aufgabe."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Uhr",
+       "Besorgung",
+       "Pflicht",
+       "Dienst",
+       "Takt",
+       "Rhythmus",
+       "Reihe",
+       "Anstoß"
+      ],
+      [
+       "work",
+       "list",
+       "run",
+       "do",
+       "bell"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

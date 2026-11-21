@@ -1,118 +1,400 @@
 {
-  "ui": {
-    "en": {
-      "vars": {
-        "city": ["Ashwell", "Harrowby", "Lindenmere", "Pellworth", "Oakhaven", "Stanmoor", "Wexcombe", "Fenbridge", "Marlbeck", "Thornley"],
-        "street": ["Mill Lane", "Church Street", "Station Road", "Quay Street", "Orchard Close", "High Street", "Tannery Row", "Chapel Walk"],
-        "n": {"min": 2, "max": 96},
-        "ph": {"min": 100, "max": 199},
-        "cur": ["£", "€", "$"]
-      },
-      "nav_label": "Main", "footer": "Independent and local.",
-      "nav_home": "Home", "nav_about": "About us", "nav_contact": "Find us", "home_title": "Welcome",
-      "nf_title": "Page not found", "nf_text": "We could not find that page. It may have moved, or perhaps we never had it.", "nf_back": "Back to the home page",
-      "see_services": "See what we offer", "all_prices": "Full price list", "visit_h": "Visit us", "hours_h": "Opening hours", "address_l": "Address", "phone_l": "Telephone",
-      "about_h": "About us", "services_h": "What we offer", "services_intro": "Prices are a guide; we are always happy to talk through what you need.",
-      "contact_h": "Find us", "contact_intro": "Drop in during opening hours or give us a call. We are happy to talk through what you need before you decide anything.",
-      "contact_note": "Parking is easiest on the next street along. If the door is closed during opening hours, we are probably on the phone; knock and wait a moment."
-    }
+ "bundles": [
+  {
+   "id": "bakery",
+   "weight": 2,
+   "photo_q": [
+    "bakery bread loaves",
+    "sourdough bread crust",
+    "pastry display counter"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "heart"
+     },
+     {
+      "icon": "leaf"
+     },
+     {
+      "icon": "gift"
+     }
+    ],
+    "services": [
+     {
+      "price": 4.8,
+      "from": false
+     },
+     {
+      "price": 5.2,
+      "from": false
+     },
+     {
+      "price": 3.6,
+      "from": false
+     },
+     {
+      "price": 2.4,
+      "from": false
+     },
+     {
+      "price": 28.0,
+      "from": true
+     }
+    ],
+    "hours": [
+     {
+      "from": 2,
+      "to": 5,
+      "open": "07:00",
+      "close": "16:00"
+     },
+     {
+      "from": 6,
+      "to": 6,
+      "open": "07:00",
+      "close": "14:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     },
+     {
+      "from": 1,
+      "to": 1,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
   },
-  "bundles": [
-    {
-      "lang": "en", "photo_q": ["bakery bread loaves","sourdough bread crust","pastry display counter"], "weight": 2,
-      "vars": {"brand": {"join": [["Rye", "Honey", "Oat", "Barley", "Fennel", "Crumb", "Hearth", "Sunday", "Sesame", "Plum"], ["Wren", "Finch", "Sparrow", "Linnet", "Thrush", "Robin", "Swift", "Lark"]], "sep": " & "}},
-      "tagline": "Bread and cakes, baked in {city}", "nav_services": "Our bakes",
-      "desc": "A neighbourhood bakery in {city}: sourdough, rolls and cakes, baked every morning.", "desc_services": "Breads, buns and cakes, with prices.", "desc_about": "The story of {brand}, a small bakery in {city}.", "desc_contact": "Opening hours and address of {brand} in {city}.",
-      "hero_h": "Bread the slow way", "intro": "A small neighbourhood bakery. Sourdough, rolls and cakes, baked every morning before the shop opens.",
-      "features": [{"icon": "heart", "h": "Baked every morning", "p": "Nothing is kept from yesterday."}, {"icon": "leaf", "h": "Honest ingredients", "p": "Flour, water, salt and time."}, {"icon": "gift", "h": "Orders welcome", "p": "Cakes and larger orders by arrangement."}],
-      "services": [
-        {"t": "Country sourdough loaf", "p": "{cur}4.80", "d": "Slowly risen, with a thick crust and a soft, open crumb."},
-        {"t": "Seeded rye", "p": "{cur}5.20", "d": "Dense, dark and very good with cheese."},
-        {"t": "Morning rolls, six", "p": "{cur}3.60", "d": "Soft rolls, baked at five and usually gone by ten."},
-        {"t": "Cardamom buns", "p": "{cur}2.40", "d": "Twisted by hand and glazed while still warm."},
-        {"t": "Celebration cake", "p": "from {cur}28", "d": "Please order three days ahead; we will agree the flavours with you."}],
-      "about": ["{brand} began in a rented kitchen behind a shop in {city}, with one oven and a good deal of optimism.", "We still bake in small batches, with flour from a mill an hour down the valley and a sourdough starter that is older than our youngest baker.", "Come early for the rolls, stay for the coffee, and tell us if your loaf was not right. We would rather know."],
-      "hours": ["Tuesday to Friday: 7:00 to 16:00", "Saturday: 7:00 to 14:00", "Sunday and Monday: closed"]
-    },
-    {
-      "lang": "en", "photo_q": ["bicycle repair workshop","bicycle wheel spokes","bicycle chain gears"], "weight": 2,
-      "vars": {"brand": {"join": [["Spoke", "Chain", "Cog", "Pedal", "Crank", "Wheel", "Gear", "Frame", "Hub", "Rim"], ["Works", "Repair", "Shed", "Garage", "Bench", "Stand", "Service", "Workshop"]], "sep": " "}},
-      "tagline": "Bicycle repairs in {city}", "nav_services": "Prices",
-      "desc": "Bicycle repairs and servicing in {city}, done while you wait or by the next day.", "desc_services": "Repairs and servicing for bicycles, with prices.", "desc_about": "About {brand}, a small bicycle workshop in {city}.", "desc_contact": "Opening hours and address of {brand} in {city}.",
-      "hero_h": "Your bike, running properly again", "intro": "A small workshop for everyday bicycles. We fix what is broken, adjust what is not quite right and tell you honestly what is not worth the money.",
-      "features": [{"icon": "tool", "h": "Done while you wait", "p": "Most small repairs take less than an hour."}, {"icon": "check", "h": "Honest advice", "p": "We will say so if something is not worth fixing."}, {"icon": "clock", "h": "Next-day servicing", "p": "Drop it off in the morning, collect it tomorrow."}],
-      "services": [
-        {"t": "Puncture repair", "p": "{cur}9", "d": "Inner tube fitted and checked, tyre inspected for the culprit."},
-        {"t": "Basic service", "p": "{cur}45", "d": "Brakes and gears adjusted, chain cleaned and oiled, tyres and bolts checked."},
-        {"t": "Full service", "p": "{cur}95", "d": "Strip-down, degrease and rebuild of drivetrain, with new cables where needed."},
-        {"t": "Wheel truing", "p": "{cur}18", "d": "Wobbles taken out and spoke tension evened up."},
-        {"t": "Winter check", "p": "{cur}30", "d": "Lights, brakes, tyres and mudguards, so the dark months are less of a risk."}],
-      "about": ["{brand} started in a garden shed in {city}, fixing neighbours' bicycles for the price of a coffee.", "Today we have a proper workshop, a very long bench and a wall of spare parts that only we understand. We still prefer repairing to replacing.", "Bring anything with two wheels. If we cannot fix it, we will tell you who can."],
-      "hours": ["Monday to Friday: 8:30 to 17:30", "Saturday: 9:00 to 15:00", "Sunday: closed"]
-    },
-    {
-      "lang": "en", "photo_q": ["sewing machine fabric","fabric rolls shelf","sewing thread spools"], "weight": 2,
-      "vars": {"brand": {"join": [["Needle", "Thimble", "Button", "Hem", "Seam", "Cuff", "Collar", "Pleat", "Bobbin", "Selvedge"], ["& Pin", "Alterations", "Tailoring", "Atelier", "Mending", "Fitting", "& Thread", "Studio"]], "sep": " "}},
-      "tagline": "Alterations and mending in {city}", "nav_services": "Alterations",
-      "desc": "Clothing alterations and repairs in {city}: hems, zips, fittings and mending.", "desc_services": "Alterations and repairs for clothes, with prices.", "desc_about": "About {brand}, a small tailoring workshop in {city}.", "desc_contact": "Opening hours and address of {brand} in {city}.",
-      "hero_h": "Clothes that fit, for longer", "intro": "Hems, zips, fittings and mending, done by hand and by machine in a small workshop above the shops.",
-      "features": [{"icon": "heart", "h": "Mended with care", "p": "Every garment is looked at properly before we start."}, {"icon": "check", "h": "Fitted to you", "p": "We pin it on you, not on a mannequin."}, {"icon": "clock", "h": "Ready when promised", "p": "We give you a day and keep to it."}],
-      "services": [
-        {"t": "Shorten trousers or a skirt", "p": "{cur}14", "d": "Hemmed to your length, with the original finish kept where possible."},
-        {"t": "Take in a jacket", "p": "from {cur}38", "d": "Sides and sleeves adjusted so it hangs properly."},
-        {"t": "Replace a zip", "p": "{cur}16", "d": "Matched for colour and weight, fitted neatly."},
-        {"t": "Mend a coat lining", "p": "from {cur}30", "d": "A torn lining replaced or repaired, pockets included."},
-        {"t": "Darning and patching", "p": "from {cur}8", "d": "Visible or invisible, as you prefer."}],
-      "about": ["{brand} is a workshop of two on the first floor of a building in {city}, above a shop that sells wool.", "We learnt the trade from people who had done it for forty years, and we have kept some of their habits, such as always pinning twice.", "If you are not sure whether something is worth altering, bring it in. We will tell you honestly."],
-      "hours": ["Tuesday to Friday: 9:30 to 17:00", "Saturday: 10:00 to 14:00", "Sunday and Monday: closed"]
-    },
-    {
-      "lang": "en", "photo_q": ["clock repair workshop","antique clock dial","watch mechanism gears"], "weight": 2,
-      "vars": {"brand": {"join": [["Pendulum", "Balance", "Spring", "Escape", "Cog", "Dial", "Chime", "Winder", "Anchor", "Jewel"], ["& Son", "Clockworks", "Watch Repair", "Horology", "Bench", "Timepieces", "Workshop", "Services"]], "sep": " "}},
-      "tagline": "Watch and clock repair in {city}", "nav_services": "Repairs",
-      "desc": "Watch and clock repair in {city}: servicing, batteries, straps and restoration.", "desc_services": "Watch and clock repairs, with prices.", "desc_about": "About {brand}, a small watch and clock workshop in {city}.", "desc_contact": "Opening hours and address of {brand} in {city}.",
-      "hero_h": "Time, put right", "intro": "A small bench where watches and clocks are cleaned, adjusted and brought back to keeping good time.",
-      "features": [{"icon": "clock", "h": "Careful work", "p": "Every movement is opened, cleaned and checked."}, {"icon": "shield", "h": "Guaranteed", "p": "Servicing comes with a twelve month guarantee."}, {"icon": "check", "h": "Fair quotes", "p": "You are told the price before anything is touched."}],
-      "services": [
-        {"t": "Mechanical watch service", "p": "from {cur}95", "d": "Movement cleaned, oiled, regulated and timed over several days."},
-        {"t": "Battery replacement", "p": "{cur}9", "d": "New battery fitted and the seal checked."},
-        {"t": "Clock overhaul", "p": "from {cur}120", "d": "Mantel and wall clocks stripped, repaired and set going again."},
-        {"t": "Strap replacement", "p": "from {cur}15", "d": "Leather, fabric and metal straps fitted while you wait."},
-        {"t": "Case cleaning", "p": "{cur}25", "d": "Gentle polishing of cases and bracelets, without removing character."}],
-      "about": ["{brand} is a one-person bench in a corner of {city}, with a very good lamp and a drawer full of tiny screws.", "Most of what comes in is inherited: a grandfather's watch, a clock from a mantelpiece. We try to mend it and keep it as it was.", "We do not sell new watches. We just make the old ones go."],
-      "hours": ["Tuesday to Friday: 10:00 to 17:00", "Saturday: 10:00 to 13:00", "Sunday and Monday: closed"]
-    },
-    {
-      "lang": "en", "photo_q": ["picture frames wall","frame moulding workshop","wooden frame corner"], "weight": 2,
-      "vars": {"brand": {"join": [["Gilt", "Mount", "Mitre", "Rabbet", "Glaze", "Hanger", "Bevel", "Easel", "Linen", "Moulding"], ["& Frame", "Framing", "Gallery", "Workshop", "Studio", "Mounts", "House", "Works"]], "sep": " "}},
-      "tagline": "Picture framing in {city}", "nav_services": "Framing",
-      "desc": "Picture framing in {city}: mounts, glass, box frames and restoration.", "desc_services": "Framing, mounting and hanging, with prices.", "desc_about": "About {brand}, a small framing workshop in {city}.", "desc_contact": "Opening hours and address of {brand} in {city}.",
-      "hero_h": "Frames made to measure", "intro": "A framing workshop for prints, photographs, textiles and things that do not fit in a frame at all.",
-      "features": [{"icon": "layers", "h": "Made to measure", "p": "Every frame is cut and joined in our workshop."}, {"icon": "eye", "h": "Careful choices", "p": "We help you choose a mount and a moulding that suit the picture."}, {"icon": "shield", "h": "Preservation glass", "p": "Available for work that should last."}],
-      "services": [
-        {"t": "Standard frame, A4", "p": "from {cur}32", "d": "A simple moulding, a mount and clear glass."},
-        {"t": "Large frame", "p": "from {cur}75", "d": "For posters and big prints, with lighter glazing."},
-        {"t": "Box frame for objects", "p": "from {cur}60", "d": "Medals, shells, tickets and other small things worth keeping."},
-        {"t": "Restoring an old frame", "p": "from {cur}40", "d": "Repair, regilding and a new back."},
-        {"t": "Hanging service", "p": "{cur}20", "d": "We will bring the pictures and hang them straight."}],
-      "about": ["{brand} is a small workshop in {city} that has been cutting mitres since long before anyone in the building was born.", "We frame a lot of children's drawings and a few very old maps. Both get the same attention and the same acid-free card.", "Bring us something you care about and we will find the frame it has been waiting for."],
-      "hours": ["Monday to Friday: 9:00 to 17:00", "Saturday: 10:00 to 14:00", "Sunday: closed"]
-    },
-    {
-      "lang": "en", "photo_q": ["piano keys close up","upright piano interior","piano strings hammers"], "weight": 2,
-      "vars": {"brand": {"join": [["Octave", "Treble", "Cadence", "Minor", "Fifth", "Harmony", "Sonata", "Pitch", "Legato", "Fugue"], ["Tuning", "Pianos", "Keys", "Studio", "Services", "Workshop", "Care", "Restoration"]], "sep": " "}},
-      "tagline": "Piano tuning and care in {city}", "nav_services": "Services",
-      "desc": "Piano tuning, small repairs and advice in {city} and the surrounding villages.", "desc_services": "Piano tuning and repair services, with prices.", "desc_about": "About {brand}, a piano tuner in {city}.", "desc_contact": "How to book {brand} in {city}.",
-      "hero_h": "A piano that sounds like one", "intro": "Tuning, small repairs and honest advice for upright and grand pianos in {city} and the villages around it.",
-      "features": [{"icon": "music", "h": "Visits at home", "p": "Tuning is done where the piano lives."}, {"icon": "clock", "h": "Unhurried", "p": "A tuning takes as long as it needs to."}, {"icon": "check", "h": "Straight answers", "p": "If a piano is not worth repairing, we will say so."}],
-      "services": [
-        {"t": "Piano tuning", "p": "{cur}85", "d": "A standard tuning to concert pitch, about ninety minutes."},
-        {"t": "Tuning and light regulation", "p": "{cur}140", "d": "Tuning plus small adjustments to make the keys more even."},
-        {"t": "Pitch raise", "p": "{cur}120", "d": "For pianos that have drifted flat after years without attention."},
-        {"t": "Repairs and quotes", "p": "from {cur}30", "d": "Sticking keys, loose pedals and buzzing strings."},
-        {"t": "Advice before you buy", "p": "{cur}45", "d": "A visit to look at a second-hand piano before you commit."}],
-      "about": ["{brand} is one person with a case of tuning levers and an old estate car, covering {city} and the villages around it.", "Most pianos I see have not been tuned in years and still sound better than their owners expect. A little patience does a lot.", "I will tell you honestly what a piano needs and what it can do without."],
-      "hours": ["Visits: Monday to Saturday, by appointment", "Phone: weekdays 9:00 to 11:00", "Sunday: closed"]
-    }
-  ]
+  {
+   "id": "bike",
+   "weight": 2,
+   "photo_q": [
+    "bicycle repair workshop",
+    "bicycle wheel spokes",
+    "bicycle chain gears"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "tool"
+     },
+     {
+      "icon": "check"
+     },
+     {
+      "icon": "clock"
+     }
+    ],
+    "services": [
+     {
+      "price": 9.0,
+      "from": false
+     },
+     {
+      "price": 45.0,
+      "from": false
+     },
+     {
+      "price": 95.0,
+      "from": false
+     },
+     {
+      "price": 18.0,
+      "from": false
+     },
+     {
+      "price": 30.0,
+      "from": false
+     }
+    ],
+    "hours": [
+     {
+      "from": 1,
+      "to": 5,
+      "open": "08:30",
+      "close": "17:30"
+     },
+     {
+      "from": 6,
+      "to": 6,
+      "open": "09:00",
+      "close": "15:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  },
+  {
+   "id": "tailor",
+   "weight": 2,
+   "photo_q": [
+    "sewing machine fabric",
+    "fabric rolls shelf",
+    "sewing thread spools"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "heart"
+     },
+     {
+      "icon": "check"
+     },
+     {
+      "icon": "clock"
+     }
+    ],
+    "services": [
+     {
+      "price": 14.0,
+      "from": false
+     },
+     {
+      "price": 38.0,
+      "from": true
+     },
+     {
+      "price": 16.0,
+      "from": false
+     },
+     {
+      "price": 30.0,
+      "from": true
+     },
+     {
+      "price": 8.0,
+      "from": true
+     }
+    ],
+    "hours": [
+     {
+      "from": 2,
+      "to": 5,
+      "open": "09:30",
+      "close": "17:00"
+     },
+     {
+      "from": 6,
+      "to": 6,
+      "open": "10:00",
+      "close": "14:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     },
+     {
+      "from": 1,
+      "to": 1,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  },
+  {
+   "id": "clock",
+   "weight": 2,
+   "photo_q": [
+    "clock repair workshop",
+    "antique clock dial",
+    "watch mechanism gears"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "clock"
+     },
+     {
+      "icon": "shield"
+     },
+     {
+      "icon": "check"
+     }
+    ],
+    "services": [
+     {
+      "price": 95.0,
+      "from": true
+     },
+     {
+      "price": 9.0,
+      "from": false
+     },
+     {
+      "price": 120.0,
+      "from": true
+     },
+     {
+      "price": 15.0,
+      "from": true
+     },
+     {
+      "price": 25.0,
+      "from": false
+     }
+    ],
+    "hours": [
+     {
+      "from": 2,
+      "to": 5,
+      "open": "10:00",
+      "close": "17:00"
+     },
+     {
+      "from": 6,
+      "to": 6,
+      "open": "10:00",
+      "close": "13:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     },
+     {
+      "from": 1,
+      "to": 1,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  },
+  {
+   "id": "framing",
+   "weight": 2,
+   "photo_q": [
+    "picture frames wall",
+    "frame moulding workshop",
+    "wooden frame corner"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "layers"
+     },
+     {
+      "icon": "eye"
+     },
+     {
+      "icon": "shield"
+     }
+    ],
+    "services": [
+     {
+      "price": 32.0,
+      "from": true
+     },
+     {
+      "price": 75.0,
+      "from": true
+     },
+     {
+      "price": 60.0,
+      "from": true
+     },
+     {
+      "price": 40.0,
+      "from": true
+     },
+     {
+      "price": 20.0,
+      "from": false
+     }
+    ],
+    "hours": [
+     {
+      "from": 1,
+      "to": 5,
+      "open": "09:00",
+      "close": "17:00"
+     },
+     {
+      "from": 6,
+      "to": 6,
+      "open": "10:00",
+      "close": "14:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  },
+  {
+   "id": "piano",
+   "weight": 2,
+   "photo_q": [
+    "piano keys close up",
+    "upright piano interior",
+    "piano strings hammers"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "music"
+     },
+     {
+      "icon": "clock"
+     },
+     {
+      "icon": "check"
+     }
+    ],
+    "services": [
+     {
+      "price": 85.0,
+      "from": false
+     },
+     {
+      "price": 140.0,
+      "from": false
+     },
+     {
+      "price": 120.0,
+      "from": false
+     },
+     {
+      "price": 30.0,
+      "from": true
+     },
+     {
+      "price": 45.0,
+      "from": false
+     }
+    ],
+    "hours": [
+     {
+      "from": 1,
+      "to": 6,
+      "open": "09:00",
+      "close": "18:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  }
+ ]
 }

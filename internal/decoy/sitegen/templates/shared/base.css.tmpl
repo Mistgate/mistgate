@@ -55,8 +55,11 @@ code,pre,kbd{font-family:var(--fm);font-size:.92em}
 .__code__{margin:0 0 .15em;color:var(--ac);font:700 4.5rem/1 var(--fh)}
 .__fld__{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
 .__fld__ label{font-size:.92rem;font-weight:600}
-.__fld__ input{width:100%;padding:.65em .8em;border:1px solid var(--ln);border-radius:var(--rs);background:var(--sf);color:var(--fg);font:inherit}
-.__fld__ input:focus{outline:2px solid var(--ac);outline-offset:1px}
+.__fld__ input,.__fld__ textarea{width:100%;padding:.65em .8em;border:1px solid var(--ln);border-radius:var(--rs);background:var(--sf);color:var(--fg);font:inherit}
+.__fld__ textarea{resize:vertical}
+.__fld__ input:focus,.__fld__ textarea:focus{outline:2px solid var(--ac);outline-offset:1px}
+.__cform__{max-width:520px}
+.__cfs__{margin:0 0 14px;color:var(--bd)}
 .__tbl__{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 th,td{padding:.6em .75em;border-bottom:1px solid var(--ln);text-align:left}

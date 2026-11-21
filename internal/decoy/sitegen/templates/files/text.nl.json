@@ -1,0 +1,163 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Kei",
+      "Linde",
+      "Lantaarn",
+      "Beuk",
+      "Veer",
+      "Esdoorn",
+      "Klaver",
+      "Barnsteen"
+     ],
+     [
+      "post",
+      "bode",
+      "mand",
+      "koerier",
+      "pad",
+      "kist"
+     ]
+    ]
+   },
+   "limit": [
+    "500 MB",
+    "1 GB",
+    "2 GB",
+    "5 GB"
+   ]
+  },
+  "nav_label": "Hoofdmenu",
+  "tagline": "Eenvoudig bestanden versturen",
+  "footer": "Bestanden worden automatisch verwijderd zodra de link verloopt.",
+  "nav_home": "Bestand versturen",
+  "nav_how": "Zo werkt het",
+  "nav_limits": "Limieten en vragen",
+  "home_title": "Bestand versturen",
+  "desc": "Deel bestanden tot {limit} met één link, bij {brand}.",
+  "desc_how": "Zo werkt het versturen van bestanden bij {brand}.",
+  "desc_limits": "Groottes, termijnen en veelgestelde vragen over {brand}.",
+  "nf_title": "Pagina niet gevonden",
+  "nf_text": "De pagina die u zoekt bestaat niet of is verplaatst.",
+  "nf_back": "Naar de startpagina",
+  "drop_h": "Sleep een bestand hierheen",
+  "drop_hint": "of kies er een op uw apparaat, tot {limit}",
+  "pick": "Bestand kiezen",
+  "uploading": "Bezig met uploaden…",
+  "e_full": [
+   "De opslag is vol. Probeer het later opnieuw.",
+   "Uploaden mislukt: de opslag is op dit moment vol."
+  ],
+  "retry": "Opnieuw proberen",
+  "how_h": "Zo werkt het",
+  "how_intro": "Drie stappen, niets in te stellen.",
+  "steps": [
+   {
+    "h": "Kies een bestand",
+    "p": "Sleep het bestand naar de startpagina of kies het op uw apparaat."
+   },
+   {
+    "h": "Ontvang een link",
+    "p": "Na het uploaden krijgt u een link die u kunt kopiëren."
+   },
+   {
+    "h": "Deel de link",
+    "p": "Wie de link heeft, kan het bestand downloaden tot het verloopt."
+   }
+  ],
+  "limits_h": "Limieten en vragen",
+  "limits_intro": "De belangrijkste cijfers op een rij.",
+  "limits": [
+   {
+    "k": "Grootste bestand",
+    "v": "{limit}"
+   },
+   {
+    "k": "Geldigheid van de link",
+    "v": "{days} dagen"
+   },
+   {
+    "k": "Bestanden per upload",
+    "v": "Eén (zip meerdere bestanden samen)"
+   },
+   {
+    "k": "Downloads per link",
+    "v": "Onbeperkt tot de link verloopt"
+   }
+  ],
+  "faq_h": "Veelgestelde vragen",
+  "faq": [
+   {
+    "q": "Heb ik een account nodig?",
+    "a": "Nee. Bestanden tot {limit} kunt u zonder inloggen versturen."
+   },
+   {
+    "q": "Hoe lang is mijn link geldig?",
+    "a": "Links zijn {days} dagen geldig. Daarna wordt het bestand verwijderd en werkt de link niet meer."
+   },
+   {
+    "q": "Ziet de ontvanger mijn naam?",
+    "a": "Alleen als u die zelf doorgeeft. Op de downloadpagina staat niets over u."
+   },
+   {
+    "q": "Wat gebeurt er met mijn bestand na afloop?",
+    "a": "Het wordt uit de opslag verwijderd. We bewaren geen kopie."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Links die verlopen",
+    "p": "Elke link werkt {days} dagen, daarna blijft er niets liggen."
+   },
+   {
+    "h": "Geen account nodig",
+    "p": "Bestanden tot {limit} verstuurt u zonder in te loggen."
+   },
+   {
+    "h": "Snel en eenvoudig",
+    "p": "Bestand toevoegen, link kopiëren, doorsturen. Meer is het niet."
+   }
+  ],
+  "nav_privacy": "Privacy",
+  "desc_privacy": "Wat er bij {brand} met uw bestanden en gegevens gebeurt.",
+  "privacy_h": "Privacyverklaring",
+  "privacy_intro": "Een korte uitleg over wat er met uw bestand en de gegevens van uw overdracht gebeurt.",
+  "privacy": [
+   {
+    "h": "Wat we bewaren",
+    "p": "Het bestand dat u uploadt en het tijdstip van uploaden. We vragen niet naar uw naam en houden geen lijst bij van wie het bestand downloadt."
+   },
+   {
+    "h": "Hoe lang we het bewaren",
+    "p": "Tot de link verloopt. Daarna wordt het bestand uit de opslag verwijderd en is het niet meer terug te halen."
+   },
+   {
+    "h": "Wie het kan zien",
+    "p": "Iedereen die de link heeft. We openen of lezen uw bestanden niet, dus deel de link alleen met mensen die het bestand mogen hebben."
+   },
+   {
+    "h": "Cookies",
+    "p": "We gebruiken alleen wat de pagina nodig heeft om te werken. Er zijn geen advertentie- of trackingcookies."
+   },
+   {
+    "h": "Een bestand eerder laten verwijderen",
+    "p": "Vraag de persoon die {brand} voor uw organisatie beheert om een bestand te verwijderen voordat de link verloopt."
+   }
+  ]
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "Bestandsoverdracht",
+   "hero_h": "Stuur een bestand naar iedereen",
+   "hero_p": "Voeg een bestand toe, krijg een link en deel die. Voor bestanden tot {limit} is geen account nodig."
+  },
+  "assignments": {
+   "kicker": "Opdrachten",
+   "hero_h": "Lever uw werk in",
+   "hero_p": "Upload hier uw opdracht vóór de deadline. Eén bestand, tot {limit}."
+  }
+ }
+}

@@ -1,10 +1,91 @@
 {
-  "title": {"en": "Project documentation", "ru": "Документация проекта (вики)"},
-  "layouts": 3,
-  "pages": [
-    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
-    {"name": "install", "tmpl": "install.html.tmpl", "paths": ["install.html", "install/index.html", "docs/install/index.html", "getting-started.html"], "nav": "nav_install", "desc": "desc_install"},
-    {"name": "usage", "tmpl": "usage.html.tmpl", "paths": ["usage.html", "usage/index.html", "docs/usage/index.html", "guide.html"], "nav": "nav_usage", "desc": "desc_usage"},
-    {"name": "faq", "tmpl": "faq.html.tmpl", "paths": ["faq.html", "faq/index.html", "docs/faq/index.html", "questions.html"], "nav": "nav_faq", "desc": "desc_faq"}
-  ]
+ "title": {
+  "en": "Project documentation",
+  "ru": "Документация проекта (вики)"
+ },
+ "layouts": 3,
+ "pages": [
+  {
+   "name": "home",
+   "tmpl": "home.html.tmpl",
+   "paths": [
+    "index.html"
+   ],
+   "nav": "nav_home",
+   "title": "home_title",
+   "desc": "desc"
+  },
+  {
+   "name": "install",
+   "tmpl": "install.html.tmpl",
+   "paths": [
+    "install.html",
+    "install/index.html",
+    "docs/install/index.html",
+    "getting-started.html"
+   ],
+   "nav": "nav_install",
+   "desc": "desc_install"
+  },
+  {
+   "name": "usage",
+   "tmpl": "usage.html.tmpl",
+   "paths": [
+    "usage.html",
+    "usage/index.html",
+    "docs/usage/index.html",
+    "guide.html"
+   ],
+   "nav": "nav_usage",
+   "desc": "desc_usage"
+  },
+  {
+   "name": "config",
+   "tmpl": "config.html.tmpl",
+   "paths": [
+    "config.html",
+    "config/index.html",
+    "docs/config/index.html",
+    "settings.html"
+   ],
+   "nav": "nav_config",
+   "desc": "desc_config"
+  },
+  {
+   "name": "recipes",
+   "tmpl": "recipes.html.tmpl",
+   "paths": [
+    "recipes.html",
+    "recipes/index.html",
+    "docs/recipes/index.html",
+    "cookbook.html"
+   ],
+   "nav": "nav_recipes",
+   "desc": "desc_recipes"
+  },
+  {
+   "name": "trouble",
+   "tmpl": "trouble.html.tmpl",
+   "paths": [
+    "troubleshooting.html",
+    "troubleshooting/index.html",
+    "docs/troubleshooting/index.html",
+    "problems.html"
+   ],
+   "nav": "nav_trouble",
+   "desc": "desc_trouble"
+  },
+  {
+   "name": "faq",
+   "tmpl": "faq.html.tmpl",
+   "paths": [
+    "faq.html",
+    "faq/index.html",
+    "docs/faq/index.html",
+    "questions.html"
+   ],
+   "nav": "nav_faq",
+   "desc": "desc_faq"
+  }
+ ]
 }

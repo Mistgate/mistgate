@@ -1,0 +1,243 @@
+{
+ "order": 5,
+ "lang": "de",
+ "html_lang": "de-CH",
+ "date": [
+  "{d}. {m} {y}",
+  "{dd}.{mm}.{y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "CHF {n}",
+  "group": "’",
+  "scale": 1.4,
+  "round": 5
+ },
+ "address": "{street} {no}, {zip} {city}",
+ "zip_tail": "XX",
+ "replace": {
+  "ß": "ss"
+ },
+ "cities": [
+  {
+   "name": "Zürich",
+   "zip": [
+    "80"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Genf",
+   "zip": [
+    "12"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Basel",
+   "zip": [
+    "40"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Bern",
+   "zip": [
+    "30"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Winterthur",
+   "zip": [
+    "84"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Luzern",
+   "zip": [
+    "60"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "St. Gallen",
+   "zip": [
+    "90"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Biel",
+   "zip": [
+    "25"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Thun",
+   "zip": [
+    "36"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Zug",
+   "zip": [
+    "63"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Schaffhausen",
+   "zip": [
+    "82"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Chur",
+   "zip": [
+    "70"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Freiburg",
+   "zip": [
+    "17"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Aarau",
+   "zip": [
+    "50"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Baden",
+   "zip": [
+    "54"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Olten",
+   "zip": [
+    "46"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Solothurn",
+   "zip": [
+    "45"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Frauenfeld",
+   "zip": [
+    "85"
+   ],
+   "phone": ""
+  }
+ ],
+ "streets": [
+  "Bahnhofstrasse",
+  "Hauptstrasse",
+  "Dorfstrasse",
+  "Schulstrasse",
+  "Kirchgasse",
+  "Seestrasse",
+  "Bergstrasse",
+  "Gartenstrasse",
+  "Industriestrasse",
+  "Birkenweg",
+  "Rosenweg",
+  "Poststrasse",
+  "Mühlegasse",
+  "Lindenstrasse",
+  "Marktgasse",
+  "Oberdorfstrasse",
+  "Talstrasse",
+  "Feldweg"
+ ],
+ "first": [
+  "Lukas",
+  "Anna:f",
+  "Noah",
+  "Sofia:f",
+  "Luca",
+  "Mia:f",
+  "Jonas",
+  "Laura:f",
+  "David",
+  "Julia:f",
+  "Nico",
+  "Lea:f",
+  "Reto",
+  "Sandra:f",
+  "Marco",
+  "Nadine:f",
+  "Gian",
+  "Sarah:f",
+  "Daniel",
+  "Nicole:f",
+  "Patrick",
+  "Franziska:f",
+  "Andreas",
+  "Monika:f",
+  "Simon",
+  "Corinne:f",
+  "Fabian",
+  "Christine:f",
+  "Beat",
+  "Rahel:f",
+  "Urs",
+  "Ursula:f",
+  "Peter",
+  "Heidi:f"
+ ],
+ "last": [
+  "Müller",
+  "Meier",
+  "Schmid",
+  "Keller",
+  "Weber",
+  "Huber",
+  "Schneider",
+  "Meyer",
+  "Steiner",
+  "Fischer",
+  "Gerber",
+  "Brunner",
+  "Baumann",
+  "Frei",
+  "Zimmermann",
+  "Moser",
+  "Widmer",
+  "Wyss",
+  "Graf",
+  "Roth",
+  "Bachmann",
+  "Suter",
+  "Bühler",
+  "Hofmann",
+  "Studer",
+  "Berger",
+  "Lüthi",
+  "Kunz",
+  "Blum",
+  "Aebi",
+  "Burri",
+  "Käser",
+  "Ammann",
+  "Schaller",
+  "Egger",
+  "Wenger"
+ ]
+}

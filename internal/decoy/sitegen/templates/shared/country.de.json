@@ -1,0 +1,357 @@
+{
+ "order": 3,
+ "lang": "de",
+ "html_lang": "de-DE",
+ "date": [
+  "{d}. {m} {y}",
+  "{dd}.{mm}.{y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "{n} €",
+  "group": ".",
+  "scale": 0.9,
+  "round": 5
+ },
+ "address": "{street} {no}, {zip} {city}",
+ "zip_tail": "XXX",
+ "cities": [
+  {
+   "name": "Berlin",
+   "zip": [
+    "10",
+    "12",
+    "13",
+    "14"
+   ],
+   "phone": "030 23125 XXX"
+  },
+  {
+   "name": "Hamburg",
+   "zip": [
+    "20",
+    "21",
+    "22"
+   ],
+   "phone": "040 66969 XXX"
+  },
+  {
+   "name": "München",
+   "zip": [
+    "80",
+    "81"
+   ],
+   "phone": "089 99998 XXX"
+  },
+  {
+   "name": "Köln",
+   "zip": [
+    "50",
+    "51"
+   ],
+   "phone": "0221 4710 XXX"
+  },
+  {
+   "name": "Frankfurt am Main",
+   "zip": [
+    "60",
+    "65"
+   ],
+   "phone": "069 90009 XXX"
+  },
+  {
+   "name": "Stuttgart",
+   "zip": [
+    "70"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Düsseldorf",
+   "zip": [
+    "40"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Leipzig",
+   "zip": [
+    "04"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Dortmund",
+   "zip": [
+    "44"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Essen",
+   "zip": [
+    "45"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Bremen",
+   "zip": [
+    "28"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Dresden",
+   "zip": [
+    "01"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Hannover",
+   "zip": [
+    "30"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Nürnberg",
+   "zip": [
+    "90"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Duisburg",
+   "zip": [
+    "47"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Bochum",
+   "zip": [
+    "44"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Wuppertal",
+   "zip": [
+    "42"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Bielefeld",
+   "zip": [
+    "33"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Bonn",
+   "zip": [
+    "53"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Münster",
+   "zip": [
+    "48"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Karlsruhe",
+   "zip": [
+    "76"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Mannheim",
+   "zip": [
+    "68"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Augsburg",
+   "zip": [
+    "86"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Wiesbaden",
+   "zip": [
+    "65"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Freiburg",
+   "zip": [
+    "79"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Kiel",
+   "zip": [
+    "24"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Lübeck",
+   "zip": [
+    "23"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Erfurt",
+   "zip": [
+    "99"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Rostock",
+   "zip": [
+    "18"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Mainz",
+   "zip": [
+    "55"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Kassel",
+   "zip": [
+    "34"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Regensburg",
+   "zip": [
+    "93"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Würzburg",
+   "zip": [
+    "97"
+   ],
+   "phone": ""
+  }
+ ],
+ "streets": [
+  "Hauptstraße",
+  "Bahnhofstraße",
+  "Schulstraße",
+  "Gartenstraße",
+  "Dorfstraße",
+  "Bergstraße",
+  "Kirchstraße",
+  "Waldstraße",
+  "Lindenstraße",
+  "Goethestraße",
+  "Schillerstraße",
+  "Ringstraße",
+  "Poststraße",
+  "Rosenstraße",
+  "Birkenweg",
+  "Mühlenweg",
+  "Wiesenweg",
+  "Friedrichstraße",
+  "Marktstraße",
+  "Parkstraße"
+ ],
+ "first": [
+  "Lukas",
+  "Anna:f",
+  "Leon",
+  "Marie:f",
+  "Jonas",
+  "Sophie:f",
+  "Felix",
+  "Laura:f",
+  "Paul",
+  "Lena:f",
+  "Maximilian",
+  "Julia:f",
+  "Tim",
+  "Katharina:f",
+  "Jan",
+  "Sarah:f",
+  "Niklas",
+  "Hannah:f",
+  "Tobias",
+  "Johanna:f",
+  "Stefan",
+  "Claudia:f",
+  "Matthias",
+  "Sabine:f",
+  "Florian",
+  "Petra:f",
+  "Andreas",
+  "Monika:f",
+  "Markus",
+  "Ute:f",
+  "Sven",
+  "Birgit:f",
+  "Christian",
+  "Nina:f",
+  "Jürgen",
+  "Eva:f"
+ ],
+ "last": [
+  "Müller",
+  "Schmidt",
+  "Schneider",
+  "Fischer",
+  "Weber",
+  "Meyer",
+  "Wagner",
+  "Becker",
+  "Schulz",
+  "Hoffmann",
+  "Schäfer",
+  "Koch",
+  "Bauer",
+  "Richter",
+  "Klein",
+  "Wolf",
+  "Schröder",
+  "Neumann",
+  "Schwarz",
+  "Zimmermann",
+  "Braun",
+  "Krüger",
+  "Hofmann",
+  "Hartmann",
+  "Lange",
+  "Schmitt",
+  "Werner",
+  "Krause",
+  "Meier",
+  "Lehmann",
+  "Schmid",
+  "Schulze",
+  "Maier",
+  "Köhler",
+  "Herrmann",
+  "König"
+ ]
+}

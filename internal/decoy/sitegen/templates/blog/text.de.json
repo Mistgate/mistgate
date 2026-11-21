@@ -1,0 +1,392 @@
+{
+ "ui": {
+  "nav_label": "Hauptmenü",
+  "footer": "Von Hand geschrieben, langsam veröffentlicht.",
+  "nav_home": "Notizen",
+  "nav_about": "Über mich",
+  "home_title": "Notizen",
+  "nf_title": "Hier ist nichts",
+  "nf_text": "Unter dieser Adresse gibt es keine Notiz. Vielleicht wurde sie umbenannt oder nie geschrieben.",
+  "nf_back": "Zurück zu den Notizen",
+  "latest_h": "Neueste Notizen",
+  "read_more": "Notiz lesen",
+  "min_read": "Min. Lesezeit",
+  "more_h": "Weitere Notizen",
+  "back_all": "Alle Notizen",
+  "about_h": "Über mich",
+  "now_h": "Zurzeit",
+  "tags_h": "Themen",
+  "by": "Geschrieben von",
+  "nav_archive": "Archiv",
+  "desc_archive": "Alle Notizen von {brand}, Monat für Monat.",
+  "archive_h": "Archiv",
+  "archive_intro": "Alle bisherigen Notizen, die neueste zuerst, nach Monaten gegliedert.",
+  "all_posts": "Alle Notizen",
+  "newer": "Neuer"
+ },
+ "bundles": {
+  "garden": {
+   "tagline": "Notizen aus dem Kleingarten",
+   "desc": "Notizen aus einem kleinen Kleingarten in {city}: was gewachsen ist, was nicht und was ich nächstes Jahr anders mache.",
+   "desc_about": "Wer hinter {brand} steckt und warum.",
+   "intro": "Notizen aus einem kleinen Kleingarten in {city}: was gewachsen ist, was nicht und was ich nächstes Jahr anders machen will.",
+   "about": [
+    "Ich bin {first}. Seit neun Jahren habe ich einen Kleingarten in {city}, vor allem für Gemüse und ein paar eigensinnige Rosen.",
+    "In diesem Heft halte ich fest, was mir der Garten beibringt, vor allem, damit ich dieselben Fehler nicht immer wieder in neuer Reihenfolge mache.",
+    "Kommentare gibt es nicht. Wenn Sie einen Tipp haben, sagen Sie ihn dem nächsten Nachbarn am Zaun; so habe ich das meiste gelernt, was ich weiß."
+   ],
+   "now": [
+    "Dicke Bohnen unter Vlies vorziehen",
+    "Die Tür der Gartenlaube reparieren, schon wieder",
+    "Etwas über Heckenschnitt lesen"
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Moos",
+       "Beet",
+       "Laube",
+       "Furchen",
+       "Hecken",
+       "Erd",
+       "Kraut",
+       "Saat",
+       "Spaten",
+       "Zaun"
+      ],
+      [
+       "notizen",
+       "tagebuch",
+       "blatt",
+       "brief",
+       "post",
+       "kalender",
+       "zeit",
+       "buch",
+       "heft",
+       "journal"
+      ]
+     ],
+     "sep": ""
+    }
+   },
+   "posts": [
+    {
+     "title": "Warum ich nicht mehr umgrabe",
+     "tag": "Boden",
+     "excerpt": "Drei Jahre ohne Spaten, und was aus den Beeten geworden ist.",
+     "body": [
+      "Jahrelang habe ich die Beete jeden Herbst umgegraben, weil es der Vorbesitzer so gemacht hat und weil es in den Büchern meiner Kindheit stand. Vor drei Jahren habe ich damit aufgehört und die Beete stattdessen dick mit Kompost abgedeckt.",
+      "Das erste Frühjahr war enttäuschend: Die Erde sah unordentlich aus und die Schnecken waren begeistert. Im zweiten Jahr hatten die Regenwürmer das meiste erledigt, die Erde bröselte in der Hand, und ich brauchte im Oktober einen Samstag weniger für die Beete."
+     ]
+    },
+    {
+     "title": "Bohnen für Leute, die das Gießen vergessen",
+     "tag": "Gemüse",
+     "excerpt": "Vier Sorten, die mir einen trockenen Juli verziehen haben.",
+     "body": [
+      "Im letzten Juli hat es neunzehn Tage nicht geregnet, und ich war elf davon verreist. Als ich zurückkam, war der Salat geschossen und die Zucchini sahen aus, als hätten sie aufgegeben. Die Bohnen waren in Ordnung.",
+      "Stangenbohnen mit tiefen Wurzeln und einer dicken Mulchschicht kommen mit zwei trockenen Wochen besser zurecht als fast alles andere. Ich säe sie jetzt am Nordrand, wo der Schatten die Erde vor dem Austrocknen schützt."
+     ]
+    },
+    {
+     "title": "Ein kleines Gewächshaus aus alten Fenstern",
+     "tag": "Bauen",
+     "excerpt": "Wie aus dem Container eines Nachbarn an einem langen Wochenende ein Gewächshaus wurde.",
+     "body": [
+      "Eine Nachbarin hatte neue Fenster bekommen, und die alten standen zwei Tage im Container. Ich fragte, ob ich sie mitnehmen dürfe, und sie bat mich, gleich den ganzen Container mitzunehmen, wenn ich könnte.",
+      "Aus altem Bauholz habe ich einen Rahmen gebaut, passend zum größten Fenster, und die übrigen Scheiben drumherum eingepasst. Nichts ist rechtwinklig und die Tür klemmt bei Regen, aber die Tomatensetzlinge sind vor dem Frost geschützt."
+     ]
+    },
+    {
+     "title": "Was im März im Garten zu tun ist",
+     "tag": "Jahreszeiten",
+     "excerpt": "Eine kurze Liste für den Monat, in dem alles möglich scheint und der Boden noch kalt ist.",
+     "body": [
+      "Der März täuscht jeden. Die Tage sind hell und man möchte pflanzen, aber die Erde ist kalt, und zu früh gesäte Samen liegen nur herum und faulen. Ich warte, bis sich der Boden auf dem Handrücken nicht mehr kühl anfühlt.",
+      "Bis dahin gibt es genug zu tun: das Saatgut sortieren, die Töpfe schrubben, die Rosen schneiden und die ersten Kartoffeln zum Vorkeimen ans Licht stellen. Das fühlt sich nach Fortschritt an und riskiert nichts."
+     ]
+    },
+    {
+     "title": "Kompost, ehrlich gesagt",
+     "tag": "Boden",
+     "excerpt": "Was auf meinen Haufen kommt, was draußen bleibt und warum er nie pünktlich fertig ist.",
+     "body": [
+      "Mein Komposthaufen hat drei Regeln: nichts Gekochtes, nichts Krankes und nichts, bei dem ich unsicher bin. Rasenschnitt kommt in dünnen Schichten hinein, zerrissener Karton dazu, und umgesetzt wird, wenn ich daran denke.",
+      "Es dauert länger, als die Bücher sagen. Ein Jahr ist ehrlicher als die sechs Wochen auf der Packung, und der fertige Kompost hält immer Überraschungen bereit, zum Beispiel eine Kartoffel, die ich längst aufgegeben hatte."
+     ]
+    },
+    {
+     "title": "Schnecken, Bierfallen und andere Niederlagen",
+     "tag": "Schädlinge",
+     "excerpt": "Was geholfen hat, was nicht und warum ich jetzt etwas mehr pflanze.",
+     "body": [
+      "Ich habe Bierfallen probiert, Eierschalen, Kupferband und nächtliche Runden mit der Taschenlampe. Alles hat etwa eine Woche funktioniert. Am besten hilft es, mehr anzubauen, als ich brauche, und den Schnecken ihren Anteil zu gönnen.",
+      "Gefährdet sind vor allem die Setzlinge. Deshalb ziehe ich sie im Haus vor und setze sie erst hinaus, wenn sie kräftig genug sind, einen Biss zu überstehen."
+     ]
+    },
+    {
+     "title": "Saatgut von den Bohnen gewinnen",
+     "tag": "Saatgut",
+     "excerpt": "Ein wenig Geduld im Oktober, und die Bohnen fürs nächste Jahr kosten nichts.",
+     "body": [
+      "Die besten Hülsen lasse ich an den Pflanzen, bis sie trocken sind und rascheln. Dann puhle ich sie am Küchentisch aus, breite die Bohnen auf einem Blech aus und lasse sie eine Woche an einem warmen Ort nachtrocknen.",
+      "Sie kommen in Papiertüten, vorne mit Sorte und Jahr beschriftet. In Plastik würden sie schwitzen, und ich habe die verschimmelten Bohnen, die das beweisen."
+     ]
+    },
+    {
+     "title": "Laub wird zu Laubhumus",
+     "tag": "Boden",
+     "excerpt": "Zwei Jahre Warten, und das Beste, was der Garten hergibt.",
+     "body": [
+      "Im November harke ich das Laub in einen Drahtkorb in der Ecke und lasse es in Ruhe. Es gibt nichts umzusetzen und nichts hinzuzufügen, und das passt mir gut.",
+      "Nach zwei Jahren ist es dunkel, krümelig und riecht nach Wald. Ich verwende es zum Auffüllen der Beete und für die Anzucht, und nichts anderes, was ich mache, kommt da heran."
+     ]
+    }
+   ]
+  },
+  "cycling": {
+   "tagline": "Touren und Reparaturen",
+   "desc": "Touren, Reparaturen und gelegentliche Umwege auf den Landstraßen rund um {city}.",
+   "desc_about": "Wer hinter {brand} steckt und warum.",
+   "intro": "Touren, Reparaturen und gelegentliche Umwege auf den Landstraßen rund um {city}.",
+   "about": [
+    "Ich bin {first}. Ich fahre die meisten Tage mit dem Rad zur Arbeit und sonntags weiter, meistens auf Nebenstraßen rund um {city}, die niemand sonst beachtet.",
+    "Hier schreibe ich auf, was ich unterwegs lerne, vor allem über Reparaturen und über Dinge, die ich besser vor der Tour gemacht hätte.",
+    "Ich freue mich über Streckentipps, aber Kommentare gibt es hier nicht. Sprechen Sie mich einfach an der nächsten Ampel an."
+   ],
+   "now": [
+    "Den Lenker neu bandagieren",
+    "Eine Zweitagestour für den Mai planen",
+    "Zentrieren von Laufrädern lernen"
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Lange",
+       "Stille",
+       "Nasse",
+       "Hintere",
+       "Flache",
+       "Kies",
+       "Frühe",
+       "Kalte",
+       "Offene",
+       "Steile"
+      ],
+      [
+       "Runde",
+       "Kette",
+       "Speiche",
+       "Straße",
+       "Gänge",
+       "Etappe",
+       "Tour",
+       "Bahn",
+       "Höhe",
+       "Fahrt"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "posts": [
+    {
+     "title": "Die 60-Kilometer-Runde, zu der ich immer zurückkehre",
+     "tag": "Strecken",
+     "excerpt": "Meist flach, ein richtiger Berg und ein Café, das früher schließt, als man hofft.",
+     "body": [
+      "Die Runde führt östlich aus {city} hinaus, folgt zehn Kilometer dem Kanal und biegt dann in eine Straße ein, die seit meinen ersten Fahrten niemand neu geteert hat. Es gibt einen einzigen richtigen Anstieg, etwa einen Kilometer lang, und deshalb komme ich immer wieder.",
+      "Auf halber Strecke liegt ein Café, das um neun öffnet und um zwei schließt, je nach Vormittag viel zu früh oder gerade rechtzeitig. Ich nehme inzwischen immer einen Müsliriegel mit."
+     ]
+    },
+    {
+     "title": "Einen Platten im Regen flicken",
+     "tag": "Reparatur",
+     "excerpt": "Eine kurze Anleitung für kalte Finger.",
+     "body": [
+      "Zuerst eine Stelle suchen, die nicht tropft, und sei es unter einer Brücke. Dann das Rad ausbauen, den Mantel an einer Seite lösen und den Schlauch herausziehen, ohne die Reifenheber zu verlieren.",
+      "Den Mantel innen mit den Fingern absuchen, bevor der neue Schlauch hineinkommt. Fast immer steckt noch ein Dorn oder ein Splitter darin, und wer ihn übersieht, flickt zweimal."
+     ]
+    },
+    {
+     "title": "Warum ich das ganze Jahr dieselbe Jacke trage",
+     "tag": "Ausrüstung",
+     "excerpt": "Eine lange Verteidigung einer etwas hässlichen, sehr gelben Jacke.",
+     "body": [
+      "Sie ist wasserdicht, passt über alles und wird von Autofahrern bemerkt. Das genügt mir als Argument, auch wenn sie nicht schön ist und ein wenig nach Regen riecht.",
+      "Im Sommer fahre ich mit offenem Reißverschluss, im Winter mit drei Schichten darunter. Eine zweite Jacke würde nur bedeuten, dass ich morgens länger überlege."
+     ]
+    },
+    {
+     "title": "Winterrad, Sommerrad",
+     "tag": "Räder",
+     "excerpt": "Zwei Räder sind eines mehr, als man braucht, aber nicht eines mehr, als man will.",
+     "body": [
+      "Das Winterrad ist alt, schwer und hat Schutzbleche, Nabendynamo und breite Reifen. Es ist nicht schnell, aber es springt immer an, und es macht mir nichts aus, wenn es im Streusalz steht.",
+      "Das Sommerrad ist leicht und empfindlich. Im Mai nehme ich es aus dem Keller und freue mich jedes Jahr, als wäre es neu."
+     ]
+    },
+    {
+     "title": "Absichtlich langsamer fahren",
+     "tag": "Gedanken",
+     "excerpt": "Was passiert, wenn man den Tacho zu Hause lässt.",
+     "body": [
+      "Ich habe den Tacho einen Monat lang abgeschraubt. Die ersten Tage fühlten sich an wie Schummeln, dann habe ich aufgehört, auf die Zahlen zu warten, und begonnen, auf die Straße zu schauen.",
+      "Ich bin nicht langsamer geworden, aber ich komme entspannter an. Meine Rekorde sind mir inzwischen ziemlich gleichgültig."
+     ]
+    },
+    {
+     "title": "Eine Woche im Dunkeln zur Arbeit",
+     "tag": "Ausrüstung",
+     "excerpt": "Licht, Reflektoren und ein vernünftiges Verhältnis zu Pfützen.",
+     "body": [
+      "Wenn die Uhren umgestellt werden, fahre ich mit zwei Lampen vorne und zwei hinten, jeweils eine davon blinkend. Das wirkt übertrieben, aber Autofahrer bemerken mich, und darum geht es.",
+      "Ersatzbatterien liegen in der Satteltasche. Eine leere Lampe auf einer dunklen Landstraße ist ein Fehler, den man nur einmal macht."
+     ]
+    },
+    {
+     "title": "Das Café oben auf dem Berg",
+     "tag": "Strecken",
+     "excerpt": "Den Anstieg wert, wenn man vor dem Kuchen da ist.",
+     "body": [
+      "Es liegt am Ende des langen Anstiegs in einem Raum, der früher wohl eine Scheune war. Der Tee kommt in der Kanne und der Kuchen in Stücken so groß wie ein Taschenbuch.",
+      "Früher bin ich den Berg hinaufgehetzt, um vor dem Mittagsansturm da zu sein. Jetzt fahre ich langsam und komme mit protestierenden Beinen an, und der Kuchen schmeckt besser."
+     ]
+    },
+    {
+     "title": "Mit dem Zug nach Hause",
+     "tag": "Gedanken",
+     "excerpt": "Es ist keine Schande, sich mitnehmen zu lassen, wenn der Wind von vorn kommt.",
+     "body": [
+      "An manchen Tagen ist die Hinfahrt herrlich und die Rückfahrt ein einziger Gegenwind. Dann stelle ich das Rad in den Zug und lese.",
+      "Früher habe ich das als Aufgeben empfunden. Heute sehe ich darin den Grund, warum ich am nächsten Tag wieder losfahre."
+     ]
+    }
+   ]
+  },
+  "kitchen": {
+   "tagline": "Notizen aus einer kleinen Küche",
+   "desc": "Rezepte, die gelingen, Fehler, aus denen ich gelernt habe, und was heute in {city} auf den Tisch kommt.",
+   "desc_about": "Wer hinter {brand} steckt und warum.",
+   "intro": "Rezepte, die gelingen, Fehler, aus denen ich gelernt habe, und was heute in {city} auf den Tisch kommt.",
+   "about": [
+    "Ich bin {first}. Ich koche für eine vierköpfige Familie in einer Küche in {city}, die kleiner ist als die meisten Badezimmer.",
+    "Hier schreibe ich auf, was funktioniert hat und was nicht, damit ich es beim nächsten Mal nicht wieder vergesse.",
+    "Mengenangaben sind Richtwerte. Wer genauer sein will, wiegt, und wer mutiger sein will, lässt die Waage in der Schublade."
+   ],
+   "now": [
+    "Einen neuen Sauerteig ansetzen",
+    "Zitronen für den Frühling einsalzen",
+    "Frieden mit der Backofentür schließen"
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Salz",
+       "Butter",
+       "Pfannen",
+       "Sonntags",
+       "Brot",
+       "Back",
+       "Rühr",
+       "Löffel",
+       "Herd",
+       "Topf"
+      ],
+      [
+       "notizen",
+       "tisch",
+       "küche",
+       "kladde",
+       "tagebuch",
+       "zettel",
+       "heft",
+       "buch",
+       "post",
+       "brief"
+      ]
+     ],
+     "sep": ""
+    }
+   },
+   "posts": [
+    {
+     "title": "Ein Brot, das Fehler verzeiht",
+     "tag": "Brot",
+     "excerpt": "Einfach zu kneten, schwer zu verderben und morgens noch warm.",
+     "body": [
+      "Mehl, Wasser, Salz und ein Löffel Sauerteig, am Abend verrührt und am Morgen gefaltet. Mehr braucht es nicht, und genau das macht es so verzeihend: Wenn man es vergisst, wird es einfach etwas saurer.",
+      "Gebacken wird in einem gusseisernen Topf mit Deckel. Die ersten zwanzig Minuten geschlossen, dann offen, bis die Kruste die Farbe von Tee hat."
+     ]
+    },
+    {
+     "title": "Was kocht man, wenn der Kühlschrank fast leer ist",
+     "tag": "Alltag",
+     "excerpt": "Eine Pfanne, ein paar Reste und zwanzig Minuten.",
+     "body": [
+      "Zwiebeln, eine Dose Bohnen, etwas geräuchertes Paprikapulver und das Grünzeug, das noch im Gemüsefach liegt. Mehr braucht es nicht, wenn man gut würzt.",
+      "Zum Schluss kommt ein Spiegelei obendrauf. Es ist weniger ein Rezept als eine Gewohnheit, und sie hat mich noch nie im Stich gelassen."
+     ]
+    },
+    {
+     "title": "Die einzige Suppe, die ich im November koche",
+     "tag": "Suppe",
+     "excerpt": "Kürbis, Ingwer und ein Schuss Sahne, wenn die Gäste kommen.",
+     "body": [
+      "Der Kürbis wird im Ofen geröstet, bis die Ränder dunkel werden. Dann kommt er mit Zwiebel, Ingwer und Brühe in den Topf und wird püriert, bis alles glatt ist.",
+      "Wer Gäste hat, gibt einen Schuss Sahne dazu. Wer keine hat, isst sie so, mit Brot, und ist auch zufrieden."
+     ]
+    },
+    {
+     "title": "Einkochen ohne Panik",
+     "tag": "Vorrat",
+     "excerpt": "Gläser, Deckel und ein Topf mit kochendem Wasser reichen.",
+     "body": [
+      "Die Gläser werden heiß ausgespült, die Früchte kurz aufgekocht und alles noch heiß abgefüllt. Die Deckel kommen fest darauf, und dann wird das Glas auf den Kopf gestellt.",
+      "Wenn es später leise ploppt, ist alles in Ordnung. Wenn nicht, kommt das Glas in den Kühlschrank und wird zuerst gegessen."
+     ]
+    },
+    {
+     "title": "Angebranntes und was ich daraus gelernt habe",
+     "tag": "Fehler",
+     "excerpt": "Eine kurze Liste von Dingen, die mir nur einmal passiert sind, beziehungsweise dreimal.",
+     "body": [
+      "Milch, die nicht bleibt, wo sie ist, Zwiebeln, die schwarz werden, während man das Telefon beantwortet, und Kekse, die man für einen Moment aus den Augen lässt.",
+      "Meine einzige Regel lautet inzwischen: Wer am Herd steht, bleibt am Herd. Das gilt auch für Telefonate."
+     ]
+    },
+    {
+     "title": "Haferbrei, richtig gemacht",
+     "tag": "Frühstück",
+     "excerpt": "Haferflocken, Wasser, Salz und zehn Minuten, in denen man nicht weggeht.",
+     "body": [
+      "Wer daran denkt, weicht die Flocken über Nacht ein. Morgens kommen Wasser und eine Prise Salz dazu, und dann wird gerührt, bis es eindickt, ungefähr so lange, wie der Wasserkocher braucht.",
+      "Ich esse ihn mit einem Löffel Marmelade oder gehackten Äpfeln. Wer Zucker nimmt, hat nicht unrecht, aber ihm entgeht etwas."
+     ]
+    },
+    {
+     "title": "Warum ich Mehl wiege",
+     "tag": "Brot",
+     "excerpt": "Eine Waage hat mein Backen mehr verändert als jedes Rezept.",
+     "body": [
+      "Eine Tasse Mehl kann je nach Schöpfen zwischen 120 und 160 Gramm wiegen. Das ist der Unterschied zwischen einem Brot und einem Ziegelstein.",
+      "Jetzt wiege ich alles, auch das Wasser. Eine Woche lang fühlt sich das umständlich an, danach wie die einzig vernünftige Art zu backen."
+     ]
+    },
+    {
+     "title": "Ein Geburtstagskuchen ohne Rezept",
+     "tag": "Backen",
+     "excerpt": "Von allem gleich viel und etwas Geduld mit dem Ofen.",
+     "body": [
+      "Der Kuchen meiner Großmutter besteht aus gleichen Teilen Butter, Zucker, Eiern und Mehl, mit etwas Vanille. Sie hat ihn nie aufgeschrieben, weil sie es nie brauchte.",
+      "Ich backe ihn zu jedem Geburtstag in der Familie. Er ist schlicht und ein wenig schief, und noch nie hat jemand einen anderen verlangt."
+     ]
+    }
+   ]
+  }
+ }
+}

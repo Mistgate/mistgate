@@ -1,14 +1,82 @@
 {
-  "title": {"en": "Photo / illustration portfolio", "ru": "Портфолио (фото, иллюстрации, дизайн)"},
-  "layouts": 3,
-  "pages": [
-    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
-    {"name": "work", "tmpl": "work.html.tmpl", "paths": ["work.html", "work/index.html", "portfolio/index.html", "projects.html"], "nav": "nav_work", "desc": "desc_work"},
-    {"name": "about", "tmpl": "about.html.tmpl", "paths": ["about.html", "about/index.html", "studio/index.html", "bio.html"], "nav": "nav_about", "desc": "desc_about"},
-    {"name": "contact", "tmpl": "contact.html.tmpl", "paths": ["contact.html", "contact/index.html", "visit/index.html", "enquiries.html"], "nav": "nav_contact", "desc": "desc_contact"}
-  ],
-  "lists": [
-    {"name": "works", "from": "works", "min": 7, "max": 9, "art": true}
-  ],
-  "photo_slots": {"w":[0,1,2]}
+ "title": {
+  "en": "Photo / illustration portfolio",
+  "ru": "Портфолио (фото, иллюстрации, дизайн)"
+ },
+ "layouts": 3,
+ "pages": [
+  {
+   "name": "home",
+   "tmpl": "home.html.tmpl",
+   "paths": [
+    "index.html"
+   ],
+   "nav": "nav_home",
+   "title": "home_title",
+   "desc": "desc"
+  },
+  {
+   "name": "work",
+   "tmpl": "work.html.tmpl",
+   "paths": [
+    "work.html",
+    "work/index.html",
+    "portfolio/index.html",
+    "projects.html"
+   ],
+   "nav": "nav_work",
+   "desc": "desc_work"
+  },
+  {
+   "name": "about",
+   "tmpl": "about.html.tmpl",
+   "paths": [
+    "about.html",
+    "about/index.html",
+    "studio/index.html",
+    "bio.html"
+   ],
+   "nav": "nav_about",
+   "desc": "desc_about"
+  },
+  {
+   "name": "contact",
+   "tmpl": "contact.html.tmpl",
+   "paths": [
+    "contact.html",
+    "contact/index.html",
+    "visit/index.html",
+    "enquiries.html"
+   ],
+   "nav": "nav_contact",
+   "desc": "desc_contact"
+  },
+  {
+   "name": "piece",
+   "tmpl": "piece.html.tmpl",
+   "paths": [
+    "work/{slug}.html",
+    "work/{slug}/index.html",
+    "pieces/{slug}.html",
+    "portfolio/{slug}/index.html"
+   ],
+   "each": "works"
+  }
+ ],
+ "lists": [
+  {
+   "name": "works",
+   "from": "works",
+   "min": 7,
+   "max": 9,
+   "art": true
+  }
+ ],
+ "photo_slots": {
+  "w": [
+   0,
+   1,
+   2
+  ]
+ }
 }

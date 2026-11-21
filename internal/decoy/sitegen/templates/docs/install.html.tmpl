@@ -1,7 +1,7 @@
 {{template "head" .}}<body>
 {{template "header" .}}
 <div class="__wrap__ __docs__">
-{{if eq .Layout 0}}{{template "sidenav" .}}{{end}}<article class="__doc__">
+{{template "sidenav" .}}<article class="__doc__">
 <h1>{{.L.install_h}}</h1>
 <p class="__lede__">{{.L.install_intro}}</p>
 <h2>{{.L.steps_h}}</h2>

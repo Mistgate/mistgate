@@ -1,7 +1,7 @@
 {{template "head" .}}<body>
 {{template "header" .}}
 <div class="__wrap__ __docs__">
-{{if eq .Layout 0}}{{template "sidenav" .}}{{end}}<article class="__doc__">
+{{template "sidenav" .}}<article class="__doc__">
 <h1>{{.L.usage_h}}</h1>
 {{range .L.usage}}<h2>{{.h}}</h2>
 <p>{{.p}}</p>
@@ -11,6 +11,7 @@
 <thead><tr><th>{{.L.opt_col}}</th><th>{{.L.desc_col}}</th></tr></thead>
 <tbody>{{range .L.options}}<tr><td><code>{{.o}}</code></td><td>{{.d}}</td></tr>{{end}}</tbody>
 </table></div>
+<p><a class="__btn__" href="{{(index .Nav 3).Href}}">{{.L.next}}: {{(index .Nav 3).Label}} {{icon "arrow"}}</a></p>
 </article>
 {{if eq .Layout 1}}{{template "facts" .}}{{end}}</div>
 {{template "footer" .}}

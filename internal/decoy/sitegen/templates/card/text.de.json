@@ -1,0 +1,158 @@
+{
+ "ui": {
+  "nav_label": "Hauptmenü",
+  "footer": "Von Hand gemacht. Keine Cookies, kein Tracking.",
+  "nav_home": "Visitenkarte",
+  "nav_about": "Über mich",
+  "nav_projects": "Projekte",
+  "nav_now": "Jetzt",
+  "home_title": "Hallo",
+  "desc_about": "Mehr über {brand}.",
+  "desc_projects": "Ausgewählte Projekte von {brand}.",
+  "desc_now": "Woran {brand} gerade arbeitet.",
+  "nf_title": "Hier ist nichts",
+  "nf_text": "Unter dieser Adresse gibt es keine Seite. Versuchen Sie es mit der Visitenkarte auf der Startseite.",
+  "nf_back": "Zurück zur Visitenkarte",
+  "link_d": [
+   "Wer ich bin und wie ich arbeite",
+   "Einiges, was ich gemacht habe",
+   "Was ich gerade mache"
+  ],
+  "about_h": "Über mich",
+  "facts_h": "Kurz gesagt",
+  "projects_h": "Projekte",
+  "projects_intro": "Einiges, worüber ich mich freue, das neueste zuerst.",
+  "now_h": "Jetzt",
+  "updated": "Aktualisiert im {upd} 2026",
+  "now_intro": "Das ist eine Jetzt-Seite: was ich im Moment mache, im Unterschied zu dem, was ich einmal angekündigt habe.",
+  "hello": "Hallo, ich bin",
+  "vars": {
+   "brand": "{name}",
+   "month": [
+    "Januar",
+    "März",
+    "Mai",
+    "September"
+   ],
+   "upd": [
+    "August",
+    "September",
+    "Oktober",
+    "November"
+   ]
+  }
+ },
+ "bundles": {
+  "illustrator": {
+   "role": "Illustration und Druckgrafik",
+   "tagline": "Bilder für Bücher, Plakate und gelegentliche Geburtstagskarten.",
+   "desc": "{brand}: Illustration und Druckgrafik in {city}. Bilderbücher, Plakate und Linolschnitte.",
+   "bio": "Ich zeichne für Bilderbücher und Plakate und schneide Linolschnitte für alle, die höflich fragen.",
+   "about": [
+    "Ich zeichne beruflich, meistens für Bilderbücher und hin und wieder für ein Plakat. Mein Arbeitszimmer in {city} hat ein Fenster zum Parkplatz, den ich zeichne, als wäre er ein See.",
+    "Vor der Illustration habe ich Textildruck gelernt, und das Denken in Schichten ist geblieben. Die meisten meiner Bilder bestehen aus drei oder vier flachen Farben."
+   ],
+   "facts": [
+    "Zu Hause in {city}",
+    "Arbeitet mit Feder, Tusche und Linolschnitt",
+    "Nimmt ab {month} neue Aufträge an"
+   ],
+   "projects": [
+    {
+     "t": "Feldnotizen",
+     "y": "2025",
+     "d": "Ein Bilderbuch über ein Jahr auf einem kleinen Feld, entstanden mit einer Druckerei vor Ort."
+    },
+    {
+     "t": "Die Marktserie",
+     "y": "2024",
+     "d": "Zwölf Linolschnitte von Ständen, Kundschaft und einer sehr selbstzufriedenen Taube."
+    },
+    {
+     "t": "Geburtstagskarten für eine Buchhandlung",
+     "y": "2023",
+     "d": "Sechs Karten, von Hand gedruckt in Auflagen von zweihundert."
+    }
+   ],
+   "now": [
+    "Die letzten Doppelseiten eines Bilderbuchs über das Wetter fertigstellen",
+    "Lernen, einen vierfarbigen Linolschnitt zu schneiden, ohne die Geduld zu verlieren",
+    "Eine größere Presse suchen"
+   ]
+  },
+  "potter": {
+   "role": "Keramik",
+   "tagline": "Schlichte Schalen, Tassen und Teller in kleinen Serien.",
+   "desc": "{brand}: Keramik aus {city}. Alltagsgeschirr, in kleinen Serien gedreht und gebrannt.",
+   "bio": "Ich drehe Schalen, Tassen und Teller für den Alltag, in kleinen Serien und mit Glasuren, die ich selbst anrühre.",
+   "about": [
+    "Ich töpfere in einer kleinen Werkstatt in {city}, in einem Raum, der im Winter gerade so warm wird. Alles, was ich mache, ist für den täglichen Gebrauch gedacht.",
+    "Ich drehe auf der Scheibe, brenne zweimal und teste jede Glasur zuerst an einer Tasse für mich selbst. Was nicht spülmaschinenfest ist, sage ich dazu."
+   ],
+   "facts": [
+    "Werkstatt in {city}",
+    "Steinzeug, bei 1260 Grad gebrannt",
+    "Verkauf ab {month} wieder"
+   ],
+   "projects": [
+    {
+     "t": "Alltagsserie",
+     "y": "2025",
+     "d": "Schalen, Tassen und Teller in drei Glasuren, für eine Bäckerei im Viertel gedreht."
+    },
+    {
+     "t": "Teekanne mit Henkel aus Weide",
+     "y": "2024",
+     "d": "Eine Kanne, die nicht tropft, nach neun Versuchen."
+    },
+    {
+     "t": "Fliesen für ein Café",
+     "y": "2023",
+     "d": "Vierzig handgemachte Fliesen für die Theke, jede ein wenig anders."
+    }
+   ],
+   "now": [
+    "Eine neue Seladonglasur testen",
+    "Den Ofen reparieren, der immer links zu heiß wird",
+    "Eine Bestellung für Schalen fertigstellen"
+   ]
+  },
+  "developer": {
+   "role": "Softwareentwicklung, kleine Werkzeuge",
+   "tagline": "Kleine, ruhige Programme, die eine Sache tun und sonst nicht stören.",
+   "desc": "{brand}: Softwareentwicklung in {city}. Kleine Werkzeuge für die Kommandozeile und das Web.",
+   "bio": "Ich schreibe kleine Programme, die eine Sache gut tun, und pflege sie länger, als es sich lohnt.",
+   "about": [
+    "Ich entwickle Software, am liebsten kleine Werkzeuge, die man ohne Anleitung versteht. Ich arbeite von zu Hause in {city}, meist mit nur einem Editor und einem Terminal.",
+    "Ich schreibe wenig Code, aber ich lösche gern welchen. Wenn eine Funktion nach einem Jahr noch niemand vermisst hat, fliegt sie raus."
+   ],
+   "facts": [
+    "Zu Hause in {city}",
+    "Schreibt in Go und Shell",
+    "Offen für kleine Aufträge ab {month}"
+   ],
+   "projects": [
+    {
+     "t": "Ein Werkzeug zum Zusammenfassen von Logdateien",
+     "y": "2025",
+     "d": "Eine Datei, ein Aufruf, eine Seite Ergebnis."
+    },
+    {
+     "t": "Ein Generator für statische Seiten",
+     "y": "2024",
+     "d": "Markdown hinein, HTML heraus, keine Abhängigkeiten."
+    },
+    {
+     "t": "Ein Erinnerungsdienst für den Verein",
+     "y": "2023",
+     "d": "Schickt jede Woche eine Liste, wer was mitbringt. Mehr nicht."
+    }
+   ],
+   "now": [
+    "Die Dokumentation eines älteren Werkzeugs überarbeiten",
+    "Einen Fehler suchen, der nur dienstags auftritt",
+    "Mehr Tests für weniger Funktionen schreiben"
+   ]
+  }
+ }
+}

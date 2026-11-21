@@ -1,0 +1,19 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __page__">
+<p class="__mu__"><a href="{{(index .Nav 1).Href}}">{{.L.rel_back}}</a></p>
+<h1>{{.Brand}} {{.Page.Item.version}}</h1>
+<p class="__mu__">{{.L.released}} <time datetime="{{.Page.Item.date_iso}}">{{.Page.Item.date}}</time></p>
+<article class="__rel__">
+<ul class="__notes__">{{range .Page.Item.notes}}<li><span class="__k__">{{.k}}</span> {{.t}}</li>{{end}}</ul>
+</article>
+<h2>{{.L.rel_src_h}}</h2>
+<pre><code>{{printf .L.src_code .Page.Item.version}}</code></pre>
+<p class="__mu__">{{.L.col_sum}}</p>
+<pre><code>{{hexs (printf "sum%d" (sub .Page.Item.n 1)) 64}}</code></pre>
+<h2>{{.L.rel_more}}</h2>
+<ul>{{range .Lists.releases}}{{if ne .slug $.Page.Item.slug}}<li><a href="{{.href}}">{{.version}}</a> <span class="__mu__">{{.date}}</span></li>{{end}}{{end}}</ul>
+</main>
+{{template "footer" .}}
+</body>
+</html>

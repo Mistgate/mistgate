@@ -1,101 +1,24 @@
 {
-  "ui": {
-    "en": {
-      "vars": {"brand": {"join": [["Alder", "Linden", "Cedar", "Harbor", "Marlow", "Birch", "Elm", "Willow", "Fern", "Oak", "Rowan", "Hazel"], ["point", "gate", "field", "line", "bridge", "well", "stone", "view", "rise", "wick"]]}},
-      "nav_label": "Main", "tagline": "Secure account access", "footer": "All rights reserved.",
-      "nav_home": "Sign in", "nav_help": "Help", "nav_privacy": "Privacy", "home_title": "Sign in",
-      "desc": "Sign in to your {brand} account.", "desc_help": "Help with signing in to {brand}.", "desc_privacy": "How {brand} handles your information.",
-      "nf_title": "Page not found", "nf_text": "The page you were looking for does not exist or has moved.", "nf_back": "Back to sign in",
-      "f_user": "Username or email", "f_pass": "Password", "f_remember": "Keep me signed in", "f_forgot": "Forgot password?",
-      "f_submit": "Sign in", "f_busy": "Signing in…", "e_empty": "Enter your username and password.",
-      "e_bad": ["Incorrect username or password.", "The username or password you entered is not correct. Please try again.", "We could not sign you in with those details."],
-      "help_h": "Trouble signing in?", "help_intro": "Most sign-in problems have a simple cause. Work through these steps before you contact anyone.",
-      "help_steps": ["Check that Caps Lock is off; passwords are case sensitive.", "Look for a stray space at the start or end of your username.", "Try again in a new browser window with no saved form data.", "Wait ten minutes if you have tried several times without success."],
-      "help_contact_h": "Still stuck?", "help_contact": "Ask the person who manages {brand} for your organisation to reset your password. For security reasons we cannot reset it over the phone or by email.",
-      "help_back": "Back to sign in",
-      "privacy_h": "Privacy notice", "privacy_intro": "We keep as little about you as we can and look after what we keep. This is a short account of what that is and why.",
-      "privacy": [
-        {"h": "What we keep", "p": "Your username, the times you signed in and the details that belong to your account. Nothing else."},
-        {"h": "What we use it for", "p": "To let you sign in and to protect your account from anyone else. We do not sell information about our users."},
-        {"h": "Cookies", "p": "We use only the cookies the service needs in order to work. There are no advertising or analytics cookies."},
-        {"h": "Your rights", "p": "You can ask to see, correct or delete the information we hold about you. Ask the person who manages your account."}
-      ]
-    },
-    "de": {
-      "vars": {"brand": {"join": [["Nord", "Lind", "Eich", "Berg", "Wald", "Brunn", "Rosen", "Linden"], ["feld", "tal", "hof", "werk", "blick", "stein", "wiese", "bach"]]}},
-      "nav_label": "Hauptmenü", "tagline": "Sicherer Kontozugang", "footer": "Alle Rechte vorbehalten.",
-      "nav_home": "Anmelden", "nav_help": "Hilfe", "nav_privacy": "Datenschutz", "home_title": "Anmelden",
-      "desc": "Melden Sie sich bei Ihrem Konto bei {brand} an.", "desc_help": "Hilfe bei der Anmeldung bei {brand}.", "desc_privacy": "Wie {brand} mit Ihren Daten umgeht.",
-      "nf_title": "Seite nicht gefunden", "nf_text": "Die gesuchte Seite existiert nicht oder wurde verschoben.", "nf_back": "Zur Anmeldung",
-      "f_user": "Benutzername oder E-Mail", "f_pass": "Passwort", "f_remember": "Angemeldet bleiben", "f_forgot": "Passwort vergessen?",
-      "f_submit": "Anmelden", "f_busy": "Anmeldung läuft …", "e_empty": "Bitte geben Sie Benutzername und Passwort ein.",
-      "e_bad": ["Benutzername oder Passwort ist falsch.", "Die Anmeldedaten sind nicht korrekt. Bitte versuchen Sie es erneut."],
-      "help_h": "Probleme bei der Anmeldung?", "help_intro": "Die meisten Anmeldeprobleme haben eine einfache Ursache. Gehen Sie diese Schritte durch, bevor Sie sich an jemanden wenden.",
-      "help_steps": ["Prüfen Sie, ob die Feststelltaste aktiviert ist; Passwörter unterscheiden Groß- und Kleinschreibung.", "Achten Sie auf ein Leerzeichen am Anfang oder Ende des Benutzernamens.", "Versuchen Sie es in einem neuen Browserfenster ohne gespeicherte Formulardaten.", "Warten Sie zehn Minuten, wenn Sie es mehrmals vergeblich versucht haben."],
-      "help_contact_h": "Immer noch kein Zugang?", "help_contact": "Bitten Sie die Person, die {brand} in Ihrer Organisation verwaltet, Ihr Passwort zurückzusetzen. Aus Sicherheitsgründen geschieht das weder am Telefon noch per E-Mail.",
-      "help_back": "Zurück zur Anmeldung",
-      "privacy_h": "Datenschutzhinweis", "privacy_intro": "Wir speichern so wenig wie möglich über Sie und gehen mit dem Gespeicherten sorgfältig um. Hier steht kurz, was das ist und warum.",
-      "privacy": [
-        {"h": "Was wir speichern", "p": "Ihren Benutzernamen, Ihre Anmeldezeiten und die Angaben, die zu Ihrem Konto gehören. Mehr nicht."},
-        {"h": "Wofür wir es nutzen", "p": "Damit Sie sich anmelden können und wir Ihr Konto vor Fremden schützen können. Wir verkaufen keine Daten unserer Nutzer."},
-        {"h": "Cookies", "p": "Wir verwenden nur die Cookies, die der Dienst zum Funktionieren braucht. Werbe- oder Analyse-Cookies gibt es nicht."},
-        {"h": "Ihre Rechte", "p": "Sie können Auskunft, Berichtigung oder Löschung Ihrer Daten verlangen. Wenden Sie sich an die Verwaltung Ihres Kontos."}
-      ]
-    },
-    "nl": {
-      "vars": {"brand": {"join": [["Veen", "Linde", "Duin", "Wiel", "Hoeve", "Beuk", "Es", "Vlier"], ["dal", "zicht", "burg", "hof", "poort", "kamp", "wijk", "water"]]}},
-      "nav_label": "Hoofdmenu", "tagline": "Veilig inloggen", "footer": "Alle rechten voorbehouden.",
-      "nav_home": "Inloggen", "nav_help": "Hulp", "nav_privacy": "Privacy", "home_title": "Inloggen",
-      "desc": "Log in op uw account bij {brand}.", "desc_help": "Hulp bij het inloggen bij {brand}.", "desc_privacy": "Hoe {brand} met uw gegevens omgaat.",
-      "nf_title": "Pagina niet gevonden", "nf_text": "De pagina die u zoekt bestaat niet of is verplaatst.", "nf_back": "Terug naar inloggen",
-      "f_user": "Gebruikersnaam of e-mailadres", "f_pass": "Wachtwoord", "f_remember": "Ingelogd blijven", "f_forgot": "Wachtwoord vergeten?",
-      "f_submit": "Inloggen", "f_busy": "Bezig met inloggen…", "e_empty": "Vul uw gebruikersnaam en wachtwoord in.",
-      "e_bad": ["Gebruikersnaam of wachtwoord is onjuist.", "De ingevoerde gegevens kloppen niet. Probeer het opnieuw."],
-      "help_h": "Problemen met inloggen?", "help_intro": "De meeste inlogproblemen hebben een eenvoudige oorzaak. Loop deze stappen door voordat u contact opneemt.",
-      "help_steps": ["Controleer of Caps Lock uitstaat; wachtwoorden zijn hoofdlettergevoelig.", "Let op een spatie aan het begin of einde van de gebruikersnaam.", "Probeer het in een nieuw browservenster zonder opgeslagen formuliergegevens.", "Wacht tien minuten als u het meerdere keren tevergeefs hebt geprobeerd."],
-      "help_contact_h": "Lukt het nog steeds niet?", "help_contact": "Vraag degene die {brand} voor uw organisatie beheert om uw wachtwoord opnieuw in te stellen. Om veiligheidsredenen gebeurt dat niet telefonisch of per e-mail.",
-      "help_back": "Terug naar inloggen",
-      "privacy_h": "Privacyverklaring", "privacy_intro": "Wij bewaren zo min mogelijk over u en gaan zorgvuldig om met wat we bewaren. Hieronder staat kort wat dat is en waarom.",
-      "privacy": [
-        {"h": "Wat we bewaren", "p": "Uw gebruikersnaam, uw inlogmomenten en de gegevens die bij uw account horen. Meer niet."},
-        {"h": "Waarvoor we het gebruiken", "p": "Zodat u kunt inloggen en wij uw account kunnen beschermen tegen anderen. We verkopen geen gegevens van onze gebruikers."},
-        {"h": "Cookies", "p": "We gebruiken alleen de cookies die de dienst nodig heeft om te werken. Er zijn geen reclame- of analysecookies."},
-        {"h": "Uw rechten", "p": "U kunt vragen om inzage, correctie of verwijdering van uw gegevens. Neem contact op met de beheerder van uw account."}
-      ]
-    },
-    "sv": {
-      "vars": {"brand": {"join": [["Björk", "Ek", "Lind", "Strand", "Fjäll", "Ängs", "Klint", "Rönn"], ["vik", "holm", "berg", "gård", "näs", "udde", "lund", "sund"]]}},
-      "nav_label": "Huvudmeny", "tagline": "Säker inloggning", "footer": "Alla rättigheter förbehållna.",
-      "nav_home": "Logga in", "nav_help": "Hjälp", "nav_privacy": "Integritet", "home_title": "Logga in",
-      "desc": "Logga in på ditt konto hos {brand}.", "desc_help": "Hjälp med att logga in hos {brand}.", "desc_privacy": "Så hanterar {brand} dina uppgifter.",
-      "nf_title": "Sidan hittades inte", "nf_text": "Sidan du söker finns inte eller har flyttats.", "nf_back": "Tillbaka till inloggningen",
-      "f_user": "Användarnamn eller e-post", "f_pass": "Lösenord", "f_remember": "Håll mig inloggad", "f_forgot": "Glömt lösenordet?",
-      "f_submit": "Logga in", "f_busy": "Loggar in …", "e_empty": "Fyll i både användarnamn och lösenord.",
-      "e_bad": ["Fel användarnamn eller lösenord.", "Uppgifterna stämmer inte. Försök igen."],
-      "help_h": "Problem med att logga in?", "help_intro": "De flesta inloggningsproblem har en enkel orsak. Gå igenom stegen nedan innan du kontaktar någon.",
-      "help_steps": ["Kontrollera att Caps Lock inte är på; lösenord skiljer mellan stora och små bokstäver.", "Se upp med ett mellanslag i början eller slutet av användarnamnet.", "Prova i ett nytt webbläsarfönster utan sparade formulärdata.", "Vänta tio minuter om du har försökt flera gånger utan resultat."],
-      "help_contact_h": "Kommer du fortfarande inte in?", "help_contact": "Be den som administrerar {brand} för din organisation att återställa ditt lösenord. Av säkerhetsskäl görs det varken per telefon eller e-post.",
-      "help_back": "Tillbaka till inloggningen",
-      "privacy_h": "Integritetspolicy", "privacy_intro": "Vi sparar så lite som möjligt om dig och tar hand om det vi sparar. Här står kort vad det är och varför.",
-      "privacy": [
-        {"h": "Vad vi sparar", "p": "Ditt användarnamn, dina inloggningstider och de uppgifter som hör till ditt konto. Inget mer."},
-        {"h": "Vad vi använder det till", "p": "För att du ska kunna logga in och för att vi ska kunna skydda ditt konto från andra. Vi säljer inga uppgifter om våra användare."},
-        {"h": "Cookies", "p": "Vi använder bara de cookies som tjänsten behöver för att fungera. Det finns inga reklam- eller analyscookies."},
-        {"h": "Dina rättigheter", "p": "Du kan begära utdrag, rättelse eller radering av dina uppgifter. Kontakta den som administrerar ditt konto."}
-      ]
-    }
+ "bundles": [
+  {
+   "id": "customer",
+   "weight": 2
   },
-  "bundles": [
-    {"lang": "en", "weight": 2, "kicker": "Customer account", "welcome": "Welcome back", "lead": "Sign in to see your invoices, update your details and manage your plan.", "bullets": ["View and download invoices", "Update your contact details", "Follow open requests"]},
-    {"lang": "en", "weight": 2, "kicker": "Staff area", "welcome": "Staff sign-in", "lead": "Use your work account to reach rotas, notices and shared documents.", "bullets": ["Shifts and rotas", "Notices for the team", "Shared documents"], "f_user": "Employee ID or email"},
-    {"lang": "en", "weight": 2, "kicker": "Learning space", "welcome": "Sign in to your class space", "lead": "Pupils, parents and teachers sign in here to find timetables, homework and messages.", "bullets": ["Timetables and homework", "Messages from teachers", "Term dates and trips"], "f_user": "Username"},
-    {"lang": "en", "weight": 2, "kicker": "Document archive", "welcome": "Open your archive", "lead": "Contracts, receipts and letters are kept here for you, and kept private.", "bullets": ["Contracts and receipts", "Letters in one place", "Access that you control"], "f_user": "Email address"},
-    {"lang": "en", "weight": 2, "kicker": "Bookings", "welcome": "Manage your bookings", "lead": "Sign in to change a reservation, add guests or see what is coming up.", "bullets": ["Change or cancel a booking", "Add guests", "See upcoming dates"], "f_user": "Booking email"},
-    {"lang": "de", "kicker": "Kundenkonto", "welcome": "Willkommen zurück", "lead": "Melden Sie sich an, um Rechnungen einzusehen, Ihre Daten zu ändern und Ihren Tarif zu verwalten.", "bullets": ["Rechnungen ansehen und laden", "Kontaktdaten ändern", "Offene Anfragen verfolgen"]},
-    {"lang": "de", "kicker": "Mitarbeiterbereich", "welcome": "Anmeldung für Mitarbeitende", "lead": "Mit Ihrem Arbeitskonto erreichen Sie Dienstpläne, Mitteilungen und gemeinsame Dokumente.", "bullets": ["Dienstpläne", "Mitteilungen des Teams", "Gemeinsame Dokumente"], "f_user": "Personalnummer oder E-Mail"},
-    {"lang": "nl", "kicker": "Klantaccount", "welcome": "Welkom terug", "lead": "Log in om uw facturen te bekijken, uw gegevens aan te passen en uw abonnement te beheren.", "bullets": ["Facturen bekijken en downloaden", "Contactgegevens aanpassen", "Openstaande verzoeken volgen"]},
-    {"lang": "nl", "kicker": "Leeromgeving", "welcome": "Log in op uw klas", "lead": "Leerlingen, ouders en docenten loggen hier in voor roosters, huiswerk en berichten.", "bullets": ["Roosters en huiswerk", "Berichten van docenten", "Vakanties en uitjes"], "f_user": "Gebruikersnaam"},
-    {"lang": "sv", "kicker": "Kundkonto", "welcome": "Välkommen tillbaka", "lead": "Logga in för att se fakturor, ändra dina uppgifter och hantera ditt abonnemang.", "bullets": ["Se och ladda ner fakturor", "Ändra kontaktuppgifter", "Följ pågående ärenden"]},
-    {"lang": "sv", "kicker": "Personalyta", "welcome": "Inloggning för personal", "lead": "Med ditt arbetskonto når du scheman, meddelanden och delade dokument.", "bullets": ["Scheman", "Meddelanden till teamet", "Delade dokument"], "f_user": "Anställningsnummer eller e-post"}
-  ]
+  {
+   "id": "staff",
+   "weight": 2
+  },
+  {
+   "id": "learning",
+   "weight": 2
+  },
+  {
+   "id": "archive",
+   "weight": 2
+  },
+  {
+   "id": "bookings",
+   "weight": 2
+  }
+ ]
 }

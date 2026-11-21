@@ -30,6 +30,7 @@
 @media (max-width:860px){.__cols__{display:block}.__side__{margin-top:32px}}
 {{else}}.__feed__{display:grid;gap:28px 24px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
 .__feed__ > .__sectitle__{grid-column:1/-1;margin:0}
+.__feed__ > p{grid-column:1/-1;margin:0}
 .__entry__{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--ln);border-radius:var(--r);background:var(--sf);box-shadow:var(--sh)}
 .__thumb__{display:block;aspect-ratio:8/5;overflow:hidden}
 .__thumb__ .__art__{height:100%}
@@ -37,3 +38,5 @@
 .__entry__ h2{font-size:1.2rem}
 {{end}}@media (max-width:560px){.__blogmain__{padding-top:28px}.__me__{width:84px;height:84px;margin-left:16px}}
 .__more__ .__mu__{margin-left:.5em}
+.__mh__{margin:1.6em 0 .4em;font-size:1.15rem}
+.__ar__{margin:0 0 .5em;font-size:1rem}

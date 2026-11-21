@@ -1,15 +1,91 @@
 {
-  "title": {"en": "Club / society / event", "ru": "Кружок, общество, клуб по интересам"},
-  "layouts": 3,
-  "pages": [
-    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
-    {"name": "events", "tmpl": "events.html.tmpl", "paths": ["programme.html", "events/index.html", "whats-on/index.html", "events.html"], "nav": "nav_events", "desc": "desc_events"},
-    {"name": "join", "tmpl": "join.html.tmpl", "paths": ["join.html", "join/index.html", "membership/index.html", "new-members.html"], "nav": "nav_join", "desc": "desc_join"},
-    {"name": "news", "tmpl": "news.html.tmpl", "paths": ["news.html", "news/index.html", "noticeboard/index.html", "updates.html"], "nav": "nav_news", "desc": "desc_news"}
-  ],
-  "lists": [
-    {"name": "events", "from": "events", "min": 5, "max": 5},
-    {"name": "news", "from": "news", "min": 3, "max": 4, "dates": {"end": "2026-10-30", "gap_min": 12, "gap_max": 50}}
-  ],
-  "photo_slots": {"cover":[0,1]}
+ "title": {
+  "en": "Club / society / event",
+  "ru": "Кружок, общество, клуб по интересам"
+ },
+ "layouts": 3,
+ "pages": [
+  {
+   "name": "home",
+   "tmpl": "home.html.tmpl",
+   "paths": [
+    "index.html"
+   ],
+   "nav": "nav_home",
+   "title": "home_title",
+   "desc": "desc"
+  },
+  {
+   "name": "events",
+   "tmpl": "events.html.tmpl",
+   "paths": [
+    "programme.html",
+    "events/index.html",
+    "whats-on/index.html",
+    "events.html"
+   ],
+   "nav": "nav_events",
+   "desc": "desc_events"
+  },
+  {
+   "name": "join",
+   "tmpl": "join.html.tmpl",
+   "paths": [
+    "join.html",
+    "join/index.html",
+    "membership/index.html",
+    "new-members.html"
+   ],
+   "nav": "nav_join",
+   "desc": "desc_join"
+  },
+  {
+   "name": "news",
+   "tmpl": "news.html.tmpl",
+   "paths": [
+    "news.html",
+    "news/index.html",
+    "noticeboard/index.html",
+    "updates.html"
+   ],
+   "nav": "nav_news",
+   "desc": "desc_news"
+  }
+ ],
+ "lists": [
+  {
+   "name": "events",
+   "from": "events",
+   "min": 5,
+   "max": 5
+  },
+  {
+   "name": "sessions",
+   "from": "sessions",
+   "min": 6,
+   "max": 8,
+   "dates": {
+    "end": "2026-11-12",
+    "gap_min": 8,
+    "gap_max": 17
+   }
+  },
+  {
+   "name": "news",
+   "from": "news",
+   "min": 3,
+   "max": 4,
+   "dates": {
+    "end": "2026-11-05",
+    "gap_min": 12,
+    "gap_max": 40
+   }
+  }
+ ],
+ "photo_slots": {
+  "cover": [
+   0,
+   1
+  ]
+ }
 }
