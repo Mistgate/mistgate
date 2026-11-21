@@ -41,7 +41,7 @@ export function PreviewCard({ id, sha, kind, bad, demo, shown }: { id: string; s
   const note = shown ? shown.note : kind === "builtin" ? t("dz.pv.noteBuiltin") : placeholder ? "" : notFound && !has404 ? t("dz.pv.no404") : t("dz.pv.note");
 
   return (
-    <DzCard className={cx("dz-pv", `v${wd}`, placeholder && "nodoc")} data-shot="decoy-preview">
+    <DzCard className={cx("dz-pv", wd === "ph" ? "vph" : "vpc",placeholder && "nodoc")} data-shot="decoy-preview">
       {list.length > 0 || !phone ? (
         <div className="dz-pvb">
           {list.length > 0 && (
