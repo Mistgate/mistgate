@@ -1,0 +1,245 @@
+{
+ "ui": {
+  "nav_label": "Nawigacja",
+  "footer": "Prowadzone przez wolontariuszy i otwarte dla wszystkich.",
+  "nav_home": "Strona główna",
+  "nav_events": "Program",
+  "nav_join": "Dołącz do nas",
+  "nav_news": "Aktualności",
+  "home_title": "Witamy",
+  "desc_events": "Regularne spotkania i wydarzenia: {brand}.",
+  "desc_join": "Jak dołączyć: {brand}, ile to kosztuje i czego się spodziewać.",
+  "desc_news": "Aktualności i ogłoszenia: {brand}.",
+  "nf_title": "Nie znaleziono strony",
+  "nf_text": "Nie znaleźliśmy tej strony. Mogła zostać usunięta po wydarzeniu, którego dotyczyła.",
+  "nf_back": "Wróć na stronę główną",
+  "meet_h": "Kiedy się spotykamy",
+  "when_l": "Kiedy",
+  "where_l": "Gdzie",
+  "upcoming_h": "Wkrótce",
+  "latest_h": "Najnowsze wiadomości",
+  "all_events": "Cały program",
+  "all_news": "Wszystkie aktualności",
+  "join_cta": "Jak dołączyć",
+  "events_h": "Program",
+  "events_intro": "Nasze regularne spotkania i to, co robiliśmy w tym sezonie, miesiąc po miesiącu.",
+  "join_h": "Dołącz do nas",
+  "steps_h": "Jak dołączyć",
+  "faq_h": "Pytania",
+  "join_fee": "Roczna składka wynosi {fee}, a dla młodzieży i studentów jest zniżka. Jeśli pieniądze są problemem, powiedz o tym cicho skarbnikowi, a nikt więcej do tego nie wróci.",
+  "steps": [
+   "Przyjdź na dowolne spotkanie i się przywitaj.",
+   "Spróbuj przez miesiąc, zanim cokolwiek zdecydujesz.",
+   "Wpłać składkę skarbnikowi, kiedy zechcesz."
+  ],
+  "news_h": "Aktualności",
+  "news_intro": "Ogłoszenia zarządu i relacje z ostatnich spotkań, od najnowszych.",
+  "regular_h": "Regularne spotkania",
+  "season_h": "Ten sezon do tej pory",
+  "find_h": "Gdzie nas znaleźć",
+  "contact_h": "Kontakt",
+  "phone_l": "Telefon"
+ },
+ "bundles": {
+  "chess": {
+   "kicker": "Klub szachowy",
+   "tagline": "Szachy w dobrej atmosferze, w każdy czwartek wieczorem",
+   "desc": "{brand} spotyka się w każdy czwartek wieczorem. Przyjazne partie dla każdego poziomu, od początkujących po mistrza klubu.",
+   "intro": "Spotykamy się w każdy czwartek, żeby grać, analizować partie i pić za dużo herbaty. Zapraszamy każdego, od osób, które grają pierwszy raz, po mistrza klubu.",
+   "when": "W czwartki, od {19:30} do {22:00}",
+   "where": "Sala na piętrze osiedlowego domu kultury",
+   "events": [
+    {"t": "Wieczór klubowy", "w": "Co czwartek, {19:30}", "p": "Gra swobodna i stolik do nauki dla początkujących."},
+    {"t": "Turniej szybkich szachów", "w": "Pierwsza sobota miesiąca, {14:00}", "p": "Siedem rund po piętnaście minut. Wpisowe to drobna wpłata na herbatę."},
+    {"t": "Wieczór dla początkujących", "w": "Drugi wtorek miesiąca, {19:00}", "p": "Poznajemy zasady i kilka prostych otwarć."},
+    {"t": "Symultana", "w": "Raz w sezonie", "p": "Mistrz klubu gra naraz na dwudziestu szachownicach. Przyjdź z kolegą i z planem."},
+    {"t": "Andrzejki klubowe", "w": "Koniec listopada", "p": "Kolacja, przemówienie i wręczenie bardzo małego pucharu."}
+   ],
+   "news": [
+    {"title": "Zaczyna się nowy sezon", "text": "Sezon jesienny rusza w przyszłym tygodniu mistrzostwami klubu. Nowi członkowie są mile widziani w każdy wieczór."},
+    {"title": "Dziękujemy wszystkim, którzy przyszli na turniej", "text": "Dwudziestu sześciu graczy, czternaście filiżanek herbaty na rundę i finał rozstrzygnięty na zegarze."},
+    {"title": "Mamy nowe szachownice", "text": "Osiem drewnianych szachownic z kompletami figur, kupionych za pieniądze z letniej loterii."},
+    {"title": "Sekcja młodzieżowa znów działa", "text": "Dzieci od siedmiu lat zapraszamy we wtorki po południu, za pierwszym razem z rodzicem."}
+   ],
+   "join": [
+    "Jesteśmy przyjaznym klubem, który liczy około czterdziestu osób w wieku od dziewięciu do osiemdziesięciu czterech lat. Większość z nas nie gra zbyt dobrze i pogodziliśmy się z tym.",
+    "Nie musisz mieć własnego kompletu ani znać teorii. Jeśli umiesz poruszać figurami, możesz zagrać w czwartek."
+   ],
+   "faq": [
+    {"q": "Czy trzeba grać dobrze?", "a": "Nie. Większość członków nie gra szczególnie dobrze, a klub jest tak zorganizowany, żeby każdy zagrał z kimś na swoim poziomie."},
+    {"q": "Czy mogą przyjść dzieci?", "a": "Tak, we wtorki po południu, a w czwartki z rodzicem."},
+    {"q": "Czy gracie w lidze?", "a": "Wystawiamy jedną drużynę w lidze okręgowej. Jeśli chcesz grać, powiedz o tym kapitanowi."}
+   ],
+   "why": [
+    {"h": "Każdy poziom", "p": "Początkujący siedzą obok starych wyjadaczy i nikomu to nie przeszkadza."},
+    {"h": "Co czwartek", "p": "Bez zapisów. Przychodź, kiedy możesz."},
+    {"h": "Sprzęt na miejscu", "p": "Szachownice i zegary są nasze, a herbatę parzysz Ty."}
+   ],
+   "sessions": [
+    {"t": "Wieczór otwarcia", "p": "Krótka pogadanka o otwarciu, które wszyscy grają, a nikt nie rozumie."},
+    {"t": "Mistrzostwa klubu, pierwsza runda", "p": "Pary z losowania i pierwsza runda, która nigdy nie idzie zgodnie z planem."},
+    {"t": "Warsztaty z końcówek", "p": "Króle, pionki i cierpliwość, żeby je przepchnąć."},
+    {"t": "Quiz i szachy", "p": "Dziesięć pytań o szachy i dziesięć o wszystkim innym."},
+    {"t": "Turniej szybkich szachów", "p": "Siedem rund po piętnaście minut i dużo herbaty."},
+    {"t": "Wieczór analizy", "p": "Wybieramy partię z wieczoru klubowego i się o nią kłócimy."},
+    {"t": "Symultana", "p": "Mistrz klubu staje do walki z dwudziestoma szachownicami naraz."},
+    {"t": "Stolik do nauki dla młodzieży", "p": "Nasi najmłodsi członkowie uczą dorosłych kilku sztuczek."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [["Klub Szachowy {city}", "Szachowe Koło {city}", "{city} Szachy"]]
+    }
+   }
+  },
+  "walking": {
+   "kicker": "Klub turystyczny",
+   "tagline": "Wędrówki po wzgórzach i wzdłuż rzeki",
+   "desc": "{brand} wędruje w każdą niedzielę po wzgórzach i wzdłuż rzeki. Zapraszamy wszystkich, doświadczenie nie jest potrzebne.",
+   "intro": "Chodzimy w każdą niedzielę, w każdą pogodę, w tempie najwolniejszej osoby. Przyjdź raz i zobacz, bo większość z nas tak zaczynała.",
+   "when": "W niedziele, {9:30}",
+   "where": "Parking przy dawnym dworcu",
+   "events": [
+    {"t": "Niedzielna wycieczka", "w": "Co niedzielę, {9:30}", "p": "Od dwunastu do dwudziestu kilometrów, a przy złej pogodzie postój w schronisku."},
+    {"t": "Krótki spacer", "w": "Pierwsza środa miesiąca, {10:00}", "p": "Pięć do siedmiu kilometrów w spokojnym tempie, na koniec kawa."},
+    {"t": "Weekend w górach", "w": "Raz w roku, wiosną", "p": "Dwa dni na szlaku, nocleg w schronisku i bardzo dużo zupy."},
+    {"t": "Wieczór z mapą", "w": "Raz w sezonie", "p": "Jak czytać mapę i co robić, kiedy to mapa czyta Ciebie."},
+    {"t": "Sprzątanie szlaku", "w": "Ostatnia sobota kwietnia", "p": "Sprzątamy ścieżkę nad rzeką, a potem przechodzimy ją jeszcze raz, bo możemy."}
+   ],
+   "news": [
+    {"title": "Jest program na wiosnę", "text": "Dwanaście wycieczek od marca do czerwca, w tym dwie nowe trasy przez grzbiet."},
+    {"title": "Ścieżka przy młynie jest znów otwarta", "text": "Po roku remontu most znów można przejść. Dziękujemy wolontariuszom, którzy poświęcili swoje soboty."},
+    {"title": "Szukamy nowych przewodników", "text": "Jeśli znasz dobrą trasę i umiesz czytać mapę, chętnie Cię posłuchamy."},
+    {"title": "Dziękujemy za zupę", "text": "Weekend w górach bardzo się udał, głównie dzięki zupie."}
+   ],
+   "join": [
+    "Jesteśmy przyjazną grupą około sześćdziesięciu osób, od tych, którzy chodzą całe życie, po tych, którzy zaczęli w zeszłym miesiącu.",
+    "Nie potrzeba specjalnego sprzętu. Buty, kurtka przeciwdeszczowa i coś do picia w zupełności wystarczą. W razie wątpliwości przyjdź i zapytaj w niedzielę rano."
+   ],
+   "faq": [
+    {"q": "Jak szybko chodzicie?", "a": "W tempie najwolniejszej osoby danego dnia, którą często jest przewodnik."},
+    {"q": "Czy mogę zabrać psa?", "a": "Na większość wycieczek tak, na smyczy. W programie jest zapisane, które trasy się nie nadają."},
+    {"q": "A jeśli będzie padać?", "a": "I tak idziemy. Tylko postój jest dłuższy."}
+   ],
+   "why": [
+    {"h": "Na wzgórzach", "p": "Trasy od dwunastu do dwudziestu kilometrów, prowadzone przez ludzi, którzy znają ścieżki."},
+    {"h": "Dobre towarzystwo", "p": "Grupa stałych bywalców i ciągły dopływ nowych twarzy."},
+    {"h": "Nikt nie zostaje z tyłu", "p": "Dostosowujemy się do tempa najwolniejszej osoby."}
+   ],
+   "sessions": [
+    {"t": "Spacer wzdłuż rzeki", "p": "Dwanaście kilometrów po płaskim, z postojem przy starej śluzie."},
+    {"t": "Wycieczka z widokiem", "p": "Szesnaście kilometrów i jedno prawdziwe podejście. Zabierz termos."},
+    {"t": "Wieczór z mapą", "p": "Współrzędne, warstwice i kompas, który pokazuje w złą stronę."},
+    {"t": "Krótki spacer i obiad", "p": "Sześć kilometrów do schroniska, w którym pali się w kominku."},
+    {"t": "Kolory jesieni", "p": "Trasa przez las, najpiękniejsza rano, gdy światło przebija się między drzewami."},
+    {"t": "Sprzątanie szlaku", "p": "Rękawice, worki i zaskakująco dużo piłek tenisowych."},
+    {"t": "Wieczorny spacer", "p": "Spokojna godzina o zmierzchu, a na koniec herbata przy czyimś kuchennym stole."},
+    {"t": "Nocny marsz", "p": "Latarki zgaszone, oczy otwarte i opowieść o gwiazdach."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [["Klub Turystyczny {city}", "Wędrowcy {city}", "{city} Pieszo"]]
+    }
+   }
+  },
+  "choir": {
+   "kicker": "Chór amatorski",
+   "tagline": "Wspólne śpiewanie w środowe wieczory",
+   "desc": "{brand} ma próby w środowe wieczory. Bez przesłuchań, bez znajomości nut, wystarczy chęć do śpiewania.",
+   "intro": "Jesteśmy chórem dla ludzi, którzy lubią śpiewać i nie chcą na to przechodzić przesłuchania. Uczymy się ze słuchu, dużo się śmiejemy i śpiewamy lepiej, niż mamy prawo.",
+   "when": "W środy, od {19:00} do {21:00}",
+   "where": "Sala parafialna przy rynku",
+   "events": [
+    {"t": "Cotygodniowa próba", "w": "Co środę, {19:00}", "p": "Rozśpiewanie, nowe pieśni i ta jedna, której wciąż nie umiemy."},
+    {"t": "Wieczór otwarty", "w": "Pierwsza środa września", "p": "Przyjdź i pośpiewaj z nami przez jeden wieczór, bez żadnych zobowiązań."},
+    {"t": "Koncert zimowy", "w": "Druga sobota grudnia", "p": "Kolędy, pieśni ludowe i jeden utwór, którego nikt się nie spodziewa."},
+    {"t": "Koncert letni", "w": "Koniec czerwca", "p": "Wieczór piosenek w ogrodzie przy domu kultury, jeśli dopisze pogoda."},
+    {"t": "Dzień śpiewania", "w": "Raz w roku", "p": "Dzień warsztatów z gościnnym dyrygentem, z obiadem."}
+   ],
+   "news": [
+    {"title": "Zaczyna się nowy sezon", "text": "Uczymy się zestawu pieśni ludowych z trzech krajów i kanonu, który nie chce trzymać rytmu."},
+    {"title": "Wielkie dzięki po koncercie letnim", "text": "Przyszło dziewięćdziesiąt osób, zjedliśmy czterdzieści jeden ciast i tylko jedna zwrotka została zaśpiewana dwa razy."},
+    {"title": "Szukamy tenorów", "text": "Mamy mnóstwo sopranów i altów. Jeśli śpiewasz nisko, przyjdź i nas poznaj."},
+    {"title": "Przyszły nowe nuty", "text": "Teczki z programem zimowym leżą w sali. Zaznaczajcie uwagi ołówkiem, nie długopisem."}
+   ],
+   "join": [
+    "Jesteśmy chórem liczącym około pięćdziesięciu osób, w wieku od szesnastu do osiemdziesięciu ośmiu lat. Większość z nas nie czyta nut i od lat uczy się pieśni ze słuchu.",
+    "Przyjdź na dowolną próbę i zaśpiewaj z nami. Znajdziemy dla Ciebie krzesło, teczkę z nutami i kogoś, obok kogo staniesz."
+   ],
+   "faq": [
+    {"q": "Czy trzeba przejść przesłuchanie?", "a": "Nie. Nie ma przesłuchań, ani teraz, ani później."},
+    {"q": "Czy trzeba umieć czytać nuty?", "a": "Nie. Uczymy ze słuchu, a nuty na papierze są dla tych, którzy chcą."},
+    {"q": "A jeśli opuszczę tydzień?", "a": "To opuścisz tydzień. Nikt nie będzie miał pretensji, a nagrania są udostępniane w internecie."}
+   ],
+   "why": [
+    {"h": "Bez przesłuchań", "p": "Jeśli potrafisz utrzymać melodię pod prysznicem, utrzymasz ją i tutaj."},
+    {"h": "Wszystkie głosy", "p": "Soprany, alty, tenory, basy i wszyscy, którzy nie są pewni."},
+    {"h": "Dwa koncerty w roku", "p": "Jeden zimą i jeden latem, z ciastem."}
+   ],
+   "sessions": [
+    {"t": "Wieczór otwarty", "p": "Przyjdź i zaśpiewaj z nami kanon albo dwa, bez przesłuchania i bez presji."},
+    {"t": "Zaczynamy nowy sezon", "p": "Rozśpiewanie, nowy utwór i dużo wspólnego nadrabiania zaległości."},
+    {"t": "Próba głosowa", "p": "Alty i tenory w sali, soprany i basy w kuchni."},
+    {"t": "Dzień śpiewania", "p": "Cała sobota z gościnnym dyrygentem."},
+    {"t": "Koncert w kościele", "p": "Dwie części, loteria i grzaniec w przerwie."},
+    {"t": "Kolędowanie na rynku", "p": "Zimne palce i ciepłe głosy na rynku."},
+    {"t": "Próba z pianistą", "p": "Pierwszy raz, kiedy utwór brzmi jak muzyka."},
+    {"t": "Wieczór wspólnego śpiewania", "p": "Piosenki, które zna każdy, i kilka, których nikt nie pamięta."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [["Chór {city}", "Chór Amatorski {city}", "{city} Śpiewa"]]
+    }
+   }
+  },
+  "astronomy": {
+   "kicker": "Towarzystwo astronomiczne",
+   "tagline": "Patrzymy w niebo, razem",
+   "desc": "{brand} spotyka się co miesiąc na prelekcjach i nocach obserwacyjnych. Zapraszamy początkujących i właścicieli teleskopów.",
+   "intro": "Spotykamy się raz w miesiącu, żeby posłuchać prelekcji i, jeśli niebo pozwala, popatrzeć przez teleskopy. Nie musisz mieć teleskopu ani nawet wiedzieć, gdzie jest północ.",
+   "when": "Pierwszy piątek miesiąca, {20:00}",
+   "where": "Czytelnia biblioteki, a obserwacje na polu za budynkiem",
+   "events": [
+    {"t": "Spotkanie miesięczne", "w": "Pierwszy piątek miesiąca, {20:00}", "p": "Prelekcja, a potem herbata i pytania o to, co widzieliśmy."},
+    {"t": "Noc obserwacyjna", "w": "Gdy niebo jest czyste", "p": "Teleskopy wychodzą na pole za budynkiem. Zabierz ciepłe ubranie."},
+    {"t": "Noc Spadających Gwiazd", "w": "Połowa sierpnia", "p": "Wieczór otwarty dla wszystkich, z Księżycem, Saturnem i meteorami."},
+    {"t": "Warsztat dla początkujących", "w": "Raz w sezonie", "p": "Jak wybrać, ustawić i schować teleskop, żeby potem nie żałować."},
+    {"t": "Wieczór ze zdjęciami", "w": "Koniec listopada", "p": "Członkowie pokazują najlepsze zdjęcia nieba z całego roku, a także te mniej udane."}
+   ],
+   "news": [
+    {"title": "Jest program na sezon", "text": "Osiem prelekcji od października do maja, od komet po czarne dziury, a jeden wieczór poświęcony błędom przy obserwacjach."},
+    {"title": "Dziękujemy za Noc Spadających Gwiazd", "text": "Przyszło ponad dwustu gości, Księżyc był piękny, a chmury przez cały wieczór tylko dwie."},
+    {"title": "Teleskop do wypożyczenia", "text": "Klub wypożycza teraz członkom teleskop na miesiąc. Zapytaj sekretarza."},
+    {"title": "Nowe terminy obserwacji", "text": "Pole za budynkiem będzie zimą otwarte o dwa wieczory w miesiącu więcej."}
+   ],
+   "join": [
+    "Jest nas około trzydziestu, a nasze instrumenty to wszystko od lornetki po coś wielkości pralki.",
+    "Przyjdź na dowolne spotkanie. Jeśli niebo będzie czyste, pokażemy Ci Księżyc, Jowisza albo cokolwiek innego, co akurat jest widać."
+   ],
+   "faq": [
+    {"q": "Czy potrzebuję teleskopu?", "a": "Nie. Przyjdź z pustymi rękami, ktoś pożyczy Ci okular i wszystko wytłumaczy."},
+    {"q": "A jeśli będą chmury?", "a": "Zostaje prelekcja i herbata, a potem czekamy na następne czyste niebo."},
+    {"q": "Czy mogą przyjść dzieci?", "a": "Tak, z dorosłym. Wieczory obserwacyjne to ich ulubione."}
+   ],
+   "why": [
+    {"h": "Niebo dla wszystkich", "p": "Na początek wystarczy lornetka i nikt nie oczekuje wiedzy."},
+    {"h": "Prelekcja co miesiąc", "p": "Różne tematy, wyjaśnione prosto, z czasem na pytania."},
+    {"h": "Teleskopy klubu", "p": "Kilka instrumentów do dyspozycji i ktoś, kto pokaże, jak ich używać."}
+   ],
+   "sessions": [
+    {"t": "Wieczór otwarcia", "p": "Wycieczka po niebie bieżącego sezonu, bez skomplikowanych map."},
+    {"t": "Komety i pył", "p": "Skąd się biorą i dlaczego zawsze czekamy na nie na próżno."},
+    {"t": "Noc obserwacyjna", "p": "Księżyc, kilka gwiazd podwójnych i gromada, której nazwę da się zapamiętać."},
+    {"t": "Warsztat z teleskopami", "p": "Ustawianie, kolimacja i drobne triki, które oszczędzają przykrych niespodzianek."},
+    {"t": "Noc Spadających Gwiazd", "p": "Wieczór otwarty dla publiczności, z teleskopami dla każdego."},
+    {"t": "Planety zimą", "p": "Jowisz, Saturn i chwile, kiedy są dobrze widoczne."},
+    {"t": "Wieczór ze zdjęciami", "p": "Zdjęcia nieba z całego roku i kilka nieudanych, które wszystkich rozśmieszają."},
+    {"t": "Kosmiczny quiz", "p": "Dziesięć pytań o kosmos, dziesięć o czymś innym i nagroda pocieszenia."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [["Towarzystwo Astronomiczne {city}", "Astronomowie {city}", "Koło Miłośników Astronomii {city}"]]
+    }
+   }
+  }
+ }
+}

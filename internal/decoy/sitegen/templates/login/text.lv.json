@@ -1,0 +1,149 @@
+{
+ "ui": {
+  "nav_label": "Izvēlne",
+  "tagline": "Droša piekļuve kontam",
+  "footer": "Visas tiesības aizsargātas.",
+  "nav_home": "Pieteikties",
+  "nav_help": "Palīdzība",
+  "nav_privacy": "Privātums",
+  "home_title": "Pieteikšanās",
+  "desc": "Piesakies savam kontam: {brand}.",
+  "desc_help": "Palīdzība pieteikšanās problēmu gadījumā: {brand}.",
+  "desc_privacy": "Kā {brand} rīkojas ar tavu informāciju.",
+  "nf_title": "Lapa nav atrasta",
+  "nf_text": "Lapas, ko meklēji, nav vai arī tā ir pārvietota.",
+  "nf_back": "Atpakaļ uz pieteikšanos",
+  "f_user": "Lietotājvārds vai e-pasta adrese",
+  "f_pass": "Parole",
+  "f_remember": "Atcerēties mani",
+  "f_forgot": "Aizmirsi paroli?",
+  "f_submit": "Pieteikties",
+  "f_busy": "Piesakās…",
+  "e_empty": "Ievadi lietotājvārdu un paroli.",
+  "e_bad": [
+   "Lietotājvārds vai parole nav pareiza.",
+   "Ievadītais lietotājvārds vai parole nav pareiza. Lūdzu, mēģini vēlreiz.",
+   "Ar šiem datiem pieteikties neizdevās."
+  ],
+  "help_h": "Neizdodas pieteikties?",
+  "help_intro": "Lielākajai daļai pieteikšanās problēmu ir vienkāršs cēlonis. Izej šos soļus, pirms sazinies ar kādu.",
+  "help_steps": [
+   "Pārbaudi, vai Caps Lock ir izslēgts; parolēs lielie un mazie burti ir atšķirīgi.",
+   "Pārbaudi, vai lietotājvārda sākumā vai beigās nav nejauša atstarpe.",
+   "Mēģini vēlreiz jaunā pārlūka logā, kurā nav saglabātu veidlapu datu.",
+   "Pagaidi desmit minūtes, ja vairāki mēģinājumi nav palīdzējuši."
+  ],
+  "help_contact_h": "Joprojām neizdodas?",
+  "help_contact": "Palūdz cilvēkam, kas jūsu organizācijā pārvalda pakalpojumu {brand}, atiestatīt tavu paroli. Drošības apsvērumu dēļ mēs to nevaram izdarīt pa tālruni vai e-pastu.",
+  "help_back": "Atpakaļ uz pieteikšanos",
+  "privacy_h": "Privātuma paziņojums",
+  "privacy_intro": "Mēs glabājam par tevi pēc iespējas mazāk un rūpējamies par to, ko glabājam. Šeit īsi aprakstīts, kas tas ir un kāpēc.",
+  "privacy": [
+   {
+    "h": "Ko mēs glabājam",
+    "p": "Tavu lietotājvārdu, pieteikšanās laikus un datus, kas pieder tavam kontam. Neko citu."
+   },
+   {
+    "h": "Kam mēs to izmantojam",
+    "p": "Lai tu varētu pieteikties un lai aizsargātu tavu kontu no citiem. Mēs nepārdodam informāciju par saviem lietotājiem."
+   },
+   {
+    "h": "Sīkdatnes",
+    "p": "Mēs lietojam tikai tās sīkdatnes, kas vajadzīgas pakalpojuma darbībai. Reklāmas vai analītikas sīkdatņu nav."
+   },
+   {
+    "h": "Tavas tiesības",
+    "p": "Tu vari lūgt apskatīt, labot vai dzēst informāciju, ko par tevi glabājam. Vērsies pie sava konta pārvaldnieka."
+   }
+  ],
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Alkšņu",
+      "Liepu",
+      "Egļu",
+      "Ostas",
+      "Bērzu",
+      "Kļavu",
+      "Ozolu",
+      "Vītolu",
+      "Papardes",
+      "Lazdu",
+      "Pīlādžu",
+      "Kārklu"
+     ],
+     [
+      "vārti",
+      "lauks",
+      "tilts",
+      "aka",
+      "akmens",
+      "skats",
+      "kalns",
+      "sēta",
+      "stūris",
+      "ceļš"
+     ]
+    ],
+    "sep": ""
+   }
+  }
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Klienta konts",
+   "welcome": "Laipni lūdzam atpakaļ",
+   "lead": "Piesakies, lai redzētu savus rēķinus, atjaunotu datus un pārvaldītu savu plānu.",
+   "bullets": [
+    "Skatīt un lejupielādēt rēķinus",
+    "Atjaunot kontaktinformāciju",
+    "Sekot atvērtajiem pieprasījumiem"
+   ]
+  },
+  "staff": {
+   "kicker": "Darbinieku zona",
+   "welcome": "Darbinieku pieteikšanās",
+   "lead": "Izmanto savu darba kontu, lai piekļūtu darba grafikiem, paziņojumiem un kopīgajiem dokumentiem.",
+   "bullets": [
+    "Maiņas un grafiki",
+    "Paziņojumi komandai",
+    "Kopīgie dokumenti"
+   ],
+   "f_user": "Darbinieka kods vai e-pasta adrese"
+  },
+  "learning": {
+   "kicker": "Mācību vide",
+   "welcome": "Piesakies savas klases vidē",
+   "lead": "Skolēni, vecāki un skolotāji piesakās šeit, lai atrastu stundu sarakstus, mājasdarbus un ziņas.",
+   "bullets": [
+    "Stundu saraksti un mājasdarbi",
+    "Ziņas no skolotājiem",
+    "Semestru datumi un ekskursijas"
+   ],
+   "f_user": "Lietotājvārds"
+  },
+  "archive": {
+   "kicker": "Dokumentu arhīvs",
+   "welcome": "Atver savu arhīvu",
+   "lead": "Līgumi, čeki un vēstules tiek glabāti šeit tev un ir slēgti citiem.",
+   "bullets": [
+    "Līgumi un čeki",
+    "Vēstules vienuviet",
+    "Piekļuve, ko kontrolē tu"
+   ],
+   "f_user": "E-pasta adrese"
+  },
+  "bookings": {
+   "kicker": "Rezervācijas",
+   "welcome": "Pārvaldi savas rezervācijas",
+   "lead": "Piesakies, lai mainītu rezervāciju, pievienotu viesus vai redzētu, kas gaidāms.",
+   "bullets": [
+    "Mainīt vai atcelt rezervāciju",
+    "Pievienot viesus",
+    "Skatīt gaidāmos datumus"
+   ],
+   "f_user": "Rezervācijas e-pasts"
+  }
+ }
+}

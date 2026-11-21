@@ -1,0 +1,300 @@
+{
+ "order": 20,
+ "lang": "tr",
+ "html_lang": "tr-TR",
+ "date": [
+  "{d} {m} {y}",
+  "{dd}.{mm}.{y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "{n} ₺",
+  "group": ".",
+  "scale": 45,
+  "round": 10
+ },
+ "address": "{street} No: {no}, {zip} {city}",
+ "zip_tail": "XXX",
+ "cities": [
+  {
+   "name": "İstanbul",
+   "zip": [
+    "34"
+   ],
+   "in": "İstanbul'da"
+  },
+  {
+   "name": "Ankara",
+   "zip": [
+    "06"
+   ],
+   "in": "Ankara'da"
+  },
+  {
+   "name": "İzmir",
+   "zip": [
+    "35"
+   ],
+   "in": "İzmir'de"
+  },
+  {
+   "name": "Bursa",
+   "zip": [
+    "16"
+   ],
+   "in": "Bursa'da"
+  },
+  {
+   "name": "Antalya",
+   "zip": [
+    "07"
+   ],
+   "in": "Antalya'da"
+  },
+  {
+   "name": "Adana",
+   "zip": [
+    "01"
+   ],
+   "in": "Adana'da"
+  },
+  {
+   "name": "Konya",
+   "zip": [
+    "42"
+   ],
+   "in": "Konya'da"
+  },
+  {
+   "name": "Gaziantep",
+   "zip": [
+    "27"
+   ],
+   "in": "Gaziantep'te"
+  },
+  {
+   "name": "Kayseri",
+   "zip": [
+    "38"
+   ],
+   "in": "Kayseri'de"
+  },
+  {
+   "name": "Mersin",
+   "zip": [
+    "33"
+   ],
+   "in": "Mersin'de"
+  },
+  {
+   "name": "Eskişehir",
+   "zip": [
+    "26"
+   ],
+   "in": "Eskişehir'de"
+  },
+  {
+   "name": "Diyarbakır",
+   "zip": [
+    "21"
+   ],
+   "in": "Diyarbakır'da"
+  },
+  {
+   "name": "Samsun",
+   "zip": [
+    "55"
+   ],
+   "in": "Samsun'da"
+  },
+  {
+   "name": "Denizli",
+   "zip": [
+    "20"
+   ],
+   "in": "Denizli'de"
+  },
+  {
+   "name": "Trabzon",
+   "zip": [
+    "61"
+   ],
+   "in": "Trabzon'da"
+  },
+  {
+   "name": "Malatya",
+   "zip": [
+    "44"
+   ],
+   "in": "Malatya'da"
+  },
+  {
+   "name": "Erzurum",
+   "zip": [
+    "25"
+   ],
+   "in": "Erzurum'da"
+  },
+  {
+   "name": "Balıkesir",
+   "zip": [
+    "10"
+   ],
+   "in": "Balıkesir'de"
+  },
+  {
+   "name": "Manisa",
+   "zip": [
+    "45"
+   ],
+   "in": "Manisa'da"
+  },
+  {
+   "name": "Tekirdağ",
+   "zip": [
+    "59"
+   ],
+   "in": "Tekirdağ'da"
+  },
+  {
+   "name": "Edirne",
+   "zip": [
+    "22"
+   ],
+   "in": "Edirne'de"
+  },
+  {
+   "name": "Muğla",
+   "zip": [
+    "48"
+   ],
+   "in": "Muğla'da"
+  },
+  {
+   "name": "Çanakkale",
+   "zip": [
+    "17"
+   ],
+   "in": "Çanakkale'de"
+  },
+  {
+   "name": "Sivas",
+   "zip": [
+    "58"
+   ],
+   "in": "Sivas'ta"
+  },
+  {
+   "name": "Aydın",
+   "zip": [
+    "09"
+   ],
+   "in": "Aydın'da"
+  },
+  {
+   "name": "Mardin",
+   "zip": [
+    "47"
+   ],
+   "in": "Mardin'de"
+  }
+ ],
+ "streets": [
+  "Atatürk Caddesi",
+  "Cumhuriyet Caddesi",
+  "İnönü Caddesi",
+  "Gazi Caddesi",
+  "Hürriyet Caddesi",
+  "Zafer Caddesi",
+  "İstasyon Caddesi",
+  "Çiçek Sokak",
+  "Gül Sokak",
+  "Lale Sokak",
+  "Çınar Sokak",
+  "Bahçe Sokak",
+  "Okul Sokak",
+  "Papatya Sokak",
+  "Menekşe Sokak",
+  "Akasya Sokak",
+  "Yıldız Sokak",
+  "Barış Sokak",
+  "Kurtuluş Caddesi",
+  "Mevlana Caddesi"
+ ],
+ "first": [
+  "Mehmet",
+  "Ayşe:f",
+  "Ahmet",
+  "Fatma:f",
+  "Mustafa",
+  "Elif:f",
+  "Ali",
+  "Zeynep:f",
+  "Hasan",
+  "Emine:f",
+  "Hüseyin",
+  "Merve:f",
+  "İbrahim",
+  "Esra:f",
+  "Murat",
+  "Selin:f",
+  "Emre",
+  "Büşra:f",
+  "Burak",
+  "Derya:f",
+  "Can",
+  "Gül:f",
+  "Cem",
+  "Hatice:f",
+  "Kemal",
+  "Pınar:f",
+  "Okan",
+  "Sevgi:f",
+  "Serkan",
+  "Yasemin:f",
+  "Volkan",
+  "Ece:f",
+  "Barış",
+  "Naz:f",
+  "Onur",
+  "Aylin:f"
+ ],
+ "last": [
+  "Yılmaz",
+  "Kaya",
+  "Demir",
+  "Şahin",
+  "Çelik",
+  "Yıldız",
+  "Yıldırım",
+  "Öztürk",
+  "Aydın",
+  "Özdemir",
+  "Arslan",
+  "Doğan",
+  "Kılıç",
+  "Aslan",
+  "Çetin",
+  "Kara",
+  "Koç",
+  "Kurt",
+  "Özkan",
+  "Şimşek",
+  "Polat",
+  "Korkmaz",
+  "Güneş",
+  "Aksoy",
+  "Avcı",
+  "Bulut",
+  "Tekin",
+  "Karaca",
+  "Uçar",
+  "Taş",
+  "Acar",
+  "Bozkurt",
+  "Erdem",
+  "Sezer",
+  "Toprak",
+  "Ünal"
+ ]
+}

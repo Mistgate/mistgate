@@ -1,0 +1,390 @@
+{
+ "ui": {
+  "nav_label": "Huvudmeny",
+  "footer": "Alla bilder är ateljéns verk och får inte återanvändas utan tillstånd.",
+  "nav_home": "Urval av verk",
+  "nav_work": "Alla verk",
+  "nav_about": "Om mig",
+  "nav_contact": "Kontakt",
+  "home_title": "Urval av verk",
+  "nf_title": "Sidan hittades inte",
+  "nf_text": "Det finns inget på den här adressen. Verken finns på startsidan.",
+  "nf_back": "Tillbaka till verken",
+  "sel_h": "Urval av verk",
+  "all_work": "Se alla verk",
+  "work_h": "Alla verk",
+  "work_intro": "Allt från de senaste åren, de nyaste först.",
+  "about_h": "Om mig",
+  "services_h": "Vad jag gör",
+  "shows_h": "Utställningar och omnämnanden",
+  "contact_h": "Kontakt",
+  "visit_h": "Ateljé",
+  "hours_h": "Öppettider",
+  "phone_l": "Telefon",
+  "visit_text": "Ateljén är öppen efter överenskommelse. Kom gärna under öppettiderna; om ingen öppnar dörren sitter jag förmodligen i bakrummet eller hos tryckaren.",
+  "commission_h": "Uppdrag",
+  "commission_text": "Jag tar emot ett litet antal uppdrag varje år. När du hör av dig, berätta vad du har i tankarna och när du behöver det, så säger jag ärligt om jag kan göra det.",
+  "hours_note": "Lördag efter överenskommelse",
+  "work_back": "Alla verk",
+  "work_more": "Fler verk",
+  "work_ask": "Fråga om det här verket",
+  "directions_h": "Hitta till ateljén",
+  "directions": "Ateljén ligger på bottenplanet, en kort promenad från centrum. Dörren finns på sidan, och det finns en ringklocka. Cykelställ finns utanför."
+ },
+ "bundles": {
+  "photo": {
+   "tagline": "Fotografier av stilla platser",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Dis",
+       "Dyn",
+       "Tystnad",
+       "Sommar",
+       "Dagg",
+       "Salt",
+       "Moln",
+       "Skymning",
+       "Hed",
+       "Myr"
+      ],
+      [
+       "ljus",
+       "ram",
+       "fält",
+       "timme",
+       "horisont",
+       "exponering",
+       "plåt",
+       "slutare",
+       "bländare",
+       "kopia"
+      ]
+     ]
+    }
+   },
+   "desc": "Landskaps- och stilleben-fotografi från {city}. Kopior och uppdrag.",
+   "desc_work": "Utvalda fotografier, de nyaste först.",
+   "desc_about": "Om fotografen och ateljén i {city}.",
+   "desc_contact": "Så hittar du ateljén i {city} och när den är öppen.",
+   "intro": "Landskaps- och stilleben-fotografi från {city}. Kopior och några uppdrag varje år.",
+   "about": [
+    "Jag är fotograf och arbetar från en liten ateljé i {city}. De flesta av mina bilder föreställer platser timmen efter att alla har gått hem.",
+    "Jag arbetar långsamt, oftast med en kamera och ett objektiv, och skriver ut allt själv i bakrummet. En bild är klar när jag kan titta på den i en vecka utan att vilja ändra något.",
+    "De senaste åren har mitt arbete visats i små gallerier och bibliotek i regionen och sålts som kopior till människor som ville ha något stilla på väggen."
+   ],
+   "services": [
+    "Konstkopior, signerade och numrerade",
+    "Porträttuppdrag hemma eller i ateljén",
+    "Fotografi för tidningar och böcker"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Två horisonter, grupputställning, Galleri Gamla Magasinet"
+    },
+    {
+     "y": "2024",
+     "t": "Stilla vatten, separatutställning, biblioteksfoajén"
+    },
+    {
+     "y": "2022",
+     "t": "Regionala fotopriset, nominerad"
+    }
+   ],
+   "works": [
+    {
+     "title": "Sluttning, eftermiddag",
+     "caption": "Pigmenttryck på arkivpapper, 2025",
+     "note": "Det sista ljuset över en äng som de flesta går förbi.",
+     "text": "Jag väntade tre eftermiddagar på att molnet skulle lätta från åsen, och det lättade i fyra minuter."
+    },
+    {
+     "title": "Två horisonter",
+     "caption": "Pigmenttryck på arkivpapper, 2025",
+     "note": "En strandlinje som inte kunde bestämma var den skulle sluta.",
+     "text": "Vattnet drog sig tillbaka och den blöta sanden fångade en andra himmel. Jag tog sex bilder och behöll den här."
+    },
+    {
+     "title": "Stilla vatten",
+     "caption": "Pigmenttryck på arkivpapper, 2024",
+     "note": "En damm i november som inte har något att bevisa.",
+     "text": "En reservoar klockan sju på morgonen, före vinden. Kopian är stor, så att stillheten får plats."
+    },
+    {
+     "title": "Rött fält",
+     "caption": "Pigmenttryck på arkivpapper, 2024",
+     "note": "Vallmo som gått i frö, fotograferad i regn.",
+     "text": "Klöver som fick blomma och sedan slogs. Färgen i kopian ligger närmare det jag såg än kameran gjorde."
+    },
+    {
+     "title": "Linjer i skymningen",
+     "caption": "Pigmenttryck på arkivpapper, 2023",
+     "note": "Telefontrådar mot en himmel som ändrade sig.",
+     "text": "Stolpar och fåror, med det sista ljuset utbrett över dem. Det blir bättre i en lång smal ram."
+    },
+    {
+     "title": "Salt och skiffer",
+     "caption": "Pigmenttryck på arkivpapper, 2023",
+     "note": "En hamnmur vid lågvatten, i färgerna av ett gammalt mynt.",
+     "text": "En strand av mörk sten med vitt salt som havet lämnat kvar. Jag kom tillbaka under tre årstider för att få det ljus jag ville ha."
+    },
+    {
+     "title": "Blå timmen",
+     "caption": "Pigmenttryck på arkivpapper, 2022",
+     "note": "Tio minuter mellan dag och natt, upprepade i en vecka.",
+     "text": "Tio minuter efter solnedgången färgas hela dalen som bläck. Det här är den enda bilden där lampan är tänd."
+    },
+    {
+     "title": "Fruktträdgård på vintern",
+     "caption": "Pigmenttryck på arkivpapper, 2022",
+     "note": "Kala träd på rad, räknade två gånger.",
+     "text": "Kala äppelträd en frostig morgon. Jag stod på en låda för att hitta en linje mellan grenarna."
+    },
+    {
+     "title": "Morgondimma",
+     "caption": "Pigmenttryck på arkivpapper, 2021",
+     "note": "En dal som ännu inte fått veta att det var morgon.",
+     "text": "Dimman var borta klockan åtta. Jag tog den här bilden under den kvart då den fanns kvar."
+    }
+   ]
+  },
+  "illustration": {
+   "tagline": "Illustration och grafik",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Ormbunke",
+       "Papper",
+       "Bläck",
+       "Citron",
+       "Mal",
+       "Apelsin",
+       "Blyerts",
+       "Linoleum",
+       "Katt",
+       "Krita"
+      ],
+      [
+       "press",
+       "ateljé",
+       "skrivbord",
+       "teckning",
+       "verk",
+       "skissbok",
+       "hörn",
+       "bord",
+       "block",
+       "skåp"
+      ]
+     ]
+    }
+   },
+   "desc": "Illustrationer, linoleumsnitt och små böcker från ett skrivbord i {city}.",
+   "desc_work": "Illustrationer och tryck, de nyaste först.",
+   "desc_about": "Om illustratören och ateljén i {city}.",
+   "desc_contact": "Så hittar du ateljén i {city} och när den är öppen.",
+   "intro": "Illustrationer, linoleumsnitt och små böcker från ett skrivbord i {city}.",
+   "about": [
+    "Jag är illustratör och grafiker. Jag ritar för bilderböcker, för tidskrifter som fortfarande betalar i tid och för alla som behöver en fågel i hörnet av en affisch.",
+    "Det mesta av mitt arbete börjar som en blyertsskiss i ett block och slutar som ett linoleumsnitt eller en digital teckning i platta färger, beroende på vad uppdraget vill ha.",
+    "Jag bor i {city} med en katt som har åsikter om mina kompositioner."
+   ],
+   "services": [
+    "Bilderböcker och redaktionell illustration",
+    "Linoleumstryck och kort",
+    "Affischer och bilder till evenemang"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Småtryckmässan, utställare"
+    },
+    {
+     "y": "2024",
+     "t": "Fältanteckningar, en bilderbok på ett lokalt förlag"
+    },
+    {
+     "y": "2023",
+     "t": "Regionala illustrationspriset, hedersomnämnande"
+    }
+   ],
+   "works": [
+    {
+     "title": "Studie i orange",
+     "caption": "Linoleumsnitt, tre färger, 2025",
+     "note": "En räv, en halv trappa och en oförklarad måne.",
+     "text": "En färg, tre papper och en eftermiddag. Det började som en uppvärmning och blev omslaget till en liten bok."
+    },
+    {
+     "title": "Marknadsdag",
+     "caption": "Digital teckning, 2025",
+     "note": "Elva stånd och en mycket självbelåten duva.",
+     "text": "Ritad på plats under tre lördagar. Försäljarna var snälla nog att stå still, eller nästan."
+    },
+    {
+     "title": "Den långa vägen",
+     "caption": "Blyerts och bläck, 2024",
+     "note": "En stig som inte går dit skylten säger.",
+     "text": "En runda jag går på söndagar, ritad ur minnet och kontrollerad på nästa promenad. Kartan hade fel på ett trevligt sätt."
+    },
+    {
+     "title": "Nattbussen",
+     "caption": "Linoleumsnitt, två färger, 2024",
+     "note": "Alla sover utom föraren och månen.",
+     "text": "Penna, bläck och mycket tålamod med speglingarna i fönstret."
+    },
+    {
+     "title": "Gröna timmar",
+     "caption": "Gouache, 2023",
+     "note": "Ett växthus klockan fyra på eftermiddagen.",
+     "text": "Timmarna före frukost i juni, när trädgården ännu är sval. Linoleumsnitt i tre färger."
+    },
+    {
+     "title": "Små fåglar",
+     "caption": "Linoleumsnitt, 2023",
+     "note": "Sju fåglar, ingen av dem rätt bestämd.",
+     "text": "Sparvar, gärdsmygar och en mycket arg rödhake. Varje fågel är ett eget block, så inga två tryck är exakt lika."
+    },
+    {
+     "title": "Regnstudie",
+     "caption": "Akvarell, 2022",
+     "note": "Paraplyer sedda från ett fönster.",
+     "text": "Akvarell, mest vatten. Jag lät papperet bestämma var pölarna hamnade."
+    },
+    {
+     "title": "Skörd",
+     "caption": "Digital teckning, 2022",
+     "note": "Ett fält i orange med en traktor i hörnet.",
+     "text": "Ett frukt- och grönsaksstånd på hösten. Den orangea pumpan fick jag rita två gånger."
+    },
+    {
+     "title": "Köksfönstret",
+     "caption": "Blyerts och bläck, 2021",
+     "note": "Vad som händer i fönsterbrädan när ingen tittar.",
+     "text": "Utsikten från där jag diskar. Den ändras med vädret, vilket är den enda anledningen till att jag inte har något emot disken."
+    }
+   ]
+  },
+  "graphic": {
+   "tagline": "Grafisk design för små organisationer",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Raster",
+       "Kärna",
+       "Marginal",
+       "Stil",
+       "Linje",
+       "Punkt",
+       "Yta",
+       "Papper",
+       "Mått",
+       "Press"
+      ],
+      [
+       "studio",
+       "verk",
+       "kontor",
+       "hus",
+       "labb",
+       "byrå",
+       "ateljé",
+       "verkstad",
+       "tryck",
+       "rum"
+      ]
+     ]
+    }
+   },
+   "desc": "Identiteter, affischer och tryckt material för små organisationer i {city} och längre bort.",
+   "desc_work": "Utvalda designprojekt, de nyaste först.",
+   "desc_about": "Om designstudion i {city}.",
+   "desc_contact": "Så hittar du studion i {city} och när den är öppen.",
+   "intro": "Identiteter, affischer och tryckt material för små organisationer i {city} och längre bort.",
+   "about": [
+    "Vi är en liten designstudio i {city}. Vi arbetar med teatrar, butiker, ideella organisationer och ibland ett bryggeri, mest med identiteter och trycksaker.",
+    "Vi gillar tydliga rutnät, ärligt papper och typsnitt som funnits tillräckligt länge för att uppföra sig. Vi försöker inte göra något som behöver en handledning.",
+    "De flesta projekt börjar med ett samtal och en kopp kaffe, och slutar med en låda tryckta prover på bordet."
+   ],
+   "services": [
+    "Identiteter och logotyper",
+    "Affischer, program och skyltning",
+    "Årsredovisningar och små böcker"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Årets affisch, regionala designpriset, nominerad"
+    },
+    {
+     "y": "2024",
+     "t": "Lugn varumärkesbyggning, ett föredrag på en lokal designträff"
+    },
+    {
+     "y": "2023",
+     "t": "Typografikväll, arrangörer"
+    }
+   ],
+   "works": [
+    {
+     "title": "Identitet för en tehandlare",
+     "caption": "Identitet, 2025",
+     "note": "Ett märke av ett enda blad och mycket återhållsamhet.",
+     "text": "En ordbild, en uppsättning etiketter och burkar som går att stapla. Bladet i märket är ett riktigt blad från ägarens trädgård."
+    },
+    {
+     "title": "Affischer för en kör",
+     "caption": "Affischserie, 2025",
+     "note": "Tolv ark, tolv röster, ett rutnät.",
+     "text": "Tre affischer till tre konserter, tryckta i två färger på ett ark för att hålla kostnaden nere."
+    },
+    {
+     "title": "Årsredovisning",
+     "caption": "Tryck, 2024",
+     "note": "Fyrtio sidor som folk faktiskt läser.",
+     "text": "Fyrtio sidor för en liten ideell organisation. Enkel text, generösa marginaler och ett diagram som får vara vackert."
+    },
+    {
+     "title": "Program för en dockteater",
+     "caption": "Tryck, 2024",
+     "note": "Viks till ett hus och sedan till en båt.",
+     "text": "Ett vikt ark som blir en liten teater när man drar i rätt hörn."
+    },
+    {
+     "title": "Förpackning för ett bageri",
+     "caption": "Förpackning, 2023",
+     "note": "Papperspåsar som ser bättre ut efter en användning.",
+     "text": "Papperspåsar, en stämpel och ett band i butikens färg. Stämpeln är skuren i en potatis."
+    },
+    {
+     "title": "Skyltning för ett bibliotek",
+     "caption": "Skyltning, 2023",
+     "note": "Skyltar som bara märks när de saknas.",
+     "text": "Skyltar för fyra våningar, testade med riktiga läsare. En skylt flyttade vi tre gånger."
+    },
+    {
+     "title": "Meny för en liten restaurang",
+     "caption": "Tryck, 2022",
+     "note": "Ett enda ark som ändras varje vecka.",
+     "text": "En sida, ny varje vecka. Layouten lämnar plats för en penna, för kocken stryker alltid något."
+    },
+    {
+     "title": "Festivalaffisch",
+     "caption": "Affisch, 2022",
+     "note": "Tryckt i två färger på tidningspapper.",
+     "text": "En affisch som måste fungera från andra sidan gatan, och det gjorde den, tack vare en djärv form och ingen liten text."
+    },
+    {
+     "title": "Serie av bokomslag",
+     "caption": "Omslag, 2021",
+     "note": "Sex omslag, ett typsnitt.",
+     "text": "Sex omslag för ett förlag, sammanbundna av ett rutnät och ett enda typsnitt. Vart och ett har sin egen färg."
+    }
+   ]
+  }
+ }
+}

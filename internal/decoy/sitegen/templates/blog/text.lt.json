@@ -1,0 +1,317 @@
+{
+ "ui": {
+  "nav_label": "Pagrindinis",
+  "footer": "Rašoma rankomis, skelbiama lėtai.",
+  "nav_home": "Užrašai",
+  "nav_about": "Apie",
+  "home_title": "Užrašai",
+  "nf_title": "Čia nieko nėra",
+  "nf_text": "Šiuo adresu užrašo nėra. Galbūt jis pervadintas arba niekada nebuvo parašytas.",
+  "nf_back": "Atgal į užrašus",
+  "latest_h": "Naujausi užrašai",
+  "read_more": "Skaityti užrašą",
+  "min_read": "min. skaitymo",
+  "more_h": "Daugiau užrašų",
+  "back_all": "Visi užrašai",
+  "about_h": "Apie",
+  "now_h": "Šiuo metu",
+  "tags_h": "Temos",
+  "by": "Parašė",
+  "nav_archive": "Archyvas",
+  "desc_archive": "Visi {brand} užrašai, mėnuo po mėnesio.",
+  "archive_h": "Archyvas",
+  "archive_intro": "Visi užrašai iki šiol, naujausi viršuje, sugrupuoti pagal mėnesius.",
+  "all_posts": "Visi užrašai",
+  "newer": "Naujesni"
+ },
+ "bundles": {
+  "garden": {
+   "tagline": "Užrašai iš sodo sklypo",
+   "desc": "Užrašai iš nedidelio sodo sklypo {city_in}: kas užaugo, kas ne ir ką kitais metais darysiu kitaip.",
+   "desc_about": "Kas rašo {brand} ir kodėl.",
+   "intro": "Užrašai iš nedidelio sodo sklypo {city_in}: kas užaugo, kas ne ir ką kitais metais darysiu kitaip.",
+   "about": [
+    "Esu {first}. Jau devynerius metus prižiūriu sodo sklypą {city_in}, daugiausia daržovėms ir kelioms užsispyrusioms rožėms.",
+    "Šiame sąsiuvinyje užsirašau, ko mane išmokė sklypas, daugiausia dėl to, kad nebedaryčiau tų pačių klaidų nauja tvarka.",
+    "Komentarai uždaryti. Jei turite patarimą, pasakykite jį kaimynui per tvorą: taip išmokau daugiausia to, ką moku."
+   ],
+   "now": [
+    "Sėju pupas po plėvele",
+    "Vėl taisau pašiūrės duris",
+    "Skaitau apie gyvatvorių formavimą"
+   ],
+   "posts": [
+    {
+     "title": "Kodėl nustojau kasti",
+     "tag": "Dirva",
+     "excerpt": "Trys sezonai be kastuvo ir kas nutiko lysvėms.",
+     "body": [
+      "Daug metų kiekvieną rudenį perkasdavau lysves, nes taip darė ankstesnis sklypo šeimininkas ir taip rašė vaikystės knygos. Prieš tris sezonus nustojau ir uždengiau lysves storu komposto sluoksniu.",
+      "Pirmas pavasaris nudžiugino mažai. Dirva atrodė netvarkinga, o šliužai džiaugėsi. Antraisiais metais sliekai nudirbo didžiąją dalį darbo, žemė birėjo rankoje, o kiekvieną spalį ant lysvių praleisdavau vienu šeštadieniu mažiau.",
+      "Stebuklu to nepavadinčiau, o kelios piktžolės sugrįžo, nors tikėjausi, kad jų nebebus. Bet nugarai gerai, o morkos išaugo tiesesnės nei tada, kai kasdavau."
+     ]
+    },
+    {
+     "title": "Pupelės tiems, kurie pamiršta palaistyti",
+     "tag": "Daržovės",
+     "excerpt": "Keturios veislės, kurios man atleido sausą liepą.",
+     "body": [
+      "Praėjusią liepą devyniolika dienų nelijo, o vienuolika jų manęs nebuvo namie. Grįžus salotos buvo išmetusios žiedus, o cukinijos atrodė, lyg būtų pasidavusios. Pupelėms nieko neatsitiko.",
+      "Šios pupelės giliai šaknijasi, o storas mulčias aplink padeda joms ištverti sausą porą savaičių geriau nei beveik bet kam, ką auginu. Dabar jas sėju šiaurinėje pusėje, kur šešėlis neleidžia dirvai išdžiūti.",
+      "Jei esate iš tų, kurie planuoja laistyti kasdien, o pavyksta du kartus per savaitę, sėkite pupeles ir nesijaudinkite."
+     ]
+    },
+    {
+     "title": "Mažas šiltnamis iš senų langų",
+     "tag": "Statyba",
+     "excerpt": "Kaip kaimynės konteineris per ilgą savaitgalį tapo šiltnamiu.",
+     "body": [
+      "Kaimynė pakeitė langus, o seni dvi dienas gulėjo konteineryje. Paklausiau, ar galiu juos pasiimti, o ji paprašė, kad pasiimčiau ir konteinerį, jei tik sugebėsiu.",
+      "Iš surinktų lentų pasidariau rėmą pagal didžiausią langą, o kitus įstačiau aplink. Nieko nėra stačiakampio, o drėgnu oru durys užstringa, bet šaltis pomidorų daigų nepasiekia.",
+      "Visa tai kainavo dėžutę sraigtų ir maišelį glaisto. Kitą kartą prieš pjaustant du kartus pamatuosiu, ir tai sakau rimtai."
+     ]
+    },
+    {
+     "title": "Ką daryti sklype kovą",
+     "tag": "Sezonai",
+     "excerpt": "Trumpas sąrašas mėnesiui, kai atrodo, kad viskas įmanoma, o žemė dar šalta.",
+     "body": [
+      "Kovas visus apgauna. Dienos šviesios ir norisi sodinti, bet žemė šalta, o per anksti pasėtos sėklos tiesiog guli ir pūva. Palaukiu, kol žemė nebeatrodys šalta rankos nugarėlei.",
+      "Tuo tarpu darbų pakanka: sutvarkyti sėklų dėžutę, išplauti vazonus, apkarpyti rožes ir sudėti pirmąsias bulves daiginti į šviesią vietą. Šie darbai atrodo kaip pažanga, nieko nerizikuojant.",
+      "Mėnesio pabaigoje paprastai leidžiu sau vieną eilę žirnių po plėvele. Tai neprotinga, bet man patinka."
+     ]
+    },
+    {
+     "title": "Kompostas, sąžiningai",
+     "tag": "Dirva",
+     "excerpt": "Kas patenka į mano krūvą, kas ne ir kodėl mano kompostas niekada nebūna laiku.",
+     "body": [
+      "Mano krūva turi tris taisykles: nieko virto, nieko sergančio ir nieko, dėl ko abejoju. Žolė dedama plonais sluoksniais, kartu su suplėšytu kartonu, o visa tai verčiu, kai tik prisimenu.",
+      "Tai lėčiau nei sako knygos. Metai yra sąžiningesnis laikas nei pažadėtos šešios savaitės, o gatavas kompostas visada su siurprizais, pavyzdžiui, bulve, kurios jau nebesitikėjau rasti.",
+      "Man nieko. Krūva, kuri nesiskubina, neturi pykčio virtuvės atliekoms."
+     ]
+    },
+    {
+     "title": "Šliužai, alaus spąstai ir kiti pralaimėjimai",
+     "tag": "Kenkėjai",
+     "excerpt": "Kas padėjo, kas ne ir kodėl dabar pasodinu šiek tiek daugiau.",
+     "body": [
+      "Bandžiau alaus spąstus, kiaušinių lukštus, vario juostą ir išėjimą su žibintuvėliu sutemus. Kiekvienas veikė maždaug savaitę. Geriausiai veikia auginti daugiau, nei reikia, ir susitaikyti, kad šliužai pasiims savo dalį.",
+      "Tikroji grėsmė yra daigai, todėl juos auginu namie ir išnešu tik tada, kai pakankamai stiprūs, kad išlaikytų kelis įkandimus."
+     ]
+    },
+    {
+     "title": "Pupų sėklų rinkimas",
+     "tag": "Sėklos",
+     "excerpt": "Šiek tiek kantrybės spalį ir kitų metų pupos nieko nekainuoja.",
+     "body": [
+      "Geriausius ankščius palieku ant augalų, kol jie išdžiūsta ir barška. Paskui lukštenu virtuvės stalo, paskleidžiu pupas ant padėklo ir savaitę laikau šiltai.",
+      "Jos keliauja į popierinius vokus, ant kurių užrašomas pavadinimas ir metai. Plastikas prakaituotų, o pelėsiuotos pupos tai įrodo."
+     ]
+    },
+    {
+     "title": "Trumpas pašiūrės inventorius",
+     "tag": "Įrankiai",
+     "excerpt": "Vienuolika daiktų, kuriuos naudoju, ir daugybė tokių, kurių nenaudoju.",
+     "body": [
+      "Kastuvas, šakės, kauptukas, dvi mentelės, rankinis grėbliukas ir genėjimo žirklės padaro beveik visą darbą. Likusi pašiūrė pilna stiklainių, špagato, sulūžusio karutuko ir sodinukų dėžių rinkinio.",
+      "Kiekvieną pavasarį žadu sutvarkyti. Kiekvieną pavasarį tą dieną, kai planavau, lyja, ir tuo nesiskundžiu."
+     ]
+    },
+    {
+     "title": "Blogi pomidorų metai",
+     "tag": "Daržovės",
+     "excerpt": "Rugpjūtį atėjo maras ir paėmė viską. Pastabos kitam kartui.",
+     "body": [
+      "Lapai paruduodavo per savaitę, o paskui ir vaisiai. Augalus išrovėme, sudėjome į maišus ir nedėjome ant komposto, o tai vienintelė taisyklė, dėl kurios visi sutinka.",
+      "Kitais metais augsiu mažiau augalų, duosiu jiems daugiau vietos ir laistysiu žemę, o ne lapus. Taip pat prisiminsiu, kad blogi pomidorų metai yra geras pretekstas žaliųjų pomidorų uogienei."
+     ]
+    },
+    {
+     "title": "Lapai virsta lapų kompostu",
+     "tag": "Dirva",
+     "excerpt": "Dveji metai laukimo ir geriausias dalykas sklype.",
+     "body": [
+      "Lapkritį sugrėbstau lapus į vielinį narvą kampe ir einu šalin. Nėra ko vartyti, nėra ko pridėti, ir tai man tinka.",
+      "Po dvejų metų jis tamsus, birus ir kvepia mišku. Juo papildau lysves ir sėju daigus, ir niekas kitas, ką pasigaminu, nė iš tolo nesilygina."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kantrybės",
+       "Samanų",
+       "Tylos",
+       "Rasos",
+       "Žemės",
+       "Pavasario",
+       "Šilumos",
+       "Rudens",
+       "Dobilų",
+       "Pievų"
+      ],
+      [
+       "lysvės",
+       "sklypas",
+       "grėbliai",
+       "daržas",
+       "vagos",
+       "pašiūrė",
+       "gyvatvorė",
+       "sezonai",
+       "kastuvas",
+       "kampelis"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "kitchen": {
+   "tagline": "Užrašai iš mažos virtuvės",
+   "desc": "Receptai, kurie pasiteisina, klaidos, kurios ko nors išmokė, ir vakarienė {city_in}.",
+   "desc_about": "Kas rašo {brand} ir kodėl.",
+   "intro": "Receptai, kurie pasiteisina, klaidos, kurios ko nors išmokė, ir ką valgysime vakarienei {city_in}.",
+   "about": [
+    "Esu {first}. Gaminu keturių asmenų šeimai virtuvėje {city_in}, kuri mažesnė už daugelio žmonių vonią, ir nekeisčiau jos.",
+    "Užsirašau, kas pavyko, tokia forma, kokia iš tikrųjų gaminu, tai yra su mažiau kiekių ir daugiau būdvardžių nei tikrame recepte.",
+    "Maisto nefotografuoju. Jei patiekalas pakankamai gražus nuotraukai, tikriausiai jį per ilgai laikiau laukti."
+   ],
+   "now": [
+    "Maitinu naują raugą",
+    "Sūdau citrinas pavasariui",
+    "Taikausi su orkaitės durelėmis"
+   ],
+   "posts": [
+    {
+     "title": "Duona, kuri atleidžia",
+     "tag": "Duona",
+     "excerpt": "Miltai, vanduo, druska ir labai kantrus sekmadienio popietis.",
+     "body": [
+      "Tai duona, kurią kepu, kai pamirštu, kad ruošiausi kepti duoną. Jai reikia vos truputėlio mielių ir ilgo poilsio, minkyti visai nereikia, o jei paliksite valandą ilgiau, nei planavote, nieko tokio.",
+      "Vakare išmaišykite miltus, vandenį ir druską, kol nebeliks sausų vietų, uždenkite dubenį ir palikite ant stalo. Ryte tešla burbuliuoja ir kiek kvepia alumi, ir būtent to norite.",
+      "Kelis kartus sulenkite, grubiai suformuokite ir kepkite karštame puode su dangčiu. Atrodys netobulai, o skanės geriau, nei turėtų."
+     ]
+    },
+    {
+     "title": "Ką gaminti, kai šaldytuvas beveik tuščias",
+     "tag": "Darbo dienos",
+     "excerpt": "Penkios skardinės, trys svogūnai ir sūrio galiukas: vakarienė.",
+     "body": [
+      "Kiekvieną ketvirtadienį atidarau šaldytuvą ir matau pusę svogūno, suvytusį porą ir stiklainį, kurio nepamenu atidarius. Anksčiau tai atrodė nesėkmė. Dabar tai vienas vakaras per savaitę, kai savo eilės sulaukia spinta.",
+      "Lėtai pakepinkite svogūnus, kol pasiduos. Įdėkite, kokių turite pupelių, skardinę pomidorų ir šaukštą ko nors aštraus: garstyčių, acto, marinuoto čili. Leiskite burbuliuoti, kol surasite duonos galiuką.",
+      "Valgykite su sutarkuotu sūriu. Niekas niekada neklausė, kas ten yra, ir aš nustojau sakyti."
+     ]
+    },
+    {
+     "title": "Vienintelė sriuba, kurią verdu lapkritį",
+     "tag": "Sriubos",
+     "excerpt": "Keptas moliūgas, vienas obuolys ir kantrybė su trintuvu.",
+     "body": [
+      "Kai ateina pirma tikrai šalta savaitė, kepu moliūgą pjūviu žemyn su visa česnako galva ir suminkštėjusiu obuoliu. Tai trunka keturiasdešimt minučių, ir visi namai kvepia žiemos pradžia.",
+      "Viską sukrėskite į puodą, įpilkite sultinio ir trinkite, kol nustos pasipriešinti. Truputis grietinėlės malonu, bet nebūtina; šaukštas obuolio saldumo atlieka beveik tą patį darbą.",
+      "Patiekiu su skrudintomis sėklomis ir vakarykšte duona. Nieko gudraus, o verdu kiekvienais metais."
+     ]
+    },
+    {
+     "title": "Rauginimas be panikos",
+     "tag": "Konservai",
+     "excerpt": "Kodėl stiklainis greitai marinuotų daržovių yra paprasčiausias dalykas virtuvėje.",
+     "body": [
+      "Žmones atbaido žodis „konservuoti“, kuris skamba, lyg reikėtų sterilizuoti, didelių puodų ir prarastos dienos. Greitas marinavimas – tai stiklainis, virdulys ir apie dešimt minučių.",
+      "Supjaustykite, kas guli stalčiuje, sudėkite į švarų stiklainį ir užpilkite karštu acto, vandens, druskos ir šiek tiek cukraus mišiniu. Jei turite, įdėkite lauro lapą. Palikite iki rytojaus.",
+      "Šaldytuve išsilaiko kelias savaites ir paprastą vakarienę paverčia apgalvota. Dar niekada nepasitaikė blogo rezultato."
+     ]
+    },
+    {
+     "title": "Sudegę dalykai ir ko išmokau",
+     "tag": "Klaidos",
+     "excerpt": "Trumpas sugadintų vakarienių katalogas ir tai, ko išmokė kiekviena.",
+     "body": [
+      "Karamelė išmokė, kad cukrui nerūpi mano telefonas. Rizotas išmokė, kad sultinys turi būti karštas. Keptos bulvės išmokė, kad skarda gali būti per pilna ir kad blyškios bulvės niekam neatleidžiamos.",
+      "Blogiausias buvo gimtadienio pyragas, kurį išėmiau per anksti ir įdėjau atgal per vėlai. Jis įkrito per vidurį kaip orus senas pastatas, ir valgėme jį šaukštais su vanilės kremu.",
+      "Ant spintelės durelių vidinės pusės laikau sąrašą, kas nepavyko. Jis ilgesnis už sąrašą to, kas pavyko, ir daug naudingesnis."
+     ]
+    },
+    {
+     "title": "Keptuvė, šaukštas ir trečiadienis",
+     "tag": "Darbo dienos",
+     "excerpt": "Viena keptuvė, dvidešimt minučių ir labai mažai plovimo.",
+     "body": [
+      "Trečiadieniais visi pavargę ir alkani, todėl vakarienė turi išeiti iš vienos keptuvės. Svogūnai, skardinė pupelių, truputis rūkytos paprikos ir kokios žalumynų yra šaldytuve.",
+      "Pabaigoje uždedu kiaušinį ir vadinu tai vakariene. Tai ne tiek receptas, kiek įprotis, ir kol kas jis manęs nenuvylė."
+     ]
+    },
+    {
+     "title": "Avižų košė, kaip reikia",
+     "tag": "Pusryčiai",
+     "excerpt": "Avižos, vanduo, druska ir dešimt minučių nepabėgant.",
+     "body": [
+      "Jei prisimenate, avižas pamirkykite vakare. Ryte įpilkite vandens ir žiupsnelį druskos ir maišykite, kol tirštėja, o tai trunka maždaug tiek, kiek verda virdulys.",
+      "Aš valgau su šaukštu uogienės ar keliais pjaustytais obuoliais. Žmonės, kurie deda cukraus į košę, nėra neteisūs, bet ko nors jiems trūksta."
+     ]
+    },
+    {
+     "title": "Likę ryžiai trimis būdais",
+     "tag": "Darbo dienos",
+     "excerpt": "Kepti, įkepti į apkepą arba įmaišyti į sriubą.",
+     "body": [
+      "Šalti ryžiai kepimui tinka geriau nei švieži, nes grūdeliai lieka atskiri. Reikia tik karštos keptuvės, šiek tiek aliejaus, kiaušinio ir svogūnų laiškų.",
+      "Įmaišyti į sriubą jie sutirština sultinį, o suspausti į formą su sūriu ir iškepti virsta kažkuo panašiu į sūrų pyragą."
+     ]
+    },
+    {
+     "title": "Kodėl sveriu miltus",
+     "tag": "Duona",
+     "excerpt": "Svarstyklės pakeitė mano kepimą labiau nei bet kuris receptas.",
+     "body": [
+      "Puodelis miltų gali sverti nuo 120 iki 160 gramų, priklausomai nuo to, kaip semiate. Tai skirtumas tarp duonos ir plytos.",
+      "Dabar sveriu viską, net vandenį. Savaitę atrodo smulkmeniška, o paskui atrodo vienintelis protingas būdas kepti."
+     ]
+    },
+    {
+     "title": "Gimtadienio pyragas be recepto",
+     "tag": "Kepiniai",
+     "excerpt": "Vienodi visko svoriai ir šiek tiek kantrybės su orkaite.",
+     "body": [
+      "Močiutės pyragas – vienodi sviesto, cukraus, kiaušinių ir miltų svoriai su truputėliu vanilės. Ji niekada jo neužrašė, nes niekada neprireikė.",
+      "Kepu jį kiekvieną šeimos gimtadienį. Jis paprastas ir šiek tiek kreivas, ir niekas niekada neprašė kito."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Druskos",
+       "Sviesto",
+       "Avižų",
+       "Mielių",
+       "Sekmadienio",
+       "Pyrago",
+       "Miltų",
+       "Pieno",
+       "Rugių",
+       "Krosnies"
+      ],
+      [
+       "šaukštas",
+       "keptuvė",
+       "užrašai",
+       "stalas",
+       "virtuvė",
+       "tešla",
+       "dubuo",
+       "puodas",
+       "orkaitė",
+       "vakarienė"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

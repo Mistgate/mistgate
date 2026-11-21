@@ -1,0 +1,435 @@
+{
+ "ui": {
+  "nav_label": "Menüü",
+  "footer": "Töötab vabatahtlike jõul ja on avatud kõigile.",
+  "nav_home": "Avaleht",
+  "nav_events": "Kava",
+  "nav_join": "Liitu meiega",
+  "nav_news": "Uudised",
+  "home_title": "Tere tulemast",
+  "desc_events": "Regulaarsed kohtumised ja erisündmused: {brand}.",
+  "desc_join": "Kuidas liituda, mis see maksab ja mida oodata: {brand}.",
+  "desc_news": "Uudised ja teated: {brand}.",
+  "nf_title": "Lehte ei leitud",
+  "nf_text": "Me ei leidnud seda lehte. Võib-olla võeti see maha pärast sündmust, millest see rääkis.",
+  "nf_back": "Tagasi avalehele",
+  "meet_h": "Millal me kohtume",
+  "when_l": "Millal",
+  "where_l": "Kus",
+  "upcoming_h": "Tulemas",
+  "latest_h": "Viimased uudised",
+  "all_events": "Kogu kava",
+  "all_news": "Kõik uudised",
+  "join_cta": "Kuidas liituda",
+  "events_h": "Kava",
+  "events_intro": "Meie regulaarsed kohtumised ja see, mida me sellel hooajal teinud oleme, kuude kaupa.",
+  "join_h": "Liitu meiega",
+  "steps_h": "Kuidas liituda",
+  "faq_h": "Küsimused",
+  "join_fee": "Liikmemaks on {fee} aastas, noortele ja õpilastele on soodushind. Kui raha teeb muret, ütle seda vaikselt laekurile ja sellest ei räägita enam.",
+  "steps": [
+   "Tule ükskõik millisele kohtumisele ja ütle tere.",
+   "Proovi kuu aega enne, kui midagi otsustad.",
+   "Maksa liikmemaks laekurile, kui oled valmis."
+  ],
+  "news_h": "Uudised",
+  "news_intro": "Juhatuse teated ja aruanded viimastest kohtumistest, uuemad eespool.",
+  "regular_h": "Regulaarsed kohtumised",
+  "season_h": "Hooaeg siiani",
+  "find_h": "Leia meid",
+  "contact_h": "Võta ühendust",
+  "phone_l": "Telefon"
+ },
+ "bundles": {
+  "chess": {
+   "kicker": "Malekluba",
+   "tagline": "Sõbralik male, igal neljapäeva õhtul",
+   "desc": "{brand} kohtub igal neljapäeva õhtul. Sõbralikud mängud igale tasemele, algajatest klubi meistrini.",
+   "intro": "Kohtume igal neljapäeval, et mängida, oma partiisid analüüsida ja liiga palju teed juua. Kõik tasemed on oodatud, esimest korda mängijatest klubi meistrini.",
+   "when": "Neljapäeviti, {19:30} kuni {22:00}",
+   "where": "Kultuurimaja ülemise korruse saal",
+   "events": [
+    {
+     "t": "Klubiõhtu",
+     "w": "Igal neljapäeval, {19:30}",
+     "p": "Vaba mäng, algajatele on õpetuslaud."
+    },
+    {
+     "t": "Kiirmalaturniir",
+     "w": "Kuu esimesel laupäeval, {14:00}",
+     "p": "Seitse vooru, igaüks viisteist minutit. Osalustasuks on väike annetus teekassasse."
+    },
+    {
+     "t": "Algajate õhtu",
+     "w": "Kuu teisel teisipäeval, {19:00}",
+     "p": "Õpi reeglid ja mõned lihtsad avangud."
+    },
+    {
+     "t": "Simultaanmäng",
+     "w": "Kord hooajas",
+     "p": "Klubi meister mängib korraga kahekümne laual. Võta kaasa sõber ja plaan."
+    },
+    {
+     "t": "Aastapidu",
+     "w": "Novembri lõpus",
+     "p": "Söök, kõne ja väga väikese karika üleandmine."
+    }
+   ],
+   "news": [
+    {
+     "title": "Uus hooaeg algab",
+     "text": "Sügishooaeg algab järgmisel nädalal klubi meistrivõistlustega. Uued liikmed on igal õhtul teretulnud."
+    },
+    {
+     "title": "Aitäh kõigile, kes kiirmaleturniirile tulid",
+     "text": "Kakskümmend kuus mängijat, neliteist tassi teed vooru kohta ja finaal, mis otsustati kella peal."
+    },
+    {
+     "title": "Meil on uued lauad",
+     "text": "Kaheksa puidust malelauda ja malekomplekti, ostetud suvise loterii tuluga."
+    },
+    {
+     "title": "Noorteosakond avatakse uuesti",
+     "text": "Lapsed alates seitsmendast eluaastast on teisipäeva pärastlõunal oodatud, esimesel korral vanemaga."
+    }
+   ],
+   "join": [
+    "Oleme sõbralik klubi umbes neljakümne liikmega, vanuses üheksast kaheksakümne neljani. Enamik meist ei ole eriti head ja oleme sellega leppinud.",
+    "Sul ei pea olema oma malekomplekti ega teoreetilisi teadmisi. Kui oskad nuppe käia, saad neljapäeval mängida."
+   ],
+   "faq": [
+    {
+     "q": "Kas pean olema hea?",
+     "a": "Ei. Enamik liikmeid ei ole ja klubi on korraldatud nii, et igaüks saab mängu endaga sama tugeva vastasega."
+    },
+    {
+     "q": "Kas lapsed võivad tulla?",
+     "a": "Jah, teisipäeva pärastlõunal ja vanemaga ka neljapäeviti."
+    },
+    {
+     "q": "Kas te mängite liigas?",
+     "a": "Meil on üks võistkond maakonna liigas. Kui tahad mängida, ütle kaptenile."
+    }
+   ],
+   "why": [
+    {
+     "h": "Kõik tasemed",
+     "p": "Algajad istuvad vanade rebaste kõrval ja keegi ei pane pahaks."
+    },
+    {
+     "h": "Igal neljapäeval",
+     "p": "Registreerimist ei ole. Tule, kui saad."
+    },
+    {
+     "h": "Lauad on olemas",
+     "p": "Komplektid ja kellad on meie, tee on sinu tehtud."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Avaõhtu",
+     "p": "Lühike jutt avangust, mida kõik mängivad ja keegi ei mõista."
+    },
+    {
+     "t": "Klubi meistrivõistlused, esimene voor",
+     "p": "Paarid loosi järgi ja esimene voor, mis ei lähe kunagi plaani järgi."
+    },
+    {
+     "t": "Lõppmängu töötuba",
+     "p": "Kuningad, ettur ja kannatlikkus neid edasi lükata."
+    },
+    {
+     "t": "Viktoriin ja male",
+     "p": "Kümme küsimust males, kümme kõigest muust."
+    },
+    {
+     "t": "Kiirmalaturniir",
+     "p": "Seitse vooru, igaüks viisteist minutit, ja palju teed."
+    },
+    {
+     "t": "Analüüsiõhtu",
+     "p": "Valime klubiõhtu partii ja vaidleme selle üle."
+    },
+    {
+     "t": "Simultaanmäng",
+     "p": "Klubi meister võtab ette kakskümmend lauda korraga."
+    },
+    {
+     "t": "Noorte õpetuslaud",
+     "p": "Meie noorimad liikmed õpetavad täiskasvanutele paar nippi."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "{city} Maleklubi",
+       "{city} Maleselts",
+       "{city} Malering"
+      ]
+     ]
+    }
+   }
+  },
+  "walking": {
+   "kicker": "Matkagrupp",
+   "tagline": "Matkad metsades ja jõe ääres",
+   "desc": "{brand} matkab igal pühapäeval metsades ja jõe ääres. Kõik on teretulnud, kogemust ei ole vaja.",
+   "intro": "Matkame igal pühapäeval igasuguse ilmaga, aeglasema inimese tempos. Tule korra ja vaata; enamik meist alustas just nii.",
+   "when": "Pühapäeviti, {9:30}",
+   "where": "Vana jaama parkla",
+   "events": [
+    {
+     "t": "Pühapäevamatk",
+     "w": "Igal pühapäeval, {9:30}",
+     "p": "Kaheksa kuni kaksteist kilomeetrit, halva ilmaga kohvikupeatus."
+    },
+    {
+     "t": "Lühike matk",
+     "w": "Kuu esimesel kolmapäeval, {10:00}",
+     "p": "Kolm kuni neli kilomeetrit rahulikus tempos, lõpetuseks kohv."
+    },
+    {
+     "t": "Nädalavahetuse reis",
+     "w": "Kord aastas, kevadel",
+     "p": "Kaks päeva metsades, öömaja ja väga palju suppi."
+    },
+    {
+     "t": "Kaardilugemise õhtu",
+     "w": "Kord hooajas",
+     "p": "Kuidas kaarti lugeda ja mida teha, kui kaart loeb sind."
+    },
+    {
+     "t": "Prügikoristus",
+     "w": "Aprilli viimasel laupäeval",
+     "p": "Puhastame jõe ääre raja ja läbime selle siis uuesti, sest saame."
+    }
+   ],
+   "news": [
+    {
+     "title": "Kevadkava on väljas",
+     "text": "Kaksteist matka märtsist juunini, sealhulgas kaks uut marsruuti läbi metsa ja soo."
+    },
+    {
+     "title": "Veski juures olev jalgrada on taas avatud",
+     "text": "Pärast aastast remonti on sild jälle lahti. Aitäh vabatahtlikele, kes loobusid oma laupäevadest."
+    },
+    {
+     "title": "Otsime uusi matkajuhte",
+     "text": "Kui tead head marsruuti ja oskad kaarti lugeda, anna meile teada."
+    },
+    {
+     "title": "Aitäh supi eest",
+     "text": "Nädalavahetuse reis läks suurepäraselt, peamiselt supi tõttu."
+    }
+   ],
+   "join": [
+    "Oleme sõbralik umbes kuuekümneliikmeline rühm: nii need, kes on terve elu matkanud, kui ka need, kes alustasid eelmisel kuul.",
+    "Erivarustust ei ole vaja. Saapad, vihmakeep ja midagi juua on täiesti piisav. Kui kahtled, tule ja küsi pühapäeva hommikul."
+   ],
+   "faq": [
+    {
+     "q": "Kui kiiresti te kõnnite?",
+     "a": "Selle päeva aeglasema inimese tempos, mis on sageli juht ise."
+    },
+    {
+     "q": "Kas ma võin koera kaasa võtta?",
+     "a": "Enamikul matkadel jah, rihma otsas. Kavas on märgitud, millised matkad ei sobi."
+    },
+    {
+     "q": "Mis siis, kui sajab?",
+     "a": "Me kõnnime ikkagi. Kohvikupeatus on pikem."
+    }
+   ],
+   "why": [
+    {
+     "h": "Looduses",
+     "p": "Marsruudid kaheksast kaheteistkümne kilomeetrini, mida juhivad rada tundvad inimesed."
+    },
+    {
+     "h": "Hea seltskond",
+     "p": "Püsiv seltskond ja pidev uute nägude voog."
+    },
+    {
+     "h": "Kedagi ei jäeta maha",
+     "p": "Hoiame aeglasema matkaja tempot."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Matk jõe ääres",
+     "p": "Kaheksa kilomeetrit tasasel maal, peatus vanal paisul."
+    },
+    {
+     "t": "Matk vaatega",
+     "p": "Kümme kilomeetrit ja üks korralik tõus. Võta termos kaasa."
+    },
+    {
+     "t": "Kaardilugemise õhtu",
+     "p": "Koordinaadid, kõrgusjooned ja kompass, mis näitab valesti."
+    },
+    {
+     "t": "Lühike matk ja lõuna",
+     "p": "Neli kilomeetrit kohvikusse, kus on hea kamin."
+    },
+    {
+     "t": "Sügisvärvid",
+     "p": "Metsarada, parim hommikul, kui valgus puude vahelt tuleb."
+    },
+    {
+     "t": "Prügikoristus",
+     "p": "Kindad, kotid ja üllatavalt palju tennisepalle."
+    },
+    {
+     "t": "Õhtujalutus",
+     "p": "Rahulik tund hämaruses, lõpetuseks tee kellegi köögilaua ääres."
+    },
+    {
+     "t": "Öömatk",
+     "p": "Taskulambid kustu, silmad lahti ja jutt tähtedest."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "{city} Matkaklubi",
+       "{city} Matkaselts",
+       "{city} Matkaring"
+      ]
+     ]
+    }
+   }
+  },
+  "choir": {
+   "kicker": "Kogukonnakoor",
+   "tagline": "Koos laulmas kolmapäeva õhtuti",
+   "desc": "{brand} harjutab kolmapäeva õhtuti. Ei mingeid proovilaulmisi, noote lugeda ei pea, vaja on vaid soovi laulda.",
+   "intro": "Oleme koor neile, kes armastavad laulda ega taha selleks proovi teha. Õpime kuulmise järgi, naerame palju ja laulame paremini, kui meil õigust oleks.",
+   "when": "Kolmapäeviti, {19:00} kuni {21:00}",
+   "where": "Kiriku saal keskväljaku ääres",
+   "events": [
+    {
+     "t": "Iganädalane proov",
+     "w": "Igal kolmapäeval, {19:00}",
+     "p": "Soojendus, uued laulud ja see üks, mis ikka veel välja ei tule."
+    },
+    {
+     "t": "Avatud õhtu",
+     "w": "Septembri esimesel kolmapäeval",
+     "p": "Tule ja laula õhtu meiega kaasa, ilma kohustuseta."
+    },
+    {
+     "t": "Talvekontsert",
+     "w": "Detsembri teisel laupäeval",
+     "p": "Jõululaulud, rahvalaulud ja üks lugu, mida keegi ei oota."
+    },
+    {
+     "t": "Suvekontsert",
+     "w": "Juuni lõpus",
+     "p": "Laulude õhtu rahvamaja aias, kui ilm lubab."
+    },
+    {
+     "t": "Laulupäev",
+     "w": "Kord aastas",
+     "p": "Päev töötubadega külalisdirigendiga, lõuna kaasa arvatud."
+    }
+   ],
+   "news": [
+    {
+     "title": "Sügishooaeg algab",
+     "text": "Õpime kolme riigi rahvalaulude kava ja ühte kaanonit, mis ei taha taktis püsida."
+    },
+    {
+     "title": "Suur aitäh pärast suvekontserti",
+     "text": "Kohale tuli üheksakümmend inimest, söödi nelikümmend üks kooki ja ainult üks salm lauldi kaks korda."
+    },
+    {
+     "title": "Otsime tenoreid",
+     "text": "Meil on sopraneid ja altisid piisavalt. Kui sa laulad madalalt, tule tutvuma."
+    },
+    {
+     "title": "Uued noodid on kohal",
+     "text": "Talvekava kaustad on saalis. Palun tee märkmed pliiatsiga, mitte pastakaga."
+    }
+   ],
+   "join": [
+    "Meid on umbes viiskümmend lauljat, vanuses kuueteistkümnest kaheksakümne kaheksani. Enamik meist ei oska noote lugeda ja oleme aastaid kuulmise järgi laule õppinud.",
+    "Tule ükskõik millisele proovile ja laula meiega. Leiame sulle tooli, kausta ja kellegi, kelle kõrval seista."
+   ],
+   "faq": [
+    {
+     "q": "Kas pean proovi tegema?",
+     "a": "Ei. Proovilaulmist ei ole ei praegu ega hiljem."
+    },
+    {
+     "q": "Kas pean noote lugema?",
+     "a": "Ei. Õpetame kuulmise järgi, noodid on paberil nendele, kes neid tahavad."
+    },
+    {
+     "q": "Mis siis, kui jään nädalaks ära?",
+     "a": "Siis jääd nädalaks ära. Keegi ei pane pahaks ja salvestused jagatakse veebis."
+    }
+   ],
+   "why": [
+    {
+     "h": "Ei mingeid proove",
+     "p": "Kui oskad duši all viisi pidada, oskad seda ka siin."
+    },
+    {
+     "h": "Kõik hääled",
+     "p": "Sopranid, altid, tenorid, bassid ja kõik, kes pole kindlad."
+    },
+    {
+     "h": "Kaks kontserti aastas",
+     "p": "Üks talvel ja üks suvel, koogiga."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Avatud õhtu",
+     "p": "Tule ja laula kaanon või kaks, ilma proovita ja ilma surveta."
+    },
+    {
+     "t": "Uus hooaeg algab",
+     "p": "Soojendused, uus lugu ja palju kuulumisi."
+    },
+    {
+     "t": "Häälerühma proov",
+     "p": "Altid ja tenorid saalis, sopranid ja bassid köögis."
+    },
+    {
+     "t": "Laulupäev",
+     "p": "Terve laupäev külalisdirigendiga."
+    },
+    {
+     "t": "Kontsert kirikus",
+     "p": "Kaks poolt, loterii ja vahepeal piparkoogid."
+    },
+    {
+     "t": "Jõululaulud platsil",
+     "p": "Külmad sõrmed ja soojad hääled turuplatsil."
+    },
+    {
+     "t": "Proov pianistiga",
+     "p": "Esimene kord, kui lugu kõlab nagu muusika."
+    },
+    {
+     "t": "Ühislaulmise õhtu",
+     "p": "Laulud, mida kõik teavad, ja mõned, mida keegi ei mäleta."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "{city} Segakoor",
+       "{city} Lauljad",
+       "{city} Hääled"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

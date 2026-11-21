@@ -1,0 +1,195 @@
+{
+ "ui": {
+  "nav_label": "Pagrindinis",
+  "footer": "Padaryta rankomis. Be slapukų ir sekimo.",
+  "nav_home": "Vizitinė",
+  "nav_about": "Apie mane",
+  "nav_projects": "Darbai",
+  "nav_now": "Dabar",
+  "home_title": "Labas",
+  "desc_about": "Daugiau apie {brand}.",
+  "desc_projects": "Pasirinkti {brand} darbai.",
+  "desc_now": "Ką {brand} veikia šiuo metu.",
+  "nf_title": "Čia nieko nėra",
+  "nf_text": "Šiuo adresu puslapio nėra. Pabandykite vizitinę pradžios puslapyje.",
+  "nf_back": "Atgal į vizitinę",
+  "link_d": [
+    "Kas aš esu ir kaip dirbu",
+    "Keli mano darbai",
+    "Ką veikiu šiuo metu"
+  ],
+  "about_h": "Apie mane",
+  "facts_h": "Trumpai",
+  "projects_h": "Darbai",
+  "projects_intro": "Keli darbai, kuriais džiaugiuosi. Naujausi viršuje.",
+  "now_h": "Dabar",
+  "updated": "Atnaujinta 2026 m. {upd} mėn.",
+  "now_intro": "Tai puslapis „dabar“: ką veikiu šiuo metu, o ne ką kadaise žadėjau daryti.",
+  "hello": "Sveiki, aš esu",
+  "vars": {
+   "brand": "{name}",
+   "month": [
+    "sausio",
+    "kovo",
+    "gegužės",
+    "rugsėjo"
+   ],
+   "upd": [
+    "rugpjūčio",
+    "rugsėjo",
+    "spalio",
+    "lapkričio"
+   ]
+  }
+ },
+ "bundles": {
+  "illustrator": {
+   "role": "Iliustracijos ir linoraižiniai",
+   "tagline": "Paveikslėliai knygoms, plakatams ir retkarčiais atvirukams.",
+   "desc": "{brand}: iliustracijos ir linoraižiniai, {city_in}. Paveikslėlių knygos, plakatai ir atvirukai.",
+   "bio": "Piešiu paveikslėlių knygoms ir plakatams, o kam paprašo mandagiai, išraižau linoraižinį.",
+   "about": [
+    "Iš piešimo gyvenu, daugiausia iliustruoju vaikų knygas, kartais plakatus. Dirbu nedideliame kambaryje {city_in}, kurio langas žiūri į automobilių stovėjimo aikštelę, o aš ją piešiu kaip ežerą.",
+    "Prieš iliustraciją mokiausi audinių spaudos, ir įprotis galvoti sluoksniais niekur nedingo. Dauguma mano paveikslų sudaryti iš trijų ar keturių lygių spalvų."
+   ],
+   "facts": [
+    "Gyvenu {city_in}",
+    "Dirbu plunksna, tušu ir linoraižiniu",
+    "Naujų užsakymų imuosi nuo {month} mėn."
+   ],
+   "projects": [
+    {
+     "t": "Lauko užrašai",
+     "y": "2025",
+     "d": "Paveikslėlių knyga apie vienerius metus mažame lauke, išleista su vietine spaustuve."
+    },
+    {
+     "t": "Turgaus serija",
+     "y": "2024",
+     "d": "Dvylika linoraižinių su prekystaliais, pirkėjais ir vienu labai patenkintu balandžiu."
+    },
+    {
+     "t": "Atvirukai knygynui",
+     "y": "2023",
+     "d": "Šeši atvirukai, atspausdinti rankomis po du šimtus egzempliorių."
+    }
+   ],
+   "now": [
+    "Baigiu paskutinius knygos apie orą atvertimus",
+    "Mokausi išraižyti keturių spalvų linoraižinį ir neprarasti kantrybės",
+    "Ieškau didesnių spaudos staklių"
+   ]
+  },
+  "translator": {
+   "role": "Vertimai iš vokiečių kalbos",
+   "tagline": "Kruopštūs grožinės literatūros, esė ir kartais instrukcijų vertimai.",
+   "desc": "{brand}: vertimai iš vokiečių kalbos į lietuvių, grožinė literatūra ir esė, {city_in}.",
+   "bio": "Verčiu iš vokiečių kalbos į lietuvių, daugiausia grožinę literatūrą ir esė, ir viską perskaitau garsiai du kartus.",
+   "about": [
+    "Verčiu iš vokiečių kalbos į lietuvių, daugiausia grožinę literatūrą ir esė, o kartais ir kokio nors daikto instrukciją, kuri nusipelno geresnio teksto.",
+    "Dirbu lėtai, viską perskaitau garsiai du kartus ir prie kiekvieno sakinio, dėl kurio abejojau, parašau pastabą. Redaktoriai sako, kad tai arba žavu, arba varo iš proto."
+   ],
+   "facts": [
+    "Gyvenu {city_in}",
+    "Verčiu iš vokiečių kalbos į lietuvių",
+    "Naujų darbų imuosi nuo {month} mėn."
+   ],
+   "projects": [
+    {
+     "t": "Romanas apie švyturio sargą",
+     "y": "2025",
+     "d": "Keturi šimtai puslapių apie orą ir apgailestavimą, versta keturiolika mėnesių."
+    },
+    {
+     "t": "Esė apie vaikščiojimą",
+     "y": "2024",
+     "d": "Trumpų tekstų rinkinys rašytojo, kuris visur keliavo pėsčiomis."
+    },
+    {
+     "t": "Muziejaus katalogas",
+     "y": "2023",
+     "d": "Tekstai tekstilės parodai, kuriuose daugiau būdvardžių, nei norėtųsi."
+    }
+   ],
+   "now": [
+    "Taisau ilgo romano vertimą",
+    "Skaitau esė, kurias galbūt pasiūlysiu leidyklai",
+    "Pildau jūrinių terminų žodynėlį"
+   ]
+  },
+  "potter": {
+   "role": "Keramika",
+   "tagline": "Paprasti dubenys, puodeliai ir lėkštės, gaminami nedideliais kiekiais.",
+   "desc": "{brand}: keramika, {city_in}. Kasdieniai akmens masės indai, formuoti ant rato.",
+   "bio": "Formuoju paprastus akmens masės indus ant rato ir degu juos nedideliais kiekiais.",
+   "about": [
+    "Gaminu kasdienius keramikos indus dirbtuvėje, kurią {city_in} dalijuosi dar su trimis meistrais. Viskas formuojama ant rato ir degama iki akmens masės.",
+    "Man patinka indai, kurie tampa kasdienybės dalimi: puodelis, kuris tinka rankai, dubuo, kuris nesiverčia. Glazūros daugiausia geležies ir pelenų, ir kiekvieną kartą jos truputį skiriasi."
+   ],
+   "facts": [
+    "Gyvenu {city_in}",
+    "Formuoju akmens masę ant rato",
+    "Nauji indai dažniausiai nuo {month} mėn."
+   ],
+   "projects": [
+    {
+     "t": "Kasdienis rinkinys",
+     "y": "2025",
+     "d": "Lėkštės, dubenys ir puodeliai avižų spalvos glazūra, kuri niekada neišeina vienodai."
+    },
+    {
+     "t": "Arbatos dubenėliai",
+     "y": "2024",
+     "d": "Trisdešimt mažų dubenėlių, kiekvienas šiek tiek kitoks, padaryti arbatinei."
+    },
+    {
+     "t": "Plytelių užsakymas",
+     "y": "2023",
+     "d": "Rankomis spaustų plytelių siena virtuvei, keturiais žalumo atspalviais."
+    }
+   ],
+   "now": [
+    "Bandau pelenų glazūrą iš kaimyno laužo",
+    "Formuoju didesnes lėkštes",
+    "Ruošiu vietą krosnies lentynose žiemos užsakymams"
+   ]
+  },
+  "developer": {
+   "role": "Maži programinės įrangos įrankiai",
+   "tagline": "Mažos tylios programos, kurios daro vieną dalyką ir netrukdo.",
+   "desc": "{brand}: maži programinės įrangos įrankiai, {city_in}. Užrašų programa, kalendorius ir kelios komandinės eilutės programos.",
+   "bio": "Rašau mažus įrankius tiems, kas dirba su žodžiais ir skaičiais, ir stengiuosi juos užbaigti.",
+   "about": [
+    "Rašau mažus įrankius tiems, kas dirba su žodžiais ir skaičiais: užrašų programą, kelias komandinės eilutės programas, kalendorių, kuris rodo tik tai, kas svarbu šiandien.",
+    "Kuriu lėtai ir stengiuosi viską užbaigti. Daugumoje mano darbų funkcijų yra mažiau, nei galėtų būti, ir tai padaryta tyčia."
+   ],
+   "facts": [
+    "Gyvenu {city_in}",
+    "Rašau keliomis nuobodžiomis kalbomis",
+    "Mažų projektų imuosi nuo {month} mėn."
+   ],
+   "projects": [
+    {
+     "t": "Užrašų programa kompiuteriui",
+     "y": "2025",
+     "d": "Paprasti tekstiniai failai, greita paieška ir jokios paskyros."
+    },
+    {
+     "t": "Vienos dienos kalendorius",
+     "y": "2024",
+     "d": "Rodo šiandieną ir daugiau nieko, o to, pasirodo, pakanka."
+    },
+    {
+     "t": "Laiko skaitiklis",
+     "y": "2023",
+     "d": "Vienas mygtukas ir savaitės suvestinė tiems, kas nemėgsta darbo laiko lapų."
+    }
+   ],
+   "now": [
+    "Tvarkau užrašų programos kodą",
+    "Rašau trumpą vadovą",
+    "Galvoju apie mažesnę viso ko versiją"
+   ]
+  }
+ }
+}

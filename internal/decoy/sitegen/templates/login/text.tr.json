@@ -1,0 +1,136 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Kuzey",
+      "Çınar",
+      "Ardıç",
+      "Liman",
+      "Meşe",
+      "Kavak",
+      "Zeytin",
+      "Fidan",
+      "Söğüt",
+      "Akasya",
+      "Bahar",
+      "Dağ"
+     ],
+     [
+      "Portal",
+      "Hizmetleri",
+      "Sistem",
+      "Merkezi",
+      "Online",
+      "Ofis",
+      "Pano",
+      "Platform"
+     ]
+    ],
+    "sep": " "
+   }
+  },
+  "nav_label": "Ana menü",
+  "tagline": "Güvenli hesap erişimi",
+  "footer": "Tüm hakları saklıdır.",
+  "nav_home": "Giriş yap",
+  "nav_help": "Yardım",
+  "nav_privacy": "Gizlilik",
+  "home_title": "Giriş yap",
+  "desc": "{brand} hesabınıza giriş yapın.",
+  "desc_help": "{brand} hesabına giriş konusunda yardım.",
+  "desc_privacy": "{brand} bilgilerinizi nasıl işliyor.",
+  "nf_title": "Sayfa bulunamadı",
+  "nf_text": "Aradığınız sayfa yok ya da başka bir yere taşınmış.",
+  "nf_back": "Girişe dön",
+  "f_user": "Kullanıcı adı veya e-posta",
+  "f_pass": "Şifre",
+  "f_remember": "Oturumum açık kalsın",
+  "f_forgot": "Şifremi unuttum",
+  "f_submit": "Giriş yap",
+  "f_busy": "Giriş yapılıyor…",
+  "e_empty": "Kullanıcı adınızı ve şifrenizi girin.",
+  "e_bad": [
+   "Kullanıcı adı veya şifre hatalı.",
+   "Girdiğiniz kullanıcı adı ya da şifre doğru değil. Lütfen tekrar deneyin.",
+   "Bu bilgilerle giriş yapamadık."
+  ],
+  "help_h": "Giriş yapamıyor musunuz?",
+  "help_intro": "Giriş sorunlarının çoğunun basit bir nedeni vardır. Başka birine başvurmadan önce şu adımlara bakın.",
+  "help_steps": [
+   "Caps Lock tuşunun kapalı olduğundan emin olun; şifrelerde büyük ve küçük harf farklıdır.",
+   "Kullanıcı adınızın başında ya da sonunda yanlışlıkla boşluk kalıp kalmadığına bakın.",
+   "Kayıtlı form bilgisi olmayan yeni bir tarayıcı penceresinde tekrar deneyin.",
+   "Birkaç kez deneyip olmadıysa on dakika bekleyin."
+  ],
+  "help_contact_h": "Hâlâ olmadı mı?",
+  "help_contact": "Şifrenizi sıfırlaması için kurumunuzda {brand} hesaplarını yöneten kişiye başvurun. Güvenlik nedeniyle şifreyi telefonla ya da e-postayla sıfırlayamıyoruz.",
+  "help_back": "Girişe dön",
+  "privacy_h": "Gizlilik bildirimi",
+  "privacy_intro": "Hakkınızda mümkün olduğunca az bilgi tutar, tuttuğumuzu da özenle koruruz. Bunların neler olduğunu ve neden tutulduğunu kısaca anlatıyoruz.",
+  "privacy": [
+   {
+    "h": "Neleri tutuyoruz",
+    "p": "Kullanıcı adınızı, giriş zamanlarınızı ve hesabınıza ait bilgileri. Başka hiçbir şeyi."
+   },
+   {
+    "h": "Ne için kullanıyoruz",
+    "p": "Giriş yapabilmeniz ve hesabınızın başkalarından korunması için. Kullanıcılarımız hakkındaki bilgileri satmayız."
+   },
+   {
+    "h": "Çerezler",
+    "p": "Yalnızca hizmetin çalışması için gereken çerezleri kullanırız. Reklam ya da analiz çerezi yoktur."
+   },
+   {
+    "h": "Haklarınız",
+    "p": "Hakkınızda tuttuğumuz bilgileri görmeyi, düzeltmeyi veya silmeyi isteyebilirsiniz. Bunu hesabınızı yöneten kişiye iletin."
+   }
+  ]
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Müşteri hesabı",
+   "welcome": "Tekrar hoş geldiniz",
+   "lead": "Faturalarınızı görmek, bilgilerinizi güncellemek ve aboneliğinizi yönetmek için giriş yapın.",
+   "bullets": [
+    "Faturaları görüntüleyin ve indirin",
+    "İletişim bilgilerinizi güncelleyin",
+    "Açık taleplerinizi takip edin"
+   ]
+  },
+  "staff": {
+   "kicker": "Personel alanı",
+   "welcome": "Personel girişi",
+   "lead": "Vardiya çizelgelerine, duyurulara ve ortak belgelere ulaşmak için kurumsal hesabınızla giriş yapın.",
+   "bullets": [
+    "Vardiyalar ve çalışma çizelgeleri",
+    "Ekibe duyurular",
+    "Ortak belgeler"
+   ],
+   "f_user": "Sicil numarası veya e-posta"
+  },
+  "archive": {
+   "kicker": "Belge arşivi",
+   "welcome": "Arşivinizi açın",
+   "lead": "Sözleşmeleriniz, makbuzlarınız ve yazışmalarınız burada sizin için saklanır ve gizli tutulur.",
+   "bullets": [
+    "Sözleşmeler ve makbuzlar",
+    "Yazışmalar tek yerde",
+    "Erişim sizin kontrolünüzde"
+   ],
+   "f_user": "E-posta adresi"
+  },
+  "bookings": {
+   "kicker": "Rezervasyonlar",
+   "welcome": "Rezervasyonlarınızı yönetin",
+   "lead": "Rezervasyonu değiştirmek, konuk eklemek ya da yaklaşan tarihleri görmek için giriş yapın.",
+   "bullets": [
+    "Rezervasyonu değiştirin veya iptal edin",
+    "Konuk ekleyin",
+    "Yaklaşan tarihleri görün"
+   ],
+   "f_user": "Rezervasyon e-postası"
+  }
+ }
+}

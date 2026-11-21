@@ -1,0 +1,101 @@
+{
+ "nav_label": "Menu principal",
+ "nf_title": "Page introuvable",
+ "nf_text": "La page que vous cherchez n'existe pas ou a été déplacée.",
+ "nf_back": "Retour à l'accueil",
+ "months": [
+  "janvier",
+  "février",
+  "mars",
+  "avril",
+  "mai",
+  "juin",
+  "juillet",
+  "août",
+  "septembre",
+  "octobre",
+  "novembre",
+  "décembre"
+ ],
+ "months_gen": [
+  "janvier",
+  "février",
+  "mars",
+  "avril",
+  "mai",
+  "juin",
+  "juillet",
+  "août",
+  "septembre",
+  "octobre",
+  "novembre",
+  "décembre"
+ ],
+ "weekdays": [
+  "Lundi",
+  "Mardi",
+  "Mercredi",
+  "Jeudi",
+  "Vendredi",
+  "Samedi",
+  "Dimanche"
+ ],
+ "weekdays_short": [
+  "Lun",
+  "Mar",
+  "Mer",
+  "Jeu",
+  "Ven",
+  "Sam",
+  "Dim"
+ ],
+ "am": "du matin",
+ "pm": "de l'après-midi",
+ "closed": "fermé",
+ "hrs_fmt": "%days% : %time%",
+ "ms": "ms",
+ "units": [
+  "o",
+  "Ko",
+  "Mo"
+ ],
+ "cf_h": "Écrivez-nous",
+ "cf_intro": "Envoyez-nous un message, nous vous répondrons dès que possible.",
+ "cf_name": "Votre nom",
+ "cf_email": "Votre adresse e-mail",
+ "cf_msg": "Message",
+ "cf_send": "Envoyer le message",
+ "cf_busy": "Envoi en cours…",
+ "cf_empty": "Merci d'écrire d'abord un message.",
+ "cf_fail": "Le message n'a pas pu être envoyé. Merci de réessayer plus tard.",
+ "nav_terms": "Conditions d'utilisation",
+ "desc_terms": "Les conditions d'utilisation de {brand}.",
+ "terms_h": "Conditions d'utilisation",
+ "terms_intro": "Merci de lire ces conditions avant d'utiliser {brand}. Elles sont courtes et s'appliquent dès la première utilisation.",
+ "terms": [
+  {
+   "h": "Utilisation du service",
+   "p": "{brand} est fourni tel quel. En l'utilisant, vous acceptez ces conditions. Si vous ne les acceptez pas, merci de ne pas utiliser le service."
+  },
+  {
+   "h": "Votre part",
+   "p": "Utilisez le service dans le respect de la loi et uniquement pour vous ou pour votre organisation. Gardez vos identifiants pour vous et prévenez-nous si vous pensez qu'une autre personne les connaît."
+  },
+  {
+   "h": "Ce qui n'est pas permis",
+   "p": "N'essayez pas de perturber le service, de le surcharger ou d'accéder à des parties qui ne vous sont pas destinées. Nous pouvons bloquer un accès qui nuit aux autres."
+  },
+  {
+   "h": "Disponibilité",
+   "p": "Nous faisons notre possible pour que le service fonctionne, mais nous ne pouvons pas promettre qu'il sera toujours disponible. Nous pouvons modifier, suspendre ou arrêter certaines parties."
+  },
+  {
+   "h": "Responsabilité",
+   "p": "Dans les limites permises par la loi, nous ne sommes pas responsables des pertes liées à l'utilisation du service ou à l'impossibilité de l'utiliser."
+  },
+  {
+   "h": "Modifications",
+   "p": "Nous pouvons mettre ces conditions à jour de temps en temps. Si vous continuez à utiliser le service après une modification, vous acceptez les nouvelles conditions."
+  }
+ ]
+}

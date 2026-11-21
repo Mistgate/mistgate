@@ -1,0 +1,101 @@
+{
+ "nav_label": "Peamenüü",
+ "nf_title": "Lehte ei leitud",
+ "nf_text": "Lehte, mida otsisid, ei ole olemas või see on teise kohta viidud.",
+ "nf_back": "Tagasi avalehele",
+ "months": [
+  "jaanuar",
+  "veebruar",
+  "märts",
+  "aprill",
+  "mai",
+  "juuni",
+  "juuli",
+  "august",
+  "september",
+  "oktoober",
+  "november",
+  "detsember"
+ ],
+ "months_gen": [
+  "jaanuar",
+  "veebruar",
+  "märts",
+  "aprill",
+  "mai",
+  "juuni",
+  "juuli",
+  "august",
+  "september",
+  "oktoober",
+  "november",
+  "detsember"
+ ],
+ "weekdays": [
+  "esmaspäev",
+  "teisipäev",
+  "kolmapäev",
+  "neljapäev",
+  "reede",
+  "laupäev",
+  "pühapäev"
+ ],
+ "weekdays_short": [
+  "E",
+  "T",
+  "K",
+  "N",
+  "R",
+  "L",
+  "P"
+ ],
+ "am": "e.l.",
+ "pm": "p.l.",
+ "closed": "suletud",
+ "hrs_fmt": "%days%: %time%",
+ "ms": "ms",
+ "units": [
+  "B",
+  "kB",
+  "MB"
+ ],
+ "cf_h": "Kirjuta meile",
+ "cf_intro": "Saada meile sõnum ja vastame esimesel võimalusel.",
+ "cf_name": "Sinu nimi",
+ "cf_email": "Sinu e-posti aadress",
+ "cf_msg": "Sõnum",
+ "cf_send": "Saada sõnum",
+ "cf_busy": "Saadan…",
+ "cf_empty": "Kirjuta kõigepealt sõnum.",
+ "cf_fail": "Sõnumit ei õnnestunud saata. Proovi hiljem uuesti.",
+ "nav_terms": "Kasutustingimused",
+ "desc_terms": "Teenuse {brand} kasutustingimused.",
+ "terms_h": "Kasutustingimused",
+ "terms_intro": "Palun loe need tingimused läbi, enne kui teenust {brand} kasutama hakkad. Need on lühikesed ja kehtivad esimesest kasutuskorrast alates.",
+ "terms": [
+  {
+   "h": "Teenuse kasutamine",
+   "p": "Teenus {brand} on pakutav sellisena, nagu ta on. Teenust kasutades nõustud nende tingimustega. Kui sa ei nõustu, ära palun teenust kasuta."
+  },
+  {
+   "h": "Sinu osa",
+   "p": "Kasuta teenust seaduslikult ja ainult enda või oma organisatsiooni jaoks. Hoia oma andmed enda teada ning anna meile teada, kui kahtlustad, et need on sattunud kellegi teise kätte."
+  },
+  {
+   "h": "Mis ei ole lubatud",
+   "p": "Ära püüa teenust rikkuda ega üle koormata ning ära proovi pääseda kohtadesse, mis ei ole sinu jaoks. Võime sulgeda ligipääsu, mis teistele kahju teeb."
+  },
+  {
+   "h": "Kättesaadavus",
+   "p": "Püüame hoida teenuse töös, kuid ei saa lubada, et see on alati kättesaadav. Võime selle osi muuta, peatada või lõpetada."
+  },
+  {
+   "h": "Vastutus",
+   "p": "Seaduse lubatud piires me ei vastuta kahju eest, mis tuleneb teenuse kasutamisest või sellest, et seda ei saanud kasutada."
+  },
+  {
+   "h": "Muudatused",
+   "p": "Võime neid tingimusi aeg-ajalt uuendada. Kui kasutad teenust ka pärast muudatust, nõustud uute tingimustega."
+  }
+ ]
+}

@@ -1,0 +1,165 @@
+{
+ "ui": {
+  "nav_label": "Navigation",
+  "footer": "Toutes les images sont l'œuvre de l'atelier et ne peuvent être reproduites sans autorisation.",
+  "nav_home": "Sélection",
+  "nav_work": "Tous les travaux",
+  "nav_about": "À propos",
+  "nav_contact": "Contact",
+  "home_title": "Sélection de travaux",
+  "nf_title": "Page introuvable",
+  "nf_text": "Il n'y a rien à cette adresse. Les travaux sont sur la page d'accueil.",
+  "nf_back": "Retour aux travaux",
+  "sel_h": "Sélection de travaux",
+  "all_work": "Voir tous les travaux",
+  "work_h": "Tous les travaux",
+  "work_intro": "Tout ce qui a été fait ces dernières années, du plus récent au plus ancien.",
+  "about_h": "À propos",
+  "services_h": "Ce que je fais",
+  "shows_h": "Expositions et mentions",
+  "contact_h": "Contact",
+  "visit_h": "L'atelier",
+  "hours_h": "Horaires d'ouverture",
+  "phone_l": "Téléphone",
+  "visit_text": "L'atelier est ouvert sur rendez-vous. Merci de venir pendant les horaires d'ouverture ; si personne ne répond à la porte, je suis sans doute dans l'arrière-salle ou chez l'imprimeur.",
+  "commission_h": "Commandes",
+  "commission_text": "J'accepte un petit nombre de commandes chaque année. Quand vous me contactez, dites-moi ce que vous avez en tête et pour quand vous en avez besoin, et je vous dirai franchement si c'est possible.",
+  "hours_note": "Samedi sur rendez-vous",
+  "work_back": "Tous les travaux",
+  "work_more": "Autres travaux",
+  "work_ask": "Se renseigner sur ce travail",
+  "directions_h": "Trouver l'atelier",
+  "directions": "L'atelier est au rez-de-chaussée, à quelques minutes à pied du centre-ville. La porte est sur le côté, avec une sonnette. Des arceaux à vélos se trouvent juste devant."
+ },
+ "bundles": {
+  "photo": {
+   "tagline": "Des photographies de lieux calmes",
+   "vars": {
+    "brand": {
+     "join": [
+      ["Atelier", "Studio", "Maison", "Galerie", "Cabinet", "Labo", "Cadre", "Objectif", "Chambre", "Salle"],
+      ["Horizon", "Brume", "Aube", "Étang", "Crépuscule", "Grève", "Lisière", "Calme", "Hameau", "Lueur"]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Photographie de paysage et nature morte {city_in}. Tirages et commandes.",
+   "desc_work": "Une sélection de photographies, des plus récentes aux plus anciennes.",
+   "desc_about": "À propos de la photographie et de l'atelier {city_in}.",
+   "desc_contact": "Où trouver l'atelier {city_in} et quand il est ouvert.",
+   "intro": "Photographie de paysage et nature morte {city_in}. Des tirages et quelques commandes chaque année.",
+   "about": [
+    "Je suis photographe et je travaille dans un petit atelier {city_in}. La plupart de mes images montrent des lieux dans l'heure qui suit le départ de tout le monde.",
+    "Je travaille lentement, en général avec un seul appareil et un seul objectif, et je tire tout moi-même dans l'arrière-salle. Une image est terminée quand je peux la regarder pendant une semaine sans avoir envie d'y changer quoi que ce soit.",
+    "Ces dernières années, mon travail a été montré dans de petites galeries et des médiathèques de la région, et vendu sous forme de tirages à des gens qui voulaient quelque chose de calme pour un mur."
+   ],
+   "services": [
+    "Tirages d'art, signés et numérotés",
+    "Portraits sur commande, à domicile ou à l'atelier",
+    "Photographie éditoriale et de livres"
+   ],
+   "shows": [
+    {"y": "2025", "t": "Deux horizons, exposition collective, galerie de la Vieille Halle"},
+    {"y": "2024", "t": "Eau calme, exposition personnelle, hall de la médiathèque"},
+    {"y": "2022", "t": "Prix régional de photographie, sélectionné pour la finale"}
+   ],
+   "works": [
+    {"title": "Coteau, l'après-midi", "caption": "Tirage pigmentaire d'archive, 2025", "note": "Les derniers rayons sur un champ que personne ne regarde.", "text": "Trois après-midi à attendre que le nuage quitte la crête, et il s'est écarté quatre minutes."},
+    {"title": "Deux horizons", "caption": "Tirage pigmentaire d'archive, 2025", "note": "Un rivage qui ne savait pas où s'arrêter.", "text": "La marée descendait et le sable mouillé a pris un second ciel. Six vues, une seule gardée."},
+    {"title": "Eau calme", "caption": "Tirage pigmentaire d'archive, 2024", "note": "Un étang en novembre qui n'a rien à prouver.", "text": "Un réservoir à sept heures du matin, avant le vent. Le tirage est grand, pour que le calme ait de la place."},
+    {"title": "Champ rouge", "caption": "Tirage pigmentaire d'archive, 2024", "note": "Des coquelicots montés en graine, photographiés sous la pluie.", "text": "Du trèfle laissé en fleur puis fauché. La couleur du tirage est plus proche de ce que j'ai vu que ne l'était l'appareil."},
+    {"title": "Lignes au crépuscule", "caption": "Tirage pigmentaire d'archive, 2023", "note": "Des fils téléphoniques sur un ciel qui changeait d'avis.", "text": "Des piquets de clôture et des sillons, avec la dernière lumière à plat dessus. L'image est plus belle dans un cadre long et étroit."},
+    {"title": "Sel et ardoise", "caption": "Tirage pigmentaire d'archive, 2023", "note": "Un mur de port à marée basse, aux couleurs d'une vieille pièce.", "text": "Une plage de pierre sombre avec du sel blanc laissé par la marée. Trois saisons de retours pour avoir la lumière voulue."},
+    {"title": "Heure bleue", "caption": "Tirage pigmentaire d'archive, 2022", "note": "Dix minutes entre le jour et la nuit, répétées pendant une semaine.", "text": "Dix minutes après le coucher du soleil, toute la vallée prend la couleur de l'encre. C'est la seule vue où la lampe est allumée."},
+    {"title": "Verger en hiver", "caption": "Tirage pigmentaire d'archive, 2022", "note": "Des arbres nus alignés, comptés deux fois.", "text": "Des pommiers nus par un matin de gel. Debout sur une caisse pour trouver une ligne à travers les branches."},
+    {"title": "Brouillard du matin", "caption": "Tirage pigmentaire d'archive, 2021", "note": "Une vallée à qui on n'avait pas encore dit qu'il était matin.", "text": "Le brouillard avait disparu à huit heures. Cette image date du quart d'heure où il était encore là."}
+   ]
+  },
+  "illustration": {
+   "tagline": "Illustration et gravure",
+   "vars": {
+    "brand": {
+     "join": [
+      ["Atelier", "Cabinet", "Bureau", "Presse", "Maison", "Carnet", "Coin", "Table", "Cahier", "Boîte"],
+      ["Citron", "Papier", "Encre", "Orange", "Crayon", "Papillon", "Fougère", "Moineau", "Gomme", "Silence"]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Illustrations, linogravures et petits livres, depuis un bureau {city_in}.",
+   "desc_work": "Illustrations et gravures, des plus récentes aux plus anciennes.",
+   "desc_about": "À propos de l'illustration et de l'atelier {city_in}.",
+   "desc_contact": "Où trouver l'atelier {city_in} et quand il est ouvert.",
+   "intro": "Illustrations, linogravures et petits livres, depuis un bureau {city_in}.",
+   "about": [
+    "Je dessine et je grave. Je travaille pour des albums jeunesse, pour des magazines qui paient encore à l'heure, et pour quiconque a besoin d'un oiseau dans le coin d'une affiche.",
+    "Presque tout commence par un croquis au crayon dans un carnet et finit en linogravure ou en dessin numérique à plat, selon ce que le travail semble réclamer.",
+    "J'habite {city_in} avec un chat qui a des opinions sur mes compositions."
+   ],
+   "services": [
+    "Albums jeunesse et illustration de presse",
+    "Linogravures et cartes",
+    "Affiches et visuels d'événements"
+   ],
+   "shows": [
+    {"y": "2025", "t": "Salon des petites estampes, exposant"},
+    {"y": "2024", "t": "Carnet de champ, un album paru dans une imprimerie de la région"},
+    {"y": "2023", "t": "Prix régional d'illustration, mention"}
+   ],
+   "works": [
+    {"title": "Étude en orange", "caption": "Linogravure, trois couleurs, 2025", "note": "Un renard, la moitié d'un escalier et une lune sans explication.", "text": "Une seule couleur, trois papiers et un après-midi. C'était un simple échauffement, devenu la couverture d'un petit livre."},
+    {"title": "Jour de marché", "caption": "Dessin numérique, 2025", "note": "Onze étals et un pigeon très content de lui.", "text": "Dessiné sur place pendant trois samedis. Les commerçants ont eu la gentillesse de rester immobiles, ou presque."},
+    {"title": "Le chemin des écoliers", "caption": "Crayon et encre, 2024", "note": "Un sentier qui ne va pas où le panneau le dit.", "text": "Un parcours du dimanche, dessiné de mémoire puis vérifié à la promenade suivante. La carte se trompait de belle façon."},
+    {"title": "Bus de nuit", "caption": "Linogravure, deux couleurs, 2024", "note": "Tout le monde dort, sauf le conducteur et la lune.", "text": "Plume, encre et beaucoup de patience avec les reflets dans la vitre."},
+    {"title": "Heures vertes", "caption": "Gouache, 2023", "note": "Une serre à quatre heures de l'après-midi.", "text": "Les heures avant le petit-déjeuner en juin, quand le jardin est encore frais. Linogravure en trois couleurs."},
+    {"title": "Petits oiseaux", "caption": "Linogravure, 2023", "note": "Sept oiseaux, dont aucun n'est identifié correctement.", "text": "Des moineaux, des troglodytes et un rouge-gorge très fâché. Chaque oiseau a son bloc, donc deux tirages ne sont jamais tout à fait semblables."},
+    {"title": "Étude de pluie", "caption": "Aquarelle, 2022", "note": "Des parapluies vus d'une fenêtre.", "text": "De l'aquarelle, surtout de l'eau. Le papier a décidé où allaient les flaques."},
+    {"title": "Récolte", "caption": "Dessin numérique, 2022", "note": "Un champ d'orange avec un tracteur dans un coin.", "text": "Un étal de fruits et légumes en automne. La courge orange a dû être dessinée deux fois."},
+    {"title": "Fenêtre de cuisine", "caption": "Crayon et encre, 2021", "note": "Ce qui se passe sur le rebord quand personne ne regarde.", "text": "La vue de là où je fais la vaisselle. Elle change avec le temps, ce qui est la seule raison pour laquelle la vaisselle ne me dérange pas."}
+   ]
+  },
+  "graphic": {
+   "tagline": "Design graphique pour les petites structures",
+   "vars": {
+    "brand": {
+     "join": [
+      ["Studio", "Atelier", "Bureau", "Maison", "Labo", "Cabinet", "Agence", "Comptoir", "Presse", "Salle"],
+      ["Grille", "Simple", "Filet", "Trait", "Calme", "Marge", "Point", "Vide", "Carré", "Ligne"]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Identités, affiches et imprimés pour les petites structures {city_in} et au-delà.",
+   "desc_work": "Une sélection de projets de design, des plus récents aux plus anciens.",
+   "desc_about": "À propos du studio de design {city_in}.",
+   "desc_contact": "Où trouver le studio {city_in} et quand il est ouvert.",
+   "intro": "Identités, affiches et imprimés pour les petites structures {city_in} et au-delà.",
+   "about": [
+    "Nous sommes un petit studio de design {city_in}. Nous travaillons avec des théâtres, des commerces, des associations et, de temps en temps, une brasserie, surtout sur des identités et des imprimés.",
+    "Nous aimons les grilles claires, le papier honnête et les caractères qui existent depuis assez longtemps pour bien se tenir. Nous essayons de ne rien faire qui demande un mode d'emploi.",
+    "La plupart des projets commencent par une conversation autour d'un thé et se terminent par une boîte d'échantillons imprimés posée sur la table."
+   ],
+   "services": [
+    "Identités et logos",
+    "Affiches, programmes et signalétique",
+    "Rapports annuels et petits livres"
+   ],
+   "shows": [
+    {"y": "2025", "t": "Affiche de l'année, prix régionaux du design, présélectionné"},
+    {"y": "2024", "t": "Une identité discrète, intervention lors d'une rencontre de designers locale"},
+    {"y": "2023", "t": "Soirée typographie, organisateurs"}
+   ],
+   "works": [
+    {"title": "Identité pour un marchand de thé", "caption": "Identité, 2025", "note": "Un signe fait d'une feuille et de beaucoup de retenue.", "text": "Un logotype, une série d'étiquettes et des boîtes qui s'empilent. La feuille du signe est une vraie feuille du jardin du propriétaire."},
+    {"title": "Affiches pour une chorale", "caption": "Série d'affiches, 2025", "note": "Douze feuilles, douze voix, une seule grille.", "text": "Trois affiches pour trois concerts, imprimées en deux couleurs sur une seule feuille pour limiter le coût."},
+    {"title": "Rapport annuel", "caption": "Imprimé, 2024", "note": "Quarante pages que les gens lisent vraiment.", "text": "Quarante pages pour une petite association. Une typographie simple, de larges marges et un seul graphique qui a le droit d'être joli."},
+    {"title": "Programme pour un théâtre de marionnettes", "caption": "Imprimé, 2024", "note": "Il se plie en maison, puis en bateau.", "text": "Une feuille pliée qui devient un petit théâtre quand on tire sur le bon coin."},
+    {"title": "Emballages pour une boulangerie", "caption": "Emballage, 2023", "note": "Des sacs en papier plus beaux après un premier usage.", "text": "Des sacs en papier, un tampon et un ruban aux couleurs de la boutique. Le tampon est taillé dans une pomme de terre."},
+    {"title": "Signalétique pour une médiathèque", "caption": "Signalétique, 2023", "note": "Des panneaux qu'on ne remarque que lorsqu'ils manquent.", "text": "Des panneaux pour quatre étages, testés avec de vrais lecteurs. Nous avons déplacé l'un d'eux trois fois."},
+    {"title": "Carte pour un petit restaurant", "caption": "Imprimé, 2022", "note": "Une seule feuille qui change chaque semaine.", "text": "Une page, renouvelée chaque semaine. La mise en page laisse de la place pour un stylo, car le chef barre toujours quelque chose."},
+    {"title": "Affiche de festival", "caption": "Affiche, 2022", "note": "Imprimée en deux encres sur du papier journal.", "text": "Une affiche qui devait se lire de l'autre côté de la rue, et c'est le cas, grâce à une grande forme et aucun texte en petits caractères."},
+    {"title": "Collection de couvertures", "caption": "Couvertures, 2021", "note": "Six couvertures, un seul caractère.", "text": "Six couvertures pour un même éditeur, reliées par une grille et un seul caractère. Chacune a sa propre couleur."}
+   ]
+  }
+ }
+}

@@ -1,0 +1,435 @@
+{
+ "ui": {
+  "nav_label": "Hoofdmenu",
+  "footer": "Georganiseerd door vrijwilligers en open voor iedereen.",
+  "nav_home": "Home",
+  "nav_events": "Programma",
+  "nav_join": "Lid worden",
+  "nav_news": "Nieuws",
+  "home_title": "Welkom",
+  "desc_events": "De vaste bijeenkomsten en bijzondere activiteiten van {brand}.",
+  "desc_join": "Hoe u lid wordt van {brand}, wat het kost en wat u kunt verwachten.",
+  "desc_news": "Nieuws en mededelingen van {brand}.",
+  "nf_title": "Pagina niet gevonden",
+  "nf_text": "We konden deze pagina niet vinden. Misschien is hij verwijderd na de activiteit waar hij over ging.",
+  "nf_back": "Terug naar de startpagina",
+  "meet_h": "Wanneer we samenkomen",
+  "when_l": "Wanneer",
+  "where_l": "Waar",
+  "upcoming_h": "Binnenkort",
+  "latest_h": "Laatste nieuws",
+  "all_events": "Volledig programma",
+  "all_news": "Al het nieuws",
+  "join_cta": "Lid worden",
+  "events_h": "Programma",
+  "events_intro": "Onze vaste bijeenkomsten, en wat we dit seizoen hebben gedaan, maand voor maand.",
+  "join_h": "Doe mee",
+  "steps_h": "Zo wordt u lid",
+  "faq_h": "Vragen",
+  "join_fee": "Het lidmaatschap kost {fee} per jaar, met een lager tarief voor jongeren en studenten. Is geld een zorg, zeg dat dan discreet tegen de penningmeester, dan komt het er nooit meer over.",
+  "steps": [
+   "Kom naar een bijeenkomst en zeg gedag.",
+   "Probeer het een maand voordat u iets besluit.",
+   "Betaal de contributie aan de penningmeester als u er klaar voor bent."
+  ],
+  "news_h": "Nieuws",
+  "news_intro": "Mededelingen van het bestuur en verslagen van recente bijeenkomsten, de nieuwste eerst.",
+  "regular_h": "Vaste bijeenkomsten",
+  "season_h": "Dit seizoen tot nu toe",
+  "find_h": "Hier vindt u ons",
+  "contact_h": "Neem contact op",
+  "phone_l": "Telefoon"
+ },
+ "bundles": {
+  "chess": {
+   "kicker": "Schaakclub",
+   "tagline": "Gezellig schaken, elke donderdagavond",
+   "desc": "{brand} komt elke donderdagavond bijeen. Gezellige partijen voor elk niveau, van beginner tot clubkampioen.",
+   "intro": "We komen elke donderdag bijeen om te spelen, onze partijen te bespreken en te veel thee te drinken. Elk niveau is welkom, van eerste keer tot clubkampioen.",
+   "when": "Donderdag, {19:30} tot {22:00}",
+   "where": "De bovenzaal van het buurthuis",
+   "events": [
+    {
+     "t": "Clubavond",
+     "w": "Elke donderdag, {19:30}",
+     "p": "Vrij spelen, met een uitlegtafel voor beginners."
+    },
+    {
+     "t": "Snelschaaktoernooi",
+     "w": "Eerste zaterdag van de maand, {14:00}",
+     "p": "Zeven rondes van elk vijftien minuten. De inleg is een kleine gift voor de theekas."
+    },
+    {
+     "t": "Beginnersavond",
+     "w": "Tweede dinsdag van de maand, {19:00}",
+     "p": "Leer de regels en een paar eenvoudige openingen."
+    },
+    {
+     "t": "Simultaanwedstrijd",
+     "w": "Eén keer per seizoen",
+     "p": "De clubkampioen speelt tegen twintig borden tegelijk. Neem een vriend en een plan mee."
+    },
+    {
+     "t": "Jaarlijks diner",
+     "w": "Eind november",
+     "p": "Een maaltijd, een toespraak en de uitreiking van een heel kleine beker."
+    }
+   ],
+   "news": [
+    {
+     "title": "Een nieuw seizoen begint",
+     "text": "Het najaarsseizoen begint volgende week met het clubkampioenschap. Nieuwe leden zijn op elke avond welkom."
+    },
+    {
+     "title": "Dank aan iedereen die naar het snelschaken kwam",
+     "text": "Zesentwintig spelers, veertien kopjes thee per ronde en een finale die op de klok werd beslist."
+    },
+    {
+     "title": "We hebben nieuwe borden",
+     "text": "Acht houten borden met stukken, gekocht van de opbrengst van de zomerloterij."
+    },
+    {
+     "title": "De jeugdafdeling gaat weer open",
+     "text": "Kinderen vanaf zeven jaar zijn welkom op dinsdagmiddag, de eerste keer met een ouder."
+    }
+   ],
+   "join": [
+    "We zijn een gezellige club met ongeveer veertig leden, van negen tot vierentachtig jaar. De meesten van ons zijn niet erg goed, en daar hebben we vrede mee.",
+    "U hoeft geen eigen set te hebben of theorie te kennen. Als u de stukken kunt verzetten, kunt u donderdag meespelen."
+   ],
+   "faq": [
+    {
+     "q": "Moet ik goed zijn?",
+     "a": "Nee. De meeste leden zijn dat niet, en de club is zo ingericht dat iedereen een partij speelt tegen iemand van het eigen niveau."
+    },
+    {
+     "q": "Mogen kinderen komen?",
+     "a": "Ja, op dinsdagmiddag en, samen met een ouder, op donderdag."
+    },
+    {
+     "q": "Spelen jullie in een competitie?",
+     "a": "We hebben één team in de regionale competitie. Wilt u meespelen, zeg het dan tegen de teamleider."
+    }
+   ],
+   "why": [
+    {
+     "h": "Elk niveau",
+     "p": "Beginners zitten naast ervaren spelers, en niemand vindt dat erg."
+    },
+    {
+     "h": "Elke donderdag",
+     "p": "Zonder aanmelden. Kom wanneer u kunt."
+    },
+    {
+     "h": "Borden aanwezig",
+     "p": "De stukken en klokken zijn van ons; de thee zet u zelf."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Openingsavond",
+     "p": "Een korte inleiding over de opening die iedereen speelt en niemand begrijpt."
+    },
+    {
+     "t": "Clubkampioenschap, ronde één",
+     "p": "Loting voor de indeling, en een eerste ronde die nooit gaat zoals gepland."
+    },
+    {
+     "t": "Eindspelworkshop",
+     "p": "Koningen, pionnen en het geduld om ze vooruit te duwen."
+    },
+    {
+     "t": "Quiz en schaak",
+     "p": "Tien vragen over schaken, tien over al het andere."
+    },
+    {
+     "t": "Snelschaaktoernooi",
+     "p": "Zeven rondes van vijftien minuten, en veel thee."
+    },
+    {
+     "t": "Analyseavond",
+     "p": "We kiezen een partij van de clubavond en maken er ruzie over."
+    },
+    {
+     "t": "Simultaanwedstrijd",
+     "p": "De clubkampioen neemt het op tegen twintig borden tegelijk."
+    },
+    {
+     "t": "Uitlegtafel voor de jeugd",
+     "p": "Onze jongste leden leren de volwassenen een trucje of twee."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Schaakclub {city}",
+       "Schaakvereniging {city}",
+       "Schaakkring {city}"
+      ]
+     ]
+    }
+   }
+  },
+  "walking": {
+   "kicker": "Wandelgroep",
+   "tagline": "Wandelen over de heide en langs de rivier",
+   "desc": "{brand} wandelt elke zondag over de heide en langs de rivier. Iedereen is welkom, ervaring is niet nodig.",
+   "intro": "We wandelen elke zondag, in alle weersomstandigheden, op het tempo van de langzaamste. Loop een keer mee en kijk; de meesten van ons begonnen zo.",
+   "when": "Zondag, {9:30}",
+   "where": "De parkeerplaats bij het oude station",
+   "events": [
+    {
+     "t": "Zondagwandeling",
+     "w": "Elke zondag, {9:30}",
+     "p": "Twaalf tot twintig kilometer, met een koffiestop in een café als het weer slecht is."
+    },
+    {
+     "t": "Korte wandeling",
+     "w": "Eerste woensdag van de maand, {10:00}",
+     "p": "Vijf tot zes kilometer in een rustig tempo, afgesloten met koffie."
+    },
+    {
+     "t": "Weekend weg",
+     "w": "Eén keer per jaar, in het voorjaar",
+     "p": "Twee dagen in de natuur, met een groepsaccommodatie en heel veel soep."
+    },
+    {
+     "t": "Kaartleesavond",
+     "w": "Eén keer per seizoen",
+     "p": "Hoe je een kaart leest, en wat je doet als de kaart jou leest."
+    },
+    {
+     "t": "Zwerfafvalronde",
+     "w": "Laatste zaterdag van april",
+     "p": "We ruimen het rivierpad op en lopen het daarna nog een keer, omdat het kan."
+    }
+   ],
+   "news": [
+    {
+     "title": "Het voorjaarsprogramma is uit",
+     "text": "Twaalf wandelingen tussen maart en juni, waaronder twee nieuwe routes over de heuvelrug."
+    },
+    {
+     "title": "Het pad bij de molen is weer open",
+     "text": "Na een jaar herstelwerk is de brug weer open. Dank aan de vrijwilligers die hun zaterdagen opgaven."
+    },
+    {
+     "title": "Nieuwe wandelleiders gezocht",
+     "text": "Kent u een mooie route en kunt u een kaart lezen, laat het ons dan weten."
+    },
+    {
+     "title": "Bedankt voor de soep",
+     "text": "Het weekend weg was een groot succes, vooral dankzij de soep."
+    }
+   ],
+   "join": [
+    "We zijn een gezellige groep van ongeveer zestig wandelaars, van mensen die hun hele leven al wandelen tot mensen die vorige maand begonnen.",
+    "U hebt geen speciale spullen nodig. Wandelschoenen, een regenjas en iets te drinken zijn genoeg. Twijfelt u, kom dan zondagochtend vragen."
+   ],
+   "faq": [
+    {
+     "q": "Hoe snel lopen jullie?",
+     "a": "Op het tempo van de langzaamste van die dag, en dat is vaak de leider."
+    },
+    {
+     "q": "Mag mijn hond mee?",
+     "a": "Bij de meeste wandelingen wel, aangelijnd. In het programma staat welke wandelingen niet geschikt zijn."
+    },
+    {
+     "q": "En als het regent?",
+     "a": "Dan lopen we toch. De koffiestop duurt langer."
+    }
+   ],
+   "why": [
+    {
+     "h": "Buiten in de natuur",
+     "p": "Routes van twaalf tot twintig kilometer, geleid door mensen die de paden kennen."
+    },
+    {
+     "h": "Goed gezelschap",
+     "p": "Een groep vaste gezichten en een gestage stroom nieuwe."
+    },
+    {
+     "h": "Niemand blijft achter",
+     "p": "We houden het tempo van de langzaamste wandelaar aan."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Wandeling langs de rivier",
+     "p": "Twaalf kilometer over vlak terrein, met een stop bij de oude sluis."
+    },
+    {
+     "t": "Heuvelwandeling met uitzicht",
+     "p": "Zestien kilometer en één echte klim. Neem een thermosfles mee."
+    },
+    {
+     "t": "Kaartleesavond",
+     "p": "Coördinaten, hoogtelijnen en een kompas dat de verkeerde kant op wijst."
+    },
+    {
+     "t": "Korte wandeling met lunch",
+     "p": "Zes kilometer naar een café met een goede open haard."
+    },
+    {
+     "t": "Herfstkleuren",
+     "p": "Een route door het bos, het mooist in de ochtend als het licht tussen de bomen valt."
+    },
+    {
+     "t": "Zwerfafvalronde",
+     "p": "Handschoenen, zakken en verrassend veel tennisballen."
+    },
+    {
+     "t": "Avondwandeling",
+     "p": "Een rustig uur bij het vallen van de avond, afgesloten met thee aan iemands keukentafel."
+    },
+    {
+     "t": "Nachtwandeling",
+     "p": "Lampen uit, ogen open, en een praatje over de sterren."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Wandelgroep {city}",
+       "Wandelclub {city}",
+       "Wandelvereniging {city}"
+      ]
+     ]
+    }
+   }
+  },
+  "choir": {
+   "kicker": "Gemengd koor",
+   "tagline": "Samen zingen op woensdagavond",
+   "desc": "{brand} repeteert op woensdagavond. Geen auditie, noten lezen hoeft niet, alleen zin om te zingen.",
+   "intro": "We zijn een koor voor mensen die graag zingen en daar geen auditie voor willen doen. We leren op het gehoor, lachen veel en zingen beter dan we mogen verwachten.",
+   "when": "Woensdag, {19:00} tot {21:00}",
+   "where": "De kerkzaal aan het plein",
+   "events": [
+    {
+     "t": "Wekelijkse repetitie",
+     "w": "Elke woensdag, {19:00}",
+     "p": "Inzingen, nieuwe liedjes en dat ene nummer dat we nog steeds niet goed krijgen."
+    },
+    {
+     "t": "Open avond",
+     "w": "Eerste woensdag van september",
+     "p": "Zing een avond met ons mee, zonder verplichtingen."
+    },
+    {
+     "t": "Kerstconcert",
+     "w": "Tweede zaterdag van december",
+     "p": "Kerstliederen, volksliedjes en één stuk dat niemand verwacht."
+    },
+    {
+     "t": "Zomerconcert",
+     "w": "Eind juni",
+     "p": "Een avond vol liedjes in de tuin van het dorpshuis, als het weer het toelaat."
+    },
+    {
+     "t": "Zangdag",
+     "w": "Eén keer per jaar",
+     "p": "Een dag workshops met een gastdirigent, lunch inbegrepen."
+    }
+   ],
+   "news": [
+    {
+     "title": "Het najaarsseizoen begint",
+     "text": "We leren een reeks volksliedjes uit drie landen, en een canon die maar niet op tempo wil blijven."
+    },
+    {
+     "title": "Hartelijk dank na het zomerconcert",
+     "text": "Negentig mensen kwamen, eenenveertig taarten werden opgegeten en slechts één couplet werd twee keer gezongen."
+    },
+    {
+     "title": "We zoeken tenoren",
+     "text": "Sopranen en alten hebben we genoeg. Kunt u laag zingen, kom ons dan ontmoeten."
+    },
+    {
+     "title": "De nieuwe muziek is binnen",
+     "text": "De mappen voor het winterprogramma liggen in de zaal. Schrijf uw aantekeningen met potlood, niet met pen."
+    }
+   ],
+   "join": [
+    "We zijn ongeveer vijftig zangers, van zestien tot achtentachtig jaar. De meesten van ons kunnen geen noten lezen en leren al jaren liedjes op het gehoor.",
+    "Kom naar een repetitie en zing met ons mee. We zoeken een stoel, een map en iemand om naast te staan voor u."
+   ],
+   "faq": [
+    {
+     "q": "Moet ik auditie doen?",
+     "a": "Nee. Er is geen auditie, nu niet en later niet."
+    },
+    {
+     "q": "Moet ik noten kunnen lezen?",
+     "a": "Nee. We leren op het gehoor, met de noten op papier voor wie ze wil."
+    },
+    {
+     "q": "En als ik een week mis?",
+     "a": "Dan mist u een week. Niemand vindt dat erg, en de opnames worden online gedeeld."
+    }
+   ],
+   "why": [
+    {
+     "h": "Geen audities",
+     "p": "Als u onder de douche een toon kunt houden, kunt u dat hier ook."
+    },
+    {
+     "h": "Alle stemmen",
+     "p": "Sopranen, alten, tenoren, bassen en iedereen die het nog niet zeker weet."
+    },
+    {
+     "h": "Twee concerten per jaar",
+     "p": "Eén in de winter en één in de zomer, met taart."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Open avond",
+     "p": "Zing een canon of twee mee, zonder auditie en zonder druk."
+    },
+    {
+     "t": "Nieuw seizoen begint",
+     "p": "Inzingen, een nieuw stuk en veel bijpraten."
+    },
+    {
+     "t": "Stemgroepenrepetitie",
+     "p": "Alten en tenoren in de zaal, sopranen en bassen in de keuken."
+    },
+    {
+     "t": "Zangdag",
+     "p": "Een hele zaterdag met een gastdirigent."
+    },
+    {
+     "t": "Concert in de kerk",
+     "p": "Twee helften, een loterij en kerstbrood in de pauze."
+    },
+    {
+     "t": "Kerstliederen op het plein",
+     "p": "Koude vingers en warme stemmen op het marktplein."
+    },
+    {
+     "t": "Repetitie met de pianist",
+     "p": "De eerste keer dat het stuk als muziek klinkt."
+    },
+    {
+     "t": "Meezingavond",
+     "p": "Liedjes die iedereen kent, en een paar die niemand zich herinnert."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Gemengd koor {city}",
+       "Zangkoor {city}",
+       "Koor {city}"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

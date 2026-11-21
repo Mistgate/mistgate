@@ -14,7 +14,7 @@
  },
  "address": "{street} {no}, {zip} {city}",
  "zip_tail": "XX AA",
- "zip_letters": "ABCDEFGHJKLMNPRTVWXZ",
+ "zip_letters": "ABCDEGHJKLMNPRTVWXZ",
  "cities": [
   {
    "name": "Amsterdam",
@@ -127,6 +127,41 @@
     "23"
    ],
    "phone": ""
+  },
+  {
+   "name": "Delft",
+   "zip": [
+    "26"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Amersfoort",
+   "zip": [
+    "38"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Dordrecht",
+   "zip": [
+    "33"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Enschede",
+   "zip": [
+    "75"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Leeuwarden",
+   "zip": [
+    "89"
+   ],
+   "phone": ""
   }
  ],
  "streets": [
@@ -141,7 +176,13 @@
   "Industrieweg",
   "Beatrixlaan",
   "Oranjestraat",
-  "Nieuwstraat"
+  "Nieuwstraat",
+  "Stationsstraat",
+  "Molenstraat",
+  "Lindelaan",
+  "Prins Hendrikstraat",
+  "Kanaalweg",
+  "Bloemenlaan"
  ],
  "first": [
   "Daan",

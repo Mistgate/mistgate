@@ -1,0 +1,271 @@
+{
+ "ui": {
+  "nav_label": "Menüü",
+  "footer": "Kirjutatud käsitsi, avaldatud aeglaselt.",
+  "nav_home": "Märkmed",
+  "nav_about": "Minust",
+  "home_title": "Märkmed",
+  "nf_title": "Siin ei ole midagi",
+  "nf_text": "Sellel aadressil ei ole märget. Võib-olla nimetati see ümber või seda ei kirjutatudki.",
+  "nf_back": "Tagasi märgete juurde",
+  "latest_h": "Viimased märkmed",
+  "read_more": "Loe märget",
+  "min_read": "min lugemist",
+  "more_h": "Veel märkmeid",
+  "back_all": "Kõik märkmed",
+  "about_h": "Minust",
+  "now_h": "Praegu",
+  "tags_h": "Teemad",
+  "by": "Autor",
+  "nav_archive": "Arhiiv",
+  "desc_archive": "Kõik märkmed: {brand}, kuude kaupa.",
+  "archive_h": "Arhiiv",
+  "archive_intro": "Kõik märkmed siiani, uuemad eespool, kuude kaupa.",
+  "all_posts": "Kõik märkmed",
+  "newer": "Uuemad"
+ },
+ "bundles": {
+  "garden": {
+   "tagline": "Märkmeid aiamaalt",
+   "desc": "Märkmeid väikesest aiamaast {city_in}: mis kasvas, mis ei kasvanud ja mida teeksin teisiti.",
+   "desc_about": "Kes kirjutab {brand} ja miks.",
+   "intro": "Märkmeid väikesest aiamaast {city_in}: mis kasvas, mis ei kasvanud ja mida teeksin järgmisel aastal teisiti.",
+   "about": [
+    "Mina olen {first}. Mul on aiamaa {city_in} juba üheksa aastat, enamasti köögiviljade ja mõne kangekaelse roosi jaoks.",
+    "Siia kirjutan üles, mida aiamaa mind õpetab, peamiselt selleks, et ma ei teeks samu vigu uues järjekorras.",
+    "Kommentaarid on suletud. Kui sul on nõuanne, ütle see oma aiamaa naabrile; nii olen ka mina enamiku asju õppinud."
+   ],
+   "now": [
+    "Külvan ube kasvuhoones",
+    "Parandan taas kuuri ust",
+    "Loen kompostimise kohta"
+   ],
+   "posts": [
+    {
+     "title": "Miks ma enam ei kaeva",
+     "tag": "Muld",
+     "excerpt": "Kolm hooaega ilma labidata ja see, mis peenardega juhtus.",
+     "body": [
+      "Aastaid kaevasin peenrad igal sügisel üle, sest nii tegi ka aiamaa eelmine pidaja ja nii oli kirjas ka lapsepõlve raamatutes. Kolm aastat tagasi jätsin selle sinnapaika ja katsin peenrad paksu komposti kihiga.",
+      "Esimene kevad valmistas pettumuse. Muld nägi sassis välja ja teod olid rõõmsad. Teisel aastal olid ussid suure töö ära teinud, muld mureneski käes ja igal oktoobril kulus peenardele üks laupäev vähem."
+     ]
+    },
+    {
+     "title": "Oad neile, kes unustavad kasta",
+     "tag": "Köögivili",
+     "excerpt": "Neli sorti, mis andsid mulle kuiva juuli andeks.",
+     "body": [
+      "Eelmisel juulil ei sadanud üheksateist päeva vihma ja ma olin neist üksteist päeva ära. Tagasi tulles oli salat õitsema läinud ja kabatšokid nägid välja, nagu oleksid alla andnud. Oad olid aga korras.",
+      "Sügava juurega ronioad ja paks multšikiht nende ümber taluvad kahenädalast põuda paremini kui peaaegu miski muu, mida ma kasvatan. Külvan need nüüd põhjaserva, kus vari hoiab mulla pehmena."
+     ]
+    },
+    {
+     "title": "Väike kasvuhoone vanadest akendest",
+     "tag": "Ehitus",
+     "excerpt": "Kuidas naabri prügikonteinerist sai ühe pika nädalavahetusega kasvuhoone.",
+     "body": [
+      "Naaber vahetas aknad välja ja vanad seisid kaks päeva konteineris. Küsisin, kas võin need võtta, ja ta palus mul võtta ka konteineri, kui jaksan.",
+      "Ehitasin raami vanadest laudadest, suurima akna järgi, ja panin ülejäänud selle ümber. Mitte miski ei ole täisnurkne ja uks kiilub vihmaga kinni, aga tomatitaimed on külma eest kaitstud."
+     ]
+    },
+    {
+     "title": "Mida teha aiamaal aprillis",
+     "tag": "Aastaajad",
+     "excerpt": "Lühike nimekiri kuule, mil kõik tundub võimalik, aga muld on veel külm.",
+     "body": [
+      "Aprill petab kõiki. Päevad on selged ja tahaks istutada, aga muld on külm ning liiga vara külvatud seemned lihtsalt mädanevad. Ootan seni, kuni maa ei tundu enam käeseljale külm.",
+      "Vahepeal on ometi tegemist: sorteerin seemnekarbi, pesen potid, lõikan roosid ja panen esimesed kartulid valgesse idanema. Need tööd tunduvad edasiminekuna, riskimata millegagi."
+     ]
+    },
+    {
+     "title": "Kompost ausalt",
+     "tag": "Muld",
+     "excerpt": "Mis mu hunnikusse läheb, mis jääb välja ja miks see ei valmi kunagi õigeks ajaks.",
+     "body": [
+      "Minu hunnikul on kolm reeglit: sinna ei lähe midagi keedetut, haiget ega sellist, milles ma pole kindel. Murulõikus läheb õhukeste kihtidena, rebitud papp sinna juurde ja kogu see segu saab ümber pööratud, kui meelde tuleb.",
+      "See käib aeglasemalt, kui raamatud ütlevad. Aasta on ausam kui kuus nädalat, mida kotil lubatakse, ja valmis kompostiga kaasnevad alati üllatused, näiteks kartul, millest olin juba loobunud."
+     ]
+    },
+    {
+     "title": "Teod, õllelõksud ja muud lüüasaamised",
+     "tag": "Kahjurid",
+     "excerpt": "Mis aitas, mis ei aidanud ja miks ma nüüd veidi rohkem istutan.",
+     "body": [
+      "Olen proovinud õllelõksu, munakoori, vasklinti ja õhtul taskulambiga väljas käimist. Igaüks neist aitas umbes nädala. Kõige paremini aitab see, et kasvatan rohkem, kui vaja, ja leppin sellega, et teod võtavad oma osa.",
+      "Päris risk on seemikud, nii et kasvatan neid enne toas ja panen välja alles siis, kui nad on piisavalt tugevad, et näksimist üle elada."
+     ]
+    },
+    {
+     "title": "Ubade seemnete kogumine",
+     "tag": "Seemned",
+     "excerpt": "Natuke kannatlikkust oktoobris annab järgmise aasta oad tasuta.",
+     "body": [
+      "Jätan parimad kaunad taimedele, kuni need on kuivad ja kõlisevad. Siis koorin need köögilaua ääres, laotan oad kandikule ja hoian nädal aega soojas.",
+      "Seemned lähevad paberümbrikesse, mille peale kirjutan nime ja aasta. Plastik higistaks, ja hallitanud oad on mul selle tõestuseks."
+     ]
+    },
+    {
+     "title": "Halb tomatiaasta",
+     "tag": "Köögivili",
+     "excerpt": "Lehemädanik tuli augustis ja võttis kõik. Märkmed järgmiseks korraks.",
+     "body": [
+      "Lehed muutusid nädalaga pruuniks ja viljad järgnesid. Tõmbasin taimed välja, panin kotti ja ei pannud kompostihunnikusse, mis on ainus reegel, milles kõik nõus on.",
+      "Järgmisel aastal kasvatan vähem taimi, annan neile rohkem ruumi ja kastan mulda, mitte lehti. Ning meenutan endale, et halb tomatiaasta on hea ettekääne tomatikastme keetmiseks."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Aia",
+       "Mulla",
+       "Kaste",
+       "Päikese",
+       "Vihma",
+       "Marja",
+       "Kartuli",
+       "Suvila",
+       "Suve",
+       "Maa"
+      ],
+      [
+       "märkmik",
+       "peenar",
+       "nurk",
+       "aed",
+       "kasvuhoone",
+       "lapp",
+       "rada",
+       "vagu",
+       "hooaeg",
+       "päevik"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "kitchen": {
+   "tagline": "Märkmeid väiksest köögist",
+   "desc": "Retseptid, mis toimivad, vead, millest midagi õppisin, ja õhtusöök {city_in}.",
+   "desc_about": "Kes kirjutab {brand} ja miks.",
+   "intro": "Retseptid, mis toimivad, vead, millest midagi õppisin, ja see, mis on {city_in} õhtusöögiks.",
+   "about": [
+    "Mina olen {first}. Keedan neljaliikmelisele perele {city_in} köögis, mis on väiksem kui enamiku inimeste vannituba, ja ei vahetaks seda millegi vastu.",
+    "Kirjutan üles selle, mis toimis, sellisel kujul, nagu ma seda tegelikult teen: see tähendab, et koguseid on vähem ja omadussõnu rohkem kui korralikus retseptis.",
+    "Ma ei pildista toitu. Kui roog näeb pildistamiseks piisavalt hea välja, olen seda ilmselt liiga kaua oodata lasknud."
+   ],
+   "now": [
+    "Toidan uut juuretist",
+    "Soolan sidrunid kevadeks",
+    "Leppin ahjuuksega"
+   ],
+   "posts": [
+    {
+     "title": "Leib, mis andestab",
+     "tag": "Leib",
+     "excerpt": "Jahu, vesi, sool ja väga kannatlik pühapäeva pärastlõuna.",
+     "body": [
+      "See on leib, mida ma küpsetan, kui olen unustanud, et tahtsin leiba küpsetada. Selles on peaaegu üldse pärmi, pikk puhkeaeg ja sõtkumist pole üldse, ja see ei pahanda, kui jätad selle tunni võrra kauemaks, kui plaanisid.",
+      "Sega õhtul jahu, vesi ja sool omavahel, kuni kuivi kohti pole, kata kauss kinni ja jäta lauale. Hommikul on tainas mullitav ja lõhnab veidi õlle järele, ja just seda sa tahadki."
+     ]
+    },
+    {
+     "title": "Mida keeta, kui külmik on peaaegu tühi",
+     "tag": "Argipäev",
+     "excerpt": "Viis purki, kolm sibulat ja juustuservak: õhtusöök.",
+     "body": [
+      "Igal neljapäeval avan külmiku ja näen pool sibulat, närtsinud porgandit ja purki, mille avamist ma ei mäleta. Varem tundus see läbikukkumisena. Nüüd mõtlen sellest kui ainsast õhtust nädalas, mil on kapi kord.",
+      "Prae sibulat aeglaselt, kuni see annab alla. Lisa, mis ube sul on, purk tomateid ja lusikatäis midagi hapukat: sinepit, äädikat, marineeritud tšillit. Lase podiseda, kuni leiad leivatüki."
+     ]
+    },
+    {
+     "title": "Ainus supp, mida ma novembris keedan",
+     "tag": "Supp",
+     "excerpt": "Küpsetatud kõrvits, üks õun ja kannatlikkus saumikseriga.",
+     "body": [
+      "Kui saabub esimene tõeliselt külm nädal, küpsetan kõrvitsa lõikepool all, terve küüslaugupea ja pehmeks läinud õunaga. See võtab nelikümmend minutit ja kogu maja lõhnab talve alguse järele.",
+      "Tõsta kõik potti, lisa puljong ja mikserda, kuni see enam ei vaidle. Veidi koort on hea, aga ei ole vaja. Serveerin röstitud seemnete ja eilse leivaga. See ei ole nutikas, aga ma teen seda igal aastal."
+     ]
+    },
+    {
+     "title": "Kiirmarinaad ilma paanikata",
+     "tag": "Hoidised",
+     "excerpt": "Miks purk kiirelt marineeritud köögivilja on köögi kõige lihtsam asi.",
+     "body": [
+      "Inimesi hirmutab sõna hoidis, mis kõlab nagu steriliseerimine, suured potid ja kadunud päev. Kiire marinaad nõuab purki, veekeetjat ja umbes kümmet minutit.",
+      "Viiluta, mis sahtlis on, pane puhtasse purki ja vala peale kuum segu äädikast, veest, soolast ja veidi suhkrust. Lisa loorberileht, kui on. Jäta homseni. Need säilivad külmikus paar nädalat."
+     ]
+    },
+    {
+     "title": "Kõrbenud road ja mida ma õppisin",
+     "tag": "Vead",
+     "excerpt": "Lühike nimekiri rikutud õhtusöökidest ja ühest asjast, mida igaüks õpetas.",
+     "body": [
+      "Karamell õpetas, et suhkrut ei huvita minu telefon. Risoto õpetas, et puljong peab olema kuum. Ahjukartulid õpetasid, et alus võib olla liiga täis ja et kahvatut kartulit keegi ei andesta.",
+      "Hullem oli sünnipäevakook, mille võtsin liiga vara välja ja panin liiga hilja tagasi. See vajus keskelt sisse nagu väärikas vana hoone ja sõime seda lusikaga ning vaniljekastmega."
+     ]
+    },
+    {
+     "title": "Pann, lusikas ja kolmapäev",
+     "tag": "Argipäev",
+     "excerpt": "Üks pann, kakskümmend minutit ja vähe nõusid.",
+     "body": [
+      "Kolmapäeviti olen väsinud ja kõik on näljased, nii et õhtusöök peab tulema ühest pannist. Sibul, purk ube, veidi suitsupaprikat ja mis rohelist külmikus on.",
+      "Lõpuks panen peale muna ja nimetan seda õhtusöögiks. See ei ole niivõrd retsept kui harjumus, ja see ei ole mind veel alt vedanud."
+     ]
+    },
+    {
+     "title": "Puder korralikult",
+     "tag": "Hommikusöök",
+     "excerpt": "Kaerahelbed, vesi, sool ja kümme minutit ilma ära jalutamata.",
+     "body": [
+      "Leota helbeid eelmisel õhtul, kui meelde tuleb. Hommikul lisa vesi ja näpuotsatäis soola ning sega, kuni see pakseneb, mis võtab umbes sama kaua kui veekeetja.",
+      "Mina söön oma moosiga või paari tükeldatud õunaga. Need, kes lisavad pudrule suhkrut, ei eksi, aga midagi jääb neil märkamata."
+     ]
+    },
+    {
+     "title": "Miks ma jahu kaalun",
+     "tag": "Leib",
+     "excerpt": "Kaalud muutsid minu küpsetamist rohkem kui ükski retsept.",
+     "body": [
+      "Klaas jahu võib kaaluda mida tahes 120 kuni 160 grammi, olenevalt sellest, kuidas sa seda kühveldad. See on vahe leiva ja telliskivi vahel.",
+      "Nüüd kaalun kõike, ka vett. Umbes nädala tundub see tobe ja siis tundub see ainus mõistlik viis küpsetada."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Soola",
+       "Kartuli",
+       "Leiva",
+       "Kuuma",
+       "Pühapäeva",
+       "Kapsa",
+       "Hapukoore",
+       "Ahju",
+       "Kodu",
+       "Suitsu"
+      ],
+      [
+       "lusikas",
+       "pann",
+       "märkmik",
+       "laud",
+       "köök",
+       "tainas",
+       "kauss",
+       "pott",
+       "ahi",
+       "päevik"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

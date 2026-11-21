@@ -1,0 +1,245 @@
+{
+ "ui": {
+  "nav_label": "Navigation",
+  "footer": "Géré par des bénévoles et ouvert à tous.",
+  "nav_home": "Accueil",
+  "nav_events": "Programme",
+  "nav_join": "Nous rejoindre",
+  "nav_news": "Actualités",
+  "home_title": "Bienvenue",
+  "desc_events": "Les réunions régulières et les événements de {brand}.",
+  "desc_join": "Comment rejoindre {brand}, ce que ça coûte et à quoi s'attendre.",
+  "desc_news": "Les actualités et les annonces de {brand}.",
+  "nf_title": "Page introuvable",
+  "nf_text": "Nous n'avons pas trouvé cette page. Elle a peut-être été retirée après l'événement dont elle parlait.",
+  "nf_back": "Retour à l'accueil",
+  "meet_h": "Quand nous nous retrouvons",
+  "when_l": "Quand",
+  "where_l": "Où",
+  "upcoming_h": "À venir",
+  "latest_h": "Dernières nouvelles",
+  "all_events": "Tout le programme",
+  "all_news": "Toutes les actualités",
+  "join_cta": "Comment nous rejoindre",
+  "events_h": "Programme",
+  "events_intro": "Nos rencontres régulières, et ce que nous avons fait cette saison, mois par mois.",
+  "join_h": "Nous rejoindre",
+  "steps_h": "Comment nous rejoindre",
+  "faq_h": "Questions",
+  "join_fee": "La cotisation est de {fee} par an, avec un tarif réduit pour les jeunes et les étudiants. Si l'argent pose problème, dites-le discrètement au trésorier et on n'en reparlera plus.",
+  "steps": [
+   "Venez à n'importe quelle réunion et dites bonjour.",
+   "Essayez pendant un mois avant de décider quoi que ce soit.",
+   "Réglez la cotisation au trésorier quand vous le souhaitez."
+  ],
+  "news_h": "Actualités",
+  "news_intro": "Les annonces du bureau et les comptes rendus des dernières réunions, du plus récent au plus ancien.",
+  "regular_h": "Rencontres régulières",
+  "season_h": "Cette saison, jusqu'ici",
+  "find_h": "Nous trouver",
+  "contact_h": "Nous contacter",
+  "phone_l": "Téléphone"
+ },
+ "bundles": {
+  "chess": {
+   "kicker": "Club d'échecs",
+   "tagline": "Des parties conviviales, tous les jeudis soir",
+   "desc": "{brand} se retrouve chaque jeudi soir. Des parties amicales pour tous les niveaux, du débutant au champion du club.",
+   "intro": "Nous nous retrouvons chaque jeudi pour jouer, analyser nos parties et boire trop de thé. Tous les niveaux sont les bienvenus, de ceux qui jouent pour la première fois jusqu'au champion du club.",
+   "when": "Les jeudis, de {19:30} à {22:00}",
+   "where": "La salle à l'étage de la salle des fêtes du quartier",
+   "events": [
+    {"t": "Soirée du club", "w": "Chaque jeudi, {19:30}", "p": "Jeu libre, avec une table d'initiation pour les débutants."},
+    {"t": "Tournoi rapide", "w": "Premier samedi du mois, {14:00}", "p": "Sept rondes de quinze minutes. L'inscription est un petit don pour la caisse du thé."},
+    {"t": "Soirée débutants", "w": "Deuxième mardi du mois, {19:00}", "p": "On apprend les règles et quelques ouvertures simples."},
+    {"t": "Simultanée", "w": "Une fois par saison", "p": "Le champion du club joue vingt échiquiers à la fois. Venez avec un ami et un plan."},
+    {"t": "Repas annuel", "w": "Fin novembre", "p": "Un repas, un discours et la remise d'un tout petit trophée."}
+   ],
+   "news": [
+    {"title": "Une nouvelle saison commence", "text": "La saison d'automne démarre la semaine prochaine avec le championnat du club. Les nouveaux membres sont les bienvenus tous les soirs."},
+    {"title": "Merci à tous ceux qui sont venus au tournoi rapide", "text": "Vingt-six joueurs, quatorze tasses de thé par ronde et une finale gagnée à la pendule."},
+    {"title": "Nous avons de nouveaux échiquiers", "text": "Huit échiquiers et jeux en bois, achetés avec les gains de la tombola de l'été."},
+    {"title": "La section jeunes rouvre", "text": "Les enfants à partir de sept ans sont accueillis le mardi après-midi, accompagnés d'un parent la première fois."}
+   ],
+   "join": [
+    "Nous sommes un club convivial d'une quarantaine de membres, de neuf à quatre-vingt-quatre ans. La plupart d'entre nous ne sont pas très forts, et nous en avons pris notre parti.",
+    "Pas besoin de posséder un jeu ni de connaître la théorie. Si vous savez déplacer les pièces, vous pouvez jouer jeudi."
+   ],
+   "faq": [
+    {"q": "Faut-il être fort ?", "a": "Non. La plupart des membres ne le sont pas, et le club est organisé pour que chacun ait une partie contre quelqu'un de son niveau."},
+    {"q": "Les enfants peuvent-ils venir ?", "a": "Oui, le mardi après-midi et, accompagnés d'un parent, le jeudi."},
+    {"q": "Jouez-vous en championnat ?", "a": "Nous engageons une équipe dans le championnat départemental. Si vous voulez jouer, dites-le au capitaine."}
+   ],
+   "why": [
+    {"h": "Tous les niveaux", "p": "Les débutants s'assoient à côté des habitués, et personne n'y trouve à redire."},
+    {"h": "Chaque jeudi", "p": "Pas d'inscription. Venez quand vous pouvez."},
+    {"h": "Le matériel est fourni", "p": "Les jeux et les pendules sont à nous ; le thé, c'est à vous de le faire."}
+   ],
+   "sessions": [
+    {"t": "Soirée d'ouverture", "p": "Un court exposé sur l'ouverture que tout le monde joue et que personne ne comprend."},
+    {"t": "Championnat du club, première ronde", "p": "Appariements tirés au sort, et une première ronde qui ne se passe jamais comme prévu."},
+    {"t": "Atelier de finales", "p": "Des rois, des pions et la patience de les pousser."},
+    {"t": "Quiz et échecs", "p": "Dix questions sur les échecs, dix sur tout le reste."},
+    {"t": "Tournoi rapide", "p": "Sept rondes de quinze minutes, et beaucoup de thé."},
+    {"t": "Soirée d'analyse", "p": "On choisit une partie de la soirée du club et on se dispute à son sujet."},
+    {"t": "Simultanée", "p": "Le champion du club affronte vingt échiquiers à la fois."},
+    {"t": "Table d'initiation pour les jeunes", "p": "Nos plus jeunes membres apprennent un ou deux tours aux grands."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [["{city} Échecs", "Échecs Club {city}", "Cercle des échecs {city}"]]
+    }
+   }
+  },
+  "walking": {
+   "kicker": "Club de randonnée",
+   "tagline": "Des sorties dans les collines et le long de la rivière",
+   "desc": "{brand} marche chaque dimanche dans les collines et le long de la rivière. Tout le monde est le bienvenu, aucune expérience n'est nécessaire.",
+   "intro": "Nous marchons chaque dimanche, par tous les temps, à l'allure du plus lent. Venez une fois pour voir ; la plupart d'entre nous ont commencé comme ça.",
+   "when": "Les dimanches, {9:30}",
+   "where": "Le parking de l'ancienne gare",
+   "events": [
+    {"t": "Randonnée du dimanche", "w": "Chaque dimanche, {9:30}", "p": "Douze à vingt kilomètres, avec une pause dans un café s'il pleut."},
+    {"t": "Petite balade", "w": "Premier mercredi du mois, {10:00}", "p": "Cinq à sept kilomètres à allure tranquille, qui se termine autour d'un café."},
+    {"t": "Week-end en gîte", "w": "Une fois par an, au printemps", "p": "Deux jours dans les collines, en gîte, avec énormément de soupe."},
+    {"t": "Soirée lecture de carte", "w": "Une fois par saison", "p": "Comment lire une carte, et que faire quand c'est elle qui vous lit."},
+    {"t": "Ramassage des déchets", "w": "Dernier samedi d'avril", "p": "Nous nettoyons le chemin de la rivière, puis nous le refaisons à pied, parce que nous le pouvons."}
+   ],
+   "news": [
+    {"title": "Le programme du printemps est sorti", "text": "Douze sorties entre mars et juin, dont deux nouveaux itinéraires sur la crête."},
+    {"title": "Le sentier près du moulin a rouvert", "text": "Après un an de travaux, le pont est de nouveau ouvert. Merci aux bénévoles qui ont sacrifié leurs samedis."},
+    {"title": "Nous cherchons de nouveaux animateurs", "text": "Si vous connaissez un bon itinéraire et savez lire une carte, nous serions ravis de vous entendre."},
+    {"title": "Merci pour la soupe", "text": "Le week-end en gîte a été une réussite, surtout grâce à la soupe."}
+   ],
+   "join": [
+    "Nous sommes un groupe convivial d'une soixantaine de marcheurs, de ceux qui marchent depuis toujours à ceux qui ont commencé le mois dernier.",
+    "Pas besoin d'équipement spécial. De bonnes chaussures, un imperméable et de quoi boire suffisent largement. Dans le doute, venez poser la question le dimanche matin."
+   ],
+   "faq": [
+    {"q": "À quelle allure marchez-vous ?", "a": "À l'allure de la personne la plus lente du jour, qui est souvent l'animateur."},
+    {"q": "Puis-je venir avec mon chien ?", "a": "Sur la plupart des sorties, oui, tenu en laisse. Le programme indique celles qui ne conviennent pas."},
+    {"q": "Et s'il pleut ?", "a": "Nous marchons quand même. La pause au café est plus longue."}
+   ],
+   "why": [
+    {"h": "Dans les collines", "p": "Des parcours de douze à vingt kilomètres, menés par des gens qui connaissent les sentiers."},
+    {"h": "Bonne compagnie", "p": "Un groupe d'habitués et un flot régulier de nouveaux visages."},
+    {"h": "Personne n'est laissé derrière", "p": "Nous nous réglons sur l'allure du marcheur le plus lent."}
+   ],
+   "sessions": [
+    {"t": "Balade le long de la rivière", "p": "Douze kilomètres sans dénivelé, avec une pause à l'ancienne écluse."},
+    {"t": "Randonnée avec vue", "p": "Seize kilomètres et une vraie montée. Apportez une gourde."},
+    {"t": "Soirée lecture de carte", "p": "Coordonnées, courbes de niveau et une boussole qui indique le mauvais nord."},
+    {"t": "Petite balade et déjeuner", "p": "Six kilomètres jusqu'à une auberge avec une bonne cheminée."},
+    {"t": "Couleurs d'automne", "p": "Un parcours en forêt, plus beau le matin quand la lumière passe entre les arbres."},
+    {"t": "Ramassage des déchets", "p": "Des gants, des sacs et un nombre surprenant de balles de tennis."},
+    {"t": "Promenade du soir", "p": "Une heure tranquille au crépuscule, qui finit par un thé autour d'une table de cuisine."},
+    {"t": "Marche de nuit", "p": "Lampes éteintes, yeux ouverts, et un exposé sur les étoiles."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [["{city} Randonnée", "Rando Loisirs {city}", "Les Randonneurs {city}"]]
+    }
+   }
+  },
+  "choir": {
+   "kicker": "Chorale",
+   "tagline": "Chanter ensemble le mercredi soir",
+   "desc": "{brand} répète le mercredi soir. Pas d'audition, pas besoin de lire la musique, juste l'envie de chanter.",
+   "intro": "Nous sommes une chorale pour celles et ceux qui aiment chanter et ne veulent pas passer d'audition pour ça. Nous apprenons à l'oreille, nous rions beaucoup et nous chantons mieux que nous n'y avons droit.",
+   "when": "Les mercredis, de {19:00} à {21:00}",
+   "where": "La salle paroissiale près de la place",
+   "events": [
+    {"t": "Répétition hebdomadaire", "w": "Chaque mercredi, {19:00}", "p": "Échauffement, nouveaux chants et celui qu'on n'arrive toujours pas à réussir."},
+    {"t": "Soirée portes ouvertes", "w": "Premier mercredi de septembre", "p": "Venez chanter avec nous le temps d'une soirée, sans aucun engagement."},
+    {"t": "Concert d'hiver", "w": "Deuxième samedi de décembre", "p": "Chants de Noël, chansons populaires et un morceau que personne n'attend."},
+    {"t": "Concert d'été", "w": "Fin juin", "p": "Une soirée de chansons dans le jardin de la salle des fêtes, si le temps le permet."},
+    {"t": "Journée de chant", "w": "Une fois par an", "p": "Une journée d'ateliers avec un chef invité, déjeuner compris."}
+   ],
+   "news": [
+    {"title": "La rentrée est là", "text": "Nous apprenons une suite de chants populaires de trois pays, et un canon qui n'arrive pas à rester en mesure."},
+    {"title": "Un grand merci après le concert d'été", "text": "Quatre-vingt-dix personnes sont venues, quarante et un gâteaux ont été mangés et un seul couplet a été chanté deux fois."},
+    {"title": "Nous cherchons des ténors", "text": "Nous avons beaucoup de sopranos et d'altos. Si vous chantez grave, venez nous rencontrer."},
+    {"title": "Les nouvelles partitions sont arrivées", "text": "Les chemises du programme d'hiver sont dans la salle. Merci de noter vos repères au crayon, pas au stylo."}
+   ],
+   "join": [
+    "Nous sommes une cinquantaine de choristes, de seize à quatre-vingt-huit ans. La plupart d'entre nous ne savent pas lire la musique et apprennent les chants à l'oreille depuis des années.",
+    "Venez à n'importe quelle répétition et chantez avec nous. Nous vous trouverons une chaise, une partition et quelqu'un à côté de qui vous placer."
+   ],
+   "faq": [
+    {"q": "Faut-il passer une audition ?", "a": "Non. Il n'y a pas d'audition, ni maintenant ni plus tard."},
+    {"q": "Faut-il savoir lire la musique ?", "a": "Non. Nous enseignons à l'oreille, avec les notes sur papier pour ceux qui le souhaitent."},
+    {"q": "Et si je rate une semaine ?", "a": "Alors vous ratez une semaine. Personne ne vous en voudra, et les enregistrements sont partagés en ligne."}
+   ],
+   "why": [
+    {"h": "Pas d'audition", "p": "Si vous savez tenir une mélodie sous la douche, vous saurez la tenir ici."},
+    {"h": "Toutes les voix", "p": "Sopranos, altos, ténors, basses et tous ceux qui ne sont pas sûrs."},
+    {"h": "Deux concerts par an", "p": "Un en hiver et un en été, avec des gâteaux."}
+   ],
+   "sessions": [
+    {"t": "Soirée portes ouvertes", "p": "Venez chanter un canon ou deux, sans audition et sans pression."},
+    {"t": "C'est la rentrée", "p": "Échauffements, un nouveau morceau et beaucoup de retrouvailles."},
+    {"t": "Répétition par pupitre", "p": "Les altos et les ténors dans la salle, les sopranos et les basses à la cuisine."},
+    {"t": "Journée de chant", "p": "Un samedi entier avec un chef invité."},
+    {"t": "Concert à l'église", "p": "Deux parties, une tombola et du vin chaud à l'entracte."},
+    {"t": "Chants de Noël sur la place", "p": "Des doigts froids et des voix chaleureuses sur la place du marché."},
+    {"t": "Répétition avec le pianiste", "p": "La première fois que le morceau ressemble à de la musique."},
+    {"t": "Soirée chansons à reprendre en chœur", "p": "Des chansons que tout le monde connaît, et quelques-unes dont personne ne se souvient."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [["Chorale {city}", "{city} Chante", "Les Voix {city}"]]
+    }
+   }
+  },
+  "astronomy": {
+   "kicker": "Club d'astronomie",
+   "tagline": "Regarder le ciel, ensemble",
+   "desc": "{brand} se réunit chaque mois pour des exposés et des soirées d'observation. Les débutants comme les propriétaires de télescope sont les bienvenus.",
+   "intro": "Nous nous réunissons une fois par mois pour écouter un exposé et, quand le ciel le permet, pour regarder dans les télescopes. Pas besoin d'en posséder un, ni même de savoir où est le nord.",
+   "when": "Premier vendredi du mois, {20:00}",
+   "where": "L'annexe de la médiathèque, avec observation sur le terrain derrière",
+   "events": [
+    {"t": "Réunion mensuelle", "w": "Premier vendredi du mois, {20:00}", "p": "Un exposé, puis du thé et des questions sur ce qu'on a vu."},
+    {"t": "Soirée d'observation", "w": "Quand le ciel est dégagé", "p": "Les télescopes sortent sur le terrain derrière l'annexe. Apportez un vêtement chaud."},
+    {"t": "Nuit des étoiles", "w": "Début août", "p": "Une soirée ouverte à tous pour regarder la Lune, Saturne et les étoiles filantes."},
+    {"t": "Atelier débutants", "w": "Une fois par saison", "p": "Comment choisir, régler et ranger un télescope sans le regretter."},
+    {"t": "Soirée de photos", "w": "Fin novembre", "p": "Les membres montrent leurs meilleures images du ciel de l'année, et les moins réussies aussi."}
+   ],
+   "news": [
+    {"title": "Le programme de la saison est publié", "text": "Huit exposés d'octobre à mai, des comètes aux trous noirs, avec une soirée consacrée aux erreurs d'observation."},
+    {"title": "Merci pour la Nuit des étoiles", "text": "Plus de deux cents visiteurs, une Lune magnifique et seulement deux nuages pendant toute la soirée."},
+    {"title": "Un télescope à prêter", "text": "Le club prête désormais un télescope aux membres pour un mois. Demandez au secrétaire."},
+    {"title": "Nouveaux créneaux d'observation", "text": "Le terrain derrière l'annexe sera ouvert deux soirées de plus par mois pendant l'hiver."}
+   ],
+   "join": [
+    "Nous sommes une trentaine de membres, avec des instruments qui vont d'une paire de jumelles à quelque chose de la taille d'un lave-linge.",
+    "Venez à n'importe quelle réunion. Si le ciel est dégagé, nous vous montrerons la Lune, Jupiter ou tout ce qui est visible ce soir-là."
+   ],
+   "faq": [
+    {"q": "Faut-il un télescope ?", "a": "Non. Venez les mains vides, quelqu'un vous prêtera un oculaire et des explications."},
+    {"q": "Et s'il y a des nuages ?", "a": "Nous gardons l'exposé, le thé, et nous rêvons du prochain ciel dégagé."},
+    {"q": "Les enfants peuvent-ils venir ?", "a": "Oui, accompagnés d'un adulte. Les soirées d'observation sont leurs préférées."}
+   ],
+   "why": [
+    {"h": "Le ciel pour tous", "p": "Des jumelles suffisent pour commencer, et personne n'attend de vous des connaissances."},
+    {"h": "Un exposé par mois", "p": "Des sujets variés, expliqués simplement, avec le temps de poser des questions."},
+    {"h": "Les télescopes du club", "p": "Plusieurs instruments à votre disposition, avec quelqu'un pour vous les montrer."}
+   ],
+   "sessions": [
+    {"t": "Soirée d'ouverture", "p": "Un tour du ciel de la saison, sans carte compliquée."},
+    {"t": "Comètes et poussières", "p": "D'où elles viennent, et pourquoi on les attend toujours en vain."},
+    {"t": "Soirée d'observation", "p": "La Lune, quelques étoiles doubles et un amas dont on retiendra le nom."},
+    {"t": "Atelier télescope", "p": "Réglages, collimation et petits gestes qui évitent les mauvaises surprises."},
+    {"t": "Nuit des étoiles", "p": "Une soirée ouverte au public, avec des télescopes pour tout le monde."},
+    {"t": "Les planètes de l'hiver", "p": "Jupiter, Saturne et les moments où elles sont bien placées."},
+    {"t": "Soirée de photos", "p": "Les images du ciel de l'année, et quelques ratés qui font rire."},
+    {"t": "Quiz de l'espace", "p": "Dix questions sur le cosmos, dix sur autre chose, et un lot de consolation."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [["Astronomie {city}", "{city} Astro", "Club d'astronomie {city}"]]
+    }
+   }
+  }
+ }
+}

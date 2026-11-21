@@ -1,0 +1,195 @@
+{
+ "ui": {
+  "nav_label": "Päävalikko",
+  "footer": "Tehty käsin. Ei evästeitä, ei seurantaa.",
+  "nav_home": "Käyntikortti",
+  "nav_about": "Minusta",
+  "nav_projects": "Työt",
+  "nav_now": "Nyt",
+  "home_title": "Hei",
+  "desc_about": "Lisää tietoa: {brand}.",
+  "desc_projects": "Valittuja töitä: {brand}.",
+  "desc_now": "Mitä {brand} tekee tällä hetkellä.",
+  "nf_title": "Täällä ei ole mitään",
+  "nf_text": "Tässä osoitteessa ei ole sivua. Kokeile etusivun korttia.",
+  "nf_back": "Takaisin korttiin",
+  "link_d": [
+   "Kuka olen ja miten työskentelen",
+   "Muutamia tekemiäni asioita",
+   "Mitä teen tällä hetkellä"
+  ],
+  "about_h": "Minusta",
+  "facts_h": "Lyhyesti",
+  "projects_h": "Työt",
+  "projects_intro": "Muutamia asioita, jotka olen iloinen tehneeni, uusin ensin.",
+  "now_h": "Nyt",
+  "updated": "Päivitetty {upd} 2026",
+  "now_intro": "Tämä on nyt-sivu: mitä puuhaan tällä hetkellä, ei sitä, mitä joskus sanoin tekeväni.",
+  "hello": "Hei, olen",
+  "vars": {
+   "brand": "{name}",
+   "month": [
+    "tammikuusta",
+    "maaliskuusta",
+    "toukokuusta",
+    "syyskuusta"
+   ],
+   "upd": [
+    "elokuussa",
+    "syyskuussa",
+    "lokakuussa",
+    "marraskuussa"
+   ]
+  }
+ },
+ "bundles": {
+  "illustrator": {
+   "role": "Kuvittaja ja grafiikantekijä",
+   "tagline": "Kuvia kirjoihin, julisteisiin ja satunnaisiin syntymäpäiväkortteihin.",
+   "desc": "{brand}: kuvittaja ja grafiikantekijä {city_in}. Kuvakirjoja, julisteita ja linoleikkauksia.",
+   "bio": "Piirrän kuvia kuvakirjoihin ja julisteisiin ja leikkaan linoleikkauksia kaikille, jotka pyytävät kauniisti.",
+   "about": [
+    "Elätän itseni piirtämällä, enimmäkseen kuvakirjoihin ja silloin tällöin julisteisiin. Työskentelen pienessä huoneessa {city_in}. Sen ikkuna avautuu parkkipaikalle, ja piirrän sen kuin se olisi järvi.",
+    "Ennen kuvitusta opiskelin tekstiilipainantaa, enkä ole oikein päässyt eroon kerroksittain ajattelemisesta. Useimmat kuvani rakentuvat kolmesta tai neljästä tasaisesta värista."
+   ],
+   "facts": [
+    "Kotipaikka: {city}",
+    "Työvälineinä kynä, muste ja linoleikkaus",
+    "Uusia toimeksiantoja {month} alkaen"
+   ],
+   "projects": [
+    {
+     "t": "Pellon muistiinpanot",
+     "y": "2025",
+     "d": "Kuvakirja yhden pienen pellon vuodesta, tehty paikallisen painon kanssa."
+    },
+    {
+     "t": "Kauppatorisarja",
+     "y": "2024",
+     "d": "Kaksitoista linoleikkausta myyntikojuista, ostajista ja yhdestä erittäin tyytyväisestä kyyhkystä."
+    },
+    {
+     "t": "Syntymäpäiväkortteja kirjakaupalle",
+     "y": "2023",
+     "d": "Kuusi korttia, painettu käsin kahdensadan kappaleen erissä."
+    }
+   ],
+   "now": [
+    "Viimeistelen säästä kertovan kuvakirjan viimeisiä aukeamia",
+    "Opettelen leikkaamaan nelivärisen linoleikkauksen menettämättä malttiani",
+    "Etsin isompaa painokonetta"
+   ]
+  },
+  "translator": {
+   "role": "Kääntäjä, englannista suomeen",
+   "tagline": "Huolellisia käännöksiä romaaneista, esseistä ja satunnaisista käyttöohjeista.",
+   "desc": "{brand}: kääntäjä englannista suomeen, romaaneja ja esseitä {city_in}.",
+   "bio": "Käännän englannista suomeksi, enimmäkseen romaaneja ja esseitä, ja luen kaiken ääneen kahdesti.",
+   "about": [
+    "Käännän englannista suomeksi, enimmäkseen romaaneja ja esseitä ja joskus sellaisen laitteen käyttöohjeen, joka ansaitsisi paremman tekstin.",
+    "Työskentelen hitaasti, luen kaiken ääneen kahdesti ja lähetän huomautuksen jokaisesta lauseesta, josta en osannut päättää. Kustannustoimittajat sanovat sen olevan joko ihastuttavaa tai raivostuttavaa."
+   ],
+   "facts": [
+    "Kotipaikka: {city}",
+    "Käännän englannista suomeen",
+    "Vapaana uusiin töihin {month} alkaen"
+   ],
+   "projects": [
+    {
+     "t": "Romaani majakanvartijasta",
+     "y": "2025",
+     "d": "Neljäsataa sivua säätä ja katumusta, käännetty neljässätoista kuukaudessa."
+    },
+    {
+     "t": "Esseitä kävelystä",
+     "y": "2024",
+     "d": "Kokoelma lyhyitä kirjoituksia kirjailijalta, joka kulki kaikkialle jalan."
+    },
+    {
+     "t": "Museon luettelo",
+     "y": "2023",
+     "d": "Tekstejä tekstiilinäyttelyyn, enemmän adjektiiveja kuin olisin itse valinnut."
+    }
+   ],
+   "now": [
+    "Tarkistan pitkän romaanin käännöstä",
+    "Luen esseitä, joita voisin ehdottaa kustantajalle",
+    "Päivitän merisanastoani"
+   ]
+  },
+  "potter": {
+   "role": "Keraamikko",
+   "tagline": "Yksinkertaisia kulhoja, mukeja ja lautasia pienissä erissä.",
+   "desc": "{brand}: keraamikko {city_in}. Arkeen sopivaa kivitavaraa, tehty savenvalajan pyörällä.",
+   "bio": "Teen yksinkertaista kivitavaraa pyörällä ja poltan sen pienissä erissä.",
+   "about": [
+    "Teen käyttökeramiikkaa ateljeessa, jonka jaan kolmen muun tekijän kanssa {city_in}. Kaikki on tehty savenvalajan pyörällä ja poltettu kivitavaraksi.",
+    "Pidän astioista, jotka katoavat arjen käyttöön: muki, joka sopii käteen, kulho, joka ei kaadu. Lasitteet ovat enimmäkseen rautaa ja tuhkaa, ja ne muuttuvat hiukan jokaisessa poltossa."
+   ],
+   "facts": [
+    "Kotipaikka: {city}",
+    "Teen kivitavaraa pyörällä",
+    "Uusia töitä {month} alkaen"
+   ],
+   "projects": [
+    {
+     "t": "Arkisarja",
+     "y": "2025",
+     "d": "Lautasia, kulhoja ja mukeja kaurapuuronvärisellä lasitteella, joka ei onnistunut kahdesti samanlaisena."
+    },
+    {
+     "t": "Teekulhot",
+     "y": "2024",
+     "d": "Kolmekymmentä pientä kulhoa, jokainen hieman erilainen, tehty teehuoneelle."
+    },
+    {
+     "t": "Laattatilaus",
+     "y": "2023",
+     "d": "Käsin painettuja laattoja keittiön seinälle neljänä vihreänä sävynä."
+    }
+   ],
+   "now": [
+    "Kokeilen lasitetta, joka on tehty naapurin kokon tuhkasta",
+    "Teen isompia lautasia",
+    "Raivaan tilaa polttouunin hyllyille talven tilauksia varten"
+   ]
+  },
+  "developer": {
+   "role": "Ohjelmistokehittäjä, pienet työkalut",
+   "tagline": "Pieniä, hiljaisia ohjelmia, jotka tekevät yhden asian eivätkä ole tiellä.",
+   "desc": "{brand}: pienten työkalujen kehittäjä {city_in}. Muistiinpanosovellus, kalenteri ja muutama komentoriviohjelma.",
+   "bio": "Kirjoitan pieniä työkaluja sanojen ja lukujen kanssa työskenteleville ja yritän saada ne valmiiksi.",
+   "about": [
+    "Kirjoitan pieniä työkaluja sanojen ja lukujen parissa työskenteleville: muistiinpanosovelluksen, muutaman komentorivi­ohjelman ja kalenterin, joka näyttää vain sen, mikä on tänään tärkeää.",
+    "Teen asioita hitaasti ja yritän saada ne valmiiksi asti. Useimmissa tekemissäni on vähemmän ominaisuuksia kuin voisi olla, ja se on tarkoituksella."
+   ],
+   "facts": [
+    "Kotipaikka: {city}",
+    "Kirjoitan muutamalla tylsällä kielellä",
+    "Vapaana pieniin töihin {month} alkaen"
+   ],
+   "projects": [
+    {
+     "t": "Muistiinpanosovellus työpöydälle",
+     "y": "2025",
+     "d": "Pelkkiä tekstitiedostoja, nopea haku ja ei tunnusta."
+    },
+    {
+     "t": "Kalenteri yhdelle päivälle",
+     "y": "2024",
+     "d": "Näyttää tämän päivän eikä muuta, ja se osoittautui riittäväksi."
+    },
+    {
+     "t": "Ajanseurantatyökalu",
+     "y": "2023",
+     "d": "Yksi painike ja viikkoyhteenveto niille, jotka eivät pidä tuntilistoista."
+    }
+   ],
+   "now": [
+    "Siivoan muistiinpanosovelluksen koodia",
+    "Kirjoitan lyhyen ohjeen",
+    "Mietin kaikesta pienempää versiota"
+   ]
+  }
+ }
+}

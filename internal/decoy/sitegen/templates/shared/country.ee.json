@@ -1,0 +1,260 @@
+{
+ "order": 22,
+ "lang": "et",
+ "html_lang": "et-EE",
+ "date": [
+  "{d}. {m} {y}",
+  "{dd}.{mm}.{y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "{n} €",
+  "group": " ",
+  "scale": 0.9,
+  "round": 5
+ },
+ "address": "{street} {no}, {zip} {city}",
+ "zip_tail": "XXX",
+ "cities": [
+  {
+   "name": "Tallinn",
+   "zip": [
+    "10",
+    "11",
+    "12",
+    "13"
+   ],
+   "in": "Tallinnas"
+  },
+  {
+   "name": "Tartu",
+   "zip": [
+    "50",
+    "51"
+   ],
+   "in": "Tartus"
+  },
+  {
+   "name": "Narva",
+   "zip": [
+    "20"
+   ],
+   "in": "Narvas"
+  },
+  {
+   "name": "Pärnu",
+   "zip": [
+    "80"
+   ],
+   "in": "Pärnus"
+  },
+  {
+   "name": "Kohtla-Järve",
+   "zip": [
+    "30"
+   ],
+   "in": "Kohtla-Järvel"
+  },
+  {
+   "name": "Viljandi",
+   "zip": [
+    "71"
+   ],
+   "in": "Viljandis"
+  },
+  {
+   "name": "Rakvere",
+   "zip": [
+    "44"
+   ],
+   "in": "Rakveres"
+  },
+  {
+   "name": "Kuressaare",
+   "zip": [
+    "93"
+   ],
+   "in": "Kuressaares"
+  },
+  {
+   "name": "Maardu",
+   "zip": [
+    "74"
+   ],
+   "in": "Maardus"
+  },
+  {
+   "name": "Võru",
+   "zip": [
+    "65"
+   ],
+   "in": "Võrus"
+  },
+  {
+   "name": "Valga",
+   "zip": [
+    "68"
+   ],
+   "in": "Valgas"
+  },
+  {
+   "name": "Haapsalu",
+   "zip": [
+    "90"
+   ],
+   "in": "Haapsalus"
+  },
+  {
+   "name": "Jõhvi",
+   "zip": [
+    "41"
+   ],
+   "in": "Jõhvis"
+  },
+  {
+   "name": "Paide",
+   "zip": [
+    "72"
+   ],
+   "in": "Paides"
+  },
+  {
+   "name": "Keila",
+   "zip": [
+    "76"
+   ],
+   "in": "Keilas"
+  },
+  {
+   "name": "Põlva",
+   "zip": [
+    "63"
+   ],
+   "in": "Põlvas"
+  },
+  {
+   "name": "Rapla",
+   "zip": [
+    "79"
+   ],
+   "in": "Raplas"
+  },
+  {
+   "name": "Jõgeva",
+   "zip": [
+    "48"
+   ],
+   "in": "Jõgeval"
+  },
+  {
+   "name": "Kärdla",
+   "zip": [
+    "92"
+   ],
+   "in": "Kärdlas"
+  },
+  {
+   "name": "Sillamäe",
+   "zip": [
+    "40"
+   ],
+   "in": "Sillamäel"
+  }
+ ],
+ "streets": [
+  "Kooli",
+  "Pargi",
+  "Jaama",
+  "Pikk",
+  "Lai",
+  "Viru",
+  "Rüütli",
+  "Põhja",
+  "Lõuna",
+  "Aia",
+  "Veski",
+  "Mäe",
+  "Metsa",
+  "Ranna",
+  "Sadama",
+  "Tamme",
+  "Kase",
+  "Männi",
+  "Niidu",
+  "Nurme"
+ ],
+ "first": [
+  "Mart",
+  "Kati:f",
+  "Andres",
+  "Liis:f",
+  "Jaan",
+  "Katrin:f",
+  "Tõnu",
+  "Maria:f",
+  "Peeter",
+  "Mari:f",
+  "Toomas",
+  "Tiina:f",
+  "Ivo",
+  "Anne:f",
+  "Kristjan",
+  "Piret:f",
+  "Marko",
+  "Kadri:f",
+  "Rein",
+  "Triin:f",
+  "Priit",
+  "Helen:f",
+  "Siim",
+  "Merle:f",
+  "Raivo",
+  "Epp:f",
+  "Kalev",
+  "Annika:f",
+  "Hendrik",
+  "Marika:f",
+  "Taavi",
+  "Sirje:f",
+  "Margus",
+  "Reet:f",
+  "Urmas",
+  "Maarja:f"
+ ],
+ "last": [
+  "Tamm",
+  "Saar",
+  "Sepp",
+  "Mägi",
+  "Kask",
+  "Kukk",
+  "Rebane",
+  "Ilves",
+  "Pärn",
+  "Koppel",
+  "Oja",
+  "Luik",
+  "Kaasik",
+  "Lepik",
+  "Raud",
+  "Kuusk",
+  "Karu",
+  "Põld",
+  "Liiv",
+  "Vaher",
+  "Ots",
+  "Laur",
+  "Jõgi",
+  "Org",
+  "Paju",
+  "Rand",
+  "Teder",
+  "Lill",
+  "Mets",
+  "Kallas",
+  "Vaht",
+  "Aas",
+  "Lember",
+  "Pettai"
+ ]
+}

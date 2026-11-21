@@ -1,0 +1,250 @@
+{
+ "ui": {
+  "nav_label": "Menüü",
+  "footer": "Kõik pildid on stuudio tööd ja neid ei tohi ilma loata reprodutseerida.",
+  "nav_home": "Valitud tööd",
+  "nav_work": "Kõik tööd",
+  "nav_about": "Minust",
+  "nav_contact": "Kontakt",
+  "home_title": "Valitud tööd",
+  "nf_title": "Lehte ei leitud",
+  "nf_text": "Sellel aadressil ei ole midagi. Tööd on avalehel.",
+  "nf_back": "Tagasi tööde juurde",
+  "sel_h": "Valitud tööd",
+  "all_work": "Vaata kõiki töid",
+  "work_h": "Kõik tööd",
+  "work_intro": "Kõik viimastest aastatest, uuemad eespool.",
+  "about_h": "Minust",
+  "services_h": "Mida ma teen",
+  "shows_h": "Näitused ja märkimised",
+  "contact_h": "Kontakt",
+  "visit_h": "Stuudio",
+  "hours_h": "Lahtiolekuajad",
+  "phone_l": "Telefon",
+  "visit_text": "Stuudio on avatud kokkuleppel. Palun tule lahtiolekuajal; kui uksele keegi ei vasta, olen tõenäoliselt tagaruumis või trükikojas.",
+  "commission_h": "Tellimustööd",
+  "commission_text": "Võtan aastas vastu väikese arvu tellimusi. Kui võtad ühendust, ütle, mida sa mõtled ja millal seda vaja on, ja ma ütlen ausalt, kas saan seda teha.",
+  "hours_note": "Laupäeval kokkuleppel",
+  "work_back": "Kõik tööd",
+  "work_more": "Veel töid",
+  "work_ask": "Küsi selle töö kohta",
+  "directions_h": "Stuudio leidmine",
+  "directions": "Stuudio asub esimesel korrusel, lühikese jalutuskäigu kaugusel kesklinnast. Uks on küljel ja seal on kell. Jalgrattahoidjad on väljas."
+ },
+ "bundles": {
+  "photo": {
+   "tagline": "Fotod vaiksetest paikadest",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Õõnes",
+       "Kahvatu",
+       "Avatud",
+       "Vaikne",
+       "Pikk",
+       "Pehme",
+       "Õhuke",
+       "Varane",
+       "Kitsas",
+       "Kauge"
+      ],
+      [
+       "valgus",
+       "kaader",
+       "põld",
+       "tund",
+       "silmapiir",
+       "säriaeg",
+       "plaat",
+       "katik",
+       "ava",
+       "tõmmis"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Maastiku- ja natüürmordifotograafia {city_in}. Tõmmised ja tellimustööd.",
+   "desc_work": "Valitud fotod, uuemad eespool.",
+   "desc_about": "Fotograafist ja stuudiost {city_in}.",
+   "desc_contact": "Kus stuudio {city_in} asub ja millal see lahti on.",
+   "intro": "Maastiku- ja natüürmordifotograafia {city_in}. Tõmmised ja mõned tellimustööd aastas.",
+   "about": [
+    "Olen fotograaf, kes töötab väikeses stuudios {city_in}. Enamik minu pilte on paikadest tunni jooksul pärast seda, kui kõik on lahkunud.",
+    "Töötan aeglaselt, tavaliselt ühe kaamera ja ühe objektiiviga, ning trükin kõik ise tagaruumis. Pilt on valmis, kui saan seda nädala vaadata ilma muutmissoovita.",
+    "Viimastel aastatel on minu töid näidatud väikestes galeriides ja raamatukogudes ümber piirkonna ning müüdud tõmmistena inimestele, kes tahtsid seinale midagi vaikset."
+   ],
+   "services": [
+    "Kunstitõmmised, allkirjastatud ja nummerdatud",
+    "Tellimusportreed kodus või stuudios",
+    "Ajakirja- ja raamatufotograafia"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Kaks silmapiiri, ühisnäitus, Vana Viljaaida galerii"
+    },
+    {
+     "y": "2024",
+     "t": "Vaikne vesi, isikunäitus, raamatukogu fuajee"
+    },
+    {
+     "y": "2022",
+     "t": "Piirkondlik fotopreemia, lühinimekiri"
+    }
+   ],
+   "works": [
+    {
+     "title": "Nõlv pärastlõunal",
+     "caption": "Arhiivipigmenttrükk, 2025",
+     "note": "Viimane valgus põllul, mida tavaliselt ei märgata.",
+     "text": "Ootasin kolm pärastlõunat, et pilv seljakult tõuseks, ja see tõusis neljaks minutiks."
+    },
+    {
+     "title": "Kaks silmapiiri",
+     "caption": "Arhiivipigmenttrükk, 2025",
+     "note": "Rannajoon, mis ei osanud otsustada, kus lõppeda.",
+     "text": "Tõusuvesi taandus ja märg liiv peegeldas teist taevast. Tegin kuus kaadrit ja jätsin selle."
+    },
+    {
+     "title": "Vaikne vesi",
+     "caption": "Arhiivipigmenttrükk, 2024",
+     "note": "Tiik novembris, millel pole midagi tõestada.",
+     "text": "Veehoidla seitsmest hommikul, enne tuult. Tõmmis on suur, nii et vaikusel on ruumi."
+    },
+    {
+     "title": "Punane põld",
+     "caption": "Arhiivipigmenttrükk, 2024",
+     "note": "Seemnesse läinud moonid, pildistatud vihmas.",
+     "text": "Ristik, mis jäeti õitsema ja siis niideti. Värv tõmmisel on lähemal sellele, mida ma nägin, kui kaamera nägi."
+    },
+    {
+     "title": "Jooned hämaruses",
+     "caption": "Arhiivipigmenttrükk, 2023",
+     "note": "Telefonijuhtmed taeva vastu, mis meelt muutis.",
+     "text": "Aiapostid ja vagud, viimane valgus nende peal lamedalt. See näeb pikas kitsas raamis parem välja."
+    },
+    {
+     "title": "Sool ja kild",
+     "caption": "Arhiivipigmenttrükk, 2023",
+     "note": "Sadamasein mõõna ajal, vana mündi värvides.",
+     "text": "Tume kivirand, mille peal on tõusuvee jäetud valge sool. Käisin kolmel aastaajal tagasi, et saada soovitud valgus."
+    },
+    {
+     "title": "Sinine tund",
+     "caption": "Arhiivipigmenttrükk, 2022",
+     "note": "Kümme minutit päeva ja öö vahel, korratud nädala jooksul.",
+     "text": "Kümme minutit pärast päikeseloojangut muutub kogu org tindivärviliseks. See on ainus kaader, kus lamp põleb."
+    }
+   ]
+  },
+  "illustration": {
+   "tagline": "Illustratsioon ja trükigraafika",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Sõnajala",
+       "Paberi",
+       "Väikese",
+       "Tindi",
+       "Sidruni",
+       "Ööliblika",
+       "Ausa",
+       "Apelsini",
+       "Pliiatsi",
+       "Vaikse"
+      ],
+      [
+       "press",
+       "stuudio",
+       "laud",
+       "joonistus",
+       "töökoda",
+       "visandikuvihik",
+       "nurk",
+       "töölaud",
+       "klots",
+       "kapp"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Illustratsioonid, linoollõiked ja väikesed raamatud ühelt laualt {city_in}.",
+   "desc_work": "Illustratsioonid ja trükised, uuemad eespool.",
+   "desc_about": "Illustraatorist ja stuudiost {city_in}.",
+   "desc_contact": "Kus stuudio {city_in} asub ja millal see lahti on.",
+   "intro": "Illustratsioonid, linoollõiked ja väikesed raamatud ühelt laualt {city_in}.",
+   "about": [
+    "Olen illustraator ja trükigraafik. Joonistan pildiraamatutele, ajakirjadele, mis veel õigel ajal maksavad, ja kõigile, kes vajavad plakati nurka lindu.",
+    "Enamik minu töid algab pliiatsivisandina märkmikus ja lõpeb linoollõike või tasapinnalise värvi digijoonistusena, olenevalt sellest, mida töö näib tahtvat.",
+    "Elan {city_in} koos kassiga, kellel on minu kompositsioonide kohta oma arvamus."
+   ],
+   "services": [
+    "Pildiraamatud ja ajakirjade illustratsioonid",
+    "Linoollõigete trükised ja kaardid",
+    "Plakatid ja ürituste kujundus"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Väikese trüki laat, müüja"
+    },
+    {
+     "y": "2024",
+     "t": "Märkmeid väljalt, pildiraamat kohalikust kirjastusest"
+    },
+    {
+     "y": "2023",
+     "t": "Piirkondlik illustratsiooniauhind, äramärgitud"
+    }
+   ],
+   "works": [
+    {
+     "title": "Etüüd oranžis",
+     "caption": "Linoollõige, kolm värvi, 2025",
+     "note": "Rebane, pool treppi ja seletamatu kuu.",
+     "text": "Üks värv, kolm paberit ja üks pärastlõuna. See algas soojendusena ja sai väikese raamatu kaanepildiks."
+    },
+    {
+     "title": "Turupäev",
+     "caption": "Digijoonistus, 2025",
+     "note": "Üksteist letti ja üks väga rahulolev tuvi.",
+     "text": "Joonistatud kohapeal kolmel laupäeval. Müüjad olid nii lahked, et püsisid paigal või peaaegu."
+    },
+    {
+     "title": "Pikk tee",
+     "caption": "Pliiats ja tint, 2024",
+     "note": "Rada, mis ei vii sinna, kuhu silt ütleb.",
+     "text": "Tee, mida käin pühapäeviti, joonistatud mälu järgi ja kontrollitud järgmisel jalutuskäigul. Kaart eksis toredal moel."
+    },
+    {
+     "title": "Öobuss",
+     "caption": "Linoollõige, kaks värvi, 2024",
+     "note": "Kõik magavad peale juhi ja kuu.",
+     "text": "Pastakas, tint ja palju kannatlikkust akna peegelduste suhtes."
+    },
+    {
+     "title": "Rohelised tunnid",
+     "caption": "Guašš, 2023",
+     "note": "Kasvuhoone kell neli pärastlõunal.",
+     "text": "Juunihommiku tunnid enne hommikusööki, kui aed on veel jahe. Linoollõige kolmes värvis."
+    },
+    {
+     "title": "Väikesed linnud",
+     "caption": "Linoollõige, 2023",
+     "note": "Seitse lindu, ühtegi pole õigesti tuvastatud.",
+     "text": "Varblased, püü ja üks väga vihane punarind. Iga lind on eraldi klots, nii et kaks tõmmist ei ole täpselt ühesugused."
+    },
+    {
+     "title": "Vihmaetüüd",
+     "caption": "Akvarell, 2022",
+     "note": "Vihmavarjud, mida näeb aknast.",
+     "text": "Akvarell, enamasti vesi. Lasin paberil otsustada, kuhu lombid läksid."
+    }
+   ]
+  }
+ }
+}

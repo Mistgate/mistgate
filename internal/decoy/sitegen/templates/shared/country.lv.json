@@ -1,0 +1,256 @@
+{
+ "order": 23,
+ "lang": "lv",
+ "html_lang": "lv-LV",
+ "date": [
+  "{y}. gada {d}. {m}",
+  "{dd}.{mm}.{y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "{n} €",
+  "group": " ",
+  "scale": 0.9,
+  "round": 5
+ },
+ "address": "{street} {no}, {city}, {zip}",
+ "zip_tail": "XX",
+ "cities": [
+  {
+   "name": "Rīga",
+   "zip": [
+    "LV-10"
+   ],
+   "in": "Rīgā"
+  },
+  {
+   "name": "Daugavpils",
+   "zip": [
+    "LV-54"
+   ],
+   "in": "Daugavpilī"
+  },
+  {
+   "name": "Liepāja",
+   "zip": [
+    "LV-34"
+   ],
+   "in": "Liepājā"
+  },
+  {
+   "name": "Jelgava",
+   "zip": [
+    "LV-30"
+   ],
+   "in": "Jelgavā"
+  },
+  {
+   "name": "Jūrmala",
+   "zip": [
+    "LV-20"
+   ],
+   "in": "Jūrmalā"
+  },
+  {
+   "name": "Ventspils",
+   "zip": [
+    "LV-36"
+   ],
+   "in": "Ventspilī"
+  },
+  {
+   "name": "Rēzekne",
+   "zip": [
+    "LV-46"
+   ],
+   "in": "Rēzeknē"
+  },
+  {
+   "name": "Valmiera",
+   "zip": [
+    "LV-42"
+   ],
+   "in": "Valmierā"
+  },
+  {
+   "name": "Jēkabpils",
+   "zip": [
+    "LV-52"
+   ],
+   "in": "Jēkabpilī"
+  },
+  {
+   "name": "Ogre",
+   "zip": [
+    "LV-50"
+   ],
+   "in": "Ogrē"
+  },
+  {
+   "name": "Tukums",
+   "zip": [
+    "LV-31"
+   ],
+   "in": "Tukumā"
+  },
+  {
+   "name": "Cēsis",
+   "zip": [
+    "LV-41"
+   ],
+   "in": "Cēsīs"
+  },
+  {
+   "name": "Kuldīga",
+   "zip": [
+    "LV-33"
+   ],
+   "in": "Kuldīgā"
+  },
+  {
+   "name": "Talsi",
+   "zip": [
+    "LV-32"
+   ],
+   "in": "Talsos"
+  },
+  {
+   "name": "Bauska",
+   "zip": [
+    "LV-39"
+   ],
+   "in": "Bauskā"
+  },
+  {
+   "name": "Dobele",
+   "zip": [
+    "LV-37"
+   ],
+   "in": "Dobelē"
+  },
+  {
+   "name": "Saldus",
+   "zip": [
+    "LV-38"
+   ],
+   "in": "Saldū"
+  },
+  {
+   "name": "Madona",
+   "zip": [
+    "LV-48"
+   ],
+   "in": "Madonā"
+  },
+  {
+   "name": "Limbaži",
+   "zip": [
+    "LV-40"
+   ],
+   "in": "Limbažos"
+  },
+  {
+   "name": "Sigulda",
+   "zip": [
+    "LV-21"
+   ],
+   "in": "Siguldā"
+  }
+ ],
+ "streets": [
+  "Brīvības iela",
+  "Lielā iela",
+  "Rīgas iela",
+  "Skolas iela",
+  "Parka iela",
+  "Dzirnavu iela",
+  "Baznīcas iela",
+  "Stacijas iela",
+  "Jūras iela",
+  "Liepu iela",
+  "Ozolu iela",
+  "Tirgus iela",
+  "Raiņa iela",
+  "Upes iela",
+  "Mežu iela",
+  "Pils iela",
+  "Smilšu iela",
+  "Ausekļa iela",
+  "Kalna iela",
+  "Avotu iela"
+ ],
+ "first": [
+  "Jānis",
+  "Anna:f",
+  "Andris",
+  "Līga:f",
+  "Māris",
+  "Inese:f",
+  "Edgars",
+  "Ilze:f",
+  "Kārlis",
+  "Kristīne:f",
+  "Pēteris",
+  "Dace:f",
+  "Ivars",
+  "Laima:f",
+  "Aigars",
+  "Baiba:f",
+  "Raimonds",
+  "Zane:f",
+  "Artūrs",
+  "Sanita:f",
+  "Mārtiņš",
+  "Agnese:f",
+  "Gatis",
+  "Evija:f",
+  "Uldis",
+  "Marta:f",
+  "Rihards",
+  "Elīna:f",
+  "Ainārs",
+  "Ieva:f",
+  "Normunds",
+  "Aija:f",
+  "Dainis",
+  "Lāsma:f",
+  "Valdis",
+  "Santa:f"
+ ],
+ "last": [
+  "Bērziņš/Bērziņa",
+  "Kalniņš/Kalniņa",
+  "Ozols/Ozola",
+  "Liepiņš/Liepiņa",
+  "Jansons/Jansone",
+  "Krūmiņš/Krūmiņa",
+  "Balodis/Balode",
+  "Eglītis/Eglīte",
+  "Zariņš/Zariņa",
+  "Pētersons/Pētersone",
+  "Vītols/Vītola",
+  "Kļaviņš/Kļaviņa",
+  "Siliņš/Siliņa",
+  "Ozoliņš/Ozoliņa",
+  "Vanags/Vanaga",
+  "Lapiņš/Lapiņa",
+  "Rozītis/Rozīte",
+  "Krastiņš/Krastiņa",
+  "Āboliņš/Āboliņa",
+  "Priede/Priede",
+  "Zvirbulis/Zvirbule",
+  "Gailis/Gaile",
+  "Putniņš/Putniņa",
+  "Avotiņš/Avotiņa",
+  "Grīnbergs/Grīnberga",
+  "Ābols/Ābola",
+  "Cīrulis/Cīrule",
+  "Dzenis/Dzene",
+  "Vilks/Vilka",
+  "Lācis/Lāce",
+  "Circenis/Circene",
+  "Zālītis/Zālīte",
+  "Muižnieks/Muižniece",
+  "Kalējs/Kalēja"
+ ]
+}

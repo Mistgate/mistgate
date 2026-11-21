@@ -1,0 +1,138 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Koivu",
+      "Leppä",
+      "Kuusi",
+      "Mänty",
+      "Tammi",
+      "Haapa",
+      "Pihlaja",
+      "Raita",
+      "Saari",
+      "Kallio",
+      "Niitty",
+      "Lehto"
+     ],
+     [
+      "kulma",
+      "portti",
+      "tupa",
+      "silta",
+      "rinne",
+      "lähde",
+      "kenttä",
+      "kuja",
+      "mäki",
+      "laakso"
+     ]
+    ],
+    "sep": ""
+   }
+  },
+  "nav_label": "Päävalikko",
+  "tagline": "Turvallinen pääsy tiliisi",
+  "footer": "Kaikki oikeudet pidätetään.",
+  "nav_home": "Kirjaudu",
+  "nav_help": "Ohje",
+  "nav_privacy": "Tietosuoja",
+  "home_title": "Kirjaudu sisään",
+  "desc": "Kirjaudu tilillesi palvelussa {brand}.",
+  "desc_help": "Apua kirjautumiseen palvelussa {brand}.",
+  "desc_privacy": "Miten {brand} käsittelee tietojasi.",
+  "nf_title": "Sivua ei löytynyt",
+  "nf_text": "Hakemaasi sivua ei ole olemassa tai se on siirretty.",
+  "nf_back": "Takaisin kirjautumiseen",
+  "f_user": "Käyttäjätunnus tai sähköposti",
+  "f_pass": "Salasana",
+  "f_remember": "Pysy kirjautuneena",
+  "f_forgot": "Unohditko salasanasi?",
+  "f_submit": "Kirjaudu sisään",
+  "f_busy": "Kirjaudutaan…",
+  "e_empty": "Anna käyttäjätunnuksesi ja salasanasi.",
+  "e_bad": [
+   "Käyttäjätunnus tai salasana on väärä.",
+   "Antamasi käyttäjätunnus tai salasana ei ole oikea. Yritä uudelleen.",
+   "Kirjautuminen näillä tiedoilla ei onnistunut."
+  ],
+  "help_h": "Ongelmia kirjautumisessa?",
+  "help_intro": "Useimpiin kirjautumisongelmiin on yksinkertainen syy. Käy nämä vaiheet läpi, ennen kuin otat yhteyttä keneenkään.",
+  "help_steps": [
+   "Tarkista, ettei Caps Lock ole päällä; salasanoissa isot ja pienet kirjaimet ovat eri merkkejä.",
+   "Katso, ettei käyttäjätunnuksesi alussa tai lopussa ole ylimääräistä välilyöntiä.",
+   "Yritä uudelleen uudessa selainikkunassa, jossa ei ole tallennettuja lomaketietoja.",
+   "Odota kymmenen minuuttia, jos olet yrittänyt monta kertaa tuloksetta."
+  ],
+  "help_contact_h": "Eikö vieläkään toimi?",
+  "help_contact": "Pyydä organisaatiosi {brand}-tunnusten ylläpitäjää nollaamaan salasanasi. Turvallisuussyistä emme voi nollata sitä puhelimitse tai sähköpostilla.",
+  "help_back": "Takaisin kirjautumiseen",
+  "privacy_h": "Tietosuojaseloste",
+  "privacy_intro": "Säilytämme sinusta mahdollisimman vähän tietoa ja huolehdimme siitä, mitä säilytämme. Tässä lyhyesti, mitä tiedot ovat ja miksi niitä säilytetään.",
+  "privacy": [
+   {
+    "h": "Mitä säilytämme",
+    "p": "Käyttäjätunnuksesi, kirjautumisajat ja tilisi tiedot. Ei mitään muuta."
+   },
+   {
+    "h": "Mihin käytämme tietoja",
+    "p": "Jotta voit kirjautua sisään ja jotta tilisi pysyy suojassa muilta. Emme myy tietoja käyttäjistämme."
+   },
+   {
+    "h": "Evästeet",
+    "p": "Käytämme vain evästeitä, joita palvelu tarvitsee toimiakseen. Mainos- tai analytiikkaevästeitä ei ole."
+   },
+   {
+    "h": "Oikeutesi",
+    "p": "Voit pyytää nähdä, oikaista tai poistaa sinusta säilytettävät tiedot. Pyydä sitä tilisi ylläpitäjältä."
+   }
+  ]
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Asiakastili",
+   "welcome": "Tervetuloa takaisin",
+   "lead": "Kirjaudu sisään nähdäksesi laskusi, päivittääksesi tietosi ja hallitaksesi sopimustasi.",
+   "bullets": [
+    "Katso ja lataa laskuja",
+    "Päivitä yhteystietosi",
+    "Seuraa avoimia pyyntöjä"
+   ]
+  },
+  "staff": {
+   "kicker": "Henkilökunnan alue",
+   "welcome": "Henkilökunnan kirjautuminen",
+   "lead": "Käytä työtunnustasi päästäksesi työvuorolistoihin, tiedotteisiin ja yhteisiin asiakirjoihin.",
+   "bullets": [
+    "Työvuorot ja työvuorolistat",
+    "Tiedotteet tiimille",
+    "Yhteiset asiakirjat"
+   ],
+   "f_user": "Työntekijänumero tai sähköposti"
+  },
+  "archive": {
+   "kicker": "Asiakirja-arkisto",
+   "welcome": "Avaa arkistosi",
+   "lead": "Sopimuksesi, kuittisi ja kirjeesi säilytetään täällä sinua varten ja pidetään yksityisinä.",
+   "bullets": [
+    "Sopimukset ja kuitit",
+    "Kirjeet yhdessä paikassa",
+    "Pääsy on sinun hallinnassasi"
+   ],
+   "f_user": "Sähköpostiosoite"
+  },
+  "bookings": {
+   "kicker": "Varaukset",
+   "welcome": "Hallitse varauksiasi",
+   "lead": "Kirjaudu sisään muuttaaksesi varausta, lisätäksesi vieraita tai nähdäksesi tulevat varaukset.",
+   "bullets": [
+    "Muuta tai peru varaus",
+    "Lisää vieraita",
+    "Katso tulevat päivämäärät"
+   ],
+   "f_user": "Varauksen sähköposti"
+  }
+ }
+}

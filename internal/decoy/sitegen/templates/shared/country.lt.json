@@ -1,0 +1,218 @@
+{
+ "order": 24,
+ "lang": "lt",
+ "html_lang": "lt-LT",
+ "date": [
+  "{y} m. {m} {d} d.",
+  "{y}.{mm}.{dd}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "{n} €",
+  "group": " ",
+  "scale": 0.9,
+  "round": 5
+ },
+ "address": "{street} {no}, {zip} {city}",
+ "zip_tail": "XXX",
+ "cities": [
+  {
+   "name": "Vilnius",
+   "zip": ["LT-01", "LT-03", "LT-04", "LT-05", "LT-06", "LT-08", "LT-09"],
+   "in": "Vilniuje"
+  },
+  {
+   "name": "Kaunas",
+   "zip": ["LT-44", "LT-46", "LT-47", "LT-48", "LT-49"],
+   "in": "Kaune"
+  },
+  {
+   "name": "Klaipėda",
+   "zip": ["LT-91", "LT-92", "LT-93"],
+   "in": "Klaipėdoje"
+  },
+  {
+   "name": "Šiauliai",
+   "zip": ["LT-76", "LT-77", "LT-78"],
+   "in": "Šiauliuose"
+  },
+  {
+   "name": "Panevėžys",
+   "zip": ["LT-35", "LT-36", "LT-37"],
+   "in": "Panevėžyje"
+  },
+  {
+   "name": "Alytus",
+   "zip": ["LT-62"],
+   "in": "Alytuje"
+  },
+  {
+   "name": "Marijampolė",
+   "zip": ["LT-68"],
+   "in": "Marijampolėje"
+  },
+  {
+   "name": "Mažeikiai",
+   "zip": ["LT-89"],
+   "in": "Mažeikiuose"
+  },
+  {
+   "name": "Jonava",
+   "zip": ["LT-55"],
+   "in": "Jonavoje"
+  },
+  {
+   "name": "Utena",
+   "zip": ["LT-28"],
+   "in": "Utenoje"
+  },
+  {
+   "name": "Kėdainiai",
+   "zip": ["LT-57"],
+   "in": "Kėdainiuose"
+  },
+  {
+   "name": "Telšiai",
+   "zip": ["LT-87"],
+   "in": "Telšiuose"
+  },
+  {
+   "name": "Tauragė",
+   "zip": ["LT-72"],
+   "in": "Tauragėje"
+  },
+  {
+   "name": "Ukmergė",
+   "zip": ["LT-20"],
+   "in": "Ukmergėje"
+  },
+  {
+   "name": "Palanga",
+   "zip": ["LT-00"],
+   "in": "Palangoje"
+  },
+  {
+   "name": "Plungė",
+   "zip": ["LT-90"],
+   "in": "Plungėje"
+  },
+  {
+   "name": "Visaginas",
+   "zip": ["LT-31"],
+   "in": "Visagine"
+  },
+  {
+   "name": "Druskininkai",
+   "zip": ["LT-66"],
+   "in": "Druskininkuose"
+  },
+  {
+   "name": "Kretinga",
+   "zip": ["LT-97"],
+   "in": "Kretingoje"
+  },
+  {
+   "name": "Radviliškis",
+   "zip": ["LT-82"],
+   "in": "Radviliškyje"
+  }
+ ],
+ "streets": [
+  "Vytauto g.",
+  "Gedimino g.",
+  "Basanavičiaus g.",
+  "Kudirkos g.",
+  "Vilniaus g.",
+  "Kauno g.",
+  "Sodų g.",
+  "Liepų g.",
+  "Ąžuolų g.",
+  "Pušų g.",
+  "Parko g.",
+  "Šilo g.",
+  "Mokyklos g.",
+  "Žemaitės g.",
+  "Birutės g.",
+  "Kęstučio g.",
+  "Jaunimo g.",
+  "Nemuno g.",
+  "Gėlių g.",
+  "Taikos g.",
+  "Aušros g.",
+  "Maironio g."
+ ],
+ "first": [
+  "Jonas",
+  "Ona:f",
+  "Petras",
+  "Rūta:f",
+  "Antanas",
+  "Jūratė:f",
+  "Tomas",
+  "Daiva:f",
+  "Darius",
+  "Laima:f",
+  "Andrius",
+  "Gintarė:f",
+  "Mantas",
+  "Agnė:f",
+  "Rimantas",
+  "Inga:f",
+  "Algirdas",
+  "Ieva:f",
+  "Mindaugas",
+  "Vilma:f",
+  "Vytautas",
+  "Aušra:f",
+  "Giedrius",
+  "Dalia:f",
+  "Paulius",
+  "Rasa:f",
+  "Arūnas",
+  "Giedrė:f",
+  "Marius",
+  "Eglė:f",
+  "Linas",
+  "Lina:f",
+  "Saulius",
+  "Justina:f",
+  "Rokas",
+  "Birutė:f"
+ ],
+ "last": [
+  "Kazlauskas/Kazlauskienė",
+  "Petrauskas/Petrauskienė",
+  "Jankauskas/Jankauskienė",
+  "Stankevičius/Stankevičienė",
+  "Vasiliauskas/Vasiliauskienė",
+  "Žukauskas/Žukauskienė",
+  "Butkus/Butkienė",
+  "Paulauskas/Paulauskienė",
+  "Urbonas/Urbonienė",
+  "Navickas/Navickienė",
+  "Sakalauskas/Sakalauskienė",
+  "Pocius/Pocienė",
+  "Balčiūnas/Balčiūnienė",
+  "Kavaliauskas/Kavaliauskienė",
+  "Jonaitis/Jonaitienė",
+  "Rimkus/Rimkienė",
+  "Morkūnas/Morkūnienė",
+  "Mockus/Mockienė",
+  "Gudaitis/Gudaitienė",
+  "Baranauskas/Baranauskienė",
+  "Ramanauskas/Ramanauskienė",
+  "Adomaitis/Adomaitienė",
+  "Šimkus/Šimkienė",
+  "Kairys/Kairienė",
+  "Bagdonas/Bagdonienė",
+  "Mikalauskas/Mikalauskienė",
+  "Černiauskas/Černiauskienė",
+  "Matulevičius/Matulevičienė",
+  "Vaitkus/Vaitkienė",
+  "Norkus/Norkienė",
+  "Valaitis/Valaitienė",
+  "Žilinskas/Žilinskienė",
+  "Jasiūnas/Jasiūnienė",
+  "Lukošius/Lukošienė"
+ ]
+}

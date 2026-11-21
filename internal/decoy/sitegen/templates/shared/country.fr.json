@@ -1,0 +1,344 @@
+{
+ "order": 9,
+ "lang": "fr",
+ "html_lang": "fr-FR",
+ "date": [
+  "{d} {m} {y}",
+  "{dd}/{mm}/{y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "{n} €",
+  "group": " ",
+  "scale": 0.9,
+  "round": 5
+ },
+ "address": "{no} {street}, {zip} {city}",
+ "zip_tail": "X",
+ "cities": [
+  {
+   "name": "Paris",
+   "in": "à Paris",
+   "zip": [
+    "7500",
+    "7501"
+   ],
+   "phone": "01 99 00 XX XX"
+  },
+  {
+   "name": "Marseille",
+   "in": "à Marseille",
+   "zip": [
+    "1300"
+   ],
+   "phone": "04 65 71 XX XX"
+  },
+  {
+   "name": "Lyon",
+   "in": "à Lyon",
+   "zip": [
+    "6900"
+   ],
+   "phone": "04 65 71 XX XX"
+  },
+  {
+   "name": "Toulouse",
+   "in": "à Toulouse",
+   "zip": [
+    "3100",
+    "3110"
+   ],
+   "phone": "05 36 49 XX XX"
+  },
+  {
+   "name": "Nice",
+   "in": "à Nice",
+   "zip": [
+    "0600",
+    "0610"
+   ],
+   "phone": "04 65 71 XX XX"
+  },
+  {
+   "name": "Nantes",
+   "in": "à Nantes",
+   "zip": [
+    "4400",
+    "4410"
+   ],
+   "phone": "02 61 91 XX XX"
+  },
+  {
+   "name": "Montpellier",
+   "in": "à Montpellier",
+   "zip": [
+    "3400",
+    "3407"
+   ],
+   "phone": "04 65 71 XX XX"
+  },
+  {
+   "name": "Strasbourg",
+   "in": "à Strasbourg",
+   "zip": [
+    "6700",
+    "6720"
+   ],
+   "phone": "03 53 01 XX XX"
+  },
+  {
+   "name": "Bordeaux",
+   "in": "à Bordeaux",
+   "zip": [
+    "3300",
+    "3320"
+   ],
+   "phone": "05 36 49 XX XX"
+  },
+  {
+   "name": "Lille",
+   "in": "à Lille",
+   "zip": [
+    "5900",
+    "5980"
+   ],
+   "phone": "03 53 01 XX XX"
+  },
+  {
+   "name": "Rennes",
+   "in": "à Rennes",
+   "zip": [
+    "3500",
+    "3520"
+   ],
+   "phone": "02 61 91 XX XX"
+  },
+  {
+   "name": "Reims",
+   "in": "à Reims",
+   "zip": [
+    "5110"
+   ],
+   "phone": "03 53 01 XX XX"
+  },
+  {
+   "name": "Saint-Étienne",
+   "in": "à Saint-Étienne",
+   "zip": [
+    "4200",
+    "4210"
+   ],
+   "phone": "04 65 71 XX XX"
+  },
+  {
+   "name": "Le Havre",
+   "in": "au Havre",
+   "zip": [
+    "7660"
+   ],
+   "phone": "02 61 91 XX XX"
+  },
+  {
+   "name": "Toulon",
+   "in": "à Toulon",
+   "zip": [
+    "8300",
+    "8320"
+   ],
+   "phone": "04 65 71 XX XX"
+  },
+  {
+   "name": "Grenoble",
+   "in": "à Grenoble",
+   "zip": [
+    "3800",
+    "3810"
+   ],
+   "phone": "04 65 71 XX XX"
+  },
+  {
+   "name": "Dijon",
+   "in": "à Dijon",
+   "zip": [
+    "2100"
+   ],
+   "phone": "03 53 01 XX XX"
+  },
+  {
+   "name": "Le Mans",
+   "in": "au Mans",
+   "zip": [
+    "7200",
+    "7210"
+   ],
+   "phone": "02 61 91 XX XX"
+  },
+  {
+   "name": "Brest",
+   "in": "à Brest",
+   "zip": [
+    "2920"
+   ],
+   "phone": "02 61 91 XX XX"
+  },
+  {
+   "name": "Tours",
+   "in": "à Tours",
+   "zip": [
+    "3700",
+    "3720"
+   ],
+   "phone": "02 61 91 XX XX"
+  },
+  {
+   "name": "Clermont-Ferrand",
+   "in": "à Clermont-Ferrand",
+   "zip": [
+    "6300",
+    "6310"
+   ],
+   "phone": "04 65 71 XX XX"
+  },
+  {
+   "name": "Rouen",
+   "in": "à Rouen",
+   "zip": [
+    "7600",
+    "7610"
+   ],
+   "phone": "02 61 91 XX XX"
+  },
+  {
+   "name": "Caen",
+   "in": "à Caen",
+   "zip": [
+    "1400"
+   ],
+   "phone": "02 61 91 XX XX"
+  },
+  {
+   "name": "Nancy",
+   "in": "à Nancy",
+   "zip": [
+    "5400",
+    "5410"
+   ],
+   "phone": "03 53 01 XX XX"
+  },
+  {
+   "name": "Metz",
+   "in": "à Metz",
+   "zip": [
+    "5700"
+   ],
+   "phone": "03 53 01 XX XX"
+  },
+  {
+   "name": "Limoges",
+   "in": "à Limoges",
+   "zip": [
+    "8700",
+    "8710"
+   ],
+   "phone": "05 36 49 XX XX"
+  }
+ ],
+ "streets": [
+  "rue de la République",
+  "rue de l'Église",
+  "rue du Moulin",
+  "rue des Lilas",
+  "avenue de la Gare",
+  "rue du Marché",
+  "rue de la Paix",
+  "rue des Écoles",
+  "rue Pasteur",
+  "rue Victor-Hugo",
+  "avenue Jean-Jaurès",
+  "boulevard Gambetta",
+  "place de la Mairie",
+  "rue des Tilleuls",
+  "chemin des Vignes",
+  "impasse des Cerisiers",
+  "rue Voltaire",
+  "rue de la Fontaine",
+  "avenue de la Liberté",
+  "rue du Château"
+ ],
+ "first": [
+  "Lucas",
+  "Emma:f",
+  "Louis",
+  "Léa:f",
+  "Hugo",
+  "Chloé:f",
+  "Jules",
+  "Camille:f",
+  "Théo",
+  "Manon:f",
+  "Antoine",
+  "Julie:f",
+  "Nicolas",
+  "Sophie:f",
+  "Thomas",
+  "Claire:f",
+  "Maxime",
+  "Marion:f",
+  "Julien",
+  "Élodie:f",
+  "Pierre",
+  "Isabelle:f",
+  "Mathieu",
+  "Nathalie:f",
+  "Romain",
+  "Céline:f",
+  "Olivier",
+  "Sandrine:f",
+  "Benoît",
+  "Valérie:f",
+  "Guillaume",
+  "Aurélie:f",
+  "Alexandre",
+  "Anaïs:f",
+  "Étienne",
+  "Mathilde:f"
+ ],
+ "last": [
+  "Martin",
+  "Bernard",
+  "Dubois",
+  "Thomas",
+  "Robert",
+  "Richard",
+  "Petit",
+  "Durand",
+  "Leroy",
+  "Moreau",
+  "Simon",
+  "Laurent",
+  "Lefebvre",
+  "Michel",
+  "Garcia",
+  "David",
+  "Bertrand",
+  "Roux",
+  "Vincent",
+  "Fournier",
+  "Morel",
+  "Girard",
+  "André",
+  "Mercier",
+  "Dupont",
+  "Lambert",
+  "Bonnet",
+  "François",
+  "Martinez",
+  "Blanc",
+  "Guérin",
+  "Muller",
+  "Faure",
+  "Rousseau",
+  "Fontaine",
+  "Chevalier"
+ ]
+}

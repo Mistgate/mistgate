@@ -1,0 +1,101 @@
+{
+ "nav_label": "Galvenā izvēlne",
+ "nf_title": "Lapa nav atrasta",
+ "nf_text": "Lapas, ko meklēji, nav vai arī tā ir pārvietota.",
+ "nf_back": "Atpakaļ uz sākumlapu",
+ "months": [
+  "janvāris",
+  "februāris",
+  "marts",
+  "aprīlis",
+  "maijs",
+  "jūnijs",
+  "jūlijs",
+  "augusts",
+  "septembris",
+  "oktobris",
+  "novembris",
+  "decembris"
+ ],
+ "months_gen": [
+  "janvārī",
+  "februārī",
+  "martā",
+  "aprīlī",
+  "maijā",
+  "jūnijā",
+  "jūlijā",
+  "augustā",
+  "septembrī",
+  "oktobrī",
+  "novembrī",
+  "decembrī"
+ ],
+ "weekdays": [
+  "pirmdiena",
+  "otrdiena",
+  "trešdiena",
+  "ceturtdiena",
+  "piektdiena",
+  "sestdiena",
+  "svētdiena"
+ ],
+ "weekdays_short": [
+  "Pr",
+  "Ot",
+  "Tr",
+  "Ce",
+  "Pk",
+  "Se",
+  "Sv"
+ ],
+ "am": "priekšpusdienā",
+ "pm": "pēcpusdienā",
+ "closed": "slēgts",
+ "hrs_fmt": "%days%: %time%",
+ "ms": "ms",
+ "units": [
+  "B",
+  "kB",
+  "MB"
+ ],
+ "cf_h": "Uzraksti mums",
+ "cf_intro": "Atsūti mums ziņu, un mēs atbildēsim, cik ātri vien varēsim.",
+ "cf_name": "Tavs vārds",
+ "cf_email": "Tava e-pasta adrese",
+ "cf_msg": "Ziņa",
+ "cf_send": "Nosūtīt ziņu",
+ "cf_busy": "Sūta…",
+ "cf_empty": "Vispirms uzraksti ziņu.",
+ "cf_fail": "Ziņu neizdevās nosūtīt. Lūdzu, mēģini vēlāk vēlreiz.",
+ "nav_terms": "Lietošanas noteikumi",
+ "desc_terms": "Pakalpojuma {brand} lietošanas noteikumi.",
+ "terms_h": "Lietošanas noteikumi",
+ "terms_intro": "Lūdzu, izlasi šos noteikumus, pirms sāc lietot pakalpojumu {brand}. Tie ir īsi un ir spēkā no pirmās lietošanas reizes.",
+ "terms": [
+  {
+   "h": "Pakalpojuma lietošana",
+   "p": "Pakalpojums {brand} tiek sniegts tāds, kāds tas ir. Lietojot to, tu piekrīti šiem noteikumiem. Ja nepiekrīti, lūdzu, pakalpojumu nelieto."
+  },
+  {
+   "h": "Tava daļa",
+   "p": "Lieto pakalpojumu likumīgi un tikai sev vai savai organizācijai. Glabā savus piekļuves datus pie sevis un pasaki mums, ja domā, ka tie ir kļuvuši zināmi citam."
+  },
+  {
+   "h": "Kas nav atļauts",
+   "p": "Nemēģini izjaukt pakalpojumu vai to pārslogot un nemēģini nokļūt vietās, kas nav paredzētas tev. Mēs varam liegt piekļuvi, kas kaitē citiem."
+  },
+  {
+   "h": "Pieejamība",
+   "p": "Mēs rūpējamies, lai pakalpojums darbotos, taču nevaram apsolīt, ka tas būs pieejams vienmēr. Mēs varam mainīt, apturēt vai beigt dažas tā daļas."
+  },
+  {
+   "h": "Atbildība",
+   "p": "Likuma atļautajās robežās mēs neatbildam par zaudējumiem, kas rodas, lietojot pakalpojumu vai tāpēc, ka to nevarēja lietot."
+  },
+  {
+   "h": "Izmaiņas",
+   "p": "Mēs varam laiku pa laikam atjaunināt šos noteikumus. Ja pēc izmaiņām turpini lietot pakalpojumu, tu piekrīti jaunajiem noteikumiem."
+  }
+ ]
+}

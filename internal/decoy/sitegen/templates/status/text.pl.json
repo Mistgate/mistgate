@@ -1,0 +1,228 @@
+{
+ "ui": {
+  "nav_label": "Nawigacja",
+  "tagline": "Stan usług",
+  "footer": "Wszystkie godziny podajemy w czasie UTC.",
+  "nav_home": "Stan",
+  "nav_history": "Historia awarii",
+  "nav_about": "O stronie",
+  "home_title": "Aktualny stan",
+  "desc": "Aktualny stan i dostępność usług {brand}.",
+  "desc_history": "Dawne awarie w {brand} i sposób, w jaki je usunięto.",
+  "desc_about": "Jak {brand} mierzy dostępność i zgłasza awarie.",
+  "nf_title": "Nie znaleziono strony",
+  "nf_text": "Pod tym adresem nic nie ma. Stan usług znajdziesz na stronie głównej.",
+  "nf_back": "Przejdź do strony ze stanem usług",
+  "banner_ok": "Wszystkie systemy działają",
+  "banner_sub": "Wszystkie usługi {brand} działają normalnie.",
+  "comps_h": "Usługi",
+  "op": "Działa",
+  "up_label": "dostępności",
+  "days_ago_l": "60 dni temu",
+  "days_ago_r": "Dzisiaj",
+  "m_uptime": "Dostępność z ostatnich 90 dni",
+  "m_resp": "Mediana czasu odpowiedzi",
+  "m_inc": "Zapisane awarie",
+  "recent_h": "Ostatnie awarie",
+  "all_inc": "Pełna historia awarii",
+  "history_h": "Historia awarii",
+  "history_intro": "Co poszło nie tak w ostatnich miesiącach i jak to naprawiliśmy, od najnowszych.",
+  "st_inv": "Sprawdzamy",
+  "st_ident": "Znamy przyczynę",
+  "st_res": "Naprawione",
+  "imp_minor": "Mały wpływ",
+  "imp_major": "Duży wpływ",
+  "imp_maint": "Prace serwisowe",
+  "dur_l": "Czas trwania",
+  "about_h": "O tej stronie",
+  "about": [
+   {
+    "h": "Co pokazuje ta strona",
+    "p": "Strona pokazuje na bieżąco stan usług {brand} i zapis dawnych awarii. Prowadzi ją zespół, który te usługi utrzymuje."
+   },
+   {
+    "h": "Jak mierzymy dostępność",
+    "p": "Każdą usługę sprawdzamy raz na minutę z kilku miejsc. Minutę uznajemy za przerwę w działaniu, gdy nie udaje się ponad połowa sprawdzeń."
+   },
+   {
+    "h": "Jak zgłaszamy awarie",
+    "p": "Publikujemy wpis, gdy zaczynamy badać problem, gdy znajdziemy jego przyczynę i gdy zostanie naprawiony. Po większych awariach piszemy krótkie podsumowanie."
+   },
+   {
+    "h": "Planowane prace",
+    "p": "Planowane prace zapowiadamy tutaj co najmniej trzy dni wcześniej i wykonujemy je w godzinach, gdy ruch jest najmniejszy."
+   }
+  ],
+  "incidents": [
+   {
+    "title": "Podwyższona liczba błędów",
+    "impact": "major",
+    "dur": "38 minut",
+    "a": "Widzimy więcej nieudanych zapytań niż zwykle i szukamy przyczyny.",
+    "b": "Znaleźliśmy wadliwą zmianę w konfiguracji i właśnie ją cofamy.",
+    "c": "Zmiana została cofnięta, a liczba błędów wróciła do normy. Sprawdzimy, jak to się stało, że nie została wychwycona wcześniej."
+   },
+   {
+    "title": "Opóźnione powiadomienia",
+    "impact": "minor",
+    "dur": "1 godzina 12 minut",
+    "a": "Powiadomienia docierają z kilkuminutowym opóźnieniem.",
+    "b": "Znaleźliśmy zator w kolejce, która obsługuje powiadomienia.",
+    "c": "Kolejka została opróżniona i powiadomienia znów docierają na czas."
+   },
+   {
+    "title": "Wolno ładujące się strony",
+    "impact": "minor",
+    "dur": "26 minut",
+    "a": "Część użytkowników zgłasza, że strony ładują się wolno. Sprawdzamy, co się dzieje.",
+    "b": "Jeden z węzłów bazy danych był przeciążony i wyłączyliśmy go z obiegu.",
+    "c": "Czas ładowania stron wrócił do normy."
+   },
+   {
+    "title": "Prace serwisowe trwały dłużej",
+    "impact": "maint",
+    "dur": "40 minut dłużej niż planowano",
+    "a": "Prace przy naszej głównej bazie danych trwają dłużej, niż planowaliśmy.",
+    "b": "Ostatni etap aktualizacji potrzebuje jeszcze kilku minut.",
+    "c": "Prace zostały zakończone i wszystkie usługi działają normalnie."
+   },
+   {
+    "title": "Częściowa awaria w jednym regionie",
+    "impact": "major",
+    "dur": "54 minuty",
+    "a": "Użytkownicy z jednego regionu nie mogą połączyć się z usługą. Pracujemy razem z dostawcą hostingu.",
+    "b": "Dostawca potwierdził awarię sieci, która dotyczy naszych serwerów w tym regionie.",
+    "c": "Awaria sieci została usunięta i region znów obsługuje ruch."
+   },
+   {
+    "title": "Nieaktualne wyniki wyszukiwania",
+    "impact": "minor",
+    "dur": "2 godziny 5 minut",
+    "a": "Nowe pozycje nie pojawiają się w wynikach wyszukiwania.",
+    "b": "Zadanie indeksujące zatrzymało się po nieudanym wdrożeniu i zostało uruchomione ponownie.",
+    "c": "Indeksowanie nadrobiło zaległości i wyszukiwanie jest aktualne."
+   },
+   {
+    "title": "Problemy z logowaniem u części użytkowników",
+    "impact": "major",
+    "dur": "19 minut",
+    "a": "Część użytkowników nie może się zalogować. Pozostali nie odczuwają problemu.",
+    "b": "Znaleźliśmy przyczynę: w usłudze logowania wygasł certyfikat.",
+    "c": "Certyfikat został wymieniony i logowanie znów działa dla wszystkich."
+   },
+   {
+    "title": "Przesyłanie plików czasem się nie udaje",
+    "impact": "minor",
+    "dur": "47 minut",
+    "a": "Niewielka część przesyłanych plików się nie udaje i trzeba ją wysłać ponownie.",
+    "b": "Znaleźliśmy węzeł magazynu danych z pełnym dyskiem.",
+    "c": "Dodaliśmy miejsce i pliki znów przesyłają się bez problemu."
+   },
+   {
+    "title": "Wolne odpowiedzi API",
+    "impact": "minor",
+    "dur": "31 minut",
+    "a": "Część zapytań do API trwa dłużej niż zwykle. Badamy sprawę.",
+    "b": "Jedno z zadań w tle zużywało za dużo pamięci na jednym z serwerów.",
+    "c": "Zadanie uruchomiono ponownie z limitem pamięci i czas odpowiedzi wrócił do normy."
+   },
+   {
+    "title": "Opóźnione webhooki",
+    "impact": "minor",
+    "dur": "52 minuty",
+    "a": "Webhooki docierają do celu z kilkuminutowym opóźnieniem.",
+    "b": "Kolejka, która je wysyła, czekała na wolne połączenie z bazą danych.",
+    "c": "Połączenie zostało przywrócone, kolejkę opróżniono i webhooki znów docierają na czas."
+   },
+   {
+    "title": "Strona konta niedostępna",
+    "impact": "major",
+    "dur": "22 minuty",
+    "a": "Strona konta wyświetla wszystkim stronę z błędem. Pozostałe usługi działają.",
+    "b": "Ostatnia wersja miała usterkę w kodzie uruchamiającym i już ją znaleźliśmy.",
+    "c": "Cofnęliśmy wersję i strona konta jest znów dostępna."
+   },
+   {
+    "title": "Planowane prace: aktualizacja bazy danych",
+    "impact": "maint",
+    "dur": "1 godzina",
+    "a": "Trwają planowane prace. Niektóre funkcje działają tylko w trybie odczytu, dopóki się nie skończą.",
+    "b": "Aktualizacja jest w połowie i przebiega zgodnie z planem.",
+    "c": "Prace zostały zakończone i wszystko działa normalnie."
+   }
+  ],
+  "inc_back": "Historia awarii",
+  "inc_more": "Inne awarie",
+  "status_l": "Status",
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Zorza",
+      "Kobalt",
+      "Bryza",
+      "Szafir",
+      "Bursztyn",
+      "Wrzos",
+      "Lumen",
+      "Granat",
+      "Rubin",
+      "Topaz",
+      "Agat",
+      "Jantar"
+     ],
+     [
+      "base",
+      "cloud",
+      "flux",
+      "desk",
+      "hub",
+      "gate",
+      "ly",
+      "kit",
+      "lab",
+      "nest"
+     ]
+    ]
+   }
+  }
+ },
+ "bundles": {
+  "saas": {
+   "components": [
+    "Publiczne API",
+    "Konto użytkownika",
+    "Webhooki",
+    "Uwierzytelnianie",
+    "Zadania w tle",
+    "Eksport danych",
+    "Rozliczenia",
+    "Strona z dokumentacją"
+   ]
+  },
+  "photos": {
+   "components": [
+    "Wysyłanie zdjęć",
+    "Wyświetlanie zdjęć",
+    "Albumy i udostępnianie",
+    "Aplikacja internetowa",
+    "Synchronizacja z telefonem",
+    "Wyszukiwarka",
+    "Powiadomienia",
+    "Konto i logowanie"
+   ]
+  },
+  "mail": {
+   "components": [
+    "Wysyłka e-maili",
+    "Wysyłka SMS-ów",
+    "Szablony wiadomości",
+    "Raporty doręczeń",
+    "REST API",
+    "Konto użytkownika",
+    "Strony wypisania z listy",
+    "Planowanie wysyłek"
+   ]
+  }
+ }
+}

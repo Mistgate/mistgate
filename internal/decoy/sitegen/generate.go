@@ -960,6 +960,10 @@ var slugBad = regexp.MustCompile(`[^a-z0-9]+`)
 
 // translit is how slugify writes the letters that a web address does not take.
 var translit = strings.NewReplacer("ä", "a", "ö", "o", "ü", "u", "ß", "ss", "å", "a", "é", "e", "è", "e", "ê", "e", "à", "a", "ç", "c", "ñ", "n",
+	"ą", "a", "ć", "c", "ę", "e", "ł", "l", "ń", "n", "ó", "o", "ś", "s", "ź", "z", "ż", "z",
+	"â", "a", "î", "i", "ï", "i", "ô", "o", "û", "u", "ù", "u", "ÿ", "y", "œ", "oe", "æ", "ae", "ë", "e", "á", "a", "í", "i", "ú", "u",
+	"ı", "i", "̇", "", "ğ", "g", "ş", "s", "õ", "o",
+	"ā", "a", "č", "c", "ē", "e", "ģ", "g", "ī", "i", "ķ", "k", "ļ", "l", "ņ", "n", "š", "s", "ū", "u", "ž", "z", "ė", "e", "į", "i", "ų", "u",
 	"а", "a", "б", "b", "в", "v", "г", "g", "д", "d", "е", "e", "ё", "e", "ж", "zh", "з", "z", "и", "i", "й", "y", "к", "k", "л", "l",
 	"м", "m", "н", "n", "о", "o", "п", "p", "р", "r", "с", "s", "т", "t", "у", "u", "ф", "f", "х", "kh", "ц", "ts", "ч", "ch", "ш", "sh",
 	"щ", "shch", "ъ", "", "ы", "y", "ь", "", "э", "e", "ю", "yu", "я", "ya")
@@ -1074,7 +1078,11 @@ func funcMap(c *ctx) map[string]tmplFunc {
 		// pct is a percentage from lo/100 to hi/100 with two decimals: pct "k" 9950 9999 gives 99.50 to 99.99.
 		"pct": func(a []any) any {
 			v := key(argStr(a, 0)).between(argInt(a, 1), argInt(a, 2))
-			return fmt.Sprintf("%d.%02d", v/100, v%100)
+			sep := "," // ponytail: every language here but English writes a decimal comma; a per-country field when one differs
+			if strings.HasPrefix(c.s.country.Lang, "en") {
+				sep = "."
+			}
+			return fmt.Sprintf("%d%s%02d", v/100, sep, v%100)
 		},
 		// rolls is n days: 1 a bad one (warn per mille), 2 a very bad one (bad per mille), 3 to 5 a good one in three shades.
 		"rolls": func(a []any) any {

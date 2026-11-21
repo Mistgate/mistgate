@@ -1,0 +1,387 @@
+{
+ "ui": {
+  "nav_label": "Ana menü",
+  "footer": "MIT lisansıyla yayımlanmıştır.",
+  "nav_home": "Genel bakış",
+  "nav_changelog": "Sürüm notları",
+  "nav_install": "Kurulum",
+  "nav_roadmap": "Yol haritası",
+  "home_title": "Genel bakış",
+  "desc_changelog": "{brand} projesinin her sürümü ve neleri değiştirdiği.",
+  "desc_install": "{brand} nasıl kurulur: dağıtım paketleri, kaynaktan derleme ve her sürüm için sağlama toplamları.",
+  "desc_roadmap": "{brand} geliştiricilerinin üzerinde çalıştıkları ve sırada olanlar.",
+  "nf_title": "Sayfa bulunamadı",
+  "nf_text": "Bu sayfa yok ya da son sürümden bu yana taşınmış.",
+  "nf_back": "Genel bakışa dön",
+  "features_h": "Neden {brand}",
+  "start_h": "Başlayın",
+  "latest_h": "Son sürüm",
+  "all_releases": "Tüm sürümler",
+  "get_it": "Kur",
+  "read_log": "Sürüm notlarını okuyun",
+  "changelog_h": "Sürüm notları",
+  "changelog_intro": "Her sürüm, en yenisi başta. Sürüm numaraları olağan ana, ikincil, yama düzenini izler.",
+  "released": "Yayın tarihi",
+  "install_h": "Kurulum:",
+  "install_intro": "{brand} hazır bir çalıştırılabilir dosya olarak sunulmaz. Dağıtımlar onu paketler; kaynak arşivinden derlemek de birkaç dakika sürer.",
+  "pkg_h": "Dağıtımınızdan",
+  "pkg_note": "Paket sürümleri son sürümün birkaç hafta gerisinde kalabilir; aşağıdaki tablo kaynak arşivinden hangi sürümü bekleyeceğinizi gösterir.",
+  "src_h": "Kaynaktan derleyin",
+  "src_intro": "Bir C derleyicisi ve make gerekir. Derleme yaklaşık bir dakika sürer. Her sürümün kaynak arşivi sürümün adını taşır.",
+  "sums_h": "Sürümler ve sağlama toplamları",
+  "sums_intro": "Her sürümün bir kaynak arşivi vardır. Derlemeden önce SHA-256 sağlama toplamını kontrol edin.",
+  "col_ver": "Sürüm",
+  "col_date": "Yayın tarihi",
+  "col_sum": "Kaynak arşivinin SHA-256 değeri",
+  "roadmap_h": "Yol haritası",
+  "roadmap_intro": "Geliştiricilerin kabaca bir sırayla üzerinde çalıştıkları işler. Planlar değişir; gerçekte ne olduğunun kaydı sürüm notlarıdır.",
+  "now_h": "Şimdi",
+  "next_h": "Sırada",
+  "later_h": "Daha sonra",
+  "licence_h": "Lisans",
+  "licence_p": "{brand} özgür yazılımdır ve MIT lisansıyla yayımlanır. Kullanın, değiştirin ve paylaşın.",
+  "rel_back": "Tüm sürümler",
+  "rel_more": "Diğer sürümler",
+  "rel_src_h": "Kaynak arşivi",
+  "pkgs": [
+   {
+    "s": "Debian ve Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "Homebrew ile macOS"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Çakıl",
+       "Sazlık",
+       "Fener",
+       "Çukur",
+       "Kor",
+       "Masal",
+       "Kaya",
+       "Isırgan",
+       "Kayrak",
+       "Yosun"
+      ],
+      [
+       "watch",
+       "tail",
+       "glance",
+       "notice",
+       "sentry",
+       "peek"
+      ]
+     ]
+    }
+   },
+   "tagline": "Dosyalarınız değiştiğinde bir komut çalıştırın",
+   "desc": "{brand} bir klasörü izler ve içinde bir şey değiştiğinde bir komut çalıştırır.",
+   "overview": "{brand} bir klasörü izler ve içinde bir şey değiştiğinde bir komut çalıştırır. Bir dosyayı kaydedip ardından başka bir pencereye geçmekten bıkmış insanlar için küçük ve hızlı bir programdır.",
+   "features": [
+    {
+     "h": "Hızlı başlar",
+     "p": "Tek bir komut, yapılandırma dosyası yok."
+    },
+    {
+     "h": "Varsayılanları mantıklı",
+     "p": "Düzenleyici geçici dosyalarını, sürüm denetimi klasörlerini ve derleme çıktısını yok sayar."
+    },
+    {
+     "h": "Her yerde çalışır",
+     "p": "Linux, macOS ve Windows'ta aynı bayraklarla."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {
+     "k": "Yeni",
+     "t": "Aynı anda birden çok klasörü izleme desteği."
+    },
+    {
+     "k": "Yeni",
+     "t": "Çalıştırmadan önce sakin bir an beklemek için bir gecikme seçeneği."
+    },
+    {
+     "k": "Yeni",
+     "t": "Terminal destekliyorsa çıktıda renk."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "İzlenen bir klasör silindiğinde nadiren görülen bir çökme."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Bir düzenleyici dosyayı iki adımda kaydettiğinde yinelenen çalıştırmalar."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Windows'ta boşluk içeren yollar."
+    },
+    {
+     "k": "Değişti",
+     "t": "Varsayılan gecikme artık 50 yerine 200 milisaniye."
+    },
+    {
+     "k": "Değişti",
+     "t": "Yok sayma desenleri artık çoğu sürüm denetimi aracıyla aynı kuralları izliyor."
+    },
+    {
+     "k": "Yeni",
+     "t": "Komutu yalnızca bir kez çalıştırıp çıkan bir once bayrağı."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Çok büyük klasörler izlenirken bellek kullanımının yavaş yavaş artması."
+    },
+    {
+     "k": "Değişti",
+     "t": "Hata iletileri artık hangi klasörün neden olduğunu söylüyor."
+    },
+    {
+     "k": "Yeni",
+     "t": "Yaygın kabuklar için kabuk tamamlamaları."
+    }
+   ],
+   "now": [
+    "Büyük klasörlerde daha hızlı başlangıç",
+    "Bir komut başarısız olduğunda daha iyi iletiler"
+   ],
+   "next": [
+    "Proje başına ayarlar için bir yapılandırma dosyası",
+    "Başlıca Linux dağıtımları için paketler"
+   ],
+   "later": [
+    "Betiklerde kullanmak için sessiz bir kip",
+    "Ağ sürücülerini güvenilir biçimde izleme"
+   ]
+  },
+  "images": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Piksel",
+       "Karo",
+       "Tane",
+       "Çerçeve",
+       "Perde",
+       "Mercek",
+       "Odak",
+       "Kırpma",
+       "Sepya",
+       "Mat"
+      ],
+      [
+       "fit",
+       "trim",
+       "shrink",
+       "pack",
+       "batch",
+       "scale"
+      ]
+     ]
+    }
+   },
+   "tagline": "Bir klasör dolusu resmi tek seferde yeniden boyutlandırın",
+   "desc": "{brand} resimleri toplu olarak yeniden boyutlandırır ve sıkıştırır, orijinallere dokunmaz.",
+   "overview": "{brand} resimleri toplu olarak yeniden boyutlandırır ve sıkıştırır. Bir klasörü gösterin, sonuçların ne kadar büyük olmasını istediğinizi söyleyin; gerisini o halleder ve orijinallere dokunmaz.",
+   "features": [
+    {
+     "h": "Önce toplu işlem",
+     "p": "Yüzlerce dosya aynı anda, her çekirdek kullanılarak."
+    },
+    {
+     "h": "Orijinalleri korur",
+     "p": "Sonuçlar yeni bir klasöre gider."
+    },
+    {
+     "h": "Öngörülebilir çıktı",
+     "p": "Aynı girdi her zaman aynı baytları verir."
+    }
+   ],
+   "quick": "{cmd} photos --width 1600 --out small",
+   "changes": [
+    {
+     "k": "Yeni",
+     "t": "WebP çıktı desteği."
+    },
+    {
+     "k": "Yeni",
+     "t": "JPEG ve WebP için bir kalite seçeneği."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Dikey modda çekilen fotoğrafların yan çıkması."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Uzantısı olmayan dosyalarda çökme."
+    },
+    {
+     "k": "Değişti",
+     "t": "Çıktı dosyaları özgün değiştirilme zamanını koruyor."
+    },
+    {
+     "k": "Yeni",
+     "t": "Yapılacakları listeleyen bir dry-run bayrağı."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Büyük toplu işlerde yavaş ilerleme bildirimi."
+    },
+    {
+     "k": "Değişti",
+     "t": "Çok büyük resimler yeniden boyutlandırılırken daha az bellek kullanımı."
+    },
+    {
+     "k": "Yeni",
+     "t": "Genişliğin yanı sıra en büyük yüksekliğe göre de yeniden boyutlandırma."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Gömülü renk profili olan resimlerde yanlış renkler."
+    },
+    {
+     "k": "Değişti",
+     "t": "Yardım metni artık örnekler içeriyor."
+    },
+    {
+     "k": "Yeni",
+     "t": "Yeniden boyutlandırılan dosyaları adlandırmak için bir suffix seçeneği."
+    }
+   ],
+   "now": [
+    "Daha hızlı JPEG çözme",
+    "Yoluna çıkmayan bir ilerleme çubuğu"
+   ],
+   "next": [
+    "Sabit orana kırpma",
+    "Başlıca Linux dağıtımları için paketler"
+   ],
+   "later": [
+    "Animasyonlu resimler için destek",
+    "Küçük bir önizleme kipi"
+   ]
+  },
+  "backup": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Tavan",
+       "Kiler",
+       "Raf",
+       "Çekmece",
+       "Dolap",
+       "Sandık",
+       "Ambar",
+       "Mahzen",
+       "Bavul",
+       "Vitrin"
+      ],
+      [
+       "copy",
+       "keep",
+       "stash",
+       "save",
+       "mirror",
+       "store"
+      ]
+     ]
+    }
+   },
+   "tagline": "Bir klasörün sade ve güvenilir yedekleri",
+   "desc": "{brand} bir klasörü başka bir yere kopyalar ve eski sürümleri sıradan dosyalar olarak saklar.",
+   "overview": "{brand} bir klasörü başka bir yere kopyalar ve eski sürümleri saklar; böylece geçen salı yapılan bir hata hâlâ geri alınabilir. Yedekler, {brand} olmadan da açabileceğiniz sıradan dosyalardır.",
+   "features": [
+    {
+     "h": "Sıradan dosyalar",
+     "p": "Sonradan açılması gereken özel bir biçim yok."
+    },
+    {
+     "h": "Sürümler",
+     "p": "İstediğiniz kadar anlık görüntü saklayın."
+    },
+    {
+     "h": "Kendini denetler",
+     "p": "Bir verify komutu bir yedeği kaynağıyla karşılaştırır."
+    }
+   ],
+   "quick": "{cmd} notes /backups/notes",
+   "changes": [
+    {
+     "k": "Yeni",
+     "t": "Bir yedeği kaynağıyla karşılaştıran verify komutu."
+    },
+    {
+     "k": "Yeni",
+     "t": "Anlık görüntüler belirli gün sayısı ya da kopya sayısı kadar saklanabiliyor."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Yedekleme sırasında değişen dosyaların iki kez kopyalanması."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Geri yüklenen dosyalarda yanlış izinler."
+    },
+    {
+     "k": "Değişti",
+     "t": "Değişmeyen dosyalar artık yeniden kopyalanmıyor."
+    },
+    {
+     "k": "Yeni",
+     "t": "Deneme kipi olan bir restore komutu."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Çok uzun yol adlarına sahip klasörlerde çökme."
+    },
+    {
+     "k": "Değişti",
+     "t": "İlerleme yalnızca çıktı bir terminal olduğunda gösteriliyor."
+    },
+    {
+     "k": "Yeni",
+     "t": "Bir yedeğin anlık görüntülerini gösteren list komutu."
+    },
+    {
+     "k": "Düzeltme",
+     "t": "Ağ sürücülerine yapılan yedeklerin zaman aşımından sonra durması."
+    },
+    {
+     "k": "Değişti",
+     "t": "Anlık görüntüler artık numaraya göre değil, tarihe göre adlandırılıyor."
+    },
+    {
+     "k": "Yeni",
+     "t": "Dosyaları desene göre dışarıda bırakma seçeneği."
+    }
+   ],
+   "now": [
+    "Çok sayıda küçük dosyanın daha hızlı kopyalanması",
+    "Daha anlaşılır bir verify raporu"
+   ],
+   "next": [
+    "Yedeklerin diskte şifrelenmesi",
+    "Tek adımda ikinci bir konuma yedekleme"
+   ],
+   "later": [
+    "Grafik bir geri yükleme aracı",
+    "Yerleşik zamanlama"
+   ]
+  }
+ }
+}

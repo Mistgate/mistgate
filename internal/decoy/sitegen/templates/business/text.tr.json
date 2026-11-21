@@ -1,0 +1,273 @@
+{
+ "ui": {
+  "nav_label": "Ana menü",
+  "footer": "Bağımsız ve yerel.",
+  "nav_home": "Ana sayfa",
+  "nav_about": "Hakkımızda",
+  "nav_contact": "Bize ulaşın",
+  "home_title": "Hoş geldiniz",
+  "nf_title": "Sayfa bulunamadı",
+  "nf_text": "Bu sayfayı bulamadık. Taşınmış olabilir, belki de hiç olmadı.",
+  "nf_back": "Ana sayfaya dön",
+  "see_services": "Neler sunduğumuza bakın",
+  "all_prices": "Tüm fiyat listesi",
+  "visit_h": "Bizi ziyaret edin",
+  "hours_h": "Çalışma saatleri",
+  "address_l": "Adres",
+  "phone_l": "Telefon",
+  "about_h": "Hakkımızda",
+  "services_h": "Neler sunuyoruz",
+  "services_intro": "Fiyatlar yol göstericidir; neye ihtiyacınız olduğunu konuşmaktan memnuniyet duyarız.",
+  "contact_h": "Bize ulaşın",
+  "contact_intro": "Çalışma saatlerinde uğrayın ya da bize yazın. Bir karar vermeden önce neye ihtiyacınız olduğunu konuşmaktan memnuniyet duyarız.",
+  "contact_note": "Park etmek en kolay bir sonraki sokakta. Çalışma saatlerinde kapı kapalıysa muhtemelen arkadayız; kapıyı çalıp biraz bekleyin.",
+  "from_l": "En az",
+  "col_service": "Hizmet",
+  "col_desc": "Kapsamı",
+  "col_price": "Fiyat",
+  "hours_note": "",
+  "directions_h": "Bize nasıl ulaşırsınız",
+  "directions": "Bizi {address} adresinde bulabilirsiniz. Şehir merkezine kısa bir yürüme mesafesinde, kapının yanında da bir bisiklet parkı var.",
+  "services_note": "Bir iş, teklif ettiğimizden fazlasını gerektirirse başlamadan önce size sorarız."
+ },
+ "bundles": {
+  "bakery": {
+   "tagline": "{city_in} pişen ekmek ve pastalar",
+   "nav_services": "Ürünlerimiz",
+   "desc": "{city_in} bir mahalle fırını: ekşi mayalı ekmek, poğaça ve pastalar, her sabah taze pişirilir.",
+   "desc_services": "Ekmekler, çörekler ve pastalar, fiyatlarıyla.",
+   "desc_about": "{brand} hikâyesi: {city_in} küçük bir fırın.",
+   "desc_contact": "Çalışma saatleri ve adres: {brand}, {city}.",
+   "hero_h": "Ekmek, acele etmeden",
+   "intro": "Küçük bir mahalle fırını. Ekşi mayalı ekmek, poğaça ve pasta; dükkân açılmadan önce her sabah pişirilir.",
+   "about": [
+    "{brand}, {city_in} bir dükkânın arkasındaki kiralık mutfakta, tek bir fırın ve bol iyimserlikle başladı.",
+    "Hâlâ küçük partiler hâlinde pişiriyoruz: un, vadide bir saat ötedeki bir değirmenden gelir; mayamız ise en genç ustamızdan yaşlıdır.",
+    "Poğaça için erken gelin, kahve için kalın; ekmeğiniz iyi olmadıysa bize söyleyin. Bilmeyi tercih ederiz."
+   ],
+   "features": [
+    {
+     "h": "Her sabah taze",
+     "p": "Dünden hiçbir şey kalmaz."
+    },
+    {
+     "h": "Dürüst malzeme",
+     "p": "Un, su, tuz ve zaman."
+    },
+    {
+     "h": "Siparişe açığız",
+     "p": "Pasta ve büyük siparişler önceden anlaşarak."
+    }
+   ],
+   "services": [
+    {
+     "t": "Köy ekmeği (ekşi mayalı)",
+     "d": "Yavaş kabarmış, kalın kabuklu, yumuşak ve boşluklu iç."
+    },
+    {
+     "t": "Tohumlu çavdar ekmeği",
+     "d": "Yoğun, koyu ve peynirle çok güzel."
+    },
+    {
+     "t": "Sabah poğaçaları, altı adet",
+     "d": "Yumuşak poğaçalar, beşte pişer ve çoğu ona kalmadan biter."
+    },
+    {
+     "t": "Tahinli çörek",
+     "d": "Elde bükülür ve sıcakken sırlanır."
+    },
+    {
+     "t": "Kutlama pastası",
+     "d": "Lütfen üç gün önceden sipariş verin; lezzetleri sizinle birlikte belirleriz."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Çavdar",
+       "Bal",
+       "Yulaf",
+       "Arpa",
+       "Rezene",
+       "Kırıntı",
+       "Ocak",
+       "Pazar",
+       "Susam",
+       "Erik"
+      ],
+      [
+       "Serçe",
+       "İspinoz",
+       "Kırlangıç",
+       "Bülbül",
+       "Saka",
+       "Kızılgerdan",
+       "Çaylak",
+       "Yeşilbaş"
+      ]
+     ],
+     "sep": " & "
+    }
+   }
+  },
+  "bike": {
+   "tagline": "{city_in} bisiklet tamiri",
+   "nav_services": "Fiyatlar",
+   "desc": "{city_in} bisiklet tamir ve bakımı; beklerken ya da ertesi gün hazır.",
+   "desc_services": "Bisiklet tamir ve bakımı, fiyatlarıyla.",
+   "desc_about": "{brand} hakkında: {city_in} küçük bir bisiklet atölyesi.",
+   "desc_contact": "Çalışma saatleri ve adres: {brand}, {city}.",
+   "hero_h": "Bisikletiniz yeniden düzgün çalışsın",
+   "intro": "Günlük kullanım bisikletleri için küçük bir atölye. Bozuk olanı onarır, tam oturmayanı ayarlar, paraya değmeyeni de dürüstçe söyleriz.",
+   "about": [
+    "{brand}, {city_in} bir bahçe barakasında, komşuların bisikletlerini bir kahve karşılığında onararak başladı.",
+    "Bugün düzgün bir atölyemiz, çok uzun bir tezgâhımız ve yalnızca bizim anladığımız bir yedek parça duvarımız var. Hâlâ değiştirmek yerine onarmayı seviyoruz.",
+    "İki tekerlekli ne varsa getirin. Onaramazsak kimin onarabileceğini söyleriz."
+   ],
+   "features": [
+    {
+     "h": "Beklerken hazır",
+     "p": "Küçük onarımların çoğu bir saatten kısa sürer."
+    },
+    {
+     "h": "Dürüst tavsiye",
+     "p": "Onarmaya değmeyen bir şey varsa söyleriz."
+    },
+    {
+     "h": "Ertesi gün bakım",
+     "p": "Sabah bırakın, yarın alın."
+    }
+   ],
+   "services": [
+    {
+     "t": "Lastik patlak tamiri",
+     "d": "İç lastik takılır ve kontrol edilir, patlağın nedeni için dış lastik incelenir."
+    },
+    {
+     "t": "Temel bakım",
+     "d": "Frenler ve vitesler ayarlanır, zincir temizlenip yağlanır, lastikler ve cıvatalar kontrol edilir."
+    },
+    {
+     "t": "Tam bakım",
+     "d": "Aktarma organları sökülür, yağdan arındırılır ve yeniden kurulur; gerekirse yeni kablolar takılır."
+    },
+    {
+     "t": "Jant ayarı",
+     "d": "Kaymalar giderilir ve jant telleri eşit gerginliğe getirilir."
+    },
+    {
+     "t": "Kış kontrolü",
+     "d": "Aydınlatma, frenler, lastikler ve çamurluklar kontrol edilir; karanlık aylar daha güvenli geçer."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Jant",
+       "Zincir",
+       "Dişli",
+       "Pedal",
+       "Krank",
+       "Teker",
+       "Vites",
+       "Kadro",
+       "Poyra",
+       "Kasnak"
+      ],
+      [
+       "Atölyesi",
+       "Servisi",
+       "Tamir",
+       "Garaj",
+       "Tezgâhı",
+       "Durağı"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "tailor": {
+   "tagline": "{city_in} giysi tadilatı ve onarımı",
+   "nav_services": "Tadilat",
+   "desc": "{city_in} giysi tadilatı ve onarımı: paça, fermuar, prova ve yırtık onarımı.",
+   "desc_services": "Giysi tadilat ve onarımları, fiyatlarıyla.",
+   "desc_about": "{brand} hakkında: {city_in} küçük bir terzi atölyesi.",
+   "desc_contact": "Çalışma saatleri ve adres: {brand}, {city}.",
+   "hero_h": "Üstünüze oturan giysiler, daha uzun süre",
+   "intro": "Paça, fermuar, prova ve onarım; dükkânların üstündeki küçük bir atölyede elde ve makinede yapılır.",
+   "about": [
+    "{brand}, {city_in} bir binanın birinci katında, bir yün dükkânının üstünde iki kişilik bir atölye.",
+    "Mesleği kırk yıldır yapanlardan öğrendik; bazı alışkanlıklarını da sürdürüyoruz, mesela iğneyi her zaman iki kez yapmak.",
+    "Bir şeyin tadilata değip değmeyeceğinden emin değilseniz getirin. Dürüstçe söyleriz."
+   ],
+   "features": [
+    {
+     "h": "Özenle onarılır",
+     "p": "Başlamadan önce her giysiye düzgünce bakılır."
+    },
+    {
+     "h": "Size göre ayarlanır",
+     "p": "Mankene değil, üzerinize iğneleriz."
+    },
+    {
+     "h": "Söz verilen günde hazır",
+     "p": "Bir gün söyleriz ve ona uyarız."
+    }
+   ],
+   "services": [
+    {
+     "t": "Pantolon veya etek boyu kısaltma",
+     "d": "İstediğiniz boya göre kısaltılır, mümkünse özgün kenar korunur."
+    },
+    {
+     "t": "Ceket daraltma",
+     "d": "Yanlar ve kollar ayarlanır, ceket düzgün duruş kazanır."
+    },
+    {
+     "t": "Fermuar değişimi",
+     "d": "Renk ve ağırlığa uygun fermuar seçilir, düzgünce takılır."
+    },
+    {
+     "t": "Mont astarı onarımı",
+     "d": "Yırtık astar değiştirilir ya da onarılır, cepler dahil."
+    },
+    {
+     "t": "Rafu ve yama",
+     "d": "Görünür ya da görünmez, nasıl isterseniz."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "İğne",
+       "Yüksük",
+       "Düğme",
+       "Etek",
+       "Dikiş",
+       "Manşet",
+       "Yaka",
+       "Pili",
+       "Bobin",
+       "Kenar"
+      ],
+      [
+       "& İplik",
+       "Tadilat",
+       "Terzi",
+       "Atölye",
+       "Onarım",
+       "Prova",
+       "& Makas",
+       "Stüdyo"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

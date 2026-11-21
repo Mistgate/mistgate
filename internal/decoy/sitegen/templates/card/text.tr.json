@@ -1,0 +1,195 @@
+{
+ "ui": {
+  "nav_label": "Ana menü",
+  "footer": "Elle yapıldı. Çerez yok, izleme yok.",
+  "nav_home": "Kartvizit",
+  "nav_about": "Hakkında",
+  "nav_projects": "Projeler",
+  "nav_now": "Şimdi",
+  "home_title": "Merhaba",
+  "desc_about": "{brand} hakkında daha fazlası.",
+  "desc_projects": "{brand} tarafından seçilmiş projeler.",
+  "desc_now": "{brand} şu sıralar ne yapıyor.",
+  "nf_title": "Burada bir şey yok",
+  "nf_text": "Bu adreste bir sayfa yok. Ana sayfadaki karta bakın.",
+  "nf_back": "Karta dön",
+  "link_d": [
+   "Ben kimim, nasıl çalışırım",
+   "Yaptığım birkaç şey",
+   "Şu sıralar ne yapıyorum"
+  ],
+  "about_h": "Hakkında",
+  "facts_h": "Kısaca",
+  "projects_h": "Projeler",
+  "projects_intro": "Yaptığım için mutlu olduğum birkaç şey, en yenisi başta.",
+  "now_h": "Şimdi",
+  "updated": "Güncellendi: {upd} 2026",
+  "now_intro": "Bu bir “şimdi” sayfası: bir zamanlar yapacağımı söylediklerim değil, şu sıralar uğraştığım şeyler.",
+  "hello": "Merhaba, ben",
+  "vars": {
+   "brand": "{name}",
+   "month": [
+    "Ocak ayından",
+    "Mart ayından",
+    "Mayıs ayından",
+    "Eylül ayından"
+   ],
+   "upd": [
+    "Ağustos",
+    "Eylül",
+    "Ekim",
+    "Kasım"
+   ]
+  }
+ },
+ "bundles": {
+  "illustrator": {
+   "role": "İllüstratör ve baskı sanatçısı",
+   "tagline": "Kitaplar, afişler ve ara sıra bir doğum günü kartı için resimler.",
+   "desc": "{brand}: {city_in} çalışan illüstratör ve baskı sanatçısı. Resimli çocuk kitapları, afişler ve linolyum baskılar.",
+   "bio": "Resimli çocuk kitapları ve afişler için çizerim, kibarca isteyenlere linolyum baskı keserim.",
+   "about": [
+    "Geçimimi çizerek sağlıyorum, çoğunlukla resimli çocuk kitapları, ara sıra da afiş. {city_in} küçük bir odada çalışıyorum; penceresi bir otoparka bakıyor, ben de onu göl gibi çiziyorum.",
+    "İllüstrasyondan önce tekstil baskı okudum ve katmanlarla düşünme alışkanlığım hiç geçmedi. Resimlerimin çoğu üç dört düz renkten kurulur."
+   ],
+   "facts": [
+    "Yaşadığım yer: {city}",
+    "Kalem, mürekkep ve linolyumla çalışıyorum",
+    "Yeni siparişler {month} itibaren"
+   ],
+   "projects": [
+    {
+     "t": "Tarla Defteri",
+     "y": "2025",
+     "d": "Küçük bir tarlada geçen bir yılı anlatan, yerel bir matbaayla yaptığım resimli çocuk kitabı."
+    },
+    {
+     "t": "Pazaryeri Serisi",
+     "y": "2024",
+     "d": "Tezgâhlar, alışverişçiler ve çok kendini beğenmiş bir güvercin üzerine on iki linolyum baskı."
+    },
+    {
+     "t": "Bir kitabevi için doğum günü kartları",
+     "y": "2023",
+     "d": "Elle basılmış, ikişer yüz adetlik altı kart."
+    }
+   ],
+   "now": [
+    "Havayı anlatan bir çocuk kitabının son sayfalarını bitiriyorum",
+    "Dört renkli linolyum baskıyı sinirlenmeden kesmeyi öğreniyorum",
+    "Daha büyük bir baskı presi arıyorum"
+   ]
+  },
+  "translator": {
+   "role": "Çevirmen, İngilizceden Türkçeye",
+   "tagline": "Roman, deneme ve ara sıra bir kullanım kılavuzu için özenli çeviriler.",
+   "desc": "{brand}: {city_in} çalışan, İngilizceden Türkçeye roman ve deneme çeviren çevirmen.",
+   "bio": "İngilizceden Türkçeye, çoğunlukla roman ve deneme çeviririm; her şeyi iki kez sesli okurum.",
+   "about": [
+    "İngilizceden Türkçeye çeviri yapıyorum; çoğunlukla roman ve deneme, bazen de daha iyi yazılmayı hak eden bir cihazın kullanım kılavuzu.",
+    "Yavaş çalışırım, her şeyi iki kez sesli okurum ve karar veremediğim her cümle için bir not gönderirim. Editörler bunun ya sevimli ya da çileden çıkarıcı olduğunu söylüyor."
+   ],
+   "facts": [
+    "Yaşadığım yer: {city}",
+    "İngilizceden Türkçeye çeviri yapıyorum",
+    "Yeni işler {month} itibaren"
+   ],
+   "projects": [
+    {
+     "t": "Bir fener bekçisi romanı",
+     "y": "2025",
+     "d": "Dört yüz sayfa hava durumu ve pişmanlık, on dört ayda çevrildi."
+    },
+    {
+     "t": "Yürüyüş üzerine denemeler",
+     "y": "2024",
+     "d": "Her yere yürüyerek giden bir yazarın kısa yazılarından oluşan derleme."
+    },
+    {
+     "t": "Bir müze kataloğu",
+     "y": "2023",
+     "d": "Bir tekstil sergisi için metinler; benim seçeceğimden daha fazla sıfatla."
+    }
+   ],
+   "now": [
+    "Uzun bir romanın çevirisini gözden geçiriyorum",
+    "Bir yayınevine önerebileceğim denemeleri okuyorum",
+    "Denizcilik terimleri sözlüğümü güncelliyorum"
+   ]
+  },
+  "potter": {
+   "role": "Çömlekçi",
+   "tagline": "Sade kâse, kupa ve tabaklar, küçük partiler hâlinde.",
+   "desc": "{brand}: {city_in} çalışan çömlekçi. Çarkta şekillendirilmiş günlük kullanım seramikleri.",
+   "bio": "Sade seramikleri çarkta şekillendirir, küçük partiler hâlinde pişiririm.",
+   "about": [
+    "{city_in} diğer üç üreticiyle paylaştığım bir atölyede kullanışlı seramikler yapıyorum. Her şey çarkta şekillendirilir ve yüksek ısıda pişirilir.",
+    "Günlük kullanımda kaybolan kapları severim: ele oturan bir kupa, devrilmeyen bir kâse. Sırların çoğu demir ve külden; her pişirimde biraz değişiyorlar."
+   ],
+   "facts": [
+    "Yaşadığım yer: {city}",
+    "Çarkta seramik yapıyorum",
+    "Yeni işler {month} itibaren"
+   ],
+   "projects": [
+    {
+     "t": "Günlük takım",
+     "y": "2025",
+     "d": "Yulaf rengi sırlı tabak, kâse ve kupalar; sır hiçbir zaman iki kez aynı çıkmadı."
+    },
+    {
+     "t": "Çay kâseleri",
+     "y": "2024",
+     "d": "Bir çay evi için yapılmış, her biri biraz farklı otuz küçük kâse."
+    },
+    {
+     "t": "Bir karo siparişi",
+     "y": "2023",
+     "d": "Bir mutfak duvarı için elle preslenmiş, dört yeşil tonunda karolar."
+    }
+   ],
+   "now": [
+    "Komşunun bahçe ateşinin külünden yapılmış bir sırı deniyorum",
+    "Daha büyük tabaklar şekillendiriyorum",
+    "Kış siparişleri için fırın raflarında yer açıyorum"
+   ]
+  },
+  "developer": {
+   "role": "Yazılım geliştirici, küçük araçlar",
+   "tagline": "Tek bir iş yapan ve yolunuzdan çekilen küçük, sessiz programlar.",
+   "desc": "{brand}: {city_in} küçük araçlar geliştiriyor. Bir not uygulaması, bir takvim ve birkaç komut satırı programı.",
+   "bio": "Kelimelerle ve sayılarla çalışanlar için küçük araçlar yazar, bitmiş hâlde teslim etmeye çalışırım.",
+   "about": [
+    "Kelimelerle ve sayılarla çalışan insanlar için küçük araçlar yazıyorum: bir not uygulaması, birkaç komut satırı programı, yalnızca bugün önemli olanı gösteren bir takvim.",
+    "Bir şeyleri yavaş yaparım ve bitmiş hâlde teslim etmeye çalışırım. Yaptıklarımın çoğunda olabileceğinden az özellik var; bu bilerek böyle."
+   ],
+   "facts": [
+    "Yaşadığım yer: {city}",
+    "Birkaç sıkıcı dille yazıyorum",
+    "Küçük işlere {month} itibaren açığım"
+   ],
+   "projects": [
+    {
+     "t": "Masaüstü için not uygulaması",
+     "y": "2025",
+     "d": "Düz metin dosyaları, hızlı arama, hesap yok."
+    },
+    {
+     "t": "Tek günlük bir takvim",
+     "y": "2024",
+     "d": "Bugünü gösterir, başka bir şey göstermez; meğer yetermiş."
+    },
+    {
+     "t": "Bir zaman takip aracı",
+     "y": "2023",
+     "d": "Tek bir düğme ve haftalık özet; puantajdan hoşlanmayanlar için."
+    }
+   ],
+   "now": [
+    "Not uygulamasının kodunu toparlıyorum",
+    "Kısa bir kılavuz yazıyorum",
+    "Her şeyin daha küçük bir sürümünü düşünüyorum"
+   ]
+  }
+ }
+}

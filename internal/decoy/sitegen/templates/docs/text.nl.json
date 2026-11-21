@@ -1,0 +1,598 @@
+{
+ "ui": {
+  "nav_label": "Documentatie",
+  "footer": "Documentatie bij versie {ver}.",
+  "nav_home": "Overzicht",
+  "nav_install": "Installeren",
+  "nav_usage": "Gebruik",
+  "nav_faq": "Veelgestelde vragen",
+  "home_title": "Overzicht",
+  "desc_install": "Zo installeer je {brand} {ver} op Linux, macOS en Windows.",
+  "desc_usage": "Zo gebruik je {brand}: veelvoorkomende taken met voorbeelden.",
+  "desc_faq": "Veelgestelde vragen over {brand}.",
+  "nf_title": "Pagina niet gevonden",
+  "nf_text": "Deze pagina hoort niet bij de documentatie. Misschien heeft hij in een nieuwere versie een andere naam gekregen.",
+  "nf_back": "Terug naar het overzicht",
+  "quick_h": "Snel aan de slag",
+  "features_h": "Wat het doet",
+  "out_h": "Uitvoer",
+  "install_h": "Installatie",
+  "steps_h": "Stappen",
+  "usage_h": "Gebruik",
+  "opts_h": "Opties",
+  "opt_col": "Optie",
+  "desc_col": "Beschrijving",
+  "faq_h": "Veelgestelde vragen",
+  "next": "Volgende",
+  "facts_h": "In het kort",
+  "menu_h": "Documentatie",
+  "facts": [
+   {
+    "k": "Versie",
+    "v": "{ver}"
+   },
+   {
+    "k": "Platforms",
+    "v": "Linux, macOS en Windows"
+   },
+   {
+    "k": "Licentie",
+    "v": "MIT"
+   },
+   {
+    "k": "Afhankelijkheden",
+    "v": "Geen"
+   }
+  ],
+  "install_check": "Als het versienummer verschijnt, is de installatie gelukt.",
+  "nav_config": "Instellingen",
+  "nav_recipes": "Voorbeelden",
+  "nav_trouble": "Problemen oplossen",
+  "desc_config": "Het configuratiebestand en de instellingen van {brand}.",
+  "desc_recipes": "Korte voorbeelden voor alledaagse klussen met {brand}.",
+  "desc_trouble": "Oplossingen voor de problemen die mensen het vaakst tegenkomen met {brand}.",
+  "config_h": "Instellingen",
+  "config_col_key": "Sleutel",
+  "config_col_default": "Standaard",
+  "config_col_desc": "Wat het doet",
+  "config_file_h": "Voorbeeld",
+  "recipes_h": "Voorbeelden",
+  "recipes_intro": "Korte antwoorden op de klussen waar het vaakst naar wordt gevraagd.",
+  "trouble_h": "Problemen oplossen",
+  "trouble_intro": "De problemen die mensen het vaakst tegenkomen, en wat ze meestal oplost.",
+  "ver_l": "Versie",
+  "prev": "Vorige"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "Een logsamenvatter voor de opdrachtregel",
+   "desc": "{brand} leest logbestanden in platte tekst en toont een korte samenvatting van wat erin staat.",
+   "overview": "{brand} leest logbestanden in platte tekst en toont een korte samenvatting: hoeveel regels er zijn, welke niveaus ze gebruiken en welke meldingen het vaakst terugkomen. Het is één klein programma zonder afhankelijkheden.",
+   "features": [
+    "Leest bestanden, mappen en standaardinvoer",
+    "Groepeert gelijkende meldingen zonder instellingen",
+    "Toont tekst, JSON of een klein HTML-rapport"
+   ],
+   "quick_out": "app.log: 48.211 regels, 3 niveaus\n  info   46.902\n  warn    1.190\n  error     119\nvaakste melding: cache miss voor sleutel (9.413 keer)",
+   "install_intro": "{brand} wordt geleverd als één programma. Voor de eerste keer starten hoef je niets in te stellen.",
+   "install_steps": [
+    "Download het archief dat bij je systeem past.",
+    "Pak het uit en zet het programma in een map die in je PATH staat.",
+    "Voer de opdracht voor het versienummer uit om te controleren of het werkt."
+   ],
+   "faq": [
+    {
+     "q": "Welke logformaten worden ondersteund?",
+     "a": "Alles wat uit losse regels bestaat. {brand} herkent de gangbare tijd- en niveaustijlen en valt anders terug op gewone regels."
+    },
+    {
+     "q": "Past het mijn bestanden aan?",
+     "a": "Nooit. Bestanden worden alleen-lezen geopend."
+    },
+    {
+     "q": "Hoe groot mag een bestand zijn?",
+     "a": "Bestanden worden regel voor regel gelezen, dus alleen je geduld is de grens. Een gigabyte kost op een laptop een paar seconden."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Een bestand samenvatten",
+     "p": "Wijs {brand} naar een bestand, een map of een pipe. Mappen worden doorzocht met alles erin, en gecomprimeerde bestanden worden onderweg uitgepakt."
+    },
+    {
+     "h": "Een periode bekijken",
+     "p": "Met --since en --until beperk je de samenvatting tot een periode. Tijden mogen absoluut zijn of ten opzichte van nu."
+    },
+    {
+     "h": "Een uitvoerformaat kiezen",
+     "p": "Standaard is de uitvoer gewone tekst. JSON is stabiel en bedoeld voor scripts; het HTML-rapport is één bestand dat je naar een collega kunt sturen."
+    }
+   ],
+   "options": [
+    {
+     "d": "Alleen regels na dit tijdstip, absoluut of zoals 2h."
+    },
+    {
+     "d": "Alleen regels vóór dit tijdstip."
+    },
+    {
+     "d": "Alleen regels van dit niveau of hoger."
+    },
+    {
+     "d": "Hoeveel terugkerende meldingen worden getoond. Standaard 5."
+    },
+    {
+     "d": "text, json of html. Standaard text."
+    }
+   ],
+   "config_intro": "{brand} leest een optioneel bestand met de naam config.toml in je configuratiemap. Elke sleutel kan ook op de opdrachtregel worden meegegeven, en de opdrachtregel wint.",
+   "config_rows": [
+    {
+     "d": "Hoeveel terugkerende meldingen worden getoond."
+    },
+    {
+     "d": "Het uitvoerformaat: text, json of html."
+    },
+    {
+     "d": "Meldingen die worden overgeslagen, vergeleken als gewone tekst."
+    },
+    {
+     "d": "Lees alleen regels na dit tijdstip."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Het drukste uur vinden",
+     "p": "Groepeer de samenvatting per uur om te zien wanneer het log het drukst was."
+    },
+    {
+     "h": "Twee dagen vergelijken",
+     "p": "Laat zien welke meldingen nieuw zijn en welke verdwenen zijn tussen twee bestanden."
+    },
+    {
+     "h": "Een rapport om door te sturen",
+     "p": "Schrijf het HTML-rapport naar een bestand en voeg het toe aan een bericht."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "De samenvatting is leeg",
+     "a": "Controleer of het bestand één melding per regel heeft. Is het gecomprimeerd in een formaat dat {brand} niet kent, pak het dan eerst uit."
+    },
+    {
+     "q": "De tijden kloppen niet",
+     "a": "Regels zonder tijdzone worden als UTC gelezen. Geef met --tz aan in welke zone ze staan."
+    },
+    {
+     "q": "Het rapport is te lang",
+     "a": "Verlaag --top, of zet de luidruchtigste meldingen op de negeerlijst in het configuratiebestand."
+    },
+    {
+     "q": "Het gaat traag op een netwerkschijf",
+     "a": "Kopieer het bestand eerst naar een lokale schijf. Regel voor regel lezen over een trage verbinding is meestal de oorzaak."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Tal",
+       "Peil",
+       "Kort",
+       "Schets",
+       "Boek",
+       "Groeve",
+       "Strak",
+       "Griffel"
+      ],
+      [
+       "log",
+       "scan",
+       "som",
+       "blik",
+       "snee",
+       "kijk"
+      ]
+     ]
+    }
+   }
+  },
+  "site": {
+   "tagline": "Een kleine bouwer van statische sites",
+   "desc": "{brand} maakt van een map met Markdown-bestanden en een paar sjablonen een statische website.",
+   "overview": "{brand} maakt van een map met Markdown-bestanden en een paar sjablonen een statische website. Er is geen database, geen runtime en niets om op de server bij te werken.",
+   "features": [
+    "Markdown met front matter",
+    "Sjablonen in gewone HTML",
+    "Een lokale voorvertoning die bij elke wijziging opnieuw bouwt"
+   ],
+   "quick_out": "Notities worden getoond op localhost:4000 (stoppen met Ctrl+C)",
+   "install_intro": "{brand} is één programma. Zet het in je PATH en je bent klaar.",
+   "install_steps": [
+    "Download het archief dat bij je systeem past.",
+    "Pak het uit en zet het programma in een map die in je PATH staat.",
+    "Voer de opdracht voor het versienummer uit om te controleren of het werkt."
+   ],
+   "faq": [
+    {
+     "q": "Kan ik mijn eigen sjablonen gebruiken?",
+     "a": "Ja. Sjablonen zijn gewone HTML-bestanden met een paar plaatsaanduidingen, en de mapindeling mag je zelf aanpassen."
+    },
+    {
+     "q": "Heeft het een database nodig?",
+     "a": "Nee. De uitvoer bestaat uit gewone bestanden die elke webserver kan tonen."
+    },
+    {
+     "q": "Hoe voeg ik een nieuw soort pagina toe?",
+     "a": "Maak onder pages een map met een eigen opmaakbestand en {brand} pakt die bij de volgende build op."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Een nieuwe site beginnen",
+     "p": "De opdracht init maakt een map met een configuratiebestand, een opmaak en één voorbeeldpagina."
+    },
+    {
+     "h": "Een pagina schrijven",
+     "p": "Pagina's zijn Markdown-bestanden. De front matter bovenaan bepaalt de titel en de datum; alles eronder is de inhoud."
+    },
+    {
+     "h": "Bouwen om te publiceren",
+     "p": "De opdracht build schrijft de afgewerkte site naar de map public. Kopieer die map naar een webserver naar keuze."
+    }
+   ],
+   "options": [
+    {
+     "d": "Map voor de afgewerkte site. Standaard public."
+    },
+    {
+     "d": "Neem ook pagina's mee die als concept zijn gemarkeerd."
+    },
+    {
+     "d": "Poort voor de voorvertoning. Standaard 4000."
+    },
+    {
+     "d": "Bouw opnieuw als een bestand verandert."
+    },
+    {
+     "d": "Toon alleen fouten."
+    }
+   ],
+   "config_intro": "Het bestand site.toml staat in de hoofdmap van je map. Een ontbrekende sleutel valt terug op de standaardwaarde, dus een nieuwe site heeft helemaal geen bestand nodig.",
+   "config_rows": [
+    {
+     "d": "De naam die in de paginakop en in de titel staat."
+    },
+    {
+     "d": "Het adres waar je site staat. Gebruik / voor een site in de hoofdmap."
+    },
+    {
+     "d": "De uitstraling van de site: plain, slate of folio."
+    },
+    {
+     "d": "Of pagina's die als concept zijn gemarkeerd worden gebouwd."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Een pagina toevoegen",
+     "p": "Maak een Markdown-bestand met bovenaan een titel en een datum."
+    },
+    {
+     "h": "Concepten bekijken",
+     "p": "Toon de site lokaal, met de onaffe pagina's erbij."
+    },
+    {
+     "h": "Publiceren naar een map",
+     "p": "Bouw de hele site naar één map die je naar een webserver kunt kopiëren."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Een pagina ontbreekt in de build",
+     "a": "Pagina's met draft: true in hun kop worden overgeslagen. Haal dat weg of bouw met --drafts."
+    },
+    {
+     "q": "Links werken niet meer na het publiceren",
+     "a": "Zet base_url op het adres van de map waarin de site staat."
+    },
+    {
+     "q": "De voorvertoning wordt niet ververst",
+     "a": "Sommige editors schrijven een nieuw bestand in plaats van het oude te wijzigen. Start de voorvertoning opnieuw, of zet veilig opslaan in de editor uit."
+    },
+    {
+     "q": "Afbeeldingen worden niet getoond",
+     "a": "Zet ze in de map static. Alles daarin wordt ongewijzigd gekopieerd."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kaal",
+       "Leien",
+       "Krijt",
+       "Folio",
+       "Veer",
+       "Steen",
+       "Pers",
+       "Inkt"
+      ],
+      [
+       "site",
+       "pagina",
+       "bouw",
+       "maker",
+       "blad"
+      ]
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Terugkerende taken zonder crontab",
+   "desc": "{brand} voert kleine terugkerende taken uit op één computer en laat het weten als er een mislukt.",
+   "overview": "{brand} voert kleine terugkerende taken uit op één computer en laat het weten als er een mislukt. Het is een vriendelijker alternatief voor een crontab die je in je hoofd moet houden.",
+   "features": [
+    "Roosters in gewone woorden",
+    "Een log van elke uitvoering",
+    "Eén regel uitvoer per taak, zodat mislukkingen opvallen"
+   ],
+   "quick_out": "backup   elke dag om 03:00   laatste keer: ok (4 s)",
+   "install_intro": "{brand} bestaat uit één programma en een klein achtergrondproces dat het rooster elke minuut controleert.",
+   "install_steps": [
+    "Download het archief dat bij je systeem past.",
+    "Pak het uit en zet het programma in een map die in je PATH staat.",
+    "Start het achtergrondproces met de servicebeheerder van je systeem."
+   ],
+   "faq": [
+    {
+     "q": "Moet het als service draaien?",
+     "a": "Ja, een klein achtergrondproces controleert het rooster elke minuut. Op de installatiepagina staat wat je moet starten."
+    },
+    {
+     "q": "Wat gebeurt er als de computer uit staat?",
+     "a": "Een taak die klaarstond terwijl de computer uit was, wordt één keer uitgevoerd zodra hij weer start."
+    },
+    {
+     "q": "Kunnen taken van elkaar afhangen?",
+     "a": "Nog niet. Zet de opdrachten voorlopig achter elkaar in één taak."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Een taak toevoegen",
+     "p": "Een taak heeft een naam, een rooster en een opdracht. Roosters schrijf je in gewone woorden."
+    },
+    {
+     "h": "Zien wat er gelopen is",
+     "p": "De opdracht list toont elke taak met het resultaat van de laatste keer. De opdracht history toont de uitvoeringen van één taak met duur en uitvoer."
+    },
+    {
+     "h": "Pauzeren en hervatten",
+     "p": "Bij pauzeren blijven de taak en de geschiedenis bewaard, maar draait hij niet meer. Handig tijdens een verhuizing of als je een back-up terugzet."
+    }
+   ],
+   "options": [
+    {
+     "d": "Waar taken en logs worden bewaard. Standaard een map in je thuismap."
+    },
+    {
+     "d": "Toon alleen mislukkingen."
+    },
+    {
+     "d": "Hoeveel uitvoeringen history toont. Standaard 10."
+    },
+    {
+     "d": "Uitvoer die door machines te lezen is."
+    },
+    {
+     "d": "Voer een taak meteen uit, naast het rooster."
+    }
+   ],
+   "config_intro": "{brand} leest jobs.toml uit je configuratiemap. De taken zelf worden apart bewaard, dus het bestand bevat alleen instellingen.",
+   "config_rows": [
+    {
+     "d": "De shell die de opdrachten uitvoert."
+    },
+    {
+     "d": "Waar de uitvoer van elke keer wordt bewaard."
+    },
+    {
+     "d": "Hoe vaak een mislukte taak opnieuw wordt geprobeerd."
+    },
+    {
+     "d": "Of een mislukte taak ook een melding stuurt."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Een taak één keer nu uitvoeren",
+     "p": "Start een taak buiten het rooster om, bijvoorbeeld om een nieuwe opdracht te testen."
+    },
+    {
+     "h": "Zien waarom een taak mislukte",
+     "p": "Toon de uitvoer van de laatste keer dat een taak liep."
+    },
+    {
+     "h": "Alles pauzeren tijdens een reis",
+     "p": "Zet alle roosters stil tot je ze hervat."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Een taak draait nooit",
+     "a": "Controleer met de opdracht list of het programma draait. Taken lopen alleen zolang dat zo is."
+    },
+    {
+     "q": "Een taak draait twee keer",
+     "a": "Er draaien twee exemplaren van het programma. Stop er een; het lockbestand staat in de logmap."
+    },
+    {
+     "q": "De opdracht werkt in mijn shell maar niet hier",
+     "a": "Taken lezen de opstartbestanden van je shell niet. Gebruik volledige paden, of stel de omgeving in bij de taak."
+    },
+    {
+     "q": "De tijden lopen een uur mis",
+     "a": "{brand} volgt de klok en tijdzone van het systeem. Pas ze daar aan, niet in de taak."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Klok",
+       "Klus",
+       "Taak",
+       "Rooster",
+       "Tik",
+       "Ritme",
+       "Beurt",
+       "Duwtje"
+      ],
+      [
+       "werk",
+       "lijst",
+       "loop",
+       "doe",
+       "bel"
+      ]
+     ]
+    }
+   }
+  },
+  "csv": {
+   "tagline": "CSV-bestanden selecteren, sorteren en samenvoegen",
+   "desc": "{brand} selecteert, sorteert, voegt samen en maakt schoon: CSV-bestanden vanaf de opdrachtregel.",
+   "overview": "{brand} selecteert, sorteert, voegt samen en maakt CSV-bestanden schoon, vanaf de opdrachtregel. Het verwerkt grote bestanden zonder ze in het geheugen te laden en verandert de invoer nooit.",
+   "features": [
+    "Kolommen kiezen en hernoemen",
+    "Bestanden sorteren, filteren en samenvoegen",
+    "Veelvoorkomende problemen herstellen, zoals losse aanhalingstekens en gemengde regeleinden"
+   ],
+   "quick_out": "naam,plaats\nMira,Leiden\nOtto,Breda",
+   "install_intro": "{brand} is één programma zonder afhankelijkheden.",
+   "install_steps": [
+    "Download het archief dat bij je systeem past.",
+    "Pak het uit en zet het programma in een map die in je PATH staat.",
+    "Voer de opdracht voor het versienummer uit om te controleren of het werkt."
+   ],
+   "faq": [
+    {
+     "q": "Hoe groot mag een bestand zijn?",
+     "a": "Bestanden worden als stroom verwerkt, dus het geheugengebruik blijft klein. Bij het sorteren van grote bestanden wordt tijdelijk ruimte op schijf gebruikt."
+    },
+    {
+     "q": "Verandert het mijn bestanden?",
+     "a": "Nee. De uitvoer gaat naar het scherm of naar een nieuw bestand."
+    },
+    {
+     "q": "En andere scheidingstekens?",
+     "a": "Met de optie delimiter kies je tabs, puntkomma's of elk ander enkel teken."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Kolommen kiezen",
+     "p": "De opdracht select toont alleen de kolommen die je noemt, in de volgorde die je opgeeft. Met een is-teken geef je een kolom een andere naam."
+    },
+    {
+     "h": "Rijen filteren",
+     "p": "De opdracht filter houdt de rijen over die aan een eenvoudige voorwaarde voldoen. Meerdere voorwaarden kunnen worden gecombineerd."
+    },
+    {
+     "h": "Twee bestanden samenvoegen",
+     "p": "De opdracht join voegt twee bestanden samen op een kolom die ze delen. Rijen zonder overeenkomst vallen weg, tenzij je erom vraagt."
+    }
+   ],
+   "options": [
+    {
+     "d": "Scheidingsteken tussen velden. Standaard een komma."
+    },
+    {
+     "d": "Zet op false als de eerste rij gegevens bevat."
+    },
+    {
+     "d": "Schrijf naar een bestand in plaats van naar het scherm."
+    },
+    {
+     "d": "Kolom om op te sorteren."
+    },
+    {
+     "d": "Kolom om op samen te voegen."
+    }
+   ],
+   "config_intro": "Zet een bestand met de naam .{cmd}rc in je thuismap om de standaardwaarden te wijzigen. Opties op de opdrachtregel winnen altijd.",
+   "config_rows": [
+    {
+     "d": "Het teken dat kolommen scheidt."
+    },
+    {
+     "d": "Of de eerste rij kolomnamen bevat."
+    },
+    {
+     "d": "De tekencodering van invoer en uitvoer."
+    },
+    {
+     "d": "Wat een lege cel in de uitvoer wordt."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Kolommen kiezen en hernoemen",
+     "p": "Houd twee kolommen over en geef een ervan een nieuwe naam."
+    },
+    {
+     "h": "Twee bestanden samenvoegen op een sleutel",
+     "p": "Combineer de rijen van twee bestanden die een id delen."
+    },
+    {
+     "h": "Dubbele rijen verwijderen",
+     "p": "Houd van elke groep identieke rijen de eerste over."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Letters met accenten zijn stuk",
+     "a": "Het bestand is waarschijnlijk geen UTF-8. Stel de codering in het configuratiebestand in of met --encoding."
+    },
+    {
+     "q": "Een kolom ontbreekt",
+     "a": "Bevat de eerste rij gegevens en geen namen, start dan met --no-header en noem kolommen met hun nummer."
+    },
+    {
+     "q": "Getallen worden als tekst gesorteerd",
+     "a": "Geef --numeric mee, anders sorteert {brand} ze zoals ze eruitzien."
+    },
+    {
+     "q": "Samenvoegen levert geen rijen op",
+     "a": "De sleutel heeft in de twee bestanden een andere spatiëring of hoofdletters. Draai tidy op beide en probeer het opnieuw."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kolom",
+       "Raster",
+       "Cel",
+       "Rij",
+       "Blad",
+       "Tab",
+       "Komma",
+       "Veld"
+      ],
+      [
+       "knip",
+       "fix",
+       "voeg",
+       "veeg",
+       "zeef",
+       "kneed"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

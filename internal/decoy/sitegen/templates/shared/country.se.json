@@ -20,21 +20,21 @@
    "zip": [
     "11"
    ],
-   "phone": ""
+   "phone": "08-465004XX"
   },
   {
    "name": "Göteborg",
    "zip": [
     "41"
    ],
-   "phone": ""
+   "phone": "031-39006XX"
   },
   {
    "name": "Malmö",
    "zip": [
     "21"
    ],
-   "phone": ""
+   "phone": "040-62804XX"
   },
   {
    "name": "Uppsala",
@@ -133,6 +133,41 @@
     "65"
    ],
    "phone": ""
+  },
+  {
+   "name": "Kiruna",
+   "zip": [
+    "98"
+   ],
+   "phone": "0980-3192XX"
+  },
+  {
+   "name": "Sundsvall",
+   "zip": [
+    "85"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Växjö",
+   "zip": [
+    "35"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Halmstad",
+   "zip": [
+    "30"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Luleå",
+   "zip": [
+    "97"
+   ],
+   "phone": ""
   }
  ],
  "streets": [
@@ -147,7 +182,13 @@
   "Bangatan",
   "Västra vägen",
   "Östra vägen",
-  "Strandvägen"
+  "Strandvägen",
+  "Stationsgatan",
+  "Kyrkvägen",
+  "Skogsvägen",
+  "Södra vägen",
+  "Norra vägen",
+  "Hamngatan"
  ],
  "first": [
   "Erik",

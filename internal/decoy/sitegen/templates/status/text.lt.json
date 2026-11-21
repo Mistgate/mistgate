@@ -1,0 +1,229 @@
+{
+ "ui": {
+  "nav_label": "Pagrindinis",
+  "tagline": "Paslaugų būsena",
+  "footer": "Visi laikai nurodyti pagal UTC.",
+  "nav_home": "Būsena",
+  "nav_history": "Incidentų istorija",
+  "nav_about": "Apie",
+  "home_title": "Dabartinė būsena",
+  "desc": "Dabartinė „{brand}“ paslaugų būsena ir veikimo laikas.",
+  "desc_history": "Ankstesni „{brand}“ incidentai ir kaip jie buvo ištaisyti.",
+  "desc_about": "Kaip „{brand}“ skaičiuoja veikimo laiką ir praneša apie incidentus.",
+  "nf_title": "Puslapis nerastas",
+  "nf_text": "Šiuo adresu nieko nėra. Būsenos puslapis yra pradžioje.",
+  "nf_back": "Į būsenos puslapį",
+  "banner_ok": "Visos sistemos veikia",
+  "banner_sub": "Visos „{brand}“ paslaugos veikia įprastai.",
+  "comps_h": "Paslaugos",
+  "op": "Veikia",
+  "up_label": "veikimo laikas",
+  "days_ago_l": "Prieš 60 dienų",
+  "days_ago_r": "Šiandien",
+  "m_uptime": "Veikimo laikas per pastarąsias 90 dienų",
+  "m_resp": "Vidutinis atsako laikas",
+  "m_inc": "Užfiksuoti incidentai",
+  "recent_h": "Naujausi incidentai",
+  "all_inc": "Visa incidentų istorija",
+  "history_h": "Incidentų istorija",
+  "history_intro": "Kas nepavyko per pastaruosius mėnesius ir kaip tai ištaisėme. Naujausi viršuje.",
+  "st_inv": "Tiriama",
+  "st_ident": "Priežastis rasta",
+  "st_res": "Išspręsta",
+  "imp_minor": "Nedidelis",
+  "imp_major": "Didelis",
+  "imp_maint": "Priežiūra",
+  "dur_l": "Trukmė",
+  "about_h": "Apie šį puslapį",
+  "about": [
+   {
+    "h": "Ką rodo šis puslapis",
+    "p": "Šiame puslapyje matyti, kaip šiuo metu veikia „{brand}“ paslaugos, ir ankstesnių incidentų sąrašas. Jį pildo komanda, kuri tas paslaugas prižiūri."
+   },
+   {
+    "h": "Kaip matuojamas veikimo laikas",
+    "p": "Kiekviena paslauga tikrinama iš kelių vietų kartą per minutę. Minutė laikoma prastova, jei nepavyksta daugiau nei pusė patikrų."
+   },
+   {
+    "h": "Kaip pranešame apie incidentus",
+    "p": "Paskelbiame naujieną, kai pradedame tirti problemą, kai randame priežastį ir kai problema išspręsta. Apie didesnius incidentus vėliau parašome trumpą aprašą."
+   },
+   {
+    "h": "Planiniai darbai",
+    "p": "Apie planinius darbus pranešame čia bent prieš tris dienas, o atliekame juos ramiu metu."
+   }
+  ],
+  "incidents": [
+   {
+    "title": "Padaugėjo klaidų",
+    "impact": "major",
+    "dur": "38 minutės",
+    "a": "Nepavykusių užklausų yra daugiau nei įprastai. Aiškinamės priežastį.",
+    "b": "Rastas klaidingas nustatymų pakeitimas, jį atšaukiame.",
+    "c": "Pakeitimas atšauktas, klaidų skaičius vėl normalus. Dar išsiaiškinsime, kaip jis praėjo patikrą."
+   },
+   {
+    "title": "Vėluoja pranešimai",
+    "impact": "minor",
+    "dur": "1 valanda 12 minučių",
+    "a": "Pranešimai pristatomi su kelių minučių vėlavimu.",
+    "b": "Rasta eilė, kurioje buvo susikaupę pranešimai.",
+    "c": "Eilė išvalyta, pranešimai vėl pristatomi laiku."
+   },
+   {
+    "title": "Lėtai kraunasi puslapiai",
+    "impact": "minor",
+    "dur": "26 minutės",
+    "a": "Dalis naudotojų skundžiasi, kad puslapiai kraunasi lėtai. Tiriame.",
+    "b": "Vienas duomenų bazės serveris buvo per daug apkrautas, todėl jį išjungėme.",
+    "c": "Puslapių krovimosi laikas vėl normalus."
+   },
+   {
+    "title": "Planiniai darbai užsitęsė",
+    "impact": "maint",
+    "dur": "40 minučių ilgiau nei planuota",
+    "a": "Pagrindinės duomenų bazės priežiūra trunka ilgiau, nei planavome.",
+    "b": "Paskutiniam atnaujinimo žingsniui reikia dar kelių minučių.",
+    "c": "Darbai baigti, visos paslaugos veikia įprastai."
+   },
+   {
+    "title": "Dalinis gedimas viename regione",
+    "impact": "major",
+    "dur": "54 minutės",
+    "a": "Vieno regiono naudotojai negali pasiekti paslaugos. Dirbame kartu su savo prieglobos tiekėju.",
+    "b": "Tiekėjas patvirtino, kad tame regione yra tinklo gedimas, paveikęs mūsų serverius.",
+    "c": "Tinklo gedimas pašalintas, regionas vėl aptarnaujamas."
+   },
+   {
+    "title": "Paieškos rezultatai pasenę",
+    "impact": "minor",
+    "dur": "2 valandos 5 minutės",
+    "a": "Nauji įrašai nerodomi paieškos rezultatuose.",
+    "b": "Indeksavimo darbas sustojo po nepavykusio atnaujinimo, todėl jį paleidome iš naujo.",
+    "c": "Indeksavimas pasivijo, paieška rodo naujausius duomenis."
+   },
+   {
+    "title": "Kai kam nepavyksta prisijungti",
+    "impact": "major",
+    "dur": "19 minučių",
+    "a": "Dalis naudotojų negali prisijungti. Kitiems problemos nėra.",
+    "b": "Nustatėme, kad prisijungimo paslaugos sertifikato galiojimas baigėsi.",
+    "c": "Sertifikatas pakeistas, prisijungti vėl gali visi."
+   },
+   {
+    "title": "Kartais nepavyksta įkelti failų",
+    "impact": "minor",
+    "dur": "47 minutės",
+    "a": "Nedidelė dalis įkėlimų nepavyksta, juos tenka kartoti.",
+    "b": "Rastas saugyklos serveris su pilnu disku.",
+    "c": "Vietos padidinta, failai vėl keliami sėkmingai."
+   },
+   {
+    "title": "Lėtai atsako API",
+    "impact": "minor",
+    "dur": "31 minutė",
+    "a": "Kai kurios užklausos į API atsakomos lėčiau nei įprastai. Aiškinamės.",
+    "b": "Vienas foninis darbas viename serveryje naudojo per daug atminties.",
+    "c": "Darbą paleidome iš naujo su atminties riba, atsakymų laikas vėl normalus."
+   },
+   {
+    "title": "Vėluoja webhook pranešimai",
+    "impact": "minor",
+    "dur": "52 minutės",
+    "a": "Webhook pranešimai pasiekia adresatą kelių minučių vėlavimu.",
+    "b": "Juos siunčianti eilė laukė lėto ryšio su duomenų baze.",
+    "c": "Ryšys atkurtas, eilė išvalyta, webhook pranešimai vėl siunčiami laiku."
+   },
+   {
+    "title": "Valdymo skydelis neveikia",
+    "impact": "major",
+    "dur": "22 minutės",
+    "a": "Valdymo skydelis visiems rodo klaidos puslapį. Kitos paslaugos veikia.",
+    "b": "Paskutinės versijos paleidimo kode buvo klaida, ją radome.",
+    "c": "Versiją atšaukėme, valdymo skydelis vėl veikia."
+   },
+   {
+    "title": "Planiniai darbai: duomenų bazės atnaujinimas",
+    "impact": "maint",
+    "dur": "1 valanda",
+    "a": "Vyksta planiniai darbai. Kol jie nesibaigė, kai kurias funkcijas galima tik peržiūrėti.",
+    "b": "Atnaujinimas įpusėjo ir vyksta pagal planą.",
+    "c": "Darbai baigti, viskas veikia įprastai."
+   }
+  ],
+  "inc_back": "Incidentų istorija",
+  "inc_more": "Kiti incidentai",
+  "status_l": "Būsena",
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Vėjo",
+      "Gintaro",
+      "Šilo",
+      "Rasos",
+      "Nemuno",
+      "Ąžuolo",
+      "Žvaigždės",
+      "Miško",
+      "Upės",
+      "Kopų",
+      "Saulės",
+      "Pušų"
+     ],
+     [
+      "debesis",
+      "tiltas",
+      "vartai",
+      "dirbtuvės",
+      "tinklas",
+      "centras",
+      "paslauga",
+      "kanalas",
+      "mazgas",
+      "stotis"
+     ]
+    ],
+    "sep": " "
+   }
+  }
+ },
+ "bundles": {
+  "saas": {
+   "components": [
+    "Viešasis API",
+    "Valdymo skydelis",
+    "Webhook pranešimai",
+    "Prisijungimas",
+    "Foniniai darbai",
+    "Duomenų eksportas",
+    "Sąskaitos",
+    "Žinyno svetainė"
+   ]
+  },
+  "photos": {
+   "components": [
+    "Nuotraukų įkėlimas",
+    "Nuotraukų pristatymas",
+    "Albumai ir dalijimasis",
+    "Interneto programa",
+    "Sinchronizavimas telefone",
+    "Paieška",
+    "Pranešimai",
+    "Paskyra ir prisijungimas"
+   ]
+  },
+  "mail": {
+   "components": [
+    "El. laiškų siuntimas",
+    "SMS siuntimas",
+    "Žinučių šablonai",
+    "Pristatymo ataskaitos",
+    "REST API",
+    "Valdymo skydelis",
+    "Atsisakymo puslapiai",
+    "Planavimas"
+   ]
+  }
+ }
+}

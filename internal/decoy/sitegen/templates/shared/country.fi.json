@@ -1,0 +1,293 @@
+{
+ "order": 21,
+ "lang": "fi",
+ "html_lang": "fi-FI",
+ "date": [
+  "{d}. {m} {y}",
+  "{dd}.{mm}.{y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "{n} €",
+  "group": " ",
+  "scale": 0.9,
+  "round": 5
+ },
+ "address": "{street} {no}, {zip} {city}",
+ "zip_tail": "X00",
+ "cities": [
+  {
+   "name": "Helsinki",
+   "zip": [
+    "00"
+   ],
+   "in": "Helsingissä"
+  },
+  {
+   "name": "Espoo",
+   "zip": [
+    "02"
+   ],
+   "in": "Espoossa"
+  },
+  {
+   "name": "Tampere",
+   "zip": [
+    "33"
+   ],
+   "in": "Tampereella"
+  },
+  {
+   "name": "Vantaa",
+   "zip": [
+    "01"
+   ],
+   "in": "Vantaalla"
+  },
+  {
+   "name": "Oulu",
+   "zip": [
+    "90"
+   ],
+   "in": "Oulussa"
+  },
+  {
+   "name": "Turku",
+   "zip": [
+    "20"
+   ],
+   "in": "Turussa"
+  },
+  {
+   "name": "Jyväskylä",
+   "zip": [
+    "40"
+   ],
+   "in": "Jyväskylässä"
+  },
+  {
+   "name": "Lahti",
+   "zip": [
+    "15"
+   ],
+   "in": "Lahdessa"
+  },
+  {
+   "name": "Kuopio",
+   "zip": [
+    "70"
+   ],
+   "in": "Kuopiossa"
+  },
+  {
+   "name": "Pori",
+   "zip": [
+    "28"
+   ],
+   "in": "Porissa"
+  },
+  {
+   "name": "Kouvola",
+   "zip": [
+    "45"
+   ],
+   "in": "Kouvolassa"
+  },
+  {
+   "name": "Joensuu",
+   "zip": [
+    "80"
+   ],
+   "in": "Joensuussa"
+  },
+  {
+   "name": "Lappeenranta",
+   "zip": [
+    "53"
+   ],
+   "in": "Lappeenrannassa"
+  },
+  {
+   "name": "Hämeenlinna",
+   "zip": [
+    "13"
+   ],
+   "in": "Hämeenlinnassa"
+  },
+  {
+   "name": "Vaasa",
+   "zip": [
+    "65"
+   ],
+   "in": "Vaasassa"
+  },
+  {
+   "name": "Seinäjoki",
+   "zip": [
+    "60"
+   ],
+   "in": "Seinäjoella"
+  },
+  {
+   "name": "Rovaniemi",
+   "zip": [
+    "96"
+   ],
+   "in": "Rovaniemellä"
+  },
+  {
+   "name": "Mikkeli",
+   "zip": [
+    "50"
+   ],
+   "in": "Mikkelissä"
+  },
+  {
+   "name": "Kotka",
+   "zip": [
+    "48"
+   ],
+   "in": "Kotkassa"
+  },
+  {
+   "name": "Salo",
+   "zip": [
+    "24"
+   ],
+   "in": "Salossa"
+  },
+  {
+   "name": "Porvoo",
+   "zip": [
+    "06"
+   ],
+   "in": "Porvoossa"
+  },
+  {
+   "name": "Kokkola",
+   "zip": [
+    "67"
+   ],
+   "in": "Kokkolassa"
+  },
+  {
+   "name": "Hyvinkää",
+   "zip": [
+    "05"
+   ],
+   "in": "Hyvinkäällä"
+  },
+  {
+   "name": "Lohja",
+   "zip": [
+    "08"
+   ],
+   "in": "Lohjalla"
+  },
+  {
+   "name": "Kajaani",
+   "zip": [
+    "87"
+   ],
+   "in": "Kajaanissa"
+  }
+ ],
+ "streets": [
+  "Kauppakatu",
+  "Kirkkokatu",
+  "Asematie",
+  "Koulukatu",
+  "Puistokatu",
+  "Mäntytie",
+  "Koivukatu",
+  "Satamakatu",
+  "Rantatie",
+  "Torikatu",
+  "Hämeenkatu",
+  "Linnankatu",
+  "Tehtaankatu",
+  "Kaivokatu",
+  "Myllytie",
+  "Kuusitie",
+  "Pohjoiskatu",
+  "Itäkatu",
+  "Kallionkatu",
+  "Ratakatu"
+ ],
+ "first": [
+  "Mikko",
+  "Anna:f",
+  "Juha",
+  "Maria:f",
+  "Jari",
+  "Laura:f",
+  "Antti",
+  "Sari:f",
+  "Timo",
+  "Minna:f",
+  "Petri",
+  "Johanna:f",
+  "Matti",
+  "Kaisa:f",
+  "Ville",
+  "Heidi:f",
+  "Janne",
+  "Tiina:f",
+  "Markku",
+  "Päivi:f",
+  "Teemu",
+  "Elina:f",
+  "Olli",
+  "Satu:f",
+  "Kari",
+  "Riikka:f",
+  "Jukka",
+  "Anne:f",
+  "Tommi",
+  "Hanna:f",
+  "Pekka",
+  "Leena:f",
+  "Sami",
+  "Katja:f",
+  "Lauri",
+  "Aino:f"
+ ],
+ "last": [
+  "Korhonen",
+  "Virtanen",
+  "Mäkinen",
+  "Nieminen",
+  "Mäkelä",
+  "Hämäläinen",
+  "Laine",
+  "Heikkinen",
+  "Koskinen",
+  "Järvinen",
+  "Lehtonen",
+  "Lehtinen",
+  "Saarinen",
+  "Salminen",
+  "Heinonen",
+  "Niemi",
+  "Heikkilä",
+  "Kinnunen",
+  "Salonen",
+  "Turunen",
+  "Salo",
+  "Laitinen",
+  "Tuominen",
+  "Rantanen",
+  "Karjalainen",
+  "Jokinen",
+  "Mattila",
+  "Savolainen",
+  "Lahtinen",
+  "Ahonen",
+  "Hiltunen",
+  "Leinonen",
+  "Miettinen",
+  "Pitkänen",
+  "Väisänen",
+  "Koivisto"
+ ]
+}

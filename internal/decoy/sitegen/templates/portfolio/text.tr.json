@@ -1,0 +1,250 @@
+{
+ "ui": {
+  "nav_label": "Ana menü",
+  "footer": "Tüm görseller stüdyonun çalışmasıdır; izinsiz çoğaltılamaz.",
+  "nav_home": "Seçilmiş işler",
+  "nav_work": "Tüm işler",
+  "nav_about": "Hakkında",
+  "nav_contact": "İletişim",
+  "home_title": "Seçilmiş işler",
+  "nf_title": "Sayfa bulunamadı",
+  "nf_text": "Bu adreste bir şey yok. İşler ana sayfada.",
+  "nf_back": "İşlere dön",
+  "sel_h": "Seçilmiş işler",
+  "all_work": "Tüm işleri gör",
+  "work_h": "Tüm işler",
+  "work_intro": "Son birkaç yılın hepsi, en yenisi başta.",
+  "about_h": "Hakkında",
+  "services_h": "Neler yapıyorum",
+  "shows_h": "Sergiler ve anılmalar",
+  "contact_h": "İletişim",
+  "visit_h": "Atölye",
+  "hours_h": "Çalışma saatleri",
+  "phone_l": "Telefon",
+  "visit_text": "Atölye randevuyla açıktır. Lütfen çalışma saatlerinde gelin; kapıya kimse bakmazsa muhtemelen arka odada ya da matbaadayım.",
+  "commission_h": "Siparişler",
+  "commission_text": "Yılda az sayıda sipariş alırım. Bana ulaştığınızda aklınızda ne olduğunu ve ne zaman istediğinizi yazın; yapıp yapamayacağımı dürüstçe söylerim.",
+  "hours_note": "Cumartesi randevuyla",
+  "work_back": "Tüm işler",
+  "work_more": "Diğer işler",
+  "work_ask": "Bu iş hakkında sorun",
+  "directions_h": "Atölyeyi bulmak",
+  "directions": "Atölye zemin katta, şehir merkezine kısa bir yürüme mesafesinde. Kapı yan tarafta ve bir zil var. Bisiklet park yerleri dışarıda."
+ },
+ "bundles": {
+  "photo": {
+   "tagline": "Sessiz yerlerin fotoğrafları",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Boş",
+       "Soluk",
+       "Açık",
+       "Durgun",
+       "Uzun",
+       "Yumuşak",
+       "İnce",
+       "Erken",
+       "Dar",
+       "Uzak"
+      ],
+      [
+       "Işık",
+       "Kare",
+       "Tarla",
+       "Saat",
+       "Ufuk",
+       "Poz",
+       "Plaka",
+       "Perde",
+       "Diyafram",
+       "Baskı"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "{city_in} peyzaj ve natürmort fotoğrafçılığı. Baskılar ve siparişler.",
+   "desc_work": "Seçilmiş fotoğraflar, en yenisi başta.",
+   "desc_about": "Fotoğrafçı ve {city_in} stüdyo hakkında.",
+   "desc_contact": "{city_in} stüdyonun nerede olduğu ve ne zaman açık olduğu.",
+   "intro": "{city_in} peyzaj ve natürmort fotoğrafçılığı. Baskılar ve yılda birkaç sipariş.",
+   "about": [
+    "{city_in} küçük bir stüdyodan çalışan bir fotoğrafçıyım. Resimlerimin çoğu, herkes gittikten sonraki saatte yerleri gösteriyor.",
+    "Yavaş çalışırım; genellikle tek bir makine ve tek bir mercekle, her şeyi arka odada kendim basarım. Bir fotoğrafı bir hafta boyunca değiştirmek istemeden bakabiliyorsam bitmiş sayarım.",
+    "Son yıllarda işlerim bölgedeki küçük galerilerde ve kütüphanelerde gösterildi, duvarına sessiz bir şey isteyenlere baskı olarak satıldı."
+   ],
+   "services": [
+    "İmzalı ve numaralı sanat baskıları",
+    "Evde ya da stüdyoda sipariş portreler",
+    "Dergi ve kitap fotoğrafçılığı"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "İki Ufuk, grup sergisi, Eski Ambar Galerisi"
+    },
+    {
+     "y": "2024",
+     "t": "Durgun Su, kişisel sergi, Dere Kütüphanesi girişi"
+    },
+    {
+     "y": "2022",
+     "t": "Bölge Fotoğraf Ödülü, kısa liste"
+    }
+   ],
+   "works": [
+    {
+     "title": "Yamaç, öğleden sonra",
+     "caption": "Arşiv kalitesinde pigment baskı, 2025",
+     "note": "Genellikle gözden kaçan bir tarlada ışığın son anı.",
+     "text": "Bulutun sırttan kalkması için üç öğleden sonra bekledim; dört dakika kalktı."
+    },
+    {
+     "title": "İki ufuk",
+     "caption": "Arşiv kalitesinde pigment baskı, 2025",
+     "note": "Nerede biteceğine karar veremeyen bir kıyı şeridi.",
+     "text": "Dalgalar çekiliyordu ve ıslak kum ikinci bir gökyüzü yansıttı. Altı kare çektim, bunu sakladım."
+    },
+    {
+     "title": "Durgun su",
+     "caption": "Arşiv kalitesinde pigment baskı, 2024",
+     "note": "Kasımda, kanıtlayacak bir şeyi olmayan bir gölet.",
+     "text": "Sabah yedide rüzgârdan önce bir baraj gölü. Baskı büyük olduğu için sessizliğin yeri var."
+    },
+    {
+     "title": "Kırmızı tarla",
+     "caption": "Arşiv kalitesinde pigment baskı, 2024",
+     "note": "Tohuma kaçmış gelincikler, yağmurda çekildi.",
+     "text": "Çiçek açmaya bırakılıp sonra biçilen bir yonca tarlası. Baskıdaki renk, makinenin gördüğünden çok benim gördüğüme yakın."
+    },
+    {
+     "title": "Alacakaranlıkta çizgiler",
+     "caption": "Arşiv kalitesinde pigment baskı, 2023",
+     "note": "Fikrini değiştiren bir gökyüzünün önünde telgraf telleri.",
+     "text": "Çit direkleri ve sürülmüş çizgiler, üzerlerine düz uzanan son ışık. Uzun ve ince bir çerçevede daha güzel duruyor."
+    },
+    {
+     "title": "Tuz ve kayrak",
+     "caption": "Arşiv kalitesinde pigment baskı, 2023",
+     "note": "Bir liman duvarı, eski bir madeni paranın renklerinde.",
+     "text": "Dalgaların bıraktığı beyaz tuzlu, koyu taşlı bir kumsal. İstediğim ışığı yakalamak için üç mevsim geri geldim."
+    },
+    {
+     "title": "Mavi saat",
+     "caption": "Arşiv kalitesinde pigment baskı, 2022",
+     "note": "Gündüzle gece arasındaki on dakika, bir hafta boyunca tekrarlandı.",
+     "text": "Gün batımından on dakika sonra bütün vadi mürekkep rengine döner. Lambanın yandığı tek kare bu."
+    }
+   ]
+  },
+  "illustration": {
+   "tagline": "İllüstrasyon ve baskı resim",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Eğrelti",
+       "Kâğıt",
+       "Küçük",
+       "Mürekkep",
+       "Limon",
+       "Güve",
+       "Dürüst",
+       "Portakal",
+       "Kurşunkalem",
+       "Sessiz"
+      ],
+      [
+       "Baskı",
+       "Atölye",
+       "Masa",
+       "Çizim",
+       "İşler",
+       "Defter",
+       "Köşe",
+       "Sehpa",
+       "Kalıp",
+       "Dolap"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "{city_in} bir masadan illüstrasyonlar, linolyum baskılar ve küçük kitaplar.",
+   "desc_work": "İllüstrasyonlar ve baskılar, en yenisi başta.",
+   "desc_about": "İllüstratör ve {city_in} atölye hakkında.",
+   "desc_contact": "{city_in} atölyenin nerede olduğu ve ne zaman açık olduğu.",
+   "intro": "{city_in} bir masadan illüstrasyonlar, linolyum baskılar ve küçük kitaplar.",
+   "about": [
+    "İllüstratör ve baskı sanatçısıyım. Resimli çocuk kitapları, ödemeleri zamanında yapan dergiler ve bir afişin köşesine bir kuş gereken herkes için çiziyorum.",
+    "İşlerimin çoğu bir defterde kurşunkalem eskiziyle başlar, işin istediğine göre linolyum baskıyla ya da düz renkli dijital bir çizimle biter.",
+    "{city_in} yaşıyorum; kompozisyonlarım hakkında fikirleri olan bir kedimle."
+   ],
+   "services": [
+    "Resimli kitaplar ve editoryal illüstrasyon",
+    "Linolyum baskılar ve kartlar",
+    "Afişler ve etkinlik görselleri"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Küçük Baskılar Fuarı, tezgâh sahibi"
+    },
+    {
+     "y": "2024",
+     "t": "Tarla Defteri, yerel bir yayınevinden resimli kitap"
+    },
+    {
+     "y": "2023",
+     "t": "Bölge illüstrasyon ödülü, övgü"
+    }
+   ],
+   "works": [
+    {
+     "title": "Turuncu üzerine çalışma",
+     "caption": "Linolyum baskı, üç renk, 2025",
+     "note": "Bir tilki, yarım merdiven ve açıklanmayan bir ay.",
+     "text": "Tek bir renk, üç kâğıt ve bir öğleden sonra. Isınma olarak başladı, küçük bir kitabın kapağı oldu."
+    },
+    {
+     "title": "Pazar yerinde bir gün",
+     "caption": "Dijital çizim, 2025",
+     "note": "On bir tezgâh ve çok kendini beğenmiş bir güvercin.",
+     "text": "Üç cumartesi boyunca yerinde çizildi. Tezgâhtarlar nazikçe kıpırdamadan durdular, ya da neredeyse."
+    },
+    {
+     "title": "Uzun yoldan",
+     "caption": "Kurşunkalem ve mürekkep, 2024",
+     "note": "Tabelanın gösterdiği yere gitmeyen bir patika.",
+     "text": "Pazar günleri yürüdüğüm bir güzergâh; hafızadan çizdim, sonra bir sonraki yürüyüşte kontrol ettim. Harita güzel şekillerde yanlıştı."
+    },
+    {
+     "title": "Gece otobüsü",
+     "caption": "Linolyum baskı, iki renk, 2024",
+     "note": "Şoför ve ay dışında herkes uyuyor.",
+     "text": "Kalem, mürekkep ve penceredeki yansımalara büyük sabır."
+    },
+    {
+     "title": "Yeşil saatler",
+     "caption": "Guaj, 2023",
+     "note": "Öğleden sonra dörtte bir sera.",
+     "text": "Haziranda kahvaltıdan önceki saatler, bahçe henüz serinken. Guajla boyandı."
+    },
+    {
+     "title": "Küçük kuşlar",
+     "caption": "Linolyum baskı, 2023",
+     "note": "Yedi kuş, hiçbiri doğru tanımlanmamış.",
+     "text": "Serçeler, çıtkuşları ve çok sinirli bir kızılgerdan. Her kuş ayrı bir kalıp, bu yüzden iki baskı birebir aynı değil."
+    },
+    {
+     "title": "Yağmur çalışması",
+     "caption": "Suluboya, 2022",
+     "note": "Pencereden görülen şemsiyeler.",
+     "text": "Suluboya, çoğunlukla su. Su birikintilerinin nereye gideceğine kâğıdın karar vermesine izin verdim."
+    }
+   ]
+  }
+ }
+}

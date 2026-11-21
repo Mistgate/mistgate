@@ -1,0 +1,153 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     ["Galet", "Plume", "Lanterne", "Bouleau", "Ardoise", "Trèfle", "Sterne", "Ambre", "Cerf", "Mouette"],
+     ["drop", "send", "share", "post", "pass", "move", "hand"]
+    ]
+   },
+   "limit": ["500 Mo", "1 Go", "2 Go", "5 Go"]
+  },
+  "nav_label": "Navigation",
+  "tagline": "Transfert de fichiers tout simple",
+  "footer": "Les fichiers sont supprimés automatiquement à l'expiration du lien.",
+  "nav_home": "Envoyer un fichier",
+  "nav_how": "Comment ça marche",
+  "nav_limits": "Limites et questions",
+  "home_title": "Envoyer un fichier",
+  "desc": "Partagez des fichiers jusqu'à {limit} avec un seul lien, grâce à {brand}.",
+  "desc_how": "Comment fonctionne le transfert de fichiers chez {brand}.",
+  "desc_limits": "Tailles de fichiers, durée des liens et questions fréquentes sur {brand}.",
+  "nf_title": "Page introuvable",
+  "nf_text": "La page que vous cherchez n'existe pas ou a été déplacée.",
+  "nf_back": "Retour à l'accueil",
+  "drop_h": "Déposez un fichier ici",
+  "drop_hint": "ou choisissez-en un sur votre appareil, jusqu'à {limit}",
+  "pick": "Choisir un fichier",
+  "uploading": "Envoi en cours…",
+  "e_full": [
+   "L'espace de stockage est plein. Merci de réessayer plus tard.",
+   "L'envoi a échoué : notre espace de stockage est plein pour le moment.",
+   "Nous ne pouvons pas enregistrer de nouveaux fichiers pour l'instant, car le stockage est plein."
+  ],
+  "retry": "Réessayer",
+  "how_h": "Comment ça marche",
+  "how_intro": "Trois étapes, rien à installer.",
+  "steps": [
+   {
+    "h": "Choisissez un fichier",
+    "p": "Déposez le fichier sur la page d'accueil ou sélectionnez-le sur votre appareil."
+   },
+   {
+    "h": "Récupérez un lien",
+    "p": "Une fois l'envoi terminé, vous obtenez un lien que vous pouvez copier."
+   },
+   {
+    "h": "Partagez le lien",
+    "p": "Toute personne qui a le lien peut télécharger le fichier jusqu'à son expiration."
+   }
+  ],
+  "limits_h": "Limites et questions fréquentes",
+  "limits_intro": "Les chiffres qui comptent, au même endroit.",
+  "limits": [
+   {
+    "k": "Fichier le plus volumineux",
+    "v": "{limit}"
+   },
+   {
+    "k": "Durée de vie du lien",
+    "v": "{days} jours"
+   },
+   {
+    "k": "Fichiers par envoi",
+    "v": "Un seul (regroupez-en plusieurs dans un fichier zip)"
+   },
+   {
+    "k": "Téléchargements par lien",
+    "v": "Illimités jusqu'à l'expiration"
+   }
+  ],
+  "faq_h": "Questions fréquentes",
+  "faq": [
+   {
+    "q": "Faut-il un compte ?",
+    "a": "Non. Vous pouvez envoyer des fichiers jusqu'à {limit} sans vous connecter."
+   },
+   {
+    "q": "Combien de temps mon lien reste-t-il valable ?",
+    "a": "Les liens fonctionnent pendant {days} jours. Ensuite, le fichier est supprimé et le lien ne marche plus."
+   },
+   {
+    "q": "Le destinataire peut-il voir mon nom ?",
+    "a": "Seulement si vous le lui dites. La page de téléchargement n'affiche rien sur vous."
+   },
+   {
+    "q": "Que devient mon fichier quand le lien expire ?",
+    "a": "Il est supprimé de notre stockage. Nous n'en gardons aucune copie."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Des liens qui expirent",
+    "p": "Chaque lien fonctionne pendant {days} jours, pour que rien ne traîne."
+   },
+   {
+    "h": "Sans inscription",
+    "p": "Les fichiers jusqu'à {limit} peuvent être envoyés sans compte."
+   },
+   {
+    "h": "Simple et rapide",
+    "p": "Ajoutez un fichier, copiez le lien, transmettez-le. C'est tout."
+   }
+  ],
+  "nav_privacy": "Confidentialité",
+  "desc_privacy": "Ce que deviennent vos fichiers et vos informations chez {brand}.",
+  "privacy_h": "Politique de confidentialité",
+  "privacy_intro": "Un bref aperçu de ce que deviennent votre fichier et les informations de votre transfert.",
+  "privacy": [
+   {
+    "h": "Ce que nous conservons",
+    "p": "Le fichier que vous envoyez et l'heure de son envoi. Nous ne demandons pas votre nom et nous ne gardons pas la liste des personnes qui le téléchargent."
+   },
+   {
+    "h": "Combien de temps nous le gardons",
+    "p": "Jusqu'à l'expiration du lien. Ensuite, le fichier est supprimé du stockage et ne peut plus être récupéré."
+   },
+   {
+    "h": "Qui peut le voir",
+    "p": "Toute personne qui a le lien. Nous n'ouvrons ni ne lisons vos fichiers : ne partagez donc le lien qu'avec les personnes qui doivent recevoir le fichier."
+   },
+   {
+    "h": "Cookies",
+    "p": "Nous n'utilisons que ce dont la page a besoin pour fonctionner. Il n'y a ni cookie publicitaire ni cookie de suivi."
+   },
+   {
+    "h": "Supprimer un fichier plus tôt",
+    "p": "Demandez à la personne qui gère {brand} dans votre structure de supprimer un fichier avant l'expiration de son lien."
+   }
+  ]
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "Transfert de fichiers",
+   "hero_h": "Envoyez un fichier à qui vous voulez",
+   "hero_p": "Ajoutez un fichier, récupérez un lien et partagez-le. Aucun compte n'est nécessaire jusqu'à {limit}."
+  },
+  "print": {
+   "kicker": "Fichiers d'impression",
+   "hero_h": "Déposez vos fichiers pour l'imprimeur",
+   "hero_p": "Envoyez-nous les fichiers prêts à imprimer pour votre commande. Les PDF, TIFF et ZIP jusqu'à {limit} sont acceptés."
+  },
+  "photos": {
+   "kicker": "Partage de photos",
+   "hero_h": "Partagez vos photos",
+   "hero_p": "Envoyez un dossier d'images dans un seul fichier zip pouvant atteindre {limit}. Vos proches n'ont besoin que du lien."
+  },
+  "assignments": {
+   "kicker": "Devoirs à rendre",
+   "hero_h": "Rendez votre travail",
+   "hero_p": "Déposez votre devoir ici avant la date limite. Un seul fichier, jusqu'à {limit}."
+  }
+ }
+}

@@ -1,0 +1,250 @@
+{
+ "ui": {
+  "nav_label": "Päävalikko",
+  "footer": "Kaikki kuvat ovat studion töitä, eikä niitä saa jäljentää ilman lupaa.",
+  "nav_home": "Valitut työt",
+  "nav_work": "Kaikki työt",
+  "nav_about": "Tietoa",
+  "nav_contact": "Yhteystiedot",
+  "home_title": "Valitut työt",
+  "nf_title": "Sivua ei löytynyt",
+  "nf_text": "Tässä osoitteessa ei ole mitään. Työt ovat etusivulla.",
+  "nf_back": "Takaisin töihin",
+  "sel_h": "Valitut työt",
+  "all_work": "Katso kaikki työt",
+  "work_h": "Kaikki työt",
+  "work_intro": "Kaikki parin viime vuoden ajalta, uusin ensin.",
+  "about_h": "Tietoa",
+  "services_h": "Mitä teen",
+  "shows_h": "Näyttelyt ja maininnat",
+  "contact_h": "Yhteystiedot",
+  "visit_h": "Ateljee",
+  "hours_h": "Aukioloajat",
+  "phone_l": "Puhelin",
+  "visit_text": "Ateljee on auki sopimuksen mukaan. Tule aukioloaikoina; jos kukaan ei avaa ovea, olen todennäköisesti takahuoneessa tai painossa.",
+  "commission_h": "Toimeksiannot",
+  "commission_text": "Otan vuosittain vastaan vain muutaman toimeksiannon. Kun otat yhteyttä, kerro, mitä mielessäsi on ja milloin tarvitset sen, niin sanon rehellisesti, pystynkö siihen.",
+  "hours_note": "Lauantaisin sopimuksen mukaan",
+  "work_back": "Kaikki työt",
+  "work_more": "Lisää töitä",
+  "work_ask": "Kysy tästä työstä",
+  "directions_h": "Ateljeen löytäminen",
+  "directions": "Ateljee on pohjakerroksessa, lyhyen kävelymatkan päässä keskustasta. Ovi on sivulla, ja siinä on ovikello. Pyörätelineet ovat ulkona."
+ },
+ "bundles": {
+  "photo": {
+   "tagline": "Valokuvia hiljaisista paikoista",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Tyhjä",
+       "Vaalea",
+       "Avoin",
+       "Tyyni",
+       "Pitkä",
+       "Pehmeä",
+       "Ohut",
+       "Varhainen",
+       "Kapea",
+       "Kaukainen"
+      ],
+      [
+       "Valo",
+       "Kuva",
+       "Pelto",
+       "Hetki",
+       "Horisontti",
+       "Valotus",
+       "Levy",
+       "Suljin",
+       "Aukko",
+       "Vedos"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Maisema- ja asetelmavalokuvausta {city_in}. Vedoksia ja toimeksiantoja.",
+   "desc_work": "Valittuja valokuvia, uusin ensin.",
+   "desc_about": "Tietoa valokuvaajasta ja ateljeesta {city_in}.",
+   "desc_contact": "Missä ateljee on {city_in} ja milloin se on auki.",
+   "intro": "Maisema- ja asetelmavalokuvausta {city_in}. Vedoksia ja muutama toimeksianto vuodessa.",
+   "about": [
+    "Olen valokuvaaja ja työskentelen pienessä ateljeessa {city_in}. Useimmat kuvani ovat paikoista sen tunnin aikana, kun kaikki ovat lähteneet.",
+    "Työskentelen hitaasti, yleensä yhdellä kameralla ja yhdellä objektiivilla, ja vedostan kaiken itse takahuoneessa. Kuva on valmis, kun voin katsoa sitä viikon haluamatta muuttaa mitään.",
+    "Viime vuosina töitäni on esitetty alueen pienissä gallerioissa ja kirjastoissa ja myyty vedoksina ihmisille, jotka halusivat seinälleen jotain hiljaista."
+   ],
+   "services": [
+    "Taidevedokset, signeeratut ja numeroidut",
+    "Muotokuvat toimeksiannosta kotona tai ateljeessa",
+    "Lehti- ja kirjakuvaus"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Kaksi horisonttia, ryhmänäyttely, Vanhan viljavaraston galleria"
+    },
+    {
+     "y": "2024",
+     "t": "Tyyni vesi, yksityisnäyttely, kirjaston aula"
+    },
+    {
+     "y": "2022",
+     "t": "Alueellinen valokuvapalkinto, finalisti"
+    }
+   ],
+   "works": [
+    {
+     "title": "Rinne iltapäivällä",
+     "caption": "Arkistolaatuinen pigmenttivedos, 2025",
+     "note": "Viimeinen valo pellolla, jota yleensä ei huomata.",
+     "text": "Odotin kolme iltapäivää, että pilvi nousisi harjanteelta, ja se nousi neljäksi minuutiksi."
+    },
+    {
+     "title": "Kaksi horisonttia",
+     "caption": "Arkistolaatuinen pigmenttivedos, 2025",
+     "note": "Rantaviiva, joka ei osannut päättää, mihin loppua.",
+     "text": "Aallot vetäytyivät, ja märkä hiekka heijasti toisen taivaan. Otin kuusi kuvaa ja pidin tämän."
+    },
+    {
+     "title": "Tyyni vesi",
+     "caption": "Arkistolaatuinen pigmenttivedos, 2024",
+     "note": "Lampi marraskuussa, jolla ei ole mitään todistettavaa.",
+     "text": "Tekojärvi seitsemältä aamulla ennen tuulta. Vedos on suuri, joten tyyneydellä on tilaa."
+    },
+    {
+     "title": "Punainen pelto",
+     "caption": "Arkistolaatuinen pigmenttivedos, 2024",
+     "note": "Siemeneksi menneet unikot, kuvattu sateessa.",
+     "text": "Apilaa, jonka annettiin kukkia ja joka sitten niitettiin. Vedoksen väri on lähempänä sitä, mitä näin, kuin kamera oli."
+    },
+    {
+     "title": "Viivoja hämärässä",
+     "caption": "Arkistolaatuinen pigmenttivedos, 2023",
+     "note": "Sähkölangat taivasta vasten, joka muutti mieltään.",
+     "text": "Aidanpylväitä ja vakoja, viimeinen valo tasaisena niiden yllä. Se näyttää paremmalta pitkässä ja kapeassa kehyksessä."
+    },
+    {
+     "title": "Suola ja liuske",
+     "caption": "Arkistolaatuinen pigmenttivedos, 2023",
+     "note": "Satamamuuri, vanhan kolikon väreissä.",
+     "text": "Rannalla tummaa kiveä ja aallokon jättämää valkoista suolaa. Palasin kolmena vuodenaikana saadakseni haluamani valon."
+    },
+    {
+     "title": "Sininen hetki",
+     "caption": "Arkistolaatuinen pigmenttivedos, 2022",
+     "note": "Kymmenen minuuttia päivän ja yön välissä, toistettuna viikon ajan.",
+     "text": "Kymmenen minuuttia auringonlaskun jälkeen koko laakso muuttuu musteen väriseksi. Tämä on ainoa kuva, jossa lamppu on päällä."
+    }
+   ]
+  },
+  "illustration": {
+   "tagline": "Kuvitusta ja grafiikkaa",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Saniainen",
+       "Paperi",
+       "Pieni",
+       "Muste",
+       "Sitruuna",
+       "Koi",
+       "Rehellinen",
+       "Appelsiini",
+       "Lyijykynä",
+       "Hiljainen"
+      ],
+      [
+       "Paino",
+       "Ateljee",
+       "Pöytä",
+       "Piirros",
+       "Työt",
+       "Luonnoskirja",
+       "Nurkka",
+       "Kulma",
+       "Lohko",
+       "Kaappi"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Kuvituksia, linoleikkauksia ja pieniä kirjoja pöydältä {city_in}.",
+   "desc_work": "Kuvituksia ja vedoksia, uusin ensin.",
+   "desc_about": "Tietoa kuvittajasta ja ateljeesta {city_in}.",
+   "desc_contact": "Missä ateljee on {city_in} ja milloin se on auki.",
+   "intro": "Kuvituksia, linoleikkauksia ja pieniä kirjoja pöydältä {city_in}.",
+   "about": [
+    "Olen kuvittaja ja grafiikantekijä. Piirrän kuvakirjoihin, lehtiin, jotka maksavat vielä ajallaan, ja kaikille, jotka tarvitsevat linnun julisteen kulmaan.",
+    "Suurin osa töistäni alkaa lyijykynäluonnoksena vihkossa ja päättyy linoleikkaukseen tai tasaväriseen digitaaliseen piirrokseen sen mukaan, mitä työ vaikuttaa haluavan.",
+    "Asun {city_in} kissan kanssa, jolla on mielipiteitä sommitelmistani."
+   ],
+   "services": [
+    "Kuvakirjat ja lehtikuvitus",
+    "Linoleikkausvedokset ja kortit",
+    "Julisteet ja tapahtumagrafiikka"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Pienten vedosten messut, myyjä"
+    },
+    {
+     "y": "2024",
+     "t": "Pellon muistiinpanot, kuvakirja paikalliselta kustantajalta"
+    },
+    {
+     "y": "2023",
+     "t": "Alueellinen kuvituspalkinto, kunniamaininta"
+    }
+   ],
+   "works": [
+    {
+     "title": "Oranssi tutkielma",
+     "caption": "Linoleikkaus, kolme väriä, 2025",
+     "note": "Kettu, puolikas portaikko ja selittämätön kuu.",
+     "text": "Yksi väri, kolme paperia ja iltapäivä. Se alkoi lämmittelynä ja päätyi pienen kirjan kanneksi."
+    },
+    {
+     "title": "Torikauppapäivä",
+     "caption": "Digitaalinen piirros, 2025",
+     "note": "Yksitoista myyntikojua ja yksi hyvin tyytyväinen kyyhkynen.",
+     "text": "Piirretty paikan päällä kolmena lauantaina. Kauppiaat olivat ystävällisesti paikoillaan, tai melkein."
+    },
+    {
+     "title": "Pitkä kierros",
+     "caption": "Lyijykynä ja muste, 2024",
+     "note": "Polku, joka ei mene sinne, minne kyltti sanoo.",
+     "text": "Reitti, jota kävelen sunnuntaisin, piirretty muistista ja tarkistettu seuraavalla kävelyllä. Kartta oli väärässä mukavilla tavoilla."
+    },
+    {
+     "title": "Yöbussi",
+     "caption": "Linoleikkaus, kaksi väriä, 2024",
+     "note": "Kaikki nukkuvat paitsi kuljettaja ja kuu.",
+     "text": "Kynä, muste ja paljon kärsivällisyyttä ikkunan heijastusten kanssa."
+    },
+    {
+     "title": "Vihreät tunnit",
+     "caption": "Guassi, 2023",
+     "note": "Kasvihuone neljältä iltapäivällä.",
+     "text": "Kesäkuun aamutunnit ennen aamiaista, kun puutarha on vielä viileä. Maalattu guassilla."
+    },
+    {
+     "title": "Pienet linnut",
+     "caption": "Linoleikkaus, 2023",
+     "note": "Seitsemän lintua, joista yhtäkään ei ole tunnistettu oikein.",
+     "text": "Varpusia, peukaloisia ja hyvin vihainen punarinta. Jokainen lintu on oma lohkonsa, joten mitkään kaksi vedosta eivät ole täysin samanlaisia."
+    },
+    {
+     "title": "Sadetutkielma",
+     "caption": "Vesiväri, 2022",
+     "note": "Sateenvarjoja ikkunasta nähtynä.",
+     "text": "Vesiväri, enimmäkseen vettä. Annoin paperin päättää, minne lätäköt menivät."
+    }
+   ]
+  }
+ }
+}

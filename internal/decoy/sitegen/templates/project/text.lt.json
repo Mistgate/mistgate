@@ -1,0 +1,383 @@
+{
+ "ui": {
+  "nav_label": "Pagrindinis",
+  "footer": "Platinama pagal MIT licenciją.",
+  "nav_home": "Apžvalga",
+  "nav_changelog": "Pakeitimai",
+  "nav_install": "Diegimas",
+  "nav_roadmap": "Planai",
+  "home_title": "Apžvalga",
+  "desc_changelog": "Visos {brand} versijos ir tai, kas jose pasikeitė.",
+  "desc_install": "Kaip įdiegti {brand}: platinimo paketai, kūrimas iš šaltinio ir kiekvienos versijos kontrolinės sumos.",
+  "desc_roadmap": "Prie ko dirba {brand} kūrėjai ir kas bus toliau.",
+  "nf_title": "Puslapis nerastas",
+  "nf_text": "Šio puslapio nėra arba jis buvo perkeltas po paskutinės versijos.",
+  "nf_back": "Atgal į apžvalgą",
+  "features_h": "Kodėl {brand}",
+  "start_h": "Pradėkite",
+  "latest_h": "Naujausia versija",
+  "all_releases": "Visos versijos",
+  "get_it": "Diegti",
+  "read_log": "Skaityti pakeitimų sąrašą",
+  "changelog_h": "Pakeitimai",
+  "changelog_intro": "Visos versijos, naujausios viršuje. Versijų numeriai sudaryti pagal įprastą schemą: pagrindinė, vidurinė, taisymo.",
+  "released": "Išleista",
+  "install_h": "Diegimas",
+  "install_intro": "{brand} nėra platinamas kaip paruošta vykdomoji programa. Jį paketuoja Linux platinimai, o sukurti iš šaltinio archyvo užtrunka kelias minutes.",
+  "pkg_h": "Iš jūsų platinimo",
+  "pkg_note": "Paketų versijos gali atsilikti nuo naujausios keliomis savaitėmis. Lentelėje žemiau matyti, kokios versijos tikėtis iš šaltinio archyvo.",
+  "src_h": "Kūrimas iš šaltinio",
+  "src_intro": "Reikia C kompiliatoriaus ir make. Kūrimas trunka apie minutę. Kiekvienos versijos šaltinio archyvo pavadinime yra versijos numeris.",
+  "sums_h": "Versijos ir kontrolinės sumos",
+  "sums_intro": "Kiekviena versija turi šaltinio archyvą. Prieš kurdami patikrinkite jo SHA-256 kontrolinę sumą.",
+  "col_ver": "Versija",
+  "col_date": "Išleista",
+  "col_sum": "Šaltinio archyvo SHA-256",
+  "roadmap_h": "Planai",
+  "roadmap_intro": "Prie ko dirba kūrėjai, maždaug eilės tvarka. Planai keičiasi, o tai, kas iš tikrųjų įvyko, užrašyta pakeitimų sąraše.",
+  "now_h": "Dabar",
+  "next_h": "Toliau",
+  "later_h": "Vėliau",
+  "licence_h": "Licencija",
+  "licence_p": "{brand} yra laisva programinė įranga, platinama pagal MIT licenciją. Naudokite, keiskite ir dalykitės.",
+  "rel_back": "Visos versijos",
+  "rel_more": "Kitos versijos",
+  "rel_src_h": "Šaltinio archyvas",
+  "pkgs": [
+   {
+    "s": "Debian ir Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS su Homebrew"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Akmuo",
+       "Liepsna",
+       "Rasa",
+       "Ugnis",
+       "Sala",
+       "Vilkas",
+       "Gandras",
+       "Samanos",
+       "Smilga",
+       "Kopa"
+      ],
+      [
+       "watch",
+       "tail",
+       "glance",
+       "notice",
+       "sentry",
+       "peek"
+      ]
+     ]
+    }
+   },
+   "tagline": "Paleidžia komandą, kai pasikeičia failai",
+   "desc": "{brand} stebi aplanką ir paleidžia komandą, kai jame kas nors pasikeičia.",
+   "overview": "{brand} stebi aplanką ir paleidžia komandą, kai jame kas nors pasikeičia. Tai maža ir greita programa tiems, kam pabodo išsaugoti failą ir persijungti į kitą langą.",
+   "features": [
+    {
+     "h": "Greita pradžia",
+     "p": "Viena komanda ir jokio nustatymų failo."
+    },
+    {
+     "h": "Protingos numatytosios reikšmės",
+     "p": "Praleidžia redaktorių laikinus failus, versijų kontrolės aplankus ir kūrimo rezultatus."
+    },
+    {
+     "h": "Veikia visur",
+     "p": "Linux, macOS ir Windows su tais pačiais parametrais."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {
+     "k": "Nauja",
+     "t": "Galima stebėti kelis aplankus vienu metu."
+    },
+    {
+     "k": "Nauja",
+     "t": "Delsos parametras: prieš paleidžiant palaukiama ramios akimirkos."
+    },
+    {
+     "k": "Nauja",
+     "t": "Spalvota išvestis, jei terminalas ją palaiko."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Retas gedimas, kai ištrinamas stebimas aplankas."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Dvigubi paleidimai, kai redaktorius įrašydavo failą dviem žingsniais."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Keliai su tarpais sistemoje Windows."
+    },
+    {
+     "k": "Pakeista",
+     "t": "Numatytoji delsa dabar yra 200 milisekundžių, o ne 50."
+    },
+    {
+     "k": "Pakeista",
+     "t": "Ignoravimo šablonai veikia pagal tas pačias taisykles kaip daugumoje versijų kontrolės įrankių."
+    },
+    {
+     "k": "Nauja",
+     "t": "Parametras once paleidžia komandą vieną kartą ir baigia darbą."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Lėtai augantis atminties naudojimas stebint labai didelius aplankus."
+    },
+    {
+     "k": "Pakeista",
+     "t": "Klaidų pranešimuose dabar nurodoma, kuris aplankas jas sukėlė."
+    },
+    {
+     "k": "Nauja",
+     "t": "Komandų užbaigimas populiariausiems apvalkalams."
+    }
+   ],
+   "now": [
+    "Greitesnis paleidimas dideliuose aplankuose",
+    "Aiškesni pranešimai, kai komanda nepavyksta"
+   ],
+   "next": [
+    "Nustatymų failas atskiriems projektams",
+    "Paketai pagrindiniams Linux platinimams"
+   ],
+   "later": [
+    "Tylusis režimas naudoti scenarijuose",
+    "Patikimas tinklo diskų stebėjimas"
+   ]
+  },
+  "backup": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Aruodas",
+       "Skrynia",
+       "Spinta",
+       "Lentyna",
+       "Sandelis",
+       "Kamara",
+       "Maisas",
+       "Stalciai"
+      ],
+      [
+       "copy",
+       "keep",
+       "stash",
+       "save",
+       "mirror",
+       "store"
+      ]
+     ]
+    }
+   },
+   "tagline": "Paprastos ir patikimos aplanko atsarginės kopijos",
+   "desc": "{brand} nukopijuoja aplanką į kitą vietą ir saugo senesnes versijas kaip paprastus failus.",
+   "overview": "{brand} nukopijuoja aplanką į kitą vietą ir saugo senesnes versijas, kad praėjusį antradienį padarytą klaidą dar būtų galima atšaukti. Kopijos yra paprasti failai, kuriuos galima atidaryti ir be {brand}.",
+   "features": [
+    {
+     "h": "Paprasti failai",
+     "p": "Jokio ypatingo formato, kurį vėliau reikėtų atrakinti."
+    },
+    {
+     "h": "Versijos",
+     "p": "Saugokite tiek kopijų, kiek norite."
+    },
+    {
+     "h": "Pati pasitikrina",
+     "p": "Komanda verify palygina kopiją su šaltiniu."
+    }
+   ],
+   "quick": "{cmd} notes /backups/notes",
+   "changes": [
+    {
+     "k": "Nauja",
+     "t": "Komanda verify palygina kopiją su šaltiniu."
+    },
+    {
+     "k": "Nauja",
+     "t": "Kopijas galima saugoti tam tikrą dienų skaičių arba tam tikrą kopijų skaičių."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Failai, pasikeitę kopijavimo metu, būdavo nukopijuojami du kartus."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Neteisingos atkurtų failų teisės."
+    },
+    {
+     "k": "Pakeista",
+     "t": "Nepasikeitę failai nebekopijuojami iš naujo."
+    },
+    {
+     "k": "Nauja",
+     "t": "Atkūrimo komanda su bandomuoju režimu."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Gedimas aplankuose su labai ilgais kelių pavadinimais."
+    },
+    {
+     "k": "Pakeista",
+     "t": "Eiga rodoma tik tada, kai išvestis yra terminalas."
+    },
+    {
+     "k": "Nauja",
+     "t": "Komanda list rodo kopijos momentines versijas."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Kopijavimas į tinklo diskus nutrūkdavo po skirtojo laiko."
+    },
+    {
+     "k": "Pakeista",
+     "t": "Momentinės versijos pavadinamos pagal datą, o ne pagal numerį."
+    },
+    {
+     "k": "Nauja",
+     "t": "Parametras failams praleisti pagal šabloną."
+    }
+   ],
+   "now": [
+    "Greitesnis daugelio mažų failų kopijavimas",
+    "Aiškesnė patikros ataskaita"
+   ],
+   "next": [
+    "Kopijų šifravimas saugant",
+    "Kopija į antrą vietą vienu žingsniu"
+   ],
+   "later": [
+    "Grafinė atkūrimo priemonė",
+    "Įmontuotas planavimas"
+   ]
+  },
+  "images": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pikselis",
+       "Rastras",
+       "Kadras",
+       "Objektyvas",
+       "Fokusas",
+       "Spalva",
+       "Nuotrauka",
+       "Albumas"
+      ],
+      [
+       "fit",
+       "trim",
+       "shrink",
+       "pack",
+       "batch",
+       "scale"
+      ]
+     ]
+    }
+   },
+   "tagline": "Vienu metu sumažina viso aplanko paveikslėlius",
+   "desc": "{brand} masiškai keičia paveikslėlių dydį ir juos suspaudžia, o originalai lieka nepaliesti.",
+   "overview": "{brand} masiškai keičia paveikslėlių dydį ir juos suspaudžia. Nurodykite aplanką ir norimą dydį, o likusį padarys programa: originalai lieka nepaliesti.",
+   "features": [
+    {
+     "h": "Visų pirma partijos",
+     "p": "Šimtai failų vienu metu, naudojant visus branduolius."
+    },
+    {
+     "h": "Originalai išlieka",
+     "p": "Rezultatai keliami į naują aplanką."
+    },
+    {
+     "h": "Nuspėjama išvestis",
+     "p": "Tie patys įvesties duomenys visada duoda tuos pačius baitus."
+    }
+   ],
+   "quick": "{cmd} photos --width 1600 --out small",
+   "changes": [
+    {
+     "k": "Nauja",
+     "t": "WebP išvesties palaikymas."
+    },
+    {
+     "k": "Nauja",
+     "t": "JPEG ir WebP kokybės parametras."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Stačiai darytos nuotraukos išeidavo pasuktos į šoną."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Gedimas failuose be plėtinio."
+    },
+    {
+     "k": "Pakeista",
+     "t": "Išvesties failai išsaugo originalų pakeitimo laiką."
+    },
+    {
+     "k": "Nauja",
+     "t": "Bandomasis parametras, kuris išvardija, kas būtų daroma."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Lėtas eigos rodymas dideliuose rinkiniuose."
+    },
+    {
+     "k": "Pakeista",
+     "t": "Mažiau atminties keičiant labai didelių paveikslėlių dydį."
+    },
+    {
+     "k": "Nauja",
+     "t": "Dydį galima keisti ir pagal didžiausią aukštį, ne tik plotį."
+    },
+    {
+     "k": "Ištaisyta",
+     "t": "Neteisingos spalvos paveikslėliuose su įterptu profiliu."
+    },
+    {
+     "k": "Pakeista",
+     "t": "Žinyno tekste dabar yra pavyzdžių."
+    },
+    {
+     "k": "Nauja",
+     "t": "Priesagos parametras, kuriuo pavadinami pakeisto dydžio failai."
+    }
+   ],
+   "now": [
+    "Greitesnis JPEG skaitymas",
+    "Eigos juosta, kuri netrukdo"
+   ],
+   "next": [
+    "Apkirpimas iki pastovaus santykio",
+    "Paketai pagrindiniams Linux platinimams"
+   ],
+   "later": [
+    "Animuotų paveikslėlių palaikymas",
+    "Nedidelis peržiūros režimas"
+   ]
+  }
+ }
+}
