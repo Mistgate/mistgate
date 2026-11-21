@@ -293,6 +293,15 @@ describe("the words of server keys", () => {
     expect(stepErrorText(t, "updates.step.err.inbound_failed", one)).toBe(en["updates.step.err.inbound_failed"]);
   });
 
+  it("quotes the profiles a gate names in the language's own quotes", () => {
+    const tRu = Object.assign((key: keyof typeof ru, vars?: Record<string, string | number>) => fill(ru[key], vars), {
+      n: (key: keyof typeof ru, n: number, vars?: Record<string, string | number>) => fill(pickForm(ru[key], n, "ru"), { n, ...vars }),
+    }) as unknown as T;
+    const one = { failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "timeout" }]), skipped_profiles: JSON.stringify(["Old"]) };
+    expect(stepErrorText(tRu, "updates.step.err.probe_failed", one)).toContain("«Main»: нет ответа");
+    expect(skippedProfilesNote(tRu, one)).toContain("«Old»");
+  });
+
   it("tells the owner what \"read the folder again\" did about the bundle of a newer release", () => {
     const answer = (params: Record<string, string>) => ({ bundle: { params } });
     expect(rescanText(t, answer({ sync: "fresh" }))).toBe(en["up.bundle.sync.fresh"]);
