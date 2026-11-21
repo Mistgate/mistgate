@@ -1,0 +1,110 @@
+{
+  "direct": [
+    "ru",
+    "su",
+    "xn--p1ai",
+    "yandex.com",
+    "yandex.net",
+    "yastatic.net",
+    "vk.com",
+    "userapi.com",
+    "sberbank.com",
+    "vtb.com"
+  ],
+  "notes": null,
+  "policy": [
+    {
+      "Domain": "+.ru",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "+.su",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "+.xn--p1ai",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "+.yandex.com",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "+.yandex.net",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "+.yastatic.net",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "+.vk.com",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "+.userapi.com",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "+.sberbank.com",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "+.vtb.com",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "rule-set:geosite-category-ru",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    }
+  ],
+  "providers": [
+    {
+      "Name": "geosite-category-ru",
+      "Behavior": "domain",
+      "URL": "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/category-ru.mrs"
+    },
+    {
+      "Name": "geoip-ru",
+      "Behavior": "ipcidr",
+      "URL": "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/ru.mrs"
+    }
+  ],
+  "rules": [
+    "RULE-SET,geosite-category-ru,DIRECT",
+    "RULE-SET,geoip-ru,DIRECT,no-resolve"
+  ]
+}

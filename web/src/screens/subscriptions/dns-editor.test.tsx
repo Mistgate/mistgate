@@ -129,8 +129,48 @@ describe("the country lists of a split rule", () => {
     const pills = [...document.querySelectorAll('[role=group][aria-label="Rule 1 · All sites of a country"] button')];
     expect(pills.map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([
       ["China", "false"],
+      ["Russia", "false"],
       ["Iran", "true"],
     ]);
+  });
+
+  const categories = () => [...document.querySelectorAll('[role=group][aria-label="Rule 1 · Site category (geosite)"] > span')].map((c) => c.textContent);
+  const categoryBox = 'input[aria-label="Rule 1 · Site category (geosite)"]';
+  const enter = (selector: string) => act(async () => void document.querySelector(selector)!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+
+  it("shows a category of a rule beside the country pills, takes more on Enter in lower case, and saves them as geosite:<name>", async () => {
+    updateDnsPreset.mockResolvedValue({});
+    await mount(presetWith([{ suffixes: [], geo: ["geosite:telegram"], servers: [server] }]));
+    expect(categories()).toEqual(["telegram"]);
+    expect([...document.querySelectorAll('[role=group][aria-label="Rule 1 · All sites of a country"] button')].map((b) => b.textContent)).toEqual(["China", "Russia"]);
+    expect(alertText()).toBe("");
+    await type(categoryBox, "geosite:Category-Media-RU, telegram");
+    await enter(categoryBox);
+    expect(categories()).toEqual(["telegram", "category-media-ru"]);
+    expect(document.querySelector<HTMLInputElement>(categoryBox)!.value).toBe("");
+    await click(china());
+    await click(button("Save"));
+    const sent = updateDnsPreset.mock.calls[0]![0] as { split: { suffixes: string[]; geo: string[] }[] };
+    expect(sent.split[0]!.geo).toEqual(["geosite:telegram", "geosite:category-media-ru", "cn"]);
+  });
+
+  it("keeps a badly written category in the box with the reason, and takes the well-written ones next to it", async () => {
+    await mount(presetWith([{ suffixes: [".cn"], geo: [], servers: [server] }]));
+    await type(categoryBox, "news bad_name");
+    await enter(categoryBox);
+    expect(categories()).toEqual(["news"]);
+    expect(document.querySelector<HTMLInputElement>(categoryBox)!.value).toBe("bad_name");
+    expect(alertText()).toContain("bad_name: lowercase Latin letters, digits and - ! @ only, at most 64 characters");
+    await type(categoryBox, "bad_name2");
+    expect(alertText()).toBe("");
+  });
+
+  it("removes a category with its cross, and a rule of categories alone asks for something again when the last one goes", async () => {
+    await mount(presetWith([{ suffixes: [], geo: ["geosite:telegram"], servers: [server] }]));
+    expect(alertText()).toBe("");
+    await click(document.querySelector('[role=group][aria-label="Rule 1 · Site category (geosite)"] button'));
+    expect(categories()).toEqual([]);
+    expect(alertText()).toBe("A split rule needs a suffix or a country, and a server.");
   });
 
   it("takes a suffix typed in a rule on Enter and shows the chip", async () => {

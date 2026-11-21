@@ -1,0 +1,82 @@
+{
+  "direct": [
+    "ru",
+    "su",
+    "xn--p1ai",
+    "yandex.com",
+    "yandex.net",
+    "yastatic.net",
+    "vk.com",
+    "userapi.com",
+    "sberbank.com",
+    "vtb.com"
+  ],
+  "directSets": [
+    "geosite-category-ru",
+    "geoip-ru"
+  ],
+  "dns": {
+    "servers": [
+      {
+        "type": "udp",
+        "tag": "remote",
+        "server": "1.1.1.1",
+        "detour": "Mistgate"
+      },
+      {
+        "type": "udp",
+        "tag": "split-1",
+        "server": "77.88.8.8"
+      },
+      {
+        "type": "local",
+        "tag": "local"
+      }
+    ],
+    "rules": [
+      {
+        "domain_suffix": [
+          "ru",
+          "su",
+          "xn--p1ai",
+          "yandex.com",
+          "yandex.net",
+          "yastatic.net",
+          "vk.com",
+          "userapi.com",
+          "sberbank.com",
+          "vtb.com"
+        ],
+        "action": "route",
+        "server": "split-1"
+      },
+      {
+        "rule_set": [
+          "geosite-category-ru"
+        ],
+        "action": "route",
+        "server": "split-1"
+      }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
+  "notes": [
+    "3 fallback resolver(s) dropped: sing-box takes one main resolver",
+    "split rule 1: 1 fallback resolver(s) dropped: sing-box takes one resolver per rule"
+  ],
+  "ruleSets": [
+    {
+      "type": "remote",
+      "tag": "geosite-category-ru",
+      "format": "binary",
+      "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ru.srs"
+    },
+    {
+      "type": "remote",
+      "tag": "geoip-ru",
+      "format": "binary",
+      "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-ru.srs"
+    }
+  ]
+}

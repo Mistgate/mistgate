@@ -273,7 +273,9 @@ func xrayRules(d *dns.XrayDNS) []xrayRule {
 		var ips []string
 		for _, g := range d.DirectGeo {
 			domains = append(domains, g.Site)
-			ips = append(ips, g.IP)
+			if g.IP != "" { // a category alone has no address list
+				ips = append(ips, g.IP)
+			}
 		}
 		rules = append(rules, xrayRule{Type: "field", Domain: domains, OutboundTag: xrayDirectTag})
 		if len(ips) > 0 {

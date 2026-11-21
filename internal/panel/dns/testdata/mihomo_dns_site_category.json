@@ -1,0 +1,35 @@
+{
+  "notes": null,
+  "policy": [
+    {
+      "Domain": "rule-set:geosite-category-media-ru",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    },
+    {
+      "Domain": "rule-set:geosite-telegram",
+      "Servers": [
+        "77.88.8.8",
+        "77.88.8.1"
+      ]
+    }
+  ],
+  "providers": [
+    {
+      "Name": "geosite-category-media-ru",
+      "Behavior": "domain",
+      "URL": "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/category-media-ru.mrs"
+    },
+    {
+      "Name": "geosite-telegram",
+      "Behavior": "domain",
+      "URL": "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/telegram.mrs"
+    }
+  ],
+  "rules": [
+    "RULE-SET,geosite-category-media-ru,DIRECT",
+    "RULE-SET,geosite-telegram,DIRECT"
+  ]
+}
