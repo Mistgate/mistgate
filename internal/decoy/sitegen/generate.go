@@ -1,4 +1,4 @@
-package decoy
+package sitegen
 
 import (
 	"bytes"
@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/mistgate/mistgate/internal/decoy"
 )
 
 // Generated decoy sites: a kind (a folder of templates under templates/) and a seed give a small, believable static site that
@@ -41,6 +43,9 @@ import (
 // not used: it would keep every method of the program in the edge builds): fields, variables, if / else if / else, range,
 // with, define and template, parentheses and the functions, trim markers and comments, but no pipes. A field or function that
 // is not there is an error, and a test renders every kind from 200 seeds to find it.
+
+// File is a file of a generated site, the type FromFiles takes.
+type File = decoy.File
 
 //go:embed templates
 var templateFS embed.FS

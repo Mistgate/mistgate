@@ -16,6 +16,7 @@ import (
 
 	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
 	"github.com/mistgate/mistgate/internal/decoy"
+	"github.com/mistgate/mistgate/internal/decoy/sitegen"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -27,7 +28,7 @@ var seedPattern = regexp.MustCompile(`^(?:[0-9a-f]{2}){8,32}$`)
 
 func (s decoySiteService) ListDecoyTemplates(_ context.Context, _ *connect.Request[decoysitev1.ListDecoyTemplatesRequest]) (*connect.Response[decoysitev1.ListDecoyTemplatesResponse], error) {
 	out := &decoysitev1.ListDecoyTemplatesResponse{}
-	for _, k := range decoy.Kinds() {
+	for _, k := range sitegen.Kinds() {
 		out.Templates = append(out.Templates, &decoysitev1.DecoyTemplate{Id: k.ID, NameEn: k.NameEN, NameRu: k.NameRU})
 	}
 	return connect.NewResponse(out), nil
@@ -52,8 +53,8 @@ func (s decoySiteService) render(kind, seed string) (generated, error) {
 		return generated{}, invalid("decoy_template_seed")
 	}
 	raw, _ := hex.DecodeString(seed)
-	files, brand, err := decoy.GenerateNamed(kind, raw)
-	if errors.Is(err, decoy.ErrUnknownKind) {
+	files, brand, err := sitegen.GenerateNamed(kind, raw)
+	if errors.Is(err, sitegen.ErrUnknownKind) {
 		return generated{}, invalid("decoy_template_unknown")
 	}
 	if err != nil {
@@ -104,7 +105,7 @@ func (s decoySiteService) GenerateDecoySite(ctx context.Context, req *connect.Re
 	}
 	note := strings.TrimSpace(m.Note)
 	if note == "" {
-		for _, k := range decoy.Kinds() {
+		for _, k := range sitegen.Kinds() {
 			if k.ID == m.Kind {
 				note = k.NameEN
 			}

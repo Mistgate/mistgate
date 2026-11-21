@@ -13,6 +13,7 @@ import (
 
 	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
 	"github.com/mistgate/mistgate/internal/decoy"
+	"github.com/mistgate/mistgate/internal/decoy/sitegen"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -22,7 +23,7 @@ func TestListDecoyTemplatesNamesEveryKind(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kinds := decoy.Kinds()
+	kinds := sitegen.Kinds()
 	if len(kinds) == 0 || len(got.Msg.Templates) != len(kinds) {
 		t.Fatalf("templates = %d, kinds = %d", len(got.Msg.Templates), len(kinds))
 	}
@@ -64,7 +65,7 @@ func TestPreviewThenGenerateGivesTheSameSiteAndSavesNoDrafts(t *testing.T) {
 	if site.Name != a.Name || site.Note != "Personal blog" || site.State != "ready" || site.Source != "upload" || site.SourceLabel != "template:blog" || site.FileCount < 5 {
 		t.Fatalf("site = %+v", site)
 	}
-	files, _, _ := decoy.GenerateNamed("blog", mustHex(t, a.Seed))
+	files, _, _ := sitegen.GenerateNamed("blog", mustHex(t, a.Seed))
 	want, err := decoy.FromFiles(files)
 	if err != nil || site.BundleSha256 != want.Hash() {
 		t.Fatalf("saved hash = %s, want the previewed site's %s (%v)", site.BundleSha256, want.Hash(), err)

@@ -1,6 +1,6 @@
 //go:build !js
 
-package decoy
+package sitegen
 
 import (
 	"bytes"
@@ -17,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mistgate/mistgate/internal/decoy"
 	"golang.org/x/net/html"
 )
 
@@ -26,6 +27,8 @@ var (
 )
 
 const seedsPerKind = 200
+
+var titleTag = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
 
 func testSeed(i int) []byte { return []byte(fmt.Sprintf("decoy-test-seed-%d", i)) }
 
@@ -141,19 +144,19 @@ func TestGenerateValid(t *testing.T) {
 			largest := 0
 			for i := 0; i < seedsPerKind; i++ {
 				files := mustGenerate(t, kind, i)
-				b, err := FromFiles(files)
+				b, err := decoy.FromFiles(files)
 				if err != nil {
 					t.Fatalf("seed %d: FromFiles: %v", i, err)
 				}
 				if b.Size() > largest {
 					largest = b.Size()
 				}
-				if b.Size() > 400<<10 || len(b.Archive()) > maxStoredArchiveBytes {
+				if b.Size() > 400<<10 || len(b.Archive()) > (decoy.MaxBundleBytes+512<<10) {
 					t.Fatalf("seed %d: %d bytes, more than a decoy site should be", i, b.Size())
 				}
-				rep := Analyze(b, true)
+				rep := decoy.Analyze(b, true)
 				for _, w := range rep.Warnings {
-					if w.Code == WarnScripts && interactive[kind] {
+					if w.Code == decoy.WarnScripts && interactive[kind] {
 						continue // the form and its script are what the kind is for
 					}
 					t.Errorf("seed %d: warning %s %v", i, w.Code, w.Paths)
@@ -309,8 +312,8 @@ func TestGenerateDeterministic(t *testing.T) {
 					t.Fatalf("%s seed %d: %s differs between two runs", kind, i, a[j].Path)
 				}
 			}
-			ba, _ := FromFiles(a)
-			bb, _ := FromFiles(b)
+			ba, _ := decoy.FromFiles(a)
+			bb, _ := decoy.FromFiles(b)
 			if ba.Hash() != bb.Hash() {
 				t.Fatalf("%s seed %d: bundle hash differs", kind, i)
 			}
@@ -529,4 +532,30 @@ func TestNoTemplateEngineImported(t *testing.T) {
 			}
 		}
 	}
+}
+
+// The generator is for the panel, which runs on a server. Every package that imports it carries its templates and the package
+// level tables of its code into the binary, and the edge Workers and the node agent do not need a byte of that: nothing but the
+// panel's own build may depend on this package.
+func TestGeneratorOnlyInThePanel(t *testing.T) {
+	const self = "github.com/mistgate/mistgate/internal/decoy/sitegen"
+	const mod = "github.com/mistgate/mistgate/cmd/"
+	edges := []string{"mistgate-edge", "mistgate-edge-admin", "mistgate-edge-jobs", "mistgate-edge-link", "mistgate-edge-provision", "mistgate-edge-public"}
+	check := func(target string, env ...string) {
+		cmd := exec.Command("go", "list", "-deps", mod+target)
+		cmd.Env = append(os.Environ(), env...)
+		out, err := cmd.Output()
+		if err != nil {
+			t.Skipf("go list is not available: %v", err)
+		}
+		for _, pkg := range strings.Fields(string(out)) {
+			if pkg == self {
+				t.Errorf("cmd/%s depends on the site generator (%s)", target, self)
+			}
+		}
+	}
+	for _, e := range edges {
+		check(e, "GOOS=js", "GOARCH=wasm")
+	}
+	check("mistgate-node", "GOOS=linux", "GOARCH=amd64")
 }

@@ -1,4 +1,4 @@
-package decoy
+package sitegen
 
 import (
 	"crypto/sha256"

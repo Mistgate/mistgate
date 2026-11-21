@@ -1,9 +1,11 @@
-package decoy
+package sitegen
 
 import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/mistgate/mistgate/internal/decoy"
 )
 
 // What makes two generated sites differ where nobody looks: robots.txt, the names of classes and ids, and the white space and
@@ -13,7 +15,7 @@ import (
 // few lines a hand-written file might have.
 func robotsFor(r *rng, assetDir string) []byte {
 	var agents []string
-	for _, l := range strings.Split(strings.SplitN(robotsTXT, "\n\n", 2)[0], "\n") {
+	for _, l := range strings.Split(strings.SplitN(decoy.RobotsTXT, "\n\n", 2)[0], "\n") {
 		if strings.HasPrefix(l, "User-agent: ") {
 			agents = append(agents, l)
 		}
