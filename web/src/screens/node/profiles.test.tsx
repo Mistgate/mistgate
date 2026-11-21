@@ -911,9 +911,23 @@ describe("the site of a REALITY server on this node", () => {
 
   it("leads to the card of neighbouring sites, which closes the window", async () => {
     await edit(vless);
-    await click(button("Find sites nearby…"));
-    await settle();
-    expect(document.querySelector("[role=dialog]")).toBeNull();
+    const scroll = vi.fn(function (this: Element) {
+      return this.id;
+    });
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      await click(button("Find sites nearby…"));
+      await settle();
+      expect(document.querySelector("[role=dialog]")).toBeNull();
+      // the scroll waits for the window to go: by then the test's page may be gone too, so the timer must not look the card up itself
+      vi.stubGlobal("document", undefined);
+      await new Promise((r) => setTimeout(r, 150));
+      vi.unstubAllGlobals();
+      expect(scroll.mock.results.map((r) => r.value)).toEqual(["sni-scan"]);
+    } finally {
+      vi.unstubAllGlobals();
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
   });
 });
 
