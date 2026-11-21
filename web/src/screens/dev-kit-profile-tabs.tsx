@@ -123,7 +123,10 @@ export function seedTabs(qc: QueryClient, state: string, _role: Role): void {
   const nodes = nodeRows().map((n) => ({ ...n, awgBackend: "auto", warp: { state: n.name === "de1" ? WarpState.UP : WarpState.NOT_CONFIGURED }, ...(v.has("out") && n.name === "nl3" && { status: NodeStatus.DOWN }) }));
   // "many": a long list, 36 nodes in all (the board's PnProfilePut36), two of the new ones with something to say (fr3 port taken, se3 old agent)
   const extra = v.has("many") ? manyNodes() : [];
-  qc.setQueryData(nodesQuery.queryKey, { nodes: [...nodes, ...extra], expectedAgentVersion: "0.1.71" } as never);
+  const fleet = { nodes: [...nodes, ...extra], expectedAgentVersion: "0.1.71" };
+  qc.setQueryData(nodesQuery.queryKey, fleet as never);
+  // a window that reloads the fleet when it is done (Put on nodes) gets the same fleet back, not the panel's answer to nothing
+  (nodesApi as unknown as Record<string, unknown>).listNodes = async () => fleet;
   if (v.has("load") || v.has("err")) qc.removeQueries({ queryKey: checksQuery("").queryKey });
   if (v.has("nogroups")) qc.setQueryData(groupsQuery.queryKey, [] as never);
   // the plan of a copy (the server's dry run), under the key the window reads
