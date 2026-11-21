@@ -40,6 +40,9 @@ import (
 //go:embed templates
 var templateFS embed.FS
 
+// ErrUnknownKind is Generate's refusal of a kind that has no folder of templates.
+var ErrUnknownKind = errors.New("decoy: unknown site kind")
+
 // KindInfo describes a kind of generated site for the admin's list.
 type KindInfo struct {
 	ID     string `json:"id"`
@@ -177,13 +180,19 @@ func Kinds() []KindInfo {
 // Generate makes the files of a site of the given kind. The same kind and seed always give the same files, byte for byte; the
 // result is meant for FromFiles.
 func Generate(kind string, seed []byte) ([]File, error) {
+	files, _, err := GenerateNamed(kind, seed)
+	return files, err
+}
+
+// GenerateNamed is Generate that also returns the brand the pages print (the site's own name, for naming it in the library).
+func GenerateNamed(kind string, seed []byte) ([]File, string, error) {
 	kinds, err := loadKinds()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	d := kinds[kind]
 	if d == nil {
-		return nil, fmt.Errorf("decoy: unknown site kind %q", kind)
+		return nil, "", fmt.Errorf("%w %q", ErrUnknownKind, kind)
 	}
 	return d.render(seed)
 }
@@ -262,17 +271,17 @@ func weightOf(b map[string]any) int {
 	return 1
 }
 
-func (d *kindDef) render(seed []byte) ([]File, error) {
+func (d *kindDef) render(seed []byte) ([]File, string, error) {
 	r := newRNG([]byte(d.id), seed)
 	c := &ctx{r: r, memo: map[string]any{}, files: map[string][]byte{}, artID: "a" + hex6(r.sub("artid"))}
 	s, err := d.newSite(c, r)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	c.s = s
 	t, err := d.tpl.Clone()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	c.t = t.Funcs(funcMap(c))
 
@@ -346,35 +355,35 @@ func (d *kindDef) render(seed []byte) ([]File, error) {
 		pd := mk(p)
 		out, err := render(p.def.Tmpl, pd)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		if _, dup := c.files[p.path]; dup {
-			return nil, fmt.Errorf("decoy kind %s: two pages at %s", d.id, p.path)
+			return nil, "", fmt.Errorf("decoy kind %s: two pages at %s", d.id, p.path)
 		}
 		c.files[p.path] = []byte(out)
 	}
 	base := pageData{site: s, Page: page{Name: "assets"}}
 	css, err := render("style.css.tmpl", base)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	c.files[strings.TrimPrefix(s.CSS, "/")] = []byte(css)
 	if d.hasJS {
 		js, err := render("script.js.tmpl", base)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		c.files[strings.TrimPrefix(s.JS, "/")] = []byte(js)
 	}
 	nf := mk(placed{def: pageDef{Name: "404", Title: "nf_title", Desc: "nf_text"}, path: "404.html"})
 	out, err := render("404.html.tmpl", nf)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	c.files["404.html"] = []byte(out)
 	c.files[strings.TrimPrefix(s.Icon, "/")] = []byte(faviconSVG(s.mark))
 	c.files["robots.txt"] = robotsFor(r.sub("robots"), path.Dir(s.CSS))
-	return c.finish(), nil
+	return c.finish(), s.Brand, nil
 }
 
 // finish renames the "__x__" and "$$x" names, breaks up long runs of prose and returns the files sorted by path.

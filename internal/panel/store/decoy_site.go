@@ -30,6 +30,8 @@ const (
 	DecoySourceUpload    = "upload"
 	DecoySourceAssistant = "assistant"
 	DecoySourceMCP       = "mcp"
+	// DecoyLabelTemplate starts the source_label of a site the panel generated from a built-in template ("template:<kind>").
+	DecoyLabelTemplate = "template:"
 
 	MaxDecoyNameRunes = 60
 	MaxDecoyNoteRunes = 200
@@ -174,10 +176,10 @@ func bundleUpsert(b *decoy.Bundle) Stmt {
 		Args: []any{b.Hash(), b.Archive()}}
 }
 
-// NewDecoySite is the input of CreateDecoySite.
+// NewDecoySite is the input of CreateDecoySite. Label is the site's source_label; empty = By (who made it).
 type NewDecoySite struct {
-	Name, Note, Source, State, By string
-	Bundle                        *decoy.Bundle
+	Name, Note, Source, State, By, Label string
+	Bundle                               *decoy.Bundle
 }
 
 // CreateDecoySite saves a bundle as a new site with one version. Refused with ErrDecoyNameTaken, ErrDecoyLibraryFull or the
@@ -205,11 +207,14 @@ func (s *Store) CreateDecoySite(ctx context.Context, now time.Time, in NewDecoyS
 		return DecoySiteRow{}, err
 	}
 	id, at := NewID("dsi_"), unix(now)
+	if in.Label == "" {
+		in.Label = in.By
+	}
 	_, err = s.batch(ctx,
 		guard(`SELECT (SELECT count(*) FROM decoy_site) < ?`, DecoySiteLimit),
 		bundleUpsert(in.Bundle),
 		Stmt{Query: `INSERT INTO decoy_site (` + decoySiteCols + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			Args: []any{id, name, note, in.Source, in.By, in.State, in.Bundle.Hash(), at, in.By, at, in.By}},
+			Args: []any{id, name, note, in.Source, in.Label, in.State, in.Bundle.Hash(), at, in.By, at, in.By}},
 		versionInsert(id, in.Bundle.Hash(), at, in.By, meta),
 	)
 	if errors.Is(err, errGuard) {

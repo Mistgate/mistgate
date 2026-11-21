@@ -84,6 +84,15 @@ const (
 	// DecoySiteServiceGetDecoyFileProcedure is the fully-qualified name of the DecoySiteService's
 	// GetDecoyFile RPC.
 	DecoySiteServiceGetDecoyFileProcedure = "/mistgate.decoysite.v1.DecoySiteService/GetDecoyFile"
+	// DecoySiteServiceListDecoyTemplatesProcedure is the fully-qualified name of the DecoySiteService's
+	// ListDecoyTemplates RPC.
+	DecoySiteServiceListDecoyTemplatesProcedure = "/mistgate.decoysite.v1.DecoySiteService/ListDecoyTemplates"
+	// DecoySiteServicePreviewDecoyTemplateProcedure is the fully-qualified name of the
+	// DecoySiteService's PreviewDecoyTemplate RPC.
+	DecoySiteServicePreviewDecoyTemplateProcedure = "/mistgate.decoysite.v1.DecoySiteService/PreviewDecoyTemplate"
+	// DecoySiteServiceGenerateDecoySiteProcedure is the fully-qualified name of the DecoySiteService's
+	// GenerateDecoySite RPC.
+	DecoySiteServiceGenerateDecoySiteProcedure = "/mistgate.decoysite.v1.DecoySiteService/GenerateDecoySite"
 )
 
 // DecoySiteServiceClient is a client for the mistgate.decoysite.v1.DecoySiteService service.
@@ -125,6 +134,14 @@ type DecoySiteServiceClient interface {
 	GetDecoyPagePreview(context.Context, *connect.Request[v1.GetDecoyPagePreviewRequest]) (*connect.Response[v1.GetDecoyPagePreviewResponse], error)
 	// The text of one text file of a version (the first 256 KiB). site_id as in ListDecoyPages.
 	GetDecoyFile(context.Context, *connect.Request[v1.GetDecoyFileRequest]) (*connect.Response[v1.GetDecoyFileResponse], error)
+	// The kinds of site the panel can make from its built-in templates (internal/decoy Generate), sorted by id. Owner only.
+	ListDecoyTemplates(context.Context, *connect.Request[v1.ListDecoyTemplatesRequest]) (*connect.Response[v1.ListDecoyTemplatesResponse], error)
+	// The home page of a generated site, as GetDecoyPagePreview gives it. Saves nothing: the answer carries the seed it was made
+	// from, and GenerateDecoySite with that seed saves exactly this site. An empty seed takes a new one ("another variant").
+	PreviewDecoyTemplate(context.Context, *connect.Request[v1.PreviewDecoyTemplateRequest]) (*connect.Response[v1.PreviewDecoyTemplateResponse], error)
+	// Makes a site of a kind from a seed and saves it to the library as a new ready site (source "upload", source_label
+	// "template:<kind>"). The name defaults to the site's own brand, the note to the kind's name. Limits as CreateDecoySite.
+	GenerateDecoySite(context.Context, *connect.Request[v1.GenerateDecoySiteRequest]) (*connect.Response[v1.GenerateDecoySiteResponse], error)
 }
 
 // NewDecoySiteServiceClient constructs a client for the mistgate.decoysite.v1.DecoySiteService
@@ -240,28 +257,49 @@ func NewDecoySiteServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(decoySiteServiceMethods.ByName("GetDecoyFile")),
 			connect.WithClientOptions(opts...),
 		),
+		listDecoyTemplates: connect.NewClient[v1.ListDecoyTemplatesRequest, v1.ListDecoyTemplatesResponse](
+			httpClient,
+			baseURL+DecoySiteServiceListDecoyTemplatesProcedure,
+			connect.WithSchema(decoySiteServiceMethods.ByName("ListDecoyTemplates")),
+			connect.WithClientOptions(opts...),
+		),
+		previewDecoyTemplate: connect.NewClient[v1.PreviewDecoyTemplateRequest, v1.PreviewDecoyTemplateResponse](
+			httpClient,
+			baseURL+DecoySiteServicePreviewDecoyTemplateProcedure,
+			connect.WithSchema(decoySiteServiceMethods.ByName("PreviewDecoyTemplate")),
+			connect.WithClientOptions(opts...),
+		),
+		generateDecoySite: connect.NewClient[v1.GenerateDecoySiteRequest, v1.GenerateDecoySiteResponse](
+			httpClient,
+			baseURL+DecoySiteServiceGenerateDecoySiteProcedure,
+			connect.WithSchema(decoySiteServiceMethods.ByName("GenerateDecoySite")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // decoySiteServiceClient implements DecoySiteServiceClient.
 type decoySiteServiceClient struct {
-	listDecoySites      *connect.Client[v1.ListDecoySitesRequest, v1.ListDecoySitesResponse]
-	getDecoySite        *connect.Client[v1.GetDecoySiteRequest, v1.GetDecoySiteResponse]
-	createDecoySite     *connect.Client[v1.CreateDecoySiteRequest, v1.CreateDecoySiteResponse]
-	addDecoySiteVersion *connect.Client[v1.AddDecoySiteVersionRequest, v1.AddDecoySiteVersionResponse]
-	editDecoySiteFile   *connect.Client[v1.EditDecoySiteFileRequest, v1.EditDecoySiteFileResponse]
-	updateDecoySite     *connect.Client[v1.UpdateDecoySiteRequest, v1.UpdateDecoySiteResponse]
-	copyDecoySite       *connect.Client[v1.CopyDecoySiteRequest, v1.CopyDecoySiteResponse]
-	setDecoySiteReady   *connect.Client[v1.SetDecoySiteReadyRequest, v1.SetDecoySiteReadyResponse]
-	assignDecoySite     *connect.Client[v1.AssignDecoySiteRequest, v1.AssignDecoySiteResponse]
-	unassignDecoySite   *connect.Client[v1.UnassignDecoySiteRequest, v1.UnassignDecoySiteResponse]
-	setPanelDecoySource *connect.Client[v1.SetPanelDecoySourceRequest, v1.SetPanelDecoySourceResponse]
-	revertDecoySite     *connect.Client[v1.RevertDecoySiteRequest, v1.RevertDecoySiteResponse]
-	deleteDecoySite     *connect.Client[v1.DeleteDecoySiteRequest, v1.DeleteDecoySiteResponse]
-	downloadDecoySite   *connect.Client[v1.DownloadDecoySiteRequest, v1.DownloadDecoySiteResponse]
-	listDecoyPages      *connect.Client[v1.ListDecoyPagesRequest, v1.ListDecoyPagesResponse]
-	getDecoyPagePreview *connect.Client[v1.GetDecoyPagePreviewRequest, v1.GetDecoyPagePreviewResponse]
-	getDecoyFile        *connect.Client[v1.GetDecoyFileRequest, v1.GetDecoyFileResponse]
+	listDecoySites       *connect.Client[v1.ListDecoySitesRequest, v1.ListDecoySitesResponse]
+	getDecoySite         *connect.Client[v1.GetDecoySiteRequest, v1.GetDecoySiteResponse]
+	createDecoySite      *connect.Client[v1.CreateDecoySiteRequest, v1.CreateDecoySiteResponse]
+	addDecoySiteVersion  *connect.Client[v1.AddDecoySiteVersionRequest, v1.AddDecoySiteVersionResponse]
+	editDecoySiteFile    *connect.Client[v1.EditDecoySiteFileRequest, v1.EditDecoySiteFileResponse]
+	updateDecoySite      *connect.Client[v1.UpdateDecoySiteRequest, v1.UpdateDecoySiteResponse]
+	copyDecoySite        *connect.Client[v1.CopyDecoySiteRequest, v1.CopyDecoySiteResponse]
+	setDecoySiteReady    *connect.Client[v1.SetDecoySiteReadyRequest, v1.SetDecoySiteReadyResponse]
+	assignDecoySite      *connect.Client[v1.AssignDecoySiteRequest, v1.AssignDecoySiteResponse]
+	unassignDecoySite    *connect.Client[v1.UnassignDecoySiteRequest, v1.UnassignDecoySiteResponse]
+	setPanelDecoySource  *connect.Client[v1.SetPanelDecoySourceRequest, v1.SetPanelDecoySourceResponse]
+	revertDecoySite      *connect.Client[v1.RevertDecoySiteRequest, v1.RevertDecoySiteResponse]
+	deleteDecoySite      *connect.Client[v1.DeleteDecoySiteRequest, v1.DeleteDecoySiteResponse]
+	downloadDecoySite    *connect.Client[v1.DownloadDecoySiteRequest, v1.DownloadDecoySiteResponse]
+	listDecoyPages       *connect.Client[v1.ListDecoyPagesRequest, v1.ListDecoyPagesResponse]
+	getDecoyPagePreview  *connect.Client[v1.GetDecoyPagePreviewRequest, v1.GetDecoyPagePreviewResponse]
+	getDecoyFile         *connect.Client[v1.GetDecoyFileRequest, v1.GetDecoyFileResponse]
+	listDecoyTemplates   *connect.Client[v1.ListDecoyTemplatesRequest, v1.ListDecoyTemplatesResponse]
+	previewDecoyTemplate *connect.Client[v1.PreviewDecoyTemplateRequest, v1.PreviewDecoyTemplateResponse]
+	generateDecoySite    *connect.Client[v1.GenerateDecoySiteRequest, v1.GenerateDecoySiteResponse]
 }
 
 // ListDecoySites calls mistgate.decoysite.v1.DecoySiteService.ListDecoySites.
@@ -349,6 +387,21 @@ func (c *decoySiteServiceClient) GetDecoyFile(ctx context.Context, req *connect.
 	return c.getDecoyFile.CallUnary(ctx, req)
 }
 
+// ListDecoyTemplates calls mistgate.decoysite.v1.DecoySiteService.ListDecoyTemplates.
+func (c *decoySiteServiceClient) ListDecoyTemplates(ctx context.Context, req *connect.Request[v1.ListDecoyTemplatesRequest]) (*connect.Response[v1.ListDecoyTemplatesResponse], error) {
+	return c.listDecoyTemplates.CallUnary(ctx, req)
+}
+
+// PreviewDecoyTemplate calls mistgate.decoysite.v1.DecoySiteService.PreviewDecoyTemplate.
+func (c *decoySiteServiceClient) PreviewDecoyTemplate(ctx context.Context, req *connect.Request[v1.PreviewDecoyTemplateRequest]) (*connect.Response[v1.PreviewDecoyTemplateResponse], error) {
+	return c.previewDecoyTemplate.CallUnary(ctx, req)
+}
+
+// GenerateDecoySite calls mistgate.decoysite.v1.DecoySiteService.GenerateDecoySite.
+func (c *decoySiteServiceClient) GenerateDecoySite(ctx context.Context, req *connect.Request[v1.GenerateDecoySiteRequest]) (*connect.Response[v1.GenerateDecoySiteResponse], error) {
+	return c.generateDecoySite.CallUnary(ctx, req)
+}
+
 // DecoySiteServiceHandler is an implementation of the mistgate.decoysite.v1.DecoySiteService
 // service.
 type DecoySiteServiceHandler interface {
@@ -389,6 +442,14 @@ type DecoySiteServiceHandler interface {
 	GetDecoyPagePreview(context.Context, *connect.Request[v1.GetDecoyPagePreviewRequest]) (*connect.Response[v1.GetDecoyPagePreviewResponse], error)
 	// The text of one text file of a version (the first 256 KiB). site_id as in ListDecoyPages.
 	GetDecoyFile(context.Context, *connect.Request[v1.GetDecoyFileRequest]) (*connect.Response[v1.GetDecoyFileResponse], error)
+	// The kinds of site the panel can make from its built-in templates (internal/decoy Generate), sorted by id. Owner only.
+	ListDecoyTemplates(context.Context, *connect.Request[v1.ListDecoyTemplatesRequest]) (*connect.Response[v1.ListDecoyTemplatesResponse], error)
+	// The home page of a generated site, as GetDecoyPagePreview gives it. Saves nothing: the answer carries the seed it was made
+	// from, and GenerateDecoySite with that seed saves exactly this site. An empty seed takes a new one ("another variant").
+	PreviewDecoyTemplate(context.Context, *connect.Request[v1.PreviewDecoyTemplateRequest]) (*connect.Response[v1.PreviewDecoyTemplateResponse], error)
+	// Makes a site of a kind from a seed and saves it to the library as a new ready site (source "upload", source_label
+	// "template:<kind>"). The name defaults to the site's own brand, the note to the kind's name. Limits as CreateDecoySite.
+	GenerateDecoySite(context.Context, *connect.Request[v1.GenerateDecoySiteRequest]) (*connect.Response[v1.GenerateDecoySiteResponse], error)
 }
 
 // NewDecoySiteServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -500,6 +561,24 @@ func NewDecoySiteServiceHandler(svc DecoySiteServiceHandler, opts ...connect.Han
 		connect.WithSchema(decoySiteServiceMethods.ByName("GetDecoyFile")),
 		connect.WithHandlerOptions(opts...),
 	)
+	decoySiteServiceListDecoyTemplatesHandler := connect.NewUnaryHandler(
+		DecoySiteServiceListDecoyTemplatesProcedure,
+		svc.ListDecoyTemplates,
+		connect.WithSchema(decoySiteServiceMethods.ByName("ListDecoyTemplates")),
+		connect.WithHandlerOptions(opts...),
+	)
+	decoySiteServicePreviewDecoyTemplateHandler := connect.NewUnaryHandler(
+		DecoySiteServicePreviewDecoyTemplateProcedure,
+		svc.PreviewDecoyTemplate,
+		connect.WithSchema(decoySiteServiceMethods.ByName("PreviewDecoyTemplate")),
+		connect.WithHandlerOptions(opts...),
+	)
+	decoySiteServiceGenerateDecoySiteHandler := connect.NewUnaryHandler(
+		DecoySiteServiceGenerateDecoySiteProcedure,
+		svc.GenerateDecoySite,
+		connect.WithSchema(decoySiteServiceMethods.ByName("GenerateDecoySite")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.decoysite.v1.DecoySiteService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DecoySiteServiceListDecoySitesProcedure:
@@ -536,6 +615,12 @@ func NewDecoySiteServiceHandler(svc DecoySiteServiceHandler, opts ...connect.Han
 			decoySiteServiceGetDecoyPagePreviewHandler.ServeHTTP(w, r)
 		case DecoySiteServiceGetDecoyFileProcedure:
 			decoySiteServiceGetDecoyFileHandler.ServeHTTP(w, r)
+		case DecoySiteServiceListDecoyTemplatesProcedure:
+			decoySiteServiceListDecoyTemplatesHandler.ServeHTTP(w, r)
+		case DecoySiteServicePreviewDecoyTemplateProcedure:
+			decoySiteServicePreviewDecoyTemplateHandler.ServeHTTP(w, r)
+		case DecoySiteServiceGenerateDecoySiteProcedure:
+			decoySiteServiceGenerateDecoySiteHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -611,4 +696,16 @@ func (UnimplementedDecoySiteServiceHandler) GetDecoyPagePreview(context.Context,
 
 func (UnimplementedDecoySiteServiceHandler) GetDecoyFile(context.Context, *connect.Request[v1.GetDecoyFileRequest]) (*connect.Response[v1.GetDecoyFileResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.decoysite.v1.DecoySiteService.GetDecoyFile is not implemented"))
+}
+
+func (UnimplementedDecoySiteServiceHandler) ListDecoyTemplates(context.Context, *connect.Request[v1.ListDecoyTemplatesRequest]) (*connect.Response[v1.ListDecoyTemplatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.decoysite.v1.DecoySiteService.ListDecoyTemplates is not implemented"))
+}
+
+func (UnimplementedDecoySiteServiceHandler) PreviewDecoyTemplate(context.Context, *connect.Request[v1.PreviewDecoyTemplateRequest]) (*connect.Response[v1.PreviewDecoyTemplateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.decoysite.v1.DecoySiteService.PreviewDecoyTemplate is not implemented"))
+}
+
+func (UnimplementedDecoySiteServiceHandler) GenerateDecoySite(context.Context, *connect.Request[v1.GenerateDecoySiteRequest]) (*connect.Response[v1.GenerateDecoySiteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.decoysite.v1.DecoySiteService.GenerateDecoySite is not implemented"))
 }

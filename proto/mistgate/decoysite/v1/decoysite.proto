@@ -12,7 +12,7 @@ import "mistgate/admin/v1/node.proto";
 // Refusals are FAILED_PRECONDITION / INVALID_ARGUMENT / NOT_FOUND / ALREADY_EXISTS whose message is a stable code, optionally
 // followed by ": key=value" (values URL-escaped): decoy_site_not_found, decoy_name_taken, decoy_name_invalid, decoy_note_invalid,
 // decoy_library_full, decoy_site_in_use (nodes=<ids>, panel=1), decoy_site_draft, decoy_site_not_draft, decoy_version_not_found,
-// decoy_file_not_found, decoy_file_binary, decoy_page_not_found, decoy_preview_too_large, node_not_assigned, node_retired,
+// decoy_file_not_found, decoy_file_binary, decoy_page_not_found, decoy_preview_too_large, decoy_template_unknown, decoy_template_seed, node_not_assigned, node_retired,
 // panel_unavailable / panel_too_large / panel_no_index / panel_invalid, and decoy_bundle_<reason> (with ": path=<entry>") for an
 // archive the bundle rules refuse (empty, bad_archive, too_large, too_many_files, bad_path, not_static, no_index, duplicate).
 service DecoySiteService {
@@ -53,6 +53,14 @@ service DecoySiteService {
   rpc GetDecoyPagePreview(GetDecoyPagePreviewRequest) returns (GetDecoyPagePreviewResponse);
   // The text of one text file of a version (the first 256 KiB). site_id as in ListDecoyPages.
   rpc GetDecoyFile(GetDecoyFileRequest) returns (GetDecoyFileResponse);
+  // The kinds of site the panel can make from its built-in templates (internal/decoy Generate), sorted by id. Owner only.
+  rpc ListDecoyTemplates(ListDecoyTemplatesRequest) returns (ListDecoyTemplatesResponse);
+  // The home page of a generated site, as GetDecoyPagePreview gives it. Saves nothing: the answer carries the seed it was made
+  // from, and GenerateDecoySite with that seed saves exactly this site. An empty seed takes a new one ("another variant").
+  rpc PreviewDecoyTemplate(PreviewDecoyTemplateRequest) returns (PreviewDecoyTemplateResponse);
+  // Makes a site of a kind from a seed and saves it to the library as a new ready site (source "upload", source_label
+  // "template:<kind>"). The name defaults to the site's own brand, the note to the kind's name. Limits as CreateDecoySite.
+  rpc GenerateDecoySite(GenerateDecoySiteRequest) returns (GenerateDecoySiteResponse);
 }
 
 // One check of a site's version. level "required" (a failed one cannot exist: the version would not have been saved) or "warning".
@@ -77,7 +85,7 @@ message DecoySite {
   string note = 3;
   // "upload" | "assistant" | "mcp"
   string source = 4;
-  // Who made it: the administrator or the API token.
+  // Who made it: the administrator or the API token. "template:<kind>" for a site the panel generated from a template.
   string source_label = 5;
   // "draft" | "ready"
   string state = 6;
@@ -344,4 +352,45 @@ message GetDecoyFileResponse {
   string text = 1;
   uint64 size = 2 [jstype = JS_NUMBER];
   bool truncated = 3;
+}
+
+message DecoyTemplate {
+  // The folder of the kind: "status", "blog", ...
+  string id = 1;
+  string name_en = 2;
+  string name_ru = 3;
+}
+
+message ListDecoyTemplatesRequest {}
+
+message ListDecoyTemplatesResponse {
+  repeated DecoyTemplate templates = 1;
+}
+
+message PreviewDecoyTemplateRequest {
+  string kind = 1;
+  // From an earlier answer; empty = a new random one. Opaque to the client.
+  string seed = 2;
+}
+
+message PreviewDecoyTemplateResponse {
+  // The same document GetDecoyPagePreview gives (for <iframe sandbox="" srcdoc>).
+  string html = 1;
+  string seed = 2;
+  // The name GenerateDecoySite would give the site.
+  string name = 3;
+}
+
+message GenerateDecoySiteRequest {
+  string kind = 1;
+  // From PreviewDecoyTemplate; empty = a new random one.
+  string seed = 2;
+  // Empty = the site's own brand (made unique with " 2", " 3" when taken). A name that is given and taken is refused.
+  string name = 3;
+  // Empty = the kind's name in English.
+  string note = 4;
+}
+
+message GenerateDecoySiteResponse {
+  DecoySite site = 1;
 }

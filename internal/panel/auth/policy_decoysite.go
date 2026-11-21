@@ -19,7 +19,8 @@ import (
 //   - everything that puts a site on a node or the panel, takes it off, marks it ready, reverts it, deletes it, or saves a new
 //     version of a ready site: the owner's approval, through the plan and apply tools.
 //
-// EditDecoySiteFile, UpdateDecoySite, CopyDecoySite, SetPanelDecoySource and ListDecoyPages / GetDecoyPagePreview stay the owner's own.
+// EditDecoySiteFile, UpdateDecoySite, CopyDecoySite, SetPanelDecoySource, ListDecoyPages / GetDecoyPagePreview and the three template
+// calls (ListDecoyTemplates, PreviewDecoyTemplate, GenerateDecoySite) stay the owner's own: an agent makes its sites its own way.
 func init() {
 	for _, p := range []string{
 		decoysitev1connect.DecoySiteServiceListDecoySitesProcedure,
@@ -39,6 +40,9 @@ func init() {
 		decoysitev1connect.DecoySiteServiceListDecoyPagesProcedure,
 		decoysitev1connect.DecoySiteServiceGetDecoyPagePreviewProcedure,
 		decoysitev1connect.DecoySiteServiceGetDecoyFileProcedure,
+		decoysitev1connect.DecoySiteServiceListDecoyTemplatesProcedure,
+		decoysitev1connect.DecoySiteServicePreviewDecoyTemplateProcedure,
+		decoysitev1connect.DecoySiteServiceGenerateDecoySiteProcedure,
 	} {
 		procedureLevels[p] = levelOwner
 	}
