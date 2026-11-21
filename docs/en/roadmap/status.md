@@ -41,7 +41,6 @@ Mistgate is in **beta**; the current release is `v0.1.85`. It runs in production
         - "[Check ports](../guide/nodes.md#ports): UDP delivery and a TCP connection to every port of the node from another node of the fleet."
         - "[Measuring the network capacity](../guide/nodes.md#measuring-the-network-capacity) of a node's link."
         - "[A decoy site per node](../guide/decoy-site.md#nodes-three-options): the built-in one, the panel's site or an archive of its own."
-        - "[A site from a template](../guide/decoy-site.md#a-site-from-a-template): the panel builds the decoy itself, from ten kinds (service status, file transfer, sign-in, blog, portfolio and more), different every time; the sign-in and upload forms send nothing anywhere (vNEXT)."
         - "[Relays through an entry node](../guide/relays.md): checked before they are switched on, watched every 5 minutes, a copy of the server in subscriptions; AmneziaWG servers too, with a key of their own for the path through the entry."
         - "[IPv6 entry](../guide/nodes.md#ipv6-entry): the node's servers at one of its IPv6 addresses, checked from outside before they are turned on."
         - "[Resources and load](../guide/nodes.md#load): what a node and Mistgate itself cost the server, a **Load** view with the room left for more people, a [debug capture](../operations/troubleshooting.md#debug-capture-of-one-node) of one node, a map of the fleet and the ways in as a graph."
@@ -164,6 +163,9 @@ Mistgate is in **beta**; the current release is `v0.1.85`. It runs in production
     - title: Where your people are
       section: settings
       text: "A region in the first-run setup and in Settings: DNS presets, \"direct\" lists, recommended apps and reachability checks follow the countries you choose. China's pieces are already in (Chinese sites direct since v0.1.64; AliDNS, DNSPod and a Baidu check in the node doctor since v0.1.78); the setting itself is not."
+    - title: Decoys that look like an ordinary self-hosted service
+      section: settings
+      text: "Built-in decoy sites in the style of a status page, a file share or a service's sign-in page, different on every installation, down to the 404, 429 and robots.txt answers, so that probers cannot recognise them; a sign-in there always fails and keeps nothing."
     - title: The Cloudflare edition on par with the VPS
       icon: layers
       text: "Bring to the six-Worker edition what it does not have yet:"
