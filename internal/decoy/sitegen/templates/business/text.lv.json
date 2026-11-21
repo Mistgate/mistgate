@@ -1,0 +1,275 @@
+{
+ "ui": {
+  "nav_label": "Izvēlne",
+  "footer": "Neatkarīgs un vietējs.",
+  "nav_home": "Sākums",
+  "nav_about": "Par mums",
+  "nav_contact": "Kā mūs atrast",
+  "home_title": "Laipni lūdzam",
+  "nf_title": "Lapa nav atrasta",
+  "nf_text": "Mēs neatradām šo lapu. Iespējams, tā ir pārvietota vai mums tādas nemaz nav.",
+  "nf_back": "Atpakaļ uz sākumlapu",
+  "see_services": "Skatīt, ko piedāvājam",
+  "all_prices": "Pilna cenu lapa",
+  "visit_h": "Apmeklē mūs",
+  "hours_h": "Darba laiks",
+  "address_l": "Adrese",
+  "phone_l": "Tālrunis",
+  "about_h": "Par mums",
+  "services_h": "Ko mēs piedāvājam",
+  "services_intro": "Cenas ir orientējošas; mēs vienmēr labprāt pārrunājam, kas tev vajadzīgs.",
+  "contact_h": "Kā mūs atrast",
+  "contact_intro": "Iegriezies darba laikā vai sazinies ar mums. Mēs labprāt pārrunājam, kas tev vajadzīgs, pirms tu ko izlem.",
+  "contact_note": "Vieglāk novietot auto ir nākamajā ielā. Ja darba laikā durvis ir aizvērtas, mēs, visticamāk, esam aizmugurē; pieklauvē un uzgaidi brīdi.",
+  "from_l": "no",
+  "col_service": "Pakalpojums",
+  "col_desc": "Ko tas ietver",
+  "col_price": "Cena",
+  "hours_note": "",
+  "directions_h": "Kā mūs atrast",
+  "directions": "Mūs vari atrast adresē {address}. Tas ir neliels gājiens no pilsētas centra, un pie durvīm ir velosipēdu statīvs.",
+  "services_note": "Ja darbs izrādās apjomīgāks, nekā novērtēts, mēs pajautāsim pirms sākšanas."
+ },
+ "bundles": {
+  "bakery": {
+   "tagline": "Maize un kūkas, cepti {city_in}",
+   "nav_services": "Mūsu izcepumi",
+   "desc": "Apkaimes maizes ceptuve {city_in}: maize uz ieraugu, maizītes un kūkas, cepti katru rītu.",
+   "desc_services": "Maizes, bulciņas un kūkas ar cenām.",
+   "desc_about": "Par {brand}, nelielu maizes ceptuvi {city_in}.",
+   "desc_contact": "{brand} darba laiks un adrese {city_in}.",
+   "hero_h": "Maize lēnajā veidā",
+   "intro": "Neliela apkaimes maizes ceptuve. Maize uz ieraugu, maizītes un kūkas, cepti katru rītu pirms veikala atvēršanas.",
+   "about": [
+    "{brand} sākās nomātā virtuvē aiz veikala {city_in}, ar vienu krāsni un krietnu devu optimisma.",
+    "Mēs joprojām cepam nelielās partijās, ar miltiem no dzirnavām stundas brauciena attālumā un ieraugu, kas ir vecāks par mūsu jaunāko maiznieku.",
+    "Nāc agri pēc maizītēm, paliec uz kafiju un pasaki mums, ja tava maize nebija tāda, kāda tai jābūt. Mēs gribam to zināt."
+   ],
+   "features": [
+    {
+     "h": "Cepts katru rītu",
+     "p": "Nekas nepaliek no vakardienas."
+    },
+    {
+     "h": "Godīgas sastāvdaļas",
+     "p": "Milti, ūdens, sāls un laiks."
+    },
+    {
+     "h": "Pasūtījumi gaidīti",
+     "p": "Kūkas un lielāki pasūtījumi pēc vienošanās."
+    }
+   ],
+   "services": [
+    {
+     "t": "Ciema maize uz ieraugu",
+     "d": "Lēni ceļusies, ar biezu garozu un mīkstu, gaisīgu mīkstumu."
+    },
+    {
+     "t": "Sēklu rupjmaize",
+     "d": "Blīva, tumša un ļoti laba ar sieru."
+    },
+    {
+     "t": "Rīta maizītes, sešas",
+     "d": "Mīkstas maizītes, cepas piecos un parasti izpārdotas līdz desmitiem."
+    },
+    {
+     "t": "Kardamona bulciņas",
+     "d": "Ar rokām savītas un glazētas, kamēr vēl siltas."
+    },
+    {
+     "t": "Svētku kūka",
+     "d": "Lūdzu, pasūti trīs dienas iepriekš; garšas saskaņosim kopā."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Rudzu",
+       "Medus",
+       "Auzu",
+       "Miežu",
+       "Dilles",
+       "Kukuļa",
+       "Krāsns",
+       "Svētdienas",
+       "Sezama",
+       "Plūmju"
+      ],
+      [
+       "Cīrulis",
+       "Strazds",
+       "Zvirbulis",
+       "Žubīte",
+       "Lakstīgala",
+       "Sarkankrūtītis",
+       "Bezdelīga",
+       "Dzenis"
+      ]
+     ],
+     "sep": " & "
+    }
+   }
+  },
+  "bike": {
+   "tagline": "Velosipēdu remonts {city_in}",
+   "nav_services": "Cenas",
+   "desc": "Velosipēdu remonts un apkope {city_in}, gaidot uz vietas vai līdz nākamajai dienai.",
+   "desc_services": "Velosipēdu remonts un apkope ar cenām.",
+   "desc_about": "Par {brand}, nelielu velosipēdu darbnīcu {city_in}.",
+   "desc_contact": "{brand} darba laiks un adrese {city_in}.",
+   "hero_h": "Tavs velosipēds atkal kārtībā",
+   "intro": "Neliela darbnīca ikdienas velosipēdiem. Mēs salabojam, kas ir bojāts, noregulējam, kas nav gluži kārtībā, un godīgi pasakām, kas nav naudas vērts.",
+   "about": [
+    "{brand} sākās dārza šķūnītī {city_in}, labojot kaimiņu velosipēdus par kafijas cenu.",
+    "Šodien mums ir īsta darbnīca, ļoti garš galds un siena ar rezerves daļām, kuras saprotam tikai mēs. Mēs joprojām labāk labojam, nekā aizvietojam.",
+    "Atnes jebko ar diviem riteņiem. Ja nevarēsim salabot, pateiksim, kas varēs."
+   ],
+   "features": [
+    {
+     "h": "Gaidot uz vietas",
+     "p": "Lielākā daļa sīko remontu aizņem mazāk par stundu."
+    },
+    {
+     "h": "Godīgi padomi",
+     "p": "Mēs pateiksim, ja kaut ko nav vērts labot."
+    },
+    {
+     "h": "Apkope uz nākamo dienu",
+     "p": "Atnes no rīta, ņem rītdien."
+    }
+   ],
+   "services": [
+    {
+     "t": "Riepas labošana",
+     "d": "Iekšējā kamera ielikta un pārbaudīta, riepa apskatīta, lai atrastu vainīgo."
+    },
+    {
+     "t": "Pamata apkope",
+     "d": "Bremzes un pārnesumi noregulēti, ķēde notīrīta un ieeļļota, riepas un skrūves pārbaudītas."
+    },
+    {
+     "t": "Pilna apkope",
+     "d": "Piedziņas izjaukšana, attaukošana un salikšana atpakaļ, vajadzības gadījumā ar jaunām trosēm."
+    },
+    {
+     "t": "Riteņa iztaisnošana",
+     "d": "Šķībums novērsts un spieķu spriegojums izlīdzināts."
+    },
+    {
+     "t": "Ziemas pārbaude",
+     "d": "Gaismas, bremzes, riepas un dubļusargi, lai tumšie mēneši būtu mazāk bīstami."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Spieķu",
+       "Ķēdes",
+       "Zobratu",
+       "Pedāļu",
+       "Ratu",
+       "Rāmja",
+       "Rumbas",
+       "Loka",
+       "Riteņu",
+       "Vārpstas"
+      ],
+      [
+       "darbnīca",
+       "serviss",
+       "šķūnis",
+       "garāža",
+       "galds",
+       "remonts",
+       "centrs",
+       "darbi"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "tailor": {
+   "tagline": "Pārlabošana un šūšana {city_in}",
+   "nav_services": "Pārlabošana",
+   "desc": "Apģērbu pārlabošana un labošana {city_in}: apmales, rāvējslēdzēji, pielaikošana un lāpīšana.",
+   "desc_services": "Apģērbu pārlabošana un labošana ar cenām.",
+   "desc_about": "Par {brand}, nelielu šūšanas darbnīcu {city_in}.",
+   "desc_contact": "{brand} darba laiks un adrese {city_in}.",
+   "hero_h": "Drēbes, kas der ilgāk",
+   "intro": "Apmales, rāvējslēdzēji, pielaikošana un labošana, veikta ar rokām un mašīnu nelielā darbnīcā virs veikaliem.",
+   "about": [
+    "{brand} ir divu cilvēku darbnīca ēkas pirmajā stāvā {city_in}, virs veikala, kur pārdod dziju.",
+    "Mēs amatu apguvām no cilvēkiem, kas to bija darījuši četrdesmit gadus, un esam saglabājuši dažus viņu ieradumus, piemēram, vienmēr piespraust divreiz.",
+    "Ja neesi pārliecināts, vai kaut ko ir vērts pārlabot, atnes to. Mēs pateiksim godīgi."
+   ],
+   "features": [
+    {
+     "h": "Labots rūpīgi",
+     "p": "Katra apģērba gabals pirms darba tiek kārtīgi apskatīts."
+    },
+    {
+     "h": "Pielaikots tev",
+     "p": "Mēs piespraužam uz tevis, nevis uz manekena."
+    },
+    {
+     "h": "Gatavs, kā solīts",
+     "p": "Mēs nosaucam dienu un to ievērojam."
+    }
+   ],
+   "services": [
+    {
+     "t": "Bikšu vai svārku saīsināšana",
+     "d": "Apmale pēc tava garuma, oriģinālais noformējums saglabāts, kur iespējams."
+    },
+    {
+     "t": "Žaketes sašaurināšana",
+     "d": "Sāni un piedurknes pielāgotas, lai tā kārtīgi krīt."
+    },
+    {
+     "t": "Rāvējslēdzēja nomaiņa",
+     "d": "Pēc krāsas un svara piemeklēts, kārtīgi ielikts."
+    },
+    {
+     "t": "Mēteļa oderes labošana",
+     "d": "Ieplēsta odere nomainīta vai salabota, kabatas ieskaitot."
+    },
+    {
+     "t": "Lāpīšana un ielāpi",
+     "d": "Redzami vai neredzami, kā tu vēlies."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Adatas",
+       "Pogas",
+       "Šuves",
+       "Apmales",
+       "Aproces",
+       "Apkakles",
+       "Ievalka",
+       "Spoles",
+       "Dzijas",
+       "Zīda"
+      ],
+      [
+       "& Diegs",
+       "labošana",
+       "šūšana",
+       "ateljē",
+       "pielaikošana",
+       "& Šķēres",
+       "studija",
+       "darbnīca"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

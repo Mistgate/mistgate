@@ -1,0 +1,229 @@
+{
+ "ui": {
+  "nav_label": "Peamenüü",
+  "tagline": "Teenuse olek",
+  "footer": "Kõik kellaajad on esitatud UTC järgi.",
+  "nav_home": "Olek",
+  "nav_history": "Häirete ajalugu",
+  "nav_about": "Info",
+  "home_title": "Praegune olek",
+  "desc": "Teenuste {brand} praegune olek ja tööaeg.",
+  "desc_history": "Teenuste {brand} varasemad häired ja nende lahendamine.",
+  "desc_about": "Kuidas {brand} mõõdab tööaega ja teatab häiretest.",
+  "nf_title": "Lehte ei leitud",
+  "nf_text": "Sellel aadressil ei ole midagi. Teenuse olek on avalehel.",
+  "nf_back": "Mine oleku lehele",
+  "banner_ok": "Kõik süsteemid töötavad",
+  "banner_sub": "Kõik {brand} teenused töötavad normaalselt.",
+  "comps_h": "Teenused",
+  "op": "Töötab",
+  "up_label": "tööaeg",
+  "days_ago_l": "60 päeva tagasi",
+  "days_ago_r": "Täna",
+  "m_uptime": "Tööaeg viimase 90 päeva jooksul",
+  "m_resp": "Keskmine vastamisaeg",
+  "m_inc": "Registreeritud häireid",
+  "recent_h": "Viimased häired",
+  "all_inc": "Kogu häirete ajalugu",
+  "history_h": "Häirete ajalugu",
+  "history_intro": "Mis on viimastel kuudel valesti läinud ja kuidas see parandati, uuemad eespool.",
+  "st_inv": "Uurime",
+  "st_ident": "Põhjus leitud",
+  "st_res": "Lahendatud",
+  "imp_minor": "Väike",
+  "imp_major": "Suur",
+  "imp_maint": "Hooldus",
+  "dur_l": "Kestus",
+  "about_h": "Sellest lehest",
+  "about": [
+   {
+    "h": "Mida see leht näitab",
+    "p": "See leht näitab teenuste {brand} praegust olekut ja varasemate häirete ajalugu. Lehte hoiab ajakohasena meeskond, kes teenuseid haldab."
+   },
+   {
+    "h": "Kuidas tööaega mõõdetakse",
+    "p": "Iga teenust kontrollitakse mitmest kohast kord minutis. Minut loetakse katkestuseks, kui üle poole kontrollidest ebaõnnestub."
+   },
+   {
+    "h": "Kuidas me häiretest teatame",
+    "p": "Anname teada, kui hakkame probleemi uurima, kui oleme põhjuse leidnud ja kui see on lahendatud. Suuremate häirete kohta kirjutame hiljem lühikese kokkuvõtte."
+   },
+   {
+    "h": "Plaanitud hooldus",
+    "p": "Plaanitud töödest teatame siin vähemalt kolm päeva ette ja teeme need vaiksel ajal."
+   }
+  ],
+  "incidents": [
+   {
+    "title": "Vigade arv on tõusnud",
+    "impact": "major",
+    "dur": "38 minutit",
+    "a": "Ebaõnnestunud päringute osakaal on tavalisest suurem. Uurime põhjust.",
+    "b": "Leidsime vigase seadistusmuudatuse ja võtame selle tagasi.",
+    "c": "Muudatus on tagasi võetud ja vigade arv on taas normaalne. Vaatame üle, kuidas see läbi pääses."
+   },
+   {
+    "title": "Teavitused hilinevad",
+    "impact": "minor",
+    "dur": "1 tund 12 minutit",
+    "a": "Teavitused jõuavad kohale mitu minutit hiljem.",
+    "b": "Teavitusi töötlevas järjekorras leidsime kuhjumise.",
+    "c": "Kuhjumine on lahendatud ja teavitused liiguvad taas tavapäraselt."
+   },
+   {
+    "title": "Lehed laadivad aeglaselt",
+    "impact": "minor",
+    "dur": "26 minutit",
+    "a": "Mõned kasutajad teatavad, et lehed laadivad aeglaselt. Uurime asja.",
+    "b": "Üks andmebaasi server oli ülekoormatud ja võtsime selle töölt maha.",
+    "c": "Lehtede laadimise aeg on tagasi normaalne."
+   },
+   {
+    "title": "Plaanitud hooldus venis pikemaks",
+    "impact": "maint",
+    "dur": "40 minutit planeeritust kauem",
+    "a": "Põhiandmebaasi hooldus võtab planeeritust rohkem aega.",
+    "b": "Uuenduse viimane samm vajab lõpetamiseks veel mõned minutid.",
+    "c": "Hooldus on lõppenud ja kõik teenused töötavad normaalselt."
+   },
+   {
+    "title": "Osaline katkestus ühes piirkonnas",
+    "impact": "major",
+    "dur": "54 minutit",
+    "a": "Ühe piirkonna kasutajad ei pääse teenusele ligi. Teeme koostööd hostinguteenuse pakkujaga.",
+    "b": "Pakkuja kinnitas, et selle piirkonna meie serveritel on võrgutõrge.",
+    "c": "Võrgutõrge on parandatud ja piirkond saab taas liiklust."
+   },
+   {
+    "title": "Otsingutulemused on vananenud",
+    "impact": "minor",
+    "dur": "2 tundi 5 minutit",
+    "a": "Uued kirjed ei ilmu otsingutulemustesse.",
+    "b": "Indekseerimise töö jäi pärast ebaõnnestunud uuendust seisma ja käivitati uuesti.",
+    "c": "Indekseerimine on järele jõudnud ja otsing on ajakohane."
+   },
+   {
+    "title": "Sisselogimine ebaõnnestub mõnel kasutajal",
+    "impact": "major",
+    "dur": "19 minutit",
+    "a": "Mõned kasutajad ei saa sisse logida. Teisi see ei puuduta.",
+    "b": "Leidsime sisselogimisteenuses aegunud sertifikaadi.",
+    "c": "Sertifikaat on asendatud ja sisselogimine töötab taas kõigil."
+   },
+   {
+    "title": "Failide üleslaadimine katkeb vahel",
+    "impact": "minor",
+    "dur": "47 minutit",
+    "a": "Väike osa üleslaadimisi ebaõnnestub ja tuleb uuesti teha.",
+    "b": "Leidsime salvestusserveri, mille ketas on täis.",
+    "c": "Ruumi lisati ja üleslaadimised õnnestuvad taas."
+   },
+   {
+    "title": "API vastab aeglaselt",
+    "impact": "minor",
+    "dur": "31 minutit",
+    "a": "Mõnele API päringule vastamine võtab tavalisest kauem aega. Uurime asja.",
+    "b": "Üks taustatöö kasutas serveris liiga palju mälu.",
+    "c": "Töö käivitati uuesti mälupiiranguga ja vastamisaeg on tagasi normaalne."
+   },
+   {
+    "title": "Webhookide saatmine hilineb",
+    "impact": "minor",
+    "dur": "52 minutit",
+    "a": "Webhookid jõuavad sihtkohta mitu minutit hiljem.",
+    "b": "Neid saatev järjekord ootas aeglast ühendust andmebaasiga.",
+    "c": "Ühendus taastati, järjekord tühjenes ja webhookid on taas õigel ajal."
+   },
+   {
+    "title": "Töölaud ei ole kättesaadav",
+    "impact": "major",
+    "dur": "22 minutit",
+    "a": "Töölaud näitab kõigile veateadet. Teisi teenuseid see ei puuduta.",
+    "b": "Hiljutise versiooni käivituskoodis oli viga ja me leidsime selle üles.",
+    "c": "Versioon võeti tagasi ja töölaud on taas kättesaadav."
+   },
+   {
+    "title": "Plaanitud hooldus: andmebaasi uuendus",
+    "impact": "maint",
+    "dur": "1 tund",
+    "a": "Plaanitud hooldus käib. Mõned funktsioonid on kuni lõpuni ainult lugemiseks.",
+    "b": "Uuendus on pooleldi tehtud ja kulgeb plaanipäraselt.",
+    "c": "Hooldus on lõppenud ja kõik töötab normaalselt."
+   }
+  ],
+  "inc_back": "Häirete ajalugu",
+  "inc_more": "Teised häired",
+  "status_l": "Olek",
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Põhja",
+      "Kivi",
+      "Kase",
+      "Tuule",
+      "Mere",
+      "Saare",
+      "Lõuna",
+      "Tamme",
+      "Laine",
+      "Selge",
+      "Hari",
+      "Kuld"
+     ],
+     [
+      "pilv",
+      "sild",
+      "värav",
+      "töö",
+      "laud",
+      "võrk",
+      "kanal",
+      "keskus",
+      "teenus",
+      "post"
+     ]
+    ],
+    "sep": ""
+   }
+  }
+ },
+ "bundles": {
+  "saas": {
+   "components": [
+    "Avalik API",
+    "Töölaud",
+    "Webhookid",
+    "Sisselogimine",
+    "Taustatööd",
+    "Andmete eksport",
+    "Arveldus",
+    "Juhendite sait"
+   ]
+  },
+  "photos": {
+   "components": [
+    "Piltide üleslaadimine",
+    "Piltide edastus",
+    "Albumid ja jagamine",
+    "Veebirakendus",
+    "Mobiilisünkroon",
+    "Otsing",
+    "Teavitused",
+    "Konto ja sisselogimine"
+   ]
+  },
+  "mail": {
+   "components": [
+    "E-kirjade saatmine",
+    "SMS-ide saatmine",
+    "Sõnumimallid",
+    "Kohaletoimetamise aruanded",
+    "REST API",
+    "Töölaud",
+    "Tellimuse lõpetamise lehed",
+    "Ajastamine"
+   ]
+  }
+ }
+}

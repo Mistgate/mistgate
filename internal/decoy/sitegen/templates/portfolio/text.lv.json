@@ -1,0 +1,250 @@
+{
+ "ui": {
+  "nav_label": "Izvēlne",
+  "footer": "Visi attēli ir studijas darbs, un tos nedrīkst pavairot bez atļaujas.",
+  "nav_home": "Izlase",
+  "nav_work": "Visi darbi",
+  "nav_about": "Par mani",
+  "nav_contact": "Kontakti",
+  "home_title": "Izlase",
+  "nf_title": "Lapa nav atrasta",
+  "nf_text": "Šajā adresē nekā nav. Darbi ir sākumlapā.",
+  "nf_back": "Atpakaļ pie darbiem",
+  "sel_h": "Izlase",
+  "all_work": "Skatīt visus darbus",
+  "work_h": "Visi darbi",
+  "work_intro": "Viss no pēdējiem gadiem, jaunākie vispirms.",
+  "about_h": "Par mani",
+  "services_h": "Ko es daru",
+  "shows_h": "Izstādes un pieminēšana",
+  "contact_h": "Kontakti",
+  "visit_h": "Studija",
+  "hours_h": "Pieņemšanas laiks",
+  "phone_l": "Tālrunis",
+  "visit_text": "Studija ir atvērta pēc vienošanās. Lūdzu, nāc pieņemšanas laikā; ja pie durvīm neviens neatbild, es, visticamāk, esmu aizmugures telpā vai tipogrāfijā.",
+  "commission_h": "Pasūtījumi",
+  "commission_text": "Gadā pieņemu nelielu skaitu pasūtījumu. Kad sazinies ar mani, pastāsti, ko iecerēji un kad tas vajadzīgs, un es godīgi pateikšu, vai to varu izdarīt.",
+  "hours_note": "Sestdienās pēc vienošanās",
+  "work_back": "Visi darbi",
+  "work_more": "Vairāk darbu",
+  "work_ask": "Pajautāt par šo darbu",
+  "directions_h": "Kā atrast studiju",
+  "directions": "Studija atrodas pirmajā stāvā, īsā gājienā no pilsētas centra. Durvis ir sānos, un tur ir zvans. Velosipēdu statīvi ir ārā."
+ },
+ "bundles": {
+  "photo": {
+   "tagline": "Fotogrāfijas par kluzām vietām",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Miglas",
+       "Klusuma",
+       "Rīta",
+       "Tālumas",
+       "Rasas",
+       "Vakara",
+       "Meža",
+       "Ezera",
+       "Lauku",
+       "Smilšu"
+      ],
+      [
+       "gaisma",
+       "kadrs",
+       "lauks",
+       "stunda",
+       "apvārsnis",
+       "ekspozīcija",
+       "plāksne",
+       "slēdzis",
+       "atvere",
+       "nospiedums"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Ainavu un klusās dabas fotogrāfija {city_in}. Izdrukas un pasūtījumi.",
+   "desc_work": "Izlases fotogrāfijas, jaunākās vispirms.",
+   "desc_about": "Par fotogrāfu un studiju {city_in}.",
+   "desc_contact": "Kur atrodas studija {city_in} un kad tā ir atvērta.",
+   "intro": "Ainavu un klusās dabas fotogrāfija {city_in}. Izdrukas un daži pasūtījumi gadā.",
+   "about": [
+    "Strādāju ar fotogrāfiju nelielā studijā {city_in}. Lielākā daļa manu bilžu ir par vietām stundu pēc tam, kad visi ir aizgājuši.",
+    "Strādāju lēni, parasti ar vienu kameru un vienu objektīvu, un visu izdrukāju aizmugures telpā. Bilde ir gatava, kad nedēļu varu uz to skatīties, negribot neko mainīt.",
+    "Pēdējos gados mani darbi ir rādīti nelielās galerijās un bibliotēkās visā reģionā un pārdoti izdrukās cilvēkiem, kas gribēja kaut ko klusu pie sienas."
+   ],
+   "services": [
+    "Mākslas izdrukas, parakstītas un numurētas",
+    "Pasūtījuma portreti mājās vai studijā",
+    "Žurnālu un grāmatu fotogrāfija"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Divi apvārsņi, kopizstāde, Vecās klēts galerija"
+    },
+    {
+     "y": "2024",
+     "t": "Klusais ūdens, personālizstāde, bibliotēkas vestibils"
+    },
+    {
+     "y": "2022",
+     "t": "Reģionālā fotogrāfijas balva, īsais saraksts"
+    }
+   ],
+   "works": [
+    {
+     "title": "Nogāze pēcpusdienā",
+     "caption": "Arhīva pigmenta druka, 2025",
+     "note": "Pēdējā gaisma uz lauka, ko parasti nepamana.",
+     "text": "Trīs pēcpusdienas gaidīju, kad mākonis pacelsies no kores, un tas pacēlās uz četrām minūtēm."
+    },
+    {
+     "title": "Divi apvārsņi",
+     "caption": "Arhīva pigmenta druka, 2025",
+     "note": "Krasta līnija, kas nevarēja izlemt, kur beigties.",
+     "text": "Paisums atkāpās, un slapjās smiltis atspoguļoja otru debesi. Uzņēmu sešus kadrus un atstāju šo."
+    },
+    {
+     "title": "Klusais ūdens",
+     "caption": "Arhīva pigmenta druka, 2024",
+     "note": "Dīķis novembrī, kam nav ko pierādīt.",
+     "text": "Ūdenskrātuve septiņos no rīta, pirms vēja. Druka ir liela, tāpēc klusumam ir vieta."
+    },
+    {
+     "title": "Sarkanais lauks",
+     "caption": "Arhīva pigmenta druka, 2024",
+     "note": "Sēklās aizgājušas magones, fotografētas lietū.",
+     "text": "Āboliņš, ko atstāja ziedēt un tad nopļāva. Krāsa drukā ir tuvāk tam, ko redzēju, nekā tam, ko redzēja kamera."
+    },
+    {
+     "title": "Līnijas krēslā",
+     "caption": "Arhīva pigmenta druka, 2023",
+     "note": "Telefona vadi pret debesīm, kas mainīja domas.",
+     "text": "Žoga stabi un vagas, pēdējā gaisma plakani pāri tiem. Garā šaurā kadrā tas izskatās labāk."
+    },
+    {
+     "title": "Sāls un šīferis",
+     "caption": "Arhīva pigmenta druka, 2023",
+     "note": "Ostas mols bēguma laikā vecas monētas krāsās.",
+     "text": "Tumšu akmeņu pludmale ar baltu sāli, ko atstājis paisums. Atgriezos trīs gadalaikos, lai dabūtu vēlamo gaismu."
+    },
+    {
+     "title": "Zilā stunda",
+     "caption": "Arhīva pigmenta druka, 2022",
+     "note": "Desmit minūtes starp dienu un nakti, atkārtotas nedēļu.",
+     "text": "Desmit minūtes pēc saulrieta visa ieleja kļūst tintes krāsā. Šis ir vienīgais kadrs, kurā deg lampa."
+    }
+   ]
+  },
+  "illustration": {
+   "tagline": "Ilustrācija un grafika",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Papīra",
+       "Tintes",
+       "Citronu",
+       "Zīmuļa",
+       "Apelsīnu",
+       "Spalvas",
+       "Papardes",
+       "Klusuma",
+       "Naktstauriņa",
+       "Lapas"
+      ],
+      [
+       "spiede",
+       "studija",
+       "galds",
+       "zīmējums",
+       "darbnīca",
+       "skiču grāmata",
+       "stūrītis",
+       "darba galds",
+       "klucis",
+       "skapis"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Ilustrācijas, linogriezumi un mazas grāmatas no galda {city_in}.",
+   "desc_work": "Ilustrācijas un izdrukas, jaunākās vispirms.",
+   "desc_about": "Par ilustratoru un studiju {city_in}.",
+   "desc_contact": "Kur atrodas studija {city_in} un kad tā ir atvērta.",
+   "intro": "Ilustrācijas, linogriezumi un mazas grāmatas no galda {city_in}.",
+   "about": [
+    "Zīmēju un veidoju linogriezumus. Zīmēju bilžu grāmatām, žurnāliem, kas vēl maksā laikā, un ikvienam, kam plakāta stūrī vajadzīgs putns.",
+    "Lielākā daļa manu darbu sākas kā zīmuļa skice piezīmju grāmatiņā un beidzas kā linogriezums vai plakanu krāsu digitāls zīmējums, atkarībā no tā, ko darbs šķiet vēlamies.",
+    "Dzīvoju {city_in} kopā ar kaķi, kuram ir savs viedoklis par manām kompozīcijām."
+   ],
+   "services": [
+    "Bilžu grāmatas un žurnālu ilustrācijas",
+    "Linogriezumu izdrukas un kartītes",
+    "Plakāti un pasākumu noformējums"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Mazo izdruku tirdziņš, tirgotājs"
+    },
+    {
+     "y": "2024",
+     "t": "Piezīmes no lauka, bilžu grāmata no vietējās izdevniecības"
+    },
+    {
+     "y": "2023",
+     "t": "Reģionālā ilustrācijas balva, atzinība"
+    }
+   ],
+   "works": [
+    {
+     "title": "Etīde oranžā",
+     "caption": "Linogriezums, trīs krāsas, 2025",
+     "note": "Lapsa, puse kāpņu un neizskaidrojams mēness.",
+     "text": "Viena krāsa, trīs papīri un viena pēcpusdiena. Tas sākās kā iesildīšanās un kļuva par mazas grāmatas vāku."
+    },
+    {
+     "title": "Tirgus diena",
+     "caption": "Digitāls zīmējums, 2025",
+     "note": "Vienpadsmit letes un viens ļoti apmierināts balodis.",
+     "text": "Zīmēts uz vietas trīs sestdienās. Tirgotāji bija tik laipni, ka stāvēja mierīgi, vai gandrīz."
+    },
+    {
+     "title": "Garais ceļš",
+     "caption": "Zīmulis un tinte, 2024",
+     "note": "Taka, kas neiet tur, kur rāda zīme.",
+     "text": "Maršruts, ko eju svētdienās, zīmēts no atmiņas un pārbaudīts nākamajā pastaigā. Karte kļūdījās jaukā veidā."
+    },
+    {
+     "title": "Nakts autobuss",
+     "caption": "Linogriezums, divas krāsas, 2024",
+     "note": "Visi guļ, izņemot šoferi un mēnesi.",
+     "text": "Pildspalva, tinte un daudz pacietības ar atspulgiem logā."
+    },
+    {
+     "title": "Zaļās stundas",
+     "caption": "Gvaša, 2023",
+     "note": "Siltumnīca pulksten četros pēcpusdienā.",
+     "text": "Jūnija rīta stundas pirms brokastīm, kad dārzs vēl ir vēss. Linogriezums trīs krāsās."
+    },
+    {
+     "title": "Mazie putni",
+     "caption": "Linogriezums, 2023",
+     "note": "Septiņi putni, neviens nav atpazīts pareizi.",
+     "text": "Zvirbuļi, ziemeļu sīļi un viens ļoti dusmīgs sarkankrūtītis. Katrs putns ir atsevišķs klucis, tāpēc nav divu pilnīgi vienādu izdruku."
+    },
+    {
+     "title": "Lietus etīde",
+     "caption": "Akvarelis, 2022",
+     "note": "Lietussargi, kas redzami pa logu.",
+     "text": "Akvarelis, galvenokārt ūdens. Ļāvu papīram izlemt, kur nonāca peļķes."
+    }
+   ]
+  }
+ }
+}

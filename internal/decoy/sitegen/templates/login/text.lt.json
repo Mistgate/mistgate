@@ -1,0 +1,138 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Liepų",
+      "Ąžuolų",
+      "Berželių",
+      "Šilų",
+      "Rūtų",
+      "Pušų",
+      "Alksnių",
+      "Obelų",
+      "Žilvičių",
+      "Klevų",
+      "Slyvų",
+      "Eglių"
+     ],
+     [
+      "namai",
+      "vartai",
+      "laukas",
+      "tiltas",
+      "šaltinis",
+      "slėnis",
+      "kalva",
+      "kampas",
+      "kiemas",
+      "takas"
+     ]
+    ],
+    "sep": " "
+   }
+  },
+  "nav_label": "Pagrindinis",
+  "tagline": "Saugi prieiga prie paskyros",
+  "footer": "Visos teisės saugomos.",
+  "nav_home": "Prisijungti",
+  "nav_help": "Pagalba",
+  "nav_privacy": "Privatumas",
+  "home_title": "Prisijungimas",
+  "desc": "Prisijunkite prie savo „{brand}“ paskyros.",
+  "desc_help": "Pagalba prisijungiant prie „{brand}“.",
+  "desc_privacy": "Kaip „{brand}“ tvarko jūsų informaciją.",
+  "nf_title": "Puslapis nerastas",
+  "nf_text": "Puslapio, kurio ieškote, nėra arba jis perkeltas.",
+  "nf_back": "Atgal į prisijungimą",
+  "f_user": "Naudotojo vardas arba el. paštas",
+  "f_pass": "Slaptažodis",
+  "f_remember": "Likti prisijungus",
+  "f_forgot": "Pamiršote slaptažodį?",
+  "f_submit": "Prisijungti",
+  "f_busy": "Jungiamasi…",
+  "e_empty": "Įveskite naudotojo vardą ir slaptažodį.",
+  "e_bad": [
+   "Neteisingas naudotojo vardas arba slaptažodis.",
+   "Įvestas naudotojo vardas arba slaptažodis neteisingas. Pabandykite dar kartą.",
+   "Su šiais duomenimis prisijungti nepavyko."
+  ],
+  "help_h": "Nepavyksta prisijungti?",
+  "help_intro": "Dažniausiai prisijungti trukdo paprasta priežastis. Prieš kreipdamiesi į ką nors, išbandykite šiuos žingsnius.",
+  "help_steps": [
+   "Patikrinkite, ar išjungtas Caps Lock: slaptažodyje svarbios didžiosios ir mažosios raidės.",
+   "Pažiūrėkite, ar naudotojo vardo pradžioje arba gale nėra tarpo.",
+   "Pabandykite dar kartą naujame naršyklės lange be išsaugotų formos duomenų.",
+   "Jei bandėte keletą kartų ir nepavyko, palaukite dešimt minučių."
+  ],
+  "help_contact_h": "Vis dar nepavyksta?",
+  "help_contact": "Paprašykite žmogaus, kuris jūsų organizacijoje tvarko „{brand}“, atkurti slaptažodį. Saugumo sumetimais jo negalime atkurti telefonu ar el. paštu.",
+  "help_back": "Atgal į prisijungimą",
+  "privacy_h": "Privatumo pranešimas",
+  "privacy_intro": "Apie jus saugome kuo mažiau ir tai, ką saugome, prižiūrime. Čia trumpai aprašyta, kas tai yra ir kodėl.",
+  "privacy": [
+   {
+    "h": "Ką saugome",
+    "p": "Jūsų naudotojo vardą, prisijungimo laikus ir duomenis, kurie priklauso jūsų paskyrai. Daugiau nieko."
+   },
+   {
+    "h": "Kam tai naudojame",
+    "p": "Kad galėtumėte prisijungti ir kad niekas kitas negalėtų patekti į jūsų paskyrą. Informacijos apie naudotojus neparduodame."
+   },
+   {
+    "h": "Slapukai",
+    "p": "Naudojame tik tuos slapukus, kurių reikia, kad paslauga veiktų. Reklamos ar analizės slapukų nėra."
+   },
+   {
+    "h": "Jūsų teisės",
+    "p": "Galite prašyti parodyti, ištaisyti ar ištrinti apie jus laikomą informaciją. Kreipkitės į žmogų, kuris tvarko jūsų paskyrą."
+   }
+  ]
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Kliento paskyra",
+   "welcome": "Sveiki sugrįžę",
+   "lead": "Prisijunkite, kad matytumėte sąskaitas, atnaujintumėte savo duomenis ir tvarkytumėte planą.",
+   "bullets": [
+    "Peržiūrėkite ir atsisiųskite sąskaitas",
+    "Atnaujinkite kontaktinius duomenis",
+    "Sekite neužbaigtas užklausas"
+   ]
+  },
+  "staff": {
+   "kicker": "Darbuotojų zona",
+   "welcome": "Darbuotojų prisijungimas",
+   "lead": "Prisijunkite su darbo paskyra, kad matytumėte grafikus, skelbimus ir bendrus dokumentus.",
+   "bullets": [
+    "Pamainos ir grafikai",
+    "Skelbimai komandai",
+    "Bendri dokumentai"
+   ],
+   "f_user": "Darbuotojo kodas arba el. paštas"
+  },
+  "archive": {
+   "kicker": "Dokumentų archyvas",
+   "welcome": "Atverkite savo archyvą",
+   "lead": "Sutartys, kvitai ir laiškai saugomi čia, tik jums.",
+   "bullets": [
+    "Sutartys ir kvitai",
+    "Visi laiškai vienoje vietoje",
+    "Prieiga, kurią valdote jūs"
+   ],
+   "f_user": "El. pašto adresas"
+  },
+  "bookings": {
+   "kicker": "Rezervacijos",
+   "welcome": "Tvarkykite rezervacijas",
+   "lead": "Prisijunkite, kad pakeistumėte rezervaciją, pridėtumėte svečių ar pamatytumėte artėjančius vizitus.",
+   "bullets": [
+    "Pakeiskite ar atšaukite rezervaciją",
+    "Pridėkite svečių",
+    "Matykite artėjančias datas"
+   ],
+   "f_user": "Rezervacijos el. paštas"
+  }
+ }
+}

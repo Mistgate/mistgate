@@ -1,0 +1,173 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Gintaro",
+      "Rasos",
+      "Liepos",
+      "Žaros",
+      "Vėjo",
+      "Šilo",
+      "Rūtos",
+      "Aušros",
+      "Smilgos",
+      "Kopų"
+     ],
+     [
+      "paštas",
+      "siuntos",
+      "krepšys",
+      "tiltas",
+      "dėžė",
+      "kurjeris",
+      "perdavimas"
+     ]
+    ],
+    "sep": " "
+   },
+   "limit": [
+    "500 MB",
+    "1 GB",
+    "2 GB",
+    "5 GB"
+   ]
+  },
+  "nav_label": "Pagrindinis",
+  "tagline": "Paprastas failų siuntimas",
+  "footer": "Failai pašalinami automatiškai, kai baigiasi nuorodos galiojimas.",
+  "nav_home": "Siųsti failą",
+  "nav_how": "Kaip tai veikia",
+  "nav_limits": "Ribos ir DUK",
+  "home_title": "Siųskite failą",
+  "desc": "Dalykitės iki {limit} failais viena nuoroda. „{brand}“.",
+  "desc_how": "Kaip veikia failų siuntimas „{brand}“.",
+  "desc_limits": "Failų dydžiai, nuorodų galiojimas ir dažniausi klausimai apie „{brand}“.",
+  "nf_title": "Puslapis nerastas",
+  "nf_text": "Puslapio, kurio ieškote, nėra arba jis perkeltas.",
+  "nf_back": "Atgal į pradžią",
+  "drop_h": "Nutempkite failą čia",
+  "drop_hint": "arba pasirinkite jį savo įrenginyje, iki {limit}",
+  "pick": "Pasirinkti failą",
+  "uploading": "Keliama…",
+  "e_full": [
+   "Saugykla pilna. Pabandykite vėliau.",
+   "Įkelti nepavyko: šiuo metu mūsų saugykla pilna.",
+   "Šiuo metu negalime priimti daugiau failų, nes saugykla pilna."
+  ],
+  "retry": "Bandyti dar kartą",
+  "how_h": "Kaip tai veikia",
+  "how_intro": "Trys žingsniai, nieko nereikia nustatinėti.",
+  "steps": [
+   {
+    "h": "Pasirinkite failą",
+    "p": "Nutempkite failą į pradžios puslapį arba pasirinkite jį savo įrenginyje."
+   },
+   {
+    "h": "Gaukite nuorodą",
+    "p": "Kai failas įkeltas, gausite nuorodą, kurią galėsite nukopijuoti."
+   },
+   {
+    "h": "Pasidalykite nuoroda",
+    "p": "Kiekvienas, turintis nuorodą, gali atsisiųsti failą, kol nuoroda nustos galioti."
+   }
+  ],
+  "limits_h": "Ribos ir DUK",
+  "limits_intro": "Svarbiausi skaičiai vienoje vietoje.",
+  "limits": [
+   {
+    "k": "Didžiausias failas",
+    "v": "{limit}"
+   },
+   {
+    "k": "Nuorodos galiojimas",
+    "v": "{days} d."
+   },
+   {
+    "k": "Failų per vieną įkėlimą",
+    "v": "Vienas (kelis failus sudėkite į ZIP)"
+   },
+   {
+    "k": "Atsisiuntimų per nuorodą",
+    "v": "Neribota, kol nuoroda galioja"
+   }
+  ],
+  "faq_h": "Dažniausi klausimai",
+  "faq": [
+   {
+    "q": "Ar reikia paskyros?",
+    "a": "Ne. Failus iki {limit} galite siųsti neprisijungę."
+   },
+   {
+    "q": "Kiek laiko galioja nuoroda?",
+    "a": "Nuorodos galioja {days} d. Po to failas ištrinamas, o nuoroda nustoja veikti."
+   },
+   {
+    "q": "Ar gavėjas mato mano vardą?",
+    "a": "Tik jei jam pasakysite. Atsisiuntimo puslapyje apie jus nieko nerodoma."
+   },
+   {
+    "q": "Kas nutinka failui, kai nuoroda nustoja galioti?",
+    "a": "Jis pašalinamas iš saugyklos. Kopijos nesaugome."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Nuorodos, kurios baigia galioti",
+    "p": "Kiekviena nuoroda veikia {days} d., todėl nieko nelieka be reikalo."
+   },
+   {
+    "h": "Be registracijos",
+    "p": "Failus iki {limit} galima siųsti be paskyros."
+   },
+   {
+    "h": "Paprasta ir greita",
+    "p": "Pridėkite failą, nukopijuokite nuorodą ir persiųskite. Daugiau nieko."
+   }
+  ],
+  "nav_privacy": "Privatumas",
+  "desc_privacy": "Kas nutinka jūsų failams ir duomenims „{brand}“.",
+  "privacy_h": "Privatumo pranešimas",
+  "privacy_intro": "Trumpai apie tai, kas nutinka jūsų failui ir siuntimo duomenims.",
+  "privacy": [
+   {
+    "h": "Ką saugome",
+    "p": "Jūsų įkeltą failą ir įkėlimo laiką. Neprašome jūsų vardo ir nesaugome sąrašo žmonių, kurie failą atsisiuntė."
+   },
+   {
+    "h": "Kiek laiko saugome",
+    "p": "Kol galioja nuoroda. Po to failas ištrinamas iš saugyklos ir jo atkurti nebegalima."
+   },
+   {
+    "h": "Kas gali jį matyti",
+    "p": "Visi, kas turi nuorodą. Failų neatidarome ir neskaitome, todėl nuorodą siųskite tik tiems, kurie turi gauti failą."
+   },
+   {
+    "h": "Slapukai",
+    "p": "Naudojame tik tai, ko reikia, kad puslapis veiktų. Reklamos ar sekimo slapukų nėra."
+   },
+   {
+    "h": "Ankstesnis failo pašalinimas",
+    "p": "Jei norite, kad failas būtų pašalintas anksčiau, nei baigiasi nuorodos galiojimas, kreipkitės į žmogų, kuris jūsų organizacijoje prižiūri „{brand}“."
+   }
+  ]
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "Failų siuntimas",
+   "hero_h": "Nusiųskite failą bet kam",
+   "hero_p": "Pridėkite failą, gaukite nuorodą ir pasidalykite. Failams iki {limit} paskyros nereikia."
+  },
+  "print": {
+   "kicker": "Spaudos failai",
+   "hero_h": "Įkelkite savo maketą",
+   "hero_p": "Atsiųskite spaudai paruoštus failus savo užsakymui. Tinka PDF, TIFF ir ZIP failai iki {limit}."
+  },
+  "photos": {
+   "kicker": "Dalijimasis nuotraukomis",
+   "hero_h": "Pasidalykite savo nuotraukomis",
+   "hero_p": "Nusiųskite nuotraukų aplanką vienu ZIP failu iki {limit}. Draugams ir šeimai pakanka nuorodos."
+  }
+ }
+}

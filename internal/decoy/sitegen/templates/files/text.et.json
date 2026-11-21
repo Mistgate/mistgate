@@ -1,0 +1,178 @@
+{
+ "ui": {
+  "nav_label": "Menüü",
+  "tagline": "Lihtne failide saatmine",
+  "footer": "Failid kustutatakse automaatselt, kui link aegub.",
+  "nav_home": "Saada fail",
+  "nav_how": "Kuidas see töötab",
+  "nav_limits": "Piirangud ja KKK",
+  "home_title": "Saada fail",
+  "desc": "Jaga kuni {limit} suuruseid faile ühe lingiga: {brand}.",
+  "desc_how": "Kuidas failide saatmine teenuses {brand} töötab.",
+  "desc_limits": "Failide suurused, linkide kehtivusaeg ja korduma kippuvad küsimused: {brand}.",
+  "nf_title": "Lehte ei leitud",
+  "nf_text": "Lehte, mida otsisid, ei ole olemas või see on teise kohta viidud.",
+  "nf_back": "Tagasi avalehele",
+  "drop_h": "Lohista fail siia",
+  "drop_hint": "või vali see oma seadmest, kuni {limit}",
+  "pick": "Vali fail",
+  "uploading": "Laadin üles…",
+  "e_full": [
+   "Hoidla on täis. Proovi hiljem uuesti.",
+   "Üleslaadimine ebaõnnestus: meie hoidla on praegu täis.",
+   "Praegu me uusi faile vastu võtta ei saa, sest hoidla on täis."
+  ],
+  "retry": "Proovi uuesti",
+  "how_h": "Kuidas see töötab",
+  "how_intro": "Kolm sammu, midagi ei pea seadistama.",
+  "steps": [
+   {
+    "h": "Vali fail",
+    "p": "Lohista fail avalehele või vali see oma seadmest."
+   },
+   {
+    "h": "Saa link",
+    "p": "Kui üleslaadimine on valmis, saad lingi, mida saad kopeerida."
+   },
+   {
+    "h": "Jaga linki",
+    "p": "Igaüks, kellel on link, saab faili alla laadida seni, kuni link aegub."
+   }
+  ],
+  "limits_h": "Piirangud ja KKK",
+  "limits_intro": "Olulised numbrid ühes kohas.",
+  "limits": [
+   {
+    "k": "Suurim fail",
+    "v": "{limit}"
+   },
+   {
+    "k": "Lingi kehtivus",
+    "v": "{days} päeva"
+   },
+   {
+    "k": "Faile korraga",
+    "v": "Üks (paki mitu faili kokku zip-failiks)"
+   },
+   {
+    "k": "Allalaadimisi lingi kohta",
+    "v": "Piiramatult, kuni link aegub"
+   }
+  ],
+  "faq_h": "Korduma kippuvad küsimused",
+  "faq": [
+   {
+    "q": "Kas mul on vaja kontot?",
+    "a": "Ei. Faile kuni {limit} saad saata ilma sisse logimata."
+   },
+   {
+    "q": "Kui kaua mu link kehtib?",
+    "a": "Link töötab {days} päeva. Pärast seda fail kustutatakse ja link lakkab töötamast."
+   },
+   {
+    "q": "Kas saaja näeb minu nime?",
+    "a": "Ainult siis, kui sa seda talle ütled. Allalaadimislehel ei ole sinu kohta mingit infot."
+   },
+   {
+    "q": "Mis saab minu failist pärast lingi aegumist?",
+    "a": "See eemaldatakse hoidlast. Koopiat me ei hoia."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Aeguvad lingid",
+    "p": "Iga link kehtib {days} päeva, nii et midagi ei jää vedelema."
+   },
+   {
+    "h": "Registreerimist pole vaja",
+    "p": "Faile kuni {limit} saab saata ilma kontota."
+   },
+   {
+    "h": "Lihtne ja kiire",
+    "p": "Lisa fail, kopeeri link ja anna see edasi. Rohkem ei olegi."
+   }
+  ],
+  "nav_privacy": "Privaatsus",
+  "desc_privacy": "Mis saab sinu failidest ja andmetest teenuses {brand}.",
+  "privacy_h": "Privaatsusteave",
+  "privacy_intro": "Lühike ülevaade sellest, mis saab sinu failist ja ülekande andmetest.",
+  "privacy": [
+   {
+    "h": "Mida me hoiame",
+    "p": "Faili, mille üles laadid, ja üleslaadimise aega. Me ei küsi sinu nime ega pea nimekirja neist, kes faili alla laadivad."
+   },
+   {
+    "h": "Kui kaua me seda hoiame",
+    "p": "Kuni link aegub. Pärast seda kustutatakse fail hoidlast ja seda ei saa taastada."
+   },
+   {
+    "h": "Kes seda näeb",
+    "p": "Igaüks, kellel on link. Me ei ava ega loe sinu faile, seega jaga linki ainult nendega, kellel peaks fail olema."
+   },
+   {
+    "h": "Küpsised",
+    "p": "Kasutame ainult seda, mida leht töötamiseks vajab. Reklaami- ega jälgimisküpsiseid ei ole."
+   },
+   {
+    "h": "Faili varajane eemaldamine",
+    "p": "Palu oma organisatsioonis teenust {brand} haldaval inimesel fail eemaldada enne, kui selle link aegub."
+   }
+  ],
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Kivi",
+      "Tamme",
+      "Lahe",
+      "Kase",
+      "Saare",
+      "Tuule",
+      "Pilve",
+      "Linnu",
+      "Kuld",
+      "Sule"
+     ],
+     [
+      "post",
+      "sild",
+      "saatja",
+      "jagaja",
+      "kuller",
+      "ruum",
+      "laegas"
+     ]
+    ],
+    "sep": ""
+   },
+   "limit": [
+    "500 MB",
+    "1 GB",
+    "2 GB",
+    "5 GB"
+   ]
+  }
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "Failide saatmine",
+   "hero_h": "Saada fail kellele tahes",
+   "hero_p": "Lisa fail, saa link ja jaga seda. Faili kuni {limit} jaoks ei ole kontot vaja."
+  },
+  "print": {
+   "kicker": "Trükifailid",
+   "hero_h": "Lae üles oma trükifail",
+   "hero_p": "Saada meile oma tellimuse trükivalmis failid. PDF-, TIFF- ja ZIP-failid kuni {limit} sobivad."
+  },
+  "photos": {
+   "kicker": "Piltide jagamine",
+   "hero_h": "Jaga oma pilte",
+   "hero_p": "Saada piltide kaust ühe pakitud failina kuni {limit}. Sõpradele ja sugulastele piisab lingist."
+  },
+  "assignments": {
+   "kicker": "Kodutööd",
+   "hero_h": "Esita oma töö",
+   "hero_p": "Laadi oma töö siia üles enne tähtaega. Üks fail, kuni {limit}."
+  }
+ }
+}

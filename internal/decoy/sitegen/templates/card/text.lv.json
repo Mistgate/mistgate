@@ -1,0 +1,195 @@
+{
+ "ui": {
+  "nav_label": "Izvēlne",
+  "footer": "Darīts ar rokām. Sīkdatņu un izsekošanas nav.",
+  "nav_home": "Vizītkarte",
+  "nav_about": "Par mani",
+  "nav_projects": "Darbi",
+  "nav_now": "Šobrīd",
+  "home_title": "Sveiki",
+  "desc_about": "Vairāk par šo cilvēku: {brand}.",
+  "desc_projects": "Atlasīti darbi: {brand}.",
+  "desc_now": "Ar ko {brand} nodarbojas šobrīd.",
+  "nf_title": "Šeit nekā nav",
+  "nf_text": "Šajā adresē nav lapas. Pamēģini vizītkarti sākumlapā.",
+  "nf_back": "Atpakaļ uz vizītkarti",
+  "link_d": [
+   "Kas es esmu un kā strādāju",
+   "Daži darbi, kas ir tapuši",
+   "Ar ko es šobrīd nodarbojos"
+  ],
+  "about_h": "Par mani",
+  "facts_h": "Īsumā",
+  "projects_h": "Darbi",
+  "projects_intro": "Daži darbi, par kuriem priecājos, jaunākie vispirms.",
+  "now_h": "Šobrīd",
+  "updated": "Atjaunināts 2026. gada {upd}",
+  "now_intro": "Šī ir lapa „šobrīd”: ar ko es nodarbojos tagad, nevis tas, ko kādreiz apsolīju darīt.",
+  "hello": "Sveiki, es esmu",
+  "vars": {
+   "brand": "{name}",
+   "month": [
+    "janvāra",
+    "marta",
+    "maija",
+    "septembra"
+   ],
+   "upd": [
+    "augustā",
+    "septembrī",
+    "oktobrī",
+    "novembrī"
+   ]
+  }
+ },
+ "bundles": {
+  "illustrator": {
+   "role": "Ilustrācija un grafika",
+   "tagline": "Attēli grāmatām, plakātiem un reizēm dzimšanas dienas kartītei.",
+   "desc": "{brand}: ilustrācija un grafika {city_in}. Bilžu grāmatas, plakāti un linogriezumi.",
+   "bio": "Zīmēju bilžu grāmatām un plakātiem un griežu linoleju ikvienam, kas pieklājīgi palūdz.",
+   "about": [
+    "Zīmēju, lai nopelnītu iztiku, galvenokārt bilžu grāmatām un reizēm plakātam. Strādāju nelielā istabā {city_in}, kuras logs vērsts uz autostāvvietu, ko zīmēju kā ezeru.",
+    "Pirms ilustrēšanas mācījos tekstilijas drukāšanu, un ieradums domāt slāņos nekad līdz galam nepazuda. Lielākā daļa manu zīmējumu ir veidoti no trim vai četrām plakanām krāsām."
+   ],
+   "facts": [
+    "Dzīvoju {city_in}",
+    "Strādāju ar pildspalvu, tinti un linogriezumu",
+    "Jaunus pasūtījumus pieņemu no {month}"
+   ],
+   "projects": [
+    {
+     "t": "Piezīmes no lauka",
+     "y": "2025",
+     "d": "Bilžu grāmata par gadu vienā mazā laukā, veidota kopā ar vietējo izdevniecību."
+    },
+    {
+     "t": "Tirgus sērija",
+     "y": "2024",
+     "d": "Divpadsmit linogriezumi ar letēm, pircējiem un vienu ļoti apmierinātu balodi."
+    },
+    {
+     "t": "Dzimšanas dienas kartītes grāmatnīcai",
+     "y": "2023",
+     "d": "Sešas kartītes, ar rokām drukātas divsimt eksemplāru tirāžās."
+    }
+   ],
+   "now": [
+    "Pabeidzu pēdējos izkārtojumus bilžu grāmatai par laikapstākļiem",
+    "Mācos izgriezt četrkrāsu linogriezumu, nezaudējot pacietību",
+    "Meklēju lielāku presi"
+   ]
+  },
+  "translator": {
+   "role": "Tulkošana no vācu valodas latviešu valodā",
+   "tagline": "Rūpīgi tulkojumi: daiļliteratūra, eseji un reizēm lietošanas pamācība.",
+   "desc": "{brand}: tulkojumi no vācu valodas latviešu valodā {city_in}: daiļliteratūra un eseji.",
+   "bio": "Tulkoju no vācu valodas latviešu valodā, galvenokārt daiļliteratūru un esejas, un visu izlasu divreiz skaļi.",
+   "about": [
+    "Tulkoju no vācu valodas latviešu valodā, galvenokārt daiļliteratūru un esejas, un reizēm kādas lietas lietošanas pamācību, kas pelnījusi labāku valodu.",
+    "Strādāju lēni, visu izlasu divreiz skaļi un nosūtu piezīmi par katru teikumu, kuru nespēju izlemt. Redaktori saka, ka tas ir vai nu burvīgi, vai ārprātīgi kaitinoši."
+   ],
+   "facts": [
+    "Dzīvoju {city_in}",
+    "Tulkoju no vācu valodas latviešu valodā",
+    "Jauni darbi: no {month}"
+   ],
+   "projects": [
+    {
+     "t": "Romāns par bākas sargu",
+     "y": "2025",
+     "d": "Četri simti lappušu laikapstākļu un nožēlas, tulkoti četrpadsmit mēnešu laikā."
+    },
+    {
+     "t": "Eseju krājums par staigāšanu",
+     "y": "2024",
+     "d": "Īsu tekstu krājums no rakstnieka, kas visur gāja kājām."
+    },
+    {
+     "t": "Muzeja katalogs",
+     "y": "2023",
+     "d": "Teksti tekstilijas izstādei ar vairāk īpašības vārdu, nekā es parasti izvēlētos."
+    }
+   ],
+   "now": [
+    "Pārlasu un labāju gara romāna tulkojumu",
+    "Lasu esejas, ko varētu ieteikt izdevējam",
+    "Papildinu savu jūrniecības terminu vārdnīcu"
+   ]
+  },
+  "potter": {
+   "role": "Keramika",
+   "tagline": "Vienkāršas bļodas, krūzes un šķīvji, darināti nelielās partijās.",
+   "desc": "{brand}: keramika {city_in}. Ikdienas akmens masas trauki, veidoti uz ripas.",
+   "bio": "Veidoju vienkāršus akmens masas traukus uz ripas un apdedzinu tos nelielās partijās.",
+   "about": [
+    "Veidoju lietojamu keramiku darbnīcā {city_in}, kurā strādāju kopā ar trim citiem meistariem. Viss ir veidots uz ripas un apdedzināts līdz akmens masai.",
+    "Man patīk trauki, kas izzūd ikdienas lietošanā: krūze, kas der rokai, bļoda, kas neapgāžas. Glazūras galvenokārt ir uz dzelzs un pelnu bāzes, un katrā apdedzināšanā tās mazliet mainās."
+   ],
+   "facts": [
+    "Dzīvoju {city_in}",
+    "Veidoju akmens masas traukus uz ripas",
+    "Jauni trauki no {month}"
+   ],
+   "projects": [
+    {
+     "t": "Ikdienas komplekts",
+     "y": "2025",
+     "d": "Šķīvji, bļodas un krūzes auzu pārslu glazūrā, kas nekad neiznāca divreiz vienāda."
+    },
+    {
+     "t": "Tējas bļodiņas",
+     "y": "2024",
+     "d": "Trīsdesmit mazas bļodiņas, katra mazliet citāda, veidotas tējas namam."
+    },
+    {
+     "t": "Flīžu pasūtījums",
+     "y": "2023",
+     "d": "Ar rokām spiestu flīžu siena virtuvei četros zaļos toņos."
+    }
+   ],
+   "now": [
+    "Izmēģinu pelnu glazūru no kaimiņa ugunskura",
+    "Veidoju lielākus šķīvjus",
+    "Atbrīvoju vietu krāsns plauktos ziemas pasūtījumiem"
+   ]
+  },
+  "developer": {
+   "role": "Programmatūras izstrāde, mazi rīki",
+   "tagline": "Mazas, klusas programmas, kas dara vienu lietu un netraucē.",
+   "desc": "{brand}: mazu rīku izstrāde {city_in}. Piezīmju lietotne, kalendārs un dažas komandrindas programmas.",
+   "bio": "Rakstu mazus rīkus cilvēkiem, kas strādā ar vārdiem un skaitļiem, un cenšos tos nodot pabeigtus.",
+   "about": [
+    "Rakstu mazus rīkus cilvēkiem, kas strādā ar vārdiem un skaitļiem: piezīmju lietotni, dažas komandrindas programmas, kalendāru, kas rāda tikai to, kas šodien svarīgs.",
+    "Veidoju lietas lēni un cenšos tās nodot pabeigtas. Lielākajai daļai manis darītā ir mazāk funkciju, nekā varētu būt, un tas ir ar nolūku."
+   ],
+   "facts": [
+    "Dzīvoju {city_in}",
+    "Rakstu dažās garlaicīgās valodās",
+    "Mazie projekti: no {month}"
+   ],
+   "projects": [
+    {
+     "t": "Piezīmju lietotne darbvirsmai",
+     "y": "2025",
+     "d": "Parasti teksta faili, ātra meklēšana un nav vajadzīgs konts."
+    },
+    {
+     "t": "Kalendārs vienai dienai",
+     "y": "2024",
+     "d": "Rāda šodienu un neko citu, kas izrādās pietiekami."
+    },
+    {
+     "t": "Laika uzskaite",
+     "y": "2023",
+     "d": "Viena poga un nedēļas kopsavilkums tiem, kam nepatīk darba laika lapas."
+    }
+   ],
+   "now": [
+    "Sakārtoju piezīmju lietotnes kodu",
+    "Rakstu īsu pamācību",
+    "Domāju par mazāku visa versiju"
+   ]
+  }
+ }
+}

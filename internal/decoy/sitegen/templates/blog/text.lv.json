@@ -1,0 +1,271 @@
+{
+ "ui": {
+  "nav_label": "Izvēlne",
+  "footer": "Rakstīts ar roku, publicēts lēni.",
+  "nav_home": "Piezīmes",
+  "nav_about": "Par mani",
+  "home_title": "Piezīmes",
+  "nf_title": "Šeit nekā nav",
+  "nf_text": "Šajā adresē nav piezīmes. Iespējams, tā ir pārdēvēta vai nekad nav uzrakstīta.",
+  "nf_back": "Atpakaļ uz piezīmēm",
+  "latest_h": "Jaunākās piezīmes",
+  "read_more": "Lasīt piezīmi",
+  "min_read": "min lasīšanas",
+  "more_h": "Vēl piezīmes",
+  "back_all": "Visas piezīmes",
+  "about_h": "Par mani",
+  "now_h": "Šobrīd",
+  "tags_h": "Tēmas",
+  "by": "Autors",
+  "nav_archive": "Arhīvs",
+  "desc_archive": "Visas piezīmes: {brand}, pa mēnešiem.",
+  "archive_h": "Arhīvs",
+  "archive_intro": "Visas piezīmes līdz šim, jaunākās vispirms, sagrupētas pa mēnešiem.",
+  "all_posts": "Visas piezīmes",
+  "newer": "Jaunākās"
+ },
+ "bundles": {
+  "garden": {
+   "tagline": "Piezīmes no dārza",
+   "desc": "Piezīmes no neliela dārza {city_in}: kas auga, kas neauga un ko darītu citādi.",
+   "desc_about": "Kas raksta {brand} un kāpēc.",
+   "intro": "Piezīmes no neliela dārza {city_in}: kas auga, kas neauga un ko nākamgad darītu citādi.",
+   "about": [
+    "Es esmu {first}. Man ir dārzs {city_in} jau deviņus gadus, galvenokārt dārzeņiem un dažiem spītīgiem rožu krūmiem.",
+    "Šajā kladē es pierakstu, ko dārzs man māca, galvenokārt tāpēc, lai nedarītu vienas un tās pašas kļūdas citā secībā.",
+    "Komentāri ir slēgti. Ja tev ir padoms, pasaki to sava dārza kaimiņam; tā es uzzināju lielāko daļu no tā, ko zinu."
+   ],
+   "now": [
+    "Sēju pupas siltumnīcā",
+    "Atkal labo šķūņa durvis",
+    "Lasu par kompostēšanu"
+   ],
+   "posts": [
+    {
+     "title": "Kāpēc es vairs neracu",
+     "tag": "Augsne",
+     "excerpt": "Trīs sezonas bez lāpstas un tas, kas notika ar dobēm.",
+     "body": [
+      "Gadiem ilgi katru rudeni es uzracu dobes, jo tā darīja iepriekšējais dārza saimnieks un tā bija rakstīts bērnības grāmatās. Pirms trim gadiem es to pārtraucu un dobes pārklāju ar biezu kompostu.",
+      "Pirmais pavasaris sagādāja vilšanos. Zeme izskatījās nekārtīga, un gliemeži bija priecīgi. Otrajā gadā tārpi bija paveikuši lielāko darbu, zeme drūpēja rokās, un katru oktobri uz dobēm pavadīju par vienu sestdienu mazāk."
+     ]
+    },
+    {
+     "title": "Pupas tiem, kas aizmirst aplaistīt",
+     "tag": "Dārzeņi",
+     "excerpt": "Četras šķirnes, kas piedeva man sauso jūliju.",
+     "body": [
+      "Pagājušajā jūlijā deviņpadsmit dienas nelija, un es vienpadsmit dienas biju prom. Kad atgriezos, salāti bija izkāruši ziedus, un cukīni izskatījās, it kā būtu padevušies. Pupas bija kārtībā.",
+      "Kāpelētājpupas ar dziļām saknēm un biezu mulču ap tām izturēja divu nedēļu sausumu labāk par gandrīz visu citu, ko audzēju. Tagad sēju tās ziemeļu malā, kur ēna neļauj zemei izkalst."
+     ]
+    },
+    {
+     "title": "Neliela siltumnīca no vecajiem logiem",
+     "tag": "Būvniecība",
+     "excerpt": "Kā kaimiņa konteiners kļuva par siltumnīcu vienā garā nedēļas nogalē.",
+     "body": [
+      "Kaimiņiene nomainīja logus, un vecie divas dienas stāvēja konteinerā. Es pajautāju, vai drīkstu tos paņemt, un viņa palūdza paņemt arī konteineru, ja spēšu.",
+      "Uztaisīju rāmi no vecajiem dēļiem pēc lielākā loga izmēra un pārējos logus iebūvēju apkārt. Nekas nav taisns, un durvis lietū iesprūst, taču tomātu stādi ir pasargāti no sala."
+     ]
+    },
+    {
+     "title": "Ko darīt dārzā aprīlī",
+     "tag": "Gadalaiki",
+     "excerpt": "Īss saraksts mēnesim, kad viss šķiet iespējams, bet zeme vēl auksta.",
+     "body": [
+      "Aprīlis visus pievilina. Dienas ir gaišas, un gribas stādīt, bet zeme ir auksta, un par agru iesētas sēklas tikai pūst. Es gaidu, līdz zeme vairs nešķiet auksta pret plaukstas virspusi.",
+      "Tikmēr darāmā netrūkst: sašķirot sēklu kastīti, nomazgāt podus, apgriezt rozes un nolikt pirmos kartupeļus gaišā vietā dīgt. Šie darbi liekas kā virzīšanās uz priekšu, neko neriskējot."
+     ]
+    },
+    {
+     "title": "Komposts bez izskaistināšanas",
+     "tag": "Augsne",
+     "excerpt": "Kas nonāk manā kaudzē, kas paliek ārpus tās un kāpēc tā nekad nav gatava laikā.",
+     "body": [
+      "Manai kaudzei ir trīs likumi: nekas vārīts, nekas slims un nekas tāds, kas rada šaubas. Zāles pļāvums nonāk plānās kārtās, plēsts kartons tur klāt, un visu apgriež, kad atceros.",
+      "Tas notiek lēnāk, nekā rakstīts grāmatās. Gads ir godīgāks par sešām nedēļām, ko sola uz maisa, un gatavais komposts vienmēr nāk ar pārsteigumiem, piemēram, kartupeli, kuru jau uzskatīju par pazudušu."
+     ]
+    },
+    {
+     "title": "Gliemeži, alus slazdi un citi zaudējumi",
+     "tag": "Kaitēkļi",
+     "excerpt": "Kas palīdzēja, kas nepalīdzēja un kāpēc tagad stādu mazliet vairāk.",
+     "body": [
+      "Mēģināju alus slazdus, olu čaumalas, vara lenti un iziet ar lukturīti pēc tumsas. Katrs no tiem palīdzēja apmēram nedēļu. Vislabāk palīdz audzēt vairāk, nekā vajag, un samierināties, ka gliemeži paņem savu daļu.",
+      "Īstais risks ir stādi, tāpēc tos audzēju iekštelpās un liku ārā tikai tad, kad tie ir pietiekami spēcīgi, lai pārciestu kādu kodienu."
+     ]
+    },
+    {
+     "title": "Pupu sēklu iegūšana",
+     "tag": "Sēklas",
+     "excerpt": "Mazliet pacietības oktobrī dod nākamā gada pupas par velti.",
+     "body": [
+      "Labākos pākšus atstāju uz augiem, līdz tie ir sausi un grab. Tad tos lobu pie virtuves galda, izklāju pupas uz paplātes un nedēļu turu siltumā.",
+      "Sēklas nonāk papīra aploksnēs, uz kurām uzrakstu nosaukumu un gadu. Plastmasā tās sasvīstu, un man ir sapelējušas pupas kā pierādījums."
+     ]
+    },
+    {
+     "title": "Slikts tomātu gads",
+     "tag": "Dārzeņi",
+     "excerpt": "Augustā atnāca puve un paņēma visu. Piezīmes nākamajai reizei.",
+     "body": [
+      "Lapas nedēļas laikā kļuva brūnas, un augļi sekoja. Izrāvu augus, ieliku tos maisā un neliku kompostā, un tas ir vienīgais likums, par ko visi ir vienisprātis.",
+      "Nākamgad audzēšu mazāk augu, došu tiem vairāk vietas un laistīšu zemi, nevis lapas. Un atcerēšos, ka slikts tomātu gads ir labs iemesls vārīt tomātu mērci."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Ābeļu",
+       "Zemes",
+       "Rasas",
+       "Saules",
+       "Lietus",
+       "Ogu",
+       "Kartupeļu",
+       "Dārza",
+       "Vasaras",
+       "Lauku"
+      ],
+      [
+       "dienasgrāmata",
+       "dobe",
+       "stūrītis",
+       "sēta",
+       "vaga",
+       "lapene",
+       "taka",
+       "druva",
+       "piezīmes",
+       "klade"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "kitchen": {
+   "tagline": "Piezīmes no mazas virtuves",
+   "desc": "Receptes, kas der, kļūdas, no kurām kaut ko iemācījos, un vakariņas {city_in}.",
+   "desc_about": "Kas raksta {brand} un kāpēc.",
+   "intro": "Receptes, kas der, kļūdas, no kurām kaut ko iemācījos, un tas, kas {city_in} ir vakariņās.",
+   "about": [
+    "Es esmu {first}. Es gatavoju četru cilvēku ģimenei virtuvē {city_in}, kas ir mazāka par lielāko daļu vannas istabu, un to nemainītu.",
+    "Es pierakstu to, kas izdevās, tādā veidā, kā es to tiešām gatavoju, tas ir, ar mazāk daudzumiem un vairāk īpašības vārdu nekā pareizā receptē.",
+    "Es nefotografēju ēdienu. Ja ēdiens izskatās pietiekami labs bildei, tas, visticamāk, ir pārāk ilgi gaidījis uz galda."
+   ],
+   "now": [
+    "Barošu jaunu miltu raugu",
+    "Sālu citronus pavasarim",
+    "Samierinos ar krāsns durtiņām"
+   ],
+   "posts": [
+    {
+     "title": "Maize, kas piedod",
+     "tag": "Maize",
+     "excerpt": "Milti, ūdens, sāls un ļoti pacietīga svētdienas pēcpusdiena.",
+     "body": [
+      "Šo maizi es cepu tad, kad maizes cepšana atkal ir piemirsusies. Tajā ir gandrīz nekāda rauga, ilga atpūta un nekāda mīcīšana, un tā neiebilst, ja to atstāj par stundu ilgāk, nekā plānots.",
+      "Vakarā samaisi miltus, ūdeni un sāli, līdz nav sausu vietu, pārklāj trauku un atstāj uz galda. No rīta mīkla ir burbuļaina un nedaudz smaržo pēc alus, un tieši tas ir vajadzīgs."
+     ]
+    },
+    {
+     "title": "Ko vārīt, kad ledusskapis gandrīz tukšs",
+     "tag": "Darbadiena",
+     "excerpt": "Piecas burkas, trīs sīpoli un siera gals: vakariņas.",
+     "body": [
+      "Katru ceturtdienu es atveru ledusskapi un redzu pusi sīpola, nokaltušu burkānu un burku, kuras atvēršanu neatceros. Agrāk tas šķita kā neveiksme. Tagad es to uzskatu par vienu vakaru nedēļā, kad pienākas rinda skapim.",
+      "Lēni apcep sīpolus, līdz tie padodas. Pievieno, kādas pupas ir, burku tomātu un karoti kaut kā skāba: sinepju, etiķa, marinēta čili. Ļauj uzvārīties, kamēr atrodi maizes galu."
+     ]
+    },
+    {
+     "title": "Vienīgā zupa, ko vāru novembrī",
+     "tag": "Zupa",
+     "excerpt": "Cepts ķirbis, viens ābols un pacietība ar blenderi.",
+     "body": [
+      "Kad pienāk pirmā patiesi aukstā nedēļa, es izcepu ķirbi ar griezuma pusi uz leju, veselu ķiploku galviņu un mīkstu ābolu. Tas aizņem četrdesmit minūtes, un visa māja smaržo pēc ziemas sākuma.",
+      "Visu saliec katlā, pievieno buljonu un blendē, līdz tas pārstāj protestēt. Mazliet krējuma ir jauki, bet nav obligāts. Pasniedzu ar grauzdētām sēklām un vakardienas maizi. Tas nav gudri, bet es to daru katru gadu."
+     ]
+    },
+    {
+     "title": "Skābēšana bez panikas",
+     "tag": "Konservi",
+     "excerpt": "Kāpēc burkā ātri marinēti dārzeņi ir vienkāršākais, ko var izdarīt virtuvē.",
+     "body": [
+      "Cilvēkus atbaida vārds konservēšana, kas izklausās pēc sterilizēšanas, lieliem podiem un zaudētas dienas. Ātrai marinādei vajag burku, tējkannu un apmēram desmit minūtes.",
+      "Sagriez, kas ir atvilktnē, ieliec tīrā burkā un aplej ar karstu etiķa, ūdens, sāls un mazliet cukura maisījumu. Pievieno lauru lapu, ja ir. Atstāj līdz rītam. Ledusskapī tie nostāv pāris nedēļas."
+     ]
+    },
+    {
+     "title": "Piedegušas lietas un ko es iemācījos",
+     "tag": "Kļūdas",
+     "excerpt": "Īss saraksts ar sabojātām vakariņām un vienu lietu, ko katra iemācīja.",
+     "body": [
+      "Karamele iemācīja, ka cukuram ir vienalga par manu telefonu. Rīss iemācīja, ka buljonam jābūt karstam. Cepti kartupeļi iemācīja, ka paplāte var būt par pilnu un ka bāla kartupeļa neviens nepiedod.",
+      "Vissliktākā bija dzimšanas dienas kūka, ko izņēmu par agru un ielicu atpakaļ par vēlu. Tā iekrita vidū kā cienīga sena ēka, un mēs to ēdām ar karoti un vaniļas mērci."
+     ]
+    },
+    {
+     "title": "Panna, karote un trešdiena",
+     "tag": "Darbadiena",
+     "excerpt": "Viena panna, divdesmit minūtes un maz trauku mazgāšanas.",
+     "body": [
+      "Trešdienās spēku nav, bet visi ir izsalkuši, tāpēc vakariņām jānāk no vienas pannas. Sīpoli, burka pupu, mazliet kūpinātas paprikas un tas, kas zaļš ir ledusskapī.",
+      "Beigās virsū uzlieku olu un saucu to par vakariņām. Tā nav tik daudz recepte kā ieradums, un tas mani vēl nav pievīlis."
+     ]
+    },
+    {
+     "title": "Putra kā nākas",
+     "tag": "Brokastis",
+     "excerpt": "Auzu pārslas, ūdens, sāls un desmit minūtes, nepaejot malā.",
+     "body": [
+      "Mērcē pārslas iepriekšējā vakarā, ja atceries. No rīta pievieno ūdeni un šķipsniņu sāls un maisi, kamēr tā sabiezē, kas aizņem apmēram tikpat, cik tējkannai uzvārīties.",
+      "Es ēdu savējo ar karoti ievārījuma vai pāris sakapātiem āboliem. Tie, kas putrai pievieno cukuru, nekļūdās, bet kaut ko pazaudē."
+     ]
+    },
+    {
+     "title": "Kāpēc es sveru miltus",
+     "tag": "Maize",
+     "excerpt": "Svari mainīja manu cepšanu vairāk nekā jebkura recepte.",
+     "body": [
+      "Glāze miltu var svērt jebko no 120 līdz 160 gramiem atkarībā no tā, kā tos ieber. Tā ir starpība starp maizes klaipu un ķieģeli.",
+      "Tagad es sveru visu, arī ūdeni. Apmēram nedēļu tas šķiet sīkumains, un tad tas šķiet vienīgais prātīgais cepšanas veids."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Sāls",
+       "Sviesta",
+       "Maizes",
+       "Pannas",
+       "Svētdienas",
+       "Kāpostu",
+       "Krējuma",
+       "Krāsns",
+       "Mājas",
+       "Dūmu"
+      ],
+      [
+       "karote",
+       "panna",
+       "piezīmes",
+       "galds",
+       "virtuve",
+       "mīkla",
+       "bļoda",
+       "katls",
+       "krāsns",
+       "vakariņas"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

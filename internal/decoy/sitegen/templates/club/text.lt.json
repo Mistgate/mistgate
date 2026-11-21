@@ -1,0 +1,435 @@
+{
+ "ui": {
+  "nav_label": "Pagrindinis",
+  "footer": "Veikia savanorių pajėgomis ir atvira visiems.",
+  "nav_home": "Pradžia",
+  "nav_events": "Programa",
+  "nav_join": "Prisijunkite",
+  "nav_news": "Naujienos",
+  "home_title": "Sveiki atvykę",
+  "desc_events": "Reguliarūs {brand} susitikimai ir ypatingi renginiai.",
+  "desc_join": "Kaip prisijungti prie {brand}, kiek tai kainuoja ir ko tikėtis.",
+  "desc_news": "{brand} naujienos ir skelbimai.",
+  "nf_title": "Puslapis nerastas",
+  "nf_text": "Šio puslapio nepavyko rasti. Gali būti, kad jis pašalintas po renginio, apie kurį buvo rašoma.",
+  "nf_back": "Atgal į pradžią",
+  "meet_h": "Kada renkamės",
+  "when_l": "Kada",
+  "where_l": "Kur",
+  "upcoming_h": "Artimiausi renginiai",
+  "latest_h": "Naujausios naujienos",
+  "all_events": "Visa programa",
+  "all_news": "Visos naujienos",
+  "join_cta": "Kaip prisijungti",
+  "events_h": "Programa",
+  "events_intro": "Mūsų reguliarūs susitikimai ir tai, ką veikėme šį sezoną, mėnuo po mėnesio.",
+  "join_h": "Prisijunkite",
+  "steps_h": "Kaip prisijungti",
+  "faq_h": "Klausimai",
+  "join_fee": "Metinis nario mokestis – {fee}, jaunimui ir studentams taikoma nuolaida. Jei pinigai kelia rūpesčių, tyliai pasakykite iždininkui ir daugiau apie tai nekalbėsime.",
+  "steps": [
+   "Užsukite į bet kurį susitikimą ir pasisveikinkite.",
+   "Išbandykite mėnesį, o tada nuspręskite.",
+   "Kai būsite pasiruošę, sumokėkite nario mokestį iždininkui."
+  ],
+  "news_h": "Naujienos",
+  "news_intro": "Valdybos skelbimai ir pranešimai apie neseniai vykusius susitikimus. Naujausi viršuje.",
+  "regular_h": "Reguliarūs susitikimai",
+  "season_h": "Šio sezono renginiai",
+  "find_h": "Kaip mus rasti",
+  "contact_h": "Susisiekite",
+  "phone_l": "Telefonas"
+ },
+ "bundles": {
+  "chess": {
+   "kicker": "Šachmatų klubas",
+   "tagline": "Draugiški šachmatai kiekvieną ketvirtadienio vakarą",
+   "desc": "{brand} renkasi kiekvieną ketvirtadienio vakarą. Draugiškos partijos visų lygių žaidėjams, nuo pradedančiųjų iki klubo čempiono.",
+   "intro": "Renkamės kiekvieną ketvirtadienį žaisti, nagrinėti savo partijas ir per daug gerti arbatos. Laukiami visų lygių žaidėjai, nuo pirmą kartą sėdančių prie lentos iki klubo čempiono.",
+   "when": "Ketvirtadieniais, {19:30}–{22:00}",
+   "where": "Antro aukšto salė bendruomenės namuose",
+   "events": [
+    {
+     "t": "Klubo vakaras",
+     "w": "Kiekvieną ketvirtadienį, {19:30}",
+     "p": "Laisvas žaidimas, o pradedantiesiems skirtas mokomasis stalas."
+    },
+    {
+     "t": "Greitųjų šachmatų turnyras",
+     "w": "Pirmą mėnesio šeštadienį, {14:00}",
+     "p": "Septyni ratai po penkiolika minučių. Dalyvio įnašas – nedidelė auka arbatos kasai."
+    },
+    {
+     "t": "Pradedančiųjų vakaras",
+     "w": "Antrą mėnesio antradienį, {19:00}",
+     "p": "Išmokite taisykles ir keletą paprastų debiutų."
+    },
+    {
+     "t": "Vienalaikis seansas",
+     "w": "Kartą per sezoną",
+     "p": "Klubo čempionas žaidžia dvidešimt lentų vienu metu. Atsiveskite draugą ir turėkite planą."
+    },
+    {
+     "t": "Metinė vakarienė",
+     "w": "Lapkričio pabaigoje",
+     "p": "Vakarienė, kalba ir labai mažos taurės įteikimas."
+    }
+   ],
+   "news": [
+    {
+     "title": "Prasideda naujas sezonas",
+     "text": "Rudens sezonas prasidės kitą savaitę klubo čempionatu. Nauji nariai laukiami bet kurį vakarą."
+    },
+    {
+     "title": "Ačiū visiems, kurie atėjo į greitųjų turnyrą",
+     "text": "Dvidešimt šeši žaidėjai, keturiolika puodelių arbatos per ratą ir finalas, išspręstas laikrodžiu."
+    },
+    {
+     "title": "Turime naują lentų komplektą",
+     "text": "Aštuonios medinės lentos su figūromis, nupirktos už vasaros loterijos pajamas."
+    },
+    {
+     "title": "Vėl atsidaro jaunių sekcija",
+     "text": "Vaikai nuo septynerių metų laukiami antradienio popietėmis, o pirmą kartą atvykus – su vienu iš tėvų."
+    }
+   ],
+   "join": [
+    "Esame draugiškas klubas, kuriame apie keturiasdešimt narių nuo devynerių iki aštuoniasdešimt ketverių metų. Dauguma mūsų žaidžia nelabai gerai, ir su tuo susitaikėme.",
+    "Nereikia turėti savo šachmatų ar žinoti teorijos. Jei sugebate paeiti figūra, ketvirtadienį galite žaisti."
+   ],
+   "faq": [
+    {
+     "q": "Ar reikia gerai žaisti?",
+     "a": "Ne. Dauguma narių žaidžia nelabai gerai, o klubas surengtas taip, kad kiekvienas gautų partiją su savo lygio priešininku."
+    },
+    {
+     "q": "Ar gali ateiti vaikai?",
+     "a": "Taip, antradienio popietėmis, o ketvirtadieniais – su vienu iš tėvų."
+    },
+    {
+     "q": "Ar žaidžiate lygoje?",
+     "a": "Vieną komandą registruojame apskrities čempionate. Jei norite žaisti, pasakykite kapitonui."
+    }
+   ],
+   "why": [
+    {
+     "h": "Visi lygiai",
+     "p": "Pradedantieji sėdi šalia patyrusių žaidėjų, ir niekam tai netrukdo."
+    },
+    {
+     "h": "Kiekvieną ketvirtadienį",
+     "p": "Nereikia registruotis. Ateikite, kai galite."
+    },
+    {
+     "h": "Lentos mūsų",
+     "p": "Šachmatai ir laikrodžiai mūsų, o arbatą pasidarote patys."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Sezono atidarymas",
+     "p": "Trumpas pasakojimas apie debiutą, kurį visi žaidžia ir niekas nesupranta."
+    },
+    {
+     "t": "Klubo čempionatas, pirmas ratas",
+     "p": "Poros traukiamos burtų keliu, o pirmas ratas niekada nevyksta, kaip planuota."
+    },
+    {
+     "t": "Baigtuvių dirbtuvės",
+     "p": "Karaliai, pėstininkai ir kantrybė juos stumti."
+    },
+    {
+     "t": "Viktorina ir šachmatai",
+     "p": "Dešimt klausimų apie šachmatus ir dešimt apie visa kita."
+    },
+    {
+     "t": "Greitųjų šachmatų turnyras",
+     "p": "Septyni ratai po penkiolika minučių ir daug arbatos."
+    },
+    {
+     "t": "Partijų analizės vakaras",
+     "p": "Pasirenkame partiją iš klubo vakaro ir ginčijamės dėl jos."
+    },
+    {
+     "t": "Vienalaikis seansas",
+     "p": "Klubo čempionas žaidžia prieš dvidešimt lentų vienu metu."
+    },
+    {
+     "t": "Mokomasis stalas jaunimui",
+     "p": "Jauniausi nariai pamoko suaugusiuosius vieno kito triuko."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Šachmatų klubas „Bokštas“",
+       "Šachmatininkų draugija „Žirgas“",
+       "Šachmatų ratelis „Ėjimas“"
+      ]
+     ]
+    }
+   }
+  },
+  "walking": {
+   "kicker": "Žygeivių grupė",
+   "tagline": "Žygiai miškuose ir palei upę",
+   "desc": "{brand} vaikšto kiekvieną sekmadienį miškuose ir palei upę. Laukiami visi, patirties nereikia.",
+   "intro": "Žygiuojame kiekvieną sekmadienį, bet kokiu oru, lėčiausio žmogaus tempu. Ateikite kartą ir pažiūrėkite, dauguma iš mūsų taip ir pradėjo.",
+   "when": "Sekmadieniais, {9:30}",
+   "where": "Senosios geležinkelio stoties aikštelė",
+   "events": [
+    {
+     "t": "Sekmadienio žygis",
+     "w": "Kiekvieną sekmadienį, {9:30}",
+     "p": "Nuo dvylikos iki aštuoniolikos kilometrų, o jei oras prastas, sustojame kavinėje."
+    },
+    {
+     "t": "Trumpas žygis",
+     "w": "Pirmą mėnesio trečiadienį, {10:00}",
+     "p": "Penki–šeši kilometrai ramiu tempu, pabaigoje – kava."
+    },
+    {
+     "t": "Savaitgalis išvykoje",
+     "w": "Kartą per metus, pavasarį",
+     "p": "Dvi dienos miške su nakvyne svečių namuose ir labai daug sriubos."
+    },
+    {
+     "t": "Žemėlapio skaitymo vakaras",
+     "w": "Kartą per sezoną",
+     "p": "Kaip skaityti žemėlapį ir ką daryti, kai jis skaito jus."
+    },
+    {
+     "t": "Talka",
+     "w": "Paskutinį balandžio šeštadienį",
+     "p": "Sutvarkome upės taką, o paskui juo nueiname dar kartą, nes galime."
+    }
+   ],
+   "news": [
+    {
+     "title": "Pasirodė pavasario programa",
+     "text": "Dvylika žygių nuo kovo iki birželio, tarp jų du nauji maršrutai per šlaitą."
+    },
+    {
+     "title": "Takas prie malūno vėl atidarytas",
+     "text": "Po metus trukusių remonto darbų tiltas vėl atidarytas. Ačiū savanoriams, kurie paaukojo savo šeštadienius."
+    },
+    {
+     "title": "Ieškome naujų žygių vadovų",
+     "text": "Jei žinote gerą maršrutą ir mokate skaityti žemėlapį, labai norėtume su jumis pabendrauti."
+    },
+    {
+     "title": "Ačiū už sriubą",
+     "text": "Savaitgalio išvyka puikiai pavyko, daugiausia dėl sriubos."
+    }
+   ],
+   "join": [
+    "Esame draugiška apie šešiasdešimties žygeivių grupė: vieni vaikšto visą gyvenimą, kiti pradėjo praeitą mėnesį.",
+    "Ypatingos aprangos nereikia. Pakanka batų, lietpalčio ir ko nors atsigerti. Jei abejojate, ateikite sekmadienio rytą ir paklauskite."
+   ],
+   "faq": [
+    {
+     "q": "Kokiu greičiu einate?",
+     "a": "Tos dienos lėčiausio žmogaus tempu, o tai dažnai būna vadovas."
+    },
+    {
+     "q": "Ar galiu atsivesti šunį?",
+     "a": "Daugumoje žygių taip, pavadėlyje. Programoje nurodyta, kurie žygiai netinka."
+    },
+    {
+     "q": "O jei lyja?",
+     "a": "Vis tiek einame. Sustojimas kavinėje būna ilgesnis."
+    }
+   ],
+   "why": [
+    {
+     "h": "Gamtoje",
+     "p": "Nuo dvylikos iki aštuoniolikos kilometrų maršrutai, kuriuos veda takus žinantys žmonės."
+    },
+    {
+     "h": "Gera kompanija",
+     "p": "Nuolatinė grupė ir nuolat atvykstantys nauji veidai."
+    },
+    {
+     "h": "Niekas nepaliekamas",
+     "p": "Einame lėčiausio žygeivio tempu."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Žygis palei upę",
+     "p": "Dvylika kilometrų lygia vieta su sustojimu prie senojo šliuzo."
+    },
+    {
+     "t": "Žygis su vaizdu",
+     "p": "Šešiolika kilometrų ir viena tikra įkalnė. Pasiimkite termosą."
+    },
+    {
+     "t": "Žemėlapio skaitymo vakaras",
+     "p": "Koordinatės, aukščio linijos ir kompasas, kuris rodo ne ten."
+    },
+    {
+     "t": "Trumpas žygis ir pietūs",
+     "p": "Šeši kilometrai iki kavinės su geru židiniu."
+    },
+    {
+     "t": "Rudens spalvos",
+     "p": "Miško maršrutas, geriausias rytą, kai šviesa prasiskverbia pro medžius."
+    },
+    {
+     "t": "Talka",
+     "p": "Pirštinės, maišai ir stebėtinai daug teniso kamuoliukų."
+    },
+    {
+     "t": "Vakaro pasivaikščiojimas",
+     "p": "Lengva valanda sutemus, kurios pabaigoje – arbata kieno nors virtuvėje."
+    },
+    {
+     "t": "Naktinis žygis",
+     "p": "Žibintai išjungti, akys atmerktos ir pasakojimas apie žvaigždes."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Žygeivių klubas „Takas“",
+       "Žygių draugija „Žingsnis“",
+       "Žygeivių būrelis „Miškas“"
+      ]
+     ]
+    }
+   }
+  },
+  "choir": {
+   "kicker": "Bendruomenės choras",
+   "tagline": "Dainuojame kartu trečiadienio vakarais",
+   "desc": "{brand} repetuoja trečiadienio vakarais. Be atrankos, be natų žinojimo, tereikia noro dainuoti.",
+   "intro": "Esame choras žmonėms, kurie mėgsta dainuoti ir nenori dėl to laikyti atrankos. Mokomės iš klausos, daug juokiamės ir dainuojame geriau, nei turėtume.",
+   "when": "Trečiadieniais, {19:00}–{21:00}",
+   "where": "Kultūros namų salė",
+   "events": [
+    {
+     "t": "Savaitinė repeticija",
+     "w": "Kiekvieną trečiadienį, {19:00}",
+     "p": "Apšilimas, naujos dainos ir ta, kurios vis dar neįveikiame."
+    },
+    {
+     "t": "Atvirų durų vakaras",
+     "w": "Pirmą rugsėjo trečiadienį",
+     "p": "Ateikite padainuoti su mumis vieną vakarą be jokių įsipareigojimų."
+    },
+    {
+     "t": "Žiemos koncertas",
+     "w": "Antrą gruodžio šeštadienį",
+     "p": "Kalėdinės giesmės, liaudies dainos ir vienas kūrinys, kurio niekas nesitiki."
+    },
+    {
+     "t": "Vasaros koncertas",
+     "w": "Birželio pabaigoje",
+     "p": "Dainų vakaras kultūros namų kieme, jei leis oras."
+    },
+    {
+     "t": "Dainų diena",
+     "w": "Kartą per metus",
+     "p": "Visa diena užsiėmimų su svečiu dirigentu, pietūs įskaičiuoti."
+    }
+   ],
+   "news": [
+    {
+     "title": "Prasideda rudens sezonas",
+     "text": "Mokomės trijų šalių liaudies dainų rinkinio ir kanono, kuris niekaip nelaikosi taktu."
+    },
+    {
+     "title": "Didelis ačiū po vasaros koncerto",
+     "text": "Atėjo devyniasdešimt žmonių, suvalgyta keturiasdešimt vienas pyragas ir tik vienas posmas buvo sudainuotas du kartus."
+    },
+    {
+     "title": "Ieškome tenorų",
+     "text": "Sopranų ir altų turime daug. Jei dainuojate žemai, ateikite susipažinti."
+    },
+    {
+     "title": "Atkeliavo nauji natų lapai",
+     "text": "Aplankai su žiemos programa jau salėje. Žymas žymėkitės pieštuku, o ne tušinuku."
+    }
+   ],
+   "join": [
+    "Esame apie penkiasdešimt dainininkų nuo šešiolikos iki aštuoniasdešimt aštuonerių metų. Dauguma nemokame skaityti natų ir daug metų dainas išmokstame iš klausos.",
+    "Ateikite į bet kurią repeticiją ir padainuokite su mumis. Rasime jums kėdę, aplanką ir žmogų, prie kurio atsistoti."
+   ],
+   "faq": [
+    {
+     "q": "Ar reikia laikyti atranką?",
+     "a": "Ne. Atrankos nėra nei dabar, nei vėliau."
+    },
+    {
+     "q": "Ar reikia mokėti skaityti natas?",
+     "a": "Ne. Mokome iš klausos, o tiems, kas nori, natos yra ir popieriuje."
+    },
+    {
+     "q": "O jei praleisiu savaitę?",
+     "a": "Tada praleisite savaitę. Niekas nesupyks, o įrašai skelbiami internete."
+    }
+   ],
+   "why": [
+    {
+     "h": "Be atrankos",
+     "p": "Jei galite išlaikyti melodiją po dušu, išlaikysite ją ir čia."
+    },
+    {
+     "h": "Visi balsai",
+     "p": "Sopranai, altai, tenorai, bosai ir visi, kurie dar nėra tikri."
+    },
+    {
+     "h": "Du koncertai per metus",
+     "p": "Vienas žiemą ir vienas vasarą, su pyragu."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Atvirų durų vakaras",
+     "p": "Ateikite padainuoti kelis kanonus be atrankos ir be įtampos."
+    },
+    {
+     "t": "Prasideda naujas sezonas",
+     "p": "Apšilimas, naujas kūrinys ir daug pasikalbėjimų po atostogų."
+    },
+    {
+     "t": "Balsų repeticija",
+     "p": "Altai ir tenorai salėje, sopranai ir bosai virtuvėje."
+    },
+    {
+     "t": "Dainų diena",
+     "p": "Visas šeštadienis su svečiu dirigentu."
+    },
+    {
+     "t": "Koncertas bažnyčioje",
+     "p": "Dvi dalys, loterija ir pyragaičiai per pertrauką."
+    },
+    {
+     "t": "Giesmės aikštėje",
+     "p": "Sušalę pirštai ir šilti balsai turgaus aikštėje."
+    },
+    {
+     "t": "Repeticija su pianistu",
+     "p": "Pirmas kartas, kai kūrinys skamba kaip muzika."
+    },
+    {
+     "t": "Dainavimo vakaras visiems",
+     "p": "Dainos, kurias žino visi, ir kelios, kurių nepamena niekas."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Bendruomenės choras „Aidas“",
+       "Choras „Gaida“",
+       "Choras „Giesmė“"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

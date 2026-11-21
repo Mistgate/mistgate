@@ -1,0 +1,281 @@
+{
+ "ui": {
+  "nav_label": "Izvēlne",
+  "footer": "Izdots ar MIT licenci.",
+  "nav_home": "Pārskats",
+  "nav_changelog": "Izmaiņu žurnāls",
+  "nav_install": "Instalēšana",
+  "nav_roadmap": "Plāni",
+  "home_title": "Pārskats",
+  "desc_changelog": "Katra {brand} versija ar tajā veiktajām izmaiņām.",
+  "desc_install": "Kā instalēt {brand}: izplatījumu pakotnes, būvēšana no pirmkoda un katras versijas kontrolsummas.",
+  "desc_roadmap": "Pie kā pašlaik strādā {brand} uzturētāji un kas sekos.",
+  "nf_title": "Lapa nav atrasta",
+  "nf_text": "Šīs lapas nav, vai arī tā ir pārvietota kopš pēdējās versijas.",
+  "nf_back": "Atpakaļ uz pārskatu",
+  "features_h": "Kāpēc {brand}",
+  "start_h": "Sākt darbu",
+  "latest_h": "Jaunākā versija",
+  "all_releases": "Visas versijas",
+  "get_it": "Instalēt",
+  "read_log": "Lasīt izmaiņu žurnālu",
+  "changelog_h": "Izmaiņu žurnāls",
+  "changelog_intro": "Katra versija, jaunākā vispirms. Versiju numuri seko parastajai shēmai: galvenā versija, apakšversija, labojums.",
+  "released": "Izdota",
+  "install_h": "Instalēšana",
+  "install_intro": "{brand} netiek piegādāts kā gatava programma. To iepako Linux izplatījumi, un būvēšana no pirmkoda arhīva aizņem pāris minūtes.",
+  "pkg_h": "No tava izplatījuma",
+  "pkg_note": "Pakotņu versijas var atpalikt no jaunākās versijas par dažām nedēļām; tabula zemāk norāda, kādu versiju gaidīt no pirmkoda arhīva.",
+  "src_h": "Būvēt no pirmkoda",
+  "src_intro": "Vajadzīgs C kompilators un make. Būvēšana aizņem apmēram minūti. Katras versijas pirmkoda arhīvs ir nosaukts pēc versijas.",
+  "sums_h": "Versijas un kontrolsummas",
+  "sums_intro": "Katrai versijai ir pirmkoda arhīvs. Pirms būvēšanas pārbaudi tā SHA-256 kontrolsummu.",
+  "col_ver": "Versija",
+  "col_date": "Izdota",
+  "col_sum": "Pirmkoda arhīva SHA-256",
+  "roadmap_h": "Plāni",
+  "roadmap_intro": "Pie kā uzturētāji strādā, aptuvenā secībā. Plāni mainās; izmaiņu žurnāls ir ieraksts par to, kas patiešām notika.",
+  "now_h": "Šobrīd",
+  "next_h": "Nākamais",
+  "later_h": "Vēlāk",
+  "licence_h": "Licence",
+  "licence_p": "{brand} ir brīva programmatūra, izdota ar MIT licenci. Lieto to, maini to un dalies ar to.",
+  "rel_back": "Visas versijas",
+  "rel_more": "Citas versijas",
+  "rel_src_h": "Pirmkoda arhīvs",
+  "pkgs": [
+   {
+    "s": "Debian un Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS (Homebrew)"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Akmens",
+       "Purvs",
+       "Laterna",
+       "Bedre",
+       "Ogle",
+       "Pasaka",
+       "Kaija",
+       "Nezale",
+       "Skifers",
+       "Sunas"
+      ],
+      [
+       "watch",
+       "tail",
+       "glance",
+       "notice",
+       "sentry",
+       "peek"
+      ]
+     ],
+     "sep": ""
+    }
+   },
+   "tagline": "Palaid komandu, kad faili mainās",
+   "desc": "{brand} novēro mapi un palaiž komandu ikreiz, kad tajā kaut kas mainās.",
+   "overview": "{brand} novēro mapi un palaiž komandu ikreiz, kad tajā kaut kas mainās. Tā ir maza un ātra programma tiem, kam apnicis saglabāt failu un pēc tam pārslēgties uz citu logu.",
+   "features": [
+    {
+     "h": "Ātri sākt",
+     "p": "Viena komanda, un konfigurācijas faila nav vajadzīgs."
+    },
+    {
+     "h": "Prātīgi noklusējumi",
+     "p": "Ignorē redaktoru pagaidu failus, versiju kontroles mapes un būvējuma izvadi."
+    },
+    {
+     "h": "Darbojas visur",
+     "p": "Linux, macOS un Windows ar tiem pašiem karodziņiem."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {
+     "k": "Pievienots",
+     "t": "Atbalsts vairāku mapju novērošanai vienlaikus."
+    },
+    {
+     "k": "Pievienots",
+     "t": "Aizkaves opcija, lai pirms palaišanas pagaidītu mierīgu brīdi."
+    },
+    {
+     "k": "Pievienots",
+     "t": "Krāsas izvadē, ja terminālis tās atbalsta."
+    },
+    {
+     "k": "Labots",
+     "t": "Reta avārija, kad novērotā mape tika izdzēsta."
+    },
+    {
+     "k": "Labots",
+     "t": "Dubultas palaišanas, kad redaktors saglabāja failu divos soļos."
+    },
+    {
+     "k": "Labots",
+     "t": "Ceļi ar atstarpēm operētājsistēmā Windows."
+    },
+    {
+     "k": "Mainīts",
+     "t": "Noklusējuma aizkave tagad ir 200 milisekundes 50 vietā."
+    },
+    {
+     "k": "Mainīts",
+     "t": "Ignorēšanas šabloni seko tiem pašiem noteikumiem kā lielākā daļa versiju kontroles rīku."
+    },
+    {
+     "k": "Pievienots",
+     "t": "Karodziņš once, kas palaiž komandu vienu reizi un beidz darbu."
+    },
+    {
+     "k": "Labots",
+     "t": "Atmiņas lietojums, kas lēni pieauga, novērojot ļoti lielas mapes."
+    },
+    {
+     "k": "Mainīts",
+     "t": "Kļūdu ziņojumi tagad norāda, kura mape tās izraisīja."
+    },
+    {
+     "k": "Pievienots",
+     "t": "Komandu pabeigšana biežāk lietotajām čaulām."
+    }
+   ],
+   "now": [
+    "Ātrāka palaišana lielām mapēm",
+    "Labāki ziņojumi, kad komanda neizdodas"
+   ],
+   "next": [
+    "Konfigurācijas fails iestatījumiem katram projektam",
+    "Pakotnes galvenajiem Linux izplatījumiem"
+   ],
+   "later": [
+    "Kluss režīms lietošanai skriptos",
+    "Uzticama tīkla disku novērošana"
+   ]
+  },
+  "backup": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pagrabs",
+       "Plaukts",
+       "Atvilktne",
+       "Skapis",
+       "Lade",
+       "Kaste",
+       "Noliktava",
+       "Seifs",
+       "Kumode",
+       "Klets"
+      ],
+      [
+       "copy",
+       "keep",
+       "stash",
+       "save",
+       "mirror",
+       "store"
+      ]
+     ],
+     "sep": ""
+    }
+   },
+   "tagline": "Vienkāršas un uzticamas mapes dublējumkopijas",
+   "desc": "{brand} nokopē mapi citā vietā un glabā vecākas versijas kā parastus failus.",
+   "overview": "{brand} nokopē mapi citā vietā un glabā vecākas versijas, lai pagājušajā otrdienā pieļauta kļūda vēl būtu labojama. Dublējumi ir parasti faili, ko vari atvērt arī bez programmas {brand}.",
+   "features": [
+    {
+     "h": "Parasti faili",
+     "p": "Nav īpaša formāta, ko vēlāk atslēgt."
+    },
+    {
+     "h": "Versijas",
+     "p": "Glabā tik daudz momentuzņēmumu, cik vēlies."
+    },
+    {
+     "h": "Pārbauda pati sevi",
+     "p": "Komanda verify salīdzina dublējumu ar tā avotu."
+    }
+   ],
+   "quick": "{cmd} notes /backups/notes",
+   "changes": [
+    {
+     "k": "Pievienots",
+     "t": "Komanda verify, kas salīdzina dublējumu ar tā avotu."
+    },
+    {
+     "k": "Pievienots",
+     "t": "Momentuzņēmumus var glabāt noteiktu dienu skaitu vai noteiktu kopiju skaitu."
+    },
+    {
+     "k": "Labots",
+     "t": "Faili, kas dublēšanas laikā mainījušies, tika nokopēti divreiz."
+    },
+    {
+     "k": "Labots",
+     "t": "Nepareizas atļaujas atjaunotajiem failiem."
+    },
+    {
+     "k": "Mainīts",
+     "t": "Nemainītie faili vairs netiek kopēti atkārtoti."
+    },
+    {
+     "k": "Pievienots",
+     "t": "Atjaunošanas komanda ar izmēģinājuma režīmu."
+    },
+    {
+     "k": "Labots",
+     "t": "Avārija mapēm ar ļoti gariem ceļu nosaukumiem."
+    },
+    {
+     "k": "Mainīts",
+     "t": "Progress tiek rādīts tikai tad, kad izvade ir terminālis."
+    },
+    {
+     "k": "Pievienots",
+     "t": "Komanda list, kas rāda dublējuma momentuzņēmumus."
+    },
+    {
+     "k": "Labots",
+     "t": "Dublēšana uz tīkla diskiem apstājās pēc noildzes."
+    },
+    {
+     "k": "Mainīts",
+     "t": "Momentuzņēmumus tagad nosauc pēc datuma, nevis pēc numura."
+    },
+    {
+     "k": "Pievienots",
+     "t": "Opcija izlaist failus pēc šablona."
+    }
+   ],
+   "now": [
+    "Ātrāka daudzu mazu failu kopēšana",
+    "Skaidrāks verify pārskats"
+   ],
+   "next": [
+    "Dublējumu šifrēšana miera stāvoklī",
+    "Dublēšana uz otru atrašanās vietu vienā solī"
+   ],
+   "later": [
+    "Grafisks atjaunošanas rīks",
+    "Iebūvēta plānošana"
+   ]
+  }
+ }
+}
