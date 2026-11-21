@@ -767,6 +767,15 @@ func funcMap(c *ctx) template.FuncMap {
 		},
 		"num":    func(k string, lo, hi int) int { return key(k).between(lo, hi) },
 		"chance": func(k string, pct int) bool { return key(k).chance(pct) },
+		// hexs is n hex digits, such as a checksum.
+		"hexs": func(k string, n int) string {
+			r := key(k)
+			var b strings.Builder
+			for b.Len() < n {
+				fmt.Fprintf(&b, "%016x", r.u64())
+			}
+			return b.String()[:n]
+		},
 		// pct is a percentage from lo/100 to hi/100 with two decimals: pct "k" 9950 9999 gives 99.50 to 99.99.
 		"pct": func(k string, lo, hi int) string {
 			v := key(k).between(lo, hi)

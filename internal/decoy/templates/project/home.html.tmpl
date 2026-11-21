@@ -8,7 +8,7 @@
 <h2>{{.L.start_h}}</h2>
 <p>{{.L.overview}}</p>
 {{if eq .Layout 1}}{{template "term" .}}
-{{end}}<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "download"}} {{.L.get_it}} {{(index .Lists.releases 0).version}}</a></p>
+{{end}}<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "terminal"}} {{.L.get_it}} {{(index .Lists.releases 0).version}}</a></p>
 </section>{{end}}
 {{define "b_latest"}}<section class="__sec__">
 <h2>{{.L.latest_h}}</h2>
@@ -25,7 +25,7 @@
 <div>
 <h1>{{.Brand}}</h1>
 <p class="__lede__">{{.L.tagline}}</p>
-<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "download"}} {{.L.get_it}}</a> <a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.read_log}}</a></p>
+<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "terminal"}} {{.L.get_it}}</a> <a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.read_log}}</a></p>
 </div>
 {{template "term" .}}
 </section>
@@ -33,7 +33,7 @@
 <div class="__wrap__ __hero__ __centre__">
 <h1>{{.Brand}}</h1>
 <p class="__lede__">{{.L.tagline}}</p>
-<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "download"}} {{.L.get_it}}</a> <a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.read_log}}</a></p>
+<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "terminal"}} {{.L.get_it}}</a> <a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.read_log}}</a></p>
 </div>
 </section>
 {{else}}<section class="__dark__">
@@ -41,7 +41,7 @@
 <h1>{{.Brand}}</h1>
 <p class="__lede__">{{.L.tagline}}</p>
 {{template "term" .}}
-<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "download"}} {{.L.get_it}}</a> <a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.read_log}}</a></p>
+<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "terminal"}} {{.L.get_it}}</a> <a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.read_log}}</a></p>
 </div>
 </section>
 {{end}}<div class="__wrap__">

@@ -1,13 +1,25 @@
 {{template "head" .}}<body>
 {{template "header" .}}
 <main class="__wrap__ __page__">
-<h1>{{.L.download_h}} {{.Brand}} {{(index .Lists.releases 0).version}}</h1>
-<p class="__lede__">{{.L.download_intro}}</p>
+<h1>{{.L.install_h}} {{.Brand}}</h1>
+<p class="__lede__">{{.L.install_intro}}</p>
+<h2>{{.L.pkg_h}}</h2>
 <div class="__tbl__"><table>
-<thead><tr><th>{{.L.col_sys}}</th><th>{{.L.col_file}}</th><th>{{.L.col_size}}</th></tr></thead>
-<tbody>{{$v := (index .Lists.releases 0).version}}{{$cmd := .V.cmd}}{{range $i, $s := .L.sys}}<tr><td>{{$s}}</td><td><code>{{$cmd}}-{{$v}}-{{if eq $i 0}}linux-amd64.tar.gz{{else if eq $i 1}}linux-arm64.tar.gz{{else if eq $i 2}}macos-arm64.tar.gz{{else if eq $i 3}}macos-amd64.tar.gz{{else}}windows-amd64.zip{{end}}</code></td><td>{{num (printf "sa%d" $i) 2 8}}.{{num (printf "sb%d" $i) 0 9}} MB</td></tr>{{end}}</tbody>
+<tbody>{{range .L.pkgs}}<tr><th scope="row">{{.s}}</th><td><code>{{.c}}</code></td></tr>{{end}}</tbody>
 </table></div>
-<p>{{.L.download_note}}</p>
+<p class="__mu__">{{.L.pkg_note}}</p>
+<h2>{{.L.src_h}}</h2>
+<p>{{.L.src_intro}}</p>
+{{$v := (index .Lists.releases 0).version}}<pre><code>tar xf {{.V.cmd}}-{{$v}}.tar.gz
+cd {{.V.cmd}}-{{$v}}
+make
+sudo make install</code></pre>
+<h2>{{.L.sums_h}}</h2>
+<p>{{.L.sums_intro}}</p>
+<div class="__tbl__"><table>
+<thead><tr><th>{{.L.col_ver}}</th><th>{{.L.col_date}}</th><th>{{.L.col_sum}}</th></tr></thead>
+<tbody>{{range $i, $r := .Lists.releases}}<tr><td>{{$r.version}}</td><td>{{$r.date}}</td><td><code class="__sum__">{{hexs (printf "sum%d" $i) 64}}</code></td></tr>{{end}}</tbody>
+</table></div>
 <h2>{{.L.licence_h}}</h2>
 <p>{{.L.licence_p}}</p>
 </main>

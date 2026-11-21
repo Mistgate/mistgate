@@ -2,14 +2,16 @@
   "ui": {
     "en": {
       "nav_label": "Main", "footer": "Released under the MIT licence.",
-      "nav_home": "Overview", "nav_changelog": "Changelog", "nav_download": "Download", "nav_roadmap": "Roadmap", "home_title": "Overview",
-      "desc_changelog": "Every release of {brand}, with what changed in it.", "desc_download": "Download {brand} for Linux, macOS and Windows.", "desc_roadmap": "What the maintainers of {brand} are working on and what comes next.",
+      "nav_home": "Overview", "nav_changelog": "Changelog", "nav_install": "Install", "nav_roadmap": "Roadmap", "home_title": "Overview",
+      "desc_changelog": "Every release of {brand}, with what changed in it.", "desc_install": "How to install {brand}: distribution packages, building from source, and checksums for every release.", "desc_roadmap": "What the maintainers of {brand} are working on and what comes next.",
       "nf_title": "Page not found", "nf_text": "This page does not exist, or it has moved since the last release.", "nf_back": "Back to the overview",
-      "features_h": "Why {brand}", "start_h": "Get started", "latest_h": "Latest release", "all_releases": "All releases", "get_it": "Download", "read_log": "Read the changelog",
+      "features_h": "Why {brand}", "start_h": "Get started", "latest_h": "Latest release", "all_releases": "All releases", "get_it": "Install", "read_log": "Read the changelog",
       "changelog_h": "Changelog", "changelog_intro": "Every release, newest first. Version numbers follow the usual major, minor, patch scheme.", "released": "Released",
-      "download_h": "Download", "download_intro": "Pick the archive for your system. Each one holds a single executable.", "col_sys": "System", "col_file": "Archive", "col_size": "Size",
-      "sys": ["Linux, 64-bit", "Linux, ARM 64-bit", "macOS, Apple silicon", "macOS, Intel", "Windows, 64-bit"],
-      "download_note": "Every archive has a checksum file next to it with the same name and the ending .sha256. Check it before you run anything you have downloaded.",
+      "install_h": "Install", "install_intro": "{brand} is not shipped as a ready-made binary. Distributions package it, and building it from the source archive takes a few minutes.",
+      "pkg_h": "From your distribution", "pkg_note": "Package versions can trail the latest release by a few weeks; the table further down says which version to expect from the source archive.",
+      "pkgs": [{"s": "Debian and Ubuntu", "c": "sudo apt install {cmd}"}, {"s": "Fedora", "c": "sudo dnf install {cmd}"}, {"s": "Arch Linux", "c": "sudo pacman -S {cmd}"}, {"s": "macOS with Homebrew", "c": "brew install {cmd}"}],
+      "src_h": "Build from source", "src_intro": "You need a C compiler and make. The build takes about a minute. The source archive of each release is named after the version.",
+      "sums_h": "Versions and checksums", "sums_intro": "Every release has a source archive. Check its SHA-256 checksum before you build it.", "col_ver": "Version", "col_date": "Released", "col_sum": "SHA-256 of the source archive",
       "roadmap_h": "Roadmap", "roadmap_intro": "What the maintainers are working on, in rough order. Plans change; the changelog is the record of what actually happened.",
       "now_h": "Now", "next_h": "Next", "later_h": "Later",
       "licence_h": "Licence", "licence_p": "{brand} is free software, released under the MIT licence. Use it, change it and share it."
