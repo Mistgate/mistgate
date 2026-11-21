@@ -296,6 +296,7 @@ type ctx struct {
 	files map[string][]byte
 	artID string
 	artN  int
+	iconN int
 }
 
 var (
@@ -494,6 +495,9 @@ func (d *kindDef) newSite(c *ctx, r *rng) (*site, error) {
 			return nil, fmt.Errorf("decoy kind %s: var %s: %w", d.id, k, err)
 		}
 		vars[k] = v
+	}
+	for _, k := range names { // a variable may name another one, one level deep: "{city} Chess Club"
+		vars[k] = fill(vars[k], vars).(string)
 	}
 	brand := vars["brand"]
 	if brand == "" {
@@ -1057,7 +1061,7 @@ func funcMap(c *ctx) template.FuncMap {
 		"sub":   func(a, b int) int { return a - b },
 		"mul":   func(a, b int) int { return a * b },
 		"lower": strings.ToLower,
-		"icon":  iconSVG,
+		"icon":  func(name string) string { c.iconN++; return iconSVG(name, c.r.sub(fmt.Sprint("icon", c.iconN))) },
 		"fdate": func(iso string) string { return c.s.fdate(iso) },
 		"art": func(k, kind string, w, h int) string {
 			r := key("art:" + k)

@@ -1,0 +1,14 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __page__ __narrow__">
+<h1>{{.L.news_h}}</h1>
+<p class="__lede__">{{.L.news_intro}}</p>
+{{range .Lists.news}}<article class="__post__">
+<p class="__mu__"><time datetime="{{.date_iso}}">{{.date}}</time></p>
+<h2>{{.title}}</h2>
+<p>{{.text}}</p>
+</article>
+{{end}}</main>
+{{template "footer" .}}
+</body>
+</html>

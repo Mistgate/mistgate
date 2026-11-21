@@ -1,0 +1,68 @@
+{{define "meet"}}<div class="__card__ __meet__">
+<h2>{{.L.meet_h}}</h2>
+<p>{{icon "clock"}} <span><strong>{{.L.when_l}}</strong> {{.L.when}}</span></p>
+<p>{{icon "pin"}} <span><strong>{{.L.where_l}}</strong> {{.L.where}}</span></p>
+<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{.L.join_cta}}</a></p>
+</div>
+{{end}}
+{{define "why"}}<ul class="__feats__">{{range .L.why}}<li><span class="__fi__">{{icon .icon}}</span><div><h3>{{.h}}</h3><p>{{.p}}</p></div></li>{{end}}</ul>
+{{end}}
+{{define "upcoming"}}<section class="__sec__">
+<h2>{{.L.upcoming_h}}</h2>
+<ul class="__ev__">{{range $i, $e := .Lists.events}}{{if lt $i 3}}<li><span class="__when__">{{$e.w}}</span><div><strong>{{$e.t}}</strong><p>{{$e.p}}</p></div></li>{{end}}{{end}}</ul>
+<p><a href="{{(index .Nav 1).Href}}">{{.L.all_events}} {{icon "arrow"}}</a></p>
+</section>
+{{end}}
+{{define "latest"}}<section class="__sec__">
+<h2>{{.L.latest_h}}</h2>
+{{range $i, $n := .Lists.news}}{{if lt $i 2}}<article class="__post__"><p class="__mu__"><time datetime="{{$n.date_iso}}">{{$n.date}}</time></p><h3>{{$n.title}}</h3><p>{{$n.text}}</p></article>{{end}}{{end}}
+<p><a href="{{(index .Nav 3).Href}}">{{.L.all_news}} {{icon "arrow"}}</a></p>
+</section>
+{{end}}
+{{template "head" .}}<body>
+{{template "header" .}}
+<main>
+{{if eq .Layout 0}}<section class="__wrap__ __hero__ __split__">
+<div>
+<p class="__kicker__">{{.L.kicker}}</p>
+<h1>{{.Brand}}</h1>
+<p class="__lede__">{{.L.intro}}</p>
+</div>
+{{template "meet" .}}
+</section>
+<div class="__wrap__ __cols__">
+<div>{{template "upcoming" .}}</div>
+<div>{{template "latest" .}}</div>
+</div>
+<div class="__wrap__ __sec__">{{template "why" .}}</div>
+{{else if eq .Layout 1}}<section class="__band__">
+<div class="__wrap__ __hero__ __centre__">
+<p class="__kicker__">{{.L.kicker}}</p>
+<h1>{{.Brand}}</h1>
+<p class="__lede__">{{.L.intro}}</p>
+<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{.L.join_cta}}</a></p>
+</div>
+</section>
+<div class="__wrap__">
+<div class="__sec__">{{template "meet" .}}</div>
+<div class="__sec__">{{template "why" .}}</div>
+{{template "upcoming" .}}
+{{template "latest" .}}
+</div>
+{{else}}<div class="__wrap__ __duo__">
+<div>
+<section class="__hero__">
+<p class="__kicker__">{{.L.kicker}}</p>
+<h1>{{.Brand}}</h1>
+<p class="__lede__">{{.L.intro}}</p>
+</section>
+{{template "why" .}}
+{{template "upcoming" .}}
+{{template "latest" .}}
+</div>
+<aside class="__sticky__">{{template "meet" .}}</aside>
+</div>
+{{end}}</main>
+{{template "footer" .}}
+</body>
+</html>

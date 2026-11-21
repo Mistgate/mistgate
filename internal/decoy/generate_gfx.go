@@ -181,34 +181,50 @@ var icons = map[string]string{
 	"download": `<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14"/>`,
 	"lock":     `<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>`,
 	"user":     `<circle cx="12" cy="8" r="4"/><path d="M4 20c1-4 4-6 8-6s7 2 8 6"/>`,
-	"users":    `<circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 19c.8-3.500 3.200-5 6.500-5s5.700 1.500 6.500 5M16 14c3 0 4.500 1.500 5.500 4.500"/>`,
+	"users":    `<circle cx="9" cy="9" r="3"/><circle cx="16" cy="10" r="2.5"/><path d="M3 20c1-4 3-5 6-5s5 1 6 5"/>`,
 	"arrow":    `<path d="M5 12h14M13 6l6 6-6 6"/>`,
-	"star":     `<path d="M12 3.5l2.600 5.400 5.900.8-4.300 4.100 1 5.900L12 16.900 6.800 19.700l1-5.900L3.500 9.700l5.900-.8z"/>`,
+	"star":     `<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>`,
 	"leaf":     `<path d="M5 19c0-9 5-14 14-14 0 9-5 14-14 14zM5 19l7-7"/>`,
 	"book":     `<path d="M4 5h6a2 2 0 012 2v12a2 2 0 00-2-2H4zM20 5h-6a2 2 0 00-2 2v12a2 2 0 012-2h6z"/>`,
-	"pin":      `<path d="M12 21s7-6 7-11a7 7 0 00-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.500"/>`,
-	"phone":    `<path d="M6 4h3l2 5-2 1.500a11 11 0 005 5L15.500 13.500 20 15.500V19a2 2 0 01-2 2A15 15 0 013 6a2 2 0 013-2z"/>`,
-	"shield":   `<path d="M12 3l7 3v6c0 4.500-3 7.500-7 9-4-1.500-7-4.500-7-9V6z"/>`,
-	"code":     `<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.500 5l-3 14"/>`,
+	"pin":      `<path d="M12 21s7-6 7-11a7 7 0 00-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>`,
+	"phone":    `<path d="M6 4h3l2 5-2 1.5a11 11 0 005 5l1.5-2 5 2v3a2 2 0 01-2 2A15 15 0 013 6a2 2 0 013-2z"/>`,
+	"shield":   `<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>`,
+	"code":     `<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>`,
 	"terminal": `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10l3 2-3 2M12 15h5"/>`,
-	"music":    `<path d="M9 18V6l10-2v12"/><circle cx="6.500" cy="18" r="2.500"/><circle cx="16.500" cy="16" r="2.500"/>`,
-	"heart":    `<path d="M12 20s-8-5-8-11a4.500 4.500 0 018-2.500A4.500 4.500 0 0120 9c0 6-8 11-8 11z"/>`,
-	"mail":     `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.500 7l8.500 6 8.500-6"/>`,
-	"eye":      `<path d="M2.500 12S6 5.500 12 5.500 21.500 12 21.500 12 18 18.500 12 18.500 2.500 12 2.500 12z"/><circle cx="12" cy="12" r="3"/>`,
+	"music":    `<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>`,
+	"heart":    `<path d="M12 20s-8-5-8-11a4.5 4.5 0 018-2.500A4.5 4.5 0 0120 9c0 6-8 11-8 11z"/>`,
+	"mail":     `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/>`,
+	"eye":      `<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="3"/>`,
 	"bolt":     `<path d="M13 3L5 13.500h6L10 21l8-10.500h-6z"/>`,
 	"globe":    `<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>`,
 	"layers":   `<path d="M12 4l9 5-9 5-9-5zM3 14l9 5 9-5"/>`,
-	"sun":      `<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.600 5.600L7 7M17 17l1.400 1.400M5.600 18.400L7 17M17 7l1.400-1.400"/>`,
-	"tool":     `<path d="M14.500 6.500a4 4 0 005 5L20 14l-6 6-9-9 6-6z"/>`,
-	"gift":     `<rect x="4" y="9" width="16" height="11" rx="1.500"/><path d="M12 9v11M3 9h18M12 9c-3 0-4.500-4-1.500-4S12 9 12 9zm0 0c3 0 4.500-4 1.500-4S12 9 12 9z"/>`,
+	"sun":      `<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/>`,
+	"tool":     `<path d="M14.5 6.500a4 4 0 005 5L20 14l-6 6-9-9 6-6z"/>`,
+	"gift":     `<rect x="4" y="9" width="16" height="11"/><path d="M12 9v11M3 9h18M12 9V5"/>`,
 }
 
-func iconSVG(name string) string {
+var spaces = []string{" ", " ", "  ", "\n"}
+
+// iconSVG is an inline icon. Its attributes come in the order and spacing r chooses, so a run of markup that holds an icon is
+// not the same on two sites.
+func iconSVG(name string, r *rng) string {
 	body, ok := icons[name]
 	if !ok {
 		body = icons["check"]
 	}
-	return `<svg class="__ic__" viewBox="0 0 24 24" aria-hidden="true">` + body + `</svg>`
+	attrs := []string{`class="__ic__"`, `viewBox="0 0 24 24"`, `aria-hidden="true"`}
+	if r.chance(50) {
+		attrs = append(attrs, `focusable="false"`)
+	}
+	if r.chance(30) {
+		attrs = append(attrs, `width="24" height="24"`)
+	}
+	var b strings.Builder
+	b.WriteString("<svg")
+	for _, i := range r.perm(len(attrs)) {
+		b.WriteString(spaces[r.n(len(spaces))] + attrs[i])
+	}
+	return b.String() + ">" + body + "</svg>"
 }
 
 // faviconMark is the inside of the site's favicon (64x64) and, at 28px, the logo next to the name: a shape from a fixed set,

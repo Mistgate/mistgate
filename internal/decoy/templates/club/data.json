@@ -1,0 +1,122 @@
+{
+  "ui": {
+    "en": {
+      "vars": {
+        "city": ["Ashwell", "Harrowby", "Lindenmere", "Pellworth", "Oakhaven", "Stanmoor", "Wexcombe", "Fenbridge", "Marlbeck", "Thornley"],
+        "fee": ["£25", "£30", "€30", "$35"]
+      },
+      "nav_label": "Main", "footer": "Run by volunteers and open to everyone.",
+      "nav_home": "Home", "nav_events": "Programme", "nav_join": "Join us", "nav_news": "News", "home_title": "Welcome",
+      "desc_events": "Regular meetings and special events of {brand}.", "desc_join": "How to join {brand}, what it costs and what to expect.", "desc_news": "News and notices from {brand}.",
+      "nf_title": "Page not found", "nf_text": "We could not find that page. It may have been taken down after the event it was about.", "nf_back": "Back to the home page",
+      "meet_h": "When we meet", "when_l": "When", "where_l": "Where", "upcoming_h": "Coming up", "latest_h": "Latest news", "all_events": "Full programme", "all_news": "All news", "join_cta": "How to join",
+      "events_h": "Programme", "events_intro": "Our regular meetings and the occasional special event. The dates for the year are on the noticeboard at every meeting.",
+      "join_h": "Join us", "steps_h": "How to join", "faq_h": "Questions",
+      "join_fee": "Membership is {fee} a year, with a reduced rate for juniors and students. If money is a worry, tell the treasurer quietly and it will not be mentioned again.",
+      "steps": ["Come along to any meeting and say hello.", "Try it for a month before you decide anything.", "Pay the membership fee to the treasurer when you are ready."],
+      "news_h": "News", "news_intro": "Notices from the committee and reports from recent meetings, newest first."
+    }
+  },
+  "bundles": [
+    {
+      "lang": "en",
+      "vars": {"brand": {"join": [["{city} Chess Club", "{city} Chess Society", "{city} Chess Circle"]]}},
+      "kicker": "Chess club", "tagline": "Friendly chess, every Thursday evening",
+      "desc": "{brand} meets every Thursday evening. Friendly games for every strength, from beginners to the club champion.",
+      "intro": "We meet every Thursday to play, to analyse our games and to drink too much tea. All strengths are welcome, from first-time players to the club champion.",
+      "when": "Thursdays, 19:30 to 22:00", "where": "The upstairs room of the Millbrook Community Hall",
+      "why": [{"icon": "users", "h": "All strengths", "p": "Beginners sit next to old hands, and nobody minds."}, {"icon": "clock", "h": "Every Thursday", "p": "No sign-up. Come when you can."}, {"icon": "gift", "h": "Boards provided", "p": "Sets and clocks are ours; tea is yours to make."}],
+      "events": [
+        {"t": "Club night", "w": "Every Thursday, 19:30", "p": "Free play, with a teaching table for beginners."},
+        {"t": "Rapid tournament", "w": "First Saturday of the month, 14:00", "p": "Seven rounds of fifteen minutes each. Entry is a small donation to the tea fund."},
+        {"t": "Beginners' evening", "w": "Second Tuesday of the month, 19:00", "p": "Learn the rules and a few simple openings."},
+        {"t": "Simultaneous display", "w": "Once a season", "p": "The club champion plays twenty boards at once. Bring a friend and a plan."},
+        {"t": "Annual dinner", "w": "Late November", "p": "A meal, a speech and the handing over of a very small trophy."}],
+      "news": [
+        {"title": "A new season begins", "text": "The autumn season starts next week with the club championship. New members are welcome on any night."},
+        {"title": "Thank you to everyone who came to the rapid", "text": "Twenty-six players, fourteen cups of tea per round, and a final won on the clock."},
+        {"title": "We have a new set of boards", "text": "Eight wooden boards and sets, bought with the proceeds of the summer raffle."},
+        {"title": "The junior section reopens", "text": "Children from seven years old are welcome on Tuesday afternoons, with a parent on the first visit."}],
+      "join": ["We are a friendly club with about forty members, aged from nine to eighty-four. Most of us are not very good, and we have made our peace with that.", "You do not need to own a set or know any theory. If you can move the pieces, you can play on Thursday."],
+      "faq": [
+        {"q": "Do I need to be good?", "a": "No. Most members are not, and the club is organised so that everybody gets a game against someone of their own strength."},
+        {"q": "Can children come?", "a": "Yes, on Tuesday afternoons and, with a parent, on Thursdays."},
+        {"q": "Do you play in a league?", "a": "We enter one team in the county league. If you want to play, tell the captain."}]
+    },
+    {
+      "lang": "en",
+      "vars": {"brand": {"join": [["{city} Walking Group", "{city} Ramblers", "{city} Hill Walkers"]]}},
+      "kicker": "Walking group", "tagline": "Walks in the hills and along the river",
+      "desc": "{brand} walks every Sunday in the hills and along the river. All welcome, no experience needed.",
+      "intro": "We walk every Sunday, in all weathers, at the pace of the slowest person. Come once and see; most of us began that way.",
+      "when": "Sundays, 9:30", "where": "The old station car park",
+      "why": [{"icon": "leaf", "h": "Out in the hills", "p": "Routes of eight to twelve miles, led by people who know the paths."}, {"icon": "users", "h": "Good company", "p": "A group of regulars and a steady stream of new faces."}, {"icon": "heart", "h": "No one is left behind", "p": "We keep to the pace of the slowest walker."}],
+      "events": [
+        {"t": "Sunday walk", "w": "Every Sunday, 9:30", "p": "Eight to twelve miles, with a pub stop if the weather is bad."},
+        {"t": "Short walk", "w": "First Wednesday of the month, 10:00", "p": "Three to four miles at an easy pace, ending with coffee."},
+        {"t": "Weekend away", "w": "Once a year, in spring", "p": "Two days in the hills, with a hostel and a great deal of soup."},
+        {"t": "Map reading evening", "w": "Once a season", "p": "How to read a map, and what to do when it reads you."},
+        {"t": "Litter pick", "w": "Last Saturday in April", "p": "We clear the river path and then walk it again, because we can."}],
+      "news": [
+        {"title": "The spring programme is out", "text": "Twelve walks between March and June, including two new routes over the ridge."},
+        {"title": "The footpath by the mill has reopened", "text": "After a year of repairs the bridge is open again. Thank you to the volunteers who gave up their Saturdays."},
+        {"title": "New walk leaders wanted", "text": "If you know a good route and can read a map, we would love to hear from you."},
+        {"title": "Thank you for the soup", "text": "The weekend away was a great success, mostly because of the soup."}],
+      "join": ["We are a friendly group of about sixty walkers, from people who have walked all their lives to people who started last month.", "You do not need special kit. Boots, a waterproof and something to drink are plenty. If in doubt, come and ask on Sunday morning."],
+      "faq": [
+        {"q": "How fast do you walk?", "a": "At the pace of the slowest person on the day, which is often the leader."},
+        {"q": "Can I bring my dog?", "a": "On most walks, yes, on a lead. The programme says which walks are not suitable."},
+        {"q": "What if it rains?", "a": "We walk anyway. The pub stop is longer."}]
+    },
+    {
+      "lang": "en",
+      "vars": {"brand": {"join": [["{city} Community Choir", "{city} Singers", "{city} Voices"]]}},
+      "kicker": "Community choir", "tagline": "Singing together on Wednesday evenings",
+      "desc": "{brand} rehearses on Wednesday evenings. No auditions, no need to read music, just a wish to sing.",
+      "intro": "We are a choir for people who like singing and do not want to audition for it. We learn by ear, laugh a lot and sing better than we have any right to.",
+      "when": "Wednesdays, 19:00 to 21:00", "where": "The church hall on the green",
+      "why": [{"icon": "music", "h": "No auditions", "p": "If you can hold a tune in the shower, you can hold one here."}, {"icon": "users", "h": "All voices", "p": "Sopranos, altos, tenors, basses and everyone who is not sure."}, {"icon": "heart", "h": "Two concerts a year", "p": "One in winter and one in summer, with cake."}],
+      "events": [
+        {"t": "Weekly rehearsal", "w": "Every Wednesday, 19:00", "p": "Warm-up, new songs and the one we still cannot get right."},
+        {"t": "Open evening", "w": "First Wednesday of September", "p": "Come and sing with us for the evening, with no commitment."},
+        {"t": "Winter concert", "w": "Second Saturday of December", "p": "Carols, folk songs and one piece nobody expects."},
+        {"t": "Summer concert", "w": "Late June", "p": "An evening of songs in the garden of the village hall, weather permitting."},
+        {"t": "Singing day", "w": "Once a year", "p": "A day of workshops with a visiting conductor, lunch included."}],
+      "news": [
+        {"title": "Autumn term begins", "text": "We are learning a set of folk songs from three countries, and a round that will not stay in time."},
+        {"title": "A big thank you after the summer concert", "text": "Ninety people came, forty-one cakes were eaten, and only one verse was sung twice."},
+        {"title": "We are looking for tenors", "text": "We have plenty of sopranos and altos. If you can sing low, please come and meet us."},
+        {"title": "New music has arrived", "text": "The folders for the winter programme are in the hall. Please pencil in your marks, not pen."}],
+      "join": ["We are about fifty singers, aged from sixteen to eighty-eight. Most of us cannot read music and have learnt songs by ear for years.", "Come to any rehearsal and sing with us. We will find you a chair, a folder and someone to stand next to."],
+      "faq": [
+        {"q": "Do I have to audition?", "a": "No. There is no audition, now or later."},
+        {"q": "Do I need to read music?", "a": "No. We teach by ear, with the notes on paper for those who want them."},
+        {"q": "What if I miss a week?", "a": "Then you miss a week. Nobody will mind, and the recordings are shared online."}]
+    },
+    {
+      "lang": "en",
+      "vars": {"brand": {"join": [["{city} Astronomy Society", "{city} Stargazers", "{city} Sky Watchers"]]}},
+      "kicker": "Astronomy society", "tagline": "Looking up, together",
+      "desc": "{brand} meets monthly for talks and observing nights. Beginners and telescope owners alike are welcome.",
+      "intro": "We meet once a month to hear a talk and, when the sky allows, to look through telescopes. You do not need to own a telescope, or even know where north is.",
+      "when": "First Friday of the month, 20:00", "where": "The library annexe, with observing on the field behind",
+      "why": [{"icon": "sun", "h": "Talks and observing", "p": "An indoor talk, then outside if the sky is kind."}, {"icon": "eye", "h": "Telescopes to try", "p": "Members bring theirs, and are glad to share."}, {"icon": "users", "h": "Beginners welcome", "p": "Most of us began with a pair of binoculars."}],
+      "events": [
+        {"t": "Monthly talk", "w": "First Friday of the month, 20:00", "p": "A speaker, a hot drink and usually a very good question at the end."},
+        {"t": "Observing night", "w": "Clear nights near the new moon", "p": "On the field behind the library. Wrap up warmly."},
+        {"t": "Telescope clinic", "w": "Third Saturday of the month, 11:00", "p": "Bring a telescope that will not behave and we will try to help."},
+        {"t": "School visit", "w": "Twice a term", "p": "We take a telescope to a local school and look at the Moon in the daytime."},
+        {"t": "Meteor watch", "w": "Mid-August", "p": "A whole night under the Perseids, with flasks and deckchairs."}],
+      "news": [
+        {"title": "Autumn talks announced", "text": "Six talks between September and February, from the surface of Mars to the history of the telescope."},
+        {"title": "Thank you to everyone who came to the meteor watch", "text": "We counted over two hundred meteors, and one cloud."},
+        {"title": "The society telescope has been repaired", "text": "The mount has a new motor and the finder scope has been aligned for the first time in years."},
+        {"title": "A new observing field", "text": "We now have permission to observe from the field behind the library, away from the street lights."}],
+      "join": ["We are about thirty members, with telescopes ranging from a pair of binoculars to something the size of a washing machine.", "Come to any meeting. If the sky is clear we will show you the Moon, Jupiter or whatever else is up."],
+      "faq": [
+        {"q": "Do I need a telescope?", "a": "No. Members are happy to share theirs, and the society owns one you can borrow."},
+        {"q": "What should I wear for an observing night?", "a": "More than you think. Hat, gloves and a flask."},
+        {"q": "What if it is cloudy?", "a": "We have a talk indoors, and sometimes the cloud goes away at ten o'clock."}]
+    }
+  ]
+}
