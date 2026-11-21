@@ -1,0 +1,19 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __pf__ __text__">
+<h1>{{.L.about_h}}</h1>
+{{range .L.about}}<p>{{.}}</p>
+{{end}}<div class="__two__">
+<section>
+<h2>{{.L.services_h}}</h2>
+<ul>{{range .L.services}}<li>{{.}}</li>{{end}}</ul>
+</section>
+<section>
+<h2>{{.L.shows_h}}</h2>
+<ul class="__shows__">{{range .L.shows}}<li><strong>{{.y}}</strong> {{.t}}</li>{{end}}</ul>
+</section>
+</div>
+</main>
+{{template "footer" .}}
+</body>
+</html>

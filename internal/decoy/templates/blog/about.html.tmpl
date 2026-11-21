@@ -1,0 +1,14 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __blogmain__ __single__">
+<article class="__post__">
+<figure class="__me__">{{art "me" "blobs" 240 240}}</figure>
+<h1>{{.L.about_h}}</h1>
+{{range .L.about}}<p>{{.}}</p>
+{{end}}<h2>{{.L.now_h}}</h2>
+<ul>{{range .L.now}}<li>{{.}}</li>{{end}}</ul>
+</article>
+</main>
+{{template "footer" .}}
+</body>
+</html>

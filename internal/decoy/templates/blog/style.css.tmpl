@@ -1,0 +1,37 @@
+{{template "base_css" .}}
+.__blogmain__{padding-top:44px}
+.__intro__{max-width:680px;margin-bottom:34px}
+.__intro__ h1{margin-bottom:.25em}
+.__lede__{color:var(--mu);font-size:1.12rem}
+.__sectitle__{margin:0 0 14px;color:var(--mu);font:700 .78rem var(--fb);letter-spacing:.07em;text-transform:uppercase}
+.__meta__{margin:0 0 .4em;color:var(--mu);font-size:.88rem}
+.__meta__ a{color:var(--mu)}
+.__entry__ h2{margin:0 0 .3em;font-size:1.4rem}
+.__entry__ h2 a{color:var(--fg);text-decoration:none}
+.__entry__ h2 a:hover{color:var(--ac)}
+.__readmore__{font-weight:600;text-decoration:none}
+.__post__{max-width:680px}
+.__post__ p{font-size:1.06rem;line-height:1.7}
+.__post__ h1{margin-bottom:.3em}
+.__more__{max-width:680px;margin-top:48px;padding-top:24px;border-top:1px solid var(--ln)}
+.__more__ ul{padding-left:1.1em}
+.__me__{float:right;width:120px;height:120px;margin:4px 0 12px 24px;overflow:hidden;border-radius:50%}
+{{if eq .Layout 0}}.__blogmain__{max-width:760px}
+.__entry__{padding:26px 0;border-top:1px solid var(--ln)}
+{{else if eq .Layout 1}}.__cols__{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:56px;align-items:start}
+.__entry__{padding:22px 0;border-top:1px solid var(--ln)}
+.__side__{padding:22px;border:1px solid var(--ln);border-radius:var(--r);background:var(--sf)}
+.__side__ ul{padding-left:1.1em;margin:0}
+.__side__ .__sectitle__:not(:first-child){margin-top:24px}
+.__single__{display:block}
+.__single__ .__cols__{display:block}
+@media (max-width:860px){.__cols__{display:block}.__side__{margin-top:32px}}
+{{else}}.__feed__{display:grid;gap:28px 24px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+.__feed__ > .__sectitle__{grid-column:1/-1;margin:0}
+.__entry__{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--ln);border-radius:var(--r);background:var(--sf);box-shadow:var(--sh)}
+.__thumb__{display:block;aspect-ratio:8/5;overflow:hidden}
+.__thumb__ .__art__{height:100%}
+.__ebody__{padding:18px 20px 22px}
+.__entry__ h2{font-size:1.2rem}
+{{end}}@media (max-width:560px){.__blogmain__{padding-top:28px}.__me__{width:84px;height:84px;margin-left:16px}}
+.__more__ .__mu__{margin-left:.5em}

@@ -1,0 +1,36 @@
+{{template "base_css" .}}
+.__pf__{padding-top:44px}
+.__hero__{max-width:720px;margin-bottom:36px}
+.__hero__ h1{margin-bottom:.25em}
+.__lede__{color:var(--mu);font-size:1.12rem}
+.__sectitle__{margin:0 0 16px;color:var(--mu);font:700 .78rem var(--fb);letter-spacing:.07em;text-transform:uppercase}
+.__fig__{margin:0}
+.__fig__ img,.__item__ img{display:block;width:100%;height:auto;border-radius:var(--rs);background:var(--so)}
+.__pic__{display:block}
+.__fig__ figcaption{display:flex;flex-direction:column;gap:2px;padding-top:8px;font-size:.92rem}
+.__fig__ figcaption span{color:var(--mu);font-size:.85rem}
+.__more__{margin-top:36px}
+.__list__{display:grid;gap:36px}
+.__item__{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;align-items:center}
+.__item__:nth-child(even) img{order:2}
+.__idesc__ h2{margin-bottom:.2em}
+.__text__{max-width:860px}
+.__text__ > p{max-width:680px;font-size:1.06rem}
+.__two__{display:grid;gap:32px 48px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));margin-top:32px}
+.__shows__{padding-left:0;list-style:none}
+.__shows__ li{margin-bottom:.6em}
+.__shows__ strong{display:inline-block;min-width:3.2em;color:var(--ac)}
+.__text__ li .__ic__,.__card__ p .__ic__{color:var(--ac)}
+{{if eq .Layout 0}}.__gal__{columns:3 260px;column-gap:20px}
+.__fig__{break-inside:avoid;margin-bottom:22px}
+{{else if eq .Layout 1}}.__gal__{display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+.__fig__{position:relative;overflow:hidden;border-radius:var(--r)}
+.__fig__ img{aspect-ratio:4/3;object-fit:cover;border-radius:0}
+.__fig__ figcaption{position:absolute;right:0;bottom:0;left:0;padding:28px 14px 12px;background:linear-gradient(transparent,rgba(0,0,0,.62));color:#fff}
+.__fig__ figcaption span{color:rgba(255,255,255,.82)}
+{{else}}.__gal__{display:grid;gap:22px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.__fig__:first-child{grid-column:1/-1}
+.__fig__:first-child img{aspect-ratio:21/9;object-fit:cover}
+.__fig__:not(:first-child) img{aspect-ratio:4/3;object-fit:cover}
+@media (max-width:820px){.__gal__{grid-template-columns:repeat(2,minmax(0,1fr))}}
+{{end}}@media (max-width:700px){.__item__{grid-template-columns:1fr;gap:14px}.__item__:nth-child(even) img{order:0}.__pf__{padding-top:28px}}

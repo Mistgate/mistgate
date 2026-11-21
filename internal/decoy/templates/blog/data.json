@@ -1,0 +1,166 @@
+{
+  "ui": {
+    "en": {
+      "nav_label": "Main", "footer": "Written by hand, published slowly.",
+      "nav_home": "Notes", "nav_about": "About", "home_title": "Notes",
+      "nf_title": "Nothing here", "nf_text": "There is no note at this address. It may have been renamed, or never written.", "nf_back": "Back to the notes",
+      "latest_h": "Latest notes", "read_more": "Read the note", "min_read": "min read", "more_h": "More notes", "back_all": "All notes",
+      "about_h": "About", "now_h": "Currently", "tags_h": "Topics", "by": "Written by",
+      "vars": {"place": ["Ashwell", "Harrowby", "Lindenmere", "Pellworth", "Oakhaven", "Stanmoor", "Wexcombe", "Fenbridge"]}
+    }
+  },
+  "bundles": [
+    {
+      "lang": "en", "tagline": "Notes from an allotment",
+      "vars": {
+        "brand": {"join": [["Slow", "Quiet", "Honest", "Little", "Wild", "Mossy", "Patient", "Muddy", "Green", "Early"], ["Soil", "Beds", "Patch", "Plot", "Trowel", "Rows", "Hedgerow", "Shed", "Furrow", "Seasons"]], "sep": " "},
+        "first": ["Marian", "Tomas", "Elin", "Rosalind", "Hugo", "Greta"]
+      },
+      "desc": "Notes from a small allotment in {place}: what grew, what did not, and what I would do differently.",
+      "desc_about": "Who writes {brand} and why.",
+      "intro": "Notes from a small allotment in {place}: what grew, what did not, and what I would do differently next year.",
+      "about": [
+        "I am {first}. I have kept an allotment plot in {place} for nine years, mostly for vegetables and a few stubborn roses.",
+        "This notebook is where I write down what the plot teaches me, mostly so that I stop making the same mistakes in a new order.",
+        "Comments are closed. If you have a tip, tell it to whoever has the plot next to yours; that is how I have learnt most of what I know."
+      ],
+      "now": ["Sowing broad beans under cloches", "Mending the shed door, again", "Reading about hedgelaying"],
+      "posts": [
+        {"title": "Why I stopped digging", "tag": "Soil", "excerpt": "Three seasons without a spade, and what happened to the beds.", "body": [
+          "For years I dug the beds over every autumn, because that is what the previous holder of the plot did and what the books of my childhood said. Three seasons ago I stopped, and covered the beds with a thick layer of compost instead.",
+          "The first spring was disappointing. The soil looked untidy and the slugs were delighted. By the second year the worms had done most of the work, the soil crumbled in my hand, and I was spending a Saturday less on the beds each October.",
+          "I would not call it a miracle, and a few weeds came back that I had hoped were gone for good. But my back is grateful, and the carrots came out straighter than they ever did when I dug."]},
+        {"title": "Beans for people who forget to water", "tag": "Vegetables", "excerpt": "Four varieties that forgave me for a dry July.", "body": [
+          "Last July it did not rain for nineteen days and I was away for eleven of them. When I came back the lettuces had bolted and the courgettes looked as if they had given up. The beans, however, were fine.",
+          "Runner beans with deep roots and a thick mulch around them cope with a dry fortnight better than almost anything else I grow. I now sow them along the north edge, where the shade keeps the soil from baking.",
+          "If you are the sort of gardener who plans to water daily and manages it twice a week, plant beans and stay calm."]},
+        {"title": "A small greenhouse from old windows", "tag": "Building", "excerpt": "How a neighbour's skip became a greenhouse in one long weekend.", "body": [
+          "A neighbour had her windows replaced and the old ones sat in a skip for two days. I asked whether I could take them, and she asked me to take the skip as well, if I could manage it.",
+          "I built a frame from reclaimed timber, sized to the biggest window, and fitted the rest in around it. Nothing is square and the door sticks in wet weather, but it keeps the frost off the tomato seedlings.",
+          "The whole thing cost me a box of screws and a bag of putty. Next time I will measure twice before I cut anything, and I mean that."]},
+        {"title": "What to do on the plot in March", "tag": "Seasons", "excerpt": "A short list for the month when everything seems possible and the soil is still cold.", "body": [
+          "March fools everyone. The days are bright and you want to plant, but the soil is cold and seeds sown too early just sit there and rot. I make myself wait until the earth no longer feels chilly against the back of my hand.",
+          "In the meantime there is plenty to do: sort the seed tin, scrub the pots, prune the roses, and put the first potatoes somewhere light to chit. These jobs feel like progress without risking anything.",
+          "By the end of the month I usually allow myself one row of peas under a cloche. It is not sensible, but I enjoy it."]},
+        {"title": "Compost, honestly", "tag": "Soil", "excerpt": "What goes in my heap, what stays out, and why mine is never ready on time.", "body": [
+          "My heap has three rules: nothing cooked, nothing diseased, and nothing I am not sure about. Grass cuttings go in thin layers, torn card goes in with them, and the whole lot gets turned whenever I remember.",
+          "It is slower than the books say. A year is more honest than the six weeks promised on the bag, and the finished compost always comes with surprises, such as a potato I had given up on.",
+          "I do not mind. A heap that takes its time is a heap with no bad feelings about the kitchen scraps."]}
+      ]
+    },
+    {
+      "lang": "en", "tagline": "Rides and repairs",
+      "vars": {
+        "brand": {"join": [["Long", "Steady", "Wet", "Back", "Flat", "Gravel", "Early", "Slow", "Cold", "Open"], ["Gear", "Spokes", "Miles", "Lanes", "Chain", "Wheel", "Ride", "Road", "Hills", "Cadence"]], "sep": " "},
+        "first": ["Jonas", "Maeve", "Kasper", "Ida", "Lewin", "Nora"]
+      },
+      "desc": "Rides, repairs and the occasional wrong turn around {place}.",
+      "desc_about": "Who writes {brand} and why.",
+      "intro": "Rides, repairs and the occasional wrong turn on the lanes around {place}.",
+      "about": [
+        "I am {first}. I ride to work most days and further on Sundays, mostly on lanes around {place} that nobody else seems to know.",
+        "I am not fast and I do not keep records of speed. What I keep are notes about routes, about things that broke, and about what I would carry next time.",
+        "There is no comment box. If you know a better way home from the ridge, write it on a postcard."]
+      ,
+      "now": ["Re-taping the handlebars", "Planning a two-day loop for May", "Learning to true a wheel"],
+      "posts": [
+        {"title": "The forty-mile loop I keep coming back to", "tag": "Routes", "excerpt": "Mostly flat, one proper hill, and a café that closes earlier than you hope.", "body": [
+          "The loop leaves {place} to the east, follows the canal for ten miles and then turns up a lane that nobody has resurfaced since I started riding. There is one proper hill, about a mile of it, and it is the reason I keep coming back.",
+          "Halfway round there is a café that opens at nine and closes at two, which is either far too early or just in time depending on how the morning has gone. I have learnt to carry a flapjack.",
+          "I have ridden it in every month of the year. It is never the same loop twice, and that is the best thing I can say about any route."]},
+        {"title": "Fixing a puncture in the rain", "tag": "Repairs", "excerpt": "Eleven minutes, one cold thumb and a lesson about carrying a spare tube.", "body": [
+          "It always happens on the one downhill where you were making good time. I pulled into a bus shelter, took the wheel off, and discovered the hole was on the inside of the rim tape, which meant it would be back.",
+          "The fix is dull and I have written it on the lid of my saddle bag: check the tyre, find the thorn, check the tape, fit the spare, pump it up harder than seems reasonable. In the rain every step takes twice as long.",
+          "The lesson, which I learn each winter, is that a spare tube weighs less than a good mood and is worth considerably more."]},
+        {"title": "Why I ride in the same jacket all year", "tag": "Kit", "excerpt": "A long defence of one slightly ugly, very yellow jacket.", "body": [
+          "It is too warm in June and not quite warm enough in January, and still it is the jacket I reach for. It is bright yellow, folds into its own pocket, and has survived two crashes and a washing machine.",
+          "I have tried better ones. Each of them was excellent until I had to decide whether to take it, and then it stayed on the hook. The best kit is the kit you actually bring.",
+          "Layers do the rest. A thin wool vest costs less than a new jacket and does more for me than any fabric with a name."]},
+        {"title": "Winter bike, summer bike", "tag": "Bikes", "excerpt": "Two bikes is a luxury, but one of them is allowed to be dirty.", "body": [
+          "For years I had one bike and rode it into the ground each winter, then spent every spring paying for it. Two seasons ago I found an old steel frame at a jumble sale and built it up as a winter bike.",
+          "It has mudguards, wide tyres and a chain I do not mind replacing. It is heavy and slow and I love it, mostly because nobody, including me, expects it to be clean.",
+          "The summer bike stays in the hall from November to March and looks at me reproachfully. I tell it to be patient."]},
+        {"title": "Slowing down on purpose", "tag": "Thoughts", "excerpt": "What happened when I stopped looking at my speed.", "body": [
+          "For a year I rode with a little computer on the handlebars and measured everything. I got slightly faster and noticeably more irritable, and I stopped seeing the lanes I was riding along.",
+          "Then the battery died in March and I did not replace it. The first ride without numbers felt strange for about ten minutes, and after that it felt like when I had first learnt to ride.",
+          "I am no longer sure what I was trying to prove. I know where the best hedges are now, and that seems the better thing to know."]}
+      ]
+    },
+    {
+      "lang": "en", "tagline": "Notes from a small kitchen",
+      "vars": {
+        "brand": {"join": [["Salt", "Butter", "Plain", "Cast", "Small", "Sunday", "Honest", "Warm", "Slow", "Quick"], ["Spoon", "Pan", "Notes", "Table", "Kitchen", "Dough", "Bowl", "Pot", "Oven", "Supper"]], "sep": " "},
+        "first": ["Anneke", "Pavel", "Sofia", "Ruben", "Clara", "Oskar"]
+      },
+      "desc": "Recipes that work, mistakes that taught me something, and dinner in {place}.",
+      "desc_about": "Who writes {brand} and why.",
+      "intro": "Recipes that work, mistakes that taught me something, and what is for dinner in {place}.",
+      "about": [
+        "I am {first}. I cook for a family of four in a kitchen in {place} that is smaller than most people's bathrooms, and I would not change it.",
+        "I write down what worked, in the form I actually cook it, which is to say with fewer amounts and more adjectives than a proper recipe.",
+        "I do not take photographs of food. If a dish looks good enough for a picture, I have probably kept it waiting."]
+      ,
+      "now": ["Feeding a new sourdough starter", "Salting lemons for spring", "Making peace with the oven door"],
+      "posts": [
+        {"title": "A loaf that forgives you", "tag": "Bread", "excerpt": "Flour, water, salt, and a very patient Sunday afternoon.", "body": [
+          "This is the bread I make when I have forgotten that I meant to make bread. It uses almost no yeast, a long rest and no kneading at all, and it does not mind if you leave it for an hour more than you planned.",
+          "Stir flour, water and salt together in the evening until there are no dry patches, cover the bowl, and leave it on the counter. In the morning it is bubbly and smells slightly of beer, and that is what you want.",
+          "Fold it a few times, shape it roughly, and bake it in a hot pot with the lid on. It will look imperfect and taste better than it has any right to."]},
+        {"title": "What to cook when the fridge is nearly empty", "tag": "Weeknights", "excerpt": "Five tins, three onions and a heel of cheese: a dinner.", "body": [
+          "Every Thursday I open the fridge and see half an onion, a wilted leek and a jar of something I do not remember opening. This used to feel like failure. Now I think of it as the one night a week when the cupboard gets a turn.",
+          "Fry the onions slowly until they give up. Add whatever beans you have, a tin of tomatoes and a spoonful of anything sharp: mustard, vinegar, a pickled chilli. Let it bubble while you find a heel of bread.",
+          "Eat it with the cheese grated on top. Nobody has ever asked what was in it, and I have stopped telling them."]},
+        {"title": "The only soup I make in November", "tag": "Soup", "excerpt": "Roast squash, one apple, and patience with the blender.", "body": [
+          "When the first properly cold week arrives I roast a squash, cut side down, with a whole head of garlic and an apple that has gone soft. It takes forty minutes and the whole house smells like the start of winter.",
+          "Scoop everything into a pan, add stock, and blend it until it stops arguing. A little cream is nice but not needed; a spoonful of the apple's sweetness does most of the same work.",
+          "I serve it with toasted seeds and bread that is a day old. It is not clever, and I make it every year."]},
+        {"title": "Pickling without panic", "tag": "Preserving", "excerpt": "Why a jar of quick pickles is the easiest thing in the kitchen.", "body": [
+          "People are put off by the word preserving, which sounds as if it involves sterilising and large pans and a day lost. A quick pickle involves a jar, a kettle and about ten minutes.",
+          "Slice whatever is in the drawer, pack it into a clean jar, and pour over a hot mix of vinegar, water, salt and a little sugar. Add a bay leaf if you have one. Leave it until tomorrow.",
+          "They keep for a few weeks in the fridge and make a plain supper feel deliberate. I have never done this and had a bad result."]},
+        {"title": "Burnt things, and what I learnt", "tag": "Mistakes", "excerpt": "A short catalogue of ruined dinners and the one thing each of them taught.", "body": [
+          "The caramel taught me that sugar does not care about my phone. The risotto taught me that stock should be hot. The roast potatoes taught me that a tray can be too full, and that nobody forgives a pale potato.",
+          "The worst was the birthday cake that I took out too early and put back in too late. It sank in the middle like a dignified old building, and we ate it with a spoon and custard.",
+          "I keep a list of what went wrong on the inside of a cupboard door. It is longer than my list of what went right, and much more useful."]}
+      ]
+    },
+    {
+      "lang": "en", "tagline": "Notes on books",
+      "vars": {
+        "brand": {"join": [["Dog-eared", "Margin", "Second", "Late", "Paper", "Quiet", "Open", "Slow", "Winter", "Rainy"], ["Pages", "Notes", "Shelf", "Chapters", "Stack", "Reader", "Binding", "Spine", "Lines", "Hours"]], "sep": " "},
+        "first": ["Ines", "Matthias", "Leona", "Arvid", "Philippa", "Theo"]
+      },
+      "desc": "Notes on books read slowly, in no particular order, from a flat in {place}.",
+      "desc_about": "Who writes {brand} and why.",
+      "intro": "Notes on books read slowly and in no particular order, from a flat in {place}.",
+      "about": [
+        "I am {first}. I read in the evenings and on the train, and I write a few lines about each book so that I remember it.",
+        "These are not reviews. I rarely say whether a book is good. I say what I noticed, what I underlined, and what I kept thinking about on the walk to work.",
+        "I live in {place}, near a library with a very good basement and a very bad heating system, which is how I spend most Saturdays."]
+      ,
+      "now": ["Rereading a book from school", "Working through a very long novel in small doses", "Returning three overdue library books"],
+      "posts": [
+        {"title": "Why I finish books I do not like", "tag": "Habits", "excerpt": "An unfashionable defence of getting to the end.", "body": [
+          "Everyone says life is too short to finish a book you do not enjoy, and for most of my reading life I agreed. Then I started finishing them, as an experiment, and found that about one in five turned around somewhere past the middle.",
+          "The rest stayed disappointing, but I learnt what exactly disappointed me, and that turned out to be useful. It is easier to describe a book you have read to the end than one you abandoned on page ninety.",
+          "I am not saying everyone should do this. I am saying the rule about life being too short has a quiet cost."]},
+        {"title": "A library card is the best bargain in town", "tag": "Libraries", "excerpt": "Free, unlimited, and with an excellent smell.", "body": [
+          "My card costs nothing and lets me take out twenty books at a time. I rarely take more than four, but I like knowing that I could.",
+          "The best part is not the books. It is the shelf next to the one I came for, where I find things I did not know I wanted. A recommendation algorithm has never once handed me a damp paperback about lighthouses.",
+          "Use your library. If it has a bad heating system, even better: you will stay longer in your coat and read more."]},
+        {"title": "Rereading a book from school", "tag": "Rereading", "excerpt": "I remembered it as dull. It was not the book that was dull.", "body": [
+          "I was made to read it at fifteen, in six weeks, with a worksheet for every chapter. I remembered it as slow and full of weather, and I did not open it again for twenty-five years.",
+          "This autumn I borrowed a copy from the library. It is strange and funny, and the weather turns out to be the point. At fifteen I was reading to answer questions; now I was reading because I wanted to know what happened.",
+          "I have a short list of other books from school to try again. I suspect most of them were fine."]},
+        {"title": "Notes on slow reading", "tag": "Habits", "excerpt": "Twenty pages a night, a pencil, and no rush.", "body": [
+          "My rule is simple: twenty pages in the evening, more if the book insists, never fewer. A long novel then takes six weeks, and by the end I know it much better than the ones I used to speed through.",
+          "I keep a pencil in the book and underline sparingly. Once a week I copy the underlined lines into a notebook, which is when I find out which ones I still care about.",
+          "It is not a method so much as a way of staying out of the hurry. The books do not mind either way."]},
+        {"title": "The unread pile", "tag": "Shelves", "excerpt": "A short, affectionate inventory of everything I have not got to yet.", "body": [
+          "The pile on the chair has fourteen books in it, including two I bought twice. It has been there so long that the cat treats it as furniture and the top book is faded on one side from the sun.",
+          "I used to feel guilty about it. Then someone told me that a shelf of unread books is not a list of failures but a store of future evenings, and I have been calmer ever since.",
+          "I buy fewer than I used to. But I would not want to be without the pile, any more than I would want an empty fridge."]}
+      ]
+    }
+  ]
+}

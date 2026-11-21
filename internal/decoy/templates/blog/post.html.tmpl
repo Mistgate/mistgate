@@ -1,0 +1,17 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __blogmain__ __single__">
+<article class="__post__">
+<p class="__meta__"><a href="/">{{.L.back_all}}</a> · <time datetime="{{.Page.Item.date_iso}}">{{.Page.Item.date}}</time> · {{num (printf "mr%s" .Page.Item.slug) 3 7}} {{.L.min_read}} · <span class="__pill__">{{.Page.Item.tag}}</span></p>
+<h1>{{.Page.Item.title}}</h1>
+<p class="__lede__">{{.Page.Item.excerpt}}</p>
+{{range .Page.Item.body}}<p>{{.}}</p>
+{{end}}</article>
+<aside class="__more__">
+<h2 class="__sectitle__">{{.L.more_h}}</h2>
+<ul>{{range .Lists.posts}}{{if ne .slug $.Page.Item.slug}}<li><a href="{{.href}}">{{.title}}</a> <span class="__mu__">{{.date}}</span></li>{{end}}{{end}}</ul>
+</aside>
+</main>
+{{template "footer" .}}
+</body>
+</html>

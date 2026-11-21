@@ -1,0 +1,22 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __pf__ __text__">
+<h1>{{.L.contact_h}}</h1>
+<div class="__two__">
+<section class="__card__">
+<h2>{{.L.visit_h}}</h2>
+<p>{{icon "pin"}} {{.V.n}} Mill Lane, {{.V.city}}</p>
+<p>{{icon "phone"}} {{.L.phone_l}}: 555-0{{.V.ph}}</p>
+<h3>{{.L.hours_h}}</h3>
+<ul>{{range .L.hours}}<li>{{.}}</li>{{end}}</ul>
+</section>
+<section>
+<p>{{.L.visit_text}}</p>
+<h2>{{.L.commission_h}}</h2>
+<p>{{.L.commission_text}}</p>
+</section>
+</div>
+</main>
+{{template "footer" .}}
+</body>
+</html>

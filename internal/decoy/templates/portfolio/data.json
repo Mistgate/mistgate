@@ -1,0 +1,91 @@
+{
+  "ui": {
+    "en": {
+      "vars": {
+        "city": ["Ashwell", "Harrowby", "Lindenmere", "Pellworth", "Oakhaven", "Stanmoor", "Wexcombe", "Fenbridge"],
+        "n": {"min": 2, "max": 58},
+        "ph": {"min": 100, "max": 199}
+      },
+      "nav_label": "Main", "footer": "All images are the work of the studio and are not to be reproduced without permission.",
+      "nav_home": "Selected work", "nav_work": "All work", "nav_about": "About", "nav_contact": "Contact", "home_title": "Selected work",
+      "nf_title": "Page not found", "nf_text": "There is nothing at this address. The work is on the start page.", "nf_back": "Back to the work",
+      "sel_h": "Selected work", "all_work": "See all work", "work_h": "All work", "work_intro": "Everything from the last few years, newest first.",
+      "about_h": "About", "services_h": "What I do", "shows_h": "Exhibitions and mentions",
+      "contact_h": "Contact", "visit_h": "Studio", "hours_h": "Opening hours", "phone_l": "Telephone",
+      "visit_text": "The studio is open by appointment. Please call during opening hours; if nobody answers, I am probably in the darkroom or at the framer's.",
+      "commission_h": "Commissions", "commission_text": "I take on a small number of commissions each year. When you call, tell me what you have in mind and when you need it, and I will say honestly whether I can do it.",
+      "hours": ["Thursday and Friday, 11:00 to 17:00", "Saturday by appointment"]
+    }
+  },
+  "bundles": [
+    {
+      "lang": "en", "tagline": "Photographs of quiet places",
+      "vars": {"brand": {"join": [["Hollow", "Pale", "Open", "Still", "Long", "Soft", "Thin", "Early", "Narrow", "Distant"], ["Light", "Frame", "Field", "Hour", "Horizon", "Exposure", "Plate", "Shutter", "Aperture", "Print"]], "sep": " "}},
+      "desc": "Landscape and still-life photography from {city}. Prints and commissions.", "desc_work": "Selected photographs, newest first.", "desc_about": "About the photographer and the studio in {city}.", "desc_contact": "Where to find the studio in {city} and when it is open.",
+      "intro": "Landscape and still-life photography from {city}. Prints and a few commissions each year.",
+      "about": [
+        "I am a photographer working from a small studio in {city}. Most of my pictures are of places in the hour after everyone has left.",
+        "I work slowly, usually with one camera and one lens, and print everything myself in the back room. A picture is finished when I can look at it for a week without wanting to change it.",
+        "In recent years my work has been shown in small galleries and libraries around the region and sold as prints to people who wanted something quiet for a wall."],
+      "services": ["Fine art prints, signed and numbered", "Commissioned portraits at home or in the studio", "Editorial and book photography"],
+      "shows": [{"y": "2025", "t": "Two Horizons, group show, The Old Granary Gallery"}, {"y": "2024", "t": "Still Water, solo show, Millbrook Library foyer"}, {"y": "2022", "t": "Regional Photography Prize, shortlisted"}],
+      "works": [
+        {"title": "Hillside, afternoon", "caption": "Archival pigment print, 2025", "note": "The last of the light on a field that is usually ignored."},
+        {"title": "Two horizons", "caption": "Archival pigment print, 2025", "note": "A shoreline that could not decide where to end."},
+        {"title": "Quiet water", "caption": "Archival pigment print, 2024", "note": "A pond in November with nothing to prove."},
+        {"title": "Red field", "caption": "Archival pigment print, 2024", "note": "Poppies gone to seed, photographed in the rain."},
+        {"title": "Lines at dusk", "caption": "Archival pigment print, 2023", "note": "Telegraph wires against a sky that was changing its mind."},
+        {"title": "Salt and slate", "caption": "Archival pigment print, 2023", "note": "A harbour wall at low tide, in the colours of an old coin."},
+        {"title": "Blue hour", "caption": "Archival pigment print, 2022", "note": "Ten minutes between day and night, repeated for a week."},
+        {"title": "Winter orchard", "caption": "Archival pigment print, 2022", "note": "Bare trees in a row, counted twice."},
+        {"title": "Morning fog", "caption": "Archival pigment print, 2021", "note": "A valley that had not yet been told it was morning."}
+      ]
+    },
+    {
+      "lang": "en", "tagline": "Illustration and printmaking",
+      "vars": {"brand": {"join": [["Fern", "Paper", "Little", "Ink", "Lemon", "Moth", "Honest", "Orange", "Pencil", "Quiet"], ["Press", "Studio", "Desk", "Drawing", "Works", "Sketchbook", "Corner", "Table", "Block", "Cabinet"]], "sep": " "}},
+      "desc": "Illustrations, linocuts and small books from a desk in {city}.", "desc_work": "Illustrations and prints, newest first.", "desc_about": "About the illustrator and the studio in {city}.", "desc_contact": "Where to find the studio in {city} and when it is open.",
+      "intro": "Illustrations, linocuts and small books from a desk in {city}.",
+      "about": [
+        "I am an illustrator and printmaker. I draw for picture books, for magazines that still pay on time, and for anyone who needs a bird in the corner of a poster.",
+        "Most of my work begins as a pencil sketch in a notebook and ends as a linocut or a flat-colour digital drawing, whichever the job seems to want.",
+        "I live in {city} with a cat who has opinions about my compositions."],
+      "services": ["Picture books and editorial illustration", "Linocut prints and cards", "Posters and event artwork"],
+      "shows": [{"y": "2025", "t": "Small Prints Fair, stallholder"}, {"y": "2024", "t": "Field Notes, a picture book from a local press"}, {"y": "2023", "t": "Regional illustration award, commended"}],
+      "works": [
+        {"title": "Study in orange", "caption": "Linocut, three colours, 2025", "note": "A fox, half a staircase and an unexplained moon."},
+        {"title": "Market day", "caption": "Digital drawing, 2025", "note": "Eleven stalls and one very smug pigeon."},
+        {"title": "The long way round", "caption": "Pencil and ink, 2024", "note": "A path that does not go where the sign says."},
+        {"title": "Night bus", "caption": "Linocut, two colours, 2024", "note": "Everyone is asleep except the driver and the moon."},
+        {"title": "Green hours", "caption": "Gouache, 2023", "note": "A greenhouse at four in the afternoon."},
+        {"title": "Small birds", "caption": "Linocut, 2023", "note": "Seven birds, none of them identified correctly."},
+        {"title": "Rain study", "caption": "Watercolour, 2022", "note": "Umbrellas seen from a window."},
+        {"title": "Harvest", "caption": "Digital drawing, 2022", "note": "A field of orange with a tractor in the corner."},
+        {"title": "Kitchen window", "caption": "Pencil and ink, 2021", "note": "What happens on the sill when nobody is looking."}
+      ]
+    },
+    {
+      "lang": "en", "tagline": "Graphic design for small organisations",
+      "vars": {"brand": {"join": [["Grid", "Plain", "Kern", "Bold", "Quiet", "Margin", "Fine", "True", "Square", "Open"], ["Studio", "Works", "Office", "House", "Lab", "Desk", "Bureau", "Workshop", "Press", "Room"]], "sep": " "}},
+      "desc": "Identities, posters and printed things for small organisations in {city} and beyond.", "desc_work": "Selected design projects, newest first.", "desc_about": "About the design studio in {city}.", "desc_contact": "Where to find the studio in {city} and when it is open.",
+      "intro": "Identities, posters and printed things for small organisations in {city} and beyond.",
+      "about": [
+        "We are a small design studio in {city}. We work with theatres, shops, charities and the occasional brewery, mostly on identities and printed matter.",
+        "We like clear grids, honest paper and typefaces that have been around long enough to behave. We try not to make anything that needs a tutorial.",
+        "Most projects start with a conversation and a cup of tea, and finish with a box of printed samples on the table."],
+      "services": ["Identities and logos", "Posters, programmes and signage", "Annual reports and small books"],
+      "shows": [{"y": "2025", "t": "Poster of the Year, regional design awards, shortlisted"}, {"y": "2024", "t": "Quiet Branding, a talk at a local design meetup"}, {"y": "2023", "t": "Typography Evening, organisers"}],
+      "works": [
+        {"title": "Identity for a tea merchant", "caption": "Identity, 2025", "note": "A mark made of one leaf and a great deal of restraint."},
+        {"title": "Posters for a choir", "caption": "Poster series, 2025", "note": "Twelve sheets, twelve voices, one grid."},
+        {"title": "Annual report", "caption": "Print, 2024", "note": "Forty pages that people actually read."},
+        {"title": "Programme for a puppet theatre", "caption": "Print, 2024", "note": "Folds into a house and then into a boat."},
+        {"title": "Packaging for a bakery", "caption": "Packaging, 2023", "note": "Paper bags that look better after one use."},
+        {"title": "Wayfinding for a library", "caption": "Signage, 2023", "note": "Signs that are only noticed when they are missing."},
+        {"title": "Menu for a small restaurant", "caption": "Print, 2022", "note": "A single sheet that changes every week."},
+        {"title": "Festival poster", "caption": "Poster, 2022", "note": "Printed in two inks on newsprint."},
+        {"title": "Book cover series", "caption": "Covers, 2021", "note": "Six covers, one typeface."}
+      ]
+    }
+  ]
+}

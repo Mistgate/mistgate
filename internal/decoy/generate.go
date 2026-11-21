@@ -758,7 +758,9 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 			p := fmt.Sprintf("%s/%s-%s.svg", dir, sl, hex6(ar))
 			it["img"] = "/" + p
 			it["art_kind"] = kind
-			c.files[p] = []byte(artSVG(ar, kind, s.P.Hue+float64(ar.n(120))-60, 480, 360, "g"+hex6(ar), true))
+			size := [][2]int{{480, 360}, {360, 480}, {480, 480}, {480, 320}, {400, 500}}[ar.n(5)]
+			it["w"], it["h"] = size[0], size[1]
+			c.files[p] = []byte(artSVG(ar, kind, s.P.Hue+float64(ar.n(120))-60, size[0], size[1], "g"+hex6(ar), true))
 		}
 	}
 	return items, nil
@@ -948,20 +950,14 @@ func breakProse(r *rng, text string) string {
 	if len(text) < 45 {
 		return text
 	}
+	// Every space may take a break, each on its own chance: two sites that say the same thing then break it in different places.
 	var out strings.Builder
-	pos := 12 + r.n(26)
-	last := 0
-	for pos < len(text)-8 {
-		sp := strings.IndexByte(text[pos:], ' ')
-		if sp < 0 {
-			break
+	for i := 0; i < len(text); i++ {
+		out.WriteByte(text[i])
+		if text[i] == ' ' && i > 6 && i < len(text)-8 && r.n(7) == 0 {
+			out.WriteString("<wbr>")
 		}
-		cut := pos + sp + 1
-		out.WriteString(text[last:cut] + "<wbr>")
-		last = cut
-		pos = cut + 40 + r.n(40)
 	}
-	out.WriteString(text[last:])
 	return out.String()
 }
 
