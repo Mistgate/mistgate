@@ -323,3 +323,17 @@ func artSVG(r *rng, kind string, hue float64, w, h int, id string, standalone bo
 	b.WriteString("</svg>")
 	return b.String()
 }
+
+// The look as maps, for the templates (they read maps only).
+func (t tone) data() map[string]any {
+	return map[string]any{"BG": t.BG, "Surface": t.Surface, "FG": t.FG, "Muted": t.Muted, "Line": t.Line, "Acc": t.Acc, "AccInk": t.AccInk,
+		"Acc2": t.Acc2, "Soft": t.Soft, "Ok": t.Ok, "Warn": t.Warn, "Bad": t.Bad}
+}
+
+func (s style) data() map[string]any {
+	return map[string]any{"R": s.R, "RS": s.RS, "W": s.W, "FS": s.FS, "LH": s.LH, "Shadow": s.Shadow, "Stroke": s.Stroke}
+}
+
+func (f fonts) data() map[string]any {
+	return map[string]any{"Body": f.Body, "Head": f.Head, "Mono": f.Mono}
+}

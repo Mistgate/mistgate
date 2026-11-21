@@ -7,12 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 	"unicode"
 )
@@ -36,6 +36,11 @@ import (
 // and the "nav" and "desc" keys the pages name. Templates see the site (.L texts, .V vars, .Layout, .Lists, .Nav, .Page) and
 // the functions of funcMap. Texts are printed as they are, never escaped: write them so they are safe in a double-quoted
 // attribute (no double quotes, no "<").
+//
+// The template language is the small subset of Go's text/template that generate_tmpl.go interprets (text/template itself is
+// not used: it would keep every method of the program in the edge builds): fields, variables, if / else if / else, range,
+// with, define and template, parentheses and the functions, trim markers and comments, but no pipes. A field or function that
+// is not there is an error, and a test renders every kind from 200 seeds to find it.
 
 //go:embed templates
 var templateFS embed.FS
@@ -98,7 +103,7 @@ type kindDef struct {
 	meta    metaDef
 	ui      map[string]map[string]any
 	bundles []map[string]any
-	tpl     *template.Template
+	tpl     *tmplSet
 	hasJS   bool
 }
 
@@ -151,15 +156,27 @@ func parseKind(id string, rawMeta []byte) (*kindDef, error) {
 	if home := d.meta.Pages[0]; home.Name != "home" || len(home.Paths) != 1 || home.Paths[0] != "index.html" {
 		return nil, errors.New(`the first page must be "home" at index.html`)
 	}
-	t := template.New(id).Funcs(funcMap(nil))
-	if t, err = t.ParseFS(templateFS, "templates/shared/*.tmpl"); err != nil {
-		return nil, err
-	}
-	if t, err = t.ParseFS(templateFS, "templates/"+id+"/*.tmpl"); err != nil {
-		return nil, err
+	t := newTmplSet(funcMap(nil))
+	for _, dir := range []string{"shared", id} { // a kind may replace a template of the shared part
+		files, err := fs.ReadDir(templateFS, "templates/"+dir)
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range files {
+			if !strings.HasSuffix(f.Name(), ".tmpl") {
+				continue
+			}
+			text, err := fs.ReadFile(templateFS, "templates/"+dir+"/"+f.Name())
+			if err != nil {
+				return nil, err
+			}
+			if err := t.add(f.Name(), string(text)); err != nil {
+				return nil, err
+			}
+		}
 	}
 	d.tpl = t
-	d.hasJS = t.Lookup("script.js.tmpl") != nil
+	d.hasJS = t.has("script.js.tmpl")
 	return d, nil
 }
 
@@ -225,16 +242,52 @@ type site struct {
 	titleStyle                 int
 }
 
-type pageData struct {
-	*site
-	Page page
-	Nav  []navItem
+// data is what a template sees as dot: the site and the page, as maps, which is all the interpreter reads.
+func (s *site) data() map[string]any {
+	vars := make(map[string]any, len(s.V))
+	for k, v := range s.V {
+		vars[k] = v
+	}
+	lists := make(map[string]any, len(s.Lists))
+	for k, items := range s.Lists {
+		l := make([]any, len(items))
+		for i, it := range items {
+			l[i] = it
+		}
+		lists[k] = l
+	}
+	order := make([]any, len(s.Order))
+	for i, o := range s.Order {
+		order[i] = o
+	}
+	return map[string]any{
+		"Kind": s.Kind, "Lang": s.Lang, "Brand": s.Brand, "Initial": s.Initial, "L": s.L, "V": vars, "Layout": s.Layout, "Head": s.Head,
+		"Foot": s.Foot, "P": map[string]any{"L": s.P.L.data(), "D": s.P.D.data()}, "S": s.S.data(), "Fnt": s.Fnt.data(), "Year": s.Year,
+		"Since": s.Since, "CSS": s.CSS, "JS": s.JS, "Icon": s.Icon, "Mark": s.Mark, "Lists": lists, "Order": order, "DateFmt": s.DateFmt,
+	}
+}
+
+// pageData is the site with one page of it and the menu as it looks on that page.
+func pageData(base map[string]any, pg page, nav []navItem) map[string]any {
+	d := maps.Clone(base)
+	var item any
+	if pg.Item != nil {
+		item = pg.Item
+	}
+	d["Page"] = map[string]any{"Name": pg.Name, "Title": pg.Title, "Full": pg.Full, "Desc": pg.Desc, "Href": pg.Href, "Path": pg.Path, "Item": item}
+	n := make([]any, len(nav))
+	for i, it := range nav {
+		n[i] = map[string]any{"Href": it.Href, "Label": it.Label, "Cur": it.Cur}
+	}
+	d["Nav"] = n
+	return d
 }
 
 type ctx struct {
 	r     *rng
 	s     *site
-	t     *template.Template
+	t     *tmplSet
+	fns   map[string]tmplFunc
 	memo  map[string]any
 	files map[string][]byte
 	artID string
@@ -279,11 +332,8 @@ func (d *kindDef) render(seed []byte) ([]File, string, error) {
 		return nil, "", err
 	}
 	c.s = s
-	t, err := d.tpl.Clone()
-	if err != nil {
-		return nil, "", err
-	}
-	c.t = t.Funcs(funcMap(c))
+	c.t, c.fns = d.tpl, funcMap(c)
+	base := s.data()
 
 	// Where every page lives, then what it is called.
 	type placed struct {
@@ -316,14 +366,14 @@ func (d *kindDef) render(seed []byte) ([]File, string, error) {
 		}
 	}
 
-	render := func(name string, pd pageData) (string, error) {
+	render := func(name string, data map[string]any) (string, error) {
 		var b bytes.Buffer
-		if err := c.t.ExecuteTemplate(&b, name, pd); err != nil {
+		if err := c.t.exec(&b, name, data, c.fns); err != nil {
 			return "", fmt.Errorf("decoy kind %s: %s: %w", d.id, name, err)
 		}
 		return b.String(), nil
 	}
-	mk := func(p placed) pageData {
+	mk := func(p placed) map[string]any {
 		pg := page{Name: p.def.Name, Path: p.path, Href: hrefOf(p.path), Item: p.item}
 		switch {
 		case p.item != nil:
@@ -348,7 +398,7 @@ func (d *kindDef) render(seed []byte) ([]File, string, error) {
 		for i := range n {
 			n[i].Cur = n[i].Href == pg.Href
 		}
-		return pageData{site: s, Page: pg, Nav: n}
+		return pageData(base, pg, n)
 	}
 
 	for _, p := range pages {
@@ -362,14 +412,14 @@ func (d *kindDef) render(seed []byte) ([]File, string, error) {
 		}
 		c.files[p.path] = []byte(out)
 	}
-	base := pageData{site: s, Page: page{Name: "assets"}}
-	css, err := render("style.css.tmpl", base)
+	assets := pageData(base, page{Name: "assets"}, nil)
+	css, err := render("style.css.tmpl", assets)
 	if err != nil {
 		return nil, "", err
 	}
 	c.files[strings.TrimPrefix(s.CSS, "/")] = []byte(css)
 	if d.hasJS {
-		js, err := render("script.js.tmpl", base)
+		js, err := render("script.js.tmpl", assets)
 		if err != nil {
 			return nil, "", err
 		}
@@ -751,10 +801,43 @@ func (s *site) fdate(iso string) string {
 	return strings.NewReplacer("{d}", fmt.Sprint(t.Day()), "{m}", months[t.Month()-1], "{y}", fmt.Sprint(t.Year())).Replace(s.DateFmt)
 }
 
-func funcMap(c *ctx) template.FuncMap {
+// The functions of the templates, other than the builtins of the interpreter. They are keyed draws: the same key in two places
+// gives the same answer, whichever page is made first. funcMap(nil) is only the list of names.
+func funcMap(c *ctx) map[string]tmplFunc {
 	key := func(k string) *rng { return c.r.sub("k:" + k) }
-	return template.FuncMap{
-		"one": func(k string, l []any) any {
+	argStr := func(a []any, i int) string {
+		if i >= len(a) {
+			fail("a function is missing argument %d", i+1)
+		}
+		s, ok := a[i].(string)
+		if !ok {
+			fail("argument %d should be a string, not %T", i+1, a[i])
+		}
+		return s
+	}
+	argInt := func(a []any, i int) int {
+		if i >= len(a) {
+			fail("a function is missing argument %d", i+1)
+		}
+		n, ok := a[i].(int)
+		if !ok {
+			fail("argument %d should be a number, not %T", i+1, a[i])
+		}
+		return n
+	}
+	argList := func(a []any, i int) []any {
+		if i >= len(a) {
+			fail("a function is missing argument %d", i+1)
+		}
+		l, ok := a[i].([]any)
+		if !ok || len(l) == 0 {
+			fail("argument %d should be a list that is not empty", i+1)
+		}
+		return l
+	}
+	return map[string]tmplFunc{
+		"one": func(a []any) any {
+			k, l := argStr(a, 0), argList(a, 1)
 			if v, ok := c.memo["one:"+k]; ok {
 				return v
 			}
@@ -762,9 +845,10 @@ func funcMap(c *ctx) template.FuncMap {
 			c.memo["one:"+k] = v
 			return v
 		},
-		"pick": func(k string, l []any, n int) []any {
+		"pick": func(a []any) any {
+			k, l, n := argStr(a, 0), argList(a, 1), argInt(a, 2)
 			if v, ok := c.memo["pick:"+k]; ok {
-				return v.([]any)
+				return v
 			}
 			n = min(n, len(l))
 			out := make([]any, n)
@@ -774,11 +858,11 @@ func funcMap(c *ctx) template.FuncMap {
 			c.memo["pick:"+k] = out
 			return out
 		},
-		"num":    func(k string, lo, hi int) int { return key(k).between(lo, hi) },
-		"chance": func(k string, pct int) bool { return key(k).chance(pct) },
+		"num":    func(a []any) any { return key(argStr(a, 0)).between(argInt(a, 1), argInt(a, 2)) },
+		"chance": func(a []any) any { return key(argStr(a, 0)).chance(argInt(a, 1)) },
 		// hexs is n hex digits, such as a checksum.
-		"hexs": func(k string, n int) string {
-			r := key(k)
+		"hexs": func(a []any) any {
+			r, n := key(argStr(a, 0)), argInt(a, 1)
 			var b strings.Builder
 			for b.Len() < n {
 				fmt.Fprintf(&b, "%016x", r.u64())
@@ -786,14 +870,14 @@ func funcMap(c *ctx) template.FuncMap {
 			return b.String()[:n]
 		},
 		// pct is a percentage from lo/100 to hi/100 with two decimals: pct "k" 9950 9999 gives 99.50 to 99.99.
-		"pct": func(k string, lo, hi int) string {
-			v := key(k).between(lo, hi)
+		"pct": func(a []any) any {
+			v := key(argStr(a, 0)).between(argInt(a, 1), argInt(a, 2))
 			return fmt.Sprintf("%d.%02d", v/100, v%100)
 		},
 		// rolls is n days: 1 a bad one (warn per mille), 2 a very bad one (bad per mille), 3 to 5 a good one in three shades.
-		"rolls": func(k string, n, warn, bad int) []int {
-			r := key(k)
-			out := make([]int, n)
+		"rolls": func(a []any) any {
+			r, n, warn, bad := key(argStr(a, 0)), argInt(a, 1), argInt(a, 2), argInt(a, 3)
+			out := make([]any, n)
 			for i := range out {
 				switch v := r.n(1000); {
 				case v < bad:
@@ -806,31 +890,40 @@ func funcMap(c *ctx) template.FuncMap {
 			}
 			return out
 		},
-		"seq": func(n int) []int {
-			out := make([]int, n)
+		"seq": func(a []any) any {
+			out := make([]any, argInt(a, 0))
 			for i := range out {
 				out[i] = i
 			}
 			return out
 		},
-		"add":   func(a, b int) int { return a + b },
-		"sub":   func(a, b int) int { return a - b },
-		"mul":   func(a, b int) int { return a * b },
-		"lower": strings.ToLower,
-		"icon":  func(name string) string { c.iconN++; return iconSVG(name, c.r.sub(fmt.Sprint("icon", c.iconN))) },
-		"fdate": func(iso string) string { return c.s.fdate(iso) },
-		"art": func(k, kind string, w, h int) string {
+		"add":   func(a []any) any { return argInt(a, 0) + argInt(a, 1) },
+		"sub":   func(a []any) any { return argInt(a, 0) - argInt(a, 1) },
+		"mul":   func(a []any) any { return argInt(a, 0) * argInt(a, 1) },
+		"lower": func(a []any) any { return strings.ToLower(argStr(a, 0)) },
+		"icon": func(a []any) any {
+			c.iconN++
+			return iconSVG(argStr(a, 0), c.r.sub(fmt.Sprint("icon", c.iconN)))
+		},
+		"fdate": func(a []any) any { return c.s.fdate(argStr(a, 0)) },
+		"art": func(a []any) any {
+			k, kind := argStr(a, 0), argStr(a, 1)
 			r := key("art:" + k)
 			if kind == "" {
 				kind = artKinds[r.n(len(artKinds))]
 			}
 			c.artN++
-			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, w, h, fmt.Sprintf("%s%d", c.artID, c.artN), false)
+			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, argInt(a, 2), argInt(a, 3), fmt.Sprintf("%s%d", c.artID, c.artN), false)
 		},
-		"blk": func(name string, data any) (string, error) {
+		"blk": func(a []any) any {
+			if len(a) != 2 {
+				fail("blk takes a name and the data")
+			}
 			var b bytes.Buffer
-			err := c.t.ExecuteTemplate(&b, "b_"+name, data)
-			return b.String(), err
+			if err := c.t.exec(&b, "b_"+argStr(a, 0), a[1], c.fns); err != nil {
+				fail("%s", err)
+			}
+			return b.String()
 		},
 	}
 }

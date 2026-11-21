@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"hash/maphash"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -405,6 +406,126 @@ func TestDumpSites(t *testing.T) {
 				if err := os.WriteFile(p, f.Content, 0o644); err != nil {
 					t.Fatal(err)
 				}
+			}
+		}
+	}
+}
+
+// run renders src as the template "t" with the given dot and functions.
+func runTemplate(src string, dot any, fns map[string]tmplFunc, extra ...string) (string, error) {
+	s := newTmplSet(fns)
+	if err := s.add("t", src); err != nil {
+		return "", err
+	}
+	for i := 0; i+1 < len(extra); i += 2 {
+		if err := s.add(extra[i], extra[i+1]); err != nil {
+			return "", err
+		}
+	}
+	var b bytes.Buffer
+	err := s.exec(&b, "t", dot, fns)
+	return b.String(), err
+}
+
+func TestTemplateInterpreter(t *testing.T) {
+	data := map[string]any{
+		"A": "a&b", "N": 3, "Z": 0, "T": true, "Nil": nil, "S": "",
+		"M":    map[string]any{"x": map[string]any{"y": "deep"}, "k": "v"},
+		"List": []any{"p", "q", "r"},
+		"Rows": []any{map[string]any{"n": "one", "ok": true}, map[string]any{"n": "two", "ok": false}},
+		"Em":   []any{},
+	}
+	fns := map[string]tmplFunc{
+		"up":  func(a []any) any { return strings.ToUpper(a[0].(string)) },
+		"cat": func(a []any) any { return a[0].(string) + a[1].(string) },
+	}
+	cases := []struct{ name, src, want string }{
+		{"text", "plain {not an action}", "plain {not an action}"},
+		{"field", "{{.A}}|{{.N}}|{{.T}}", "a&b|3|true"},
+		{"chain", "{{.M.x.y}} {{$.M.k}}", "deep v"},
+		{"dot", "{{range .List}}{{.}}{{end}}", "pqr"},
+		{"literals", `{{"s"}}{{12}}{{-3}}{{true}}`, "s12-3true"},
+		{"function", `{{up .A}} {{cat "x" (up "y")}}`, "A&B xY"},
+		{"paren chain", "{{(index .Rows 1).n}}", "two"},
+		{"if", "{{if .N}}y{{end}}{{if .Z}}y{{else}}n{{end}}{{if .S}}y{{end}}{{if .Em}}y{{end}}{{if .List}}y{{end}}", "yny"},
+		{"else if", "{{if eq .N 1}}one{{else if eq .N 3}}three{{else}}other{{end}}", "three"},
+		{"eq many", `{{if eq .A "x" "a&b"}}in{{end}}{{if ne .N 4}}ne{{end}}`, "inne"},
+		{"compare", "{{lt 1 2}}{{gt 1 2}}{{le 2 2}}{{ge 1 2}}{{lt \"a\" \"b\"}}", "truefalsetruefalsetrue"},
+		{"not", "{{not .Z}}{{not .N}}", "truefalse"},
+		{"range index", "{{range $i, $v := .List}}{{$i}}{{$v}},{{end}}", "0p,1q,2r,"},
+		{"range value", "{{range $v := .List}}{{$v}}{{end}}", "pqr"},
+		{"range else", "{{range .Em}}x{{else}}empty{{end}}", "empty"},
+		{"range fields", "{{range .Rows}}{{.n}}{{if .ok}}!{{end}} {{end}}", "one! two "},
+		{"with", "{{with .M.x}}{{.y}}{{end}}{{with .Z}}no{{else}}else{{end}}", "deepelse"},
+		{"variables", "{{$x := 1}}{{if true}}{{$x = 2}}{{$y := 9}}{{end}}{{$x}}", "2"},
+		{"range scope", "{{$n := 0}}{{range .List}}{{$n = .}}{{end}}{{$n}}", "r"},
+		{"index", `{{index .List 1}}{{index .M "k"}}`, "qv"},
+		{"len", "{{len .List}}{{len .A}}{{len .M}}", "332"},
+		{"printf", `{{printf "%d-%s-%s" .N .A "z"}}`, "3-a&b-z"},
+		{"js", `{{js "it's <b>\"x\" a=b\n…"}}`, `it\'s <b>\"x\" a=b\u000A…`},
+		{"trim", "a  {{- 1 -}}  b", "a1b"},
+		{"comment", "a{{/* gone */}}b", "ab"},
+		{"template", `{{template "u" .M.k}}`, "<v>"},
+		{"template no arg", `{{template "n"}}{{template "u" "x"}}`, "-<x>"},
+		{"define in file", `{{define "d"}}[{{.}}]{{end}}{{template "d" .N}}`, "[3]"},
+		{"dollar in template", `{{template "w" .M}}`, "v/v"},
+	}
+	extra := []string{"u", "<{{.}}>", "n", "-", "w", "{{.k}}/{{$.k}}"}
+	for _, c := range cases {
+		got, err := runTemplate(c.src, data, fns, extra...)
+		if err != nil {
+			t.Errorf("%s: %v", c.name, err)
+		} else if got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+
+	// What it does not know is an error, never an empty string.
+	bad := map[string]string{
+		"missing field":     "{{.Nope}}",
+		"deep missing":      "{{.M.x.nope}}",
+		"field of text":     "{{.A.b}}",
+		"nil printed":       "{{.Nil}}",
+		"unknown function":  "{{nope 1}}",
+		"pipe":              "{{.A | up}}",
+		"unclosed if":       "{{if .N}}x",
+		"stray end":         "x{{end}}",
+		"stray else":        "{{else}}",
+		"unclosed action":   "{{.A",
+		"unknown template":  `{{template "zzz" .}}`,
+		"undeclared var":    "{{$q}}",
+		"assign undeclared": "{{$q = 1}}",
+		"range of text":     "{{range .A}}x{{end}}",
+		"bad compare":       `{{eq .N "x"}}`,
+		"index range":       "{{index .List 7}}",
+		"index key":         `{{index .M "zz"}}`,
+		"nested define":     `{{if true}}{{define "x"}}{{end}}{{end}}`,
+		"empty action":      "{{}}",
+		"bad token":         "{{.N + 1}}",
+		"two else":          "{{if true}}a{{else}}b{{else}}c{{end}}",
+	}
+	for name, src := range bad {
+		if got, err := runTemplate(src, data, fns); err == nil {
+			t.Errorf("%s: no error, got %q", name, got)
+		}
+	}
+}
+
+// The edge builds drop the methods nothing calls, unless the program reaches reflect's MethodByName. text/template does, and
+// with it every edge build grows by 10 to 17 MB; the interpreter exists so that it stays out of this package.
+func TestNoTemplateEngineImported(t *testing.T) {
+	for _, goos := range []string{"", "js"} {
+		cmd := exec.Command("go", "list", "-deps", ".")
+		if goos != "" {
+			cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm")
+		}
+		out, err := cmd.Output()
+		if err != nil {
+			t.Skipf("go list is not available: %v", err)
+		}
+		for _, pkg := range strings.Fields(string(out)) {
+			if pkg == "text/template" || pkg == "html/template" {
+				t.Errorf("GOOS=%q: the package depends on %s", goos, pkg)
 			}
 		}
 	}
