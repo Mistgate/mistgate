@@ -458,11 +458,8 @@ func (s *Service) register(ctx context.Context, nodeID string, acceptTOS bool, t
 	if err != nil {
 		return store.WarpAccountRow{}, err
 	}
-	oldSecrets, _ := s.open(old) // unreadable (wrong master key): only the local account goes
-	license := "none"
-	if replace && oldSecrets.PlusKey != "" {
-		license = s.carryLicense(ctx, p, oldSecrets.PlusKey, &row, &x)
-	}
+	oldSecrets, _ := s.open(old)   // unreadable (wrong master key): only the local account goes
+	x.PlusKey = oldSecrets.PlusKey // the owner's key outlives the account; it is bound below, once the old device is gone
 	row.SecretEnc = s.seal(nodeID, x)
 	if replace {
 		if err := s.st.ReplaceWarpAccount(ctx, row); err != nil {
@@ -470,6 +467,11 @@ func (s *Service) register(ctx context.Context, nodeID string, acceptTOS bool, t
 			return store.WarpAccountRow{}, s.accountErr("replace account", err)
 		}
 		remote := s.forget(nodeID, p, oldSecrets)
+		// After the old device is deleted: while it lives it holds a place of the key, and a key at its limit of devices would refuse the new one.
+		license := "none"
+		if oldSecrets.PlusKey != "" {
+			license = s.carryLicense(ctx, p, oldSecrets.PlusKey, &row, &x)
+		}
 		s.log.Info("warp: account registered again", "node", nodeID, "admin", actor, "old_deleted", remote)
 		s.audit(ctx, actor, "warp_reregister", map[string]string{"node_id": nodeID, "node": n.Name, "tos_url": tosURL, "api": p.APIVersion,
 			"old_deleted": fmt.Sprint(remote), "license": license})
@@ -613,21 +615,25 @@ func (s *Service) bindLicense(ctx context.Context, nodeID string, p Params, x se
 	return reg.AccountType, nil
 }
 
-// carryLicense binds the owner's key of the replaced account to the new device (row and x: the new account, not stored
-// yet). A refusal does not fail the re-registration: the account stays "free" and x.LicenseError says why, which the
-// card shows. It returns "applied", or that reason.
+// carryLicense binds the owner's key of the replaced account to the new device (row and x: the new account, which is stored
+// already and whose old device is gone) and stores the result. A refusal does not fail the re-registration: the account stays
+// "free" and x.LicenseError says why, which the card shows. It returns "applied", or that reason.
 func (s *Service) carryLicense(ctx context.Context, p Params, key string, row *store.WarpAccountRow, x *secrets) string {
 	x.PlusKey = key // kept either way: the owner's key outlives a refusal, the next re-registration tries it again
+	license := "applied"
 	typ, err := s.bindLicense(ctx, row.NodeID, p, *x, key)
 	if err != nil {
 		x.LicenseError = licenseFailure(err)
 		s.log.Warn("warp: the license key was not bound to the new device", "code", "warp_license_carry_failed", "node", row.NodeID, "reason", x.LicenseError, "status", apiStatus(err), "err", err)
-		return x.LicenseError
-	}
-	if typ != "" {
+		license = x.LicenseError
+	} else if typ != "" {
 		row.AccountType = typ
 	}
-	return "applied"
+	row.SecretEnc = s.seal(row.NodeID, *x)
+	if err := s.st.SetWarpSecret(ctx, row.NodeID, row.SecretEnc, row.AccountType, s.now()); err != nil {
+		s.log.Warn("warp: the license result was not stored", "code", "warp_license_store_failed", "node", row.NodeID, "err", err)
+	}
+	return license
 }
 
 // setLicense is "Set the WARP+ key": bind it to the node's device, keep it sealed with the account's secrets and take the
@@ -908,10 +914,7 @@ func (s *Service) AutoReregister(ctx context.Context, nodeID string) (bool, erro
 	if err != nil {
 		return false, err
 	}
-	license := "none"
-	if old.PlusKey != "" {
-		license = s.carryLicense(ctx, p, old.PlusKey, &row, &x)
-	}
+	x.PlusKey = old.PlusKey // bound below, once the old device is gone (see register)
 	row.SecretEnc = s.seal(nodeID, x)
 	row.Enabled, row.CreatedAt = a.Enabled, a.CreatedAt
 	if err := s.st.ReplaceWarpAccount(ctx, row); err != nil {
@@ -919,6 +922,10 @@ func (s *Service) AutoReregister(ctx context.Context, nodeID string) (bool, erro
 		return false, s.internal("replace account", err)
 	}
 	s.forget(nodeID, p, old)
+	license := "none"
+	if old.PlusKey != "" {
+		license = s.carryLicense(ctx, p, old.PlusKey, &row, &x)
+	}
 	s.log.Info("warp: account re-registered automatically", "node", nodeID)
 	s.audit(ctx, "system", "warp_reregister", map[string]string{"node_id": nodeID, "node": n.Name, "tos_url": TOSURL, "license": license})
 	s.fl.StateChanged()
