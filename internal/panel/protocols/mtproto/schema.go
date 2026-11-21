@@ -17,8 +17,8 @@ const settingsSchema = `{
       "type": "string", "enum": ["fake_tls", "web"], "default": "fake_tls",
       "x-enum-labels": {"fake_tls": "Fake TLS", "web": "Web"},
       "title": "Mode",
-      "description": "Fake TLS is the proxy of the Telegram apps (tg://proxy). Web is the proxy of Telegram Web in a browser: it has a name of its own on this node (the node needs a domain), is served on port 443 and uses the node's own site as its cover. The person's Telegram key is the same in both.",
-      "x-widget": "segmented", "x-order": 5, "x-critical": true
+      "description": "Fake TLS is the usual Telegram proxy (tg://proxy). Web is a newer kind (tg://webproxy): the Telegram app reaches the proxy as an ordinary HTTPS site. It has a name of its own on this node (the node needs a domain), is served on port 443 and uses the node's own site as its cover; calls do not work through it. The person's Telegram key is the same in both.",
+      "x-widget": "segmented", "x-group": "basics", "x-order": 5, "x-critical": true
     },
     "port": {
       "type": "integer", "minimum": 1, "maximum": 65535, "default": 443,
