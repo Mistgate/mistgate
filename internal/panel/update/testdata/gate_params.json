@@ -1,0 +1,8 @@
+{
+  "failed_profiles": "failed_profiles",
+  "failed_more": "failed_more",
+  "skipped_profiles": "skipped_profiles",
+  "skipped_more": "skipped_more",
+  "profile_fields": ["id", "name", "code"],
+  "shown": 5
+}

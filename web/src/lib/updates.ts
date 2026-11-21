@@ -239,10 +239,10 @@ function gateProfiles(params: Params): { list: GateProfile[]; more: number } {
   }
 }
 
-/** "“Main”: no answer; “Backup”: not checked yet", or "" when the gate named no profile. Returns the plural count too. */
+/** "“Main”: No answer in time…; “Backup”: not checked yet", or "" when the gate named no profile. Returns the plural count too. */
 function profileList(t: T, params: Params): { text: string; n: number } {
   const { list, more } = gateProfiles(params);
-  const items = list.map((p) => `${t("doctor.tok.quoted", { name: p.name })}: ${known(t, `updates.step.profile.why.${p.code}`) ?? p.code}`);
+  const items = list.map((p) => `${t("doctor.tok.quoted", { name: p.name })}: ${known(t, `health.check.err.${p.code}`) ?? known(t, `updates.step.profile.why.${p.code}`) ?? p.code}`);
   if (more > 0) items.push(t("updates.step.profiles.more", { n: more }));
   return { text: items.join("; "), n: list.length + more };
 }
@@ -260,12 +260,18 @@ export function skippedProfilesNote(t: T, params: Params): string {
   }
 }
 
+/** "The client-eye check failed after the update for the profile “Main”: …", or "" when the gate named no profile (agent and OS steps alike). */
+export function failedProfilesText(t: T, params: Params): string {
+  const { text, n } = profileList(t, params);
+  return text ? t.n("updates.step.profiles", n, { list: text }) : "";
+}
+
 /** Why a step failed, was rolled back or skipped. `key` arrives whole ("updates.step.err.<code>"). */
 export function stepErrorText(t: T, key: string, params: Params = {}): string {
   if (!key) return "";
   if (last(key) === "probe_failed") {
-    const { text, n } = profileList(t, params);
-    if (text) return t.n("updates.step.profiles", n, { list: text });
+    const named = failedProfilesText(t, params);
+    if (named) return named;
   }
   return known(t, key, withSentences(t, params)) ?? t("up.err.other", { code: last(key) });
 }

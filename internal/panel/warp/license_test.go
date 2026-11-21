@@ -22,6 +22,7 @@ const (
 	keyLimit = "TESTFULL-AAAAAAAA-BBBBBBBB"
 	keyBusy  = "TESTBUSY-AAAAAAAA-BBBBBBBB"
 	keyDown  = "TESTDOWN-AAAAAAAA-BBBBBBBB"
+	keyOne   = "TESTONEK-AAAAAAAA-BBBBBBBB" // allows one device
 )
 
 func (e *env) setKeys(m map[string]string) {
@@ -434,4 +435,52 @@ func TestLicenseFailureClasses(t *testing.T) {
 			t.Errorf("account type %q -> %q, want %q", in, got, want)
 		}
 	}
+}
+
+// A key that allows one device is held by the old device until it is deleted: the re-registration, by hand or on its own, takes the
+// old device away first and only then binds the key to the new one, so the account is plus again and not refused for the limit.
+func TestReregisterFreesTheKeyBeforeBindingIt(t *testing.T) {
+	e := newEnv(t)
+	e.secret = append(e.secret, keyOne)
+	e.setKeys(map[string]string{keyOne: "one"})
+	node := e.addNode("de1")
+	if _, err := e.register(node); err != nil {
+		t.Fatal(err)
+	}
+	if a, err := e.setLicense(node, keyOne); err != nil || a.AccountType != "plus" {
+		t.Fatalf("set: %+v %v", a, err)
+	}
+
+	a, err := e.reregister(node)
+	if err != nil || a.AccountType != "plus" || !a.HasLicense || a.LicenseError != "" {
+		t.Fatalf("by hand: %+v %v", a, err)
+	}
+	if !e.cf.reg(1).deleted || e.cf.reg(2).deleted {
+		t.Error("the old device is not the one deleted")
+	}
+	if card := e.account(node); card.AccountType != "plus" || card.LicenseError != "" {
+		t.Errorf("card = %+v", card)
+	}
+	row, err := e.st.WarpAccount(e.ctx, node)
+	if x, oerr := e.s.open(row); err != nil || oerr != nil || x.PlusKey != keyOne || x.LicenseError != "" || row.AccountType != "plus" {
+		t.Errorf("stored: %+v %v %v", row, err, oerr)
+	}
+
+	if _, err := e.rpc().UpdateWarpRegistrationParams(e.ctx, connect.NewRequest(&adminv1.UpdateWarpRegistrationParamsRequest{
+		Params: &adminv1.WarpRegistrationParams{AutoReregister: true}})); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.s.NeedsAttention(e.ctx, node, "revoked"); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := e.s.AutoReregister(e.ctx, node); !ok || err != nil {
+		t.Fatalf("auto re-registration: %v %v", ok, err)
+	}
+	if a := e.account(node); a.AccountType != "plus" || !a.HasLicense || a.LicenseError != "" {
+		t.Errorf("auto: %+v", a)
+	}
+	if !e.cf.reg(2).deleted || e.cf.reg(3).deleted {
+		t.Error("the old device is not the one deleted after the automatic re-registration")
+	}
+	e.noSecrets()
 }

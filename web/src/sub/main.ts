@@ -90,9 +90,9 @@ function flash(message: string, from?: HTMLElement) {
 }
 
 // Clipboard API needs a secure context and a user gesture; the textarea path covers plain http and old WebViews.
-function copy(text: string, message: string, done?: () => void, from?: HTMLElement) {
+function copy(text: string, done?: () => void, message?: string, from?: HTMLElement) {
   const ok = () => {
-    if (message) flash(message, from); // "" = the control says it itself
+    if (message) flash(message, from);
     done?.();
   };
   const fallback = () => {

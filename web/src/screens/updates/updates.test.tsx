@@ -782,7 +782,7 @@ describe("the folds of the Updates screen", () => {
       params: { failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "timeout" }]), skipped_profiles: JSON.stringify(["Backup"]) },
     });
     await mount(page({ nodes: [node()], rollout: rollout({ status: RolloutStatus.FAILED, steps: [failed] }) }));
-    expect(text()).toContain("The client-eye check failed after the update for the profile “Main”: no answer.");
+    expect(text()).toContain("The client-eye check failed after the update for the profile “Main”: No answer in time");
     expect(text()).toContain("these did not work before it: “Backup”.");
   });
 

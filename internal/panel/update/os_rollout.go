@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -781,6 +782,7 @@ func (p *osPass) event(x *store.OsStepRow) {
 	if x.ErrorKey != "" {
 		params["reason"] = x.ErrorKey
 	}
+	maps.Copy(params, failedProfileNotes(x.Params)) // the profiles that did not pass, as the agent update names them
 	if err := p.s.st.InsertEvent(p.ctx, store.EventRow{Time: p.now, Severity: sev, Code: code, Source: "panel", NodeID: x.NodeID, Params: params}); err != nil {
 		p.s.log.Warn("update: OS step event", "code", "update_os_step_event", "node", x.NodeID, "err", err)
 	}
@@ -792,6 +794,7 @@ func (p *osPass) pause(code string, x *store.OsStepRow, reason string) {
 		return
 	}
 	params := map[string]string{"node": x.NodeName, "node_id": x.NodeID, "reason": reason, "code": x.Params["code"], "mode": p.ro.Mode}
+	maps.Copy(params, failedProfileNotes(x.Params)) // the profiles that did not pass: the owner reads them on the pause too
 	// only over the status and the pause this pass read: a rollout paused or resumed meanwhile keeps what the other writer made of it
 	ok, err := p.s.st.PauseOsRollout(p.ctx, p.ro.ID, p.ro.Status, p.ro.PauseKey, code, params)
 	if err != nil {

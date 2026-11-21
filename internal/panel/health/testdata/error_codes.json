@@ -1,0 +1,15 @@
+[
+  "auth",
+  "client_unsupported",
+  "exit_unreachable",
+  "freeze",
+  "http_status",
+  "inbound_disabled",
+  "inbound_failed",
+  "inbound_not_active",
+  "inbound_pending",
+  "node_offline",
+  "refused",
+  "timeout",
+  "tls"
+]

@@ -143,7 +143,7 @@ func syncCurrentTestBundleFromGitHub(e *env) {
 	}
 	sum := sha256.Sum256(b.raw)
 	e.s.cfg.NodeBundleSource = fixedNodeBundleSource{manifestSHA256: hex.EncodeToString(sum[:])}
-	e.s.syncNodeBundle(e.ctx)
+	e.syncBundle()
 }
 
 func TestTrustedGitHubBundleWaitsForExplicitNodeUpdate(t *testing.T) {

@@ -52,6 +52,7 @@ type fakeCF struct {
 type fakeReg struct {
 	id, token, license string
 	deleted            bool
+	boundKey           string // the WARP+ key bound to this device (a "one" key counts the devices)
 	endpoint           string
 	kind               string // account_type; "" is "free"
 }
@@ -111,6 +112,15 @@ func (f *fakeCF) serve(w http.ResponseWriter, r *http.Request) {
 		switch f.keys[body.License] {
 		case "ok":
 			reg.kind = "unlimited"
+			_, _ = fmt.Fprintf(w, `{"id":"acc","account_type":"unlimited","license":%q}`, body.License)
+		case "one": // a key that allows one device: a live device holding it refuses the next one
+			for _, other := range f.regs {
+				if other != reg && !other.deleted && other.boundKey == body.License {
+					http.Error(w, `{"success":false,"errors":[{"code":2002,"message":"Maximum number of devices reached for `+body.License+`"}]}`, http.StatusBadRequest)
+					return
+				}
+			}
+			reg.kind, reg.boundKey = "unlimited", body.License
 			_, _ = fmt.Fprintf(w, `{"id":"acc","account_type":"unlimited","license":%q}`, body.License)
 		case "limit":
 			http.Error(w, `{"success":false,"errors":[{"code":2002,"message":"Maximum number of devices reached for `+body.License+`"}]}`, http.StatusBadRequest)

@@ -33,6 +33,9 @@ export const tile = (tone: string, ic: IconName, o: { size?: 36 | 40; iconSize?:
 export const bar = (pct: number, warn: boolean, label: string) =>
   h("div", { class: "bar", role: "img", "aria-label": label }, h("i", { class: warn ? "warn" : "", style: { width: `${Math.round(pct * 10) / 10}%` } }));
 
+/** How long a control that did its work says so in place (the copy button's tick, a key window tile's done word), in ms. */
+export const DONE_MS = 2000;
+
 /**
  * The board's copy button (.u-cpb): the icon turns into a tick and the label rolls up into `done` for a moment (the CSS reads
  * data-cp="done"). `cls` is the look of the button (default the board's .u-btn; .u-ic for an icon alone, .a-lnk for the link in
@@ -52,13 +55,13 @@ export function copyButton(a: Tools, o: { text: string; label?: string; done?: s
   btn.addEventListener("click", () =>
     a.copy(
       o.text,
-      o.toast,
       () => {
         o.after?.();
         btn.dataset.cp = "done";
         clearTimeout(timer);
-        timer = window.setTimeout(() => (btn.dataset.cp = ""), 1800);
+        timer = window.setTimeout(() => (btn.dataset.cp = ""), DONE_MS);
       },
+      o.toast,
       btn,
     ),
   );

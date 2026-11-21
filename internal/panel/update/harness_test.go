@@ -435,6 +435,13 @@ func (e *env) newEdgeService(key ed25519.PublicKey, version string) *Service {
 	return s
 }
 
+// syncBundle runs the GitHub bundle sync the way the worker starts it, and waits for it.
+func (e *env) syncBundle() {
+	e.t.Helper()
+	e.s.startNodeBundleSync(e.ctx)
+	e.s.wg.Wait()
+}
+
 // restart replaces the Service with a new one on the same database, the way a panel restart does.
 func (e *env) restart() {
 	e.t.Helper()

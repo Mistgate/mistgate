@@ -8,6 +8,7 @@ import { qrCard } from "./qr";
 import { flag } from "./servers";
 import type { AmzActions, AmzState, Tools } from "./state";
 import type { AwgConfig, AwgDevice, Lang, MgData, Platform } from "./types";
+import { DONE_MS } from "./ui";
 
 export { newAmzState } from "./state";
 export type { AmzActions, AmzState, Tools } from "./state";
@@ -203,7 +204,7 @@ export function readyBody(c: AmzCtx, x: AwgDevice): HTMLElement {
 
   // the board's .a-act: a tile with the icon, the name of the way and a line under it. A tile that did its work says so in place
   // for two seconds (.done): the icon turns into a tick and the line into the done word; a toast would stand on the tile above.
-  const act = (ico: IconName, k: string, title: string, done: string, line: Kid[], click: (ok: () => void, btn: HTMLButtonElement) => void) => {
+  const act = (ico: IconName, k: string, title: string, done: string, line: Kid[], click: (ok: () => void) => void) => {
     const tick = icon("check");
     tick.classList.add("ok");
     const btn = h(
@@ -216,9 +217,9 @@ export function readyBody(c: AmzCtx, x: AwgDevice): HTMLElement {
     const ok = () => {
       btn.classList.add("done");
       clearTimeout(timer);
-      timer = window.setTimeout(() => btn.classList.remove("done"), 2000);
+      timer = window.setTimeout(() => btn.classList.remove("done"), DONE_MS);
     };
-    btn.addEventListener("click", () => click(ok, btn));
+    btn.addEventListener("click", () => click(ok));
     return btn;
   };
   // "The line vpn:// for AmneziaVPN": the scheme in the file's own face, wherever the language puts it
@@ -227,8 +228,8 @@ export function readyBody(c: AmzCtx, x: AwgDevice): HTMLElement {
     "div",
     { class: "a-acts3" },
     act("file", `amz-dl-${x.id}`, t.adActFile, t.adFileDone, [h("span", { class: "m" }, filename)], (ok) => (a.download(filename, cfg.conf), ok())),
-    act("copy", `amz-conf-${x.id}`, t.adActConf, t.confCopied, [t.adActConfD], (ok, btn) => a.copy(cfg.conf, "", ok, btn)),
-    act("key", `amz-key-${x.id}`, t.copyKey, t.keyCopied, [lead ?? "", h("span", { class: "m" }, "vpn://"), tail ?? ""], (ok, btn) => a.copy(cfg.vpn_key, "", ok, btn)),
+    act("copy", `amz-conf-${x.id}`, t.adActConf, t.confCopied, [t.adActConfD], (ok) => a.copy(cfg.conf, ok)),
+    act("key", `amz-key-${x.id}`, t.copyKey, t.keyCopied, [lead ?? "", h("span", { class: "m" }, "vpn://"), tail ?? ""], (ok) => a.copy(cfg.vpn_key, ok)),
   );
   const qr = qrCard(cfg.qr, t.qrKeyAlt(app), qrLogoSrc(d));
 

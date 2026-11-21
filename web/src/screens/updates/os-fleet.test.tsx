@@ -308,6 +308,17 @@ describe("the queue of a run", () => {
     expect(host!.querySelector("[role=progressbar][aria-label='The update is in progress']")).toBeNull();
   });
 
+  it("names the profiles a node's check failed for, and those it did not hold against the job, in the queue", async () => {
+    const failed = JSON.stringify([{ id: "inb_1", name: "Main", code: "refused" }]);
+    await mount(<OsSection />, all(rollout([
+      step("de1", OsStepState.FAILED, 0, { errorKey: "probe_failed", finishedUnix: NOW - 60, params: { failed_profiles: failed } }),
+      step("fi1", OsStepState.PASSED, 1, { finishedUnix: NOW - 30, params: { upgraded: "2", reboot: "done", skipped_profiles: JSON.stringify(["Old"]) } }),
+    ])));
+    const c = card().textContent!;
+    expect(c).toContain("The client-eye check failed after the update for the profile “Main”: Connection refused");
+    expect(c).toContain("Not held against the update, these did not work before it: “Old”.");
+  });
+
   it("offers Pause and Cancel to a running run, and Pause asks the panel after a step-up", async () => {
     await mount(<OsSection />, all(rollout([passed("nl1"), step("de1", OsStepState.PENDING, 1)])));
     expect(button("Pause", card())).toBeTruthy();

@@ -2,7 +2,6 @@ package update
 
 import (
 	"context"
-	"encoding/json"
 	"slices"
 	"strconv"
 	"strings"
@@ -220,24 +219,22 @@ func clearOsRetryWait(params map[string]string) map[string]string {
 
 // gate_* params of a GATING step (admin update.proto OsStep.params).
 const (
-	gateFor    = "gate_for"
-	gateNames  = "gate_names"
-	gateMore   = "gate_more"
-	gateMaxS   = "gate_max_s"
-	gateShown  = 5
-	gateNameLn = 40
+	gateFor   = "gate_for"
+	gateNames = "gate_names"
+	gateMore  = "gate_more"
+	gateMaxS  = "gate_max_s"
 )
 
 var gateKeys = []string{gateFor, gateNames, gateMore, gateMaxS}
 
-// gateWaitParams says what the check waits for: the profiles that have not passed yet (names; at most gateShown of them), else
+// gateWaitParams says what the check waits for: the profiles that have not passed yet (names; at most GateShown of them), else
 // the kind of thing it lacks, and how long the check may take. The same values give no write.
 func (s *Service) gateWaitParams(g gateResult) map[string]string {
 	out := map[string]string{gateMaxS: strconv.Itoa(int(s.cfg.OsGateWait / time.Second))}
 	switch {
 	case len(g.waiting) > 0:
-		names := make([]string, 0, gateShown)
-		for _, n := range g.waiting[:min(len(g.waiting), gateShown)] {
+		names := make([]string, 0, GateShown)
+		for _, n := range g.waiting[:min(len(g.waiting), GateShown)] {
 			names = append(names, truncateRunes(n, gateNameLn))
 		}
 		out[gateFor], out[gateNames] = "profiles", jsonStringList(names)
@@ -287,16 +284,4 @@ func withoutGateWait(params map[string]string) map[string]string {
 		delete(params, k)
 	}
 	return params
-}
-
-func truncateRunes(s string, n int) string {
-	if r := []rune(s); len(r) > n {
-		return string(r[:n-1]) + "…"
-	}
-	return s
-}
-
-func jsonStringList(in []string) string {
-	b, _ := json.Marshal(in)
-	return string(b)
 }

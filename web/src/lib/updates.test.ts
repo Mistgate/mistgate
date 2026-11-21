@@ -1,4 +1,5 @@
 import { Code, ConnectError } from "@connectrpc/connect";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BundleStatus, NodeUpdateState, RolloutStatus, StepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { fill, pickForm, type T } from "@/i18n";
@@ -275,16 +276,19 @@ describe("the words of server keys", () => {
 
   it("names the profile and the reason when the gate says which profile failed, in the step and in the pause", () => {
     const one = { failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "timeout" }]) };
-    expect(stepErrorText(t, "updates.step.err.probe_failed", one)).toBe("The client-eye check failed after the update for the profile “Main”: no answer.");
+    expect(stepErrorText(t, "updates.step.err.probe_failed", one)).toBe(`The client-eye check failed after the update for the profile “Main”: ${en["health.check.err.timeout"]}.`);
+    // the code the check gives a flow that stops after the first kilobytes has its words too, not the raw code
+    const frozen = { failed_profiles: JSON.stringify([{ id: "inb_3", name: "Main", code: "freeze" }]) };
+    expect(stepErrorText(t, "updates.step.err.probe_failed", frozen)).toBe(`The client-eye check failed after the update for the profile “Main”: ${en["health.check.err.freeze"]}.`);
     const two = {
       failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "refused" }, { id: "inb_2", name: "Backup", code: "no_round" }]),
       failed_more: "3",
     };
     expect(stepErrorText(t, "updates.step.err.probe_failed", two)).toBe(
-      "The client-eye check failed after the update for the profiles “Main”: connection refused; “Backup”: not checked yet; and 3 more.",
+      `The client-eye check failed after the update for the profiles “Main”: ${en["health.check.err.refused"]}; “Backup”: not checked yet; and 3 more.`,
     );
-    expect(pauseText(t, "updates.pause.gate_failed", { node: "de1", reason: "probe_failed", ...one })).toMatch(
-      /^de1 did not pass the check after updating: the client-eye check failed for the profile “Main”: no answer\. Where possible/,
+    expect(pauseText(t, "updates.pause.gate_failed", { node: "de1", reason: "probe_failed", ...one })).toContain(
+      `de1 did not pass the check after updating: the client-eye check failed for the profile “Main”: ${en["health.check.err.timeout"]}. Where possible`,
     );
     // a code the dictionary does not know is shown as it is, and a value that is not the gate's JSON changes nothing
     expect(stepErrorText(t, "updates.step.err.probe_failed", { failed_profiles: JSON.stringify([{ id: "x", name: "Main", code: "new_code" }]) })).toContain("“Main”: new_code");
@@ -293,12 +297,35 @@ describe("the words of server keys", () => {
     expect(stepErrorText(t, "updates.step.err.inbound_failed", one)).toBe(en["updates.step.err.inbound_failed"]);
   });
 
+  it("reads the gate's profile params under the keys and in the shape the panel writes them", () => {
+    // internal/panel/update/testdata/gate_params.json is what the Go side (gate_profiles_test.go) holds its constants to
+    const golden = JSON.parse(readFileSync(`${process.cwd()}/../internal/panel/update/testdata/gate_params.json`, "utf8")) as {
+      failed_profiles: string;
+      failed_more: string;
+      skipped_profiles: string;
+      skipped_more: string;
+      profile_fields: string[];
+    };
+    expect(golden.profile_fields).toEqual(["id", "name", "code"]);
+    const [id, name, code] = golden.profile_fields as [string, string, string];
+    const params = {
+      [golden.failed_profiles]: JSON.stringify([{ [id]: "inb_1", [name]: "Main", [code]: "timeout" }]),
+      [golden.failed_more]: "2",
+      [golden.skipped_profiles]: JSON.stringify(["Old"]),
+      [golden.skipped_more]: "1",
+    };
+    const sentence = stepErrorText(t, "updates.step.err.probe_failed", params);
+    expect(sentence).toContain("“Main”");
+    expect(sentence).toContain("and 2 more");
+    expect(skippedProfilesNote(t, params)).toContain("“Old”, and 1 more");
+  });
+
   it("quotes the profiles a gate names in the language's own quotes", () => {
     const tRu = Object.assign((key: keyof typeof ru, vars?: Record<string, string | number>) => fill(ru[key], vars), {
       n: (key: keyof typeof ru, n: number, vars?: Record<string, string | number>) => fill(pickForm(ru[key], n, "ru"), { n, ...vars }),
     }) as unknown as T;
     const one = { failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "timeout" }]), skipped_profiles: JSON.stringify(["Old"]) };
-    expect(stepErrorText(tRu, "updates.step.err.probe_failed", one)).toContain("«Main»: нет ответа");
+    expect(stepErrorText(tRu, "updates.step.err.probe_failed", one)).toContain(`«Main»: ${ru["health.check.err.timeout"]}`);
     expect(skippedProfilesNote(tRu, one)).toContain("«Old»");
   });
 
@@ -442,7 +469,7 @@ describe("dictionary", () => {
 
   it("has the words of a profile failure in every language", () => {
     const keys = ["updates.step.profiles", "updates.step.profiles.more", "updates.step.skipped", "updates.pause.why.profiles",
-      ...["timeout", "refused", "auth", "tls", "http_status", "exit_unreachable", "no_round", "failed"].map((c) => `updates.step.profile.why.${c}`),
+      ...["no_round", "failed"].map((c) => `updates.step.profile.why.${c}`),
       ...["fresh", "installed", "downloading", "failed", "wait.rollout", "wait.os_rollout", "wait.panel_update", "wait.other"].map((c) => `up.bundle.sync.${c}`)];
     for (const k of keys) {
       expect(en, k).toHaveProperty([k]);

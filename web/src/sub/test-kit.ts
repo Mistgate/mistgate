@@ -41,7 +41,7 @@ export function actions(over: Partial<Actions> = {}): Actions & { log: string[] 
     devicesOpen: (o) => log.push(`devices-open ${o}`),
     closeAnn: () => log.push("closed"),
     mark: () => log.push("mark"),
-    copy: (text, _m, done) => {
+    copy: (text, done) => {
       log.push(`copy ${text}`);
       done?.();
     },

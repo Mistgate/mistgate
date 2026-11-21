@@ -401,6 +401,17 @@ describe("a stopped run", () => {
     expect(document.body.textContent).toContain("Failed: the panel could not reach de1's profiles, and no other node could check them.");
   });
 
+  it("names the profiles the check failed for, and those it did not hold against the job, as the agent update does", async () => {
+    const params = {
+      failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "freeze" }]),
+      skipped_profiles: JSON.stringify(["Old"]),
+    };
+    await mount(actions(failed({ errorKey: "probe_failed", params }, { pauseKey: "gate_failed" })));
+    const s = document.body.textContent!;
+    expect(s).toContain("The client-eye check failed after the update for the profile “Main”: The tunnel works, but a transfer stops after the first kilobytes");
+    expect(s).toContain("Not held against the update, these did not work before it: “Old”.");
+  });
+
   it("says why for a node that did not come back, with the way out", async () => {
     await mount(actions(failed({ errorKey: "not_back", params: {} }, { pauseKey: "not_back" })));
     expect(document.querySelector("[role=alert]")!.textContent).toContain("choose the previous kernel in the GRUB menu");
