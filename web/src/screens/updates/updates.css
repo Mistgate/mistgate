@@ -797,6 +797,9 @@
   .uq .uq-last { flex-wrap: wrap; }
   .uq .uq-pk { padding: 0 16px 16px; }
   .uq .uq-ls { padding: 0 16px 12px; }
+  /* what a step says (the profiles that did not pass, with the reason) takes the row's whole width under the node and its stage */
+  .uq .uq-ls > div { grid-template-columns: auto minmax(0, 1fr); row-gap: 0; padding-block: 8px; }
+  .uq .uq-ls .uq-lq { grid-column: 1 / -1; padding-block: 4px 0; }
   .uq .uq-lsn { padding-inline: 16px; }
   .uq .uq-oa { padding: 4px 16px 16px; }
   .uq .uq-oa button { width: 100%; justify-content: center; }
