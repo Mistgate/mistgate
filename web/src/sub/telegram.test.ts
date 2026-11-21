@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cases } from "./dev-data";
 import { dict, langs } from "./i18n";
-import { normalize } from "./logic";
+import { normalize, safeUrl } from "./logic";
 import { actions, data, state, text } from "./test-kit";
 import { view } from "./view";
 
@@ -77,6 +77,25 @@ describe("the Telegram proxy panel", () => {
     expect(prows(el)[0]!.querySelector(".fl2")?.getAttribute("aria-label")).toBe("Флаг: Германия");
   });
 
+  it("the Web Proxy of Telegram Web is a link of its own, tagged \"Web\" in the list, the pane and the phone's row, and opens as the others do", () => {
+    const web = cases["telegram-web"]!.telegram!.links[1]!;
+    expect(web.web).toBe(true);
+    expect(web.url).toMatch(/^tg:\/\/webproxy\?/);
+    const { el } = tg({}, "ru", "telegram-web");
+    expect(picks(el).map((b) => text(b.querySelector(".u-tag")))).toEqual(["", "Web", ""]);
+    expect(prows(el).map((r) => text(r.querySelector(".u-tag")))).toEqual(["", "Web", ""]);
+    expect(prows(el)[1]!.querySelector(".u-tag")?.getAttribute("title")).toBe("Прокси для Telegram Web, который открывается в браузере");
+    expect(prows(el)[1]!.querySelector("[data-k=tg-open-m-1]")?.getAttribute("href")).toBe(web.url);
+    picks(el)[1]!.click();
+    expect(text(pane(el).querySelector(".u-h2 .u-tag"))).toBe("Web");
+    expect(pane(el).querySelector("[data-k=tg-open-1]")?.getAttribute("href")).toBe(web.url);
+    picks(el)[0]!.click();
+    // the page keeps the flag of the panel's link, and tg://webproxy passes the page's own check of a link
+    const d = normalize({ ...cases.first, access: { happ: true, amnezia: false, telegram: true }, telegram: { links: [{ label: "Germany", country_code: "DE", web: true, url: web.url }, { label: "Germany", country_code: "DE", url: "tg://proxy?server=de1.example.com" }] } });
+    expect(d.telegram?.links.map((l) => l.web)).toEqual([true, undefined]);
+    expect(safeUrl(web.url)).toBe(web.url);
+  });
+
   it("with one proxy there is nothing to choose: no list, the pane alone", () => {
     const { el } = tg({}, "ru", "telegram-first");
     const single = view(data("telegram-first", (d) => (d.telegram!.links = d.telegram!.links.slice(0, 1))), state("windows", { tab: "telegram" }), actions());
@@ -104,7 +123,7 @@ describe("the Telegram proxy panel", () => {
   it("the words are in all five languages, and the pane names the country in the QR picture", () => {
     for (const lang of langs) {
       const w = dict[lang];
-      for (const k of ["tgCap", "tgPane", "tgHintDesk", "tgHintPhone", "openShort", "telegramOpen", "telegramCopy"] as const) expect(w[k], `${lang} ${k}`).toBeTruthy();
+      for (const k of ["tgCap", "tgPane", "tgHintDesk", "tgHintPhone", "tgWeb", "tgWebHint", "openShort", "telegramOpen", "telegramCopy"] as const) expect(w[k], `${lang} ${k}`).toBeTruthy();
       expect(w.tgCopyAria("X"), lang).toContain("X");
       const { el } = tg({}, lang);
       expect(text(el.querySelector(".u-cap"))).toBe(w.tgCap);

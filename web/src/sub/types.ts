@@ -185,8 +185,8 @@ export type MgData = {
   options: { show_announcement: boolean; show_support: boolean; show_qr: boolean };
   apps: AppEntry[];
   access: { happ: boolean; amnezia: boolean; telegram?: boolean; trust_tunnel?: boolean };
-  /** The tg://proxy links of the person, when Telegram is on; null when it is off. */
-  telegram?: { links: { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string; qr: Qr | null }[] } | null;
+  /** The tg://proxy links of the person (tg://webproxy for a Web Proxy, `web`), when Telegram is on; null when it is off. */
+  telegram?: { links: { label: string; country_code: string; place: string; ipv6: boolean; web?: boolean; relay: boolean; via: string; url: string; qr: Qr | null }[] } | null;
   /**
    * The tt:// links of the person for the official TrustTunnel apps, when it is on; null when it is off. A server whose certificate
    * is self-signed is a row with a `note` ("self_signed") and no url.

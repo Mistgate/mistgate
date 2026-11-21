@@ -98,6 +98,17 @@ describe("the Telegram proxy of a person", () => {
     expect(document.querySelector("[role=dialog] svg[role=img]")?.getAttribute("aria-label")).toBe("QR code of the tg:// link to de1");
   });
 
+  it("marks the link of the Web Proxy with a Web tag, and opens it like the others", async () => {
+    const webUrl = "tg://webproxy?server=web.de1.example.com&port=443&secret=dd00";
+    getTelegramLinks.mockResolvedValue({ ...proxy, links: [link({}), link({ profileId: "prf_web", profileName: "Telegram Web", web: true, url: webUrl })] });
+    await mount(<TelegramSection user={user(true)} countryOf={() => "DE"} onTurnOn={vi.fn()} onChanged={vi.fn()} />);
+    const links = linkRows();
+    expect(links.map((r) => r.querySelector(".up-tag")?.textContent ?? "")).toEqual(["", "Web"]);
+    expect(links[1]!.querySelector(".up-tag")?.getAttribute("title")).toBe("The proxy of Telegram Web (tg://webproxy): for Telegram in a browser tab");
+    expect(links[1]!.querySelector("a")!.getAttribute("href")).toBe(webUrl);
+    expect(text()).not.toContain("secret=");
+  });
+
   it("on without a key: issues one and shows its links", async () => {
     getTelegramLinks.mockResolvedValue({ hasKey: false, links: [] });
     issueTelegramKey.mockResolvedValue({ proxy });
