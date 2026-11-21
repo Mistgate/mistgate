@@ -6,7 +6,7 @@ import { VlessHy2Docs } from "@/screens/node/inbound-check";
 import { useTx } from "@/screens/users/t";
 import { AwgPanel, awgHidden, handTyped, type AwgAdvice } from "./awg-panel";
 import { EgressNote } from "./egress-note";
-import { mtprotoHidden, mtprotoOn443 } from "./mtproto-form";
+import { mtprotoEdited, mtprotoGroups, mtprotoHidden, mtprotoLocked, mtprotoOn443, mtprotoWeb } from "./mtproto-form";
 import { allFields, getAt, parseSchema, setAt, type Field, type Settings } from "./schema";
 import { SchemaForm, type Problem } from "./schema-form";
 import { vlessEdited, vlessHidden, vlessOffers } from "./vless-form";
@@ -18,7 +18,7 @@ import { vlessEdited, vlessHidden, vlessOffers } from "./vless-form";
  */
 export function FullForm({ info, settings, base, problems, advice, onChange }: { info: ProtocolInfo; settings: Settings; base: Settings; problems: readonly Problem[]; advice?: AwgAdvice; onChange: (next: Settings) => void }) {
   const t = useTx();
-  const groups = useMemo(() => parseSchema(info.settingsSchemaJson), [info.settingsSchemaJson]);
+  const groups = useMemo(() => (info.id === "mtproto" ? mtprotoGroups(parseSchema(info.settingsSchemaJson)) : parseSchema(info.settingsSchemaJson)), [info.id, info.settingsSchemaJson]);
   const fields = useMemo(() => allFields(groups), [groups]);
   const isAwg = info.id === "awg";
   const isVless = info.id === "vless";
@@ -28,6 +28,8 @@ export function FullForm({ info, settings, base, problems, advice, onChange }: {
   const hidden = isAwg ? awgHidden : isVless && vlessHiddenIds.size > 0 ? vlessHiddenIds : isMtproto && mtprotoHiddenIds.size > 0 ? mtprotoHiddenIds : undefined;
 
   const extra = (f: Field): ReactNode => {
+    if (isMtproto && f.id === "mode" && mtprotoWeb(settings)) return <span className="text-[11px] leading-snug text-muted">{t("mtproto.web.dns")}</span>;
+    if (isMtproto && f.id === "port" && mtprotoWeb(settings)) return <span className="text-[11px] leading-snug text-muted">{t("mtproto.web.port")}</span>;
     if (isMtproto && f.id === "fake_tls.domain") {
       return (
         <span className="flex flex-col gap-1 text-[11px] leading-snug text-muted">
@@ -79,7 +81,8 @@ export function FullForm({ info, settings, base, problems, advice, onChange }: {
         settings={settings}
         base={base}
         problems={problems}
-        onChange={isAwg ? (n) => onChange(handTyped(settings, n)) : isVless ? (n) => onChange(vlessEdited(settings, n)) : onChange}
+        onChange={isAwg ? (n) => onChange(handTyped(settings, n)) : isVless ? (n) => onChange(vlessEdited(settings, n)) : isMtproto ? (n) => onChange(mtprotoEdited(settings, n)) : onChange}
+        readOnly={isMtproto ? mtprotoLocked(settings) : undefined}
         hidden={hidden}
         offers={isVless ? vlessOffers : undefined}
         extra={extra}

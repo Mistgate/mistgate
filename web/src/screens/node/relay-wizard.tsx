@@ -136,7 +136,7 @@ function Body({ data, w, start, demo, onClose }: { data: Data; w: WaysModel; sta
     const live = !!relay?.enabled;
     const blocked = bridge && blockedOf(c) !== "";
     const why = c.unsupported
-      ? (["cdn", "acme_ip", "build_failed"] as const).includes(c.unsupported as "cdn")
+      ? (["cdn", "acme_ip", "webproxy", "build_failed"] as const).includes(c.unsupported as "cdn")
         ? t(`relay.unsupported.${c.unsupported as "cdn"}`)
         : c.unsupported
       : live

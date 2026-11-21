@@ -307,3 +307,32 @@ export const awg = String.raw`{
     }
   }
 }`;
+
+// The schema the MTProto plugin publishes (internal/panel/protocols/mtproto/schema.go): the mode has no group, as the panel sends it.
+export const mtproto = JSON.stringify({
+  type: "object",
+  properties: {
+    mode: {
+      type: "string",
+      enum: ["fake_tls", "web"],
+      default: "fake_tls",
+      "x-enum-labels": { fake_tls: "Fake TLS", web: "Web" },
+      title: "Mode",
+      description: "Fake TLS is the proxy of the Telegram apps (tg://proxy). Web is the proxy of Telegram Web in a browser.",
+      "x-widget": "segmented",
+      "x-order": 5,
+      "x-critical": true,
+    },
+    port: { type: "integer", minimum: 1, maximum: 65535, default: 443, title: "TCP port", description: "Port the node listens on for Telegram clients.", "x-group": "basics", "x-order": 10, "x-critical": true },
+    fake_tls: {
+      type: "object",
+      title: "Fake TLS",
+      "x-group": "basics",
+      "x-order": 20,
+      properties: {
+        kind: { type: "string", enum: ["own", "site"], default: "own", "x-enum-labels": { own: "This node's name", site: "Another site" }, title: "Name in the TLS handshake", description: "The domain Telegram puts in the handshake.", "x-widget": "segmented", "x-order": 5, "x-critical": true },
+        domain: { type: "string", maxLength: 253, title: "Site", description: "A host name such as www.google.com.", "x-order": 10, "x-critical": true },
+      },
+    },
+  },
+});

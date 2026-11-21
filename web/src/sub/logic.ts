@@ -201,11 +201,11 @@ export function normalize(raw: unknown): MgData {
   const tg = r.telegram && typeof r.telegram === "object" ? rec(r.telegram) : null;
   const telegram = tg
     ? {
-        links: list(tg.links).flatMap((l): { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string; qr: Qr | null }[] => {
+        links: list(tg.links).flatMap((l): { label: string; country_code: string; place: string; ipv6: boolean; web?: boolean; relay: boolean; via: string; url: string; qr: Qr | null }[] => {
           const x = rec(l);
           const url = str(x.url);
           return /^tg:/i.test(url)
-            ? [{ label: str(x.label), country_code: str(x.country_code), place: str(x.place), ipv6: x.ipv6 === true, relay: x.relay === true, via: str(x.via), url, qr: qrOf(x.qr) }]
+            ? [{ label: str(x.label), country_code: str(x.country_code), place: str(x.place), ipv6: x.ipv6 === true, ...(x.web === true && { web: true }), relay: x.relay === true, via: str(x.via), url, qr: qrOf(x.qr) }]
             : [];
         }),
       }

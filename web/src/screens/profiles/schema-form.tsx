@@ -138,7 +138,7 @@ function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, prob
     case "number":
       control = (
         <>
-          <NumberInput label={label} value={getAt(settings, f.path)} integer={f.integer} invalid={invalid} describedBy={describedBy} onChange={(v) => onChange(f.path, v)} className="w-24 text-end" />
+          <NumberInput label={label} value={getAt(settings, f.path)} integer={f.integer} invalid={invalid} describedBy={describedBy} disabled={locked} onChange={(v) => onChange(f.path, v)} className="w-24 text-end disabled:opacity-60" />
           {unit && <span className="min-w-10 text-xs text-muted">{unit}</span>}
         </>
       );
@@ -205,13 +205,14 @@ function FieldRow({ protocol, f, t, settings, locked, offers, extra, dirty, prob
 }
 
 /** Digits only (plus one dot for a non-integer); an empty box stays empty and the server names the problem. */
-export function NumberInput({ label, value, integer, invalid, describedBy, onChange, className, masked }: { label: string; value: unknown; integer: boolean; invalid: boolean; describedBy?: string; onChange: (v: number | string) => void; className?: string; masked?: boolean }) {
+export function NumberInput({ label, value, integer, invalid, describedBy, onChange, className, masked, disabled }: { label: string; value: unknown; integer: boolean; invalid: boolean; describedBy?: string; onChange: (v: number | string) => void; className?: string; masked?: boolean; disabled?: boolean }) {
   return (
     <input
       type={masked ? "password" : undefined}
       aria-label={label}
       aria-invalid={invalid || undefined}
       aria-describedby={describedBy}
+      disabled={disabled}
       inputMode={integer ? "numeric" : "decimal"}
       autoComplete="off"
       value={value === undefined || value === null ? "" : String(value)}

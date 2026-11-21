@@ -22,7 +22,7 @@ import { setTheme, useTheme } from "@/lib/theme";
 import { updatesQuery } from "@/lib/updates";
 import { Shot } from "@/screens/dev-kit-redesign";
 import { ProfileNewScreen, type WizardDemo } from "@/screens/profiles/wizard";
-import { hy2, trusttunnel, vless } from "@/screens/profiles/schema.fixtures";
+import { hy2, mtproto as mtSchema, trusttunnel, vless } from "@/screens/profiles/schema.fixtures";
 import { emptyRun, type RunState } from "@/screens/profiles/wizard-run";
 import { settingsQuery } from "@/screens/subscriptions/queries";
 import { groupsQuery, profileListQuery, protocolsQuery } from "@/screens/users/rpc";
@@ -100,13 +100,6 @@ const awgSchema = JSON.stringify({
     mtu: { type: "integer", title: "MTU", "x-unit": "bytes", "x-group": "basics", "x-order": 30 },
     obfuscation: { type: "object", title: "Obfuscation", "x-group": "obfuscation", properties: { preset: { type: "string", title: "Look" }, per_device_signature: { type: "boolean", title: "Own signature for each device" } } },
     egress: { type: "string", enum: ["direct", "warp"], title: "Exit", "x-group": "advanced", "x-widget": "segmented" },
-  },
-});
-const mtSchema = JSON.stringify({
-  type: "object",
-  properties: {
-    port: { type: "integer", title: "TCP port", "x-group": "basics", "x-order": 10, "x-critical": true },
-    fake_tls: { type: "object", title: "Fake TLS", "x-group": "basics", "x-order": 20, properties: { kind: { type: "string", enum: ["own", "site"], "x-enum-labels": { own: "This node's name", site: "Another site" }, "x-widget": "segmented", title: "Name in the handshake" }, domain: { type: "string", title: "Site" } } },
   },
 });
 const protocols = [

@@ -155,7 +155,7 @@ export function inUseWhere(t: T, names: readonly string[], panel: boolean): stri
 /** The words of a relay refusal's values: why a server cannot be relayed, which stage of the check failed. */
 function relayVars(t: T, vars: Record<string, string>): Record<string, string> {
   const reason = vars.reason ?? "";
-  const worded = ["cdn", "acme_ip", "build_failed"].includes(reason);
+  const worded = ["cdn", "acme_ip", "webproxy", "build_failed"].includes(reason);
   const bridge = ["udp", "entry_agent_old", "exit_agent_old"].includes(reason);
   const stage = vars.stage === "path" || vars.stage === "reverse_reach" || vars.stage === "bridge" ? vars.stage : "leg";
   return {

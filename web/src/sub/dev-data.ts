@@ -9,7 +9,7 @@ import type { AmneziaData, AppEntry, AwgDevice, AwgProfile, Device, DnsInfo, Dns
 // The scenes (dev-scene.ts has the parameters, dev-scene.test.ts the whole list of URLs, with the width to look at each in: 1280 a computer, 390 a phone):
 //   states   ?case=return | first | soon | quota (quota-plain: no reset day) | expired | disabled | plain
 //   pieces   first (announcement) | long | nosupport | noqr | keys-only | happ | both        lists  servers-2 | -11 | -30;  dev-0 | -3 | -16 | -20 | -nolimit &tab=devices[&more=1]
-//   tabs     &tab=telegram|trusttunnel (cases telegram, trusttunnel, and -soon for none yet) [&proxy=2]
+//   tabs     &tab=telegram|trusttunnel (cases telegram, telegram-web (a Web Proxy among them), trusttunnel, and -soon for none yet) [&proxy=2]
 //   key window  case=key-one | key-pair | key-many  &sheet=key|made [&profile=p20w] [&list=1]   (one profile; a profile of each version; several of one version)
 //   windows  &sheet=pick|link|conn|key|full|made   &key=d3[&country=1]   &renew=d3 (stale)   &menu=d3|l1   &rename=d3   &ask=remove:d3|rotate:d3   &stale=d3
 //            &dns=de1|link [&dnsall=0|1] [&dnsdone=1 [&dnsskip=nl1]]   (cases dns-both, dns-link, stale-dns)       password: case=locked[&lockerr=wrong|short|latin|later|net]
@@ -521,6 +521,9 @@ const tgLinks = [tgFra, { ...tgFra, ipv6: true, url: tgUrl("[2001:db8::7]") }, {
 // the person's Telegram key among the devices: issued by the admin, used by Telegram two hours ago
 const tgKey = { ...dev("tg1", "", "Telegram proxy", "telegram", 2 * hour, false, "telegram"), can_remove: false, can_rename: false };
 cases.telegram = { ...returning, access: { ...returning.access, telegram: true }, telegram: { links: tgLinks }, devices: [...returning.devices, tgKey] };
+// the Web Proxy of Telegram Web (tg://webproxy, its own name on the node) beside the Fake TLS proxy of the same node: tagged "Web"
+const tgWebUrl = (host: string) => `tg://webproxy?server=${host}&port=443&secret=dd0123456789abcdef0123456789abcdef`;
+cases["telegram-web"] = { ...cases.telegram!, telegram: { links: [tgFra, { ...tgFra, web: true, url: tgWebUrl("web.de1.example.com") }, tgLinks[3]!] } };
 // a first visit with Telegram on: the steps first, then the servers and the proxy
 cases["telegram-first"] = { ...base, access: { ...base.access, telegram: true }, telegram: { links: tgLinks.slice(0, 2) } };
 // Telegram is on, no MTProto profile runs yet

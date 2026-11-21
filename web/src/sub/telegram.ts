@@ -14,7 +14,7 @@ import { copyButton } from "./ui";
 // person with one proxy is left out (nothing to choose). TrustTunnel is the same panel with its own words (trusttunnel.ts).
 
 /** What one proxy link of either kind is: the server as the page names it, its marks, the link ("" = none yet). */
-export type ProxyLink = { label: string; country_code: string; place: string; ipv6: boolean; relay: boolean; via: string; url: string; qr: Qr | null };
+export type ProxyLink = { label: string; country_code: string; place: string; ipv6: boolean; web?: boolean; relay: boolean; via: string; url: string; qr: Qr | null };
 
 export type ProxySpec = {
   /** The prefix of every data-k ("tg", "tt"). */
@@ -45,8 +45,8 @@ const chosen: Record<string, number> = {};
 /** The dev server's `&proxy=<n>`: the n-th proxy of the panel ("tg", "tt") is the chosen one. */
 export const pickProxy = (key: "tg" | "tt", n: number) => void (chosen[key] = n);
 
-/** The marks of a proxy: IPv6, and a twin through a node of another country. */
-const marks = (c: Ctx, l: ProxyLink): HTMLElement[] => [l.ipv6 && h("span", { class: "u-tag dir" }, "IPv6"), l.relay && h("span", { class: "u-tag ru", title: c.t.viaHint(l.via) }, c.t.chipVia(l.via))].filter((x): x is HTMLElement => !!x);
+/** The marks of a proxy: IPv6, a twin through a node of another country, and the Web Proxy of Telegram Web (tg://webproxy). */
+const marks = (c: Ctx, l: ProxyLink): HTMLElement[] => [l.web && h("span", { class: "u-tag", title: c.t.tgWebHint }, c.t.tgWeb), l.ipv6 && h("span", { class: "u-tag dir" }, "IPv6"), l.relay && h("span", { class: "u-tag ru", title: c.t.viaHint(l.via) }, c.t.chipVia(l.via))].filter((x): x is HTMLElement => !!x);
 
 const nameOf = (c: Ctx, l: ProxyLink) => serverName(l, c.s.lang);
 

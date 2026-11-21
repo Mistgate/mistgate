@@ -268,7 +268,7 @@ export function cacheOf(s: Scene) {
           ],
   } as never);
   const key = !["tt-off", "tt-none", "tt-nol", "new"].includes(s.state);
-  c.setQueryData(["users", "telegram", "usr_alice", true], { hasKey: true, keyDeviceId: "dev_tg", keyIssuedUnix: NOW - 28 * D, links: [tgLink("de1"), tgLink("de1", { ipv6: true, url: "tg://proxy?server=[2001:db8::7]&port=443&secret=ee00de1" }), tgLink("fi1"), tgLink("msk1")] });
+  c.setQueryData(["users", "telegram", "usr_alice", true], { hasKey: true, keyDeviceId: "dev_tg", keyIssuedUnix: NOW - 28 * D, links: [tgLink("de1"), tgLink("de1", { ipv6: true, url: "tg://proxy?server=[2001:db8::7]&port=443&secret=ee00de1" }), tgLink("fi1"), tgLink("msk1"), tgLink("de1", { profileId: "p_tgw", profileName: "Telegram Web", web: true, url: "tg://webproxy?server=web.de1.example.com&port=443&secret=dd00de1" })] });
   c.setQueryData(["users", "trusttunnel", "usr_alice", s.state !== "tt-off"], {
     hasKey: key, keyDeviceId: "dev_tt", keyIssuedUnix: NOW - 5 * D,
     links: !key || s.state === "tt-nol" ? [] : [ttLink("de1"), ttLink("de1", { hasIpv6: true, url: url("tt") + "6" }), ttLink("nl1", { relay: true, via: "RU", url: url("tt") + "r" }), ttLink("fi1", { url: "", note: "self_signed", profileId: "p_tt" })],

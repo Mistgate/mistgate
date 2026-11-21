@@ -7,7 +7,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { App, NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { SubFormat } from "@/gen/mistgate/admin/v1/subscription_pb";
-import { hy2, vless } from "./schema.fixtures";
+import { hy2, mtproto, vless } from "./schema.fixtures";
 import { ProfileEditorScreen } from "./page";
 
 const createProfile = vi.fn();
@@ -20,6 +20,8 @@ let search: Record<string, string> = {};
 let profileProtocol = "hysteria2";
 let role = Role.OWNER;
 let savedElsewhere = false; // the profile was saved from another window: version 2, port 8443
+let savedSettings = ""; // the saved settings of the profile when a test fixes them (an MTProto one in a mode)
+let savedInbounds: object[] = []; // the profile's servers on nodes
 let qc: QueryClient;
 
 // the plugin's schema with the domain field (the trimmed fixture has none)
@@ -34,7 +36,7 @@ const awgSchema = JSON.stringify({
     subnet6: { type: "string", title: "Client network (IPv6)", "x-group": "basics", "x-order": 60 },
   },
 });
-const mtprotoSchema = JSON.stringify({ type: "object", properties: { port: { type: "integer", title: "Port", "x-group": "basics", "x-order": 10, "x-critical": true } } });
+const mtprotoSchema = mtproto;
 const vlessDefaults = JSON.stringify({ port: 443, transport: "xhttp", security: "reality", reality: { target_kind: "self", target: "", server_names: [], short_ids: [], fingerprint: "chrome" }, xhttp: { path: "", host: "", mode: "auto", x_padding_bytes: "100-1000" }, egress: "direct" });
 const awgDefaults = JSON.stringify({ version: "3.1", port: 10819, mtu: 1280, subnet4: "10.66.4.0/22", subnet6: "fd66:66:0:1::/64", obfuscation: { preset: "dns" } });
 
@@ -61,8 +63,8 @@ vi.mock("@/lib/api", async (orig) => ({
     getProfile: () =>
       Promise.resolve({
         profile: { id: "p_old", name: "hy2 · 443", protocol: profileProtocol, version: savedElsewhere ? 2 : 1, nodeCount: 2, userCount: 12, summary: "", warnings: [], formats: [] },
-        settingsJson: profileProtocol === "vless" ? vlessDefaults : savedElsewhere ? defaults.replace('"port":443', '"port":8443') : defaults,
-        inbounds: [],
+        settingsJson: savedSettings || (profileProtocol === "vless" ? vlessDefaults : savedElsewhere ? defaults.replace('"port":443', '"port":8443') : defaults),
+        inbounds: savedInbounds,
       }),
     createProfile: (...a: unknown[]) => createProfile(...a),
     updateProfile: (...a: unknown[]) => updateProfile(...a),
@@ -119,6 +121,8 @@ beforeEach(() => {
   profileProtocol = "hysteria2";
   role = Role.OWNER;
   savedElsewhere = false;
+  savedSettings = "";
+  savedInbounds = [];
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -350,5 +354,87 @@ describe("a port change the UDP check refuses", () => {
     await click(button("Take 4443"));
     expect(portField().value).toBe("4443");
     expect(text()).not.toContain("loses 37 %");
+  });
+});
+
+describe("the Web mode of an MTProto profile", () => {
+  const fakeTls = JSON.stringify({ mode: "fake_tls", port: 443, fake_tls: { kind: "own", domain: "" } });
+  const onNode = (nodeId: string, nodeName: string, portOverride: number) => ({
+    id: `inb_${nodeName}`,
+    profileId: "p_old",
+    profileName: "tg",
+    protocol: "mtproto",
+    nodeId,
+    nodeName,
+    port: portOverride || 443,
+    tlsServerName: "",
+    state: 1,
+    lastError: "",
+    certPinSha256: "",
+    certNotAfterUnix: 0,
+    egress: "direct",
+    portOverride,
+    tlsServerNameOverride: "",
+    enabled: true,
+    directInSubscriptions: true,
+    cdn: false,
+  });
+  const tcpPort = () => document.querySelector<HTMLInputElement>("input[aria-label='TCP port']")!;
+  beforeEach(() => {
+    params = { id: "p_old" };
+    profileProtocol = "mtproto";
+    savedSettings = fakeTls;
+  });
+
+  it("puts the mode in the first card, not in the fold of the advanced ones", async () => {
+    await mount();
+    expect(radio("Fake TLS")?.getAttribute("aria-checked")).toBe("true");
+    expect(radio("Web")?.getAttribute("aria-checked")).toBe("false");
+    expect(document.querySelector('[data-group="basics"] [data-k="mode"]')).not.toBeNull();
+    expect(document.querySelector('[data-group="advanced"]')).toBeNull();
+  });
+
+  it("fixes the port to 443 with the reason, drops the Fake TLS name and explains what Web is; Fake TLS brings the rest back", async () => {
+    await mount();
+    await type(tcpPort(), "8443");
+    expect(radio("This node’s name")).not.toBeUndefined();
+    await click(radio("Web"));
+    expect(tcpPort().disabled).toBe(true);
+    expect(tcpPort().value).toBe("443");
+    expect(text()).toContain("Fixed: Telegram Web reaches the proxy over HTTPS, and that is port 443 only.");
+    expect(text()).toContain("Needs a subdomain of its own on the node");
+    expect(text()).toContain("calls do not work through it");
+    expect(radio("This node’s name")).toBeUndefined();
+    expect(radio("Another site")).toBeUndefined();
+    await click(radio("Fake TLS"));
+    expect(tcpPort().disabled).toBe(false);
+    expect(radio("This node’s name")?.getAttribute("aria-checked")).toBe("true");
+    expect(text()).not.toContain("Fixed: Telegram Web");
+  });
+
+  it("is a critical change: the save asks, and the window names the mode", async () => {
+    updateProfile.mockResolvedValue({ impact: { inboundsRestarted: 1, usersOnline: 0, devicesNeedReissue: 0, criticalFields: ["/mode"], affectedUserNames: ["anna"] } });
+    await mount();
+    await click(radio("Web"));
+    expect(document.querySelector('[data-k="mode"] .pp-crit')).not.toBeNull();
+    await click(button("Save"));
+    await settle();
+    const dialog = [...document.querySelectorAll("[role=dialog]")].at(-1)!.textContent!;
+    expect(dialog).toContain("Mode");
+    expect(dialog).toContain("Web");
+    expect(dialog).toContain("The Telegram link stops working for 12 people");
+  });
+
+  it("names the nodes where a port of its own would stop the inbound, before the save, in the form and in the window", async () => {
+    savedInbounds = [onNode("nod_1", "de1", 8443), onNode("nod_2", "fi1", 443)];
+    updateProfile.mockResolvedValue({ impact: { inboundsRestarted: 2, usersOnline: 0, devicesNeedReissue: 0, criticalFields: ["/mode"], affectedUserNames: [] } });
+    await mount();
+    expect(text()).not.toContain("In the Web mode the profile will not start");
+    await click(radio("Web"));
+    expect(document.querySelector(".pp-rmc")?.textContent).toContain("In the Web mode the profile will not start on de1 (8443): the port set for it there is not 443.");
+    expect(document.querySelector(".pp-rmc")?.textContent).not.toContain("fi1");
+    await click(button("Save…"));
+    await settle();
+    expect([...document.querySelectorAll("[role=dialog]")].at(-1)!.textContent).toContain("will not start on de1 (8443)");
   });
 });

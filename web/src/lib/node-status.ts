@@ -106,7 +106,7 @@ export function reasonText(t: T, reason?: Reason): string {
       return t(key, { span: minutesText(t, Number(p.expires_in_minutes)) });
     case "inbound_failed":
       // The agent's error as it came, unless lib/inbound-error.ts has a sentence that says more than the code does
-      const error = inboundErrorKind(p.error ?? "") === "target" ? inboundErrorText(t, p.error ?? "") : (p.error ?? "");
+      const error = ["target", "agent"].includes(inboundErrorKind(p.error ?? "")) ? inboundErrorText(t, p.error ?? "") : (p.error ?? "");
       return p.profile ? t("node.reason.inbound_failed.named", { profile: p.profile, error }) : t(key, { ...p, error });
   }
   return t(key, p);

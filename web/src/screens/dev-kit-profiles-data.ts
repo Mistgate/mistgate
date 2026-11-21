@@ -61,6 +61,11 @@ export const PROFILES: ProfileSpec[] = [
   { id: "prf_tg1", name: "Telegram · 8443", protocol: "mtproto", summary: "TCP 8443 · Fake TLS", port: 8443, sv: {}, groups: [], people: 0, drops: [[0, "unsupported"], [1, "unsupported"], [2, "unsupported"], [3, "unsupported"]] },
 ];
 
+/** The Telegram Web Proxy profile of the profile page's scenes only: the lists above keep their ten profiles. */
+export const WEB_PROFILE: ProfileSpec = { id: "prf_tg2", name: "Telegram Web", protocol: "mtproto", summary: "TCP 443 · Web Proxy", port: 443, sv: { de1: "ok", nl1: "ok" }, groups: [], people: 0, drops: [[0, "unsupported"], [1, "unsupported"], [2, "unsupported"], [3, "unsupported"]] };
+/** Every profile a page scene can show. */
+export const SCENE_PROFILES: ProfileSpec[] = [...PROFILES, WEB_PROFILE];
+
 export const PROTOCOLS = [
   { id: "hysteria2", displayName: "Hysteria2", apps: [App.HAPP], experimental: false },
   { id: "vless", displayName: "VLESS", apps: [App.HAPP], experimental: false },
@@ -83,21 +88,22 @@ const hash = (s: string) => {
 /** What a scene changes in the fleet: one node out of touch (nl3), the checks that have not run yet. */
 export type Fleet = { out?: boolean; noChecks?: boolean; count?: number };
 
-export const summaries = (n = PROFILES.length) =>
-  PROFILES.slice(0, n).map((p) => ({
-    id: p.id,
-    name: p.name,
-    protocol: p.protocol,
-    summary: p.summary,
-    nodeCount: Object.keys(p.sv).length,
-    userCount: p.people,
-    warnings: p.warnings ?? [],
-    version: 1,
-    formats: SUBS.map((format, i) => {
-      const d = p.drops?.find((x) => x[0] === i);
-      return { format, ok: !d, note: d?.[1] ?? "" };
-    }),
-  }));
+export const summaryOf = (p: ProfileSpec) => ({
+  id: p.id,
+  name: p.name,
+  protocol: p.protocol,
+  summary: p.summary,
+  nodeCount: Object.keys(p.sv).length,
+  userCount: p.people,
+  warnings: p.warnings ?? [],
+  version: 1,
+  formats: SUBS.map((format, i) => {
+    const d = p.drops?.find((x) => x[0] === i);
+    return { format, ok: !d, note: d?.[1] ?? "" };
+  }),
+});
+
+export const summaries = (n = PROFILES.length) => PROFILES.slice(0, n).map(summaryOf);
 
 const history = (bad: number, part: number, none = false) =>
   Array.from({ length: 48 }, (_, k) => {

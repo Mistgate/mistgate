@@ -1121,6 +1121,14 @@ a.up-gtag:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.up-tg .up-tag {
+  margin-inline-start: 8px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-style: normal;
+  vertical-align: middle;
+}
 .up-tg > div > span:last-child {
   overflow: visible;
 }

@@ -52,6 +52,9 @@ describe("the panel's refusal codes", () => {
     expect(say("port_taken: node=msk1&port=443&profile=hy2", Code.AlreadyExists)).toBe("Port 443 on msk1 is already taken by the profile “hy2”."); // a profile stays a profile
     expect(say("relay_unsupported: reason=cdn", Code.FailedPrecondition, "ru")).toBe("Этот сервер нельзя пустить через ретрансляцию. Идёт через CDN: люди подключаются к CDN, а не к ноде.");
     expect(say("relay_unsupported: reason=acme_ip", Code.FailedPrecondition)).toBe("This server cannot go through a relay. Its certificate is for the node’s IP; apps would reject it on another address.");
+    // the Telegram Web Proxy is reached by its own name: it goes straight to the node, in every language
+    expect(say("relay_unsupported: reason=webproxy", Code.FailedPrecondition)).toBe("This server cannot go through a relay. Web Proxy works only straight on the node: people reach it by its own name, not by an address.");
+    expect(say("relay_unsupported: reason=webproxy", Code.FailedPrecondition, "ru")).toBe("Этот сервер нельзя пустить через ретрансляцию. Web Proxy работает только напрямую на ноду: люди приходят к нему по его имени, а не по адресу.");
     expect(say("relay_unchecked", Code.FailedPrecondition, "ru")).toBe(ru["err.relay_unchecked"]);
     expect(say("relay_check_stale", Code.FailedPrecondition)).toBe(en["err.relay_check_stale"]);
     expect(say("relay_check_failed: code=timeout&stage=path", Code.FailedPrecondition, "ru")).toBe("Ретрансляция не прошла проверку (снаружи через вход). Почему — на странице ноды входа.");

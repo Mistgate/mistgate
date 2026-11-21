@@ -21,8 +21,9 @@ import { noteServerVersion, setLoadedVersion } from "@/lib/stale";
 import { setTheme, useTheme } from "@/lib/theme";
 import { updatesQuery } from "@/lib/updates";
 import { Shot } from "@/screens/dev-kit-redesign";
-import { checksOf, connectionsOf, GROUPS, NODES, NOW, nid, nodeRows, PROFILES, PROTOCOLS, relaysOf, summaries, type Fleet } from "@/screens/dev-kit-profiles-data";
+import { checksOf, connectionsOf, GROUPS, NODES, NOW, nid, nodeRows, PROTOCOLS, relaysOf, SCENE_PROFILES, summaries, summaryOf, type Fleet } from "@/screens/dev-kit-profiles-data";
 import { ProfilePage, type PageScene } from "@/screens/profiles/page";
+import { mtprotoEdited } from "@/screens/profiles/mtproto-form";
 import { setAt, type Settings } from "@/screens/profiles/schema";
 import type { PageData } from "@/screens/profiles/page-types";
 import { fleetConnectionsQuery } from "@/screens/profiles/profiles-data";
@@ -46,13 +47,7 @@ const SCHEMAS: Record<string, string> = {
   vless: fixture.vless,
   trusttunnel: fixture.trusttunnel,
   awg: fixture.awg,
-  mtproto: JSON.stringify({
-    type: "object",
-    properties: {
-      port: { type: "integer", title: "TCP port", "x-group": "basics", "x-order": 10, "x-critical": true },
-      fake_tls: { type: "object", title: "Fake TLS", "x-group": "obfuscation", "x-order": 20, properties: { kind: { type: "string", enum: ["own", "site"], title: "Name in the handshake", "x-critical": true }, domain: { type: "string", title: "Site", "x-critical": true } } },
-    },
-  }),
+  mtproto: fixture.mtproto,
 };
 
 /** AmneziaWG's settings as the panel hands them out (the values are made up: the header protection key is the mask the panel sends instead of a secret). */
@@ -107,15 +102,16 @@ const SETTINGS: Record<string, string> = {
   aw1: JSON.stringify(awgSettings("3.1")),
   aw2: JSON.stringify(awgSettings("2.0")),
   tg1: JSON.stringify({ port: 8443, fake_tls: { kind: "own", domain: "" } }),
+  tg2: JSON.stringify({ mode: "web", port: 443, fake_tls: { kind: "own", domain: "" } }),
 };
 
 const kid = (id: string) => id.replace("prf_", "");
 
 /** The profile a scene shows, as the panel answers GetProfile for it. */
 export function pageDataOf(profileKey: string): PageData {
-  const spec = PROFILES.find((p) => kid(p.id) === profileKey) ?? PROFILES[0]!;
+  const spec = SCENE_PROFILES.find((p) => kid(p.id) === profileKey) ?? SCENE_PROFILES[0]!;
   const info = PROTOCOLS.find((p) => p.id === spec.protocol)!;
-  const sum = summaries().find((s) => s.id === spec.id)!;
+  const sum = summaryOf(spec);
   const inbounds = Object.entries(spec.sv).map(([node, st]) => ({
     id: `inb_${kid(spec.id)}_${node}`,
     profileId: spec.id,
@@ -157,13 +153,15 @@ export function sceneOf(state: string): PageScene {
   const dlg = (["put", "take", "twin", "del"] as const).find((d) => variant.split(".").includes(d));
   const v = variant.split(".");
   const bumped = (b: Settings) => setAt(b, ["port"], 9443);
+  // the Telegram profile switched to the Web mode (the port and the name follow)
+  const webbed = (b: Settings) => mtprotoEdited(b, setAt(b, ["mode"], "web"));
   return {
     tab,
     ...(dlg && { dlg }),
     ...(v.includes("stale") && { stale: true }),
     ...(v.includes("gone") && { gone: true }),
     ...(v.includes("saved") && { saved: true }),
-    ...((v.includes("dirty") || v.includes("impact")) && { seed: { settings: bumped, ...(v.includes("impact") && { impact: { criticalFields: ["/port"], inboundsRestarted: 2, usersOnline: 3, devicesNeedReissue: 0, affectedUserNames: ["alice", "bob", "carol"] } as never }) } }),
+    ...((v.includes("dirty") || v.includes("impact") || v.includes("web")) && { seed: { settings: v.includes("web") ? webbed : bumped, ...(v.includes("impact") && { impact: { criticalFields: [v.includes("web") ? "/mode" : "/port"], inboundsRestarted: 2, usersOnline: 3, devicesNeedReissue: 0, affectedUserNames: ["alice", "bob", "carol"] } as never }) } }),
     ...(v.includes("errors") && { seed: { settings: (b: Settings) => setAt(b, ["port"], 0), name: "" } }),
     variant,
   };
@@ -216,10 +214,16 @@ PersistentKeepalive = ${String(ob.persistent_keepalive ?? "")}`;
       obfuscationScore: { value: items.reduce((n, i) => n + i.delta, base), base, tier: v31 ? "header_protection" : "ranges", items },
     };
   };
+  const tgPreview = (json: string) => {
+    const web = (JSON.parse(json) as Record<string, unknown>).mode === "web";
+    return { errors, warnings, clientPreview: web ? "tg://webproxy?server=web.de1.example.com\n&port=443&secret=dd••••" : "tg://proxy?server=de1.example.com\n&port=8443&secret=ee••••", clientLabel: web ? "de1 - Telegram Web" : "de1", formats: [], obfuscationScore: undefined };
+  };
   p.previewProfile = async (req: { protocol: string; settingsJson: string }) =>
     req.protocol === "awg"
       ? awgView(req.settingsJson)
-      : { errors, warnings, clientPreview: "hysteria2://••••@de1.example.com:443/\n?sni=de1.example.com&obfs=salamander&obfs-password=••••\n#de1 · hy2 · 443", clientLabel: "de1", formats: [], obfuscationScore: undefined };
+      : req.protocol === "mtproto"
+        ? tgPreview(req.settingsJson)
+        : { errors, warnings, clientPreview: "hysteria2://••••@de1.example.com:443/\n?sni=de1.example.com&obfs=salamander&obfs-password=••••\n#de1 · hy2 · 443", clientLabel: "de1", formats: [], obfuscationScore: undefined };
   p.updateProfile = async () => ({ profile: undefined, impact: undefined });
   // AmneziaWG's panel asks for the mimicry cards (without an answer the page says it cannot reach the panel)
   const a = awgApi as unknown as Record<string, unknown>;
@@ -326,6 +330,12 @@ export const frames: Frame[] = [
   { id: "profile-aw1-readonly", state: "aw1.settings", title: "AmneziaWG seen by an observer", w: 1440, h: 2000, params: "&role=readonly" },
   { id: "profile-tt1", state: "tt1.settings", title: "TrustTunnel", w: 1440, h: 1200 },
   { id: "profile-tg1", state: "tg1.settings", title: "MTProto", w: 1440, h: 1000 },
+  { id: "profile-tg1-web", state: "tg1.settings.web", title: "MTProto switched to Web: the port is fixed to 443 and says why, the Fake TLS name is gone, the DNS note under the mode", w: 1440, h: 1000 },
+  { id: "profile-tg1-web-impact", state: "tg1.settings.web.impact", title: "MTProto to Web: \"Save changes?\" with the mode and the port as critical", w: 1440, h: 1000 },
+  { id: "profile-tg2", state: "tg2.settings", title: "A Web Proxy profile on two nodes", w: 1440, h: 1000 },
+  { id: "profile-tg2-override", state: "tg2.settings.override.fake.web", title: "A Fake TLS profile switched to Web while a node holds a port of its own: the remark names the node", w: 1440, h: 1100 },
+  { id: "profile-tg2-override-impact", state: "tg2.settings.override.fake.web.impact", title: "The same in \"Save changes?\"", w: 1440, h: 1100 },
+  { id: "profile-tg2-phone", state: "tg2.settings.override", title: "A Web Proxy profile on a phone, 400 wide", w: 400, h: 2600 },
   ...tabFrames,
 ];
 

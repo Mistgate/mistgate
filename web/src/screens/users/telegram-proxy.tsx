@@ -154,7 +154,7 @@ export function TelegramSection({
   );
 }
 
-/** One tg://proxy link (the board's .up-tg row): the node's flag and name, the profile with the twin's mark, and the three ways to hand it over. */
+/** One tg://proxy link (the board's .up-tg row): the node's flag and name, the profile with the twin's mark (or the tag "Web" of a tg://webproxy link), and the three ways to hand it over. */
 function LinkRow({ l, cc, t }: { l: TelegramProxyLink; cc: string; t: Tx }) {
   const [qr, setQr] = useState(false);
   const marks = [l.ipv6 && "IPv6", l.relay && t("tgproxy.via", { cc: l.via || "?" })].filter((x): x is string => !!x);
@@ -164,7 +164,14 @@ function LinkRow({ l, cc, t }: { l: TelegramProxyLink; cc: string; t: Tx }) {
         <Flag code={cc} size={16} />
       </span>
       <b>{l.nodeName}</b>
-      <span>{[l.profileName, ...marks].join(" · ")}</span>
+      <span>
+        {[l.profileName, ...marks].join(" · ")}
+        {l.web && (
+          <i className="up-tag" title={t("tgproxy.webHint")}>
+            {t("tgproxy.web")}
+          </i>
+        )}
+      </span>
       <span className="flex items-center gap-1.5">
         <Tip label={t("tgproxy.open")}>
           <a href={l.url} aria-label={t("tgproxy.open")} className="up-dotsb">
