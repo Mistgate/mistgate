@@ -29,6 +29,7 @@ export const looks: Record<string, Look> = {
   wd: { brand: "Werkplaats Eik", lang: "nl", font: '"Trebuchet MS",Verdana,sans-serif', bg: "#eef0e8", fg: "#1d2a22", ac: "#2f6b4a", c: ["#c9d3bd", "#9db39a", "#6f8f78"], ln: "#1d2a2222", r: "14px", w: 700, nav: ["Meubels", "Werkwijze", "Contact"], h1: "Meubels van <i>massief eiken</i>", p: "Tafels, kasten en banken op maat, gemaakt in onze eigen werkplaats", cta: "Bekijk het werk", p1: "Elk stuk maken we op bestelling", li: [["Eettafel", "op maat"], ["Boekenkast", "op maat"], ["Tuinbank", "180 cm"]], p2: "Voorbeeldstraat 8, Utrecht. Op afspraak", nf: "Deze pagina bestaat niet" },
   bike: { brand: "alpine·loop", lang: "en", font: '"Courier New",monospace', bg: "#fbfbf7", fg: "#1b1b1b", ac: "#d2452f", c: ["#e7e5da", "#cfd8d2", "#b9c7d6"], ln: "#1b1b1b22", r: "2px", w: 700, nav: ["Routes", "Gear", "About"], h1: "Slow rides across <i>the Alps</i>", p: "Notes, maps and packing lists from a few summers of bikepacking", cta: "Read the routes", p1: "Routes I have ridden and would ride again", li: [["Lake loop", "3 days"], ["High pass", "5 days"], ["Valley floor", "2 days"]], p2: "A personal blog. No comments, no tracking", nf: "Wrong turn. Nothing here" },
   gd: { brand: "Gärtnerei Lindenhof", lang: "de", font: "Georgia,serif", bg: "#f3f6ee", fg: "#22301c", ac: "#5c7d2e", c: ["#d6e2c2", "#b4cc97", "#8cab6a"], ln: "#22301c22", r: "999px", w: 400, nav: ["Pflanzen", "Anfahrt"], h1: "Stauden und <i>Gehölze</i>", p: "Eine kleine Gärtnerei mit eigener Anzucht", cta: "Zum Sortiment", p1: "Aus eigener Anzucht", li: [["Stauden", "ab April"], ["Obstgehölze", "ab Oktober"]], p2: "Lindenweg 3. Mo–Sa", nf: "Seite nicht gefunden" },
+  tpl: { brand: "Rainy Reader", lang: "en", font: 'Georgia,"Times New Roman",serif', bg: "#f7f5f0", fg: "#25221d", ac: "#8a4b2a", c: ["#e6dfd0", "#d2c5ad", "#b9a98a"], ln: "#25221d22", r: "3px", w: 500, nav: ["Notes", "Archive", "About"], h1: "Notes from a <i>rainy</i> reading desk", p: "Short posts about books, tea and long walks home", cta: "Read the notes", p1: "The latest notes, newest first", li: [["On slow reading", "12 Oct"], ["A shelf for one", "28 Sep"], ["Walking home", "9 Sep"]], p2: "Written by one person, a few times a month", nf: "No such note" },
   boat: { brand: "Järvi Vene", lang: "fi", font: "Verdana,Arial,sans-serif", bg: "#eaf2f6", fg: "#12303f", ac: "#1f6f93", c: ["#bcd7e3", "#8fbdd0", "#5d9cb8"], ln: "#12303f22", r: "10px", w: 700, nav: ["Veneet", "Hinnat", "Yhteys"], h1: "Soutuveneet ja <i>kanootit</i>", p: "Vuokraa vene päiväksi tai viikoksi suoraan laiturilta", cta: "Katso veneet", p1: "Kaikki veneet sisältävät airot ja liivit", li: [["Soutuvene", "päivä"], ["Kanootti", "päivä"], ["Kajakki", "päivä"]], p2: "Esimerkkitie 4, Tampere. Touko–syyskuu", nf: "Sivua ei löytynyt" },
 };
 // a generic look for the sites a scene makes up to fill the library
@@ -67,6 +68,8 @@ export type DemoSite = {
   note: string;
   source: "upload" | "assistant" | "mcp";
   token?: string;
+  /** The kind of template it was made from (the panel marks such a site with the source label "template:<kind>"). */
+  template?: string;
   state: "ready" | "draft";
   /** A required check that fails (the board's "no index.html"). */
   bad?: boolean;
@@ -110,6 +113,10 @@ export const demoSites: DemoSite[] = [
     warn: [{ code: "scripts_or_forms", paths: ["map.js"] }],
     tree: [["index.html", 6.8], ["routes.html", 7.9], ["gear.html", 5.2], ["about.html", 2.2], ["404.html", 0.9], ["style.css", 4.6], ["map.js", 3.4], ["img/pass.jpg", 12], ["img/tent.jpg", 3]],
     versions: [{ agoS: 3 * H, by: "claude-desktop", bytes: 46 * KB }, { agoS: 3 * H + 480, by: "claude-desktop", bytes: 41 * KB }] },
+  { id: "dsi_tpl", name: "Rainy Reader", note: "Личный блог", source: "upload", template: "blog", state: "ready", files: 11, bytes: 38 * KB, sha: "b6d03e8f2a15", nodes: [], panel: false, updatedAgoS: 40 * 60, createdAgoS: 40 * 60, by: "owner", has404: true, title: "Notes · Rainy Reader",
+    warn: [],
+    tree: [["index.html", 5.9], ["archive.html", 4.6], ["about.html", 3.0], ["404.html", 1.1], ["robots.txt", 0.1], ["assets/site.css", 7.8], ["assets/icon.svg", 0.8], ["img/desk.svg", 5.2]],
+    versions: [{ agoS: 40 * 60, by: "owner", bytes: 38 * KB }] },
   { id: "dsi_gd", name: "Садовый питомник", note: "питомник растений, немецкий", source: "assistant", state: "draft", files: 3, bytes: 11 * KB, sha: "5a9e12c0b7f4", nodes: [], panel: false, updatedAgoS: 5 * H, createdAgoS: 5 * H, by: "assistant", has404: false, title: "Gärtnerei Lindenhof",
     warn: [{ code: "no_404" }, { code: "few_pages" }],
     tree: [["index.html", 4.7], ["pflanzen.html", 3.6], ["style.css", 2.7]],

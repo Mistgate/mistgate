@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { en } from "@/i18n/en";
-import { setLang } from "@/i18n";
+import { dictionaries, plainText, setLang } from "@/i18n";
 import { DecoysScreen } from "./decoys/list";
 import { DecoySiteScreen } from "./decoys/site";
 import { frames, sceneOf } from "./dev-kit-decoys";
@@ -53,7 +53,7 @@ describe("the scenes of the Decoy sites screens", () => {
     expect(text()).not.toContain("undefined");
     expect(document.querySelector("h1")?.textContent || document.querySelector("[role=dialog] h2")?.textContent).toBeTruthy();
     const cards = () => document.querySelectorAll("a.dz-c").length;
-    if (state === "list") expect(cards()).toBe(7);
+    if (state === "list") expect(cards()).toBe(8);
     if (state === "list-full") expect(cards()).toBe(100);
     if (state === "list-many") {
       // twelve nodes and the panel: thirteen cells, filled up to fifteen so the last row has all its lines
@@ -63,7 +63,8 @@ describe("the scenes of the Decoy sites screens", () => {
     if (state === "list-draft") expect(cards()).toBe(3);
     if (state === "list-find") expect(cards()).toBe(1);
     if (state === "list-nomatch") expect(text()).toContain(en["dz.none.title"]);
-    if (state === "list-empty") expect(document.querySelectorAll(".dz-way")).toHaveLength(3);
+    if (state === "list-empty") expect(document.querySelectorAll(".dz-way")).toHaveLength(4);
+    if (state === "dlg-new") expect(document.querySelectorAll(".dz-way")).toHaveLength(4);
     if (state === "list-load") expect(document.querySelectorAll(".dz-sk")).toHaveLength(6);
     if (state === "list-err") expect(text()).toContain(en["dz.err.title"]);
     if (state === "list-deny" || state === "site-deny") expect(text()).toContain(en["dz.deny.title"]);
@@ -73,6 +74,12 @@ describe("the scenes of the Decoy sites screens", () => {
     if (state === "dlg-up-run") expect(text()).toContain("34%");
     if (state === "dlg-up-big") expect(text()).toContain(en["dz.er.decoy_bundle_too_large"]);
     if (state === "dlg-up-unsafe") expect(text()).toContain("img/latest");
+    if (state === "dlg-tpl") expect(document.querySelectorAll(".dz-ways.tpl .dz-way")).toHaveLength(10);
+    if (state === "dlg-tpl-wait") expect(document.querySelector(".dz-fr")?.textContent).toContain(en["dz.tpl.loading"]);
+    if (state === "dlg-tpl-view") expect(document.querySelector(".dz-fr iframe")?.getAttribute("srcdoc")).toContain("Rainy Reader");
+    if (state === "dlg-tpl-view") expect(text()).toContain(en["dz.tpl.footView"].replace("{name}", "Rainy Reader"));
+    if (state === "dlg-tpl-run") expect(text()).toContain(en["dz.tpl.footRun"]);
+    if (state === "dlg-tpl-err") expect(text()).toContain(en["err.decoy_library_full"]);
     if (state === "dlg-mcp") expect(document.querySelector(".dz-task")?.textContent).toContain("decoy_site_draft_save");
     if (state === "site-used") expect(document.querySelector("[data-shot=decoy-placement]")?.querySelectorAll(".dz-plr")).toHaveLength(2);
     if (state === "site-draft") expect(text()).toContain(en["dz.act.ready"]);
@@ -95,10 +102,23 @@ describe("the scenes of the Decoy sites screens", () => {
   it.each(["ru", "zh", "fa", "tr"] as const)("the list and a site draw in %s", async (lang) => {
     setLang(lang);
     await draw("list");
-    expect(document.querySelectorAll("a.dz-c")).toHaveLength(7);
+    expect(document.querySelectorAll("a.dz-c")).toHaveLength(8);
     act(() => root?.unmount());
     host?.remove();
     await draw("site-used");
     expect(document.querySelector("h1")?.textContent).toBe("Пекарня Хольцофен");
+  });
+
+  it.each(["ru", "zh", "fa", "tr"] as const)("the window from a template draws in %s: the kinds and a preview", async (lang) => {
+    setLang(lang);
+    await draw("dlg-tpl");
+    expect(document.querySelectorAll(".dz-ways.tpl .dz-way")).toHaveLength(10);
+    expect(text()).toContain(dictionaries[lang]["dz.tpl.blog"]);
+    expect(text()).not.toContain("dz.tpl.");
+    act(() => root?.unmount());
+    host?.remove();
+    await draw("dlg-tpl-view");
+    expect(text()).toContain(dictionaries[lang]["dz.tpl.create"]);
+    expect(plainText(text())).toContain(dictionaries[lang]["dz.tpl.footView"].replace("{name}", "Rainy Reader"));
   });
 });
