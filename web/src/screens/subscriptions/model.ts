@@ -95,8 +95,11 @@ export function dnsChips(items: readonly { category: DnsCategory; country: strin
 }
 /** The country of a regional chip ("CN"), "" for any other chip. */
 export const chipCountry = (chip: string): string => (chip.startsWith(`${DnsCategory.REGIONAL}:`) ? chip.slice(chip.indexOf(":") + 1) : "");
+/** A rule's geo list holds a site category alone as "geosite:<name>" (internal/panel/dns/geo.go). */
+const geositePrefix = "geosite:";
 /** A country by its code ("cn", "IR") in the UI language: the panel's own word for Russia and China, else the browser's, else the code. */
 export function countryName(code: string, t: Tx): string {
+  if (code.startsWith(geositePrefix)) return code; // a site category, not a country: the subtitle names it as written
   const c = code.toUpperCase();
   const key = countryKey[c];
   if (key) return t(key);
@@ -120,7 +123,21 @@ export function chipLabel(chip: string, t: Tx): string {
  * code, shows it as well so it can be seen and turned off.
  */
 const geoOffered = ["cn", "ru"];
-export const geoChoices = (have: readonly string[]): string[] => [...new Set([...geoOffered, ...have])];
+export const geoChoices = (have: readonly string[]): string[] => [...new Set([...geoOffered, ...have.filter((g) => !g.startsWith(geositePrefix))])];
+/** The category names of a rule ("telegram" for "geosite:telegram"). */
+export const geoCategories = (geo: readonly string[]): string[] => geo.filter((g) => g.startsWith(geositePrefix)).map((g) => g.slice(geositePrefix.length));
+// The form the panel checks: lower-case letters and digits, then also - ! @, at most 64. A name the lists do not hold is not caught here or there.
+const categoryRe = /^[a-z0-9][a-z0-9!@-]{0,63}$/;
+/** Categories typed in one go, separated by commas, semicolons or spaces, lower-cased, with or without the "geosite:" in front: the well-formed ones and the rest. */
+export function parseCategories(text: string): { ok: string[]; bad: string[] } {
+  const tokens = [...new Set(text.toLowerCase().split(/[\s,;]+/).filter(Boolean))];
+  const name = (n: string) => (n.startsWith(geositePrefix) ? n.slice(geositePrefix.length) : n);
+  return { ok: [...new Set(tokens.map(name).filter((n) => categoryRe.test(n)))], bad: tokens.filter((n) => !categoryRe.test(name(n))) };
+}
+/** The geo list of a rule with these category names added (the ones it has already are not repeated). */
+export const addCategories = (geo: readonly string[], names: readonly string[]): string[] => [...geo, ...names.filter((n) => !geo.includes(geositePrefix + n)).map((n) => geositePrefix + n)];
+/** The geo list of a rule without this category. */
+export const removeCategory = (geo: readonly string[], name: string): string[] => geo.filter((g) => g !== geositePrefix + name);
 /** The country lists of a rule with `code` switched on (added at the end) or off; the others keep their order. */
 export const toggleGeo = (geo: readonly string[], code: string): string[] => (geo.includes(code) ? geo.filter((g) => g !== code) : [...geo, code]);
 

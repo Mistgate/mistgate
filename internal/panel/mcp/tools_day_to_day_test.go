@@ -243,7 +243,8 @@ func TestDNSPresetPlansAndApplies(t *testing.T) {
 	e := newTestEnv(t)
 	_, admin := e.token(ProfileAdmin)
 	s := e.session(admin)
-	create := planOf(t, s, "dns_preset_create", map[string]any{"name": "Family DNS", "description": "Family resolver", "servers": []any{map[string]any{"kind": "plain", "address": "192.0.2.53"}}, "preferred_transport": "plain", "block_ads": true})
+	create := planOf(t, s, "dns_preset_create", map[string]any{"name": "Family DNS", "description": "Family resolver", "servers": []any{map[string]any{"kind": "plain", "address": "192.0.2.53"}}, "preferred_transport": "plain", "block_ads": true,
+		"split": []any{map[string]any{"geo": []any{"geosite:telegram"}, "servers": []any{map[string]any{"kind": "plain", "address": "192.0.2.54"}}}}})
 	if !create.NeedsApproval || create.Danger[0] != dangerPage || !factIn(t, create.Facts, "name").Untrusted {
 		t.Fatalf("create plan: %+v", create)
 	}
@@ -259,7 +260,8 @@ func TestDNSPresetPlansAndApplies(t *testing.T) {
 	}
 	approvePlan(t, e, create)
 	applyOf(t, s, "dns_preset_create", create.ConfirmToken)
-	if len(e.w.dnsCreateReq) != 1 || e.w.dnsCreateReq[0].GetName() != "Family DNS" || e.w.dnsCreateReq[0].GetServers()[0].GetAddress() != "192.0.2.53" || !e.w.dnsCreateReq[0].GetBlockAds() {
+	if len(e.w.dnsCreateReq) != 1 || e.w.dnsCreateReq[0].GetName() != "Family DNS" || e.w.dnsCreateReq[0].GetServers()[0].GetAddress() != "192.0.2.53" || !e.w.dnsCreateReq[0].GetBlockAds() ||
+		len(e.w.dnsCreateReq[0].GetSplit()) != 1 || len(e.w.dnsCreateReq[0].GetSplit()[0].GetGeo()) != 1 || e.w.dnsCreateReq[0].GetSplit()[0].GetGeo()[0] != "geosite:telegram" {
 		t.Fatalf("CreateDnsPreset request: %+v", e.w.dnsCreateReq)
 	}
 	if e.w.calls(adminv1connect.DnsServiceCreateDnsPresetProcedure)[0].Approved != create.PlanID {

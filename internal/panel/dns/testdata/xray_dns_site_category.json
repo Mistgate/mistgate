@@ -1,0 +1,46 @@
+{
+  "direct": null,
+  "directGeo": [
+    {
+      "Site": "geosite:category-media-ru",
+      "IP": ""
+    },
+    {
+      "Site": "geosite:telegram",
+      "IP": ""
+    }
+  ],
+  "directIPs": [
+    "77.88.8.8",
+    "77.88.8.1"
+  ],
+  "dns": {
+    "tag": "dns-internal",
+    "queryStrategy": "UseIPv4",
+    "servers": [
+      {
+        "address": "1.1.1.1"
+      },
+      {
+        "address": "1.0.0.1"
+      },
+      {
+        "address": "77.88.8.8",
+        "domains": [
+          "geosite:category-media-ru",
+          "geosite:telegram"
+        ],
+        "skipFallback": true
+      },
+      {
+        "address": "77.88.8.1",
+        "domains": [
+          "geosite:category-media-ru",
+          "geosite:telegram"
+        ],
+        "skipFallback": true
+      }
+    ]
+  },
+  "notes": null
+}

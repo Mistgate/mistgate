@@ -41,7 +41,7 @@ type XrayDNS struct {
 	Notes []string
 }
 
-// XrayGeo is one country list as Xray names it.
+// XrayGeo is one country list as Xray names it; IP is empty for a site category alone.
 type XrayGeo struct{ Site, IP string }
 
 // XraySection is the JSON of the "dns" key.
@@ -80,7 +80,11 @@ func (p Preset) XrayDNS() (XrayDNS, error) {
 			domains[i] = "domain:" + b
 		}
 		for _, code := range sp.Geo {
-			g := XrayGeo{Site: "geosite:" + geoLists[code].Site, IP: "geoip:" + geoLists[code].IP}
+			l, _ := geoListOf(code)
+			g := XrayGeo{Site: "geosite:" + l.Site}
+			if l.IP != "" {
+				g.IP = "geoip:" + l.IP
+			}
 			domains = append(domains, g.Site)
 			out.DirectGeo = append(out.DirectGeo, g)
 		}
