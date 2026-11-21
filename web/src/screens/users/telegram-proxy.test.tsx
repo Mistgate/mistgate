@@ -104,7 +104,7 @@ describe("the Telegram proxy of a person", () => {
     await mount(<TelegramSection user={user(true)} countryOf={() => "DE"} onTurnOn={vi.fn()} onChanged={vi.fn()} />);
     const links = linkRows();
     expect(links.map((r) => r.querySelector(".up-tag")?.textContent ?? "")).toEqual(["", "Web"]);
-    expect(links[1]!.querySelector(".up-tag")?.getAttribute("title")).toBe("The proxy of Telegram Web (tg://webproxy): for Telegram in a browser tab");
+    expect(links[1]!.querySelector(".up-tag")?.getAttribute("title")).toBe("Telegram Web Proxy (tg://webproxy): the app reaches it as an ordinary HTTPS site");
     expect(links[1]!.querySelector("a")!.getAttribute("href")).toBe(webUrl);
     expect(text()).not.toContain("secret=");
   });

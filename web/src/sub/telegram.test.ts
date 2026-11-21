@@ -77,14 +77,14 @@ describe("the Telegram proxy panel", () => {
     expect(prows(el)[0]!.querySelector(".fl2")?.getAttribute("aria-label")).toBe("Флаг: Германия");
   });
 
-  it("the Web Proxy of Telegram Web is a link of its own, tagged \"Web\" in the list, the pane and the phone's row, and opens as the others do", () => {
+  it("a Web Proxy is a link of its own, tagged \"Web\" in the list, the pane and the phone's row, and opens as the others do", () => {
     const web = cases["telegram-web"]!.telegram!.links[1]!;
     expect(web.web).toBe(true);
     expect(web.url).toMatch(/^tg:\/\/webproxy\?/);
     const { el } = tg({}, "ru", "telegram-web");
     expect(picks(el).map((b) => text(b.querySelector(".u-tag")))).toEqual(["", "Web", ""]);
     expect(prows(el).map((r) => text(r.querySelector(".u-tag")))).toEqual(["", "Web", ""]);
-    expect(prows(el)[1]!.querySelector(".u-tag")?.getAttribute("title")).toBe("Прокси для Telegram Web, который открывается в браузере");
+    expect(prows(el)[1]!.querySelector(".u-tag")?.getAttribute("title")).toBe("Новый вид прокси: Telegram ходит к нему как на обычный сайт. Звонки через него не работают");
     expect(prows(el)[1]!.querySelector("[data-k=tg-open-m-1]")?.getAttribute("href")).toBe(web.url);
     picks(el)[1]!.click();
     expect(text(pane(el).querySelector(".u-h2 .u-tag"))).toBe("Web");
