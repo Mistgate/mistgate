@@ -18,6 +18,10 @@ import {
   pageLabel,
   panelFallbackKey,
   panelSourceOf,
+  templateIcon,
+  templateIcons,
+  templateOf,
+  templateWords,
   treeRows,
   uploadError,
   type Site,
@@ -220,4 +224,27 @@ describe("the copy of the page in the five languages", () => {
       expect(own.filter((k) => holes(d[k]) !== holes(decoysites.en[k])), "placeholders differ").toEqual([]);
     });
   }
+});
+
+describe("sites made from a template", () => {
+  it("are known by the source label the panel writes, and a site of any other source is not", () => {
+    expect(templateOf({ sourceLabel: "template:blog" })).toBe("blog");
+    expect(templateOf({ sourceLabel: "owner" })).toBe("");
+    expect(templateOf({ sourceLabel: "" })).toBe("");
+  });
+
+  it("have a name, a line and an icon for every kind the screen knows, in every language; an unknown kind keeps the panel's name", () => {
+    for (const lang of ["en", "ru", "zh", "fa", "tr"] as const) {
+      setLang(lang);
+      const tr = ((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dictionaries[lang][key], vars)) as T;
+      for (const id of Object.keys(templateIcons)) {
+        const w = templateWords(tr, id);
+        expect(w.name, `${lang} ${id}`).not.toBe(id);
+        expect(w.text, `${lang} ${id}`).not.toBe("");
+        expect(templateIcon(id)).toBe(templateIcons[id as keyof typeof templateIcons]);
+      }
+      expect(templateWords(tr, "newkind", "A new kind")).toEqual({ name: "A new kind", text: "" });
+      expect(templateIcon("newkind")).toBe("layers");
+    }
+  });
 });

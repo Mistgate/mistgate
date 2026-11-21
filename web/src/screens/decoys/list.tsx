@@ -18,12 +18,13 @@ import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { errorText } from "@/lib/errors";
 import { McpDialog, NewSiteDialog, UploadDialog, Ways, type UploadDemo } from "./create";
-import { asSource, DzIcon, Gl, liveNodes, PanelGlyph, SiteLink, sourceKey, useAssistant, usageText, whenText } from "./parts";
+import { TemplateDialog, type TemplateDemo } from "./template";
+import { DzIcon, Gl, liveNodes, PanelGlyph, SiteLink, SourceTag, useAssistant, usageText, whenText } from "./parts";
 import { BuiltinLogo, Thumb } from "./thumb";
 import "./decoys.css";
 
 /** What the dev kit starts the screen with (a window, a filter, a search); the app starts with none. */
-export type DecoysDemo = { dialog?: "new" | "up" | "mcp"; upload?: UploadDemo; filter?: SiteFilter; q?: string };
+export type DecoysDemo = { dialog?: "new" | "up" | "mcp" | "tpl"; upload?: UploadDemo; template?: TemplateDemo; filter?: SiteFilter; q?: string };
 
 /**
  * The Decoy sites page (the board's PnDecoys): what each node and the panel show now, the two built-in entries, and the own sites
@@ -36,7 +37,7 @@ export function DecoysScreen({ demo }: { demo?: DecoysDemo } = {}) {
   const { edge } = useEdition();
   const lib = useQuery({ ...sitesQuery, enabled: owner && !edge });
   const nodes = useQuery({ ...nodesQuery, enabled: owner });
-  const [dialog, setDialog] = useState<"" | "new" | "up" | "mcp">(demo?.dialog ?? "");
+  const [dialog, setDialog] = useState<"" | "new" | "up" | "mcp" | "tpl">(demo?.dialog ?? "");
   const assistant = useAssistant();
   const ready = lib.data !== undefined || edge;
   const sites = useMemo(() => lib.data?.sites ?? [], [lib.data]);
@@ -115,11 +116,12 @@ export function DecoysScreen({ demo }: { demo?: DecoysDemo } = {}) {
         <>
           <Showing nodes={liveNodes(nodes.data?.nodes)} sites={sites} panelSource={lib.data.panelSource} panel={lib.data.panel} ready={nodes.isSuccess} />
           <Builtins dirAvailable={lib.data.builtin.find((b) => b.id === "panel_dir")?.available ?? false} dirReason={lib.data.builtin.find((b) => b.id === "panel_dir")?.reasonCode ?? ""} />
-          <Mine sites={sites} nodes={liveNodes(nodes.data?.nodes)} limit={limit} demo={demo} onWay={{ up: () => setDialog("up"), as: askNew, mcp: () => setDialog("mcp") }} />
+          <Mine sites={sites} nodes={liveNodes(nodes.data?.nodes)} limit={limit} demo={demo} onWay={{ tpl: () => setDialog("tpl"), up: () => setDialog("up"), as: askNew, mcp: () => setDialog("mcp") }} />
         </>
       )}
 
-      {dialog === "new" && <NewSiteDialog onClose={close} onUpload={() => setDialog("up")} onAssistant={askNew} onMcp={() => setDialog("mcp")} />}
+      {dialog === "new" && <NewSiteDialog onClose={close} onTemplate={() => setDialog("tpl")} onUpload={() => setDialog("up")} onAssistant={askNew} onMcp={() => setDialog("mcp")} />}
+      {dialog === "tpl" && <TemplateDialog onClose={close} demo={demo?.template} />}
       {dialog === "up" && <UploadDialog onClose={close} demo={demo?.upload} />}
       {dialog === "mcp" && <McpDialog onClose={close} />}
     </div>
@@ -265,7 +267,7 @@ export function Builtins({ edge, dirAvailable, dirReason }: { edge?: boolean; di
 
 // ---- own sites
 
-function Mine({ sites, nodes, limit, demo, onWay }: { sites: readonly Site[]; nodes: readonly Node[]; limit: number; demo?: DecoysDemo; onWay: { up: () => void; as: () => void; mcp: () => void } }) {
+function Mine({ sites, nodes, limit, demo, onWay }: { sites: readonly Site[]; nodes: readonly Node[]; limit: number; demo?: DecoysDemo; onWay: { tpl: () => void; up: () => void; as: () => void; mcp: () => void } }) {
   const t = useT();
   const [filter, setFilter] = useState<SiteFilter>(demo?.filter ?? "all");
   const [q, setQ] = useState(demo?.q ?? "");
@@ -285,7 +287,7 @@ function Mine({ sites, nodes, limit, demo, onWay }: { sites: readonly Site[]; no
             <h2>{t("dz.first.title")}</h2>
             <p>{t("dz.first.text")}</p>
           </div>
-          <Ways onUpload={onWay.up} onAssistant={onWay.as} onMcp={onWay.mcp} />
+          <Ways onTemplate={onWay.tpl} onUpload={onWay.up} onAssistant={onWay.as} onMcp={onWay.mcp} />
         </section>
       ) : (
         <>
@@ -343,7 +345,6 @@ export function SiteCard({ site, nodes }: { site: Site; nodes: readonly Node[] }
   const flags = [...new Set(nodes.filter((n) => n.decoySiteId === site.id && n.decoyMode === "own").map((n) => n.countryCode))].filter(Boolean);
   const used = isUsed(site);
   const warns = warningsOf(site.checks).length;
-  const src = asSource(site.source);
   const bad = isBad(site);
   return (
     <Link ref={ref} to="/decoys/$id" params={{ id: site.id }} className="dz-card dz-c" data-draft={isDraft(site) || undefined}>
@@ -356,11 +357,7 @@ export function SiteCard({ site, nodes }: { site: Site; nodes: readonly Node[] }
           {site.note || t("dz.card.noNote")}
         </span>
         <div className="dz-ml">
-          <span className="dz-src">
-            <DzIcon kind={src} size={14} />
-            {t(sourceKey[src])}
-            {src === "mcp" && site.sourceLabel && <span className="dz-m">{site.sourceLabel}</span>}
-          </span>
+          <SourceTag site={site} />
           <span className="dz-m">{fmt.bytes(site.sizeBytes, 1024)}</span>
           <span>{whenText(fmt, t, site.updatedUnix)}</span>
         </div>

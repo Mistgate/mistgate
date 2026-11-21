@@ -96,6 +96,9 @@ export const errorCodes = [
   "decoy_file_binary",
   "decoy_page_not_found",
   "decoy_preview_too_large",
+  // a site from a template (GenerateDecoySite, PreviewDecoyTemplate): InvalidArgument
+  "decoy_template_unknown",
+  "decoy_template_seed",
   // relays (relay.proto): CreateRelay / UpdateRelay / CheckRelay
   "relay_exists",
   "same_node",

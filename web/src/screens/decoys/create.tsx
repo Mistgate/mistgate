@@ -31,11 +31,12 @@ export type UploadDemo = {
   site?: Site;
 };
 
-/** The three ways to a site, as cards: used by the empty list and by the "New site" window. */
-export function Ways({ one, onUpload, onAssistant, onMcp }: { one?: boolean; onUpload: () => void; onAssistant: () => void; onMcp: () => void }) {
+/** The four ways to a site, as cards: used by the empty list and by the "New site" window. */
+export function Ways({ one, onTemplate, onUpload, onAssistant, onMcp }: { one?: boolean; onTemplate: () => void; onUpload: () => void; onAssistant: () => void; onMcp: () => void }) {
   const t = useT();
   const assistant = useAssistant();
   const ways = [
+    { kind: "template" as const, title: t("dz.way.tpl"), text: t("dz.way.tplText"), result: t("dz.way.tplResult"), go: onTemplate, off: false },
     { kind: "upload" as const, title: t("dz.way.up"), text: t("dz.way.upText"), result: t("dz.way.upResult"), go: onUpload, off: false },
     { kind: "assistant" as const, title: t("dz.way.as"), text: t("dz.way.asText"), result: t("dz.way.asResult"), go: onAssistant, off: assistant.off },
     { kind: "mcp" as const, title: t("dz.way.mcp"), text: t("dz.way.mcpText"), result: t("dz.way.mcpResult"), go: onMcp, off: false },
@@ -45,7 +46,7 @@ export function Ways({ one, onUpload, onAssistant, onMcp }: { one?: boolean; onU
       {ways.map((w) => (
         <button key={w.kind} type="button" className="dz-way" disabled={w.off} title={w.off ? t("dz.way.asOff") : undefined} onClick={w.go}>
           <span className="g" aria-hidden>
-            <DzIcon kind={w.kind === "upload" ? "upload" : w.kind} />
+            <DzIcon kind={w.kind} />
           </span>
           <b>{w.title}</b>
           <span>{w.text}</span>
@@ -56,12 +57,12 @@ export function Ways({ one, onUpload, onAssistant, onMcp }: { one?: boolean; onU
   );
 }
 
-/** "New site": the three ways, one under another. */
-export function NewSiteDialog({ onClose, onUpload, onAssistant, onMcp }: { onClose: () => void; onUpload: () => void; onAssistant: () => void; onMcp: () => void }) {
+/** "New site": the four ways, one under another. */
+export function NewSiteDialog({ onClose, onTemplate, onUpload, onAssistant, onMcp }: { onClose: () => void; onTemplate: () => void; onUpload: () => void; onAssistant: () => void; onMcp: () => void }) {
   const t = useT();
   return (
     <Modal open onOpenChange={(o) => !o && onClose()} title={t("dz.d.new")} closeLabel={t("common.close")} wide className={dialogWidth} shot="decoy-dialog-new" footer={<span className="dz-foot">{t("dz.d.newFoot")}</span>}>
-      <Ways one onUpload={onUpload} onAssistant={onAssistant} onMcp={onMcp} />
+      <Ways one onTemplate={onTemplate} onUpload={onUpload} onAssistant={onAssistant} onMcp={onMcp} />
     </Modal>
   );
 }

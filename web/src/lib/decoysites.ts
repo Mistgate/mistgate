@@ -1,8 +1,8 @@
 import { ConnectError } from "@connectrpc/connect";
 import { queryOptions } from "@tanstack/react-query";
-import type { DecoyCheck, DecoyFileInfo, DecoyPanelState, DecoySite, DecoyVersion } from "@/gen/mistgate/decoysite/v1/decoysite_pb";
+import type { DecoyCheck, DecoyFileInfo, DecoyPanelState, DecoySite, DecoyTemplate, DecoyVersion } from "@/gen/mistgate/decoysite/v1/decoysite_pb";
 import type { Node as NodeMsg } from "@/gen/mistgate/admin/v1/node_pb";
-import type { T } from "@/i18n";
+import { dictionaries, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { decoySites } from "./api";
 import { asDecoyMode, isDecoyReason } from "./decoy";
@@ -18,6 +18,7 @@ export type SiteVersion = Plain<DecoyVersion>;
 export type SiteCheck = Plain<DecoyCheck>;
 export type SiteFile = Plain<DecoyFileInfo>;
 export type PanelState = Plain<DecoyPanelState>;
+export type SiteTemplate = Plain<DecoyTemplate>;
 export type Node = Plain<NodeMsg>;
 
 /** The two entries of the library that are not sites: they have no id of their own in the route, these are their words. */
@@ -82,6 +83,13 @@ export const fileQuery = (id: string, sha: string, path: string) =>
     retry: false,
   });
 
+/** The kinds of site the panel builds from its templates (they grow with the releases; the answer never changes while the panel runs). */
+export const templatesQuery = queryOptions({
+  queryKey: ["decoy-templates"],
+  queryFn: async ({ signal }) => plain(await decoySites.listDecoyTemplates({}, { signal })).templates,
+  staleTime: Infinity,
+});
+
 /** What an assignment would replace, and the warnings, without doing it (a dry run). `picks` is the sorted node ids and "panel". */
 export const assignPreviewQuery = (id: string, picks: readonly string[]) =>
   queryOptions({
@@ -115,6 +123,21 @@ export const countOfFilter = (sites: readonly Site[], f: SiteFilter) => sites.fi
 export function filterSites(sites: readonly Site[], filter: SiteFilter, query: string): Site[] {
   const q = query.trim().toLowerCase();
   return sites.filter((s) => filterTest[filter](s) && (!q || `${s.name} ${s.note}`.toLowerCase().includes(q)));
+}
+
+// ---- sites made from a template
+
+/** The icon of each kind of template the screens know (a kind added by a later release shows the generic one until the screens learn it). */
+export const templateIcons = { status: "pulse", files: "upload", login: "key", blog: "note", portfolio: "palette", business: "tag", docs: "list", card: "person", club: "people", project: "code" } as const;
+export const templateIcon = (id: string) => templateIcons[id as keyof typeof templateIcons] ?? "layers";
+
+/** The kind a site was made from ("" for a site that was not): the panel marks a generated site with the source label "template:<kind>". */
+export const templateOf = (s: Pick<Site, "sourceLabel">) => (s.sourceLabel.startsWith("template:") ? s.sourceLabel.slice("template:".length) : "");
+
+/** The name and the one-line description of a kind in the admin's language; a kind the dictionary does not know yet keeps the panel's own English name. */
+export function templateWords(t: T, id: string, fallbackName = id): { name: string; text: string } {
+  const known = `dz.tpl.${id}` in dictionaries.en;
+  return { name: known ? t(`dz.tpl.${id}` as MessageKey) : fallbackName, text: known ? t(`dz.tpl.${id}.text` as MessageKey) : "" };
 }
 
 // ---- where a node stands: the words of its delivery

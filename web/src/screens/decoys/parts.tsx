@@ -7,7 +7,7 @@ import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { plainText, useT, type T } from "@/i18n";
 import { accessQuery, askAssistant } from "@/lib/assistant";
 import { cx } from "@/lib/cx";
-import { type Delivery, type DeliveryKind, type Node } from "@/lib/decoysites";
+import { templateOf, templateWords, type Delivery, type DeliveryKind, type Node, type Site } from "@/lib/decoysites";
 import type { Fmt } from "@/lib/format";
 
 // Small pieces the list and the page of a site share.
@@ -26,6 +26,8 @@ const sourcePath = {
   phone: "M8 3.5h8a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 19V5A1.5 1.5 0 0 1 8 3.5zM11 17.5h2",
   pc: "M4 5h16v11H4zM9 20h6M12 16v4",
   folder: "M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z",
+  // a page with a header bar and a column: the template
+  template: "M4 5.5h16v13H4zM4 10h16M10 10v8.5",
 } as const;
 export type SourceKind = keyof typeof sourcePath;
 
@@ -40,6 +42,20 @@ export function DzIcon({ kind, size = 16, className }: { kind: SourceKind; size?
 
 export const sourceKey = { upload: "dz.src.upload", assistant: "dz.src.assistant", mcp: "dz.src.mcp" } as const;
 export const asSource = (v: string): "upload" | "assistant" | "mcp" => (v === "assistant" || v === "mcp" ? v : "upload");
+
+/** Where a site came from, as the card and the page say it: the icon and "Uploaded", "Assistant", "MCP · token" or "Template · Blog". */
+export function SourceTag({ site, size = 14 }: { site: Pick<Site, "source" | "sourceLabel">; size?: number }) {
+  const t = useT();
+  const kind = templateOf(site);
+  const src = asSource(site.source);
+  return (
+    <span className="dz-src">
+      <DzIcon kind={kind ? "template" : src} size={size} />
+      {kind ? `${t("dz.src.template")} · ${templateWords(t, kind).name}` : t(sourceKey[src])}
+      {!kind && src === "mcp" && site.sourceLabel && <span className="dz-m">{site.sourceLabel}</span>}
+    </span>
+  );
+}
 
 /** The panel's square of four (the Overview's section glyph): the panel in a row of nodes. */
 export function PanelGlyph({ className }: { className?: string }) {

@@ -6,7 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
-import { setLang } from "@/i18n";
+import { dictionaries, setLang } from "@/i18n";
 import { en } from "@/i18n/en";
 import { accessQuery } from "@/lib/assistant";
 import { pagesQuery, siteQuery, sitesQuery } from "@/lib/decoysites";
@@ -34,6 +34,9 @@ const api = {
   listDecoyPages: vi.fn(),
   getDecoyPagePreview: vi.fn(),
   getDecoyFile: vi.fn(),
+  listDecoyTemplates: vi.fn(),
+  previewDecoyTemplate: vi.fn(),
+  generateDecoySite: vi.fn(),
 };
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
@@ -216,10 +219,10 @@ describe("the list", () => {
     expect(cards()).toHaveLength(1);
   });
 
-  it("shows the empty first look with the three ways", async () => {
+  it("shows the empty first look with the four ways", async () => {
     await mountUi(list(), { lib: library([]), nodes: [node("de1")] });
     expect(text()).toContain(en["dz.first.title"]);
-    expect(document.querySelectorAll(".dz-way")).toHaveLength(3);
+    expect(document.querySelectorAll(".dz-way")).toHaveLength(4);
     expect(document.querySelector(".dz-bar")).toBeNull();
     expect(text()).toContain(en["dz.now.sumBi"].replace("{nodes}", "1 node"));
   });
@@ -230,6 +233,21 @@ describe("the list", () => {
     const add = button(en["dz.new"])!;
     expect(add.hasAttribute("disabled") || add.getAttribute("data-disabled") !== null).toBe(true);
     expect(add.closest("span")?.getAttribute("title")).toBe(en["dz.newFull"].replace("{n}", "100"));
+  });
+
+  it("says on a card and on the page where a site came from: a template shows its kind", async () => {
+    const made = site("tp", { name: "Rainy Reader", sourceLabel: "template:blog" });
+    await mountUi(list(), { lib: library([made, site("up")]), nodes });
+    const meta = cards().map((c) => c.querySelector(".dz-src")?.textContent);
+    expect(meta).toEqual([`${en["dz.src.template"]} · ${en["dz.tpl.blog"]}`, en["dz.src.upload"]]);
+    document.body.innerHTML = "";
+    await mountUi(page("dsi_tp"), { lib: library([made]), detail: { site: made } });
+    expect(document.querySelector(".dz-meta .dz-src")?.textContent).toBe(`${en["dz.src.template"]} · ${en["dz.tpl.blog"]}`);
+    expect(text()).toContain(en["dz.fact.template"].replace("{kind}", en["dz.tpl.blog"]));
+    // a kind that a later release adds keeps the name the panel gave it
+    document.body.innerHTML = "";
+    await mountUi(list(), { lib: library([site("tp", { sourceLabel: "template:newkind" })]), nodes });
+    expect(cards()[0]!.querySelector(".dz-src")?.textContent).toBe(`${en["dz.src.template"]} · newkind`);
   });
 
   it("opens the three ways of the new-site window: archive, task for an agent", async () => {
@@ -255,6 +273,95 @@ describe("the list", () => {
     expect(heard).toHaveBeenCalledTimes(1);
     expect((heard.mock.calls[0]![0] as CustomEvent).detail.text).toContain("decoy site");
     expect(text()).not.toContain(en["dz.d.new"]);
+  });
+});
+
+describe("a site from a template", () => {
+  const kinds = ["status", "files", "login", "blog", "portfolio", "business", "docs", "card", "club", "project"].map((id) => ({ id, nameEn: `Kind ${id}`, nameRu: `Вид ${id}` }));
+  const shown = (n: number) => ({ html: `<p>page ${n}</p>`, seed: `${n}`.padStart(16, "0"), name: `Brand ${n}` });
+  const open = async (lib = library([site("a")])) => {
+    api.listDecoyTemplates.mockResolvedValue({ templates: kinds });
+    await mountUi(list(), { lib, nodes: [node("de1")] });
+    await click(button(en["dz.new"]));
+    await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.way.tpl"])));
+  };
+  const frame = () => document.querySelector(".dz-fr iframe")?.getAttribute("srcdoc");
+
+  it("offers the ten kinds with a name and a line each, and asks for no preview before one is chosen", async () => {
+    await open();
+    expect(text()).toContain(en["dz.d.tpl"]);
+    const cardsOf = [...document.querySelectorAll(".dz-ways.tpl .dz-way")];
+    expect(cardsOf).toHaveLength(10);
+    expect(cardsOf[0]!.textContent).toBe(`${en["dz.tpl.status"]}${en["dz.tpl.status.text"]}`);
+    expect(api.previewDecoyTemplate).not.toHaveBeenCalled();
+    expect(button(en["dz.tpl.create"])).toBeUndefined();
+  });
+
+  it("previews the chosen kind, another variant asks for a new one, and Create saves the variant in view", async () => {
+    api.previewDecoyTemplate.mockResolvedValueOnce(shown(1)).mockResolvedValueOnce(shown(2));
+    api.generateDecoySite.mockResolvedValue({ site: site("new", { id: "dsi_new" }) });
+    await open();
+    await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.tpl.blog"])));
+    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: "" });
+    expect(frame()).toBe("<p>page 1</p>");
+    expect(text()).toContain(en["dz.tpl.footView"].replace("{name}", "Brand 1"));
+    expect(api.generateDecoySite).not.toHaveBeenCalled(); // a preview saves nothing
+    await click(button(en["dz.tpl.another"]));
+    expect(api.previewDecoyTemplate).toHaveBeenCalledTimes(2);
+    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: "" });
+    expect(frame()).toBe("<p>page 2</p>");
+    await click(button(en["dz.tpl.create"]));
+    expect(api.generateDecoySite).toHaveBeenCalledTimes(1);
+    expect(api.generateDecoySite).toHaveBeenCalledWith({ kind: "blog", seed: shown(2).seed, note: en["dz.tpl.blog"] });
+    expect(navigate).toHaveBeenCalledWith({ to: "/decoys/$id", params: { id: "dsi_new" } });
+  });
+
+  it("goes back to the kinds, and says in words when the library is full", async () => {
+    api.previewDecoyTemplate.mockResolvedValue(shown(1));
+    api.generateDecoySite.mockRejectedValue(new ConnectError("decoy_library_full", Code.FailedPrecondition));
+    await open();
+    await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.tpl.card"])));
+    await click(button(en["dz.tpl.create"]));
+    expect(document.querySelector("[role=alert]")?.textContent).toContain(en["err.decoy_library_full"]);
+    expect(text()).toContain(en["dz.tpl.footErr"]);
+    expect(navigate).not.toHaveBeenCalled();
+    await click(button(en["dz.tpl.back"]));
+    expect(document.querySelectorAll(".dz-ways.tpl .dz-way")).toHaveLength(10);
+    expect(button(en["dz.tpl.create"])).toBeUndefined();
+  });
+
+  it("keeps Create closed while the page is being made, and says when the preview failed", async () => {
+    api.previewDecoyTemplate.mockReturnValue(new Promise(() => {}));
+    await open();
+    await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.tpl.docs"])));
+    expect(document.querySelector(".dz-fr")?.textContent).toContain(en["dz.tpl.loading"]);
+    expect(button(en["dz.tpl.create"])!.getAttribute("aria-disabled")).toBe("true");
+    await click(button(en["dz.tpl.create"]));
+    expect(api.generateDecoySite).not.toHaveBeenCalled();
+    document.body.innerHTML = "";
+    api.previewDecoyTemplate.mockReset().mockRejectedValue(new ConnectError("decoy_template_unknown", Code.InvalidArgument));
+    await open();
+    await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.tpl.docs"])));
+    expect(document.querySelector(".dz-fr [role=alert]")?.textContent).toContain(en["err.decoy_template_unknown"]);
+    expect(button(en["dz.tpl.create"])!.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("names a kind this screen does not know yet by the panel's own name, and shows it in every language", async () => {
+    api.listDecoyTemplates.mockResolvedValue({ templates: [...kinds, { id: "newkind", nameEn: "A new kind", nameRu: "Новый вид" }] });
+    await mountUi(list(), { lib: library([]), nodes: [node("de1")] });
+    await click(button(en["dz.new"]));
+    await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.way.tpl"])));
+    expect(document.querySelectorAll(".dz-ways.tpl .dz-way")).toHaveLength(11);
+    expect(text()).toContain("A new kind");
+    for (const lang of ["ru", "zh", "fa", "tr"] as const) {
+      setLang(lang);
+      document.body.innerHTML = "";
+      await mountUi(list(), { lib: library([]), nodes: [node("de1")] });
+      await click(button(dictionaries[lang]["dz.new"]));
+      await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(dictionaries[lang]["dz.way.tpl"])));
+      expect(document.querySelectorAll(".dz-ways.tpl .dz-way"), lang).toHaveLength(11);
+      expect(text(), lang).toContain(dictionaries[lang]["dz.tpl.blog"]);
+    }
   });
 });
 
