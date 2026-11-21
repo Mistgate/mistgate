@@ -2,6 +2,7 @@ package ownprobe
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -949,23 +950,28 @@ func TestInstallRunUpgradeUninstall(t *testing.T) {
 }
 
 // The lab ends what a test started in it before the directory of the test is removed: here a loop that keeps writing there,
-// left in the background the way the script leaves a worker's curls. A lab that only removed its directory failed with
-// "directory not empty", or the loop made the directory again.
+// left in the background the way the script leaves a worker's curls. The loop holds a pipe of this test; the pipe ends when
+// the loop is gone, and after the lab that must be at once.
 func TestLabEndsWhatItStarted(t *testing.T) {
 	t.Parallel()
 	forShells(t, func(t *testing.T, sh shellSpec) {
 		t.Parallel()
-		root := ""
+		r, w, err := os.Pipe()
+		must(t, err)
+		defer func() { _ = r.Close() }()
 		t.Run("lab", func(t *testing.T) {
 			l := newLab(t, sh, labOptions{})
-			root = l.root
-			out, _ := l.shellScript(`( while :; do mkdir -p "$FAKE_DIR/calls/x"; rmdir "$FAKE_DIR/calls/x"; done ) >/dev/null 2>&1 & echo $!`)
-			if pid, _ := strconv.Atoi(strings.TrimSpace(out)); !procAlive(pid) {
-				t.Fatalf("the loop did not start: %s", out)
-			}
+			argv := append(append([]string{}, sh.argv[1:]...), "-c", `( while :; do mkdir -p "$FAKE_DIR/calls/x"; rmdir "$FAKE_DIR/calls/x"; done ) >/dev/null 2>&1 &`)
+			c := exec.Command(sh.argv[0], argv...)
+			c.Env = l.env
+			l.own(c)
+			c.ExtraFiles = append([]*os.File{w}, c.ExtraFiles...) // before the lab's own pipe: a process that ends closes this one first
+			must(t, runCmd(c))
 		})
-		if _, err := os.Stat(root); err == nil {
-			t.Error("a process of the lab outlived it and made its directory again")
+		must(t, w.Close())
+		_ = r.SetReadDeadline(time.Now().Add(10 * time.Second)) // reached only when the loop still runs
+		if _, err := r.Read(make([]byte, 1)); err != io.EOF {
+			t.Errorf("the loop outlived its lab: %v", err)
 		}
 	})
 }
