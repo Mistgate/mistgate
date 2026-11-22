@@ -39,19 +39,20 @@
           const mx = (x, w = 0) => (lang === "fa" ? 1600 - x - w : x);
           const r = A.rects;
           const click = (from) => A.clicks.find((c) => c >= from);
-          const added = click(m.addProfile);
           // the edit: [from frame, to frame, speed]; the slow parts of the page (typing, the install) play faster
           const plan = [
-            [6, m.modal, 1.0],
-            [m.modal, m.host, 1.3],
-            [m.host, m.key, 1.5],
-            [m.key, m.preflight, 2.0],
-            [m.preflight, m.install, 3.0],
-            [m.install, m.installed, 7.0],
-            [m.installed, m.node, 1.4],
-            [m.node, m.profilesTab, 1.8],
-            [m.profilesTab, added + 6, 1.8],
-            [added + 6, m.healthy + 36, 1.4],
+            [6, m.modal, 1.3],
+            [m.modal, m.server, 2.2],
+            [m.server, m.key, 1.5],
+            [m.key, m.way, 1.3],
+            [m.way, m.preflight, 2.6],
+            [m.preflight, m.agree, 2.4],
+            [m.agree, m.install, 1.2],
+            [m.install, m.installed, 9.0],
+            [m.installed, m.node, 1.7],
+            [m.node, m.addProfile, 1.8],
+            [m.addProfile, m.profileAdded, 1.6],
+            [m.profileAdded, m.healthy + 30, 1.4],
           ];
           let at = 0;
           const admin = plan.map(([from, to, speed]) => {
@@ -68,22 +69,21 @@
           const tEnd = tP + 4.2; // the outro starts
           const box = (x, y, w, h) => ({ x, y, w, h });
           const key = (t, f, d) => ({ t, d, ...f });
+          // the node's page: the head, the tabs and what is under them
+          const page = (h) => fit(box(mx(304, 1240), 90, 1240, h), 40, 0, 0);
           const camera = [
             key(0, { cx: 800, cy: 500, vw: 2010 }, 0),
             key(0.15, { cx: mx(900), cy: 360, vw: 1640 }, 2.3),
-            key(T(m.modal) - 0.5, fit(r.dlgChoose, 110, 0, 0), 0.6),
-            key(T(m.host) - 0.3, fit(r.dlgHost, 70, 0, 0), 0.5),
-            key(T(m.key) - 0.25, fit(box(r.dlgKey.x, r.dlgKey.y, r.dlgKey.w, 440), 50, 0, 0), 0.5),
-            key(T(click(m.name + 40)) - 0.35, fit(box(r.dlgKey.x, r.dlgKey.y + 370, r.dlgKey.w, 500), 50, 0, 0), 0.6),
-            key(T(m.preflight) - 0.2, fit(box(r.dlgCheck.x, r.dlgCheck.y, r.dlgCheck.w, 400), 40, 0, 0), 0.5),
-            key(T(click(m.preflight)) - 0.35, fit(box(r.dlgCheck.x, r.dlgCheck.y + 360, r.dlgCheck.w, r.dlgCheck.h - 360), 40, 0, 0), 0.5),
+            key(T(m.modal) - 0.5, fit(r.dlgServer, 110, 0, 0), 0.6),
+            key(T(m.key) - 0.25, fit(r.dlgKey, 70, 0, 0), 0.5),
+            key(T(m.preflight) - 0.2, fit(r.dlgCheck, 60, 0, 0), 0.5),
             key(T(m.install) - 0.05, fit(r.dlgDone, 90, 0, 0), 0.5),
-            key(T(m.node) - 0.3, fit(box(mx(288, 1240), 70, 1240, 330), 40, 0, 0), 0.6),
-            key(T(click(m.profilesTab)) + 0.1, fit(r.dlgAdd, 110, 0, 0), 0.55),
-            key(T(m.profileAdded) - 0.1, fit(box(mx(288, 1240), 70, 1240, r.inbound.y + r.inbound.h - 40), 30, 0, 0), 0.6),
+            key(T(m.node) - 0.3, page(420), 0.6),
+            key(T(click(m.addProfile)) - 0.35, fit(r.dlgAdd, 110, 0, 0), 0.55),
+            key(T(m.profileAdded) - 0.1, page(r.inbound.y + r.inbound.h - 80), 0.6),
             key(tP - 1.05, { cx: 800, cy: 520, vw: 1990 }, 0.9),
             key(tP + 0.05, fit(box(phoneAt.x, phoneAt.y, phoneAt.w, phoneAt.h), 36, 0, 0), 0.8),
-            key(tP + 1.35, fit(box(phoneAt.x + sg.x, phoneAt.y + sg.y, sg.w, sg.h), 190, 0, 0), 1.4),
+            key(tP + 1.35, fit(box(phoneAt.x, phoneAt.y + sg.y + sg.h - 560, phoneAt.w, 560), 40, 0, 0), 1.4),
           ];
           const c = captions[lang];
           return {
@@ -99,9 +99,9 @@
             camera,
             captions: [
               { at: 0.35, end: T(m.modal) - 0.6, text: c[0] },
-              { at: T(m.modal) - 0.2, end: T(m.key) + 0.3, text: c[1] },
+              { at: T(m.modal) - 0.2, end: T(m.preflight) - 0.3, text: c[1] },
               { at: T(m.preflight) + 0.1, end: T(m.installed) + 0.4, text: c[2] },
-              { at: T(m.node) + 0.6, end: T(m.profileAdded) + 1.0, text: c[3] },
+              { at: T(m.node) + 0.4, end: T(m.profileAdded) + 1.0, text: c[3] },
               { at: tP + 0.6, end: tEnd - 0.15, text: c[4] },
             ],
             outroAt: tEnd,

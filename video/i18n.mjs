@@ -23,11 +23,11 @@ export function t(lang, key, vars = {}) {
   return s.split("|")[0].replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
 }
 
-// the person's page (web/src/sub/i18n.ts): `key: "value",` inside `const ru = {`, `const en: Dict = {` and the like
+// the person's page (web/src/sub/i18n*.ts: the base words and the redesign's core, new-device window, small windows and tabs): `key: "value",` inside `const ru = {`, `const en: Dict = {` and the like
 const subDict = { en: {}, ru: {}, zh: {}, fa: {}, tr: {} };
-{
+for (const file of ["i18n.ts", "i18n-core.ts", "i18n-add.ts", "i18n-dlg.ts", "i18n-tabs.ts"]) {
   let lang = null;
-  for (const line of readFileSync(fileURLToPath(new URL("../web/src/sub/i18n.ts", import.meta.url)), "utf8").split("\n")) {
+  for (const line of readFileSync(fileURLToPath(new URL(`../web/src/sub/${file}`, import.meta.url)), "utf8").split("\n")) {
     const head = line.match(/^const (en|ru|zh|fa|tr)\b[^=]*= \{/);
     if (head) lang = head[1];
     else if (/^\};/.test(line)) lang = null;

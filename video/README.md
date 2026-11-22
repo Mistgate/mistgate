@@ -6,10 +6,10 @@ composition rendered to MP4 in English, Russian and Chinese; the hero also in Pe
 
 | Video | File | What it shows |
 | --- | --- | --- |
-| hero | `hero.html` | the Overview, a node sg1 installed over SSH from the browser, a profile put on it, alice's page with Singapore |
-| link | `link.html` | a new person, carol, her one link and QR code, her own page: one-tap add, the QR for another device, servers, devices |
-| health | `health.html` | the folded alerts, one opened, the doctor's fix for an oversized journal, the check green |
-| telegram | `telegram.html` | a new MTProto profile with Fake TLS, on every node and in the groups at once, alice's Telegram proxy links |
+| hero | `hero.html` | the Overview, a node sg1 installed over SSH from the browser (the New node window, its four steps), a profile put on it, alice's page with Singapore |
+| link | `link.html` | a new person, carol, her one link and QR code, her own page: Add a device, an app, one tap, her servers |
+| health | `health.html` | the open alerts, one opened, the doctor's fix for an oversized journal, the doctor green |
+| telegram | `telegram.html` | a new MTProto profile (the wizard) with Fake TLS, on every node and in the groups at once, alice's Telegram proxy links |
 
 ## How it is made
 
@@ -101,6 +101,8 @@ Chrome is always started with `--headless=old`: the new headless mode opens wind
 | `CHROME` | the usual Chrome path of the platform | the Chrome the takes are filmed in |
 | `ADMIN_ORIGIN`, `SUB_ORIGIN` | `http://127.0.0.1:5293`, `:5294` | the two Vite servers |
 | `CDP_PORT` | `9381` | a different one per take to film several at once |
+| `TAKES_OUT` | `video/assets/takes` | where the frames of a take go (try a take elsewhere without touching the footage the compositions use) |
+| `DPR` | the take's own (2) | the device pixel ratio of the footage; `DPR=1` makes a quick, soft try of a take |
 | `VIDEO_OUT` | `video/out` | where the delivery files go |
 
 `make.mjs` runs HyperFrames with its telemetry, update check and installs switched off. HyperFrames is pinned in
