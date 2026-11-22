@@ -25,6 +25,7 @@ import { useEdition } from "@/lib/edition";
 import { errorCode, errorText } from "@/lib/errors";
 import { useFmt } from "@/lib/format";
 import { subHostQuery } from "@/lib/queries";
+import { siteNameOf } from "@/lib/site-name";
 import { rememberShare } from "@/lib/node-share";
 import { plain } from "@/lib/plain";
 
@@ -248,9 +249,11 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
   const subHostOff = useQuery({ ...subHostQuery, refetchInterval: false, enabled: hostable }).data?.state === SubscriptionHostState.OFF;
   const [asSubHost, setAsSubHost] = useState(false);
   const [subDomain, setSubDomain] = useState("");
-  const [subSite, setSubSite] = useState("");
+  const [subSiteTyped, setSubSite] = useState<string | null>(null);
   const [dnsMismatch, setDnsMismatch] = useState(false);
   const hostInstall = hostable && subHostOff && asSubHost;
+  // the node's own name (its address when that is a host name) until the owner types one (#55)
+  const subSite = subSiteTyped ?? siteNameOf(address, subDomain);
   const [optionsOpen, setOptionsOpen] = useState(seed?.optionsOpen ?? false);
   const [whereOpen, setWhereOpen] = useState(seed?.whereOpen ?? false);
   // the answers of the server check come in one by one: how many have

@@ -15,6 +15,7 @@ import { agoOf } from "@/lib/format";
 import { instanceQuery } from "@/lib/instance";
 import { nodesQuery, subHostQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
+import { siteNameOf } from "@/lib/site-name";
 import { useNow } from "@/lib/time";
 import { BusyButton, CmdRow, Foot, ICONS, Mono, Pb, Row, Rows, Sec, slots, SxGate } from "./sx-bits";
 
@@ -91,7 +92,17 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
   const nameOf = (id: string) => nodeList.find((n) => n.id === id)?.name ?? id;
   const [node, setNode] = useState("");
   const [domain, setDomain] = useState("");
-  const [siteName, setSiteName] = useState("");
+  const [siteName, setSiteNameRaw] = useState("");
+  // the node's own name goes in until the owner types one (#55)
+  const [siteTyped, setSiteTyped] = useState(false);
+  const setSiteName = (v: string) => {
+    setSiteTyped(true);
+    setSiteNameRaw(v);
+  };
+  const pickNode = (id: string, forDomain: string) => {
+    setNode(id);
+    if (!siteTyped) setSiteNameRaw(siteNameOf(nodeList.find((n) => n.id === id)?.address ?? "", forDomain));
+  };
   const [publicUrl, setPublicUrl] = useState("");
   const [check, setCheck] = useState<CheckSubscriptionHostDomainResponse | null>(null);
   const [failure, setFailure] = useState<{ code: string; text: string } | null>(null);
@@ -174,7 +185,7 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
         <p className="sb-lead">{t("set.domains.subHost.intro")}</p>
         <Rows>
           <Row label={t("set.domains.subHost.node")}>
-            <Select value={node} onValueChange={setNode} options={options([])} aria-label={t("set.domains.subHost.node")} />
+            <Select value={node} onValueChange={(v) => pickNode(v, domain)} options={options([])} aria-label={t("set.domains.subHost.node")} />
           </Row>
         </Rows>
         <TextField label={t("set.domains.subHost.domain")} hint={t("set.domains.subHost.domainHint")} value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="sub.example.com" mono maxLength={253} autoComplete="off" />
@@ -265,7 +276,7 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
         {error}
         <Rows>
           <Row label={t("set.domains.subHost.moveTo")}>
-            <Select value={node === host.nodeId ? "" : node} onValueChange={setNode} options={options([host.nodeId])} aria-label={t("set.domains.subHost.moveTo")} />
+            <Select value={node === host.nodeId ? "" : node} onValueChange={(v) => pickNode(v, host.domain)} options={options([host.nodeId])} aria-label={t("set.domains.subHost.moveTo")} />
           </Row>
         </Rows>
         <TextField label={t("set.domains.subHost.siteName")} hint={t("set.domains.subHost.siteNameHint")} value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="www.example.com" mono maxLength={253} autoComplete="off" />

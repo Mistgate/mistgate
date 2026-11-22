@@ -85,7 +85,7 @@ type nodeInstallArgs struct {
 	// The first subscription host (a panel behind NAT): the node enrols inside the SSH session and serves the subdomain; the
 	// owner's approval of this plan covers that too.
 	SubscriptionHostDomain string `json:"subscription_host_domain,omitempty" jsonschema:"optional subdomain whose DNS points at this server: the panel's public address moves onto it once the node is ready (for a panel the server cannot reach)"`
-	SiteName               string `json:"site_name,omitempty" jsonschema:"with subscription_host_domain: a second name pointing at the server, for the node's own site on 443"`
+	SiteName               string `json:"site_name,omitempty" jsonschema:"with subscription_host_domain: a second name pointing at the server, for the node's own site on 443; defaults to address when that is a host name"`
 	SkipDNSCheck           bool   `json:"skip_dns_check,omitempty" jsonschema:"with subscription_host_domain: skip the DNS check when DNS is proxied or not yet visible"`
 }
 
@@ -145,8 +145,11 @@ func nodeInstallPlanTool() toolDef {
 						if resolved.SiteName, err = subHostSiteName(in.SiteName); err != nil {
 							return nil, nil, err
 						}
+						if resolved.SiteName == "" { // the node's own name, not asked for again
+							resolved.SiteName = siteNameOf(resolved.Address, resolved.SubscriptionHostDomain)
+						}
 						if resolved.SiteName == "" || resolved.SiteName == resolved.SubscriptionHostDomain {
-							return nil, nil, errors.New("site_name: give a second name pointing at the server, other than the subdomain")
+							return nil, nil, errors.New("site_name: give a second name pointing at the server, other than the subdomain (address is no host name to use)")
 						}
 						resolved.SkipDNSCheck = in.SkipDNSCheck
 						// what the panel would refuse at apply, said now: the owner's typed password is not spent on it

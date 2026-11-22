@@ -38,7 +38,7 @@ This is the VPS edition only. The Cloudflare edition already has a public addres
 
 Open **Settings → Domains**, card **Subscription host**:
 
-1. Choose the **Node** and enter the **Subdomain**, and the **Site name** if no profile on the node's 443 serves its own site.
+1. Choose the **Node** and enter the **Subdomain**, and the **Site name** if no profile on the node's 443 serves its own site. When the node's address is a host name, it is filled in as the site name; change it if you like.
 2. **Check records** shows the addresses the names resolve to now and the addresses expected.
 3. **Enable**. If a record does not point at the node, the panel refuses and offers **Enable anyway**. Use it only when you know the record is right, for example behind a DNS proxy.
 

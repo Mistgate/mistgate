@@ -54,6 +54,7 @@ beforeEach(() => {
     nodes: [
       { id: "nod_a", name: "de1", address: "203.0.113.1" },
       { id: "nod_b", name: "nl1", address: "203.0.113.2" },
+      { id: "nod_c", name: "fi1", address: "fi1.example.com" },
     ],
   });
   subHost.checkSubscriptionHostDomain.mockResolvedValue({ matches: false, found: ["198.51.100.9"], expected: ["203.0.113.2"] });
@@ -198,5 +199,20 @@ describe("Settings → Domains → subscription host", () => {
     withState(SubscriptionHostState.ON, { domain: "sub.example.com", nodeId: "nod_a", notReady: ["panel_cert", "caa"], caaStatus: "account_pending" });
     await mount();
     expect(button(en["set.domains.subHost.caaWaive"])).toBeUndefined();
+  });
+  it("off: a node whose address is a host name gives its site name, until the owner types one (#55)", async () => {
+    withState(SubscriptionHostState.OFF);
+    await mount();
+    const select = document.querySelector<HTMLSelectElement>(`select[aria-label="${en["set.domains.subHost.node"]}"]`)!;
+    const site = () => document.querySelector<HTMLInputElement>('input[placeholder="www.example.com"]')!.value;
+    const pick = async (id: string) =>
+      act(async () => {
+        select.value = id;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    await pick("nod_c");
+    expect(site()).toBe("fi1.example.com");
+    await pick("nod_a");
+    expect(site()).toBe(""); // an IP address is no site name
   });
 });

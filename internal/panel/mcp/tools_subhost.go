@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/netip"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -99,6 +100,33 @@ func subscriptionHostTools() []toolDef {
 		})
 	return []toolDef{get, subHostSetPlanTool(), subHostSetApplyTool(), subHostMovePlanTool(), subHostMoveApplyTool(),
 		subHostDisablePlanTool(), subHostDisableApplyTool(), subHostCAAWaivePlanTool(), subHostCAAWaiveApplyTool()}
+}
+
+// siteNameOf is the site name a node already has: its address when that is a host name (not an IP, and not the subdomain
+// itself); "" when it has none. The owner asked that it be used rather than asked for again (#55). It is harmless when an
+// inbound on 443 serves the node's site: the host then ignores it.
+func siteNameOf(address, domain string) string {
+	a := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(address)), ".")
+	if _, err := netip.ParseAddr(strings.Trim(a, "[]")); err == nil || !strings.Contains(a, ".") || a == domain {
+		return ""
+	}
+	if d, err := subHostDomain(a); err == nil {
+		return d
+	}
+	return ""
+}
+
+// nodeSiteName is siteNameOf the node id's address.
+func (c *call) nodeSiteName(id, domain string) string {
+	all, err := c.listNodes()
+	if err != nil {
+		return ""
+	}
+	n, err := resolveNode(all, id)
+	if err != nil {
+		return ""
+	}
+	return siteNameOf(n.GetAddress(), domain)
 }
 
 // subHostSiteName is the optional site name, shaped like a domain.
@@ -204,7 +232,7 @@ type subHostSetArgs struct {
 	ReasonField
 	NodeID       string `json:"node_id" jsonschema:"id or exact name of the node that will serve the subdomain"`
 	Domain       string `json:"domain" jsonschema:"subdomain whose DNS points at the node, e.g. sub.example.com"`
-	SiteName     string `json:"site_name,omitempty" jsonschema:"a second name pointing at the node for its own site on 443; needed when no inbound on 443 serves one"`
+	SiteName     string `json:"site_name,omitempty" jsonschema:"a second name pointing at the node for its own site on 443; needed when no inbound on 443 serves one; defaults to the node's address when that is a host name"`
 	SkipDNSCheck bool   `json:"skip_dns_check,omitempty" jsonschema:"set only when DNS is proxied or not yet visible to the panel"`
 }
 
@@ -238,6 +266,9 @@ func subHostSetPlanTool() toolDef {
 			id, name, err := c.nodeRef(in.NodeID)
 			if err != nil {
 				return nil, nil, err
+			}
+			if site == "" {
+				site = c.nodeSiteName(id, domain) // the node's own name, not asked for again
 			}
 			dns, ok, err := subHostDNSFact(c, id, domain, site)
 			if err != nil {
@@ -274,7 +305,7 @@ type subHostMoveArgs struct {
 	ReasonField
 	Action   string `json:"action" jsonschema:"start (a second node gets ready to take over), finish (complete the move or the leaving) or cancel"`
 	NodeID   string `json:"node_id,omitempty" jsonschema:"for start: id or exact name of the node to move to"`
-	SiteName string `json:"site_name,omitempty" jsonschema:"for start: the next node's own site name on 443, when no inbound there serves one"`
+	SiteName string `json:"site_name,omitempty" jsonschema:"for start: the next node's own site name on 443, when no inbound there serves one; defaults to the node's address when that is a host name"`
 	Force    bool   `json:"force,omitempty" jsonschema:"for finish: finish even while nodes still connect through the subscription host (leaving) or DNS does not point at the next node yet (moving)"`
 }
 
@@ -316,6 +347,9 @@ func subHostMovePlanTool() toolDef {
 				site, err := subHostSiteName(in.SiteName)
 				if err != nil {
 					return nil, nil, err
+				}
+				if site == "" {
+					site = c.nodeSiteName(id, h.GetDomain())
 				}
 				p.NodeID, p.Name, p.SiteName = id, name, site
 				summary = "Get a second node ready to take over the subscription host; the current node keeps serving until the move finishes."

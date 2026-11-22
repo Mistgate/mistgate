@@ -281,3 +281,31 @@ func TestNodeInstallPlanChecksTheSubscriptionHost(t *testing.T) {
 		t.Fatalf("a second host was planned: %s", out)
 	}
 }
+
+// A node that already has a site name (its address is a host name) is not asked for it again (#55): node_install uses it when
+// site_name is left out; an address that is an IP leaves it to be given.
+func TestNodeInstallPlanTakesTheSiteNameFromTheAddress(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	args := map[string]any{"host": "203.0.113.30", "username": "root", "name": "host-1", "address": "de1.example.com",
+		"subscription_host_domain": "sub.example.com", "skip_dns_check": true}
+	p := planOf(t, s, "node_install", args)
+	stored := e.plans.only()
+	if !p.NeedsApproval || !strings.Contains(stored.ParamsJSON, `"SiteName":"de1.example.com"`) {
+		t.Fatalf("the site name was not taken from the address: %s", stored.ParamsJSON)
+	}
+	args["address"], args["name"] = "203.0.113.30", "host-2"
+	if out := mustFail(t, s, "node_install_plan", args); !strings.Contains(out, "site_name") {
+		t.Fatalf("an IP address gave a site name: %s", out)
+	}
+}
+
+func TestSiteNameOf(t *testing.T) {
+	for addr, want := range map[string]string{"de1.example.com": "de1.example.com", "DE1.Example.com.": "de1.example.com",
+		"203.0.113.5": "", "[2001:db8::1]": "", "2001:db8::1": "", "localhost": "", "sub.example.com": "", "bad name.example.com": ""} {
+		if got := siteNameOf(addr, "sub.example.com"); got != want {
+			t.Errorf("siteNameOf(%q) = %q, want %q", addr, got, want)
+		}
+	}
+}
