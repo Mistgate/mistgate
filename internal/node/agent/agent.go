@@ -147,7 +147,7 @@ type Agent struct {
 	// change at run time and are guarded by metaMu; the rest of meta is fixed at start.
 	metaMu           sync.Mutex
 	triedNext        bool             // connectLoop only: the last session tried meta.NextLink
-	currentFailed    bool             // connectLoop only: the last session over the current link did not establish
+	currentFailed    bool             // connectLoop only: the last session over the current link did not hold (panellink.go)
 	panelLinkIgnored atomic.Bool      // an mTLS node has logged that it does not follow a panel link address
 	nextAnswered     atomic.Bool      // a direct probe from the bridge reached meta.NextLink: the next session tries it
 	linkClock        func() time.Time // the clock of meta.LinkSince; nil = a.now (tests move it days ahead)
@@ -1314,17 +1314,13 @@ func (a *Agent) linkOnly() bool {
 }
 
 // session runs one panel session: every other turn a new link address the panel sent (panellink.go), and at once when
-// a direct probe from the bridge reached it; after a turn on which the current link did not answer, the previous panel
-// address (panellink.go); else the link or mTLS as before.
+// a direct probe from the bridge reached it; after a turn on which the current link did not hold (did not establish, or
+// ended before healthyAfter), the previous panel address (panellink.go); else the link or mTLS as before.
 func (a *Agent) session(ctx context.Context) error {
 	nextAnswered := a.nextAnswered.Swap(false)
 	if next := a.nextLink(); next != "" && (!a.triedNext || nextAnswered) {
 		a.triedNext = true
-		err := a.nextLinkSession(ctx, next)
-		if a.linkURL() == next {
-			a.currentFailed = false // a new current link: the old one's failure says nothing about it
-		}
-		return err
+		return a.nextLinkSession(ctx, next)
 	}
 	a.triedNext = false
 	if a.currentFailed {
@@ -1334,8 +1330,9 @@ func (a *Agent) session(ctx context.Context) error {
 		}
 	}
 	if a.linkOnly() {
+		started := time.Now()
 		err := a.linkSession(ctx, a.dialCurrentLink)
-		a.currentFailed = errors.Is(err, errLinkNotEstablished) && ctx.Err() == nil
+		a.currentFailed = a.didNotHold(ctx, err, started)
 		return err
 	}
 	if a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {

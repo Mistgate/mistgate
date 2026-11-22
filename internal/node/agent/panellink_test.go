@@ -25,8 +25,9 @@ import (
 )
 
 // sessionLinkPanel is a panel's link endpoint that runs the whole v2 handshake (sealed) and answers the Hello with a
-// HelloAck. It records the audience (the Host) and the link prefix of every session that got as far as the Hello, and
-// answers 404 under a refused prefix (an address that stopped answering).
+// HelloAck. It records the audience (the Host) and the link prefix of every session that got as far as the Hello,
+// answers 404 under a refused prefix (an address that stopped answering), and closes every session under a dropped
+// prefix right after its HelloAck (an address that answers and then goes silent).
 type sessionLinkPanel struct {
 	h        *harness
 	hellos   chan string
@@ -37,13 +38,14 @@ type sessionLinkPanel struct {
 
 	mu      sync.Mutex
 	refused map[string]bool
+	dropped map[string]bool
 	dials   map[string]int // requests per link prefix
 }
 
 func newSessionLinkPanel(h *harness) *sessionLinkPanel {
 	return &sessionLinkPanel{h: h, hellos: make(chan string, 8), sessions: make(chan string, 32),
 		push: make(chan *pb.ConnectResponse, 8), applies: make(chan *pb.ApplyResult, 8),
-		refused: map[string]bool{}, dials: map[string]int{}}
+		refused: map[string]bool{}, dropped: map[string]bool{}, dials: map[string]int{}}
 }
 
 func linkPrefix(c byte) string { return strings.Repeat(string(c), 24) }
@@ -62,6 +64,13 @@ func (p *sessionLinkPanel) answer(c byte) {
 	delete(p.refused, linkPrefix(c))
 }
 
+// drop makes the link address with prefix linkPrefix(c) close every session right after its HelloAck.
+func (p *sessionLinkPanel) drop(c byte) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.dropped[linkPrefix(c)] = true
+}
+
 func (p *sessionLinkPanel) dialsTo(c byte) int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -72,7 +81,7 @@ func (p *sessionLinkPanel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	prefix, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 	p.mu.Lock()
 	p.dials[prefix]++
-	refused := p.refused[prefix]
+	refused, dropped := p.refused[prefix], p.dropped[prefix]
 	p.mu.Unlock()
 	if refused {
 		http.NotFound(w, r)
@@ -124,6 +133,9 @@ func (p *sessionLinkPanel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if link.Write(ctx, &pb.ConnectResponse{Message: &pb.ConnectResponse_HelloAck{HelloAck: &pb.HelloAck{
 		ServerTimeUnix: time.Now().Unix(), Settings: cmp.Or(p.settings, &pb.NodeSettings{}),
 	}}}) != nil {
+		return
+	}
+	if dropped {
 		return
 	}
 	go func() {
@@ -384,8 +396,16 @@ func endSession(t *testing.T, h *harness) {
 	h.a.cur.Load().cancel()
 }
 
-// prevLinkHarness is an agent on link address A with a new address B pending, both served by one link panel. The agent
-// is not started.
+// endHealthySession ends the agent's current panel session once it is healthy (has lived healthyAfter).
+func endHealthySession(t *testing.T, h *harness) {
+	t.Helper()
+	eventually(t, func() bool { return h.a.cur.Load() != nil }, "a panel session")
+	time.Sleep(h.a.healthyAfter())
+	h.a.cur.Load().cancel()
+}
+
+// prevLinkHarness is an agent on link address A with a new address B pending, both served by one link panel. A session
+// is healthy after 50 ms. The agent is not started.
 func prevLinkHarness(t *testing.T) (h *harness, lp *sessionLinkPanel, a, b string) {
 	h = newHarness(t, harnessOpts{noStart: true})
 	lp = newSessionLinkPanel(h)
@@ -394,6 +414,7 @@ func prevLinkHarness(t *testing.T) (h *harness, lp *sessionLinkPanel, a, b strin
 	a, b = linkBaseOf(server, 'a'), linkBaseOf(server, 'b')
 	h.a.linkHTTPClient = server.Client()
 	h.a.meta.Link, h.a.cfg.LinkURL, h.a.meta.NextLink = a, a, b
+	h.a.resetAfter = 25 * time.Millisecond
 	return h, lp, a, b
 }
 
@@ -420,7 +441,7 @@ func TestPrevLinkWhenTheNewOneStopsAnswering(t *testing.T) {
 	committedTo(t, h, b, a)
 
 	lp.refuse('b')
-	endSession(t, h)
+	endHealthySession(t, h)
 	if got := lp.session(t); got != linkPrefix('a') {
 		t.Fatal("the next session was not on the previous address")
 	}
@@ -428,6 +449,46 @@ func TestPrevLinkWhenTheNewOneStopsAnswering(t *testing.T) {
 	if !h.a.linkOnly() || lp.dialsTo('b') < 2 {
 		t.Fatalf("linkOnly=%v, new address dialled %d times", h.a.linkOnly(), lp.dialsTo('b'))
 	}
+}
+
+// A committed new link address that answers the Hello and drops the session at once: the first session over it
+// committed it, did not hold, and the next turn goes back to the previous address.
+func TestPrevLinkWhenTheNewOneDropsAfterHelloAck(t *testing.T) {
+	h, lp, a, _ := prevLinkHarness(t)
+	h.a.resetAfter = time.Minute // healthy after 2 minutes: no session here is
+	lp.drop('b')
+	h.start()
+	if got := lp.session(t); got != linkPrefix('b') {
+		t.Fatal("the first session was not on the new address")
+	}
+	if got := lp.session(t); got != linkPrefix('a') {
+		t.Fatal("the next session was not on the previous address")
+	}
+	committedTo(t, h, a, "")
+	if n := lp.dialsTo('b'); n != 1 {
+		t.Fatalf("new address dialled %d times, want 1", n)
+	}
+}
+
+// The current link (committed earlier, with a previous address) answers the Hello and drops every session at once: the
+// agent goes back to the previous address although the current one never failed to establish.
+func TestPrevLinkWhenTheCurrentDropsAfterHelloAck(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	h.a.resetAfter = time.Minute
+	h.a.meta.Link, h.a.cfg.LinkURL, h.a.meta.NextLink, h.a.meta.PrevLink = b, b, "", a
+	h.a.meta.LinkSince = time.Now().Add(-time.Hour).Unix()
+	if err := saveMeta(h.dir, h.a.meta); err != nil {
+		t.Fatal(err)
+	}
+	lp.drop('b')
+	h.start()
+	if got := lp.session(t); got != linkPrefix('b') {
+		t.Fatal("the first session was not on the current address")
+	}
+	if got := lp.session(t); got != linkPrefix('a') {
+		t.Fatal("the next session was not on the previous address")
+	}
+	committedTo(t, h, a, "")
 }
 
 // The previous address survives a restart: an agent that starts on a committed link that does not answer goes back.
@@ -461,7 +522,7 @@ func TestPrevLinkUnusedWhileTheCurrentAnswers(t *testing.T) {
 	lp.session(t)
 	committedTo(t, h, b, a)
 	for range 3 {
-		endSession(t, h)
+		endHealthySession(t, h)
 		if got := lp.session(t); got != linkPrefix('b') {
 			t.Fatal("a session left the current address")
 		}
@@ -479,18 +540,18 @@ func skewLinkClock(h *harness) *atomic.Int64 {
 	return &skew
 }
 
-// nextEstablished ends the agent's current session and waits until the next one has its HelloAck (and has run what
-// follows it, such as forgetting an expired previous address).
-func nextEstablished(t *testing.T, h *harness) {
+// nextHealthy ends the agent's current session once it is healthy, waits for the next one and lets it become healthy too
+// (and run what follows, such as forgetting an expired previous address).
+func nextHealthy(t *testing.T, h *harness) {
 	t.Helper()
-	eventually(t, func() bool { return h.a.cur.Load() != nil }, "a panel session")
+	endHealthySession(t, h)
 	old := h.a.cur.Load()
-	old.cancel()
 	eventually(t, func() bool { s := h.a.cur.Load(); return s != nil && s != old }, "the next panel session")
+	time.Sleep(2 * h.a.healthyAfter())
 }
 
-// A session over the new address 8 days after it took over: the previous address is forgotten, in agent.json too, and
-// is no longer dialled when the new one stops answering.
+// A healthy session over the new address 8 days after it took over: the previous address is forgotten, in agent.json
+// too, and is no longer dialled when the new one stops answering.
 func TestPrevAddressForgottenAfterTheNewOneWorked7Days(t *testing.T) {
 	h, lp, a, b := prevLinkHarness(t)
 	skew := skewLinkClock(h)
@@ -502,7 +563,7 @@ func TestPrevAddressForgottenAfterTheNewOneWorked7Days(t *testing.T) {
 	}
 
 	skew.Store(int64(8 * 24 * time.Hour))
-	nextEstablished(t, h)
+	nextHealthy(t, h)
 	committedTo(t, h, b, "")
 	raw, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
 	if err != nil {
@@ -521,7 +582,7 @@ func TestPrevAddressForgottenAfterTheNewOneWorked7Days(t *testing.T) {
 	}
 }
 
-// A session over the new address 1 day after it took over: the previous address stays.
+// A healthy session over the new address 1 day after it took over: the previous address stays.
 func TestPrevAddressKeptWithin7Days(t *testing.T) {
 	h, lp, a, b := prevLinkHarness(t)
 	skew := skewLinkClock(h)
@@ -531,11 +592,41 @@ func TestPrevAddressKeptWithin7Days(t *testing.T) {
 	since := readMeta(t, h.dir).LinkSince
 
 	skew.Store(int64(24 * time.Hour))
-	nextEstablished(t, h)
+	nextHealthy(t, h)
 	committedTo(t, h, b, a)
 	if got := readMeta(t, h.dir).LinkSince; got != since {
 		t.Fatalf("link_since %d, want %d", got, since)
 	}
+}
+
+// The current address took over 8 days ago and answers, but its sessions end before healthyAfter: neither the HelloAck
+// nor such a session forgets the previous address (the agent goes on trying it after each). The first session that
+// lives healthyAfter forgets it.
+func TestPrevAddressKeptPast7DaysByUnhealthySessions(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	h.a.resetAfter = 500 * time.Millisecond // healthy after 1 s
+	h.a.meta.Link, h.a.cfg.LinkURL, h.a.meta.NextLink, h.a.meta.PrevLink = b, b, "", a
+	h.a.meta.LinkSince = time.Now().Add(-8 * 24 * time.Hour).Unix()
+	if err := saveMeta(h.dir, h.a.meta); err != nil {
+		t.Fatal(err)
+	}
+	lp.refuse('a') // the fallback finds nothing: the agent stays on b and its previous address stays a
+	h.start()
+	for range 2 {
+		if got := lp.session(t); got != linkPrefix('b') {
+			t.Fatal("a session was not on the current address")
+		}
+		eventually(t, func() bool { return h.a.cur.Load() != nil }, "a panel session")
+		time.Sleep(200 * time.Millisecond)
+		committedTo(t, h, b, a)
+		dials := lp.dialsTo('a')
+		endSession(t, h)
+		eventually(t, func() bool { return lp.dialsTo('a') > dials }, "the fallback to the previous address")
+	}
+	if got := lp.session(t); got != linkPrefix('b') {
+		t.Fatal("a session was not on the current address")
+	}
+	committedTo(t, h, b, "")
 }
 
 // The new address took over 8 days ago but has not established a session since: the previous address was not
@@ -568,6 +659,7 @@ func TestPrevAddressNoneLeavesAgentJSON(t *testing.T) {
 	a := linkBaseOf(server, 'a')
 	h.a.linkHTTPClient = server.Client()
 	h.a.meta.Link, h.a.cfg.LinkURL = a, a
+	h.a.resetAfter = 25 * time.Millisecond
 	if err := saveMeta(h.dir, h.a.meta); err != nil {
 		t.Fatal(err)
 	}
@@ -578,7 +670,7 @@ func TestPrevAddressNoneLeavesAgentJSON(t *testing.T) {
 	skewLinkClock(h).Store(int64(8 * 24 * time.Hour))
 	h.start()
 	lp.session(t)
-	nextEstablished(t, h)
+	nextHealthy(t, h)
 	after, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
 	if err != nil {
 		t.Fatal(err)

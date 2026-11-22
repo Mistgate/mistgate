@@ -288,7 +288,7 @@ next: mistgate-node install   (or, in the foreground: mistgate-node run)
 | `--link-url` | none | none | 面板的新连接地址，`wss://host/<secret-prefix>/`。必填。 |
 | `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | 状态目录。 |
 
-把该地址保存到 `agent.json`，作为下次尝试的地址；节点必须是通过连接（`--link-url`）注册的。对于通过 mTLS 连接的节点（`agent.json` 中没有 `link`），命令会拒绝执行，保持 `agent.json` 不变，并以状态 1 退出。重启后，Agent 会轮流尝试新地址和当前地址，一旦通过新地址建立会话就保留它。Agent 会记住之前的地址，新地址不再响应时就回到之前的地址；新地址正常工作满 7 天后，Agent 会忘掉之前的地址。面板可以把同样的更改发送给各 Agent（`panel_link_url`）；目前还没有任何功能发送它，mTLS 节点也会忽略它。此命令用于已无法连到面板的节点。命令输出 `Saved. Restart the agent: systemctl restart mistgate-node`。
+把该地址保存到 `agent.json`，作为下次尝试的地址；节点必须是通过连接（`--link-url`）注册的。对于通过 mTLS 连接的节点（`agent.json` 中没有 `link`），命令会拒绝执行，保持 `agent.json` 不变，并以状态 1 退出。重启后，Agent 会轮流尝试新地址和当前地址，一旦通过新地址建立会话就保留它。Agent 会记住之前的地址，新地址不再响应或在 2 分钟内断开会话时就回到之前的地址；切换满 7 天后，通过新地址的会话首次持续 2 分钟时，Agent 会忘掉之前的地址。面板可以把同样的更改发送给各 Agent（`panel_link_url`）；目前还没有任何功能发送它，mTLS 节点也会忽略它。此命令用于已无法连到面板的节点。命令输出 `Saved. Restart the agent: systemctl restart mistgate-node`。
 
 ### mistgate-node install
 

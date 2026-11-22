@@ -67,10 +67,11 @@ type Meta struct {
 	// NextLink is a new link address the panel sent (NodeSettings.panel_link_url) or `set-panel` saved. The agent tries it
 	// in turn with its current one and makes it Link once a session over it succeeds. Only a link node (Link set) has one.
 	NextLink string `json:"next_link,omitempty"`
-	// PrevLink is the link address the agent used before its last new link address took over. While the current link
-	// does not answer, the agent tries the previous address every other turn and makes it current again once a session
-	// over it succeeds. LinkSince (unix seconds) is when Link took over from it; the agent forgets the previous address
-	// once Link has worked for prevAddressKeep (panellink.go). Both are empty when there is no previous address.
+	// PrevLink is the link address the agent used before its last new link address took over. After a session over the
+	// current link that did not hold (no HelloAck, or ended before healthyAfter), the agent tries the previous address and
+	// makes it current again once a session over it succeeds. LinkSince (unix seconds) is when Link took over from it; the
+	// agent forgets the previous address once Link has worked for prevAddressKeep (panellink.go). Both are empty when there
+	// is no previous address.
 	PrevLink  string `json:"prev_link,omitempty"`
 	LinkSince int64  `json:"link_since,omitempty"`
 }
