@@ -1,0 +1,743 @@
+<!DOCTYPE html><html lang="en-GB"><head><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; font-src data:; style-src &#39;unsafe-inline&#39;; form-action &#39;none&#39;"/>
+<meta charset="utf-8"/>
+ <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <title>Oakrise: Sign in</title>
+<meta name="description" content="Sign in to your Oakrise account."/>
+
+<meta name="theme-color" content="#0a0e1f"/>
+  <meta name="color-scheme" content="dark"/>
+      <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3QgeD0iNSIgeT0iMTAiIHdpZHRoPSI1NyIgaGVpZ2h0PSIxMiIgcng9IjYiIGZpbGw9IiM4YjliZmYiLz48cmVjdCB4PSI0IiB5PSIyNiIgd2lkdGg9IjQ3IiBoZWlnaHQ9IjEyIiByeD0iNiIgZmlsbD0iIzVlZWFkNCIvPjxyZWN0IHg9IjExIiB5PSI0MiIgd2lkdGg9IjM0IiBoZWlnaHQ9IjEyIiByeD0iNiIgZmlsbD0iIzhiOWJmZiIvPjwvc3ZnPg=="/>
+ <style>:root{color-scheme:dark;
+--bg:#0a0e1f;--band:#0d1330;--sf:#131a3a;
+  --sf2:#1b2350;--fg:#e8ebf7;
+	--mu:#aab3d6;
+  --ln:#1f2851;--ln2:#28316a;
+--ac:#8b9bff;
+  --ai:#0b0b10;
+--a2:#5eead4;
+  --so:#1f2543;
+--ok:#54c993;--wa:#f0a638;
+	--bd:#e7685f; --oks:#193336;
+--was:#382c24;--bds:#36202c;--r:17px;--rs:13px;
+	--rb:22px;
+--bw:1px;
+--w:1255px;
+--wt:660px;
+  --s:calc(8px*0.99); --sec:71px;
+--gut:20px;
+  --fb:system-ui,
+-apple-system,"Segoe UI",  Roboto,  "Helvetica Neue",Arial,sans-serif; --fh:system-ui,-apple-system,  "Segoe UI",Roboto,"Helvetica Neue",  Arial,  sans-serif;--fl:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",Arial, sans-serif;
+	--fm:ui-monospace,SFMono-Regular, Menlo,Consolas,"Liberation Mono", monospace;
+--fwh:650; --lsh:-.045em;--lhh:.98;
+	--ttl:none;
+--lsl:.06em;--fsl:.78rem;
+	--t0:17px;
+	--t1:22.4px;--t2:29.4px;--t3:clamp(23px,2.68vw,38.7px);
+--t4:clamp(25.4px,  3.53vw,50.8px); --t5:clamp(33.4px,4.64vw, 66.8px);
+--ts:11.3px;
+  --sh:none}
+*,*::before,
+*::after{
+  box-sizing:border-box}
+[hidden]{
+  display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{
+	margin:0;
+  min-height:100vh;
+	display:flex; flex-direction:column; background:var(--bg);color:var(--fg);font:17px/1.52 var(--fb); -webkit-font-smoothing:antialiased}
+main{
+	flex:1}
+h1,
+h2,  h3,h4{font-family:var(--fh); font-weight:var(--fwh);line-height:var(--lhh);
+  margin:0 0 .5em;letter-spacing:var(--lsh)}
+h1{
+font-size:clamp(1.75rem,4.4vw,
+2.6rem)}
+h2{
+font-size:clamp(1.3rem,
+3vw,
+1.7rem)}
+h3{font-size:1.12rem}
+p{
+margin:0 0 1em}
+ul, ol{margin:0 0 1em;padding-left:1.25em}
+a{color:var(--ac)}
+img, svg{
+  max-width:100%}
+code, pre,kbd{
+  font-family:var(--fm);font-size:.92em}
+pre{margin:0 0 1em; padding:14px 16px;overflow-x:auto;background:var(--sf);color:var(--fg);
+	border:1px solid var(--ln);
+	border-radius:var(--rs);line-height:1.55}
+pre code{font-size:inherit}
+.ovl98{width:100%;
+  max-width:var(--w);
+	margin:0 auto;
+  padding-left:var(--gut);
+  padding-right:var(--gut)}
+.oeg39{
+	color:var(--mu)}
+.xjk74{
+width:1.25em;height:1.25em;flex:none;
+  vertical-align:-.25em;
+  fill:none;
+	stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+	stroke-linejoin:round}
+.xfczt99{
+	display:block;
+width:100%;height:100%}
+.ykcdo47{
+	width:28px;
+  height:28px;
+  flex:none}
+.eohj75{ display:none}
+.twve99{
+	display:flex;align-items:center; justify-content:center;
+width:44px; height:44px;
+margin-right:-8px;list-style:none;cursor:pointer;
+	color:var(--fg);
+	border-radius:var(--rs)}
+.twve99::-webkit-details-marker{display:none}
+.twve99 .xjk74{
+  width:26px; height:26px}
+.eohj75 .twve99 .xjk74:nth-child(2),.eohj75[open] .twve99 .xjk74:nth-child(1){
+display:none}
+.eohj75[open] .twve99 .xjk74:nth-child(2){ display:inline-block}
+.qtlyn9{
+  position:absolute;
+left:0;
+  right:0; top:100%;z-index:5; display:flex;flex-direction:column;
+padding:6px var(--gut) 14px;
+	background:var(--sf);
+border-bottom:1px solid var(--ln); box-shadow:0 14px 24px rgba(0,0,  0,
+.12)}
+.qtlyn9 a{
+	padding:12px 2px; color:var(--fg);text-decoration:none;border-bottom:1px solid var(--ln); font-size:1.05rem}
+.qtlyn9 a[aria-current]{
+  color:var(--ac);
+  font-weight:600}
+.qtlyn9 a:last-child{ border-bottom:0}
+@media (max-width:720px){
+  .xynus83{
+display:none}.eohj75{display:block}
+	.kcf71{flex-wrap:nowrap} }
+.bipn49{
+  display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:var(--sec) 56px;
+padding-top:48px;
+align-items:start}
+.iaq93{max-width:var(--wt)}
+.iaq93 h2{
+margin-top:1.8em;scroll-margin-top:24px}
+.ibrs28{ position:sticky;top:24px; padding:18px 20px;border:1px solid var(--ln);
+  border-radius:var(--r);background:var(--sf); font-size:.92rem}
+.ibrs28 h2{
+  margin:0 0 10px;color:var(--mu);
+font:700 .78rem var(--fb);letter-spacing:.07em; text-transform:uppercase}
+.ibrs28 ol{ margin:0;padding:0;list-style:none;counter-reset:t}
+.ibrs28 li{counter-increment:t;padding:5px 0 5px 22px;
+  position:relative}
+.ibrs28 li::before{content:counter(t);
+  position:absolute; left:0; color:var(--mu);font-variant-numeric:tabular-nums}
+.ibrs28 a{ color:var(--fg);
+text-decoration:none}
+.ibrs28 a:hover{
+	color:var(--ac)}
+.kxshn88{
+	display:grid;grid-template-columns:1fr 1fr;
+  gap:40px;
+  align-items:center;padding-top:72px;
+padding-bottom:24px}
+.tht79{
+	margin:0 0 .1em;
+  color:var(--ac);
+  font:var(--fwh) clamp(5rem,16vw,  11rem)/.9 var(--fh);letter-spacing:var(--lsh)}
+.zrapa24{
+	border-radius:var(--rb);overflow:hidden; aspect-ratio:4/3;background:var(--band)}
+.arnhl26{
+margin:0 0 28px;
+  border:1px solid var(--ln);border-radius:var(--r);overflow:hidden; background:var(--band)}
+.arnhl26 figcaption{ padding:12px 16px;background:var(--sf);border-top:1px solid var(--ln)}
+.rpfwb27{
+  display:flex;
+flex-direction:column; gap:6px;margin-bottom:14px}
+.rpfwb27 label{font-size:.92rem;font-weight:600}
+.rpfwb27 input, .rpfwb27 textarea{width:100%;
+  padding:.65em .8em;
+  border:1px solid var(--ln);
+  border-radius:var(--rs);
+background:var(--sf);
+	color:var(--fg);font:inherit}
+.rpfwb27 textarea{
+  resize:vertical}
+.rpfwb27 input:focus,.rpfwb27 textarea:focus{
+outline:2px solid var(--ac);outline-offset:1px}
+.vkt33{
+	max-width:520px}
+.osiqa41{
+	margin:0 0 14px; color:var(--bd)}
+@media (max-width:720px){ .bipn49{grid-template-columns:1fr;
+	padding-top:28px}
+	.ibrs28{position:static;order:-1}.kxshn88{grid-template-columns:1fr; padding-top:36px;
+  gap:24px}}
+@media (max-width:560px){
+.kcf71{ padding-top:12px; padding-bottom:10px}
+  }
+.sjzn25{
+  display:block; width:100%; height:auto}
+.yxnxl63{
+	fill:none; stroke:var(--ac);
+	stroke-width:2.4;
+  stroke-linejoin:round;stroke-linecap:round;
+vector-effect:non-scaling-stroke}
+.yacyt60{ fill:var(--ac);
+  opacity:.14}
+.qadsz21{fill:none; stroke:var(--ln); stroke-width:1;
+vector-effect:non-scaling-stroke}
+.cace24{
+  fill:var(--ac); opacity:.38}
+.vaanq96{
+fill:var(--ac)}
+.yahp15,
+.ojyzw3,.sel99,.vwbfm52{ display:block;width:100%;height:auto}
+.nsnif38{
+  fill:var(--sf2)}
+.alr94{ fill:var(--wa)}
+.qerv25{
+  fill:var(--bd)}
+.utzhi46{fill:var(--ac)}
+.gmvxt70{fill:var(--a2)}
+.stefa68{fill:var(--fg)}
+.pef45{
+	fill:var(--mu)}
+.yyfd61{
+  fill:var(--band)}
+.ooxg30{
+fill:var(--sf2);stroke:var(--sf2);
+stroke-width:6;stroke-linejoin:round}
+.rkte35{
+	fill:var(--oks);
+	stroke:var(--oks);
+stroke-width:6;
+	stroke-linejoin:round}
+.lut97{
+  fill:var(--ok);
+opacity:.55}
+.con28{
+  fill:none;
+stroke:var(--so);
+stroke-width:16; stroke-linecap:round}
+.dhoj58{
+fill:none;stroke:var(--ln);stroke-width:7}
+.oumek89{
+  fill:none;stroke:var(--ln2);
+  stroke-width:12}
+.risrs19{fill:var(--mu);
+font-family:var(--fb);
+paint-order:stroke;stroke:var(--sf);
+  stroke-width:3}
+.wmh52{ fill:var(--ac);
+  opacity:.18}
+.hsvqp80{
+  fill:var(--ac)}
+.wvcue34{
+  fill:var(--ai)}
+.cttxt42{
+  fill:var(--fg)}
+.kjb78{ fill:none;stroke:var(--bg);
+  stroke-width:1.2;
+stroke-dasharray:2 5;
+	opacity:.7}
+.vib26{
+  fill:var(--bg);font-family:var(--fh);font-weight:700; text-transform:uppercase}
+.vmag65{fill:var(--a2)}
+.hpwe82{
+  color:var(--mu)}
+.qna82{
+	color:var(--ok)}
+.vjg96{
+  color:var(--wa)}
+.lxxwd80{color:var(--a2)}
+.tgr29{color:var(--ac)}
+.ujmad71{ color:var(--mu);user-select:none}
+.teajc9{
+  font-weight:600}
+
+h1,  h2,  h3{color:var(--fg)}
+h1{
+  margin:24px 0 20px;font-size:var(--t5);
+line-height:.98;
+overflow-wrap:anywhere; hyphens:auto}
+a{color:inherit}
+.gdb47{position:relative;border-bottom:1px solid var(--ln);background:var(--band)}
+.swk92{display:flex;align-items:center;
+	justify-content:space-between;
+	gap:24px; height:76px}
+.tggry31{
+  display:flex; align-items:center;
+  gap:10px; min-width:0;color:var(--fg);
+	font:650 1.2rem/1 var(--fh);letter-spacing:-.01em; text-decoration:none;position:relative}
+.tggry31 span{
+  min-width:0;overflow:hidden;
+  line-height:1.35;text-overflow:ellipsis}
+.tggry31 .ykcdo47{width:30px;
+  height:30px}
+.xynus83{display:flex; gap:6px;font-size:.94rem}
+.xynus83 a{
+  padding:8px 16px;border-radius:99px;
+	color:var(--mu);
+	text-decoration:none}
+.xynus83 a:hover{
+color:var(--fg)}
+.xynus83 a[aria-current]{
+	background:var(--sf2); color:var(--fg)}
+.twve99{margin-right:0;
+  border:1px solid var(--ln2); border-radius:var(--rs);
+background:var(--sf)}
+.qtlyn9{ background:var(--band);border-bottom:1px solid var(--ln);box-shadow:none}
+.qtlyn9 a{border-bottom-color:var(--ln)}
+.qtlyn9 a[aria-current]{
+color:var(--ac)}
+.jvw24{display:inline-flex;align-items:center;
+  justify-content:center;
+  gap:10px;
+min-height:52px;
+	padding:0 26px;
+	border:0;
+border-radius:var(--rs);
+	background:var(--ac);
+color:var(--ai);font:650 1rem var(--fb);
+	text-decoration:none;
+	cursor:pointer}
+.jvw24:hover{
+filter:brightness(1.08)}
+.jvw24:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+.dmcrr78{
+	width:100%;
+min-height:54px;
+  font-size:1.05rem}
+.dmcrr78:disabled{
+opacity:.7;cursor:progress}
+.yhuv64{
+background:var(--bg);
+color:var(--fg)}
+.swscb24{ display:inline-flex;
+align-items:center;
+  padding:6px 14px;
+border:1px solid var(--ln2);border-radius:99px;color:color-mix(in srgb, var(--ac) 70%,var(--fg));font:600 .8rem var(--fl);letter-spacing:.08em;text-transform:uppercase}
+.lfzco60{max-width:28em;margin:0 0 30px; color:var(--mu);
+	font-size:clamp(17px, 1.4vw,
+21px)}
+.camy41{
+  display:grid;
+gap:14px;
+	margin:0;
+padding:0;
+list-style:none}
+.camy41 li{
+display:flex;
+  gap:12px;
+  align-items:center; font-size:1.05rem}
+.camy41 .xjk74{
+  width:24px;height:24px; color:var(--a2)}
+.yrm10{
+display:block; width:100%;height:auto}
+.tic57{fill:none;
+	stroke:var(--ln2);
+stroke-width:1.2px}
+.wxn35,.ibdo47{ fill:none;
+stroke:var(--ac); stroke-width:2px}
+.ibdo47{ stroke:var(--ln2);
+	stroke-width:1.2px}
+.kswtu73{
+	fill:none;stroke:var(--a2);stroke-width:2px;stroke-linecap:round}
+.hsgct44{fill:var(--ac)}
+.obxzf13{
+	fill:none;stroke:var(--ac);
+	stroke-width:12px;
+stroke-linecap:round}
+.mtj77{ fill:var(--band)}
+.yye7{fill:none;stroke:var(--band);stroke-width:10px;
+	stroke-linecap:round}
+.ail98{
+fill:var(--a2)}
+.ofnll9{ fill:var(--ln2)}
+.wesdt44{ position:absolute;pointer-events:none}
+.knd9{
+display:grid;
+	min-height:min(100vh,
+860px)}
+.oxuzs21{position:relative;
+  overflow:hidden;display:flex;
+flex-direction:column; justify-content:space-between;gap:48px;
+padding:clamp(28px,3.4vw,52px) clamp(24px,5vw,80px);
+	background:var(--band)}
+.oxuzs21 .wesdt44{
+right:-8%;
+bottom:-9%;width:64%}
+.fmtq24{
+position:relative;max-width:620px}
+.yyrk89{
+position:relative;color:var(--mu);font-size:.88rem}
+.bix11{display:flex;flex-direction:column; justify-content:center;padding:clamp(24px,  4vw, 64px)}
+.bkr61{ width:100%;
+	max-width:420px;
+  margin:0 auto}
+.xvxlr36 h2{margin:0 0 26px; font-size:clamp(1.6rem,2.4vw, 2.1rem);letter-spacing:-.03em}
+.rpfwb27{ gap:8px;
+  margin-bottom:20px}
+.rpfwb27 label{color:var(--mu);
+  font-size:.9rem;font-weight:500}
+.rpfwb27 input{min-height:52px;padding:0 16px; border:1px solid var(--ln2);border-radius:var(--rs); background:var(--sf);
+	color:var(--fg)}
+.rpfwb27 input:focus{
+outline:2px solid var(--ac);
+  outline-offset:1px;
+  border-color:var(--ac)}
+.bkf34{
+display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+gap:8px 12px;
+  margin:2px 0 24px;font-size:.92rem}
+.bkf34 a{
+	color:color-mix(in srgb,var(--ac) 70%, var(--fg))}
+.tbz85{
+	display:flex;align-items:center;gap:10px;cursor:pointer}
+.tbz85 input{
+	appearance:none;
+  flex:none;width:20px;height:20px;
+	margin:0;
+	border:1.5px solid var(--ln2);
+border-radius:6px;background:var(--sf);cursor:pointer}
+.tbz85 input:checked{
+	border-color:var(--ac);background:var(--ac);box-shadow:inset 0 0 0 4px var(--sf)}
+.tbz85 input:focus-visible{
+outline:2px solid var(--ac);outline-offset:2px}
+.kubql87{margin:0 0 14px;
+	padding:.65em .85em;border:1px solid var(--bd);border-radius:var(--rs);
+background:var(--bds);color:var(--fg); font-size:.92rem}
+.kubql87[hidden]{display:none}
+.nees43{
+  display:flex;justify-content:center;
+gap:18px;
+	margin:26px 0 0;
+color:var(--mu);
+	font-size:.9rem}
+.nees43 a{ text-decoration:none}
+.nees43 a:hover{color:var(--fg)}
+.spcv9{
+	padding-top:clamp(56px, 7vw,
+104px);padding-bottom:clamp(56px, 7vw,104px)}
+.desl49{ display:grid;
+	grid-template-columns:1fr 1.3fr;gap:clamp(32px,  6vw,96px); align-items:start}
+.desl49 > *{
+	min-width:0}
+.ihko19{margin:0 0 16px;
+  font-size:var(--t4);
+line-height:1.05;
+letter-spacing:-.035em}
+.dyf9{
+max-width:26em; margin:0 0 32px; color:var(--mu);font-size:1.1rem}
+.kpipe32{
+padding:28px;
+	border:1px solid var(--ln2);
+  border-radius:var(--rb);background:var(--sf)}
+.kpipe32 h3{margin:0 0 8px;font-size:1.2rem}
+.kpipe32 p{
+	margin:0;
+  color:var(--mu)}
+.jhdvl83{ margin:0;
+padding:0;list-style:none;
+	counter-reset:s}
+.jhdvl83 li{
+counter-increment:s;
+	display:grid; grid-template-columns:64px 1fr;gap:20px;
+align-items:center;
+  padding:24px 0;border-top:1px solid var(--ln);
+	font-size:1.15rem}
+.jhdvl83 li:last-child{
+	border-bottom:1px solid var(--ln)}
+.jhdvl83 li::before{content:counter(s, decimal-leading-zero);
+	color:var(--mu);
+  font:var(--fwh) 2.1rem/1 var(--fh);
+letter-spacing:-.03em;
+	font-variant-numeric:tabular-nums}
+.wcko31{
+padding-bottom:clamp(56px,
+7vw,104px); border-top:1px solid var(--ln);
+	background:var(--band)}
+.wcko31 .dyf9{
+	margin-bottom:0}
+.eivta7{
+display:grid;
+	grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:20px;
+	margin-top:40px}
+.eivta7 > div{padding:24px;border:1px solid var(--ln); border-radius:var(--r);
+  background:var(--bg)}
+.gdx75{display:block; margin-bottom:18px;color:var(--ac)}
+.gdx75 .xjk74,  .xoylp40 .xjk74{ width:28px;height:28px}
+.eivta7 h3{
+	margin:0 0 8px;font-size:1.1rem;
+	font-weight:600; letter-spacing:0}
+.eivta7 p{ margin:0;
+color:var(--mu);font-size:.95rem}
+.hpc76{position:relative;
+	overflow:hidden; border-bottom:1px solid var(--ln);
+	background:var(--band)}
+.yzpox84{position:relative;display:grid;
+  grid-template-columns:minmax(0,  1.2fr) minmax(0,  1fr); gap:48px;align-items:center; padding-top:clamp(40px, 5vw, 80px);
+	padding-bottom:clamp(40px,  5vw,80px)}
+.vyw81{ padding-top:clamp(40px,
+5vw, 80px);padding-bottom:clamp(40px,
+5vw,
+80px)}
+.phaab56{display:grid;
+	grid-template-columns:minmax(0, 1.2fr) minmax(0,1fr); gap:48px;
+  align-items:center;
+padding-top:clamp(40px,5vw,  80px);padding-bottom:clamp(40px,5vw,80px)}
+.phaab56 .yrm10{ max-width:420px;
+  justify-self:end}
+.vyw81 h1,.phaab56 h1{
+  font-size:var(--t4)}
+.vyw81 .lfzco60,.phaab56 .lfzco60{
+	margin:0}
+.ysj18{
+	display:grid;grid-template-columns:1fr 1fr;
+gap:20px;margin:0; padding:0;list-style:none}
+.odz3{display:flex; flex-direction:column;gap:clamp(28px,  4vw,  56px); min-height:210px;
+padding:32px; border:1px solid var(--ln2);
+  border-radius:var(--rb); background:var(--sf)}
+.odz3 b{ color:var(--mu);
+  font:var(--fwh) 3.4rem/.8 var(--fh);letter-spacing:-.05em;
+font-variant-numeric:tabular-nums}
+.odz3 p{ margin:0;
+  font-size:1.25rem;
+line-height:1.4;letter-spacing:-.01em}
+.kpipe32:not(.tjby60){
+	display:grid;
+	grid-template-columns:1fr auto;
+gap:32px;
+align-items:center;
+margin-top:20px;
+  padding:clamp(28px,
+3.4vw,
+48px);
+	border:0;
+border-radius:calc(var(--rb)*1.2);
+  background:var(--ac); color:var(--ai)}
+.kpipe32:not(.tjby60) h2{margin:0 0 8px; color:inherit;
+	font-size:var(--t3);
+  letter-spacing:-.035em}
+.kpipe32:not(.tjby60) p{
+  max-width:38em; color:inherit;font-size:1.1rem}
+.kgr79{
+display:grid; grid-template-columns:260px minmax(0,
+1fr);
+gap:clamp(32px,  6vw, 96px); align-items:start}
+.qyuz14{ position:sticky;top:24px;
+font-size:.94rem}
+.qyuz14 h6{margin:0 0 12px; color:var(--mu);
+font:600 .75rem var(--fl);letter-spacing:.1em;text-transform:uppercase}
+.qyuz14 a{
+display:block;
+  padding:8px 14px;border-left:2px solid var(--ln);
+  color:var(--mu);
+text-decoration:none}
+.qyuz14 a:hover{border-color:var(--ac);
+	color:var(--fg)}
+.skfb29{display:grid;
+  grid-template-columns:72px minmax(0,1fr);
+gap:24px;
+  padding:36px 0;border-top:1px solid var(--ln);scroll-margin-top:16px}
+.skfb29:nth-of-type(1){
+	border-top:0;padding-top:0}
+.xoylp40{ display:grid;place-items:center;width:64px;height:64px; border:1px solid var(--ln2);border-radius:var(--r); background:var(--sf);color:var(--ac)}
+.xoylp40 .xjk74{
+	width:30px;
+height:30px}
+.skfb29 h2{
+  margin:0 0 8px;
+  font-size:var(--t3);line-height:1.1;
+letter-spacing:-.035em}
+.skfb29 p{ max-width:34em;
+margin:0;color:var(--mu);font-size:1.1rem}
+.rsjez37{
+	margin:36px 0 0}
+.iwtl52{margin-top:0;
+  padding:56px 0 32px;
+	border-top:1px solid var(--ln); background:color-mix(in srgb, var(--bg) 60%,
+#000)}
+.ahdfu73{
+  display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px}
+.ahdfu73 h6{margin:0 0 14px;
+  color:var(--mu); font:600 .8rem var(--fl);
+  letter-spacing:.08em;
+	text-transform:uppercase}
+.ahdfu73 a{display:block;padding:4px 0;color:var(--mu);
+  font-size:.94rem; text-decoration:none}
+.ahdfu73 a:hover{color:var(--fg)}
+.ahdfu73 .tggry31{display:flex;padding:0;color:var(--fg)}
+.ahdfu73 p{
+	max-width:20em;
+margin:14px 0 0;
+  color:var(--mu);font-size:.94rem}
+.oocb29{
+  display:flex;flex-wrap:wrap;justify-content:space-between;
+  gap:6px 16px;margin-top:40px;
+	color:var(--mu);
+  font-size:.88rem}
+.bipn49{padding-bottom:clamp(40px,5vw,72px)}
+.ibrs28{border-color:var(--ln);background:var(--sf)}
+.tht79{
+	color:var(--ac)}
+.zrapa24{
+	border:1px solid var(--ln2)}
+.knd9{
+grid-template-columns:minmax(0,
+1.25fr) minmax(0,1fr)}
+@media (max-width:900px){
+  .xynus83{
+	display:none}
+.eohj75{
+	display:block}.knd9,
+.yzpox84,
+.phaab56,.desl49,
+.kgr79,.kpipe32:not(.tjby60){
+	grid-template-columns:1fr}
+	.knd9{min-height:0}
+.oxuzs21{gap:36px}
+	.oxuzs21 .wesdt44{
+  position:relative;
+right:auto;bottom:auto;
+order:5;
+	width:min(86%,460px);margin:0 auto -48px}
+	.bix11{ padding:40px 20px 56px}
+  .oxuzs21{
+  order:0}.bix11{ order:1}.yyrk89{display:none}
+.eivta7{
+  grid-template-columns:1fr 1fr}
+.ahdfu73{
+  grid-template-columns:1fr 1fr}
+	.hxn86{grid-column:1/-1}
+	.qyuz14{
+  display:none}
+.phaab56 .yrm10{
+  justify-self:center;max-width:300px;grid-row:1}
+  .kpipe32:not(.tjby60) .jvw24{
+  justify-self:start}}
+@media (max-width:560px){
+	.eivta7,.ysj18{grid-template-columns:1fr}.jhdvl83 li{
+	grid-template-columns:48px 1fr;
+	font-size:1.05rem}.skfb29{
+	grid-template-columns:52px minmax(0,  1fr);
+  gap:16px}
+	.xoylp40{
+	width:52px;height:52px}
+	.odz3{
+	min-height:0;
+  padding:24px}h1{
+font-size:clamp(2rem,  10vw, var(--t5))}
+	.vyw81 h1,  .phaab56 h1, .yzpox84 h1{
+	font-size:clamp(2rem, 9.6vw,var(--t4))}
+}
+</style>
+    </head>
+<body>
+<main>
+<section class="knd9">
+<div class="oxuzs21">
+<div class="wesdt44"><svg class="yrm10" viewBox="0 0 640 560" aria-hidden="true" focusable="false">
+<g class="tic57"><path d="M-27 560L320 330M73 560L320 330M173 560L320 330M273 560L320 330M373 560L320 330M473 560L320 330M573 560L320 330"></path>
+<path d="M0 540H640M20 500H620M70 460H570M120 430H520M170 404H470M220 384H420"></path></g>
+<g class="wxn35"><circle cx="320" cy="250" r="180" opacity=".25"></circle><circle cx="320" cy="250" r="136" opacity=".45"></circle><circle cx="320" cy="250" r="95" opacity=".9"></circle></g>
+<g class="kswtu73"><path d="M320 64v40M320 400v-40M127 250h40M510 250h-40" opacity=".7"></path></g>
+<rect class="hsgct44" x="262" y="206" width="116" height="92" rx="26"></rect>
+<path class="obxzf13" d="M286 206v-18a34 34 0 0168 0v18"></path>
+<circle class="mtj77" cx="320" cy="248" r="11"></circle><rect class="mtj77" x="316" y="252" width="8" height="26" rx="4"></rect>
+<g class="ail98"><circle cx="471" cy="151" r="6"></circle><circle cx="147" cy="330" r="5"></circle><circle cx="540" cy="331" r="4"></circle></g>
+<g class="ofnll9"><circle cx="98" cy="170" r="5"></circle><circle cx="560" cy="212" r="5"></circle><circle cx="202" cy="90" r="4"></circle></g>
+</svg></div>
+	<a class="tggry31" data-page="index.html"><svg class="ykcdo47" viewBox="0 0 64 64" aria-hidden="true"><rect x="5" y="10" width="57" height="12" rx="6" fill="#8b9bff"></rect><rect x="4" y="26" width="47" height="12" rx="6" fill="#5eead4"></rect><rect x="11" y="42" width="34" height="12" rx="6" fill="#8b9bff"></rect></svg><span>Oakrise</span></a>
+<div class="fmtq24"><span class="swscb24">Learning space</span>
+<h1>Sign in to your class space</h1>
+		<p class="lfzco60">Pupils, parents and teachers sign in here to find timetables, homework and messages.</p>
+		<ul class="camy41"><li><svg class="xjk74" viewBox="0 0 24 24" aria-hidden="true" width="24" height="24"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l3 3 5-6"></path></svg><span>Timetables and homework</span></li>
+		<li><svg class="xjk74" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l3 3 5-6"></path></svg><span>Messages from teachers</span></li>
+
+  <li><svg aria-hidden="true" class="xjk74" focusable="false" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l3 3 5-6"></path></svg><span>Term dates and trips</span></li>
+	</ul>
+        </div>
+
+  <div class="yyrk89"><span>Secure account access</span></div>
+    </div>
+     <div class="bix11"><div class="bkr61"><form class="xvxlr36" id="xvipp96" novalidate="">
+<h2>Sign in</h2>
+    <div class="rpfwb27"><label for="clz58">Username</label><input id="clz58" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"/></div>
+   <div class="rpfwb27"><label for="fnzvy37">Password</label><input id="fnzvy37" type="password" autocomplete="current-password"/></div>
+<div class="bkf34"><label class="tbz85"><input type="checkbox"/><span>Keep me signed in</span></label><a data-page="help.html">Forgot password?</a></div>
+        <p class="kubql87" id="slyty45" role="alert" hidden=""></p>
+      <button class="jvw24 dmcrr78" id="ucghy95" type="button">Sign in</button>
+<p class="nees43"><a data-page="help.html">Help</a><a data-page="legal/privacy.html">Privacy</a></p>
+  </form>
+</div>
+		</div>
+        </section>
+    <section class="spcv9"><div class="ovl98 desl49">
+<div><h2 class="ihko19">Trouble signing in?</h2>
+ <p class="dyf9">Most sign-in problems have a simple cause. Work through these steps before you contact anyone.</p>
+    <div class="kpipe32 tjby60"><h3>Still stuck?</h3>
+  <p>Ask the person who manages Oakrise for your organisation to reset your password. For security reasons we cannot reset it over the phone or by email.</p>
+  </div>
+   </div>
+    <ol class="jhdvl83"><li>Check that Caps Lock is off; passwords are case sensitive.</li>
+ <li>Look for a stray space at the start or end of your username.</li>
+
+<li>Try again in a new browser window with no saved form data.</li>
+    <li>Wait ten minutes if you have tried several times without success.</li>
+</ol>
+        </div>
+ </section>
+    <section class="spcv9 wcko31"><div class="ovl98">
+<h2 class="ihko19">Privacy notice</h2>
+
+  <p class="dyf9">We keep as little about you as we can and look after what we keep. This is a short account of what that is and why.</p>
+   <div class="eivta7"><div><span class="gdx75"><svg viewBox="0 0 24 24" width="24" height="24" focusable="false" aria-hidden="true" class="xjk74"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 018 0v3"></path></svg></span><h3>What we keep</h3>
+  <p>Your username, the times you signed in and the details that belong to your account. Nothing else.</p>
+		</div>
+		<div><span class="gdx75"><svg class="xjk74" focusable="false" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"></path></svg></span><h3>What we use it for</h3>
+  <p>To let you sign in and to protect your account from anyone else. We do not sell information about our users.</p>
+
+  </div>
+     <div><span class="gdx75"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false" class="xjk74"><circle cx="12" cy="12" r="9"></circle><path d="M9 10v.01M15 10v.01M8.5 14.5c2 2 5 2 7 0"></path></svg></span><h3>Cookies</h3>
+
+<p>We use only the cookies the service needs in order to work. There are no advertising or analytics cookies.</p>
+
+</div>
+     <div><span class="gdx75"><svg aria-hidden="true" class="xjk74" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg></span><h3>Your rights</h3>
+	<p>You can ask to see, correct or delete the information we hold about you. Ask the person who manages your account.</p>
+ </div>
+      </div>
+  </div>
+   </section>
+   </main>
+
+<footer class="iwtl52">
+<div class="ovl98">
+<div class="ahdfu73">
+<div class="hxn86"><a class="tggry31" data-page="index.html"><svg class="ykcdo47" viewBox="0 0 64 64" aria-hidden="true"><rect x="5" y="10" width="57" height="12" rx="6" fill="#8b9bff"></rect><rect x="4" y="26" width="47" height="12" rx="6" fill="#5eead4"></rect><rect x="11" y="42" width="34" height="12" rx="6" fill="#8b9bff"></rect></svg><span>Oakrise</span></a><p>Sign in to your Oakrise account.</p>
+  </div>
+  <div class="vyqj73"><h6 class="oar48">Main</h6><a class="uunpt96" data-page="index.html">Sign in</a><a class="uunpt96" data-page="help.html">Help</a><a class="uunpt96" data-page="legal/privacy.html">Privacy</a><a class="uunpt96" data-page="terms/index.html">Terms of use</a></div>
+
+  <div class="vyqj73"><h6 class="oar48">Help</h6><a class="uunpt96" data-page="help.html">Trouble signing in?</a><a class="uunpt96" data-page="help.html">Still stuck?</a></div>
+      <div class="vyqj73"><h6 class="oar48">Privacy</h6><a class="uunpt96" data-page="legal/privacy.html">What we keep</a><a class="uunpt96" data-page="legal/privacy.html">What we use it for</a><a class="uunpt96" data-page="legal/privacy.html">Cookies</a></div>
+     </div>
+    <div class="oocb29"><span>All rights reserved.</span><span>© 2023–2026 Oakrise</span></div>
+      </div>
+ </footer>
+     
+
+
+
+</body></html>
