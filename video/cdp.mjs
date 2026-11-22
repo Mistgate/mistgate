@@ -16,7 +16,7 @@ export async function launch(profileDir, port = Number(process.env.CDP_PORT || 9
   rmSync(profileDir, { recursive: true, force: true });
   mkdirSync(profileDir, { recursive: true });
   const child = spawn(CHROME, [
-    ...(/headless-shell/i.test(CHROME) ? [] : ["--headless=new"]), `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`, "--no-first-run", "--no-default-browser-check",
+    ...(/headless-shell/i.test(CHROME) ? [] : ["--headless=old"]), `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`, "--no-first-run", "--no-default-browser-check",
     "--hide-scrollbars", "--force-color-profile=srgb", "--disable-background-networking", "--disable-component-update", "--disable-sync",
     "--disable-features=Translate,OptimizationHints,MediaRouter", "--font-render-hinting=none", "about:blank",
   ], { stdio: "ignore" });
