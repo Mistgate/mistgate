@@ -15,7 +15,7 @@ const videos = {
   hero: { poster: 24.2, mp4: 8, webp: 4 },
   link: { poster: 21.6, mp4: 8, webp: 4 },
   health: { poster: 15.4, mp4: 8, webp: 4 },
-  telegram: { poster: 20.0, mp4: 8, webp: 4 },
+  telegram: { poster: 19.3, mp4: 8, webp: 4 },
 };
 const [name, ...langs] = process.argv.slice(2);
 const v = videos[name];
