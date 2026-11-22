@@ -60,9 +60,11 @@ table and update files over the link with a token of its link session (`link-fet
 
 **Limits.** The front keeps no per-source limits on purpose. The host's intake does: at most 400 people at once through
 the bridge (what four HTTP/2 connections carry), 16 per source address (an IPv6 one by its /64), 64 subscriptions per
-network (an IPv4 /24, an IPv6 /48, so a few dozen /64s of one network cannot fill the class), and a reserve for the
-agents' links, recognised by the fleet nodes' addresses the panel sends: the subdomain is one name and the path is
-inside TLS, so the source address is the only thing the host can tell them by.
+network (an IPv4 /24, an IPv6 /48, so a few dozen /64s of one network cannot fill the class) once the subscriptions take
+about three quarters of their class (below that a prober cannot make the host switch the name to the site with a few
+connections more), and a reserve for the agents' links, recognised by the fleet nodes' addresses the panel sends: the
+subdomain is one name and the path is inside TLS, so the source address is the only thing the host can tell them by. A
+connection over a limit waits up to two seconds for a place before it goes to the site.
 
 **The first host is installed over SSH** with offline enrollment in the same session: it cannot reach the panel before
 it is the host. The panel signs the node's CSR, sends the role on standard input, and reads back only the pin of the

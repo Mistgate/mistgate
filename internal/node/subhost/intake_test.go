@@ -309,3 +309,58 @@ func TestIntakeServeAndCloseRace(t *testing.T) {
 		t.Fatal("a Serve after Close left its listener open")
 	}
 }
+
+// The per-source and per-network caps of subscriptions apply only once the class is mostly taken (SoftFrom): below that, one
+// address may hold more than its share, so a prober cannot switch the name to the site with a few connections (Medium-4).
+func TestIntakeSoftCaps(t *testing.T) {
+	in, _, f := newTestIntake(t)
+	in.SetLimits(Limits{MaxClients: 20, LinkReserve: 4, SubPerSource: 2, SubPerNetwork: 3, LinkPerSource: 1, SoftFrom: 6})
+	start := func(c net.Conn) { in.wg.Add(1); go func() { defer in.wg.Done(); in.handle(c) }() }
+	for i := range 6 {
+		start(person("198.51.100.1", 10+i)) // one address, far over its cap of 2, while the class is below SoftFrom
+		eventually(t, "carried", func() bool { return in.Stats().ClientsSub == uint32(i+1) })
+	}
+	if f.diverted.Load() != 0 {
+		t.Fatal("a connection below SoftFrom went to the site")
+	}
+	start(person("198.51.100.1", 20)) // at SoftFrom: the caps apply now
+	eventually(t, "over its cap at SoftFrom", func() bool { return f.diverted.Load() == 1 && in.Stats().RefusedPerSource == 1 })
+	start(person("203.0.113.7", 21)) // another network still gets in
+	eventually(t, "another network", func() bool { return in.Stats().ClientsSub == 7 })
+}
+
+// A connection over a limit waits up to QueueWait for a place and is carried if one frees; if none does, it goes to the site
+// once the wait is over, not before.
+func TestIntakeQueuesOverTheLimit(t *testing.T) {
+	in, e, f := newTestIntake(t)
+	in.SetLimits(Limits{MaxClients: 2, LinkReserve: 0, SubPerSource: 10, LinkPerSource: 1, QueueWait: 300 * time.Millisecond})
+	start := func(c net.Conn) { in.wg.Add(1); go func() { defer in.wg.Done(); in.handle(c) }() }
+	start(person("198.51.100.1", 1))
+	start(person("198.51.100.2", 2))
+	eventually(t, "the class full", func() bool { return in.Stats().ClientsSub == 2 })
+
+	began := time.Now()
+	start(person("198.51.100.3", 3))
+	eventually(t, "the over-limit connection goes to the site", func() bool { return f.diverted.Load() == 1 })
+	if waited := time.Since(began); waited < 250*time.Millisecond {
+		t.Fatalf("diverted after %v, before its wait was over", waited)
+	}
+
+	start(person("198.51.100.4", 4)) // waits; a place frees while it waits
+	time.Sleep(50 * time.Millisecond)
+	e.mu.Lock()
+	n := len(e.relays)
+	e.mu.Unlock()
+	if n != 2 {
+		t.Fatalf("attached %d before a place freed", n)
+	}
+	close(e.release) // the two carried ones leave
+	eventually(t, "the queued one carried", func() bool {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		return len(e.relays) == 3
+	})
+	if f.diverted.Load() != 1 {
+		t.Fatalf("diverted %d, want only the first over-limit one", f.diverted.Load())
+	}
+}
