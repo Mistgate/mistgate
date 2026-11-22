@@ -330,7 +330,7 @@ func TestPhotoReasons(t *testing.T) {
 	}
 	setKey(t, e, svc, pexelsTestKey)
 	// kinds that never show a photo, with a key
-	for _, kind := range []string{"card", "docs", "project", "status"} {
+	for _, kind := range []string{"docs", "project", "status"} {
 		if got := preview(t, e, svc, kind, ""); got.Photos != "none_for_kind" {
 			t.Errorf("%s: %q", kind, got.Photos)
 		}

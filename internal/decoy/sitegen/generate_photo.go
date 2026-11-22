@@ -56,7 +56,7 @@ func GenerateWith(kind string, seed []byte, o Options) ([]File, string, error) {
 func Plan(kind string, seed []byte) ([]Slot, error) { return PlanFor(kind, seed, "") }
 
 // PlanFor lists the photos a site of this kind, seed and country would like, in the order its pages ask for them, at most
-// MaxPhotos. It is empty when the kind or the variant the seed chose shows none (a card, a docs site, an illustrator's portfolio).
+// MaxPhotos. It is empty when the kind or the variant the seed chose shows none (a docs site, a status page, an illustrator's portfolio).
 func PlanFor(kind string, seed []byte, country string) ([]Slot, error) {
 	d, err := kindOf(kind)
 	if err != nil {
