@@ -65,7 +65,7 @@
             loop: 0.5,
             outroAt: tEnd,
             windows: [
-              { id: "admin", take: "link-admin", kind: "window", x: 0, y: 0, w: 1600, h: 1000, segments: admin, cursor: true, opacity: (t) => 1 - 0.85 * Film.inOut(Film.clamp((t - tIn) / 0.7)) },
+              { id: "admin", take: "link-admin", kind: "window", x: 0, y: 0, w: 1600, h: 1000, segments: admin, cursor: true, opacity: (t) => 1 - 1.0 * Film.inOut(Film.clamp((t - tIn) / 0.7)) },
               { id: "phone", take: "link-phone", kind: "phone", ...phoneAt, segments: phoneSeg, taps: true, opacity: (t) => (t >= tIn ? 1 : 0), lift: (t) => 1050 * (1 - Film.outCubic(Film.clamp((t - tIn) / 0.85))) },
             ],
             camera: [
