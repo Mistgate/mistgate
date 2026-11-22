@@ -29,16 +29,117 @@ Hysteria2، VLESS و AmneziaWG. دو فایل اجرایی Go، به‌علاو�
 
 پنل را روی یک سرور نصب می‌کنید و سرورهای VPN خود را به‌عنوان نود به آن اضافه می‌کنید. هر نفر یک لینک اشتراک می‌گیرد و برنامه‌اش همهٔ سرورهایی را که اجازهٔ استفاده از آن‌ها را دارد خودش دریافت می‌کند. پنل پیکربندی نودها را درست نگه می‌دارد و آن‌ها را بررسی می‌کند.
 
-- نود را از مرورگر با IP و کلید SSH خود پنل (یک بار نزد میزبان اضافه‌اش می‌کنید) یا رمز عبور root اضافه می‌کنید. پنل کلید SSH سرور را به خاطر می‌سپارد، سرور را بررسی می‌کند، اگر UFW یا firewalld فعال باشد پورت‌ها را در آن باز می‌کند و ایجنت امضاشده را نصب می‌کند؛ در کارت نود هم رمز را عوض می‌کند و کلیدهای SSH سرور را مدیریت می‌کند. یک فرمان نصب یک‌بارمصرف هم کار می‌کند. [افزودن نود](docs/en/getting-started/add-node.md)
-- برای هر نفر یک لینک. برنامه‌های مبتنی بر Mihomo (kl!ck، FlClash و Clash Verge Rev) هر سه پروتکل را از همین لینک می‌گیرند، Happ پروتکل‌های Hysteria2 و VLESS را، و AmneziaVPN برای هر دستگاه یک کلید جداگانه از صفحهٔ کاربر برمی‌دارد. برنامه‌های Mihomo و sing-box خودشان به یک سرور سالم می‌روند. [برنامه‌های کلاینت](docs/en/guide/client-apps.md)
-- پنل هر 5 دقیقه یک بار، درست مثل یک برنامه، به هر سرور وصل می‌شود. عیب‌یابِ هر نود 22 بررسی روی میزبان انجام می‌دهد و ده راه‌حل پیشنهاد می‌کند که فقط پس از تأیید شما اجرا می‌شوند. هشدارها در پنل مدیریت دیده می‌شوند و به Telegram هم فرستاده می‌شوند. [سلامت](docs/en/operations/health.md)
+همهٔ این‌ها روی داده‌های نمایشی ساختگی اجرا شده‌اند؛ کلیپ‌ها حلقه‌های کوتاهی از پنل مدیریت واقعی‌اند.
+
+<table>
+<tr>
+<td width="38%" valign="top">
+<h3>افزودن سرور از مرورگر</h3>
+<p>نشانی IP سرور را بنویسید، انتخاب کنید پنل چگونه وارد شود (با کلید SSH خود پنل که یک بار نزد ارائه‌دهنده اضافه می‌کنید، یا با گذرواژهٔ root) و نصب را تماشا کنید. پنل کلید SSH سرور را ثابت می‌کند، سرور را بررسی می‌کند، پورت‌ها را در UFW یا firewalld فعال باز می‌کند و عامل امضاشده را نصب می‌کند. روی سرور جدید به ترمینال نیازی نیست؛ اگر بخواهید، یک دستور یک‌بارمصرف هم هست.</p>
+<p><a href="docs/fa/getting-started/add-node.md">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/addnode-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/addnode-light-en.webp"><img alt="پنجرهٔ «نود جدید»: نشانی سرور، بعد ورود، بررسی‌ها و مرحله‌های نصب یکی پس از دیگری تا وصل شدن نود" src="docs/images/readme/addnode-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>یک پیوند برای هر نفر و صفحهٔ خودش</h3>
+<p>هر نفر یک پیوند اشتراک، یک کد QR و صفحه‌ای پشت آن می‌گیرد: راهنما برای پلتفرم خودش، روزهای باقی‌مانده، ترافیک و دستگاه‌های خودش. برنامه‌های مبتنی بر Mihomo همهٔ پروتکل‌ها را از پیوند می‌گیرند، Happ پروتکل‌های Hysteria2 و VLESS را و AmneziaVPN برای هر دستگاه یک کلید از صفحه می‌گیرد. گروه‌ها مشخص می‌کنند هر نفر به کدام سرورها می‌رسد.</p>
+<p><a href="docs/fa/guide/user-page.md">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/link-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/link-light-en.webp"><img alt="کارت یک کاربر در پنل مدیریت: ترافیک، پیوند اشتراک و پنجرهٔ کد QR آن" src="docs/images/readme/link-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>بررسی از دید مشتری</h3>
+<p>هر 5 دقیقه پنل مثل یک برنامه به هر پروتکل روی هر نود وصل می‌شود و تأخیر هر تونل را نشان می‌دهد؛ پس از خراب شدن سرور زودتر از کاربران آن خبردار می‌شوید. «دکتر» روی هر نود 22 بررسی از میزبان انجام می‌دهد و ده اصلاح پیشنهاد می‌کند؛ هیچ‌کدام بدون تأیید شما اجرا نمی‌شود.</p>
+<p><a href="docs/en/operations/health.md">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-en.webp"><img alt="جدول بررسی از دید مشتری: نودها و پروتکل‌ها با تأخیر هر تونل، و یک نود خراب باز شده که علت را نشان می‌دهد" src="docs/images/readme/health-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>یک TCP 443 برای چند پروتکل</h3>
+<p>بسیاری از شبکه‌ها فقط TCP 443 را رد می‌کنند. یک نود می‌تواند VLESS REALITY، VLESS روی TLS، TrustTunnel و MTProto را روی همین یک پورت نگه دارد؛ عامل آن‌ها را از روی نامی که مشتری می‌خواهد جدا می‌کند. وقتی پروفایل دوم را روی پورت گرفته‌شده می‌گذارید، پنل پیشنهاد می‌کند کنار اولی بگذاریدش و رکورد DNS لازم را نشان می‌دهد.</p>
+<p><a href="docs/en/guide/shared-port.md">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/shared-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/shared-light-en.webp"><img alt="پیشنهاد گذاشتن یک پروفایل کنار دیگری روی پورت 443 و بعد کارت پورت مشترک با شمارنده‌ها" src="docs/images/readme/shared-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>سایت‌های استتار از روی قالب</h3>
+<p>کسی که نود را باز می‌کند باید یک سایت کوچک معمولی ببیند، نه صفحهٔ Mistgate. یک کشور و یکی از ده نوع (صفحهٔ وضعیت، مستندات، وبلاگ، کسب‌وکار کوچک، نمونه‌کار و غیره) را انتخاب کنید تا پنل سایتی به زبان همان کشور با ظاهر و متن خودش بسازد، هر بار متفاوت. نگاهش کنید، نسخهٔ دیگری بخواهید، بعد ذخیره کنید. با کلید رایگان خودتان برای عکس‌ها، سایت عکس‌های واقعی هم می‌گیرد که خود نود ارائه می‌کند.</p>
+<p><a href="docs/en/guide/decoy-site.md#a-site-from-a-template">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-light-en.webp"><img alt="پنجرهٔ «از روی قالب»: کشور، نوع، پیش‌نمایش سایت جدید و دکمهٔ «نسخهٔ دیگر»" src="docs/images/readme/decoys-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>به‌روزرسانی با انتشار مرحله‌ای و بازگشت</h3>
+<p>نودها خودشان به‌روز نمی‌شوند. انتشار مرحله‌ای اول یک نود قناری را به‌روز می‌کند و 5 دقیقه به آن فرصت می‌دهد بررسی سلامت را بگذراند، بعد دسته‌های کوچک را ادامه می‌دهد. نودی که رد شود نسخهٔ قبلی‌اش را پس می‌گیرد و انتشار متوقف می‌شود. پنل فقط با تأیید شما خودش را به‌روز می‌کند و اگر نسخهٔ جدید دوام نیاورد، فایل اجرایی و داده‌های قبلی را برمی‌گرداند.</p>
+<p><a href="docs/en/operations/updates.md">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/updates-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/updates-light-en.webp"><img alt="صفحهٔ «به‌روزرسانی‌ها»: انتشار مرحله‌ای نود قناری را نصب می‌کند، 5 دقیقه بررسی می‌کند و به نودهای دیگر می‌رود" src="docs/images/readme/updates-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>به‌روزرسانی سیستم سرورها</h3>
+<p>ببینید کدام سرورها منتظر به‌روزرسانی امنیتی یا راه‌اندازی مجدد هستند، بی‌آنکه به هر کدام وارد شوید. می‌توانید به‌روزرسانی امنیتی را روی یک سرور نصب یا آن را راه‌اندازی مجدد کنید، یا چند سرور را علامت بزنید و مثل یک انتشار مرحله‌ای اجرا کنید: چند تا در هر نوبت، بعد از هرکدام بررسی سلامت، و توقف در اولین شکست.</p>
+<p><a href="docs/en/operations/updates.md#server-operating-system">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/os-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/os-light-en.webp"><img alt="زبانهٔ «سیستم سرورها»: سرورها با هسته و به‌روزرسانی‌های منتظر، دو تا علامت‌خورده، در حال نصب، انجام شد" src="docs/images/readme/os-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>خروجی WARP، همراه با بررسی کار کردنش</h3>
+<p>ترافیک یک پروفایل را از Cloudflare WARP بیرون بفرستید، با یک حساب برای هر نود. کارت تونل، ترافیک و بررسی خروجی را نشان می‌دهد؛ پنل همچنین فهرستی از سایت‌ها را از WARP هر نود می‌گیرد و وقتی بعضی از آن‌ها شروع به مسدود کردنش کنند هشدار می‌دهد. پروفایلی که خروجی WARP دارد هرگز به نشانی خود نود برنمی‌گردد.</p>
+<p><a href="docs/en/guide/warp.md">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/warp-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/warp-light-en.webp"><img alt="کارت WARP یک نود: تونل بالاست و بررسی خروجی درست است، بعد تونل قطع می‌شود و کارت راه‌اندازی مجدد پیشنهاد می‌کند" src="docs/images/readme/warp-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>پیش‌تنظیم‌های DNS برای برنامه‌ها</h3>
+<p>پیش‌تنظیم مشخص می‌کند برنامهٔ هر نفر از کدام سرورهای DNS و چگونه بپرسد (ساده، DoT یا DoH)، با قاعده‌های جداسازی برای یک کشور یا فهرستی از سایت‌ها، مثلاً سایت‌های روسی مستقیم، و مسدود کردن تبلیغ‌ها در برنامه‌ها. آن را به همه، یک گروه یا یک نفر بدهید؛ ویرایشگر نشان می‌دهد هر برنامه واقعاً چه می‌گیرد.</p>
+<p><a href="docs/en/guide/dns.md">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/dns-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/dns-light-en.webp"><img alt="زبانهٔ DNS در «اشتراک‌ها»: پیش‌تنظیم‌ها، بعد یکی باز شده با سرورها و آنچه هر برنامه می‌گیرد، بعد قاعده‌های جداسازی آن" src="docs/images/readme/dns-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>دستیار و MCP، اول طرح</h3>
+<p>دستیار داخلی (یک مدل ابری که با کلید خودتان وصل می‌کنید) دربارهٔ نودها و افراد پاسخ می‌دهد و تغییرها را آماده می‌کند. MCP همین را به یک عامل هوش مصنوعی بیرونی می‌دهد: ناوگان را می‌خواند و تغییر طرح می‌کند و هر تغییر پرخطر را پیش از اجرا شما در پنل مدیریت تأیید می‌کنید. یک توکن API در هر ساعت حداکثر 10 نفر را غیرفعال یا بازنویسی می‌کند، مگر محدودیت را بردارید.</p>
+<p><a href="docs/en/guide/assistant.md">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/assistant-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/assistant-light-en.webp"><img alt="پنجرهٔ دستیار: یک پرسش، پاسخ با تغییرهای پیشنهادی، «تأیید و اجرا» و سطری که می‌گوید اجرا شد" src="docs/images/readme/assistant-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>هشدارها در تلگرام</h3>
+<p>ربات خودتان را وصل کنید تا پنل وقتی نودی از کار می‌افتد یا برمی‌گردد، بررسی‌ای ناموفق است، پشتیبان‌گیری شکست می‌خورد یا طرح یک عامل منتظر شماست در چتتان بنویسد. فقط هشدار می‌فرستد: از چت چیزی تأیید یا تغییر داده نمی‌شود. هر مدیر چت خودش را وصل می‌کند.</p>
+<p><a href="docs/en/operations/telegram-alerts.md">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/telegram-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/telegram-light-en.webp"><img alt="صفحهٔ «یکپارچه‌سازی‌ها»: ربات، چتی که منتظر Start است، بعد وصل‌شده و یک پیام آزمایشی فرستاده‌شده" src="docs/images/readme/telegram-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>پشتیبان‌های رمزگذاری‌شده و بازیابی محتاطانه</h3>
+<p>پشتیبان‌ها به سطل Cloudflare R2 خودتان می‌روند، زمان‌بندی‌شده یا با دکمه، و پیش از خروج از پنل با کلیدی که آفلاین نگه می‌دارید رمزگذاری می‌شوند. بازیابی اول پشتیبان را بررسی می‌کند و آنچه در آن است را با آنچه اکنون دارید مقایسه می‌کند؛ تا تأیید نکنید چیزی عوض نمی‌شود و داده‌های پیش از بازیابی می‌مانند.</p>
+<p><a href="docs/en/operations/backups.md">مستندات ←</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/backups-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/backups-light-en.webp"><img alt="پنجرهٔ «بازیابی از پشتیبان»: فایل بررسی شد، خلاصه با وضعیت فعلی مقایسه می‌شود، بازیابی، پنل برگشت" src="docs/images/readme/backups-dark-en.webp" width="100%"></picture></td>
+</tr>
+</table>
+
+علاوه بر این:
+
 - اگر از برخی شبکه‌ها نتوان به سروری رسید، کاربران از راه نود دیگری از نودهای شما به آن وصل می‌شوند؛ آن نود فقط ترافیک رمزگذاری‌شده را جابه‌جا می‌کند. پنل پیش از روشن کردن مسیر آن را بررسی می‌کند و بعد هم زیر نظرش دارد؛ «مسیرهای ورود» در صفحهٔ نود نموداری است که نشان می‌دهد کاربران چگونه به سرور می‌رسند، و صفحهٔ نودها نقشهٔ همهٔ نودها را دارد. [رله‌ها](docs/en/guide/relays.md)
 - بررسی اختیاریِ اینکه سرورهای شما از داخل یک کشور، شبکه به شبکه، باز می‌شوند یا نه: سنجش‌های Globalping در شبکه‌های خانگی و همراه روی IPv4 و IPv6، نقطه‌های سنجش داوطلبان و سیم‌کارت‌ها، فهرست‌های مسدودسازی و یک سنجش TSPU از نود خودتان. بیشتر این منابع فقط در روسیه کار می‌کنند. [دسترس‌پذیری](docs/en/operations/reachability.md)
 - بدون Docker و بدون سرور پایگاه داده. پنل در حالت بیکار روی سروری با یک vCPU و یک گیگابایت رم فقط 16 تا 20 MiB حافظه مصرف می‌کند. [بنچمارک‌ها](docs/en/reference/benchmarks.md)، از جمله جاهایی که Mistgate کندتر است.
 - غریبه‌ای که نشانی پنل را باز کند یک سایت پوششی می‌بیند؛ پنل مدیریت پشت یک مسیر یا نام میزبان مخفی است.
-- دستیار داخلی (یک مدل ابری که با کلید خودتان وصل می‌کنید) دربارهٔ نودها و کاربران پاسخ می‌دهد و تغییرها را به‌صورت کارت‌هایی آماده می‌کند که خودتان اجرا می‌کنید. MCP به ایجنت هوش مصنوعی بیرونی اجازه می‌دهد وضعیت نودها را بخواند، مسیرهای میان نودها را آزمایش کند و تغییر برنامه‌ریزی کند؛ تغییرات پرخطر در پنل مدیریت منتظر تأیید شما می‌مانند. یک توکن API در هر ساعت حداکثر می‌تواند 10 نفر را غیرفعال یا بازنویسی کند، مگر اینکه محدودیت را برای آن بردارید. [دستیار](docs/en/guide/assistant.md)، [MCP](docs/en/reference/mcp.md)
+- هر سرور برای چه کسی است: یک نود برای همه، برای گروه‌های انتخاب‌شده یا فعلاً برای هیچ‌کس است و هر نفر می‌تواند در چند گروه باشد. [گروه‌ها](docs/en/guide/users-and-groups.md)
+- یک برنامهٔ دسکتاپ برای ویندوز، [Mistgate](https://github.com/Mistgate/mistgate-client)، با این پنل‌ها و با پیوندهای اشتراک معمولی کار می‌کند.
 
-آنچه هنوز نیست: برنامهٔ خودمان (در برنامه است)؛ ربات Telegram فعلاً فقط هشدار می‌فرستد و نسخهٔ Cloudflare Workers هنوز [پیش‌نمایش](docs/en/getting-started/install-edge.md) است. برخی پیش‌فرض‌ها برای کاربران داخل روسیه انتخاب شده‌اند؛ همهٔ آن‌ها در تنظیمات قابل تغییرند.
+چیزهایی که هنوز نیست: ربات تلگرام جز هشدار، و نسخهٔ Cloudflare Workers هنوز [پیش‌نمایش](docs/en/getting-started/install-edge.md) است. بعضی پیش‌فرض‌ها به سمت کاربران روسیه است؛ همه تنظیم‌اند.
 
 ## پروتکل‌ها
 
@@ -47,6 +148,7 @@ Hysteria2، VLESS و AmneziaWG. دو فایل اجرایی Go، به‌علاو�
 | [Hysteria2](docs/en/guide/hysteria2.md) | هستهٔ رسمی Hysteria2 | روی UDP (QUIC). مبهم‌سازی Salamander (Gecko آزمایشی است)، پرش پورت، گواهی Let's Encrypt یا گواهی خودامضا با اثرانگشت ثابت. |
 | [VLESS](docs/en/guide/vless.md) | xray-core | پروتکل REALITY روی XHTTP یا TCP (RAW + Vision)؛ TLS روی XHTTP یا WebSocket، مستقیم یا پشت CDN. |
 | [AmneziaWG](docs/en/guide/amneziawg.md) | amneziawg-go در فضای کاربر، یا ماژول کرنل | نسخه‌های 3.1 (پیش‌فرض) و 2.0، با کلید جداگانه برای هر دستگاه. نسخه‌های 1.5 و 1.0 ارائه نمی‌شوند. |
+| [TrustTunnel](docs/en/guide/trusttunnel.md) | موتور خود Mistgate در عامل نود | آزمایشی. یک VPN درون HTTPS معمولی (HTTP/2 و در صورت دلخواه HTTP/3) با گواهی واقعی؛ کلیدهای <code dir="ltr">tt://</code> برای برنامه‌های رسمی TrustTunnel. |
 | [MTProto](docs/en/guide/mtproto.md) | هستهٔ MTProto خودِ Mistgate | آزمایشی. پروکسی فقط برای برنامهٔ Telegram: Fake TLS با دامنهٔ خود نود یا سایتی دیگر به‌عنوان نام، یک کلید برای هر نفر، و سایت پوششی برای بقیه. |
 
 پروتکل‌های Hysteria2 و VLESS می‌توانند روی یک نود کنار هم کار کنند، حتی روی TCP 443. هر قالب برنامه همهٔ پروفایل‌ها را پشتیبانی نمی‌کند: [چه چیزی کجا کار می‌کند](docs/en/guide/subscriptions.md#what-works-where) را ببینید.
@@ -57,7 +159,7 @@ Hysteria2، VLESS و AmneziaWG. دو فایل اجرایی Go، به‌علاو�
 
 ## آیا پایدار است؟
 
-بتاست و هنوز جوان: برچسب v0.1.0 در 2026-10-03 زده شد و v0.1.81 هشتادودومین برچسب است. تا نسخهٔ 1.0 ممکن است API، تنظیمات ذخیره‌شده و پروتکل نود تغییر کنند. نسخه‌ها هنوز از آزمون خودکار ارتقا از نسخه‌های قدیمی‌تر نمی‌گذرند؛ این یکی از [شرط‌های رسیدن به 1.0](docs/en/roadmap/status.md) است.
+بتاست و هنوز جوان: برچسب v0.1.0 در 2026-10-03 زده شد و خط 0.2.0 کل رابط را از نو کشیده است. تا نسخهٔ 1.0 ممکن است API، تنظیمات ذخیره‌شده و پروتکل نود تغییر کنند. نسخه‌ها هنوز از آزمون خودکار ارتقا از نسخه‌های قدیمی‌تر نمی‌گذرند؛ این یکی از [شرط‌های رسیدن به 1.0](docs/en/roadmap/status.md) است.
 
 من خودم آن را روی شش سرورم برای خانواده و دوستانم به کار می‌برم.
 
@@ -78,24 +180,6 @@ Hysteria2، VLESS و AmneziaWG. دو فایل اجرایی Go، به‌علاو�
 - با این حال از <code dir="ltr">/var/lib/mistgate</code> [نسخهٔ پشتیبان رمزگذاری‌شده](docs/en/operations/backups.md) نگه دارید.
 
 کد Mistgate با کمک ایجنت‌های کدنویسی هوش مصنوعی نوشته می‌شود. من آنچه را می‌نویسند بازبینی می‌کنم و تصمیم می‌گیرم چه چیزی ادغام و منتشر شود؛ بررسی‌های بالا برای کد آن‌ها همان است که برای کد هر کس دیگری. کامیت‌هایی که با یک ایجنت ساخته شده‌اند خط `Co-Authored-By` دارند و قواعدی که ایجنت‌ها در این مخزن رعایت می‌کنند در [AGENTS.md](AGENTS.md) آمده است.
-
-## تصاویر
-
-<table>
-<tr>
-<td colspan="2"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/overview-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/overview-light-en.webp"><img alt="پنل مدیریت Mistgate: شش نود با سلامت و ترافیک عبوری‌شان، یک مشکل باز و رویدادهای اخیر" src="docs/images/readme/overview-dark-en.webp" width="100%"></picture><br><sub><b>نمای کلی.</b> سلامت و ترافیک عبوری همهٔ نودها، مشکلات باز و رویدادهای اخیر.</sub></td>
-</tr>
-<tr>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/node-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/node-light-en.webp"><img alt="صفحهٔ یک نود: وضعیت، خروجی WARP، پردازنده، رم، دیسک و ترافیک 24 ساعت گذشته" src="docs/images/readme/node-dark-en.webp" width="100%"></picture><br><sub><b>یک نود.</b> وضعیت، خروجی WARP، بار و ترافیک 24 ساعت گذشته.</sub></td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-en.webp"><img alt="بررسی از دید کلاینت: جدول نودها بر اساس پروتکل، با تأخیر از درون هر تونل" src="docs/images/readme/health-dark-en.webp" width="100%"></picture><br><sub><b>بررسی از دید کلاینت.</b> هر پروتکل روی هر نود، با تأخیر از درون تونل.</sub></td>
-</tr>
-<tr>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/user-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/user-light-en.webp"><img alt="صفحهٔ یک کاربر: ترافیک، هر دستگاه با شناسهٔ دستگاه خودش و کلید AmneziaVPN، و سهمیه، مدت، محدودیت دستگاه و محدودیت‌های سرعت" src="docs/images/readme/user-dark-en.webp" width="100%"></picture><br><sub><b>یک کاربر.</b> دستگاه‌ها بر اساس شناسهٔ دستگاه، ترافیکی که از سهمیه کم می‌شود، و محدودیت‌ها.</sub></td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/phone-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/phone-light-en.webp"><img alt="صفحهٔ کاربر روی گوشی: روزهای باقی‌مانده، ترافیک و دستگاه‌هایش با دکمهٔ افزودن دستگاه" src="docs/images/readme/phone-dark-en.webp" width="100%"></picture><br><sub><b>لینک خودش در مرورگر.</b> روزهای باقی‌مانده، ترافیک و دستگاه‌هایش.</sub></td>
-</tr>
-</table>
-
-تصاویر از رابط انگلیسی و با داده‌های نمایشی ساختگی گرفته شده‌اند.
 
 ## شروع سریع
 
