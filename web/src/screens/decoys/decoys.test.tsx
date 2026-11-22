@@ -39,6 +39,7 @@ const api = {
   generateDecoySite: vi.fn(),
   getDecoyPhotos: vi.fn(),
   setDecoyPhotosKey: vi.fn(),
+  setDecoyPhotosSource: vi.fn(),
 };
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
@@ -65,7 +66,7 @@ beforeEach(() => {
   setLang("en");
   for (const f of Object.values(api)) f.mockReset();
   navigate.mockReset();
-  api.getDecoyPhotos.mockResolvedValue({ hasKey: false });
+  api.getDecoyPhotos.mockResolvedValue({ hasKey: false, hasPixabayKey: false, source: "pixabay" });
   api.getDecoyPagePreview.mockResolvedValue({ html: "<p>home</p>", path: "" });
   api.listDecoyPages.mockResolvedValue({ pages: ["index.html", "about.html"], files: [], has404: true });
   api.getDecoyFile.mockResolvedValue({ text: "<h1>Hi</h1>", size: 11, truncated: false });
@@ -411,19 +412,21 @@ describe("a site from a template", () => {
 
 describe("the photos of a generated site", () => {
   const kinds = ["blog", "card"].map(kindOf);
-  const seeded = (n: number, photos: string) => ({ html: `<p>page ${n}</p>`, seed: `${n}`.padStart(16, "0"), name: `Brand ${n}`, photos });
-  const SECRET = "pexels-test-key-0123456789abcdef";
-  const view = async (photos = "no_key") => {
+  const nothing = { hasKey: false, hasPixabayKey: false, source: "pixabay" };
+  const seeded = (n: number, photos: string, photosSource = "pixabay") => ({ html: `<p>page ${n}</p>`, seed: `${n}`.padStart(16, "0"), name: `Brand ${n}`, photos, photosSource });
+  const SECRET = "pixabay-test-key-0123456789ab";
+  const view = async (photos = "no_key", photosSource = "pixabay") => {
     api.listDecoyTemplates.mockResolvedValue(listed(kinds));
-    api.previewDecoyTemplate.mockResolvedValue(seeded(7, photos));
+    api.previewDecoyTemplate.mockResolvedValue(seeded(7, photos, photosSource));
     await mountUi(list(), { lib: library([site("a")]), nodes: [node("de1")] });
     await click(button(en["dz.new"]));
     await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.way.tpl"])));
     await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.tpl.blog"])));
   };
   const row = () => document.querySelector(".dz-ph");
+  const radio = (name: string) => [...document.querySelectorAll(".dz-ph .src [role=radio]")].find((r) => r.textContent?.includes(name));
 
-  it("shows whether a key is set on the page of the kinds as well, with the link Pexels asks for", async () => {
+  it("names the source and says whether it has a key on the page of the kinds as well, with the line both services ask for", async () => {
     api.listDecoyTemplates.mockResolvedValue(listed(kinds));
     await mountUi(list(), { lib: library([site("a")]), nodes: [node("de1")] });
     await click(button(en["dz.new"]));
@@ -432,16 +435,29 @@ describe("the photos of a generated site", () => {
     expect(row()?.textContent).toContain(en["dz.ph.off"]);
     expect(button(en["dz.ph.add"])).toBeDefined();
     expect(button(en["dz.ph.remove"])).toBeUndefined();
+    // nothing is stored: Pixabay, the source that still gives keys, is the one in view
+    expect(document.querySelectorAll(".dz-ph .src [role=radio]")).toHaveLength(2);
+    expect(radio("Pixabay")?.getAttribute("data-checked")).not.toBeNull();
+    expect(radio("Pexels")?.getAttribute("data-checked")).toBeNull();
     const credit = row()?.querySelector(".ft a");
-    expect(credit?.getAttribute("href")).toBe("https://www.pexels.com");
+    expect(credit?.getAttribute("href")).toBe("https://pixabay.com");
     expect(credit?.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(credit?.textContent).toBe("Photos provided by Pixabay");
+    expect(row()?.querySelector(".hint")).toBeNull();
   });
 
-  it("says one line about the preview's photos, for every answer the panel gives", async () => {
-    for (const photos of ["used", "no_key", "bad_key", "limit", "unavailable", "none_for_kind"]) {
-      document.body.innerHTML = "";
-      await view(photos);
-      expect(row()?.querySelector(".ft")?.textContent, photos).toContain(en[`dz.ph.st.${photos}` as "dz.ph.st.used"]);
+  it("says one line about the preview's photos, naming the source it was made from, for every answer the panel gives", async () => {
+    for (const source of ["pixabay", "pexels"]) {
+      const name = source === "pexels" ? "Pexels" : "Pixabay";
+      for (const photos of ["used", "no_key", "bad_key", "limit", "unavailable", "none_for_kind"]) {
+        document.body.innerHTML = "";
+        await view(photos, source);
+        const line = row()?.querySelector(".ft")?.textContent;
+        expect(line, `${source} ${photos}`).toContain(en[`dz.ph.st.${photos}` as "dz.ph.st.used"].replace("{name}", name));
+        expect(line, `${source} ${photos}`).not.toContain("{name}");
+        // the credit follows the preview, not the pick: the photos in view are from this source
+        expect(row()?.querySelector(".ft a")?.getAttribute("href")).toBe(`https://${source === "pexels" ? "www.pexels.com" : "pixabay.com"}`);
+      }
     }
     // a word this screen does not know is not shown as a key of the dictionary
     document.body.innerHTML = "";
@@ -450,22 +466,25 @@ describe("the photos of a generated site", () => {
   });
 
   it("takes the key in a password field, builds the same site again with it, and never shows the key again", async () => {
-    api.setDecoyPhotosKey.mockResolvedValue({ hasKey: true });
+    api.getDecoyPhotos.mockResolvedValue(nothing);
+    api.setDecoyPhotosKey.mockResolvedValue({ hasKey: false, hasPixabayKey: true, source: "pixabay" });
     await view();
     await click(button(en["dz.ph.add"]));
-    const field = row()?.querySelector("input") as HTMLInputElement;
+    const field = row()?.querySelector("input[type=password]") as HTMLInputElement;
     expect(field.type).toBe("password");
     expect(field.autocomplete).toBe("off");
     expect(row()?.textContent).toContain(en["dz.ph.lead"]);
-    expect(row()?.querySelector(".frm a")?.getAttribute("href")).toBe("https://www.pexels.com/api/");
+    expect(row()?.textContent).toContain(en["dz.ph.howPixabay"]);
+    expect(row()?.textContent).toContain(en["dz.ph.field"].replace("{name}", "Pixabay"));
+    expect(row()?.querySelector(".frm a")?.getAttribute("href")).toBe("https://pixabay.com/api/docs/");
     expect(button(en["dz.ph.save"])!.disabled).toBe(true); // nothing typed
     await type(field, `  ${SECRET} `);
     api.previewDecoyTemplate.mockResolvedValue(seeded(7, "used"));
     await click(button(en["dz.ph.save"]));
-    expect(api.setDecoyPhotosKey).toHaveBeenCalledWith({ key: SECRET });
+    expect(api.setDecoyPhotosKey).toHaveBeenCalledWith({ key: SECRET, source: "pixabay" });
     // the site in view is made again from its own seed, so that it comes back with its photos
     expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: seeded(7, "").seed, country: "de" });
-    expect(row()?.querySelector("input")).toBeNull();
+    expect(row()?.querySelector("input[type=password]")).toBeNull();
     expect(text()).not.toContain(SECRET);
     expect(row()?.textContent).toContain(en["dz.ph.on"]);
     expect(row()?.querySelector(".ft")?.textContent).toContain(en["dz.ph.st.used"]);
@@ -473,37 +492,93 @@ describe("the photos of a generated site", () => {
     // with a key set the button that opens the form says so
     expect(button(en["dz.ph.add"])).toBeUndefined();
     expect(button(en["dz.ph.change"])).toBeDefined();
+    expect(radio("Pixabay")?.querySelector(".tone-ok")).not.toBeNull(); // the source with a key wears the dot
+    expect(radio("Pexels")?.querySelector(".tone-ok")).toBeNull();
   });
 
   it("removes the key with one press, and a refused key is said in words and stays in the field to be fixed", async () => {
-    api.getDecoyPhotos.mockResolvedValue({ hasKey: true });
-    api.setDecoyPhotosKey.mockResolvedValue({ hasKey: false });
+    api.getDecoyPhotos.mockResolvedValue({ hasKey: false, hasPixabayKey: true, source: "pixabay" });
+    api.setDecoyPhotosKey.mockResolvedValue(nothing);
     await view("used");
     expect(row()?.textContent).toContain(en["dz.ph.on"]);
     await click(button(en["dz.ph.remove"]));
-    expect(api.setDecoyPhotosKey).toHaveBeenCalledWith({ key: "" });
+    expect(api.setDecoyPhotosKey).toHaveBeenCalledWith({ key: "", source: "pixabay" });
     expect(row()?.textContent).toContain(en["dz.ph.off"]);
     expect(button(en["dz.ph.remove"])).toBeUndefined();
     expect(button(en["dz.ph.add"])).toBeDefined(); // the key is gone: the button asks for one again
 
     api.setDecoyPhotosKey.mockReset().mockRejectedValue(new ConnectError("decoy_photos_key_invalid", Code.InvalidArgument));
     await click(button(en["dz.ph.add"]));
-    await type(row()?.querySelector("input") as HTMLInputElement, "bad key");
+    await type(row()?.querySelector("input[type=password]") as HTMLInputElement, "bad key");
     await click(button(en["dz.ph.save"]));
     expect(row()?.textContent).toContain(en["err.decoy_photos_key_invalid"]);
-    expect((row()?.querySelector("input") as HTMLInputElement | null)?.value).toBe("bad key");
+    expect((row()?.querySelector("input[type=password]") as HTMLInputElement | null)?.value).toBe("bad key");
     await click(button(en["dz.ph.cancel"]));
-    expect(row()?.querySelector("input")).toBeNull();
+    expect(row()?.querySelector("input[type=password]")).toBeNull();
   });
 
-  it("is worded in every language", () => {
-    const keys = Object.keys(en).filter((k) => k.startsWith("dz.ph.") || k === "err.decoy_photos_key_invalid" || k === "err.decoy_template_country" || /^dz\.tpl\.(country|countryText|noteLead)$/.test(k));
-    expect(keys.length).toBeGreaterThanOrEqual(20);
+  it("looking at a source without a key, a preview without photos says nothing of the other source", async () => {
+    api.getDecoyPhotos.mockResolvedValue({ hasKey: false, hasPixabayKey: false, source: "pixabay" });
+    await view("no_key", "pixabay");
+    expect(row()?.querySelector(".ft")?.textContent).toContain("Pixabay");
+    await click(radio("Pexels"));
+    const foot = row()?.querySelector(".ft");
+    expect(foot?.textContent).not.toContain("Pixabay");
+    expect(foot?.querySelector("a")?.getAttribute("href")).toBe("https://www.pexels.com");
+  });
+
+  it("looks at Pexels without a key: a calm hint to Pixabay, nothing is asked of the panel, and the key typed there is Pexels'", async () => {
+    api.getDecoyPhotos.mockResolvedValue({ hasKey: false, hasPixabayKey: true, source: "pixabay" });
+    api.setDecoyPhotosKey.mockResolvedValue({ hasKey: true, hasPixabayKey: true, source: "pexels" });
+    await view("used");
+    expect(row()?.querySelector(".hint")).toBeNull();
+    await click(radio("Pexels"));
+    expect(api.setDecoyPhotosSource).not.toHaveBeenCalled(); // no key there: the pick stays in this window
+    expect(radio("Pexels")?.getAttribute("data-checked")).not.toBeNull();
+    expect(row()?.textContent).toContain(en["dz.ph.off"]);
+    expect(row()?.querySelector(".hint")?.textContent).toContain(en["dz.ph.pexelsHint"]);
+    const hint = row()?.querySelector(".hint a");
+    expect(hint?.getAttribute("href")).toBe("https://pixabay.com/api/docs/");
+    expect(hint?.getAttribute("target")).toBe("_blank");
+    await click(button(en["dz.ph.add"]));
+    expect(row()?.querySelector(".hint")).toBeNull(); // the form takes its place
+    expect(row()?.textContent).toContain(en["dz.ph.field"].replace("{name}", "Pexels"));
+    expect(row()?.querySelector(".frm a")?.getAttribute("href")).toBe("https://www.pexels.com/api/");
+    expect(row()?.textContent).not.toContain(en["dz.ph.howPixabay"]);
+    await type(row()?.querySelector("input[type=password]") as HTMLInputElement, "pexels-test-key-0123456789abcdef");
+    await click(button(en["dz.ph.save"]));
+    expect(api.setDecoyPhotosKey).toHaveBeenCalledWith({ key: "pexels-test-key-0123456789abcdef", source: "pexels" });
+    expect(radio("Pexels")?.getAttribute("data-checked")).not.toBeNull(); // the key just stored is the one in use
+  });
+
+  it("picks between two keys with one press and builds the same site again from the other source", async () => {
+    api.getDecoyPhotos.mockResolvedValue({ hasKey: true, hasPixabayKey: true, source: "pixabay" });
+    api.setDecoyPhotosSource.mockResolvedValue({ hasKey: true, hasPixabayKey: true, source: "pexels" });
+    await view("used");
+    expect(radio("Pixabay")?.querySelector(".tone-ok")).not.toBeNull();
+    expect(radio("Pexels")?.querySelector(".tone-ok")).not.toBeNull();
+    api.previewDecoyTemplate.mockResolvedValue(seeded(7, "limit", "pexels"));
+    await click(radio("Pexels"));
+    expect(api.setDecoyPhotosSource).toHaveBeenCalledWith({ source: "pexels" });
+    expect(api.previewDecoyTemplate).toHaveBeenLastCalledWith({ kind: "blog", seed: seeded(7, "").seed, country: "de" });
+    expect(radio("Pexels")?.getAttribute("data-checked")).not.toBeNull();
+    expect(row()?.querySelector(".ft")?.textContent).toContain(en["dz.ph.st.limit"].replace("{name}", "Pexels"));
+    expect(row()?.querySelector(".ft a")?.getAttribute("href")).toBe("https://www.pexels.com");
+    // pressing the source already in use asks for nothing
+    api.setDecoyPhotosSource.mockClear();
+    await click(radio("Pexels"));
+    expect(api.setDecoyPhotosSource).not.toHaveBeenCalled();
+  });
+
+  it("is worded in every language, and every language keeps the name of the source in the lines that carry it", () => {
+    const keys = Object.keys(en).filter((k) => k.startsWith("dz.ph.") || /^err\.decoy_photos_/.test(k) || k === "err.decoy_template_country" || /^dz\.tpl\.(country|countryText|noteLead)$/.test(k));
+    expect(keys.length).toBeGreaterThanOrEqual(30);
     for (const lang of ["ru", "zh", "fa", "tr"] as const) {
       for (const k of keys) {
         const w = dictionaries[lang][k as keyof typeof en];
         expect(w, `${lang} ${k}`).toBeTruthy();
         if (!/^(dz\.ph\.credit|dz\.ph\.title)$/.test(k)) expect(w, `${lang} ${k} is the English text`).not.toBe(en[k as keyof typeof en]);
+        if (en[k as keyof typeof en].includes("{name}")) expect(w, `${lang} ${k} lost {name}`).toContain("{name}");
       }
     }
   });

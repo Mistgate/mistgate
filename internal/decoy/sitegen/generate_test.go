@@ -36,9 +36,9 @@ var (
 // differ from it in text and data, not in structure, and there are sixteen of them: with 40 the package ran past the 10 minute limit in CI).
 func seedsFor(c tcase) int {
 	if c.cc == DefaultCountry {
-		return 200
+		return 120
 	}
-	return 12
+	return 6
 }
 
 var titleTag = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)

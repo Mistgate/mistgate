@@ -2841,11 +2841,13 @@ type PreviewDecoyTemplateResponse struct {
 	Seed string `protobuf:"bytes,2,opt,name=seed,proto3" json:"seed,omitempty"`
 	// The name GenerateDecoySite would give the site.
 	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	// Whether the preview has photographs: "used", or why not: "no_key" (none stored), "bad_key" (Pexels refused it), "limit"
-	// (Pexels asked to wait), "unavailable" (no answer, nothing found, a broken file), "none_for_kind" (this kind or variant shows
-	// none). Without photos the site is drawn and everything else works. GenerateDecoySite saves the previewed site (photos
-	// included) for 15 minutes after the preview.
-	Photos        string `protobuf:"bytes,4,opt,name=photos,proto3" json:"photos,omitempty"`
+	// Whether the preview has photographs: "used", or why not: "no_key" (none stored for the source in use), "bad_key" (the source
+	// refused the key), "limit" (the source asked to wait), "unavailable" (no answer, nothing found, a broken file), "none_for_kind"
+	// (this kind or variant shows none). Without photos the site is drawn and everything else works. GenerateDecoySite saves the
+	// previewed site (photos included) for 15 minutes after the preview.
+	Photos string `protobuf:"bytes,4,opt,name=photos,proto3" json:"photos,omitempty"`
+	// The source the photos above are about: "pexels" or "pixabay" ("" for none_for_kind: nothing was asked of any).
+	PhotosSource  string `protobuf:"bytes,5,opt,name=photos_source,json=photosSource,proto3" json:"photos_source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2904,6 +2906,13 @@ func (x *PreviewDecoyTemplateResponse) GetName() string {
 func (x *PreviewDecoyTemplateResponse) GetPhotos() string {
 	if x != nil {
 		return x.Photos
+	}
+	return ""
+}
+
+func (x *PreviewDecoyTemplateResponse) GetPhotosSource() string {
+	if x != nil {
+		return x.PhotosSource
 	}
 	return ""
 }
@@ -3079,8 +3088,14 @@ func (*GetDecoyPhotosRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetDecoyPhotosResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	HasKey        bool                   `protobuf:"varint,1,opt,name=has_key,json=hasKey,proto3" json:"has_key,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Whether a Pexels key is stored (the field is older than Pixabay: it keeps saying so).
+	HasKey bool `protobuf:"varint,1,opt,name=has_key,json=hasKey,proto3" json:"has_key,omitempty"`
+	// Whether a Pixabay key is stored.
+	HasPixabayKey bool `protobuf:"varint,2,opt,name=has_pixabay_key,json=hasPixabayKey,proto3" json:"has_pixabay_key,omitempty"`
+	// The source in use: "pexels" or "pixabay". With one key it is that key's source; with both, the one the owner picked (the one
+	// whose key was stored last, until a pick); with none, "pixabay".
+	Source        string `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3122,10 +3137,26 @@ func (x *GetDecoyPhotosResponse) GetHasKey() bool {
 	return false
 }
 
+func (x *GetDecoyPhotosResponse) GetHasPixabayKey() bool {
+	if x != nil {
+		return x.HasPixabayKey
+	}
+	return false
+}
+
+func (x *GetDecoyPhotosResponse) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
 type SetDecoyPhotosKeyRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// A Pexels API key, 8 to 256 characters without spaces; write-only. "" removes it.
-	Key           string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// An API key, 8 to 256 characters without spaces; write-only. "" removes it.
+	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// Whose key: "pexels" (also when empty) or "pixabay".
+	Source        string `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3167,9 +3198,19 @@ func (x *SetDecoyPhotosKeyRequest) GetKey() string {
 	return ""
 }
 
+func (x *SetDecoyPhotosKeyRequest) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+// The state after the call, as GetDecoyPhotosResponse.
 type SetDecoyPhotosKeyResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	HasKey        bool                   `protobuf:"varint,1,opt,name=has_key,json=hasKey,proto3" json:"has_key,omitempty"`
+	HasPixabayKey bool                   `protobuf:"varint,2,opt,name=has_pixabay_key,json=hasPixabayKey,proto3" json:"has_pixabay_key,omitempty"`
+	Source        string                 `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3209,6 +3250,126 @@ func (x *SetDecoyPhotosKeyResponse) GetHasKey() bool {
 		return x.HasKey
 	}
 	return false
+}
+
+func (x *SetDecoyPhotosKeyResponse) GetHasPixabayKey() bool {
+	if x != nil {
+		return x.HasPixabayKey
+	}
+	return false
+}
+
+func (x *SetDecoyPhotosKeyResponse) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+type SetDecoyPhotosSourceRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "pexels" or "pixabay"; the source must have a key.
+	Source        string `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDecoyPhotosSourceRequest) Reset() {
+	*x = SetDecoyPhotosSourceRequest{}
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDecoyPhotosSourceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDecoyPhotosSourceRequest) ProtoMessage() {}
+
+func (x *SetDecoyPhotosSourceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDecoyPhotosSourceRequest.ProtoReflect.Descriptor instead.
+func (*SetDecoyPhotosSourceRequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *SetDecoyPhotosSourceRequest) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+// The state after the call, as GetDecoyPhotosResponse.
+type SetDecoyPhotosSourceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HasKey        bool                   `protobuf:"varint,1,opt,name=has_key,json=hasKey,proto3" json:"has_key,omitempty"`
+	HasPixabayKey bool                   `protobuf:"varint,2,opt,name=has_pixabay_key,json=hasPixabayKey,proto3" json:"has_pixabay_key,omitempty"`
+	Source        string                 `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDecoyPhotosSourceResponse) Reset() {
+	*x = SetDecoyPhotosSourceResponse{}
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDecoyPhotosSourceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDecoyPhotosSourceResponse) ProtoMessage() {}
+
+func (x *SetDecoyPhotosSourceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_decoysite_v1_decoysite_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDecoyPhotosSourceResponse.ProtoReflect.Descriptor instead.
+func (*SetDecoyPhotosSourceResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *SetDecoyPhotosSourceResponse) GetHasKey() bool {
+	if x != nil {
+		return x.HasKey
+	}
+	return false
+}
+
+func (x *SetDecoyPhotosSourceResponse) GetHasPixabayKey() bool {
+	if x != nil {
+		return x.HasPixabayKey
+	}
+	return false
+}
+
+func (x *SetDecoyPhotosSourceResponse) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
 }
 
 var File_mistgate_decoysite_v1_decoysite_proto protoreflect.FileDescriptor
@@ -3415,12 +3576,13 @@ const file_mistgate_decoysite_v1_decoysite_proto_rawDesc = "" +
 	"\x1bPreviewDecoyTemplateRequest\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x12\n" +
 	"\x04seed\x18\x02 \x01(\tR\x04seed\x12\x18\n" +
-	"\acountry\x18\x03 \x01(\tR\acountry\"r\n" +
+	"\acountry\x18\x03 \x01(\tR\acountry\"\x97\x01\n" +
 	"\x1cPreviewDecoyTemplateResponse\x12\x12\n" +
 	"\x04html\x18\x01 \x01(\tR\x04html\x12\x12\n" +
 	"\x04seed\x18\x02 \x01(\tR\x04seed\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
-	"\x06photos\x18\x04 \x01(\tR\x06photos\"\x84\x01\n" +
+	"\x06photos\x18\x04 \x01(\tR\x06photos\x12#\n" +
+	"\rphotos_source\x18\x05 \x01(\tR\fphotosSource\"\x84\x01\n" +
 	"\x18GenerateDecoySiteRequest\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x12\n" +
 	"\x04seed\x18\x02 \x01(\tR\x04seed\x12\x12\n" +
@@ -3430,13 +3592,24 @@ const file_mistgate_decoysite_v1_decoysite_proto_rawDesc = "" +
 	"\x19GenerateDecoySiteResponse\x124\n" +
 	"\x04site\x18\x01 \x01(\v2 .mistgate.decoysite.v1.DecoySiteR\x04site\x12\x16\n" +
 	"\x06photos\x18\x02 \x01(\tR\x06photos\"\x17\n" +
-	"\x15GetDecoyPhotosRequest\"1\n" +
+	"\x15GetDecoyPhotosRequest\"q\n" +
 	"\x16GetDecoyPhotosResponse\x12\x17\n" +
-	"\ahas_key\x18\x01 \x01(\bR\x06hasKey\",\n" +
+	"\ahas_key\x18\x01 \x01(\bR\x06hasKey\x12&\n" +
+	"\x0fhas_pixabay_key\x18\x02 \x01(\bR\rhasPixabayKey\x12\x16\n" +
+	"\x06source\x18\x03 \x01(\tR\x06source\"D\n" +
 	"\x18SetDecoyPhotosKeyRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\"4\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x16\n" +
+	"\x06source\x18\x02 \x01(\tR\x06source\"t\n" +
 	"\x19SetDecoyPhotosKeyResponse\x12\x17\n" +
-	"\ahas_key\x18\x01 \x01(\bR\x06hasKey2\x9d\x14\n" +
+	"\ahas_key\x18\x01 \x01(\bR\x06hasKey\x12&\n" +
+	"\x0fhas_pixabay_key\x18\x02 \x01(\bR\rhasPixabayKey\x12\x16\n" +
+	"\x06source\x18\x03 \x01(\tR\x06source\"5\n" +
+	"\x1bSetDecoyPhotosSourceRequest\x12\x16\n" +
+	"\x06source\x18\x01 \x01(\tR\x06source\"w\n" +
+	"\x1cSetDecoyPhotosSourceResponse\x12\x17\n" +
+	"\ahas_key\x18\x01 \x01(\bR\x06hasKey\x12&\n" +
+	"\x0fhas_pixabay_key\x18\x02 \x01(\bR\rhasPixabayKey\x12\x16\n" +
+	"\x06source\x18\x03 \x01(\tR\x06source2\x9e\x15\n" +
 	"\x10DecoySiteService\x12m\n" +
 	"\x0eListDecoySites\x12,.mistgate.decoysite.v1.ListDecoySitesRequest\x1a-.mistgate.decoysite.v1.ListDecoySitesResponse\x12g\n" +
 	"\fGetDecoySite\x12*.mistgate.decoysite.v1.GetDecoySiteRequest\x1a+.mistgate.decoysite.v1.GetDecoySiteResponse\x12p\n" +
@@ -3459,7 +3632,8 @@ const file_mistgate_decoysite_v1_decoysite_proto_rawDesc = "" +
 	"\x14PreviewDecoyTemplate\x122.mistgate.decoysite.v1.PreviewDecoyTemplateRequest\x1a3.mistgate.decoysite.v1.PreviewDecoyTemplateResponse\x12v\n" +
 	"\x11GenerateDecoySite\x12/.mistgate.decoysite.v1.GenerateDecoySiteRequest\x1a0.mistgate.decoysite.v1.GenerateDecoySiteResponse\x12m\n" +
 	"\x0eGetDecoyPhotos\x12,.mistgate.decoysite.v1.GetDecoyPhotosRequest\x1a-.mistgate.decoysite.v1.GetDecoyPhotosResponse\x12v\n" +
-	"\x11SetDecoyPhotosKey\x12/.mistgate.decoysite.v1.SetDecoyPhotosKeyRequest\x1a0.mistgate.decoysite.v1.SetDecoyPhotosKeyResponseB\xe5\x01\n" +
+	"\x11SetDecoyPhotosKey\x12/.mistgate.decoysite.v1.SetDecoyPhotosKeyRequest\x1a0.mistgate.decoysite.v1.SetDecoyPhotosKeyResponse\x12\x7f\n" +
+	"\x14SetDecoyPhotosSource\x122.mistgate.decoysite.v1.SetDecoyPhotosSourceRequest\x1a3.mistgate.decoysite.v1.SetDecoyPhotosSourceResponseB\xe5\x01\n" +
 	"\x19com.mistgate.decoysite.v1B\x0eDecoysiteProtoP\x01ZBgithub.com/mistgate/mistgate/gen/mistgate/decoysite/v1;decoysitev1\xa2\x02\x03MDX\xaa\x02\x15Mistgate.Decoysite.V1\xca\x02\x15Mistgate\\Decoysite\\V1\xe2\x02!Mistgate\\Decoysite\\V1\\GPBMetadata\xea\x02\x17Mistgate::Decoysite::V1b\x06proto3"
 
 var (
@@ -3474,7 +3648,7 @@ func file_mistgate_decoysite_v1_decoysite_proto_rawDescGZIP() []byte {
 	return file_mistgate_decoysite_v1_decoysite_proto_rawDescData
 }
 
-var file_mistgate_decoysite_v1_decoysite_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
+var file_mistgate_decoysite_v1_decoysite_proto_msgTypes = make([]protoimpl.MessageInfo, 55)
 var file_mistgate_decoysite_v1_decoysite_proto_goTypes = []any{
 	(*DecoyCheck)(nil),                   // 0: mistgate.decoysite.v1.DecoyCheck
 	(*DecoyFileInfo)(nil),                // 1: mistgate.decoysite.v1.DecoyFileInfo
@@ -3529,7 +3703,9 @@ var file_mistgate_decoysite_v1_decoysite_proto_goTypes = []any{
 	(*GetDecoyPhotosResponse)(nil),       // 50: mistgate.decoysite.v1.GetDecoyPhotosResponse
 	(*SetDecoyPhotosKeyRequest)(nil),     // 51: mistgate.decoysite.v1.SetDecoyPhotosKeyRequest
 	(*SetDecoyPhotosKeyResponse)(nil),    // 52: mistgate.decoysite.v1.SetDecoyPhotosKeyResponse
-	(*v1.Node)(nil),                      // 53: mistgate.admin.v1.Node
+	(*SetDecoyPhotosSourceRequest)(nil),  // 53: mistgate.decoysite.v1.SetDecoyPhotosSourceRequest
+	(*SetDecoyPhotosSourceResponse)(nil), // 54: mistgate.decoysite.v1.SetDecoyPhotosSourceResponse
+	(*v1.Node)(nil),                      // 55: mistgate.admin.v1.Node
 }
 var file_mistgate_decoysite_v1_decoysite_proto_depIdxs = []int32{
 	0,  // 0: mistgate.decoysite.v1.DecoySite.checks:type_name -> mistgate.decoysite.v1.DecoyCheck
@@ -3551,8 +3727,8 @@ var file_mistgate_decoysite_v1_decoysite_proto_depIdxs = []int32{
 	2,  // 16: mistgate.decoysite.v1.SetDecoySiteReadyResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
 	0,  // 17: mistgate.decoysite.v1.AssignDecoySiteResponse.warnings:type_name -> mistgate.decoysite.v1.DecoyCheck
 	24, // 18: mistgate.decoysite.v1.AssignDecoySiteResponse.replaced:type_name -> mistgate.decoysite.v1.DecoyReplaced
-	53, // 19: mistgate.decoysite.v1.AssignDecoySiteResponse.nodes:type_name -> mistgate.admin.v1.Node
-	53, // 20: mistgate.decoysite.v1.UnassignDecoySiteResponse.nodes:type_name -> mistgate.admin.v1.Node
+	55, // 19: mistgate.decoysite.v1.AssignDecoySiteResponse.nodes:type_name -> mistgate.admin.v1.Node
+	55, // 20: mistgate.decoysite.v1.UnassignDecoySiteResponse.nodes:type_name -> mistgate.admin.v1.Node
 	2,  // 21: mistgate.decoysite.v1.RevertDecoySiteResponse.site:type_name -> mistgate.decoysite.v1.DecoySite
 	1,  // 22: mistgate.decoysite.v1.ListDecoyPagesResponse.files:type_name -> mistgate.decoysite.v1.DecoyFileInfo
 	42, // 23: mistgate.decoysite.v1.ListDecoyTemplatesResponse.templates:type_name -> mistgate.decoysite.v1.DecoyTemplate
@@ -3579,30 +3755,32 @@ var file_mistgate_decoysite_v1_decoysite_proto_depIdxs = []int32{
 	47, // 44: mistgate.decoysite.v1.DecoySiteService.GenerateDecoySite:input_type -> mistgate.decoysite.v1.GenerateDecoySiteRequest
 	49, // 45: mistgate.decoysite.v1.DecoySiteService.GetDecoyPhotos:input_type -> mistgate.decoysite.v1.GetDecoyPhotosRequest
 	51, // 46: mistgate.decoysite.v1.DecoySiteService.SetDecoyPhotosKey:input_type -> mistgate.decoysite.v1.SetDecoyPhotosKeyRequest
-	8,  // 47: mistgate.decoysite.v1.DecoySiteService.ListDecoySites:output_type -> mistgate.decoysite.v1.ListDecoySitesResponse
-	10, // 48: mistgate.decoysite.v1.DecoySiteService.GetDecoySite:output_type -> mistgate.decoysite.v1.GetDecoySiteResponse
-	12, // 49: mistgate.decoysite.v1.DecoySiteService.CreateDecoySite:output_type -> mistgate.decoysite.v1.CreateDecoySiteResponse
-	14, // 50: mistgate.decoysite.v1.DecoySiteService.AddDecoySiteVersion:output_type -> mistgate.decoysite.v1.AddDecoySiteVersionResponse
-	16, // 51: mistgate.decoysite.v1.DecoySiteService.EditDecoySiteFile:output_type -> mistgate.decoysite.v1.EditDecoySiteFileResponse
-	18, // 52: mistgate.decoysite.v1.DecoySiteService.UpdateDecoySite:output_type -> mistgate.decoysite.v1.UpdateDecoySiteResponse
-	20, // 53: mistgate.decoysite.v1.DecoySiteService.CopyDecoySite:output_type -> mistgate.decoysite.v1.CopyDecoySiteResponse
-	22, // 54: mistgate.decoysite.v1.DecoySiteService.SetDecoySiteReady:output_type -> mistgate.decoysite.v1.SetDecoySiteReadyResponse
-	25, // 55: mistgate.decoysite.v1.DecoySiteService.AssignDecoySite:output_type -> mistgate.decoysite.v1.AssignDecoySiteResponse
-	27, // 56: mistgate.decoysite.v1.DecoySiteService.UnassignDecoySite:output_type -> mistgate.decoysite.v1.UnassignDecoySiteResponse
-	29, // 57: mistgate.decoysite.v1.DecoySiteService.SetPanelDecoySource:output_type -> mistgate.decoysite.v1.SetPanelDecoySourceResponse
-	31, // 58: mistgate.decoysite.v1.DecoySiteService.RevertDecoySite:output_type -> mistgate.decoysite.v1.RevertDecoySiteResponse
-	33, // 59: mistgate.decoysite.v1.DecoySiteService.DeleteDecoySite:output_type -> mistgate.decoysite.v1.DeleteDecoySiteResponse
-	35, // 60: mistgate.decoysite.v1.DecoySiteService.DownloadDecoySite:output_type -> mistgate.decoysite.v1.DownloadDecoySiteResponse
-	37, // 61: mistgate.decoysite.v1.DecoySiteService.ListDecoyPages:output_type -> mistgate.decoysite.v1.ListDecoyPagesResponse
-	39, // 62: mistgate.decoysite.v1.DecoySiteService.GetDecoyPagePreview:output_type -> mistgate.decoysite.v1.GetDecoyPagePreviewResponse
-	41, // 63: mistgate.decoysite.v1.DecoySiteService.GetDecoyFile:output_type -> mistgate.decoysite.v1.GetDecoyFileResponse
-	44, // 64: mistgate.decoysite.v1.DecoySiteService.ListDecoyTemplates:output_type -> mistgate.decoysite.v1.ListDecoyTemplatesResponse
-	46, // 65: mistgate.decoysite.v1.DecoySiteService.PreviewDecoyTemplate:output_type -> mistgate.decoysite.v1.PreviewDecoyTemplateResponse
-	48, // 66: mistgate.decoysite.v1.DecoySiteService.GenerateDecoySite:output_type -> mistgate.decoysite.v1.GenerateDecoySiteResponse
-	50, // 67: mistgate.decoysite.v1.DecoySiteService.GetDecoyPhotos:output_type -> mistgate.decoysite.v1.GetDecoyPhotosResponse
-	52, // 68: mistgate.decoysite.v1.DecoySiteService.SetDecoyPhotosKey:output_type -> mistgate.decoysite.v1.SetDecoyPhotosKeyResponse
-	47, // [47:69] is the sub-list for method output_type
-	25, // [25:47] is the sub-list for method input_type
+	53, // 47: mistgate.decoysite.v1.DecoySiteService.SetDecoyPhotosSource:input_type -> mistgate.decoysite.v1.SetDecoyPhotosSourceRequest
+	8,  // 48: mistgate.decoysite.v1.DecoySiteService.ListDecoySites:output_type -> mistgate.decoysite.v1.ListDecoySitesResponse
+	10, // 49: mistgate.decoysite.v1.DecoySiteService.GetDecoySite:output_type -> mistgate.decoysite.v1.GetDecoySiteResponse
+	12, // 50: mistgate.decoysite.v1.DecoySiteService.CreateDecoySite:output_type -> mistgate.decoysite.v1.CreateDecoySiteResponse
+	14, // 51: mistgate.decoysite.v1.DecoySiteService.AddDecoySiteVersion:output_type -> mistgate.decoysite.v1.AddDecoySiteVersionResponse
+	16, // 52: mistgate.decoysite.v1.DecoySiteService.EditDecoySiteFile:output_type -> mistgate.decoysite.v1.EditDecoySiteFileResponse
+	18, // 53: mistgate.decoysite.v1.DecoySiteService.UpdateDecoySite:output_type -> mistgate.decoysite.v1.UpdateDecoySiteResponse
+	20, // 54: mistgate.decoysite.v1.DecoySiteService.CopyDecoySite:output_type -> mistgate.decoysite.v1.CopyDecoySiteResponse
+	22, // 55: mistgate.decoysite.v1.DecoySiteService.SetDecoySiteReady:output_type -> mistgate.decoysite.v1.SetDecoySiteReadyResponse
+	25, // 56: mistgate.decoysite.v1.DecoySiteService.AssignDecoySite:output_type -> mistgate.decoysite.v1.AssignDecoySiteResponse
+	27, // 57: mistgate.decoysite.v1.DecoySiteService.UnassignDecoySite:output_type -> mistgate.decoysite.v1.UnassignDecoySiteResponse
+	29, // 58: mistgate.decoysite.v1.DecoySiteService.SetPanelDecoySource:output_type -> mistgate.decoysite.v1.SetPanelDecoySourceResponse
+	31, // 59: mistgate.decoysite.v1.DecoySiteService.RevertDecoySite:output_type -> mistgate.decoysite.v1.RevertDecoySiteResponse
+	33, // 60: mistgate.decoysite.v1.DecoySiteService.DeleteDecoySite:output_type -> mistgate.decoysite.v1.DeleteDecoySiteResponse
+	35, // 61: mistgate.decoysite.v1.DecoySiteService.DownloadDecoySite:output_type -> mistgate.decoysite.v1.DownloadDecoySiteResponse
+	37, // 62: mistgate.decoysite.v1.DecoySiteService.ListDecoyPages:output_type -> mistgate.decoysite.v1.ListDecoyPagesResponse
+	39, // 63: mistgate.decoysite.v1.DecoySiteService.GetDecoyPagePreview:output_type -> mistgate.decoysite.v1.GetDecoyPagePreviewResponse
+	41, // 64: mistgate.decoysite.v1.DecoySiteService.GetDecoyFile:output_type -> mistgate.decoysite.v1.GetDecoyFileResponse
+	44, // 65: mistgate.decoysite.v1.DecoySiteService.ListDecoyTemplates:output_type -> mistgate.decoysite.v1.ListDecoyTemplatesResponse
+	46, // 66: mistgate.decoysite.v1.DecoySiteService.PreviewDecoyTemplate:output_type -> mistgate.decoysite.v1.PreviewDecoyTemplateResponse
+	48, // 67: mistgate.decoysite.v1.DecoySiteService.GenerateDecoySite:output_type -> mistgate.decoysite.v1.GenerateDecoySiteResponse
+	50, // 68: mistgate.decoysite.v1.DecoySiteService.GetDecoyPhotos:output_type -> mistgate.decoysite.v1.GetDecoyPhotosResponse
+	52, // 69: mistgate.decoysite.v1.DecoySiteService.SetDecoyPhotosKey:output_type -> mistgate.decoysite.v1.SetDecoyPhotosKeyResponse
+	54, // 70: mistgate.decoysite.v1.DecoySiteService.SetDecoyPhotosSource:output_type -> mistgate.decoysite.v1.SetDecoyPhotosSourceResponse
+	48, // [48:71] is the sub-list for method output_type
+	25, // [25:48] is the sub-list for method input_type
 	25, // [25:25] is the sub-list for extension type_name
 	25, // [25:25] is the sub-list for extension extendee
 	0,  // [0:25] is the sub-list for field type_name
@@ -3619,7 +3797,7 @@ func file_mistgate_decoysite_v1_decoysite_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_decoysite_v1_decoysite_proto_rawDesc), len(file_mistgate_decoysite_v1_decoysite_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   53,
+			NumMessages:   55,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

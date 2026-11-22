@@ -114,7 +114,7 @@ func TestSearchAsksTheRightWayAndKeepsOnlyImageHostFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res) != 2 || res[0].ID != 1 || res[1].ID != 6 || res[1].Large2 != res[1].Large {
+	if len(res) != 2 || res[0].ID != 1 || res[1].ID != 6 || res[1].Big != res[1].Small {
 		t.Fatalf("results = %+v", res)
 	}
 	q := got.URL.Query()
@@ -445,7 +445,7 @@ func TestMakeFetchesWithinTheLimitsAndFillsTheSite(t *testing.T) {
 			seed, plan = planFor(t, kind, 6)
 		}
 		p := newPexels(t)
-		res := NewMaker(p, nil).Make(context.Background(), testKey, seed, plan)
+		res := NewMaker(p, nil).Make(context.Background(), SourcePexels, testKey, seed, plan)
 		if res.Reason != ReasonUsed || len(res.Photos) != len(plan) {
 			t.Fatalf("%s: reason %q, %d photos for %d slots", kind, res.Reason, len(res.Photos), len(plan))
 		}
@@ -491,7 +491,7 @@ func TestMakeDifferentSeedsGiveDifferentPhotos(t *testing.T) {
 	m := NewMaker(p, nil)
 	seen := map[string]bool{}
 	for i := 0; i < 12; i++ {
-		res := m.Make(context.Background(), testKey, []byte(fmt.Sprintf("diff-%d", i)), plan)
+		res := m.Make(context.Background(), SourcePexels, testKey, []byte(fmt.Sprintf("diff-%d", i)), plan)
 		if res.Reason != ReasonUsed {
 			t.Fatal(res.Reason)
 		}
@@ -502,12 +502,12 @@ func TestMakeDifferentSeedsGiveDifferentPhotos(t *testing.T) {
 		t.Fatalf("%d searches for 12 sites: the pages were not cached", p.searches)
 	}
 	same := newPexels(t)
-	a := NewMaker(same, nil).Make(context.Background(), testKey, []byte("one"), plan)
+	a := NewMaker(same, nil).Make(context.Background(), SourcePexels, testKey, []byte("one"), plan)
 	var urls1, urls2 []string
 	for _, r := range same.seen {
 		urls1 = append(urls1, r.URL.String())
 	}
-	b := NewMaker(same, nil).Make(context.Background(), testKey, []byte("one"), plan)
+	b := NewMaker(same, nil).Make(context.Background(), SourcePexels, testKey, []byte("one"), plan)
 	for _, r := range same.seen[len(urls1):] {
 		urls2 = append(urls2, r.URL.String())
 	}
@@ -523,14 +523,14 @@ func TestMakeSearchPagesAreCachedForAnHour(t *testing.T) {
 	p := newPexels(t)
 	clock := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	m := NewMaker(p, func() time.Time { return clock })
-	m.Make(context.Background(), testKey, seed, plan)
+	m.Make(context.Background(), SourcePexels, testKey, seed, plan)
 	first := p.searches
-	m.Make(context.Background(), testKey, seed, plan)
+	m.Make(context.Background(), SourcePexels, testKey, seed, plan)
 	if p.searches != first {
 		t.Fatalf("the second site searched again: %d then %d", first, p.searches)
 	}
 	clock = clock.Add(61 * time.Minute)
-	m.Make(context.Background(), testKey, seed, plan)
+	m.Make(context.Background(), SourcePexels, testKey, seed, plan)
 	if p.searches != 2*first {
 		t.Fatalf("after an hour the pages were not refreshed: %d searches", p.searches)
 	}
@@ -551,7 +551,7 @@ func TestMakeReasons(t *testing.T) {
 	} {
 		p := newPexels(t)
 		tc.set(p)
-		res := NewMaker(p, nil).Make(context.Background(), testKey, seed, plan)
+		res := NewMaker(p, nil).Make(context.Background(), SourcePexels, testKey, seed, plan)
 		if res.Reason != tc.reason || len(res.Photos) != 0 {
 			t.Errorf("%s: reason %q, %d photos", tc.name, res.Reason, len(res.Photos))
 		}
@@ -568,10 +568,10 @@ func TestMakeLeavesPexelsAloneAfterTheLimit(t *testing.T) {
 	p.status = 429
 	clock := time.Now()
 	m := NewMaker(p, func() time.Time { return clock })
-	m.Make(context.Background(), testKey, seed, plan)
+	m.Make(context.Background(), SourcePexels, testKey, seed, plan)
 	asked := p.searches
 	for i := 0; i < 5; i++ {
-		if res := m.Make(context.Background(), testKey, []byte(fmt.Sprint("again", i)), plan); res.Reason != ReasonLimit {
+		if res := m.Make(context.Background(), SourcePexels, testKey, []byte(fmt.Sprint("again", i)), plan); res.Reason != ReasonLimit {
 			t.Fatalf("reason %q", res.Reason)
 		}
 	}
@@ -580,7 +580,7 @@ func TestMakeLeavesPexelsAloneAfterTheLimit(t *testing.T) {
 	}
 	clock = clock.Add(coolDefault + time.Second)
 	p.status = 0
-	if res := m.Make(context.Background(), testKey, seed, plan); res.Reason != ReasonUsed {
+	if res := m.Make(context.Background(), SourcePexels, testKey, seed, plan); res.Reason != ReasonUsed {
 		t.Fatalf("after the wait: %q", res.Reason)
 	}
 }
@@ -603,7 +603,7 @@ func TestMakeSkipsABrokenFileAndKeepsTheRest(t *testing.T) {
 		}
 		inner(req, w)
 	}
-	res := NewMaker(p, nil).Make(context.Background(), testKey, seed, plan)
+	res := NewMaker(p, nil).Make(context.Background(), SourcePexels, testKey, seed, plan)
 	if res.Reason != ReasonUsed || len(res.Photos) != len(plan)-1 {
 		t.Fatalf("reason %q, %d photos of %d", res.Reason, len(res.Photos), len(plan))
 	}
@@ -612,7 +612,7 @@ func TestMakeSkipsABrokenFileAndKeepsTheRest(t *testing.T) {
 func TestMakeNeverPutsTheKeyOnAFileRequestOrInAResult(t *testing.T) {
 	seed, plan := planFor(t, "business", 2)
 	p := newPexels(t)
-	res := NewMaker(p, nil).Make(context.Background(), vault.Redacted(testKey), seed, plan)
+	res := NewMaker(p, nil).Make(context.Background(), SourcePexels, vault.Redacted(testKey), seed, plan)
 	for _, r := range p.seen {
 		if r.Host == "images.pexels.com" && r.Header.Get("Authorization") != "" {
 			t.Fatal("the key went to the image host")

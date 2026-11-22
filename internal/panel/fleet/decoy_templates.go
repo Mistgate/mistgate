@@ -48,6 +48,7 @@ func (s decoySiteService) ListDecoyTemplates(_ context.Context, _ *connect.Reque
 type generated struct {
 	bundle                      *decoy.Bundle
 	brand, seed, photo, country string
+	photoSource                 string // the source the photos are about: "" when the kind shows none
 }
 
 const (
@@ -60,10 +61,14 @@ const (
 	// One site's photos may take this long to fetch.
 	photoBudget = 40 * time.Second
 
-	photoKeySetting = "decoy.photos.key" // base64 of the vault-sealed Pexels key
-	photoKeyAAD     = "setting/decoy.photos.key"
-	photoKeyMin     = 8
-	photoKeyMax     = 256
+	// The keys are sealed with the vault and kept as base64; the pick is plain ("pexels", "pixabay", or none yet).
+	photoKeySetting    = "decoy.photos.key" // Pexels: the name is older than Pixabay
+	photoKeyAAD        = "setting/decoy.photos.key"
+	pixabayKeySetting  = "decoy.photos.pixabay.key"
+	pixabayKeyAAD      = "setting/decoy.photos.pixabay.key"
+	photoSourceSetting = "decoy.photos.source"
+	photoKeyMin        = 8
+	photoKeyMax        = 256
 )
 
 type previewEntry struct {
@@ -71,7 +76,7 @@ type previewEntry struct {
 	g  generated
 }
 
-// templateState is what the template calls remember between calls: the sites just previewed and the Pexels client.
+// templateState is what the template calls remember between calls: the sites just previewed and the photo maker (its sources).
 type templateState struct {
 	mu       sync.Mutex
 	previews map[string]previewEntry
@@ -123,9 +128,28 @@ func (st *templateState) put(key string, g generated, now time.Time) {
 	st.previews[key] = previewEntry{at: now, g: g}
 }
 
-// photoKey is the owner's Pexels key; "" when there is none (or the stored one cannot be opened: another master key).
-func (f *Fleet) photoKey(ctx context.Context) vault.Redacted {
-	raw, err := f.st.Setting(ctx, photoKeySetting)
+// photoSources is where each source keeps its key.
+var photoSources = []struct{ name, setting, aad string }{
+	{decoyphotos.SourcePexels, photoKeySetting, photoKeyAAD},
+	{decoyphotos.SourcePixabay, pixabayKeySetting, pixabayKeyAAD},
+}
+
+func photoSourceOf(name string) (setting, aad string, ok bool) {
+	for _, x := range photoSources {
+		if x.name == name {
+			return x.setting, x.aad, true
+		}
+	}
+	return "", "", false
+}
+
+// photoKey is the owner's key of a source; "" when there is none (or the stored one cannot be opened: another master key).
+func (f *Fleet) photoKey(ctx context.Context, source string) vault.Redacted {
+	setting, aad, ok := photoSourceOf(source)
+	if !ok {
+		return ""
+	}
+	raw, err := f.st.Setting(ctx, setting)
 	if err != nil || raw == "" {
 		return ""
 	}
@@ -133,41 +157,101 @@ func (f *Fleet) photoKey(ctx context.Context) vault.Redacted {
 	if err != nil {
 		return ""
 	}
-	b, err := f.v.Open(sealed, photoKeyAAD)
+	b, err := f.v.Open(sealed, aad)
 	if err != nil {
-		f.log.Warn("decoy photos: the stored key cannot be opened; it is ignored", "code", "decoy_photos_key_unreadable")
+		f.log.Warn("decoy photos: the stored key cannot be opened; it is ignored", "code", "decoy_photos_key_unreadable", "source", source)
 		return ""
 	}
 	return vault.Redacted(b)
 }
 
+// photoSource is the source the photos of new sites come from: the one the owner picked, or whose key was stored last. A panel
+// from before Pixabay has no pick: its Pexels key is the one it has; with no key at all the answer is Pixabay, the source that
+// still hands out keys. The key of that source may be missing: the sites are then drawn and say "no_key" (the other source is
+// never taken in its place).
+func (f *Fleet) photoSource(ctx context.Context) string {
+	pick, _ := f.st.Setting(ctx, photoSourceSetting)
+	if _, _, ok := photoSourceOf(pick); ok {
+		return pick
+	}
+	if f.photoKey(ctx, decoyphotos.SourcePexels) != "" && f.photoKey(ctx, decoyphotos.SourcePixabay) == "" {
+		return decoyphotos.SourcePexels
+	}
+	return decoyphotos.SourcePixabay
+}
+
+func (f *Fleet) photosState(ctx context.Context) (hasPexels, hasPixabay bool, source string) {
+	return f.photoKey(ctx, decoyphotos.SourcePexels) != "", f.photoKey(ctx, decoyphotos.SourcePixabay) != "", f.photoSource(ctx)
+}
+
 func (s decoySiteService) GetDecoyPhotos(ctx context.Context, _ *connect.Request[decoysitev1.GetDecoyPhotosRequest]) (*connect.Response[decoysitev1.GetDecoyPhotosResponse], error) {
-	return connect.NewResponse(&decoysitev1.GetDecoyPhotosResponse{HasKey: s.f.photoKey(ctx) != ""}), nil
+	px, pb, src := s.f.photosState(ctx)
+	return connect.NewResponse(&decoysitev1.GetDecoyPhotosResponse{HasKey: px, HasPixabayKey: pb, Source: src}), nil
+}
+
+// forgetPreviews drops the sites just previewed: they were made with other keys or another source than the next "Create" should save.
+func (f *Fleet) forgetPreviews() {
+	st := f.templateState()
+	st.mu.Lock()
+	st.previews = map[string]previewEntry{}
+	st.mu.Unlock()
 }
 
 func (s decoySiteService) SetDecoyPhotosKey(ctx context.Context, req *connect.Request[decoysitev1.SetDecoyPhotosKeyRequest]) (*connect.Response[decoysitev1.SetDecoyPhotosKeyResponse], error) {
 	f := s.f
+	source := req.Msg.Source
+	if source == "" {
+		source = decoyphotos.SourcePexels // a client from before Pixabay knows no other
+	}
+	setting, aad, ok := photoSourceOf(source)
+	if !ok {
+		return nil, invalid("decoy_photos_source_invalid")
+	}
 	key := vault.Redacted(strings.TrimSpace(req.Msg.Key))
-	value := ""
+	values := map[string]string{setting: ""}
 	if key != "" {
 		if len(key) < photoKeyMin || len(key) > photoKeyMax || strings.IndexFunc(key.Reveal(), func(r rune) bool { return unicode.IsControl(r) || unicode.IsSpace(r) || r > unicode.MaxASCII }) >= 0 {
 			return nil, invalid("decoy_photos_key_invalid")
 		}
-		value = base64.StdEncoding.EncodeToString(f.v.Seal([]byte(key.Reveal()), photoKeyAAD))
+		values[setting] = base64.StdEncoding.EncodeToString(f.v.Seal([]byte(key.Reveal()), aad))
+		values[photoSourceSetting] = source // the key just stored is the one the owner means to use
+	} else if f.photoSource(ctx) == source {
+		// the key of the source in use is gone: the other one takes over when it has a key, else the pick stays and sites are drawn
+		for _, x := range photoSources {
+			if x.name != source && f.photoKey(ctx, x.name) != "" {
+				values[photoSourceSetting] = x.name
+			}
+		}
 	}
-	if err := f.st.SetSettings(ctx, map[string]string{photoKeySetting: value}); err != nil {
-		return nil, s.fail("save the Pexels key", err)
+	if err := f.st.SetSettings(ctx, values); err != nil {
+		return nil, s.fail("save the "+source+" key", err)
 	}
-	st := f.templateState()
-	st.mu.Lock() // sites made with the old key (or without one) are not the ones the next "Create" should save
-	st.previews = map[string]previewEntry{}
-	st.mu.Unlock()
+	f.forgetPreviews()
 	if key == "" {
-		f.audit(ctx, "decoy_photos.key_remove", map[string]string{})
+		f.audit(ctx, "decoy_photos.key_remove", map[string]string{"source": source})
 	} else {
-		f.audit(ctx, "decoy_photos.key_set", map[string]string{})
+		f.audit(ctx, "decoy_photos.key_set", map[string]string{"source": source})
 	}
-	return connect.NewResponse(&decoysitev1.SetDecoyPhotosKeyResponse{HasKey: key != ""}), nil
+	px, pb, src := f.photosState(ctx)
+	return connect.NewResponse(&decoysitev1.SetDecoyPhotosKeyResponse{HasKey: px, HasPixabayKey: pb, Source: src}), nil
+}
+
+func (s decoySiteService) SetDecoyPhotosSource(ctx context.Context, req *connect.Request[decoysitev1.SetDecoyPhotosSourceRequest]) (*connect.Response[decoysitev1.SetDecoyPhotosSourceResponse], error) {
+	f := s.f
+	source := req.Msg.Source
+	if _, _, ok := photoSourceOf(source); !ok {
+		return nil, invalid("decoy_photos_source_invalid")
+	}
+	if f.photoKey(ctx, source) == "" {
+		return nil, refuse("decoy_photos_no_key") // no key, nothing to pick: the sites would be drawn
+	}
+	if err := f.st.SetSettings(ctx, map[string]string{photoSourceSetting: source}); err != nil {
+		return nil, s.fail("save the photos source", err)
+	}
+	f.forgetPreviews()
+	f.audit(ctx, "decoy_photos.source_set", map[string]string{"source": source})
+	px, pb, src := f.photosState(ctx)
+	return connect.NewResponse(&decoysitev1.SetDecoyPhotosSourceResponse{HasKey: px, HasPixabayKey: pb, Source: src}), nil
 }
 
 // render makes the site of a kind for a country from a seed; an empty seed takes a new random one, an empty country is
@@ -202,13 +286,14 @@ func (s decoySiteService) render(ctx context.Context, kind, country, seed string
 		return generated{}, s.fail("plan decoy site", err)
 	}
 	// Photos are an extra: whatever goes wrong with them, the site is made with drawings.
-	why, photos := photoNoneForKind, map[string][]byte(nil)
+	why, photos, source := photoNoneForKind, map[string][]byte(nil), ""
 	if len(plan) > 0 {
-		if key := s.f.photoKey(ctx); key == "" {
+		source = s.f.photoSource(ctx)
+		if key := s.f.photoKey(ctx, source); key == "" {
 			why = photoNoKey
 		} else {
 			fetchCtx, cancel := context.WithTimeout(ctx, photoBudget)
-			res := st.maker.Make(fetchCtx, key, raw, plan)
+			res := st.maker.Make(fetchCtx, source, key, raw, plan)
 			cancel()
 			why, photos = res.Reason, res.Photos
 		}
@@ -228,7 +313,7 @@ func (s decoySiteService) render(ctx context.Context, kind, country, seed string
 	if err != nil {
 		return generated{}, s.fail("bundle generated decoy site", err)
 	}
-	g := generated{bundle: b, brand: fitName(brand), seed: seed, photo: why, country: country}
+	g := generated{bundle: b, brand: fitName(brand), seed: seed, photo: why, country: country, photoSource: source}
 	st.put(pk, g, s.f.now())
 	return g, nil
 }
@@ -242,7 +327,7 @@ func (s decoySiteService) PreviewDecoyTemplate(ctx context.Context, req *connect
 	if err != nil {
 		return nil, s.fail("preview generated decoy site", err)
 	}
-	return connect.NewResponse(&decoysitev1.PreviewDecoyTemplateResponse{Html: doc, Seed: g.seed, Name: g.brand, Photos: g.photo}), nil
+	return connect.NewResponse(&decoysitev1.PreviewDecoyTemplateResponse{Html: doc, Seed: g.seed, Name: g.brand, Photos: g.photo, PhotosSource: g.photoSource}), nil
 }
 
 // fitName is a name the library takes: trimmed, at most 60 characters.

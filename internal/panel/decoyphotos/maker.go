@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	// MaxSearches and MaxFiles are the most requests one site costs Pexels.
+	// MaxSearches and MaxFiles are the most requests one site costs its source.
 	MaxSearches = 3
 	MaxFiles    = sitegen.MaxPhotos
 
@@ -27,9 +27,8 @@ const (
 	Budget = 1300 << 10
 
 	perPage     = 30
-	pages       = 3 // the page of results is drawn from the first three: later ones are often thin
-	searchTTL   = time.Hour
-	searchKeep  = 48 // search pages kept
+	pages       = 3  // the page of results is drawn from the first three: later ones are often thin
+	searchKeep  = 48 // search pages kept per source
 	coolDefault = 10 * time.Minute
 	coolMax     = time.Hour
 	fetchPar    = 4
@@ -43,21 +42,37 @@ const (
 	ReasonUnavailable = "unavailable"
 )
 
+// searchTTL is how long a source's search pages are kept, so that asking for another variant of a site costs no search. Pixabay's
+// terms ask for 24 hours (the file addresses in an answer live as long); Pexels has no such rule, an hour is plenty.
+var searchTTL = map[string]time.Duration{SourcePexels: time.Hour, SourcePixabay: 24 * time.Hour}
+
+// Source is what the Maker needs of a photo service: a page of results, and the bytes of a file one of them names.
+type Source interface {
+	Search(ctx context.Context, key vault.Redacted, query string, portrait bool, page, perPage int) ([]Photo, error)
+	Download(ctx context.Context, rawURL string) ([]byte, error)
+}
+
+// source is a Source with what the Maker remembers of it: its search pages, and the time until which it is left alone.
+type source struct {
+	Source
+	ttl      time.Duration
+	cache    map[string]cached
+	cooldown time.Time
+}
+
 // Result is what Make brings back: photos by slot name, and why there are none (or fewer than asked).
 type Result struct {
 	Photos map[string][]byte
 	Reason string
 }
 
-// Maker finds, downloads and prepares the photos of a site. It remembers the search pages for an hour, so that asking for another
-// variant of a site costs no search, and after a "too many requests" it leaves Pexels alone for a while.
+// Maker finds, downloads and prepares the photos of a site. It remembers the search pages of each source (searchTTL), and after a
+// "too many requests" it leaves that source alone for a while.
 type Maker struct {
-	c   *Client
 	now func() time.Time
 
-	mu       sync.Mutex
-	cache    map[string]cached
-	cooldown time.Time
+	mu   sync.Mutex // guards the cache and the cooldown of every source
+	srcs map[string]*source
 }
 
 type cached struct {
@@ -70,20 +85,24 @@ func NewMaker(rt http.RoundTripper, now func() time.Time) *Maker {
 	if now == nil {
 		now = time.Now
 	}
-	return &Maker{c: New(rt), now: now, cache: map[string]cached{}}
+	mk := func(name string, s Source) *source {
+		return &source{Source: s, ttl: searchTTL[name], cache: map[string]cached{}}
+	}
+	return &Maker{now: now, srcs: map[string]*source{SourcePexels: mk(SourcePexels, New(rt)), SourcePixabay: mk(SourcePixabay, NewPixabay(rt))}}
 }
 
-// people are words in Pexels' own description of a picture that make it unfit: a site must not show a real person as its owner.
+// people are words in the source's own description of a picture (Pexels' text, Pixabay's tags) that make it unfit: a site must not
+// show a real person as its owner.
 var people = regexp.MustCompile(`(?i)\b(man|men|woman|women|person|people|girl|boy|child|children|kid|kids|baby|lady|guy|couple|family|crowd|team|group|portrait|selfie|face|faces|smiling|customer|worker|workers|baker|barista|chef|waiter)\b`)
 
-func (m *Maker) searchPage(ctx context.Context, key vault.Redacted, query string, portrait bool, page int, spent *int) ([]Photo, error) {
+func (m *Maker) searchPage(ctx context.Context, src *source, key vault.Redacted, query string, portrait bool, page int, spent *int) ([]Photo, error) {
 	ck := query + "|" + map[bool]string{false: "l", true: "p"}[portrait] + "|" + string(rune('0'+page))
 	m.mu.Lock()
-	if e, ok := m.cache[ck]; ok && m.now().Sub(e.at) < searchTTL {
+	if e, ok := src.cache[ck]; ok && m.now().Sub(e.at) < src.ttl {
 		m.mu.Unlock()
 		return e.photos, nil
 	}
-	if m.now().Before(m.cooldown) {
+	if m.now().Before(src.cooldown) {
 		m.mu.Unlock()
 		return nil, &Error{Code: CodeLimit}
 	}
@@ -92,7 +111,7 @@ func (m *Maker) searchPage(ctx context.Context, key vault.Redacted, query string
 		return nil, nil
 	}
 	*spent++
-	got, err := m.c.Search(ctx, key, query, portrait, page, perPage)
+	got, err := src.Search(ctx, key, query, portrait, page, perPage)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if err != nil {
@@ -102,26 +121,26 @@ func (m *Maker) searchPage(ctx context.Context, key vault.Redacted, query string
 			if wait <= 0 {
 				wait = coolDefault
 			}
-			m.cooldown = m.now().Add(min(wait, coolMax))
+			src.cooldown = m.now().Add(min(wait, coolMax))
 		}
 		return nil, err
 	}
 	kept := got[:0:0]
 	for _, p := range got {
-		if !people.MatchString(p.Alt) {
+		if !people.MatchString(p.Text) {
 			kept = append(kept, p)
 		}
 	}
-	if len(m.cache) >= searchKeep {
+	if len(src.cache) >= searchKeep {
 		var oldest string
-		for k, e := range m.cache {
-			if oldest == "" || e.at.Before(m.cache[oldest].at) {
+		for k, e := range src.cache {
+			if oldest == "" || e.at.Before(src.cache[oldest].at) {
 				oldest = k
 			}
 		}
-		delete(m.cache, oldest)
+		delete(src.cache, oldest)
 	}
-	m.cache[ck] = cached{at: m.now(), photos: kept}
+	src.cache[ck] = cached{at: m.now(), photos: kept}
 	return kept, nil
 }
 
@@ -140,10 +159,31 @@ type group struct {
 	slots    []sitegen.Slot
 }
 
-// Make fetches a photo for every slot of the plan it can: at most MaxSearches searches and MaxFiles downloads. The same seed
-// and the same search results choose the same photos. A slot that got none is simply missing from the result; Reason says why
-// when the result is empty ("used" otherwise).
-func (m *Maker) Make(ctx context.Context, key vault.Redacted, seed []byte, plan []sitegen.Slot) Result {
+// fileFor is the file of p to cut slot s from: the smaller one when it is sharp enough, else the bigger one, "" when neither is. A
+// photo is never enlarged, so a file whose cut to the slot's shape is narrower than four fifths of the slot (at most MaxW) would
+// show soft: the slot stays drawn. A file of unknown size is trusted.
+func fileFor(p Photo, s sitegen.Slot) string {
+	want := min(s.W, s.MaxW)
+	sharp := func(w, h int) bool {
+		return w <= 0 || h <= 0 || min(w, h*s.W/s.H)*5 >= want*4
+	}
+	if s.MaxW <= 640 && sharp(p.SmallW, p.SmallH) {
+		return p.Small
+	}
+	if sharp(p.BigW, p.BigH) {
+		return p.Big
+	}
+	return ""
+}
+
+// Make fetches a photo for every slot of the plan it can from one source ("pexels" or "pixabay"): at most MaxSearches searches
+// and MaxFiles downloads, all to that source. The same seed and the same search results choose the same photos. A slot that got
+// none is simply missing from the result; Reason says why when the result is empty ("used" otherwise).
+func (m *Maker) Make(ctx context.Context, srcName string, key vault.Redacted, seed []byte, plan []sitegen.Slot) Result {
+	src := m.srcs[srcName]
+	if src == nil {
+		return Result{Reason: ReasonUnavailable}
+	}
 	var groups []*group
 	for _, s := range plan {
 		portrait := s.H*10 > s.W*11
@@ -169,7 +209,7 @@ func (m *Maker) Make(ctx context.Context, key vault.Redacted, seed []byte, plan 
 
 	type pick struct {
 		slot sitegen.Slot
-		ph   Photo
+		url  string
 	}
 	var picks []pick
 	spent := 0
@@ -177,10 +217,10 @@ func (m *Maker) Make(ctx context.Context, key vault.Redacted, seed []byte, plan 
 	used := map[int64]bool{}
 	for gi, g := range groups {
 		page := 1 + int(draw(seed, "page:"+g.query)%pages)
-		res, err := m.searchPage(ctx, key, g.query, g.portrait, page, &spent)
+		res, err := m.searchPage(ctx, src, key, g.query, g.portrait, page, &spent)
 		// a thin page: the first one is the safe one, if the searches the other groups need are left
 		if err == nil && len(res) < len(g.slots) && page != 1 && spent+len(groups)-gi-1 < MaxSearches {
-			if first, err1 := m.searchPage(ctx, key, g.query, g.portrait, 1, &spent); err1 == nil && len(first) > len(res) {
+			if first, err1 := m.searchPage(ctx, src, key, g.query, g.portrait, 1, &spent); err1 == nil && len(first) > len(res) {
 				res = first
 			}
 		}
@@ -200,16 +240,16 @@ func (m *Maker) Make(ctx context.Context, key vault.Redacted, seed []byte, plan 
 			order[i], rank[p.ID] = i, draw(seed, "pick:"+g.query+":"+strconv.FormatInt(p.ID, 10))
 		}
 		sort.Slice(order, func(a, b int) bool { return rank[res[order[a]].ID] < rank[res[order[b]].ID] })
-		next := 0
 		for _, s := range g.slots {
-			for next < len(order) && used[res[order[next]].ID] {
-				next++
+			for _, i := range order { // the first unused result that has a file sharp enough for the slot
+				if p := res[i]; !used[p.ID] {
+					if u := fileFor(p, s); u != "" {
+						used[p.ID] = true
+						picks = append(picks, pick{s, u})
+						break
+					}
+				}
 			}
-			if next == len(order) {
-				break
-			}
-			used[res[order[next]].ID] = true
-			picks = append(picks, pick{s, res[order[next]]})
 		}
 	}
 	if len(picks) > MaxFiles {
@@ -226,11 +266,7 @@ func (m *Maker) Make(ctx context.Context, key vault.Redacted, seed []byte, plan 
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			src := p.ph.Large
-			if p.slot.MaxW > 640 {
-				src = p.ph.Large2
-			}
-			data, err := m.c.Download(ctx, src)
+			data, err := src.Download(ctx, p.url)
 			if err != nil {
 				errMu.Lock()
 				if firstErr == nil {

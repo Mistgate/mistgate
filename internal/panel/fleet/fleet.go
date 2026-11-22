@@ -175,7 +175,7 @@ type Fleet struct {
 	decoySyncDirty  map[string]bool
 	decoyAttempts   map[string]decoyAttempt
 
-	// The previews of sites made from templates and the Pexels client (decoy_templates.go; nothing is made in the Cloudflare edition,
+	// The previews of sites made from templates and the photo maker for Pexels and Pixabay (decoy_templates.go; nothing is made in the Cloudflare edition,
 	// so the state is an any here). Guarded by panelDecoyMu. photoTransport carries the client's requests: a test seam.
 	decoyTemplates any
 	photoTransport http.RoundTripper
