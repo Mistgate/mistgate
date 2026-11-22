@@ -304,7 +304,7 @@ type Agent struct {
 	sessionFn              func(context.Context) error                             // test seam: the direct control session
 	bridgedFn              func(context.Context, string) error                     // test seam: the control session through an entry's bridge
 	panelEntryFn           func() string                                           // test seam: the entry whose bridge is up
-	probeFn                func(context.Context) error                             // test seam: one probe of the direct path
+	probeFn                func(context.Context) error                             // test seam: one probe of the current direct path
 
 	busy atomic.Int32 // operations started by a session that ending it would cut short (goBusy)
 
@@ -1011,9 +1011,7 @@ func (a *Agent) bridgeSession(ctx context.Context, entryNodeID string, p *panelP
 			if sctx.Err() != nil {
 				return
 			}
-			probeCtx, stop := context.WithTimeout(sctx, a.bridgeProbeDeadline())
-			err := a.probeDirectPanel(probeCtx)
-			stop()
+			err := a.probeDirectPanel(sctx)
 			p.probeAt = time.Now().Add(a.bridgeProbeDelay(p.flaps))
 			if err != nil {
 				p.passed = 0
@@ -1041,6 +1039,19 @@ func (a *Agent) sessionViaBridge(ctx context.Context, entryNodeID string) error 
 		return a.bridgedFn(ctx, entryNodeID)
 	}
 	if a.linkOnly() {
+		// Every other turn the new link address, through the bridge like the current one (a node whose direct path is
+		// closed moves to it there). One that does not establish leaves the turn to the current address, so a wrong new
+		// address does not cost the node its bridge.
+		if next := a.nextLink(); next != "" && !a.triedNext {
+			a.triedNext = true
+			epoch := a.sessionEpoch.Load()
+			err := a.nextLinkSession(ctx, next, entryNodeID)
+			if ctx.Err() != nil || a.sessionEpoch.Load() != epoch {
+				return err
+			}
+		} else {
+			a.triedNext = false
+		}
 		return a.linkSessionVia(ctx, entryNodeID)
 	}
 	if a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
@@ -1058,17 +1069,28 @@ func (a *Agent) sessionViaBridge(ctx context.Context, entryNodeID string) error 
 	return a.mtlsSessionVia(ctx, entryNodeID)
 }
 
+// probeDirectPanel probes the direct path once. A link node with a new address probes that first, within a
+// bridgeProbeDeadline of its own, and then, when it did not answer, the current address within another: a new address
+// that does not answer cannot eat the time of the current one, which would keep the node on the bridge. Each budget is
+// dial_timeout (15 s by default), and a link handshake stops at linkHandshakeTimeout (10 s) anyway: by default a probe
+// of a link node with a new address takes at most 2 × 10 s = 20 s, any other probe at most 15 s, and probes run
+// 10 minutes apart or more.
 func (a *Agent) probeDirectPanel(ctx context.Context) error {
-	if a.probeFn != nil {
-		return a.probeFn(ctx)
-	}
 	if next := a.nextLink(); next != "" {
 		// A bridged node whose current link is gone comes back over the new address: the session that follows tries
 		// it first (session) and commits it after its HelloAck, like any session over a new address.
-		if a.probeLink(ctx, next) == nil {
+		nctx, stop := context.WithTimeout(ctx, a.bridgeProbeDeadline())
+		err := a.probeLink(nctx, next)
+		stop()
+		if err == nil {
 			a.nextAnswered.Store(true)
 			return nil
 		}
+	}
+	ctx, stop := context.WithTimeout(ctx, a.bridgeProbeDeadline())
+	defer stop()
+	if a.probeFn != nil {
+		return a.probeFn(ctx)
 	}
 	if a.linkOnly() || (a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0) {
 		return a.probeLink(ctx, a.linkURL())
@@ -1320,7 +1342,7 @@ func (a *Agent) session(ctx context.Context) error {
 	nextAnswered := a.nextAnswered.Swap(false)
 	if next := a.nextLink(); next != "" && (!a.triedNext || nextAnswered) {
 		a.triedNext = true
-		return a.nextLinkSession(ctx, next)
+		return a.nextLinkSession(ctx, next, "")
 	}
 	a.triedNext = false
 	if a.currentFailed {

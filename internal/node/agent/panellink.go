@@ -112,22 +112,24 @@ func (a *Agent) applyPanelLink(st *pb.NodeSettings) (fresh bool) {
 	return fresh
 }
 
-// nextLinkSession runs a session over the new link address. Once its HelloAck arrives the address replaces the old one
-// for good, and the session counts as one over the current address: if it does not hold, the next turn tries the
-// previous address. A failure before the HelloAck is an ordinary connection failure (backoff), and the next turn uses the
-// old address.
-func (a *Agent) nextLinkSession(ctx context.Context, next string) error {
-	a.log.Info("trying the new panel link address")
+// nextLinkSession runs a session over the new link address, through the panel bridge of entry node viaNodeID when set
+// (sessionViaBridge). Once its HelloAck arrives the address replaces the old one for good, and a direct session counts as
+// one over the current address: if it does not hold, the next turn tries the previous address. A failure before the
+// HelloAck is an ordinary connection failure (backoff), and the next turn uses the old address.
+func (a *Agent) nextLinkSession(ctx context.Context, next, viaNodeID string) error {
+	a.log.Info("trying the new panel link address", "via", viaNodeID)
 	started := time.Now()
-	err := a.linkSession(ctx, func(ctx context.Context) (*websocketAgentTransport, func(), error) {
-		t, cleanup, err := a.dialLinkBase(ctx, next, "")
+	err := a.linkSessionOn(ctx, func(ctx context.Context) (*websocketAgentTransport, func(), error) {
+		t, cleanup, err := a.dialLinkBase(ctx, next, viaNodeID)
 		if err == nil {
 			t.onEstablished = func() { a.commitNextLink(next) }
 		}
 		return t, cleanup, err
-	})
+	}, viaNodeID)
 	if a.linkURL() == next {
-		a.currentFailed = a.didNotHold(ctx, err, started) // the old address's failure says nothing about the new one
+		// The old address's failure says nothing about the new one; a session through a bridge, nothing about the direct
+		// path.
+		a.currentFailed = viaNodeID == "" && a.didNotHold(ctx, err, started)
 	}
 	if errors.Is(err, errLinkNotEstablished) {
 		return fmt.Errorf("new panel link address: %v", err) // not errLinkNotEstablished: no mTLS hold period for it

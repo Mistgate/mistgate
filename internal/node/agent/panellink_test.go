@@ -6,11 +6,16 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,6 +27,9 @@ import (
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/agentlink"
+	nodebridge "github.com/mistgate/mistgate/internal/node/bridge"
+	"github.com/mistgate/mistgate/internal/node/sitehttp"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // sessionLinkPanel is a panel's link endpoint that runs the whole v2 handshake (sealed) and answers the Hello with a
@@ -39,13 +47,14 @@ type sessionLinkPanel struct {
 	mu      sync.Mutex
 	refused map[string]bool
 	dropped map[string]bool
-	dials   map[string]int // requests per link prefix
+	via     map[string]string // the Hello.link_via_node_id of the last session per link prefix
+	dials   map[string]int    // requests per link prefix
 }
 
 func newSessionLinkPanel(h *harness) *sessionLinkPanel {
 	return &sessionLinkPanel{h: h, hellos: make(chan string, 8), sessions: make(chan string, 32),
 		push: make(chan *pb.ConnectResponse, 8), applies: make(chan *pb.ApplyResult, 8),
-		refused: map[string]bool{}, dropped: map[string]bool{}, dials: map[string]int{}}
+		refused: map[string]bool{}, dropped: map[string]bool{}, via: map[string]string{}, dials: map[string]int{}}
 }
 
 func linkPrefix(c byte) string { return strings.Repeat(string(c), 24) }
@@ -122,6 +131,9 @@ func (p *sessionLinkPanel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil || proto.Unmarshal(frame, &req) != nil || req.GetHello() == nil {
 		return
 	}
+	p.mu.Lock()
+	p.via[prefix] = req.GetHello().GetLinkViaNodeId()
+	p.mu.Unlock()
 	select {
 	case p.hellos <- audience:
 	default:
@@ -703,4 +715,140 @@ func TestNextLinkMovesABridgedNode(t *testing.T) {
 		t.Fatal("the node did not come back over the new address")
 	}
 	committedTo(t, h, b, a)
+}
+
+// directLinkClient is the link client of h with a direct path that dial decides; through a bridge the agent replaces
+// the dial and keeps the rest (the test server's roots).
+func directLinkClient(h *harness, dial func(ctx context.Context, network, address string) (net.Conn, error)) {
+	transport := h.a.linkHTTPClient.Transport.(*http.Transport).Clone()
+	transport.DialContext = dial
+	h.a.linkHTTPClient = &http.Client{Transport: transport}
+}
+
+func closedDirectPath(context.Context, string, string) (net.Conn, error) {
+	return nil, errors.New("direct panel path closed")
+}
+
+// linkPanelBridge brings up the panel bridge of entry node nod_msk1 for h, forwarding to the link panel at panelAddress.
+func linkPanelBridge(t *testing.T, h *harness, panelAddress string) {
+	t.Helper()
+	entry := nodebridge.NewEntry()
+	bridgeServerCert, pin := issueBridgeSiteCertificate(t, h.panel)
+	if err := entry.SetServe(nodebridge.ServeConfig{EntryNodeID: "nod_msk1", Path: "/private-bridge-path", ExitNodeIDs: []string{h.a.meta.NodeID},
+		PanelVia: true, PanelAddress: panelAddress, Roots: h.a.id.Load().ca}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewUnstartedServer(entry.Handler(http.NotFoundHandler()))
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{bridgeServerCert}, MinVersion: tls.VersionTLS13}
+	server.Config.TLSConfig = server.TLS
+	if err := sitehttp.ConfigureSiteHTTP2(server.Config); err != nil {
+		t.Fatal(err)
+	}
+	server.StartTLS()
+	t.Cleanup(func() {
+		entry.Close()
+		server.Close()
+	})
+	_, portText, err := net.SplitHostPort(server.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.ParseUint(portText, 10, 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := issueBridgePeerIdentity(t, h.panel, h.a.meta.NodeID)
+	dial := plugin.BridgeDial{EntryNodeID: "nod_msk1", Host: "127.0.0.1", Port: uint16(port), SNI: "msk1.example.com", PinSHA256: pin,
+		Path: "/private-bridge-path", Pool: 2, PanelVia: true, Targets: []plugin.BridgeTarget{{RelayID: "rly_a", Network: "tcp", Port: 4443}}}
+	dialer := nodebridge.NewDialer(func() nodebridge.DialIdentity { return identity })
+	h.a.bridgeDialer.Close()
+	h.a.bridgeDialer = dialer
+	dialer.Sync(context.Background(), []nodebridge.DialSpec{{Dial: dial}})
+	t.Cleanup(dialer.Close)
+	waitPanelBridgeConns(t, dialer, dial.EntryNodeID)
+	m := newModel()
+	m.bridgeDials = []plugin.BridgeDial{dial}
+	h.a.setModel(m)
+}
+
+// A node whose direct path is closed goes to the bridge, and moves to its new link address there: through the bridge,
+// with the new address as the link base, committed after its HelloAck.
+func TestNextLinkThroughTheBridge(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	u, err := url.Parse(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	directLinkClient(h, closedDirectPath)
+	linkPanelBridge(t, h, u.Host)
+	h.a.bridgeFallbackAfter, h.a.bridgeFallbackAttempts = time.Hour, 2
+	h.a.bridgeWait = func(ctx context.Context, _ time.Duration) bool { <-ctx.Done(); return false } // no direct probe
+	h.start()
+	for turn := 0; lp.session(t) != linkPrefix('b'); turn++ {
+		if turn == 3 {
+			t.Fatal("the bridged sessions never tried the new address")
+		}
+		endSession(t, h)
+	}
+	committedTo(t, h, b, a)
+	lp.mu.Lock()
+	via := lp.via[linkPrefix('b')]
+	lp.mu.Unlock()
+	if via != "nod_msk1" {
+		t.Fatal("the session over the new address was not through the bridge")
+	}
+}
+
+// A node on the bridge whose new link address does not answer at all (the dial hangs): the probe of the new address
+// runs out its own time, the current address is still probed within its own, and the node comes back off the bridge
+// over the current address.
+func TestNextLinkUnreachableDoesNotHoldANodeOnTheBridge(t *testing.T) {
+	h, lp, a, _ := prevLinkHarness(t)
+	next := "wss://next.example.com/" + linkPrefix('b') + "/"
+	h.a.meta.NextLink = next
+	var directOpen atomic.Bool
+	gone := make(chan struct{})
+	directLinkClient(h, func(ctx context.Context, network, address string) (net.Conn, error) {
+		switch {
+		case !directOpen.Load():
+			return closedDirectPath(ctx, network, address)
+		case address == "next.example.com:443":
+			select { // a host that never answers
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-gone:
+				return nil, errors.New("connection refused")
+			}
+		}
+		var d net.Dialer
+		return d.DialContext(ctx, network, address)
+	})
+	var bridged atomic.Int32
+	left := make(chan struct{})
+	h.a.panelEntryFn = func() string { return "nod_de1" }
+	h.a.bridgedFn = func(ctx context.Context, _ string) error {
+		if bridged.Add(1) == 1 {
+			defer close(left)
+		}
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	h.a.bridgeFallbackAfter, h.a.bridgeFallbackAttempts = time.Hour, 2
+	h.a.bridgeProbeEvery, h.a.bridgeProbeTimeout = 20*time.Millisecond, time.Second
+	h.start()
+	eventually(t, func() bool { return bridged.Load() > 0 }, "the node on the bridge")
+
+	directOpen.Store(true)
+	select {
+	case <-left:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the node stayed on the bridge")
+	}
+	close(gone)
+	if got := lp.session(t); got != linkPrefix('a') {
+		t.Fatal("the node did not come back over the current address")
+	}
+	if h.a.linkURL() != a || h.a.nextLink() != next {
+		t.Fatal("the unreachable new address was committed, or dropped")
+	}
 }
