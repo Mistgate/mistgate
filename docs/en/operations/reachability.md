@@ -5,6 +5,8 @@ description: Whether the nodes open from inside a country, Russia by default; th
 
 The client-eye checks run on the panel's server, which is not inside the country where your users are, so they cannot see a block there. Five sources look from inside one country (Russia by default) instead: [Globalping](#globalping), the [block lists](#block-lists), the [TSPU probe](#tspu-probe), [cheburcheck](#cheburcheck) and [bsbord](#bsbord). Each is an integration of its own and **off by default**. The panel [combines what they see](#how-the-sources-join-the-verdict) into one verdict per node, keeps a week of it, and raises an [alert](#the-alert) when a node stops opening. The [kl!ck reports](#klck-reports) are shown next to them and do not change the verdict.
 
+![Two points of view on a node](../diagrams/two-views.svg)
+
 ## In the admin
 
 **Reachability** is a section of its own in the menu, right after **Health** (on a phone, under **More**). Everyone who can open Health can open it; the sources and the country are the owner's, and changing a source asks for a fresh confirmation.

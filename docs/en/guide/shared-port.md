@@ -7,6 +7,8 @@ description: How VLESS, TrustTunnel and MTProto share TCP 443 of one node by the
 
 Many networks let through only TCP 443. A node can run several TCP services on it at once: VLESS REALITY, VLESS over TLS, TrustTunnel and MTProto. The node's agent reads the **name** the client asks for in the first bytes of the connection (the SNI, the host name in the TLS hello), and hands the connection to the service that holds that name. Nothing is decrypted on the way and the front answers nothing itself. This page says who can share the port, what a stranger sees, what you must prepare (a name and a DNS record for each service) and how to set it up.
 
+![One TCP 443, several services](../diagrams/shared-443.svg)
+
 A node with one service on a port works as before: the agent starts the extra listener only when two or more services stand on the same TCP port.
 
 ## Who can share the port

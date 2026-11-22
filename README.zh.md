@@ -27,6 +27,8 @@
 
 面板装在一台服务器上，你的 VPN 服务器作为节点加进来。每个人拿到一个订阅链接，应用会自动获取他可以用的所有服务器。面板负责让节点保持正确配置，并持续检测它们。
 
+<p align="center"><img alt="Mistgate 各部分如何配合" src="docs/zh/diagrams/how-it-fits.svg" width="720"></p>
+
 这里的一切都用虚构的演示数据；动图是真实管理端的短循环。
 
 <table>
@@ -168,6 +170,8 @@ Hysteria2 和 VLESS 可以共用一个节点，包括 TCP 443。并非每种订�
 - 每次 push 和 pull request 都运行 CI（[ci.yml](.github/workflows/ci.yml)）：Go 测试和 vet、面板与 Agent 会话的竞态检测、`govulncheck`、管理后台的 lint 和测试、文档构建，以及在 Debian 和 Ubuntu 上测试安装脚本。
 - 端到端测试（[scripts/e2e-wsl.sh](scripts/e2e-wsl.sh)）：真实的面板和节点，配合真实的 Hysteria2、AmneziaWG、Xray、mihomo 和 sing-box 客户端，还覆盖 Agent 更新、回滚和通过 SSH 安装。每次发布前在 WSL 或虚拟机里手动运行，不在 CI 中。
 - GitHub Actions 把每个标签构建成草稿版本。我在存有离线发布密钥的机器上从标签重新构建，只签名逐字节一致的二进制文件；节点和面板只安装已签名的构建。[发布版本和签名](docs/zh/operations/releases.md)
+
+<p align="center"><img alt="更新凭什么被信任" src="docs/zh/diagrams/update-trust.svg" width="720"></p>
 
 更新（[更新](docs/zh/operations/updates.md)）：
 

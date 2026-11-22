@@ -27,6 +27,8 @@ Hysteria2, VLESS ve AmneziaWG. İki Go ikili dosyası, SQLite ve systemd.</p>
 
 Paneli bir sunucuya kurar, VPN sunucularınızı ona düğüm olarak eklersiniz. Her kişi tek bir abonelik bağlantısı alır ve uygulaması, kullanabileceği bütün sunucuları kendiliğinden çeker. Panel düğümlerin yapılandırmasını güncel tutar ve onları kontrol eder.
 
+<p align="center"><img alt="How Mistgate fits together" src="docs/en/diagrams/how-it-fits.svg" width="720"></p>
+
 Buradaki her şey uydurma demo verileriyle çalışır; klipler gerçek yönetim panelinin kısa döngüleridir.
 
 <table>
@@ -168,6 +170,8 @@ Kontroller:
 - Her push ve pull request'te CI ([ci.yml](.github/workflows/ci.yml)): Go testleri ve vet, panel-ajan oturumunda yarış dedektörü, `govulncheck`, yönetim panelinin lint ve testleri, belgelerin derlenmesi, Debian ve Ubuntu'da kurulum betiği.
 - Uçtan uca bir çalıştırma ([scripts/e2e-wsl.sh](scripts/e2e-wsl.sh)): gerçek Hysteria2, AmneziaWG, Xray, mihomo ve sing-box istemcileriyle gerçek bir panel ve düğüm; ayrıca ajan güncellemeleri, geri almalar ve SSH üzerinden kurulum. Her sürümden önce WSL'de ya da bir sanal makinede elle çalıştırılır, CI'da değil.
 - GitHub Actions her etiketi taslak olarak derler. Ben onu çevrimdışı sürüm anahtarının bulunduğu bir makinede etiketten yeniden derler ve yalnızca bayt bayt eşleşen ikili dosyaları imzalarım; düğümler ve panel yalnızca imzalı derlemeleri kurar. [Sürümler ve imzalama](docs/en/operations/releases.md)
+
+<p align="center"><img alt="What an update is trusted for" src="docs/en/diagrams/update-trust.svg" width="720"></p>
 
 Güncelleme ([Güncellemeler](docs/en/operations/updates.md)):
 

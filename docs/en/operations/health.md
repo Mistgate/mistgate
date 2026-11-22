@@ -139,6 +139,8 @@ A green cell means that, within the last few minutes, a client from the panel's 
 
 Whether the nodes open from inside a country (Russia by default) is checked by Globalping, the block lists, the TSPU probe, cheburcheck and bsbord, and has a section of its own in the admin, **Reachability**: see [Reachability](reachability.md). Here, **Health → Checks** shows the verdict as its last column, *From Russia*, and the node page as a row.
 
+![Two points of view on a node](../diagrams/two-views.svg)
+
 ## Node doctor
 
 Every node agent runs 22 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).

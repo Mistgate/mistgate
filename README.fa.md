@@ -29,6 +29,8 @@ Hysteria2، VLESS و AmneziaWG. دو فایل اجرایی Go، به‌علاو�
 
 پنل را روی یک سرور نصب می‌کنید و سرورهای VPN خود را به‌عنوان نود به آن اضافه می‌کنید. هر نفر یک لینک اشتراک می‌گیرد و برنامه‌اش همهٔ سرورهایی را که اجازهٔ استفاده از آن‌ها را دارد خودش دریافت می‌کند. پنل پیکربندی نودها را درست نگه می‌دارد و آن‌ها را بررسی می‌کند.
 
+<p align="center"><img alt="How Mistgate fits together" src="docs/en/diagrams/how-it-fits.svg" width="720"></p>
+
 همهٔ این‌ها روی داده‌های نمایشی ساختگی اجرا شده‌اند؛ کلیپ‌ها حلقه‌های کوتاهی از پنل مدیریت واقعی‌اند.
 
 <table>
@@ -170,6 +172,8 @@ Hysteria2، VLESS و AmneziaWG. دو فایل اجرایی Go، به‌علاو�
 - اجرای CI روی هر push و pull request ([ci.yml](.github/workflows/ci.yml)): تست‌های Go و vet، ردیاب race روی نشست پنل و ایجنت، `govulncheck`، lint و تست‌های پنل مدیریت، ساخت مستندات، و نصب‌کننده روی Debian و Ubuntu.
 - یک اجرای سرتاسری ([scripts/e2e-wsl.sh](scripts/e2e-wsl.sh)): یک پنل و نود واقعی با کلاینت‌های واقعی Hysteria2، AmneziaWG، Xray، mihomo و sing-box، به‌علاوهٔ به‌روزرسانی و بازگردانی ایجنت و نصب از راه SSH. پیش از هر نسخه، دستی در WSL یا یک ماشین مجازی اجرا می‌شود، نه در CI.
 - هر برچسب را GitHub Actions به‌صورت پیش‌نویس می‌سازد. من آن را روی ماشینی که کلید آفلاین امضای نسخه‌ها روی آن است از روی همان برچسب دوباره می‌سازم و فقط فایل‌های اجرایی‌ای را امضا می‌کنم که بایت به بایت یکسان باشند؛ نودها و پنل فقط بیلدهای امضاشده را نصب می‌کنند. [نسخه‌ها و امضا](docs/en/operations/releases.md)
+
+<p align="center"><img alt="What an update is trusted for" src="docs/en/diagrams/update-trust.svg" width="720"></p>
 
 به‌روزرسانی ([به‌روزرسانی‌ها](docs/en/operations/updates.md)):
 

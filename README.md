@@ -27,6 +27,8 @@ Hysteria2, VLESS and AmneziaWG. Two Go binaries, SQLite and systemd.</p>
 
 You put the panel on one server and add your VPN servers to it as nodes. Each person gets one subscription link, and their app picks up every server they may use. The panel keeps the nodes configured and checks them.
 
+<p align="center"><img alt="How Mistgate fits together" src="docs/en/diagrams/how-it-fits.svg" width="720"></p>
+
 Everything here runs on invented demo data; the clips are short loops of the real admin.
 
 <table>
@@ -168,6 +170,8 @@ Checks:
 - CI on every push and pull request ([ci.yml](.github/workflows/ci.yml)): Go tests and vet, the race detector on the panel-agent session, `govulncheck`, the admin's lint and tests, the docs build, the installer on Debian and Ubuntu.
 - An end-to-end run ([scripts/e2e-wsl.sh](scripts/e2e-wsl.sh)): a real panel and node with real Hysteria2, AmneziaWG, Xray, mihomo and sing-box clients, plus agent updates, rollbacks and an install over SSH. It runs by hand before every release, in WSL or a VM, not in CI.
 - GitHub Actions builds each tag as a draft. I rebuild it from the tag on a machine with the offline release key and sign only binaries that match byte for byte; nodes and the panel install only signed builds. [Releases and signing](docs/en/operations/releases.md)
+
+<p align="center"><img alt="What an update is trusted for" src="docs/en/diagrams/update-trust.svg" width="720"></p>
 
 Updating ([Updates](docs/en/operations/updates.md)):
 

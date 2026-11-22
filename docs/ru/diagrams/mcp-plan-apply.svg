@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mgd" viewBox="0 0 720 320" width="720" height="320" role="img" aria-labelledby="title desc">
+<title id="title">План, одобрение, применение</title>
+<desc id="desc">ИИ-агент подключается с токеном, профиль которого решает, что ему можно. Изменение — это два вызова: план, где панель описывает изменение и выдаёт одноразовый токен на десять минут, и применение, которое принимает только этот токен, так что между ними ничего не поменять. Рискованное изменение ждёт одобрения владельца в админке; нерискованное этот шаг пропускает. Каждый вызов попадает в журнал аудита.</desc>
+<style>
+.mgd{--d-bg:var(--mgd-bg,#ffffff);--d-box:var(--mgd-box,#f8f8f6);--d-line:var(--mgd-line,#e3e3df);--d-text:var(--mgd-text,#16161a);--d-muted:var(--mgd-muted,#6b6b73);--d-lav:var(--mgd-lav,#473a73);--d-lav-bg:var(--mgd-lav-bg,#eae8fc);--d-sky:var(--mgd-sky,#174e6a);--d-sky-bg:var(--mgd-sky-bg,#e0f0fa);--d-mint:var(--mgd-mint,#00582f);--d-mint-bg:var(--mgd-mint-bg,#dcf3e4);--d-sage:var(--mgd-sage,#3b511d);--d-sage-bg:var(--mgd-sage-bg,#e8f1e0);--d-sand:var(--mgd-sand,#5c4a12);--d-sand-bg:var(--mgd-sand-bg,#f5efdf);--d-rose:var(--mgd-rose,#67343e);--d-rose-bg:var(--mgd-rose-bg,#f9e6e8)}
+@media (prefers-color-scheme:dark){.mgd{--d-bg:var(--mgd-bg,#141417);--d-box:var(--mgd-box,#0c0c0e);--d-line:var(--mgd-line,#25252b);--d-text:var(--mgd-text,#f3f3f5);--d-muted:var(--mgd-muted,#8b8b94);--d-lav:var(--mgd-lav,#b8acf2);--d-lav-bg:var(--mgd-lav-bg,#2d2b38);--d-sky:var(--mgd-sky,#8ec8ea);--d-sky-bg:var(--mgd-sky-bg,#263037);--d-mint:var(--mgd-mint,#7dd3a0);--d-mint-bg:var(--mgd-mint-bg,#243229);--d-sage:var(--mgd-sage,#b0cc90);--d-sage-bg:var(--mgd-sage-bg,#2c3126);--d-sand:var(--mgd-sand,#dcc68c);--d-sand-bg:var(--mgd-sand-bg,#332f25);--d-rose:var(--mgd-rose,#e6a6b0);--d-rose-bg:var(--mgd-rose-bg,#362a2c)}}
+.mgd text{font-family:Onest,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--d-text)}
+.mgd .bg{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .card{fill:var(--d-box);stroke:var(--d-line)}
+.mgd .pill{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .h{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.mgd .t{font-size:13px;font-weight:700}
+.mgd .s{font-size:13px;fill:var(--d-muted)}
+.mgd .m{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;fill:var(--d-muted)}
+.mgd .lav{--t:var(--d-lav);--tb:var(--d-lav-bg)}
+.mgd .sky{--t:var(--d-sky);--tb:var(--d-sky-bg)}
+.mgd .mint{--t:var(--d-mint);--tb:var(--d-mint-bg)}
+.mgd .sage{--t:var(--d-sage);--tb:var(--d-sage-bg)}
+.mgd .sand{--t:var(--d-sand);--tb:var(--d-sand-bg)}
+.mgd .rose{--t:var(--d-rose);--tb:var(--d-rose-bg)}
+.mgd .grey{--t:var(--d-muted);--tb:var(--d-line)}
+.mgd .chip{fill:var(--tb)}
+.mgd .ico{fill:none;stroke:var(--t);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .edge{fill:var(--tb);stroke:var(--t);stroke-opacity:.45}
+.mgd .flow{fill:none;stroke:var(--t);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .wide{stroke-width:3}
+.mgd .dash{stroke-dasharray:5 5}
+.mgd .head{fill:var(--t)}
+.mgd .badge{fill:var(--t)}
+.mgd .bn{font-size:11px;font-weight:800;fill:var(--d-bg);text-anchor:middle}
+.mgd .tt{fill:var(--t)}
+.mgd .rule{stroke:var(--d-line)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="719" height="319" rx="16"/>
+<rect class="card" x="24" y="74" width="150" height="140" rx="14"/>
+<g class="lav"><rect class="chip" x="36" y="86" width="24" height="24" rx="7"/><svg x="41" y="91" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M12 3.5Q12.9 11.1 20.5 12Q12.9 12.9 12 20.5Q11.1 12.9 3.5 12Q11.1 11.1 12 3.5z"/></svg></g>
+<text class="t" x="70" y="103">ИИ-агент</text>
+<text class="s" x="36" y="132">приходит с токеном:</text>
+<text class="s" x="36" y="148">его профиль решает,</text>
+<text class="s" x="36" y="164">что ему можно</text>
+<rect class="card" x="198" y="74" width="150" height="140" rx="14"/>
+<g class="sky"><rect class="chip" x="210" y="86" width="24" height="24" rx="7"/><svg x="215" y="91" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></g>
+<text class="t" x="244" y="103">План</text>
+<text class="m" x="210" y="130">10 минут</text>
+<text class="s" x="210" y="150">панель описывает</text>
+<text class="s" x="210" y="166">изменение и выдаёт</text>
+<text class="s" x="210" y="182">одноразовый токен</text>
+<rect class="card" x="372" y="74" width="150" height="140" rx="14"/>
+<g class="rose"><rect class="chip" x="384" y="86" width="24" height="24" rx="7"/><svg x="389" y="91" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg></g>
+<text class="t" x="418" y="103">Одобрение</text>
+<text class="s" x="384" y="132">рискованное</text>
+<text class="s" x="384" y="148">изменение ждёт</text>
+<text class="s" x="384" y="164">владельца в</text>
+<text class="s" x="384" y="180">админке</text>
+<rect class="card" x="546" y="74" width="150" height="140" rx="14"/>
+<g class="mint"><rect class="chip" x="558" y="86" width="24" height="24" rx="7"/><svg x="563" y="91" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></svg></g>
+<text class="t" x="592" y="103">Применение</text>
+<text class="s" x="558" y="132">принимает только</text>
+<text class="s" x="558" y="148">токен: между планом</text>
+<text class="s" x="558" y="164">и применением не</text>
+<text class="s" x="558" y="180">поменять ничего</text>
+<g class="lav"><path class="flow " d="M174 144L191 144"/><path class="head" d="M198 144l-8 -4.5v9z"/></g>
+<g class="sky"><path class="flow " d="M348 144L365 144"/><path class="head" d="M372 144l-8 -4.5v9z"/></g>
+<g class="rose"><path class="flow " d="M522 144L539 144"/><path class="head" d="M546 144l-8 -4.5v9z"/></g>
+<g class="grey"><path class="flow dash" d="M273 74L273 50L621 50L621 67"/><path class="head" d="M621 74l-4.5 -8h9z"/></g>
+<text class="s" x="447" y="42" text-anchor="middle">нерискованное изменение пропускает одобрение</text>
+<line class="rule" x1="24" y1="248" x2="696" y2="248"/>
+<text class="s" x="24" y="278">Каждый вызов попадает в журнал аудита. Профиль токена (только чтение,</text>
+<text class="s" x="24" y="296">оператор или админ) решает, какие инструменты агент вообще видит.</text>
+</svg>

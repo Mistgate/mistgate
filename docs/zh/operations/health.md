@@ -139,6 +139,8 @@ Hysteria2 检测还会统计两个方向的丢包。去往节点的方向由其�
 
 能否从某个国家境内（默认俄罗斯）访问节点，由 Globalping、封锁名单、TSPU 探测、cheburcheck 和 bsbord 检测，在管理后台中有单独的部分**可达性**：见[可达性](reachability.md)。在这里，**运行状况 → 检测**以最后一列「从俄罗斯访问」显示结论，节点页面上则显示为一行。
 
+![看一个节点的两种视角](../diagrams/two-views.svg)
+
 ## 节点诊断
 
 每个节点 Agent 都会运行 22 项主机检查。这些检查只读取内容：`/proc` 和 `/sys` 下的文件、少量配置文件，以及只读命令（`systemctl list-*`、`nft list`、`timedatectl show`、`dmesg`、`journalctl -k`）。任何更改都必须通过另一个单独确认的步骤执行（见下文「修复」）。
