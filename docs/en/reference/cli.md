@@ -161,7 +161,7 @@ mistgate admin-address --admin-listen host:port [--data-dir DIR]
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | Data directory. The command refuses a directory without a panel database. |
 | `--dev` | `MISTGATE_DEV` | off | A development installation: data in `./.data`. |
 
-Moves the admin to a separate listener, dropping the admin host and the secret admin prefix, the way `mistgate setup --admin-listen` sets it up. It is the way back in when the admin's public address no longer works. The public URL, the agent SNI and the secret subscription, link and probe prefixes stay as they are. It prints the new admin URL (`http://localhost:<port>/`) and a reminder that passkeys registered for the previous address no longer work there: sign in with the password and authenticator code, then add a new passkey. Restart the panel with the same `--admin-listen` afterwards.
+Moves the admin to a separate listener, dropping the admin host and the secret admin prefix, the way `mistgate setup --admin-listen` sets it up. It is the way back in when the admin's public address no longer works. The public URL, the agent SNI and the secret subscription, link and probe prefixes stay as they are. It prints the new admin URL (`http://localhost:<port>/`) and a reminder that passkeys registered for the previous address no longer work there: sign in with the password and authenticator code, then add a new passkey. Then restart the panel: `mistgate serve` reads the stored address itself, so the service needs no `--admin-listen` (a flag there would later differ from the setting).
 
 ### mistgate mcp
 

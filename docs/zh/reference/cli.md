@@ -161,7 +161,7 @@ mistgate admin-address --admin-listen host:port [--data-dir DIR]
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | 数据目录。若目录中没有面板数据库，命令会拒绝执行。 |
 | `--dev` | `MISTGATE_DEV` | off | 开发安装：数据位于 `./.data`。 |
 
-将管理后台移到单独的监听地址，并去掉管理后台主机名和私密管理前缀，效果与 `mistgate setup --admin-listen` 的设置相同。当管理后台的公开地址不再可用时，可用它重新进入面板。公开 URL、Agent SNI 以及订阅、连接和探测的私密前缀保持不变。命令会输出新的管理后台地址（`http://localhost:<port>/`），并提醒为原地址注册的通行密钥在此处不再可用：请使用密码和身份验证器代码登录，然后添加新的通行密钥。之后使用相同的 `--admin-listen` 重启面板。
+将管理后台移到单独的监听地址，并去掉管理后台主机名和私密管理前缀，效果与 `mistgate setup --admin-listen` 的设置相同。当管理后台的公开地址不再可用时，可用它重新进入面板。公开 URL、Agent SNI 以及订阅、连接和探测的私密前缀保持不变。命令会输出新的管理后台地址（`http://localhost:<port>/`），并提醒为原地址注册的通行密钥在此处不再可用：请使用密码和身份验证器代码登录，然后添加新的通行密钥。之后重启面板即可：`mistgate serve` 会自行读取已保存的地址，因此无需在服务中添加 `--admin-listen`（那里的参数日后会与设置不一致）。
 
 ### mistgate mcp
 

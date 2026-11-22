@@ -12,7 +12,7 @@ const adminAddressUsage = `usage: mistgate admin-address --admin-listen host:por
 
   Move the admin to a separate listener (e.g. 127.0.0.1:8443, reached over an SSH tunnel), dropping the admin host
   and the secret admin prefix. The way back in when the admin's public address no longer works. Restart the panel
-  with the same --admin-listen afterwards.
+  afterwards: serve reads the stored address itself.
 `
 
 // runAdminAddress implements `mistgate admin-address`: it stores the separate admin listener the way `mistgate setup
@@ -46,6 +46,6 @@ func runAdminAddress(args []string, out io.Writer) error {
 	}
 	fmt.Fprintf(out, "Admin URL: %s\n", in.adminURL())
 	fmt.Fprintln(out, "Passkeys were registered for the previous address and no longer work here. Sign in with your password and authenticator code, then add a new passkey.")
-	fmt.Fprintf(out, "Restart the panel with --admin-listen %s.\n", listen)
+	fmt.Fprintln(out, "Restart the panel.")
 	return nil
 }

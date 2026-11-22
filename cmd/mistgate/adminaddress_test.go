@@ -41,7 +41,7 @@ func TestAdminAddressMovesTheAdminToAListener(t *testing.T) {
 	if err := runAdminAddress([]string{"--admin-listen", "127.0.0.1:8443", "--data-dir", dir}, &out); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(out.String(), "Admin URL: http://localhost:8443/\n") || !strings.Contains(out.String(), "Restart the panel with --admin-listen 127.0.0.1:8443.") {
+	if !strings.HasPrefix(out.String(), "Admin URL: http://localhost:8443/\n") || !strings.HasSuffix(out.String(), "\nRestart the panel.\n") {
 		t.Errorf("output: %q", out.String())
 	}
 	after := load()
