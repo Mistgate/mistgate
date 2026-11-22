@@ -72,9 +72,12 @@ export function PhotoRow({ status, statusSource, onChanged, demo }: { status?: s
     else setPick(s);
   };
 
-  // the preview's own words name the source it was made from; before any preview the line speaks of the source on the screen
-  const shownSource = isPhotoSource(statusSource) ? statusSource : view;
-  const word = status ? photoStateKey(status) : undefined;
+  // the preview's own words name the source it was made from, and photos in view keep the credit of their source whatever is
+  // picked. While the owner only looks at a source that has no key yet and the preview has no photos, "no key of the other
+  // source" would read as an answer about this one: the line then speaks of the source on the screen and says nothing more
+  const ofPreview = isPhotoSource(statusSource) && (!pick || status === "used");
+  const shownSource = ofPreview ? statusSource : view;
+  const word = status && (!pick || status === "used") ? photoStateKey(status) : undefined;
 
   return (
     <div className="dz-ph">

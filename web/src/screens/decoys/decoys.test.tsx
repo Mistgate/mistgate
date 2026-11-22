@@ -517,6 +517,16 @@ describe("the photos of a generated site", () => {
     expect(row()?.querySelector("input[type=password]")).toBeNull();
   });
 
+  it("looking at a source without a key, a preview without photos says nothing of the other source", async () => {
+    api.getDecoyPhotos.mockResolvedValue({ hasKey: false, hasPixabayKey: false, source: "pixabay" });
+    await view("no_key", "pixabay");
+    expect(row()?.querySelector(".ft")?.textContent).toContain("Pixabay");
+    await click(radio("Pexels"));
+    const foot = row()?.querySelector(".ft");
+    expect(foot?.textContent).not.toContain("Pixabay");
+    expect(foot?.querySelector("a")?.getAttribute("href")).toBe("https://www.pexels.com");
+  });
+
   it("looks at Pexels without a key: a calm hint to Pixabay, nothing is asked of the panel, and the key typed there is Pexels'", async () => {
     api.getDecoyPhotos.mockResolvedValue({ hasKey: false, hasPixabayKey: true, source: "pixabay" });
     api.setDecoyPhotosKey.mockResolvedValue({ hasKey: true, hasPixabayKey: true, source: "pexels" });
