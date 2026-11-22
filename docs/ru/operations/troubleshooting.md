@@ -313,7 +313,7 @@ timedatectl
 | ``master key: … (run `mistgate setup`)`` | Нет `master.key`, и базы ещё нет: выполните `mistgate setup`. |
 | `master key: … is missing but the database exists: restore master.key from your backup …` | Установка потеряла ключ. Верните `master.key` из резервной копии. `setup` здесь откажется: новый ключ не прочтёт хранимые секреты. |
 | `vault: … is accessible to group or others …; run chmod 600 on it` | Выполните `chmod 600` для файла ключа. |
-| `--admin-listen conflicts with the stored admin address …` | Установка настроена на секретный хост или префикс; уберите `--admin-listen`. |
+| `--admin-listen conflicts with the stored admin address …` | Установка настроена на секретный хост или префикс; уберите `--admin-listen`. Чтобы перенести админку на отдельный адрес, выполните [`mistgate admin-address`](../reference/cli.md#mistgate-admin-address) и перезапустите панель. |
 | `--tls-cert and --tls-key go together` | Укажите оба флага или ни одного. |
 
 ## Журнал панели, сроки хранения, экспорт и метрики

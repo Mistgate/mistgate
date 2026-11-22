@@ -137,7 +137,7 @@ func runServe(args []string) error {
 		if *adminListen != "" && in.AdminListen == "" {
 			// Host and prefix modes have the admin on the public listener and their WebAuthn
 			// origins derived from it; a second way in would be reachable but broken.
-			return errors.New("--admin-listen conflicts with the stored admin address (a secret host or path prefix); run setup with --admin-listen instead")
+			return errors.New("--admin-listen conflicts with the stored admin address (a secret host or path prefix); drop it, or move the admin to a separate listener with `mistgate admin-address --admin-listen host:port` and restart the panel")
 		}
 		if *adminListen == "" {
 			*adminListen = in.AdminListen

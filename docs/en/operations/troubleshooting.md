@@ -313,7 +313,7 @@ Start-up errors of `mistgate serve` and what they mean:
 | ``master key: … (run `mistgate setup`)`` | `master.key` is missing and there is no database yet: run `mistgate setup`. |
 | `master key: … is missing but the database exists: restore master.key from your backup …` | The installation lost its key. Put `master.key` back from a backup. `setup` refuses here: a new key cannot read the stored secrets. |
 | `vault: … is accessible to group or others …; run chmod 600 on it` | Run `chmod 600` on the key file. |
-| `--admin-listen conflicts with the stored admin address …` | The installation was set up for a secret host or prefix; drop `--admin-listen`. |
+| `--admin-listen conflicts with the stored admin address …` | The installation was set up for a secret host or prefix; drop `--admin-listen`. To move the admin to a separate listener, run [`mistgate admin-address`](../reference/cli.md#mistgate-admin-address) and restart the panel. |
 | `--tls-cert and --tls-key go together` | Give both or neither. |
 
 ## Panel logs, retention, export and metrics

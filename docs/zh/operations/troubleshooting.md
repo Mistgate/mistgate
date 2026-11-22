@@ -313,7 +313,7 @@ timedatectl
 | ``master key: … (run `mistgate setup`)`` | `master.key` 不存在，数据库也不存在：请运行 `mistgate setup`。 |
 | `master key: … is missing but the database exists: restore master.key from your backup …` | 安装丢失了密钥。请从备份中恢复 `master.key`。此时 `setup` 会拒绝运行：新的主密钥无法解密已存储的机密数据。 |
 | `vault: … is accessible to group or others …; run chmod 600 on it` | 对密钥文件运行 `chmod 600`。 |
-| `--admin-listen conflicts with the stored admin address …` | 安装时设置了私密主机名或路径前缀；移除 `--admin-listen`。 |
+| `--admin-listen conflicts with the stored admin address …` | 安装时设置了私密主机名或路径前缀；移除 `--admin-listen`。如需把管理后台移到单独的监听地址，请运行 [`mistgate admin-address`](../reference/cli.md#mistgate-admin-address) 并重启面板。 |
 | `--tls-cert and --tls-key go together` | 必须同时提供两个参数，或都不提供。 |
 
 ## 面板日志、保留时间、导出和指标

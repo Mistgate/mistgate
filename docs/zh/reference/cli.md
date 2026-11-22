@@ -163,6 +163,13 @@ mistgate admin-address --admin-listen host:port [--data-dir DIR]
 
 将管理后台移到单独的监听地址，并去掉管理后台主机名和私密管理前缀，效果与 `mistgate setup --admin-listen` 的设置相同。当管理后台的公开地址不再可用时，可用它重新进入面板。公开 URL、Agent SNI 以及订阅、连接和探测的私密前缀保持不变。命令会输出新的管理后台地址（`http://localhost:<port>/`），并提醒为原地址注册的通行密钥在此处不再可用：请使用密码和身份验证器代码登录，然后添加新的通行密钥。之后重启面板即可：`mistgate serve` 会自行读取已保存的地址，因此无需在服务中添加 `--admin-listen`（那里的参数日后会与设置不一致）。
 
+迁移之后：
+
+- 无法再回到公开的管理后台。没有任何命令会重新设置管理后台主机名或私密管理前缀，`setup` 也会保持已配置的安装不变。管理后台留在单独的监听地址上，通过 SSH 隧道访问，例如 `ssh -L 8443:127.0.0.1:8443 panel.example.com`。
+- Telegram 通知中不再包含指向管理后台页面的链接：环回地址在服务器之外没有意义，因此面板不再附上这些链接。
+- MCP 客户端和脚本需要使用新地址：通过隧道访问 `http://localhost:<port>/mcp`，或使用 `mistgate mcp --url http://localhost:<port>/`。API 令牌仍然有效。
+- 仅使用通行密钥登录的管理员没有可用的密码。请在面板服务器上运行 `mistgate auth reset-login`：不带登录名时会列出管理员，`mistgate auth reset-login <新登录名> --admin <id>` 会为该管理员添加密码登录和身份验证器应用。参见 [mistgate auth](#mistgate-auth)。
+
 ### mistgate mcp
 
 此本地 MCP 服务器通过标准输入和标准输出与只能启动命令的智能体客户端交互。它会将每条消息转发到面板的 MCP 端点（管理后台 URL 加上 `mcp`），自身不作任何判断：面板会根据令牌权限级别响应。
