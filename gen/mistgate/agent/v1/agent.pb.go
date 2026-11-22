@@ -1689,7 +1689,8 @@ type Hello struct {
 	// "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
 	// "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
 	// by an agent that can also run OS jobs; the panel sends UpdateOs only when it is listed.
-	// "panel-link/1" (NodeSettings.panel_link_url: a link node moves to a new panel link address on its own).
+	// "panel-link/1" (NodeSettings.panel_link_url: a link node moves to a new panel link address on its own); only a link node
+	// lists it, an mTLS node ignores the address.
 	Capabilities []string `protobuf:"bytes,11,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	// Unix time of the source commit this binary was built from (buildinfo.Built), 0 for a build without it.
 	// Orders releases (the version string does not); the panel compares it with the bundle manifest.
@@ -6993,10 +6994,10 @@ type NodeSettings struct {
 	OsStatus bool `protobuf:"varint,15,opt,name=os_status,json=osStatus,proto3" json:"os_status,omitempty"`
 	// A new link address of the panel (the base URL wss://host/<secret-prefix>/, as at enrollment). Empty = no change.
 	// The panel sends it, in HelloAck and DesiredState settings, only to agents with "panel-link/1", and only once the
-	// owner set an address. Only a link node (one enrolled over the link) follows it; an mTLS node ignores it. The agent
-	// saves it as its next address and tries it at its next reconnect: in a HelloAck that session ends at once, in a
-	// DesiredState the session goes on. The new address is committed only after a HelloAck over it, on a session the
-	// panel's CA signed; until then and while it does not answer, the agent keeps using its current address.
+	// owner set an address. Only a link node (one enrolled over the link) lists "panel-link/1" and follows it; an mTLS node
+	// ignores it. The agent saves it as its next address and tries it at its next reconnect: in a HelloAck that session ends
+	// at once, in a DesiredState the session goes on. The new address is committed only after a HelloAck over it, on a
+	// session the panel's CA signed; until then and while it does not answer, the agent keeps using its current address.
 	PanelLinkUrl  string `protobuf:"bytes,17,opt,name=panel_link_url,json=panelLinkUrl,proto3" json:"panel_link_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
