@@ -73,7 +73,6 @@ export const en = {
   "osf.cancel.body": "Nodes that have not started yet are skipped. A job already running on a node is never interrupted: it finishes and is still checked.",
   "osf.cancel.keep": "Keep going",
   "osf.cancel.go": "Cancel the update",
-  "osf.cancelling.text": "Cancelling. The nodes that have not started are skipped; the panel waits for the jobs already running to finish.",
   "osf.stop.retried": "This node was already retried once, so only skipping it or closing the run is left.",
   "osf.leg.done": "Done: {n}",
   "osf.leg.working": "Updating: {n}",
@@ -106,7 +105,6 @@ export const en = {
   "os.step.err.skipped_after_failure": "This node had failed. You chose to skip it and carry on.",
   "os.step.err.reboot_blocked": "Left alone: a reboot would be refused, so nothing was changed.",
   "os.pause.owner": "The update is paused.",
-  "os.pause.cancel_wait": "The update is being cancelled.",
 
   // ---- one node: "All packages" next to the security updates
   "osf.one.title.all": "Install all updates on {node}",
@@ -207,7 +205,6 @@ export const ru: Record<keyof typeof en, string> = {
   "osf.cancel.body": "Ноды, до которых ещё не дошло дело, будут пропущены. Задание, которое уже идёт на ноде, никогда не прерывается: оно доработает до конца и всё равно будет проверено.",
   "osf.cancel.keep": "Пусть идёт",
   "osf.cancel.go": "Отменить обновление",
-  "osf.cancelling.text": "Отмена. Ноды, которые ещё не начали, пропущены; панель ждёт, пока закончатся уже идущие задания.",
   "osf.stop.retried": "Эту ноду уже повторяли один раз, поэтому остаётся пропустить её или закрыть запуск.",
   "osf.leg.done": "Готово: {n}",
   "osf.leg.working": "Идёт: {n}",
@@ -240,7 +237,6 @@ export const ru: Record<keyof typeof en, string> = {
   "os.step.err.skipped_after_failure": "На этой ноде был сбой. Ты решил пропустить её и идти дальше.",
   "os.step.err.reboot_blocked": "Не тронута: перезагрузка была бы отклонена, поэтому ничего не менялось.",
   "os.pause.owner": "Обновление на паузе.",
-  "os.pause.cancel_wait": "Обновление отменяется.",
 
   "osf.one.title.all": "Установить все обновления на {node}",
   "osf.one.lead.all": "Панель просит ноду поставить все ожидающие обновления: и безопасности, и обычные. Подходит, когда нужна полностью свежая система.",
@@ -338,7 +334,6 @@ export const zh: Record<keyof typeof en, string> = {
   "osf.cancel.body": "尚未开始的节点将被跳过。节点上已在运行的任务绝不会被中断：它会运行完，并照常接受检查。",
   "osf.cancel.keep": "继续运行",
   "osf.cancel.go": "取消更新",
-  "osf.cancelling.text": "正在取消。尚未开始的节点已被跳过；面板正在等待运行中的任务结束。",
   "osf.stop.retried": "这个节点已经重试过一次，只能跳过它或关闭本次运行。",
   "osf.leg.done": "完成：{n}",
   "osf.leg.working": "更新中：{n}",
@@ -371,7 +366,6 @@ export const zh: Record<keyof typeof en, string> = {
   "os.step.err.skipped_after_failure": "这个节点之前失败了。你选择了跳过它并继续。",
   "os.step.err.reboot_blocked": "未处理：重启会被拒绝，所以没有做任何改动。",
   "os.pause.owner": "更新已暂停。",
-  "os.pause.cancel_wait": "更新正在取消。",
 
   "osf.one.title.all": "在 {node} 上安装全部更新",
   "osf.one.lead.all": "面板请节点安装所有待装更新，包括安全更新和普通更新。想让整个系统保持最新时使用。",
@@ -469,7 +463,6 @@ export const fa: Record<keyof typeof en, string> = {
   "osf.cancel.body": "نودهایی که هنوز نوبتشان نرسیده کنار گذاشته می‌شوند. کاری که از قبل روی یک نود در حال اجراست هرگز قطع نمی‌شود: تا آخر انجام می‌شود و باز هم بررسی می‌شود.",
   "osf.cancel.keep": "ادامه بده",
   "osf.cancel.go": "لغو به‌روزرسانی",
-  "osf.cancelling.text": "در حال لغو. نودهایی که شروع نکرده‌اند کنار گذاشته شدند؛ پنل منتظر پایان کارهای در حال اجرا است.",
   "osf.stop.retried": "این نود قبلاً یک بار دوباره امتحان شده، پس فقط می‌توانی از آن رد شوی یا اجرا را ببندی.",
   "osf.leg.done": "انجام‌شده: {n}",
   "osf.leg.working": "در حال به‌روزرسانی: {n}",
@@ -502,7 +495,6 @@ export const fa: Record<keyof typeof en, string> = {
   "os.step.err.skipped_after_failure": "این نود خطا داده بود. تو انتخاب کردی از آن رد شوی و ادامه بدهی.",
   "os.step.err.reboot_blocked": "دست نخورد: راه‌اندازی مجدد رد می‌شد، پس چیزی تغییر نکرد.",
   "os.pause.owner": "به‌روزرسانی متوقف شده است.",
-  "os.pause.cancel_wait": "به‌روزرسانی در حال لغو است.",
 
   "osf.one.title.all": "نصب همهٔ به‌روزرسانی‌ها روی {node}",
   "osf.one.lead.all": "پنل از نود می‌خواهد همهٔ به‌روزرسانی‌های منتظر، چه امنیتی چه معمولی، را نصب کند. وقتی می‌خواهی کل سیستم تازه باشد از این استفاده کن.",
@@ -600,7 +592,6 @@ export const tr: Record<keyof typeof en, string> = {
   "osf.cancel.body": "Henüz sırası gelmemiş düğümler atlanır. Bir düğümde zaten çalışan iş asla kesilmez: sonuna kadar çalışır ve yine kontrol edilir.",
   "osf.cancel.keep": "Devam etsin",
   "osf.cancel.go": "Güncellemeyi iptal et",
-  "osf.cancelling.text": "İptal ediliyor. Başlamamış düğümler atlandı; panel, çalışmakta olan işlerin bitmesini bekliyor.",
   "osf.stop.retried": "Bu düğüm zaten bir kez yeniden denendi; geriye onu atlamak ya da çalıştırmayı kapatmak kalıyor.",
   "osf.leg.done": "Bitti: {n}",
   "osf.leg.working": "Güncelleniyor: {n}",
@@ -633,7 +624,6 @@ export const tr: Record<keyof typeof en, string> = {
   "os.step.err.skipped_after_failure": "Bu düğüm hata vermişti. Onu atlayıp devam etmeyi seçtin.",
   "os.step.err.reboot_blocked": "Dokunulmadı: yeniden başlatma reddedilirdi, bu yüzden hiçbir şey değişmedi.",
   "os.pause.owner": "Güncelleme duraklatıldı.",
-  "os.pause.cancel_wait": "Güncelleme iptal ediliyor.",
 
   "osf.one.title.all": "{node} üzerine tüm güncellemeleri kur",
   "osf.one.lead.all": "Panel, düğümden bekleyen tüm güncellemeleri, hem güvenlik hem sıradan, kurmasını ister. Sistemin tamamının güncel olmasını istediğinde kullan.",

@@ -801,10 +801,38 @@ func TestOsCancel(t *testing.T) {
 
 	e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
 	e.osTick()
-	if _, err := e.s.cancelOs(e.ctx, ""); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "os_cancel_inflight") {
-		t.Fatalf("cancel while the job runs on the node = %v", err)
+	got, err = e.s.cancelOs(e.ctx, "")
+	if err != nil || got.Status != store.RolloutPaused || got.PauseKey != pauseCancelWait {
+		t.Fatalf("cancel while the job runs on the node = %+v, %v", got, err)
 	}
-	e.wantOsRollout(store.RolloutRunning, "")
+	e.wantOsRollout(store.RolloutPaused, pauseCancelWait)
+	x := e.osStep(id)
+	e.osEvent(id, "os_update_failed", map[string]string{"job_id": x.JobID, "code": osupdate.CodeInstallFailed})
+	e.osTick()
+	e.wantOsStep(id, store.OsStepFailed, osErrJobFailed)
+	e.wantOsRollout(store.RolloutCancelled, "")
+}
+
+func TestOsCancelWaitReadsLegacyPauseParams(t *testing.T) {
+	e := newEnv(t)
+	id := e.osNode("de1")
+	ro := e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
+	e.osTick()
+	legacy := map[string]string{"cancel_requested": "true"}
+	if _, err := e.st.SetOsRolloutStatus(e.ctx, ro.ID, []string{store.RolloutRunning}, store.RolloutPaused, pauseCancelWait, legacy, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	if !isCancelWait("", legacy) {
+		t.Fatal("the old OS cancel marker is no longer recognized")
+	}
+	if _, err := e.s.resumeOs(e.ctx, ro.ID, false); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("resume of a stored cancellation wait = %v", err)
+	}
+	x := e.osStep(id)
+	e.osEvent(id, "os_update_failed", map[string]string{"job_id": x.JobID, "code": osupdate.CodeInstallFailed})
+	e.osTick()
+	e.wantOsStep(id, store.OsStepFailed, osErrJobFailed)
+	e.wantOsRollout(store.RolloutCancelled, "")
 }
 
 func TestOsRolloutPrune(t *testing.T) {

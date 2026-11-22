@@ -88,6 +88,15 @@ func (e *nodeLinkEmu) nowMs() int64 { return e.now().UnixMilli() }
 // advance moves the emulated clock forward. Timers are not re-armed: call runAlarm.
 func (e *nodeLinkEmu) advance(d time.Duration) { e.offset.Add(int64(d)) }
 
+// advanceBetweenSteps moves the clock as an event of the node's object, so no step of it is under way when time jumps. A
+// step sends its frames before it stores its alarm: a test that saw the agent act on a frame and moved the clock at once
+// would have that step clamp a deadline counted on the old clock to "now + MIN_ALARM_GAP_MS" on the new one, and the
+// alarm would not be due. Use it before runAlarm.
+func (e *nodeLinkEmu) advanceBetweenSteps(nodeID string, d time.Duration) {
+	o := e.object(nodeID)
+	o.do(func() { e.advance(d) })
+}
+
 // limits are BLOCK_MS and STEP_MS: tests shorten them for the moment a step is meant to run out of time.
 func (e *nodeLinkEmu) limits() (budget, stepMax time.Duration) {
 	e.mu.Lock()
@@ -311,7 +320,7 @@ func (e *nodeLinkEmu) Poke(ctx context.Context, nodeIDs []string) error {
 }
 
 // runAlarm is the platform calling alarm(). The platform does so only for an armed alarm whose time has come, so this
-// fails the test when none is armed or it is not due yet (move the clock with advance or advanceToAlarm first).
+// fails the test when none is armed or it is not due yet (move the clock with advanceBetweenSteps or advanceToAlarm first).
 func (e *nodeLinkEmu) runAlarm(nodeID string) { e.callAlarm(nodeID, true) }
 
 // runAlarmIfArmed is runAlarm for a clock moved past a deadline that the object may re-arm at any moment (it does so when it

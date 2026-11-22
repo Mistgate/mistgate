@@ -2,9 +2,10 @@ import type { StatusKind } from "@/components/ui/status";
 import { OsRebootPolicy, OsRolloutMode, OsRolloutStatus, OsStepState } from "@/gen/mistgate/admin/v1/update_pb";
 import type { T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
-import { elapsedText, keyTail, minutesUntil, blockOf, stepPill } from "./os-run";
+import { elapsedText, minutesUntil, blockOf, stepPill } from "./os-run";
 import { minutesText } from "./format";
 import type { Os, OsRow, OsRun, OsStepRow } from "./os-updates";
+import { isCancelWait } from "./updates";
 
 // The OS update of several nodes in one run (UpdateService.StartOsRollout with up to 20 node ids): what the window offers and
 // how it orders the nodes, and how a running or stopped run reads (a queue by stages, the state of each node, why one waits).
@@ -81,7 +82,7 @@ export function fleetPhase(r: OsRun): FleetPhase {
     case OsRolloutStatus.RUNNING:
       return "running";
     case OsRolloutStatus.PAUSED:
-      if (keyTail(r.pauseKey) === "cancel_wait") return "cancelling";
+      if (isCancelWait(r.pauseKey, r.pauseParams)) return "cancelling";
       return failedOf(r) ? "stopped" : "paused";
     case OsRolloutStatus.CANCELLED:
       return "cancelled";

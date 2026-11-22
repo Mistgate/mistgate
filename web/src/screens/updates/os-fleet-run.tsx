@@ -254,7 +254,7 @@ export function OsFleetRun({ run, owner, actions, nowSec, askingCancel }: { run:
         )}
       </div>
       <Bar run={run} nowSec={nowSec} />
-      {phase === "cancelling" && <Notice tone="quiet">{t("osf.cancelling.text")}</Notice>}
+      {phase === "cancelling" && <Notice tone="quiet">{t("updates.pause.cancel_wait")}</Notice>}
       {culprit && <StoppedBanner run={run} step={culprit} owner={owner} actions={actions} />}
       {open && (
         <div className="border-t border-line pt-2">
