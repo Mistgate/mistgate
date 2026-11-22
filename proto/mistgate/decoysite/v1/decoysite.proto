@@ -12,7 +12,7 @@ import "mistgate/admin/v1/node.proto";
 // Refusals are FAILED_PRECONDITION / INVALID_ARGUMENT / NOT_FOUND / ALREADY_EXISTS whose message is a stable code, optionally
 // followed by ": key=value" (values URL-escaped): decoy_site_not_found, decoy_name_taken, decoy_name_invalid, decoy_note_invalid,
 // decoy_library_full, decoy_site_in_use (nodes=<ids>, panel=1), decoy_site_draft, decoy_site_not_draft, decoy_version_not_found,
-// decoy_file_not_found, decoy_file_binary, decoy_page_not_found, decoy_preview_too_large, decoy_template_unknown, decoy_template_seed, decoy_photos_key_invalid, node_not_assigned, node_retired,
+// decoy_file_not_found, decoy_file_binary, decoy_page_not_found, decoy_preview_too_large, decoy_template_unknown, decoy_template_seed, decoy_photos_key_invalid, decoy_photos_source_invalid, decoy_photos_no_key, node_not_assigned, node_retired,
 // panel_unavailable / panel_too_large / panel_no_index / panel_invalid, and decoy_bundle_<reason> (with ": path=<entry>") for an
 // archive the bundle rules refuse (empty, bad_archive, too_large, too_many_files, bad_path, not_static, no_index, duplicate).
 service DecoySiteService {
@@ -61,12 +61,16 @@ service DecoySiteService {
   // Makes a site of a kind from a seed and saves it to the library as a new ready site (source "upload", source_label
   // "template:<kind>"). The name defaults to the site's own brand, the note to the kind's name. Limits as CreateDecoySite.
   rpc GenerateDecoySite(GenerateDecoySiteRequest) returns (GenerateDecoySiteResponse);
-  // Photos for generated sites come from Pexels (pexels.com) with the owner's own free API key. Whether a key is stored; the
-  // key itself never comes back. Owner only.
+  // Photos for generated sites come from Pexels (pexels.com) or Pixabay (pixabay.com) with the owner's own free API key of that
+  // source. Which keys are stored and which source is in use; a key itself never comes back. Owner only.
   rpc GetDecoyPhotos(GetDecoyPhotosRequest) returns (GetDecoyPhotosResponse);
-  // Stores the Pexels key, or removes it when key is empty. Owner only; the audit log records that it was set or removed, never
-  // the value. Without a key every generated site is drawn, as before.
+  // Stores the key of a source (Pexels when source is empty, as before Pixabay came), or removes it when key is empty. A key that is
+  // stored becomes the source in use; removing the key of the source in use passes to the other source when it has a key. Owner
+  // only; the audit log records that a key was set or removed and for which source, never the value. Without a key every
+  // generated site is drawn, as before.
   rpc SetDecoyPhotosKey(SetDecoyPhotosKeyRequest) returns (SetDecoyPhotosKeyResponse);
+  // Picks the source of the photos when both have a key (a source with no key is refused: decoy_photos_no_key). Owner only.
+  rpc SetDecoyPhotosSource(SetDecoyPhotosSourceRequest) returns (SetDecoyPhotosSourceResponse);
 }
 
 // One check of a site's version. level "required" (a failed one cannot exist: the version would not have been saved) or "warning".
@@ -393,11 +397,13 @@ message PreviewDecoyTemplateResponse {
   string seed = 2;
   // The name GenerateDecoySite would give the site.
   string name = 3;
-  // Whether the preview has photographs: "used", or why not: "no_key" (none stored), "bad_key" (Pexels refused it), "limit"
-  // (Pexels asked to wait), "unavailable" (no answer, nothing found, a broken file), "none_for_kind" (this kind or variant shows
-  // none). Without photos the site is drawn and everything else works. GenerateDecoySite saves the previewed site (photos
-  // included) for 15 minutes after the preview.
+  // Whether the preview has photographs: "used", or why not: "no_key" (none stored for the source in use), "bad_key" (the source
+  // refused the key), "limit" (the source asked to wait), "unavailable" (no answer, nothing found, a broken file), "none_for_kind"
+  // (this kind or variant shows none). Without photos the site is drawn and everything else works. GenerateDecoySite saves the
+  // previewed site (photos included) for 15 minutes after the preview.
   string photos = 4;
+  // The source the photos above are about: "pexels" or "pixabay" ("" for none_for_kind: nothing was asked of any).
+  string photos_source = 5;
 }
 
 message GenerateDecoySiteRequest {
@@ -422,14 +428,37 @@ message GenerateDecoySiteResponse {
 message GetDecoyPhotosRequest {}
 
 message GetDecoyPhotosResponse {
+  // Whether a Pexels key is stored (the field is older than Pixabay: it keeps saying so).
   bool has_key = 1;
+  // Whether a Pixabay key is stored.
+  bool has_pixabay_key = 2;
+  // The source in use: "pexels" or "pixabay". With one key it is that key's source; with both, the one the owner picked (the one
+  // whose key was stored last, until a pick); with none, "pixabay".
+  string source = 3;
 }
 
 message SetDecoyPhotosKeyRequest {
-  // A Pexels API key, 8 to 256 characters without spaces; write-only. "" removes it.
+  // An API key, 8 to 256 characters without spaces; write-only. "" removes it.
   string key = 1;
+  // Whose key: "pexels" (also when empty) or "pixabay".
+  string source = 2;
 }
 
+// The state after the call, as GetDecoyPhotosResponse.
 message SetDecoyPhotosKeyResponse {
   bool has_key = 1;
+  bool has_pixabay_key = 2;
+  string source = 3;
+}
+
+message SetDecoyPhotosSourceRequest {
+  // "pexels" or "pixabay"; the source must have a key.
+  string source = 1;
+}
+
+// The state after the call, as GetDecoyPhotosResponse.
+message SetDecoyPhotosSourceResponse {
+  bool has_key = 1;
+  bool has_pixabay_key = 2;
+  string source = 3;
 }

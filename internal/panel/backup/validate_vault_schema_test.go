@@ -5,6 +5,7 @@ package backup
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -122,5 +123,52 @@ func TestRestoreRefusesForeignTaskPromptAndFollowUpNote(t *testing.T) {
 		if _, err := st.W.ExecContext(ctx, `DELETE FROM scheduled_task; DELETE FROM assistant_follow_up`); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// The photo keys of both sources (Pexels and Pixabay) are checked on restore, each by its own name, and a key sealed for one source
+// does not pass as the other's.
+func TestRestoreChecksTheKeysOfBothPhotoSources(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "panel.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	own := bytes.Repeat([]byte{0x11}, vault.KeySize)
+	foreign := bytes.Repeat([]byte{0x22}, vault.KeySize)
+	ownVault, err := vault.New(own)
+	if err != nil {
+		t.Fatal(err)
+	}
+	put := func(k, aad string) {
+		t.Helper()
+		sealed := base64.StdEncoding.EncodeToString(ownVault.Seal([]byte("not-a-real-photo-key-0123456789"), aad))
+		if _, err := st.W.ExecContext(ctx, `INSERT OR REPLACE INTO setting(k, v) VALUES(?, ?)`, k, sealed); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put("decoy.photos.key", "setting/decoy.photos.key")
+	put("decoy.photos.pixabay.key", "setting/decoy.photos.pixabay.key")
+	if _, err := st.W.ExecContext(ctx, `INSERT OR REPLACE INTO setting(k, v) VALUES('decoy.photos.source', 'pixabay')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateSealedDatabaseValues(ctx, st.R, own); err != nil {
+		t.Fatalf("both keys under their own master.key: %v", err)
+	}
+	if err := validateSealedDatabaseValues(ctx, st.R, foreign); err == nil || !strings.Contains(err.Error(), "decoy.photos") {
+		t.Fatalf("both keys under a foreign master.key: %v", err)
+	}
+	// the Pixabay key alone under a foreign master.key names itself
+	if _, err := st.W.ExecContext(ctx, `DELETE FROM setting WHERE k = 'decoy.photos.key'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateSealedDatabaseValues(ctx, st.R, foreign); err == nil || !strings.Contains(err.Error(), "decoy.photos.pixabay.key") {
+		t.Fatalf("the Pixabay key under a foreign master.key: %v", err)
+	}
+	// a value sealed for the other source's name is refused
+	put("decoy.photos.pixabay.key", "setting/decoy.photos.key")
+	if err := validateSealedDatabaseValues(ctx, st.R, own); err == nil || !strings.Contains(err.Error(), "decoy.photos.pixabay.key") {
+		t.Fatalf("a Pixabay key sealed under the Pexels name: %v", err)
 	}
 }

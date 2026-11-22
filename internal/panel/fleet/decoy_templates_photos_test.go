@@ -167,7 +167,7 @@ func TestPhotosKeyIsStoredSealedAndNeverShown(t *testing.T) {
 	if err != nil || !set.Msg.HasKey || !has() {
 		t.Fatalf("set: %v %v", set, err)
 	}
-	if got := e.f.photoKey(e.ctx); got.Reveal() != pexelsTestKey {
+	if got := e.f.photoKey(e.ctx, "pexels"); got.Reveal() != pexelsTestKey {
 		t.Fatal("the stored key is not the one that was set (trimmed)")
 	}
 	// the stored value is sealed, not the key

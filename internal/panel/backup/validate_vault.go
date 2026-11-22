@@ -137,8 +137,10 @@ var restoredSealedSettingKeys = []struct {
 	{"cheburcheck.token", "setting/cheburcheck.token"},
 	// setting.bsbord.key uses keyAAD; see bsbord.rpc.UpdateBsbord in bsbord/service.go.
 	{"bsbord.key", "setting/bsbord.key"},
-	// setting.decoy.photos.key uses photoKeyAAD; see Fleet.SetDecoyPhotosKey in fleet/decoy_templates.go.
+	// setting.decoy.photos.key uses photoKeyAAD; see decoySiteService.SetDecoyPhotosKey in fleet/decoy_templates.go (the Pexels key).
 	{"decoy.photos.key", "setting/decoy.photos.key"},
+	// setting.decoy.photos.pixabay.key uses pixabayKeyAAD, the same file.
+	{"decoy.photos.pixabay.key", "setting/decoy.photos.pixabay.key"},
 }
 
 func validateSealedDatabaseValues(ctx context.Context, db *sql.DB, key []byte) error {
