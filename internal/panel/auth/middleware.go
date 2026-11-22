@@ -128,7 +128,7 @@ func (s *Service) RequireSession(next http.Handler) http.Handler {
 			s.serveToken(w, r, next)
 			return
 		}
-		sess, admin, err := s.resolveSession(r.Context(), sessionToken(r.Header))
+		sess, admin, err := s.resolveSession(r.Context(), s.sessionToken(r.Header))
 		if err != nil {
 			writeJSONError(w, http.StatusUnauthorized, unauthenticatedBody)
 			return

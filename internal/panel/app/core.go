@@ -45,6 +45,13 @@ import (
 	"github.com/mistgate/mistgate/internal/statehash"
 )
 
+func globalpingIPv6Error(err error) error {
+	if errors.Is(err, globalping.ErrDisabled) {
+		return fleet.ErrGlobalpingOff
+	}
+	return err
+}
+
 func nodeUpdateReleaseKey(dataDir string, onEdge bool) (ed25519.PublicKey, error) {
 	key, err := buildinfo.ReleasePublicKey()
 	if dataDir != "" && !onEdge {
@@ -260,7 +267,8 @@ func wireCore(c Config) (*core, error) {
 	fcfg.OnAwgPrepareFailed = tg.AwgPrepareFailed
 	// the last resort of the IPv6 check of a node; Globalping is built after the fleet, hence the late binding
 	fcfg.GlobalpingTCP6 = func(ctx context.Context, addr string, port uint16) (int, int, error) {
-		return k.gp.ProbeTCP6(ctx, addr, port)
+		answered, connected, err := k.gp.ProbeTCP6(ctx, addr, port)
+		return answered, connected, globalpingIPv6Error(err)
 	}
 	k.fl, err = fleet.New(st, vlt, b.reg, fcfg)
 	if err != nil {

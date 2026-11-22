@@ -124,6 +124,7 @@ type location struct {
 	ASN     uint32   `json:"asn,omitempty"`
 	City    string   `json:"city,omitempty"`
 	Tags    []string `json:"tags,omitempty"`
+	Magic   string   `json:"magic,omitempty"`
 	Limit   int      `json:"limit,omitempty"`
 }
 

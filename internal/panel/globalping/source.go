@@ -387,7 +387,7 @@ func (s *Service) ProbeTCP6(ctx context.Context, addr string, port uint16) (answ
 	defer done()
 	tctx, cancel := context.WithTimeout(tctx, 40*time.Second)
 	defer cancel()
-	c, err := src.create(tctx, measurementRequest{Type: "ping", Target: addr, Locations: []location{{Limit: 2}},
+	c, err := src.create(tctx, measurementRequest{Type: "ping", Target: addr, Locations: []location{{Magic: "world", Limit: 2}},
 		MeasurementOptions: pingOptions{Protocol: "TCP", Port: port, Packets: pingPackets}})
 	if err != nil {
 		return 0, 0, err

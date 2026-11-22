@@ -93,8 +93,8 @@ type Config struct {
 	// the panel time. Must not block.
 	OnAwgPrepareFailed func(nodeID, code string, at int64)
 	// GlobalpingTCP6 asks Globalping for a TCP ping of port on an IPv6 address from probes around the world, and says how many
-	// probes answered and how many of them connected. It is the last resort of CheckIPv6, when no node can send over IPv6. Nil, or an
-	// error, means Globalping is not there to ask.
+	// probes answered and how many of them connected. It is the last resort of CheckIPv6, when no node can send over IPv6. Nil means
+	// there is no Globalping source; ErrGlobalpingOff distinguishes an explicitly disabled source from a failed check.
 	GlobalpingTCP6 func(ctx context.Context, addr string, port uint16) (answered, connected int, err error)
 	// Actor returns the admin id for audit rows. Default: the signed-in admin from the auth interceptor.
 	Actor func(context.Context) string

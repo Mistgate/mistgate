@@ -36,9 +36,9 @@ var (
 // differ from it in text and data, not in structure, and there are sixteen of them: with 40 the package ran past the 10 minute limit in CI).
 func seedsFor(c tcase) int {
 	if c.cc == DefaultCountry {
-		return 120
+		return 200
 	}
-	return 6
+	return 12
 }
 
 var titleTag = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
@@ -178,6 +178,7 @@ func TestGenerateValid(t *testing.T) {
 	for _, c := range cases(t) {
 		kind := c.kind
 		t.Run(c.String(), func(t *testing.T) {
+			t.Parallel() // the cases share nothing, and one after another the package does not fit its ten minutes on a slow runner
 			largest := 0
 			for i := 0; i < seedsFor(c); i++ {
 				files := mustGenerate(t, c, i)
@@ -250,6 +251,7 @@ func titleOf(files []File) string {
 func TestGenerateDiffers(t *testing.T) {
 	for _, c := range cases(t) {
 		t.Run(c.String(), func(t *testing.T) {
+			t.Parallel() // the cases share nothing, and one after another the package does not fit its ten minutes on a slow runner
 			same := 0
 			for i := 0; i < 60; i++ {
 				a, b := mustGenerate(t, c, i), mustGenerate(t, c, i+1000)
@@ -332,6 +334,7 @@ func sharedRun(a, b []File, limit int) string {
 func TestGenerateNoSharedRuns(t *testing.T) {
 	for _, c := range cases(t) {
 		t.Run(c.String(), func(t *testing.T) {
+			t.Parallel() // the cases share nothing, and one after another the package does not fit its ten minutes on a slow runner
 			for i := 0; i < 12; i++ {
 				if run := sharedRun(mustGenerate(t, c, i), mustGenerate(t, c, i+500), 200); run != "" {
 					t.Errorf("pair %d: more than 200 bytes in common: %s", i, run)
@@ -377,6 +380,7 @@ func TestGenerateClean(t *testing.T) {
 	for _, c := range cases(t) {
 		kind := c.kind
 		t.Run(c.String(), func(t *testing.T) {
+			t.Parallel() // the cases share nothing, and one after another the package does not fit its ten minutes on a slow runner
 			for i := 0; i < seedsFor(c); i++ {
 				for _, f := range mustGenerate(t, c, i) {
 					if f.Path == "robots.txt" {
