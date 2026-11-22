@@ -3,6 +3,8 @@ title: WARP
 description: How to send a profile's traffic out through Cloudflare WARP, how to get an account for a node, what fail-closed means, and how to read and fix the WARP link.
 ---
 
+![The WARP card of a node: the tunnel is up and the egress check passes, then the tunnel goes down and the card offers a restart](../../images/readme/warp-dark-en.webp)
+
 By default a profile's traffic leaves a node from the node's own address. With WARP it leaves through Cloudflare's network instead: sites see a Cloudflare address, not your hoster's. A node has at most one WARP account, and every profile with the WARP exit on that node goes through it. Hysteria2, VLESS and AmneziaWG profiles can use it.
 
 ## How it fits together

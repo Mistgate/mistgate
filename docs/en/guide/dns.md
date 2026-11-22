@@ -3,6 +3,8 @@ title: DNS
 description: What a DNS preset is, how split DNS works, which preset applies to a person, the DNS a person picks for the apps on the link and per server, how each app receives it, and when a change reaches people.
 ---
 
+![The DNS tab of Subscriptions: the presets, then one opened with its servers and what each app gets, then its split rules](../../images/readme/dns-dark-en.webp)
+
 A DNS preset decides which DNS servers a person's app asks, and how. The queries travel inside the tunnel, so the person's provider does not see them. The panel ships ready presets (one is the default for everyone), and you can make your own and give one to a user or a group. Presets live on the **DNS** tab of **Subscriptions**.
 
 This is the DNS of the apps. The node has DNS settings of its own: see "Node DNS is something else" below.

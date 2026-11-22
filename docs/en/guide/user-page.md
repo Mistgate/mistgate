@@ -3,6 +3,8 @@ title: User page
 description: What a person sees when they open their link in a browser, how the page password works, and how the admin previews the page.
 ---
 
+![A person's card in the admin: traffic, the subscription link and the window with its QR code](../../images/readme/link-dark-en.webp)
+
 The user page is what a browser gets at a person's subscription link: a page made for that person, with their status, their traffic and simple steps to connect. It is the page you send people to; they do not need an account or the admin. Its options and the apps it recommends are set on the **User page** tab of **Subscriptions** (see [Subscriptions](subscriptions.md)).
 
 ## What the person sees

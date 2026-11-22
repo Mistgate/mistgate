@@ -3,6 +3,8 @@ title: افزودن نود
 description: بین نصب از راه SSH و نصب دستی یکی را انتخاب کنید، سروری را با فرمان یک‌بارمصرف ثبت کنید، آنلاین شدنش را ببینید و بعداً تمیز حذفش کنید.
 ---
 
+![A New node window: the server's address, then the login, the checks and the install steps one after another until the node is connected](../../images/readme/addnode-dark-en.webp)
+
 نود وقتی به مجموعه می‌پیوندد که ایجنتش از پنل گواهی بگیرد، خودش را به‌صورت سرویس systemd نصب کند و وصل شود. **نودها ← افزودن نود** دو راه پیشنهاد می‌کند:
 
 | راه | کاری که می‌کنید | چه وقت انتخابش کنید |
