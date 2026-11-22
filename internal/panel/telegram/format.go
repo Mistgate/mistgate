@@ -946,6 +946,7 @@ var toolTitles = map[string]localizedText{
 	"subscription_host_set":       {en: "Move the panel address onto a node subdomain", ru: "Перенести адрес панели на поддомен ноды", zh: "将面板地址迁移到节点子域名"},
 	"subscription_host_move":      {en: "Change the subscription host’s node", ru: "Сменить ноду хоста подписок", zh: "更换订阅主机的节点"},
 	"subscription_host_disable":   {en: "Turn the subscription host off", ru: "Отключить хост подписок", zh: "关闭订阅主机"},
+	"subscription_host_caa_waive": {en: "Let the subscription host go without its CAA record", ru: "Разрешить хосту подписок обойтись без CAA-записи", zh: "允许订阅主机在没有 CAA 记录时就绪"},
 }
 
 // planWaitingText says an agent's plan waits for the owner. It never says what the plan contains beyond the tool's title:

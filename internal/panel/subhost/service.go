@@ -518,6 +518,7 @@ func (s *Service) view(ctx context.Context) (*subhostv1.SubscriptionHost, error)
 		h.NotReady = s.notReady(ctx, st)
 	}
 	h.CaaRecord, h.CaaStatus = s.caa(ctx, st.Domain)
+	h.CaaWaived = s.caaWaived(ctx, st)
 	return h, nil
 }
 

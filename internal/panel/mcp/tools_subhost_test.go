@@ -28,6 +28,8 @@ type fakeSubHost struct {
 	dnsMismatch         bool
 	downReason          string // of the serving node's bridge; "" = up
 	set, moves, disable []string
+	waived              int
+	caaStatus           string
 }
 
 func (f *fakeSubHost) view() *subhostv1.SubscriptionHost {
@@ -39,6 +41,7 @@ func (f *fakeSubHost) view() *subhostv1.SubscriptionHost {
 	if f.node != "" {
 		h.Bridges = []*subhostv1.SubscriptionHostBridge{{NodeId: f.node, Up: f.downReason == "", DownReason: f.downReason}}
 		h.NotReady = []string{"panel_cert"}
+		h.CaaStatus, h.CaaWaived = f.caaStatus, f.waived > 0
 	}
 	return h
 }
@@ -88,6 +91,13 @@ func (f *fakeSubHost) DisableSubscriptionHost(_ context.Context, r *connect.Requ
 	f.disable = append(f.disable, r.Msg.GetPublicUrl()+" "+strconv.FormatBool(r.Msg.GetForce()))
 	f.state, f.publicURL = subhostv1.SubscriptionHostState_SUBSCRIPTION_HOST_STATE_LEAVING, r.Msg.GetPublicUrl()
 	return connect.NewResponse(&subhostv1.DisableSubscriptionHostResponse{Host: f.view()}), nil
+}
+
+func (f *fakeSubHost) WaiveSubscriptionHostCAA(context.Context, *connect.Request[subhostv1.WaiveSubscriptionHostCAARequest]) (*connect.Response[subhostv1.WaiveSubscriptionHostCAAResponse], error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.waived++
+	return connect.NewResponse(&subhostv1.WaiveSubscriptionHostCAAResponse{Host: f.view()}), nil
 }
 
 func noSubHostSecret(t *testing.T, what, out string) {
@@ -185,5 +195,53 @@ func TestSubscriptionHostPlansWaitForTheOwner(t *testing.T) {
 	}
 	for _, p := range e.plans.byID {
 		noSubHostSecret(t, p.Tool, p.ParamsJSON+p.FactsJSON+p.Summary+p.Result)
+	}
+}
+
+// Proceeding without the CAA record is the owner's approved choice: planned only while there is something to waive, applied
+// only with the confirm token, refused once the domain changed (High-1).
+func TestSubscriptionHostCAAWaivePlan(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	if out := mustFail(t, s, "subscription_host_caa_waive_plan", map[string]any{}); !strings.Contains(out, "on or moving") {
+		t.Fatalf("a waiver planned with no host: %s", out)
+	}
+	e.w.subhost.mu.Lock()
+	e.w.subhost.state, e.w.subhost.domain, e.w.subhost.node = subhostv1.SubscriptionHostState_SUBSCRIPTION_HOST_STATE_ON, "sub.example.com", "de1"
+	e.w.subhost.caaStatus = "present"
+	e.w.subhost.mu.Unlock()
+	if out := mustFail(t, s, "subscription_host_caa_waive_plan", map[string]any{}); !strings.Contains(out, "nothing to waive") {
+		t.Fatalf("a waiver planned with the record published: %s", out)
+	}
+	e.w.subhost.mu.Lock()
+	e.w.subhost.caaStatus = "absent"
+	e.w.subhost.mu.Unlock()
+	p := planOf(t, s, "subscription_host_caa_waive", map[string]any{})
+	if !p.NeedsApproval {
+		t.Fatalf("a waiver without the owner: %+v", p)
+	}
+	if out := applyError(t, s, "subscription_host_caa_waive", p.ConfirmToken); e.w.subhost.waived != 0 {
+		t.Fatalf("waived before approval: %s", out)
+	}
+	approvePlan(t, e, p)
+	if a := applyOf(t, s, "subscription_host_caa_waive", p.ConfirmToken); a.Status != StatusApplied || e.w.subhost.waived != 1 {
+		t.Fatalf("apply: %+v, waived %d", a, e.w.subhost.waived)
+	}
+	if out := mustOK(t, s, "subscription_host_get", map[string]any{}); !strings.Contains(out, `"caa_waived":true`) {
+		t.Fatalf("get: %s", out)
+	}
+	// a plan made for one domain does not waive another's
+	e.w.subhost.mu.Lock()
+	e.w.subhost.waived = 0
+	e.w.subhost.mu.Unlock()
+	p = planOf(t, s, "subscription_host_caa_waive", map[string]any{})
+	approvePlan(t, e, p)
+	e.w.subhost.mu.Lock()
+	e.w.subhost.domain = "other.example.com"
+	e.w.subhost.mu.Unlock()
+	applyError(t, s, "subscription_host_caa_waive", p.ConfirmToken)
+	if e.w.subhost.waived != 0 {
+		t.Fatal("a waiver applied to another domain")
 	}
 }

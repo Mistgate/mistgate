@@ -22,6 +22,7 @@ const (
 	notReadySiteCert  = "site_cert"    // the host's site on 443 has no publicly trusted certificate yet
 	notReadyBridge    = "bridge"       // the panel holds no connection to the host
 	notReadyPanelCert = "panel_cert"   // the panel has no certificate for the subdomain yet
+	notReadyCAA       = "caa"          // DNS has no CAA record naming this panel's ACME account, and the owner did not waive it
 )
 
 // tunnelDownAfter is how long the panel's connection to the host may stay down before the owner hears of it.
@@ -54,7 +55,18 @@ func (s *Service) notReady(ctx context.Context, st state) []string {
 	if !s.panelCert(ctx, st.Domain) {
 		out = append(out, notReadyPanelCert)
 	}
+	// Only a CAA record naming this panel's ACME account keeps whoever holds the host from getting a certificate of their own
+	// for the subdomain (design/adr/0018-panel-behind-nat.md); the owner may proceed without it (WaiveSubscriptionHostCAA).
+	if _, status := s.caa(ctx, st.Domain); status != "present" && !s.caaWaived(ctx, st) {
+		out = append(out, notReadyCAA)
+	}
 	return out
+}
+
+// caaWaived says the owner proceeds without the CAA record for this domain and the panel's current ACME account: a waiver is
+// gone with a new domain (a new state) or a new account.
+func (s *Service) caaWaived(ctx context.Context, st state) bool {
+	return st.CAAWaived != "" && st.CAAWaived == s.accountURI(ctx)
 }
 
 func (s *Service) bridgeUp(nodeID string) bool {

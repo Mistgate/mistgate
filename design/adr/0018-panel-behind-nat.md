@@ -49,9 +49,9 @@ on TCP 443 (`hysteria2_site_443`, until it can sit behind the front), an inbound
 inbound that claims the subdomain. An unfit role installs nothing on the node; its inbounds keep running.
 
 **Readiness before anything moves.** The panel moves subscriptions and agents to the subdomain only once the host is
-ready: the host reports no error, its site has a publicly trusted certificate, the panel holds a connection to it, and
-the panel has the subdomain's certificate. Losing readiness later does not move them back; the agents keep the
-fallback of a new panel address (#56).
+ready: the host reports no error, its site has a publicly trusted certificate, the panel holds a connection to it, the
+panel has the subdomain's certificate, and DNS has the CAA record naming the panel's ACME account (or the owner waived
+it). Losing readiness later does not move them back; the agents keep the fallback of a new panel address (#56).
 
 **Agents follow by link.** The other agents reach the panel only through the WebSocket link at the subdomain
 (`NodeSettings.panel_link_url`, #56). The host's own link runs inside the bridge (`Entry.DialExit`), never through its
@@ -81,11 +81,11 @@ and waits while nodes move there; the owner finishes, forcing it if needed. The 
 - A home panel needs no public address, no port forwarding and no dynamic DNS; the fleet stays reachable as long as the
   host node is. The host is a single point for subscriptions and links; the owner can move it.
 - Seizing the host yields no stored subscriptions, tokens or keys: TLS it cannot decrypt, the bridge path, and the role.
-  It does not keep the subdomain safe, though: the subdomain points at the host, so whoever holds it can pass an ACME
-  challenge for the name and get a certificate of their own, then terminate the people's TLS and read their
-  subscriptions while it keeps the role. Only a CAA record that names this panel's ACME account (`accounturi`) and
-  challenge method stops that, and only at authorities that honour it; the panel shows the record but does not enforce
-  it yet.
+  It does not keep the subdomain safe by itself: the subdomain points at the host, so whoever holds it can pass an ACME
+  challenge for the name and get a certificate of their own. Only a CAA record that names this panel's ACME account
+  (`accounturi`) stops that, at the authorities that honour it. It is therefore a step of readiness (`caa`); the owner may
+  proceed without it after a fresh sign-in, audited and raised as a warning event, for that domain and that account only. A
+  panel restored without its ACME cache has a new account, and the record must be replaced before the next renewal.
 - What the bridge cannot hide remains: one to four long connections from the panel's address to the node's 443, pings
   every 15 s, a new connection about every hour. A subdomain visitor during an outage sees the node's certificate.
 - The extra hop is measurable: a subscription or a link through the host takes the panel–host round trip on top of the

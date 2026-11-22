@@ -280,9 +280,12 @@ type SubscriptionHost struct {
 	SiteName string `protobuf:"bytes,11,opt,name=site_name,json=siteName,proto3" json:"site_name,omitempty"`
 	// The host is ready: the panel's subscriptions and agents use the subdomain. Until then not_ready says what is missing:
 	// host_offline | host_error | site_cert (the host's site has no public certificate yet) | bridge (the panel holds no
-	// connection) | panel_cert (the panel has no certificate for the subdomain yet).
-	Ready         bool     `protobuf:"varint,12,opt,name=ready,proto3" json:"ready,omitempty"`
-	NotReady      []string `protobuf:"bytes,13,rep,name=not_ready,json=notReady,proto3" json:"not_ready,omitempty"`
+	// connection) | panel_cert (the panel has no certificate for the subdomain yet) | caa (DNS has no CAA record that limits
+	// the subdomain's certificates to this panel's ACME account, and the owner did not waive it).
+	Ready    bool     `protobuf:"varint,12,opt,name=ready,proto3" json:"ready,omitempty"`
+	NotReady []string `protobuf:"bytes,13,rep,name=not_ready,json=notReady,proto3" json:"not_ready,omitempty"`
+	// The owner proceeds without the CAA record, for this domain and the panel's current ACME account.
+	CaaWaived     bool `protobuf:"varint,14,opt,name=caa_waived,json=caaWaived,proto3" json:"caa_waived,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -408,6 +411,93 @@ func (x *SubscriptionHost) GetNotReady() []string {
 	return nil
 }
 
+func (x *SubscriptionHost) GetCaaWaived() bool {
+	if x != nil {
+		return x.CaaWaived
+	}
+	return false
+}
+
+type WaiveSubscriptionHostCAARequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WaiveSubscriptionHostCAARequest) Reset() {
+	*x = WaiveSubscriptionHostCAARequest{}
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WaiveSubscriptionHostCAARequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WaiveSubscriptionHostCAARequest) ProtoMessage() {}
+
+func (x *WaiveSubscriptionHostCAARequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WaiveSubscriptionHostCAARequest.ProtoReflect.Descriptor instead.
+func (*WaiveSubscriptionHostCAARequest) Descriptor() ([]byte, []int) {
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{4}
+}
+
+type WaiveSubscriptionHostCAAResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          *SubscriptionHost      `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WaiveSubscriptionHostCAAResponse) Reset() {
+	*x = WaiveSubscriptionHostCAAResponse{}
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WaiveSubscriptionHostCAAResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WaiveSubscriptionHostCAAResponse) ProtoMessage() {}
+
+func (x *WaiveSubscriptionHostCAAResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WaiveSubscriptionHostCAAResponse.ProtoReflect.Descriptor instead.
+func (*WaiveSubscriptionHostCAAResponse) Descriptor() ([]byte, []int) {
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *WaiveSubscriptionHostCAAResponse) GetHost() *SubscriptionHost {
+	if x != nil {
+		return x.Host
+	}
+	return nil
+}
+
 type GetSubscriptionHostRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -416,7 +506,7 @@ type GetSubscriptionHostRequest struct {
 
 func (x *GetSubscriptionHostRequest) Reset() {
 	*x = GetSubscriptionHostRequest{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[4]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -428,7 +518,7 @@ func (x *GetSubscriptionHostRequest) String() string {
 func (*GetSubscriptionHostRequest) ProtoMessage() {}
 
 func (x *GetSubscriptionHostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[4]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -441,7 +531,7 @@ func (x *GetSubscriptionHostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubscriptionHostRequest.ProtoReflect.Descriptor instead.
 func (*GetSubscriptionHostRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{4}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{6}
 }
 
 type GetSubscriptionHostResponse struct {
@@ -453,7 +543,7 @@ type GetSubscriptionHostResponse struct {
 
 func (x *GetSubscriptionHostResponse) Reset() {
 	*x = GetSubscriptionHostResponse{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[5]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -465,7 +555,7 @@ func (x *GetSubscriptionHostResponse) String() string {
 func (*GetSubscriptionHostResponse) ProtoMessage() {}
 
 func (x *GetSubscriptionHostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[5]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -478,7 +568,7 @@ func (x *GetSubscriptionHostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubscriptionHostResponse.ProtoReflect.Descriptor instead.
 func (*GetSubscriptionHostResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{5}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetSubscriptionHostResponse) GetHost() *SubscriptionHost {
@@ -501,7 +591,7 @@ type SetSubscriptionHostRequest struct {
 
 func (x *SetSubscriptionHostRequest) Reset() {
 	*x = SetSubscriptionHostRequest{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[6]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -513,7 +603,7 @@ func (x *SetSubscriptionHostRequest) String() string {
 func (*SetSubscriptionHostRequest) ProtoMessage() {}
 
 func (x *SetSubscriptionHostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[6]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -526,7 +616,7 @@ func (x *SetSubscriptionHostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSubscriptionHostRequest.ProtoReflect.Descriptor instead.
 func (*SetSubscriptionHostRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{6}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SetSubscriptionHostRequest) GetNodeId() string {
@@ -566,7 +656,7 @@ type SetSubscriptionHostResponse struct {
 
 func (x *SetSubscriptionHostResponse) Reset() {
 	*x = SetSubscriptionHostResponse{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[7]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -578,7 +668,7 @@ func (x *SetSubscriptionHostResponse) String() string {
 func (*SetSubscriptionHostResponse) ProtoMessage() {}
 
 func (x *SetSubscriptionHostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[7]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -591,7 +681,7 @@ func (x *SetSubscriptionHostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSubscriptionHostResponse.ProtoReflect.Descriptor instead.
 func (*SetSubscriptionHostResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{7}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SetSubscriptionHostResponse) GetHost() *SubscriptionHost {
@@ -611,7 +701,7 @@ type StartSubscriptionHostMoveRequest struct {
 
 func (x *StartSubscriptionHostMoveRequest) Reset() {
 	*x = StartSubscriptionHostMoveRequest{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[8]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -623,7 +713,7 @@ func (x *StartSubscriptionHostMoveRequest) String() string {
 func (*StartSubscriptionHostMoveRequest) ProtoMessage() {}
 
 func (x *StartSubscriptionHostMoveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[8]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -636,7 +726,7 @@ func (x *StartSubscriptionHostMoveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartSubscriptionHostMoveRequest.ProtoReflect.Descriptor instead.
 func (*StartSubscriptionHostMoveRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{8}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *StartSubscriptionHostMoveRequest) GetNodeId() string {
@@ -662,7 +752,7 @@ type StartSubscriptionHostMoveResponse struct {
 
 func (x *StartSubscriptionHostMoveResponse) Reset() {
 	*x = StartSubscriptionHostMoveResponse{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[9]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -674,7 +764,7 @@ func (x *StartSubscriptionHostMoveResponse) String() string {
 func (*StartSubscriptionHostMoveResponse) ProtoMessage() {}
 
 func (x *StartSubscriptionHostMoveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[9]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -687,7 +777,7 @@ func (x *StartSubscriptionHostMoveResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use StartSubscriptionHostMoveResponse.ProtoReflect.Descriptor instead.
 func (*StartSubscriptionHostMoveResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{9}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *StartSubscriptionHostMoveResponse) GetHost() *SubscriptionHost {
@@ -708,7 +798,7 @@ type FinishSubscriptionHostChangeRequest struct {
 
 func (x *FinishSubscriptionHostChangeRequest) Reset() {
 	*x = FinishSubscriptionHostChangeRequest{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[10]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -720,7 +810,7 @@ func (x *FinishSubscriptionHostChangeRequest) String() string {
 func (*FinishSubscriptionHostChangeRequest) ProtoMessage() {}
 
 func (x *FinishSubscriptionHostChangeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[10]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -733,7 +823,7 @@ func (x *FinishSubscriptionHostChangeRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use FinishSubscriptionHostChangeRequest.ProtoReflect.Descriptor instead.
 func (*FinishSubscriptionHostChangeRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{10}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *FinishSubscriptionHostChangeRequest) GetForce() bool {
@@ -752,7 +842,7 @@ type FinishSubscriptionHostChangeResponse struct {
 
 func (x *FinishSubscriptionHostChangeResponse) Reset() {
 	*x = FinishSubscriptionHostChangeResponse{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[11]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -764,7 +854,7 @@ func (x *FinishSubscriptionHostChangeResponse) String() string {
 func (*FinishSubscriptionHostChangeResponse) ProtoMessage() {}
 
 func (x *FinishSubscriptionHostChangeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[11]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -777,7 +867,7 @@ func (x *FinishSubscriptionHostChangeResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use FinishSubscriptionHostChangeResponse.ProtoReflect.Descriptor instead.
 func (*FinishSubscriptionHostChangeResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{11}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *FinishSubscriptionHostChangeResponse) GetHost() *SubscriptionHost {
@@ -795,7 +885,7 @@ type CancelSubscriptionHostChangeRequest struct {
 
 func (x *CancelSubscriptionHostChangeRequest) Reset() {
 	*x = CancelSubscriptionHostChangeRequest{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[12]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -807,7 +897,7 @@ func (x *CancelSubscriptionHostChangeRequest) String() string {
 func (*CancelSubscriptionHostChangeRequest) ProtoMessage() {}
 
 func (x *CancelSubscriptionHostChangeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[12]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -820,7 +910,7 @@ func (x *CancelSubscriptionHostChangeRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use CancelSubscriptionHostChangeRequest.ProtoReflect.Descriptor instead.
 func (*CancelSubscriptionHostChangeRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{12}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{14}
 }
 
 type CancelSubscriptionHostChangeResponse struct {
@@ -832,7 +922,7 @@ type CancelSubscriptionHostChangeResponse struct {
 
 func (x *CancelSubscriptionHostChangeResponse) Reset() {
 	*x = CancelSubscriptionHostChangeResponse{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[13]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -844,7 +934,7 @@ func (x *CancelSubscriptionHostChangeResponse) String() string {
 func (*CancelSubscriptionHostChangeResponse) ProtoMessage() {}
 
 func (x *CancelSubscriptionHostChangeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[13]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -857,7 +947,7 @@ func (x *CancelSubscriptionHostChangeResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use CancelSubscriptionHostChangeResponse.ProtoReflect.Descriptor instead.
 func (*CancelSubscriptionHostChangeResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{13}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CancelSubscriptionHostChangeResponse) GetHost() *SubscriptionHost {
@@ -878,7 +968,7 @@ type DisableSubscriptionHostRequest struct {
 
 func (x *DisableSubscriptionHostRequest) Reset() {
 	*x = DisableSubscriptionHostRequest{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[14]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -890,7 +980,7 @@ func (x *DisableSubscriptionHostRequest) String() string {
 func (*DisableSubscriptionHostRequest) ProtoMessage() {}
 
 func (x *DisableSubscriptionHostRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[14]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -903,7 +993,7 @@ func (x *DisableSubscriptionHostRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisableSubscriptionHostRequest.ProtoReflect.Descriptor instead.
 func (*DisableSubscriptionHostRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{14}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DisableSubscriptionHostRequest) GetPublicUrl() string {
@@ -929,7 +1019,7 @@ type DisableSubscriptionHostResponse struct {
 
 func (x *DisableSubscriptionHostResponse) Reset() {
 	*x = DisableSubscriptionHostResponse{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[15]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -941,7 +1031,7 @@ func (x *DisableSubscriptionHostResponse) String() string {
 func (*DisableSubscriptionHostResponse) ProtoMessage() {}
 
 func (x *DisableSubscriptionHostResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[15]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -954,7 +1044,7 @@ func (x *DisableSubscriptionHostResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisableSubscriptionHostResponse.ProtoReflect.Descriptor instead.
 func (*DisableSubscriptionHostResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{15}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *DisableSubscriptionHostResponse) GetHost() *SubscriptionHost {
@@ -978,7 +1068,7 @@ type CheckSubscriptionHostDomainRequest struct {
 
 func (x *CheckSubscriptionHostDomainRequest) Reset() {
 	*x = CheckSubscriptionHostDomainRequest{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[16]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -990,7 +1080,7 @@ func (x *CheckSubscriptionHostDomainRequest) String() string {
 func (*CheckSubscriptionHostDomainRequest) ProtoMessage() {}
 
 func (x *CheckSubscriptionHostDomainRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[16]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1003,7 +1093,7 @@ func (x *CheckSubscriptionHostDomainRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use CheckSubscriptionHostDomainRequest.ProtoReflect.Descriptor instead.
 func (*CheckSubscriptionHostDomainRequest) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{16}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CheckSubscriptionHostDomainRequest) GetNodeId() string {
@@ -1045,7 +1135,7 @@ type CheckSubscriptionHostDomainResponse struct {
 
 func (x *CheckSubscriptionHostDomainResponse) Reset() {
 	*x = CheckSubscriptionHostDomainResponse{}
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[17]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1057,7 +1147,7 @@ func (x *CheckSubscriptionHostDomainResponse) String() string {
 func (*CheckSubscriptionHostDomainResponse) ProtoMessage() {}
 
 func (x *CheckSubscriptionHostDomainResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[17]
+	mi := &file_mistgate_subhost_v1_subhost_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1070,7 +1160,7 @@ func (x *CheckSubscriptionHostDomainResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use CheckSubscriptionHostDomainResponse.ProtoReflect.Descriptor instead.
 func (*CheckSubscriptionHostDomainResponse) Descriptor() ([]byte, []int) {
-	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{17}
+	return file_mistgate_subhost_v1_subhost_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CheckSubscriptionHostDomainResponse) GetMatches() bool {
@@ -1112,7 +1202,7 @@ const file_mistgate_subhost_v1_subhost_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"F\n" +
 	"\x17SubscriptionHostNodeRef\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xb8\x04\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xd7\x04\n" +
 	"\x10SubscriptionHost\x12@\n" +
 	"\x05state\x18\x01 \x01(\x0e2*.mistgate.subhost.v1.SubscriptionHostStateR\x05state\x12\x16\n" +
 	"\x06domain\x18\x02 \x01(\tR\x06domain\x12\x17\n" +
@@ -1131,7 +1221,12 @@ const file_mistgate_subhost_v1_subhost_proto_rawDesc = "" +
 	" \x03(\v2,.mistgate.subhost.v1.SubscriptionHostNodeRefR\vlackingLink\x12\x1b\n" +
 	"\tsite_name\x18\v \x01(\tR\bsiteName\x12\x14\n" +
 	"\x05ready\x18\f \x01(\bR\x05ready\x12\x1b\n" +
-	"\tnot_ready\x18\r \x03(\tR\bnotReady\"\x1c\n" +
+	"\tnot_ready\x18\r \x03(\tR\bnotReady\x12\x1d\n" +
+	"\n" +
+	"caa_waived\x18\x0e \x01(\bR\tcaaWaived\"!\n" +
+	"\x1fWaiveSubscriptionHostCAARequest\"]\n" +
+	" WaiveSubscriptionHostCAAResponse\x129\n" +
+	"\x04host\x18\x01 \x01(\v2%.mistgate.subhost.v1.SubscriptionHostR\x04host\"\x1c\n" +
 	"\x1aGetSubscriptionHostRequest\"X\n" +
 	"\x1bGetSubscriptionHostResponse\x129\n" +
 	"\x04host\x18\x01 \x01(\v2%.mistgate.subhost.v1.SubscriptionHostR\x04host\"\x90\x01\n" +
@@ -1174,7 +1269,7 @@ const file_mistgate_subhost_v1_subhost_proto_rawDesc = "" +
 	"\x1bSUBSCRIPTION_HOST_STATE_OFF\x10\x01\x12\x1e\n" +
 	"\x1aSUBSCRIPTION_HOST_STATE_ON\x10\x02\x12\"\n" +
 	"\x1eSUBSCRIPTION_HOST_STATE_MOVING\x10\x03\x12#\n" +
-	"\x1fSUBSCRIPTION_HOST_STATE_LEAVING\x10\x042\xe0\a\n" +
+	"\x1fSUBSCRIPTION_HOST_STATE_LEAVING\x10\x042\xea\b\n" +
 	"\x17SubscriptionHostService\x12x\n" +
 	"\x13GetSubscriptionHost\x12/.mistgate.subhost.v1.GetSubscriptionHostRequest\x1a0.mistgate.subhost.v1.GetSubscriptionHostResponse\x12x\n" +
 	"\x13SetSubscriptionHost\x12/.mistgate.subhost.v1.SetSubscriptionHostRequest\x1a0.mistgate.subhost.v1.SetSubscriptionHostResponse\x12\x8a\x01\n" +
@@ -1182,7 +1277,8 @@ const file_mistgate_subhost_v1_subhost_proto_rawDesc = "" +
 	"\x1cFinishSubscriptionHostChange\x128.mistgate.subhost.v1.FinishSubscriptionHostChangeRequest\x1a9.mistgate.subhost.v1.FinishSubscriptionHostChangeResponse\x12\x93\x01\n" +
 	"\x1cCancelSubscriptionHostChange\x128.mistgate.subhost.v1.CancelSubscriptionHostChangeRequest\x1a9.mistgate.subhost.v1.CancelSubscriptionHostChangeResponse\x12\x84\x01\n" +
 	"\x17DisableSubscriptionHost\x123.mistgate.subhost.v1.DisableSubscriptionHostRequest\x1a4.mistgate.subhost.v1.DisableSubscriptionHostResponse\x12\x90\x01\n" +
-	"\x1bCheckSubscriptionHostDomain\x127.mistgate.subhost.v1.CheckSubscriptionHostDomainRequest\x1a8.mistgate.subhost.v1.CheckSubscriptionHostDomainResponseB\xd5\x01\n" +
+	"\x1bCheckSubscriptionHostDomain\x127.mistgate.subhost.v1.CheckSubscriptionHostDomainRequest\x1a8.mistgate.subhost.v1.CheckSubscriptionHostDomainResponse\x12\x87\x01\n" +
+	"\x18WaiveSubscriptionHostCAA\x124.mistgate.subhost.v1.WaiveSubscriptionHostCAARequest\x1a5.mistgate.subhost.v1.WaiveSubscriptionHostCAAResponseB\xd5\x01\n" +
 	"\x17com.mistgate.subhost.v1B\fSubhostProtoP\x01Z>github.com/mistgate/mistgate/gen/mistgate/subhost/v1;subhostv1\xa2\x02\x03MSX\xaa\x02\x13Mistgate.Subhost.V1\xca\x02\x13Mistgate\\Subhost\\V1\xe2\x02\x1fMistgate\\Subhost\\V1\\GPBMetadata\xea\x02\x15Mistgate::Subhost::V1b\x06proto3"
 
 var (
@@ -1198,58 +1294,63 @@ func file_mistgate_subhost_v1_subhost_proto_rawDescGZIP() []byte {
 }
 
 var file_mistgate_subhost_v1_subhost_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_mistgate_subhost_v1_subhost_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_mistgate_subhost_v1_subhost_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_mistgate_subhost_v1_subhost_proto_goTypes = []any{
 	(SubscriptionHostState)(0),                   // 0: mistgate.subhost.v1.SubscriptionHostState
 	(*SubscriptionHostBridge)(nil),               // 1: mistgate.subhost.v1.SubscriptionHostBridge
 	(*SubscriptionHostPendingNode)(nil),          // 2: mistgate.subhost.v1.SubscriptionHostPendingNode
 	(*SubscriptionHostNodeRef)(nil),              // 3: mistgate.subhost.v1.SubscriptionHostNodeRef
 	(*SubscriptionHost)(nil),                     // 4: mistgate.subhost.v1.SubscriptionHost
-	(*GetSubscriptionHostRequest)(nil),           // 5: mistgate.subhost.v1.GetSubscriptionHostRequest
-	(*GetSubscriptionHostResponse)(nil),          // 6: mistgate.subhost.v1.GetSubscriptionHostResponse
-	(*SetSubscriptionHostRequest)(nil),           // 7: mistgate.subhost.v1.SetSubscriptionHostRequest
-	(*SetSubscriptionHostResponse)(nil),          // 8: mistgate.subhost.v1.SetSubscriptionHostResponse
-	(*StartSubscriptionHostMoveRequest)(nil),     // 9: mistgate.subhost.v1.StartSubscriptionHostMoveRequest
-	(*StartSubscriptionHostMoveResponse)(nil),    // 10: mistgate.subhost.v1.StartSubscriptionHostMoveResponse
-	(*FinishSubscriptionHostChangeRequest)(nil),  // 11: mistgate.subhost.v1.FinishSubscriptionHostChangeRequest
-	(*FinishSubscriptionHostChangeResponse)(nil), // 12: mistgate.subhost.v1.FinishSubscriptionHostChangeResponse
-	(*CancelSubscriptionHostChangeRequest)(nil),  // 13: mistgate.subhost.v1.CancelSubscriptionHostChangeRequest
-	(*CancelSubscriptionHostChangeResponse)(nil), // 14: mistgate.subhost.v1.CancelSubscriptionHostChangeResponse
-	(*DisableSubscriptionHostRequest)(nil),       // 15: mistgate.subhost.v1.DisableSubscriptionHostRequest
-	(*DisableSubscriptionHostResponse)(nil),      // 16: mistgate.subhost.v1.DisableSubscriptionHostResponse
-	(*CheckSubscriptionHostDomainRequest)(nil),   // 17: mistgate.subhost.v1.CheckSubscriptionHostDomainRequest
-	(*CheckSubscriptionHostDomainResponse)(nil),  // 18: mistgate.subhost.v1.CheckSubscriptionHostDomainResponse
+	(*WaiveSubscriptionHostCAARequest)(nil),      // 5: mistgate.subhost.v1.WaiveSubscriptionHostCAARequest
+	(*WaiveSubscriptionHostCAAResponse)(nil),     // 6: mistgate.subhost.v1.WaiveSubscriptionHostCAAResponse
+	(*GetSubscriptionHostRequest)(nil),           // 7: mistgate.subhost.v1.GetSubscriptionHostRequest
+	(*GetSubscriptionHostResponse)(nil),          // 8: mistgate.subhost.v1.GetSubscriptionHostResponse
+	(*SetSubscriptionHostRequest)(nil),           // 9: mistgate.subhost.v1.SetSubscriptionHostRequest
+	(*SetSubscriptionHostResponse)(nil),          // 10: mistgate.subhost.v1.SetSubscriptionHostResponse
+	(*StartSubscriptionHostMoveRequest)(nil),     // 11: mistgate.subhost.v1.StartSubscriptionHostMoveRequest
+	(*StartSubscriptionHostMoveResponse)(nil),    // 12: mistgate.subhost.v1.StartSubscriptionHostMoveResponse
+	(*FinishSubscriptionHostChangeRequest)(nil),  // 13: mistgate.subhost.v1.FinishSubscriptionHostChangeRequest
+	(*FinishSubscriptionHostChangeResponse)(nil), // 14: mistgate.subhost.v1.FinishSubscriptionHostChangeResponse
+	(*CancelSubscriptionHostChangeRequest)(nil),  // 15: mistgate.subhost.v1.CancelSubscriptionHostChangeRequest
+	(*CancelSubscriptionHostChangeResponse)(nil), // 16: mistgate.subhost.v1.CancelSubscriptionHostChangeResponse
+	(*DisableSubscriptionHostRequest)(nil),       // 17: mistgate.subhost.v1.DisableSubscriptionHostRequest
+	(*DisableSubscriptionHostResponse)(nil),      // 18: mistgate.subhost.v1.DisableSubscriptionHostResponse
+	(*CheckSubscriptionHostDomainRequest)(nil),   // 19: mistgate.subhost.v1.CheckSubscriptionHostDomainRequest
+	(*CheckSubscriptionHostDomainResponse)(nil),  // 20: mistgate.subhost.v1.CheckSubscriptionHostDomainResponse
 }
 var file_mistgate_subhost_v1_subhost_proto_depIdxs = []int32{
 	0,  // 0: mistgate.subhost.v1.SubscriptionHost.state:type_name -> mistgate.subhost.v1.SubscriptionHostState
 	1,  // 1: mistgate.subhost.v1.SubscriptionHost.bridges:type_name -> mistgate.subhost.v1.SubscriptionHostBridge
 	2,  // 2: mistgate.subhost.v1.SubscriptionHost.pending:type_name -> mistgate.subhost.v1.SubscriptionHostPendingNode
 	3,  // 3: mistgate.subhost.v1.SubscriptionHost.lacking_link:type_name -> mistgate.subhost.v1.SubscriptionHostNodeRef
-	4,  // 4: mistgate.subhost.v1.GetSubscriptionHostResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
-	4,  // 5: mistgate.subhost.v1.SetSubscriptionHostResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
-	4,  // 6: mistgate.subhost.v1.StartSubscriptionHostMoveResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
-	4,  // 7: mistgate.subhost.v1.FinishSubscriptionHostChangeResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
-	4,  // 8: mistgate.subhost.v1.CancelSubscriptionHostChangeResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
-	4,  // 9: mistgate.subhost.v1.DisableSubscriptionHostResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
-	5,  // 10: mistgate.subhost.v1.SubscriptionHostService.GetSubscriptionHost:input_type -> mistgate.subhost.v1.GetSubscriptionHostRequest
-	7,  // 11: mistgate.subhost.v1.SubscriptionHostService.SetSubscriptionHost:input_type -> mistgate.subhost.v1.SetSubscriptionHostRequest
-	9,  // 12: mistgate.subhost.v1.SubscriptionHostService.StartSubscriptionHostMove:input_type -> mistgate.subhost.v1.StartSubscriptionHostMoveRequest
-	11, // 13: mistgate.subhost.v1.SubscriptionHostService.FinishSubscriptionHostChange:input_type -> mistgate.subhost.v1.FinishSubscriptionHostChangeRequest
-	13, // 14: mistgate.subhost.v1.SubscriptionHostService.CancelSubscriptionHostChange:input_type -> mistgate.subhost.v1.CancelSubscriptionHostChangeRequest
-	15, // 15: mistgate.subhost.v1.SubscriptionHostService.DisableSubscriptionHost:input_type -> mistgate.subhost.v1.DisableSubscriptionHostRequest
-	17, // 16: mistgate.subhost.v1.SubscriptionHostService.CheckSubscriptionHostDomain:input_type -> mistgate.subhost.v1.CheckSubscriptionHostDomainRequest
-	6,  // 17: mistgate.subhost.v1.SubscriptionHostService.GetSubscriptionHost:output_type -> mistgate.subhost.v1.GetSubscriptionHostResponse
-	8,  // 18: mistgate.subhost.v1.SubscriptionHostService.SetSubscriptionHost:output_type -> mistgate.subhost.v1.SetSubscriptionHostResponse
-	10, // 19: mistgate.subhost.v1.SubscriptionHostService.StartSubscriptionHostMove:output_type -> mistgate.subhost.v1.StartSubscriptionHostMoveResponse
-	12, // 20: mistgate.subhost.v1.SubscriptionHostService.FinishSubscriptionHostChange:output_type -> mistgate.subhost.v1.FinishSubscriptionHostChangeResponse
-	14, // 21: mistgate.subhost.v1.SubscriptionHostService.CancelSubscriptionHostChange:output_type -> mistgate.subhost.v1.CancelSubscriptionHostChangeResponse
-	16, // 22: mistgate.subhost.v1.SubscriptionHostService.DisableSubscriptionHost:output_type -> mistgate.subhost.v1.DisableSubscriptionHostResponse
-	18, // 23: mistgate.subhost.v1.SubscriptionHostService.CheckSubscriptionHostDomain:output_type -> mistgate.subhost.v1.CheckSubscriptionHostDomainResponse
-	17, // [17:24] is the sub-list for method output_type
-	10, // [10:17] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	4,  // 4: mistgate.subhost.v1.WaiveSubscriptionHostCAAResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
+	4,  // 5: mistgate.subhost.v1.GetSubscriptionHostResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
+	4,  // 6: mistgate.subhost.v1.SetSubscriptionHostResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
+	4,  // 7: mistgate.subhost.v1.StartSubscriptionHostMoveResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
+	4,  // 8: mistgate.subhost.v1.FinishSubscriptionHostChangeResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
+	4,  // 9: mistgate.subhost.v1.CancelSubscriptionHostChangeResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
+	4,  // 10: mistgate.subhost.v1.DisableSubscriptionHostResponse.host:type_name -> mistgate.subhost.v1.SubscriptionHost
+	7,  // 11: mistgate.subhost.v1.SubscriptionHostService.GetSubscriptionHost:input_type -> mistgate.subhost.v1.GetSubscriptionHostRequest
+	9,  // 12: mistgate.subhost.v1.SubscriptionHostService.SetSubscriptionHost:input_type -> mistgate.subhost.v1.SetSubscriptionHostRequest
+	11, // 13: mistgate.subhost.v1.SubscriptionHostService.StartSubscriptionHostMove:input_type -> mistgate.subhost.v1.StartSubscriptionHostMoveRequest
+	13, // 14: mistgate.subhost.v1.SubscriptionHostService.FinishSubscriptionHostChange:input_type -> mistgate.subhost.v1.FinishSubscriptionHostChangeRequest
+	15, // 15: mistgate.subhost.v1.SubscriptionHostService.CancelSubscriptionHostChange:input_type -> mistgate.subhost.v1.CancelSubscriptionHostChangeRequest
+	17, // 16: mistgate.subhost.v1.SubscriptionHostService.DisableSubscriptionHost:input_type -> mistgate.subhost.v1.DisableSubscriptionHostRequest
+	19, // 17: mistgate.subhost.v1.SubscriptionHostService.CheckSubscriptionHostDomain:input_type -> mistgate.subhost.v1.CheckSubscriptionHostDomainRequest
+	5,  // 18: mistgate.subhost.v1.SubscriptionHostService.WaiveSubscriptionHostCAA:input_type -> mistgate.subhost.v1.WaiveSubscriptionHostCAARequest
+	8,  // 19: mistgate.subhost.v1.SubscriptionHostService.GetSubscriptionHost:output_type -> mistgate.subhost.v1.GetSubscriptionHostResponse
+	10, // 20: mistgate.subhost.v1.SubscriptionHostService.SetSubscriptionHost:output_type -> mistgate.subhost.v1.SetSubscriptionHostResponse
+	12, // 21: mistgate.subhost.v1.SubscriptionHostService.StartSubscriptionHostMove:output_type -> mistgate.subhost.v1.StartSubscriptionHostMoveResponse
+	14, // 22: mistgate.subhost.v1.SubscriptionHostService.FinishSubscriptionHostChange:output_type -> mistgate.subhost.v1.FinishSubscriptionHostChangeResponse
+	16, // 23: mistgate.subhost.v1.SubscriptionHostService.CancelSubscriptionHostChange:output_type -> mistgate.subhost.v1.CancelSubscriptionHostChangeResponse
+	18, // 24: mistgate.subhost.v1.SubscriptionHostService.DisableSubscriptionHost:output_type -> mistgate.subhost.v1.DisableSubscriptionHostResponse
+	20, // 25: mistgate.subhost.v1.SubscriptionHostService.CheckSubscriptionHostDomain:output_type -> mistgate.subhost.v1.CheckSubscriptionHostDomainResponse
+	6,  // 26: mistgate.subhost.v1.SubscriptionHostService.WaiveSubscriptionHostCAA:output_type -> mistgate.subhost.v1.WaiveSubscriptionHostCAAResponse
+	19, // [19:27] is the sub-list for method output_type
+	11, // [11:19] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_mistgate_subhost_v1_subhost_proto_init() }
@@ -1263,7 +1364,7 @@ func file_mistgate_subhost_v1_subhost_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mistgate_subhost_v1_subhost_proto_rawDesc), len(file_mistgate_subhost_v1_subhost_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   18,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

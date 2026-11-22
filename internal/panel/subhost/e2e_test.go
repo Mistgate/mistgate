@@ -246,7 +246,9 @@ func TestSubscriptionHostEndToEnd(t *testing.T) {
 	}
 	_ = tc.Close()
 
-	// Readiness: everything holds but the site's public certificate (a pin here), so the panel keeps its address.
+	// Readiness: everything holds but the site's public certificate (a pin here), so the panel keeps its address (the CAA
+	// record is published).
+	publishCAA(svc, e2eDomain)
 	g, err := (rpc{svc}).GetSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.GetSubscriptionHostRequest{}))
 	if err != nil || g.Msg.Host.Ready || strings.Join(g.Msg.Host.NotReady, ",") != notReadySiteCert || len(g.Msg.Host.Bridges) != 1 || !g.Msg.Host.Bridges[0].Up {
 		t.Fatalf("view: %v %v", g.Msg.GetHost(), err)

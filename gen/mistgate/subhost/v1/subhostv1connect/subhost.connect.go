@@ -54,6 +54,9 @@ const (
 	// SubscriptionHostServiceCheckSubscriptionHostDomainProcedure is the fully-qualified name of the
 	// SubscriptionHostService's CheckSubscriptionHostDomain RPC.
 	SubscriptionHostServiceCheckSubscriptionHostDomainProcedure = "/mistgate.subhost.v1.SubscriptionHostService/CheckSubscriptionHostDomain"
+	// SubscriptionHostServiceWaiveSubscriptionHostCAAProcedure is the fully-qualified name of the
+	// SubscriptionHostService's WaiveSubscriptionHostCAA RPC.
+	SubscriptionHostServiceWaiveSubscriptionHostCAAProcedure = "/mistgate.subhost.v1.SubscriptionHostService/WaiveSubscriptionHostCAA"
 )
 
 // SubscriptionHostServiceClient is a client for the mistgate.subhost.v1.SubscriptionHostService
@@ -72,6 +75,10 @@ type SubscriptionHostServiceClient interface {
 	DisableSubscriptionHost(context.Context, *connect.Request[v1.DisableSubscriptionHostRequest]) (*connect.Response[v1.DisableSubscriptionHostResponse], error)
 	// Read-only: whether the domain's (and the site name's) DNS points at the node.
 	CheckSubscriptionHostDomain(context.Context, *connect.Request[v1.CheckSubscriptionHostDomainRequest]) (*connect.Response[v1.CheckSubscriptionHostDomainResponse], error)
+	// The owner proceeds without the CAA record (the "caa" step of readiness): whoever holds the host can then get a
+	// certificate of their own for the subdomain. Audited, a warning event; it lasts for this domain and this panel's ACME
+	// account only. on or moving.
+	WaiveSubscriptionHostCAA(context.Context, *connect.Request[v1.WaiveSubscriptionHostCAARequest]) (*connect.Response[v1.WaiveSubscriptionHostCAAResponse], error)
 }
 
 // NewSubscriptionHostServiceClient constructs a client for the
@@ -128,6 +135,12 @@ func NewSubscriptionHostServiceClient(httpClient connect.HTTPClient, baseURL str
 			connect.WithSchema(subscriptionHostServiceMethods.ByName("CheckSubscriptionHostDomain")),
 			connect.WithClientOptions(opts...),
 		),
+		waiveSubscriptionHostCAA: connect.NewClient[v1.WaiveSubscriptionHostCAARequest, v1.WaiveSubscriptionHostCAAResponse](
+			httpClient,
+			baseURL+SubscriptionHostServiceWaiveSubscriptionHostCAAProcedure,
+			connect.WithSchema(subscriptionHostServiceMethods.ByName("WaiveSubscriptionHostCAA")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -140,6 +153,7 @@ type subscriptionHostServiceClient struct {
 	cancelSubscriptionHostChange *connect.Client[v1.CancelSubscriptionHostChangeRequest, v1.CancelSubscriptionHostChangeResponse]
 	disableSubscriptionHost      *connect.Client[v1.DisableSubscriptionHostRequest, v1.DisableSubscriptionHostResponse]
 	checkSubscriptionHostDomain  *connect.Client[v1.CheckSubscriptionHostDomainRequest, v1.CheckSubscriptionHostDomainResponse]
+	waiveSubscriptionHostCAA     *connect.Client[v1.WaiveSubscriptionHostCAARequest, v1.WaiveSubscriptionHostCAAResponse]
 }
 
 // GetSubscriptionHost calls mistgate.subhost.v1.SubscriptionHostService.GetSubscriptionHost.
@@ -182,6 +196,12 @@ func (c *subscriptionHostServiceClient) CheckSubscriptionHostDomain(ctx context.
 	return c.checkSubscriptionHostDomain.CallUnary(ctx, req)
 }
 
+// WaiveSubscriptionHostCAA calls
+// mistgate.subhost.v1.SubscriptionHostService.WaiveSubscriptionHostCAA.
+func (c *subscriptionHostServiceClient) WaiveSubscriptionHostCAA(ctx context.Context, req *connect.Request[v1.WaiveSubscriptionHostCAARequest]) (*connect.Response[v1.WaiveSubscriptionHostCAAResponse], error) {
+	return c.waiveSubscriptionHostCAA.CallUnary(ctx, req)
+}
+
 // SubscriptionHostServiceHandler is an implementation of the
 // mistgate.subhost.v1.SubscriptionHostService service.
 type SubscriptionHostServiceHandler interface {
@@ -198,6 +218,10 @@ type SubscriptionHostServiceHandler interface {
 	DisableSubscriptionHost(context.Context, *connect.Request[v1.DisableSubscriptionHostRequest]) (*connect.Response[v1.DisableSubscriptionHostResponse], error)
 	// Read-only: whether the domain's (and the site name's) DNS points at the node.
 	CheckSubscriptionHostDomain(context.Context, *connect.Request[v1.CheckSubscriptionHostDomainRequest]) (*connect.Response[v1.CheckSubscriptionHostDomainResponse], error)
+	// The owner proceeds without the CAA record (the "caa" step of readiness): whoever holds the host can then get a
+	// certificate of their own for the subdomain. Audited, a warning event; it lasts for this domain and this panel's ACME
+	// account only. on or moving.
+	WaiveSubscriptionHostCAA(context.Context, *connect.Request[v1.WaiveSubscriptionHostCAARequest]) (*connect.Response[v1.WaiveSubscriptionHostCAAResponse], error)
 }
 
 // NewSubscriptionHostServiceHandler builds an HTTP handler from the service implementation. It
@@ -249,6 +273,12 @@ func NewSubscriptionHostServiceHandler(svc SubscriptionHostServiceHandler, opts 
 		connect.WithSchema(subscriptionHostServiceMethods.ByName("CheckSubscriptionHostDomain")),
 		connect.WithHandlerOptions(opts...),
 	)
+	subscriptionHostServiceWaiveSubscriptionHostCAAHandler := connect.NewUnaryHandler(
+		SubscriptionHostServiceWaiveSubscriptionHostCAAProcedure,
+		svc.WaiveSubscriptionHostCAA,
+		connect.WithSchema(subscriptionHostServiceMethods.ByName("WaiveSubscriptionHostCAA")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/mistgate.subhost.v1.SubscriptionHostService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SubscriptionHostServiceGetSubscriptionHostProcedure:
@@ -265,6 +295,8 @@ func NewSubscriptionHostServiceHandler(svc SubscriptionHostServiceHandler, opts 
 			subscriptionHostServiceDisableSubscriptionHostHandler.ServeHTTP(w, r)
 		case SubscriptionHostServiceCheckSubscriptionHostDomainProcedure:
 			subscriptionHostServiceCheckSubscriptionHostDomainHandler.ServeHTTP(w, r)
+		case SubscriptionHostServiceWaiveSubscriptionHostCAAProcedure:
+			subscriptionHostServiceWaiveSubscriptionHostCAAHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -300,4 +332,8 @@ func (UnimplementedSubscriptionHostServiceHandler) DisableSubscriptionHost(conte
 
 func (UnimplementedSubscriptionHostServiceHandler) CheckSubscriptionHostDomain(context.Context, *connect.Request[v1.CheckSubscriptionHostDomainRequest]) (*connect.Response[v1.CheckSubscriptionHostDomainResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.subhost.v1.SubscriptionHostService.CheckSubscriptionHostDomain is not implemented"))
+}
+
+func (UnimplementedSubscriptionHostServiceHandler) WaiveSubscriptionHostCAA(context.Context, *connect.Request[v1.WaiveSubscriptionHostCAARequest]) (*connect.Response[v1.WaiveSubscriptionHostCAAResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("mistgate.subhost.v1.SubscriptionHostService.WaiveSubscriptionHostCAA is not implemented"))
 }

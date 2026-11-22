@@ -18,6 +18,8 @@ func TestSubHostPolicy(t *testing.T) {
 		SubHostFinishProcedure: subhostv1connect.SubscriptionHostServiceFinishSubscriptionHostChangeProcedure,
 		SubHostCancelProcedure: subhostv1connect.SubscriptionHostServiceCancelSubscriptionHostChangeProcedure,
 		SubHostOffProcedure:    subhostv1connect.SubscriptionHostServiceDisableSubscriptionHostProcedure,
+		// proceeding without the CAA record is the owner's approved choice too
+		SubHostWaiveCAAProcedure: subhostv1connect.SubscriptionHostServiceWaiveSubscriptionHostCAAProcedure,
 	}
 	read := map[string]string{
 		SubHostGetProcedure:   subhostv1connect.SubscriptionHostServiceGetSubscriptionHostProcedure,

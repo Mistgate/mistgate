@@ -29,6 +29,7 @@ const (
 	keyNextPath     = "sub_host_next_path"
 	keyBootstrapPin = "sub_host_bootstrap_pin"
 	keyReadyAt      = "sub_host_ready_at"
+	keyCAAWaived    = "sub_host_caa_waived" // the ACME account URI the owner waived the CAA step for (this domain only)
 	keyPublicURL    = "public_url"          // the panel's own address (state off)
 	keyHostURL      = "sub_host_public_url" // the effective address while a host is set
 )
@@ -47,6 +48,7 @@ type state struct {
 	NextPath                           string // the next node's own bridge path during a move: a host never learns another's
 	BootstrapPin                       string // the host site's pin from the SSH install, until its agent reports one
 	ReadyAt                            string // unix seconds: when the host was first ready ("" = not yet)
+	CAAWaived                          string // the ACME account URI the owner proceeded without CAA for ("" = not waived)
 	PublicURL                          string
 }
 
@@ -73,7 +75,7 @@ func (s *state) ptrs() map[string]*string {
 	return map[string]*string{
 		keyState: &s.State, keyDomain: &s.Domain, keyNode: &s.Node, keyNext: &s.Next, keyPrevURL: &s.PrevURL,
 		keyPath: &s.Path, keySiteName: &s.SiteName, keyNextSiteName: &s.NextSiteName, keyNextPath: &s.NextPath, keyBootstrapPin: &s.BootstrapPin,
-		keyReadyAt: &s.ReadyAt, keyPublicURL: &s.PublicURL,
+		keyReadyAt: &s.ReadyAt, keyPublicURL: &s.PublicURL, keyCAAWaived: &s.CAAWaived,
 	}
 }
 

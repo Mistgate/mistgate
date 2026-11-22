@@ -45,6 +45,7 @@ type subHostView struct {
 	Pending     []subHostNodeView   `json:"pending,omitempty"`
 	CAARecord   string              `json:"caa_record,omitempty"`
 	CAAStatus   string              `json:"caa_status,omitempty"`
+	CAAWaived   bool                `json:"caa_waived,omitempty"`
 	LackingLink []subHostNodeView   `json:"lacking_link,omitempty"`
 }
 
@@ -64,7 +65,7 @@ func subHostState(s subhostv1.SubscriptionHostState) string {
 func subHostViewOf(h *subhostv1.SubscriptionHost) subHostView {
 	v := subHostView{State: subHostState(h.GetState()), Domain: clean(h.GetDomain(), 253), NodeID: clean(h.GetNodeId(), 64),
 		NextNodeID: clean(h.GetNextNodeId(), 64), PublicURL: clean(h.GetPublicUrl(), 300), CAARecord: clean(h.GetCaaRecord(), 300), CAAStatus: clean(h.GetCaaStatus(), 64)}
-	v.SiteName, v.Ready = clean(h.GetSiteName(), 253), h.GetReady()
+	v.SiteName, v.Ready, v.CAAWaived = clean(h.GetSiteName(), 253), h.GetReady(), h.GetCaaWaived()
 	for _, r := range h.GetNotReady() {
 		v.NotReady = append(v.NotReady, clean(r, 32))
 	}
@@ -85,9 +86,10 @@ func subscriptionHostTools() []toolDef {
 	get := readTool("subscription_host_get", ProfileAdmin, procs(subhostv1connect.SubscriptionHostServiceGetSubscriptionHostProcedure),
 		"The subscription host: whether the panel's public address is a subdomain served by a node (state off, on, moving or leaving), "+
 			"the domain, the serving node and the next one during a move, the name of the node's own site on 443, whether it is ready "+
-			"(not_ready lists what is missing: host_offline, host_error, site_cert, bridge, panel_cert), the health of the bridge the panel dials "+
+			"(not_ready lists what is missing: host_offline, host_error, site_cert, bridge, panel_cert, caa), the health of the bridge the panel dials "+
 			"(down_reason unreachable, tls, pin_mismatch, refused, no_verification or unfit:<reason>), nodes still connected through it while leaving, "+
-			"the CAA record to publish, and nodes whose agent cannot follow the panel to a new link address.",
+			"the CAA record to publish and whether the owner proceeds without it (caa_waived), and nodes whose agent cannot follow the "+
+			"panel to a new link address.",
 		func(c *call, _ noArgs) (any, error) {
 			h, err := c.subHost()
 			if err != nil {
@@ -96,7 +98,7 @@ func subscriptionHostTools() []toolDef {
 			return subHostViewOf(h), nil
 		})
 	return []toolDef{get, subHostSetPlanTool(), subHostSetApplyTool(), subHostMovePlanTool(), subHostMoveApplyTool(),
-		subHostDisablePlanTool(), subHostDisableApplyTool()}
+		subHostDisablePlanTool(), subHostDisableApplyTool(), subHostCAAWaivePlanTool(), subHostCAAWaiveApplyTool()}
 }
 
 // subHostSiteName is the optional site name, shaped like a domain.
@@ -427,5 +429,58 @@ func subHostDisableApplyTool() toolDef {
 				return done{}, apiError(err)
 			}
 			return doneWith("subscription_host_leaving", "The subscription host is leaving; finish it once the nodes have moved."), nil
+		})
+}
+
+type subHostCAAWaiveArgs struct {
+	ReasonField
+}
+
+type subHostCAAWaiveParams struct{ Domain string }
+
+func subHostCAAWaivePlanTool() toolDef {
+	const base = "subscription_host_caa_waive"
+	return planToolDef(base, procs(subhostv1connect.SubscriptionHostServiceGetSubscriptionHostProcedure),
+		"Prepare to let the subscription host become ready without the CAA record (the caa step of readiness): whoever holds the "+
+			"host can then get a certificate of their own for the subdomain. Publishing the record shown by subscription_host_get is "+
+			"the safe way; this is for a DNS provider that cannot publish it. Lasts for this domain and the panel's ACME account. The "+
+			"owner approves with a fresh sign-in.",
+		func(c *call, in subHostCAAWaiveArgs) (*mcp.CallToolResult, any, error) {
+			reason := (&in.ReasonField).take()
+			h, err := c.subHost()
+			if err != nil {
+				return nil, nil, scrubError(err)
+			}
+			if st := h.GetState(); st != subhostv1.SubscriptionHostState_SUBSCRIPTION_HOST_STATE_ON && st != subhostv1.SubscriptionHostState_SUBSCRIPTION_HOST_STATE_MOVING {
+				return nil, nil, errors.New("the CAA step is waived only while the subscription host is on or moving; it is " + subHostState(st))
+			}
+			if h.GetCaaWaived() {
+				return nil, nil, errors.New("the CAA step is already waived for this domain")
+			}
+			if h.GetCaaStatus() == "present" {
+				return nil, nil, errors.New("the CAA record is published: nothing to waive")
+			}
+			return subHostPlan(c, base, subHostCAAWaiveParams{Domain: clean(h.GetDomain(), 253)}, reason,
+				"Let the subscription host become ready without the CAA record for its domain.",
+				[]Fact{{Key: "domain", Value: clean(h.GetDomain(), 253), Untrusted: true},
+					{Key: "warning", Value: "without the CAA record whoever holds the host can get a certificate of their own for the subdomain and read the subscriptions it carries"}})
+		})
+}
+
+func subHostCAAWaiveApplyTool() toolDef {
+	return applyToolDef("subscription_host_caa_waive", procs(subhostv1connect.SubscriptionHostServiceWaiveSubscriptionHostCAAProcedure),
+		"Apply an owner-approved subscription_host_caa_waive plan. Takes only the confirm_token.", "make a new plan",
+		func(c *call, p subHostCAAWaiveParams) (done, error) {
+			h, err := c.subHost()
+			if err != nil {
+				return done{}, err
+			}
+			if h.GetDomain() != p.Domain {
+				return done{}, failure("changed_since_plan", "the subscription host's domain changed since the plan: make a new one")
+			}
+			if _, err := c.cl.SubHost.WaiveSubscriptionHostCAA(c.ctx, connect.NewRequest(&subhostv1.WaiveSubscriptionHostCAARequest{})); err != nil {
+				return done{}, apiError(err)
+			}
+			return doneWith("subscription_host_caa_waived", "The subscription host may become ready without the CAA record for "+clean(p.Domain, 253)+"."), nil
 		})
 }

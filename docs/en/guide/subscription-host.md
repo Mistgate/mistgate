@@ -50,7 +50,8 @@ Nothing moves until the host is **ready**. Until then the card lists the steps a
 2. The node took the role (an unfit role names its reason; nothing is installed then).
 3. The node's site has a public certificate.
 4. The panel's bridge to the node is up.
-5. The panel has a certificate for the subdomain (Let's Encrypt, through the host).
+5. The panel has a certificate for the subdomain (Let's Encrypt, through the host; the panel asks for it once its bridge is up).
+6. DNS has the CAA record that limits the subdomain's certificates to this panel (see [CAA record](#caa-record)), or the owner proceeds without it.
 
 Once all hold, the panel records `sub_host_ready` and switches at run time, without a restart: the **Base of the subscription links** becomes the subdomain (*via subscription host*), the agents receive the new link address over their current link and keep their old one until a session over the new one succeeds, and new nodes enroll over the subdomain's link. Losing readiness later does not move anything back.
 
@@ -60,7 +61,11 @@ What a visitor sees: a connection for the subdomain that the panel cannot take (
 
 ## CAA record
 
-The card shows a CAA record that lets only this panel's certificate account issue certificates for the domain. Publish it in your DNS. The line under it says whether DNS has it: *Published in DNS*, *Not in DNS yet*, *Appears once the panel has its certificate account*, or *Could not check DNS for it*.
+The subdomain points at the host, so whoever takes over the node could get a certificate of their own for it and read the subscriptions it carries. Only a CAA record that names this panel's certificate account stops that. The card shows the record once the panel has its account (it gets one when it first asks for the subdomain's certificate); publish it in your DNS. The line under it says whether DNS has it: *Published in DNS*, *Not in DNS yet*, *Appears once the panel has its certificate account*, or *Could not check DNS for it*. The host is not ready until the record is published.
+
+If your DNS provider cannot publish CAA records, **Proceed without CAA** lets the host become ready without it, after a fresh sign-in. The panel audits it, records the warning event `sub_host_caa_waived` and says so on the card. The choice holds for this subdomain and this certificate account only: a new subdomain, or a new account, asks again. Through MCP it is the plan `subscription_host_caa_waive`.
+
+The record names the panel's certificate account. A panel restored or moved without its `acme` directory gets a new account: Let's Encrypt then refuses to renew the subdomain's certificate until you replace the record with the one the card shows.
 
 ## Profiles on the host
 

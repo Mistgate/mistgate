@@ -8,17 +8,19 @@ package auth
 // does not offer it, edition.SubscriptionHost) links none of it: the procedures are named here by path, and a test compares
 // them with the generated names.
 const (
-	SubHostGetProcedure    = "/mistgate.subhost.v1.SubscriptionHostService/GetSubscriptionHost"
-	SubHostSetProcedure    = "/mistgate.subhost.v1.SubscriptionHostService/SetSubscriptionHost"
-	SubHostMoveProcedure   = "/mistgate.subhost.v1.SubscriptionHostService/StartSubscriptionHostMove"
-	SubHostFinishProcedure = "/mistgate.subhost.v1.SubscriptionHostService/FinishSubscriptionHostChange"
-	SubHostCancelProcedure = "/mistgate.subhost.v1.SubscriptionHostService/CancelSubscriptionHostChange"
-	SubHostOffProcedure    = "/mistgate.subhost.v1.SubscriptionHostService/DisableSubscriptionHost"
-	SubHostCheckProcedure  = "/mistgate.subhost.v1.SubscriptionHostService/CheckSubscriptionHostDomain"
+	SubHostGetProcedure      = "/mistgate.subhost.v1.SubscriptionHostService/GetSubscriptionHost"
+	SubHostSetProcedure      = "/mistgate.subhost.v1.SubscriptionHostService/SetSubscriptionHost"
+	SubHostMoveProcedure     = "/mistgate.subhost.v1.SubscriptionHostService/StartSubscriptionHostMove"
+	SubHostFinishProcedure   = "/mistgate.subhost.v1.SubscriptionHostService/FinishSubscriptionHostChange"
+	SubHostCancelProcedure   = "/mistgate.subhost.v1.SubscriptionHostService/CancelSubscriptionHostChange"
+	SubHostOffProcedure      = "/mistgate.subhost.v1.SubscriptionHostService/DisableSubscriptionHost"
+	SubHostCheckProcedure    = "/mistgate.subhost.v1.SubscriptionHostService/CheckSubscriptionHostDomain"
+	SubHostWaiveCAAProcedure = "/mistgate.subhost.v1.SubscriptionHostService/WaiveSubscriptionHostCAA"
 )
 
 func init() {
-	change := []string{SubHostSetProcedure, SubHostMoveProcedure, SubHostFinishProcedure, SubHostCancelProcedure, SubHostOffProcedure}
+	change := []string{SubHostSetProcedure, SubHostMoveProcedure, SubHostFinishProcedure, SubHostCancelProcedure, SubHostOffProcedure,
+		SubHostWaiveCAAProcedure}
 	for _, p := range append([]string{SubHostGetProcedure, SubHostCheckProcedure}, change...) {
 		procedureLevels[p] = levelOwner
 	}
@@ -30,5 +32,6 @@ func init() {
 	tokenProcedures[SubHostCheckProcedure] = TokenAccessPlanning
 	grantProcedures["subscription_host_set"] = []string{SubHostSetProcedure}
 	grantProcedures["subscription_host_move"] = []string{SubHostMoveProcedure, SubHostFinishProcedure, SubHostCancelProcedure}
+	grantProcedures["subscription_host_caa_waive"] = []string{SubHostWaiveCAAProcedure}
 	grantProcedures["subscription_host_disable"] = []string{SubHostOffProcedure, SubHostFinishProcedure, SubHostCancelProcedure}
 }

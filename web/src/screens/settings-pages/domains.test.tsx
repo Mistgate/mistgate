@@ -21,6 +21,7 @@ const subHost = vi.hoisted(() => ({
   finishSubscriptionHostChange: vi.fn(),
   cancelSubscriptionHostChange: vi.fn(),
   disableSubscriptionHost: vi.fn(),
+  waiveSubscriptionHostCAA: vi.fn(),
   checkSubscriptionHostDomain: vi.fn(),
 }));
 vi.mock("@/lib/api", async (orig) => ({ ...(await orig<typeof import("@/lib/api")>()), auth, instance, nodes, subHost }));
@@ -43,7 +44,7 @@ beforeAll(() => {
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
-const base = { domain: "", nodeId: "", nextNodeId: "", publicUrl: "", bridges: [], pending: [], caaRecord: "", caaStatus: "", lackingLink: [], siteName: "", ready: false, notReady: [] as string[] };
+const base = { domain: "", nodeId: "", nextNodeId: "", publicUrl: "", bridges: [], pending: [], caaRecord: "", caaStatus: "", lackingLink: [], siteName: "", ready: false, notReady: [] as string[], caaWaived: false };
 const withState = (state: SubscriptionHostState, more: object = {}) => subHost.getSubscriptionHost.mockResolvedValue({ host: { ...base, state, ...more } });
 
 beforeEach(() => {
@@ -122,7 +123,7 @@ describe("Settings → Domains → subscription host", () => {
     await mount();
     expect(text()).toContain(en["set.domains.subHost.readyNo"]);
     const steps = [...document.querySelectorAll('[data-testid="subhost-steps"] li')];
-    expect(steps.map((li) => li.hasAttribute("data-done"))).toEqual([true, true, true, false, false]);
+    expect(steps.map((li) => li.hasAttribute("data-done"))).toEqual([true, true, true, false, false, true]);
     expect(text()).toContain(en["set.domains.subHost.bridge.pin_mismatch"]);
     expect(text()).not.toContain(en["set.domains.subHost.via"]);
   });
@@ -180,5 +181,22 @@ describe("Settings → Domains → subscription host", () => {
     subHost.setSubscriptionHost.mockResolvedValue({ host: { ...base, state: SubscriptionHostState.ON, domain: "sub.example.com", nodeId: "nod_a" } });
     await click(button(en["set.domains.subHost.saveAnyway"]));
     expect(subHost.setSubscriptionHost).toHaveBeenLastCalledWith({ nodeId: "nod_a", domain: "sub.example.com", siteName: "", skipDnsCheck: true });
+  });
+  it("caa: Proceed without CAA asks first, then waives; a waiver is shown", async () => {
+    withState(SubscriptionHostState.ON, { domain: "sub.example.com", nodeId: "nod_a", notReady: ["caa"], caaStatus: "absent", caaRecord: 'sub.example.com. CAA 0 issue "letsencrypt.org"' });
+    subHost.waiveSubscriptionHostCAA.mockResolvedValue({ host: { ...base, state: SubscriptionHostState.ON, domain: "sub.example.com", nodeId: "nod_a", ready: true, caaWaived: true } });
+    await mount();
+    await click(button(en["set.domains.subHost.caaWaive"]));
+    expect(subHost.waiveSubscriptionHostCAA).not.toHaveBeenCalled();
+    expect(text()).toContain(en["set.domains.subHost.caaWaiveAsk"]);
+    await click(button(en["set.domains.subHost.caaWaive"]));
+    expect(subHost.waiveSubscriptionHostCAA).toHaveBeenCalledTimes(1);
+    expect(text()).toContain(en["set.domains.subHost.caaWaived"]);
+  });
+
+  it("caa: nothing to waive while the panel has no ACME account", async () => {
+    withState(SubscriptionHostState.ON, { domain: "sub.example.com", nodeId: "nod_a", notReady: ["panel_cert", "caa"], caaStatus: "account_pending" });
+    await mount();
+    expect(button(en["set.domains.subHost.caaWaive"])).toBeUndefined();
   });
 });

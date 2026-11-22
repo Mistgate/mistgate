@@ -51,6 +51,7 @@ const textKeys: Record<string, MessageKey> = {
   sub_host_ready: "event.sub_host_ready",
   sub_host_tunnel_down: "event.sub_host_tunnel_down",
   sub_host_tunnel_up: "event.sub_host_tunnel_up",
+  sub_host_caa_waived: "event.sub_host_caa_waived",
   nft_missing: "event.nft_missing",
   nft_restored: "event.nft_restored",
   user_created: "event.user_created",

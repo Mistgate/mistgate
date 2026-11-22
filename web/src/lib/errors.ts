@@ -139,6 +139,8 @@ export const errorCodes = [
   "sub_host_inbound_unfit",
   // finishing a move before the next node can carry the subdomain: "sub_host_next_not_ready: not_ready=<steps, comma-separated>"
   "sub_host_next_not_ready",
+  // proceeding without the CAA record before the panel has an ACME account to tie the waiver to
+  "sub_host_caa_account_pending",
 ] as const;
 
 /**
@@ -205,7 +207,7 @@ export function shareRefusalText(t: T, code: string, vars: Record<string, string
   return t(key, { protocol: "", ...vars });
 }
 
-const subHostSteps = ["host_offline", "host_error", "site_cert", "bridge", "panel_cert"];
+const subHostSteps = ["host_offline", "host_error", "site_cert", "bridge", "panel_cert", "caa"];
 
 export const subHostUnfit = [
   "retired",

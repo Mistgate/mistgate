@@ -68,7 +68,7 @@ export function DomainsPage() {
 }
 
 /** The steps of readiness, in the order they come true (SubscriptionHost.not_ready). */
-const steps = ["host_offline", "host_error", "site_cert", "bridge", "panel_cert"] as const;
+const steps = ["host_offline", "host_error", "site_cert", "bridge", "panel_cert", "caa"] as const;
 const bridgeReasons = ["unreachable", "tls", "pin_mismatch", "refused", "no_verification"];
 
 /** The addresses the names resolve to and the ones they should. */
@@ -96,6 +96,7 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
   const [check, setCheck] = useState<CheckSubscriptionHostDomainResponse | null>(null);
   const [failure, setFailure] = useState<{ code: string; text: string } | null>(null);
   const [askNoAddress, setAskNoAddress] = useState(false);
+  const [askNoCAA, setAskNoCAA] = useState(false);
   const [busy, setBusy] = useState("");
 
   // during a move: do the names already point at the next node
@@ -229,6 +230,29 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
                 </li>
               ))}
             </ul>
+          </Pb>
+        )}
+        {host.caaWaived && (
+          <Pb tone="part" className="sx-pbm">
+            {t("set.domains.subHost.caaWaived")}
+          </Pb>
+        )}
+        {!host.ready && host.notReady.includes("caa") && host.caaStatus !== "account_pending" && (
+          <Pb
+            tone="part"
+            action={
+              askNoCAA ? (
+                <BusyButton variant="danger" busy={busy === "caa"} disabled={!!busy} onClick={() => void run("caa", () => subHost.waiveSubscriptionHostCAA({}))}>
+                  {t("set.domains.subHost.caaWaive")}
+                </BusyButton>
+              ) : (
+                <BusyButton disabled={!!busy} onClick={() => setAskNoCAA(true)}>
+                  {t("set.domains.subHost.caaWaive")}
+                </BusyButton>
+              )
+            }
+          >
+            {askNoCAA ? t("set.domains.subHost.caaWaiveAsk") : t("set.domains.subHost.caa.absent")}
           </Pb>
         )}
         {host.caaRecord && (

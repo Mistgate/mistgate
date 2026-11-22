@@ -240,6 +240,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `subscription_host_set` | 管理员 | 计划参数：`node_id`、`domain`，节点 443 上没有配置提供自有站点时加 `site_name`，以及 `skip_dns_check`；执行时只接收 `confirm_token`。计划会检查这些名称是否指向该节点。主机就绪后面板地址才切换。见[订阅主机](../guide/subscription-host.md) | 始终（step-up） |
 | `subscription_host_move` | 管理员 | 计划参数：`action` 为 `start`（带 `node_id`，需要时带 `site_name`）、`finish`（带 `force` 时，即使仍有节点经由主机连接或 DNS 尚未指向下一个节点也完成）或 `cancel`；执行时只接收 `confirm_token` | 始终（step-up） |
 | `subscription_host_disable` | 管理员 | 计划参数：面板要回到的 `public_url`，或不填并带 `force`；执行时只接收 `confirm_token`。用 `subscription_host_move` 的 `finish` 完成关闭 | 始终（step-up） |
+| `subscription_host_caa_waive` | 管理员 | 计划参数：无（当前域名）；执行时只接收 `confirm_token`。允许主机在没有 CAA 记录时就绪；仅在主机开启或迁移中且记录未发布时可用。对此域名和面板的 ACME 账户有效。见[订阅主机](../guide/subscription-host.md#caa-记录) | 始终（step-up） |
 
 对于 `create` 和 `enable`，`relay_apply` 遵循面板自己的顺序：先创建中转（关闭状态），检测链路，再开启，然后由面板从外部检测路径。检测未通过的中转保持关闭，执行失败并给出阶段（`leg` 或 `path`）及其代码；迁移已开启中转的端口会重新检测路径，失败则关闭中转。第二个服务器会在订阅下次刷新时出现或消失。请参阅[中转](../guide/relays.md)。
 

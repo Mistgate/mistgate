@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/subhost/v1/subhost.proto.
  */
 export const file_mistgate_subhost_v1_subhost: GenFile = /*@__PURE__*/
-  fileDesc("CiFtaXN0Z2F0ZS9zdWJob3N0L3YxL3N1Ymhvc3QucHJvdG8SE21pc3RnYXRlLnN1Ymhvc3QudjEicgoWU3Vic2NyaXB0aW9uSG9zdEJyaWRnZRIPCgdub2RlX2lkGAEgASgJEgoKAnVwGAIgASgIEhYKCnNpbmNlX3VuaXgYAyABKANCAjACEg4KBnJ0dF9tcxgEIAEoDRITCgtkb3duX3JlYXNvbhgFIAEoCSI8ChtTdWJzY3JpcHRpb25Ib3N0UGVuZGluZ05vZGUSDwoHbm9kZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIjgKF1N1YnNjcmlwdGlvbkhvc3ROb2RlUmVmEg8KB25vZGVfaWQYASABKAkSDAoEbmFtZRgCIAEoCSK6AwoQU3Vic2NyaXB0aW9uSG9zdBI5CgVzdGF0ZRgBIAEoDjIqLm1pc3RnYXRlLnN1Ymhvc3QudjEuU3Vic2NyaXB0aW9uSG9zdFN0YXRlEg4KBmRvbWFpbhgCIAEoCRIPCgdub2RlX2lkGAMgASgJEhQKDG5leHRfbm9kZV9pZBgEIAEoCRISCgpwdWJsaWNfdXJsGAUgASgJEjwKB2JyaWRnZXMYBiADKAsyKy5taXN0Z2F0ZS5zdWJob3N0LnYxLlN1YnNjcmlwdGlvbkhvc3RCcmlkZ2USQQoHcGVuZGluZxgHIAMoCzIwLm1pc3RnYXRlLnN1Ymhvc3QudjEuU3Vic2NyaXB0aW9uSG9zdFBlbmRpbmdOb2RlEhIKCmNhYV9yZWNvcmQYCCABKAkSEgoKY2FhX3N0YXR1cxgJIAEoCRJCCgxsYWNraW5nX2xpbmsYCiADKAsyLC5taXN0Z2F0ZS5zdWJob3N0LnYxLlN1YnNjcmlwdGlvbkhvc3ROb2RlUmVmEhEKCXNpdGVfbmFtZRgLIAEoCRINCgVyZWFkeRgMIAEoCBIRCglub3RfcmVhZHkYDSADKAkiHAoaR2V0U3Vic2NyaXB0aW9uSG9zdFJlcXVlc3QiUgobR2V0U3Vic2NyaXB0aW9uSG9zdFJlc3BvbnNlEjMKBGhvc3QYASABKAsyJS5taXN0Z2F0ZS5zdWJob3N0LnYxLlN1YnNjcmlwdGlvbkhvc3QiaAoaU2V0U3Vic2NyaXB0aW9uSG9zdFJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIOCgZkb21haW4YAiABKAkSFgoOc2tpcF9kbnNfY2hlY2sYAyABKAgSEQoJc2l0ZV9uYW1lGAQgASgJIlIKG1NldFN1YnNjcmlwdGlvbkhvc3RSZXNwb25zZRIzCgRob3N0GAEgASgLMiUubWlzdGdhdGUuc3ViaG9zdC52MS5TdWJzY3JpcHRpb25Ib3N0IkYKIFN0YXJ0U3Vic2NyaXB0aW9uSG9zdE1vdmVSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSEQoJc2l0ZV9uYW1lGAIgASgJIlgKIVN0YXJ0U3Vic2NyaXB0aW9uSG9zdE1vdmVSZXNwb25zZRIzCgRob3N0GAEgASgLMiUubWlzdGdhdGUuc3ViaG9zdC52MS5TdWJzY3JpcHRpb25Ib3N0IjQKI0ZpbmlzaFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXF1ZXN0Eg0KBWZvcmNlGAEgASgIIlsKJEZpbmlzaFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXNwb25zZRIzCgRob3N0GAEgASgLMiUubWlzdGdhdGUuc3ViaG9zdC52MS5TdWJzY3JpcHRpb25Ib3N0IiUKI0NhbmNlbFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXF1ZXN0IlsKJENhbmNlbFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXNwb25zZRIzCgRob3N0GAEgASgLMiUubWlzdGdhdGUuc3ViaG9zdC52MS5TdWJzY3JpcHRpb25Ib3N0IkMKHkRpc2FibGVTdWJzY3JpcHRpb25Ib3N0UmVxdWVzdBISCgpwdWJsaWNfdXJsGAEgASgJEg0KBWZvcmNlGAIgASgIIlYKH0Rpc2FibGVTdWJzY3JpcHRpb25Ib3N0UmVzcG9uc2USMwoEaG9zdBgBIAEoCzIlLm1pc3RnYXRlLnN1Ymhvc3QudjEuU3Vic2NyaXB0aW9uSG9zdCJpCiJDaGVja1N1YnNjcmlwdGlvbkhvc3REb21haW5SZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDgoGZG9tYWluGAIgASgJEhEKCXNpdGVfbmFtZRgDIAEoCRIPCgdhZGRyZXNzGAQgASgJIlcKI0NoZWNrU3Vic2NyaXB0aW9uSG9zdERvbWFpblJlc3BvbnNlEg8KB21hdGNoZXMYASABKAgSDQoFZm91bmQYAiADKAkSEAoIZXhwZWN0ZWQYAyADKAkqygEKFVN1YnNjcmlwdGlvbkhvc3RTdGF0ZRInCiNTVUJTQ1JJUFRJT05fSE9TVF9TVEFURV9VTlNQRUNJRklFRBAAEh8KG1NVQlNDUklQVElPTl9IT1NUX1NUQVRFX09GRhABEh4KGlNVQlNDUklQVElPTl9IT1NUX1NUQVRFX09OEAISIgoeU1VCU0NSSVBUSU9OX0hPU1RfU1RBVEVfTU9WSU5HEAMSIwofU1VCU0NSSVBUSU9OX0hPU1RfU1RBVEVfTEVBVklORxAEMuAHChdTdWJzY3JpcHRpb25Ib3N0U2VydmljZRJ4ChNHZXRTdWJzY3JpcHRpb25Ib3N0Ei8ubWlzdGdhdGUuc3ViaG9zdC52MS5HZXRTdWJzY3JpcHRpb25Ib3N0UmVxdWVzdBowLm1pc3RnYXRlLnN1Ymhvc3QudjEuR2V0U3Vic2NyaXB0aW9uSG9zdFJlc3BvbnNlEngKE1NldFN1YnNjcmlwdGlvbkhvc3QSLy5taXN0Z2F0ZS5zdWJob3N0LnYxLlNldFN1YnNjcmlwdGlvbkhvc3RSZXF1ZXN0GjAubWlzdGdhdGUuc3ViaG9zdC52MS5TZXRTdWJzY3JpcHRpb25Ib3N0UmVzcG9uc2USigEKGVN0YXJ0U3Vic2NyaXB0aW9uSG9zdE1vdmUSNS5taXN0Z2F0ZS5zdWJob3N0LnYxLlN0YXJ0U3Vic2NyaXB0aW9uSG9zdE1vdmVSZXF1ZXN0GjYubWlzdGdhdGUuc3ViaG9zdC52MS5TdGFydFN1YnNjcmlwdGlvbkhvc3RNb3ZlUmVzcG9uc2USkwEKHEZpbmlzaFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2USOC5taXN0Z2F0ZS5zdWJob3N0LnYxLkZpbmlzaFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXF1ZXN0GjkubWlzdGdhdGUuc3ViaG9zdC52MS5GaW5pc2hTdWJzY3JpcHRpb25Ib3N0Q2hhbmdlUmVzcG9uc2USkwEKHENhbmNlbFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2USOC5taXN0Z2F0ZS5zdWJob3N0LnYxLkNhbmNlbFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXF1ZXN0GjkubWlzdGdhdGUuc3ViaG9zdC52MS5DYW5jZWxTdWJzY3JpcHRpb25Ib3N0Q2hhbmdlUmVzcG9uc2UShAEKF0Rpc2FibGVTdWJzY3JpcHRpb25Ib3N0EjMubWlzdGdhdGUuc3ViaG9zdC52MS5EaXNhYmxlU3Vic2NyaXB0aW9uSG9zdFJlcXVlc3QaNC5taXN0Z2F0ZS5zdWJob3N0LnYxLkRpc2FibGVTdWJzY3JpcHRpb25Ib3N0UmVzcG9uc2USkAEKG0NoZWNrU3Vic2NyaXB0aW9uSG9zdERvbWFpbhI3Lm1pc3RnYXRlLnN1Ymhvc3QudjEuQ2hlY2tTdWJzY3JpcHRpb25Ib3N0RG9tYWluUmVxdWVzdBo4Lm1pc3RnYXRlLnN1Ymhvc3QudjEuQ2hlY2tTdWJzY3JpcHRpb25Ib3N0RG9tYWluUmVzcG9uc2VC1QEKF2NvbS5taXN0Z2F0ZS5zdWJob3N0LnYxQgxTdWJob3N0UHJvdG9QAVo+Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvc3ViaG9zdC92MTtzdWJob3N0djGiAgNNU1iqAhNNaXN0Z2F0ZS5TdWJob3N0LlYxygITTWlzdGdhdGVcU3ViaG9zdFxWMeICH01pc3RnYXRlXFN1Ymhvc3RcVjFcR1BCTWV0YWRhdGHqAhVNaXN0Z2F0ZTo6U3ViaG9zdDo6VjFiBnByb3RvMw");
+  fileDesc("CiFtaXN0Z2F0ZS9zdWJob3N0L3YxL3N1Ymhvc3QucHJvdG8SE21pc3RnYXRlLnN1Ymhvc3QudjEicgoWU3Vic2NyaXB0aW9uSG9zdEJyaWRnZRIPCgdub2RlX2lkGAEgASgJEgoKAnVwGAIgASgIEhYKCnNpbmNlX3VuaXgYAyABKANCAjACEg4KBnJ0dF9tcxgEIAEoDRITCgtkb3duX3JlYXNvbhgFIAEoCSI8ChtTdWJzY3JpcHRpb25Ib3N0UGVuZGluZ05vZGUSDwoHbm9kZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIjgKF1N1YnNjcmlwdGlvbkhvc3ROb2RlUmVmEg8KB25vZGVfaWQYASABKAkSDAoEbmFtZRgCIAEoCSLOAwoQU3Vic2NyaXB0aW9uSG9zdBI5CgVzdGF0ZRgBIAEoDjIqLm1pc3RnYXRlLnN1Ymhvc3QudjEuU3Vic2NyaXB0aW9uSG9zdFN0YXRlEg4KBmRvbWFpbhgCIAEoCRIPCgdub2RlX2lkGAMgASgJEhQKDG5leHRfbm9kZV9pZBgEIAEoCRISCgpwdWJsaWNfdXJsGAUgASgJEjwKB2JyaWRnZXMYBiADKAsyKy5taXN0Z2F0ZS5zdWJob3N0LnYxLlN1YnNjcmlwdGlvbkhvc3RCcmlkZ2USQQoHcGVuZGluZxgHIAMoCzIwLm1pc3RnYXRlLnN1Ymhvc3QudjEuU3Vic2NyaXB0aW9uSG9zdFBlbmRpbmdOb2RlEhIKCmNhYV9yZWNvcmQYCCABKAkSEgoKY2FhX3N0YXR1cxgJIAEoCRJCCgxsYWNraW5nX2xpbmsYCiADKAsyLC5taXN0Z2F0ZS5zdWJob3N0LnYxLlN1YnNjcmlwdGlvbkhvc3ROb2RlUmVmEhEKCXNpdGVfbmFtZRgLIAEoCRINCgVyZWFkeRgMIAEoCBIRCglub3RfcmVhZHkYDSADKAkSEgoKY2FhX3dhaXZlZBgOIAEoCCIhCh9XYWl2ZVN1YnNjcmlwdGlvbkhvc3RDQUFSZXF1ZXN0IlcKIFdhaXZlU3Vic2NyaXB0aW9uSG9zdENBQVJlc3BvbnNlEjMKBGhvc3QYASABKAsyJS5taXN0Z2F0ZS5zdWJob3N0LnYxLlN1YnNjcmlwdGlvbkhvc3QiHAoaR2V0U3Vic2NyaXB0aW9uSG9zdFJlcXVlc3QiUgobR2V0U3Vic2NyaXB0aW9uSG9zdFJlc3BvbnNlEjMKBGhvc3QYASABKAsyJS5taXN0Z2F0ZS5zdWJob3N0LnYxLlN1YnNjcmlwdGlvbkhvc3QiaAoaU2V0U3Vic2NyaXB0aW9uSG9zdFJlcXVlc3QSDwoHbm9kZV9pZBgBIAEoCRIOCgZkb21haW4YAiABKAkSFgoOc2tpcF9kbnNfY2hlY2sYAyABKAgSEQoJc2l0ZV9uYW1lGAQgASgJIlIKG1NldFN1YnNjcmlwdGlvbkhvc3RSZXNwb25zZRIzCgRob3N0GAEgASgLMiUubWlzdGdhdGUuc3ViaG9zdC52MS5TdWJzY3JpcHRpb25Ib3N0IkYKIFN0YXJ0U3Vic2NyaXB0aW9uSG9zdE1vdmVSZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSEQoJc2l0ZV9uYW1lGAIgASgJIlgKIVN0YXJ0U3Vic2NyaXB0aW9uSG9zdE1vdmVSZXNwb25zZRIzCgRob3N0GAEgASgLMiUubWlzdGdhdGUuc3ViaG9zdC52MS5TdWJzY3JpcHRpb25Ib3N0IjQKI0ZpbmlzaFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXF1ZXN0Eg0KBWZvcmNlGAEgASgIIlsKJEZpbmlzaFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXNwb25zZRIzCgRob3N0GAEgASgLMiUubWlzdGdhdGUuc3ViaG9zdC52MS5TdWJzY3JpcHRpb25Ib3N0IiUKI0NhbmNlbFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXF1ZXN0IlsKJENhbmNlbFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXNwb25zZRIzCgRob3N0GAEgASgLMiUubWlzdGdhdGUuc3ViaG9zdC52MS5TdWJzY3JpcHRpb25Ib3N0IkMKHkRpc2FibGVTdWJzY3JpcHRpb25Ib3N0UmVxdWVzdBISCgpwdWJsaWNfdXJsGAEgASgJEg0KBWZvcmNlGAIgASgIIlYKH0Rpc2FibGVTdWJzY3JpcHRpb25Ib3N0UmVzcG9uc2USMwoEaG9zdBgBIAEoCzIlLm1pc3RnYXRlLnN1Ymhvc3QudjEuU3Vic2NyaXB0aW9uSG9zdCJpCiJDaGVja1N1YnNjcmlwdGlvbkhvc3REb21haW5SZXF1ZXN0Eg8KB25vZGVfaWQYASABKAkSDgoGZG9tYWluGAIgASgJEhEKCXNpdGVfbmFtZRgDIAEoCRIPCgdhZGRyZXNzGAQgASgJIlcKI0NoZWNrU3Vic2NyaXB0aW9uSG9zdERvbWFpblJlc3BvbnNlEg8KB21hdGNoZXMYASABKAgSDQoFZm91bmQYAiADKAkSEAoIZXhwZWN0ZWQYAyADKAkqygEKFVN1YnNjcmlwdGlvbkhvc3RTdGF0ZRInCiNTVUJTQ1JJUFRJT05fSE9TVF9TVEFURV9VTlNQRUNJRklFRBAAEh8KG1NVQlNDUklQVElPTl9IT1NUX1NUQVRFX09GRhABEh4KGlNVQlNDUklQVElPTl9IT1NUX1NUQVRFX09OEAISIgoeU1VCU0NSSVBUSU9OX0hPU1RfU1RBVEVfTU9WSU5HEAMSIwofU1VCU0NSSVBUSU9OX0hPU1RfU1RBVEVfTEVBVklORxAEMuoIChdTdWJzY3JpcHRpb25Ib3N0U2VydmljZRJ4ChNHZXRTdWJzY3JpcHRpb25Ib3N0Ei8ubWlzdGdhdGUuc3ViaG9zdC52MS5HZXRTdWJzY3JpcHRpb25Ib3N0UmVxdWVzdBowLm1pc3RnYXRlLnN1Ymhvc3QudjEuR2V0U3Vic2NyaXB0aW9uSG9zdFJlc3BvbnNlEngKE1NldFN1YnNjcmlwdGlvbkhvc3QSLy5taXN0Z2F0ZS5zdWJob3N0LnYxLlNldFN1YnNjcmlwdGlvbkhvc3RSZXF1ZXN0GjAubWlzdGdhdGUuc3ViaG9zdC52MS5TZXRTdWJzY3JpcHRpb25Ib3N0UmVzcG9uc2USigEKGVN0YXJ0U3Vic2NyaXB0aW9uSG9zdE1vdmUSNS5taXN0Z2F0ZS5zdWJob3N0LnYxLlN0YXJ0U3Vic2NyaXB0aW9uSG9zdE1vdmVSZXF1ZXN0GjYubWlzdGdhdGUuc3ViaG9zdC52MS5TdGFydFN1YnNjcmlwdGlvbkhvc3RNb3ZlUmVzcG9uc2USkwEKHEZpbmlzaFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2USOC5taXN0Z2F0ZS5zdWJob3N0LnYxLkZpbmlzaFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXF1ZXN0GjkubWlzdGdhdGUuc3ViaG9zdC52MS5GaW5pc2hTdWJzY3JpcHRpb25Ib3N0Q2hhbmdlUmVzcG9uc2USkwEKHENhbmNlbFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2USOC5taXN0Z2F0ZS5zdWJob3N0LnYxLkNhbmNlbFN1YnNjcmlwdGlvbkhvc3RDaGFuZ2VSZXF1ZXN0GjkubWlzdGdhdGUuc3ViaG9zdC52MS5DYW5jZWxTdWJzY3JpcHRpb25Ib3N0Q2hhbmdlUmVzcG9uc2UShAEKF0Rpc2FibGVTdWJzY3JpcHRpb25Ib3N0EjMubWlzdGdhdGUuc3ViaG9zdC52MS5EaXNhYmxlU3Vic2NyaXB0aW9uSG9zdFJlcXVlc3QaNC5taXN0Z2F0ZS5zdWJob3N0LnYxLkRpc2FibGVTdWJzY3JpcHRpb25Ib3N0UmVzcG9uc2USkAEKG0NoZWNrU3Vic2NyaXB0aW9uSG9zdERvbWFpbhI3Lm1pc3RnYXRlLnN1Ymhvc3QudjEuQ2hlY2tTdWJzY3JpcHRpb25Ib3N0RG9tYWluUmVxdWVzdBo4Lm1pc3RnYXRlLnN1Ymhvc3QudjEuQ2hlY2tTdWJzY3JpcHRpb25Ib3N0RG9tYWluUmVzcG9uc2UShwEKGFdhaXZlU3Vic2NyaXB0aW9uSG9zdENBQRI0Lm1pc3RnYXRlLnN1Ymhvc3QudjEuV2FpdmVTdWJzY3JpcHRpb25Ib3N0Q0FBUmVxdWVzdBo1Lm1pc3RnYXRlLnN1Ymhvc3QudjEuV2FpdmVTdWJzY3JpcHRpb25Ib3N0Q0FBUmVzcG9uc2VC1QEKF2NvbS5taXN0Z2F0ZS5zdWJob3N0LnYxQgxTdWJob3N0UHJvdG9QAVo+Z2l0aHViLmNvbS9taXN0Z2F0ZS9taXN0Z2F0ZS9nZW4vbWlzdGdhdGUvc3ViaG9zdC92MTtzdWJob3N0djGiAgNNU1iqAhNNaXN0Z2F0ZS5TdWJob3N0LlYxygITTWlzdGdhdGVcU3ViaG9zdFxWMeICH01pc3RnYXRlXFN1Ymhvc3RcVjFcR1BCTWV0YWRhdGHqAhVNaXN0Z2F0ZTo6U3ViaG9zdDo6VjFiBnByb3RvMw");
 
 /**
  * The panel's connection to one host node (the bridge it dials).
@@ -172,7 +172,8 @@ export type SubscriptionHost = Message<"mistgate.subhost.v1.SubscriptionHost"> &
   /**
    * The host is ready: the panel's subscriptions and agents use the subdomain. Until then not_ready says what is missing:
    * host_offline | host_error | site_cert (the host's site has no public certificate yet) | bridge (the panel holds no
-   * connection) | panel_cert (the panel has no certificate for the subdomain yet).
+   * connection) | panel_cert (the panel has no certificate for the subdomain yet) | caa (DNS has no CAA record that limits
+   * the subdomain's certificates to this panel's ACME account, and the owner did not waive it).
    *
    * @generated from field: bool ready = 12;
    */
@@ -182,6 +183,13 @@ export type SubscriptionHost = Message<"mistgate.subhost.v1.SubscriptionHost"> &
    * @generated from field: repeated string not_ready = 13;
    */
   notReady: string[];
+
+  /**
+   * The owner proceeds without the CAA record, for this domain and the panel's current ACME account.
+   *
+   * @generated from field: bool caa_waived = 14;
+   */
+  caaWaived: boolean;
 };
 
 /**
@@ -190,6 +198,36 @@ export type SubscriptionHost = Message<"mistgate.subhost.v1.SubscriptionHost"> &
  */
 export const SubscriptionHostSchema: GenMessage<SubscriptionHost> = /*@__PURE__*/
   messageDesc(file_mistgate_subhost_v1_subhost, 3);
+
+/**
+ * @generated from message mistgate.subhost.v1.WaiveSubscriptionHostCAARequest
+ */
+export type WaiveSubscriptionHostCAARequest = Message<"mistgate.subhost.v1.WaiveSubscriptionHostCAARequest"> & {
+};
+
+/**
+ * Describes the message mistgate.subhost.v1.WaiveSubscriptionHostCAARequest.
+ * Use `create(WaiveSubscriptionHostCAARequestSchema)` to create a new message.
+ */
+export const WaiveSubscriptionHostCAARequestSchema: GenMessage<WaiveSubscriptionHostCAARequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_subhost_v1_subhost, 4);
+
+/**
+ * @generated from message mistgate.subhost.v1.WaiveSubscriptionHostCAAResponse
+ */
+export type WaiveSubscriptionHostCAAResponse = Message<"mistgate.subhost.v1.WaiveSubscriptionHostCAAResponse"> & {
+  /**
+   * @generated from field: mistgate.subhost.v1.SubscriptionHost host = 1;
+   */
+  host?: SubscriptionHost | undefined;
+};
+
+/**
+ * Describes the message mistgate.subhost.v1.WaiveSubscriptionHostCAAResponse.
+ * Use `create(WaiveSubscriptionHostCAAResponseSchema)` to create a new message.
+ */
+export const WaiveSubscriptionHostCAAResponseSchema: GenMessage<WaiveSubscriptionHostCAAResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_subhost_v1_subhost, 5);
 
 /**
  * @generated from message mistgate.subhost.v1.GetSubscriptionHostRequest
@@ -202,7 +240,7 @@ export type GetSubscriptionHostRequest = Message<"mistgate.subhost.v1.GetSubscri
  * Use `create(GetSubscriptionHostRequestSchema)` to create a new message.
  */
 export const GetSubscriptionHostRequestSchema: GenMessage<GetSubscriptionHostRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 4);
+  messageDesc(file_mistgate_subhost_v1_subhost, 6);
 
 /**
  * @generated from message mistgate.subhost.v1.GetSubscriptionHostResponse
@@ -219,7 +257,7 @@ export type GetSubscriptionHostResponse = Message<"mistgate.subhost.v1.GetSubscr
  * Use `create(GetSubscriptionHostResponseSchema)` to create a new message.
  */
 export const GetSubscriptionHostResponseSchema: GenMessage<GetSubscriptionHostResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 5);
+  messageDesc(file_mistgate_subhost_v1_subhost, 7);
 
 /**
  * @generated from message mistgate.subhost.v1.SetSubscriptionHostRequest
@@ -253,7 +291,7 @@ export type SetSubscriptionHostRequest = Message<"mistgate.subhost.v1.SetSubscri
  * Use `create(SetSubscriptionHostRequestSchema)` to create a new message.
  */
 export const SetSubscriptionHostRequestSchema: GenMessage<SetSubscriptionHostRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 6);
+  messageDesc(file_mistgate_subhost_v1_subhost, 8);
 
 /**
  * @generated from message mistgate.subhost.v1.SetSubscriptionHostResponse
@@ -270,7 +308,7 @@ export type SetSubscriptionHostResponse = Message<"mistgate.subhost.v1.SetSubscr
  * Use `create(SetSubscriptionHostResponseSchema)` to create a new message.
  */
 export const SetSubscriptionHostResponseSchema: GenMessage<SetSubscriptionHostResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 7);
+  messageDesc(file_mistgate_subhost_v1_subhost, 9);
 
 /**
  * @generated from message mistgate.subhost.v1.StartSubscriptionHostMoveRequest
@@ -292,7 +330,7 @@ export type StartSubscriptionHostMoveRequest = Message<"mistgate.subhost.v1.Star
  * Use `create(StartSubscriptionHostMoveRequestSchema)` to create a new message.
  */
 export const StartSubscriptionHostMoveRequestSchema: GenMessage<StartSubscriptionHostMoveRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 8);
+  messageDesc(file_mistgate_subhost_v1_subhost, 10);
 
 /**
  * @generated from message mistgate.subhost.v1.StartSubscriptionHostMoveResponse
@@ -309,7 +347,7 @@ export type StartSubscriptionHostMoveResponse = Message<"mistgate.subhost.v1.Sta
  * Use `create(StartSubscriptionHostMoveResponseSchema)` to create a new message.
  */
 export const StartSubscriptionHostMoveResponseSchema: GenMessage<StartSubscriptionHostMoveResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 9);
+  messageDesc(file_mistgate_subhost_v1_subhost, 11);
 
 /**
  * @generated from message mistgate.subhost.v1.FinishSubscriptionHostChangeRequest
@@ -329,7 +367,7 @@ export type FinishSubscriptionHostChangeRequest = Message<"mistgate.subhost.v1.F
  * Use `create(FinishSubscriptionHostChangeRequestSchema)` to create a new message.
  */
 export const FinishSubscriptionHostChangeRequestSchema: GenMessage<FinishSubscriptionHostChangeRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 10);
+  messageDesc(file_mistgate_subhost_v1_subhost, 12);
 
 /**
  * @generated from message mistgate.subhost.v1.FinishSubscriptionHostChangeResponse
@@ -346,7 +384,7 @@ export type FinishSubscriptionHostChangeResponse = Message<"mistgate.subhost.v1.
  * Use `create(FinishSubscriptionHostChangeResponseSchema)` to create a new message.
  */
 export const FinishSubscriptionHostChangeResponseSchema: GenMessage<FinishSubscriptionHostChangeResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 11);
+  messageDesc(file_mistgate_subhost_v1_subhost, 13);
 
 /**
  * @generated from message mistgate.subhost.v1.CancelSubscriptionHostChangeRequest
@@ -359,7 +397,7 @@ export type CancelSubscriptionHostChangeRequest = Message<"mistgate.subhost.v1.C
  * Use `create(CancelSubscriptionHostChangeRequestSchema)` to create a new message.
  */
 export const CancelSubscriptionHostChangeRequestSchema: GenMessage<CancelSubscriptionHostChangeRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 12);
+  messageDesc(file_mistgate_subhost_v1_subhost, 14);
 
 /**
  * @generated from message mistgate.subhost.v1.CancelSubscriptionHostChangeResponse
@@ -376,7 +414,7 @@ export type CancelSubscriptionHostChangeResponse = Message<"mistgate.subhost.v1.
  * Use `create(CancelSubscriptionHostChangeResponseSchema)` to create a new message.
  */
 export const CancelSubscriptionHostChangeResponseSchema: GenMessage<CancelSubscriptionHostChangeResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 13);
+  messageDesc(file_mistgate_subhost_v1_subhost, 15);
 
 /**
  * @generated from message mistgate.subhost.v1.DisableSubscriptionHostRequest
@@ -400,7 +438,7 @@ export type DisableSubscriptionHostRequest = Message<"mistgate.subhost.v1.Disabl
  * Use `create(DisableSubscriptionHostRequestSchema)` to create a new message.
  */
 export const DisableSubscriptionHostRequestSchema: GenMessage<DisableSubscriptionHostRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 14);
+  messageDesc(file_mistgate_subhost_v1_subhost, 16);
 
 /**
  * @generated from message mistgate.subhost.v1.DisableSubscriptionHostResponse
@@ -417,7 +455,7 @@ export type DisableSubscriptionHostResponse = Message<"mistgate.subhost.v1.Disab
  * Use `create(DisableSubscriptionHostResponseSchema)` to create a new message.
  */
 export const DisableSubscriptionHostResponseSchema: GenMessage<DisableSubscriptionHostResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 15);
+  messageDesc(file_mistgate_subhost_v1_subhost, 17);
 
 /**
  * @generated from message mistgate.subhost.v1.CheckSubscriptionHostDomainRequest
@@ -452,7 +490,7 @@ export type CheckSubscriptionHostDomainRequest = Message<"mistgate.subhost.v1.Ch
  * Use `create(CheckSubscriptionHostDomainRequestSchema)` to create a new message.
  */
 export const CheckSubscriptionHostDomainRequestSchema: GenMessage<CheckSubscriptionHostDomainRequest> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 16);
+  messageDesc(file_mistgate_subhost_v1_subhost, 18);
 
 /**
  * @generated from message mistgate.subhost.v1.CheckSubscriptionHostDomainResponse
@@ -479,7 +517,7 @@ export type CheckSubscriptionHostDomainResponse = Message<"mistgate.subhost.v1.C
  * Use `create(CheckSubscriptionHostDomainResponseSchema)` to create a new message.
  */
 export const CheckSubscriptionHostDomainResponseSchema: GenMessage<CheckSubscriptionHostDomainResponse> = /*@__PURE__*/
-  messageDesc(file_mistgate_subhost_v1_subhost, 17);
+  messageDesc(file_mistgate_subhost_v1_subhost, 19);
 
 /**
  * @generated from enum mistgate.subhost.v1.SubscriptionHostState
@@ -528,7 +566,8 @@ export const SubscriptionHostStateSchema: GenEnum<SubscriptionHostState> = /*@__
  * sub_host_wrong_state, sub_host_domain_invalid, sub_host_site_name_invalid, sub_host_node_unfit (reason=retired|offline|
  * agent_too_old|reality_foreign_target|hysteria2_site_443|port_443_unshareable|name_taken|site_name_required|site_name_conflict),
  * sub_host_nodes_lack_link (nodes=<ids>), sub_host_dns_mismatch (found, expected), sub_host_return_url_required,
- * sub_host_nodes_pending (nodes=<ids>), sub_host_same_node.
+ * sub_host_nodes_pending (nodes=<ids>), sub_host_same_node, sub_host_next_not_ready (not_ready=<steps>),
+ * sub_host_caa_account_pending.
  *
  * @generated from service mistgate.subhost.v1.SubscriptionHostService
  */
@@ -600,6 +639,18 @@ export const SubscriptionHostService: GenService<{
     methodKind: "unary";
     input: typeof CheckSubscriptionHostDomainRequestSchema;
     output: typeof CheckSubscriptionHostDomainResponseSchema;
+  },
+  /**
+   * The owner proceeds without the CAA record (the "caa" step of readiness): whoever holds the host can then get a
+   * certificate of their own for the subdomain. Audited, a warning event; it lasts for this domain and this panel's ACME
+   * account only. on or moving.
+   *
+   * @generated from rpc mistgate.subhost.v1.SubscriptionHostService.WaiveSubscriptionHostCAA
+   */
+  waiveSubscriptionHostCAA: {
+    methodKind: "unary";
+    input: typeof WaiveSubscriptionHostCAARequestSchema;
+    output: typeof WaiveSubscriptionHostCAAResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_subhost_v1_subhost, 0);

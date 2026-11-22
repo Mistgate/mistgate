@@ -544,9 +544,10 @@ func TestReadiness(t *testing.T) {
 		}
 		return strings.Join(g.Msg.Host.NotReady, ",")
 	}
-	if got := notReady(); got != "host_error,site_cert,bridge,panel_cert" {
+	if got := notReady(); got != "host_error,site_cert,bridge,panel_cert,caa" {
 		t.Fatalf("not ready: %q", got)
 	}
+	publishCAA(e.svc, "sub.example.com")
 	e.fl.status[a] = &agentv1.SubHostStatus{}
 	public, up = true, true
 	// the panel asks for the subdomain's certificate itself once the bridge is up (Let's Encrypt validates through the host)
@@ -740,5 +741,103 @@ func TestDuplexPipeHalfClose(t *testing.T) {
 	_ = idle.SetReadDeadline(time.Now().Add(20 * time.Millisecond))
 	if _, err := idle.Read(make([]byte, 1)); !errors.Is(err, os.ErrDeadlineExceeded) {
 		t.Fatalf("a read past its deadline: %v", err)
+	}
+}
+
+// testAccount is the panel's ACME account in the tests (caa.go accountURI).
+const testAccount = "https://acme.test/acme/acct/1"
+
+// publishCAA gives the panel s an ACME account and DNS the CAA record that names it for domain.
+func publishCAA(s *Service, domain string) {
+	s.caaMu.Lock()
+	s.account = testAccount
+	s.caaCache = map[string]caaEntry{}
+	s.caaMu.Unlock()
+	want := "letsencrypt.org; accounturi=" + testAccount + "; validationmethods=tls-alpn-01"
+	s.cfg.CAA = func(_ context.Context, name string) ([]string, bool, error) {
+		if name == domain {
+			return []string{want}, true, nil
+		}
+		return nil, false, nil
+	}
+}
+
+// The CAA step: only a record naming this panel's account makes it; the owner may proceed without it (audited, a warning
+// event, shown on the card), for this domain and this account only (High-1).
+func TestCAAReadinessAndWaiver(t *testing.T) {
+	e := newEnv(t)
+	a := e.node("a", "203.0.113.1", allCaps, true)
+	e.fl.target = func(string, string, string) (string, string, string, bool, bool) {
+		return "127.0.0.1", "de1.example.com", "", true, true
+	}
+	e.fl.status = map[string]*agentv1.SubHostStatus{a: {}}
+	e.svc.upSeam = func(string) bool { return true }
+	e.svc.tun.seen("sub.example.com")
+	if err := e.set(a, "sub.example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	view := func() *subhostv1.SubscriptionHost {
+		g, err := e.rpc.GetSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.GetSubscriptionHostRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return g.Msg.Host
+	}
+	waive := func() error {
+		_, err := e.rpc.WaiveSubscriptionHostCAA(e.ctx, connect.NewRequest(&subhostv1.WaiveSubscriptionHostCAARequest{}))
+		return err
+	}
+	if h := view(); strings.Join(h.NotReady, ",") != "caa" || h.CaaStatus != "account_pending" {
+		t.Fatalf("no account: not ready %v, caa %q", h.NotReady, h.CaaStatus)
+	}
+	wantCode(t, waive(), "sub_host_caa_account_pending") // nothing to tie a waiver to yet
+	e.svc.caaMu.Lock()
+	e.svc.account = testAccount
+	e.svc.caaMu.Unlock()
+	e.clock.Add(61) // past the CAA cache
+	// a record that names another account does not count
+	e.svc.cfg.CAA = func(context.Context, string) ([]string, bool, error) {
+		return []string{"letsencrypt.org; accounturi=https://acme.test/acme/acct/2; validationmethods=tls-alpn-01"}, true, nil
+	}
+	if h := view(); strings.Join(h.NotReady, ",") != "caa" || h.CaaStatus != "absent" || h.CaaWaived {
+		t.Fatalf("another account's record: %v %q", h.NotReady, h.CaaStatus)
+	}
+	if err := waive(); err != nil {
+		t.Fatal(err)
+	}
+	if h := view(); len(h.NotReady) != 0 || !h.CaaWaived {
+		t.Fatalf("waived: not ready %v, waived %v", h.NotReady, h.CaaWaived)
+	}
+	rows, _, err := e.st.Events(e.ctx, store.EventFilter{Limit: 10})
+	if err != nil || len(rows) == 0 || rows[0].Code != "sub_host_caa_waived" || rows[0].Severity != 2 || rows[0].Params["domain"] != "sub.example.com" {
+		t.Fatalf("event %+v %v", rows, err)
+	}
+	audit, err := e.st.ListAudit(e.ctx, "", 0, 5)
+	if err != nil || len(audit) == 0 || audit[0].Action != "sub_host_caa_waive" {
+		t.Fatalf("audit %+v %v", audit, err)
+	}
+	// a new ACME account (a restored panel without its cache): the waiver is gone
+	e.svc.caaMu.Lock()
+	e.svc.account = "https://acme.test/acme/acct/3"
+	e.svc.caaMu.Unlock()
+	if h := view(); strings.Join(h.NotReady, ",") != "caa" || h.CaaWaived {
+		t.Fatalf("new account: not ready %v, waived %v", h.NotReady, h.CaaWaived)
+	}
+	// a new domain: off and set again, the waiver is gone with the old state
+	e.svc.caaMu.Lock()
+	e.svc.account = testAccount
+	e.svc.caaMu.Unlock()
+	if !view().CaaWaived {
+		t.Fatal("the waiver for this account came back without the old one")
+	}
+	if _, err := e.rpc.DisableSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.DisableSubscriptionHostRequest{Force: true})); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.set(a, "other.example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	e.svc.tun.seen("other.example.com")
+	if h := view(); strings.Join(h.NotReady, ",") != "caa" || h.CaaWaived {
+		t.Fatalf("new domain: not ready %v, waived %v", h.NotReady, h.CaaWaived)
 	}
 }

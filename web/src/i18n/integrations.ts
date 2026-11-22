@@ -264,6 +264,8 @@ export const en = {
   "approval.outcome.subscription_host_change_finished": "Subscription host change finished",
   "approval.outcome.subscription_host_change_cancelled": "Subscription host change cancelled",
   "approval.outcome.subscription_host_leaving": "Subscription host is leaving; finish it once the nodes have moved",
+  "approval.tool.subscription_host_caa_waive": "Let the subscription host go without its CAA record",
+  "approval.outcome.subscription_host_caa_waived": "The subscription host may become ready without the CAA record",
 
   // protocol profiles (profile_create, profile_update, profile_deploy). A settings field is "setting:<JSON pointer>".
   "approval.tool.profile_create": "Create a profile",
@@ -678,6 +680,8 @@ export const ru: Record<keyof typeof en, string> = {
   "approval.outcome.subscription_host_change_finished": "Смена хоста подписок завершена",
   "approval.outcome.subscription_host_change_cancelled": "Смена хоста подписок отменена",
   "approval.outcome.subscription_host_leaving": "Хост подписок отключается; завершите, когда ноды перейдут",
+  "approval.tool.subscription_host_caa_waive": "Разрешить хосту подписок обойтись без CAA-записи",
+  "approval.outcome.subscription_host_caa_waived": "Хост подписок может стать готовым без CAA-записи",
 
   "approval.tool.profile_create": "Создать профиль",
   "approval.tool.profile_update": "Изменить профиль",
@@ -1088,6 +1092,8 @@ export const zh: typeof en = {
   "approval.outcome.subscription_host_change_finished": "订阅主机变更已完成",
   "approval.outcome.subscription_host_change_cancelled": "订阅主机变更已取消",
   "approval.outcome.subscription_host_leaving": "订阅主机正在关闭；节点迁移后请完成操作",
+  "approval.tool.subscription_host_caa_waive": "允许订阅主机在没有 CAA 记录时就绪",
+  "approval.outcome.subscription_host_caa_waived": "订阅主机可在没有 CAA 记录时就绪",
 
   // protocol profiles (profile_create, profile_update, profile_deploy)
   "approval.tool.profile_create": "创建协议配置",
@@ -1483,6 +1489,8 @@ export const fa: Record<keyof typeof en, string> = {
   "approval.outcome.subscription_host_change_finished": "تغییر میزبان اشتراک تمام شد",
   "approval.outcome.subscription_host_change_cancelled": "تغییر میزبان اشتراک لغو شد",
   "approval.outcome.subscription_host_leaving": "میزبان اشتراک در حال خاموش شدن است؛ پس از انتقال نودها آن را تمام کنید",
+  "approval.tool.subscription_host_caa_waive": "اجازه به میزبان اشتراک بدون رکورد CAA",
+  "approval.outcome.subscription_host_caa_waived": "میزبان اشتراک می‌تواند بدون رکورد CAA آماده شود",
   "approval.tool.profile_create": "ساخت پروفایل",
   "approval.tool.profile_update": "تغییر پروفایل",
   "approval.tool.profile_deploy": "تغییر نودها و گروه‌های پروفایل",
@@ -1870,6 +1878,8 @@ export const tr: Record<keyof typeof en, string> = {
   "approval.outcome.subscription_host_change_finished": "Abonelik sunucusu değişikliği tamamlandı",
   "approval.outcome.subscription_host_change_cancelled": "Abonelik sunucusu değişikliği iptal edildi",
   "approval.outcome.subscription_host_leaving": "Abonelik sunucusu kapanıyor; düğümler taşındığında tamamlayın",
+  "approval.tool.subscription_host_caa_waive": "Abonelik sunucusunun CAA kaydı olmadan hazır olmasına izin ver",
+  "approval.outcome.subscription_host_caa_waived": "Abonelik sunucusu CAA kaydı olmadan hazır olabilir",
   "approval.tool.profile_create": "Profil oluştur",
   "approval.tool.profile_update": "Profili değiştir",
   "approval.tool.profile_deploy": "Profilin düğümlerini ve gruplarını değiştir",

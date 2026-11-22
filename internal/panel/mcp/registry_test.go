@@ -223,7 +223,7 @@ func TestToolsPerProfile(t *testing.T) {
 		}
 	}
 	for _, n := range []string{"node_fix_plan", "node_fix_apply", "rollout_start_plan", "rollout_pause_plan", "rollout_resume_plan", "rollout_cancel_plan", "node_rollback_plan", "node_server_keys_add_plan", "node_server_keys_add_apply", "os_rollout_start_plan", "os_rollout_start_apply", "os_rollout_pause_plan", "os_rollout_pause_apply", "os_rollout_resume_plan", "os_rollout_resume_apply", "os_rollout_cancel_plan", "os_rollout_cancel_apply", "audit_search",
-		"subscription_host_get", "subscription_host_set_plan", "subscription_host_set_apply", "subscription_host_move_plan", "subscription_host_move_apply", "subscription_host_disable_plan", "subscription_host_disable_apply"} {
+		"subscription_host_get", "subscription_host_set_plan", "subscription_host_set_apply", "subscription_host_move_plan", "subscription_host_move_apply", "subscription_host_disable_plan", "subscription_host_disable_apply", "subscription_host_caa_waive_plan", "subscription_host_caa_waive_apply"} {
 		if !slices.Contains(got[ProfileAdmin], n) {
 			t.Errorf("admin lacks %s", n)
 		}
@@ -272,7 +272,7 @@ func TestProvisioningToolsKeepSecretsOutOfPlans(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"node_server_key_add_apply", "node_server_keys_add_apply", "node_server_key_remove_apply",
-		"subscription_host_set_apply", "subscription_host_move_apply", "subscription_host_disable_apply"} {
+		"subscription_host_set_apply", "subscription_host_move_apply", "subscription_host_disable_apply", "subscription_host_caa_waive_apply"} {
 		if len(properties[name]) != 1 || properties[name]["confirm_token"] == nil {
 			t.Fatalf("%s must take only confirm_token: %v", name, properties[name])
 		}

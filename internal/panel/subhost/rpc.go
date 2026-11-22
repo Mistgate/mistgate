@@ -322,3 +322,33 @@ func (r rpc) DisableSubscriptionHost(ctx context.Context, req *connect.Request[s
 	}
 	return connect.NewResponse(&subhostv1.DisableSubscriptionHostResponse{Host: h}), nil
 }
+
+func (r rpc) WaiveSubscriptionHostCAA(ctx context.Context, _ *connect.Request[subhostv1.WaiveSubscriptionHostCAARequest]) (*connect.Response[subhostv1.WaiveSubscriptionHostCAAResponse], error) {
+	s := r.s
+	if err := s.stepUp(ctx); err != nil {
+		return nil, err
+	}
+	// The waiver names the account it is for: without an account (no certificate asked for yet) there is nothing to tie it to.
+	account := s.accountURI(ctx)
+	if account == "" {
+		return nil, coded(connect.CodeFailedPrecondition, "sub_host_caa_account_pending")
+	}
+	var domain, node string
+	err := s.transition(ctx, func(st *state) error {
+		if st.State != stateOn && st.State != stateMoving {
+			return wrongState()
+		}
+		st.CAAWaived, domain, node = account, st.Domain, st.Node
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.audit(ctx, "sub_host_caa_waive", map[string]string{"domain": domain, "node_id": node})
+	s.event(ctx, 2, "sub_host_caa_waived", node, map[string]string{"domain": domain})
+	h, err := s.view(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&subhostv1.WaiveSubscriptionHostCAAResponse{Host: h}), nil
+}
