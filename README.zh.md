@@ -68,7 +68,7 @@
 <p>陌生人打开节点时，应该看到一个普通的小网站，而不是 Mistgate 的页面。选择一个国家和十种类型之一（服务状态页、文档、博客、小商铺、作品集等），面板就会生成一个使用该国语言、有自己外观和文字的站点，每次都不一样。先预览，不满意就换一个，再保存。填入你自己的免费图片 API 密钥后，站点还能用上真实照片，由节点自己提供。</p>
 <p><a href="docs/zh/guide/decoy-site.md#从模板创建站点">文档 →</a></p>
 </td>
-<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-light-en.webp"><img alt="“从模板创建”窗口：国家、类型、新站点的预览和“另一个版本”按钮" src="docs/images/readme/decoys-dark-en.webp" width="100%"></picture></td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-light-en.webp"><img alt="“从模板创建”窗口：国家、类型、新站点的预览和“另一个版本”按钮" src="docs/images/readme/decoys-dark-en.webp" width="100%"></picture><br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-sites-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-sites-light-en.webp"><img alt="生成器做出的五种类型的站点依次划过" src="docs/images/readme/decoys-sites-dark-en.webp" width="100%"></picture></td>
 </tr>
 <tr>
 <td width="38%" valign="top">

@@ -8,7 +8,7 @@
 // Needs the admin's Vite on ADMIN_ORIGIN (default http://127.0.0.1:5293, started from web/) and ffmpeg on PATH.
 // Chrome from CHROME, always headless=old (the new headless mode opens windows on some systems).
 import { spawn, execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,20 +26,38 @@ const PORT = Number(process.env.CDP_PORT || 9391);
 // the window), steps. Steps: ["wait", ms] ["move", target, ms?] ["click", target] ["type", text] ["eval", js] ["hold", ms]
 // A target is a CSS selector, "text:Exact words" (a visible element whose own text is these words) or [x, y].
 const takes = {
+  // the real sites of the generator side by side, slowly moving past (the documents of web/src/screens/dev-kit-fixtures)
+  "decoys-sites": {
+    shots: ["status-1", "business-1", "blog-2", "project-1", "files-1"],
+    page: (theme, shots) => stripPage(theme, shots),
+    ready: "document.querySelectorAll('img').length === 5",
+    prep: "(async () => { const b = document.getElementById('belt'); const w = (ms) => new Promise((r) => setTimeout(r, ms)); for (const x of [0.25, 0.5, 0.75, 1, 0]) { b.style.transform = 'translateX(' + (x * (innerWidth - b.scrollWidth)) + 'px)'; await w(900); } b.style.transform = 'none'; await w(500); })()",
+    vp: [840, 340],
+    fps: 10,
+    q: 30,
+    crop: [0, 0, 840, 340],
+    lead: 300,
+    tail: 600,
+    steps: [
+      ["eval", "document.getElementById('belt').animate([{ transform: 'translateX(0)' }, { transform: 'translateX(' + (innerWidth - document.getElementById('belt').scrollWidth) + 'px)' }], { duration: 6500, easing: 'cubic-bezier(.35,0,.65,1)', fill: 'forwards' })"],
+      ["wait", 6800],
+    ],
+  },
   decoys: {
     url: "/dev-kit?only=decoys-page&state=dlg-tpl&fx=1",
     vp: [1280, 900],
     crop: [190, 30, 900, 820],
+    lead: 300,
+    tail: 500,
     steps: [
+      ["click", "text:Germany", 420],
+      ["wait", 200],
+      ["click", "text:United Kingdom", 380],
       ["wait", 300],
-      ["click", "text:Germany"],
-      ["wait", 300],
-      ["click", "text:United Kingdom"],
-      ["wait", 300],
-      ["click", "text:Portfolio"],
-      ["wait", 1100],
-      ["click", "text:Another variant"],
-      ["wait", 1000],
+      ["click", "text:Status page", 420],
+      ["wait", 1500],
+      ["click", "text:Another variant", 420],
+      ["wait", 1400],
     ],
   },
   addnode: {
@@ -179,6 +197,20 @@ const takes = {
   },
 };
 
+// a belt of browser windows, each a screenshot of a real site (shots: data URLs, taken by film())
+function stripPage(theme, shots) {
+  const dark = theme === "dark";
+  const cards = shots.map((src) => `<div class="w"><div class="bar"><i></i><i></i><i></i></div><img src="${src}"></div>`).join("");
+  return `<!doctype html><meta charset="utf-8"><style>
+html,body{margin:0;height:100%;overflow:hidden;background:${dark ? "#0c0c0f" : "#eceef0"}}
+#belt{display:flex;gap:22px;padding:26px 24px;width:max-content}
+.w{width:400px;height:288px;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 0 0 1px ${dark ? "#ffffff1f" : "#00000020"},0 12px 30px ${dark ? "#00000090" : "#00000026"};flex:none}
+.bar{height:22px;background:${dark ? "#1b1b20" : "#f4f4f5"};display:flex;gap:6px;align-items:center;padding:0 10px}
+.bar i{width:7px;height:7px;border-radius:50%;background:${dark ? "#44444c" : "#cfcfd4"}}
+img{width:400px;display:block}
+</style><div id="belt">${cards}</div>`;
+}
+
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 async function launch() {
@@ -299,9 +331,22 @@ async function film(name, theme, outDir, keep) {
     await b.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: theme }] });
     await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `try{localStorage.setItem("lang","en");localStorage.setItem("theme","${theme}");localStorage.setItem("firstRunHidden","1")}catch(e){}` });
     await b.send("Page.addScriptToEvaluateOnNewDocument", { source: CURSOR });
-    await b.send("Page.navigate", { url: ORIGIN + take.url + (take.url.includes("?") ? "&" : "?") + "theme=" + theme });
+    let shots = [];
+    if (take.shots) {
+      // the real sites, each in a window of 1333 x 866 px (the card shows it at 0.3)
+      await b.send("Emulation.setDeviceMetricsOverride", { width: 1333, height: 866, deviceScaleFactor: 1, mobile: false });
+      for (const n of take.shots) {
+        await b.send("Page.navigate", { url: `${ORIGIN}/src/screens/dev-kit-fixtures/sites/gb/${n}.html` });
+        await sleep(1800);
+        const shot = await b.send("Page.captureScreenshot", { format: "jpeg", quality: 88 });
+        shots.push("data:image/jpeg;base64," + shot.data);
+      }
+      await b.send("Emulation.setDeviceMetricsOverride", { width: vw, height: vh, deviceScaleFactor: dpr, mobile: false });
+    }
+    const target = take.page ? "data:text/html;charset=utf-8," + encodeURIComponent(take.page(theme, shots)) : ORIGIN + take.url + (take.url.includes("?") ? "&" : "?") + "theme=" + theme;
+    await b.send("Page.navigate", { url: target });
     for (let i = 0; i < 80; i++) {
-      const r = await b.send("Runtime.evaluate", { expression: "!document.getElementById('mg-splash') && document.body.innerText.length>60", returnByValue: true });
+      const r = await b.send("Runtime.evaluate", { expression: take.ready ?? "!document.getElementById('mg-splash') && document.body.innerText.length>60", returnByValue: true });
       if (r.result.value) break;
       await sleep(500);
     }

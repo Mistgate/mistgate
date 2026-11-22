@@ -70,7 +70,7 @@ Hysteria2، VLESS و AmneziaWG. دو فایل اجرایی Go، به‌علاو�
 <p>کسی که نود را باز می‌کند باید یک سایت کوچک معمولی ببیند، نه صفحهٔ Mistgate. یک کشور و یکی از ده نوع (صفحهٔ وضعیت، مستندات، وبلاگ، کسب‌وکار کوچک، نمونه‌کار و غیره) را انتخاب کنید تا پنل سایتی به زبان همان کشور با ظاهر و متن خودش بسازد، هر بار متفاوت. نگاهش کنید، نسخهٔ دیگری بخواهید، بعد ذخیره کنید. با کلید رایگان خودتان برای عکس‌ها، سایت عکس‌های واقعی هم می‌گیرد که خود نود ارائه می‌کند.</p>
 <p><a href="docs/en/guide/decoy-site.md#a-site-from-a-template">مستندات ←</a></p>
 </td>
-<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-light-en.webp"><img alt="پنجرهٔ «از روی قالب»: کشور، نوع، پیش‌نمایش سایت جدید و دکمهٔ «نسخهٔ دیگر»" src="docs/images/readme/decoys-dark-en.webp" width="100%"></picture></td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-light-en.webp"><img alt="پنجرهٔ «از روی قالب»: کشور، نوع، پیش‌نمایش سایت جدید و دکمهٔ «نسخهٔ دیگر»" src="docs/images/readme/decoys-dark-en.webp" width="100%"></picture><br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-sites-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-sites-light-en.webp"><img alt="پنج سایت از پنج نوع که مولد ساخته یکی پس از دیگری رد می‌شوند" src="docs/images/readme/decoys-sites-dark-en.webp" width="100%"></picture></td>
 </tr>
 <tr>
 <td width="38%" valign="top">

@@ -68,7 +68,7 @@ Hysteria2, VLESS и AmneziaWG. Два бинарника на Go, SQLite и syst
 <p>Посторонний, открывший ноду, должен увидеть обычный небольшой сайт, а не страницу Mistgate. Выберите страну и один из десяти видов (статус сервиса, документация, блог, малый бизнес, портфолио и другие), и панель соберёт сайт на языке этой страны со своим видом и текстами, каждый раз новый. Посмотрите, попросите другой вариант и сохраните. Со своим бесплатным ключом к фотографиям на сайте появятся настоящие снимки, которые отдаёт сама нода.</p>
 <p><a href="docs/ru/guide/decoy-site.md#сайт-из-шаблона">Документация →</a></p>
 </td>
-<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-light-en.webp"><img alt="Окно «Из шаблона»: страна, вид, предпросмотр нового сайта и кнопка «Другой вариант»" src="docs/images/readme/decoys-dark-en.webp" width="100%"></picture></td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-light-en.webp"><img alt="Окно «Из шаблона»: страна, вид, предпросмотр нового сайта и кнопка «Другой вариант»" src="docs/images/readme/decoys-dark-en.webp" width="100%"></picture><br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-sites-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-sites-light-en.webp"><img alt="Пять сайтов пяти видов, сделанных генератором, проплывают мимо" src="docs/images/readme/decoys-sites-dark-en.webp" width="100%"></picture></td>
 </tr>
 <tr>
 <td width="38%" valign="top">
