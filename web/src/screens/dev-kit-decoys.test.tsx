@@ -114,9 +114,10 @@ describe("the scenes of the Decoy sites screens", () => {
     }
     if (state === "dlg-tpl-limit") expect(text()).toContain(en["dz.ph.st.limit"].replace("{name}", "Pixabay"));
     if (state.startsWith("dlg-tpl")) {
-      // the line that says where the photos are from names the source of the preview in view, and links to it
+      // the line that says where the photos are from names the source of the preview in view, and links to it; with no photos
+      // in view and a source without a key on the screen, it names that source
       const credit = document.querySelector(".dz-ph .ft a");
-      const pexels = state === "dlg-tpl-both";
+      const pexels = state === "dlg-tpl-both" || state === "dlg-tpl-pexels";
       expect(credit?.getAttribute("href")).toBe(pexels ? "https://www.pexels.com" : "https://pixabay.com");
       expect(credit?.textContent).toBe(en["dz.ph.credit"].replace("{name}", pexels ? "Pexels" : "Pixabay"));
       expect(credit?.getAttribute("rel")).toContain("noopener");
