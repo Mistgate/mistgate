@@ -386,6 +386,7 @@ func TestPhonesAndContactForms(t *testing.T) {
 		country := loc.countries[c.cc]
 		addr := addressRE(country)
 		t.Run(c.String(), func(t *testing.T) {
+			t.Parallel() // the cases share nothing, and one after another the package does not fit its ten minutes on a slow runner
 			withPhone, withForm := 0, 0
 			for i := 0; i < seedsFor(c); i++ {
 				files := mustGenerate(t, c, i)
@@ -454,6 +455,7 @@ func TestDepth(t *testing.T) {
 	min := map[string]int{"blog": 12, "portfolio": 12, "business": 5, "docs": 8, "project": 10, "club": 5, "status": 11, "files": 6, "login": 5, "card": 5}
 	for _, c := range cases(t) {
 		t.Run(c.String(), func(t *testing.T) {
+			t.Parallel() // the cases share nothing, and one after another the package does not fit its ten minutes on a slow runner
 			least := 1 << 20
 			for i := 0; i < 12; i++ {
 				n := 0
