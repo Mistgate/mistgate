@@ -578,3 +578,43 @@ func TestCheckerAndMarkDifferBetweenSites(t *testing.T) {
 		}
 	}
 }
+
+func TestDarkArtIsDarkAndInThePalette(t *testing.T) {
+	acc, page := "#ff8a65", "#1b1530" // an orange accent (hue about 14) on a violet night (about 255)
+	hue := func(hex string) float64 {
+		c, _ := parseHex(hex)
+		h, _, _ := toHSL(c)
+		return h
+	}
+	near := func(a, b float64) float64 { return math.Abs(math.Mod(a-b+540, 360) - 180) }
+	for _, kind := range allArtKinds {
+		r := newRNG([]byte("dark"), []byte(kind))
+		svg := artSVG(r, kind, 120, 480, 360, "d1", false)
+		dark := darkArt(svg, kind, acc, page)
+		wellFormed(t, "dark "+kind, dark)
+		if strings.Count(svg, "<") != strings.Count(dark, "<") {
+			t.Errorf("%s: the markup changed", kind)
+		}
+		if bg := regexp.MustCompile(`<rect[^>]*fill="(#[0-9a-f]{6})"`).FindStringSubmatch(dark); bg != nil && kind != "poster" && kind != "tiles" {
+			c, _ := parseHex(bg[1])
+			if _, _, l := toHSL(c); l > 25 {
+				t.Errorf("%s: the ground is still pale (%s, lightness %.0f)", kind, bg[1], l)
+			}
+		}
+		// every saturated colour is in the hues of the page or of the accent
+		for _, hex := range hexInSVG.FindAllString(dark, -1) {
+			c, _ := parseHex(hex)
+			if h, s, _ := toHSL(c); s > 30 && near(h, hue(acc)) > 60 && near(h, hue(page)) > 25 {
+				t.Errorf("%s: colour %s is in neither the accent's nor the page's hue", kind, hex)
+				break
+			}
+		}
+		if turned := darkArt(svg, kind, "", ""); turned == svg && kind != "stars" {
+			t.Errorf("%s: without a palette the picture should still be turned", kind)
+		}
+	}
+	// ids that look like colours are not touched
+	if got := darkArt(`<g id="a1b2c3d4"/><use href="#a1b2c3d4"/><path fill="#ffffff"/>`, "staff", acc, page); !strings.Contains(got, `href="#a1b2c3d4"`) || strings.Contains(got, "#ffffff") {
+		t.Errorf("an id was recoloured or a colour was not: %s", got)
+	}
+}

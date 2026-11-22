@@ -18,7 +18,7 @@ contributors are `ident` + `person`, topics with counts are `tags`, the round ba
 config samples are `hl`.
 
 To look at your kind: `go test ./internal/decoy/sitegen -run TestDumpSites -decoy-dump=<dir> -decoy-dump-n=1 -decoy-dump-cc=us`
-(add `-decoy-dump-new` to see the legacy kinds in their new palettes, fonts and ranges); `-run TestDumpDrawings -decoy-draw=<dir>`
+(add `-decoy-dump-new` to see the legacy kinds in their new palettes, fonts and ranges, `-decoy-dump-kinds="club portfolio"` to write only some kinds; a kind that does not build is skipped with a log line); `-run TestDumpDrawings -decoy-draw=<dir>`
 writes one page with every drawing and code sample. Open them in a browser in the light and the dark scheme, at 1440 and 390 px.
 
 ## 1. The style of a kind (`meta.json` -> `"style"`)
@@ -53,6 +53,10 @@ writes one page with every drawing and code sample. Open them in a browser in th
   (0..n-1), as before. Section order is `home_blocks` / `home_fixed` / `.Order`, as before.
 * **Small ranges** stay inside the character of the kind. Nothing but these ranges is random in the look.
 * A variant (data.json bundle) may have `"art": "topo"`: the subject of its pictures (see `art` below).
+* A bundle may also have `"arts": ["botanical", "still", "blobs"]`: the subjects the pictures of a **list** with `"art": true` (works of a portfolio) take in
+  turn, from a start the site draws, so that seven works are not seven of one picture. `art` stays the subject of `{{art}}` in templates.
+* In a `dark` scheme every `art` and `photo` fallback is turned over by `darkArt` (pale grounds take the page's hue and become the night, ink
+  becomes light lines, hues are drawn toward the accent), so do not dim them in CSS with a `filter`.
 
 ## 2. Variables of the stylesheet
 

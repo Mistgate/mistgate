@@ -140,7 +140,10 @@ type bundleDef struct {
 	PhotoQ []string `json:"photo_q"` // English: the photo search is English whatever the site's language
 	// Art is the subject of the pictures of this variant (one of the kinds artSVG draws), for {{art "k" "" W H}} and for the
 	// pictures of lists; without one the pictures are drawn in the old four subjects at random.
-	Art   string         `json:"art"`
+	Art string `json:"art"`
+	// Arts are the subjects the pictures of a list take in turn, from a start of the site's choosing, so that the works of one
+	// bundle are not seven of one picture; Art is still the subject of {{art}} in the templates.
+	Arts  []string       `json:"arts"`
 	Fixed map[string]any `json:"fixed"` // merged under the texts of the variant
 }
 
@@ -225,6 +228,11 @@ func parseKind(id string, rawMeta []byte) (*kindDef, error) {
 	for _, b := range d.bundles {
 		if b.Art != "" && !slices.Contains(allArtKinds, b.Art) {
 			return nil, fmt.Errorf("data.json: variant %s has the picture subject %q, which is not drawn", b.ID, b.Art)
+		}
+		for _, k := range b.Arts {
+			if !slices.Contains(allArtKinds, k) {
+				return nil, fmt.Errorf("data.json: variant %s has the picture subject %q, which is not drawn", b.ID, k)
+			}
 		}
 	}
 	if home := d.meta.Pages[0]; home.Name != "home" || len(home.Paths) != 1 || home.Paths[0] != "index.html" {
@@ -337,9 +345,10 @@ type site struct {
 	V                          map[string]string
 	Layout, Head, Foot         int
 	P                          palette
-	Scheme                     string // light, dark or both
-	Theme                      string // the colour of the browser's own bars
-	Art                        string // the subject of the variant's pictures, "" for the old random four
+	Scheme                     string   // light, dark or both
+	Theme                      string   // the colour of the browser's own bars
+	Art                        string   // the subject of the variant's pictures, "" for the old random four
+	Arts                       []string // the subjects the pictures of a list take in turn (see bundleDef.Arts)
 	S                          style
 	Fnt                        fonts
 	Year, Since                string
@@ -656,7 +665,7 @@ func (d *kindDef) newSite(c *ctx, r *rng, country *countryDef, shared map[string
 	s := &site{
 		Kind: d.id, Lang: country.HTML, Brand: brand, Initial: initialOf(brand), L: L, V: vars, country: country,
 		Layout: look.sub("layout").n(d.meta.Layouts), Head: look.sub("head").n(3), Foot: look.sub("foot").n(3),
-		Scheme: "both", Art: b.Art,
+		Scheme: "both", Art: b.Art, Arts: b.Arts,
 		Year: "2026", Since: fmt.Sprint(2015 + look.sub("since").n(10)), titleStyle: look.sub("title").n(4),
 		Lists: map[string][]map[string]any{}, photoSlots: d.meta.PhotoSlots,
 	}
@@ -954,6 +963,7 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 	}
 	slugs := map[string]bool{}
 	ar := r.sub("art")
+	artStart := r.sub("artstart").n(1 << 16)
 	for i, it := range items {
 		sl := str(it["slug"])
 		if sl == "" {
@@ -973,13 +983,16 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 			if s.Art != "" {
 				kind = s.Art
 			}
+			if len(s.Arts) > 0 {
+				kind = s.Arts[(i+artStart)%len(s.Arts)]
+			}
 			dir := imgDirs[r.sub("imgdir").n(len(imgDirs))]
 			p := fmt.Sprintf("%s/%s-%s.svg", dir, sl, hex6(ar))
 			it["img"] = "/" + p
 			it["art_kind"] = kind
 			size := [][2]int{{480, 360}, {360, 480}, {480, 480}, {480, 320}, {400, 500}}[ar.n(5)]
 			it["w"], it["h"] = size[0], size[1]
-			svg := []byte(artSVG(ar, kind, s.P.Hue+float64(ar.n(120))-60, size[0], size[1], "g"+hex6(ar), true))
+			svg := []byte(c.tone(artSVG(ar, kind, s.P.Hue+float64(ar.n(120))-60, size[0], size[1], "g"+hex6(ar), true), kind))
 			if pp, ok := c.photoFile(fmt.Sprintf("w%d", i+1), 4, 3, dir, true); ok { // a photo takes the picture's place
 				it["img"], it["w"], it["h"] = pp, 640, 480
 			} else {
@@ -1178,7 +1191,7 @@ func funcMap(c *ctx) map[string]tmplFunc {
 			r := key("art:" + k)
 			kind = c.artKind(r, kind)
 			c.artN++
-			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, argInt(a, 2), argInt(a, 3), fmt.Sprintf("%s%d", c.artID, c.artN), false)
+			return c.tone(artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, argInt(a, 2), argInt(a, 3), fmt.Sprintf("%s%d", c.artID, c.artN), false), kind)
 		},
 		// photo is the photo of a slot as an <img>, or the picture "art" would draw with the same arguments when the slot has none.
 		"photo": func(a []any) any {
@@ -1189,7 +1202,7 @@ func funcMap(c *ctx) map[string]tmplFunc {
 			r := key("art:" + k)
 			kind = c.artKind(r, kind)
 			c.artN++
-			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, w, h, fmt.Sprintf("%s%d", c.artID, c.artN), false)
+			return c.tone(artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, w, h, fmt.Sprintf("%s%d", c.artID, c.artN), false), kind)
 		},
 		// hasphoto is whether the slot has a photo, for markup that only makes sense around one.
 		"hasphoto": func(a []any) any {

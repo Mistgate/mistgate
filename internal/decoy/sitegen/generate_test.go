@@ -28,6 +28,8 @@ var (
 	decoyDumpNew = flag.Bool("decoy-dump-new", false, "with -decoy-dump: draw every kind in its new style (palettes, fonts, ranges of meta.json) even where legacy is on")
 	// decoyDumpCC are the countries -decoy-dump writes sites for.
 	decoyDumpCC = flag.String("decoy-dump-cc", DefaultCountry, "the countries (codes, separated by spaces) -decoy-dump writes sites for")
+	// decoyDumpKinds narrows -decoy-dump to some kinds; empty means all.
+	decoyDumpKinds = flag.String("decoy-dump-kinds", "", "with -decoy-dump: only these kinds (separated by spaces)")
 )
 
 // seedsFor is how many seeds a kind is made from for a country: the default country gets the full 200, the others 12 (their pages
@@ -442,7 +444,7 @@ func TestDumpSites(t *testing.T) {
 	}
 	for _, cc := range strings.Fields(*decoyDumpCC) {
 		for _, kind := range kindIDs(t) {
-			if !contains(Countries(), cc, kind) {
+			if !contains(Countries(), cc, kind) || (*decoyDumpKinds != "" && !slices.Contains(strings.Fields(*decoyDumpKinds), kind)) {
 				continue
 			}
 			for n := 1; n <= *decoyDumpN; n++ {

@@ -1,6 +1,8 @@
 package sitegen
 
 import (
+	"math"
+	"regexp"
 	"strings"
 	"unicode"
 )
@@ -46,4 +48,42 @@ func lastWord(s string) (head, last, end string) {
 		return "", string(r), ""
 	}
 	return string(r[:w]), string(r[w:n]), string(r[n:])
+}
+
+var hexInSVG = regexp.MustCompile(`#[0-9a-f]{6}\b`)
+
+// darkArt redraws a picture of artSVG for a dark site: the pictures are drawn in light tones, and on a dark page a pale tile is a
+// grey patch. Every colour is turned over (pale to dark, dark to light, so that a paper becomes the night and the ink becomes a
+// line of light). What was pale, the grounds, takes the hue and the saturation of the page (bg), the rest has its hue drawn toward
+// the accent's (acc), so that the picture sits in the palette of the site. A subject that is dark to begin with (stars) is not
+// turned. A colour that does not parse leaves the hues alone.
+func darkArt(svg, kind, acc, bg string) string {
+	ac, okA := parseHex(acc)
+	ah, _, _ := toHSL(ac)
+	bc, okB := parseHex(bg)
+	bh, bs, _ := toHSL(bc)
+	return hexInSVG.ReplaceAllStringFunc(svg, func(hex string) string {
+		c, _ := parseHex(hex)
+		h, s, l := toHSL(c)
+		ground := l >= 80
+		if kind != "stars" {
+			l = 7 + (100-l)*.6
+		}
+		switch {
+		case ground && okB && kind != "stars":
+			h, s = bh, math.Min(bs, 45)
+		case okA:
+			h += (math.Mod(ah-h+540, 360) - 180) * .7
+			s *= .85
+		}
+		return hsl(h, s, l)
+	})
+}
+
+// tone is the picture as the site's colour scheme wants it.
+func (c *ctx) tone(svg, kind string) string {
+	if c.s.Scheme != "dark" {
+		return svg
+	}
+	return darkArt(svg, kind, c.s.P.D.Acc, c.s.P.D.BG)
 }
