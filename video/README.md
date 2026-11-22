@@ -76,6 +76,24 @@ the WebP and the poster are copied there as they are.
 Stills of a composition without a render, to check a cut: `node stills.mjs hero.html en <dir> 3.5,12,24.4`.
 HyperFrames' own preview works too: `npx hyperframes preview`.
 
+## Clips for the README
+
+The loops beside the features in the README (`docs/images/readme/<clip>-<dark|light>-en.webp`, 840 px wide, 12 fps, a few
+seconds each, about 50-250 kB) are not films of the pipeline above. `clips.mjs` plays a short scene of the admin's dev-kit
+(`/dev-kit?only=...`, invented data, nothing leaves the page) in headless Chrome with a drawn pointer that moves, hovers and
+clicks, takes Chrome's screencast and encodes it with ffmpeg. The takes (the scene, the crop, the steps) are at the top of the
+file; the other languages' READMEs use the same English clips.
+
+```sh
+pnpm --dir web exec vite --host 127.0.0.1 --port 5293 --strictPort     # in its own terminal
+cd video
+node clips.mjs decoys                 # one take, both themes
+node clips.mjs addnode health --theme dark --out /tmp/clips
+node clips.mjs --probe "/dev-kit?only=decoys-page&state=dlg-tpl" 1440 900   # what can be clicked on a scene
+```
+
+Chrome is always started with `--headless=old`: the new headless mode opens windows on some systems.
+
 ## Settings
 
 | Variable | Default | |
