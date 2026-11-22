@@ -53,3 +53,36 @@ func TestAdminAddressMovesTheAdminToAListener(t *testing.T) {
 		t.Errorf("changed beyond the admin: before %+v after %+v", before, after)
 	}
 }
+
+// `setup --admin-listen` and `admin-address` refuse an admin listener `serve` could not bring up.
+func TestAdminListenIsChecked(t *testing.T) {
+	ctx := context.Background()
+	dir := filepath.Join(t.TempDir(), "data")
+	var out bytes.Buffer
+	if err := setup(ctx, dir, setupOpts{publicURL: "https://example.com"}, &out, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	for listen, want := range map[string]string{
+		"127.0.0.1:":      "port",
+		"127.0.0.1:abc":   "port",
+		"127.0.0.1:99999": "port",
+		"127.0.0.1:0":     "port",
+		"127.0.0.1:08443": "port",
+		":8443":           "host",
+		"127.0.0.1":       "missing port",
+		"127.0.0.1:8443":  "",
+		"[::1]:8443":      "",
+		"localhost:8443":  "",
+	} {
+		_, setupErr := newInstance(setupOpts{publicURL: "https://example.com", adminListen: listen})
+		cmdErr := runAdminAddress([]string{"--admin-listen", listen, "--data-dir", dir}, &out)
+		for name, err := range map[string]error{"setup": setupErr, "admin-address": cmdErr} {
+			switch {
+			case want == "" && err != nil:
+				t.Errorf("%s %q: %v", name, listen, err)
+			case want != "" && (err == nil || !strings.Contains(err.Error(), want)):
+				t.Errorf("%s %q: got %v, want an error about the %s", name, listen, err, want)
+			}
+		}
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -107,14 +108,30 @@ func newInstance(o setupOpts) (instance, error) {
 
 // listenAdmin is the admin on a separate listener: no admin host, no secret prefix, WebAuthn on localhost.
 func (in *instance) listenAdmin(listen string) error {
-	_, port, err := net.SplitHostPort(listen)
+	port, err := checkAdminListen(listen)
 	if err != nil {
-		return fmt.Errorf("--admin-listen %q: %w", listen, err)
+		return err
 	}
 	in.AdminListen, in.AdminHost, in.AdminPrefix = listen, "", "/"
 	in.RPID = "localhost"
 	in.RPOrigins = []string{"http://localhost:" + port}
 	return nil
+}
+
+// checkAdminListen refuses an admin listener `mistgate serve` could not bring up: it needs a host and a port, and the
+// port is a number from 1 to 65535 written as the browser writes it in the WebAuthn origin.
+func checkAdminListen(listen string) (port string, err error) {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return "", fmt.Errorf("--admin-listen %q: %w", listen, err)
+	}
+	if host == "" {
+		return "", fmt.Errorf("--admin-listen %q: the host is missing", listen)
+	}
+	if n, err := strconv.ParseUint(port, 10, 16); err != nil || n == 0 || strconv.FormatUint(n, 10) != port {
+		return "", fmt.Errorf("--admin-listen %q: the port must be a number from 1 to 65535", listen)
+	}
+	return port, nil
 }
 
 // newSecretPrefix is "/" + 24 random base32 characters (120 bits) + "/".
