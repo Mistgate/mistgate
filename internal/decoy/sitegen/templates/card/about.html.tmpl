@@ -1,10 +1,11 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __text__">
-<h1>{{.L.about_h}}</h1>
-{{range .L.about}}<p>{{.}}</p>
-{{end}}<h2>{{.L.facts_h}}</h2>
-<ul class="__facts__">{{range .L.facts}}<li>{{icon "check"}} {{.}}</li>{{end}}</ul>
+<main class="__wrap__ __bento__ __pgab__">
+<section class="__pgh__"><div><span class="__lab__">{{.Brand}}</span><h1>{{.L.about_h}}</h1></div><p class="__tg__">{{.L.tagline}}</p></section>
+{{range $i, $a := .L.about}}<section class="__t__ __ab__ {{if eq $i 0}}__ab1__{{else}}__ab2__{{end}}"><p>{{$a}}</p></section>
+{{end}}{{template "factsT" .}}
+{{template "term" .}}
+{{template "links" .}}
 </main>
 {{template "footer" .}}
 </body>

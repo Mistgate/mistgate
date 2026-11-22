@@ -1,0 +1,43 @@
+{{define "header"}}<header class="__top__">
+<div class="__wrap__ __topin__">
+<a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span></a>
+<nav class="__nav__" aria-label="{{.L.nav_label}}">{{range $i, $n := .Nav}}{{if lt $i 3}}<a href="{{$n.Href}}"{{if $n.Cur}} aria-current="page"{{end}}>{{$n.Label}}</a>{{end}}{{end}}</nav>
+<a class="__btn__ __topbtn__" href="/">{{.L.pick}}</a>
+{{template "menu" .}}
+</div>
+</header>
+{{end}}
+{{define "footer"}}<footer class="__foot__">
+<div class="__wrap__">
+<div class="__fg__">
+<div class="__fb__"><a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span></a><p>{{.L.desc}}</p></div>
+<div><h4>{{.L.nav_label}}</h4>{{range $i, $n := .Nav}}{{if lt $i 3}}<a class="__fa__" href="{{$n.Href}}">{{$n.Label}}</a>{{end}}{{end}}</div>
+<div><h4>{{.L.nav_privacy}}</h4>{{range $i, $x := .L.privacy}}{{if lt $i 3}}<a class="__fa__" href="{{(index $.Nav 3).Href}}#s{{add $i 1}}">{{$x.h}}</a>{{end}}{{end}}</div>
+<div><h4>{{.L.nav_terms}}</h4>{{range $i, $x := .L.terms}}{{if lt $i 3}}<a class="__fa__" href="{{(index $.Nav 4).Href}}#s{{add $i 1}}">{{$x.h}}</a>{{end}}{{end}}</div>
+</div>
+<div class="__fine2__"><span>{{.L.footer}}</span><span>© {{.Since}}–{{.Year}} {{.Brand}}</span></div>
+<div class="__wm__" aria-hidden="true">{{.Brand}}</div>
+</div>
+</footer>
+{{end}}
+{{define "stack"}}<svg class="__stack__" viewBox="0 0 360 190" aria-hidden="true" focusable="false">
+<g class="__sk__">
+<g transform="rotate(-{{num "d1" 6 12}} 110 90)"><path class="__f1__" d="M70 22h70l24 24v86H70z"/><path class="__fw__" d="M140 22v24h24"/></g>
+<g transform="rotate({{num "d2" 5 10}} 250 86)"><path class="__f2__" d="M210 18h70l24 24v90H210z"/><path class="__fw__" d="M280 18v24h24"/></g>
+<g transform="translate({{num "d3" 0 8}} 0)"><path class="__f3__" d="M140 34h80l26 26v100H140z"/><path class="__fw__" d="M220 34v26h26"/>
+{{if eq (num "dk" 0 2) 0}}<circle class="__fw__" cx="172" cy="108" r="9"/><path class="__f4__" d="M150 152l24-26 18 16 14-12 24 22z"/>{{else if eq (num "dk" 0 2) 1}}<path d="M160 92h60M160 108h60M160 124h38"/>{{else}}<path d="M193 34v18M193 62v10M193 82v10"/><rect class="__f4__" x="181" y="104" width="24" height="26" rx="5"/>{{end}}</g>
+<path d="M30 168h300"/>
+</g>
+</svg>{{end}}
+{{define "ill1"}}<svg class="__il__" viewBox="0 0 320 170" aria-hidden="true" focusable="false">
+<g class="__sk__"><rect class="__fw__" x="20" y="20" width="280" height="130" rx="{{num "i1" 14 24}}" stroke-dasharray="{{num "i1d" 7 11}} 8"/>
+<path class="__f1__" d="M130 50h50l18 18v56h-68z"/><path class="__fw__" d="M180 50v18h18"/><path d="M160 112V88M150 98l10-10 10 10"/></g>
+</svg>{{end}}
+{{define "ill2"}}<svg class="__il__" viewBox="0 0 320 170" aria-hidden="true" focusable="false">
+<g class="__sk__"><rect class="__fw__" x="20" y="52" width="280" height="64" rx="{{num "i2" 12 20}}"/>
+<rect class="__f2__" x="214" y="62" width="76" height="44" rx="{{num "i2b" 8 12}}"/><path d="M40 84h{{num "i2l" 130 160}}M240 84h26"/></g>
+</svg>{{end}}
+{{define "ill3"}}<svg class="__il__" viewBox="0 0 320 170" aria-hidden="true" focusable="false">
+<g class="__sk__"><path d="M94 74L228 {{num "i3a" 48 58}}M94 96L228 {{num "i3b" 112 122}}" stroke-dasharray="3 9"/>
+<circle class="__f3__" cx="70" cy="85" r="{{num "i3r" 24 28}}"/><circle class="__f4__" cx="250" cy="45" r="22"/><circle class="__f1__" cx="250" cy="125" r="22"/></g>
+</svg>{{end}}

@@ -1,52 +1,157 @@
 {
  "style": {
-  "legacy": true,
   "scheme": "light",
   "palettes": [
    {
     "name": "cream-yellow",
-    "l": {"bg": "#fff7e6", "fg": "#111111", "ac": "#ffd23f", "a2": "#ff8fb3", "sf": "#ffffff"}
+    "l": {
+     "bg": "#fff7e6",
+     "fg": "#111111",
+     "ac": "#ffd23f",
+     "a2": "#ff8fb3",
+     "sf": "#ffffff",
+     "oks": "#7be0b0",
+     "was": "#8ab6ff",
+     "bds": "#c4a8ff"
+    }
    },
    {
     "name": "cream-pink",
-    "l": {"bg": "#fff7e6", "fg": "#111111", "ac": "#ff8fb3", "a2": "#8ab6ff", "sf": "#ffffff"}
+    "l": {
+     "bg": "#fff7e6",
+     "fg": "#111111",
+     "ac": "#ff8fb3",
+     "a2": "#8ab6ff",
+     "sf": "#ffffff",
+     "oks": "#ffd23f",
+     "was": "#7be0b0",
+     "bds": "#ff9f6b"
+    }
    },
    {
     "name": "mint",
-    "l": {"bg": "#effaf3", "fg": "#0f1a14", "ac": "#7be0b0", "a2": "#ffd23f", "sf": "#ffffff"}
+    "l": {
+     "bg": "#effaf3",
+     "fg": "#0f1a14",
+     "ac": "#7be0b0",
+     "a2": "#ffd23f",
+     "sf": "#ffffff",
+     "oks": "#ff8fb3",
+     "was": "#8ab6ff",
+     "bds": "#c4a8ff"
+    }
    },
    {
     "name": "sky",
-    "l": {"bg": "#eef5ff", "fg": "#101828", "ac": "#8ab6ff", "a2": "#ff8fb3", "sf": "#ffffff"}
+    "l": {
+     "bg": "#eef5ff",
+     "fg": "#101828",
+     "ac": "#8ab6ff",
+     "a2": "#ff8fb3",
+     "sf": "#ffffff",
+     "oks": "#ffd23f",
+     "was": "#7be0b0",
+     "bds": "#c4a8ff"
+    }
    },
    {
     "name": "lilac",
-    "l": {"bg": "#f6f0ff", "fg": "#1a1228", "ac": "#c4a8ff", "a2": "#ffd23f", "sf": "#ffffff"}
+    "l": {
+     "bg": "#f6f0ff",
+     "fg": "#1a1228",
+     "ac": "#c4a8ff",
+     "a2": "#ffd23f",
+     "sf": "#ffffff",
+     "oks": "#7be0b0",
+     "was": "#ff8fb3",
+     "bds": "#8ab6ff"
+    }
    },
    {
     "name": "peach",
-    "l": {"bg": "#fff1e8", "fg": "#2a1608", "ac": "#ff9f6b", "a2": "#8ab6ff", "sf": "#ffffff"}
+    "l": {
+     "bg": "#fff1e8",
+     "fg": "#2a1608",
+     "ac": "#ff9f6b",
+     "a2": "#8ab6ff",
+     "sf": "#ffffff",
+     "oks": "#ffd23f",
+     "was": "#7be0b0",
+     "bds": "#ff8fb3"
+    }
    }
   ],
   "fonts": [
-   {"head": "sans", "body": "sans", "fw": 900, "ls": "-.06em", "lh": ".92"},
-   {"head": "rounded", "body": "sans", "fw": 900, "ls": "-.05em", "lh": ".94"},
-   {"head": "verdana", "body": "verdana", "fw": 800, "ls": "-.05em", "lh": "1"}
+   {
+    "head": "sans",
+    "body": "sans",
+    "fw": 900,
+    "ls": "-.06em",
+    "lh": ".92"
+   },
+   {
+    "head": "rounded",
+    "body": "sans",
+    "fw": 900,
+    "ls": "-.05em",
+    "lh": ".94"
+   },
+   {
+    "head": "verdana",
+    "body": "verdana",
+    "fw": 800,
+    "ls": "-.05em",
+    "lh": "1"
+   }
   ],
-  "radius": [14, 20],
-  "radius_s": [10, 14],
-  "radius_b": [24, 30],
-  "density": [0.95, 1.08],
-  "width": [1240, 1280],
-  "measure": [640, 720],
-  "base": [17, 18],
-  "scale": [1.4, 1.5],
-  "lh": [1.5, 1.6],
-  "stroke": [2.2, 2.8],
-  "border": [2, 3],
+  "radius": [
+   14,
+   20
+  ],
+  "radius_s": [
+   10,
+   14
+  ],
+  "radius_b": [
+   24,
+   30
+  ],
+  "density": [
+   0.95,
+   1.08
+  ],
+  "width": [
+   1240,
+   1280
+  ],
+  "measure": [
+   640,
+   720
+  ],
+  "base": [
+   17,
+   18
+  ],
+  "scale": [
+   1.4,
+   1.5
+  ],
+  "lh": [
+   1.5,
+   1.6
+  ],
+  "stroke": [
+   2.2,
+   2.8
+  ],
+  "border": [
+   2,
+   3
+  ],
   "shadows": [
    "5px 5px 0 var(--fg)",
-   "4px 4px 0 var(--fg)"
+   "4px 4px 0 var(--fg)",
+   "6px 6px 0 var(--fg)"
   ]
  },
  "title": {
@@ -121,5 +226,11 @@
  },
  "photo_q": [
   "mountain lake landscape"
- ]
+ ],
+ "home_blocks": [
+  "feat",
+  "steps",
+  "limits"
+ ],
+ "home_fixed": 0
 }

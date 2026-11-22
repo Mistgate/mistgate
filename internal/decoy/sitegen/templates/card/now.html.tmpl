@@ -1,10 +1,11 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __text__">
-<h1>{{.L.now_h}}</h1>
-<p class="__mu__">{{.L.now_intro}}</p>
-<ul class="__facts__">{{range .L.now}}<li>{{icon "arrow"}} {{.}}</li>{{end}}</ul>
-<p class="__mu__">{{.L.updated}}</p>
+<main class="__wrap__ __bento__ __pgnow__">
+<section class="__pgh__"><div><span class="__up__ __upm__"><i></i>{{.L.updated}}</span><h1>{{.L.now_h}}</h1></div><p class="__tg__">{{.L.now_intro}}</p></section>
+<section class="__nw__">{{range $i, $x := .L.now}}<div class="{{if eq $i 0}}__nw1__{{else if eq $i 1}}__nw2__{{else}}__nw3__{{end}}"><b>0{{add $i 1}}</b><p>{{$x}}</p></div>
+{{end}}</section>
+{{template "factsT" .}}
+{{template "links" .}}
 </main>
 {{template "footer" .}}
 </body>

@@ -1,49 +1,146 @@
 {
  "style": {
-  "legacy": true,
   "scheme": "light",
   "palettes": [
    {
     "name": "green-paper",
-    "l": {"bg": "#f4efe4", "fg": "#1b1a17", "ac": "#25533a", "a2": "#8a2e1f"}
+    "l": {
+     "bg": "#f4efe4",
+     "fg": "#1b1a17",
+     "ac": "#25533a",
+     "a2": "#8a2e1f",
+     "sf": "#fbf8f0",
+     "band": "#ebe4d2",
+     "ln": "#cfc6b0",
+     "ln2": "#b5ab93",
+     "mu": "#5f5a4c"
+    }
    },
    {
     "name": "ink-blue",
-    "l": {"bg": "#f2efe8", "fg": "#1a1c22", "ac": "#234a7a", "a2": "#9a3b1a"}
+    "l": {
+     "bg": "#f2efe8",
+     "fg": "#1a1c22",
+     "ac": "#234a7a",
+     "a2": "#9a3b1a"
+    }
    },
    {
     "name": "oxblood",
-    "l": {"bg": "#f5eee6", "fg": "#231a17", "ac": "#7d2430", "a2": "#2f5a45"}
+    "l": {
+     "bg": "#f5eee6",
+     "fg": "#231a17",
+     "ac": "#7d2430",
+     "a2": "#2f5a45"
+    }
    },
    {
     "name": "plum",
-    "l": {"bg": "#f3eee9", "fg": "#1f1a20", "ac": "#5b2f6b", "a2": "#8a5a1a"}
+    "l": {
+     "bg": "#f3eee9",
+     "fg": "#1f1a20",
+     "ac": "#5b2f6b",
+     "a2": "#8a5a1a"
+    }
    },
    {
     "name": "teal",
-    "l": {"bg": "#eff0e8", "fg": "#17201f", "ac": "#1f5f5a", "a2": "#8a2e1f"}
+    "l": {
+     "bg": "#eff0e8",
+     "fg": "#17201f",
+     "ac": "#1f5f5a",
+     "a2": "#8a2e1f"
+    }
    },
    {
     "name": "ochre",
-    "l": {"bg": "#f6f0e0", "fg": "#221c10", "ac": "#7a5a12", "a2": "#25533a"}
+    "l": {
+     "bg": "#f6f0e0",
+     "fg": "#221c10",
+     "ac": "#7a5a12",
+     "a2": "#25533a"
+    }
    }
   ],
   "fonts": [
-   {"head": "old", "body": "old", "fw": 500, "ls": "-.035em", "lh": "1", "label": "sans", "tt": "uppercase", "lsl": ".14em", "fsl": ".75rem"},
-   {"head": "bookish", "body": "bookish", "fw": 500, "ls": "-.03em", "lh": "1.02", "label": "sans", "tt": "uppercase", "lsl": ".14em", "fsl": ".75rem"},
-   {"head": "georgia", "body": "georgia", "fw": 500, "ls": "-.03em", "lh": "1.02", "label": "sans", "tt": "uppercase", "lsl": ".12em", "fsl": ".75rem"}
+   {
+    "head": "old",
+    "body": "old",
+    "fw": 500,
+    "ls": "-.035em",
+    "lh": "1",
+    "label": "sans",
+    "tt": "uppercase",
+    "lsl": ".14em",
+    "fsl": ".75rem"
+   },
+   {
+    "head": "bookish",
+    "body": "bookish",
+    "fw": 500,
+    "ls": "-.03em",
+    "lh": "1.02",
+    "label": "sans",
+    "tt": "uppercase",
+    "lsl": ".14em",
+    "fsl": ".75rem"
+   },
+   {
+    "head": "georgia",
+    "body": "georgia",
+    "fw": 500,
+    "ls": "-.03em",
+    "lh": "1.02",
+    "label": "sans",
+    "tt": "uppercase",
+    "lsl": ".12em",
+    "fsl": ".75rem"
+   }
   ],
-  "radius": [0, 4],
-  "radius_s": [0, 3],
-  "radius_b": [0, 6],
-  "density": [0.95, 1.08],
-  "width": [1240, 1300],
-  "measure": [640, 700],
-  "base": [18, 19],
-  "scale": [1.33, 1.45],
-  "lh": [1.6, 1.7],
-  "stroke": [1.5, 1.9],
-  "border": [1, 1],
+  "radius": [
+   0,
+   4
+  ],
+  "radius_s": [
+   0,
+   3
+  ],
+  "radius_b": [
+   0,
+   6
+  ],
+  "density": [
+   0.95,
+   1.08
+  ],
+  "width": [
+   1240,
+   1300
+  ],
+  "measure": [
+   640,
+   700
+  ],
+  "base": [
+   18,
+   19
+  ],
+  "scale": [
+   1.33,
+   1.45
+  ],
+  "lh": [
+   1.6,
+   1.7
+  ],
+  "stroke": [
+   1.5,
+   1.9
+  ],
+  "border": [
+   1,
+   1
+  ],
   "shadows": [
    "none"
   ]
@@ -98,6 +195,18 @@
     "journal/{slug}/index.html"
    ],
    "each": "posts"
+  },
+  {
+   "name": "terms",
+   "tmpl": "terms.html.tmpl",
+   "paths": [
+    "terms.html",
+    "terms/index.html",
+    "legal/terms.html",
+    "conditions.html"
+   ],
+   "nav": "nav_terms",
+   "desc": "desc_terms"
   }
  ],
  "lists": [
@@ -119,5 +228,12 @@
    1,
    2
   ]
- }
+ },
+ "home_blocks": [
+  "stmt",
+  "cols",
+  "quote",
+  "arch"
+ ],
+ "home_fixed": 1
 }

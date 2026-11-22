@@ -1,12 +1,15 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __prose__">
-<h1>{{.L.help_h}}</h1>
-<p class="__mu__">{{.L.help_intro}}</p>
-<ol>{{range .L.help_steps}}<li>{{.}}</li>{{end}}</ol>
-<h2>{{.L.help_contact_h}}</h2>
-<p>{{.L.help_contact}}</p>
-<p><a class="__btn__ __ghost__" href="/">{{icon "arrow"}}{{.L.help_back}}</a></p>
+<main>
+<section class="__hero__"><div class="__wrap__ __hgrid2__">
+<div class="__ht__"><span class="__kick__">{{.L.nav_help}}</span><h1>{{.L.help_h}}</h1><p class="__lead__">{{.L.help_intro}}</p></div>
+{{template "ill2" .}}
+</div></section>
+<div class="__wrap__ __sec__">
+<ol class="__g2__">{{range $i, $s := .L.help_steps}}<li class="__st__"><b>0{{add $i 1}}</b><p>{{$s}}</p></li>
+{{end}}</ol>
+<div class="__still__" id="s1"><div><h2>{{.L.help_contact_h}}</h2><p>{{.L.help_contact}}</p></div><a class="__btn__ __inv__" href="/">{{.L.help_back}}</a></div>
+</div>
 </main>
 {{template "footer" .}}
 </body>
