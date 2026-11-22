@@ -20,6 +20,7 @@
 </div>
 </footer>
 {{end}}
+{{define "b_hours"}}<ul class="__hr__">{{range .L.hours}}{{$h := hrsp .from .to .open .close}}<li><span>{{$h.days}}</span><span>{{$h.time}}</span></li>{{end}}{{if .L.hours_note}}<li class="__hn__">{{.L.hours_note}}</li>{{end}}</ul>{{end}}
 {{define "b_feat"}}<section class="__band__">
 <div class="__wrap__"><ul class="__g__">{{range .L.features}}<li><span class="__fi__">{{icon .icon}}</span><div><h3>{{.h}}</h3><p>{{.p}}</p></div></li>{{end}}</ul></div>
 </section>{{end}}
@@ -42,17 +43,17 @@
 {{define "b_visit"}}<section class="__wrap__ __sec__">
 <h2>{{.L.visit_h}}</h2>
 <div class="__vis__">
-<div class="__card__ __dkc__"><h3>{{.L.hours_h}}</h3>
-<ul class="__hr__">{{range .L.hours}}<li>{{hrs .from .to .open .close}}</li>{{end}}{{if .L.hours_note}}<li>{{.L.hours_note}}</li>{{end}}</ul></div>
-<div class="__card__ __soft__">{{mapsvg "visit" 360 360}}
+<div class="__card__ __dkc__"><h3>{{.L.hours_h}}</h3>{{template "b_hours" .}}</div>
+<div class="__card__ __soft__">
 <h3>{{.L.directions_h}}</h3>
 <b>{{.L.address_l}}</b><p>{{.V.address}}</p>
 {{if .V.phone}}<b>{{.L.phone_l}}</b><p>{{.V.phone}}</p>
-{{end}}<p>{{.L.directions}}</p></div>
+{{end}}<p>{{.L.directions}}</p>
+<div class="__mapb__">{{mapsvg "visit" 640 260}}</div></div>
 </div>
 </section>{{end}}
 {{define "hero_copy"}}<div class="__hcopy__">
-<h1>{{.L.hero_h}}</h1>
+{{$w := lastword .L.hero_h}}<h1>{{$w.head}}<em>{{$w.last}}</em>{{$w.end}}</h1>
 <p class="__lead__">{{.L.intro}}</p>
 <p class="__bs__"><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.see_services}}</a><a class="__btn__ __bo__" href="{{(index .Nav 1).Href}}">{{.L.all_prices}}</a></p>
 </div>{{end}}

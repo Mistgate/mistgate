@@ -6,8 +6,7 @@
 </section>
 <div class="__cg__">
 <div class="__map__">{{mapsvg "contact" 640 440}}<div class="__pin__"><b>{{.L.address_l}}</b>{{.V.address}}</div></div>
-<div class="__card__ __dkc__"><h3>{{.L.hours_h}}</h3>
-<ul class="__hr__">{{range .L.hours}}<li>{{hrs .from .to .open .close}}</li>{{end}}{{if .L.hours_note}}<li>{{.L.hours_note}}</li>{{end}}</ul></div>
+<div class="__card__ __dkc__"><h3>{{.L.hours_h}}</h3>{{template "b_hours" .}}</div>
 </div>
 <section class="__dir__">
 <div><h2>{{.L.directions_h}}</h2><p>{{.L.directions}}</p><p>{{.L.contact_note}}</p></div>

@@ -13,6 +13,7 @@
   {
    "id": "photo",
    "art": "topo",
+   "arts": ["topo", "landscape", "waves", "still"],
    "photo_q": [
     "quiet landscape hills",
     "misty field morning",
@@ -21,11 +22,13 @@
   },
   {
    "id": "illustration",
-   "art": "botanical"
+   "art": "botanical",
+   "arts": ["botanical", "still", "blobs"]
   },
   {
    "id": "graphic",
-   "art": "poster"
+   "art": "poster",
+   "arts": ["poster", "tiles", "checker"]
   }
  ]
 }

@@ -43,15 +43,15 @@
 {{template "header" .}}
 <main>
 {{if eq .Layout 0}}<section class="__wrap__ __hero__">
-<div class="__g__"><span class="__lab__">{{.L.tagline}}</span><h1>{{.L.intro}}</h1></div>
+<div class="__g__"><span class="__lab__">{{.L.tagline}}</span>{{$w := lastword .L.intro}}<h1>{{$w.head}}{{$w.last}}<span class="__ed__">{{$w.end}}</span></h1></div>
 <div class="__mods__">{{template "mods" .}}</div>
 </section>
 {{else if eq .Layout 1}}<section class="__wrap__ __hero__ __hero1__">
-<div class="__g__"><span class="__lab__">{{.L.tagline}}</span><h1>{{.L.intro}}</h1><div class="__mods1__">{{template "mods" .}}</div></div>
+<div class="__g__"><span class="__lab__">{{.L.tagline}}</span>{{$w := lastword .L.intro}}<h1>{{$w.head}}{{$w.last}}<span class="__ed__">{{$w.end}}</span></h1><div class="__mods1__">{{template "mods" .}}</div></div>
 </section>
 {{else}}<section class="__wrap__ __hero__ __hero2__">
 <div class="__mods2__">{{template "mods" .}}</div>
-<div class="__h2t__"><span class="__lab__">{{.L.tagline}}</span><h1>{{.L.intro}}</h1></div>
+<div class="__h2t__"><span class="__lab__">{{.L.tagline}}</span>{{$w := lastword .L.intro}}<h1>{{$w.head}}{{$w.last}}<span class="__ed__">{{$w.end}}</span></h1></div>
 </section>
 {{end}}{{range .Order}}{{blk . $}}{{end}}
 </main>

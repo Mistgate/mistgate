@@ -49,7 +49,10 @@
 </section>{{end}}
 {{define "b_find"}}<section class="__wrap__ __sec__ __fd__">
 <div class="__map__">{{mapsvg "find" 600 440}}<div class="__pin__"><b>{{.L.find_h}}</b>{{.L.where}}, {{.V.address}}</div></div>
-{{if .V.phone}}<div class="__jb__"><h3>{{.L.phone_l}}</h3><p class="__tel__">{{icon "phone"}} {{.V.phone}}</p><p>{{.L.when}}</p></div>
+{{if .V.phone}}<div class="__jb__ __tc__"><h3>{{.L.phone_l}}</h3><p class="__tel__">{{icon "phone"}} {{.V.phone}}</p>
+<p class="__iline__">{{icon "clock"}} <span>{{.L.when}}</span></p>
+<p class="__iline__">{{icon "pin"}} <span>{{.L.where}}, {{.V.address}}</span></p>
+<p class="__tb__"><a class="__btn__" href="{{(index .Nav 2).Href}}">{{.L.join_cta}}</a></p></div>
 {{else}}{{template "contactform" .}}
 <script src="{{.JS}}" defer></script>
 {{end}}</section>{{end}}
