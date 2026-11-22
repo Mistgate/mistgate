@@ -14,7 +14,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
-	"github.com/mistgate/mistgate/internal/plugin"
+	"github.com/mistgate/mistgate/internal/agentcap"
 )
 
 // LINK FETCH (agent.proto): a VPS panel gives a link session of an agent that lists link-fetch/1 a token in its HelloAck;
@@ -96,7 +96,7 @@ type fetchSessionStream struct {
 func (s *fetchSessionStream) Receive() (*agentv1.ConnectRequest, error) {
 	m, err := s.agentSessionStream.Receive()
 	if h := m.GetHello(); h != nil {
-		s.capable = slices.Contains(h.Capabilities, plugin.CapLinkFetch)
+		s.capable = slices.Contains(h.Capabilities, agentcap.LinkFetch)
 	}
 	return m, err
 }

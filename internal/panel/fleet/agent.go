@@ -18,7 +18,6 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/plugin"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -579,7 +578,7 @@ func sessionCloseError(close *SessionClose) error {
 func helloInfo(h *agentv1.Hello, vps bool) store.HelloInfo {
 	info := store.HelloInfo{AgentVersion: clipText(h.AgentVersion, 64), APIVersion: h.ApiVersion, Instance: h.InstanceId,
 		Built: h.Built, Caps: capabilities(h), LastUpdateJSON: lastUpdateJSON(h.LastUpdate)}
-	if vps && slices.Contains(info.Caps, plugin.CapLinkFetch) {
+	if vps && slices.Contains(info.Caps, agentcap.LinkFetch) {
 		info.Caps = linkFetchCaps(info.Caps)
 	}
 	if slices.Contains(info.Caps, agentcap.Nets) {
@@ -619,11 +618,11 @@ func helloInfo(h *agentv1.Hello, vps bool) store.HelloInfo {
 // link (update-link/1).
 func linkFetchCaps(caps []string) []string {
 	out := slices.Clone(caps)
-	if !slices.Contains(out, capNetworks) {
-		out = append(out, capNetworks)
+	if !slices.Contains(out, agentcap.Nets) {
+		out = append(out, agentcap.Nets)
 	}
-	if slices.Contains(out, capUpdateLink) && !slices.Contains(out, capUpdate) {
-		out = append(out, capUpdate)
+	if slices.Contains(out, agentcap.UpdateLink) && !slices.Contains(out, agentcap.Update) {
+		out = append(out, agentcap.Update)
 	}
 	return out
 }

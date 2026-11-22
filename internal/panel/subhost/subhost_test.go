@@ -21,6 +21,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	subhostv1 "github.com/mistgate/mistgate/gen/mistgate/subhost/v1"
 	"github.com/mistgate/mistgate/internal/panel/pubaddr"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -103,7 +104,7 @@ type env struct {
 	clock atomic.Int64
 }
 
-var allCaps = []string{plugin.CapSubHost, plugin.CapPanelLink, capWSLink}
+var allCaps = []string{agentcap.SubHost, agentcap.PanelLink, agentcap.WSLink}
 
 // a node's own site on 443 (TrustTunnel): the host needs no site name
 var ownSite = []plugin.InboundSpec{{ID: "inb_t", Protocol: "trusttunnel", Listen: plugin.Listen{Network: "tcp", Port: 443},
@@ -328,7 +329,7 @@ func TestTransitions(t *testing.T) {
 func TestNodeFitness(t *testing.T) {
 	e := newEnv(t)
 	offline := e.node("off", "203.0.113.3", allCaps, false)
-	old := e.node("old", "203.0.113.4", []string{plugin.CapPanelLink, capWSLink}, true)
+	old := e.node("old", "203.0.113.4", []string{agentcap.PanelLink, agentcap.WSLink}, true)
 	bare := e.node("bare", "203.0.113.5", allCaps, true)
 	e.fl.specs[bare] = nil
 	foreign := e.node("foreign", "203.0.113.6", allCaps, true)
@@ -354,7 +355,7 @@ func TestNodeFitness(t *testing.T) {
 func TestFleetMustFollowTheLink(t *testing.T) {
 	e := newEnv(t)
 	a := e.node("a", "203.0.113.1", allCaps, true)
-	lacking := e.node("legacy", "203.0.113.9", []string{plugin.CapSubHost}, true)
+	lacking := e.node("legacy", "203.0.113.9", []string{agentcap.SubHost}, true)
 	wantCode(t, e.set(a, "sub.example.com", true), "sub_host_nodes_lack_link: nodes="+lacking)
 	g, err := e.rpc.GetSubscriptionHost(e.ctx, connect.NewRequest(&subhostv1.GetSubscriptionHostRequest{}))
 	if err != nil || g.Msg.Host.State != subhostv1.SubscriptionHostState_SUBSCRIPTION_HOST_STATE_OFF ||

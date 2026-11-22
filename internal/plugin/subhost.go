@@ -9,9 +9,6 @@ import (
 // names to the panel, which calls it over the bridge. The panel and the agent decide its routes, and whether the node can be
 // one, with the same function (SubHostRoutes).
 
-// CapSubHost is the Hello capability of an agent that can be a subscription host.
-const CapSubHost = "sub-host/1"
-
 // The ids of the host's routes on the front of TCP 443. Inbound ids never hold "~".
 const (
 	SubHostRouteID     = "~sub-host"      // the subscription names: to the panel, over the bridge
@@ -80,7 +77,7 @@ func SubHostRoutesOn(port uint16, role SubHostRole, specs []InboundSpec) ([]TCPE
 	}
 	if !tcpOn443 {
 		for _, s := range specs {
-			if hy2SitePort(s) == port {
+			if Hy2SitePort(s) == port {
 				return nil, SubHostHysteria2Site
 			}
 		}

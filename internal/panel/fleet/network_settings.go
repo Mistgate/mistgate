@@ -9,7 +9,6 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/plugin"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -31,7 +30,7 @@ func (f *Fleet) nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettin
 	if l := f.panelLink.Load(); l != nil && *l != "" && store.CapabilityPresent(caps, agentcap.PanelLink) {
 		s.PanelLinkUrl = *l
 	}
-	if roles := f.subHostRoles.Load(); roles != nil && store.CapabilityPresent(caps, plugin.CapSubHost) {
+	if roles := f.subHostRoles.Load(); roles != nil && store.CapabilityPresent(caps, agentcap.SubHost) {
 		if r := (*roles)[n.ID]; r != nil {
 			s.SubHost = proto.Clone(r).(*agentv1.SubHostRole)
 		}

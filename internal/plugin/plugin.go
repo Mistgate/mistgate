@@ -50,17 +50,6 @@ type WarpSpec struct {
 	Backend       string // "auto" | "kernel" | "userspace"
 }
 
-// CapRelayForward is the Hello capability of an agent that can forward ports (DesiredState.relays, ApplyResult.relays).
-// The panel sends relays only to a stream that listed it.
-const CapRelayForward = "relay-forward/1"
-
-// CapPanelLink is the Hello capability of an agent that follows NodeSettings.panel_link_url to a new panel link address.
-const CapPanelLink = "panel-link/1"
-
-// CapLinkFetch is the Hello capability of an agent that, link-only, fetches update files and the network table over the
-// link with HelloAck.fetch_token.
-const CapLinkFetch = "link-fetch/1"
-
 // RelayForward is one forwarded port of the node (agent.v1.RelayForward): connections to Port go, unchanged, to ToHost:ToPort.
 // ToHost is an IPv4 literal or a name the agent resolves.
 type RelayForward struct {

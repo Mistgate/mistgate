@@ -15,8 +15,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/coder/websocket"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/agentlink"
-	"github.com/mistgate/mistgate/internal/plugin"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -75,7 +75,7 @@ func TestLinkFetchServesTheSessionsNode(t *testing.T) {
 
 	ws := openPanelLink(t, server.URL, a)
 	t.Cleanup(func() { _ = ws.Close(websocket.StatusNormalClosure, "") })
-	ack := linkHelloWith(t, ws, plugin.CapLinkFetch)
+	ack := linkHelloWith(t, ws, agentcap.LinkFetch)
 	token := ack.FetchToken
 	if len(token) < 40 {
 		t.Fatalf("fetch token %q, want a 32-byte random value", token)
@@ -160,7 +160,7 @@ func TestLinkFetchTokenNotLogged(t *testing.T) {
 	server := httptest.NewServer(e.f.LinkHandler())
 	t.Cleanup(server.Close)
 	ws := openPanelLink(t, server.URL, a)
-	token := linkHelloWith(t, ws, plugin.CapLinkFetch).FetchToken
+	token := linkHelloWith(t, ws, agentcap.LinkFetch).FetchToken
 	fetchGET(e.f.LinkHandler(), "/fetch/"+a.nodeID+"/f", token, "")
 	_ = ws.Close(websocket.StatusNormalClosure, "")
 	if token == "" || strings.Contains(logs.String(), token) {
@@ -171,19 +171,19 @@ func TestLinkFetchTokenNotLogged(t *testing.T) {
 // A link-only agent lists update-link/1 and link-fetch/1, never update/1 or nets/1 itself, so an older VPS panel (and the
 // edge) never sends it a VPS update it cannot fetch. A VPS panel that serves the fetch route reads the pair as both.
 func TestLinkFetchCapabilitiesOnlyOnAVPSPanel(t *testing.T) {
-	link := &agentv1.Hello{Capabilities: []string{"ws-link/1", capUpdateLink, plugin.CapLinkFetch}}
-	if caps := helloInfo(link, true).Caps; !slices.Contains(caps, capUpdate) || !slices.Contains(caps, capNetworks) {
+	link := &agentv1.Hello{Capabilities: []string{"ws-link/1", agentcap.UpdateLink, agentcap.LinkFetch}}
+	if caps := helloInfo(link, true).Caps; !slices.Contains(caps, agentcap.Update) || !slices.Contains(caps, agentcap.Nets) {
 		t.Fatalf("VPS panel: %v, want update/1 and nets/1", caps)
 	}
-	if caps := helloInfo(link, false).Caps; slices.Contains(caps, capUpdate) || slices.Contains(caps, capNetworks) {
+	if caps := helloInfo(link, false).Caps; slices.Contains(caps, agentcap.Update) || slices.Contains(caps, agentcap.Nets) {
 		t.Fatalf("edge: %v, want neither", caps)
 	}
-	noUpdater := &agentv1.Hello{Capabilities: []string{"ws-link/1", plugin.CapLinkFetch}}
-	if caps := helloInfo(noUpdater, true).Caps; slices.Contains(caps, capUpdate) || !slices.Contains(caps, capNetworks) {
+	noUpdater := &agentv1.Hello{Capabilities: []string{"ws-link/1", agentcap.LinkFetch}}
+	if caps := helloInfo(noUpdater, true).Caps; slices.Contains(caps, agentcap.Update) || !slices.Contains(caps, agentcap.Nets) {
 		t.Fatalf("an unsigned link agent: %v, want nets/1 only", caps)
 	}
-	old := &agentv1.Hello{Capabilities: []string{"ws-link/1", capUpdateLink}}
-	if caps := helloInfo(old, true).Caps; slices.Contains(caps, capUpdate) || slices.Contains(caps, capNetworks) {
+	old := &agentv1.Hello{Capabilities: []string{"ws-link/1", agentcap.UpdateLink}}
+	if caps := helloInfo(old, true).Caps; slices.Contains(caps, agentcap.Update) || slices.Contains(caps, agentcap.Nets) {
 		t.Fatalf("an older link agent: %v, want nothing added", caps)
 	}
 
@@ -194,9 +194,9 @@ func TestLinkFetchCapabilitiesOnlyOnAVPSPanel(t *testing.T) {
 	t.Cleanup(server.Close)
 	ws := openPanelLink(t, server.URL, a)
 	t.Cleanup(func() { _ = ws.Close(websocket.StatusNormalClosure, "") })
-	linkHelloWith(t, ws, capUpdateLink, plugin.CapLinkFetch)
+	linkHelloWith(t, ws, agentcap.UpdateLink, agentcap.LinkFetch)
 	n, err := e.f.st.Node(context.Background(), a.nodeID)
-	if err != nil || !slices.Contains(n.AgentCaps, capUpdate) || !slices.Contains(n.AgentCaps, capNetworks) {
+	if err != nil || !slices.Contains(n.AgentCaps, agentcap.Update) || !slices.Contains(n.AgentCaps, agentcap.Nets) {
 		t.Fatalf("stored capabilities %v, %v", n.AgentCaps, err)
 	}
 }

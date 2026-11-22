@@ -14,6 +14,7 @@ sni-scan/1
 speed/1
 speed-channel/1
 debug/1
+link-fetch/1
 nets/1
 debug/2
 torrentguard/1
@@ -33,6 +34,7 @@ sni-scan/1
 speed/1
 speed-channel/1
 debug/1
+link-fetch/1
 os-status/1
 os-update/1
 nets/1
@@ -50,6 +52,7 @@ trusttunnel-h3/1
 trusttunnel-refusals/1
 trusttunnel-tcp-stalls/1
 tcp-share/1
+sub-host/1
 user-rate-limit/1
 warp/1
 warp-reach/1
@@ -82,6 +85,7 @@ sni-scan/1
 speed/1
 speed-channel/1
 debug/1
+link-fetch/1
 nets/1
 debug/2
 awg/1
@@ -121,6 +125,7 @@ sni-scan/1
 speed/1
 speed-channel/1
 debug/1
+link-fetch/1
 os-status/1
 os-update/1
 nets/1
@@ -138,6 +143,7 @@ trusttunnel-h3/1
 trusttunnel-refusals/1
 trusttunnel-tcp-stalls/1
 tcp-share/1
+sub-host/1
 user-rate-limit/1
 relay-forward/1
 torrentguard/1
@@ -165,6 +171,7 @@ sni-scan/1
 speed/1
 speed-channel/1
 debug/1
+link-fetch/1
 os-status/1
 os-update/1
 panel-link/1
@@ -182,6 +189,7 @@ trusttunnel-h3/1
 trusttunnel-refusals/1
 trusttunnel-tcp-stalls/1
 tcp-share/1
+sub-host/1
 user-rate-limit/1
 warp/1
 warp-reach/1

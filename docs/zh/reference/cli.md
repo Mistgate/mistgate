@@ -321,6 +321,8 @@ next: mistgate-node install   (or, in the foreground: mistgate-node run)
 
 把该地址保存到 `agent.json`，作为下次尝试的地址；节点必须已注册。重启后，Agent 会轮流尝试新地址和当前地址，一旦通过新地址建立会话就保留它。Agent 会记住之前的地址，新地址不再响应时就回到之前的地址；新地址正常工作满 7 天后，Agent 会忘掉之前的地址。面板地址迁移到[订阅主机](../guide/subscription-host.md)时，会把同样的更改发送给各 Agent（`panel_link_url`）。mTLS 节点也会接受：此时之前的地址就是 mTLS，它同样会回到 mTLS，并恢复其配置的 `--link-url`。此命令用于已无法连到面板的节点。命令输出 `Saved. Restart the agent: systemctl restart mistgate-node`。
 
+兼容性说明：只有通过连接注册的节点才声明 `panel-link/1`，面板仍按该能力下发设置。mTLS 迁移保留为独立提交，但在传输方案确定前无法通过集群设置触发，因此 mTLS 集群自动迁移到 NAT 后尚未完成。连接会话短于 2 分钟会触发回退；7 天后还需一次健康会话才会忘记旧地址。
+
 ### mistgate-node install
 
 仅限 Linux；注册后以 root 身份运行。

@@ -68,7 +68,7 @@ func (a *Agent) applySubHost(st *pb.NodeSettings) (changed bool) {
 		return false
 	}
 	a.meta.SubHost = next
-	if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
+	if err := saveMeta(a.cfg.StateDir, &a.meta); err != nil {
 		a.log.Error("subscription host role not saved", "code", "sub_host_role_not_saved", "err", err)
 	}
 	if next == nil {

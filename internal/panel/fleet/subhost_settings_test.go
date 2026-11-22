@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // A host's role reaches its agent only, and only one with sub-host/1; nobody else's settings or signature change, and the
@@ -14,7 +14,7 @@ import (
 func TestSubHostRoleInNodeSettings(t *testing.T) {
 	host := store.NodeRow{ID: "nod_host", DialTimeoutS: 30, CountryCode: "DE", AwgBackend: "userspace"}
 	other := store.NodeRow{ID: "nod_other", DialTimeoutS: 30, CountryCode: "DE", AwgBackend: "userspace"}
-	capable := []string{plugin.CapSubHost}
+	capable := []string{agentcap.SubHost}
 	f := &Fleet{}
 	base := settingsSig(f.nodeSettings(host, capable))
 

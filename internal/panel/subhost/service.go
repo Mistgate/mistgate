@@ -24,6 +24,7 @@ import (
 	"golang.org/x/crypto/acme"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	subhostv1 "github.com/mistgate/mistgate/gen/mistgate/subhost/v1"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/pubaddr"
@@ -31,8 +32,6 @@ import (
 	"github.com/mistgate/mistgate/internal/plugin"
 	"google.golang.org/protobuf/proto"
 )
-
-const capWSLink = "ws-link/1"
 
 // Fleet is what the service needs of the fleet (*fleet.Fleet).
 type Fleet interface {
@@ -295,7 +294,7 @@ func (s *Service) fitNode(ctx context.Context, id, domain, siteName string) (sto
 	switch {
 	case n.State == "retired":
 		return n, unfit("retired")
-	case !store.CapabilityPresent(n.AgentCaps, plugin.CapSubHost):
+	case !store.CapabilityPresent(n.AgentCaps, agentcap.SubHost):
 		return n, unfit("agent_too_old")
 	case !s.cfg.Fleet.HasSession(n.ID):
 		return n, unfit("offline")
@@ -329,7 +328,7 @@ func (s *Service) lackingLink(ctx context.Context) ([]*subhostv1.SubscriptionHos
 		if n.State == "retired" || n.State == "pending" {
 			continue
 		}
-		if !store.CapabilityPresent(n.AgentCaps, capWSLink) || !store.CapabilityPresent(n.AgentCaps, plugin.CapPanelLink) {
+		if !store.CapabilityPresent(n.AgentCaps, agentcap.WSLink) || !store.CapabilityPresent(n.AgentCaps, agentcap.PanelLink) {
 			out = append(out, &subhostv1.SubscriptionHostNodeRef{NodeId: n.ID, Name: n.Name})
 		}
 	}

@@ -18,9 +18,9 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
-	"github.com/mistgate/mistgate/internal/panel/auth"
 	subhostv1 "github.com/mistgate/mistgate/gen/mistgate/subhost/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/subhost/v1/subhostv1connect"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/provision"
 )
 

@@ -321,6 +321,8 @@ The offline form enrolls the panel's first subscription host, which cannot reach
 
 Saves the address in `agent.json` as the one to try next; the node must be enrolled. After a restart the agent tries the new address and its current one in turn, and keeps the new one once a session over it succeeds. The agent keeps the previous address and goes back to it if the new one stops answering; once the new address has worked for 7 days, the agent forgets the previous one. The panel sends the same change to its agents (`panel_link_url`) when its address moves onto a [subscription host](../guide/subscription-host.md). An mTLS node takes it too: mTLS is then its previous address, it goes back to mTLS the same way, and its configured `--link-url` comes back with it. The command is for a node that cannot reach the panel any more. It prints `Saved. Restart the agent: systemctl restart mistgate-node`.
 
+Compatibility note: only link-enrolled nodes advertise `panel-link/1`; fleet settings remain capability-gated. The isolated mTLS transition is not reachable through fleet settings pending the transport decision, so automatic migration of an mTLS fleet behind NAT is not complete. A link session shorter than 2 minutes triggers fallback; forgetting the previous address requires a healthy session after 7 days.
+
 ### mistgate-node install
 
 Linux only, as root, after `enroll`.

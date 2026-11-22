@@ -264,21 +264,53 @@ func TestMTLSAgentStaysMTLSWithoutANewLink(t *testing.T) {
 	}
 }
 
-// An mTLS agent takes a panel link address (the panel sends one once its address is on a subscription host): it saves it as
-// its next address and stays on mTLS until a session over the link succeeds.
-func TestMTLSAgentTakesAPanelLinkAddress(t *testing.T) {
+// An mTLS agent ignores a panel-supplied link address and keeps its session running.
+func TestMTLSAgentIgnoresAPanelLink(t *testing.T) {
 	h := newHarness(t, harnessOpts{noStart: true})
 	a := h.a
-	newLink := "wss://sub.example.com/" + strings.Repeat("n", 24) + "/"
-	if !a.applyPanelLink(&pb.NodeSettings{PanelLinkUrl: newLink}) || a.nextLink() != newLink {
-		t.Fatal("an mTLS agent did not take the link address")
-	}
-	if m := readMeta(t, h.dir); m.NextLink != newLink || m.Link != "" || m.PrevMTLS {
-		t.Fatalf("saved next=%t link=%q prev_mtls=%v", m.NextLink == newLink, m.Link, m.PrevMTLS)
-	}
+	link := "wss://panel.example.com/" + linkPrefix('n') + "/"
 	if a.linkOnly() {
-		t.Fatal("link-only before a session over the new address")
+		t.Fatal("harness agent is link-only")
 	}
+	before, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
+	if err != nil {
+		t.Fatal(err)
+	}
+	unchanged := func() {
+		t.Helper()
+		after, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(before, after) {
+			t.Fatalf("%s changed:\n%s\n%s", fileMeta, before, after)
+		}
+		a.metaMu.Lock()
+		next := a.meta.NextLink
+		a.metaMu.Unlock()
+		if a.linkOnly() || a.nextLink() != "" || next != "" || a.linkURL() != "" {
+			t.Fatalf("linkOnly=%v next=%v", a.linkOnly(), a.nextLink() != "" || next != "")
+		}
+	}
+	if a.applyPanelLink(&pb.NodeSettings{}) || a.applyPanelLink(&pb.NodeSettings{PanelLinkUrl: link}) {
+		t.Fatal("an mTLS agent took a panel link address")
+	}
+	unchanged()
+
+	h.panel.settings.Store(&pb.NodeSettings{PanelLinkUrl: link})
+	h.start()
+	h.waitConnected()
+	eventually(t, func() bool { return a.cur.Load() != nil }, "mTLS session")
+	s := a.cur.Load()
+	ds := fullState(1)
+	ds.Settings = &pb.NodeSettings{PanelLinkUrl: link}
+	h.panel.push(ds)
+	h.panel.nextApply()
+	time.Sleep(200 * time.Millisecond)
+	if a.cur.Load() != s {
+		t.Fatal("the mTLS session ended for a link address")
+	}
+	unchanged()
 }
 
 // A new link address that fails is tried every other turn, the old way to the panel in between.
