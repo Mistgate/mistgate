@@ -706,20 +706,31 @@ func drawSubject(b *strings.Builder, r *rng, kind string, hue, W, H float64, id 
 		rect(lx+8, ly+8, lw*fw(.3, .6), 4, hsl(30, 10, 30))
 		fmt.Fprintf(b, `<circle cx="%.0f" cy="%.0f" r="%.0f" fill="none" stroke="%s" stroke-width="2.5"/></g>`, bx+bw*fw(.7, .85), by+bh*fw(.2, .3), bw*fw(.07, .1), hsl(hue, 60, 48))
 	case "checker":
+		// a woven check: every column and row has a width of its own, so two sites never share a run of the path
 		cols := 6 + r.n(4)
 		s := W / float64(cols)
+		edges := func(total float64) []float64 {
+			e := []float64{0}
+			for e[len(e)-1] < total {
+				e = append(e, e[len(e)-1]+s*fw(.72, 1.28))
+			}
+			e[len(e)-1] = total
+			return e
+		}
+		xs, ys := edges(W), edges(H)
 		bg(hsl(hue, fw(20, 30), fw(92, 96)))
 		fmt.Fprintf(b, `<path fill="%s" d="`, hsl(hue, fw(40, 55), fw(32, 46)))
-		for y := 0; float64(y)*s < H; y++ {
-			for x := 0; x < cols; x++ {
+		for y := 0; y+1 < len(ys); y++ {
+			for x := 0; x+1 < len(xs); x++ {
 				if (x+y)%2 == 0 {
-					fmt.Fprintf(b, "M%.0f %.0fh%.0fv%.0fh-%.0fz", float64(x)*s, float64(y)*s, s+1, s+1, s+1)
+					fmt.Fprintf(b, "M%.1f %.1fh%.1fv%.1fh-%.1fz", xs[x], ys[y], xs[x+1]-xs[x]+.5, ys[y+1]-ys[y]+.5, xs[x+1]-xs[x]+.5)
 				}
 			}
 		}
 		b.WriteString(`"/>`)
 		for i, n := 0, 2+r.n(2); i < n; i++ {
-			fmt.Fprintf(b, `<circle cx="%.0f" cy="%.0f" r="%.0f" fill="%s"/>`, (float64(r.n(cols))+.5)*s, (float64(r.n(int(H/s)))+.5)*s, s*fw(.3, .4), hsl(hue+fw(150, 210), fw(55, 75), fw(48, 62)))
+			cx, cy := r.n(len(xs)-1), r.n(len(ys)-1)
+			fmt.Fprintf(b, `<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>`, (xs[cx]+xs[cx+1])/2, (ys[cy]+ys[cy+1])/2, s*fw(.3, .4), hsl(hue+fw(150, 210), fw(55, 75), fw(48, 62)))
 		}
 	case "staff":
 		bg(hsl(hue, fw(20, 30), fw(92, 96)))

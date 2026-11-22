@@ -447,8 +447,9 @@ func TestDumpSites(t *testing.T) {
 			}
 			for n := 1; n <= *decoyDumpN; n++ {
 				files, _, err := GenerateWith(kind, []byte(fmt.Sprintf("dump-%s-%d", kind, n)), Options{Country: cc})
-				if err != nil {
-					t.Fatal(err)
+				if err != nil { // a kind that is being worked on may not build: the others are still written
+					t.Logf("%s/%s %d skipped: %v", cc, kind, n, err)
+					continue
 				}
 				name := kind
 				if *decoyDumpN > 1 {

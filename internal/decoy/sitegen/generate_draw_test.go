@@ -485,3 +485,96 @@ func drawCSSForSheet(t *testing.T) string {
 	}
 	return b.String()
 }
+
+// ---- helpers for the second wave of kinds
+
+func TestHoursPartsAreHrsCut(t *testing.T) {
+	for _, cc := range []string{"gb", "us", "de", "ru"} {
+		c := testCtx(t, cc, "hours")
+		for _, args := range [][]any{{1, 5, "08:00", "18:30"}, {6, 6, "09:00", "13:00"}, {7, 7, "", ""}} {
+			p := call(t, c, "hrsp", args...).(map[string]any)
+			days, when := p["days"].(string), p["time"].(string)
+			if days == "" || when == "" {
+				t.Fatalf("%s %v: days %q, time %q", cc, args, days, when)
+			}
+			line := call(t, c, "hrs", args...).(string)
+			if !strings.Contains(line, days) || !strings.Contains(line, when) {
+				t.Errorf("%s %v: hrs says %q, hrsp %q and %q", cc, args, line, days, when)
+			}
+		}
+		if p := call(t, c, "hrsp", 1, 1, "", "").(map[string]any); p["time"] != str(c.s.L["closed"]) {
+			t.Errorf("%s: a closed day says %q", cc, p["time"])
+		}
+	}
+}
+
+func TestLastWord(t *testing.T) {
+	for _, w := range []struct{ in, head, last, end string }{
+		{"Slow bread, made well", "Slow bread, made ", "well", ""},
+		{"Slow bread, made well.", "Slow bread, made ", "well", "."},
+		{"Hello world!", "Hello ", "world", "!"},
+		{"Вкусно и просто.", "Вкусно и ", "просто", "."},
+		{"Schnell und zuverlässig…", "Schnell und ", "zuverlässig", "…"},
+		{"Say \"cheese\"!", "Say ", "\"cheese", "\"!"},
+		{"One", "", "One", ""},
+		{"Один.", "", "Один", "."},
+		{"  padded words  ", "padded ", "words", ""},
+		{"a-b c-d", "a-b ", "c-d", ""},
+		{"", "", "", ""},
+		{"...", "", "...", ""},
+	} {
+		head, last, end := lastWord(w.in)
+		if head != w.head || last != w.last || end != w.end {
+			t.Errorf("lastWord(%q) = %q %q %q, want %q %q %q", w.in, head, last, end, w.head, w.last, w.end)
+		}
+		if head+last+end != strings.TrimSpace(w.in) {
+			t.Errorf("lastWord(%q) does not add up", w.in)
+		}
+	}
+	c := testCtx(t, "gb", "lw")
+	m := call(t, c, "lastword", "Fresh every morning.").(map[string]any)
+	if m["head"] != "Fresh every " || m["last"] != "morning" || m["end"] != "." {
+		t.Errorf("lastword from a template: %v", m)
+	}
+}
+
+func TestPriceKeepsSmallChange(t *testing.T) {
+	loc, err := loadLocales()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range []struct {
+		cc   string
+		in   float64
+		want string
+	}{{"us", 4.8, "$4.80"}, {"us", 30, "$30"}, {"gb", 95, "£76"}, {"gb", 4.8, "£3.85"}, {"ru", 4.8, loc.countries["ru"].money(4.8)}} {
+		if got := loc.countries[w.cc].price(w.in); got != w.want {
+			t.Errorf("%s: price(%v) = %q, want %q", w.cc, w.in, got, w.want)
+		}
+	}
+	if got := loc.countries["de"].price(6); !regexp.MustCompile(`^\d+,\d\d\x{a0}€$`).MatchString(got) {
+		t.Errorf("de: price(6) = %q", got)
+	}
+}
+
+// Pictures and marks that the second wave of kinds leans on must not repeat between sites: 40 pairs of seeds, not two.
+func TestCheckerAndMarkDifferBetweenSites(t *testing.T) {
+	for i := 0; i < 40; i++ {
+		a, b := testCtx(t, "gb", fmt.Sprint("pa", i)), testCtx(t, "gb", fmt.Sprint("pb", i))
+		for _, size := range [][2]int{{480, 360}, {360, 480}} {
+			pa := call(t, a, "art", "k", "checker", size[0], size[1]).(string)
+			pb := call(t, b, "art", "k", "checker", size[0], size[1]).(string)
+			wellFormed(t, "checker", pa)
+			if run := commonRun(pa, pb, 150); run != "" {
+				t.Fatalf("pair %d: two checkers share %q", i, run)
+			}
+		}
+		pal := palette{}
+		pal.L.Acc, pal.L.Acc2, pal.L.AccInk = "#b5472a", "#3a6a4a", "#ffffff"
+		ma, mb := inlineMark(faviconMark(newRNG([]byte("m"), []byte(fmt.Sprint("a", i))), pal, "K")), inlineMark(faviconMark(newRNG([]byte("m"), []byte(fmt.Sprint("b", i))), pal, "K"))
+		wellFormed(t, "mark", ma)
+		if run := commonRun(ma, mb, 150); run != "" {
+			t.Fatalf("pair %d: two marks share %q", i, run)
+		}
+	}
+}

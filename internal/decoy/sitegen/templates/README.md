@@ -114,6 +114,9 @@ is at most 8 KB, and takes its numbers from the site's rng.
 {{hexs "sha" 64}}                                       (existing) n hex digits: the sha256 column of a release
 {{art "k" "" 480 360}}                                  (existing) a picture; "" = the variant's `art`, else one of landscape blobs tiles waves
 {{icon "menu"}}                                         (existing) see the list in `icons` (generate_gfx.go)
+{{$h := hrsp 1 5 "08:00" "18:00"}}{{$h.days}} {{$h.time}}   opening hours in two parts, {days, time}; `hrs` with the same arguments is the two parts in one line
+{{$w := lastword .L.hero_title}}{{$w.head}}<em>{{$w.last}}</em>{{$w.end}}   {head, last, end}: the line before its last word (with the space), the last word, and the . ! ? … » " ) it ends with; one word = empty head, empty line = three empty parts
+{{price .price}}                                         like `money`, but a sum under 30 of the country's units keeps its pence or cents, to the nearest 5: "£4.80", "4,80 €"; `money` rounds to whole units
 ```
 
 `hl` languages: `sh`, `json`, `yaml` (also `toml`, `ini`), `out` (numbers only), anything else is just escaped. Put the result inside
@@ -130,7 +133,22 @@ The interpreter has no `and`, `or` or pipes; use nested `if`. Numbers in templat
 `privacy` and `terms` (a `.L.<name>` list of `{h, p}`) are a text column with a contents box (`toc_h`, new key in all 13 shared texts),
 `404` has a big code and a picture, `contactmap` and `contactform` are for contact pages. Their CSS is in `base_pages`.
 
-## 6. What the tests will check
+## 6. Class names of the shared part
+
+Class names are global to the site (a kind's CSS and the shared pages `privacy`, `terms`, `404`, `contact` are one stylesheet), so a
+kind must not declare its own class with a name below, or the shared page would pick up the kind's rules (or the kind the shared
+ones). These are taken, written here without the underscores that the generator renames per site:
+
+* chrome: `hd hdin logo mark lg lgt nav mn mnb mnl ft ftin ftcol ftnav`
+* components: `wrap btn ghost card pill grid tbl mu sub code ic art`
+* shared pages: `nf nfa toc cmap cform cfs fld`
+* drawings: `dchart dline darea dbars dgrid dpt dcal dc0 dc1 dc2 di0 di1 di2 di3 did dpi dmap dmb dmg dmh dml dmm dmp dmr dms dmt dpin
+  dstamp dsb dsd dsm dst dhc dhf dhk dhm dhn dhp dhs`
+
+Use a prefix of your own for the kind's classes (`bz-`, `cl-`...), not a short common word. The list is what `base.css.tmpl` and the
+shared page templates use today; when you add a class to a shared template, add it here.
+
+## 7. What the tests will check
 
 * `TestTemplatesHaveNoWords`: no word in a template, not even "UTC" or "Name": every word is a key of `text.<lang>.json`, the
   same keys in all 13 languages (new keys: add them to every language file of the kind, in `ui` or in each variant).

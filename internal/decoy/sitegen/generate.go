@@ -1142,31 +1142,36 @@ func funcMap(c *ctx) map[string]tmplFunc {
 			}
 			return c.s.country.money(v)
 		},
+		// price is money for a price list: sums under 30 keep their pence or cents ("£4.80"), bigger ones are rounded as money does.
+		"price": func(a []any) any {
+			if len(a) != 1 {
+				fail("price takes a price")
+			}
+			v, ok := number(a[0])
+			if !ok {
+				fail("price takes a number, not %T", a[0])
+			}
+			return c.s.country.price(v)
+		},
 		// hrs is a line of opening hours: the days from..to (1 is Monday), then the hours as "08:00" "18:00", or "" for a closed day.
 		"hrs": func(a []any) any {
-			if len(a) != 4 {
-				fail("hrs takes the first day, the last day, the opening and the closing time")
-			}
-			from, ok1 := number(a[0])
-			to, ok2 := number(a[1])
-			if !ok1 || !ok2 || from < 1 || to > 7 || to < from {
-				fail("hrs: the days are %v to %v", a[0], a[1])
-			}
-			long, short := c.s.textList("weekdays"), c.s.textList("weekdays_short")
-			days := nameAt(long, int(from)-1)
-			if to > from {
-				days = nameAt(short, int(from)-1) + "–" + nameAt(short, int(to)-1)
-			}
-			when := str(c.s.L["closed"])
-			if open, shut := str(a[2]), str(a[3]); open != "" && shut != "" {
-				cl := c.s.country
-				when = cl.clock(open, str(c.s.L["am"]), str(c.s.L["pm"])) + "–" + cl.clock(shut, str(c.s.L["am"]), str(c.s.L["pm"]))
-			}
+			days, when := c.hoursParts("hrs", a)
 			f := str(c.s.L["hrs_fmt"])
 			if f == "" {
 				f = "%days%: %time%"
 			}
 			return strings.NewReplacer("%days%", days, "%time%", when).Replace(f)
+		},
+		// hrsp is the same line in two parts, {days, time}, for a layout with the days on the left and the hours on the right.
+		"hrsp": func(a []any) any {
+			days, when := c.hoursParts("hrsp", a)
+			return map[string]any{"days": days, "time": when}
+		},
+		// lastword cuts a line into {head, last, end}: everything before the last word (with its space), the last word, and the
+		// mark it ends with (. ! ? … or none) which stays with the word. A line of one word has an empty head.
+		"lastword": func(a []any) any {
+			head, last, end := lastWord(argStr(a, 0))
+			return map[string]any{"head": head, "last": last, "end": end}
 		},
 		"art": func(a []any) any {
 			k, kind := argStr(a, 0), argStr(a, 1)

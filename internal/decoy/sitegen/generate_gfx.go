@@ -290,7 +290,14 @@ func iconSVG(name string, r *rng) string {
 func faviconMark(r *rng, p palette, initial string) string {
 	a, b, ac := p.L.Acc, p.L.Acc2, p.L.AccInk
 	rx := 8 + r.n(24)
-	letter := fmt.Sprintf(`<text x="32" y="%d" text-anchor="middle" font-family="system-ui,sans-serif" font-size="%d" font-weight="700" fill="%s">%s</text>`, 43+r.n(3), 32+r.n(6), ac, initial)
+	// the attributes of the letter come in an order and with a spacing of the rng's choosing, like those of svgOpen
+	ta := []string{`x="32"`, fmt.Sprintf(`y="%d"`, 43+r.n(3)), `text-anchor="middle"`, `font-family="system-ui,sans-serif"`, fmt.Sprintf(`font-size="%d"`, 32+r.n(6)), `font-weight="700"`, fmt.Sprintf(`fill="%s"`, ac)}
+	var lb strings.Builder
+	lb.WriteString("<text")
+	for _, i := range r.perm(len(ta)) {
+		lb.WriteString(spaces[r.n(len(spaces))] + ta[i])
+	}
+	letter := lb.String() + ">" + initial + "</text>"
 	switch r.n(7) {
 	case 0:
 		return fmt.Sprintf(`<rect width="64" height="64" rx="%d" fill="%s"/>%s`, rx, a, letter)

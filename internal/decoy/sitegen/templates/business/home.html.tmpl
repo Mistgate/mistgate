@@ -28,7 +28,7 @@
 <div>
 <h2>{{.L.services_h}}</h2>
 <p class="__sub__">{{.L.services_intro}}</p>
-<ul class="__it__">{{range .L.services}}<li><h3>{{.t}}</h3><b>{{if .from}}{{$.L.from_l}} {{end}}{{money .price}}</b><p>{{.d}}</p></li>{{end}}</ul>
+<ul class="__it__">{{range .L.services}}<li><h3>{{.t}}</h3><b>{{if .from}}{{$.L.from_l}} {{end}}{{price .price}}</b><p>{{.d}}</p></li>{{end}}</ul>
 <p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.all_prices}}</a></p>
 </div>
 </section>{{end}}
