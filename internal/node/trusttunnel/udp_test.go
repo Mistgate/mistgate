@@ -151,8 +151,12 @@ func TestUDPForbiddenDestinationDropsTheDatagramNotTheStream(t *testing.T) {
 			t.Fatalf("reply = %q, %v, want %q", frame.Payload, err, want)
 		}
 	}
+	// The writer adds down traffic after Flush returns, which can trail the client's read of the frame.
+	credential := h.in.idx.Load().byID["alice"]
+	wantTraffic := uint64(len("fine") + len("fine again"))
+	waitFor(t, time.Second, func() bool { return credential.down.Load() >= wantTraffic })
 	stats := collect(t, h.e)
-	if up, down := trafficFor(stats, "alice"); up != uint64(len("fine")+len("fine again")) || down != up {
+	if up, down := trafficFor(stats, "alice"); up != wantTraffic || down != up {
 		t.Fatalf("traffic up/down = %d/%d: a dropped datagram must not be counted", up, down)
 	}
 	_ = writer.Close()
