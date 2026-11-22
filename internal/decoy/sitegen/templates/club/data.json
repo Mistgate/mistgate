@@ -14,6 +14,7 @@
  "bundles": [
   {
    "id": "chess",
+   "art": "tiles",
    "photo_q": [
     "chess board pieces",
     "wooden chess pieces"
@@ -34,6 +35,7 @@
   },
   {
    "id": "walking",
+   "art": "topo",
    "photo_q": [
     "hiking trail countryside",
     "footpath hills landscape"
@@ -54,6 +56,7 @@
   },
   {
    "id": "choir",
+   "art": "staff",
    "photo_q": [
     "empty concert hall",
     "sheet music stand"
@@ -74,6 +77,7 @@
   },
   {
    "id": "astronomy",
+   "art": "stars",
    "photo_q": [
     "night sky stars",
     "telescope night sky"

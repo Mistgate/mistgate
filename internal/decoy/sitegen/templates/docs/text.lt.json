@@ -1,5 +1,6 @@
 {
  "ui": {
+  "ref_h": "Žinynas",
   "nav_label": "Dokumentacija",
   "footer": "Dokumentacija, versija {ver}.",
   "nav_home": "Apžvalga",

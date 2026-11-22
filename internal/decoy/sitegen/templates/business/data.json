@@ -2,6 +2,7 @@
  "bundles": [
   {
    "id": "bakery",
+   "art": "botanical",
    "weight": 2,
    "photo_q": [
     "bakery bread loaves",
@@ -72,6 +73,7 @@
   },
   {
    "id": "bike",
+   "art": "topo",
    "weight": 2,
    "photo_q": [
     "bicycle repair workshop",
@@ -136,6 +138,7 @@
   },
   {
    "id": "tailor",
+   "art": "tiles",
    "weight": 2,
    "photo_q": [
     "sewing machine fabric",
@@ -206,6 +209,7 @@
   },
   {
    "id": "clock",
+   "art": "poster",
    "weight": 2,
    "photo_q": [
     "clock repair workshop",
@@ -276,6 +280,7 @@
   },
   {
    "id": "framing",
+   "art": "still",
    "weight": 2,
    "photo_q": [
     "picture frames wall",
@@ -340,6 +345,7 @@
   },
   {
    "id": "piano",
+   "art": "staff",
    "weight": 2,
    "photo_q": [
     "piano keys close up",

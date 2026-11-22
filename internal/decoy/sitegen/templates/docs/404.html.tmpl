@@ -1,0 +1,18 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<div class="__nfw__">
+<main class="__nfm__">
+<div class="__crumb__">{{.L.menu_h}} / 404</div>
+<h1>{{.L.nf_title}}</h1>
+<p class="__lead__">{{.L.nf_text}}</p>
+<div class="__cap__"><span>{{.L.cap_sh}}</span></div>
+<pre class="__pre__"><code>{{hl (printf "$ %s" .L.quick) "sh"}}
+{{hl (printf "$ %s" .L.ver_cmd) "sh"}}
+<span class="__dhf__">404</span> {{.L.nf_title}}</code></pre>
+<p><a class="__btn__" href="/">{{icon "back"}}{{.L.nf_back}}</a></p>
+</main>
+<aside class="__nfn__" aria-hidden="true">404</aside>
+</div>
+{{template "footer" .}}
+</body>
+</html>

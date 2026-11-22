@@ -1,5 +1,6 @@
 {
  "ui": {
+  "ref_h": "Viite",
   "nav_label": "Ohjeet",
   "footer": "Version {ver} ohjeet.",
   "nav_home": "Yleiskatsaus",

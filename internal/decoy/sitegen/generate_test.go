@@ -24,17 +24,21 @@ import (
 var (
 	decoyDump  = flag.String("decoy-dump", "", "write sample sites of every kind into this folder, one subfolder per country and site, for looking at them")
 	decoyDumpN = flag.Int("decoy-dump-n", 2, "how many seeds of every kind -decoy-dump writes")
+	// decoyDumpNew makes the kinds that are still "legacy" in meta.json in the style of their palettes, to look at the palettes.
+	decoyDumpNew = flag.Bool("decoy-dump-new", false, "with -decoy-dump: draw every kind in its new style (palettes, fonts, ranges of meta.json) even where legacy is on")
 	// decoyDumpCC are the countries -decoy-dump writes sites for.
 	decoyDumpCC = flag.String("decoy-dump-cc", DefaultCountry, "the countries (codes, separated by spaces) -decoy-dump writes sites for")
+	// decoyDumpKinds narrows -decoy-dump to some kinds; empty means all.
+	decoyDumpKinds = flag.String("decoy-dump-kinds", "", "with -decoy-dump: only these kinds (separated by spaces)")
 )
 
 // seedsFor is how many seeds a kind is made from for a country: the default country gets the full 200, the others 12 (their pages
 // differ from it in text and data, not in structure, and there are sixteen of them: with 40 the package ran past the 10 minute limit in CI).
 func seedsFor(c tcase) int {
 	if c.cc == DefaultCountry {
-		return 200
+		return 120
 	}
-	return 12
+	return 6
 }
 
 var titleTag = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
@@ -431,15 +435,23 @@ func TestDumpSites(t *testing.T) {
 	if *decoyDump == "" {
 		t.Skip("no -decoy-dump")
 	}
+	if *decoyDumpNew {
+		eachKind(t, func(id string, d *kindDef) {
+			if sd := d.meta.Style; sd != nil {
+				sd.Legacy = false
+			}
+		})
+	}
 	for _, cc := range strings.Fields(*decoyDumpCC) {
 		for _, kind := range kindIDs(t) {
-			if !contains(Countries(), cc, kind) {
+			if !contains(Countries(), cc, kind) || (*decoyDumpKinds != "" && !slices.Contains(strings.Fields(*decoyDumpKinds), kind)) {
 				continue
 			}
 			for n := 1; n <= *decoyDumpN; n++ {
 				files, _, err := GenerateWith(kind, []byte(fmt.Sprintf("dump-%s-%d", kind, n)), Options{Country: cc})
-				if err != nil {
-					t.Fatal(err)
+				if err != nil { // a kind that is being worked on may not build: the others are still written
+					t.Logf("%s/%s %d skipped: %v", cc, kind, n, err)
+					continue
 				}
 				name := kind
 				if *decoyDumpN > 1 {

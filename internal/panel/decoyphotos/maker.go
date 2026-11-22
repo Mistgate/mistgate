@@ -149,7 +149,9 @@ func (m *Maker) Make(ctx context.Context, key vault.Redacted, seed []byte, plan 
 		portrait := s.H*10 > s.W*11
 		var g *group
 		for _, x := range groups {
-			if x.query == s.Query && x.portrait == portrait {
+			// one search per query, whatever the shapes of its slots: a picture is cropped to its slot anyway, and a kind
+			// that shows one subject in an arch and in a wide tile must not spend two of the three searches on it
+			if x.query == s.Query {
 				g = x
 			}
 		}

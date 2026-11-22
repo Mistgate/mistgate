@@ -10,6 +10,7 @@ import (
 	"maps"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -127,14 +128,23 @@ type metaDef struct {
 	// search words (PhotoQ) its numbered slots take in turn. A site has photos only where this and the words both exist.
 	PhotoSlots map[string][]int `json:"photo_slots"`
 	PhotoQ     []string         `json:"photo_q"` // the search words of every variant that has none of its own
+	// Style is the kind's look: its palettes, font sets and the ranges of its shapes (generate_style.go). A kind without one gets
+	// the old random look.
+	Style *styleDef `json:"style"`
 }
 
 // bundleDef is a variant of a kind, the part of it that does not depend on the language.
 type bundleDef struct {
-	ID     string         `json:"id"`
-	Weight int            `json:"weight"`
-	PhotoQ []string       `json:"photo_q"` // English: the photo search is English whatever the site's language
-	Fixed  map[string]any `json:"fixed"`   // merged under the texts of the variant
+	ID     string   `json:"id"`
+	Weight int      `json:"weight"`
+	PhotoQ []string `json:"photo_q"` // English: the photo search is English whatever the site's language
+	// Art is the subject of the pictures of this variant (one of the kinds artSVG draws), for {{art "k" "" W H}} and for the
+	// pictures of lists; without one the pictures are drawn in the old four subjects at random.
+	Art string `json:"art"`
+	// Arts are the subjects the pictures of a list take in turn, from a start of the site's choosing, so that the works of one
+	// bundle are not seven of one picture; Art is still the subject of {{art}} in the templates.
+	Arts  []string       `json:"arts"`
+	Fixed map[string]any `json:"fixed"` // merged under the texts of the variant
 }
 
 // langText is the texts of a kind in one language.
@@ -209,6 +219,21 @@ func parseKind(id string, rawMeta []byte) (*kindDef, error) {
 	}
 	if d.meta.Layouts < 1 {
 		d.meta.Layouts = 1
+	}
+	if sd := d.meta.Style; sd != nil {
+		if err := sd.build(d.meta.Layouts); err != nil {
+			return nil, fmt.Errorf("meta.json style: %w", err)
+		}
+	}
+	for _, b := range d.bundles {
+		if b.Art != "" && !slices.Contains(allArtKinds, b.Art) {
+			return nil, fmt.Errorf("data.json: variant %s has the picture subject %q, which is not drawn", b.ID, b.Art)
+		}
+		for _, k := range b.Arts {
+			if !slices.Contains(allArtKinds, k) {
+				return nil, fmt.Errorf("data.json: variant %s has the picture subject %q, which is not drawn", b.ID, k)
+			}
+		}
 	}
 	if home := d.meta.Pages[0]; home.Name != "home" || len(home.Paths) != 1 || home.Paths[0] != "index.html" {
 		return nil, errors.New(`the first page must be "home" at index.html`)
@@ -320,6 +345,10 @@ type site struct {
 	V                          map[string]string
 	Layout, Head, Foot         int
 	P                          palette
+	Scheme                     string   // light, dark or both
+	Theme                      string   // the colour of the browser's own bars
+	Art                        string   // the subject of the variant's pictures, "" for the old random four
+	Arts                       []string // the subjects the pictures of a list take in turn (see bundleDef.Arts)
 	S                          style
 	Fnt                        fonts
 	Year, Since                string
@@ -354,7 +383,8 @@ func (s *site) data() map[string]any {
 	}
 	return map[string]any{
 		"Kind": s.Kind, "Lang": s.Lang, "Brand": s.Brand, "Initial": s.Initial, "L": s.L, "V": vars, "Layout": s.Layout, "Head": s.Head,
-		"Foot": s.Foot, "P": map[string]any{"L": s.P.L.data(), "D": s.P.D.data()}, "S": s.S.data(), "Fnt": s.Fnt.data(), "Year": s.Year,
+		"Foot": s.Foot, "P": map[string]any{"L": s.P.L.data(), "D": s.P.D.data()}, "Pm": s.P.prim(s.Scheme).data(), "Scheme": s.Scheme,
+		"ColorScheme": colorScheme(s.Scheme), "Theme": s.Theme, "Art": s.Art, "S": s.S.data(), "Fnt": s.Fnt.data(), "Year": s.Year,
 		"Since": s.Since, "CSS": s.CSS, "JS": s.JS, "Icon": s.Icon, "Mark": s.Mark, "Lists": lists, "Order": order, "DateFmt": s.DateFmt,
 	}
 }
@@ -635,9 +665,19 @@ func (d *kindDef) newSite(c *ctx, r *rng, country *countryDef, shared map[string
 	s := &site{
 		Kind: d.id, Lang: country.HTML, Brand: brand, Initial: initialOf(brand), L: L, V: vars, country: country,
 		Layout: look.sub("layout").n(d.meta.Layouts), Head: look.sub("head").n(3), Foot: look.sub("foot").n(3),
-		P: newPalette(look.sub("palette")), S: newStyle(look.sub("style")), Fnt: newFonts(look.sub("fonts")),
+		Scheme: "both", Art: b.Art, Arts: b.Arts,
 		Year: "2026", Since: fmt.Sprint(2015 + look.sub("since").n(10)), titleStyle: look.sub("title").n(4),
 		Lists: map[string][]map[string]any{}, photoSlots: d.meta.PhotoSlots,
+	}
+	if sd := d.meta.Style; sd != nil && !sd.Legacy {
+		s.Scheme = sd.Scheme
+		s.P = sd.pal[look.sub("pal").n(len(sd.pal))]
+		s.S = sd.shape(look.sub("shape"))
+		s.Fnt = sd.fonts(look.sub("fnt"), hasCyrillic(country.Lang))
+		s.Theme = s.P.prim(s.Scheme).BG
+	} else {
+		s.P, s.S, s.Fnt = newPalette(look.sub("palette")), legacyStyle(newStyle(look.sub("style"))), legacyFonts(newFonts(look.sub("fonts")))
+		s.Theme = s.P.L.Acc
 	}
 	s.photoQ = d.photoWords(b)
 	c.s = s // the lists below may ask for photos
@@ -923,6 +963,7 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 	}
 	slugs := map[string]bool{}
 	ar := r.sub("art")
+	artStart := r.sub("artstart").n(1 << 16)
 	for i, it := range items {
 		sl := str(it["slug"])
 		if sl == "" {
@@ -939,13 +980,19 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 		it["n"] = i + 1
 		if ld.Art {
 			kind := artKinds[ar.n(len(artKinds))]
+			if s.Art != "" {
+				kind = s.Art
+			}
+			if len(s.Arts) > 0 {
+				kind = s.Arts[(i+artStart)%len(s.Arts)]
+			}
 			dir := imgDirs[r.sub("imgdir").n(len(imgDirs))]
 			p := fmt.Sprintf("%s/%s-%s.svg", dir, sl, hex6(ar))
 			it["img"] = "/" + p
 			it["art_kind"] = kind
 			size := [][2]int{{480, 360}, {360, 480}, {480, 480}, {480, 320}, {400, 500}}[ar.n(5)]
 			it["w"], it["h"] = size[0], size[1]
-			svg := []byte(artSVG(ar, kind, s.P.Hue+float64(ar.n(120))-60, size[0], size[1], "g"+hex6(ar), true))
+			svg := []byte(c.tone(artSVG(ar, kind, s.P.Hue+float64(ar.n(120))-60, size[0], size[1], "g"+hex6(ar), true), kind))
 			if pp, ok := c.photoFile(fmt.Sprintf("w%d", i+1), 4, 3, dir, true); ok { // a photo takes the picture's place
 				it["img"], it["w"], it["h"] = pp, 640, 480
 			} else {
@@ -954,6 +1001,17 @@ func (d *kindDef) buildList(c *ctx, r *rng, ld listDef, L map[string]any, s *sit
 		}
 	}
 	return items, nil
+}
+
+// artKind is the subject of a picture: the one the template names, else the variant's own, else one of the old four at random.
+func (c *ctx) artKind(r *rng, kind string) string {
+	switch {
+	case kind != "":
+		return kind
+	case c.s.Art != "":
+		return c.s.Art
+	}
+	return artKinds[r.n(len(artKinds))]
 }
 
 var slugBad = regexp.MustCompile(`[^a-z0-9]+`)
@@ -1011,37 +1069,7 @@ func (s *site) fmonth(t time.Time) string {
 // gives the same answer, whichever page is made first. funcMap(nil) is only the list of names.
 func funcMap(c *ctx) map[string]tmplFunc {
 	key := func(k string) *rng { return c.r.sub("k:" + k) }
-	argStr := func(a []any, i int) string {
-		if i >= len(a) {
-			fail("a function is missing argument %d", i+1)
-		}
-		s, ok := a[i].(string)
-		if !ok {
-			fail("argument %d should be a string, not %T", i+1, a[i])
-		}
-		return s
-	}
-	argInt := func(a []any, i int) int {
-		if i >= len(a) {
-			fail("a function is missing argument %d", i+1)
-		}
-		n, ok := a[i].(int)
-		if !ok {
-			fail("argument %d should be a number, not %T", i+1, a[i])
-		}
-		return n
-	}
-	argList := func(a []any, i int) []any {
-		if i >= len(a) {
-			fail("a function is missing argument %d", i+1)
-		}
-		l, ok := a[i].([]any)
-		if !ok || len(l) == 0 {
-			fail("argument %d should be a list that is not empty", i+1)
-		}
-		return l
-	}
-	return map[string]tmplFunc{
+	fm := map[string]tmplFunc{
 		"one": func(a []any) any {
 			k, l := argStr(a, 0), argList(a, 1)
 			if v, ok := c.memo["one:"+k]; ok {
@@ -1127,40 +1155,43 @@ func funcMap(c *ctx) map[string]tmplFunc {
 			}
 			return c.s.country.money(v)
 		},
+		// price is money for a price list: sums under 30 keep their pence or cents ("£4.80"), bigger ones are rounded as money does.
+		"price": func(a []any) any {
+			if len(a) != 1 {
+				fail("price takes a price")
+			}
+			v, ok := number(a[0])
+			if !ok {
+				fail("price takes a number, not %T", a[0])
+			}
+			return c.s.country.price(v)
+		},
 		// hrs is a line of opening hours: the days from..to (1 is Monday), then the hours as "08:00" "18:00", or "" for a closed day.
 		"hrs": func(a []any) any {
-			if len(a) != 4 {
-				fail("hrs takes the first day, the last day, the opening and the closing time")
-			}
-			from, ok1 := number(a[0])
-			to, ok2 := number(a[1])
-			if !ok1 || !ok2 || from < 1 || to > 7 || to < from {
-				fail("hrs: the days are %v to %v", a[0], a[1])
-			}
-			long, short := c.s.textList("weekdays"), c.s.textList("weekdays_short")
-			days := nameAt(long, int(from)-1)
-			if to > from {
-				days = nameAt(short, int(from)-1) + "–" + nameAt(short, int(to)-1)
-			}
-			when := str(c.s.L["closed"])
-			if open, shut := str(a[2]), str(a[3]); open != "" && shut != "" {
-				cl := c.s.country
-				when = cl.clock(open, str(c.s.L["am"]), str(c.s.L["pm"])) + "–" + cl.clock(shut, str(c.s.L["am"]), str(c.s.L["pm"]))
-			}
+			days, when := c.hoursParts("hrs", a)
 			f := str(c.s.L["hrs_fmt"])
 			if f == "" {
 				f = "%days%: %time%"
 			}
 			return strings.NewReplacer("%days%", days, "%time%", when).Replace(f)
 		},
+		// hrsp is the same line in two parts, {days, time}, for a layout with the days on the left and the hours on the right.
+		"hrsp": func(a []any) any {
+			days, when := c.hoursParts("hrsp", a)
+			return map[string]any{"days": days, "time": when}
+		},
+		// lastword cuts a line into {head, last, end}: everything before the last word (with its space), the last word, and the
+		// mark it ends with (. ! ? … or none) which stays with the word. A line of one word has an empty head.
+		"lastword": func(a []any) any {
+			head, last, end := lastWord(argStr(a, 0))
+			return map[string]any{"head": head, "last": last, "end": end}
+		},
 		"art": func(a []any) any {
 			k, kind := argStr(a, 0), argStr(a, 1)
 			r := key("art:" + k)
-			if kind == "" {
-				kind = artKinds[r.n(len(artKinds))]
-			}
+			kind = c.artKind(r, kind)
 			c.artN++
-			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, argInt(a, 2), argInt(a, 3), fmt.Sprintf("%s%d", c.artID, c.artN), false)
+			return c.tone(artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, argInt(a, 2), argInt(a, 3), fmt.Sprintf("%s%d", c.artID, c.artN), false), kind)
 		},
 		// photo is the photo of a slot as an <img>, or the picture "art" would draw with the same arguments when the slot has none.
 		"photo": func(a []any) any {
@@ -1169,11 +1200,9 @@ func funcMap(c *ctx) map[string]tmplFunc {
 				return photoTag(k, p, w, h)
 			}
 			r := key("art:" + k)
-			if kind == "" {
-				kind = artKinds[r.n(len(artKinds))]
-			}
+			kind = c.artKind(r, kind)
 			c.artN++
-			return artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, w, h, fmt.Sprintf("%s%d", c.artID, c.artN), false)
+			return c.tone(artSVG(r, kind, c.s.P.Hue+float64(r.n(100))-50, w, h, fmt.Sprintf("%s%d", c.artID, c.artN), false), kind)
 		},
 		// hasphoto is whether the slot has a photo, for markup that only makes sense around one.
 		"hasphoto": func(a []any) any {
@@ -1203,4 +1232,6 @@ func funcMap(c *ctx) map[string]tmplFunc {
 			return b.String()
 		},
 	}
+	maps.Copy(fm, drawFuncs(c))
+	return fm
 }

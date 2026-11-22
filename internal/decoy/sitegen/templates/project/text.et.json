@@ -1,5 +1,8 @@
 {
  "ui": {
+  "platforms": "Platvormid",
+  "col_name": "Nimi",
+  "col_size": "Suurus",
   "nav_label": "Menüü",
   "footer": "Avaldatud MIT litsentsi all.",
   "nav_home": "Ülevaade",

@@ -1,24 +1,32 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __page__">
-<h1>{{.L.install_h}} {{.Brand}}</h1>
-<p class="__lede__">{{.L.install_intro}}</p>
-<h2>{{.L.pkg_h}}</h2>
-<div class="__tbl__"><table>
-<tbody>{{range .L.pkgs}}<tr><th scope="row">{{.s}}</th><td><code>{{.c}}</code></td></tr>{{end}}</tbody>
-</table></div>
-<p class="__mu__">{{.L.pkg_note}}</p>
-<h2>{{.L.src_h}}</h2>
-<p>{{.L.src_intro}}</p>
-{{$v := (index .Lists.releases 0).version}}<pre><code>{{printf .L.src_code $v}}</code></pre>
+<main>
+<section class="__ph__">
+<span class="__eb__">{{.L.nav_install}}</span>
+<h1>{{.L.install_h}} <em>{{.V.cmd}}</em></h1>
+<p class="__sub__">{{.L.install_intro}}</p>
+</section>
+{{$v := (index .Lists.releases 0).version}}
+<section class="__ins__ __ln__">
+<div><h2>{{.L.pkg_h}}</h2><p class="__sub__">{{.L.pkg_note}}</p></div>
+<div>
+<div class="__cmd__"><span>{{hl (printf "$ %s" (index .L.pkgs 0).c) "sh"}}</span><small>{{(index .L.pkgs 0).s}}</small></div>
+<div class="__pk__">{{range $i, $p := .L.pkgs}}{{if ne $i 0}}<div><span>{{$p.s}}</span><span>{{$p.c}}</span></div>{{end}}{{end}}</div>
+</div>
+</section>
+<section class="__ins__ __ln__">
+<div><h2>{{.L.src_h}}</h2><p class="__sub__">{{.L.src_intro}}</p></div>
+<div><div class="__term__ __boxed__"><pre><code>{{hl (printf .L.src_code $v) "sh"}}</code></pre></div></div>
+</section>
+<section class="__sec__ __ln__">
 <h2>{{.L.sums_h}}</h2>
-<p>{{.L.sums_intro}}</p>
-<div class="__tbl__"><table>
+<p class="__sub__ __mb__">{{.L.sums_intro}}</p>
+<div class="__tw__"><table>
 <thead><tr><th>{{.L.col_ver}}</th><th>{{.L.col_date}}</th><th>{{.L.col_sum}}</th></tr></thead>
-<tbody>{{range $i, $r := .Lists.releases}}<tr><td><a href="{{$r.href}}">{{$r.version}}</a></td><td>{{$r.date}}</td><td><code class="__sum__">{{hexs (printf "sum%d" $i) 64}}</code></td></tr>{{end}}</tbody>
+<tbody>{{range $i, $r := .Lists.releases}}<tr><td class="__nm__"><a href="{{$r.href}}">{{$r.version}}</a></td><td class="__dm__">{{$r.date}}</td><td class="__hx__">{{hexs (printf "sum%d" $i) 64}}</td></tr>{{end}}</tbody>
 </table></div>
-<h2>{{.L.licence_h}}</h2>
-<p>{{.L.licence_p}}</p>
+</section>
+<section class="__lic__"><b>{{.L.licence_h}}</b><span>{{.L.licence_p}}</span></section>
 </main>
 {{template "footer" .}}
 </body>

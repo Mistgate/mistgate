@@ -1,5 +1,6 @@
 {
  "ui": {
+  "utc": "UTC",
   "nav_label": "Nawigacja",
   "tagline": "Stan usług",
   "footer": "Wszystkie godziny podajemy w czasie UTC.",

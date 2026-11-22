@@ -1,4 +1,52 @@
 {
+ "style": {
+  "scheme": "light",
+  "palettes": [
+   {
+    "name": "red",
+    "l": {"bg": "#f6f5f1", "fg": "#111111", "ac": "#ff3b1f", "a2": "#1c3f94"}
+   },
+   {
+    "name": "blue",
+    "l": {"bg": "#f4f4ef", "fg": "#101010", "ac": "#2a58d6", "a2": "#ff3b1f"}
+   },
+   {
+    "name": "teal",
+    "l": {"bg": "#f3f5f1", "fg": "#0f1514", "ac": "#00877a", "a2": "#ff3b1f"}
+   },
+   {
+    "name": "green",
+    "l": {"bg": "#f3f4ee", "fg": "#0f1410", "ac": "#13854a", "a2": "#ff3b1f"}
+   },
+   {
+    "name": "pink",
+    "l": {"bg": "#f7f3f1", "fg": "#14100f", "ac": "#e0307d", "a2": "#1c3f94"}
+   },
+   {
+    "name": "orange",
+    "l": {"bg": "#f6f4ef", "fg": "#111111", "ac": "#e8590c", "a2": "#12332a"}
+   }
+  ],
+  "fonts": [
+   {"head": "grotesque", "body": "grotesque", "fw": 700, "ls": "-.06em", "lh": ".92"},
+   {"head": "sans", "body": "sans", "fw": 700, "ls": "-.06em", "lh": ".92"},
+   {"head": "sans", "body": "sans", "fw": 600, "ls": "-.05em", "lh": ".95", "label": "mono", "tt": "uppercase", "lsl": ".05em", "fsl": ".72rem"}
+  ],
+  "radius": [0, 2],
+  "radius_s": [0, 2],
+  "radius_b": [0, 4],
+  "density": [0.95, 1.05],
+  "width": [1360, 1440],
+  "measure": [620, 700],
+  "base": [15, 16],
+  "scale": [1.4, 1.47],
+  "lh": [1.4, 1.5],
+  "stroke": [1.5, 1.9],
+  "border": [1, 2],
+  "shadows": [
+   "none"
+  ]
+ },
  "title": {
   "en": "Photo / illustration portfolio",
   "ru": "Портфолио (фото, иллюстрации, дизайн)"
@@ -72,11 +120,10 @@
    "art": true
   }
  ],
+ "home_blocks": ["work", "services", "about", "shows"],
+ "home_fixed": 1,
  "photo_slots": {
-  "w": [
-   0,
-   1,
-   2
-  ]
+  "w": [0, 1, 2],
+  "about": [1]
  }
 }

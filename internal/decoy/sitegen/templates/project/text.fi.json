@@ -1,5 +1,8 @@
 {
  "ui": {
+  "platforms": "Alustat",
+  "col_name": "Nimi",
+  "col_size": "Koko",
   "nav_label": "Päävalikko",
   "footer": "Julkaistu MIT-lisenssillä.",
   "nav_home": "Yleiskatsaus",

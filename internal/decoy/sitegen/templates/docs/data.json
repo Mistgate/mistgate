@@ -9,7 +9,11 @@
     "2.3",
     "3.1"
    ]
-  }
+  },
+  "cap_sh": "shell",
+  "cap_os": "Linux",
+  "cfg_name": "config.toml",
+  "ver_cmd": "{cmd} --version"
  },
  "bundles": [
   {

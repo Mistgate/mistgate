@@ -1,52 +1,42 @@
-{{define "term"}}<div class="__term__"><span class="__dots__"><i></i><i></i><i></i></span><pre><code>{{.L.quick}}</code></pre></div>
-{{end}}
-{{define "b_features"}}<section class="__sec__">
-<h2>{{.L.features_h}}</h2>
-<ul class="__feats__">{{range .L.features}}<li class="__card__"><h3>{{.h}}</h3><p>{{.p}}</p></li>{{end}}</ul>
+{{define "b_install"}}<section class="__ins__">
+<div><h2>{{.L.install_h}}</h2><p class="__sub__">{{.L.install_intro}}</p></div>
+<div>
+<div class="__cmd__"><span>{{hl (printf "$ %s" (index .L.pkgs 0).c) "sh"}}</span><small>{{(index .L.pkgs 0).s}}</small></div>
+<div class="__pk__">{{range $i, $p := .L.pkgs}}{{if ne $i 0}}<div><span>{{$p.s}}</span><span>{{$p.c}}</span></div>{{end}}{{end}}</div>
+</div>
 </section>{{end}}
-{{define "b_start"}}<section class="__sec__">
-<h2>{{.L.start_h}}</h2>
-<p>{{.L.overview}}</p>
-{{if eq .Layout 1}}{{template "term" .}}
-{{end}}<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "terminal"}} {{.L.get_it}} {{(index .Lists.releases 0).version}}</a></p>
+{{define "b_features"}}<section class="__fe__">{{range $i, $f := .L.features}}<div><b>0{{add $i 1}}</b><span><h3>{{$f.h}}</h3><p>{{$f.p}}</p></span></div>{{end}}</section>{{end}}
+{{define "b_start"}}<section class="__ins__">
+<div><h2>{{.L.start_h}}</h2></div>
+<div><div class="__term__ __boxed__"><pre><code>{{hl (printf "$ %s\n$ %s\n$ %s" .L.quick .L.help_cmd .L.ver_cmd) "sh"}}</code></pre></div></div>
 </section>{{end}}
-{{define "b_latest"}}<section class="__sec__">
-<h2>{{.L.latest_h}}</h2>
-{{with index .Lists.releases 0}}<article class="__rel__">
-<h3>{{$.Brand}} {{.version}} <span class="__mu__">{{.date}}</span></h3>
-<ul class="__notes__">{{range .notes}}<li><span class="__k__">{{.k}}</span> {{.t}}</li>{{end}}</ul>
-</article>{{end}}
-<p><a href="{{(index .Nav 1).Href}}">{{.L.all_releases}} {{icon "arrow"}}</a></p>
+{{define "b_changelog"}}<section class="__sec__">
+<h2>{{.L.changelog_h}}</h2>
+<p class="__sub__ __mb__">{{.L.changelog_intro}}</p>
+{{range $i, $r := .Lists.releases}}{{if lt $i 3}}<div class="__rel__"><h3><a href="{{$r.href}}">{{$r.version}}</a><span><time datetime="{{$r.date_iso}}">{{$r.date}}</time></span></h3>{{template "notes" $r}}</div>{{end}}{{end}}
+<p class="__more__"><a href="{{(index .Nav 1).Href}}">{{.L.all_releases}} {{icon "arrow"}}</a></p>
+</section>{{end}}
+{{define "b_roadmap"}}<section class="__rmw__">
+<div class="__sec__ __nopb__"><h2>{{.L.roadmap_h}}</h2><p class="__sub__">{{.L.roadmap_intro}}</p></div>
+<div class="__rm__">
+<div><h3><i></i>{{.L.now_h}}</h3><ul>{{range .L.now}}<li>{{.}}</li>{{end}}</ul></div>
+<div><h3><i></i>{{.L.next_h}}</h3><ul>{{range .L.next}}<li>{{.}}</li>{{end}}</ul></div>
+<div><h3><i></i>{{.L.later_h}}</h3><ul>{{range .L.later}}<li>{{.}}</li>{{end}}</ul></div>
+</div>
 </section>{{end}}
 {{template "head" .}}<body>
 {{template "header" .}}
 <main>
-{{if eq .Layout 0}}<section class="__wrap__ __hero__ __split__">
-<div>
-<h1>{{.Brand}}</h1>
-<p class="__lede__">{{.L.tagline}}</p>
-<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "terminal"}} {{.L.get_it}}</a> <a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.read_log}}</a></p>
+<section class="__hero__">
+<div class="__hh__"><span class="__eb__">{{.L.home_title}}</span>{{$w := lastword .L.tagline}}<h1>{{$w.head}}<em>{{$w.last}}</em>{{$w.end}}</h1></div>
+<div class="__hb__">
+<p class="__lead__">{{.L.overview}}</p>
+<div class="__bd__"><span><b>{{.L.col_ver}}</b> {{(index .Lists.releases 0).version}}</span><span><b>{{.L.licence_h}}</b> {{.L.lic_v}}</span><span><b>{{.L.platforms}}</b> {{.L.plat_v}}</span></div>
 </div>
-{{template "term" .}}
+<div class="__term__">{{template "tbar" .}}{{template "tbody" .}}</div>
 </section>
-{{else if eq .Layout 1}}<section class="__band__">
-<div class="__wrap__ __hero__ __centre__">
-<h1>{{.Brand}}</h1>
-<p class="__lede__">{{.L.tagline}}</p>
-<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "terminal"}} {{.L.get_it}}</a> <a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.read_log}}</a></p>
-</div>
-</section>
-{{else}}<section class="__dark__">
-<div class="__wrap__ __hero__">
-<h1>{{.Brand}}</h1>
-<p class="__lede__">{{.L.tagline}}</p>
-{{template "term" .}}
-<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{icon "terminal"}} {{.L.get_it}}</a> <a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.read_log}}</a></p>
-</div>
-</section>
-{{end}}<div class="__wrap__">
 {{range .Order}}{{blk . $}}{{end}}
-</div>
+<section class="__lic__"><b>{{.L.licence_h}}</b><span>{{.L.licence_p}}</span></section>
 </main>
 {{template "footer" .}}
 </body>

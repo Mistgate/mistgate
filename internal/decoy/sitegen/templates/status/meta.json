@@ -1,4 +1,58 @@
 {
+ "style": {
+  "scheme": "both",
+  "palettes": [
+   {
+    "name": "green",
+    "l": {"bg": "#f3f5f8", "fg": "#0f1720", "ac": "#0b7a3e", "a2": "#2447a3", "sf": "#ffffff"},
+    "d": {"bg": "#0e151c", "fg": "#e6ecf2", "ac": "#4ade80", "a2": "#7aa7ff"}
+   },
+   {
+    "name": "blue",
+    "l": {"bg": "#f2f5fa", "fg": "#0e1726", "ac": "#1d4ed8", "a2": "#6d3fd0", "sf": "#ffffff"},
+    "d": {"bg": "#0d1422", "fg": "#e6ebf5", "ac": "#7aa2ff", "a2": "#b79cff"}
+   },
+   {
+    "name": "teal",
+    "l": {"bg": "#f0f6f6", "fg": "#0d1b1e", "ac": "#0f766e", "a2": "#2447a3", "sf": "#ffffff"},
+    "d": {"bg": "#0c1819", "fg": "#e3eeee", "ac": "#2dd4bf", "a2": "#7aa7ff"}
+   },
+   {
+    "name": "violet",
+    "l": {"bg": "#f5f4fa", "fg": "#16132a", "ac": "#5b3fd0", "a2": "#1d6fa5", "sf": "#ffffff"},
+    "d": {"bg": "#130f22", "fg": "#ebe8f6", "ac": "#a78bfa", "a2": "#6fb8ee"}
+   },
+   {
+    "name": "orange",
+    "l": {"bg": "#f6f4f1", "fg": "#1c1917", "ac": "#c2410c", "a2": "#1d4ed8", "sf": "#ffffff"},
+    "d": {"bg": "#151515", "fg": "#efefec", "ac": "#fb923c", "a2": "#7aa2ff"}
+   },
+   {
+    "name": "graphite",
+    "l": {"bg": "#f4f4f5", "fg": "#18181b", "ac": "#3f3f46", "a2": "#2447a3", "sf": "#ffffff"},
+    "d": {"bg": "#121214", "fg": "#ececee", "ac": "#d4d4d8", "a2": "#7aa7ff"}
+   }
+  ],
+  "fonts": [
+   {"head": "sans", "body": "sans", "fw": 650, "ls": "-.03em", "lh": "1.05"},
+   {"head": "sans", "body": "sans", "fw": 700, "ls": "-.02em", "lh": "1.1", "label": "mono", "tt": "uppercase", "lsl": ".08em", "fsl": ".72rem"},
+   {"head": "geometric", "body": "sans", "fw": 650, "ls": "-.025em", "lh": "1.08"}
+  ],
+  "radius": [12, 24],
+  "radius_s": [8, 12],
+  "radius_b": [24, 32],
+  "density": [0.95, 1.08],
+  "width": [1160, 1240],
+  "measure": [680, 760],
+  "base": [16, 17],
+  "scale": [1.25, 1.33],
+  "lh": [1.5, 1.6],
+  "stroke": [1.6, 2],
+  "border": [1, 1],
+  "shadows": [
+   "none"
+  ]
+ },
  "title": {
   "en": "Service status page",
   "ru": "Страница статуса сервиса"
@@ -53,11 +107,12 @@
   }
  ],
  "home_blocks": [
-  "comps",
   "metrics",
-  "recent"
+  "comps",
+  "recent",
+  "about"
  ],
- "home_fixed": 0,
+ "home_fixed": 1,
  "lists": [
   {
    "name": "comps",

@@ -1,14 +1,19 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __page__">
-<h1>{{.L.events_h}}</h1>
-<p class="__lede__">{{.L.events_intro}}</p>
-<h2>{{.L.regular_h}}</h2>
-<ul class="__ev__ __full__">{{range .Lists.events}}<li><span class="__when__">{{.w}}</span><div><h3>{{.t}}</h3><p>{{.p}}</p></div></li>{{end}}</ul>
-<h2>{{.L.season_h}}</h2>
-{{$m := ""}}{{range .Lists.sessions}}{{if ne .month $m}}{{$m = .month}}<h3 class="__mh__">{{.month_label}}</h3>
-{{end}}<ul class="__ev__ __full__"><li><span class="__when__">{{.date}}</span><div><strong>{{.t}}</strong><p>{{.p}}</p></div></li></ul>
-{{end}}<p>{{icon "pin"}} {{.L.where}}</p>
+<main class="__wrap__">
+<section class="__hd2__">
+<div class="__sky__">{{art "hd" "" 400 300}}</div>
+<div class="__hd2t__"><span class="__kick__">{{.L.kicker}}</span><h1>{{.L.events_h}}</h1><p class="__lead__">{{.L.events_intro}}</p></div>
+</section>
+<section class="__sec__">
+<div class="__sh__"><h2>{{.L.regular_h}}</h2></div>
+<div class="__evl__">{{range $i, $e := .Lists.events}}<div class="__er__"><div class="__dt__"><b>0{{add $i 1}}</b></div><div><h3>{{$e.t}}</h3><div class="__wh__">{{$e.w}}</div></div><p>{{$e.p}}</p></div>{{end}}</div>
+</section>
+<section class="__sec__">
+<div class="__sh__"><h2>{{.L.season_h}}</h2></div>
+<div class="__ss__ __ss2__">{{range .Lists.sessions}}<div class="__sc__ __sc2__"><p class="__dd__"><time datetime="{{.date_iso}}">{{.date}}</time></p><div><h3>{{.t}}</h3><p>{{.p}}</p></div></div>{{end}}</div>
+<p class="__where__">{{icon "pin"}} {{.L.where}}</p>
+</section>
 </main>
 {{template "footer" .}}
 </body>

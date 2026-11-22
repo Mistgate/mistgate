@@ -1,18 +1,59 @@
+{{define "header"}}<header class="__hd__">
+<div class="__wrap__ __nb__">
+<a class="__lg__" href="/"><i class="__dot__"></i><span>{{.Brand}}</span></a>
+<nav class="__nav__" aria-label="{{.L.nav_label}}">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</nav>
+{{template "menu" .}}
+</div>
+</header>
+{{end}}
+{{define "footer"}}<section class="__cta__"><div class="__wrap__ __g__">
+<h2>{{.L.contact_h}}</h2>
+<div class="__ct__"><b class="__lab__">{{.L.commission_h}}</b>{{.L.commission_text}}<a href="{{(index .Nav 3).Href}}">{{.L.contact_h}} {{icon "arrowc"}}</a></div>
+</div></section>
+<footer class="__foot__"><div class="__wrap__">
+<div class="__g__">
+<div class="__c1__"><h6 class="__fh6__">{{.Brand}}</h6><p class="__fdesc__">{{.L.desc}}</p></div>
+<div class="__c2__"><h6 class="__fh6__">{{.L.work_h}}</h6><a class="__fa__" href="{{(index .Nav 0).Href}}">{{(index .Nav 0).Label}}</a><a class="__fa__" href="{{(index .Nav 1).Href}}">{{(index .Nav 1).Label}}</a></div>
+<div class="__c3__"><h6 class="__fh6__">{{.L.visit_h}}</h6><a class="__fa__" href="{{(index .Nav 2).Href}}">{{(index .Nav 2).Label}}</a><a class="__fa__" href="{{(index .Nav 3).Href}}">{{(index .Nav 3).Label}}</a></div>
+<div class="__c4__"><h6 class="__fh6__">{{.L.contact_h}}</h6><span class="__fa__">{{.V.address}}</span>{{if .V.phone}}<span class="__fa__">{{.V.phone}}</span>{{end}}</div>
+</div>
+<div class="__fb__"><span class="__fs__">{{.L.footer}}</span><span class="__fs__">© {{.Since}}–{{.Year}} {{.Brand}}</span></div>
+</div></footer>
+{{end}}
+{{define "work_card"}}<article class="__wk__"><a class="__img__" href="{{.href}}"><img src="{{.img}}" alt="{{.title}}" width="{{.w}}" height="{{.h}}" loading="lazy"></a><div class="__cp__"><span class="__num__">0{{.n}}</span><div><h3><a href="{{.href}}">{{.title}}</a></h3><p>{{.note}}</p><small>{{.caption}}</small></div></div></article>{{end}}
+{{define "b_work"}}<section class="__wrap__ __sec__">
+<div class="__sh__"><div class="__g__"><span class="__lab__ __cnt__"></span><h2>{{.L.sel_h}}</h2><a href="{{(index .Nav 1).Href}}">{{.L.all_work}} {{icon "arrowc"}}</a></div></div>
+<div class="__works__">{{range $i, $w := .Lists.works}}{{if lt $i 7}}{{template "work_card" $w}}{{end}}{{end}}</div>
+</section>{{end}}
+{{define "b_services"}}<section class="__wrap__ __sec__">
+<div class="__sh__"><div class="__g__"><span class="__lab__ __cnt__"></span><h2>{{.L.services_h}}</h2></div></div>
+<div class="__sv__">{{range $i, $s := .L.services}}<div><b>0{{add $i 1}}</b><span>{{$s}}</span></div>{{end}}</div>
+</section>{{end}}
+{{define "b_about"}}<section class="__wrap__ __sec__">
+<div class="__sh__"><div class="__g__"><span class="__lab__ __cnt__"></span><h2>{{.L.about_h}}</h2></div></div>
+<div class="__g__"><div class="__big__">{{index .L.about 0}}</div>
+<div class="__cols__">{{range $i, $p := .L.about}}{{if gt $i 0}}<p>{{$p}}</p>{{end}}{{end}}</div></div>
+</section>{{end}}
+{{define "b_shows"}}<section class="__wrap__ __sec__">
+<div class="__sh__"><div class="__g__"><span class="__lab__ __cnt__"></span><h2>{{.L.shows_h}}</h2></div></div>
+<div class="__sw__">{{range .L.shows}}<div><b>{{.y}}</b><span>{{.t}}</span></div>{{end}}</div>
+</section>{{end}}
+{{define "mods"}}{{$o := num "mods" 0 3}}{{range $i, $x := seq 4}}{{$t := add $i $o}}{{if ge $t 4}}{{$t = sub $t 4}}{{end}}<i class="__m__ __m{{$t}}__">{{if eq $t 2}}<s></s><s></s><s></s><s></s>{{end}}</i>{{end}}{{end}}
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __pf__">
-<section class="__hero__">
-<h1>{{.Brand}}</h1>
-<p class="__lede__">{{.L.intro}}</p>
+<main>
+{{if eq .Layout 0}}<section class="__wrap__ __hero__">
+<div class="__g__"><span class="__lab__">{{.L.tagline}}</span>{{$w := lastword .L.intro}}<h1>{{$w.head}}{{$w.last}}<span class="__ed__">{{$w.end}}</span></h1></div>
+<div class="__mods__">{{template "mods" .}}</div>
 </section>
-<h2 class="__sectitle__">{{.L.sel_h}}</h2>
-<div class="__gal__">
-{{$lim := 6}}{{if eq .Layout 2}}{{$lim = 7}}{{end}}{{range $i, $w := .Lists.works}}{{if lt $i $lim}}<figure class="__fig__">
-<a class="__pic__" href="{{$w.href}}"><img src="{{$w.img}}" alt="{{$w.title}}" width="{{$w.w}}" height="{{$w.h}}" loading="lazy"></a>
-<figcaption><strong><a href="{{$w.href}}">{{$w.title}}</a></strong><span>{{$w.caption}}</span></figcaption>
-</figure>
-{{end}}{{end}}</div>
-<p class="__more__"><a class="__btn__ __ghost__" href="{{(index .Nav 1).Href}}">{{.L.all_work}} {{icon "arrow"}}</a></p>
+{{else if eq .Layout 1}}<section class="__wrap__ __hero__ __hero1__">
+<div class="__g__"><span class="__lab__">{{.L.tagline}}</span>{{$w := lastword .L.intro}}<h1>{{$w.head}}{{$w.last}}<span class="__ed__">{{$w.end}}</span></h1><div class="__mods1__">{{template "mods" .}}</div></div>
+</section>
+{{else}}<section class="__wrap__ __hero__ __hero2__">
+<div class="__mods2__">{{template "mods" .}}</div>
+<div class="__h2t__"><span class="__lab__">{{.L.tagline}}</span>{{$w := lastword .L.intro}}<h1>{{$w.head}}{{$w.last}}<span class="__ed__">{{$w.end}}</span></h1></div>
+</section>
+{{end}}{{range .Order}}{{blk . $}}{{end}}
 </main>
 {{template "footer" .}}
 </body>

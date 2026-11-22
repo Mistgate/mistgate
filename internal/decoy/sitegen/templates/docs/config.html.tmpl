@@ -1,18 +1,27 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<div class="__wrap__ __docs__">
-{{template "sidenav" .}}<article class="__doc__">
+<div class="__shell__">
+{{template "sidenav" .}}
+<main class="__main__">
+<div class="__crumb__">{{.L.menu_h}} / {{.L.ref_h}} / {{(index .Nav 3).Label}}</div>
 <h1>{{.L.config_h}}</h1>
-<p class="__lede__">{{.L.config_intro}}</p>
-<h2>{{.L.config_file_h}}</h2>
-<pre><code>{{.L.config_code}}</code></pre>
+<p class="__lead__">{{.L.config_intro}}</p>
+<h2 id="__t1__">{{.L.config_file_h}}</h2>
+<div class="__cap__"><span>{{.L.cfg_name}}</span></div>
+<pre class="__pre__"><code>{{hl .L.config_code "toml"}}</code></pre>
+<h2 id="__t2__">{{.L.opts_h}}</h2>
 <div class="__tbl__"><table>
 <thead><tr><th>{{.L.config_col_key}}</th><th>{{.L.config_col_default}}</th><th>{{.L.config_col_desc}}</th></tr></thead>
-<tbody>{{range .L.config_rows}}<tr><td><code>{{.k}}</code></td><td><code>{{.v}}</code></td><td>{{.d}}</td></tr>{{end}}</tbody>
+<tbody>{{range .L.config_rows}}<tr><td><code>{{.k}}</code></td><td class="__mono__">{{.v}}</td><td>{{.d}}</td></tr>{{end}}</tbody>
 </table></div>
-<p><a class="__btn__" href="{{(index .Nav 4).Href}}">{{.L.next}}: {{(index .Nav 4).Label}} {{icon "arrow"}}</a></p>
-</article>
-{{if eq .Layout 1}}{{template "facts" .}}{{end}}</div>
+<div class="__pn__"><a href="{{(index .Nav 2).Href}}"><small>{{.L.prev}}</small><b>{{(index .Nav 2).Label}}</b></a><a href="{{(index .Nav 4).Href}}"><small>{{.L.next}}</small><b>{{(index .Nav 4).Label}}</b></a></div>
+</main>
+<aside class="__tc__" aria-label="{{.L.toc_h}}">
+<h6>{{.L.toc_h}}</h6>
+<a href="#__t1__">{{.L.config_file_h}}</a><a href="#__t2__">{{.L.opts_h}}</a>
+{{template "glance" .}}
+</aside>
+</div>
 {{template "footer" .}}
 </body>
 </html>

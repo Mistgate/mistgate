@@ -1,5 +1,8 @@
 {
  "ui": {
+  "platforms": "Platformlar",
+  "col_name": "Ad",
+  "col_size": "Boyut",
   "nav_label": "Ana menü",
   "footer": "MIT lisansıyla yayımlanmıştır.",
   "nav_home": "Genel bakış",

@@ -1,0 +1,33 @@
+{{define "header"}}<header class="__wrap__ __nv__">
+<a class="__logo__" href="/"><b>{{.Initial}}</b><span>{{.Brand}}</span></a>
+<nav class="__nl__" aria-label="{{.L.nav_label}}">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</nav>
+{{template "menu" .}}
+</header>
+{{end}}
+{{define "footer"}}<footer class="__foot__">
+<div class="__wrap__">
+<div class="__fg__">
+<div class="__fcol__"><a class="__logo__" href="/"><b>{{.Initial}}</b><span>{{.Brand}}</span></a><p>{{.L.desc}}</p></div>
+<div class="__fcol__"><h6>{{.L.nav_home}}</h6>{{range .Nav}}<a class="__fa__" href="{{.Href}}">{{.Label}}</a>{{end}}</div>
+<div class="__fcol__"><h6>{{.L.projects_h}}</h6>{{range .L.projects}}<a class="__fa__" href="{{(index $.Nav 2).Href}}">{{.t}}</a>{{end}}</div>
+<div class="__fcol__"><h6>{{.L.facts_h}}</h6>{{range .L.facts}}<span class="__fa__">{{.}}</span>{{end}}</div>
+</div>
+<div class="__wm__" aria-hidden="true">{{.Brand}}</div>
+<div class="__fb__"><span>{{.L.footer}}</span><span>© {{.Since}}–{{.Year}} {{.Brand}}</span></div>
+</div>
+</footer>
+{{end}}
+{{define "term"}}<section class="__t__ __term__"><div class="__tb__"><i></i><i></i><i></i></div><pre><code>{{hl (index .L.term 0) "sh"}}
+{{.V.cmd}}
+{{hl (index .L.term 1) "sh"}}
+{{range .L.facts}}  {{.}}
+{{end}}{{hl (index .L.term 2) "sh"}}
+<span class="__ol__">{{index .L.now 0}} <span class="__cur__">▮</span></span></code></pre></section>{{end}}
+{{define "factsT"}}<section class="__t__ __side__"><span class="__lab__">{{.L.facts_h}}</span><ul>{{range .L.facts}}<li>{{.}}</li>{{end}}</ul></section>{{end}}
+{{define "avatar"}}<section class="__t__ __av__">{{if hasphoto "me" 640 720}}<div class="__avp__">{{photo "me" "" 640 720}}</div>
+{{else}}<div class="__avp__ __avl__"><span class="__avc__">{{.Initial}}</span></div>
+{{end}}<span class="__avt__ __lab__">{{.V.city}}</span></section>{{end}}
+{{define "pjart"}}{{if eq . 0}}<svg class="__pa__" viewBox="0 0 280 96" aria-hidden="true" focusable="false"><g class="__sk__"><path d="M10 16h{{num "pa1" 150 210}}M10 38h{{num "pa2" 230 262}}M10 60h{{num "pa3" 110 170}}M10 82h{{num "pa4" 180 230}}"/></g></svg>
+{{else if eq . 1}}<svg class="__pa__" viewBox="0 0 280 96" aria-hidden="true" focusable="false"><rect class="__fh__" x="4" y="4" width="88" height="88" rx="{{num "pb1" 16 28}}"/><rect class="__fi__" x="26" y="26" width="44" height="12" rx="6"/><rect class="__fi__" x="26" y="48" width="{{num "pb4" 26 44}}" height="12" rx="6"/><g class="__fk__"><rect x="112" y="14" width="{{num "pb2" 130 164}}" height="14" rx="7"/><rect x="112" y="41" width="{{num "pb3" 90 130}}" height="14" rx="7"/><rect x="112" y="68" width="{{num "pb5" 120 150}}" height="14" rx="7"/></g></svg>
+{{else}}<svg class="__pa__" viewBox="0 0 280 96" aria-hidden="true" focusable="false"><circle class="__rg__" cx="48" cy="48" r="40"/><circle class="__ra__" cx="48" cy="48" r="40" stroke-dasharray="{{num "pc1" 130 200}} 400"/><g class="__fi__"><rect x="120" y="{{num "pc2" 46 56}}" width="22" height="{{num "pc3" 30 40}}" rx="5"/><rect x="152" y="{{num "pc4" 26 34}}" width="22" height="{{num "pc5" 52 60}}" rx="5"/><rect x="184" y="{{num "pc6" 10 18}}" width="22" height="{{num "pc7" 68 76}}" rx="5"/><rect x="216" y="{{num "pc8" 34 44}}" width="22" height="{{num "pc9" 42 52}}" rx="5"/><rect x="248" y="{{num "pc10" 52 62}}" width="22" height="{{num "pc11" 24 34}}" rx="5"/></g></svg>
+{{end}}{{end}}

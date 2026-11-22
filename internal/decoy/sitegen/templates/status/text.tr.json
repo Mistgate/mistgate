@@ -1,5 +1,6 @@
 {
  "ui": {
+  "utc": "UTC",
   "nav_label": "Ana menü",
   "tagline": "Hizmet durumu",
   "footer": "Tüm saatler UTC olarak gösterilir.",

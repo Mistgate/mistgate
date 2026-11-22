@@ -1,0 +1,18 @@
+{{define "header"}}<header class="__wrap__ __mh__">
+<div class="__mt__ __lab__"><span>{{.L.tagline}}</span><span class="__mtd__">{{(index .Lists.posts 0).date}}</span><span>{{.V.city}}</span></div>
+<div class="__brandrow__"><a class="__brand__" href="/">{{.Brand}}</a>{{template "menu" .}}</div>
+<nav class="__nav__ __lab__" aria-label="{{.L.nav_label}}">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</nav>
+</header>
+{{end}}
+{{define "footer"}}<footer class="__foot__">
+<div class="__wrap__">
+<div class="__fg__">
+<div class="__fcol__"><div class="__fbrand__">{{.Brand}}</div><p>{{.L.desc}}</p></div>
+<div class="__fcol__"><h6 class="__lab__">{{.L.nav_home}}</h6><a class="__fa__" href="/">{{.L.latest_h}}</a><a class="__fa__" href="{{(index .Nav 2).Href}}">{{.L.nav_archive}}</a><a class="__fa__" href="{{(index .Nav 2).Href}}">{{.L.all_posts}}</a></div>
+<div class="__fcol__"><h6 class="__lab__">{{.L.tags_h}}</h6>{{range $i, $t := tags .Lists.posts "tag"}}{{if lt $i 4}}<a class="__fa__" href="{{(index $.Nav 2).Href}}">{{$t.tag}}</a>{{end}}{{end}}</div>
+<div class="__fcol__"><h6 class="__lab__">{{.L.nav_label}}</h6><a class="__fa__" href="{{(index .Nav 1).Href}}">{{.L.nav_about}}</a><a class="__fa__" href="{{(index .Nav 3).Href}}">{{.L.nav_terms}}</a></div>
+</div>
+<div class="__fbar__"><span>{{.L.footer}}</span><span>© {{.Since}}–{{.Year}} {{.Brand}}</span></div>
+</div>
+</footer>
+{{end}}

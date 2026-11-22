@@ -1,5 +1,6 @@
 {
  "ui": {
+  "ref_h": "Teatmik",
   "nav_label": "Dokumentatsioon",
   "footer": "Dokumentatsioon versioonile {ver}.",
   "nav_home": "Ülevaade",

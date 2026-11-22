@@ -1,13 +1,16 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __page__">
-<h1>{{.L.services_h}}</h1>
-<p class="__lede__">{{.L.services_intro}}</p>
-<div class="__tbl__"><table class="__ptable__">
-<thead><tr><th>{{.L.col_service}}</th><th>{{.L.col_desc}}</th><th>{{.L.col_price}}</th></tr></thead>
-<tbody>{{range .L.services}}<tr><td><strong>{{.t}}</strong></td><td>{{.d}}</td><td class="__pr__">{{if .from}}{{$.L.from_l}} {{end}}{{money .price}}</td></tr>{{end}}</tbody>
-</table></div>
-<p class="__mu__">{{.L.services_note}}</p>
+<main class="__wrap__">
+<section class="__hd2__">
+<div><h1>{{.L.services_h}}</h1><p class="__lead__">{{.L.services_intro}}</p></div>
+<figure class="__stad__">{{photo "hero3" "" 800 480}}</figure>
+</section>
+<section class="__pl__">
+<div class="__th__"><span>{{.L.col_service}}</span><span>{{.L.col_desc}}</span><span>{{.L.col_price}}</span></div>
+{{range .L.services}}<div class="__row__"><h3>{{.t}}</h3><p>{{.d}}</p><b>{{if .from}}{{$.L.from_l}} {{end}}{{price .price}}</b></div>
+{{end}}</section>
+<p class="__note__">{{.L.services_note}}</p>
+<div class="__cta__"><h2>{{.L.visit_h}}</h2><a class="__btn__" href="{{(index .Nav 3).Href}}">{{.L.hours_h}}</a></div>
 </main>
 {{template "footer" .}}
 </body>

@@ -1,18 +1,25 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __blogmain__ __single__">
+<main class="__wrap__">
+{{$it := .Page.Item}}{{$pt := ""}}{{$ph := ""}}{{$nt := ""}}{{$nh := ""}}{{$seen := 0}}{{$got := 0}}{{range .Lists.posts}}{{if eq .slug $it.slug}}{{$seen = 1}}{{else if eq $seen 0}}{{$pt = .title}}{{$ph = .href}}{{else if eq $got 0}}{{$nt = .title}}{{$nh = .href}}{{$got = 1}}{{end}}{{end}}
 <article class="__post__">
-<p class="__meta__"><a href="/">{{.L.back_all}}</a> · <time datetime="{{.Page.Item.date_iso}}">{{.Page.Item.date}}</time> · {{num (printf "mr%s" .Page.Item.slug) 3 7}} {{.L.min_read}} · <span class="__pill__">{{.Page.Item.tag}}</span></p>
-<h1>{{.Page.Item.title}}</h1>
-<p class="__lede__">{{.Page.Item.excerpt}}</p>
-{{if hasphoto (printf "t%d" .Page.Item.n) 480 300}}<figure class="__pcov__">{{photo (printf "t%d" .Page.Item.n) "" 480 300}}</figure>
-{{end}}{{range .Page.Item.body}}<p>{{.}}</p>
-{{end}}</article>
-<aside class="__more__">
-<h2 class="__sectitle__">{{.L.more_h}}</h2>
-<ul>{{range .Lists.posts}}{{if ne .slug $.Page.Item.slug}}<li><a href="{{.href}}">{{.title}}</a> <span class="__mu__">{{.date}}</span></li>{{end}}{{end}}</ul>
-<p><a href="{{(index .Nav 2).Href}}">{{.L.all_posts}} {{icon "arrow"}}</a></p>
-</aside>
+<header class="__hd__">
+<span class="__lab__ __tag__">{{$it.tag}}</span>
+<h1 class="__t__">{{$it.title}}</h1>
+<p class="__ex__">{{$it.excerpt}}</p>
+<div class="__meta__"><a href="{{(index .Nav 2).Href}}">{{.L.back_all}}</a><span>{{$it.date}}</span><span>{{num (printf "mr%s" $it.slug) 3 7}} {{.L.min_read}}</span></div>
+</header>
+<figure class="__cov__">{{photo (printf "t%d" $it.n) "" 1280 640}}<figcaption class="__lab__">{{$it.tag}}</figcaption></figure>
+{{$q := ""}}{{range $it.body}}{{if eq $q ""}}{{$q = .}}{{else if lt (len .) (len $q)}}{{$q = .}}{{end}}{{end}}{{range $i, $p := $it.body}}<p{{if eq $i 0}} class="__dc__"{{end}}>{{$p}}</p>
+{{if eq $i 1}}{{if gt (len $it.body) 3}}<div class="__pq__"><q>{{$q}}</q></div>
+{{end}}{{end}}{{end}}
+<aside class="__auth__"><div class="__av__"><span>{{.V.first}}</span></div><div><span class="__lab__ __tag__">{{.L.by}}</span><h4>{{.V.first}}</h4><p>{{index .L.about 0}}</p></div></aside>
+<nav class="__nb__" aria-label="{{.L.more_h}}">
+{{if ne $pt ""}}<a href="{{$ph}}"><small class="__lab__">{{.L.newer}}</small><b>{{$pt}}</b></a>{{else}}<a href="/"><small class="__lab__">{{.L.back_all}}</small><b>{{.L.latest_h}}</b></a>{{end}}
+{{if ne $nt ""}}<a href="{{$nh}}"><small class="__lab__">{{.L.more_h}}</small><b>{{$nt}}</b></a>{{else}}<a href="{{(index .Nav 2).Href}}"><small class="__lab__">{{.L.all_posts}}</small><b>{{.L.nav_archive}}</b></a>{{end}}
+</nav>
+<div class="__tags__ __tagsc__">{{range $i, $t := tags .Lists.posts "tag"}}{{if lt $i 5}}<a class="__tg__" href="{{(index $.Nav 2).Href}}">{{$t.tag}}<sup class="__tn__">{{$t.n}}</sup></a>{{end}}{{end}}</div>
+</article>
 </main>
 {{template "footer" .}}
 </body>

@@ -1,5 +1,6 @@
 {
  "ui": {
+  "utc": "UTC",
   "nav_label": "Päävalikko",
   "tagline": "Palvelun tila",
   "footer": "Kaikki ajat näytetään UTC-aikana.",

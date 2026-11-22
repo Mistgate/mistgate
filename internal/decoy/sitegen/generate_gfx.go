@@ -3,6 +3,7 @@ package sitegen
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 )
 
@@ -12,6 +13,9 @@ import (
 // tone is one colour scheme (light or dark) of a site.
 type tone struct {
 	BG, Surface, FG, Muted, Line, Acc, AccInk, Acc2, Soft, Ok, Warn, Bad string
+	// Roles of the redesigned kinds (see generate_style.go): a band between the page and its surfaces, a second surface, a
+	// stronger line, and the soft backgrounds of the three states. A legacy palette derives them from the others.
+	Band, Surface2, Line2, OkSoft, WarnSoft, BadSoft string
 }
 
 type palette struct {
@@ -27,13 +31,30 @@ type style struct {
 	LH     string // body line height
 	Shadow string // box-shadow value of cards
 	Stroke string // stroke width of the icons
+	// The rest is the redesigned kinds' (legacy kinds get values that match what they have always assumed):
+	RB, WT, BW, Sec, Gut int       // big radius, width of a text column, border width, space between sections, gutter: px
+	Dens                 string    // the density the rhythm was drawn at, 1 is the middle
+	T                    [6]string // type scale t0..t5: sizes as CSS values, t3 and up follow the window width
+	TS                   string    // small text size
 }
 
-type fonts struct{ Body, Head, Mono string }
+// fonts are the stacks of a site and the way its headings and labels are set.
+type fonts struct {
+	Body, Head, Mono, Label string
+	FW                      int    // weight of headings
+	LS, LH                  string // letter spacing and line height of headings
+	TT, LSL, FSL            string // text-transform, letter spacing and size of labels
+}
 
 const monoStack = `ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace`
 
 var fontStacks = map[string]string{
+	"mono":      monoStack,
+	"rounded":   `ui-rounded,"SF Pro Rounded","Nunito","Segoe UI",system-ui,sans-serif`,
+	"geometric": `"Avenir Next",Avenir,Montserrat,"Century Gothic","Segoe UI",system-ui,sans-serif`,
+	"didone":    `Didot,"Bodoni 72","Bodoni MT","Playfair Display",Georgia,serif`,
+	"bookish":   `Cambria,Georgia,"Times New Roman","DejaVu Serif",serif`,
+	"verdana":   `Verdana,Geneva,"DejaVu Sans",sans-serif`,
 	"sans":      `system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif`,
 	"humanist":  `Seravek,"Gill Sans Nova",Ubuntu,Calibri,"DejaVu Sans",sans-serif`,
 	"grotesque": `"Helvetica Neue",Helvetica,Arial,"Liberation Sans",sans-serif`,
@@ -167,6 +188,8 @@ func newPalette(r *rng) palette {
 		Acc2: hsl(h2, float64(50+r.n(25)), float64(62+r.n(8))), Soft: hsl(h, float64(25+r.n(25)), float64(15+r.n(4))),
 		Ok: hsl(float64(140+r.n(20)), float64(44+r.n(12)), float64(52+r.n(8))), Warn: hsl(float64(36+r.n(12)), float64(84+r.n(10)), float64(54+r.n(8))), Bad: hsl(float64(358+r.n(10)), float64(74+r.n(10)), float64(62+r.n(8))),
 	}
+	light.complete(false)
+	dark.complete(true)
 	return palette{L: light, D: dark, Hue: h}
 }
 
@@ -201,9 +224,44 @@ var icons = map[string]string{
 	"sun":      `<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/>`,
 	"tool":     `<path d="M14.5 6.500a4 4 0 005 5L20 14l-6 6-9-9 6-6z"/>`,
 	"gift":     `<rect x="4" y="9" width="16" height="11"/><path d="M12 9v11M3 9h18M12 9V5"/>`,
+	"menu":     `<path d="M4 7h16M4 12h16M4 17h16"/>`,
+	"close":    `<path d="M6 6l12 12M18 6L6 18"/>`,
+	"chev":     `<path d="M9 5l7 7-7 7"/>`,
+	"chevd":    `<path d="M5 9l7 7 7-7"/>`,
+	"back":     `<path d="M19 12H5M11 6l-6 6 6 6"/>`,
+	"search":   `<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>`,
+	"plus":     `<path d="M12 5v14M5 12h14"/>`,
+	"minus":    `<path d="M5 12h14"/>`,
+	"grid":     `<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M13 16.5h7"/>`,
+	"chart":    `<path d="M5 20V9M11 20V4M17 20v-7M3 20h18"/>`,
+	"checkc":   `<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>`,
+	"key":      `<circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3"/>`,
+	"face":     `<circle cx="12" cy="12" r="9"/><path d="M9 10v.01M15 10v.01M8.5 14.5c2 2 5 2 7 0"/>`,
+	"wheat":    `<path d="M12 21V8M12 11c-3 0-4.5-1.5-4.5-4 3 0 4.5 1.5 4.5 4zM12 11c3 0 4.5-1.5 4.5-4-3 0-4.5 1.5-4.5 4zM12 17c-3 0-4.5-1.5-4.5-4 3 0 4.5 1.5 4.5 4zM12 17c3 0 4.5-1.5 4.5-4-3 0-4.5 1.5-4.5 4z"/>`,
+	"basket":   `<path d="M4 10h16l-1.5 9h-13zM8 10c0-5 8-5 8 0"/>`,
+	"cup":      `<path d="M5 8h11v6a5 5 0 01-5 5h-1a5 5 0 01-5-5zM16 10h2a2 2 0 010 4h-2M8 3v2M12 3v2"/>`,
+	"moon":     `<path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/>`,
+	"nouser":   `<circle cx="12" cy="8" r="4"/><path d="M4 20c1-4 4-6 8-6s7 2 8 6M4 4l16 16"/>`,
+	"tag":      `<path d="M4 4h8l8 8-8 8-8-8z"/><circle cx="8.5" cy="8.5" r="1"/>`,
+	"link":     `<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>`,
+	"arrowc":   `<circle cx="12" cy="12" r="9"/><path d="M7 12h10M13 8l4 4-4 4"/>`,
+	"sparkle":  `<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>`,
+	"external": `<path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/>`,
+	"cake":     `<path d="M4 20h16v-7H4zM6 13V9h12v4M12 9V5"/>`,
 }
 
 var spaces = []string{" ", " ", "  ", "\n"}
+
+// svgOpen is the opening tag of an inline drawing with its attributes in an order and with a spacing of the rng's choosing, so
+// that two drawings do not begin with the same run of markup.
+func svgOpen(r *rng, attrs ...string) string {
+	var b strings.Builder
+	b.WriteString("<svg")
+	for _, i := range r.perm(len(attrs)) {
+		b.WriteString(spaces[r.n(len(spaces))] + attrs[i])
+	}
+	return b.String() + ">"
+}
 
 // iconSVG is an inline icon. Its attributes come in the order and spacing r chooses, so a run of markup that holds an icon is
 // not the same on two sites.
@@ -232,7 +290,14 @@ func iconSVG(name string, r *rng) string {
 func faviconMark(r *rng, p palette, initial string) string {
 	a, b, ac := p.L.Acc, p.L.Acc2, p.L.AccInk
 	rx := 8 + r.n(24)
-	letter := fmt.Sprintf(`<text x="32" y="%d" text-anchor="middle" font-family="system-ui,sans-serif" font-size="%d" font-weight="700" fill="%s">%s</text>`, 43+r.n(3), 32+r.n(6), ac, initial)
+	// the attributes of the letter come in an order and with a spacing of the rng's choosing, like those of svgOpen
+	ta := []string{`x="32"`, fmt.Sprintf(`y="%d"`, 43+r.n(3)), `text-anchor="middle"`, `font-family="system-ui,sans-serif"`, fmt.Sprintf(`font-size="%d"`, 32+r.n(6)), `font-weight="700"`, fmt.Sprintf(`fill="%s"`, ac)}
+	var lb strings.Builder
+	lb.WriteString("<text")
+	for _, i := range r.perm(len(ta)) {
+		lb.WriteString(spaces[r.n(len(spaces))] + ta[i])
+	}
+	letter := lb.String() + ">" + initial + "</text>"
 	switch r.n(7) {
 	case 0:
 		return fmt.Sprintf(`<rect width="64" height="64" rx="%d" fill="%s"/>%s`, rx, a, letter)
@@ -264,16 +329,25 @@ func inlineMark(mark string) string {
 // Pictures: abstract "photos" and header art. kind is one of artKinds; w, h the viewBox.
 var artKinds = []string{"landscape", "blobs", "tiles", "waves"}
 
+// subjectKinds are the subjects of artSVG that a variant asks for with its "art" (data.json) or a template with a name; the
+// old four are what a picture gets when neither does.
+var subjectKinds = []string{"topo", "stars", "botanical", "still", "poster", "ui", "parcel", "checker", "staff"}
+
+var allArtKinds = append(slices.Clone(artKinds), subjectKinds...)
+
 func artSVG(r *rng, kind string, hue float64, w, h int, id string, standalone bool) string {
 	var b strings.Builder
-	open := fmt.Sprintf(`<svg viewBox="0 0 %d %d" preserveAspectRatio="xMidYMid slice" role="img" aria-hidden="true"`, w, h)
+	vb, par := fmt.Sprintf(`viewBox="0 0 %d %d"`, w, h), `preserveAspectRatio="xMidYMid slice"`
 	if standalone {
-		open = fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" preserveAspectRatio="xMidYMid slice"`, w, h)
+		b.WriteString(svgOpen(r, `xmlns="http://www.w3.org/2000/svg"`, vb, par))
 	} else {
-		open += ` class="__art__"`
+		b.WriteString(svgOpen(r, vb, par, `role="img"`, `aria-hidden="true"`, `class="__art__"`))
 	}
-	b.WriteString(open + ">")
 	W, H := float64(w), float64(h)
+	if drawSubject(&b, r, kind, hue, W, H, id) {
+		b.WriteString("</svg>")
+		return b.String()
+	}
 	fw := func(lo, hi float64) float64 { return lo + r.float()*(hi-lo) }
 	switch kind {
 	case "landscape":
@@ -327,13 +401,17 @@ func artSVG(r *rng, kind string, hue float64, w, h int, id string, standalone bo
 // The look as maps, for the templates (they read maps only).
 func (t tone) data() map[string]any {
 	return map[string]any{"BG": t.BG, "Surface": t.Surface, "FG": t.FG, "Muted": t.Muted, "Line": t.Line, "Acc": t.Acc, "AccInk": t.AccInk,
-		"Acc2": t.Acc2, "Soft": t.Soft, "Ok": t.Ok, "Warn": t.Warn, "Bad": t.Bad}
+		"Acc2": t.Acc2, "Soft": t.Soft, "Ok": t.Ok, "Warn": t.Warn, "Bad": t.Bad,
+		"Band": t.Band, "Surface2": t.Surface2, "Line2": t.Line2, "OkSoft": t.OkSoft, "WarnSoft": t.WarnSoft, "BadSoft": t.BadSoft}
 }
 
 func (s style) data() map[string]any {
-	return map[string]any{"R": s.R, "RS": s.RS, "W": s.W, "FS": s.FS, "LH": s.LH, "Shadow": s.Shadow, "Stroke": s.Stroke}
+	return map[string]any{"R": s.R, "RS": s.RS, "W": s.W, "FS": s.FS, "LH": s.LH, "Shadow": s.Shadow, "Stroke": s.Stroke,
+		"RB": s.RB, "WT": s.WT, "BW": s.BW, "Sec": s.Sec, "Gut": s.Gut, "Dens": s.Dens, "TS": s.TS,
+		"T0": s.T[0], "T1": s.T[1], "T2": s.T[2], "T3": s.T[3], "T4": s.T[4], "T5": s.T[5]}
 }
 
 func (f fonts) data() map[string]any {
-	return map[string]any{"Body": f.Body, "Head": f.Head, "Mono": f.Mono}
+	return map[string]any{"Body": f.Body, "Head": f.Head, "Mono": f.Mono, "Label": f.Label, "FW": f.FW, "LS": f.LS, "LH": f.LH,
+		"TT": f.TT, "LSL": f.LSL, "FSL": f.FSL}
 }

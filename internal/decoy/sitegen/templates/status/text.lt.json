@@ -1,5 +1,6 @@
 {
  "ui": {
+  "utc": "UTC",
   "nav_label": "Pagrindinis",
   "tagline": "Paslaugų būsena",
   "footer": "Visi laikai nurodyti pagal UTC.",

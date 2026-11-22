@@ -1,4 +1,164 @@
 {
+ "style": {
+  "scheme": "dark",
+  "palettes": [
+   {
+    "name": "indigo-mint",
+    "d": {
+     "bg": "#0a0e1f",
+     "sf": "#131a3a",
+     "fg": "#e8ebf7",
+     "ac": "#8b9bff",
+     "a2": "#5eead4",
+     "band": "#0d1330",
+     "ln": "#1f2851",
+     "ln2": "#28316a",
+     "sf2": "#1b2350",
+     "mu": "#aab3d6"
+    }
+   },
+   {
+    "name": "slate-teal",
+    "d": {
+     "bg": "#0a1216",
+     "sf": "#121e24",
+     "fg": "#e6f0f3",
+     "ac": "#5eead4",
+     "a2": "#8b9bff",
+     "band": "#0d161b",
+     "ln": "#152e2f",
+     "ln2": "#1c4240",
+     "sf2": "#1d3b3d"
+    }
+   },
+   {
+    "name": "violet",
+    "d": {
+     "bg": "#100c1f",
+     "sf": "#1a1432",
+     "fg": "#ede8f8",
+     "ac": "#b69cff",
+     "a2": "#5eead4",
+     "band": "#140f26",
+     "ln": "#261f3c",
+     "ln2": "#352c50",
+     "sf2": "#30274f"
+    }
+   },
+   {
+    "name": "navy-sky",
+    "d": {
+     "bg": "#08121f",
+     "sf": "#101e32",
+     "fg": "#e6eef8",
+     "ac": "#7ec3ff",
+     "a2": "#ffd27a",
+     "band": "#0b1626",
+     "ln": "#17293c",
+     "ln2": "#223950",
+     "sf2": "#1f354f"
+    }
+   },
+   {
+    "name": "plum-pink",
+    "d": {
+     "bg": "#150c1a",
+     "sf": "#211229",
+     "fg": "#f3e8f6",
+     "ac": "#ff9bd2",
+     "a2": "#8bf0d8",
+     "band": "#190e1f",
+     "ln": "#331f32",
+     "ln2": "#482b42",
+     "sf2": "#402541"
+    }
+   },
+   {
+    "name": "ink-lime",
+    "d": {
+     "bg": "#0b0e12",
+     "sf": "#141920",
+     "fg": "#e8ecf1",
+     "ac": "#b6f06c",
+     "a2": "#8b9bff",
+     "band": "#0e1217",
+     "ln": "#212b1e",
+     "ln2": "#314026",
+     "sf2": "#2b372b"
+    }
+   }
+  ],
+  "fonts": [
+   {
+    "head": "sans",
+    "body": "sans",
+    "fw": 650,
+    "ls": "-.045em",
+    "lh": ".98"
+   },
+   {
+    "head": "geometric",
+    "body": "sans",
+    "fw": 650,
+    "ls": "-.04em",
+    "lh": "1"
+   },
+   {
+    "head": "sans",
+    "body": "sans",
+    "fw": 700,
+    "ls": "-.03em",
+    "lh": "1.05"
+   }
+  ],
+  "radius": [
+   14,
+   24
+  ],
+  "radius_s": [
+   12,
+   16
+  ],
+  "radius_b": [
+   20,
+   28
+  ],
+  "density": [
+   0.95,
+   1.08
+  ],
+  "width": [
+   1240,
+   1280
+  ],
+  "measure": [
+   620,
+   700
+  ],
+  "base": [
+   16,
+   17
+  ],
+  "scale": [
+   1.3,
+   1.4
+  ],
+  "lh": [
+   1.5,
+   1.6
+  ],
+  "stroke": [
+   1.6,
+   2
+  ],
+  "border": [
+   1,
+   1
+  ],
+  "shadows": [
+   "none"
+  ]
+ },
  "title": {
   "en": "Sign-in page",
   "ru": "Страница входа в сервис"
@@ -59,5 +219,10 @@
  },
  "photo_q": [
   "city skyline dusk"
- ]
+ ],
+ "home_blocks": [
+  "help",
+  "priv"
+ ],
+ "home_fixed": 0
 }

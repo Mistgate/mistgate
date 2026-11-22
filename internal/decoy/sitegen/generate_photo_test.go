@@ -41,7 +41,7 @@ func photosFor(t *testing.T, plan []Slot) map[string][]byte {
 }
 
 // Kinds that must never show a photograph, whatever the seed.
-var photoFree = map[string]bool{"card": true, "docs": true, "project": true, "status": true}
+var photoFree = map[string]bool{"docs": true, "project": true, "status": true}
 
 func TestPlanSlots(t *testing.T) {
 	withPhotos := map[string]int{}

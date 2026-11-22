@@ -5,17 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Page.Full}}</title>
 <meta name="description" content="{{.Page.Desc}}">
-<meta name="theme-color" content="{{.P.L.Acc}}">
-<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="{{.Theme}}">
+<meta name="color-scheme" content="{{.ColorScheme}}">
 <link rel="icon" href="{{.Icon}}" type="image/svg+xml">
 <link rel="stylesheet" href="{{.CSS}}">
 </head>
 {{end}}
 
+{{define "menu"}}<details class="__mn__"><summary class="__mnb__" aria-label="{{.L.nav_label}}">{{icon "menu"}}{{icon "close"}}</summary><div class="__mnl__">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</div></details>{{end}}
+
 {{define "header"}}<header class="__hd__">
 <div class="__wrap__ __hdin__">
 <a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span>{{if eq .Head 2}}<span class="__sub__">{{.L.tagline}}</span>{{end}}</a>
 <nav class="__nav__" aria-label="{{.L.nav_label}}">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</nav>
+{{template "menu" .}}
 </div>
 </header>
 {{end}}

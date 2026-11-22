@@ -1,0 +1,25 @@
+{{define "header"}}<header class="__bar__">
+<div class="__bin__">
+<a class="__logo__" href="/"><i class="__lm__">{{.Initial}}</i><span>{{.Brand}}</span></a>
+<span class="__ver__">{{.L.ver_l}} {{.V.ver}}</span>
+<nav class="__tn__" aria-label="{{.L.nav_label}}"><a href="{{(index .Nav 0).Href}}"{{if (index .Nav 0).Cur}} aria-current="page"{{end}}>{{(index .Nav 0).Label}}</a><a href="{{(index .Nav 1).Href}}"{{if (index .Nav 1).Cur}} aria-current="page"{{end}}>{{(index .Nav 1).Label}}</a><a href="{{(index .Nav 2).Href}}"{{if (index .Nav 2).Cur}} aria-current="page"{{end}}>{{(index .Nav 2).Label}}</a><a href="{{(index .Nav 6).Href}}"{{if (index .Nav 6).Cur}} aria-current="page"{{end}}>{{(index .Nav 6).Label}}</a></nav>
+{{template "menu" .}}
+</div>
+</header>{{end}}
+{{define "sidenav"}}<nav class="__side__" aria-label="{{.L.menu_h}}">
+<div class="__g__"><h6>{{.L.menu_h}}</h6>{{range $i, $n := .Nav}}{{if ne $i 7}}{{if ne $i 3}}{{if ne $i 4}}{{if ne $i 5}}<a href="{{$n.Href}}"{{if $n.Cur}} aria-current="page"{{end}}>{{$n.Label}}</a>{{end}}{{end}}{{end}}{{end}}{{end}}</div>
+<div class="__g__"><h6>{{.L.ref_h}}</h6>{{range $i, $n := .Nav}}{{if gt $i 2}}{{if lt $i 6}}<a href="{{$n.Href}}"{{if $n.Cur}} aria-current="page"{{end}}>{{$n.Label}}</a>{{end}}{{end}}{{end}}</div>
+</nav>{{end}}
+{{define "glance"}}<dl class="__gl__"><h6>{{.L.facts_h}}</h6>{{range .L.facts}}<dt>{{.k}}</dt><dd>{{.v}}</dd>{{end}}</dl>{{end}}
+{{define "footer"}}<footer class="__foot__">
+<div class="__fi__">
+<div class="__fg__">
+<div><a class="__logo__" href="/"><i class="__lm__">{{.Initial}}</i><span>{{.Brand}}</span></a><p>{{.L.desc}}</p></div>
+<div><h6>{{.L.menu_h}}</h6><a href="{{(index .Nav 0).Href}}">{{(index .Nav 0).Label}}</a><a href="{{(index .Nav 1).Href}}">{{(index .Nav 1).Label}}</a><a href="{{(index .Nav 2).Href}}">{{(index .Nav 2).Label}}</a><a href="{{(index .Nav 6).Href}}">{{(index .Nav 6).Label}}</a></div>
+<div><h6>{{.L.ref_h}}</h6><a href="{{(index .Nav 3).Href}}">{{(index .Nav 3).Label}}</a><a href="{{(index .Nav 4).Href}}">{{(index .Nav 4).Label}}</a><a href="{{(index .Nav 5).Href}}">{{(index .Nav 5).Label}}</a></div>
+<div><h6>{{.L.facts_h}}</h6>{{range .L.facts}}<span>{{.k}}: {{.v}}</span>{{end}}</div>
+</div>
+<div class="__fb__"><span>{{.L.footer}}</span><a href="{{(index .Nav 7).Href}}">{{(index .Nav 7).Label}}</a></div>
+</div>
+</footer>{{end}}
+{{define "cap"}}<div class="__cap__"><span>{{.}}</span></div>{{end}}

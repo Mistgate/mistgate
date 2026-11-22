@@ -1,10 +1,219 @@
 {
-  "title": {"en": "Personal card page", "ru": "Личная визитка со ссылками"},
-  "layouts": 3,
-  "pages": [
-    {"name": "home", "tmpl": "home.html.tmpl", "paths": ["index.html"], "nav": "nav_home", "title": "home_title", "desc": "desc"},
-    {"name": "about", "tmpl": "about.html.tmpl", "paths": ["about.html", "about/index.html", "me/index.html", "hello.html"], "nav": "nav_about", "desc": "desc_about"},
-    {"name": "projects", "tmpl": "projects.html.tmpl", "paths": ["projects.html", "work/index.html", "projects/index.html", "things.html"], "nav": "nav_projects", "desc": "desc_projects"},
-    {"name": "now", "tmpl": "now.html.tmpl", "paths": ["now.html", "now/index.html", "lately/index.html", "currently.html"], "nav": "nav_now", "desc": "desc_now"}
+ "style": {
+  "scheme": "dark",
+  "palettes": [
+   {
+    "name": "lilac-peach",
+    "d": {
+     "bg": "#121214",
+     "sf": "#1b1b1f",
+     "fg": "#f3f1ee",
+     "ac": "#cdb8ff",
+     "a2": "#ffc9a8",
+     "sf2": "#2b2b2c",
+     "ln": "#28282a",
+     "ln2": "#3f3f40"
+    }
+   },
+   {
+    "name": "mint-sand",
+    "d": {
+     "bg": "#101412",
+     "sf": "#181d1a",
+     "fg": "#eef3ef",
+     "ac": "#9fe3b0",
+     "a2": "#ffd9a0",
+     "sf2": "#282d2a",
+     "ln": "#262a28",
+     "ln2": "#3c413e"
+    }
+   },
+   {
+    "name": "sky-rose",
+    "d": {
+     "bg": "#0f1216",
+     "sf": "#171b21",
+     "fg": "#edf1f5",
+     "ac": "#9ccfff",
+     "a2": "#ffb3c8",
+     "sf2": "#272b2f",
+     "ln": "#25282c",
+     "ln2": "#3b3f43"
+    }
+   },
+   {
+    "name": "lemon-lilac",
+    "d": {
+     "bg": "#131312",
+     "sf": "#1c1c1a",
+     "fg": "#f4f3ec",
+     "ac": "#f4e27a",
+     "a2": "#cdb8ff",
+     "sf2": "#2c2c2a",
+     "ln": "#2a2928",
+     "ln2": "#40403e"
+    }
+   },
+   {
+    "name": "coral-ice",
+    "d": {
+     "bg": "#141212",
+     "sf": "#1d1a1a",
+     "fg": "#f4efee",
+     "ac": "#ff9e8a",
+     "a2": "#a6e3f0",
+     "sf2": "#2d2a2a",
+     "ln": "#2a2828",
+     "ln2": "#413e3e"
+    }
+   },
+   {
+    "name": "peach-green",
+    "d": {
+     "bg": "#121214",
+     "sf": "#1b1b1f",
+     "fg": "#f3f1ee",
+     "ac": "#ffc9a8",
+     "a2": "#9fe3b0",
+     "sf2": "#2b2b2c",
+     "ln": "#28282a",
+     "ln2": "#3f3f40"
+    }
+   }
+  ],
+  "fonts": [
+   {
+    "head": "sans",
+    "body": "sans",
+    "fw": 750,
+    "ls": "-.05em",
+    "lh": "1"
+   },
+   {
+    "head": "geometric",
+    "body": "geometric",
+    "fw": 700,
+    "ls": "-.045em",
+    "lh": "1"
+   },
+   {
+    "head": "rounded",
+    "body": "sans",
+    "fw": 750,
+    "ls": "-.045em",
+    "lh": "1"
+   }
+  ],
+  "radius": [
+   26,
+   34
+  ],
+  "radius_s": [
+   16,
+   22
+  ],
+  "radius_b": [
+   30,
+   36
+  ],
+  "density": [
+   0.95,
+   1.08
+  ],
+  "width": [
+   1200,
+   1280
+  ],
+  "measure": [
+   620,
+   700
+  ],
+  "base": [
+   16,
+   17
+  ],
+  "scale": [
+   1.4,
+   1.5
+  ],
+  "lh": [
+   1.5,
+   1.6
+  ],
+  "stroke": [
+   1.7,
+   2.1
+  ],
+  "border": [
+   1,
+   1
+  ],
+  "shadows": [
+   "none"
   ]
+ },
+ "title": {
+  "en": "Personal card page",
+  "ru": "Личная визитка со ссылками"
+ },
+ "layouts": 3,
+ "pages": [
+  {
+   "name": "home",
+   "tmpl": "home.html.tmpl",
+   "paths": [
+    "index.html"
+   ],
+   "nav": "nav_home",
+   "title": "home_title",
+   "desc": "desc"
+  },
+  {
+   "name": "about",
+   "tmpl": "about.html.tmpl",
+   "paths": [
+    "about.html",
+    "about/index.html",
+    "me/index.html",
+    "hello.html"
+   ],
+   "nav": "nav_about",
+   "desc": "desc_about"
+  },
+  {
+   "name": "projects",
+   "tmpl": "projects.html.tmpl",
+   "paths": [
+    "projects.html",
+    "work/index.html",
+    "projects/index.html",
+    "things.html"
+   ],
+   "nav": "nav_projects",
+   "desc": "desc_projects"
+  },
+  {
+   "name": "now",
+   "tmpl": "now.html.tmpl",
+   "paths": [
+    "now.html",
+    "now/index.html",
+    "lately/index.html",
+    "currently.html"
+   ],
+   "nav": "nav_now",
+   "desc": "desc_now"
+  }
+ ],
+ "home_blocks": [
+  "abt",
+  "proj",
+  "now"
+ ],
+ "home_fixed": 0,
+ "photo_slots": {
+  "me": [
+   0
+  ]
+ }
 }

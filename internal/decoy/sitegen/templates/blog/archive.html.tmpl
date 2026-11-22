@@ -1,12 +1,13 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __blogmain__ __single__">
-<article class="__post__">
-<h1>{{.L.archive_h}}</h1>
-<p class="__lede__">{{.L.archive_intro}}</p>
-{{$m := ""}}{{range .Lists.posts}}{{if ne .month $m}}{{$m = .month}}<h2 class="__mh__">{{.month_label}}</h2>
-{{end}}<p class="__ar__"><a href="{{.href}}">{{.title}}</a> <span class="__mu__">{{.date}} · {{.tag}}</span></p>
-{{end}}</article>
+<main class="__wrap__ __arc__">
+<section>
+<span class="__lab__ __tag__">{{.L.nav_archive}}</span>
+<h1 class="__t__">{{.L.archive_h}}</h1>
+<p class="__ex__">{{.L.archive_intro}}</p>
+{{$m := ""}}{{range .Lists.posts}}{{$new := 0}}{{if ne .month $m}}{{$m = .month}}{{$new = 1}}{{end}}<div class="__ar__ __arp__{{if eq $new 1}} __nm__{{end}}"><h3>{{if eq $new 1}}{{.month_label}}{{end}}</h3><div class="__arli__"><a href="{{.href}}">{{.title}}</a><span class="__ardate__">{{.date}}</span><span class="__arg__">{{.tag}}</span></div></div>
+{{end}}</section>
+{{template "side" .}}
 </main>
 {{template "footer" .}}
 </body>

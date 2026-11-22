@@ -364,6 +364,29 @@ func (c *countryDef) money(base float64) string {
 	return strings.Replace(c.Money.Fmt, "{n}", n, 1)
 }
 
+// price is money for a shop's or a service's price list: a small sum (under 30 of the country's units) keeps its pence or cents,
+// to the nearest 5, as "£4.80" or "4,80 €" (a whole sum has none), because a bakery's price rounded to a whole unit looks made up; a bigger one is money.
+func (c *countryDef) price(base float64) string {
+	scale := c.Money.Scale
+	if scale == 0 {
+		scale = 1
+	}
+	x := base * scale
+	if x >= 30 || x < 0 {
+		return c.money(base)
+	}
+	cents := int(math.Round(x*100/5)) * 5
+	mark := ","
+	if strings.HasPrefix(c.Lang, "en") || c.Code == "ch" {
+		mark = "."
+	}
+	n := fmt.Sprintf("%d%s%02d", cents/100, mark, cents%100)
+	if cents%100 == 0 { // "£24", not "£24.00"
+		n = strconv.Itoa(cents / 100)
+	}
+	return strings.Replace(c.Money.Fmt, "{n}", n, 1)
+}
+
 // clock is a time of day, "08:30", the way the country writes it: 8:30, or 8:30 am.
 func (c *countryDef) clock(hhmm string, am, pm string) string {
 	var h, m int

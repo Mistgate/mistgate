@@ -1,20 +1,13 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<main class="__wrap__ __pf__">
-<section class="__hero__">
-<h1>{{.L.work_h}}</h1>
-<p class="__lede__">{{.L.work_intro}}</p>
+<main>
+<section class="__wrap__ __hero__ __hero3__">
+<div class="__g__"><span class="__lab__">{{.L.tagline}}</span><h1>{{.L.work_h}}</h1><p class="__wlead__">{{.L.work_intro}}</p></div>
 </section>
-<div class="__list__">
-{{range .Lists.works}}<article class="__item__">
-<a href="{{.href}}"><img src="{{.img}}" alt="{{.title}}" width="{{.w}}" height="{{.h}}" loading="lazy"></a>
-<div class="__idesc__">
-<h2><a href="{{.href}}">{{.title}}</a></h2>
-<p class="__mu__">{{.caption}}</p>
-<p>{{.note}}</p>
-</div>
-</article>
-{{end}}</div>
+<section class="__wrap__ __sec__">
+<div class="__sh__"><div class="__g__"><span class="__lab__ __cnt__"></span><h2>{{.L.sel_h}}</h2></div></div>
+<div class="__works__ __all__">{{range .Lists.works}}{{template "work_card" .}}{{end}}</div>
+</section>
 </main>
 {{template "footer" .}}
 </body>

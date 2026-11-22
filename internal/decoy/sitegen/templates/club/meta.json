@@ -1,4 +1,52 @@
 {
+ "style": {
+  "scheme": "dark",
+  "palettes": [
+   {
+    "name": "night-amber",
+    "d": {"bg": "#0c1228", "sf": "#151d44", "fg": "#f6efe0", "ac": "#ffb347", "a2": "#9fb0ff", "band": "#111838", "sf2": "#232c5f", "so": "#2a2447"}
+   },
+   {
+    "name": "night-coral",
+    "d": {"bg": "#140d1f", "sf": "#1f1633", "fg": "#f3ecf7", "ac": "#ff8f7a", "a2": "#7fe0d0"}
+   },
+   {
+    "name": "forest-lime",
+    "d": {"bg": "#0c1a14", "sf": "#14281f", "fg": "#eaf3ec", "ac": "#b8f070", "a2": "#ffd27a"}
+   },
+   {
+    "name": "ink-cyan",
+    "d": {"bg": "#081824", "sf": "#0f2635", "fg": "#e6f1f7", "ac": "#5ee0f0", "a2": "#ffb347"}
+   },
+   {
+    "name": "plum-rose",
+    "d": {"bg": "#1a0e1c", "sf": "#271629", "fg": "#f5e9f3", "ac": "#ff8fc4", "a2": "#ffd27a"}
+   },
+   {
+    "name": "graphite-gold",
+    "d": {"bg": "#111113", "sf": "#1a1a1e", "fg": "#f0ede4", "ac": "#f2c14e", "a2": "#8fd0ff"}
+   }
+  ],
+  "fonts": [
+   {"head": "rounded", "body": "rounded", "fw": 850, "ls": "-.05em", "lh": ".96"},
+   {"head": "sans", "body": "sans", "fw": 850, "ls": "-.045em", "lh": ".98"},
+   {"head": "verdana", "body": "verdana", "fw": 800, "ls": "-.04em", "lh": "1"}
+  ],
+  "radius": [28, 40],
+  "radius_s": [16, 22],
+  "radius_b": [40, 48],
+  "density": [0.95, 1.08],
+  "width": [1240, 1300],
+  "measure": [640, 720],
+  "base": [16, 17],
+  "scale": [1.33, 1.4],
+  "lh": [1.55, 1.65],
+  "stroke": [1.8, 2.2],
+  "border": [1, 2],
+  "shadows": [
+   "none"
+  ]
+ },
  "title": {
   "en": "Club / society / event",
   "ru": "Кружок, общество, клуб по интересам"
@@ -82,10 +130,10 @@
    }
   }
  ],
+ "home_blocks": ["info", "why", "upcoming", "season", "news", "join", "find"],
+ "home_fixed": 2,
  "photo_slots": {
-  "cover": [
-   0,
-   1
-  ]
+  "cover": [0, 1],
+  "s": [1, 0]
  }
 }

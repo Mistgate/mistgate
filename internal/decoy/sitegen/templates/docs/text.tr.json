@@ -1,5 +1,6 @@
 {
  "ui": {
+  "ref_h": "Başvuru",
   "nav_label": "Belgeler",
   "footer": "{ver} sürümü belgeleri.",
   "nav_home": "Genel bakış",

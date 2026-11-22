@@ -1,16 +1,39 @@
 {
  "bundles": [
   {
-   "id": "illustrator"
+   "id": "illustrator",
+   "photo_q": [
+    "pen and ink drawing desk",
+    "linocut printing studio"
+   ]
   },
   {
-   "id": "translator"
+   "id": "translator",
+   "photo_q": [
+    "dictionary books desk",
+    "notebook pen coffee"
+   ]
   },
   {
-   "id": "potter"
+   "id": "potter",
+   "photo_q": [
+    "pottery studio ceramics",
+    "clay bowls shelf"
+   ]
   },
   {
-   "id": "developer"
+   "id": "developer",
+   "photo_q": [
+    "keyboard desk laptop",
+    "code editor monitor"
+   ]
   }
- ]
+ ],
+ "ui": {
+  "term": [
+   "$ whoami",
+   "$ cat facts.txt",
+   "$ tail -n 1 now.txt"
+  ]
+ }
 }
