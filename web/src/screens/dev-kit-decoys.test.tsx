@@ -83,14 +83,28 @@ describe("the scenes of the Decoy sites screens", () => {
     if (state === "dlg-tpl-err") expect(text()).toContain(en["err.decoy_library_full"]);
     if (state === "dlg-tpl-nokey") {
       expect(text()).toContain(en["dz.ph.off"]);
-      expect(text()).toContain(en["dz.ph.st.no_key"]);
+      expect(text()).toContain(en["dz.ph.st.no_key"].replace("{name}", "Pixabay"));
       expect(buttonOf(en["dz.ph.add"])).toBeDefined();
       expect(buttonOf(en["dz.ph.remove"])).toBeUndefined();
     }
     if (state === "dlg-tpl-keyform") {
       expect(document.querySelector(".dz-ph input[type=password]")).not.toBeNull();
       expect(text()).toContain(en["dz.ph.lead"]);
-      expect(document.querySelector(".dz-ph .frm a")?.getAttribute("href")).toBe("https://www.pexels.com/api/");
+      expect(document.querySelector(".dz-ph .frm a")?.getAttribute("href")).toBe("https://pixabay.com/api/docs/");
+      expect(text()).toContain(en["dz.ph.howPixabay"]);
+    }
+    if (state === "dlg-tpl-pexels") {
+      // Pexels looked at without a key: the calm hint names Pixabay and links to its API page, and no form is open
+      expect(document.querySelector(".dz-ph .hint")?.textContent).toContain(en["dz.ph.pexelsHint"]);
+      expect(document.querySelector(".dz-ph .hint a")?.getAttribute("href")).toBe("https://pixabay.com/api/docs/");
+      expect(document.querySelector(".dz-ph input[type=password]")).toBeNull();
+      expect(text()).toContain(en["dz.ph.off"]);
+      expect(buttonOf(en["dz.ph.add"])).toBeDefined();
+    }
+    if (state === "dlg-tpl-both") {
+      expect(document.querySelectorAll(".dz-ph .src [role=radio]")).toHaveLength(2);
+      expect(document.querySelector(".dz-ph .src [role=radio][data-checked]")?.textContent).toContain("Pexels");
+      expect(text()).toContain(en["dz.ph.st.used"]);
     }
     if (state === "dlg-tpl-photos") {
       expect(text()).toContain(en["dz.ph.on"]);
@@ -98,11 +112,15 @@ describe("the scenes of the Decoy sites screens", () => {
       expect(buttonOf(en["dz.ph.remove"])).toBeDefined();
       expect(document.querySelector(".dz-fr iframe")?.getAttribute("srcdoc")).toContain("data:image/jpeg;base64,");
     }
-    if (state === "dlg-tpl-limit") expect(text()).toContain(en["dz.ph.st.limit"]);
+    if (state === "dlg-tpl-limit") expect(text()).toContain(en["dz.ph.st.limit"].replace("{name}", "Pixabay"));
     if (state.startsWith("dlg-tpl")) {
+      // the line that says where the photos are from names the source of the preview in view, and links to it
       const credit = document.querySelector(".dz-ph .ft a");
-      expect(credit?.getAttribute("href")).toBe("https://www.pexels.com");
+      const pexels = state === "dlg-tpl-both";
+      expect(credit?.getAttribute("href")).toBe(pexels ? "https://www.pexels.com" : "https://pixabay.com");
+      expect(credit?.textContent).toBe(en["dz.ph.credit"].replace("{name}", pexels ? "Pexels" : "Pixabay"));
       expect(credit?.getAttribute("rel")).toContain("noopener");
+      expect(document.querySelectorAll(".dz-ph .src [role=radio]")).toHaveLength(2);
     }
     if (state === "dlg-mcp") expect(document.querySelector(".dz-task")?.textContent).toContain("decoy_site_draft_save");
     if (state === "site-used") expect(document.querySelector("[data-shot=decoy-placement]")?.querySelectorAll(".dz-plr")).toHaveLength(2);

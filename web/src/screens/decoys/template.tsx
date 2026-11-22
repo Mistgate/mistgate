@@ -36,13 +36,14 @@ export type TemplateDemo = {
   name?: string;
   /** The code of the refusal of "err". */
   error?: string;
-  /** What the preview says about its photos ("used", "no_key", ...), and how the row of the Pexels key starts. */
+  /** What the preview says about its photos ("used", "no_key", ...), the source they are about, and how the row of the photo key starts. */
   photos?: string;
+  photosSource?: string;
   key?: PhotoDemo;
 };
 
-/** What a preview answered: the page, the seed it was made from (opaque), the name the site would get and why it has photos or not. */
-type Shown = { html: string; seed: string; name: string; photos: string };
+/** What a preview answered: the page, the seed it was made from (opaque), the name the site would get, and why it has photos or not and from which source. */
+type Shown = { html: string; seed: string; name: string; photos: string; photosSource: string };
 
 export function TemplateDialog({ onClose, demo }: { onClose: () => void; demo?: TemplateDemo }) {
   const t = useT();
@@ -53,7 +54,7 @@ export function TemplateDialog({ onClose, demo }: { onClose: () => void; demo?: 
   const nodes = useQuery(nodesQuery);
   const [kind, setKind] = useState(demo?.kind ?? "");
   const [picked, setPicked] = useState(demo?.country ?? "");
-  const [shown, setShown] = useState<Shown | undefined>(demo?.html ? { html: demo.html, seed: "demo", name: demo.name ?? "", photos: demo.photos ?? "" } : undefined);
+  const [shown, setShown] = useState<Shown | undefined>(demo?.html ? { html: demo.html, seed: "demo", name: demo.name ?? "", photos: demo.photos ?? "", photosSource: demo.photosSource ?? "" } : undefined);
   const [problem, setProblem] = useState(demo?.error ? t(`err.${demo.error}` as MessageKey) : "");
   const countries = templates.data?.countries ?? [];
   // the country of the window: the one picked, else the one most of the nodes with a shared page stand in, else the first
@@ -94,7 +95,7 @@ export function TemplateDialog({ onClose, demo }: { onClose: () => void; demo?: 
     setProblem("");
     preview.mutate({ kind, seed: "" });
   };
-  // a key was added or removed: the same site again (its seed), now with or without its photos
+  // a key was added or removed, or the source changed: the same site again (its seed), now with or without its photos
   const keyChanged = () => {
     if (!view || !shown) return;
     setShown(undefined);
@@ -193,7 +194,7 @@ export function TemplateDialog({ onClose, demo }: { onClose: () => void; demo?: 
               {t("dz.tpl.back")}
             </Button>
           </div>
-          <PhotoRow status={making ? undefined : shown?.photos} onChanged={keyChanged} demo={demo?.key} />
+          <PhotoRow status={making ? undefined : shown?.photos} statusSource={making ? undefined : shown?.photosSource} onChanged={keyChanged} demo={demo?.key} />
           {problem && (
             <Msg kind="bad" role="alert" title={t("dz.tpl.errTitle")}>
               <span>{problem}</span>

@@ -90,16 +90,24 @@ export const templatesQuery = queryOptions({
   staleTime: Infinity,
 });
 
-/** Whether the owner has put a Pexels key in (the key itself never comes back): the photos of generated sites need it. */
+/** Which photo keys the owner has put in (a key itself never comes back) and which source the photos come from. */
 export const photosQuery = queryOptions({
   queryKey: ["decoy-photos"],
   queryFn: async ({ signal }) => plain(await decoySites.getDecoyPhotos({}, { signal })),
   staleTime: Infinity,
 });
 
-/** The page where a free Pexels API key is made, and the site the credit line points to. */
-export const PEXELS_KEY_URL = "https://www.pexels.com/api/";
-export const PEXELS_URL = "https://www.pexels.com";
+/**
+ * The sources of the photos of generated sites. `keyUrl` is where the owner gets a free key (Pixabay shows it on its API page once
+ * you are signed in), `url` is what the credit line points to: both services ask to say where the photos are from.
+ */
+export const photoSources = {
+  pexels: { name: "Pexels", keyUrl: "https://www.pexels.com/api/", url: "https://www.pexels.com" },
+  pixabay: { name: "Pixabay", keyUrl: "https://pixabay.com/api/docs/", url: "https://pixabay.com" },
+} as const;
+export type PhotoSource = keyof typeof photoSources;
+export const photoSourceOrder = ["pexels", "pixabay"] as const satisfies readonly PhotoSource[];
+export const isPhotoSource = (s: string | undefined): s is PhotoSource => s === "pexels" || s === "pixabay";
 
 /** What a preview says about its photos (PreviewDecoyTemplateResponse.photos); a word the panel adds later is not shown. */
 export const photoStates = ["used", "no_key", "bad_key", "limit", "unavailable", "none_for_kind"] as const;

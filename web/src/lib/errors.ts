@@ -101,6 +101,8 @@ export const errorCodes = [
   "decoy_template_country",
   "decoy_template_seed",
   "decoy_photos_key_invalid",
+  "decoy_photos_source_invalid",
+  "decoy_photos_no_key",
   // relays (relay.proto): CreateRelay / UpdateRelay / CheckRelay
   "relay_exists",
   "same_node",
