@@ -1,5 +1,6 @@
 {
  "ui": {
+  "utc": "UTC",
   "nav_label": "Huvudmeny",
   "tagline": "Status för våra tjänster",
   "footer": "Alla tider anges i UTC.",

@@ -1,5 +1,8 @@
 {
  "ui": {
+  "platforms": "Plattformar",
+  "col_name": "Namn",
+  "col_size": "Storlek",
   "nav_label": "Huvudmeny",
   "footer": "Utgiven under MIT-licensen.",
   "nav_home": "Översikt",

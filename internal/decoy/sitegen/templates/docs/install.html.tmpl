@@ -1,16 +1,24 @@
 {{template "head" .}}<body>
 {{template "header" .}}
-<div class="__wrap__ __docs__">
-{{template "sidenav" .}}<article class="__doc__">
+<div class="__shell__">
+{{template "sidenav" .}}
+<main class="__main__">
+<div class="__crumb__">{{.L.menu_h}} / {{(index .Nav 1).Label}}</div>
 <h1>{{.L.install_h}}</h1>
-<p class="__lede__">{{.L.install_intro}}</p>
-<h2>{{.L.steps_h}}</h2>
-<ol>{{range .L.install_steps}}<li>{{.}}</li>{{end}}</ol>
-<pre><code>{{.L.install_code}}</code></pre>
-<p>{{.L.install_check}}</p>
-<p><a class="__btn__" href="{{(index .Nav 2).Href}}">{{.L.next}}: {{(index .Nav 2).Label}} {{icon "arrow"}}</a></p>
-</article>
-{{if eq .Layout 1}}{{template "facts" .}}{{end}}</div>
+<p class="__lead__">{{.L.install_intro}}</p>
+<h2 id="__t1__">{{.L.steps_h}}</h2>
+<ol class="__steps__">{{range .L.install_steps}}<li>{{.}}</li>{{end}}</ol>
+<div class="__cap__"><span>{{.L.cap_sh}}</span><span>{{.L.cap_os}}</span></div>
+<pre class="__pre__"><code>{{hl .L.install_code "sh"}}</code></pre>
+<div class="__note__">{{icon "checkc"}}<span>{{.L.install_check}}</span></div>
+<div class="__pn__"><a href="{{(index .Nav 0).Href}}"><small>{{.L.prev}}</small><b>{{(index .Nav 0).Label}}</b></a><a href="{{(index .Nav 2).Href}}"><small>{{.L.next}}</small><b>{{(index .Nav 2).Label}}</b></a></div>
+</main>
+<aside class="__tc__" aria-label="{{.L.toc_h}}">
+<h6>{{.L.toc_h}}</h6>
+<a href="#__t1__">{{.L.steps_h}}</a>
+{{template "glance" .}}
+</aside>
+</div>
 {{template "footer" .}}
 </body>
 </html>

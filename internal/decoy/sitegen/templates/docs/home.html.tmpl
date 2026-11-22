@@ -1,36 +1,51 @@
-{{define "header"}}<header class="__hd__">
-<div class="__wrap__ __hdin__">
-<a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span>{{if eq .Head 2}}<span class="__sub__">{{.L.tagline}}</span>{{end}}</a>
-<span class="__ver__">{{.L.ver_l}} {{.V.ver}}</span>
-</div>
-</header>
-{{end}}
-{{define "sidenav"}}<nav class="__sidenav__" aria-label="{{.L.menu_h}}">
-<strong>{{.L.menu_h}}</strong>
-<ul>{{range .Nav}}<li><a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a></li>{{end}}</ul>
-</nav>
-{{end}}
-{{define "facts"}}<aside class="__facts__">
-<h2>{{.L.facts_h}}</h2>
-<dl>{{range .L.facts}}<dt>{{.k}}</dt><dd>{{.v}}</dd>{{end}}</dl>
-</aside>
-{{end}}
 {{template "head" .}}<body>
 {{template "header" .}}
-<div class="__wrap__ __docs__">
-{{template "sidenav" .}}<article class="__doc__">
+<div class="__shell__">
+{{template "sidenav" .}}
+<main class="__main__">
+<div class="__crumb__">{{.L.menu_h}} / {{(index .Nav 0).Label}}</div>
 <h1>{{.Brand}}</h1>
-<p class="__lede__">{{.L.tagline}}</p>
-<p>{{.L.overview}}</p>
-<h2>{{.L.features_h}}</h2>
-<ul>{{range .L.features}}<li>{{.}}</li>{{end}}</ul>
-<h2>{{.L.quick_h}}</h2>
-<pre><code>{{.L.quick}}</code></pre>
-<p class="__mu__">{{.L.out_h}}</p>
-<pre><code>{{.L.quick_out}}</code></pre>
-<p><a class="__btn__" href="{{(index .Nav 1).Href}}">{{.L.next}}: {{(index .Nav 1).Label}} {{icon "arrow"}}</a></p>
-</article>
-{{if eq .Layout 1}}{{template "facts" .}}{{end}}</div>
+<p class="__tag__">{{.L.tagline}}</p>
+<p class="__lead__">{{.L.overview}}</p>
+
+<h2 id="__t1__">{{.L.quick_h}}</h2>
+<div class="__co__">
+<div>{{template "cap" .L.cap_sh}}<pre class="__pre__"><code>{{hl (printf "$ %s" .L.quick) "sh"}}</code></pre></div>
+<div>{{template "cap" .L.out_h}}<pre class="__pre__"><code>{{hl .L.quick_out "out"}}</code></pre></div>
+</div>
+
+<h2 id="__t2__">{{.L.features_h}}</h2>
+<ul class="__feat__">{{range $i, $f := .L.features}}<li>{{if eq $i 0}}{{icon "file"}}{{else if eq $i 1}}{{icon "layers"}}{{else if eq $i 2}}{{icon "chart"}}{{else}}{{icon "code"}}{{end}}{{$f}}</li>{{end}}</ul>
+
+<h2 id="__t3__">{{.L.install_h}}</h2>
+<p>{{.L.install_intro}}</p>
+<ol class="__steps__">{{range .L.install_steps}}<li>{{.}}</li>{{end}}</ol>
+<div class="__cap__"><span>{{.L.cap_sh}}</span><span>{{.L.cap_os}}</span></div>
+<pre class="__pre__"><code>{{hl .L.install_code "sh"}}</code></pre>
+<div class="__note__">{{icon "checkc"}}<span>{{.L.install_check}}</span></div>
+
+<h2 id="__t4__">{{.L.usage_h}}</h2>
+{{range $i, $u := .L.usage}}<h3>{{$u.h}}</h3>
+<p>{{$u.p}}</p>
+<pre class="__pre__"><code>{{hl $u.code "sh"}}</code></pre>
+{{end}}
+<h2 id="__t5__">{{.L.opts_h}}</h2>
+<div class="__tbl__"><table>
+<thead><tr><th>{{.L.opt_col}}</th><th>{{.L.desc_col}}</th></tr></thead>
+<tbody>{{range .L.options}}<tr><td><code>{{.o}}</code></td><td>{{.d}}</td></tr>{{end}}</tbody>
+</table></div>
+
+<h2 id="__t6__">{{.L.faq_h}}</h2>
+<div class="__faq__">{{range $i, $q := .L.faq}}<details{{if eq $i 0}} open{{end}}><summary>{{$q.q}}</summary><p>{{$q.a}}</p></details>{{end}}</div>
+
+<div class="__pn__"><a href="{{(index .Nav 1).Href}}"><small>{{.L.next}}</small><b>{{(index .Nav 1).Label}}</b></a><a href="{{(index .Nav 2).Href}}"><small>{{.L.next}}</small><b>{{(index .Nav 2).Label}}</b></a></div>
+</main>
+<aside class="__tc__" aria-label="{{.L.toc_h}}">
+<h6>{{.L.toc_h}}</h6>
+<a href="#__t1__">{{.L.quick_h}}</a><a href="#__t2__">{{.L.features_h}}</a><a href="#__t3__">{{.L.install_h}}</a><a href="#__t4__">{{.L.usage_h}}</a><a href="#__t5__">{{.L.opts_h}}</a><a href="#__t6__">{{.L.faq_h}}</a>
+{{template "glance" .}}
+</aside>
+</div>
 {{template "footer" .}}
 </body>
 </html>

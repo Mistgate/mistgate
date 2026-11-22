@@ -1,6 +1,5 @@
 {
  "style": {
-  "legacy": true,
   "scheme": "dark",
   "palettes": [
    {
@@ -114,9 +113,11 @@
   }
  ],
  "home_blocks": [
+  "install",
   "features",
   "start",
-  "latest"
+  "changelog",
+  "roadmap"
  ],
  "home_fixed": 0,
  "lists": [

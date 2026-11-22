@@ -1,6 +1,5 @@
 {
  "style": {
-  "legacy": true,
   "scheme": "both",
   "palettes": [
    {
@@ -141,6 +140,18 @@
    ],
    "nav": "nav_faq",
    "desc": "desc_faq"
+  },
+  {
+   "name": "terms",
+   "tmpl": "terms.html.tmpl",
+   "paths": [
+    "terms.html",
+    "terms/index.html",
+    "legal/terms.html",
+    "conditions.html"
+   ],
+   "nav": "nav_terms",
+   "desc": "desc_terms"
   }
  ]
 }

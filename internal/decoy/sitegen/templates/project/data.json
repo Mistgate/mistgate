@@ -14,20 +14,198 @@
     "c": "brew install {cmd}"
    }
   ],
-  "src_code": "tar xf {cmd}-%[1]s.tar.gz\ncd {cmd}-%[1]s\nmake\nsudo make install"
+  "src_code": "tar xf {cmd}-%[1]s.tar.gz\ncd {cmd}-%[1]s\nmake\nsudo make install",
+  "ver_cmd": "{cmd} --version",
+  "help_cmd": "{cmd} --help",
+  "term_path": "~/project",
+  "lic_v": "MIT",
+  "plat_v": "Linux, macOS, Windows",
+  "sum_os": "Linux",
+  "sum_cmd": "sha256sum {cmd}-%[1]s.tar.gz",
+  "files": [
+   {
+    "n": "{cmd}-%[1]s.tar.gz"
+   },
+   {
+    "n": "{cmd}-%[1]s.tar.xz"
+   },
+   {
+    "n": "{cmd}-%[1]s.zip"
+   }
+  ]
  },
  "bundles": [
   {
-   "id": "watch"
+   "id": "watch",
+   "fixed": {
+    "changes": [
+     {
+      "c": "add"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "add"
+     }
+    ]
+   }
   },
   {
-   "id": "images"
+   "id": "images",
+   "fixed": {
+    "changes": [
+     {
+      "c": "add"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "add"
+     }
+    ]
+   }
   },
   {
-   "id": "markdown"
+   "id": "markdown",
+   "fixed": {
+    "changes": [
+     {
+      "c": "add"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "add"
+     }
+    ]
+   }
   },
   {
-   "id": "backup"
+   "id": "backup",
+   "fixed": {
+    "changes": [
+     {
+      "c": "add"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "add"
+     },
+     {
+      "c": "fix"
+     },
+     {
+      "c": "chg"
+     },
+     {
+      "c": "add"
+     }
+    ]
+   }
   }
  ]
 }

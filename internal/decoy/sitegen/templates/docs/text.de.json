@@ -1,5 +1,6 @@
 {
  "ui": {
+  "ref_h": "Referenz",
   "nav_label": "Dokumentation",
   "footer": "Dokumentation für Version {ver}.",
   "nav_home": "Überblick",

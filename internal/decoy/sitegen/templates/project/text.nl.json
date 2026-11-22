@@ -1,5 +1,8 @@
 {
  "ui": {
+  "platforms": "Platforms",
+  "col_name": "Naam",
+  "col_size": "Grootte",
   "nav_label": "Hoofdmenu",
   "footer": "Uitgebracht onder de MIT-licentie.",
   "nav_home": "Overzicht",

@@ -1,33 +1,37 @@
 {{define "b_comps"}}<section class="__sec__">
-<h2>{{.L.comps_h}}</h2>
-<ul class="__comps__">{{range $i, $c := .Lists.comps}}<li class="__comp__">
-<div class="__ch__"><span class="__cn__">{{$c.text}}</span><span class="__cs__">{{icon "check"}}{{$.L.op}}</span></div>
-<div class="__bars__" aria-hidden="true">{{range rolls (printf "bars%d" $i) 60 45 14}}<i{{if eq . 1}} class="__w__"{{else if eq . 2}} class="__x__"{{else if eq . 3}} class="__o1__"{{else if eq . 4}} class="__o2__"{{end}}></i>{{end}}</div>
-<div class="__cf__"><span>{{$.L.days_ago_l}}</span><span>{{pct (printf "up%d" $i) 9950 9999}}% {{$.L.up_label}}</span><span>{{$.L.days_ago_r}}</span></div>
-</li>{{end}}</ul>
+<div class="__sech__"><h2>{{.L.comps_h}}</h2><small>{{.L.footer}}</small></div>
+<div class="__tbl__">
+<div class="__scale__"><span></span><div><span>{{.L.days_ago_l}}</span><span>{{.L.days_ago_r}}</span></div><span></span><span></span></div>
+{{range $i, $c := .Lists.comps}}{{$a := avail (printf "svc%d" $i) 60 15 4 7}}{{$sh := rolls (printf "sh%d" $i) 60 0 0}}<div class="__row__"><span class="__n__">{{$c.text}}</span>
+<div class="__bars__" aria-hidden="true">{{range $j, $d := $a.days}}<i class="{{if eq $d 1}}__w__{{else if eq $d 2}}__x__{{else}}__o{{index $sh $j}}__{{end}}"></i>{{end}}</div>
+<span class="__pc__ __mono__">{{$a.pct}}%</span><span class="__ok__">{{icon "checkc"}}{{$.L.op}}</span></div>
+{{end}}</div>
 </section>{{end}}
-{{define "b_metrics"}}<section class="__sec__">
-<div class="__metrics__">
-<div class="__card__"><span class="__mv__">{{pct "upall" 9965 9999}}%</span><span class="__ml__">{{.L.m_uptime}}</span></div>
-<div class="__card__"><span class="__mv__">{{num "resp" 88 340}} {{.L.ms}}</span><span class="__ml__">{{.L.m_resp}}</span></div>
-<div class="__card__"><span class="__mv__">{{len .Lists.incidents}}</span><span class="__ml__">{{.L.m_inc}}</span></div>
+{{define "b_metrics"}}{{$s := series "resp" 60 110 190}}<section class="__grid2__">
+<div class="__card__">
+<div class="__ch__"><h2>{{.L.m_resp}}</h2><b class="__mono__">{{$s.avg}} {{.L.ms}}</b></div>
+<div class="__cht__">{{chart $s "area" 900 220}}</div>
+<div class="__axis__ __mono__"><span>{{.L.days_ago_l}}</span><span>{{.L.days_ago_r}}</span></div>
 </div>
+<div class="__side__"><div class="__card__ __stat__"><span>{{.L.m_inc}}</span><b class="__mono__">{{len .Lists.incidents}}</b><i>{{.L.st_res}}</i></div></div>
 </section>{{end}}
 {{define "b_recent"}}<section class="__sec__">
-<h2>{{.L.recent_h}}</h2>
-<ul class="__recent__">{{range $i, $x := .Lists.incidents}}{{if lt $i 3}}<li>
-<div class="__rh__"><strong>{{$x.title}}</strong><span class="__pill__ {{if eq $x.impact "major"}}__imp2__{{else if eq $x.impact "maint"}}__imp3__{{else}}__imp1__{{end}}">{{if eq $x.impact "major"}}{{$.L.imp_major}}{{else if eq $x.impact "maint"}}{{$.L.imp_maint}}{{else}}{{$.L.imp_minor}}{{end}}</span></div>
-<p class="__mu__">{{$x.date}} · {{$.L.st_res}}</p>
-<p>{{$x.c}}</p>
-</li>{{end}}{{end}}</ul>
-<p><a href="{{(index .Nav 1).Href}}">{{.L.all_inc}} {{icon "arrow"}}</a></p>
+<div class="__sech__"><h2>{{.L.recent_h}}</h2><a class="__more__" href="{{(index .Nav 1).Href}}">{{.L.all_inc}} {{icon "arrow"}}</a></div>
+<div class="__card__ __tlc__"><ul class="__tl__">{{range $i, $x := .Lists.incidents}}{{if lt $i 3}}<li><div class="__d__ __mono__"><time datetime="{{$x.date_iso}}">{{$x.date}}</time></div>
+<div class="__b__"><a class="__ti__" href="{{$x.href}}">{{$x.title}}</a><span class="__pill__ {{if eq $x.impact "major"}}__imp2__{{else if eq $x.impact "maint"}}__imp3__{{else}}__imp1__{{end}}">{{if eq $x.impact "major"}}{{$.L.imp_major}}{{else if eq $x.impact "maint"}}{{$.L.imp_maint}}{{else}}{{$.L.imp_minor}}{{end}}</span><p>{{$x.c}}</p>
+<div class="__m__"><span>{{$.L.st_res}}</span><span>{{$.L.dur_l}}: {{$x.dur}}</span></div></div></li>{{end}}{{end}}</ul></div>
+</section>{{end}}
+{{define "b_about"}}<section class="__sec__">
+<div class="__sech__"><h2>{{.L.about_h}}</h2></div>
+<div class="__abt__">{{range $i, $x := .L.about}}<div><span class="__no__ __mono__">0{{add $i 1}}</span><h3>{{$x.h}}</h3><p>{{$x.p}}</p></div>{{end}}</div>
 </section>{{end}}
 {{template "head" .}}<body>
 {{template "header" .}}
 <main class="__wrap__ __st__">
-<section class="__banner__">
-<span class="__tick__">{{icon "check"}}</span>
-<div><h1>{{.L.banner_ok}}</h1><p>{{.L.banner_sub}}</p></div>
+{{$u := avail "all" 90 6 1 14}}
+<section class="__hero__">
+<div class="__hc__"><span class="__chip__"><i class="__dot__"></i>{{.L.home_title}}</span><h1>{{.L.banner_ok}}</h1><p class="__lede__">{{.L.banner_sub}}</p></div>
+<div class="__big__"><b class="__mono__">{{$u.pct}}%</b><span>{{.L.m_uptime}}</span></div>
 </section>
 {{range .Order}}{{blk . $}}{{end}}
 </main>

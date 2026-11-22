@@ -1,5 +1,6 @@
 {
  "ui": {
+  "ref_h": "Naslag",
   "nav_label": "Documentatie",
   "footer": "Documentatie bij versie {ver}.",
   "nav_home": "Overzicht",

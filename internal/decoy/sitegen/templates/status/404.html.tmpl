@@ -1,0 +1,14 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __st__ __nfm__">
+<section class="__card__ __nfc__">
+<span class="__chip__ __bad__"><i class="__dot__"></i><b class="__mono__">404</b></span>
+<h1>{{.L.nf_title}}</h1>
+<p class="__lede__">{{.L.nf_text}}</p>
+<div class="__bars__" aria-hidden="true">{{range $j, $d := rolls "nf" 60 20 0}}<i class="{{if eq $d 1}}__w__{{else}}__o{{$d}}__{{end}}"></i>{{end}}<i class="__x__"></i></div>
+<p><a class="__btn__" href="/">{{icon "back"}}{{.L.nf_back}}</a></p>
+</section>
+</main>
+{{template "footer" .}}
+</body>
+</html>

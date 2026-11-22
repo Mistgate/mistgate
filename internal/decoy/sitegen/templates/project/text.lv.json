@@ -1,5 +1,8 @@
 {
  "ui": {
+  "platforms": "Platformas",
+  "col_name": "Nosaukums",
+  "col_size": "Izmērs",
   "nav_label": "Izvēlne",
   "footer": "Izdots ar MIT licenci.",
   "nav_home": "Pārskats",

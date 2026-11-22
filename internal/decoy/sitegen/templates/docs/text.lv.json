@@ -1,5 +1,6 @@
 {
  "ui": {
+  "ref_h": "Atsauce",
   "nav_label": "Dokumentācija",
   "footer": "Dokumentācija versijai {ver}.",
   "nav_home": "Pārskats",

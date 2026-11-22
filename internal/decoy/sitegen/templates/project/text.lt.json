@@ -1,5 +1,8 @@
 {
  "ui": {
+  "platforms": "Platformos",
+  "col_name": "Pavadinimas",
+  "col_size": "Dydis",
   "nav_label": "Pagrindinis",
   "footer": "Platinama pagal MIT licenciją.",
   "nav_home": "Apžvalga",

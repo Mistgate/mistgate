@@ -1,5 +1,8 @@
 {
  "ui": {
+  "platforms": "Plattformen",
+  "col_name": "Name",
+  "col_size": "Größe",
   "nav_label": "Hauptmenü",
   "footer": "Veröffentlicht unter der MIT-Lizenz.",
   "nav_home": "Überblick",

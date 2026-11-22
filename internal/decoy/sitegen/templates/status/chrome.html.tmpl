@@ -1,0 +1,18 @@
+{{define "header"}}<header class="__top__">
+<div class="__wrap__ __topin__">
+<a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span><small>{{.L.tagline}}</small></a>
+<nav class="__nav__" aria-label="{{.L.nav_label}}">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</nav>
+{{template "menu" .}}
+</div>
+</header>{{end}}
+{{define "footer"}}<footer class="__ft__">
+<div class="__wrap__">
+<div class="__fg__">
+<div><div class="__fl__">{{.Mark}}<span>{{.Brand}}</span></div><p>{{.L.desc}}</p></div>
+<div><h4>{{.L.status_l}}</h4>{{range .Nav}}<a href="{{.Href}}">{{.Label}}</a>{{end}}</div>
+<div><h4>{{.L.about_h}}</h4>{{range $i, $x := .L.about}}<a href="{{(index $.Nav 2).Href}}#__s{{add $i 1}}__">{{$x.h}}</a>{{end}}</div>
+<div><h4>{{.L.recent_h}}</h4>{{range $i, $x := .Lists.incidents}}{{if lt $i 3}}<a href="{{$x.href}}">{{$x.title}}</a>{{end}}{{end}}</div>
+</div>
+<div class="__fb__"><span>{{.L.footer}}</span><span>© {{.Year}} {{.Brand}}</span></div>
+</div>
+</footer>{{end}}

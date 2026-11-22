@@ -1,0 +1,24 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<div class="__shell__">
+{{template "sidenav" .}}
+<main class="__main__">
+<div class="__crumb__">{{.L.menu_h}} / {{(index .Nav 7).Label}}</div>
+<h1>{{.L.terms_h}}</h1>
+<p class="__lead__">{{.L.terms_intro}}</p>
+<div class="__meta__"><span>{{.L.ver_l}} {{.V.ver}}</span><span>{{(index .L.facts 2).k}} {{(index .L.facts 2).v}}</span></div>
+<article class="__legal__">
+{{range $i, $s := .L.terms}}<span class="__no__">0{{add $i 1}}</span>
+<h2 id="__t{{add $i 1}}__">{{$s.h}}</h2>
+<p>{{$s.p}}</p>
+{{end}}</article>
+<div class="__pn__"><a href="{{(index .Nav 6).Href}}"><small>{{.L.prev}}</small><b>{{(index .Nav 6).Label}}</b></a><a href="{{(index .Nav 0).Href}}"><small>{{.L.next}}</small><b>{{(index .Nav 0).Label}}</b></a></div>
+</main>
+<aside class="__tc__" aria-label="{{.L.toc_h}}">
+<h6>{{.L.toc_h}}</h6>
+{{range $i, $s := .L.terms}}<a href="#__t{{add $i 1}}__">{{$s.h}}</a>{{end}}
+</aside>
+</div>
+{{template "footer" .}}
+</body>
+</html>

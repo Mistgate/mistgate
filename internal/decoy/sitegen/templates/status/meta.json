@@ -1,6 +1,5 @@
 {
  "style": {
-  "legacy": true,
   "scheme": "both",
   "palettes": [
    {
@@ -10,18 +9,18 @@
    },
    {
     "name": "blue",
-    "l": {"bg": "#f2f5fa", "fg": "#0e1726", "ac": "#1d4ed8", "a2": "#0b7a3e", "sf": "#ffffff"},
-    "d": {"bg": "#0d1422", "fg": "#e6ebf5", "ac": "#7aa2ff", "a2": "#4ade80"}
+    "l": {"bg": "#f2f5fa", "fg": "#0e1726", "ac": "#1d4ed8", "a2": "#6d3fd0", "sf": "#ffffff"},
+    "d": {"bg": "#0d1422", "fg": "#e6ebf5", "ac": "#7aa2ff", "a2": "#b79cff"}
    },
    {
     "name": "teal",
-    "l": {"bg": "#f0f6f6", "fg": "#0d1b1e", "ac": "#0f766e", "a2": "#b45309", "sf": "#ffffff"},
-    "d": {"bg": "#0c1819", "fg": "#e3eeee", "ac": "#2dd4bf", "a2": "#fbbf24"}
+    "l": {"bg": "#f0f6f6", "fg": "#0d1b1e", "ac": "#0f766e", "a2": "#2447a3", "sf": "#ffffff"},
+    "d": {"bg": "#0c1819", "fg": "#e3eeee", "ac": "#2dd4bf", "a2": "#7aa7ff"}
    },
    {
     "name": "violet",
-    "l": {"bg": "#f5f4fa", "fg": "#16132a", "ac": "#5b3fd0", "a2": "#0f766e", "sf": "#ffffff"},
-    "d": {"bg": "#130f22", "fg": "#ebe8f6", "ac": "#a78bfa", "a2": "#5eead4"}
+    "l": {"bg": "#f5f4fa", "fg": "#16132a", "ac": "#5b3fd0", "a2": "#1d6fa5", "sf": "#ffffff"},
+    "d": {"bg": "#130f22", "fg": "#ebe8f6", "ac": "#a78bfa", "a2": "#6fb8ee"}
    },
    {
     "name": "orange",
@@ -30,8 +29,8 @@
    },
    {
     "name": "graphite",
-    "l": {"bg": "#f4f4f5", "fg": "#18181b", "ac": "#3f3f46", "a2": "#0b7a3e", "sf": "#ffffff"},
-    "d": {"bg": "#121214", "fg": "#ececee", "ac": "#d4d4d8", "a2": "#4ade80"}
+    "l": {"bg": "#f4f4f5", "fg": "#18181b", "ac": "#3f3f46", "a2": "#2447a3", "sf": "#ffffff"},
+    "d": {"bg": "#121214", "fg": "#ececee", "ac": "#d4d4d8", "a2": "#7aa7ff"}
    }
   ],
   "fonts": [
@@ -108,11 +107,12 @@
   }
  ],
  "home_blocks": [
-  "comps",
   "metrics",
-  "recent"
+  "comps",
+  "recent",
+  "about"
  ],
- "home_fixed": 0,
+ "home_fixed": 1,
  "lists": [
   {
    "name": "comps",
