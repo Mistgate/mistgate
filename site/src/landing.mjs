@@ -3,6 +3,7 @@
 // plain voice: the same facts, no claim the README or the docs do not make. docs/<lang>/index.md stays the sidebar's
 // source and the docs' start page on GitHub.
 // Copy may hold `code`, **bold** and [text](page-key#anchor) or [text](https://...) links.
+import { FEATS } from "./landing-feats.mjs";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,7 +44,7 @@ export const LANDING = {
       ["mask", "A decoy site", "Strangers who open the panel's address see a decoy site; the admin is behind a secret path or host name.", "guide/decoy-site"],
       ["ai", "Assistant and MCP", "A built-in assistant (a cloud model you connect with your own key) answers about your nodes and people and prepares changes you apply. MCP lets an outside AI agent read the fleet, test paths between your nodes and plan changes; risky ones wait for your approval in the admin. An API token can disable or rewrite at most 10 people an hour unless you lift the limit for it.", "guide/assistant"],
     ],
-    notYet: "Not there yet: an app of our own (planned), a Telegram bot beyond alerts, and the Cloudflare Workers edition is still a [preview](getting-started/install-edge). Some defaults lean towards users in Russia; all of them are settings.",
+    notYet: "Not there yet: a Telegram bot beyond alerts, and the Cloudflare Workers edition is still a [preview](getting-started/install-edge). Some defaults lean towards users in Russia; all of them are settings.",
     fitH: "How it fits together",
     fitP: "Two programs: the panel and an agent on every server. A person's app talks to the panel only to fetch its link; VPN traffic goes straight to the node.",
     fitAlt: "How Mistgate fits together: you use the admin, a person's app fetches its link from the panel, VPN traffic goes from the app to the node and out to the internet, and the node keeps one connection to the panel",
@@ -130,7 +131,7 @@ export const LANDING = {
       ["mask", "Сайт-ширма", "Посторонний по адресу панели видит сайт-ширму; админка — за секретным путём или именем хоста.", "guide/decoy-site"],
       ["ai", "Ассистент и MCP", "Встроенный ассистент (облачная модель, которую вы подключаете своим ключом) отвечает про ваши ноды и людей и готовит изменения, которые применяете вы. MCP позволяет внешнему ИИ-агенту читать флот, проверять пути между нодами и планировать изменения; рискованные ждут вашего одобрения в админке. API-токен может отключить или переписать не больше 10 человек в час, пока вы не снимете для него лимит.", "guide/assistant"],
     ],
-    notYet: "Чего пока нет: собственного приложения (оно в планах); Telegram-бот только присылает алерты, а версия для Cloudflare Workers — [предварительная](getting-started/install-edge). Часть настроек по умолчанию рассчитана на пользователей в России; все их можно поменять.",
+    notYet: "Чего пока нет: Telegram-бот только присылает алерты, а версия для Cloudflare Workers — [предварительная](getting-started/install-edge). Часть настроек по умолчанию рассчитана на пользователей в России; все их можно поменять.",
     fitH: "Как это устроено",
     fitP: "Две программы: панель и агент на каждом сервере. С панелью приложение человека говорит, только когда забирает ссылку; VPN-трафик идёт прямо на ноду.",
     fitAlt: "Как устроен Mistgate: вы работаете в админке, приложение человека забирает ссылку у панели, VPN-трафик идёт от приложения на ноду и в интернет, а нода держит одно соединение с панелью",
@@ -217,7 +218,7 @@ export const LANDING = {
       ["mask", "伪装站点", "陌生人打开面板地址只会看到伪装站点；管理后台位于私密路径或私密主机名之后。", "guide/decoy-site"],
       ["ai", "助手和 MCP", "内置助手（你用自己的密钥接入的云端模型）回答关于节点和用户的问题，并把更改整理成由你应用的卡片。MCP 让外部 AI 智能体读取集群状态、测试节点之间的路径并规划修改，有风险的操作要等你在管理后台批准。API 令牌每小时最多只能停用或改写 10 人，除非你为它解除限额。", "guide/assistant"],
     ],
-    notYet: "目前还没有的：我们自己的应用（已在计划中）；Telegram 机器人只能发告警；Cloudflare Workers 版仍是[预览版](getting-started/install-edge)。部分默认值偏向俄罗斯用户，都可以在设置里修改。",
+    notYet: "目前还没有的：Telegram 机器人只能发告警；Cloudflare Workers 版仍是[预览版](getting-started/install-edge)。部分默认值偏向俄罗斯用户，都可以在设置里修改。",
     fitH: "各部分如何配合",
     fitP: "两个程序：面板，以及每台服务器上的 Agent。用户的应用只在获取链接时访问面板；VPN 流量直接发往节点。",
     fitAlt: "Mistgate 的组成：你使用管理后台，用户的应用从面板获取自己的链接，VPN 流量从应用经节点送往互联网，节点与面板保持一条连接",
@@ -304,7 +305,7 @@ export const LANDING = {
       ["mask", "سایت پوششی", "غریبه‌ای که نشانی پنل را باز کند یک سایت پوششی می‌بیند؛ پنل مدیریت پشت یک مسیر یا نام میزبان مخفی است.", "guide/decoy-site"],
       ["ai", "دستیار و MCP", "دستیار داخلی (یک مدل ابری که با کلید خودتان وصل می‌کنید) دربارهٔ نودها و کاربران پاسخ می‌دهد و تغییرها را به‌صورت کارت‌هایی آماده می‌کند که خودتان اجرا می‌کنید. MCP به ایجنت هوش مصنوعی بیرونی اجازه می‌دهد وضعیت نودها را بخواند، مسیرهای میان نودها را آزمایش کند و تغییر برنامه‌ریزی کند؛ تغییرات پرخطر در پنل مدیریت منتظر تأیید شما می‌مانند. یک توکن API در هر ساعت حداکثر می‌تواند 10 نفر را غیرفعال یا بازنویسی کند، مگر اینکه محدودیت را برای آن بردارید.", "guide/assistant"],
     ],
-    notYet: "آنچه هنوز نیست: برنامهٔ خودمان (در برنامه است)؛ ربات Telegram فعلاً فقط هشدار می‌فرستد و نسخهٔ Cloudflare Workers هنوز [پیش‌نمایش](getting-started/install-edge) است. برخی پیش‌فرض‌ها برای کاربران داخل روسیه انتخاب شده‌اند؛ همهٔ آن‌ها در تنظیمات قابل تغییرند.",
+    notYet: "آنچه هنوز نیست: ربات Telegram فعلاً فقط هشدار می‌فرستد و نسخهٔ Cloudflare Workers هنوز [پیش‌نمایش](getting-started/install-edge) است. برخی پیش‌فرض‌ها برای کاربران داخل روسیه انتخاب شده‌اند؛ همهٔ آن‌ها در تنظیمات قابل تغییرند.",
     fitH: "اجزا چطور کنار هم کار می‌کنند",
     fitP: "دو برنامه: پنل، و یک ایجنت روی هر سرور. برنامهٔ کاربر فقط برای گرفتن لینکش با پنل حرف می‌زند؛ ترافیک VPN مستقیم به نود می‌رود.",
     fitAlt: "اجزای Mistgate: شما با پنل مدیریت کار می‌کنید، برنامهٔ کاربر لینکش را از پنل می‌گیرد، ترافیک VPN از برنامه به نود و از آنجا به اینترنت می‌رود، و نود یک اتصال با پنل نگه می‌دارد",
@@ -390,7 +391,7 @@ export const LANDING = {
       ["mask", "Kamuflaj sitesi", "Panelin adresini açan yabancılar bir kamuflaj sitesi görür; yönetim paneli gizli bir yolun ya da ana bilgisayar adının arkasındadır.", "guide/decoy-site"],
       ["ai", "Asistan ve MCP", "Yerleşik asistan (kendi anahtarınızla bağladığınız bir bulut modeli) düğümleriniz ve kişiler hakkındaki sorulara yanıt verir ve değişiklikleri sizin uygulayacağınız kartlar olarak hazırlar. MCP, dışarıdaki bir yapay zekâ ajanının düğümlerin durumunu okumasına, düğümler arasındaki yolları sınamasına ve değişiklik planlamasına izin verir; riskli olanlar yönetim panelinde sizin onayınızı bekler. Bir API token'ı, siz onun için sınırı kaldırmadıkça saatte en çok 10 kişiyi devre dışı bırakabilir ya da yeniden yazabilir.", "guide/assistant"],
     ],
-    notYet: "Henüz olmayanlar: kendi uygulamamız (planlandı); Telegram botu şimdilik yalnızca uyarı gönderir, Cloudflare Workers sürümü de hâlâ bir [önizleme](getting-started/install-edge). Bazı varsayılanlar Rusya'daki kullanıcılara göre seçilmiştir; hepsi ayarlardan değiştirilebilir.",
+    notYet: "Henüz olmayanlar: Telegram botu şimdilik yalnızca uyarı gönderir, Cloudflare Workers sürümü de hâlâ bir [önizleme](getting-started/install-edge). Bazı varsayılanlar Rusya'daki kullanıcılara göre seçilmiştir; hepsi ayarlardan değiştirilebilir.",
     fitH: "Parçalar nasıl birleşir",
     fitP: "İki program: panel ve her sunucudaki ajan. Bir kişinin uygulaması panelle yalnızca bağlantısını almak için konuşur; VPN trafiği doğrudan düğüme gider.",
     fitAlt: "Mistgate'in parçaları: siz yönetim panelini kullanırsınız, kişinin uygulaması bağlantısını panelden alır, VPN trafiği uygulamadan düğüme ve oradan internete gider, düğüm de panelle tek bir bağlantı tutar",
@@ -461,6 +462,16 @@ export const LANDING = {
 /** Hero and body of the home page. `nav` gives the order, titles and addresses of the pages (an untranslated one is the
  *  English page, marked `en`); `name(page)` writes a page's name with its EN mark; `section(key)` names the admin section a
  *  page describes, "start" for the pages before the admin, null for the reference. */
+const APP_TITLE = { en: "Mistgate for Windows", ru: "Mistgate для Windows", zh: "适用于 Windows 的 Mistgate", fa: "Mistgate برای ویندوز", tr: "Windows için Mistgate" };
+// the Windows app, as the README says it (a link to its repository)
+const APPS = {
+  en: "A desktop app for Windows, [Mistgate](https://github.com/Mistgate/mistgate-client), works with these panels and with plain subscription links.",
+  ru: "Приложение для Windows, [Mistgate](https://github.com/Mistgate/mistgate-client), работает с этими панелями и с обычными ссылками-подписками.",
+  zh: "Windows 桌面应用 [Mistgate](https://github.com/Mistgate/mistgate-client) 可配合这些面板，也可用于普通订阅链接。",
+  fa: "یک برنامهٔ دسکتاپ برای ویندوز، [Mistgate](https://github.com/Mistgate/mistgate-client)، با این پنل‌ها و با پیوندهای اشتراک معمولی کار می‌کند.",
+  tr: "Windows için bir masaüstü uygulaması, [Mistgate](https://github.com/Mistgate/mistgate-client), bu panellerle ve düz abonelik bağlantılarıyla çalışır.",
+};
+
 export function renderLanding({ lang, t, nav, section, name = (p) => esc(p.title), langNames = [] }) {
   const L = LANDING[lang];
   const pages = new Map(nav.flatMap((g) => g.items).map((i) => [i.key, i]));
@@ -496,8 +507,15 @@ export function renderLanding({ lang, t, nav, section, name = (p) => esc(p.title
 <figure class="shot shot--video"><video src="/video/hero-${lang}.mp4" poster="/video/hero-poster-${lang}.webp" width="1280" height="720" autoplay muted loop playsinline preload="metadata" aria-label="${esc(L.demoAlt)}"></video></figure>
 </section>`;
 
+  // the features, a loop of the admin beside each; then what the home page already listed and the README's "Also in the box"
+  const F = FEATS[lang];
+  const clip = (n, alt) => `<figure class="shot shot--clip feat__m"><img class="shot__dark" src="/img/readme/${n}-dark-en.webp" alt="${esc(alt)}" width="840" loading="lazy"><img class="shot__light" src="/img/readme/${n}-light-en.webp" alt="${esc(alt)}" width="840" loading="lazy"></figure>`;
+  const feats = `<ul class="feats">${F.rows.map(([n, h, p, key, frag, alt]) => `<li class="feat"><div class="feat__t"><h3>${esc(h)}</h3><p>${esc(p)}</p><a class="feat__a" href="${url(key)}${own(key) && frag ? `#${frag}` : ""}">${esc(F.docs)}${icon("chevronRight", 12)}</a></div><div class="feat__m">${clip(n, alt)}${n === "decoys" ? clip("decoys-sites", F.stripAlt) : ""}</div></li>`).join("")}</ul>`;
+  // covered by a feature above: nodes from the browser, one link per person, checks, one 443, the assistant
+  const also = L.does.filter((_, i) => ![0, 1, 2, 4, 9].includes(i));
+  const app = `<li>${chip("monitor")}<div><h3>${esc(APP_TITLE[lang])}</h3><p>${fmt(APPS[lang])}</p></div></li>`;
   const does = `<section class="home-sec" aria-labelledby="does"><h2 id="does">${esc(L.doesH)}</h2>
-${list(L.does)}<p class="home-p">${fmt(L.notYet)}</p></section>`;
+${feats}<h3 class="home-h3">${esc(F.also)}</h3>${list(also).replace("</ul>", `${app}</ul>`)}<p class="home-p">${fmt(L.notYet)}</p></section>`;
 
   const fit = `<section class="home-sec" aria-labelledby="fit"><h2 id="fit">${esc(L.fitH)}</h2><p class="home-p">${esc(L.fitP)}</p>
 <figure class="diagram diagram--svg" tabindex="0">${inlineSvg(`${DOCS}${fitLang}/diagrams/how-it-fits.svg`, L.fitAlt)}</figure></section>`;
