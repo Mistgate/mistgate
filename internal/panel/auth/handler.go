@@ -32,8 +32,8 @@ func (s *Service) Handler() (string, http.Handler) {
 	return adminv1connect.NewAuthServiceHandler(s, connect.WithReadMaxBytes(64<<10))
 }
 
-func sessionToken(h http.Header) string {
-	c, err := (&http.Request{Header: h}).Cookie(CookieName)
+func (s *Service) sessionToken(h http.Header) string {
+	c, err := (&http.Request{Header: h}).Cookie(s.cookieName)
 	if err != nil {
 		return ""
 	}
@@ -696,7 +696,7 @@ func nonEmpty(s, def string) string {
 // is public, and an audit row per anonymous call would let anyone who reaches the admin grow the audit log (pruned
 // only after its retention, 400 days by default) and the database at the admin request rate.
 func (s *Service) Logout(ctx context.Context, req *connect.Request[adminv1.LogoutRequest]) (*connect.Response[adminv1.LogoutResponse], error) {
-	if tok := sessionToken(req.Header()); tok != "" {
+	if tok := s.sessionToken(req.Header()); tok != "" {
 		admin, err := s.resolve(ctx, tok)
 		if err := s.st.DeleteSession(ctx, hashToken(tok)); err != nil {
 			s.log.Error("delete session", "err", err)
@@ -707,7 +707,7 @@ func (s *Service) Logout(ctx context.Context, req *connect.Request[adminv1.Logou
 		}
 	}
 	resp := connect.NewResponse(&adminv1.LogoutResponse{})
-	resp.Header().Add("Set-Cookie", clearedCookie().String())
+	resp.Header().Add("Set-Cookie", s.clearedCookie().String())
 	return resp, nil
 }
 

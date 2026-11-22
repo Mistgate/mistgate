@@ -118,7 +118,7 @@ Agent 通过面板的公共端口访问接入端点：使用私密名称进行 T
 
 公共监听器按以下顺序判断请求去向：使用私密 Agent 名称的 TLS 连接进入 Agent 接入端点；请求私密管理主机名或位于私密管理前缀下的请求进入管理后台；位于订阅前缀下的请求交给订阅处理器；其他请求进入伪装站点。非规范路径、错误前缀和未知主机名最终都会得到伪装站点的两种响应之一（页面或 404）。每个 404 响应至少延迟 8 ms，因此无法通过计时区分未知订阅令牌（一次数据库读取）和未知路径。即使订阅处理器内部生成 404 或 405，也会替换为伪装站点的 404。
 
-管理后台由单页应用、位于 `<admin>/api/` 下的 Connect API、位于 `<admin>/mcp` 的 MCP 服务器，以及位于 `<admin>/nodes/install` 的服务端渲染 SSH 安装管理器组成。API 会先检查会话：需要会话 Cookie（`__Host-sid`，Secure、HttpOnly、SameSite=Strict），或 `Authorization: Bearer` 请求头中的 API 令牌。管理后台响应带有严格的 Content-Security-Policy、`X-Frame-Options: DENY`、`no-store`、`noindex`，并在 TLS 上启用 HSTS；拒绝来自其他源的状态变更请求。
+管理后台由单页应用、位于 `<admin>/api/` 下的 Connect API、位于 `<admin>/mcp` 的 MCP 服务器，以及位于 `<admin>/nodes/install` 的服务端渲染 SSH 安装管理器组成。API 会先检查会话：HTTPS 模式下使用会话 Cookie（`__Host-sid`，Secure、HttpOnly、SameSite=Strict）；单独的普通 HTTP 监听器使用不带 Secure 的 `sid`，并保留 HttpOnly、SameSite=Strict 和 Path=/；也可以使用 `Authorization: Bearer` 请求头中的 API 令牌。管理后台响应带有严格的 Content-Security-Policy、`X-Frame-Options: DENY`、`no-store`、`noindex`，并在 TLS 上启用 HSTS；拒绝来自其他源的状态变更请求。
 
 每个客户端（一个 IPv4 地址或一个 IPv6 /64）在公共、管理和 Agent 三侧分别有请求额度。超出额度时，客户端会收到伪装站点样式的 429 响应。订阅端点还单独设有限制：客户端网络一分钟内尝试 20 个未知令牌后，会被封锁 15 分钟，其未知令牌一次最多引发 30 次数据库查询，之后每两秒一次，而面板已知存在的链接仍可正常使用。同一链接每个网络每小时最多请求 60 次，所有网络合计每小时最多 600 次。自助操作每网络每小时最多 20 次，每个令牌总计最多 100 次。一个链接一天内被 8 个以上网络使用时，会产生「链接共享」事件。
 

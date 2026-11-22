@@ -58,7 +58,8 @@ Signing in counts as a proof, so "sign in, then add a passkey" asks nothing more
 
 ## Sessions
 
-- The session cookie is `__Host-sid`: HTTPS only, not readable by scripts, sent only to the panel itself (SameSite=Strict).
+- The separate plain HTTP listener uses `sid` without Secure; it keeps HttpOnly, SameSite=Strict and Path=/.
+- The HTTPS session cookie is `__Host-sid`: not readable by scripts, sent only to the panel itself (SameSite=Strict).
 - A session ends after 12 hours without activity, and after 30 days at most.
 - **Settings → Sessions** lists the admin's own sessions with the address and browser. **End** ends one (ending another than the current one needs step-up); **End all others** ends the rest (needs step-up).
 - Changing the password, re-binding the app and `mistgate auth reset-login` end other sessions too.

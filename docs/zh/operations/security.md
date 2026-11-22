@@ -58,7 +58,8 @@ description: 了解管理后台的权限、登录、重新验证和会话机制�
 
 ## 会话
 
-- 会话 Cookie 为 `__Host-sid`：仅限 HTTPS，脚本无法读取，只会发送给面板本身（SameSite=Strict）。
+- 单独的普通 HTTP 监听器使用不带 Secure 的 `sid` Cookie，并保留 HttpOnly、SameSite=Strict 和 Path=/。
+- HTTPS 模式下会话 Cookie 为 `__Host-sid`：脚本无法读取，只会发送给面板本身（SameSite=Strict）。
 - 会话在 12 小时无操作后结束，最长不超过 30 天。
 - **设置 → 会话**会列出管理员自己的会话、地址和浏览器。**结束**会结束一个会话（结束当前会话以外的会话需要重新验证）；**结束其他会话**会结束其余会话（需要重新验证）。
 - 更改密码、重新绑定应用以及运行 `mistgate auth reset-login` 也会结束其他会话。

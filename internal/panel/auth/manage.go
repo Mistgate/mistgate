@@ -98,7 +98,7 @@ func (s *Service) BeginAddPasskey(ctx context.Context, req *connect.Request[admi
 		return nil, errInternal(err)
 	}
 	// bound to this session, like step-up and TOTP enrollment: the step-up above was this session's
-	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonyAddPasskey, src: SourceKey(s.clientIP(req)), data: *data, admin: admin, name: name, tokenHash: currentHash(req)})
+	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonyAddPasskey, src: SourceKey(s.clientIP(req)), data: *data, admin: admin, name: name, tokenHash: s.currentHash(req)})
 	if err != nil {
 		return nil, ceremonyPutError(err)
 	}
@@ -113,7 +113,7 @@ func (s *Service) FinishAddPasskey(ctx context.Context, req *connect.Request[adm
 	}
 	// another admin's ceremony, or one begun in another session of the same admin, is as good as unknown
 	c, err := s.takeCeremony(ctx, req.Msg.CeremonyId, ceremonyAddPasskey, func(c *ceremony) bool {
-		return c.admin.ID == admin.ID && bytes.Equal(c.tokenHash, currentHash(req))
+		return c.admin.ID == admin.ID && bytes.Equal(c.tokenHash, s.currentHash(req))
 	})
 	if errors.Is(err, errCeremonyGone) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("registration expired, start again"))
@@ -167,7 +167,7 @@ func (s *Service) RemovePasskey(ctx context.Context, req *connect.Request[adminv
 		return nil, errInternal(err)
 	}
 	// A removed passkey is what the owner does after losing a device: sessions it opened must not outlive it.
-	ended, err := s.st.DeleteOtherSessions(ctx, admin.ID, currentHash(req))
+	ended, err := s.st.DeleteOtherSessions(ctx, admin.ID, s.currentHash(req))
 	if err != nil {
 		s.log.Error("end other sessions", "code", "passkey_remove_end_sessions_failed", "err", err)
 		return nil, errInternal(err)
@@ -178,8 +178,8 @@ func (s *Service) RemovePasskey(ctx context.Context, req *connect.Request[adminv
 	return connect.NewResponse(&adminv1.RemovePasskeyResponse{}), nil
 }
 
-func currentHash(req connect.AnyRequest) []byte {
-	if tok := sessionToken(req.Header()); tok != "" {
+func (s *Service) currentHash(req connect.AnyRequest) []byte {
+	if tok := s.sessionToken(req.Header()); tok != "" {
 		return hashToken(tok)
 	}
 	return nil
@@ -196,7 +196,7 @@ func (s *Service) ListSessions(ctx context.Context, req *connect.Request[adminv1
 		s.log.Error("list sessions", "err", err)
 		return nil, errInternal(err)
 	}
-	cur, now := currentHash(req), s.now()
+	cur, now := s.currentHash(req), s.now()
 	resp := &adminv1.ListSessionsResponse{}
 	for _, sess := range all {
 		if !now.Before(sess.ExpiresAt) || now.Sub(sess.LastSeenAt) >= SessionIdleTTL {
@@ -220,7 +220,7 @@ func (s *Service) EndSession(ctx context.Context, req *connect.Request[adminv1.E
 	if err != nil || len(h) != len(hashToken("")) {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("no such session"))
 	}
-	if !bytes.Equal(h, currentHash(req)) { // ending the current session is a logout; ending another one needs a step-up
+	if !bytes.Equal(h, s.currentHash(req)) { // ending the current session is a logout; ending another one needs a step-up
 		if err := s.RequireStepUp(ctx); err != nil {
 			return nil, err
 		}
@@ -235,8 +235,8 @@ func (s *Service) EndSession(ctx context.Context, req *connect.Request[adminv1.E
 	}
 	s.audit(ctx, admin.ID, "session_end", "ok", s.clientIP(req), nil)
 	resp := connect.NewResponse(&adminv1.EndSessionResponse{})
-	if bytes.Equal(h, currentHash(req)) {
-		resp.Header().Add("Set-Cookie", clearedCookie().String())
+	if bytes.Equal(h, s.currentHash(req)) {
+		resp.Header().Add("Set-Cookie", s.clearedCookie().String())
 	}
 	return resp, nil
 }
@@ -250,7 +250,7 @@ func (s *Service) EndOtherSessions(ctx context.Context, req *connect.Request[adm
 	if err := s.RequireStepUp(ctx); err != nil {
 		return nil, err
 	}
-	n, err := s.st.DeleteOtherSessions(ctx, admin.ID, currentHash(req))
+	n, err := s.st.DeleteOtherSessions(ctx, admin.ID, s.currentHash(req))
 	if err != nil {
 		s.log.Error("delete other sessions", "err", err)
 		return nil, errInternal(err)

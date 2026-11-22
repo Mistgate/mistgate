@@ -151,13 +151,15 @@ func fullFlow(t *testing.T, e *testEnv, adminBase, host string) {
 	}
 
 	// Session cookie attributes.
+	cookieName := e.auth.SessionCookieName()
+	wantSecure := cookieName == auth.CookieName
 	var sess *http.Cookie
 	for _, c := range b.jar.last {
-		if c.Name == auth.CookieName {
+		if c.Name == cookieName {
 			sess = c
 		}
 	}
-	if sess == nil || !sess.HttpOnly || !sess.Secure || sess.SameSite != http.SameSiteStrictMode || sess.Path != "/" || sess.Domain != "" || len(sess.Value) < 40 {
+	if sess == nil || !sess.HttpOnly || sess.Secure != wantSecure || sess.SameSite != http.SameSiteStrictMode || sess.Path != "/" || sess.Domain != "" || sess.MaxAge != int(auth.SessionMaxAge/time.Second) || len(sess.Value) < 40 {
 		t.Fatalf("bad session cookie: %+v", sess)
 	}
 
@@ -167,6 +169,25 @@ func fullFlow(t *testing.T, e *testEnv, adminBase, host string) {
 	}
 	if !strings.HasPrefix(me.Admin.Id, "adm_") {
 		t.Errorf("admin id %q", me.Admin.Id)
+	}
+	otherName := auth.CookieName
+	if cookieName == auth.CookieName {
+		otherName = auth.PlainHTTPCookieName
+	}
+	b.jar.cookie = otherName + "=" + sess.Value
+	if _, err := b.me(); code(err) != connect.CodeUnauthenticated {
+		t.Fatalf("session accepted under the other cookie name %q: %v", otherName, err)
+	}
+	b.jar.cookie = cookieName + "=" + sess.Value
+	if _, err := b.me(); err != nil {
+		t.Fatalf("session stopped working under %q: %v", cookieName, err)
+	}
+	sessions, err := b.api.ListSessions(context.Background(), connect.NewRequest(&adminv1.ListSessionsRequest{}))
+	if err != nil {
+		t.Fatalf("list sessions with %q: %v", cookieName, err)
+	}
+	if len(sessions.Msg.Sessions) != 1 || !sessions.Msg.Sessions[0].Current {
+		t.Fatalf("session list with %q: response=%v err=%v", cookieName, sessions, err)
 	}
 
 	// The token is single use, and no second admin can be created.
@@ -178,11 +199,20 @@ func fullFlow(t *testing.T, e *testEnv, adminBase, host string) {
 	if err := b.logout(); err != nil {
 		t.Fatal(err)
 	}
+	var cleared *http.Cookie
+	for _, c := range b.jar.last {
+		if c.Name == cookieName && c.MaxAge < 0 {
+			cleared = c
+		}
+	}
+	if cleared == nil || cleared.Secure != wantSecure || !cleared.HttpOnly || cleared.SameSite != http.SameSiteStrictMode || cleared.Path != "/" {
+		t.Fatalf("logout did not clear the matching session cookie: %+v", cleared)
+	}
 	if _, err := b.me(); code(err) != connect.CodeUnauthenticated {
 		t.Fatalf("Me after logout: %v", err)
 	}
 	replay := newBrowser(t, adminBase, host)
-	replay.jar.cookie = auth.CookieName + "=" + sess.Value
+	replay.jar.cookie = cookieName + "=" + sess.Value
 	if _, err := replay.me(); code(err) != connect.CodeUnauthenticated {
 		t.Fatalf("old session cookie still valid after logout: %v", err)
 	}
@@ -250,7 +280,10 @@ func TestAuthFlowThroughSecretHost(t *testing.T) {
 }
 
 func TestAuthFlowThroughAdminListener(t *testing.T) {
-	e := newTestEnv(t)
+	e := newTestEnvAuth(t, func(cfg *auth.Config) { cfg.PlainHTTP = true })
+	if got := e.auth.SessionCookieName(); got != auth.PlainHTTPCookieName {
+		t.Fatalf("admin listener cookie name = %q, want %q", got, auth.PlainHTTPCookieName)
+	}
 	fullFlow(t, e, e.admin.URL+"/", "")
 }
 

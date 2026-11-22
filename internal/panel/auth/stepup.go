@@ -110,7 +110,7 @@ func (s *Service) BeginStepUp(ctx context.Context, req *connect.Request[adminv1.
 	if err != nil {
 		return nil, errInternal(err)
 	}
-	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonyStepUp, src: SourceKey(s.clientIP(req)), data: *data, admin: admin, tokenHash: currentHash(req)})
+	id, err := s.putCeremony(ctx, &ceremony{kind: ceremonyStepUp, src: SourceKey(s.clientIP(req)), data: *data, admin: admin, tokenHash: s.currentHash(req)})
 	if err != nil {
 		return nil, ceremonyPutError(err)
 	}
@@ -166,7 +166,7 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 	method := "passkey"
 	if m.CeremonyId != "" || m.CredentialJson != "" {
 		c, err := s.takeCeremony(ctx, m.CeremonyId, ceremonyStepUp, func(c *ceremony) bool {
-			return c.admin.ID == admin.ID && bytes.Equal(c.tokenHash, currentHash(req))
+			return c.admin.ID == admin.ID && bytes.Equal(c.tokenHash, s.currentHash(req))
 		})
 		if errors.Is(err, errCeremonyGone) {
 			return nil, refuse("unknown or foreign ceremony", nil)
@@ -232,7 +232,7 @@ func (s *Service) FinishStepUp(ctx context.Context, req *connect.Request[adminv1
 		}
 	}
 
-	if err := s.st.SessionStepUp(ctx, currentHash(req), now); err != nil {
+	if err := s.st.SessionStepUp(ctx, s.currentHash(req), now); err != nil {
 		releaseAttempt()
 		s.log.Error("record step-up", "err", err)
 		return nil, errInternal(err)
