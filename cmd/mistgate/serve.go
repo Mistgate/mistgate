@@ -151,6 +151,7 @@ func runServe(args []string) error {
 	// a rename reaches the prompt after a restart. The TOTP issuer is read per setup.
 	authSvc, err := auth.New(st, auth.Config{
 		RPID: in.RPID, RPName: brand.BrandName(), Origins: in.RPOrigins, Vault: vlt, TrustedProxies: proxies, SourceURL: *sourceURL,
+		PlainHTTP: in.AdminListen != "",
 	}, log)
 	if err != nil {
 		return err

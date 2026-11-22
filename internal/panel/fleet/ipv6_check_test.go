@@ -390,11 +390,17 @@ func TestCheckIPv6GlobalpingIsTheLastResortAndSaysSo(t *testing.T) {
 	if got.Pass || got.By != store.IPv6ByGlobalping || verdictOf(got, "tcp", 443) != "timeout" {
 		t.Fatalf("no probe connected: %+v", got)
 	}
-	// Globalping off or failing: nothing verified the address
-	failure = errors.New("switched off")
+	// An explicit switch-off keeps the existing no-verifier reason.
+	failure = ErrGlobalpingOff
 	got = awaitIPv6(t, x.checkIPv6(target.nodeID, v6Entry))
 	if got.Pass || got.Code != "no_ipv6_verifier" {
-		t.Fatalf("Globalping failed: %+v", got)
+		t.Fatalf("Globalping off: %+v", got)
+	}
+	// A rejected or unreachable Globalping request gets its own reason instead of looking switched off.
+	failure = errors.New("Globalping request failed")
+	got = awaitIPv6(t, x.checkIPv6(target.nodeID, v6Entry))
+	if got.Pass || got.Code != "globalping_failed" {
+		t.Fatalf("Globalping failure: %+v", got)
 	}
 	assertNoPortCommands(t, targetConn) // the target was never asked to count: nothing was sent to it
 }

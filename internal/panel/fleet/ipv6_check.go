@@ -20,6 +20,9 @@ import (
 // ErrIPv6Address: the address given to CheckIPv6 is not a global unicast IPv6 address.
 var ErrIPv6Address = errors.New("fleet: not a global IPv6 address")
 
+// ErrGlobalpingOff marks the owner's explicit choice to switch Globalping off.
+var ErrGlobalpingOff = errors.New("fleet: Globalping is off")
+
 // CheckIPv6 (node.proto CheckIpv6): is this IPv6 address of the node reachable from outside, and is what answers there the node
 // itself? It sends nothing but test packets and changes nothing on any host.
 //
@@ -333,11 +336,15 @@ func (f *Fleet) ipv6ByGlobalping(ctx context.Context, chk *store.IPv6Check, tcp 
 		return
 	}
 	answered, connected, err := f.cfg.GlobalpingTCP6(ctx, chk.Addr, port)
+	if errors.Is(err, ErrGlobalpingOff) {
+		chk.Code = "no_ipv6_verifier"
+		return
+	}
 	if err != nil || answered == 0 {
 		if err != nil && ctx.Err() == nil {
 			f.log.Warn("IPv6 check through Globalping", "err", err)
 		}
-		chk.Code = "no_ipv6_verifier"
+		chk.Code = "globalping_failed"
 		return
 	}
 	verdict := "timeout"

@@ -639,6 +639,11 @@ describe("the IPv6 entry", () => {
     await click(buttonIn(dialog(), "Only check"));
     await settle();
     expect(dialog().querySelector("[data-testid=ipv6-check]")?.textContent).toBe(`2001:db8::7 was not checked. ${en["ways.ipv6.why.no_ipv6_verifier"]}10 min ago`);
+
+    checkIpv6.mockResolvedValueOnce(passed({ passed: false, errorCode: "globalping_failed", verdicts: [], sender: "" }));
+    await click(buttonIn(dialog(), "Only check"));
+    await settle();
+    expect(dialog().querySelector("[data-testid=ipv6-check]")?.textContent).toBe(`2001:db8::7 was not checked. ${en["ways.ipv6.why.globalping_failed"]}10 min ago`);
   });
 
   it("on: the address, when and by whom it was checked (Globalping said as a weaker proof), and Turn off behind a confirmation", async () => {

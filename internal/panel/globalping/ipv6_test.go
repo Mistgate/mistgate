@@ -280,7 +280,7 @@ func TestProbeTCP6IsOneTCPPingOfTheLiteralFromTwoProbes(t *testing.T) {
 		t.Fatalf("%d measurements: %+v", len(posts), posts)
 	}
 	// a literal takes no ipVersion; two probes anywhere (no country: the audience's own probes are not wanted here)
-	want := map[string]any{"type": "ping", "target": "2001:db8::10", "locations": []any{map[string]any{"limit": 2.0}},
+	want := map[string]any{"type": "ping", "target": "2001:db8::10", "locations": []any{map[string]any{"magic": "world", "limit": 2.0}},
 		"measurementOptions": map[string]any{"protocol": "TCP", "port": 443.0, "packets": 3.0}}
 	if got := jsonOf(t, posts[0].Body); !reflect.DeepEqual(got, want) {
 		t.Fatalf("request = %s", posts[0].Body)
