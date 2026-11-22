@@ -691,6 +691,16 @@ print("    integrity_check:", c.execute("pragma integrity_check").fetchone()[0],
 PY
   stop_node
   stop_pid "$PANEL_PID"; PANEL_PID=""
+  # and forward again: the new panel on what the old binary wrote
+  : >"$WORK/panel-new-$label.log"
+  spawn env MISTGATE_HEALTH_BLIP_WINDOW=3s "$BIN/new/mistgate" serve --data-dir "$DATA" --listen "127.0.0.1:$PUB"     --tls-cert "$WORK/pub.crt" --tls-key "$WORK/pub.key" --agent-addr "127.0.0.1:$PUB" >>"$WORK/panel-new-$label.log" 2>&1
+  PANEL_PID=$LAST_PID
+  if wait_for 60 "the new panel again" panel_up && login && api UserService/ListUsers '{}' | jq -e '[.users[].name] | index("zed") != null' >/dev/null; then
+    ok "$label: the new panel starts again on the database the old binary wrote to, and shows what the old binary added"
+  else
+    finding "$label: the new panel does not come back on the database the old binary wrote to"
+  fi
+  stop_pid "$PANEL_PID"; PANEL_PID=""
   DATA=$saved
 }
 
