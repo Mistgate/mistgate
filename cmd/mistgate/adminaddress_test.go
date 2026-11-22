@@ -63,16 +63,20 @@ func TestAdminListenIsChecked(t *testing.T) {
 		t.Fatal(err)
 	}
 	for listen, want := range map[string]string{
-		"127.0.0.1:":      "port",
-		"127.0.0.1:abc":   "port",
-		"127.0.0.1:99999": "port",
-		"127.0.0.1:0":     "port",
-		"127.0.0.1:08443": "port",
-		":8443":           "host",
-		"127.0.0.1":       "missing port",
-		"127.0.0.1:8443":  "",
-		"[::1]:8443":      "",
-		"localhost:8443":  "",
+		"127.0.0.1:":       "port",
+		"127.0.0.1:abc":    "port",
+		"127.0.0.1:99999":  "port",
+		"127.0.0.1:0":      "port",
+		"127.0.0.1:08443":  "port",
+		":8443":            "host",
+		"127.0.0.1":        "missing port",
+		"0.0.0.0:8443":     "loopback",
+		"[::]:8443":        "loopback",
+		"192.0.2.1:8443":   "loopback",
+		"example.com:8443": "loopback",
+		"127.0.0.1:8443":   "",
+		"[::1]:8443":       "",
+		"localhost:8443":   "",
 	} {
 		_, setupErr := newInstance(setupOpts{publicURL: "https://example.com", adminListen: listen})
 		cmdErr := runAdminAddress([]string{"--admin-listen", listen, "--data-dir", dir}, &out)

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -118,8 +119,11 @@ func (in *instance) listenAdmin(listen string) error {
 	return nil
 }
 
-// checkAdminListen refuses an admin listener `mistgate serve` could not bring up: it needs a host and a port, and the
-// port is a number from 1 to 65535 written as the browser writes it in the WebAuthn origin.
+// checkAdminListen refuses an admin listener `mistgate serve` could not bring up or should not: it needs a host and a
+// port, the port is a number from 1 to 65535 written as the browser writes it in the WebAuthn origin, and the host is
+// on loopback. The listener serves the admin over plain HTTP without a secret prefix, and its WebAuthn origin is
+// localhost, so it is reached through an SSH tunnel; on any other address it would expose the admin and still not let
+// anyone sign in.
 func checkAdminListen(listen string) (port string, err error) {
 	host, port, err := net.SplitHostPort(listen)
 	if err != nil {
@@ -130,6 +134,9 @@ func checkAdminListen(listen string) (port string, err error) {
 	}
 	if n, err := strconv.ParseUint(port, 10, 16); err != nil || n == 0 || strconv.FormatUint(n, 10) != port {
 		return "", fmt.Errorf("--admin-listen %q: the port must be a number from 1 to 65535", listen)
+	}
+	if ip, err := netip.ParseAddr(host); host != "localhost" && (err != nil || !ip.IsLoopback()) {
+		return "", fmt.Errorf("--admin-listen %q: the host must be on loopback (127.0.0.1, ::1 or localhost); the admin listener serves plain HTTP and is reached through an SSH tunnel", listen)
 	}
 	return port, nil
 }

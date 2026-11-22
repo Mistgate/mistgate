@@ -45,7 +45,7 @@ description: Все флаги mistgate serve и mistgate setup с переме�
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` | Где создать каталог данных, мастер-ключ и базу. |
 | `--public-url` | `MISTGATE_PUBLIC_URL` | нет | URL публичного сайта (сайта-ширмы), `http(s)://host[:port]`, например `https://panel.example.com`. От него строятся ссылки подписки и адрес для агентов. Обязателен, если не задан `--admin-host` или `--admin-listen`, а желателен всегда. |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | нет | Отдавать админку на этом секретном имени хоста вместо секретного пути. |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | нет | Отдавать админку на отдельном слушателе, например `127.0.0.1:8081`. Вместе с `--admin-host` не работает. |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | нет | Отдавать админку на отдельном слушателе, например `127.0.0.1:8081`. Хост должен быть на loopback (`127.0.0.1`, `::1` или `localhost`), порт — числом от 1 до 65535; другие адреса не принимаются. Вместе с `--admin-host` не работает. |
 | `--rp-id` | `MISTGATE_RP_ID` | выводится | Идентификатор проверяющей стороны WebAuthn (RP ID). |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | выводится | Через запятую — origin браузера, которым разрешены WebAuthn и меняющие данные запросы к админке. |
 

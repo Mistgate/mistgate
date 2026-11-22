@@ -45,7 +45,7 @@ Setup runs once per installation. The first run stores the addresses below; late
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` | Where to create the data directory, the master key and the database. |
 | `--public-url` | `MISTGATE_PUBLIC_URL` | none | URL of the public (decoy) site, `http(s)://host[:port]`, for example `https://panel.example.com`. The base of subscription links and of the agents' address. Required unless `--admin-host` or `--admin-listen` is given, and recommended always. |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | none | Serve the admin on this secret host name instead of a secret path prefix. |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | Serve the admin on a separate listener, for example `127.0.0.1:8081`. Cannot be combined with `--admin-host`. |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | Serve the admin on a separate listener, for example `127.0.0.1:8081`. The host must be on loopback (`127.0.0.1`, `::1` or `localhost`) and the port a number from 1 to 65535; anything else is refused. Cannot be combined with `--admin-host`. |
 | `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn relying party ID. |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | derived | Comma-separated browser origins allowed for WebAuthn and for state-changing admin requests. |
 

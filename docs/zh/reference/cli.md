@@ -80,7 +80,7 @@ The link works once and expires in 30 minutes. Open it in a browser and create y
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` | 数据目录（数据库、主密钥）。 |
 | `--public-url` | `MISTGATE_PUBLIC_URL` | none | 公共（伪装）站点的 URL，例如 `https://panel.example.com`。此 URL 也是订阅链接的基础地址。 |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | none | 使用此私密主机名提供管理后台，而不是使用私密路径前缀。 |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | 使用单独的监听器提供管理后台，例如 `127.0.0.1:8081`。不能与 `--admin-host` 同时使用。 |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | 使用单独的监听器提供管理后台，例如 `127.0.0.1:8081`。主机必须是环回地址（`127.0.0.1`、`::1` 或 `localhost`），端口必须是 1 到 65535 之间的数字；其他地址会被拒绝。不能与 `--admin-host` 同时使用。 |
 | `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn 依赖方 ID。 |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | derived | 允许的 WebAuthn 来源，使用逗号分隔。 |
 
@@ -157,7 +157,7 @@ mistgate admin-address --admin-listen host:port [--data-dir DIR]
 
 | 标志 | 环境变量 | 默认值 | 含义 |
 |---|---|---|---|
-| `--admin-listen` | none | none | 单独的管理后台监听地址 `host:port`，例如 `127.0.0.1:8443`，通过 SSH 隧道访问。必填。 |
+| `--admin-listen` | none | none | 单独的管理后台监听地址 `host:port`，例如 `127.0.0.1:8443`，通过 SSH 隧道访问。主机必须是环回地址（`127.0.0.1`、`::1` 或 `localhost`），端口必须是 1 到 65535 之间的数字。必填。 |
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | 数据目录。若目录中没有面板数据库，命令会拒绝执行。 |
 | `--dev` | `MISTGATE_DEV` | off | 开发安装：数据位于 `./.data`。 |
 

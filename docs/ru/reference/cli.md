@@ -80,7 +80,7 @@ The link works once and expires in 30 minutes. Open it in a browser and create y
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` | Каталог данных (база, мастер-ключ). |
 | `--public-url` | `MISTGATE_PUBLIC_URL` | нет | URL публичного сайта (ширмы), например `https://panel.example.com`. Он же — основа ссылок подписки. |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | нет | Отдавать админку на этом секретном имени хоста вместо секретного префикса пути. |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | нет | Отдавать админку на отдельном адресе, например `127.0.0.1:8081`. Нельзя сочетать с `--admin-host`. |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | нет | Отдавать админку на отдельном адресе, например `127.0.0.1:8081`. Хост должен быть на loopback (`127.0.0.1`, `::1` или `localhost`), порт — числом от 1 до 65535; другие адреса не принимаются. Нельзя сочетать с `--admin-host`. |
 | `--rp-id` | `MISTGATE_RP_ID` | выводится | Идентификатор WebAuthn RP. |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | выводятся | Разрешённые источники WebAuthn через запятую. |
 
@@ -157,7 +157,7 @@ mistgate admin-address --admin-listen host:port [--data-dir DIR]
 
 | Флаг | Переменная | По умолчанию | Значение |
 |---|---|---|---|
-| `--admin-listen` | нет | нет | `host:port` отдельного адреса админки, например `127.0.0.1:8443`, до которого доходят через SSH-туннель. Обязателен. |
+| `--admin-listen` | нет | нет | `host:port` отдельного адреса админки, например `127.0.0.1:8443`, до которого доходят через SSH-туннель. Хост должен быть на loopback (`127.0.0.1`, `::1` или `localhost`), порт — числом от 1 до 65535. Обязателен. |
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` с `--dev`) | Каталог данных. Каталог без базы панели команда не примет. |
 | `--dev` | `MISTGATE_DEV` | выключен | Установка для разработки: данные в `./.data`. |
 

@@ -45,7 +45,7 @@ description: mistgate serve 和 mistgate setup 的所有标志、对应的环境
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` | 创建数据目录、主密钥和数据库的位置。 |
 | `--public-url` | `MISTGATE_PUBLIC_URL` | none | 公共（伪装）站点的 URL，格式为 `http(s)://host[:port]`，例如 `https://panel.example.com`。这是订阅链接和 Agent 地址的基础地址。除非指定 `--admin-host` 或 `--admin-listen`，否则必须设置；始终建议设置。 |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | none | 使用此私密主机名提供管理后台，而不是使用私密路径前缀。 |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | 使用单独的监听器提供管理后台，例如 `127.0.0.1:8081`。不能与 `--admin-host` 同时使用。 |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | 使用单独的监听器提供管理后台，例如 `127.0.0.1:8081`。主机必须是环回地址（`127.0.0.1`、`::1` 或 `localhost`），端口必须是 1 到 65535 之间的数字；其他地址会被拒绝。不能与 `--admin-host` 同时使用。 |
 | `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn 依赖方 ID。 |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | derived | WebAuthn 和管理后台状态变更请求允许使用的浏览器来源，使用逗号分隔。 |
 

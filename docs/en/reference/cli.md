@@ -80,7 +80,7 @@ The link works once and expires in 30 minutes. Open it in a browser and create y
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` | Data directory (database, master key). |
 | `--public-url` | `MISTGATE_PUBLIC_URL` | none | URL of the public (decoy) site, for example `https://panel.example.com`. Also the base of the subscription links. |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | none | Serve the admin on this secret host name instead of a secret path prefix. |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | Serve the admin on a separate listener, for example `127.0.0.1:8081`. Cannot be combined with `--admin-host`. |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | Serve the admin on a separate listener, for example `127.0.0.1:8081`. The host must be on loopback (`127.0.0.1`, `::1` or `localhost`) and the port a number from 1 to 65535; anything else is refused. Cannot be combined with `--admin-host`. |
 | `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn relying party id. |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | derived | Comma-separated allowed WebAuthn origins. |
 
@@ -157,7 +157,7 @@ mistgate admin-address --admin-listen host:port [--data-dir DIR]
 
 | Flag | Environment | Default | Meaning |
 |---|---|---|---|
-| `--admin-listen` | none | none | `host:port` of the separate admin listener, e.g. `127.0.0.1:8443`, reached over an SSH tunnel. Required. |
+| `--admin-listen` | none | none | `host:port` of the separate admin listener, e.g. `127.0.0.1:8443`, reached over an SSH tunnel. The host must be on loopback (`127.0.0.1`, `::1` or `localhost`) and the port a number from 1 to 65535. Required. |
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | Data directory. The command refuses a directory without a panel database. |
 | `--dev` | `MISTGATE_DEV` | off | A development installation: data in `./.data`. |
 
