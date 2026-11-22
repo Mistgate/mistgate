@@ -28,9 +28,9 @@
    }
   ],
   "fonts": [
-   {"head": "mono", "body": "mono", "fw": 700, "ls": "-.06em", "lh": ".95", "tt": "uppercase", "lsl": ".14em", "fsl": ".78rem"},
-   {"head": "mono", "body": "sans", "fw": 700, "ls": "-.05em", "lh": "1", "label": "mono", "tt": "uppercase", "lsl": ".12em", "fsl": ".76rem"},
-   {"head": "sans", "body": "mono", "fw": 750, "ls": "-.05em", "lh": ".98", "label": "mono", "tt": "uppercase", "lsl": ".1em", "fsl": ".76rem"}
+   {"head": "mono", "body": "mono", "fw": 700, "ls": "-.04em", "lh": "1", "tt": "uppercase", "lsl": ".14em", "fsl": ".78rem"},
+   {"head": "mono", "body": "sans", "fw": 700, "ls": "-.035em", "lh": "1", "label": "mono", "tt": "uppercase", "lsl": ".12em", "fsl": ".76rem"},
+   {"head": "sans", "body": "mono", "fw": 750, "ls": "-.035em", "lh": "1", "label": "mono", "tt": "uppercase", "lsl": ".1em", "fsl": ".76rem"}
   ],
   "radius": [0, 2],
   "radius_s": [0, 2],

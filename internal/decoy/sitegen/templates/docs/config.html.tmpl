@@ -9,7 +9,7 @@
 <h2 id="__t1__">{{.L.config_file_h}}</h2>
 <div class="__cap__"><span>{{.L.cfg_name}}</span></div>
 <pre class="__pre__"><code>{{hl .L.config_code "toml"}}</code></pre>
-<h2 id="__t2__">{{.L.config_h}}</h2>
+<h2 id="__t2__">{{.L.opts_h}}</h2>
 <div class="__tbl__"><table>
 <thead><tr><th>{{.L.config_col_key}}</th><th>{{.L.config_col_default}}</th><th>{{.L.config_col_desc}}</th></tr></thead>
 <tbody>{{range .L.config_rows}}<tr><td><code>{{.k}}</code></td><td class="__mono__">{{.v}}</td><td>{{.d}}</td></tr>{{end}}</tbody>
@@ -18,7 +18,7 @@
 </main>
 <aside class="__tc__" aria-label="{{.L.toc_h}}">
 <h6>{{.L.toc_h}}</h6>
-<a href="#__t1__">{{.L.config_file_h}}</a><a href="#__t2__">{{.L.config_h}}</a>
+<a href="#__t1__">{{.L.config_file_h}}</a><a href="#__t2__">{{.L.opts_h}}</a>
 {{template "glance" .}}
 </aside>
 </div>

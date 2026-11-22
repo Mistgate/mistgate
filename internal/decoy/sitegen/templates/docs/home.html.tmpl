@@ -38,7 +38,7 @@
 <h2 id="__t6__">{{.L.faq_h}}</h2>
 <div class="__faq__">{{range $i, $q := .L.faq}}<details{{if eq $i 0}} open{{end}}><summary>{{$q.q}}</summary><p>{{$q.a}}</p></details>{{end}}</div>
 
-<div class="__pn__"><a href="{{(index .Nav 1).Href}}"><small>{{.L.next}}</small><b>{{(index .Nav 1).Label}}</b></a><a href="{{(index .Nav 2).Href}}"><small>{{.L.next}}</small><b>{{(index .Nav 2).Label}}</b></a></div>
+<div class="__pn__ __pn1__"><a href="{{(index .Nav 1).Href}}"><small>{{.L.next}}</small><b>{{(index .Nav 1).Label}}</b></a></div>
 </main>
 <aside class="__tc__" aria-label="{{.L.toc_h}}">
 <h6>{{.L.toc_h}}</h6>

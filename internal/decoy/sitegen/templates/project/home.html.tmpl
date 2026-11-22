@@ -28,7 +28,7 @@
 {{template "header" .}}
 <main>
 <section class="__hero__">
-<div class="__hh__"><span class="__eb__">{{.L.home_title}}</span><h1>{{.L.tagline}}</h1></div>
+<div class="__hh__"><span class="__eb__">{{.L.home_title}}</span>{{$w := lastword .L.tagline}}<h1>{{$w.head}}<em>{{$w.last}}</em>{{$w.end}}</h1></div>
 <div class="__hb__">
 <p class="__lead__">{{.L.overview}}</p>
 <div class="__bd__"><span><b>{{.L.col_ver}}</b> {{(index .Lists.releases 0).version}}</span><span><b>{{.L.licence_h}}</b> {{.L.lic_v}}</span><span><b>{{.L.platforms}}</b> {{.L.plat_v}}</span></div>

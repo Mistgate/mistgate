@@ -86,21 +86,21 @@
     "head": "sans",
     "body": "sans",
     "fw": 900,
-    "ls": "-.06em",
-    "lh": ".92"
+    "ls": "-.035em",
+    "lh": "1"
    },
    {
     "head": "rounded",
     "body": "sans",
     "fw": 900,
-    "ls": "-.05em",
-    "lh": ".94"
+    "ls": "-.03em",
+    "lh": "1"
    },
    {
     "head": "verdana",
     "body": "verdana",
     "fw": 800,
-    "ls": "-.05em",
+    "ls": "-.03em",
     "lh": "1"
    }
   ],

@@ -38,7 +38,7 @@
 {{end}}</div>
 </section>{{end}}
 {{define "hero_txt"}}<span class="__sticker__">{{.L.kicker}}</span>
-<h1><span class="__mk__">{{.L.hero_h}}</span></h1>
+<h1>{{$w := lastword .L.hero_h}}{{$w.head}}<span class="__mk__">{{$w.last}}</span>{{$w.end}}</h1>
 <p class="__lead__">{{.L.hero_p}}</p>{{end}}
 {{template "head" .}}<body>
 {{template "header" .}}

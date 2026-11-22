@@ -13,7 +13,7 @@
 <div class="__cht__">{{chart $s "area" 900 220}}</div>
 <div class="__axis__ __mono__"><span>{{.L.days_ago_l}}</span><span>{{.L.days_ago_r}}</span></div>
 </div>
-<div class="__side__"><div class="__card__ __stat__"><span>{{.L.m_inc}}</span><b class="__mono__">{{len .Lists.incidents}}</b><i>{{.L.st_res}}</i></div></div>
+<div class="__side__"><div class="__card__ __stat__"><span>{{.L.m_inc}}</span><b class="__mono__">{{len .Lists.incidents}}</b><div class="__hm__">{{cal .Lists.incidents "2026-11-14" 26}}</div><i>{{.L.st_res}}</i></div></div>
 </section>{{end}}
 {{define "b_recent"}}<section class="__sec__">
 <div class="__sech__"><h2>{{.L.recent_h}}</h2><a class="__more__" href="{{(index .Nav 1).Href}}">{{.L.all_inc}} {{icon "arrow"}}</a></div>

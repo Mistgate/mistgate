@@ -74,6 +74,8 @@ pre.__pre__{margin:0 0 20px;padding:20px 24px;border:0;border-radius:var(--r);ba
 .__pn__ a{display:block;border:1px solid var(--ln2);background:var(--sf);border-radius:var(--r);padding:18px 22px;min-width:0}
 .__pn__ a:hover{border-color:var(--ac)}
 .__pn__ a:last-child{text-align:right}
+.__pn__ a:only-child{text-align:left}
+.__pn1__ a{grid-column:2;text-align:right}
 .__pn__ small{display:block;color:var(--mu);font-size:.8rem}
 .__pn__ b{font-size:1.2rem;letter-spacing:-.01em;overflow-wrap:anywhere}
 .__tc__{grid-area:toc;position:sticky;top:64px;align-self:start;padding:48px 0;font-size:.9rem}
@@ -110,7 +112,9 @@ pre.__pre__{margin:0 0 20px;padding:20px 24px;border:0;border-radius:var(--r);ba
 .__side__ .__g__{margin:0;display:flex;flex-wrap:wrap;gap:6px}
 .__side__ h6{display:none}
 .__side__ a{background:var(--sf);border:1px solid var(--ln);margin:0}
-.__co__,.__feat__,.__pn__,.__nfw__{grid-template-columns:1fr}
+.__co__,.__feat__,.__pn__{grid-template-columns:1fr}
+.__nfw__{grid-template-columns:minmax(0,1fr)}
+.__pn1__ a{grid-column:1}
 .__tn__{display:none}
 .__logo__{width:auto}
 .__fg__{grid-template-columns:1fr 1fr}

@@ -6,13 +6,13 @@ a{color:inherit;text-decoration:none}
 .__tag__{color:var(--a2)}
 .__mh__{position:relative;padding-top:20px;text-align:center}
 .__mt__{display:flex;justify-content:space-between;gap:16px;padding-bottom:14px;border-bottom:1px solid var(--fg);color:var(--mu)}
-{{$n := len .Brand}}.__brandrow__{position:relative;margin:clamp(14px,2.4vw,32px) 0 clamp(14px,2.2vw,30px)}
+{{$n := len .Brand}}.__brandrow__{position:relative;display:flex;align-items:center;justify-content:center;min-height:52px;margin:clamp(14px,2.4vw,32px) 0 clamp(14px,2.2vw,30px)}
 .__brand__{display:block;color:var(--ac);font-family:var(--fh);font-size:min(208px,14.4vw,calc(190vw/{{$n}}));font-style:italic;font-weight:400;line-height:1.12;letter-spacing:-.05em;overflow-wrap:anywhere}
 .__nav__{display:flex;justify-content:center;gap:clamp(20px,4vw,56px);padding:14px 0;border-top:3px double var(--fg);border-bottom:1px solid var(--fg)}
 .__nav__ a{padding-bottom:2px;border-bottom:2px solid transparent}
 .__nav__ a:hover{color:var(--ac)}
 .__nav__ a[aria-current]{color:var(--ac);border-bottom-color:var(--ac)}
-.__mnb__{position:absolute;right:var(--gut);top:12px;margin-right:0;color:var(--fg)}
+.__mnb__{position:absolute;right:var(--gut);top:50%;margin:-22px 0 0;color:var(--fg)}
 .__mnl__{top:100%;background:var(--bg);border-bottom:1px solid var(--fg);box-shadow:none;text-align:left;font-family:var(--fl)}
 .__mnl__ a{border-bottom:1px solid var(--ln);color:var(--fg);font-family:var(--fh)}
 .__mnl__ a[aria-current]{color:var(--ac)}
@@ -52,7 +52,7 @@ a{color:inherit;text-decoration:none}
 .__q__{padding:clamp(48px,7vw,104px) 0;background:var(--ac);color:var(--ai)}
 .__qin__{display:grid;grid-template-columns:120px minmax(0,1fr);gap:32px}
 .__q__ i{display:block;color:color-mix(in srgb,var(--ai) 55%,var(--ac));font:normal clamp(120px,14vw,220px)/.7 var(--fh)}
-.__q__ blockquote{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;margin:0;overflow:hidden;font-size:var(--t4);line-height:1.16;letter-spacing:-.025em;font-style:italic}
+.__q__ blockquote{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:6;margin:0;overflow:hidden;font-size:var(--t4);line-height:1.26;letter-spacing:-.025em;font-style:italic}
 .__q__ cite{display:block;margin-top:24px;font-style:normal;color:color-mix(in srgb,var(--ai) 75%,var(--ac))}
 .__arch__{padding-top:clamp(40px,5vw,72px);padding-bottom:clamp(40px,5vw,72px)}
 .__ar__{display:grid;grid-template-columns:200px minmax(0,1fr);gap:32px;padding:6px 0 6px}
@@ -83,7 +83,7 @@ a{color:inherit;text-decoration:none}
 .__cov__ figcaption{position:absolute;left:14px;bottom:12px;padding:2px 8px;background:var(--bg);color:var(--mu)}
 .__post__ p{margin:0 0 1.2em;font-size:clamp(19px,1.5vw,22px);line-height:1.75}
 .__pq__{margin:40px 0;padding:36px 0;border-top:3px double var(--fg);border-bottom:1px solid var(--fg);text-align:center}
-.__pq__ q{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden;color:var(--ac);font-size:var(--t3);font-style:italic;line-height:1.18;letter-spacing:-.025em;quotes:none}
+.__pq__ q{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden;color:var(--ac);font-size:var(--t3);font-style:italic;line-height:1.26;letter-spacing:-.025em;quotes:none}
 .__auth__{display:grid;grid-template-columns:88px minmax(0,1fr);gap:22px;align-items:center;margin-top:48px;padding:26px 30px;background:var(--sf2)}
 .__av__{display:grid;place-items:center;width:88px;height:88px;border-radius:50%;background:var(--ac);color:var(--ai);font-size:0}
 .__av__ span::first-letter{font-size:36px;font-style:italic}
