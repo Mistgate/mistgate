@@ -217,10 +217,12 @@ func (f *fakeGlobalping) create(w http.ResponseWriter, body []byte) {
 		idx = prev.probes
 	case []any:
 		picked := map[int]bool{}
-		for _, raw := range loc {
+		for i, raw := range loc {
 			l, ok := raw.(map[string]any)
-			if !ok {
-				continue
+			if !ok || !fakeHasLocationSelector(l) {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprintf(w, `{"error":{"type":"validation_error","message":"locations[%d] must contain at least one of [continent, region, country, state, city, network, asn, magic, tags]"}}`, i)
+				return
 			}
 			limit := 1
 			if n, ok := l["limit"].(float64); ok {
@@ -254,7 +256,32 @@ func (f *fakeGlobalping) create(w http.ResponseWriter, body []byte) {
 	fmt.Fprintf(w, `{"id":%q,"probesCount":%d}`, id, len(idx))
 }
 
+func fakeHasLocationSelector(loc map[string]any) bool {
+	for _, key := range []string{"continent", "region", "country", "state", "city", "network", "asn", "magic", "tags"} {
+		value, ok := loc[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch v := value.(type) {
+		case string:
+			if strings.TrimSpace(v) != "" {
+				return true
+			}
+		case float64:
+			return true
+		case []any:
+			if len(v) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func fakeProbeMatches(p fakeProbe, loc map[string]any) bool {
+	if magic, ok := loc["magic"].(string); ok && magic != "world" {
+		return false
+	}
 	if country, ok := loc["country"].(string); ok && p.Country != country {
 		return false
 	}
@@ -274,6 +301,27 @@ func fakeProbeMatches(p fakeProbe, loc map[string]any) bool {
 		}
 	}
 	return true
+}
+
+func TestFakeGlobalpingRejectsAnUnscopedLocation(t *testing.T) {
+	f := newFakeGlobalping(t)
+	resp, err := http.Post(f.srv.URL+"/v1/measurements", "application/json",
+		strings.NewReader(`{"type":"ping","target":"2001:db8::10","locations":[{"limit":2}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var body struct {
+		Error struct {
+			Type string `json:"type"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusBadRequest || body.Error.Type != "validation_error" {
+		t.Fatalf("unscoped location got HTTP %d error %q; want 400 validation_error", resp.StatusCode, body.Error.Type)
+	}
 }
 
 func (f *fakeGlobalping) get(w http.ResponseWriter, id string) {
