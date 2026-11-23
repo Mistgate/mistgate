@@ -85,6 +85,7 @@ for (const n of names) {
 for (const pt of PATCHES) for (const r of pt.required) if (names.includes(r) && !compiled[r].patches.includes(pt.id)) throw new Error(`patch ${pt.id} did not apply to ${r}`);
 for (const [f, body] of images) asset(f, body);
 copyFileSync(p('runtime', 'rt.js'), join(BUILD, '_gen/runtime/rt.js'));
+copyFileSync(p('runtime', 'boot.js'), join(BUILD, '_gen/runtime/boot.js'));
 lap(`compiled ${names.length} boards, ${patchCount} patches applied, ${images.size} images`);
 
 // ---- 2. entries of the pages, bundles ----
@@ -107,6 +108,7 @@ for (const page of PAGES) {
   ].join('\n'));
 }
 const entry = Object.fromEntries(PAGES.map((pg) => [pg, join(BUILD, '_gen/entries', pg + '.js')]));
+entry.boot = join(BUILD, '_gen/runtime/boot.js'); // the loader of the page: starts everything but the first paint's own css after the first frame (runtime/boot.js)
 const boardEntries = [...new Set(PAGES.flatMap(loadable))];
 for (const n of boardEntries) entry['b-' + n] = join(BUILD, '_gen/boards', n + '.js');
 const res = await esbuild.build({
@@ -124,8 +126,8 @@ lap(`bundled: ${Object.keys(out).length} files`);
 let fontsCss = readFileSync(join(FONTS, 'fonts.css'), 'utf8');
 const fontFiles = {};
 fontsCss = fontsCss.replace(/url\("\.\/([\w-]+\.woff2)"\)/g, (_, f) => { fontFiles[f] = fontFiles[f] || hashedAsset(f.replace('.woff2', ''), 'woff2', readFileSync(join(FONTS, f))); return `url("/${fontFiles[f]}")`; });
-const fontsFile = hashedAsset('fonts', 'css', Buffer.from((await esbuild.transform(fontsCss, { loader: 'css', minify: true })).code));
-const siteCss = hashedAsset('site', 'css', Buffer.from('body{margin:0;background:#0c0c0e}[data-board]{display:contents}'));
+// the @font-face rules and the body rule go in front of land.css: one blocking file, not three (a request less, and no chain page -> fonts.css -> font)
+const leadCss = (await esbuild.transform('body{margin:0;background:#0c0c0e}[data-board]{display:contents}' + fontsCss, { loader: 'css', minify: true })).code;
 // land.css is the page's own (its h1 is the real heading); the stylesheets of the boards inside a page speak of <mg-h1> (compile.mjs)
 const designCss = Object.fromEntries(['land.css', 'pn.css', 'sub-s.css', 'app-s.css', 'app-zh-s.css', 'app-fa-s.css'].map((f) => [f, f === 'land.css' ? read(f) : renameH1(read(f))]));
 const tokensOf = (bs) => usage(bs.map((n) => sources[n]));
@@ -133,7 +135,7 @@ const cssStats = {}, prunedClasses = {};
 const cssOut = {}; // page -> {land, sub, pn, app: {file group -> path}}
 async function emitCss(page, key, file, boardList) {
   const pr = pruneCss(designCss[file], tokensOf(boardList));
-  const min = Buffer.from((await esbuild.transform(pr.css, { loader: 'css', minify: true, target: 'chrome120' })).code);
+  const min = Buffer.from((key === 'land' ? leadCss : '') + (await esbuild.transform(pr.css, { loader: 'css', minify: true, target: 'chrome120' })).code);
   const path = hashedAsset(file.replace(/\.css$/, ''), 'css', min);
   cssStats[`${page}:${key}`] = { file: path, from: designCss[file].length, pruned: pr.stats.bytesOut, raw: min.length, br: brLen(min) };
   const pc = (prunedClasses[page] ||= { dropped: new Set(), kept: new Set() }); pr.dropped.forEach((x) => pc.dropped.add(x)); pr.kept.forEach((x) => pc.kept.add(x)); // per page: what the stand checks the screens against
@@ -189,9 +191,10 @@ const jsOf = (page, lang) => {
 };
 for (const page of PAGES) for (const lang of LANGS) {
   const o = cssOut[page], js = jsOf(page, lang);
-  const blocking = [fontsFile, siteCss, o.land, o.app[appCss(lang)] && !o.pn ? o.app[appCss(lang)] : null, o.pn].filter(Boolean);
+  const blocking = [o.land, o.app[appCss(lang)] && !o.pn ? o.app[appCss(lang)] : null].filter(Boolean); // the panel stylesheet (pn) is in <head> too, but does not block the first paint
+  const cssAsync = [o.pn].filter(Boolean);
   const m = ((manifest.pages[page] ||= {})[lang] = {
-    body: `pages/${page}.${lang}.html`, title: '', description: '', css: blocking, modules: [rel(js.main)], preload: js.pre.map(rel), dir: lang === 'fa' ? 'rtl' : 'ltr',
+    body: `pages/${page}.${lang}.html`, title: '', description: '', css: blocking, cssAsync, loader: rel(outByEntry.boot), modules: [rel(js.main)], preload: js.pre.map(rel), dir: lang === 'fa' ? 'rtl' : 'ltr',
     htmlAttrs: { 'data-lg': lang.toUpperCase() }, fonts: siteFonts(lang), fetch: [bundles[`${page}:${lang}`]],
   });
   if (page === 'main') { const s = sm[lang]; m.title = s?.title || (s?.h1 ? `Mistgate — ${s.h1}` : ''); m.description = s?.description || ''; if (!s?.description) { m.todo = true; warn(`main/${lang}: no title/description in meta.json`); } }

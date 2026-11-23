@@ -29,12 +29,13 @@ ${alts}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 ${(m.fonts || []).map((f) => `<link rel="preload" href="/${f}" as="font" type="font/woff2" crossorigin>`).join('\n')}
 ${m.css.map((c) => `<link rel="stylesheet" href="/${c}">`).join('\n')}
-${(m.fetch || []).map((f) => `<link rel="preload" href="/${f}" as="fetch" crossorigin>`).join('\n')}
-${(m.preload || []).map((p) => `<link rel="modulepreload" href="/${p}">`).join('\n')}
+${m.loader ? `<script type="application/json" id="mg-boot">${JSON.stringify({ css: (m.cssAsync || []).map((x) => '/' + x), preload: (m.preload || []).map((x) => '/' + x), fetch: (m.fetch || []).map((x) => '/' + x), modules: m.modules.map((x) => '/' + x) })}</script>
+<script src="/${m.loader}" defer></script>` : `${(m.fetch || []).map((f) => `<link rel="preload" href="/${f}" as="fetch" crossorigin>`).join('\n')}
+${(m.preload || []).map((p) => `<link rel="modulepreload" href="/${p}">`).join('\n')}`}
 </head>
 <body>
 ${fragment}
-${m.modules.map((s) => `<script type="module" src="/${s}"></script>`).join('\n')}
+${m.loader ? '' : m.modules.map((s) => `<script type="module" src="/${s}"></script>`).join('\n')}
 </body>
 </html>
 `;

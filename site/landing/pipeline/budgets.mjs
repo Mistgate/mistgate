@@ -7,7 +7,8 @@ const KB = 1024;
 // name -> [target, red] in KB (br)
 export const LIMITS = {
   'HTML of the first screen (page fragment)': [50, 70],
-  'CSS blocking (land + pn / app)': [60, 80],
+  'CSS blocking (land / app)': [60, 80],
+  'CSS beside the first paint (pn)': [60, 80],
   'CSS lazy (app of the language + sub)': [45, 60],
   'Fonts preloaded for the first screen': [80, 120],
   'wasm + glue': [120, 150],
@@ -31,8 +32,9 @@ export function budgets(c) {
     const m = manifest.pages[page][lang], o = cssOut[page];
     const frag = brOf(m.body);
     add(page, lang, 'HTML of the first screen (page fragment)', frag || null, `pages/${page}.${lang}.html: the markup of ${page === 'main' ? 'Main' : 'AppPage'} and the first board`);
-    const blocking = m.css.filter((x) => /\/(land|pn|app)[.-]/.test('/' + x));
-    add(page, lang, 'CSS blocking (land + pn / app)', blocking.reduce((s, x) => s + brOf(x), 0), blocking.map((x) => `${x} ${(brOf(x) / KB).toFixed(1)} KB`).join(', '));
+    const blocking = m.css.filter((x) => /\/(land|app)[.-]/.test('/' + x));
+    add(page, lang, 'CSS beside the first paint (pn)', (m.cssAsync || []).reduce((s, x) => s + brOf(x), 0), (m.cssAsync || []).map((x) => `${x} ${(brOf(x) / KB).toFixed(1)} KB`).join(', '));
+    add(page, lang, 'CSS blocking (land / app)', blocking.reduce((s, x) => s + brOf(x), 0), blocking.map((x) => `${x} ${(brOf(x) / KB).toFixed(1)} KB`).join(', '));
     const app = o.app[lang === 'fa' ? 'app-fa-s.css' : lang === 'zh' ? 'app-zh-s.css' : 'app-s.css'];
     const lazy = [!blocking.includes(app) && app, o.sub].filter(Boolean);
     add(page, lang, 'CSS lazy (app of the language + sub)', lazy.reduce((s, x) => s + brOf(x), 0), lazy.map((x) => `${x} ${(brOf(x) / KB).toFixed(1)} KB`).join(', '));

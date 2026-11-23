@@ -795,8 +795,11 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lx-go .lp .hero-m{animation:lx-rise-t .9s cubic-bezier(.22,1,.36,1) .54s both}
 .lx-go .lp .lx-mx{animation:lx-fade 2s ease .3s both}
 .lx-go .lp .lx-halo{animation:lx-fade 1.8s ease .2s both,lx-br 8s ease-in-out 2s infinite}
-.lx-go .lpe.hero-e .emb.pwin{animation:lx-win 1.3s cubic-bezier(.22,1,.36,1) .6s both}
-@media (prefers-reduced-motion:reduce){.lx-go .lp .top,.lx-go .lp .hero h1 .ln>span,.lx-go .lp .hero-s,.lx-go .lp .hero-a,.lx-go .lp .hero-m,.lx-go .lp .lx-mx,.lx-go .lp .lx-halo,.lx-go .lpe.hero-e .emb.pwin{animation:none}}
+.lpe.hero-e{visibility:hidden}
+html:not([data-pn]) .lpe.hero-e *,html:not([data-pn]) .lpe.hero-e *::before,html:not([data-pn]) .lpe.hero-e *::after{transition:none!important}
+html[data-pn] .lpe.hero-e{visibility:visible}
+html[data-pn] .lx-go .lpe.hero-e .emb.pwin{animation:lx-win 1.3s cubic-bezier(.22,1,.36,1) .35s both}
+@media (prefers-reduced-motion:reduce){.lx-go .lp .top,.lx-go .lp .hero h1 .ln>span,.lx-go .lp .hero-s,.lx-go .lp .hero-a,.lx-go .lp .hero-m,.lx-go .lp .lx-mx,.lx-go .lp .lx-halo,html[data-pn] .lx-go .lpe.hero-e .emb.pwin{animation:none}}
 .lp .hero{overflow:visible}
 /* the hero field is taller than the hero and fades out behind the panel window */
 .lp:has(>.wrap>.hero){overflow-x:clip;overflow-y:visible}
