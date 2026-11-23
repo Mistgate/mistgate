@@ -291,6 +291,7 @@ The reason under a traffic alert names the likely cause:
 |---|---|
 | UDP port blocked | A profile times out while another profile of the node answers on another port, or the whole node times out on one port: the hoster seems to cut that UDP port. |
 | All UDP blocked | Every profile times out, on port 443 or on two and more ports: the hoster seems to cut incoming UDP. |
+| Panel's UDP path | A UDP profile times out, but a clean UDP delivery check from another node reached its port after the failures began: the port is open and works for people, and the loss is on the path from the panel's server. Warning at most; there is no need to change the port. |
 | WARP exit dead | A profile with WARP egress fails while a direct profile of the same protocol on the node works. |
 | auth, tls, refused, exit unreachable, test sites answer errors | The error code of the check, explained in plain words. |
 | Mixed | Every profile fails, each in its own way. |
