@@ -39,7 +39,10 @@
     "Подробнее|Ассистент и MCP": "guide/assistant",
     "Подробнее|Квоты, сроки и устройства": "guide/users-and-groups",
     "Подробнее|Алерты в Telegram": "operations/telegram-alerts",
-    "Подробнее|Сайт-ширма": "guide/decoy-site"
+    "Подробнее|Сайт-ширма": "guide/decoy-site",
+    "Подробнее|DNS-пресеты для приложений": "guide/dns",
+    "Подробнее|Обновления системы на серверах": { "key": "operations/updates", "heading": 8 },
+    "Подробнее|Бэкапы и аккуратное восстановление": "operations/backups"
   },
   "page": {
     "app": "@app"
