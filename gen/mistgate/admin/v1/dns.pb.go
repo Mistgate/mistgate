@@ -681,7 +681,10 @@ type DnsPreset struct {
 	Country string `protobuf:"bytes,13,opt,name=country,proto3" json:"country,omitempty"`
 	// The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
 	// Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
-	BlockAds      bool `protobuf:"varint,14,opt,name=block_ads,json=blockAds,proto3" json:"block_ads,omitempty"`
+	BlockAds bool `protobuf:"varint,14,opt,name=block_ads,json=blockAds,proto3" json:"block_ads,omitempty"`
+	// The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
+	// report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
+	BlockMax      bool `protobuf:"varint,15,opt,name=block_max,json=blockMax,proto3" json:"block_max,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -814,6 +817,13 @@ func (x *DnsPreset) GetBlockAds() bool {
 	return false
 }
 
+func (x *DnsPreset) GetBlockMax() bool {
+	if x != nil {
+		return x.BlockMax
+	}
+	return false
+}
+
 type ListDnsPresetsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -928,7 +938,10 @@ type CreateDnsPresetRequest struct {
 	PreferredTransport DnsTransport `protobuf:"varint,7,opt,name=preferred_transport,json=preferredTransport,proto3,enum=mistgate.admin.v1.DnsTransport" json:"preferred_transport,omitempty"`
 	// The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
 	// Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
-	BlockAds      bool `protobuf:"varint,8,opt,name=block_ads,json=blockAds,proto3" json:"block_ads,omitempty"`
+	BlockAds bool `protobuf:"varint,8,opt,name=block_ads,json=blockAds,proto3" json:"block_ads,omitempty"`
+	// The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
+	// report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
+	BlockMax      bool `protobuf:"varint,9,opt,name=block_max,json=blockMax,proto3" json:"block_max,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1019,6 +1032,13 @@ func (x *CreateDnsPresetRequest) GetBlockAds() bool {
 	return false
 }
 
+func (x *CreateDnsPresetRequest) GetBlockMax() bool {
+	if x != nil {
+		return x.BlockMax
+	}
+	return false
+}
+
 type CreateDnsPresetResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Preset        *DnsPreset             `protobuf:"bytes,1,opt,name=preset,proto3" json:"preset,omitempty"`
@@ -1081,7 +1101,11 @@ type UpdateDnsPresetRequest struct {
 	// The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
 	// Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
 	// Absent keeps the stored value (clients that predate this field).
-	BlockAds      *bool `protobuf:"varint,9,opt,name=block_ads,json=blockAds,proto3,oneof" json:"block_ads,omitempty"`
+	BlockAds *bool `protobuf:"varint,9,opt,name=block_ads,json=blockAds,proto3,oneof" json:"block_ads,omitempty"`
+	// The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
+	// report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
+	// Absent keeps the stored value.
+	BlockMax      *bool `protobuf:"varint,10,opt,name=block_max,json=blockMax,proto3,oneof" json:"block_max,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1175,6 +1199,13 @@ func (x *UpdateDnsPresetRequest) GetPreferredTransport() DnsTransport {
 func (x *UpdateDnsPresetRequest) GetBlockAds() bool {
 	if x != nil && x.BlockAds != nil {
 		return *x.BlockAds
+	}
+	return false
+}
+
+func (x *UpdateDnsPresetRequest) GetBlockMax() bool {
+	if x != nil && x.BlockMax != nil {
+		return *x.BlockMax
 	}
 	return false
 }
@@ -1879,7 +1910,7 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\fDnsSplitRule\x12\x1a\n" +
 	"\bsuffixes\x18\x01 \x03(\tR\bsuffixes\x126\n" +
 	"\aservers\x18\x02 \x03(\v2\x1c.mistgate.admin.v1.DnsServerR\aservers\x12\x10\n" +
-	"\x03geo\x18\x03 \x03(\tR\x03geo\"\x9d\x04\n" +
+	"\x03geo\x18\x03 \x03(\tR\x03geo\"\xba\x04\n" +
 	"\tDnsPreset\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1897,12 +1928,13 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\x13preferred_transport\x18\v \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\x12:\n" +
 	"\bcategory\x18\f \x01(\x0e2\x1e.mistgate.admin.v1.DnsCategoryR\bcategory\x12\x18\n" +
 	"\acountry\x18\r \x01(\tR\acountry\x12\x1b\n" +
-	"\tblock_ads\x18\x0e \x01(\bR\bblockAds\"\x17\n" +
+	"\tblock_ads\x18\x0e \x01(\bR\bblockAds\x12\x1b\n" +
+	"\tblock_max\x18\x0f \x01(\bR\bblockMax\"\x17\n" +
 	"\x15ListDnsPresetsRequest\"\xda\x01\n" +
 	"\x16ListDnsPresetsResponse\x126\n" +
 	"\apresets\x18\x01 \x03(\v2\x1c.mistgate.admin.v1.DnsPresetR\apresets\x12<\n" +
 	"\tproviders\x18\x02 \x03(\v2\x1e.mistgate.admin.v1.DnsProviderR\tproviders\x12J\n" +
-	"\x0eclient_support\x18\x03 \x03(\v2#.mistgate.admin.v1.ClientDnsSupportR\rclientSupport\"\xec\x02\n" +
+	"\x0eclient_support\x18\x03 \x03(\v2#.mistgate.admin.v1.ClientDnsSupportR\rclientSupport\"\x89\x03\n" +
 	"\x16CreateDnsPresetRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x126\n" +
@@ -1911,9 +1943,10 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\tipv4_only\x18\x05 \x01(\bR\bipv4Only\x12!\n" +
 	"\fsplit_direct\x18\x06 \x01(\bR\vsplitDirect\x12P\n" +
 	"\x13preferred_transport\x18\a \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\x12\x1b\n" +
-	"\tblock_ads\x18\b \x01(\bR\bblockAds\"O\n" +
+	"\tblock_ads\x18\b \x01(\bR\bblockAds\x12\x1b\n" +
+	"\tblock_max\x18\t \x01(\bR\bblockMax\"O\n" +
 	"\x17CreateDnsPresetResponse\x124\n" +
-	"\x06preset\x18\x01 \x01(\v2\x1c.mistgate.admin.v1.DnsPresetR\x06preset\"\x8f\x03\n" +
+	"\x06preset\x18\x01 \x01(\v2\x1c.mistgate.admin.v1.DnsPresetR\x06preset\"\xbf\x03\n" +
 	"\x16UpdateDnsPresetRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1923,9 +1956,13 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\tipv4_only\x18\x06 \x01(\bR\bipv4Only\x12!\n" +
 	"\fsplit_direct\x18\a \x01(\bR\vsplitDirect\x12P\n" +
 	"\x13preferred_transport\x18\b \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\x12 \n" +
-	"\tblock_ads\x18\t \x01(\bH\x00R\bblockAds\x88\x01\x01B\f\n" +
+	"\tblock_ads\x18\t \x01(\bH\x00R\bblockAds\x88\x01\x01\x12 \n" +
+	"\tblock_max\x18\n" +
+	" \x01(\bH\x01R\bblockMax\x88\x01\x01B\f\n" +
 	"\n" +
-	"_block_ads\"O\n" +
+	"_block_adsB\f\n" +
+	"\n" +
+	"_block_max\"O\n" +
 	"\x17UpdateDnsPresetResponse\x124\n" +
 	"\x06preset\x18\x01 \x01(\v2\x1c.mistgate.admin.v1.DnsPresetR\x06preset\"(\n" +
 	"\x16DeleteDnsPresetRequest\x12\x0e\n" +

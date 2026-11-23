@@ -86,6 +86,7 @@
     "batch_size",
     "before",
     "block_ads",
+    "block_max",
     "bundle",
     "bytes",
     "canary",

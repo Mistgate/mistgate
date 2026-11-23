@@ -195,6 +195,7 @@ func (p mihomoProfile) build() ([]byte, error) {
 
 	var direct []string
 	var providers, block []dns.MihomoProvider
+	var blockDomains []string
 	if p.preset != nil {
 		d, err := p.preset.MihomoDNS(group)
 		if err != nil {
@@ -206,6 +207,7 @@ func (p mihomoProfile) build() ([]byte, error) {
 			direct = d.Direct
 			providers = d.Providers
 			block = d.Block
+			blockDomains = d.BlockDomains
 		}
 	}
 	if len(providers)+len(block) > 0 {
@@ -221,6 +223,9 @@ func (p mihomoProfile) build() ([]byte, error) {
 		root.set("rule-providers", rp.n)
 	}
 	rules := seqNode()
+	for _, s := range blockDomains { // Max: the very first rules, ahead of DOMAIN-SUFFIX,ru,DIRECT
+		rules.Content = append(rules.Content, quoted("DOMAIN-SUFFIX,"+s+",REJECT"))
+	}
 	for _, pr := range block { // first of all: the ad list is dropped whatever else matches
 		rules.Content = append(rules.Content, quoted(pr.RuleTo("REJECT")))
 	}

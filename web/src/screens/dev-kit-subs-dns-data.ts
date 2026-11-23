@@ -50,7 +50,7 @@ export const rule = (suffixes: string[], servers: DnsServerN[], geo: string[] = 
 
 type Make = Partial<Preset> & { id: string; name: string };
 const preset = (p: Make): Preset => ({
-  description: "", builtin: true, servers: [], split: [], ipv4Only: false, userCount: 0, isDefault: false, splitDirect: false, preferredTransport: DnsTransport.PLAIN, category: DnsCategory.REGULAR, country: "", blockAds: false, ...p,
+  description: "", builtin: true, servers: [], split: [], ipv4Only: false, userCount: 0, isDefault: false, splitDirect: false, preferredTransport: DnsTransport.PLAIN, category: DnsCategory.REGULAR, country: "", blockAds: false, blockMax: false, ...p,
 });
 
 /** The ids the board's "Как выбрать" names. */

@@ -43,7 +43,7 @@ func decode(t *testing.T, header string) string {
 const goldenRuSplit = `{"Name":"DNS","GlobalProxy":"true","RemoteDNSType":"DoU","RemoteDNSDomain":"","RemoteDNSIP":"1.1.1.1",` +
 	`"DomesticDNSType":"DoU","DomesticDNSDomain":"","DomesticDNSIP":"77.88.8.8","LastUpdated":"","DnsHosts":{},` +
 	`"DirectSites":["domain:ru","domain:su","domain:xn--p1ai","domain:yandex.com","domain:yandex.net","domain:yastatic.net","domain:vk.com","domain:userapi.com","domain:sberbank.com","domain:vtb.com"],` +
-	`"DirectIp":[],"ProxySites":[],"ProxyIp":[],"BlockSites":[],"BlockIp":[],"DomainStrategy":"IPIfNonMatch","FakeDNS":"false"}`
+	`"DirectIp":[],"ProxySites":[],"ProxyIp":[],"BlockSites":["domain:max.ru","domain:oneme.ru"],"BlockIp":[],"DomainStrategy":"IPIfNonMatch","FakeDNS":"false"}`
 
 const goldenStandard = `{"Name":"DNS","GlobalProxy":"true","RemoteDNSType":"DoU","RemoteDNSDomain":"","RemoteDNSIP":"1.1.1.1",` +
 	`"DomesticDNSType":"DoU","DomesticDNSDomain":"","DomesticDNSIP":"1.1.1.1","LastUpdated":"","DnsHosts":{},` +
@@ -78,7 +78,7 @@ func TestHappRoutingGolden(t *testing.T) {
 	// split_direct off: the same split is ignored, so the profile equals the no-split one; the built-in
 	// "Russia through the VPN" has the same main servers and no split
 	off := ru
-	off.SplitDirect = false
+	off.SplitDirect, off.BlockMax = false, false // the built-in blocks Max (max_test.go)
 	h, err = HappRouting(off)
 	if err != nil {
 		t.Fatal(err)
@@ -90,8 +90,10 @@ func TestHappRoutingGolden(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := decode(t, h); got != goldenStandard {
-		t.Errorf("ru proxied:\n got %s\nwant %s", got, goldenStandard)
+	// the standard profile plus the Max block (the built-in blocks Max, max_test.go)
+	wantProxied := strings.Replace(goldenStandard, `"BlockSites":[]`, `"BlockSites":["domain:max.ru","domain:oneme.ru"]`, 1)
+	if got := decode(t, h); got != wantProxied {
+		t.Errorf("ru proxied:\n got %s\nwant %s", got, wantProxied)
 	}
 
 	// split_direct on without a split changes nothing
@@ -148,7 +150,7 @@ func TestHappRoutingMapping(t *testing.T) {
 
 	// SplitDirect off: the split is ignored and said so
 	ru := builtin(t, "dns_builtin_ru_split")
-	ru.SplitDirect = false
+	ru.SplitDirect, ru.BlockMax = false, false
 	h, notes, err = happRender(ru)
 	if err != nil {
 		t.Fatal(err)

@@ -97,6 +97,11 @@ func (p Preset) XrayDNS() (XrayDNS, error) {
 	if p.BlockAds {
 		out.Block = []string{"geosite:" + adsSite}
 	}
+	if p.BlockMax {
+		for _, s := range maxDomains {
+			out.Block = append(out.Block, "domain:"+s)
+		}
+	}
 	return out, nil
 }
 
