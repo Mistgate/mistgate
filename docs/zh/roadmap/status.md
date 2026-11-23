@@ -66,7 +66,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.89`�
         - "[通过已建立隧道的响应时间与单独显示的连接时间](../operations/health.md#数字的含义)，以及[面板主机丢失 UDP 时的提示](../operations/health.md#面板服务器丢失-udp-时)。"
         - "在管理后台和 Telegram 中接收[告警](../operations/health.md#告警)。"
         - "[面板监视器](../operations/panel-watcher.md)：Cloudflare Worker 每分钟检查一次面板，并在其无响应时向 Telegram 发送消息。"
-        - "[关闭告警](../operations/health.md#关闭)直到问题消失，以及节点诊断的 [21 项检查](../operations/health.md#检查项目)，其中包括 CPU steal、连接跟踪和 Agent 打开的文件。"
+        - "[关闭告警](../operations/health.md#关闭)直到问题消失，以及节点诊断的 [23 项检查](../operations/health.md#检查项目)，其中包括 CPU steal、连接跟踪和 Agent 打开的文件。"
     - title: 更新
       section: updates
       points:
@@ -91,7 +91,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.89`�
         - "代码审计（v0.1.84）检查了登录、订阅、节点连接、MCP 和助手；发现的问题均已修复。参见[安全](../operations/security.md)。"
         - "[伪装站点](../guide/decoy-site.md)会显示在面板地址上，向陌生人隐藏管理后台。"
         - "支持定时将[加密备份](../operations/backups.md)保存到 Cloudflare R2 并设置保留期限，或保存为所有者电脑上的文件；可在面板中恢复，或用安装程序在新服务器上恢复。"
-        - "所有者可用的[面板日志、保留时间、导出和指标](../operations/troubleshooting.md#面板日志保留时间导出和指标)，以及可选的出现动画（测试版）。"
+        - "所有者可用的[面板日志、保留时间、导出和指标](../operations/troubleshooting.md#面板日志保留时间导出和指标)，以及出现动画（默认开启，可在**设置 → 界面**中针对本设备关闭）。"
 - status: now
   title: 进行中
   meta: v0.2.0-dev.1 – dev.14, v0.1.34 – v0.1.81

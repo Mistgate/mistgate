@@ -66,7 +66,7 @@ Mistgate is in **beta**; the current release is `v0.1.89`; the 0.2.0 line is bei
         - "[Response time through an open tunnel and connect time apart from it](../operations/health.md#what-the-numbers-mean), and a [notice when the panel's host loses UDP](../operations/health.md#when-the-panels-server-loses-udp)."
         - "[Alerts](../operations/health.md#alerts) in the admin and in Telegram."
         - "The [panel watcher](../operations/panel-watcher.md): a Cloudflare Worker checks the panel every minute and writes to Telegram when it does not answer."
-        - "[Closing an alert](../operations/health.md#closing) until its problem goes away, and the doctor's [21 checks](../operations/health.md#the-checks), among them CPU steal, connection tracking and the agent's open files."
+        - "[Closing an alert](../operations/health.md#closing) until its problem goes away, and the doctor's [23 checks](../operations/health.md#the-checks), among them CPU steal, connection tracking and the agent's open files."
     - title: Updates
       section: updates
       points:
@@ -91,7 +91,7 @@ Mistgate is in **beta**; the current release is `v0.1.89`; the 0.2.0 line is bei
         - "A code audit (v0.1.84) went over sign-in, subscriptions, the node link, MCP and the assistant; the gaps it found are closed. See [Security](../operations/security.md)."
         - "A [decoy site](../guide/decoy-site.md) at the panel's address hides the admin from strangers."
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, or to a file on the owner's computer; restore in the panel or on a new server with the installer."
-        - "[Panel logs, retention, export and metrics](../operations/troubleshooting.md#panel-logs-retention-export-and-metrics) for the owner, and an opt-in reveal animation (Beta)."
+        - "[Panel logs, retention, export and metrics](../operations/troubleshooting.md#panel-logs-retention-export-and-metrics) for the owner, and the reveal animation (on by default, switched off per device in **Settings → Interface**)."
 - status: now
   title: Now
   meta: v0.2.0-dev.1 – dev.14, v0.1.34 – v0.1.81

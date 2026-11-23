@@ -51,7 +51,7 @@ Buradaki her şey uydurma demo verileriyle çalışır; klipler gerçek yönetim
 <tr>
 <td width="38%" valign="top">
 <h3>İstemcinin gözünden kontroller</h3>
-<p>Panel her 5 dakikada bir, bir uygulama gibi her düğümdeki her protokole bağlanır ve her tünelden geçen gecikmeyi gösterir; bozuk bir sunucuyu onu kullananlardan önce siz öğrenirsiniz. Her düğümdeki Teşhis 22 sunucu kontrolü yapar ve on düzeltme önerir; hiçbiri onayınız olmadan çalışmaz.</p>
+<p>Panel her 5 dakikada bir, bir uygulama gibi her düğümdeki her protokole bağlanır ve her tünelden geçen gecikmeyi gösterir; bozuk bir sunucuyu onu kullananlardan önce siz öğrenirsiniz. Her düğümdeki Teşhis 23 sunucu kontrolü yapar ve on düzeltme önerir; hiçbiri onayınız olmadan çalışmaz.</p>
 <p><a href="docs/en/operations/health.md">Belgeler →</a></p>
 </td>
 <td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-en.webp"><img alt="İstemci gözüyle kontrol tablosu: düğümler ve protokoller, her tünelden geçen gecikme, nedenini göstermek için açılmış bozuk bir düğüm" src="docs/images/readme/health-dark-en.webp" width="100%"></picture></td>

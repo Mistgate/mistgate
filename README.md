@@ -51,7 +51,7 @@ Everything here runs on invented demo data; the clips are short loops of the rea
 <tr>
 <td width="38%" valign="top">
 <h3>Checks from the client's side</h3>
-<p>Every 5 minutes the panel connects to every protocol on every node the way an app does and shows the delay through each tunnel, so you hear about a broken server before the people on it do. A doctor on each node runs 22 host checks and offers ten fixes; none of them runs without your confirmation.</p>
+<p>Every 5 minutes the panel connects to every protocol on every node the way an app does and shows the delay through each tunnel, so you hear about a broken server before the people on it do. A doctor on each node runs 23 host checks and offers ten fixes; none of them runs without your confirmation.</p>
 <p><a href="docs/en/operations/health.md">Docs →</a></p>
 </td>
 <td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-en.webp"><img alt="The client-eye checks table: nodes against protocols with the delay through each tunnel, and a failing node opened to show why" src="docs/images/readme/health-dark-en.webp" width="100%"></picture></td>

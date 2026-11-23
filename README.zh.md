@@ -51,7 +51,7 @@
 <tr>
 <td width="38%" valign="top">
 <h3>客户端视角的检查</h3>
-<p>面板每 5 分钟像一个应用那样连接每个节点上的每种协议，并显示经过每条隧道的延迟，所以服务器出问题时你会比使用者先知道。每个节点上的诊断程序做 22 项主机检查并提供十种修复，没有你的确认，一项也不会运行。</p>
+<p>面板每 5 分钟像一个应用那样连接每个节点上的每种协议，并显示经过每条隧道的延迟，所以服务器出问题时你会比使用者先知道。每个节点上的诊断程序做 23 项主机检查并提供十种修复，没有你的确认，一项也不会运行。</p>
 <p><a href="docs/zh/operations/health.md">文档 →</a></p>
 </td>
 <td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-en.webp"><img alt="客户端视角检查表：节点与协议，以及经过每条隧道的延迟；出问题的节点展开后显示原因" src="docs/images/readme/health-dark-en.webp" width="100%"></picture></td>
