@@ -100,7 +100,7 @@ body{margin:0;background:#0c0c0e}
           <div class="hb"><span>Remnawave</span><span class="mono">426–454</span><i style="--w: 100%"></i></div>
         </div>
       </div></div><div class="lp lx-t"><h3>Два бинарника на Go</h3><p>Без Docker и сервера БД: SQLite и systemd. В простое панель занимает 16–20 МиБ памяти</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
-  <article class="lx-c s2 rv"><div class="lx-shot" data-ui data-shot data-sel=".sb-tab" data-k=".58" data-pad="20" data-pre="[role=tab]|^Доктор" style="--pan: -150px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnHealth" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Доктор на каждой ноде</h3><p>22 проверки хоста и десять исправлений. Без вашего подтверждения ни одно не запускается</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv"><div class="lx-shot" data-ui data-shot data-sel=".sb-tab" data-k=".58" data-pad="20" data-pre="[role=tab]|^Доктор" style="--pan: -150px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnHealth" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Доктор на каждой ноде</h3><p>23 проверки хоста и десять исправлений. Без вашего подтверждения ни одно не запускается</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
   <article class="lx-c s2 rv" style="--d: 80ms"><div class="lx-shot" data-ui data-shot data-sel=".sb-tab" data-k=".58" data-pad="20" style="--pan: -190px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnReach" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Видно ли изнутри страны</h3><p>Необязательная проверка доступности серверов по сетям. Большинство источников работает только в России</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
   <article class="lx-c s2 rv" style="--d: 160ms"><div class="lx-shot" data-ui data-shot data-sel=".sb-tab" data-k=".58" data-pad="20" style="--pan: -170px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnUpdates" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Обновления с канарейкой</h3><p>Сначала одна нода и 5 минут проверки, потом пачками. Не прошла проверку: вернётся прежняя сборка</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
   <article class="lx-c s3 rv"><div class="lx-shot" data-ui data-shot data-sel=".fz-cv" data-k="1.2" data-km="1.1" data-cx="250" data-cxm="185" data-cy="215" data-cine="1" data-pre=".fz-bar .seg button|^Карта$" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnNodes" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Ретрансляции и карта флота</h3><p>Если сервер не открывается из каких-то сетей, люди попадают на него через другую вашу ноду. Она только пересылает зашифрованный трафик</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
@@ -111,7 +111,7 @@ body{margin:0;background:#0c0c0e}
         <div class="seg sm2"><button type="button" aria-pressed="{{decOut}}" onClick="{{pickOut}}">Видит посторонний</button><button type="button" aria-pressed="{{decIn}}" onClick="{{pickIn}}">Видите вы</button></div>
         <sc-if value="{{isOut}}" hint-placeholder-val="{{true}}"><div class="pg"><span class="url"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z"/></svg>panel.example.com</span><h4>Заметки о путешествиях</h4><p>Обычный сайт: пара статей и страница «О себе». Формы входа здесь нет</p></div></sc-if>
         <sc-if value="{{isIn}}" hint-placeholder-val="{{false}}"><div class="pg"><span class="url"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z"/></svg>panel.example.com/<span style="color: var(--acc)">&lt;секретный путь&gt;</span></span><h4>Вход в панель</h4><span class="btn sm pri" style="align-self: flex-start">Войти по passkey</span></div></sc-if>
-      </div></div><div class="lp lx-t"><h3>Сайт-ширма</h3><p>Посторонний по адресу панели видит обычный сайт, а админка доступна по секретному пути или имени хоста</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+      </div></div><div class="lp lx-t"><h3>Сайт-ширма</h3><p>Посторонний видит обычный сайт, а админка доступна по секретному пути или имени хоста. Сайты для нод панель собирает из шаблона: десять видов, язык страны и фотографии по вашему ключу Pexels или Pixabay</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
 </div></div>
 <div class="lp {{jsCls}}" style="--acc: {{accent}}">
 <div class="wrap">
@@ -205,7 +205,7 @@ body{margin:0;background:#0c0c0e}
 
 <!-- честно -->
 <section class="sec">
-  <div class="sh rv"><span class="kick"><i class="dot blip" aria-hidden="true"></i>Бета, v0.1.0 вышла 3 октября 2026</span><h2>Чего пока нет и как выходят релизы</h2></div>
+  <div class="sh rv"><span class="kick"><i class="dot blip" aria-hidden="true"></i>Бета, v0.2.0</span><h2>Чего пока нет и как выходят релизы</h2></div>
   <div class="two">
     <div class="card hn rv">
       <h3>Пока нет</h3>
@@ -464,7 +464,7 @@ class Component extends DCLogic {
   renderVals() {
     const s = this.state;
     const dom = (s.dom || '').replace(/^https?:\/\//, '').trim() || 'panel.example.com';
-    const STEPS = [['Сервер проверен', 'linux · amd64 · systemd'], ['Порты открыты в UFW', '443/udp · 443/tcp'], ['Агент поставлен', 'подпись верна'], ['Доктор: 21 проверка', 'всё в порядке']];
+    const STEPS = [['Сервер проверен', 'linux · amd64 · systemd'], ['Порты открыты в UFW', '443/udp · 443/tcp'], ['Агент поставлен', 'подпись верна'], ['Доктор: 23 проверки', 'всё в порядке']];
     const cls = (i) => (s.run > i + 1 ? 'done' : (s.run === i + 1 ? 'busy' : ''));
     const MARQ = [['Hysteria2', 'ok'], ['VLESS REALITY', 'dir'], ['AmneziaWG 3.1', 'ru'], ['AmneziaWG 2.0', ''], ['Cloudflare WARP', 'warp'], ['XHTTP', ''], ['MTProto', ''], ['TrustTunnel', ''], ['xray-core', 'dir'], ['Mihomo', ''], ['sing-box', ''], ['SQLite', 'warp'], ['systemd', ''], ['Go', 'ok'], ['Linux amd64', ''], ['Linux arm64', ''], ['MCP', 'ru'], ['Telegram-алерты', 'dir'], ['Let’s Encrypt', ''], ['AGPL-3.0', 'ok'], ['5 языков', '']];
     const SERVERS = [['de', 'Германия', 39, '', ''], ['nl', 'Нидерланды', 44, 'WARP', 'warp'], ['fi', 'Финляндия', 52, '', ''], ['ee', 'Эстония', 58, 'через RU', 'ru'], ['pl', 'Польша', 61, 'напрямую', 'dir']];
@@ -478,7 +478,7 @@ class Component extends DCLogic {
         apps: ['Mistgate для Windows', 'Happ', 'приложения на Mihomo'] },
       { k: 'vless', n: 'VLESS', s: 'TCP · xray-core', d: RI.net, lead: 'Для сетей, где режут UDP и QUIC', doc: G + 'vless/', page: 'https://github.com/Mistgate/Xray-core',
         route: [N('Устройство', 'dev'), Wr('TCP 443 · REALITY', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Интернет', 'net')],
-        rows: [['REALITY', 'Поверх XHTTP или TCP (RAW + Vision)', 'сертификат не нужен, работает по IP', ''], ['TLS', 'Поверх XHTTP или WebSocket', 'напрямую или за CDN', ''], ['Цель REALITY', '«Сайт этой ноды» или «Другой сайт»', 'по умолчанию сайт этой ноды', ''], ['Вместе с Hysteria2', 'Делят порт 443 на одной ноде', 'один на TCP, другой на UDP', '']],
+        rows: [['REALITY', 'Поверх XHTTP или TCP (RAW + Vision)', 'сертификат не нужен, работает по IP', ''], ['TLS', 'Поверх XHTTP или WebSocket', 'напрямую или за CDN', ''], ['Цель REALITY', '«Сайт этой ноды» или «Другой сайт»', 'по умолчанию сайт этой ноды', ''], ['Один порт на несколько', 'VLESS, TrustTunnel и MTProto делят TCP 443 на одной ноде', 'по имени, которое запрашивает клиент; Hysteria2 рядом, на UDP', '']],
         apps: ['Mistgate для Windows', 'Happ', 'приложения на Mihomo', 'sing-box, без XHTTP'] },
       { k: 'amneziawg', n: 'AmneziaWG', s: '3.1 и 2.0', d: 'M4 15.500a3.500 3.500 0 1 0 7 0 3.500 3.500 0 0 0-7 0zM11 15.500h9M17 15.500v-3', lead: 'Отдельный ключ на каждое устройство', doc: G + 'amneziawg/', page: 'https://github.com/amnezia-vpn/amneziawg-go',
         route: [N('Устройство', 'dev'), Wr('UDP · свой ключ', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Интернет', 'net')],
@@ -507,7 +507,7 @@ class Component extends DCLogic {
       ov: ['Обзор', 'Что требует внимания', 'Здоровье и нагрузка флота, открытые замечания и последние события на одном экране', ['У каждого замечания готовое действие', 'Проверки глазами клиента по каждой ноде', 'Онлайн, скорость и трафик за сутки'], 'operations/health/', 'Как устроено здоровье'],
       nd: ['Ноды', 'Весь флот на одной странице', 'Список, пути, карта и нагрузка. Карта показывает, как люди попадают на каждый сервер', ['Нода добавляется из браузера по SSH или одноразовой командой', 'Ретрансляция включается после проверки пути', 'Панель открывает порты в UFW или firewalld и ставит подписанный агент'], 'getting-started/add-node/', 'Добавление ноды'],
       us: ['Люди', 'Новый человек за минуту', 'Имя, группа и квота. Дальше человек получает одну ссылку, и приложение само подтягивает положенные ему серверы', ['Одна ссылка на человека', 'Квота, срок и лимит устройств', 'Изменение пользователя не перезапускает сервер'], 'getting-started/first-users/', 'Первые пользователи'],
-      hl: ['Здоровье', 'Алерты, проверки и доктор', 'Каждые 5 минут панель подключается к каждому серверу, как приложение', ['Доктор делает 22 проверки хоста на каждой ноде', 'Десять исправлений, ни одно без вашего подтверждения', 'Алерты в админке и в Telegram'], 'operations/health/', 'Здоровье'],
+      hl: ['Здоровье', 'Алерты, проверки и доктор', 'Каждые 5 минут панель подключается к каждому серверу, как приложение', ['Доктор делает 23 проверки хоста на каждой ноде', 'Десять исправлений, ни одно без вашего подтверждения', 'Алерты в админке и в Telegram'], 'operations/health/', 'Здоровье'],
       rc: ['Доступность', 'Открываются ли серверы изнутри страны', 'Необязательная проверка по сетям разных типов. Большинство источников работает только в России', ['Пробы Globalping в домашних и мобильных сетях', 'Списки блокировок и ТСПУ-зонд с вашей ноды', 'Пробы добровольцев и SIM-пробы'], 'operations/reachability/', 'Доступность'],
       up: ['Обновления', 'С канарейкой и откатом', 'Ноды сами не обновляются. Раскатка начинается с одной ноды и встаёт на паузу, если что-то не так', ['Канарейке даётся 5 минут на проверку', 'Агент откатывается сам, если не подключился', 'Панель обновляется только с подтверждения и хранит копию данных'], 'operations/updates/', 'Обновления']
     };
@@ -552,7 +552,7 @@ class Component extends DCLogic {
       ['users', 1, 'Telegram-бот', 'p|только алерты', 'y', 'y', 'y', 'p|уведомления', 'y', 'q'],
       ['users', 0, 'API', 'y', 'y', 'y', 'y', 'y', 'y', 'y'],
       ['users', 1, 'MCP-сервер для ИИ-агентов', 'y', 'q', 'q', 'q', 'p|от сообщества', 'q', 'q'],
-      ['ops', 0, 'Здоровье и алерты', 'y', 'p', 'p', 'p', 'y', 'p', 'q'],
+      ['ops', 0, 'Здоровье и алерты', 'y', 'y|мониторинг туннеля по желанию', 'p', 'p', 'y', 'p', 'q'],
       ['ops', 0, 'Подписанные релизы', 'y', 'p|файлы .sha256', 'q', 'q', 'q', 'q', 'q'],
       ['ops', 0, 'Сайт-ширма', 'y', 'q', 'q', 'q', 'q', 'q', 'q'],
       ['ops', 0, 'Блокировка торрентов', 'y', 'q', 'q', 'q', 'y|плагин', 'q', 'q'],
