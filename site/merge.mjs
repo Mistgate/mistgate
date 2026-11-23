@@ -13,7 +13,7 @@ import { WEBSITE, ORG, ldScript, gitDates, newest } from "./src/jsonld.mjs";
 
 /** Files the merged folder must have: the landing's <head> points at the icons and og.png, which only the docs write. */
 const REQUIRED = ["favicon.svg", "favicon-32.png", "apple-touch-icon.png", "og.png", "mistgate-badge.svg", "robots.txt", "sitemap.xml", "404.html", "_headers", "_redirects", "install.sh"];
-const SECURITY = ["x-content-type-options", "x-frame-options", "referrer-policy", "permissions-policy", "content-security-policy"];
+const SECURITY = ["x-content-type-options", "strict-transport-security", "x-frame-options", "referrer-policy", "permissions-policy", "content-security-policy"];
 
 // a file of the merged folder: {from: path on disk} or {data: string|Buffer}; {landing: true} once the landing wrote it
 const text = (e) => (e.data ?? readFileSync(e.from)).toString("utf8");

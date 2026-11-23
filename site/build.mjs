@@ -196,6 +196,7 @@ out("_redirects", Object.entries(MOVED).flatMap(([from, to]) => LANGS.filter((l)
 const initHash = createHash("sha256").update(THEME_INIT).digest("base64");
 out("_headers", `/*
   X-Content-Type-Options: nosniff
+  Strict-Transport-Security: max-age=31536000
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
@@ -210,6 +211,9 @@ out("_headers", `/*
 /install.sh
   Content-Type: text/plain; charset=utf-8
   Cache-Control: public, max-age=300
+
+https://mistgate-docs.pages.dev/*
+  X-Robots-Tag: noindex
 `);
 
 // ---- link check: every internal href/src must land on a written page, asset or anchor ----
