@@ -1,5 +1,6 @@
 ---
 title: AmneziaWG
+seoTitle: "AmneziaWG server panel: 2.0 and 3.1, a key per device — Mistgate"
 description: AmneziaWG 3.1 and 2.0 profiles, their parameters and mimicry looks, the userspace and kernel backends of a node, and the per-device keys people import into AmneziaVPN.
 ---
 

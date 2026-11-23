@@ -783,18 +783,23 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 @keyframes lx-dn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}
 @keyframes lx-win{from{opacity:0;transform:translateY(44px) scale(.97)}to{opacity:1;transform:none}}
 .lp-root.lx-boot{opacity:0}
-.lp-root.lx-go{animation:lx-fade .5s ease both}
-.lx-go .lp .top{animation:lx-dn .8s cubic-bezier(.22,1,.36,1) .05s both}
+/* seo: the text of the first screen is there from the first frame: nothing of it starts at opacity 0 (the page does not fade in; the words only rise) */
+@keyframes lx-rise-t{from{transform:translateY(22px)}to{transform:none}}
+@keyframes lx-dn-t{from{transform:translateY(-12px)}to{transform:none}}
+.lx-go .lp .top{animation:lx-dn-t .8s cubic-bezier(.22,1,.36,1) .05s both}
 .lx-go .lp .hero h1 .ln{overflow:visible}
-.lx-go .lp .hero h1 .ln>span{animation:lx-rise 1s cubic-bezier(.22,1,.36,1) .1s both}
+.lx-go .lp .hero h1 .ln>span{animation:lx-rise-t 1s cubic-bezier(.22,1,.36,1) .1s both}
 .lx-go .lp .hero h1 .ln:nth-child(2)>span{animation-delay:.2s}
-.lx-go .lp .hero-s{animation:lx-rise .9s cubic-bezier(.22,1,.36,1) .34s both}
-.lx-go .lp .hero-a{animation:lx-rise .9s cubic-bezier(.22,1,.36,1) .44s both}
-.lx-go .lp .hero-m{animation:lx-rise .9s cubic-bezier(.22,1,.36,1) .54s both}
+.lx-go .lp .hero-s{animation:lx-rise-t .9s cubic-bezier(.22,1,.36,1) .34s both}
+.lx-go .lp .hero-a{animation:lx-rise-t .9s cubic-bezier(.22,1,.36,1) .44s both}
+.lx-go .lp .hero-m{animation:lx-rise-t .9s cubic-bezier(.22,1,.36,1) .54s both}
 .lx-go .lp .lx-mx{animation:lx-fade 2s ease .3s both}
 .lx-go .lp .lx-halo{animation:lx-fade 1.8s ease .2s both,lx-br 8s ease-in-out 2s infinite}
-.lx-go .lpe.hero-e .emb.pwin{animation:lx-win 1.3s cubic-bezier(.22,1,.36,1) .6s both}
-@media (prefers-reduced-motion:reduce){.lx-go .lp .top,.lx-go .lp .hero h1 .ln>span,.lx-go .lp .hero-s,.lx-go .lp .hero-a,.lx-go .lp .hero-m,.lx-go .lp .lx-mx,.lx-go .lp .lx-halo,.lx-go .lpe.hero-e .emb.pwin{animation:none}}
+.lpe.hero-e{visibility:hidden}
+html:not([data-pn]) .lpe.hero-e *,html:not([data-pn]) .lpe.hero-e *::before,html:not([data-pn]) .lpe.hero-e *::after{transition:none!important}
+html[data-pn] .lpe.hero-e{visibility:visible}
+html[data-pn] .lx-go .lpe.hero-e .emb.pwin{animation:lx-win 1.3s cubic-bezier(.22,1,.36,1) .35s both}
+@media (prefers-reduced-motion:reduce){.lx-go .lp .top,.lx-go .lp .hero h1 .ln>span,.lx-go .lp .hero-s,.lx-go .lp .hero-a,.lx-go .lp .hero-m,.lx-go .lp .lx-mx,.lx-go .lp .lx-halo,html[data-pn] .lx-go .lpe.hero-e .emb.pwin{animation:none}}
 .lp .hero{overflow:visible}
 /* the hero field is taller than the hero and fades out behind the panel window */
 .lp:has(>.wrap>.hero){overflow-x:clip;overflow-y:visible}
@@ -845,6 +850,30 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lp .lx-mn a{display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 12px;border-radius:10px;font-size:16px;color:var(--text)}
 .lp .lx-mn a:hover{background:var(--step)}
 .lp .lx-mn a .i{color:var(--muted)}
+/* two cards of the features block draw a piece of the panel as it is, not a board: the piece sits in .pnr (the container of the panel's own narrow rules) and is scaled to the width of the frame, so its layout is the same at every width */
+.lpe .lx-sc{container:lxs/inline-size}
+.lpe .lx-sc>.pnr{--k:.48;--z:1;position:absolute;left:0;top:0;width:calc(100%/(var(--k)*var(--z)));transform:scale(calc(var(--k)*var(--z)));transform-origin:0 0}
+.lpe .lx-sd>.pnr{--z:.86}
+@container lxs (min-width:308px){.lpe .lx-sc>.pnr{--k:.55}}
+@container lxs (min-width:350px){.lpe .lx-sc>.pnr{--k:.625}}
+@container lxs (min-width:400px){.lpe .lx-sc>.pnr{--k:.714}}
+@container lxs (min-width:456px){.lpe .lx-sc>.pnr{--k:.814}}
+@container lxs (min-width:520px){.lpe .lx-sc>.pnr{--k:.929}}
+.lpe .lx-sc .pn{display:block;min-height:0;padding:20px 20px 0;background:none}
+.lpe .lx-sd .pn{padding-top:14px}
+.lpe .lx-sd .us-db .rc-pb{margin:0}
+.lpe .lx-sc .us-dlg{border-radius:20px;max-height:none;animation:none}
+.lpe .lx-sum{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:12px;background:var(--step)}
+.lpe .lx-sum>svg{flex:none;margin-top:2px;width:18px;height:18px;color:var(--acc)}
+.lpe .lx-sum>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.lpe .lx-sum b{font-size:13px;font-weight:500}
+.lpe .lx-sum span{font-size:12px;line-height:16px;color:var(--muted)}
+.lpe .lx-cmp{width:100%;border-collapse:collapse;font-size:13px}
+.lpe .lx-cmp th{padding-bottom:6px;font-size:11px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:end}
+.lpe .lx-cmp td{padding:6px 0;border-top:1px solid var(--hair);text-align:end;font-variant-numeric:tabular-nums}
+.lpe .lx-cmp th:first-child,.lpe .lx-cmp td:first-child{text-align:start}
+.lpe .lx-cmp td:nth-child(2){font-weight:500}
+.lpe .lx-cmp td.same{color:var(--muted)}
 @container lpr (max-width:900px){
 .lpe{padding:0 16px 48px}
 .lpe .lx-h .stg .rel{transform:scale(.64)}
@@ -1042,10 +1071,12 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lp .lx-pl.on b{color:var(--text);font-weight:600}
 .lp .lx-pl.on>span:not(.lx-pli){color:var(--sec)}
 .lp .lx-pl.on em{color:var(--acc)}
-.lp .lx-pl.on em i{width:6px;height:6px;margin:0 3px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent);animation:lx-plp 2.4s ease-in-out infinite}
+.lp .lx-pl.on em i{width:6px;height:6px;margin:0 3px;border-radius:50%;background:var(--acc);position:relative}
+.lp .lx-pl.on em i::after{content:"";position:absolute;inset:0;border-radius:50%;background:color-mix(in srgb,var(--acc) 22%,transparent);animation:lx-plp 2.4s ease-in-out infinite}
 .lp .lx-plat.in .lx-pl{animation:lx-rise .6s var(--e) both}
 .lp .lx-plat.in .lx-pl:nth-child(2){animation-delay:.07s}.lp .lx-plat.in .lx-pl:nth-child(3){animation-delay:.14s}.lp .lx-plat.in .lx-pl:nth-child(4){animation-delay:.21s}.lp .lx-plat.in .lx-pl:nth-child(5){animation-delay:.28s}
-@keyframes lx-plp{0%,100%{box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent)}50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--acc) 0%,transparent)}}
+/* the ring is a pseudo-element that scales and fades (transform and opacity run on the compositor; a box-shadow animation does not) */
+@keyframes lx-plp{0%,100%{transform:scale(2);opacity:1}50%{transform:scale(3);opacity:0}}
 @container lpr (max-width:1100px){
 .lp .lx-as{align-items:stretch}
 .lp .lx-atabs{overflow-x:auto;scrollbar-width:none;width:auto;margin:0 -16px;padding:0 16px;border:0;background:none;border-radius:0}
@@ -2249,3 +2280,6 @@ html[data-lg=FA] .lx-docp .mono{letter-spacing:0;font-family:"JetBrains Mono","V
 @container lpr (max-width:700px){.lp .da-syg{grid-template-columns:minmax(0,1fr)}.lp .da-wf>div{grid-template-columns:minmax(0,1fr);gap:0}.lp .da-ft.f2.w>div,.lp .da-ft.f2.k2>div{grid-template-columns:minmax(0,1fr);gap:2px}.lp .da-see{padding:14px 16px 16px}}
 .lp .da-fn a,.lp .dx-h p a{color:var(--acc)}
 /* docs:end */
+
+/* seo: text for the screen reader and the crawler, not drawn (the link "Подробнее" says what it is about) */
+.lp .vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}

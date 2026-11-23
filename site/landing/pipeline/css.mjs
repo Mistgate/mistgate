@@ -86,3 +86,12 @@ export function pruneCss(css, u, { keepKeyframes = () => false } = {}) {
   // dropped: names that no source mentions, cut with their rules. A class that is used but whose rule asks for another one nobody uses is not "dropped"
   return { css: out, stats, dropped: new Set([...seen].filter((x) => !kept.has(x) && !isUsedC(x))), kept };
 }
+
+/** The headings of the boards inside a page are `<mg-h1>` (compile.mjs): the tag selectors `h1` of the design's stylesheets follow, and the
+ *  rule the browser's own stylesheet gave the h1 stays with the new tag. Classes (`.nd-h1`, `.u-h1`) are not tags and are left alone. */
+export function renameH1(css, tag = 'mg-h1') {
+  const root = postcss.parse(css);
+  root.walkRules((r) => { if (!/keyframes$/i.test(r.parent?.name || '')) r.selector = r.selector.replace(/(?<![\w.#\-[:"'=])h1(?![\w-])/g, tag); });
+  root.prepend(postcss.rule({ selector: tag, nodes: [postcss.decl({ prop: 'display', value: 'block' }), postcss.decl({ prop: 'font-size', value: '2em' }), postcss.decl({ prop: 'font-weight', value: '700' }), postcss.decl({ prop: 'margin', value: '.67em 0' })] }));
+  return root.toString();
+}

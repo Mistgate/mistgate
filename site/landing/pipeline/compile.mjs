@@ -19,6 +19,7 @@ const HOLE = /\{\{([^}]*)\}\}/g;
 const wholeHole = (s) => { const m = s.trim().match(/^\{\{([^}]*)\}\}$/); return m ? m[1] : null; };
 /** frames of boards: users do not touch them (CSS: pointer-events none), keyboard focus must not enter them either */
 const FRAME = new Set(['emb', 'lx-shot', 'lx-app', 'lx-gw']);
+export const H1 = 'mg-h1';
 const LOOKUPS = new Set(['querySelector', 'querySelectorAll', 'getElementById']);
 
 /** the literal text of an element (holes and svg are skipped): the Russian label a link is known by in links.json */
@@ -165,7 +166,8 @@ export function compileBoard(src, name, opts = {}) {
   const group = (list) => (list.length === 1 ? list[0] : `[${list.join(',')}]`);
 
   function elem(n, scope, pre) {
-    const t = n.tagName;
+    // the heading of a board that sits inside a page is not a heading of the page (one <h1> per document): the tag is renamed, css.mjs renameH1 does the same to the stylesheets
+    const t = !opts.page && n.tagName === 'h1' ? H1 : n.tagName;
     if (t === 'helmet') return null;
     if (t === 'sc-if') {
       stats.ifs++;

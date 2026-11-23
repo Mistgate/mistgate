@@ -1,5 +1,6 @@
 ---
 title: VLESS REALITY
+seoTitle: "Панель для VLESS Reality: профили и пользователи — Mistgate"
 description: "Профиль VLESS: REALITY поверх TCP и XHTTP или TLS с XHTTP и WebSocket, напрямую или за CDN. Когда выбирать его вместо Hysteria2, все настройки, цель REALITY, порты и что получают и что требуют приложения."
 ---
 

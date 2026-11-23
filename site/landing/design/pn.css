@@ -42,7 +42,8 @@
 @keyframes pn-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes pn-spin{to{transform:rotate(360deg)}}
 @keyframes pn-pop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
-@keyframes pn-live{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 50%,transparent)}70%,100%{box-shadow:0 0 0 6px transparent}}
+/* the ring of a live dot is a pseudo-element that scales and fades (compositor), not a box-shadow */
+@keyframes pn-live{0%{transform:scale(1);opacity:.5}70%,100%{transform:scale(2.5);opacity:0}}
 @keyframes pn-wave-r{from{--r:30px}to{--r:1400px}}
 @keyframes pn-wave-a{0%{opacity:0}5%{opacity:1}30%{opacity:.82}55%{opacity:.5}78%{opacity:.18}92%{opacity:.04}100%{opacity:0}}
 @keyframes pn-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
@@ -85,7 +86,8 @@
 .pn .ph{display:flex;align-items:center;gap:12px;margin-bottom:4px}
 .pn .ph h1{font-size:28px;line-height:32px;font-weight:500;letter-spacing:-.02em}
 .pn .live{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-inline-end:auto}
-.pn .live .dot{animation:pn-live 2.4s ease-out infinite}
+.pn .live .dot{position:relative}
+.pn .live .dot::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--acc);opacity:0;animation:pn-live 2.4s ease-out infinite}
 
 /* состояние флота */
 .pn .hero{display:grid;grid-template-columns:minmax(0,1fr) 472px;overflow:hidden}
@@ -2740,7 +2742,7 @@ body:has(.pn.an-solo.light){background:#f8f8f6 !important}
 .pn .nx-roll b{color:var(--text)}.pn .nx-roll b .sc-interp{color:inherit;font-size:inherit}
 
 /* ноды: на средней ширине поиск сворачивается в кнопку и раскрывается по клику, фильтры остаются в строке */
-.pn .fz-q{transition:flex-basis .3s var(--e),padding .3s var(--e),border-color .15s var(--e)}
+.pn .fz-q{transition:border-color .15s var(--e)}
 .pn .fz-q input{transition:opacity .2s var(--e)}
 @container fzb (max-width:960px){
   .pn .fz-ch{order:2;flex:0 1 auto;min-width:0}
@@ -3718,7 +3720,7 @@ body:has(.pn.an-solo.light){background:#f8f8f6 !important}
 .pn [data-scr] i{font-style:normal;color:var(--muted)}
 .pn .up-big b[data-scr]{display:inline-block;min-width:3ch}
 .pn .stat .v b[data-scr]{display:inline-block;font:inherit;font-variant-numeric:tabular-nums}
-.pn .scr-c{display:inline-block;white-space:pre;color:var(--muted);transition:color .28s var(--e);will-change:transform,opacity}
+.pn .scr-c{display:inline-block;white-space:pre;color:var(--muted);will-change:transform,opacity}
 .pn .scr-c.in{color:inherit}
 .pn .gv b[data-scr]{display:inline-block;font:inherit;font-variant-numeric:tabular-nums}
 .pn .lg b[data-scr]{font-variant-numeric:tabular-nums}

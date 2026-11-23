@@ -1,5 +1,6 @@
 ---
 title: VLESS REALITY
+seoTitle: "VLESS REALITY panel: profiles, users, targets — Mistgate"
 description: "The VLESS profile: REALITY on TCP and XHTTP, or TLS with XHTTP and WebSocket, direct or behind a CDN. When to choose it over Hysteria2, every setting, the REALITY target, ports, and what the apps receive and need."
 ---
 

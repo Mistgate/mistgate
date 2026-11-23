@@ -1,5 +1,6 @@
 ---
 title: FAQ
+seoTitle: "Mistgate FAQ: Docker, memory, migration, license"
 description: "Short answers to common questions about Mistgate: Docker, memory, apps, size, IPv6, Cloudflare, migration, the license and where to report problems."
 ---
 

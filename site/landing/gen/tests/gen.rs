@@ -128,7 +128,7 @@ fn lang_dir_and_data_lg_are_right() {
         assert_eq!(h.attr("data-lg"), Some(l.to_uppercase().as_str()), "{url}");
     }
     assert!(read_page(&out, "/fa/").starts_with("<!doctype html>\n<html lang=\"fa\" dir=\"rtl\" data-lg=\"FA\">"));
-    assert!(read_page(&out, "/zh/").contains("<html lang=\"zh-CN\""), "Chinese is zh-CN in <html> and zh-Hans in hreflang");
+    assert!(read_page(&out, "/zh/").contains("<html lang=\"zh-Hans\""), "Chinese is zh-Hans in <html> and zh-Hans in hreflang");
 }
 
 #[test]
@@ -431,4 +431,45 @@ fn the_fixtures_links_exist_in_the_real_docs() {
     assert!(idx.has("/docs/") && idx.has("/ru/docs/") && !idx.has("/"));
     assert!(idx.has_id("/ru/getting-started/install-panel/", "установка-одной-командой"));
     assert!(!idx.has("/ru/guide/no-such-page/"));
+}
+
+#[test]
+fn a_stylesheet_beside_the_first_paint_is_in_head_but_does_not_block() {
+    let build = fixture_build("async-css");
+    edit_manifest(&build, |v| v["pages"]["main"]["en"]["cssAsync"] = serde_json::json!(["assets/land.1a2b3c4d.css"]));
+    let out = dist_of(&build);
+    generate(&build, &out).unwrap();
+    let page = read_page(&out, "/");
+    assert!(page.contains(r#"<link rel="stylesheet" href="/assets/land.1a2b3c4d.css" media="print" data-async="">"#), "{page}");
+    assert!(page.contains(r#"<noscript><link rel="stylesheet" href="/assets/land.1a2b3c4d.css">"#), "the plain sheet stays for a browser without scripts");
+    // the blocking sheet comes first; the preloads of modules and data are low priority, so that they do not take the sheets' bandwidth
+    assert!(page.find(r#"href="/assets/land.1a2b3c4d.css">"#).unwrap() < page.find("media=\"print\"").unwrap());
+    assert!(page.contains(r#"<link rel="modulepreload" href="/assets/rt.1a2b3c4d.js" fetchpriority="low">"#), "{page}");
+    // a page with no such sheet has no noscript
+    assert!(!read_page(&out, "/app/").contains("<noscript>"));
+}
+
+#[test]
+fn with_a_loader_the_head_keeps_only_the_first_paint_and_a_json_block_for_the_loader() {
+    let build = fixture_build("loader");
+    edit_manifest(&build, |v| {
+        v["pages"]["main"]["en"]["cssAsync"] = serde_json::json!(["assets/land.1a2b3c4d.css"]);
+        v["pages"]["main"]["en"]["loader"] = serde_json::json!("assets/app.1a2b3c4d.js");
+    });
+    let out = dist_of(&build);
+    generate(&build, &out).unwrap();
+    let page = read_page(&out, "/");
+    let head = page.split_once("</head>").unwrap().0;
+    // nothing of the page's own modules, preloads or async sheets is a tag
+    assert!(!head.contains("modulepreload") && !head.contains("media=\"print\"") && !head.contains(r#"<script type="module""#), "{head}");
+    assert!(head.contains(r#"<script type="application/json" id="mg-boot">"#) && head.contains(r#"<script src="/assets/app.1a2b3c4d.js" defer="">"#), "{head}");
+    let json = head.split("id=\"mg-boot\">").nth(1).unwrap().split("</script>").next().unwrap();
+    let v: serde_json::Value = serde_json::from_str(json).unwrap();
+    assert_eq!(v["css"], serde_json::json!(["/assets/land.1a2b3c4d.css"]));
+    assert_eq!(v["modules"], serde_json::json!(["/assets/main.1a2b3c4d.js"]));
+    assert_eq!(v["preload"], serde_json::json!(["/assets/rt.1a2b3c4d.js"]));
+    // the font is still a tag: the first paint needs it
+    assert!(head.contains(r#"as="font""#));
+    // a page without a loader is as before
+    assert!(read_page(&out, "/ru/").contains(r#"<script type="module" src="/assets/main.1a2b3c4d.js">"#));
 }

@@ -8,6 +8,7 @@ import YAML from "yaml";
 import { createHl, createRenderer, parseNav } from "./src/markdown.mjs";
 import { T, renderDoc, render404, THEME_INIT, formatStars } from "./src/layout.mjs";
 import { SITE, GITHUB, LANGS, COMPLETE, pageUrl, landingUrl } from "./src/urls.mjs";
+import { gitDates } from "./src/jsonld.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 // MG_DOCS / MG_DIST point the build at another docs tree / output (the test builds a fixture that way)
@@ -16,6 +17,7 @@ const DIST = process.env.MG_DIST ?? join(ROOT, "dist");
 const INSTALLER = join(ROOT, "..", "scripts", "install.sh");
 const SRC = join(ROOT, "src");
 const BRAND = join(ROOT, "..", "web", "src");
+const dates = gitDates(DOCS); // <lang>/<key>.md -> date of its last commit; empty without git history
 const warnings = [];
 const warn = (m) => warnings.push(m);
 
@@ -48,6 +50,23 @@ for (const [file, dest, key] of [["og.png", "og.png", "og"], ["favicon-32.png", 
   if (existsSync(p)) { out(dest, readFileSync(p)); assets[key] = "/" + dest; }
 }
 
+// /favicon.ico: browsers and crawlers ask for it without reading <head>; an .ico may hold a PNG (6-byte header, one 16-byte entry, the PNG)
+if (assets.favicon32) {
+  const png = readFileSync(join(SRC, "assets", "favicon-32.png")), ico = Buffer.alloc(22);
+  ico.writeUInt16LE(1, 2); ico.writeUInt16LE(1, 4); // type icon, one image
+  ico[6] = png.readUInt32BE(16); ico[7] = png.readUInt32BE(20); // width, height (as bytes; 0 would mean 256)
+  ico.writeUInt16LE(1, 10); ico.writeUInt16LE(32, 12); ico.writeUInt32LE(png.length, 14); ico.writeUInt32LE(22, 18);
+  out("favicon.ico", Buffer.concat([ico, png]));
+}
+// /.well-known/security.txt (RFC 9116): how to report a vulnerability is what SECURITY.md in the repository says (privately, through the Security tab)
+out(".well-known/security.txt", [
+  "Contact: https://github.com/Mistgate/mistgate/security",
+  "Expires: " + new Date(Date.now() + 365 * 864e5).toISOString(), // a year from this build
+  "Preferred-Languages: en, ru",
+  "Policy: https://github.com/Mistgate/mistgate/blob/main/SECURITY.md",
+  "Canonical: " + SITE + "/.well-known/security.txt",
+].join("\n") + "\n");
+
 // ---- content ----
 const walk = (dir) => readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? walk(p) : p.endsWith(".md") ? [p] : []; });
 function readPage(lang, file) {
@@ -62,7 +81,7 @@ function readPage(lang, file) {
   }
   if (!fm.title) warn(`${lang}/${key}.md: no title in front matter`);
   if (!fm.description) warn(`${lang}/${key}.md: no description in front matter`);
-  return { lang, key, url: pageUrl(lang, key), title: String(fm.title ?? key), description: String(fm.description ?? ""), body: m ? raw.slice(m[0].length) : raw };
+  return { lang, key, url: pageUrl(lang, key), date: dates.get(`${lang}/${key}.md`), title: String(fm.title ?? key), seoTitle: fm.seoTitle ? String(fm.seoTitle) : undefined, description: String(fm.description ?? ""), body: m ? raw.slice(m[0].length) : raw };
 }
 
 // the star count on the GitHub button, if GitHub answers within 5 s (an offline build has none; app.js refreshes it anyway).
@@ -163,7 +182,7 @@ const llmsPages = [...urls].sort((a, b) => a.url.localeCompare(b.url)).map((p) =
 out("llms.txt", `# Mistgate documentation\n\n> Self-hosted VPN fleet panel and Go node agent. The panel and node agent are static Go binaries; no Docker runtime is required.\n\n## AI and installation\n\n- [AI agent guide](${SITE}/getting-started/ai-agents/): ready prompts to install the panel over SSH, run the fleet through owner-approved MCP tools, and contribute to the code.\n- [Install the panel](${SITE}/getting-started/install-panel/): the official release binaries, mistgate setup and the systemd unit.\n- [Install a node over SSH](${SITE}/getting-started/ssh-install/)\n- [Repository agent instructions](https://github.com/Mistgate/mistgate/blob/main/AGENTS.md)\n- [MCP tool reference](${SITE}/reference/mcp/)\n\n## All pages\n\n${llmsPages}\n`);
 out("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${urls.map((p) => `<url><loc>${SITE}${p.url}</loc>${p.alternates.length > 1 ? "\n" + p.alternates.map((a) => `  <xhtml:link rel="alternate" hreflang="${a.lang}" href="${SITE}${a.url}"/>`).join("\n") + "\n" : ""}</url>`).join("\n")}
+${urls.map((p) => `<url><loc>${SITE}${p.url}</loc>${p.date ? `<lastmod>${p.date}</lastmod>` : ""}${p.alternates.length > 1 ? "\n" + p.alternates.map((a) => `  <xhtml:link rel="alternate" hreflang="${a.lang}" href="${SITE}${a.url}"/>`).join("\n") + "\n" : ""}</url>`).join("\n")}
 </urlset>
 `);
 out("robots.txt", `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
@@ -177,6 +196,7 @@ out("_redirects", Object.entries(MOVED).flatMap(([from, to]) => LANGS.filter((l)
 const initHash = createHash("sha256").update(THEME_INIT).digest("base64");
 out("_headers", `/*
   X-Content-Type-Options: nosniff
+  Strict-Transport-Security: max-age=31536000
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
@@ -191,6 +211,9 @@ out("_headers", `/*
 /install.sh
   Content-Type: text/plain; charset=utf-8
   Cache-Control: public, max-age=300
+
+https://mistgate-docs.pages.dev/*
+  X-Robots-Tag: noindex
 `);
 
 // ---- link check: every internal href/src must land on a written page, asset or anchor ----

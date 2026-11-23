@@ -1,5 +1,6 @@
 ---
 title: 常见问题
+seoTitle: "Mistgate 常见问题：Docker、内存、迁移、许可证"
 description: 关于 Mistgate 常见问题的简短回答：Docker、内存、应用、规模、IPv6、Cloudflare、迁移、许可证以及问题反馈渠道。
 ---
 

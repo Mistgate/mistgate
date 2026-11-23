@@ -55,9 +55,9 @@ test("a build with two zh pages succeeds and writes only those", () => {
   assert.ok(existsSync(join(out, "zh/search-index.json")));
 });
 
-test("a zh page is lang zh-CN, has the zh interface, a callout and the English page behind a missing link", () => {
+test("a zh page is lang zh-Hans, has the zh interface, a callout and the English page behind a missing link", () => {
   const html = read("zh/getting-started/overview/index.html");
-  assert.match(html, /<html lang="zh-CN">/);
+  assert.match(html, /<html lang="zh-Hans">/);
   assert.match(html, /<meta property="og:locale" content="zh_CN">/);
   assert.match(html, /callout--note/);
   assert.match(html, /<span class="pending"/, "the link to the zh page that does not exist is not a link");
@@ -69,21 +69,21 @@ test("a zh page is lang zh-CN, has the zh interface, a callout and the English p
 test("the language menu lists every language, links to the same page or else the language home, and marks the current one", () => {
   const en = menu(read("getting-started/overview/index.html"));
   assert.match(en, /<summary class="ib lang__btn" aria-label="Language">/);
-  assert.match(en, /href="\/zh\/getting-started\/overview\/" lang="zh-CN" hreflang="zh-Hans"/);
+  assert.match(en, /href="\/zh\/getting-started\/overview\/" lang="zh-Hans" hreflang="zh-Hans"/);
   assert.match(en, /href="\/ru\/getting-started\/overview\/"/);
   assert.match(en, /<span class="lang__item" lang="en" aria-current="true">/, "the current language is not a link");
   assert.ok(en.indexOf("English") < en.indexOf("Русский") && en.indexOf("Русский") < en.indexOf("简体中文"), "English, Русский, 简体中文");
   // a page zh does not have yet: the zh entry leads to the zh home, never to a missing page
   const nodes = menu(read("guide/nodes/index.html"));
-  assert.match(nodes, /href="\/zh\/docs\/" lang="zh-CN"/);
+  assert.match(nodes, /href="\/zh\/docs\/" lang="zh-Hans"/);
   assert.match(nodes, /href="\/ru\/guide\/nodes\/"/);
   // from zh: back to the same English and Russian pages
   const zh = menu(read("zh/getting-started/overview/index.html"));
-  assert.match(zh, /<span class="lang__cur" lang="zh-CN">中文<\/span>/);
+  assert.match(zh, /<span class="lang__cur" lang="zh-Hans">中文<\/span>/);
   assert.match(zh, /href="\/getting-started\/overview\/" lang="en"/);
-  assert.match(zh, /<span class="lang__item" lang="zh-CN" aria-current="true">/);
+  assert.match(zh, /<span class="lang__item" lang="zh-Hans" aria-current="true">/);
   // the home page too
-  assert.match(menu(read("ru/docs/index.html")), /href="\/zh\/docs\/" lang="zh-CN"/);
+  assert.match(menu(read("ru/docs/index.html")), /href="\/zh\/docs\/" lang="zh-Hans"/);
 });
 
 test("the zh docs home is a page like the others: its text, the pages that exist in zh, no link to one that does not", () => {
@@ -100,7 +100,7 @@ test("sitemap, llms.txt, 404 and the zh search index know about zh", () => {
   assert.match(sitemap, /hreflang="zh-Hans" href="https:\/\/mistgate\.app\/zh\/getting-started\/overview\/"/);
   assert.doesNotMatch(sitemap, /\/zh\/guide\//);
   assert.match(read("llms.txt"), /\(https:\/\/mistgate\.app\/zh\/getting-started\/overview\/\)/);
-  assert.match(read("404.html"), /href="\/zh\/docs\/" lang="zh-CN"/);
+  assert.match(read("404.html"), /href="\/zh\/docs\/" lang="zh-Hans"/);
   const idx = JSON.parse(read("zh/search-index.json"));
   assert.deepEqual(idx.map((p) => p.t).sort(), ["Mistgate 文档", "概览"]);
   assert.equal(find(idx, "两个程序")[0].url, "/zh/getting-started/overview/#两个程序");

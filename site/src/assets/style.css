@@ -521,7 +521,7 @@ dialog.search::backdrop { background: var(--backdrop); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
-/* ---------- Chinese (html lang="zh-CN"): wider leading, no negative tracking (it crowds the glyphs), labels not shrunk to 11 px ---------- */
+/* ---------- Chinese (html lang="zh-Hans"): wider leading, no negative tracking (it crowds the glyphs), labels not shrunk to 11 px ---------- */
 body.mg:lang(zh) { line-height: 1.75; }
 :lang(zh) .doc-h1, :lang(zh) .prose h2, :lang(zh) .prose h3, :lang(zh) .prose h4,
 :lang(zh) .pn__t, :lang(zh) .rm-nav__t, :lang(zh) .rm-card h3 { letter-spacing: 0; line-height: 1.35; }

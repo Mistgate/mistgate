@@ -1,5 +1,6 @@
 ---
 title: نصب پنل
+seoTitle: "نصب پنل VPN خودمیزبان روی لینوکس — Mistgate"
 description: Mistgate را دانلود یا بسازید، پنل را با mistgate setup آماده کنید، زیر systemd اجرا کنید و برای اولین بار وارد شوید.
 ---
 

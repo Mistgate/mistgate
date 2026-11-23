@@ -7,7 +7,7 @@ use std::path::{Component, Path};
 pub const SITE: &str = "https://mistgate.app";
 
 /// A language of the site. The values are the same as in the docs generator (`site/src/layout.mjs`): the hreflang of
-/// Chinese is `zh-Hans`, its `<html lang>` is `zh-CN`.
+/// Chinese is `zh-Hans` in `<html lang>` and in hreflang (the Open Graph locale is `zh_CN`).
 pub struct Lang {
     pub code: &'static str,
     pub hreflang: &'static str,
@@ -19,7 +19,7 @@ pub struct Lang {
 pub const LANGS: [Lang; 5] = [
     Lang { code: "en", hreflang: "en", html_lang: "en", og_locale: "en_US", rtl: false },
     Lang { code: "ru", hreflang: "ru", html_lang: "ru", og_locale: "ru_RU", rtl: false },
-    Lang { code: "zh", hreflang: "zh-Hans", html_lang: "zh-CN", og_locale: "zh_CN", rtl: false },
+    Lang { code: "zh", hreflang: "zh-Hans", html_lang: "zh-Hans", og_locale: "zh_CN", rtl: false },
     Lang { code: "fa", hreflang: "fa", html_lang: "fa", og_locale: "fa_IR", rtl: true },
     Lang { code: "tr", hreflang: "tr", html_lang: "tr", og_locale: "tr_TR", rtl: false },
 ];
@@ -60,6 +60,13 @@ pub struct PageEntry {
     pub description: String,
     #[serde(default)]
     pub css: Vec<String>,
+    /// stylesheets below the first screen: in `<head>` but not render-blocking (`media="print"`, switched on by a module of the page); `<noscript>` has them plain
+    #[serde(default, rename = "cssAsync")]
+    pub css_async: Vec<String>,
+    /// the loader script (a plain deferred script): with one, the generator writes the page's modules, preloads, data and async stylesheets into a JSON block for it
+    /// to start after the first paint, instead of as tags of `<head>`
+    #[serde(default)]
+    pub loader: Option<String>,
     #[serde(default)]
     pub modules: Vec<String>,
     #[serde(default)]
@@ -153,7 +160,7 @@ pub fn validate(m: &Manifest, build: &Path) -> Vec<String> {
             } else if !build.join(&e.body).is_file() {
                 bad.push(format!("{at}: fragment {} does not exist", e.body));
             }
-            for (field, list) in [("css", &e.css), ("modules", &e.modules), ("preload", &e.preload), ("fonts", &e.fonts), ("fetch", &e.fetch)] {
+            for (field, list) in [("css", &e.css), ("cssAsync", &e.css_async), ("loader", &e.loader.iter().cloned().collect()), ("modules", &e.modules), ("preload", &e.preload), ("fonts", &e.fonts), ("fetch", &e.fetch)] {
                 for a in list {
                     if !safe_rel(a) || !a.starts_with("assets/") {
                         bad.push(format!("{at}: \"{field}\" entry {a:?} is not a path under assets/"));

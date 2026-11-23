@@ -1,5 +1,6 @@
 ---
 title: 与其他面板对比
+seoTitle: "Mistgate 对比 3x-ui、Marzban、Remnawave：面板对比"
 description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Manager 和 s-ui 的对比、其他项目领先之处，以及截至 2026-10-09 核对过的来源。
 ---
 
