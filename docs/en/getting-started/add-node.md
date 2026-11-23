@@ -32,6 +32,8 @@ In **Nodes → Add node**, choose **Get a manual install command**. The same win
 
 When the address is an IP, the window says so before you go on: Hysteria2 on that node then needs a domain with an A record or the self-signed (pinned) certificate, which you pick when you add the profile. AmneziaWG works on an IP as it is.
 
+From the second node on the window also asks **Who gets this node**: **Everyone** (every group, and groups made later), **Some groups** (only the ones you tick) or **Nobody yet** (check the node first: no group gets it, so it is in no subscription). The choice starts at the one you made last time, and at **Nobody yet** before that. The first node of a panel is not asked: it goes to every group, so a new panel works at once, and the window says so. You can change it later on the node's page: see [Who gets a node](../guide/nodes.md#the-nodes-list).
+
 Press **Create install command**. The node appears in the list as "Waiting for install", and the window shows three steps.
 
 ## 2. Put the agent on the server
