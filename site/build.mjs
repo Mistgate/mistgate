@@ -50,6 +50,23 @@ for (const [file, dest, key] of [["og.png", "og.png", "og"], ["favicon-32.png", 
   if (existsSync(p)) { out(dest, readFileSync(p)); assets[key] = "/" + dest; }
 }
 
+// /favicon.ico: browsers and crawlers ask for it without reading <head>; an .ico may hold a PNG (6-byte header, one 16-byte entry, the PNG)
+if (assets.favicon32) {
+  const png = readFileSync(join(SRC, "assets", "favicon-32.png")), ico = Buffer.alloc(22);
+  ico.writeUInt16LE(1, 2); ico.writeUInt16LE(1, 4); // type icon, one image
+  ico[6] = png.readUInt32BE(16); ico[7] = png.readUInt32BE(20); // width, height (as bytes; 0 would mean 256)
+  ico.writeUInt16LE(1, 10); ico.writeUInt16LE(32, 12); ico.writeUInt32LE(png.length, 14); ico.writeUInt32LE(22, 18);
+  out("favicon.ico", Buffer.concat([ico, png]));
+}
+// /.well-known/security.txt (RFC 9116): how to report a vulnerability is what SECURITY.md in the repository says (privately, through the Security tab)
+out(".well-known/security.txt", [
+  "Contact: https://github.com/Mistgate/mistgate/security",
+  "Expires: " + new Date(Date.now() + 365 * 864e5).toISOString(), // a year from this build
+  "Preferred-Languages: en, ru",
+  "Policy: https://github.com/Mistgate/mistgate/blob/main/SECURITY.md",
+  "Canonical: " + SITE + "/.well-known/security.txt",
+].join("\n") + "\n");
+
 // ---- content ----
 const walk = (dir) => readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? walk(p) : p.endsWith(".md") ? [p] : []; });
 function readPage(lang, file) {
