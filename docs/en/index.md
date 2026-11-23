@@ -1,5 +1,6 @@
 ---
 title: Mistgate documentation
+seoTitle: "Mistgate documentation: install, nodes, protocols, API"
 description: What is in the documentation, where to find it, and the order to read it in.
 ---
 

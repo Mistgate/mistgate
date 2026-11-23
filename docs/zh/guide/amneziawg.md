@@ -1,5 +1,6 @@
 ---
 title: AmneziaWG
+seoTitle: "AmneziaWG 服务器面板：2.0 与 3.1，每台设备一个密钥 — Mistgate"
 description: 了解 AmneziaWG 3.1 和 2.0 协议配置、参数和伪装样式、节点的用户态与内核后端，以及用户导入 AmneziaVPN 的设备密钥。
 ---
 

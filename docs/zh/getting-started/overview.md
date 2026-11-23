@@ -1,5 +1,6 @@
 ---
 title: 概览
+seoTitle: "Mistgate 是什么：面向小型 VPN 的面板"
 description: Mistgate 是什么、不是什么、适合谁使用，以及各部分如何配合。
 ---
 

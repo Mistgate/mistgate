@@ -30,6 +30,14 @@ export function href(target, page, text, ctx) {
   return target;
 }
 
+// ---- live starts ----
+// What makes a panel mock-up move (the tour of a window, the scramble of numbers, the canvases of the hero) is not part of the first tasks: the page is
+// there pre-rendered, and these start once it has loaded and the browser is idle. Boards ask with window.mgLive(fn) (patches.mjs); fn runs at once after that.
+let live = false; const queued = new Set();
+const goLive = () => { live = true; queued.forEach((f) => setTimeout(f, 0)); queued.clear(); };
+const startLive = () => (window.requestIdleCallback ? window.requestIdleCallback(goLive, { timeout: 1500 }) : setTimeout(goLive, 300)); // boot() calls it once the page is mounted
+if (typeof window !== 'undefined') window.mgLive = (f) => { if (live) return setTimeout(f, 0); queued.add(f); return 0; };
+
 // ---- scope of a board: its lookups run over its own frame ----
 const NONE = { querySelector: () => null, querySelectorAll: () => [], getElementById: () => null };
 function hostOf(inst) {
@@ -122,6 +130,7 @@ export async function boot(name, Page, eager = {}) {
   // the language bundle and the boards of the first screen are fetched together
   const [b] = await Promise.all([bundle ? fetch(bundle).then((r) => r.json()) : {}, ...(eager[lang] || eager.all || []).map(async (n) => { registry.eager[n] = (await registry.load[n]()).default; })]);
   Object.assign(CFG, { links: b.links || {}, css: b.css || {}, pages: b.pages || {} });
+  window.MG_STARS = b.stars || 0; // the GitHub button of the page (this build's number)
   if (b.dict && registry.i18n) registry.i18n(b.dict); // the translator of the design (generated, see translate.mjs)
   window.__dcNav = (to) => {
     const u = CFG.pages[CFG.page] && CFG.pages[CFG.page][String(to).toLowerCase()];
@@ -136,6 +145,7 @@ export async function boot(name, Page, eager = {}) {
   if (window.MG_I18N && window.MG_I18N.now) window.MG_I18N.now();
   if (/[?&]prerender\b/.test(location.search)) window.__PRE = host.innerHTML; // build time: the markup of the first render, before any timer
   host.dispatchEvent(new CustomEvent('dc:mounted', { bubbles: true }));
+  startLive();
   return host;
 }
 

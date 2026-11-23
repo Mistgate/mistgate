@@ -48,3 +48,14 @@ test("a class a script assembles from a one-letter prefix and a number ('s' + st
   const r = pruneCss('.box.s1{a:1}.box.s2{a:2}.box.sx{a:3}.box.t1{a:4}', u).css;
   assert.match(r, /\.s1/); assert.match(r, /\.s2/); assert.doesNotMatch(r, /\.sx/); assert.doesNotMatch(r, /\.t1/);
 });
+
+import { renameH1 } from '../css.mjs';
+test('renameH1 renames the h1 tag in selectors only and gives the new tag the look of the browser h1', () => {
+  const r = renameH1('.pn h1,.pn h2{margin:0}.pn .nd-h1 h1{x:1}.u-h1{y:1}.cS :where(.mg) :where(p,h1,h2){margin:0}.a[data-h1]{z:1}');
+  assert.match(r, /^mg-h1\{display:block/);
+  assert.match(r, /\.pn mg-h1,\.pn h2\{margin:0\}/);
+  assert.match(r, /\.pn \.nd-h1 mg-h1\{x:1\}/);
+  assert.match(r, /\.u-h1\{y:1\}/);
+  assert.match(r, /:where\(p,mg-h1,h2\)/);
+  assert.match(r, /\.a\[data-h1\]/);
+});

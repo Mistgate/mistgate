@@ -1,5 +1,6 @@
 ---
 title: Paneli kurma
+seoTitle: "Linux’ta kendi sunucunuzda VPN paneli kurulumu — Mistgate"
 description: Mistgate'i indirin ya da derleyin, paneli mistgate setup ile hazırlayın, systemd altında çalıştırın ve ilk kez giriş yapın.
 ---
 

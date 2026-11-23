@@ -1,5 +1,6 @@
 ---
 title: Hysteria2
+seoTitle: "Hysteria2 服务器面板：用户、端口、证书 — Mistgate"
 description: 了解 Hysteria2 协议配置编辑器中的所有设置、节点如何处理流量，以及应用会收到和需要什么。
 ---
 

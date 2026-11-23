@@ -28,6 +28,11 @@ pub struct Head {
     /// root-relative URLs of `.json` files the page fetches at once
     pub fetches: Vec<String>,
     pub css: Vec<String>,
+    /// root-relative URLs of stylesheets that do not block the first paint
+    pub css_async: Vec<String>,
+    /// root-relative URL of the loader script: with one, the page's own modules, their preloads, the data it fetches and the async stylesheets are not tags
+    /// of `<head>` but a JSON block the loader starts from after the first paint
+    pub loader: Option<String>,
     pub modules: Vec<String>,
 }
 
@@ -51,9 +56,23 @@ fn og(property: &'static str, content: String) -> impl IntoView {
     leptos::html::meta().add_any_attr(custom_attribute("property", property)).content(content)
 }
 
+/// What `<noscript>` holds: the async stylesheets plain, and the rule that shows what the stylesheet of the page would have shown (the design hides the hero window until the sheet is on)
+fn noscript_css(css: &[String]) -> String {
+    let links: String = css.iter().map(|c| format!(r#"<link rel="stylesheet" href="{c}">"#)).collect();
+    format!("{links}<style>.lpe.hero-e{{visibility:visible}}</style>")
+}
+
+/// The JSON block the loader reads (`<script type="application/json" id="mg-boot">`): what the page starts after its first paint.
+fn boot_json(head: &Head) -> String {
+    let j = serde_json::json!({ "css": head.css_async, "preload": head.module_preloads, "fetch": head.fetches, "modules": head.modules });
+    j.to_string().replace('<', "\\u003c") // no `</script>` can end the block
+}
+
 #[component]
 fn HeadTags(head: Head) -> impl IntoView {
     let og_image = format!("{SITE}/og.png");
+    let boot = head.loader.clone().map(|l| view! { <script type="application/json" id="mg-boot" inner_html=boot_json(&head)></script><script src=l defer=""></script> });
+    let direct = head.loader.is_none();
     view! {
         <head>
         <meta charset="utf-8"/>
@@ -75,11 +94,14 @@ fn HeadTags(head: Head) -> impl IntoView {
         <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
         <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png"/>
         <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
-        {head.fonts.into_iter().map(|f| view! { <link rel="preload" href=f r#as="font" type="font/woff2" crossorigin=""/> }).collect_view()}
-        {head.module_preloads.into_iter().map(|m| view! { <link rel="modulepreload" href=m/> }).collect_view()}
-        {head.fetches.into_iter().map(|f| view! { <link rel="preload" href=f r#as="fetch" crossorigin=""/> }).collect_view()}
         {head.css.into_iter().map(|c| view! { <link rel="stylesheet" href=c/> }).collect_view()}
-        {head.modules.into_iter().map(|m| view! { <script type="module" src=m></script> }).collect_view()}
+        {direct.then(|| head.css_async.iter().map(|c| view! { <link rel="stylesheet" href=c.clone() media="print" data-async=""/> }).collect_view())}
+        {(!head.css_async.is_empty()).then(|| view! { <noscript inner_html=noscript_css(&head.css_async)></noscript> })}
+        {head.fonts.into_iter().map(|f| view! { <link rel="preload" href=f r#as="font" type="font/woff2" crossorigin=""/> }).collect_view()}
+        {boot}
+        {direct.then(|| head.module_preloads.iter().map(|m| view! { <link rel="modulepreload" href=m.clone() fetchpriority="low"/> }).collect_view())}
+        {direct.then(|| head.fetches.iter().map(|f| view! { <link rel="preload" href=f.clone() r#as="fetch" crossorigin="" fetchpriority="low"/> }).collect_view())}
+        {direct.then(|| head.modules.iter().map(|m| view! { <script type="module" src=m.clone()></script> }).collect_view())}
         </head>
     }
 }

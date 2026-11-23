@@ -138,6 +138,8 @@ pub fn run(o: &Options) -> Result<Report, String> {
                     module_preloads,
                     fetches,
                     css: e.css.iter().map(|c| format!("/{c}")).collect(),
+                    css_async: e.css_async.iter().map(|c| format!("/{c}")).collect(),
+                    loader: e.loader.as_ref().map(|l| format!("/{l}")),
                     modules: e.modules.iter().map(|c| format!("/{c}")).collect(),
                 },
                 body: fragment,

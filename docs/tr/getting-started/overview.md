@@ -1,5 +1,6 @@
 ---
 title: Genel bakış
+seoTitle: "Mistgate nedir: küçük bir VPN için panel"
 description: Mistgate'in ne olduğu ve ne olmadığı, kimin için olduğu ve parçalarının birbirine nasıl oturduğu.
 ---
 

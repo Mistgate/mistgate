@@ -8,7 +8,7 @@ const SITE = "https://mistgate.app";
 const INIT = "document.documentElement.dataset.theme='dark'";
 const HASH = createHash("sha256").update(INIT).digest("base64");
 const csp = (script) => `default-src 'self'; script-src ${script}; style-src 'self' 'unsafe-inline'; object-src 'none'`;
-const common = "/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Permissions-Policy: camera=()\n";
+const common = "/*\n  X-Content-Type-Options: nosniff\n  Strict-Transport-Security: max-age=31536000\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Permissions-Policy: camera=()\n";
 const DOCS_HEADERS = `${common}  Content-Security-Policy: ${csp(`'self' 'sha256-${HASH}'`)}\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n`;
 const LAND_HEADERS = `${common}  Content-Security-Policy: ${csp("'self'")}\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/\n  Cache-Control: public, max-age=0, must-revalidate\n\n/app/\n  Cache-Control: public, max-age=0, must-revalidate\n`;
 
@@ -100,7 +100,7 @@ test("an inline script must be hashed in the policy of its page; the landing all
 });
 
 test("headers: a landing rule that differs from the docs' own, or a policy that is not reset, is refused", () => {
-  const l = landing(); l.set("_headers", { data: LAND_HEADERS.replace("max-age=31536000", "max-age=1") });
+  const l = landing(); l.set("_headers", { data: LAND_HEADERS.replace("public, max-age=31536000", "public, max-age=1") });
   refused(docs(), l, /_headers: \/assets\/\* differs/);
   const n = landing(); n.set("_headers", { data: LAND_HEADERS.replace(/  Content-Security-Policy.*\n/, "") });
   refused(docs(), n, /both sides must set a Content-Security-Policy/);

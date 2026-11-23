@@ -17,7 +17,7 @@ export function renderDocument(manifest, page, lang, fragment, { site = 'http://
   const url = (l) => (l === 'en' ? '' : '/' + l) + (page === 'app' ? '/app/' : '/');
   const alts = manifest.langs.map((l) => `<link rel="alternate" hreflang="${l === 'zh' ? 'zh-Hans' : l}" href="${site}${url(l).replace('//', '/')}">`).join('\n');
   return `<!doctype html>
-<html lang="${lang === 'zh' ? 'zh-CN' : lang}" dir="${m.dir}"${Object.entries(m.htmlAttrs || {}).map(([k, v]) => ` ${k}="${esc(v)}"`).join('')}>
+<html lang="${lang === 'zh' ? 'zh-Hans' : lang}" dir="${m.dir}"${Object.entries(m.htmlAttrs || {}).map(([k, v]) => ` ${k}="${esc(v)}"`).join('')}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -29,12 +29,13 @@ ${alts}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 ${(m.fonts || []).map((f) => `<link rel="preload" href="/${f}" as="font" type="font/woff2" crossorigin>`).join('\n')}
 ${m.css.map((c) => `<link rel="stylesheet" href="/${c}">`).join('\n')}
-${(m.fetch || []).map((f) => `<link rel="preload" href="/${f}" as="fetch" crossorigin>`).join('\n')}
-${(m.preload || []).map((p) => `<link rel="modulepreload" href="/${p}">`).join('\n')}
+${m.loader ? `<script type="application/json" id="mg-boot">${JSON.stringify({ css: (m.cssAsync || []).map((x) => '/' + x), preload: (m.preload || []).map((x) => '/' + x), fetch: (m.fetch || []).map((x) => '/' + x), modules: m.modules.map((x) => '/' + x) })}</script>
+<script src="/${m.loader}" defer></script>` : `${(m.fetch || []).map((f) => `<link rel="preload" href="/${f}" as="fetch" crossorigin>`).join('\n')}
+${(m.preload || []).map((p) => `<link rel="modulepreload" href="/${p}">`).join('\n')}`}
 </head>
 <body>
 ${fragment}
-${m.modules.map((s) => `<script type="module" src="/${s}"></script>`).join('\n')}
+${m.loader ? '' : m.modules.map((s) => `<script type="module" src="/${s}"></script>`).join('\n')}
 </body>
 </html>
 `;
