@@ -16,7 +16,7 @@ import { closure } from './sync.mjs';
 import { PATCHES } from './patches.mjs';
 import { scanBlobs, blobAsset, loadBlobs } from './blobs.mjs';
 import { parseI18n, translatorModule, makeTr, corpusOf, subsetKeys, keysUsedFor, langDict } from './translate.mjs';
-import { usage, pruneCss } from './css.mjs';
+import { usage, pruneCss, renameH1 } from './css.mjs';
 import { resolveLinks, homeUrl, appUrl } from './links.mjs';
 import { prerender } from './prerender.mjs';
 import { budgets } from './budgets.mjs';
@@ -121,7 +121,8 @@ const fontFiles = {};
 fontsCss = fontsCss.replace(/url\("\.\/([\w-]+\.woff2)"\)/g, (_, f) => { fontFiles[f] = fontFiles[f] || hashedAsset(f.replace('.woff2', ''), 'woff2', readFileSync(join(FONTS, f))); return `url("/${fontFiles[f]}")`; });
 const fontsFile = hashedAsset('fonts', 'css', Buffer.from((await esbuild.transform(fontsCss, { loader: 'css', minify: true })).code));
 const siteCss = hashedAsset('site', 'css', Buffer.from('body{margin:0;background:#0c0c0e}[data-board]{display:contents}'));
-const designCss = Object.fromEntries(['land.css', 'pn.css', 'sub-s.css', 'app-s.css', 'app-zh-s.css', 'app-fa-s.css'].map((f) => [f, read(f)]));
+// land.css is the page's own (its h1 is the real heading); the stylesheets of the boards inside a page speak of <mg-h1> (compile.mjs)
+const designCss = Object.fromEntries(['land.css', 'pn.css', 'sub-s.css', 'app-s.css', 'app-zh-s.css', 'app-fa-s.css'].map((f) => [f, f === 'land.css' ? read(f) : renameH1(read(f))]));
 const tokensOf = (bs) => usage(bs.map((n) => sources[n]));
 const cssStats = {}, prunedClasses = {};
 const cssOut = {}; // page -> {land, sub, pn, app: {file group -> path}}
