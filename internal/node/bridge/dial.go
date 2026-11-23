@@ -918,10 +918,12 @@ func (d *Dialer) serveClient(run *dialRun, cc *http2.ClientConn, tracker *connTr
 	idle := newIdleConn(targetConn, d.timing.streamIdle)
 	err = d.bridgeLocal(ctx, run, target, idle, responses, tracker, cancel)
 	stopIdle() // a session that ends badly is not a failure of the bridge (see Entry.servePairHalf)
-	cancel()
 	if err == nil {
+		// A clean end: wait for the entry to finish its half (the end of its response) before cancelling, or the cancel's
+		// RST_STREAM can overtake the last bytes still queued for the entry, and the entry resets the person.
 		_, _ = io.Copy(io.Discard, responses.down.Body)
 	}
+	cancel()
 	closePairResponses(responses)
 	_ = idle.Close()
 	_ = cc
