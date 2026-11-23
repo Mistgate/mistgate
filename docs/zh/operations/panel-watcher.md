@@ -34,7 +34,7 @@ description: 使用 Cloudflare Worker 每分钟检查一次面板，并在面板
    ```
 
    使用与面板 Telegram 告警相同的机器人。向 BotFather 获取其令牌；面板不会再次显示该令牌。
-6. 从自己的已关联卡片上的 **集成 → Telegram 告警** 获取聊天 ID：
+6. 从**集成**页面上自己已绑定聊天的**聊天 ID** 一行获取聊天 ID：
 
    ```sh
    wrangler secret put TELEGRAM_CHAT_ID

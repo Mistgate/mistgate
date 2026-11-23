@@ -53,9 +53,9 @@ The panel serves the bundle's files only to agents with a valid node certificate
 
 Everyone can view the page. Updating, scheduling, pausing, resuming and cancelling, rolling a node back and **Read the folder again** need the owner and a fresh step-up (see [Security](security.md)).
 
-The page has three layers, a card for each in a row at the top: **This panel**, **Node agents** and **Server systems**. Each card says where its layer stands and carries a status, so all three are in view whichever is open; the chosen one opens below. The page opens on the panel when a panel update is out, because the panel is updated before the nodes, and otherwise on the node agents; the address remembers the layer. The Cloudflare edition has the first two.
+The page has three tabs under its title: **This panel**, **Node agents** and **Server systems**. A tab carries a number when something in it wants a hand (a new panel release, nodes to update or to look at, servers waiting for security updates or a reboot). The page opens on **This panel** when a panel update is out or its release needs a look, because the panel is updated before the nodes, and otherwise on **Node agents**; the address remembers the tab (`?tab=`). The Cloudflare edition has the first two.
 
-What the layers hold (the fleet card, the rollout and the nodes are under **Node agents**; **Server systems** is described in [Server operating system](#server-operating-system)):
+What the tabs hold (the fleet card, the rollout and the nodes are under **Node agents**; **Server systems** is described in [Server operating system](#server-operating-system)):
 
 - **This panel**: one line with its version, build date, state and **Check GitHub**. When a signed release is out, the card stands out and carries **Update panel**. The release key fingerprint, the SHA-256 and the explanation are behind **Details**; a panel that cannot update itself opens its steps on its own.
 - **The fleet card**: where the fleet stands ("2 of 4 nodes on v0.1.24"), a bar with one segment per node, the count of each state under it, and the one main button. With something to update that is **Update N nodes** (below); while a rollout runs, **Pause** / **Resume** / **Cancel rollout**. Its last line is the **Release bundle**: the bundle in `<data-dir>/dist`, the verdict of the signature check, its version and dates, **Read the folder again**, and the folded details (files, the reason for a refusal, the steps to make a bundle yourself).
@@ -125,7 +125,7 @@ sequenceDiagram
 **Update** in a node's row opens a dialog with two choices:
 
 - **Update now** starts the update of this node at once. While another update runs with the same release, the choice reads **Add to current rollout**: the node becomes the next stage and starts after the current one passes its checks. A paused rollout, or one with another release, has to be resumed, finished or cancelled first.
-- **Choose a date and time** saves a schedule. The time is entered in the fixed UTC offset of **Settings → System → Update time zone**; UTC is the default (installations made before this default keep UTC+03:00, which was the default then). Changing the setting does not move existing schedules: each keeps the exact instant and offset shown when it was saved. The earliest time is a minute from now; **Cancel schedule** removes it.
+- **Choose a date and time** saves a schedule. The time is entered in the fixed UTC offset of **Settings → System → Time zone for new schedules**; UTC is the default (installations made before this default keep UTC+03:00, which was the default then). Changing the setting does not move existing schedules: each keeps the exact instant and offset shown when it was saved. The earliest time is a minute from now; **Cancel schedule** removes it.
 
 Each update is pinned to a release:
 
@@ -135,7 +135,7 @@ Each update is pinned to a release:
 ### One node's update
 
 1. The panel sends the signed manifest. The agent checks it, downloads its file, keeps its current binary as `<binary>.prev`, puts the new one in its place and restarts itself in place (systemd sees nothing). The node is offline for a few seconds; the admin shows it as updating, not as an outage.
-2. The panel gives agents with `update-timeout/1` the configured download window (30 minutes by default, changed in **Settings → System → Download timeout**); the window is captured when the command is sent, and a transfer that sends nothing for 90 seconds is resumed where it stopped, up to three times, within the window. The panel sends its bundle first and, when enabled and verified for this release, GitHub second to agents with `update-sources/1`. Changing a setting affects later steps. Older agents keep their built-in 10-minute limit. After the agent answers, the panel allows up to 3 minutes for the node to come back with the new build.
+2. The panel gives agents with `update-timeout/1` the configured download window (30 minutes by default, changed in **Settings → System → Maximum download time**); the window is captured when the command is sent, and a transfer that sends nothing for 90 seconds is resumed where it stopped, up to three times, within the window. The panel sends its bundle first and, when enabled and verified for this release, GitHub second to agents with `update-sources/1`. Changing a setting affects later steps. Older agents keep their built-in 10-minute limit. After the agent answers, the panel allows up to 3 minutes for the node to come back with the new build.
 3. The **gate** runs for up to 5 minutes after the node is back. It passes when all of this holds:
    - the new build has committed: it connected and applied its configuration without a failed profile;
    - the configuration the node applied is the panel's;
@@ -312,7 +312,7 @@ What happens around the restart:
 
 ![The Server systems tab: servers with their kernels and waiting updates, two ticked, installing, done](../../images/readme/os-dark-en.webp)
 
-The **Server systems** layer of the Updates page shows the operating system of every server: this panel's own server first, then each node. It answers which servers wait for a new kernel, a reboot or security updates, without a login to each of them.
+The **Server systems** tab of the Updates page shows the operating system of every server: this panel's own server first, then each node. It answers which servers wait for a new kernel, a reboot or security updates, without a login to each of them.
 
 | Column | What it shows |
 |---|---|
@@ -335,11 +335,11 @@ How it is read:
 
 The status lists up to 32 pending security package names and marks names that have remained pending for more than two days while automatic updates are enabled. After `unattended-upgrade`, the node retries security packages it still sees in its own simulation, including any required new dependencies, and reports a failed retry without failing the job. When apt holds its lock, the status names the holder process and shows when it started.
 
-From this layer the panel can install security updates or all packages, or reboot one node; see [Update one server's system](#update-one-servers-system). A fleet OS rollout can update 1–20 nodes: its canary has the fewest people online, then the fewest inbounds; later batches contain 1–5 nodes (default 1). Ordinary package updates use mode `all`; the panel's own server remains out of scope and must be updated by hand. The Cloudflare edition does not have this layer. The MCP tool `os_updates_status` returns the same stored readings and the last OS update; it never contacts a node.
+From this tab the panel can install security updates or all packages, or reboot one node; see [Update one server's system](#update-one-servers-system). A fleet OS rollout can update 1–20 nodes: its canary has the fewest people online, then the fewest inbounds; later batches contain 1–5 nodes (default 1). Ordinary package updates use mode `all`; the panel's own server remains out of scope and must be updated by hand. The Cloudflare edition does not have this tab. The MCP tool `os_updates_status` returns the same stored readings and the last OS update; it never contacts a node.
 
 ### Update one server's system
 
-An owner can install security updates on one server, or reboot it, from the panel: on the node's **Server** tab (the **Operating system** card) or in the node's row of the **Server systems** layer. The panel asks for a fresh confirmation first, as for every change that runs as root on a node.
+An owner can install security updates on one server, or reboot it, from the panel: on the node's **Server** tab (the **Operating system** card) or in the node's row of the **Server systems** tab. The panel asks for a fresh confirmation first, as for every change that runs as root on a node.
 
 | Button | What it does |
 |---|---|

@@ -120,7 +120,7 @@ Mistgate 目前处于**测试版（Beta）**；当前发布版本为 `v0.1.89`�
       text: "在某一步运行时取消滚动发布，对节点更新和系统更新的表现一致；回滚会指出未通过的配置及原因。可以测量节点的通道：每个方向 8 个流、各 10 秒，然后给出“写入 X，测得 Y：设为 Z？”。参见[更新](../operations/updates.md)。"
     - title: "适用于 Windows 的 Mistgate 应用"
       section: settings
-      text: "一个独立项目 [mistgate-client](https://github.com/Mistgate/mistgate-client)：把 Hysteria2、AmneziaWG 和 VLESS 放在一个应用里，按站点和按程序路由，带 kill switch。它可配合这些面板（通过所有者在**订阅 → 谁获得什么**中的开关）使用，也可用于普通订阅链接。"
+      text: "一个独立项目 [mistgate-client](https://github.com/Mistgate/mistgate-client)：把 Hysteria2、AmneziaWG 和 VLESS 放在一个应用里，按站点和按程序路由，带 kill switch。它可配合这些面板（通过所有者在**订阅 → 下发规则**中的开关）使用，也可用于普通订阅链接。"
     - title: 在生产环境中测试 VLESS
       section: profiles
       text: "v0.1.34 起支持 REALITY，v0.1.35 起支持以节点自己的站点为目标，v0.1.36 起支持 TLS 和 CDN。尚未通过真实 CDN 测试 VLESS：端到端测试中由节点自身模拟 CDN。参见 [VLESS 通过 CDN 接入](../guide/vless.md#vless-经-cdn-连接)。"
