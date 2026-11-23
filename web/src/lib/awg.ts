@@ -224,9 +224,9 @@ export const key32Fields = new Set(["obfuscation.header_protection_key"]);
 
 // ---- devices ----
 
-/** Saves text as a file in the browser (no server round trip: the config is already here). */
+/** Saves text as a file in the browser (no server round trip: the config is already here). Not text/plain: Firefox on Android adds ".txt" to a text download. */
 export function downloadText(filename: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  const url = URL.createObjectURL(new Blob([text], { type: "application/octet-stream" }));
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
