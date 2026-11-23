@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// 00155 switches block_max on for the two built-in Russian presets that send Russian sites direct and for nothing else: the other
+// 00155 switches block_max on for the three built-in Russian presets and for nothing else: the other
 // built-ins and a custom preset stay off, the migration is repeatable (down and up), and Update carries the value (the owner can
 // switch a built-in off).
 func TestDNSBlockMaxMigration(t *testing.T) {
@@ -20,7 +20,7 @@ func TestDNSBlockMaxMigration(t *testing.T) {
 	if err := d.Create(ctx, p); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]bool{"dns_builtin_ru_split": true, "dns_builtin_ru_geo": true}
+	want := map[string]bool{"dns_builtin_ru_split": true, "dns_builtin_ru_geo": true, "dns_builtin_ru_proxied": true}
 	check := func(when string) {
 		t.Helper()
 		all, err := d.List(ctx)

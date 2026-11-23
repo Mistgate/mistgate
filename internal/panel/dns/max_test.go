@@ -93,7 +93,7 @@ func TestBlockMaxLeavesAmneziaWGAlone(t *testing.T) {
 }
 
 // block_max: Create stores it, Update without the field keeps it (a client that predates it), with the field sets it either way, and
-// an own preset made without it stays off. Of the built-ins only the two Russian splits that go direct have it on, and the owner can
+// an own preset made without it stays off. Of the built-ins only the three Russian ones have it on, and the owner can
 // switch one off.
 func TestBlockMaxService(t *testing.T) {
 	e := newEnv(t)
@@ -125,7 +125,7 @@ func TestBlockMaxService(t *testing.T) {
 		t.Errorf("fromRow lost block_max: %+v", p)
 	}
 	for id, b := range e.list() {
-		if b.Builtin && b.BlockMax != (id == "dns_builtin_ru_split" || id == "dns_builtin_ru_geo") {
+		if b.Builtin && b.BlockMax != (id == "dns_builtin_ru_split" || id == "dns_builtin_ru_geo" || id == "dns_builtin_ru_proxied") {
 			t.Errorf("built-in %s block_max = %v", id, b.BlockMax)
 		}
 	}

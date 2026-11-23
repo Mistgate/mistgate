@@ -90,8 +90,10 @@ func TestHappRoutingGolden(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := decode(t, h); got != goldenStandard {
-		t.Errorf("ru proxied:\n got %s\nwant %s", got, goldenStandard)
+	// the standard profile plus the Max block (the built-in blocks Max, max_test.go)
+	wantProxied := strings.Replace(goldenStandard, `"BlockSites":[]`, `"BlockSites":["domain:max.ru","domain:oneme.ru"]`, 1)
+	if got := decode(t, h); got != wantProxied {
+		t.Errorf("ru proxied:\n got %s\nwant %s", got, wantProxied)
 	}
 
 	// split_direct on without a split changes nothing

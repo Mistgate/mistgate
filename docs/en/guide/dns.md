@@ -97,7 +97,7 @@ The list is not the same everywhere. Mihomo and sing-box get about 900 domains. 
 
 The Russian messenger Max (VK) sends a report to its servers when it starts: the device's public address, a flag that a VPN is running, and the reachability of several sites. So that the app cannot reach its servers while the VPN is on and cannot pass on the address of your node, **Block the Max messenger in the apps** makes the apps drop its own domains `max.ru` and `oneme.ru` (with subdomains) before any other rule, including the "`.ru` direct" rule: otherwise `max.ru` would go direct by its ending. **Max will not work while the VPN is on: that is the point.** The domains of VK, Mail, Odnoklassniki and the school platform Sferum are not touched.
 
-The option is on in the built-in **Russia: .ru direct** and **Russia: Russian sites direct (community list)**: after the update it starts working for everyone who uses them. Your own presets do not get it: turn it on in the preset. To turn it off, switch it off in the preset (built-in presets can be edited).
+The option is on in the three built-in Russian presets, **Russia: .ru direct**, **Russia: Russian sites direct (community list)** and **Russia: all through VPN** (Max reports the VPN whichever way Russian sites go): after the update it starts working for everyone who uses them. Your own presets do not get it: turn it on in the preset. To turn it off, switch it off in the preset (built-in presets can be edited).
 
 | App | What happens |
 |:--|:--|
@@ -117,7 +117,7 @@ Built-in presets exist on every install. They can be edited, not deleted.
 | Category | Preset | What it does |
 |:--|:--|:--|
 | Russia | **Russia: .ru direct** (the built-in default) | `.ru`, `.su`, `.рф`, Yandex, VK and bank domains are asked at Yandex DNS and open directly, bypassing the VPN; everything else goes through the VPN to Cloudflare and Google. For people inside Russia. The Max messenger is blocked (see "The Max messenger"). |
-| Russia | **Russia: all through VPN** | Everything through the VPN, Cloudflare and Google for every domain. For people abroad. |
+| Russia | **Russia: all through VPN** | Everything through the VPN, Cloudflare and Google for every domain. For people abroad. The Max messenger is blocked (see "The Max messenger"). |
 | Russia | **Yandex DNS** | Yandex DNS for everything. |
 | China | **China: Chinese sites direct** | The sites of the Chinese lists (see "Country lists") are asked at AliDNS and DNSPod and open directly, bypassing the VPN; everything else goes through the VPN to Cloudflare and Google. For people inside China. Not the default: choose it as the default for everyone, or give it to a group. AliDNS and DNSPod are in the catalog with plain DNS only. |
 | Russia | **Russia: Russian sites direct (community list)** | The same suffixes and Yandex DNS as **Russia: .ru direct**, plus the `ru` country list: the known Russian services of a community list (not every site) open directly, bypassing the VPN, and the app downloads and refreshes the list itself. Everything else goes through the VPN to Cloudflare and Google. Not the default; **Russia: .ru direct** is left as it was. Xray and Happ need the code `category-ru` in the app's `geosite.dat`: an app without it cannot start the config. AmneziaWG keys and the plain link list carry no rules. Max is blocked, as in **Russia: .ru direct**. |
