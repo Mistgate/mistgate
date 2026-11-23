@@ -185,6 +185,9 @@ func (p singboxProfile) build() ([]byte, error) {
 	}
 	if d != nil {
 		cfg.DNS = &d.Section
+		if len(d.BlockDomains) > 0 { // Max: the first of the drops
+			cfg.Route.Rules = append(cfg.Route.Rules, singboxRule{DomainSuffix: d.BlockDomains, Action: "reject"})
+		}
 		if len(d.BlockSets) > 0 { // right after ip_is_private, before everything that goes direct
 			cfg.Route.Rules = append(cfg.Route.Rules, singboxRule{RuleSet: d.BlockSets, Action: "reject"})
 		}

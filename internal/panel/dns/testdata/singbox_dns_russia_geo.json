@@ -36,6 +36,14 @@
     "rules": [
       {
         "domain_suffix": [
+          "max.ru",
+          "oneme.ru"
+        ],
+        "action": "predefined",
+        "rcode": "NXDOMAIN"
+      },
+      {
+        "domain_suffix": [
           "ru",
           "su",
           "xn--p1ai",

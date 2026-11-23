@@ -80,13 +80,13 @@ describe("DNS choice on the user page (node)", () => {
     expect(text()).toContain("Happ, the Mihomo apps, Xray JSON and sing-box have one DNS for all nodes: offer it in Subscriptions → User page. Per node it works only for AmneziaWG keys.");
   });
 
-  it("says that AmneziaWG keys do not block ads once a preset does", async () => {
+  it("says that AmneziaWG keys do not block ads and Max once a preset does", async () => {
     await mount(1);
     expect(text()).not.toContain(en["subs.dns.awgNoBlock"]);
     act(() => root?.unmount());
     host?.remove();
     await mount(1, undefined, [...presets, preset("dns_builtin_ads_device", "Без рекламы на устройстве", true)]);
-    expect(text()).toContain("AmneziaWG keys take only the resolvers: ads are not blocked there.");
+    expect(text()).toContain("AmneziaWG keys take only the resolvers: ads and Max are not blocked there.");
   });
 
   it("sends the offered presets in the owner's order and the default, and reads only its own node", async () => {

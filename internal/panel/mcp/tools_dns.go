@@ -74,6 +74,7 @@ type dnsPresetV struct {
 	SplitDirect        bool         `json:"split_direct"`
 	PreferredTransport string       `json:"preferred_transport"`
 	BlockAds           bool         `json:"block_ads"`
+	BlockMax           bool         `json:"block_max"`
 	Category           string       `json:"category,omitempty"`
 	Country            string       `json:"country,omitempty"`
 	UserCount          uint32       `json:"user_count"`
@@ -136,7 +137,7 @@ func dnsListView(r *adminv1.ListDnsPresetsResponse) *dnsListV {
 
 func dnsPresetView(p *adminv1.DnsPreset) dnsPresetV {
 	v := dnsPresetV{ID: clean(p.GetId(), 80), Name: nm(p.GetName()), Description: clean(p.GetDescription(), 512), Builtin: p.GetBuiltin(), IPv4Only: p.GetIpv4Only(),
-		SplitDirect: p.GetSplitDirect(), PreferredTransport: dnsTransportWord(p.GetPreferredTransport()), BlockAds: p.GetBlockAds(), Category: enumName("DNS_CATEGORY_", p.GetCategory().String()),
+		SplitDirect: p.GetSplitDirect(), PreferredTransport: dnsTransportWord(p.GetPreferredTransport()), BlockAds: p.GetBlockAds(), BlockMax: p.GetBlockMax(), Category: enumName("DNS_CATEGORY_", p.GetCategory().String()),
 		Country: clean(p.GetCountry(), 2), UserCount: p.GetUserCount(), IsDefault: p.GetIsDefault(), Servers: []dnsServerV{}, Split: []dnsSplitV{}}
 	for _, s := range p.GetServers() {
 		v.Servers = append(v.Servers, dnsServerView(s))
@@ -187,6 +188,7 @@ type dnsPresetArgs struct {
 	SplitDirect        bool           `json:"split_direct,omitempty"`
 	PreferredTransport string         `json:"preferred_transport,omitempty" jsonschema:"plain, dot or doh; catalog servers use this when the client supports it"`
 	BlockAds           *bool          `json:"block_ads,omitempty"`
+	BlockMax           *bool          `json:"block_max,omitempty" jsonschema:"drop the domains of the messenger Max (max.ru, oneme.ru) in the apps"`
 	BeforeHash         string         `json:"before_hash,omitempty" jsonschema:"-"`
 }
 
@@ -296,6 +298,9 @@ func dnsCleanArgs(a dnsPresetArgs) (*adminv1.DnsPreset, error) {
 	if a.BlockAds != nil {
 		p.BlockAds = *a.BlockAds
 	}
+	if a.BlockMax != nil {
+		p.BlockMax = *a.BlockMax
+	}
 	a.Name, a.Description = name, description
 	return p, nil
 }
@@ -337,7 +342,7 @@ func dnsTransportValue(word string) (adminv1.DnsTransport, error) {
 }
 
 func dnsPresetHash(p *adminv1.DnsPreset) string {
-	return hashText(p.GetId() + "\x00" + p.GetName() + "\x00" + p.GetDescription() + "\x00" + fmt.Sprint(p.GetIpv4Only(), p.GetSplitDirect(), p.GetPreferredTransport(), p.GetBlockAds()) + "\x00" + fmt.Sprint(p.GetServers(), p.GetSplit()))
+	return hashText(p.GetId() + "\x00" + p.GetName() + "\x00" + p.GetDescription() + "\x00" + fmt.Sprint(p.GetIpv4Only(), p.GetSplitDirect(), p.GetPreferredTransport(), p.GetBlockAds(), p.GetBlockMax()) + "\x00" + fmt.Sprint(p.GetServers(), p.GetSplit()))
 }
 
 const (
@@ -537,7 +542,8 @@ func dnsMutationFacts(name, description string, before, p *adminv1.DnsPreset) ([
 		codedFact("ipv4_only", strconv.FormatBool(p.GetIpv4Only()), "boolean", "value", strconv.FormatBool(p.GetIpv4Only())),
 		codedFact("split_direct", strconv.FormatBool(p.GetSplitDirect()), "boolean", "value", strconv.FormatBool(p.GetSplitDirect())),
 		codedFact("preferred_transport", dnsTransportWord(p.GetPreferredTransport()), "transport", "value", dnsTransportWord(p.GetPreferredTransport())),
-		codedFact("block_ads", strconv.FormatBool(p.GetBlockAds()), "boolean", "value", strconv.FormatBool(p.GetBlockAds())))
+		codedFact("block_ads", strconv.FormatBool(p.GetBlockAds()), "boolean", "value", strconv.FormatBool(p.GetBlockAds())),
+		codedFact("block_max", strconv.FormatBool(p.GetBlockMax()), "boolean", "value", strconv.FormatBool(p.GetBlockMax())))
 	return dnsApprovalWithBeforeFacts(facts, beforeGroups, omittedBefore, 16<<10)
 }
 
@@ -591,7 +597,7 @@ var dnsPresetCreate = changeSpec[dnsPresetArgs]{
 			return done{}, failure("plan_unreadable", "the stored DNS preset is unreadable: make a new plan")
 		}
 		r, err := c.cl.DNS.CreateDnsPreset(c.ctx, connect.NewRequest(&adminv1.CreateDnsPresetRequest{Name: p.GetName(), Description: p.GetDescription(), Servers: p.GetServers(), Split: p.GetSplit(),
-			Ipv4Only: p.GetIpv4Only(), SplitDirect: p.GetSplitDirect(), PreferredTransport: p.GetPreferredTransport(), BlockAds: p.GetBlockAds()}))
+			Ipv4Only: p.GetIpv4Only(), SplitDirect: p.GetSplitDirect(), PreferredTransport: p.GetPreferredTransport(), BlockAds: p.GetBlockAds(), BlockMax: p.GetBlockMax()}))
 		if err != nil {
 			return done{}, apiError(err)
 		}
@@ -617,7 +623,10 @@ var dnsPresetUpdate = changeSpec[dnsPresetArgs]{
 		if a.BlockAds == nil {
 			p.BlockAds = old.GetBlockAds()
 		}
-		if dnsPresetHash(old) == dnsPresetHash(&adminv1.DnsPreset{Id: old.GetId(), Name: p.GetName(), Description: p.GetDescription(), Ipv4Only: p.GetIpv4Only(), SplitDirect: p.GetSplitDirect(), PreferredTransport: p.GetPreferredTransport(), BlockAds: p.GetBlockAds(), Servers: p.GetServers(), Split: p.GetSplit()}) {
+		if a.BlockMax == nil {
+			p.BlockMax = old.GetBlockMax()
+		}
+		if dnsPresetHash(old) == dnsPresetHash(&adminv1.DnsPreset{Id: old.GetId(), Name: p.GetName(), Description: p.GetDescription(), Ipv4Only: p.GetIpv4Only(), SplitDirect: p.GetSplitDirect(), PreferredTransport: p.GetPreferredTransport(), BlockAds: p.GetBlockAds(), BlockMax: p.GetBlockMax(), Servers: p.GetServers(), Split: p.GetSplit()}) {
 			return nil, errors.New("nothing to change: this DNS preset already looks like this")
 		}
 		a.BeforeHash, a.Name, a.Description = dnsPresetHash(old), p.GetName(), p.GetDescription()
@@ -642,8 +651,11 @@ var dnsPresetUpdate = changeSpec[dnsPresetArgs]{
 		if a.BlockAds == nil {
 			p.BlockAds = old.GetBlockAds()
 		}
+		if a.BlockMax == nil {
+			p.BlockMax = old.GetBlockMax()
+		}
 		if _, err := c.cl.DNS.UpdateDnsPreset(c.ctx, connect.NewRequest(&adminv1.UpdateDnsPresetRequest{Id: a.PresetID, Name: p.GetName(), Description: p.GetDescription(), Servers: p.GetServers(), Split: p.GetSplit(),
-			Ipv4Only: p.GetIpv4Only(), SplitDirect: p.GetSplitDirect(), PreferredTransport: p.GetPreferredTransport(), BlockAds: &p.BlockAds})); err != nil {
+			Ipv4Only: p.GetIpv4Only(), SplitDirect: p.GetSplitDirect(), PreferredTransport: p.GetPreferredTransport(), BlockAds: &p.BlockAds, BlockMax: &p.BlockMax})); err != nil {
 			return done{}, apiError(err)
 		}
 		return doneWith("dns_preset_updated", "DNS preset updated."), nil
