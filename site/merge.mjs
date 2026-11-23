@@ -8,7 +8,8 @@ import { join, dirname, relative, posix } from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { SITE } from "./src/urls.mjs";
+import { SITE, GITHUB } from "./src/urls.mjs";
+import { WEBSITE, ORG, ldScript, gitDates, newest } from "./src/jsonld.mjs";
 
 /** Files the merged folder must have: the landing's <head> points at the icons and og.png, which only the docs write. */
 const REQUIRED = ["favicon.svg", "favicon-32.png", "apple-touch-icon.png", "og.png", "mistgate-badge.svg", "robots.txt", "sitemap.xml", "404.html", "_headers", "_redirects", "install.sh"];
@@ -62,13 +63,29 @@ export function mergeHeaders(docs, landing, errors) {
   return showHeaders(out);
 }
 
-// ---- sitemap: the docs', plus every landing page with its hreflang set
-export function mergeSitemap(docs, landingPages) {
+// ---- schema.org of a landing page, read from its own <head>: the facts are the page's (description, language, address)
+const unesc = (s) => s.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (m, e) => ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" })[e.toLowerCase()] ?? String.fromCodePoint(e[1] === "x" ? parseInt(e.slice(2), 16) : +e.slice(1)));
+/** The home page: the program, the site, the project. /app/: the Windows client (no version or download: the page has neither). */
+export function landingLd(html) {
+  const description = unesc(attr(tagsOf(html, "meta").find((t) => attr(t, "name") === "description"), "content") ?? "");
+  const url = attr(tagsOf(html, "link").find((t) => attr(t, "rel") === "canonical"), "href");
+  const inLanguage = /<html\b[^>]*\slang="([^"]+)"/.exec(html)?.[1];
+  const app = { "@type": "SoftwareApplication", name: "Mistgate", applicationCategory: "SecurityApplication", url, description, inLanguage, publisher: { "@id": ORG["@id"] } };
+  if (new URL(url).pathname.endsWith("/app/")) return [{ ...app, operatingSystem: "Windows" }];
+  return [
+    { ...app, operatingSystem: "Linux", offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }, license: "https://www.gnu.org/licenses/agpl-3.0.html", codeRepository: GITHUB, sameAs: [GITHUB] },
+    { ...WEBSITE, inLanguage, publisher: { "@id": ORG["@id"] } }, ORG,
+  ];
+}
+const withLd = (html) => html.replace("</head>", () => ldScript(landingLd(html)) + "\n</head>");
+
+// ---- sitemap: the docs', plus every landing page with its hreflang set (lastmod: the last change of the design, when git knows it)
+export function mergeSitemap(docs, landingPages, lastmod) {
   const kept = docs.match(/<url>[\s\S]*?<\/url>/g);
   const added = landingPages.map((html) => {
     const alts = tagsOf(html, "link").filter((t) => attr(t, "rel") === "alternate" && attr(t, "hreflang"));
     const loc = attr(tagsOf(html, "link").find((t) => attr(t, "rel") === "canonical"), "href");
-    return `<url><loc>${loc}</loc>\n${alts.map((a) => `  <xhtml:link rel="alternate" hreflang="${attr(a, "hreflang")}" href="${attr(a, "href")}"/>`).join("\n")}\n</url>`;
+    return `<url><loc>${loc}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}\n${alts.map((a) => `  <xhtml:link rel="alternate" hreflang="${attr(a, "hreflang")}" href="${attr(a, "href")}"/>`).join("\n")}\n</url>`;
   });
   return docs.slice(0, docs.indexOf("<url>")) + [...added, ...kept].join("\n") + "\n</urlset>\n";
 }
@@ -136,7 +153,7 @@ export function check(files, errors) {
 }
 
 /** docs, landing: Map<path without a leading slash, Buffer | string | {from: file}>. -> {files, errors, policies} */
-export function merge(docs, landing) {
+export function merge(docs, landing, lastmod) {
   const errors = [], files = new Map(docs), lower = new Map([...docs.keys()].map((p) => [p.toLowerCase(), p]));
   for (const [p, e] of landing) {
     if (p === "_headers") continue;
@@ -145,8 +162,9 @@ export function merge(docs, landing) {
     else files.set(p, { ...e, landing: true });
   }
   files.set("_headers", { data: mergeHeaders(text(docs.get("_headers") ?? NONE), text(landing.get("_headers") ?? NONE), errors) });
-  const pages = [...landing].filter(([p]) => p.endsWith("index.html")).map(([, e]) => text(e));
-  if (docs.has("sitemap.xml") && pages.length) files.set("sitemap.xml", { data: mergeSitemap(text(docs.get("sitemap.xml")), pages) });
+  const pages = [];
+  for (const [p, e] of landing) if (p.endsWith("index.html")) { const html = withLd(text(e)); pages.push(html); files.set(p, { data: html, landing: true }); }
+  if (docs.has("sitemap.xml") && pages.length) files.set("sitemap.xml", { data: mergeSitemap(text(docs.get("sitemap.xml")), pages, lastmod) });
   const policies = check(files, errors);
   return { files, errors, policies };
 }
@@ -168,7 +186,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     // cwd gen/: rustup picks the toolchain of gen/rust-toolchain.toml from the working directory
     run("cargo", ["run", "--release", "--", "--build", join(LAND, "build"), "--out", join(LAND, "dist"), "--docs-dist", DOCS], join(LAND, "gen"));
   }
-  const { files, errors, policies } = merge(new Map(walk(DOCS)), new Map(walk(join(LAND, "dist"))));
+  const { files, errors, policies } = merge(new Map(walk(DOCS)), new Map(walk(join(LAND, "dist"))), newest(gitDates(join(LAND, "design")).values()));
   if (errors.length) { console.error(`\nmerge: ${errors.length} problem(s)\n` + errors.map((e) => "  - " + e).join("\n")); rmSync(OUT, { recursive: true, force: true }); process.exit(1); }
   rmSync(OUT, { recursive: true, force: true });
   for (const [p, e] of files) {

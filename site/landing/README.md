@@ -9,7 +9,8 @@ the generator, then the merge into `site/public/`. The docs' start page is `/doc
 (`/`, `/ru/`, `/zh/`, `/fa/`, `/tr/`) are the landing's alone; every other address stays the docs'. The merge refuses a path both sides write,
 merges `_headers` (the docs' policy under `/*`, the landing's in the rule of each of its addresses, after `! Content-Security-Policy`)
 and `sitemap.xml`, and fails on a broken link, a page whose policy forbids its inline script, or a sitemap that does not
-match the pages. `node site/merge.mjs --no-build` merges what `site/dist/` and `site/landing/dist/` already hold.
+match the pages. The merge also puts a schema.org JSON-LD block into the `<head>` of every landing page (built from the page's own title, description and language; `site/merge.mjs`, `landingLd`) and writes `<lastmod>` for the landing pages: the date of the last commit in `landing/design`. Dates come from one `git log`; without git or in a shallow clone there are none (the build still passes).
+`node site/merge.mjs --no-build` merges what `site/dist/` and `site/landing/dist/` already hold.
 
 ```
 site/landing/
