@@ -1068,10 +1068,12 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lp .lx-pl.on b{color:var(--text);font-weight:600}
 .lp .lx-pl.on>span:not(.lx-pli){color:var(--sec)}
 .lp .lx-pl.on em{color:var(--acc)}
-.lp .lx-pl.on em i{width:6px;height:6px;margin:0 3px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent);animation:lx-plp 2.4s ease-in-out infinite}
+.lp .lx-pl.on em i{width:6px;height:6px;margin:0 3px;border-radius:50%;background:var(--acc);position:relative}
+.lp .lx-pl.on em i::after{content:"";position:absolute;inset:0;border-radius:50%;background:color-mix(in srgb,var(--acc) 22%,transparent);animation:lx-plp 2.4s ease-in-out infinite}
 .lp .lx-plat.in .lx-pl{animation:lx-rise .6s var(--e) both}
 .lp .lx-plat.in .lx-pl:nth-child(2){animation-delay:.07s}.lp .lx-plat.in .lx-pl:nth-child(3){animation-delay:.14s}.lp .lx-plat.in .lx-pl:nth-child(4){animation-delay:.21s}.lp .lx-plat.in .lx-pl:nth-child(5){animation-delay:.28s}
-@keyframes lx-plp{0%,100%{box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent)}50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--acc) 0%,transparent)}}
+/* the ring is a pseudo-element that scales and fades (transform and opacity run on the compositor; a box-shadow animation does not) */
+@keyframes lx-plp{0%,100%{transform:scale(2);opacity:1}50%{transform:scale(3);opacity:0}}
 @container lpr (max-width:1100px){
 .lp .lx-as{align-items:stretch}
 .lp .lx-atabs{overflow-x:auto;scrollbar-width:none;width:auto;margin:0 -16px;padding:0 16px;border:0;background:none;border-radius:0}
