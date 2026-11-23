@@ -1,0 +1,796 @@
+<!DOCTYPE html><html lang="en-GB"><head><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; font-src data:; style-src &#39;unsafe-inline&#39;; form-action &#39;none&#39;"/>
+<meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+ <title>Cadencedo | Overview</title>
+<meta name="description" content="Cadencedo runs small recurring jobs on one machine and tells you when one of them fails."/>
+ <meta name="theme-color" content="#fbfaf7"/>
+   <meta name="color-scheme" content="light dark"/>
+        <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMjMiIGZpbGw9IiNjMjQxMGMiLz48cGF0aCBkPSJNMCA0OSBMMjYgMzAgTDY0IDUwIFY2NCBIMHoiIGZpbGw9IiMzYTRmMjciIG9wYWNpdHk9Ii45Ii8+PGNpcmNsZSBjeD0iNDgiIGN5PSIxOSIgcj0iNyIgZmlsbD0iI2ZmZmZmZiIvPjwvc3ZnPg=="/>
+      <style>:root{color-scheme:light dark;--bg:#fbfaf7;--band:#f2f1ee;--sf:#ffffff;--sf2:#eae9e6;--fg:#1c1917;
+  --mu:#666361;
+--ln:#e0dfdc; --ln2:#c5c4c1;
+  --ac:#c2410c;--ai:#ffffff;--a2:#3a4f27; --so:#f4e4db; --ok:#238557;--wa:#a3660a;--bd:#b82d23;
+  --oks:#ddeae1;
+--was:#efe5d6;
+--bds:#f2ddd9;
+	--r:11px;
+--rs:6px; --rb:14px;
+	--bw:1px;
+--w:1366px;
+	--wt:718px;
+	--s:calc(8px*1.02);
+	--sec:73px;
+  --gut:20px;
+--fb:system-ui, -apple-system,  "Segoe UI", Roboto, "Helvetica Neue",Arial, sans-serif;
+  --fh:Charter,
+"Bitstream Charter","Sitka Text", Cambria,
+serif;
+  --fl:system-ui,
+-apple-system,  "Segoe UI", Roboto, "Helvetica Neue",  Arial,sans-serif;--fm:ui-monospace,SFMono-Regular, Menlo, Consolas, "Liberation Mono",  monospace;--fwh:700;--lsh:-.025em;
+  --lhh:1.08;
+--ttl:none;
+--lsl:.06em;
+  --fsl:.78rem;
+  --t0:17px;
+	--t1:21.4px;--t2:27px;
+--t3:clamp(23px,2.37vw, 34.1px);
+	--t4:clamp(23px,  2.99vw, 43px);
+  --t5:clamp(27.1px,
+3.76vw, 54.2px);
+--ts:12px;
+--sh:none}
+@media (prefers-color-scheme:dark){ :root{
+  --bg:#161412; --band:#1d1b19;
+	--sf:#211f1c; --sf2:#292724;--fg:#ece7dd;
+--mu:#99958e;
+--ln:#34322e;--ln2:#524f4b; --ac:#fb923c;--ai:#0b0b10;--a2:#a7c58a;
+	--so:#3b2819; --ok:#54c993;
+--wa:#f0a638;--bd:#e7685f;
+--oks:#22382c;
+  --was:#42311a;
+	--bds:#402521}
+}
+*,*::before,
+*::after{
+box-sizing:border-box}
+[hidden]{
+  display:none!important}
+html{ -webkit-text-size-adjust:100%}
+body{ margin:0;min-height:100vh;display:flex;
+flex-direction:column;
+	background:var(--bg);
+  color:var(--fg);
+font:17px/1.64 var(--fb);
+	-webkit-font-smoothing:antialiased}
+main{flex:1}
+h1,
+h2, h3, h4{
+font-family:var(--fh);
+  font-weight:var(--fwh); line-height:var(--lhh);
+	margin:0 0 .5em;
+  letter-spacing:var(--lsh)}
+h1{ font-size:clamp(1.75rem,
+4.4vw, 2.6rem)}
+h2{font-size:clamp(1.3rem,3vw,1.7rem)}
+h3{
+font-size:1.12rem}
+p{
+  margin:0 0 1em}
+ul,  ol{
+margin:0 0 1em; padding-left:1.25em}
+a{
+color:var(--ac)}
+img, svg{max-width:100%}
+code,  pre, kbd{
+  font-family:var(--fm);font-size:.92em}
+pre{
+  margin:0 0 1em;padding:14px 16px; overflow-x:auto; background:var(--sf);
+	color:var(--fg);border:1px solid var(--ln);border-radius:var(--rs); line-height:1.55}
+pre code{ font-size:inherit}
+.gkmm33{width:100%;max-width:var(--w);
+	margin:0 auto;
+	padding-left:var(--gut);padding-right:var(--gut)}
+.warx66{color:var(--mu)}
+.ffvgb95{
+  width:1.25em;
+	height:1.25em;flex:none;vertical-align:-.25em;fill:none;
+  stroke:currentColor; stroke-width:1.9;
+  stroke-linecap:round;stroke-linejoin:round}
+.jpg85{
+	display:block;width:100%; height:100%}
+.rbybz58{width:28px;height:28px;
+  flex:none}
+.rkbqi84{ display:none}
+.oltwx55{
+display:flex;align-items:center;justify-content:center; width:44px;
+  height:44px;margin-right:-8px;list-style:none;cursor:pointer;
+	color:var(--fg);border-radius:var(--rs)}
+.oltwx55::-webkit-details-marker{
+	display:none}
+.oltwx55 .ffvgb95{width:26px;
+	height:26px}
+.rkbqi84 .oltwx55 .ffvgb95:nth-child(2),.rkbqi84[open] .oltwx55 .ffvgb95:nth-child(1){
+	display:none}
+.rkbqi84[open] .oltwx55 .ffvgb95:nth-child(2){display:inline-block}
+.nhr62{
+position:absolute;
+	left:0;
+	right:0;
+  top:100%;z-index:5;display:flex;flex-direction:column; padding:6px var(--gut) 14px;background:var(--sf);
+	border-bottom:1px solid var(--ln);box-shadow:0 14px 24px rgba(0,0, 0,
+.12)}
+.nhr62 a{ padding:12px 2px;
+  color:var(--fg); text-decoration:none;
+border-bottom:1px solid var(--ln); font-size:1.05rem}
+.nhr62 a[aria-current]{ color:var(--ac);
+	font-weight:600}
+.nhr62 a:last-child{ border-bottom:0}
+@media (max-width:720px){
+  .ykb37{display:none}.rkbqi84{ display:block}
+	.yfko81{
+flex-wrap:nowrap} }
+.jrr24{ display:grid;grid-template-columns:minmax(0, 1fr) 230px;
+	gap:var(--sec) 56px;
+	padding-top:48px;
+	align-items:start}
+.edd47{max-width:var(--wt)}
+.edd47 h2{margin-top:1.8em; scroll-margin-top:24px}
+.ddo95{
+	position:sticky;top:24px;
+	padding:18px 20px;border:1px solid var(--ln);border-radius:var(--r);background:var(--sf);font-size:.92rem}
+.ddo95 h2{ margin:0 0 10px;color:var(--mu);
+	font:700 .78rem var(--fb);
+  letter-spacing:.07em;
+  text-transform:uppercase}
+.ddo95 ol{ margin:0;padding:0;
+list-style:none; counter-reset:t}
+.ddo95 li{
+counter-increment:t;padding:5px 0 5px 22px;
+  position:relative}
+.ddo95 li::before{
+content:counter(t);
+	position:absolute;left:0;
+	color:var(--mu);
+font-variant-numeric:tabular-nums}
+.ddo95 a{
+	color:var(--fg);
+text-decoration:none}
+.ddo95 a:hover{ color:var(--ac)}
+.nlj10{
+	display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;
+padding-top:72px;
+  padding-bottom:24px}
+.nvv2{
+margin:0 0 .1em;
+	color:var(--ac);
+	font:var(--fwh) clamp(5rem,
+16vw,11rem)/.9 var(--fh); letter-spacing:var(--lsh)}
+.mkk8{border-radius:var(--rb);
+  overflow:hidden;
+  aspect-ratio:4/3;
+	background:var(--band)}
+.xvp10{
+	margin:0 0 28px;border:1px solid var(--ln);
+	border-radius:var(--r);
+	overflow:hidden;
+	background:var(--band)}
+.xvp10 figcaption{
+	padding:12px 16px;
+  background:var(--sf); border-top:1px solid var(--ln)}
+.xxpa40{ display:flex;
+flex-direction:column;
+  gap:6px; margin-bottom:14px}
+.xxpa40 label{
+	font-size:.92rem;
+font-weight:600}
+.xxpa40 input,
+.xxpa40 textarea{ width:100%;
+padding:.65em .8em;
+border:1px solid var(--ln);
+	border-radius:var(--rs);
+background:var(--sf);
+	color:var(--fg);font:inherit}
+.xxpa40 textarea{ resize:vertical}
+.xxpa40 input:focus,
+.xxpa40 textarea:focus{outline:2px solid var(--ac);outline-offset:1px}
+.qzgmf56{max-width:520px}
+.qvee48{margin:0 0 14px;color:var(--bd)}
+@media (max-width:720px){ .jrr24{
+	grid-template-columns:1fr;
+	padding-top:28px} .ddo95{
+	position:static;
+  order:-1}
+	.nlj10{
+  grid-template-columns:1fr;
+	padding-top:36px; gap:24px}
+	}
+@media (max-width:560px){
+.yfko81{
+  padding-top:12px;padding-bottom:10px}
+  }
+.iviqa30{
+  display:block;
+  width:100%;
+height:auto}
+.xubaw11{fill:none; stroke:var(--ac);
+	stroke-width:2.4; stroke-linejoin:round;
+stroke-linecap:round;
+  vector-effect:non-scaling-stroke}
+.qemo19{
+	fill:var(--ac);opacity:.14}
+.qcq48{
+	fill:none;
+	stroke:var(--ln);stroke-width:1;
+	vector-effect:non-scaling-stroke}
+.lqcf13{fill:var(--ac);opacity:.38}
+.rdun85{
+  fill:var(--ac)}
+.nqhi75,
+.drn65, .aekld0, .wzvvg11{
+  display:block;width:100%;height:auto}
+.epzc89{
+fill:var(--sf2)}
+.zern14{ fill:var(--wa)}
+.llo7{
+	fill:var(--bd)}
+.ehm10{ fill:var(--ac)}
+.eiovk24{ fill:var(--a2)}
+.eqkwp28{fill:var(--fg)}
+.taebb96{
+	fill:var(--mu)}
+.bpwx8{
+	fill:var(--band)}
+.yyvlc57{fill:var(--sf2);
+stroke:var(--sf2);stroke-width:6;stroke-linejoin:round}
+.jjyo55{ fill:var(--oks);stroke:var(--oks); stroke-width:6; stroke-linejoin:round}
+.lygsd95{
+	fill:var(--ok);opacity:.55}
+.qjoao24{fill:none; stroke:var(--so);
+  stroke-width:16;
+	stroke-linecap:round}
+.lvn44{fill:none;
+stroke:var(--ln);
+  stroke-width:7}
+.utr22{fill:none;
+	stroke:var(--ln2);
+	stroke-width:12}
+.lscm22{fill:var(--mu);font-family:var(--fb);
+  paint-order:stroke;stroke:var(--sf);
+  stroke-width:3}
+.lupgb50{
+fill:var(--ac);opacity:.18}
+.pqyjj28{
+  fill:var(--ac)}
+.fbry66{
+	fill:var(--ai)}
+.zyh90{fill:var(--fg)}
+.lyk11{fill:none;
+  stroke:var(--bg);
+stroke-width:1.2;stroke-dasharray:2 5;opacity:.7}
+.ndrw88{
+	fill:var(--bg); font-family:var(--fh);
+  font-weight:700;
+	text-transform:uppercase}
+.hym2{
+	fill:var(--a2)}
+.xvtu52{
+	color:var(--mu)}
+.psoy81{
+color:var(--ok)}
+.huice87{
+color:var(--wa)}
+.lvuz32{color:var(--a2)}
+.gxyno11{
+color:var(--ac)}
+.mhh85{ color:var(--mu);
+  user-select:none}
+.orn92{font-weight:600}
+
+pre,  code{font-family:var(--fm)}
+a{
+color:inherit;text-decoration:none}
+.ngkdm67{font-family:var(--fm)}
+.evs62{position:sticky; top:0;
+	z-index:3;background:var(--bg);
+border-bottom:var(--bw) solid var(--ln)}
+.qllm52{position:relative;
+  max-width:var(--w);
+  margin:0 auto;
+  height:64px;
+  display:flex;align-items:center;gap:24px;padding:0 clamp(16px,  2.4vw,
+32px)}
+.irc79{
+display:flex;align-items:center;gap:10px;
+	font:750 1.2rem var(--fh);letter-spacing:var(--lsh);width:236px;min-width:0}
+.zif72{
+  flex:none;
+	display:grid;
+place-items:center;
+width:28px;
+height:28px;
+	border-radius:var(--rs);
+	background:var(--ac);
+	color:var(--ai);font:750 .95rem var(--fh);font-style:normal; letter-spacing:0}
+.irc79 span{min-width:0;
+  overflow-wrap:anywhere}
+.ies30{font:.82rem var(--fm); border:1px solid var(--ln2); border-radius:99px;
+padding:3px 12px;color:var(--mu);background:var(--sf);
+white-space:nowrap}
+.vojs85{
+	margin-left:auto;
+  display:flex;gap:6px;
+font-size:.94rem}
+.vojs85 a{padding:7px 12px;border-radius:var(--rs); color:var(--mu)}
+.vojs85 a:hover{
+  color:var(--fg)}
+.vojs85 a[aria-current]{color:var(--fg);background:var(--sf2)}
+.rkbqi84{
+margin-left:auto}
+.nhr62{ background:var(--bg)}
+.xvr31{
+  max-width:var(--w);
+  margin:0 auto;
+display:grid;grid-template-columns:236px minmax(0,1fr) 220px;grid-template-areas:"side main toc"; gap:clamp(20px, 3.4vw,
+56px);
+padding:0 clamp(16px, 2.4vw, 32px)}
+.eyd80{ grid-area:side;
+position:sticky;
+top:64px; align-self:start;
+padding:32px 0; font-size:.94rem}
+.eyd80 h6,.cngn66 h6{margin:0 0 10px;
+font:650 .74rem var(--fb);
+  letter-spacing:.1em;
+text-transform:uppercase;
+color:var(--mu)}
+.eyd80 a{
+display:block;padding:7px 12px;border-radius:var(--rs);
+	color:var(--fg); margin-bottom:2px;overflow-wrap:anywhere}
+.eyd80 a:hover{background:var(--sf2)}
+.eyd80 a[aria-current]{
+background:var(--so);
+	color:var(--ac); color:color-mix(in srgb, var(--ac) 72%, var(--fg));
+  font-weight:650}
+.rhi15{
+  margin-bottom:28px}
+.sik85{grid-area:main;
+padding:48px 0 32px;
+  min-width:0}
+.dxa0{font:.84rem var(--fm);
+color:var(--mu);
+	margin-bottom:20px;overflow-wrap:anywhere}
+.sik85 h1{ font-size:var(--t5);
+  line-height:1.02; margin:0 0 12px; overflow-wrap:anywhere}
+.eqs51{
+font-size:var(--t2);color:var(--ac);color:color-mix(in srgb, var(--ac) 72%,var(--fg)); margin:0 0 24px;
+font-weight:500}
+.yclp79{
+	font:400 1.22rem/1.65 var(--fh);
+color:var(--fg);
+	margin:0 0 36px; max-width:36em;
+letter-spacing:0}
+.sik85 h2{font-size:var(--t3);margin:64px 0 16px;
+  scroll-margin-top:80px; display:flex;
+  align-items:baseline;
+  gap:12px}
+.sik85 h2::before{content:"#";
+color:var(--ln2);
+	font-weight:500}
+.sik85 h3{
+font-size:1.25rem;margin:32px 0 6px}
+.sik85 p{margin:0 0 16px;
+  font-size:1.06rem; line-height:1.7;max-width:46em}
+.shblh72{display:grid;grid-template-columns:1fr 1fr;
+  gap:20px}
+.shblh72>*{
+min-width:0}
+.sgdc49{
+display:flex;justify-content:space-between;align-items:center;
+	gap:12px;
+	background:var(--cb2);color:var(--cm);border-radius:var(--r) var(--r) 0 0;
+padding:8px 20px;
+  font:.8rem var(--fm); margin-top:20px}
+.shblh72 .sgdc49{
+margin-top:0}
+pre.ovzi55{margin:0 0 20px;
+	padding:20px 24px;
+border:0;
+border-radius:var(--r);
+  background:var(--cb);color:var(--ct); font-size:.9rem;
+  line-height:1.7;
+	overflow:auto}
+.shblh72 pre.ovzi55{margin:0}
+.sgdc49+pre.ovzi55{
+  margin-top:0; border-radius:0 0 var(--r) var(--r)}
+.xvr31,.zrclo28{
+--cb:var(--fg);--ct:var(--bg);
+  --cb2:color-mix(in srgb, var(--fg) 88%,var(--bg));
+  --cm:color-mix(in srgb,var(--bg) 60%,var(--fg));
+	--cc:color-mix(in srgb, var(--bg) 48%, var(--fg));
+	--cf:color-mix(in srgb, var(--ac) 62%,
+var(--bg));--cs:color-mix(in srgb,var(--ok) 62%,var(--bg));
+--cn:color-mix(in srgb,
+var(--a2) 55%,  var(--bg))}
+@media (prefers-color-scheme:dark){.xvr31,  .zrclo28{--cb:var(--sf2);--ct:var(--fg);--cb2:var(--sf);
+	--cm:var(--mu);
+  --cc:var(--mu); --cf:var(--ac);--cs:var(--ok);--cn:var(--a2)} }
+.ovzi55 .xvtu52,.ovzi55 .mhh85{
+color:var(--cc)}
+.ovzi55 .huice87{
+	color:var(--cf)}
+.ovzi55 .orn92{ color:var(--cn);
+	font-weight:400}
+.ovzi55 .psoy81{
+color:var(--cs)}
+.ovzi55 .gxyno11, .ovzi55 .lvuz32{
+color:var(--cn)}
+.yar17{list-style:none;padding:0;
+margin:0;display:grid;
+  grid-template-columns:repeat(3,minmax(0, 1fr)); gap:16px}
+.yar17 li{
+	background:var(--sf);
+  border:var(--bw) solid var(--ln);
+border-radius:var(--r);
+padding:20px;line-height:1.5; box-shadow:var(--sh)}
+.yar17 .ffvgb95{display:block;
+width:26px;
+	height:26px;color:var(--ac);
+	margin-bottom:14px}
+.vtvgg56{
+	list-style:none;
+	padding:0;
+  margin:0 0 24px;counter-reset:s}
+.vtvgg56 li{counter-increment:s;
+  display:flex;gap:16px; padding:10px 0;
+	font-size:1.06rem;align-items:baseline}
+.vtvgg56 li::before{
+	content:counter(s);flex:none;width:30px;height:30px;border-radius:50%;background:var(--so);
+color:var(--ac);color:color-mix(in srgb, var(--ac) 72%,
+var(--fg)); font:650 .9rem var(--fb);
+display:grid;
+	place-items:center;
+  transform:translateY(4px)}
+.dhjww18{
+  background:var(--oks);border-radius:var(--r);
+	padding:14px 18px; color:var(--fg); display:flex;gap:12px;
+  align-items:center; margin-bottom:20px}
+.dhjww18 .ffvgb95{
+flex:none; color:var(--ok);
+  width:22px;
+  height:22px}
+.helfw65{ overflow-x:auto;margin-bottom:24px}
+.helfw65 table{
+  width:100%;
+	border-collapse:collapse}
+.helfw65 th{
+	text-align:left;
+font:650 .74rem var(--fb); letter-spacing:.1em;
+	text-transform:uppercase;color:var(--mu);padding:10px 14px; border-bottom:2px solid var(--ln2)}
+.helfw65 td{
+	padding:14px;
+	border-bottom:1px solid var(--ln);
+  vertical-align:top}
+.helfw65 td:first-child{ white-space:nowrap}
+.helfw65 td code{
+  background:var(--so);
+  border-radius:6px;padding:2px 8px;font-size:.88rem;
+color:var(--ac); color:color-mix(in srgb,
+var(--ac) 72%,var(--fg))}
+.imlbo27 details{ border-bottom:1px solid var(--ln);
+padding:4px 0}
+.imlbo27 summary{cursor:pointer;
+list-style:none;display:flex;justify-content:space-between; gap:16px;
+  padding:16px 0; font:650 1.14rem var(--fb);letter-spacing:-.01em;scroll-margin-top:80px}
+.imlbo27 summary::-webkit-details-marker{
+  display:none}
+.imlbo27 summary::after{ content:"+";
+	color:var(--ac);
+  font-weight:400;font-size:1.5rem;
+	line-height:1}
+.imlbo27 details[open] summary::after{content:"–"}
+.imlbo27 p{margin:0 0 14px}
+.lop49{ display:flex;flex-wrap:wrap;gap:8px;font:.84rem var(--fm); margin:0 0 8px}
+.lop49 span{
+border:1px solid var(--ln2); border-radius:99px; padding:2px 12px;color:var(--mu)}
+.ndr44{ display:block;margin-top:40px}
+.hxvom11{
+display:block;
+  font:.84rem var(--fm); color:var(--mu);
+margin:36px 0 -44px}
+.ndr44 .hxvom11:first-child{
+	margin-top:0}
+.ndr44 h2{ margin-top:56px}
+.lkx74{
+  display:grid;
+	grid-template-columns:1fr 1fr;
+gap:16px;
+  margin-top:56px}
+.lkx74 a{display:block;
+  border:1px solid var(--ln2);
+	background:var(--sf);
+border-radius:var(--r);padding:18px 22px;
+min-width:0}
+.lkx74 a:hover{ border-color:var(--ac)}
+.lkx74 a:last-child{ text-align:right}
+.lkx74 a:only-child{text-align:left}
+.wqloj61 a{
+grid-column:2; text-align:right}
+.lkx74 small{display:block;color:var(--mu);
+  font-size:.8rem}
+.lkx74 b{
+font-size:1.2rem;letter-spacing:-.01em;
+overflow-wrap:anywhere}
+.cngn66{
+  grid-area:toc;
+	position:sticky;top:64px;align-self:start;
+padding:48px 0;font-size:.9rem}
+.cngn66>a{ display:block;
+  padding:5px 0 5px 14px;color:var(--mu);border-left:2px solid var(--ln);overflow-wrap:anywhere}
+.cngn66>a:hover{ color:var(--fg);
+	border-color:var(--ac)}
+.lamia47{margin:32px 0 0;
+padding:16px;background:var(--sf); border:var(--bw) solid var(--ln);
+border-radius:var(--r);font-size:.88rem}
+.lamia47 h6{
+	margin:0 0 12px;font:650 .74rem var(--fb);letter-spacing:.1em;text-transform:uppercase; color:var(--mu)}
+.lamia47 dt{
+color:var(--mu);
+  font-size:.78rem}
+.lamia47 dd{
+	margin:0 0 10px;overflow-wrap:anywhere}
+.hyfvk38{
+  border-top:var(--bw) solid var(--ln); margin-top:40px;background:var(--band)}
+.dqk8{
+	max-width:var(--w);
+  margin:0 auto;padding:48px clamp(16px,
+2.4vw,32px) 28px}
+.dwqqn98{
+	display:grid; grid-template-columns:1.6fr 1fr 1fr 1fr;gap:36px}
+.dwqqn98 h6{
+  margin:0 0 12px;
+	font:650 .74rem var(--fb);letter-spacing:.1em;
+	text-transform:uppercase;
+  color:var(--mu)}
+.dwqqn98 a,.dwqqn98 span{
+	display:block;padding:3px 0;
+  font-size:.94rem;overflow-wrap:anywhere}
+.dwqqn98 a:hover{
+	color:var(--ac)}
+.dwqqn98 a.irc79{ display:flex;width:auto;
+	padding:0}
+.dwqqn98 p{font-size:.94rem;
+  color:var(--mu); margin:10px 0 0;max-width:22em}
+.dwqqn98 div{min-width:0}
+.evuam49{margin-top:32px;padding-top:18px;border-top:1px solid var(--ln2);font-size:.88rem; color:var(--mu);display:flex; justify-content:space-between;gap:12px;
+  flex-wrap:wrap}
+.evuam49 a:hover{color:var(--ac)}
+.zrclo28{max-width:var(--w);
+margin:0 auto; display:grid;grid-template-columns:minmax(0,1fr) minmax(0, .8fr);
+	gap:clamp(20px,3.4vw,56px);
+  padding:0 clamp(16px,  2.4vw, 32px);align-items:center}
+.xicbr21{
+	padding:64px 0}
+.pvg41{ font:var(--fwh) clamp(8rem, 24vw, 22rem)/.8 var(--fh);
+  letter-spacing:var(--lsh);
+	color:var(--so);
+text-align:center}
+.joalx87{display:inline-flex;align-items:center;
+	gap:8px; padding:12px 20px; border-radius:var(--rs);
+	background:var(--ac);color:var(--ai);
+font-weight:650}
+.joalx87 .ffvgb95{width:1.1em;
+	height:1.1em}
+@media (max-width:1100px){
+.xvr31{grid-template-columns:200px minmax(0,1fr); grid-template-areas:"side main"}
+.cngn66{display:none}
+.irc79{
+width:200px}
+}
+@media (max-width:820px){
+.xvr31{grid-template-columns:1fr;grid-template-areas:"side" "main";
+gap:0}
+.eyd80{position:static; display:flex;
+flex-wrap:wrap;
+	gap:6px;
+  padding:16px 0 0;
+border-bottom:1px solid var(--ln)}
+.eyd80 .rhi15{margin:0;display:flex; flex-wrap:wrap;gap:6px}
+.eyd80 h6{
+display:none}
+.eyd80 a{
+background:var(--sf);
+border:1px solid var(--ln);margin:0}
+.shblh72, .yar17, .lkx74{grid-template-columns:1fr}
+.zrclo28{grid-template-columns:minmax(0,
+1fr)}
+.wqloj61 a{grid-column:1}
+.vojs85{
+display:none}
+.irc79{
+width:auto}
+.dwqqn98{grid-template-columns:1fr 1fr}
+.dwqqn98>div:first-child{ grid-column:1/-1}
+.sik85 h2{ font-size:1.6rem}
+.yclp79{font-size:1.1rem}
+.sik85{padding-top:32px}
+.helfw65 td:first-child{
+	white-space:normal}
+
+.pvg41{
+	display:none}
+.xicbr21{padding:40px 0}
+}
+@media (max-width:720px){.eyd80{display:none}}
+@media (max-width:560px){
+.helfw65 thead{
+	display:none}.helfw65 table,.helfw65 tbody,  .helfw65 tr, .helfw65 td{display:block;
+  width:100%}
+	.helfw65 tr{
+	padding:12px 0;border-bottom:1px solid var(--ln)}.helfw65 td{
+  border:0;padding:3px 14px;
+  white-space:normal}.dwqqn98{
+  grid-template-columns:1fr}
+	.qllm52{
+	gap:12px}.ies30{ font-size:.74rem;
+  padding:2px 8px}}
+@media (min-width:1101px){
+.xvr31{
+  grid-template-columns:236px minmax(0,1fr);grid-template-areas:"side toc" "side main"}.cngn66{
+  position:static;
+	padding:40px 0 0;
+display:flex; flex-wrap:wrap;
+	align-items:baseline;
+	gap:4px 8px}.cngn66 h6{
+margin:0 6px 0 0; width:100%}
+.cngn66>a{
+  padding:4px 12px;
+border:1px solid var(--ln);
+	border-radius:99px}
+  .cngn66 .lamia47{
+  display:none}
+.sik85{padding-top:28px}
+  }
+
+</style>
+  </head>
+<body>
+<header class="evs62">
+<div class="qllm52">
+<a class="irc79" data-page="index.html"><i class="zif72">C</i><span>Cadencedo</span></a>
+<span class="ies30">Version 0.8</span>
+<nav class="vojs85" aria-label="Documentation"><a aria-current="page" data-page="index.html">Overview</a><a data-page="docs/install/index.html">Install</a><a data-page="usage/index.html">Usage</a><a data-page="faq/index.html">FAQ</a></nav>
+  <details class="rkbqi84"><summary class="oltwx55" aria-label="Documentation"><svg class="ffvgb95" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="ffvgb95"><path d="M6 6l12 12M18 6L6 18"></path></svg></summary><div class="nhr62"><a aria-current="page" data-page="index.html">Overview</a><a data-page="docs/install/index.html">Install</a><a data-page="usage/index.html">Usage</a><a data-page="config.html">Configuration</a><a data-page="docs/recipes/index.html">Recipes</a><a data-page="problems.html">Troubleshooting</a><a data-page="faq/index.html">FAQ</a><a data-page="legal/terms.html">Terms of use</a></div>
+
+</details>
+</div>
+        </header>
+		<div class="xvr31">
+<nav class="eyd80" aria-label="Documentation">
+<div class="rhi15"><h6>Documentation</h6><a aria-current="page" data-page="index.html">Overview</a><a data-page="docs/install/index.html">Install</a><a data-page="usage/index.html">Usage</a><a data-page="faq/index.html">FAQ</a></div>
+        <div class="rhi15"><h6>Reference</h6><a data-page="config.html">Configuration</a><a data-page="docs/recipes/index.html">Recipes</a><a data-page="problems.html">Troubleshooting</a></div>
+    </nav>
+		<main class="sik85">
+<div class="dxa0">Documentation / Overview</div>
+ <h1>Cadencedo</h1>
+   <p class="eqs51">Recurring jobs without a crontab</p>
+    <p class="yclp79">Cadencedo runs small recurring jobs on one machine and tells you when one of them fails. It is a friendlier alternative to a crontab you have to keep in your head.</p>
+	
+<h2 id="yml58">Quick start</h2>
+     <div class="shblh72">
+<div><div class="sgdc49"><span>shell</span></div>
+<pre class="ovzi55"><code><span class="mhh85">$ </span><span class="orn92">cadencedo</span> add backup <span class="psoy81">&#39;every day at 03:00&#39;</span> <span class="psoy81">&#39;tar czf notes.tgz notes&#39;</span>
+<span class="orn92">cadencedo</span> list</code></pre></div>
+	<div><div class="sgdc49"><span>Output</span></div>
+
+  <pre class="ovzi55"><code>backup   every day at <span class="gxyno11">03:00</span>   last run: ok (<span class="gxyno11">4</span> s)</code></pre></div>
+
+</div>
+
+  
+<h2 id="lwqk27">What it does</h2>
+   <ul class="yar17"><li><svg viewBox="0 0 24 24" class="ffvgb95" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v4h4"></path></svg>Schedules written in plain words</li>
+    <li><svg focusable="false" viewBox="0 0 24 24" class="ffvgb95" aria-hidden="true"><path d="M12 4l9 5-9 5-9-5zM3 14l9 5 9-5"></path></svg>A log for every run</li>
+<li><svg viewBox="0 0 24 24" aria-hidden="true" class="ffvgb95"><path d="M5 20V9M11 20V4M17 20v-7M3 20h18"></path></svg>One line of output per job, so failures stand out</li>
+
+  </ul>
+  
+<h2 id="gpxtj8">Installation</h2>
+    <p>Cadencedo is a single executable plus a small background process that checks the schedule once a minute.</p>
+
+<ol class="vtvgg56"><li>Download the archive that matches your system.</li>
+      <li>Unpack it and copy the executable to a directory on your PATH.</li>
+<li>Start the background process with your system&#39;s service manager.</li>
+	</ol>
+
+<div class="sgdc49"><span>shell</span><span>Linux</span></div>
+
+<pre class="ovzi55"><code><span class="orn92">tar</span> xf cadencedo-0.8-linux-amd64.tar.gz
+<span class="orn92">sudo</span> <span class="orn92">mv</span> cadencedo /usr/local/bin/
+<span class="orn92">cadencedo</span> <span class="huice87">--version</span></code></pre>
+<div class="dhjww18"><svg class="ffvgb95" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l3 3 5-6"></path></svg><span>If the version number is printed, the installation worked.</span></div>
+   
+<h2 id="epp84">Usage</h2>
+
+  <h3>Add a job</h3>
+     <p>A job has a name, a schedule and a command. Schedules are written in plain words.</p>
+		<pre class="ovzi55"><code><span class="orn92">cadencedo</span> add backup <span class="psoy81">&#39;every day at 03:00&#39;</span> <span class="psoy81">&#39;tar czf notes.tgz notes&#39;</span>
+<span class="orn92">cadencedo</span> add tidy <span class="psoy81">&#39;every monday&#39;</span> <span class="psoy81">&#39;rm -r tmp/old&#39;</span></code></pre>
+<h3>See what ran</h3>
+
+  <p>The list command shows every job with the result of its last run. The history command shows the runs of one job with their duration and output.</p>
+    <pre class="ovzi55"><code><span class="orn92">cadencedo</span> list
+<span class="orn92">cadencedo</span> history backup</code></pre>
+<h3>Pause and resume</h3>
+        <p>Pausing keeps the job and its history but stops it from running. Useful while you move house or restore a backup.</p>
+
+<pre class="ovzi55"><code><span class="orn92">cadencedo</span> pause backup
+<span class="orn92">cadencedo</span> resume backup</code></pre>
+
+<h2 id="ghcs61">Options</h2>
+      <div class="helfw65"><table>
+<thead><tr><th>Option</th>
+      <th>Description</th>
+
+  </tr>
+ </thead>
+<tbody><tr><td><code>--dir</code></td>
+        <td>Where jobs and logs are kept. Default is a folder in your home.</td>
+  </tr>
+<tr><td><code>--quiet</code></td>
+   <td>Print only failures.</td>
+  </tr>
+        <tr><td><code>--limit</code></td>
+
+  <td>How many runs history shows. Default 10.</td>
+        </tr>
+<tr><td><code>--json</code></td>
+     <td>Machine readable output.</td>
+ </tr>
+     <tr><td><code>--now</code></td>
+	<td>Run a job right away as well as on schedule.</td>
+
+  </tr>
+    </tbody>
+</table>
+        </div>
+    
+<h2 id="fyb9">Frequently asked questions</h2>
+
+<div class="imlbo27"><details open=""><summary>Does it need to run as a service?</summary><p>Yes, a small background process checks the schedule once a minute. The install page shows what to start.</p>
+        </details><details><summary>What happens if the computer is off?</summary><p>A job that was due while the machine was off runs once when it starts again.</p>
+
+</details><details><summary>Can jobs depend on each other?</summary><p>Not yet. Chain the commands in a single job for now.</p>
+
+</details></div>
+ 
+<div class="lkx74 wqloj61"><a data-page="docs/install/index.html"><small>Next</small><b>Install</b></a></div>
+     </main>
+   <aside class="cngn66" aria-label="On this page">
+<h6>On this page</h6>
+<a href="#yml58">Quick start</a><a href="#lwqk27">What it does</a><a href="#gpxtj8">Installation</a><a href="#epp84">Usage</a><a href="#ghcs61">Options</a><a href="#fyb9">Frequently asked questions</a>
+<dl class="lamia47"><h6>At a glance</h6><dt>Version</dt>
+      <dd>0.8</dd>
+  <dt>Platforms</dt>
+    <dd>Linux, macOS and Windows</dd>
+    <dt>Licence</dt>
+     <dd>MIT</dd>
+
+<dt>Dependencies</dt>
+      <dd>None</dd>
+    </dl>
+</aside>
+</div>
+    <footer class="hyfvk38">
+<div class="dqk8">
+<div class="dwqqn98">
+<div><a class="irc79" data-page="index.html"><i class="zif72">C</i><span>Cadencedo</span></a><p>Cadencedo runs small recurring jobs on one machine and tells you when one of them fails.</p>
+	</div>
+     <div><h6>Documentation</h6><a data-page="index.html">Overview</a><a data-page="docs/install/index.html">Install</a><a data-page="usage/index.html">Usage</a><a data-page="faq/index.html">FAQ</a></div>
+<div><h6>Reference</h6><a data-page="config.html">Configuration</a><a data-page="docs/recipes/index.html">Recipes</a><a data-page="problems.html">Troubleshooting</a></div>
+	<div><h6>At a glance</h6><span>Version: 0.8</span><span>Platforms: Linux, macOS and Windows</span><span>Licence: MIT</span><span>Dependencies: None</span></div>
+</div>
+<div class="evuam49"><span>Documentation for version 0.8.</span><a data-page="legal/terms.html">Terms of use</a></div>
+  </div>
+    </footer>
+      
+
+</body></html>

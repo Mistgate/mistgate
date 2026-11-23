@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mgd" viewBox="0 0 720 478" width="720" height="478" role="img" aria-labelledby="title desc">
+<title id="title">Чему доверяет обновление</title>
+<desc id="desc">Ключ релиза подписывает релиз, его закрытая половина хранится офлайн. Панель только возит подписанный пакет нод. Агент ноды проверяет подпись вшитым в него ключом, затем формат, срок действия, что релиз новее него самого и что в пакете есть файл под его ОС и архитектуру, и сверяет размер и SHA-256 с подписанным манифестом. При любой ошибке установленный бинарник не трогается.</desc>
+<style>
+.mgd{--d-bg:var(--mgd-bg,#ffffff);--d-box:var(--mgd-box,#f8f8f6);--d-line:var(--mgd-line,#e3e3df);--d-text:var(--mgd-text,#16161a);--d-muted:var(--mgd-muted,#6b6b73);--d-lav:var(--mgd-lav,#473a73);--d-lav-bg:var(--mgd-lav-bg,#eae8fc);--d-sky:var(--mgd-sky,#174e6a);--d-sky-bg:var(--mgd-sky-bg,#e0f0fa);--d-mint:var(--mgd-mint,#00582f);--d-mint-bg:var(--mgd-mint-bg,#dcf3e4);--d-sage:var(--mgd-sage,#3b511d);--d-sage-bg:var(--mgd-sage-bg,#e8f1e0);--d-sand:var(--mgd-sand,#5c4a12);--d-sand-bg:var(--mgd-sand-bg,#f5efdf);--d-rose:var(--mgd-rose,#67343e);--d-rose-bg:var(--mgd-rose-bg,#f9e6e8)}
+@media (prefers-color-scheme:dark){.mgd{--d-bg:var(--mgd-bg,#141417);--d-box:var(--mgd-box,#0c0c0e);--d-line:var(--mgd-line,#25252b);--d-text:var(--mgd-text,#f3f3f5);--d-muted:var(--mgd-muted,#8b8b94);--d-lav:var(--mgd-lav,#b8acf2);--d-lav-bg:var(--mgd-lav-bg,#2d2b38);--d-sky:var(--mgd-sky,#8ec8ea);--d-sky-bg:var(--mgd-sky-bg,#263037);--d-mint:var(--mgd-mint,#7dd3a0);--d-mint-bg:var(--mgd-mint-bg,#243229);--d-sage:var(--mgd-sage,#b0cc90);--d-sage-bg:var(--mgd-sage-bg,#2c3126);--d-sand:var(--mgd-sand,#dcc68c);--d-sand-bg:var(--mgd-sand-bg,#332f25);--d-rose:var(--mgd-rose,#e6a6b0);--d-rose-bg:var(--mgd-rose-bg,#362a2c)}}
+.mgd text{font-family:Onest,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--d-text)}
+.mgd .bg{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .card{fill:var(--d-box);stroke:var(--d-line)}
+.mgd .pill{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .h{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.mgd .t{font-size:13px;font-weight:700}
+.mgd .s{font-size:13px;fill:var(--d-muted)}
+.mgd .m{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;fill:var(--d-muted)}
+.mgd .lav{--t:var(--d-lav);--tb:var(--d-lav-bg)}
+.mgd .sky{--t:var(--d-sky);--tb:var(--d-sky-bg)}
+.mgd .mint{--t:var(--d-mint);--tb:var(--d-mint-bg)}
+.mgd .sage{--t:var(--d-sage);--tb:var(--d-sage-bg)}
+.mgd .sand{--t:var(--d-sand);--tb:var(--d-sand-bg)}
+.mgd .rose{--t:var(--d-rose);--tb:var(--d-rose-bg)}
+.mgd .grey{--t:var(--d-muted);--tb:var(--d-line)}
+.mgd .chip{fill:var(--tb)}
+.mgd .ico{fill:none;stroke:var(--t);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .edge{fill:var(--tb);stroke:var(--t);stroke-opacity:.45}
+.mgd .flow{fill:none;stroke:var(--t);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .wide{stroke-width:3}
+.mgd .dash{stroke-dasharray:5 5}
+.mgd .head{fill:var(--t)}
+.mgd .badge{fill:var(--t)}
+.mgd .bn{font-size:11px;font-weight:800;fill:var(--d-bg);text-anchor:middle}
+.mgd .tt{fill:var(--t)}
+.mgd .rule{stroke:var(--d-line)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="719" height="477" rx="16"/>
+<rect class="card" x="24" y="32" width="132" height="112" rx="14"/>
+<g class="lav"><rect class="chip" x="36" y="44" width="24" height="24" rx="7"/><svg x="41" y="49" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M8 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 12l9-9M16 7l3 3M14 9l2 2"/></svg></g>
+<text class="t" x="70" y="61">Ключ релиза</text>
+<text class="s" x="36" y="90">Ed25519; закрытая</text>
+<text class="s" x="36" y="106">половина хранится</text>
+<text class="s" x="36" y="122">офлайн</text>
+<rect class="card" x="204" y="32" width="132" height="112" rx="14"/>
+<g class="sand"><rect class="chip" x="216" y="44" width="24" height="24" rx="7"/><svg x="221" y="49" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5"/></svg></g>
+<text class="t" x="250" y="61">Релиз</text>
+<text class="s" x="216" y="90">пакет нод и</text>
+<text class="s" x="216" y="106">манифест панели,</text>
+<text class="s" x="216" y="122">оба с подписью</text>
+<rect class="card" x="384" y="32" width="132" height="112" rx="14"/>
+<g class="sky"><rect class="chip" x="396" y="44" width="24" height="24" rx="7"/><svg x="401" y="49" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg></g>
+<text class="t" x="430" y="61">Панель</text>
+<text class="s" x="396" y="90">только курьер:</text>
+<text class="s" x="396" y="106">передаёт то, что</text>
+<text class="s" x="396" y="122">подписано</text>
+<rect class="card" x="564" y="32" width="132" height="112" rx="14"/>
+<g class="mint"><rect class="chip" x="576" y="44" width="24" height="24" rx="7"/><svg x="581" y="49" width="14" height="14" viewBox="0 0 24 24"><path class="ico" d="M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01"/></svg></g>
+<text class="t" x="610" y="61">Агент ноды</text>
+<text class="s" x="576" y="90">всё проверяет</text>
+<text class="s" x="576" y="106">сам, и только</text>
+<text class="s" x="576" y="122">потом ставит</text>
+<g class="lav"><path class="flow " d="M156 88L197 88"/><path class="head" d="M204 88l-8 -4.5v9z"/></g>
+<g class="sand"><path class="flow " d="M336 88L377 88"/><path class="head" d="M384 88l-8 -4.5v9z"/></g>
+<g class="sky"><path class="flow " d="M516 88L557 88"/><path class="head" d="M564 88l-8 -4.5v9z"/></g>
+<rect class="card" x="24" y="176" width="672" height="168" rx="16"/>
+<g class="mint"><rect class="chip" x="40" y="192" width="26" height="26" rx="7"/><svg x="45" y="197" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3zM9 12l2.2 2.2L15.5 10"/></svg></g>
+<text class="h" x="76" y="210">Что проверяет агент, по порядку</text>
+<rect class="pill" x="40" y="234" width="118" height="54" rx="11"/>
+<g class="mint"><circle class="badge" cx="58" cy="261" r="10"/><text class="bn" x="58" y="265">1</text></g>
+<text class="t" x="74" y="258">Подпись</text>
+<text class="s" x="74" y="276">вшитый ключ</text>
+<rect class="pill" x="170" y="234" width="118" height="54" rx="11"/>
+<g class="mint"><circle class="badge" cx="188" cy="261" r="10"/><text class="bn" x="188" y="265">2</text></g>
+<text class="t" x="204" y="258">Формат</text>
+<text class="s" x="204" y="276">известный</text>
+<rect class="pill" x="300" y="234" width="118" height="54" rx="11"/>
+<g class="mint"><circle class="badge" cx="318" cy="261" r="10"/><text class="bn" x="318" y="265">3</text></g>
+<text class="t" x="334" y="258">Срок</text>
+<text class="s" x="334" y="276">не истёк</text>
+<rect class="pill" x="430" y="234" width="118" height="54" rx="11"/>
+<g class="mint"><circle class="badge" cx="448" cy="261" r="10"/><text class="bn" x="448" y="265">4</text></g>
+<text class="t" x="464" y="258">Новее</text>
+<text class="s" x="464" y="276">него самого</text>
+<rect class="pill" x="560" y="234" width="118" height="54" rx="11"/>
+<g class="mint"><circle class="badge" cx="578" cy="261" r="10"/><text class="bn" x="578" y="265">5</text></g>
+<text class="t" x="594" y="258">Файл</text>
+<text class="s" x="594" y="276">под его ОС</text>
+<text class="s" x="40" y="316">Затем размер и SHA-256 скачанного сверяются с подписанным манифестом.</text>
+<text class="s" x="40" y="333">При любой ошибке установленный бинарник не трогается.</text>
+<line class="rule" x1="24" y1="372" x2="696" y2="372"/>
+<g class="lav"><circle class="badge" cx="34" cy="402" r="10"/><text class="bn" x="34" y="406">1</text></g>
+<text class="s" x="54" y="407">Взломанная панель не заставит ноду запустить код,</text>
+<text class="s" x="54" y="425">который не подписан ключом релиза.</text>
+<g class="sky"><circle class="badge" cx="382" cy="402" r="10"/><text class="bn" x="382" y="406">2</text></g>
+<text class="s" x="402" y="407">Манифест панели подписан в своём контексте,</text>
+<text class="s" x="402" y="425">поэтому нода не примет его за своё обновление.</text>
+</svg>

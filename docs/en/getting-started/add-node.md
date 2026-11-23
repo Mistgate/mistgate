@@ -3,6 +3,8 @@ title: Add a node
 description: Choose between the SSH installation and the manual install, enroll a server with a one-time command, watch it come online, and remove it cleanly later.
 ---
 
+![A New node window: the server's address, then the login, the checks and the install steps one after another until the node is connected](../../images/readme/addnode-dark-en.webp)
+
 A node joins the fleet when its agent gets a certificate from the panel, installs itself as a systemd service and connects. **Nodes → Add node** offers two ways:
 
 | Way | What you do | When to pick it |

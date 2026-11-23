@@ -3,6 +3,8 @@ title: Health
 description: How the panel checks every profile as a real client, what the node doctor looks at and can fix, and how alerts open, close and stay quiet.
 ---
 
+![The client-eye checks table: nodes against protocols with the delay through each tunnel, and a failing node opened to show why](../../images/readme/health-dark-en.webp)
+
 Mistgate watches the fleet from two sides. The panel connects to every profile on every node the way a client app does (client-eye checks), and the agent on every node checks its own host (the node doctor). Alerts are derived from both and from the state of the nodes. Everything is on the **Health** page, in the tabs **Alerts**, **Checks** and **Doctor**; the node page has its own **Doctor** tab and shows the checks of that node on its **Overview** tab.
 
 ![Health: the folded alerts, the doctor's one-click fix and the check turning green](../../images/video/health-poster-en.webp)
@@ -136,6 +138,8 @@ A green cell means that, within the last few minutes, a client from the panel's 
 ## Country check
 
 Whether the nodes open from inside a country (Russia by default) is checked by Globalping, the block lists, the TSPU probe, cheburcheck and bsbord, and has a section of its own in the admin, **Reachability**: see [Reachability](reachability.md). Here, **Health → Checks** shows the verdict as its last column, *From Russia*, and the node page as a row.
+
+![Two points of view on a node](../diagrams/two-views.svg)
 
 ## Node doctor
 

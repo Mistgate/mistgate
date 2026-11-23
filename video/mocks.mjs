@@ -29,6 +29,10 @@ const fleet = [
   ["nod_nl1", "nl1", "NL", "203.0.113.41", { hysteria2: 1 }, 38, 7],
   ["nod_msk1", "msk1", "RU", "198.51.100.20", { "vless-reality": 1 }, 17, 4],
 ];
+// the panel's public SSH key (an invented one: the body is not a real key)
+const PANEL_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFd2Qm9vYm9nYXRlZGVtb2tleTAwMDAwMDAwMDAwMDAw mistgate-panel";
+// a made-up 41-module QR code with a hole for the logo (web/src/lib/qr-demo.ts): it encodes nothing anyone should scan
+const QR_BITS = "/s4oHz/BIHyNEG6wvQ6rt1eSC+XboUChIuwXP1vpB/qqqqr+Aa5hLABXufbw9pQFgiVzVMTo2keHIsd/BWS2mUbeRmgUeaKyH8wFcKrTlKLdUFoveD2VQFIYgBnXyOcwkjqPXJviHvoT8ud8h17iNT9qVTGkDZOdErQG/5zAzfCAPoRAqjfknOO+Lq38rdscvbWLzBOrkUaDtqoUnhBSKfM1OZurhrpC+4BbojHE/6Y0mSpQUuyakeuizcKP1dafAydO6SvmiDcFWlTLov4xcgf9AA==";
 const SG = ["nod_sg1", "sg1", "SG", "203.0.113.50", {}, 0, 2];
 
 // the protocols' settings schemas, read from this worktree's Go sources: the forms are the real ones
@@ -80,7 +84,7 @@ export function world(lang = "en") {
     ev(6, 9 * H, "cert_renewed", { node: "nod_de1", nodeName: "de1" }),
   ];
   const overview = () => ({
-    nowUnix: NOW, nodesTotal: rows().length, nodesProblem: 0, usersOnline: 6, nodes: rows().map(card), traffic: series(14 * GB), online: series(8).map((p) => ({ ...p, values: p.values.map((v) => ({ ...v, value: Math.max(1, Math.round(v.value)) })) })),
+    nowUnix: NOW, nodesTotal: rows().length, nodesProblem: 0, usersOnline: 3, nodes: rows().map(card), traffic: series(14 * GB), online: series(8).map((p) => ({ ...p, values: p.values.map((v) => ({ ...v, value: Math.max(1, Math.round(v.value)) })) })),
     events: events(), topConsumers: [
       { userId: "usr_alice", userName: "alice", nodeId: "nod_de1", nodeName: "de1", downBps: 31e6 },
       { userId: "usr_bob", userName: "bob", nodeId: "nod_nl1", nodeName: "nl1", downBps: 12e6 },
@@ -89,7 +93,7 @@ export function world(lang = "en") {
   });
 
   // ---- the SSH install of sg1: the job walks its phases one poll at a time ----
-  const phases = ["connecting", "preflight", "firewall", "transfer", "install", "waiting_node"];
+  const phases = ["connecting", "preflight", "firewall", "transfer", "enrollment", "install", "waiting_node"];
   const job = () => {
     const i = state.provisionCalls++;
     const done = i >= phases.length;
@@ -137,6 +141,24 @@ export function world(lang = "en") {
         item("disk_space"), item("time_sync"), item("memory_pressure"), item("security_updates"),
         r[1] === "de1" && !state.journalFixed ? item("journald_size", "DOCTOR_STATUS_WARN", { params: { journal_mb: "3870", cap_mb: "500" }, whyKey: "health.doctor.journald_size.why", fixId: "journald_vacuum" }) : item("journald_size"),
       ],
+    })),
+  });
+
+  // ---- the panel's own tunnel checks: two profiles, a day of half-hour rounds per node (a couple of slow hours on nl1) ----
+  const checkColumns = [{ profileId: "prf_vr", profileName: "VLESS · Reality", protocol: "vless" }, { profileId: "prf_hy", profileName: "Hysteria2", protocol: "hysteria2" }];
+  const checkCell = (nodeId, col, ms, deployed = true) => {
+    const history = Array.from({ length: 48 }, (_, i) => {
+      const startUnix = NOW - NOW % 1800 - (47 - i) * 1800;
+      const slow = nodeId === "nod_nl1" && col === 1 && i >= 20 && i < 24;
+      return { startUnix, ok: deployed ? (slow ? 4 : 6) : 0, failed: deployed && slow ? 2 : 0, latencyMs: Math.round(ms * (1 + 0.15 * Math.sin(i / 4 + nodeId.length))) };
+    });
+    return { deployed, inboundId: deployed ? `inb_${nodeId.slice(4)}_${col}` : "", last: deployed ? { status: "CHECK_STATUS_OK", atUnix: NOW - 90, latencyMs: ms, exitIp: "", exitCountry: "" } : undefined, failStreak: 0, history: deployed ? history : [], latencyHourMs: ms, responseHourMs: ms, connectHourMs: Math.round(ms * 0.6) };
+  };
+  const checks = () => ({
+    nowUnix: NOW, intervalS: 300, columns: checkColumns, countryChecks: [],
+    rows: rows().filter((r) => r[0] !== "nod_sg1" || (state.sg1 === "online" && state.sg1Profile)).map((r) => ({
+      nodeId: r[0], nodeName: r[1], countryCode: r[2], nodeStatus: "NODE_STATUS_ONLINE",
+      cells: [checkCell(r[0], 0, 80 + r[1].length * 9), checkCell(r[0], 1, 96 + r[1].length * 7, r[0] !== "nod_sg1" && r[0] !== "nod_fi1" && r[0] !== "nod_msk1")],
     })),
   });
 
@@ -207,10 +229,17 @@ export function world(lang = "en") {
       return { group: g };
     },
     "ProvisioningService/GetSSHFingerprint": (b) => ({ host: b.host, port: b.port, fingerprint: "SHA256:Qm4Vw7dJx2kR9tYc1fHn8sLp3aZe6uBg0iXo5NvK2Ws", algorithm: "ssh-ed25519" }),
-    "ProvisioningService/CheckSSH": { preflight: { distribution: "Debian", version: "13", kernel: "6.12.48", architecture: "amd64", cpuCount: 2, memoryBytes: 4 * GB, diskAvailableBytes: 36 * GB, systemd: true, alreadyEnrolled: false, panelReachable: true } },
+    "ProvisioningService/CheckSSH": { preflight: { distribution: "Debian", version: "13", kernel: "6.12.48", architecture: "amd64", cpuCount: 2, memoryBytes: 4 * GB, diskAvailableBytes: 36 * GB, systemd: true, nftables: true, alreadyEnrolled: false, panelReachable: true } },
     "ProvisioningService/StartNodeProvision": () => ((state.sg1 = "pending"), { job: { id: "job_sg1", nodeId: "nod_sg1", name: "sg1", sshHost: "203.0.113.50", sshPort: 22, state: "queued", phase: "queued", errorCode: "", createdUnix: NOW, updatedUnix: NOW } }),
     "ProvisioningService/GetNodeProvision": job,
+    "ProvisioningService/GetPanelSSHKey": { publicKey: PANEL_KEY, fingerprint: "SHA256:Zk3dT8mQ1vN6xYw0Lr4Pc9BsHe2UjAo7GiXf5KtVn1E" },
+    "ProvisioningService/ListNodeServerAccess": { access: [{ nodeId: "nod_de1", nodeName: "de1", host: "203.0.113.7", port: 22, username: "root", fingerprint: "", panelKeyFingerprint: "SHA256:Zk3dT8mQ1vN6xYw0Lr4Pc9BsHe2UjAo7GiXf5KtVn1E", configuredUnix: String(NOW - 60 * DAY) }] },
+    "AssistantService/GetAssistantAccess": { available: false, reason: "", choices: [] },
     "ProvisioningService/ListNodeProvisions": { jobs: [] },
+    "ProvisioningService/ListNodeProvisionEvents": { events: [] },
+    "ProbeService/NodeSniScan": {},
+    "ClientApiService/GetClientApi": {},
+    "InstanceService/EncodeQr": { qr: { n: 41, bits: QR_BITS, window: 9.98 } },
     "ApprovalService/ListApprovals": { approvals: [], awaiting: 0, nowUnix: NOW },
     "UserService/ListUsers": () => {
       const list = people.filter((p) => state.carol || p[1] !== "carol").map(user);
@@ -234,7 +263,7 @@ export function world(lang = "en") {
       state.journalFixed = true;
       return { applied: true, affected: 1, error: "", resultParams: { freed_mb: "3370" } };
     },
-    "HealthService/GetChecks": { nowUnix: NOW, intervalS: 300, columns: [], rows: [], countryChecks: [] },
+    "HealthService/GetChecks": checks,
     "CountryReachabilityService/GetCountryReachability": { settings: { country: "RU" } },
     "RelayService/ListRelays": { relays: [] },
     "ProfileService/ListProtocols": () => ({ protocols: protocols() }),

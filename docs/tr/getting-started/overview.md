@@ -23,7 +23,7 @@ Mistgate, kendi sunucularınızda yönettiğiniz küçük bir VPN filosu için k
 
 - **Bir VPN hizmeti değil.** Sunucuları ve alan adlarını siz getirir, her şeyi siz işletirsiniz. Mistgate sunucu kiralamaz ve erişim satmaz.
 - **Bir faturalama sistemi değil.** Ödeme, tarife ya da fatura yoktur. Trafik kotaları, süreler ve cihaz sınırları kendi koyduğunuz sınırlardır.
-- **Bir istemci uygulaması değil.** İnsanlar mevcut uygulamalarla bağlanır: Happ gibi bir abonelik uygulaması, ya da mihomo çekirdeğini kullanan kl!ck (Windows ve macOS'ta önerilir), Clash Verge veya FlClash gibi bir uygulama; AmneziaWG anahtarları için AmneziaVPN. Kendi uygulamamız **Planlanıyor**.
+- **Bir istemci uygulaması değil.** İnsanlar mevcut uygulamalarla bağlanır: Happ gibi bir abonelik uygulaması, ya da mihomo çekirdeğini kullanan kl!ck (Windows ve macOS'ta önerilir), Clash Verge veya FlClash gibi bir uygulama; AmneziaWG anahtarları için AmneziaVPN. Kendi uygulamamız, Windows için [Mistgate](https://github.com/Mistgate/mistgate-client), ayrı bir projedir: bu panellerle ve düz abonelik bağlantılarıyla çalışır.
 - **Bitmiş bir ürün değil.** Bu erken bir sürüm: API, saklanan ayarlar ve düğüm protokolü 1.0'dan önce hâlâ değişebilir. Veri modeli yaklaşık 5000 kullanıcı ve 50 düğüme göre boyutlandırılmıştır.
 - **Tek tıkla kurulan bir yükleyici değil.** Paneli kendi sunucunuza [tek bir komutla](install-panel.md) kurarsınız ya da elle: bir GitHub sürümünün Linux ikili dosyalarından ya da kaynaktan derlenmiş olarak; sunucuyu ve alan adını siz getirirsiniz, sahip hesabını tarayıcıda oluşturursunuz. Düğüm yönetim panelinden eklenir, ya SSH ile otomatik olarak ya da sunucuda çalıştıracağınız tek kullanımlık bir kurulum komutuyla.
 

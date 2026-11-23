@@ -1,0 +1,790 @@
+<!DOCTYPE html><html lang="en-GB"><head><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; font-src data:; style-src &#39;unsafe-inline&#39;; form-action &#39;none&#39;"/>
+<meta charset="utf-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+<title>Fieldwrangle | Overview</title>
+<meta name="description" content="Fieldwrangle selects, sorts, joins and cleans CSV files from the command line."/>
+    <meta name="theme-color" content="#fbfaf7"/>
+   <meta name="color-scheme" content="light dark"/>
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTEyIDhoMjR2NDhIMTJ6IiBmaWxsPSIjYzI0MTBjIi8+PHBhdGggZD0iTTQyIDhoMTUgdjQ4aC0xMyB6IiBmaWxsPSIjM2E0ZjI3Ii8+PC9zdmc+"/>
+
+<style>:root{
+  color-scheme:light dark; --bg:#fbfaf7;--band:#f2f1ee;
+	--sf:#ffffff;--sf2:#eae9e6;
+  --fg:#1c1917;--mu:#666361;
+	--ln:#e0dfdc;--ln2:#c5c4c1;
+  --ac:#c2410c;--ai:#ffffff;
+	--a2:#3a4f27;--so:#f4e4db;--ok:#238557;
+	--wa:#a3660a;
+	--bd:#b82d23;
+  --oks:#ddeae1;
+  --was:#efe5d6;
+	--bds:#f2ddd9;
+	--r:14px; --rs:7px;--rb:17px; --bw:1px; --w:1422px;
+  --wt:693px; --s:calc(8px*1.04); --sec:75px;
+	--gut:21px;--fb:system-ui,-apple-system, "Segoe UI",
+Roboto, "Helvetica Neue", Arial,
+sans-serif;
+--fh:Cambria,Georgia, "Times New Roman", "DejaVu Serif", serif; --fl:system-ui,-apple-system, "Segoe UI",Roboto, "Helvetica Neue", Arial,sans-serif;
+  --fm:ui-monospace,  SFMono-Regular,Menlo,
+Consolas,  "Liberation Mono",
+monospace;
+  --fwh:700;--lsh:-.02em;--lhh:1.1;--ttl:none;
+--lsl:.06em;
+--fsl:.78rem;
+--t0:17px;
+--t1:21.3px;
+--t2:26.7px;--t3:clamp(23px,
+2.32vw,  33.4px);--t4:clamp(23px,
+2.91vw,41.9px);
+--t5:clamp(26.3px, 3.65vw,
+52.5px);
+  --ts:12.1px;--sh:none}
+@media (prefers-color-scheme:dark){
+	:root{--bg:#161412;
+	--band:#1d1b19;--sf:#211f1c;--sf2:#292724;--fg:#ece7dd;
+--mu:#99958e;--ln:#34322e; --ln2:#524f4b; --ac:#fb923c;
+--ai:#0b0b10;
+  --a2:#a7c58a;
+	--so:#3b2819;--ok:#54c993;
+--wa:#f0a638; --bd:#e7685f; --oks:#22382c;--was:#42311a;--bds:#402521}}
+*,
+*::before, *::after{
+	box-sizing:border-box}
+[hidden]{
+	display:none!important}
+html{
+	-webkit-text-size-adjust:100%}
+body{
+	margin:0;min-height:100vh;display:flex;
+flex-direction:column; background:var(--bg);color:var(--fg);
+  font:17px/1.66 var(--fb);
+-webkit-font-smoothing:antialiased}
+main{
+flex:1}
+h1,
+h2, h3,
+h4{
+	font-family:var(--fh);font-weight:var(--fwh);line-height:var(--lhh);margin:0 0 .5em; letter-spacing:var(--lsh)}
+h1{
+	font-size:clamp(1.75rem,4.4vw, 2.6rem)}
+h2{
+	font-size:clamp(1.3rem,  3vw,1.7rem)}
+h3{
+font-size:1.12rem}
+p{margin:0 0 1em}
+ul, ol{
+margin:0 0 1em;padding-left:1.25em}
+a{color:var(--ac)}
+img,svg{
+	max-width:100%}
+code,pre,kbd{font-family:var(--fm);
+font-size:.92em}
+pre{ margin:0 0 1em;
+padding:14px 16px;
+  overflow-x:auto;background:var(--sf);color:var(--fg);
+border:1px solid var(--ln);
+  border-radius:var(--rs);line-height:1.55}
+pre code{ font-size:inherit}
+.jlfb62{width:100%;max-width:var(--w);margin:0 auto;
+padding-left:var(--gut);padding-right:var(--gut)}
+.gmg67{ color:var(--mu)}
+.ddamg26{ width:1.25em;
+	height:1.25em;
+flex:none; vertical-align:-.25em;fill:none;stroke:currentColor; stroke-width:1.9;stroke-linecap:round; stroke-linejoin:round}
+.hfyr56{display:block;
+	width:100%; height:100%}
+.gaeew29{
+  width:28px;height:28px;
+	flex:none}
+.vnvm42{ display:none}
+.frpk56{
+  display:flex;
+	align-items:center;
+justify-content:center; width:44px;height:44px;
+margin-right:-8px;list-style:none;cursor:pointer;color:var(--fg); border-radius:var(--rs)}
+.frpk56::-webkit-details-marker{
+	display:none}
+.frpk56 .ddamg26{
+width:26px;
+	height:26px}
+.vnvm42 .frpk56 .ddamg26:nth-child(2),.vnvm42[open] .frpk56 .ddamg26:nth-child(1){ display:none}
+.vnvm42[open] .frpk56 .ddamg26:nth-child(2){
+display:inline-block}
+.ujma51{position:absolute;left:0; right:0;
+	top:100%;
+	z-index:5;display:flex;flex-direction:column;padding:6px var(--gut) 14px;
+  background:var(--sf);
+border-bottom:1px solid var(--ln);box-shadow:0 14px 24px rgba(0,0, 0,.12)}
+.ujma51 a{
+padding:12px 2px;
+  color:var(--fg);
+  text-decoration:none;border-bottom:1px solid var(--ln);font-size:1.05rem}
+.ujma51 a[aria-current]{
+	color:var(--ac);font-weight:600}
+.ujma51 a:last-child{
+border-bottom:0}
+@media (max-width:720px){ .ovhgd41{display:none} .vnvm42{
+  display:block}
+.ztlp80{
+  flex-wrap:nowrap}
+  }
+.tupb22{display:grid;
+grid-template-columns:minmax(0,
+1fr) 230px;
+	gap:var(--sec) 56px;
+padding-top:48px;
+	align-items:start}
+.bdhst13{
+max-width:var(--wt)}
+.bdhst13 h2{margin-top:1.8em;
+  scroll-margin-top:24px}
+.myi51{position:sticky; top:24px;padding:18px 20px;border:1px solid var(--ln);border-radius:var(--r);background:var(--sf);
+  font-size:.92rem}
+.myi51 h2{margin:0 0 10px; color:var(--mu);font:700 .78rem var(--fb); letter-spacing:.07em;
+  text-transform:uppercase}
+.myi51 ol{margin:0;padding:0;
+	list-style:none; counter-reset:t}
+.myi51 li{counter-increment:t; padding:5px 0 5px 22px;
+	position:relative}
+.myi51 li::before{content:counter(t);position:absolute; left:0;color:var(--mu);
+font-variant-numeric:tabular-nums}
+.myi51 a{color:var(--fg);
+text-decoration:none}
+.myi51 a:hover{
+	color:var(--ac)}
+.mqt48{
+display:grid;
+grid-template-columns:1fr 1fr;
+	gap:40px;
+align-items:center;padding-top:72px;
+padding-bottom:24px}
+.gdrwv65{margin:0 0 .1em;color:var(--ac);
+	font:var(--fwh) clamp(5rem,16vw,11rem)/.9 var(--fh); letter-spacing:var(--lsh)}
+.fih15{
+  border-radius:var(--rb);
+	overflow:hidden;
+	aspect-ratio:4/3;
+background:var(--band)}
+.afc17{
+margin:0 0 28px; border:1px solid var(--ln);
+border-radius:var(--r); overflow:hidden;
+  background:var(--band)}
+.afc17 figcaption{ padding:12px 16px;
+	background:var(--sf);
+	border-top:1px solid var(--ln)}
+.gwgmb19{
+  display:flex;flex-direction:column;gap:6px;
+	margin-bottom:14px}
+.gwgmb19 label{
+  font-size:.92rem; font-weight:600}
+.gwgmb19 input,.gwgmb19 textarea{width:100%;
+  padding:.65em .8em;
+	border:1px solid var(--ln);
+  border-radius:var(--rs); background:var(--sf);
+  color:var(--fg);font:inherit}
+.gwgmb19 textarea{ resize:vertical}
+.gwgmb19 input:focus, .gwgmb19 textarea:focus{
+	outline:2px solid var(--ac);
+outline-offset:1px}
+.yynpl63{
+	max-width:520px}
+.xira27{
+margin:0 0 14px; color:var(--bd)}
+@media (max-width:720px){.tupb22{
+  grid-template-columns:1fr;padding-top:28px}.myi51{position:static;
+order:-1}
+  .mqt48{grid-template-columns:1fr; padding-top:36px;
+  gap:24px} }
+@media (max-width:560px){.ztlp80{
+padding-top:12px;padding-bottom:10px}
+	}
+.amdqw11{
+display:block;
+width:100%;height:auto}
+.bkl24{
+  fill:none;
+stroke:var(--ac);stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.ixih24{ fill:var(--ac);opacity:.14}
+.drt49{
+	fill:none; stroke:var(--ln);stroke-width:1;
+	vector-effect:non-scaling-stroke}
+.etxp71{fill:var(--ac);
+opacity:.38}
+.pzrp95{
+  fill:var(--ac)}
+.zbzg19,.aur36, .fwu16, .xgyty32{
+	display:block;
+  width:100%;height:auto}
+.bcsy60{
+fill:var(--sf2)}
+.ryoru77{
+	fill:var(--wa)}
+.blksz31{
+fill:var(--bd)}
+.iigc3{
+	fill:var(--ac)}
+.epon50{fill:var(--a2)}
+.xqcg7{ fill:var(--fg)}
+.kden22{ fill:var(--mu)}
+.tzqil92{
+fill:var(--band)}
+.dgtuj44{fill:var(--sf2);stroke:var(--sf2);stroke-width:6;
+	stroke-linejoin:round}
+.rwf74{
+	fill:var(--oks);
+  stroke:var(--oks);stroke-width:6;
+  stroke-linejoin:round}
+.gono48{
+fill:var(--ok);
+opacity:.55}
+.cjhjv1{fill:none;stroke:var(--so);stroke-width:16;
+  stroke-linecap:round}
+.sfdjm10{ fill:none;
+  stroke:var(--ln);stroke-width:7}
+.buke82{ fill:none;stroke:var(--ln2);
+	stroke-width:12}
+.dmls80{fill:var(--mu);font-family:var(--fb);
+	paint-order:stroke;stroke:var(--sf); stroke-width:3}
+.suli70{ fill:var(--ac);opacity:.18}
+.tjb28{fill:var(--ac)}
+.llveq38{
+  fill:var(--ai)}
+.ror4{
+  fill:var(--fg)}
+.ubvr76{fill:none;stroke:var(--bg);
+  stroke-width:1.2; stroke-dasharray:2 5;opacity:.7}
+.dzxek14{ fill:var(--bg);font-family:var(--fh);
+font-weight:700; text-transform:uppercase}
+.ijsb98{ fill:var(--a2)}
+.ybcic31{ color:var(--mu)}
+.eegdh96{
+color:var(--ok)}
+.sojo78{
+	color:var(--wa)}
+.gcg38{color:var(--a2)}
+.hpxta85{
+  color:var(--ac)}
+.myiym59{color:var(--mu); user-select:none}
+.wge44{
+font-weight:600}
+
+pre, code{
+	font-family:var(--fm)}
+a{color:inherit;text-decoration:none}
+.wqgl6{ font-family:var(--fm)}
+.axd10{position:sticky;top:0;z-index:3;
+  background:var(--bg);border-bottom:var(--bw) solid var(--ln)}
+.wuqp14{
+position:relative; max-width:var(--w);margin:0 auto;
+	height:64px;
+  display:flex; align-items:center;
+gap:24px;
+  padding:0 clamp(16px, 2.4vw,
+32px)}
+.cptl38{display:flex;
+	align-items:center;
+  gap:10px; font:750 1.2rem var(--fh);
+letter-spacing:var(--lsh);width:236px;
+	min-width:0}
+.mappq86{ flex:none;
+  display:grid;
+place-items:center; width:28px;
+  height:28px;
+border-radius:var(--rs); background:var(--ac);
+color:var(--ai);font:750 .95rem var(--fh);
+font-style:normal; letter-spacing:0}
+.cptl38 span{ min-width:0;
+  overflow-wrap:anywhere}
+.whr34{
+font:.82rem var(--fm);
+  border:1px solid var(--ln2);
+	border-radius:99px;
+	padding:3px 12px;color:var(--mu);background:var(--sf);
+  white-space:nowrap}
+.gqcsz27{
+margin-left:auto;
+  display:flex;gap:6px; font-size:.94rem}
+.gqcsz27 a{
+padding:7px 12px;
+border-radius:var(--rs);
+color:var(--mu)}
+.gqcsz27 a:hover{color:var(--fg)}
+.gqcsz27 a[aria-current]{
+	color:var(--fg);
+  background:var(--sf2)}
+.vnvm42{margin-left:auto}
+.ujma51{
+background:var(--bg)}
+.nltf61{ max-width:var(--w); margin:0 auto; display:grid;grid-template-columns:236px minmax(0, 1fr) 220px;grid-template-areas:"side main toc";gap:clamp(20px,3.4vw, 56px);
+	padding:0 clamp(16px,
+2.4vw,  32px)}
+.eeg94{grid-area:side;
+	position:sticky;
+top:64px;align-self:start;
+	padding:32px 0; font-size:.94rem}
+.eeg94 h6, .ixlji7 h6{ margin:0 0 10px;
+font:650 .74rem var(--fb); letter-spacing:.1em;text-transform:uppercase;color:var(--mu)}
+.eeg94 a{
+  display:block;
+padding:7px 12px;
+border-radius:var(--rs);
+	color:var(--fg);
+  margin-bottom:2px;overflow-wrap:anywhere}
+.eeg94 a:hover{background:var(--sf2)}
+.eeg94 a[aria-current]{
+  background:var(--so);
+color:var(--ac);color:color-mix(in srgb, var(--ac) 72%, var(--fg)); font-weight:650}
+.hnwp69{margin-bottom:28px}
+.hbeg62{
+	grid-area:main;
+padding:48px 0 32px;
+min-width:0}
+.anbv83{font:.84rem var(--fm);color:var(--mu);margin-bottom:20px;
+overflow-wrap:anywhere}
+.hbeg62 h1{
+  font-size:var(--t5);line-height:1.02; margin:0 0 12px;overflow-wrap:anywhere}
+.wik55{ font-size:var(--t2); color:var(--ac); color:color-mix(in srgb, var(--ac) 72%,var(--fg));margin:0 0 24px;
+font-weight:500}
+.eecwj26{
+font:400 1.22rem/1.65 var(--fh);color:var(--fg); margin:0 0 36px;
+  max-width:36em;
+	letter-spacing:0}
+.hbeg62 h2{ font-size:var(--t3);
+margin:64px 0 16px; scroll-margin-top:80px; display:flex; align-items:baseline;
+gap:12px}
+.hbeg62 h2::before{
+content:"#";color:var(--ln2);
+	font-weight:500}
+.hbeg62 h3{ font-size:1.25rem; margin:32px 0 6px}
+.hbeg62 p{ margin:0 0 16px;
+	font-size:1.06rem;
+line-height:1.7; max-width:46em}
+.thf50{
+display:grid;
+  grid-template-columns:1fr 1fr; gap:20px}
+.thf50>*{min-width:0}
+.spt51{
+	display:flex;
+justify-content:space-between;align-items:center;
+	gap:12px;
+	background:var(--cb2); color:var(--cm);border-radius:var(--r) var(--r) 0 0;
+padding:8px 20px;
+font:.8rem var(--fm);
+  margin-top:20px}
+.thf50 .spt51{margin-top:0}
+pre.hdalu59{
+  margin:0 0 20px;
+padding:20px 24px;
+border:0;border-radius:var(--r);
+  background:var(--cb);
+	color:var(--ct);
+	font-size:.9rem; line-height:1.7; overflow:auto}
+.thf50 pre.hdalu59{ margin:0}
+.spt51+pre.hdalu59{margin-top:0;border-radius:0 0 var(--r) var(--r)}
+.nltf61,.xll61{ --cb:var(--fg);
+  --ct:var(--bg);
+  --cb2:color-mix(in srgb,  var(--fg) 88%,var(--bg)); --cm:color-mix(in srgb, var(--bg) 60%, var(--fg)); --cc:color-mix(in srgb, var(--bg) 48%, var(--fg));
+  --cf:color-mix(in srgb,
+var(--ac) 62%,var(--bg));--cs:color-mix(in srgb, var(--ok) 62%, var(--bg));--cn:color-mix(in srgb,
+var(--a2) 55%,var(--bg))}
+@media (prefers-color-scheme:dark){ .nltf61,.xll61{--cb:var(--sf2);
+	--ct:var(--fg);
+  --cb2:var(--sf);
+--cm:var(--mu);
+--cc:var(--mu);
+	--cf:var(--ac);--cs:var(--ok);
+	--cn:var(--a2)}
+  }
+.hdalu59 .ybcic31, .hdalu59 .myiym59{color:var(--cc)}
+.hdalu59 .sojo78{color:var(--cf)}
+.hdalu59 .wge44{color:var(--cn);
+  font-weight:400}
+.hdalu59 .eegdh96{ color:var(--cs)}
+.hdalu59 .hpxta85,.hdalu59 .gcg38{color:var(--cn)}
+.frqdm29{
+list-style:none;
+padding:0;margin:0;
+  display:grid;grid-template-columns:repeat(3,  minmax(0, 1fr));gap:16px}
+.frqdm29 li{background:var(--sf);
+	border:var(--bw) solid var(--ln);border-radius:var(--r);padding:20px;line-height:1.5;box-shadow:var(--sh)}
+.frqdm29 .ddamg26{display:block; width:26px;height:26px;
+  color:var(--ac);
+  margin-bottom:14px}
+.luxrz40{list-style:none;
+	padding:0;
+margin:0 0 24px;counter-reset:s}
+.luxrz40 li{
+counter-increment:s;display:flex; gap:16px; padding:10px 0;font-size:1.06rem;
+align-items:baseline}
+.luxrz40 li::before{
+  content:counter(s);flex:none;width:30px;height:30px;
+  border-radius:50%;
+	background:var(--so);color:var(--ac); color:color-mix(in srgb,var(--ac) 72%, var(--fg));
+  font:650 .9rem var(--fb);
+display:grid;place-items:center;
+	transform:translateY(4px)}
+.eejq81{background:var(--oks);border-radius:var(--r); padding:14px 18px;
+color:var(--fg); display:flex;gap:12px;
+align-items:center;
+margin-bottom:20px}
+.eejq81 .ddamg26{flex:none;
+  color:var(--ok);
+  width:22px;
+	height:22px}
+.gfx65{overflow-x:auto;
+	margin-bottom:24px}
+.gfx65 table{width:100%;
+border-collapse:collapse}
+.gfx65 th{ text-align:left;
+font:650 .74rem var(--fb);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+color:var(--mu);
+  padding:10px 14px;
+	border-bottom:2px solid var(--ln2)}
+.gfx65 td{padding:14px;border-bottom:1px solid var(--ln);
+vertical-align:top}
+.gfx65 td:first-child{
+  white-space:nowrap}
+.gfx65 td code{background:var(--so);
+border-radius:6px;
+  padding:2px 8px;font-size:.88rem; color:var(--ac);
+  color:color-mix(in srgb,  var(--ac) 72%,  var(--fg))}
+.fsf82 details{
+  border-bottom:1px solid var(--ln);
+	padding:4px 0}
+.fsf82 summary{
+  cursor:pointer;
+	list-style:none;
+	display:flex; justify-content:space-between;
+  gap:16px;
+  padding:16px 0;font:650 1.14rem var(--fb);letter-spacing:-.01em;
+scroll-margin-top:80px}
+.fsf82 summary::-webkit-details-marker{display:none}
+.fsf82 summary::after{content:"+";
+	color:var(--ac);
+font-weight:400;
+font-size:1.5rem;
+	line-height:1}
+.fsf82 details[open] summary::after{
+  content:"–"}
+.fsf82 p{
+	margin:0 0 14px}
+.jkx79{
+display:flex;
+	flex-wrap:wrap;
+	gap:8px;
+  font:.84rem var(--fm);margin:0 0 8px}
+.jkx79 span{ border:1px solid var(--ln2); border-radius:99px;
+padding:2px 12px;
+  color:var(--mu)}
+.ocvbc14{
+display:block;
+	margin-top:40px}
+.ver87{
+	display:block; font:.84rem var(--fm);color:var(--mu);margin:36px 0 -44px}
+.ocvbc14 .ver87:first-child{margin-top:0}
+.ocvbc14 h2{
+margin-top:56px}
+.tltfx24{
+	display:grid;grid-template-columns:1fr 1fr;
+	gap:16px;margin-top:56px}
+.tltfx24 a{
+  display:block;border:1px solid var(--ln2);background:var(--sf);border-radius:var(--r);
+	padding:18px 22px;
+	min-width:0}
+.tltfx24 a:hover{
+border-color:var(--ac)}
+.tltfx24 a:last-child{text-align:right}
+.tltfx24 a:only-child{
+  text-align:left}
+.wbrr51 a{grid-column:2;
+  text-align:right}
+.tltfx24 small{
+	display:block;
+color:var(--mu);
+  font-size:.8rem}
+.tltfx24 b{
+  font-size:1.2rem; letter-spacing:-.01em; overflow-wrap:anywhere}
+.ixlji7{
+	grid-area:toc;position:sticky; top:64px;
+align-self:start;padding:48px 0;
+	font-size:.9rem}
+.ixlji7>a{
+  display:block;
+  padding:5px 0 5px 14px;
+	color:var(--mu);border-left:2px solid var(--ln);
+overflow-wrap:anywhere}
+.ixlji7>a:hover{ color:var(--fg);border-color:var(--ac)}
+.alnk40{margin:32px 0 0;
+padding:16px;background:var(--sf);border:var(--bw) solid var(--ln);
+border-radius:var(--r);font-size:.88rem}
+.alnk40 h6{ margin:0 0 12px;
+font:650 .74rem var(--fb);letter-spacing:.1em;
+text-transform:uppercase;color:var(--mu)}
+.alnk40 dt{
+	color:var(--mu);
+	font-size:.78rem}
+.alnk40 dd{
+  margin:0 0 10px;
+  overflow-wrap:anywhere}
+.fih6{border-top:var(--bw) solid var(--ln);margin-top:40px;
+  background:var(--band)}
+.copbp38{
+	max-width:var(--w);margin:0 auto;
+padding:48px clamp(16px, 2.4vw, 32px) 28px}
+.wrfnj86{
+	display:grid;
+  grid-template-columns:1.6fr 1fr 1fr 1fr;
+gap:36px}
+.wrfnj86 h6{
+margin:0 0 12px;
+  font:650 .74rem var(--fb);
+  letter-spacing:.1em;text-transform:uppercase;color:var(--mu)}
+.wrfnj86 a,
+.wrfnj86 span{
+display:block;padding:3px 0;font-size:.94rem;overflow-wrap:anywhere}
+.wrfnj86 a:hover{
+  color:var(--ac)}
+.wrfnj86 a.cptl38{display:flex;width:auto;
+padding:0}
+.wrfnj86 p{
+  font-size:.94rem; color:var(--mu); margin:10px 0 0;max-width:22em}
+.wrfnj86 div{ min-width:0}
+.ukjqy30{ margin-top:32px;padding-top:18px;
+  border-top:1px solid var(--ln2);
+font-size:.88rem; color:var(--mu);
+display:flex;
+	justify-content:space-between;
+  gap:12px;flex-wrap:wrap}
+.ukjqy30 a:hover{ color:var(--ac)}
+.xll61{
+  max-width:var(--w);
+margin:0 auto;display:grid;
+	grid-template-columns:minmax(0, 1fr) minmax(0,.8fr); gap:clamp(20px,
+3.4vw, 56px);
+padding:0 clamp(16px,2.4vw,32px); align-items:center}
+.qulbx75{padding:64px 0}
+.hfqoa48{
+  font:var(--fwh) clamp(8rem,  24vw,22rem)/.8 var(--fh);
+  letter-spacing:var(--lsh); color:var(--so);text-align:center}
+.yjtcm70{display:inline-flex;align-items:center;
+	gap:8px;
+	padding:12px 20px;
+border-radius:var(--rs);
+	background:var(--ac);color:var(--ai);
+  font-weight:650}
+.yjtcm70 .ddamg26{
+width:1.1em;height:1.1em}
+@media (max-width:1100px){
+.nltf61{grid-template-columns:200px minmax(0, 1fr);
+  grid-template-areas:"side main"}
+.ixlji7{
+	display:none}
+.cptl38{
+	width:200px}
+}
+@media (max-width:820px){
+.nltf61{
+  grid-template-columns:1fr;grid-template-areas:"side" "main";
+gap:0}
+.eeg94{ position:static;
+display:flex; flex-wrap:wrap;gap:6px;padding:16px 0 0;border-bottom:1px solid var(--ln)}
+.eeg94 .hnwp69{margin:0;display:flex;
+  flex-wrap:wrap;
+	gap:6px}
+.eeg94 h6{
+display:none}
+.eeg94 a{
+  background:var(--sf);
+  border:1px solid var(--ln);
+  margin:0}
+.thf50,  .frqdm29, .tltfx24{
+grid-template-columns:1fr}
+.xll61{ grid-template-columns:minmax(0,
+1fr)}
+.wbrr51 a{
+	grid-column:1}
+.gqcsz27{display:none}
+.cptl38{
+width:auto}
+.wrfnj86{
+	grid-template-columns:1fr 1fr}
+.wrfnj86>div:first-child{
+  grid-column:1/-1}
+.hbeg62 h2{
+font-size:1.6rem}
+.eecwj26{
+  font-size:1.1rem}
+.hbeg62{
+  padding-top:32px}
+.gfx65 td:first-child{
+	white-space:normal}
+
+.hfqoa48{ display:none}
+.qulbx75{padding:40px 0}
+}
+@media (max-width:720px){
+.eeg94{display:none}}
+@media (max-width:560px){.gfx65 thead{ display:none}
+.gfx65 table,
+.gfx65 tbody,  .gfx65 tr,
+.gfx65 td{
+display:block;
+width:100%} .gfx65 tr{
+padding:12px 0;
+  border-bottom:1px solid var(--ln)}
+	.gfx65 td{border:0;
+	padding:3px 14px;white-space:normal}
+  .wrfnj86{
+  grid-template-columns:1fr}
+  .wuqp14{gap:12px}.whr34{
+  font-size:.74rem;padding:2px 8px} }
+
+</style>
+     </head>
+<body>
+<header class="axd10">
+<div class="wuqp14">
+<a class="cptl38" data-page="index.html"><i class="mappq86">F</i><span>Fieldwrangle</span></a>
+<span class="whr34">Version 2.0</span>
+<nav class="gqcsz27" aria-label="Documentation"><a aria-current="page" data-page="index.html">Overview</a><a data-page="docs/install/index.html">Install</a><a data-page="usage.html">Usage</a><a data-page="faq/index.html">FAQ</a></nav>
+<details class="vnvm42"><summary class="frpk56" aria-label="Documentation"><svg aria-hidden="true" focusable="false" class="ddamg26" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg aria-hidden="true" viewBox="0 0 24 24" class="ddamg26" focusable="false"><path d="M6 6l12 12M18 6L6 18"></path></svg></summary><div class="ujma51"><a aria-current="page" data-page="index.html">Overview</a><a data-page="docs/install/index.html">Install</a><a data-page="usage.html">Usage</a><a data-page="config/index.html">Configuration</a><a data-page="recipes.html">Recipes</a><a data-page="troubleshooting/index.html">Troubleshooting</a><a data-page="faq/index.html">FAQ</a><a data-page="terms.html">Terms of use</a></div>
+ </details>
+</div>
+      </header>
+     <div class="nltf61">
+<nav class="eeg94" aria-label="Documentation">
+<div class="hnwp69"><h6>Documentation</h6><a aria-current="page" data-page="index.html">Overview</a><a data-page="docs/install/index.html">Install</a><a data-page="usage.html">Usage</a><a data-page="faq/index.html">FAQ</a></div>
+        <div class="hnwp69"><h6>Reference</h6><a data-page="config/index.html">Configuration</a><a data-page="recipes.html">Recipes</a><a data-page="troubleshooting/index.html">Troubleshooting</a></div>
+        </nav>
+
+<main class="hbeg62">
+<div class="anbv83">Documentation / Overview</div>
+  <h1>Fieldwrangle</h1>
+<p class="wik55">Select, sort and join CSV files</p>
+
+<p class="eecwj26">Fieldwrangle selects, sorts, joins and cleans CSV files from the command line. It handles large files without loading them into memory and never changes the input.</p>
+		
+<h2 id="brckm80">Quick start</h2>
+<div class="thf50">
+<div><div class="spt51"><span>shell</span></div>
+		<pre class="hdalu59"><code><span class="myiym59">$ </span><span class="wge44">fieldwrangle</span> select name,city people.csv
+<span class="wge44">fieldwrangle</span> sort <span class="sojo78">--by</span> city people.csv</code></pre></div>
+
+  <div><div class="spt51"><span>Output</span></div>
+        <pre class="hdalu59"><code>name,city
+Mira,Leeds
+Otto,York</code></pre></div>
+		</div>
+
+<h2 id="wlkm24">What it does</h2>
+<ul class="frqdm29"><li><svg aria-hidden="true" class="ddamg26" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v4h4"></path></svg>Select and rename columns</li>
+		<li><svg class="ddamg26" viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 4l9 5-9 5-9-5zM3 14l9 5 9-5"></path></svg>Sort, filter and join files</li>
+  <li><svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" class="ddamg26"><path d="M5 20V9M11 20V4M17 20v-7M3 20h18"></path></svg>Fix common problems such as stray quotes and mixed line endings</li>
+ </ul>
+
+  
+<h2 id="zuq18">Installation</h2>
+<p>Fieldwrangle is a single executable with no dependencies.</p>
+     <ol class="luxrz40"><li>Download the archive that matches your system.</li>
+        <li>Unpack it and copy the executable to a directory on your PATH.</li>
+	<li>Run the version command to check that it works.</li>
+
+  </ol>
+    <div class="spt51"><span>shell</span><span>Linux</span></div>
+        <pre class="hdalu59"><code><span class="wge44">tar</span> xf fieldwrangle-2.0-linux-amd64.tar.gz
+<span class="wge44">sudo</span> <span class="wge44">mv</span> fieldwrangle /usr/local/bin/
+<span class="wge44">fieldwrangle</span> <span class="sojo78">--version</span></code></pre>
+<div class="eejq81"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="ddamg26"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l3 3 5-6"></path></svg><span>If the version number is printed, the installation worked.</span></div>
+   
+<h2 id="pvmqc73">Usage</h2>
+	<h3>Pick columns</h3>
+        <p>The select command prints only the columns you name, in the order you give them. A column can be renamed with an equals sign.</p>
+        <pre class="hdalu59"><code><span class="wge44">fieldwrangle</span> select name,city people.csv
+<span class="wge44">fieldwrangle</span> select id,town=city people.csv</code></pre>
+<h3>Filter rows</h3>
+   <p>The filter command keeps the rows that match a simple condition. Several conditions can be combined.</p>
+   <pre class="hdalu59"><code><span class="wge44">fieldwrangle</span> filter <span class="eegdh96">&#39;city = York&#39;</span> people.csv
+<span class="wge44">fieldwrangle</span> filter <span class="eegdh96">&#39;age &gt; 30&#39;</span> people.csv</code></pre>
+<h3>Join two files</h3>
+        <p>The join command combines two files on a column they share. Rows without a match are dropped unless you ask for them.</p>
+      <pre class="hdalu59"><code><span class="wge44">fieldwrangle</span> join <span class="sojo78">--on</span> id people.csv orders.csv</code></pre>
+
+<h2 id="ycm40">Options</h2>
+     <div class="gfx65"><table>
+<thead><tr><th>Option</th>
+
+  <th>Description</th>
+ </tr>
+	</thead>
+<tbody><tr><td><code>--delimiter</code></td>
+    <td>Field separator. Default is a comma.</td>
+    </tr>
+      <tr><td><code>--header</code></td>
+   <td>Set to false if the first row is data.</td>
+
+  </tr>
+
+<tr><td><code>--output</code></td>
+
+<td>Write to a file instead of the screen.</td>
+		</tr>
+
+<tr><td><code>--by</code></td>
+     <td>Column to sort by.</td>
+      </tr>
+    <tr><td><code>--on</code></td>
+  <td>Column to join on.</td>
+        </tr>
+</tbody>
+</table>
+</div>
+
+  
+<h2 id="ika84">Frequently asked questions</h2>
+	<div class="fsf82"><details open=""><summary>How large a file can it handle?</summary><p>Files are processed as a stream, so memory use stays small. Sorting large files uses temporary space on disk.</p>
+		</details><details><summary>Does it change my files?</summary><p>No. Output goes to the screen or to a new file.</p>
+  </details><details><summary>What about other separators?</summary><p>Use the delimiter option for tabs, semicolons or any single character.</p>
+
+  </details></div>
+
+  
+<div class="tltfx24 wbrr51"><a data-page="docs/install/index.html"><small>Next</small><b>Install</b></a></div>
+		</main>
+	<aside class="ixlji7" aria-label="On this page">
+<h6>On this page</h6>
+<a href="#brckm80">Quick start</a><a href="#wlkm24">What it does</a><a href="#zuq18">Installation</a><a href="#pvmqc73">Usage</a><a href="#ycm40">Options</a><a href="#ika84">Frequently asked questions</a>
+<dl class="alnk40"><h6>At a glance</h6><dt>Version</dt>
+<dd>2.0</dd>
+    <dt>Platforms</dt>
+   <dd>Linux, macOS and Windows</dd>
+     <dt>Licence</dt>
+      <dd>MIT</dd>
+
+<dt>Dependencies</dt>
+ <dd>None</dd>
+
+</dl>
+</aside>
+ </div>
+
+<footer class="fih6">
+<div class="copbp38">
+<div class="wrfnj86">
+<div><a class="cptl38" data-page="index.html"><i class="mappq86">F</i><span>Fieldwrangle</span></a><p>Fieldwrangle selects, sorts, joins and cleans CSV files from the command line.</p>
+	</div>
+      <div><h6>Documentation</h6><a data-page="index.html">Overview</a><a data-page="docs/install/index.html">Install</a><a data-page="usage.html">Usage</a><a data-page="faq/index.html">FAQ</a></div>
+
+  <div><h6>Reference</h6><a data-page="config/index.html">Configuration</a><a data-page="recipes.html">Recipes</a><a data-page="troubleshooting/index.html">Troubleshooting</a></div>
+   <div><h6>At a glance</h6><span>Version: 2.0</span><span>Platforms: Linux, macOS and Windows</span><span>Licence: MIT</span><span>Dependencies: None</span></div>
+      </div>
+
+<div class="ukjqy30"><span>Documentation for version 2.0.</span><a data-page="terms.html">Terms of use</a></div>
+
+  </div>
+        </footer>
+
+
+</body></html>

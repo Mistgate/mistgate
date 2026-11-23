@@ -14,6 +14,8 @@ const ALIAS = { bash: "sh", shell: "sh", shellscript: "sh", zsh: "sh", console: 
 
 // the poster of a product video in the docs: images/video/<name>-poster-<lang>.webp
 const VIDEO_POSTER = /images\/video\/([a-z]+)-poster-([a-z]+)\.webp$/;
+// a loop of the admin (docs/images/readme/<name>-dark-en.webp, and its -light- twin): shown in the theme the reader has
+const CLIP = /images\/readme\/([a-z0-9]+(?:-[a-z0-9]+)*)-dark-([a-z]+)\.webp$/;
 
 export async function createHl() {
   const hl = await createHighlighter({ themes: ["github-light", "github-dark"], langs: LANGS });
@@ -88,6 +90,12 @@ export function createRenderer(lang, t, highlight) {
   const image = md.renderer.rules.image;
   md.renderer.rules.image = (tokens, idx, o, env, self) => {
     const tok = tokens[idx], src = tok.attrGet("src") ?? "";
+    const clip = CLIP.exec(src);
+    if (clip) {
+      const alt = self.renderInlineAsText(tok.children, o, env);
+      const [, name, l] = clip;
+      return `<figure class="shot shot--clip"><img class="shot__dark" src="/img/readme/${name}-dark-${l}.webp" alt="${esc(alt)}" width="840" loading="lazy"><img class="shot__light" src="/img/readme/${name}-light-${l}.webp" alt="${esc(alt)}" width="840" loading="lazy"></figure>`;
+    }
     const video = VIDEO_POSTER.exec(src);
     if (video) {
       const alt = self.renderInlineAsText(tok.children, o, env);
@@ -110,7 +118,7 @@ export function createRenderer(lang, t, highlight) {
   md.core.ruler.push("mg_figures", (state) => {
     state.tokens.forEach((tok, i) => {
       const ch = tok.type === "inline" && tok.children?.filter((c) => !(c.type === "text" && !c.content.trim()));
-      if (ch?.length === 1 && ch[0].type === "image" && (/\.svg$/.test(ch[0].attrGet("src")) || VIDEO_POSTER.test(ch[0].attrGet("src"))) && state.tokens[i - 1].type === "paragraph_open") {
+      if (ch?.length === 1 && ch[0].type === "image" && (/\.svg$/.test(ch[0].attrGet("src")) || VIDEO_POSTER.test(ch[0].attrGet("src")) || CLIP.test(ch[0].attrGet("src"))) && state.tokens[i - 1].type === "paragraph_open") {
         state.tokens[i - 1].hidden = state.tokens[i + 1].hidden = true;
       }
     });

@@ -3,6 +3,8 @@ title: WARP
 description: 了解如何让协议配置的流量经 Cloudflare WARP 出口、如何为节点获取账户、「停止转发（不回退直连）」的含义，以及如何查看和修复 WARP 连接。
 ---
 
+![节点的 WARP 卡片：隧道正常、出口检查通过，随后隧道中断，卡片提供重启](../../images/readme/warp-dark-en.webp)
+
 默认情况下，协议配置的流量会从节点自身的地址离开。使用 WARP 后，流量会改经 Cloudflare 网络离开：网站看到的是 Cloudflare 地址，而不是服务商分配给你的地址。每个节点最多有一个 WARP 账户，该节点上所有使用 WARP 出口的协议配置都会经由此账户传输。Hysteria2、VLESS 和 AmneziaWG 协议配置都可以使用 WARP。
 
 ## 工作方式

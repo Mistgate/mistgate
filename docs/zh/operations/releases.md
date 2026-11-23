@@ -5,6 +5,8 @@ description: 面向维护者和使用自有密钥构建 Mistgate 的用户：发
 
 Mistgate 信任一个 Ed25519 发布密钥：持有其私钥的人决定节点 Agent 和面板可以安装哪些内容。官方二进制包含项目的密钥，维护者会使用它为每个 GitHub 发布版本签名。如果安装的是官方发布版本，本页的内容都不需要操作；[更新](updates.md)介绍如何运行集群。本页面向维护者，以及使用自有密钥构建二进制的用户。
 
+![更新凭什么被信任](../diagrams/update-trust.svg)
+
 ## 发布密钥
 
 - 私钥必须离线保存。构建时，公钥会写入两个二进制：`make build` 使用 `RELEASE_KEY`，`mistgate release build` 使用 `--key`，发布工作流使用仓库变量 `MISTGATE_RELEASE_PUBLIC_KEY`。

@@ -3,6 +3,8 @@ title: Telegram alerts
 description: Send the panel's alerts to Telegram. Set up the bot with BotFather, link your chat, what is sent and to whom, and use the panel watcher for outage alerts.
 ---
 
+![The Integrations page: the bot, the chat that waits for Start, then linked, and a test message sent](../../images/readme/telegram-dark-en.webp)
+
 The panel can write to your Telegram when something needs a human: a node goes down or comes back, a check fails, a backup fails, a new release is out, an agent's plan waits for your approval. It is **off until the owner sets a bot up**, and it only sends alerts: there are no commands, nothing to approve or change from the chat. An approval stays in the admin, behind a passkey or an authenticator code.
 
 ## Set up the bot (owner)

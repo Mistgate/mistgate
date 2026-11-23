@@ -5,6 +5,8 @@ description: For maintainers and for anyone who builds Mistgate with a key of th
 
 Mistgate trusts one Ed25519 release key: whoever holds its private half decides what node agents and panels may install. The official binaries carry the project's key, and the maintainers sign every GitHub release with it. If you install the official release, you need nothing on this page; [Updates](updates.md) covers running the fleet. This page is for the maintainers, and for anyone who builds the binaries with a key of their own.
 
+![What an update is trusted for](../diagrams/update-trust.svg)
+
 ## The release key
 
 - The private half stays offline. The public half is stamped into both binaries at build time: `RELEASE_KEY` for `make build`, `--key` for `mistgate release build`, and the repository variable `MISTGATE_RELEASE_PUBLIC_KEY` in the release workflow.

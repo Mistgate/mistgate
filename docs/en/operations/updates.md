@@ -3,6 +3,8 @@ title: Updates
 description: How node agents update themselves from signed bundles, how to update a node now or on a schedule, what protects an update, and how the panel updates itself.
 ---
 
+![The Updates page: a rollout installs the canary, checks it for 5 minutes, then moves on to the other nodes](../../images/readme/updates-dark-en.webp)
+
 Node agents update themselves, but only to a build signed with the release key. The panel carries the signed bundle to the nodes, and every agent checks the signature against the key compiled into its own binary before it replaces itself. The panel never updates a node on its own: you press **Update N nodes** (or **Update** in a node's row) to update now, or schedule a node for a quiet hour. The panel itself can install a newer official release from the Updates page, again only when its signature verifies.
 
 This page is for running a fleet. Making the release key, signing releases and publishing them is in [Releases and signing](releases.md).
@@ -307,6 +309,8 @@ What happens around the restart:
 > **Warning:** Migrations only go forward. An older panel binary is not guaranteed to work with a database a newer one has migrated. To go back, stop the panel, restore the data directory from the backup taken before the update, put the old binary back and start it. Changes made after the backup are lost.
 
 ## Server operating system
+
+![The Server systems tab: servers with their kernels and waiting updates, two ticked, installing, done](../../images/readme/os-dark-en.webp)
 
 The **Server systems** layer of the Updates page shows the operating system of every server: this panel's own server first, then each node. It answers which servers wait for a new kernel, a reboot or security updates, without a login to each of them.
 

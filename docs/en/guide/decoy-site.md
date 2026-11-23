@@ -3,6 +3,8 @@ title: Your own decoy site
 description: Why to replace the built-in decoy page with a small site of your own, what a good one looks like, how to install it with --decoy-dir, and a ready prompt that has an AI agent invent a unique site.
 ---
 
+![The From a template window: a country, a kind, the preview of the new site and the Another variant button](../../images/readme/decoys-dark-en.webp)
+
 The public address of the panel shows a decoy site to everyone who is not the admin, a subscription client or a node agent. This page is about replacing the built-in page with a small site of your own, so that the address looks like any other small site. The flag and the serving rules are in [Install the panel](../getting-started/install-panel.md#5-the-decoy-site); [Security](../operations/security.md#the-decoy-site-and-the-hidden-admin) explains how the decoy hides the admin.
 
 ## Why your own
@@ -44,6 +46,8 @@ The plan lists every file with its size, the total and the SHA-256 of the bundle
 The built-in [assistant](assistant.md) can make the site itself: ask it in the chat ("make a decoy site for the node alpha"). It writes a few small pages and a style sheet, and shows a **Proposed change** card with the list of files; you approve it as any other change. A model's answer is length-capped, so a site made this way stays small, about 20 KB in all, which is enough for the three to five pages described below.
 
 ## A site from a template
+
+![Five sites of five kinds made by the generator, passing by](../../images/readme/decoys-sites-dark-en.webp)
 
 The quickest way to a site of your own: the panel builds it from a built-in template. On the **Decoy sites** page press **+ Site**, choose **From a template**, then one of ten kinds: a service status page, a file transfer page, a sign-in page, a personal blog, a portfolio, a small-business site, project documentation, a personal card, a club or society, an open-source project page.
 
