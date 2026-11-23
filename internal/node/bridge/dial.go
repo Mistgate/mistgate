@@ -39,6 +39,7 @@ const (
 	DialRetryResetAfter       = 30 * time.Second
 	BridgePingInterval        = 15 * time.Second
 	BridgePingTimeout         = 10 * time.Second
+	bridgeDrainTimeout        = 5 * time.Second // how long a cleanly ended session waits for the entry to end its response
 	BridgeConnectionAge       = time.Hour
 	BridgeConnectionAgeJitter = BridgeConnectionAge / 5
 	BridgeDrainTimeout        = 10 * time.Minute
@@ -918,10 +919,14 @@ func (d *Dialer) serveClient(run *dialRun, cc *http2.ClientConn, tracker *connTr
 	idle := newIdleConn(targetConn, d.timing.streamIdle)
 	err = d.bridgeLocal(ctx, run, target, idle, responses, tracker, cancel)
 	stopIdle() // a session that ends badly is not a failure of the bridge (see Entry.servePairHalf)
-	cancel()
 	if err == nil {
+		// A clean end: wait for the entry to finish its half (the end of its response) before cancelling, or the cancel's
+		// RST_STREAM can overtake the last bytes still queued for the entry, and the entry resets the person.
+		drain := time.AfterFunc(bridgeDrainTimeout, cancel) // an entry that never ends its half must not hold the session
 		_, _ = io.Copy(io.Discard, responses.down.Body)
+		drain.Stop()
 	}
+	cancel()
 	closePairResponses(responses)
 	_ = idle.Close()
 	_ = cc
