@@ -128,7 +128,7 @@ fn lang_dir_and_data_lg_are_right() {
         assert_eq!(h.attr("data-lg"), Some(l.to_uppercase().as_str()), "{url}");
     }
     assert!(read_page(&out, "/fa/").starts_with("<!doctype html>\n<html lang=\"fa\" dir=\"rtl\" data-lg=\"FA\">"));
-    assert!(read_page(&out, "/zh/").contains("<html lang=\"zh-CN\""), "Chinese is zh-CN in <html> and zh-Hans in hreflang");
+    assert!(read_page(&out, "/zh/").contains("<html lang=\"zh-Hans\""), "Chinese is zh-Hans in <html> and zh-Hans in hreflang");
 }
 
 #[test]

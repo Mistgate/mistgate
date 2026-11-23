@@ -7,7 +7,7 @@ use std::path::{Component, Path};
 pub const SITE: &str = "https://mistgate.app";
 
 /// A language of the site. The values are the same as in the docs generator (`site/src/layout.mjs`): the hreflang of
-/// Chinese is `zh-Hans`, its `<html lang>` is `zh-CN`.
+/// Chinese is `zh-Hans` in `<html lang>` and in hreflang (the Open Graph locale is `zh_CN`).
 pub struct Lang {
     pub code: &'static str,
     pub hreflang: &'static str,
@@ -19,7 +19,7 @@ pub struct Lang {
 pub const LANGS: [Lang; 5] = [
     Lang { code: "en", hreflang: "en", html_lang: "en", og_locale: "en_US", rtl: false },
     Lang { code: "ru", hreflang: "ru", html_lang: "ru", og_locale: "ru_RU", rtl: false },
-    Lang { code: "zh", hreflang: "zh-Hans", html_lang: "zh-CN", og_locale: "zh_CN", rtl: false },
+    Lang { code: "zh", hreflang: "zh-Hans", html_lang: "zh-Hans", og_locale: "zh_CN", rtl: false },
     Lang { code: "fa", hreflang: "fa", html_lang: "fa", og_locale: "fa_IR", rtl: true },
     Lang { code: "tr", hreflang: "tr", html_lang: "tr", og_locale: "tr_TR", rtl: false },
 ];

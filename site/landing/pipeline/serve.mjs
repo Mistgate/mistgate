@@ -17,7 +17,7 @@ export function renderDocument(manifest, page, lang, fragment, { site = 'http://
   const url = (l) => (l === 'en' ? '' : '/' + l) + (page === 'app' ? '/app/' : '/');
   const alts = manifest.langs.map((l) => `<link rel="alternate" hreflang="${l === 'zh' ? 'zh-Hans' : l}" href="${site}${url(l).replace('//', '/')}">`).join('\n');
   return `<!doctype html>
-<html lang="${lang === 'zh' ? 'zh-CN' : lang}" dir="${m.dir}"${Object.entries(m.htmlAttrs || {}).map(([k, v]) => ` ${k}="${esc(v)}"`).join('')}>
+<html lang="${lang === 'zh' ? 'zh-Hans' : lang}" dir="${m.dir}"${Object.entries(m.htmlAttrs || {}).map(([k, v]) => ` ${k}="${esc(v)}"`).join('')}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
