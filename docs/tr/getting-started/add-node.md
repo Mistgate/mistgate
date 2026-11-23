@@ -7,8 +7,8 @@ Bir düğüm, ajanı panelden sertifika alıp kendini bir systemd hizmeti olarak
 
 | Yol | Ne yaparsınız | Ne zaman seçilir |
 |:--|:--|:--|
-| **SSH ile otomatik kur** | Sunucunun adresini girer, SSH ana bilgisayar anahtarını onaylar, panel anahtarıyla ya da parolayla giriş yaparsınız; gerisini panel yapar. | Olağan yol. [SSH ile düğüm kurma](ssh-install.md) sayfasında anlatılır. |
-| **Elle kurulum için komut al** | Ajanı sunucuya kopyalar ve root olarak tek kullanımlık bir komut çalıştırırsınız. | Panel sunucuya SSH ile ulaşamıyorsa (Cloudflare sürümünde: adres Cloudflare'e aittir ya da onun proxy'sinin arkasındadır, ağ özeldir ya da SSH yalnızca kendi IP'nize açıktır) ya da komutları kendiniz çalıştırmak istiyorsanız. Bu sayfada anlatılır. |
+| **SSH ile** | Sunucunun adresini girer, SSH ana bilgisayar anahtarını onaylar, panel anahtarıyla ya da parolayla giriş yaparsınız; gerisini panel yapar. | Olağan yol. [SSH ile düğüm kurma](ssh-install.md) sayfasında anlatılır. |
+| **Komutla** | Ajanı sunucuya kopyalar ve root olarak tek kullanımlık bir komut çalıştırırsınız. | Panel sunucuya SSH ile ulaşamıyorsa (Cloudflare sürümünde: adres Cloudflare'e aittir ya da onun proxy'sinin arkasındadır, ağ özeldir ya da SSH yalnızca kendi IP'nize açıktır) ya da komutları kendiniz çalıştırmak istiyorsanız. Bu sayfada anlatılır. |
 
 Bir yapay zekâ ajanı da MCP üzerinden bir SSH kurulumu başlatabilir; onaylarsınız ve onay ekranında panel anahtarını seçersiniz ya da parolayı yazarsınız: bkz. [Yapay zekâ ajanı kılavuzu](ai-agents.md). Bu sayfa ayrıca bir düğümün nasıl kaldırılacağını da anlatır. Pencere doğrudan ad, ülke ve adres alanlarıyla açılıyorsa panel SSH kurulumu gelmeden önceki bir sürümdür: önce onu güncelleyin ([panel güncellemelerine](../operations/updates.md) bakın).
 
@@ -20,7 +20,7 @@ Bir yapay zekâ ajanı da MCP üzerinden bir SSH kurulumu başlatabilir; onaylar
 
 ## 1. Elle kurulumu seçin
 
-**Düğümler → Düğüm ekle** bölümünde **Elle kurulum için komut al** seçeneğini seçin. Aynı pencere Genel bakış'taki **Düğüm ekle** kutucuğundan, komut paletinden ve kurulum sihirbazının sonundan da açılır. Bekleyen bir elle düğüm oluşturduysanız, aynı adı SSH sihirbazında kullanmadan önce onu kullanımdan kaldırın ya da kullanılmayan başka bir ad seçin.
+**Düğümler → Düğüm ekle** bölümünde **Komutla** seçeneğini seçin. Aynı pencere Genel bakış'taki **Düğüm ekle** kutucuğundan, komut paletinden ve kurulum sihirbazının sonundan da açılır. Bekleyen bir elle düğüm oluşturduysanız, aynı adı SSH sihirbazında kullanmadan önce onu kullanımdan kaldırın ya da kullanılmayan başka bir ad seçin.
 
 | Alan | Ne girilir |
 |:--|:--|
