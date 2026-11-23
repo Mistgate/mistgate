@@ -1001,7 +1001,7 @@
   grid-template-columns: repeat(5,minmax(0,1fr));
   gap: 8px;
 }
-.sbp .sb-tiles button {
+.sbp .sb-tiles [role="radio"] {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -1011,16 +1011,17 @@
   border: 1px solid var(--border);
   background: var(--surface);
   text-align: start;
+  cursor: pointer;
   transition: border-color .15s var(--e),background-color .15s var(--e);
 }
-.sbp .sb-tiles button:hover {
+.sbp .sb-tiles [role="radio"]:hover {
   border-color: color-mix(in srgb,var(--text) 26%,transparent);
 }
-.sbp .sb-tiles button[aria-pressed="true"] {
+.sbp .sb-tiles [role="radio"][aria-checked="true"] {
   border-color: var(--accent-mark);
   background: color-mix(in srgb,var(--accent-mark) 5%,var(--surface));
 }
-.sbp .sb-tiles span {
+.sbp .sb-tiles [role="radio"]>span {
   font-size: 13px;
   color: var(--sec);
 }
@@ -1656,7 +1657,7 @@
   scrollbar-width: none;
   flex-wrap: nowrap;
 }
-.sbp .sb-vf .sb-ch button {
+.sbp .sb-vf .sb-ch [role="radio"] {
   flex: none;
 }
 .sbp .sb-vf {
@@ -2020,7 +2021,7 @@
   gap: 4px;
   flex: none;
 }
-.sbp .sb-ch>button {
+.sbp .sb-ch>[role="radio"] {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2030,18 +2031,19 @@
   border: 1px solid var(--border);
   font-size: 13px;
   color: var(--sec);
+  cursor: pointer;
+  white-space: nowrap;
   transition: background-color .15s var(--e), color .15s var(--e), border-color .15s var(--e);
 }
-.sbp .sb-ch>button .mono {
+.sbp .sb-ch>[role="radio"] .mono {
   font-size: 11px;
   font-weight: 400;
   color: var(--muted);
 }
-.sbp .sb-ch>button:hover {
+.sbp .sb-ch>[role="radio"]:hover {
   color: var(--text);
 }
-.sbp .sb-ch>button[aria-pressed="true"],
-.sbp .sb-ch>button[aria-checked="true"] {
+.sbp .sb-ch>[role="radio"][aria-checked="true"] {
   background: var(--surface-2);
   border-color: transparent;
   color: var(--text);
