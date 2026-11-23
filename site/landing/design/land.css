@@ -2273,3 +2273,6 @@ html[data-lg=FA] .lx-docp .mono{letter-spacing:0;font-family:"JetBrains Mono","V
 @container lpr (max-width:700px){.lp .da-syg{grid-template-columns:minmax(0,1fr)}.lp .da-wf>div{grid-template-columns:minmax(0,1fr);gap:0}.lp .da-ft.f2.w>div,.lp .da-ft.f2.k2>div{grid-template-columns:minmax(0,1fr);gap:2px}.lp .da-see{padding:14px 16px 16px}}
 .lp .da-fn a,.lp .dx-h p a{color:var(--acc)}
 /* docs:end */
+
+/* seo: text for the screen reader and the crawler, not drawn (the link "Подробнее" says what it is about) */
+.lp .vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
