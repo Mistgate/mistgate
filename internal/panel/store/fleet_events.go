@@ -32,7 +32,7 @@ func IsPanelEventCode(code string) bool {
 }
 
 var panelEventCodes = map[string]struct{}{
-	"node_retired": {}, "node_recovered": {}, "node_blip": {}, "agent_restarted": {}, "node_enrolled": {}, "node_down": {},
+	"node_retired": {}, "node_recovered": {}, "node_blip": {}, "panel_link_gap": {}, "agent_restarted": {}, "node_enrolled": {}, "node_down": {},
 	"awg_kernel_switched": {}, "bandwidth_upload_missing": {}, "bandwidth_measured": {}, "front_overloaded": {},
 	"stats_stale": {}, "stats_rejected": {}, "apply_rejected": {}, "state_drift": {}, "node_event_daily_limit": {},
 	"port_lossy": {}, "path_lossy": {}, "panel_path_lossy": {}, "user_change_limit": {}, "device_limit_reached": {},
