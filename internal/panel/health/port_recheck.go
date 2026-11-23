@@ -146,6 +146,35 @@ func (s *Service) runOnePortRecheck(ctx context.Context) bool {
 	return true
 }
 
+// recheckUDPPorts asks for one UDP delivery check from another node for each node whose UDP profiles time out on the
+// panel's probe without a fresh clean check to tell the panel's path from the node's port (panelUDPPath). At most once an
+// hour per node; the evaluator runs again when the check is stored. The caller holds evalMu.
+func (s *Service) recheckUDPPorts(ctx context.Context, now time.Time, nodeIDs []string) {
+	check := s.cfg.CheckPortsUDP
+	if check == nil {
+		check = s.cfg.CheckPorts
+	}
+	if check == nil {
+		return
+	}
+	for _, id := range nodeIDs {
+		if now.Sub(s.udpRecheckAt[id]) < time.Hour {
+			continue
+		}
+		s.udpRecheckAt[id] = now
+		go func() {
+			select {
+			case s.portCheckRun <- struct{}{}:
+				defer func() { <-s.portCheckRun }()
+			case <-ctx.Done():
+				return
+			}
+			_, _, _ = check(ctx, id, nil)
+			s.evaluateSoon()
+		}()
+	}
+}
+
 func (s *Service) portCheckScheduleNodes(ctx context.Context, now time.Time, sn *snapshot) ([]PortCheckScheduleNode, error) {
 	checks, err := s.st.PortChecks(ctx)
 	if err != nil {

@@ -194,6 +194,7 @@ type Service struct {
 
 	portCheckRun      chan struct{} // one scheduled CheckPorts run at a time
 	portCheckAttempts map[string]int64
+	udpRecheckAt      map[string]time.Time // node id -> when the panel last asked for a UDP delivery check because of probe timeouts
 
 	nhMu             sync.RWMutex
 	nodeHealth       map[string]nodeHealth // computed by the last evaluation
@@ -257,7 +258,7 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, fl Fleet, cfg
 		st: st, v: v, reg: reg, fl: fl, cfg: cfg, log: cfg.Log, now: cfg.Now, startedAt: cfg.Now(),
 		creds: map[string]store.ProbeCredRow{}, cells: map[string]*cell{}, sched: map[string]*schedule{},
 		work: make(chan string, 1024), queued: map[string]bool{}, kick: make(chan struct{}, 1),
-		portCheckRun: make(chan struct{}, 1), portCheckAttempts: map[string]int64{},
+		portCheckRun: make(chan struct{}, 1), portCheckAttempts: map[string]int64{}, udpRecheckAt: map[string]time.Time{},
 		nowRunning: map[string]time.Time{},
 		nodeHealth: map[string]nodeHealth{}, waiters: map[string][]chan struct{}{},
 		plans: map[string]fixPlan{}, fixBusy: map[string]bool{}, recentFix: map[string]time.Time{},

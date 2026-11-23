@@ -285,6 +285,8 @@ export const en = {
   "health.alert.no_traffic.why.unknown": "The node is up and the agent answers, but every profile fails the client-eye check. Open the node for the details.",
   "health.alert.check_failed.why.udp_blocked":
     "“{profile}” does not answer on port {port}, while another profile of this node does: the hoster cuts UDP port {port}. Change the port of this profile on this node.",
+  "health.alert.check_failed.why.panel_udp_path":
+    "“{profile}” does not answer the panel’s check on UDP port {port}, but another node’s UDP reaches this port. So the port is open and works for people; the loss is on the path from the panel’s server. No need to change the port.",
   "health.alert.check_failed.why.warp_path":
     "The direct profile of this node works, but “{profile}” does not: its WARP exit is dead. The WARP card of the node shows the handshake, the probes and the last error.",
   "health.alert.check_failed.why.timeout": "“{profile}” does not complete the handshake on port {port}. The profile may be down or the port blocked. Restart it; if that does not help, look at the node.",
@@ -912,6 +914,8 @@ export const ru: typeof en = {
   "health.alert.no_traffic.why.unknown": "Нода жива и агент отвечает, но каждый профиль не проходит проверку глазами клиента. Подробности на странице ноды.",
   "health.alert.check_failed.why.udp_blocked":
     "«{profile}» не отвечает на порту {port}, а другой профиль этой ноды отвечает: хостер режет UDP-порт {port}. Смени порт этого профиля на этой ноде.",
+  "health.alert.check_failed.why.panel_udp_path":
+    "Проверка панели не достаёт до «{profile}» на UDP-порту {port}, но с другой ноды UDP на этот порт проходит. Значит, порт открыт и у людей работает, а теряется UDP на пути от сервера панели. Менять порт не нужно.",
   "health.alert.check_failed.why.warp_path":
     "Прямой профиль этой ноды работает, а «{profile}» нет: мёртв его выход через WARP. Карточка WARP ноды показывает рукопожатие, проверки и последнюю ошибку.",
   "health.alert.check_failed.why.timeout": "«{profile}» не завершает рукопожатие на порту {port}. Профиль мог упасть, либо порт закрыт. Перезапусти его; не поможет — загляни на ноду.",
@@ -1511,6 +1515,8 @@ export const zh: typeof en = {
   "health.alert.no_traffic.why.http_status": "隧道能建立，但检测所访问的网站返回错误。节点通往互联网的出口可能已损坏。",
   "health.alert.no_traffic.why.unknown": "节点在线，Agent 也有响应，但所有协议配置都未通过客户端视角检测。请打开节点查看详情。",
   "health.alert.check_failed.why.udp_blocked": "此节点上的另一个协议配置有应答，而「{profile}」在端口 {port} 上没有应答：服务商封锁了 UDP 端口 {port}。请更换此节点上该协议配置的端口。",
+  "health.alert.check_failed.why.panel_udp_path":
+    "面板的检测无法通过 UDP 端口 {port} 连到「{profile}」，但其他节点的 UDP 可以到达该端口。说明端口是开放的，用户可以正常使用，丢包发生在面板服务器出发的链路上。无需更换端口。",
   "health.alert.check_failed.why.warp_path": "此节点的直连协议配置正常，但「{profile}」不正常：它的 WARP 出口已失效。节点的 WARP 卡片会显示握手、探测和最近一次错误。",
   "health.alert.check_failed.why.timeout": "「{profile}」在端口 {port} 上无法完成握手。协议配置可能已停止，或端口被封锁。请重启它；如果没有帮助，再检查节点。",
   "health.alert.check_failed.why.auth": "「{profile}」拒绝了面板的检测账户。节点上的配置可能是旧的：请重启该协议配置。",
@@ -2056,6 +2062,8 @@ export const fa: typeof en = {
   "health.alert.no_traffic.why.http_status": "تونل‌ها بالا می‌آیند، ولی سایت‌هایی که بررسی باز می‌کند با خطا جواب می‌دهند. احتمالاً خروجی نود به اینترنت خراب است.",
   "health.alert.no_traffic.why.unknown": "نود روشن است و ایجنت جواب می‌دهد، ولی همهٔ پروفایل‌ها در بررسی از دید کلاینت رد می‌شوند. جزئیات در صفحهٔ نود است.",
   "health.alert.check_failed.why.udp_blocked": "«{profile}» روی پورت {port} جواب نمی‌دهد، در حالی که پروفایل دیگری از همین نود جواب می‌دهد: سرویس‌دهنده پورت UDP {port} را مسدود می‌کند. پورت این پروفایل را روی این نود عوض کن.",
+  "health.alert.check_failed.why.panel_udp_path":
+    "بررسی پنل روی پورت UDP {port} به «{profile}» نمی‌رسد، اما UDP از نود دیگری به این پورت می‌رسد. پس پورت باز است و برای کاربران کار می‌کند و UDP در مسیر سرور پنل گم می‌شود. نیازی به عوض کردن پورت نیست.",
   "health.alert.check_failed.why.warp_path": "پروفایل مستقیم این نود کار می‌کند، اما «{profile}» نه: خروجی WARP آن از کار افتاده است. کارت WARP نود دست‌دهی، بررسی‌ها و آخرین خطا را نشان می‌دهد.",
   "health.alert.check_failed.why.timeout": "«{profile}» روی پورت {port} دست‌دهی را کامل نمی‌کند. شاید پروفایل از کار افتاده یا پورت بسته است. آن را راه‌اندازی دوباره کن؛ اگر کمک نکرد، نود را ببین.",
   "health.alert.check_failed.why.auth": "«{profile}» حساب بررسی پنل را رد می‌کند. شاید پیکربندی نود قدیمی باشد: پروفایل را راه‌اندازی دوباره کن.",
@@ -2590,6 +2598,8 @@ export const tr: typeof en = {
   "health.alert.no_traffic.why.http_status": "Tüneller kalkıyor ama kontrolün açtığı siteler hata ile yanıt veriyor. Düğümün internete çıkışı büyük olasılıkla bozuk.",
   "health.alert.no_traffic.why.unknown": "Düğüm ayakta ve ajan yanıt veriyor ama her profil istemci gözüyle kontrolü geçemiyor. Ayrıntılar için düğümü aç.",
   "health.alert.check_failed.why.udp_blocked": "“{profile}” {port} portunda yanıt vermiyor, bu düğümün başka bir profili ise veriyor: sağlayıcı {port} UDP portunu kesiyor. Bu profilin portunu bu düğümde değiştir.",
+  "health.alert.check_failed.why.panel_udp_path":
+    "Panelin kontrolü “{profile}” profiline {port} UDP portunda ulaşamıyor, ama başka bir düğümden UDP bu porta ulaşıyor. Yani port açık ve kullanıcılar için çalışıyor; UDP kaybı panel sunucusundan çıkan yolda. Portu değiştirmeye gerek yok.",
   "health.alert.check_failed.why.warp_path": "Bu düğümün doğrudan profili çalışıyor ama “{profile}” çalışmıyor: WARP çıkışı ölü. Düğümün WARP kartında el sıkışma, yoklamalar ve son hata görünür.",
   "health.alert.check_failed.why.timeout": "“{profile}” {port} portunda el sıkışmayı tamamlamıyor. Profil çökmüş ya da port kapalı olabilir. Yeniden başlat; işe yaramazsa düğüme bak.",
   "health.alert.check_failed.why.auth": "“{profile}” panelin kontrol hesabını reddediyor. Düğümde eski bir yapılandırma olabilir: profili yeniden başlat.",
