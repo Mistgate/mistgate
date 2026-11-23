@@ -145,6 +145,7 @@ type Fleet struct {
 	upd                    Updates                      // set by SetUpdates (update.go); guarded by mu
 	warp                   Warp                         // set by SetWarp (l3.go); guarded by mu
 	sessions               map[string]*session          // node id -> the one live agent session
+	own                    ownGap                       // frames the panel itself heard: tells a silence of the panel from a blip of a node (own_gap.go)
 	owners                 map[string]sessionOwner      // authenticated streams claim a generation before Hello
 	stuck                  map[string]stuckSeq          // node id -> the stats batch the database refused last (statsguard.go)
 	liveProjectionWarnings sync.Map                     // node id -> struct{}; avoids repeating oversized projection warnings
