@@ -385,6 +385,8 @@ message Device {
   // When the nodes last counted a connection of the device (a session they saw, or the newest hour with connections or online time
   // in the connection counters); 0 = none counted. For a link device last_seen_unix is its last subscription fetch, not this.
   int64 last_online_unix = 25 [jstype = JS_NUMBER];
+  // AmneziaWG key: "" = all through the VPN, "ru-direct" = the Russian services go around it (CreateAwgDeviceRequest.route).
+  string awg_route = 26;
 }
 
 enum DeviceKind {
