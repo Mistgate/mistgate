@@ -9,8 +9,8 @@ A node joins the fleet when its agent gets a certificate from the panel, install
 
 | Way | What you do | When to pick it |
 |:--|:--|:--|
-| **Install automatically over SSH** | Enter the server's address, confirm its SSH host key, log in with the panel's key or a password; the panel does the rest. | The usual way. Described in [Install a node over SSH](ssh-install.md). |
-| **Get a manual install command** | Copy the agent to the server and run a one-time command as root. | The panel cannot reach the server over SSH (on the Cloudflare edition: the address is Cloudflare's or proxied by it, the network is private, or SSH is open only to your own IP), or you want to run the commands yourself. Described on this page. |
+| **Over SSH** | Enter the server's address, confirm its SSH host key, log in with the panel's key or a password; the panel does the rest. | The usual way. Described in [Install a node over SSH](ssh-install.md). |
+| **By command** | Copy the agent to the server and run a one-time command as root. | The panel cannot reach the server over SSH (on the Cloudflare edition: the address is Cloudflare's or proxied by it, the network is private, or SSH is open only to your own IP), or you want to run the commands yourself. Described on this page. |
 
 An AI agent can also start an SSH installation through MCP; you approve it and choose the panel key or type the password on the approval screen: see the [AI agent guide](ai-agents.md). This page also explains how to remove a node. If the dialog opens directly on the name, country and address fields, the panel predates the SSH installation: update it first (see [panel updates](../operations/updates.md)).
 
@@ -22,7 +22,7 @@ An AI agent can also start an SSH installation through MCP; you approve it and c
 
 ## 1. Choose manual installation
 
-In **Nodes → Add node**, choose **Get a manual install command**. The same window opens from the **Add node** tile on the Overview, the command palette and the end of the setup wizard. If you already created a pending manual node, retire it before using the same name in the SSH wizard, or choose another unused name.
+In **Nodes → Add node**, choose **By command**. The same window opens from the **Add node** tile on the Overview, the command palette and the end of the setup wizard. If you already created a pending manual node, retire it before using the same name in the SSH wizard, or choose another unused name.
 
 | Field | What to enter |
 |:--|:--|
@@ -34,7 +34,7 @@ When the address is an IP, the window says so before you go on: Hysteria2 on tha
 
 From the second node on the window also asks **Who gets this node**: **Everyone** (every group, and groups made later), **Some groups** (only the ones you tick) or **Nobody yet** (check the node first: no group gets it, so it is in no subscription). The choice starts at the one you made last time, and at **Nobody yet** before that. The first node of a panel is not asked: it goes to every group, so a new panel works at once, and the window says so. You can change it later on the node's page: see [Who gets a node](../guide/nodes.md#the-nodes-list).
 
-Press **Create install command**. The node appears in the list as "Waiting for install", and the window shows three steps.
+Press **Get install command**. The node appears in the list as "Waiting for install", and the window shows three steps.
 
 ## 2. Put the agent on the server
 
@@ -177,6 +177,6 @@ If you applied the doctor's resolver fix on that node, remove `/etc/systemd/reso
 | `install: must run as root` | Not root. | Run the command as root. |
 | `install: nft is not installed on this server` (exit status 3) | The `nftables` package is missing, as on cloud images of Debian 13. Nothing was changed. | Run the command the message names (`apt-get install -y nftables`), then run `install` again. |
 | `holds no identity: run mistgate-node enroll first` | `enroll` failed, or `install` got another `--state-dir`. | Run `enroll` again with the same state directory. |
-| The admin answers **Create install command** with "panel address is not configured" | The panel knows no address for agents: setup ran without `--public-url` and `serve` has no `--agent-addr`. | Restart the panel with `--agent-addr panel.example.com:443`. |
+| The admin answers **Get install command** with "panel address is not configured" | The panel knows no address for agents: setup ran without `--public-url` and `serve` has no `--agent-addr`. | Restart the panel with `--agent-addr panel.example.com:443`. |
 
 More symptoms and fixes are in [Troubleshooting](../operations/troubleshooting.md). Day-to-day node settings are in [Nodes](../guide/nodes.md).

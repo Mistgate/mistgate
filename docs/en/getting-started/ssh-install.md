@@ -3,7 +3,7 @@ title: Install a node over SSH
 description: Let the panel install the node agent on a fresh server over SSH with its own key or a password, follow, cancel and retry install jobs, and manage the saved SSH access.
 ---
 
-With an SSH installation the panel itself connects to a new server, checks it, installs the node agent and waits for it to connect: you do not copy anything to the server or paste a command. It is the owner's job and starts in **Nodes → Add node → Install automatically over SSH**. An AI agent can start the same installation through MCP, and you approve it in the admin: see the [AI agent guide](ai-agents.md). When the panel cannot reach the server over SSH, use the [manual install](add-node.md).
+With an SSH installation the panel itself connects to a new server, checks it, installs the node agent and waits for it to connect: you do not copy anything to the server or paste a command. It is the owner's job and starts in **Nodes → Add node → Over SSH**. An AI agent can start the same installation through MCP, and you approve it in the admin: see the [AI agent guide](ai-agents.md). When the panel cannot reach the server over SSH, use the [manual install](add-node.md).
 
 ## What you need
 

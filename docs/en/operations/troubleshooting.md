@@ -52,11 +52,11 @@ A pending node whose command has expired needs a **New install command**; the ol
 
 `install` needs root and an enrolled state directory: run `enroll` first, with the same `--state-dir` if you changed it.
 
-If **Create install command** in the admin fails with "panel address is not configured", the panel does not know the address agents should dial: run setup with `--public-url`, or serve with `--agent-addr` (see [CLI](../reference/cli.md)).
+If **Get install command** in the admin fails with "panel address is not configured", the panel does not know the address agents should dial: run setup with `--public-url`, or serve with `--agent-addr` (see [CLI](../reference/cli.md)).
 
 ## An SSH installation fails
 
-**Nodes → Add node → Install automatically over SSH** connects from the panel's server, so the node's SSH port must be reachable from there, and the node must reach the panel back. When a job fails, the wizard says why and offers **Retry installation** (with the SSH password again; it continues from where it stopped) and **Open install manager**, which shows the exact reason.
+**Nodes → Add node → Over SSH** connects from the panel's server, so the node's SSH port must be reachable from there, and the node must reach the panel back. When a job fails, the wizard says why and offers **Retry installation** (with the SSH password again; it continues from where it stopped) and **Open install manager**, which shows the exact reason.
 
 The most common causes:
 

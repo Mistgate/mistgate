@@ -110,9 +110,9 @@ test("node guides show the SSH install choice, and updates show the published pa
   const updatesEn = page("en", "operations/updates");
   const updatesRu = page("ru", "operations/updates");
 
-  assert.ok(addEn.includes("Install automatically over SSH"));
+  assert.ok(addEn.includes("Over SSH"));
   assert.ok(addEn.includes('href="/getting-started/ssh-install/"'));
-  assert.ok(addRu.includes("Запустить автоустановку по SSH"));
+  assert.ok(addRu.includes("По SSH"));
   assert.ok(addRu.includes('href="/ru/getting-started/ssh-install/"'));
   assert.ok(sshEn.includes("Saved SSH access"));
   assert.ok(sshEn.includes("--token-stdin"));
