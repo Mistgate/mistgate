@@ -122,6 +122,7 @@ export async function boot(name, Page, eager = {}) {
   // the language bundle and the boards of the first screen are fetched together
   const [b] = await Promise.all([bundle ? fetch(bundle).then((r) => r.json()) : {}, ...(eager[lang] || eager.all || []).map(async (n) => { registry.eager[n] = (await registry.load[n]()).default; })]);
   Object.assign(CFG, { links: b.links || {}, css: b.css || {}, pages: b.pages || {} });
+  window.MG_STARS = b.stars || 0; // the GitHub button of the page (this build's number)
   if (b.dict && registry.i18n) registry.i18n(b.dict); // the translator of the design (generated, see translate.mjs)
   window.__dcNav = (to) => {
     const u = CFG.pages[CFG.page] && CFG.pages[CFG.page][String(to).toLowerCase()];

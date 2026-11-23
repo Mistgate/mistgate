@@ -20,6 +20,7 @@ import { usage, pruneCss, renameH1 } from './css.mjs';
 import { resolveLinks, homeUrl, appUrl } from './links.mjs';
 import { prerender } from './prerender.mjs';
 import { budgets } from './budgets.mjs';
+import { GITHUB } from '../../src/urls.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const p = (...a) => join(HERE, ...a);
@@ -40,6 +41,10 @@ const CSS_FILE = { land: 'land.css', sub: 'sub-s.css', pn: 'pn.css' };
 const appCss = (lang) => (lang === 'fa' ? 'app-fa-s.css' : lang === 'zh' ? 'app-zh-s.css' : 'app-s.css');
 const brLen = (b) => brotliCompressSync(b, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }).length;
 const sha = (b, n = 8) => createHash('sha256').update(b).digest('hex').slice(0, n);
+// the star count on the GitHub button: the number of this build (MG_STARS sets it, '' for none; offline there is none and the button shows no number)
+const stars = 'MG_STARS' in process.env ? Number(process.env.MG_STARS) || 0
+  : await fetch(GITHUB.replace('//github.com/', '//api.github.com/repos/'), { headers: { 'user-agent': 'mistgate-site-build' }, signal: AbortSignal.timeout(5000) })
+    .then((r) => (r.ok ? r.json() : {})).then((j) => (Number.isInteger(j.stargazers_count) ? j.stargazers_count : 0)).catch(() => 0);
 const warnings = [];
 const warn = (m) => { warnings.push(m); console.warn('warning: ' + m); };
 const t0 = performance.now();
@@ -165,7 +170,7 @@ const pagesUrls = Object.fromEntries(['main', 'app'].map((pg) => [pg, urlsOf(pg)
 for (const page of PAGES) for (const lang of LANGS) {
   const o = cssOut[page];
   const css = { before: o.pn ? '/' + o.pn : '', app: o.app[appCss(lang)] ? ['/' + o.app[appCss(lang)]] : [], sub: o.sub ? ['/' + o.sub] : [] };
-  const b = { lang, links: resolveLinks(linksTable, lang, DOCS), css, pages: pagesUrls };
+  const b = { lang, links: resolveLinks(linksTable, lang, DOCS), css, pages: pagesUrls, stars };
   if (lang !== 'ru') b.dict = langDict(dict, subsets[page], lang.toUpperCase());
   bundles[`${page}:${lang}`] = hashedAsset(`lang-${page}-${lang}`, 'json', Buffer.from(JSON.stringify(b)));
 }
