@@ -89,3 +89,19 @@ test("dates: a folder outside any repository gives none, and nothing throws", ()
     assert.ok(m.size > 20 && m.get("en/index.md") && [...m.values()].every((v) => W3C.test(v)));
   }
 });
+
+test("a page can word its <title> in front matter (seoTitle); one <h1>; the files crawlers ask for", () => {
+  const read = (f) => readFileSync(join(dist, f), "utf8");
+  assert.match(read("getting-started/install-panel/index.html"), /<title>Install a self-hosted VPN panel on Linux — Mistgate<\/title>/);
+  assert.match(read("ru/reference/comparison/index.html"), /<title>Mistgate или 3x-ui, Marzban, Remnawave: сравнение<\/title>/);
+  assert.match(read("getting-started/ssh-install/index.html"), /<title>[^<]* — Mistgate docs<\/title>/, "a page without seoTitle keeps the title of its page");
+  for (const f of ["guide/assistant/index.html", "ru/guide/assistant/index.html", "zh/guide/assistant/index.html"]) assert.equal((read(f).match(/<h1[\s>]/g) || []).length, 1, f);
+  const ico = readFileSync(join(dist, "favicon.ico"));
+  assert.equal(ico.readUInt16LE(2), 1, "an icon file"); assert.equal(ico.readUInt32LE(18), 22); assert.equal(ico.subarray(22, 30).toString("hex"), "89504e470d0a1a0a", "a PNG inside");
+  const sec = read(".well-known/security.txt");
+  assert.match(sec, /^Contact: https:\/\/github\.com\/Mistgate\/mistgate\/security$/m);
+  assert.match(sec, /^Policy: https:\/\/github\.com\/Mistgate\/mistgate\/blob\/main\/SECURITY\.md$/m);
+  const exp = Date.parse(/^Expires: (.+)$/m.exec(sec)[1]); assert.ok(exp > Date.now() + 300 * 864e5 && exp < Date.now() + 400 * 864e5, "expires in about a year");
+  assert.match(read("_headers"), /^  Strict-Transport-Security: max-age=31536000$/m);
+  assert.match(read("_headers"), /^https:\/\/mistgate-docs\.pages\.dev\/\*\n  X-Robots-Tag: noindex$/m);
+});
