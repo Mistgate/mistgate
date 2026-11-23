@@ -216,7 +216,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `relay` | 管理员 | 计划参数：`action` 及其参数；执行时只接收 `confirm_token`。`create`：`node`（入口，ID 或精确名称）、`inbound_id`（来自 `relay_candidates`），以及可选的 `port`（443 或 1024 到 65535；省略时，若出口的端口在入口上空闲则用它，否则用一个空闲端口）。`enable`、`disable` 和 `delete`：`relay_id`。`port`：`relay_id` 和 `port`。计划会不带地址地说明这项更改：入口、出口、服务器、端口、国家检测如何看待两端、最近一次检测，以及用户会看到什么；入口与出口同国家时附一条 `warning` 事实（提示，不是拒绝）；AmneziaWG 服务器另有一条 `awg_path_keys` 事实（被允许使用两个节点的人各得一个经入口的专属密钥；AmneziaVPN 密钥需要重新导入，使用订阅链接的应用在下次刷新时获得），端口在空闲时取适合协议配置样式的端口 | 始终 |
 | `rollout_start` | 管理员 | 计划：`nodes`（`updates_status` 中 1 到 20 个节点 ID；也接受旧参数 `node_ids`，但不能同时提供）；执行：仅 `confirm_token`。计划显示受信任的签名版本、金丝雀顺序（在线人数较少优先，然后是入站较少）、批次大小，以及每个节点的名称、Agent 版本和在线人数；计划固定精确节点集合及发布包版本/构建号 | 始终（step-up） |
 | `os_rollout_start` | 管理员 | 计划：`node_ids`（`os_updates_status` 中的 1–20 个 id）、`mode`（`security`、`all`：安装普通软件包和安全更新，或 `reboot_only`）、可选 `batch_size`（1–5，默认 1）和 `reboot`（软件包模式用 `never` 或 `if_required`；`reboot_only` 用 `if_required` 或 `always`）；应用：仅 `confirm_token`。计划固定 id、模式、重启策略和批次大小。计划显示金丝雀和顺序（先在线人数较少，再 inbound 较少），以及每个不可信节点名称、待处理/安全更新、下一个内核、是否需要重启、在线人数和重启阻塞原因；还会列出当前会被跳过的节点。会警告 unattended-upgrades 自动重启和缺失的 AmneziaWG 模块。 | 始终（step-up） |
-| `os_rollout_cancel` | 管理员 | `os_updates_status` 中的 `rollout_id`。关闭已停止的系统更新（其告警随之清除）或尚未开始的更新；节点上正在运行的任务无法停止，会被拒绝 | 始终（step-up） |
+| `os_rollout_cancel` | 管理员 | `os_updates_status` 中的 `rollout_id`。取消系统更新：立即跳过尚未开始的节点，并关闭已停止的更新（其告警随之清除）。节点上已在运行的任务不会被打断，更新会在该节点的步骤有结果后以已取消结束 | 始终（step-up） |
 | `os_rollout_pause` | 管理员 | 计划：`os_updates_status` 中的 `rollout_id`；应用：仅 `confirm_token`。已在节点上运行的任务会完成并通过健康检查后再暂停；后续任务等待 | 始终（step-up） |
 | `os_rollout_resume` | 管理员 | 计划：`rollout_id`，可选 `skip_failed`；应用：仅 `confirm_token`。默认将失败步骤重试一次；设置 `skip_failed` 则跳过失败步骤并继续 | 始终（step-up） |
 | `node_update_schedule` | 管理员 | 计划参数：`node_id`、`local_datetime`（使用 `updates_status` 中的偏移量，格式为 `YYYY-MM-DDTHH:mm`，至少提前一分钟且最多提前一年）；计划会固定受信任的版本和偏移量 | 始终 |
@@ -311,7 +311,7 @@ Mistgate 应用是 `apps` 的第四个字段（`mistgate`，默认开启）。�
 
 ### 所有者在哪里审批
 
-此类计划会显示在管理后台的 **AI → 等待你处理** 中，并带有角标；如果所有者已绑定 Telegram，面板还会发送一条计划等待审批的通知，其中包含指向该页面的链接（只能在管理后台中作出决定：参见[Telegram 告警](../operations/telegram-alerts.md)）。所有者会看到面板对变更的描述、风险提示、智能体的理由（标记为「由智能体撰写，面板未做核实。」）和剩余时间，然后选择：
+此类计划会显示在管理后台的 **AI → 等待您处理** 中，并带有角标；如果所有者已绑定 Telegram，面板还会发送一条计划等待审批的通知，其中包含指向该页面的链接（只能在管理后台中作出决定：参见[Telegram 告警](../operations/telegram-alerts.md)）。所有者会看到面板对变更的描述、风险提示、智能体的理由（标记为「由智能体撰写，面板未做核实。」）和剩余时间，然后选择：
 
 - **批准**：要求所有者再次使用通行密钥或身份验证器验证码。之后智能体只能执行此计划。
 - **拒绝**：智能体执行计划时会失败，并返回「rejected by the owner」。
@@ -339,7 +339,7 @@ Mistgate 应用是 `apps` 的第四个字段（`mistgate`，默认开启）。�
    }
    ```
 
-   计划的 `needs_approval` 为 true，风险标记为 `user_page`。向所有者展示计划，请其在 **AI → 等待你处理** 中批准，然后使用 `confirm_token` 调用 `subscription_app_upsert_apply`。
+   计划的 `needs_approval` 为 true，风险标记为 `user_page`。向所有者展示计划，请其在 **AI → 等待您处理** 中批准，然后使用 `confirm_token` 调用 `subscription_app_upsert_apply`。
 3. The same for macOS: the same arguments with `"platform": "macos"`.
 4. 要让 kl!ck 排在前面，请在两个平台上分别制定一个计划，取消 Happ 的推荐标记：`{"platform": "windows", "name": "Happ", "recommended": false, "reason": "kl!ck leads on the desktop"}`，然后将平台改为 `"macos"` 再执行一次。更新现有应用时只需提供变更字段。
 

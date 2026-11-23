@@ -34,7 +34,7 @@ From `deploy/cloudflare-watcher`:
    ```
 
    Use the same bot as the panel's Telegram alerts. Get its token from BotFather; the panel does not show it again.
-6. Add the chat ID from **Integrations → Telegram alerts** on your own linked card:
+6. Add the chat ID from the **Chat ID** row of **Integrations** on your own linked chat:
 
    ```sh
    wrangler secret put TELEGRAM_CHAT_ID
