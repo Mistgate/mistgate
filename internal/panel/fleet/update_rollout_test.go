@@ -17,6 +17,7 @@ import (
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/agent/v1/agentv1connect"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/update"
 	"github.com/mistgate/mistgate/internal/release"
 )
@@ -86,7 +87,7 @@ func TestRolloutOverTheAgentEndpoint(t *testing.T) {
 
 	// the agent is connected with its old build and the capability
 	c := a.open()
-	c.send(0, helloWithUpdate("inst1", oldBuilt, "update/1", "update-guard/1", capUpdateSources))
+	c.send(0, helloWithUpdate("inst1", oldBuilt, "update/1", "update-guard/1", agentcap.UpdateSources))
 	c.wait(func(m *agentv1.ConnectResponse) bool { return m.GetHelloAck() != nil })
 	ds := c.desired()
 	model := newModel()

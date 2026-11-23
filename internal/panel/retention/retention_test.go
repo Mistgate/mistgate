@@ -7,26 +7,37 @@ import (
 
 func TestDefaultsAreWhatThePanelAlwaysDid(t *testing.T) {
 	p := Default()
-	want := map[string]time.Duration{
-		"journal_days": 7 * 24 * time.Hour, "events_info_days": 90 * 24 * time.Hour, "events_warn_days": 400 * 24 * time.Hour,
-		"audit_days": 400 * 24 * time.Hour, "alerts_days": 90 * 24 * time.Hour, "check_samples_hours": 25 * time.Hour,
-		"check_daily_days": 90 * 24 * time.Hour, "host_history_days": 90 * 24 * time.Hour,
-		"traffic_bucket_days": 400 * 24 * time.Hour, "node_traffic_hour_days": 400 * 24 * time.Hour,
-		"networks_days": 7 * 24 * time.Hour,
+	want := map[Key]time.Duration{
+		JournalDays: 7 * 24 * time.Hour, EventsInfoDays: 90 * 24 * time.Hour, EventsWarnDays: 400 * 24 * time.Hour,
+		AuditDays: 400 * 24 * time.Hour, AlertsDays: 90 * 24 * time.Hour, CheckSamplesHours: 25 * time.Hour,
+		CheckDailyDays: 90 * 24 * time.Hour, HostHistoryDays: 90 * 24 * time.Hour,
+		TrafficBucketDays: 400 * 24 * time.Hour, NodeTrafficHourDays: 400 * 24 * time.Hour,
+		NetworksDays: 7 * 24 * time.Hour,
 	}
 	if len(Fields) != len(want) {
 		t.Fatalf("%d fields, want %d", len(Fields), len(want))
 	}
 	for k, d := range want {
 		if got := p.Duration(k); got != d {
-			t.Errorf("%s: %v, want %v", k, got, d)
+			t.Errorf("%s: %v, want %v", Fields[k].Key, got, d)
 		}
 	}
 	if len(Keys()) != len(Fields) || Keys()[0] != "retention.journal_days" {
 		t.Errorf("keys: %v", Keys())
 	}
-	if p.Duration("nope") != 0 {
-		t.Error("an unknown name has a duration")
+}
+
+// Every Key lands on its own field: an unset slot of Fields would have an empty name and a zero window.
+func TestEveryKeyHasAWindow(t *testing.T) {
+	seen := map[string]bool{}
+	for k, f := range Fields {
+		if f.Key == "" || f.Unit == 0 || f.Min < 1 || seen[f.Key] {
+			t.Errorf("key %d: unset or duplicate field %+v", k, f)
+		}
+		seen[f.Key] = true
+		if Default().Duration(Key(k)) <= 0 {
+			t.Errorf("%s: no window by default", f.Key)
+		}
 	}
 }
 

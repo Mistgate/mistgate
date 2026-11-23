@@ -22,6 +22,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hysteria2"
@@ -624,12 +625,12 @@ func TestTCPShareCapability(t *testing.T) {
 		}
 		return a
 	}
-	if caps := engines("vless", "trusttunnel", "mtproto", "hysteria2").capabilities(); !slices.Contains(caps, capTCPShare) {
-		t.Fatalf("capabilities %v lack %s with every engine built in", caps, capTCPShare)
+	if caps := engines("vless", "trusttunnel", "mtproto", "hysteria2").capabilities(); !slices.Contains(caps, agentcap.TCPShare) {
+		t.Fatalf("capabilities %v lack %s with every engine built in", caps, agentcap.TCPShare)
 	}
 	for _, protocols := range [][]string{nil, {"vless", "trusttunnel", "mtproto"}, {"vless", "mtproto", "hysteria2"}} {
-		if caps := engines(protocols...).capabilities(); slices.Contains(caps, capTCPShare) {
-			t.Fatalf("capabilities %v list %s with engines %v", caps, capTCPShare, protocols)
+		if caps := engines(protocols...).capabilities(); slices.Contains(caps, agentcap.TCPShare) {
+			t.Fatalf("capabilities %v list %s with engines %v", caps, agentcap.TCPShare, protocols)
 		}
 	}
 }

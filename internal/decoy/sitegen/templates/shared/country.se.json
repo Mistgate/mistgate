@@ -1,0 +1,265 @@
+{
+ "order": 8,
+ "lang": "sv",
+ "html_lang": "sv-SE",
+ "date": [
+  "{d} {m} {y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "{n} kr",
+  "group": " ",
+  "scale": 10,
+  "round": 10
+ },
+ "address": "{street} {no}, {zip} {city}",
+ "zip_tail": "X XX",
+ "cities": [
+  {
+   "name": "Stockholm",
+   "zip": [
+    "11"
+   ],
+   "phone": "08-465004XX"
+  },
+  {
+   "name": "Göteborg",
+   "zip": [
+    "41"
+   ],
+   "phone": "031-39006XX"
+  },
+  {
+   "name": "Malmö",
+   "zip": [
+    "21"
+   ],
+   "phone": "040-62804XX"
+  },
+  {
+   "name": "Uppsala",
+   "zip": [
+    "75"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Västerås",
+   "zip": [
+    "72"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Örebro",
+   "zip": [
+    "70"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Linköping",
+   "zip": [
+    "58"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Helsingborg",
+   "zip": [
+    "25"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Jönköping",
+   "zip": [
+    "55"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Norrköping",
+   "zip": [
+    "60"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Lund",
+   "zip": [
+    "22"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Umeå",
+   "zip": [
+    "90"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Gävle",
+   "zip": [
+    "80"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Borås",
+   "zip": [
+    "50"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Södertälje",
+   "zip": [
+    "15"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Eskilstuna",
+   "zip": [
+    "63"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Karlstad",
+   "zip": [
+    "65"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Kiruna",
+   "zip": [
+    "98"
+   ],
+   "phone": "0980-3192XX"
+  },
+  {
+   "name": "Sundsvall",
+   "zip": [
+    "85"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Växjö",
+   "zip": [
+    "35"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Halmstad",
+   "zip": [
+    "30"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Luleå",
+   "zip": [
+    "97"
+   ],
+   "phone": ""
+  }
+ ],
+ "streets": [
+  "Storgatan",
+  "Kungsgatan",
+  "Drottninggatan",
+  "Skolgatan",
+  "Kyrkogatan",
+  "Järnvägsgatan",
+  "Parkgatan",
+  "Industrivägen",
+  "Bangatan",
+  "Västra vägen",
+  "Östra vägen",
+  "Strandvägen",
+  "Stationsgatan",
+  "Kyrkvägen",
+  "Skogsvägen",
+  "Södra vägen",
+  "Norra vägen",
+  "Hamngatan"
+ ],
+ "first": [
+  "Erik",
+  "Emma:f",
+  "Lars",
+  "Maja:f",
+  "Karl",
+  "Alice:f",
+  "Anders",
+  "Elsa:f",
+  "Johan",
+  "Astrid:f",
+  "Oskar",
+  "Ebba:f",
+  "Mikael",
+  "Linnea:f",
+  "Gustav",
+  "Sofia:f",
+  "Per",
+  "Karin:f",
+  "Nils",
+  "Anna:f",
+  "Olof",
+  "Ida:f",
+  "Magnus",
+  "Helena:f",
+  "Henrik",
+  "Cecilia:f",
+  "Fredrik",
+  "Malin:f",
+  "Jonas",
+  "Emelie:f",
+  "Viktor",
+  "Sara:f",
+  "Axel",
+  "Julia:f"
+ ],
+ "last": [
+  "Andersson",
+  "Johansson",
+  "Karlsson",
+  "Nilsson",
+  "Eriksson",
+  "Larsson",
+  "Olsson",
+  "Persson",
+  "Svensson",
+  "Gustafsson",
+  "Pettersson",
+  "Jonsson",
+  "Jansson",
+  "Hansson",
+  "Bengtsson",
+  "Jönsson",
+  "Lindberg",
+  "Jakobsson",
+  "Magnusson",
+  "Olofsson",
+  "Lindström",
+  "Lindgren",
+  "Axelsson",
+  "Berg",
+  "Bergström",
+  "Lundberg",
+  "Lind",
+  "Lundgren",
+  "Holm",
+  "Nyström",
+  "Berglund",
+  "Sandberg",
+  "Forsberg",
+  "Ekström"
+ ]
+}

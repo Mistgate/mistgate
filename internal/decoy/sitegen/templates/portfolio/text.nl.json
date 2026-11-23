@@ -1,0 +1,390 @@
+{
+ "ui": {
+  "nav_label": "Hoofdmenu",
+  "footer": "Alle beelden zijn werk van het atelier en mogen niet zonder toestemming worden overgenomen.",
+  "nav_home": "Geselecteerd werk",
+  "nav_work": "Al het werk",
+  "nav_about": "Over mij",
+  "nav_contact": "Contact",
+  "home_title": "Geselecteerd werk",
+  "nf_title": "Pagina niet gevonden",
+  "nf_text": "Op dit adres staat niets. Het werk staat op de startpagina.",
+  "nf_back": "Terug naar het werk",
+  "sel_h": "Geselecteerd werk",
+  "all_work": "Bekijk al het werk",
+  "work_h": "Al het werk",
+  "work_intro": "Alles van de afgelopen jaren, het nieuwste eerst.",
+  "about_h": "Over mij",
+  "services_h": "Wat ik doe",
+  "shows_h": "Tentoonstellingen en vermeldingen",
+  "contact_h": "Contact",
+  "visit_h": "Atelier",
+  "hours_h": "Openingstijden",
+  "phone_l": "Telefoon",
+  "visit_text": "Het atelier is open op afspraak. Kom bij voorkeur tijdens de openingstijden; als niemand opendoet, zit ik waarschijnlijk in de achterkamer of bij de drukker.",
+  "commission_h": "Opdrachten",
+  "commission_text": "Ik neem elk jaar een klein aantal opdrachten aan. Vertel me als u contact opneemt wat u in gedachten hebt en wanneer u het nodig hebt, dan zeg ik eerlijk of ik het kan doen.",
+  "hours_note": "Zaterdag op afspraak",
+  "work_back": "Al het werk",
+  "work_more": "Meer werk",
+  "work_ask": "Informeer naar dit werk",
+  "directions_h": "Het atelier vinden",
+  "directions": "Het atelier zit op de begane grond, op loopafstand van het centrum. De deur zit aan de zijkant, met een bel. Buiten staan fietsenrekken."
+ },
+ "bundles": {
+  "photo": {
+   "tagline": "Foto's van stille plekken",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Mist",
+       "Duin",
+       "Stilte",
+       "Zomer",
+       "Dauw",
+       "Zout",
+       "Wolk",
+       "Schemer",
+       "Heide",
+       "Veen"
+      ],
+      [
+       "licht",
+       "kader",
+       "veld",
+       "uur",
+       "horizon",
+       "belichting",
+       "plaat",
+       "sluiter",
+       "diafragma",
+       "afdruk"
+      ]
+     ]
+    }
+   },
+   "desc": "Landschaps- en stillevenfotografie uit {city}. Afdrukken en opdrachten.",
+   "desc_work": "Geselecteerde foto's, de nieuwste eerst.",
+   "desc_about": "Over de fotograaf en het atelier in {city}.",
+   "desc_contact": "Waar u het atelier in {city} vindt en wanneer het open is.",
+   "intro": "Landschaps- en stillevenfotografie uit {city}. Afdrukken en een paar opdrachten per jaar.",
+   "about": [
+    "Ik ben fotograaf en werk vanuit een klein atelier in {city}. De meeste van mijn foto's zijn van plekken in het uur nadat iedereen is vertrokken.",
+    "Ik werk langzaam, meestal met één camera en één lens, en druk alles zelf af in de achterkamer. Een foto is af als ik er een week naar kan kijken zonder iets te willen veranderen.",
+    "De afgelopen jaren is mijn werk getoond in kleine galerijen en bibliotheken in de regio en verkocht als afdruk aan mensen die iets rustigs voor aan de muur wilden."
+   ],
+   "services": [
+    "Fine-artafdrukken, gesigneerd en genummerd",
+    "Portretopdrachten thuis of in het atelier",
+    "Fotografie voor redactie en boeken"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Twee horizonten, groepstentoonstelling, Galerij De Oude Graanschuur"
+    },
+    {
+     "y": "2024",
+     "t": "Stil water, solotentoonstelling, hal van de bibliotheek"
+    },
+    {
+     "y": "2022",
+     "t": "Regionale fotoprijs, genomineerd"
+    }
+   ],
+   "works": [
+    {
+     "title": "Heuvelhelling, middag",
+     "caption": "Pigmentprint op archiefpapier, 2025",
+     "note": "Het laatste licht op een veld waar meestal niemand naar kijkt.",
+     "text": "Ik wachtte drie middagen tot de wolk van de heuvelrug trok, en hij trok vier minuten weg."
+    },
+    {
+     "title": "Twee horizonten",
+     "caption": "Pigmentprint op archiefpapier, 2025",
+     "note": "Een kustlijn die niet kon kiezen waar hij eindigde.",
+     "text": "Het tij liep weg en het natte zand nam een tweede hemel over. Ik maakte zes opnamen en hield deze."
+    },
+    {
+     "title": "Stil water",
+     "caption": "Pigmentprint op archiefpapier, 2024",
+     "note": "Een vijver in november die niets hoeft te bewijzen.",
+     "text": "Een stuwmeer om zeven uur 's ochtends, voor de wind. De afdruk is groot, zodat de stilte ruimte heeft."
+    },
+    {
+     "title": "Rood veld",
+     "caption": "Pigmentprint op archiefpapier, 2024",
+     "note": "Klaprozen die zaad hadden gezet, gefotografeerd in de regen.",
+     "text": "Klaver die mocht bloeien en daarna werd gemaaid. De kleur in de afdruk komt dichter bij wat ik zag dan de camera deed."
+    },
+    {
+     "title": "Lijnen bij schemering",
+     "caption": "Pigmentprint op archiefpapier, 2023",
+     "note": "Telefoondraden tegen een hemel die van gedachten veranderde.",
+     "text": "Hekpalen en voren, met het laatste licht plat eroverheen. Het ziet er beter uit in een lang smal kader."
+    },
+    {
+     "title": "Zout en leisteen",
+     "caption": "Pigmentprint op archiefpapier, 2023",
+     "note": "Een havenmuur bij eb, in de kleuren van een oude munt.",
+     "text": "Een strand van donkere steen met wit zout dat het tij achterliet. Ik kwam in drie seizoenen terug voor het licht dat ik wilde."
+    },
+    {
+     "title": "Blauwe uur",
+     "caption": "Pigmentprint op archiefpapier, 2022",
+     "note": "Tien minuten tussen dag en nacht, een week lang herhaald.",
+     "text": "Tien minuten na zonsondergang kleurt het hele dal als inkt. Dit is de enige opname waarop de lamp aan is."
+    },
+    {
+     "title": "Boomgaard in de winter",
+     "caption": "Pigmentprint op archiefpapier, 2022",
+     "note": "Kale bomen op een rij, twee keer geteld.",
+     "text": "Kale appelbomen op een vrieskoude ochtend. Ik stond op een krat om een lijn tussen de takken te vinden."
+    },
+    {
+     "title": "Ochtendmist",
+     "caption": "Pigmentprint op archiefpapier, 2021",
+     "note": "Een dal dat nog niet wist dat het ochtend was.",
+     "text": "De mist was om acht uur weg. Ik maakte deze foto in het kwartier dat hij er nog was."
+    }
+   ]
+  },
+  "illustration": {
+   "tagline": "Illustratie en grafiek",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Varen",
+       "Papier",
+       "Inkt",
+       "Citroen",
+       "Mot",
+       "Sinaasappel",
+       "Potlood",
+       "Linoleum",
+       "Kat",
+       "Krijt"
+      ],
+      [
+       "pers",
+       "atelier",
+       "bureau",
+       "tekening",
+       "werk",
+       "schetsboek",
+       "hoek",
+       "tafel",
+       "blok",
+       "kast"
+      ]
+     ]
+    }
+   },
+   "desc": "Illustraties, linosneden en kleine boekjes van een bureau in {city}.",
+   "desc_work": "Illustraties en drukwerk, de nieuwste eerst.",
+   "desc_about": "Over de illustrator en het atelier in {city}.",
+   "desc_contact": "Waar u het atelier in {city} vindt en wanneer het open is.",
+   "intro": "Illustraties, linosneden en kleine boekjes van een bureau in {city}.",
+   "about": [
+    "Ik ben illustrator en drukker van linosneden. Ik teken voor prentenboeken, voor tijdschriften die nog op tijd betalen en voor iedereen die een vogel in de hoek van een affiche nodig heeft.",
+    "Het meeste van mijn werk begint als een potloodschets in een schrift en eindigt als linosnede of als digitale tekening met vlakke kleuren, wat de opdracht ook vraagt.",
+    "Ik woon in {city} met een kat die opvattingen heeft over mijn composities."
+   ],
+   "services": [
+    "Prentenboeken en redactionele illustratie",
+    "Linosneden en kaarten",
+    "Affiches en beeld voor evenementen"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Kleine Drukbeurs, standhouder"
+    },
+    {
+     "y": "2024",
+     "t": "Veldnotities, een prentenboek bij een lokale uitgeverij"
+    },
+    {
+     "y": "2023",
+     "t": "Regionale illustratieprijs, eervolle vermelding"
+    }
+   ],
+   "works": [
+    {
+     "title": "Studie in oranje",
+     "caption": "Linosnede, drie kleuren, 2025",
+     "note": "Een vos, een halve trap en een onverklaarde maan.",
+     "text": "Eén kleur, drie papiersoorten en een middag. Het begon als opwarmertje en werd de kaft van een klein boek."
+    },
+    {
+     "title": "Marktdag",
+     "caption": "Digitale tekening, 2025",
+     "note": "Elf kramen en één zeer zelfvoldane duif.",
+     "text": "Ter plekke getekend, drie zaterdagen lang. De kooplui waren zo vriendelijk stil te staan, of bijna."
+    },
+    {
+     "title": "De lange weg",
+     "caption": "Potlood en inkt, 2024",
+     "note": "Een pad dat niet gaat waar het bord zegt.",
+     "text": "Een route die ik op zondag loop, uit het hoofd getekend en bij de volgende wandeling gecontroleerd. De kaart klopte op leuke manieren niet."
+    },
+    {
+     "title": "Nachtbus",
+     "caption": "Linosnede, twee kleuren, 2024",
+     "note": "Iedereen slaapt behalve de chauffeur en de maan.",
+     "text": "Pen, inkt en veel geduld met de weerspiegelingen in het raam."
+    },
+    {
+     "title": "Groene uren",
+     "caption": "Gouache, 2023",
+     "note": "Een kas om vier uur 's middags.",
+     "text": "De uren voor het ontbijt in juni, als de tuin nog koel is. Linosnede in drie kleuren."
+    },
+    {
+     "title": "Kleine vogels",
+     "caption": "Linosnede, 2023",
+     "note": "Zeven vogels, geen enkele goed herkend.",
+     "text": "Mussen, winterkoninkjes en een erg boze roodborst. Elke vogel is een apart blok, dus geen twee afdrukken zijn precies gelijk."
+    },
+    {
+     "title": "Regenstudie",
+     "caption": "Aquarel, 2022",
+     "note": "Paraplu's gezien vanuit een raam.",
+     "text": "Aquarel, vooral water. Ik liet het papier bepalen waar de plassen kwamen."
+    },
+    {
+     "title": "Oogst",
+     "caption": "Digitale tekening, 2022",
+     "note": "Een veld van oranje met een tractor in de hoek.",
+     "text": "Een groente- en fruitkraam in de herfst. De oranje pompoen moest ik twee keer tekenen."
+    },
+    {
+     "title": "Keukenraam",
+     "caption": "Potlood en inkt, 2021",
+     "note": "Wat er op de vensterbank gebeurt als niemand kijkt.",
+     "text": "Het uitzicht vanaf waar ik afwas. Het verandert met het weer, en alleen daarom vind ik afwassen niet erg."
+    }
+   ]
+  },
+  "graphic": {
+   "tagline": "Grafisch ontwerp voor kleine organisaties",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Raster",
+       "Kern",
+       "Marge",
+       "Letter",
+       "Lijn",
+       "Punt",
+       "Vlak",
+       "Papier",
+       "Maat",
+       "Pers"
+      ],
+      [
+       "studio",
+       "werk",
+       "kantoor",
+       "huis",
+       "lab",
+       "bureau",
+       "atelier",
+       "werkplaats",
+       "pers",
+       "kamer"
+      ]
+     ]
+    }
+   },
+   "desc": "Huisstijlen, affiches en drukwerk voor kleine organisaties in {city} en daarbuiten.",
+   "desc_work": "Geselecteerde ontwerpprojecten, de nieuwste eerst.",
+   "desc_about": "Over de ontwerpstudio in {city}.",
+   "desc_contact": "Waar u de studio in {city} vindt en wanneer ze open is.",
+   "intro": "Huisstijlen, affiches en drukwerk voor kleine organisaties in {city} en daarbuiten.",
+   "about": [
+    "Wij zijn een kleine ontwerpstudio in {city}. We werken voor theaters, winkels, goede doelen en af en toe een brouwerij, meestal aan huisstijlen en drukwerk.",
+    "We houden van heldere rasters, eerlijk papier en lettertypen die al lang genoeg bestaan om zich te gedragen. We proberen niets te maken waar een handleiding bij nodig is.",
+    "De meeste projecten beginnen met een gesprek en een kop thee, en eindigen met een doos gedrukte proefexemplaren op tafel."
+   ],
+   "services": [
+    "Huisstijlen en logo's",
+    "Affiches, programma's en bewegwijzering",
+    "Jaarverslagen en kleine boeken"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Affiche van het jaar, regionale ontwerpprijzen, genomineerd"
+    },
+    {
+     "y": "2024",
+     "t": "Rustige merken, een lezing bij een lokale ontwerpbijeenkomst"
+    },
+    {
+     "y": "2023",
+     "t": "Typografieavond, organisatoren"
+    }
+   ],
+   "works": [
+    {
+     "title": "Huisstijl voor een theehandelaar",
+     "caption": "Huisstijl, 2025",
+     "note": "Een merkteken van één blad en heel veel terughoudendheid.",
+     "text": "Een woordmerk, een reeks etiketten en blikken die op elkaar passen. Het blad in het merkteken is een echt blad uit de tuin van de eigenaar."
+    },
+    {
+     "title": "Affiches voor een koor",
+     "caption": "Affichereeks, 2025",
+     "note": "Twaalf vellen, twaalf stemmen, één raster.",
+     "text": "Drie affiches voor drie concerten, in twee kleuren op één vel papier gedrukt om de kosten laag te houden."
+    },
+    {
+     "title": "Jaarverslag",
+     "caption": "Drukwerk, 2024",
+     "note": "Veertig pagina's die mensen echt lezen.",
+     "text": "Veertig pagina's voor een klein goed doel. Gewone letters, ruime marges en één grafiek die mooi mag zijn."
+    },
+    {
+     "title": "Programma voor een poppentheater",
+     "caption": "Drukwerk, 2024",
+     "note": "Vouwt tot een huisje en daarna tot een boot.",
+     "text": "Een gevouwen vel dat een klein theater wordt als je aan de goede hoek trekt."
+    },
+    {
+     "title": "Verpakking voor een bakkerij",
+     "caption": "Verpakking, 2023",
+     "note": "Papieren zakken die er na één keer gebruiken beter uitzien.",
+     "text": "Papieren zakken, een stempel en een lint in de kleur van de winkel. De stempel is uit een aardappel gesneden."
+    },
+    {
+     "title": "Bewegwijzering voor een bibliotheek",
+     "caption": "Bewegwijzering, 2023",
+     "note": "Borden die je alleen opmerkt als ze ontbreken.",
+     "text": "Borden voor vier verdiepingen, getest met echte lezers. Eén bord hebben we drie keer verplaatst."
+    },
+    {
+     "title": "Menukaart voor een klein restaurant",
+     "caption": "Drukwerk, 2022",
+     "note": "Eén vel dat elke week verandert.",
+     "text": "Eén pagina, elke week anders. De opmaak laat ruimte voor een pen, want de kok streept altijd iets door."
+    },
+    {
+     "title": "Festivalaffiche",
+     "caption": "Affiche, 2022",
+     "note": "Gedrukt in twee inkten op krantenpapier.",
+     "text": "Een affiche dat vanaf de overkant van de straat moest werken, en dat deed het, dankzij één gewaagde vorm en geen kleine letters."
+    },
+    {
+     "title": "Reeks boekomslagen",
+     "caption": "Omslagen, 2021",
+     "note": "Zes omslagen, één lettertype.",
+     "text": "Zes omslagen voor één uitgever, verbonden door een raster en één lettertype. Elk heeft een eigen kleur."
+    }
+   ]
+  }
+ }
+}

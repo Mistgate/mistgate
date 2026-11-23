@@ -8,8 +8,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -55,51 +55,6 @@ func panelReason(err error) string {
 // panelUnavailable is the refusal when the owner picks the panel's site and there is none.
 func panelUnavailable(err error) error {
 	return connect.NewError(connect.CodeFailedPrecondition, errors.New(panelReason(err)))
-}
-
-func (f *Fleet) nodeMessages(ctx context.Context, nodes []store.NodeRow) ([]*adminv1.Node, error) {
-	now := f.now().UTC()
-	protos, err := f.st.FleetNodeProtocols(ctx)
-	if err != nil {
-		return nil, err
-	}
-	today, err := f.todayBytesByNode(ctx, now)
-	if err != nil {
-		return nil, err
-	}
-	relayToday, err := f.st.RelayTodayBytesByNode(ctx, todayStart(now))
-	if err != nil {
-		return nil, err
-	}
-	enabled, err := f.st.FleetEnabledInbounds(ctx)
-	if err != nil {
-		return nil, err
-	}
-	liveRows, err := f.liveView(ctx)
-	if err != nil {
-		return nil, err
-	}
-	live := liveRowsByID(liveRows)
-	panelBundle, _ := f.panelDecoyBundle()
-	healthSummaries := f.healthSummaries(ctx)
-	d6 := f.ipv6Doctors(ctx)
-	shares, err := f.st.NodeShares(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*adminv1.Node, 0, len(nodes))
-	for _, node := range nodes {
-		out = append(out, f.nodeMsg(ctx, node, protos[node.ID], today[node.ID], relayToday[node.ID], inboundsOf(enabled, node.ID), now, live[node.ID], panelBundle, healthSummaries[node.ID], d6[node.ID], shares[node.ID]))
-	}
-	return out, nil
-}
-
-func (f *Fleet) nodeMessage(ctx context.Context, node store.NodeRow) (*adminv1.Node, error) {
-	rows, err := f.nodeMessages(ctx, []store.NodeRow{node})
-	if err != nil {
-		return nil, err
-	}
-	return rows[0], nil
 }
 
 func (f *Fleet) scheduleDecoySync(nodeID string) {
@@ -153,7 +108,7 @@ func (f *Fleet) decoySyncFailed(nodeID string) bool {
 // decoySweep runs with the 30 s sweep: a connected node whose reported site is not the configured one gets it again
 // (the panel's --decoy-dir changed, or an earlier push failed; a failed push waits decoyRetryAfter).
 func (f *Fleet) decoySweep(n store.NodeRow, live store.NodeLiveRow) {
-	if n.State != "active" || !live.Connected || n.DecoyMode == decoy.ModeBuiltin || !slices.Contains(live.AgentCaps, capDecoy) {
+	if n.State != "active" || !live.Connected || n.DecoyMode == decoy.ModeBuiltin || !slices.Contains(live.AgentCaps, agentcap.Decoy) {
 		return
 	}
 	want := n.DecoyBundleHash
@@ -198,7 +153,7 @@ func (f *Fleet) syncNodeDecoy(ctx context.Context, nodeID string) error {
 	if err != nil {
 		return err
 	}
-	if !live.Connected || !slices.Contains(live.AgentCaps, capDecoy) {
+	if !live.Connected || !slices.Contains(live.AgentCaps, agentcap.Decoy) {
 		return nil
 	}
 

@@ -1,0 +1,466 @@
+{
+ "ui": {
+  "ref_h": "Žinynas",
+  "nav_label": "Dokumentacija",
+  "footer": "Dokumentacija, versija {ver}.",
+  "nav_home": "Apžvalga",
+  "nav_install": "Diegimas",
+  "nav_usage": "Naudojimas",
+  "nav_faq": "DUK",
+  "home_title": "Apžvalga",
+  "desc_install": "Kaip įdiegti {brand} {ver} Linux, macOS ir Windows sistemose.",
+  "desc_usage": "Kaip naudoti {brand}: dažniausios užduotys su pavyzdžiais.",
+  "desc_faq": "Dažniausiai užduodami klausimai apie {brand}.",
+  "nf_title": "Puslapis nerastas",
+  "nf_text": "Šis puslapis nepriklauso dokumentacijai. Naujesnėje versijoje jis galėjo būti pervadintas.",
+  "nf_back": "Atgal į apžvalgą",
+  "quick_h": "Greita pradžia",
+  "features_h": "Ką ji daro",
+  "out_h": "Rezultatas",
+  "install_h": "Diegimas",
+  "steps_h": "Žingsniai",
+  "usage_h": "Naudojimas",
+  "opts_h": "Parametrai",
+  "opt_col": "Parametras",
+  "desc_col": "Aprašymas",
+  "faq_h": "Dažniausiai užduodami klausimai",
+  "next": "Toliau",
+  "facts_h": "Trumpai",
+  "menu_h": "Dokumentacija",
+  "facts": [
+   {
+    "k": "Versija",
+    "v": "{ver}"
+   },
+   {
+    "k": "Platformos",
+    "v": "Linux, macOS ir Windows"
+   },
+   {
+    "k": "Licencija",
+    "v": "MIT"
+   },
+   {
+    "k": "Priklausomybės",
+    "v": "Nėra"
+   }
+  ],
+  "install_check": "Jei išvedamas versijos numeris, diegimas pavyko.",
+  "nav_config": "Nustatymai",
+  "nav_recipes": "Receptai",
+  "nav_trouble": "Problemų sprendimas",
+  "desc_config": "{brand} nustatymų failas ir nustatymai.",
+  "desc_recipes": "Trumpi receptai kasdieniams darbams su {brand}.",
+  "desc_trouble": "Dažniausių {brand} problemų sprendimai.",
+  "config_h": "Nustatymai",
+  "config_col_key": "Raktas",
+  "config_col_default": "Numatytoji reikšmė",
+  "config_col_desc": "Ką daro",
+  "config_file_h": "Pavyzdys",
+  "recipes_h": "Receptai",
+  "recipes_intro": "Trumpi atsakymai apie darbus, apie kuriuos klausiama dažniausiai.",
+  "trouble_h": "Problemų sprendimas",
+  "trouble_intro": "Dažniausios problemos ir tai, kas jas paprastai išsprendžia.",
+  "ver_l": "Versija",
+  "prev": "Atgal"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "Žurnalų santrauka komandinėje eilutėje",
+   "desc": "{brand} skaito paprastus tekstinius žurnalo failus ir išveda trumpą jų santrauką.",
+   "overview": "{brand} skaito paprastus tekstinius žurnalo failus ir išveda trumpą santrauką: kiek yra eilučių, kokie lygiai naudojami ir kurie pranešimai kartojasi dažniausiai. Tai viena maža programa be priklausomybių.",
+   "features": [
+    "Skaito failus, aplankus ir standartinę įvestį",
+    "Sugrupuoja panašius pranešimus be jokių nustatymų",
+    "Išveda tekstą, JSON arba nedidelę HTML ataskaitą"
+   ],
+   "quick_out": "app.log: 48 211 eilučių, 3 lygiai\n  info   46 902\n  warn    1 190\n  error     119\ndažniausias pranešimas: cache miss for key (9 413 kartų)",
+   "install_intro": "{brand} platinamas kaip viena vykdomoji programa. Prieš pirmą paleidimą nieko nustatyti nereikia.",
+   "install_steps": [
+    "Atsisiųskite archyvą, tinkantį jūsų sistemai.",
+    "Išpakuokite jį ir nukopijuokite programą į aplanką, esantį PATH sąraše.",
+    "Paleiskite versijos komandą ir patikrinkite, ar viskas veikia."
+   ],
+   "faq": [
+    {
+     "q": "Kokie žurnalų formatai palaikomi?",
+     "a": "Bet kuris, kuriame viena eilutė yra vienas įrašas. {brand} atpažįsta dažniausius laiko ir lygio užrašymo būdus, o jei neatpažįsta, skaito paprastas eilutes."
+    },
+    {
+     "q": "Ar programa keičia mano failus?",
+     "a": "Niekada. Failai atidaromi tik skaitymui."
+    },
+    {
+     "q": "Kokio dydžio failą galima skaityti?",
+     "a": "Failai skaitomi srautu, todėl dydį riboja tik laikas. Gigabaitas nešiojamajame kompiuteryje užtrunka kelias sekundes."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Failo santrauka",
+     "p": "Nurodykite {brand} failą, aplanką arba srautą. Aplankai skaitomi rekursyviai, o suglaudinti failai išpakuojami iš karto."
+    },
+    {
+     "h": "Laiko intervalas",
+     "p": "Parametrais --since ir --until susiaurinkite santrauką iki laiko intervalo. Laikas gali būti nurodytas tiksliai arba nuo dabar."
+    },
+    {
+     "h": "Išvesties formatas",
+     "p": "Numatytoji išvestis yra paprastas tekstas. JSON formatas pastovus ir skirtas scenarijams, o HTML ataskaita yra vienas failas, kurį galima nusiųsti kolegai."
+    }
+   ],
+   "options": [
+    {
+     "d": "Tik eilutės po šio laiko, tikslios arba tokios kaip 2h."
+    },
+    {
+     "d": "Tik eilutės prieš šį laiką."
+    },
+    {
+     "d": "Tik šio ar aukštesnio lygio eilutės."
+    },
+    {
+     "d": "Kiek besikartojančių pranešimų išvardyti. Numatyta 5."
+    },
+    {
+     "d": "text, json arba html. Numatyta text."
+    }
+   ],
+   "config_intro": "{brand} skaito neprivalomą failą config.toml iš jūsų nustatymų aplanko. Kiekvieną raktą galima nurodyti ir komandinėje eilutėje, ir ji turi pirmenybę.",
+   "config_rows": [
+    {
+     "d": "Kiek besikartojančių pranešimų išvardyti."
+    },
+    {
+     "d": "Išvesties formatas: text, json arba html."
+    },
+    {
+     "d": "Pranešimai, kuriuos reikia praleisti, ieškoma kaip paprasto teksto."
+    },
+    {
+     "d": "Skaityti tik eilutes po šio laiko."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Rasti triukšmingiausią valandą",
+     "p": "Sugrupuokite santrauką pagal valandas ir pamatysite, kada žurnale buvo daugiausia įrašų."
+    },
+    {
+     "h": "Palyginti dvi dienas",
+     "p": "Parodykite, kurie pranešimai atsirado, o kurie išnyko tarp dviejų failų."
+    },
+    {
+     "h": "Paruošti ataskaitą kitiems",
+     "p": "Įrašykite HTML ataskaitą į failą ir pridėkite jį prie laiško."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Santrauka tuščia",
+     "a": "Patikrinkite, ar faile yra po vieną pranešimą eilutėje. Jei failas suglaudintas {brand} nepažįstamu formatu, pirmiausia jį išpakuokite."
+    },
+    {
+     "q": "Laikai atrodo neteisingi",
+     "a": "Eilutės be laiko juostos skaitomos kaip UTC. Parametru --tz nurodykite, kokioje juostoje jos užrašytos."
+    },
+    {
+     "q": "Ataskaita per ilga",
+     "a": "Sumažinkite --top arba įrašykite triukšmingiausius pranešimus į nustatymų failo ignoravimo sąrašą."
+    },
+    {
+     "q": "Lėtai veikia tinklo diske",
+     "a": "Pirmiausia nukopijuokite failą į vietinį diską. Dažniausia priežastis yra skaitymas eilutė po eilutės lėtu ryšiu."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Dienynas",
+       "Sauja",
+       "Ratas",
+       "Skaita",
+       "Lapas",
+       "Tvarka",
+       "Rinkinys",
+       "Knyga"
+      ],
+      [
+       "log",
+       "scan",
+       "sum",
+       "view",
+       "cut",
+       "peek"
+      ]
+     ]
+    }
+   }
+  },
+  "site": {
+   "tagline": "Nedidelis statinių svetainių kūrimo įrankis",
+   "desc": "{brand} paverčia Markdown failų aplanką ir kelis šablonus statine svetaine.",
+   "overview": "{brand} paverčia Markdown failų aplanką ir kelis šablonus statine svetaine. Nėra duomenų bazės, nėra vykdymo aplinkos ir serveryje nieko nereikia atnaujinti.",
+   "features": [
+    "Markdown su antraštės duomenimis",
+    "Šablonai paprastu HTML",
+    "Vietinė peržiūra, kuri atnaujinama po kiekvieno išsaugojimo"
+   ],
+   "quick_out": "Svetainė „notes“ pasiekiama adresu localhost:4000 (sustabdyti: Ctrl+C)",
+   "install_intro": "{brand} yra viena vykdomoji programa. Įdėkite ją į PATH aplanką, ir viskas.",
+   "install_steps": [
+    "Atsisiųskite archyvą, tinkantį jūsų sistemai.",
+    "Išpakuokite jį ir nukopijuokite programą į aplanką, esantį PATH sąraše.",
+    "Paleiskite versijos komandą ir patikrinkite, ar viskas veikia."
+   ],
+   "faq": [
+    {
+     "q": "Ar galiu naudoti savo šablonus?",
+     "a": "Taip. Šablonai yra paprasti HTML failai su keliomis vietos žymomis, o aplankų struktūrą galite keisti kaip norite."
+    },
+    {
+     "q": "Ar reikia duomenų bazės?",
+     "a": "Ne. Rezultatas yra paprasti failai, kuriuos gali pateikti bet kuris interneto serveris."
+    },
+    {
+     "q": "Kaip pridėti naują puslapio tipą?",
+     "a": "Sukurkite aplanką pages viduje su savo maketo failu, ir {brand} jį pastebės per kitą kūrimą."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Nauja svetainė",
+     "p": "Komanda init sukuria aplanką su nustatymų failu, maketu ir vienu pavyzdiniu puslapiu."
+    },
+    {
+     "h": "Puslapio rašymas",
+     "p": "Puslapiai yra Markdown failai. Viršuje esantys antraštės duomenys nurodo pavadinimą ir datą, viskas žemiau yra turinys."
+    },
+    {
+     "h": "Kūrimas skelbimui",
+     "p": "Komanda build įrašo gatavą svetainę į aplanką public. Nukopijuokite tą aplanką į bet kurį interneto serverį."
+    }
+   ],
+   "options": [
+    {
+     "d": "Aplankas gatavai svetainei. Numatyta public."
+    },
+    {
+     "d": "Įtraukti puslapius, pažymėtus kaip juodraščius."
+    },
+    {
+     "d": "Peržiūros serverio prievadas. Numatyta 4000."
+    },
+    {
+     "d": "Perkurti, kai pasikeičia failas."
+    },
+    {
+     "d": "Rodyti tik klaidas."
+    }
+   ],
+   "config_intro": "Failas site.toml yra jūsų aplanko šaknyje. Trūkstamas raktas gauna numatytąją reikšmę, todėl naujai svetainei failo visai nereikia.",
+   "config_rows": [
+    {
+     "d": "Pavadinimas, rodomas puslapio antraštėje ir pavadinime."
+    },
+    {
+     "d": "Adresas, kuriuo veikia svetainė. Šaknyje esančiai svetainei naudokite /."
+    },
+    {
+     "d": "Svetainės išvaizda: plain, slate arba folio."
+    },
+    {
+     "d": "Ar kuriami juodraščiais pažymėti puslapiai."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Pridėti naują puslapį",
+     "p": "Sukurkite Markdown failą, kurio viršuje būtų pavadinimas ir data."
+    },
+    {
+     "h": "Peržiūrėti juodraščius",
+     "p": "Paleiskite svetainę vietoje kartu su nebaigtais puslapiais."
+    },
+    {
+     "h": "Paskelbti į aplanką",
+     "p": "Sukurkite visą svetainę viename aplanke, kurį galėsite nukopijuoti į bet kurį interneto serverį."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Puslapio nėra sukurtoje svetainėje",
+     "a": "Puslapiai su draft: true antraštėje praleidžiami. Pašalinkite šią eilutę arba kurkite su --drafts."
+    },
+    {
+     "q": "Po paskelbimo nuorodos neveikia",
+     "a": "Nustatykite base_url į aplanko, kuriame paskelbta svetainė, adresą."
+    },
+    {
+     "q": "Peržiūra neatsinaujina",
+     "a": "Kai kurie redaktoriai sukuria naują failą, užuot pakeitę seną. Paleiskite peržiūrą iš naujo arba redaktoriuje išjunkite saugųjį įrašymą."
+    },
+    {
+     "q": "Nerodomi paveikslėliai",
+     "a": "Padėkite juos į aplanką static. Viskas jame nukopijuojama nepakeista."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Paprasta",
+       "Kreida",
+       "Plunksna",
+       "Spauda",
+       "Lapas",
+       "Foliantas",
+       "Rastas",
+       "Knyga"
+      ],
+      [
+       "site",
+       "page",
+       "build",
+       "gen",
+       "sheet"
+      ]
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Pasikartojantys darbai be crontab",
+   "desc": "{brand} paleidžia nedidelius pasikartojančius darbus viename kompiuteryje ir praneša, jei kuris nepavyksta.",
+   "overview": "{brand} paleidžia nedidelius pasikartojančius darbus viename kompiuteryje ir praneša, jei kuris nepavyksta. Tai patogesnė alternatyva crontab, kurį tenka laikyti galvoje.",
+   "features": [
+    "Grafikai užrašomi paprastais žodžiais",
+    "Kiekvieno paleidimo žurnalas",
+    "Viena išvesties eilutė kiekvienam darbui, todėl nesėkmės krenta į akis"
+   ],
+   "quick_out": "backup   kasdien 03:00   paskutinis paleidimas: gerai (4 s)",
+   "install_intro": "{brand} sudaro viena vykdomoji programa ir nedidelis foninis procesas, kuris kartą per minutę tikrina grafiką.",
+   "install_steps": [
+    "Atsisiųskite archyvą, tinkantį jūsų sistemai.",
+    "Išpakuokite jį ir nukopijuokite programą į aplanką, esantį PATH sąraše.",
+    "Paleiskite foninį procesą savo sistemos paslaugų tvarkyklėje."
+   ],
+   "faq": [
+    {
+     "q": "Ar ji turi veikti kaip paslauga?",
+     "a": "Taip, nedidelis foninis procesas kartą per minutę tikrina grafiką. Diegimo puslapyje parodyta, ką paleisti."
+    },
+    {
+     "q": "Kas nutinka, jei kompiuteris išjungtas?",
+     "a": "Darbas, kurio metas atėjo, kai kompiuteris buvo išjungtas, bus paleistas vieną kartą, kai tik jis vėl įsijungs."
+    },
+    {
+     "q": "Ar darbai gali priklausyti vienas nuo kito?",
+     "a": "Kol kas ne. Sujunkite komandas į vieną darbą."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Darbo pridėjimas",
+     "p": "Darbą sudaro pavadinimas, grafikas ir komanda. Grafikai užrašomi paprastais žodžiais."
+    },
+    {
+     "h": "Kas buvo paleista",
+     "p": "Komanda list parodo kiekvieną darbą su paskutinio paleidimo rezultatu. Komanda history parodo vieno darbo paleidimus, jų trukmę ir išvestį."
+    },
+    {
+     "h": "Sustabdymas ir tęsimas",
+     "p": "Sustabdytas darbas ir jo istorija išsaugomi, bet darbas nebeleidžiamas. Patogu, kai keliatės ar atkuriate atsarginę kopiją."
+    }
+   ],
+   "options": [
+    {
+     "d": "Kur laikomi darbai ir žurnalai. Numatytasis yra aplankas jūsų namų kataloge."
+    },
+    {
+     "d": "Rodyti tik nesėkmes."
+    },
+    {
+     "d": "Kiek paleidimų rodo istorija. Numatyta 10."
+    },
+    {
+     "d": "Išvestis, tinkama skaityti programoms."
+    },
+    {
+     "d": "Paleisti darbą nedelsiant, o ne tik pagal grafiką."
+    }
+   ],
+   "config_intro": "{brand} skaito jobs.toml iš jūsų nustatymų aplanko. Patys darbai laikomi atskirai, todėl faile yra tik nustatymai.",
+   "config_rows": [
+    {
+     "d": "Apvalkalas, kuris vykdo komandas."
+    },
+    {
+     "d": "Kur laikoma kiekvieno paleidimo išvestis."
+    },
+    {
+     "d": "Kiek kartų bandoma iš naujo, jei darbas nepavyko."
+    },
+    {
+     "d": "Ar nepavykęs darbas taip pat siunčia pranešimą."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Paleisti darbą vieną kartą, dabar",
+     "p": "Paleiskite darbą ne pagal grafiką, pavyzdžiui, norėdami išbandyti naują komandą."
+    },
+    {
+     "h": "Pamatyti, kodėl darbas nepavyko",
+     "p": "Išveskite paskutinio darbo paleidimo išvestį."
+    },
+    {
+     "h": "Sustabdyti viską kelionės metu",
+     "p": "Sustabdykite visus grafikus, kol juos vėl įjungsite."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Darbas niekada nepaleidžiamas",
+     "a": "Komanda list patikrinkite, ar programa veikia. Darbai paleidžiami tik tada, kai ji veikia."
+    },
+    {
+     "q": "Darbas paleidžiamas du kartus",
+     "a": "Veikia dvi programos kopijos. Sustabdykite vieną iš jų, užrakto failas yra žurnalų aplanke."
+    },
+    {
+     "q": "Komanda veikia mano terminale, bet čia ne",
+     "a": "Darbai neskaito jūsų apvalkalo paleidimo failų. Naudokite pilnus kelius arba nustatykite aplinką pačiame darbe."
+    },
+    {
+     "q": "Laikas skiriasi viena valanda",
+     "a": "{brand} seka sistemos laikrodį ir laiko juostą. Keiskite juos ten, o ne darbe."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Laikrodis",
+       "Darbas",
+       "Vakaras",
+       "Ritmas",
+       "Skambutis",
+       "Tvarka",
+       "Planas",
+       "Ciklas"
+      ],
+      [
+       "work",
+       "list",
+       "run",
+       "do",
+       "bell"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

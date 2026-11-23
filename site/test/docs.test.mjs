@@ -127,9 +127,9 @@ test("node guides show the SSH install choice, and updates show the published pa
   const updatesEn = page("en", "operations/updates");
   const updatesRu = page("ru", "operations/updates");
 
-  assert.ok(addEn.includes("Install automatically over SSH"));
+  assert.ok(addEn.includes("Over SSH"));
   assert.ok(addEn.includes('href="/getting-started/ssh-install/"'));
-  assert.ok(addRu.includes("Запустить автоустановку по SSH"));
+  assert.ok(addRu.includes("По SSH"));
   assert.ok(addRu.includes('href="/ru/getting-started/ssh-install/"'));
   assert.ok(sshEn.includes("Saved SSH access"));
   assert.ok(sshEn.includes("--token-stdin"));
@@ -142,14 +142,13 @@ test("node guides show the SSH install choice, and updates show the published pa
   assert.ok(updatesRu.includes("Проверить GitHub"));
 });
 
-test("the device-ID column of the client apps is answers in every language, and fa and tr mark what is planned", () => {
+test("the device-ID column of the client apps is answers in every language, and the fa and tr overviews name the app for Windows", () => {
   for (const lang of LANGS) {
     const html = page(lang, "guide/client-apps");
     assert.equal(html.match(/class="yn yn--yes"/g)?.length, 3, `${lang}: three apps send an ID ("Yes." and "Yes, by default.")`);
     assert.equal(html.match(/class="yn yn--no"/g)?.length, 1, `${lang}: one row says no`);
   }
-  assert.ok(page("fa", "getting-started/overview").includes('<strong class="planned">برنامه‌ریزی‌شده</strong>'));
-  assert.ok(page("tr", "getting-started/overview").includes('<strong class="planned">Planlanıyor</strong>'));
+  for (const lang of ["fa", "tr"]) assert.ok(page(lang, "getting-started/overview").includes("github.com/Mistgate/mistgate-client"), `${lang}: the overview names the app for Windows`);
 });
 
 // Emphasis that CommonMark does not close (a ** next to full-width punctuation and a letter) shows up as literal asterisks:

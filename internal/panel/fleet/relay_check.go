@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -189,16 +190,16 @@ func (r relayRun) udp() bool { return r.link.Network == "udp" }
 // capability is what a node must list to send (and, for UDP, to count) this relay's probes.
 func (r relayRun) capability() string {
 	if r.udp() {
-		return capUDPCheck
+		return agentcap.UDPCheck
 	}
-	return capTCPCheck
+	return agentcap.TCPCheck
 }
 
 // online: the node's agent is connected and lists the capability; else the failure code.
 func (r relayRun) online(id, code string) string {
 	l := r.live[id]
 	switch {
-	case !l.Connected || (r.f.cfg.Remote == nil && r.f.session(id) == nil):
+	case !r.f.reachable(l, id):
 		return code
 	case !slices.Contains(l.AgentCaps, r.capability()):
 		return "agent_too_old"

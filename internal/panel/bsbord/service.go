@@ -34,7 +34,6 @@ import (
 const (
 	Source = countryreach.SourceBsbord
 
-	settingCountry  = "country_reachability.country" // the country the owner checks from, owned by countryreach
 	settingEnabled  = "bsbord.enabled"
 	settingKey      = "bsbord.key"
 	settingUnits    = "bsbord.units"
@@ -87,9 +86,8 @@ type Service struct {
 	log *slog.Logger
 	now func() time.Time
 
+	guard  countryreach.RunGuard
 	mu     sync.Mutex
-	gen    uint64
-	cancel context.CancelFunc
 	tickMu sync.Mutex
 
 	lastTest time.Time
@@ -292,37 +290,6 @@ func (s *Service) observeVersion(version string) {
 	}
 }
 
-func (s *Service) generation() uint64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.gen
-}
-
-func (s *Service) track(ctx context.Context, gen uint64) (context.Context, func(), bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if gen != s.gen {
-		return nil, nil, false
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	s.cancel = cancel
-	return ctx, func() {
-		s.mu.Lock()
-		s.cancel = nil
-		s.mu.Unlock()
-		cancel()
-	}, true
-}
-
-func (s *Service) stop() {
-	s.mu.Lock()
-	s.gen++
-	if cancel := s.cancel; cancel != nil {
-		cancel()
-	}
-	s.mu.Unlock()
-}
-
 // State is the settings-only view of this source for health.Config.External: one batched settings read, no network. It is read on
 // every checks, history and evaluator pass.
 func (s *Service) State(ctx context.Context) health.ExternalState {
@@ -335,15 +302,13 @@ func (s *Service) State(ctx context.Context) health.ExternalState {
 }
 
 // StateKeys are the settings State reads; StateFrom builds it from their values.
-func StateKeys() []string { return []string{settingEnabled, settingInterval, settingCountry} }
+func StateKeys() []string {
+	return []string{settingEnabled, settingInterval, countryreach.CountrySetting}
+}
 
 // StateFrom is State from the values of StateKeys.
 func StateFrom(kv map[string]string) health.ExternalState {
-	country := strings.ToUpper(strings.TrimSpace(kv[settingCountry]))
-	if country == "" {
-		country = countryreach.DefaultCountry
-	}
-	if country != countryreach.TSPUCountry {
+	if countryreach.ParseCountry(kv[countryreach.CountrySetting]) != countryreach.TSPUCountry {
 		return health.ExternalState{Source: Source}
 	}
 	interval := DefaultIntervalMin
@@ -373,7 +338,7 @@ func (s *Service) Tick(ctx context.Context) {
 		return
 	}
 	defer s.tickMu.Unlock()
-	gen := s.generation()
+	gen := s.guard.Generation()
 	st, err := s.load(ctx)
 	if err != nil {
 		s.log.Warn("bsbord: read settings")
@@ -395,7 +360,7 @@ func (s *Service) Tick(ctx context.Context) {
 	if !s.lease(ctx) {
 		return
 	}
-	rctx, done, ok := s.track(ctx, gen)
+	rctx, done, ok := s.guard.Track(ctx, gen, 0)
 	if !ok {
 		return
 	}
@@ -428,7 +393,7 @@ func (s *Service) startRound(ctx context.Context, st settings, secret vault.Reda
 		return
 	}
 	if len(calls) == 0 {
-		if s.generation() != gen {
+		if !s.guard.Current(gen) {
 			return
 		}
 		rows := skippedRows(skippedNodes, skipped, now)
@@ -450,7 +415,7 @@ func (s *Service) startRound(ctx context.Context, st settings, secret vault.Reda
 		s.log.Warn("bsbord: create request key")
 		return
 	}
-	if s.generation() != gen {
+	if !s.guard.Current(gen) {
 		return
 	}
 	p := &pending{Key: key, Body: calls[0].Body, Targets: calls[0].Targets, At: now.Unix(), RoundAt: now.Unix(),
@@ -462,7 +427,7 @@ func (s *Service) startRound(ctx context.Context, st settings, secret vault.Reda
 
 func (s *Service) runPending(ctx context.Context, st settings, secret vault.Redacted, gen uint64, now time.Time, currentKey string) {
 	p := st.Pending
-	if p == nil || s.generation() != gen {
+	if p == nil || !s.guard.Current(gen) {
 		return
 	}
 	c := s.client(secret)
@@ -470,7 +435,7 @@ func (s *Service) runPending(ctx context.Context, st settings, secret vault.Reda
 	if !p.Sent {
 		preview, _, err := c.preview(ctx, p.Body)
 		if err != nil {
-			if s.generation() != gen {
+			if !s.guard.Current(gen) {
 				return
 			}
 			s.handleFailure(ctx, st, err, now, false, currentKey)
@@ -508,7 +473,7 @@ func (s *Service) runPending(ctx context.Context, st settings, secret vault.Reda
 		case <-timer.C:
 		}
 	}
-	if s.generation() != gen {
+	if !s.guard.Current(gen) {
 		return
 	}
 	if !s.tickCurrent(ctx, currentKey) {
@@ -525,14 +490,14 @@ func (s *Service) runPending(ctx context.Context, st settings, secret vault.Reda
 		s.log.Warn("bsbord: save request state", "err", err)
 		return
 	}
-	if s.generation() != gen {
+	if !s.guard.Current(gen) {
 		return
 	}
 	if !s.tickCurrent(ctx, p.Key) {
 		return
 	}
 	result, _, err := c.probe(ctx, p.Body, p.Key)
-	if s.generation() != gen {
+	if !s.guard.Current(gen) {
 		return
 	}
 	if err != nil {
@@ -939,16 +904,8 @@ func fail(code connect.Code, msg string) error { return connect.NewError(code, e
 
 var errInternal = fail(connect.CodeInternal, "internal error")
 
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
-
 func (r rpc) GetBsbord(ctx context.Context, _ *connect.Request[adminv1.GetBsbordRequest]) (*connect.Response[adminv1.GetBsbordResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	if r.s.country(ctx) != countryreach.TSPUCountry {
@@ -962,7 +919,7 @@ func (r rpc) GetBsbord(ctx context.Context, _ *connect.Request[adminv1.GetBsbord
 }
 
 func (r rpc) UpdateBsbord(ctx context.Context, req *connect.Request[adminv1.UpdateBsbordRequest]) (*connect.Response[adminv1.UpdateBsbordResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1050,7 +1007,7 @@ func (r rpc) UpdateBsbord(ctx context.Context, req *connect.Request[adminv1.Upda
 	turningOff := m.Enabled != nil && !*m.Enabled
 	cancelPending := st.Pending != nil && (turningOff || keyChanged || unitsChanged)
 	if turningOff || cancelPending {
-		s.stop()
+		s.guard.Stop()
 	}
 	if cancelPending {
 		if st.Pending.Sent && st.Pending.Reserve > 0 {
@@ -1128,7 +1085,7 @@ func (s *Service) cancelPending(ctx context.Context, st settings) {
 }
 
 func (r rpc) DisconnectBsbord(ctx context.Context, _ *connect.Request[adminv1.DisconnectBsbordRequest]) (*connect.Response[adminv1.DisconnectBsbordResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1141,7 +1098,7 @@ func (r rpc) DisconnectBsbord(ctx context.Context, _ *connect.Request[adminv1.Di
 		return nil, err
 	}
 	old := st
-	s.stop()
+	s.guard.Stop()
 	if st.Pending != nil && st.Pending.Sent && st.Pending.Reserve > 0 {
 		st.Spend = addSpend(st.Spend, st.Pending.Reserve, s.now())
 	}
@@ -1174,7 +1131,7 @@ func (r rpc) DisconnectBsbord(ctx context.Context, _ *connect.Request[adminv1.Di
 }
 
 func (r rpc) TestBsbord(ctx context.Context, _ *connect.Request[adminv1.TestBsbordRequest]) (*connect.Response[adminv1.TestBsbordResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	s := r.s
@@ -1228,7 +1185,7 @@ func (s *Service) testRate() error {
 }
 
 func (r rpc) ListBsbordUnits(ctx context.Context, _ *connect.Request[adminv1.ListBsbordUnitsRequest]) (*connect.Response[adminv1.ListBsbordUnitsResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	st, err := r.s.load(ctx)
@@ -1266,7 +1223,7 @@ func (r rpc) ListBsbordUnits(ctx context.Context, _ *connect.Request[adminv1.Lis
 }
 
 func (r rpc) PreviewBsbord(ctx context.Context, _ *connect.Request[adminv1.PreviewBsbordRequest]) (*connect.Response[adminv1.PreviewBsbordResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	s := r.s

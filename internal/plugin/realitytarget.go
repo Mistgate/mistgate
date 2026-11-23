@@ -1,7 +1,6 @@
 package plugin
 
 import (
-	"encoding/json"
 	"net"
 	"strconv"
 	"strings"
@@ -11,25 +10,12 @@ import (
 // target ("host:port") and the first server name the node asks it for (what the engine's own probe sends). ok is false for
 // every other inbound: other protocols, TLS, the node's own site (target "self"), and settings that cannot be read.
 func RealityTarget(s InboundSpec) (target, name string, ok bool) {
-	if s.Protocol != "vless" {
+	v, readable := VLESSOf(s)
+	if !readable || v.Security != "reality" || v.Target == "" || v.TargetSelf() || len(v.ServerNames) == 0 {
 		return "", "", false
 	}
-	var j struct {
-		Security string `json:"security"`
-		Reality  struct {
-			Target      string   `json:"target"`
-			ServerNames []string `json:"server_names"`
-		} `json:"reality"`
-	}
-	if len(s.Settings) == 0 || json.Unmarshal(s.Settings, &j) != nil || j.Security != "reality" {
-		return "", "", false
-	}
-	target = strings.TrimSpace(j.Reality.Target)
-	if target == "" || target == "self" || len(j.Reality.ServerNames) == 0 {
-		return "", "", false
-	}
-	name = strings.TrimSuffix(strings.TrimSpace(j.Reality.ServerNames[0]), ".")
-	return target, name, name != ""
+	name = strings.TrimSuffix(strings.TrimSpace(v.ServerNames[0]), ".")
+	return v.Target, name, name != ""
 }
 
 // RealityTargetShown is what a VLESS REALITY inbound shows strangers, for a person to read: "self" (the node's own site), the target's
@@ -38,16 +24,7 @@ func RealityTargetShown(s InboundSpec) string {
 	if target, _, ok := RealityTarget(s); ok {
 		return target
 	}
-	if s.Protocol != "vless" {
-		return ""
-	}
-	var j struct {
-		Security string `json:"security"`
-		Reality  struct {
-			Target string `json:"target"`
-		} `json:"reality"`
-	}
-	if json.Unmarshal(s.Settings, &j) == nil && j.Security == "reality" && strings.TrimSpace(j.Reality.Target) == "self" {
+	if v, ok := VLESSOf(s); ok && v.Security == "reality" && v.TargetSelf() {
 		return "self"
 	}
 	return ""

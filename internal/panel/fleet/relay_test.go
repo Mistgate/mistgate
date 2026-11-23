@@ -11,6 +11,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -134,6 +135,18 @@ func (c *conn) next(m *model) *agentv1.DesiredState {
 	return ds
 }
 
+// nextUntil is next for a state that several debounced recomputes may lead to: the setup of a test kicks the recompute more than
+// once, and on a loaded machine one of them can fire before the setup is done and send a delta of the half-built fleet first.
+// It applies and acknowledges deltas until ok accepts one (c.wait fails the test when none ever does).
+func (c *conn) nextUntil(m *model, ok func(*agentv1.DesiredState) bool) *agentv1.DesiredState {
+	c.t.Helper()
+	for {
+		if ds := c.next(m); ok(ds) {
+			return ds
+		}
+	}
+}
+
 // A node without the capability never gets forwards, and its hash is the hash of a state that has none; one with it does.
 func TestRelaysReachOnlyAgentsThatListTheCapability(t *testing.T) {
 	x := newRelayEnv(t)
@@ -148,7 +161,7 @@ func TestRelaysReachOnlyAgentsThatListTheCapability(t *testing.T) {
 		t.Fatalf("a node without forwards hashes %s, want %s (the hash it had before forwards existed)", ds.StateHash, noForwards)
 	}
 
-	_, m, ds = connectCaps(x.entry, "new", "doctor/1", plugin.CapRelayForward)
+	_, m, ds = connectCaps(x.entry, "new", "doctor/1", agentcap.RelayForward)
 	want := &agentv1.RelayForwards{Items: []*agentv1.RelayForward{{RelayId: "rly_a", Network: "udp", Port: 8443, ToHost: "exit.example.com", ToPort: 4443}}}
 	if !proto.Equal(ds.Relays, want) {
 		t.Fatalf("forwards on the wire = %v, want %v", ds.Relays, want)
@@ -169,7 +182,7 @@ func TestRelaysReachOnlyAgentsThatListTheCapability(t *testing.T) {
 func TestRelayForwardsFollowTheSwitchAndTheServer(t *testing.T) {
 	x := newRelayEnv(t)
 	x.relay("rly_a", 8443, false)
-	c, m, ds := connectCaps(x.entry, "new", plugin.CapRelayForward)
+	c, m, ds := connectCaps(x.entry, "new", agentcap.RelayForward)
 	if ds.Relays != nil || ds.StateHash != statehash.State(nil) {
 		t.Fatalf("a relay that is off was sent: %v", ds.Relays)
 	}
@@ -226,13 +239,13 @@ func TestRelayForwardsSurviveAReconnect(t *testing.T) {
 	x := newRelayEnv(t)
 	x.relay("rly_a", 8443, true)
 	x.relayOf("rly_b", relayInbound2, 7443, false)
-	_, m, _ := connectCaps(x.entry, "first", plugin.CapRelayForward)
+	_, m, _ := connectCaps(x.entry, "first", agentcap.RelayForward)
 	if len(m.relays) != 1 {
 		t.Fatalf("held %v", m.relays)
 	}
 	c := x.entry.open()
 	h := hello("second", m.rev, m.hash())
-	h.GetHello().Capabilities = []string{plugin.CapRelayForward}
+	h.GetHello().Capabilities = []string{agentcap.RelayForward}
 	c.send(0, h)
 	c.wait(func(r *agentv1.ConnectResponse) bool { return r.GetHelloAck() != nil })
 	c.quiet(300 * time.Millisecond)
@@ -250,7 +263,7 @@ func TestRelayForwardsSurviveAReconnect(t *testing.T) {
 func TestRelayResultsAreStored(t *testing.T) {
 	x := newRelayEnv(t)
 	x.relay("rly_a", 8443, true)
-	c, m, ds := connectCaps(x.entry, "new", plugin.CapRelayForward)
+	c, m, ds := connectCaps(x.entry, "new", agentcap.RelayForward)
 	result := func(rs ...*agentv1.RelayResult) {
 		r := applied(ds, m.hash())
 		r.GetApplyResult().Relays = rs
@@ -279,7 +292,7 @@ func TestRelayResultsAreStored(t *testing.T) {
 func TestTheExitsReportMovesTheEntry(t *testing.T) {
 	x := newRelayEnv(t)
 	x.relay("rly_a", 8443, true)
-	c, m, _ := connectCaps(x.entry, "new", plugin.CapRelayForward)
+	c, m, _ := connectCaps(x.entry, "new", agentcap.RelayForward)
 	if len(m.relays) != 1 {
 		t.Fatalf("held %v", m.relays)
 	}
@@ -300,7 +313,7 @@ func TestRetiringANodeDeletesItsRelays(t *testing.T) {
 		t.Run(retire, func(t *testing.T) {
 			x := newRelayEnv(t)
 			x.relay("rly_a", 8443, true)
-			c, m, _ := connectCaps(x.entry, "new", plugin.CapRelayForward)
+			c, m, _ := connectCaps(x.entry, "new", agentcap.RelayForward)
 			node := x.exit
 			if retire == "entry" {
 				node = x.entry

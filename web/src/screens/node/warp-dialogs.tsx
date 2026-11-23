@@ -4,6 +4,7 @@ import { isStepUpCancelled, useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
+import { TextField } from "@/components/ui/text-field";
 import { useToast } from "@/components/ui/toast";
 import { warp as warpApi } from "@/lib/api";
 import { looksLikeWgcfProfile, safeHttpUrl } from "@/lib/warp";
@@ -184,6 +185,81 @@ export function ImportWarpDialog({ open, onOpenChange, nodeId }: { open: boolean
     >
       <FileText label="wgcf-profile.conf" hint={t("warp.imp.confHint")} value={conf} onChange={setConf} accept=".conf,text/plain" invalid={bad ? t("warp.imp.notProfile") : undefined} />
       <FileText label="wgcf-account.toml" hint={t("warp.imp.tomlHint")} value={toml} onChange={setToml} accept=".toml,text/plain" />
+      {error && <Notice tone="danger">{error}</Notice>}
+    </Modal>
+  );
+}
+
+/**
+ * "WARP+ key": the owner's paid license key, bound to the node's device at Cloudflare. The box hides what is typed, the key
+ * is cleared as soon as the window closes, and nothing but "a key is set" ever comes back from the panel. A refusal of
+ * Cloudflare (a wrong key, a key that is on all the devices it allows) stays in the window, above its buttons.
+ */
+export function LicenseWarpDialog(props: { open: boolean; onOpenChange: (open: boolean) => void; nodeId: string; hasLicense: boolean }) {
+  // mounted only while open: whatever way the window closes (Cancel, Esc, a click outside, success), the key goes with it
+  return props.open ? <LicenseWindow {...props} /> : null;
+}
+
+function LicenseWindow({ open, onOpenChange, nodeId, hasLicense }: { open: boolean; onOpenChange: (open: boolean) => void; nodeId: string; hasLicense: boolean }) {
+  const t = useTx();
+  const toast = useToast();
+  const guard = useStepUp();
+  const refresh = useRefresh(nodeId);
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const ready = key.trim().length >= 16;
+
+  async function submit() {
+    if (!ready || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const r = await guard(() => warpApi.setWarpLicense({ nodeId, licenseKey: key }));
+      await refresh();
+      onOpenChange(false);
+      toast(t(r.account?.accountType === "plus" ? "warp.plus.done" : "warp.plus.doneFree"));
+    } catch (e) {
+      if (!isStepUpCancelled(e)) setError(warpError(e, t));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={(o) => !busy && onOpenChange(o)}
+      title={t(hasLicense ? "warp.plus.titleChange" : "warp.plus.title")}
+      description={t("warp.plus.body")}
+      footer={
+        <>
+          <Button variant="ghost" size="md" disabled={busy} onClick={() => onOpenChange(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="primary" size="md" disabled={busy || !ready} onClick={() => void submit()}>
+            {busy && <span aria-hidden className="size-3.5 flex-none animate-[mg-ui-spin_0.8s_linear_infinite] rounded-full border-2 border-current border-t-transparent" />}
+            {t(busy ? "warp.plus.doing" : "warp.plus.do")}
+          </Button>
+        </>
+      }
+    >
+      <TextField
+        type="password"
+        mono
+        label={t("warp.plus.field")}
+        hint={t("warp.plus.hint")}
+        value={key}
+        onChange={(e) => setKey(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && void submit()}
+        name="warp-plus-key"
+        autoComplete="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        data-1p-ignore
+        data-lpignore="true"
+        disabled={busy}
+      />
       {error && <Notice tone="danger">{error}</Notice>}
     </Modal>
   );

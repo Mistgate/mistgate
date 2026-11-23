@@ -15,6 +15,7 @@ import (
 
 	"connectrpc.com/connect"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/mcp"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -51,8 +52,6 @@ const (
 	followUpBusyWait  = 30 * time.Second
 	followUpRateWait  = time.Minute
 	followUpStoreWait = 2 * time.Minute
-	// timezoneSetting is the panel's time zone, the scheduled tasks' and the update schedules' (internal/panel/update/schedule.go)
-	timezoneSetting = "update_schedule_timezone_offset_minutes"
 )
 
 // FollowUpAAD is the vault's associated data of a follow-up's note.
@@ -259,16 +258,9 @@ const followUpNote = `This turn is a follow-up you set earlier with follow_up: t
 
 const followUpVerdictNote = `- End by calling follow_up_verdict once: problem=true when you found something the person should look at or act on, false when all is well; summary is one plain line of at most 200 characters (node, group or protocol names are fine), never a secret.`
 
-// panelOffset is the panel's time zone in minutes east of UTC; a missing or unusable value is UTC.
+// panelOffset is the panel's time zone in minutes east of UTC; a failed read counts as UTC.
 func (s *Service) panelOffset(ctx context.Context) int {
-	raw, err := s.st.Setting(ctx, timezoneSetting)
-	if err != nil {
-		return 0
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil || n < -12*60 || n > 14*60 || n%15 != 0 {
-		return 0
-	}
+	n, _ := s.st.PanelTimezone(ctx)
 	return n
 }
 
@@ -362,7 +354,7 @@ func (s *Service) followUpTool(ctx context.Context, admin store.Admin, conversat
 		return fail("in_seconds must be from 30 to 86400 (24 hours)")
 	}
 	// the note is the model's own text, kept and sent back to it: scrubbed like any text of the assistant
-	note := cleanContextText(redactCredentialLabels(args.Note), followUpNoteRunes)
+	note := cleanContextText(mcp.RedactCredentialLabels(args.Note), followUpNoteRunes)
 	if note == "" {
 		return fail("note must say what to do then (1 to 400 characters)")
 	}
@@ -494,10 +486,12 @@ func followUpHint(card *adminv1.PlanCard) string {
 	if card == nil {
 		return ""
 	}
-	seconds, what := 0, ""
-	switch card.Tool {
-	case "node_debug_capture":
-		seconds, what = 360, "read node_debug_logs"
+	when, ok := followUpAfter[card.Tool]
+	if !ok {
+		return ""
+	}
+	seconds := when.seconds
+	if card.Tool == "node_debug_capture" {
 		for _, fact := range card.Facts {
 			if fact.Key == "duration" {
 				if n, err := strconv.Atoi(strings.TrimSuffix(strings.TrimSpace(fact.Value), " s")); err == nil && n > 0 {
@@ -505,23 +499,25 @@ func followUpHint(card *adminv1.PlanCard) string {
 				}
 			}
 		}
-	case "path_speed":
-		seconds, what = 60, "read the result"
-	case "channel_measure":
-		seconds, what = 100, "read the result with path_speed_results (the figures are an estimate at that moment, not a guarantee of the tariff)"
-	case "node_update", "node_rollback":
-		seconds, what = 300, "check that the node is back and on the right version"
-	case "rollout_start":
-		seconds, what = 900, "check the rollout"
-	case "os_rollout_start":
-		seconds, what = 1500, "check the OS update of the node: that it finished, the node is back and its profiles are up"
-	case "relay":
-		seconds, what = 180, "check that the relay carries traffic"
-	default:
-		return ""
 	}
 	return "This runs only when the person applies the plan and finishes later: call follow_up now with plan_id " + card.PlanId +
-		" and in_seconds about " + strconv.Itoa(seconds) + " to come back and " + what + " by yourself. Never promise to come back without it."
+		" and in_seconds about " + strconv.Itoa(seconds) + " to come back and " + when.what + " by yourself. Never promise to come back without it."
+}
+
+// followUpAfter are the changes (by the name their plan card carries, without _plan) that start something that ends later: how many
+// seconds after the apply to come back, and what to do then. TestFollowUpPlansAreChangesOfTheRegistry holds the names to the registry.
+var followUpAfter = map[string]struct {
+	seconds int
+	what    string
+}{
+	"node_debug_capture": {360, "read node_debug_logs"},
+	"path_speed":         {60, "read the result"},
+	"channel_measure":    {100, "read the result with path_speed_results (the figures are an estimate at that moment, not a guarantee of the tariff)"},
+	"node_update":        {300, "check that the node is back and on the right version"},
+	"node_rollback":      {300, "check that the node is back and on the right version"},
+	"rollout_start":      {900, "check the rollout"},
+	"os_rollout_start":   {1500, "check the OS update of the node: that it finished, the node is back and its profiles are up"},
+	"relay":              {180, "check that the relay carries traffic"},
 }
 
 // withFollowUpHint adds followUpHint to a plan tool's result (a JSON object) for the model.
@@ -635,7 +631,7 @@ func (s *Service) RunFollowUp(ctx context.Context, f store.AssistantFollowUp) Fo
 	switch {
 	case !settings.enabled:
 		return s.followUpNoteOutcome(ctx, admin, f, note, "failed", "assistant_off")
-	case !audienceAllows(settings.audience, admin.Role):
+	case !auth.AssistantAudienceAllows(settings.audience, admin.Role):
 		return s.followUpNoteOutcome(ctx, admin, f, note, "failed", "not_allowed")
 	case settings.provider == adminv1.AssistantProvider_ASSISTANT_PROVIDER_UNSPECIFIED:
 		return s.followUpNoteOutcome(ctx, admin, f, note, "failed", "no_provider")

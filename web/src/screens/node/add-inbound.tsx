@@ -29,6 +29,7 @@ import { isShareCode } from "@/lib/tcpshare";
 import { markFresh } from "@/components/fx/registry";
 import { LossyNotice, lossyRefusal } from "./port-lossy";
 import { tlsHint } from "./reality-target";
+import { AddProfilesList } from "./add-profiles";
 
 type Node = NonNullable<Plain<GetNodeResponse>["node"]>;
 
@@ -57,35 +58,44 @@ export function AddInbound({ open, onOpenChange, data, initialProfile }: { open:
   const all = list.data ?? [];
   const here = new Set(data.inbounds.map((i) => i.profileId));
   const available = all.filter((p) => !here.has(p.id));
+  // the list of the profiles that can be put (the board's window); a profile that needs a field or a choice opens its form from there, and a
+  // profile named by the caller (a link "add this one") goes straight to its form
+  const [formFor, setFormFor] = useState<string | undefined>(undefined);
+  const form = formFor ?? initialProfile;
+  const showList = open && !list.isPending && all.length > 0 && !selfSigned && available.length > 0 && !form;
   const close = () => {
     onOpenChange(false);
     setSelfSigned(false);
+    setFormFor(undefined);
   };
 
   return (
-    <Modal
-      open={open}
-      onOpenChange={(o) => (o ? onOpenChange(true) : close())}
-      title={t("node.profiles.addTitle", { name: node.name })}
-      description={t("node.profiles.addBody")}
-    >
-      {list.isPending ? (
-        <p className="text-sm text-muted">{t("common.loading")}</p>
-      ) : all.length === 0 || selfSigned ? (
-        <QuickProfile node={node} taken={all.map((p) => p.name)} selfSigned={selfSigned} onDone={close} onBack={selfSigned ? () => setSelfSigned(false) : undefined} />
-      ) : available.length === 0 ? (
-        <div className="flex flex-col gap-3">
-          <Notice>{t("node.profiles.allDeployed")}</Notice>
-          <div className="flex justify-end">
-            <Button variant="ghost" size="md" onClick={close}>
-              {t("common.close")}
-            </Button>
+    <>
+      {showList && <AddProfilesList data={data} available={available} onClose={close} onForm={setFormFor} />}
+      <Modal
+        open={open && !showList}
+        onOpenChange={(o) => (o ? onOpenChange(true) : close())}
+        title={t("node.profiles.addTitle", { name: node.name })}
+        description={t("node.profiles.addBody")}
+      >
+        {list.isPending ? (
+          <p className="text-sm text-muted">{t("common.loading")}</p>
+        ) : all.length === 0 || selfSigned ? (
+          <QuickProfile node={node} taken={all.map((p) => p.name)} selfSigned={selfSigned} onDone={close} onBack={selfSigned ? () => setSelfSigned(false) : undefined} />
+        ) : available.length === 0 ? (
+          <div className="flex flex-col gap-3">
+            <Notice>{t("node.profiles.allDeployed")}</Notice>
+            <div className="flex justify-end">
+              <Button variant="ghost" size="md" onClick={close}>
+                {t("common.close")}
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <AddForm data={data} available={available} initialProfile={initialProfile} onDone={close} onSelfSigned={() => setSelfSigned(true)} />
-      )}
-    </Modal>
+        ) : (
+          <AddForm data={data} available={available} initialProfile={form} onDone={close} onSelfSigned={() => setSelfSigned(true)} />
+        )}
+      </Modal>
+    </>
   );
 }
 

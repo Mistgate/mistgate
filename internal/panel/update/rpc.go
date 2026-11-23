@@ -12,12 +12,13 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
-	"github.com/mistgate/mistgate/internal/node/osupdate"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/edition"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 // rpc is the admin UpdateService (update.proto). Roles are decided by auth/policy.go before a call gets here;
@@ -261,7 +262,7 @@ func (r rpc) GetOsUpdates(ctx context.Context, _ *connect.Request[adminv1.GetOsU
 				online = uint32(len(users))
 			}
 		}
-		capable := slices.Contains(node.AgentCaps, osupdate.Capability)
+		capable := slices.Contains(node.AgentCaps, agentcap.OSStatus)
 		facts, err := s.st.NodeFacts(ctx, node.ID)
 		if err != nil {
 			return nil, s.internal("read node facts", err)
@@ -459,8 +460,28 @@ func (r rpc) RescanBundle(ctx context.Context, _ *connect.Request[adminv1.Rescan
 	} else {
 		b = r.s.rescanForRequest()
 	}
-	r.s.audit(ctx, "update_rescan", map[string]string{"status": b.view.Status.String()})
-	return connect.NewResponse(&adminv1.RescanBundleResponse{Bundle: b.view}), nil
+	view := b.view
+	audit := map[string]string{"status": b.view.Status.String()}
+	if !r.s.cfg.Edge {
+		// Reading the folder is not all: the bundle of a new release also has to be fetched from its source, and the owner is told
+		// honestly whether that is done, going on, or waiting for something (Bundle.params "sync", "sync_wait").
+		if outcome, wait := r.s.syncBundleOnRequest(ctx); outcome != "" {
+			if cur := r.s.current(); cur != nil {
+				b = cur // a bundle installed by the sync is the one to show
+			}
+			view = proto.Clone(b.view).(*adminv1.Bundle)
+			if view.Params == nil {
+				view.Params = map[string]string{}
+			}
+			view.Params["sync"] = outcome
+			audit["sync"] = outcome
+			if wait != "" {
+				view.Params["sync_wait"], audit["sync_wait"] = wait, wait
+			}
+		}
+	}
+	r.s.audit(ctx, "update_rescan", audit)
+	return connect.NewResponse(&adminv1.RescanBundleResponse{Bundle: view}), nil
 }
 
 func (r rpc) ScheduleNodeUpdate(ctx context.Context, req *connect.Request[adminv1.ScheduleNodeUpdateRequest]) (*connect.Response[adminv1.ScheduleNodeUpdateResponse], error) {

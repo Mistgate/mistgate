@@ -1,0 +1,143 @@
+{
+ "ui": {
+  "nav_label": "Navigation",
+  "footer": "Indépendants et du quartier.",
+  "nav_home": "Accueil",
+  "nav_about": "Qui sommes-nous",
+  "nav_contact": "Nous trouver",
+  "home_title": "Bienvenue",
+  "nf_title": "Page introuvable",
+  "nf_text": "Nous n'avons pas trouvé cette page. Elle a peut-être changé d'adresse, ou nous ne l'avons jamais eue.",
+  "nf_back": "Retour à l'accueil",
+  "see_services": "Voir ce que nous proposons",
+  "all_prices": "Tous les tarifs",
+  "visit_h": "Venez nous voir",
+  "hours_h": "Horaires d'ouverture",
+  "address_l": "Adresse",
+  "phone_l": "Téléphone",
+  "about_h": "Qui sommes-nous",
+  "services_h": "Ce que nous proposons",
+  "services_intro": "Les prix sont donnés à titre indicatif ; nous prenons toujours volontiers le temps de parler de ce dont vous avez besoin.",
+  "contact_h": "Nous trouver",
+  "contact_intro": "Passez nous voir pendant les heures d'ouverture ou contactez-nous. Nous sommes ravis d'échanger sur ce dont vous avez besoin avant que vous ne décidiez quoi que ce soit.",
+  "contact_note": "Le plus simple pour se garer, c'est la rue d'à côté. Si la porte est fermée pendant les heures d'ouverture, nous sommes probablement dans l'arrière-boutique ; frappez et patientez un instant.",
+  "from_l": "à partir de",
+  "col_service": "Prestation",
+  "col_desc": "Ce qui est inclus",
+  "col_price": "Prix",
+  "hours_note": "",
+  "directions_h": "Comment nous trouver",
+  "directions": "Vous nous trouverez au {address}. C'est à quelques minutes à pied du centre-ville, avec un arceau à vélos devant la porte.",
+  "services_note": "Si un travail demande finalement plus que ce que nous avions annoncé, nous vous demanderons avant de commencer."
+ },
+ "bundles": {
+  "bakery": {
+   "tagline": "Du pain et des gâteaux, cuits {city_in}",
+   "nav_services": "Nos fournées",
+   "desc": "Une boulangerie de quartier {city_in} : pain au levain, petits pains et gâteaux, cuits chaque matin.",
+   "desc_services": "Pains, viennoiseries et gâteaux, avec les prix.",
+   "desc_about": "L'histoire de {brand}, une petite boulangerie {city_in}.",
+   "desc_contact": "Horaires et adresse de {brand} {city_in}.",
+   "hero_h": "Du pain, à l'ancienne",
+   "intro": "Une petite boulangerie de quartier. Pain au levain, petits pains et gâteaux, cuits chaque matin avant l'ouverture de la boutique.",
+   "about": [
+    "{brand} a commencé dans une cuisine louée derrière une boutique {city_in}, avec un four et pas mal d'optimisme.",
+    "Nous cuisons toujours par petites fournées, avec de la farine d'un moulin à une heure d'ici et un levain plus vieux que notre plus jeune boulanger.",
+    "Venez tôt pour les petits pains, restez pour le café, et dites-nous si votre pain n'était pas réussi. Nous préférons le savoir."
+   ],
+   "features": [
+    {"h": "Cuit chaque matin", "p": "Rien n'est gardé de la veille."},
+    {"h": "Des ingrédients simples", "p": "De la farine, de l'eau, du sel et du temps."},
+    {"h": "Commandes bienvenues", "p": "Gâteaux et grosses commandes sur demande."}
+   ],
+   "services": [
+    {"t": "Pain de campagne au levain", "d": "Levée lente, croûte épaisse et mie souple et alvéolée."},
+    {"t": "Pain de seigle aux graines", "d": "Dense, sombre et très bon avec du fromage."},
+    {"t": "Petits pains du matin, six", "d": "Des petits pains tendres, cuits à cinq heures et presque toujours partis à dix."},
+    {"t": "Croissant pur beurre", "d": "Roulé à la main et doré à l'œuf juste avant la cuisson."},
+    {"t": "Gâteau de fête", "d": "À commander trois jours à l'avance ; nous choisissons les parfums avec vous."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Seigle", "Miel", "Avoine", "Orge", "Fenouil", "Mie", "Foyer", "Dimanche", "Sésame", "Prune"],
+      ["Mésange", "Pinson", "Moineau", "Linotte", "Grive", "Rouge-gorge", "Hirondelle", "Alouette"]
+     ],
+     "sep": " & "
+    }
+   }
+  },
+  "bike": {
+   "tagline": "Réparation de vélos {city_in}",
+   "nav_services": "Tarifs",
+   "desc": "Réparation et entretien de vélos {city_in}, pendant que vous attendez ou pour le lendemain.",
+   "desc_services": "Réparation et entretien de vélos, avec les tarifs.",
+   "desc_about": "À propos de {brand}, un petit atelier de vélos {city_in}.",
+   "desc_contact": "Horaires et adresse de {brand} {city_in}.",
+   "hero_h": "Votre vélo, de nouveau en état de rouler",
+   "intro": "Un petit atelier pour les vélos de tous les jours. Nous réparons ce qui est cassé, nous réglons ce qui n'est pas tout à fait au point et nous vous disons franchement ce qui ne vaut pas la dépense.",
+   "about": [
+    "{brand} a démarré dans un abri de jardin {city_in}, à réparer les vélos des voisins pour le prix d'un café.",
+    "Aujourd'hui, nous avons un vrai atelier, un très long établi et un mur de pièces détachées que nous sommes les seuls à comprendre. Nous préférons toujours réparer plutôt que remplacer.",
+    "Apportez tout ce qui a deux roues. Si nous ne pouvons pas le réparer, nous vous dirons qui le peut."
+   ],
+   "features": [
+    {"h": "Sur place", "p": "La plupart des petites réparations prennent moins d'une heure."},
+    {"h": "Des conseils honnêtes", "p": "Nous vous dirons si quelque chose ne vaut pas la peine d'être réparé."},
+    {"h": "Entretien pour le lendemain", "p": "Déposez-le le matin, récupérez-le demain."}
+   ],
+   "services": [
+    {"t": "Réparation de crevaison", "d": "Chambre à air posée et vérifiée, pneu inspecté pour trouver le coupable."},
+    {"t": "Entretien de base", "d": "Freins et vitesses réglés, chaîne nettoyée et huilée, pneus et vis vérifiés."},
+    {"t": "Entretien complet", "d": "Démontage, dégraissage et remontage de la transmission, avec de nouveaux câbles si besoin."},
+    {"t": "Dévoilage de roue", "d": "Les voiles sont supprimés et la tension des rayons est équilibrée."},
+    {"t": "Contrôle d'hiver", "d": "Éclairage, freins, pneus et garde-boue, pour que les mois sombres soient moins risqués."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Atelier", "Garage", "Cabanon", "Service", "Maison", "Boutique", "Comptoir", "Dépôt"],
+      ["Rayon", "Chaîne", "Pignon", "Pédale", "Manivelle", "Roue", "Vitesse", "Cadre", "Moyeu", "Jante"]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "tailor": {
+   "tagline": "Retouches et réparations {city_in}",
+   "nav_services": "Retouches",
+   "desc": "Retouches et réparations de vêtements {city_in} : ourlets, fermetures, essayages et raccommodage.",
+   "desc_services": "Retouches et réparations de vêtements, avec les tarifs.",
+   "desc_about": "À propos de {brand}, un petit atelier de couture {city_in}.",
+   "desc_contact": "Horaires et adresse de {brand} {city_in}.",
+   "hero_h": "Des vêtements qui tombent bien, plus longtemps",
+   "intro": "Ourlets, fermetures, essayages et raccommodage, faits à la main et à la machine dans un petit atelier au-dessus des boutiques.",
+   "about": [
+    "{brand} est un atelier de deux personnes, au premier étage d'un immeuble {city_in}, au-dessus d'une boutique de laine.",
+    "Nous avons appris le métier auprès de gens qui le faisaient depuis quarante ans, et nous avons gardé certaines de leurs habitudes, comme celle d'épingler toujours deux fois.",
+    "Si vous ne savez pas si un vêtement vaut la peine d'être retouché, apportez-le. Nous vous le dirons franchement."
+   ],
+   "features": [
+    {"h": "Réparé avec soin", "p": "Chaque vêtement est examiné sérieusement avant que nous commencions."},
+    {"h": "Ajusté à vous", "p": "Nous épinglons sur vous, pas sur un mannequin."},
+    {"h": "Prêt à la date promise", "p": "Nous vous donnons un jour et nous le tenons."}
+   ],
+   "services": [
+    {"t": "Raccourcir un pantalon ou une jupe", "d": "Ourlet à votre longueur, en gardant la finition d'origine quand c'est possible."},
+    {"t": "Reprendre une veste", "d": "Côtés et manches ajustés pour qu'elle tombe correctement."},
+    {"t": "Remplacer une fermeture éclair", "d": "Assortie en couleur et en poids, posée proprement."},
+    {"t": "Réparer la doublure d'un manteau", "d": "Une doublure déchirée remplacée ou réparée, poches comprises."},
+    {"t": "Reprisage et pièces", "d": "Visible ou invisible, comme vous préférez."}
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Aiguille", "Dé", "Bouton", "Ourlet", "Couture", "Poignet", "Col", "Pli", "Bobine", "Lisière"],
+      ["& Épingle", "Retouches", "Couture", "Atelier", "Raccommodage", "Essayage", "& Fil", "Studio"]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

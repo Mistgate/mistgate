@@ -1,0 +1,461 @@
+{
+ "ui": {
+  "nav_label": "Navigation",
+  "footer": "Écrit à la main, publié lentement.",
+  "nav_home": "Notes",
+  "nav_about": "À propos",
+  "home_title": "Notes",
+  "nf_title": "Il n'y a rien ici",
+  "nf_text": "Il n'y a pas de note à cette adresse. Elle a peut-être été renommée, ou jamais écrite.",
+  "nf_back": "Retour aux notes",
+  "latest_h": "Dernières notes",
+  "read_more": "Lire la note",
+  "min_read": "min de lecture",
+  "more_h": "Autres notes",
+  "back_all": "Toutes les notes",
+  "about_h": "À propos",
+  "now_h": "En ce moment",
+  "tags_h": "Sujets",
+  "by": "Écrit par",
+  "nav_archive": "Archives",
+  "desc_archive": "Toutes les notes de {brand}, mois par mois.",
+  "archive_h": "Archives",
+  "archive_intro": "Toutes les notes jusqu'ici, de la plus récente à la plus ancienne, regroupées par mois.",
+  "all_posts": "Toutes les notes",
+  "newer": "Plus récent"
+ },
+ "bundles": {
+  "garden": {
+   "tagline": "Notes d'un jardin ouvrier",
+   "desc": "Notes d'un petit jardin ouvrier {city_in} : ce qui a poussé, ce qui n'a pas poussé et ce que je ferais autrement.",
+   "desc_about": "Qui écrit {brand}, et pourquoi.",
+   "intro": "Notes d'un petit jardin ouvrier {city_in} : ce qui a poussé, ce qui n'a pas poussé et ce que je ferai autrement l'an prochain.",
+   "about": [
+    "Je m'appelle {first}. Depuis neuf ans, j'ai une parcelle de jardin ouvrier {city_in}, surtout pour les légumes et quelques rosiers têtus.",
+    "Ce carnet est l'endroit où je note ce que la parcelle m'apprend, surtout pour arrêter de refaire les mêmes erreurs dans un ordre différent.",
+    "Les commentaires sont fermés. Si vous avez un conseil, donnez-le à celui ou celle qui a la parcelle d'à côté ; c'est comme ça que j'ai appris presque tout ce que je sais."
+   ],
+   "now": [
+    "Je sème les fèves sous des cloches",
+    "Je répare la porte de la cabane, encore une fois",
+    "Je lis un livre sur le plessage des haies"
+   ],
+   "posts": [
+    {
+     "title": "Pourquoi j'ai arrêté de bêcher",
+     "tag": "Sol",
+     "excerpt": "Trois saisons sans bêche, et ce qui est arrivé aux planches.",
+     "body": [
+      "Pendant des années, j'ai retourné les planches chaque automne, parce que c'était ce que faisait l'ancien occupant de la parcelle et ce que disaient les livres de mon enfance. Il y a trois saisons, j'ai arrêté et j'ai couvert les planches d'une épaisse couche de compost.",
+      "Le premier printemps a été décevant. La terre avait l'air en désordre et les limaces étaient ravies. La deuxième année, les vers avaient fait presque tout le travail, la terre s'émiettait dans ma main et je passais un samedi de moins sur les planches chaque octobre.",
+      "Je ne parlerais pas de miracle, et quelques mauvaises herbes que je croyais parties pour de bon sont revenues. Mais mon dos me remercie, et les carottes sont sorties plus droites qu'elles ne l'ont jamais été quand je bêchais."
+     ]
+    },
+    {
+     "title": "Des haricots pour ceux qui oublient d'arroser",
+     "tag": "Légumes",
+     "excerpt": "Quatre variétés qui m'ont pardonné un mois de juillet sec.",
+     "body": [
+      "En juillet dernier, il n'a pas plu pendant dix-neuf jours et je n'étais pas là pendant onze d'entre eux. À mon retour, les laitues étaient montées et les courgettes avaient l'air d'avoir renoncé. Les haricots, eux, allaient très bien.",
+      "Les haricots d'Espagne, aux racines profondes et avec un bon paillage autour, supportent une quinzaine de jours sans eau mieux que presque tout ce que je cultive. Je les sème maintenant au nord de la parcelle, où l'ombre empêche la terre de cuire.",
+      "Si vous êtes du genre à prévoir d'arroser tous les jours et à y arriver deux fois par semaine, plantez des haricots et restez calme."
+     ]
+    },
+    {
+     "title": "Une petite serre faite de vieilles fenêtres",
+     "tag": "Construction",
+     "excerpt": "Comment la benne d'une voisine est devenue une serre en un long week-end.",
+     "body": [
+      "Une voisine avait fait changer ses fenêtres et les anciennes sont restées deux jours dans une benne. J'ai demandé si je pouvais les prendre, et elle m'a demandé d'emporter aussi la benne, si j'y arrivais.",
+      "J'ai construit une ossature avec du bois de récupération, à la taille de la plus grande fenêtre, et j'ai ajusté les autres autour. Rien n'est d'équerre et la porte coince quand il pleut, mais elle protège du gel les plants de tomates.",
+      "L'ensemble m'a coûté une boîte de vis et un sachet de mastic. La prochaine fois, je mesurerai deux fois avant de couper quoi que ce soit, et je le pense vraiment."
+     ]
+    },
+    {
+     "title": "Que faire à la parcelle en mars",
+     "tag": "Saisons",
+     "excerpt": "Une courte liste pour le mois où tout semble possible et où la terre est encore froide.",
+     "body": [
+      "Mars trompe tout le monde. Les jours sont lumineux et on a envie de planter, mais la terre est froide et les graines semées trop tôt restent là et pourrissent. Je me force à attendre que la terre ne soit plus fraîche contre le dos de la main.",
+      "En attendant, il y a largement de quoi faire : trier la boîte à graines, frotter les pots, tailler les rosiers et mettre les premières pommes de terre à germer dans un endroit lumineux. Ces travaux donnent l'impression d'avancer sans rien risquer.",
+      "À la fin du mois, je m'autorise d'habitude un rang de petits pois sous une cloche. Ce n'est pas raisonnable, mais ça me plaît."
+     ]
+    },
+    {
+     "title": "Le compost, franchement",
+     "tag": "Sol",
+     "excerpt": "Ce qui va dans mon tas, ce qui n'y va pas, et pourquoi le mien n'est jamais prêt à temps.",
+     "body": [
+      "Mon tas obéit à trois règles : rien de cuit, rien de malade et rien dont je ne suis pas sûr. La tonte va en fines couches, le carton déchiré va avec, et le tout est retourné quand j'y pense.",
+      "C'est plus lent que ce que disent les livres. Un an est plus honnête que les six semaines promises sur le sac, et le compost fini réserve toujours des surprises, comme une pomme de terre dont j'avais fait mon deuil.",
+      "Ça m'est égal. Un tas qui prend son temps est un tas qui ne garde pas rancune aux épluchures."
+     ]
+    },
+    {
+     "title": "Limaces, pièges à bière et autres défaites",
+     "tag": "Ravageurs",
+     "excerpt": "Ce qui a marché, ce qui n'a pas marché, et pourquoi je plante maintenant un peu plus que nécessaire.",
+     "body": [
+      "J'ai essayé les pièges à bière, les coquilles d'œufs, le ruban de cuivre et les sorties à la lampe de poche après la tombée de la nuit. Chacun a marché une semaine environ. Ce qui marche le mieux, c'est de cultiver plus que nécessaire et d'accepter que les limaces prennent leur part.",
+      "Les semis sont le vrai risque, alors je les démarre à l'intérieur et je ne les sors que quand ils sont assez robustes pour survivre à un grignotage."
+     ]
+    },
+    {
+     "title": "Garder des graines de haricots",
+     "tag": "Graines",
+     "excerpt": "Un peu de patience en octobre, et les haricots de l'an prochain sont gratuits.",
+     "body": [
+      "Je laisse les plus belles gousses sur les plants jusqu'à ce qu'elles soient sèches et sonnent. Puis je les écosse sur la table de la cuisine, j'étale les graines sur un plateau et je les garde au chaud une semaine.",
+      "Elles vont dans des enveloppes en papier, avec le nom et l'année écrits dessus. Le plastique ferait transpirer les graines, et j'ai les haricots moisis pour le prouver."
+     ]
+    },
+    {
+     "title": "Petit inventaire de la cabane",
+     "tag": "Outils",
+     "excerpt": "Onze choses que j'utilise et un grand nombre que je n'utilise pas.",
+     "body": [
+      "Une bêche, une fourche, une binette, deux transplantoirs, un petit râteau et un sécateur font presque tout le travail. Le reste de la cabane contient des pots de confiture, de la ficelle, une brouette cassée et une collection de godets.",
+      "Chaque printemps, je promets de tout ranger. Chaque printemps, il pleut le jour où je l'avais prévu, et ça ne me déplaît pas."
+     ]
+    },
+    {
+     "title": "Une mauvaise année pour les tomates",
+     "tag": "Légumes",
+     "excerpt": "Le mildiou est arrivé en août et a tout pris. Des notes pour la prochaine fois.",
+     "body": [
+      "Les feuilles ont bruni en une semaine et les fruits ont suivi. J'ai arraché les plants, je les ai mis dans un sac et je ne les ai pas mis au compost, ce qui est la seule règle sur laquelle tout le monde est d'accord.",
+      "L'an prochain, je cultiverai moins de plants, je leur donnerai plus de place et j'arroserai la terre plutôt que les feuilles. Je me souviendrai aussi qu'une mauvaise année de tomates est une bonne excuse pour faire du chutney."
+     ]
+    },
+    {
+     "title": "Des feuilles mortes au terreau de feuilles",
+     "tag": "Sol",
+     "excerpt": "Deux ans d'attente, et la meilleure chose de la parcelle.",
+     "body": [
+      "En novembre, je ratisse les feuilles dans une cage grillagée au coin de la parcelle et je m'en vais. Il n'y a rien à retourner et rien à ajouter, ce qui me convient.",
+      "Au bout de deux ans, c'est sombre, friable et ça sent la forêt. Je m'en sers pour regarnir les planches et pour démarrer les semis, et rien d'autre de ce que je fabrique n'approche."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Carnet",
+       "Cahier",
+       "Journal",
+       "Petites notes",
+       "Notes",
+       "Chronique",
+       "Brindilles",
+       "Lettres",
+       "Mots",
+       "Brouillon"
+      ],
+      [
+       "Terreau",
+       "Carrés",
+       "Parcelle",
+       "Potager",
+       "Truelle",
+       "Rangs",
+       "Haie",
+       "Cabane",
+       "Sillon",
+       "Saisons"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "cycling": {
+   "tagline": "Sorties et réparations",
+   "desc": "Sorties, réparations et quelques mauvais virages sur les petites routes, {city_in}.",
+   "desc_about": "Qui écrit {brand}, et pourquoi.",
+   "intro": "Sorties, réparations et quelques mauvais virages sur les petites routes, {city_in}.",
+   "about": [
+    "Je m'appelle {first}. Je vais au travail à vélo presque tous les jours et plus loin le dimanche, surtout sur des petites routes {city_in} que personne d'autre ne semble connaître.",
+    "Je ne suis pas rapide et je ne garde aucune trace de ma vitesse. Ce que je garde, ce sont des notes sur les itinéraires, sur ce qui a cassé et sur ce que j'emporterais la prochaine fois.",
+    "Il n'y a pas de zone de commentaires. Si vous connaissez un meilleur chemin pour rentrer depuis la crête, écrivez-le sur une carte postale."
+   ],
+   "now": [
+    "Je refais le guidoline",
+    "Je prépare une boucle de deux jours pour mai",
+    "J'apprends à dévoiler une roue"
+   ],
+   "posts": [
+    {
+     "title": "La boucle de soixante-cinq kilomètres où je reviens toujours",
+     "tag": "Itinéraires",
+     "excerpt": "Surtout plate, une vraie côte et un café qui ferme plus tôt qu'on le voudrait.",
+     "body": [
+      "La boucle sort de la ville par l'est, longe le canal sur seize kilomètres, puis monte par une petite route que personne n'a refaite depuis que je roule. Il y a une vraie côte, d'un kilomètre et demi environ, et c'est la raison pour laquelle j'y reviens.",
+      "À mi-parcours, il y a un café qui ouvre à neuf heures et ferme à quatorze heures, ce qui est beaucoup trop tôt ou juste à temps selon la façon dont s'est passée la matinée. J'ai appris à emporter un morceau de cake.",
+      "Je l'ai faite tous les mois de l'année. Ce n'est jamais deux fois la même boucle, et c'est le plus beau compliment que je puisse faire à un itinéraire."
+     ]
+    },
+    {
+     "title": "Réparer une crevaison sous la pluie",
+     "tag": "Réparations",
+     "excerpt": "Onze minutes, un pouce gelé et une leçon sur l'intérêt d'emporter une chambre de rechange.",
+     "body": [
+      "Ça arrive toujours dans l'unique descente où l'on avançait bien. Je m'abrite sous un abribus, je retire la roue et je découvre que le trou est à l'intérieur du fond de jante, ce qui veut dire qu'il reviendra.",
+      "La réparation est ennuyeuse et je l'ai écrite sur le couvercle de ma sacoche : vérifier le pneu, trouver l'épine, vérifier le fond de jante, monter la chambre de rechange, gonfler plus fort qu'il ne semble raisonnable. Sous la pluie, chaque étape prend deux fois plus de temps.",
+      "La leçon, que j'apprends chaque hiver, c'est qu'une chambre de rechange pèse moins qu'une bonne humeur et vaut considérablement plus."
+     ]
+    },
+    {
+     "title": "Pourquoi je roule avec la même veste toute l'année",
+     "tag": "Équipement",
+     "excerpt": "Une longue défense d'une veste un peu laide, très jaune.",
+     "body": [
+      "Elle est trop chaude en juin et pas tout à fait assez chaude en janvier, et c'est pourtant celle que je prends. Elle est jaune vif, se range dans sa propre poche et a survécu à deux chutes et à une machine à laver.",
+      "J'en ai essayé de meilleures. Chacune était excellente jusqu'au moment de décider si je la prenais, et alors elle restait sur le crochet. Le meilleur équipement est celui qu'on emporte vraiment.",
+      "Les couches font le reste. Un gilet de laine fin coûte moins cher qu'une veste neuve et fait plus pour moi que n'importe quel tissu à nom de marque."
+     ]
+    },
+    {
+     "title": "Vélo d'hiver, vélo d'été",
+     "tag": "Vélos",
+     "excerpt": "Deux vélos, c'est un luxe, mais l'un des deux a le droit d'être sale.",
+     "body": [
+      "Pendant des années, j'ai eu un seul vélo et je l'ai usé jusqu'à la corde chaque hiver, avant de passer chaque printemps à le payer. Il y a deux saisons, j'ai trouvé un vieux cadre en acier à un vide-grenier et je l'ai monté en vélo d'hiver.",
+      "Il a des garde-boue, de gros pneus et une chaîne que je ne regrette pas de remplacer. Il est lourd et lent et je l'adore, surtout parce que personne, moi compris, n'attend qu'il soit propre.",
+      "Le vélo d'été reste dans l'entrée de novembre à mars et me regarde d'un air de reproche. Je lui dis d'être patient."
+     ]
+    },
+    {
+     "title": "Ralentir exprès",
+     "tag": "Réflexions",
+     "excerpt": "Ce qui s'est passé quand j'ai arrêté de regarder ma vitesse.",
+     "body": [
+      "Pendant un an, j'ai roulé avec un petit compteur sur le guidon et j'ai tout mesuré. J'ai gagné un peu de vitesse et beaucoup d'irritabilité, et j'ai cessé de voir les petites routes sur lesquelles je roulais.",
+      "Puis la pile s'est vidée en mars et je ne l'ai pas remplacée. La première sortie sans chiffres m'a paru étrange pendant dix minutes environ, et ensuite elle m'a rappelé la première fois que j'avais appris à rouler.",
+      "Je ne sais plus ce que je voulais prouver. Je sais maintenant où sont les plus belles haies, et c'est sans doute ce qui vaut la peine d'être su."
+     ]
+    },
+    {
+     "title": "Une semaine de trajets dans le noir",
+     "tag": "Équipement",
+     "excerpt": "Des lumières, du ruban réfléchissant et une attitude raisonnable face aux flaques.",
+     "body": [
+      "Quand on change l'heure, je passe à deux feux à l'avant et deux à l'arrière, dont un de chaque en mode clignotant. Ça paraît excessif, mais les automobilistes vous voient, et c'est le but.",
+      "Je garde aussi un jeu de piles de rechange dans la sacoche. Un feu éteint sur une petite route dans le noir, c'est le genre d'erreur qu'on ne fait qu'une fois."
+     ]
+    },
+    {
+     "title": "Le café en haut de la côte",
+     "tag": "Itinéraires",
+     "excerpt": "Ça vaut la montée, si l'on arrive avant que le gâteau soit parti.",
+     "body": [
+      "Il se trouve en haut de la longue montée, dans une salle qui a dû être une grange. Le thé arrive dans une théière et le gâteau en parts de la taille d'un livre de poche.",
+      "Avant, je me dépêchais de monter pour éviter la cohue du déjeuner. Maintenant, je monte lentement et j'arrive les jambes en protestation, et le gâteau est meilleur."
+     ]
+    },
+    {
+     "title": "Comment j'ai appris à aimer les garde-boue",
+     "tag": "Équipement",
+     "excerpt": "Dix ans de dos mouillé, puis une paire de bandes en plastique.",
+     "body": [
+      "Pendant des années, j'ai pensé que les garde-boue étaient pour ceux qui ne prennent pas le vélo au sérieux. Puis j'en ai monté une paire, et mes chaussures étaient sèches dès la première sortie sous la pluie.",
+      "Ils ajoutent un peu de poids et ils claquent s'ils sont mal montés. Ces deux défauts sont minuscules à côté de l'arrivée au travail avec une raie de boue dans le dos."
+     ]
+    },
+    {
+     "title": "Manger à vélo",
+     "tag": "Nourriture",
+     "excerpt": "Ce qui va dans la poche, et ce que je regrette.",
+     "body": [
+      "La règle est de manger avant d'avoir faim. Sur une longue sortie, je prends quelque chose de petit toutes les quarante minutes : une banane, un morceau de cake, une poignée de dattes.",
+      "J'ai essayé les gels énergétiques une fois et j'ai décidé que je préférais un sandwich. C'est un peu salissant, et ça marche."
+     ]
+    },
+    {
+     "title": "Rentrer en train",
+     "tag": "Réflexions",
+     "excerpt": "Il n'y a pas de honte à se faire ramener quand le vent est de face.",
+     "body": [
+      "Certains jours, l'aller est magnifique et le retour se fait avec le vent de face tout du long. Ces jours-là, je monte dans le train avec le vélo et je lis.",
+      "Avant, j'y voyais un abandon. Maintenant, j'y vois la raison pour laquelle je repars le lendemain."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Carnet",
+       "Cahier",
+       "Journal",
+       "Notes",
+       "Chronique",
+       "Recueil",
+       "Lettres",
+       "Mots",
+       "Brouillon",
+       "Livre"
+      ],
+      [
+       "Pédales",
+       "Rayons",
+       "Kilomètres",
+       "Chemins",
+       "Chaîne",
+       "Roue",
+       "Sorties",
+       "Route",
+       "Côtes",
+       "Cadence"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "kitchen": {
+   "tagline": "Notes d'une petite cuisine",
+   "desc": "Des recettes qui marchent, des erreurs qui m'ont appris quelque chose, et le dîner {city_in}.",
+   "desc_about": "Qui écrit {brand}, et pourquoi.",
+   "intro": "Des recettes qui marchent, des erreurs qui m'ont appris quelque chose, et ce qu'on mange ce soir {city_in}.",
+   "about": [
+    "Je m'appelle {first}. Je cuisine pour une famille de quatre dans une cuisine {city_in} plus petite que la plupart des salles de bains, et je ne la changerais pour rien au monde.",
+    "Je note ce qui a marché, tel que je le cuisine vraiment, c'est-à-dire avec moins de quantités et plus d'adjectifs qu'une vraie recette.",
+    "Je ne photographie pas la nourriture. Si un plat est assez beau pour une photo, c'est que je l'ai sans doute laissé attendre."
+   ],
+   "now": [
+    "Je nourris un nouveau levain",
+    "Je mets des citrons au sel pour le printemps",
+    "Je fais la paix avec la porte du four"
+   ],
+   "posts": [
+    {
+     "title": "Un pain qui pardonne tout",
+     "tag": "Pain",
+     "excerpt": "De la farine, de l'eau, du sel et un dimanche après-midi très patient.",
+     "body": [
+      "C'est le pain que je fais quand j'ai oublié que je voulais faire du pain. Il ne demande presque pas de levure, un long repos et aucun pétrissage, et il ne se vexe pas si on l'oublie une heure de plus que prévu.",
+      "Le soir, mélangez la farine, l'eau et le sel jusqu'à ce qu'il n'y ait plus de parties sèches, couvrez le saladier et laissez-le sur le plan de travail. Le matin, la pâte est pleine de bulles et sent un peu la bière, et c'est exactement ce qu'on veut.",
+      "Pliez-la quelques fois, façonnez-la sans chichis et faites-la cuire dans une cocotte très chaude, couvercle fermé. Elle aura l'air imparfaite et un goût meilleur qu'elle n'a le droit d'en avoir."
+     ]
+    },
+    {
+     "title": "Que cuisiner quand le frigo est presque vide",
+     "tag": "Soirs de semaine",
+     "excerpt": "Cinq boîtes de conserve, trois oignons et un croûton de fromage : un dîner.",
+     "body": [
+      "Chaque jeudi, j'ouvre le frigo et je vois un demi-oignon, un poireau fatigué et un bocal dont je ne me rappelle pas l'ouverture. Avant, j'y voyais un échec. Aujourd'hui, c'est le seul soir de la semaine où le placard a son tour.",
+      "Faites revenir les oignons doucement jusqu'à ce qu'ils renoncent. Ajoutez les haricots que vous avez, une boîte de tomates et une cuillerée de quelque chose de vif : moutarde, vinaigre, un piment au vinaigre. Laissez frémir pendant que vous cherchez un quignon de pain.",
+      "Mangez avec le fromage râpé par-dessus. Personne ne m'a jamais demandé ce qu'il y avait dedans, et j'ai arrêté de le dire."
+     ]
+    },
+    {
+     "title": "La seule soupe que je fais en novembre",
+     "tag": "Soupe",
+     "excerpt": "Une courge rôtie, une pomme et de la patience avec le mixeur.",
+     "body": [
+      "Quand arrive la première semaine vraiment froide, je fais rôtir une courge, face coupée vers le bas, avec une tête d'ail entière et une pomme devenue molle. Ça prend quarante minutes et toute la maison sent le début de l'hiver.",
+      "Mettez tout dans une casserole, ajoutez du bouillon et mixez jusqu'à ce que ça arrête de discuter. Un peu de crème est agréable mais pas indispensable ; une cuillerée de la douceur de la pomme fait presque le même travail.",
+      "Je la sers avec des graines grillées et du pain de la veille. Ce n'est pas malin, et je la fais chaque année."
+     ]
+    },
+    {
+     "title": "Les cornichons sans panique",
+     "tag": "Conserves",
+     "excerpt": "Pourquoi un bocal de légumes au vinaigre est la chose la plus facile de la cuisine.",
+     "body": [
+      "Beaucoup sont rebutés par le mot conserves, qui évoque la stérilisation, de grandes casseroles et une journée perdue. Des légumes au vinaigre rapides, c'est un bocal, une bouilloire et une dizaine de minutes.",
+      "Coupez en tranches ce qu'il y a dans le bac à légumes, tassez-les dans un bocal propre et versez dessus un mélange chaud de vinaigre, d'eau, de sel et d'un peu de sucre. Ajoutez une feuille de laurier si vous en avez. Attendez demain.",
+      "Ils se gardent quelques semaines au frigo et donnent à un dîner tout simple un air voulu. Je n'ai jamais fait ça sans que ce soit réussi."
+     ]
+    },
+    {
+     "title": "Les choses brûlées, et ce qu'elles m'ont appris",
+     "tag": "Erreurs",
+     "excerpt": "Un petit catalogue de dîners ratés et de la seule leçon de chacun.",
+     "body": [
+      "Le caramel m'a appris que le sucre se moque de mon téléphone. Le risotto, que le bouillon doit être chaud. Les pommes de terre rôties, qu'une plaque peut être trop pleine, et que personne ne pardonne une pomme de terre pâle.",
+      "Le pire a été le gâteau d'anniversaire sorti trop tôt et remis trop tard. Il s'est affaissé au milieu comme un vieux bâtiment digne, et nous l'avons mangé à la cuillère avec de la crème anglaise.",
+      "Je garde une liste de ce qui a raté à l'intérieur d'une porte de placard. Elle est plus longue que celle de ce qui a réussi, et beaucoup plus utile."
+     ]
+    },
+    {
+     "title": "Une poêle, une cuillère et un mercredi",
+     "tag": "Soirs de semaine",
+     "excerpt": "Une poêle, vingt minutes et très peu de vaisselle.",
+     "body": [
+      "Le mercredi, la fatigue est là et tout le monde a faim, alors le dîner doit sortir d'une seule poêle. Des oignons, une boîte de haricots, un peu de paprika fumé et les légumes verts qui traînent au frigo.",
+      "Je pose un œuf dessus à la fin et j'appelle ça le dîner. Ce n'est pas tant une recette qu'une habitude, et elle ne m'a pas encore déçu."
+     ]
+    },
+    {
+     "title": "Des crêpes sans balance",
+     "tag": "Petit-déjeuner",
+     "excerpt": "De la farine, des œufs, du lait et dix minutes à ne pas s'éloigner.",
+     "body": [
+      "Mélangez la farine et les œufs d'abord, puis versez le lait peu à peu en fouettant. Si vous y pensez, laissez la pâte reposer la veille. Le matin, ajoutez une pincée de sel et un peu de beurre fondu.",
+      "Je les mange avec une cuillerée de confiture ou quelques pommes coupées. Ceux qui ajoutent du sucre dans la pâte n'ont pas tort, mais ils passent à côté de quelque chose."
+     ]
+    },
+    {
+     "title": "Du riz de la veille, de trois façons",
+     "tag": "Soirs de semaine",
+     "excerpt": "Sauté, cuit en gâteau ou ajouté à la soupe.",
+     "body": [
+      "Le riz froid est meilleur que le riz frais pour être sauté, car les grains restent bien séparés. Une poêle chaude, un peu d'huile, un œuf et quelques oignons nouveaux suffisent.",
+      "Dans une soupe, il épaissit le bouillon, et tassé dans un moule avec du fromage puis cuit au four, il devient presque un gâteau salé."
+     ]
+    },
+    {
+     "title": "Pourquoi je pèse ma farine",
+     "tag": "Pain",
+     "excerpt": "Une balance a plus changé ma façon de cuire que n'importe quelle recette.",
+     "body": [
+      "Un verre de farine peut peser de 120 à 160 grammes selon la façon de le remplir. C'est la différence entre un pain et une brique.",
+      "Maintenant, je pèse tout, l'eau comprise. Pendant une semaine, ça paraît tatillon, puis c'est la seule façon raisonnable de cuire."
+     ]
+    },
+    {
+     "title": "Un gâteau d'anniversaire sans recette",
+     "tag": "Pâtisserie",
+     "excerpt": "Le même poids de tout, et un peu de patience avec le four.",
+     "body": [
+      "Le gâteau de ma grand-mère, c'est le même poids de beurre, de sucre, d'œufs et de farine, avec un peu de vanille. Elle ne l'a jamais écrit parce qu'elle n'en avait jamais eu besoin.",
+      "Je le fais pour chaque anniversaire de la famille. Il est simple et un peu de travers, et personne n'en a jamais réclamé un autre."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Carnet",
+       "Cahier",
+       "Journal",
+       "Notes",
+       "Chronique",
+       "Recueil",
+       "Lettres",
+       "Mots",
+       "Brouillon",
+       "Livre"
+      ],
+      [
+       "Cuillère",
+       "Poêle",
+       "Table",
+       "Cuisine",
+       "Pâte",
+       "Bol",
+       "Marmite",
+       "Four",
+       "Soupe",
+       "Sel"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

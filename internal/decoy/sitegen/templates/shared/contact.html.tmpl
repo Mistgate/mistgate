@@ -1,0 +1,43 @@
+{{define "contactmap"}}<figure class="__cmap__">{{mapsvg "contact" 640 420}}<figcaption>{{icon "pin"}} {{.V.address}}</figcaption></figure>
+{{end}}
+{{define "contactform"}}<form class="__cform__" id="__cf__" onsubmit="return false" novalidate>
+<h2>{{.L.cf_h}}</h2>
+<p class="__mu__">{{.L.cf_intro}}</p>
+<div class="__fld__"><label for="__cfn__">{{.L.cf_name}}</label><input id="__cfn__" type="text" autocomplete="name"></div>
+<div class="__fld__"><label for="__cfe__">{{.L.cf_email}}</label><input id="__cfe__" type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false"></div>
+<div class="__fld__"><label for="__cfm__">{{.L.cf_msg}}</label><textarea id="__cfm__" rows="5"></textarea></div>
+<p class="__cfs__" id="__cfo__" role="alert" hidden></p>
+<button class="__btn__" id="__cfb__" type="button">{{.L.cf_send}}</button>
+</form>
+{{end}}
+{{define "contact_js"}}(function () {
+  var $$box = document.getElementById('__cf__');
+  if (!$$box) return;
+  var $$msg = document.getElementById('__cfm__');
+  var $$out = document.getElementById('__cfo__');
+  var $$btn = document.getElementById('__cfb__');
+  var $$busy = false;
+  function $$say(text) {
+    $$out.textContent = text;
+    $$out.hidden = false;
+  }
+  $$btn.addEventListener('click', function () {
+    if ($$busy) return;
+    $$out.hidden = true;
+    if (!$$msg.value.trim()) {
+      $$say('{{js .L.cf_empty}}');
+      return;
+    }
+    $$busy = true;
+    $$btn.disabled = true;
+    var $$label = $$btn.textContent;
+    $$btn.textContent = '{{js .L.cf_busy}}';
+    setTimeout(function () {
+      $$busy = false;
+      $$btn.disabled = false;
+      $$btn.textContent = $$label;
+      $$say('{{js .L.cf_fail}}');
+    }, 700 + Math.random() * 1300);
+  });
+})();
+{{end}}

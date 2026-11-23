@@ -1,0 +1,102 @@
+{
+ "nav_label": "Päävalikko",
+ "toc_h": "Tällä sivulla",
+ "nf_title": "Sivua ei löytynyt",
+ "nf_text": "Hakemaasi sivua ei ole olemassa tai se on siirretty.",
+ "nf_back": "Takaisin etusivulle",
+ "months": [
+  "tammikuu",
+  "helmikuu",
+  "maaliskuu",
+  "huhtikuu",
+  "toukokuu",
+  "kesäkuu",
+  "heinäkuu",
+  "elokuu",
+  "syyskuu",
+  "lokakuu",
+  "marraskuu",
+  "joulukuu"
+ ],
+ "months_gen": [
+  "tammikuuta",
+  "helmikuuta",
+  "maaliskuuta",
+  "huhtikuuta",
+  "toukokuuta",
+  "kesäkuuta",
+  "heinäkuuta",
+  "elokuuta",
+  "syyskuuta",
+  "lokakuuta",
+  "marraskuuta",
+  "joulukuuta"
+ ],
+ "weekdays": [
+  "maanantai",
+  "tiistai",
+  "keskiviikko",
+  "torstai",
+  "perjantai",
+  "lauantai",
+  "sunnuntai"
+ ],
+ "weekdays_short": [
+  "ma",
+  "ti",
+  "ke",
+  "to",
+  "pe",
+  "la",
+  "su"
+ ],
+ "am": "ap.",
+ "pm": "ip.",
+ "closed": "suljettu",
+ "hrs_fmt": "%days%: %time%",
+ "ms": "ms",
+ "units": [
+  "B",
+  "kB",
+  "MB"
+ ],
+ "cf_h": "Kirjoita meille",
+ "cf_intro": "Lähetä meille viesti, niin vastaamme mahdollisimman pian.",
+ "cf_name": "Nimesi",
+ "cf_email": "Sähköpostiosoitteesi",
+ "cf_msg": "Viesti",
+ "cf_send": "Lähetä viesti",
+ "cf_busy": "Lähetetään…",
+ "cf_empty": "Kirjoita ensin viesti.",
+ "cf_fail": "Viestiä ei voitu lähettää. Yritä myöhemmin uudelleen.",
+ "nav_terms": "Käyttöehdot",
+ "desc_terms": "Käyttöehdot: {brand}.",
+ "terms_h": "Käyttöehdot",
+ "terms_intro": "Lue nämä ehdot ennen kuin alat käyttää palvelua {brand}. Ne ovat lyhyet ja ne ovat voimassa heti ensimmäisestä käyttökerrasta lähtien.",
+ "terms": [
+  {
+   "h": "Palvelun käyttö",
+   "p": "Palvelu {brand} tarjotaan sellaisena kuin se on. Käyttämällä sitä hyväksyt nämä ehdot. Jos et hyväksy ehtoja, älä käytä palvelua."
+  },
+  {
+   "h": "Sinun osuutesi",
+   "p": "Käytä palvelua lain mukaisesti ja vain itseäsi tai organisaatiotasi varten. Älä anna tunnuksiasi muille, ja kerro meille, jos epäilet jonkun muun tietävän ne."
+  },
+  {
+   "h": "Mitä ei saa tehdä",
+   "p": "Älä yritä häiritä tai ylikuormittaa palvelua äläkä yritä päästä osiin, jotka eivät ole sinua varten. Voimme estää käytön, joka haittaa muita."
+  },
+  {
+   "h": "Saatavuus",
+   "p": "Pidämme palvelun toiminnassa, mutta emme voi luvata, että se on aina käytettävissä. Voimme muuttaa, keskeyttää tai lopettaa osia siitä."
+  },
+  {
+   "h": "Vastuu",
+   "p": "Lain sallimissa rajoissa emme vastaa vahingoista, jotka aiheutuvat palvelun käytöstä tai siitä, ettei sitä voi käyttää."
+  },
+  {
+   "h": "Muutokset",
+   "p": "Voimme päivittää näitä ehtoja aika ajoin. Jos jatkat palvelun käyttöä muutoksen jälkeen, hyväksyt uudet ehdot."
+  }
+ ]
+}

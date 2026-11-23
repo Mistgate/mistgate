@@ -1,0 +1,806 @@
+<!DOCTYPE html><html lang="en-GB"><head><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; font-src data:; style-src &#39;unsafe-inline&#39;; form-action &#39;none&#39;"/>
+<meta charset="utf-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1"/>
+      <title>Overview – Mattepack</title>
+<meta name="description" content="Mattepack resizes and compresses pictures in bulk and leaves the originals alone."/>
+		<meta name="theme-color" content="#0b090b"/>
+	<meta name="color-scheme" content="dark"/>
+		<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDMgNjEgMzIgMzIgNjEgMyAzMnoiIGZpbGw9IiNmZjdhYzYiLz48dGV4dApmb250LXNpemU9IjMyIiAgZmlsbD0iIzBiMGIxMCIgIGZvbnQtd2VpZ2h0PSI3MDAiICBmb250LWZhbWlseT0ic3lzdGVtLXVpLHNhbnMtc2VyaWYiCnk9IjQ0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIgp4PSIzMiI+TTwvdGV4dD48L3N2Zz4="/>
+	<style>:root{
+  color-scheme:dark;
+  --bg:#0b090b;
+  --band:#131113;
+--sf:#161416;
+	--sf2:#1f1d1f;--fg:#ece6ec;
+	--mu:#8e898e;--ln:#2b282b;--ln2:#4a474a;--ac:#ff7ac6; --ai:#0b0b10; --a2:#7fd6e8;
+--so:#321b29; --ok:#54c993;
+--wa:#f0a638;--bd:#e7685f;
+--oks:#1a2f26;--was:#392814; --bds:#371c1c;--r:0px;
+--rs:0px;
+  --rb:1px; --bw:1px;
+--w:1333px;
+  --wt:657px;--s:calc(8px*1.01);--sec:72px;
+--gut:20px;
+  --fb:ui-monospace,
+SFMono-Regular, Menlo,
+Consolas,"Liberation Mono",
+monospace;
+--fh:system-ui,
+-apple-system, "Segoe UI", Roboto,  "Helvetica Neue", Arial, sans-serif; --fl:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",
+monospace;
+	--fm:ui-monospace, SFMono-Regular,Menlo,
+Consolas,
+"Liberation Mono",monospace;
+	--fwh:750;--lsh:-.035em;
+--lhh:1;--ttl:uppercase;
+  --lsl:.1em;
+	--fsl:.76rem;
+  --t0:16px;
+  --t1:21.9px;
+--t2:29.9px;
+	--t3:clamp(21.6px,2.83vw, 40.8px); --t4:clamp(27.9px,3.87vw,55.7px);
+--t5:clamp(38px, 5.28vw, 76.1px);
+  --ts:10px;
+	--sh:none}
+*,
+*::before, *::after{box-sizing:border-box}
+[hidden]{
+	display:none!important}
+html{
+	-webkit-text-size-adjust:100%}
+body{
+	margin:0; min-height:100vh;
+	display:flex;flex-direction:column;background:var(--bg); color:var(--fg);
+font:16px/1.64 var(--fb); -webkit-font-smoothing:antialiased}
+main{ flex:1}
+h1,
+h2,h3,  h4{
+font-family:var(--fh);
+font-weight:var(--fwh);
+	line-height:var(--lhh);
+  margin:0 0 .5em; letter-spacing:var(--lsh)}
+h1{ font-size:clamp(1.75rem,4.4vw, 2.6rem)}
+h2{
+font-size:clamp(1.3rem,3vw,  1.7rem)}
+h3{font-size:1.12rem}
+p{margin:0 0 1em}
+ul,ol{
+margin:0 0 1em;
+  padding-left:1.25em}
+a{ color:var(--ac)}
+img, svg{max-width:100%}
+code,
+pre,  kbd{
+	font-family:var(--fm);
+  font-size:.92em}
+pre{margin:0 0 1em;padding:14px 16px;
+	overflow-x:auto;
+	background:var(--sf);
+color:var(--fg);
+	border:1px solid var(--ln);border-radius:var(--rs);line-height:1.55}
+pre code{
+	font-size:inherit}
+.wkmcg35{width:100%;max-width:var(--w);
+margin:0 auto;
+padding-left:var(--gut);padding-right:var(--gut)}
+.apq71{
+color:var(--mu)}
+.lci66{
+  width:1.25em; height:1.25em;
+  flex:none; vertical-align:-.25em;
+  fill:none;stroke:currentColor;stroke-width:1.9; stroke-linecap:round;
+	stroke-linejoin:round}
+.amzn89{ display:block;width:100%; height:100%}
+.jtms18{ width:28px;
+  height:28px;flex:none}
+.rpf66{ display:none}
+.kyz10{
+  display:flex;align-items:center;justify-content:center;
+  width:44px;height:44px;margin-right:-8px;list-style:none; cursor:pointer;color:var(--fg);
+  border-radius:var(--rs)}
+.kyz10::-webkit-details-marker{display:none}
+.kyz10 .lci66{
+	width:26px;
+height:26px}
+.rpf66 .kyz10 .lci66:nth-child(2),  .rpf66[open] .kyz10 .lci66:nth-child(1){display:none}
+.rpf66[open] .kyz10 .lci66:nth-child(2){display:inline-block}
+.awfo89{position:absolute;
+	left:0;
+right:0;
+	top:100%;z-index:5;
+	display:flex;
+  flex-direction:column;padding:6px var(--gut) 14px;background:var(--sf);
+	border-bottom:1px solid var(--ln); box-shadow:0 14px 24px rgba(0, 0,
+0,  .12)}
+.awfo89 a{padding:12px 2px;
+color:var(--fg);text-decoration:none;
+border-bottom:1px solid var(--ln);
+font-size:1.05rem}
+.awfo89 a[aria-current]{color:var(--ac);font-weight:600}
+.awfo89 a:last-child{ border-bottom:0}
+@media (max-width:720px){
+  .vklin73{
+	display:none}.rpf66{
+	display:block}
+	.ugblj84{
+flex-wrap:nowrap} }
+.fxfw96{display:grid;
+  grid-template-columns:minmax(0, 1fr) 230px;gap:var(--sec) 56px;
+  padding-top:48px;
+align-items:start}
+.mxyrw36{max-width:var(--wt)}
+.mxyrw36 h2{
+  margin-top:1.8em;scroll-margin-top:24px}
+.gaxef62{position:sticky;top:24px;padding:18px 20px; border:1px solid var(--ln);border-radius:var(--r);background:var(--sf); font-size:.92rem}
+.gaxef62 h2{ margin:0 0 10px;
+  color:var(--mu);
+	font:700 .78rem var(--fb);letter-spacing:.07em;
+text-transform:uppercase}
+.gaxef62 ol{
+margin:0;
+  padding:0;
+list-style:none; counter-reset:t}
+.gaxef62 li{
+counter-increment:t;
+	padding:5px 0 5px 22px; position:relative}
+.gaxef62 li::before{ content:counter(t);
+  position:absolute; left:0;color:var(--mu);
+	font-variant-numeric:tabular-nums}
+.gaxef62 a{
+  color:var(--fg);text-decoration:none}
+.gaxef62 a:hover{
+	color:var(--ac)}
+.cydf40{display:grid;grid-template-columns:1fr 1fr;
+  gap:40px;align-items:center;
+	padding-top:72px;
+padding-bottom:24px}
+.ekvye56{ margin:0 0 .1em;color:var(--ac); font:var(--fwh) clamp(5rem,16vw,
+11rem)/.9 var(--fh);
+	letter-spacing:var(--lsh)}
+.jflmm87{border-radius:var(--rb);
+overflow:hidden;aspect-ratio:4/3;background:var(--band)}
+.nuu92{margin:0 0 28px;
+	border:1px solid var(--ln);border-radius:var(--r);
+overflow:hidden;
+background:var(--band)}
+.nuu92 figcaption{
+padding:12px 16px;background:var(--sf);
+	border-top:1px solid var(--ln)}
+.rncn38{
+display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.rncn38 label{
+	font-size:.92rem;font-weight:600}
+.rncn38 input,
+.rncn38 textarea{
+	width:100%; padding:.65em .8em;border:1px solid var(--ln);
+  border-radius:var(--rs);
+	background:var(--sf); color:var(--fg);
+  font:inherit}
+.rncn38 textarea{
+resize:vertical}
+.rncn38 input:focus,  .rncn38 textarea:focus{ outline:2px solid var(--ac);
+outline-offset:1px}
+.hbde45{max-width:520px}
+.ver81{
+  margin:0 0 14px;color:var(--bd)}
+@media (max-width:720px){ .fxfw96{
+	grid-template-columns:1fr; padding-top:28px}
+  .gaxef62{position:static;
+  order:-1}.cydf40{ grid-template-columns:1fr;
+	padding-top:36px;gap:24px}
+}
+@media (max-width:560px){
+	.ugblj84{padding-top:12px;padding-bottom:10px}
+  }
+.hyba22{ display:block;
+width:100%;
+  height:auto}
+.ezgpi78{fill:none;
+stroke:var(--ac);stroke-width:2.4;
+stroke-linejoin:round;
+  stroke-linecap:round;
+vector-effect:non-scaling-stroke}
+.mmo79{
+  fill:var(--ac);opacity:.14}
+.gzn91{fill:none;stroke:var(--ln);
+	stroke-width:1;vector-effect:non-scaling-stroke}
+.ykn7{
+	fill:var(--ac);
+	opacity:.38}
+.knpn31{fill:var(--ac)}
+.seg12,.zflbq82, .pldkz13,
+.qnfe38{
+	display:block;
+	width:100%;
+	height:auto}
+.yyjuo55{fill:var(--sf2)}
+.xhw92{ fill:var(--wa)}
+.cne16{
+  fill:var(--bd)}
+.wos88{fill:var(--ac)}
+.spow18{
+fill:var(--a2)}
+.yib38{
+  fill:var(--fg)}
+.rhe14{fill:var(--mu)}
+.mygz96{
+fill:var(--band)}
+.wsl12{ fill:var(--sf2);
+stroke:var(--sf2);
+	stroke-width:6;stroke-linejoin:round}
+.mfzto5{
+	fill:var(--oks);
+  stroke:var(--oks);stroke-width:6;
+	stroke-linejoin:round}
+.ubak33{
+  fill:var(--ok);opacity:.55}
+.qudr56{fill:none;
+stroke:var(--so);stroke-width:16;
+  stroke-linecap:round}
+.pueo94{
+fill:none;
+stroke:var(--ln);stroke-width:7}
+.owt51{
+  fill:none;stroke:var(--ln2); stroke-width:12}
+.vic29{ fill:var(--mu); font-family:var(--fb);
+	paint-order:stroke; stroke:var(--sf);
+  stroke-width:3}
+.zpdy68{ fill:var(--ac);opacity:.18}
+.emqm19{fill:var(--ac)}
+.trnrr65{
+	fill:var(--ai)}
+.zbo95{
+	fill:var(--fg)}
+.ilms79{
+  fill:none;
+stroke:var(--bg); stroke-width:1.2;stroke-dasharray:2 5;opacity:.7}
+.brri31{fill:var(--bg);font-family:var(--fh); font-weight:700; text-transform:uppercase}
+.qbcas54{ fill:var(--a2)}
+.pxqhr76{
+  color:var(--mu)}
+.ovkx86{color:var(--ok)}
+.khds13{ color:var(--wa)}
+.nbtxg97{ color:var(--a2)}
+.coe62{ color:var(--ac)}
+.onc58{ color:var(--mu);
+user-select:none}
+.bozr78{
+	font-weight:600}
+
+html{ background:var(--bg)}
+body{ max-width:var(--w);width:100%;
+margin:0 auto;
+	border-left:var(--bw) solid var(--ln); border-right:var(--bw) solid var(--ln);
+overflow-x:hidden}
+a{
+	color:inherit;text-decoration:none}
+h1,  h2,h3{font-weight:var(--fwh)}
+.descr99{
+border-top:var(--bw) solid var(--ln)}
+.fsvba50{position:relative;
+	display:flex;align-items:center;
+justify-content:space-between;gap:20px; padding:0 clamp(16px, 2.6vw,36px);height:64px; border-bottom:var(--bw) solid var(--ln)}
+.eow49{display:flex;
+align-items:center; gap:8px; font:700 1.2rem var(--fh); letter-spacing:var(--lsh)}
+.eow49 i{
+display:block;width:10px;
+  height:20px;background:var(--ac)}
+.vklin73{
+display:flex; gap:4px}
+.vklin73 a{
+	padding:6px 12px;color:var(--mu)}
+.vklin73 a::before{
+  content:"["}
+.vklin73 a::after{
+	content:"]"}
+.vklin73 a:hover{
+color:var(--fg)}
+.vklin73 a[aria-current]{color:var(--ac)}
+.kyz10{
+color:var(--fg)}
+.awfo89{ background:var(--bg);
+  box-shadow:none;
+border-bottom:var(--bw) solid var(--ln)}
+.awfo89 a{font-family:var(--fm);
+	border-color:var(--ln)}
+.aupv39{
+display:inline-flex;align-items:center;
+	gap:8px; color:var(--ac); font:var(--fsl) var(--fl);
+	letter-spacing:var(--lsl); text-transform:var(--ttl)}
+.aupv39 .lci66{ width:1.1em;
+	height:1.1em}
+.vtv78{
+margin:0;
+	color:var(--mu);max-width:36em}
+.onc88{margin-bottom:28px}
+.wgerf37{
+  margin-top:24px}
+.skbe66{
+	padding:clamp(28px, 4vw,64px) clamp(16px,
+2.6vw,  36px)}
+.skbe66 h1, .gfsr65 h1{
+	font-size:var(--t5); line-height:1; margin:16px 0 20px}
+h1 em{ display:inline-block;
+  max-width:100%; font-style:normal; line-height:1; background:var(--ac); color:var(--ai);padding:0 .08em}
+.dtos8{
+padding:clamp(28px,4vw,
+56px) clamp(16px, 2.6vw,36px)}
+.sjtyg30{ padding-bottom:0}
+.dtos8 h2,.rlz95 h2, .dcgex64 h2{
+  font-size:var(--t4);
+line-height:1;
+  margin:0 0 14px}
+.khow94{ display:grid;grid-template-columns:1.15fr 1fr;grid-template-areas:"hh term" "hb term"}
+.utt96{
+grid-area:hh;
+	padding:clamp(28px,  5vw, 72px) clamp(16px, 2.6vw,
+36px) 0}
+.vcbf98{
+  grid-area:hb;
+display:flex;flex-direction:column; justify-content:space-between; gap:32px;padding:24px clamp(16px,2.6vw, 36px) clamp(32px, 5vw,  64px)}
+.utt96 h1{ font-size:var(--t5);line-height:1;margin:20px 0 0}
+.khow94>.ssu16{
+  grid-area:term;
+border-left:var(--bw) solid var(--ln)}
+.jdv10{
+	margin:0;max-width:34em;
+	color:var(--mu);
+	font-size:1.08rem}
+.ylsj54{
+display:flex;flex-wrap:wrap;gap:8px}
+.ylsj54 span{border:1px solid var(--ln2); padding:3px 10px;
+	font-size:.84rem}
+.ylsj54 b{color:var(--ac);
+  font-weight:600}
+.ssu16{background:var(--sf);
+  display:flex;flex-direction:column;
+  min-width:0}
+.jaiir54{display:flex; gap:8px;
+  align-items:center;
+	padding:12px 16px;border-bottom:var(--bw) solid var(--ln);
+  color:var(--mu); font-size:.84rem}
+.jaiir54 i{ width:11px;height:11px;
+border-radius:50%; border:1px solid var(--ln2)}
+.jaiir54 span{ margin-left:8px}
+.ssu16 pre{margin:0;
+	padding:24px;font:inherit;
+  font-family:var(--fm);
+	font-size:.94rem;
+  line-height:1.85;overflow:auto;
+  flex:1;
+border:0;background:none}
+.geiw80{
+border:var(--bw) solid var(--ln)}
+.geiw80 pre{padding:20px 24px}
+.bozr78{color:var(--ac); font-weight:400}
+.pxqhr76,
+.onc58{color:var(--mu)}
+.khds13{
+	color:var(--wa)}
+.coe62{
+  color:var(--a2)}
+.ovkx86{color:var(--a2)}
+.xkvel72{
+	display:inline-block;
+width:9px; height:17px;background:var(--ac);vertical-align:-3px}
+.rlz95{display:grid;grid-template-columns:1fr 1.6fr;border-top:var(--bw) solid var(--ln)}
+.rlz95>div{
+	padding:clamp(24px, 3.4vw, 48px) clamp(16px,  2.6vw, 36px);min-width:0}
+.rlz95>div:first-child{
+  border-right:var(--bw) solid var(--ln)}
+.vtbt28{
+display:flex; align-items:center; justify-content:space-between;
+gap:16px;border:1px solid var(--ac);padding:14px 18px;margin-bottom:20px;color:var(--ac);
+  font-family:var(--fm)}
+.vtbt28 small{flex:none;color:var(--ai); background:var(--ac); padding:2px 10px;font:var(--fsl) var(--fl);letter-spacing:var(--lsl);text-transform:var(--ttl)}
+.vtbt28 .bozr78, .vtbt28 .onc58{
+color:var(--ac)}
+.vtbt28 span:first-child{ min-width:0;overflow-wrap:anywhere}
+.dks42{
+  border-top:var(--bw) solid var(--ln)}
+.dks42 div{display:grid;
+grid-template-columns:200px minmax(0,1fr); gap:16px;
+  padding:12px 0;
+	border-bottom:1px solid var(--ln);
+  font-size:.9rem;
+	font-family:var(--fm)}
+.dks42 span:first-child{color:var(--mu)}
+.dks42 span{ overflow-wrap:anywhere}
+.ssunh44{ display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));border-top:var(--bw) solid var(--ln)}
+.ssunh44>div{
+  padding:clamp(24px, 3vw, 44px) clamp(16px,2.6vw, 36px) clamp(32px, 4vw, 56px);
+border-right:var(--bw) solid var(--ln);display:flex;
+	flex-direction:column;gap:56px}
+.ssunh44>div:last-child{
+  border:0}
+.ssunh44 b{
+	font:700 var(--t5) var(--fh);letter-spacing:var(--lsh);
+color:var(--ln2);
+line-height:.8}
+.ssunh44 h3{ margin:0 0 8px;
+font-size:1.3rem}
+.ssunh44 p{margin:0;color:var(--mu)}
+.kivxm24{display:grid;
+  grid-template-columns:220px minmax(0,1fr);gap:24px;
+border-top:var(--bw) solid var(--ln);
+padding:28px 0}
+.kivxm24 h3{margin:0;
+	font-size:1.6rem}
+.kivxm24 h3 span{display:block;
+	font:400 .8rem var(--fb);
+letter-spacing:0;color:var(--mu);margin-top:4px}
+.eoxh87{
+	list-style:none; margin:0;
+  padding:0}
+.eoxh87 li{
+	display:grid;
+	grid-template-columns:96px minmax(0, 1fr);gap:14px;padding:5px 0; align-items:baseline}
+.jpft50{display:inline-block;font:var(--fsl) var(--fl); letter-spacing:var(--lsl);
+	text-transform:var(--ttl);padding:1px 8px;text-align:center;
+	border:1px solid var(--ln2);
+  color:var(--fg);overflow-wrap:anywhere}
+.vprum63{
+	background:var(--ac); color:var(--ai);border-color:var(--ac)}
+.gtflk76{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.qzx59{margin:20px 0 0;color:var(--ac)}
+.fizp48{
+  display:grid; grid-template-columns:repeat(3,minmax(0,1fr))}
+.dcgex64{border-top:var(--bw) solid var(--ln)}
+.dcgex64 .fizp48{
+	margin-top:32px; border-top:var(--bw) solid var(--ln)}
+.fizp48>div{ padding:clamp(20px,
+3vw,40px) clamp(16px,2.6vw,36px);border-right:var(--bw) solid var(--ln)}
+.fizp48>div:last-child{
+border:0}
+.fizp48 h3{
+margin:0 0 18px;font:var(--fsl) var(--fl);
+font-weight:700;letter-spacing:var(--lsl); text-transform:var(--ttl); display:flex;align-items:center;
+  gap:10px}
+.fizp48 h3 i{
+  width:10px;
+	height:10px; display:block;background:var(--ac)}
+.fizp48>div:nth-child(2) h3 i{background:var(--fg)}
+.fizp48>div:nth-child(3) h3 i{
+  background:var(--ln2)}
+.fizp48 ul{margin:0;
+padding:0}
+.fizp48 li{ list-style:none;
+  padding:10px 0; border-top:1px solid var(--ln)}
+.ltn13{ display:flex;
+  justify-content:space-between;align-items:center; gap:24px; padding:clamp(28px,4vw, 56px) clamp(16px, 2.6vw,36px);background:var(--ac);
+color:var(--ai)}
+.ltn13 b{
+	font:700 var(--t4)/.95 var(--fh);
+	letter-spacing:var(--lsh)}
+.ltn13 span{
+max-width:22em}
+.bnvqd78{
+  padding:44px clamp(16px, 2.6vw,36px) 0;
+overflow:hidden;
+  border-top:var(--bw) solid var(--ln)}
+.torde26{
+display:grid;
+	grid-template-columns:1.5fr 1fr 1fr 1fr; gap:32px}
+.torde26 h6{margin:0 0 12px;
+  font:400 var(--fsl) var(--fl);
+	letter-spacing:var(--lsl);
+text-transform:var(--ttl);color:var(--mu)}
+.torde26 a,
+.torde26 span{
+	display:block;
+  padding:3px 0}
+.torde26 a:hover{color:var(--ac)}
+.torde26 a.eow49{display:flex;
+  padding:0}
+.torde26 p{
+  color:var(--mu);margin:12px 0 0;
+  max-width:24em}
+.torde26 div{min-width:0;
+overflow-wrap:anywhere}
+.ebc94{font:700 min(200px,calc(120vw/9))/1.3 var(--fh);letter-spacing:-.04em;
+  color:transparent;
+-webkit-text-stroke:1.5px var(--ln2);
+  margin:8px 0 0;white-space:nowrap}
+.njabm49{
+display:flex; justify-content:space-between;gap:12px;
+flex-wrap:wrap;color:var(--mu); font-size:.84rem;border-top:var(--bw) solid var(--ln);
+padding:16px clamp(16px,  2.6vw,
+36px)}
+.hxbr57{display:grid;grid-template-columns:240px 28px minmax(0, 1fr);gap:0 24px; padding:0 0 48px}
+.gfqc79{
+text-align:right;padding-top:2px}
+.gfqc79 h2{
+	margin:0; font-size:2.1rem; line-height:1}
+.gfqc79 span{
+display:block;
+	font-size:.8rem;
+  color:var(--mu); margin-top:6px}
+.eqmzv32{position:relative}
+.eqmzv32::before{ content:"";position:absolute;
+  left:13px;
+  top:6px;
+bottom:-54px; width:1px;
+	background:var(--ln)}
+.hxbr57:last-child .eqmzv32::before{display:none}
+.eqmzv32 i{position:absolute;
+	left:7px;
+	top:8px;
+width:13px;
+	height:13px;
+	background:var(--bg);
+border:2px solid var(--ac);
+display:block}
+.hxbr57:first-child .eqmzv32 i{
+background:var(--ac)}
+.hxbr57 .eoxh87{
+	border:1px solid var(--ln);background:var(--sf)}
+.hxbr57 .eoxh87 li{ padding:12px 18px;border-top:1px solid var(--ln)}
+.hxbr57 .eoxh87 li:first-child{border-top:0}
+.rojhw68{
+	display:inline-block;margin:12px 0 0;
+	color:var(--ac)}
+.gfsr65{
+  display:grid;grid-template-columns:1.4fr 1fr;border-bottom:var(--bw) solid var(--ln)}
+.gfsr65>div{
+	padding:clamp(28px,4vw,
+56px) clamp(16px, 2.6vw,  36px);min-width:0}
+.gfsr65>div:last-child{border-left:var(--bw) solid var(--ln);background:var(--sf)}
+.gfsr65 h1{
+font-size:clamp(3.4rem, 10vw,
+9rem);
+	margin:10px 0 8px}
+.rsha69{
+display:grid;
+	grid-template-columns:130px minmax(0, 1fr);
+	gap:12px;
+padding:12px 0;
+  border-bottom:1px solid var(--ln);
+  font-size:.9rem}
+.rsha69 span:first-child{
+color:var(--mu)}
+.rsha69:last-child{
+	border:0}
+.rlcy65{margin:20px 0 0;
+  border:1px solid var(--ln); background:var(--sf)}
+.rlcy65 .eoxh87 li{padding:14px 20px;
+border-top:1px solid var(--ln)}
+.rlcy65 .eoxh87 li:first-child{
+	border-top:0}
+.clc18{
+  overflow-x:auto}
+table{width:100%;
+	border-collapse:collapse;
+  font-size:.9rem}
+th{text-align:left;font:400 var(--fsl) var(--fl);
+  letter-spacing:var(--lsl);text-transform:var(--ttl);color:var(--mu);padding:10px 14px;border-bottom:var(--bw) solid var(--ln)}
+td{ padding:16px 14px;
+  border-bottom:1px solid var(--ln); vertical-align:top}
+td.mdqs7, td.mdqs7 a{ color:var(--ac);
+	white-space:nowrap}
+td.spotw30{
+min-width:21em;color:var(--mu); word-break:break-all;font-family:var(--fm); font-size:.8rem; line-height:1.5;max-width:520px}
+td.obki43{
+	color:var(--mu)}
+td.kfv72{
+  text-align:right}
+td.kfv72 a{color:var(--ac)}
+.etox40{
+display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+	margin-top:28px;
+	border-top:var(--bw) solid var(--ln)}
+.etox40>div{padding:clamp(20px,  3vw,40px) clamp(16px, 2.6vw,
+36px);border-right:var(--bw) solid var(--ln); min-width:0}
+.etox40>div:last-child{border:0}
+.etox40 ul{
+	margin:0; padding:0}
+.etox40 li{list-style:none;
+	padding:10px 0;
+	border-top:1px solid var(--ln);
+  overflow-wrap:anywhere;font-family:var(--fm);font-size:.9rem}
+.etox40 h3{
+margin:0 0 16px;
+font:700 var(--fsl) var(--fl);
+  letter-spacing:var(--lsl);
+  text-transform:var(--ttl)}
+.vjdp44{
+	display:grid;
+grid-template-columns:1.1fr 1fr;min-height:640px}
+.myp99{padding:clamp(28px,5vw,
+72px) clamp(16px,
+2.6vw, 36px);border-right:var(--bw) solid var(--ln);
+	display:flex;
+  flex-direction:column; justify-content:space-between;gap:40px;min-width:0}
+.myp99 h1{
+font-size:var(--t5);
+  line-height:.94;margin:16px 0 20px}
+.atzz28{
+  font:700 clamp(120px,24vw,360px)/.78 var(--fh);color:transparent;
+  -webkit-text-stroke:2px var(--ac)}
+.sazjm26{
+	margin:28px 0 0}
+.pqrbu17{display:inline-block;
+  background:var(--ac);
+  color:var(--ai);
+padding:12px 22px; font-weight:700}
+@media (max-width:900px){
+.khow94{grid-template-columns:1fr;
+	grid-template-areas:"hh" "hb" "term"}
+.khow94>.ssu16{ border-left:0;border-top:var(--bw) solid var(--ln)}
+.rlz95,.ssunh44,
+.fizp48, .etox40, .gfsr65, .vjdp44{grid-template-columns:1fr}
+.rlz95>div:first-child, .ssunh44>div, .fizp48>div, .etox40>div, .myp99{
+border-right:0;border-bottom:var(--bw) solid var(--ln)}
+.gfsr65>div:last-child{border-left:0}
+.ssunh44>div{gap:20px}
+.kivxm24{
+  grid-template-columns:1fr;gap:12px}
+.hxbr57{
+grid-template-columns:1fr;gap:12px;
+	padding-bottom:32px}
+.eqmzv32{
+  display:none}
+.gfqc79{
+	text-align:left}
+.torde26{
+  grid-template-columns:1fr 1fr}
+.torde26>div:first-child{grid-column:1/-1}
+.ltn13{
+flex-direction:column;
+	align-items:flex-start}
+.dks42 div{grid-template-columns:1fr;gap:2px}
+.vjdp44{
+min-height:0}
+}
+@media (max-width:720px){
+	.vklin73{display:none}}
+@media (max-width:560px){td.spotw30{min-width:0} td.mdqs7, td.mdqs7 a{
+white-space:normal; word-break:break-all}
+  th,  td{ padding-left:8px;
+  padding-right:8px}.eoxh87 li{
+  grid-template-columns:1fr;gap:4px}
+  .eoxh87 .jpft50{
+  justify-self:start}.torde26{grid-template-columns:1fr} .rsha69{grid-template-columns:100px minmax(0,
+1fr)}}
+@media (min-width:901px){
+	.khow94{grid-template-columns:1fr 1fr;
+grid-template-areas:"hh hh" "hb term"}.utt96 h1{
+	font-size:var(--t5);
+max-width:14em}.utt96{padding-bottom:8px} .khow94>.ssu16{
+	border-top:var(--bw) solid var(--ln)}}
+
+</style>
+   </head>
+<body>
+<header class="fsvba50">
+<a class="eow49" data-page="index.html">mattepack<i></i></a>
+<nav class="vklin73" aria-label="Main"><a aria-current="page" data-page="index.html">Overview</a><a data-page="history.html">Changelog</a><a data-page="install/index.html">Install</a><a data-page="roadmap.html">Roadmap</a></nav>
+
+<details class="rpf66"><summary class="kyz10" aria-label="Main"><svg class="lci66" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg aria-hidden="true" class="lci66" viewBox="0 0 24 24" focusable="false"><path d="M6 6l12 12M18 6L6 18"></path></svg></summary><div class="awfo89"><a aria-current="page" data-page="index.html">Overview</a><a data-page="history.html">Changelog</a><a data-page="install/index.html">Install</a><a data-page="roadmap.html">Roadmap</a></div>
+		</details>
+</header>
+ <main>
+<section class="khow94">
+<div class="utt96"><span class="aupv39">Overview</span><h1>Resize a folder of pictures in one <em>go</em></h1>
+        </div>
+      <div class="vcbf98">
+<p class="jdv10">Mattepack resizes and compresses pictures in bulk. Point it at a folder and say how big you want the results; it does the rest and leaves the originals alone.</p>
+		<div class="ylsj54"><span><b>Version</b> 0.5.0</span><span><b>Licence</b> MIT</span><span><b>Platforms</b> Linux, macOS, Windows</span></div>
+ </div>
+ <div class="ssu16"><div class="jaiir54"><i></i><i></i><i></i><span>~/project</span></div>
+	<pre><code><span class="onc58">$ </span><span class="bozr78">sudo</span> <span class="bozr78">apt</span> install mattepack
+<span class="onc58">$ </span><span class="bozr78">mattepack</span> <span class="khds13">--version</span>
+mattepack <span class="coe62">0.5.0</span>
+<span class="onc58">$ </span><span class="bozr78">mattepack</span> photos <span class="khds13">--width</span> <span class="coe62">1600</span> <span class="khds13">--out</span> small
+<span class="onc58">$ </span><span class="xkvel72"></span></code></pre></div>
+		</section>
+<section class="dcgex64">
+<div class="dtos8 sjtyg30"><h2>Roadmap</h2>
+	<p class="vtv78">What the maintainers are working on, in rough order. Plans change; the changelog is the record of what actually happened.</p>
+   </div>
+   <div class="fizp48">
+<div><h3><i></i>Now</h3>
+   <ul><li>Faster JPEG decoding</li>
+ <li>A progress bar that stays out of the way</li>
+  </ul>
+        </div>
+<div><h3><i></i>Next</h3>
+ <ul><li>Cropping to a fixed ratio</li>
+   <li>Packages for the main Linux distributions</li>
+     </ul>
+</div>
+        <div><h3><i></i>Later</h3>
+    <ul><li>Support for animated images</li>
+ <li>A small preview mode</li>
+ </ul>
+
+  </div>
+
+  </div>
+
+</section>
+      <section class="ssunh44"><div><b>01</b><span><h3>Batch first</h3>
+ <p>Hundreds of files at once, using every core.</p>
+      </span></div>
+<div><b>02</b><span><h3>Keeps the originals</h3>
+ <p>Results go to a new folder.</p>
+   </span></div>
+
+<div><b>03</b><span><h3>Predictable output</h3>
+    <p>The same input always gives the same bytes.</p>
+ </span></div>
+
+</section>
+  <section class="rlz95">
+<div><h2>Install</h2>
+   <p class="vtv78">Mattepack is not shipped as a ready-made binary. Distributions package it, and building it from the source archive takes a few minutes.</p>
+
+  </div>
+<div>
+<div class="vtbt28"><span><span class="onc58">$ </span><span class="bozr78">sudo</span> <span class="bozr78">apt</span> install mattepack</span><small>Debian and Ubuntu</small></div>
+   <div class="dks42"><div><span>Fedora</span><span>sudo dnf install mattepack</span></div>
+     <div><span>Arch Linux</span><span>sudo pacman -S mattepack</span></div>
+  <div><span>macOS with Homebrew</span><span>brew install mattepack</span></div>
+      </div>
+ </div>
+	</section>
+ <section class="rlz95">
+<div><h2>Get started</h2>
+	</div>
+
+  <div><div class="ssu16 geiw80"><pre><code><span class="onc58">$ </span><span class="bozr78">mattepack</span> photos <span class="khds13">--width</span> <span class="coe62">1600</span> <span class="khds13">--out</span> small
+<span class="onc58">$ </span><span class="bozr78">mattepack</span> <span class="khds13">--help</span>
+<span class="onc58">$ </span><span class="bozr78">mattepack</span> <span class="khds13">--version</span></code></pre></div>
+    </div>
+ </section>
+      <section class="dtos8">
+<h2>Changelog</h2>
+   <p class="vtv78 onc88">Every release, newest first. Version numbers follow the usual major, minor, patch scheme.</p>
+
+  <div class="kivxm24"><h3><a data-page="changelog/v0-5-0.html">0.5.0</a><span><time datetime="2026-10-10">10 October 2026</time></span></h3>
+     <ul class="eoxh87"><li><span class="jpft50 vprum63">Added</span><span>Resizing to a maximum height as well as a width.</span></li>
+        <li><span class="jpft50 gtflk76">Fixed</span><span>Slow progress reporting on large batches.</span></li>
+	<li><span class="jpft50 gtflk76">Fixed</span><span>Photos taken in portrait mode coming out sideways.</span></li>
+      <li><span class="jpft50 gtflk76">Fixed</span><span>Wrong colours on pictures with an embedded profile.</span></li>
+        </ul>
+    </div>
+
+<div class="kivxm24"><h3><a data-page="changelog/v0-4-0.html">0.4.0</a><span><time datetime="2026-09-18">18 September 2026</time></span></h3>
+ <ul class="eoxh87"><li><span class="jpft50 bce8">Changed</span><span>Output files keep the original modification time.</span></li>
+     <li><span class="jpft50 vprum63">Added</span><span>A dry-run flag that lists what would be done.</span></li>
+  <li><span class="jpft50 vprum63">Added</span><span>A suffix option to name the resized files.</span></li>
+      <li><span class="jpft50 vprum63">Added</span><span>Support for WebP output.</span></li>
+
+</ul>
+</div>
+
+  <div class="kivxm24"><h3><a data-page="changelog/v0-3-2.html">0.3.2</a><span><time datetime="2026-08-17">17 August 2026</time></span></h3>
+   <ul class="eoxh87"><li><span class="jpft50 bce8">Changed</span><span>Smaller memory use when resizing very large pictures.</span></li>
+   <li><span class="jpft50 bce8">Changed</span><span>The help text now has examples.</span></li>
+        <li><span class="jpft50 gtflk76">Fixed</span><span>A crash on files with no extension.</span></li>
+
+  <li><span class="jpft50 vprum63">Added</span><span>A quality option for JPEG and WebP.</span></li>
+		</ul>
+
+  </div>
+		<p class="qzx59"><a data-page="history.html">All releases <svg aria-hidden="true" class="lci66" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a></p>
+
+  </section>
+ <section class="ltn13"><b>Licence</b><span>Mattepack is free software, released under the MIT licence. Use it, change it and share it.</span></section>
+	</main>
+<footer class="bnvqd78">
+<div class="torde26">
+<div><a class="eow49" data-page="index.html">mattepack<i></i></a><p>Mattepack resizes and compresses pictures in bulk and leaves the originals alone.</p>
+	</div>
+   <div><h6>Main</h6><a data-page="index.html">Overview</a><a data-page="history.html">Changelog</a><a data-page="install/index.html">Install</a><a data-page="roadmap.html">Roadmap</a></div>
+ <div><h6>Changelog</h6><a data-page="changelog/v0-5-0.html">Latest release</a><a data-page="history.html">All releases</a><a data-page="install/index.html">Build from source</a></div>
+    <div><h6>Roadmap</h6><span>Faster JPEG decoding</span><span>A progress bar that stays out of the way</span><span>Cropping to a fixed ratio</span><span>Packages for the main Linux distributions</span></div>
+      </div>
+     <div class="ebc94" aria-hidden="true">mattepack</div>
+  </footer>
+
+  <div class="njabm49"><span>Released under the MIT licence.</span><span>© 2026 Mattepack</span></div>
+        
+
+</body></html>

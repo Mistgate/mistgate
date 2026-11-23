@@ -22,9 +22,6 @@ import (
 // the capability string, the periodic DoctorReport, RunDoctor and ApplyFix handling, and the agent-side facts
 // the checks need. Runs and fixes happen in their own goroutines, so the stream reader never waits for them.
 
-// capDoctor is listed in Hello.capabilities: the panel sends RunDoctor and ApplyFix only to agents that have it.
-const capDoctor = "doctor/1"
-
 const (
 	// First report 30 s after every connect (engines need a moment to settle), then every 10 min +-60 s.
 	doctorFirstDelay = 30 * time.Second
@@ -207,8 +204,8 @@ func runStateName(s plugin.RunState) string {
 	return "stopped"
 }
 
-// tlsPortOf is the TCP port whose served certificate the doctor can read, 0 = none. Hysteria2: its HTTPS masquerade
-// listener, settings.masquerade.tcp_port, 443 when absent, 0 = none (hysteria2/settings.go). VLESS with security tls: the
+// tlsPortOf is the TCP port whose served certificate the doctor can read, 0 = none. Hysteria2: its HTTPS site
+// (plugin.Hy2SitePort). VLESS with security tls: the
 // inbound's own port. TrustTunnel: its own TCP port, where the site and the tunnel share one certificate (the QUIC listener
 // on the same number serves the same one). VLESS with REALITY, whatever its target: nothing, because the certificate of a
 // "self" site is behind REALITY (a visitor of the port gets it, but the doctor's own handshake is not one of them), and before the first
@@ -221,26 +218,11 @@ func tlsPortOf(sp plugin.InboundSpec) int {
 	}
 	switch sp.Protocol {
 	case "hysteria2":
-		var j struct {
-			Masquerade struct {
-				TCPPort *int `json:"tcp_port"`
-			} `json:"masquerade"`
-		}
-		if len(sp.Settings) > 0 && json.Unmarshal(sp.Settings, &j) != nil {
-			return 0
-		}
-		if p := j.Masquerade.TCPPort; p != nil {
-			return max(*p, 0)
-		}
-		return 443
+		return int(plugin.Hy2SitePort(sp))
 	case "vless":
-		var j struct {
-			Security string `json:"security"`
+		if v, _ := plugin.VLESSOf(sp); v.TLS() {
+			return int(sp.Listen.Port)
 		}
-		if json.Unmarshal(sp.Settings, &j) != nil || j.Security != "tls" {
-			return 0
-		}
-		return int(sp.Listen.Port)
 	case "trusttunnel":
 		return int(sp.Listen.Port)
 	}

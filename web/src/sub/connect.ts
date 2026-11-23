@@ -13,9 +13,9 @@ import { appTile } from "./ways";
 
 const platIcon: Record<Platform, IconName> = { ios: "phone", android: "android", windows: "monitor", macos: "laptop", linux: "terminal" };
 
-/** A choice of the board (.a-chip): an icon and a word, one of a radio group. */
-export function chip(o: { ico?: IconName; label: string; on: boolean; k: string; click: () => void }): HTMLButtonElement {
-  return h("button", { class: `a-chip${o.on ? " on" : ""}`, type: "button", role: "radio", "aria-checked": o.on, "data-k": o.k, on: { click: o.click } }, o.ico && icon(o.ico), o.label);
+/** A choice of the board (.a-chip): an icon (or `pre`, a flag) and a word, `post` after it (a mark), one of a radio group. */
+export function chip(o: { ico?: IconName; pre?: Kid; label: string; post?: Kid; on: boolean; k: string; click: () => void }): HTMLButtonElement {
+  return h("button", { class: `a-chip${o.on ? " on" : ""}`, type: "button", role: "radio", "aria-checked": o.on, "data-k": o.k, on: { click: o.click } }, o.ico && icon(o.ico), o.pre, o.label, o.post);
 }
 
 /** The QR code of the link can be shown: the page has the option, a link and some link app. */

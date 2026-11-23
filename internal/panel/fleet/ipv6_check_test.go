@@ -13,6 +13,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -44,7 +45,7 @@ func v6Works(addrs string) map[string]string {
 // v6Peer is a node that can send over IPv6: its doctor says outbound IPv6 works.
 func (x *l3Env) v6Peer(name string) (*agent, *conn) {
 	x.t.Helper()
-	p, c := addPortCheckPeer(x, name, "provider-b", "DE", capUDPCheck, capTCPCheck)
+	p, c := addPortCheckPeer(x, name, "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
 	x.doctorIPv6(p.nodeID, v6Works("2001:db8:ffff::"+name[len(name)-1:]+"/64"))
 	return p, c
 }
@@ -114,7 +115,7 @@ func verdictOf(c store.IPv6Check, network string, port uint16) string {
 func TestCheckIPv6SendsFromAnIPv6NodeToTheAddressAndWritesNoPortCheck(t *testing.T) {
 	x, target, targetConn := ipv6Target(t)
 	sender, senderConn := x.v6Peer("sender1")
-	v4only, v4Conn := addPortCheckPeer(x, "oldv4", "provider-c", "NL", capUDPCheck, capTCPCheck)
+	v4only, v4Conn := addPortCheckPeer(x, "oldv4", "provider-c", "NL", agentcap.UDPCheck, agentcap.TCPCheck)
 	x.doctorIPv6(v4only.nodeID, map[string]string{"ipv6": "no"})
 	ch := x.checkIPv6(target.nodeID, v6Entry)
 
@@ -272,8 +273,8 @@ func TestCheckIPv6MissingHalfWithOtherSendersIsNoVerifier(t *testing.T) {
 		wantNet     string
 		wantVerdict string
 	}{
-		{name: "no TCP sender", caps: []string{capUDPCheck}, udpRuns: true, wantNet: "udp", wantVerdict: "ok"},
-		{name: "no UDP sender, TCP says other", caps: []string{capTCPCheck}, tcpRuns: true, tcp443: "other", wantNet: "tcp", wantVerdict: "other"},
+		{name: "no TCP sender", caps: []string{agentcap.UDPCheck}, udpRuns: true, wantNet: "udp", wantVerdict: "ok"},
+		{name: "no UDP sender, TCP says other", caps: []string{agentcap.TCPCheck}, tcpRuns: true, tcp443: "other", wantNet: "tcp", wantVerdict: "other"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			x, target, targetConn := ipv6Target(t)
@@ -312,7 +313,7 @@ func TestCheckIPv6MissingHalfWithOtherSendersIsNoVerifier(t *testing.T) {
 func TestIPv6CheckTargetsSkipUnsupportedServers(t *testing.T) {
 	specs := []tcpSpec{
 		hy2Spec("ip", plugin.TLSAcmeIP, "node-a.example.com", ""),
-		hy2Spec("cdn", plugin.TLSSelfSigned, "node-a.example.com", `{"cdn":{"host":"cdn.example.com"}}`),
+		vlessSpec("cdn", 443, `{"security":"tls","cdn":{"host":"cdn.example.com"}}`, plugin.TLS{Mode: plugin.TLSSelfSigned, ServerName: "node-a.example.com"}),
 	}
 	tcp, udp := ipv6CheckTargets(specs, nil)
 	if len(tcp) != 0 || len(udp) != 0 {
@@ -332,7 +333,7 @@ func TestCheckIPv6PanelWithoutIPv6IsNeverAPass(t *testing.T) {
 		return "6", map[uint16]string{443: "ours", 8443: "ours"}, nil
 	}
 	// a node that has IPv4 only is no sender either
-	v4, v4Conn := addPortCheckPeer(x, "oldv4", "provider-c", "NL", capUDPCheck, capTCPCheck)
+	v4, v4Conn := addPortCheckPeer(x, "oldv4", "provider-c", "NL", agentcap.UDPCheck, agentcap.TCPCheck)
 	x.doctorIPv6(v4.nodeID, map[string]string{"ipv6": "yes", "connect": "failed"})
 
 	got := awaitIPv6(t, x.checkIPv6(target.nodeID, v6Entry))
@@ -389,11 +390,17 @@ func TestCheckIPv6GlobalpingIsTheLastResortAndSaysSo(t *testing.T) {
 	if got.Pass || got.By != store.IPv6ByGlobalping || verdictOf(got, "tcp", 443) != "timeout" {
 		t.Fatalf("no probe connected: %+v", got)
 	}
-	// Globalping off or failing: nothing verified the address
-	failure = errors.New("switched off")
+	// An explicit switch-off keeps the existing no-verifier reason.
+	failure = ErrGlobalpingOff
 	got = awaitIPv6(t, x.checkIPv6(target.nodeID, v6Entry))
 	if got.Pass || got.Code != "no_ipv6_verifier" {
-		t.Fatalf("Globalping failed: %+v", got)
+		t.Fatalf("Globalping off: %+v", got)
+	}
+	// A rejected or unreachable Globalping request gets its own reason instead of looking switched off.
+	failure = errors.New("Globalping request failed")
+	got = awaitIPv6(t, x.checkIPv6(target.nodeID, v6Entry))
+	if got.Pass || got.Code != "globalping_failed" {
+		t.Fatalf("Globalping failure: %+v", got)
 	}
 	assertNoPortCommands(t, targetConn) // the target was never asked to count: nothing was sent to it
 }

@@ -1,0 +1,435 @@
+{
+ "ui": {
+  "nav_label": "Ana menü",
+  "footer": "Gönüllüler tarafından yürütülür, herkese açıktır.",
+  "nav_home": "Ana sayfa",
+  "nav_events": "Program",
+  "nav_join": "Katılın",
+  "nav_news": "Haberler",
+  "home_title": "Hoş geldiniz",
+  "desc_events": "{brand} düzenli toplantıları ve özel etkinlikleri.",
+  "desc_join": "{brand} topluluğuna nasıl katılırsınız, maliyeti nedir ve neler beklemelisiniz.",
+  "desc_news": "{brand} duyuruları ve haberleri.",
+  "nf_title": "Sayfa bulunamadı",
+  "nf_text": "Bu sayfayı bulamadık. Konusu olan etkinlikten sonra kaldırılmış olabilir.",
+  "nf_back": "Ana sayfaya dön",
+  "meet_h": "Ne zaman buluşuyoruz",
+  "when_l": "Ne zaman",
+  "where_l": "Nerede",
+  "upcoming_h": "Yaklaşanlar",
+  "latest_h": "Son haberler",
+  "all_events": "Tüm program",
+  "all_news": "Tüm haberler",
+  "join_cta": "Nasıl katılırsınız",
+  "events_h": "Program",
+  "events_intro": "Düzenli toplantılarımız ve bu sezon yaptıklarımız, ay ay.",
+  "join_h": "Bize katılın",
+  "steps_h": "Nasıl katılırsınız",
+  "faq_h": "Sorular",
+  "join_fee": "Üyelik yılda {fee}; gençler ve öğrenciler için indirimli. Para sıkıntınız varsa saymana sessizce söyleyin, bir daha anılmaz.",
+  "steps": [
+   "Herhangi bir toplantıya gelin ve merhaba deyin.",
+   "Bir şeye karar vermeden önce bir ay deneyin.",
+   "Hazır olduğunuzda üyelik ücretini saymana ödeyin."
+  ],
+  "news_h": "Haberler",
+  "news_intro": "Yönetim kurulundan duyurular ve son toplantılardan haberler, en yenisi başta.",
+  "regular_h": "Düzenli toplantılar",
+  "season_h": "Bu sezon şimdiye kadar",
+  "find_h": "Bizi bulun",
+  "contact_h": "İletişim",
+  "phone_l": "Telefon"
+ },
+ "bundles": {
+  "chess": {
+   "kicker": "Satranç kulübü",
+   "tagline": "Dostça satranç, her perşembe akşamı",
+   "desc": "{brand} her perşembe akşamı toplanır. Yeni başlayanlardan kulüp şampiyonuna kadar her seviyeye uygun dostça oyunlar.",
+   "intro": "Her perşembe oynamak, partilerimizi çözümlemek ve fazla çay içmek için toplanıyoruz. İlk kez oynayanlardan kulüp şampiyonuna kadar her seviyeden herkes hoş geldi.",
+   "when": "Perşembe günleri, {19:30} – {22:00}",
+   "where": "Halk Eğitim Merkezi'nin üst kat salonu",
+   "events": [
+    {
+     "t": "Kulüp akşamı",
+     "w": "Her perşembe, {19:30}",
+     "p": "Serbest oyun; yeni başlayanlar için bir öğretim masası var."
+    },
+    {
+     "t": "Hızlı turnuva",
+     "w": "Ayın ilk cumartesi günü, {14:00}",
+     "p": "On beş dakikalık yedi tur. Katılım, çay kasasına küçük bir bağıştır."
+    },
+    {
+     "t": "Yeni başlayanlar akşamı",
+     "w": "Ayın ikinci salı günü, {19:00}",
+     "p": "Kuralları ve birkaç basit açılışı öğrenin."
+    },
+    {
+     "t": "Simültane gösteri",
+     "w": "Sezonda bir kez",
+     "p": "Kulüp şampiyonu yirmi tahtada birden oynar. Bir arkadaşınızı ve bir plan getirin."
+    },
+    {
+     "t": "Yıllık yemek",
+     "w": "Kasım sonunda",
+     "p": "Bir yemek, bir konuşma ve çok küçük bir kupanın devri."
+    }
+   ],
+   "news": [
+    {
+     "title": "Yeni sezon başlıyor",
+     "text": "Güz sezonu önümüzdeki hafta kulüp şampiyonasıyla açılıyor. Yeni üyeler her akşam gelebilir."
+    },
+    {
+     "title": "Hızlı turnuvaya gelen herkese teşekkürler",
+     "text": "Yirmi altı oyuncu, her turda on dört bardak çay ve saatle belli olan bir final."
+    },
+    {
+     "title": "Yeni tahtalarımız geldi",
+     "text": "Yaz tombalasının gelirleriyle alınmış sekiz ahşap tahta ve takım."
+    },
+    {
+     "title": "Genç bölümü yeniden açılıyor",
+     "text": "Yedi yaşından büyük çocuklar salı öğleden sonraları gelebilir; ilk gelişte yanlarında bir ebeveyn olsun."
+    }
+   ],
+   "join": [
+    "Yaşları dokuz ile seksen dört arasında değişen, yaklaşık kırk üyeli dostça bir kulübüz. Çoğumuz pek iyi oynamıyoruz ve bununla barıştık.",
+    "Takımınız olması ya da kuram bilmeniz gerekmez. Taşları oynatabiliyorsanız perşembe günü oynayabilirsiniz."
+   ],
+   "faq": [
+    {
+     "q": "İyi oynamam gerekiyor mu?",
+     "a": "Hayır. Üyelerin çoğu iyi oynamıyor; kulüp, herkesin kendi seviyesinde biriyle oynayabileceği şekilde düzenleniyor."
+    },
+    {
+     "q": "Çocuklar gelebilir mi?",
+     "a": "Evet, salı öğleden sonraları ve bir ebeveynle birlikte perşembe günleri."
+    },
+    {
+     "q": "Bir ligde oynuyor musunuz?",
+     "a": "İl liginde bir takımla yer alıyoruz. Oynamak isterseniz kaptana söyleyin."
+    }
+   ],
+   "why": [
+    {
+     "h": "Her seviye",
+     "p": "Yeni başlayanlar eski kurtların yanında oturur, kimse kimseyi yargılamaz."
+    },
+    {
+     "h": "Her perşembe",
+     "p": "Kayıt yok. Gelebildiğiniz zaman gelin."
+    },
+    {
+     "h": "Takımlar bizden",
+     "p": "Taşlar ve saatler kulübün; çayı demlemek sizin işiniz."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Açılış akşamı",
+     "p": "Herkesin oynadığı ama kimsenin anlamadığı açılış üzerine kısa bir konuşma."
+    },
+    {
+     "t": "Kulüp şampiyonası, birinci tur",
+     "p": "Eşleşmeler kurayla, ve hiçbir zaman planlandığı gibi geçmeyen bir ilk tur."
+    },
+    {
+     "t": "Oyun sonu atölyesi",
+     "p": "Şahlar, piyonlar ve onları ilerletecek sabır."
+    },
+    {
+     "t": "Bilgi yarışması ve satranç",
+     "p": "Satrançla ilgili on soru, her şeyle ilgili on soru."
+    },
+    {
+     "t": "Hızlı turnuva",
+     "p": "On beş dakikalık yedi tur ve bir sürü çay."
+    },
+    {
+     "t": "Çözümleme akşamı",
+     "p": "Kulüp akşamından bir parti seçip üzerinde tartışıyoruz."
+    },
+    {
+     "t": "Simültane gösteri",
+     "p": "Kulüp şampiyonu yirmi tahtada birden oynuyor."
+    },
+    {
+     "t": "Gençler için öğretim masası",
+     "p": "En genç üyelerimiz büyüklere bir iki hile öğretiyor."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "{city} Satranç Kulübü",
+       "{city} Satranç Derneği",
+       "{city} Satranç Topluluğu"
+      ]
+     ]
+    }
+   }
+  },
+  "walking": {
+   "kicker": "Yürüyüş grubu",
+   "tagline": "Tepelerde ve nehir kıyısında yürüyüşler",
+   "desc": "{brand} her pazar tepelerde ve nehir kıyısında yürür. Herkes katılabilir, deneyim gerekmez.",
+   "intro": "Her pazar, hava nasıl olursa olsun, en yavaş kişinin hızında yürüyoruz. Bir kez gelin, görün; çoğumuz böyle başladı.",
+   "when": "Pazar günleri, {9:30}",
+   "where": "Eski garın otoparkı",
+   "events": [
+    {
+     "t": "Pazar yürüyüşü",
+     "w": "Her pazar, {9:30}",
+     "p": "On iki ile on sekiz kilometre arası; hava kötüyse bir çay molasıyla."
+    },
+    {
+     "t": "Kısa yürüyüş",
+     "w": "Ayın ilk çarşamba günü, {10:00}",
+     "p": "Rahat bir tempoda beş altı kilometre, sonunda kahve."
+    },
+    {
+     "t": "Hafta sonu kaçamağı",
+     "w": "Yılda bir kez, ilkbaharda",
+     "p": "Tepelerde iki gün, bir pansiyon ve bir sürü çorba."
+    },
+    {
+     "t": "Harita okuma akşamı",
+     "w": "Sezonda bir kez",
+     "p": "Harita nasıl okunur ve harita sizi okuyorsa ne yapılır."
+    },
+    {
+     "t": "Çöp toplama",
+     "w": "Nisanın son cumartesi günü",
+     "p": "Nehir yolunu temizliyoruz, sonra bir kez daha yürüyoruz, çünkü yürüyebiliyoruz."
+    }
+   ],
+   "news": [
+    {
+     "title": "İlkbahar programı çıktı",
+     "text": "Mart ile Haziran arasında on iki yürüyüş, sırtın üzerinden geçen iki yeni rota dahil."
+    },
+    {
+     "title": "Değirmenin yanındaki patika yeniden açıldı",
+     "text": "Bir yıllık onarımın ardından köprü yeniden açık. Cumartesilerinden vazgeçen gönüllülere teşekkürler."
+    },
+    {
+     "title": "Yeni yürüyüş liderleri aranıyor",
+     "text": "İyi bir rota biliyor ve harita okuyabiliyorsanız sizden haber almak isteriz."
+    },
+    {
+     "title": "Çorba için teşekkürler",
+     "text": "Hafta sonu kaçamağı çok güzel geçti, bunda en büyük pay çorbanın."
+    }
+   ],
+   "join": [
+    "Hayatı boyunca yürüyenlerden geçen ay başlayanlara kadar yaklaşık altmış yürüyüşçüden oluşan dostça bir grubuz.",
+    "Özel bir ekipmana gerek yok. Bot, yağmurluk ve içecek bir şey yeterli. Emin değilseniz pazar sabahı gelip sorun."
+   ],
+   "faq": [
+    {
+     "q": "Ne kadar hızlı yürüyorsunuz?",
+     "a": "O günkü en yavaş kişinin hızında; bu da çoğu zaman lider oluyor."
+    },
+    {
+     "q": "Köpeğimi getirebilir miyim?",
+     "a": "Çoğu yürüyüşte evet, tasmayla. Program hangi yürüyüşlerin uygun olmadığını belirtir."
+    },
+    {
+     "q": "Yağmur yağarsa ne olur?",
+     "a": "Yine yürürüz. Çay molası uzar."
+    }
+   ],
+   "why": [
+    {
+     "h": "Tepelerde",
+     "p": "Yolları bilenlerin önderliğinde on iki ile on sekiz kilometrelik rotalar."
+    },
+    {
+     "h": "İyi bir ekip",
+     "p": "Düzenli gelenlerden oluşan bir grup ve sürekli gelen yeni yüzler."
+    },
+    {
+     "h": "Kimse geride kalmaz",
+     "p": "En yavaş yürüyenin hızına uyarız."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Nehir boyunca yürüyüş",
+     "p": "Düz zeminde on iki kilometre, eski değirmenin yanında bir mola."
+    },
+    {
+     "t": "Manzaralı tepe yürüyüşü",
+     "p": "On beş kilometre ve bir gerçek tırmanış. Termosunuzu getirin."
+    },
+    {
+     "t": "Harita okuma akşamı",
+     "p": "Koordinatlar, eş yükselti çizgileri ve yanlış yönü gösteren bir pusula."
+    },
+    {
+     "t": "Kısa yürüyüş ve öğle yemeği",
+     "p": "Sıcak bir sobası olan bir lokantaya altı kilometre."
+    },
+    {
+     "t": "Sonbahar renkleri",
+     "p": "Işığın sabahları ağaçların arasından süzüldüğü bir orman rotası."
+    },
+    {
+     "t": "Çöp toplama",
+     "p": "Eldiven, torbalar ve şaşırtıcı sayıda tenis topu."
+    },
+    {
+     "t": "Akşam gezintisi",
+     "p": "Alacakaranlıkta rahat bir saat, birinin mutfak masasında çayla bitiyor."
+    },
+    {
+     "t": "Gece yürüyüşü",
+     "p": "Fenerler kapalı, gözler açık ve yıldızlar üzerine bir konuşma."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "{city} Doğa Yürüyüşü Grubu",
+       "{city} Yürüyüş Kulübü",
+       "{city} Doğaseverler Derneği"
+      ]
+     ]
+    }
+   }
+  },
+  "choir": {
+   "kicker": "Topluluk korosu",
+   "tagline": "Çarşamba akşamları birlikte şarkı söylemek",
+   "desc": "{brand} çarşamba akşamları prova yapar. Sınav yok, nota bilmek gerekmez, yeter ki şarkı söyleme isteği olsun.",
+   "intro": "Şarkı söylemeyi seven ama bunun için sınava girmek istemeyen insanların korosuyuz. Kulaktan öğreniriz, çok gülerüz ve hak ettiğimizden daha iyi söyleriz.",
+   "when": "Çarşamba günleri, {19:00} – {21:00}",
+   "where": "Kültür evinin salonu",
+   "events": [
+    {
+     "t": "Haftalık prova",
+     "w": "Her çarşamba, {19:00}",
+     "p": "Isınma, yeni şarkılar ve bir türlü oturtamadığımız o şarkı."
+    },
+    {
+     "t": "Açık akşam",
+     "w": "Eylülün ilk çarşambası",
+     "p": "Bir akşam bizimle söyleyin, hiçbir bağlayıcılığı yok."
+    },
+    {
+     "t": "Kış konseri",
+     "w": "Aralığın ikinci cumartesisi",
+     "p": "Türküler, şarkılar ve kimsenin beklemediği bir parça."
+    },
+    {
+     "t": "Yaz konseri",
+     "w": "Haziran sonu",
+     "p": "Kültür evinin bahçesinde, hava izin verirse şarkılı bir akşam."
+    },
+    {
+     "t": "Şarkı günü",
+     "w": "Yılda bir kez",
+     "p": "Konuk bir şefle atölyeler dolu bir gün, öğle yemeği dahil."
+    }
+   ],
+   "news": [
+    {
+     "title": "Güz dönemi başlıyor",
+     "text": "Üç ülkenin halk şarkılarını ve bir türlü ritme oturmayan bir kanonu öğreniyoruz."
+    },
+    {
+     "title": "Yaz konserinin ardından büyük bir teşekkür",
+     "text": "Doksan kişi geldi, kırk bir dilim pasta yendi ve yalnızca bir kıta iki kez söylendi."
+    },
+    {
+     "title": "Tenor arıyoruz",
+     "text": "Soprano ve alto sesimiz çok. Kalın sesle söyleyebiliyorsanız lütfen gelip tanışın."
+    },
+    {
+     "title": "Yeni notalar geldi",
+     "text": "Kış programının dosyaları salonda. Lütfen işaretlerinizi kalemle yapın, tükenmezle değil."
+    }
+   ],
+   "join": [
+    "Yaşları on altı ile seksen sekiz arasında değişen yaklaşık elli kişiyiz. Çoğumuz nota okuyamıyoruz ve yıllardır şarkıları kulaktan öğreniyoruz.",
+    "Herhangi bir provaya gelip bizimle söyleyin. Size bir sandalye, bir dosya ve yanında duracak birini buluruz."
+   ],
+   "faq": [
+    {
+     "q": "Sınava girmem gerekiyor mu?",
+     "a": "Hayır. Ne şimdi ne sonra sınav var."
+    },
+    {
+     "q": "Nota bilmem gerekiyor mu?",
+     "a": "Hayır. Kulaktan öğretiyoruz, isteyenler için notalar kâğıtta da var."
+    },
+    {
+     "q": "Bir hafta gelmezsem ne olur?",
+     "a": "O hafta kaçırırsınız. Kimse bozulmaz, kayıtlar da çevrimiçi paylaşılıyor."
+    }
+   ],
+   "why": [
+    {
+     "h": "Sınav yok",
+     "p": "Duşta bir melodiyi tutturabiliyorsanız, burada da tutturabilirsiniz."
+    },
+    {
+     "h": "Her ses",
+     "p": "Soprano, alto, tenor, bas ve emin olmayan herkes."
+    },
+    {
+     "h": "Yılda iki konser",
+     "p": "Biri kışın, biri yazın, pastalı."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Açık akşam",
+     "p": "Sınavsız ve baskısız, bir iki kanon söylemek için gelin."
+    },
+    {
+     "t": "Yeni dönem başlıyor",
+     "p": "Isınmalar, yeni bir parça ve bol sohbet."
+    },
+    {
+     "t": "Ses grubu provası",
+     "p": "Altolar ve tenorlar salonda, sopranolar ve baslar mutfakta."
+    },
+    {
+     "t": "Şarkı günü",
+     "p": "Konuk bir şefle bütün bir cumartesi."
+    },
+    {
+     "t": "Kültür evinde konser",
+     "p": "İki bölüm, bir tombala ve ara verirken çay ile kurabiye."
+    },
+    {
+     "t": "Meydanda şarkılar",
+     "p": "Pazar meydanında soğuk eller ve sıcak sesler."
+    },
+    {
+     "t": "Piyanistle prova",
+     "p": "Parçanın ilk kez müzik gibi duyulduğu an."
+    },
+    {
+     "t": "Hep birlikte şarkı akşamı",
+     "p": "Herkesin bildiği şarkılar ve kimsenin hatırlamadığı birkaç tane."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "{city} Topluluk Korosu",
+       "{city} Halk Müziği Korosu",
+       "{city} Sesleri Korosu"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

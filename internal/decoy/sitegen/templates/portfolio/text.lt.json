@@ -1,0 +1,274 @@
+{
+ "ui": {
+  "nav_label": "Pagrindinis",
+  "footer": "Visi paveikslai yra studijos darbai ir be leidimo jų atkurti negalima.",
+  "nav_home": "Pasirinkti darbai",
+  "nav_work": "Visi darbai",
+  "nav_about": "Apie",
+  "nav_contact": "Kontaktai",
+  "home_title": "Pasirinkti darbai",
+  "nf_title": "Puslapis nerastas",
+  "nf_text": "Šiuo adresu nieko nėra. Darbai yra pradžios puslapyje.",
+  "nf_back": "Atgal į darbus",
+  "sel_h": "Pasirinkti darbai",
+  "all_work": "Žiūrėti visus darbus",
+  "work_h": "Visi darbai",
+  "work_intro": "Viskas, kas padaryta per pastaruosius kelerius metus. Naujausi viršuje.",
+  "about_h": "Apie",
+  "services_h": "Ką darau",
+  "shows_h": "Parodos ir paminėjimai",
+  "contact_h": "Kontaktai",
+  "visit_h": "Studija",
+  "hours_h": "Darbo laikas",
+  "phone_l": "Telefonas",
+  "visit_text": "Studija veikia susitarus. Ateikite darbo valandomis, o jei niekas neatidaro durų, tikriausiai esu galiniame kambaryje arba spaustuvėje.",
+  "commission_h": "Užsakymai",
+  "commission_text": "Per metus priimu nedidelį skaičių užsakymų. Susisiekdami parašykite, ką turite omenyje ir kada to reikia, o aš sąžiningai atsakysiu, ar galiu tai padaryti.",
+  "hours_note": "Šeštadienį susitarus",
+  "work_back": "Visi darbai",
+  "work_more": "Daugiau darbų",
+  "work_ask": "Teirautis apie šį darbą",
+  "directions_h": "Kaip rasti studiją",
+  "directions": "Studija yra pirmame aukšte, nedideliu atstumu nuo miesto centro. Durys iš šono, yra skambutis. Dviračių stovai lauke."
+ },
+ "bundles": {
+  "photo": {
+   "tagline": "Tylių vietų fotografijos",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Tylos",
+       "Vakaro",
+       "Rudens",
+       "Rūko",
+       "Pievos",
+       "Ūkanų",
+       "Ryto",
+       "Horizonto",
+       "Šlaito",
+       "Ežero"
+      ],
+      [
+       "kadras",
+       "šviesa",
+       "valanda",
+       "horizontas",
+       "atspaudas",
+       "ekspozicija",
+       "plokštė",
+       "užraktas",
+       "diafragma",
+       "laukas"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Peizažo ir natiurmorto fotografija {city_in}. Atspaudai ir užsakymai.",
+   "desc_work": "Pasirinktos fotografijos, naujausios viršuje.",
+   "desc_about": "Apie fotografiją ir studiją, esančią {city_in}.",
+   "desc_contact": "Kaip rasti studiją {city_in} ir kada ji dirba.",
+   "intro": "Peizažo ir natiurmorto fotografija {city_in}. Atspaudai ir keli užsakymai per metus.",
+   "about": [
+    "Fotografuoju iš nedidelės studijos {city_in}. Daugiausia mano nuotraukų yra apie vietas valandą po to, kai visi jas palieka.",
+    "Dirbu lėtai, dažniausiai su vienu fotoaparatu ir vienu objektyvu, ir viską spausdinu savo galiniame kambaryje. Nuotrauka baigta tada, kai ją savaitę galima žiūrėti nenorint nieko keisti.",
+    "Pastaraisiais metais mano darbai rodyti nedidelėse galerijose ir bibliotekose visame regione, o atspaudus pirko žmonės, kuriems ant sienos reikėjo kažko ramaus."
+   ],
+   "services": [
+    "Dailės atspaudai, pasirašyti ir sunumeruoti",
+    "Portretai namuose arba studijoje pagal užsakymą",
+    "Fotografija leidiniams ir knygoms"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Du horizontai, grupinė paroda, Senojo aruodo galerija"
+    },
+    {
+     "y": "2024",
+     "t": "Ramus vanduo, personalinė paroda, miesto bibliotekos fojė"
+    },
+    {
+     "y": "2022",
+     "t": "Regioninė fotografijos premija, finalininkų sąraše"
+    }
+   ],
+   "works": [
+    {
+     "title": "Šlaitas po pietų",
+     "caption": "Archyvinis pigmentinis atspaudas, 2025",
+     "note": "Paskutinė šviesa lauke, į kurį dažniausiai nekreipiama dėmesio.",
+     "text": "Tris popietes laukiau, kol debesys nusikels nuo kalvagūbrio, ir jie nusikėlė keturioms minutėms."
+    },
+    {
+     "title": "Du horizontai",
+     "caption": "Archyvinis pigmentinis atspaudas, 2025",
+     "note": "Pakrantė, kuri niekaip negalėjo apsispręsti, kur baigtis.",
+     "text": "Jūra traukėsi, o šlapias smėlis atspindėjo antrą dangų. Padariau šešis kadrus ir palikau šį."
+    },
+    {
+     "title": "Ramus vanduo",
+     "caption": "Archyvinis pigmentinis atspaudas, 2024",
+     "note": "Tvenkinys lapkritį, kuriam nieko nereikia įrodinėti.",
+     "text": "Tvenkinys septintą ryto, dar prieš vėją. Atspaudas didelis, todėl tylai yra vietos."
+    },
+    {
+     "title": "Raudonas laukas",
+     "caption": "Archyvinis pigmentinis atspaudas, 2024",
+     "note": "Aguonos, jau subrandinusios sėklas, nufotografuotos lyjant.",
+     "text": "Dobilai, palikti žydėti, o paskui nupjauti. Spalva atspaude artimesnė tai, ką mačiau, nei tai, ką užfiksavo fotoaparatas."
+    },
+    {
+     "title": "Linijos sutemus",
+     "caption": "Archyvinis pigmentinis atspaudas, 2023",
+     "note": "Laidai prieš dangų, kuris vis keitė nuomonę.",
+     "text": "Tvoros stulpai ir vagos, o per juos plokščia paskutinė šviesa. Ilgame siaurame kadre atrodo geriau."
+    },
+    {
+     "title": "Druska ir skalūnas",
+     "caption": "Archyvinis pigmentinis atspaudas, 2023",
+     "note": "Uosto siena per atoslūgį, seno pinigo spalvomis.",
+     "text": "Tamsių akmenų paplūdimys su balta druska, palikta bangų. Grįžau tris kartus skirtingais metų laikais, kad pagaučiau norimą šviesą."
+    },
+    {
+     "title": "Mėlynoji valanda",
+     "caption": "Archyvinis pigmentinis atspaudas, 2022",
+     "note": "Dešimt minučių tarp dienos ir nakties, kartotos visą savaitę.",
+     "text": "Dešimt minučių po saulėlydžio visas slėnis tampa rašalo spalvos. Tik šiame kadre dega lempa."
+    },
+    {
+     "title": "Žiemos sodas",
+     "caption": "Archyvinis pigmentinis atspaudas, 2022",
+     "note": "Plikos obelys eilėje, suskaičiuotos du kartus.",
+     "text": "Plikos obelys šaltą rytą. Užlipau ant dėžės, kad rasčiau liniją tarp šakų."
+    },
+    {
+     "title": "Rytinis rūkas",
+     "caption": "Archyvinis pigmentinis atspaudas, 2021",
+     "note": "Slėnis, kuriam dar niekas nepasakė, kad jau rytas.",
+     "text": "Iki aštuonių rūkas išsisklaidė. Šią nuotrauką padariau per ketvirtį valandos, kol jis dar buvo."
+    }
+   ]
+  },
+  "illustration": {
+   "tagline": "Iliustracija ir grafika",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Papartėlio",
+       "Popieriaus",
+       "Rašalo",
+       "Citrinos",
+       "Kandies",
+       "Pieštuko",
+       "Obuolio",
+       "Žiogo",
+       "Vyšnios",
+       "Tylos"
+      ],
+      [
+       "spaustuvė",
+       "studija",
+       "stalas",
+       "piešinys",
+       "dirbtuvės",
+       "eskizų knyga",
+       "kampelis",
+       "staliukas",
+       "raižinys",
+       "spintelė"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Iliustracijos, linoraižiniai ir mažos knygos iš darbo stalo {city_in}.",
+   "desc_work": "Iliustracijos ir atspaudai, naujausi viršuje.",
+   "desc_about": "Apie iliustracijas ir studiją, esančią {city_in}.",
+   "desc_contact": "Kaip rasti studiją {city_in} ir kada ji dirba.",
+   "intro": "Iliustracijos, linoraižiniai ir mažos knygos iš darbo stalo {city_in}.",
+   "about": [
+    "Iliustruoju ir darau grafikos atspaudus. Piešiu vaikų knygoms, žurnalams, kurie vis dar moka laiku, ir visiems, kam plakato kampe reikia paukščio.",
+    "Dauguma darbų prasideda pieštuko eskizu sąsiuvinyje ir baigiasi linoraižiniu arba plokščių spalvų skaitmeniniu piešiniu, priklausomai nuo to, ko prašo užsakymas.",
+    "Gyvenu {city_in} su kate, kuri turi nuomonę apie mano kompozicijas."
+   ],
+   "services": [
+    "Vaikų knygos ir leidinių iliustracijos",
+    "Linoraižinių atspaudai ir atvirukai",
+    "Plakatai ir renginių grafika"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Mažosios grafikos mugė, prekystalis"
+    },
+    {
+     "y": "2024",
+     "t": "Lauko užrašai, vaikų knyga, išleista vietos leidyklos"
+    },
+    {
+     "y": "2023",
+     "t": "Regioninis iliustracijos apdovanojimas, pagyrimo raštas"
+    }
+   ],
+   "works": [
+    {
+     "title": "Oranžinis etiudas",
+     "caption": "Linoraižinys, trys spalvos, 2025",
+     "note": "Lapė, pusė laiptų ir nepaaiškinamas mėnulis.",
+     "text": "Viena spalva, trys popieriai ir viena popietė. Pradėjau kaip apšilimą, o tapo mažos knygos viršeliu."
+    },
+    {
+     "title": "Turgaus diena",
+     "caption": "Skaitmeninis piešinys, 2025",
+     "note": "Vienuolika prekystalių ir vienas labai patenkintas balandis.",
+     "text": "Piešta vietoje per tris šeštadienius. Pardavėjai buvo tokie malonūs, kad stovėjo nejudėdami, ar beveik."
+    },
+    {
+     "title": "Ilgas kelias aplink",
+     "caption": "Pieštukas ir tušas, 2024",
+     "note": "Takas, kuris veda ne ten, kur rodo ženklas.",
+     "text": "Maršrutas, kuriuo vaikštau sekmadieniais, nupieštas iš atminties, o paskui patikrintas kitą kartą. Žemėlapis klydo maloniai."
+    },
+    {
+     "title": "Naktinis autobusas",
+     "caption": "Linoraižinys, dvi spalvos, 2024",
+     "note": "Visi miega, išskyrus vairuotoją ir mėnulį.",
+     "text": "Plunksna, tušas ir daug kantrybės su atspindžiais lange."
+    },
+    {
+     "title": "Žalios valandos",
+     "caption": "Guašas, 2023",
+     "note": "Šiltnamis ketvirtą popiet.",
+     "text": "Valandos prieš pusryčius birželį, kai sodas dar vėsus. Trijų spalvų linoraižinys."
+    },
+    {
+     "title": "Mažieji paukščiai",
+     "caption": "Linoraižinys, 2023",
+     "note": "Septyni paukščiai, nė vienas neatpažintas teisingai.",
+     "text": "Žvirbliai, zylės ir vienas labai piktas strazdas. Kiekvienas paukštis iš atskiros plokštės, todėl du atspaudai nėra visiškai vienodi."
+    },
+    {
+     "title": "Lietaus etiudas",
+     "caption": "Akvarelė, 2022",
+     "note": "Skėčiai, matomi pro langą.",
+     "text": "Akvarelė, daugiausia vanduo. Leidau popieriui pačiam nuspręsti, kur bus balos."
+    },
+    {
+     "title": "Derlius",
+     "caption": "Skaitmeninis piešinys, 2022",
+     "note": "Oranžinis laukas su traktoriumi kampe.",
+     "text": "Vaisių ir daržovių prekystalis rudenį. Oranžinį moliūgą teko piešti du kartus."
+    },
+    {
+     "title": "Virtuvės langas",
+     "caption": "Pieštukas ir tušas, 2021",
+     "note": "Kas vyksta ant palangės, kai niekas nemato.",
+     "text": "Vaizdas iš vietos, kur plaunu indus. Jis keičiasi su oru, ir tik dėl to indų plovimas manęs netrikdo."
+    }
+   ]
+  }
+ }
+}

@@ -84,6 +84,12 @@ const checked = async () => {
 const text = () => document.querySelector("[role=dialog]")?.textContent ?? document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button, a")].find((b) => b.textContent?.trim() === label);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+/** "Add profile" opens the list of what can be put; the form of the first profile is one "Set up…" away. */
+const openAdd = async () => {
+  await click(button("Add profile"));
+  await settle();
+  await click(button("Set up…"));
+};
 const saveButton = () => document.querySelector<HTMLButtonElement>("[role=dialog] button[type=submit]");
 const disabled = (b: HTMLButtonElement | null) => !!b && (b.disabled || b.hasAttribute("data-disabled"));
 async function type(el: HTMLInputElement | undefined | null, value: string) {
@@ -117,7 +123,7 @@ describe("adding a profile whose name the node's port already holds", () => {
 
   it("shows the refusal and the name to take before the click, then puts the profile beside the other and says what that means", async () => {
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await checked();
 
     // the button is off, and the dialog says why and what to do
@@ -149,7 +155,7 @@ describe("adding a profile whose name the node's port already holds", () => {
 
   it("puts the name the admin wrote, not the suggestion, and refuses a name that is not a host name", async () => {
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await checked();
     await type(field("Name of this profile on de1"), "203.0.113.9");
     expect(text()).toContain("Not a host name");
@@ -162,7 +168,7 @@ describe("adding a profile whose name the node's port already holds", () => {
 
   it("takes the free port instead when the admin prefers it", async () => {
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await checked();
     await click(button("Take 8443"));
     await checked();
@@ -183,8 +189,13 @@ describe("adding a profile whose name the node's port already holds", () => {
       createInbound.mockRejectedValue(refuse(msg, code));
       await mount(data());
       await click(button("Add profile"));
-      await checked();
-      expect(disabled(saveButton()), msg).toBe(true);
+      await checked(); // the list asks first; a refused profile "needs an action": its form is the action
+      // an old agent is told in the list itself (the way out is the updates); the others open their form
+      if (code !== Code.FailedPrecondition || !msg.startsWith("share_agent_old")) {
+        await click(button("Set up…"));
+        await checked();
+        expect(disabled(saveButton()), msg).toBe(true);
+      } else expect(button("Set up…")).toBeUndefined();
       for (const w of words) expect(text(), msg).toContain(w);
       expect(text(), msg).not.toMatch(/[{}]/);
       act(() => root?.unmount());

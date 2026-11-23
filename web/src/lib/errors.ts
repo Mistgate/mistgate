@@ -22,6 +22,8 @@ export const errorCodes = [
   "stale_version",
   // a profile on a node (UpdateInbound) that was changed by someone else between its read and its write: the page reads it again
   "stale_inbound",
+  // a person (UpdateUser) who was changed by someone else (switched off, extended, edited) between its read and its write: nothing is written
+  "stale_user",
   "node_offline",
   "agent_too_old",
   "node_retired",
@@ -94,6 +96,13 @@ export const errorCodes = [
   "decoy_file_binary",
   "decoy_page_not_found",
   "decoy_preview_too_large",
+  // a site from a template (GenerateDecoySite, PreviewDecoyTemplate): InvalidArgument
+  "decoy_template_unknown",
+  "decoy_template_country",
+  "decoy_template_seed",
+  "decoy_photos_key_invalid",
+  "decoy_photos_source_invalid",
+  "decoy_photos_no_key",
   // relays (relay.proto): CreateRelay / UpdateRelay / CheckRelay
   "relay_exists",
   "same_node",
@@ -109,7 +118,6 @@ export const errorCodes = [
   "debug_busy",
   // an OS update of a node (update.proto StartOsRollout / CancelOsRollout), "os_blocked: reason=<key of os.block.*>"; and a node being updated (awgprep)
   "os_blocked",
-  "os_cancel_inflight",
   "node_updating",
   // the root update helper follows /etc/mistgate/panel-update-channel (InstallPanelUpdate, FailedPrecondition): "channel=<selected>&allowed=<policy>"
   "panel_update_channel_not_allowed",

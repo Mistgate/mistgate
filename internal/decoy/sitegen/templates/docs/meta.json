@@ -1,0 +1,157 @@
+{
+ "style": {
+  "scheme": "both",
+  "palettes": [
+   {
+    "name": "cream-orange",
+    "l": {"bg": "#fbfaf7", "fg": "#1c1917", "ac": "#c2410c", "a2": "#3a4f27", "sf": "#ffffff"},
+    "d": {"bg": "#161412", "fg": "#ece7dd", "ac": "#fb923c", "a2": "#a7c58a"}
+   },
+   {
+    "name": "paper-blue",
+    "l": {"bg": "#f8f9fb", "fg": "#111827", "ac": "#1d4ed8", "a2": "#b45309", "sf": "#ffffff"},
+    "d": {"bg": "#0f1420", "fg": "#e5e9f2", "ac": "#7aa2ff", "a2": "#fbbf24"}
+   },
+   {
+    "name": "snow-green",
+    "l": {"bg": "#f7faf8", "fg": "#0f1f17", "ac": "#0f7a4a", "a2": "#2447a3", "sf": "#ffffff"},
+    "d": {"bg": "#0d1712", "fg": "#e2efe8", "ac": "#4ade80", "a2": "#7aa7ff"}
+   },
+   {
+    "name": "ivory-plum",
+    "l": {"bg": "#faf8f9", "fg": "#1f1420", "ac": "#9d2b6b", "a2": "#0f766e", "sf": "#ffffff"},
+    "d": {"bg": "#1a1018", "fg": "#f0e6ee", "ac": "#f472b6", "a2": "#5eead4"}
+   },
+   {
+    "name": "stone-teal",
+    "l": {"bg": "#f6f6f4", "fg": "#1a1d1c", "ac": "#0e7490", "a2": "#c2410c", "sf": "#ffffff"},
+    "d": {"bg": "#101516", "fg": "#e4eced", "ac": "#22d3ee", "a2": "#fb923c"}
+   },
+   {
+    "name": "white-red",
+    "l": {"bg": "#fcfcfc", "fg": "#18181b", "ac": "#b91c1c", "a2": "#1d4ed8", "sf": "#ffffff"},
+    "d": {"bg": "#141414", "fg": "#ececec", "ac": "#f87171", "a2": "#7aa2ff"}
+   }
+  ],
+  "fonts": [
+   {"head": "sans", "body": "sans", "fw": 760, "ls": "-.04em", "lh": "1.02"},
+   {"head": "bookish", "body": "sans", "fw": 700, "ls": "-.02em", "lh": "1.1"},
+   {"head": "charter", "body": "sans", "fw": 700, "ls": "-.025em", "lh": "1.08"}
+  ],
+  "radius": [10, 16],
+  "radius_s": [6, 8],
+  "radius_b": [14, 18],
+  "density": [0.95, 1.05],
+  "width": [1360, 1440],
+  "measure": [680, 760],
+  "base": [16, 18],
+  "scale": [1.25, 1.33],
+  "lh": [1.6, 1.7],
+  "stroke": [1.6, 2],
+  "border": [1, 1],
+  "shadows": [
+   "none"
+  ]
+ },
+ "title": {
+  "en": "Project documentation",
+  "ru": "Документация проекта (вики)"
+ },
+ "layouts": 3,
+ "pages": [
+  {
+   "name": "home",
+   "tmpl": "home.html.tmpl",
+   "paths": [
+    "index.html"
+   ],
+   "nav": "nav_home",
+   "title": "home_title",
+   "desc": "desc"
+  },
+  {
+   "name": "install",
+   "tmpl": "install.html.tmpl",
+   "paths": [
+    "install.html",
+    "install/index.html",
+    "docs/install/index.html",
+    "getting-started.html"
+   ],
+   "nav": "nav_install",
+   "desc": "desc_install"
+  },
+  {
+   "name": "usage",
+   "tmpl": "usage.html.tmpl",
+   "paths": [
+    "usage.html",
+    "usage/index.html",
+    "docs/usage/index.html",
+    "guide.html"
+   ],
+   "nav": "nav_usage",
+   "desc": "desc_usage"
+  },
+  {
+   "name": "config",
+   "tmpl": "config.html.tmpl",
+   "paths": [
+    "config.html",
+    "config/index.html",
+    "docs/config/index.html",
+    "settings.html"
+   ],
+   "nav": "nav_config",
+   "desc": "desc_config"
+  },
+  {
+   "name": "recipes",
+   "tmpl": "recipes.html.tmpl",
+   "paths": [
+    "recipes.html",
+    "recipes/index.html",
+    "docs/recipes/index.html",
+    "cookbook.html"
+   ],
+   "nav": "nav_recipes",
+   "desc": "desc_recipes"
+  },
+  {
+   "name": "trouble",
+   "tmpl": "trouble.html.tmpl",
+   "paths": [
+    "troubleshooting.html",
+    "troubleshooting/index.html",
+    "docs/troubleshooting/index.html",
+    "problems.html"
+   ],
+   "nav": "nav_trouble",
+   "desc": "desc_trouble"
+  },
+  {
+   "name": "faq",
+   "tmpl": "faq.html.tmpl",
+   "paths": [
+    "faq.html",
+    "faq/index.html",
+    "docs/faq/index.html",
+    "questions.html"
+   ],
+   "nav": "nav_faq",
+   "desc": "desc_faq"
+  },
+  {
+   "name": "terms",
+   "tmpl": "terms.html.tmpl",
+   "paths": [
+    "terms.html",
+    "terms/index.html",
+    "legal/terms.html",
+    "conditions.html"
+   ],
+   "nav": "nav_terms",
+   "desc": "desc_terms"
+  }
+ ]
+}

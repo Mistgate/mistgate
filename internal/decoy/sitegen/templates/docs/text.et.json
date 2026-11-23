@@ -1,0 +1,469 @@
+{
+ "ui": {
+  "ref_h": "Teatmik",
+  "nav_label": "Dokumentatsioon",
+  "footer": "Dokumentatsioon versioonile {ver}.",
+  "nav_home": "Ülevaade",
+  "nav_install": "Paigaldus",
+  "nav_usage": "Kasutamine",
+  "nav_faq": "KKK",
+  "home_title": "Ülevaade",
+  "desc_install": "Kuidas paigaldada {brand} {ver} Linuxis, macOS-is ja Windowsis.",
+  "desc_usage": "Kuidas kasutada {brand}: levinud tegevused koos näidetega.",
+  "desc_faq": "Korduma kippuvad küsimused: {brand}.",
+  "nf_title": "Lehte ei leitud",
+  "nf_text": "See leht ei kuulu dokumentatsiooni. Võib-olla nimetati see uues versioonis ümber.",
+  "nf_back": "Tagasi ülevaatesse",
+  "quick_h": "Kiirstart",
+  "features_h": "Mida see teeb",
+  "out_h": "Väljund",
+  "install_h": "Paigaldus",
+  "steps_h": "Sammud",
+  "usage_h": "Kasutamine",
+  "opts_h": "Valikud",
+  "opt_col": "Valik",
+  "desc_col": "Kirjeldus",
+  "faq_h": "Korduma kippuvad küsimused",
+  "next": "Järgmine",
+  "facts_h": "Lühidalt",
+  "menu_h": "Dokumentatsioon",
+  "facts": [
+   {
+    "k": "Versioon",
+    "v": "{ver}"
+   },
+   {
+    "k": "Platvormid",
+    "v": "Linux, macOS ja Windows"
+   },
+   {
+    "k": "Litsents",
+    "v": "MIT"
+   },
+   {
+    "k": "Sõltuvused",
+    "v": "Puuduvad"
+   }
+  ],
+  "install_check": "Kui kuvatakse versiooninumber, õnnestus paigaldus.",
+  "nav_config": "Seadistus",
+  "nav_recipes": "Retseptid",
+  "nav_trouble": "Probleemide lahendamine",
+  "desc_config": "Seadistusfail ja seaded: {brand}.",
+  "desc_recipes": "Lühikesed retseptid igapäevasteks töödeks: {brand}.",
+  "desc_trouble": "Lahendused probleemidele, millega {brand} kasutajad kõige sagedamini kokku puutuvad.",
+  "config_h": "Seadistus",
+  "config_col_key": "Võti",
+  "config_col_default": "Vaikeväärtus",
+  "config_col_desc": "Mida see teeb",
+  "config_file_h": "Näide",
+  "recipes_h": "Retseptid",
+  "recipes_intro": "Lühikesed vastused tööde kohta, mille järele küsitakse kõige rohkem.",
+  "trouble_h": "Probleemide lahendamine",
+  "trouble_intro": "Probleemid, millega kõige sagedamini kokku puututakse, ja see, mis tavaliselt aitab.",
+  "ver_l": "Versioon",
+  "prev": "Eelmine"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "Logide kokkuvõtja käsureale",
+   "desc": "{brand} loeb tekstilogisid ja trükib lühikese kokkuvõtte nende sisust.",
+   "overview": "{brand} loeb tekstilogisid ja trükib lühikese kokkuvõtte: mitu rida neis on, milliseid tasemeid kasutatakse ja millised teated korduvad kõige rohkem. See on üks väike programm ilma sõltuvusteta.",
+   "features": [
+    "Loeb faile, kaustu ja standardsisendit",
+    "Rühmitab sarnased teated ilma seadistamata",
+    "Trükib teksti, JSON-i või väikese HTML-aruande"
+   ],
+   "quick_out": "app.log: 48 211 rida, 3 taset\n  info   46 902\n  warn    1 190\n  error     119\nkõige sagedasem teade: cache miss for key (9 413 korda)",
+   "install_intro": "{brand} jagatakse ühe programmifailina. Enne esimest käivitust ei ole vaja midagi seadistada.",
+   "install_steps": [
+    "Lae alla arhiiv, mis sobib sinu süsteemiga.",
+    "Paki see lahti ja kopeeri programm kausta, mis on PATH-is.",
+    "Käivita versioonikäsk, et kontrollida, kas see töötab."
+   ],
+   "faq": [
+    {
+     "q": "Milliseid logivorminguid toetatakse?",
+     "a": "Kõike, mis on reapõhine. {brand} tunneb ära levinud kellaaja- ja tasemevormingud ning kasutab muul juhul tavalisi ridu."
+    },
+    {
+     "q": "Kas see muudab minu faile?",
+     "a": "Mitte kunagi. Failid avatakse ainult lugemiseks."
+    },
+    {
+     "q": "Kui suurt faili see suudab lugeda?",
+     "a": "Faile loetakse jooksvalt, nii et piiriks on vaid aeg. Gigabaiti töötleb sülearvuti mõne sekundiga."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Faili kokkuvõte",
+     "p": "Suuna {brand} failile, kaustale või torule. Kaustu loetakse sügavuti ja pakitud faile pakitakse lahti käigu pealt."
+    },
+    {
+     "h": "Ajavahemiku vaatamine",
+     "p": "Kasuta valikuid --since ja --until, et kokkuvõte ajavahemikuga piirata. Aeg võib olla kindel või praegusest sõltuv."
+    },
+    {
+     "h": "Väljundvormingu valik",
+     "p": "Vaikimisi on väljund tavatekst. JSON on püsiv ja mõeldud skriptidele; HTML-aruanne on üks fail, mille saad kolleegile saata."
+    }
+   ],
+   "options": [
+    {
+     "d": "Ainult sellest ajast hilisemad read, kindel aeg või näiteks 2h."
+    },
+    {
+     "d": "Ainult sellest ajast varasemad read."
+    },
+    {
+     "d": "Ainult selle taseme või kõrgema taseme read."
+    },
+    {
+     "d": "Mitu korduvat teadet loetleda. Vaikimisi 5."
+    },
+    {
+     "d": "text, json või html. Vaikimisi text."
+    }
+   ],
+   "config_intro": "{brand} loeb soovi korral seadistusfaili config.toml sinu seadistuskaustast. Iga võtme saab anda ka käsureal ja käsurida on tähtsam.",
+   "config_rows": [
+    {
+     "d": "Mitu korduvat teadet loetleda."
+    },
+    {
+     "d": "Väljundi vorming: text, json või html."
+    },
+    {
+     "d": "Teated, mis tuleb välja jätta, võrreldakse lihttekstina."
+    },
+    {
+     "d": "Ainult sellest ajast hilisemad read."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Kõige lärmakama tunni leidmine",
+     "p": "Rühmita kokkuvõte tundide kaupa, et näha, millal logi oli kõige tihedam."
+    },
+    {
+     "h": "Kahe päeva võrdlus",
+     "p": "Näita, millised teated on kahe faili vahel uued ja millised kadusid."
+    },
+    {
+     "h": "Aruande koostamine ringisaatmiseks",
+     "p": "Kirjuta HTML-aruanne faili ja lisa see kirja manusesse."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Kokkuvõte on tühi",
+     "a": "Kontrolli, et failis on üks teade rea kohta. Kui see on pakitud vormingus, mida {brand} ei tunne, paki see kõigepealt lahti."
+    },
+    {
+     "q": "Kellaajad tunduvad valed",
+     "a": "Ilma ajavööndita ridu loetakse UTC-s. Kasuta valikut --tz, et öelda, mis ajavööndis need on."
+    },
+    {
+     "q": "Aruanne on liiga pikk",
+     "a": "Vähenda valiku --top väärtust või lisa kõige lärmakamad teated seadistusfaili välistuste loendisse."
+    },
+    {
+     "q": "Võrgukettal on aeglane",
+     "a": "Kopeeri fail esmalt kohalikule kettale. Rida-realt lugemine aeglase ühenduse kaudu on tavaline põhjus."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Lugu",
+       "Kirju",
+       "Tuli",
+       "Kaste",
+       "Selge",
+       "Sara",
+       "Lehe",
+       "Kuu"
+      ],
+      [
+       "log",
+       "scan",
+       "sum",
+       "view",
+       "cut",
+       "peek"
+      ]
+     ],
+     "sep": ""
+    }
+   }
+  },
+  "site": {
+   "tagline": "Väike staatilise saidi koostaja",
+   "desc": "{brand} teeb Markdown-failide kaustast ja mõnest mallist staatilise veebisaidi.",
+   "overview": "{brand} teeb Markdown-failide kaustast ja mõnest mallist staatilise veebisaidi. Andmebaasi ei ole, käitusaega ei ole ja serveris ei ole midagi, mida peaks ajakohasena hoidma.",
+   "features": [
+    "Markdown koos päisega",
+    "Mallid tavalises HTML-is",
+    "Kohalik eelvaade, mis ehitatakse igal salvestamisel uuesti"
+   ],
+   "quick_out": "Märkmed on saadaval aadressil localhost:4000 (peatamiseks vajuta Ctrl+C)",
+   "install_intro": "{brand} on üks käivitatav fail. Pane see PATH-i ja kõik.",
+   "install_steps": [
+    "Lae alla arhiiv, mis sobib sinu süsteemiga.",
+    "Paki see lahti ja kopeeri käivitatav fail kausta, mis on PATH-is.",
+    "Käivita versioonikäsk, et kontrollida, kas see töötab."
+   ],
+   "faq": [
+    {
+     "q": "Kas ma saan kasutada oma malle?",
+     "a": "Jah. Mallid on tavalised HTML-failid mõne kohatäitjaga ja kaustade ülesehituse võid ise valida."
+    },
+    {
+     "q": "Kas see vajab andmebaasi?",
+     "a": "Ei. Väljund on lihtsad failid, mida serveerib iga veebiserver."
+    },
+    {
+     "q": "Kuidas lisada uut liiki lehte?",
+     "a": "Lisa kaust pages alla oma küljenduse failiga ja {brand} võtab selle järgmisel ehitamisel kasutusele."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Uue saidi alustamine",
+     "p": "Käsk init loob kausta, kus on seadistusfail, küljendus ja üks näitelehekülg."
+    },
+    {
+     "h": "Lehe kirjutamine",
+     "p": "Lehed on Markdown-failid. Päis faili alguses määrab pealkirja ja kuupäeva; kõik selle all on sisu."
+    },
+    {
+     "h": "Ehitamine avaldamiseks",
+     "p": "Käsk build kirjutab valmis saidi kausta public. Kopeeri see kaust suvalisele veebiserverile."
+    }
+   ],
+   "options": [
+    {
+     "d": "Valmis saidi kaust. Vaikimisi public."
+    },
+    {
+     "d": "Võta kaasa mustandiks märgitud lehed."
+    },
+    {
+     "d": "Eelvaateserveri port. Vaikimisi 4000."
+    },
+    {
+     "d": "Ehita uuesti, kui fail muutub."
+    },
+    {
+     "d": "Trüki ainult vead."
+    }
+   ],
+   "config_intro": "Fail site.toml asub sinu kausta juurkataloogis. Puuduv võti saab vaikeväärtuse, nii et uus sait ei vaja faili üldse.",
+   "config_rows": [
+    {
+     "d": "Nimi, mida näidatakse lehe päises ja pealkirjas."
+    },
+    {
+     "d": "Aadress, kus sinu sait asub. Kui sait on juurkataloogis, kasuta /."
+    },
+    {
+     "d": "Saidi välimus: plain, slate või folio."
+    },
+    {
+     "d": "Kas mustandiks märgitud lehed ehitatakse."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Uue lehe lisamine",
+     "p": "Loo Markdown-fail, mille alguses on pealkiri ja kuupäev."
+    },
+    {
+     "h": "Mustandite eelvaade",
+     "p": "Serveeri sait kohalikult koos pooleli olevate lehtedega."
+    },
+    {
+     "h": "Avaldamine kausta",
+     "p": "Ehita kogu sait ühte kausta, mille saad kopeerida suvalisele veebiserverile."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Leht puudub ehitusest",
+     "a": "Lehed, mille päises on draft: true, jäetakse vahele. Eemalda see või ehita valikuga --drafts."
+    },
+    {
+     "q": "Lingid lähevad avaldamisel katki",
+     "a": "Pane base_url samaks aadressiga, kus sait avaldatakse."
+    },
+    {
+     "q": "Eelvaade ei uuene",
+     "a": "Mõned redaktorid kirjutavad vana faili muutmise asemel uue. Käivita eelvaade uuesti või lülita redaktoris turvasalvestus välja."
+    },
+    {
+     "q": "Pilte ei näidata",
+     "a": "Pane need kausta static. Kõik selles kaustas kopeeritakse muutmata kujul."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kivi",
+       "Tamm",
+       "Kask",
+       "Puu",
+       "Liiv",
+       "Mari",
+       "Sepa",
+       "Tuul"
+      ],
+      [
+       "site",
+       "page",
+       "build",
+       "gen",
+       "sheet"
+      ]
+     ],
+     "sep": ""
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Korduvad tööd ilma crontabita",
+   "desc": "{brand} käivitab ühes arvutis väikeseid korduvaid töid ja annab teada, kui mõni ebaõnnestub.",
+   "overview": "{brand} käivitab ühes arvutis väikeseid korduvaid töid ja annab teada, kui mõni ebaõnnestub. See on sõbralikum alternatiiv crontabile, mida pead peas hoidma.",
+   "features": [
+    "Ajakavad kirjutatakse tavaliste sõnadega",
+    "Iga käivituse kohta on oma logi",
+    "Üks väljundrida töö kohta, nii et tõrked paistavad silma"
+   ],
+   "quick_out": "backup   iga päev kell 03:00   viimane käivitus: ok (4 s)",
+   "install_intro": "{brand} koosneb ühest käivitatavast failist ja väikesest taustaprotsessist, mis kontrollib ajakava kord minutis.",
+   "install_steps": [
+    "Lae alla arhiiv, mis sobib sinu süsteemiga.",
+    "Paki see lahti ja kopeeri käivitatav fail kausta, mis on PATH-is.",
+    "Käivita taustaprotsess oma süsteemi teenusehalduriga."
+   ],
+   "faq": [
+    {
+     "q": "Kas see peab töötama teenusena?",
+     "a": "Jah, väike taustaprotsess kontrollib ajakava kord minutis. Paigaldusleht näitab, mida käivitada."
+    },
+    {
+     "q": "Mis juhtub, kui arvuti on välja lülitatud?",
+     "a": "Töö, mis pidi käima ajal, mil masin oli väljas, käivitatakse üks kord, kui masin uuesti käivitub."
+    },
+    {
+     "q": "Kas tööd võivad üksteisest sõltuda?",
+     "a": "Veel mitte. Seni pane käsud ühte töösse järjest."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Töö lisamine",
+     "p": "Töö koosneb nimest, ajakavast ja käsust. Ajakavad kirjutatakse tavaliste sõnadega."
+    },
+    {
+     "h": "Mis käivitus",
+     "p": "Käsk list näitab iga tööd koos viimase käivituse tulemusega. Käsk history näitab ühe töö käivitusi koos kestuse ja väljundiga."
+    },
+    {
+     "h": "Peatamine ja jätkamine",
+     "p": "Peatamine jätab töö ja selle ajaloo alles, kuid takistab selle käivitumist. Kasulik kolimise ajal või varukoopia taastamisel."
+    }
+   ],
+   "options": [
+    {
+     "d": "Kus tööd ja logid asuvad. Vaikimisi on see kaust sinu kodukaustas."
+    },
+    {
+     "d": "Trüki ainult tõrked."
+    },
+    {
+     "d": "Mitu käivitust ajalugu näitab. Vaikimisi 10."
+    },
+    {
+     "d": "Masinloetav väljund."
+    },
+    {
+     "d": "Käivita töö kohe ka väljaspool ajakava."
+    }
+   ],
+   "config_intro": "{brand} loeb faili jobs.toml sinu seadistuskaustast. Tööd ise hoitakse eraldi, nii et fail sisaldab ainult seadeid.",
+   "config_rows": [
+    {
+     "d": "Kest, mis käske käivitab."
+    },
+    {
+     "d": "Kus iga käivituse väljundit hoitakse."
+    },
+    {
+     "d": "Mitu korda ebaõnnestunud tööd uuesti proovitakse."
+    },
+    {
+     "d": "Kas ebaõnnestunud töö saadab ka teate."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Töö käivitamine üks kord, kohe",
+     "p": "Käivita töö väljaspool ajakava, näiteks uue käsu proovimiseks."
+    },
+    {
+     "h": "Töö ebaõnnestumise põhjuse vaatamine",
+     "p": "Trüki töö viimase käivituse väljund."
+    },
+    {
+     "h": "Kõige peatamine reisi ajaks",
+     "p": "Peata kõik ajakavad, kuni need uuesti käivitad."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Töö ei käivitu kunagi",
+     "a": "Kontrolli käsuga list, kas programm töötab. Tööd käivituvad ainult siis, kui see töötab."
+    },
+    {
+     "q": "Töö käivitub kaks korda",
+     "a": "Programmil töötab kaks koopiat. Peata üks neist; lukufail asub logikaustas."
+    },
+    {
+     "q": "Käsk töötab minu kestas, aga siin mitte",
+     "a": "Tööd ei loe sinu kesta käivitusfaile. Kasuta täielikke failiteid või sea keskkond töös endas."
+    },
+    {
+     "q": "Kellaajad on tunni võrra nihkes",
+     "a": "{brand} järgib süsteemi kella ja ajavööndit. Muuda neid seal, mitte töös."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kell",
+       "Tegu",
+       "Ring",
+       "Aeg",
+       "Tikk",
+       "Rada",
+       "Kord",
+       "Sika"
+      ],
+      [
+       "work",
+       "list",
+       "run",
+       "do",
+       "bell"
+      ]
+     ],
+     "sep": ""
+    }
+   }
+  }
+ }
+}

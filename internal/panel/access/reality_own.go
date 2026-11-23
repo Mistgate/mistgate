@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net"
 	"net/netip"
@@ -82,13 +81,8 @@ func (s *Service) ownHostsOf(ctx context.Context, skip string) (ownHosts, error)
 			if spec.TLS.Mode != 0 {
 				own.add(spec.TLS.ServerName)
 			}
-			var settings struct {
-				CDN struct {
-					Host string `json:"host"`
-				} `json:"cdn"`
-			}
-			if spec.Protocol == "vless" && json.Unmarshal(spec.Settings, &settings) == nil {
-				own.add(settings.CDN.Host)
+			if v, ok := plugin.VLESSOf(spec); ok {
+				own.add(v.CDNHost)
 			}
 		}
 	}

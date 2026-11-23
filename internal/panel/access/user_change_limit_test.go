@@ -297,7 +297,7 @@ func TestTokenCreateExtendEnableAndRepeatedCallsAreFree(t *testing.T) {
 	ctx := c.e.ctx
 	ids := c.users(4)
 	for _, id := range ids[1:3] {
-		if err := c.e.st.Access().SetUserExpiry(ctx, id, c.e.clock.Add(30*24*time.Hour)); err != nil {
+		if err := c.e.st.Access().SetUserExpiry(ctx, id, time.Time{}, c.e.clock.Add(30*24*time.Hour)); err != nil {
 			t.Fatal(err)
 		}
 	}

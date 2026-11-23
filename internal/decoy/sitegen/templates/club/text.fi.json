@@ -1,0 +1,435 @@
+{
+ "ui": {
+  "nav_label": "Päävalikko",
+  "footer": "Vapaaehtoisten ylläpitämä ja avoin kaikille.",
+  "nav_home": "Etusivu",
+  "nav_events": "Ohjelma",
+  "nav_join": "Liity mukaan",
+  "nav_news": "Uutiset",
+  "home_title": "Tervetuloa",
+  "desc_events": "Säännölliset kokoontumiset ja erikoistapahtumat: {brand}.",
+  "desc_join": "Miten liityt, mitä se maksaa ja mitä voit odottaa: {brand}.",
+  "desc_news": "Uutisia ja tiedotteita: {brand}.",
+  "nf_title": "Sivua ei löytynyt",
+  "nf_text": "Emme löytäneet sivua. Se on saatettu poistaa sen tapahtuman jälkeen, josta se kertoi.",
+  "nf_back": "Takaisin etusivulle",
+  "meet_h": "Milloin tapaamme",
+  "when_l": "Milloin",
+  "where_l": "Missä",
+  "upcoming_h": "Tulossa",
+  "latest_h": "Tuoreimmat uutiset",
+  "all_events": "Koko ohjelma",
+  "all_news": "Kaikki uutiset",
+  "join_cta": "Näin liityt",
+  "events_h": "Ohjelma",
+  "events_intro": "Säännölliset kokoontumisemme ja se, mitä olemme tehneet tällä kaudella, kuukausi kuukaudelta.",
+  "join_h": "Liity mukaan",
+  "steps_h": "Näin liityt",
+  "faq_h": "Kysymyksiä",
+  "join_fee": "Jäsenmaksu on {fee} vuodessa, nuorilla ja opiskelijoilla alennettu. Jos raha mietityttää, kerro asiasta hiljaa rahastonhoitajalle, niin siitä ei puhuta enää.",
+  "steps": [
+   "Tule mihin tahansa kokoontumiseen ja sano hei.",
+   "Kokeile kuukausi, ennen kuin päätät mitään.",
+   "Maksa jäsenmaksu rahastonhoitajalle, kun olet valmis."
+  ],
+  "news_h": "Uutiset",
+  "news_intro": "Hallituksen tiedotteita ja raportteja viimeisistä kokoontumisista, uusin ensin.",
+  "regular_h": "Säännölliset kokoontumiset",
+  "season_h": "Tämä kausi tähän mennessä",
+  "find_h": "Löydä meidät",
+  "contact_h": "Ota yhteyttä",
+  "phone_l": "Puhelin"
+ },
+ "bundles": {
+  "chess": {
+   "kicker": "Shakkikerho",
+   "tagline": "Ystävällistä shakkia joka torstai-ilta",
+   "desc": "{brand} kokoontuu joka torstai-ilta. Ystävällisiä pelejä kaikentasoisille, aloittelijoista kerhomestariin.",
+   "intro": "Kokoonnumme joka torstai pelaamaan, käymään pelejämme läpi ja juomaan liikaa kahvia. Kaikki tasot ovat tervetulleita, ensimmäistä kertaa pelaavista kerhomestariin.",
+   "when": "Torstaisin klo {19:30}–{22:00}",
+   "where": "Kansalaisopiston yläkerran sali",
+   "events": [
+    {
+     "t": "Kerhoilta",
+     "w": "Joka torstai klo {19:30}",
+     "p": "Vapaata pelaamista, ja aloittelijoille on opetuspöytä."
+    },
+    {
+     "t": "Pikaturnaus",
+     "w": "Kuukauden ensimmäinen lauantai klo {14:00}",
+     "p": "Seitsemän kierrosta, viisitoista minuuttia per pelaaja. Osallistumismaksu on pieni lahjoitus kahvikassaan."
+    },
+    {
+     "t": "Aloittelijoiden ilta",
+     "w": "Kuukauden toinen tiistai klo {19:00}",
+     "p": "Opi säännöt ja muutama yksinkertainen avaus."
+    },
+    {
+     "t": "Simultaaninäytös",
+     "w": "Kerran kaudessa",
+     "p": "Kerhomestari pelaa kahtakymmentä lautaa vastaan yhtä aikaa. Ota mukaan ystävä ja suunnitelma."
+    },
+    {
+     "t": "Vuosijuhla",
+     "w": "Marraskuun lopussa",
+     "p": "Ateria, puhe ja hyvin pienen pokaalin luovutus."
+    }
+   ],
+   "news": [
+    {
+     "title": "Uusi kausi alkaa",
+     "text": "Syyskausi alkaa ensi viikolla kerhomestaruuskilpailulla. Uudet jäsenet ovat tervetulleita mihin iltaan tahansa."
+    },
+    {
+     "title": "Kiitos kaikille pikaturnaukseen tulleille",
+     "text": "Kaksikymmentäkuusi pelaajaa, neljätoista kupillista kahvia per kierros ja finaali, joka ratkesi kellolla."
+    },
+    {
+     "title": "Saimme uudet laudat",
+     "text": "Kahdeksan puista lautaa nappuloineen, ostettu kesäarpajaisten tuotoilla."
+    },
+    {
+     "title": "Juniorijaosto aukeaa uudelleen",
+     "text": "Seitsemänvuotiaat ja sitä vanhemmat lapset ovat tervetulleita tiistai-iltapäivisin, ensimmäisellä kerralla vanhemman kanssa."
+    }
+   ],
+   "join": [
+    "Olemme ystävällinen kerho, jossa on noin neljäkymmentä jäsentä yhdeksästä kahdeksaankymmeneen neljään vuoteen. Useimmat meistä eivät pelaa kovin hyvin, ja olemme tehneet sovinnon sen kanssa.",
+    "Sinun ei tarvitse omistaa shakkisettiä tai osata teoriaa. Jos osaat siirtää nappuloita, voit pelata torstaina."
+   ],
+   "faq": [
+    {
+     "q": "Pitääkö minun olla hyvä?",
+     "a": "Ei. Useimmat jäsenet eivät ole, ja kerho on järjestetty niin, että jokainen saa pelin itsensä tasoista vastaan."
+    },
+    {
+     "q": "Voivatko lapset tulla?",
+     "a": "Voivat, tiistai-iltapäivisin ja vanhemman kanssa torstaisin."
+    },
+    {
+     "q": "Pelaatteko sarjassa?",
+     "a": "Meillä on yksi joukkue alueen sarjassa. Jos haluat pelata, kerro kapteenille."
+    }
+   ],
+   "why": [
+    {
+     "h": "Kaikki tasot",
+     "p": "Aloittelijat istuvat konkarien vieressä, eikä se haittaa ketään."
+    },
+    {
+     "h": "Joka torstai",
+     "p": "Ei ilmoittautumista. Tule, kun pääset."
+    },
+    {
+     "h": "Laudat kerholta",
+     "p": "Setit ja kellot ovat kerhon, kahvin keität itse."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Avajaisilta",
+     "p": "Lyhyt esitys avauksesta, jota kaikki pelaavat eikä kukaan ymmärrä."
+    },
+    {
+     "t": "Kerhomestaruus, ensimmäinen kierros",
+     "p": "Parit arvotaan, ja ensimmäinen kierros ei koskaan mene suunnitelmien mukaan."
+    },
+    {
+     "t": "Loppupelityöpaja",
+     "p": "Kuninkaat, sotilaat ja kärsivällisyys työntää niitä eteenpäin."
+    },
+    {
+     "t": "Shakkivisa",
+     "p": "Kymmenen kysymystä shakista, kymmenen kaikesta muusta."
+    },
+    {
+     "t": "Pikaturnaus",
+     "p": "Seitsemän kierrosta, viisitoista minuuttia ja paljon kahvia."
+    },
+    {
+     "t": "Analyysi-ilta",
+     "p": "Valitsemme kerhoillan pelin ja väittelemme siitä."
+    },
+    {
+     "t": "Simultaaninäytös",
+     "p": "Kerhomestari pelaa kahtakymmentä lautaa vastaan yhtä aikaa."
+    },
+    {
+     "t": "Opetuspöytä junioreille",
+     "p": "Nuorimmat jäsenemme opettavat aikuisille temppu tai kaksi."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Shakkikerho {city}",
+       "Shakkiseura {city}",
+       "Shakkiyhdistys {city}"
+      ]
+     ]
+    }
+   }
+  },
+  "walking": {
+   "kicker": "Kävelyryhmä",
+   "tagline": "Kävelyretkiä metsässä ja joen varrella",
+   "desc": "{brand} kävelee joka sunnuntai metsissä ja joen varrella. Kaikki ovat tervetulleita, kokemusta ei tarvita.",
+   "intro": "Kävelemme joka sunnuntai säällä kuin säällä hitaimman vauhtia. Tule kerran katsomaan; useimmat meistä aloittivat niin.",
+   "when": "Sunnuntaisin klo {9:30}",
+   "where": "Vanhan asemarakennuksen parkkipaikka",
+   "events": [
+    {
+     "t": "Sunnuntaikävely",
+     "w": "Joka sunnuntai klo {9:30}",
+     "p": "Kahdeksan–kaksitoista kilometriä, ja huonolla säällä kahvitauko."
+    },
+    {
+     "t": "Lyhyt kävely",
+     "w": "Kuukauden ensimmäinen keskiviikko klo {10:00}",
+     "p": "Neljästä viiteen kilometriä rauhallista vauhtia, lopuksi kahvit."
+    },
+    {
+     "t": "Viikonloppureissu",
+     "w": "Kerran vuodessa keväällä",
+     "p": "Kaksi päivää maastossa, retkimaja ja valtavasti keittoa."
+    },
+    {
+     "t": "Karttailta",
+     "w": "Kerran kaudessa",
+     "p": "Miten karttaa luetaan ja mitä tehdä, kun kartta alkaa lukea sinua."
+    },
+    {
+     "t": "Roskienkeruu",
+     "w": "Huhtikuun viimeinen lauantai",
+     "p": "Siivoamme jokipolun ja kävelemme sen sitten uudestaan, koska voimme."
+    }
+   ],
+   "news": [
+    {
+     "title": "Kevätohjelma on julkaistu",
+     "text": "Kaksitoista kävelyä maalis- ja kesäkuun välillä, mukaan lukien kaksi uutta reittiä harjun yli."
+    },
+    {
+     "title": "Myllyn viereinen polku on avattu uudelleen",
+     "text": "Vuoden korjausten jälkeen silta on taas auki. Kiitos vapaaehtoisille, jotka uhrasivat lauantaitaan."
+    },
+    {
+     "title": "Uusia kävelyn vetäjiä kaivataan",
+     "text": "Jos tiedät hyvän reitin ja osaat lukea karttaa, kuulisimme mielellämme sinusta."
+    },
+    {
+     "title": "Kiitos keitosta",
+     "text": "Viikonloppureissu oli suuri menestys, enimmäkseen keiton ansiosta."
+    }
+   ],
+   "join": [
+    "Olemme ystävällinen noin kuudenkymmenen kävelijän ryhmä, joukossa niitä, jotka ovat kävelleet koko ikänsä, ja niitä, jotka aloittivat viime kuussa.",
+    "Erityisvarusteita ei tarvita. Kengät, sadetakki ja jotakin juotavaa riittävät. Jos olet epävarma, tule kysymään sunnuntaiaamuna."
+   ],
+   "faq": [
+    {
+     "q": "Kuinka kovaa kävelette?",
+     "a": "Kyseisen päivän hitaimman vauhtia, joka on usein vetäjä."
+    },
+    {
+     "q": "Voinko ottaa koirani mukaan?",
+     "a": "Useimmille kävelyille voit, hihnassa. Ohjelmasta näkee, mitkä kävelyt eivät sovi."
+    },
+    {
+     "q": "Entä jos sataa?",
+     "a": "Kävelemme silti. Kahvitauko on pidempi."
+    }
+   ],
+   "why": [
+    {
+     "h": "Maastossa",
+     "p": "Kahdeksan–kaksitoista kilometrin reittejä polut tuntevien vetäminä."
+    },
+    {
+     "h": "Hyvää seuraa",
+     "p": "Vakiokävelijoita ja tasaisesti uusia kasvoja."
+    },
+    {
+     "h": "Ketään ei jätetä",
+     "p": "Pidämme hitaimman kävelijän vauhtia."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Kävely joen varrella",
+     "p": "Kahdeksan kilometriä tasaista, tauko vanhan sulun luona."
+    },
+    {
+     "t": "Maisemakävely mäelle",
+     "p": "Kaksitoista kilometriä ja yksi kunnon nousu. Ota termospullo mukaan."
+    },
+    {
+     "t": "Karttailta",
+     "p": "Koordinaatit, korkeuskäyrät ja kompassi, joka näyttää väärään suuntaan."
+    },
+    {
+     "t": "Lyhyt kävely ja lounas",
+     "p": "Viisi kilometriä kahvilaan, jossa on hyvä takkatuli."
+    },
+    {
+     "t": "Ruska",
+     "p": "Metsäreitti, parhaimmillaan aamulla, kun valo tulee puiden lomasta."
+    },
+    {
+     "t": "Roskienkeruu",
+     "p": "Käsineet, pussit ja yllättävän monta tennispalloa."
+    },
+    {
+     "t": "Iltakävely",
+     "p": "Rauhallinen tunti hämärässä, lopuksi teetä jonkun keittiön pöydän ääressä."
+    },
+    {
+     "t": "Yökävely",
+     "p": "Taskulamput sammuksissa, silmät auki ja puhe tähdistä."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kävelyryhmä {city}",
+       "Retkeilijät {city}",
+       "Kävelyseura {city}"
+      ]
+     ]
+    }
+   }
+  },
+  "choir": {
+   "kicker": "Yhteisökuoro",
+   "tagline": "Yhdessä laulaen keskiviikkoiltaisin",
+   "desc": "{brand} harjoittelee keskiviikkoiltaisin. Ei koelaulua, ei nuottien lukutaitoa, vain halu laulaa.",
+   "intro": "Olemme kuoro ihmisille, jotka tykkäävät laulaa eivätkä halua mennä siihen koelauluun. Opimme korvakuulolta, nauramme paljon ja laulamme paremmin kuin meillä on oikeutta.",
+   "when": "Keskiviikkoisin klo {19:00}–{21:00}",
+   "where": "Seurakuntakodin sali",
+   "events": [
+    {
+     "t": "Viikkoharjoitus",
+     "w": "Joka keskiviikko klo {19:00}",
+     "p": "Lämmittely, uusia lauluja ja se yksi, jota emme vieläkään osaa."
+    },
+    {
+     "t": "Avoin ilta",
+     "w": "Syyskuun ensimmäinen keskiviikko",
+     "p": "Tule laulamaan kanssamme yhdeksi illaksi, ilman sitoumuksia."
+    },
+    {
+     "t": "Joulukonsertti",
+     "w": "Joulukuun toinen lauantai",
+     "p": "Joululauluja, kansanlauluja ja yksi kappale, jota kukaan ei odota."
+    },
+    {
+     "t": "Kesäkonsertti",
+     "w": "Kesäkuun loppu",
+     "p": "Lauluilta seurakuntakodin pihalla, jos sää sallii."
+    },
+    {
+     "t": "Laulupäivä",
+     "w": "Kerran vuodessa",
+     "p": "Työpajoja vierailevan kuoronjohtajan kanssa, lounas kuuluu hintaan."
+    }
+   ],
+   "news": [
+    {
+     "title": "Syyskausi alkaa",
+     "text": "Opettelemme kolmen maan kansanlauluja ja kaanonia, joka ei pysy tahdissa."
+    },
+    {
+     "title": "Suuri kiitos kesäkonsertin jälkeen",
+     "text": "Yhdeksänkymmentä ihmistä tuli, neljäkymmentäyksi kakunpalaa syötiin ja vain yksi säkeistö laulettiin kahdesti."
+    },
+    {
+     "title": "Etsimme tenoreita",
+     "text": "Meillä on paljon sopraanoja ja alttoja. Jos osaat laulaa matalalta, tule tutustumaan."
+    },
+    {
+     "title": "Uudet nuotit ovat tulleet",
+     "text": "Talviohjelman kansiot ovat salissa. Tee merkintäsi lyijykynällä, älä kuulakärkikynällä."
+    }
+   ],
+   "join": [
+    "Meitä on noin viisikymmentä laulajaa kuudestatoista kahdeksaankymmeneen kahdeksaan vuoteen. Useimmat meistä eivät osaa lukea nuotteja ja ovat oppineet laulut korvakuulolta vuosien ajan.",
+    "Tule mihin tahansa harjoitukseen laulamaan kanssamme. Löydämme sinulle tuolin, kansion ja jonkun, jonka viereen seisoa."
+   ],
+   "faq": [
+    {
+     "q": "Pitääkö minun mennä koelauluun?",
+     "a": "Ei. Koelaulua ei ole, ei nyt eikä myöhemmin."
+    },
+    {
+     "q": "Pitääkö osata lukea nuotteja?",
+     "a": "Ei. Opetamme korvakuulolta, ja halukkaille nuotit ovat paperilla."
+    },
+    {
+     "q": "Entä jos jään pois viikoksi?",
+     "a": "Silloin jäät pois viikoksi. Ketään ei haittaa, ja äänitteet jaetaan verkossa."
+    }
+   ],
+   "why": [
+    {
+     "h": "Ei koelaulua",
+     "p": "Jos pidät sävelen suihkussa, pidät sen täälläkin."
+    },
+    {
+     "h": "Kaikki äänet",
+     "p": "Sopraanot, altot, tenorit, bassot ja kaikki, jotka eivät ole varmoja."
+    },
+    {
+     "h": "Kaksi konserttia vuodessa",
+     "p": "Yksi talvella ja yksi kesällä, kakun kera."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Avoin ilta",
+     "p": "Tule laulamaan kaanon tai pari, ilman koelaulua ja paineita."
+    },
+    {
+     "t": "Uusi kausi alkaa",
+     "p": "Lämmittelyjä, uusi kappale ja paljon kuulumisia."
+    },
+    {
+     "t": "Äänilajiharjoitus",
+     "p": "Altot ja tenorit salissa, sopraanot ja bassot keittiössä."
+    },
+    {
+     "t": "Laulupäivä",
+     "p": "Koko lauantai vierailevan kuoronjohtajan kanssa."
+    },
+    {
+     "t": "Konsertti kirkossa",
+     "p": "Kaksi puoliaikaa, arpajaiset ja väliajalla kahvi ja pulla."
+    },
+    {
+     "t": "Joululaulut torilla",
+     "p": "Kylmät sormet ja lämpimät äänet torilla."
+    },
+    {
+     "t": "Harjoitus pianistin kanssa",
+     "p": "Ensimmäinen kerta, kun kappale kuulostaa musiikilta."
+    },
+    {
+     "t": "Yhteislauluilta",
+     "p": "Lauluja, jotka kaikki tuntevat, ja muutama, jota kukaan ei muista."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Sekakuoro {city}",
+       "Yhteisökuoro {city}",
+       "Laulajat {city}"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

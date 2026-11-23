@@ -17,6 +17,7 @@ import (
 
 	coreErrs "github.com/apernet/hysteria/core/v2/errors"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 )
 
 // localTunnel is a tunnel that goes straight to a local server, recording what it was asked to dial. host
@@ -226,11 +227,11 @@ func TestSkipsAreNotFailuresAndLeaveTheStreak(t *testing.T) {
 	}
 	before := f.calls.Load()
 
-	f.fl.set(f.node, liveState{up: false, caps: []string{capDoctor}}) // node offline: nothing is dialled
+	f.fl.set(f.node, liveState{up: false, caps: []string{agentcap.Doctor}}) // node offline: nothing is dialled
 	if _, ok := f.s.round(f.ctx, f.in); ok || f.calls.Load() != before {
 		t.Fatal("an offline node was probed")
 	}
-	f.fl.set(f.node, liveState{up: true, caps: []string{capDoctor}})
+	f.fl.set(f.node, liveState{up: true, caps: []string{agentcap.Doctor}})
 	f.exec(`UPDATE inbound SET state = 'failed' WHERE id = ?`, f.in) // not active
 	if _, ok := f.s.round(f.ctx, f.in); ok || f.calls.Load() != before {
 		t.Fatal("an inbound that is not active was probed")
@@ -246,7 +247,7 @@ func TestSkipsAreNotFailuresAndLeaveTheStreak(t *testing.T) {
 
 	// the node goes away during the retry wait: not a failure of the inbound
 	f.dial = func(Target) (Tunnel, error) {
-		f.fl.set(f.node, liveState{up: false, caps: []string{capDoctor}})
+		f.fl.set(f.node, liveState{up: false, caps: []string{agentcap.Doctor}})
 		return nil, &ProbeError{Code: "timeout", Detail: "x"}
 	}
 	if _, ok := f.s.round(f.ctx, f.in); ok || len(f.samples()) != 1 {
@@ -346,7 +347,7 @@ func TestScheduleDueAndNextRunAfterARound(t *testing.T) {
 		t.Fatalf("after a good round the next is in %v", got)
 	}
 
-	f.fl.set(f.node, liveState{up: false, caps: []string{capDoctor}}) // not probed now: forgotten
+	f.fl.set(f.node, liveState{up: false, caps: []string{agentcap.Doctor}}) // not probed now: forgotten
 	f.s.scheduleDue(f.ctx)
 	if f.s.sched[f.in] != nil {
 		t.Fatal("an offline node keeps a schedule")

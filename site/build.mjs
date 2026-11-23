@@ -37,6 +37,9 @@ for (const f of readdirSync(join(BRAND, "fonts"))) if (/\.(woff2|txt)$/.test(f))
 const VIDEOS = join(ROOT, "..", "docs", "images", "video");
 for (const f of readdirSync(VIDEOS)) if (/^[a-z]+-(poster-)?[a-z]+\.(mp4|webp)$/.test(f) && (f.endsWith(".mp4") || f.includes("-poster-"))) { mkdirSync(join(DIST, "video"), { recursive: true }); copyFileSync(join(VIDEOS, f), join(DIST, "video", f)); }
 out("install.sh", readFileSync(INSTALLER));
+// the loops of the admin (docs/images/readme): shown on the docs pages in the reader's theme
+const CLIPS = join(ROOT, "..", "docs", "images", "readme");
+for (const f of readdirSync(CLIPS)) if (/^[a-z0-9-]+-(dark|light)-[a-z]+\.webp$/.test(f)) { mkdirSync(join(DIST, "img", "readme"), { recursive: true }); copyFileSync(join(CLIPS, f), join(DIST, "img", "readme", f)); }
 const badge = readFileSync(join(BRAND, "assets", "mistgate-badge.svg"));
 out("mistgate-badge.svg", badge);
 out("favicon.svg", badge);

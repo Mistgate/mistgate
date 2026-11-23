@@ -30,6 +30,7 @@ var manualMinGap = censorSimManualCheckGap(30 * time.Second) // RunChecksNow: at
 type cell struct {
 	last   *Result // nil before the first round
 	streak int
+	since  time.Time // when the current series of failed rounds began
 }
 
 // schedule is when an inbound is probed next.
@@ -56,6 +57,7 @@ func (s *Service) cellOf(ctx context.Context, inboundID string) cell {
 					break
 				}
 				c.streak++
+				c.since = x.At
 			}
 		}
 		s.cells[inboundID] = c
@@ -78,6 +80,9 @@ func (s *Service) record(ctx context.Context, inboundID string, res Result) {
 	c := s.cells[inboundID]
 	c.last = &res
 	if res.failed() {
+		if c.streak == 0 {
+			c.since = res.At
+		}
 		c.streak++
 	} else {
 		c.streak = 0

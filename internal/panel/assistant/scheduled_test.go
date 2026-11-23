@@ -12,6 +12,7 @@ import (
 
 	"connectrpc.com/connect"
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/mcp"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -113,7 +114,7 @@ func TestScheduledRunAnswersInTheTasksConversation(t *testing.T) {
 	}
 	reqs := f.adapter.requests()
 	for _, tool := range reqs[0].Tools {
-		if strings.HasSuffix(tool.Name, "_apply") || tool.Name == "memory_save" || tool.Name == "ui_open" || tool.Name == "ui_secret_form" ||
+		if mcp.KindOf(tool.Name) == mcp.KindApply || tool.Name == "memory_save" || tool.Name == "ui_open" || tool.Name == "ui_secret_form" ||
 			tool.Name == "conversation_search" || tool.Name == "conversation_read" {
 			t.Errorf("a scheduled run was offered %s", tool.Name)
 		}

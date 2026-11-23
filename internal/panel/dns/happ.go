@@ -140,7 +140,7 @@ func happBuild(p Preset) (happProfile, []string, error) {
 					}
 				}
 				for _, code := range r.Geo {
-					l, ok := geoLists[code]
+					l, ok := geoListOf(code)
 					if !ok {
 						notes = append(notes, fmt.Sprintf("country list %q skipped: unknown", code))
 						continue
@@ -148,7 +148,7 @@ func happBuild(p Preset) (happProfile, []string, error) {
 					if e := "geosite:" + l.Site; !slices.Contains(direct, e) {
 						direct = append(direct, e)
 					}
-					if e := "geoip:" + l.IP; !slices.Contains(directIP, e) {
+					if e := "geoip:" + l.IP; l.IP != "" && !slices.Contains(directIP, e) {
 						directIP = append(directIP, e)
 					}
 				}

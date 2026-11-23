@@ -22,20 +22,37 @@ import (
 
 type rb2Svc struct {
 	agentv1connect.UnimplementedAgentServiceHandler
-	s        *Service
-	node     string
-	ret      chan error
-	returned chan rb2Return
+	s         *Service
+	node      string
+	ret       chan error
+	returned  chan rb2Return
+	firstSend chan rb2FirstSend
 }
 
 type rb2Return struct {
 	offset uint64
 	err    error
+	// The old handler can return while the test is still draining the resumed stream.
+	returnedAt time.Time
+}
+
+// The old write deadline can expire during the large resumed transfer, so capture overlap at its first send.
+type rb2FirstSend struct {
+	offset uint64
+	zombie bool
 }
 
 // rb2Svc adapts the update service to the Connect handler used by these transport regressions.
 func (a rb2Svc) FetchUpdate(ctx context.Context, req *connect.Request[agentv1.FetchUpdateRequest], stream *connect.ServerStream[agentv1.FetchUpdateResponse]) error {
+	reportedFirstSend := false
 	err := a.s.ServeWithWriteDeadline(ctx, a.node, req.Msg.Name, req.Msg.Offset, WriteDeadlineFromContext(ctx), func(chunk []byte, total uint64) error {
+		if req.Msg.Offset != 0 && !reportedFirstSend {
+			reportedFirstSend = true
+			a.s.bmu.Lock()
+			zombie := a.s.zombieTotal == 1 && a.s.zombies[a.node] == 1
+			a.s.bmu.Unlock()
+			a.firstSend <- rb2FirstSend{offset: req.Msg.Offset, zombie: zombie}
+		}
 		return stream.Send(&agentv1.FetchUpdateResponse{Data: chunk, TotalSize: total})
 	})
 	select {
@@ -43,7 +60,7 @@ func (a rb2Svc) FetchUpdate(ctx context.Context, req *connect.Request[agentv1.Fe
 	default:
 	}
 	select {
-	case a.returned <- rb2Return{offset: req.Msg.Offset, err: err}:
+	case a.returned <- rb2Return{offset: req.Msg.Offset, err: err, returnedAt: time.Now()}:
 	default:
 	}
 	return err
@@ -58,7 +75,9 @@ type rb2Server struct {
 
 // newRB2Server wires the update stream with the agent listener's production timeouts.
 func newRB2Server(t *testing.T, s *Service, h2 bool, ln net.Listener, h2conf *http.HTTP2Config) *rb2Server {
-	r := &rb2Server{svc: rb2Svc{s: s, node: "nod_de1", ret: make(chan error, 64), returned: make(chan rb2Return, 64)}}
+	r := &rb2Server{svc: rb2Svc{
+		s: s, node: "nod_de1", ret: make(chan error, 64), returned: make(chan rb2Return, 64), firstSend: make(chan rb2FirstSend, 64),
+	}}
 	path, rpc := agentv1connect.NewAgentServiceHandler(r.svc)
 	mux := http.NewServeMux()
 	mux.Handle(path, rpc)
@@ -207,6 +226,14 @@ func TestBundleHTTP2StallThenResetRepeated(t *testing.T) {
 					t.Fatalf("round %d: resume on a fresh connection: %v", round, err)
 				}
 				suffix := make([]byte, 0, len(want)-len(prefix))
+				if !resumed.Receive() {
+					t.Fatalf("round %d: resumed stream had no first chunk: %v", round, resumed.Err())
+				}
+				firstSend := <-r.svc.firstSend
+				if firstSend.offset != resumeOffset || !firstSend.zombie {
+					t.Fatalf("round %d: resumed first send offset=%d, old zombie=%v", round, firstSend.offset, firstSend.zombie)
+				}
+				suffix = append(suffix, resumed.Msg().Data...)
 				for resumed.Receive() {
 					suffix = append(suffix, resumed.Msg().Data...)
 				}
@@ -216,13 +243,6 @@ func TestBundleHTTP2StallThenResetRepeated(t *testing.T) {
 				if r.newConns.Load() <= beforeResume {
 					t.Fatalf("round %d: resume did not use a fresh connection", round)
 				}
-				e.s.bmu.Lock()
-				zombies := e.s.zombieTotal == 1 && e.s.zombies["nod_de1"] == 1
-				e.s.bmu.Unlock()
-				if !zombies {
-					t.Fatalf("round %d: old Serve returned before the resumed stream completed", round)
-				}
-
 				newReturned, oldReturned := false, false
 				for !newReturned || !oldReturned {
 					select {
@@ -237,6 +257,9 @@ func TestBundleHTTP2StallThenResetRepeated(t *testing.T) {
 							if result.err == nil {
 								t.Fatalf("round %d: superseded Serve returned nil, want its blocked write to fail", round)
 							}
+							if took := result.returnedAt.Sub(handoverAt); took > e.s.sendTimeout+stallSlack {
+								t.Fatalf("round %d: superseded Serve returned after %s, want within the send timeout", round, took)
+							}
 							oldReturned = true
 						default:
 							t.Fatalf("round %d: unexpected returned offset %d", round, result.offset)
@@ -244,9 +267,6 @@ func TestBundleHTTP2StallThenResetRepeated(t *testing.T) {
 					case <-time.After(e.s.sendTimeout + stallSlack):
 						t.Fatalf("round %d: both Serve calls did not return within %s", round, e.s.sendTimeout+stallSlack)
 					}
-				}
-				if took := time.Since(handoverAt); took > e.s.sendTimeout+stallSlack {
-					t.Fatalf("round %d: superseded Serve returned after %s, want within the send timeout", round, took)
 				}
 				cancelFirst()
 				_ = first.Close()

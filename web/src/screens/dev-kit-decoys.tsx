@@ -11,14 +11,17 @@ import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
 import { isLang, setLang, useLang } from "@/i18n";
 import { decoySites } from "@/lib/api";
 import { accessQuery } from "@/lib/assistant";
-import { pagesQuery, siteQuery, sitesQuery, type Site } from "@/lib/decoysites";
+import { pagesQuery, photosQuery, siteQuery, sitesQuery, templatesQuery, type Site } from "@/lib/decoysites";
 import { setEffectsEnabled } from "@/lib/effects";
 import { nodesQuery } from "@/lib/queries";
 import { meQuery } from "@/lib/session";
 import { setTheme, useTheme } from "@/lib/theme";
 import { Shot } from "@/screens/dev-kit-redesign";
-import { demoNodes, demoSites, fileText, fillerSites, pageDoc, type DemoSite } from "./dev-kit-decoys-data";
+import { demoNodes, demoSites, fileText, fillerSites, looks, pageDoc, type DemoSite } from "./dev-kit-decoys-data";
+import { PHOTO_STUBS } from "./dev-kit-decoys-photos";
+import { demoBlog, realSite } from "./dev-kit-decoys-real";
 import type { UploadDemo } from "./decoys/create";
+import type { TemplateDemo } from "./decoys/template";
 import { DecoysScreen, type DecoysDemo } from "./decoys/list";
 import { DecoySiteScreen, type SiteDemo } from "./decoys/site";
 import { ShellLayout } from "./shell";
@@ -29,9 +32,9 @@ import { ShellLayout } from "./shell";
 //   /dev-kit?only=decoys-page&state=<state>[&lang=en|ru|zh|fa|tr][&theme=light|dark][&fx=1]
 // list states: list | list-delivery | list-panel-fb | list-empty | list-many | list-full | list-load | list-err | list-deny | list-edge | list-draft |
 //   list-used | list-free | list-find | list-nomatch
-// the windows of the list: dlg-new | dlg-up | dlg-up-drag | dlg-up-run | dlg-up-ready | dlg-up-draft | dlg-up-taken | dlg-up-big |
+// the windows of the list: dlg-new | dlg-tpl | dlg-tpl-nl | dlg-tpl-wait | dlg-tpl-view | dlg-tpl-run | dlg-tpl-err | dlg-tpl-nokey | dlg-tpl-keyform | dlg-tpl-photos | dlg-tpl-limit | dlg-tpl-pexels | dlg-tpl-both | dlg-up | dlg-up-drag | dlg-up-run | dlg-up-ready | dlg-up-draft | dlg-up-taken | dlg-up-big |
 //   dlg-up-many | dlg-up-unsafe | dlg-up-fmt | dlg-up-noindex | dlg-mcp
-// page states: site-used | site-ready | site-draft | site-bad | site-builtin | site-dir | site-dir-off | site-way | site-fail | site-off |
+// page states: site-used | site-ready | site-template | site-draft | site-bad | site-builtin | site-dir | site-dir-off | site-way | site-fail | site-off |
 //   site-old | site-phone | site-404 | site-page | site-edit | site-menu | site-checks | site-copied | site-css | site-img | site-deny |
 //   site-load | site-nf | site-edge
 // the windows of the page: dlg-assign | dlg-assign-two | dlg-assign-panel | dlg-unassign | dlg-unassign-panel | dlg-delete-draft |
@@ -54,10 +57,13 @@ type World = {
   role: Role;
   edge: boolean;
   hang: "" | "list" | "site";
-  fail: "" | "list" | "site-nf";
+  fail: "" | "list" | "site-nf" | "preview" | "generate";
   /** Twelve nodes in all (the grid of "showing now" with a last row that is not full). */
   many: boolean;
+  /** The photo keys the owner has put in, and the source in use. */
+  photos: PhotosWorld;
 };
+type PhotosWorld = { pexels: boolean; pixabay: boolean; source: "pexels" | "pixabay" };
 
 const moreNodes = ["be1", "se1", "pl1", "fr1", "uk1", "at1", "cz1", "no1"].map((name, i) => ({ id: `nod_${name}`, name, cc: ["BE", "SE", "PL", "FR", "GB", "AT", "CZ", "NO"][i]!, address: `${name}.example.com` }));
 
@@ -73,6 +79,12 @@ function worldOf(state: string): World {
     hang: state === "list-load" ? "list" : state === "site-load" ? "site" : "",
     fail: state === "list-err" ? "list" : state === "site-nf" ? "site-nf" : "",
     many: state === "list-many",
+    photos:
+      state === "dlg-tpl-photos" || state === "dlg-tpl-limit"
+        ? { pexels: false, pixabay: true, source: "pixabay" }
+        : state === "dlg-tpl-both"
+          ? { pexels: true, pixabay: true, source: "pexels" }
+          : { pexels: false, pixabay: false, source: "pixabay" },
   };
   if (state === "list-empty" || state === "dlg-new" || state === "dlg-mcp") {
     if (state === "list-empty") {
@@ -81,7 +93,7 @@ function worldOf(state: string): World {
       w.panelSource = "builtin";
     }
   }
-  if (state === "list-full") w.sites = [...demoSites, ...fillerSites(8, 100)];
+  if (state === "list-full") w.sites = [...demoSites, ...fillerSites(9, 100)];
   if (state === "list-delivery") w.reasons = { nod_nl1: "pending", nod_fi1: "apply_failed", nod_msk1: "node_offline" };
   if (w.edge) {
     w.serves = { nod_de1: "builtin", nod_nl1: "builtin", nod_fi1: "builtin", nod_msk1: "builtin" };
@@ -110,7 +122,7 @@ const checks = (s: DemoSite) => [
 
 function siteMsg(s: DemoSite, w: World): Site {
   return {
-    id: s.id, name: s.name, note: s.note, source: s.source, sourceLabel: s.token ?? (s.source === "upload" || s.source === "assistant" ? s.by : ""), state: s.state, bundleSha256: s.sha.padEnd(64, "0"),
+    id: s.id, name: s.name, note: s.note, source: s.source, sourceLabel: s.template ? `template:${s.template}` : (s.token ?? (s.source === "upload" || s.source === "assistant" ? s.by : "")), state: s.state, bundleSha256: s.sha.padEnd(64, "0"),
     createdUnix: now - s.createdAgoS, createdBy: s.by, updatedUnix: now - s.updatedAgoS, updatedBy: s.by, version: s.versions.length, sizeBytes: s.bytes, fileCount: s.files, title: s.title,
     checks: checks(s), nodeCount: Object.values(w.serves).filter((v) => v === s.id).length, onPanel: w.panelSource === `site:${s.id}`,
   } as Site;
@@ -206,6 +218,43 @@ function installFake(w: World) {
       const page = notFound ? (s.has404 ? 404 : "nf") : i === 0 ? 0 : i === pages.length - 1 ? 2 : 1;
       return { html: pageDoc(siteId.replace("dsi_", ""), page, 0), path };
     },
+    listDecoyTemplates: async () => templateAnswer,
+    previewDecoyTemplate: async ({ kind, seed, country }: { kind: string; seed: string; country?: string }) => {
+      if (w.fail === "preview") throw new ConnectError("unavailable", Code.Unavailable);
+      if (!seed) variant += 1;
+      const n = seed ? Number.parseInt(seed.slice(0, 4), 16) - 0x1000 : variant;
+      const look = templateLook[kind] ?? "tpl";
+      const on = w.photos[w.photos.source];
+      // a real site of the generator (dev-kit-fixtures) when there is one and no photos are asked for; the drawn stand-ins otherwise
+      const real = on ? null : realSite(kind, country ?? "gb", n);
+      return {
+        html: real?.html ?? pageDoc(look, 0, n, on ? PHOTO_STUBS : undefined),
+        seed: seed || `${(variant + 0x1000).toString(16)}0000000000000000`.slice(0, 16),
+        name: real?.name ?? looks[look]!.brand,
+        photos: on ? "used" : "no_key",
+        photosSource: w.photos.source,
+      };
+    },
+    getDecoyPhotos: async () => photosAnswer(w.photos),
+    setDecoyPhotosKey: async ({ key, source }: { key: string; source?: string }) => {
+      const s = source === "pixabay" ? "pixabay" : "pexels";
+      const other = s === "pixabay" ? "pexels" : "pixabay";
+      w.photos[s] = key !== "";
+      if (key) w.photos.source = s;
+      else if (w.photos.source === s && w.photos[other]) w.photos.source = other;
+      return photosAnswer(w.photos);
+    },
+    setDecoyPhotosSource: async ({ source }: { source: "pexels" | "pixabay" }) => {
+      if (!w.photos[source]) throw new ConnectError("decoy_photos_no_key", Code.FailedPrecondition);
+      w.photos.source = source;
+      return photosAnswer(w.photos);
+    },
+    generateDecoySite: async ({ kind }: { kind: string }) => {
+      if (w.fail === "generate") throw new ConnectError("decoy_library_full", Code.FailedPrecondition);
+      const s = { ...demoSites.find((x) => x.id === "dsi_tpl")!, id: `dsi_gen${w.sites.length}`, name: looks[templateLook[kind] ?? "tpl"]!.brand, template: kind };
+      w.sites = [...w.sites, s];
+      return { site: siteMsg(s, w) };
+    },
     getDecoyFile: async ({ siteId, path }: { siteId: string; path: string }) =>
       siteId === "panel_dir" ? { text: PANEL_DIR_INDEX, size: PANEL_DIR_INDEX.length, truncated: false } : { text: fileText(siteId.replace("dsi_", ""), path), size: 1024, truncated: false },
     assignDecoySite: async ({ siteId, nodeIds, panel }: { siteId: string; nodeIds: string[]; panel: boolean }) => {
@@ -241,6 +290,8 @@ function seeded(w: World) {
   c.setQueryData(nodesQuery.queryKey, { nodes: (w.many ? [...demoNodes, ...moreNodes] : demoNodes).map((n) => nodeRow(n, w)), expectedAgentVersion: "0.1.71" } as never);
   if (!w.hang && !w.fail) {
     c.setQueryData(sitesQuery.queryKey, libraryOf(w) as never);
+    c.setQueryData(photosQuery.queryKey, photosAnswer(w.photos) as never);
+    c.setQueryData(templatesQuery.queryKey, templateAnswer as never);
     for (const s of w.sites.slice(0, 12)) {
       const d = detailOf(s, w);
       c.setQueryData(siteQuery(s.id).queryKey, d as never);
@@ -265,7 +316,35 @@ const uploads: Record<string, UploadDemo> = {
   "dlg-up-fmt": { phase: "err", file: { name: "holzofen.rar", size: 412 * kb }, error: { code: "decoy_bundle_bad_archive" } },
   "dlg-up-noindex": { phase: "err", file: { name: "site-backup.tar.gz", size: 880 * kb }, error: { code: "decoy_bundle_no_index" } },
 };
+// ---- the made-up window "From a template": the kinds the panel names, and which made-up look stands for each in the preview
+const templateKinds: [string, string][] = [["status", "Service status page"], ["files", "File transfer (upload page)"], ["login", "Sign-in page"], ["blog", "Personal blog"], ["portfolio", "Photo / illustration portfolio"], ["business", "Small business site"], ["docs", "Project documentation"], ["card", "Personal card page"], ["club", "Club / society / event"], ["project", "Open-source project page"]];
+// the countries the panel builds sites for, and the kinds that have texts in each country's language (the Dutch and the Swedish have two)
+const templateCountries = ["us", "gb", "de", "at", "ch", "ru", "nl", "se"];
+const templateAnswer = {
+  countries: templateCountries,
+  templates: templateKinds.map(([id, nameEn]) => ({ id, nameEn, nameRu: nameEn, countries: id === "files" || id === "login" ? templateCountries : templateCountries.slice(0, 6) })),
+};
+const templateLook: Record<string, string> = { blog: "tpl", business: "bk", portfolio: "ph", card: "wd", club: "boat", status: "bike", docs: "gd" };
+let variant = 0;
+const photosAnswer = (p: PhotosWorld) => ({ hasKey: p.pexels, hasPixabayKey: p.pixabay, source: p.source });
+const templates: Record<string, TemplateDemo> = {
+  "dlg-tpl": { phase: "pick" },
+  "dlg-tpl-nl": { phase: "pick", country: "nl" },
+  "dlg-tpl-wait": { phase: "view", kind: "blog" },
+  "dlg-tpl-view": { phase: "view", kind: "blog", country: "de", html: demoBlog.html, name: demoBlog.name },
+  "dlg-tpl-run": { phase: "run", kind: "blog", html: demoBlog.html, name: demoBlog.name },
+  "dlg-tpl-err": { phase: "err", kind: "blog", html: demoBlog.html, name: demoBlog.name, error: "decoy_library_full" },
+  // the photos of a site: no key (drawn), the key being typed, a site with photos, Pixabay asked to wait, Pexels looked at without a
+  // key (it gives none out now), both keys with Pexels in use
+  "dlg-tpl-nokey": { phase: "view", kind: "blog", html: demoBlog.html, name: demoBlog.name, photos: "no_key", photosSource: "pixabay" },
+  "dlg-tpl-keyform": { phase: "view", kind: "blog", html: demoBlog.html, name: demoBlog.name, photos: "no_key", photosSource: "pixabay", key: { form: true } },
+  "dlg-tpl-photos": { phase: "view", kind: "blog", html: pageDoc("tpl", 0, 0, PHOTO_STUBS), name: "Rainy Reader", photos: "used", photosSource: "pixabay" },
+  "dlg-tpl-limit": { phase: "view", kind: "blog", html: demoBlog.html, name: demoBlog.name, photos: "limit", photosSource: "pixabay" },
+  "dlg-tpl-pexels": { phase: "view", kind: "blog", html: demoBlog.html, name: demoBlog.name, photos: "no_key", photosSource: "pixabay", key: { pick: "pexels" } },
+  "dlg-tpl-both": { phase: "view", kind: "blog", html: pageDoc("tpl", 0, 0, PHOTO_STUBS), name: "Rainy Reader", photos: "used", photosSource: "pexels" },
+};
 const listDemos = (state: string): DecoysDemo | undefined => {
+  if (templates[state]) return { dialog: "tpl", template: templates[state] };
   if (state === "dlg-new") return { dialog: "new" };
   if (state === "dlg-mcp") return { dialog: "mcp" };
   if (uploads[state]) return { dialog: "up", upload: uploads[state] };
@@ -278,7 +357,7 @@ const listDemos = (state: string): DecoysDemo | undefined => {
 };
 
 // ---- the pages of one site
-const siteOf: Record<string, string> = { "site-used": "dsi_bk", "site-ready": "dsi_boat", "site-draft": "dsi_bike", "site-bad": "dsi_arc", "site-builtin": "builtin", "site-dir": "panel_dir", "site-dir-off": "panel_dir" };
+const siteOf: Record<string, string> = { "site-used": "dsi_bk", "site-ready": "dsi_boat", "site-template": "dsi_tpl", "site-draft": "dsi_bike", "site-bad": "dsi_arc", "site-builtin": "builtin", "site-dir": "panel_dir", "site-dir-off": "panel_dir" };
 const siteDemos: Record<string, SiteDemo> = {
   "site-phone": { preview: { width: "ph" } },
   "site-404": { preview: { notFound: true } },
@@ -362,6 +441,39 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "decoys-list-find", state: "list-find", title: "A search that finds a site", w: 1440, h: 1100 },
   { id: "decoys-list-nomatch", state: "list-nomatch", title: "A search that finds nothing", w: 1440, h: 1000 },
   { id: "decoys-dlg-new", state: "dlg-new", title: "Window: new site", w: 1440, h: 900 },
+  { id: "decoys-dlg-tpl", state: "dlg-tpl", title: "Window: from a template, the kinds", w: 1440, h: 900 },
+  { id: "decoys-dlg-tpl-light", state: "dlg-tpl", title: "Window: from a template, the same on the light theme", w: 1440, h: 900, params: "&theme=light" },
+  { id: "decoys-dlg-tpl-rail", state: "dlg-tpl", title: "Window: from a template, a 820 window", w: 820, h: 1000 },
+  { id: "decoys-dlg-tpl-phone", state: "dlg-tpl", title: "Window: from a template, a phone (a sheet)", w: 400, h: 1100 },
+  { id: "decoys-dlg-tpl-fa", state: "dlg-tpl", title: "Window: from a template, right to left (fa)", w: 1440, h: 900, params: "&lang=fa" },
+  { id: "decoys-dlg-tpl-wait", state: "dlg-tpl-wait", title: "Window: from a template, the page is being made", w: 1440, h: 1000 },
+  { id: "decoys-dlg-tpl-view", state: "dlg-tpl-view", title: "Window: from a template, a preview", w: 1440, h: 1100 },
+  { id: "decoys-dlg-tpl-view-light", state: "dlg-tpl-view", title: "Window: from a template, a preview on the light theme", w: 1440, h: 1100, params: "&theme=light" },
+  { id: "decoys-dlg-tpl-view-rail", state: "dlg-tpl-view", title: "Window: from a template, a preview in a 820 window", w: 820, h: 1100 },
+  { id: "decoys-dlg-tpl-view-phone", state: "dlg-tpl-view", title: "Window: from a template, a preview on a phone", w: 400, h: 1100 },
+  { id: "decoys-dlg-tpl-view-fa", state: "dlg-tpl-view", title: "Window: from a template, a preview, right to left (fa)", w: 1440, h: 1100, params: "&lang=fa" },
+  { id: "decoys-dlg-tpl-run", state: "dlg-tpl-run", title: "Window: from a template, the site is being saved", w: 1440, h: 1100 },
+  { id: "decoys-dlg-tpl-err", state: "dlg-tpl-err", title: "Window: from a template, the library is full", w: 1440, h: 1100 },
+  { id: "decoys-dlg-tpl-nokey", state: "dlg-tpl-nokey", title: "Window: from a template, a preview without a photo key", w: 1440, h: 1200 },
+  { id: "decoys-dlg-tpl-nokey-light", state: "dlg-tpl-nokey", title: "Window: from a template, no photo key, the light theme", w: 1440, h: 1200, params: "&theme=light" },
+  { id: "decoys-dlg-tpl-nokey-phone", state: "dlg-tpl-nokey", title: "Window: from a template, no photo key, a phone", w: 400, h: 1300 },
+  { id: "decoys-dlg-tpl-nokey-fa", state: "dlg-tpl-nokey", title: "Window: from a template, no photo key, right to left (fa)", w: 1440, h: 1200, params: "&lang=fa" },
+  { id: "decoys-dlg-tpl-keyform", state: "dlg-tpl-keyform", title: "Window: from a template, the Pixabay key being typed", w: 1440, h: 1300 },
+  { id: "decoys-dlg-tpl-keyform-rail", state: "dlg-tpl-keyform", title: "Window: from a template, the key form in a 820 window", w: 820, h: 1300 },
+  { id: "decoys-dlg-tpl-keyform-phone", state: "dlg-tpl-keyform", title: "Window: from a template, the key form on a phone", w: 400, h: 1400 },
+  { id: "decoys-dlg-tpl-photos", state: "dlg-tpl-photos", title: "Window: from a template, a preview with photos", w: 1440, h: 1200 },
+  { id: "decoys-dlg-tpl-photos-light", state: "dlg-tpl-photos", title: "Window: from a template, with photos, the light theme", w: 1440, h: 1200, params: "&theme=light" },
+  { id: "decoys-dlg-tpl-photos-rail", state: "dlg-tpl-photos", title: "Window: from a template, with photos, a 820 window", w: 820, h: 1200 },
+  { id: "decoys-dlg-tpl-photos-phone", state: "dlg-tpl-photos", title: "Window: from a template, with photos, a phone", w: 400, h: 1300 },
+  { id: "decoys-dlg-tpl-limit", state: "dlg-tpl-limit", title: "Window: from a template, without photos, Pixabay limit", w: 1440, h: 1200 },
+  { id: "decoys-dlg-tpl-limit-fa", state: "dlg-tpl-limit", title: "Window: from a template, Pixabay limit, right to left (fa)", w: 1440, h: 1200, params: "&lang=fa" },
+  { id: "decoys-dlg-tpl-pexels", state: "dlg-tpl-pexels", title: "Window: from a template, Pexels looked at without a key", w: 1440, h: 1200 },
+  { id: "decoys-dlg-tpl-pexels-light", state: "dlg-tpl-pexels", title: "Window: from a template, Pexels without a key, the light theme", w: 1440, h: 1200, params: "&theme=light" },
+  { id: "decoys-dlg-tpl-pexels-phone", state: "dlg-tpl-pexels", title: "Window: from a template, Pexels without a key, a phone", w: 400, h: 1300 },
+  { id: "decoys-dlg-tpl-pexels-fa", state: "dlg-tpl-pexels", title: "Window: from a template, Pexels without a key, right to left (fa)", w: 1440, h: 1200, params: "&lang=fa" },
+  { id: "decoys-dlg-tpl-both", state: "dlg-tpl-both", title: "Window: from a template, both keys, Pexels in use", w: 1440, h: 1200 },
+  { id: "decoys-dlg-tpl-both-light", state: "dlg-tpl-both", title: "Window: from a template, both keys, the light theme", w: 1440, h: 1200, params: "&theme=light" },
+  { id: "decoys-dlg-tpl-both-phone", state: "dlg-tpl-both", title: "Window: from a template, both keys, a phone", w: 400, h: 1300 },
   { id: "decoys-dlg-up", state: "dlg-up", title: "Window: upload an archive", w: 1440, h: 900 },
   { id: "decoys-dlg-up-drag", state: "dlg-up-drag", title: "Window: a file is over the drop zone", w: 1440, h: 900 },
   { id: "decoys-dlg-up-run", state: "dlg-up-run", title: "Window: the upload runs", w: 1440, h: 900 },
@@ -381,6 +493,7 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "decoys-site-used-phone", state: "site-used", title: "A phone, 400 wide (the phone width only)", w: 400, h: 3200 },
   { id: "decoys-site-used-fa", state: "site-used", title: "Right to left (fa)", w: 1440, h: 1700, params: "&lang=fa" },
   { id: "decoys-site-ready", state: "site-ready", title: "A ready site that stands nowhere", w: 1440, h: 1500 },
+  { id: "decoys-site-template", state: "site-template", title: "A site made from a template", w: 1440, h: 1500 },
   { id: "decoys-site-draft", state: "site-draft", title: "A draft", w: 1440, h: 1500 },
   { id: "decoys-site-bad", state: "site-bad", title: "A site that fails a required check", w: 1440, h: 1300 },
   { id: "decoys-site-builtin", state: "site-builtin", title: "The built-in entry", w: 1440, h: 1000 },

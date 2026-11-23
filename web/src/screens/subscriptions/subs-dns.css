@@ -542,6 +542,19 @@
   line-height: 16px;
   color: var(--danger-text);
 }
+.sbp .dq-rule .sb-pad .dq-er {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  color: var(--danger-text);
+}
+.sbp .dq-rule .sb-spl[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.sbp .dq-rule .sb-pad:has(+ .dq-sub) {
+  padding-bottom: 4px;
+}
 .sbp .sb-srv .dq-kd {
   flex: none;
   font-size: 12px;

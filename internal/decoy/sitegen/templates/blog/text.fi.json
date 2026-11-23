@@ -1,0 +1,271 @@
+{
+ "ui": {
+  "nav_label": "Päävalikko",
+  "footer": "Kirjoitettu käsin, julkaistu hitaasti.",
+  "nav_home": "Muistiinpanot",
+  "nav_about": "Tietoa",
+  "home_title": "Muistiinpanot",
+  "nf_title": "Täällä ei ole mitään",
+  "nf_text": "Tässä osoitteessa ei ole muistiinpanoa. Se on voitu nimetä uudelleen tai sitä ei ole koskaan kirjoitettu.",
+  "nf_back": "Takaisin muistiinpanoihin",
+  "latest_h": "Uusimmat muistiinpanot",
+  "read_more": "Lue muistiinpano",
+  "min_read": "min lukuaika",
+  "more_h": "Lisää muistiinpanoja",
+  "back_all": "Kaikki muistiinpanot",
+  "about_h": "Tietoa",
+  "now_h": "Tällä hetkellä",
+  "tags_h": "Aiheet",
+  "by": "Kirjoittanut",
+  "nav_archive": "Arkisto",
+  "desc_archive": "Kaikki muistiinpanot: {brand}, kuukausi kuukaudelta.",
+  "archive_h": "Arkisto",
+  "archive_intro": "Kaikki muistiinpanot tähän asti, uusin ensin, kuukausittain ryhmiteltynä.",
+  "all_posts": "Kaikki muistiinpanot",
+  "newer": "Uudemmat"
+ },
+ "bundles": {
+  "garden": {
+   "tagline": "Muistiinpanoja viljelypalstalta",
+   "desc": "Muistiinpanoja pieneltä viljelypalstalta, {city_in}: mikä kasvoi, mikä ei ja mitä tekisin ensi vuonna toisin.",
+   "desc_about": "Kuka kirjoittaa ja miksi: {brand}.",
+   "intro": "Muistiinpanoja pieneltä viljelypalstalta, {city_in}: mikä kasvoi, mikä ei ja mitä tekisin ensi vuonna toisin.",
+   "about": [
+    "Olen {first}. Olen viljellyt palstaa {city_in} yhdeksän vuotta, enimmäkseen vihanneksia ja muutamaa itsepäistä ruusua.",
+    "Tähän vihkoon kirjoitan ylös, mitä palsta opettaa, enimmäkseen jotta lakkaisin tekemästä samoja virheitä uudessa järjestyksessä.",
+    "Kommentit on suljettu. Jos sinulla on vinkki, kerro se palstanaapurillesi; olen oppinut suurimman osan tiedoistani niin."
+   ],
+   "now": [
+    "Kylvän härkäpapuja suojan alle",
+    "Korjaan vajan ovea taas",
+    "Luen vanhaa puutarhakirjaa"
+   ],
+   "posts": [
+    {
+     "title": "Miksi lopetin kaivamisen",
+     "tag": "Maa",
+     "excerpt": "Kolme kautta ilman lapiota ja se, mitä penkeille tapahtui.",
+     "body": [
+      "Vuosien ajan kaivoin penkit joka syksy, koska niin teki palstan edellinen haltija ja niin sanoivat lapsuuteni kirjat. Kolme kautta sitten lopetin ja peitin penkit paksulla kompostikerroksella.",
+      "Ensimmäinen kevät oli pettymys: maa näytti epäsiistiltä ja etanat olivat ilahtuneita. Toisena vuonna madot olivat tehneet suurimman osan työstä, maa murentui kädessäni, ja käytin penkkeihin lauantain vähemmän joka lokakuu. En sanoisi sitä ihmeeksi, ja muutama rikkaruoho palasi. Mutta selkäni on kiitollinen, ja porkkanat tulivat suorempina kuin kaivamisen aikaan."
+     ]
+    },
+    {
+     "title": "Papuja niille, jotka unohtavat kastella",
+     "tag": "Vihannekset",
+     "excerpt": "Neljä lajiketta, jotka antoivat anteeksi kuivan heinäkuun.",
+     "body": [
+      "Viime heinäkuussa ei satanut yhdeksääntoista päivään, ja olin poissa niistä yksitoista. Kun palasin, salaatit olivat nousseet kukkaan ja kesäkurpitsat näyttivät luovuttaneen. Pavut olivat kuitenkin kunnossa.",
+      "Syväjuuriset ja paksulla katteella suojatut pavut kestävät kuivan kahden viikon jakson paremmin kuin lähes mikään muu, mitä kasvatan. Kylvän ne nykyään pohjoisreunalle, jossa varjo estää maata kuivumasta. Jos olet sitä sorttia, joka suunnittelee kastelevansa päivittäin ja onnistuu kahdesti viikossa, istuta papuja ja pysy rauhallisena."
+     ]
+    },
+    {
+     "title": "Pieni kasvihuone vanhoista ikkunoista",
+     "tag": "Rakentaminen",
+     "excerpt": "Miten naapurin jäteastiasta tuli kasvihuone yhdessä pitkässä viikonlopussa.",
+     "body": [
+      "Naapuri vaihtoi ikkunansa, ja vanhat seisoivat kaksi päivää jäteastiassa. Kysyin, saisinko ne, ja hän pyysi ottamaan astian myös, jos pystyn.",
+      "Rakensin rungon kierrätetystä lautatavarasta suurimman ikkunan mukaan ja sovitin loput sen ympärille. Mikään ei ole suorassa ja ovi jumittaa sateella, mutta se pitää hallan poissa tomaatintaimilta. Koko homma maksoi rasian ruuveja ja pussin kittiä. Ensi kerralla mittaan kahdesti ennen sahaamista, ja tarkoitan sitä."
+     ]
+    },
+    {
+     "title": "Mitä palstalla tehdään huhtikuussa",
+     "tag": "Vuodenajat",
+     "excerpt": "Lyhyt lista kuukaudelle, jolloin kaikki tuntuu mahdolliselta ja maa on vielä kylmää.",
+     "body": [
+      "Huhtikuu huijaa kaikkia. Päivät ovat kirkkaita ja haluaisi kylvää, mutta maa on kylmää ja liian aikaisin kylvetyt siemenet vain mätänevät paikoilleen. Pakotan itseni odottamaan, kunnes maa ei enää tunnu kylmältä käteni selkää vasten.",
+      "Sillä välin on paljon tekemistä: lajittele siemenrasia, pese ruukut, leikkaa ruusut ja laita ensimmäiset perunat valoon idätettäväksi. Nämä työt tuntuvat edistykseltä ilman riskiä. Kuun lopussa sallin itselleni yhden rivin herneitä suojan alle. Se ei ole järkevää, mutta nautin siitä."
+     ]
+    },
+    {
+     "title": "Komposti, rehellisesti",
+     "tag": "Maa",
+     "excerpt": "Mitä kompostiini menee, mitä ei, ja miksi omani ei ole koskaan ajoissa valmis.",
+     "body": [
+      "Kasallani on kolme sääntöä: ei mitään keitettyä, ei mitään sairasta eikä mitään, mistä en ole varma. Ruohosilppu menee ohuina kerroksina, revitty pahvi sen mukana, ja koko kasa käännetään aina, kun muistan.",
+      "Se on hitaampaa kuin kirjat sanovat. Vuosi on rehellisempi kuin pussissa luvatut kuusi viikkoa, ja valmis komposti tuo aina yllätyksiä, kuten perunan, josta olin luopunut. En välitä: kasa, joka ottaa aikansa, on kasa, jolla ei ole pahaa mieltä keittiöjätteistä."
+     ]
+    },
+    {
+     "title": "Etanat, olutpyydykset ja muita tappioita",
+     "tag": "Tuholaiset",
+     "excerpt": "Mikä toimi, mikä ei, ja miksi istutan nykyään vähän ylimääräistä.",
+     "body": [
+      "Olen kokeillut olutpyydyksiä, munankuoria, kuparinauhaa ja taskulampun kanssa ulos lähtemistä pimeällä. Jokainen toimi noin viikon. Parhaiten toimii kasvattaa enemmän kuin tarvitsee ja hyväksyä, että etanat ottavat osansa.",
+      "Todellinen riski ovat taimet, joten aloitan ne sisällä ja vien ne ulos vasta, kun ne ovat tarpeeksi vahvoja kestämään nakerruksen."
+     ]
+    },
+    {
+     "title": "Siementen talteenotto pavuista",
+     "tag": "Siemenet",
+     "excerpt": "Hiukan kärsivällisyyttä lokakuussa antaa ensi vuoden pavut ilmaiseksi.",
+     "body": [
+      "Jätän parhaat palot kasveihin, kunnes ne ovat kuivat ja kolisevat. Sitten kuorin ne keittiön pöydän ääressä, levitän pavut tarjottimelle ja pidän ne viikon lämpimässä.",
+      "Ne menevät paperikuoriin, joiden etupuolelle on kirjoitettu nimi ja vuosi. Muovi hikoilisi, ja minulla on homehtuneet pavut todisteena."
+     ]
+    },
+    {
+     "title": "Lyhyt luettelo vajasta",
+     "tag": "Työkalut",
+     "excerpt": "Yksitoista asiaa, joita käytän, ja hyvin monta, joita en.",
+     "body": [
+      "Lapio, haarukka, kuokka, kaksi istutuslapiota, käsiharava ja oksasakset hoitavat lähes kaiken työn. Muu vaja pitää sisällään säilytyspurkkeja, narua, rikkinäisen kottikärryn ja kokoelman taimilaatikoita.",
+      "Joka kevät lupaan järjestää sen. Joka kevät sataa sinä päivänä, jolle olin suunnitellut sen, ja olen aika iloinen."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Hidas",
+       "Hiljainen",
+       "Rehellinen",
+       "Pieni",
+       "Villi",
+       "Sammaleinen",
+       "Kärsivällinen",
+       "Mutainen",
+       "Vihreä",
+       "Varhainen"
+      ],
+      [
+       "Multa",
+       "Penkit",
+       "Palsta",
+       "Lapio",
+       "Rivit",
+       "Pensas",
+       "Kasvihuone",
+       "Vaja",
+       "Vako",
+       "Vuodenajat"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "kitchen": {
+   "tagline": "Muistiinpanoja pienestä keittiöstä",
+   "desc": "Reseptejä, jotka toimivat, virheitä, jotka opettivat, ja päivällinen {city_in}.",
+   "desc_about": "Kuka kirjoittaa ja miksi: {brand}.",
+   "intro": "Reseptejä, jotka toimivat, virheitä, jotka opettivat jotain, ja se, mitä on päivälliseksi {city_in}.",
+   "about": [
+    "Olen {first}. Laitan ruokaa nelihenkiselle perheelle keittiössä {city_in}, joka on pienempi kuin useimpien kylpyhuone, enkä vaihtaisi sitä.",
+    "Kirjoitan ylös sen, mikä toimi, siinä muodossa kuin oikeasti laitan ruokaa, eli vähemmillä mitoilla ja useammilla adjektiiveilla kuin kunnollisessa reseptissä.",
+    "En ota ruoasta valokuvia. Jos annos näyttää kuvaamisen arvoiselta, olen luultavasti pitänyt sitä odottamassa."
+   ],
+   "now": [
+    "Ruokin uutta hapanjuurta",
+    "Suolaan sitruunoita kevättä varten",
+    "Teen sovintoa uunin luukun kanssa"
+   ],
+   "posts": [
+    {
+     "title": "Leipä, joka antaa anteeksi",
+     "tag": "Leipä",
+     "excerpt": "Jauhoja, vettä, suolaa ja hyvin kärsivällinen sunnuntai-iltapäivä.",
+     "body": [
+      "Tämä on leipä, jonka teen, kun olen unohtanut aikoneeni leipoa. Siinä on lähes ei lainkaan hiivaa, pitkä lepo eikä lainkaan alustusta, eikä se välitä, jos jätät sen tunniksi suunniteltua pidemmäksi aikaa.",
+      "Sekoita jauhot, vesi ja suola illalla, kunnes kuivia kohtia ei ole, peitä kulho ja jätä se pöydälle. Aamulla se on kuplivaa ja tuoksuu hieman oluelta, ja niin pitääkin. Taita sitä muutaman kerran, muotoile kevyesti ja paista kuumassa padassa kansi päällä. Se näyttää epätäydelliseltä ja maistuu paremmalta kuin sen pitäisi."
+     ]
+    },
+    {
+     "title": "Mitä laittaa, kun jääkaappi on lähes tyhjä",
+     "tag": "Arki-illat",
+     "excerpt": "Viisi purkkia, kolme sipulia ja juustonkannikka: päivällinen.",
+     "body": [
+      "Joka torstai avaan jääkaapin ja näen puolikkaan sipulin, lakastuneen purjon ja purkin, jonka avaamista en muista. Ennen se tuntui epäonnistumiselta. Nyt ajattelen sitä viikon yhtenä iltana, jolloin kaapin vuoro tulee.",
+      "Paista sipulit hitaasti, kunnes ne antavat periksi. Lisää mitä papuja tahansa, purkki tomaattia ja lusikallinen jotain happamaa: sinappia, etikkaa, pikkelöityä chiliä. Anna kuplia, kun etsit leivänpalan. Syö juusto raastettuna päälle. Kukaan ei ole koskaan kysynyt, mitä siinä oli, enkä enää kerro."
+     ]
+    },
+    {
+     "title": "Torstain hernekeitto",
+     "tag": "Keitto",
+     "excerpt": "Kuivattuja herneitä, savukinkkua ja yön yli liotus.",
+     "body": [
+      "Torstaina on perinteisesti hernekeittoa, ja olen noudattanut sitä siitä asti kun muistan. Liota herneet edellisenä iltana, keitä ne aamulla pehmeiksi sipulin ja palan savukinkun kanssa ja anna hautua hitaasti.",
+      "Tarjoa sinappia ja ruisleipää. Se ei ole fiksua, ja teen sitä silti joka viikko."
+     ]
+    },
+    {
+     "title": "Säilöntää ilman paniikkia",
+     "tag": "Säilöntä",
+     "excerpt": "Miksi pikapikkeli on keittiön helpoin asia.",
+     "body": [
+      "Ihmisiä hirvittää sana säilöntä, joka kuulostaa steriloinnilta, isoilta kattiloilta ja menetetyltä päivältä. Pikapikkeli vaatii purkin, vedenkeittimen ja noin kymmenen minuuttia.",
+      "Viipaloi mitä vihanneslaatikossa on, pakkaa se puhtaaseen purkkiin ja kaada päälle kuuma etikan, veden, suolan ja vähän sokerin seos. Lisää laakerinlehti, jos sellainen on. Anna olla huomiseen. Ne säilyvät jääkaapissa muutaman viikon ja saavat tavallisen illallisen tuntumaan tarkoitukselliselta."
+     ]
+    },
+    {
+     "title": "Palaneita asioita ja mitä opin",
+     "tag": "Virheet",
+     "excerpt": "Lyhyt luettelo pilalle menneistä päivällisistä ja yksi asia, jonka kukin opetti.",
+     "body": [
+      "Karamelli opetti, ettei sokeri välitä puhelimestani. Risotto opetti, että liemen pitää olla kuumaa. Paahdetut perunat opettivat, että pelti voi olla liian täynnä ja ettei kukaan anna anteeksi kalpeaa perunaa.",
+      "Pahin oli synttärikakku, jonka otin liian aikaisin ulos ja laitoin liian myöhään takaisin. Se painui keskeltä kuin arvokas vanha rakennus, ja söimme sen lusikalla ja vaniljakastikkeella. Pidän listaa siitä, mikä meni pieleen, kaapin oven sisäpuolella. Se on pidempi kuin lista siitä, mikä meni oikein, ja paljon hyödyllisempi."
+     ]
+    },
+    {
+     "title": "Pannu, lusikka ja keskiviikko",
+     "tag": "Arki-illat",
+     "excerpt": "Yksi pannu, kaksikymmentä minuuttia ja hyvin vähän tiskattavaa.",
+     "body": [
+      "Keskiviikkoisin olen väsynyt ja kaikilla on nälkä, joten päivällisen täytyy tulla yhdestä pannusta. Sipulia, purkillinen papuja, vähän savupaprikaa ja jääkaapin vihreitä.",
+      "Lopuksi laitan päälle kananmunan ja kutsun sitä päivälliseksi. Se on pikemminkin tapa kuin resepti, eikä se ole vielä pettänyt."
+     ]
+    },
+    {
+     "title": "Puuro kunnolla",
+     "tag": "Aamiainen",
+     "excerpt": "Kaurahiutaleita, vettä, suolaa ja kymmenen minuuttia poissa lähtemättä.",
+     "body": [
+      "Liota hiutaleet edellisenä iltana, jos muistat. Aamulla lisää vettä ja ripaus suolaa ja sekoita, kun se paksuuntuu, mikä kestää suunnilleen yhtä kauan kuin vedenkeittimen kiehuminen.",
+      "Syön omani lusikallisen kanssa marjahilloa tai muutaman pilkotun omenan kanssa. Ne, jotka lisäävät puuroon sokeria, eivät ole väärässä, mutta heiltä jää jotain pois."
+     ]
+    },
+    {
+     "title": "Jäännösriisi kolmella tavalla",
+     "tag": "Arki-illat",
+     "excerpt": "Paistettuna, kakuksi uunissa tai keittoon sekoitettuna.",
+     "body": [
+      "Kylmä riisi on parempaa paistettavaksi kuin tuore, koska jyvät pysyvät erillään. Kuuma pannu, vähän öljyä, kananmuna ja kevätsipulia riittävät.",
+      "Keittoon sekoitettuna se sakeuttaa liemen, ja juuston kanssa vuokaan painettuna ja uunissa paistettuna siitä tulee jotain suolaisen kakun kaltaista."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Suola",
+       "Voi",
+       "Pelkkä",
+       "Valurauta",
+       "Pieni",
+       "Sunnuntai",
+       "Rehellinen",
+       "Lämmin",
+       "Hidas",
+       "Nopea"
+      ],
+      [
+       "Lusikka",
+       "Pannu",
+       "Muistiinpanot",
+       "Pöytä",
+       "Keittiö",
+       "Taikina",
+       "Kulho",
+       "Kattila",
+       "Uuni",
+       "Illallinen"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

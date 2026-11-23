@@ -534,6 +534,25 @@ describe("the entrance of a window plays once per stage", () => {
   });
 });
 
+describe("a window whose middle scrolls", () => {
+  it("keeps its place through a draw of the same step, not through a new one", () => {
+    const modal = createModal({ onClose: () => {}, refocus: () => {}, label: () => "w" });
+    const body = () => {
+      const section = document.createElement("section");
+      section.append(Object.assign(document.createElement("div"), { className: "a-b" }));
+      return [section];
+    };
+    const middle = () => modal.el.querySelector<HTMLElement>(".a-b")!;
+    modal.sync(true, body(), "key");
+    middle().scrollTop = 120;
+    expect(middle().scrollTop).toBe(120); // jsdom keeps what is set: the test is about the copy that replaces it
+    modal.sync(true, body(), "key");
+    expect(middle().scrollTop).toBe(120);
+    modal.sync(true, body(), "ready:d3:created"); // another step starts at the top
+    expect(middle().scrollTop).toBe(0);
+  });
+});
+
 describe("the windows with the page's real actions", () => {
   const settle = () => new Promise((r) => setTimeout(r, 0));
   const cfg = awgConfig({ node_id: "de1", label: "Германия", country_code: "DE", version: "3.1", conf: "[Interface]\n", vpn_key: "vpn://k", filename: "a.conf", warnings: [] });

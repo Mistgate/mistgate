@@ -18,6 +18,7 @@ import (
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 )
 
 // The channel measure against fake agents: which nodes it picks, the order and the content of the commands on both ends, what is
@@ -39,13 +40,13 @@ func newChannelEnv(t *testing.T, partners map[string]int, nodeCaps ...string) *c
 	x, _ := newL3Env(t) // "nodea" stays unconnected: never a partner
 	e := &channelEnv{x: x, partners: map[string]*agent{}, partnerConns: map[string]*conn{}, partnerAddresses: map[string]string{}}
 	if nodeCaps == nil {
-		nodeCaps = []string{capSpeed, capSpeedChannel}
+		nodeCaps = []string{agentcap.Speed, agentcap.SpeedChannel}
 	}
 	e.node, e.nodeConn = addPortCheckPeer(x, "sender", "provider-b", "DE", nodeCaps...)
 	x.exec(`UPDATE node SET address = '203.0.113.2' WHERE id = ?`, e.node.nodeID)
 	i := 10
 	for name, mbps := range partners {
-		p, c := addPortCheckPeer(x, name, "provider-c", "NL", capSpeed, capSpeedChannel)
+		p, c := addPortCheckPeer(x, name, "provider-c", "NL", agentcap.Speed, agentcap.SpeedChannel)
 		addr := "203.0.113." + strconv.Itoa(i)
 		i++
 		x.exec(`UPDATE node SET address = ?, bandwidth_mbps = ? WHERE id = ?`, addr, mbps, p.nodeID)
@@ -262,14 +263,14 @@ func TestChannelMeasureRefusesWhatCannotRun(t *testing.T) {
 		}
 	})
 	t.Run("an old agent on the node", func(t *testing.T) {
-		e := newChannelEnv(t, map[string]int{"de1": 1000}, capSpeed) // speed/1 only
+		e := newChannelEnv(t, map[string]int{"de1": 1000}, agentcap.Speed) // speed/1 only
 		if p := e.plan(t); p.Error != "agent_too_old" {
 			t.Fatalf("plan = %+v, want agent_too_old", p)
 		}
 	})
 	t.Run("a partner with an old agent is not used", func(t *testing.T) {
 		e := newChannelEnv(t, map[string]int{"de1": 1000})
-		old, _ := addPortCheckPeer(e.x, "old1", "provider-c", "NL", capSpeed)
+		old, _ := addPortCheckPeer(e.x, "old1", "provider-c", "NL", agentcap.Speed)
 		e.x.exec(`UPDATE node SET bandwidth_mbps = 9000, address = '203.0.113.99' WHERE id = ?`, old.nodeID)
 		p := e.plan(t)
 		if p.Error != "" || len(p.Partners) != 1 || p.Partners[0].Name != "de1" {

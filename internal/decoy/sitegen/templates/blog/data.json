@@ -1,0 +1,40 @@
+{
+ "bundles": [
+  {
+   "id": "garden",
+   "photo_q": [
+    "vegetable garden raised beds",
+    "garden tools soil",
+    "seedlings greenhouse"
+   ],
+   "art": "botanical"
+  },
+  {
+   "id": "cycling",
+   "photo_q": [
+    "gravel road bicycle",
+    "bicycle touring countryside",
+    "bicycle saddle bag"
+   ],
+   "art": "topo"
+  },
+  {
+   "id": "kitchen",
+   "photo_q": [
+    "home kitchen cooking",
+    "rustic bread table",
+    "cast iron pan"
+   ],
+   "art": "still"
+  },
+  {
+   "id": "books",
+   "photo_q": [
+    "books reading desk",
+    "bookshelf library",
+    "open book coffee"
+   ],
+   "art": "poster"
+  }
+ ]
+}

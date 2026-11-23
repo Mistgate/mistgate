@@ -32,7 +32,7 @@ import { ShellLayout } from "./shell";
 // iframe, so the window's breakpoints answer to the frame); each frame is a page of its own, for the screenshot script and for the
 // side-by-side with the board:
 //   /dev-kit?only=profile-new-page&state=<state>[&lang=en|ru|zh|fa|tr][&theme=light|dark][&role=owner|helper|readonly][&fx=1]
-// states: t-fast (the first step, the board's default) | t-router (another card chosen) | t-own | t-few (a panel with two protocols)
+// states: t-fast (the first step, the board's default) | t-router (another card chosen) | t-few (a panel with two protocols)
 //   s2-fast | s2-phone | s2-router | s2-router-old | s2-cdn | s2-cdn-empty (the CDN host missing) | s2-tg | s2-tt | s2-own | s2-all (All settings open)
 //   s2-awg-all (and AmneziaWG's own cards) | s2-port-bad | s2-name-empty | s2-name-taken | s2-loading (the preview not here yet)
 //   s3-fast | s3-phone | s3-router | s3-tt | s3-fixed (a domain written under fi3) | s3-self (the other way out taken) | s3-pick (two nodes ticked by hand) |
@@ -121,7 +121,7 @@ const profileRows = [
   { id: "prf_main", name: "Main · 443", protocol: "hysteria2" },
   { id: "prf_site", name: "Site · 443", protocol: "vless" },
 ];
-const group = (gid: string, name: string, color: string, userCount: number, profileIds: string[]) => ({ id: `grp_${gid}`, name, color, profileIds, userCount, happNodes: 4, amneziaNodes: 0, telegramNodes: 0, disabledNodeIds: [] as string[], dnsPresetId: "" });
+const group = (gid: string, name: string, color: string, userCount: number, profileIds: string[]) => ({ id: `grp_${gid}`, name, color, profileIds, userCount, extraUserCount: 0, happNodes: 4, amneziaNodes: 0, telegramNodes: 0, disabledNodeIds: [] as string[], dnsPresetId: "" });
 const groupRows = [group("friends", "friends", "sky", 14, []), group("family", "family", "sand", 9, ["prf_main"])];
 
 const preview = (protocol: string, settingsJson: string) => {
@@ -223,7 +223,6 @@ export const demoOf: Record<string, WizardDemo> = {
   "t-fast": {},
   "t-few": {},
   "t-router": { task: "router" },
-  "t-own": { task: "own" },
   "s2-fast": { step: 2, task: "fast" },
   "s2-phone": { step: 2, task: "phone" },
   "s2-router": { step: 2, task: "router" },
@@ -291,7 +290,6 @@ export const frames: { id: string; state: string; title: string; w: number; h: n
   { id: "t-fast-fa", state: "t-fast", title: "Right to left (fa)", w: 1440, h: 900, params: "&lang=fa" },
   { id: "t-fast-fx", state: "t-fast", title: "With the effects on", w: 1440, h: 900, params: "&fx=1" },
   { id: "t-router", state: "t-router", title: "Step 1: AmneziaWG chosen", w: 1440, h: 900 },
-  { id: "t-own", state: "t-own", title: "Step 1: \"I'll pick the protocol myself\"", w: 1440, h: 900 },
   { id: "t-few", state: "t-few", title: "A panel with two protocols: the tasks of the others are not drawn", w: 1440, h: 900 },
   { id: "s2-fast", state: "s2-fast", title: "Step 2: Hysteria2", w: 1440, h: 900 },
   { id: "s2-fast-light", state: "s2-fast", title: "Step 2, light", w: 1440, h: 900, params: "&theme=light" },

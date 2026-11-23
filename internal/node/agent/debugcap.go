@@ -16,10 +16,6 @@ import (
 // to 15 minutes. The agent raises its log level, keeps the matching records already scrubbed in a bounded buffer, ships them when
 // the time is up or on a stop, and puts the level back. Nothing is written to disk: a restart ends the capture.
 
-// capDebug is listed in Hello.capabilities: the panel sends DebugCapture only to agents that have it.
-const capDebug = "debug/1"
-const capDebug2 = "debug/2"
-
 const (
 	debugMaxRecords  = 20000
 	debugMaxBytes    = 4 << 20

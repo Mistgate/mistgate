@@ -297,6 +297,22 @@ func secretKeyName(name string) bool {
 // ScrubText applies the MCP result scrubbers to untrusted context the assistant sends to a provider.
 func ScrubText(s string) string { return scrub(s) }
 
+var credentialLabel = regexp.MustCompile(`(?i)(^|[^[:alnum:]_])((?:password|passwd|pwd|pass|secret|token|api[\s_-]*key|private[\s_-]*key|key|license(?:[\s_-]*key)?|licence(?:[\s_-]*key)?|пароль|токен|ключ|лицензия))(\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)`)
+
+// HasCredentialLabel reports whether text contains a credential label with a value, such as "password: x".
+func HasCredentialLabel(s string) bool { return credentialLabel.MatchString(s) }
+
+// RedactCredentialLabels replaces the value after each credential label.
+func RedactCredentialLabels(s string) string {
+	return credentialLabel.ReplaceAllString(s, `${1}${2}${3}[removed: looks like a password]`)
+}
+
+// LooksSecret reports whether text must not be stored in a task: the scrubbers would change it, or it has a credential
+// label with a value. The plan of a task and its application both ask this, so they cannot disagree.
+func LooksSecret(s string) bool {
+	return s != "" && (scrub(s) != s || HasCredentialLabel(s))
+}
+
 // ScrubJSON scrubs string values in a JSON result while retaining object order and number text.
 func ScrubJSON(s string) string { return scrubJSON(s) }
 

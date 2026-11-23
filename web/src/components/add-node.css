@@ -15,8 +15,11 @@
   position: relative;
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
+  /* the window never outgrows the screen: the head and the foot of a step stay, the middle scrolls */
+  grid-template-rows: minmax(0, 1fr);
   width: 100%;
-  min-height: 616px;
+  min-height: min(616px, calc(100dvh - 64px));
+  max-height: min(720px, calc(100dvh - 64px));
   margin: 0 auto;
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -118,6 +121,8 @@
 .an-s {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   gap: 20px;
   padding: 24px 16px 20px;
   border-inline-end: 1px solid var(--border);
@@ -251,7 +256,7 @@
 .an-st .now .an-sl b {
   color: var(--text);
 }
-.an-sl .an-sum {
+.an-sl .an-rs {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 12px;
@@ -262,7 +267,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.an-sl .an-sum:empty {
+.an-sl .an-rs:empty {
   display: none;
 }
 .an-n {
@@ -281,6 +286,7 @@
   position: relative;
   display: flex;
   min-width: 0;
+  min-height: 0;
 }
 .an-x {
   position: absolute;
@@ -294,11 +300,13 @@
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  min-height: 0;
   animation: an-in 0.35s var(--e) both;
 }
 .an-h {
-  padding-block: 28px 0;
+  padding-block: 28px 16px;
   padding-inline: 32px 64px;
+  border-bottom: 1px solid transparent;
 }
 .an-e {
   display: block;
@@ -317,14 +325,23 @@
   flex-direction: column;
   gap: 16px;
   flex: 1;
-  padding: 24px 32px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  padding: 8px 32px 24px;
+}
+.an-b > * {
+  flex-shrink: 0;
 }
 .an-a {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 12px;
   padding: 16px 32px;
   border-top: 1px solid var(--border);
+  background: var(--surface);
 }
 .an-a button:disabled {
   opacity: 0.4;
@@ -439,13 +456,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 6px 16px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
+/* the link goes under the tick when both do not fit the row, and never past the edge of the box */
 .an-kf > label {
   flex: 1 1 auto;
-  white-space: nowrap;
+  min-width: 0;
 }
 .an-lk {
   color: var(--text);
@@ -462,54 +481,10 @@
   font-size: 13px;
   color: var(--sec);
 }
-.an-rw {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 168px;
-  align-items: end;
-  gap: 12px;
-}
-.an-ws {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2px;
-  height: 40px;
-  padding: 3px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-}
-.an-ws [role="radio"] {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 100%;
-  padding: 0 8px;
-  border-radius: 8px;
-  font-size: 14px;
-  color: var(--sec);
-  cursor: pointer;
-  transition:
-    background-color 0.15s var(--e),
-    color 0.15s var(--e);
-}
-.an-ws [role="radio"]:hover {
-  color: var(--text);
-}
-.an-ws [role="radio"] svg {
-  color: var(--muted);
-}
-.an-ws [role="radio"][aria-checked="true"] {
-  background: var(--surface-2);
-  color: var(--text);
-}
-.an-ws [role="radio"][aria-checked="true"] svg {
-  color: var(--accent-mark);
-}
 .an-box {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   animation: mg-up 0.3s var(--e) both;
 }
 .an-box p,
@@ -542,10 +517,12 @@
 }
 .an-code.an-cw {
   align-items: flex-start;
+  /* the bottom space is here, not in the clamped line box: padding below a line-clamp lets half of the next line show */
+  padding-block-end: 10px;
 }
 .an-code.an-cw code {
   display: -webkit-box;
-  padding: 6px 0;
+  padding: 6px 0 0;
   white-space: normal;
   word-break: break-all;
   -webkit-line-clamp: 3;
@@ -666,7 +643,7 @@
 .an-pl {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   animation: mg-up 0.35s var(--e) both;
 }
 .an-pl > div,
@@ -1104,7 +1081,7 @@
     min-height: 0;
   }
   .an-h {
-    padding: 8px 16px 0;
+    padding: 8px 16px 16px;
   }
   .an-e {
     margin-bottom: 4px;
@@ -1122,7 +1099,7 @@
     min-height: 0;
     overflow-y: auto;
     scrollbar-width: none;
-    padding: 16px;
+    padding: 8px 16px 16px;
     gap: 14px;
   }
   .an-b::-webkit-scrollbar {
@@ -1138,7 +1115,8 @@
     gap: 8px;
     background: var(--surface);
   }
-  .an-a button {
+  .an-a button,
+  .an-a a {
     flex: 1 1 auto;
     height: 48px;
     border-radius: 12px;
@@ -1194,16 +1172,6 @@
   }
   .an-kh {
     flex-wrap: wrap;
-  }
-  .an-rw {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .an-ws [role="radio"] {
-    gap: 6px;
-    font-size: 13px;
-  }
-  .an-ws [role="radio"] svg {
-    display: none;
   }
   .an-code.an-cw {
     flex-direction: column;
@@ -1273,5 +1241,335 @@
     transform: translateX(-50%);
     border-radius: 2px;
     background: color-mix(in srgb, var(--text) 22%, transparent);
+  }
+}
+
+/* ---- the board's changes of 20 November 2026 (pn.css, the blocks "правки по спеке"): a choice of cards that does not depend on the length
+   of a word, a tick with a line under it, the folded check, the consent that does not scroll */
+
+/* the confirmation of the key: the link is always the second line, under the text of the tick (20 px of the box and 10 of the gap) */
+.an-kf.an-kf2 {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.an-kf.an-kf2 > label {
+  flex: none;
+  white-space: normal;
+}
+.an-kf.an-kf2 .an-lk {
+  margin-inline-start: 30px;
+}
+
+/* the login on a row of its own */
+.an-lg {
+  max-width: 240px;
+}
+
+/* the cards: one grid, the text wraps, the circle of the radio in the corner */
+.an-wc {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.an-wc [role="radio"] {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 2px 8px;
+  align-content: start;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color 0.15s var(--e),
+    background-color 0.15s var(--e);
+}
+.an-wc [role="radio"] > svg {
+  grid-column: 1;
+  grid-row: 1;
+  margin-top: 2px;
+  color: var(--muted);
+  transition: color 0.15s var(--e);
+}
+.an-wc b {
+  grid-column: 2;
+  padding-inline-end: 20px;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.an-wc [role="radio"] > span:last-child {
+  grid-column: 2;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.an-rd {
+  position: absolute;
+  inset-block-start: 12px;
+  inset-inline-end: 12px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--text) 28%, transparent);
+  transition: border-color 0.15s var(--e);
+}
+.an-rd::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--accent-mark);
+  transform: scale(0);
+  transition: transform 0.2s var(--ease-spring);
+}
+.an-wc [role="radio"]:hover {
+  border-color: color-mix(in srgb, var(--text) 20%, transparent);
+  background: var(--step);
+}
+.an-wc [role="radio"][aria-checked="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.an-wc [role="radio"][aria-checked="true"] > svg {
+  color: var(--accent-mark);
+}
+.an-wc [role="radio"][aria-checked="true"] .an-rd {
+  border-color: var(--accent-mark);
+}
+.an-wc [role="radio"][aria-checked="true"] .an-rd::after {
+  transform: scale(1);
+}
+.an-wc [role="radio"]:focus-visible {
+  outline: 2px solid var(--accent-mark);
+  outline-offset: 2px;
+}
+
+/* a tick with a line under its label: what it is is the label, what it means is under it */
+.an-c2 {
+  align-items: flex-start;
+}
+.an-c2 [role="checkbox"] {
+  margin-top: 1px;
+}
+.an-c2t {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.an-c2t b {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 22px;
+}
+.an-c2t b + span {
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.an-box .an-nt {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  margin: 4px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.an-nt svg {
+  margin-top: 1px;
+}
+
+/* the check: one line that says how it went, the rows behind it */
+.an-sum {
+  display: grid;
+  grid-template-columns: 20px auto minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.15s var(--e);
+}
+.an-sum:hover {
+  border-color: color-mix(in srgb, var(--text) 20%, transparent);
+}
+.an-sum:focus-visible {
+  outline: 2px solid var(--accent-mark);
+  outline-offset: 2px;
+}
+.an-sum b {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.an-sum .an-mono {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.an-sum em {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--sec);
+}
+.an-sum .an-cv {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  transition: transform 0.2s var(--e);
+}
+.an-sum.open .an-cv {
+  transform: rotate(180deg);
+}
+.an-sum.open {
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+/* the rows hang from the line: its bottom edge is theirs (the gap of the body and the border of the line) */
+.an-sum.open + .an-fx {
+  margin-top: -17px;
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+.an-sum.warn .an-ck,
+.an-fr.warn .an-ck {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+.an-fr.warn {
+  grid-column: 1 / -1;
+  height: auto;
+  min-height: 40px;
+  padding-block: 10px;
+  row-gap: 2px;
+  color: var(--text);
+}
+.an-fr.warn b {
+  color: var(--warning-text);
+}
+.an-fr small {
+  grid-column: 2 / -1;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+.an-fr.warn + .an-fr,
+.an-fr.warn + .an-fr + .an-fr {
+  border-top: 1px solid var(--border);
+}
+.an-fx:has(.an-fr.warn) .an-fr:nth-child(2) {
+  border-top: 1px solid var(--border);
+}
+
+/* the words about the firewall: a quiet link, and under it what the panel and the agent do */
+.an-fwq {
+  margin: -4px 0 0;
+  font-size: 13px;
+}
+.an-fwq .an-lk {
+  color: var(--sec);
+}
+.an-fwt {
+  margin: -4px 0 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--sec);
+}
+
+/* the groups that get the node */
+.an-gr {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.an-gr button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--sec);
+  cursor: pointer;
+}
+.an-gr button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.an-gr button[aria-pressed="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.an-gd {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--t, var(--muted));
+}
+
+/* the consent stands over the buttons and does not scroll */
+.an-ag {
+  flex: none;
+  padding: 12px 32px;
+  border-top: 1px solid var(--border);
+}
+.an-ag + .an-a {
+  padding-top: 4px;
+  border-top: 0;
+}
+
+@container (max-width: 760px) {
+  .an-wc {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .an-wc [role="radio"] {
+    padding: 10px 12px;
+  }
+  .an-lg {
+    max-width: none;
+  }
+  .an-ag {
+    padding: 10px 16px;
+  }
+  .an-sum {
+    grid-template-columns: 20px minmax(0, 1fr) auto 16px;
+    padding-block: 10px;
+  }
+  .an-sum .an-mono {
+    display: none;
+  }
+  .an-sum b {
+    min-width: 0;
+    white-space: normal;
+  }
+  .an-sum.open + .an-fx {
+    margin-top: -15px;
   }
 }

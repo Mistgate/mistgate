@@ -1,0 +1,102 @@
+{
+ "nav_label": "Ana menü",
+ "toc_h": "Bu sayfada",
+ "nf_title": "Sayfa bulunamadı",
+ "nf_text": "Aradığınız sayfa yok ya da başka bir yere taşınmış.",
+ "nf_back": "Ana sayfaya dön",
+ "months": [
+  "Ocak",
+  "Şubat",
+  "Mart",
+  "Nisan",
+  "Mayıs",
+  "Haziran",
+  "Temmuz",
+  "Ağustos",
+  "Eylül",
+  "Ekim",
+  "Kasım",
+  "Aralık"
+ ],
+ "months_gen": [
+  "Ocak",
+  "Şubat",
+  "Mart",
+  "Nisan",
+  "Mayıs",
+  "Haziran",
+  "Temmuz",
+  "Ağustos",
+  "Eylül",
+  "Ekim",
+  "Kasım",
+  "Aralık"
+ ],
+ "weekdays": [
+  "Pazartesi",
+  "Salı",
+  "Çarşamba",
+  "Perşembe",
+  "Cuma",
+  "Cumartesi",
+  "Pazar"
+ ],
+ "weekdays_short": [
+  "Pzt",
+  "Sal",
+  "Çar",
+  "Per",
+  "Cum",
+  "Cmt",
+  "Paz"
+ ],
+ "am": "öö",
+ "pm": "ös",
+ "closed": "kapalı",
+ "hrs_fmt": "%days%: %time%",
+ "ms": "ms",
+ "units": [
+  "B",
+  "KB",
+  "MB"
+ ],
+ "cf_h": "Bize yazın",
+ "cf_intro": "Bize bir mesaj gönderin, en kısa sürede yanıt verelim.",
+ "cf_name": "Adınız",
+ "cf_email": "E-posta adresiniz",
+ "cf_msg": "Mesajınız",
+ "cf_send": "Mesajı gönder",
+ "cf_busy": "Gönderiliyor…",
+ "cf_empty": "Lütfen önce bir mesaj yazın.",
+ "cf_fail": "Mesaj gönderilemedi. Lütfen daha sonra tekrar deneyin.",
+ "nav_terms": "Kullanım koşulları",
+ "desc_terms": "{brand} için kullanım koşulları.",
+ "terms_h": "Kullanım koşulları",
+ "terms_intro": "{brand} hizmetini kullanmadan önce lütfen bu koşulları okuyun. Koşullar kısadır ve hizmeti ilk kullandığınız andan itibaren geçerlidir.",
+ "terms": [
+  {
+   "h": "Hizmetin kullanımı",
+   "p": "{brand} olduğu gibi sunulur. Hizmeti kullanarak bu koşulları kabul etmiş olursunuz. Kabul etmiyorsanız lütfen hizmeti kullanmayın."
+  },
+  {
+   "h": "Sizin sorumluluğunuz",
+   "p": "Hizmeti yasalara uygun biçimde ve yalnızca kendiniz ya da kurumunuz için kullanın. Giriş bilgilerinizi kimseyle paylaşmayın; bir başkasının elinde olduğundan şüphelenirseniz bize bildirin."
+  },
+  {
+   "h": "İzin verilmeyenler",
+   "p": "Hizmeti bozmaya, aşırı yüklemeye ya da size ait olmayan bölümlere ulaşmaya çalışmayın. Başkalarına zarar veren erişimleri engelleyebiliriz."
+  },
+  {
+   "h": "Erişilebilirlik",
+   "p": "Hizmetin çalışır durumda kalması için emek veriyoruz, ama her zaman erişilebilir olacağını vaat edemeyiz. Bazı bölümlerini değiştirebilir, durdurabilir ya da kaldırabiliriz."
+  },
+  {
+   "h": "Sorumluluk",
+   "p": "Yasaların izin verdiği ölçüde, hizmetin kullanılmasından ya da kullanılamamasından doğan zararlardan sorumlu değiliz."
+  },
+  {
+   "h": "Değişiklikler",
+   "p": "Bu koşulları zaman zaman güncelleyebiliriz. Bir değişiklikten sonra hizmeti kullanmaya devam ederseniz yeni koşulları kabul etmiş sayılırsınız."
+  }
+ ]
+}

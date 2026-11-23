@@ -1,0 +1,435 @@
+{
+ "ui": {
+  "nav_label": "Izvēlne",
+  "footer": "Darbojas brīvprātīgo spēkiem, un ikviens ir gaidīts.",
+  "nav_home": "Sākums",
+  "nav_events": "Programma",
+  "nav_join": "Pievienojies",
+  "nav_news": "Jaunumi",
+  "home_title": "Laipni lūdzam",
+  "desc_events": "Regulārās tikšanās un īpašie pasākumi: {brand}.",
+  "desc_join": "Kā pievienoties, cik tas maksā un ko gaidīt: {brand}.",
+  "desc_news": "Jaunumi un paziņojumi: {brand}.",
+  "nf_title": "Lapa nav atrasta",
+  "nf_text": "Mēs neatradām šo lapu. Iespējams, tā ir noņemta pēc pasākuma, par kuru tā bija.",
+  "nf_back": "Atpakaļ uz sākumlapu",
+  "meet_h": "Kad mēs tiekamies",
+  "when_l": "Kad",
+  "where_l": "Kur",
+  "upcoming_h": "Drīzumā",
+  "latest_h": "Jaunākie jaunumi",
+  "all_events": "Pilna programma",
+  "all_news": "Visi jaunumi",
+  "join_cta": "Kā pievienoties",
+  "events_h": "Programma",
+  "events_intro": "Mūsu regulārās tikšanās un tas, ko esam darījuši šajā sezonā, pa mēnešiem.",
+  "join_h": "Pievienojies",
+  "steps_h": "Kā pievienoties",
+  "faq_h": "Jautājumi",
+  "join_fee": "Biedra nauda ir {fee} gadā, jauniešiem un studentiem ir atlaide. Ja nauda sagādā raizes, pasaki to klusi kasierim, un par to vairs nerunās.",
+  "steps": [
+   "Atnāc uz jebkuru tikšanos un pasveicinies.",
+   "Izmēģini mēnesi, pirms ko izlem.",
+   "Samaksā biedra naudu kasierim, kad vēlies pievienoties."
+  ],
+  "news_h": "Jaunumi",
+  "news_intro": "Valdes paziņojumi un ziņojumi no nesenajām tikšanās reizēm, jaunākie vispirms.",
+  "regular_h": "Regulārās tikšanās",
+  "season_h": "Sezona līdz šim",
+  "find_h": "Kā mūs atrast",
+  "contact_h": "Sazinies ar mums",
+  "phone_l": "Tālrunis"
+ },
+ "bundles": {
+  "chess": {
+   "kicker": "Šaha klubs",
+   "tagline": "Draudzīgs šahs katru ceturtdienas vakaru",
+   "desc": "{brand} tiekas katru ceturtdienas vakaru. Draudzīgas spēles jebkura līmeņa spēlētājiem, no iesācējiem līdz kluba čempionam.",
+   "intro": "Mēs tiekamies katru ceturtdienu, lai spēlētu, analizētu savas partijas un izdzertu pārāk daudz tējas. Gaidīti visi līmeņi, no pirmreizējiem spēlētājiem līdz kluba čempionam.",
+   "when": "Ceturtdienās, {19:30} līdz {22:00}",
+   "where": "Kultūras nama otrā stāva zāle",
+   "events": [
+    {
+     "t": "Kluba vakars",
+     "w": "Katru ceturtdienu, {19:30}",
+     "p": "Brīva spēle, iesācējiem ir mācību galds."
+    },
+    {
+     "t": "Ātrā šaha turnīrs",
+     "w": "Mēneša pirmajā sestdienā, {14:00}",
+     "p": "Septiņas kārtas pa piecpadsmit minūtēm. Dalības maksa ir neliels ziedojums tējas kasei."
+    },
+    {
+     "t": "Iesācēju vakars",
+     "w": "Mēneša otrajā otrdienā, {19:00}",
+     "p": "Apgūsti noteikumus un dažas vienkāršas atklātnes."
+    },
+    {
+     "t": "Simultānspēle",
+     "w": "Reizi sezonā",
+     "p": "Kluba čempions spēlē uzreiz uz divdesmit dēļiem. Atved draugu un plānu."
+    },
+    {
+     "t": "Gada sapulce",
+     "w": "Novembra beigās",
+     "p": "Maltīte, runa un ļoti maza kausa pasniegšana."
+    }
+   ],
+   "news": [
+    {
+     "title": "Sākas jauna sezona",
+     "text": "Rudens sezona sākas nākamnedēļ ar kluba čempionātu. Jauni biedri ir gaidīti jebkurā vakarā."
+    },
+    {
+     "title": "Paldies visiem, kas atnāca uz ātrā šaha turnīru",
+     "text": "Divdesmit seši spēlētāji, četrpadsmit tējas krūzes katrā kārtā un fināls, ko izšķīra pulkstenis."
+    },
+    {
+     "title": "Mums ir jauni dēļi",
+     "text": "Astoņi koka dēļi un figūru komplekti, nopirkti par vasaras izlozes ieņēmumiem."
+    },
+    {
+     "title": "Jauniešu sekcija atsāk darbu",
+     "text": "Bērni no septiņu gadu vecuma ir gaidīti otrdienās pēcpusdienā, pirmajā reizē kopā ar vecāku."
+    }
+   ],
+   "join": [
+    "Esam draudzīgs klubs ar apmēram četrdesmit biedriem no deviņu līdz astoņdesmit četru gadu vecumam. Lielākā daļa no mums nav sevišķi stipri, un mēs ar to esam samierinājušies.",
+    "Tev nav jābūt savam komplektam vai jāzina teorija. Ja proti kustināt figūras, vari spēlēt ceturtdienā."
+   ],
+   "faq": [
+    {
+     "q": "Vai man jābūt stipram?",
+     "a": "Nē. Lielākā daļa biedru nav, un klubs ir organizēts tā, lai ikviens varētu spēlēt pret pretinieku ar līdzīgu spēku."
+    },
+    {
+     "q": "Vai bērni var nākt?",
+     "a": "Jā, otrdienās pēcpusdienā un kopā ar vecāku arī ceturtdienās."
+    },
+    {
+     "q": "Vai jūs spēlējat līgā?",
+     "a": "Mums ir viena komanda novada līgā. Ja gribi spēlēt, pasaki kapteinim."
+    }
+   ],
+   "why": [
+    {
+     "h": "Visi līmeņi",
+     "p": "Iesācēji sēž blakus veterāniem, un tas nevienu netraucē."
+    },
+    {
+     "h": "Katru ceturtdienu",
+     "p": "Nav jāpiesakās. Nāc, kad vari."
+    },
+    {
+     "h": "Dēļi ir mūsu",
+     "p": "Komplekti un pulksteņi ir mūsu, tēja jāuzvāra tev."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Atklāšanas vakars",
+     "p": "Īss stāsts par atklātni, ko visi spēlē un neviens nesaprot."
+    },
+    {
+     "t": "Kluba čempionāts, pirmā kārta",
+     "p": "Pāri pēc izlozes un pirmā kārta, kas nekad nenotiek pēc plāna."
+    },
+    {
+     "t": "Nobeiguma darbnīca",
+     "p": "Ķēniņi, bandinieki un pacietība tos virzīt."
+    },
+    {
+     "t": "Viktorīna un šahs",
+     "p": "Desmit jautājumi par šahu, desmit par visu citu."
+    },
+    {
+     "t": "Ātrā šaha turnīrs",
+     "p": "Septiņas kārtas, katra piecpadsmit minūtes, un daudz tējas."
+    },
+    {
+     "t": "Analīzes vakars",
+     "p": "Izvēlamies partiju no kluba vakara un strīdamies par to."
+    },
+    {
+     "t": "Simultānspēle",
+     "p": "Kluba čempions spēlē pret divdesmit dēļiem uzreiz."
+    },
+    {
+     "t": "Mācību galds jauniešiem",
+     "p": "Mūsu jaunākie biedri māca pieaugušajiem triku vai divus."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Šaha klubs „{city}”",
+       "Šaha biedrība „{city}”",
+       "Šaha pulciņš „{city}”"
+      ]
+     ]
+    }
+   }
+  },
+  "walking": {
+   "kicker": "Pārgājienu grupa",
+   "tagline": "Pārgājieni mežos un gar upi",
+   "desc": "{brand} dodas pārgājienos katru svētdienu mežos un gar upi. Gaidīts ikviens, pieredze nav vajadzīga.",
+   "intro": "Mēs ejam katru svētdienu jebkuros laikapstākļos, lēnākā cilvēka tempā. Atnāc vienreiz un paskaties; lielākā daļa no mums sāka tieši tā.",
+   "when": "Svētdienās, {9:30}",
+   "where": "Vecās stacijas stāvvieta",
+   "events": [
+    {
+     "t": "Svētdienas pārgājiens",
+     "w": "Katru svētdienu, {9:30}",
+     "p": "No astoņiem līdz divpadsmit kilometriem, sliktā laikā apstāšanās kafejnīcā."
+    },
+    {
+     "t": "Īss pārgājiens",
+     "w": "Mēneša pirmajā trešdienā, {10:00}",
+     "p": "Trīs līdz četri kilometri mierīgā tempā, beigās kafija."
+    },
+    {
+     "t": "Brauciens uz nedēļas nogali",
+     "w": "Reizi gadā, pavasarī",
+     "p": "Divas dienas mežos, naktsmītne un ļoti daudz zupas."
+    },
+    {
+     "t": "Kartes lasīšanas vakars",
+     "w": "Reizi sezonā",
+     "p": "Kā lasīt karti un ko darīt, ja karte lasa tevi."
+    },
+    {
+     "t": "Atkritumu vākšana",
+     "w": "Aprīļa pēdējā sestdienā",
+     "p": "Satīrām upes taku un tad atkal pa to izejam, jo varam."
+    }
+   ],
+   "news": [
+    {
+     "title": "Pavasara programma ir klāt",
+     "text": "Divpadsmit pārgājieni no marta līdz jūnijam, tostarp divi jauni maršruti pāri paugurim."
+    },
+    {
+     "title": "Taka pie dzirnavām atkal atvērta",
+     "text": "Pēc gada ilgiem remontdarbiem tilts atkal ir atvērts. Paldies brīvprātīgajiem, kas upurēja savas sestdienas."
+    },
+    {
+     "title": "Meklējam jaunus pārgājienu vadītājus",
+     "text": "Ja zini labu maršrutu un proti lasīt karti, mēs labprāt tevi uzklausīsim."
+    },
+    {
+     "title": "Paldies par zupu",
+     "text": "Brauciens uz nedēļas nogali bija ļoti izdevies, galvenokārt zupas dēļ."
+    }
+   ],
+   "join": [
+    "Esam draudzīga apmēram sešdesmit pārgājēju grupa, no cilvēkiem, kas staigājuši visu mūžu, līdz tiem, kas sāka pagājušajā mēnesī.",
+    "Speciāls aprīkojums nav vajadzīgs. Zābaki, lietusmētelis un kaut kas dzerams ir pilnīgi pietiekami. Ja šaubies, atnāc un pajautā svētdienas rītā."
+   ],
+   "faq": [
+    {
+     "q": "Cik ātri jūs ejat?",
+     "a": "Tās dienas lēnākā cilvēka tempā, kas bieži vien ir pats vadītājs."
+    },
+    {
+     "q": "Vai drīkst ņemt līdzi suni?",
+     "a": "Lielākajā daļā pārgājienu jā, pavadā. Programmā ir norādīts, kuri pārgājieni nav piemēroti."
+    },
+    {
+     "q": "Kas notiek, ja līst?",
+     "a": "Mēs tāpat ejam. Apstāšanās kafejnīcā ir garāka."
+    }
+   ],
+   "why": [
+    {
+     "h": "Dabā",
+     "p": "Maršruti no astoņiem līdz divpadsmit kilometriem, kurus vada cilvēki, kas zina takas."
+    },
+    {
+     "h": "Laba kompānija",
+     "p": "Pastāvīgs pulciņš un nepārtraukta jaunu seju plūsma."
+    },
+    {
+     "h": "Neviens netiek atstāts",
+     "p": "Turamies pie lēnākā pārgājēja tempa."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Pārgājiens gar upi",
+     "p": "Astoņi kilometri pa līdzenu, apstāšanās pie vecās slūžas."
+    },
+    {
+     "t": "Pārgājiens ar skatu",
+     "p": "Desmit kilometri un viens īsts kāpums. Paņem termosu."
+    },
+    {
+     "t": "Kartes lasīšanas vakars",
+     "p": "Koordinātas, augstuma līknes un kompass, kas rāda nepareizi."
+    },
+    {
+     "t": "Īss pārgājiens un pusdienas",
+     "p": "Četri kilometri līdz kafejnīcai ar labu kamīnu."
+    },
+    {
+     "t": "Rudens krāsas",
+     "p": "Meža maršruts, vislabākais no rīta, kad gaisma spīd cauri."
+    },
+    {
+     "t": "Atkritumu vākšana",
+     "p": "Cimdi, maisi un pārsteidzoši daudz tenisa bumbiņu."
+    },
+    {
+     "t": "Vakara pastaiga",
+     "p": "Mierīga stunda krēslā, beigās tēja pie kāda virtuves galda."
+    },
+    {
+     "t": "Nakts pārgājiens",
+     "p": "Lukturīši izslēgti, acis vaļā un saruna par zvaigznēm."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pārgājienu klubs „{city}”",
+       "Pārgājēju biedrība „{city}”",
+       "Pārgājienu grupa „{city}”"
+      ]
+     ]
+    }
+   }
+  },
+  "choir": {
+   "kicker": "Kopienas koris",
+   "tagline": "Dziedam kopā trešdienas vakaros",
+   "desc": "{brand} mēģina trešdienas vakaros. Nav noklausīšanās, nav jāprot lasīt notis, vajag tikai vēlmi dziedāt.",
+   "intro": "Esam koris cilvēkiem, kas mīl dziedāt un negrib tam kārtot noklausīšanos. Mēs mācāmies pēc dzirdes, daudz smejamies un dziedam labāk, nekā mums būtu tiesības.",
+   "when": "Trešdienās, {19:00} līdz {21:00}",
+   "where": "Baznīcas zāle laukuma malā",
+   "events": [
+    {
+     "t": "Iknedēļas mēģinājums",
+     "w": "Katru trešdienu, {19:00}",
+     "p": "Iesildīšanās, jaunas dziesmas un tā, kas vēl joprojām neprotas."
+    },
+    {
+     "t": "Atvērtais vakars",
+     "w": "Septembra pirmajā trešdienā",
+     "p": "Atnāc un padziedi kopā ar mums vienu vakaru, bez saistībām."
+    },
+    {
+     "t": "Ziemas koncerts",
+     "w": "Decembra otrajā sestdienā",
+     "p": "Ziemassvētku dziesmas, tautasdziesmas un viens skaņdarbs, ko neviens negaida."
+    },
+    {
+     "t": "Vasaras koncerts",
+     "w": "Jūnija beigās",
+     "p": "Dziesmu vakars tautas nama dārzā, ja laiks atļaus."
+    },
+    {
+     "t": "Dziedāšanas diena",
+     "w": "Reizi gadā",
+     "p": "Diena ar darbnīcām kopā ar viesdiriģentu, pusdienas iekļautas."
+    }
+   ],
+   "news": [
+    {
+     "title": "Sākas rudens sezona",
+     "text": "Mācāmies tautasdziesmu programmu no trim zemēm un kanonu, kas negrib turēt taktī."
+    },
+    {
+     "title": "Liels paldies pēc vasaras koncerta",
+     "text": "Atnāca deviņdesmit cilvēku, tika apēstas četrdesmit viena kūka un tikai viens pants tika nodziedāts divreiz."
+    },
+    {
+     "title": "Meklējam tenorus",
+     "text": "Soprānu un altu mums ir daudz. Ja proti dziedāt zemu, nāc iepazīties."
+    },
+    {
+     "title": "Ir ieradušās jaunas notis",
+     "text": "Ziemas programmas mapes ir zālē. Lūdzu, atzīmes veic ar zīmuli, nevis pildspalvu."
+    }
+   ],
+   "join": [
+    "Esam apmēram piecdesmit dziedātāju no sešpadsmit līdz astoņdesmit astoņu gadu vecumam. Lielākā daļa no mums nelasa notis un dziesmas gadiem mācījušies pēc dzirdes.",
+    "Atnāc uz jebkuru mēģinājumu un padziedi kopā ar mums. Mēs atradīsim tev krēslu, mapi un kādu, kam blakus stāvēt."
+   ],
+   "faq": [
+    {
+     "q": "Vai jākārto noklausīšanās?",
+     "a": "Nē. Noklausīšanās nav ne tagad, ne vēlāk."
+    },
+    {
+     "q": "Vai jāprot lasīt notis?",
+     "a": "Nē. Mēs mācām pēc dzirdes, notis ir uz papīra tiem, kas tās grib."
+    },
+    {
+     "q": "Ko darīt, ja izlaižu nedēļu?",
+     "a": "Tad tu izlaid nedēļu. Neviens neņems ļaunā, un ieraksti tiek koplietoti tiešsaistē."
+    }
+   ],
+   "why": [
+    {
+     "h": "Bez noklausīšanās",
+     "p": "Ja proti noturēt melodiju dušā, noturēsi to arī šeit."
+    },
+    {
+     "h": "Visas balsis",
+     "p": "Soprāni, alti, tenori, basi un visi, kas nav pārliecināti."
+    },
+    {
+     "h": "Divi koncerti gadā",
+     "p": "Viens ziemā un viens vasarā, ar kūku."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Atvērtais vakars",
+     "p": "Atnāc un nodziedi kanonu vai divus, bez noklausīšanās un bez spiediena."
+    },
+    {
+     "t": "Sākas jauns semestris",
+     "p": "Iesildīšanās, jauns skaņdarbs un daudz jaunumu."
+    },
+    {
+     "t": "Balsu grupu mēģinājums",
+     "p": "Alti un tenori zālē, soprāni un basi virtuvē."
+    },
+    {
+     "t": "Dziedāšanas diena",
+     "p": "Vesela sestdiena ar viesdiriģentu."
+    },
+    {
+     "t": "Koncerts baznīcā",
+     "p": "Divas daļas, izloze un pīrādziņi starpbrīdī."
+    },
+    {
+     "t": "Ziemassvētku dziesmas laukumā",
+     "p": "Auksti pirksti un siltas balsis tirgus laukumā."
+    },
+    {
+     "t": "Mēģinājums ar pianistu",
+     "p": "Pirmā reize, kad skaņdarbs izklausās pēc mūzikas."
+    },
+    {
+     "t": "Kopdziedāšanas vakars",
+     "p": "Dziesmas, ko zina visi, un dažas, ko neatceras neviens."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kopienas koris „{city}”",
+       "Dziedātāji „{city}”",
+       "Balsis „{city}”"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

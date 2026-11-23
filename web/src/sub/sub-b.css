@@ -7,8 +7,10 @@
 /* servers ------------------------------------------------------------------------------------------------------------------ */
 /* a person with no AmneziaVPN keys has no DNS column: three columns */
 .u-tbl.k3 .u-tr { grid-template-columns: minmax(0, 1.3fr) 184px minmax(0, 1fr); }
-.u-name > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.u-name .id { direction: ltr; unicode-bidi: isolate; }
+.u-name .nx { overflow: hidden; }
+.u-name .l1 > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.u-name .id, .u-name .dom { direction: ltr; unicode-bidi: isolate; }
+.u-name .dom { text-align: start; }
 .fl2.nc { background: var(--surface-2); }
 /* a server that does not answer is quiet */
 .u-tr.off .u-name, .u-sr.off .u-name { color: var(--sec); }

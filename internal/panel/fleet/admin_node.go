@@ -20,6 +20,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/agentlink"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/auth"
@@ -249,6 +250,68 @@ func pct(used, total uint64) float32 {
 	return float32(float64(used) * 100 / float64(total))
 }
 
+// nodeMessages is the one way to build the cards of existing nodes: the lookups every card needs are read once for the
+// whole list. A failed read fails the list.
+func (f *Fleet) nodeMessages(ctx context.Context, nodes []store.NodeRow) ([]*adminv1.Node, error) {
+	now := f.now().UTC()
+	protos, err := f.st.FleetNodeProtocols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("node protocols: %w", err)
+	}
+	today, err := f.todayBytesByNode(ctx, now)
+	if err != nil {
+		return nil, fmt.Errorf("traffic today: %w", err)
+	}
+	relayToday, err := f.st.RelayTodayBytesByNode(ctx, todayStart(now))
+	if err != nil {
+		return nil, fmt.Errorf("relay traffic today: %w", err)
+	}
+	enabled, err := f.st.FleetEnabledInbounds(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("node inbounds: %w", err)
+	}
+	liveRows, err := f.liveView(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("node live: %w", err)
+	}
+	live := liveRowsByID(liveRows)
+	panelBundle, _ := f.panelDecoyBundle() // no bundle is a normal state: the card then says the panel has no site
+	healthSummaries := f.healthSummaries(ctx)
+	d6 := f.ipv6Doctors(ctx)
+	shares, err := f.st.NodeShares(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("node shares: %w", err)
+	}
+	out := make([]*adminv1.Node, 0, len(nodes))
+	for _, node := range nodes {
+		out = append(out, f.nodeMsg(ctx, node, protos[node.ID], today[node.ID], relayToday[node.ID], inboundsOf(enabled, node.ID), now, live[node.ID], panelBundle, healthSummaries[node.ID], d6[node.ID], shares[node.ID]))
+	}
+	return out, nil
+}
+
+func (f *Fleet) nodeMessage(ctx context.Context, node store.NodeRow) (*adminv1.Node, error) {
+	rows, err := f.nodeMessages(ctx, []store.NodeRow{node})
+	if err != nil {
+		return nil, err
+	}
+	return rows[0], nil
+}
+
+// nodeCardAfterWrite is the card an RPC answers with once its write is done. The write stands, so a failed read of the
+// card is logged and the card comes without its counters instead of the RPC failing.
+func (f *Fleet) nodeCardAfterWrite(ctx context.Context, n store.NodeRow) *adminv1.Node {
+	card, err := f.nodeMessage(ctx, n)
+	if err == nil {
+		return card
+	}
+	f.log.Warn("read the node card after a write", "code", "node_card_failed", "node", n.ID, "err", err)
+	live, err := f.liveRowsForNode(ctx, n.ID, true)
+	if err != nil {
+		f.log.Warn("read the node live projection after a write", "code", "node_card_failed", "node", n.ID, "err", err)
+	}
+	return f.nodeMsg(ctx, n, nil, 0, 0, nil, f.now().UTC(), live, nil, store.NodeHealthSummary{}, f.ipv6Doctor(ctx, n.ID), f.shareOf(ctx, n.ID))
+}
+
 // nodeMsg builds the Node message. protos, todayBytes, enabled and live are looked up by the caller once per
 // request.
 func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, todayBytes, relayTodayBytes uint64, enabled map[string]string, now time.Time, live store.NodeLiveRow, panelBundle *decoy.Bundle, health store.NodeHealthSummary, d6 store.IPv6Doctor, share store.NodeShare) *adminv1.Node {
@@ -261,9 +324,9 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 		BandwidthMbps: uint32(n.BandwidthMbps), ClientIpv6: n.ClientIPv6, Sharing: shareMsg(n, enabled, share, now),
 	}
 	caps := live.AgentCaps
-	out.TorrentBlockerSupported = store.CapabilityPresent(caps, capTorrentGuard)
-	out.ClientIpv6Supported = store.CapabilityPresent(caps, capClientIPv6)
-	out.UserRateLimitSupported = store.CapabilityPresent(caps, capUserRateLimit)
+	out.TorrentBlockerSupported = store.CapabilityPresent(caps, agentcap.TorrentGuard)
+	out.ClientIpv6Supported = store.CapabilityPresent(caps, agentcap.ClientIPv6)
+	out.UserRateLimitSupported = store.CapabilityPresent(caps, agentcap.UserRateLimit)
 	out.BridgePort = uint32(n.BridgePort)
 	out.BridgePortReason, out.BridgePortProfileId = f.bridgePortReason(ctx, n)
 	out.AwgPrepare = awgPrepareMsg(n, caps, now)
@@ -276,7 +339,7 @@ func (f *Fleet) nodeMsg(ctx context.Context, n store.NodeRow, protos []string, t
 		}
 	}
 	out.Warp = f.warpSummary(ctx, n.ID, live.Connected, now)
-	decoySupported := store.CapabilityPresent(caps, capDecoy)
+	decoySupported := store.CapabilityPresent(caps, agentcap.Decoy)
 	agentMode := n.DecoyAgentMode
 	if agentMode == "" && !decoySupported {
 		agentMode = decoy.ModeBuiltin
@@ -357,7 +420,7 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 		}
 		if spec.Protocol == "vless" && spec.Listen.Network == "tcp" && spec.Listen.Port == 443 {
 			vless443 = true
-			if vlessExternalReality(spec) {
+			if v, _ := plugin.VLESSOf(spec); v.Security == "reality" && !v.TargetSelf() {
 				return "reality_external_target", row.ProfileID
 			}
 		}
@@ -365,7 +428,7 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 	}
 	for _, inbound := range specs {
 		spec := inbound.spec
-		if spec.Protocol == "hysteria2" && hy2SitePort(spec) == 443 {
+		if spec.Protocol == "hysteria2" && plugin.Hy2SitePort(spec) == 443 {
 			if !vless443 {
 				return "", ""
 			}
@@ -389,19 +452,6 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 		}
 	}
 	return "", ""
-}
-
-func vlessExternalReality(spec plugin.InboundSpec) bool {
-	var settings struct {
-		Security string `json:"security"`
-		Reality  struct {
-			Target string `json:"target"`
-		} `json:"reality"`
-	}
-	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
-		return false
-	}
-	return settings.Security == "reality" && settings.Reality.Target != "self"
 }
 
 func fleetUnix(t time.Time) int64 {
@@ -428,44 +478,15 @@ func (f *Fleet) todayBytesByNode(ctx context.Context, now time.Time) (map[string
 
 func (s nodeService) ListNodes(ctx context.Context, req *connect.Request[adminv1.ListNodesRequest]) (*connect.Response[adminv1.ListNodesResponse], error) {
 	f := s.f
-	now := f.now().UTC()
 	nodes, err := f.st.Nodes(ctx, req.Msg.IncludeRetired)
 	if err != nil {
 		return nil, internalErr(f.log.Error, "list nodes", err)
 	}
-	protos, err := f.st.FleetNodeProtocols(ctx)
+	cards, err := f.nodeMessages(ctx, nodes)
 	if err != nil {
-		return nil, internalErr(f.log.Error, "node protocols", err)
+		return nil, internalErr(f.log.Error, "list node cards", err)
 	}
-	today, err := f.todayBytesByNode(ctx, now)
-	if err != nil {
-		return nil, internalErr(f.log.Error, "traffic today", err)
-	}
-	relayToday, err := f.st.RelayTodayBytesByNode(ctx, todayStart(now))
-	if err != nil {
-		return nil, internalErr(f.log.Error, "relay traffic today", err)
-	}
-	enabled, err := f.st.FleetEnabledInbounds(ctx)
-	if err != nil {
-		return nil, internalErr(f.log.Error, "node inbounds", err)
-	}
-	liveRows, err := f.liveView(ctx)
-	if err != nil {
-		return nil, internalErr(f.log.Error, "node live", err)
-	}
-	live := liveRowsByID(liveRows)
-	panelBundle, _ := f.panelDecoyBundle()
-	healthSummaries := f.healthSummaries(ctx)
-	d6 := f.ipv6Doctors(ctx)
-	shares, err := f.st.NodeShares(ctx)
-	if err != nil {
-		return nil, internalErr(f.log.Error, "node shares", err)
-	}
-	resp := &adminv1.ListNodesResponse{ExpectedAgentVersion: f.cfg.ExpectedAgentVersion}
-	for _, n := range nodes {
-		resp.Nodes = append(resp.Nodes, f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], relayToday[n.ID], inboundsOf(enabled, n.ID), now, live[n.ID], panelBundle, healthSummaries[n.ID], d6[n.ID], shares[n.ID]))
-	}
-	return connect.NewResponse(resp), nil
+	return connect.NewResponse(&adminv1.ListNodesResponse{Nodes: cards, ExpectedAgentVersion: f.cfg.ExpectedAgentVersion}), nil
 }
 
 func (s nodeService) GetNode(ctx context.Context, req *connect.Request[adminv1.GetNodeRequest]) (*connect.Response[adminv1.GetNodeResponse], error) {
@@ -696,7 +717,7 @@ func (f *Fleet) inboundMsg(n store.NodeRow, row store.FleetInboundRow) *adminv1.
 	}
 	if spec, err := f.buildSpec(n, row); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
-		out.Cdn = protocols.ServerCDN(spec)
+		out.Cdn = plugin.ServerCDN(spec)
 		out.RealityTarget = plugin.RealityTargetShown(spec)
 	}
 	return out
@@ -1034,7 +1055,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			if err != nil {
 				return nil, internalErr(f.log.Error, "update node", err)
 			}
-			if !store.CapabilityPresent(cur.AgentCaps, capTorrentGuard) {
+			if !store.CapabilityPresent(cur.AgentCaps, agentcap.TorrentGuard) {
 				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 			}
 		}
@@ -1053,7 +1074,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			if err != nil {
 				return nil, internalErr(f.log.Error, "update node", err)
 			}
-			if !store.CapabilityPresent(cur.AgentCaps, capClientIPv6) {
+			if !store.CapabilityPresent(cur.AgentCaps, agentcap.ClientIPv6) {
 				return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 			}
 		}
@@ -1098,10 +1119,6 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 			}
 		}
 	}
-	live, err := f.liveRowsForNode(ctx, m.NodeId, true)
-	if err != nil {
-		return nil, internalErr(f.log.Error, "read node live projection", err)
-	}
 	n, err := f.st.UpdateNode(ctx, m.NodeId, p)
 	switch {
 	case errors.Is(err, store.ErrConflict):
@@ -1118,13 +1135,7 @@ func (s nodeService) UpdateNode(ctx context.Context, req *connect.Request[adminv
 	}
 	f.audit(ctx, "node.update", nodeUpdateAudit(n, m))
 	f.StateChanged() // address, DNS, timeouts and node settings feed the desired state
-	now := f.now().UTC()
-	protos, _ := f.st.FleetNodeProtocols(ctx)
-	today, _ := f.todayBytesByNode(ctx, now)
-	relayToday, _ := f.st.RelayTodayBytesByNode(ctx, todayStart(now))
-	enabled, _ := f.st.FleetEnabledInbounds(ctx)
-	panelBundle, _ := f.panelDecoyBundle()
-	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeMsg(ctx, n, protos[n.ID], today[n.ID], relayToday[n.ID], inboundsOf(enabled, n.ID), now, live, panelBundle, f.healthSummaries(ctx)[n.ID], f.ipv6Doctor(ctx, n.ID), f.shareOf(ctx, n.ID))}), nil
+	return connect.NewResponse(&adminv1.UpdateNodeResponse{Node: f.nodeCardAfterWrite(ctx, n)}), nil
 }
 
 // nodeUpdateAudit is the audit record of an UpdateNode: the names of the fields the request carried and, for the

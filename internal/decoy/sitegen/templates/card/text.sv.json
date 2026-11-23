@@ -1,0 +1,195 @@
+{
+ "ui": {
+  "nav_label": "Huvudmeny",
+  "footer": "Gjort för hand. Inga kakor, ingen spårning.",
+  "nav_home": "Kortet",
+  "nav_about": "Om mig",
+  "nav_projects": "Projekt",
+  "nav_now": "Nu",
+  "home_title": "Hej",
+  "desc_about": "Mer om {brand}.",
+  "desc_projects": "Utvalda projekt av {brand}.",
+  "desc_now": "Vad {brand} gör just nu.",
+  "nf_title": "Här finns inget",
+  "nf_text": "Det finns ingen sida på den här adressen. Prova kortet på startsidan.",
+  "nf_back": "Tillbaka till kortet",
+  "link_d": [
+   "Vem jag är och hur jag arbetar",
+   "Några saker jag har gjort",
+   "Vad jag gör just nu"
+  ],
+  "about_h": "Om mig",
+  "facts_h": "I korthet",
+  "projects_h": "Projekt",
+  "projects_intro": "Några saker jag är glad över att ha gjort, de nyaste först.",
+  "now_h": "Nu",
+  "updated": "Uppdaterad i {upd} 2026",
+  "now_intro": "Det här är en nu-sida: vad jag håller på med just nu, till skillnad från vad jag en gång sa att jag skulle göra.",
+  "hello": "Hej, jag heter",
+  "vars": {
+   "brand": "{name}",
+   "month": [
+    "januari",
+    "mars",
+    "maj",
+    "september"
+   ],
+   "upd": [
+    "augusti",
+    "september",
+    "oktober",
+    "november"
+   ]
+  }
+ },
+ "bundles": {
+  "illustrator": {
+   "role": "Illustratör och grafiker",
+   "tagline": "Bilder till böcker, affischer och ett och annat födelsedagskort.",
+   "desc": "{brand}: illustratör och grafiker i {city}. Bilderböcker, affischer och linoleumsnitt.",
+   "bio": "Jag ritar bilder till bilderböcker och affischer, och skär linoleumsnitt åt den som frågar snällt.",
+   "about": [
+    "Jag försörjer mig på att rita, mest till bilderböcker och en och annan affisch. Jag arbetar i ett litet rum i {city} med fönster mot en parkering, som jag ritar som om den vore en sjö.",
+    "Innan jag blev illustratör läste jag textiltryck, och vanan att tänka i lager har aldrig riktigt släppt. De flesta av mina bilder byggs upp av tre eller fyra platta färger."
+   ],
+   "facts": [
+    "Bor i {city}",
+    "Arbetar med penna, bläck och linoleumsnitt",
+    "Tar emot nya uppdrag från {month}"
+   ],
+   "projects": [
+    {
+     "t": "Fältanteckningar",
+     "y": "2025",
+     "d": "En bilderbok om ett år på en liten äng, gjord tillsammans med ett lokalt förlag."
+    },
+    {
+     "t": "Marknadsserien",
+     "y": "2024",
+     "d": "Tolv linoleumsnitt av stånd, kunder och en mycket självbelåten duva."
+    },
+    {
+     "t": "Födelsedagskort till en bokhandel",
+     "y": "2023",
+     "d": "Sex kort, handtryckta i upplagor på tvåhundra."
+    }
+   ],
+   "now": [
+    "Gör klart de sista uppslagen i en bilderbok om väder",
+    "Lär mig skära ett linoleumsnitt i fyra färger utan att tappa humöret",
+    "Letar efter en större press"
+   ]
+  },
+  "translator": {
+   "role": "Översättare, tyska till svenska",
+   "tagline": "Noggranna översättningar av skönlitteratur, essäer och ibland en bruksanvisning.",
+   "desc": "{brand}: översättare från tyska till svenska, arbetar från {city} med skönlitteratur och essäer.",
+   "bio": "Jag översätter från tyska till svenska, mest skönlitteratur och essäer, och läser allt högt två gånger.",
+   "about": [
+    "Jag översätter från tyska till svenska, mest skönlitteratur och essäer, och ibland bruksanvisningen till en pryl som förtjänar bättre text.",
+    "Jag arbetar långsamt, läser allt högt två gånger och skickar med en anteckning om varje mening jag inte kunde bestämma mig för. Redaktörer säger att det är antingen charmigt eller outhärdligt."
+   ],
+   "facts": [
+    "Bor i {city}",
+    "Översätter från tyska till svenska",
+    "Öppen för nya uppdrag från {month}"
+   ],
+   "projects": [
+    {
+     "t": "En roman om en fyrvaktare",
+     "y": "2025",
+     "d": "Fyrahundra sidor väder och ånger, översatta under fjorton månader."
+    },
+    {
+     "t": "Essäer om att gå",
+     "y": "2024",
+     "d": "En samling korta texter av en författare som gick överallt till fots."
+    },
+    {
+     "t": "En museikatalog",
+     "y": "2023",
+     "d": "Texter till en utställning om textil, med fler adjektiv än jag själv hade valt."
+    }
+   ],
+   "now": [
+    "Går igenom översättningen av en lång roman",
+    "Läser essäer som jag kanske föreslår för ett förlag",
+    "Uppdaterar min ordlista över sjöfartstermer"
+   ]
+  },
+  "potter": {
+   "role": "Keramiker",
+   "tagline": "Enkla skålar, muggar och tallrikar, gjorda i små omgångar.",
+   "desc": "{brand}: keramiker i {city}. Bruksgods i stengods, drejat för hand.",
+   "bio": "Jag drejar enkelt stengods och bränner det i små omgångar.",
+   "about": [
+    "Jag gör bruksgods i en ateljé som jag delar med tre andra keramiker i {city}. Allt är drejat och bränt till stengods.",
+    "Jag gillar krukor som försvinner i vardagen: en mugg som passar i handen, en skål som inte välter. Glasyrerna är mest järn och aska, och de ändras lite vid varje bränning."
+   ],
+   "facts": [
+    "Bor i {city}",
+    "Drejar stengods",
+    "Nya krukor oftast från {month}"
+   ],
+   "projects": [
+    {
+     "t": "Vardagsservis",
+     "y": "2025",
+     "d": "Tallrikar, skålar och muggar i en havregrynsfärgad glasyr som aldrig blev likadan två gånger."
+    },
+    {
+     "t": "Tekoppar",
+     "y": "2024",
+     "d": "Trettio små skålar, alla lite olika, gjorda för ett tehus."
+    },
+    {
+     "t": "Ett kakeluppdrag",
+     "y": "2023",
+     "d": "En vägg av handpressade kakelplattor till ett kök, i fyra gröna nyanser."
+    }
+   ],
+   "now": [
+    "Testar en askglasyr gjord på en grannes brasa",
+    "Drejar större tallrikar",
+    "Gör plats på ugnshyllorna för vinterns beställningar"
+   ]
+  },
+  "developer": {
+   "role": "Programutvecklare, små verktyg",
+   "tagline": "Små, lugna program som gör en sak och inte är i vägen.",
+   "desc": "{brand}: utvecklare av små verktyg i {city}. En anteckningsapp, en kalender och några program för kommandoraden.",
+   "bio": "Jag skriver små verktyg för dem som arbetar med ord och siffror, och försöker leverera dem färdiga.",
+   "about": [
+    "Jag skriver små verktyg för dem som arbetar med ord och siffror: en anteckningsapp, några program för kommandoraden, en kalender som bara visar det som gäller i dag.",
+    "Jag bygger långsamt och försöker leverera färdigt. Det mesta jag gör har färre funktioner än det kunde ha, och det är med flit."
+   ],
+   "facts": [
+    "Bor i {city}",
+    "Skriver i några tråkiga programmeringsspråk",
+    "Tillgänglig för små projekt från {month}"
+   ],
+   "projects": [
+    {
+     "t": "En anteckningsapp för datorn",
+     "y": "2025",
+     "d": "Vanliga textfiler, snabb sökning och inget konto."
+    },
+    {
+     "t": "En kalender för en dag",
+     "y": "2024",
+     "d": "Visar i dag och inget annat, vilket visar sig räcka."
+    },
+    {
+     "t": "En tidrapportering",
+     "y": "2023",
+     "d": "En knapp och en veckosammanfattning, för dem som ogillar tidrapporter."
+    }
+   ],
+   "now": [
+    "Städar koden i anteckningsappen",
+    "Skriver en kort manual",
+    "Funderar på en mindre version av allt"
+   ]
+  }
+ }
+}

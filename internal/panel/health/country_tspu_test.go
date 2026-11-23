@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -336,7 +337,7 @@ func TestCountryAlertHeldWhileTheNodeIsOffline(t *testing.T) {
 	c.putTSPU("de1", "blocked", blocked)
 	c.evaluate()
 	mustHave(t, c, "country_blocked/de1/", true)
-	c.fl.set("de1", liveState{up: false, caps: []string{capDoctor}, lastSeen: c.clock.Now()})
+	c.fl.set("de1", liveState{up: false, caps: []string{agentcap.Doctor}, lastSeen: c.clock.Now()})
 	c.clock.Advance(2 * time.Hour)
 	c.putTSPU("de1", "open", tport{Port: 443, Verdict: "open"})
 	c.clock.Advance(2 * time.Hour)

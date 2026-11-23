@@ -393,6 +393,7 @@ func reservePort(t *testing.T) uint16 {
 	t.Helper()
 	// The h3 inbound binds the same number on UDP, and a number free on TCP may be taken or reserved there (Windows keeps
 	// excluded UDP ranges), so the port is one that both protocols give out.
+	var last error
 	for range 50 {
 		listener, err := net.Listen("tcp", "127.0.0.1:0")
 		if err != nil {
@@ -402,12 +403,13 @@ func reservePort(t *testing.T) uint16 {
 		udp, err := net.ListenPacket("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 		_ = listener.Close()
 		if err != nil {
+			last = err
 			continue
 		}
 		_ = udp.Close()
 		return uint16(port)
 	}
-	t.Fatal("no port free on both TCP and UDP")
+	t.Fatalf("no port free on both TCP and UDP in 50 tries, last UDP error: %v", last)
 	return 0
 }
 

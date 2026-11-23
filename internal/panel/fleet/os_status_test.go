@@ -8,6 +8,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -20,11 +21,11 @@ func TestOsStatusSettingNeedsCapabilityAndPreservesOldSignature(t *testing.T) {
 	if got := settingsSig(old); got != "10 20 45 30 []DE" {
 		t.Fatalf("legacy settings signature = %q", got)
 	}
-	without := nodeSettingsFor(n, []string{capOSStatus}, false)
+	without := nodeSettingsFor(n, []string{agentcap.OSStatus}, false)
 	if without.GetOsStatus() || settingsSig(without) != settingsSig(old) {
 		t.Fatalf("old panel settings changed: %+v, signature %q", without, settingsSig(without))
 	}
-	with := nodeSettingsFor(n, []string{capOSStatus}, true)
+	with := nodeSettingsFor(n, []string{agentcap.OSStatus}, true)
 	if !with.GetOsStatus() || settingsSig(with) == settingsSig(old) {
 		t.Fatalf("capable and requested settings = %+v, signature %q", with, settingsSig(with))
 	}
@@ -214,7 +215,7 @@ func TestUpdateOsFrameNeedsTheWriteCapability(t *testing.T) {
 	if capability, message := requestCapability(frame, false); capability != "os-update/1" || message != "agent too old" {
 		t.Fatalf("capability = %q %q", capability, message)
 	}
-	if capability, _ := requestCapability(frame, false); capability == capOSStatus {
+	if capability, _ := requestCapability(frame, false); capability == agentcap.OSStatus {
 		t.Fatal("the read-only capability must not allow the write command")
 	}
 	if requestKind(frame) != PendingCommand {

@@ -10,6 +10,7 @@ import type { AmneziaData, AppEntry, AwgDevice, AwgProfile, Device, DnsInfo, Dns
 //   states   ?case=return | first | soon | quota (quota-plain: no reset day) | expired | disabled | plain
 //   pieces   first (announcement) | long | nosupport | noqr | keys-only | happ | both        lists  servers-2 | -11 | -30;  dev-0 | -3 | -16 | -20 | -nolimit &tab=devices[&more=1]
 //   tabs     &tab=telegram|trusttunnel (cases telegram, trusttunnel, and -soon for none yet) [&proxy=2]
+//   key window  case=key-one | key-pair | key-many  &sheet=key|made [&profile=p20w] [&list=1]   (one profile; a profile of each version; several of one version)
 //   windows  &sheet=pick|link|conn|key|full|made   &key=d3[&country=1]   &renew=d3 (stale)   &menu=d3|l1   &rename=d3   &ask=remove:d3|rotate:d3   &stale=d3
 //            &dns=de1|link [&dnsall=0|1] [&dnsdone=1 [&dnsskip=nl1]]   (cases dns-both, dns-link, stale-dns)       password: case=locked[&lockerr=wrong|short|latin|later|net]
 //   all      &lang=en|ru|zh|fa|tr  &theme=light|dark  &as=ios|android|windows|macos|linux
@@ -114,6 +115,7 @@ const fra: ServerEntry = {
   country_code: "DE",
   place: "Франкфурт",
   label: "Германия · Франкфурт",
+  host: "fra1.example.com",
   app_names: ["DE · Hysteria2", "DE · Hysteria2 WARP"],
   connections: [
     { way: "link", exit: "direct", app_name: "DE · Hysteria2", profile_id: "" },
@@ -129,6 +131,7 @@ const ams: ServerEntry = {
   country_code: "NL",
   place: "",
   label: "Нидерланды",
+  host: "ams1.example.com",
   app_names: ["NL · Hysteria2"],
   connections: [
     { way: "link", exit: "direct", app_name: "NL · Hysteria2", profile_id: "" },
@@ -138,9 +141,9 @@ const ams: ServerEntry = {
   load: "medium",
   dns: dnsOf("dns_standard", ["dns_standard", "dns_family", "dns_adblock"]),
 };
-const hel: ServerEntry = { id: "nod_hel", country_code: "FI", place: "", label: "Финляндия", app_names: ["FI · Hysteria2"], connections: [{ way: "link", exit: "direct", app_name: "FI · Hysteria2", profile_id: "" }], online: false, load: null, dns: null };
-const ber: ServerEntry = { id: "nod_ber", country_code: "DE", place: "Берлин", label: "Германия · Берлин", app_names: ["DE · Hysteria2 2"], connections: [{ way: "link", exit: "direct", app_name: "DE · Hysteria2 2", profile_id: "" }], online: true, load: null, dns: dnsOf("dns_adblock", ["dns_adblock", "dns_standard"]) };
-const mow: ServerEntry = { id: "nod_mow", country_code: "RU", place: "Москва", label: "Россия · Москва", app_names: [], connections: [{ way: "key", exit: "direct", app_name: "", profile_id: "p31" }], online: true, load: "medium", dns: dnsOf("dns_yandex", ["dns_yandex"]) };
+const hel: ServerEntry = { id: "nod_hel", country_code: "FI", place: "", label: "Финляндия", host: "hel1.example.com", app_names: ["FI · Hysteria2"], connections: [{ way: "link", exit: "direct", app_name: "FI · Hysteria2", profile_id: "" }], online: false, load: null, dns: null };
+const ber: ServerEntry = { id: "nod_ber", country_code: "DE", place: "Берлин", label: "Германия · Берлин", host: "ber1.example.com", app_names: ["DE · Hysteria2 2"], connections: [{ way: "link", exit: "direct", app_name: "DE · Hysteria2 2", profile_id: "" }], online: true, load: null, dns: dnsOf("dns_adblock", ["dns_adblock", "dns_standard"]) };
+const mow: ServerEntry = { id: "nod_mow", country_code: "RU", place: "Москва", label: "Россия · Москва", host: "msk1.example.com", app_names: [], connections: [{ way: "key", exit: "direct", app_name: "", profile_id: "p31" }], online: true, load: "medium", dns: dnsOf("dns_yandex", ["dns_yandex"]) };
 const dnsOn: DnsInfo = { enabled: true, endpoint: "dev:", refresh_hours: 12, link: { effective: "dns_adblock", choice: "", default: "dns_adblock", options: [] } };
 
 /**
@@ -376,6 +379,7 @@ const de1: ServerEntry = {
   country_code: "DE",
   place: "",
   label: "Германия",
+  host: "de1.example.com",
   app_names: ["DE · Hysteria2", "DE · Hysteria2 WARP"],
   connections: [
     { way: "link", exit: "direct", app_name: "DE · Hysteria2", profile_id: "" },
@@ -391,6 +395,7 @@ const nl1: ServerEntry = {
   country_code: "NL",
   place: "",
   label: "Нидерланды",
+  host: "nl1.example.com",
   app_names: ["NL · Hysteria2"],
   connections: [
     { way: "link", exit: "direct", app_name: "NL · Hysteria2", profile_id: "" },
@@ -439,6 +444,76 @@ const de1Awg: ServerEntry = {
 };
 cases["awg-relay"] = { ...dnsBoth, servers: [de1Awg, nl1], dns: linkDns(offered) };
 
+// ---- the window "New device → key", by what the owner made: one profile, one of each version, several of a kind ----
+// Eleven servers (the second of a country is "DE-2", a place stands for the number, two have an address and no name); the keys of a
+// profile hold the servers it lists. Open: ?case=key-one | key-pair | key-many &sheet=key (the form), &sheet=made (the key just made,
+// dev-api.ts gives it one config a server of the profile). Phone: width 390; tablet: 820.
+const countryRu: Record<string, string> = { by: "Беларусь", de: "Германия", ee: "Эстония", nl: "Нидерланды", pl: "Польша", ro: "Румыния", ru: "Россия" };
+// [country, its number among twins (0: alone), place, host, how the link reaches it, whether its keys have a DNS of their own]
+const landSpecs: [string, number, string, string, "ru" | "warp" | "", boolean][] = [
+  ["by", 0, "", "by1.example.com", "ru", true],
+  ["de", 1, "", "de1.example.com", "warp", true],
+  ["de", 2, "", "de2.example.com", "warp", true],
+  ["de", 3, "", "203.0.113.24", "", false],
+  ["ee", 1, "", "est1.example.com", "ru", true],
+  ["ee", 2, "", "est2.example.com", "ru", false],
+  ["nl", 0, "", "nl1.example.com", "warp", true],
+  ["pl", 0, "", "pl1.example.com", "ru", true],
+  ["ro", 0, "Бухарест", "ro1.example.com", "warp", true],
+  ["ru", 1, "", "msk1.example.com", "", true],
+  ["ru", 2, "", "203.0.113.41", "", false],
+];
+/** The ids of the made-up servers of two countries are spelled out ("est1", "rus2"), so that none reads as the name of a real node. */
+const pre: Record<string, string> = { ee: "est", ru: "rus" };
+/** The eleven servers; `on[slug]` lists the profiles whose key holds a server ("de1", "ro1": the country and its number). */
+const keyLands = (on: Record<string, string[]>): ServerEntry[] =>
+  landSpecs.map(([cc, n, place, host, route, ownDns]) => {
+    const slug = `${pre[cc] ?? cc}${n || 1}`;
+    const name = `${cc.toUpperCase()} · Hysteria2${n > 1 ? ` ${n}` : ""}`;
+    return {
+      id: `nod_${slug}`,
+      country_code: cc.toUpperCase(),
+      place,
+      label: place ? `${countryRu[cc]} · ${place}` : countryRu[cc] + (n > 1 ? ` ${n}` : ""),
+      host,
+      app_names: [name],
+      connections: [
+        { way: "link", exit: route === "warp" ? "warp" : "direct", app_name: name, profile_id: "", ...(route === "ru" ? { relay: true, via: "RU" } : {}) },
+        ...(on[slug] ?? []).map((profile_id) => ({ way: "key" as const, exit: "direct" as const, app_name: "", profile_id })),
+      ],
+      online: true,
+      load: "low",
+      dns: ownDns ? dnsOf("dns_standard", ["dns_standard", "dns_family"]) : null,
+    };
+  });
+const slugs = landSpecs.map(([cc, n]) => `${pre[cc] ?? cc}${n || 1}`);
+/** Every server but the last (it has no key). */
+const allBut = (...ps: string[]) => (slug: string) => (slug === "rus2" ? [] : ps);
+const onProfiles = (f: (slug: string) => string[]) => Object.fromEntries(slugs.map((x) => [x, f(x)]));
+const profile = (id: string, name: string, version: "3.1" | "2.0", egress: AwgProfile["egress"] = "direct"): AwgProfile => ({ id, name, version, egress, countries: [] });
+const keyCase = (profiles: AwgProfile[], servers: ServerEntry[]): MgData => ({
+  ...base,
+  user: withUser({ device_limit: 8, devices_used: 0 }),
+  devices: [],
+  servers,
+  server_count: servers.length,
+  server_loads: [],
+  amnezia: amz([], { profiles: profiles.map((p) => ({ ...p, countries: [...new Set(servers.filter((x) => x.connections.some((c) => c.profile_id === p.id)).map((x) => x.country_code))] })) }),
+});
+const forKey = (all: ServerEntry[]) => all.filter((x) => x.connections.some((c) => c.way === "key"));
+// one profile on one server: no choice, one card
+cases["key-one"] = keyCase([profile("p31", "AWG 3.1", "3.1")], forKey(keyLands(onProfiles((s) => (s === "est1" ? ["p31"] : [])))));
+// one profile of each version: the usual good case
+cases["key-pair"] = keyCase(
+  [profile("p31", "AWG 3.1", "3.1"), profile("p20", "AWG 2.0", "2.0")],
+  forKey(keyLands(onProfiles((s) => [...(["de1", "est1", "nl1", "ro1"].includes(s) ? ["p31"] : []), ...(["de1", "nl1", "ro1"].includes(s) ? ["p20"] : [])]))),
+);
+// several profiles of one version: two new ones, three old ones (the third leaves through the spare exit)
+cases["key-many"] = keyCase(
+  [profile("p31", "AWG3.1", "3.1"), profile("p31b", "AWG 3.1 (new)", "3.1"), profile("p20", "AWG2", "2.0"), profile("p20b", "AWG 2.0 (new)", "2.0"), profile("p20w", "AWG 2.0 (new) · WARP", "2.0", "warp")],
+  keyLands(onProfiles((s) => [...allBut("p31", "p20")(s), ...(["est1", "est2"].includes(s) ? ["p31b", "p20b"] : []), ...(s === "est2" ? ["p20w"] : [])])),
+);
+
 // the Telegram proxy: one card per tg://proxy link, the twins of a server's link (its IPv6 entry, a relay in RU) marked
 const tgUrl = (host: string, port = 443) => `tg://proxy?server=${host}&port=${port}&secret=ee0123456789abcdef0123456789abcdef7777772e676f6f676c652e636f6d`;
 const tgFra = { label: "Германия · Франкфурт", country_code: "DE", place: "Франкфурт", ipv6: false, relay: false, via: "", url: tgUrl("de1.example.com"), qr: sampleQr };
@@ -486,6 +561,7 @@ const crowdServer = (i: number): ServerEntry => {
     country_code: cc,
     place: "",
     label: n > 1 ? `${cc} ${n}` : cc,
+    host: `${id}.example.com`,
     app_names: [name, ...(i % 3 === 1 ? [`${name} WARP`] : [])],
     connections: [
       { way: "link", exit: "direct", app_name: name, profile_id: "" },
@@ -540,6 +616,7 @@ const own: Record<string, Partial<Record<Lang, string>>> = {
   "Берлин": { en: "Berlin", fa: "برلین", tr: "Berlin" },
   "Германия · Берлин": { en: "Germany · Berlin", fa: "آلمان · برلین", tr: "Almanya · Berlin" },
   "Москва": { en: "Moscow", fa: "مسکو", tr: "Moskova" },
+  "Бухарест": { en: "Bucharest", fa: "بخارست", tr: "Bükreş" },
   "Россия · Москва": { en: "Russia · Moscow", fa: "روسیه · مسکو", tr: "Rusya · Moskova" },
   "Нидерланды": { en: "Netherlands", fa: "هلند", tr: "Hollanda" },
   "Финляндия": { en: "Finland", fa: "فنلاند", tr: "Finlandiya" },

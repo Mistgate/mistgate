@@ -13,6 +13,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	accesssvc "github.com/mistgate/mistgate/internal/panel/access"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	mtprotoProto "github.com/mistgate/mistgate/internal/panel/protocols/mtproto"
@@ -58,17 +59,17 @@ func newCheckEnv(t *testing.T, online ...string) *checkEnv {
 	}
 	e.f.settleUDP = func(context.Context) error { return nil }
 	e.run()
-	caps := []string{capUDPCheck, capTCPCheck}
+	caps := []string{agentcap.UDPCheck, agentcap.TCPCheck}
 	for _, name := range online {
 		switch name {
 		case "entry":
-			x.ec, x.em, _ = connectCaps(x.entry, "entry", append([]string{plugin.CapRelayForward}, caps...)...)
+			x.ec, x.em, _ = connectCaps(x.entry, "entry", append([]string{agentcap.RelayForward}, caps...)...)
 		case "exit":
 			// The exit can run an MTProto server (mtprotoRelay); without the capability the panel withholds that inbound from it and
 			// marks it failed, and a failed server is not forwarded to.
 			// It serves the VLESS inbound of these tests too: without vless/1 the panel withheld that inbound and the tests ran
 			// against a server marked failed.
-			x.xc, _, _ = connectCaps(x.exit, "exit", append([]string{capMTProto, capVLESS}, caps...)...)
+			x.xc, _, _ = connectCaps(x.exit, "exit", append([]string{agentcap.MTProto, agentcap.VLESS}, caps...)...)
 			// connectCaps only SENDS the ApplyResult. When the panel stores it, it also writes the outcome of the inbounds it
 			// withheld from this agent (state, an empty certificate pin), so a test that sets a pin right after connecting
 			// lost it about once in forty runs under the race detector. Wait until the result is stored.
@@ -294,7 +295,7 @@ func TestCheckRelayLegNeedsTheEntryOnlineWithTheCapability(t *testing.T) {
 
 	// An entry whose agent has no UDP check cannot send.
 	x = newCheckEnv(t, "exit", "s1")
-	x.ec, _, _ = connectCaps(x.entry, "entry-old", plugin.CapRelayForward)
+	x.ec, _, _ = connectCaps(x.entry, "entry-old", agentcap.RelayForward)
 	x.relay("rly_u", 8443, false)
 	if c, err = x.f.CheckRelay(x.ctx, "rly_u"); err != nil || c.Leg.Code != "agent_too_old" {
 		t.Fatalf("old entry: %+v %v", c, err)

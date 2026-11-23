@@ -12,9 +12,8 @@ import (
 )
 
 // countryNowSources are the sources "Check now" of a node asks for a round of the country check out of turn besides Globalping
-// (health.Config.CountryNow): the TSPU probe, cheburcheck on both of its sources and the owner's own probes. bsbord is not among
-// them: it is paid and runs on its schedule only. The services are read when the request comes (the own probes are built after
-// the health module).
+// (health.Config.CountryNow): the ones countryreach.Sources marks NowPlan. bsbord is not among them: it is paid and runs on its
+// schedule only. The services are read when the request comes (the own probes are built after the health module).
 func countryNowSources(k *core) []health.CountryNowSource {
 	cheb := func(source string) func(context.Context, string) (health.CountryNowRun, string) {
 		return func(ctx context.Context, nodeID string) (health.CountryNowRun, string) {

@@ -1,0 +1,469 @@
+{
+ "ui": {
+  "ref_h": "Atsauce",
+  "nav_label": "Dokumentācija",
+  "footer": "Dokumentācija versijai {ver}.",
+  "nav_home": "Pārskats",
+  "nav_install": "Instalēšana",
+  "nav_usage": "Lietošana",
+  "nav_faq": "BUJ",
+  "home_title": "Pārskats",
+  "desc_install": "Kā instalēt {brand} {ver} operētājsistēmās Linux, macOS un Windows.",
+  "desc_usage": "Kā lietot {brand}: biežākie uzdevumi ar piemēriem.",
+  "desc_faq": "Biežāk uzdotie jautājumi par {brand}.",
+  "nf_title": "Lapa nav atrasta",
+  "nf_text": "Šī lapa nav dokumentācijas daļa. Iespējams, jaunākajā versijā tā ir pārdēvēta.",
+  "nf_back": "Atpakaļ uz pārskatu",
+  "quick_h": "Ātrā sākšana",
+  "features_h": "Ko tā dara",
+  "out_h": "Izvade",
+  "install_h": "Instalēšana",
+  "steps_h": "Soļi",
+  "usage_h": "Lietošana",
+  "opts_h": "Opcijas",
+  "opt_col": "Opcija",
+  "desc_col": "Apraksts",
+  "faq_h": "Biežāk uzdotie jautājumi",
+  "next": "Nākamā",
+  "facts_h": "Īsumā",
+  "menu_h": "Dokumentācija",
+  "facts": [
+   {
+    "k": "Versija",
+    "v": "{ver}"
+   },
+   {
+    "k": "Platformas",
+    "v": "Linux, macOS un Windows"
+   },
+   {
+    "k": "Licence",
+    "v": "MIT"
+   },
+   {
+    "k": "Atkarības",
+    "v": "Nav"
+   }
+  ],
+  "install_check": "Ja tiek izdrukāts versijas numurs, instalēšana izdevās.",
+  "nav_config": "Konfigurācija",
+  "nav_recipes": "Receptes",
+  "nav_trouble": "Problēmu risināšana",
+  "desc_config": "Konfigurācijas fails un iestatījumi: {brand}.",
+  "desc_recipes": "Īsas receptes ikdienas darbiem ar {brand}.",
+  "desc_trouble": "Risinājumi problēmām, ar ko lietotāji {brand} lietošanā sastopas visbiežāk.",
+  "config_h": "Konfigurācija",
+  "config_col_key": "Atslēga",
+  "config_col_default": "Noklusējums",
+  "config_col_desc": "Ko tā dara",
+  "config_file_h": "Piemērs",
+  "recipes_h": "Receptes",
+  "recipes_intro": "Īsas atbildes uz darbiem, par kuriem jautā visvairāk.",
+  "trouble_h": "Problēmu risināšana",
+  "trouble_intro": "Problēmas, ar kurām sastopas visbiežāk, un tas, kas parasti palīdz.",
+  "ver_l": "Versija",
+  "prev": "Iepriekšējā"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "Žurnālu kopsavilkums komandrindai",
+   "desc": "{brand} nolasa teksta žurnālus un izdrukā īsu kopsavilkumu par to saturu.",
+   "overview": "{brand} nolasa teksta žurnālus un izdrukā īsu kopsavilkumu: cik rindu tajos ir, kādi līmeņi tiek lietoti un kuri ziņojumi atkārtojas visbiežāk. Tā ir viena maza programma bez atkarībām.",
+   "features": [
+    "Lasa failus, mapes un standarta ievadi",
+    "Grupē līdzīgus ziņojumus bez iestatīšanas",
+    "Izdrukā tekstu, JSON vai nelielu HTML pārskatu"
+   ],
+   "quick_out": "app.log: 48 211 rindas, 3 līmeņi\n  info   46 902\n  warn    1 190\n  error     119\nbiežākais ziņojums: cache miss for key (9 413 reizes)",
+   "install_intro": "{brand} tiek piegādāta kā viena programma. Pirms pirmās palaišanas nekas nav jāiestata.",
+   "install_steps": [
+    "Lejupielādē arhīvu, kas der tavai sistēmai.",
+    "Izpako to un nokopē programmu mapē, kas ir PATH.",
+    "Palaid versijas komandu, lai pārbaudītu, vai tā darbojas."
+   ],
+   "faq": [
+    {
+     "q": "Kādi žurnālu formāti tiek atbalstīti?",
+     "a": "Jebkurš rindās veidots. {brand} atpazīst biežāk lietotos laika un līmeņa pierakstus, bet ja tas neizdodas, rindas tiek lasītas kā parasts teksts."
+    },
+    {
+     "q": "Vai tā maina manus failus?",
+     "a": "Nekad. Faili tiek atvērti tikai lasīšanai."
+    },
+    {
+     "q": "Cik lielu failu var nolasīt?",
+     "a": "Faili tiek apstrādāti pa daļām, tāpēc ierobežojums ir tikai laiks. Gigabaitu klēpjdators apstrādā dažās sekundēs."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Faila kopsavilkums",
+     "p": "Norādi {brand} failu, mapi vai cauruli. Mapes tiek lasītas rekursīvi, un saspiestie faili tiek izpakoti lasīšanas laikā."
+    },
+    {
+     "h": "Laika posma apskate",
+     "p": "Lieto --since un --until, lai kopsavilkumu ierobežotu ar laika posmu. Laiks var būt konkrēts vai rēķināts no šī brīža."
+    },
+    {
+     "h": "Izvades formāta izvēle",
+     "p": "Pēc noklusējuma izvade ir parasts teksts. JSON ir stabils un paredzēts skriptiem; HTML pārskats ir viens fails, ko var nosūtīt kolēģim."
+    }
+   ],
+   "options": [
+    {
+     "d": "Tikai rindas pēc šī laika, konkrēts laiks vai, piemēram, 2h."
+    },
+    {
+     "d": "Tikai rindas pirms šī laika."
+    },
+    {
+     "d": "Tikai šī līmeņa vai augstāka līmeņa rindas."
+    },
+    {
+     "d": "Cik atkārtotu ziņojumu uzskaitīt. Noklusējums ir 5."
+    },
+    {
+     "d": "text, json vai html. Noklusējums ir text."
+    }
+   ],
+   "config_intro": "{brand} lasa neobligātu failu config.toml no tavas konfigurācijas mapes. Katru atslēgu var norādīt arī komandrindā, un komandrinda ir svarīgāka.",
+   "config_rows": [
+    {
+     "d": "Cik atkārtotu ziņojumu uzskaitīt."
+    },
+    {
+     "d": "Izvades formāts: text, json vai html."
+    },
+    {
+     "d": "Ziņojumi, ko izlaist, salīdzina kā parastu tekstu."
+    },
+    {
+     "d": "Lasīt tikai rindas pēc šī laika."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Skaļākās stundas atrašana",
+     "p": "Sagrupē kopsavilkumu pa stundām, lai redzētu, kad žurnālā bija visvairāk ierakstu."
+    },
+    {
+     "h": "Divu dienu salīdzināšana",
+     "p": "Parādi, kuri ziņojumi starp diviem failiem ir jauni un kuri ir pazuduši."
+    },
+    {
+     "h": "Pārskata izveide nosūtīšanai",
+     "p": "Ieraksti HTML pārskatu failā un pievieno to ziņai."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Kopsavilkums ir tukšs",
+     "a": "Pārbaudi, vai failā ir viens ziņojums rindā. Ja tas ir saspiests formātā, ko {brand} nepazīst, vispirms to izpako."
+    },
+    {
+     "q": "Laiki šķiet nepareizi",
+     "a": "Rindas bez laika joslas tiek lasītas kā UTC. Lieto --tz, lai norādītu, kādā joslā tās ir."
+    },
+    {
+     "q": "Pārskats ir pārāk garš",
+     "a": "Samazini --top vai pievieno skaļākos ziņojumus konfigurācijas faila izlaižamo sarakstam."
+    },
+    {
+     "q": "Tīkla diskā darbojas lēni",
+     "a": "Vispirms nokopē failu uz vietējo disku. Parasti vaina ir rindu lasīšanā pa lēnu savienojumu."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Ozols",
+       "Kalns",
+       "Vilnis",
+       "Saule",
+       "Lapa",
+       "Egle",
+       "Zibens",
+       "Rits"
+      ],
+      [
+       "log",
+       "scan",
+       "sum",
+       "view",
+       "cut",
+       "peek"
+      ]
+     ],
+     "sep": "-"
+    }
+   }
+  },
+  "site": {
+   "tagline": "Neliels statisku vietņu veidotājs",
+   "desc": "{brand} no Markdown failu mapes un dažām veidnēm izveido statisku tīmekļa vietni.",
+   "overview": "{brand} no Markdown failu mapes un dažām veidnēm izveido statisku tīmekļa vietni. Nav datubāzes, nav izpildlaika, un serverī nav nekā, ko vajadzētu uzturēt.",
+   "features": [
+    "Markdown ar sākuma galveni",
+    "Veidnes parastā HTML",
+    "Vietējs priekšskatījums, kas pārbūvējas pēc katras saglabāšanas"
+   ],
+   "quick_out": "Piezīmes pieejamas adresē localhost:4000 (lai apturētu, nospied Ctrl+C)",
+   "install_intro": "{brand} ir viens izpildāmais fails. Ieliec to PATH, un viss.",
+   "install_steps": [
+    "Lejupielādē arhīvu, kas der tavai sistēmai.",
+    "Izpako to un nokopē izpildāmo failu mapē, kas ir PATH.",
+    "Palaid versijas komandu, lai pārbaudītu, vai tā darbojas."
+   ],
+   "faq": [
+    {
+     "q": "Vai var lietot savas veidnes?",
+     "a": "Jā. Veidnes ir parasti HTML faili ar dažām vietturēm, un mapju struktūru vari mainīt pēc savas gaumes."
+    },
+    {
+     "q": "Vai vajag datubāzi?",
+     "a": "Nē. Rezultāts ir parasti faili, ko var piegādāt jebkurš tīmekļa serveris."
+    },
+    {
+     "q": "Kā pievienot jaunu lapu veidu?",
+     "a": "Pievieno mapi zem pages ar savu izkārtojuma failu, un {brand} to ņems vērā nākamajā būvēšanā."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Jaunas vietnes sākšana",
+     "p": "Komanda init izveido mapi ar konfigurācijas failu, izkārtojumu un vienu piemēra lapu."
+    },
+    {
+     "h": "Lapas rakstīšana",
+     "p": "Lapas ir Markdown faili. Galvene faila sākumā nosaka virsrakstu un datumu; viss zem tās ir saturs."
+    },
+    {
+     "h": "Būvēšana publicēšanai",
+     "p": "Komanda build ieraksta gatavo vietni mapē public. Nokopē šo mapi uz jebkuru tīmekļa serveri."
+    }
+   ],
+   "options": [
+    {
+     "d": "Mape gatavajai vietnei. Noklusējums ir public."
+    },
+    {
+     "d": "Iekļaut lapas, kas atzīmētas kā melnraksti."
+    },
+    {
+     "d": "Priekšskatījuma servera ports. Noklusējums ir 4000."
+    },
+    {
+     "d": "Pārbūvēt, kad fails mainās."
+    },
+    {
+     "d": "Izdrukāt tikai kļūdas."
+    }
+   ],
+   "config_intro": "Fails site.toml atrodas tavas mapes saknē. Trūkstošai atslēgai tiek lietots noklusējums, tāpēc jaunai vietnei fails nav vajadzīgs vispār.",
+   "config_rows": [
+    {
+     "d": "Nosaukums, ko rāda lapas galvenē un virsrakstā."
+    },
+    {
+     "d": "Adrese, kurā atrodas tava vietne. Vietnei saknē lieto /."
+    },
+    {
+     "d": "Vietnes izskats: plain, slate vai folio."
+    },
+    {
+     "d": "Vai tiek būvētas lapas, kas atzīmētas kā melnraksti."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Jaunas lapas pievienošana",
+     "p": "Izveido Markdown failu, kura sākumā ir virsraksts un datums."
+    },
+    {
+     "h": "Melnrakstu priekšskatījums",
+     "p": "Palaid vietni lokāli kopā ar nepabeigtajām lapām."
+    },
+    {
+     "h": "Publicēšana mapē",
+     "p": "Uzbūvē visu vietni vienā mapē, ko vari nokopēt uz jebkuru tīmekļa serveri."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Lapa trūkst būvējumā",
+     "a": "Lapas ar draft: true galvenē tiek izlaistas. Noņem to vai būvē ar --drafts."
+    },
+    {
+     "q": "Saites pēc publicēšanas nedarbojas",
+     "a": "Iestati base_url uz mapes adresi, kurā vietne ir publicēta."
+    },
+    {
+     "q": "Priekšskatījums neatjaunojas",
+     "a": "Daži redaktori vecā faila mainīšanas vietā ieraksta jaunu failu. Restartē priekšskatījumu vai izslēdz redaktorā drošo saglabāšanu."
+    },
+    {
+     "q": "Attēli netiek rādīti",
+     "a": "Ieliec tos mapē static. Viss, kas tajā ir, tiek nokopēts nemainīts."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Akmens",
+       "Priede",
+       "Strauts",
+       "Smilts",
+       "Lauks",
+       "Logs",
+       "Pagale",
+       "Taka"
+      ],
+      [
+       "site",
+       "page",
+       "build",
+       "gen",
+       "sheet"
+      ]
+     ],
+     "sep": "-"
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Atkārtoti darbi bez crontab",
+   "desc": "{brand} vienā datorā palaiž nelielus atkārtotus darbus un paziņo, ja kāds no tiem neizdodas.",
+   "overview": "{brand} vienā datorā palaiž nelielus atkārtotus darbus un paziņo, ja kāds no tiem neizdodas. Tā ir draudzīgāka alternatīva crontab, kas jāatceras no galvas.",
+   "features": [
+    "Grafiki rakstīti parastos vārdos",
+    "Katrai palaišanai ir savs žurnāls",
+    "Viena izvades rinda uz darbu, tāpēc kļūmes ir labi redzamas"
+   ],
+   "quick_out": "backup   katru dienu plkst. 03:00   pēdējā palaišana: ok (4 s)",
+   "install_intro": "{brand} ir viens izpildāmais fails un neliels fona process, kas reizi minūtē pārbauda grafiku.",
+   "install_steps": [
+    "Lejupielādē arhīvu, kas der tavai sistēmai.",
+    "Izpako to un nokopē izpildāmo failu mapē, kas ir PATH.",
+    "Palaid fona procesu ar savas sistēmas pakalpojumu pārvaldnieku."
+   ],
+   "faq": [
+    {
+     "q": "Vai tai jādarbojas kā pakalpojumam?",
+     "a": "Jā, neliels fona process reizi minūtē pārbauda grafiku. Instalēšanas lapa rāda, ko palaist."
+    },
+    {
+     "q": "Kas notiek, ja dators ir izslēgts?",
+     "a": "Darbs, kam bija jāpalaižas, kamēr dators bija izslēgts, palaižas vienu reizi, kad dators ieslēdzas."
+    },
+    {
+     "q": "Vai darbi var būt atkarīgi cits no cita?",
+     "a": "Pagaidām nē. Šobrīd savieno komandas vienā darbā."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Darba pievienošana",
+     "p": "Darbam ir nosaukums, grafiks un komanda. Grafikus raksta parastos vārdos."
+    },
+    {
+     "h": "Kas ir darbojies",
+     "p": "Komanda list parāda katru darbu ar pēdējās palaišanas rezultātu. Komanda history parāda viena darba palaišanas ar ilgumu un izvadi."
+    },
+    {
+     "h": "Apturēšana un atsākšana",
+     "p": "Apturot darbs un tā vēsture tiek saglabāti, bet darbs vairs nepalaižas. Noder pārcelšanās laikā vai dublējuma atjaunošanas laikā."
+    }
+   ],
+   "options": [
+    {
+     "d": "Kur tiek glabāti darbi un žurnāli. Noklusējums ir mape tavā mājas direktorijā."
+    },
+    {
+     "d": "Izdrukāt tikai kļūmes."
+    },
+    {
+     "d": "Cik palaišanu rāda vēsture. Noklusējums ir 10."
+    },
+    {
+     "d": "Mašīnlasāma izvade."
+    },
+    {
+     "d": "Palaist darbu uzreiz, ne tikai pēc grafika."
+    }
+   ],
+   "config_intro": "{brand} nolasa jobs.toml no tavas konfigurācijas mapes. Paši darbi tiek glabāti atsevišķi, tāpēc failā ir tikai iestatījumi.",
+   "config_rows": [
+    {
+     "d": "Čaula, kas palaiž komandas."
+    },
+    {
+     "d": "Kur tiek glabāta katras palaišanas izvade."
+    },
+    {
+     "d": "Cik reižu neizdevies darbs tiek mēģināts vēlreiz."
+    },
+    {
+     "d": "Vai neizdevies darbs nosūta arī paziņojumu."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Darba palaišana vienu reizi, tūlīt",
+     "p": "Palaid darbu ārpus grafika, piemēram, lai pārbaudītu jaunu komandu."
+    },
+    {
+     "h": "Darba neveiksmes iemesla apskate",
+     "p": "Izdrukā darba pēdējās palaišanas izvadi."
+    },
+    {
+     "h": "Visa apturēšana ceļojuma laikā",
+     "p": "Aptur visus grafikus, līdz tu tos atsāc."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Darbs nekad nepalaižas",
+     "a": "Ar komandu list pārbaudi, vai programma darbojas. Darbi palaižas tikai tad, kad tā darbojas."
+    },
+    {
+     "q": "Darbs palaižas divreiz",
+     "a": "Darbojas divas programmas kopijas. Aptur vienu no tām; bloķēšanas fails ir žurnālu mapē."
+    },
+    {
+     "q": "Komanda darbojas manā čaulā, bet šeit ne",
+     "a": "Darbi nelasa tavas čaulas startēšanas failus. Lieto pilnus ceļus vai iestati vidi pašā darbā."
+    },
+    {
+     "q": "Laiki ir par stundu nobīdīti",
+     "a": "{brand} seko sistēmas pulkstenim un laika joslai. Maini tos tur, nevis darbā."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Rits",
+       "Darbs",
+       "Gajiens",
+       "Rinda",
+       "Stunda",
+       "Grafiks",
+       "Zvans",
+       "Cikls"
+      ],
+      [
+       "work",
+       "list",
+       "run",
+       "do",
+       "bell"
+      ]
+     ],
+     "sep": "-"
+    }
+   }
+  }
+ }
+}

@@ -15,6 +15,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
@@ -700,7 +701,7 @@ func TestWarpEventsReachTheModuleWithoutBlockingTheStream(t *testing.T) {
 func TestWarpRefreshThrottleUsesCoreEventTimeAndSurvivesAckQueueFull(t *testing.T) {
 	e, core, ctx, state, now := coreFixture(t, "warp-refresh")
 	h := hello("instance-warp-refresh", 0, "")
-	h.GetHello().Capabilities = []string{capWarp}
+	h.GetHello().Capabilities = []string{agentcap.Warp}
 	started := stepHello(t, core, ctx, state, now, h.GetHello())
 	s := newTestSession(e, ctx, core, started.State)
 	warpEvent := func(seq uint64, at time.Time) *agentv1.ConnectRequest {

@@ -11,6 +11,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
@@ -20,9 +21,6 @@ import (
 // fails the rest on bind, so it is sent the default route alone and the others are withheld, as an awg inbound is from an agent
 // without awg/1.
 func TestSharedPortIsWithheldFromAnAgentThatCannotShare(t *testing.T) {
-	if capTCPShare != "tcp-share/1" { // the agent's own constant (internal/node/agent l3.go) is pinned to the same literal
-		t.Fatalf("capability is %q", capTCPShare)
-	}
 	tcp := func(id, protocol string, port uint16, name, settings string) statehash.Inbound {
 		return statehash.Inbound{Spec: plugin.InboundSpec{ID: id, Protocol: protocol, Enabled: true, Listen: plugin.Listen{Network: "tcp", Port: port},
 			TLS: plugin.TLS{Mode: plugin.TLSAcmeDomain, ServerName: name}, Settings: []byte(settings)}}
@@ -34,7 +32,7 @@ func TestSharedPortIsWithheldFromAnAgentThatCannotShare(t *testing.T) {
 	}
 	e := newEnv(t)
 	node := store.NodeRow{ID: "nod_1", State: "active"}
-	allCaps := []string{capVLESS, capVLESSSelf, capMTProto, capTrustTunnel}
+	allCaps := []string{agentcap.VLESS, agentcap.VLESSSelf, agentcap.MTProto, agentcap.TrustTunnel}
 	desired := func(in ...statehash.Inbound) {
 		e.f.cfg.Desired = func(context.Context, string) ([]statehash.Inbound, error) { return in, nil }
 	}
@@ -56,7 +54,7 @@ func TestSharedPortIsWithheldFromAnAgentThatCannotShare(t *testing.T) {
 	if got := held(old); !slices.Equal(got, []string{"inb_a", "inb_d"}) || !slices.Equal(old.withheld, []string{"inb_b", "inb_c"}) {
 		t.Fatalf("an agent that cannot share holds %v and is withheld %v, want a and d held, b and c withheld", got, old.withheld)
 	}
-	capable := build(append(allCaps, capTCPShare)...)
+	capable := build(append(allCaps, agentcap.TCPShare)...)
 	// the two held back for the port they stand on say so with a code of their own, not the general "agent too old"
 	if !slices.Equal(old.withheldShare, []string{"inb_b", "inb_c"}) {
 		t.Fatalf("withheldShare = %v, want b and c", old.withheldShare)

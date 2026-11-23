@@ -6,8 +6,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // ControlRelay applies the mode controller (store.EvaluateRelayMode, a pure function) to one relay. The fleet calls it after the
@@ -171,4 +171,4 @@ func (s *Service) settleReverseSwitch(ctx context.Context, id string) {
 	}
 }
 
-func hasReverse(caps []string) bool { return slices.Contains(caps, plugin.CapRelayReverse) }
+func hasReverse(caps []string) bool { return slices.Contains(caps, agentcap.RelayReverse) }

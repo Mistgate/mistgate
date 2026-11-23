@@ -68,7 +68,6 @@ type UpdateAgentOptions struct {
 	Sources []string
 }
 
-const updateTimeoutCapability = "update-timeout/1"
 const bundleSendStallTimeout = 120 * time.Second
 
 // bundleNodeSlotWait is how long a request waits when another file is live or a zombie cap blocks hand-over.
@@ -82,6 +81,10 @@ type Health interface {
 	// NodeChecksSince counts probeable inbounds and rounds ended at or after since; read errors are returned to the gate.
 	// timeoutsOnly: something failed and every failed round since was a timeout; failedFor: how long the failures have lasted.
 	NodeChecksSince(ctx context.Context, nodeID string, since time.Time) (probeable, ok, failed int, timeoutsOnly bool, failedFor time.Duration, err error)
+	// NodeChecksPending lists the probeable inbounds NodeChecksSince does not count as ok (no OK round ended at or after since).
+	NodeChecksPending(ctx context.Context, nodeID string, since time.Time) ([]string, error)
+	// NodeLastRounds returns the newest stored round of each probeable inbound of the node: what was failing before an update, and why.
+	NodeLastRounds(ctx context.Context, nodeID string) ([]store.CheckSample, error)
 }
 
 // Timing of the module. The zero value is production; tests shorten what they need.
@@ -89,6 +92,7 @@ type Timing struct {
 	Tick              time.Duration // worker period; default 5 s
 	Rescan            time.Duration // bundle directory poll; default 60 s
 	BundlePoll        time.Duration // GitHub agent bundle poll; default 10 min
+	BundleSyncWait    time.Duration // RescanBundle waits this long for the GitHub check before it says the download goes on; default 10 s
 	GitHubSourceCheck time.Duration // bound for the optional GitHub manifest check; default 10 s
 	AnswerWait        time.Duration // UpdateAgent: the agent's CommandResult, download included; default 10 min
 	ReconnectWait     time.Duration // after the answer: the node is back with the new build; default 3 min
@@ -106,7 +110,7 @@ type Timing struct {
 
 func (t *Timing) defaults() {
 	for p, d := range map[*time.Duration]time.Duration{
-		&t.Tick: 5 * time.Second, &t.Rescan: time.Minute, &t.BundlePoll: 10 * time.Minute,
+		&t.Tick: 5 * time.Second, &t.Rescan: time.Minute, &t.BundlePoll: 10 * time.Minute, &t.BundleSyncWait: 10 * time.Second,
 		&t.GitHubSourceCheck: 10 * time.Second,
 		&t.AnswerWait:        10 * time.Minute, &t.ReconnectWait: 3 * time.Minute,
 		&t.GateWait: 5 * time.Minute, &t.RollbackWait: time.Minute, &t.InboundGrace: 30 * time.Second, &t.Prune: 6 * time.Hour,

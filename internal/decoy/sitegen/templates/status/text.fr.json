@@ -1,0 +1,229 @@
+{
+ "ui": {
+  "utc": "UTC",
+  "nav_label": "Navigation",
+  "tagline": "État des services",
+  "footer": "Toutes les heures sont affichées en UTC.",
+  "nav_home": "État",
+  "nav_history": "Historique des incidents",
+  "nav_about": "À propos",
+  "home_title": "État actuel",
+  "desc": "État actuel et disponibilité des services {brand}.",
+  "desc_history": "Les incidents passés chez {brand} et la façon dont ils ont été résolus.",
+  "desc_about": "Comment {brand} mesure la disponibilité et signale les incidents.",
+  "nf_title": "Page introuvable",
+  "nf_text": "Il n'y a rien à cette adresse. La page d'état se trouve sur la page d'accueil.",
+  "nf_back": "Aller à la page d'état",
+  "banner_ok": "Tous les systèmes sont opérationnels",
+  "banner_sub": "Tous les services {brand} fonctionnent normalement.",
+  "comps_h": "Services",
+  "op": "Opérationnel",
+  "up_label": "de disponibilité",
+  "days_ago_l": "il y a 60 jours",
+  "days_ago_r": "Aujourd'hui",
+  "m_uptime": "Disponibilité, 90 derniers jours",
+  "m_resp": "Temps de réponse médian",
+  "m_inc": "Incidents enregistrés",
+  "recent_h": "Incidents récents",
+  "all_inc": "Historique complet des incidents",
+  "history_h": "Historique des incidents",
+  "history_intro": "Ce qui a mal tourné ces derniers mois et comment nous l'avons corrigé, du plus récent au plus ancien.",
+  "st_inv": "En cours d'analyse",
+  "st_ident": "Cause identifiée",
+  "st_res": "Résolu",
+  "imp_minor": "Mineur",
+  "imp_major": "Majeur",
+  "imp_maint": "Maintenance",
+  "dur_l": "Durée",
+  "about_h": "À propos de cette page",
+  "about": [
+   {
+    "h": "Ce que montre cette page",
+    "p": "Cette page montre l'état en direct des services {brand} et garde la trace des incidents passés. Elle est tenue à jour par l'équipe qui les exploite."
+   },
+   {
+    "h": "Comment on mesure la disponibilité",
+    "p": "Chaque service est vérifié depuis plusieurs endroits, une fois par minute. Une minute compte comme une panne quand plus de la moitié des vérifications échouent."
+   },
+   {
+    "h": "Comment on signale les incidents",
+    "p": "Nous publions un message quand nous commençons à étudier un problème, quand nous en trouvons la cause et quand il est résolu. Les incidents les plus importants font ensuite l'objet d'un court compte rendu."
+   },
+   {
+    "h": "Maintenances prévues",
+    "p": "Les travaux prévus sont annoncés ici au moins trois jours à l'avance et ont lieu aux heures creuses."
+   }
+  ],
+  "incidents": [
+   {
+    "title": "Taux d'erreurs élevé",
+    "impact": "major",
+    "dur": "38 minutes",
+    "a": "Nous constatons plus de requêtes en échec que d'habitude et nous cherchons la cause.",
+    "b": "Un changement de configuration défectueux a été trouvé et il est en cours d'annulation.",
+    "c": "Le changement a été annulé et le taux d'erreurs est revenu à la normale. Nous allons examiner comment il est passé entre les mailles."
+   },
+   {
+    "title": "Notifications retardées",
+    "impact": "minor",
+    "dur": "1 heure 12 minutes",
+    "a": "Les notifications arrivent avec plusieurs minutes de retard.",
+    "b": "Un retard s'est accumulé dans la file qui gère les notifications.",
+    "c": "La file a été vidée et les délais de livraison sont redevenus normaux."
+   },
+   {
+    "title": "Pages lentes à charger",
+    "impact": "minor",
+    "dur": "26 minutes",
+    "a": "Plusieurs utilisateurs signalent que les pages se chargent lentement. Nous enquêtons.",
+    "b": "Un nœud de la base de données chauffait trop et a été retiré de la rotation.",
+    "c": "Les temps de chargement sont revenus à la normale."
+   },
+   {
+    "title": "Maintenance plus longue que prévu",
+    "impact": "maint",
+    "dur": "40 minutes de plus que prévu",
+    "a": "La maintenance de notre base de données principale dure plus longtemps que prévu.",
+    "b": "La dernière étape de la mise à niveau demande encore quelques minutes.",
+    "c": "La maintenance est terminée et tous les services fonctionnent normalement."
+   },
+   {
+    "title": "Panne partielle dans une région",
+    "impact": "major",
+    "dur": "54 minutes",
+    "a": "Les utilisateurs d'une région n'arrivent pas à joindre le service. Nous travaillons avec notre hébergeur.",
+    "b": "L'hébergeur a confirmé une panne réseau qui touche nos serveurs dans cette région.",
+    "c": "La panne réseau est réparée et la région est de nouveau desservie."
+   },
+   {
+    "title": "Résultats de recherche périmés",
+    "impact": "minor",
+    "dur": "2 heures 5 minutes",
+    "a": "Les nouveaux éléments n'apparaissent pas dans les résultats de recherche.",
+    "b": "La tâche d'indexation s'était arrêtée après un déploiement raté et a été relancée.",
+    "c": "L'indexation a rattrapé son retard et la recherche est à jour."
+   },
+   {
+    "title": "Échecs de connexion pour certains utilisateurs",
+    "impact": "major",
+    "dur": "19 minutes",
+    "a": "Certains utilisateurs n'arrivent pas à se connecter. Les autres ne sont pas touchés.",
+    "b": "Un certificat expiré dans le service de connexion a été identifié.",
+    "c": "Le certificat a été remplacé et la connexion fonctionne de nouveau pour tout le monde."
+   },
+   {
+    "title": "Envois de fichiers qui échouent par moments",
+    "impact": "minor",
+    "dur": "47 minutes",
+    "a": "Une petite partie des envois échoue et doit être relancée.",
+    "b": "Un serveur de stockage dont le disque était plein a été repéré.",
+    "c": "De la capacité a été ajoutée et les envois réussissent de nouveau."
+   },
+   {
+    "title": "Réponses lentes de l'API",
+    "impact": "minor",
+    "dur": "31 minutes",
+    "a": "Certaines requêtes vers l'API mettent plus de temps que d'habitude à recevoir une réponse. Nous regardons de près.",
+    "b": "Une tâche de fond consommait trop de mémoire sur l'un des serveurs.",
+    "c": "La tâche a été relancée avec une limite de mémoire et les temps de réponse sont revenus à la normale."
+   },
+   {
+    "title": "Webhooks livrés en retard",
+    "impact": "minor",
+    "dur": "52 minutes",
+    "a": "Les webhooks arrivent à destination avec plusieurs minutes de retard.",
+    "b": "La file qui les envoie attendait une connexion lente à la base de données.",
+    "c": "La connexion a été rétablie, la file a été vidée et les webhooks arrivent de nouveau à l'heure."
+   },
+   {
+    "title": "Tableau de bord indisponible",
+    "impact": "major",
+    "dur": "22 minutes",
+    "a": "Le tableau de bord affiche une page d'erreur pour tout le monde. Les autres services ne sont pas touchés.",
+    "b": "Une version récente contenait un défaut dans son code de démarrage, et nous l'avons trouvé.",
+    "c": "La version a été annulée et le tableau de bord est de nouveau disponible."
+   },
+   {
+    "title": "Maintenance prévue : mise à niveau de la base de données",
+    "impact": "maint",
+    "dur": "1 heure",
+    "a": "Une maintenance prévue est en cours. Certaines fonctions sont en lecture seule jusqu'à la fin des travaux.",
+    "b": "La mise à niveau est à moitié faite et se déroule comme prévu.",
+    "c": "La maintenance est terminée et tout fonctionne normalement."
+   }
+  ],
+  "inc_back": "Historique des incidents",
+  "inc_more": "Autres incidents",
+  "status_l": "Statut",
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Aurore",
+      "Cobalt",
+      "Ardoise",
+      "Lagune",
+      "Brise",
+      "Ambre",
+      "Sureau",
+      "Lumen",
+      "Galet",
+      "Argile",
+      "Mistral",
+      "Corail"
+     ],
+     [
+      "base",
+      "cloud",
+      "flux",
+      "desk",
+      "hub",
+      "gate",
+      "ly",
+      "kit",
+      "lab",
+      "nest"
+     ]
+    ]
+   }
+  }
+ },
+ "bundles": {
+  "saas": {
+   "components": [
+    "API publique",
+    "Tableau de bord",
+    "Webhooks",
+    "Authentification",
+    "Tâches de fond",
+    "Exports de données",
+    "Facturation",
+    "Site de documentation"
+   ]
+  },
+  "photos": {
+   "components": [
+    "Envoi des images",
+    "Diffusion des images",
+    "Albums et partage",
+    "Application web",
+    "Synchronisation mobile",
+    "Recherche",
+    "Notifications",
+    "Compte et connexion"
+   ]
+  },
+  "mail": {
+   "components": [
+    "Envoi des e-mails",
+    "Envoi des SMS",
+    "Modèles de messages",
+    "Rapports de livraison",
+    "API REST",
+    "Tableau de bord",
+    "Pages de désinscription",
+    "Planification des envois"
+   ]
+  }
+ }
+}

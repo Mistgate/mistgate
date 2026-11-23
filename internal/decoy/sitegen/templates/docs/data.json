@@ -1,0 +1,280 @@
+{
+ "ui": {
+  "vars": {
+   "ver": [
+    "0.8",
+    "1.2",
+    "1.4",
+    "2.0",
+    "2.3",
+    "3.1"
+   ]
+  },
+  "cap_sh": "shell",
+  "cap_os": "Linux",
+  "cfg_name": "config.toml",
+  "ver_cmd": "{cmd} --version"
+ },
+ "bundles": [
+  {
+   "id": "logs",
+   "fixed": {
+    "quick": "{cmd} summary app.log",
+    "install_code": "tar xf {cmd}-{ver}-linux-amd64.tar.gz\nsudo mv {cmd} /usr/local/bin/\n{cmd} --version",
+    "usage": [
+     {
+      "code": "{cmd} summary app.log\n{cmd} summary /var/log/myapp/\ncat app.log | {cmd} summary -"
+     },
+     {
+      "code": "{cmd} summary --since 2h app.log\n{cmd} summary --since 2025-03-01 --until 2025-03-02 app.log"
+     },
+     {
+      "code": "{cmd} summary --format json app.log\n{cmd} summary --format html app.log"
+     }
+    ],
+    "options": [
+     {
+      "o": "--since"
+     },
+     {
+      "o": "--until"
+     },
+     {
+      "o": "--level"
+     },
+     {
+      "o": "--top"
+     },
+     {
+      "o": "--format"
+     }
+    ],
+    "config_code": "# ~/.config/{cmd}/config.toml\ntop = 10\nformat = \"text\"\nignore = [\"healthcheck\"]",
+    "config_rows": [
+     {
+      "k": "top",
+      "v": "5"
+     },
+     {
+      "k": "format",
+      "v": "text"
+     },
+     {
+      "k": "ignore",
+      "v": "[]"
+     },
+     {
+      "k": "since",
+      "v": "—"
+     }
+    ],
+    "recipes": [
+     {
+      "code": "{cmd} summary --by hour app.log"
+     },
+     {
+      "code": "{cmd} diff yesterday.log today.log"
+     },
+     {
+      "code": "{cmd} summary --format html app.log > report.html"
+     }
+    ]
+   }
+  },
+  {
+   "id": "site",
+   "fixed": {
+    "quick": "{cmd} init notes\ncd notes\n{cmd} serve",
+    "install_code": "tar xf {cmd}-{ver}-linux-amd64.tar.gz\nsudo mv {cmd} /usr/local/bin/\n{cmd} --version",
+    "usage": [
+     {
+      "code": "{cmd} init notes\ncd notes\nls"
+     },
+     {
+      "code": "title: First note\ndate: 2025-03-14\n---\nSome words about the first note."
+     },
+     {
+      "code": "{cmd} build\nls public"
+     }
+    ],
+    "options": [
+     {
+      "o": "--out"
+     },
+     {
+      "o": "--drafts"
+     },
+     {
+      "o": "--port"
+     },
+     {
+      "o": "--watch"
+     },
+     {
+      "o": "--quiet"
+     }
+    ],
+    "config_code": "# site.toml\ntitle = \"My notes\"\nbase_url = \"/\"\ntheme = \"plain\"\ndrafts = false",
+    "config_rows": [
+     {
+      "k": "title",
+      "v": "My site"
+     },
+     {
+      "k": "base_url",
+      "v": "/"
+     },
+     {
+      "k": "theme",
+      "v": "plain"
+     },
+     {
+      "k": "drafts",
+      "v": "false"
+     }
+    ],
+    "recipes": [
+     {
+      "code": "{cmd} new notes/first-post.md"
+     },
+     {
+      "code": "{cmd} serve --drafts"
+     },
+     {
+      "code": "{cmd} build --out public"
+     }
+    ]
+   }
+  },
+  {
+   "id": "jobs",
+   "fixed": {
+    "quick": "{cmd} add backup 'every day at 03:00' 'tar czf notes.tgz notes'\n{cmd} list",
+    "install_code": "tar xf {cmd}-{ver}-linux-amd64.tar.gz\nsudo mv {cmd} /usr/local/bin/\n{cmd} --version",
+    "usage": [
+     {
+      "code": "{cmd} add backup 'every day at 03:00' 'tar czf notes.tgz notes'\n{cmd} add tidy 'every monday' 'rm -r tmp/old'"
+     },
+     {
+      "code": "{cmd} list\n{cmd} history backup"
+     },
+     {
+      "code": "{cmd} pause backup\n{cmd} resume backup"
+     }
+    ],
+    "options": [
+     {
+      "o": "--dir"
+     },
+     {
+      "o": "--quiet"
+     },
+     {
+      "o": "--limit"
+     },
+     {
+      "o": "--json"
+     },
+     {
+      "o": "--now"
+     }
+    ],
+    "config_code": "# jobs.toml\nshell = \"/bin/sh\"\nlog_dir = \"~/.local/share/{cmd}\"\nretries = 2",
+    "config_rows": [
+     {
+      "k": "shell",
+      "v": "/bin/sh"
+     },
+     {
+      "k": "log_dir",
+      "v": "~/.local/share/{cmd}"
+     },
+     {
+      "k": "retries",
+      "v": "0"
+     },
+     {
+      "k": "notify",
+      "v": "off"
+     }
+    ],
+    "recipes": [
+     {
+      "code": "{cmd} run backup"
+     },
+     {
+      "code": "{cmd} log backup --last"
+     },
+     {
+      "code": "{cmd} pause --all"
+     }
+    ]
+   }
+  },
+  {
+   "id": "csv",
+   "fixed": {
+    "quick": "{cmd} select name,city people.csv\n{cmd} sort --by city people.csv",
+    "install_code": "tar xf {cmd}-{ver}-linux-amd64.tar.gz\nsudo mv {cmd} /usr/local/bin/\n{cmd} --version",
+    "usage": [
+     {
+      "code": "{cmd} select name,city people.csv\n{cmd} select id,town=city people.csv"
+     },
+     {
+      "code": "{cmd} filter 'city = York' people.csv\n{cmd} filter 'age > 30' people.csv"
+     },
+     {
+      "code": "{cmd} join --on id people.csv orders.csv"
+     }
+    ],
+    "options": [
+     {
+      "o": "--delimiter"
+     },
+     {
+      "o": "--header"
+     },
+     {
+      "o": "--output"
+     },
+     {
+      "o": "--by"
+     },
+     {
+      "o": "--on"
+     }
+    ],
+    "config_code": "# ~/.{cmd}rc\ndelimiter = \",\"\nheader = true\nencoding = \"utf-8\"",
+    "config_rows": [
+     {
+      "k": "delimiter",
+      "v": ","
+     },
+     {
+      "k": "header",
+      "v": "true"
+     },
+     {
+      "k": "encoding",
+      "v": "utf-8"
+     },
+     {
+      "k": "null",
+      "v": "—"
+     }
+    ],
+    "recipes": [
+     {
+      "code": "{cmd} select name,city --rename city=town people.csv"
+     },
+     {
+      "code": "{cmd} join id people.csv orders.csv"
+     },
+     {
+      "code": "{cmd} tidy --dedupe people.csv"
+     }
+    ]
+   }
+  }
+ ]
+}

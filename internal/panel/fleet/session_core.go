@@ -14,6 +14,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -367,7 +368,7 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	tr.state.HelloAppliedStateHash = h.AppliedStateHash
 	tr.Effects = append(tr.Effects, SessionEffect{Kind: EffectConnectEvents, PreviousNode: &prev, BootAt: info.BootAt, At: event.At, Instance: h.InstanceId})
 	autoMeasure := prev.State == "pending" && node.BandwidthMbps == 0
-	autoMeasure = autoMeasure && slices.Contains(info.Caps, capBandwidth)
+	autoMeasure = autoMeasure && slices.Contains(info.Caps, agentcap.Bandwidth)
 	tr.state.AgentCaps = slices.Clone(info.Caps)
 	if !slices.Equal(prev.AgentCaps, info.Caps) {
 		c.f.controlRelaysForNode(ctx, tr.state.NodeID)

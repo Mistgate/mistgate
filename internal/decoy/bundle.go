@@ -574,10 +574,10 @@ func BundleHandler(b *Bundle) http.Handler {
 		if !ok {
 			if name == "robots.txt" {
 				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-				w.Header().Set("Content-Length", fmt.Sprint(len(robotsTXT)))
+				w.Header().Set("Content-Length", fmt.Sprint(len(RobotsTXT)))
 				w.WriteHeader(http.StatusOK)
 				if r.Method != http.MethodHead {
-					_, _ = io.WriteString(w, robotsTXT)
+					_, _ = io.WriteString(w, RobotsTXT)
 				}
 				return
 			}
@@ -596,7 +596,8 @@ func bundleNotFound(w http.ResponseWriter, r *http.Request, files map[string][]b
 	write(w, r, http.StatusNotFound, body)
 }
 
-const robotsTXT = "User-agent: GPTBot\nUser-agent: ChatGPT-User\nUser-agent: OAI-SearchBot\nUser-agent: ClaudeBot\n" +
+// RobotsTXT is the robots.txt a site without one is served; the site generator makes its own from the same list of crawlers.
+const RobotsTXT = "User-agent: GPTBot\nUser-agent: ChatGPT-User\nUser-agent: OAI-SearchBot\nUser-agent: ClaudeBot\n" +
 	"User-agent: Claude-Web\nUser-agent: anthropic-ai\nUser-agent: CCBot\nUser-agent: Google-Extended\n" +
 	"User-agent: Bytespider\nUser-agent: PerplexityBot\nUser-agent: Amazonbot\nUser-agent: Applebot-Extended\n" +
 	"User-agent: meta-externalagent\nUser-agent: cohere-ai\nUser-agent: Diffbot\nDisallow: /\n\nUser-agent: *\nAllow: /\n"

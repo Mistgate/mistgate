@@ -1,0 +1,24 @@
+{
+ "bundles": [
+  {
+   "id": "customer",
+   "weight": 2
+  },
+  {
+   "id": "staff",
+   "weight": 2
+  },
+  {
+   "id": "learning",
+   "weight": 2
+  },
+  {
+   "id": "archive",
+   "weight": 2
+  },
+  {
+   "id": "bookings",
+   "weight": 2
+  }
+ ]
+}

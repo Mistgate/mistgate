@@ -11,13 +11,14 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
 // The OS rollout: the node's side is played by the test (snapshots, events, boots), the panel's by the Service on a real store.
 
-var osCaps = []string{"doctor/1", osupdate.Capability, osupdate.CapabilityUpdate}
+var osCaps = []string{"doctor/1", agentcap.OSStatus, agentcap.OSUpdate}
 
 const (
 	kernelOld = "6.8.0-147-generic"
@@ -348,7 +349,7 @@ func TestOsStartRefusals(t *testing.T) {
 		t.Fatalf("an unknown node = %v", err)
 	}
 
-	old := e.addNode("old1", nodeOpts{caps: []string{"doctor/1", osupdate.Capability}})
+	old := e.addNode("old1", nodeOpts{caps: []string{"doctor/1", agentcap.OSStatus}})
 	e.osStatus(old, nil)
 	e.wantBlocked(old, sec, ifReq, blockAgentOld)
 
@@ -386,7 +387,7 @@ func TestOsStartRefusedByOtherWork(t *testing.T) {
 	e := newEnv(t)
 	e.defaultBundle()
 	os1 := e.osNode("de1")
-	other := e.addNode("nl1", nodeOpts{caps: []string{"doctor/1", capUpdate, capGuard}})
+	other := e.addNode("nl1", nodeOpts{caps: []string{"doctor/1", agentcap.Update, agentcap.UpdateGuard}})
 
 	e.startRollout(other)
 	e.wantBlocked(os1, store.OsModeSecurity, store.OsRebootIfRequired, blockAgentRollout)
@@ -475,7 +476,7 @@ func TestOsRolloutThatHappenedOnTheNodePausesAndBlocksOnlyTheNextOsUpdate(t *tes
 	e := newEnv(t)
 	e.defaultBundle()
 	id := e.osNode("de1")
-	other := e.addNode("nl1", nodeOpts{caps: []string{"doctor/1", capUpdate, capGuard}})
+	other := e.addNode("nl1", nodeOpts{caps: []string{"doctor/1", agentcap.Update, agentcap.UpdateGuard}})
 	e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
 	e.osTick()
 	x := e.osStep(id)
@@ -800,10 +801,38 @@ func TestOsCancel(t *testing.T) {
 
 	e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
 	e.osTick()
-	if _, err := e.s.cancelOs(e.ctx, ""); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "os_cancel_inflight") {
-		t.Fatalf("cancel while the job runs on the node = %v", err)
+	got, err = e.s.cancelOs(e.ctx, "")
+	if err != nil || got.Status != store.RolloutPaused || got.PauseKey != pauseCancelWait {
+		t.Fatalf("cancel while the job runs on the node = %+v, %v", got, err)
 	}
-	e.wantOsRollout(store.RolloutRunning, "")
+	e.wantOsRollout(store.RolloutPaused, pauseCancelWait)
+	x := e.osStep(id)
+	e.osEvent(id, "os_update_failed", map[string]string{"job_id": x.JobID, "code": osupdate.CodeInstallFailed})
+	e.osTick()
+	e.wantOsStep(id, store.OsStepFailed, osErrJobFailed)
+	e.wantOsRollout(store.RolloutCancelled, "")
+}
+
+func TestOsCancelWaitReadsLegacyPauseParams(t *testing.T) {
+	e := newEnv(t)
+	id := e.osNode("de1")
+	ro := e.startOs(id, store.OsModeSecurity, store.OsRebootIfRequired)
+	e.osTick()
+	legacy := map[string]string{"cancel_requested": "true"}
+	if _, err := e.st.SetOsRolloutStatus(e.ctx, ro.ID, []string{store.RolloutRunning}, store.RolloutPaused, pauseCancelWait, legacy, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	if !isCancelWait("", legacy) {
+		t.Fatal("the old OS cancel marker is no longer recognized")
+	}
+	if _, err := e.s.resumeOs(e.ctx, ro.ID, false); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("resume of a stored cancellation wait = %v", err)
+	}
+	x := e.osStep(id)
+	e.osEvent(id, "os_update_failed", map[string]string{"job_id": x.JobID, "code": osupdate.CodeInstallFailed})
+	e.osTick()
+	e.wantOsStep(id, store.OsStepFailed, osErrJobFailed)
+	e.wantOsRollout(store.RolloutCancelled, "")
 }
 
 func TestOsRolloutPrune(t *testing.T) {
@@ -874,7 +903,7 @@ func TestOsBlockOrder(t *testing.T) {
 func TestGetOsUpdatesCarriesBlocksAndTheRollout(t *testing.T) {
 	e := newEnv(t)
 	id := e.osNode("de1")
-	old := e.addNode("old1", nodeOpts{caps: []string{"doctor/1", osupdate.Capability}})
+	old := e.addNode("old1", nodeOpts{caps: []string{"doctor/1", agentcap.OSStatus}})
 	e.osStatus(old, nil)
 	get := func() *adminv1.GetOsUpdatesResponse {
 		t.Helper()
@@ -925,7 +954,7 @@ func TestRefreshOsUpdatesIsRateLimited(t *testing.T) {
 	off := e.osNode("off1")
 	e.osStatus(off, func(s *agentv1.OsStatus) { s.ListsUnix = e.clk.Now().Unix() - 3*3600 })
 	e.drop(off)
-	old := e.addNode("old1", nodeOpts{caps: []string{"doctor/1", osupdate.Capability}})
+	old := e.addNode("old1", nodeOpts{caps: []string{"doctor/1", agentcap.OSStatus}})
 	got := func(res []*adminv1.OsRefreshResult) map[string]string {
 		m := map[string]string{}
 		for _, r := range res {

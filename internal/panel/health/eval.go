@@ -2,7 +2,6 @@ package health
 
 import (
 	"context"
-	"encoding/json"
 	"maps"
 	"slices"
 	"sort"
@@ -14,6 +13,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/node/unit"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // Alert derivation. One evaluation computes, from the node states, the doctor rows and the check
@@ -118,6 +118,7 @@ type derived struct {
 	holdKeys   map[key]bool    // an alert cannot be judged yet: its comparison window is warming up, or the check result behind it is stale
 	superseded map[key]bool    // an open alert is explained by a more specific current check alert
 	guard      bool            // the panel's own network is suspect: no per-node synthetic alert is raised
+	recheck    []string        // nodes whose UDP profiles time out and have no fresh clean delivery check from another node
 	staleAfter time.Duration   // how old a check result may be and still count (the interval setting is read once per pass)
 	health     map[string]nodeHealth
 }
@@ -257,6 +258,7 @@ func (s *Service) evaluateLocked(ctx context.Context) {
 		return
 	}
 	d := s.derive(ctx, now, sn, indexLiveRows(liveRows), rows, acceptsByNode(accepts), signals, portChecks, probeSamples, active)
+	s.recheckUDPPorts(ctx, now, d.recheck)
 	addPathLossyConds(now, pathLosses, func(c cond) { d.conds[c.key] = c })
 	s.addRelayDownConds(ctx, now, sn, signals.RelayLinks, active, d)
 	s.nhMu.Lock()
@@ -466,8 +468,14 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 				}
 			}
 		}
+		panelPath := func(p probed) bool { return panelUDPPath(p, n.ID, portChecks) }
 		if !d.guard && len(judgedFailing) > 0 {
-			if len(nodeProbed) > 0 && len(nodeJudgedFailing) == len(nodeProbed) && !staleOn[n.ID] {
+			if slices.ContainsFunc(judgedFailing, func(p probed) bool { return udpTimedOut(p) && !panelPath(p) }) {
+				d.recheck = append(d.recheck, n.ID)
+			}
+			// every profile timing out while other nodes reach its UDP port is the panel's path, not a node without traffic
+			if len(nodeProbed) > 0 && len(nodeJudgedFailing) == len(nodeProbed) && !staleOn[n.ID] &&
+				slices.ContainsFunc(nodeJudgedFailing, func(p probed) bool { return !panelPath(p) }) {
 				h.noTraffic = true
 				params := map[string]string{"failed": strconv.Itoa(h.failed), "total": strconv.Itoa(h.total)}
 				ports := failedPorts(nodeJudgedFailing)
@@ -481,6 +489,9 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 				warpDead := !d.holdDoctor[n.ID] && failsCheck(docs[n.ID], "warp_path")
 				for _, f := range judgedFailing {
 					variant := whyVariant(f, ps)
+					if panelPath(f) {
+						variant = panelUDPPathVariant
+					}
 					cdn := cdnHost(f.t)
 					if cdn != "" {
 						variant = "via_cdn"
@@ -489,7 +500,7 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 						continue
 					}
 					sev := sevWarning
-					if sameProtocol(sn.byNode[n.ID], f.t) == 1 {
+					if sameProtocol(sn.byNode[n.ID], f.t) == 1 && variant != panelUDPPathVariant {
 						sev = sevCritical // the node's only inbound of that protocol
 					}
 					code := f.c.last.ErrorCode
@@ -557,19 +568,13 @@ func notStartedCond(ts []*target, t *target) cond {
 }
 
 func cdnHost(t *target) string {
-	if t == nil || t.in.Protocol != "vless" {
+	if t == nil {
 		return ""
 	}
-	var settings struct {
-		Security string `json:"security"`
-		CDN      struct {
-			Host string `json:"host"`
-		} `json:"cdn"`
+	if v, _ := plugin.VLESSOf(t.spec); v.TLS() {
+		return v.CDNHost
 	}
-	if json.Unmarshal(t.settings, &settings) != nil || settings.Security != "tls" {
-		return ""
-	}
-	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(settings.CDN.Host), "."))
+	return ""
 }
 
 // addPortLossyConds derives a port alert from each enabled inbound's current port and its latest stored verdict.
@@ -675,6 +680,26 @@ type probed struct {
 }
 
 func (p probed) passing() bool { return p.c.streak < failStreakMin }
+
+// panelUDPPathVariant is the diagnosis of a UDP profile whose check times out while another node's UDP reaches its port.
+const panelUDPPathVariant = "panel_udp_path"
+
+func udpTimedOut(f probed) bool {
+	return f.c.last != nil && f.c.last.ErrorCode == "timeout" && udpProbeProtocol(f.t.spec.Protocol)
+}
+
+// panelUDPPath reports whether a UDP profile times out only on the panel's own path: a clean UDP delivery check of its port
+// from another node, taken after the current series of failures began, shows the port open and reachable. The series
+// start is the freshness bar: an older check may predate the cause.
+func panelUDPPath(f probed, nodeID string, checks []store.PortCheck) bool {
+	if !udpTimedOut(f) {
+		return false
+	}
+	return slices.ContainsFunc(checks, func(c store.PortCheck) bool {
+		return c.NodeID == nodeID && c.Port == uint16(f.t.spec.Listen.Port) && c.Verdict == "ok" &&
+			c.Sender != "" && c.Sender != "panel" && c.Sender != nodeID && c.CheckedAt.After(f.c.since)
+	})
+}
 
 // whyVariant is the diagnosis of one failing inbound among the probed inbounds of its node.
 func whyVariant(f probed, all []probed) string {

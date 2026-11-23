@@ -474,7 +474,7 @@ func TestOnlyARunningOsRolloutHoldsUpTheBundleSyncAndTheSchedule(t *testing.T) {
 
 	e.startOs(osn, store.OsModeSecurity, store.OsRebootIfRequired)
 	e.osTick() // sent: running
-	e.s.syncNodeBundle(e.ctx)
+	e.syncBundle()
 	e.s.processScheduledNodeUpdates(e.ctx)
 	if src.syncs != 0 {
 		t.Fatalf("the bundle was synced %d times during an OS update", src.syncs)
@@ -491,7 +491,7 @@ func TestOnlyARunningOsRolloutHoldsUpTheBundleSyncAndTheSchedule(t *testing.T) {
 	e.osEvent(osn, "os_update_failed", map[string]string{"job_id": x.JobID, "code": osupdate.CodeInstallFailed})
 	e.osTick()
 	e.wantOsRollout(store.RolloutPaused, pauseStepFailed)
-	e.s.syncNodeBundle(e.ctx)
+	e.syncBundle()
 	if src.syncs != 1 {
 		t.Fatalf("the bundle sync was held up by a stopped OS update (%d syncs)", src.syncs)
 	}

@@ -4,8 +4,8 @@ import (
 	"slices"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
-	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The way of a relay in the admin API (relay.proto Relay.mode and the fields after it). This part only reports what the store
@@ -31,9 +31,9 @@ func reverseBlockedOf(network string, entryCaps, exitCaps []string) string {
 	switch {
 	case network != "tcp":
 		return reverseBlockedUDP
-	case !slices.Contains(entryCaps, plugin.CapRelayReverse):
+	case !slices.Contains(entryCaps, agentcap.RelayReverse):
 		return reverseBlockedEntryOld
-	case !slices.Contains(exitCaps, plugin.CapRelayReverse):
+	case !slices.Contains(exitCaps, agentcap.RelayReverse):
 		return reverseBlockedExitOld
 	}
 	return ""

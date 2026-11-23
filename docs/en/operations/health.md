@@ -3,6 +3,8 @@ title: Health
 description: How the panel checks every profile as a real client, what the node doctor looks at and can fix, and how alerts open, close and stay quiet.
 ---
 
+![The client-eye checks table: nodes against protocols with the delay through each tunnel, and a failing node opened to show why](../../images/readme/health-dark-en.webp)
+
 Mistgate watches the fleet from two sides. The panel connects to every profile on every node the way a client app does (client-eye checks), and the agent on every node checks its own host (the node doctor). Alerts are derived from both and from the state of the nodes. Everything is on the **Health** page, in the tabs **Alerts**, **Checks** and **Doctor**; the node page has its own **Doctor** tab and shows the checks of that node on its **Overview** tab.
 
 ![Health: the folded alerts, the doctor's one-click fix and the check turning green](../../images/video/health-poster-en.webp)
@@ -137,9 +139,11 @@ A green cell means that, within the last few minutes, a client from the panel's 
 
 Whether the nodes open from inside a country (Russia by default) is checked by Globalping, the block lists, the TSPU probe, cheburcheck and bsbord, and has a section of its own in the admin, **Reachability**: see [Reachability](reachability.md). Here, **Health → Checks** shows the verdict as its last column, *From Russia*, and the node page as a row.
 
+![Two points of view on a node](../diagrams/two-views.svg)
+
 ## Node doctor
 
-Every node agent runs 22 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
+Every node agent runs 23 checks of its own host. They only read: files under `/proc` and `/sys`, a few configuration files and read-only commands (`systemctl list-*`, `nft list`, `timedatectl show`, `dmesg`, `journalctl -k`). Changing anything is a separate, confirmed step (see "Fixes" below).
 
 ### When it runs
 
@@ -251,7 +255,7 @@ An alert that fires again within an hour of closing reopens with its original id
 | Title in the admin | Kind | Severity | Opens when |
 |---|---|---|---|
 | Node is unreachable | `node_down` | Critical | The agent has had no connection for 10 minutes. A shorter outage is an event, not an alert. The alert and the `node_down` event carry `traffic_24h_bytes` and `traffic_7d_bytes`, the node's traffic over the last 24 hours and 7 days as it was when the node went silent (the `country_blocked` alert carries the same two numbers from the moment it opened). The Cloudflare edition leaves them out. |
-| Host blip | `host_blip` | Info | History only: written when the link came back within 10 minutes without a reboot. It is never active. |
+| Host blip | `host_blip` | Info | History only: written when the link came back within 10 minutes without a reboot. It is never active. If the panel itself heard no node at all for longer than about 35 seconds (its own network dropped, or its server froze), the nodes that come back after that are not blamed: no record and no blip count per node, one `panel_link_gap` event is written instead. |
 | The panel lost contact with most nodes | `node_down` (fleet-wide) | Critical | At once, at least 80% of active nodes at three or more values of **Hoster** have had no connection for 10 minutes. That points at the panel's own connection: the per-node "Node is unreachable" alerts are held, and one alert stands for all. |
 | The node keeps dropping | `host_blip` (flapping) | Warning | In the last hour the agent's link dropped briefly, or the agent restarted soon after its previous start, three times or more. Each break is shorter than a "Node is unreachable", but connections on the node drop every time. |
 | "<profile>" did not start on the node | `check_failed` | Warning; Critical when it is the node's only profile of that protocol | The node reported that the profile failed to start, so it serves no one (and is left out of subscriptions). The reason is on the node page. A profile with the WARP exit is left to the WARP alert while WARP is down. |
@@ -287,6 +291,7 @@ The reason under a traffic alert names the likely cause:
 |---|---|
 | UDP port blocked | A profile times out while another profile of the node answers on another port, or the whole node times out on one port: the hoster seems to cut that UDP port. |
 | All UDP blocked | Every profile times out, on port 443 or on two and more ports: the hoster seems to cut incoming UDP. |
+| Panel's UDP path | A UDP profile times out, but a clean UDP delivery check from another node reached its port after the failures began: the port is open and works for people, and the loss is on the path from the panel's server. Warning at most; there is no need to change the port. |
 | WARP exit dead | A profile with WARP egress fails while a direct profile of the same protocol on the node works. |
 | auth, tls, refused, exit unreachable, test sites answer errors | The error code of the check, explained in plain words. |
 | Mixed | Every profile fails, each in its own way. |

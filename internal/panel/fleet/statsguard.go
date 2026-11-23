@@ -7,6 +7,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/logscrub"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -126,7 +127,7 @@ func satMulDuration(rate uint64, elapsed time.Duration) uint64 {
 
 // guardNetworks makes the owner switch effective even when an agent sends rows it should not send.
 func (f *Fleet) guardNetworks(st *agentv1.StatsBatch, caps []string) ([]store.FleetNetwork, []store.FleetPersonNetwork, string) {
-	if !store.CapabilityPresent(caps, capNetworks) {
+	if !store.CapabilityPresent(caps, agentcap.Nets) {
 		return nil, nil, ""
 	}
 	mode := f.NetworkMode()
@@ -281,6 +282,15 @@ func (f *Fleet) guardLinks(st *agentv1.StatsBatch) []store.FleetLink {
 			RealityFallback: l.RealityFallback, AuthFailed: l.AuthFailed, TCPStalls: l.TcpStalls, TCPStalls16K: l.TcpStalls_16K,
 			Initiations: l.Initiations, Responses: l.Responses, ResponsesUnmatched: l.ResponsesUnmatched,
 			HelloPQ: l.HelloPq, HelloClassic: l.HelloClassic, HelloUnknown: l.HelloUnknown, Tunnel: tunnelRefusals(l)})
+	}
+	// The panel's own TLS checks of a REALITY port were counted as wrong keys and fallbacks by the node (ownProbes): take each
+	// off the inbound row, so every reader (the page, the API, MCP) sees strangers only. Not below zero.
+	for i := range out {
+		if l := &out[i]; l.CredID == "" && l.AuthFailed > 0 {
+			n := f.ownProbes.take(l.InboundID, l.AuthFailed, f.now())
+			l.AuthFailed -= n
+			l.RealityFallback -= min(n, l.RealityFallback)
+		}
 	}
 	return out
 }

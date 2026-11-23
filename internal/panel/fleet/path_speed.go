@@ -18,6 +18,7 @@ import (
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -219,10 +220,10 @@ func (f *Fleet) runPathSpeed(ctx context.Context, from, to store.NodeRow, direct
 // limits, and mb is then the volume cap of the step in MiB; the sender is stopped too when the call is cancelled.
 func (f *Fleet) runSpeedMode(ctx context.Context, from, to store.NodeRow, direction string, mb uint32, channel bool) speedJSON {
 	res := speedJSON{MB: mb}
-	capability, serveStep, runStep, serveS, runS := capSpeed, uint32(1), uint32(2), uint32(speedMaxS), uint32(speedMaxS)
+	capability, serveStep, runStep, serveS, runS := agentcap.Speed, uint32(1), uint32(2), uint32(speedMaxS), uint32(speedMaxS)
 	runWait := speedRunWait
 	if channel {
-		capability, serveStep, runStep, serveS, runS = capSpeedChannel, speedStepServeChannel, speedStepRunChannel, channelServeS, channelRunS
+		capability, serveStep, runStep, serveS, runS = agentcap.SpeedChannel, speedStepServeChannel, speedStepRunChannel, channelServeS, channelRunS
 		runWait = channelRunWait
 	}
 	liveRows, err := f.Live(ctx)

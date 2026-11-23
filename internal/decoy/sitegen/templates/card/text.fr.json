@@ -1,0 +1,185 @@
+{
+ "ui": {
+  "nav_label": "Navigation",
+  "footer": "Fait à la main. Sans cookies, sans suivi.",
+  "nav_home": "Carte de visite",
+  "nav_about": "À propos",
+  "nav_projects": "Projets",
+  "nav_now": "En ce moment",
+  "home_title": "Bonjour",
+  "desc_about": "En savoir plus sur {brand}.",
+  "desc_projects": "Une sélection de projets de {brand}.",
+  "desc_now": "Ce que fait {brand} en ce moment.",
+  "nf_title": "Il n'y a rien ici",
+  "nf_text": "Il n'y a pas de page à cette adresse. Essayez la carte de visite sur la page d'accueil.",
+  "nf_back": "Retour à la carte de visite",
+  "link_d": [
+   "Qui je suis et comment je travaille",
+   "Quelques réalisations à regarder",
+   "Ce que je fais en ce moment"
+  ],
+  "about_h": "À propos",
+  "facts_h": "En bref",
+  "projects_h": "Projets",
+  "projects_intro": "Quelques réalisations, des plus récentes aux plus anciennes.",
+  "now_h": "En ce moment",
+  "updated": "Mis à jour en {upd} 2026",
+  "now_intro": "Voici une page « en ce moment » : ce que je fais ces jours-ci, et non ce que j'ai dit un jour que je ferais.",
+  "hello": "Bonjour, je suis",
+  "vars": {
+   "brand": "{name}",
+   "month": ["janvier", "mars", "mai", "septembre"],
+   "upd": ["août", "septembre", "octobre", "novembre"]
+  }
+ },
+ "bundles": {
+  "illustrator": {
+   "role": "Illustration et linogravure",
+   "tagline": "Des images pour des albums, des affiches et, de temps en temps, une carte d'anniversaire.",
+   "desc": "{brand} : illustration et linogravure {city_in}. Albums jeunesse, affiches et gravures.",
+   "bio": "Je dessine pour des albums jeunesse et des affiches, et je grave des linogravures pour qui le demande poliment.",
+   "about": [
+    "Je vis du dessin, surtout pour des albums jeunesse et, de temps en temps, une affiche. Je travaille dans une petite pièce {city_in}, dont la fenêtre donne sur un parking que je dessine comme si c'était un lac.",
+    "Avant l'illustration, j'ai étudié l'impression sur textile, et l'habitude de penser en couches n'a jamais disparu. La plupart de mes images sont construites avec trois ou quatre aplats de couleur."
+   ],
+   "facts": [
+    "Atelier {city_in}",
+    "Plume, encre et linogravure",
+    "Commandes ouvertes à partir de {month}"
+   ],
+   "projects": [
+    {
+     "t": "Carnet de champ",
+     "y": "2025",
+     "d": "Un album sur une année dans un petit champ, réalisé avec une imprimerie de la région."
+    },
+    {
+     "t": "La série du marché",
+     "y": "2024",
+     "d": "Douze linogravures d'étals, de clients et d'un pigeon très content de lui."
+    },
+    {
+     "t": "Cartes d'anniversaire pour une librairie",
+     "y": "2023",
+     "d": "Six cartes imprimées à la main, tirées à deux cents exemplaires."
+    }
+   ],
+   "now": [
+    "Je termine les dernières doubles pages d'un album sur la météo",
+    "J'apprends à graver une linogravure en quatre couleurs sans perdre patience",
+    "Je cherche une presse plus grande"
+   ]
+  },
+  "translator": {
+   "role": "Traduction de l'allemand vers le français",
+   "tagline": "Des traductions soignées de romans, d'essais et, parfois, d'une notice.",
+   "desc": "{brand} : traduction de l'allemand vers le français, romans et essais, {city_in}.",
+   "bio": "Je traduis de l'allemand vers le français, surtout des romans et des essais, et je relis tout à voix haute deux fois.",
+   "about": [
+    "Je traduis de l'allemand vers le français, surtout des romans et des essais, et parfois la notice d'un objet qui mériterait mieux que ça.",
+    "Je travaille lentement, je relis tout à voix haute deux fois et j'envoie une note pour chaque phrase sur laquelle j'ai hésité. Les éditeurs trouvent ça soit charmant, soit exaspérant."
+   ],
+   "facts": [
+    "Bureau {city_in}",
+    "Traduction de l'allemand vers le français",
+    "Disponible pour de nouveaux projets à partir de {month}"
+   ],
+   "projects": [
+    {
+     "t": "Un roman sur un gardien de phare",
+     "y": "2025",
+     "d": "Quatre cents pages de météo et de regrets, traduites en quatorze mois."
+    },
+    {
+     "t": "Essais sur la marche",
+     "y": "2024",
+     "d": "Un recueil de textes courts d'un écrivain qui allait partout à pied."
+    },
+    {
+     "t": "Un catalogue de musée",
+     "y": "2023",
+     "d": "Les textes d'une exposition de tissus, avec plus d'adjectifs que je n'en aurais choisi."
+    }
+   ],
+   "now": [
+    "Je révise la traduction d'un long roman",
+    "Je lis des essais que je pourrais proposer à un éditeur",
+    "Je mets à jour mon glossaire de termes de marine"
+   ]
+  },
+  "potter": {
+   "role": "Poterie",
+   "tagline": "Des bols, des tasses et des assiettes simples, fabriqués en petites séries.",
+   "desc": "{brand} : poterie {city_in}. De la vaisselle de grès tournée au quotidien.",
+   "bio": "Je tourne du grès tout simple et je le cuis en petites fournées.",
+   "about": [
+    "Je fabrique de la vaisselle utile dans un atelier partagé avec trois autres artisans {city_in}. Tout est tourné au tour et cuit en grès.",
+    "J'aime les pièces qui se fondent dans l'usage de tous les jours : une tasse qui tient bien en main, un bol qui ne bascule pas. Les émaux sont surtout à base de fer et de cendres, et ils changent un peu à chaque cuisson."
+   ],
+   "facts": [
+    "Atelier {city_in}",
+    "Grès cuit à 1260 degrés",
+    "Nouvelles pièces en vente dès {month}"
+   ],
+   "projects": [
+    {
+     "t": "Le service de tous les jours",
+     "y": "2025",
+     "d": "Assiettes, bols et tasses dans un émail couleur avoine qui n'est jamais sorti deux fois pareil."
+    },
+    {
+     "t": "Bols à thé",
+     "y": "2024",
+     "d": "Trente petits bols, tous un peu différents, faits pour un salon de thé."
+    },
+    {
+     "t": "Une commande de carreaux",
+     "y": "2023",
+     "d": "Un mur de carreaux pressés à la main pour une cuisine, en quatre verts."
+    }
+   ],
+   "now": [
+    "Je teste un émail aux cendres, fait avec celles du feu de jardin d'un voisin",
+    "Je tourne de plus grandes assiettes",
+    "Je fais de la place sur les étagères du four pour les commandes d'hiver"
+   ]
+  },
+  "developer": {
+   "role": "Développement de petits outils",
+   "tagline": "De petits programmes discrets qui font une seule chose et ne dérangent personne.",
+   "desc": "{brand} : développement de petits outils {city_in}. Une application de notes, un calendrier et quelques programmes en ligne de commande.",
+   "bio": "J'écris de petits outils pour les gens qui travaillent avec des mots et des chiffres, et j'essaie de les livrer terminés.",
+   "about": [
+    "J'écris de petits outils pour les gens qui travaillent avec des mots et des chiffres : une application de notes, quelques programmes en ligne de commande, un calendrier qui n'affiche que ce qui compte aujourd'hui.",
+    "Je construis les choses lentement et j'essaie de les livrer terminées. La plupart de ce que je fais a moins de fonctions qu'il pourrait en avoir, et c'est voulu."
+   ],
+   "facts": [
+    "Bureau {city_in}",
+    "Écrit en quelques langages sans surprise",
+    "Disponible pour de petits projets à partir de {month}"
+   ],
+   "projects": [
+    {
+     "t": "Une application de notes pour le bureau",
+     "y": "2025",
+     "d": "Des fichiers texte, une recherche rapide et aucun compte à créer."
+    },
+    {
+     "t": "Un calendrier pour un seul jour",
+     "y": "2024",
+     "d": "Il affiche aujourd'hui et rien d'autre, ce qui suffit finalement."
+    },
+    {
+     "t": "Un suivi du temps de travail",
+     "y": "2023",
+     "d": "Un seul bouton et un résumé chaque semaine, pour ceux qui détestent les feuilles de temps."
+    }
+   ],
+   "now": [
+    "Je remets de l'ordre dans le code de l'application de notes",
+    "J'écris un petit mode d'emploi",
+    "Je réfléchis à une version plus petite de tout"
+   ]
+  }
+ }
+}

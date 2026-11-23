@@ -515,7 +515,7 @@ func (s decoySiteService) CopyDecoySite(ctx context.Context, req *connect.Reques
 			name = string([]rune(from.Name)[:store.MaxDecoyNameRunes-5]) + " copy"
 		}
 	}
-	row, err := f.st.CreateDecoySite(ctx, f.now(), store.NewDecoySite{Name: name, Note: from.Note, Source: from.Source, State: store.DecoyStateDraft, By: f.actor(ctx), Bundle: b})
+	row, err := f.st.CreateDecoySite(ctx, f.now(), store.NewDecoySite{Name: name, Note: from.Note, Source: from.Source, State: store.DecoyStateDraft, By: f.actor(ctx), Label: templateLabelOf(from.SourceLabel), Bundle: b})
 	if err != nil {
 		return nil, s.fail("copy decoy site", err)
 	}

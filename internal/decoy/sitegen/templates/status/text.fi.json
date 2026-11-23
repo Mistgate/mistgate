@@ -1,0 +1,230 @@
+{
+ "ui": {
+  "utc": "UTC",
+  "nav_label": "Päävalikko",
+  "tagline": "Palvelun tila",
+  "footer": "Kaikki ajat näytetään UTC-aikana.",
+  "nav_home": "Tila",
+  "nav_history": "Häiriöhistoria",
+  "nav_about": "Tietoa",
+  "home_title": "Nykyinen tila",
+  "desc": "Palvelun {brand} nykyinen tila ja käytettävyys.",
+  "desc_history": "Palvelun {brand} aiemmat häiriöt ja miten ne korjattiin.",
+  "desc_about": "Miten palvelu {brand} mittaa käytettävyyttään ja kertoo häiriöistä.",
+  "nf_title": "Sivua ei löytynyt",
+  "nf_text": "Tässä osoitteessa ei ole mitään. Tilasivu löytyy etusivulta.",
+  "nf_back": "Siirry tilasivulle",
+  "banner_ok": "Kaikki järjestelmät toimivat",
+  "banner_sub": "Kaikki palvelun {brand} osat toimivat normaalisti.",
+  "comps_h": "Osat",
+  "op": "Toiminnassa",
+  "up_label": "käytettävyys",
+  "days_ago_l": "60 päivää sitten",
+  "days_ago_r": "Tänään",
+  "m_uptime": "Käytettävyys, viimeiset 90 päivää",
+  "m_resp": "Vasteajan mediaani",
+  "m_inc": "Kirjattuja häiriöitä",
+  "recent_h": "Viimeisimmät häiriöt",
+  "all_inc": "Koko häiriöhistoria",
+  "history_h": "Häiriöhistoria",
+  "history_intro": "Mikä meni pieleen viime kuukausina ja miten se korjattiin, uusin ensin.",
+  "st_inv": "Selvitetään",
+  "st_ident": "Syy löydetty",
+  "st_res": "Ratkaistu",
+  "imp_minor": "Pieni",
+  "imp_major": "Suuri",
+  "imp_maint": "Huolto",
+  "dur_l": "Kesto",
+  "about_h": "Tietoa tästä sivusta",
+  "about": [
+   {
+    "h": "Mitä tämä sivu näyttää",
+    "p": "Tämä sivu näyttää palvelun {brand} osien tilan reaaliajassa sekä kirjauksen aiemmista häiriöistä. Sivua ylläpitää palvelua pyörittävä tiimi."
+   },
+   {
+    "h": "Miten käytettävyys mitataan",
+    "p": "Jokaista osaa tarkistetaan useasta paikasta kerran minuutissa. Minuutti lasketaan katkoksi, jos yli puolet tarkistuksista epäonnistuu."
+   },
+   {
+    "h": "Miten häiriöistä kerrotaan",
+    "p": "Julkaisemme päivityksen, kun alamme selvittää ongelmaa, kun löydämme syyn ja kun ongelma on ratkaistu. Suuremmista häiriöistä kirjoitamme jälkikäteen lyhyen selvityksen."
+   },
+   {
+    "h": "Suunnitellut huollot",
+    "p": "Suunnitellut huollot ilmoitetaan täällä vähintään kolme päivää etukäteen, ja ne tehdään hiljaisina aikoina."
+   }
+  ],
+  "incidents": [
+   {
+    "title": "Virheiden määrä kasvanut",
+    "impact": "major",
+    "dur": "38 minuuttia",
+    "a": "Epäonnistuneiden pyyntöjen osuus on tavallista suurempi. Selvitämme syytä.",
+    "b": "Virheellinen asetusmuutos löytyi, ja se perutaan.",
+    "c": "Muutos peruttiin ja virheiden määrä on palannut normaaliksi. Selvitämme vielä, miten se pääsi läpi."
+   },
+   {
+    "title": "Ilmoitukset viivästyvät",
+    "impact": "minor",
+    "dur": "1 tunti 12 minuuttia",
+    "a": "Ilmoitukset saapuvat usean minuutin viiveellä.",
+    "b": "Ilmoituksia käsittelevässä jonossa havaittiin ruuhka.",
+    "c": "Ruuhka on purettu ja ilmoitukset kulkevat taas normaalisti."
+   },
+   {
+    "title": "Sivut latautuvat hitaasti",
+    "impact": "minor",
+    "dur": "26 minuuttia",
+    "a": "Osa käyttäjistä kertoo, että sivut latautuvat hitaasti. Selvitämme asiaa.",
+    "b": "Yksi tietokantapalvelin kuormittui liikaa ja se otettiin pois käytöstä.",
+    "c": "Sivujen latausajat ovat palanneet normaaleiksi."
+   },
+   {
+    "title": "Huolto venyi suunniteltua pidemmäksi",
+    "impact": "maint",
+    "dur": "40 minuuttia suunniteltua pidempään",
+    "a": "Päätietokannan huolto kestää suunniteltua kauemmin.",
+    "b": "Päivityksen viimeinen vaihe tarvitsee vielä muutaman minuutin.",
+    "c": "Huolto on valmis ja kaikki palvelut toimivat normaalisti."
+   },
+   {
+    "title": "Osittainen katkos yhdellä alueella",
+    "impact": "major",
+    "dur": "54 minuuttia",
+    "a": "Yhden alueen käyttäjät eivät pääse palveluun. Teemme töitä palveluntarjoajamme kanssa.",
+    "b": "Palveluntarjoaja on vahvistanut, että alueen palvelimiamme koskee verkkovika.",
+    "c": "Verkkovika on korjattu ja alue on taas liikenteen piirissä."
+   },
+   {
+    "title": "Hakutulokset vanhentuneita",
+    "impact": "minor",
+    "dur": "2 tuntia 5 minuuttia",
+    "a": "Uudet kohteet eivät näy hakutuloksissa.",
+    "b": "Indeksointityö pysähtyi epäonnistuneen julkaisun jälkeen ja se käynnistettiin uudelleen.",
+    "c": "Indeksointi on ajan tasalla ja haku näyttää uusimmat tiedot."
+   },
+   {
+    "title": "Kirjautuminen epäonnistuu joillakin",
+    "impact": "major",
+    "dur": "19 minuuttia",
+    "a": "Osa käyttäjistä ei pääse kirjautumaan sisään. Muita asia ei koske.",
+    "b": "Kirjautumispalvelun varmenne oli vanhentunut.",
+    "c": "Varmenne uusittiin ja kirjautuminen toimii taas kaikilla."
+   },
+   {
+    "title": "Lataukset epäonnistuvat ajoittain",
+    "impact": "minor",
+    "dur": "47 minuuttia",
+    "a": "Pieni osa latauksista epäonnistuu ja ne pitää yrittää uudelleen.",
+    "b": "Löytyi tallennuspalvelin, jonka levy oli täynnä.",
+    "c": "Tilaa lisättiin ja lataukset onnistuvat taas."
+   },
+   {
+    "title": "Rajapinta vastaa hitaasti",
+    "impact": "minor",
+    "dur": "31 minuuttia",
+    "a": "Osa rajapintapyynnöistä vastataan tavallista hitaammin. Selvitämme asiaa.",
+    "b": "Taustatyö käytti yhdellä palvelimella liikaa muistia.",
+    "c": "Työ käynnistettiin uudelleen muistirajoituksella ja vasteajat ovat normaalit."
+   },
+   {
+    "title": "Webhookit myöhässä",
+    "impact": "minor",
+    "dur": "52 minuuttia",
+    "a": "Webhookit saapuvat perille usean minuutin myöhässä.",
+    "b": "Niitä lähettävä jono odotti hidasta yhteyttä tietokantaan.",
+    "c": "Yhteys korjattiin, jono purettiin ja webhookit tulevat taas ajoissa."
+   },
+   {
+    "title": "Hallintapaneeli ei toimi",
+    "impact": "major",
+    "dur": "22 minuuttia",
+    "a": "Hallintapaneeli näyttää kaikille virhesivun. Muut palvelut toimivat.",
+    "b": "Viimeisimmän julkaisun käynnistyskoodissa oli virhe, ja se löytyi.",
+    "c": "Julkaisu peruttiin ja hallintapaneeli toimii taas."
+   },
+   {
+    "title": "Suunniteltu huolto: tietokannan päivitys",
+    "impact": "maint",
+    "dur": "1 tunti",
+    "a": "Suunniteltu huolto on käynnissä. Joitakin toimintoja voi vain lukea, kunnes huolto on valmis.",
+    "b": "Päivitys on puolivälissä ja etenee suunnitellusti.",
+    "c": "Huolto on valmis ja kaikki toimii normaalisti."
+   }
+  ],
+  "inc_back": "Häiriöhistoria",
+  "inc_more": "Muut häiriöt",
+  "status_l": "Tila",
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Pohjan",
+      "Kivi",
+      "Koivu",
+      "Tuuli",
+      "Kuura",
+      "Meri",
+      "Jää",
+      "Lyhty",
+      "Sini",
+      "Havu",
+      "Kaarna",
+      "Aalto"
+     ],
+     [
+      "pilvi",
+      "silta",
+      "portti",
+      "paja",
+      "pöytä",
+      "verkko",
+      "kanava",
+      "keskus",
+      "palvelu",
+      "lanka"
+     ]
+    ],
+    "sep": ""
+   }
+  }
+ },
+ "bundles": {
+  "saas": {
+   "components": [
+    "Julkinen rajapinta",
+    "Hallintapaneeli",
+    "Webhookit",
+    "Kirjautuminen",
+    "Taustatyöt",
+    "Tietojen vienti",
+    "Laskutus",
+    "Ohjesivusto"
+   ]
+  },
+  "photos": {
+   "components": [
+    "Kuvien lataus",
+    "Kuvien jakelu",
+    "Albumit ja jakaminen",
+    "Verkkosovellus",
+    "Mobiilisynkronointi",
+    "Haku",
+    "Ilmoitukset",
+    "Tili ja kirjautuminen"
+   ]
+  },
+  "mail": {
+   "components": [
+    "Sähköpostien lähetys",
+    "Tekstiviestien lähetys",
+    "Viestipohjat",
+    "Toimitusraportit",
+    "REST-rajapinta",
+    "Hallintapaneeli",
+    "Tilauksen perumissivut",
+    "Ajastus"
+   ]
+  }
+ }
+}

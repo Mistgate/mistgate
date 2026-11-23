@@ -140,7 +140,7 @@ func (o Outcome) paramsJSON() string {
 type planned struct {
 	Summary  string // one English paragraph; never embeds untrusted text (that goes in Facts)
 	Facts    []Fact
-	Danger   []string // step_up | fleet | bulk: any entry makes the plan wait for the owner
+	Danger   []string // the danger codes of tools_change.go: any entry makes the plan wait for the owner
 	InnerRef string   // node_fix: the dry run's own plan id, never shown to the agent
 	// Params, when set, are the arguments as the plan resolved them (a node name became its id, "every outdated node" became
 	// the list the owner sees); they are what gets stored and applied. Nil: the arguments as given.
@@ -205,10 +205,10 @@ type changeSpec[P any] struct {
 // change builds the two tools of a change.
 func change[P any, PP reasoned[P]](s changeSpec[P]) []toolDef {
 	planTool := toolDef{
-		name: s.name + "_plan", min: s.min, procs: s.procs, free: true, isPlan: true, danger: s.danger,
-		desc: s.desc + " Changes nothing yet: it returns a plan and a confirm_token for " + s.name + "_apply.",
+		name: PlanTool(s.name), min: s.min, procs: s.procs, free: true, isPlan: true, danger: s.danger,
+		desc: s.desc + " Changes nothing yet: it returns a plan and a confirm_token for " + ApplyTool(s.name) + ".",
 		add: func(srv *mcp.Server, e *env, desc string) {
-			mcp.AddTool(srv, &mcp.Tool{Name: s.name + "_plan", Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
+			mcp.AddTool(srv, &mcp.Tool{Name: PlanTool(s.name), Description: desc, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in P) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, readTimeout)
 					if err != nil {
@@ -241,11 +241,11 @@ func change[P any, PP reasoned[P]](s changeSpec[P]) []toolDef {
 		},
 	}
 	applyTool := toolDef{
-		name: s.name + "_apply", min: s.min, procs: s.procs, danger: s.danger,
-		desc: "Executes the plan made by " + s.name + "_plan, once. Takes only the confirm_token. Call it only after the user agreed to the plan" +
+		name: ApplyTool(s.name), min: s.min, procs: s.procs, danger: s.danger,
+		desc: "Executes the plan made by " + PlanTool(s.name) + ", once. Takes only the confirm_token. Call it only after the user agreed to the plan" +
 			" (and, when the plan says it needs the owner, after the owner approved it in the admin panel).",
 		add: func(srv *mcp.Server, e *env, desc string) {
-			mcp.AddTool(srv, &mcp.Tool{Name: s.name + "_apply", Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(s.danger), OpenWorldHint: ptr(false)}},
+			mcp.AddTool(srv, &mcp.Tool{Name: ApplyTool(s.name), Description: desc, Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(s.danger), OpenWorldHint: ptr(false)}},
 				func(ctx context.Context, req *mcp.CallToolRequest, in applyIn) (*mcp.CallToolResult, any, error) {
 					c, err := e.begin(ctx, req, applyTimeout)
 					if err != nil {

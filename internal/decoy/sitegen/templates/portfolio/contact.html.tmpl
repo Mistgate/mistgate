@@ -1,0 +1,26 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main>
+<section class="__wrap__ __hero__ __hero3__">
+<div class="__g__"><span class="__lab__">{{.L.tagline}}</span><h1>{{.L.contact_h}}</h1></div>
+</section>
+<section class="__wrap__ __sec__">
+<div class="__sh__"><div class="__g__"><span class="__lab__ __cnt__"></span><h2>{{.L.visit_h}}</h2></div></div>
+<div class="__cgrid__">
+<div class="__cl__">
+<div class="__sw__"><div><b>{{icon "pin"}}</b><span>{{.V.address}}</span></div>{{if .V.phone}}<div><b>{{icon "phone"}}</b><span>{{.V.phone}}</span></div>{{end}}{{range $i, $h := .L.hours}}<div><b>{{if eq $i 0}}{{$.L.hours_h}}{{end}}</b><span>{{hrs $h.from $h.to $h.open $h.close}}</span></div>{{end}}<div><b></b><span>{{.L.hours_note}}</span></div></div>
+<figure class="__cmapf__">{{mapsvg "contact" 640 420}}</figure>
+</div>
+<div class="__cr__">
+<p class="__tbig__">{{.L.visit_text}}</p>
+<h3 class="__ch__">{{.L.commission_h}}</h3><p>{{.L.commission_text}}</p>
+<h3 class="__ch__">{{.L.directions_h}}</h3><p>{{.L.directions}}</p>
+{{if not .V.phone}}{{template "contactform" .}}
+<script src="{{.JS}}" defer></script>
+{{end}}</div>
+</div>
+</section>
+</main>
+{{template "footer" .}}
+</body>
+</html>

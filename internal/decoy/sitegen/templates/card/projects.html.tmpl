@@ -1,0 +1,11 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __bento__">
+<section class="__pgh__"><div><span class="__lab__">{{.Brand}}</span><h1>{{.L.projects_h}}</h1></div><p class="__tg__">{{.L.projects_intro}}</p></section>
+{{template "pj" .}}
+<section class="__t__ __n1__ __intro__"><span class="__lab__">{{.L.facts_h}}</span><p>{{index .L.about 0}}</p></section>
+{{template "links" .}}
+</main>
+{{template "footer" .}}
+</body>
+</html>

@@ -14,9 +14,6 @@ import (
 // process's sandbox, and the agent keeps the current backend (userspace) the whole time. Switching to the module is the
 // panel's job once it hears "done"; the agent re-runs the two doctor checks that describe the result.
 
-// capAwgPrepare is listed in Hello.capabilities: the panel sends PrepareAwgKernel only to agents that have it.
-const capAwgPrepare = "awg-prepare/1"
-
 const (
 	// prepareWatchEvery is how often the status file of a run is looked at.
 	prepareWatchEvery = 5 * time.Second

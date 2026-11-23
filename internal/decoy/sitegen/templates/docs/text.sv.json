@@ -1,0 +1,599 @@
+{
+ "ui": {
+  "ref_h": "Referens",
+  "nav_label": "Dokumentation",
+  "footer": "Dokumentation för version {ver}.",
+  "nav_home": "Översikt",
+  "nav_install": "Installation",
+  "nav_usage": "Användning",
+  "nav_faq": "Vanliga frågor",
+  "home_title": "Översikt",
+  "desc_install": "Så installerar du {brand} {ver} på Linux, macOS och Windows.",
+  "desc_usage": "Så använder du {brand}: vanliga uppgifter med exempel.",
+  "desc_faq": "Vanliga frågor om {brand}.",
+  "nf_title": "Sidan hittades inte",
+  "nf_text": "Den här sidan hör inte till dokumentationen. Den kan ha bytt namn i en nyare version.",
+  "nf_back": "Tillbaka till översikten",
+  "quick_h": "Kom igång snabbt",
+  "features_h": "Vad det gör",
+  "out_h": "Utdata",
+  "install_h": "Installation",
+  "steps_h": "Steg",
+  "usage_h": "Användning",
+  "opts_h": "Flaggor",
+  "opt_col": "Flagga",
+  "desc_col": "Beskrivning",
+  "faq_h": "Vanliga frågor",
+  "next": "Nästa",
+  "facts_h": "I korthet",
+  "menu_h": "Dokumentation",
+  "facts": [
+   {
+    "k": "Version",
+    "v": "{ver}"
+   },
+   {
+    "k": "Plattformar",
+    "v": "Linux, macOS och Windows"
+   },
+   {
+    "k": "Licens",
+    "v": "MIT"
+   },
+   {
+    "k": "Beroenden",
+    "v": "Inga"
+   }
+  ],
+  "install_check": "Om versionsnumret skrivs ut fungerade installationen.",
+  "nav_config": "Inställningar",
+  "nav_recipes": "Exempel",
+  "nav_trouble": "Felsökning",
+  "desc_config": "Konfigurationsfilen och inställningarna för {brand}.",
+  "desc_recipes": "Korta exempel på vardagliga uppgifter med {brand}.",
+  "desc_trouble": "Lösningar på de problem som flest stöter på med {brand}.",
+  "config_h": "Inställningar",
+  "config_col_key": "Nyckel",
+  "config_col_default": "Standardvärde",
+  "config_col_desc": "Vad den gör",
+  "config_file_h": "Exempel",
+  "recipes_h": "Exempel",
+  "recipes_intro": "Korta svar på de uppgifter som folk frågar mest om.",
+  "trouble_h": "Felsökning",
+  "trouble_intro": "De problem som flest stöter på, och vad som brukar lösa dem.",
+  "ver_l": "Version",
+  "prev": "Föregående"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "En loggsammanfattare för kommandoraden",
+   "desc": "{brand} läser loggfiler i vanlig text och skriver ut en kort sammanfattning av innehållet.",
+   "overview": "{brand} läser loggfiler i vanlig text och skriver ut en kort sammanfattning: hur många rader det finns, vilka nivåer som används och vilka meddelanden som återkommer oftast. Det är ett litet program utan beroenden.",
+   "features": [
+    "Läser filer, kataloger och standardindata",
+    "Grupperar liknande meddelanden utan inställningar",
+    "Skriver ut text, JSON eller en liten HTML-rapport"
+   ],
+   "quick_out": "app.log: 48 211 rader, 3 nivåer\n  info   46 902\n  warn    1 190\n  error     119\noftast: cache miss för nyckel (9 413 gånger)",
+   "install_intro": "{brand} levereras som ett enda program. Du behöver inte ställa in något före första körningen.",
+   "install_steps": [
+    "Ladda ner arkivet som passar ditt system.",
+    "Packa upp det och kopiera programmet till en katalog i din PATH.",
+    "Kör kommandot för versionsnummer för att se att det fungerar."
+   ],
+   "faq": [
+    {
+     "q": "Vilka loggformat stöds?",
+     "a": "Allt som är radbaserat. {brand} känner igen vanliga tids- och nivåformat och tar annars raderna som de är."
+    },
+    {
+     "q": "Ändrar det mina filer?",
+     "a": "Aldrig. Filer öppnas skrivskyddade."
+    },
+    {
+     "q": "Hur stor fil kan det läsa?",
+     "a": "Filer läses som en ström, så det enda som begränsar är tiden. En gigabyte tar några sekunder på en laptop."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Sammanfatta en fil",
+     "p": "Peka {brand} mot en fil, en katalog eller en pipe. Kataloger läses rekursivt och komprimerade filer packas upp direkt."
+    },
+    {
+     "h": "Titta på ett tidsintervall",
+     "p": "Med --since och --until begränsar du sammanfattningen till ett tidsintervall. Tiderna kan vara absoluta eller räknade från nu."
+    },
+    {
+     "h": "Välj utdataformat",
+     "p": "Som standard skrivs vanlig text ut. JSON är stabilt och gjort för skript; HTML-rapporten är en enda fil som du kan skicka till en kollega."
+    }
+   ],
+   "options": [
+    {
+     "d": "Bara rader efter den här tiden, absolut eller som 2h."
+    },
+    {
+     "d": "Bara rader före den här tiden."
+    },
+    {
+     "d": "Bara rader av den här nivån eller högre."
+    },
+    {
+     "d": "Hur många återkommande meddelanden som listas. Standard är 5."
+    },
+    {
+     "d": "text, json eller html. Standard är text."
+    }
+   ],
+   "config_intro": "{brand} läser en valfri fil som heter config.toml i din konfigurationsmapp. Varje nyckel kan också anges på kommandoraden, och kommandoraden vinner.",
+   "config_rows": [
+    {
+     "d": "Hur många återkommande meddelanden som listas."
+    },
+    {
+     "d": "Utdataformatet: text, json eller html."
+    },
+    {
+     "d": "Meddelanden som utelämnas, jämförda som vanlig text."
+    },
+    {
+     "d": "Läs bara rader efter den här tiden."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Hitta den stökigaste timmen",
+     "p": "Gruppera sammanfattningen per timme för att se när loggen var som mest belastad."
+    },
+    {
+     "h": "Jämför två dagar",
+     "p": "Visa vilka meddelanden som är nya och vilka som har försvunnit mellan två filer."
+    },
+    {
+     "h": "Gör en rapport att skicka vidare",
+     "p": "Skriv HTML-rapporten till en fil och bifoga den i ett meddelande."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Sammanfattningen är tom",
+     "a": "Kontrollera att filen har ett meddelande per rad. Är den komprimerad i ett format som {brand} inte känner till, packa upp den först."
+    },
+    {
+     "q": "Tiderna ser fel ut",
+     "a": "Rader utan tidszon läses som UTC. Ange med --tz vilken zon de ligger i."
+    },
+    {
+     "q": "Rapporten är för lång",
+     "a": "Sänk --top, eller lägg de mest högljudda meddelandena i ignoreringslistan i konfigurationsfilen."
+    },
+    {
+     "q": "Det går långsamt på en nätverksdisk",
+     "a": "Kopiera filen till en lokal disk först. Att läsa rad för rad över en långsam anslutning är den vanligaste orsaken."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Tal",
+       "Peil",
+       "Kort",
+       "Skiss",
+       "Bok",
+       "Brott",
+       "Strak",
+       "Penna"
+      ],
+      [
+       "logg",
+       "skan",
+       "summa",
+       "blick",
+       "klipp",
+       "titt"
+      ]
+     ]
+    }
+   }
+  },
+  "site": {
+   "tagline": "Ett litet verktyg för statiska webbplatser",
+   "desc": "{brand} gör en mapp med Markdown-filer och några mallar till en statisk webbplats.",
+   "overview": "{brand} gör en mapp med Markdown-filer och några mallar till en statisk webbplats. Det finns ingen databas, ingen körmiljö och inget att hålla uppdaterat på servern.",
+   "features": [
+    "Markdown med front matter",
+    "Mallar i vanlig HTML",
+    "En lokal förhandsvisning som byggs om vid varje sparning"
+   ],
+   "quick_out": "Anteckningar visas på localhost:4000 (avsluta med Ctrl+C)",
+   "install_intro": "{brand} är ett enda program. Lägg det i din PATH så är du klar.",
+   "install_steps": [
+    "Ladda ner arkivet som passar ditt system.",
+    "Packa upp det och kopiera programmet till en katalog i din PATH.",
+    "Kör kommandot för versionsnummer för att se att det fungerar."
+   ],
+   "faq": [
+    {
+     "q": "Kan jag använda egna mallar?",
+     "a": "Ja. Mallar är vanliga HTML-filer med några platshållare, och mappstrukturen bestämmer du själv."
+    },
+    {
+     "q": "Behövs det en databas?",
+     "a": "Nej. Resultatet är vanliga filer som vilken webbserver som helst kan visa."
+    },
+    {
+     "q": "Hur lägger jag till en ny sidtyp?",
+     "a": "Skapa en mapp under pages med en egen layoutfil så plockar {brand} upp den vid nästa bygge."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Starta en ny webbplats",
+     "p": "Kommandot init skapar en mapp med en konfigurationsfil, en layout och en exempelsida."
+    },
+    {
+     "h": "Skriv en sida",
+     "p": "Sidor är Markdown-filer. Front matter högst upp sätter titel och datum; allt under är innehållet."
+    },
+    {
+     "h": "Bygg för publicering",
+     "p": "Kommandot build skriver den färdiga webbplatsen till mappen public. Kopiera mappen till vilken webbserver som helst."
+    }
+   ],
+   "options": [
+    {
+     "d": "Mapp för den färdiga webbplatsen. Standard är public."
+    },
+    {
+     "d": "Ta med sidor som är markerade som utkast."
+    },
+    {
+     "d": "Port för förhandsvisningen. Standard är 4000."
+    },
+    {
+     "d": "Bygg om när en fil ändras."
+    },
+    {
+     "d": "Skriv bara ut fel."
+    }
+   ],
+   "config_intro": "Filen site.toml ligger i roten av din mapp. En nyckel som saknas får sitt standardvärde, så en ny webbplats behöver ingen fil alls.",
+   "config_rows": [
+    {
+     "d": "Namnet som visas i sidhuvudet och i titeln."
+    },
+    {
+     "d": "Adressen där webbplatsen ligger. Använd / för en webbplats i roten."
+    },
+    {
+     "d": "Webbplatsens utseende: plain, slate eller folio."
+    },
+    {
+     "d": "Om sidor som är markerade som utkast byggs."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Lägg till en sida",
+     "p": "Skapa en Markdown-fil med titel och datum högst upp."
+    },
+    {
+     "h": "Förhandsvisa utkast",
+     "p": "Kör webbplatsen lokalt med de ofärdiga sidorna med."
+    },
+    {
+     "h": "Publicera till en mapp",
+     "p": "Bygg hela webbplatsen till en mapp som du kan kopiera till vilken webbserver som helst."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "En sida saknas i bygget",
+     "a": "Sidor med draft: true i sidhuvudet hoppas över. Ta bort raden eller bygg med --drafts."
+    },
+    {
+     "q": "Länkarna slutar fungera efter publicering",
+     "a": "Ställ in base_url på adressen till mappen där webbplatsen ligger."
+    },
+    {
+     "q": "Förhandsvisningen uppdateras inte",
+     "a": "Vissa redigerare skriver en ny fil i stället för att ändra den gamla. Starta om förhandsvisningen eller stäng av säker sparning i redigeraren."
+    },
+    {
+     "q": "Bilderna visas inte",
+     "a": "Lägg dem i mappen static. Allt som ligger där kopieras oförändrat."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kal",
+       "Skiffer",
+       "Krita",
+       "Folio",
+       "Penna",
+       "Sten",
+       "Press",
+       "Tusch"
+      ],
+      [
+       "sida",
+       "bygge",
+       "sats",
+       "verk",
+       "blad"
+      ]
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Återkommande jobb utan crontab",
+   "desc": "{brand} kör små återkommande jobb på en dator och säger till när något misslyckas.",
+   "overview": "{brand} kör små återkommande jobb på en dator och säger till när något misslyckas. Det är ett vänligare alternativ till en crontab som du måste ha i huvudet.",
+   "features": [
+    "Scheman som skrivs med vanliga ord",
+    "En logg för varje körning",
+    "En rad utdata per jobb, så att misslyckanden syns"
+   ],
+   "quick_out": "backup   varje dag kl. 03:00   senast: ok (4 s)",
+   "install_intro": "{brand} består av ett program och en liten bakgrundsprocess som kontrollerar schemat varje minut.",
+   "install_steps": [
+    "Ladda ner arkivet som passar ditt system.",
+    "Packa upp det och kopiera programmet till en katalog i din PATH.",
+    "Starta bakgrundsprocessen med systemets tjänstehanterare."
+   ],
+   "faq": [
+    {
+     "q": "Måste det köras som en tjänst?",
+     "a": "Ja, en liten bakgrundsprocess kontrollerar schemat varje minut. På installationssidan står vad du ska starta."
+    },
+    {
+     "q": "Vad händer om datorn är avstängd?",
+     "a": "Ett jobb som skulle ha körts medan datorn var avstängd körs en gång när den startar igen."
+    },
+    {
+     "q": "Kan jobb bero på varandra?",
+     "a": "Inte ännu. Lägg kommandona efter varandra i ett enda jobb så länge."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Lägg till ett jobb",
+     "p": "Ett jobb har ett namn, ett schema och ett kommando. Scheman skrivs med vanliga ord."
+    },
+    {
+     "h": "Se vad som har körts",
+     "p": "Kommandot list visar varje jobb med resultatet av senaste körningen. Kommandot history visar körningarna för ett jobb med tid och utdata."
+    },
+    {
+     "h": "Pausa och återuppta",
+     "p": "När du pausar finns jobbet och dess historik kvar, men det körs inte. Praktiskt under en flytt eller när du återställer en säkerhetskopia."
+    }
+   ],
+   "options": [
+    {
+     "d": "Var jobb och loggar sparas. Standard är en mapp i din hemkatalog."
+    },
+    {
+     "d": "Skriv bara ut misslyckanden."
+    },
+    {
+     "d": "Hur många körningar history visar. Standard är 10."
+    },
+    {
+     "d": "Utdata som är läsbara för maskiner."
+    },
+    {
+     "d": "Kör ett jobb direkt, utöver schemat."
+    }
+   ],
+   "config_intro": "{brand} läser jobs.toml från din konfigurationsmapp. Själva jobben sparas separat, så filen innehåller bara inställningar.",
+   "config_rows": [
+    {
+     "d": "Skalet som kör kommandona."
+    },
+    {
+     "d": "Var utdata från varje körning sparas."
+    },
+    {
+     "d": "Hur många gånger ett misslyckat jobb provas igen."
+    },
+    {
+     "d": "Om ett misslyckat jobb också skickar en avisering."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Kör ett jobb en gång, nu",
+     "p": "Starta ett jobb utanför schemat, till exempel för att testa ett nytt kommando."
+    },
+    {
+     "h": "Se varför ett jobb misslyckades",
+     "p": "Skriv ut utdata från senaste körningen av ett jobb."
+    },
+    {
+     "h": "Pausa allt under en resa",
+     "p": "Stoppa alla scheman tills du återupptar dem."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Ett jobb körs aldrig",
+     "a": "Kontrollera med kommandot list att programmet körs. Jobben körs bara så länge det gör det."
+    },
+    {
+     "q": "Ett jobb körs två gånger",
+     "a": "Två exemplar av programmet körs. Stäng av det ena; låsfilen ligger i loggmappen."
+    },
+    {
+     "q": "Kommandot fungerar i mitt skal men inte här",
+     "a": "Jobb läser inte skalets startfiler. Använd fullständiga sökvägar eller ställ in miljön i jobbet."
+    },
+    {
+     "q": "Tiderna är en timme fel",
+     "a": "{brand} följer systemets klocka och tidszon. Ändra dem där, inte i jobbet."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Klock",
+       "Syssla",
+       "Tur",
+       "Schema",
+       "Tick",
+       "Takt",
+       "Vakt",
+       "Puff"
+      ],
+      [
+       "verk",
+       "lista",
+       "gang",
+       "gor",
+       "klang"
+      ]
+     ]
+    }
+   }
+  },
+  "csv": {
+   "tagline": "Välj, sortera och foga ihop CSV-filer",
+   "desc": "{brand} väljer, sorterar, fogar ihop och rensar CSV-filer från kommandoraden.",
+   "overview": "{brand} väljer, sorterar, fogar ihop och rensar CSV-filer från kommandoraden. Det hanterar stora filer utan att läsa in dem i minnet och ändrar aldrig indata.",
+   "features": [
+    "Välj och byt namn på kolumner",
+    "Sortera, filtrera och foga ihop filer",
+    "Rätta vanliga problem som lösa citattecken och blandade radslut"
+   ],
+   "quick_out": "namn,ort\nMira,Lund\nOtto,Umeå",
+   "install_intro": "{brand} är ett enda program utan beroenden.",
+   "install_steps": [
+    "Ladda ner arkivet som passar ditt system.",
+    "Packa upp det och kopiera programmet till en katalog i din PATH.",
+    "Kör kommandot för versionsnummer för att se att det fungerar."
+   ],
+   "faq": [
+    {
+     "q": "Hur stor fil kan det hantera?",
+     "a": "Filer bearbetas som en ström, så minnesanvändningen förblir liten. Vid sortering av stora filer används tillfälligt utrymme på disk."
+    },
+    {
+     "q": "Ändrar det mina filer?",
+     "a": "Nej. Resultatet går till skärmen eller till en ny fil."
+    },
+    {
+     "q": "Hur är det med andra avgränsare?",
+     "a": "Med flaggan delimiter väljer du tabb, semikolon eller något annat enskilt tecken."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Välj kolumner",
+     "p": "Kommandot select skriver bara ut de kolumner du anger, i den ordning du anger dem. En kolumn kan döpas om med ett likhetstecken."
+    },
+    {
+     "h": "Filtrera rader",
+     "p": "Kommandot filter behåller de rader som uppfyller ett enkelt villkor. Flera villkor kan kombineras."
+    },
+    {
+     "h": "Foga ihop två filer",
+     "p": "Kommandot join fogar ihop två filer på en kolumn som de har gemensam. Rader utan träff tas bort om du inte ber om dem."
+    }
+   ],
+   "options": [
+    {
+     "d": "Avgränsare mellan fält. Standard är kommatecken."
+    },
+    {
+     "d": "Sätt till false om första raden är data."
+    },
+    {
+     "d": "Skriv till en fil i stället för till skärmen."
+    },
+    {
+     "d": "Kolumn att sortera på."
+    },
+    {
+     "d": "Kolumn att foga ihop på."
+    }
+   ],
+   "config_intro": "Lägg en fil som heter .{cmd}rc i din hemkatalog för att ändra standardvärdena. Flaggor på kommandoraden vinner alltid.",
+   "config_rows": [
+    {
+     "d": "Tecknet som skiljer kolumner åt."
+    },
+    {
+     "d": "Om första raden innehåller kolumnnamn."
+    },
+    {
+     "d": "Teckenkodningen för indata och utdata."
+    },
+    {
+     "d": "Vad en tom cell blir i utdata."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Välj och döp om kolumner",
+     "p": "Behåll två kolumner och ge den ena ett nytt namn."
+    },
+    {
+     "h": "Foga ihop två filer på en nyckel",
+     "p": "Kombinera raderna i två filer som har ett id gemensamt."
+    },
+    {
+     "h": "Ta bort dubbletter",
+     "p": "Behåll den första raden i varje grupp av identiska rader."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Svenska tecken blir fel",
+     "a": "Filen är troligen inte UTF-8. Ange kodningen i konfigurationsfilen eller med --encoding."
+    },
+    {
+     "q": "En kolumn saknas",
+     "a": "Om första raden är data och inte namn, kör med --no-header och ange kolumnerna med nummer."
+    },
+    {
+     "q": "Siffror sorteras som text",
+     "a": "Ange --numeric, annars sorterar {brand} dem som de ser ut."
+    },
+    {
+     "q": "En sammanfogning ger inga rader",
+     "a": "Nyckeln har olika blanksteg eller skiftläge i de två filerna. Kör tidy på båda och försök igen."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kolumn",
+       "Rad",
+       "Cell",
+       "Blad",
+       "Flik",
+       "Komma",
+       "Tabell",
+       "Post"
+      ],
+      [
+       "klipp",
+       "fix",
+       "foga",
+       "feja",
+       "sikta",
+       "knada"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

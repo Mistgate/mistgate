@@ -12,6 +12,7 @@ import {
   bundleErrorText,
   heroOf,
   isActive,
+  isCancelWait,
   isFailurePause,
 
   pausedStep,
@@ -110,6 +111,8 @@ function Paused({ d, owner, actions, onCancel }: { d: Updates; owner: boolean; a
   const r = d.rollout!;
   const failed = isFailurePause(r.pauseKey);
   const culprit = failed ? pausedStep(r) : undefined;
+  // a cancel that waits for the node in flight ends by itself (resume is refused): no way on and nothing more to cancel
+  const canAct = owner && !isCancelWait(r.pauseKey);
   return (
     <Bar
       bad={failed}
@@ -120,12 +123,12 @@ function Paused({ d, owner, actions, onCancel }: { d: Updates; owner: boolean; a
               {t("up.openNode", { name: culprit.nodeName })}
             </Link>
           )}
-          {owner && (
+          {canAct && (
             <Button variant="secondary" size="md" disabled={actions.busy} onClick={() => void actions.resume(r.id)}>
               {t("up.resume")}
             </Button>
           )}
-          {owner && (
+          {canAct && (
             <Button variant="secondary" size="md" disabled={actions.busy} onClick={onCancel}>
               {t("up.cancel")}
             </Button>
@@ -175,15 +178,14 @@ export type AgentsProps = {
 export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSchedule, onRollback, scene }: AgentsProps) {
   const t = useT();
   const edition = useEdition();
-  const noUpdates = edition.off("agent_updates"); // there the buttons are gone for everyone, not just for a helper
   const hero = heroOf(d);
   const l = look(t, d, hero, edition.edge);
   const active = isActive(d.rollout) ? d.rollout : null;
   const cards = fleetCards(d);
   const trusted = d.bundle?.status === BundleStatus.TRUSTED;
   const offline = trusted ? d.nodes.filter((n) => n.state === NodeUpdateState.OFFLINE && n.supportsUpdate && n.built < d.bundle!.built) : [];
-  const canStart = owner && !noUpdates && hero.id === "available" && !!d.bundle;
-  const readOnly = !owner && !noUpdates && (hero.id === "available" || !!active);
+  const canStart = owner && hero.id === "available" && !!d.bundle;
+  const readOnly = !owner && (hero.id === "available" || !!active);
   // a rollout that ends while the page is open: the wave from the card and a word
   const toast = useToast();
   const card = useRef<HTMLElement>(null);
@@ -236,7 +238,7 @@ export function AgentsTab({ data: d, owner, actions, onRollout, onCancel, onSche
         {active?.status === RolloutStatus.PAUSED && <Paused d={d} owner={owner} actions={actions} onCancel={onCancel} />}
         <Offline nodes={offline} />
       </section>
-      <NodesCard nodes={d.nodes} data={d} owner={owner && !noUpdates} rollout={active} onSchedule={onSchedule} onRollback={onRollback} />
+      <NodesCard nodes={d.nodes} data={d} owner={owner} rollout={active} onSchedule={onSchedule} onRollback={onRollback} />
       <div className="uq-two">
         {!edition.edge && <BundleCard data={d} owner={owner} actions={actions} reading={scene?.reading} />}
         {d.rollout && <RolloutHistory rollout={d.rollout} defaultOpen={scene?.last} />}

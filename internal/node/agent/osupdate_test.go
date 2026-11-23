@@ -10,6 +10,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/awg"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
@@ -115,7 +116,7 @@ func TestOsUpdateCapabilityNeedsTheControllerAndTheHost(t *testing.T) {
 	h := newOsAgent(t, n, nil)
 	h.waitConnected()
 	hello := h.panel.current().hello
-	if !hasCapability(hello, osupdate.Capability) || !hasCapability(hello, osupdate.CapabilityUpdate) {
+	if !hasCapability(hello, agentcap.OSStatus) || !hasCapability(hello, agentcap.OSUpdate) {
 		t.Fatalf("capabilities = %v, want os-status/1 and os-update/1", hello.GetCapabilities())
 	}
 	// A host that cannot run it (not root, no systemd) lists neither.
@@ -124,7 +125,7 @@ func TestOsUpdateCapabilityNeedsTheControllerAndTheHost(t *testing.T) {
 		c.OSUpdate = newOsNode().controller(c.StateDir)
 	}})
 	h2.waitConnected()
-	if hello := h2.panel.current().hello; hasCapability(hello, osupdate.CapabilityUpdate) || hasCapability(hello, osupdate.Capability) {
+	if hello := h2.panel.current().hello; hasCapability(hello, agentcap.OSUpdate) || hasCapability(hello, agentcap.OSStatus) {
 		t.Fatalf("capabilities = %v on a host that cannot run OS jobs", hello.GetCapabilities())
 	}
 }
@@ -133,7 +134,7 @@ func TestOsUpdateCapabilityNeedsTheControllerAndTheHost(t *testing.T) {
 func TestOsUpdateWithoutAControllerIsRefused(t *testing.T) {
 	h := newHarness(t, harnessOpts{cfg: func(c *Config) { c.OSUpdateCapability = func() bool { return true } }})
 	h.waitConnected()
-	if hello := h.panel.current().hello; hasCapability(hello, osupdate.CapabilityUpdate) {
+	if hello := h.panel.current().hello; hasCapability(hello, agentcap.OSUpdate) {
 		t.Fatalf("os-update/1 listed without a controller: %v", hello.GetCapabilities())
 	}
 	if r := askOs(h, &pb.UpdateOs{Action: "refresh", Reboot: "never"}); r.Ok || r.Error != "unsupported_host" {

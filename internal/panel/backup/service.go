@@ -181,15 +181,25 @@ func (s *Service) backoff(failed bool, interval time.Duration) {
 
 type rpc struct{ s *Service }
 
+// GetBackupSettings answers the signed-in owner with the settings and a token of the admin profile (the MCP's backup_status, the
+// assistant) with the status only: no account, bucket, key id, age recipient or whether a secret is set. Every other backup call
+// stays closed to tokens.
 func (r rpc) GetBackupSettings(ctx context.Context, _ *connect.Request[adminv1.GetBackupSettingsRequest]) (*connect.Response[adminv1.GetBackupSettingsResponse], error) {
-	if err := requireOwner(ctx); err != nil {
-		return nil, err
+	if a, ok := auth.AdminFrom(ctx); !ok || a.Role != store.RoleOwner {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("owner access required"))
 	}
 	settings, err := r.s.st.PanelBackupSettings(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errBackupInvalidSettings)
 	}
-	return connect.NewResponse(&adminv1.GetBackupSettingsResponse{Settings: r.s.settingsProto(settings)}), nil
+	out := r.s.settingsProto(settings)
+	if auth.PrincipalFrom(ctx).Token {
+		out = &adminv1.BackupSettings{
+			Enabled: out.Enabled, IntervalHours: out.IntervalHours, RetentionDays: out.RetentionDays,
+			LastSuccessUnix: out.LastSuccessUnix, LastErrorCode: out.LastErrorCode, Running: out.Running,
+		}
+	}
+	return connect.NewResponse(&adminv1.GetBackupSettingsResponse{Settings: out}), nil
 }
 
 func (r rpc) UpdateBackupSettings(ctx context.Context, req *connect.Request[adminv1.UpdateBackupSettingsRequest]) (*connect.Response[adminv1.UpdateBackupSettingsResponse], error) {
@@ -243,7 +253,7 @@ func (r rpc) UpdateBackupSettings(ctx context.Context, req *connect.Request[admi
 }
 
 func (r rpc) TestBackupStorage(ctx context.Context, _ *connect.Request[adminv1.TestBackupStorageRequest]) (*connect.Response[adminv1.TestBackupStorageResponse], error) {
-	if err := requireOwner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	if err := edition.Check(r.s.edge, edition.Backups); err != nil {
@@ -269,7 +279,7 @@ func (r rpc) TestBackupStorage(ctx context.Context, _ *connect.Request[adminv1.T
 }
 
 func (r rpc) CreateBackup(ctx context.Context, _ *connect.Request[adminv1.CreateBackupRequest]) (*connect.Response[adminv1.CreateBackupResponse], error) {
-	if err := requireOwner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	if err := edition.Check(r.s.edge, edition.Backups); err != nil {
@@ -318,7 +328,7 @@ func (s *Service) startBackup(ctx context.Context) error {
 }
 
 func (r rpc) ListBackups(ctx context.Context, _ *connect.Request[adminv1.ListBackupsRequest]) (*connect.Response[adminv1.ListBackupsResponse], error) {
-	if err := requireOwner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	if err := edition.Check(r.s.edge, edition.Backups); err != nil {
@@ -344,23 +354,13 @@ func (r rpc) ListBackups(ctx context.Context, _ *connect.Request[adminv1.ListBac
 }
 
 func (s *Service) requireOwnerStepUp(ctx context.Context) error {
-	if err := requireOwner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return err
 	}
 	if s.stepUp == nil {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("backup step-up is unavailable"))
 	}
 	return s.stepUp(ctx)
-}
-
-// requireOwner admits the owner in a browser session only: an API or MCP token never reaches backups, whatever its
-// profile, even if the procedure allow-list ever lets one through.
-func requireOwner(ctx context.Context) error {
-	admin, ok := auth.AdminFrom(ctx)
-	if !ok || admin.Role != store.RoleOwner || strings.HasPrefix(admin.ID, "token:") || strings.HasPrefix(admin.ID, "mcp:") || auth.PrincipalFrom(ctx).Token {
-		return connect.NewError(connect.CodePermissionDenied, errors.New("owner access required"))
-	}
-	return nil
 }
 
 func (s *Service) newR2Client(ctx context.Context, settings store.PanelBackupSettings) (s3API, error) {

@@ -1,0 +1,34 @@
+{
+ "ui": {
+  "hours": [
+   {
+    "from": 4,
+    "to": 5,
+    "open": "11:00",
+    "close": "17:00"
+   }
+  ]
+ },
+ "bundles": [
+  {
+   "id": "photo",
+   "art": "topo",
+   "arts": ["topo", "landscape", "waves", "still"],
+   "photo_q": [
+    "quiet landscape hills",
+    "misty field morning",
+    "empty beach shore"
+   ]
+  },
+  {
+   "id": "illustration",
+   "art": "botanical",
+   "arts": ["botanical", "still", "blobs"]
+  },
+  {
+   "id": "graphic",
+   "art": "poster",
+   "arts": ["poster", "tiles", "checker"]
+  }
+ ]
+}

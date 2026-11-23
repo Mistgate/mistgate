@@ -24,19 +24,38 @@ const (
 	day  = 24 * time.Hour
 )
 
-// Fields lists the settings in display order.
-var Fields = [...]Field{
-	{"journal_days", 7, 1, 7, day},                 // the node journal; its read window is 7 days, so more would never be seen
-	{"events_info_days", 90, 1, 365, day},          // events of severity info
-	{"events_warn_days", 400, 1, 1095, day},        // warning and error events
-	{"audit_days", 400, 30, 1095, day},             // the audit log
-	{"alerts_days", 90, 7, 730, day},               // resolved alerts
-	{"check_samples_hours", 25, 25, 168, hour},     // raw check rounds, once their day is rolled up
-	{"check_daily_days", 90, 7, 730, day},          // the daily check aggregates
-	{"host_history_days", 90, 7, 365, day},         // hourly host load of a node
-	{"traffic_bucket_days", 400, 30, 3650, day},    // hourly traffic per person, node and protocol
-	{"node_traffic_hour_days", 400, 30, 3650, day}, // hourly traffic per node
-	{"networks_days", 7, 1, 7, day},                // hourly ASN counters and the recent per-person ASN view
+// Key names one retention setting in code. A misspelt Key does not compile, where a misspelt name used to read as a zero
+// window and the prune that follows would delete the whole table.
+type Key int
+
+const (
+	JournalDays Key = iota
+	EventsInfoDays
+	EventsWarnDays
+	AuditDays
+	AlertsDays
+	CheckSamplesHours
+	CheckDailyDays
+	HostHistoryDays
+	TrafficBucketDays
+	NodeTrafficHourDays
+	NetworksDays
+	numKeys
+)
+
+// Fields lists the settings in display order; Fields[k] is the field of Key k.
+var Fields = [numKeys]Field{
+	JournalDays:         {"journal_days", 7, 1, 7, day},                 // the node journal; its read window is 7 days, so more would never be seen
+	EventsInfoDays:      {"events_info_days", 90, 1, 365, day},          // events of severity info
+	EventsWarnDays:      {"events_warn_days", 400, 1, 1095, day},        // warning and error events
+	AuditDays:           {"audit_days", 400, 30, 1095, day},             // the audit log
+	AlertsDays:          {"alerts_days", 90, 7, 730, day},               // resolved alerts
+	CheckSamplesHours:   {"check_samples_hours", 25, 25, 168, hour},     // raw check rounds, once their day is rolled up
+	CheckDailyDays:      {"check_daily_days", 90, 7, 730, day},          // the daily check aggregates
+	HostHistoryDays:     {"host_history_days", 90, 7, 365, day},         // hourly host load of a node
+	TrafficBucketDays:   {"traffic_bucket_days", 400, 30, 3650, day},    // hourly traffic per person, node and protocol
+	NodeTrafficHourDays: {"node_traffic_hour_days", 400, 30, 3650, day}, // hourly traffic per node
+	NetworksDays:        {"networks_days", 7, 1, 7, day},                // hourly ASN counters and the recent per-person ASN view
 }
 
 // Keys lists the setting keys, for one batched read.
@@ -85,12 +104,7 @@ func (p Policy) Get(key string) (int, bool) {
 	return 0, false
 }
 
-// Duration is the named field as a duration.
-func (p Policy) Duration(key string) time.Duration {
-	for i, f := range Fields {
-		if f.Key == key {
-			return time.Duration(p.Values[i]) * f.Unit
-		}
-	}
-	return 0
+// Duration is the field k as a duration.
+func (p Policy) Duration(k Key) time.Duration {
+	return time.Duration(p.Values[k]) * Fields[k].Unit
 }

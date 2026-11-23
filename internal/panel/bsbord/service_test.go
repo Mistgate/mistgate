@@ -772,7 +772,7 @@ func TestSelectorsAreExactListedOperatorDistrictModeKeys(t *testing.T) {
 func TestBsbordStateAndGetAreUnavailableOutsideRussia(t *testing.T) {
 	e := newTestEnv(t)
 	e.configure(true, []string{testUnit}, 100)
-	if err := e.st.SetSettings(e.ctx, map[string]string{settingCountry: "BY"}); err != nil {
+	if err := e.st.SetSettings(e.ctx, map[string]string{countryreach.CountrySetting: "BY"}); err != nil {
 		t.Fatal(err)
 	}
 	e.svc.cfg.Country = func(context.Context) string { return "BY" }

@@ -5,16 +5,16 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"net"
 	"net/netip"
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
+	"sync"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -27,7 +27,6 @@ import (
 // probes: a TLS handshake for the HTTPS ports, the marked GET for port 80.
 
 const (
-	capTCPCheck = "tcpcheck/1"
 	// tcpMarkHold is how long the target keeps the mark; the probe follows at once and takes at most 8 s.
 	tcpMarkHold = 30
 	tcpMarkWait = 5 * time.Second
@@ -56,6 +55,7 @@ type tcpTarget struct {
 	SNI        string
 	Pin        string // lower-case hex sha256 of the leaf the node reported, "" = none
 	PublicCert bool   // an ACME certificate; a name without a pin can be checked by the node's system roots
+	Inbound    string // the REALITY inbound whose port this is: REALITY counts a TLS check of it as a wrong key (ownProbes)
 }
 
 // tcpTargets lists the ports to probe on a node from its enabled inbounds, 80 first and then by port, at most
@@ -114,6 +114,9 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 			if ownName {
 				t.ALPN = alpn(t.Port, spec.TLS)
 			}
+			if v, _ := plugin.VLESSOf(spec); !v.TLS() { // settings that name no security are REALITY
+				t.Inbound = spec.ID
+			}
 			add(t)
 		case spec.Protocol == "trusttunnel" && spec.Listen.Network == "tcp":
 			// An HTTPS site of its own: the TLS handshake with the node's name proves the port reaches this node (TLS-ALPN-01
@@ -133,7 +136,7 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 			add(tcpTarget{Port: spec.Listen.Port, Role: tcpRoleMTProto, Profile: s.Profile, Kind: tcpcheck.KindTLS,
 				SNI: spec.TLS.ServerName, Pin: pin, PublicCert: hasPublicCertificate(spec.TLS) || spec.TLS.Mode == 0})
 		case spec.Protocol == "hysteria2":
-			port := uint16(hy2SitePort(spec))
+			port := plugin.Hy2SitePort(spec)
 			if port == 0 || owners[port].Protocol != "hysteria2" {
 				continue
 			}
@@ -165,56 +168,27 @@ func hasPublicCertificate(tls plugin.TLS) bool {
 // vlessProbeName is the TLS name to send to a VLESS listener, and whether it is the node's own name ("self" REALITY or a
 // TLS front, where the node holds the certificate itself) rather than the name of another site REALITY forwards to.
 func vlessProbeName(spec plugin.InboundSpec) (name string, own bool) {
-	var settings struct {
-		Security string `json:"security"`
-		Reality  struct {
-			Target      string   `json:"target"`
-			ServerNames []string `json:"server_names"`
-		} `json:"reality"`
-	}
-	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
+	v, ok := plugin.VLESSOf(spec)
+	if !ok {
 		return "", false
 	}
-	if settings.Security == "tls" || (settings.Security == "reality" || settings.Security == "") && settings.Reality.Target == "self" {
+	if v.OwnSite() {
 		if spec.TLS.ServerName != "" {
 			return spec.TLS.ServerName, true
 		}
-		if len(settings.Reality.ServerNames) > 0 {
-			return settings.Reality.ServerNames[0], true
+		if len(v.ServerNames) > 0 {
+			return v.ServerNames[0], true
 		}
 		return "", true
 	}
-	if len(settings.Reality.ServerNames) > 0 {
-		return settings.Reality.ServerNames[0], false
+	if len(v.ServerNames) > 0 {
+		return v.ServerNames[0], false
 	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(settings.Reality.Target))
-	if err != nil {
-		return "", false
-	}
+	host := v.TargetHost()
 	if _, err := netip.ParseAddr(host); err == nil { // an IP address is no name to send
 		return "", false
 	}
 	return host, false
-}
-
-// hy2SitePort is the TCP port of a Hysteria2 inbound's HTTPS site: settings.masquerade.tcp_port, 443 when omitted, 0 = no
-// site (the node's own rule, internal/node/hysteria2/settings.go).
-func hy2SitePort(spec plugin.InboundSpec) int {
-	if spec.Protocol != "hysteria2" || spec.TLS.Mode == 0 {
-		return 0
-	}
-	var settings struct {
-		Masquerade struct {
-			TCPPort *int `json:"tcp_port"`
-		} `json:"masquerade"`
-	}
-	if len(spec.Settings) > 0 && json.Unmarshal(spec.Settings, &settings) != nil {
-		return 0
-	}
-	if settings.Masquerade.TCPPort != nil {
-		return min(max(*settings.Masquerade.TCPPort, 0), 65535)
-	}
-	return 443
 }
 
 // runTCPCheck runs the TCP half for a node whose agent is connected. ran is false when there was nothing to do or nobody to
@@ -246,7 +220,7 @@ func (f *Fleet) runTCPCheck(ctx context.Context, target store.NodeRow, allowPane
 		f.log.Warn("list nodes for TCP port check", "node", target.ID, "err", err)
 		return nil, false
 	}
-	senders := f.portSenders(target, allNodes, live, capTCPCheck)
+	senders := f.portSenders(target, allNodes, live, agentcap.TCPCheck)
 	if len(senders) > 2 {
 		senders = senders[:2]
 	}
@@ -411,7 +385,7 @@ func validTCPVerdict(v string) bool {
 // armTCPMark asks the target to answer one marked request on port 80. It returns "serving" when armed, "off" when the node
 // has no ACME name, "busy" when another program holds port 80 (a verdict of the row), or "" with the reason for the row.
 func (f *Fleet) armTCPMark(ctx context.Context, target store.NodeRow, live store.NodeLiveRow, token, answer *[tcpcheck.MarkSize]byte) (verdict, reason string) {
-	if !slices.Contains(live.AgentCaps, capTCPCheck) {
+	if !slices.Contains(live.AgentCaps, agentcap.TCPCheck) {
 		return "", "agent_too_old"
 	}
 	if _, err := rand.Read(token[:]); err != nil {
@@ -454,6 +428,7 @@ func (f *Fleet) probeTCPTargets(ctx context.Context, host string, sender portSen
 			probes[i].Token, probes[i].Answer = token, answer
 			wire[i].Token, wire[i].Answer = token, answer
 		}
+		f.noteOwnProbe(t)
 	}
 	if sender.panel {
 		probe := f.probeTCP
@@ -507,4 +482,62 @@ func tcpCheckMessages(names map[string]string, rows []store.TCPCheck) []*adminv1
 			Verdict: row.Verdict, Reason: row.Reason, Sender: sender, CheckedUnix: row.CheckedAt.Unix()})
 	}
 	return out
+}
+
+// ownProbeTTL is how long a TLS check the panel ordered may wait for its count: the node reports in batches of 10 s, so a check
+// that has not come back in this time never reached the node (a refused or lost connection) and takes nothing off later counters.
+// ownProbeMax bounds the list of one inbound.
+const (
+	ownProbeTTL = 2 * time.Minute
+	ownProbeMax = 256
+)
+
+// ownProbes remembers, per REALITY inbound, the TLS checks of its port the panel ordered (probeTCPTargets, pathProbeTCP). Such a
+// check says the profile's name and holds no key, so REALITY counts it as a fallback and a failed authentication, which the page
+// shows as "wrong REALITY key". The node cannot tell the panel's senders from a stranger, so the panel takes its own checks off the
+// inbound's counters when they arrive (guardLinks). Its zero value is ready; a restart forgets the checks of the last two minutes.
+type ownProbes struct {
+	mu sync.Mutex
+	at map[string][]time.Time // inbound id to when each check was ordered, oldest first
+}
+
+// noteOwnProbe records a TLS check about to be sent to the port of a REALITY inbound, before it leaves: the count comes back in a
+// batch that may overtake the answer.
+func (f *Fleet) noteOwnProbe(t tcpTarget) {
+	if t.Inbound != "" && t.Kind == tcpcheck.KindTLS {
+		f.ownProbes.add(t.Inbound, f.now())
+	}
+}
+
+// dropStale cuts the checks older than ownProbeTTL off the front of at.
+func dropStale(at []time.Time, now time.Time) []time.Time {
+	i := 0
+	for i < len(at) && now.Sub(at[i]) > ownProbeTTL {
+		i++
+	}
+	return at[i:]
+}
+
+func (o *ownProbes) add(inbound string, now time.Time) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.at == nil {
+		o.at = make(map[string][]time.Time)
+	}
+	at := append(dropStale(o.at[inbound], now), now)
+	o.at[inbound] = at[max(0, len(at)-ownProbeMax):]
+}
+
+// take uses up to want of the inbound's fresh checks and says how many it used.
+func (o *ownProbes) take(inbound string, want uint32, now time.Time) uint32 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	at := dropStale(o.at[inbound], now)
+	n := min(len(at), int(want))
+	if at = at[n:]; len(at) == 0 {
+		delete(o.at, inbound)
+	} else {
+		o.at[inbound] = at
+	}
+	return uint32(n)
 }

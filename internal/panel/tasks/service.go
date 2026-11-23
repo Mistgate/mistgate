@@ -31,7 +31,6 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -80,8 +79,6 @@ const (
 	toolsFresh = 10 * time.Minute
 	// excerptRunes bounds the start of a tool's result kept with a run
 	excerptRunes = 2000
-	// timezoneSetting is the panel's time zone, the one of the update schedules (internal/panel/update/schedule.go)
-	timezoneSetting = "update_schedule_timezone_offset_minutes"
 )
 
 // Service is the TasksService and the scheduler.
@@ -149,16 +146,9 @@ func (s *Service) kick() {
 	}
 }
 
-// timezone is the panel's offset east of UTC in minutes; a missing or unusable value is UTC.
+// timezone is the panel's offset east of UTC in minutes; a failed read counts as UTC.
 func (s *Service) timezone(ctx context.Context) int {
-	raw, err := s.cfg.Store.Setting(ctx, timezoneSetting)
-	if err != nil {
-		return 0
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil || n < -12*60 || n > 14*60 || n%15 != 0 {
-		return 0
-	}
+	n, _ := s.cfg.Store.PanelTimezone(ctx)
 	return n
 }
 
@@ -234,13 +224,11 @@ func (s *Service) checkTools(ctx context.Context) ([]checkTool, error) {
 	return out, nil
 }
 
-// CheckToolName reports whether a tool of the operator profile may be a step of a check: not a plan, not an apply, not a task tool.
+// CheckToolName reports whether a tool of the operator profile may be a step of a check: a read or a probe of the registry, not a
+// plan, not an apply, not a task tool.
 func CheckToolName(name string) bool {
-	return name != "" && !taskTools[name] && !hasSuffix(name, "_plan") && !hasSuffix(name, "_apply")
-}
-
-func hasSuffix(s, suffix string) bool {
-	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
+	k := mcp.KindOf(name)
+	return (k == mcp.KindRead || k == mcp.KindRun) && !taskTools[name]
 }
 
 // checkSpec turns the tool list into the two functions spec.Steps checks steps with.

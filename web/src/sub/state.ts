@@ -38,10 +38,9 @@ export type AmzState = {
   rename: { id: string; value: string } | null;
   configs: Record<string, AwgConfig[]>;
   node: Record<string, number>;
-  /** Where each key is being added ("this", "phone", "other"): the dialog's switch; absent = the default for the device. */
-  where: Record<string, string>;
-  form: { profile: string; platform: string; label: string };
-  /** The platform this page is open on ("" unknown): a key for this very device is copied or downloaded, not scanned. */
+  /** The form of a new device; `list`: the servers of the chosen key are unfolded under the choice. */
+  form: { profile: string; platform: string; label: string; list: boolean };
+  /** The platform this page is open on ("" unknown): the app the page names first for it. */
   here: string;
 };
 
@@ -61,8 +60,7 @@ export const newAmzState = (platform: string, profile: string, here = ""): AmzSt
   rename: null,
   configs: {},
   node: {},
-  where: {},
-  form: { profile, platform, label: "" },
+  form: { profile, platform, label: "", list: false },
   here,
 });
 
@@ -100,7 +98,6 @@ export type AmzActions = {
   /** Opens (id) or closes (null) the "new key needed" question of a stale device. */
   stale(id: string | null): void;
   node(id: string, i: number): void;
-  where(id: string, w: string): void;
   ask(c: Confirm): void;
   rotate(id: string): void;
   remove(id: string): void;
@@ -122,8 +119,11 @@ export type DnsActions = {
   scope(all: boolean): void;
 };
 
-/** What the page offers its parts: copy (with a callback for the button's own "copied" state) and download. */
-export type Tools = { copy(text: string, message: string, done?: () => void, from?: HTMLElement): void; download(filename: string, text: string): void };
+/**
+ * What the page offers its parts: copy and download. `done` runs when the clipboard took the text (the control's own "copied"
+ * state); `message` is a toast above `from`, for a control that has no state of its own to say it.
+ */
+export type Tools = { copy(text: string, done?: () => void, message?: string, from?: HTMLElement): void; download(filename: string, text: string): void };
 
 /** The tabs under the status: the servers, the Telegram proxies, TrustTunnel, the devices. */
 export type Tab = "servers" | "telegram" | "trusttunnel" | "devices";

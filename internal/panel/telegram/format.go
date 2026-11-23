@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/mistgate/mistgate/internal/panel/access"
+	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -158,6 +159,7 @@ var whyVariants = map[string]localizedText{
 	"via_cdn":          {en: "the check goes through the CDN; check the CDN and the origin", ru: "проверка идёт через CDN; проверьте CDN и источник", zh: "检测请求经过 CDN，请检查 CDN 和源站"},
 	"udp_blocked":      {en: "the hoster seems to block UDP on this port", ru: "хостер, похоже, режет UDP на этом порту", zh: "服务商似乎封锁了这个端口的 UDP"},
 	"udp_all_blocked":  {en: "the hoster seems to block UDP on the whole node", ru: "хостер, похоже, режет весь UDP на ноде", zh: "服务商似乎封锁了整个节点的 UDP"},
+	"panel_udp_path":   {en: "the panel's path to this UDP port loses packets; other nodes reach it", ru: "UDP теряется на пути от панели; другие ноды порт достают", zh: "面板到此 UDP 端口的链路丢包，其他节点可以连通"},
 	"timeout":          {en: "the handshake does not complete", ru: "рукопожатие не завершается", zh: "握手无法完成"},
 	"auth":             {en: "the panel’s check account is refused", ru: "проверочная учётка панели отклонена", zh: "面板的检测账户被拒绝"},
 	"tls":              {en: "the certificate does not match", ru: "сертификат не подходит", zh: "证书不匹配"},
@@ -508,31 +510,25 @@ func countryPartialReason(l L, p map[string]string) string {
 	return countrySeenBy(l, p, line)
 }
 
+// countrySourceNames is how the alert names each source that can raise it: English, Russian, Chinese. A source of
+// countryreach.Sources that raises an alert and is missing here is left out of "Seen by" (a test holds the two together).
+var countrySourceNames = map[string][3]string{
+	countryreach.SourceGlobalping:     {"Globalping", "Globalping", "Globalping"},
+	countryreach.SourceTSPU:           {"the TSPU probe on your node", "зонд ТСПУ на вашей ноде", "您节点上的 TSPU 探测"},
+	countryreach.SourceCheburcheck:    {"cheburcheck", "cheburcheck", "cheburcheck"},
+	countryreach.SourceCheburcheckOwn: {"your cheburcheck probe", "ваш зонд cheburcheck", "您的 cheburcheck 探测点"},
+	countryreach.SourceBsbord:         {"bsbord", "bsbord", "bsbord"},
+	countryreach.SourceBsbordTunnel:   {"bsbord tunnel checks", "проверки туннелей bsbord", "bsbord 隧道检查"},
+	countryreach.SourceBsbordGeo:      {"bsbord GEO", "bsbord GEO", "bsbord GEO"},
+	countryreach.SourceProbes:         {"your own probes", "ваши зонды", "您自己的探测点"},
+}
+
 func countrySeenBy(l L, p map[string]string, line string) string {
 	sources := strings.Split(p["sources"], ",")
-	has := func(name string) bool { return slices.Contains(sources, name) }
 	var seen []string
-	if has("globalping") {
-		seen = append(seen, l.pick("Globalping", "Globalping", "Globalping"))
-	}
-	if has("tspu") {
-		seen = append(seen, l.pick("the TSPU probe on your node", "зонд ТСПУ на вашей ноде", "您节点上的 TSPU 探测"))
-	}
-	for _, source := range []string{"cheburcheck", "cheburcheck_own", "bsbord", "bsbord_tunnel", "bsbord_geo"} {
-		if !has(source) {
-			continue
-		}
-		switch source {
-		case "cheburcheck":
-			seen = append(seen, l.pick("cheburcheck", "cheburcheck", "cheburcheck"))
-		case "cheburcheck_own":
-			seen = append(seen, l.pick("your cheburcheck probe", "ваш зонд cheburcheck", "您的 cheburcheck 探测点"))
-		case "bsbord":
-			seen = append(seen, l.pick("bsbord", "bsbord", "bsbord"))
-		case "bsbord_tunnel":
-			seen = append(seen, l.pick("bsbord tunnel checks", "проверки туннелей bsbord", "bsbord 隧道检查"))
-		case "bsbord_geo":
-			seen = append(seen, l.pick("bsbord GEO", "bsbord GEO", "bsbord GEO"))
+	for _, src := range countryreach.Sources {
+		if names, ok := countrySourceNames[src.ID]; ok && slices.Contains(sources, src.ID) {
+			seen = append(seen, l.pick(names[0], names[1], names[2]))
 		}
 	}
 	if len(seen) == 0 {
@@ -876,36 +872,77 @@ func backupRecoveredText(l L) string {
 	return "<b>" + l.pick("Resolved: the panel backup works again", "Решено: бэкап панели снова работает", "已解决：面板备份已恢复正常") + "</b>"
 }
 
-// toolTitles are the MCP tools that can wait for the owner (the admin screen's "approval.tool.*").
+// toolTitles are the plan tools of the registry (by the name of the change, without _plan), worded as the admin screen's
+// "approval.tool.*", for the message that a plan waits for the owner. TestToolTitlesCoverEveryPlanTool fails for a plan tool
+// that has none.
 var toolTitles = map[string]localizedText{
-	"user_create":                 {en: "Create a user", ru: "Создать пользователя", zh: "创建用户"},
-	"user_update":                 {en: "Change a user", ru: "Изменить пользователя", zh: "更改用户"},
-	"user_disable":                {en: "Disable users", ru: "Отключить пользователей", zh: "停用用户"},
-	"user_enable":                 {en: "Enable users", ru: "Включить пользователей", zh: "启用用户"},
-	"user_reset_traffic":          {en: "Reset users’ traffic", ru: "Сбросить трафик пользователей", zh: "重置用户流量"},
-	"device_revoke":               {en: "Remove a device", ru: "Удалить устройство", zh: "移除设备"},
-	"alert_mute":                  {en: "Mute an alert", ru: "Заглушить алерт", zh: "静默告警"},
-	"alert_close":                 {en: "Close an alert", ru: "Закрыть алерт", zh: "关闭告警"},
-	"node_fix":                    {en: "Fix a node", ru: "Исправить ноду", zh: "修复节点"},
-	"rollout_start":               {en: "Update a node now", ru: "Обновить ноду сейчас", zh: "立即更新节点"},
-	"os_rollout_start":            {en: "Update the operating system of a node", ru: "Обновить операционную систему ноды", zh: "更新节点的操作系统"},
-	"os_rollout_cancel":           {en: "Close the OS update of a node", ru: "Закрыть обновление ОС ноды", zh: "关闭节点的系统更新"},
-	"rollout_pause":               {en: "Pause the rollout", ru: "Поставить раскатку на паузу", zh: "暂停滚动更新"},
-	"rollout_resume":              {en: "Resume the rollout", ru: "Продолжить раскатку", zh: "继续滚动更新"},
-	"rollout_cancel":              {en: "Cancel the rollout", ru: "Отменить раскатку", zh: "取消滚动更新"},
-	"node_update_schedule":        {en: "Schedule a node update", ru: "Запланировать обновление ноды", zh: "定时更新节点"},
-	"node_update_schedule_cancel": {en: "Cancel a scheduled node update", ru: "Отменить запланированное обновление ноды", zh: "取消节点的定时更新"},
-	"update_timezone":             {en: "Change the time zone of update schedules", ru: "Сменить часовой пояс расписания обновлений", zh: "更改更新计划的时区"},
-	"update_download_timeout":     {en: "Change the update download timeout", ru: "Изменить тайм-аут загрузки обновлений", zh: "更改更新下载超时"},
-	"retention":                   {en: "Change how long the panel keeps its data", ru: "Изменить сроки хранения данных панели", zh: "更改面板的数据保留时间"},
-	"node_rollback":               {en: "Roll a node back", ru: "Откатить ноду", zh: "回滚节点"},
-	"node_install":                {en: "Install a node over SSH", ru: "Установить ноду по SSH", zh: "通过 SSH 安装节点"},
-	"node_server_password_rotate": {en: "Change a node’s SSH password", ru: "Сменить SSH-пароль ноды", zh: "更改节点的 SSH 密码"},
-	"node_server_keys_list":       {en: "List a node’s SSH keys", ru: "Показать SSH-ключи ноды", zh: "列出节点的 SSH 密钥"},
-	"node_server_key_add":         {en: "Add a node SSH key", ru: "Добавить SSH-ключ ноды", zh: "添加节点 SSH 密钥"},
-	"node_server_key_remove":      {en: "Remove a node SSH key", ru: "Удалить SSH-ключ ноды", zh: "移除节点 SSH 密钥"},
-	"subscription_app_upsert":     {en: "Add or change an app on the user page", ru: "Добавить или изменить приложение на странице пользователя", zh: "添加或更改用户页面上的应用"},
-	"subscription_app_remove":     {en: "Remove an app from the user page", ru: "Убрать приложение со страницы пользователя", zh: "移除用户页面上的应用"},
+	"user_create":                      {en: "Create a user", ru: "Создать пользователя", zh: "创建用户"},
+	"user_update":                      {en: "Change a user", ru: "Изменить пользователя", zh: "更改用户"},
+	"user_disable":                     {en: "Disable users", ru: "Отключить пользователей", zh: "停用用户"},
+	"user_enable":                      {en: "Enable users", ru: "Включить пользователей", zh: "启用用户"},
+	"user_reset_traffic":               {en: "Reset users’ traffic", ru: "Сбросить трафик пользователей", zh: "重置用户流量"},
+	"device_revoke":                    {en: "Remove a device", ru: "Удалить устройство", zh: "移除设备"},
+	"alert_mute":                       {en: "Mute an alert", ru: "Заглушить алерт", zh: "静默告警"},
+	"alert_close":                      {en: "Close an alert", ru: "Закрыть алерт", zh: "关闭告警"},
+	"node_fix":                         {en: "Fix a node", ru: "Исправить ноду", zh: "修复节点"},
+	"rollout_start":                    {en: "Update a node now", ru: "Обновить ноду сейчас", zh: "立即更新节点"},
+	"os_rollout_start":                 {en: "Update the operating system of a node", ru: "Обновить операционную систему ноды", zh: "更新节点的操作系统"},
+	"os_rollout_cancel":                {en: "Close the OS update of a node", ru: "Закрыть обновление ОС ноды", zh: "关闭节点的系统更新"},
+	"rollout_pause":                    {en: "Pause the rollout", ru: "Поставить раскатку на паузу", zh: "暂停滚动更新"},
+	"rollout_resume":                   {en: "Resume the rollout", ru: "Продолжить раскатку", zh: "继续滚动更新"},
+	"rollout_cancel":                   {en: "Cancel the rollout", ru: "Отменить раскатку", zh: "取消滚动更新"},
+	"node_update_schedule":             {en: "Schedule a node update", ru: "Запланировать обновление ноды", zh: "定时更新节点"},
+	"node_update_schedule_cancel":      {en: "Cancel a scheduled node update", ru: "Отменить запланированное обновление ноды", zh: "取消节点的定时更新"},
+	"update_timezone":                  {en: "Change the time zone of update schedules", ru: "Сменить часовой пояс расписания обновлений", zh: "更改更新计划的时区"},
+	"update_download_timeout":          {en: "Change the update download timeout", ru: "Изменить тайм-аут загрузки обновлений", zh: "更改更新下载超时"},
+	"retention":                        {en: "Change how long the panel keeps its data", ru: "Изменить сроки хранения данных панели", zh: "更改面板的数据保留时间"},
+	"node_rollback":                    {en: "Roll a node back", ru: "Откатить ноду", zh: "回滚节点"},
+	"node_install":                     {en: "Install a node over SSH", ru: "Установить ноду по SSH", zh: "通过 SSH 安装节点"},
+	"node_server_password_rotate":      {en: "Change a node’s SSH password", ru: "Сменить SSH-пароль ноды", zh: "更改节点的 SSH 密码"},
+	"node_server_key_add":              {en: "Add a node SSH key", ru: "Добавить SSH-ключ ноды", zh: "添加节点 SSH 密钥"},
+	"node_server_key_remove":           {en: "Remove a node SSH key", ru: "Удалить SSH-ключ ноды", zh: "移除节点 SSH 密钥"},
+	"subscription_app_upsert":          {en: "Add or change an app on the user page", ru: "Добавить или изменить приложение на странице пользователя", zh: "添加或更改用户页面上的应用"},
+	"subscription_app_remove":          {en: "Remove an app from the user page", ru: "Убрать приложение со страницы пользователя", zh: "移除用户页面上的应用"},
+	"channel_measure":                  {en: "Measure a node’s channel", ru: "Измерить канал ноды", zh: "测量节点的通道"},
+	"decoy_site_assign":                {en: "Put a decoy site on nodes or the panel", ru: "Поставить сайт-ширму на ноды или на панель", zh: "将伪装站点放到节点或面板上"},
+	"decoy_site_delete":                {en: "Delete a decoy site", ru: "Удалить сайт-ширму", zh: "删除伪装站点"},
+	"decoy_site_ready":                 {en: "Mark a decoy site ready", ru: "Пометить сайт-ширму готовым", zh: "将伪装站点标记为就绪"},
+	"decoy_site_revert":                {en: "Return a decoy site to an earlier version", ru: "Вернуть сайт-ширму к прежней версии", zh: "将伪装站点恢复到早期版本"},
+	"decoy_site_unassign":              {en: "Take a decoy site off nodes or the panel", ru: "Снять сайт-ширму с нод или с панели", zh: "将伪装站点从节点或面板上撤下"},
+	"decoy_site_version":               {en: "Save a new version of a decoy site", ru: "Сохранить новую версию сайта-ширмы", zh: "保存伪装站点的新版本"},
+	"dns_preset_create":                {en: "Create a DNS preset", ru: "Создать набор DNS", zh: "创建 DNS 预设"},
+	"dns_preset_delete":                {en: "Delete a DNS preset", ru: "Удалить набор DNS", zh: "删除 DNS 预设"},
+	"dns_preset_update":                {en: "Change a DNS preset", ru: "Изменить набор DNS", zh: "更改 DNS 预设"},
+	"dns_settings_set":                 {en: "Change the DNS settings", ru: "Изменить настройки DNS", zh: "更改 DNS 设置"},
+	"group_create":                     {en: "Create a group", ru: "Создать группу", zh: "创建分组"},
+	"group_delete":                     {en: "Delete a group", ru: "Удалить группу", zh: "删除分组"},
+	"group_update":                     {en: "Change a group", ru: "Изменить группу", zh: "更改分组"},
+	"log_level":                        {en: "Change the panel’s log level", ru: "Изменить уровень журнала панели", zh: "更改面板的日志级别"},
+	"node_awg_backend":                 {en: "Change how a node runs AmneziaWG", ru: "Изменить, как нода запускает AmneziaWG", zh: "更改节点运行 AmneziaWG 的方式"},
+	"node_debug_capture":               {en: "Capture a node’s debug log", ru: "Снять отладочный журнал ноды", zh: "抓取节点的调试日志"},
+	"node_decoy":                       {en: "Change a node’s decoy site", ru: "Изменить сайт-ширму ноды", zh: "更改节点的伪装站点"},
+	"node_ipv6":                        {en: "Turn a node’s IPv6 entry on or off", ru: "Включить или выключить IPv6-вход ноды", zh: "开启或关闭节点的 IPv6 入口"},
+	"node_server_keys_add":             {en: "Add an SSH key to several nodes", ru: "Добавить SSH-ключ на несколько нод", zh: "向多个节点添加 SSH 密钥"},
+	"node_sharing_set":                 {en: "Change who gets a node", ru: "Изменить, кому выдаётся нода", zh: "更改谁能获得该节点"},
+	"node_update":                      {en: "Change a node’s settings", ru: "Изменить настройки ноды", zh: "更改节点设置"},
+	"os_rollout_pause":                 {en: "Pause the system update", ru: "Поставить обновление системы на паузу", zh: "暂停系统更新"},
+	"os_rollout_resume":                {en: "Resume the system update", ru: "Продолжить обновление системы", zh: "继续系统更新"},
+	"path_speed":                       {en: "Test the speed between two nodes", ru: "Проверить скорость между двумя нодами", zh: "测试两个节点之间的速度"},
+	"profile_create":                   {en: "Create a profile", ru: "Создать профиль", zh: "创建协议配置"},
+	"profile_deploy":                   {en: "Change a profile’s nodes and groups", ru: "Изменить ноды и группы профиля", zh: "更改协议配置的节点和分组"},
+	"profile_update":                   {en: "Change a profile", ru: "Изменить профиль", zh: "更改协议配置"},
+	"relay":                            {en: "Change a relay", ru: "Изменить ретрансляцию", zh: "更改中转"},
+	"subscription_link_limits_set":     {en: "Change the limits of subscription links", ru: "Изменить ограничения ссылок подписки", zh: "更改订阅链接的限制"},
+	"subscription_mihomo_template_set": {en: "Change a Mihomo template", ru: "Изменить шаблон Mihomo", zh: "更改 Mihomo 模板"},
+	"subscription_page_set":            {en: "Change the user page", ru: "Изменить страницу пользователя", zh: "更改用户页面"},
+	"subscription_routing_set":         {en: "Change a routing profile", ru: "Изменить профиль маршрутизации", zh: "更改路由配置"},
+	"subscription_rules_set":           {en: "Change the subscription rules", ru: "Изменить правила подписки", zh: "更改订阅规则"},
+	"subscription_texts_set":           {en: "Change the subscription texts", ru: "Изменить тексты подписки", zh: "更改订阅文字"},
+	"task_create":                      {en: "Create a scheduled task", ru: "Создать задачу по расписанию", zh: "创建计划任务"},
+	"task_delete":                      {en: "Delete a scheduled task", ru: "Удалить задачу по расписанию", zh: "删除计划任务"},
+	"task_update":                      {en: "Change a scheduled task", ru: "Изменить задачу по расписанию", zh: "修改计划任务"},
+	"warp_reregister":                  {en: "Register a new WARP device", ru: "Зарегистрировать новое устройство WARP", zh: "注册新的 WARP 设备"},
+	"warp_restart":                     {en: "Restart WARP on a node", ru: "Перезапустить WARP на ноде", zh: "重启节点上的 WARP"},
 }
 
 // planWaitingText says an agent's plan waits for the owner. It never says what the plan contains beyond the tool's title:

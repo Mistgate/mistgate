@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file mistgate/decoysite/v1/decoysite.proto.
  */
 export const file_mistgate_decoysite_v1_decoysite: GenFile = /*@__PURE__*/
-  fileDesc("CiVtaXN0Z2F0ZS9kZWNveXNpdGUvdjEvZGVjb3lzaXRlLnByb3RvEhVtaXN0Z2F0ZS5kZWNveXNpdGUudjEiRAoKRGVjb3lDaGVjaxIMCgRjb2RlGAEgASgJEg0KBWxldmVsGAIgASgJEgoKAm9rGAMgASgIEg0KBXBhdGhzGAQgAygJIi8KDURlY295RmlsZUluZm8SDAoEcGF0aBgBIAEoCRIQCgRzaXplGAIgASgEQgIwAiKAAwoJRGVjb3lTaXRlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEbm90ZRgDIAEoCRIOCgZzb3VyY2UYBCABKAkSFAoMc291cmNlX2xhYmVsGAUgASgJEg0KBXN0YXRlGAYgASgJEhUKDWJ1bmRsZV9zaGEyNTYYByABKAkSGAoMY3JlYXRlZF91bml4GAggASgDQgIwAhISCgpjcmVhdGVkX2J5GAkgASgJEhgKDHVwZGF0ZWRfdW5peBgKIAEoA0ICMAISEgoKdXBkYXRlZF9ieRgLIAEoCRIPCgd2ZXJzaW9uGAwgASgNEhYKCnNpemVfYnl0ZXMYDSABKARCAjACEhIKCmZpbGVfY291bnQYDiABKA0SDQoFdGl0bGUYDyABKAkSMQoGY2hlY2tzGBAgAygLMiEubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295Q2hlY2sSEgoKbm9kZV9jb3VudBgRIAEoDRIQCghvbl9wYW5lbBgSIAEoCCLfAQoMRGVjb3lWZXJzaW9uEgsKA3NlcRgBIAEoDRIVCg1idW5kbGVfc2hhMjU2GAIgASgJEhgKDGNyZWF0ZWRfdW5peBgDIAEoA0ICMAISEgoKY3JlYXRlZF9ieRgEIAEoCRIWCgpzaXplX2J5dGVzGAUgASgEQgIwAhISCgpmaWxlX2NvdW50GAYgASgNEg0KBXRpdGxlGAcgASgJEjEKBmNoZWNrcxgIIAMoCzIhLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUNoZWNrEg8KB2N1cnJlbnQYCSABKAgibAoQRGVjb3lCdWlsdGluSXRlbRIKCgJpZBgBIAEoCRIRCglhdmFpbGFibGUYAiABKAgSEwoLcmVhc29uX2NvZGUYAyABKAkSEgoKbm9kZV9jb3VudBgEIAEoDRIQCghvbl9wYW5lbBgFIAEoCCJICg9EZWNveVBhbmVsU3RhdGUSDwoHYWRkcmVzcxgBIAEoCRIPCgdzZXJ2aW5nGAIgASgJEhMKC3JlYXNvbl9jb2RlGAMgASgJInEKDURlY295U2l0ZU5vZGUSDwoHbm9kZV9pZBgBIAEoCRIRCglub2RlX25hbWUYAiABKAkSEwoLcmVhc29uX2NvZGUYAyABKAkSEQoJc3VwcG9ydGVkGAQgASgIEhQKDGFnZW50X3NoYTI1NhgFIAEoCSIXChVMaXN0RGVjb3lTaXRlc1JlcXVlc3Qi+wEKFkxpc3REZWNveVNpdGVzUmVzcG9uc2USLwoFc2l0ZXMYASADKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEjgKB2J1aWx0aW4YAiADKAsyJy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lCdWlsdGluSXRlbRIUCgxwYW5lbF9zb3VyY2UYAyABKAkSEgoKc2l0ZV9saW1pdBgEIAEoDRIVCg12ZXJzaW9uX2xpbWl0GAUgASgNEjUKBXBhbmVsGAYgASgLMiYubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295UGFuZWxTdGF0ZSImChNHZXREZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAki2QIKFEdldERlY295U2l0ZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEjUKCHZlcnNpb25zGAIgAygLMiMubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295VmVyc2lvbhIzCgVmaWxlcxgDIAMoCzIkLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUZpbGVJbmZvEjMKBW5vZGVzGAQgAygLMiQubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295U2l0ZU5vZGUSOQoOc2hhcmVkX2RvbWFpbnMYBSABKAsyIS5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lDaGVjaxI1CgVwYW5lbBgGIAEoCzImLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVBhbmVsU3RhdGUiawoWQ3JlYXRlRGVjb3lTaXRlUmVxdWVzdBIMCgRuYW1lGAEgASgJEgwKBG5vdGUYAiABKAkSFgoOYnVuZGxlX2FyY2hpdmUYAyABKAwSDQoFc3RhdGUYBCABKAkSDgoGc291cmNlGAUgASgJIkkKF0NyZWF0ZURlY295U2l0ZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIkUKGkFkZERlY295U2l0ZVZlcnNpb25SZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSFgoOYnVuZGxlX2FyY2hpdmUYAiABKAwiZwobQWRkRGVjb3lTaXRlVmVyc2lvblJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEhgKEHVwZGF0ZWRfbm9kZV9pZHMYAiADKAkiWgoYRWRpdERlY295U2l0ZUZpbGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSDAoEcGF0aBgCIAEoCRIPCgdjb250ZW50GAMgASgMEg4KBmRlbGV0ZRgEIAEoCCJLChlFZGl0RGVjb3lTaXRlRmlsZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIkUKFlVwZGF0ZURlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEgwKBG5vdGUYAyABKAkiSQoXVXBkYXRlRGVjb3lTaXRlUmVzcG9uc2USLgoEc2l0ZRgBIAEoCzIgLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVNpdGUiNQoUQ29weURlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIkcKFUNvcHlEZWNveVNpdGVSZXNwb25zZRIuCgRzaXRlGAEgASgLMiAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295U2l0ZSI6ChhTZXREZWNveVNpdGVSZWFkeVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRINCgVyZWFkeRgCIAEoCCJLChlTZXREZWNveVNpdGVSZWFkeVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIlsKFkFzc2lnbkRlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIQCghub2RlX2lkcxgCIAMoCRINCgVwYW5lbBgDIAEoCBIPCgdkcnlfcnVuGAQgASgIImcKDURlY295UmVwbGFjZWQSDgoGdGFyZ2V0GAEgASgJEhAKCHByZXZpb3VzGAIgASgJEhgKEHByZXZpb3VzX3NpdGVfaWQYAyABKAkSGgoScHJldmlvdXNfc2l0ZV9uYW1lGAQgASgJIr8BChdBc3NpZ25EZWNveVNpdGVSZXNwb25zZRIzCgh3YXJuaW5ncxgBIAMoCzIhLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUNoZWNrEjYKCHJlcGxhY2VkGAIgAygLMiQubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295UmVwbGFjZWQSJgoFbm9kZXMYAyADKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlEg8KB2FwcGxpZWQYBCABKAgiXgoYVW5hc3NpZ25EZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSEAoIbm9kZV9pZHMYAiADKAkSDQoFcGFuZWwYAyABKAgSEAoIZmFsbGJhY2sYBCABKAkiWQoZVW5hc3NpZ25EZWNveVNpdGVSZXNwb25zZRImCgVub2RlcxgBIAMoCzIXLm1pc3RnYXRlLmFkbWluLnYxLk5vZGUSFAoMcGFuZWxfc291cmNlGAIgASgJIiwKGlNldFBhbmVsRGVjb3lTb3VyY2VSZXF1ZXN0Eg4KBnNvdXJjZRgBIAEoCSIzChtTZXRQYW5lbERlY295U291cmNlUmVzcG9uc2USFAoMcGFuZWxfc291cmNlGAEgASgJIjYKFlJldmVydERlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0iYwoXUmV2ZXJ0RGVjb3lTaXRlUmVzcG9uc2USLgoEc2l0ZRgBIAEoCzIgLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVNpdGUSGAoQdXBkYXRlZF9ub2RlX2lkcxgCIAMoCSIpChZEZWxldGVEZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkiGQoXRGVsZXRlRGVjb3lTaXRlUmVzcG9uc2UiOAoYRG93bmxvYWREZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSCwoDc2VxGAIgASgNIj4KGURvd25sb2FkRGVjb3lTaXRlUmVzcG9uc2USEAoIZmlsZW5hbWUYASABKAkSDwoHYXJjaGl2ZRgCIAEoDCI1ChVMaXN0RGVjb3lQYWdlc1JlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0ibQoWTGlzdERlY295UGFnZXNSZXNwb25zZRINCgVwYWdlcxgBIAMoCRIzCgVmaWxlcxgCIAMoCzIkLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUZpbGVJbmZvEg8KB2hhc180MDQYAyABKAgiWwoaR2V0RGVjb3lQYWdlUHJldmlld1JlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0SDAoEcGF0aBgDIAEoCRIRCglub3RfZm91bmQYBCABKAgiOQobR2V0RGVjb3lQYWdlUHJldmlld1Jlc3BvbnNlEgwKBGh0bWwYASABKAkSDAoEcGF0aBgCIAEoCSJBChNHZXREZWNveUZpbGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSCwoDc2VxGAIgASgNEgwKBHBhdGgYAyABKAkiSQoUR2V0RGVjb3lGaWxlUmVzcG9uc2USDAoEdGV4dBgBIAEoCRIQCgRzaXplGAIgASgEQgIwAhIRCgl0cnVuY2F0ZWQYAyABKAgywg8KEERlY295U2l0ZVNlcnZpY2USbQoOTGlzdERlY295U2l0ZXMSLC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuTGlzdERlY295U2l0ZXNSZXF1ZXN0Gi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkxpc3REZWNveVNpdGVzUmVzcG9uc2USZwoMR2V0RGVjb3lTaXRlEioubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkdldERlY295U2l0ZVJlcXVlc3QaKy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuR2V0RGVjb3lTaXRlUmVzcG9uc2UScAoPQ3JlYXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkNyZWF0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuQ3JlYXRlRGVjb3lTaXRlUmVzcG9uc2USfAoTQWRkRGVjb3lTaXRlVmVyc2lvbhIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5BZGREZWNveVNpdGVWZXJzaW9uUmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5BZGREZWNveVNpdGVWZXJzaW9uUmVzcG9uc2USdgoRRWRpdERlY295U2l0ZUZpbGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRWRpdERlY295U2l0ZUZpbGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkVkaXREZWNveVNpdGVGaWxlUmVzcG9uc2UScAoPVXBkYXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlVwZGF0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuVXBkYXRlRGVjb3lTaXRlUmVzcG9uc2USagoNQ29weURlY295U2l0ZRIrLm1pc3RnYXRlLmRlY295c2l0ZS52MS5Db3B5RGVjb3lTaXRlUmVxdWVzdBosLm1pc3RnYXRlLmRlY295c2l0ZS52MS5Db3B5RGVjb3lTaXRlUmVzcG9uc2USdgoRU2V0RGVjb3lTaXRlUmVhZHkSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuU2V0RGVjb3lTaXRlUmVhZHlSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlNldERlY295U2l0ZVJlYWR5UmVzcG9uc2UScAoPQXNzaWduRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkFzc2lnbkRlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuQXNzaWduRGVjb3lTaXRlUmVzcG9uc2USdgoRVW5hc3NpZ25EZWNveVNpdGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuVW5hc3NpZ25EZWNveVNpdGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlVuYXNzaWduRGVjb3lTaXRlUmVzcG9uc2USfAoTU2V0UGFuZWxEZWNveVNvdXJjZRIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5TZXRQYW5lbERlY295U291cmNlUmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5TZXRQYW5lbERlY295U291cmNlUmVzcG9uc2UScAoPUmV2ZXJ0RGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlJldmVydERlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuUmV2ZXJ0RGVjb3lTaXRlUmVzcG9uc2UScAoPRGVsZXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlbGV0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVsZXRlRGVjb3lTaXRlUmVzcG9uc2USdgoRRG93bmxvYWREZWNveVNpdGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRG93bmxvYWREZWNveVNpdGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRvd25sb2FkRGVjb3lTaXRlUmVzcG9uc2USbQoOTGlzdERlY295UGFnZXMSLC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuTGlzdERlY295UGFnZXNSZXF1ZXN0Gi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkxpc3REZWNveVBhZ2VzUmVzcG9uc2USfAoTR2V0RGVjb3lQYWdlUHJldmlldxIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5HZXREZWNveVBhZ2VQcmV2aWV3UmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5HZXREZWNveVBhZ2VQcmV2aWV3UmVzcG9uc2USZwoMR2V0RGVjb3lGaWxlEioubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkdldERlY295RmlsZVJlcXVlc3QaKy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuR2V0RGVjb3lGaWxlUmVzcG9uc2VC5QEKGWNvbS5taXN0Z2F0ZS5kZWNveXNpdGUudjFCDkRlY295c2l0ZVByb3RvUAFaQmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2RlY295c2l0ZS92MTtkZWNveXNpdGV2MaICA01EWKoCFU1pc3RnYXRlLkRlY295c2l0ZS5WMcoCFU1pc3RnYXRlXERlY295c2l0ZVxWMeICIU1pc3RnYXRlXERlY295c2l0ZVxWMVxHUEJNZXRhZGF0YeoCF01pc3RnYXRlOjpEZWNveXNpdGU6OlYxYgZwcm90bzM", [file_mistgate_admin_v1_node]);
+  fileDesc("CiVtaXN0Z2F0ZS9kZWNveXNpdGUvdjEvZGVjb3lzaXRlLnByb3RvEhVtaXN0Z2F0ZS5kZWNveXNpdGUudjEiRAoKRGVjb3lDaGVjaxIMCgRjb2RlGAEgASgJEg0KBWxldmVsGAIgASgJEgoKAm9rGAMgASgIEg0KBXBhdGhzGAQgAygJIi8KDURlY295RmlsZUluZm8SDAoEcGF0aBgBIAEoCRIQCgRzaXplGAIgASgEQgIwAiKAAwoJRGVjb3lTaXRlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEbm90ZRgDIAEoCRIOCgZzb3VyY2UYBCABKAkSFAoMc291cmNlX2xhYmVsGAUgASgJEg0KBXN0YXRlGAYgASgJEhUKDWJ1bmRsZV9zaGEyNTYYByABKAkSGAoMY3JlYXRlZF91bml4GAggASgDQgIwAhISCgpjcmVhdGVkX2J5GAkgASgJEhgKDHVwZGF0ZWRfdW5peBgKIAEoA0ICMAISEgoKdXBkYXRlZF9ieRgLIAEoCRIPCgd2ZXJzaW9uGAwgASgNEhYKCnNpemVfYnl0ZXMYDSABKARCAjACEhIKCmZpbGVfY291bnQYDiABKA0SDQoFdGl0bGUYDyABKAkSMQoGY2hlY2tzGBAgAygLMiEubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295Q2hlY2sSEgoKbm9kZV9jb3VudBgRIAEoDRIQCghvbl9wYW5lbBgSIAEoCCLfAQoMRGVjb3lWZXJzaW9uEgsKA3NlcRgBIAEoDRIVCg1idW5kbGVfc2hhMjU2GAIgASgJEhgKDGNyZWF0ZWRfdW5peBgDIAEoA0ICMAISEgoKY3JlYXRlZF9ieRgEIAEoCRIWCgpzaXplX2J5dGVzGAUgASgEQgIwAhISCgpmaWxlX2NvdW50GAYgASgNEg0KBXRpdGxlGAcgASgJEjEKBmNoZWNrcxgIIAMoCzIhLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUNoZWNrEg8KB2N1cnJlbnQYCSABKAgibAoQRGVjb3lCdWlsdGluSXRlbRIKCgJpZBgBIAEoCRIRCglhdmFpbGFibGUYAiABKAgSEwoLcmVhc29uX2NvZGUYAyABKAkSEgoKbm9kZV9jb3VudBgEIAEoDRIQCghvbl9wYW5lbBgFIAEoCCJICg9EZWNveVBhbmVsU3RhdGUSDwoHYWRkcmVzcxgBIAEoCRIPCgdzZXJ2aW5nGAIgASgJEhMKC3JlYXNvbl9jb2RlGAMgASgJInEKDURlY295U2l0ZU5vZGUSDwoHbm9kZV9pZBgBIAEoCRIRCglub2RlX25hbWUYAiABKAkSEwoLcmVhc29uX2NvZGUYAyABKAkSEQoJc3VwcG9ydGVkGAQgASgIEhQKDGFnZW50X3NoYTI1NhgFIAEoCSIXChVMaXN0RGVjb3lTaXRlc1JlcXVlc3Qi+wEKFkxpc3REZWNveVNpdGVzUmVzcG9uc2USLwoFc2l0ZXMYASADKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEjgKB2J1aWx0aW4YAiADKAsyJy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lCdWlsdGluSXRlbRIUCgxwYW5lbF9zb3VyY2UYAyABKAkSEgoKc2l0ZV9saW1pdBgEIAEoDRIVCg12ZXJzaW9uX2xpbWl0GAUgASgNEjUKBXBhbmVsGAYgASgLMiYubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295UGFuZWxTdGF0ZSImChNHZXREZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAki2QIKFEdldERlY295U2l0ZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEjUKCHZlcnNpb25zGAIgAygLMiMubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295VmVyc2lvbhIzCgVmaWxlcxgDIAMoCzIkLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUZpbGVJbmZvEjMKBW5vZGVzGAQgAygLMiQubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295U2l0ZU5vZGUSOQoOc2hhcmVkX2RvbWFpbnMYBSABKAsyIS5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lDaGVjaxI1CgVwYW5lbBgGIAEoCzImLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVBhbmVsU3RhdGUiawoWQ3JlYXRlRGVjb3lTaXRlUmVxdWVzdBIMCgRuYW1lGAEgASgJEgwKBG5vdGUYAiABKAkSFgoOYnVuZGxlX2FyY2hpdmUYAyABKAwSDQoFc3RhdGUYBCABKAkSDgoGc291cmNlGAUgASgJIkkKF0NyZWF0ZURlY295U2l0ZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIkUKGkFkZERlY295U2l0ZVZlcnNpb25SZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSFgoOYnVuZGxlX2FyY2hpdmUYAiABKAwiZwobQWRkRGVjb3lTaXRlVmVyc2lvblJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlEhgKEHVwZGF0ZWRfbm9kZV9pZHMYAiADKAkiWgoYRWRpdERlY295U2l0ZUZpbGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSDAoEcGF0aBgCIAEoCRIPCgdjb250ZW50GAMgASgMEg4KBmRlbGV0ZRgEIAEoCCJLChlFZGl0RGVjb3lTaXRlRmlsZVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIkUKFlVwZGF0ZURlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEgwKBG5vdGUYAyABKAkiSQoXVXBkYXRlRGVjb3lTaXRlUmVzcG9uc2USLgoEc2l0ZRgBIAEoCzIgLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVNpdGUiNQoUQ29weURlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIkcKFUNvcHlEZWNveVNpdGVSZXNwb25zZRIuCgRzaXRlGAEgASgLMiAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295U2l0ZSI6ChhTZXREZWNveVNpdGVSZWFkeVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRINCgVyZWFkeRgCIAEoCCJLChlTZXREZWNveVNpdGVSZWFkeVJlc3BvbnNlEi4KBHNpdGUYASABKAsyIC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVjb3lTaXRlIlsKFkFzc2lnbkRlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRIQCghub2RlX2lkcxgCIAMoCRINCgVwYW5lbBgDIAEoCBIPCgdkcnlfcnVuGAQgASgIImcKDURlY295UmVwbGFjZWQSDgoGdGFyZ2V0GAEgASgJEhAKCHByZXZpb3VzGAIgASgJEhgKEHByZXZpb3VzX3NpdGVfaWQYAyABKAkSGgoScHJldmlvdXNfc2l0ZV9uYW1lGAQgASgJIr8BChdBc3NpZ25EZWNveVNpdGVSZXNwb25zZRIzCgh3YXJuaW5ncxgBIAMoCzIhLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUNoZWNrEjYKCHJlcGxhY2VkGAIgAygLMiQubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295UmVwbGFjZWQSJgoFbm9kZXMYAyADKAsyFy5taXN0Z2F0ZS5hZG1pbi52MS5Ob2RlEg8KB2FwcGxpZWQYBCABKAgiXgoYVW5hc3NpZ25EZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSEAoIbm9kZV9pZHMYAiADKAkSDQoFcGFuZWwYAyABKAgSEAoIZmFsbGJhY2sYBCABKAkiWQoZVW5hc3NpZ25EZWNveVNpdGVSZXNwb25zZRImCgVub2RlcxgBIAMoCzIXLm1pc3RnYXRlLmFkbWluLnYxLk5vZGUSFAoMcGFuZWxfc291cmNlGAIgASgJIiwKGlNldFBhbmVsRGVjb3lTb3VyY2VSZXF1ZXN0Eg4KBnNvdXJjZRgBIAEoCSIzChtTZXRQYW5lbERlY295U291cmNlUmVzcG9uc2USFAoMcGFuZWxfc291cmNlGAEgASgJIjYKFlJldmVydERlY295U2l0ZVJlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0iYwoXUmV2ZXJ0RGVjb3lTaXRlUmVzcG9uc2USLgoEc2l0ZRgBIAEoCzIgLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveVNpdGUSGAoQdXBkYXRlZF9ub2RlX2lkcxgCIAMoCSIpChZEZWxldGVEZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkiGQoXRGVsZXRlRGVjb3lTaXRlUmVzcG9uc2UiOAoYRG93bmxvYWREZWNveVNpdGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSCwoDc2VxGAIgASgNIj4KGURvd25sb2FkRGVjb3lTaXRlUmVzcG9uc2USEAoIZmlsZW5hbWUYASABKAkSDwoHYXJjaGl2ZRgCIAEoDCI1ChVMaXN0RGVjb3lQYWdlc1JlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0ibQoWTGlzdERlY295UGFnZXNSZXNwb25zZRINCgVwYWdlcxgBIAMoCRIzCgVmaWxlcxgCIAMoCzIkLm1pc3RnYXRlLmRlY295c2l0ZS52MS5EZWNveUZpbGVJbmZvEg8KB2hhc180MDQYAyABKAgiWwoaR2V0RGVjb3lQYWdlUHJldmlld1JlcXVlc3QSDwoHc2l0ZV9pZBgBIAEoCRILCgNzZXEYAiABKA0SDAoEcGF0aBgDIAEoCRIRCglub3RfZm91bmQYBCABKAgiOQobR2V0RGVjb3lQYWdlUHJldmlld1Jlc3BvbnNlEgwKBGh0bWwYASABKAkSDAoEcGF0aBgCIAEoCSJBChNHZXREZWNveUZpbGVSZXF1ZXN0Eg8KB3NpdGVfaWQYASABKAkSCwoDc2VxGAIgASgNEgwKBHBhdGgYAyABKAkiSQoUR2V0RGVjb3lGaWxlUmVzcG9uc2USDAoEdGV4dBgBIAEoCRIQCgRzaXplGAIgASgEQgIwAhIRCgl0cnVuY2F0ZWQYAyABKAgiUAoNRGVjb3lUZW1wbGF0ZRIKCgJpZBgBIAEoCRIPCgduYW1lX2VuGAIgASgJEg8KB25hbWVfcnUYAyABKAkSEQoJY291bnRyaWVzGAQgAygJIhsKGUxpc3REZWNveVRlbXBsYXRlc1JlcXVlc3QiaAoaTGlzdERlY295VGVtcGxhdGVzUmVzcG9uc2USNwoJdGVtcGxhdGVzGAEgAygLMiQubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295VGVtcGxhdGUSEQoJY291bnRyaWVzGAIgAygJIkoKG1ByZXZpZXdEZWNveVRlbXBsYXRlUmVxdWVzdBIMCgRraW5kGAEgASgJEgwKBHNlZWQYAiABKAkSDwoHY291bnRyeRgDIAEoCSJvChxQcmV2aWV3RGVjb3lUZW1wbGF0ZVJlc3BvbnNlEgwKBGh0bWwYASABKAkSDAoEc2VlZBgCIAEoCRIMCgRuYW1lGAMgASgJEg4KBnBob3RvcxgEIAEoCRIVCg1waG90b3Nfc291cmNlGAUgASgJImMKGEdlbmVyYXRlRGVjb3lTaXRlUmVxdWVzdBIMCgRraW5kGAEgASgJEgwKBHNlZWQYAiABKAkSDAoEbmFtZRgDIAEoCRIMCgRub3RlGAQgASgJEg8KB2NvdW50cnkYBSABKAkiWwoZR2VuZXJhdGVEZWNveVNpdGVSZXNwb25zZRIuCgRzaXRlGAEgASgLMiAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlY295U2l0ZRIOCgZwaG90b3MYAiABKAkiFwoVR2V0RGVjb3lQaG90b3NSZXF1ZXN0IlIKFkdldERlY295UGhvdG9zUmVzcG9uc2USDwoHaGFzX2tleRgBIAEoCBIXCg9oYXNfcGl4YWJheV9rZXkYAiABKAgSDgoGc291cmNlGAMgASgJIjcKGFNldERlY295UGhvdG9zS2V5UmVxdWVzdBILCgNrZXkYASABKAkSDgoGc291cmNlGAIgASgJIlUKGVNldERlY295UGhvdG9zS2V5UmVzcG9uc2USDwoHaGFzX2tleRgBIAEoCBIXCg9oYXNfcGl4YWJheV9rZXkYAiABKAgSDgoGc291cmNlGAMgASgJIi0KG1NldERlY295UGhvdG9zU291cmNlUmVxdWVzdBIOCgZzb3VyY2UYASABKAkiWAocU2V0RGVjb3lQaG90b3NTb3VyY2VSZXNwb25zZRIPCgdoYXNfa2V5GAEgASgIEhcKD2hhc19waXhhYmF5X2tleRgCIAEoCBIOCgZzb3VyY2UYAyABKAkynhUKEERlY295U2l0ZVNlcnZpY2USbQoOTGlzdERlY295U2l0ZXMSLC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuTGlzdERlY295U2l0ZXNSZXF1ZXN0Gi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkxpc3REZWNveVNpdGVzUmVzcG9uc2USZwoMR2V0RGVjb3lTaXRlEioubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkdldERlY295U2l0ZVJlcXVlc3QaKy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuR2V0RGVjb3lTaXRlUmVzcG9uc2UScAoPQ3JlYXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkNyZWF0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuQ3JlYXRlRGVjb3lTaXRlUmVzcG9uc2USfAoTQWRkRGVjb3lTaXRlVmVyc2lvbhIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5BZGREZWNveVNpdGVWZXJzaW9uUmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5BZGREZWNveVNpdGVWZXJzaW9uUmVzcG9uc2USdgoRRWRpdERlY295U2l0ZUZpbGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRWRpdERlY295U2l0ZUZpbGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkVkaXREZWNveVNpdGVGaWxlUmVzcG9uc2UScAoPVXBkYXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlVwZGF0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuVXBkYXRlRGVjb3lTaXRlUmVzcG9uc2USagoNQ29weURlY295U2l0ZRIrLm1pc3RnYXRlLmRlY295c2l0ZS52MS5Db3B5RGVjb3lTaXRlUmVxdWVzdBosLm1pc3RnYXRlLmRlY295c2l0ZS52MS5Db3B5RGVjb3lTaXRlUmVzcG9uc2USdgoRU2V0RGVjb3lTaXRlUmVhZHkSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuU2V0RGVjb3lTaXRlUmVhZHlSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlNldERlY295U2l0ZVJlYWR5UmVzcG9uc2UScAoPQXNzaWduRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkFzc2lnbkRlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuQXNzaWduRGVjb3lTaXRlUmVzcG9uc2USdgoRVW5hc3NpZ25EZWNveVNpdGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuVW5hc3NpZ25EZWNveVNpdGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlVuYXNzaWduRGVjb3lTaXRlUmVzcG9uc2USfAoTU2V0UGFuZWxEZWNveVNvdXJjZRIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5TZXRQYW5lbERlY295U291cmNlUmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5TZXRQYW5lbERlY295U291cmNlUmVzcG9uc2UScAoPUmV2ZXJ0RGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlJldmVydERlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuUmV2ZXJ0RGVjb3lTaXRlUmVzcG9uc2UScAoPRGVsZXRlRGVjb3lTaXRlEi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRlbGV0ZURlY295U2l0ZVJlcXVlc3QaLi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRGVsZXRlRGVjb3lTaXRlUmVzcG9uc2USdgoRRG93bmxvYWREZWNveVNpdGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuRG93bmxvYWREZWNveVNpdGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkRvd25sb2FkRGVjb3lTaXRlUmVzcG9uc2USbQoOTGlzdERlY295UGFnZXMSLC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuTGlzdERlY295UGFnZXNSZXF1ZXN0Gi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkxpc3REZWNveVBhZ2VzUmVzcG9uc2USfAoTR2V0RGVjb3lQYWdlUHJldmlldxIxLm1pc3RnYXRlLmRlY295c2l0ZS52MS5HZXREZWNveVBhZ2VQcmV2aWV3UmVxdWVzdBoyLm1pc3RnYXRlLmRlY295c2l0ZS52MS5HZXREZWNveVBhZ2VQcmV2aWV3UmVzcG9uc2USZwoMR2V0RGVjb3lGaWxlEioubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkdldERlY295RmlsZVJlcXVlc3QaKy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuR2V0RGVjb3lGaWxlUmVzcG9uc2USeQoSTGlzdERlY295VGVtcGxhdGVzEjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkxpc3REZWNveVRlbXBsYXRlc1JlcXVlc3QaMS5taXN0Z2F0ZS5kZWNveXNpdGUudjEuTGlzdERlY295VGVtcGxhdGVzUmVzcG9uc2USfwoUUHJldmlld0RlY295VGVtcGxhdGUSMi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuUHJldmlld0RlY295VGVtcGxhdGVSZXF1ZXN0GjMubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlByZXZpZXdEZWNveVRlbXBsYXRlUmVzcG9uc2USdgoRR2VuZXJhdGVEZWNveVNpdGUSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuR2VuZXJhdGVEZWNveVNpdGVSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkdlbmVyYXRlRGVjb3lTaXRlUmVzcG9uc2USbQoOR2V0RGVjb3lQaG90b3MSLC5taXN0Z2F0ZS5kZWNveXNpdGUudjEuR2V0RGVjb3lQaG90b3NSZXF1ZXN0Gi0ubWlzdGdhdGUuZGVjb3lzaXRlLnYxLkdldERlY295UGhvdG9zUmVzcG9uc2USdgoRU2V0RGVjb3lQaG90b3NLZXkSLy5taXN0Z2F0ZS5kZWNveXNpdGUudjEuU2V0RGVjb3lQaG90b3NLZXlSZXF1ZXN0GjAubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlNldERlY295UGhvdG9zS2V5UmVzcG9uc2USfwoUU2V0RGVjb3lQaG90b3NTb3VyY2USMi5taXN0Z2F0ZS5kZWNveXNpdGUudjEuU2V0RGVjb3lQaG90b3NTb3VyY2VSZXF1ZXN0GjMubWlzdGdhdGUuZGVjb3lzaXRlLnYxLlNldERlY295UGhvdG9zU291cmNlUmVzcG9uc2VC5QEKGWNvbS5taXN0Z2F0ZS5kZWNveXNpdGUudjFCDkRlY295c2l0ZVByb3RvUAFaQmdpdGh1Yi5jb20vbWlzdGdhdGUvbWlzdGdhdGUvZ2VuL21pc3RnYXRlL2RlY295c2l0ZS92MTtkZWNveXNpdGV2MaICA01EWKoCFU1pc3RnYXRlLkRlY295c2l0ZS5WMcoCFU1pc3RnYXRlXERlY295c2l0ZVxWMeICIU1pc3RnYXRlXERlY295c2l0ZVxWMVxHUEJNZXRhZGF0YeoCF01pc3RnYXRlOjpEZWNveXNpdGU6OlYxYgZwcm90bzM", [file_mistgate_admin_v1_node]);
 
 /**
  * One check of a site's version. level "required" (a failed one cannot exist: the version would not have been saved) or "warning".
@@ -101,7 +101,7 @@ export type DecoySite = Message<"mistgate.decoysite.v1.DecoySite"> & {
   source: string;
 
   /**
-   * Who made it: the administrator or the API token.
+   * Who made it: the administrator or the API token. "template:<kind>" for a site the panel generated from a template.
    *
    * @generated from field: string source_label = 5;
    */
@@ -1240,15 +1240,389 @@ export const GetDecoyFileResponseSchema: GenMessage<GetDecoyFileResponse> = /*@_
   messageDesc(file_mistgate_decoysite_v1_decoysite, 41);
 
 /**
+ * @generated from message mistgate.decoysite.v1.DecoyTemplate
+ */
+export type DecoyTemplate = Message<"mistgate.decoysite.v1.DecoyTemplate"> & {
+  /**
+   * The folder of the kind: "status", "blog", ...
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name_en = 2;
+   */
+  nameEn: string;
+
+  /**
+   * @generated from field: string name_ru = 3;
+   */
+  nameRu: string;
+
+  /**
+   * The countries (lower case ISO 3166 codes, in the order of ListDecoyTemplatesResponse.countries) the kind can be made for:
+   * the ones whose language it has texts in.
+   *
+   * @generated from field: repeated string countries = 4;
+   */
+  countries: string[];
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.DecoyTemplate.
+ * Use `create(DecoyTemplateSchema)` to create a new message.
+ */
+export const DecoyTemplateSchema: GenMessage<DecoyTemplate> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 42);
+
+/**
+ * @generated from message mistgate.decoysite.v1.ListDecoyTemplatesRequest
+ */
+export type ListDecoyTemplatesRequest = Message<"mistgate.decoysite.v1.ListDecoyTemplatesRequest"> & {
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.ListDecoyTemplatesRequest.
+ * Use `create(ListDecoyTemplatesRequestSchema)` to create a new message.
+ */
+export const ListDecoyTemplatesRequestSchema: GenMessage<ListDecoyTemplatesRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 43);
+
+/**
+ * @generated from message mistgate.decoysite.v1.ListDecoyTemplatesResponse
+ */
+export type ListDecoyTemplatesResponse = Message<"mistgate.decoysite.v1.ListDecoyTemplatesResponse"> & {
+  /**
+   * @generated from field: repeated mistgate.decoysite.v1.DecoyTemplate templates = 1;
+   */
+  templates: DecoyTemplate[];
+
+  /**
+   * Every country the templates know, in the order the window shows them ("us", "gb", "de", ...). The first is the default.
+   *
+   * @generated from field: repeated string countries = 2;
+   */
+  countries: string[];
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.ListDecoyTemplatesResponse.
+ * Use `create(ListDecoyTemplatesResponseSchema)` to create a new message.
+ */
+export const ListDecoyTemplatesResponseSchema: GenMessage<ListDecoyTemplatesResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 44);
+
+/**
+ * @generated from message mistgate.decoysite.v1.PreviewDecoyTemplateRequest
+ */
+export type PreviewDecoyTemplateRequest = Message<"mistgate.decoysite.v1.PreviewDecoyTemplateRequest"> & {
+  /**
+   * @generated from field: string kind = 1;
+   */
+  kind: string;
+
+  /**
+   * From an earlier answer; empty = a new random one. Opaque to the client.
+   *
+   * @generated from field: string seed = 2;
+   */
+  seed: string;
+
+  /**
+   * The country the site is made for: its language, cities, addresses, money and phone numbers. Empty = "us".
+   * decoy_template_country when the panel does not know the country or the kind has no texts for it.
+   *
+   * @generated from field: string country = 3;
+   */
+  country: string;
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.PreviewDecoyTemplateRequest.
+ * Use `create(PreviewDecoyTemplateRequestSchema)` to create a new message.
+ */
+export const PreviewDecoyTemplateRequestSchema: GenMessage<PreviewDecoyTemplateRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 45);
+
+/**
+ * @generated from message mistgate.decoysite.v1.PreviewDecoyTemplateResponse
+ */
+export type PreviewDecoyTemplateResponse = Message<"mistgate.decoysite.v1.PreviewDecoyTemplateResponse"> & {
+  /**
+   * The same document GetDecoyPagePreview gives (for <iframe sandbox="" srcdoc>).
+   *
+   * @generated from field: string html = 1;
+   */
+  html: string;
+
+  /**
+   * @generated from field: string seed = 2;
+   */
+  seed: string;
+
+  /**
+   * The name GenerateDecoySite would give the site.
+   *
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * Whether the preview has photographs: "used", or why not: "no_key" (none stored for the source in use), "bad_key" (the source
+   * refused the key), "limit" (the source asked to wait), "unavailable" (no answer, nothing found, a broken file), "none_for_kind"
+   * (this kind or variant shows none). Without photos the site is drawn and everything else works. GenerateDecoySite saves the
+   * previewed site (photos included) for 15 minutes after the preview.
+   *
+   * @generated from field: string photos = 4;
+   */
+  photos: string;
+
+  /**
+   * The source the photos above are about: "pexels" or "pixabay" ("" for none_for_kind: nothing was asked of any).
+   *
+   * @generated from field: string photos_source = 5;
+   */
+  photosSource: string;
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.PreviewDecoyTemplateResponse.
+ * Use `create(PreviewDecoyTemplateResponseSchema)` to create a new message.
+ */
+export const PreviewDecoyTemplateResponseSchema: GenMessage<PreviewDecoyTemplateResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 46);
+
+/**
+ * @generated from message mistgate.decoysite.v1.GenerateDecoySiteRequest
+ */
+export type GenerateDecoySiteRequest = Message<"mistgate.decoysite.v1.GenerateDecoySiteRequest"> & {
+  /**
+   * @generated from field: string kind = 1;
+   */
+  kind: string;
+
+  /**
+   * From PreviewDecoyTemplate; empty = a new random one.
+   *
+   * @generated from field: string seed = 2;
+   */
+  seed: string;
+
+  /**
+   * Empty = the site's own brand (made unique with " 2", " 3" when taken). A name that is given and taken is refused.
+   *
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * Empty = the kind's name in English.
+   *
+   * @generated from field: string note = 4;
+   */
+  note: string;
+
+  /**
+   * As PreviewDecoyTemplateRequest.country; the site is the one of the preview of this kind, seed and country.
+   *
+   * @generated from field: string country = 5;
+   */
+  country: string;
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.GenerateDecoySiteRequest.
+ * Use `create(GenerateDecoySiteRequestSchema)` to create a new message.
+ */
+export const GenerateDecoySiteRequestSchema: GenMessage<GenerateDecoySiteRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 47);
+
+/**
+ * @generated from message mistgate.decoysite.v1.GenerateDecoySiteResponse
+ */
+export type GenerateDecoySiteResponse = Message<"mistgate.decoysite.v1.GenerateDecoySiteResponse"> & {
+  /**
+   * @generated from field: mistgate.decoysite.v1.DecoySite site = 1;
+   */
+  site?: DecoySite | undefined;
+
+  /**
+   * As PreviewDecoyTemplateResponse.photos, for the site that was saved: after the preview's 15 minutes the site is made again,
+   * and its photos may differ.
+   *
+   * @generated from field: string photos = 2;
+   */
+  photos: string;
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.GenerateDecoySiteResponse.
+ * Use `create(GenerateDecoySiteResponseSchema)` to create a new message.
+ */
+export const GenerateDecoySiteResponseSchema: GenMessage<GenerateDecoySiteResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 48);
+
+/**
+ * @generated from message mistgate.decoysite.v1.GetDecoyPhotosRequest
+ */
+export type GetDecoyPhotosRequest = Message<"mistgate.decoysite.v1.GetDecoyPhotosRequest"> & {
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.GetDecoyPhotosRequest.
+ * Use `create(GetDecoyPhotosRequestSchema)` to create a new message.
+ */
+export const GetDecoyPhotosRequestSchema: GenMessage<GetDecoyPhotosRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 49);
+
+/**
+ * @generated from message mistgate.decoysite.v1.GetDecoyPhotosResponse
+ */
+export type GetDecoyPhotosResponse = Message<"mistgate.decoysite.v1.GetDecoyPhotosResponse"> & {
+  /**
+   * Whether a Pexels key is stored (the field is older than Pixabay: it keeps saying so).
+   *
+   * @generated from field: bool has_key = 1;
+   */
+  hasKey: boolean;
+
+  /**
+   * Whether a Pixabay key is stored.
+   *
+   * @generated from field: bool has_pixabay_key = 2;
+   */
+  hasPixabayKey: boolean;
+
+  /**
+   * The source in use: "pexels" or "pixabay". With one key it is that key's source; with both, the one the owner picked (the one
+   * whose key was stored last, until a pick); with none, "pixabay".
+   *
+   * @generated from field: string source = 3;
+   */
+  source: string;
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.GetDecoyPhotosResponse.
+ * Use `create(GetDecoyPhotosResponseSchema)` to create a new message.
+ */
+export const GetDecoyPhotosResponseSchema: GenMessage<GetDecoyPhotosResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 50);
+
+/**
+ * @generated from message mistgate.decoysite.v1.SetDecoyPhotosKeyRequest
+ */
+export type SetDecoyPhotosKeyRequest = Message<"mistgate.decoysite.v1.SetDecoyPhotosKeyRequest"> & {
+  /**
+   * An API key, 8 to 256 characters without spaces; write-only. "" removes it.
+   *
+   * @generated from field: string key = 1;
+   */
+  key: string;
+
+  /**
+   * Whose key: "pexels" (also when empty) or "pixabay".
+   *
+   * @generated from field: string source = 2;
+   */
+  source: string;
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.SetDecoyPhotosKeyRequest.
+ * Use `create(SetDecoyPhotosKeyRequestSchema)` to create a new message.
+ */
+export const SetDecoyPhotosKeyRequestSchema: GenMessage<SetDecoyPhotosKeyRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 51);
+
+/**
+ * The state after the call, as GetDecoyPhotosResponse.
+ *
+ * @generated from message mistgate.decoysite.v1.SetDecoyPhotosKeyResponse
+ */
+export type SetDecoyPhotosKeyResponse = Message<"mistgate.decoysite.v1.SetDecoyPhotosKeyResponse"> & {
+  /**
+   * @generated from field: bool has_key = 1;
+   */
+  hasKey: boolean;
+
+  /**
+   * @generated from field: bool has_pixabay_key = 2;
+   */
+  hasPixabayKey: boolean;
+
+  /**
+   * @generated from field: string source = 3;
+   */
+  source: string;
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.SetDecoyPhotosKeyResponse.
+ * Use `create(SetDecoyPhotosKeyResponseSchema)` to create a new message.
+ */
+export const SetDecoyPhotosKeyResponseSchema: GenMessage<SetDecoyPhotosKeyResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 52);
+
+/**
+ * @generated from message mistgate.decoysite.v1.SetDecoyPhotosSourceRequest
+ */
+export type SetDecoyPhotosSourceRequest = Message<"mistgate.decoysite.v1.SetDecoyPhotosSourceRequest"> & {
+  /**
+   * "pexels" or "pixabay"; the source must have a key.
+   *
+   * @generated from field: string source = 1;
+   */
+  source: string;
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.SetDecoyPhotosSourceRequest.
+ * Use `create(SetDecoyPhotosSourceRequestSchema)` to create a new message.
+ */
+export const SetDecoyPhotosSourceRequestSchema: GenMessage<SetDecoyPhotosSourceRequest> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 53);
+
+/**
+ * The state after the call, as GetDecoyPhotosResponse.
+ *
+ * @generated from message mistgate.decoysite.v1.SetDecoyPhotosSourceResponse
+ */
+export type SetDecoyPhotosSourceResponse = Message<"mistgate.decoysite.v1.SetDecoyPhotosSourceResponse"> & {
+  /**
+   * @generated from field: bool has_key = 1;
+   */
+  hasKey: boolean;
+
+  /**
+   * @generated from field: bool has_pixabay_key = 2;
+   */
+  hasPixabayKey: boolean;
+
+  /**
+   * @generated from field: string source = 3;
+   */
+  source: string;
+};
+
+/**
+ * Describes the message mistgate.decoysite.v1.SetDecoyPhotosSourceResponse.
+ * Use `create(SetDecoyPhotosSourceResponseSchema)` to create a new message.
+ */
+export const SetDecoyPhotosSourceResponseSchema: GenMessage<SetDecoyPhotosSourceResponse> = /*@__PURE__*/
+  messageDesc(file_mistgate_decoysite_v1_decoysite, 54);
+
+/**
  * The library of decoy sites: the static sites the owner (or the assistant, or an MCP agent) keeps in the panel and puts on nodes
  * or on the panel itself. A package of its own on purpose, like mistgate.trusttunnel.v1: the Cloudflare edition keeps no
  * bundles, so its Workers link none of this code and answer every procedure with unavailable_in_edition: feature=decoy_own.
  * Owner only (internal/panel/auth policy_decoysite.go). File contents never reach the audit log or any other log.
- *
+ * 
  * Refusals are FAILED_PRECONDITION / INVALID_ARGUMENT / NOT_FOUND / ALREADY_EXISTS whose message is a stable code, optionally
  * followed by ": key=value" (values URL-escaped): decoy_site_not_found, decoy_name_taken, decoy_name_invalid, decoy_note_invalid,
  * decoy_library_full, decoy_site_in_use (nodes=<ids>, panel=1), decoy_site_draft, decoy_site_not_draft, decoy_version_not_found,
- * decoy_file_not_found, decoy_file_binary, decoy_page_not_found, decoy_preview_too_large, node_not_assigned, node_retired,
+ * decoy_file_not_found, decoy_file_binary, decoy_page_not_found, decoy_preview_too_large, decoy_template_unknown, decoy_template_seed, decoy_photos_key_invalid, decoy_photos_source_invalid, decoy_photos_no_key, node_not_assigned, node_retired,
  * panel_unavailable / panel_too_large / panel_no_index / panel_invalid, and decoy_bundle_<reason> (with ": path=<entry>") for an
  * archive the bundle rules refuse (empty, bad_archive, too_large, too_many_files, bad_path, not_static, no_index, duplicate).
  *
@@ -1427,6 +1801,72 @@ export const DecoySiteService: GenService<{
     methodKind: "unary";
     input: typeof GetDecoyFileRequestSchema;
     output: typeof GetDecoyFileResponseSchema;
+  },
+  /**
+   * The kinds of site the panel can make from its built-in templates (internal/decoy Generate), sorted by id. Owner only.
+   *
+   * @generated from rpc mistgate.decoysite.v1.DecoySiteService.ListDecoyTemplates
+   */
+  listDecoyTemplates: {
+    methodKind: "unary";
+    input: typeof ListDecoyTemplatesRequestSchema;
+    output: typeof ListDecoyTemplatesResponseSchema;
+  },
+  /**
+   * The home page of a generated site, as GetDecoyPagePreview gives it. Saves nothing: the answer carries the seed it was made
+   * from, and GenerateDecoySite with that seed saves exactly this site. An empty seed takes a new one ("another variant").
+   *
+   * @generated from rpc mistgate.decoysite.v1.DecoySiteService.PreviewDecoyTemplate
+   */
+  previewDecoyTemplate: {
+    methodKind: "unary";
+    input: typeof PreviewDecoyTemplateRequestSchema;
+    output: typeof PreviewDecoyTemplateResponseSchema;
+  },
+  /**
+   * Makes a site of a kind from a seed and saves it to the library as a new ready site (source "upload", source_label
+   * "template:<kind>"). The name defaults to the site's own brand, the note to the kind's name. Limits as CreateDecoySite.
+   *
+   * @generated from rpc mistgate.decoysite.v1.DecoySiteService.GenerateDecoySite
+   */
+  generateDecoySite: {
+    methodKind: "unary";
+    input: typeof GenerateDecoySiteRequestSchema;
+    output: typeof GenerateDecoySiteResponseSchema;
+  },
+  /**
+   * Photos for generated sites come from Pexels (pexels.com) or Pixabay (pixabay.com) with the owner's own free API key of that
+   * source. Which keys are stored and which source is in use; a key itself never comes back. Owner only.
+   *
+   * @generated from rpc mistgate.decoysite.v1.DecoySiteService.GetDecoyPhotos
+   */
+  getDecoyPhotos: {
+    methodKind: "unary";
+    input: typeof GetDecoyPhotosRequestSchema;
+    output: typeof GetDecoyPhotosResponseSchema;
+  },
+  /**
+   * Stores the key of a source (Pexels when source is empty, as before Pixabay came), or removes it when key is empty. A key that is
+   * stored becomes the source in use; removing the key of the source in use passes to the other source when it has a key. Owner
+   * only; the audit log records that a key was set or removed and for which source, never the value. Without a key every
+   * generated site is drawn, as before.
+   *
+   * @generated from rpc mistgate.decoysite.v1.DecoySiteService.SetDecoyPhotosKey
+   */
+  setDecoyPhotosKey: {
+    methodKind: "unary";
+    input: typeof SetDecoyPhotosKeyRequestSchema;
+    output: typeof SetDecoyPhotosKeyResponseSchema;
+  },
+  /**
+   * Picks the source of the photos when both have a key (a source with no key is refused: decoy_photos_no_key). Owner only.
+   *
+   * @generated from rpc mistgate.decoysite.v1.DecoySiteService.SetDecoyPhotosSource
+   */
+  setDecoyPhotosSource: {
+    methodKind: "unary";
+    input: typeof SetDecoyPhotosSourceRequestSchema;
+    output: typeof SetDecoyPhotosSourceResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_mistgate_decoysite_v1_decoysite, 0);

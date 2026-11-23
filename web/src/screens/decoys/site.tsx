@@ -44,7 +44,7 @@ import { FilesCard, type FilesDemo } from "./site-files";
 import { PreviewCard, type PreviewDemo } from "./site-preview";
 import { AssignDialog, DeleteDialog, ReplaceDialog, RevertDialog, UnassignDialog, type AssignDemo, type AssignTarget, type UnassignTarget } from "./site-dialogs";
 import { ChecksCard, checkLines, FactsCard, PlacementCard, VersionsCard, type Place } from "./site-side";
-import { asSource, Field, liveNodes, Msg, onText, DzIcon, sourceKey, useAssistant } from "./parts";
+import { DzIcon, Field, liveNodes, Msg, onText, SourceTag, useAssistant } from "./parts";
 import "./decoys.css";
 
 export type SiteDemo = {
@@ -259,7 +259,6 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
   const standsOn = new Set(places.map((p) => (p.panel ? "panel" : p.key)));
   const title = fixed ? t(fixed === "builtin" ? "dz.bi.builtin" : "dz.bi.dir") : (site?.name ?? "");
   const noteText = fixed ? t(fixed === "builtin" ? "dz.bi.builtinNote" : "dz.bi.dirNote") : (site?.note ?? "");
-  const src = site ? asSource(site.source) : "upload";
   const canAssign = !draft;
   // the warning "stands on nodes of different domains" is the panel's own (the one an assignment shows), for the nodes it stands on now
   const shared = detail.data?.sharedDomains;
@@ -321,11 +320,14 @@ function Loaded({ id, fixed, back, nodesAll, demo }: { id: string; fixed?: "buil
                 <span dir="auto" className={noteText ? "" : "none"}>
                   {noteText || t("dz.card.noNote")}
                 </span>
-                <span className="dz-src">
-                  <DzIcon kind={fixed ? "folder" : src} />
-                  {fixed ? t("dz.srcBuiltin") : t(sourceKey[src])}
-                  {src === "mcp" && site?.sourceLabel && <span className="dz-m">{site.sourceLabel}</span>}
-                </span>
+                {site ? (
+                  <SourceTag site={site} size={16} />
+                ) : (
+                  <span className="dz-src">
+                    <DzIcon kind="folder" />
+                    {t("dz.srcBuiltin")}
+                  </span>
+                )}
                 <span className={cx("dz-use", used && "on")}>{used ? t("dz.on.stands", { where }) : t("dz.use.none")}</span>
               </div>
             </>

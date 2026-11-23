@@ -1,0 +1,239 @@
+{
+ "style": {
+  "scheme": "light",
+  "palettes": [
+   {
+    "name": "green-paper",
+    "l": {
+     "bg": "#f4efe4",
+     "fg": "#1b1a17",
+     "ac": "#25533a",
+     "a2": "#8a2e1f",
+     "sf": "#fbf8f0",
+     "band": "#ebe4d2",
+     "ln": "#cfc6b0",
+     "ln2": "#b5ab93",
+     "mu": "#5f5a4c"
+    }
+   },
+   {
+    "name": "ink-blue",
+    "l": {
+     "bg": "#f2efe8",
+     "fg": "#1a1c22",
+     "ac": "#234a7a",
+     "a2": "#9a3b1a"
+    }
+   },
+   {
+    "name": "oxblood",
+    "l": {
+     "bg": "#f5eee6",
+     "fg": "#231a17",
+     "ac": "#7d2430",
+     "a2": "#2f5a45"
+    }
+   },
+   {
+    "name": "plum",
+    "l": {
+     "bg": "#f3eee9",
+     "fg": "#1f1a20",
+     "ac": "#5b2f6b",
+     "a2": "#8a5a1a"
+    }
+   },
+   {
+    "name": "teal",
+    "l": {
+     "bg": "#eff0e8",
+     "fg": "#17201f",
+     "ac": "#1f5f5a",
+     "a2": "#8a2e1f"
+    }
+   },
+   {
+    "name": "ochre",
+    "l": {
+     "bg": "#f6f0e0",
+     "fg": "#221c10",
+     "ac": "#7a5a12",
+     "a2": "#25533a"
+    }
+   }
+  ],
+  "fonts": [
+   {
+    "head": "old",
+    "body": "old",
+    "fw": 500,
+    "ls": "-.035em",
+    "lh": "1",
+    "label": "sans",
+    "tt": "uppercase",
+    "lsl": ".14em",
+    "fsl": ".75rem"
+   },
+   {
+    "head": "bookish",
+    "body": "bookish",
+    "fw": 500,
+    "ls": "-.03em",
+    "lh": "1.02",
+    "label": "sans",
+    "tt": "uppercase",
+    "lsl": ".14em",
+    "fsl": ".75rem"
+   },
+   {
+    "head": "georgia",
+    "body": "georgia",
+    "fw": 500,
+    "ls": "-.03em",
+    "lh": "1.02",
+    "label": "sans",
+    "tt": "uppercase",
+    "lsl": ".12em",
+    "fsl": ".75rem"
+   }
+  ],
+  "radius": [
+   0,
+   4
+  ],
+  "radius_s": [
+   0,
+   3
+  ],
+  "radius_b": [
+   0,
+   6
+  ],
+  "density": [
+   0.95,
+   1.08
+  ],
+  "width": [
+   1240,
+   1300
+  ],
+  "measure": [
+   640,
+   700
+  ],
+  "base": [
+   18,
+   19
+  ],
+  "scale": [
+   1.33,
+   1.45
+  ],
+  "lh": [
+   1.6,
+   1.7
+  ],
+  "stroke": [
+   1.5,
+   1.9
+  ],
+  "border": [
+   1,
+   1
+  ],
+  "shadows": [
+   "none"
+  ]
+ },
+ "title": {
+  "en": "Personal blog",
+  "ru": "Личный блог (заметки)"
+ },
+ "layouts": 3,
+ "pages": [
+  {
+   "name": "home",
+   "tmpl": "home.html.tmpl",
+   "paths": [
+    "index.html"
+   ],
+   "nav": "nav_home",
+   "title": "home_title",
+   "desc": "desc"
+  },
+  {
+   "name": "about",
+   "tmpl": "about.html.tmpl",
+   "paths": [
+    "about.html",
+    "about/index.html",
+    "me/index.html",
+    "hello.html"
+   ],
+   "nav": "nav_about",
+   "desc": "desc_about"
+  },
+  {
+   "name": "archive",
+   "tmpl": "archive.html.tmpl",
+   "paths": [
+    "archive.html",
+    "archive/index.html",
+    "all/index.html",
+    "index-of-notes.html"
+   ],
+   "nav": "nav_archive",
+   "desc": "desc_archive"
+  },
+  {
+   "name": "post",
+   "tmpl": "post.html.tmpl",
+   "paths": [
+    "notes/{slug}.html",
+    "posts/{slug}/index.html",
+    "{slug}.html",
+    "journal/{slug}/index.html"
+   ],
+   "each": "posts"
+  },
+  {
+   "name": "terms",
+   "tmpl": "terms.html.tmpl",
+   "paths": [
+    "terms.html",
+    "terms/index.html",
+    "legal/terms.html",
+    "conditions.html"
+   ],
+   "nav": "nav_terms",
+   "desc": "desc_terms"
+  }
+ ],
+ "lists": [
+  {
+   "name": "posts",
+   "from": "posts",
+   "min": 8,
+   "max": 12,
+   "dates": {
+    "end": "2026-11-10",
+    "gap_min": 6,
+    "gap_max": 22
+   }
+  }
+ ],
+ "photo_slots": {
+  "t": [
+   0,
+   1,
+   2
+  ]
+ },
+ "home_blocks": [
+  "stmt",
+  "cols",
+  "quote",
+  "arch"
+ ],
+ "home_fixed": 1
+}

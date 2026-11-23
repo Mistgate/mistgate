@@ -3,6 +3,8 @@ title: Encrypted panel backups
 description: Configure Cloudflare R2 backups, keep the recovery identity offline, and restore a panel into a fresh data directory.
 ---
 
+![The Restore from a backup window: the file is checked, the summary compared with now, the restore, the panel is back](../../images/readme/backups-dark-en.webp)
+
 Mistgate can upload scheduled or on-demand panel backups to your Cloudflare R2 bucket. Backups are **off until the owner configures them**. Each archive is encrypted with age before it leaves the panel; Cloudflare stores ciphertext, not the database contents.
 
 ## Before enabling backups

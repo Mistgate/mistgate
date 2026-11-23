@@ -1,0 +1,229 @@
+{
+ "ui": {
+  "utc": "UTC",
+  "nav_label": "Huvudmeny",
+  "tagline": "Status för våra tjänster",
+  "footer": "Alla tider anges i UTC.",
+  "nav_home": "Status",
+  "nav_history": "Driftstörningar",
+  "nav_about": "Om sidan",
+  "home_title": "Aktuell status",
+  "desc": "Aktuell status och tillgänglighet för tjänsterna hos {brand}.",
+  "desc_history": "Tidigare driftstörningar hos {brand} och hur de åtgärdades.",
+  "desc_about": "Så mäter {brand} tillgängligheten och rapporterar driftstörningar.",
+  "nf_title": "Sidan hittades inte",
+  "nf_text": "Det finns inget på den här adressen. Statussidan ligger på startsidan.",
+  "nf_back": "Till statussidan",
+  "banner_ok": "Alla system fungerar",
+  "banner_sub": "Alla tjänster hos {brand} fungerar som de ska.",
+  "comps_h": "Tjänster",
+  "op": "Fungerar",
+  "up_label": "tillgänglighet",
+  "days_ago_l": "60 dagar sedan",
+  "days_ago_r": "Idag",
+  "m_uptime": "Tillgänglighet, senaste 90 dagarna",
+  "m_resp": "Mediansvarstid",
+  "m_inc": "Registrerade störningar",
+  "recent_h": "Senaste störningarna",
+  "all_inc": "Alla driftstörningar",
+  "history_h": "Driftstörningar",
+  "history_intro": "Vad som gick fel de senaste månaderna och hur det åtgärdades, med de nyaste överst.",
+  "st_inv": "Utreds",
+  "st_ident": "Orsak funnen",
+  "st_res": "Åtgärdat",
+  "imp_minor": "Liten",
+  "imp_major": "Stor",
+  "imp_maint": "Underhåll",
+  "dur_l": "Varaktighet",
+  "about_h": "Om den här sidan",
+  "about": [
+   {
+    "h": "Vad sidan visar",
+    "p": "Här ser du hur tjänsterna hos {brand} mår just nu, tillsammans med en logg över tidigare driftstörningar. Sidan uppdateras av teamet som driver tjänsterna."
+   },
+   {
+    "h": "Så mäter vi tillgänglighet",
+    "p": "Varje tjänst kontrolleras en gång i minuten från flera platser. En minut räknas som avbrott när fler än hälften av kontrollerna misslyckas."
+   },
+   {
+    "h": "Så rapporterar vi störningar",
+    "p": "Vi skriver ett inlägg när vi börjar utreda ett problem, när vi hittat orsaken och när det är åtgärdat. Efter större störningar följer en kort beskrivning."
+   },
+   {
+    "h": "Planerat underhåll",
+    "p": "Planerat arbete meddelas här minst tre dagar i förväg och görs när det är lugnt."
+   }
+  ],
+  "incidents": [
+   {
+    "title": "Fler fel än vanligt",
+    "impact": "major",
+    "dur": "38 minuter",
+    "a": "Vi ser fler misslyckade anrop än vanligt och undersöker orsaken.",
+    "b": "En felaktig ändring i konfigurationen har hittats och rullas tillbaka.",
+    "c": "Ändringen har rullats tillbaka och antalet fel är normalt igen. Vi går igenom hur den kunde passera kontrollen."
+   },
+   {
+    "title": "Försenade notiser",
+    "impact": "minor",
+    "dur": "1 timme 12 minuter",
+    "a": "Notiser levereras med flera minuters fördröjning.",
+    "b": "En stockning i kön för notiser har hittats.",
+    "c": "Stockningen är borta och notiserna levereras i normal tid igen."
+   },
+   {
+    "title": "Långsamma sidor",
+    "impact": "minor",
+    "dur": "26 minuter",
+    "a": "Några användare uppger att sidor laddas långsamt. Vi undersöker saken.",
+    "b": "En databasnod gick för hårt och har tagits ur drift.",
+    "c": "Laddningstiderna är normala igen."
+   },
+   {
+    "title": "Planerat underhåll drog över",
+    "impact": "maint",
+    "dur": "40 minuter längre än planerat",
+    "a": "Underhållet av vår huvuddatabas tar längre tid än planerat.",
+    "b": "Sista steget i uppdateringen behöver några minuter till.",
+    "c": "Underhållet är klart och alla tjänster fungerar normalt."
+   },
+   {
+    "title": "Delvis avbrott i en region",
+    "impact": "major",
+    "dur": "54 minuter",
+    "a": "Användare i en region kommer inte åt tjänsten. Vi arbetar tillsammans med vår driftleverantör.",
+    "b": "Leverantören har bekräftat ett nätverksfel som påverkar våra servrar i regionen.",
+    "c": "Nätverksfelet är åtgärdat och regionen når tjänsten igen."
+   },
+   {
+    "title": "Inaktuella sökresultat",
+    "impact": "minor",
+    "dur": "2 timmar 5 minuter",
+    "a": "Nya objekt dyker inte upp i sökresultaten.",
+    "b": "Indexeringen stannade efter en misslyckad uppdatering och har startats om.",
+    "c": "Indexet är ikapp och sökningen är aktuell igen."
+   },
+   {
+    "title": "Inloggningen fungerar inte för vissa",
+    "impact": "major",
+    "dur": "19 minuter",
+    "a": "Vissa användare kan inte logga in. Andra märker ingenting.",
+    "b": "Ett utgånget certifikat i inloggningstjänsten har hittats.",
+    "c": "Certifikatet har bytts ut och alla kan logga in igen."
+   },
+   {
+    "title": "Uppladdningar misslyckas ibland",
+    "impact": "minor",
+    "dur": "47 minuter",
+    "a": "En liten del av uppladdningarna misslyckas och måste göras om.",
+    "b": "En lagringsnod med full disk har hittats.",
+    "c": "Mer utrymme har lagts till och uppladdningarna fungerar igen."
+   },
+   {
+    "title": "Långsamma svar från API:et",
+    "impact": "minor",
+    "dur": "31 minuter",
+    "a": "Vissa anrop till API:et tar längre tid än vanligt att besvara. Vi undersöker saken.",
+    "b": "Ett bakgrundsjobb använde för mycket minne på en av servrarna.",
+    "c": "Jobbet har startats om med en minnesgräns och svarstiderna är normala igen."
+   },
+   {
+    "title": "Försenade webhooks",
+    "impact": "minor",
+    "dur": "52 minuter",
+    "a": "Webhooks når mottagarna flera minuter för sent.",
+    "b": "Kön som skickar dem väntade på en långsam anslutning till databasen.",
+    "c": "Anslutningen är återställd, kön är tömd och webhooks kommer i tid igen."
+   },
+   {
+    "title": "Dashboarden är nere",
+    "impact": "major",
+    "dur": "22 minuter",
+    "a": "Dashboarden visar en felsida för alla. Övriga tjänster påverkas inte.",
+    "b": "En ny version hade ett fel i startkoden, och vi har hittat det.",
+    "c": "Versionen har rullats tillbaka och dashboarden fungerar igen."
+   },
+   {
+    "title": "Planerat underhåll: uppdatering av databasen",
+    "impact": "maint",
+    "dur": "1 timme",
+    "a": "Planerat underhåll pågår. Vissa funktioner är skrivskyddade tills det är klart.",
+    "b": "Uppdateringen är halvvägs och går enligt plan.",
+    "c": "Underhållet är klart och allt fungerar normalt."
+   }
+  ],
+  "inc_back": "Driftstörningar",
+  "inc_more": "Andra störningar",
+  "status_l": "Status",
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Klar",
+      "Norr",
+      "Kobolt",
+      "Låga",
+      "Trana",
+      "Kvarts",
+      "Svala",
+      "Måne",
+      "Äng",
+      "Dyn",
+      "Bris",
+      "Trast"
+     ],
+     [
+      "verk",
+      "moln",
+      "nät",
+      "nav",
+      "punkt",
+      "port",
+      "kit",
+      "linje",
+      "bas",
+      "källa"
+     ]
+    ]
+   }
+  }
+ },
+ "bundles": {
+  "saas": {
+   "components": [
+    "Öppet API",
+    "Dashboard",
+    "Webhooks",
+    "Inloggning",
+    "Bakgrundsjobb",
+    "Dataexport",
+    "Fakturering",
+    "Dokumentationssida"
+   ]
+  },
+  "photos": {
+   "components": [
+    "Uppladdning av bilder",
+    "Visning av bilder",
+    "Album och delning",
+    "Webbappen",
+    "Synkning med mobilen",
+    "Sök",
+    "Notiser",
+    "Konto och inloggning"
+   ]
+  },
+  "mail": {
+   "components": [
+    "Leverans av e-post",
+    "Leverans av sms",
+    "Meddelandemallar",
+    "Leveransrapporter",
+    "REST-API",
+    "Dashboard",
+    "Avanmälningssidor",
+    "Schemaläggning"
+   ]
+  }
+ }
+}

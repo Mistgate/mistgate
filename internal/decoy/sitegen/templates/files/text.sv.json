@@ -1,0 +1,163 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Sten",
+      "Lind",
+      "Lykt",
+      "Björk",
+      "Fjäder",
+      "Lönn",
+      "Klöver",
+      "Bärnsten"
+     ],
+     [
+      "post",
+      "bud",
+      "korg",
+      "kurir",
+      "väg",
+      "låda"
+     ]
+    ]
+   },
+   "limit": [
+    "500 MB",
+    "1 GB",
+    "2 GB",
+    "5 GB"
+   ]
+  },
+  "nav_label": "Huvudmeny",
+  "tagline": "Enkel filöverföring",
+  "footer": "Filer tas bort automatiskt när länken har gått ut.",
+  "nav_home": "Skicka en fil",
+  "nav_how": "Så fungerar det",
+  "nav_limits": "Gränser och frågor",
+  "home_title": "Skicka en fil",
+  "desc": "Dela filer upp till {limit} med en länk, hos {brand}.",
+  "desc_how": "Så fungerar filöverföringen hos {brand}.",
+  "desc_limits": "Storlekar, tider och vanliga frågor om {brand}.",
+  "nf_title": "Sidan hittades inte",
+  "nf_text": "Sidan du söker finns inte eller har flyttats.",
+  "nf_back": "Till startsidan",
+  "drop_h": "Släpp en fil här",
+  "drop_hint": "eller välj en från din enhet, upp till {limit}",
+  "pick": "Välj fil",
+  "uploading": "Laddar upp …",
+  "e_full": [
+   "Lagringsutrymmet är fullt. Försök igen senare.",
+   "Uppladdningen misslyckades: lagringsutrymmet är fullt just nu."
+  ],
+  "retry": "Försök igen",
+  "how_h": "Så fungerar det",
+  "how_intro": "Tre steg, inget att ställa in.",
+  "steps": [
+   {
+    "h": "Välj en fil",
+    "p": "Dra filen till startsidan eller välj den på din enhet."
+   },
+   {
+    "h": "Få en länk",
+    "p": "När filen har laddats upp får du en länk som du kan kopiera."
+   },
+   {
+    "h": "Dela länken",
+    "p": "Den som har länken kan hämta filen tills den går ut."
+   }
+  ],
+  "limits_h": "Gränser och frågor",
+  "limits_intro": "De viktigaste siffrorna på ett ställe.",
+  "limits": [
+   {
+    "k": "Största fil",
+    "v": "{limit}"
+   },
+   {
+    "k": "Länkens giltighet",
+    "v": "{days} dagar"
+   },
+   {
+    "k": "Filer per uppladdning",
+    "v": "En (packa flera filer i en zip)"
+   },
+   {
+    "k": "Nedladdningar per länk",
+    "v": "Obegränsat tills länken går ut"
+   }
+  ],
+  "faq_h": "Vanliga frågor",
+  "faq": [
+   {
+    "q": "Behöver jag ett konto?",
+    "a": "Nej. Filer upp till {limit} kan skickas utan att du loggar in."
+   },
+   {
+    "q": "Hur länge gäller min länk?",
+    "a": "Länkar gäller i {days} dagar. Därefter tas filen bort och länken slutar fungera."
+   },
+   {
+    "q": "Ser mottagaren mitt namn?",
+    "a": "Bara om du berättar det. På nedladdningssidan står inget om dig."
+   },
+   {
+    "q": "Vad händer med filen när tiden har gått ut?",
+    "a": "Den tas bort från lagringen. Vi sparar ingen kopia."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Länkar som går ut",
+    "p": "Varje länk fungerar i {days} dagar, sedan finns inget kvar."
+   },
+   {
+    "h": "Inget konto",
+    "p": "Filer upp till {limit} kan skickas utan att logga in."
+   },
+   {
+    "h": "Snabbt och enkelt",
+    "p": "Lägg till en fil, kopiera länken, skicka vidare. Mer än så är det inte."
+   }
+  ],
+  "nav_privacy": "Integritet",
+  "desc_privacy": "Vad som händer med dina filer och uppgifter hos {brand}.",
+  "privacy_h": "Integritetsmeddelande",
+  "privacy_intro": "En kort redogörelse för vad som händer med din fil och uppgifterna om din överföring.",
+  "privacy": [
+   {
+    "h": "Vad vi sparar",
+    "p": "Filen du laddar upp och tidpunkten då du laddade upp den. Vi frågar inte efter ditt namn och för ingen lista över dem som hämtar filen."
+   },
+   {
+    "h": "Hur länge vi sparar den",
+    "p": "Tills länken går ut. Därefter raderas filen från lagringen och kan inte återställas."
+   },
+   {
+    "h": "Vem som kan se den",
+    "p": "Alla som har länken. Vi öppnar eller läser inte dina filer, så dela länken bara med dem som ska ha filen."
+   },
+   {
+    "h": "Kakor",
+    "p": "Vi använder bara det som sidan behöver för att fungera. Det finns inga reklam- eller spårningskakor."
+   },
+   {
+    "h": "Ta bort en fil i förtid",
+    "p": "Be den som sköter {brand} för din organisation att ta bort en fil innan länken går ut."
+   }
+  ]
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "Filöverföring",
+   "hero_h": "Skicka en fil till vem som helst",
+   "hero_p": "Lägg till en fil, få en länk och dela den. Du behöver inget konto för filer upp till {limit}."
+  },
+  "photos": {
+   "kicker": "Bilddelning",
+   "hero_h": "Dela dina bilder",
+   "hero_p": "Skicka en mapp med bilder som en enda zip-fil på upp till {limit}. Vänner och familj behöver bara länken."
+  }
+ }
+}

@@ -1,0 +1,165 @@
+{
+ "ui": {
+  "nav_label": "Nawigacja",
+  "footer": "Wszystkie zdjęcia i rysunki są dziełem pracowni i nie wolno ich kopiować bez zgody.",
+  "nav_home": "Wybrane prace",
+  "nav_work": "Wszystkie prace",
+  "nav_about": "O mnie",
+  "nav_contact": "Kontakt",
+  "home_title": "Wybrane prace",
+  "nf_title": "Nie znaleziono strony",
+  "nf_text": "Pod tym adresem nic nie ma. Prace są na stronie głównej.",
+  "nf_back": "Wróć do prac",
+  "sel_h": "Wybrane prace",
+  "all_work": "Zobacz wszystkie prace",
+  "work_h": "Wszystkie prace",
+  "work_intro": "Wszystko z ostatnich lat, od najnowszych.",
+  "about_h": "O mnie",
+  "services_h": "Czym się zajmuję",
+  "shows_h": "Wystawy i wzmianki",
+  "contact_h": "Kontakt",
+  "visit_h": "Pracownia",
+  "hours_h": "Godziny otwarcia",
+  "phone_l": "Telefon",
+  "visit_text": "Pracownia jest otwarta po wcześniejszym umówieniu. Przychodź w godzinach otwarcia, a jeśli nikt nie otwiera drzwi, to pewnie jestem na zapleczu albo w drukarni.",
+  "commission_h": "Zlecenia",
+  "commission_text": "Rocznie przyjmuję niewiele zleceń. Gdy się odezwiesz, napisz, co masz na myśli i na kiedy to potrzebne, a szczerze powiem, czy dam radę.",
+  "hours_note": "Sobota po umówieniu",
+  "work_back": "Wszystkie prace",
+  "work_more": "Więcej prac",
+  "work_ask": "Zapytaj o tę pracę",
+  "directions_h": "Jak trafić do pracowni",
+  "directions": "Pracownia jest na parterze, kilka minut spacerem od centrum. Drzwi są z boku, obok jest dzwonek. Stojaki na rowery stoją tuż przed budynkiem."
+ },
+ "bundles": {
+  "photo": {
+   "tagline": "Fotografie spokojnych miejsc",
+   "vars": {
+    "brand": {
+     "join": [
+      ["Pracownia", "Studio", "Atelier", "Galeria", "Dom", "Foto", "Kadr", "Obiektyw", "Ciemnia", "Salon"],
+      ["Horyzont", "Mgła", "Świt", "Staw", "Zmierzch", "Brzeg", "Skraj", "Cisza", "Osada", "Blask"]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Fotografia krajobrazu i martwej natury {city_in}. Odbitki i zlecenia.",
+   "desc_work": "Wybrane fotografie, od najnowszych.",
+   "desc_about": "O fotografii i pracowni {city_in}.",
+   "desc_contact": "Gdzie znaleźć pracownię {city_in} i kiedy jest otwarta.",
+   "intro": "Fotografia krajobrazu i martwej natury {city_in}. Odbitki i kilka zleceń rocznie.",
+   "about": [
+    "Fotografuję z małej pracowni {city_in}. Większość moich zdjęć przedstawia miejsca w godzinie po tym, jak wszyscy już sobie poszli.",
+    "Pracuję powoli, zwykle z jednym aparatem i jednym obiektywem, a wszystko odbijam własnoręcznie w ciemni na zapleczu. Zdjęcie jest skończone, gdy mogę je oglądać przez tydzień i nic nie chcę w nim zmieniać.",
+    "W ostatnich latach moje prace pokazywano w małych galeriach i bibliotekach w regionie, a sprzedawano jako odbitki ludziom, którzy szukali czegoś spokojnego na ścianę."
+   ],
+   "services": [
+    "Odbitki artystyczne, sygnowane i numerowane",
+    "Portrety na zamówienie, w domu lub w pracowni",
+    "Fotografia prasowa i książkowa"
+   ],
+   "shows": [
+    {"y": "2025", "t": "Dwa horyzonty, wystawa zbiorowa, Galeria Stary Spichlerz"},
+    {"y": "2024", "t": "Cicha woda, wystawa indywidualna, foyer biblioteki"},
+    {"y": "2022", "t": "Regionalna nagroda fotograficzna, finał"}
+   ],
+   "works": [
+    {"title": "Zbocze, popołudnie", "caption": "Odbitka pigmentowa archiwalna, 2025", "note": "Ostatnie światło na polu, którego nikt nie zauważa.", "text": "Trzy popołudnia czekania, aż chmura zejdzie z grzbietu, i zeszła na cztery minuty."},
+    {"title": "Dwa horyzonty", "caption": "Odbitka pigmentowa archiwalna, 2025", "note": "Linia brzegu, która nie umiała się zdecydować, gdzie się kończy.", "text": "Woda odpływała, a mokry piasek odbijał drugie niebo. Sześć klatek, zostaje jedna."},
+    {"title": "Cicha woda", "caption": "Odbitka pigmentowa archiwalna, 2024", "note": "Staw w listopadzie, który nie musi niczego udowadniać.", "text": "Zbiornik o siódmej rano, zanim zerwał się wiatr. Odbitka jest duża, żeby cisza miała dość miejsca."},
+    {"title": "Czerwone pole", "caption": "Odbitka pigmentowa archiwalna, 2024", "note": "Maki, które przekwitły i poszły w nasiona, fotografowane w deszczu.", "text": "Koniczyna, którą zostawiono do kwitnienia, a potem skoszono. Kolor na odbitce jest bliższy temu, co widać było w terenie, niż temu, co zapisał aparat."},
+    {"title": "Linie o zmierzchu", "caption": "Odbitka pigmentowa archiwalna, 2023", "note": "Druty telegraficzne na tle nieba, które zmieniało zdanie.", "text": "Słupki ogrodzenia i bruzdy, na których leży ostatnie, płaskie światło. W długiej, wąskiej ramie wygląda to lepiej."},
+    {"title": "Sól i łupek", "caption": "Odbitka pigmentowa archiwalna, 2023", "note": "Mur portowy podczas odpływu, w kolorach starej monety.", "text": "Plaża z ciemnego kamienia z białą solą zostawioną przez przypływ. Trzy pory roku powrotów, żeby złapać wymarzone światło."},
+    {"title": "Niebieska godzina", "caption": "Odbitka pigmentowa archiwalna, 2022", "note": "Dziesięć minut między dniem a nocą, powtarzane przez tydzień.", "text": "Dziesięć minut po zachodzie słońca cała dolina robi się koloru atramentu. To jedyna klatka, na której świeci lampa."},
+    {"title": "Zimowy sad", "caption": "Odbitka pigmentowa archiwalna, 2022", "note": "Gołe drzewa w rzędzie, policzone dwa razy.", "text": "Gołe jabłonie w mroźny poranek. Stanie na skrzynce, żeby znaleźć linię między gałęziami."},
+    {"title": "Poranna mgła", "caption": "Odbitka pigmentowa archiwalna, 2021", "note": "Dolina, której nikt jeszcze nie powiedział, że to już rano.", "text": "Mgła zniknęła przed ósmą. To zdjęcie powstało w kwadrans, kiedy jeszcze była."}
+   ]
+  },
+  "illustration": {
+   "tagline": "Ilustracje i grafika warsztatowa",
+   "vars": {
+    "brand": {
+     "join": [
+      ["Pracownia", "Gabinet", "Biuro", "Drukarnia", "Dom", "Szkicownik", "Kącik", "Stół", "Zeszyt", "Szuflada"],
+      ["Cytryna", "Papier", "Tusz", "Pomarańcza", "Ołówek", "Ćma", "Paproć", "Wróbel", "Gumka", "Cisza"]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Ilustracje, linoryty i małe książki z biurka {city_in}.",
+   "desc_work": "Ilustracje i grafiki, od najnowszych.",
+   "desc_about": "O ilustracjach i pracowni {city_in}.",
+   "desc_contact": "Gdzie znaleźć pracownię {city_in} i kiedy jest otwarta.",
+   "intro": "Ilustracje, linoryty i małe książki z biurka {city_in}.",
+   "about": [
+    "Rysuję i wycinam linoryty. Pracuję dla książek obrazkowych, dla czasopism, które jeszcze płacą w terminie, i dla każdego, kto potrzebuje ptaka w rogu plakatu.",
+    "Większość prac zaczyna się jako szkic ołówkiem w zeszycie, a kończy jako linoryt albo płaski rysunek cyfrowy, zależnie od tego, czego potrzebuje dana praca.",
+    "Mieszkam {city_in} z kotem, który ma opinie o moich kompozycjach."
+   ],
+   "services": [
+    "Książki obrazkowe i ilustracja prasowa",
+    "Linoryty i kartki",
+    "Plakaty i grafika na wydarzenia"
+   ],
+   "shows": [
+    {"y": "2025", "t": "Targi małych grafik, wystawca"},
+    {"y": "2024", "t": "Zeszyt z pola, książka obrazkowa wydana w lokalnej drukarni"},
+    {"y": "2023", "t": "Regionalna nagroda za ilustrację, wyróżnienie"}
+   ],
+   "works": [
+    {"title": "Studium w pomarańczy", "caption": "Linoryt, trzy kolory, 2025", "note": "Lis, pół schodów i niewyjaśniony księżyc.", "text": "Jeden kolor, trzy papiery i jedno popołudnie. Zaczęło się od rozgrzewki, a skończyło okładką małej książki."},
+    {"title": "Dzień targowy", "caption": "Rysunek cyfrowy, 2025", "note": "Jedenaście straganów i jeden bardzo zadowolony z siebie gołąb.", "text": "Rysowane na miejscu przez trzy soboty. Sprzedawcy byli tak mili, że stali nieruchomo, albo prawie."},
+    {"title": "Naokoło", "caption": "Ołówek i tusz, 2024", "note": "Ścieżka, która nie prowadzi tam, gdzie mówi tablica.", "text": "Trasa niedzielnych spacerów, narysowana z pamięci, a potem sprawdzona przy następnym spacerze. Mapa myliła się w przyjemny sposób."},
+    {"title": "Autobus nocny", "caption": "Linoryt, dwa kolory, 2024", "note": "Wszyscy śpią oprócz kierowcy i księżyca.", "text": "Pióro, tusz i bardzo dużo cierpliwości dla odbić w szybie."},
+    {"title": "Zielone godziny", "caption": "Gwasz, 2023", "note": "Szklarnia o czwartej po południu.", "text": "Godziny przed śniadaniem w czerwcu, gdy ogród jest jeszcze chłodny. Linoryt w trzech kolorach."},
+    {"title": "Małe ptaki", "caption": "Linoryt, 2023", "note": "Siedem ptaków, żaden nie rozpoznany poprawnie.", "text": "Wróble, strzyżyki i bardzo zły rudzik. Każdy ptak to osobna płyta, więc żadne dwie odbitki nie są dokładnie takie same."},
+    {"title": "Studium deszczu", "caption": "Akwarela, 2022", "note": "Parasole widziane z okna.", "text": "Akwarela, głównie woda. Papier sam zdecydował, gdzie będą kałuże."},
+    {"title": "Żniwa", "caption": "Rysunek cyfrowy, 2022", "note": "Pole pomarańczy z traktorem w rogu.", "text": "Stragan z owocami i warzywami jesienią. Pomarańczową dynię trzeba było narysować dwa razy."},
+    {"title": "Okno w kuchni", "caption": "Ołówek i tusz, 2021", "note": "To, co dzieje się na parapecie, gdy nikt nie patrzy.", "text": "Widok z miejsca, w którym zmywam. Zmienia się z pogodą i to jedyny powód, dla którego nie przeszkadza mi zmywanie."}
+   ]
+  },
+  "graphic": {
+   "tagline": "Projektowanie graficzne dla małych organizacji",
+   "vars": {
+    "brand": {
+     "join": [
+      ["Studio", "Pracownia", "Biuro", "Dom", "Laboratorium", "Gabinet", "Agencja", "Warsztat", "Drukarnia", "Pokój"],
+      ["Siatka", "Prostota", "Kerning", "Linia", "Spokój", "Margines", "Punkt", "Prawda", "Kwadrat", "Przestrzeń"]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Identyfikacje, plakaty i druki dla małych organizacji {city_in} i nie tylko.",
+   "desc_work": "Wybrane projekty graficzne, od najnowszych.",
+   "desc_about": "O studiu projektowym {city_in}.",
+   "desc_contact": "Gdzie znaleźć studio {city_in} i kiedy jest otwarte.",
+   "intro": "Identyfikacje, plakaty i druki dla małych organizacji {city_in} i nie tylko.",
+   "about": [
+    "Jesteśmy małym studiem projektowym {city_in}. Pracujemy z teatrami, sklepami, fundacjami i od czasu do czasu z browarem, głównie przy identyfikacjach wizualnych i drukach.",
+    "Lubimy czytelne siatki, uczciwy papier i kroje pisma, które istnieją na tyle długo, że umieją się zachowywać. Staramy się nie robić niczego, do czego potrzebna jest instrukcja.",
+    "Większość projektów zaczyna się od rozmowy przy herbacie, a kończy pudełkiem z wydrukowanymi próbkami na stole."
+   ],
+   "services": [
+    "Identyfikacje i logotypy",
+    "Plakaty, programy i oznakowanie",
+    "Raporty roczne i małe książki"
+   ],
+   "shows": [
+    {"y": "2025", "t": "Plakat roku, regionalne nagrody designu, finał"},
+    {"y": "2024", "t": "Cicha identyfikacja, wystąpienie na lokalnym spotkaniu projektantów"},
+    {"y": "2023", "t": "Wieczór typografii, organizatorzy"}
+   ],
+   "works": [
+    {"title": "Identyfikacja dla sprzedawcy herbaty", "caption": "Identyfikacja, 2025", "note": "Znak z jednego liścia i dużej dawki powściągliwości.", "text": "Logotyp, zestaw etykiet i puszki, które się układają jedna na drugiej. Liść w znaku to prawdziwy liść z ogrodu właściciela."},
+    {"title": "Plakaty dla chóru", "caption": "Seria plakatów, 2025", "note": "Dwanaście arkuszy, dwanaście głosów, jedna siatka.", "text": "Trzy plakaty na trzy koncerty, wydrukowane w dwóch kolorach na jednym arkuszu, żeby obniżyć koszt."},
+    {"title": "Raport roczny", "caption": "Druk, 2024", "note": "Czterdzieści stron, które ludzie naprawdę czytają.", "text": "Czterdzieści stron dla małej fundacji. Prosta czcionka, szerokie marginesy i jeden wykres, któremu wolno być ładnym."},
+    {"title": "Program dla teatru lalek", "caption": "Druk, 2024", "note": "Składa się w domek, a potem w łódkę.", "text": "Złożony arkusz, który zamienia się w mały teatr, gdy pociągnie się za właściwy róg."},
+    {"title": "Opakowania dla piekarni", "caption": "Opakowania, 2023", "note": "Papierowe torby, które po pierwszym użyciu wyglądają lepiej.", "text": "Papierowe torby, pieczątka i wstążka w kolorze sklepu. Pieczątka jest wycięta w ziemniaku."},
+    {"title": "Oznakowanie dla biblioteki", "caption": "Oznakowanie, 2023", "note": "Tablice, które zauważa się dopiero, gdy ich brakuje.", "text": "Oznaczenia dla czterech pięter, sprawdzone z prawdziwymi czytelnikami. Jedną tablicę przestawialiśmy trzy razy."},
+    {"title": "Menu dla małej restauracji", "caption": "Druk, 2022", "note": "Jedna kartka, która zmienia się co tydzień.", "text": "Jedna strona, zmieniana co tydzień. W układzie jest miejsce na długopis, bo szef kuchni zawsze coś skreśla."},
+    {"title": "Plakat festiwalowy", "caption": "Plakat, 2022", "note": "Wydrukowany dwiema farbami na papierze gazetowym.", "text": "Plakat, który musiał być czytelny z drugiej strony ulicy, i jest, dzięki jednej wyrazistej formie i braku drobnego druku."},
+    {"title": "Seria okładek", "caption": "Okładki, 2021", "note": "Sześć okładek, jeden krój pisma.", "text": "Sześć okładek dla jednego wydawcy, połączonych siatką i jednym krojem pisma. Każda ma własny kolor."}
+   ]
+  }
+ }
+}

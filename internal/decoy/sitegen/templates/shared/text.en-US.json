@@ -1,0 +1,102 @@
+{
+ "nav_label": "Main menu",
+ "toc_h": "On this page",
+ "nf_title": "Page not found",
+ "nf_text": "The page you were looking for does not exist or has moved.",
+ "nf_back": "Back to the start page",
+ "months": [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
+ ],
+ "months_gen": [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
+ ],
+ "weekdays": [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday"
+ ],
+ "weekdays_short": [
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+  "Sun"
+ ],
+ "am": "am",
+ "pm": "pm",
+ "closed": "closed",
+ "hrs_fmt": "%days%: %time%",
+ "ms": "ms",
+ "units": [
+  "B",
+  "KB",
+  "MB"
+ ],
+ "cf_h": "Write to us",
+ "cf_intro": "Send us a message and we will reply as soon as we can.",
+ "cf_name": "Your name",
+ "cf_email": "Your email address",
+ "cf_msg": "Message",
+ "cf_send": "Send message",
+ "cf_busy": "Sending…",
+ "cf_empty": "Please write a message first.",
+ "cf_fail": "The message could not be sent. Please try again later.",
+ "nav_terms": "Terms of use",
+ "desc_terms": "The terms for using {brand}.",
+ "terms_h": "Terms of use",
+ "terms_intro": "Please read these terms before you use {brand}. They are short, and they apply from the first time you use the service.",
+ "terms": [
+  {
+   "h": "Using the service",
+   "p": "{brand} is provided as it is. By using it you agree to these terms. If you do not agree, please do not use the service."
+  },
+  {
+   "h": "Your part",
+   "p": "Use the service lawfully and only for yourself or your organization. Keep your details to yourself, and tell us if you think someone else has them."
+  },
+  {
+   "h": "What is not allowed",
+   "p": "Do not try to break the service, overload it or reach parts that are not meant for you. We may block access that harms other people."
+  },
+  {
+   "h": "Availability",
+   "p": "We work to keep the service running, but we cannot promise that it will always be available. We may change, pause or end parts of it."
+  },
+  {
+   "h": "Liability",
+   "p": "As far as the law allows, we are not responsible for losses that come from using the service, or from not being able to use it."
+  },
+  {
+   "h": "Changes",
+   "p": "We may update these terms from time to time. If you keep using the service after a change, you accept the new terms."
+  }
+ ]
+}

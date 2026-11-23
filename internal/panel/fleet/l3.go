@@ -12,6 +12,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -256,7 +257,7 @@ func (f *Fleet) checkAwgBackend(ctx context.Context, n store.NodeRow, value stri
 	if !has {
 		return nil
 	}
-	if !slices.Contains(n.AgentCaps, capAWG) {
+	if !slices.Contains(n.AgentCaps, agentcap.AWG) {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}
 	return nil

@@ -1,0 +1,153 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     ["Kamyk", "Brzoza", "Klon", "Jaskółka", "Koniczyna", "Bursztyn", "Mewa", "Wydma", "Szuwar", "Sosna"],
+     ["drop", "send", "share", "post", "pass", "move", "hand"]
+    ]
+   },
+   "limit": ["500 MB", "1 GB", "2 GB", "5 GB"]
+  },
+  "nav_label": "Nawigacja",
+  "tagline": "Proste przesyłanie plików",
+  "footer": "Pliki są usuwane automatycznie, gdy link wygaśnie.",
+  "nav_home": "Wyślij plik",
+  "nav_how": "Jak to działa",
+  "nav_limits": "Limity i pytania",
+  "home_title": "Wyślij plik",
+  "desc": "Udostępniaj pliki do {limit} jednym linkiem w serwisie {brand}.",
+  "desc_how": "Jak działa przesyłanie plików w serwisie {brand}.",
+  "desc_limits": "Rozmiary plików, czas ważności linków i najczęstsze pytania o {brand}.",
+  "nf_title": "Nie znaleziono strony",
+  "nf_text": "Strona, której szukasz, nie istnieje albo została przeniesiona.",
+  "nf_back": "Wróć na stronę główną",
+  "drop_h": "Upuść plik tutaj",
+  "drop_hint": "albo wybierz go z urządzenia, do {limit}",
+  "pick": "Wybierz plik",
+  "uploading": "Wysyłanie…",
+  "e_full": [
+   "Brak miejsca w magazynie. Spróbuj ponownie później.",
+   "Nie udało się wysłać pliku: nasz magazyn jest teraz pełny.",
+   "W tej chwili nie możemy zapisać kolejnych plików, bo magazyn jest pełny."
+  ],
+  "retry": "Spróbuj jeszcze raz",
+  "how_h": "Jak to działa",
+  "how_intro": "Trzy kroki i nic do ustawiania.",
+  "steps": [
+   {
+    "h": "Wybierz plik",
+    "p": "Upuść plik na stronie głównej albo wybierz go z urządzenia."
+   },
+   {
+    "h": "Odbierz link",
+    "p": "Gdy plik się wyśle, dostaniesz link, który możesz skopiować."
+   },
+   {
+    "h": "Wyślij link dalej",
+    "p": "Każdy, kto ma link, może pobrać plik, dopóki link nie wygaśnie."
+   }
+  ],
+  "limits_h": "Limity i najczęstsze pytania",
+  "limits_intro": "Najważniejsze liczby w jednym miejscu.",
+  "limits": [
+   {
+    "k": "Największy plik",
+    "v": "{limit}"
+   },
+   {
+    "k": "Ważność linku",
+    "v": "{days} dni"
+   },
+   {
+    "k": "Plików w jednej wysyłce",
+    "v": "Jeden (kilka plików spakuj do jednego archiwum zip)"
+   },
+   {
+    "k": "Pobrań z jednego linku",
+    "v": "Bez ograniczeń do czasu wygaśnięcia"
+   }
+  ],
+  "faq_h": "Najczęstsze pytania",
+  "faq": [
+   {
+    "q": "Czy potrzebuję konta?",
+    "a": "Nie. Pliki do {limit} możesz wysyłać bez logowania."
+   },
+   {
+    "q": "Jak długo działa mój link?",
+    "a": "Link działa przez {days} dni. Potem plik jest usuwany, a link przestaje działać."
+   },
+   {
+    "q": "Czy odbiorca zobaczy moje imię i nazwisko?",
+    "a": "Tylko jeśli sam mu je podasz. Na stronie pobierania nie ma żadnych informacji o Tobie."
+   },
+   {
+    "q": "Co się dzieje z plikiem, gdy link wygaśnie?",
+    "a": "Usuwamy go z magazynu. Nie zachowujemy żadnej kopii."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Linki, które wygasają",
+    "p": "Każdy link działa przez {days} dni, więc nic nie zostaje na zawsze."
+   },
+   {
+    "h": "Bez rejestracji",
+    "p": "Pliki do {limit} wysyłasz bez zakładania konta."
+   },
+   {
+    "h": "Prosto i szybko",
+    "p": "Dodajesz plik, kopiujesz link i przekazujesz go dalej. I tyle."
+   }
+  ],
+  "nav_privacy": "Prywatność",
+  "desc_privacy": "Co dzieje się z Twoimi plikami i danymi w serwisie {brand}.",
+  "privacy_h": "Polityka prywatności",
+  "privacy_intro": "Krótko o tym, co dzieje się z Twoim plikiem i informacjami o wysyłce.",
+  "privacy": [
+   {
+    "h": "Co przechowujemy",
+    "p": "Plik, który wysyłasz, i godzinę jego wysłania. Nie pytamy o Twoje imię i nazwisko i nie prowadzimy listy osób, które plik pobierają."
+   },
+   {
+    "h": "Jak długo to przechowujemy",
+    "p": "Do wygaśnięcia linku. Potem plik jest usuwany z magazynu i nie da się go odzyskać."
+   },
+   {
+    "h": "Kto może go zobaczyć",
+    "p": "Każdy, kto ma link. Nie otwieramy ani nie czytamy Twoich plików, więc przekazuj link tylko tym osobom, które mają dostać plik."
+   },
+   {
+    "h": "Pliki cookie",
+    "p": "Używamy tylko tego, co jest potrzebne, żeby strona działała. Nie ma reklamowych ani śledzących plików cookie."
+   },
+   {
+    "h": "Usunięcie pliku przed czasem",
+    "p": "Poproś osobę, która zajmuje się serwisem {brand} w Twojej firmie lub szkole, o usunięcie pliku przed wygaśnięciem linku."
+   }
+  ]
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "Przesyłanie plików",
+   "hero_h": "Wyślij plik komu chcesz",
+   "hero_p": "Dodaj plik, odbierz link i prześlij go dalej. Do {limit} nie potrzeba konta."
+  },
+  "print": {
+   "kicker": "Pliki do druku",
+   "hero_h": "Wyślij nam swój projekt",
+   "hero_p": "Prześlij pliki gotowe do druku do swojego zamówienia. Pliki PDF, TIFF i ZIP do {limit} są w porządku."
+  },
+  "photos": {
+   "kicker": "Udostępnianie zdjęć",
+   "hero_h": "Podziel się zdjęciami",
+   "hero_p": "Wyślij cały folder ze zdjęciami jako jeden plik zip do {limit}. Znajomi i rodzina potrzebują tylko linku."
+  },
+  "assignments": {
+   "kicker": "Prace do oddania",
+   "hero_h": "Oddaj swoją pracę",
+   "hero_p": "Wyślij tutaj pracę przed terminem. Jeden plik, do {limit}."
+  }
+ }
+}

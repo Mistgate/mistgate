@@ -490,6 +490,7 @@ func (s *Service) previewPreset(ctx context.Context, userID string) func() *dns.
 var clientNames = map[plugin.ClientID]string{
 	plugin.ClientHapp: "Happ", plugin.ClientAmnezia: "AmneziaVPN", plugin.ClientTelegram: "Telegram",
 	plugin.ClientMihomo: "Mihomo / Clash Meta", plugin.ClientSingbox: "sing-box",
+	plugin.ClientTrustTunnel: "TrustTunnel", plugin.ClientMistgate: "Mistgate",
 }
 
 // formatOf maps a plugin wire format to the serving format of the settings; 0 = not a serving format (yet).

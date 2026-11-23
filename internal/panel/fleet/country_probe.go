@@ -13,11 +13,8 @@ import (
 // other nodes of the fleet survive the national DPI. This file only sends the command to one node and parses the answer;
 // choosing the node, the targets and the schedule, and storing the result, belong to the scheduler (step E).
 
-const (
-	capCountryProbe = "country-probe/1"
-	// countryProbeWait is the agent's own total deadline (120 s) and a margin for the answer.
-	countryProbeWait = 130 * time.Second
-)
+// countryProbeWait is the agent's own total deadline (120 s) and a margin for the answer.
+const countryProbeWait = 130 * time.Second
 
 // CountryProbeTarget is one fleet node as the panel knows it: node.address and the TCP ports to test.
 type CountryProbeTarget struct {

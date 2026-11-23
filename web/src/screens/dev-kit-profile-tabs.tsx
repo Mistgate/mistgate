@@ -18,7 +18,7 @@ import { groupsQuery } from "@/screens/users/rpc";
 //     nochecks | out (nl3 out of touch) | chk | chkd (the check walk, mid-way and just done) | apply | applied (the apply course) | own (a port of its
 //     own, a switched-off server, an address left out of the subscriptions) | cert (a certificate about to end) | warp (the profile exits through WARP)
 //   people: menu (the "Add to a group" menu open) | nogroups (the panel has no group at all)
-//   windows: put [pchk | run [hang | fail] on-de2+nl3+fi2 (out: nl3 is out of touch)] | take [pick-de1+nl1] | del [typed | run | err-deployed | err-name | err-stale | err-gone |
+//   windows: put [many (36 nodes) | pchk | run [hang | fail] on-de2+nl3+fi2 (out: nl3 is out of touch)] | take [pick-de1+nl1] | del [typed | run | err-deployed | err-name | err-stale | err-gone |
 //     err-partial] | twin [done]
 
 const NEVER = new Promise<never>(() => {});
@@ -50,7 +50,8 @@ function fakeCalls(state: string) {
         if (node === "fi3") throw err(`share_needs_site: ${held.replace("&name=", "")}`);
         if (node === "nl3") throw err(`share_agent_old: ${held.replace("&name=", "")}`);
       }
-      if (node === "nl2") throw err(`port_taken: port=${port}&profile=VLESS · TCP&free=${port + 1}`);
+      if (node === "nl2" || (v.has("many") && node === "fr3")) throw err(`port_taken: port=${port}&profile=VLESS · TCP&free=${port + 1}`);
+      if (v.has("many") && node === "se3") throw err("agent_too_old: the node's agent is older than this profile needs");
       if (node === "fi3" && !req.tlsServerNameOverride && key !== "aw1") throw err(`acme_needs_domain: address=${NODES.find((x) => x.n === "fi3")?.ip}`);
       if (node === "spb1") throw err("agent_too_old: the node's agent is older than this profile needs");
       return { inbound: { port: req.portOverride || port, tlsServerName: "" }, warnings: [], freePort: 0 };
@@ -102,13 +103,30 @@ export function tabsData(data: PageData, state: string): PageData {
   return { ...data, inbounds: inbounds as never, initial: { ...data.initial, settingsJson } };
 }
 
+/** Twenty-seven more nodes for a long list: a country each in turn, numbered inside it, on the documentation addresses of 198.51.100.0/24. */
+function manyNodes() {
+  const places = [["DE", "de", "Frankfurt"], ["NL", "nl", "Amsterdam"], ["FI", "fi", "Helsinki"], ["FR", "fr", "Paris"], ["SE", "se", "Stockholm"], ["PL", "pl", "Warsaw"]] as const;
+  const seen: Record<string, number> = { de: 3, nl: 3, fi: 3 };
+  return Array.from({ length: 27 }, (_, i) => {
+    const [cc, code, city] = places[i % places.length]!;
+    const k = (seen[code] = (seen[code] ?? 0) + 1);
+    const name = `${code}${k}`;
+    return { id: nid(name), name, countryCode: cc, location: city, provider: "Example Cloud", notes: "", address: `198.51.100.${10 + i}`, status: NodeStatus.ONLINE, protocols: [], online: [], trafficTodayBytes: 0, hasMetrics: false, cpuPct: 0, uptimeS: 0, lastSeenUnix: NOW, awgBackend: "auto", warp: { state: WarpState.NOT_CONFIGURED } };
+  });
+}
+
 /** Seeds what a state of these tabs needs into the scene's query cache (and puts its calls on the shared client). */
 export function seedTabs(qc: QueryClient, state: string, _role: Role): void {
   const v = new Set(tokens(state));
   fakeCalls(state);
   // WARP is up on one node only: the others are named where a WARP exit lacks it
   const nodes = nodeRows().map((n) => ({ ...n, awgBackend: "auto", warp: { state: n.name === "de1" ? WarpState.UP : WarpState.NOT_CONFIGURED }, ...(v.has("out") && n.name === "nl3" && { status: NodeStatus.DOWN }) }));
-  qc.setQueryData(nodesQuery.queryKey, { nodes, expectedAgentVersion: "0.1.71" } as never);
+  // "many": a long list, 36 nodes in all (the board's PnProfilePut36), two of the new ones with something to say (fr3 port taken, se3 old agent)
+  const extra = v.has("many") ? manyNodes() : [];
+  const fleet = { nodes: [...nodes, ...extra], expectedAgentVersion: "0.1.71" };
+  qc.setQueryData(nodesQuery.queryKey, fleet as never);
+  // a window that reloads the fleet when it is done (Put on nodes) gets the same fleet back, not the panel's answer to nothing
+  (nodesApi as unknown as Record<string, unknown>).listNodes = async () => fleet;
   if (v.has("load") || v.has("err")) qc.removeQueries({ queryKey: checksQuery("").queryKey });
   if (v.has("nogroups")) qc.setQueryData(groupsQuery.queryKey, [] as never);
   // the plan of a copy (the server's dry run), under the key the window reads
@@ -168,6 +186,9 @@ export const tabFrames: Frame[] = [
   f("put-pick-light", "hy1.servers.put", "The same on the light theme", 1440, 1100, "&theme=light"),
   f("put-pick-phone", "hy1.servers.put", "A phone", 400, 1600),
   f("put-pick-fa", "hy1.servers.put", "Right to left (fa)", 1440, 1100, "&lang=fa"),
+  f("put-many", "hy1.servers.put.many", "Put on nodes: 36 nodes, the list scrolls inside, the foot stays", 1440, 900),
+  f("put-many-820", "hy1.servers.put.many", "The same in a 820 window", 820, 900),
+  f("put-many-phone", "hy1.servers.put.many", "The same on a phone, 390 wide", 390, 844),
   f("put-aw1", "aw1.servers.put", "The first AmneziaWG on a node: its backend", 1440, 1100),
   f("put-run", "hy1.servers.put.run.hang.out.on-de2+nl3+fi2", "Put on nodes: running", 1440, 800),
   f("put-done", "hy1.servers.put.run.out.on-de2+nl3+fi2", "Put on nodes: done, one waits for its node", 1440, 800),

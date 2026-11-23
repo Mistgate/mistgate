@@ -577,7 +577,7 @@ func TestUserDisableBulkNeedsTheOwner(t *testing.T) {
 	if len(e.w.disableReq) != 1 {
 		t.Error("a bulk disable ran without the owner")
 	}
-	// the operator profile has no step-up procedure to approve with: the grant would only matter for tokenApproved ones,
+	// the operator profile has no step-up procedure to approve with: the grant would only matter for the procedures that need the owner's approval,
 	// and SetUsersEnabled is a plain procedure, so after the owner's click the apply runs as an ordinary call
 	e.plans.decide(many.PlanID, true)
 	applyOf(t, s, "user_disable", many.ConfirmToken)
@@ -960,6 +960,17 @@ func TestRolloutPauseNeedsRunning(t *testing.T) {
 	}
 	if len(e.w.pauseReq) != 0 {
 		t.Error("paused a finished rollout")
+	}
+}
+
+func TestRolloutCancelPlanExplainsInFlightWait(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileAdmin)
+	s := e.session(secret)
+	e.w.rolloutStat = adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING
+	p := planOf(t, s, "rollout_cancel", map[string]any{"rollout_id": "rol_1"})
+	if !p.NeedsApproval || !strings.Contains(p.Summary, "step already in progress finishes and is checked") || !strings.Contains(p.Summary, "steps that have not started are skipped") {
+		t.Fatalf("cancel plan does not describe the in-flight rule: %+v", p)
 	}
 }
 

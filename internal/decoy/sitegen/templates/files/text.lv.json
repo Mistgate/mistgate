@@ -1,0 +1,178 @@
+{
+ "ui": {
+  "nav_label": "Izvēlne",
+  "tagline": "Vienkārša failu sūtīšana",
+  "footer": "Faili tiek dzēsti automātiski, kad saites termiņš beidzas.",
+  "nav_home": "Nosūtīt failu",
+  "nav_how": "Kā tas darbojas",
+  "nav_limits": "Ierobežojumi un BUJ",
+  "home_title": "Nosūtīt failu",
+  "desc": "Kopīgo failus līdz {limit} ar vienu saiti: {brand}.",
+  "desc_how": "Kā {brand} sūta failus.",
+  "desc_limits": "Failu izmēri, saišu derīguma laiks un biežākie jautājumi par {brand}.",
+  "nf_title": "Lapa nav atrasta",
+  "nf_text": "Lapas, ko meklēji, nav vai arī tā ir pārvietota.",
+  "nf_back": "Atpakaļ uz sākumlapu",
+  "drop_h": "Ievelc failu šeit",
+  "drop_hint": "vai izvēlies to savā ierīcē, līdz {limit}",
+  "pick": "Izvēlēties failu",
+  "uploading": "Augšupielādē…",
+  "e_full": [
+   "Krātuve ir pilna. Lūdzu, mēģini vēlāk vēlreiz.",
+   "Augšupielāde neizdevās: mūsu krātuve šobrīd ir pilna.",
+   "Pašlaik nevaram saglabāt vairāk failu, jo krātuve ir pilna."
+  ],
+  "retry": "Mēģināt vēlreiz",
+  "how_h": "Kā tas darbojas",
+  "how_intro": "Trīs soļi, nekas nav jāiestata.",
+  "steps": [
+   {
+    "h": "Izvēlies failu",
+    "p": "Ievelc failu sākumlapā vai izvēlies to savā ierīcē."
+   },
+   {
+    "h": "Saņem saiti",
+    "p": "Kad augšupielāde ir pabeigta, tu saņem saiti, ko vari nokopēt."
+   },
+   {
+    "h": "Kopīgo saiti",
+    "p": "Ikviens, kam ir saite, var lejupielādēt failu, kamēr saites termiņš nav beidzies."
+   }
+  ],
+  "limits_h": "Ierobežojumi un BUJ",
+  "limits_intro": "Svarīgākie skaitļi vienuviet.",
+  "limits": [
+   {
+    "k": "Lielākais fails",
+    "v": "{limit}"
+   },
+   {
+    "k": "Saites derīguma laiks",
+    "v": "{days} dienas"
+   },
+   {
+    "k": "Faili vienā augšupielādē",
+    "v": "Viens (vairākus failus saspied vienā zip failā)"
+   },
+   {
+    "k": "Lejupielādes vienai saitei",
+    "v": "Neierobežoti, kamēr termiņš nav beidzies"
+   }
+  ],
+  "faq_h": "Biežāk uzdotie jautājumi",
+  "faq": [
+   {
+    "q": "Vai man vajag kontu?",
+    "a": "Nē. Failus līdz {limit} vari nosūtīt, nepierakstoties."
+   },
+   {
+    "q": "Cik ilgi mana saite derīga?",
+    "a": "Saites darbojas {days} dienas. Pēc tam fails tiek dzēsts, un saite pārstāj darboties."
+   },
+   {
+    "q": "Vai saņēmējs redz manu vārdu?",
+    "a": "Tikai tad, ja tu to pasaki. Lejupielādes lapā par tevi nekā nav."
+   },
+   {
+    "q": "Kas notiek ar manu failu pēc saites termiņa beigām?",
+    "a": "Tas tiek izņemts no krātuves. Kopiju mēs neglabājam."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Saites ar termiņu",
+    "p": "Katra saite darbojas {days} dienas, tāpēc nekas nepaliek nevajadzīgi."
+   },
+   {
+    "h": "Bez reģistrēšanās",
+    "p": "Failus līdz {limit} var sūtīt bez konta."
+   },
+   {
+    "h": "Vienkārši un ātri",
+    "p": "Pievieno failu, nokopē saiti un nodod tālāk. Nekā cita nav."
+   }
+  ],
+  "nav_privacy": "Privātums",
+  "desc_privacy": "Kas notiek ar taviem failiem un datiem pakalpojumā {brand}.",
+  "privacy_h": "Privātuma paziņojums",
+  "privacy_intro": "Īss apraksts, kas notiek ar tavu failu un pārsūtīšanas datiem.",
+  "privacy": [
+   {
+    "h": "Ko mēs glabājam",
+    "p": "Failu, ko tu augšupielādē, un augšupielādes laiku. Mēs neprasām tavu vārdu un neveidojam sarakstu ar tiem, kas failu lejupielādē."
+   },
+   {
+    "h": "Cik ilgi mēs to glabājam",
+    "p": "Līdz saites termiņa beigām. Pēc tam fails tiek izdzēsts no krātuves, un to nevar atjaunot."
+   },
+   {
+    "h": "Kas to var redzēt",
+    "p": "Ikviens, kam ir saite. Mēs neatveram un nelasām tavus failus, tāpēc dalies ar saiti tikai ar tiem, kam failam jābūt."
+   },
+   {
+    "h": "Sīkdatnes",
+    "p": "Mēs lietojam tikai to, kas lapai vajadzīgs, lai tā darbotos. Reklāmas vai izsekošanas sīkdatņu nav."
+   },
+   {
+    "h": "Faila agrāka noņemšana",
+    "p": "Palūdz cilvēkam, kas jūsu organizācijā pārvalda pakalpojumu {brand}, noņemt failu pirms saites termiņa beigām."
+   }
+  ],
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Ozolu",
+      "Liepu",
+      "Bērzu",
+      "Kļavu",
+      "Ostas",
+      "Putnu",
+      "Rasas",
+      "Ābeļu",
+      "Vītolu",
+      "Dzintara"
+     ],
+     [
+      "pasts",
+      "tilts",
+      "sūtne",
+      "kurjers",
+      "kaste",
+      "nesējs",
+      "ceļš"
+     ]
+    ],
+    "sep": ""
+   },
+   "limit": [
+    "500 MB",
+    "1 GB",
+    "2 GB",
+    "5 GB"
+   ]
+  }
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "Failu sūtīšana",
+   "hero_h": "Nosūti failu ikvienam",
+   "hero_p": "Pievieno failu, saņem saiti un kopīgo to. Failam līdz {limit} konts nav vajadzīgs."
+  },
+  "print": {
+   "kicker": "Drukas faili",
+   "hero_h": "Augšupielādē savu darbu",
+   "hero_p": "Atsūti mums drukai gatavus failus savam pasūtījumam. Der PDF, TIFF un ZIP faili līdz {limit}."
+  },
+  "photos": {
+   "kicker": "Foto kopīgošana",
+   "hero_h": "Dalies ar fotogrāfijām",
+   "hero_p": "Nosūti attēlu mapi kā vienu saspiestu failu līdz {limit}. Draugiem un ģimenei vajag tikai saiti."
+  },
+  "assignments": {
+   "kicker": "Mājasdarbi",
+   "hero_h": "Iesniedz savu darbu",
+   "hero_p": "Augšupielādē savu darbu šeit pirms termiņa. Viens fails, līdz {limit}."
+  }
+ }
+}

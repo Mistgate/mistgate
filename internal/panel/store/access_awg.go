@@ -239,10 +239,11 @@ func (a Access) RotateAWGDevice(ctx context.Context, deviceID string, now time.T
 	return resultUserID, nil
 }
 
-// EnsureKeyPathCred gives a static AWG device one peer for a relay entry of its profile. The direct key must still be live,
-// and the relay is checked in the guarded insert so a concurrent delete cannot leave a new orphan path key behind.
+// EnsureKeyPathCred gives a static AWG device one peer for the IPv6 entry or a relay entry of its profile. The direct key must
+// still be live, and the entry or the relay is checked in the guarded insert so a concurrent change cannot leave a new orphan
+// path key behind.
 func (a Access) EnsureKeyPathCred(ctx context.Context, deviceID, profileID, path string, maxIdx int, now time.Time, issue AWGIssue) (AccessCred, bool, error) {
-	if deviceID == "" || profileID == "" || !strings.HasPrefix(path, "relay:") || strings.TrimPrefix(path, "relay:") == "" || issue == nil {
+	if deviceID == "" || profileID == "" || (path != PathIPv6 && !IsRelayPath(path)) || path == relayPathPre || issue == nil {
 		return AccessCred{}, false, errors.New("store: invalid AWG path credential request")
 	}
 	cutoff := unix(now.Add(-awgQuarantine))
@@ -341,10 +342,24 @@ func scanAWGPathCred(r rowScanner) (AccessCred, error) {
 	return value, err
 }
 
+// The names of the ways to a server. They are in the database (a path credential of an AmneziaWG key) and in the client API, so
+// their values never change; awgPathExistsSQL spells the same two prefixes inside its SQL.
+const (
+	PathDirect   = "direct" // SubServer.PathKey of the server itself; its credentials hold "" as the path
+	PathIPv6     = "ipv6"
+	relayPathPre = "relay:"
+)
+
+// RelayPath is the path through the relay whose entry is the node entryNodeID.
+func RelayPath(entryNodeID string) string { return relayPathPre + entryNodeID }
+
+// IsRelayPath says whether path goes through a relay entry.
+func IsRelayPath(path string) bool { return strings.HasPrefix(path, relayPathPre) }
+
 // AWGImplicitWant asks for an AWG credential of one profile on the request's link device.
 type AWGImplicitWant struct {
 	ProfileID string
-	Path      string // "" is direct; extra paths are "ipv6" or "relay:<entry node id>"
+	Path      string // "" is direct; extra paths are PathIPv6 or RelayPath(entry node id)
 	MaxIdx    int
 	Issue     AWGIssue
 }

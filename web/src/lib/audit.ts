@@ -105,6 +105,7 @@ const keys: Record<string, MessageKey> = {
   warp_refresh: "audit.warp_refresh",
   warp_delete: "audit.warp_delete",
   warp_reregister: "audit.warp_reregister",
+  warp_license: "audit.warp_license",
   warp_reach_settings: "audit.warp_reach_settings",
   log_level_set: "audit.log_level_set",
   retention_set: "audit.retention_set",

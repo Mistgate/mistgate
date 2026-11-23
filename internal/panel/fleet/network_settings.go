@@ -7,6 +7,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -25,7 +26,7 @@ type networkTableReader interface {
 // so its settings and their signature stay what they were.
 func (f *Fleet) nodeSettings(n store.NodeRow, caps []string) *agentv1.NodeSettings {
 	s := nodeSettingsFor(n, caps, f.osStatusAllowed())
-	if !store.CapabilityPresent(caps, capNetworks) {
+	if !store.CapabilityPresent(caps, agentcap.Nets) {
 		return s
 	}
 	s.Networks = f.NetworkMode()

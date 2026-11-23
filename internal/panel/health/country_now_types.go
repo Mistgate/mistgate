@@ -8,7 +8,7 @@ import "context"
 type CountryNowRun func(ctx context.Context) (state, reason string)
 
 // CountryNowSource is a source of the country check that can be asked for a round of one node out of turn (country_now.go). Plan
-// is quick and runs inside the request: it says why the source will not run now (the reason words of CountryNowSource.reason) or
+// is quick and runs inside the request: it says why the source will not run now (the reason words of adminv1.CountryNowSource) or
 // returns the work to do. A source that keeps no other state has nothing else to do; a plan that takes a lock for its run
 // releases it when the run ends, and when it returns a reason, at once.
 type CountryNowSource struct {

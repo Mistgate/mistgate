@@ -308,6 +308,17 @@ describe("the queue of a run", () => {
     expect(host!.querySelector("[role=progressbar][aria-label='The update is in progress']")).toBeNull();
   });
 
+  it("names the profiles a node's check failed for, and those it did not hold against the job, in the queue", async () => {
+    const failed = JSON.stringify([{ id: "inb_1", name: "Main", code: "refused" }]);
+    await mount(<OsSection />, all(rollout([
+      step("de1", OsStepState.FAILED, 0, { errorKey: "probe_failed", finishedUnix: NOW - 60, params: { failed_profiles: failed } }),
+      step("fi1", OsStepState.PASSED, 1, { finishedUnix: NOW - 30, params: { upgraded: "2", reboot: "done", skipped_profiles: JSON.stringify(["Old"]) } }),
+    ])));
+    const c = card().textContent!;
+    expect(c).toContain("The client-eye check failed after the update for the profile “Main”: Connection refused");
+    expect(c).toContain("Not held against the update, these did not work before it: “Old”.");
+  });
+
   it("offers Pause and Cancel to a running run, and Pause asks the panel after a step-up", async () => {
     await mount(<OsSection />, all(rollout([passed("nl1"), step("de1", OsStepState.PENDING, 1)])));
     expect(button("Pause", card())).toBeTruthy();
@@ -317,7 +328,7 @@ describe("the queue of a run", () => {
     expect(updates.pauseOsRollout).toHaveBeenCalledWith({ rolloutId: "osr_1" });
   });
 
-  it("asks before cancelling, and says a job that is already running is not interrupted", async () => {
+  it("asks before cancelling while a job is running, and sends the cancel", async () => {
     await mount(<OsSection />, all(rollout([passed("nl1"), step("de1", OsStepState.SENT, 1, { phase: "installing" })])));
     await click(button("Cancel…", card()));
     const d = document.querySelector<HTMLElement>("[data-shot=os-fleet-cancel]")!;
@@ -376,9 +387,9 @@ describe("the queue of a run", () => {
     expect(button("Retry", banner)!.className).not.toContain("bg-accent");
   });
 
-  it("says a cancel that waits for a running job, with no buttons", async () => {
+  it("shows the agent rollout's cancel-wait message, with no buttons", async () => {
     await mount(<OsSection />, all(rollout([passed("nl1"), step("de1", OsStepState.SENT, 1, { phase: "installing" }), step("fi1", OsStepState.SKIPPED, 1, { errorKey: "cancelled" })], { status: OsRolloutStatus.PAUSED, pauseKey: "cancel_wait" })));
-    expect(card().textContent).toContain("Cancelling. The nodes that have not started are skipped");
+    expect(card().textContent).toContain("Being cancelled: it ends as soon as the node that is updating now is decided.");
     expect(button("Pause", card())).toBeUndefined();
     expect(button("Continue", card())).toBeUndefined();
     // a node that was only cancelled needs no sentence of its own

@@ -1,0 +1,163 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Kiesel",
+      "Linden",
+      "Lampen",
+      "Birken",
+      "Feder",
+      "Ahorn",
+      "Klee",
+      "Bernstein"
+     ],
+     [
+      "post",
+      "bote",
+      "korb",
+      "kurier",
+      "weg",
+      "kiste"
+     ]
+    ]
+   },
+   "limit": [
+    "500 MB",
+    "1 GB",
+    "2 GB",
+    "5 GB"
+   ]
+  },
+  "nav_label": "Hauptmenü",
+  "tagline": "Einfacher Dateiversand",
+  "footer": "Dateien werden nach Ablauf des Links automatisch gelöscht.",
+  "nav_home": "Datei senden",
+  "nav_how": "So funktioniert’s",
+  "nav_limits": "Grenzen und FAQ",
+  "home_title": "Datei senden",
+  "desc": "Dateien bis {limit} mit einem Link teilen, bei {brand}.",
+  "desc_how": "So funktioniert der Dateiversand bei {brand}.",
+  "desc_limits": "Größen, Fristen und häufige Fragen zu {brand}.",
+  "nf_title": "Seite nicht gefunden",
+  "nf_text": "Die gesuchte Seite existiert nicht oder wurde verschoben.",
+  "nf_back": "Zur Startseite",
+  "drop_h": "Datei hier ablegen",
+  "drop_hint": "oder auf dem Gerät auswählen, bis {limit}",
+  "pick": "Datei auswählen",
+  "uploading": "Wird hochgeladen …",
+  "e_full": [
+   "Der Speicher ist voll. Bitte versuchen Sie es später erneut.",
+   "Hochladen fehlgeschlagen: Der Speicher ist derzeit voll."
+  ],
+  "retry": "Erneut versuchen",
+  "how_h": "So funktioniert’s",
+  "how_intro": "Drei Schritte, nichts einzurichten.",
+  "steps": [
+   {
+    "h": "Datei wählen",
+    "p": "Ziehen Sie die Datei auf die Startseite oder wählen Sie sie auf Ihrem Gerät aus."
+   },
+   {
+    "h": "Link erhalten",
+    "p": "Nach dem Hochladen erhalten Sie einen Link, den Sie kopieren können."
+   },
+   {
+    "h": "Link teilen",
+    "p": "Wer den Link hat, kann die Datei bis zum Ablauf herunterladen."
+   }
+  ],
+  "limits_h": "Grenzen und FAQ",
+  "limits_intro": "Die wichtigsten Zahlen auf einen Blick.",
+  "limits": [
+   {
+    "k": "Größte Datei",
+    "v": "{limit}"
+   },
+   {
+    "k": "Gültigkeit des Links",
+    "v": "{days} Tage"
+   },
+   {
+    "k": "Dateien pro Upload",
+    "v": "Eine (mehrere Dateien bitte zippen)"
+   },
+   {
+    "k": "Downloads pro Link",
+    "v": "Unbegrenzt bis zum Ablauf"
+   }
+  ],
+  "faq_h": "Häufige Fragen",
+  "faq": [
+   {
+    "q": "Brauche ich ein Konto?",
+    "a": "Nein. Dateien bis {limit} können Sie ohne Anmeldung senden."
+   },
+   {
+    "q": "Wie lange gilt mein Link?",
+    "a": "Links gelten {days} Tage. Danach wird die Datei gelöscht und der Link funktioniert nicht mehr."
+   },
+   {
+    "q": "Sieht der Empfänger meinen Namen?",
+    "a": "Nur, wenn Sie ihn mitteilen. Auf der Download-Seite steht nichts über Sie."
+   },
+   {
+    "q": "Was passiert nach Ablauf mit der Datei?",
+    "a": "Sie wird aus dem Speicher entfernt. Wir behalten keine Kopie."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Links mit Ablaufdatum",
+    "p": "Jeder Link funktioniert {days} Tage, danach bleibt nichts liegen."
+   },
+   {
+    "h": "Ohne Anmeldung",
+    "p": "Dateien bis {limit} lassen sich ohne Konto senden."
+   },
+   {
+    "h": "Schnell und schlicht",
+    "p": "Datei hinzufügen, Link kopieren, weitergeben. Mehr gibt es nicht."
+   }
+  ],
+  "nav_privacy": "Datenschutz",
+  "desc_privacy": "Was bei {brand} mit Ihren Dateien und Angaben geschieht.",
+  "privacy_h": "Datenschutzhinweis",
+  "privacy_intro": "Eine kurze Übersicht darüber, was mit Ihrer Datei und den Angaben zur Übertragung geschieht.",
+  "privacy": [
+   {
+    "h": "Was wir speichern",
+    "p": "Die hochgeladene Datei und den Zeitpunkt des Hochladens. Wir fragen nicht nach Ihrem Namen und führen keine Liste der Personen, die die Datei herunterladen."
+   },
+   {
+    "h": "Wie lange wir sie speichern",
+    "p": "Bis der Link abläuft. Danach wird die Datei aus dem Speicher gelöscht und lässt sich nicht wiederherstellen."
+   },
+   {
+    "h": "Wer sie sehen kann",
+    "p": "Jeder, der den Link hat. Wir öffnen und lesen Ihre Dateien nicht. Geben Sie den Link deshalb nur an die Personen weiter, die die Datei bekommen sollen."
+   },
+   {
+    "h": "Cookies",
+    "p": "Wir verwenden nur das, was die Seite zum Funktionieren braucht. Es gibt keine Werbe- oder Tracking-Cookies."
+   },
+   {
+    "h": "Datei vorzeitig entfernen",
+    "p": "Bitten Sie die Person, die {brand} für Ihre Organisation betreut, eine Datei vor Ablauf des Links zu entfernen."
+   }
+  ]
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "Dateiversand",
+   "hero_h": "Datei an jeden senden",
+   "hero_p": "Datei hinzufügen, Link erhalten, weitergeben. Für Dateien bis {limit} ist kein Konto nötig."
+  },
+  "photos": {
+   "kicker": "Fotoaustausch",
+   "hero_h": "Fotos teilen",
+   "hero_p": "Schicken Sie einen Ordner voller Bilder als eine ZIP-Datei bis {limit}. Freunde und Familie brauchen nur den Link."
+  }
+ }
+}

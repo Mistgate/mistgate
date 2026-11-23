@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -63,7 +65,6 @@ const (
 const (
 	pauseOsRebootHeld = "reboot_held"
 	pauseOsNotBack    = "not_back"
-	pauseOsCancelWait = "cancel_wait"
 )
 
 const osErrSkippedAfterFailure = "skipped_after_failure"
@@ -175,10 +176,10 @@ func osBlockForMode(g osGlobal, n osNode, mode string) string {
 
 // osNodeOf collects the facts of one node for osBlock. nodeHost is the node's host name, "" when unknown.
 func (s *Service) osNodeOf(n store.NodeRow, connected bool, status *agentv1.OsStatus, host *agentv1.OsStatus, nodeHost string, nowUnix int64, reboots []time.Time) osNode {
-	capable := slices.Contains(n.AgentCaps, osupdate.Capability)
+	capable := slices.Contains(n.AgentCaps, agentcap.OSStatus)
 	at, code := osRebootWait(n.BootAt, reboots, time.Unix(nowUnix, 0))
 	return osNode{rebootAt: at, rebootCode: code,
-		connected: connected, updateCap: slices.Contains(n.AgentCaps, osupdate.CapabilityUpdate),
+		connected: connected, updateCap: slices.Contains(n.AgentCaps, agentcap.OSUpdate),
 		supported: osUpdateSupported(capable, status), onPanel: s.onPanelServer(status, host, nodeHost),
 		awgBuilding: n.AwgPrepare().State == store.AwgPrepareRunning,
 		busy: osUpdateState(capable, connected, status, nowUnix) == adminv1.OsUpdateState_OS_UPDATE_STATE_BUSY ||
@@ -393,8 +394,7 @@ func (s *Service) osStatusOf(ctx context.Context, nodeID string) *agentv1.OsStat
 	return status
 }
 
-// cancelOs ends the OS rollout: its pending steps are skipped, a paused rollout ends at once (its alert clears), a step in flight
-// finishes and is still checked. With none of those it would change nothing, and says so.
+// Pending steps are recorded as skipped before cancellation so a worker cannot launch them again.
 func (s *Service) cancelOs(ctx context.Context, id string) (store.OsRolloutRow, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -432,57 +432,28 @@ func (s *Service) cancelOs(ctx context.Context, id string) (store.OsRolloutRow, 
 	if err != nil {
 		return ro, s.internal("load OS steps", err)
 	}
-	if ro.Status == store.RolloutRunning && !slices.ContainsFunc(steps, func(x store.OsStepRow) bool { return x.State == store.OsStepPending }) {
-		inFlight := slices.ContainsFunc(steps, func(x store.OsStepRow) bool {
-			return x.State == store.OsStepSent || x.State == store.OsStepRebooting || x.State == store.OsStepGating
-		})
-		if inFlight {
-			return ro, precondition("os_cancel_inflight") // a node job cannot be stopped, and nothing else is queued
-		}
-		if _, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutRunning}, store.RolloutCancelled, "", nil, s.now()); err != nil {
-			return ro, s.internal("cancel empty OS rollout", err)
-		}
-		s.audit(ctx, "os_rollout_cancel", map[string]string{"rollout_id": ro.ID})
-		return s.st.OsRollout(ctx, ro.ID)
-	}
 	if err := s.st.SkipPendingOsSteps(ctx, ro.ID, errCancelled, s.now()); err != nil {
 		return ro, s.internal("cancel OS rollout", err)
 	}
 	s.audit(ctx, "os_rollout_cancel", map[string]string{"rollout_id": ro.ID})
-	if ro.Status == store.RolloutPaused {
-		steps, err = s.st.OsRolloutSteps(ctx, ro.ID)
-		if err != nil {
-			return ro, s.internal("reload OS steps", err)
-		}
-		inFlight := slices.ContainsFunc(steps, func(x store.OsStepRow) bool {
-			return x.State == store.OsStepSent || x.State == store.OsStepRebooting || x.State == store.OsStepGating
-		})
-		if inFlight {
-			params := cloneStrings(ro.PauseParams)
-			params["cancel_requested"] = "true"
-			if _, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutPaused}, store.RolloutPaused, pauseOsCancelWait, params, time.Time{}); err != nil {
-				return ro, s.internal("cancel OS rollout", err)
-			}
-		} else if _, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{store.RolloutPaused}, store.RolloutCancelled, "", nil, s.now()); err != nil {
+	steps, err = s.st.OsRolloutSteps(ctx, ro.ID)
+	if err != nil {
+		return ro, s.internal("reload OS steps", err)
+	}
+	if cancelMustWaitForStep(steps, func(x store.OsStepRow) bool {
+		return x.State == store.OsStepSent || x.State == store.OsStepRebooting || x.State == store.OsStepGating
+	}) {
+		if _, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{ro.Status}, store.RolloutPaused, pauseCancelWait, nil, time.Time{}); err != nil {
 			return ro, s.internal("cancel OS rollout", err)
 		}
-		if inFlight {
-			got, err := s.st.OsRollout(ctx, ro.ID)
-			if err != nil {
-				return ro, s.internal("reload OS rollout", err)
-			}
-			s.loadOsUpdating(ctx)
-			return got, nil
-		}
-		got, err := s.st.OsRollout(ctx, ro.ID)
+	} else {
+		ok, err := s.st.SetOsRolloutStatus(ctx, ro.ID, []string{ro.Status}, store.RolloutCancelled, "", nil, s.now())
 		if err != nil {
-			return ro, s.internal("reload OS rollout", err)
+			return ro, s.internal("cancel OS rollout", err)
 		}
-		s.loadOsUpdating(ctx)
-		return got, nil
-	}
-	if steps, err := s.st.OsRolloutSteps(ctx, ro.ID); err == nil {
-		s.finishOsIfDone(ctx, ro, steps)
+		if ok {
+			s.startNodeBundleSyncLocked()
+		}
 	}
 	s.loadOsUpdating(ctx)
 	got, err := s.st.OsRollout(ctx, ro.ID)
@@ -490,14 +461,6 @@ func (s *Service) cancelOs(ctx context.Context, id string) (store.OsRolloutRow, 
 		return ro, s.internal("reload OS rollout", err)
 	}
 	return got, nil
-}
-
-func cloneStrings(in map[string]string) map[string]string {
-	out := make(map[string]string, len(in)+1)
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
 }
 
 func (s *Service) pauseOs(ctx context.Context, id string) (store.OsRolloutRow, error) {
@@ -551,7 +514,7 @@ func (s *Service) resumeOs(ctx context.Context, id string, skipFailed bool) (sto
 	if ro.Status != store.RolloutPaused {
 		return ro, precondition("rollout is not paused")
 	}
-	if ro.PauseParams["cancel_requested"] == "true" {
+	if isCancelWait(ro.PauseKey, ro.PauseParams) {
 		return ro, precondition("rollout cancellation is waiting for a job on a node to finish")
 	}
 	steps, err := s.st.OsRolloutSteps(ctx, ro.ID)
@@ -600,7 +563,7 @@ func (s *Service) resumeOs(ctx context.Context, id string, skipFailed bool) (sto
 // finishOsIfDone ends a rollout with nothing left to do: DONE, FAILED (a step failed) or CANCELLED (the owner cancelled). A
 // PAUSED rollout is only ended this way after a cancel: otherwise the pause (and its alert) waits for the owner.
 func (s *Service) finishOsIfDone(ctx context.Context, ro store.OsRolloutRow, steps []store.OsStepRow) bool {
-	cancelled, bad := ro.PauseParams["cancel_requested"] == "true", false
+	cancelled, bad := isCancelWait(ro.PauseKey, ro.PauseParams), false
 	for _, x := range steps {
 		switch {
 		case !x.Decided():
@@ -625,6 +588,9 @@ func (s *Service) finishOsIfDone(ctx context.Context, ro store.OsRolloutRow, ste
 	if err != nil {
 		s.log.Warn("update: finish OS rollout", "code", "update_os_finish_os_rollout", "rollout", ro.ID, "err", err)
 		return false
+	}
+	if ok {
+		s.startNodeBundleSyncLocked() // an agent bundle that waited for the OS update is fetched now
 	}
 	return ok
 }
@@ -777,6 +743,7 @@ func (p *osPass) event(x *store.OsStepRow) {
 	if x.ErrorKey != "" {
 		params["reason"] = x.ErrorKey
 	}
+	maps.Copy(params, failedProfileNotes(x.Params)) // the profiles that did not pass, as the agent update names them
 	if err := p.s.st.InsertEvent(p.ctx, store.EventRow{Time: p.now, Severity: sev, Code: code, Source: "panel", NodeID: x.NodeID, Params: params}); err != nil {
 		p.s.log.Warn("update: OS step event", "code", "update_os_step_event", "node", x.NodeID, "err", err)
 	}
@@ -788,12 +755,14 @@ func (p *osPass) pause(code string, x *store.OsStepRow, reason string) {
 		return
 	}
 	params := map[string]string{"node": x.NodeName, "node_id": x.NodeID, "reason": reason, "code": x.Params["code"], "mode": p.ro.Mode}
-	previous := p.ro.Status
-	ok, err := p.s.st.SetOsRolloutStatus(p.ctx, p.ro.ID, []string{previous}, store.RolloutPaused, code, params, time.Time{})
+	maps.Copy(params, failedProfileNotes(x.Params)) // the profiles that did not pass: the owner reads them on the pause too
+	// A second writer must keep a pause it recorded unless an owner resumed after this pass read the old one.
+	ro, ok, err := pauseOverRead(p.ctx, p.ro.ID, p.ro, code, params, osRolloutPauseState, osRolloutPauseCAS{p.s.st})
 	if err != nil {
 		p.s.log.Warn("update: pause OS rollout", "code", "update_os_pause_os_rollout", "rollout", p.ro.ID, "err", err)
 		return
 	}
+	p.ro = ro
 	if ok {
 		p.ro.Status, p.ro.PauseKey, p.ro.PauseParams = store.RolloutPaused, code, params
 		p.s.log.Warn("update: OS rollout paused", "code", "update_os_rollout_paused", "rollout", p.ro.ID, "reason", code, "node", x.NodeName, "detail", reason)
@@ -942,17 +911,7 @@ func (p *osPass) retryNotBefore(nodeID, code string) time.Time {
 }
 
 func (p *osPass) preFailed(x *store.OsStepRow) []string {
-	in, err := p.s.st.FleetInbounds(p.ctx, x.NodeID, true)
-	if err != nil {
-		return x.PreFailed
-	}
-	var failed []string
-	for _, inbound := range in {
-		if inbound.State == "failed" {
-			failed = append(failed, inbound.ID)
-		}
-	}
-	return failed
+	return p.s.preFailedOf(p.ctx, x.NodeID, p.now, x.PreFailed)
 }
 
 // stepPassOs loads the active OS rollout and the step of the node if it is still the one the goroutine started with.

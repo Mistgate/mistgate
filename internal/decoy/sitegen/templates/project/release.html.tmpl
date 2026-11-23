@@ -1,0 +1,41 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main>
+{{with .Page.Item}}{{$v := .version}}<section class="__hd__">
+<div>
+<a class="__eb__" href="{{(index $.Nav 1).Href}}">{{icon "back"}} {{$.L.rel_back}}</a>
+<h1>{{.version}}</h1>
+<p class="__sub__">{{$.L.released}} <time datetime="{{.date_iso}}">{{.date}}</time></p>
+</div>
+<div>
+<div class="__kv__"><span>{{$.L.col_ver}}</span><span>{{.version}}</span></div>
+<div class="__kv__"><span>{{$.L.released}}</span><span>{{.date}}</span></div>
+<div class="__kv__"><span>{{$.L.licence_h}}</span><span>{{$.L.lic_v}}</span></div>
+<div class="__kv__"><span>{{$.L.platforms}}</span><span>{{$.L.plat_v}}</span></div>
+</div>
+</section>
+<section class="__sec__">
+<h2>{{$.L.changelog_h}}</h2>
+<div class="__bign__">{{template "notes" .}}</div>
+</section>
+<section class="__sec__ __ln__">
+<h2>{{$.L.rel_src_h}}</h2>
+<p class="__sub__ __mb__">{{$.L.sums_intro}}</p>
+<div class="__tw__"><table>
+<thead><tr><th>{{$.L.col_name}}</th><th>{{$.L.col_size}}</th><th>{{$.L.col_sum}}</th></tr></thead>
+<tbody>{{range $i, $f := $.L.files}}<tr><td class="__nm__">{{printf $f.n $v}}</td><td>{{fsize (printf "fs%d%s" $i $v) 180 420}}</td><td class="__hx__">{{hexs (printf "fh%d%s" $i $v) 64}}</td></tr>{{end}}</tbody>
+</table></div>
+<div class="__cmd__ __mt__"><span>{{hl (printf "$ %s" (printf $.L.sum_cmd $v)) "sh"}}</span><small>{{$.L.sum_os}}</small></div>
+</section>
+<section class="__sec__ __ln__ __nopb__">
+<h2>{{$.L.install_h}}</h2>
+</section>
+<section class="__cols__">{{range $i, $p := $.L.pkgs}}{{if lt $i 3}}<div><h3>{{$p.s}}</h3><ul><li>{{$p.c}}</li></ul></div>{{end}}{{end}}</section>
+<section class="__sec__ __ln__">
+<h2>{{$.L.rel_more}}</h2>
+<div class="__tw__"><table><tbody>{{range $.Lists.releases}}{{if ne .slug $.Page.Item.slug}}<tr><td class="__nm__">{{.version}}</td><td class="__dm__">{{.date}}</td><td class="__ar__"><a href="{{.href}}">{{icon "arrow"}}</a></td></tr>{{end}}{{end}}</tbody></table></div>
+</section>{{end}}
+</main>
+{{template "footer" .}}
+</body>
+</html>

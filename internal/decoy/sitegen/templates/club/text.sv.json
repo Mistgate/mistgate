@@ -1,0 +1,435 @@
+{
+ "ui": {
+  "nav_label": "Huvudmeny",
+  "footer": "Drivs av ideella krafter och öppet för alla.",
+  "nav_home": "Hem",
+  "nav_events": "Program",
+  "nav_join": "Bli medlem",
+  "nav_news": "Nyheter",
+  "home_title": "Välkommen",
+  "desc_events": "Återkommande träffar och särskilda evenemang hos {brand}.",
+  "desc_join": "Så blir du medlem i {brand}, vad det kostar och vad du kan förvänta dig.",
+  "desc_news": "Nyheter och meddelanden från {brand}.",
+  "nf_title": "Sidan hittades inte",
+  "nf_text": "Vi hittade inte sidan. Den kan ha tagits bort efter det evenemang den handlade om.",
+  "nf_back": "Tillbaka till startsidan",
+  "meet_h": "När vi träffas",
+  "when_l": "När",
+  "where_l": "Var",
+  "upcoming_h": "På gång",
+  "latest_h": "Senaste nytt",
+  "all_events": "Hela programmet",
+  "all_news": "Alla nyheter",
+  "join_cta": "Så blir du medlem",
+  "events_h": "Program",
+  "events_intro": "Våra regelbundna träffar, och vad vi har gjort den här säsongen, månad för månad.",
+  "join_h": "Häng med",
+  "steps_h": "Så blir du medlem",
+  "faq_h": "Frågor",
+  "join_fee": "Medlemskapet kostar {fee} per år, med lägre avgift för ungdomar och studenter. Om pengar är ett bekymmer, säg det diskret till kassören så nämns det aldrig mer.",
+  "steps": [
+   "Kom på en träff och säg hej.",
+   "Prova i en månad innan du bestämmer dig.",
+   "Betala medlemsavgiften till kassören när du är redo."
+  ],
+  "news_h": "Nyheter",
+  "news_intro": "Meddelanden från styrelsen och rapporter från senaste träffarna, de nyaste först.",
+  "regular_h": "Återkommande träffar",
+  "season_h": "Säsongen hittills",
+  "find_h": "Hitta hit",
+  "contact_h": "Kontakta oss",
+  "phone_l": "Telefon"
+ },
+ "bundles": {
+  "chess": {
+   "kicker": "Schackklubb",
+   "tagline": "Trevligt schack varje torsdagskväll",
+   "desc": "{brand} träffas varje torsdagskväll. Trevliga partier för alla nivåer, från nybörjare till klubbmästare.",
+   "intro": "Vi träffas varje torsdag för att spela, gå igenom våra partier och dricka för mycket te. Alla nivåer är välkomna, från förstagångsspelare till klubbmästaren.",
+   "when": "Torsdagar, {19:30} till {22:00}",
+   "where": "Övervåningen i bygdegården",
+   "events": [
+    {
+     "t": "Klubbkväll",
+     "w": "Varje torsdag, {19:30}",
+     "p": "Fritt spel, med ett undervisningsbord för nybörjare."
+    },
+    {
+     "t": "Snabbschacksturnering",
+     "w": "Första lördagen i månaden, {14:00}",
+     "p": "Sju ronder på femton minuter vardera. Inträdet är en liten slant till fikakassan."
+    },
+    {
+     "t": "Nybörjarkväll",
+     "w": "Andra tisdagen i månaden, {19:00}",
+     "p": "Lär dig reglerna och några enkla öppningar."
+    },
+    {
+     "t": "Simultanspel",
+     "w": "En gång per säsong",
+     "p": "Klubbmästaren spelar mot tjugo brädor samtidigt. Ta med en vän och en plan."
+    },
+    {
+     "t": "Årsmiddag",
+     "w": "Sent i november",
+     "p": "En måltid, ett tal och överlämnandet av en mycket liten pokal."
+    }
+   ],
+   "news": [
+    {
+     "title": "En ny säsong börjar",
+     "text": "Höstsäsongen startar nästa vecka med klubbmästerskapet. Nya medlemmar är välkomna vilken kväll som helst."
+    },
+    {
+     "title": "Tack till alla som kom på snabbschacket",
+     "text": "Tjugosex spelare, fjorton koppar te per rond och en final som avgjordes på klockan."
+    },
+    {
+     "title": "Vi har fått nya brädor",
+     "text": "Åtta träbrädor med pjäser, köpta för vinsten från sommarens lotteri."
+    },
+    {
+     "title": "Ungdomsgruppen öppnar igen",
+     "text": "Barn från sju år är välkomna på tisdagseftermiddagar, första gången med en förälder."
+    }
+   ],
+   "join": [
+    "Vi är en trevlig klubb med ungefär fyrtio medlemmar, från nio till åttiofyra år. De flesta av oss är inte särskilt bra, och vi har gjort upp med det.",
+    "Du behöver varken äga ett spel eller kunna någon teori. Kan du flytta pjäserna kan du spela på torsdag."
+   ],
+   "faq": [
+    {
+     "q": "Måste jag vara duktig?",
+     "a": "Nej. De flesta medlemmar är inte det, och klubben är upplagd så att alla får ett parti mot någon på samma nivå."
+    },
+    {
+     "q": "Får barn komma?",
+     "a": "Ja, på tisdagseftermiddagar och, tillsammans med en förälder, på torsdagar."
+    },
+    {
+     "q": "Spelar ni i serie?",
+     "a": "Vi har ett lag i distriktsserien. Vill du spela, säg det till lagledaren."
+    }
+   ],
+   "why": [
+    {
+     "h": "Alla nivåer",
+     "p": "Nybörjare sitter bredvid rutinerade spelare, och ingen bryr sig."
+    },
+    {
+     "h": "Varje torsdag",
+     "p": "Ingen anmälan. Kom när du kan."
+    },
+    {
+     "h": "Spel finns",
+     "p": "Pjäser och klockor är våra; teet kokar du själv."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Premiärkväll",
+     "p": "En kort genomgång av öppningen som alla spelar och ingen förstår."
+    },
+    {
+     "t": "Klubbmästerskapet, rond ett",
+     "p": "Lottning av partierna och en första rond som aldrig går som planerat."
+    },
+    {
+     "t": "Slutspelsverkstad",
+     "p": "Kungar, bönder och tålamodet att driva fram dem."
+    },
+    {
+     "t": "Frågesport och schack",
+     "p": "Tio frågor om schack, tio om allt annat."
+    },
+    {
+     "t": "Snabbschacksturnering",
+     "p": "Sju ronder på femton minuter, och mycket te."
+    },
+    {
+     "t": "Analyskväll",
+     "p": "Vi väljer ett parti från klubbkvällen och grälar om det."
+    },
+    {
+     "t": "Simultanspel",
+     "p": "Klubbmästaren möter tjugo brädor samtidigt."
+    },
+    {
+     "t": "Undervisningsbord för ungdomar",
+     "p": "Våra yngsta medlemmar lär de vuxna ett knep eller två."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "{city} Schackklubb",
+       "Schackklubben i {city}",
+       "{city} Schackförening"
+      ]
+     ]
+    }
+   }
+  },
+  "walking": {
+   "kicker": "Vandringsgrupp",
+   "tagline": "Vandringar i skogen och längs älven",
+   "desc": "{brand} vandrar varje söndag i skogen och längs älven. Alla är välkomna, ingen erfarenhet behövs.",
+   "intro": "Vi går varje söndag, i alla väder, i den långsammastes takt. Följ med en gång och se; de flesta av oss började så.",
+   "when": "Söndagar, {9:30}",
+   "where": "Parkeringen vid gamla stationen",
+   "events": [
+    {
+     "t": "Söndagsvandring",
+     "w": "Varje söndag, {9:30}",
+     "p": "Tolv till tjugo kilometer, med fika vid en eld om vädret är dåligt."
+    },
+    {
+     "t": "Kort vandring",
+     "w": "Första onsdagen i månaden, {10:00}",
+     "p": "Fem till sex kilometer i lugnt tempo, avslutad med kaffe."
+    },
+    {
+     "t": "Helg bort",
+     "w": "En gång per år, på våren",
+     "p": "Två dagar i fjällen, med en stuga och väldigt mycket soppa."
+    },
+    {
+     "t": "Kartläsningskväll",
+     "w": "En gång per säsong",
+     "p": "Hur man läser en karta, och vad man gör när kartan läser en."
+    },
+    {
+     "t": "Skräpplockning",
+     "w": "Sista lördagen i april",
+     "p": "Vi städar stigen längs älven och går den sedan en gång till, för att vi kan."
+    }
+   ],
+   "news": [
+    {
+     "title": "Vårprogrammet är klart",
+     "text": "Tolv vandringar mellan mars och juni, bland annat två nya rutter över åsen."
+    },
+    {
+     "title": "Stigen vid kvarnen är öppen igen",
+     "text": "Efter ett års reparationer är bron öppen igen. Tack till de frivilliga som gav upp sina lördagar."
+    },
+    {
+     "title": "Nya vandringsledare sökes",
+     "text": "Känner du till en bra rutt och kan läsa en karta, hör gärna av dig."
+    },
+    {
+     "title": "Tack för soppan",
+     "text": "Helgen bort blev en stor succé, mest tack vare soppan."
+    }
+   ],
+   "join": [
+    "Vi är en trevlig grupp på ungefär sextio vandrare, från människor som gått hela livet till människor som började förra månaden.",
+    "Du behöver ingen särskild utrustning. Kängor, ett regnskydd och något att dricka räcker gott. Är du osäker, kom och fråga på söndagsmorgonen."
+   ],
+   "faq": [
+    {
+     "q": "Hur fort går ni?",
+     "a": "I takt med den långsammaste den dagen, och det är ofta ledaren."
+    },
+    {
+     "q": "Får jag ta med hunden?",
+     "a": "På de flesta vandringar, ja, i koppel. I programmet står vilka vandringar som inte passar."
+    },
+    {
+     "q": "Vad händer om det regnar?",
+     "a": "Vi går ändå. Fikat blir längre."
+    }
+   ],
+   "why": [
+    {
+     "h": "Ute i skogen",
+     "p": "Rutter på tolv till tjugo kilometer, ledda av folk som kan stigarna."
+    },
+    {
+     "h": "Gott sällskap",
+     "p": "En grupp stamgäster och en jämn ström av nya ansikten."
+    },
+    {
+     "h": "Ingen lämnas efter",
+     "p": "Vi håller den långsammaste vandrarens takt."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Vandring längs älven",
+     "p": "Tolv kilometer på plan mark, med ett stopp vid den gamla slussen."
+    },
+    {
+     "t": "Bergsvandring med utsikt",
+     "p": "Sexton kilometer och en riktig stigning. Ta med termos."
+    },
+    {
+     "t": "Kartläsningskväll",
+     "p": "Koordinater, höjdkurvor och en kompass som pekar åt fel håll."
+    },
+    {
+     "t": "Kort vandring och lunch",
+     "p": "Sex kilometer till ett värdshus med en bra öppen spis."
+    },
+    {
+     "t": "Höstfärger",
+     "p": "En skogsrunda, bäst på morgonen när ljuset silar in."
+    },
+    {
+     "t": "Skräpplockning",
+     "p": "Handskar, sopsäckar och förvånansvärt många tennisbollar."
+    },
+    {
+     "t": "Kvällspromenad",
+     "p": "En lugn timme i skymningen, avslutad med te vid någons köksbord."
+    },
+    {
+     "t": "Nattvandring",
+     "p": "Lamporna släckta, ögonen öppna och en pratstund om stjärnorna."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "{city} Vandringsgrupp",
+       "{city} Vandrarna",
+       "Vandringsklubben i {city}"
+      ]
+     ]
+    }
+   }
+  },
+  "choir": {
+   "kicker": "Kör för alla",
+   "tagline": "Sång tillsammans på onsdagskvällar",
+   "desc": "{brand} repeterar på onsdagskvällar. Ingen provsjungning, inget krav på att kunna noter, bara lust att sjunga.",
+   "intro": "Vi är en kör för dem som gillar att sjunga och inte vill provsjunga för det. Vi lär oss efter gehör, skrattar mycket och låter bättre än vi har rätt till.",
+   "when": "Onsdagar, {19:00} till {21:00}",
+   "where": "Församlingshemmet vid torget",
+   "events": [
+    {
+     "t": "Veckorepetition",
+     "w": "Varje onsdag, {19:00}",
+     "p": "Uppvärmning, nya sånger och den som vi fortfarande inte får till."
+    },
+    {
+     "t": "Öppen kväll",
+     "w": "Första onsdagen i september",
+     "p": "Sjung med oss en kväll, utan att binda dig."
+    },
+    {
+     "t": "Julkonsert",
+     "w": "Andra lördagen i december",
+     "p": "Julsånger, folkvisor och ett stycke som ingen väntar sig."
+    },
+    {
+     "t": "Sommarkonsert",
+     "w": "Sent i juni",
+     "p": "En kväll med sånger i bygdegårdens trädgård, om vädret tillåter."
+    },
+    {
+     "t": "Sångdag",
+     "w": "En gång per år",
+     "p": "En dag med workshoppar med en gästdirigent, lunch ingår."
+    }
+   ],
+   "news": [
+    {
+     "title": "Hösttermin börjar",
+     "text": "Vi lär oss en samling folkvisor från tre länder och en kanon som inte vill hålla takten."
+    },
+    {
+     "title": "Ett stort tack efter sommarkonserten",
+     "text": "Nittio personer kom, fyrtioen bakelser åts upp och bara en vers sjöngs två gånger."
+    },
+    {
+     "title": "Vi söker tenorer",
+     "text": "Vi har gott om sopraner och alter. Kan du sjunga lågt, kom och träffa oss."
+    },
+    {
+     "title": "Nya noter har kommit",
+     "text": "Mapparna till vinterprogrammet finns i salen. Skriv dina markeringar med blyerts, inte med penna."
+    }
+   ],
+   "join": [
+    "Vi är ungefär femtio sångare, från sexton till åttioåtta år. De flesta av oss kan inte läsa noter och har lärt oss sånger efter gehör i åratal.",
+    "Kom på vilken repetition som helst och sjung med oss. Vi ordnar en stol, en mapp och någon att stå bredvid."
+   ],
+   "faq": [
+    {
+     "q": "Måste jag provsjunga?",
+     "a": "Nej. Det finns ingen provsjungning, varken nu eller senare."
+    },
+    {
+     "q": "Måste jag kunna läsa noter?",
+     "a": "Nej. Vi lär ut efter gehör, med noterna på papper för den som vill ha dem."
+    },
+    {
+     "q": "Vad händer om jag missar en vecka?",
+     "a": "Då missar du en vecka. Ingen bryr sig, och inspelningarna delas på nätet."
+    }
+   ],
+   "why": [
+    {
+     "h": "Ingen provsjungning",
+     "p": "Kan du hålla en ton i duschen kan du hålla den här."
+    },
+    {
+     "h": "Alla röster",
+     "p": "Sopraner, alter, tenorer, basar och alla som inte är säkra."
+    },
+    {
+     "h": "Två konserter per år",
+     "p": "En på vintern och en på sommaren, med kaffe och tårta."
+    }
+   ],
+   "sessions": [
+    {
+     "t": "Öppen kväll",
+     "p": "Kom och sjung en kanon eller två, utan provsjungning och utan krav."
+    },
+    {
+     "t": "Terminen börjar",
+     "p": "Uppvärmning, ett nytt stycke och mycket att prata ikapp."
+    },
+    {
+     "t": "Stämrepetition",
+     "p": "Alter och tenorer i salen, sopraner och basar i köket."
+    },
+    {
+     "t": "Sångdag",
+     "p": "En hel lördag med gästdirigent."
+    },
+    {
+     "t": "Konsert i kyrkan",
+     "p": "Två avdelningar, ett lotteri och pepparkakor i pausen."
+    },
+    {
+     "t": "Julsånger på torget",
+     "p": "Kalla fingrar och varma röster på torget."
+    },
+    {
+     "t": "Repetition med pianisten",
+     "p": "Första gången stycket låter som musik."
+    },
+    {
+     "t": "Allsångskväll",
+     "p": "Sånger som alla kan, och några som ingen minns."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "{city} Allsångskör",
+       "Kören i {city}",
+       "{city} Sångare"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

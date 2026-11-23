@@ -18,6 +18,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
@@ -464,7 +465,7 @@ func TestSessionCoreRehydratesStateBetweenEvents(t *testing.T) {
 	run("open", SessionEvent{Kind: EventOpen, At: base}, false)
 	helloAt := base.Add(time.Second)
 	h := hello("instance-replay", 0, "")
-	h.GetHello().Capabilities = []string{capAWG, capBandwidth, capWarp, "doctor/1"}
+	h.GetHello().Capabilities = []string{agentcap.AWG, agentcap.Bandwidth, agentcap.Warp, "doctor/1"}
 	run("hello", SessionEvent{Kind: EventHello, At: helloAt, Frame: h}, false)
 	run("initial desired changed", SessionEvent{Kind: EventDesiredChanged, At: helloAt}, false)
 	run("initial desired prepared", SessionEvent{Kind: EventDesiredPrepared, At: helloAt}, true)
@@ -595,7 +596,7 @@ func TestSessionCoreRehydratesLivenessTimeoutAndDisconnect(t *testing.T) {
 	run("open", SessionEvent{Kind: EventOpen, At: base}, false)
 	helloAt := base.Add(time.Second)
 	h := hello("instance-replay-live", 0, "")
-	h.GetHello().Capabilities = []string{capAWG}
+	h.GetHello().Capabilities = []string{agentcap.AWG}
 	run("hello", SessionEvent{Kind: EventHello, At: helloAt, Frame: h}, false)
 	run("desired changed", SessionEvent{Kind: EventDesiredChanged, At: helloAt}, false)
 	run("desired prepared", SessionEvent{Kind: EventDesiredPrepared, At: helloAt}, true)
@@ -997,7 +998,7 @@ func TestSessionCoreHelloDeadlineIsDecidedByAlarm(t *testing.T) {
 func TestSessionCoreAutoBandwidthAlarm(t *testing.T) {
 	_, core, ctx, state, now := coreFixture(t, "core-auto-bandwidth")
 	h := hello("instance-auto-bandwidth", 0, "")
-	h.GetHello().Capabilities = []string{capBandwidth}
+	h.GetHello().Capabilities = []string{agentcap.Bandwidth}
 	tr := stepHello(t, core, ctx, state, now, h.GetHello())
 	want := now.Add(core.f.measureDelay)
 	if !tr.State.AutoBandwidthDeadline.Equal(want) {
@@ -1035,7 +1036,7 @@ func TestSessionCoreAutoBandwidthAlarm(t *testing.T) {
 func TestAutoBandwidthDeadlineStartsInHello(t *testing.T) {
 	e, core, ctx, state, now := coreFixture(t, "core-bw-start")
 	h := hello("instance-auto-bandwidth-start", 0, "")
-	h.GetHello().Capabilities = []string{capBandwidth}
+	h.GetHello().Capabilities = []string{agentcap.Bandwidth}
 	helloTransition, err := coreStep(ctx, core, state, SessionEvent{Kind: EventHello, At: now, Frame: h})
 	if err != nil {
 		t.Fatal(err)
@@ -1051,7 +1052,7 @@ func TestSessionCoreAutoBandwidthResultStoresCapacityInline(t *testing.T) {
 	e.f.measureDelay = 2 * time.Second
 	e.f.measureWait = 3 * time.Second
 	h := hello("instance-auto-bandwidth-result", 0, "")
-	h.GetHello().Capabilities = []string{capBandwidth}
+	h.GetHello().Capabilities = []string{agentcap.Bandwidth}
 	started := stepHello(t, core, ctx, state, now, h.GetHello())
 	due, err := coreStep(ctx, core, started.State, SessionEvent{Kind: EventAlarm, At: started.State.AutoBandwidthDeadline})
 	if err != nil {

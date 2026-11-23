@@ -1,0 +1,16 @@
+{
+ "bundles": [
+  {
+   "id": "saas",
+   "weight": 2
+  },
+  {
+   "id": "photos",
+   "weight": 2
+  },
+  {
+   "id": "mail",
+   "weight": 2
+  }
+ ]
+}

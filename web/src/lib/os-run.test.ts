@@ -152,6 +152,8 @@ describe("the words of a run", () => {
   });
   it("words the banner of a stopped run with the node's name", () => {
     expect(pauseText(t, "step_failed", "de1")).toBe("The update of de1 stopped.");
+    expect(pauseText(t, "os.pause.cancel_wait", "de1")).toBe(en["updates.pause.cancel_wait"]);
+    expect(pauseText(t, "owner", "de1", { cancel_requested: "true" })).toBe(en["updates.pause.cancel_wait"]);
     expect(pauseText(t, "os.pause.gate_failed", "de1")).toBe("de1 came back but failed the check after the update.");
     expect(pauseText(tRu, "reboot_held", "fi1")).toBe("fi1: обновления установлены, но сервер не перезагрузили.");
     expect(pauseText(t, "something_new", "de1")).toBe("The update of de1 stopped.");
@@ -238,7 +240,6 @@ describe("every sentence has its words in every language", () => {
     "approval.outcome.os_rollout_started",
     "approval.outcome.os_rollout_cancelled",
     "err.os_blocked",
-    "err.os_cancel_inflight",
     "err.node_updating",
   ];
   it("writes each one in all five, none left as the English", () => {

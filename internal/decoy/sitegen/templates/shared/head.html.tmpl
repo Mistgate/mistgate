@@ -1,0 +1,37 @@
+{{define "head"}}<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Page.Full}}</title>
+<meta name="description" content="{{.Page.Desc}}">
+<meta name="theme-color" content="{{.Theme}}">
+<meta name="color-scheme" content="{{.ColorScheme}}">
+<link rel="icon" href="{{.Icon}}" type="image/svg+xml">
+<link rel="stylesheet" href="{{.CSS}}">
+</head>
+{{end}}
+
+{{define "menu"}}<details class="__mn__"><summary class="__mnb__" aria-label="{{.L.nav_label}}">{{icon "menu"}}{{icon "close"}}</summary><div class="__mnl__">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</div></details>{{end}}
+
+{{define "header"}}<header class="__hd__">
+<div class="__wrap__ __hdin__">
+<a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span>{{if eq .Head 2}}<span class="__sub__">{{.L.tagline}}</span>{{end}}</a>
+<nav class="__nav__" aria-label="{{.L.nav_label}}">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</nav>
+{{template "menu" .}}
+</div>
+</header>
+{{end}}
+
+{{define "footer"}}<footer class="__ft__">
+<div class="__wrap__ __ftin__">
+{{if eq .Foot 1}}<div class="__ftcol__"><strong>{{.Brand}}</strong><span>{{.L.footer}}</span></div>
+<nav class="__ftnav__">{{range .Nav}}<a href="{{.Href}}">{{.Label}}</a>{{end}}</nav>
+<small>© {{.Since}}–{{.Year}} {{.Brand}}</small>
+{{else if eq .Foot 2}}<small>{{.L.footer}}</small>
+<small>© {{.Year}} {{.Brand}}</small>
+{{else}}<small>© {{.Year}} {{.Brand}}. {{.L.footer}}</small>
+<nav class="__ftnav__">{{range .Nav}}<a href="{{.Href}}">{{.Label}}</a>{{end}}</nav>
+{{end}}</div>
+</footer>
+{{end}}

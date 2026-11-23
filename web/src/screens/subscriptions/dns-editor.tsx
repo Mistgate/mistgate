@@ -27,11 +27,15 @@ import {
   dnsKindKey,
   dnsKinds,
   dnsTransports,
+  addCategories,
   emptyServer,
+  geoCategories,
   geoChoices,
+  parseCategories,
   parseSuffixes,
   presetName,
   presetProblem,
+  removeCategory,
   serverProblem,
   toggleGeo,
   transportKey,
@@ -208,6 +212,7 @@ export function PresetEditor({ preset, data, t, fallback, onClose }: { preset?: 
                     <p className="dq-gl">{t("subs.dns.suffixes")}</p>
                     <SuffixChips label={label} suffixes={r.suffixes} t={t} onChange={(suffixes) => setRule(i, { suffixes })} />
                     <GeoToggles scope={label} geo={r.geo} t={t} onChange={(geo) => setRule(i, { geo })} />
+                    <SiteCategories scope={label} geo={r.geo} t={t} onChange={(geo) => setRule(i, { geo })} />
                     <p className="dq-gl">{t("subs.dns.splitServers")}</p>
                     <ServerList scope={label} servers={r.servers} t={t} providers={data.providers} catalog={catalog} onChange={(servers) => setRule(i, { servers })} />
                   </div>
@@ -499,6 +504,68 @@ function GeoToggles({ geo, t, onChange, scope }: { geo: string[]; t: Tx; onChang
         })}
       </div>
       <p className="sb-lead dq-sub">{t("subs.dns.geoHint")}</p>
+    </>
+  );
+}
+
+/** "Site category (geosite)": the categories of a rule as chips (kept in geo as "geosite:<name>") and a box that takes more; only the form of a name is checked. */
+function SiteCategories({ geo, t, onChange, scope }: { geo: string[]; t: Tx; onChange: (geo: string[]) => void; scope: string }) {
+  const ro = use(Ro);
+  const [text, setText] = useState("");
+  const [bad, setBad] = useState<string[]>([]);
+  const names = geoCategories(geo);
+  const commit = () => {
+    const more = parseCategories(text);
+    if (more.ok.length > 0) onChange(addCategories(geo, more.ok));
+    setText(more.bad.join(" "));
+    setBad(more.bad);
+  };
+  const label = `${scope} · ${t("subs.dns.geoSite")}`;
+  return (
+    <>
+      <p className="dq-gl">{t("subs.dns.geoSite")}</p>
+      <div className="sb-chips" role="group" aria-label={label}>
+        {names.map((n) => (
+          <span key={n} className="mono">
+            {n}
+            {!ro && (
+              <button type="button" aria-label={t("subs.dns.suffixRemove", { s: n })} onClick={() => onChange(removeCategory(geo, n))}>
+                <Svg d={path.x} />
+              </button>
+            )}
+          </span>
+        ))}
+      </div>
+      {!ro && (
+        <div className="sb-pad">
+          <input
+            className="an-i mono sb-spl"
+            aria-label={label}
+            aria-invalid={bad.length > 0 || undefined}
+            value={text}
+            placeholder={names.length === 0 ? t("subs.dns.geoSitePh") : t("subs.dns.suffixMore")}
+            onChange={(e) => {
+              setText(e.target.value);
+              setBad([]);
+            }}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                commit();
+              } else if (e.key === "Backspace" && text === "" && names.length > 0) onChange(removeCategory(geo, names[names.length - 1]!));
+            }}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {bad.length > 0 && (
+            <p role="alert" className="dq-er">
+              {t("subs.dns.geoSiteBad", { s: bad.join(", ") })}
+            </p>
+          )}
+        </div>
+      )}
+      <p className="sb-lead dq-sub">{t("subs.dns.geoSiteHint")}</p>
     </>
   );
 }

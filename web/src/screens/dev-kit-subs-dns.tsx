@@ -99,6 +99,8 @@ const list = scene("dns", "DNS: the board's «список» (five presets, Clou
 const fresh = editor("dns-new", "DNS: the board's «новый» (an empty preset, nothing to get)", "new");
 const cf = editor("dns-cf", "DNS: the board's «Cloudflare» (open: the server, DoH, what each app gets)", ids.cf);
 const users = scene("dns-users", "DNS: a panel in use (people on the presets, presets of its own, the built-ins)", { list: manyPresets, h: 1300 });
+const geoEmpty = editor("dns-geo-empty", "DNS: a split rule with a country on and the field «Site category» empty", ids.cf, { demo: { draft: { split: [rule([".ru"], [cat("yandex/basic")], ["ru"])] } } });
+const geoChips = editor("dns-geo-chips", "DNS: a split rule with two country lists and two site categories (chips)", ids.geoOwn, { list: manyPresets });
 const split = editor("dns-split", "DNS: a preset with split rules (suffixes, a country, servers of their own)", ids.ru, {
   list: [...boardPresets.slice(0, 4), { ...boardPresets[4]!, split: [rule([".ru", ".su", ".xn--p1ai"], [cat("yandex/basic")]), rule([], [cat("alidns/standard"), own("203.0.113.9")], ["cn"])] }],
 });
@@ -129,6 +131,8 @@ export const dnsScenes: SceneDef[] = [
   }),
   editor("dns-split-new", "DNS: a split rule just added (empty: it needs a suffix or a country, and a server)", ids.cf, { demo: { draft: { split: [rule([], [])] } } }),
   split,
+  geoEmpty,
+  geoChips,
   editor("dns-catalog", "DNS: the catalog panel open (what is in the list is ticked)", "new", { demo: { catalog: true, draft: { name: "Новый", servers: [cat("cloudflare/standard")] } } }),
   editor("dns-dot", "DNS: asked over DoT (what each app gets: Happ and Xray have none)", ids.cf, { demo: { draft: { transport: DnsTransport.DOT } } }),
   editor("dns-multi", "DNS: several servers (sing-box keeps the first)", ids.cf, { demo: { draft: { servers: [cat("cloudflare/standard"), cat("google/standard"), cat("quad9/standard")] } } }),
@@ -147,5 +151,7 @@ export const dnsScenes: SceneDef[] = [
   ...looks(cf),
   ...looks(users),
   ...looks(split),
+  ...looks(geoEmpty),
+  ...looks(geoChips),
   ...looks(editor("dns-bad-addr-look", "DNS: bad addresses", "new", { demo: { draft: { name: "Офис", servers: [own("1.1.1"), cat("quad9/standard")] } } })),
 ];

@@ -185,7 +185,7 @@ func TestFollowUpContinuesTheConversationAsItsAdmin(t *testing.T) {
 		t.Fatalf("the turn does not start from the follow-up line: %s", lastLine)
 	}
 	for _, tool := range first.Tools {
-		if strings.HasSuffix(tool.Name, "_apply") || tool.Name == followUpVerdictTool {
+		if mcp.KindOf(tool.Name) == mcp.KindApply || tool.Name == followUpVerdictTool {
 			t.Fatalf("a follow-up's turn was offered %s", tool.Name)
 		}
 	}

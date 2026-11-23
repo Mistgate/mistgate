@@ -1,0 +1,406 @@
+{
+ "bundles": [
+  {
+   "id": "bakery",
+   "art": "botanical",
+   "weight": 2,
+   "photo_q": [
+    "bakery bread loaves",
+    "sourdough bread crust",
+    "pastry display counter"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "heart"
+     },
+     {
+      "icon": "leaf"
+     },
+     {
+      "icon": "gift"
+     }
+    ],
+    "services": [
+     {
+      "price": 4.8,
+      "from": false
+     },
+     {
+      "price": 5.2,
+      "from": false
+     },
+     {
+      "price": 3.6,
+      "from": false
+     },
+     {
+      "price": 2.4,
+      "from": false
+     },
+     {
+      "price": 28.0,
+      "from": true
+     }
+    ],
+    "hours": [
+     {
+      "from": 2,
+      "to": 5,
+      "open": "07:00",
+      "close": "16:00"
+     },
+     {
+      "from": 6,
+      "to": 6,
+      "open": "07:00",
+      "close": "14:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     },
+     {
+      "from": 1,
+      "to": 1,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  },
+  {
+   "id": "bike",
+   "art": "topo",
+   "weight": 2,
+   "photo_q": [
+    "bicycle repair workshop",
+    "bicycle wheel spokes",
+    "bicycle chain gears"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "tool"
+     },
+     {
+      "icon": "check"
+     },
+     {
+      "icon": "clock"
+     }
+    ],
+    "services": [
+     {
+      "price": 9.0,
+      "from": false
+     },
+     {
+      "price": 45.0,
+      "from": false
+     },
+     {
+      "price": 95.0,
+      "from": false
+     },
+     {
+      "price": 18.0,
+      "from": false
+     },
+     {
+      "price": 30.0,
+      "from": false
+     }
+    ],
+    "hours": [
+     {
+      "from": 1,
+      "to": 5,
+      "open": "08:30",
+      "close": "17:30"
+     },
+     {
+      "from": 6,
+      "to": 6,
+      "open": "09:00",
+      "close": "15:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  },
+  {
+   "id": "tailor",
+   "art": "tiles",
+   "weight": 2,
+   "photo_q": [
+    "sewing machine fabric",
+    "fabric rolls shelf",
+    "sewing thread spools"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "heart"
+     },
+     {
+      "icon": "check"
+     },
+     {
+      "icon": "clock"
+     }
+    ],
+    "services": [
+     {
+      "price": 14.0,
+      "from": false
+     },
+     {
+      "price": 38.0,
+      "from": true
+     },
+     {
+      "price": 16.0,
+      "from": false
+     },
+     {
+      "price": 30.0,
+      "from": true
+     },
+     {
+      "price": 8.0,
+      "from": true
+     }
+    ],
+    "hours": [
+     {
+      "from": 2,
+      "to": 5,
+      "open": "09:30",
+      "close": "17:00"
+     },
+     {
+      "from": 6,
+      "to": 6,
+      "open": "10:00",
+      "close": "14:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     },
+     {
+      "from": 1,
+      "to": 1,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  },
+  {
+   "id": "clock",
+   "art": "poster",
+   "weight": 2,
+   "photo_q": [
+    "clock repair workshop",
+    "antique clock dial",
+    "watch mechanism gears"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "clock"
+     },
+     {
+      "icon": "shield"
+     },
+     {
+      "icon": "check"
+     }
+    ],
+    "services": [
+     {
+      "price": 95.0,
+      "from": true
+     },
+     {
+      "price": 9.0,
+      "from": false
+     },
+     {
+      "price": 120.0,
+      "from": true
+     },
+     {
+      "price": 15.0,
+      "from": true
+     },
+     {
+      "price": 25.0,
+      "from": false
+     }
+    ],
+    "hours": [
+     {
+      "from": 2,
+      "to": 5,
+      "open": "10:00",
+      "close": "17:00"
+     },
+     {
+      "from": 6,
+      "to": 6,
+      "open": "10:00",
+      "close": "13:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     },
+     {
+      "from": 1,
+      "to": 1,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  },
+  {
+   "id": "framing",
+   "art": "still",
+   "weight": 2,
+   "photo_q": [
+    "picture frames wall",
+    "frame moulding workshop",
+    "wooden frame corner"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "layers"
+     },
+     {
+      "icon": "eye"
+     },
+     {
+      "icon": "shield"
+     }
+    ],
+    "services": [
+     {
+      "price": 32.0,
+      "from": true
+     },
+     {
+      "price": 75.0,
+      "from": true
+     },
+     {
+      "price": 60.0,
+      "from": true
+     },
+     {
+      "price": 40.0,
+      "from": true
+     },
+     {
+      "price": 20.0,
+      "from": false
+     }
+    ],
+    "hours": [
+     {
+      "from": 1,
+      "to": 5,
+      "open": "09:00",
+      "close": "17:00"
+     },
+     {
+      "from": 6,
+      "to": 6,
+      "open": "10:00",
+      "close": "14:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  },
+  {
+   "id": "piano",
+   "art": "staff",
+   "weight": 2,
+   "photo_q": [
+    "piano keys close up",
+    "upright piano interior",
+    "piano strings hammers"
+   ],
+   "fixed": {
+    "features": [
+     {
+      "icon": "music"
+     },
+     {
+      "icon": "clock"
+     },
+     {
+      "icon": "check"
+     }
+    ],
+    "services": [
+     {
+      "price": 85.0,
+      "from": false
+     },
+     {
+      "price": 140.0,
+      "from": false
+     },
+     {
+      "price": 120.0,
+      "from": false
+     },
+     {
+      "price": 30.0,
+      "from": true
+     },
+     {
+      "price": 45.0,
+      "from": false
+     }
+    ],
+    "hours": [
+     {
+      "from": 1,
+      "to": 6,
+      "open": "09:00",
+      "close": "18:00"
+     },
+     {
+      "from": 7,
+      "to": 7,
+      "open": "",
+      "close": ""
+     }
+    ]
+   }
+  }
+ ]
+}

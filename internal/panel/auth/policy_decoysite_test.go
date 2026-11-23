@@ -39,8 +39,8 @@ func TestDecoySiteServiceIsOwnerOnlyForAdmins(t *testing.T) {
 			t.Errorf("%s reaches a helper or a read-only admin", path)
 		}
 	}
-	if n != 17 {
-		t.Fatalf("decoy library procedures with a level = %d, want 17", n)
+	if n != 23 {
+		t.Fatalf("decoy library procedures with a level = %d, want 23", n)
 	}
 }
 
@@ -212,6 +212,22 @@ func TestDecoyBuiltinEntriesFollowTheRightsOfTheReadsOfASite(t *testing.T) {
 		}
 		if procedureLevels[p] != levelOwner {
 			t.Errorf("%s level = %v, want owner", p, procedureLevels[p])
+		}
+	}
+}
+
+// An agent or a token cannot read or change a photo key, or the source of the photos.
+func TestPhotoKeysAndSourceAreClosedToTokens(t *testing.T) {
+	for _, p := range []string{
+		decoysitev1connect.DecoySiteServiceGetDecoyPhotosProcedure,
+		decoysitev1connect.DecoySiteServiceSetDecoyPhotosKeyProcedure,
+		decoysitev1connect.DecoySiteServiceSetDecoyPhotosSourceProcedure,
+	} {
+		if procedureLevels[p] != levelOwner {
+			t.Errorf("%s is not owner-only", p)
+		}
+		if _, listed := TokenAccess(p); listed {
+			t.Errorf("%s is reachable with a token", p)
 		}
 	}
 }

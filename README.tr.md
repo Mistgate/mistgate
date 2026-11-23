@@ -27,16 +27,119 @@ Hysteria2, VLESS ve AmneziaWG. İki Go ikili dosyası, SQLite ve systemd.</p>
 
 Paneli bir sunucuya kurar, VPN sunucularınızı ona düğüm olarak eklersiniz. Her kişi tek bir abonelik bağlantısı alır ve uygulaması, kullanabileceği bütün sunucuları kendiliğinden çeker. Panel düğümlerin yapılandırmasını güncel tutar ve onları kontrol eder.
 
-- Düğümü tarayıcıdan, IP adresiyle, panelin kendi SSH anahtarıyla (sağlayıcınıza bir kez eklersiniz) ya da root parolasıyla eklersiniz. Panel sunucunun SSH anahtarını sabitler, sunucuyu kontrol eder, etkin bir UFW ya da firewalld varsa portları açar ve imzalı ajanı kurar; düğüm kartında parolayı değiştirir ve sunucunun SSH anahtarlarını yönetir. Tek kullanımlık bir kurulum komutu da olur. [Düğüm ekleme](docs/en/getting-started/add-node.md)
-- Kişi başına tek bağlantı. Mihomo tabanlı uygulamalar (kl!ck, FlClash, Clash Verge Rev) bu bağlantıdan üç protokolün hepsini alır, Happ Hysteria2 ve VLESS'i alır, AmneziaVPN ise kişinin sayfasından her cihaz için ayrı bir anahtar alır. Mihomo ve sing-box uygulamaları çalışan bir sunucuya kendileri geçer. [İstemci uygulamaları](docs/en/guide/client-apps.md)
-- Panel her 5 dakikada bir, tıpkı bir uygulama gibi her sunucuya bağlanır. Her düğümdeki Teşhis 22 sunucu kontrolü yapar ve on düzeltme önerir; bunlar ancak siz onayladıktan sonra çalışır. Uyarılar yönetim panelinde görünür ve Telegram'a da gelir. [Sağlık](docs/en/operations/health.md)
+<p align="center"><img alt="How Mistgate fits together" src="docs/en/diagrams/how-it-fits.svg" width="720"></p>
+
+Buradaki her şey uydurma demo verileriyle çalışır; klipler gerçek yönetim panelinin kısa döngüleridir.
+
+<table>
+<tr>
+<td width="38%" valign="top">
+<h3>Sunucuyu tarayıcıdan ekleyin</h3>
+<p>Sunucunun IP adresini yazın, panelin nasıl giriş yapacağını seçin (hizmet sağlayıcınızda bir kez eklediğiniz panelin kendi SSH anahtarı ya da root parolası) ve kurulumu izleyin. Panel sunucunun SSH anahtarını sabitler, sunucuyu kontrol eder, etkin UFW veya firewalld içinde portları açar ve imzalı ajanı kurar. Yeni sunucuda terminal gerekmez; isterseniz tek seferlik bir komut da var.</p>
+<p><a href="docs/tr/getting-started/add-node.md">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/addnode-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/addnode-light-en.webp"><img alt="&quot;Yeni düğüm&quot; penceresi: sunucunun adresi, sonra giriş, kontroller ve kurulum adımları düğüm bağlanana kadar art arda" src="docs/images/readme/addnode-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>Kişi başına tek bağlantı ve kendi sayfası</h3>
+<p>Her kişi tek bir abonelik bağlantısı, bir QR kodu ve arkasında bir sayfa alır: kendi platformu için yönergeler, kalan günler, trafik ve kendi cihazları. Mihomo tabanlı uygulamalar bağlantıdan bütün protokolleri alır, Happ Hysteria2 ve VLESS'i alır, AmneziaVPN ise sayfadan her cihaz için bir anahtar alır. Gruplar, her kişinin hangi sunuculara ulaşacağını belirler.</p>
+<p><a href="docs/tr/guide/user-page.md">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/link-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/link-light-en.webp"><img alt="Yönetim panelinde bir kişinin kartı: trafik, abonelik bağlantısı ve QR kodunun penceresi" src="docs/images/readme/link-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>İstemcinin gözünden kontroller</h3>
+<p>Panel her 5 dakikada bir, bir uygulama gibi her düğümdeki her protokole bağlanır ve her tünelden geçen gecikmeyi gösterir; bozuk bir sunucuyu onu kullananlardan önce siz öğrenirsiniz. Her düğümdeki Teşhis 23 sunucu kontrolü yapar ve on düzeltme önerir; hiçbiri onayınız olmadan çalışmaz.</p>
+<p><a href="docs/en/operations/health.md">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-en.webp"><img alt="İstemci gözüyle kontrol tablosu: düğümler ve protokoller, her tünelden geçen gecikme, nedenini göstermek için açılmış bozuk bir düğüm" src="docs/images/readme/health-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>Birkaç protokol için tek TCP 443</h3>
+<p>Birçok ağ yalnızca TCP 443'ü geçirir. Bir düğüm VLESS REALITY, TLS üzerinden VLESS, TrustTunnel ve MTProto'yu bu tek portta tutabilir; ajan onları istemcinin istediği ada göre ayırır. Dolu bir porta ikinci bir profil koyduğunuzda panel onu birincinin yanına koymayı önerir ve eklemeniz gereken DNS kaydını gösterir.</p>
+<p><a href="docs/en/guide/shared-port.md">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/shared-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/shared-light-en.webp"><img alt="Bir profili 443 portunda başka birinin yanına koyma önerisi, sonra sayaçlarıyla ortak port kartı" src="docs/images/readme/shared-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>Şablondan kamuflaj siteleri</h3>
+<p>Düğümü açan yabancı, Mistgate sayfası değil, sıradan küçük bir site görmeli. Bir ülke ve on türden birini seçin (durum sayfası, belgeler, blog, küçük işletme, portfolyo ve diğerleri); panel o ülkenin dilinde, kendi görünümü ve metinleriyle bir site kursun, her seferinde farklı. Bakın, başka bir sürüm isteyin, sonra kaydedin. Kendi ücretsiz fotoğraf anahtarınızla siteye gerçek fotoğraflar da gelir; onları düğümün kendisi sunar.</p>
+<p><a href="docs/en/guide/decoy-site.md#a-site-from-a-template">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-light-en.webp"><img alt="&quot;Şablondan&quot; penceresi: bir ülke, bir tür, yeni sitenin önizlemesi ve &quot;Başka sürüm&quot; düğmesi" src="docs/images/readme/decoys-dark-en.webp" width="100%"></picture><br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/decoys-sites-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/decoys-sites-light-en.webp"><img alt="Üreticinin yaptığı beş türden beş site yan yana kayıyor" src="docs/images/readme/decoys-sites-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>Kademeli ve geri alınabilir güncellemeler</h3>
+<p>Düğümler kendiliğinden güncellenmez. Kademeli güncelleme önce tek bir kanarya düğümünü günceller ve ona sağlık kontrolünü geçmesi için 5 dakika verir, sonra küçük gruplarla sürer. Kontrolü geçemeyen düğüm önceki sürümünü geri alır ve güncelleme durur. Panel yalnızca siz onaylayınca kendini günceller ve yeni sürüm ayakta kalamazsa eski programı ve verileri geri koyar.</p>
+<p><a href="docs/en/operations/updates.md">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/updates-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/updates-light-en.webp"><img alt="Güncellemeler sayfası: kademeli güncelleme kanaryayı kurar, 5 dakika kontrol eder, sonra diğer düğümlere geçer" src="docs/images/readme/updates-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>Sunucuların işletim sistemi güncellemeleri</h3>
+<p>Hangi sunucuların güvenlik güncellemesi ya da yeniden başlatma beklediğini, her birine girmeden görün. Bir sunucuya güvenlik güncellemesi kurabilir ya da onu yeniden başlatabilirsiniz; birkaç sunucuyu işaretleyip kademeli olarak da çalıştırabilirsiniz: her seferinde birkaç sunucu, her birinden sonra sağlık kontrolü, ilk başarısızlıkta durma.</p>
+<p><a href="docs/en/operations/updates.md#server-operating-system">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/os-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/os-light-en.webp"><img alt="Sunucu sistemleri sekmesi: çekirdekleri ve bekleyen güncellemeleriyle sunucular, ikisi işaretli, kuruluyor, bitti" src="docs/images/readme/os-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>WARP çıkışı ve çalıştığının kontrolü</h3>
+<p>Bir profilin trafiğini Cloudflare WARP üzerinden çıkarın, düğüm başına tek hesapla. Kart tüneli, trafiği ve çıkış kontrolünü gösterir; panel ayrıca her düğümün WARP'ı üzerinden bir site listesi çeker ve bazıları onu engellemeye başlarsa uyarı verir. WARP çıkışlı bir profil hiçbir zaman düğümün kendi adresine dönmez.</p>
+<p><a href="docs/en/guide/warp.md">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/warp-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/warp-light-en.webp"><img alt="Bir düğümün WARP kartı: tünel açık ve çıkış kontrolü geçiyor, sonra tünel düşüyor ve kart yeniden başlatmayı öneriyor" src="docs/images/readme/warp-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>Uygulamalar için DNS ön ayarları</h3>
+<p>Ön ayar, bir kişinin uygulamasının hangi DNS sunucularına ve nasıl soracağını belirler (düz, DoT veya DoH); bir ülke ya da site listesi için ayrı kurallar ve uygulamalarda reklam engelleme de olabilir. Herkese, bir gruba ya da tek bir kişiye verin; düzenleyici, her uygulamanın gerçekte ne alacağını gösterir.</p>
+<p><a href="docs/en/guide/dns.md">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/dns-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/dns-light-en.webp"><img alt="Abonelikler'in DNS sekmesi: ön ayarlar, sonra biri sunucuları ve her uygulamanın alacağıyla açık, sonra ayrım kuralları" src="docs/images/readme/dns-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>Asistan ve MCP: önce plan</h3>
+<p>Yerleşik asistan (kendi anahtarınızla bağladığınız bir bulut modeli) düğümleriniz ve kişiler hakkında yanıt verir, değişiklikleri hazırlar. MCP aynısını dışarıdaki bir yapay zekâ ajanına verir: filoyu okur, değişiklik planlar; riskli her değişikliği uygulanmadan önce siz yönetim panelinde onaylarsınız. Bir API belirteci, siz sınırı kaldırmadıkça saatte en fazla 10 kişiyi devre dışı bırakabilir veya yeniden yazabilir.</p>
+<p><a href="docs/en/guide/assistant.md">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/assistant-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/assistant-light-en.webp"><img alt="Asistan penceresi: bir soru, önerilen değişikliklerle yanıt, &quot;Onayla ve uygula&quot; ve uygulandığını söyleyen satır" src="docs/images/readme/assistant-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>Telegram'da uyarılar</h3>
+<p>Kendi botunuzu bağlayın; bir düğüm düştüğünde ya da geri geldiğinde, bir kontrol başarısız olduğunda, yedekleme başarısız olduğunda ya da bir ajanın planı sizi beklediğinde panel sohbetinize yazsın. Yalnızca uyarı gönderir: sohbetten bir şey onaylanmaz ya da değiştirilmez. Her yönetici kendi sohbetini bağlar.</p>
+<p><a href="docs/en/operations/telegram-alerts.md">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/telegram-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/telegram-light-en.webp"><img alt="Entegrasyonlar sayfası: bot, Start bekleyen sohbet, sonra bağlandı ve bir deneme iletisi gönderildi" src="docs/images/readme/telegram-dark-en.webp" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="38%" valign="top">
+<h3>Şifreli yedekler ve dikkatli geri yükleme</h3>
+<p>Yedekler kendi Cloudflare R2 kovanıza gider, zamanlanmış ya da isteğe bağlı olarak, panelden çıkmadan önce çevrimdışı sakladığınız anahtarla şifrelenir. Geri yükleme önce yedeği kontrol eder ve içindekini şimdi sahip olduklarınızla karşılaştırır; siz onaylamadan hiçbir şey değişmez ve geri yüklemeden önceki veriler saklanır.</p>
+<p><a href="docs/en/operations/backups.md">Belgeler →</a></p>
+</td>
+<td width="62%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/backups-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/backups-light-en.webp"><img alt="&quot;Yedekten geri yükle&quot; penceresi: dosya kontrol edildi, özet şimdiki durumla karşılaştırılıyor, geri yükleme, panel geri geldi" src="docs/images/readme/backups-dark-en.webp" width="100%"></picture></td>
+</tr>
+</table>
+
+Ayrıca:
+
 - Bazı ağlardan bir sunucuya ulaşılamıyorsa kişiler ona başka bir düğümünüz üzerinden bağlanır; o düğüm yalnızca şifreli trafiği iletir. Panel yolu açmadan önce kontrol eder, sonra da izlemeye devam eder; düğüm sayfasındaki Giriş yolları, kişilerin sunucuya nasıl ulaştığını gösteren bir grafiktir; Düğümler sayfasında ise tüm düğümlerin haritası vardır. [Aktarıcılar](docs/en/guide/relays.md)
 - İsteğe bağlı olarak, sunucularınızın bir ülkenin içinden açılıp açılmadığını ağ ağ kontrol edebilirsiniz: ev ve mobil ağlarda IPv4 ve IPv6 üzerinden Globalping ölçümleri, gönüllü ve SIM ölçüm noktaları, engelleme listeleri ve kendi düğümünüzden bir TSPU ölçümü. Kaynakların çoğu yalnızca Rusya'da çalışır. [Erişilebilirlik](docs/en/operations/reachability.md)
 - Docker yok, veritabanı sunucusu yok. Panel boştayken 1 vCPU / 1 GB'lık bir sunucuda 16-20 MiB bellek kullanır. [Performans testleri](docs/en/reference/benchmarks.md), Mistgate'in daha yavaş kaldığı yerler dahil.
 - Panelin adresini açan yabancılar bir kamuflaj sitesi görür; yönetim paneli gizli bir yolun ya da ana bilgisayar adının arkasındadır.
-- Yerleşik asistan (kendi anahtarınızla bağladığınız bir bulut modeli) düğümleriniz ve kişiler hakkındaki sorulara yanıt verir ve değişiklikleri sizin uygulayacağınız kartlar olarak hazırlar. MCP, dışarıdaki bir yapay zekâ ajanının düğümlerin durumunu okumasına, düğümler arasındaki yolları sınamasına ve değişiklik planlamasına izin verir; riskli olanlar yönetim panelinde sizin onayınızı bekler. Bir API token'ı, siz onun için sınırı kaldırmadıkça saatte en çok 10 kişiyi devre dışı bırakabilir ya da yeniden yazabilir. [Asistan](docs/en/guide/assistant.md), [MCP](docs/en/reference/mcp.md)
+- Hangi sunucu kime: bir düğüm herkese, seçili gruplara ya da şimdilik hiç kimseye verilir; bir kişi birkaç grupta olabilir. [Gruplar](docs/en/guide/users-and-groups.md)
+- Windows için bir masaüstü uygulaması, [Mistgate](https://github.com/Mistgate/mistgate-client), bu panellerle ve düz abonelik bağlantılarıyla çalışır.
 
-Henüz olmayanlar: kendi uygulamamız (planlandı); Telegram botu şimdilik yalnızca uyarı gönderir, Cloudflare Workers sürümü de hâlâ bir [önizleme](docs/en/getting-started/install-edge.md). Bazı varsayılanlar Rusya'daki kullanıcılara göre seçilmiştir; hepsi ayarlardan değiştirilebilir.
+Henüz olmayanlar: uyarılar dışında bir Telegram botu; Cloudflare Workers sürümü de hâlâ bir [önizleme](docs/en/getting-started/install-edge.md). Bazı varsayılanlar Rusya'daki kullanıcılara göre ayarlıdır; hepsi ayardır.
 
 ## Protokoller
 
@@ -45,6 +148,7 @@ Henüz olmayanlar: kendi uygulamamız (planlandı); Telegram botu şimdilik yaln
 | [Hysteria2](docs/en/guide/hysteria2.md) | Resmî Hysteria2 çekirdeği | UDP (QUIC). Salamander gizleme (Gecko deneysel), port atlama, Let's Encrypt sertifikası ya da parmak izi sabitlenmiş kendinden imzalı sertifika. |
 | [VLESS](docs/en/guide/vless.md) | xray-core | XHTTP ya da TCP (RAW + Vision) üzerinden REALITY; XHTTP ya da WebSocket üzerinden TLS, doğrudan veya bir CDN arkasında. |
 | [AmneziaWG](docs/en/guide/amneziawg.md) | Kullanıcı alanında amneziawg-go ya da çekirdek modülü | 3.1 (varsayılan) ve 2.0 sürümleri, her cihaz için ayrı anahtar. 1.5 ve 1.0 sunulmaz. |
+| [TrustTunnel](docs/en/guide/trusttunnel.md) | Düğüm ajanının içindeki Mistgate'in kendi motoru | Deneysel. Sıradan HTTPS içinde bir VPN (HTTP/2, isteğe bağlı HTTP/3), gerçek sertifikayla; resmî TrustTunnel uygulamaları için `tt://` anahtarları. |
 | [MTProto](docs/en/guide/mtproto.md) | Mistgate'in kendi MTProto çekirdeği | Deneysel. Yalnızca Telegram uygulaması için bir proxy: ad olarak düğümün kendi alan adını ya da başka bir siteyi kullanan Fake TLS, kişi başına bir anahtar, geri kalan herkese kamuflaj sitesi. |
 
 Hysteria2 ve VLESS, TCP 443 dahil, aynı düğümü paylaşabilir. Her uygulama biçimi her profili taşımaz: [ne nerede çalışır](docs/en/guide/subscriptions.md#what-works-where).
@@ -55,7 +159,7 @@ Bir protokol, ikili dosyalara derlenmiş iki yarıdan oluşur. Panel tarafında 
 
 ## Kararlı mı?
 
-Beta aşamasında ve henüz genç: v0.1.0 etiketi 2026-10-03'te atıldı, v0.1.81 ise 82. etiket. 1.0'a kadar API, kayıtlı ayarlar ve düğüm protokolü değişebilir. Sürümler henüz eski sürümlerden otomatik bir yükseltme testinden geçmiyor; bu, [1.0 koşullarından](docs/en/roadmap/status.md) biri.
+Beta aşamasında ve henüz genç: v0.1.0 etiketi 2026-10-03'te atıldı, 0.2.0 hattı ise bütün arayüzü baştan çizdi. 1.0'a kadar API, kayıtlı ayarlar ve düğüm protokolü değişebilir. Sürümler henüz eski sürümlerden otomatik bir yükseltme testinden geçmiyor; bu, [1.0 koşullarından](docs/en/roadmap/status.md) biri.
 
 Ben kendi altı sunucumda, ailem ve arkadaşlarım için kullanıyorum.
 
@@ -67,6 +171,8 @@ Kontroller:
 - Uçtan uca bir çalıştırma ([scripts/e2e-wsl.sh](scripts/e2e-wsl.sh)): gerçek Hysteria2, AmneziaWG, Xray, mihomo ve sing-box istemcileriyle gerçek bir panel ve düğüm; ayrıca ajan güncellemeleri, geri almalar ve SSH üzerinden kurulum. Her sürümden önce WSL'de ya da bir sanal makinede elle çalıştırılır, CI'da değil.
 - GitHub Actions her etiketi taslak olarak derler. Ben onu çevrimdışı sürüm anahtarının bulunduğu bir makinede etiketten yeniden derler ve yalnızca bayt bayt eşleşen ikili dosyaları imzalarım; düğümler ve panel yalnızca imzalı derlemeleri kurar. [Sürümler ve imzalama](docs/en/operations/releases.md)
 
+<p align="center"><img alt="What an update is trusted for" src="docs/en/diagrams/update-trust.svg" width="720"></p>
+
 Güncelleme ([Güncellemeler](docs/en/operations/updates.md)):
 
 - Düğümler asla kendiliğinden güncellenmez. Bir dağıtım önce tek bir kanarya düğümünü günceller ve sağlık kontrolünü geçmesi için ona 5 dakika tanır, sonra birer ya da ikişer düğümlük gruplarla devam eder. Başarısız olan düğüm önceki derlemesine döner ve dağıtım duraklar.
@@ -76,24 +182,6 @@ Güncelleme ([Güncellemeler](docs/en/operations/updates.md)):
 - Yine de `/var/lib/mistgate` dizininin [şifreli yedeklerini](docs/en/operations/backups.md) alın.
 
 Mistgate yapay zekâ kodlama ajanlarıyla yazılıyor. Yazdıklarını ben gözden geçiriyor, neyin birleştirilip yayımlanacağına ben karar veriyorum; yukarıdaki kontroller onların kodu için de herkesin kodu için olduğu gibi aynıdır. Bir ajanla yapılan commit'ler bir `Co-Authored-By` satırı taşır; ajanların bu depoda uyduğu kurallar [AGENTS.md](AGENTS.md) dosyasındadır.
-
-## Ekran görüntüleri
-
-<table>
-<tr>
-<td colspan="2"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/overview-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/overview-light-en.webp"><img alt="Mistgate yönetim paneli: sağlık durumu ve aktarım hızıyla altı düğüm, açık bir sorun, son olaylar" src="docs/images/readme/overview-dark-en.webp" width="100%"></picture><br><sub><b>Genel bakış.</b> Tüm düğümlerin sağlığı ve aktarım hızı, açık sorunlar ve son olaylar.</sub></td>
-</tr>
-<tr>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/node-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/node-light-en.webp"><img alt="Bir düğüm sayfası: durum, WARP çıkışı, CPU, RAM, disk ve 24 saatlik trafik" src="docs/images/readme/node-dark-en.webp" width="100%"></picture><br><sub><b>Bir düğüm.</b> Durum, WARP çıkışı, yük ve 24 saatlik trafik.</sub></td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/health-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/health-light-en.webp"><img alt="İstemci gözüyle kontroller: protokollere göre düğümler tablosu ve her tünelden geçen gecikme" src="docs/images/readme/health-dark-en.webp" width="100%"></picture><br><sub><b>İstemci gözüyle kontroller.</b> Her düğümde her protokol, tünelden geçen gecikme.</sub></td>
-</tr>
-<tr>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/user-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/user-light-en.webp"><img alt="Bir kullanıcı sayfası: trafik, her cihaz kendi cihaz kimliği ve AmneziaVPN anahtarıyla, ayrıca kota, süre, cihaz sınırı ve hız sınırları" src="docs/images/readme/user-dark-en.webp" width="100%"></picture><br><sub><b>Bir kişi.</b> Cihaz kimliğine göre cihazlar, kotadan düşen trafik ve sınırlar.</sub></td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/phone-dark-en.webp"><source media="(prefers-color-scheme: light)" srcset="docs/images/readme/phone-light-en.webp"><img alt="Telefonda kişinin sayfası: kalan günler, trafik ve cihaz ekleme düğmesiyle birlikte cihazları" src="docs/images/readme/phone-dark-en.webp" width="100%"></picture><br><sub><b>Tarayıcıda kendi bağlantısı.</b> Kalan günler, trafik ve cihazları.</sub></td>
-</tr>
-</table>
-
-Ekran görüntüleri İngilizce arayüzden, uydurma demo verileriyle alınmıştır.
 
 ## Hızlı başlangıç
 

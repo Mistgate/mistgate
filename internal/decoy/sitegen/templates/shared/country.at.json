@@ -1,0 +1,228 @@
+{
+ "order": 4,
+ "lang": "de",
+ "html_lang": "de-AT",
+ "date": [
+  "{d}. {m} {y}",
+  "{dd}.{mm}.{y}"
+ ],
+ "clock": "24h",
+ "money": {
+  "fmt": "€ {n}",
+  "group": ".",
+  "scale": 0.9,
+  "round": 5
+ },
+ "address": "{street} {no}, {zip} {city}",
+ "zip_tail": "XX",
+ "cities": [
+  {
+   "name": "Wien",
+   "zip": [
+    "10",
+    "11",
+    "12"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Graz",
+   "zip": [
+    "80"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Linz",
+   "zip": [
+    "40"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Salzburg",
+   "zip": [
+    "50"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Innsbruck",
+   "zip": [
+    "60"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Klagenfurt",
+   "zip": [
+    "90"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Villach",
+   "zip": [
+    "95"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Wels",
+   "zip": [
+    "46"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "St. Pölten",
+   "zip": [
+    "31"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Dornbirn",
+   "zip": [
+    "68"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Bregenz",
+   "zip": [
+    "69"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Steyr",
+   "zip": [
+    "44"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Wiener Neustadt",
+   "zip": [
+    "27"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Feldkirch",
+   "zip": [
+    "68"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Baden",
+   "zip": [
+    "25"
+   ],
+   "phone": ""
+  },
+  {
+   "name": "Eisenstadt",
+   "zip": [
+    "70"
+   ],
+   "phone": ""
+  }
+ ],
+ "streets": [
+  "Hauptstraße",
+  "Bahnhofstraße",
+  "Schulstraße",
+  "Gartenstraße",
+  "Dorfstraße",
+  "Bergstraße",
+  "Kirchengasse",
+  "Wiener Straße",
+  "Linzer Straße",
+  "Lindengasse",
+  "Mozartstraße",
+  "Schubertstraße",
+  "Ringstraße",
+  "Rosengasse",
+  "Marktplatz",
+  "Mühlgasse",
+  "Feldgasse",
+  "Hauptplatz"
+ ],
+ "first": [
+  "Lukas",
+  "Anna:f",
+  "Maximilian",
+  "Sophie:f",
+  "Jakob",
+  "Hannah:f",
+  "Tobias",
+  "Lena:f",
+  "Fabian",
+  "Julia:f",
+  "David",
+  "Laura:f",
+  "Elias",
+  "Marie:f",
+  "Michael",
+  "Katharina:f",
+  "Stefan",
+  "Lisa:f",
+  "Gernot",
+  "Christina:f",
+  "Matthias",
+  "Sabine:f",
+  "Florian",
+  "Magdalena:f",
+  "Johannes",
+  "Theresa:f",
+  "Georg",
+  "Barbara:f",
+  "Manuel",
+  "Elisabeth:f",
+  "Patrick",
+  "Verena:f",
+  "Daniel",
+  "Nicole:f"
+ ],
+ "last": [
+  "Gruber",
+  "Huber",
+  "Bauer",
+  "Wagner",
+  "Müller",
+  "Pichler",
+  "Steiner",
+  "Moser",
+  "Mayer",
+  "Hofer",
+  "Leitner",
+  "Berger",
+  "Fuchs",
+  "Eder",
+  "Fischer",
+  "Schmid",
+  "Winkler",
+  "Weber",
+  "Schwarz",
+  "Maier",
+  "Schneider",
+  "Reiter",
+  "Mayr",
+  "Schmidt",
+  "Wimmer",
+  "Egger",
+  "Brunner",
+  "Lang",
+  "Baumgartner",
+  "Auer",
+  "Binder",
+  "Lechner",
+  "Wolf",
+  "Wallner",
+  "Aigner",
+  "Ebner"
+ ]
+}

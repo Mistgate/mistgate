@@ -1,0 +1,461 @@
+{
+ "ui": {
+  "nav_label": "Nawigacja",
+  "footer": "Pisane ręcznie, publikowane powoli.",
+  "nav_home": "Notatki",
+  "nav_about": "O mnie",
+  "home_title": "Notatki",
+  "nf_title": "Tu nic nie ma",
+  "nf_text": "Pod tym adresem nie ma żadnej notatki. Może zmieniła nazwę, a może nigdy jej nie napisano.",
+  "nf_back": "Wróć do notatek",
+  "latest_h": "Najnowsze notatki",
+  "read_more": "Czytaj notatkę",
+  "min_read": "min czytania",
+  "more_h": "Więcej notatek",
+  "back_all": "Wszystkie notatki",
+  "about_h": "O mnie",
+  "now_h": "Teraz",
+  "tags_h": "Tematy",
+  "by": "Autor:",
+  "nav_archive": "Archiwum",
+  "desc_archive": "Wszystkie notatki na stronie {brand}, miesiąc po miesiącu.",
+  "archive_h": "Archiwum",
+  "archive_intro": "Wszystkie notatki do tej pory, od najnowszych, pogrupowane według miesięcy.",
+  "all_posts": "Wszystkie notatki",
+  "newer": "Nowsze"
+ },
+ "bundles": {
+  "garden": {
+   "tagline": "Notatki z działki",
+   "desc": "Notatki z małej działki {city_in}: co urosło, co nie urosło i co zrobię inaczej.",
+   "desc_about": "Kto pisze {brand} i po co.",
+   "intro": "Notatki z małej działki {city_in}: co urosło, co nie urosło i co zrobię inaczej w przyszłym roku.",
+   "about": [
+    "Mam na imię {first}. Od dziewięciu lat mam ogródek działkowy {city_in}, głównie na warzywa i kilka upartych róż.",
+    "Ten zeszyt to miejsce, gdzie zapisuję, czego uczy mnie działka, głównie po to, żeby przestać popełniać te same błędy w nowej kolejności.",
+    "Komentarze są wyłączone. Jeśli masz radę, powiedz ją sąsiadowi z sąsiedniej działki, bo tak nauczyło mnie się większości tego, co wiem."
+   ],
+   "now": [
+    "Wysiewam bób pod osłonami",
+    "Naprawiam drzwi altanki, kolejny raz",
+    "Czytam o plecionych żywopłotach"
+   ],
+   "posts": [
+    {
+     "title": "Dlaczego już nie przekopuję grządek",
+     "tag": "Gleba",
+     "excerpt": "Mam za sobą trzy sezony bez szpadla i widzę, co się stało z grządkami.",
+     "body": [
+      "Przez lata co jesień przekopywało się grządki, bo tak robił poprzedni użytkownik działki i tak pisały książki z dzieciństwa. Trzy sezony temu przestało się kopać, a grządki przykrywa gruba warstwa kompostu.",
+      "Pierwsza wiosna była rozczarowująca. Ziemia wyglądała niechlujnie, a ślimaki były zachwycone. W drugim roku większość pracy wykonały dżdżownice, gleba kruszyła się w dłoni, a w październiku na grządki szła mi jedna sobota mniej.",
+      "To żaden cud, a kilka chwastów, które miały zniknąć na dobre, wróciło. Ale kręgosłup jest wdzięczny, a marchew rośnie prostsza niż kiedykolwiek przy kopaniu."
+     ]
+    },
+    {
+     "title": "Fasola dla tych, którzy zapominają o podlewaniu",
+     "tag": "Warzywa",
+     "excerpt": "Cztery odmiany, które wybaczyły suchy lipiec.",
+     "body": [
+      "W zeszłym lipcu przez dziewiętnaście dni nie spadła kropla deszczu, a przez jedenaście z nich nikogo nie było na działce. Po powrocie sałata poszła w kwiaty, a cukinie wyglądały na zrezygnowane. Fasola była w świetnej formie.",
+      "Fasola tyczna z głębokimi korzeniami i grubą warstwą ściółki znosi dwutygodniową suszę lepiej niż prawie wszystko, co uprawiam. Teraz sieje się ją wzdłuż północnego skraju, gdzie cień chroni ziemię przed wysuszeniem.",
+      "Jeśli planujesz podlewać codziennie, a wychodzi dwa razy w tygodniu, posadź fasolę i zachowaj spokój."
+     ]
+    },
+    {
+     "title": "Mała szklarnia ze starych okien",
+     "tag": "Budowa",
+     "excerpt": "Jak kontener sąsiadki zamienił się w szklarnię w jeden długi weekend.",
+     "body": [
+      "Sąsiadka wymieniła okna, a stare przez dwa dni stały w kontenerze. Padło pytanie, czy można je zabrać, a sąsiadka poprosiła, żeby przy okazji zabrać też kontener, jeśli się da.",
+      "Rama z drewna z odzysku jest dopasowana do największego okna, a pozostałe wstawiono wokół niej. Nic nie jest równe i drzwi się zacinają przy mokrej pogodzie, ale szklarnia chroni przed mrozem rozsadę pomidorów.",
+      "Całość kosztowała pudełko wkrętów i torebkę kitu. Następnym razem będę mierzyć dwa razy, zanim cokolwiek przetnę, i mówię to poważnie."
+     ]
+    },
+    {
+     "title": "Co robić na działce w marcu",
+     "tag": "Pory roku",
+     "excerpt": "Krótka lista na miesiąc, w którym wszystko wydaje się możliwe, a ziemia jest jeszcze zimna.",
+     "body": [
+      "Marzec oszukuje wszystkich. Dni są jasne i chce się siać, ale ziemia jest zimna, a nasiona posiane za wcześnie leżą i gniją. Czekam, aż ziemia przestanie być chłodna dla wierzchu dłoni.",
+      "W międzyczasie jest dużo do zrobienia: przesortować pudełko z nasionami, wyszorować doniczki, przyciąć róże i wystawić pierwsze ziemniaki do podkiełkowania w jasnym miejscu. Te prace dają poczucie postępu i niczym nie grożą.",
+      "Pod koniec miesiąca zwykle pozwalam sobie na jeden rządek grochu pod osłoną. To niezbyt rozsądne, ale sprawia mi radość."
+     ]
+    },
+    {
+     "title": "Kompost, szczerze",
+     "tag": "Gleba",
+     "excerpt": "Co trafia do mojego kompostownika, co nie i dlaczego mój nigdy nie jest gotowy na czas.",
+     "body": [
+      "Kompostownik rządzą trzy zasady: nic gotowanego, nic chorego i nic, w co nie mam pewności. Skoszona trawa idzie cienkimi warstwami, podarty karton razem z nią, a całość przerzucam, kiedy sobie przypomnę.",
+      "To idzie wolniej, niż piszą książki. Rok jest uczciwszym terminem niż sześć tygodni obiecane na worku, a gotowy kompost zawsze skrywa niespodzianki, na przykład ziemniaka, na którego nikt już nie liczył.",
+      "Nie przeszkadza mi to. Kompostownik, który się nie spieszy, nie ma też urazy do obierek."
+     ]
+    },
+    {
+     "title": "Ślimaki, pułapki z piwa i inne porażki",
+     "tag": "Szkodniki",
+     "excerpt": "Co się sprawdziło, co nie i dlaczego teraz sadzi się trochę więcej.",
+     "body": [
+      "Były pułapki z piwa, skorupki jajek, miedziana taśma i wychodzenie z latarką po zmroku. Każda z tych metod działała około tygodnia. Najlepiej sprawdza się uprawa więcej, niż potrzeba, i zgoda na to, że ślimaki zabiorą swoją część.",
+      "Prawdziwym zagrożeniem są siewki, więc zaczynam je w domu i wystawiam dopiero wtedy, gdy są dość silne, żeby przetrwać podgryzanie."
+     ]
+    },
+    {
+     "title": "Zbieranie nasion fasoli",
+     "tag": "Nasiona",
+     "excerpt": "Trochę cierpliwości w październiku daje fasolę na przyszły rok za darmo.",
+     "body": [
+      "Najładniejsze strąki zostawiam na roślinach, aż wyschną i będą grzechotać. Potem łuskam je przy kuchennym stole, rozkładam nasiona na tacy i trzymam w cieple przez tydzień.",
+      "Trafiają do papierowych kopert z nazwą i rokiem na wierzchu. W plastiku nasiona się pocą, a spleśniała fasola jest na to dowodem."
+     ]
+    },
+    {
+     "title": "Krótki spis zawartości altanki",
+     "tag": "Narzędzia",
+     "excerpt": "Jedenaście rzeczy, których używam, i bardzo wiele takich, których nie używam.",
+     "body": [
+      "Szpadel, widły, motyka, dwie łopatki, małe grabki i sekator robią prawie całą robotę. Reszta altanki mieści słoiki, sznurek, zepsutą taczkę i kolekcję doniczek.",
+      "Co wiosnę obiecuję sobie, że to uporządkuję. Co wiosnę w dniu, który na to wyznaczam, pada deszcz i wcale mi z tego powodu nie żal."
+     ]
+    },
+    {
+     "title": "Zły rok dla pomidorów",
+     "tag": "Warzywa",
+     "excerpt": "Zaraza ziemniaczana przyszła w sierpniu i zabrała wszystko. Notatki na następny raz.",
+     "body": [
+      "Liście zbrązowiały w tydzień, a potem owoce. Rośliny wyrwano, zapakowano do worka i nie trafiły na kompost, co jest jedyną zasadą, w której wszyscy się zgadzają.",
+      "W przyszłym roku będzie mniej roślin, każda dostanie więcej miejsca i będzie się podlewać ziemię, a nie liście. Będę też pamiętać, że zły rok dla pomidorów to dobra wymówka, żeby zrobić przetwory."
+     ]
+    },
+    {
+     "title": "Z liści powstaje ziemia liściowa",
+     "tag": "Gleba",
+     "excerpt": "Dwa lata czekania i najlepsza rzecz na działce.",
+     "body": [
+      "W listopadzie grabię liście do siatkowej klatki w rogu działki i odchodzę. Nic nie trzeba przerzucać ani dodawać, co mi odpowiada.",
+      "Po dwóch latach jest ciemna, krucha i pachnie lasem. Używam jej do wzbogacania grządek i do wysiewu siewek, a nic innego z tego, co robię, się z nią nie równa."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Notatnik",
+       "Zeszyt",
+       "Dziennik",
+       "Zapiski",
+       "Notatki",
+       "Kronika",
+       "Listy",
+       "Słowa",
+       "Szkice",
+       "Brudnopis"
+      ],
+      [
+       "Ziemia",
+       "Grządki",
+       "Działka",
+       "Ogródek",
+       "Łopatka",
+       "Rządki",
+       "Żywopłot",
+       "Altanka",
+       "Bruzda",
+       "Pory roku"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "cycling": {
+   "tagline": "Wyprawy i naprawy",
+   "desc": "Wyprawy, naprawy i czasem nie ten skręt na bocznych drogach {city_in}.",
+   "desc_about": "Kto pisze {brand} i po co.",
+   "intro": "Wyprawy, naprawy i czasem nie ten skręt na bocznych drogach {city_in}.",
+   "about": [
+    "Mam na imię {first}. Do pracy jeżdżę rowerem prawie codziennie, a w niedziele dalej, najczęściej bocznymi drogami {city_in}, których nikt inny chyba nie zna.",
+    "Nie ścigam się i nie zapisuję prędkości. Zapisuję trasy, to, co się zepsuło, i to, co następnym razem zabrać ze sobą.",
+    "Nie ma pola na komentarze. Jeśli znasz lepszą drogę do domu z grzbietu, napisz ją na pocztówce."
+   ],
+   "now": [
+    "Owijam kierownicę na nowo",
+    "Planuję dwudniową pętlę na maj",
+    "Uczę się centrować koło"
+   ],
+   "posts": [
+    {
+     "title": "Sześćdziesięciokilometrowa pętla, do której wracam",
+     "tag": "Trasy",
+     "excerpt": "Głównie płasko, jeden prawdziwy podjazd i kawiarnia, która zamyka się wcześniej, niż by się chciało.",
+     "body": [
+      "Pętla wychodzi z miasta na wschód, szesnaście kilometrów biegnie wzdłuż kanału, a potem skręca w drogę, której nikt nie remontował, odkąd jeżdżę. Jest jeden prawdziwy podjazd, mniej więcej półtora kilometra, i to dla niego wracam.",
+      "W połowie drogi stoi kawiarnia, która otwiera się o dziewiątej, a zamyka o czternastej, co jest albo stanowczo za wcześnie, albo w sam raz, zależnie od tego, jak minął ranek. Nauczyło mnie to wozić ze sobą kawałek ciasta.",
+      "Przejechana w każdym miesiącu roku. To nigdy nie jest dwa razy ta sama pętla i nie umiem powiedzieć o trasie nic lepszego."
+     ]
+    },
+    {
+     "title": "Łatanie dętki w deszczu",
+     "tag": "Naprawy",
+     "excerpt": "Jedenaście minut, jeden zmarznięty kciuk i lekcja o zapasowej dętce.",
+     "body": [
+      "Zawsze zdarza się to na jedynym zjeździe, na którym szło się dobrze. Chowam się w wiacie przystankowej, zdejmuję koło i odkrywam, że dziura jest po wewnętrznej stronie taśmy obręczowej, czyli wróci.",
+      "Naprawa jest nudna i mam ją zapisaną na wieczku torby podsiodłowej: sprawdzić oponę, znaleźć cierń, sprawdzić taśmę, założyć zapasową dętkę, napompować mocniej, niż się wydaje rozsądne. W deszczu każdy krok trwa dwa razy dłużej.",
+      "Lekcja, którą powtarzam co zimę, jest taka, że zapasowa dętka waży mniej niż dobry humor i jest warta znacznie więcej."
+     ]
+    },
+    {
+     "title": "Dlaczego jeżdżę cały rok w tej samej kurtce",
+     "tag": "Sprzęt",
+     "excerpt": "Długa obrona jednej trochę brzydkiej, bardzo żółtej kurtki.",
+     "body": [
+      "W czerwcu jest za ciepła, w styczniu nie dość ciepła, a mimo to to po nią sięgam. Jest jaskrawożółta, składa się do własnej kieszeni i przeżyła dwie wywrotki i pralkę.",
+      "Były lepsze. Każda była świetna, dopóki nie trzeba było zdecydować, czy ją zabrać, a wtedy wisiała na haczyku. Najlepszy sprzęt to ten, który naprawdę się zabiera.",
+      "Resztę robią warstwy. Cienka wełniana koszulka kosztuje mniej niż nowa kurtka i daje więcej niż jakakolwiek tkanina z nazwą."
+     ]
+    },
+    {
+     "title": "Rower zimowy, rower letni",
+     "tag": "Rowery",
+     "excerpt": "Dwa rowery to luksus, ale jeden z nich może być brudny.",
+     "body": [
+      "Przez lata był jeden rower, który co zimę jeździł do zdarcia, a każdą wiosnę trzeba było za to płacić. Dwa sezony temu na targu staroci trafiła się stara stalowa rama i została zmieniona w rower zimowy.",
+      "Ma błotniki, szerokie opony i łańcuch, którego wymiana nie boli. Jest ciężki i wolny, i go uwielbiam, głównie dlatego, że nikt, ze mną włącznie, nie oczekuje, że będzie czysty.",
+      "Rower letni stoi w przedpokoju od listopada do marca i patrzy na mnie z wyrzutem. Mówię mu, żeby uzbroił się w cierpliwość."
+     ]
+    },
+    {
+     "title": "Zwalnianie celowo",
+     "tag": "Przemyślenia",
+     "excerpt": "Co się stało, gdy przestano patrzeć na prędkość.",
+     "body": [
+      "Przez rok na kierownicy był mały licznik, który mierzył wszystko. Efekt: trochę większa prędkość, wyraźnie większa irytacja i brak oka dla bocznych dróg, którymi się jechało.",
+      "Potem w marcu padła bateria i nie została wymieniona. Pierwsza jazda bez liczb wydawała się dziwna przez jakieś dziesięć minut, a potem przypominała dzień, w którym zaczynało się jeździć na rowerze.",
+      "Nie wiem już, co właściwie było do udowodnienia. Teraz wiem, gdzie są najładniejsze żywopłoty, i to chyba lepiej wiedzieć."
+     ]
+    },
+    {
+     "title": "Tydzień dojazdów po ciemku",
+     "tag": "Sprzęt",
+     "excerpt": "Światła, taśma odblaskowa i rozsądny stosunek do kałuż.",
+     "body": [
+      "Gdy cofają zegary, przechodzę na dwa światła z przodu i dwa z tyłu, po jednym z każdej pary migającym. Wygląda to na przesadę, ale kierowcy cię zauważają i o to chodzi.",
+      "W torbie podsiodłowej trzymam też zapasowy komplet baterii. Martwe światło na ciemnej drodze to błąd, który popełnia się tylko raz."
+     ]
+    },
+    {
+     "title": "Kawiarnia na szczycie wzgórza",
+     "tag": "Trasy",
+     "excerpt": "Warta podjazdu, jeśli zdąży się przed końcem ciasta.",
+     "body": [
+      "Stoi na szczycie długiego podjazdu, w sali, która kiedyś pewnie była stodołą. Herbata podawana jest w dzbanku, a ciasto w kawałkach wielkości książki kieszonkowej.",
+      "Kiedyś pędziło się pod górę, żeby uprzedzić obiadowy tłok. Teraz jedzie się powoli i dociera z protestującymi nogami, a ciasto smakuje lepiej."
+     ]
+    },
+    {
+     "title": "Jak polubić błotniki",
+     "tag": "Sprzęt",
+     "excerpt": "Dziesięć lat mokrych pleców, a potem komplet plastikowych pasków.",
+     "body": [
+      "Przez lata błotniki wydawały się rzeczą dla tych, którzy nie traktują jazdy poważnie. Potem założono parę i buty były suche już na pierwszej mokrej trasie.",
+      "Dodają trochę wagi i grzechoczą, jeśli są źle założone. Obie wady są drobne przy przyjeździe do pracy z pasem błota na plecach."
+     ]
+    },
+    {
+     "title": "Jedzenie na rowerze",
+     "tag": "Jedzenie",
+     "excerpt": "Co trafia do kieszeni i czego żałuję.",
+     "body": [
+      "Zasada jest taka, żeby jeść, zanim zrobi się głód. Na długiej trasie co czterdzieści minut coś małego: banan, batonik owsiany, garść daktyli.",
+      "Żele spróbowane raz skończyły się decyzją, że wolę kanapkę. Trochę brudzi, ale działa."
+     ]
+    },
+    {
+     "title": "Powrót pociągiem",
+     "tag": "Przemyślenia",
+     "excerpt": "Nie ma wstydu w podwózce, gdy wiatr wieje w twarz.",
+     "body": [
+      "Są dni, kiedy droga tam jest cudowna, a droga z powrotem to wiatr w twarz przez całą trasę. W takie dni wsiadam z rowerem do pociągu i czytam.",
+      "Kiedyś widziało się w tym poddanie. Teraz to powód, dla którego następnego dnia znów się wyjeżdża."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Notatnik",
+       "Zeszyt",
+       "Dziennik",
+       "Zapiski",
+       "Notatki",
+       "Kronika",
+       "Listy",
+       "Słowa",
+       "Szkice",
+       "Brudnopis"
+      ],
+      [
+       "Przerzutki",
+       "Szprychy",
+       "Kilometry",
+       "Drogi",
+       "Łańcuch",
+       "Koło",
+       "Trasy",
+       "Szosa",
+       "Wzgórza",
+       "Kadencja"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "kitchen": {
+   "tagline": "Notatki z małej kuchni",
+   "desc": "Przepisy, które się udają, błędy, które czegoś nauczyły, i obiad {city_in}.",
+   "desc_about": "Kto pisze {brand} i po co.",
+   "intro": "Przepisy, które się udają, błędy, które czegoś nauczyły, i to, co dziś na obiad {city_in}.",
+   "about": [
+    "Mam na imię {first}. Gotuję dla czteroosobowej rodziny w kuchni {city_in}, która jest mniejsza niż większość łazienek, i nie zamieniam jej na żadną inną.",
+    "Zapisuję to, co się udało, w takiej formie, w jakiej to naprawdę gotuję, czyli z mniejszą liczbą gramów i większą liczbą przymiotników niż w porządnym przepisie.",
+    "Nie fotografuję jedzenia. Jeśli danie wygląda dość dobrze na zdjęcie, to pewnie za długo czekało."
+   ],
+   "now": [
+    "Karmię nowy zakwas",
+    "Kiszę cytryny na wiosnę",
+    "Godzę się z drzwiczkami piekarnika"
+   ],
+   "posts": [
+    {
+     "title": "Chleb, który wszystko wybacza",
+     "tag": "Chleb",
+     "excerpt": "Mąka, woda, sól i bardzo cierpliwe niedzielne popołudnie.",
+     "body": [
+      "To chleb, który piekę, gdy zapomnę, że miał być chleb. Prawie nie wymaga drożdży, tylko długiego odpoczynku, wcale nie trzeba go wyrabiać i nie obrazi się, jeśli zostanie godzinę dłużej, niż planowano.",
+      "Wieczorem wymieszaj mąkę, wodę i sól, aż nie będzie suchych miejsc, przykryj miskę i zostaw na blacie. Rano ciasto jest pełne bąbli i pachnie trochę piwem, i o to chodzi.",
+      "Złóż je kilka razy, uformuj byle jak i wypiecz w rozgrzanym garnku pod przykryciem. Będzie wyglądał niedoskonale, a smakował lepiej, niż ma prawo."
+     ]
+    },
+    {
+     "title": "Co ugotować, gdy lodówka jest prawie pusta",
+     "tag": "Dni powszednie",
+     "excerpt": "Pięć puszek, trzy cebule i kawałek sera: obiad.",
+     "body": [
+      "W każdy czwartek otwieram lodówkę i widzę pół cebuli, zwiędły por i słoik, którego otwarcia nie pamiętam. Kiedyś to wyglądało na porażkę. Teraz to jedyny wieczór w tygodniu, kiedy swoją kolej ma szafka.",
+      "Powoli smaż cebulę, aż się podda. Dodaj jaką masz fasolę, puszkę pomidorów i łyżkę czegoś ostrego: musztardy, octu, marynowanej papryczki. Niech bulgocze, a w tym czasie poszukaj kromki chleba.",
+      "Jedz z tartym serem na wierzchu. Nikt nigdy nie zapytał, co w tym jest, a ja już nie mówię."
+     ]
+    },
+    {
+     "title": "Jedyna zupa, którą gotuję w listopadzie",
+     "tag": "Zupa",
+     "excerpt": "Pieczona dynia, jedno jabłko i cierpliwość do blendera.",
+     "body": [
+      "Gdy przychodzi pierwszy naprawdę zimny tydzień, piekę dynię przekrojoną na pół, z całą główką czosnku i jabłkiem, które zdążyło zmięknąć. Trwa to czterdzieści minut, a cały dom pachnie początkiem zimy.",
+      "Przełóż wszystko do garnka, dolej wywaru i blenduj, aż zupa przestanie się kłócić. Odrobina śmietany jest miła, ale nie jest konieczna. Łyżka słodyczy z jabłka robi prawie to samo.",
+      "Podaję ją z prażonymi pestkami i chlebem z poprzedniego dnia. Nie jest wymyślna i robię ją co roku."
+     ]
+    },
+    {
+     "title": "Kiszenie bez paniki",
+     "tag": "Przetwory",
+     "excerpt": "Dlaczego słoik szybkich kiszonek to najprostsza rzecz w kuchni.",
+     "body": [
+      "Wiele osób odstrasza słowo „przetwory”, które kojarzy się ze sterylizacją, wielkimi garnkami i straconym dniem. Szybkie kiszonki to słoik, czajnik i około dziesięciu minut.",
+      "Pokrój to, co leży w szufladzie lodówki, ułóż w czystym słoiku i zalej gorącą mieszanką octu, wody, soli i odrobiny cukru. Dodaj liść laurowy, jeśli masz. Zostaw do jutra.",
+      "Wytrzymują kilka tygodni w lodówce i sprawiają, że zwykła kolacja wygląda na przemyślaną. Jeszcze nigdy nie wyszło z tego nic złego."
+     ]
+    },
+    {
+     "title": "Przypalone rzeczy i czego mnie nauczyły",
+     "tag": "Błędy",
+     "excerpt": "Krótki katalog zepsutych obiadów i jedna lekcja z każdego.",
+     "body": [
+      "Karmel nauczył mnie, że cukier nie liczy się z telefonem. Risotto, że wywar ma być gorący. Pieczone ziemniaki, że blacha może być za pełna i że nikt nie wybacza bladego ziemniaka.",
+      "Najgorszy był tort urodzinowy, który został wyjęty za wcześnie i wrócił do piekarnika za późno. Opadł w środku jak dostojny stary budynek, a zjedliśmy go łyżkami z kremem waniliowym.",
+      "Lista tego, co poszło źle, wisi na wewnętrznej stronie drzwi szafki. Jest dłuższa niż lista tego, co się udało, i dużo bardziej przydatna."
+     ]
+    },
+    {
+     "title": "Patelnia, łyżka i środa",
+     "tag": "Dni powszednie",
+     "excerpt": "Jedna patelnia, dwadzieścia minut i niewiele zmywania.",
+     "body": [
+      "W środy wszyscy są zmęczeni i głodni, więc obiad musi wyjść z jednej patelni. Cebula, puszka fasoli, odrobina wędzonej papryki i jakiekolwiek zielone liście, które są w lodówce.",
+      "Na koniec kładę na wierzchu jajko i nazywam to obiadem. To bardziej nawyk niż przepis i jeszcze mnie nie zawiódł."
+     ]
+    },
+    {
+     "title": "Owsianka, jak trzeba",
+     "tag": "Śniadanie",
+     "excerpt": "Płatki, woda, sól i dziesięć minut bez odchodzenia od garnka.",
+     "body": [
+      "Jeśli pamiętasz, namocz płatki poprzedniego wieczoru. Rano dodaj wodę i szczyptę soli i mieszaj, aż zgęstnieje, co trwa mniej więcej tyle, ile gotuje się woda w czajniku.",
+      "Jem ją z łyżką dżemu albo kilkoma pokrojonymi jabłkami. Ci, którzy dosypują cukru do owsianki, nie mylą się, ale tracą coś ważnego."
+     ]
+    },
+    {
+     "title": "Wczorajsze ziemniaki na trzy sposoby",
+     "tag": "Dni powszednie",
+     "excerpt": "Smażone, w placku albo do zupy.",
+     "body": [
+      "Ugotowane i wystudzone ziemniaki lepiej się smażą niż świeże, bo kawałki się nie rozpadają. Wystarczy gorąca patelnia, trochę oleju, jajko i szczypior.",
+      "Rozgniecione w zupie zagęszczają wywar, a utarte z jajkiem i mąką zamieniają się w placki, które znikają szybciej, niż się smaży."
+     ]
+    },
+    {
+     "title": "Dlaczego ważę mąkę",
+     "tag": "Chleb",
+     "excerpt": "Waga zmieniła moje pieczenie bardziej niż jakikolwiek przepis.",
+     "body": [
+      "Szklanka mąki może ważyć od 120 do 160 gramów, zależnie od tego, jak się ją nabiera. To różnica między bochenkiem a cegłą.",
+      "Teraz ważę wszystko, także wodę. Przez tydzień wydaje się to czepialstwem, a potem jedynym rozsądnym sposobem pieczenia."
+     ]
+    },
+    {
+     "title": "Babka bez przepisu",
+     "tag": "Wypieki",
+     "excerpt": "Tyle samo wszystkiego i trochę cierpliwości do piekarnika.",
+     "body": [
+      "Babcina babka to tyle samo masła, cukru, jajek i mąki, z odrobiną wanilii. Nigdy jej nie zapisała, bo nigdy nie musiała.",
+      "Piekę ją na każde rodzinne urodziny. Jest zwyczajna i trochę krzywa, a nikt jeszcze nie poprosił o inną."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Notatnik",
+       "Zeszyt",
+       "Dziennik",
+       "Zapiski",
+       "Notatki",
+       "Kronika",
+       "Listy",
+       "Słowa",
+       "Szkice",
+       "Brudnopis"
+      ],
+      [
+       "Sól",
+       "Masło",
+       "Łyżka",
+       "Patelnia",
+       "Stół",
+       "Kuchnia",
+       "Ciasto",
+       "Miska",
+       "Garnek",
+       "Piekarnik"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

@@ -119,6 +119,12 @@ const checked = async () => {
 const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label || b.textContent?.trim() === `+ ${label}` || b.getAttribute("aria-label") === label);
 const click = (b: Element | undefined | null) => act(async () => void b?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+/** "Add profile" opens the list of what can be put; the form of the first profile is one "Set up…" away. */
+const openAdd = async () => {
+  await click(button("Add profile"));
+  await settle();
+  await click(button("Set up…"));
+};
 const radio = (label: string) => [...document.querySelectorAll("[role=radio]")].find((r) => r.textContent?.trim() === label);
 const submit = () => click(document.querySelector("[role=dialog] button[type=submit]"));
 const input = (label: string) => [...document.querySelectorAll<HTMLInputElement>("[role=dialog] input")].find((i) => i.labels?.[0]?.textContent === label);
@@ -155,7 +161,7 @@ describe("adding a profile to a node", () => {
     listProfiles.mockResolvedValue({ profiles: [{ id: "prf_awg", name: "Amnezia 3.1 test", protocol: "awg" }] });
     getDoctor.mockResolvedValue(doctorWith("kernel_headers.no_awg"));
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
 
     expect(text()).toContain("AmneziaWG on this node");
@@ -182,7 +188,7 @@ describe("adding a profile to a node", () => {
     getDoctor.mockResolvedValue(doctorWith("kernel_headers.userspace", { missing: "headers,dkms" }));
     const inbounds = [{ id: "inb_9", profileId: "prf_other", profileName: "other", protocol: "awg", state: InboundState.ACTIVE, port: 51820, awg: { backend: "userspace", backendVersion: "amneziawg-go v3.1", peers: 3, peersOnline: 1 } }];
     await mount(data({ inbounds }));
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
 
     expect(text()).toContain("userspace · amneziawg-go v3.1");
@@ -203,7 +209,7 @@ describe("adding a profile to a node", () => {
     getDoctor.mockResolvedValue(doctorWith("kernel_headers.userspace", { missing: "headers,dkms" }));
     prepareAwgKernel.mockResolvedValue({ outcome: PrepareAwgOutcome.NEEDS_PREPARE });
     await mount(capable());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     await click(radio("Kernel module"));
     expect(text()).not.toContain("Run the command first"); // the command is not what this node needs
@@ -222,7 +228,7 @@ describe("adding a profile to a node", () => {
     getDoctor.mockResolvedValue(doctorWith("kernel_headers.ready"));
     prepareAwgKernel.mockResolvedValue({ outcome: PrepareAwgOutcome.READY });
     await mount(capable());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     await click(radio("Kernel module"));
     await submit();
@@ -255,7 +261,7 @@ describe("adding a profile to a node", () => {
     listProfiles.mockResolvedValue({ profiles: [{ id: "prf_hy", name: "test", protocol: "hysteria2", summary: "UDP 443 · Salamander · Let's Encrypt · WARP" }] });
     createInbound.mockResolvedValue({ inbound: { port: 443, tlsServerName: "de1.example.com", nodeName: "de1" }, warnings: [], freePort: 8443 });
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     expect(text()).not.toContain("AmneziaWG on this node");
     expect(getDoctor).not.toHaveBeenCalled();
@@ -282,7 +288,7 @@ describe("the check before the click", () => {
     );
     updateProfile.mockResolvedValue({});
     await mount(ipNode);
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
 
     expect(text()).toContain("Let’s Encrypt will not issue a certificate for an IP");
@@ -311,7 +317,7 @@ describe("the check before the click", () => {
       r.tlsServerNameOverride ? Promise.resolve({ inbound: { port: 443, tlsServerName: r.tlsServerNameOverride }, warnings: [] }) : Promise.reject(refuse("reality_needs_domain: address=203.0.113.10&node=ip1")),
     );
     await mount(ipNode);
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
 
     // the field a VLESS profile does not have otherwise is there now, with the sentence of the refusal
@@ -333,7 +339,7 @@ describe("the check before the click", () => {
     listProfiles.mockResolvedValue({ profiles: [hy({ nodeCount: 2 })] });
     createInbound.mockRejectedValue(refuse("acme_needs_domain: address=203.0.113.10&node=ip1"));
     await mount(ipNode);
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     expect(button("Switch “Main” to self-signed")).toBeUndefined();
     expect(text()).toContain("“Main” stays with Let’s Encrypt on the nodes it already runs on.");
@@ -357,7 +363,7 @@ describe("the check before the click", () => {
           : Promise.resolve({ inbound: { port: r.portOverride }, warnings: [] }),
     );
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     await checked();
     expect(input("Port")?.value).toBe("8443");
@@ -378,7 +384,7 @@ describe("the check before the click", () => {
     listProfiles.mockResolvedValue({ profiles: [hy({ summary: "UDP 8443 · Salamander · Let's Encrypt · WARP" })] });
     createInbound.mockResolvedValue({ inbound: { port: 8443, nodeName: "de1" }, warnings: [{ code: "warp_missing", params: { state: "none" } }] });
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     expect(text()).toContain("de1 has no WARP — a profile with a WARP exit will not pass traffic there.");
     expect(document.querySelector('a[href="/nodes/$id#warp"]')?.textContent).toBe("Set up WARP on de1");
@@ -390,7 +396,7 @@ describe("the check before the click", () => {
     const params = { node: "de1", port: "443", hy2: "Main", vless: "vless 443", via: "site", target: "www.example.org", port80: "unchecked" };
     createInbound.mockResolvedValue({ inbound: { port: 443, nodeName: "de1" }, warnings: [{ code: "hy2_decoy_paused", params }] });
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     expect(text()).toContain(
       "TCP 443 on de1 goes to “vless 443”. The site of “Main” is off while it does and comes back when the port is free; visitors of TCP 443 see www.example.org instead (REALITY passes them on). The Hysteria2 certificate now renews only through TCP 80.",
@@ -408,7 +414,7 @@ describe("the check before the click", () => {
     listProfiles.mockResolvedValue({ profiles: [hy({ summary: "UDP 8443 · Salamander · Let's Encrypt · WARP" })] });
     createInbound.mockResolvedValue({ inbound: { port: 8443, nodeName: "de1" }, warnings: [{ code: "warp_missing", params: { state: "down" } }] });
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     expect(text()).toContain("WARP on de1 does not work now");
     expect(document.querySelector('a[href="/nodes/$id#warp"]')?.textContent).toBe("Open WARP on de1");
@@ -418,7 +424,7 @@ describe("the check before the click", () => {
     listProfiles.mockResolvedValue({ profiles: [hy()] });
     createInbound.mockImplementation((r: { validateOnly?: boolean }) => (r.validateOnly ? Promise.resolve({ inbound: { port: 443 }, warnings: [] }) : Promise.reject(refuse("node_retired", Code.FailedPrecondition))));
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     await submit();
     await settle();
@@ -440,7 +446,7 @@ describe("a node with no profile and a panel with none", () => {
     listGroups.mockResolvedValue({ groups: [{ id: "grp_all", name: "Все", profileIds: [], userCount: 4 }] });
     createProfile.mockResolvedValue({ profile: { id: "prf_new", version: 1 } });
     await mount(data({ node: node({ name: "ip1", address: "203.0.113.10" }) }));
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     expect(text()).toContain("There are no profiles yet");
     expect(text()).toContain("The address of ip1 is an IP.");
@@ -651,7 +657,7 @@ describe("a port that loses UDP packets", () => {
       r.portOverride === 0 ? Promise.reject(refuse(lossy(8443), Code.FailedPrecondition)) : Promise.resolve({ inbound: { port: r.portOverride }, warnings: [] }),
     );
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     await checked();
     expect(input("Port")?.value).toBe("2053");
@@ -668,7 +674,7 @@ describe("a port that loses UDP packets", () => {
       r.portOverride === 8443 && !r.allowLossyPort ? Promise.reject(refuse(lossy(8443, 4443), Code.FailedPrecondition)) : Promise.resolve({ inbound: { port: r.portOverride }, warnings: [] }),
     );
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     await type(input("Port"), "8443");
     await checked();
@@ -687,7 +693,7 @@ describe("a port that loses UDP packets", () => {
       r.validateOnly ? Promise.resolve({ inbound: { port: 8443 }, warnings: [] }) : r.portOverride === 4443 ? Promise.resolve({ inbound: {}, warnings: [] }) : Promise.reject(refuse(lossy(8443, 4443), Code.FailedPrecondition)),
     );
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     await submit();
     await settle();
@@ -709,7 +715,7 @@ describe("a port that loses UDP packets", () => {
       r.validateOnly ? Promise.resolve({ inbound: { port: 8443 }, warnings: [] }) : new Promise((res) => (finish = res)),
     );
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     await checked();
     await submit();
@@ -746,7 +752,7 @@ describe("a port that loses UDP packets", () => {
     updateProfile.mockResolvedValue({ profile: { id: "prf_new", version: 2 } });
     createInbound.mockImplementation((r: { validateOnly?: boolean }) => (r.validateOnly ? Promise.reject(refuse(lossy(443, 2053), Code.FailedPrecondition)) : Promise.resolve({ inbound: {}, warnings: [] })));
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     await click(button("Create Hysteria2 · 443 and put it on de1"));
     await settle();
@@ -762,7 +768,7 @@ describe("a port that loses UDP packets", () => {
     let real = 0;
     createInbound.mockImplementation((r: { validateOnly?: boolean }) => (r.validateOnly || real++ > 0 ? Promise.resolve({ inbound: {}, warnings: [] }) : Promise.reject(refuse(lossy(443, 4443), Code.FailedPrecondition))));
     await mount(data());
-    await click(button("Add profile"));
+    await openAdd();
     await settle();
     await click(button("Create Hysteria2 · 443 and put it on de1"));
     await settle();
@@ -905,9 +911,23 @@ describe("the site of a REALITY server on this node", () => {
 
   it("leads to the card of neighbouring sites, which closes the window", async () => {
     await edit(vless);
-    await click(button("Find sites nearby…"));
-    await settle();
-    expect(document.querySelector("[role=dialog]")).toBeNull();
+    const scroll = vi.fn(function (this: Element) {
+      return this.id;
+    });
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      await click(button("Find sites nearby…"));
+      await settle();
+      expect(document.querySelector("[role=dialog]")).toBeNull();
+      // the scroll waits for the window to go: by then the test's page may be gone too, so the timer must not look the card up itself
+      vi.stubGlobal("document", undefined);
+      await new Promise((r) => setTimeout(r, 150));
+      vi.unstubAllGlobals();
+      expect(scroll.mock.results.map((r) => r.value)).toEqual(["sni-scan"]);
+    } finally {
+      vi.unstubAllGlobals();
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
   });
 });
 

@@ -1,0 +1,177 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Kivi",
+      "Marmori",
+      "Satama",
+      "Lyhty",
+      "Koivu",
+      "Sulka",
+      "Vaahtera",
+      "Tiira",
+      "Apila",
+      "Meripihka"
+     ],
+     [
+      "lähetys",
+      "posti",
+      "jako",
+      "paketti",
+      "kuriiri",
+      "siirto",
+      "kyyti"
+     ]
+    ]
+   },
+   "limit": [
+    "500 MB",
+    "1 GB",
+    "2 GB",
+    "5 GB"
+   ]
+  },
+  "nav_label": "Päävalikko",
+  "tagline": "Yksinkertainen tiedostonsiirto",
+  "footer": "Tiedostot poistetaan automaattisesti, kun linkki vanhenee.",
+  "nav_home": "Lähetä tiedosto",
+  "nav_how": "Näin se toimii",
+  "nav_limits": "Rajat ja UKK",
+  "home_title": "Lähetä tiedosto",
+  "desc": "Jaa enintään {limit} tiedostoja yhdellä linkillä: {brand}.",
+  "desc_how": "Näin tiedostojen siirto toimii palvelussa {brand}.",
+  "desc_limits": "Tiedostokoot, linkkien voimassaoloajat ja usein kysyttyä palvelusta {brand}.",
+  "nf_title": "Sivua ei löytynyt",
+  "nf_text": "Hakemaasi sivua ei ole olemassa tai se on siirretty.",
+  "nf_back": "Takaisin etusivulle",
+  "drop_h": "Pudota tiedosto tähän",
+  "drop_hint": "tai valitse se laitteeltasi, enintään {limit}",
+  "pick": "Valitse tiedosto",
+  "uploading": "Ladataan…",
+  "e_full": [
+   "Tallennustila on täynnä. Yritä myöhemmin uudelleen.",
+   "Lataus epäonnistui: tallennustilamme on juuri nyt täynnä.",
+   "Emme voi tällä hetkellä ottaa vastaan lisää tiedostoja, koska tallennustila on täynnä."
+  ],
+  "retry": "Yritä uudelleen",
+  "how_h": "Näin se toimii",
+  "how_intro": "Kolme vaihetta, mitään ei tarvitse asentaa.",
+  "steps": [
+   {
+    "h": "Valitse tiedosto",
+    "p": "Pudota tiedosto etusivulle tai valitse se laitteeltasi."
+   },
+   {
+    "h": "Hae linkki",
+    "p": "Kun lataus on valmis, saat linkin, jonka voit kopioida."
+   },
+   {
+    "h": "Jaa linkki",
+    "p": "Kuka tahansa, jolla on linkki, voi ladata tiedoston, kunnes linkki vanhenee."
+   }
+  ],
+  "limits_h": "Rajat ja UKK",
+  "limits_intro": "Tärkeät luvut yhdessä paikassa.",
+  "limits": [
+   {
+    "k": "Suurin tiedosto",
+    "v": "{limit}"
+   },
+   {
+    "k": "Linkin voimassaolo",
+    "v": "{days} päivää"
+   },
+   {
+    "k": "Tiedostoja per lähetys",
+    "v": "Yksi (pakkaa useat tiedostot zip-tiedostoksi)"
+   },
+   {
+    "k": "Latauksia per linkki",
+    "v": "Rajattomasti, kunnes linkki vanhenee"
+   }
+  ],
+  "faq_h": "Usein kysyttyä",
+  "faq": [
+   {
+    "q": "Tarvitsenko tunnuksen?",
+    "a": "Et. Voit lähettää enintään {limit} tiedostoja kirjautumatta."
+   },
+   {
+    "q": "Kuinka kauan linkkini toimii?",
+    "a": "Linkit toimivat {days} päivää. Sen jälkeen tiedosto poistetaan ja linkki lakkaa toimimasta."
+   },
+   {
+    "q": "Näkeekö vastaanottaja nimeni?",
+    "a": "Vain jos kerrot sen hänelle. Latausivulla ei näy mitään sinusta."
+   },
+   {
+    "q": "Mitä tiedostolleni tapahtuu, kun linkki vanhenee?",
+    "a": "Se poistetaan tallennustilasta. Emme säilytä kopiota."
+   }
+  ],
+  "feats": [
+   {
+    "h": "Vanhenevat linkit",
+    "p": "Jokainen linkki toimii {days} päivää, joten mitään ei jää lojumaan."
+   },
+   {
+    "h": "Ei rekisteröitymistä",
+    "p": "Enintään {limit} tiedostoja voi lähettää ilman tunnusta."
+   },
+   {
+    "h": "Yksinkertainen ja nopea",
+    "p": "Lisää tiedosto, kopioi linkki, välitä se eteenpäin. Siinä kaikki."
+   }
+  ],
+  "nav_privacy": "Tietosuoja",
+  "desc_privacy": "Mitä tiedoillesi ja tiedostoillesi tapahtuu palvelussa {brand}.",
+  "privacy_h": "Tietosuojaseloste",
+  "privacy_intro": "Lyhyt kuvaus siitä, mitä tiedostollesi ja siirtosi tiedoille tapahtuu.",
+  "privacy": [
+   {
+    "h": "Mitä säilytämme",
+    "p": "Lataamasi tiedoston ja lataushetken. Emme kysy nimeäsi emmekä pidä luetteloa tiedoston lataajista."
+   },
+   {
+    "h": "Kuinka kauan säilytämme",
+    "p": "Siihen asti, kun linkki vanhenee. Sen jälkeen tiedosto poistetaan tallennustilasta, eikä sitä voi palauttaa."
+   },
+   {
+    "h": "Kuka sen näkee",
+    "p": "Kuka tahansa, jolla on linkki. Emme avaa tai lue tiedostojasi, joten jaa linkki vain niille, joiden kuuluu saada tiedosto."
+   },
+   {
+    "h": "Evästeet",
+    "p": "Käytämme vain sitä, mitä sivu tarvitsee toimiakseen. Mainos- tai seurantaevästeitä ei ole."
+   },
+   {
+    "h": "Tiedoston poistaminen etuajassa",
+    "p": "Pyydä organisaatiosi {brand}-palvelun ylläpitäjää poistamaan tiedosto, ennen kuin sen linkki vanhenee."
+   }
+  ]
+ },
+ "bundles": {
+  "transfer": {
+   "kicker": "Tiedostonsiirto",
+   "hero_h": "Lähetä tiedosto kenelle tahansa",
+   "hero_p": "Lisää tiedosto, hae linkki ja jaa se. Enintään {limit} tiedostoihin ei tarvita tunnusta."
+  },
+  "print": {
+   "kicker": "Painotiedostot",
+   "hero_h": "Lataa työsi",
+   "hero_p": "Lähetä meille painovalmiit tiedostot tilaustasi varten. Enintään {limit} PDF-, TIFF- ja ZIP-tiedostot käyvät."
+  },
+  "photos": {
+   "kicker": "Kuvien jako",
+   "hero_h": "Jaa valokuvasi",
+   "hero_p": "Lähetä kansiollinen kuvia yhtenä zip-tiedostona, enintään {limit}. Ystävien ja perheen tarvitsee vain linkki."
+  },
+  "assignments": {
+   "kicker": "Tehtävät",
+   "hero_h": "Palauta työsi",
+   "hero_p": "Lataa tehtäväsi tänne ennen määräaikaa. Yksi tiedosto, enintään {limit}."
+  }
+ }
+}

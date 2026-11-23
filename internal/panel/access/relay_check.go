@@ -14,6 +14,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -506,18 +507,6 @@ func (s *Service) CheckRelay(ctx context.Context, req *connect.Request[adminv1.C
 	return connect.NewResponse(&adminv1.CheckRelayResponse{Relay: s.relayMsg(ctx, next)}), nil
 }
 
-// relayUnsupported says why a server cannot be passed on by an entry, "" when it can: people reach a CDN server through the CDN,
-// not the exit's address; a certificate on the exit's IP address would not fit the entry's.
-func relayUnsupported(protocol string, spec plugin.InboundSpec) string {
-	switch {
-	case spec.TLS.Mode == plugin.TLSAcmeIP:
-		return "acme_ip"
-	case protocols.ServerCDN(spec):
-		return "cdn"
-	}
-	return ""
-}
-
 func relayCheckMsg(c store.RelayCheck, nameOf func(string) string) *adminv1.RelayCheck {
 	stage := func(s store.RelayStage) *adminv1.RelayStage {
 		return &adminv1.RelayStage{Status: s.Status, Code: s.Code, SenderId: s.Sender, SenderName: nameOf(s.Sender),
@@ -618,7 +607,7 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 				c.Unsupported = "build_failed"
 			} else {
 				c.Network, c.Port, c.Hop = spec.Listen.Network, uint32(spec.Listen.Port), spec.Listen.HopFrom != 0
-				c.Unsupported = relayUnsupported(f.Profile.Protocol, spec)
+				c.Unsupported = protocols.IPv6Unsupported(spec)
 			}
 			c.ReverseBlocked = reverseBlockedOf(c.Network, entry.AgentCaps, n.AgentCaps)
 			out = append(out, c)
@@ -726,7 +715,7 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 		}
 		return strings.ToLower(a.ProfileName) < strings.ToLower(b.ProfileName)
 	})
-	return connect.NewResponse(&adminv1.ListRelayCandidatesResponse{Candidates: out, AgentSupported: slices.Contains(entry.AgentCaps, plugin.CapRelayForward),
+	return connect.NewResponse(&adminv1.ListRelayCandidatesResponse{Candidates: out, AgentSupported: slices.Contains(entry.AgentCaps, agentcap.RelayForward),
 		EntryCountry: hint(entry.ID)}), nil
 }
 

@@ -1,0 +1,14 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __st__">
+<p class="__crumb__"><a href="{{(index .Nav 0).Href}}">{{.L.nav_home}}</a> / <span>{{.L.about_h}}</span></p>
+<h1>{{.L.about_h}}</h1>
+<p class="__lede__">{{.L.banner_sub}}</p>
+<div class="__ab__">{{range $i, $x := .L.about}}<section id="__s{{add $i 1}}__" class="__abr__"><span class="__no__ __mono__">0{{add $i 1}}</span><div><h2>{{$x.h}}</h2><p>{{$x.p}}</p></div></section>
+{{end}}</div>
+<div class="__card__ __abl__"><h2>{{.L.comps_h}}</h2>
+<ul>{{range .Lists.comps}}<li><span>{{.text}}</span><span class="__ok__">{{icon "checkc"}}{{$.L.op}}</span></li>{{end}}</ul></div>
+</main>
+{{template "footer" .}}
+</body>
+</html>

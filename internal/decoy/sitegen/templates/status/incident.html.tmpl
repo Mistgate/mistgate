@@ -1,0 +1,24 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __st__">
+{{with .Page.Item}}{{$t := times (printf "t%s" .slug) 3}}{{$imp := .impact}}<p class="__crumb__"><a href="{{(index $.Nav 1).Href}}">{{$.L.history_h}}</a> / <span>{{.title}}</span></p>
+<h1>{{.title}}</h1>
+<div class="__head__"><span class="__pill__ {{if eq .impact "major"}}__imp2__{{else if eq .impact "maint"}}__imp3__{{else}}__imp1__{{end}}">{{if eq .impact "major"}}{{$.L.imp_major}}{{else if eq .impact "maint"}}{{$.L.imp_maint}}{{else}}{{$.L.imp_minor}}{{end}}</span><time class="__mono__" datetime="{{.date_iso}}">{{.date}}</time><span>{{$.L.dur_l}}: {{.dur}}</span><span class="__pill__ __imp0__">{{$.L.st_res}}</span></div>
+<div class="__ig__">
+<article class="__card__ __itl__"><ol class="__tl__">
+<li><strong>{{$.L.st_res}}</strong><span class="__t__ __mono__">{{index $t 2}} {{$.L.utc}}</span><p>{{.c}}</p></li>
+<li><strong>{{$.L.st_ident}}</strong><span class="__t__ __mono__">{{index $t 1}} {{$.L.utc}}</span><p>{{.b}}</p></li>
+<li><strong>{{$.L.st_inv}}</strong><span class="__t__ __mono__">{{index $t 0}} {{$.L.utc}}</span><p>{{.a}}</p></li>
+</ol></article>
+<aside>
+<div class="__card__ __sd__"><h2>{{$.L.comps_h}}</h2>
+<ul class="__aff__">{{range $i, $c := $.Lists.comps}}<li><span>{{$c.text}}</span>{{if eq $i 0}}<span class="__pill__ {{if eq $imp "major"}}__imp2__{{else if eq $imp "maint"}}__imp3__{{else}}__imp1__{{end}}">{{if eq $imp "major"}}{{$.L.imp_major}}{{else if eq $imp "maint"}}{{$.L.imp_maint}}{{else}}{{$.L.imp_minor}}{{end}}</span>{{else if eq $i 1}}<span class="__pill__ __imp1__">{{$.L.imp_minor}}</span>{{else}}<span class="__pill__ __imp0__">{{$.L.op}}</span>{{end}}</li>{{end}}</ul></div>
+<div class="__card__ __sd__"><h2>{{$.L.inc_more}}</h2>
+<ul class="__mlist__">{{range $.Lists.incidents}}{{if ne .slug $.Page.Item.slug}}<li><a href="{{.href}}">{{.title}}</a><span class="__mono__">{{.date}}</span></li>{{end}}{{end}}</ul></div>
+<p><a class="__btn__" href="{{(index $.Nav 1).Href}}">{{icon "back"}}{{$.L.inc_back}}</a></p>
+</aside>
+</div>{{end}}
+</main>
+{{template "footer" .}}
+</body>
+</html>

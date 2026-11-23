@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -869,7 +870,16 @@ func TestReview15_FastDeadConnectionsBackOff(t *testing.T) {
 	})
 	dialer.timing.retryMin = 40 * time.Millisecond
 	dialer.timing.retryMax = 160 * time.Millisecond
-	dialer.timing.retryJitter = func(wait time.Duration) time.Duration { return wait }
+	// The delay the dialer asks for before each retry is recorded, not measured: a clock on a loaded machine cannot tell 80 ms
+	// from 120 ms, but the requested delays are what the dialer decided.
+	var waitsMu sync.Mutex
+	var waits []time.Duration
+	dialer.timing.retryJitter = func(wait time.Duration) time.Duration {
+		waitsMu.Lock()
+		defer waitsMu.Unlock()
+		waits = append(waits, wait)
+		return wait
+	}
 	dialer.timing.startStagger = 30 * time.Second
 	dialer.timing.dialTimeout = time.Second
 	dialer.timing.pendingWorkers = 1
@@ -887,12 +897,17 @@ func TestReview15_FastDeadConnectionsBackOff(t *testing.T) {
 			t.Fatalf("only %d fast-dead TLS connections were accepted", len(seen))
 		}
 	}
-	if len(seen) >= 3 {
-		first := seen[1].Sub(seen[0])
-		second := seen[2].Sub(seen[1])
-		if first < 30*time.Millisecond || second < first+20*time.Millisecond {
-			t.Fatalf("fast-dead retries did not back off: intervals %s then %s", first, second)
-		}
+	// Four failures came before the fifth accept; each asked for a wait, doubling up to the cap.
+	waitsMu.Lock()
+	got := append([]time.Duration(nil), waits...)
+	waitsMu.Unlock()
+	want := []time.Duration{40 * time.Millisecond, 80 * time.Millisecond, 160 * time.Millisecond, 160 * time.Millisecond}
+	if len(got) < len(want) || !slices.Equal(got[:len(want)], want) {
+		t.Fatalf("fast-dead retries did not back off: asked waits %v, want %v first", got, want)
+	}
+	// A timer never fires early, so however loaded the machine is, those waits lie between the first and the last accept.
+	if span := seen[4].Sub(seen[0]); span < 440*time.Millisecond {
+		t.Fatalf("fast-dead retries did not wait what they asked: %s between the first and the fifth accept, want at least 440ms", span)
 	}
 }
 

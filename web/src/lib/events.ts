@@ -12,6 +12,7 @@ import { usedText } from "./update-sources";
 const textKeys: Record<string, MessageKey> = {
   node_down: "event.node_down",
   node_blip: "event.node_blip",
+  panel_link_gap: "event.panel_link_gap",
   node_recovered: "event.node_recovered",
   agent_restarted: "event.agent_restarted",
   user_change_limit: "event.user_change_limit",
@@ -91,6 +92,7 @@ const textKeys: Record<string, MessageKey> = {
 // process: a still dot, never the spinning ring of "busy".
 const kindByCode: Record<string, StatusKind> = {
   node_blip: "blip",
+  panel_link_gap: "blip",
   node_recovered: "ok",
   node_retired: "off",
 };
@@ -135,6 +137,8 @@ export function describeEvent(t: T, e: Described, stamp?: (unix: number) => stri
       return { text: t(p.unasked === "true" ? "event.client_logs_received.unasked" : key, { lines: p.lines ?? "?" }), detail: "" };
     case "node_blip":
       return { text: t(p.rebooted === "true" ? "event.node_blip.rebooted" : key, { span }), detail };
+    case "panel_link_gap":
+      return { text: t(key, { seconds: p.seconds ?? "?" }), detail };
     case "node_recovered":
       return { text: t(key, { span }), detail };
     case "engine_failed":

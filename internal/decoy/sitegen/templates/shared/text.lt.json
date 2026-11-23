@@ -1,0 +1,102 @@
+{
+ "nav_label": "Pagrindinis meniu",
+ "toc_h": "Šiame puslapyje",
+ "nf_title": "Puslapis nerastas",
+ "nf_text": "Puslapio, kurio ieškote, nėra arba jis perkeltas.",
+ "nf_back": "Atgal į pradžią",
+ "months": [
+  "sausis",
+  "vasaris",
+  "kovas",
+  "balandis",
+  "gegužė",
+  "birželis",
+  "liepa",
+  "rugpjūtis",
+  "rugsėjis",
+  "spalis",
+  "lapkritis",
+  "gruodis"
+ ],
+ "months_gen": [
+  "sausio",
+  "vasario",
+  "kovo",
+  "balandžio",
+  "gegužės",
+  "birželio",
+  "liepos",
+  "rugpjūčio",
+  "rugsėjo",
+  "spalio",
+  "lapkričio",
+  "gruodžio"
+ ],
+ "weekdays": [
+  "Pirmadienis",
+  "Antradienis",
+  "Trečiadienis",
+  "Ketvirtadienis",
+  "Penktadienis",
+  "Šeštadienis",
+  "Sekmadienis"
+ ],
+ "weekdays_short": [
+  "Pr",
+  "An",
+  "Tr",
+  "Kt",
+  "Pn",
+  "Št",
+  "Sk"
+ ],
+ "am": "ryto",
+ "pm": "vakaro",
+ "closed": "uždaryta",
+ "hrs_fmt": "%days%: %time%",
+ "ms": "ms",
+ "units": [
+  "B",
+  "KB",
+  "MB"
+ ],
+ "cf_h": "Parašykite mums",
+ "cf_intro": "Atsiųskite žinutę, ir atsakysime, kai tik galėsime.",
+ "cf_name": "Jūsų vardas",
+ "cf_email": "El. pašto adresas",
+ "cf_msg": "Žinutė",
+ "cf_send": "Siųsti žinutę",
+ "cf_busy": "Siunčiama…",
+ "cf_empty": "Pirmiausia parašykite žinutę.",
+ "cf_fail": "Žinutės išsiųsti nepavyko. Pabandykite vėliau.",
+ "nav_terms": "Naudojimo sąlygos",
+ "desc_terms": "Paslaugos „{brand}“ naudojimo sąlygos.",
+ "terms_h": "Naudojimo sąlygos",
+ "terms_intro": "Prieš naudodamiesi paslauga „{brand}“, perskaitykite šias sąlygas. Jos trumpos ir galioja nuo pirmo naudojimo karto.",
+ "terms": [
+  {
+   "h": "Paslaugos naudojimas",
+   "p": "Paslauga „{brand}“ teikiama tokia, kokia yra. Naudodamiesi ja sutinkate su šiomis sąlygomis. Jei nesutinkate, paslaugos nenaudokite."
+  },
+  {
+   "h": "Jūsų pareigos",
+   "p": "Naudokitės paslauga teisėtai ir tik savo ar savo organizacijos reikmėms. Neatskleiskite prisijungimo duomenų kitiems ir pasakykite mums, jei manote, kad juos sužinojo kas nors kitas."
+  },
+  {
+   "h": "Kas draudžiama",
+   "p": "Negalima bandyti sugadinti paslaugos, jos perkrauti ar patekti ten, kur jums neleista. Galime užblokuoti prieigą, kuri kenkia kitiems."
+  },
+  {
+   "h": "Prieinamumas",
+   "p": "Stengiamės, kad paslauga veiktų, bet negalime žadėti, kad ji bus pasiekiama visada. Galime pakeisti, sustabdyti ar nutraukti kai kurias jos dalis."
+  },
+  {
+   "h": "Atsakomybė",
+   "p": "Kiek leidžia įstatymai, neatsakome už nuostolius, atsiradusius naudojantis paslauga ar dėl to, kad ja nepavyko pasinaudoti."
+  },
+  {
+   "h": "Pakeitimai",
+   "p": "Šias sąlygas kartais galime atnaujinti. Jei po pakeitimo toliau naudositės paslauga, laikysime, kad naujoms sąlygoms pritariate."
+  }
+ ]
+}

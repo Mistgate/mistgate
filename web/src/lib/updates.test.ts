@@ -1,4 +1,5 @@
 import { Code, ConnectError } from "@connectrpc/connect";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BundleStatus, NodeUpdateState, RolloutStatus, StepState } from "@/gen/mistgate/admin/v1/update_pb";
 import { fill, pickForm, type T } from "@/i18n";
@@ -13,6 +14,7 @@ import {
   fastPollMs,
   heroOf,
   isFailurePause,
+  isCancelWait,
   lastUpdateView,
   manualCommands,
   nodeStateKind,
@@ -20,6 +22,8 @@ import {
   pauseText,
   progressOf,
   reasonText,
+  rescanText,
+  skippedProfilesNote,
   slowPollMs,
   stagesOf,
   stepErrorText,
@@ -271,6 +275,84 @@ describe("the words of server keys", () => {
     expect(reasonText(t, "something odd")).toBe("something odd");
   });
 
+  it("names the profile and the reason when the gate says which profile failed, in the step and in the pause", () => {
+    const one = { failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "timeout" }]) };
+    expect(stepErrorText(t, "updates.step.err.probe_failed", one)).toBe(`The client-eye check failed after the update for the profile “Main”: ${en["health.check.err.timeout"]}.`);
+    // the code the check gives a flow that stops after the first kilobytes has its words too, not the raw code
+    const frozen = { failed_profiles: JSON.stringify([{ id: "inb_3", name: "Main", code: "freeze" }]) };
+    expect(stepErrorText(t, "updates.step.err.probe_failed", frozen)).toBe(`The client-eye check failed after the update for the profile “Main”: ${en["health.check.err.freeze"]}.`);
+    const two = {
+      failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "refused" }, { id: "inb_2", name: "Backup", code: "no_round" }]),
+      failed_more: "3",
+    };
+    expect(stepErrorText(t, "updates.step.err.probe_failed", two)).toBe(
+      `The client-eye check failed after the update for the profiles “Main”: ${en["health.check.err.refused"]}; “Backup”: not checked yet; and 3 more.`,
+    );
+    expect(pauseText(t, "updates.pause.gate_failed", { node: "de1", reason: "probe_failed", ...one })).toContain(
+      `de1 did not pass the check after updating: the client-eye check failed for the profile “Main”: ${en["health.check.err.timeout"]}. Where possible`,
+    );
+    // a code the dictionary does not know is shown as it is, and a value that is not the gate's JSON changes nothing
+    expect(stepErrorText(t, "updates.step.err.probe_failed", { failed_profiles: JSON.stringify([{ id: "x", name: "Main", code: "new_code" }]) })).toContain("“Main”: new_code");
+    expect(stepErrorText(t, "updates.step.err.probe_failed", { failed_profiles: "{not json" })).toBe(en["updates.step.err.probe_failed"]);
+    expect(stepErrorText(t, "updates.step.err.probe_failed", {})).toBe(en["updates.step.err.probe_failed"]);
+    expect(stepErrorText(t, "updates.step.err.inbound_failed", one)).toBe(en["updates.step.err.inbound_failed"]);
+  });
+
+  it("reads the gate's profile params under the keys and in the shape the panel writes them", () => {
+    // internal/panel/update/testdata/gate_params.json is what the Go side (gate_profiles_test.go) holds its constants to
+    const golden = JSON.parse(readFileSync(`${process.cwd()}/../internal/panel/update/testdata/gate_params.json`, "utf8")) as {
+      failed_profiles: string;
+      failed_more: string;
+      skipped_profiles: string;
+      skipped_more: string;
+      profile_fields: string[];
+    };
+    expect(golden.profile_fields).toEqual(["id", "name", "code"]);
+    const [id, name, code] = golden.profile_fields as [string, string, string];
+    const params = {
+      [golden.failed_profiles]: JSON.stringify([{ [id]: "inb_1", [name]: "Main", [code]: "timeout" }]),
+      [golden.failed_more]: "2",
+      [golden.skipped_profiles]: JSON.stringify(["Old"]),
+      [golden.skipped_more]: "1",
+    };
+    const sentence = stepErrorText(t, "updates.step.err.probe_failed", params);
+    expect(sentence).toContain("“Main”");
+    expect(sentence).toContain("and 2 more");
+    expect(skippedProfilesNote(t, params)).toContain("“Old”, and 1 more");
+  });
+
+  it("quotes the profiles a gate names in the language's own quotes", () => {
+    const tRu = Object.assign((key: keyof typeof ru, vars?: Record<string, string | number>) => fill(ru[key], vars), {
+      n: (key: keyof typeof ru, n: number, vars?: Record<string, string | number>) => fill(pickForm(ru[key], n, "ru"), { n, ...vars }),
+    }) as unknown as T;
+    const one = { failed_profiles: JSON.stringify([{ id: "inb_1", name: "Main", code: "timeout" }]), skipped_profiles: JSON.stringify(["Old"]) };
+    expect(stepErrorText(tRu, "updates.step.err.probe_failed", one)).toContain(`«Main»: ${ru["health.check.err.timeout"]}`);
+    expect(skippedProfilesNote(tRu, one)).toContain("«Old»");
+  });
+
+  it("tells the owner what \"read the folder again\" did about the bundle of a newer release", () => {
+    const answer = (params: Record<string, string>) => ({ bundle: { params } });
+    expect(rescanText(t, answer({ sync: "fresh" }))).toBe(en["up.bundle.sync.fresh"]);
+    expect(rescanText(t, answer({ sync: "installed" }))).toBe(en["up.bundle.sync.installed"]);
+    expect(rescanText(t, answer({ sync: "downloading" }))).toBe(en["up.bundle.sync.downloading"]);
+    expect(rescanText(t, answer({ sync: "failed" }))).toBe(en["up.bundle.sync.failed"]);
+    expect(rescanText(t, answer({ sync: "waiting", sync_wait: "rollout" }))).toBe(en["up.bundle.sync.wait.rollout"]);
+    expect(rescanText(t, answer({ sync: "waiting", sync_wait: "os_rollout" }))).toBe(en["up.bundle.sync.wait.os_rollout"]);
+    expect(rescanText(t, answer({ sync: "waiting", sync_wait: "panel_update" }))).toBe(en["up.bundle.sync.wait.panel_update"]);
+    expect(rescanText(t, answer({ sync: "waiting", sync_wait: "something_new" }))).toBe(en["up.bundle.sync.wait.other"]);
+    // a panel with no source, or an answer without params: only the folder was read
+    expect(rescanText(t, answer({}))).toBe(en["up.bundle.rescanned"]);
+    expect(rescanText(t, {})).toBe(en["up.bundle.rescanned"]);
+    expect(rescanText(t, answer({ sync: "something_new" }))).toBe(en["up.bundle.rescanned"]);
+  });
+
+  it("says which profiles were not held against the update because they did not work before it", () => {
+    expect(skippedProfilesNote(t, { skipped_profiles: JSON.stringify(["Main", "Backup"]) })).toBe("Not held against the update, these did not work before it: “Main”, “Backup”.");
+    expect(skippedProfilesNote(t, { skipped_profiles: JSON.stringify(["Main"]), skipped_more: "2" })).toContain("“Main”, and 2 more");
+    expect(skippedProfilesNote(t, {})).toBe("");
+    expect(skippedProfilesNote(t, { skipped_profiles: "oops" })).toBe("");
+  });
+
   it("tells apart the three ways a node can miss its configuration after an update, and still reads the old code", () => {
     const codes = ["not_committed", "state_not_applied", "inbounds_unreadable"];
     const views = codes.map((c) => [
@@ -315,6 +397,13 @@ describe("the words of server keys", () => {
     expect(pausedStep(r)?.nodeId).toBe("nod_2");
     expect(isFailurePause("updates.pause.owner")).toBe(false);
     expect(isFailurePause("updates.pause.bundle_changed")).toBe(false);
+  });
+
+  it("recognizes the shared cancel-wait marker and the stored OS marker", () => {
+    expect(isCancelWait("updates.pause.cancel_wait")).toBe(true);
+    expect(isCancelWait("os.pause.cancel_wait")).toBe(true);
+    expect(isCancelWait("owner", { cancel_requested: "true" })).toBe(true);
+    expect(isCancelWait("owner")).toBe(false);
   });
 });
 
@@ -380,11 +469,22 @@ describe("dictionary", () => {
   // the codes the panel and the agents produce
   const stepCodes = ["bad_signature", "unsigned_build", "bad_manifest", "expired", "downgrade", "no_file_for_platform", "download_failed", "size_mismatch", "hash_mismatch", "not_writable", "busy", "no_answer", "not_reconnected", "not_committed", "state_not_applied", "inbounds_unreadable", "warp_down", "inbound_failed", "probe_failed", "rolled_back_by_agent", "manual", "offline", "unsupported", "up_to_date", "cancelled", "agent_failed", "rollback_failed", "failed"];
   const bundleCodes = ["no_manifest", "no_signature", "bad_manifest", "unsupported_schema", "bad_signature", "expired", "file_missing", "file_mismatch"];
-  const pause = ["owner", "step_failed", "gate_failed", "bundle_changed", "panel_restart_ambiguous"];
+  const pause = ["owner", "step_failed", "gate_failed", "bundle_changed", "panel_restart_ambiguous", "cancel_wait"];
   // the agent's own codes, and the panel's names for who sent a rollback (update/reason.go)
   const reason = ["not_committed", "built_mismatch", "crash_loop", "apply_failed", "manual", "interrupted", "gate", "gate_probe_failed", "gate_inbound_failed", "gate_not_committed", "gate_state_not_applied", "gate_inbounds_unreadable", "gate_warp_down", "command"];
   // the gate's codes, which a pause names in a short form
   const pauseWhy = ["probe_failed", "inbound_failed", "not_committed", "state_not_applied", "inbounds_unreadable", "warp_down", "not_reconnected", "no_answer", "rolled_back_by_agent", "agent_failed"];
+
+  it("has the words of a profile failure in every language", () => {
+    const keys = ["updates.step.profiles", "updates.step.profiles.more", "updates.step.skipped", "updates.pause.why.profiles",
+      ...["no_round", "failed"].map((c) => `updates.step.profile.why.${c}`),
+      ...["fresh", "installed", "downloading", "failed", "wait.rollout", "wait.os_rollout", "wait.panel_update", "wait.other"].map((c) => `up.bundle.sync.${c}`)];
+    for (const k of keys) {
+      expect(en, k).toHaveProperty([k]);
+      expect(ru, k).toHaveProperty([k]);
+    }
+    expect(ru["updates.step.profiles"].split("|")).toHaveLength(3);
+  });
 
   it("has a sentence in both languages for every code the server can send", () => {
     const keys = [

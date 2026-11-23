@@ -89,7 +89,7 @@ const issued = (over: Record<string, unknown> = {}) =>
     installCommand:
       "chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example.com:443 --sni q3m8x2kd7w.invalid --ca-sha256 9f2c1a6d0b7e4c3a8f5d2e1b0c9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a --token 2qgx7mbd3jc5u4yvtwnfhx6kqjz4pm2s7ylbq3e5c6a7nd8p9r0s && /root/mistgate-node install",
     caFingerprint: "sha256:9f2c1a6d0b7e4c3a8f5d2e1b0c9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a",
-    expiresUnix: BigInt(NOW + 3600),
+    expiresUnix: NOW + 3600,
     copyCommand: "scp /var/lib/mistgate/dist/mistgate-node-linux-amd64 root@se1.example.com:/root/mistgate-node",
     ...over,
   }) as unknown as NonNullable<AddNodeSeed["issued"]>;
@@ -248,7 +248,10 @@ scenes.push(
   win("node-chk-busy", "New node, 3 Check: the server is being read", { draft: filled, ssh: { ...ssh, step: 2, confirmedKey: true, method: "key" } }),
   win("node-chk-mid", "New node, 3 Check: the rows answer one by one", { draft: filled, ssh: { ...checkSeed, answered: 3 } }),
   win("node-chk", "New node, 3 Check: the server fits, what the install does", { draft: filled, ssh: { ...checkSeed, answered: 99 } }),
-  win("node-chk-nft", "New node, 3 Check: no nftables on the server (its own step)", { draft: filled, ssh: { ...checkSeed, preflight: pf({ nftables: false }) } }),
+  win("node-chk-nft", "New node, 3 Check: no nftables on the server (a remark, its own step)", { draft: filled, ssh: { ...checkSeed, preflight: pf({ nftables: false }) } }),
+  win("node-chk-open", "New node, 3 Check: all well, the rows unfolded behind the line", { draft: filled, ssh: { ...checkSeed, checksOpen: true } }),
+  win("node-chk-nft-folded", "New node, 3 Check: a remark, the rows folded again", { draft: filled, ssh: { ...checkSeed, preflight: pf({ nftables: false }), checksOpen: false } }),
+  win("node-chk-fw", "New node, 3 Check: the words about the firewall unfolded", { draft: filled, ssh: { ...checkSeed, firewallOpen: true } }),
   win("node-run", "New node, 4 Install: stage 4 of 7", { draft: filled, ssh: { ...checkSeed, step: 3, jobId: "prv_demo", method: "key" } }, jobSeeds("running", "transfer", runEvents)),
   win("node-run-wait", "New node, 4 Install: waiting for the node (up to 2 minutes)", { draft: filled, ssh: { ...checkSeed, step: 3, jobId: "prv_demo", method: "key" } }, jobSeeds("running", "waiting_node", ["connecting", "preflight", "firewall", "transfer", "enrollment", "install", "waiting_node"])),
   win("node-fail", "New node, 4 Install: the server did not take the panel key", { draft: filled, ssh: { ...checkSeed, step: 3, jobId: "prv_demo", method: "key" } }, jobSeeds("failed", "failed", ["connecting"], "ssh_authentication_failed")),

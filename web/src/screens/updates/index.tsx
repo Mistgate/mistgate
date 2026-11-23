@@ -1,6 +1,5 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
-import { EditionNotice } from "@/components/edition-notice";
 import { BundleStatus, NodeUpdateState, RolloutStatus } from "@/gen/mistgate/admin/v1/update_pb";
 import { useT, type T } from "@/i18n";
 import { cx } from "@/lib/cx";
@@ -102,11 +101,9 @@ export function UpdatesScreen() {
 export function UpdatesView({ scene }: { scene?: UpdatesScene }) {
   const t = useT();
   const q = useUpdates();
-  // no update, schedule, roll back or bundle rescan there: the buttons go and the nodes stay listed
   const isOwner = useIsOwner();
   const edition = useEdition();
   const fx = useEffectsEnabled();
-  const owner = !edition.off("agent_updates") && isOwner;
   // the servers' operating system is a tab of its own; the edition without it keeps the page as two
   const hasOs = !edition.off("os_updates");
   const navigate = useNavigate();
@@ -185,14 +182,13 @@ export function UpdatesView({ scene }: { scene?: UpdatesScene }) {
         <h1>{t("up.title")}</h1>
         <p>{summary(t, d, osNeeds?.reboot ?? 0, false)}</p>
       </header>
-      <EditionNotice feature="agent_updates" />
       <TabStrip tabs={tabs} value={tab} label={t("up.tabs")} onPick={setTab} />
       <div id="uq-tabpanel" role="tabpanel" aria-labelledby={`uq-tab-${tab}`} key={tab} className="uq-tab">
         {tab === "panel" && <PanelTab data={d} owner={isOwner} actions={actions} refetch={() => q.refetch()} answeredAt={q.dataUpdatedAt} scene={scene?.panel} />}
         {tab === "agents" && (
           <AgentsTab
             data={d}
-            owner={owner}
+            owner={isOwner}
             actions={actions}
             onRollout={() => setDialog({ kind: "rollout" })}
             onCancel={() => d.rollout && setDialog({ kind: "cancel", id: d.rollout.id })}

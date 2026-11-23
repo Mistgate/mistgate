@@ -1,0 +1,275 @@
+{
+ "ui": {
+  "nav_label": "Pagrindinis",
+  "footer": "Nepriklausoma ir vietinė.",
+  "nav_home": "Pradžia",
+  "nav_about": "Apie mus",
+  "nav_contact": "Kaip mus rasti",
+  "home_title": "Sveiki atvykę",
+  "nf_title": "Puslapis nerastas",
+  "nf_text": "Šio puslapio nepavyko rasti. Gali būti, kad jis perkeltas, o gal jo niekada ir nebuvo.",
+  "nf_back": "Atgal į pradžią",
+  "see_services": "Žiūrėti, ką siūlome",
+  "all_prices": "Visas kainoraštis",
+  "visit_h": "Aplankykite mus",
+  "hours_h": "Darbo laikas",
+  "address_l": "Adresas",
+  "phone_l": "Telefonas",
+  "about_h": "Apie mus",
+  "services_h": "Ką siūlome",
+  "services_intro": "Kainos orientacinės, mielai aptarsime, ko jums reikia.",
+  "contact_h": "Kaip mus rasti",
+  "contact_intro": "Užsukite darbo valandomis arba susisiekite. Mielai viską aptarsime, kol dar nieko nesprendėte.",
+  "contact_note": "Lengviausia stovėti gretimoje gatvėje. Jei darbo valandomis durys uždarytos, tikriausiai esame užpakalinėje patalpoje: pasibelskite ir šiek tiek palaukite.",
+  "from_l": "nuo",
+  "col_service": "Paslauga",
+  "col_desc": "Kas įeina",
+  "col_price": "Kaina",
+  "hours_note": "",
+  "directions_h": "Kaip mus rasti",
+  "directions": "Rasite mus adresu {address}. Nuo miesto centro čia visai netoli, o prie durų yra dviračių stovas.",
+  "services_note": "Jei paaiškės, kad darbas didesnis, nei nurodėme, prieš pradėdami paklausime."
+ },
+ "bundles": {
+  "bakery": {
+   "tagline": "Duona ir pyragai, kepami {city_in}",
+   "nav_services": "Mūsų kepiniai",
+   "desc": "Kaimynystės kepyklėlė {city_in}: raugo duona, bandelės ir pyragai, kepami kiekvieną rytą.",
+   "desc_services": "Duonos, bandelės ir pyragai su kainomis.",
+   "desc_about": "{brand} istorija: nedidelė kepyklėlė {city_in}.",
+   "desc_contact": "{brand} darbo laikas ir adresas, {city_in}.",
+   "hero_h": "Duona lėtu būdu",
+   "intro": "Nedidelė kaimynystės kepyklėlė. Raugo duona, bandelės ir pyragai, kepami kiekvieną rytą, prieš atidarant parduotuvę.",
+   "about": [
+    "{brand} prasidėjo išnuomotoje virtuvėje už parduotuvės {city_in}: viena krosnis ir nemažai optimizmo.",
+    "Vis dar kepame mažomis partijomis, iš miltų, atvežtų iš malūno už valandos kelio, ir su raugu, kuris yra vyresnis už mūsų jauniausią kepėją.",
+    "Ateikite anksti bandelių, pasilikite kavos ir pasakykite, jei kepalas buvo ne toks, kaip turėtų būti. Mieliau tai žinotume."
+   ],
+   "features": [
+    {
+     "h": "Kepama kiekvieną rytą",
+     "p": "Nieko nepaliekame nuo vakar."
+    },
+    {
+     "h": "Sąžiningi produktai",
+     "p": "Miltai, vanduo, druska ir laikas."
+    },
+    {
+     "h": "Užsakymai laukiami",
+     "p": "Pyragai ir didesni užsakymai susitarus."
+    }
+   ],
+   "services": [
+    {
+     "t": "Kaimiška raugo duona",
+     "d": "Lėtai kelta, su storu apvalkalu ir minkštu, akytu minkštimu."
+    },
+    {
+     "t": "Ruginė duona su sėklomis",
+     "d": "Tanki, tamsi ir labai tinka su sūriu."
+    },
+    {
+     "t": "Rytinės bandelės, šešios",
+     "d": "Minkštos bandelės, keptos penktą ryto ir paprastai išperkamos iki dešimtos."
+    },
+    {
+     "t": "Kardamono suktinukai",
+     "d": "Suvynioti rankomis ir glaistomi dar šilti."
+    },
+    {
+     "t": "Šventinis tortas",
+     "d": "Užsisakykite prieš tris dienas, skonius suderinsime su jumis."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Rugiai",
+       "Medus",
+       "Avižos",
+       "Kviečiai",
+       "Mielės",
+       "Trupinys",
+       "Krosnis",
+       "Sekmadienis",
+       "Sezamas",
+       "Slyva"
+      ],
+      [
+       "Lakštingala",
+       "Zylė",
+       "Žvirblis",
+       "Kielė",
+       "Strazdas",
+       "Šarka",
+       "Čiurlys",
+       "Vieversys"
+      ]
+     ],
+     "sep": " ir "
+    }
+   }
+  },
+  "bike": {
+   "tagline": "Dviračių remontas {city_in}",
+   "nav_services": "Kainos",
+   "desc": "Dviračių remontas ir techninė priežiūra {city_in}: kol laukiate arba iki kitos dienos.",
+   "desc_services": "Dviračių remontas ir priežiūra su kainomis.",
+   "desc_about": "Apie {brand}: nedidelės dviračių dirbtuvės {city_in}.",
+   "desc_contact": "{brand} darbo laikas ir adresas, {city_in}.",
+   "hero_h": "Jūsų dviratis vėl tvarkingai važiuoja",
+   "intro": "Nedidelės dirbtuvės kasdieniams dviračiams. Taisome, kas sugedo, sureguliuojame, kas nelabai gerai, ir sąžiningai pasakome, kas nevertas pinigų.",
+   "about": [
+    "{brand} prasidėjo sodo pašiūrėje {city_in}: taisėme kaimynų dviračius už kavos kainą.",
+    "Dabar turime tikras dirbtuves, labai ilgą stalą ir sieną atsarginių dalių, kurią supranta tik mes. Vis dar labiau mėgstame taisyti nei keisti.",
+    "Atsineškite bet ką, kas turi du ratus. Jei negalėsime sutaisyti, pasakysime, kas gali."
+   ],
+   "features": [
+    {
+     "h": "Kol laukiate",
+     "p": "Dauguma smulkių remontų trunka mažiau nei valandą."
+    },
+    {
+     "h": "Sąžiningas patarimas",
+     "p": "Pasakysime, jei kažką taisyti neapsimoka."
+    },
+    {
+     "h": "Priežiūra iki kitos dienos",
+     "p": "Atvežkite ryte, pasiimkite rytoj."
+    }
+   ],
+   "services": [
+    {
+     "t": "Pradurtos padangos taisymas",
+     "d": "Įdedama ir patikrinama kamera, padanga apžiūrima, ar nėra to, kas ją pradūrė."
+    },
+    {
+     "t": "Paprasta priežiūra",
+     "d": "Sureguliuojami stabdžiai ir pavaros, išvaloma ir sutepama grandinė, patikrinamos padangos ir varžtai."
+    },
+    {
+     "t": "Pilna priežiūra",
+     "d": "Pavaros išardymas, nuriebalinimas ir surinkimas, prireikus su naujais lynais."
+    },
+    {
+     "t": "Rato tiesinimas",
+     "d": "Pašalinami svyravimai ir išlyginamas stipinų įtempimas."
+    },
+    {
+     "t": "Žieminė patikra",
+     "d": "Žibintai, stabdžiai, padangos ir sparnai, kad tamsūs mėnesiai būtų mažiau pavojingi."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Stipinų",
+       "Grandinės",
+       "Krumpliaračio",
+       "Pedalo",
+       "Švaistiklio",
+       "Rato",
+       "Pavaros",
+       "Rėmo",
+       "Stebulės",
+       "Lanko"
+      ],
+      [
+       "dirbtuvės",
+       "remontas",
+       "pastogė",
+       "garažas",
+       "stalas",
+       "stovas",
+       "servisas",
+       "dirbtuvė"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "tailor": {
+   "tagline": "Drabužių taisymas ir permatavimas {city_in}",
+   "nav_services": "Taisymas",
+   "desc": "Drabužių taisymas ir pritaikymas {city_in}: palenkimai, užtrauktukai, matavimai ir lopai.",
+   "desc_services": "Drabužių taisymas ir pritaikymas su kainomis.",
+   "desc_about": "Apie {brand}: nedidelė siuvykla {city_in}.",
+   "desc_contact": "{brand} darbo laikas ir adresas, {city_in}.",
+   "hero_h": "Drabužiai, kurie tinka ilgiau",
+   "intro": "Palenkimai, užtrauktukai, matavimai ir lopai, padaryti rankomis ir mašina nedidelėse dirbtuvėse virš parduotuvių.",
+   "about": [
+    "{brand} yra dviejų žmonių dirbtuvė antrame pastato aukšte {city_in}, virš vilnos parduotuvės.",
+    "Amato mokėmės iš žmonių, kurie jį dirbo keturiasdešimt metų, ir išsaugojome kai kuriuos jų įpročius, pavyzdžiui, visada segti adatomis du kartus.",
+    "Jei nesate tikri, ar daiktą verta taisyti, atneškite. Pasakysime sąžiningai."
+   ],
+   "features": [
+    {
+     "h": "Taisoma rūpestingai",
+     "p": "Prieš pradėdami kiekvieną drabužį gerai apžiūrime."
+    },
+    {
+     "h": "Pritaikoma jums",
+     "p": "Segame ant jūsų, o ne ant manekeno."
+    },
+    {
+     "h": "Paruošta, kada pažadėta",
+     "p": "Pasakome dieną ir jos laikomės."
+    }
+   ],
+   "services": [
+    {
+     "t": "Kelnių ar sijono patrumpinimas",
+     "d": "Pakeliama iki jūsų ilgio, kiek įmanoma išsaugant originalų kraštą."
+    },
+    {
+     "t": "Švarko susiaurinimas",
+     "d": "Sureguliuojami šonai ir rankovės, kad gražiai kabėtų."
+    },
+    {
+     "t": "Užtrauktuko keitimas",
+     "d": "Parenkamas pagal spalvą ir storį ir tvarkingai įsiuvamas."
+    },
+    {
+     "t": "Paltų pamušalo taisymas",
+     "d": "Suplyšęs pamušalas pakeičiamas arba sutaisomas, kišenės įskaitant."
+    },
+    {
+     "t": "Lopymas ir kamšymas",
+     "d": "Matomai arba nematomai, kaip jums labiau patinka."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Adatos",
+       "Antpirščio",
+       "Sagos",
+       "Palenkimo",
+       "Siūlės",
+       "Rankogalio",
+       "Apykaklės",
+       "Klostės",
+       "Ritės",
+       "Krašto"
+      ],
+      [
+       "ateljė",
+       "taisykla",
+       "siuvykla",
+       "dirbtuvė",
+       "siuvimas",
+       "taisymas",
+       "studija",
+       "kampelis"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

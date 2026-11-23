@@ -99,9 +99,9 @@ const says: Record<string, () => void> = {
     expect(document.querySelector(".dq-now")!.textContent).toContain("Quad9");
   },
   "dns-users": () => {
-    expect(rows()).toHaveLength(11);
+    expect(rows()).toHaveLength(13);
     expect(rows()[0]!.querySelector(".dq-u")!.textContent).toBe("alldefault");
-    expect([...document.querySelectorAll('.dq-cat [role="radio"]')].map((c) => c.textContent)).toContain("Own3");
+    expect([...document.querySelectorAll('.dq-cat [role="radio"]')].map((c) => c.textContent)).toContain("Own4");
   },
   "dns-ads": () => expect([...rows().find((r) => nameOf(r) === "No ads on the device")!.querySelectorAll(".dq-n > b > i")].map((i) => i.textContent)).toEqual(["built-in", "no ads"]),
   "dns-nodef": () => {
@@ -119,7 +119,7 @@ const says: Record<string, () => void> = {
     expect(button(en["subs.dns.new"])).toBeUndefined();
     expect(rows().every((r) => !r.querySelector<HTMLButtonElement>(".dq-def")!.disabled)).toBe(true);
   },
-  "dns-edge": () => expect(rows()).toHaveLength(11),
+  "dns-edge": () => expect(rows()).toHaveLength(13),
   "dns-own": () => {
     expect(input().value).toBe("Офис");
     expect(document.querySelectorAll(".sb-srvs .sb-srv")).toHaveLength(3); // the main two and the one of the rule
@@ -198,7 +198,7 @@ describe("the scenes of the DNS tab", () => {
   it.each(["ru", "zh", "fa", "tr"] as const)("the list, an editor and the question draw in %s", async (lang) => {
     await draw("dns-users", 60, lang);
     expect(text()).not.toMatch(/\b(sx\.dns|subs\.dns)\./);
-    expect(rows()).toHaveLength(11);
+    expect(rows()).toHaveLength(13);
     act(() => root?.unmount());
     host?.remove();
     await draw("dns-ask-used", 60, lang);

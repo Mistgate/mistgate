@@ -1,0 +1,19 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __arc__ __abt__">
+<article>
+<span class="__lab__ __tag__">{{.L.nav_about}}</span>
+<h1 class="__t__">{{.L.about_h}}</h1>
+<p class="__ex__">{{.L.tagline}}</p>
+{{range $i, $a := .L.about}}<p{{if eq $i 0}} class="__dc__"{{end}}>{{$a}}</p>
+{{end}}<div class="__nb__ __nb1__"><a href="{{(index .Nav 2).Href}}"><small class="__lab__">{{.L.all_posts}}</small><b>{{.L.nav_archive}}</b></a></div>
+</article>
+<aside class="__side__">
+<figure class="__me__">{{art "me" "" 480 560}}<figcaption class="__lab__">{{.V.first}}</figcaption></figure>
+<div><h2 class="__lab__ __sh5__">{{.L.now_h}}</h2><ul>{{range .L.now}}<li>{{.}}</li>{{end}}</ul></div>
+<div class="__nob__"><h2 class="__lab__ __sh5__">{{.L.tags_h}}</h2><div class="__tags__">{{range tags .Lists.posts "tag"}}<a class="__tg__" href="{{(index $.Nav 2).Href}}">{{.tag}}<sup class="__tn__">{{.n}}</sup></a>{{end}}</div></div>
+</aside>
+</main>
+{{template "footer" .}}
+</body>
+</html>

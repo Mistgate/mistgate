@@ -1,0 +1,390 @@
+{
+ "ui": {
+  "platforms": "Plattformen",
+  "col_name": "Name",
+  "col_size": "Größe",
+  "nav_label": "Hauptmenü",
+  "footer": "Veröffentlicht unter der MIT-Lizenz.",
+  "nav_home": "Überblick",
+  "nav_changelog": "Änderungen",
+  "nav_install": "Installation",
+  "nav_roadmap": "Fahrplan",
+  "home_title": "Überblick",
+  "desc_changelog": "Jede Version von {brand} mit dem, was sich darin geändert hat.",
+  "desc_install": "So installieren Sie {brand}: Distributionspakete, Bauen aus dem Quelltext und Prüfsummen für jede Version.",
+  "desc_roadmap": "Woran die Betreuer von {brand} arbeiten und was als Nächstes kommt.",
+  "nf_title": "Seite nicht gefunden",
+  "nf_text": "Diese Seite gibt es nicht, oder sie ist seit der letzten Version umgezogen.",
+  "nf_back": "Zurück zum Überblick",
+  "features_h": "Warum {brand}",
+  "start_h": "Loslegen",
+  "latest_h": "Neueste Version",
+  "all_releases": "Alle Versionen",
+  "get_it": "Installieren",
+  "read_log": "Änderungen lesen",
+  "changelog_h": "Änderungen",
+  "changelog_intro": "Jede Version, die neueste zuerst. Die Versionsnummern folgen dem üblichen Schema aus Haupt-, Neben- und Patchversion.",
+  "released": "Veröffentlicht",
+  "install_h": "Installieren",
+  "install_intro": "{brand} wird nicht als fertige Datei ausgeliefert. Die Distributionen paketieren es, und das Bauen aus dem Quellarchiv dauert ein paar Minuten.",
+  "pkg_h": "Aus Ihrer Distribution",
+  "pkg_note": "Die Paketversionen können der neuesten Version um einige Wochen hinterherhinken; die Tabelle weiter unten nennt die Version, die Sie vom Quellarchiv erwarten können.",
+  "src_h": "Aus dem Quelltext bauen",
+  "src_intro": "Sie brauchen einen C-Compiler und make. Das Bauen dauert etwa eine Minute. Das Quellarchiv jeder Version ist nach der Versionsnummer benannt.",
+  "sums_h": "Versionen und Prüfsummen",
+  "sums_intro": "Jede Version hat ein Quellarchiv. Prüfen Sie dessen SHA-256-Prüfsumme, bevor Sie es bauen.",
+  "col_ver": "Version",
+  "col_date": "Veröffentlicht",
+  "col_sum": "SHA-256 des Quellarchivs",
+  "roadmap_h": "Fahrplan",
+  "roadmap_intro": "Woran die Betreuer arbeiten, grob nach Reihenfolge. Pläne ändern sich; was wirklich geschah, steht in den Änderungen.",
+  "now_h": "Jetzt",
+  "next_h": "Als Nächstes",
+  "later_h": "Später",
+  "licence_h": "Lizenz",
+  "licence_p": "{brand} ist freie Software unter der MIT-Lizenz. Sie dürfen es verwenden, ändern und weitergeben.",
+  "rel_back": "Alle Versionen",
+  "rel_more": "Weitere Versionen",
+  "rel_src_h": "Quellarchiv",
+  "pkgs": [
+   {
+    "s": "Debian und Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS mit Homebrew"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "tagline": "Einen Befehl ausführen, wenn sich Dateien ändern",
+   "desc": "{brand} beobachtet einen Ordner und führt einen Befehl aus, sobald sich darin etwas ändert.",
+   "overview": "{brand} beobachtet einen Ordner und führt einen Befehl aus, sobald sich darin etwas ändert. Es ist ein kleines, schnelles Programm für alle, die es leid sind, eine Datei zu speichern und dann in ein anderes Fenster zu wechseln.",
+   "features": [
+    {
+     "h": "Schnell gestartet",
+     "p": "Ein Befehl und keine Konfigurationsdatei."
+    },
+    {
+     "h": "Vernünftige Voreinstellungen",
+     "p": "Ignoriert Auslagerungsdateien von Editoren, Versionsverwaltungsordner und Build-Ausgaben."
+    },
+    {
+     "h": "Läuft überall",
+     "p": "Linux, macOS und Windows, mit denselben Optionen."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {
+     "k": "Neu",
+     "t": "Mehrere Ordner können gleichzeitig beobachtet werden."
+    },
+    {
+     "k": "Neu",
+     "t": "Eine Verzögerungsoption, die auf einen ruhigen Moment wartet, bevor der Befehl läuft."
+    },
+    {
+     "k": "Neu",
+     "t": "Farbe in der Ausgabe, wenn das Terminal sie unterstützt."
+    },
+    {
+     "k": "Behoben",
+     "t": "Ein seltener Absturz, wenn ein beobachteter Ordner gelöscht wurde."
+    },
+    {
+     "k": "Behoben",
+     "t": "Doppelte Läufe, wenn ein Editor eine Datei in zwei Schritten speicherte."
+    },
+    {
+     "k": "Behoben",
+     "t": "Pfade mit Leerzeichen unter Windows."
+    },
+    {
+     "k": "Geändert",
+     "t": "Die Standardverzögerung beträgt jetzt 200 statt 50 Millisekunden."
+    },
+    {
+     "k": "Geändert",
+     "t": "Ignoriermuster folgen denselben Regeln wie in den meisten Versionsverwaltungen."
+    },
+    {
+     "k": "Neu",
+     "t": "Eine Option once, die den Befehl genau einmal ausführt und beendet."
+    },
+    {
+     "k": "Behoben",
+     "t": "Der Speicherverbrauch wuchs langsam, wenn sehr große Ordner beobachtet wurden."
+    },
+    {
+     "k": "Geändert",
+     "t": "Fehlermeldungen nennen jetzt den Ordner, der sie ausgelöst hat."
+    },
+    {
+     "k": "Neu",
+     "t": "Shell-Vervollständigungen für die gängigen Shells."
+    }
+   ],
+   "now": [
+    "Schnellerer Start bei großen Ordnern",
+    "Bessere Meldungen, wenn ein Befehl fehlschlägt"
+   ],
+   "next": [
+    "Eine Konfigurationsdatei für Einstellungen pro Projekt",
+    "Pakete für die wichtigsten Linux-Distributionen"
+   ],
+   "later": [
+    "Ein stiller Modus für Skripte",
+    "Netzlaufwerke zuverlässig beobachten"
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kiesel",
+       "Marsch",
+       "Laterne",
+       "Senke",
+       "Glut",
+       "Fabel",
+       "Seeschwalbe",
+       "Nessel",
+       "Schiefer",
+       "Moos"
+      ],
+      [
+       "watch",
+       "tail",
+       "glance",
+       "notice",
+       "sentry",
+       "peek"
+      ]
+     ]
+    }
+   }
+  },
+  "images": {
+   "tagline": "Einen ganzen Ordner voller Bilder auf einmal verkleinern",
+   "desc": "{brand} verkleinert und komprimiert Bilder in großer Zahl und lässt die Originale unberührt.",
+   "overview": "{brand} verkleinert und komprimiert Bilder in großer Zahl. Zeigen Sie auf einen Ordner und sagen Sie, wie groß die Ergebnisse sein sollen; den Rest erledigt es und lässt die Originale unberührt.",
+   "features": [
+    {
+     "h": "Auf Stapel ausgelegt",
+     "p": "Hunderte Dateien auf einmal, mit allen Kernen."
+    },
+    {
+     "h": "Behält die Originale",
+     "p": "Die Ergebnisse landen in einem neuen Ordner."
+    },
+    {
+     "h": "Vorhersehbare Ausgabe",
+     "p": "Dieselbe Eingabe ergibt immer dieselben Bytes."
+    }
+   ],
+   "quick": "{cmd} photos --width 1600 --out small",
+   "changes": [
+    {
+     "k": "Neu",
+     "t": "Unterstützung für WebP-Ausgabe."
+    },
+    {
+     "k": "Neu",
+     "t": "Eine Qualitätsoption für JPEG und WebP."
+    },
+    {
+     "k": "Behoben",
+     "t": "Hochformataufnahmen kamen seitlich gedreht heraus."
+    },
+    {
+     "k": "Behoben",
+     "t": "Ein Absturz bei Dateien ohne Endung."
+    },
+    {
+     "k": "Geändert",
+     "t": "Ausgabedateien behalten die ursprüngliche Änderungszeit."
+    },
+    {
+     "k": "Neu",
+     "t": "Eine Probelaufoption, die auflistet, was getan würde."
+    },
+    {
+     "k": "Behoben",
+     "t": "Langsame Fortschrittsanzeige bei großen Stapeln."
+    },
+    {
+     "k": "Geändert",
+     "t": "Geringerer Speicherverbrauch beim Verkleinern sehr großer Bilder."
+    },
+    {
+     "k": "Neu",
+     "t": "Verkleinern auf eine Höchsthöhe zusätzlich zur Breite."
+    },
+    {
+     "k": "Behoben",
+     "t": "Falsche Farben bei Bildern mit eingebettetem Profil."
+    },
+    {
+     "k": "Geändert",
+     "t": "Der Hilfetext enthält jetzt Beispiele."
+    },
+    {
+     "k": "Neu",
+     "t": "Eine Option für ein Suffix, mit dem die verkleinerten Dateien benannt werden."
+    }
+   ],
+   "now": [
+    "Schnelleres Dekodieren von JPEG",
+    "Eine Fortschrittsanzeige, die nicht im Weg ist"
+   ],
+   "next": [
+    "Zuschneiden auf ein festes Seitenverhältnis",
+    "Pakete für die wichtigsten Linux-Distributionen"
+   ],
+   "later": [
+    "Unterstützung für animierte Bilder",
+    "Ein kleiner Vorschaumodus"
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pixel",
+       "Kachel",
+       "Korn",
+       "Rahmen",
+       "Blende",
+       "Linse",
+       "Fokus",
+       "Zuschnitt",
+       "Sepia",
+       "Matt"
+      ],
+      [
+       "fit",
+       "trim",
+       "shrink",
+       "pack",
+       "batch",
+       "scale"
+      ]
+     ]
+    }
+   }
+  },
+  "backup": {
+   "tagline": "Schlichte, verlässliche Sicherungen eines Ordners",
+   "desc": "{brand} kopiert einen Ordner an einen anderen Ort und behält ältere Stände als gewöhnliche Dateien.",
+   "overview": "{brand} kopiert einen Ordner an einen anderen Ort und behält ältere Stände, damit ein Fehler vom letzten Dienstag noch rückgängig gemacht werden kann. Sicherungen sind gewöhnliche Dateien, die Sie auch ohne {brand} öffnen können.",
+   "features": [
+    {
+     "h": "Gewöhnliche Dateien",
+     "p": "Kein besonderes Format, das später entsperrt werden muss."
+    },
+    {
+     "h": "Versionen",
+     "p": "Behalten Sie so viele Stände, wie Sie möchten."
+    },
+    {
+     "h": "Prüft sich selbst",
+     "p": "Ein Befehl verify vergleicht eine Sicherung mit ihrer Quelle."
+    }
+   ],
+   "quick": "{cmd} notes /backups/notes",
+   "changes": [
+    {
+     "k": "Neu",
+     "t": "Ein Befehl verify, der eine Sicherung mit ihrer Quelle vergleicht."
+    },
+    {
+     "k": "Neu",
+     "t": "Stände lassen sich für eine Anzahl von Tagen oder Kopien aufbewahren."
+    },
+    {
+     "k": "Behoben",
+     "t": "Dateien, die sich während einer Sicherung änderten, wurden doppelt kopiert."
+    },
+    {
+     "k": "Behoben",
+     "t": "Falsche Berechtigungen bei wiederhergestellten Dateien."
+    },
+    {
+     "k": "Geändert",
+     "t": "Unveränderte Dateien werden nicht mehr erneut kopiert."
+    },
+    {
+     "k": "Neu",
+     "t": "Ein Befehl restore mit Probelaufmodus."
+    },
+    {
+     "k": "Behoben",
+     "t": "Ein Absturz bei Ordnern mit sehr langen Pfadnamen."
+    },
+    {
+     "k": "Geändert",
+     "t": "Der Fortschritt wird nur noch angezeigt, wenn die Ausgabe ein Terminal ist."
+    },
+    {
+     "k": "Neu",
+     "t": "Ein Befehl list, der die Stände einer Sicherung anzeigt."
+    },
+    {
+     "k": "Behoben",
+     "t": "Sicherungen auf Netzlaufwerke brachen nach einer Zeitüberschreitung ab."
+    },
+    {
+     "k": "Geändert",
+     "t": "Stände werden nach Datum statt nach Nummer benannt."
+    },
+    {
+     "k": "Neu",
+     "t": "Eine Option, Dateien nach Muster auszulassen."
+    }
+   ],
+   "now": [
+    "Schnelleres Kopieren vieler kleiner Dateien",
+    "Ein verständlicherer Prüfbericht"
+   ],
+   "next": [
+    "Verschlüsselung der Sicherungen im Ruhezustand",
+    "Sicherung an einen zweiten Ort in einem Schritt"
+   ],
+   "later": [
+    "Ein grafisches Werkzeug zur Wiederherstellung",
+    "Eingebaute Zeitplanung"
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Dachboden",
+       "Keller",
+       "Regal",
+       "Schublade",
+       "Schließfach",
+       "Truhe",
+       "Speisekammer",
+       "Vorrat",
+       "Schrank",
+       "Koffer"
+      ],
+      [
+       "copy",
+       "keep",
+       "stash",
+       "save",
+       "mirror",
+       "store"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

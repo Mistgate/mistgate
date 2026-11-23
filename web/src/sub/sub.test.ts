@@ -9,7 +9,7 @@ import { figures } from "./status";
 import type { Ctx, State } from "./state";
 import { actions, amzNoop, data, plain, state, text } from "./test-kit";
 import type { Lang, MgData } from "./types";
-import { copyButton } from "./ui";
+import { copyButton, DONE_MS, placeToast } from "./ui";
 import { annKey, openTab, pageHeader, tabsOf, view } from "./view";
 
 const now = 1_800_000_000;
@@ -863,13 +863,13 @@ describe("the copy button", () => {
   it("a click copies, tells the page with the button in hand, rolls the label over and, after a moment, back", () => {
     const seen: unknown[] = [];
     const after = vi.fn();
-    const a = actions({ copy: (value, message, done, from) => (seen.push([value, message, from]), done?.()) });
+    const a = actions({ copy: (value, done, message, from) => (seen.push([value, message, from]), done?.()) });
     const btn = copyButton(a, { text: "https://x", label: "Скопировать", done: "Скопировано", toast: "Ссылка скопирована", after });
     btn.click();
     expect(seen).toEqual([["https://x", "Ссылка скопирована", btn]]);
     expect(btn.dataset.cp).toBe("done");
     expect(after).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(1799);
+    vi.advanceTimersByTime(DONE_MS - 1);
     expect(btn.dataset.cp).toBe("done");
     vi.advanceTimersByTime(2);
     expect(btn.dataset.cp).toBe("");
@@ -884,6 +884,21 @@ describe("the copy button", () => {
   it("without a label it is the icon alone and its name is given", () => {
     const btn = copyButton(actions(), { text: "x", toast: "T", cls: "u-ic", aria: "Copy the link" });
     expect([btn.className, btn.getAttribute("aria-label"), btn.querySelector(".u-cpt")]).toEqual(["u-ic u-cpb", "Copy the link", null]);
+  });
+  it("the toast of a control in an open window lives in the window, and goes back to the page after", () => {
+    const toast = document.createElement("div");
+    const win = document.createElement("dialog");
+    win.setAttribute("open", "");
+    const inside = win.appendChild(document.createElement("button"));
+    const outside = document.body.appendChild(document.createElement("button"));
+    document.body.append(win);
+    placeToast(toast, inside);
+    expect([toast.parentElement, toast.classList.contains("in")]).toEqual([win, true]);
+    placeToast(toast, outside);
+    expect([toast.parentElement, toast.classList.contains("in")]).toEqual([document.body, false]);
+    win.remove();
+    outside.remove();
+    toast.remove();
   });
   it("the card's buttons are such buttons", () => {
     const btn = $(page("return").el, "aside [data-k=hero-copy]")!;

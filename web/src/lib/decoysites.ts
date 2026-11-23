@@ -1,8 +1,8 @@
 import { ConnectError } from "@connectrpc/connect";
 import { queryOptions } from "@tanstack/react-query";
-import type { DecoyCheck, DecoyFileInfo, DecoyPanelState, DecoySite, DecoyVersion } from "@/gen/mistgate/decoysite/v1/decoysite_pb";
+import type { DecoyCheck, DecoyFileInfo, DecoyPanelState, DecoySite, DecoyTemplate, DecoyVersion } from "@/gen/mistgate/decoysite/v1/decoysite_pb";
 import type { Node as NodeMsg } from "@/gen/mistgate/admin/v1/node_pb";
-import type { T } from "@/i18n";
+import { dictionaries, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { decoySites } from "./api";
 import { asDecoyMode, isDecoyReason } from "./decoy";
@@ -18,6 +18,7 @@ export type SiteVersion = Plain<DecoyVersion>;
 export type SiteCheck = Plain<DecoyCheck>;
 export type SiteFile = Plain<DecoyFileInfo>;
 export type PanelState = Plain<DecoyPanelState>;
+export type SiteTemplate = Plain<DecoyTemplate>;
 export type Node = Plain<NodeMsg>;
 
 /** The two entries of the library that are not sites: they have no id of their own in the route, these are their words. */
@@ -82,6 +83,37 @@ export const fileQuery = (id: string, sha: string, path: string) =>
     retry: false,
   });
 
+/** The kinds of site the panel builds from its templates and the countries it builds them for (they grow with the releases; the answer never changes while the panel runs). */
+export const templatesQuery = queryOptions({
+  queryKey: ["decoy-templates"],
+  queryFn: async ({ signal }) => plain(await decoySites.listDecoyTemplates({}, { signal })),
+  staleTime: Infinity,
+});
+
+/** Which photo keys the owner has put in (a key itself never comes back) and which source the photos come from. */
+export const photosQuery = queryOptions({
+  queryKey: ["decoy-photos"],
+  queryFn: async ({ signal }) => plain(await decoySites.getDecoyPhotos({}, { signal })),
+  staleTime: Infinity,
+});
+
+/**
+ * The sources of the photos of generated sites. `keyUrl` is where the owner gets a free key (Pixabay shows it on its API page once
+ * you are signed in), `url` is what the credit line points to: both services ask to say where the photos are from.
+ */
+export const photoSources = {
+  pexels: { name: "Pexels", keyUrl: "https://www.pexels.com/api/", url: "https://www.pexels.com" },
+  pixabay: { name: "Pixabay", keyUrl: "https://pixabay.com/api/docs/", url: "https://pixabay.com" },
+} as const;
+export type PhotoSource = keyof typeof photoSources;
+export const photoSourceOrder = ["pexels", "pixabay"] as const satisfies readonly PhotoSource[];
+export const isPhotoSource = (s: string | undefined): s is PhotoSource => s === "pexels" || s === "pixabay";
+
+/** What a preview says about its photos (PreviewDecoyTemplateResponse.photos); a word the panel adds later is not shown. */
+export const photoStates = ["used", "no_key", "bad_key", "limit", "unavailable", "none_for_kind"] as const;
+export type PhotoState = (typeof photoStates)[number];
+export const photoStateKey = (s: string): MessageKey | undefined => ((photoStates as readonly string[]).includes(s) ? (`dz.ph.st.${s}` as MessageKey) : undefined);
+
 /** What an assignment would replace, and the warnings, without doing it (a dry run). `picks` is the sorted node ids and "panel". */
 export const assignPreviewQuery = (id: string, picks: readonly string[]) =>
   queryOptions({
@@ -115,6 +147,48 @@ export const countOfFilter = (sites: readonly Site[], f: SiteFilter) => sites.fi
 export function filterSites(sites: readonly Site[], filter: SiteFilter, query: string): Site[] {
   const q = query.trim().toLowerCase();
   return sites.filter((s) => filterTest[filter](s) && (!q || `${s.name} ${s.note}`.toLowerCase().includes(q)));
+}
+
+// ---- sites made from a template
+
+/** The icon of each kind of template the screens know (a kind added by a later release shows the generic one until the screens learn it). */
+export const templateIcons = { status: "pulse", files: "upload", login: "key", blog: "note", portfolio: "palette", business: "tag", docs: "list", card: "person", club: "people", project: "code" } as const;
+export const templateIcon = (id: string) => templateIcons[id as keyof typeof templateIcons] ?? "layers";
+
+/** The order of the kinds in the window; a kind this list does not know yet follows them in the panel's own order. */
+export const templateOrder = ["status", "login", "files", "docs", "project", "blog", "club", "portfolio", "business", "card"];
+export function sortTemplates<K extends { id: string }>(list: K[]): K[] {
+  const at = (id: string) => (templateOrder.includes(id) ? templateOrder.indexOf(id) : templateOrder.length);
+  return list.map((k, i) => [k, i] as const).sort((a, b) => at(a[0].id) - at(b[0].id) || a[1] - b[1]).map(([k]) => k);
+}
+
+/**
+ * The country the window starts with: the one most of the nodes that show the built-in or the panel's own page stand in, among
+ * the countries the panel has templates for (a tie goes to the country that comes first in the list); the first of the list when
+ * no such node is in one of them.
+ */
+export function defaultTemplateCountry(nodes: readonly Pick<Node, "countryCode" | "decoyMode" | "decoySiteId">[] | undefined, countries: readonly string[]): string {
+  const count = new Map<string, number>();
+  for (const n of nodes ?? []) {
+    const cc = n.countryCode.toLowerCase();
+    if (nodeServes(n).kind === "site" || !countries.includes(cc)) continue;
+    count.set(cc, (count.get(cc) ?? 0) + 1);
+  }
+  let best = countries[0] ?? "";
+  for (const cc of countries) if ((count.get(cc) ?? 0) > (count.get(best) ?? 0)) best = cc;
+  return best;
+}
+
+/** The note of a site made from a template: "Template · Blog · Germany". */
+export const templateNote = (lead: string, kind: string, country: string) => [lead, kind, country].join(" · ");
+
+/** The kind a site was made from ("" for a site that was not): the panel marks a generated site with the source label "template:<kind>". */
+export const templateOf = (s: Pick<Site, "sourceLabel">) => (s.sourceLabel.startsWith("template:") ? s.sourceLabel.slice("template:".length) : "");
+
+/** The name and the one-line description of a kind in the admin's language; a kind the dictionary does not know yet keeps the panel's own English name. */
+export function templateWords(t: T, id: string, fallbackName = id): { name: string; text: string } {
+  const known = `dz.tpl.${id}` in dictionaries.en;
+  return { name: known ? t(`dz.tpl.${id}` as MessageKey) : fallbackName, text: known ? t(`dz.tpl.${id}.text` as MessageKey) : "" };
 }
 
 // ---- where a node stands: the words of its delivery

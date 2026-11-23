@@ -79,7 +79,7 @@ const text = () => document.body.textContent ?? "";
 const button = (label: string) => [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const click = (el: Element | null | undefined) => act(async () => void el?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 const input = (placeholder: string) => document.querySelector<HTMLInputElement>(`input[placeholder="${placeholder}"]`)!;
-const radio = (label: string) => [...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === label);
+const radio = (label: string) => [...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => (r.querySelector("b") ?? r).textContent === label);
 const checked = (label: string) => radio(label)?.getAttribute("aria-checked") === "true";
 // the boxes of the window: the first is the one the step is about (the server key, the install)
 const box = (i = 0) => document.querySelectorAll<HTMLElement>("[role=checkbox]")[i];
@@ -260,6 +260,8 @@ describe("the add-node window", () => {
     });
     expect(text()).toContain(en["win.node.chkOk"]);
     expect(text()).toContain(en["win.node.planTitle"]);
+    expect(text()).not.toContain("An inactive firewall stays inactive"); // behind the link
+    await click(button(en["win.node.fwMore"]));
     expect(text()).toContain("An inactive firewall stays inactive");
     expect(passwords().value).toBe("");
     expect(button("Start installation")?.disabled).toBe(true); // nothing starts before the box is ticked
@@ -305,8 +307,12 @@ describe("the add-node window", () => {
     expect(text()).not.toContain(en["win.node.planTitle"]);
     // 450 ms, then 190 per row, then a moment: in steps, so that every answer is drawn before the next
     for (let i = 0; i < 14; i++) await wait(200);
-    expect(rows()).toEqual(Array(9).fill("done"));
+    // all well: the rows fold behind one line, and open again with it
+    expect(rows()).toEqual([]);
+    expect(document.querySelector(".an-sum")?.textContent).toContain("9 checks passed");
     expect(text()).toContain(en["win.node.planTitle"]);
+    await click(document.querySelector(".an-sum"));
+    expect(rows()).toEqual(Array(9).fill("done"));
     expect(document.querySelector(".an-fx")?.getAttribute("aria-busy")).toBe("false");
   }, 8_000);
 
@@ -332,18 +338,24 @@ describe("the add-node window", () => {
 
     it("says the install adds the nftables package when the server has no nft", async () => {
       await toChecks(false);
-      expect(text()).toContain("nftables");
+      // a remark: the rows stay open, its row first, with what it means under it
+      expect(text()).toContain(en["win.node.chkWarnTitle"]);
+      expect(document.querySelector(".an-sum")?.textContent).toContain("8 checks passed, 1 remark");
+      expect(document.querySelector(".an-fr")?.className).toContain("warn");
+      expect(document.querySelector(".an-fr")?.textContent).toContain("nftables");
       expect(text()).toContain("No, the install adds it");
-      expect(text()).toContain("The server has no nft command");
-      expect(text()).toContain("separate step before the firewall step");
+      expect(text()).toContain(en["win.node.chkNftNote"]);
       expect(text()).toContain(en["win.node.planNftables"]);
+      expect(text()).toContain(en["win.node.planNftablesBody"]);
     });
 
     it("shows nft as there, and no note, when the server has it", async () => {
       await toChecks(true);
+      expect(text()).not.toContain("nftables"); // folded behind "9 checks passed"
+      await click(document.querySelector(".an-sum"));
       expect(text()).toContain("nftables");
       expect(text()).not.toContain("No, the install adds it");
-      expect(text()).not.toContain("The server has no nft command");
+      expect(text()).not.toContain(en["win.node.chkNftNote"]);
       expect(text()).not.toContain(en["win.node.planNftables"]);
     });
 
@@ -473,7 +485,7 @@ describe("the add-node window", () => {
       startNodeProvision.mockResolvedValue(queued);
       getNodeProvision.mockReturnValue(new Promise(() => {}));
       await toLogin();
-      expect([...document.querySelectorAll(".an-ws [role=radio]")].map((r) => r.textContent)).toEqual(["Panel key", "Password", "Own key"]);
+      expect([...document.querySelectorAll(".an-wc [role=radio] b")].map((r) => r.textContent)).toEqual(["Panel key", "Password", "Own key"]);
       expect(checked("Panel key")).toBe(true);
 
       await click(radio("Own key"));

@@ -1,0 +1,537 @@
+{
+ "ui": {
+  "ref_h": "Référence",
+  "nav_label": "Documentation",
+  "footer": "Documentation de la version {ver}.",
+  "nav_home": "Présentation",
+  "nav_install": "Installation",
+  "nav_usage": "Utilisation",
+  "nav_faq": "FAQ",
+  "home_title": "Présentation",
+  "desc_install": "Comment installer {brand} {ver} sous Linux, macOS et Windows.",
+  "desc_usage": "Comment utiliser {brand} : les tâches courantes avec des exemples.",
+  "desc_faq": "Les questions les plus fréquentes sur {brand}.",
+  "nf_title": "Page introuvable",
+  "nf_text": "Cette page ne fait pas partie de la documentation. Elle a peut-être été renommée dans une version plus récente.",
+  "nf_back": "Retour à la présentation",
+  "quick_h": "Démarrage rapide",
+  "features_h": "Ce que ça fait",
+  "out_h": "Résultat",
+  "install_h": "Installation",
+  "steps_h": "Étapes",
+  "usage_h": "Utilisation",
+  "opts_h": "Options",
+  "opt_col": "Option",
+  "desc_col": "Description",
+  "faq_h": "Questions fréquentes",
+  "next": "Suivant",
+  "facts_h": "En un coup d'œil",
+  "menu_h": "Documentation",
+  "facts": [
+   {
+    "k": "Version",
+    "v": "{ver}"
+   },
+   {
+    "k": "Plateformes",
+    "v": "Linux, macOS et Windows"
+   },
+   {
+    "k": "Licence",
+    "v": "MIT"
+   },
+   {
+    "k": "Dépendances",
+    "v": "Aucune"
+   }
+  ],
+  "install_check": "Si le numéro de version s'affiche, l'installation a fonctionné.",
+  "nav_config": "Configuration",
+  "nav_recipes": "Recettes",
+  "nav_trouble": "Dépannage",
+  "desc_config": "Le fichier de configuration et les réglages de {brand}.",
+  "desc_recipes": "De courtes recettes pour les tâches de tous les jours avec {brand}.",
+  "desc_trouble": "Des solutions aux problèmes les plus courants avec {brand}.",
+  "config_h": "Configuration",
+  "config_col_key": "Clé",
+  "config_col_default": "Valeur par défaut",
+  "config_col_desc": "Rôle",
+  "config_file_h": "Exemple",
+  "recipes_h": "Recettes",
+  "recipes_intro": "De courtes réponses aux besoins les plus fréquents.",
+  "trouble_h": "Dépannage",
+  "trouble_intro": "Les problèmes qu'on rencontre le plus souvent, et ce qui les règle d'habitude.",
+  "ver_l": "Version",
+  "prev": "Précédent"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "Un résumeur de journaux pour la ligne de commande",
+   "desc": "{brand} lit des fichiers journaux en texte brut et affiche un court résumé de leur contenu.",
+   "overview": "{brand} lit des fichiers journaux en texte brut et affiche un court résumé : combien de lignes ils contiennent, quels niveaux ils utilisent et quels messages reviennent le plus. C'est un petit programme unique, sans dépendances.",
+   "features": [
+    "Lit des fichiers, des dossiers et l'entrée standard",
+    "Regroupe les messages semblables sans aucune configuration",
+    "Affiche du texte, du JSON ou un petit rapport HTML"
+   ],
+   "quick_out": "app.log : 48 211 lignes, 3 niveaux\n  info   46 902\n  warn    1 190\n  error     119\nmessage le plus fréquent : cache absent pour la clé (9 413 fois)",
+   "install_intro": "{brand} se distribue sous la forme d'un seul programme. Il n'y a rien à configurer avant le premier lancement.",
+   "install_steps": [
+    "Téléchargez l'archive qui correspond à votre système.",
+    "Décompressez-la et copiez le programme dans un dossier présent dans votre PATH.",
+    "Lancez la commande de version pour vérifier que tout fonctionne."
+   ],
+   "faq": [
+    {
+     "q": "Quels formats de journaux sont pris en charge ?",
+     "a": "Tout ce qui est organisé par lignes. {brand} reconnaît les styles courants d'horodatage et de niveau, et se rabat sur de simples lignes quand il ne les reconnaît pas."
+    },
+    {
+     "q": "Est-ce qu'il modifie mes fichiers ?",
+     "a": "Jamais. Les fichiers sont ouverts en lecture seule."
+    },
+    {
+     "q": "Quelle taille de fichier peut-il lire ?",
+     "a": "Les fichiers sont lus au fil de l'eau, donc seul le temps est une limite. Un gigaoctet prend quelques secondes sur un ordinateur portable."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Résumer un fichier",
+     "p": "Indiquez à {brand} un fichier, un dossier ou un tube. Les dossiers sont lus de façon récursive et les fichiers compressés sont décompressés à la volée."
+    },
+    {
+     "h": "Regarder une période",
+     "p": "Utilisez --since et --until pour limiter le résumé à une période. Les heures peuvent être absolues ou relatives à maintenant."
+    },
+    {
+     "h": "Choisir un format de sortie",
+     "p": "La sortie par défaut est du texte brut. Le JSON est stable et destiné aux scripts ; le rapport HTML est un fichier unique que vous pouvez envoyer à un collègue."
+    }
+   ],
+   "options": [
+    {
+     "d": "Seulement les lignes après cette heure, absolue ou du type 2h."
+    },
+    {
+     "d": "Seulement les lignes avant cette heure."
+    },
+    {
+     "d": "Seulement les lignes de ce niveau ou d'un niveau supérieur."
+    },
+    {
+     "d": "Nombre de messages répétés à lister. 5 par défaut."
+    },
+    {
+     "d": "text, json ou html. text par défaut."
+    }
+   ],
+   "config_intro": "{brand} lit un fichier facultatif nommé config.toml dans votre dossier de configuration. Chaque clé peut aussi être donnée en ligne de commande, et la ligne de commande l'emporte.",
+   "config_rows": [
+    {
+     "d": "Nombre de messages répétés à lister."
+    },
+    {
+     "d": "Le format de sortie : text, json ou html."
+    },
+    {
+     "d": "Les messages à ignorer, comparés comme du texte brut."
+    },
+    {
+     "d": "Lire seulement les lignes après cette heure."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Trouver l'heure la plus bruyante",
+     "p": "Regroupez le résumé par heure pour voir quand le journal était le plus chargé."
+    },
+    {
+     "h": "Comparer deux jours",
+     "p": "Affichez les messages nouveaux et ceux qui ont disparu entre deux fichiers."
+    },
+    {
+     "h": "Fabriquer un rapport à faire circuler",
+     "p": "Écrivez le rapport HTML dans un fichier et joignez-le à un message."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Le résumé est vide",
+     "a": "Vérifiez que le fichier contient un message par ligne. S'il est compressé dans un format que {brand} ne connaît pas, décompressez-le d'abord."
+    },
+    {
+     "q": "Les heures semblent fausses",
+     "a": "Les lignes sans fuseau horaire sont lues en UTC. Utilisez --tz pour indiquer leur fuseau."
+    },
+    {
+     "q": "Le rapport est trop long",
+     "a": "Baissez --top, ou ajoutez les messages les plus bruyants à la liste d'exclusion du fichier de configuration."
+    },
+    {
+     "q": "C'est lent sur un disque réseau",
+     "a": "Copiez d'abord le fichier sur un disque local. La lecture ligne par ligne sur une liaison lente est la cause habituelle."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Bilan", "Jauge", "Digest", "Survol", "Registre", "Carrier", "Compte", "Scribe"],
+      ["log", "scan", "sum", "view", "cut", "peek"]
+     ]
+    }
+   }
+  },
+  "site": {
+   "tagline": "Un petit générateur de sites statiques",
+   "desc": "{brand} transforme un dossier de fichiers Markdown et quelques modèles en site web statique.",
+   "overview": "{brand} transforme un dossier de fichiers Markdown et quelques modèles en site web statique. Il n'y a ni base de données, ni environnement d'exécution, ni rien à tenir à jour sur le serveur.",
+   "features": [
+    "Du Markdown avec un en-tête de métadonnées",
+    "Des modèles en HTML simple",
+    "Un aperçu local qui se reconstruit à chaque enregistrement"
+   ],
+   "quick_out": "Site notes servi sur localhost:4000 (Ctrl+C pour arrêter)",
+   "install_intro": "{brand} est un seul exécutable. Placez-le dans votre PATH et c'est terminé.",
+   "install_steps": [
+    "Téléchargez l'archive qui correspond à votre système.",
+    "Décompressez-la et copiez l'exécutable dans un dossier présent dans votre PATH.",
+    "Lancez la commande de version pour vérifier que tout fonctionne."
+   ],
+   "faq": [
+    {
+     "q": "Puis-je utiliser mes propres modèles ?",
+     "a": "Oui. Les modèles sont de simples fichiers HTML avec quelques emplacements à remplir, et l'organisation des dossiers est à vous."
+    },
+    {
+     "q": "A-t-il besoin d'une base de données ?",
+     "a": "Non. Le résultat est composé de fichiers simples que n'importe quel serveur web peut servir."
+    },
+    {
+     "q": "Comment ajouter un nouveau type de page ?",
+     "a": "Ajoutez un dossier dans pages avec son propre fichier de mise en page, et {brand} le prendra en compte à la prochaine construction."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Créer un nouveau site",
+     "p": "La commande init crée un dossier avec un fichier de configuration, une mise en page et une page d'exemple."
+    },
+    {
+     "h": "Écrire une page",
+     "p": "Les pages sont des fichiers Markdown. L'en-tête en haut donne le titre et la date ; tout ce qui suit est le contenu."
+    },
+    {
+     "h": "Construire pour publier",
+     "p": "La commande build écrit le site terminé dans le dossier public. Copiez ce dossier sur n'importe quel serveur web."
+    }
+   ],
+   "options": [
+    {
+     "d": "Dossier du site terminé. public par défaut."
+    },
+    {
+     "d": "Inclure les pages marquées comme brouillons."
+    },
+    {
+     "d": "Port du serveur d'aperçu. 4000 par défaut."
+    },
+    {
+     "d": "Reconstruire quand un fichier change."
+    },
+    {
+     "d": "Afficher uniquement les erreurs."
+    }
+   ],
+   "config_intro": "Le fichier site.toml se trouve à la racine de votre dossier. Une clé absente prend sa valeur par défaut : un nouveau site n'a donc besoin d'aucun fichier.",
+   "config_rows": [
+    {
+     "d": "Le nom affiché dans l'en-tête de la page et dans le titre."
+    },
+    {
+     "d": "L'adresse où se trouve votre site. Utilisez / pour un site à la racine."
+    },
+    {
+     "d": "L'apparence du site : plain, slate ou folio."
+    },
+    {
+     "d": "Indique si les pages marquées comme brouillons sont construites."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Ajouter une page",
+     "p": "Créez un fichier Markdown avec un titre et une date en haut."
+    },
+    {
+     "h": "Prévisualiser les brouillons",
+     "p": "Servez le site en local, pages inachevées comprises."
+    },
+    {
+     "h": "Publier dans un dossier",
+     "p": "Construisez tout le site dans un seul dossier que vous pouvez copier sur n'importe quel serveur web."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Une page manque dans le site construit",
+     "a": "Les pages avec draft: true dans leur en-tête sont ignorées. Retirez cette ligne ou construisez avec --drafts."
+    },
+    {
+     "q": "Les liens sont cassés après la publication",
+     "a": "Réglez base_url sur l'adresse du dossier dans lequel le site est publié."
+    },
+    {
+     "q": "L'aperçu ne se met pas à jour",
+     "a": "Certains éditeurs écrivent un nouveau fichier au lieu de modifier l'ancien. Relancez l'aperçu, ou désactivez l'écriture sécurisée dans l'éditeur."
+    },
+    {
+     "q": "Les images ne s'affichent pas",
+     "a": "Placez-les dans le dossier static. Tout ce qu'il contient est copié tel quel."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Simple", "Ardoise", "Craie", "Folio", "Plume", "Presse", "Encre", "Papier"],
+      ["site", "page", "build", "gen", "sheet"]
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Des tâches récurrentes sans crontab",
+   "desc": "{brand} exécute de petites tâches récurrentes sur une machine et vous prévient quand l'une d'elles échoue.",
+   "overview": "{brand} exécute de petites tâches récurrentes sur une machine et vous prévient quand l'une d'elles échoue. C'est une alternative plus aimable à une crontab qu'il faut garder en tête.",
+   "features": [
+    "Des horaires écrits avec des mots simples",
+    "Un journal pour chaque exécution",
+    "Une ligne par tâche, pour que les échecs sautent aux yeux"
+   ],
+   "quick_out": "backup   tous les jours à 03:00   dernier passage : ok (4 s)",
+   "install_intro": "{brand} se compose d'un seul exécutable et d'un petit processus en arrière-plan qui vérifie le planning une fois par minute.",
+   "install_steps": [
+    "Téléchargez l'archive qui correspond à votre système.",
+    "Décompressez-la et copiez l'exécutable dans un dossier présent dans votre PATH.",
+    "Lancez le processus en arrière-plan avec le gestionnaire de services de votre système."
+   ],
+   "faq": [
+    {
+     "q": "Faut-il le lancer comme un service ?",
+     "a": "Oui, un petit processus en arrière-plan vérifie le planning une fois par minute. La page d'installation indique quoi lancer."
+    },
+    {
+     "q": "Que se passe-t-il si l'ordinateur est éteint ?",
+     "a": "Une tâche qui devait s'exécuter pendant que la machine était éteinte s'exécute une fois au redémarrage."
+    },
+    {
+     "q": "Des tâches peuvent-elles dépendre les unes des autres ?",
+     "a": "Pas encore. Pour l'instant, enchaînez les commandes dans une seule tâche."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Ajouter une tâche",
+     "p": "Une tâche a un nom, un horaire et une commande. Les horaires s'écrivent avec des mots simples."
+    },
+    {
+     "h": "Voir ce qui a tourné",
+     "p": "La commande list affiche chaque tâche avec le résultat de sa dernière exécution. La commande history affiche les exécutions d'une tâche, avec leur durée et leur sortie."
+    },
+    {
+     "h": "Mettre en pause et reprendre",
+     "p": "La pause conserve la tâche et son historique, mais l'empêche de s'exécuter. Pratique pendant un déménagement ou la restauration d'une sauvegarde."
+    }
+   ],
+   "options": [
+    {
+     "d": "Où sont rangés les tâches et les journaux. Par défaut, un dossier de votre répertoire personnel."
+    },
+    {
+     "d": "N'afficher que les échecs."
+    },
+    {
+     "d": "Nombre d'exécutions affichées par history. 10 par défaut."
+    },
+    {
+     "d": "Sortie lisible par une machine."
+    },
+    {
+     "d": "Lancer une tâche tout de suite, en plus de son horaire."
+    }
+   ],
+   "config_intro": "{brand} lit jobs.toml dans votre dossier de configuration. Les tâches elles-mêmes sont rangées à part : ce fichier ne contient que des réglages.",
+   "config_rows": [
+    {
+     "d": "L'interpréteur qui exécute les commandes."
+    },
+    {
+     "d": "Où est conservée la sortie de chaque exécution."
+    },
+    {
+     "d": "Combien de fois une tâche en échec est relancée."
+    },
+    {
+     "d": "Indique si une tâche en échec envoie aussi une notification."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Lancer une tâche une fois, maintenant",
+     "p": "Démarrez une tâche en dehors de son horaire, par exemple pour tester une nouvelle commande."
+    },
+    {
+     "h": "Voir pourquoi une tâche a échoué",
+     "p": "Affichez la sortie de la dernière exécution d'une tâche."
+    },
+    {
+     "h": "Tout mettre en pause pendant un voyage",
+     "p": "Arrêtez tous les horaires jusqu'à ce que vous les repreniez."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Une tâche ne s'exécute jamais",
+     "a": "Vérifiez avec la commande list que le programme tourne. Les tâches ne s'exécutent que pendant ce temps."
+    },
+    {
+     "q": "Une tâche s'exécute deux fois",
+     "a": "Deux copies du programme tournent. Arrêtez-en une ; le fichier de verrou se trouve dans le dossier des journaux."
+    },
+    {
+     "q": "La commande marche dans mon terminal mais pas ici",
+     "a": "Les tâches ne lisent pas les fichiers de démarrage de votre shell. Utilisez des chemins complets, ou définissez l'environnement dans la tâche."
+    },
+    {
+     "q": "Les heures sont décalées d'une heure",
+     "a": "{brand} suit l'horloge et le fuseau horaire du système. Changez-les là, pas dans la tâche."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Horloge", "Rappel", "Tour", "Cadence", "Minuteur", "Rythme", "Alarme", "Planning"],
+      ["work", "list", "run", "do", "bell"]
+     ]
+    }
+   }
+  },
+  "csv": {
+   "tagline": "Sélectionner, trier et joindre des fichiers CSV",
+   "desc": "{brand} sélectionne, trie, joint et nettoie des fichiers CSV depuis la ligne de commande.",
+   "overview": "{brand} sélectionne, trie, joint et nettoie des fichiers CSV depuis la ligne de commande. Il gère de gros fichiers sans les charger en mémoire et ne modifie jamais ce qu'il lit.",
+   "features": [
+    "Sélectionner et renommer des colonnes",
+    "Trier, filtrer et joindre des fichiers",
+    "Corriger les problèmes courants : guillemets égarés, fins de ligne mélangées"
+   ],
+   "quick_out": "name,city\nMira,Lille\nOtto,Nancy",
+   "install_intro": "{brand} est un seul exécutable, sans dépendances.",
+   "install_steps": [
+    "Téléchargez l'archive qui correspond à votre système.",
+    "Décompressez-la et copiez l'exécutable dans un dossier présent dans votre PATH.",
+    "Lancez la commande de version pour vérifier que tout fonctionne."
+   ],
+   "faq": [
+    {
+     "q": "Quelle taille de fichier peut-il gérer ?",
+     "a": "Les fichiers sont traités au fil de l'eau : la mémoire utilisée reste faible. Le tri de gros fichiers utilise de l'espace temporaire sur le disque."
+    },
+    {
+     "q": "Est-ce qu'il modifie mes fichiers ?",
+     "a": "Non. Le résultat va à l'écran ou dans un nouveau fichier."
+    },
+    {
+     "q": "Et les autres séparateurs ?",
+     "a": "Utilisez l'option delimiter pour les tabulations, les points-virgules ou n'importe quel caractère unique."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Choisir des colonnes",
+     "p": "La commande select n'affiche que les colonnes que vous nommez, dans l'ordre où vous les donnez. Une colonne peut être renommée avec un signe égal."
+    },
+    {
+     "h": "Filtrer des lignes",
+     "p": "La commande filter garde les lignes qui répondent à une condition simple. Plusieurs conditions peuvent être combinées."
+    },
+    {
+     "h": "Joindre deux fichiers",
+     "p": "La commande join combine deux fichiers sur une colonne qu'ils ont en commun. Les lignes sans correspondance sont écartées, sauf si vous demandez de les garder."
+    }
+   ],
+   "options": [
+    {
+     "d": "Séparateur de champs. La virgule par défaut."
+    },
+    {
+     "d": "À mettre sur false si la première ligne contient des données."
+    },
+    {
+     "d": "Écrire dans un fichier plutôt qu'à l'écran."
+    },
+    {
+     "d": "Colonne servant au tri."
+    },
+    {
+     "d": "Colonne servant à la jointure."
+    }
+   ],
+   "config_intro": "Placez un fichier nommé .{cmd}rc dans votre dossier personnel pour changer les valeurs par défaut. Les options de la ligne de commande l'emportent toujours.",
+   "config_rows": [
+    {
+     "d": "Le caractère qui sépare les colonnes."
+    },
+    {
+     "d": "Indique si la première ligne contient les noms des colonnes."
+    },
+    {
+     "d": "L'encodage du texte en entrée et en sortie."
+    },
+    {
+     "d": "Ce qu'on écrit à la place d'une cellule vide dans le résultat."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Choisir et renommer des colonnes",
+     "p": "Gardez deux colonnes et donnez un nouveau nom à l'une d'elles."
+    },
+    {
+     "h": "Joindre deux fichiers sur une clé",
+     "p": "Combinez les lignes de deux fichiers qui ont un identifiant en commun."
+    },
+    {
+     "h": "Supprimer les lignes en double",
+     "p": "Gardez la première de chaque groupe de lignes identiques."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Les accents sont mal affichés",
+     "a": "Le fichier n'est probablement pas en UTF-8. Réglez l'encodage dans le fichier de configuration ou avec --encoding."
+    },
+    {
+     "q": "Il manque une colonne",
+     "a": "Si la première ligne contient des données et non des noms, lancez avec --no-header et désignez les colonnes par leur numéro."
+    },
+    {
+     "q": "Les nombres sont triés comme du texte",
+     "a": "Dites-le avec --numeric, sinon {brand} les trie comme ils s'écrivent."
+    },
+    {
+     "q": "Une jointure ne donne aucune ligne",
+     "a": "La clé n'a pas les mêmes espaces ou la même casse dans les deux fichiers. Lancez tidy sur les deux et réessayez."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Colonne", "Grille", "Cellule", "Ligne", "Feuille", "Onglet", "Virgule", "Champ"],
+      ["cut", "fix", "join", "tidy", "sift", "wrangle"]
+     ]
+    }
+   }
+  }
+ }
+}

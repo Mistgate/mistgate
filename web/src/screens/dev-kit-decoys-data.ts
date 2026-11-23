@@ -29,6 +29,7 @@ export const looks: Record<string, Look> = {
   wd: { brand: "Werkplaats Eik", lang: "nl", font: '"Trebuchet MS",Verdana,sans-serif', bg: "#eef0e8", fg: "#1d2a22", ac: "#2f6b4a", c: ["#c9d3bd", "#9db39a", "#6f8f78"], ln: "#1d2a2222", r: "14px", w: 700, nav: ["Meubels", "Werkwijze", "Contact"], h1: "Meubels van <i>massief eiken</i>", p: "Tafels, kasten en banken op maat, gemaakt in onze eigen werkplaats", cta: "Bekijk het werk", p1: "Elk stuk maken we op bestelling", li: [["Eettafel", "op maat"], ["Boekenkast", "op maat"], ["Tuinbank", "180 cm"]], p2: "Voorbeeldstraat 8, Utrecht. Op afspraak", nf: "Deze pagina bestaat niet" },
   bike: { brand: "alpine·loop", lang: "en", font: '"Courier New",monospace', bg: "#fbfbf7", fg: "#1b1b1b", ac: "#d2452f", c: ["#e7e5da", "#cfd8d2", "#b9c7d6"], ln: "#1b1b1b22", r: "2px", w: 700, nav: ["Routes", "Gear", "About"], h1: "Slow rides across <i>the Alps</i>", p: "Notes, maps and packing lists from a few summers of bikepacking", cta: "Read the routes", p1: "Routes I have ridden and would ride again", li: [["Lake loop", "3 days"], ["High pass", "5 days"], ["Valley floor", "2 days"]], p2: "A personal blog. No comments, no tracking", nf: "Wrong turn. Nothing here" },
   gd: { brand: "Gärtnerei Lindenhof", lang: "de", font: "Georgia,serif", bg: "#f3f6ee", fg: "#22301c", ac: "#5c7d2e", c: ["#d6e2c2", "#b4cc97", "#8cab6a"], ln: "#22301c22", r: "999px", w: 400, nav: ["Pflanzen", "Anfahrt"], h1: "Stauden und <i>Gehölze</i>", p: "Eine kleine Gärtnerei mit eigener Anzucht", cta: "Zum Sortiment", p1: "Aus eigener Anzucht", li: [["Stauden", "ab April"], ["Obstgehölze", "ab Oktober"]], p2: "Lindenweg 3. Mo–Sa", nf: "Seite nicht gefunden" },
+  tpl: { brand: "Rainy Reader", lang: "en", font: 'Georgia,"Times New Roman",serif', bg: "#f7f5f0", fg: "#25221d", ac: "#8a4b2a", c: ["#e6dfd0", "#d2c5ad", "#b9a98a"], ln: "#25221d22", r: "3px", w: 500, nav: ["Notes", "Archive", "About"], h1: "Notes from a <i>rainy</i> reading desk", p: "Short posts about books, tea and long walks home", cta: "Read the notes", p1: "The latest notes, newest first", li: [["On slow reading", "12 Oct"], ["A shelf for one", "28 Sep"], ["Walking home", "9 Sep"]], p2: "Written by one person, a few times a month", nf: "No such note" },
   boat: { brand: "Järvi Vene", lang: "fi", font: "Verdana,Arial,sans-serif", bg: "#eaf2f6", fg: "#12303f", ac: "#1f6f93", c: ["#bcd7e3", "#8fbdd0", "#5d9cb8"], ln: "#12303f22", r: "10px", w: 700, nav: ["Veneet", "Hinnat", "Yhteys"], h1: "Soutuveneet ja <i>kanootit</i>", p: "Vuokraa vene päiväksi tai viikoksi suoraan laiturilta", cta: "Katso veneet", p1: "Kaikki veneet sisältävät airot ja liivit", li: [["Soutuvene", "päivä"], ["Kanootti", "päivä"], ["Kajakki", "päivä"]], p2: "Esimerkkitie 4, Tampere. Touko–syyskuu", nf: "Sivua ei löytynyt" },
 };
 // a generic look for the sites a scene makes up to fill the library
@@ -37,10 +38,10 @@ const filler = (n: number): Look => ({ ...looks.bike!, brand: `Site ${n}`, bg: `
 const NOT_FOUND = '<!doctype html><html><meta charset="utf-8"><title>404</title><body style="margin:0;display:grid;place-content:center;min-height:100vh;font:16px/1.5 system-ui,sans-serif;color:#444;background:#fff;text-align:center"><b style="font-size:48px;line-height:1">404</b><span>Not Found</span></body></html>';
 
 /** One page of a made-up site as a single document: 0 the home page, 1 the first inner page, 2 the last, 404 the site's own 404.html. */
-export function pageDoc(id: string, page: number | "nf", n = 0): string {
+export function pageDoc(id: string, page: number | "nf", n = 0, photos?: string[]): string {
   if (page === "nf") return NOT_FOUND;
   const o = looks[id] ?? filler(n);
-  const css = `*{box-sizing:border-box}body{margin:0;font:400 16px/1.5 ${o.font};background:${o.bg};color:${o.fg}}a{color:inherit;text-decoration:none}header{display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between;align-items:center;padding:24px 6vw}header b{font-size:20px;font-weight:${o.w}}nav{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:15px;opacity:.75}main{padding:4vw 6vw 8vw}h1{margin:0 0 20px;font-size:clamp(34px,6.4vw,88px);line-height:1.02;letter-spacing:-.02em;font-weight:${o.w};max-width:13ch}h1 i{font-style:normal;color:${o.ac}}p{margin:0;max-width:46ch;font-size:clamp(16px,1.5vw,20px);opacity:.78}.b{display:inline-block;margin-top:28px;padding:14px 22px;border-radius:${o.r};background:${o.ac};color:${o.bg};font-weight:600}.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-top:6vw}.g div{aspect-ratio:4/3;border-radius:${o.r};background:${o.c[0]}}.g div:nth-child(2){background:${o.c[1]}}.g div:nth-child(3){background:${o.c[2]}}ul{list-style:none;margin:5vw 0 0;padding:0;max-width:640px}li{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid ${o.ln}}.e{min-height:60vh;display:grid;place-content:center;justify-items:center;text-align:center;gap:8px}.e b{font-size:clamp(72px,16vw,200px);line-height:1;color:${o.ac}}`;
+  const css = `*{box-sizing:border-box}body{margin:0;font:400 16px/1.5 ${o.font};background:${o.bg};color:${o.fg}}a{color:inherit;text-decoration:none}header{display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between;align-items:center;padding:24px 6vw}header b{font-size:20px;font-weight:${o.w}}nav{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:15px;opacity:.75}main{padding:4vw 6vw 8vw}h1{margin:0 0 20px;font-size:clamp(34px,6.4vw,88px);line-height:1.02;letter-spacing:-.02em;font-weight:${o.w};max-width:13ch}h1 i{font-style:normal;color:${o.ac}}p{margin:0;max-width:46ch;font-size:clamp(16px,1.5vw,20px);opacity:.78}.b{display:inline-block;margin-top:28px;padding:14px 22px;border-radius:${o.r};background:${o.ac};color:${o.bg};font-weight:600}.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-top:6vw}.g img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:${o.r}}.g div{aspect-ratio:4/3;border-radius:${o.r};background:${o.c[0]}}.g div:nth-child(2){background:${o.c[1]}}.g div:nth-child(3){background:${o.c[2]}}ul{list-style:none;margin:5vw 0 0;padding:0;max-width:640px}li{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid ${o.ln}}.e{min-height:60vh;display:grid;place-content:center;justify-items:center;text-align:center;gap:8px}.e b{font-size:clamp(72px,16vw,200px);line-height:1;color:${o.ac}}`;
   const head = `<header><b>${o.brand}</b><nav>${o.nav.map((x) => `<a href="#">${x}</a>`).join("")}</nav></header>`;
   const body =
     page === 404
@@ -49,7 +50,7 @@ export function pageDoc(id: string, page: number | "nf", n = 0): string {
         ? `<h1>${o.nav[0]}</h1><p>${o.p1}</p><ul>${o.li.map((x) => `<li><span>${x[0]}</span><span>${x[1]}</span></li>`).join("")}</ul>`
         : page === 2
           ? `<h1>${o.nav[o.nav.length - 1]}</h1><p>${o.p2}</p>`
-          : `<h1>${o.h1}</h1><p>${o.p}</p><a class="b" href="#">${o.cta}</a><div class="g"><div></div><div></div><div></div></div>`;
+          : `<h1>${o.h1}</h1><p>${o.p}</p><a class="b" href="#">${o.cta}</a><div class="g">${photos ? photos.map((p) => `<img src="${p}" alt="">`).join("") : "<div></div><div></div><div></div>"}</div>`;
   return `<!doctype html><html lang="${o.lang}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${o.brand}</title><style>${css}</style>${head}<main>${body}</main></html>`;
 }
 
@@ -67,6 +68,8 @@ export type DemoSite = {
   note: string;
   source: "upload" | "assistant" | "mcp";
   token?: string;
+  /** The kind of template it was made from (the panel marks such a site with the source label "template:<kind>"). */
+  template?: string;
   state: "ready" | "draft";
   /** A required check that fails (the board's "no index.html"). */
   bad?: boolean;
@@ -110,6 +113,10 @@ export const demoSites: DemoSite[] = [
     warn: [{ code: "scripts_or_forms", paths: ["map.js"] }],
     tree: [["index.html", 6.8], ["routes.html", 7.9], ["gear.html", 5.2], ["about.html", 2.2], ["404.html", 0.9], ["style.css", 4.6], ["map.js", 3.4], ["img/pass.jpg", 12], ["img/tent.jpg", 3]],
     versions: [{ agoS: 3 * H, by: "claude-desktop", bytes: 46 * KB }, { agoS: 3 * H + 480, by: "claude-desktop", bytes: 41 * KB }] },
+  { id: "dsi_tpl", name: "Rainy Reader", note: "Личный блог", source: "upload", template: "blog", state: "ready", files: 11, bytes: 38 * KB, sha: "b6d03e8f2a15", nodes: [], panel: false, updatedAgoS: 40 * 60, createdAgoS: 40 * 60, by: "owner", has404: true, title: "Notes · Rainy Reader",
+    warn: [],
+    tree: [["index.html", 5.9], ["archive.html", 4.6], ["about.html", 3.0], ["404.html", 1.1], ["robots.txt", 0.1], ["assets/site.css", 7.8], ["assets/icon.svg", 0.8], ["img/desk.svg", 5.2]],
+    versions: [{ agoS: 40 * 60, by: "owner", bytes: 38 * KB }] },
   { id: "dsi_gd", name: "Садовый питомник", note: "питомник растений, немецкий", source: "assistant", state: "draft", files: 3, bytes: 11 * KB, sha: "5a9e12c0b7f4", nodes: [], panel: false, updatedAgoS: 5 * H, createdAgoS: 5 * H, by: "assistant", has404: false, title: "Gärtnerei Lindenhof",
     warn: [{ code: "no_404" }, { code: "few_pages" }],
     tree: [["index.html", 4.7], ["pflanzen.html", 3.6], ["style.css", 2.7]],

@@ -11,13 +11,13 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/tasks/spec"
 )
 
 const (
-	updateScheduleTimezoneKey = "update_schedule_timezone_offset_minutes"
 	// defaultScheduleTimezoneOffsetMin is UTC. Installations made while the default was UTC+3 got that value stored
 	// by migration 00041, so their schedules are entered as before.
 	defaultScheduleTimezoneOffsetMin = 0
@@ -28,27 +28,13 @@ const (
 	scheduleMissAfter = 2 * time.Hour
 )
 
-func validScheduleTimezoneOffset(offset int32) bool {
-	return offset >= -12*60 && offset <= 14*60 && offset%15 == 0
-}
-
 func (s *Service) scheduleTimezoneOffset(ctx context.Context) (int32, error) {
-	raw, err := s.st.Setting(ctx, updateScheduleTimezoneKey)
-	if errors.Is(err, store.ErrNotFound) {
-		return defaultScheduleTimezoneOffsetMin, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-	n, err := strconv.ParseInt(raw, 10, 32)
-	if err != nil || !validScheduleTimezoneOffset(int32(n)) {
-		return defaultScheduleTimezoneOffsetMin, nil
-	}
-	return int32(n), nil
+	n, err := s.st.PanelTimezone(ctx)
+	return int32(n), err
 }
 
 func (s *Service) setScheduleTimezone(ctx context.Context, offset int32) error {
-	if !validScheduleTimezoneOffset(offset) {
+	if !store.ValidTimezoneOffset(int(offset)) {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("timezone offset must be between UTC-12:00 and UTC+14:00 in 15-minute steps"))
 	}
 	previous, err := s.scheduleTimezoneOffset(ctx)
@@ -67,7 +53,7 @@ func (s *Service) setScheduleTimezone(ctx context.Context, offset int32) error {
 			nexts = append(nexts, store.ScheduledTaskNext{ID: task.ID, NextRunAt: schedule.Next(now, int(offset), spec.Jitter(task.ID, schedule))})
 		}
 	}
-	if err := s.st.SetSettingAndScheduledTaskNexts(ctx, updateScheduleTimezoneKey, strconv.FormatInt(int64(offset), 10), nexts); err != nil {
+	if err := s.st.SetPanelTimezone(ctx, int(offset), nexts); err != nil {
 		return s.internal("save update timezone", err)
 	}
 	s.audit(ctx, "update_schedule_timezone", map[string]string{"offset_minutes": strconv.FormatInt(int64(offset), 10)})
@@ -85,7 +71,7 @@ func timezoneName(offset int32) string {
 }
 
 func parseScheduleLocalTime(local string, offset int32) (time.Time, error) {
-	if !validScheduleTimezoneOffset(offset) || len(local) != len("2006-01-02T15:04") {
+	if !store.ValidTimezoneOffset(int(offset)) || len(local) != len("2006-01-02T15:04") {
 		return time.Time{}, errors.New("date and time must use YYYY-MM-DDTHH:mm")
 	}
 	zone := time.FixedZone(timezoneName(offset), int(offset)*60)
@@ -107,7 +93,7 @@ func (s *Service) scheduleNodeUpdate(ctx context.Context, nodeID, localDateTime 
 	if err != nil {
 		return store.NodeUpdateScheduleRow{}, s.internal("load update timezone", err)
 	}
-	if !validScheduleTimezoneOffset(requestedOffset) {
+	if !store.ValidTimezoneOffset(int(requestedOffset)) {
 		return store.NodeUpdateScheduleRow{}, connect.NewError(connect.CodeInvalidArgument, errors.New("timezone offset is invalid"))
 	}
 	if requestedOffset != offset {
@@ -168,7 +154,7 @@ func (s *Service) scheduleNodeUpdate(ctx context.Context, nodeID, localDateTime 
 func updatableWhenOffline(n nodeView) bool {
 	updateCap := n.updateCap
 	if updateCap == "" {
-		updateCap = capUpdate
+		updateCap = agentcap.Update
 	}
 	return updatableWhenOfflineForCap(n, updateCap)
 }

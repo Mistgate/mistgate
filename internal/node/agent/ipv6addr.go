@@ -15,10 +15,6 @@ import (
 // The node's own IPv6 addresses (agent.proto "IPV6 ADDRESSES"): NodeSettings.ipv6_addresses, held on the uplink by the host
 // owner (hostctl.OwnedIPv6Host). The rules and the ownership file are hostctl's; this file is the wiring.
 
-// capIPv6Addr is listed in Hello.capabilities when the host can hold addresses: the panel sends NodeSettings.ipv6_addresses
-// only to an agent that has it.
-const capIPv6Addr = "ipv6-addr/1"
-
 // ipv6AddrState is what the worker remembers of the last sync.
 type ipv6AddrState struct {
 	key string // "addr=state,..." of the last sync: a change of it is a reason for a doctor report

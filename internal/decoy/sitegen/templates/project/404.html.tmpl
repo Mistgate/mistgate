@@ -1,0 +1,23 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main>
+<section class="__nfw__">
+<div class="__nl__">
+<div>
+<span class="__eb__">404</span>
+<h1>{{.L.nf_title}}</h1>
+<p class="__sub__">{{.L.nf_text}}</p>
+<p class="__cta__"><a class="__btn__" href="/">{{.L.nf_back}}</a></p>
+</div>
+<div class="__nfn__" aria-hidden="true">404</div>
+</div>
+<div class="__term__">{{template "tbar" .}}<pre><code>{{hl (printf "$ %s" .L.quick) "sh"}}
+{{hl (printf "$ %s" .L.ver_cmd) "sh"}}
+{{hl (printf "%s %s" .V.cmd (index .Lists.releases 0).version) "out"}}
+<span class="__dhf__">404</span>  {{.L.nf_title}}
+{{hl "$ " "sh"}}<span class="__cur__"></span></code></pre></div>
+</section>
+</main>
+{{template "footer" .}}
+</body>
+</html>

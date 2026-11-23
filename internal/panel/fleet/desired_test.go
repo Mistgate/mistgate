@@ -13,6 +13,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 	"github.com/mistgate/mistgate/internal/statehash"
@@ -25,17 +26,17 @@ func TestRequiredProtocolCapability(t *testing.T) {
 		spec plugin.InboundSpec
 		want string
 	}{
-		{name: "AWG", spec: plugin.InboundSpec{Protocol: "awg"}, want: capAWG},
-		{name: "VLESS", spec: plugin.InboundSpec{Protocol: "vless"}, want: capVLESS},
-		{name: "VLESS, another site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"www.example.org:443"}}`)}, want: capVLESS},
-		{name: "VLESS, a site chosen on the node", spec: plugin.InboundSpec{Protocol: "vless", TLS: plugin.TLS{ServerName: "shop.example.com"}, Settings: []byte(`{"reality":{"target":"shop.example.com:443"}}`)}, want: capVLESSTarget},
-		{name: "VLESS, the node's own site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"self"}}`)}, want: capVLESSSelf},
-		{name: "VLESS TLS front", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"security":"tls"}`)}, want: capVLESSTLS},
-		{name: "other L3 protocol", spec: plugin.InboundSpec{Tunnel: plugin.Tunnel{MTU: 1280}}, want: capAWG},
-		{name: "MTProto", spec: plugin.InboundSpec{Protocol: "mtproto"}, want: capMTProto},
-		{name: "TrustTunnel", spec: plugin.InboundSpec{Protocol: "trusttunnel"}, want: capTrustTunnel},
-		{name: "TrustTunnel HTTP/2", spec: plugin.InboundSpec{Protocol: "trusttunnel", Settings: []byte(`{"h3":false}`)}, want: capTrustTunnel},
-		{name: "TrustTunnel HTTP/3", spec: plugin.InboundSpec{Protocol: "trusttunnel", Settings: []byte(`{"h3":true}`)}, want: capTrustTunnelH3},
+		{name: "AWG", spec: plugin.InboundSpec{Protocol: "awg"}, want: agentcap.AWG},
+		{name: "VLESS", spec: plugin.InboundSpec{Protocol: "vless"}, want: agentcap.VLESS},
+		{name: "VLESS, another site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"www.example.org:443"}}`)}, want: agentcap.VLESS},
+		{name: "VLESS, a site chosen on the node", spec: plugin.InboundSpec{Protocol: "vless", TLS: plugin.TLS{ServerName: "shop.example.com"}, Settings: []byte(`{"reality":{"target":"shop.example.com:443"}}`)}, want: agentcap.VLESSTarget},
+		{name: "VLESS, the node's own site", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"reality":{"target":"self"}}`)}, want: agentcap.VLESSSelf},
+		{name: "VLESS TLS front", spec: plugin.InboundSpec{Protocol: "vless", Settings: []byte(`{"security":"tls"}`)}, want: agentcap.VLESSTLS},
+		{name: "other L3 protocol", spec: plugin.InboundSpec{Tunnel: plugin.Tunnel{MTU: 1280}}, want: agentcap.AWG},
+		{name: "MTProto", spec: plugin.InboundSpec{Protocol: "mtproto"}, want: agentcap.MTProto},
+		{name: "TrustTunnel", spec: plugin.InboundSpec{Protocol: "trusttunnel"}, want: agentcap.TrustTunnel},
+		{name: "TrustTunnel HTTP/2", spec: plugin.InboundSpec{Protocol: "trusttunnel", Settings: []byte(`{"h3":false}`)}, want: agentcap.TrustTunnel},
+		{name: "TrustTunnel HTTP/3", spec: plugin.InboundSpec{Protocol: "trusttunnel", Settings: []byte(`{"h3":true}`)}, want: agentcap.TrustTunnelH3},
 		{name: "Hysteria2", spec: plugin.InboundSpec{Protocol: "hysteria2"}},
 	}
 	for _, tt := range tests {
@@ -48,11 +49,6 @@ func TestRequiredProtocolCapability(t *testing.T) {
 }
 
 func TestTrustTunnelInboundIsWithheldWithoutCapability(t *testing.T) {
-	// The agent's own constants (internal/node/agent l3.go) are pinned to the same literals in its test: the two halves meet
-	// only in these strings.
-	if capTrustTunnel != "trusttunnel/1" || capTrustTunnelH3 != "trusttunnel-h3/1" {
-		t.Fatalf("capabilities are %q and %q", capTrustTunnel, capTrustTunnelH3)
-	}
 	tt := plugin.InboundSpec{ID: "inb_tt", Protocol: "trusttunnel", Enabled: true,
 		Listen: plugin.Listen{Network: "tcp", Port: 443}, Settings: []byte(`{"h3":false}`)}
 	e := newEnv(t)
@@ -67,7 +63,7 @@ func TestTrustTunnelInboundIsWithheldWithoutCapability(t *testing.T) {
 		withheld bool
 	}{
 		{name: "agent without TrustTunnel", withheld: true},
-		{name: "agent with TrustTunnel", caps: []string{capTrustTunnel}, held: true},
+		{name: "agent with TrustTunnel", caps: []string{agentcap.TrustTunnel}, held: true},
 	} {
 		st, err := e.f.buildState(context.Background(), node, tc.caps)
 		if err != nil {
@@ -94,8 +90,8 @@ func TestTrustTunnelHTTP3NeedsItsOwnCapability(t *testing.T) {
 		caps []string
 		held bool
 	}{
-		{name: "HTTP/2 engine only", caps: []string{capTrustTunnel}},
-		{name: "HTTP/2 and HTTP/3", caps: []string{capTrustTunnel, capTrustTunnelH3}, held: true},
+		{name: "HTTP/2 engine only", caps: []string{agentcap.TrustTunnel}},
+		{name: "HTTP/2 and HTTP/3", caps: []string{agentcap.TrustTunnel, agentcap.TrustTunnelH3}, held: true},
 	} {
 		st, err := e.f.buildState(context.Background(), node, tc.caps)
 		if err != nil {
@@ -654,8 +650,8 @@ func TestMTProtoInboundGoesOnlyToAnAgentWithTheEngine(t *testing.T) {
 			t.Errorf("%s: held %v withheld %v, want %v and %v", tc.name, held, st.withheld, tc.held, tc.withheld)
 		}
 	}
-	listed := capabilities(&agentv1.Hello{Capabilities: []string{capMTProto}, Engines: []*agentv1.EngineInfo{{Protocol: "mtproto"}}})
-	if !slices.Equal(listed, []string{capMTProto}) {
+	listed := capabilities(&agentv1.Hello{Capabilities: []string{agentcap.MTProto}, Engines: []*agentv1.EngineInfo{{Protocol: "mtproto"}}})
+	if !slices.Equal(listed, []string{agentcap.MTProto}) {
 		t.Errorf("an agent that lists mtproto/1 itself: %v", listed)
 	}
 }

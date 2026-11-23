@@ -1,0 +1,42 @@
+(function () {
+  var $$form = document.getElementById('__f__');
+  var $$user = document.getElementById('__u__');
+  var $$pass = document.getElementById('__p__');
+  var $$note = document.getElementById('__e__');
+  var $$btn = document.getElementById('__b__');
+  var $$busy = false;
+
+  function $$say(text) {
+    $$note.textContent = text;
+    $$note.hidden = false;
+  }
+
+  function $$attempt() {
+    if ($$busy) return;
+    $$note.hidden = true;
+    if (!$$user.value.trim() || !$$pass.value) {
+      $$say('{{js .L.e_empty}}');
+      return;
+    }
+    $$busy = true;
+    $$btn.disabled = true;
+    var $$label = $$btn.textContent;
+    $$btn.textContent = '{{js .L.f_busy}}';
+    setTimeout(function () {
+      $$busy = false;
+      $$btn.disabled = false;
+      $$btn.textContent = $$label;
+      $$pass.value = '';
+      $$say('{{js (one "ebad" .L.e_bad)}}');
+      $$pass.focus();
+    }, 600 + Math.random() * 1200);
+  }
+
+  $$btn.addEventListener('click', $$attempt);
+  $$form.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      $$attempt();
+    }
+  });
+})();

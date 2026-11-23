@@ -11,7 +11,7 @@ import { useFmt } from "@/lib/format";
 import { isFleetRun, lockRefusedText, stepChip, stepNote, waitText, waitingRetry } from "@/lib/os-fleet";
 import { blockKeys, blockOf, blockText, elapsedText, gateWaitText, gateWindowText, osRunOf, pauseCode, pauseText, phaseText, resultLine, stepPill, stepReason, stepSince, useOsActions, type OsNodeRun } from "@/lib/os-run";
 import type { OsRow } from "@/lib/os-updates";
-import { useIsOwner, vantageNote } from "@/lib/updates";
+import { skippedProfilesNote, useIsOwner, vantageNote } from "@/lib/updates";
 import { OsConfirmDialog, type OsDialogMode } from "./os-confirm";
 
 // What the owner does with one node's operating system, and what is going on there: the buttons (install the security
@@ -93,7 +93,8 @@ function Result({ run, row, owner, busy, onClose }: { run: Extract<OsNodeRun, { 
   const pill = stepPill(step);
   const reason = stepReason(t, step.errorKey, step.params);
   // the gate's look from another node at the panel's own path: why a pass is not a plain pass, or why a probe failure stands
-  const note = vantageNote(t, row.name ?? step.nodeName, step.params, step.state === OsStepState.PASSED);
+  // and the profiles the check did not hold against the job because they did not work before it
+  const note = [vantageNote(t, row.name ?? step.nodeName, step.params, step.state === OsStepState.PASSED), skippedProfilesNote(t, step.params)].filter(Boolean).join(" ");
   // the pause names the step's reason and mode itself; an older answer lacks them, the step has them
   const pause = { ...step.params, reason: step.errorKey, ...rollout.pauseParams };
   const banner = pauseText(t, rollout.pauseKey, row.name ?? step.nodeName, pause);

@@ -16,6 +16,7 @@ import (
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	probev1 "github.com/mistgate/mistgate/gen/mistgate/probe/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -99,7 +100,7 @@ func targetName(t *testing.T, x *l3Env, id string) string {
 
 func TestPathProbeUDPArmsSendsAndStoresWithoutAnAddress(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capProbe)
+	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.Probe)
 	result := startPathProbe(x, sender.nodeID, target.nodeID, "udp", []uint32{443}, nil)
 
 	arm := waitUDPCount(targetConn, false)
@@ -138,7 +139,7 @@ func TestPathProbeUDPArmsSendsAndStoresWithoutAnAddress(t *testing.T) {
 
 func TestPathProbeMTUSweepSendsDontFragmentAndFindsTheLargestSize(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capProbe)
+	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.Probe)
 	result := startPathProbe(x, sender.nodeID, target.nodeID, "udp", []uint32{443}, []uint32{1200, 1452, 1200})
 
 	// 1200 arrives whole; 1452 is refused by the sender's own interface (EMSGSIZE, no_route): the counter is still stopped
@@ -171,7 +172,7 @@ func TestPathProbeMTUSweepSendsDontFragmentAndFindsTheLargestSize(t *testing.T) 
 func TestPathProbeRefusesAnOldAgentAndSendsItNothing(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
 	// an agent that has the UDP check but predates probe/1 must not be sent the don't-fragment field or any new command
-	old, oldConn := addPortCheckPeer(x, "old", "provider-b", "DE", capUDPCheck)
+	old, oldConn := addPortCheckPeer(x, "old", "provider-b", "DE", agentcap.UDPCheck)
 	got := awaitProbe(t, startPathProbe(x, old.nodeID, target.nodeID, "udp", []uint32{443}, []uint32{1200}))
 	if got.Error != "agent_too_old" || len(got.Sizes) != 0 {
 		t.Fatalf("old sender: %+v", got)
@@ -183,8 +184,8 @@ func TestPathProbeRefusesAnOldAgentAndSendsItNothing(t *testing.T) {
 	}
 
 	// the trace is gated the same way, at the panel's request layer too
-	if capability, _ := requestCapability(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_PathTrace{PathTrace: &agentv1.PathTrace{}}}, false); capability != capProbe {
-		t.Errorf("PathTrace needs %q, got %q", capProbe, capability)
+	if capability, _ := requestCapability(&agentv1.ConnectResponse{Message: &agentv1.ConnectResponse_PathTrace{PathTrace: &agentv1.PathTrace{}}}, false); capability != agentcap.Probe {
+		t.Errorf("PathTrace needs %q, got %q", agentcap.Probe, capability)
 	}
 	traced, err := (probeService{x.f}).NodeTrace(x.ctx, connect.NewRequest(&probev1.NodeTraceRequest{FromNodeId: old.nodeID, ToNodeId: target.nodeID}))
 	if err != nil || traced.Msg.Error != "agent_too_old" || len(traced.Msg.Hops) != 0 {
@@ -195,7 +196,7 @@ func TestPathProbeRefusesAnOldAgentAndSendsItNothing(t *testing.T) {
 
 func TestPathProbeOnlyNamesFleetPortsAndNodes(t *testing.T) {
 	x, target, _ := portCheckTarget(t)
-	sender, _ := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck, capProbe, capTCPCheck)
+	sender, _ := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.Probe, agentcap.TCPCheck)
 	for _, test := range []struct {
 		name, kind, want string
 		ports            []uint32
@@ -233,7 +234,7 @@ func TestPathProbeOnlyNamesFleetPortsAndNodes(t *testing.T) {
 
 func TestPathProbeTCPAndTLSWireTargetsAndTimings(t *testing.T) {
 	x, target, _ := portCheckTarget(t)
-	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capTCPCheck, capProbe)
+	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.TCPCheck, agentcap.Probe)
 	from, _ := x.st.Node(x.ctx, sender.nodeID)
 	to, _ := x.st.Node(x.ctx, target.nodeID)
 	liveRows, err := x.f.Live(x.ctx)
@@ -385,7 +386,7 @@ func TestProbeAndSpeedShareFleetActiveLimit(t *testing.T) {
 
 func TestPathProbeRateLimitReachesTheRPC(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
-	sender, _ := addPortCheckPeer(x, "sender", "provider-b", "DE", capUDPCheck) // too old: each probe ends at once but counts
+	sender, _ := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck) // too old: each probe ends at once but counts
 	for i := 0; i < probeNodeMax; i++ {
 		got := awaitProbe(t, startPathProbe(x, sender.nodeID, target.nodeID, "udp", []uint32{443}, nil))
 		if got.Error != "agent_too_old" {
@@ -401,7 +402,7 @@ func TestPathProbeRateLimitReachesTheRPC(t *testing.T) {
 
 func TestNodeTraceReturnsHopsWithoutRoutersAndDiffsAgainstThePrevious(t *testing.T) {
 	x, target, _ := portCheckTarget(t)
-	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", capProbe)
+	sender, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.Probe)
 	trace := func(params map[string]string) *probev1.NodeTraceResponse {
 		out := make(chan *probev1.NodeTraceResponse, 1)
 		go func() {
@@ -507,7 +508,7 @@ func TestNodeDNSCheckRunsTheDoctorKeepsAHistoryAndTrends(t *testing.T) {
 	x, target, targetConn := portCheckTarget(t)
 	// the node lists doctor/1 only in a hello that says so; connect it again with the capability
 	_ = targetConn
-	a, aConn := addPortCheckPeer(x, "dnsnode", "provider-b", "DE", capDoctor)
+	a, aConn := addPortCheckPeer(x, "dnsnode", "provider-b", "DE", agentcap.Doctor)
 	_ = target
 	at := x.clock.now().Add(-time.Hour)
 	stored := func(p50 string, when time.Time) {

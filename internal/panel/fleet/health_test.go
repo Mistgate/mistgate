@@ -12,6 +12,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/decoy"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
@@ -153,9 +154,9 @@ func TestRefreshUnitCommandRequiresBothCapabilities(t *testing.T) {
 		caps []string
 		want bool
 	}{
-		{"doctor only", []string{capDoctor}, false},
-		{"refresh only", []string{capUnitRefresh}, false},
-		{"doctor and refresh", []string{capDoctor, capUnitRefresh}, true},
+		{"doctor only", []string{agentcap.Doctor}, false},
+		{"refresh only", []string{agentcap.UnitRefresh}, false},
+		{"doctor and refresh", []string{agentcap.Doctor, agentcap.UnitRefresh}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := e.f.readyForRequest(e.ctx, "nodea", frame, &store.NodeLiveRow{Connected: true, AgentCaps: tc.caps})
@@ -540,5 +541,47 @@ func TestAgentRestartedSoonAfterConnectIsRecorded(t *testing.T) {
 	reconnect("inst3")
 	if count() != 1 {
 		t.Fatalf("a new process after an hour of uptime was recorded: %d", count())
+	}
+}
+
+// Two nodes come back after the panel itself heard nobody: one panel_link_gap event, no node_blip and no history record.
+// When the others were heard meanwhile, the one that was quiet is a blip as before.
+func TestPanelSilenceIsNotABlipOfTheNodes(t *testing.T) {
+	e := newEnv(t)
+	h := &fakeHealth{}
+	e.f.SetHealth(h)
+	a := e.enroll("nodea")
+	b := e.fixture(a.nodeID).nodeB
+	ka := e.f.keepaliveEvery()
+	t0 := time.Now().UTC().Add(-5 * time.Minute)
+	at := func(s int) time.Time { return t0.Add(time.Duration(s) * time.Second) }
+	prev := func(id string, lastS int) store.NodeRow {
+		return store.NodeRow{ID: id, State: "active", LastSeenAt: at(lastS), LastConnectedAt: at(-600)}
+	}
+
+	e.f.own.heard(a.nodeID, at(0), ka)
+	e.f.own.heard(b, at(4), ka)
+	e.f.own.heard(a.nodeID, at(70), ka) // the panel hears again after 66 s of silence
+	e.f.connectEvents(e.ctx, a.nodeID, prev(a.nodeID, 0), "inst1", time.Time{}, at(70))
+	e.f.own.heard(b, at(72), ka)
+	e.f.connectEvents(e.ctx, b, prev(b, 4), "inst1", time.Time{}, at(72))
+	if n := e.count(`SELECT count(*) FROM event WHERE code = 'panel_link_gap' AND node_id IS NULL`); n != 1 {
+		t.Fatalf("panel_link_gap events = %d, want 1", n)
+	}
+	if n := e.count(`SELECT count(*) FROM event WHERE code = 'node_blip'`); n != 0 || len(h.returned) != 0 {
+		t.Fatalf("the nodes were blamed: %d node_blip, %d history records", n, len(h.returned))
+	}
+
+	// a node that was quiet for 100 s while the others were heard all along: a blip of that node
+	for s := 100; s <= 200; s += 10 {
+		e.f.own.heard(a.nodeID, at(s), ka)
+		e.f.own.heard(b, at(s+1), ka)
+	}
+	e.f.connectEvents(e.ctx, a.nodeID, prev(a.nodeID, 100), "inst1", time.Time{}, at(200))
+	if n := e.count(`SELECT count(*) FROM event WHERE code = 'node_blip' AND node_id = ?`, a.nodeID); n != 1 || len(h.returned) != 1 {
+		t.Fatalf("a real blip: %d node_blip, %d history records, want 1 and 1", n, len(h.returned))
+	}
+	if n := e.count(`SELECT count(*) FROM event WHERE code = 'panel_link_gap'`); n != 1 {
+		t.Fatalf("panel_link_gap events = %d, want still 1", n)
 	}
 }

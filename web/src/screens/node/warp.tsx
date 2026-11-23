@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Flourish } from "@/components/fx/flourish";
 import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/bits";
 import { QueryError } from "@/components/ui/query-error";
 import { StatusPill } from "@/components/ui/status";
 import { useToast } from "@/components/ui/toast";
@@ -22,7 +23,7 @@ import { useTx } from "@/screens/users/t";
 import { Facts } from "./server-parts";
 import { Wa } from "./parts";
 import { warpError, warpQuery, type WarpData } from "./warp-model";
-import { DeleteWarpDialog, ImportWarpDialog, PauseWarpDialog, RegisterWarpDialog } from "./warp-dialogs";
+import { DeleteWarpDialog, ImportWarpDialog, LicenseWarpDialog, PauseWarpDialog, RegisterWarpDialog } from "./warp-dialogs";
 import "./exit.css";
 
 // The WARP card (the board's .nx-warp): a head with the account and the state, then one of three bodies: nothing connected yet, the
@@ -91,7 +92,7 @@ export function WarpCard(props: { nodeId: string; nodeName: string; retired: boo
   );
 }
 
-type WarpDialog = "register" | "again" | "import" | "delete" | "pause" | null;
+type WarpDialog = "register" | "again" | "import" | "license" | "delete" | "pause" | null;
 /** The four steps of a registration, as the board draws them; the call itself is one request, the steps are where it is likely to be. */
 const stepMs = 1350;
 const steps = ["account", "keys", "tunnel", "check"] as const;
@@ -162,7 +163,22 @@ function WarpCardBody({ nodeId, nodeName, retired, down, profiles }: { nodeId: s
   const failing = !!account && account.enabled && !!h && (warpCheckFailed(h.lastError) || h.probeCloudflare?.ok === false || h.probeOther?.ok === false);
   const pill = warpPill(state, failing);
   const via = (profiles ?? 0) > 0 ? t.n("np.wp.via", d.inbounds.length, { m: profiles ?? 0 }) : "";
-  const sub = reg !== null ? t("np.wp.sub.reg") : !account ? t("np.wp.sub.none") : [t(sourceWord[account.source]), account.accountType, via].filter(Boolean).join(" · ");
+  const plus = account?.accountType === "plus";
+  const sub =
+    reg !== null ? (
+      t("np.wp.sub.reg")
+    ) : !account ? (
+      t("np.wp.sub.none")
+    ) : (
+      <>
+        {[t(sourceWord[account.source]), plus ? "" : account.accountType, via].filter(Boolean).join(" · ")}
+        {plus && (
+          <Chip tone="lavender" className="ms-1.5 !h-5 align-middle" title={t("warp.plus.badgeTitle")}>
+            {t("warp.plus.badge")}
+          </Chip>
+        )}
+      </>
+    );
 
   return (
     <section ref={card} className={cx(frame, just && "just")} aria-label="WARP" aria-busy={reg !== null}>
@@ -192,6 +208,7 @@ function WarpCardBody({ nodeId, nodeName, retired, down, profiles }: { nodeId: s
       <Honest tosUrl={d.tosUrl} />
       <RegisterWarpDialog open={dialog === "register" || dialog === "again"} again={dialog === "again"} onOpenChange={(o) => (close(o), !o && setRegError(null))} tosUrl={d.tosUrl} onImport={() => setDialog("import")} onRegister={() => void register(dialog === "again", d.tosUrl)} error={regError} />
       <ImportWarpDialog open={dialog === "import"} onOpenChange={close} nodeId={nodeId} />
+      <LicenseWarpDialog open={dialog === "license"} onOpenChange={close} nodeId={nodeId} hasLicense={!!d.account?.hasLicense} />
       <PauseWarpDialog open={dialog === "pause"} onOpenChange={close} nodeId={nodeId} nodeName={nodeName} inbounds={d.inbounds} />
       <DeleteWarpDialog open={dialog === "delete"} onOpenChange={close} nodeId={nodeId} nodeName={nodeName} hasToken={!!d.account?.hasToken} />
     </section>
@@ -485,6 +502,7 @@ function Account({ d, nodeId, retired, down, onDialog }: { d: WarpData; nodeId: 
     ...(reported && h.warpFlag ? [{ l: t("warp.detail.flag"), v: `warp=${h.warpFlag}`, mono: true }] : []),
     ...(a.useReserved ? [{ l: t("warp.detail.reserved"), v: t("warp.detail.reservedOn") }] : []),
     { l: np("np.wp.d.account"), v: [a.accountType, t(sourceWord[a.source])].filter(Boolean).join(", ") },
+    { l: t("warp.plus.detail"), v: t(a.hasLicense ? "warp.plus.detailSet" : "warp.plus.detailNone") },
   ];
 
   return (
@@ -496,6 +514,11 @@ function Account({ d, nodeId, retired, down, onDialog }: { d: WarpData; nodeId: 
           {!attention && d.attentionReason && <span className="mt-1 block font-mono text-[11px] break-words text-muted">{d.attentionReason}</span>}
           {/* revoked: what the node saw, small; its own advice would argue with "Register again" */}
           {trouble?.kind === "revoked" && words?.head && <span className="mt-1 block text-muted">{words.head}</span>}
+        </Wa>
+      )}
+      {a.licenseError && (
+        <Wa tone="warn" title={t("warp.plus.carryFailed")}>
+          {t.opt("warp.err." + a.licenseError) ?? a.licenseError}
         </Wa>
       )}
       {a.hasToken === false && <p className="nx-p !pb-3">{t("warp.noToken")}</p>}
@@ -618,6 +641,9 @@ function Account({ d, nodeId, retired, down, onDialog }: { d: WarpData; nodeId: 
                 {t("warp.reregister")}
               </Button>
             )}
+            <Button variant="secondary" size="md" disabled={!!busy || retired || !a.hasToken} title={a.hasToken ? undefined : t("warp.noToken")} onClick={() => onDialog("license")}>
+              {t(a.hasLicense ? "warp.plus.change" : "warp.plus.add")}
+            </Button>
             <Button variant="secondary" size="md" className="nx-del" disabled={!!busy} onClick={() => onDialog("delete")}>
               {t("warp.delete")}
             </Button>

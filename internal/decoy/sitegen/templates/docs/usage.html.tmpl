@@ -1,0 +1,26 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<div class="__shell__">
+{{template "sidenav" .}}
+<main class="__main__">
+<div class="__crumb__">{{.L.menu_h}} / {{(index .Nav 2).Label}}</div>
+<h1>{{.L.usage_h}}</h1>
+{{range $i, $u := .L.usage}}<h2 id="__t{{add $i 1}}__">{{$u.h}}</h2>
+<p>{{$u.p}}</p>
+<pre class="__pre__"><code>{{hl $u.code "sh"}}</code></pre>
+{{end}}<h2 id="__t9__">{{.L.opts_h}}</h2>
+<div class="__tbl__"><table>
+<thead><tr><th>{{.L.opt_col}}</th><th>{{.L.desc_col}}</th></tr></thead>
+<tbody>{{range .L.options}}<tr><td><code>{{.o}}</code></td><td>{{.d}}</td></tr>{{end}}</tbody>
+</table></div>
+<div class="__pn__"><a href="{{(index .Nav 1).Href}}"><small>{{.L.prev}}</small><b>{{(index .Nav 1).Label}}</b></a><a href="{{(index .Nav 3).Href}}"><small>{{.L.next}}</small><b>{{(index .Nav 3).Label}}</b></a></div>
+</main>
+<aside class="__tc__" aria-label="{{.L.toc_h}}">
+<h6>{{.L.toc_h}}</h6>
+{{range $i, $u := .L.usage}}<a href="#__t{{add $i 1}}__">{{$u.h}}</a>{{end}}<a href="#__t9__">{{.L.opts_h}}</a>
+{{template "glance" .}}
+</aside>
+</div>
+{{template "footer" .}}
+</body>
+</html>

@@ -1040,6 +1040,9 @@ var userUpdate = changeSpec[userUpdateArgs]{
 			req.PagePasswordAction, _ = pagePasswordAction(*a.PagePassword)
 		}
 		if _, err := c.cl.User.UpdateUser(c.ctx, connect.NewRequest(req)); err != nil {
+			if connect.CodeOf(err) == connect.CodeAborted { // the panel refuses a write over a person who changed after the read (stale_user)
+				return done{}, failure("changed_since_plan", "the user changed after the plan; make a new plan")
+			}
 			return done{}, apiError(err)
 		}
 		return doneWith("user_updated", "User updated."), nil
@@ -1876,8 +1879,12 @@ func rolloutAction(name, verb, proc, desc string, fits func(adminv1.RolloutStatu
 					finished++
 				}
 			}
+			summary := "Ask to " + verb + " the running staged update. The owner has to approve it first."
+			if verb == "cancel" {
+				summary = "Cancel the running staged update. Any step already in progress finishes and is checked; steps that have not started are skipped. The owner has to approve it first."
+			}
 			return &planned{
-				Summary: "Ask to " + verb + " the running staged update. The owner has to approve it first.",
+				Summary: summary,
 				Facts: []Fact{
 					{Key: "rollout", Value: clean(r.GetId(), 60)},
 					{Key: "version", Value: clean(r.GetToVersion(), 60)},
@@ -1913,7 +1920,7 @@ var (
 			_, err := c.cl.Update.ResumeRollout(c.ctx, connect.NewRequest(&adminv1.ResumeRolloutRequest{RolloutId: id}))
 			return err
 		})
-	rolloutCancel = rolloutAction("rollout_cancel", "cancel", adminv1connect.UpdateServiceCancelRolloutProcedure, "Cancel the rollout: nodes not yet updated are skipped.",
+	rolloutCancel = rolloutAction("rollout_cancel", "cancel", adminv1connect.UpdateServiceCancelRolloutProcedure, "Cancel the rollout: a step already in progress finishes and is checked; steps that have not started are skipped.",
 		func(s adminv1.RolloutStatus) bool {
 			return s == adminv1.RolloutStatus_ROLLOUT_STATUS_RUNNING || s == adminv1.RolloutStatus_ROLLOUT_STATUS_PAUSED
 		},

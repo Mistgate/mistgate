@@ -14,6 +14,7 @@ import (
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	mtprotoProto "github.com/mistgate/mistgate/internal/panel/protocols/mtproto"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -58,10 +59,10 @@ func newReverseCheckEnv(t *testing.T, entrySite, exitTCP bool) *checkEnv {
 	}
 	e.f.settleUDP = func(context.Context) error { return nil }
 	e.run()
-	entryCaps := []string{plugin.CapRelayForward, capUDPCheck, capTCPCheck, capVLESS, capSpeed}
-	exitCaps := []string{capMTProto, capVLESS, capUDPCheck, capSpeed}
+	entryCaps := []string{agentcap.RelayForward, agentcap.UDPCheck, agentcap.TCPCheck, agentcap.VLESS, agentcap.Speed}
+	exitCaps := []string{agentcap.MTProto, agentcap.VLESS, agentcap.UDPCheck, agentcap.Speed}
 	if exitTCP {
-		exitCaps = append(exitCaps, capTCPCheck)
+		exitCaps = append(exitCaps, agentcap.TCPCheck)
 	}
 	x.ec, _, _ = connectCaps(x.entry, "msk1", entryCaps...)
 	x.xc, _, _ = connectCaps(x.exit, "de1", exitCaps...)

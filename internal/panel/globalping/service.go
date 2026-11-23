@@ -23,6 +23,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/health"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
@@ -73,10 +74,8 @@ type Service struct {
 	log *slog.Logger
 	now func() time.Time
 
+	guard    countryreach.RunGuard // a source made before the integration was switched off or disconnected refuses to start
 	mu       sync.Mutex
-	gen      uint64 // bumped when the integration is switched off or disconnected; older sources refuse to start
-	inflight map[uint64]context.CancelFunc
-	next     uint64
 	lastTest time.Time
 }
 
@@ -100,7 +99,7 @@ func New(cfg Config) (*Service, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	return &Service{cfg: cfg, log: cfg.Log, now: cfg.Now, inflight: map[uint64]context.CancelFunc{}}, nil
+	return &Service{cfg: cfg, log: cfg.Log, now: cfg.Now}, nil
 }
 
 // Handler is the admin GlobalpingService.
@@ -176,40 +175,7 @@ func (s *Service) Country(ctx context.Context) (health.CountryConfig, health.Cou
 	if tok != "" {
 		limit = limitToken
 	}
-	s.mu.Lock()
-	gen := s.gen
-	s.mu.Unlock()
-	return cc, &source{svc: s, c: s.client(tok), limit: limit, poll: s.cfg.PollDelay, gen: gen}
-}
-
-// track registers a round in flight so that switching the integration off can cancel it. It refuses to start when the
-// integration was switched off after the source was made.
-func (s *Service) track(ctx context.Context, gen uint64) (context.Context, func(), error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if gen != s.gen {
-		return ctx, func() {}, errSwitchedOff
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	id := s.next
-	s.next++
-	s.inflight[id] = cancel
-	return ctx, func() {
-		s.mu.Lock()
-		delete(s.inflight, id)
-		s.mu.Unlock()
-		cancel()
-	}, nil
-}
-
-// stop cancels every round in flight and keeps later ones from starting on an older source.
-func (s *Service) stop() {
-	s.mu.Lock()
-	s.gen++
-	for _, cancel := range s.inflight {
-		cancel()
-	}
-	s.mu.Unlock()
+	return cc, &source{svc: s, c: s.client(tok), limit: limit, poll: s.cfg.PollDelay, gen: s.guard.Generation()}
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -220,15 +186,6 @@ type rpc struct{ s *Service }
 func fail(code connect.Code, msg string) error { return connect.NewError(code, errors.New(msg)) }
 
 var errInternal = fail(connect.CodeInternal, "internal error")
-
-// owner is the signed-in owner; a token (API or MCP) is refused again here, whatever the policy table says.
-func owner(ctx context.Context) (store.Admin, error) {
-	a, ok := auth.AdminFrom(ctx)
-	if !ok || strings.HasPrefix(a.ID, "token:") || strings.HasPrefix(a.ID, "mcp:") || auth.PrincipalFrom(ctx).Token || a.Role != store.RoleOwner {
-		return a, fail(connect.CodePermissionDenied, "owner access required")
-	}
-	return a, nil
-}
 
 // current is the settings as an answer.
 func (s *Service) current(ctx context.Context) (*adminv1.GlobalpingSettings, error) {
@@ -241,7 +198,7 @@ func (s *Service) current(ctx context.Context) (*adminv1.GlobalpingSettings, err
 }
 
 func (r rpc) GetGlobalping(ctx context.Context, _ *connect.Request[adminv1.GetGlobalpingRequest]) (*connect.Response[adminv1.GetGlobalpingResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	cur, err := r.s.current(ctx)
@@ -252,7 +209,7 @@ func (r rpc) GetGlobalping(ctx context.Context, _ *connect.Request[adminv1.GetGl
 }
 
 func (r rpc) UpdateGlobalping(ctx context.Context, req *connect.Request[adminv1.UpdateGlobalpingRequest]) (*connect.Response[adminv1.UpdateGlobalpingResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +253,7 @@ func (r rpc) UpdateGlobalping(ctx context.Context, req *connect.Request[adminv1.
 		}
 	}
 	if m.Enabled != nil && !*m.Enabled {
-		s.stop()
+		s.guard.Stop()
 	}
 	s.audit(ctx, admin, "globalping_update", `{"token_changed":`+strconv.FormatBool(m.Token != nil)+`}`)
 	s.changed(ctx)
@@ -308,7 +265,7 @@ func (r rpc) UpdateGlobalping(ctx context.Context, req *connect.Request[adminv1.
 }
 
 func (r rpc) DisconnectGlobalping(ctx context.Context, _ *connect.Request[adminv1.DisconnectGlobalpingRequest]) (*connect.Response[adminv1.DisconnectGlobalpingResponse], error) {
-	admin, err := owner(ctx)
+	admin, err := auth.OwnerSession(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +273,7 @@ func (r rpc) DisconnectGlobalping(ctx context.Context, _ *connect.Request[adminv
 	if err := s.cfg.StepUp(ctx); err != nil {
 		return nil, err
 	}
-	s.stop() // first: nothing new may start while the settings change
+	s.guard.Stop() // first: nothing new may start while the settings change
 	if err := s.cfg.Store.SetSettings(ctx, map[string]string{settingEnabled: "0", settingToken: ""}); err != nil {
 		s.log.Error("globalping: disconnect", "err", err)
 		return nil, errInternal
@@ -332,7 +289,7 @@ func (r rpc) DisconnectGlobalping(ctx context.Context, _ *connect.Request[adminv
 
 // TestGlobalping asks GET /v1/limits. It never carries an address and does not use a test.
 func (r rpc) TestGlobalping(ctx context.Context, _ *connect.Request[adminv1.TestGlobalpingRequest]) (*connect.Response[adminv1.TestGlobalpingResponse], error) {
-	if _, err := owner(ctx); err != nil {
+	if _, err := auth.OwnerSession(ctx); err != nil {
 		return nil, err
 	}
 	s := r.s

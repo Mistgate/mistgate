@@ -9,15 +9,9 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
-
-// capTCPShare is what an agent lists when it can share a TCP port between services by SNI (agent.proto "SHARED TCP PORT").
-const capTCPShare = "tcp-share/1"
-
-// shareProtocols are the protocols whose TCP inbounds can stand on one port, told apart by the name in the first ClientHello
-// (plugin.TCPSharePlan). A TCP inbound of any other protocol keeps the port to itself.
-var shareProtocols = []string{"vless", "trusttunnel", "mtproto"}
 
 // portSubject says who asks for the port: the profile (named in a refusal) and what the node's agent lists (nil: the node has not
 // said yet, so it is not refused for being old: the deployment withholds what an old agent cannot take).
@@ -33,7 +27,7 @@ func isSharePeer(spec plugin.InboundSpec, other nodeListen) bool {
 	return spec.ID != "" && other.spec.ID != "" && spec.ID != other.spec.ID &&
 		spec.Listen.Network == "tcp" && other.l.Network == "tcp" && spec.Listen.Port != 0 && spec.Listen.Port == other.l.Port &&
 		spec.Listen.HopFrom == 0 && other.l.HopFrom == 0 &&
-		slices.Contains(shareProtocols, spec.Protocol) && slices.Contains(shareProtocols, other.protocol)
+		plugin.SharesTCPPort(spec.Protocol) && plugin.SharesTCPPort(other.protocol)
 }
 
 func sharePeers(spec plugin.InboundSpec, others []nodeListen) []nodeListen {
@@ -56,7 +50,7 @@ func shareRefusal(spec plugin.InboundSpec, node string, others []nodeListen, who
 		return nil
 	}
 	port := strconv.Itoa(int(spec.Listen.Port))
-	if len(who.Agent) > 0 && !slices.Contains(who.Agent, capTCPShare) {
+	if len(who.Agent) > 0 && !slices.Contains(who.Agent, agentcap.TCPShare) {
 		return coded(connect.CodeFailedPrecondition, "share_agent_old", "port", port, "node", node, "profile", peers[0].profile)
 	}
 	names := map[string]string{spec.ID: who.Profile}

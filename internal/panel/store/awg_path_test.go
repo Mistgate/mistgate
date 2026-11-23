@@ -207,6 +207,37 @@ func TestEnsureKeyPathCredRequiresRelayAndIsIdempotent(t *testing.T) {
 	}
 }
 
+// A static device gets a key of its own for the IPv6 entry too, while some live inbound of its profile sits on a node whose entry is on.
+func TestEnsureKeyPathCredIssuesTheIPv6PathOnlyWhileTheEntryIsOn(t *testing.T) {
+	ctx := context.Background()
+	s, profileID, deviceID, _ := awgPathFixture(t)
+	var calls atomic.Int32
+	issue := func(idx int) (AccessCred, string, error) {
+		calls.Add(1)
+		return AccessCred{ID: NewID("crd_path_"), Protocol: "awg", SecretEnc: []byte{1}, DataJSON: `{}`}, "pub_ipv6", nil
+	}
+	if _, _, err := s.Access().EnsureKeyPathCred(ctx, deviceID, profileID, PathIPv6, 32, linkNow, issue); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("IPv6 key with the entry off = %v, want ErrNotFound", err)
+	}
+	for _, bad := range []string{"", PathDirect, "relay:", "other"} {
+		if _, _, err := s.Access().EnsureKeyPathCred(ctx, deviceID, profileID, bad, 32, linkNow, issue); err == nil || errors.Is(err, ErrNotFound) {
+			t.Fatalf("path %q = %v, want an invalid request", bad, err)
+		}
+	}
+	execT(t, s, `UPDATE node SET ipv6_entry = '2001:db8::5' WHERE id = 'nod_de1'`)
+	first, created, err := s.Access().EnsureKeyPathCred(ctx, deviceID, profileID, PathIPv6, 32, linkNow, issue)
+	if err != nil || !created || first.Path != PathIPv6 {
+		t.Fatalf("IPv6 key with the entry on = %+v, %v, %v", first, created, err)
+	}
+	again, created, err := s.Access().EnsureKeyPathCred(ctx, deviceID, profileID, PathIPv6, 32, linkNow, issue)
+	if err != nil || created || again.ID != first.ID || calls.Load() != 1 {
+		t.Fatalf("a second issue = %+v, %v, %v after %d calls; want the same key", again, created, err, calls.Load())
+	}
+	if got := countT(t, s, `SELECT count(*) FROM awg_peer WHERE credential_id = ? AND released_at = 0`, first.ID); got != 1 {
+		t.Fatalf("IPv6 peer allocation = %d, want one", got)
+	}
+}
+
 func TestEnsureLinkAWGSkipsAPathWithoutItsRelay(t *testing.T) {
 	ctx := context.Background()
 	s, profileID, _, _ := awgPathFixture(t)

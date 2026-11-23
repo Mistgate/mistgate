@@ -1,0 +1,100 @@
+{
+ "ui": {
+  "vars": {
+   "fee": {
+    "money": [
+     25,
+     30,
+     35,
+     40
+    ]
+   }
+  }
+ },
+ "bundles": [
+  {
+   "id": "chess",
+   "art": "tiles",
+   "photo_q": [
+    "chess board pieces",
+    "wooden chess pieces"
+   ],
+   "fixed": {
+    "why": [
+     {
+      "icon": "users"
+     },
+     {
+      "icon": "clock"
+     },
+     {
+      "icon": "gift"
+     }
+    ]
+   }
+  },
+  {
+   "id": "walking",
+   "art": "topo",
+   "photo_q": [
+    "hiking trail countryside",
+    "footpath hills landscape"
+   ],
+   "fixed": {
+    "why": [
+     {
+      "icon": "leaf"
+     },
+     {
+      "icon": "users"
+     },
+     {
+      "icon": "heart"
+     }
+    ]
+   }
+  },
+  {
+   "id": "choir",
+   "art": "staff",
+   "photo_q": [
+    "empty concert hall",
+    "sheet music stand"
+   ],
+   "fixed": {
+    "why": [
+     {
+      "icon": "music"
+     },
+     {
+      "icon": "users"
+     },
+     {
+      "icon": "heart"
+     }
+    ]
+   }
+  },
+  {
+   "id": "astronomy",
+   "art": "stars",
+   "photo_q": [
+    "night sky stars",
+    "telescope night sky"
+   ],
+   "fixed": {
+    "why": [
+     {
+      "icon": "sun"
+     },
+     {
+      "icon": "eye"
+     },
+     {
+      "icon": "users"
+     }
+    ]
+   }
+  }
+ ]
+}

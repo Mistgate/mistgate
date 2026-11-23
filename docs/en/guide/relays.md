@@ -42,25 +42,25 @@ Accounting stays on the exit: traffic, quotas, speed limits, devices and [torren
 
 ## Add a relay
 
-1. Update the entry node's agent if **Updates** says so: older agents cannot forward ("Update the node agent to add relays"). The server's firewall must allow forwarded traffic; if it drops it (`FORWARD` policy `DROP`, as UFW and Docker set by default) the relay stays down and the card says so.
-2. Open the node people cannot reach: **Nodes** → that node → **Ways in** → **Add a way in…**. When the node is dark, the dialog starts: "From Russia, de1 does not open on MTS. Give those people another way in — the node and its keys stay the same."
-3. Choose **Through another node**: "People connect to a node their network sees; it passes their traffic to de1 unchanged." The best choice is hinted ("Good fit: msk1, seen from MTS"). The other choice is the [IPv6 entry](nodes.md#ipv6-entry); it is greyed out, with the reason, when the node cannot take one.
-4. Pick the entry (**Through which node**). **Good fits: seen from MTS** come first, then **Other nodes**; each shows its country code, whether people see it and, where the TSPU probe runs from it, whether it reaches de1. A node that already passes servers of de1 says "Already passes on 2 servers of de1". An entry in the same country as the exit gains people nothing, because their route to it does not change: it is never in **Good fits**, it carries the hint "Same country as the exit", and you can still pick it.
-5. Tick the servers to relay. Each has a port on the entry (**auto** is the exit's port if free, else a free one). A server that cannot be relayed is grey with the reason.
-6. **Check and turn on** runs both checks and switches the relay on. **Only check** runs the leg and adds the relay switched off; turn it on with **Turn on** in its row within 15 minutes, or check again (switching on needs a leg check that passed less than 15 minutes ago). The dialog shows the progress and the result per server; **Back** returns to the choice of the node.
-7. The row shows *Works, checked 3 min ago*, or *Not turned on* with the stage: `leg` (the entry cannot reach the exit's server: a block, a route, the exit's firewall), `path` (the port on the entry is not reachable from outside: the entry's firewall or hoster, or `FORWARD` dropped). **Check now** repeats the checks; **Turn off** and **Remove** stop the forward on the entry.
+1. Update the entry node's agent if **Updates** says so: older agents cannot forward ("The agent of msk1 is too old for relays. Update it on the Updates page."). The server's firewall must allow forwarded traffic; if it drops it (`FORWARD` policy `DROP`, as UFW and Docker set by default) the relay stays down and the row says so.
+2. Open the node people cannot reach: **Nodes** → that node → **Ways in**. When the node is dark from the country of the check, the button **Make reachable from Russia…** is on top of the list. **Add a way in…** under the list opens the same window, and so does the grey row **Via another node** ("a spare way, in case the node stops opening directly"). The [IPv6 entry](nodes.md#ipv6-entry) has its own button, **Add IPv6 entry…**.
+3. The window **Make reachable from Russia** has four steps: **Node**, **Entry**, **What people get** and **Done**. On **Node** the node you came from is already chosen, with its verdict: "there is a way, adding a spare one", "partly" or "no way". **Next** goes on.
+4. On **Entry** pick the node people go through ("Through which node should people go to de1"). The nodes that **Fit** come first; each shows how the country check sees it, whether it reaches de1 (where the TSPU probe runs from it) and its load. A node that already passes servers of de1 is not offered again: add more of them with **Route more servers…** in its lane. An entry in the same country as the exit gains people nothing, because their route to it does not change: it never **Fits**, it carries the hint "Same country as the exit", and you can still pick it.
+5. On **What people get** tick the servers to relay. Each line shows the profile and its port on the entry ("tcp/443 on msk1"); a server that cannot be relayed is grey with the reason. The panel picks the port: the exit's own when it is free on the entry, else a free one; **Change port…** in the server's menu changes it later. Under the list the window says who gets what ("12 people get "DE · via RU": 3 servers through msk1, beside the old ones"). When direct does not reach the exit but the exit reaches the entry, it says "Will go through the bridge". **Check and turn on** starts the run; **Back** returns to the choice of the entry.
+6. **Done** shows the run ("Checking and turning on · 1 of 3") and a line per server ("checking msk1 → de1 and from outside", then "works"). Both checks of [How it works](#how-it-works) run for each server, and the relay is turned on only when both pass. **Stop** lets the server in flight finish and starts no more. You can close the window: the run goes on, and the result is in the **Ways in** tab ("Not finished" with **Finish it** shows relays that were made but not turned on). A server that fails stays off and nothing is given to people; if its port was taken, its line offers **Take 8444**, and **Another entry…** starts over with another node. At the end: "de1 is reachable through msk1. People get the new servers with the next subscription update."
+7. The row of each server shows **Works**, **Off**, **Down**, **Turning on…** or **Checking…**. A working one says how a client sees it ("As a client: 182 ms · 3 min ago"); a down one says why ("Down since 14:20: msk1 cannot reach de1 on 443/tcp." for the leg, "443/tcp on msk1 is not reachable from outside" for the path: the entry's firewall or hoster, or `FORWARD` dropped). The **⋯** menu of the row has **Check now**, **Turn on** or **Turn off**, **Change port…**, **Method…** and **Remove…** (it asks "Really remove?"). **Turn on** needs a check that passed less than 15 minutes ago.
 
-A server the panel has no way to prove is its own is checked as far as it can be: an [MTProto](mtproto.md) server whose Fake TLS falls back to another site has no name of this node to probe. Its row says *The panel cannot check it* instead of a failure, and it can still be turned on. An MTProto server whose Fake TLS falls back to the node's own site is checked like a VLESS one.
+A server the panel has no way to prove is its own is checked as far as it can be: an [MTProto](mtproto.md) server whose Fake TLS falls back to another site has no name of this node to probe. Its row says "On. The panel cannot check it: the server has no name to check it by." instead of a failure, and it can still be turned on. An MTProto server whose Fake TLS falls back to the node's own site is checked like a VLESS one.
 
-You can start from the entry as well: the entry node → **Ways in** → the group **Reached through msk1** → **Relay another node…**. It is the same dialog, with the servers of every node instead of one.
+You can start from the entry as well: the entry node → **Ways in** → **Whom it carries** → **Carry more nodes…** opens the **Paths** view of **Nodes**, and the buttons there start the same window.
 
-On the exit node, each relay is a lane **Through msk1** on the **Ways in** tab; on the entry node it is a row in the group **Reached through msk1** ("→ DE de1"). Removing a profile from a node, or retiring a node, also removes the relays that depend on it; the dialog says how many.
+On the exit node, each relay is a lane **Through msk1** on the **Ways in** tab; on the entry node it is a row for the exit in **Whom it carries**. Removing a profile from a node, or retiring a node, also removes the relays that depend on it; the dialog says how many.
 
 ## Supervision
 
 Every relay that is on joins the client-eye check rounds as a target of its own: the panel connects through the entry's forwarded port with the exit's profile and credentials, as an app would, and reads 64 KB through it, so a transfer that starts and then stops counts as a freeze.
 
-- The relay row shows the last round: "Through the relay: works, 182 ms, 4 min ago", or the stage that failed.
+- The relay row shows the last round: "As a client: 182 ms · 4 min ago", or the stage that failed ("Through the relay: the transfer stalls after the first kilobytes, 4 min ago").
 - It also shows the bytes and packets that went through the forward since the entry's agent installed it, and when the agent read them. Older agents without counters show nothing.
 - After two failed rounds in a row a `relay_down` alert opens on [Health](../operations/health.md): "Relay de1 via msk1 is down". It names the stage in words: `leg`, the entry does not reach the exit; `entry`, the forward on the entry is not installed; `path`, nothing comes through from outside through the entry; `freeze`, the transfer stalls after the first kilobytes. The alert's **Open the way in** button opens the exit node's **Ways in** tab on that lane.
 - The alert gives way while the exit's own check alert or a `node_down` of either node is open, and closes when the relay works again. Telegram sends it too.
@@ -69,17 +69,17 @@ The panel's own checks run from the panel's server, outside the entry's country,
 
 ## Bridge: when the entry cannot reach the exit
 
-A direct relay (**Direct**) works in one direction: the entry connects to the exit. Some filters cut connections in that direction but let through a connection the exit opens to the entry. The **bridge** uses that. The exit connects to the entry and keeps several encrypted connections open. When a person connects to the entry's port, the entry hands their session to one of those connections, and the exit answers it. The entry does not open the session, as with a direct relay.
+A relay that forwards (**Forwarding**, called direct below) works in one direction: the entry connects to the exit. Some filters cut connections in that direction but let through a connection the exit opens to the entry. The **bridge** uses that. The exit connects to the entry and keeps several encrypted connections open. When a person connects to the entry's port, the entry hands their session to one of those connections, and the exit answers it. The entry does not open the session, as with a direct relay.
 
 The bridge carries TCP only.
 
-The way is set for each relay with **Change way** on its **Way** line:
+The method is set for each relay: **Method…** in the **⋯** menu of its row, or the button **Method: auto** in the **Method** block of the pair (the entry and the exit together). Only the owner can change it, and the open connections of people drop when it changes; their apps reconnect by themselves.
 
 | Way | What it does |
 |:--|:--|
-| **Auto (recommended)** | Direct while it works. When the entry stops reaching the exit, the panel moves to the bridge by itself, and comes back when direct works again. |
-| **Direct** | The entry connects to the exit. Nothing switches by itself. |
-| **Via bridge** | The exit connects to the entry and keeps the line open. Nothing switches back by itself: only you can change it. |
+| **Auto (recommended)** | Forwarding while it works. When the entry stops reaching the exit, the panel moves to the bridge by itself, and comes back when direct works again. |
+| **Forwarding only** | The entry connects to the exit. Nothing switches by itself. |
+| **Bridge only** | The exit connects to the entry and keeps the line open. Nothing switches back by itself: only you can change it. |
 
 **What works through the bridge:**
 
@@ -92,7 +92,7 @@ The way is set for each relay with **Change way** on its **Way** line:
 - **To the bridge.** The panel checks each relay about every 10 minutes. Two failed checks in a row switch it to the bridge, when the entry does not reach the exit or the transfer freezes after the first kilobytes. The switch needs the bridge to be up and the exit to reach the entry. If the bridge does not hold, a `relay_down` alert opens with the stage `bridge`.
 - **Back to direct.** Every 30 minutes the panel checks the direct path with a quick packet test. Three passes in a row, at least 30 minutes apart and at least 30 minutes after the last switch, start a flow test: the entry opens a connection to the exit, and the exit sends 8 MB back. If it passes, the relay goes back to direct. If not, the relay stays on the bridge, the count starts again, and the next flow test waits at least 6 hours. Going back takes at least an hour.
 - **If direct fails again soon after.** Within 30 minutes of going back, one failed check is enough to return to the bridge.
-- The row shows the progress: "Returning to direct: 2 of 3 checks passed in a row."
+- The pair shows the progress: "Forwarding failed at 14:20. We go back to it after 3 successful checks in a row and a speed check (now 2 of 3)".
 - Each switch is logged as an event, with no Telegram message.
 - A switch drops the open connections of people. Their apps reconnect by themselves.
 
@@ -100,10 +100,10 @@ The way is set for each relay with **Change way** on its **Way** line:
 
 - The bridge holds a few connections, and people share them. Each connection serves about 120 people: about 240 people with two connections, about 480 with four.
 - The panel starts with two. It moves to four by itself when the bridge reaches 80 % of the two-connection limit (about 190 people), or when the relay carries 10 Mbit/s or more. It goes back to two after 30 minutes with no reason to keep four, once fewer than about 100 people use it.
-- The bridge line shows **In use: N of ~capacity**. From 80 % it says **nearly full**. That is information only: no alert and no Telegram message.
+- The bridge line shows **Used: N of ~capacity**. From 80 % it says **almost full**. That is information only: no alert and no Telegram message.
 - At four connections the bridge cannot grow. New people are turned away within a second, and their apps move to another server. The line then offers **Another entry for {exit}…**: a second entry shares the people.
 
-**Speed check:** the **Speed check (8 MB)** button sends 8 MB from the exit to the entry, and counts toward the daily limit of speed checks on both nodes. The test uses a separate port of the entry, not the bridge's port. It shows that the line can carry a full flow, not that the bridge itself works.
+**Speed check:** the **Check by speed (8 MB)** button sends 8 MB from the exit to the entry, and counts toward the daily limit of speed checks on both nodes. The test uses a separate port of the entry, not the bridge's port. It shows that the line can carry a full flow, not that the bridge itself works.
 
 **When the exit cannot reach the panel:** its agent connects through the bridge and keeps its control session there. The encryption to the panel is end to end, so the entry sees only encrypted bytes. While on the bridge, the agent tests the direct path about every 10 minutes; two passes in a row bring it back to direct. After a restart it first tries direct for about 50 seconds.
 
@@ -112,7 +112,7 @@ Agent updates do not go through the bridge. An exit on the bridge updates from G
 **Limits of the first version:**
 
 - **TCP only.** UDP servers stay direct.
-- **The exit sees its own agent, not the person.** For connections through the bridge, the exit sees its agent's address, so their network (ASN) and logs are wrong. Traffic, quotas, speed limits, devices and torrent protection still work per person, because they use the key. The panel marks these connections **via bridge**.
+- **The exit sees its own agent, not the person.** For connections through the bridge, the exit sees its agent's address, so their network (ASN) and logs are wrong. Traffic, quotas, speed limits, devices and torrent protection still work per person, because they use the key. The panel marks these connections **through the bridge**.
 - **Both nodes need the new agent.** If one is older, the panel names the node to update, and the relay stays direct.
 - **Tested in a lab, not on live networks.** The lab simulates a filter. It shows the logic works, not how a real filter treats the bridge. Not yet tested: a session longer than a day; real Mihomo and Telegram clients; older agent versions; VLESS on the node's own site and VLESS with TLS (both need a Let's Encrypt certificate); a second entry at four connections; an exit and an entry that reach the panel in different ways.
 

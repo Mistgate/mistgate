@@ -1,0 +1,466 @@
+{
+ "ui": {
+  "ref_h": "Viite",
+  "nav_label": "Ohjeet",
+  "footer": "Version {ver} ohjeet.",
+  "nav_home": "Yleiskatsaus",
+  "nav_install": "Asennus",
+  "nav_usage": "Käyttö",
+  "nav_faq": "UKK",
+  "home_title": "Yleiskatsaus",
+  "desc_install": "Näin asennat {brand} {ver}: Linux, macOS ja Windows.",
+  "desc_usage": "Näin käytät ohjelmaa {brand}: yleiset tehtävät esimerkkeineen.",
+  "desc_faq": "Usein kysyttyä: {brand}.",
+  "nf_title": "Sivua ei löytynyt",
+  "nf_text": "Tämä sivu ei kuulu ohjeisiin. Se on voitu nimetä uudelleen uudemmassa versiossa.",
+  "nf_back": "Takaisin yleiskatsaukseen",
+  "quick_h": "Pikaopas",
+  "features_h": "Mitä se tekee",
+  "out_h": "Tuloste",
+  "install_h": "Asennus",
+  "steps_h": "Vaiheet",
+  "usage_h": "Käyttö",
+  "opts_h": "Valitsimet",
+  "opt_col": "Valitsin",
+  "desc_col": "Kuvaus",
+  "faq_h": "Usein kysyttyä",
+  "next": "Seuraava",
+  "facts_h": "Pähkinänkuoressa",
+  "menu_h": "Ohjeet",
+  "facts": [
+   {
+    "k": "Versio",
+    "v": "{ver}"
+   },
+   {
+    "k": "Alustat",
+    "v": "Linux, macOS ja Windows"
+   },
+   {
+    "k": "Lisenssi",
+    "v": "MIT"
+   },
+   {
+    "k": "Riippuvuudet",
+    "v": "Ei ole"
+   }
+  ],
+  "install_check": "Jos versionumero tulostuu, asennus onnistui.",
+  "nav_config": "Asetukset",
+  "nav_recipes": "Esimerkit",
+  "nav_trouble": "Ongelmatilanteet",
+  "desc_config": "Asetustiedosto ja asetukset: {brand}.",
+  "desc_recipes": "Lyhyitä esimerkkejä arkisiin tehtäviin: {brand}.",
+  "desc_trouble": "Ratkaisuja yleisimpiin ongelmiin: {brand}.",
+  "config_h": "Asetukset",
+  "config_col_key": "Avain",
+  "config_col_default": "Oletus",
+  "config_col_desc": "Mitä se tekee",
+  "config_file_h": "Esimerkki",
+  "recipes_h": "Esimerkit",
+  "recipes_intro": "Lyhyet vastaukset useimmin kysyttyihin tehtäviin.",
+  "trouble_h": "Ongelmatilanteet",
+  "trouble_intro": "Yleisimmät ongelmat ja se, mikä ne yleensä korjaa.",
+  "ver_l": "Versio",
+  "prev": "Edellinen"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "Lokien tiivistäjä komentoriville",
+   "desc": "{brand} lukee tekstimuotoisia lokitiedostoja ja tulostaa lyhyen yhteenvedon niiden sisällöstä.",
+   "overview": "{brand} lukee tekstimuotoisia lokitiedostoja ja tulostaa lyhyen yhteenvedon: kuinka monta riviä on, mitä tasoja käytetään ja mitkä viestit toistuvat eniten. Se on yksi pieni ohjelma ilman riippuvuuksia.",
+   "features": [
+    "Lukee tiedostoja, hakemistoja ja vakiosyötettä",
+    "Ryhmittelee samankaltaiset viestit ilman asetuksia",
+    "Tulostaa tekstiä, JSONia tai pienen HTML-raportin"
+   ],
+   "quick_out": "app.log: 48 211 riviä, 3 tasoa\n  info   46 902\n  warn    1 190\n  error     119\nyleisin viesti: cache miss for key (9 413 kertaa)",
+   "install_intro": "{brand} jaellaan yhtenä ohjelmatiedostona. Ennen ensimmäistä ajoa ei tarvitse asettaa mitään.",
+   "install_steps": [
+    "Lataa järjestelmääsi vastaava arkisto.",
+    "Pura se ja kopioi ohjelmatiedosto johonkin PATH-polun hakemistoon.",
+    "Tarkista, että se toimii, ajamalla versiokomento."
+   ],
+   "faq": [
+    {
+     "q": "Mitä lokimuotoja tuetaan?",
+     "a": "Kaikkea rivipohjaista. {brand} tunnistaa yleiset aikaleima- ja tasomuodot ja palaa tavallisiin riveihin, jos ei tunnista."
+    },
+    {
+     "q": "Muuttaako se tiedostojani?",
+     "a": "Ei koskaan. Tiedostot avataan vain luettaviksi."
+    },
+    {
+     "q": "Kuinka suurta tiedostoa se osaa lukea?",
+     "a": "Tiedostot luetaan virtana, joten kokoa rajoittaa vain aika. Gigatavu kestää kannettavalla muutaman sekunnin."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Tee yhteenveto tiedostosta",
+     "p": "Anna ohjelmalle tiedosto, hakemisto tai putki. Hakemistot luetaan rekursiivisesti ja pakatut tiedostot puretaan lennossa."
+    },
+    {
+     "h": "Katso aikaväliä",
+     "p": "Rajaa yhteenveto aikavälille valitsimilla --since ja --until. Ajat voivat olla absoluuttisia tai suhteessa nykyhetkeen."
+    },
+    {
+     "h": "Valitse tulostusmuoto",
+     "p": "Oletustulostus on tavallista tekstiä. JSON on vakaa ja tarkoitettu skripteille; HTML-raportti on yksi tiedosto, jonka voit lähettää työkaverille."
+    }
+   ],
+   "options": [
+    {
+     "d": "Vain tämän ajan jälkeiset rivit, absoluuttinen tai kuten 2h."
+    },
+    {
+     "d": "Vain tätä ennen olevat rivit."
+    },
+    {
+     "d": "Vain tämän tason ja sitä ylempien tasojen rivit."
+    },
+    {
+     "d": "Kuinka monta toistuvaa viestiä listataan. Oletus 5."
+    },
+    {
+     "d": "text, json tai html. Oletus text."
+    }
+   ],
+   "config_intro": "{brand} lukee valinnaisen config.toml-tiedoston asetuskansiostasi. Jokaisen avaimen voi antaa myös komentorivillä, ja komentorivi voittaa.",
+   "config_rows": [
+    {
+     "d": "Kuinka monta toistuvaa viestiä listataan."
+    },
+    {
+     "d": "Tulostusmuoto: text, json tai html."
+    },
+    {
+     "d": "Pois jätettävät viestit, täsmäytetään tavallisena tekstinä."
+    },
+    {
+     "d": "Lue vain tämän ajan jälkeiset rivit."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Löydä meluisin tunti",
+     "p": "Ryhmittele yhteenveto tunneittain nähdäksesi, milloin loki oli vilkkaimmillaan."
+    },
+    {
+     "h": "Vertaa kahta päivää",
+     "p": "Näytä, mitkä viestit ovat uusia ja mitkä ovat poistuneet kahden tiedoston välillä."
+    },
+    {
+     "h": "Tee raportti jaettavaksi",
+     "p": "Kirjoita HTML-raportti tiedostoon ja liitä se viestiin."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Yhteenveto on tyhjä",
+     "a": "Tarkista, että tiedostossa on yksi viesti riviä kohden. Jos se on pakattu muodossa, jota {brand} ei tunne, pura se ensin."
+    },
+    {
+     "q": "Ajat näyttävät väärältä",
+     "a": "Rivit ilman aikavyöhykettä luetaan UTC-aikana. Kerro valitsimella --tz, missä vyöhykkeessä ne ovat."
+    },
+    {
+     "q": "Raportti on liian pitkä",
+     "a": "Pienennä arvoa --top tai lisää meluisimmat viestit asetustiedoston ohituslistaan."
+    },
+    {
+     "q": "Hidas verkkolevyllä",
+     "a": "Kopioi tiedosto ensin paikalliselle levylle. Rivi riviltä lukeminen hitaan yhteyden yli on yleinen syy."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Tilasto",
+       "Kirjuri",
+       "Louhos",
+       "Seula",
+       "Sivu",
+       "Laskuri",
+       "Silmäys",
+       "Kirjaaja"
+      ],
+      [
+       "log",
+       "scan",
+       "sum",
+       "view",
+       "cut",
+       "peek"
+      ]
+     ]
+    }
+   }
+  },
+  "site": {
+   "tagline": "Pieni staattisten sivustojen rakentaja",
+   "desc": "{brand} muuttaa kansion Markdown-tiedostoja ja muutaman pohjan staattiseksi verkkosivustoksi.",
+   "overview": "{brand} muuttaa kansion Markdown-tiedostoja ja muutaman pohjan staattiseksi verkkosivustoksi. Tietokantaa ei ole, ajoympäristöä ei ole eikä palvelimella ole mitään päivitettävää.",
+   "features": [
+    "Markdown ja sivun otsaketiedot",
+    "Pohjat tavallista HTML:ää",
+    "Paikallinen esikatselu, joka rakentuu uudelleen jokaisella tallennuksella"
+   ],
+   "quick_out": "Kansio notes palvelee osoitteessa localhost:4000 (pysäytä painamalla Ctrl+C)",
+   "install_intro": "{brand} on yksi ohjelmatiedosto. Laita se PATH-polulle, ja olet valmis.",
+   "install_steps": [
+    "Lataa järjestelmääsi vastaava arkisto.",
+    "Pura se ja kopioi ohjelmatiedosto johonkin PATH-polun hakemistoon.",
+    "Tarkista, että se toimii, ajamalla versiokomento."
+   ],
+   "faq": [
+    {
+     "q": "Voinko käyttää omia pohjiani?",
+     "a": "Voit. Pohjat ovat tavallisia HTML-tiedostoja, joissa on muutama paikkamerkki, ja kansiorakenteen saat muuttaa mieleiseksesi."
+    },
+    {
+     "q": "Tarvitaanko tietokantaa?",
+     "a": "Ei. Tuloste on tavallisia tiedostoja, joita mikä tahansa verkkopalvelin voi jakaa."
+    },
+    {
+     "q": "Miten lisään uuden sivutyypin?",
+     "a": "Lisää pages-kansion alle kansio, jossa on oma pohjatiedosto, niin {brand} ottaa sen mukaan seuraavassa rakennuksessa."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Aloita uusi sivusto",
+     "p": "Komento init luo kansion, jossa on asetustiedosto, pohja ja yksi esimerkkisivu."
+    },
+    {
+     "h": "Kirjoita sivu",
+     "p": "Sivut ovat Markdown-tiedostoja. Yläreunan otsaketiedot asettavat otsikon ja päivämäärän; kaikki sen alla on sisältöä."
+    },
+    {
+     "h": "Rakenna julkaisua varten",
+     "p": "Komento build kirjoittaa valmiin sivuston kansioon public. Kopioi se kansio mille tahansa verkkopalvelimelle."
+    }
+   ],
+   "options": [
+    {
+     "d": "Kansio valmiille sivustolle. Oletus public."
+    },
+    {
+     "d": "Sisällytä luonnoksiksi merkityt sivut."
+    },
+    {
+     "d": "Esikatselupalvelimen portti. Oletus 4000."
+    },
+    {
+     "d": "Rakenna uudelleen, kun tiedosto muuttuu."
+    },
+    {
+     "d": "Tulosta vain virheet."
+    }
+   ],
+   "config_intro": "Tiedosto site.toml on kansiosi juuressa. Puuttuva avain palaa oletukseensa, joten uusi sivusto ei tarvitse tiedostoa ollenkaan.",
+   "config_rows": [
+    {
+     "d": "Sivun ylätunnisteessa ja otsikossa näkyvä nimi."
+    },
+    {
+     "d": "Osoite, jossa sivustosi sijaitsee. Käytä merkkiä / juuressa olevalle sivustolle."
+    },
+    {
+     "d": "Sivuston ulkoasu: plain, slate tai folio."
+    },
+    {
+     "d": "Rakennetaanko luonnoksiksi merkityt sivut."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Lisää uusi sivu",
+     "p": "Luo Markdown-tiedosto, jonka alussa on otsikko ja päivämäärä."
+    },
+    {
+     "h": "Esikatsele luonnokset",
+     "p": "Palvele sivusto paikallisesti keskeneräiset sivut mukaan lukien."
+    },
+    {
+     "h": "Julkaise kansioon",
+     "p": "Rakenna koko sivusto yhteen kansioon, jonka voit kopioida mille tahansa verkkopalvelimelle."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Sivu puuttuu rakennuksesta",
+     "a": "Sivut, joiden otsakkeessa on draft: true, ohitetaan. Poista se tai rakenna valitsimella --drafts."
+    },
+    {
+     "q": "Linkit rikkoutuvat julkaisun jälkeen",
+     "a": "Aseta base_url sen kansion osoitteeksi, johon sivusto on julkaistu."
+    },
+    {
+     "q": "Esikatselu ei päivity",
+     "a": "Jotkin editorit kirjoittavat uuden tiedoston vanhan muokkaamisen sijaan. Käynnistä esikatselu uudelleen tai poista editorin turvallinen tallennus käytöstä."
+    },
+    {
+     "q": "Kuvat eivät näy",
+     "a": "Laita ne static-kansioon. Kaikki siinä kopioidaan sellaisenaan."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Selkeä",
+       "Liuske",
+       "Liitu",
+       "Folio",
+       "Sulka",
+       "Muuraaja",
+       "Paino",
+       "Muste"
+      ],
+      [
+       "site",
+       "page",
+       "build",
+       "gen",
+       "sheet"
+      ]
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Toistuvat työt ilman crontabia",
+   "desc": "{brand} ajaa pieniä toistuvia töitä yhdellä koneella ja kertoo, kun jokin niistä epäonnistuu.",
+   "overview": "{brand} ajaa pieniä toistuvia töitä yhdellä koneella ja kertoo, kun jokin niistä epäonnistuu. Se on ystävällisempi vaihtoehto crontabille, jota joutuu pitämään päässään.",
+   "features": [
+    "Aikataulut kirjoitetaan tavallisilla sanoilla",
+    "Loki jokaisesta ajosta",
+    "Yksi rivi tulostetta per työ, joten virheet erottuvat"
+   ],
+   "quick_out": "backup   joka päivä klo 03:00   viimeisin ajo: ok (4 s)",
+   "install_intro": "{brand} on yksi ohjelmatiedosto ja pieni taustaprosessi, joka tarkistaa aikataulun kerran minuutissa.",
+   "install_steps": [
+    "Lataa järjestelmääsi vastaava arkisto.",
+    "Pura se ja kopioi ohjelmatiedosto johonkin PATH-polun hakemistoon.",
+    "Käynnistä taustaprosessi järjestelmäsi palveluhallinnalla."
+   ],
+   "faq": [
+    {
+     "q": "Täytyykö sen toimia palveluna?",
+     "a": "Kyllä, pieni taustaprosessi tarkistaa aikataulun kerran minuutissa. Asennussivu näyttää, mitä käynnistetään."
+    },
+    {
+     "q": "Mitä tapahtuu, jos tietokone on sammutettuna?",
+     "a": "Työ, jonka aika oli koneen ollessa sammutettuna, ajetaan kerran, kun kone käynnistyy uudelleen."
+    },
+    {
+     "q": "Voivatko työt riippua toisistaan?",
+     "a": "Ei vielä. Ketjuta komennot toistaiseksi yhdeksi työksi."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Lisää työ",
+     "p": "Työllä on nimi, aikataulu ja komento. Aikataulut kirjoitetaan tavallisilla sanoilla."
+    },
+    {
+     "h": "Katso, mitä ajettiin",
+     "p": "Komento list näyttää jokaisen työn ja sen viimeisimmän ajon tuloksen. Komento history näyttää yhden työn ajot kestoineen ja tulosteineen."
+    },
+    {
+     "h": "Keskeytä ja jatka",
+     "p": "Keskeyttäminen säilyttää työn ja sen historian mutta estää sen ajamisen. Hyödyllistä muuton tai varmuuskopion palautuksen ajaksi."
+    }
+   ],
+   "options": [
+    {
+     "d": "Missä työt ja lokit säilytetään. Oletus on kansio kotihakemistossasi."
+    },
+    {
+     "d": "Tulosta vain epäonnistumiset."
+    },
+    {
+     "d": "Kuinka monta ajoa historia näyttää. Oletus 10."
+    },
+    {
+     "d": "Koneluettava tuloste."
+    },
+    {
+     "d": "Aja työ heti aikataulun lisäksi."
+    }
+   ],
+   "config_intro": "{brand} lukee tiedoston jobs.toml asetuskansiostasi. Työt itse säilytetään erikseen, joten tiedostossa on vain asetukset.",
+   "config_rows": [
+    {
+     "d": "Komennot ajava komentotulkki."
+    },
+    {
+     "d": "Missä jokaisen ajon tuloste säilytetään."
+    },
+    {
+     "d": "Kuinka monta kertaa epäonnistunut työ yritetään uudelleen."
+    },
+    {
+     "d": "Lähettääkö epäonnistunut työ myös ilmoituksen."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Aja työ kerran heti",
+     "p": "Käynnistä työ aikataulun ulkopuolella, esimerkiksi uuden komennon kokeilemiseksi."
+    },
+    {
+     "h": "Katso, miksi työ epäonnistui",
+     "p": "Tulosta työn viimeisimmän ajon tuloste."
+    },
+    {
+     "h": "Keskeytä kaikki matkan ajaksi",
+     "p": "Pysäytä kaikki aikataulut, kunnes jatkat niitä."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Työ ei koskaan aja",
+     "a": "Tarkista komennolla list, että ohjelma on käynnissä. Työt ajetaan vain, kun se on."
+    },
+    {
+     "q": "Työ ajetaan kahdesti",
+     "a": "Ohjelmaa on käynnissä kaksi kopiota. Pysäytä toinen; lukitustiedosto on lokikansiossa."
+    },
+    {
+     "q": "Komento toimii omassa komentotulkissani mutta ei täällä",
+     "a": "Työt eivät lue komentotulkkisi käynnistystiedostoja. Käytä täysiä polkuja tai aseta ympäristö työssä."
+    },
+    {
+     "q": "Ajat ovat tunnin pielessä",
+     "a": "{brand} seuraa järjestelmän kelloa ja aikavyöhykettä. Muuta niitä siellä, älä työssä."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kello",
+       "Askare",
+       "Tehtävä",
+       "Vuoro",
+       "Tikitys",
+       "Rytmi",
+       "Jono",
+       "Töytäisy"
+      ],
+      [
+       "work",
+       "list",
+       "run",
+       "do",
+       "bell"
+      ]
+     ]
+    }
+   }
+  }
+ }
+}

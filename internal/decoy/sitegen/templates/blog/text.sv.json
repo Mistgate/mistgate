@@ -1,0 +1,461 @@
+{
+ "ui": {
+  "nav_label": "Huvudmeny",
+  "footer": "Skrivet för hand, publicerat i lugn takt.",
+  "nav_home": "Anteckningar",
+  "nav_about": "Om mig",
+  "home_title": "Anteckningar",
+  "nf_title": "Här finns inget",
+  "nf_text": "Det finns ingen anteckning på den här adressen. Den kan ha bytt namn, eller aldrig blivit skriven.",
+  "nf_back": "Tillbaka till anteckningarna",
+  "latest_h": "Senaste anteckningarna",
+  "read_more": "Läs anteckningen",
+  "min_read": "min läsning",
+  "more_h": "Fler anteckningar",
+  "back_all": "Alla anteckningar",
+  "about_h": "Om mig",
+  "now_h": "Just nu",
+  "tags_h": "Ämnen",
+  "by": "Skriven av",
+  "nav_archive": "Arkiv",
+  "desc_archive": "Alla anteckningar på {brand}, månad för månad.",
+  "archive_h": "Arkiv",
+  "archive_intro": "Alla anteckningar hittills, de nyaste först, grupperade per månad.",
+  "all_posts": "Alla anteckningar",
+  "newer": "Nyare"
+ },
+ "bundles": {
+  "garden": {
+   "tagline": "Anteckningar från en kolonilott",
+   "desc": "Anteckningar från en liten kolonilott i {city}: vad som växte, vad som inte gjorde det och vad jag gör annorlunda nästa år.",
+   "desc_about": "Vem som skriver {brand} och varför.",
+   "intro": "Anteckningar från en liten kolonilott i {city}: vad som växte, vad som inte gjorde det och vad jag gör annorlunda nästa år.",
+   "about": [
+    "Jag heter {first}. Jag har haft en kolonilott i {city} i nio år, mest för grönsaker och några envisa rosor.",
+    "I den här anteckningsboken skriver jag ner vad lotten lär mig, mest för att jag ska sluta göra samma misstag i ny ordning.",
+    "Kommentarer är stängda. Har du ett tips, berätta det för den som har lotten bredvid din; så har jag lärt mig det mesta jag kan."
+   ],
+   "now": [
+    "Så bondbönor under en liten kupa",
+    "Laga dörren till redskapsboden, igen",
+    "Läsa om att binda en häck"
+   ],
+   "posts": [
+    {
+     "title": "Därför slutade jag gräva",
+     "tag": "Jord",
+     "excerpt": "Tre säsonger utan spade, och vad som hände med bäddarna.",
+     "body": [
+      "I flera år grävde jag om bäddarna varje höst, för att den som hade lotten före mig gjorde så och för att böckerna från min barndom sa det. För tre säsonger sedan slutade jag och täckte bäddarna med ett tjockt lager kompost i stället.",
+      "Den första våren var en besvikelse. Jorden såg rörig ut och sniglarna var överförtjusta. Andra året hade maskarna gjort det mesta av jobbet, jorden smulades i handen och jag lade en lördag mindre på bäddarna varje oktober.",
+      "Jag skulle inte kalla det ett under, och några ogräs som jag hoppats vara av med för gott kom tillbaka. Men min rygg är tacksam, och morötterna blev rakare än när jag grävde."
+     ]
+    },
+    {
+     "title": "Bönor för den som glömmer vattna",
+     "tag": "Grönsaker",
+     "excerpt": "Fyra sorter som förlät mig en torr juli.",
+     "body": [
+      "Förra julin regnade det inte på nitton dagar och jag var borta under elva av dem. När jag kom tillbaka hade salladen gått i blom och zucchinin såg ut som om den gett upp. Bönorna var däremot bra.",
+      "Rosenbönor med djupa rötter och ett tjockt täcke runt sig klarar två torra veckor bättre än nästan allt annat jag odlar. Jag sår dem nu längs norrkanten, där skuggan hindrar jorden från att baka.",
+      "Är du en sån trädgårdsmästare som tänker vattna varje dag och klarar det två gånger i veckan, så plantera bönor och håll dig lugn."
+     ]
+    },
+    {
+     "title": "Ett litet växthus av gamla fönster",
+     "tag": "Bygge",
+     "excerpt": "Hur en grannes container blev ett växthus under en lång helg.",
+     "body": [
+      "En granne bytte fönster och de gamla stod två dagar i en container. Jag frågade om jag fick ta dem, och hon frågade om jag kunde ta containern också, om jag orkade.",
+      "Jag byggde en ram av återanvänt virke, anpassad efter det största fönstret, och passade in resten runt omkring. Inget är rätvinkligt och dörren kärvar i fuktigt väder, men det håller frosten borta från tomatplantorna.",
+      "Det hela kostade mig en ask skruv och en burk kitt. Nästa gång mäter jag två gånger innan jag sågar, och det menar jag."
+     ]
+    },
+    {
+     "title": "Vad man gör på lotten i mars",
+     "tag": "Årstider",
+     "excerpt": "En kort lista för månaden då allt verkar möjligt och jorden fortfarande är kall.",
+     "body": [
+      "Mars lurar alla. Dagarna är ljusa och man vill så, men jorden är kall och frön som sås för tidigt ligger bara där och ruttnar. Jag tvingar mig att vänta tills jorden inte längre känns kall mot handryggen.",
+      "Under tiden finns det gott om att göra: sortera fröburken, skrubba krukorna, beskära rosorna och lägga de första potatisarna på en ljus plats att gro. De sysslorna känns som framsteg utan att man riskerar något.",
+      "I slutet av månaden unnar jag mig oftast en rad ärtor under en kupa. Det är inte förnuftigt, men jag gillar det."
+     ]
+    },
+    {
+     "title": "Kompost, ärligt talat",
+     "tag": "Jord",
+     "excerpt": "Vad som hamnar i min hög, vad som inte gör det och varför min aldrig blir klar i tid.",
+     "body": [
+      "Min hög har tre regler: inget kokt, inget sjukt och inget jag är osäker på. Gräsklipp läggs i tunna lager, riven kartong får följa med och hela högen vänds när jag kommer ihåg det.",
+      "Det går långsammare än i böckerna. Ett år är ärligare än de sex veckor som utlovas på påsen, och den färdiga komposten bjuder alltid på överraskningar, som en potatis jag hade gett upp hoppet om.",
+      "Jag har inget emot det. En hög som tar sin tid är en hög utan dåligt samvete över matresterna."
+     ]
+    },
+    {
+     "title": "Sniglar, ölfällor och andra nederlag",
+     "tag": "Skadedjur",
+     "excerpt": "Vad som fungerade, vad som inte gjorde det och varför jag numera planterar lite extra.",
+     "body": [
+      "Jag har provat ölfällor, äggskal, kopparband och att gå ut med ficklampa efter mörkrets inbrott. Allt fungerade ungefär en vecka. Det som fungerar bäst är att odla mer än jag behöver och acceptera att sniglarna tar sin del.",
+      "Det är småplantorna som är den verkliga risken, så jag drar upp dem inomhus och sätter ut dem först när de är kraftiga nog att klara en tugga."
+     ]
+    },
+    {
+     "title": "Att spara frö från bönorna",
+     "tag": "Frön",
+     "excerpt": "Lite tålamod i oktober ger dig nästa års bönor gratis.",
+     "body": [
+      "Jag låter de bästa baljorna sitta kvar på plantorna tills de är torra och skramlar. Sedan rensar jag dem vid köksbordet, breder ut bönorna på en bricka och låter dem ligga varmt en vecka.",
+      "De får komma i papperskuvert med namn och årtal på framsidan. I plast blir bönorna fuktiga, och jag har de möglade bönorna som bevis."
+     ]
+    },
+    {
+     "title": "En kort inventering av redskapsboden",
+     "tag": "Redskap",
+     "excerpt": "Elva saker jag använder och väldigt många jag inte gör.",
+     "body": [
+      "En spade, en grep, en hacka, två planteringsskedar, en kratta och en sekatör gör nästan allt jobb. Resten av boden rymmer syltburkar, snöre, en trasig skottkärra och en samling pluggbrätten.",
+      "Varje vår lovar jag att reda ut det. Varje vår regnar det den dag jag tänkt göra det, och jag är rätt glad för det."
+     ]
+    },
+    {
+     "title": "Ett dåligt tomatår",
+     "tag": "Grönsaker",
+     "excerpt": "Bladmögel kom i augusti och tog allt. Anteckningar till nästa gång.",
+     "body": [
+      "Bladen blev bruna på en vecka och frukterna följde efter. Jag tog bort plantorna, la dem i en säck och slängde dem inte på komposten, den enda regel som alla är överens om.",
+      "Nästa år odlar jag färre plantor, ger dem mer utrymme och vattnar jorden i stället för bladen. Jag ska också komma ihåg att ett dåligt tomatår är en bra ursäkt för chutney."
+     ]
+    },
+    {
+     "title": "Löv blir lövjord",
+     "tag": "Jord",
+     "excerpt": "Två års väntan, och det bästa som finns på lotten.",
+     "body": [
+      "I november krattar jag löven i en trådbur i hörnet och går därifrån. Det finns inget att vända och inget att tillsätta, vilket passar mig bra.",
+      "Efter två år är det mörkt, smuligt och luktar skog. Jag använder det för att fylla på bäddarna och för att dra upp plantor, och inget annat jag tillverkar kommer i närheten."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Tålmodiga",
+       "Leriga",
+       "Gröna",
+       "Vilda",
+       "Mossiga",
+       "Små",
+       "Tidiga",
+       "Ärliga",
+       "Stilla",
+       "Sena"
+      ],
+      [
+       "Bäddar",
+       "Rader",
+       "Lotter",
+       "Hägnar",
+       "Skjul",
+       "Skördar",
+       "Frön",
+       "Redskap",
+       "Åkrar",
+       "Säsonger"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "cycling": {
+   "tagline": "Turer och reparationer",
+   "desc": "Turer, reparationer och en och annan felsväng runt {city}.",
+   "desc_about": "Vem som skriver {brand} och varför.",
+   "intro": "Turer, reparationer och en och annan felsväng på småvägarna runt {city}.",
+   "about": [
+    "Jag heter {first}. Jag cyklar till jobbet de flesta dagar och längre på söndagar, mest på småvägar runt {city} som ingen annan verkar känna till.",
+    "Jag är inte snabb och jag för inga rekord över fart. Det jag för är anteckningar om rutter, om saker som gick sönder och om vad jag borde ha med nästa gång.",
+    "Det finns ingen kommentarsruta. Om du vet en bättre väg hem från åsen, skriv det på ett vykort."
+   ],
+   "now": [
+    "Tejpa om styret",
+    "Planera en tvådagarsrunda till maj",
+    "Lära mig centrera ett hjul"
+   ],
+   "posts": [
+    {
+     "title": "Rundan på fyra mil som jag ständigt återvänder till",
+     "tag": "Rutter",
+     "excerpt": "Mest platt, en riktig backe och ett fik som stänger tidigare än man hoppas.",
+     "body": [
+      "Rundan lämnar {city} österut, följer kanalen i en dryg mil och viker sedan av på en väg som ingen har lagt om sedan jag började cykla. Det finns en riktig backe, ungefär en kilometer lång, och den är orsaken till att jag kommer tillbaka.",
+      "Halvvägs finns ett fik som öppnar klockan nio och stänger klockan två, vilket är antingen alldeles för tidigt eller precis i tid beroende på hur förmiddagen har gått. Jag har lärt mig att ha med mig en kanelbulle.",
+      "Jag har cyklat den i alla årets månader. Den är aldrig samma runda två gånger, och det är det bästa jag kan säga om en rutt."
+     ]
+    },
+    {
+     "title": "Laga punktering i regnet",
+     "tag": "Reparationer",
+     "excerpt": "Elva minuter, en kall tumme och en läxa om att ha med sig en reservslang.",
+     "body": [
+      "Det händer alltid i den enda utförsbacken där det gick bra. Jag drog in under ett busskur, tog av hjulet och upptäckte att hålet satt på insidan av fälgbandet, vilket betydde att det skulle komma tillbaka.",
+      "Åtgärden är tråkig och jag har skrivit den på locket till sadelväskan: kolla däcket, hitta taggen, kolla fälgbandet, sätt i reserven, pumpa hårdare än vad som verkar rimligt. I regn tar varje steg dubbelt så lång tid.",
+      "Läxan, som jag lär mig om varje vinter, är att en reservslang väger mindre än ett gott humör och är värd betydligt mer."
+     ]
+    },
+    {
+     "title": "Därför cyklar jag i samma jacka året runt",
+     "tag": "Kläder",
+     "excerpt": "Ett långt försvar för en lite ful, väldigt gul jacka.",
+     "body": [
+      "Den är för varm i juni och inte riktigt varm nog i januari, och ändå är det den jag tar. Den är skarpt gul, viks ihop i sin egen ficka och har överlevt två kraschar och en tvättmaskin.",
+      "Jag har provat bättre. Alla var utmärkta tills jag skulle bestämma mig för om jag tog med den, och då hängde den kvar på kroken. Den bästa utrustningen är den du faktiskt tar med.",
+      "Lager på lager gör resten. En tunn ylletröja kostar mindre än en ny jacka och gör mer för mig än något tyg med ett namn."
+     ]
+    },
+    {
+     "title": "Vintercykel, sommarcykel",
+     "tag": "Cyklar",
+     "excerpt": "Två cyklar är en lyx, men en av dem får vara smutsig.",
+     "body": [
+      "I flera år hade jag en cykel och körde sönder den varje vinter, för att sedan betala för det varje vår. För två säsonger sedan hittade jag en gammal stålram på en loppis och byggde upp den till vintercykel.",
+      "Den har stänkskydd, breda däck och en kedja som jag inte har något emot att byta. Den är tung och långsam och jag älskar den, mest för att ingen, inte ens jag, förväntar sig att den ska vara ren.",
+      "Sommarcykeln står i hallen från november till mars och ser förebrående på mig. Jag säger åt den att ha tålamod."
+     ]
+    },
+    {
+     "title": "Att sakta ner med flit",
+     "tag": "Tankar",
+     "excerpt": "Vad som hände när jag slutade titta på farten.",
+     "body": [
+      "Under ett år cyklade jag med en liten dator på styret och mätte allt. Jag blev lite snabbare och märkbart mer irriterad, och jag slutade se vägarna jag cyklade längs.",
+      "Sedan tog batteriet slut i mars och jag bytte det inte. Första turen utan siffror kändes konstig i ungefär tio minuter, och sedan kändes den som när jag lärde mig cykla.",
+      "Jag är inte säker på vad jag försökte bevisa. Nu vet jag var de bästa häckarna finns, och det verkar vara bättre att veta."
+     ]
+    },
+    {
+     "title": "En vecka med pendling i mörker",
+     "tag": "Kläder",
+     "excerpt": "Lyktor, reflexband och ett förnuftigt förhållande till pölar.",
+     "body": [
+      "När klockorna ställs om byter jag till två lyktor fram och två bak, en av varje blinkande. Det ser mycket ut, men bilisterna ser dig, och det är poängen.",
+      "Jag har också alltid extra batterier i sadelväskan. En död lykta på en mörk väg är ett misstag man gör bara en gång."
+     ]
+    },
+    {
+     "title": "Fiket på toppen av backen",
+     "tag": "Rutter",
+     "excerpt": "Värt klättringen, om du kommer dit innan kakan är slut.",
+     "body": [
+      "Det ligger högst upp i den långa uppförsbacken, i ett rum som troligen en gång var en lada. Teet kommer i en kanna och kakan i bitar stora som en pocketbok.",
+      "Förr skyndade jag uppför för att hinna före lunchrusningen. Nu cyklar jag långsamt och kommer fram med klagande ben, och kakan smakar bättre."
+     ]
+    },
+    {
+     "title": "Hur jag lärde mig älska stänkskydd",
+     "tag": "Kläder",
+     "excerpt": "Tio år med blöt rygg, och sedan ett par plastremsor.",
+     "body": [
+      "I många år trodde jag att stänkskydd var för folk som inte tog cykling på allvar. Sedan satte jag på ett par, och mina skor var torra på första blöta turen.",
+      "De ger lite extra vikt och de skramlar om man sätter dem fel. Båda problemen är små jämfört med att komma till jobbet med en rand uppför ryggen."
+     ]
+    },
+    {
+     "title": "Att äta på cykeln",
+     "tag": "Mat",
+     "excerpt": "Vad som hamnar i fickan, och vad jag ångrar.",
+     "body": [
+      "Regeln är att äta innan du blir hungrig. På en lång tur tar jag något litet var fyrtionde minut: en banan, en bulle, en handfull dadlar.",
+      "Jag provade gel en gång och kom fram till att jag är en smörgåsmänniska. Det blir lite kladdigt, och det fungerar."
+     ]
+    },
+    {
+     "title": "Att ta tåget hem",
+     "tag": "Tankar",
+     "excerpt": "Det är ingen skam att åka med när vinden är emot.",
+     "body": [
+      "Vissa dagar är hela vägen ut härlig och hela vägen tillbaka i motvind. Då tar jag cykeln med på tåget och läser.",
+      "Förr såg jag det som att ge upp. Nu ser jag det som anledningen till att jag cyklar ut igen nästa dag."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Långa",
+       "Lugna",
+       "Våta",
+       "Platta",
+       "Grusiga",
+       "Tidiga",
+       "Sega",
+       "Kalla",
+       "Öppna",
+       "Stilla"
+      ],
+      [
+       "Växlar",
+       "Ekrar",
+       "Mil",
+       "Backar",
+       "Kedjor",
+       "Hjul",
+       "Turer",
+       "Vägar",
+       "Stigar",
+       "Trampor"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  },
+  "kitchen": {
+   "tagline": "Anteckningar från ett litet kök",
+   "desc": "Recept som funkar, misstag jag lärde mig något av och vad det blir till middag i {city}.",
+   "desc_about": "Vem som skriver {brand} och varför.",
+   "intro": "Recept som funkar, misstag jag lärde mig något av och vad det blir till middag i {city}.",
+   "about": [
+    "Jag heter {first}. Jag lagar mat åt en familj på fyra i ett kök i {city} som är mindre än de flesta badrum, och jag skulle inte byta det.",
+    "Jag skriver ner det som funkade, i den form jag faktiskt lagar det, alltså med färre mängder och fler adjektiv än i ett riktigt recept.",
+    "Jag fotograferar inte mat. Om en rätt ser tillräckligt fin ut för en bild har jag nog låtit den vänta för länge."
+   ],
+   "now": [
+    "Mata en ny surdegsgrund",
+    "Salta citroner inför våren",
+    "Sluta fred med ugnsluckan"
+   ],
+   "posts": [
+    {
+     "title": "Ett bröd som förlåter dig",
+     "tag": "Bröd",
+     "excerpt": "Mjöl, vatten, salt och en riktigt tålmodig söndagseftermiddag.",
+     "body": [
+      "Det här är brödet jag bakar när jag har glömt att jag tänkt baka bröd. Det använder nästan ingen jäst, en lång vila och ingen knådning alls, och det tar inte illa upp om du låter det vara en timme längre än du tänkt.",
+      "Rör ihop mjöl, vatten och salt på kvällen tills det inte finns några torra fläckar, täck skålen och låt den stå på bänken. På morgonen är det bubbligt och luktar svagt öl, och det är precis vad du vill.",
+      "Vik det några gånger, forma det slarvigt och grädda det i en het gryta med lock. Det ser ofullkomligt ut och smakar bättre än det har rätt till."
+     ]
+    },
+    {
+     "title": "Vad man lagar när kylskåpet nästan är tomt",
+     "tag": "Vardag",
+     "excerpt": "Fem burkar, tre lökar och en ostkant: en middag.",
+     "body": [
+      "Varje torsdag öppnar jag kylskåpet och ser en halv lök, en slokig purjolök och en burk med något jag inte minns att jag öppnat. Förr kändes det som ett misslyckande. Nu ser jag det som den enda kvällen i veckan då skafferiet får sin tur.",
+      "Stek löken långsamt tills den ger upp. Tillsätt de bönor du har, en burk krossade tomater och en sked av något skarpt: senap, vinäger, en inlagd chili. Låt det puttra medan du letar fram en brödkant.",
+      "Ät det med riven ost över. Ingen har någonsin frågat vad det var i, och jag har slutat berätta."
+     ]
+    },
+    {
+     "title": "Den enda soppan jag lagar i november",
+     "tag": "Soppa",
+     "excerpt": "Rostad pumpa, ett äpple och tålamod med stavmixern.",
+     "body": [
+      "När den första riktigt kalla veckan kommer rostar jag en pumpa med snittytan nedåt, tillsammans med en hel vitlök och ett äpple som blivit mjukt. Det tar fyrtio minuter och hela huset luktar början på vintern.",
+      "Skrapa ner allt i en kastrull, tillsätt buljong och mixa tills det slutar protestera. Lite grädde är gott men behövs inte; en sked av äpplets sötma gör nästan samma nytta.",
+      "Jag serverar den med rostade frön och dagsgammalt bröd. Det är inte listigt, och jag lagar den varje år."
+     ]
+    },
+    {
+     "title": "Att lägga in utan panik",
+     "tag": "Konservering",
+     "excerpt": "Varför en burk snabbpicklat är det enklaste som finns i köket.",
+     "body": [
+      "Folk blir avskräckta av ordet konservera, som låter som om det handlar om sterilisering, stora kastruller och en bortkastad dag. En snabbpickle kräver en burk, en vattenkokare och ungefär tio minuter.",
+      "Skiva det som finns i lådan, packa det i en ren burk och häll över en het blandning av ättika, vatten, salt och lite socker. Lägg i ett lagerblad om du har ett. Låt det stå till i morgon.",
+      "De håller några veckor i kylen och får en enkel middag att kännas genomtänkt. Jag har aldrig gjort det och fått ett dåligt resultat."
+     ]
+    },
+    {
+     "title": "Svedda saker och vad jag lärde mig",
+     "tag": "Misstag",
+     "excerpt": "En kort katalog över misslyckade middagar och den enda läxan var och en gav.",
+     "body": [
+      "Kolan lärde mig att socker inte bryr sig om min mobil. Risotton lärde mig att buljongen ska vara het. De rostade potatisarna lärde mig att en plåt kan vara för full, och att ingen förlåter en blek potatis.",
+      "Värst var födelsedagstårtan som jag tog ut för tidigt och satte in för sent. Den sjönk ihop i mitten som en värdig gammal byggnad, och vi åt den med sked och vaniljsås.",
+      "Jag har en lista över vad som gick fel på insidan av en skåpdörr. Den är längre än min lista över vad som gick bra, och mycket mer användbar."
+     ]
+    },
+    {
+     "title": "En panna, en sked och en onsdag",
+     "tag": "Vardag",
+     "excerpt": "En panna, tjugo minuter och väldigt lite disk.",
+     "body": [
+      "På onsdagar är jag trött och alla är hungriga, så middagen måste komma ur en enda panna. Lök, en burk bönor, lite rökt paprikapulver och den gröna sak som råkar finnas i kylen.",
+      "Jag lägger ett ägg överst på slutet och kallar det middag. Det är mer en vana än ett recept, och det har inte svikit mig än."
+     ]
+    },
+    {
+     "title": "Havregrynsgröt, på riktigt",
+     "tag": "Frukost",
+     "excerpt": "Havregryn, vatten, salt och tio minuter utan att gå därifrån.",
+     "body": [
+      "Blötlägg havregrynen kvällen innan om du kommer ihåg det. På morgonen tillsätter du vatten och en nypa salt och rör medan det tjocknar, vilket tar ungefär lika lång tid som vattenkokaren.",
+      "Jag äter min med en sked sylt eller några hackade äpplen. De som sätter socker i gröten har inte fel, men de missar något."
+     ]
+    },
+    {
+     "title": "Rester av ris, på tre sätt",
+     "tag": "Vardag",
+     "excerpt": "Stekt, gräddat till en kaka eller omrört i soppa.",
+     "body": [
+      "Kallt ris är bättre än nykokt för stekning, eftersom kornen hålls isär. En het panna, lite olja, ett ägg och några salladslökar är allt som behövs.",
+      "Omrört i soppa tjocknar det buljongen, och tryckt i en form med ost och gräddat blir det något som liknar en salt kaka."
+     ]
+    },
+    {
+     "title": "Därför väger jag mitt mjöl",
+     "tag": "Bröd",
+     "excerpt": "En våg förändrade mitt bakande mer än något recept.",
+     "body": [
+      "En kopp mjöl kan väga allt från 120 till 160 gram beroende på hur man öser. Det är skillnaden mellan ett bröd och en tegelsten.",
+      "Nu väger jag allt, även vattnet. Det känns petigt i ungefär en vecka och sedan känns det som det enda förnuftiga sättet att baka."
+     ]
+    },
+    {
+     "title": "En födelsedagskaka utan recept",
+     "tag": "Bakning",
+     "excerpt": "Lika vikt av allt, och lite tålamod med ugnen.",
+     "body": [
+      "Min mormors kaka är lika vikt smör, socker, ägg och mjöl, med lite vanilj. Hon skrev aldrig ner den, för hon behövde aldrig det.",
+      "Jag bakar den till varje födelsedag i familjen. Den är enkel och lite sned, och ingen har någonsin bett om en annan."
+     ]
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Salta",
+       "Gräddiga",
+       "Vanliga",
+       "Svarta",
+       "Små",
+       "Söndagens",
+       "Ärliga",
+       "Varma",
+       "Sega",
+       "Snabba"
+      ],
+      [
+       "Skedar",
+       "Pannor",
+       "Anteckningar",
+       "Bord",
+       "Kök",
+       "Degar",
+       "Skålar",
+       "Grytor",
+       "Ugnar",
+       "Middagar"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

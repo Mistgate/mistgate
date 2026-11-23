@@ -49,7 +49,7 @@ type ScheduledOutcome struct {
 }
 
 const (
-	scheduledToolCalls = 24
+	scheduledToolCalls = maxTurnToolCalls
 	scheduledTurn      = 10 * time.Minute
 	// scheduledAttempts is how often one model call is tried on the same provider before the run gives up on it.
 	scheduledAttempts = 3
@@ -176,7 +176,7 @@ func (s *Service) RunScheduled(ctx context.Context, run ScheduledRun) ScheduledO
 	}
 	tools := make([]chatTool, 0, len(registry)+1)
 	for _, t := range registry {
-		if t.Name == "" || strings.HasSuffix(t.Name, "_apply") {
+		if t.Name == "" || mcp.KindOf(t.Name) == mcp.KindApply {
 			continue
 		}
 		tools = append(tools, chatTool{AssistantTool: t})

@@ -33,6 +33,7 @@ describe("the panel's refusal codes", () => {
     expect(say("profile_deployed: nodes=de1%2C+nl1", Code.FailedPrecondition, "ru")).toBe("Профиль стоит на нодах de1, nl1 — сначала убери его с них.");
     expect(say("stale_version", Code.Aborted)).toBe(en["err.stale_version"]);
     for (const lang of langs) expect(say("stale_inbound", Code.Aborted, lang), lang).not.toBe("stale_inbound"); // the refusal of an inbound edit over a newer one reads in every language
+    for (const lang of langs) expect(say("stale_user", Code.Aborted, lang), lang).not.toBe("stale_user"); // the refusal of an edit of a person over a newer state
     expect(say("agent too old", Code.FailedPrecondition)).toBe(en["err.agent_too_old"]); // the older spelling of the code
     expect(errorVars("device_limit: 5/5").detail).toBe("5/5"); // the older "code: detail" keeps its detail
   });
@@ -63,13 +64,12 @@ describe("the panel's refusal codes", () => {
     expect(say("same_node: node=de1", Code.InvalidArgument, "ru")).toBe("Сервер стоит на самой de1: ретранслировать можно только сервер другой ноды.");
   });
 
-  it("word the refusals of an OS update: why it cannot start (in the words of the block), a job that cannot be stopped, a node being updated", () => {
+  it("words why an OS update cannot start and why a node is being updated", () => {
     expect(say("os_blocked: reason=node_busy", Code.FailedPrecondition)).toBe("The OS update cannot start: Another job is running on the server, for example a check for updates you have just started. Wait until it ends.");
     expect(say("os_blocked: reason=offline", Code.FailedPrecondition, "ru")).toBe("Нельзя начать обновление ОС: Нода не в сети.");
     expect(say("os_blocked: reason=from_the_future", Code.FailedPrecondition)).toBe("The OS update cannot start: from_the_future");
-    expect(say("os_cancel_inflight", Code.FailedPrecondition)).toBe(en["err.os_cancel_inflight"]);
     expect(say("node_updating", Code.FailedPrecondition, "ru")).toBe("На ноде идёт обновление, подожди его конца.");
-    for (const c of ["os_blocked", "os_cancel_inflight", "node_updating"]) expect(errorCodes).toContain(c);
+    for (const c of ["os_blocked", "node_updating"]) expect(errorCodes).toContain(c);
   });
 
   it("name the feature an edition cannot run, in the page's language", () => {

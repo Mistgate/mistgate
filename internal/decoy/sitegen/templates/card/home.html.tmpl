@@ -1,0 +1,23 @@
+{{define "pj"}}{{range $i, $p := .L.projects}}<article class="__t__ __pj__ {{if eq $i 0}}__pc1__{{else if eq $i 1}}__pc2__{{else}}__pc3__{{end}}"><span class="__y__">{{$p.y}}</span>{{template "pjart" $i}}<div><h3>{{$p.t}}</h3><p>{{$p.d}}</p></div></article>
+{{end}}{{end}}
+{{define "links"}}<nav class="__lk__" aria-label="{{.L.nav_label}}">{{range $i, $n := .Nav}}{{if gt $i 0}}{{if not $n.Cur}}<a class="{{if eq $i 1}}__lk1__{{else if eq $i 2}}__lk2__{{end}}" href="{{$n.Href}}"><b>{{$n.Label}}</b><span>{{index $.L.link_d (sub $i 1)}}</span>{{icon "arrowc"}}</a>{{end}}{{end}}{{end}}</nav>{{end}}
+{{define "b_abt"}}<section class="__t__ __abt__"><span class="__lab__">{{.L.nav_about}}</span>{{range .L.about}}<p>{{.}}</p>{{end}}</section>
+{{template "term" .}}{{end}}
+{{define "b_proj"}}<div class="__sh__"><h2>{{.L.projects_h}}</h2><span class="__lab__">{{.L.projects_intro}}</span></div>
+{{template "pj" .}}{{end}}
+{{define "b_now"}}<section class="__t__ __n1__"><span class="__lab__">{{.L.now_h}}</span><div class="__up__"><i></i>{{.L.updated}}</div><ul>{{range .L.now}}<li>{{.}}</li>{{end}}</ul><p>{{.L.now_intro}}</p></section>
+{{template "links" .}}{{end}}
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __bento__">
+<section class="__t__ __a1__">
+<div><span class="__hi__">{{.L.hello}}</span><h1>{{.Brand}}</h1><p class="__role__">{{.L.role}}</p><p class="__tg__">{{.L.tagline}}</p></div>
+<span class="__lab__">{{.V.city}}</span>
+</section>
+{{template "avatar" .}}
+{{template "factsT" .}}
+{{range .Order}}{{blk . $}}{{end}}
+</main>
+{{template "footer" .}}
+</body>
+</html>

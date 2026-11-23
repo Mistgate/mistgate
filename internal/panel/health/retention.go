@@ -113,48 +113,48 @@ func (s *Service) sweep(ctx context.Context) {
 }
 
 func (s *Service) sweepPolicyPrunes(ctx context.Context, now time.Time, pol retention.Policy) {
-	if n, err := s.st.PruneHealth(ctx, now, pol.Duration("check_samples_hours"), pol.Duration("check_daily_days"), pol.Duration("alerts_days")); err != nil && ctx.Err() == nil {
+	if n, err := s.st.PruneHealth(ctx, now, pol.Duration(retention.CheckSamplesHours), pol.Duration(retention.CheckDailyDays), pol.Duration(retention.AlertsDays)); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune", "code", "prune_health_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned rows", "count", n)
 	}
-	if n, err := s.st.PruneEvents(ctx, now, pol.Duration("events_info_days"), pol.Duration("events_warn_days"), eventBatch); err != nil && ctx.Err() == nil {
+	if n, err := s.st.PruneEvents(ctx, now, pol.Duration(retention.EventsInfoDays), pol.Duration(retention.EventsWarnDays), eventBatch); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune events", "code", "prune_events_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned events", "count", n)
 	}
-	if n, err := s.st.PruneAudit(ctx, now.Add(-pol.Duration("audit_days")), eventBatch); err != nil && ctx.Err() == nil {
+	if n, err := s.st.PruneAudit(ctx, now.Add(-pol.Duration(retention.AuditDays)), eventBatch); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune audit", "code", "prune_audit_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned audit rows", "count", n)
 	}
-	if n, err := s.st.PruneNodeJournal(ctx, now.Add(-pol.Duration("journal_days"))); err != nil && ctx.Err() == nil {
+	if n, err := s.st.PruneNodeJournal(ctx, now.Add(-pol.Duration(retention.JournalDays))); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune node journal", "code", "prune_node_journal_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned node journal", "count", n)
 	}
-	if n, err := s.st.PruneNodeHostHours(ctx, now.Add(-pol.Duration("host_history_days"))); err != nil && ctx.Err() == nil {
+	if n, err := s.st.PruneNodeHostHours(ctx, now.Add(-pol.Duration(retention.HostHistoryDays))); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune host load", "code", "prune_host_hours_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned host load hours", "count", n)
 	}
-	if n, err := s.st.PruneTrafficBuckets(ctx, now.Add(-pol.Duration("traffic_bucket_days"))); err != nil && ctx.Err() == nil {
+	if n, err := s.st.PruneTrafficBuckets(ctx, now.Add(-pol.Duration(retention.TrafficBucketDays))); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune traffic buckets", "code", "prune_traffic_buckets_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned traffic buckets", "count", n)
 	}
-	if n, err := s.st.PruneNodeTrafficHours(ctx, now.Add(-pol.Duration("node_traffic_hour_days"))); err != nil && ctx.Err() == nil {
+	if n, err := s.st.PruneNodeTrafficHours(ctx, now.Add(-pol.Duration(retention.NodeTrafficHourDays))); err != nil && ctx.Err() == nil {
 		s.log.Warn("health: prune node traffic", "code", "prune_node_traffic_hours_failed", "err", err)
 	} else if n > 0 {
 		s.log.Info("health: pruned node traffic hours", "count", n)
 	}
 	if !s.cfg.Edge { // The edge edition rejects network stats, so these D1 deletes cannot remove any rows.
-		if n, err := s.st.PruneNetworkHours(ctx, now.Add(-pol.Duration("networks_days"))); err != nil && ctx.Err() == nil {
+		if n, err := s.st.PruneNetworkHours(ctx, now.Add(-pol.Duration(retention.NetworksDays))); err != nil && ctx.Err() == nil {
 			s.log.Warn("health: prune network counters", "code", "prune_network_hours_failed", "err", err)
 		} else if n > 0 {
 			s.log.Info("health: pruned network counter hours", "count", n)
 		}
-		if n, err := s.st.PruneUserNetworks(ctx, now.Add(-pol.Duration("networks_days"))); err != nil && ctx.Err() == nil {
+		if n, err := s.st.PruneUserNetworks(ctx, now.Add(-pol.Duration(retention.NetworksDays))); err != nil && ctx.Err() == nil {
 			s.log.Warn("health: prune recent networks", "code", "prune_user_networks_failed", "err", err)
 		} else if n > 0 {
 			s.log.Info("health: pruned recent networks", "count", n)

@@ -32,7 +32,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.ReleaseNote.url":                       "a public link to the official GitHub release",
 		"mistgate.admin.v1.NodeServerAccess.password_generated":   "a bool: whether the panel generated the saved password",
 		"mistgate.admin.v1.DnsProviderVariant.doh_url":            "a public DNS resolver endpoint from the built-in provider catalog",
-		"mistgate.admin.v1.GetBackupSettingsResponse.settings":    "owner-only settings contain metadata but never the access secret; MCP returns only a status projection",
+		"mistgate.admin.v1.GetBackupSettingsResponse.settings":    "the owner's session reads the storage settings; a token gets the status only (BackupSettings is rebuilt for it in backup.GetBackupSettings, checked on the real auth in cmd/mistgate)",
 		"mistgate.admin.v1.BackupSettings.access_key_id":          "an access key identifier, not the secret access key",
 		"mistgate.admin.v1.BackupSettings.has_secret":             "a bool that reports whether a secret is configured",
 		// The subscription page every user sees (SubscriptionService.Get/UpdateSubscriptionSettings): names, texts and public

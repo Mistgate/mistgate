@@ -1,0 +1,275 @@
+{
+ "ui": {
+  "nav_label": "Menüü",
+  "footer": "Sõltumatu ja kohalik.",
+  "nav_home": "Avaleht",
+  "nav_about": "Meist",
+  "nav_contact": "Leia meid",
+  "home_title": "Tere tulemast",
+  "nf_title": "Lehte ei leitud",
+  "nf_text": "Me ei leidnud seda lehte. Võib-olla viidi see teise kohta või meil seda polegi.",
+  "nf_back": "Tagasi avalehele",
+  "see_services": "Vaata, mida pakume",
+  "all_prices": "Täielik hinnakiri",
+  "visit_h": "Külasta meid",
+  "hours_h": "Lahtiolekuajad",
+  "address_l": "Aadress",
+  "phone_l": "Telefon",
+  "about_h": "Meist",
+  "services_h": "Mida me pakume",
+  "services_intro": "Hinnad on orienteeruvad; räägime alati hea meelega läbi, mida sa vajad.",
+  "contact_h": "Leia meid",
+  "contact_intro": "Astu läbi lahtiolekuajal või võta ühendust. Räägime hea meelega läbi, mida sa vajad, enne kui midagi otsustad.",
+  "contact_note": "Parkida on kõige lihtsam kõrvalpõiktänaval. Kui uks on lahtiolekuajal kinni, oleme tõenäoliselt taga ruumis; koputa ja oota hetk.",
+  "from_l": "alates",
+  "col_service": "Teenus",
+  "col_desc": "Mida see sisaldab",
+  "col_price": "Hind",
+  "hours_note": "",
+  "directions_h": "Kuidas meid leida",
+  "directions": "Leiad meid aadressil {address}. See on lühike jalutuskäik kesklinnast ja ukse juures on jalgrattahoidja.",
+  "services_note": "Kui töö osutub kavandatust mahukamaks, küsime enne alustamist luba."
+ },
+ "bundles": {
+  "bakery": {
+   "tagline": "Leib ja kooke, küpsetatud {city_in}",
+   "nav_services": "Meie küpsetised",
+   "desc": "Naabruskonna pagariäri {city_in}: juuretisleib, saiad ja koogid, küpsetatud igal hommikul.",
+   "desc_services": "Leivad, saiad ja koogid koos hindadega.",
+   "desc_about": "Ettevõtte {brand} lugu, väike pagariäri {city_in}.",
+   "desc_contact": "Ettevõtte {brand} lahtiolekuajad ja aadress {city_in}.",
+   "hero_h": "Leib aeglasel viisil",
+   "intro": "Väike naabruskonna pagariäri. Juuretisleib, saiad ja koogid, küpsetatud igal hommikul enne poe avamist.",
+   "about": [
+    "{brand} sai alguse üürikööagist poe taga {city_in}, ühe ahju ja päris suure optimismiga.",
+    "Küpsetame siiani väikeste partiidena, jahuga veskist, mis on tunni tee kaugusel, ja juuretisega, mis on vanem kui meie noorim pagar.",
+    "Tule vara saiade järele, jää kohvi peale ja ütle meile, kui su leib ei olnud õige. Me tahame seda teada."
+   ],
+   "features": [
+    {
+     "h": "Küpsetatud igal hommikul",
+     "p": "Midagi ei jää eilsest."
+    },
+    {
+     "h": "Ausad koostisosad",
+     "p": "Jahu, vesi, sool ja aeg."
+    },
+    {
+     "h": "Tellimused on teretulnud",
+     "p": "Koogid ja suuremad tellimused kokkuleppel."
+    }
+   ],
+   "services": [
+    {
+     "t": "Talupojaleib juuretisega",
+     "d": "Aeglaselt kerkinud, paksu koore ja pehme õhulise sisuga."
+    },
+    {
+     "t": "Seemnetega rukkileib",
+     "d": "Tihe, tume ja väga hea juustuga."
+    },
+    {
+     "t": "Hommikusaiad, kuus",
+     "d": "Pehmed saiad, küpsetatud viiest ja tavaliselt kümneks otsas."
+    },
+    {
+     "t": "Kardemonisaiad",
+     "d": "Käsitsi keeratud ja soojalt glasuuritud."
+    },
+    {
+     "t": "Pidukook",
+     "d": "Palun telli kolm päeva ette; lepime maitsed koos kokku."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Rukki",
+       "Mee",
+       "Kaera",
+       "Odra",
+       "Tilli",
+       "Raasu",
+       "Ahju",
+       "Pühapäeva",
+       "Seesami",
+       "Ploomi"
+      ],
+      [
+       "Lõoke",
+       "Rähn",
+       "Varblane",
+       "Pääsuke",
+       "Rästas",
+       "Punarind",
+       "Ööbik",
+       "Kiur"
+      ]
+     ],
+     "sep": " & "
+    }
+   }
+  },
+  "bike": {
+   "tagline": "Jalgrattaremont {city_in}",
+   "nav_services": "Hinnad",
+   "desc": "Jalgrataste remont ja hooldus {city_in}, valmis ootamise ajal või järgmiseks päevaks.",
+   "desc_services": "Jalgrataste remont ja hooldus koos hindadega.",
+   "desc_about": "Ettevõttest {brand}, väike jalgrattatöökoda {city_in}.",
+   "desc_contact": "Ettevõtte {brand} lahtiolekuajad ja aadress {city_in}.",
+   "hero_h": "Sinu ratas jälle korralikult käima",
+   "intro": "Väike töökoda igapäevaste jalgrataste jaoks. Parandame, mis on katki, reguleerime, mis ei ole päris õige, ja ütleme ausalt, mis ei ole raha väärt.",
+   "about": [
+    "{brand} sai alguse aiakuurist {city_in}, kus parandasime naabrite jalgrattaid kohvi hinna eest.",
+    "Täna on meil korralik töökoda, väga pikk tööpink ja sein varuosi, millest saame aru ainult meie. Eelistame ikka parandada kui välja vahetada.",
+    "Too kõik, millel on kaks ratast. Kui me seda parandada ei saa, ütleme, kes saab."
+   ],
+   "features": [
+    {
+     "h": "Valmis ootamise ajal",
+     "p": "Enamik väikseid remonte võtab vähem kui tunni."
+    },
+    {
+     "h": "Ausad nõuanded",
+     "p": "Ütleme, kui midagi ei ole parandamist väärt."
+    },
+    {
+     "h": "Hooldus järgmiseks päevaks",
+     "p": "Too hommikul, tule järele homme."
+    }
+   ],
+   "services": [
+    {
+     "t": "Rehvi parandus",
+     "d": "Sisekumm paigaldatud ja kontrollitud, rehv üle vaadatud süüdlase leidmiseks."
+    },
+    {
+     "t": "Põhihooldus",
+     "d": "Pidurid ja käigud reguleeritud, kett puhastatud ja õlitatud, rehvid ja poldid kontrollitud."
+    },
+    {
+     "t": "Täishooldus",
+     "d": "Käigukomplekti lahtivõtmine, rasvaeemaldus ja uuesti kokkupanek, vajadusel uute trossidega."
+    },
+    {
+     "t": "Ratta sirgendamine",
+     "d": "Vingerdus eemaldatud ja kodarate pinge ühtlustatud."
+    },
+    {
+     "t": "Talvekontroll",
+     "d": "Tuled, pidurid, rehvid ja porikaitsmed, et pimedad kuud oleksid vähem ohtlikud."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Keti",
+       "Hamba",
+       "Pedaali",
+       "Veldri",
+       "Ratta",
+       "Käigu",
+       "Raami",
+       "Rummu",
+       "Velje",
+       "Kodara"
+      ],
+      [
+       "töökoda",
+       "remont",
+       "kuur",
+       "garaaž",
+       "pink",
+       "teenindus",
+       "töötuba",
+       "hooldus"
+      ]
+     ],
+     "sep": ""
+    }
+   }
+  },
+  "tailor": {
+   "tagline": "Parandused ja õmblustööd {city_in}",
+   "nav_services": "Parandused",
+   "desc": "Riiete parandus ja ümbertegemine {city_in}: palistused, lukud, sobitused ja õmblustööd.",
+   "desc_services": "Riiete parandus ja ümbertegemine koos hindadega.",
+   "desc_about": "Ettevõttest {brand}, väike rätsepatöökoda {city_in}.",
+   "desc_contact": "Ettevõtte {brand} lahtiolekuajad ja aadress {city_in}.",
+   "hero_h": "Riided, mis istuvad kauem",
+   "intro": "Palistused, lukud, sobitused ja parandused, tehtud käsitsi ja masinaga väikeses töökojas poodide kohal.",
+   "about": [
+    "{brand} on kahe inimese töökoda {city_in} hoone teisel korrusel, villapoe kohal.",
+    "Õppisime ametit inimestelt, kes olid seda teinud nelikümmend aastat, ja oleme säilitanud mõned nende harjumused, näiteks alati kaks korda nõeltega märkimine.",
+    "Kui sa ei ole kindel, kas midagi on väärt ümber teha, too see meile. Ütleme ausalt."
+   ],
+   "features": [
+    {
+     "h": "Parandatud hoolega",
+     "p": "Iga rõivas vaadatakse enne alustamist korralikult üle."
+    },
+    {
+     "h": "Sobitatud sulle",
+     "p": "Märgime sinu peal, mitte mannekeenil."
+    },
+    {
+     "h": "Valmis, nagu lubatud",
+     "p": "Anname päeva ja peame sellest kinni."
+    }
+   ],
+   "services": [
+    {
+     "t": "Pükste või seeliku lühendamine",
+     "d": "Palistatud sinu pikkuse järgi, algne viimistlus säilitatud, kus võimalik."
+    },
+    {
+     "t": "Jaki kitsendamine",
+     "d": "Küljed ja varrukad reguleeritud, et see istuks õigesti."
+    },
+    {
+     "t": "Luku vahetamine",
+     "d": "Värvi ja raskuse järgi valitud, korralikult paigaldatud."
+    },
+    {
+     "t": "Mantli voodri parandus",
+     "d": "Rebenenud vooder asendatud või parandatud, taskud kaasa arvatud."
+    },
+    {
+     "t": "Parandamine ja lappimine",
+     "d": "Nähtav või nähtamatu, nagu eelistad."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Nõela",
+       "Nööbi",
+       "Palistuse",
+       "Õmbluse",
+       "Mansheti",
+       "Krae",
+       "Voldi",
+       "Pooli",
+       "Ääre",
+       "Siidi"
+      ],
+      [
+       "& Nõel",
+       "parandus",
+       "rätsepatöö",
+       "ateljee",
+       "õmblus",
+       "sobitus",
+       "& Niit",
+       "stuudio"
+      ]
+     ],
+     "sep": " "
+    }
+   }
+  }
+ }
+}

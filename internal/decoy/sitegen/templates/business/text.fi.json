@@ -1,0 +1,273 @@
+{
+ "ui": {
+  "nav_label": "Päävalikko",
+  "footer": "Itsenäinen ja paikallinen.",
+  "nav_home": "Etusivu",
+  "nav_about": "Tietoa meistä",
+  "nav_contact": "Yhteystiedot",
+  "home_title": "Tervetuloa",
+  "nf_title": "Sivua ei löytynyt",
+  "nf_text": "Emme löytäneet sivua. Se on voinut siirtyä, tai ehkä meillä ei ole koskaan ollutkaan sitä.",
+  "nf_back": "Takaisin etusivulle",
+  "see_services": "Katso, mitä tarjoamme",
+  "all_prices": "Koko hinnasto",
+  "visit_h": "Tervetuloa käymään",
+  "hours_h": "Aukioloajat",
+  "address_l": "Osoite",
+  "phone_l": "Puhelin",
+  "about_h": "Tietoa meistä",
+  "services_h": "Mitä tarjoamme",
+  "services_intro": "Hinnat ovat suuntaa antavia; keskustelemme mielellämme siitä, mitä tarvitset.",
+  "contact_h": "Yhteystiedot",
+  "contact_intro": "Pistäydy aukioloaikoina tai ota yhteyttä. Keskustelemme mielellämme siitä, mitä tarvitset, ennen kuin päätät mitään.",
+  "contact_note": "Pysäköinti on helpointa seuraavalla kadulla. Jos ovi on aukioloaikana kiinni, olemme todennäköisesti takahuoneessa; koputa ja odota hetki.",
+  "from_l": "alk.",
+  "col_service": "Palvelu",
+  "col_desc": "Sisältö",
+  "col_price": "Hinta",
+  "hours_note": "",
+  "directions_h": "Näin löydät meidät",
+  "directions": "Löydät meidät osoitteesta {address}. Matka keskustasta on lyhyt kävelymatka, ja oven vieressä on pyöräteline.",
+  "services_note": "Jos työ osoittautuu tarjoustamme laajemmaksi, kysymme sinulta ennen kuin aloitamme."
+ },
+ "bundles": {
+  "bakery": {
+   "tagline": "Leipää ja leivonnaisia, leivottu {city_in}",
+   "nav_services": "Tuotteemme",
+   "desc": "Lähileipomo {city_in}: hapanleipää, sämpylöitä ja leivonnaisia, leivottu joka aamu.",
+   "desc_services": "Leivät, pullat ja kakut hintoineen.",
+   "desc_about": "Tarina: {brand}, pieni leipomo {city_in}.",
+   "desc_contact": "Aukioloajat ja osoite: {brand}, {city}.",
+   "hero_h": "Leipää hitaasti",
+   "intro": "Pieni lähileipomo. Hapanleipää, sämpylöitä ja leivonnaisia, leivottu joka aamu ennen kuin kauppa aukeaa.",
+   "about": [
+    "{brand} sai alkunsa vuokratussa keittiössä kaupan takana {city_in}, yhdellä uunilla ja runsaalla optimismilla.",
+    "Leivomme edelleen pieninä eräinä. Jauhot tulevat myllystä tunnin ajomatkan päästä, ja hapanjuuremme on nuorinta leipuriamme vanhempi.",
+    "Tule aikaisin sämpylöille, jää kahville ja kerro, jos leipäsi ei ollut kunnossa. Haluamme mieluummin tietää."
+   ],
+   "features": [
+    {
+     "h": "Leivottu joka aamu",
+     "p": "Eilistä ei jää mitään."
+    },
+    {
+     "h": "Rehelliset raaka-aineet",
+     "p": "Jauhoja, vettä, suolaa ja aikaa."
+    },
+    {
+     "h": "Tilaukset tervetulleita",
+     "p": "Kakut ja isommat tilaukset sopimuksen mukaan."
+    }
+   ],
+   "services": [
+    {
+     "t": "Maalaishapanleipä",
+     "d": "Hitaasti noussut, paksu kuori ja pehmeä, ilmava sisus."
+    },
+    {
+     "t": "Siemenruisleipä",
+     "d": "Tiivis, tumma ja erittäin hyvä juuston kanssa."
+    },
+    {
+     "t": "Aamusämpylät, kuusi kappaletta",
+     "d": "Pehmeitä sämpylöitä, leivotaan viideltä ja useimmiten loppu kymmeneltä."
+    },
+    {
+     "t": "Kardemummapullat",
+     "d": "Kierretty käsin ja sokeroitu vielä lämpimänä."
+    },
+    {
+     "t": "Juhlakakku",
+     "d": "Tilaa kolme päivää etukäteen; sovimme maut kanssasi."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Ruis",
+       "Hunaja",
+       "Kaura",
+       "Ohra",
+       "Tilli",
+       "Murunen",
+       "Uuni",
+       "Pyhä",
+       "Seesami",
+       "Luumu"
+      ],
+      [
+       "Peippo",
+       "Kottarainen",
+       "Varpunen",
+       "Hemppo",
+       "Rastas",
+       "Punarinta",
+       "Kiuru",
+       "Västäräkki"
+      ]
+     ],
+     "sep": " & "
+    }
+   }
+  },
+  "bike": {
+   "tagline": "Pyöränkorjausta {city_in}",
+   "nav_services": "Hinnasto",
+   "desc": "Polkupyörien korjaus ja huolto {city_in}, valmiina odottaessa tai seuraavaksi päiväksi.",
+   "desc_services": "Polkupyörien korjaus ja huolto hintoineen.",
+   "desc_about": "Tietoa: {brand}, pieni pyöräkorjaamo {city_in}.",
+   "desc_contact": "Aukioloajat ja osoite: {brand}, {city}.",
+   "hero_h": "Pyöräsi taas kunnossa",
+   "intro": "Pieni verstas arkipyörille. Korjaamme rikkinäisen, säädämme sen, mikä ei ole aivan kohdallaan, ja kerromme rehellisesti, mikä ei ole rahan arvoista.",
+   "about": [
+    "{brand} aloitti puutarhavajasta {city_in}, korjaamalla naapureiden pyöriä kahvikupillista vastaan.",
+    "Nykyään meillä on kunnon verstas, hyvin pitkä työpöytä ja varaosaseinä, jota vain me ymmärrämme. Mieluummin korjaamme kuin vaihdamme.",
+    "Tuo mitä tahansa kaksipyöräistä. Jos emme pysty korjaamaan sitä, kerromme, kuka pystyy."
+   ],
+   "features": [
+    {
+     "h": "Valmis odottaessa",
+     "p": "Useimmat pienet korjaukset vievät alle tunnin."
+    },
+    {
+     "h": "Rehellinen neuvo",
+     "p": "Sanomme sen, jos jokin ei kannata korjata."
+    },
+    {
+     "h": "Huolto seuraavaksi päiväksi",
+     "p": "Tuo aamulla, hae huomenna."
+    }
+   ],
+   "services": [
+    {
+     "t": "Renkaan paikkaus",
+     "d": "Sisärengas vaihdetaan ja tarkistetaan, ja rengas tutkitaan syyllisen löytämiseksi."
+    },
+    {
+     "t": "Peruskunnostus",
+     "d": "Jarrut ja vaihteet säädetään, ketju puhdistetaan ja öljytään, renkaat ja pultit tarkistetaan."
+    },
+    {
+     "t": "Täyshuolto",
+     "d": "Voimansiirto puretaan, rasvataan ja kasataan uudelleen, tarvittaessa uusilla vaijereilla."
+    },
+    {
+     "t": "Vanteen suoristus",
+     "d": "Heilunta poistetaan ja pinnojen kireys tasataan."
+    },
+    {
+     "t": "Talvitarkastus",
+     "d": "Valot, jarrut, renkaat ja lokasuojat, jotta pimeät kuukaudet ovat vähemmän riskialttiita."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pinna",
+       "Ketju",
+       "Rattaat",
+       "Poljin",
+       "Kampi",
+       "Pyörä",
+       "Vaihde",
+       "Runko",
+       "Napa",
+       "Vanne"
+      ],
+      [
+       "verstas",
+       "korjaamo",
+       "paja",
+       "huolto",
+       "halli",
+       "vaja"
+      ]
+     ],
+     "sep": ""
+    }
+   }
+  },
+  "tailor": {
+   "tagline": "Vaatekorjausta {city_in}",
+   "nav_services": "Korjaukset",
+   "desc": "Vaatteiden korjaus ja muutos {city_in}: lahkeet, vetoketjut, sovitukset ja paikkaukset.",
+   "desc_services": "Vaatteiden muutos- ja korjaustyöt hintoineen.",
+   "desc_about": "Tietoa: {brand}, pieni ompelimo {city_in}.",
+   "desc_contact": "Aukioloajat ja osoite: {brand}, {city}.",
+   "hero_h": "Vaatteet, jotka istuvat pidempään",
+   "intro": "Lahkeita, vetoketjuja, sovituksia ja paikkauksia, tehtynä käsin ja koneella pienessä ompelimossa kauppojen yläkerrassa.",
+   "about": [
+    "{brand} on kahden hengen ompelimo kerrostalon toisessa kerroksessa {city_in}, lankakaupan yläpuolella.",
+    "Opimme ammatin ihmisiltä, jotka olivat tehneet sitä neljäkymmentä vuotta, ja olemme säilyttäneet joitain heidän tapojaan, kuten sen, että kiinnitämme neulat aina kahdesti.",
+    "Jos et ole varma, kannattaako jotain muuttaa, tuo se käymään. Kerromme rehellisesti."
+   ],
+   "features": [
+    {
+     "h": "Korjattu huolella",
+     "p": "Jokainen vaate tutkitaan kunnolla ennen aloitusta."
+    },
+    {
+     "h": "Sovitettu sinulle",
+     "p": "Neulaamme sen sinun päällesi, emme sovituspukuun."
+    },
+    {
+     "h": "Valmis luvattuna päivänä",
+     "p": "Sanomme päivän ja pidämme siitä kiinni."
+    }
+   ],
+   "services": [
+    {
+     "t": "Housujen tai hameen lyhennys",
+     "d": "Päärmätään pituuteesi, alkuperäinen viimeistely säilytetään aina kun mahdollista."
+    },
+    {
+     "t": "Takin kaventaminen",
+     "d": "Sivut ja hihat säädetään, jotta takki asettuu kunnolla."
+    },
+    {
+     "t": "Vetoketjun vaihto",
+     "d": "Väriin ja painoon sopiva vetoketju asennetaan siististi."
+    },
+    {
+     "t": "Takin vuorin korjaus",
+     "d": "Repeytynyt vuori vaihdetaan tai korjataan, taskut mukaan lukien."
+    },
+    {
+     "t": "Parsiminen ja paikkaus",
+     "d": "Näkyvä tai näkymätön, kuten haluat."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Neula",
+       "Sormustin",
+       "Nappi",
+       "Helma",
+       "Sauma",
+       "Kalvosin",
+       "Kaulus",
+       "Laskos",
+       "Puola",
+       "Reuna"
+      ],
+      [
+       "ompelimo",
+       "korjaamo",
+       "atelje",
+       "paja",
+       "sovitus",
+       "muutos",
+       "työ",
+       "tupa"
+      ]
+     ],
+     "sep": ""
+    }
+   }
+  }
+ }
+}

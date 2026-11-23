@@ -1,0 +1,149 @@
+{
+ "ui": {
+  "nav_label": "Menüü",
+  "tagline": "Turvaline ligipääs kontole",
+  "footer": "Kõik õigused kaitstud.",
+  "nav_home": "Logi sisse",
+  "nav_help": "Abi",
+  "nav_privacy": "Privaatsus",
+  "home_title": "Logi sisse",
+  "desc": "Logi sisse oma kontole: {brand}.",
+  "desc_help": "Abi sisselogimisel: {brand}.",
+  "desc_privacy": "Kuidas {brand} sinu andmetega ümber käib.",
+  "nf_title": "Lehte ei leitud",
+  "nf_text": "Lehte, mida otsisid, ei ole olemas või see on teise kohta viidud.",
+  "nf_back": "Tagasi sisselogimisele",
+  "f_user": "Kasutajanimi või e-posti aadress",
+  "f_pass": "Parool",
+  "f_remember": "Hoia mind sisselogituna",
+  "f_forgot": "Unustasid parooli?",
+  "f_submit": "Logi sisse",
+  "f_busy": "Login sisse…",
+  "e_empty": "Sisesta kasutajanimi ja parool.",
+  "e_bad": [
+   "Kasutajanimi või parool on vale.",
+   "Sisestatud kasutajanimi või parool ei ole õige. Palun proovi uuesti.",
+   "Nende andmetega me sind sisse logida ei saanud."
+  ],
+  "help_h": "Sisselogimine ei õnnestu?",
+  "help_intro": "Enamikul sisselogimisprobleemidest on lihtne põhjus. Käi need sammud läbi, enne kui kellegi poole pöördud.",
+  "help_steps": [
+   "Kontrolli, et Caps Lock on välja lülitatud; paroolides on suur- ja väiketähel vahe.",
+   "Vaata, kas kasutajanime alguses või lõpus on kogemata tühik.",
+   "Proovi uuesti uues brauseriaknas, kus pole salvestatud vormiandmeid.",
+   "Oota kümme minutit, kui oled mitu korda tulemusetult proovinud."
+  ],
+  "help_contact_h": "Ikka ei õnnestu?",
+  "help_contact": "Palu oma organisatsioonis teenust {brand} haldaval inimesel su parool lähtestada. Turvakaalutlustel ei saa me seda teha telefoni ega e-posti teel.",
+  "help_back": "Tagasi sisselogimisele",
+  "privacy_h": "Privaatsusteave",
+  "privacy_intro": "Me hoiame sinu kohta võimalikult vähe andmeid ja hoolitseme nende eest. See on lühike ülevaade sellest, mis need on ja miks.",
+  "privacy": [
+   {
+    "h": "Mida me hoiame",
+    "p": "Sinu kasutajanime, sisselogimiste aegu ja andmeid, mis kuuluvad sinu kontole. Muud midagi."
+   },
+   {
+    "h": "Milleks me seda kasutame",
+    "p": "Et sa saaksid sisse logida ja et kaitsta sinu kontot teiste eest. Me ei müü teavet oma kasutajate kohta."
+   },
+   {
+    "h": "Küpsised",
+    "p": "Kasutame ainult küpsiseid, mida teenus töötamiseks vajab. Reklaami- ega analüütikaküpsiseid ei ole."
+   },
+   {
+    "h": "Sinu õigused",
+    "p": "Sa võid paluda näha, parandada või kustutada andmeid, mida me sinu kohta hoiame. Pöördu oma konto haldaja poole."
+   }
+  ],
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Lepa",
+      "Pärna",
+      "Seedri",
+      "Sadama",
+      "Mõisa",
+      "Kase",
+      "Kuuse",
+      "Pihlaka",
+      "Sarapuu",
+      "Tamme",
+      "Paju",
+      "Saare"
+     ],
+     [
+      "värav",
+      "väli",
+      "sild",
+      "kaev",
+      "kivi",
+      "vaade",
+      "mägi",
+      "küla",
+      "post",
+      "tee"
+     ]
+    ],
+    "sep": ""
+   }
+  }
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Kliendikonto",
+   "welcome": "Tere tulemast tagasi",
+   "lead": "Logi sisse, et näha oma arveid, uuendada oma andmeid ja hallata oma tellimust.",
+   "bullets": [
+    "Vaata ja laadi alla arveid",
+    "Uuenda oma kontaktandmeid",
+    "Jälgi avatud päringuid"
+   ]
+  },
+  "staff": {
+   "kicker": "Töötajate keskkond",
+   "welcome": "Töötajate sisselogimine",
+   "lead": "Kasuta oma töökontot, et pääseda ligi töögraafikutele, teadetele ja ühisdokumentidele.",
+   "bullets": [
+    "Vahetused ja graafikud",
+    "Teated meeskonnale",
+    "Ühisdokumendid"
+   ],
+   "f_user": "Töötaja kood või e-posti aadress"
+  },
+  "learning": {
+   "kicker": "Õpikeskkond",
+   "welcome": "Logi sisse oma klassi keskkonda",
+   "lead": "Õpilased, lapsevanemad ja õpetajad logivad siin sisse, et leida tunniplaane, kodutöid ja sõnumeid.",
+   "bullets": [
+    "Tunniplaanid ja kodutööd",
+    "Sõnumid õpetajatelt",
+    "Õppeperioodide kuupäevad ja ekskursioonid"
+   ],
+   "f_user": "Kasutajanimi"
+  },
+  "archive": {
+   "kicker": "Dokumendiarhiiv",
+   "welcome": "Ava oma arhiiv",
+   "lead": "Lepingud, tšekid ja kirjad on siin sinu jaoks hoiul ja privaatsed.",
+   "bullets": [
+    "Lepingud ja tšekid",
+    "Kirjad ühes kohas",
+    "Ligipääs, mida sina kontrollid"
+   ],
+   "f_user": "E-posti aadress"
+  },
+  "bookings": {
+   "kicker": "Broneeringud",
+   "welcome": "Halda oma broneeringuid",
+   "lead": "Logi sisse, et muuta broneeringut, lisada külalisi või näha, mis on tulemas.",
+   "bullets": [
+    "Muuda või tühista broneering",
+    "Lisa külalisi",
+    "Vaata tulevasi kuupäevi"
+   ],
+   "f_user": "Broneeringu e-posti aadress"
+  }
+ }
+}

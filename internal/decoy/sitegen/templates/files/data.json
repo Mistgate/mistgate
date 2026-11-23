@@ -1,0 +1,41 @@
+{
+ "ui": {
+  "vars": {
+   "days": [
+    "3",
+    "7",
+    "14",
+    "30"
+   ]
+  },
+  "feats": [
+   {
+    "icon": "clock"
+   },
+   {
+    "icon": "nouser"
+   },
+   {
+    "icon": "bolt"
+   }
+  ]
+ },
+ "bundles": [
+  {
+   "id": "transfer",
+   "weight": 2
+  },
+  {
+   "id": "print",
+   "weight": 2
+  },
+  {
+   "id": "photos",
+   "weight": 2
+  },
+  {
+   "id": "assignments",
+   "weight": 2
+  }
+ ]
+}

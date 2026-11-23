@@ -12,6 +12,7 @@ import (
 	"time"
 
 	pb "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/awg"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
@@ -438,8 +439,8 @@ func TestL3CapabilitiesAreListedOnlyWhenTheBuildHasThem(t *testing.T) {
 			t.Errorf("a full build does not list %q: %v", c, full)
 		}
 	}
-	if full[capTorrentGuard] != hostctl.TorrentGuardSupported() {
-		t.Errorf("torrent guard capability=%v, build support=%v", full[capTorrentGuard], hostctl.TorrentGuardSupported())
+	if full[agentcap.TorrentGuard] != hostctl.TorrentGuardSupported() {
+		t.Errorf("torrent guard capability=%v, build support=%v", full[agentcap.TorrentGuard], hostctl.TorrentGuardSupported())
 	}
 	// An engine-less, manager-less build on a generation 2 unit lists none of the new strings.
 	plain := caps(newHarness(t, harnessOpts{cfg: func(c *Config) { c.UnitGen = 2 }}))
@@ -448,8 +449,8 @@ func TestL3CapabilitiesAreListedOnlyWhenTheBuildHasThem(t *testing.T) {
 			t.Errorf("a build without the feature lists %q", c)
 		}
 	}
-	if plain[capTorrentGuard] != hostctl.TorrentGuardSupported() {
-		t.Errorf("torrent guard capability=%v, build support=%v", plain[capTorrentGuard], hostctl.TorrentGuardSupported())
+	if plain[agentcap.TorrentGuard] != hostctl.TorrentGuardSupported() {
+		t.Errorf("torrent guard capability=%v, build support=%v", plain[agentcap.TorrentGuard], hostctl.TorrentGuardSupported())
 	}
 	// AWG but no WARP manager and a generation 2 unit.
 	mid := caps(newL3(t, 2, false).harness)
@@ -573,8 +574,9 @@ func TestTunnelFirewallTracksEnabledPublishedInboundPorts(t *testing.T) {
 // port that sshd or an AWG tunnel holds is never published, a disabled inbound publishes nothing.
 func TestTunnelPublishedPortsTable(t *testing.T) {
 	spec := func(id, protocol, network string, port uint16, enabled bool, settings string) *inbound {
+		// a Hysteria2 inbound has a TLS mode (its certificate); without one it does not run and has no site
 		return &inbound{spec: plugin.InboundSpec{ID: id, Protocol: protocol, Enabled: enabled, Settings: []byte(settings),
-			Listen: plugin.Listen{Network: network, Port: port}}}
+			TLS: plugin.TLS{Mode: plugin.TLSSelfSigned}, Listen: plugin.Listen{Network: network, Port: port}}}
 	}
 	pp := func(network string, port uint32) hostctl.PublishedPort {
 		return hostctl.PublishedPort{Network: network, Port: port}
@@ -587,6 +589,12 @@ func TestTunnelPublishedPortsTable(t *testing.T) {
 	}{
 		{"hysteria2 default decoy", []*inbound{spec("de1", "hysteria2", "udp", 8443, true, ``)}, nil, []hostctl.PublishedPort{pp("tcp", 443), pp("udp", 8443)}},
 		{"decoy port set", []*inbound{spec("de1", "hysteria2", "udp", 8443, true, `{"masquerade":{"tcp_port":9443}}`)}, nil, []hostctl.PublishedPort{pp("tcp", 9443), pp("udp", 8443)}},
+		{"no TLS mode: the inbound cannot run, so it has no site", []*inbound{func() *inbound {
+			in := spec("de1", "hysteria2", "udp", 8443, true, ``)
+			in.spec.TLS = plugin.TLS{}
+			return in
+		}()}, nil, []hostctl.PublishedPort{pp("udp", 8443)}},
+		{"decoy port out of range: the node refuses the inbound", []*inbound{spec("de1", "hysteria2", "udp", 8443, true, `{"masquerade":{"tcp_port":65536}}`)}, nil, []hostctl.PublishedPort{pp("udp", 8443)}},
 		{"decoy off", []*inbound{spec("de1", "hysteria2", "udp", 8443, true, `{"masquerade":{"tcp_port":0}}`)}, nil, []hostctl.PublishedPort{pp("udp", 8443)}},
 		{"decoy on sshd port", []*inbound{spec("de1", "hysteria2", "udp", 8443, true, `{"masquerade":{"tcp_port":2222}}`)}, []uint16{2222}, []hostctl.PublishedPort{pp("udp", 8443)}},
 		{"disabled", []*inbound{spec("de1", "hysteria2", "udp", 8443, false, ``), spec("nl1", "vless", "tcp", 8444, false, ``)}, nil, []hostctl.PublishedPort{}},

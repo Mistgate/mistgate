@@ -1,0 +1,21 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__">
+<div class="__pgh__"><span class="__sticker__">{{.L.kicker}}</span><h1><span class="__mk__">{{.L.limits_h}}</span></h1><p class="__lead__">{{.L.limits_intro}}</p></div>
+<div class="__big__ __big4__">{{range $i, $l := .L.limits}}<div class="__bx__ __bg__{{if ge $i 2}} __bgs__{{end}}"><b>{{$l.v}}</b><span>{{$l.k}}</span></div>
+{{end}}</div>
+<div class="__lg2__">
+<div>
+<h2>{{.L.limits_h}}</h2>
+<div class="__tbx__ __bx__"><table><tbody>{{range .L.limits}}<tr><th scope="row">{{.k}}</th><td>{{.v}}</td></tr>{{end}}</tbody></table></div>
+</div>
+<div>
+<h2>{{.L.faq_h}}</h2>
+{{range $i, $f := .L.faq}}<details class="__qa__"{{if lt $i 2}} open{{end}}><summary>{{$f.q}}<i></i></summary><p>{{$f.a}}</p></details>
+{{end}}</div>
+</div>
+<div class="__cta__"><h2>{{.L.nav_home}}</h2><a class="__btn__ __pk__" href="/">{{icon "upload"}}{{.L.pick}}</a></div>
+</main>
+{{template "footer" .}}
+</body>
+</html>

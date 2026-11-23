@@ -8,6 +8,7 @@ import {
   continueTask,
   copyName,
   countOfFilter,
+  defaultTemplateCountry,
   createTask,
   decoyErrorText,
   deliveryOf,
@@ -18,6 +19,12 @@ import {
   pageLabel,
   panelFallbackKey,
   panelSourceOf,
+  sortTemplates,
+  templateIcon,
+  templateNote,
+  templateIcons,
+  templateOf,
+  templateWords,
   treeRows,
   uploadError,
   type Site,
@@ -220,4 +227,49 @@ describe("the copy of the page in the five languages", () => {
       expect(own.filter((k) => holes(d[k]) !== holes(decoysites.en[k])), "placeholders differ").toEqual([]);
     });
   }
+});
+
+describe("sites made from a template", () => {
+  it("are known by the source label the panel writes, and a site of any other source is not", () => {
+    expect(templateOf({ sourceLabel: "template:blog" })).toBe("blog");
+    expect(templateOf({ sourceLabel: "owner" })).toBe("");
+    expect(templateOf({ sourceLabel: "" })).toBe("");
+  });
+
+  it("have a name, a line and an icon for every kind the screen knows, in every language; an unknown kind keeps the panel's name", () => {
+    for (const lang of ["en", "ru", "zh", "fa", "tr"] as const) {
+      setLang(lang);
+      const tr = ((key: keyof typeof en, vars?: Record<string, string | number>) => fill(dictionaries[lang][key], vars)) as T;
+      for (const id of Object.keys(templateIcons)) {
+        const w = templateWords(tr, id);
+        expect(w.name, `${lang} ${id}`).not.toBe(id);
+        expect(w.text, `${lang} ${id}`).not.toBe("");
+        expect(templateIcon(id)).toBe(templateIcons[id as keyof typeof templateIcons]);
+      }
+      expect(templateWords(tr, "newkind", "A new kind")).toEqual({ name: "A new kind", text: "" });
+      expect(templateIcon("newkind")).toBe("layers");
+    }
+  });
+});
+
+describe("the window From a template", () => {
+  it("puts the kinds in its own order and the kinds it does not know after them in the panel's order", () => {
+    const ids = ["blog", "zzz", "status", "card", "aaa", "files", "club", "login", "docs", "project", "portfolio", "business"];
+    expect(sortTemplates(ids.map((id) => ({ id }))).map((k) => k.id)).toEqual(["status", "login", "files", "docs", "project", "blog", "club", "portfolio", "business", "card", "zzz", "aaa"]);
+  });
+
+  it("starts with the country most of the nodes with a shared page stand in", () => {
+    const node = (countryCode: string, decoyMode = "builtin") => ({ countryCode, decoyMode, decoySiteId: decoyMode === "own" ? "dsi_a" : "" });
+    const countries = ["us", "gb", "de", "ru"];
+    expect(defaultTemplateCountry([node("DE"), node("RU"), node("de"), node("GB")], countries)).toBe("de");
+    expect(defaultTemplateCountry([node("RU", "panel"), node("DE", "own"), node("DE", "own")], countries)).toBe("ru"); // a node with a site of its own does not vote
+    expect(defaultTemplateCountry([node("FI"), node("FI")], countries)).toBe("us"); // no template for Finland: the first country
+    expect(defaultTemplateCountry([node("RU"), node("DE")], countries)).toBe("de"); // a tie goes to the earlier country
+    expect(defaultTemplateCountry([], countries)).toBe("us");
+    expect(defaultTemplateCountry(undefined, [])).toBe("");
+  });
+
+  it("writes the note of a site as the template, the kind and the country", () => {
+    expect(templateNote("Template", "Blog", "Germany")).toBe("Template · Blog · Germany");
+  });
 });

@@ -33,7 +33,7 @@ const (
 	// ConfidenceConflict: a path-only reach disagrees with an end-to-end block.
 	ConfidenceConflict = "conflict"
 
-	// The sources, as CountryCheck.sources and the alert's "sources" param name them.
+	// The sources, as CountryCheck.sources and the alert's "sources" param name them. A new one gets its row in Sources.
 	SourceGlobalping     = "globalping"
 	SourceTSPU           = "tspu"
 	SourceLists          = "lists"
@@ -95,31 +95,6 @@ func isDark(v string) bool {
 }
 
 func isFull(v string) bool { return v == VerdictTCPBlocked || v == VerdictBlocked }
-
-func sourceRank(source string) int {
-	switch source {
-	case SourceGlobalping:
-		return 0
-	case SourceTSPU:
-		return 1
-	case SourceCheburcheck:
-		return 2
-	case SourceCheburcheckOwn:
-		return 3
-	case SourceBsbord:
-		return 4
-	case SourceBsbordTunnel:
-		return 5
-	case SourceBsbordGeo:
-		return 6
-	case SourceLists:
-		return 7
-	case SourceProbes:
-		return 8
-	default:
-		return 9
-	}
-}
 
 // CompareSources compares source names in the fixed country-check order.
 func CompareSources(a, b string) int {

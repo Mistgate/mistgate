@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -17,6 +18,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -445,6 +447,9 @@ func (s *Service) resume(ctx context.Context, id string) (store.RolloutRow, erro
 	if ro.Status != store.RolloutPaused {
 		return ro, precondition("rollout is not paused")
 	}
+	if isCancelWait(ro.PauseKey, nil) {
+		return ro, precondition("rollout cancellation is waiting for a node to finish")
+	}
 	steps, err := s.st.RolloutSteps(ctx, ro.ID)
 	if err != nil {
 		return ro, s.internal("load steps", err)
@@ -471,16 +476,23 @@ func (s *Service) cancel(ctx context.Context, id string) (store.RolloutRow, erro
 		return ro, s.internal("cancel rollout", err)
 	}
 	s.audit(ctx, "update_rollout_cancel", map[string]string{"rollout_id": ro.ID})
-	if ro.Status == store.RolloutPaused {
-		// finishIfDone ends a PAUSED rollout only when this cancel skipped a step. With nothing pending (a fleet of one,
-		// or the last step failed) it would stay paused for ever, with its alert: a cancelled rollout waits for nobody.
-		if _, err := s.st.SetRolloutStatus(ctx, ro.ID, []string{store.RolloutPaused}, store.RolloutRunning, "", nil, time.Time{}); err != nil {
+	steps, err := s.st.RolloutSteps(ctx, ro.ID)
+	if err != nil {
+		return ro, s.internal("load steps", err)
+	}
+	if cancelMustWaitForStep(steps, func(x store.StepRow) bool { return x.State == store.StepSent || x.State == store.StepGating }) {
+		if _, err := s.st.SetRolloutStatus(ctx, ro.ID, []string{ro.Status}, store.RolloutPaused, pauseCancelWait, nil, time.Time{}); err != nil {
 			return ro, s.internal("cancel rollout", err)
 		}
-		ro.Status = store.RolloutRunning
-	}
-	if steps, err := s.st.RolloutSteps(ctx, ro.ID); err == nil {
-		s.finishIfDone(ctx, ro, steps) // nothing in flight: ends now; else when the steps in flight are decided
+		ro.Status, ro.PauseKey = store.RolloutPaused, pauseCancelWait
+	} else {
+		ok, err := s.st.SetRolloutStatus(ctx, ro.ID, []string{ro.Status}, store.RolloutCancelled, "", nil, s.now())
+		if err != nil {
+			return ro, s.internal("cancel rollout", err)
+		}
+		if ok {
+			s.startNodeBundleSyncLocked()
+		}
 	}
 	s.loadUpdating(ctx)
 	return s.reload(ctx, ro.ID)
@@ -498,7 +510,7 @@ func (s *Service) reload(ctx context.Context, id string) (store.RolloutRow, erro
 // CANCELLED (the owner cancelled). A PAUSED rollout is only ended this way after a cancel: otherwise the pause (and
 // its alert) waits for the owner.
 func (s *Service) finishIfDone(ctx context.Context, ro store.RolloutRow, steps []store.StepRow) bool {
-	cancelled, bad := false, false
+	cancelled, bad := ro.Status == store.RolloutPaused && isCancelWait(ro.PauseKey, nil), false
 	for _, x := range steps {
 		switch {
 		case !x.Decided():
@@ -514,15 +526,18 @@ func (s *Service) finishIfDone(ctx context.Context, ro store.RolloutRow, steps [
 	}
 	status := store.RolloutDone
 	switch {
-	case bad:
-		status = store.RolloutFailed
 	case cancelled:
 		status = store.RolloutCancelled
+	case bad:
+		status = store.RolloutFailed
 	}
 	ok, err := s.st.SetRolloutStatus(ctx, ro.ID, []string{store.RolloutRunning, store.RolloutPaused}, status, "", nil, s.now())
 	if err != nil {
 		s.log.Warn("update: finish rollout", "rollout", ro.ID, "err", err)
 		return false
+	}
+	if ok {
+		s.startNodeBundleSyncLocked() // the bundle the rollout kept waiting is fetched now, not at the next poll
 	}
 	return ok
 }
@@ -624,9 +639,10 @@ func (p *pass) finish(x *store.StepRow, state, key string, params map[string]str
 	return true
 }
 
-// finishAndPause keeps the VPS handler's historical pause behavior, while an edge pass pauses only after it wins the step CAS.
+// finishAndPause ends a step and pauses the rollout for it. A pass that did not win the write of its step (the step was
+// decided meanwhile) pauses nothing.
 func (p *pass) finishAndPause(x *store.StepRow, state, key string, params map[string]string, pauseCode, reason string) {
-	if p.finish(x, state, key, params) || !p.s.cfg.Edge {
+	if p.finish(x, state, key, params) {
 		p.pause(pauseCode, x, reason)
 	}
 }
@@ -648,6 +664,7 @@ func (p *pass) event(x *store.StepRow, state, key string) {
 	if key != "" {
 		params["reason"] = key
 	}
+	maps.Copy(params, failedProfileNotes(x.Params))
 	if err := p.s.st.InsertEvent(p.ctx, store.EventRow{Time: p.now, Severity: sev, Code: code, Source: "panel", NodeID: x.NodeID, Params: params}); err != nil {
 		p.s.log.Warn("update: step event", "node", x.NodeID, "err", err)
 	}
@@ -655,15 +672,18 @@ func (p *pass) event(x *store.StepRow, state, key string) {
 
 // pause stops the rollout because of a step; a pause by the owner gives way to a failure, a failure stays as the first said it.
 func (p *pass) pause(code string, x *store.StepRow, reason string) {
-	if p.ro.Status != store.RolloutRunning && p.ro.PauseKey != pauseOwner {
+	if p.ro.Status != store.RolloutRunning && !(p.ro.Status == store.RolloutPaused && p.ro.PauseKey == pauseOwner) {
 		return
 	}
 	params := map[string]string{"node": x.NodeName, "node_id": x.NodeID, "reason": reason}
-	ok, err := p.s.st.SetRolloutStatus(p.ctx, p.ro.ID, []string{store.RolloutRunning, store.RolloutPaused}, store.RolloutPaused, code, params, time.Time{})
+	maps.Copy(params, failedProfileNotes(x.Params)) // the profiles that did not pass: the owner reads them on the pause too
+	// A second writer must keep a pause it recorded unless an owner resumed after this pass read the old one.
+	ro, ok, err := pauseOverRead(p.ctx, p.ro.ID, p.ro, code, params, rolloutPauseState, rolloutPauseCAS{p.s.st})
 	if err != nil {
 		p.s.log.Warn("update: pause rollout", "rollout", p.ro.ID, "err", err)
 		return
 	}
+	p.ro = ro
 	if ok {
 		p.ro.Status, p.ro.PauseKey, p.ro.PauseParams = store.RolloutPaused, code, params
 		p.s.log.Warn("update: rollout paused", "rollout", p.ro.ID, "reason", code, "node", x.NodeName, "detail", reason)
@@ -754,7 +774,7 @@ func (p *pass) configuredAnswerWait(n store.NodeRow) time.Duration {
 }
 
 func (p *pass) downloadTimeoutFor(n store.NodeRow) time.Duration {
-	if !slices.Contains(n.AgentCaps, updateTimeoutCapability) {
+	if !slices.Contains(n.AgentCaps, agentcap.UpdateTimeout) {
 		return 0
 	}
 	return p.downloadWait
@@ -860,17 +880,22 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 		if err != nil {
 			miss(errProbeFailed)
 		} else if probeable > 0 && ok < probeable {
-			miss(errProbeFailed)
-			pathLooksLossy = ok+failed == probeable && timeoutsOnly && failedFor >= vantageMinFailing
-			if l, can := s.hl.(interface {
-				NodeChecksPending(ctx context.Context, nodeID string, since time.Time) ([]string, error)
-			}); can {
-				if ids, err := l.NodeChecksPending(ctx, nodeID, since); err == nil {
-					pending = append(pending, ids...)
-				}
+			listed := false
+			if ids, err := s.hl.NodeChecksPending(ctx, nodeID, since); err == nil {
+				pending, listed = ids, true
 			}
-			if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
-				s.log.Warn("update: run checks", "node", nodeID, "err", err)
+			// A profile whose check was already failing when the step was sent is not what this update broke: it is left out of the
+			// count, and when nothing else fails the step passes and says which profiles it did not hold against the update.
+			var skipped []string
+			pending, skipped = withoutProbeSick(pending, preFailed)
+			if listed && len(pending) == 0 && len(skipped) > 0 {
+				skippedProfileParams(with, skipped, label)
+			} else {
+				miss(errProbeFailed)
+				pathLooksLossy = ok+failed == probeable && timeoutsOnly && failedFor >= vantageMinFailing
+				if _, _, _, err := s.hl.RunChecksNow(ctx, nodeID); err != nil {
+					s.log.Warn("update: run checks", "node", nodeID, "err", err)
+				}
 			}
 		}
 	}
@@ -884,6 +909,11 @@ func (s *Service) healthGate(ctx context.Context, nodeID string, n store.NodeRow
 		wait = v.verdict == ""
 		if v.verdict == vantageOK {
 			soft = ""
+		}
+	}
+	if soft == errProbeFailed { // what the owner reads: which profiles did not pass, and the error of the last round of each
+		for k, v := range s.failedProfileParams(ctx, nodeID, pending, label, since) {
+			with[k] = v
 		}
 	}
 	var waiting []string
@@ -1201,7 +1231,7 @@ func (p *pass) send(x *store.StepRow, n store.NodeRow) {
 		p.sendLink(x, n, p.preFailed(x))
 		return
 	}
-	if slices.Contains(n.AgentCaps, updateSourcesCapability) {
+	if slices.Contains(n.AgentCaps, agentcap.UpdateSources) {
 		if s.preparing[x.NodeID] == p.ro.ID {
 			return
 		}
@@ -1225,7 +1255,7 @@ func (p *pass) send(x *store.StepRow, n store.NodeRow) {
 			if err != nil {
 				return
 			}
-			if !slices.Contains(currentNode.AgentCaps, updateSourcesCapability) {
+			if !slices.Contains(currentNode.AgentCaps, agentcap.UpdateSources) {
 				sources = nil
 			}
 			prepared.sendPrepared(step, currentNode, sources)
@@ -1269,17 +1299,7 @@ func (p *pass) sendPrepared(x *store.StepRow, n store.NodeRow, sources []string)
 }
 
 func (p *pass) preFailed(x *store.StepRow) []string {
-	in, err := p.s.st.FleetInbounds(p.ctx, x.NodeID, true)
-	if err != nil {
-		return x.PreFailed
-	}
-	var preFailed []string
-	for _, inbound := range in {
-		if inbound.State == "failed" {
-			preFailed = append(preFailed, inbound.ID)
-		}
-	}
-	return preFailed
+	return p.s.preFailedOf(p.ctx, x.NodeID, p.now, x.PreFailed)
 }
 
 func (p *pass) sendLink(x *store.StepRow, n store.NodeRow, preFailed []string) {

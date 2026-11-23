@@ -1,0 +1,229 @@
+{
+ "ui": {
+  "utc": "UTC",
+  "nav_label": "Hoofdmenu",
+  "tagline": "Status van onze diensten",
+  "footer": "Alle tijden zijn in UTC.",
+  "nav_home": "Status",
+  "nav_history": "Storingen",
+  "nav_about": "Over deze pagina",
+  "home_title": "Huidige status",
+  "desc": "Actuele status en bereikbaarheid van de diensten van {brand}.",
+  "desc_history": "Eerdere storingen bij {brand} en hoe ze zijn opgelost.",
+  "desc_about": "Hoe {brand} de bereikbaarheid meet en storingen meldt.",
+  "nf_title": "Pagina niet gevonden",
+  "nf_text": "Op dit adres staat niets. De statuspagina staat op de startpagina.",
+  "nf_back": "Naar de statuspagina",
+  "banner_ok": "Alle systemen werken",
+  "banner_sub": "Alle diensten van {brand} draaien normaal.",
+  "comps_h": "Diensten",
+  "op": "Werkt",
+  "up_label": "bereikbaar",
+  "days_ago_l": "60 dagen geleden",
+  "days_ago_r": "Vandaag",
+  "m_uptime": "Bereikbaarheid, laatste 90 dagen",
+  "m_resp": "Mediane reactietijd",
+  "m_inc": "Gemelde storingen",
+  "recent_h": "Recente storingen",
+  "all_inc": "Alle storingen",
+  "history_h": "Storingen",
+  "history_intro": "Wat er de afgelopen maanden misging en hoe het is opgelost, de nieuwste bovenaan.",
+  "st_inv": "In onderzoek",
+  "st_ident": "Oorzaak gevonden",
+  "st_res": "Opgelost",
+  "imp_minor": "Klein",
+  "imp_major": "Groot",
+  "imp_maint": "Onderhoud",
+  "dur_l": "Duur",
+  "about_h": "Over deze pagina",
+  "about": [
+   {
+    "h": "Wat deze pagina laat zien",
+    "p": "Op deze pagina ziet u hoe de diensten van {brand} er nu voor staan, met een overzicht van eerdere storingen. Het team dat de diensten beheert, houdt de pagina bij."
+   },
+   {
+    "h": "Hoe we de bereikbaarheid meten",
+    "p": "Elke dienst wordt elke minuut vanaf meerdere plekken gecontroleerd. Een minuut telt als storing als meer dan de helft van de controles mislukt."
+   },
+   {
+    "h": "Hoe we storingen melden",
+    "p": "We plaatsen een bericht zodra we een probleem gaan onderzoeken, zodra we de oorzaak kennen en zodra het is opgelost. Bij grotere storingen volgt achteraf een korte toelichting."
+   },
+   {
+    "h": "Gepland onderhoud",
+    "p": "Gepland onderhoud kondigen we minstens drie dagen van tevoren hier aan. We doen het op rustige tijden."
+   }
+  ],
+  "incidents": [
+   {
+    "title": "Meer foutmeldingen dan normaal",
+    "impact": "major",
+    "dur": "38 minuten",
+    "a": "We zien meer mislukte verzoeken dan gewoonlijk en zoeken uit waardoor dat komt.",
+    "b": "Een foute wijziging in de configuratie is gevonden en wordt teruggedraaid.",
+    "c": "De wijziging is teruggedraaid en het aantal fouten is weer normaal. We bekijken hoe dit door de controle kon komen."
+   },
+   {
+    "title": "Vertraagde meldingen",
+    "impact": "minor",
+    "dur": "1 uur en 12 minuten",
+    "a": "Meldingen komen enkele minuten te laat aan.",
+    "b": "In de wachtrij voor meldingen is een opstopping gevonden.",
+    "c": "De opstopping is weggewerkt en meldingen komen weer op tijd aan."
+   },
+   {
+    "title": "Trage pagina's",
+    "impact": "minor",
+    "dur": "26 minuten",
+    "a": "Sommige gebruikers melden dat pagina's traag laden. We zoeken het uit.",
+    "b": "Een databaseserver draaide te zwaar en is uit de verdeling gehaald.",
+    "c": "De laadtijden zijn weer normaal."
+   },
+   {
+    "title": "Gepland onderhoud liep uit",
+    "impact": "maint",
+    "dur": "40 minuten langer dan gepland",
+    "a": "Het onderhoud aan onze hoofddatabase duurt langer dan gepland.",
+    "b": "De laatste stap van de update heeft nog een paar minuten nodig.",
+    "c": "Het onderhoud is klaar en alle diensten draaien weer normaal."
+   },
+   {
+    "title": "Gedeeltelijke storing in één regio",
+    "impact": "major",
+    "dur": "54 minuten",
+    "a": "Gebruikers in één regio kunnen de dienst niet bereiken. We werken samen met onze hostingpartij.",
+    "b": "De hostingpartij heeft een netwerkstoring bevestigd die onze servers in die regio treft.",
+    "c": "De netwerkstoring is verholpen en de regio is weer bereikbaar."
+   },
+   {
+    "title": "Verouderde zoekresultaten",
+    "impact": "minor",
+    "dur": "2 uur en 5 minuten",
+    "a": "Nieuwe items verschijnen niet in de zoekresultaten.",
+    "b": "De indexeertaak was na een mislukte update gestopt en is opnieuw gestart.",
+    "c": "De index is bijgewerkt en zoeken geeft weer actuele resultaten."
+   },
+   {
+    "title": "Inloggen lukt niet bij sommige gebruikers",
+    "impact": "major",
+    "dur": "19 minuten",
+    "a": "Sommige gebruikers kunnen niet inloggen. Anderen merken er niets van.",
+    "b": "Een verlopen certificaat in de inlogdienst is gevonden.",
+    "c": "Het certificaat is vervangen en inloggen werkt weer voor iedereen."
+   },
+   {
+    "title": "Uploads mislukken af en toe",
+    "impact": "minor",
+    "dur": "47 minuten",
+    "a": "Een klein deel van de uploads mislukt en moet opnieuw worden gedaan.",
+    "b": "Een opslagserver met een volle schijf is gevonden.",
+    "c": "Er is capaciteit bijgeplaatst en uploads lukken weer."
+   },
+   {
+    "title": "Trage antwoorden van de API",
+    "impact": "minor",
+    "dur": "31 minuten",
+    "a": "Sommige verzoeken aan de API krijgen later antwoord dan normaal. We zoeken het uit.",
+    "b": "Een achtergrondtaak gebruikte te veel geheugen op een van de servers.",
+    "c": "De taak is opnieuw gestart met een geheugenlimiet en de reactietijden zijn weer normaal."
+   },
+   {
+    "title": "Webhooks komen te laat aan",
+    "impact": "minor",
+    "dur": "52 minuten",
+    "a": "Webhooks bereiken hun bestemming enkele minuten te laat.",
+    "b": "De wachtrij die ze verstuurt, wachtte op een trage verbinding met de database.",
+    "c": "De verbinding is hersteld, de wachtrij is leeg en webhooks komen weer op tijd aan."
+   },
+   {
+    "title": "Dashboard niet beschikbaar",
+    "impact": "major",
+    "dur": "22 minuten",
+    "a": "Het dashboard geeft voor iedereen een foutpagina. Andere diensten hebben er geen last van.",
+    "b": "Een recente versie bevatte een fout in de opstartcode en die hebben we gevonden.",
+    "c": "De versie is teruggedraaid en het dashboard is weer beschikbaar."
+   },
+   {
+    "title": "Gepland onderhoud: database-update",
+    "impact": "maint",
+    "dur": "1 uur",
+    "a": "Het geplande onderhoud is bezig. Sommige functies zijn tot het klaar is alleen-lezen.",
+    "b": "De update is half klaar en verloopt volgens plan.",
+    "c": "Het onderhoud is klaar en alles werkt weer normaal."
+   }
+  ],
+  "inc_back": "Storingen",
+  "inc_more": "Andere storingen",
+  "status_l": "Status",
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Helder",
+      "Noord",
+      "Kobalt",
+      "Vlam",
+      "Wulp",
+      "Kwarts",
+      "Zwaluw",
+      "Maan",
+      "Veld",
+      "Duin",
+      "Bries",
+      "Merel"
+     ],
+     [
+      "werk",
+      "wolk",
+      "net",
+      "hub",
+      "punt",
+      "poort",
+      "kit",
+      "lijn",
+      "base",
+      "bron"
+     ]
+    ]
+   }
+  }
+ },
+ "bundles": {
+  "saas": {
+   "components": [
+    "Openbare API",
+    "Dashboard",
+    "Webhooks",
+    "Inloggen",
+    "Achtergrondtaken",
+    "Data-exports",
+    "Facturatie",
+    "Documentatiesite"
+   ]
+  },
+  "photos": {
+   "components": [
+    "Foto's uploaden",
+    "Foto's tonen",
+    "Albums en delen",
+    "Webapp",
+    "Synchroniseren met telefoon",
+    "Zoeken",
+    "Meldingen",
+    "Account en inloggen"
+   ]
+  },
+  "mail": {
+   "components": [
+    "E-mailbezorging",
+    "Sms-bezorging",
+    "Berichtsjablonen",
+    "Bezorgrapporten",
+    "REST-API",
+    "Dashboard",
+    "Afmeldpagina's",
+    "Inplannen"
+   ]
+  }
+ }
+}

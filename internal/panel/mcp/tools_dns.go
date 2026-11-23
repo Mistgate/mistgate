@@ -173,7 +173,7 @@ type dnsServerArg struct {
 }
 type dnsSplitArg struct {
 	Suffixes []string       `json:"suffixes,omitempty"`
-	Geo      []string       `json:"geo,omitempty" jsonschema:"country geosite codes such as cn"`
+	Geo      []string       `json:"geo,omitempty" jsonschema:"country codes such as cn or ru, or one geosite category written geosite:<name>, for example geosite:telegram or geosite:category-media-ru (lower-case; only its form is checked, an unknown name is shown by the app)"`
 	Servers  []dnsServerArg `json:"servers"`
 }
 type dnsPresetArgs struct {

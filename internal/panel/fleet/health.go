@@ -7,7 +7,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
-	"github.com/mistgate/mistgate/internal/node/unit"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -15,10 +15,6 @@ import (
 // hands over (doctor reports, returning nodes), what the admin views ask for (status, alert counts), and the two
 // commands that need a stream (RunDoctor, ApplyFix). The health module imports nothing from here; cmd/mistgate
 // connects them.
-
-// capDoctor is the Hello.capabilities entry of an agent that implements the doctor (agent.proto "DOCTOR").
-const capDoctor = "doctor/1"
-const capUnitRefresh = unit.CapabilityRefresh
 
 // maxCapabilities bounds the Hello list a node can make the panel store. It must stay well above what an agent
 // lists: v0.1.36 lists 17, and the 16 of an earlier bound cut off the last one (update-guard/1).
@@ -123,9 +119,9 @@ func capabilities(h *agentv1.Hello) []string {
 		}
 		out = append(out, clip(c, 32))
 	}
-	// an agent with the MTProto engine can take an mtproto inbound; it does not list a string for it (capMTProto)
-	if slices.ContainsFunc(h.Engines, func(e *agentv1.EngineInfo) bool { return e.GetProtocol() == protocolMTProto }) && !slices.Contains(out, capMTProto) {
-		out = append(out, capMTProto)
+	// an agent with the MTProto engine can take an mtproto inbound; it does not list a string for it (agentcap.MTProto)
+	if slices.ContainsFunc(h.Engines, func(e *agentv1.EngineInfo) bool { return e.GetProtocol() == protocolMTProto }) && !slices.Contains(out, agentcap.MTProto) {
+		out = append(out, agentcap.MTProto)
 	}
 	return out
 }

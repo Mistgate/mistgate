@@ -451,7 +451,7 @@ func externalFixtureTools() map[string]bool {
 		"node_connections": true, "node_server_keys_list": true, "dns_preset_get": true, "profile_get": true, "relay_check": true, "node_ports": true,
 		"warp_status": true, "nodes_get": true, "user_get": true, "user_traffic": true, "user_devices": true, "user_connection": true,
 		"subscription_preview": true, "group_get": true, "user_diagnose": true,
-		"task_get": true, "task_runs": true, "task_run_now": true, "backup_status": true,
+		"task_get": true, "task_runs": true, "task_run_now": true,
 		"node_debug_logs":     true, // a capture is created only by the mutating node_debug_capture tool
 		"node_neighbor_sites": true, // the sweep reads the stored result only; a node that was never scanned is a clean answer
 		"decoy_site_get":      true, "decoy_site_file": true, "subscription_mihomo_template_get": true,
@@ -835,7 +835,8 @@ func contains(s []string, x string) bool {
 
 // isWrite: a plan, an apply, or a write that needs no plan (the operator's free tools): none of them is a read.
 func isWrite(n string) bool {
-	return strings.HasSuffix(n, "_plan") || strings.HasSuffix(n, "_apply") || n == "decoy_site_draft_save"
+	k := mcp.KindOf(n)
+	return k == mcp.KindPlan || k == mcp.KindApply || n == "decoy_site_draft_save"
 }
 
 // ------------------------------------------------------------------------------------------------ the scenario
@@ -1058,9 +1059,6 @@ func (e *env) scenario() {
 		// the throwaway panel has no Mihomo template of its own: the owner makes one through an approved plan, so the name is
 		// answered with a clean "no such template" (the text of a real one is read in internal/panel/mcp's tests)
 		"subscription_mihomo_template_get": true,
-		// BackupService.GetBackupSettings wants the owner session itself, so an admin token gets "owner access required" on a
-		// real panel although the fakes of the unit tests let it through. A finding, not the harness's to fix.
-		"backup_status": true,
 	}
 	var readTools, uncovered []string
 	for _, n := range adN {

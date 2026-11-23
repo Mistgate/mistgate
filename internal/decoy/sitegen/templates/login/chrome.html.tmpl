@@ -1,0 +1,41 @@
+{{define "header"}}<header class="__top__">
+<div class="__wrap__ __topin__">
+<a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span></a>
+<nav class="__nav__" aria-label="{{.L.nav_label}}">{{range .Nav}}<a href="{{.Href}}"{{if .Cur}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</nav>
+{{template "menu" .}}
+</div>
+</header>
+{{end}}
+{{define "footer"}}<footer class="__foot__">
+<div class="__wrap__">
+<div class="__fg__">
+<div class="__fb__"><a class="__logo__" href="/">{{.Mark}}<span>{{.Brand}}</span></a><p>{{.L.desc}}</p></div>
+<div class="__fcol__"><h6 class="__fh6__">{{.L.nav_label}}</h6>{{range .Nav}}<a class="__fa__" href="{{.Href}}">{{.Label}}</a>{{end}}</div>
+<div class="__fcol__"><h6 class="__fh6__">{{.L.nav_help}}</h6><a class="__fa__" href="{{(index .Nav 1).Href}}">{{.L.help_h}}</a><a class="__fa__" href="{{(index .Nav 1).Href}}#s1">{{.L.help_contact_h}}</a></div>
+<div class="__fcol__"><h6 class="__fh6__">{{.L.nav_privacy}}</h6>{{range $i, $x := .L.privacy}}{{if lt $i 3}}<a class="__fa__" href="{{(index $.Nav 2).Href}}#s{{add $i 1}}">{{$x.h}}</a>{{end}}{{end}}</div>
+</div>
+<div class="__fbar__"><span>{{.L.footer}}</span><span>© {{.Since}}–{{.Year}} {{.Brand}}</span></div>
+</div>
+</footer>
+{{end}}
+{{define "ico"}}{{if eq . 0}}{{icon "lock"}}{{else if eq . 1}}{{icon "shield"}}{{else if eq . 2}}{{icon "face"}}{{else if eq . 3}}{{icon "search"}}{{else if eq . 4}}{{icon "eye"}}{{else if eq . 5}}{{icon "key"}}{{else if eq . 6}}{{icon "clock"}}{{else}}{{icon "layers"}}{{end}}{{end}}
+{{define "ill"}}<svg class="__ill__" viewBox="0 0 640 560" aria-hidden="true" focusable="false">
+<g class="__gl__"><path d="{{range seq 7}}M{{sub (mul . 100) (num "gx" 10 40)}} 560L320 330{{end}}"/>
+<path d="M0 540H640M20 500H620M70 460H570M120 430H520M170 404H470M220 384H420"/></g>
+<g class="__gr__"><circle cx="320" cy="250" r="{{num "r1" 180 200}}" opacity=".25"/><circle cx="320" cy="250" r="{{num "r2" 132 148}}" opacity=".45"/><circle cx="320" cy="250" r="{{num "r3" 86 96}}" opacity=".9"/></g>
+<g class="__ga__"><path d="M320 {{num "t1" 54 70}}v40M320 400v-40M{{num "t2" 124 140}} 250h40M510 250h-40" opacity=".7"/></g>
+<rect class="__lk__" x="262" y="206" width="116" height="92" rx="{{num "lr" 18 26}}"/>
+<path class="__sh__" d="M286 206v-18a34 34 0 0168 0v18"/>
+<circle class="__kh__" cx="320" cy="248" r="11"/><rect class="__kh__" x="316" y="252" width="8" height="26" rx="4"/>
+<g class="__d1__"><circle cx="{{num "a1" 460 500}}" cy="{{num "a2" 140 160}}" r="6"/><circle cx="{{num "a3" 146 166}}" cy="330" r="5"/><circle cx="540" cy="{{num "a4" 320 340}}" r="4"/></g>
+<g class="__d2__"><circle cx="{{num "b1" 90 110}}" cy="170" r="5"/><circle cx="560" cy="{{num "b2" 200 220}}" r="5"/><circle cx="{{num "b3" 200 220}}" cy="90" r="4"/></g>
+</svg>{{end}}
+{{define "ill2"}}<svg class="__ill__" viewBox="0 0 420 340" aria-hidden="true" focusable="false">
+<g class="__gr2__"><circle cx="210" cy="170" r="{{num "q1" 144 156}}"/><circle cx="210" cy="170" r="{{num "q2" 106 114}}"/></g>
+<g class="__gr__"><circle cx="210" cy="170" r="70" opacity=".9"/></g>
+<circle class="__lk__" cx="210" cy="170" r="{{num "q3" 50 56}}"/>
+<path class="__qm__" d="M192 156a18 18 0 1 1 28 15c-6 4-10 7-10 15"/>
+<circle class="__kh__" cx="210" cy="214" r="6"/>
+<g class="__d1__"><circle cx="{{num "c1" 345 360}}" cy="96" r="6"/><circle cx="70" cy="{{num "c2" 245 255}}" r="5"/></g>
+<g class="__d2__"><circle cx="90" cy="100" r="5"/><circle cx="340" cy="{{num "c3" 255 265}}" r="5"/></g>
+</svg>{{end}}

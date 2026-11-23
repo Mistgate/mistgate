@@ -1,0 +1,284 @@
+{
+ "ui": {
+  "platforms": "Platvormid",
+  "col_name": "Nimi",
+  "col_size": "Suurus",
+  "nav_label": "Menüü",
+  "footer": "Avaldatud MIT litsentsi all.",
+  "nav_home": "Ülevaade",
+  "nav_changelog": "Muudatuste logi",
+  "nav_install": "Paigaldus",
+  "nav_roadmap": "Plaanid",
+  "home_title": "Ülevaade",
+  "desc_changelog": "Iga {brand} väljalase koos selles tehtud muudatustega.",
+  "desc_install": "Kuidas {brand} paigaldada: levipaketid, ehitamine lähtekoodist ja iga väljalaske kontrollsummad.",
+  "desc_roadmap": "Millega {brand} hooldajad praegu tegelevad ja mis tuleb edasi.",
+  "nf_title": "Lehte ei leitud",
+  "nf_text": "Seda lehte ei ole olemas või see on pärast viimast väljalaset teise kohta viidud.",
+  "nf_back": "Tagasi ülevaatesse",
+  "features_h": "Miks {brand}",
+  "start_h": "Alusta",
+  "latest_h": "Viimane väljalase",
+  "all_releases": "Kõik väljalasked",
+  "get_it": "Paigalda",
+  "read_log": "Loe muudatuste logi",
+  "changelog_h": "Muudatuste logi",
+  "changelog_intro": "Iga väljalase, uuemad eespool. Versiooninumbrid järgivad tavalist skeemi: peaversioon, alamversioon, parandus.",
+  "released": "Välja lastud",
+  "install_h": "Paigaldus",
+  "install_intro": "{brand} ei ole levitatud valmis programmina. Selle pakivad Linuxi distributsioonid ja lähtekoodiarhiivist ehitamine võtab paar minutit.",
+  "pkg_h": "Sinu distributsioonist",
+  "pkg_note": "Pakettide versioonid võivad uusimast väljalaskest paar nädalat maha jääda; allpool olev tabel ütleb, millist versiooni lähtekoodiarhiivist oodata.",
+  "src_h": "Ehita lähtekoodist",
+  "src_intro": "Vaja on C kompilaatorit ja make'i. Ehitamine võtab umbes minuti. Iga väljalaske lähtekoodiarhiiv on nimetatud versiooni järgi.",
+  "sums_h": "Versioonid ja kontrollsummad",
+  "sums_intro": "Igal väljalaskel on lähtekoodiarhiiv. Kontrolli selle SHA-256 kontrollsummat enne ehitamist.",
+  "col_ver": "Versioon",
+  "col_date": "Välja lastud",
+  "col_sum": "Lähtekoodiarhiivi SHA-256",
+  "roadmap_h": "Plaanid",
+  "roadmap_intro": "Millega hooldajad tegelevad, ligikaudses järjekorras. Plaanid muutuvad; muudatuste logi on kirje sellest, mis tegelikult juhtus.",
+  "now_h": "Praegu",
+  "next_h": "Järgmisena",
+  "later_h": "Hiljem",
+  "licence_h": "Litsents",
+  "licence_p": "{brand} on vaba tarkvara, avaldatud MIT litsentsi all. Kasuta, muuda ja jaga seda.",
+  "rel_back": "Kõik väljalasked",
+  "rel_more": "Teised väljalasked",
+  "rel_src_h": "Lähtekoodiarhiiv",
+  "pkgs": [
+   {
+    "s": "Debian ja Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS (Homebrew)"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Kivi",
+       "Raba",
+       "Latern",
+       "Auk",
+       "Susi",
+       "Muna",
+       "Tiir",
+       "Nokk",
+       "Kilp",
+       "Sammal"
+      ],
+      [
+       "watch",
+       "tail",
+       "glance",
+       "notice",
+       "sentry",
+       "peek"
+      ]
+     ],
+     "sep": ""
+    }
+   },
+   "tagline": "Käivita käsk, kui failid muutuvad",
+   "desc": "{brand} jälgib kausta ja käivitab käsu iga kord, kui selles midagi muutub.",
+   "overview": "{brand} jälgib kausta ja käivitab käsu iga kord, kui selles midagi muutub. See on väike ja kiire programm neile, kellel on villand faili salvestamisest ja teise aknasse vahetamisest.",
+   "features": [
+    {
+     "h": "Kiire alustada",
+     "p": "Üks käsk ja seadistusfaili pole vaja."
+    },
+    {
+     "h": "Mõistlikud vaikeseaded",
+     "p": "Jätab tähelepanuta redaktorite ajutised failid, versioonihalduse kaustad ja ehituse väljundi."
+    },
+    {
+     "h": "Töötab kõikjal",
+     "p": "Linux, macOS ja Windows, samade lippudega."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {
+     "k": "Lisatud",
+     "t": "Mitme kausta jälgimise tugi."
+    },
+    {
+     "k": "Lisatud",
+     "t": "Viivituse valik, et oodata vaikset hetke enne käivitamist."
+    },
+    {
+     "k": "Lisatud",
+     "t": "Värv väljundis, kui terminal seda toetab."
+    },
+    {
+     "k": "Parandatud",
+     "t": "Haruldane krahh, kui jälgitud kaust kustutati."
+    },
+    {
+     "k": "Parandatud",
+     "t": "Topeltkäivitused, kui redaktor salvestas faili kahes osas."
+    },
+    {
+     "k": "Parandatud",
+     "t": "Tühikuid sisaldavad teed Windowsis."
+    },
+    {
+     "k": "Muudetud",
+     "t": "Vaikeviivitus on nüüd 200 millisekundit 50 asemel."
+    },
+    {
+     "k": "Muudetud",
+     "t": "Ignoreerimismustrid järgivad samu reegleid nagu enamik versioonihaldusvahendeid."
+    },
+    {
+     "k": "Lisatud",
+     "t": "Lipp once, mis käivitab käsu ühe korra ja lõpetab."
+    },
+    {
+     "k": "Parandatud",
+     "t": "Mälukasutus, mis kasvas aeglaselt väga suurte kaustade jälgimisel."
+    },
+    {
+     "k": "Muudetud",
+     "t": "Veateated ütlevad nüüd, milline kaust need põhjustas."
+    },
+    {
+     "k": "Lisatud",
+     "t": "Käsurea automaattäitmine levinumatele kestadele."
+    }
+   ],
+   "now": [
+    "Kiirem käivitumine suurtel kaustadel",
+    "Paremad teated, kui käsk ebaõnnestub"
+   ],
+   "next": [
+    "Seadistusfail projektipõhiste seadete jaoks",
+    "Paketid peamistele Linuxi distributsioonidele"
+   ],
+   "later": [
+    "Vaikne režiim skriptides kasutamiseks",
+    "Võrgukettade usaldusväärne jälgimine"
+   ]
+  },
+  "backup": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pood",
+       "Aitt",
+       "Riiul",
+       "Sahtel",
+       "Kapp",
+       "Kirst",
+       "Kamber",
+       "Varu",
+       "Kast",
+       "Kohver"
+      ],
+      [
+       "copy",
+       "keep",
+       "stash",
+       "save",
+       "mirror",
+       "store"
+      ]
+     ],
+     "sep": ""
+    }
+   },
+   "tagline": "Lihtsad ja usaldusväärsed kausta varukoopiad",
+   "desc": "{brand} kopeerib kausta teise kohta ja hoiab vanemaid versioone tavaliste failidena.",
+   "overview": "{brand} kopeerib kausta teise kohta ja hoiab vanemaid versioone, nii et eelmisel teisipäeval tehtud viga on veel tagasi võetav. Varukoopiad on tavalised failid, mida saad avada ka ilma programmita {brand}.",
+   "features": [
+    {
+     "h": "Tavalised failid",
+     "p": "Ei mingit erivormingut, mida hiljem lahti lukustada."
+    },
+    {
+     "h": "Versioonid",
+     "p": "Hoia nii palju hetktõmmiseid, kui tahad."
+    },
+    {
+     "h": "Kontrollib ennast",
+     "p": "Käsk verify võrdleb varukoopiat selle allikaga."
+    }
+   ],
+   "quick": "{cmd} notes /backups/notes",
+   "changes": [
+    {
+     "k": "Lisatud",
+     "t": "Käsk verify, mis võrdleb varukoopiat selle allikaga."
+    },
+    {
+     "k": "Lisatud",
+     "t": "Hetktõmmiseid saab hoida kindla arvu päevi või kindla arvu koopiaid."
+    },
+    {
+     "k": "Parandatud",
+     "t": "Varukoopia ajal muudetud failid kopeeriti kaks korda."
+    },
+    {
+     "k": "Parandatud",
+     "t": "Taastatud failide valed õigused."
+    },
+    {
+     "k": "Muudetud",
+     "t": "Muutmata faile ei kopeerita enam uuesti."
+    },
+    {
+     "k": "Lisatud",
+     "t": "Taastamiskäsk koos proovikäivituse režiimiga."
+    },
+    {
+     "k": "Parandatud",
+     "t": "Krahh väga pikkade tee nimedega kaustadel."
+    },
+    {
+     "k": "Muudetud",
+     "t": "Edenemist näidatakse ainult siis, kui väljund on terminal."
+    },
+    {
+     "k": "Lisatud",
+     "t": "Käsk list, mis näitab varukoopia hetktõmmiseid."
+    },
+    {
+     "k": "Parandatud",
+     "t": "Võrgukettale tehtavad varukoopiad katkesid ajalõpu tõttu."
+    },
+    {
+     "k": "Muudetud",
+     "t": "Hetktõmmised nimetatakse nüüd kuupäeva, mitte numbri järgi."
+    },
+    {
+     "k": "Lisatud",
+     "t": "Valik failide väljajätmiseks mustri järgi."
+    }
+   ],
+   "now": [
+    "Palju väikeseid faile kopeeritakse kiiremini",
+    "Selgem verify aruanne"
+   ],
+   "next": [
+    "Varukoopiate krüptimine salvestatuna",
+    "Varukoopia teise asukohta ühe sammuga"
+   ],
+   "later": [
+    "Graafiline taastamisvahend",
+    "Sisseehitatud ajastamine"
+   ]
+  }
+ }
+}

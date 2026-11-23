@@ -13,7 +13,7 @@ Mistgate 需要一台 Linux 面板服务器、一台或多台 Linux 节点服务
 | 访问权限 | 安装时需要 root。面板运行后只需绑定 TCP 443 和 80，并写入数据目录。 |
 | 域名 | 一个主机名，其 A 记录（以及使用 IPv6 时的 AAAA 记录）指向服务器，例如 `panel.example.com`。 |
 | 入站端口 | TCP 443：用于伪装站点、订阅、用户页面、管理后台（前缀和主机名模式）以及节点 Agent。面板通过 Let’s Encrypt 获取证书时，还需要 TCP 80。除非选择单独的管理后台或 Agent 监听器，否则无需开放其他端口。 |
-| 出站连接 | 使用 Let’s Encrypt 时连接其 HTTPS 服务。节点上服务器的端口：面板会像客户端一样检查每台服务器（通过 UDP 运行的 Hysteria2、通过 UDP 运行的 AmneziaWG）。从管理后台安装节点时，SSH（TCP 22 或指定端口）连接节点服务器。通过 HTTPS 连接 GitHub（`api.github.com`、`github.com` 和其下载主机）获取发布版本：面板每 10 分钟检查新的已签名节点包和面板更新。注册 WARP 账户、启用 Turnstile 人机验证或备份到 R2 时，通过 HTTPS 连接 Cloudflare。 |
+| 出站连接 | 使用 Let’s Encrypt 时连接其 HTTPS 服务。节点上服务器的端口：面板会像客户端一样检查每台服务器（通过 UDP 运行的 Hysteria2、通过 UDP 运行的 AmneziaWG）。从管理后台安装节点时，SSH（TCP 22 或指定端口）连接节点服务器。通过 HTTPS 连接 GitHub（`api.github.com`、`github.com` 和其下载主机）获取发布版本：面板每 10 分钟检查新的已签名节点包和面板更新。注册 WARP 账户、启用 Turnstile 人机验证或备份到 R2 时，通过 HTTPS 连接 Cloudflare。面板还会在你于“从模板创建”窗口填入密钥后，连接模板伪装站点的图片来源：`api.pexels.com` 和 `images.pexels.com`（Pexels），或 `pixabay.com` 和 `cdn.pixabay.com`（Pixabay）。 |
 | 存储 | 默认数据目录为 `/var/lib/mistgate`：包含一个 SQLite 数据库、主密钥、节点包和少量文件。 |
 | 其他软件 | 无。面板是一个静态二进制文件。只有自更新会调用 systemd（`systemctl`、`systemd-run`）。 |
 

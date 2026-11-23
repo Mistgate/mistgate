@@ -140,29 +140,30 @@ func (s *Service) EffectiveOnNode(ctx context.Context, userID, nodeID string) (P
 
 // The built-in presets have one stored name, Russian, and a description of the form "Russian\nEnglish". The page speaks
 // the language of the visitor while the stored name is still the stock one (an owner may have renamed it; that name is
-// shown as it is). They are the names the admin shows an owner in that language (web/src/screens/subscriptions/model.ts
-// builtinNames); the provider catalog's own English names ("Default", "Basic") do not say what a preset is for. Persian and
-// Turkish are the user page's only (the admin has no such language yet).
+// shown as it is). The provider catalog's own English names ("Default", "Basic") do not say what a preset is for. The
+// names are the ones the admin shows (web/src/screens/subscriptions/model.ts builtinNames): both are pinned to
+// testdata/builtin_names.json by a test on each side. Only the descriptions below are the user page's alone.
 var builtinNames = map[string]struct{ ru, en, zh, fa, tr string }{
-	"dns_builtin_ru_split":   {"Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连", "روسیه: سایت‌های روسی مستقیم", "Rusya: .ru doğrudan"},
-	"dns_builtin_ru_proxied": {"Россия: всё через VPN", "Russia: all through VPN", "俄罗斯：全部经 VPN", "روسیه: همه از طریق VPN", "Rusya: tümü VPN üzerinden"},
+	"dns_builtin_ru_split":   {"Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连", "روسیه: ‎.ru مستقیم", "Rusya: .ru doğrudan"},
+	"dns_builtin_ru_proxied": {"Россия: всё через VPN", "Russia: all through VPN", "俄罗斯：全部经 VPN", "روسیه: همه‌چیز از راه VPN", "Rusya: her şey VPN üzerinden"},
+	"dns_builtin_ru_geo":     {"Россия: российские сайты напрямую (список сообщества)", "Russia: Russian sites direct (community list)", "俄罗斯：俄罗斯网站直连（社区列表）", "روسیه: سایت‌های روسی مستقیم (فهرست جامعه)", "Rusya: Rus siteleri doğrudan (topluluk listesi)"},
 	"dns_builtin_cn_split":   {"Китай: китайские сайты напрямую", "China: Chinese sites direct", "中国：国内网站直连", "چین: سایت‌های چینی مستقیم", "Çin: Çin siteleri doğrudan"},
 	"dns_builtin_standard":   {"Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google", "Cloudflare + Google"},
-	"dns_builtin_adblock":    {"AdGuard: без рекламы", "AdGuard: no ads", "AdGuard：无广告", "AdGuard: بدون تبلیغات", "AdGuard: reklamsız"},
-	"dns_builtin_family":     {"AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family：无广告和成人内容", "AdGuard Family: بدون تبلیغات و محتوای بزرگسالان", "AdGuard Family: reklamsız, 18+ yok"},
-	"dns_builtin_quad9":      {"Quad9: защита от вредоносных", "Quad9: malware blocking", "Quad9：拦截恶意网站", "Quad9: مسدود کردن بدافزار", "Quad9: zararlı yazılım engeli"},
+	"dns_builtin_adblock":    {"AdGuard: без рекламы", "AdGuard: no ads", "AdGuard：无广告", "AdGuard: بدون تبلیغ", "AdGuard: reklamsız"},
+	"dns_builtin_family":     {"AdGuard Family: без рекламы и 18+", "AdGuard Family: no ads, no 18+", "AdGuard Family：无广告和成人内容", "AdGuard Family: بدون تبلیغ و محتوای بزرگسالان", "AdGuard Family: reklam ve +18 yok"},
+	"dns_builtin_quad9":      {"Quad9: защита от вредоносных", "Quad9: malware blocking", "Quad9：拦截恶意网站", "Quad9: مسدودسازی بدافزار", "Quad9: zararlı yazılım engeli"},
 	"dns_builtin_yandex":     {"Яндекс DNS", "Yandex DNS", "Yandex DNS", "Yandex DNS", "Yandex DNS"},
 	// 00011_dns_v2.sql
 	"dns_builtin_cloudflare":          {"Cloudflare: без фильтров", "Cloudflare: no filtering", "Cloudflare：无过滤", "Cloudflare: بدون فیلتر", "Cloudflare: filtresiz"},
 	"dns_builtin_google":              {"Google: без фильтров", "Google: no filtering", "Google：无过滤", "Google: بدون فیلتر", "Google: filtresiz"},
 	"dns_builtin_dnssb":               {"DNS.SB: без фильтров", "DNS.SB: no filtering", "DNS.SB：无过滤", "DNS.SB: بدون فیلتر", "DNS.SB: filtresiz"},
-	"dns_builtin_cloudflare_family":   {"Cloudflare Family: без вредоносных и 18+", "Cloudflare Family: no malware, no 18+", "Cloudflare Family：无恶意网站和成人内容", "Cloudflare Family: بدون بدافزار و محتوای بزرگسالان", "Cloudflare Family: zararlı ve 18+ yok"},
-	"dns_builtin_yandex_family":       {"Яндекс семейный: без 18+", "Yandex Family: no 18+", "Yandex Family：无成人内容", "Yandex خانوادگی: بدون محتوای بزرگسالان", "Yandex Aile: 18+ yok"},
-	"dns_builtin_opendns_family":      {"OpenDNS FamilyShield: без 18+", "OpenDNS FamilyShield: no 18+", "OpenDNS FamilyShield：无成人内容", "OpenDNS FamilyShield: بدون محتوای بزرگسالان", "OpenDNS FamilyShield: 18+ yok"},
-	"dns_builtin_cloudflare_security": {"Cloudflare Security: защита от вредоносных", "Cloudflare Security: malware blocking", "Cloudflare Security：拦截恶意网站", "Cloudflare Security: مسدود کردن بدافزار", "Cloudflare Security: zararlı yazılım engeli"},
-	"dns_builtin_yandex_safe":         {"Яндекс безопасный: защита от вредоносных", "Yandex Safe: malware blocking", "Yandex Safe：拦截恶意网站", "Yandex امن: مسدود کردن بدافزار", "Yandex Güvenli: zararlı yazılım engeli"},
+	"dns_builtin_cloudflare_family":   {"Cloudflare Family: без вредоносных и 18+", "Cloudflare Family: no malware, no 18+", "Cloudflare Family：无恶意网站和成人内容", "Cloudflare Family: بدون بدافزار و محتوای بزرگسالان", "Cloudflare Family: zararlı ve +18 yok"},
+	"dns_builtin_yandex_family":       {"Яндекс семейный: без 18+", "Yandex Family: no 18+", "Yandex Family：无成人内容", "Yandex Family: بدون محتوای بزرگسالان", "Yandex Family: +18 yok"},
+	"dns_builtin_opendns_family":      {"OpenDNS FamilyShield: без 18+", "OpenDNS FamilyShield: no 18+", "OpenDNS FamilyShield：无成人内容", "OpenDNS FamilyShield: بدون محتوای بزرگسالان", "OpenDNS FamilyShield: +18 yok"},
+	"dns_builtin_cloudflare_security": {"Cloudflare Security: защита от вредоносных", "Cloudflare Security: malware blocking", "Cloudflare Security：拦截恶意网站", "Cloudflare Security: مسدودسازی بدافزار", "Cloudflare Security: zararlı yazılım engeli"},
+	"dns_builtin_yandex_safe":         {"Яндекс безопасный: защита от вредоносных", "Yandex Safe: malware blocking", "Yandex Safe：拦截恶意网站", "Yandex Safe: مسدودسازی بدافزار", "Yandex Safe: zararlı yazılım engeli"},
 	// 00088_dns_builtin_ads_device.sql
-	"dns_builtin_ads_device": {"Без рекламы на устройстве", "No ads on the device", "设备端拦截广告", "حذف تبلیغات روی دستگاه", "Cihazda reklam engeli"},
+	"dns_builtin_ads_device": {"Без рекламы на устройстве", "No ads on the device", "设备端拦截广告", "مسدودسازی تبلیغ روی دستگاه", "Cihazda reklam engeli"},
 }
 
 // NameIn is the name of the preset in the language of the page.
@@ -190,6 +191,7 @@ func (p Preset) NameIn(lang string) string {
 var builtinDescriptions = map[string]struct{ en, zh, fa, tr string }{
 	"dns_builtin_ru_split":   {"Russian sites direct, everything else through the VPN", "俄罗斯网站直连，其余走 VPN", "سایت‌های روسی مستقیم، بقیه از طریق VPN", "Rus siteleri doğrudan, geri kalan her şey VPN üzerinden"},
 	"dns_builtin_ru_proxied": {"Everything through the VPN, Russian sites via a Russian node", "全部走 VPN，俄罗斯网站经由俄罗斯节点", "همه از طریق VPN، سایت‌های روسی از طریق سروری در روسیه", "Her şey VPN üzerinden, Rus siteleri Rusya'daki bir sunucu üzerinden"},
+	"dns_builtin_ru_geo":     {"Known Russian services direct by a community list, not every site; the app downloads and updates the list itself", "按社区列表直连已知的俄罗斯服务，并非所有网站；列表由应用自行下载和更新", "سرویس‌های شناخته‌شدهٔ روسی طبق فهرست جامعه، نه همهٔ سایت‌ها؛ برنامه فهرست را خودش دانلود و به‌روز می‌کند", "Topluluk listesine göre bilinen Rus hizmetleri, tüm siteler değil; liste uygulama tarafından indirilir ve güncellenir"},
 	"dns_builtin_cn_split":   {"Chinese sites direct, everything else through the VPN", "国内网站直连，其余走 VPN", "سایت‌های چینی مستقیم، بقیه از طریق VPN", "Çin siteleri doğrudan, geri kalan her şey VPN üzerinden"},
 	"dns_builtin_standard":   {"Cloudflare and Google for everything", "全部使用 Cloudflare 和 Google", "Cloudflare و Google برای همه‌چیز", "Her şey için Cloudflare ve Google"},
 	"dns_builtin_adblock":    {"AdGuard DNS: no ads, no trackers", "AdGuard DNS：无广告，无跟踪器", "AdGuard DNS: بدون تبلیغات و ردیاب", "AdGuard DNS: reklam yok, izleyici yok"},

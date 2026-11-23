@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -38,14 +39,14 @@ const (
 // listing caps) is concerned: the relay stands in the reverse way, its server speaks TCP, and the agents at both ends list the
 // capability. The other end's capabilities are those the panel has on record.
 func reverseCarried(l store.RelayLink, nodeID string, caps []string) bool {
-	if !l.Reverse() || l.Network != "tcp" || !slices.Contains(caps, plugin.CapRelayReverse) {
+	if !l.Reverse() || l.Network != "tcp" || !slices.Contains(caps, agentcap.RelayReverse) {
 		return false
 	}
 	other := l.ExitNodeCaps
 	if l.ExitNodeID == nodeID {
 		other = l.ViaNodeCaps
 	}
-	return slices.Contains(other, plugin.CapRelayReverse)
+	return slices.Contains(other, agentcap.RelayReverse)
 }
 
 func bridgePathValid(path string) bool {
@@ -68,7 +69,7 @@ func bridgePortValid(port uint16) bool { return port == 0 || port == 443 || port
 // the TLS name of the entry's own site on 443 (a public certificate, or an inbound's pin), or, for a separate bridge site, the pin the
 // entry's agent reported; an entry that has told no pin is not dialed yet.
 func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []string) (*plugin.BridgeServe, []plugin.BridgeDial, error) {
-	if !slices.Contains(caps, plugin.CapRelayReverse) {
+	if !slices.Contains(caps, agentcap.RelayReverse) {
 		return nil, nil, nil
 	}
 	links, err := f.st.RelayLinks(ctx, store.RelayFilter{NodeID: n.ID})
@@ -82,7 +83,7 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 	dials := map[string]*plugin.BridgeDial{}
 	entries := map[string]store.NodeRow{}
 	for _, l := range links {
-		if !l.Live() || l.Network != "tcp" || !slices.Contains(l.ViaNodeCaps, plugin.CapRelayReverse) || !slices.Contains(l.ExitNodeCaps, plugin.CapRelayReverse) {
+		if !l.Live() || l.Network != "tcp" || !slices.Contains(l.ViaNodeCaps, agentcap.RelayReverse) || !slices.Contains(l.ExitNodeCaps, agentcap.RelayReverse) {
 			continue
 		}
 		if l.ViaNodeID == n.ID && l.BridgeServed() && bridgePathValid(n.BridgePath) && bridgePortValid(n.BridgePort) &&

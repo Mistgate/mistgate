@@ -63,7 +63,8 @@ jobs:
       # runs on, and under dash. busybox-static is the distribution package; MGP_REQUIRE_BUSYBOX turns a missing busybox into a failure.
       - name: busybox for the probe script tests
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends busybox-static
-      - run: go test ./...
+      # the site generator's package alone takes six to ten minutes on a slow shared runner: the default limit of ten cut it off
+      - run: go test -timeout 20m ./...
         env:
           MGP_REQUIRE_BUSYBOX: "1"
       - run: shellcheck scripts/install.sh

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/tcpcheck"
@@ -18,6 +19,9 @@ import (
 
 // ErrIPv6Address: the address given to CheckIPv6 is not a global unicast IPv6 address.
 var ErrIPv6Address = errors.New("fleet: not a global IPv6 address")
+
+// ErrGlobalpingOff marks the owner's explicit choice to switch Globalping off.
+var ErrGlobalpingOff = errors.New("fleet: Globalping is off")
 
 // CheckIPv6 (node.proto CheckIpv6): is this IPv6 address of the node reachable from outside, and is what answers there the node
 // itself? It sends nothing but test packets and changes nothing on any host.
@@ -197,10 +201,10 @@ func (f *Fleet) ipv6OnNodes(ctx context.Context, node store.NodeRow, addr string
 	}
 	live := liveRowsByID(liveRows)
 	targetLive := live[node.ID]
-	if !targetLive.Connected || (f.cfg.Remote == nil && f.session(node.ID) == nil) {
+	if !f.reachable(targetLive, node.ID) {
 		return nil, "node_offline"
 	}
-	if len(udp) > 0 && !slices.Contains(targetLive.AgentCaps, capUDPCheck) {
+	if len(udp) > 0 && !slices.Contains(targetLive.AgentCaps, agentcap.UDPCheck) {
 		return nil, "agent_too_old"
 	}
 	nodes, err := f.st.Nodes(ctx, false)
@@ -231,12 +235,12 @@ func (f *Fleet) ipv6OnNodes(ctx context.Context, node store.NodeRow, addr string
 
 	run := &ipv6Run{needUDP: len(udp) > 0, needTCP: len(tcp) > 0}
 	if run.needUDP {
-		available := senders(capUDPCheck)
+		available := senders(agentcap.UDPCheck)
 		run.udpSenders = len(available)
 		run.udp, run.udpBy, run.ranUDP, run.udpCode = f.ipv6UDP(ctx, node, targetLive, available, addr, udp)
 	}
 	if run.needTCP {
-		available := senders(capTCPCheck)
+		available := senders(agentcap.TCPCheck)
 		run.tcpSenders = len(available)
 		run.tcp, run.tcpBy, run.ranTCP, run.tcpCode = f.ipv6TCP(ctx, addr, available, tcp)
 	}
@@ -332,11 +336,15 @@ func (f *Fleet) ipv6ByGlobalping(ctx context.Context, chk *store.IPv6Check, tcp 
 		return
 	}
 	answered, connected, err := f.cfg.GlobalpingTCP6(ctx, chk.Addr, port)
+	if errors.Is(err, ErrGlobalpingOff) {
+		chk.Code = "no_ipv6_verifier"
+		return
+	}
 	if err != nil || answered == 0 {
 		if err != nil && ctx.Err() == nil {
 			f.log.Warn("IPv6 check through Globalping", "err", err)
 		}
-		chk.Code = "no_ipv6_verifier"
+		chk.Code = "globalping_failed"
 		return
 	}
 	verdict := "timeout"

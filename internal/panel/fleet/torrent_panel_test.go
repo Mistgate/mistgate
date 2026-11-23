@@ -11,6 +11,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
@@ -40,7 +41,7 @@ func TestTorrentBlockerSettingRequiresCapabilityAndPropagates(t *testing.T) {
 		t.Fatal(err)
 	}
 	oldAgentSettings := nodeSettings(n, nil)
-	guardSettings := nodeSettings(n, []string{capTorrentGuard})
+	guardSettings := nodeSettings(n, []string{agentcap.TorrentGuard})
 	if oldAgentSettings.TorrentBlockerEnabled || guardSettings.TorrentBlockerEnabled {
 		t.Fatal("a disabled setting should be false for every agent")
 	}
@@ -52,11 +53,11 @@ func TestTorrentBlockerSettingRequiresCapabilityAndPropagates(t *testing.T) {
 	if nodeSettings(enabledNode, nil).TorrentBlockerEnabled {
 		t.Fatal("an old agent was sent the torrent blocker setting")
 	}
-	if settingsSig(guardSettings) == settingsSig(nodeSettings(enabledNode, []string{capTorrentGuard})) {
+	if settingsSig(guardSettings) == settingsSig(nodeSettings(enabledNode, []string{agentcap.TorrentGuard})) {
 		t.Fatal("enabling the blocker did not change the settings signature")
 	}
 
-	c, _, initial := connectCaps(a, "torrentguard", capTorrentGuard)
+	c, _, initial := connectCaps(a, "torrentguard", agentcap.TorrentGuard)
 	if initial.Settings == nil || initial.Settings.TorrentBlockerEnabled {
 		t.Fatalf("initial torrent blocker setting = %v", initial.Settings)
 	}

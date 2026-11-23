@@ -1,0 +1,270 @@
+{
+ "order": 28,
+ "lang": "en-GB",
+ "html_lang": "en-IE",
+ "date": [
+  "{d} {m} {y}",
+  "{dd}/{mm}/{y}"
+ ],
+ "clock": "12h",
+ "money": {
+  "fmt": "€{n}",
+  "group": ",",
+  "scale": 0.9,
+  "round": 5
+ },
+ "address": "{no} {street}, {city}, {zip}",
+ "zip_tail": " AXXX",
+ "zip_letters": "ACDEFHKNPRTVWXY",
+ "cities": [
+  {
+   "name": "Dublin",
+   "zip": [
+    "D01",
+    "D02",
+    "D04",
+    "D07",
+    "D08",
+    "D09",
+    "D12",
+    "D15"
+   ]
+  },
+  {
+   "name": "Cork",
+   "zip": [
+    "T12",
+    "T23"
+   ]
+  },
+  {
+   "name": "Galway",
+   "zip": [
+    "H91"
+   ]
+  },
+  {
+   "name": "Limerick",
+   "zip": [
+    "V94"
+   ]
+  },
+  {
+   "name": "Waterford",
+   "zip": [
+    "X91"
+   ]
+  },
+  {
+   "name": "Kilkenny",
+   "zip": [
+    "R95"
+   ]
+  },
+  {
+   "name": "Sligo",
+   "zip": [
+    "F91"
+   ]
+  },
+  {
+   "name": "Athlone",
+   "zip": [
+    "N37"
+   ]
+  },
+  {
+   "name": "Drogheda",
+   "zip": [
+    "A92"
+   ]
+  },
+  {
+   "name": "Dundalk",
+   "zip": [
+    "A91"
+   ]
+  },
+  {
+   "name": "Navan",
+   "zip": [
+    "C15"
+   ]
+  },
+  {
+   "name": "Tralee",
+   "zip": [
+    "V92"
+   ]
+  },
+  {
+   "name": "Killarney",
+   "zip": [
+    "V93"
+   ]
+  },
+  {
+   "name": "Ennis",
+   "zip": [
+    "V95"
+   ]
+  },
+  {
+   "name": "Letterkenny",
+   "zip": [
+    "F92"
+   ]
+  },
+  {
+   "name": "Wexford",
+   "zip": [
+    "Y35"
+   ]
+  },
+  {
+   "name": "Carlow",
+   "zip": [
+    "R93"
+   ]
+  },
+  {
+   "name": "Naas",
+   "zip": [
+    "W91"
+   ]
+  },
+  {
+   "name": "Mullingar",
+   "zip": [
+    "N91"
+   ]
+  },
+  {
+   "name": "Castlebar",
+   "zip": [
+    "F23"
+   ]
+  },
+  {
+   "name": "Tullamore",
+   "zip": [
+    "R35"
+   ]
+  },
+  {
+   "name": "Bray",
+   "zip": [
+    "A98"
+   ]
+  },
+  {
+   "name": "Swords",
+   "zip": [
+    "K67"
+   ]
+  },
+  {
+   "name": "Cavan",
+   "zip": [
+    "H12"
+   ]
+  },
+  {
+   "name": "Clonmel",
+   "zip": [
+    "E91"
+   ]
+  }
+ ],
+ "streets": [
+  "Main Street",
+  "Church Street",
+  "Castle Street",
+  "Market Street",
+  "Bridge Street",
+  "Church Road",
+  "Station Road",
+  "Mill Road",
+  "Dublin Road",
+  "Cork Road",
+  "Convent Road",
+  "Chapel Lane",
+  "Patrick Street",
+  "O'Connell Street",
+  "Park Road",
+  "Abbey Street",
+  "Quay Street"
+ ],
+ "first": [
+  "Seán",
+  "Aoife:f",
+  "Conor",
+  "Niamh:f",
+  "Cian",
+  "Ciara:f",
+  "Darragh",
+  "Siobhán:f",
+  "Oisín",
+  "Orla:f",
+  "Eoin",
+  "Saoirse:f",
+  "Liam",
+  "Róisín:f",
+  "Patrick",
+  "Sinéad:f",
+  "Michael",
+  "Emer:f",
+  "Niall",
+  "Caoimhe:f",
+  "Ciarán",
+  "Áine:f",
+  "Declan",
+  "Fiona:f",
+  "Cathal",
+  "Clodagh:f",
+  "Brendan",
+  "Maeve:f",
+  "Colm",
+  "Mary:f",
+  "Aidan",
+  "Grace:f",
+  "Kevin",
+  "Sarah:f"
+ ],
+ "last": [
+  "Murphy",
+  "Kelly",
+  "O'Sullivan",
+  "Walsh",
+  "Smith",
+  "O'Brien",
+  "Byrne",
+  "Ryan",
+  "O'Connor",
+  "O'Neill",
+  "O'Reilly",
+  "Doyle",
+  "McCarthy",
+  "Gallagher",
+  "Doherty",
+  "Kennedy",
+  "Lynch",
+  "Murray",
+  "Quinn",
+  "Moore",
+  "McLoughlin",
+  "O'Carroll",
+  "Connolly",
+  "Daly",
+  "O'Connell",
+  "Wilson",
+  "Dunne",
+  "Moran",
+  "Burke",
+  "Collins",
+  "Campbell",
+  "Clarke",
+  "Johnston",
+  "Hughes"
+ ]
+}

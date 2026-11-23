@@ -1,0 +1,20 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__ __st__">
+<p class="__crumb__"><a href="{{(index .Nav 0).Href}}">{{.L.nav_home}}</a> / <span>{{.L.history_h}}</span></p>
+<h1>{{.L.history_h}}</h1>
+<p class="__lede__">{{.L.history_intro}}</p>
+<div class="__card__ __cal__">
+{{range calmonths .Lists.incidents "2026-11-14" 3}}<div class="__mo__"><h3>{{.label}}</h3>
+<div class="__wd__">{{range $.L.weekdays_short}}<span>{{.}}</span>{{end}}</div>
+<div class="__dy__">{{range seq .pad}}<i class="__e__"></i>{{end}}{{range .days}}<i{{if eq .k 1}} class="__n__"{{else if eq .k 2}} class="__m__"{{else if eq .k 3}} class="__t__"{{else if eq .k 4}} class="__f__"{{end}}></i>{{end}}</div></div>
+{{end}}<div class="__leg__"><span><i></i>{{.L.op}}</span><span><i class="__n__"></i>{{.L.imp_minor}}</span><span><i class="__m__"></i>{{.L.imp_major}}</span><span><i class="__t__"></i>{{.L.imp_maint}}</span></div>
+</div>
+{{$m := ""}}{{range .Lists.incidents}}{{if ne .month $m}}{{if ne $m ""}}</section>
+{{end}}{{$m = .month}}<section class="__grp__"><h2>{{.month_label}}</h2>
+{{end}}<a class="__li__" href="{{.href}}"><time class="__d__ __mono__" datetime="{{.date_iso}}">{{.date}}</time><b>{{.title}}</b><span class="__pill__ {{if eq .impact "major"}}__imp2__{{else if eq .impact "maint"}}__imp3__{{else}}__imp1__{{end}}">{{if eq .impact "major"}}{{$.L.imp_major}}{{else if eq .impact "maint"}}{{$.L.imp_maint}}{{else}}{{$.L.imp_minor}}{{end}}</span><span class="__u__">{{$.L.dur_l}}: {{.dur}}</span></a>
+{{end}}</section>
+</main>
+{{template "footer" .}}
+</body>
+</html>

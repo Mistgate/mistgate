@@ -126,7 +126,7 @@ func (s *Service) ChangePassword(ctx context.Context, req *connect.Request[admin
 		s.log.Error("set password", "err", err)
 		return nil, errInternal(err)
 	}
-	ended, err := s.st.DeleteOtherSessions(ctx, admin.ID, currentHash(req))
+	ended, err := s.st.DeleteOtherSessions(ctx, admin.ID, s.currentHash(req))
 	if err != nil {
 		releaseAttempt()
 		s.log.Error("end other sessions", "err", err)
@@ -159,7 +159,7 @@ func (s *Service) BeginTotpEnrollment(ctx context.Context, req *connect.Request[
 		return nil, codedErr(connect.CodeFailedPrecondition, "no_master_key")
 	}
 	m := req.Msg
-	c := &ceremony{kind: ceremonyTOTPEnroll, src: SourceKey(s.clientIP(req)), admin: admin, tokenHash: currentHash(req)}
+	c := &ceremony{kind: ceremonyTOTPEnroll, src: SourceKey(s.clientIP(req)), admin: admin, tokenHash: s.currentHash(req)}
 	switch cred, err := s.st.PasswordByAdmin(ctx, admin.ID); {
 	case err == nil: // re-bind: the login and the password stay as they are
 		if m.Login != "" || m.Password != "" {
@@ -217,7 +217,7 @@ func (s *Service) FinishTotpEnrollment(ctx context.Context, req *connect.Request
 	if !ok {
 		return nil, expired()
 	}
-	if c.admin.ID != admin.ID || !bytes.Equal(c.tokenHash, currentHash(req)) {
+	if c.admin.ID != admin.ID || !bytes.Equal(c.tokenHash, s.currentHash(req)) {
 		if _, err := s.st.ConsumeAuthCeremony(ctx, m.CeremonyId); err != nil {
 			s.log.Error("consume foreign TOTP enrollment ceremony", "err", err)
 		}
@@ -252,7 +252,7 @@ func (s *Service) FinishTotpEnrollment(ctx context.Context, req *connect.Request
 			s.log.Error("set totp secret", "err", err)
 			return nil, errInternal(err)
 		}
-		ended, err := s.st.DeleteOtherSessions(ctx, admin.ID, currentHash(req))
+		ended, err := s.st.DeleteOtherSessions(ctx, admin.ID, s.currentHash(req))
 		if err != nil {
 			s.log.Error("end other sessions", "err", err)
 			return nil, errInternal(err)

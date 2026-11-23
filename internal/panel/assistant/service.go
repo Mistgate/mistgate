@@ -174,7 +174,7 @@ func (s *Service) access(ctx context.Context, admin store.Admin) (*adminv1.GetAs
 		resp.Reason = "assistant_off"
 		return resp, nil
 	}
-	if !audienceAllows(settings.audience, admin.Role) {
+	if !auth.AssistantAudienceAllows(settings.audience, admin.Role) {
 		resp.Reason = "not_allowed"
 		return resp, nil
 	}
@@ -259,19 +259,6 @@ func listedPrice(spec providerSpec, model string) price {
 		}
 	}
 	return price{}
-}
-
-func audienceAllows(a adminv1.AssistantAudience, role string) bool {
-	switch a {
-	case adminv1.AssistantAudience_ASSISTANT_AUDIENCE_EVERYONE:
-		return role == store.RoleOwner || role == store.RoleHelper || role == store.RoleReadonly
-	case adminv1.AssistantAudience_ASSISTANT_AUDIENCE_ADMINS:
-		return role == store.RoleOwner || role == store.RoleHelper
-	case adminv1.AssistantAudience_ASSISTANT_AUDIENCE_OWNER:
-		return role == store.RoleOwner
-	default:
-		return false
-	}
 }
 
 func (s *Service) GetAssistantAccess(ctx context.Context, _ *connect.Request[adminv1.GetAssistantAccessRequest]) (*connect.Response[adminv1.GetAssistantAccessResponse], error) {

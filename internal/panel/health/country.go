@@ -17,6 +17,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/plugin"
 )
 
 // The country check: "does the node answer from inside a country". The panel's server is not in that country, so its own
@@ -253,32 +254,9 @@ func countryReached(obs CountryObserved, targets []CountryTarget, icmpOnly bool)
 // ---------------------------------------------------------------------------------------------------
 // Targets
 
-// hy2DecoyPort is the TCP port of a Hysteria2 inbound's HTTPS decoy (443 unless the profile says otherwise, 0 = none), the
-// same rule as the agent's doctor.
-func hy2DecoyPort(t *target) uint16 {
-	if t.spec.TLS.Mode == 0 {
-		return 0
-	}
-	var j struct {
-		Masquerade struct {
-			Type    string `json:"type"`
-			TCPPort *int   `json:"tcp_port"`
-		} `json:"masquerade"`
-	}
-	if len(t.settings) > 0 && json.Unmarshal(t.settings, &j) != nil {
-		return 0
-	}
-	if strings.EqualFold(j.Masquerade.Type, "none") {
-		return 0
-	}
-	if p := j.Masquerade.TCPPort; p != nil {
-		return uint16(max(0, min(*p, 65535)))
-	}
-	return 443
-}
-
 // countryPorts are the distinct TCP ports a node answers on: the ports of its active TCP inbounds (VLESS) and the HTTPS
-// decoy of its Hysteria2 ones. A node with only UDP inbounds and no decoy has none and is checked by ICMP alone.
+// site of its Hysteria2 ones (the decoy page, or the plain 404 of masquerade type none). A node with only UDP inbounds and no site has
+// none and is checked by ICMP alone.
 func countryPorts(ts []*target) []uint16 {
 	var ports []uint16
 	add := func(p uint16) {
@@ -294,7 +272,7 @@ func countryPorts(ts []*target) []uint16 {
 		case t.spec.Listen.Network == "tcp":
 			add(t.spec.Listen.Port)
 		case t.in.Protocol == "hysteria2":
-			add(hy2DecoyPort(t))
+			add(plugin.Hy2SitePort(t.spec))
 		}
 	}
 	slices.Sort(ports)
@@ -313,7 +291,7 @@ func countryPreferredPort(ts []*target) uint16 {
 		var p uint16
 		switch {
 		case t.in.Protocol == "hysteria2":
-			p = hy2DecoyPort(t)
+			p = plugin.Hy2SitePort(t.spec)
 		case t.in.Protocol == "vless" && t.spec.Listen.Network == "tcp":
 			var settings struct {
 				Security string `json:"security"`
@@ -812,19 +790,16 @@ func (s *Service) activeExternalStates(ctx context.Context) []ExternalState {
 }
 
 func externalSourcePath(source string) bool {
-	return source == countryreach.SourceCheburcheck || source == countryreach.SourceCheburcheckOwn
+	info, _ := countryreach.Info(source)
+	return info.Path
 }
 
 func externalSourceEyeball(source string, kinds ...string) bool {
-	switch source {
-	case countryreach.SourceCheburcheck, countryreach.SourceCheburcheckOwn, countryreach.SourceBsbord,
-		countryreach.SourceBsbordTunnel, countryreach.SourceBsbordGeo:
-		return true
-	case countryreach.SourceProbes:
+	if source == countryreach.SourceProbes { // the own probes are as eyeball as the point is
 		return len(kinds) > 0 && (kinds[0] == countryreach.VantageKindHome || kinds[0] == countryreach.VantageKindMobile)
-	default:
-		return false
 	}
+	info, _ := countryreach.Info(source)
+	return info.Eyeball
 }
 
 func externalVantagesEyeball(source string, vantages []countryreach.Vantage) bool {
@@ -1534,8 +1509,8 @@ func countryEvents(signals []countryAlertSignal, nodeID string) []countryEvent {
 }
 
 // The shared list Combine supplies the verdict. A full result is demoted to partial for alerts unless a country-wide source
-// says it: Globalping, public cheburcheck or the TSPU probe. The owner's cheburcheck probe and bsbord select regions or single
-// networks, so even several of them agreeing raise only the partial alert, naming their networks.
+// says it (Broad in countryreach.Sources). The owner's cheburcheck probe and bsbord select regions or single networks, so even
+// several of them agreeing raise only the partial alert, naming their networks.
 func countryAlertCombine(live []countryreach.Live) countryreach.Combined {
 	c := countryreach.Combine(live, nil)
 	if countryBad(c.Verdict) && !countryAlertHasBroadBlock(live) {
@@ -1549,8 +1524,7 @@ func countryAlertHasBroadBlock(live []countryreach.Live) bool {
 		if !countryBad(row.Verdict) {
 			continue
 		}
-		switch row.Source {
-		case countryreach.SourceTSPU, countryreach.SourceCheburcheck, countryreach.SourceGlobalping:
+		if info, _ := countryreach.Info(row.Source); info.Broad {
 			return true
 		}
 	}
@@ -1820,8 +1794,8 @@ func countryCond(n store.NodeRow, e countryEvent) cond {
 }
 
 // ReconcileCountry brings the COUNTRY_BLOCKED alerts up to date without the full evaluator, which the Cloudflare edition
-// does not run on the admin isolate. The edge calls it when the integration is switched off (globalping.Config.OnChange);
-// the cron tick's evaluator (EvaluateOnce) derives these alerts itself. Alerts of other kinds are left alone.
+// does not run on the admin isolate. Every source of the country check calls it (its Config.OnChange) when its settings change
+// or it stored a result; the cron tick's evaluator (EvaluateOnce) derives these alerts itself. Alerts of other kinds are left alone.
 func (s *Service) ReconcileCountry(ctx context.Context) {
 	s.evalMu.Lock()
 	defer s.evalMu.Unlock()

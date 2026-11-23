@@ -23,8 +23,6 @@ import (
 // UpdateAgent/RollbackAgent, drains the agent before a re-exec, and runs the commit watch of a new build.
 
 const (
-	capUpdateLink = "update-link/1"
-
 	// A new build commits only after it has been connected this long with its state applied: engines need a moment
 	// before a failing inbound shows up in their health.
 	commitSettle = 10 * time.Second

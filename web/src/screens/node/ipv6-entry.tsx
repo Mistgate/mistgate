@@ -59,7 +59,7 @@ export function entryErrorText(e: unknown, t: T): string {
 const senderOf = (t: T, sender: string) => (sender === "globalping" ? "Globalping" : senderLabel(t, sender));
 
 /** Why a check could not run (CheckIpv6Response.error_code): its own two codes, else those of the port check. */
-const whyNot = (t: T, code: string) => (code === "no_ipv6_verifier" || code === "nothing_to_check" ? t(`ways.ipv6.why.${code}`) : reasonText(t, code));
+const whyNot = (t: T, code: string) => (code === "no_ipv6_verifier" || code === "globalping_failed" || code === "nothing_to_check" ? t(`ways.ipv6.why.${code}`) : reasonText(t, code));
 
 /** One port's verdict as a pill: tcp as the port check says it (Globalping's "reachable" only connected), udp ok / lossy / broken. */
 export function verdictLook(t: T, v: { network: string; verdict: string }): { kind: StatusKind; label: string } {

@@ -1,0 +1,19 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<div class="__shell__">
+{{template "sidenav" .}}
+<main class="__main__">
+<div class="__crumb__">{{.L.menu_h}} / {{(index .Nav 6).Label}}</div>
+<h1>{{.L.faq_h}}</h1>
+<p class="__lead__">{{.L.tagline}}</p>
+<div class="__faq__">{{range $i, $q := .L.faq}}<details id="__t{{add $i 1}}__" open><summary>{{$q.q}}</summary><p>{{$q.a}}</p></details>{{end}}</div>
+<div class="__pn__"><a href="{{(index .Nav 5).Href}}"><small>{{.L.prev}}</small><b>{{(index .Nav 5).Label}}</b></a><a href="{{(index .Nav 7).Href}}"><small>{{.L.next}}</small><b>{{(index .Nav 7).Label}}</b></a></div>
+</main>
+<aside class="__tc__" aria-label="{{.L.toc_h}}">
+<h6>{{.L.toc_h}}</h6>
+{{range $i, $q := .L.faq}}<a href="#__t{{add $i 1}}__">{{$q.q}}</a>{{end}}
+</aside>
+</div>
+{{template "footer" .}}
+</body>
+</html>

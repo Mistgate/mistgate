@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/vault"
 )
@@ -42,16 +43,22 @@ type fakeCF struct {
 	endpoint   string // what peers[0].endpoint.v4 says
 	onRegister func() // runs inside a POST, before the answer
 	issued     []string
+	// WARP+ keys the fake knows: key -> "ok" (Cloudflare takes it), "limit" (it is on all the devices it allows), "429",
+	// "down" (the connection is cut); a key that is not listed is invalid. bound records the PUT bodies in order.
+	keys  map[string]string
+	bound []string
 }
 
 type fakeReg struct {
 	id, token, license string
 	deleted            bool
+	boundKey           string // the WARP+ key bound to this device (a "one" key counts the devices)
 	endpoint           string
+	kind               string // account_type; "" is "free"
 }
 
 func newFakeCF(t *testing.T) *fakeCF {
-	f := &fakeCF{t: t, version: "v0a5641", regs: map[string]*fakeReg{}, endpoint: "162.159.192.1:0"}
+	f := &fakeCF{t: t, version: "v0a5641", regs: map[string]*fakeReg{}, endpoint: "162.159.192.1:0", keys: map[string]string{}}
 	f.srv = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.srv.Close)
 	return f
@@ -87,6 +94,43 @@ func (f *fakeCF) serve(w http.ResponseWriter, r *http.Request) {
 		f.regs[reg.id] = reg
 		f.issued = append(f.issued, reg.id, reg.token, reg.license)
 		f.answer(w, reg, true)
+	case r.Method == http.MethodPut && strings.HasPrefix(path, "/reg/") && strings.HasSuffix(path, "/account"):
+		reg := f.regs[strings.TrimSuffix(strings.TrimPrefix(path, "/reg/"), "/account")]
+		if reg == nil || reg.deleted {
+			http.Error(w, `{"success":false,"errors":[{"code":1006,"message":"Registration not found"}]}`, http.StatusNotFound)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer "+reg.token {
+			http.Error(w, `{"success":false,"errors":[{"code":1001,"message":"Unauthorized"}]}`, http.StatusUnauthorized)
+			return
+		}
+		var body struct {
+			License string `json:"license"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		f.bound = append(f.bound, body.License)
+		switch f.keys[body.License] {
+		case "ok":
+			reg.kind = "unlimited"
+			_, _ = fmt.Fprintf(w, `{"id":"acc","account_type":"unlimited","license":%q}`, body.License)
+		case "one": // a key that allows one device: a live device holding it refuses the next one
+			for _, other := range f.regs {
+				if other != reg && !other.deleted && other.boundKey == body.License {
+					http.Error(w, `{"success":false,"errors":[{"code":2002,"message":"Maximum number of devices reached for `+body.License+`"}]}`, http.StatusBadRequest)
+					return
+				}
+			}
+			reg.kind, reg.boundKey = "unlimited", body.License
+			_, _ = fmt.Fprintf(w, `{"id":"acc","account_type":"unlimited","license":%q}`, body.License)
+		case "limit":
+			http.Error(w, `{"success":false,"errors":[{"code":2002,"message":"Maximum number of devices reached for `+body.License+`"}]}`, http.StatusBadRequest)
+		case "429":
+			http.Error(w, `{"success":false,"errors":[{"code":10000,"message":"Too many requests"}]}`, http.StatusTooManyRequests)
+		case "down":
+			panic(http.ErrAbortHandler) // the connection is cut: the panel sees no answer
+		default:
+			http.Error(w, `{"success":false,"errors":[{"code":2001,"message":"Invalid license key `+body.License+`"}]}`, http.StatusBadRequest)
+		}
 	case strings.HasPrefix(path, "/reg/"):
 		id := strings.TrimPrefix(path, "/reg/")
 		reg := f.regs[id]
@@ -117,10 +161,14 @@ func (f *fakeCF) answer(w http.ResponseWriter, reg *fakeReg, withToken bool) {
 	if withToken {
 		token = fmt.Sprintf(`"token":%q,`, reg.token)
 	}
-	_, _ = fmt.Fprintf(w, `{"id":%q,%s"account":{"id":"acc","account_type":"free","license":%q},
+	kind := reg.kind
+	if kind == "" {
+		kind = "free"
+	}
+	_, _ = fmt.Fprintf(w, `{"id":%q,%s"account":{"id":"acc","account_type":%q,"license":%q},
 	"config":{"client_id":"AbCd","interface":{"addresses":{"v4":"172.16.0.2","v6":"2001:db8:110::2"}},
 	"peers":[{"public_key":"bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=","endpoint":{"host":"engage.cloudflareclient.com:2408","v4":%q,"v6":"[2606:4700:d0::a29f:c001]:0","ports":[2408,500,1701,4500]}}]}}`,
-		reg.id, token, reg.license, reg.endpoint)
+		reg.id, token, kind, reg.license, reg.endpoint)
 }
 
 func (f *fakeCF) callLog() []string {
@@ -249,7 +297,7 @@ func (f *envFleet) StateChanged() {
 func (e *env) addNode(name string, caps ...string) string {
 	e.t.Helper()
 	if caps == nil {
-		caps = []string{"doctor/1", CapWarp}
+		caps = []string{"doctor/1", agentcap.Warp}
 	}
 	id := "nod_" + name
 	if _, err := e.st.W.ExecContext(e.ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES (?, ?, ?, 'active', 1)`, id, name, name+".example.com"); err != nil {

@@ -248,3 +248,13 @@ func (s *Store) AssistantRetention(ctx context.Context, now time.Time) error {
 	_, err := s.RetainAssistantConversations(ctx, now.Add(-time.Duration(days)*24*time.Hour))
 	return err
 }
+
+// AssistantAccess reads whether the assistant is on and who may use it (the numeric AssistantAudience). A panel that never saved
+// the settings has no row: an error, which every caller reads as "off".
+func (s *Store) AssistantAccess(ctx context.Context) (enabled bool, audience int64, err error) {
+	var on int
+	if err = s.R.QueryRowContext(ctx, `SELECT enabled,audience FROM assistant_settings WHERE id=1`).Scan(&on, &audience); err != nil {
+		return false, 0, err
+	}
+	return on != 0, audience, nil
+}

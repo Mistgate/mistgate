@@ -1,0 +1,230 @@
+{
+ "ui": {
+  "utc": "UTC",
+  "nav_label": "Galvenā izvēlne",
+  "tagline": "Pakalpojumu statuss",
+  "footer": "Visi laiki norādīti pēc UTC.",
+  "nav_home": "Statuss",
+  "nav_history": "Traucējumu vēsture",
+  "nav_about": "Par lapu",
+  "home_title": "Pašreizējais statuss",
+  "desc": "Pakalpojumu {brand} pašreizējais statuss un darbības laiks.",
+  "desc_history": "Pakalpojumu {brand} iepriekšējie traucējumi un to novēršana.",
+  "desc_about": "Kā {brand} mēra darbības laiku un ziņo par traucējumiem.",
+  "nf_title": "Lapa nav atrasta",
+  "nf_text": "Šajā adresē nekā nav. Pakalpojumu statuss ir sākumlapā.",
+  "nf_back": "Uz statusa lapu",
+  "banner_ok": "Visas sistēmas darbojas",
+  "banner_sub": "Visi {brand} pakalpojumi darbojas normāli.",
+  "comps_h": "Pakalpojumi",
+  "op": "Darbojas",
+  "up_label": "darbības laiks",
+  "days_ago_l": "pirms 60 dienām",
+  "days_ago_r": "Šodien",
+  "m_uptime": "Darbības laiks pēdējās 90 dienās",
+  "m_resp": "Vidējais atbildes laiks",
+  "m_inc": "Reģistrēti traucējumi",
+  "recent_h": "Jaunākie traucējumi",
+  "all_inc": "Visa traucējumu vēsture",
+  "history_h": "Traucējumu vēsture",
+  "history_intro": "Kas pēdējos mēnešos ir noticis nepareizi un kā tas ir novērsts, jaunākie vispirms.",
+  "st_inv": "Izmeklējam",
+  "st_ident": "Cēlonis atrasts",
+  "st_res": "Novērsts",
+  "imp_minor": "Neliels",
+  "imp_major": "Liels",
+  "imp_maint": "Uzturēšana",
+  "dur_l": "Ilgums",
+  "about_h": "Par šo lapu",
+  "about": [
+   {
+    "h": "Ko šī lapa rāda",
+    "p": "Šī lapa rāda pakalpojumu {brand} pašreizējo stāvokli un iepriekšējo traucējumu vēsturi. Lapu atjaunina komanda, kas pakalpojumus uztur."
+   },
+   {
+    "h": "Kā mēra darbības laiku",
+    "p": "Katru pakalpojumu pārbauda no vairākām vietām reizi minūtē. Minūti uzskata par dīkstāvi, ja neizdodas vairāk nekā puse pārbaužu."
+   },
+   {
+    "h": "Kā mēs ziņojam par traucējumiem",
+    "p": "Mēs ierakstām jaunumus, kad sākam pētīt problēmu, kad atrodam cēloni un kad tā ir novērsta. Pēc lielākiem traucējumiem pievienojam īsu aprakstu."
+   },
+   {
+    "h": "Plānotie darbi",
+    "p": "Plānotos darbus paziņojam šeit vismaz trīs dienas iepriekš un veicam tos mierīgā laikā."
+   }
+  ],
+  "incidents": [
+   {
+    "title": "Kļūdu skaits ir pieaudzis",
+    "impact": "major",
+    "dur": "38 minūtes",
+    "a": "Neizdevušos pieprasījumu ir vairāk nekā parasti. Meklējam cēloni.",
+    "b": "Atradām kļūdainu iestatījumu izmaiņu, un to atceļam.",
+    "c": "Izmaiņas atceltas, un kļūdu skaits ir atgriezies normālā līmenī. Izskatīsim, kā tās netika pamanītas."
+   },
+   {
+    "title": "Paziņojumi kavējas",
+    "impact": "minor",
+    "dur": "1 stunda 12 minūtes",
+    "a": "Paziņojumi tiek piegādāti ar vairāku minūšu kavēšanos.",
+    "b": "Paziņojumu rindā atradām sastrēgumu.",
+    "c": "Sastrēgums novērsts, un paziņojumi atkal tiek piegādāti kā parasti."
+   },
+   {
+    "title": "Lapas ielādējas lēni",
+    "impact": "minor",
+    "dur": "26 minūtes",
+    "a": "Daži lietotāji ziņo, ka lapas ielādējas lēni. Noskaidrojam, kas notiek.",
+    "b": "Viens datubāzes serveris bija pārslogots, un mēs to izņēmām no darba.",
+    "c": "Lapu ielādes laiks ir atgriezies normālā līmenī."
+   },
+   {
+    "title": "Plānotie darbi ieilga",
+    "impact": "maint",
+    "dur": "par 40 minūtēm ilgāk, nekā plānots",
+    "a": "Mūsu galvenās datubāzes apkope ilgst ilgāk, nekā plānots.",
+    "b": "Atjauninājuma pēdējam solim vajag vēl dažas minūtes.",
+    "c": "Apkope pabeigta, un visi pakalpojumi darbojas normāli."
+   },
+   {
+    "title": "Daļējs pārtraukums vienā reģionā",
+    "impact": "major",
+    "dur": "54 minūtes",
+    "a": "Viena reģiona lietotāji nevar piekļūt pakalpojumam. Sadarbojamies ar mitināšanas pakalpojuma sniedzēju.",
+    "b": "Sniedzējs apstiprināja tīkla kļūmi, kas skar mūsu serverus šajā reģionā.",
+    "c": "Tīkla kļūme ir novērsta, un reģions atkal saņem datplūsmu."
+   },
+   {
+    "title": "Meklēšanas rezultāti ir novecojuši",
+    "impact": "minor",
+    "dur": "2 stundas 5 minūtes",
+    "a": "Jauni ieraksti neparādās meklēšanas rezultātos.",
+    "b": "Indeksēšanas darbs apstājās pēc neveiksmīga atjauninājuma, un tas ir palaists no jauna.",
+    "c": "Indeksēšana ir panākusi atpalicību, un meklēšana ir aktuāla."
+   },
+   {
+    "title": "Pieteikšanās problēmas dažiem lietotājiem",
+    "impact": "major",
+    "dur": "19 minūtes",
+    "a": "Daži lietotāji nevar pieteikties. Pārējos tas neskar.",
+    "b": "Pieteikšanās pakalpojumā atradām beigušos sertifikātu.",
+    "c": "Sertifikāts nomainīts, un pieteikšanās atkal darbojas visiem."
+   },
+   {
+    "title": "Augšupielāde dažreiz neizdodas",
+    "impact": "minor",
+    "dur": "47 minūtes",
+    "a": "Neliela daļa augšupielāžu neizdodas, un tās jāatkārto.",
+    "b": "Atradām glabāšanas serveri ar pilnu disku.",
+    "c": "Vieta pievienota, un augšupielādes atkal izdodas."
+   },
+   {
+    "title": "API atbild lēni",
+    "impact": "minor",
+    "dur": "31 minūte",
+    "a": "Daži pieprasījumi API tiek apstrādāti ilgāk nekā parasti. Noskaidrojam, kas notiek.",
+    "b": "Viens fona darbs serverī izmantoja pārāk daudz atmiņas.",
+    "c": "Darbs palaists no jauna ar atmiņas ierobežojumu, un atbildes laiks ir normāls."
+   },
+   {
+    "title": "Webhook piegāde kavējas",
+    "impact": "minor",
+    "dur": "52 minūtes",
+    "a": "Webhook ziņojumi sasniedz galamērķi ar vairāku minūšu kavēšanos.",
+    "b": "Rinda, kas tos sūta, gaidīja lēnu savienojumu ar datubāzi.",
+    "c": "Savienojums atjaunots, rinda iztukšota, un webhook ziņojumi atkal tiek piegādāti laikā."
+   },
+   {
+    "title": "Vadības lapa nav pieejama",
+    "impact": "major",
+    "dur": "22 minūtes",
+    "a": "Vadības lapa visiem rāda kļūdu. Citus pakalpojumus tas neskar.",
+    "b": "Nesenajā versijā bija kļūda palaišanas kodā, un mēs to atradām.",
+    "c": "Versija atcelta, un vadības lapa atkal ir pieejama."
+   },
+   {
+    "title": "Plānotie darbi: datubāzes atjaunināšana",
+    "impact": "maint",
+    "dur": "1 stunda",
+    "a": "Notiek plānotie darbi. Dažas funkcijas līdz to beigām ir tikai lasāmas.",
+    "b": "Atjaunināšana ir puslīdz paveikta un norit pēc plāna.",
+    "c": "Darbi pabeigti, un viss darbojas normāli."
+   }
+  ],
+  "inc_back": "Traucējumu vēsture",
+  "inc_more": "Citi traucējumi",
+  "status_l": "Statuss",
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Jūras",
+      "Kalna",
+      "Vēja",
+      "Saules",
+      "Upes",
+      "Meža",
+      "Ziedu",
+      "Zvaigžņu",
+      "Gaismas",
+      "Priežu",
+      "Akmens",
+      "Avotu"
+     ],
+     [
+      "tilts",
+      "vārti",
+      "tīkls",
+      "serviss",
+      "centrs",
+      "birojs",
+      "kanāls",
+      "krātuve",
+      "pults",
+      "pasts"
+     ]
+    ],
+    "sep": ""
+   }
+  }
+ },
+ "bundles": {
+  "saas": {
+   "components": [
+    "Publiskais API",
+    "Vadības lapa",
+    "Webhook ziņojumi",
+    "Pieteikšanās",
+    "Fona darbi",
+    "Datu eksports",
+    "Rēķini",
+    "Dokumentācijas vietne"
+   ]
+  },
+  "photos": {
+   "components": [
+    "Attēlu augšupielāde",
+    "Attēlu piegāde",
+    "Albumi un kopīgošana",
+    "Tīmekļa lietotne",
+    "Mobilā sinhronizācija",
+    "Meklēšana",
+    "Paziņojumi",
+    "Konts un pieteikšanās"
+   ]
+  },
+  "mail": {
+   "components": [
+    "E-pastu sūtīšana",
+    "SMS sūtīšana",
+    "Ziņu sagataves",
+    "Piegādes atskaites",
+    "REST API",
+    "Vadības lapa",
+    "Atrakstīšanās lapas",
+    "Plānošana"
+   ]
+  }
+ }
+}

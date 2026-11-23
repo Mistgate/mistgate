@@ -20,9 +20,6 @@ import (
 // PATH SPEED (agent.proto "PATH SPEED"): a bounded throughput test between two fleet nodes. The target opens a TCP listener
 // for one connection that starts with a one-time token; the sender moves mb MiB through it and measures. Nothing is stored.
 
-// capSpeed is listed in Hello.capabilities: the panel sends SpeedTest only to agents that have it.
-const capSpeed = "speed/1"
-
 const (
 	speedTokenSize  = 16
 	speedMinMB      = 8

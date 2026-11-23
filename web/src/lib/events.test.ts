@@ -43,6 +43,8 @@ describe("events", () => {
     expect(describeEvent(t as never, { code: "node_blip", params: { minutes: "3", rebooted: "false" } }).text).toBe("the link dropped for 3 min and came back by itself");
     expect(describeEvent(t as never, { code: "node_blip", params: { minutes: "3", rebooted: "true" } }).text).toBe("the server rebooted (3 min without a link)");
     expect(describeEvent(t as never, { code: "node_recovered", params: { minutes: "2880" } }).text).toBe("back online after 2 d");
+    expect(describeEvent(t as never, { code: "panel_link_gap", params: { seconds: "41" } }).text).toContain("the panel heard no node for 41 s");
+    expect(eventKind({ code: "panel_link_gap", severity: EventSeverity.INFO })).toBe("blip");
     expect(describeEvent(t as never, { code: "clock_skew", params: { offset_s: "4" } }).text).toBe("the server clock differs from the panel’s by 4 s");
   });
   it("words the bandwidth and tunnel-firewall fallbacks, the second one by how far it fell back", () => {

@@ -16,7 +16,7 @@ import {
 } from "@/lib/os-fleet";
 import { keyTail, pauseCode, pauseText, stepReason, type OsActions } from "@/lib/os-run";
 import type { OsRun, OsStepRow } from "@/lib/os-updates";
-import { vantageNote } from "@/lib/updates";
+import { skippedProfilesNote, vantageNote } from "@/lib/updates";
 
 // The queue of an OS update that goes through several nodes: the stages (the canary, then the batches), the state of each node,
 // why one waits ("can retry in 12 min"), and what the owner can do: pause, continue, cancel; for a stopped run, retry the node,
@@ -87,7 +87,7 @@ function Stages({ run, nowSec, skipNoteOf }: { run: OsRun; nowSec: number; /** T
                 </p>
               ))}
               {st.steps.map((s) => {
-                const v = vantageNote(t, s.nodeName, s.params, s.state === OsStepState.PASSED);
+                const v = [vantageNote(t, s.nodeName, s.params, s.state === OsStepState.PASSED), skippedProfilesNote(t, s.params)].filter(Boolean).join(" ");
                 return v ? (
                   <p key={`v-${s.nodeId}`} className="text-xs leading-snug text-pretty text-muted">
                     <b className="font-mono">{s.nodeName}</b> · {v}
@@ -254,7 +254,7 @@ export function OsFleetRun({ run, owner, actions, nowSec, askingCancel }: { run:
         )}
       </div>
       <Bar run={run} nowSec={nowSec} />
-      {phase === "cancelling" && <Notice tone="quiet">{t("osf.cancelling.text")}</Notice>}
+      {phase === "cancelling" && <Notice tone="quiet">{t("updates.pause.cancel_wait")}</Notice>}
       {culprit && <StoppedBanner run={run} step={culprit} owner={owner} actions={actions} />}
       {open && (
         <div className="border-t border-line pt-2">

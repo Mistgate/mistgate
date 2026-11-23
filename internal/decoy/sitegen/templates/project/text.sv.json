@@ -1,0 +1,498 @@
+{
+ "ui": {
+  "platforms": "Plattformar",
+  "col_name": "Namn",
+  "col_size": "Storlek",
+  "nav_label": "Huvudmeny",
+  "footer": "Utgiven under MIT-licensen.",
+  "nav_home": "Översikt",
+  "nav_changelog": "Ändringslogg",
+  "nav_install": "Installera",
+  "nav_roadmap": "Planer",
+  "home_title": "Översikt",
+  "desc_changelog": "Varje version av {brand}, med vad som ändrats i den.",
+  "desc_install": "Så installerar du {brand}: paket från din distribution, bygge från källkod och kontrollsummor för varje version.",
+  "desc_roadmap": "Vad underhållarna av {brand} arbetar med och vad som kommer sedan.",
+  "nf_title": "Sidan hittades inte",
+  "nf_text": "Sidan finns inte, eller så har den flyttats sedan förra versionen.",
+  "nf_back": "Tillbaka till översikten",
+  "features_h": "Varför {brand}",
+  "start_h": "Kom igång",
+  "latest_h": "Senaste versionen",
+  "all_releases": "Alla versioner",
+  "get_it": "Installera",
+  "read_log": "Läs ändringsloggen",
+  "changelog_h": "Ändringslogg",
+  "changelog_intro": "Varje version, den nyaste överst. Versionsnumren följer det vanliga schemat med huvudversion, delversion och patch.",
+  "released": "Utgiven",
+  "install_h": "Installera",
+  "install_intro": "{brand} levereras inte som ett färdigt program. Distributionerna paketerar det, och att bygga det från källkodsarkivet tar några minuter.",
+  "pkg_h": "Från din distribution",
+  "pkg_note": "Paketversionerna kan ligga några veckor efter den senaste versionen; tabellen längre ner visar vilken version du får i källkodsarkivet.",
+  "src_h": "Bygg från källkod",
+  "src_intro": "Du behöver en C-kompilator och make. Bygget tar ungefär en minut. Källkodsarkivet för varje version är uppkallat efter versionsnumret.",
+  "sums_h": "Versioner och kontrollsummor",
+  "sums_intro": "Varje version har ett källkodsarkiv. Kontrollera dess SHA-256-summa innan du bygger.",
+  "col_ver": "Version",
+  "col_date": "Utgiven",
+  "col_sum": "SHA-256 för källkodsarkivet",
+  "roadmap_h": "Planer",
+  "roadmap_intro": "Vad underhållarna arbetar med, ungefär i ordning. Planer ändras; ändringsloggen är det som faktiskt hände.",
+  "now_h": "Nu",
+  "next_h": "Därefter",
+  "later_h": "Senare",
+  "licence_h": "Licens",
+  "licence_p": "{brand} är fri programvara och ges ut under MIT-licensen. Använd det, ändra det och dela det.",
+  "rel_back": "Alla versioner",
+  "rel_more": "Andra versioner",
+  "rel_src_h": "Källkodsarkiv",
+  "pkgs": [
+   {
+    "s": "Debian och Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS med Homebrew"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Grus",
+       "Myr",
+       "Lykta",
+       "Dal",
+       "Glimt",
+       "Saga",
+       "Trana",
+       "Nype",
+       "Skiffer",
+       "Mossa"
+      ],
+      [
+       "vakt",
+       "svans",
+       "blick",
+       "lur",
+       "post",
+       "titt"
+      ]
+     ]
+    }
+   },
+   "tagline": "Kör ett kommando när dina filer ändras",
+   "desc": "{brand} bevakar en mapp och kör ett kommando så fort något i den ändras.",
+   "overview": "{brand} bevakar en mapp och kör ett kommando så fort något i den ändras. Det är ett litet, snabbt program för dig som är less på att spara en fil och sedan byta till ett annat fönster.",
+   "features": [
+    {
+     "h": "Snabbt att komma igång",
+     "p": "Ett kommando och ingen konfigurationsfil."
+    },
+    {
+     "h": "Vettiga standardval",
+     "p": "Hoppar över redigerarnas tillfälliga filer, versionshanteringens mappar och byggresultat."
+    },
+    {
+     "h": "Fungerar överallt",
+     "p": "Linux, macOS och Windows, med samma flaggor."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {
+     "k": "Nytt",
+     "t": "Stöd för att bevaka flera mappar samtidigt."
+    },
+    {
+     "k": "Nytt",
+     "t": "En fördröjningsflagga som väntar på ett lugnt ögonblick innan kommandot körs."
+    },
+    {
+     "k": "Nytt",
+     "t": "Färg i utskriften när terminalen klarar det."
+    },
+    {
+     "k": "Rättat",
+     "t": "En sällsynt krasch när en bevakad mapp raderades."
+    },
+    {
+     "k": "Rättat",
+     "t": "Dubbla körningar när en redigerare sparade en fil i två steg."
+    },
+    {
+     "k": "Rättat",
+     "t": "Sökvägar med mellanslag i Windows."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Standardfördröjningen är nu 200 millisekunder i stället för 50."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Ignoreringsmönster följer samma regler som de flesta verktyg för versionshantering."
+    },
+    {
+     "k": "Nytt",
+     "t": "Flaggan once som kör kommandot en enda gång och avslutar."
+    },
+    {
+     "k": "Rättat",
+     "t": "Minnesanvändning som sakta växte vid bevakning av mycket stora mappar."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Felmeddelanden anger nu vilken mapp som orsakade felet."
+    },
+    {
+     "k": "Nytt",
+     "t": "Komplettering med tabbtangenten för de vanligaste skalen."
+    }
+   ],
+   "now": [
+    "Snabbare start i stora mappar",
+    "Tydligare meddelanden när ett kommando misslyckas"
+   ],
+   "next": [
+    "En konfigurationsfil för inställningar per projekt",
+    "Paket för de vanligaste Linux-distributionerna"
+   ],
+   "later": [
+    "Ett tyst läge för användning i skript",
+    "Pålitlig bevakning av nätverksdiskar"
+   ]
+  },
+  "images": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Pixel",
+       "Kakel",
+       "Korn",
+       "Ram",
+       "Slutare",
+       "Lins",
+       "Fokus",
+       "Snitt",
+       "Sepia",
+       "Matt"
+      ],
+      [
+       "pass",
+       "klipp",
+       "krymp",
+       "packa",
+       "serie",
+       "skala"
+      ]
+     ]
+    }
+   },
+   "tagline": "Gör en hel mapp med bilder mindre i ett svep",
+   "desc": "{brand} förminskar och komprimerar bilder i bulk och låter originalen vara.",
+   "overview": "{brand} förminskar och komprimerar bilder i bulk. Peka det mot en mapp och säg hur stora du vill ha resultaten; resten sköter det själv, och originalen lämnas ifred.",
+   "features": [
+    {
+     "h": "Bulk först",
+     "p": "Hundratals filer på en gång, med alla processorkärnor."
+    },
+    {
+     "h": "Behåller originalen",
+     "p": "Resultaten hamnar i en ny mapp."
+    },
+    {
+     "h": "Förutsägbart resultat",
+     "p": "Samma indata ger alltid samma byte."
+    }
+   ],
+   "quick": "{cmd} bilder --width 1600 --out sma",
+   "changes": [
+    {
+     "k": "Nytt",
+     "t": "Stöd för WebP som utdata."
+    },
+    {
+     "k": "Nytt",
+     "t": "En kvalitetsflagga för JPEG och WebP."
+    },
+    {
+     "k": "Rättat",
+     "t": "Stående bilder som kom ut på sidan."
+    },
+    {
+     "k": "Rättat",
+     "t": "En krasch på filer utan filändelse."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Utdatafiler behåller originalets ändringsdatum."
+    },
+    {
+     "k": "Nytt",
+     "t": "En flagga för provkörning som listar vad som skulle göras."
+    },
+    {
+     "k": "Rättat",
+     "t": "Långsam förloppsvisning vid stora serier."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Lägre minnesanvändning vid förminskning av mycket stora bilder."
+    },
+    {
+     "k": "Nytt",
+     "t": "Förminskning till en högsta höjd, förutom bredd."
+    },
+    {
+     "k": "Rättat",
+     "t": "Fel färger på bilder med en inbäddad profil."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Hjälptexten innehåller nu exempel."
+    },
+    {
+     "k": "Nytt",
+     "t": "En flagga för ändelse som sätter namn på de förminskade filerna."
+    }
+   ],
+   "now": [
+    "Snabbare avkodning av JPEG",
+    "En förloppsindikator som inte är i vägen"
+   ],
+   "next": [
+    "Beskärning till ett fast bildförhållande",
+    "Paket för de vanligaste Linux-distributionerna"
+   ],
+   "later": [
+    "Stöd för animerade bilder",
+    "Ett litet förhandsvisningsläge"
+   ]
+  },
+  "markdown": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Rak",
+       "Komma",
+       "Penna",
+       "Marginal",
+       "Glans",
+       "Prosa",
+       "Utkast",
+       "Korrektur",
+       "Kern",
+       "Serif"
+      ],
+      [
+       "kolla",
+       "granska",
+       "ordna",
+       "spana",
+       "las",
+       "sopa"
+      ]
+     ]
+    }
+   },
+   "tagline": "Hitta små misstag i Markdown innan läsarna gör det",
+   "desc": "{brand} kontrollerar Markdown-filer efter trasiga länkar, hoppade rubriknivåer och andra små misstag.",
+   "overview": "{brand} kontrollerar Markdown-filer efter trasiga länkar, hoppade rubriknivåer, överblivna mellanslag och allt annat smått som får ett dokument att se slarvigt ut. Det går igenom en hel dokumentationsmapp på en sekund.",
+   "features": [
+    {
+     "h": "Snabbt",
+     "p": "Tusen filer på ungefär en sekund."
+    },
+    {
+     "h": "Lugnt",
+     "p": "Rapporterar bara det som det är säkert på."
+    },
+    {
+     "h": "Går att ställa in",
+     "p": "Stäng av vilken regel som helst, eller gör den strängare."
+    }
+   ],
+   "quick": "{cmd} docs/",
+   "changes": [
+    {
+     "k": "Nytt",
+     "t": "En regel för rubriker som hoppar över en nivå."
+    },
+    {
+     "k": "Nytt",
+     "t": "En regel för länkar som pekar på filer som saknas."
+    },
+    {
+     "k": "Rättat",
+     "t": "Felaktiga rapporter för länkar med ankare."
+    },
+    {
+     "k": "Rättat",
+     "t": "En krasch på filer med byteordningsmärke."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Rapporterna sorteras nu efter fil och rad."
+    },
+    {
+     "k": "Nytt",
+     "t": "En flagga som rättar enkla problem automatiskt."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Regelnamnen är kortare och lättare att skriva."
+    },
+    {
+     "k": "Rättat",
+     "t": "Fel radnummer efter front matter."
+    },
+    {
+     "k": "Nytt",
+     "t": "Utdata som JSON för användning i andra verktyg."
+    },
+    {
+     "k": "Rättat",
+     "t": "Långsam kontroll av mycket långa rader."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Konfigurationsfilen kan nu ligga i vilken överliggande mapp som helst."
+    },
+    {
+     "k": "Nytt",
+     "t": "En regel för upprepade ord."
+    }
+   ],
+   "now": [
+    "Fler regler för tabeller",
+    "Bättre stöd för front matter"
+   ],
+   "next": [
+    "Kontroll av länkar till rubriker i andra dokument",
+    "Ett tilläggsgränssnitt för egna regler"
+   ],
+   "later": [
+    "Integration med redigerare",
+    "Översättningar av meddelandena"
+   ]
+  },
+  "backup": {
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Vind",
+       "Hylla",
+       "Lada",
+       "Kista",
+       "Skafferi",
+       "Koffert",
+       "Kappsack",
+       "Forrad",
+       "Valv",
+       "Pall"
+      ],
+      [
+       "kopia",
+       "spara",
+       "gom",
+       "lagra",
+       "spegel",
+       "arkiv"
+      ]
+     ]
+    }
+   },
+   "tagline": "Enkla, pålitliga säkerhetskopior av en mapp",
+   "desc": "{brand} kopierar en mapp till ett annat ställe och sparar äldre versioner som vanliga filer.",
+   "overview": "{brand} kopierar en mapp till ett annat ställe och sparar äldre versioner, så att ett misstag från i tisdags fortfarande går att ångra. Säkerhetskopiorna är vanliga filer som du kan öppna utan {brand}.",
+   "features": [
+    {
+     "h": "Vanliga filer",
+     "p": "Inget särskilt format som du måste låsa upp senare."
+    },
+    {
+     "h": "Versioner",
+     "p": "Spara så många ögonblicksbilder du vill."
+    },
+    {
+     "h": "Kontrollerar sig själv",
+     "p": "Kommandot verify jämför en säkerhetskopia med källan."
+    }
+   ],
+   "quick": "{cmd} anteckningar /backup/anteckningar",
+   "changes": [
+    {
+     "k": "Nytt",
+     "t": "Ett kommando verify som jämför en säkerhetskopia med källan."
+    },
+    {
+     "k": "Nytt",
+     "t": "Ögonblicksbilder kan sparas i ett antal dagar eller som ett antal kopior."
+    },
+    {
+     "k": "Rättat",
+     "t": "Filer som ändrades under en säkerhetskopiering och kopierades två gånger."
+    },
+    {
+     "k": "Rättat",
+     "t": "Fel rättigheter på återställda filer."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Oförändrade filer kopieras inte om längre."
+    },
+    {
+     "k": "Nytt",
+     "t": "Ett kommando restore med provkörningsläge."
+    },
+    {
+     "k": "Rättat",
+     "t": "En krasch i mappar med mycket långa sökvägar."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Förloppet visas bara när utdata går till en terminal."
+    },
+    {
+     "k": "Nytt",
+     "t": "Ett kommando list som visar ögonblicksbilderna i en säkerhetskopia."
+    },
+    {
+     "k": "Rättat",
+     "t": "Säkerhetskopior till nätverksdiskar som avbröts efter en timeout."
+    },
+    {
+     "k": "Ändrat",
+     "t": "Ögonblicksbilder namnges efter datum i stället för nummer."
+    },
+    {
+     "k": "Nytt",
+     "t": "En flagga för att utelämna filer efter mönster."
+    }
+   ],
+   "now": [
+    "Snabbare kopiering av många små filer",
+    "En tydligare rapport från verify"
+   ],
+   "next": [
+    "Kryptering av säkerhetskopior i vila",
+    "Säkerhetskopiering till en andra plats i ett steg"
+   ],
+   "later": [
+    "Ett grafiskt verktyg för återställning",
+    "Inbyggd schemaläggning"
+   ]
+  }
+ }
+}

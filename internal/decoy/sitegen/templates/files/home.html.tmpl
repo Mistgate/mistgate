@@ -1,0 +1,69 @@
+{{define "dropzone"}}<div class="__dz__">
+<span class="__tag__">{{.V.limit}}</span>
+<div class="__drop__" id="__d__" tabindex="0" role="button" aria-label="{{.L.drop_h}}">
+{{template "stack" .}}
+<strong class="__dh__">{{.L.drop_h}}</strong>
+<span class="__dhint__">{{.L.drop_hint}}</span>
+<button class="__btn__ __pk__" id="__pick__" type="button">{{icon "upload"}}{{.L.pick}}</button>
+<input type="file" id="__in__" hidden>
+</div>
+<div class="__state__" id="__s__" role="status" hidden>
+<div class="__fileline__"><span class="__fname__" id="__fn__"></span><span class="__fsize__" id="__fz__"></span></div>
+<div class="__bar__"><i id="__bi__"></i></div>
+<p class="__msg__" id="__m__"></p>
+<button class="__btn__ __ghost__" id="__again__" type="button" hidden>{{.L.retry}}</button>
+</div>
+</div>
+{{end}}
+{{define "b_feat"}}<section class="__wrap__ __feats__">
+{{range .L.feats}}<div class="__ft__ __bx__"><span class="__fi__">{{icon .icon}}</span><h3>{{.h}}</h3><p>{{.p}}</p></div>
+{{end}}</section>{{end}}
+{{define "b_steps"}}<section class="__band__">
+<div class="__wrap__">
+<div class="__sh__"><h2>{{.L.how_h}}</h2><p>{{.L.how_intro}}</p></div>
+<ol class="__steps__">{{range $i, $s := .L.steps}}<li class="__sc__"><b>{{add $i 1}}</b><h3>{{$s.h}}</h3><p>{{$s.p}}</p></li>
+{{end}}</ol>
+<p class="__morep__"><a class="__btn__ __ghost__ __inv__" href="{{(index .Nav 1).Href}}">{{.L.nav_how}}{{icon "arrow"}}</a></p>
+</div>
+</section>{{end}}
+{{define "b_limits"}}<section class="__wrap__ __lim__">
+<div>
+<div class="__sh2__"><h2>{{.L.limits_h}}</h2><p>{{.L.limits_intro}}</p></div>
+<div class="__big__">{{range $i, $l := .L.limits}}{{if lt $i 2}}<div class="__bx__ __bg__"><b>{{$l.v}}</b><span>{{$l.k}}</span></div>{{end}}{{end}}</div>
+<div class="__tbx__ __bx__"><table><tbody>{{range $i, $l := .L.limits}}{{if ge $i 2}}<tr><th scope="row">{{$l.k}}</th><td>{{$l.v}}</td></tr>{{end}}{{end}}</tbody></table></div>
+</div>
+<div>
+<div class="__sh2__"><h2>{{.L.faq_h}}</h2></div>
+{{range $i, $f := .L.faq}}<details class="__qa__"{{if eq $i 0}} open{{end}}><summary>{{$f.q}}<i></i></summary><p>{{$f.a}}</p></details>
+{{end}}</div>
+</section>{{end}}
+{{define "hero_txt"}}<span class="__sticker__">{{.L.kicker}}</span>
+<h1>{{$w := lastword .L.hero_h}}{{$w.head}}<span class="__mk__">{{$w.last}}</span>{{$w.end}}</h1>
+<p class="__lead__">{{.L.hero_p}}</p>{{end}}
+{{template "head" .}}<body>
+{{template "header" .}}
+<main>
+{{if eq .Layout 0}}<section class="__wrap__ __hero__">
+<div class="__ht__">{{template "hero_txt" .}}
+<span class="__fine__">{{.L.footer}}</span></div>
+{{template "dropzone" .}}
+</section>
+{{else if eq .Layout 1}}<section class="__wrap__ __hero__ __hc__">
+<div class="__ht__">{{template "hero_txt" .}}</div>
+{{template "dropzone" .}}
+<span class="__fine__">{{.L.footer}}</span>
+</section>
+{{else}}<section class="__hb__">
+<div class="__wrap__ __hero__">
+{{template "dropzone" .}}
+<div class="__ht__">{{template "hero_txt" .}}
+{{if hasphoto "cover" 560 400}}<figure class="__pol__">{{photo "cover" "" 560 400}}</figure>
+{{end}}<span class="__fine__">{{.L.footer}}</span></div>
+</div>
+</section>
+{{end}}{{range .Order}}{{blk . $}}{{end}}
+</main>
+{{template "footer" .}}
+<script src="{{.JS}}" defer></script>
+</body>
+</html>

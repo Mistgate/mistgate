@@ -1,0 +1,102 @@
+{
+ "nav_label": "Menu główne",
+ "toc_h": "Na tej stronie",
+ "nf_title": "Nie znaleziono strony",
+ "nf_text": "Strona, której szukasz, nie istnieje albo została przeniesiona.",
+ "nf_back": "Wróć na stronę główną",
+ "months": [
+  "styczeń",
+  "luty",
+  "marzec",
+  "kwiecień",
+  "maj",
+  "czerwiec",
+  "lipiec",
+  "sierpień",
+  "wrzesień",
+  "październik",
+  "listopad",
+  "grudzień"
+ ],
+ "months_gen": [
+  "stycznia",
+  "lutego",
+  "marca",
+  "kwietnia",
+  "maja",
+  "czerwca",
+  "lipca",
+  "sierpnia",
+  "września",
+  "października",
+  "listopada",
+  "grudnia"
+ ],
+ "weekdays": [
+  "Poniedziałek",
+  "Wtorek",
+  "Środa",
+  "Czwartek",
+  "Piątek",
+  "Sobota",
+  "Niedziela"
+ ],
+ "weekdays_short": [
+  "Pn",
+  "Wt",
+  "Śr",
+  "Cz",
+  "Pt",
+  "So",
+  "Nd"
+ ],
+ "am": "rano",
+ "pm": "po południu",
+ "closed": "nieczynne",
+ "hrs_fmt": "%days%: %time%",
+ "ms": "ms",
+ "units": [
+  "B",
+  "KB",
+  "MB"
+ ],
+ "cf_h": "Napisz do nas",
+ "cf_intro": "Wyślij nam wiadomość, odpowiemy najszybciej, jak się da.",
+ "cf_name": "Imię i nazwisko",
+ "cf_email": "Adres e-mail",
+ "cf_msg": "Wiadomość",
+ "cf_send": "Wyślij wiadomość",
+ "cf_busy": "Wysyłanie…",
+ "cf_empty": "Najpierw napisz wiadomość.",
+ "cf_fail": "Nie udało się wysłać wiadomości. Spróbuj ponownie później.",
+ "nav_terms": "Regulamin",
+ "desc_terms": "Regulamin korzystania z serwisu {brand}.",
+ "terms_h": "Regulamin",
+ "terms_intro": "Przeczytaj ten regulamin, zanim zaczniesz korzystać z serwisu {brand}. Jest krótki i obowiązuje od pierwszego użycia.",
+ "terms": [
+  {
+   "h": "Korzystanie z serwisu",
+   "p": "Serwis {brand} udostępniamy w takiej postaci, w jakiej jest. Korzystając z niego, akceptujesz ten regulamin. Jeśli się z nim nie zgadzasz, nie korzystaj z serwisu."
+  },
+  {
+   "h": "Twoje obowiązki",
+   "p": "Korzystaj z serwisu zgodnie z prawem i tylko na własny użytek albo użytek swojej organizacji. Nie udostępniaj nikomu swoich danych dostępowych, a jeśli podejrzewasz, że ktoś je zna, daj nam znać."
+  },
+  {
+   "h": "Czego nie wolno",
+   "p": "Nie wolno zakłócać pracy serwisu, przeciążać go ani wchodzić do miejsc, które nie są dla Ciebie przeznaczone. Możemy zablokować dostęp, który szkodzi innym."
+  },
+  {
+   "h": "Dostępność",
+   "p": "Staramy się, żeby serwis działał, ale nie możemy obiecać, że będzie dostępny zawsze. Możemy zmieniać, wstrzymywać lub kończyć niektóre jego części."
+  },
+  {
+   "h": "Odpowiedzialność",
+   "p": "W granicach, na jakie pozwala prawo, nie odpowiadamy za straty wynikające z korzystania z serwisu ani z braku możliwości skorzystania z niego."
+  },
+  {
+   "h": "Zmiany",
+   "p": "Możemy od czasu do czasu zmienić ten regulamin. Jeśli po zmianie nadal korzystasz z serwisu, przyjmujesz nowe zasady."
+  }
+ ]
+}

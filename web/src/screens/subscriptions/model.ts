@@ -95,8 +95,11 @@ export function dnsChips(items: readonly { category: DnsCategory; country: strin
 }
 /** The country of a regional chip ("CN"), "" for any other chip. */
 export const chipCountry = (chip: string): string => (chip.startsWith(`${DnsCategory.REGIONAL}:`) ? chip.slice(chip.indexOf(":") + 1) : "");
+/** A rule's geo list holds a site category alone as "geosite:<name>" (internal/panel/dns/geo.go). */
+const geositePrefix = "geosite:";
 /** A country by its code ("cn", "IR") in the UI language: the panel's own word for Russia and China, else the browser's, else the code. */
 export function countryName(code: string, t: Tx): string {
+  if (code.startsWith(geositePrefix)) return code; // a site category, not a country: the subtitle names it as written
   const c = code.toUpperCase();
   const key = countryKey[c];
   if (key) return t(key);
@@ -115,12 +118,26 @@ export function chipLabel(chip: string, t: Tx): string {
 }
 
 /**
- * The country lists the split-rule editor offers: China only, the one with a built-in preset and resolvers checked from
+ * The country lists the split-rule editor offers: China and Russia, the ones with a built-in preset and resolvers checked from
  * inside the country. The panel knows "ir" too (internal/panel/dns/geo.go); a rule that already holds it, or any other
  * code, shows it as well so it can be seen and turned off.
  */
-const geoOffered = ["cn"];
-export const geoChoices = (have: readonly string[]): string[] => [...new Set([...geoOffered, ...have])];
+const geoOffered = ["cn", "ru"];
+export const geoChoices = (have: readonly string[]): string[] => [...new Set([...geoOffered, ...have.filter((g) => !g.startsWith(geositePrefix))])];
+/** The category names of a rule ("telegram" for "geosite:telegram"). */
+export const geoCategories = (geo: readonly string[]): string[] => geo.filter((g) => g.startsWith(geositePrefix)).map((g) => g.slice(geositePrefix.length));
+// The form the panel checks: lower-case letters and digits, then also - ! @, at most 64. A name the lists do not hold is not caught here or there.
+const categoryRe = /^[a-z0-9][a-z0-9!@-]{0,63}$/;
+/** Categories typed in one go, separated by commas, semicolons or spaces, lower-cased, with or without the "geosite:" in front: the well-formed ones and the rest. */
+export function parseCategories(text: string): { ok: string[]; bad: string[] } {
+  const tokens = [...new Set(text.toLowerCase().split(/[\s,;]+/).filter(Boolean))];
+  const name = (n: string) => (n.startsWith(geositePrefix) ? n.slice(geositePrefix.length) : n);
+  return { ok: [...new Set(tokens.map(name).filter((n) => categoryRe.test(n)))], bad: tokens.filter((n) => !categoryRe.test(name(n))) };
+}
+/** The geo list of a rule with these category names added (the ones it has already are not repeated). */
+export const addCategories = (geo: readonly string[], names: readonly string[]): string[] => [...geo, ...names.filter((n) => !geo.includes(geositePrefix + n)).map((n) => geositePrefix + n)];
+/** The geo list of a rule without this category. */
+export const removeCategory = (geo: readonly string[], name: string): string[] => geo.filter((g) => g !== geositePrefix + name);
 /** The country lists of a rule with `code` switched on (added at the end) or off; the others keep their order. */
 export const toggleGeo = (geo: readonly string[], code: string): string[] => (geo.includes(code) ? geo.filter((g) => g !== code) : [...geo, code]);
 
@@ -544,10 +561,12 @@ export function shortAddress(kind: DnsServerKind, address: string): string {
 
 // The built-in presets have one stored name (Russian). Any other UI language shows these while the stored name is still
 // the stock one; a name an admin edited is shown as stored. The Chinese names are the ones the user page shows
-// (internal/panel/dns/node.go builtinNames). The Persian ".ru" starts with a left-to-right mark: a leading dot would
-// otherwise take the right-to-left side of the Persian around it.
-const builtinNames: Record<string, { ru: string; en: string; zh: string; fa: string; tr: string }> = {
+// (internal/panel/dns/node.go builtinNames); model.test.ts holds both to internal/panel/dns/testdata/builtin_names.json.
+// The Persian ".ru" starts with a left-to-right mark: a leading dot would otherwise take the right-to-left side of the
+// Persian around it.
+export const builtinNames: Record<string, { ru: string; en: string; zh: string; fa: string; tr: string }> = {
   dns_builtin_ru_split: { ru: "Россия: .ru напрямую", en: "Russia: .ru direct", zh: "俄罗斯：.ru 直连", fa: "روسیه: \u200E.ru مستقیم", tr: "Rusya: .ru doğrudan" },
+  dns_builtin_ru_geo: { ru: "Россия: российские сайты напрямую (список сообщества)", en: "Russia: Russian sites direct (community list)", zh: "俄罗斯：俄罗斯网站直连（社区列表）", fa: "روسیه: سایت‌های روسی مستقیم (فهرست جامعه)", tr: "Rusya: Rus siteleri doğrudan (topluluk listesi)" },
   dns_builtin_ru_proxied: { ru: "Россия: всё через VPN", en: "Russia: all through VPN", zh: "俄罗斯：全部经 VPN", fa: "روسیه: همه‌چیز از راه VPN", tr: "Rusya: her şey VPN üzerinden" },
   dns_builtin_cn_split: { ru: "Китай: китайские сайты напрямую", en: "China: Chinese sites direct", zh: "中国：国内网站直连", fa: "چین: سایت‌های چینی مستقیم", tr: "Çin: Çin siteleri doğrudan" },
   dns_builtin_standard: { ru: "Cloudflare + Google", en: "Cloudflare + Google", zh: "Cloudflare + Google", fa: "Cloudflare + Google", tr: "Cloudflare + Google" },

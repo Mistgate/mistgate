@@ -8,14 +8,9 @@ import (
 	"sort"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/buildinfo"
 	"github.com/mistgate/mistgate/internal/panel/store"
-)
-
-// Capabilities of an agent that matter here (agent.proto "UPDATE").
-const (
-	capUpdate = "update/1"
-	capGuard  = "update-guard/1"
 )
 
 // refBuilt is the build a node is compared with: the trusted bundle's, else this panel's own, so the page is useful
@@ -29,7 +24,7 @@ func (s *Service) refBuilt(b *bundleState) int64 {
 
 // nodeState picks the first state whose condition applies. updating: the node has a SENT or GATING step.
 func nodeState(n store.NodeRow, connected, updating bool, ref int64) adminv1.NodeUpdateState {
-	return nodeStateForCap(n, connected, updating, ref, capUpdate)
+	return nodeStateForCap(n, connected, updating, ref, agentcap.Update)
 }
 
 func nodeStateForCap(n store.NodeRow, connected, updating bool, ref int64, updateCap string) adminv1.NodeUpdateState {
@@ -142,11 +137,11 @@ func (s *Service) OutdatedAgents(ctx context.Context) (version string, names []s
 func (v nodeView) proto() *adminv1.NodeUpdate {
 	updateCap := v.updateCap
 	if updateCap == "" {
-		updateCap = capUpdate
+		updateCap = agentcap.Update
 	}
 	m := &adminv1.NodeUpdate{
 		NodeId: v.row.ID, Name: v.row.Name, Version: v.row.AgentVersion, Built: v.row.AgentBuilt,
-		SupportsUpdate: slices.Contains(v.row.AgentCaps, updateCap), CrashGuard: slices.Contains(v.row.AgentCaps, capGuard),
+		SupportsUpdate: slices.Contains(v.row.AgentCaps, updateCap), CrashGuard: slices.Contains(v.row.AgentCaps, agentcap.UpdateGuard),
 		State: v.state, Inbounds: uint32(v.inbounds), OnlineUsers: uint32(v.online), Address: v.row.Address, Arch: v.arch,
 	}
 	if lu, ok := currentLastUpdate(v.row); ok {

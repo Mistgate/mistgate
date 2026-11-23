@@ -1,0 +1,148 @@
+{
+ "ui": {
+  "vars": {
+   "brand": {
+    "join": [
+     [
+      "Alder",
+      "Linden",
+      "Cedar",
+      "Harbor",
+      "Marlow",
+      "Birch",
+      "Elm",
+      "Willow",
+      "Fern",
+      "Oak",
+      "Rowan",
+      "Hazel"
+     ],
+     [
+      "point",
+      "gate",
+      "field",
+      "line",
+      "bridge",
+      "well",
+      "stone",
+      "view",
+      "rise",
+      "wick"
+     ]
+    ]
+   }
+  },
+  "nav_label": "Main",
+  "tagline": "Secure account access",
+  "footer": "All rights reserved.",
+  "nav_home": "Sign in",
+  "nav_help": "Help",
+  "nav_privacy": "Privacy",
+  "home_title": "Sign in",
+  "desc": "Sign in to your {brand} account.",
+  "desc_help": "Help with signing in to {brand}.",
+  "desc_privacy": "How {brand} handles your information.",
+  "nf_title": "Page not found",
+  "nf_text": "The page you were looking for does not exist or has moved.",
+  "nf_back": "Back to sign in",
+  "f_user": "Username or email",
+  "f_pass": "Password",
+  "f_remember": "Keep me signed in",
+  "f_forgot": "Forgot password?",
+  "f_submit": "Sign in",
+  "f_busy": "Signing in…",
+  "e_empty": "Enter your username and password.",
+  "e_bad": [
+   "Incorrect username or password.",
+   "The username or password you entered is not correct. Please try again.",
+   "We could not sign you in with those details."
+  ],
+  "help_h": "Trouble signing in?",
+  "help_intro": "Most sign-in problems have a simple cause. Work through these steps before you contact anyone.",
+  "help_steps": [
+   "Check that Caps Lock is off; passwords are case sensitive.",
+   "Look for a stray space at the start or end of your username.",
+   "Try again in a new browser window with no saved form data.",
+   "Wait ten minutes if you have tried several times without success."
+  ],
+  "help_contact_h": "Still stuck?",
+  "help_contact": "Ask the person who manages {brand} for your organisation to reset your password. For security reasons we cannot reset it over the phone or by email.",
+  "help_back": "Back to sign in",
+  "privacy_h": "Privacy notice",
+  "privacy_intro": "We keep as little about you as we can and look after what we keep. This is a short account of what that is and why.",
+  "privacy": [
+   {
+    "h": "What we keep",
+    "p": "Your username, the times you signed in and the details that belong to your account. Nothing else."
+   },
+   {
+    "h": "What we use it for",
+    "p": "To let you sign in and to protect your account from anyone else. We do not sell information about our users."
+   },
+   {
+    "h": "Cookies",
+    "p": "We use only the cookies the service needs in order to work. There are no advertising or analytics cookies."
+   },
+   {
+    "h": "Your rights",
+    "p": "You can ask to see, correct or delete the information we hold about you. Ask the person who manages your account."
+   }
+  ]
+ },
+ "bundles": {
+  "customer": {
+   "kicker": "Customer account",
+   "welcome": "Welcome back",
+   "lead": "Sign in to see your invoices, update your details and manage your plan.",
+   "bullets": [
+    "View and download invoices",
+    "Update your contact details",
+    "Follow open requests"
+   ]
+  },
+  "staff": {
+   "kicker": "Staff area",
+   "welcome": "Staff sign-in",
+   "lead": "Use your work account to reach rotas, notices and shared documents.",
+   "bullets": [
+    "Shifts and rotas",
+    "Notices for the team",
+    "Shared documents"
+   ],
+   "f_user": "Employee ID or email"
+  },
+  "learning": {
+   "kicker": "Learning space",
+   "welcome": "Sign in to your class space",
+   "lead": "Pupils, parents and teachers sign in here to find timetables, homework and messages.",
+   "bullets": [
+    "Timetables and homework",
+    "Messages from teachers",
+    "Term dates and trips"
+   ],
+   "f_user": "Username"
+  },
+  "archive": {
+   "kicker": "Document archive",
+   "welcome": "Open your archive",
+   "lead": "Contracts, receipts and letters are kept here for you, and kept private.",
+   "bullets": [
+    "Contracts and receipts",
+    "Letters in one place",
+    "Access that you control"
+   ],
+   "f_user": "Email address"
+  },
+  "bookings": {
+   "kicker": "Bookings",
+   "welcome": "Manage your bookings",
+   "lead": "Sign in to change a reservation, add guests or see what is coming up.",
+   "bullets": [
+    "Change or cancel a booking",
+    "Add guests",
+    "See upcoming dates"
+   ],
+   "f_user": "Booking email"
+  }
+ }
+}

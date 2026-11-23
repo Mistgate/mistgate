@@ -369,7 +369,6 @@ export function NodesPage() {
               allShown={false}
               total={4}
               avail={avail}
-              agentOff={false}
               busy={state === "job-running"}
               job={bar(state)}
               rows={bar(state).rows}

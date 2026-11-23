@@ -72,6 +72,8 @@ What to set on the CDN:
 5. **Origin certificate**: the origin is always TLS, never plain HTTP, because the VLESS header would cross the network in the clear. Let's Encrypt works when the CDN checks the origin's certificate. A self-signed certificate works only if the CDN is set not to verify it, and Mistgate allows it only for a profile that has a CDN host.
 6. **Origin port**: some CDNs forward only to a fixed list of ports. Use one the CDN supports (443 is the safe choice).
 
+Check separately how the CDN passes a long answer. XHTTP receives its data in one long GET, and a CDN that holds the answer back until the origin sends the next piece looks like this: the connection is there, and pages hang after five to ten seconds. According to user reports CDNvideo and the Selectel CDN behave this way, while Yandex Cloud CDN works; we have not tested these CDNs ourselves. If you see such a hang, try the WebSocket transport on the same CDN, or another CDN.
+
 If XHTTP stalls, the CDN may be holding whole request bodies: keep **Packet up**. If it still does not work, make a second profile with WebSocket; people then see both. Against a CDN that cuts idle connections after 60 to 100 seconds, the node sends keep-alive padding on a quiet download; that has not been checked against a real CDN either.
 
 > **Note:** real CDNs are not tested yet. The whole path, from a client through the node's TLS front to the internet, is tested in the project's end-to-end run, with the node itself standing in for the CDN. How a particular CDN treats long downloads, request sizes and idle connections is not known until someone tries it.

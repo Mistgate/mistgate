@@ -1,0 +1,195 @@
+{
+ "ui": {
+  "nav_label": "Menüü",
+  "footer": "Tehtud käsitsi. Küpsiseid ega jälgimist ei ole.",
+  "nav_home": "Visiitkaart",
+  "nav_about": "Minust",
+  "nav_projects": "Tööd",
+  "nav_now": "Praegu",
+  "home_title": "Tere",
+  "desc_about": "Rohkem infot: {brand}.",
+  "desc_projects": "Valitud tööd: {brand}.",
+  "desc_now": "Millega {brand} praegu tegeleb.",
+  "nf_title": "Siin ei ole midagi",
+  "nf_text": "Sellel aadressil ei ole lehte. Proovi visiitkaarti avalehel.",
+  "nf_back": "Tagasi visiitkaardi juurde",
+  "link_d": [
+   "Kes ma olen ja kuidas ma töötan",
+   "Mõned asjad, mille olen teinud",
+   "Millega ma praegu tegelen"
+  ],
+  "about_h": "Minust",
+  "facts_h": "Lühidalt",
+  "projects_h": "Tööd",
+  "projects_intro": "Mõned asjad, mille üle olen rõõmus, uuemad eespool.",
+  "now_h": "Praegu",
+  "updated": "Uuendatud {upd} 2026",
+  "now_intro": "See on lehekülg „praegu“: millega ma praegu tegelen, mitte see, mida ma kunagi tegema lubasin.",
+  "hello": "Tere, mina olen",
+  "vars": {
+   "brand": "{name}",
+   "month": [
+    "jaanuarist",
+    "märtsist",
+    "maist",
+    "septembrist"
+   ],
+   "upd": [
+    "augustil",
+    "septembril",
+    "oktoobril",
+    "novembril"
+   ]
+  }
+ },
+ "bundles": {
+  "illustrator": {
+   "role": "Illustraator ja trükigraafik",
+   "tagline": "Pildid raamatutele, plakatitele ja aeg-ajalt sünnipäevakaardile.",
+   "desc": "{brand}: illustraator ja trükigraafik {city_in}. Pildiraamatud, plakatid ja linoollõiked.",
+   "bio": "Joonistan pilte pildiraamatutele ja plakatitele ning lõikan linoolist kõigile, kes viisakalt paluvad.",
+   "about": [
+    "Joonistan elatise teenimiseks, enamasti pildiraamatutele ja aeg-ajalt plakatile. Töötan väikeses toas {city_in}, mille aken vaatab parklale, mida joonistan nagu järve.",
+    "Enne illustratsiooni õppisin tekstiilitrükki ja harjumus mõelda kihtidena ei ole kunagi päris kadunud. Enamik minu pilte on ehitatud kolmest või neljast tasapinnalisest värvist."
+   ],
+   "facts": [
+    "Elan {city_in}",
+    "Töötan pliiatsi, tindi ja linoolõikega",
+    "Uusi tellimusi võtan vastu alates {month}"
+   ],
+   "projects": [
+    {
+     "t": "Märkmeid väljalt",
+     "y": "2025",
+     "d": "Pildiraamat aastast ühel väikesel põllul, tehtud koos kohaliku kirjastusega."
+    },
+    {
+     "t": "Turusari",
+     "y": "2024",
+     "d": "Kaksteist linoollõiget letitest, ostjatest ja ühest väga rahulolevast tuvist."
+    },
+    {
+     "t": "Sünnipäevakaardid raamatupoele",
+     "y": "2023",
+     "d": "Kuus kaarti, trükitud käsitsi kahesaja eksemplari kaupa."
+    }
+   ],
+   "now": [
+    "Viimistlen ilma kohta käiva pildiraamatu viimaseid lehepaare",
+    "Õpin lõikama neljavärvilist linoollõiket ilma tuju kaotamata",
+    "Otsin suuremat pressi"
+   ]
+  },
+  "translator": {
+   "role": "Tõlkija, saksa keelest eesti keelde",
+   "tagline": "Hoolikad tõlked ilukirjandusest, esseedest ja aeg-ajalt kasutusjuhendist.",
+   "desc": "{brand}: saksa keelest eesti keelde tõlkija, kes töötab {city_in} ilukirjanduse ja esseedega.",
+   "bio": "Tõlgin saksa keelest eesti keelde, enamasti ilukirjandust ja esseid, ning loen kõike kaks korda valjusti.",
+   "about": [
+    "Tõlgin saksa keelest eesti keelde, enamasti ilukirjandust ja esseid, ning vahel mõne asja kasutusjuhendi, mis väärib paremat kirjutamist.",
+    "Töötan aeglaselt, loen kõike kaks korda valjusti ja saadan märkuse iga lause kohta, milles ma ei osanud otsustada. Toimetajad ütlevad, et see on kas sümpaatne või ajab hulluks."
+   ],
+   "facts": [
+    "Elan {city_in}",
+    "Tõlgin saksa keelest eesti keelde",
+    "Uusi töid võtan vastu alates {month}"
+   ],
+   "projects": [
+    {
+     "t": "Romaan tuletornivahist",
+     "y": "2025",
+     "d": "Neli sada lehekülge ilma ja kahetsust, tõlgitud neljateistkümne kuu jooksul."
+    },
+    {
+     "t": "Esseed kõndimisest",
+     "y": "2024",
+     "d": "Lühikeste tekstide kogumik kirjanikult, kes käis kõikjale jala."
+    },
+    {
+     "t": "Muuseumikataloog",
+     "y": "2023",
+     "d": "Tekstid tekstiilinäitusele, rohkemate omadussõnadega, kui ise oleksin valinud."
+    }
+   ],
+   "now": [
+    "Parandan pika romaani tõlget",
+    "Loen esseid, mida võiksin kirjastusele soovitada",
+    "Uuendan oma merendussõnastikku"
+   ]
+  },
+  "potter": {
+   "role": "Pottsepp",
+   "tagline": "Lihtsad kausid, kruusid ja taldrikud, tehtud väikeste partiidena.",
+   "desc": "{brand}: pottsepp {city_in}. Igapäevane kivisavinõu, vormitud kettal.",
+   "bio": "Vormin lihtsat kivisavinõu kettal ja põletan seda väikeste partiidena.",
+   "about": [
+    "Teen kasutuskeraamikat töökojas, mida jagan kolme teise meistriga {city_in}. Kõik on vormitud kettal ja põletatud kivisaviks.",
+    "Mulle meeldivad potid, mis kaovad igapäevasesse kasutusse: kruus, mis sobib kätte, kauss, mis ei kaldu. Glasuurid on enamasti raua- ja tuhapõhised ning muutuvad igal põletusel veidi."
+   ],
+   "facts": [
+    "Elan {city_in}",
+    "Vormin kivisavinõusid kettal",
+    "Uusi potte valmib alates {month}"
+   ],
+   "projects": [
+    {
+     "t": "Igapäevane komplekt",
+     "y": "2025",
+     "d": "Taldrikud, kausid ja kruusid kaerahelbevärvi glasuuris, mis ei tulnud kunagi kaks korda ühesugune."
+    },
+    {
+     "t": "Teekausid",
+     "y": "2024",
+     "d": "Kolmkümmend väikest kaussi, igaüks veidi erinev, tehtud teemaja jaoks."
+    },
+    {
+     "t": "Kahhelplaatide tellimus",
+     "y": "2023",
+     "d": "Käsitsi pressitud plaatidest sein köögi jaoks, nelja rohelise varjundiga."
+    }
+   ],
+   "now": [
+    "Katsetan naabri lõkkest saadud tuhaglasuuri",
+    "Vormin suuremaid taldrikuid",
+    "Teen ahjuriiulitel ruumi talvistele tellimustele"
+   ]
+  },
+  "developer": {
+   "role": "Tarkvaraarendaja, väikesed tööriistad",
+   "tagline": "Väikesed vaiksed programmid, mis teevad ühte asja ega aja segadust.",
+   "desc": "{brand}: väikeste tööriistade arendaja {city_in}. Märkmete rakendus, kalender ja mõned käsurea programmid.",
+   "bio": "Kirjutan väikesi tööriistu inimestele, kes töötavad sõnade ja numbritega, ning püüan need valmis saata.",
+   "about": [
+    "Kirjutan väikesi tööriistu inimestele, kes töötavad sõnade ja numbritega: märkmete rakendus, mõned käsurea programmid ja kalender, mis näitab ainult seda, mis täna loeb.",
+    "Ehitan asju aeglaselt ja püüan need valmis saata. Enamikul sellest, mida teen, on vähem funktsioone, kui võiks olla, ja see on meelega."
+   ],
+   "facts": [
+    "Elan {city_in}",
+    "Kirjutan mõnes igavas keeles",
+    "Vaba väikesteks töödeks alates {month}"
+   ],
+   "projects": [
+    {
+     "t": "Märkmete rakendus lauaarvutile",
+     "y": "2025",
+     "d": "Lihtsad tekstifailid, kiire otsing ja konto ei ole vaja."
+    },
+    {
+     "t": "Kalender ühe päeva jaoks",
+     "y": "2024",
+     "d": "Näitab tänast päeva ja mitte midagi muud, mis osutub piisavaks."
+    },
+    {
+     "t": "Ajajälgija",
+     "y": "2023",
+     "d": "Üks nupp ja nädalakokkuvõte neile, kes ei salli tööaja tabeleid."
+    }
+   ],
+   "now": [
+    "Korrastan märkmete rakenduse koodi",
+    "Kirjutan lühikese juhendi",
+    "Mõtlen kõige väiksemale versioonile"
+   ]
+  }
+ }
+}

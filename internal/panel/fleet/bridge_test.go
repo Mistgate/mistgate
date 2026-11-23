@@ -12,6 +12,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	nodebridge "github.com/mistgate/mistgate/internal/node/bridge"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -159,11 +160,11 @@ func TestBridgeFieldsReachOnlyAgentsThatListTheCapability(t *testing.T) {
 	x.reverseRelay("rly_a", relayInbound, 8443, store.RelayModeReverse)
 
 	// Both ends list relay-forward/1 only: a reverse way is the DNAT forward it was, and nothing of the bridge is sent.
-	_, em, eds := connectCaps(x.exit, "exit-old", plugin.CapRelayForward, capVLESSTLS)
+	_, em, eds := connectCaps(x.exit, "exit-old", agentcap.RelayForward, agentcap.VLESSTLS)
 	if eds.BridgeServe != nil || eds.BridgeDials != nil || eds.Relays != nil || em.hash() != eds.StateHash {
 		t.Fatalf("an exit without the capability: serve %v dials %v relays %v", eds.BridgeServe, eds.BridgeDials, eds.Relays)
 	}
-	_, m, ds := connectCaps(x.entry, "entry-old", plugin.CapRelayForward, capVLESSTLS)
+	_, m, ds := connectCaps(x.entry, "entry-old", agentcap.RelayForward, agentcap.VLESSTLS)
 	plain := x.plainForward("rly_a", 8443)
 	if ds.BridgeServe != nil || ds.BridgeDials != nil || len(ds.Relays.GetItems()) != 1 || ds.Relays.Items[0].Mode != "" || ds.Relays.Items[0].ExitNodeId != "" {
 		t.Fatalf("an entry without relay-reverse/1 was sent the bridge: %v", ds)
@@ -173,8 +174,8 @@ func TestBridgeFieldsReachOnlyAgentsThatListTheCapability(t *testing.T) {
 	}
 
 	// The entry lists both, the exit does not: the pair cannot do it, the relay stays a plain forward and no bridge is served.
-	_, m, ds = connectCaps(x.exit, "exit-old-again", plugin.CapRelayForward, capVLESSTLS)
-	_, m, ds = connectCaps(x.entry, "entry-new", plugin.CapRelayForward, plugin.CapRelayReverse, capVLESSTLS)
+	_, m, ds = connectCaps(x.exit, "exit-old-again", agentcap.RelayForward, agentcap.VLESSTLS)
+	_, m, ds = connectCaps(x.entry, "entry-new", agentcap.RelayForward, agentcap.RelayReverse, agentcap.VLESSTLS)
 	if ds.BridgeServe != nil || ds.Relays.Items[0].Mode != "" || m.hash() != statehash.StateRelays(nil, nil, []plugin.RelayForward{plain}) {
 		t.Fatalf("a pair with an old exit: %v", ds)
 	}
@@ -184,8 +185,8 @@ func TestReversePairIsSentTheBridge(t *testing.T) {
 	x := newRelayEnv(t)
 	x.givePath(8443)
 	x.reverseRelay("rly_a", relayInbound, 7443, store.RelayModeReverse)
-	ec, em, eds := connectCaps(x.exit, "exit", plugin.CapRelayReverse, capVLESSTLS)
-	_, m, ds := connectCaps(x.entry, "entry", plugin.CapRelayForward, plugin.CapRelayReverse)
+	ec, em, eds := connectCaps(x.exit, "exit", agentcap.RelayReverse, agentcap.VLESSTLS)
+	_, m, ds := connectCaps(x.entry, "entry", agentcap.RelayForward, agentcap.RelayReverse)
 
 	// The entry: the forward carries the way and the exit, the serve setting says where the exit calls and whom it accepts.
 	wantRelays := &agentv1.RelayForwards{Items: []*agentv1.RelayForward{{RelayId: "rly_a", Network: "tcp", Port: 7443, ToHost: "exit.example.com", ToPort: 4443,
@@ -243,8 +244,8 @@ func TestBridgeDoesNotUseSystemRootsForAnUnpinnedSelfSignedSite(t *testing.T) {
 	x.givePath(0)
 	x.reverseRelay("rly_a", relayInbound, 7443, store.RelayModeReverse)
 	x.entrySelfSignedSite()
-	connectCaps(x.exit, "exit", plugin.CapRelayReverse, capVLESSTLS)
-	connectCaps(x.entry, "entry", plugin.CapRelayForward, plugin.CapRelayReverse, capVLESSTLS)
+	connectCaps(x.exit, "exit", agentcap.RelayReverse, agentcap.VLESSTLS)
+	connectCaps(x.entry, "entry", agentcap.RelayForward, agentcap.RelayReverse, agentcap.VLESSTLS)
 	exitNode, err := x.st.Node(x.ctx, x.exit.nodeID)
 	if err != nil {
 		t.Fatal(err)
@@ -265,9 +266,9 @@ func TestBridgeAllowsTwoExitsAndUsesFourConnectionsForBusyRelay(t *testing.T) {
 		VALUES ('prf_vless_tcp2', 'vless', 'second tcp exit', '{"port":4444,"security":"tls"}', 1, ?, ?)`, now, now)
 	x.exec(`INSERT INTO inbound (id, profile_id, node_id, spec_version, state, created_at, updated_at)
 		VALUES ('inb_second_tcp', 'prf_vless_tcp2', ?, 1, 'active', ?, ?)`, second.nodeID, now, now)
-	exitConn, exitModel, _ := connectCaps(x.exit, "exit-one", plugin.CapRelayReverse, capVLESSTLS)
-	secondConn, secondModel, _ := connectCaps(second, "exit-two", plugin.CapRelayReverse, capVLESSTLS)
-	entryConn, entryModel, _ := connectCaps(x.entry, "entry", plugin.CapRelayForward, plugin.CapRelayReverse, capVLESSTLS)
+	exitConn, exitModel, _ := connectCaps(x.exit, "exit-one", agentcap.RelayReverse, agentcap.VLESSTLS)
+	secondConn, secondModel, _ := connectCaps(second, "exit-two", agentcap.RelayReverse, agentcap.VLESSTLS)
+	entryConn, entryModel, _ := connectCaps(x.entry, "entry", agentcap.RelayForward, agentcap.RelayReverse, agentcap.VLESSTLS)
 	create := func(id, inbound, exitID string, port uint16) {
 		t.Helper()
 		if err := x.st.CreateRelay(x.ctx, store.Relay{ID: id, InboundID: inbound, ViaNodeID: x.entry.nodeID,
@@ -300,18 +301,25 @@ func TestBridgeAllowsTwoExitsAndUsesFourConnectionsForBusyRelay(t *testing.T) {
 		{PeerNodeId: second.nodeID, Conns: 2, SinceUnix: time.Now().Unix() - 60, SiteCertPinSha256: bridgePin}}
 	x.f.recordBridgeReports(x.ctx, x.entry.nodeID, entryConn.bridges, time.Now())
 	x.f.StateChanged()
-	entryState := entryConn.next(entryModel)
 	wantExits := []string{x.exit.nodeID, second.nodeID}
 	if wantExits[0] > wantExits[1] {
 		wantExits[0], wantExits[1] = wantExits[1], wantExits[0]
 	}
+	// The setup above kicks the recompute more than once; a delta from before the second relay existed may come first.
+	entryState := entryConn.nextUntil(entryModel, func(ds *agentv1.DesiredState) bool {
+		return ds.BridgeServe != nil && len(ds.BridgeServe.ExitNodeIds) == len(wantExits)
+	})
 	if entryState.BridgeServe == nil || len(entryState.BridgeServe.ExitNodeIds) != len(wantExits) ||
 		entryState.BridgeServe.ExitNodeIds[0] != wantExits[0] || entryState.BridgeServe.ExitNodeIds[1] != wantExits[1] {
 		t.Fatalf("entry allowed exits = %v", entryState.BridgeServe)
 	}
 	assertAgentBridgeValid(t, entryState, x.pool)
-	firstState := exitConn.next(exitModel)
-	secondState := secondConn.next(secondModel)
+	firstState := exitConn.nextUntil(exitModel, func(ds *agentv1.DesiredState) bool {
+		return ds.BridgeDials != nil && len(ds.BridgeDials.Items) == 1 && ds.BridgeDials.Items[0].Pool == 4
+	})
+	secondState := secondConn.nextUntil(secondModel, func(ds *agentv1.DesiredState) bool {
+		return ds.BridgeDials != nil && len(ds.BridgeDials.Items) == 1
+	})
 	if firstState.BridgeDials == nil || len(firstState.BridgeDials.Items) != 1 || firstState.BridgeDials.Items[0].Pool != 4 ||
 		len(firstState.BridgeDials.Items[0].Targets) != 1 || firstState.BridgeDials.Items[0].Targets[0].RelayId != "rly_a" {
 		t.Fatalf("busy exit's bridge dials = %v", firstState.BridgeDials)
@@ -361,9 +369,9 @@ func TestBridgeEmptyIsNotAbsent(t *testing.T) {
 	x := newRelayEnv(t)
 	x.givePath(8443)
 	x.reverseRelay("rly_a", relayInbound, 7443, store.RelayModeReverse)
-	ec, em, eds := connectCaps(x.exit, "exit", plugin.CapRelayReverse, capVLESSTLS)
+	ec, em, eds := connectCaps(x.exit, "exit", agentcap.RelayReverse, agentcap.VLESSTLS)
 	exitHash := eds.StateHash // the exit with its TCP server and no bridge
-	c, m, _ := connectCaps(x.entry, "entry", plugin.CapRelayForward, plugin.CapRelayReverse)
+	c, m, _ := connectCaps(x.entry, "entry", agentcap.RelayForward, agentcap.RelayReverse)
 	x.f.StateChanged()
 	ec.next(em)
 	if len(m.bridgeDials) != 0 || m.bridgeServe == nil || len(em.bridgeDials) != 1 || em.bridgeServe != nil {
@@ -429,12 +437,12 @@ func TestEmptyBridgeSnapshotsDoNotCreateBridgeStateForPlainRelay(t *testing.T) {
 // that is off and a server that is not usable.
 func TestReverseWayWithoutWhatItNeedsIsPlain(t *testing.T) {
 	x := newRelayEnv(t)
-	connectCaps(x.exit, "exit", plugin.CapRelayReverse, capVLESSTLS)
+	connectCaps(x.exit, "exit", agentcap.RelayReverse, agentcap.VLESSTLS)
 	// A UDP server (the default of relayOf) in the reverse way, an entry without a path: the plain forward.
 	x.relayOf("rly_u", relayInbound2, 6443, true)
 	x.setActive("rly_u", store.RelayModeReverse)
 	x.reverseRelay("rly_a", relayInbound, 7443, store.RelayModeReverse)
-	c, m, ds := connectCaps(x.entry, "entry", plugin.CapRelayForward, plugin.CapRelayReverse)
+	c, m, ds := connectCaps(x.entry, "entry", agentcap.RelayForward, agentcap.RelayReverse)
 	if ds.BridgeServe != nil || len(ds.Relays.Items) != 2 || ds.Relays.Items[0].Mode != "" || ds.Relays.Items[1].Mode != "" || len(m.relays) != 2 {
 		t.Fatalf("no bridge path on the entry: %v", ds)
 	}
@@ -515,8 +523,8 @@ func TestBridgeIsLostWhenTheEntrysSiteOn443BecomesAnotherSite(t *testing.T) {
 	x.givePath(0)
 	x.reverseRelay("rly_a", relayInbound, 7443, store.RelayModeReverse)
 	x.entrySelfSignedSite()
-	connectCaps(x.exit, "exit", plugin.CapRelayReverse, capVLESSTLS)
-	connectCaps(x.entry, "entry", plugin.CapRelayForward, plugin.CapRelayReverse, capVLESSTLS)
+	connectCaps(x.exit, "exit", agentcap.RelayReverse, agentcap.VLESSTLS)
+	connectCaps(x.entry, "entry", agentcap.RelayForward, agentcap.RelayReverse, agentcap.VLESSTLS)
 	exitNode, err := x.st.Node(x.ctx, x.exit.nodeID)
 	if err != nil {
 		t.Fatal(err)

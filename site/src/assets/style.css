@@ -542,3 +542,14 @@ body.mg:lang(fa) { line-height: 1.8; }
 :lang(fa) :is(.label, .grp__label, .code__lang, .code__kind, .table-wrap td[data-label]:not(:first-child)::before) { font-size: 13px; }
 
 @media print { .top, .side, .toc, .toc-inline, .foot, .pns, .edit, .backdrop { display: none !important; } .shell { display: block; } }
+
+/* the features of the home page: the words, and a loop of the admin beside them */
+.feats { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 44px; }
+.feat { display: grid; grid-template-columns: minmax(0, 38fr) minmax(0, 62fr); gap: 28px; align-items: center; }
+.feat__t h3 { margin: 0 0 8px; font-size: 1.15rem; letter-spacing: -.01em; }
+.feat__t p { margin: 0 0 10px; color: var(--text-2, var(--muted)); line-height: 1.6; }
+.feat__a { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.feat__m { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.feat__m .shot { margin: 0; }
+.home-h3 { margin: 48px 0 6px; font-size: 1.1rem; }
+@media (max-width: 760px) { .feat { grid-template-columns: 1fr; gap: 14px; } .feats { gap: 36px; } }

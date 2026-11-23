@@ -2,7 +2,7 @@
    What the boards' .a-* rules (sub.css) leave to the page. Read after sub.css, so it may override it. */
 
 /* a window that is drawn again while it stays the same one does not play its entrance again (modal.ts: .still on the box) */
-.still .a-dlg, .still .a-b > * { animation: none; }
+.still .a-dlg, .still .a-b > *, .still .a-srv { animation: none; }
 
 /* names of devices and servers read in their own direction inside a right-to-left page */
 .a-h .t, .a-opt .t, .a-opt .d, .a-chip { unicode-bidi: isolate; }

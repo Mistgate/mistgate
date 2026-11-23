@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useT, type T } from "@/i18n";
 import type { MessageKey } from "@/i18n/en";
 import { cx } from "@/lib/cx";
-import { deliveryHint, type Delivery, type Node, type Site, type SiteCheck, type SiteVersion } from "@/lib/decoysites";
+import { deliveryHint, templateOf, templateWords, type Delivery, type Node, type Site, type SiteCheck, type SiteVersion } from "@/lib/decoysites";
 import { useFmt, type Fmt } from "@/lib/format";
 import { asSource, CardHead, DeliveryWord, DzCard, Gl, TargetMark, usageText, whenText } from "./parts";
 
@@ -177,8 +177,9 @@ export function FactsCard({ site }: { site: Site }) {
   const t = useT();
   const fmt = useFmt();
   const src = asSource(site.source);
+  const template = templateOf(site);
   const rows: { l: string; v: string; mono?: boolean }[] = [
-    { l: t("dz.fact.source"), v: src === "upload" ? t("dz.fact.upload") : src === "assistant" ? t("dz.fact.assistant") : t("dz.fact.mcp", { token: site.sourceLabel }) },
+    { l: t("dz.fact.source"), v: template ? t("dz.fact.template", { kind: templateWords(t, template).name }) : src === "upload" ? t("dz.fact.upload") : src === "assistant" ? t("dz.fact.assistant") : t("dz.fact.mcp", { token: site.sourceLabel }) },
     { l: t("dz.fact.created"), v: t("dz.fact.by", { when: whenText(fmt, t, site.createdUnix), who: site.createdBy }) },
     { l: t("dz.fact.changed"), v: t("dz.fact.by", { when: whenText(fmt, t, site.updatedUnix), who: site.updatedBy }) },
     { l: t("dz.fact.sha"), v: `${site.bundleSha256.slice(0, 8)}…`, mono: true },

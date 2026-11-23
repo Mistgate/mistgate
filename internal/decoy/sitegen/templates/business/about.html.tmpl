@@ -1,0 +1,18 @@
+{{template "head" .}}<body>
+{{template "header" .}}
+<main class="__wrap__">
+<section class="__hd2__">
+<div><h1>{{.L.about_h}}</h1></div>
+<figure class="__stad__">{{photo "hero3" "" 800 480}}</figure>
+</section>
+<section class="__ab__ __abp__">
+<div class="__pair__"><figure>{{photo "about" "" 480 640}}</figure><figure>{{photo "about2" "" 480 580}}</figure></div>
+<div>
+{{range $i, $p := .L.about}}<p{{if eq $i 0}} class="__lead2__"{{end}}>{{$p}}</p>
+{{end}}</div>
+</section>
+<div class="__cta__"><h2>{{.L.visit_h}}</h2><a class="__btn__" href="{{(index .Nav 3).Href}}">{{.L.hours_h}}</a></div>
+</main>
+{{template "footer" .}}
+</body>
+</html>

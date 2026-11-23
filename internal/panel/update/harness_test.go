@@ -20,6 +20,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/node/osupdate"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/release"
@@ -165,7 +166,7 @@ func (f *fakeFleet) precondition(id string) error {
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
 	}
 	for _, c := range f.caps[id] {
-		if c == capUpdate || c == capLinkUpdate { // the edge fleet asks link-only nodes with update-link/1
+		if c == agentcap.Update || c == agentcap.UpdateLink { // the edge fleet asks link-only nodes with update-link/1
 			return nil
 		}
 	}
@@ -179,7 +180,7 @@ func (f *fakeFleet) UpdateOs(_ context.Context, id string, req OsJobRequest, _ t
 		f.mu.Unlock()
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("node is offline"))
 	}
-	if !slices.Contains(f.caps[id], osupdate.CapabilityUpdate) {
+	if !slices.Contains(f.caps[id], agentcap.OSUpdate) {
 		f.mu.Unlock()
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("agent too old"))
 	}
@@ -301,9 +302,10 @@ type fakeHealth struct {
 	runs      map[string]int
 	since     map[string]time.Time
 	errors    map[string]error
-	timeouts  map[string]bool          // every failed round was a timeout
-	lasted    map[string]time.Duration // how long the failures have lasted
-	pending   map[string][]string      // inbound ids without an OK round, for NodeChecksPending
+	timeouts  map[string]bool                // every failed round was a timeout
+	lasted    map[string]time.Duration       // how long the failures have lasted
+	pending   map[string][]string            // inbound ids without an OK round, for NodeChecksPending
+	rounds    map[string][]store.CheckSample // the newest round of each probeable inbound, for NodeLastRounds
 }
 
 func newFakeHealth() *fakeHealth {
@@ -433,6 +435,13 @@ func (e *env) newEdgeService(key ed25519.PublicKey, version string) *Service {
 	return s
 }
 
+// syncBundle runs the GitHub bundle sync the way the worker starts it, and waits for it.
+func (e *env) syncBundle() {
+	e.t.Helper()
+	e.s.startNodeBundleSync(e.ctx)
+	e.s.wg.Wait()
+}
+
 // restart replaces the Service with a new one on the same database, the way a panel restart does.
 func (e *env) restart() {
 	e.t.Helper()
@@ -506,7 +515,7 @@ func (e *env) addNode(name string, o nodeOpts) string {
 		e.t.Fatal(err)
 	}
 	if o.caps == nil {
-		o.caps = []string{"doctor/1", capUpdate, capGuard}
+		o.caps = []string{"doctor/1", agentcap.Update, agentcap.UpdateGuard}
 	}
 	if o.built == 0 {
 		o.built = oldBuilt
@@ -545,7 +554,7 @@ func (e *env) hello(id, version string, built int64, caps []string, lastUpdateJS
 // upgrade plays what the agent does after a successful UpdateAgent: it re-executes and reconnects with the new build.
 func (e *env) upgrade(id string) {
 	e.t.Helper()
-	e.hello(id, "0.2.0-new", newBuilt, []string{"doctor/1", capUpdate, capGuard}, "")
+	e.hello(id, "0.2.0-new", newBuilt, []string{"doctor/1", agentcap.Update, agentcap.UpdateGuard}, "")
 }
 
 // commit plays the agent raising update_committed.
@@ -654,4 +663,20 @@ func (e *env) nodeState(id string) adminv1.NodeUpdateState {
 	}
 	e.t.Fatalf("node %s is not listed", id)
 	return 0
+}
+
+func (h *fakeHealth) NodeLastRounds(_ context.Context, id string) ([]store.CheckSample, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.rounds[id]), h.errors[id]
+}
+
+// setRounds sets the newest round of each probeable inbound of the node (what NodeLastRounds returns).
+func (h *fakeHealth) setRounds(id string, rounds ...store.CheckSample) {
+	h.mu.Lock()
+	if h.rounds == nil {
+		h.rounds = map[string][]store.CheckSample{}
+	}
+	h.rounds[id] = rounds
+	h.mu.Unlock()
 }

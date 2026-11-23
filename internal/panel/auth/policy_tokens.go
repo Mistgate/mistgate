@@ -54,7 +54,7 @@ var tokenProcedures = map[string]int{
 	adminv1connect.SubscriptionServiceListClientsProcedure:             TokenAccessDirect,
 	adminv1connect.SubscriptionServiceTestUserAgentProcedure:           TokenAccessDirect,
 	adminv1connect.DnsServiceListDnsPresetsProcedure:                   TokenAccessDirect,
-	adminv1connect.BackupServiceGetBackupSettingsProcedure:             TokenAccessDirect,
+	adminv1connect.BackupServiceGetBackupSettingsProcedure:             TokenAccessDirect, // the status only: the handler leaves the storage out of a token's answer (backup_status)
 	adminv1connect.UpdateServiceGetUpdatesProcedure:                    TokenAccessDirect,
 	adminv1connect.UpdateServiceGetOsUpdatesProcedure:                  TokenAccessDirect,
 	adminv1connect.WarpServiceGetWarpProcedure:                         TokenAccessPlanning,
@@ -200,6 +200,7 @@ var stepUpProcedures = map[string]bool{
 	adminv1connect.ProvisioningServiceAttachNodeServerAccessProcedure:   true,
 	adminv1connect.WarpServiceRegisterWarpProcedure:                     true,
 	adminv1connect.WarpServiceImportWarpProcedure:                       true,
+	adminv1connect.WarpServiceSetWarpLicenseProcedure:                   true,
 	adminv1connect.WarpServiceDeleteWarpProcedure:                       true,
 	adminv1connect.ApiTokenServiceCreateApiTokenProcedure:               true,
 	adminv1connect.ApiTokenServiceSetApiTokenBulkProcedure:              true,

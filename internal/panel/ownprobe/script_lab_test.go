@@ -113,6 +113,8 @@ type lab struct {
 	conf   string
 	opts   labOptions
 	env    []string
+	group  int      // the process group of everything the lab starts
+	hold   *os.File // what each of them holds open while it lives
 }
 
 const (
@@ -134,6 +136,7 @@ func newLab(t testing.TB, sh shellSpec, opts labOptions) *lab {
 		root = t.TempDir()
 	}
 	l := &lab{t: t, sh: sh, root: root, fake: filepath.Join(root, "fake"), opts: opts}
+	l.startGroup()
 	for _, d := range []string{"bin", "fake/t", "tmp", "run"} {
 		must(t, os.MkdirAll(filepath.Join(root, d), 0o755))
 	}
@@ -251,6 +254,7 @@ func (l *lab) cmd(extraEnv []string, args ...string) *exec.Cmd {
 	c := exec.Command(sh[0], argv...)
 	c.Dir = l.root
 	c.Env = append(append([]string{}, l.env...), extraEnv...)
+	l.own(c)
 	return c
 }
 
@@ -284,6 +288,7 @@ func (l *lab) shellScript(program string, args ...string) (string, int) {
 	c := exec.Command(l.sh.argv[0], append(argv, args...)...)
 	c.Dir = l.root
 	c.Env = append(append([]string{}, l.env...), "PATH="+filepath.Join(l.root, "bin")+":"+os.Getenv("PATH"))
+	l.own(c)
 	var out bytes.Buffer
 	c.Stdout, c.Stderr = &out, &out
 	err := runCmd(c)

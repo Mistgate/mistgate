@@ -155,7 +155,7 @@ func TestBundleHandlerUsesPanelSiteRules(t *testing.T) {
 		{http.MethodGet, "/absent", http.StatusNotFound, "missing"},
 		{http.MethodGet, "/../secret", http.StatusNotFound, "missing"},
 		{http.MethodPost, "/", http.StatusNotFound, "missing"},
-		{http.MethodGet, "/robots.txt", http.StatusOK, robotsTXT},
+		{http.MethodGet, "/robots.txt", http.StatusOK, RobotsTXT},
 	} {
 		r := httptest.NewRequest(tc.method, tc.path, nil)
 		w := httptest.NewRecorder()

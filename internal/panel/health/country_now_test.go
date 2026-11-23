@@ -14,6 +14,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
 )
 
@@ -118,7 +119,7 @@ func TestCountryNowAsksAtMostOnceInTenMinutes(t *testing.T) {
 	if v.RetryAfterS != 6*60 || v.Running {
 		t.Fatalf("retry = %d running=%v, want 360 s", v.RetryAfterS, v.Running)
 	}
-	if len(v.Sources) != len(countryNowOrder) {
+	if len(v.Sources) != len(countryreach.NowSources()) {
 		t.Fatalf("sources = %+v", v.Sources)
 	}
 	for _, s := range v.Sources {
@@ -236,7 +237,7 @@ func TestCountryNowGlobalpingReasons(t *testing.T) {
 	n.cfg.Enabled = true
 	n.fl.set("n1", liveState{up: false})
 	check("node_offline")
-	n.fl.set("n1", liveState{up: true, caps: []string{capDoctor}, lastSeen: n.clock.Now()})
+	n.fl.set("n1", liveState{up: true, caps: []string{agentcap.Doctor}, lastSeen: n.clock.Now()})
 	n.names["n1.example.com"] = nil
 	n.s.invalidateSnapshot()
 	check("no_address")
@@ -271,12 +272,12 @@ func TestCountryNowAskedSourcesAndTheOnesThatAreNot(t *testing.T) {
 	}
 	v := n.s.RunCountryNow(n.ctx, "n1")
 	n.wait()
-	if got := len(v.Sources); got != len(countryNowOrder) {
+	if got := len(v.Sources); got != len(countryreach.NowSources()) {
 		t.Fatalf("sources = %+v", v.Sources)
 	}
-	for i, id := range countryNowOrder {
-		if v.Sources[i].Source != id {
-			t.Fatalf("source %d = %s, want %s", i, v.Sources[i].Source, id)
+	for i, src := range countryreach.NowSources() {
+		if v.Sources[i].Source != src.ID {
+			t.Fatalf("source %d = %s, want %s", i, v.Sources[i].Source, src.ID)
 		}
 	}
 	want := map[string][2]string{
@@ -287,7 +288,7 @@ func TestCountryNowAskedSourcesAndTheOnesThatAreNot(t *testing.T) {
 		countryreach.SourceProbes:         {"running", ""},
 		countryreach.SourceBsbord:         {"skipped", "schedule_only"},
 		countryreach.SourceLists:          {"reread", ""},
-		sourceKlick:                       {"reread", ""},
+		countryreach.SourceKlick:          {"reread", ""},
 	}
 	for id, w := range want {
 		if st, why := stateOf(v, id); st != w[0] || why != w[1] {

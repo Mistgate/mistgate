@@ -3,6 +3,8 @@ title: WARP
 description: How to send a profile's traffic out through Cloudflare WARP, how to get an account for a node, what fail-closed means, and how to read and fix the WARP link.
 ---
 
+![The WARP card of a node: the tunnel is up and the egress check passes, then the tunnel goes down and the card offers a restart](../../images/readme/warp-dark-en.webp)
+
 By default a profile's traffic leaves a node from the node's own address. With WARP it leaves through Cloudflare's network instead: sites see a Cloudflare address, not your hoster's. A node has at most one WARP account, and every profile with the WARP exit on that node goes through it. Hysteria2, VLESS and AmneziaWG profiles can use it.
 
 ## How it fits together
@@ -12,7 +14,7 @@ By default a profile's traffic leaves a node from the node's own address. With W
 - **The exit is a profile setting.** **Exit** (in **Advanced** for Hysteria2 and VLESS, in **Basics** for AmneziaWG) is **Direct** or **WARP**.
 - **The account belongs to a node.** It is set up on the WARP card of the node: node → **Exit**, the first card. The WARP chip in the node's header leads there too.
 - **A profile with the WARP exit needs an account on every node it runs on.** The editor lists the nodes of the profile that have no working WARP, each a link to its WARP card.
-- **MCP tools.** `warp_status` reads the account and the node's last probes. With an Admin token, `warp_restart_plan` / `_apply` restart the tunnel; `warp_reregister_plan` / `_apply` replace the account after the owner approves the plan and sees the terms link.
+- **MCP tools.** `warp_status` reads the account and the node's last probes. With an Admin token, `warp_restart_plan` / `_apply` restart the tunnel; `warp_reregister_plan` / `_apply` replace the account after the owner approves the plan and sees the terms link; a WARP+ key set on the account is bound to the new device. There is no tool for setting the key: it never goes through an agent.
 
 To offer people both exits, make a twin of the profile with the other exit ("WARP copy"): see [Profiles](profiles.md).
 
@@ -98,6 +100,7 @@ After the last step it rests for 10 minutes, still trying the next address after
 | **Restart WARP** | The account is on and not revoked; the main button when the tunnel is down | Pauses and resumes in one step: the node tears the tunnel down and brings it up again with the ladder from the start. If the node did not confirm the pause in time, the resume goes out anyway: "WARP is on again, but the node did not confirm the pause: look again in a minute". |
 | **Register again** | Always; the main button when Cloudflare no longer knows the account (revoked) | Registers a new account and puts it in the old one's place in one step; the old device is deleted at Cloudflare. Same terms window as **Enable WARP**. Use it, not **Delete account** followed by a new registration, to get a fresh device for a slow or flaky exit: the node keeps its WARP until the new account arrives, so nothing stops and no alert opens. |
 | **Read from Cloudflare again** | The account has an access token | Re-reads the endpoint, addresses and client id from Cloudflare. Creates nothing. |
+| **Set WARP+ key** / **Change WARP+ key** | Under **Details**; the account has an access token | Binds your paid WARP+ license key to the node's device. See [WARP+ license key](#warp-license-key). |
 | **Pause** / **Resume** | Always | Pause tears the tunnel down. The window names the profiles that stop and how many connections go through them now. A paused account is resumed, not restarted. |
 | **Delete account** | Always | Type the node name to confirm; needs a step-up. The node loses WARP; WARP-exit profiles stop. The device is deleted at Cloudflare too when a token is stored. You can register or import another account afterwards. |
 
@@ -108,9 +111,18 @@ Some problems need you, not a button. The card names them:
 - a network interface named `mgwarp` already exists and is not WARP's;
 - the node could not apply the account: the reason is in the node's events.
 
+## WARP+ license key
+
+A node's account is a free one unless you give it a paid WARP+ license key. On the WARP card open **Details** and press **Set WARP+ key** (owner only, with a fresh step-up). The panel binds the key to the node's device at Cloudflare, the same request the 1.1.1.1 app and `wgcf update --license-key` make (`PUT /reg/{id}/account`), reads the account back and shows its type: when Cloudflare reports a WARP+ account the card gets a **Plus** badge and `warp=plus` shows in the probe details.
+
+- **The key is a secret.** It is stored encrypted with the account's other secrets and never shown again. It does not appear in the API (the account only says "key set" and its type), the logs, the audit log (which records that a key was set, on which node, and the account type) or MCP. MCP has no tool for it: an agent must never see a key.
+- **It needs an access token:** an account registered here, or imported with `wgcf-account.toml`. An imported account's type is read from Cloudflare when you import it (and by **Read from Cloudflare again**); an import without the token stays untyped.
+- **Register again keeps the key.** The same key is bound to the new device by itself, also by the automatic re-registration. If Cloudflare refuses it (for example the key is already on all the devices it allows), the re-registration still goes through: the account stays `free`, the card says why and the audit entry records the outcome. Free a device or set another key, then press **Set WARP+ key** again.
+- **Refusals are worded.** The window says whether the key is not accepted, is already on as many devices as it allows, whether Cloudflare is limiting requests from the panel's address or does not answer, or whether the account itself was revoked. Cloudflare's own texts for these are not documented, so an answer the panel cannot place reads "Cloudflare refused without saying why".
+
 ## Sites that refuse WARP
 
-Some sites show a block page to WARP addresses at one Cloudflare colo and not at another, while the tunnel itself is healthy. Every 15 minutes the panel asks each node whose WARP is up to fetch a short list of sites through its tunnel and to say which answer with a block page. The list is the panel's built-in one (`notion.com`, `discord.com`, `chatgpt.com`, `claude.ai`) unless you change it; an empty list switches the check off. The list is set in the API only (`WarpReachService.GetWarpReachSettings` and `UpdateWarpReachSettings`, owner only, at most 8 lower-case host names, audited as `warp_reach_settings`).
+Some sites show a block page to WARP addresses at one Cloudflare colo and not at another, while the tunnel itself is healthy. Every 15 minutes the panel asks each node whose WARP is up to fetch a short list of sites through its tunnel and to say which answer with a block page. The list is the panel's built-in one (`notion.com`, `discord.com`, `chatgpt.com`, `claude.ai`) unless you change it; an empty list switches the check off. The owner changes the list in **Settings → System**, on the **WARP reach check** card: the sites are chips, **Add a site** takes a name such as `example.com` (no address, port or path; at most 8, lower case) and **Save** stores the list. A tag on the card says which list is in force: **built-in list**, **your list** or **check off** (an empty list), and **Restore the built-in list** brings the default back. The same is in the API (`WarpReachService.GetWarpReachSettings` and `UpdateWarpReachSettings`, owner only, audited as `warp_reach_settings`).
 
 - The node reads at most 64 KiB of a page, follows at most one redirect, and refuses any address inside its own network after resolving the name. A node whose agent is older answers nothing, and the WARP card says so.
 - The verdict is `blocked` for HTTP 451 or a 403 page of a known kind (a Cloudflare error 1006 to 1012 or 1020, "Sorry, you have been blocked", an Akamai "Access Denied" page, CloudFront's country block, a site's own "not available in your country"). A bare 403, a challenge page, a rate limit and a server error read `error`; no answer reads `unreachable`.

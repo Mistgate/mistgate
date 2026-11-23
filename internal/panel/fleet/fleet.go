@@ -93,8 +93,8 @@ type Config struct {
 	// the panel time. Must not block.
 	OnAwgPrepareFailed func(nodeID, code string, at int64)
 	// GlobalpingTCP6 asks Globalping for a TCP ping of port on an IPv6 address from probes around the world, and says how many
-	// probes answered and how many of them connected. It is the last resort of CheckIPv6, when no node can send over IPv6. Nil, or an
-	// error, means Globalping is not there to ask.
+	// probes answered and how many of them connected. It is the last resort of CheckIPv6, when no node can send over IPv6. Nil means
+	// there is no Globalping source; ErrGlobalpingOff distinguishes an explicitly disabled source from a failed check.
 	GlobalpingTCP6 func(ctx context.Context, addr string, port uint16) (answered, connected int, err error)
 	// Actor returns the admin id for audit rows. Default: the signed-in admin from the auth interceptor.
 	Actor func(context.Context) string
@@ -145,6 +145,7 @@ type Fleet struct {
 	upd                    Updates                      // set by SetUpdates (update.go); guarded by mu
 	warp                   Warp                         // set by SetWarp (l3.go); guarded by mu
 	sessions               map[string]*session          // node id -> the one live agent session
+	own                    ownGap                       // frames the panel itself heard: tells a silence of the panel from a blip of a node (own_gap.go)
 	owners                 map[string]sessionOwner      // authenticated streams claim a generation before Hello
 	stuck                  map[string]stuckSeq          // node id -> the stats batch the database refused last (statsguard.go)
 	liveProjectionWarnings sync.Map                     // node id -> struct{}; avoids repeating oversized projection warnings
@@ -175,16 +176,21 @@ type Fleet struct {
 	decoySyncDirty  map[string]bool
 	decoyAttempts   map[string]decoyAttempt
 
-	panelDecoyMu  sync.Mutex
-	panelDecoyDir string
-	panelDecoyAt  time.Time
-	panelDecoyB   *decoy.Bundle
-	panelDecoyErr error
-	sendUDP       func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
-	probeTCP      func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
-	settleUDP     func(context.Context) error
-	probes        probeState                 // on-demand probes between nodes (path_probe.go); its zero value is ready
-	panelIPv6     func(context.Context) bool // tests: whether the panel itself can send over IPv6; default panelHasIPv6
+	// The previews of sites made from templates and the photo maker for Pexels and Pixabay (decoy_templates.go; nothing is made in the Cloudflare edition,
+	// so the state is an any here). Guarded by panelDecoyMu. photoTransport carries the client's requests: a test seam.
+	decoyTemplates any
+	photoTransport http.RoundTripper
+	panelDecoyMu   sync.Mutex
+	panelDecoyDir  string
+	panelDecoyAt   time.Time
+	panelDecoyB    *decoy.Bundle
+	panelDecoyErr  error
+	sendUDP        func(context.Context, string, []uint16, [8]byte, int, int, int) (string, int, error)
+	probeTCP       func(context.Context, string, []tcpcheck.Target) (string, map[uint16]string, error)
+	settleUDP      func(context.Context) error
+	probes         probeState                 // on-demand probes between nodes (path_probe.go); its zero value is ready
+	ownProbes      ownProbes                  // the panel's own TLS checks of REALITY ports, taken off the counters (ports_tcp.go)
+	panelIPv6      func(context.Context) bool // tests: whether the panel itself can send over IPv6; default panelHasIPv6
 }
 
 // SetRelayControl attaches the access module's mode controller after both services are built.

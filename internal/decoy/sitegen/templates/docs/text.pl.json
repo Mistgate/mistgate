@@ -1,0 +1,537 @@
+{
+ "ui": {
+  "ref_h": "Opis techniczny",
+  "nav_label": "Dokumentacja",
+  "footer": "Dokumentacja wersji {ver}.",
+  "nav_home": "Przegląd",
+  "nav_install": "Instalacja",
+  "nav_usage": "Użycie",
+  "nav_faq": "FAQ",
+  "home_title": "Przegląd",
+  "desc_install": "Jak zainstalować program {brand} {ver} w systemach Linux, macOS i Windows.",
+  "desc_usage": "Jak używać programu {brand}: typowe zadania z przykładami.",
+  "desc_faq": "Najczęstsze pytania o program {brand}.",
+  "nf_title": "Nie znaleziono strony",
+  "nf_text": "Tej strony nie ma w dokumentacji. Być może w nowszej wersji zmieniła nazwę.",
+  "nf_back": "Wróć do przeglądu",
+  "quick_h": "Szybki start",
+  "features_h": "Co potrafi",
+  "out_h": "Wynik",
+  "install_h": "Instalacja",
+  "steps_h": "Kroki",
+  "usage_h": "Użycie",
+  "opts_h": "Opcje",
+  "opt_col": "Opcja",
+  "desc_col": "Opis",
+  "faq_h": "Najczęstsze pytania",
+  "next": "Dalej",
+  "facts_h": "W skrócie",
+  "menu_h": "Dokumentacja",
+  "facts": [
+   {
+    "k": "Wersja",
+    "v": "{ver}"
+   },
+   {
+    "k": "Systemy",
+    "v": "Linux, macOS i Windows"
+   },
+   {
+    "k": "Licencja",
+    "v": "MIT"
+   },
+   {
+    "k": "Zależności",
+    "v": "Brak"
+   }
+  ],
+  "install_check": "Jeśli wyświetli się numer wersji, instalacja się udała.",
+  "nav_config": "Konfiguracja",
+  "nav_recipes": "Przepisy",
+  "nav_trouble": "Rozwiązywanie problemów",
+  "desc_config": "Plik konfiguracyjny i ustawienia programu {brand}.",
+  "desc_recipes": "Krótkie przepisy na codzienne zadania w programie {brand}.",
+  "desc_trouble": "Co zrobić z najczęstszymi problemami z programem {brand}.",
+  "config_h": "Konfiguracja",
+  "config_col_key": "Klucz",
+  "config_col_default": "Domyślnie",
+  "config_col_desc": "Do czego służy",
+  "config_file_h": "Przykład",
+  "recipes_h": "Przepisy",
+  "recipes_intro": "Krótkie odpowiedzi na najczęstsze potrzeby.",
+  "trouble_h": "Rozwiązywanie problemów",
+  "trouble_intro": "Problemy, które zdarzają się najczęściej, i to, co zwykle pomaga.",
+  "ver_l": "Wersja",
+  "prev": "Wstecz"
+ },
+ "bundles": {
+  "logs": {
+   "tagline": "Podsumowanie logów w wierszu poleceń",
+   "desc": "{brand} czyta pliki logów w zwykłym tekście i wypisuje krótkie podsumowanie tego, co w nich jest.",
+   "overview": "{brand} czyta pliki logów w zwykłym tekście i wypisuje krótkie podsumowanie: ile jest w nich linii, jakich poziomów używają i które komunikaty powtarzają się najczęściej. To jeden mały program bez zależności.",
+   "features": [
+    "Czyta pliki, katalogi i standardowe wejście",
+    "Grupuje podobne komunikaty bez żadnej konfiguracji",
+    "Wypisuje tekst, JSON albo mały raport HTML"
+   ],
+   "quick_out": "app.log: 48 211 linii, 3 poziomy\n  info   46 902\n  warn    1 190\n  error     119\nnajczęstszy komunikat: brak w pamięci podręcznej dla klucza (9 413 razy)",
+   "install_intro": "{brand} jest dostępny jako jeden plik wykonywalny. Przed pierwszym uruchomieniem niczego nie trzeba ustawiać.",
+   "install_steps": [
+    "Pobierz archiwum pasujące do Twojego systemu.",
+    "Rozpakuj je i skopiuj program do katalogu, który jest w zmiennej PATH.",
+    "Uruchom polecenie wyświetlające wersję, żeby sprawdzić, czy program działa."
+   ],
+   "faq": [
+    {
+     "q": "Jakie formaty logów są obsługiwane?",
+     "a": "Każdy, który jest zapisany liniami. Program {brand} rozpoznaje popularne style znaczników czasu i poziomów, a gdy ich nie rozpozna, traktuje wszystko jak zwykłe linie."
+    },
+    {
+     "q": "Czy zmienia moje pliki?",
+     "a": "Nigdy. Pliki są otwierane tylko do odczytu."
+    },
+    {
+     "q": "Jak duży plik potrafi odczytać?",
+     "a": "Pliki są czytane strumieniowo, więc ogranicza go tylko czas. Gigabajt zajmuje kilka sekund na laptopie."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Podsumowanie pliku",
+     "p": "Wskaż programowi {brand} plik, katalog albo potok. Katalogi są czytane rekurencyjnie, a skompresowane pliki rozpakowywane w locie."
+    },
+    {
+     "h": "Wybrany przedział czasu",
+     "p": "Opcje --since i --until zawężają podsumowanie do przedziału czasu. Czas można podać bezwzględnie albo względem chwili obecnej."
+    },
+    {
+     "h": "Wybór formatu wyniku",
+     "p": "Domyślnie wynik jest zwykłym tekstem. JSON ma stały układ i jest przeznaczony dla skryptów, a raport HTML to jeden plik, który można wysłać koledze."
+    }
+   ],
+   "options": [
+    {
+     "d": "Tylko linie po tym czasie, podanym bezwzględnie albo np. jako 2h."
+    },
+    {
+     "d": "Tylko linie sprzed tego czasu."
+    },
+    {
+     "d": "Tylko linie tego poziomu lub wyższych."
+    },
+    {
+     "d": "Ile powtarzających się komunikatów wypisać. Domyślnie 5."
+    },
+    {
+     "d": "text, json albo html. Domyślnie text."
+    }
+   ],
+   "config_intro": "{brand} czyta opcjonalny plik config.toml z Twojego katalogu konfiguracji. Każdy klucz można też podać w wierszu poleceń, który ma pierwszeństwo.",
+   "config_rows": [
+    {
+     "d": "Ile powtarzających się komunikatów wypisać."
+    },
+    {
+     "d": "Format wyniku: text, json albo html."
+    },
+    {
+     "d": "Komunikaty do pominięcia, dopasowywane jako zwykły tekst."
+    },
+    {
+     "d": "Czytaj tylko linie po tym czasie."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Najgłośniejsza godzina",
+     "p": "Pogrupuj podsumowanie według godzin, żeby zobaczyć, kiedy w logu działo się najwięcej."
+    },
+    {
+     "h": "Porównanie dwóch dni",
+     "p": "Pokaż, które komunikaty pojawiły się, a które zniknęły między dwoma plikami."
+    },
+    {
+     "h": "Raport do przesłania dalej",
+     "p": "Zapisz raport HTML do pliku i dołącz go do wiadomości."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Podsumowanie jest puste",
+     "a": "Sprawdź, czy w pliku jest jeden komunikat w każdej linii. Jeśli plik jest skompresowany w formacie, którego {brand} nie zna, najpierw go rozpakuj."
+    },
+    {
+     "q": "Godziny wyglądają źle",
+     "a": "Linie bez strefy czasowej są odczytywane jako UTC. Opcją --tz podaj, w jakiej strefie zapisano czas."
+    },
+    {
+     "q": "Raport jest za długi",
+     "a": "Zmniejsz wartość --top albo dopisz najgłośniejsze komunikaty do listy pomijanych w pliku konfiguracyjnym."
+    },
+    {
+     "q": "Na dysku sieciowym działa wolno",
+     "a": "Najpierw skopiuj plik na dysk lokalny. Zwykle winne jest czytanie linia po linii przez wolne łącze."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Bilans", "Miarka", "Rejestr", "Kronika", "Zapis", "Pisak", "Licznik", "Kartka"],
+      ["log", "scan", "sum", "view", "cut", "peek"]
+     ]
+    }
+   }
+  },
+  "site": {
+   "tagline": "Mały generator stron statycznych",
+   "desc": "{brand} zamienia katalog plików Markdown i kilka szablonów w statyczną stronę internetową.",
+   "overview": "{brand} zamienia katalog plików Markdown i kilka szablonów w statyczną stronę internetową. Nie ma bazy danych, środowiska uruchomieniowego ani niczego, co trzeba by aktualizować na serwerze.",
+   "features": [
+    "Markdown z nagłówkiem metadanych",
+    "Szablony w zwykłym HTML",
+    "Lokalny podgląd, który odświeża się przy każdym zapisie"
+   ],
+   "quick_out": "Strona notes dostępna pod localhost:4000 (Ctrl+C, żeby zatrzymać)",
+   "install_intro": "{brand} to jeden plik wykonywalny. Wstaw go do katalogu z PATH i gotowe.",
+   "install_steps": [
+    "Pobierz archiwum pasujące do Twojego systemu.",
+    "Rozpakuj je i skopiuj plik wykonywalny do katalogu, który jest w zmiennej PATH.",
+    "Uruchom polecenie wyświetlające wersję, żeby sprawdzić, czy program działa."
+   ],
+   "faq": [
+    {
+     "q": "Czy mogę używać własnych szablonów?",
+     "a": "Tak. Szablony to zwykłe pliki HTML z kilkoma miejscami do uzupełnienia, a układ katalogów możesz ustalić sam."
+    },
+    {
+     "q": "Czy potrzebuje bazy danych?",
+     "a": "Nie. Wynik to zwykłe pliki, które obsłuży każdy serwer WWW."
+    },
+    {
+     "q": "Jak dodać nowy rodzaj strony?",
+     "a": "Dodaj katalog w folderze pages z własnym plikiem układu, a {brand} uwzględni go przy następnym budowaniu."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Nowa strona internetowa",
+     "p": "Polecenie init tworzy katalog z plikiem konfiguracji, układem i jedną przykładową stroną."
+    },
+    {
+     "h": "Pisanie podstrony",
+     "p": "Podstrony to pliki Markdown. Nagłówek na górze ustala tytuł i datę, a wszystko pod nim to treść."
+    },
+    {
+     "h": "Budowanie do publikacji",
+     "p": "Polecenie build zapisuje gotową stronę w katalogu public. Skopiuj ten katalog na dowolny serwer WWW."
+    }
+   ],
+   "options": [
+    {
+     "d": "Katalog na gotową stronę. Domyślnie public."
+    },
+    {
+     "d": "Uwzględnij strony oznaczone jako szkice."
+    },
+    {
+     "d": "Port serwera podglądu. Domyślnie 4000."
+    },
+    {
+     "d": "Buduj ponownie, gdy plik się zmieni."
+    },
+    {
+     "d": "Wypisuj tylko błędy."
+    }
+   ],
+   "config_intro": "Plik site.toml leży w głównym katalogu Twojej strony. Brakujący klucz przyjmuje wartość domyślną, więc nowa strona nie potrzebuje żadnego pliku.",
+   "config_rows": [
+    {
+     "d": "Nazwa wyświetlana w nagłówku strony i w tytule."
+    },
+    {
+     "d": "Adres, pod którym jest strona. Dla strony w katalogu głównym wpisz /."
+    },
+    {
+     "d": "Wygląd strony: plain, slate albo folio."
+    },
+    {
+     "d": "Czy strony oznaczone jako szkice są budowane."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Dodanie nowej podstrony",
+     "p": "Utwórz plik Markdown z tytułem i datą na górze."
+    },
+    {
+     "h": "Podgląd szkiców",
+     "p": "Uruchom stronę lokalnie razem z niedokończonymi podstronami."
+    },
+    {
+     "h": "Publikacja do katalogu",
+     "p": "Zbuduj całą stronę w jednym katalogu, który skopiujesz na dowolny serwer WWW."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Brakuje podstrony w zbudowanej stronie",
+     "a": "Podstrony z draft: true w nagłówku są pomijane. Usuń tę linię albo zbuduj stronę z opcją --drafts."
+    },
+    {
+     "q": "Po publikacji linki nie działają",
+     "a": "Ustaw base_url na adres katalogu, w którym strona jest opublikowana."
+    },
+    {
+     "q": "Podgląd się nie odświeża",
+     "a": "Niektóre edytory zapisują nowy plik zamiast zmieniać stary. Uruchom podgląd jeszcze raz albo wyłącz w edytorze bezpieczny zapis."
+    },
+    {
+     "q": "Nie widać obrazków",
+     "a": "Umieść je w katalogu static. Wszystko, co w nim jest, kopiuje się bez zmian."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Prosta", "Tablica", "Kreda", "Folio", "Kartka", "Druk", "Prasa", "Atrament"],
+      ["site", "page", "build", "gen", "sheet"]
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "tagline": "Zadania cykliczne bez crontaba",
+   "desc": "{brand} uruchamia na jednym komputerze małe zadania cykliczne i daje znać, gdy któreś się nie uda.",
+   "overview": "{brand} uruchamia na jednym komputerze małe zadania cykliczne i daje znać, gdy któreś się nie uda. To przyjaźniejsza alternatywa dla crontaba, który trzeba trzymać w głowie.",
+   "features": [
+    "Harmonogramy zapisane zwykłymi słowami",
+    "Dziennik każdego uruchomienia",
+    "Jedna linia wyniku na zadanie, żeby błędy rzucały się w oczy"
+   ],
+   "quick_out": "backup   codziennie o 03:00   ostatnie uruchomienie: ok (4 s)",
+   "install_intro": "{brand} to jeden plik wykonywalny i mały proces w tle, który raz na minutę sprawdza harmonogram.",
+   "install_steps": [
+    "Pobierz archiwum pasujące do Twojego systemu.",
+    "Rozpakuj je i skopiuj plik wykonywalny do katalogu, który jest w zmiennej PATH.",
+    "Uruchom proces w tle za pomocą menedżera usług swojego systemu."
+   ],
+   "faq": [
+    {
+     "q": "Czy trzeba go uruchamiać jako usługę?",
+     "a": "Tak, mały proces w tle sprawdza harmonogram raz na minutę. Na stronie instalacji jest opisane, co uruchomić."
+    },
+    {
+     "q": "Co się stanie, gdy komputer jest wyłączony?",
+     "a": "Zadanie, które miało ruszyć, gdy komputer był wyłączony, uruchomi się raz po jego włączeniu."
+    },
+    {
+     "q": "Czy zadania mogą zależeć od siebie?",
+     "a": "Jeszcze nie. Na razie połącz polecenia w jedno zadanie."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Dodawanie zadania",
+     "p": "Zadanie ma nazwę, harmonogram i polecenie. Harmonogramy zapisuje się zwykłymi słowami."
+    },
+    {
+     "h": "Co się uruchomiło",
+     "p": "Polecenie list pokazuje wszystkie zadania z wynikiem ostatniego uruchomienia. Polecenie history pokazuje uruchomienia jednego zadania z czasem trwania i wynikiem."
+    },
+    {
+     "h": "Wstrzymywanie i wznawianie",
+     "p": "Wstrzymanie zachowuje zadanie i jego historię, ale zatrzymuje uruchamianie. Przydaje się na czas przeprowadzki albo odtwarzania kopii zapasowej."
+    }
+   ],
+   "options": [
+    {
+     "d": "Gdzie przechowywane są zadania i dzienniki. Domyślnie katalog w Twoim katalogu domowym."
+    },
+    {
+     "d": "Wypisuj tylko błędy."
+    },
+    {
+     "d": "Ile uruchomień pokazuje history. Domyślnie 10."
+    },
+    {
+     "d": "Wynik czytelny dla maszyn."
+    },
+    {
+     "d": "Uruchom zadanie od razu, a nie tylko według harmonogramu."
+    }
+   ],
+   "config_intro": "{brand} czyta plik jobs.toml z Twojego katalogu konfiguracji. Same zadania są przechowywane osobno, więc w pliku są tylko ustawienia.",
+   "config_rows": [
+    {
+     "d": "Powłoka, która uruchamia polecenia."
+    },
+    {
+     "d": "Gdzie zapisywany jest wynik każdego uruchomienia."
+    },
+    {
+     "d": "Ile razy nieudane zadanie jest ponawiane."
+    },
+    {
+     "d": "Czy nieudane zadanie wysyła też powiadomienie."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Jednorazowe uruchomienie teraz",
+     "p": "Uruchom zadanie poza harmonogramem, na przykład żeby wypróbować nowe polecenie."
+    },
+    {
+     "h": "Dlaczego zadanie się nie udało",
+     "p": "Wypisz wynik ostatniego uruchomienia zadania."
+    },
+    {
+     "h": "Wstrzymanie wszystkiego na czas wyjazdu",
+     "p": "Zatrzymaj wszystkie harmonogramy, dopóki ich nie wznowisz."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Zadanie nigdy się nie uruchamia",
+     "a": "Poleceniem list sprawdź, czy program działa. Zadania uruchamiają się tylko wtedy, gdy działa."
+    },
+    {
+     "q": "Zadanie uruchamia się dwa razy",
+     "a": "Działają dwie kopie programu. Zatrzymaj jedną z nich; plik blokady jest w katalogu dzienników."
+    },
+    {
+     "q": "Polecenie działa w mojej powłoce, a tutaj nie",
+     "a": "Zadania nie czytają plików startowych Twojej powłoki. Używaj pełnych ścieżek albo ustaw środowisko w zadaniu."
+    },
+    {
+     "q": "Godziny są przesunięte o godzinę",
+     "a": "{brand} korzysta z zegara i strefy czasowej systemu. Zmień je tam, a nie w zadaniu."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Zegar", "Przypominacz", "Kolej", "Rytm", "Budzik", "Plan", "Dzwonek", "Cykl"],
+      ["work", "list", "run", "do", "bell"]
+     ]
+    }
+   }
+  },
+  "csv": {
+   "tagline": "Wybieranie, sortowanie i łączenie plików CSV",
+   "desc": "{brand} wybiera, sortuje, łączy i czyści pliki CSV z wiersza poleceń.",
+   "overview": "{brand} wybiera, sortuje, łączy i czyści pliki CSV z wiersza poleceń. Radzi sobie z dużymi plikami bez wczytywania ich do pamięci i nigdy nie zmienia danych wejściowych.",
+   "features": [
+    "Wybieranie i zmiana nazw kolumn",
+    "Sortowanie, filtrowanie i łączenie plików",
+    "Naprawianie typowych kłopotów: zbłąkanych cudzysłowów i mieszanych końców linii"
+   ],
+   "quick_out": "name,city\nMira,Lublin\nOtto,Toruń",
+   "install_intro": "{brand} to jeden plik wykonywalny bez zależności.",
+   "install_steps": [
+    "Pobierz archiwum pasujące do Twojego systemu.",
+    "Rozpakuj je i skopiuj plik wykonywalny do katalogu, który jest w zmiennej PATH.",
+    "Uruchom polecenie wyświetlające wersję, żeby sprawdzić, czy program działa."
+   ],
+   "faq": [
+    {
+     "q": "Jak duże pliki potrafi obsłużyć?",
+     "a": "Pliki są przetwarzane strumieniowo, więc zużycie pamięci pozostaje małe. Sortowanie dużych plików zajmuje tymczasowe miejsce na dysku."
+    },
+    {
+     "q": "Czy zmienia moje pliki?",
+     "a": "Nie. Wynik trafia na ekran albo do nowego pliku."
+    },
+    {
+     "q": "A inne separatory?",
+     "a": "Opcja delimiter pozwala użyć tabulatorów, średników albo dowolnego pojedynczego znaku."
+    }
+   ],
+   "usage": [
+    {
+     "h": "Wybieranie kolumn",
+     "p": "Polecenie select wypisuje tylko wskazane kolumny, w podanej kolejności. Nazwę kolumny można zmienić za pomocą znaku równości."
+    },
+    {
+     "h": "Filtrowanie wierszy",
+     "p": "Polecenie filter zostawia wiersze spełniające prosty warunek. Kilka warunków można połączyć."
+    },
+    {
+     "h": "Łączenie dwóch plików",
+     "p": "Polecenie join łączy dwa pliki według wspólnej kolumny. Wiersze bez dopasowania są pomijane, chyba że poprosisz o ich zachowanie."
+    }
+   ],
+   "options": [
+    {
+     "d": "Separator pól. Domyślnie przecinek."
+    },
+    {
+     "d": "Ustaw false, jeśli pierwszy wiersz zawiera dane."
+    },
+    {
+     "d": "Zapisz do pliku zamiast na ekran."
+    },
+    {
+     "d": "Kolumna, według której sortować."
+    },
+    {
+     "d": "Kolumna, według której łączyć."
+    }
+   ],
+   "config_intro": "Umieść plik .{cmd}rc w swoim katalogu domowym, żeby zmienić wartości domyślne. Opcje z wiersza poleceń zawsze mają pierwszeństwo.",
+   "config_rows": [
+    {
+     "d": "Znak oddzielający kolumny."
+    },
+    {
+     "d": "Czy pierwszy wiersz zawiera nazwy kolumn."
+    },
+    {
+     "d": "Kodowanie tekstu na wejściu i na wyjściu."
+    },
+    {
+     "d": "Co jest zapisywane w wyniku w miejscu pustej komórki."
+    }
+   ],
+   "recipes": [
+    {
+     "h": "Wybieranie i zmiana nazw kolumn",
+     "p": "Zostaw dwie kolumny i jednej z nich nadaj nową nazwę."
+    },
+    {
+     "h": "Łączenie dwóch plików po kluczu",
+     "p": "Połącz wiersze dwóch plików, które mają wspólny identyfikator."
+    },
+    {
+     "h": "Usuwanie zduplikowanych wierszy",
+     "p": "Zostaw pierwszy z każdej grupy identycznych wierszy."
+    }
+   ],
+   "trouble": [
+    {
+     "q": "Polskie znaki wyglądają źle",
+     "a": "Plik prawdopodobnie nie jest w UTF-8. Ustaw kodowanie w pliku konfiguracyjnym albo opcją --encoding."
+    },
+    {
+     "q": "Brakuje kolumny",
+     "a": "Jeśli pierwszy wiersz zawiera dane, a nie nazwy, uruchom z opcją --no-header i odwołuj się do kolumn po numerze."
+    },
+    {
+     "q": "Liczby są sortowane jak tekst",
+     "a": "Powiedz o tym opcją --numeric, bo inaczej {brand} sortuje je tak, jak wyglądają."
+    },
+    {
+     "q": "Łączenie nie daje żadnych wierszy",
+     "a": "Klucz ma inne odstępy albo wielkość liter w obu plikach. Uruchom tidy na obu i spróbuj jeszcze raz."
+    }
+   ],
+   "vars": {
+    "brand": {
+     "join": [
+      ["Kolumna", "Siatka", "Tabela", "Wiersz", "Arkusz", "Przecinek", "Pole", "Rekord"],
+      ["cut", "fix", "join", "tidy", "sift", "wrangle"]
+     ]
+    }
+   }
+  }
+ }
+}

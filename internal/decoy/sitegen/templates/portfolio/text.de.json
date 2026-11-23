@@ -1,0 +1,357 @@
+{
+ "ui": {
+  "nav_label": "Hauptmenü",
+  "footer": "Alle Bilder sind Arbeiten des Ateliers und dürfen ohne Erlaubnis nicht vervielfältigt werden.",
+  "nav_home": "Ausgewählte Arbeiten",
+  "nav_work": "Alle Arbeiten",
+  "nav_about": "Über mich",
+  "nav_contact": "Kontakt",
+  "home_title": "Ausgewählte Arbeiten",
+  "nf_title": "Seite nicht gefunden",
+  "nf_text": "Unter dieser Adresse gibt es nichts. Die Arbeiten finden Sie auf der Startseite.",
+  "nf_back": "Zurück zu den Arbeiten",
+  "sel_h": "Ausgewählte Arbeiten",
+  "all_work": "Alle Arbeiten ansehen",
+  "work_h": "Alle Arbeiten",
+  "work_intro": "Alles aus den letzten Jahren, die neueste Arbeit zuerst.",
+  "about_h": "Über mich",
+  "services_h": "Was ich mache",
+  "shows_h": "Ausstellungen und Erwähnungen",
+  "contact_h": "Kontakt",
+  "visit_h": "Atelier",
+  "hours_h": "Öffnungszeiten",
+  "phone_l": "Telefon",
+  "visit_text": "Das Atelier ist nach Vereinbarung geöffnet. Bitte kommen Sie in den Öffnungszeiten; wenn niemand an die Tür kommt, bin ich vermutlich im Nebenraum oder in der Druckerei.",
+  "commission_h": "Aufträge",
+  "commission_text": "Ich nehme jedes Jahr nur wenige Aufträge an. Schreiben Sie mir, was Sie sich vorstellen und bis wann Sie es brauchen, dann sage ich Ihnen ehrlich, ob ich es schaffe.",
+  "hours_note": "Samstag nach Vereinbarung",
+  "work_back": "Alle Arbeiten",
+  "work_more": "Weitere Arbeiten",
+  "work_ask": "Nach dieser Arbeit fragen",
+  "directions_h": "So finden Sie das Atelier",
+  "directions": "Das Atelier liegt im Erdgeschoss, nur einen kurzen Fußweg vom Zentrum entfernt. Die Tür ist seitlich am Haus, es gibt eine Klingel. Fahrradbügel stehen davor."
+ },
+ "bundles": {
+  "photo": {
+   "tagline": "Fotografien stiller Orte",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Stilles",
+       "Blasses",
+       "Offenes",
+       "Weites",
+       "Frühes",
+       "Sanftes",
+       "Fernes",
+       "Schmales",
+       "Klares",
+       "Leises"
+      ],
+      [
+       "Licht",
+       "Bild",
+       "Feld",
+       "Moment",
+       "Horizont",
+       "Format",
+       "Objektiv",
+       "Korn",
+       "Blende",
+       "Abzug"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Landschafts- und Stilllebenfotografie aus {city}. Abzüge und Auftragsarbeiten.",
+   "desc_work": "Ausgewählte Fotografien, die neueste zuerst.",
+   "desc_about": "Über die Fotografie und das Atelier in {city}.",
+   "desc_contact": "Wo das Atelier in {city} liegt und wann es geöffnet ist.",
+   "intro": "Landschafts- und Stilllebenfotografie aus {city}. Abzüge und einige Aufträge pro Jahr.",
+   "about": [
+    "Ich fotografiere und arbeite in einem kleinen Atelier in {city}. Die meisten meiner Bilder zeigen Orte in der Stunde, nachdem alle gegangen sind.",
+    "Ich arbeite langsam, meist mit einer Kamera und einem Objektiv, und ziehe alle Abzüge selbst im Nebenraum ab. Ein Bild ist fertig, wenn ich es eine Woche lang ansehen kann, ohne etwas ändern zu wollen.",
+    "In den letzten Jahren wurden meine Arbeiten in kleinen Galerien und Bibliotheken der Region gezeigt und als Abzüge an Menschen verkauft, die etwas Ruhiges für ihre Wand wollten."
+   ],
+   "services": [
+    "Kunstabzüge, signiert und nummeriert",
+    "Porträtaufträge zu Hause oder im Atelier",
+    "Redaktions- und Buchfotografie"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Zwei Horizonte, Gruppenausstellung, Galerie im alten Speicher"
+    },
+    {
+     "y": "2024",
+     "t": "Stilles Wasser, Einzelausstellung, Foyer der Stadtbibliothek"
+    },
+    {
+     "y": "2022",
+     "t": "Regionaler Fotopreis, Shortlist"
+    }
+   ],
+   "works": [
+    {
+     "title": "Hang am Nachmittag",
+     "caption": "Pigmentdruck auf Archivpapier, 2025",
+     "note": "Das letzte Licht auf einer Wiese, die sonst niemand beachtet.",
+     "text": "Ich habe drei Nachmittage gewartet, bis die Wolken vom Kamm zogen, und sie zogen vier Minuten lang."
+    },
+    {
+     "title": "Zwei Horizonte",
+     "caption": "Pigmentdruck auf Archivpapier, 2025",
+     "note": "Eine Küstenlinie, die sich nicht entscheiden konnte, wo sie endet.",
+     "text": "Die Flut ging zurück, und der nasse Sand spiegelte einen zweiten Himmel. Ich habe sechs Bilder gemacht und dieses behalten."
+    },
+    {
+     "title": "Stilles Wasser",
+     "caption": "Pigmentdruck auf Archivpapier, 2024",
+     "note": "Ein Stausee um sieben Uhr morgens, bevor der Wind kommt.",
+     "text": "Der Abzug ist groß, damit die Stille Platz hat."
+    },
+    {
+     "title": "Rotes Feld",
+     "caption": "Pigmentdruck auf Archivpapier, 2024",
+     "note": "Klee, den man blühen ließ und dann mähte.",
+     "text": "Die Farbe im Abzug ist näher an dem, was ich gesehen habe, als es die Kamera war."
+    },
+    {
+     "title": "Linien in der Dämmerung",
+     "caption": "Pigmentdruck auf Archivpapier, 2023",
+     "note": "Zaunpfähle und Ackerfurchen im letzten flachen Licht.",
+     "text": "Im langen, schmalen Format wirkt das Bild am besten."
+    },
+    {
+     "title": "Salz und Schiefer",
+     "caption": "Pigmentdruck auf Archivpapier, 2023",
+     "note": "Ein Strand aus dunklem Stein mit weißem Salz, das die Flut zurückließ.",
+     "text": "Ich bin in drei Jahreszeiten wiedergekommen, um das Licht zu bekommen, das ich wollte."
+    },
+    {
+     "title": "Blaue Stunde",
+     "caption": "Pigmentdruck auf Archivpapier, 2022",
+     "note": "Zehn Minuten nach Sonnenuntergang wird das ganze Tal tintenblau.",
+     "text": "Es ist das einzige Bild, auf dem eine Lampe brennt."
+    }
+   ]
+  },
+  "illustration": {
+   "tagline": "Illustration und Druckgrafik",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Farn",
+       "Papier",
+       "Kleine",
+       "Tinten",
+       "Zitronen",
+       "Motten",
+       "Ehrliche",
+       "Orange",
+       "Bleistift",
+       "Stille"
+      ],
+      [
+       "Presse",
+       "Atelier",
+       "Schreibtisch",
+       "Zeichnung",
+       "Werkstatt",
+       "Skizzenbuch",
+       "Ecke",
+       "Tisch",
+       "Druck",
+       "Schrank"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Illustration und Linolschnitt aus {city}. Bilderbücher, Plakate und Auftragsarbeiten.",
+   "desc_work": "Ausgewählte Illustrationen und Drucke, die neuesten zuerst.",
+   "desc_about": "Über die Illustration und das Atelier in {city}.",
+   "desc_contact": "Wo das Atelier in {city} liegt und wann es geöffnet ist.",
+   "intro": "Illustration und Linolschnitt aus {city}. Bilderbücher, Plakate und ein paar Aufträge im Jahr.",
+   "about": [
+    "Ich zeichne für Bilderbücher und gelegentlich für Plakate und arbeite in einem kleinen Raum in {city}, dessen Fenster auf einen Parkplatz geht, den ich zeichne, als wäre er ein See.",
+    "Vor der Illustration habe ich Textildruck gelernt, und das Denken in Schichten ist geblieben. Die meisten meiner Bilder bestehen aus drei oder vier flachen Farben.",
+    "Meine Drucke entstehen in kleinen Auflagen auf einer Handpresse. Jeder ist ein wenig anders, und das gehört dazu."
+   ],
+   "services": [
+    "Illustration für Bilderbücher und Zeitschriften",
+    "Linolschnitte in kleinen, nummerierten Auflagen",
+    "Karten, Plakate und Einladungen"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Feldnotizen, Einzelausstellung, Buchhandlung am Markt"
+    },
+    {
+     "y": "2024",
+     "t": "Der Markt, Gruppenausstellung, Kulturhaus"
+    },
+    {
+     "y": "2023",
+     "t": "Preis für Bilderbuchillustration, lobende Erwähnung"
+    }
+   ],
+   "works": [
+    {
+     "title": "Studie in Orange",
+     "caption": "Gouache auf Papier, 2025",
+     "note": "Eine einzige Farbe, drei Papiere und ein Nachmittag.",
+     "text": "Es begann als Aufwärmübung und wurde zum Umschlag eines kleinen Buches."
+    },
+    {
+     "title": "Markttag",
+     "caption": "Tusche und Aquarell, 2025",
+     "note": "Drei Samstage lang vor Ort gezeichnet.",
+     "text": "Die Standbetreiber haben freundlich stillgehalten, oder fast."
+    },
+    {
+     "title": "Der lange Weg",
+     "caption": "Linolschnitt, 2024",
+     "note": "Ein Sonntagsweg, aus dem Gedächtnis gezeichnet und beim nächsten Spaziergang geprüft.",
+     "text": "Die Karte stimmte auf angenehme Weise nicht."
+    },
+    {
+     "title": "Nachtbus",
+     "caption": "Tusche auf Papier, 2024",
+     "note": "Feder, Tusche und viel Geduld mit den Spiegelungen im Fenster.",
+     "text": "Das Fenster ist das eigentliche Bild, der Bus nur der Rahmen."
+    },
+    {
+     "title": "Grüne Stunden",
+     "caption": "Dreifarbiger Linolschnitt, 2023",
+     "note": "Die Stunden vor dem Frühstück im Juni, wenn der Garten noch kühl ist.",
+     "text": "Drei Platten, drei Farben und ein Wochenende, an dem ich nichts anderes gemacht habe."
+    },
+    {
+     "title": "Kleine Vögel",
+     "caption": "Linolschnitt, 2023",
+     "note": "Spatzen, Zaunkönige und ein sehr verärgertes Rotkehlchen.",
+     "text": "Jeder Vogel ist eine eigene Platte, deshalb gleicht kein Abzug dem anderen."
+    },
+    {
+     "title": "Regenstudie",
+     "caption": "Aquarell, 2022",
+     "note": "Fast nur Wasser.",
+     "text": "Ich habe das Papier entscheiden lassen, wohin die Pfützen laufen."
+    }
+   ]
+  },
+  "graphic": {
+   "tagline": "Grafikdesign für kleine Organisationen",
+   "vars": {
+    "brand": {
+     "join": [
+      [
+       "Raster",
+       "Klare",
+       "Feine",
+       "Echte",
+       "Offene",
+       "Runde",
+       "Ruhige",
+       "Starke",
+       "Gerade",
+       "Nahe"
+      ],
+      [
+       "Studio",
+       "Werk",
+       "Büro",
+       "Haus",
+       "Labor",
+       "Atelier",
+       "Satz",
+       "Presse",
+       "Raum",
+       "Entwurf"
+      ]
+     ],
+     "sep": " "
+    }
+   },
+   "desc": "Grafikdesign für kleine Organisationen in {city}: Zeichen, Druck und Plakate.",
+   "desc_work": "Ausgewählte Projekte, die neuesten zuerst.",
+   "desc_about": "Über das Designstudio in {city}.",
+   "desc_contact": "Wo das Studio in {city} liegt und wann es geöffnet ist.",
+   "intro": "Grafikdesign für Vereine, Läden und kleine Organisationen in {city}. Wenige Projekte, jedes mit Sorgfalt.",
+   "about": [
+    "Ich gestalte Zeichen, Drucksachen und Plakate für Vereine, Läden und kleine Organisationen in {city}. Die meisten Projekte beginnen mit einem Gespräch und einer Tasse Kaffee.",
+    "Ich arbeite gern mit wenigen Mitteln: einer Schrift, einem Raster, ein bis zwei Farben. Was wegbleibt, ist meistens die beste Entscheidung.",
+    "Wer schon Texte und Bilder hat, bekommt eine Gestaltung, die sie trägt. Wer noch nichts hat, bekommt zuerst Fragen."
+   ],
+   "services": [
+    "Zeichen, Schrift und Farben für kleine Marken",
+    "Plakate, Flyer und Programmhefte",
+    "Verpackungen und Beschilderung"
+   ],
+   "shows": [
+    {
+     "y": "2025",
+     "t": "Plakatwettbewerb der Stadt, zweiter Platz"
+    },
+    {
+     "y": "2024",
+     "t": "Gestaltung des Jahres, Auswahl der Region"
+    },
+    {
+     "y": "2023",
+     "t": "Typografie in kleinen Räumen, Vortrag, Designtage"
+    }
+   ],
+   "works": [
+    {
+     "title": "Erscheinungsbild für einen Teehändler",
+     "caption": "Zeichen, Etiketten und Dosen, 2025",
+     "note": "Ein Schriftzug, eine Reihe von Etiketten und stapelbare Dosen.",
+     "text": "Das Blatt im Zeichen ist ein echtes Blatt aus dem Garten des Inhabers."
+    },
+    {
+     "title": "Plakate für einen Chor",
+     "caption": "Zweifarbiger Druck, 2025",
+     "note": "Drei Plakate für drei Konzerte.",
+     "text": "Gedruckt in zwei Farben auf einem Bogen, damit die Kosten niedrig bleiben."
+    },
+    {
+     "title": "Jahresbericht",
+     "caption": "Heft, 40 Seiten, 2024",
+     "note": "Für einen kleinen Verein, schlicht gesetzt.",
+     "text": "Eine ruhige Schrift, große Ränder und ein Diagramm, das schön sein darf."
+    },
+    {
+     "title": "Programmheft für ein Puppentheater",
+     "caption": "Gefaltetes Blatt, 2024",
+     "note": "Ein Blatt, das sich zum kleinen Theater faltet.",
+     "text": "Man muss nur an der richtigen Ecke ziehen."
+    },
+    {
+     "title": "Verpackung für eine Bäckerei",
+     "caption": "Tüten und Stempel, 2023",
+     "note": "Papiertüten, ein Stempel und ein Band in der Farbe des Ladens.",
+     "text": "Der Stempel ist aus einer Kartoffel geschnitten."
+    },
+    {
+     "title": "Leitsystem für eine Bibliothek",
+     "caption": "Beschilderung, 2023",
+     "note": "Schilder für vier Etagen, mit echten Leserinnen und Lesern getestet.",
+     "text": "Ein Schild haben wir dreimal versetzt."
+    },
+    {
+     "title": "Speisekarte für ein kleines Restaurant",
+     "caption": "Einseitiges Blatt, 2022",
+     "note": "Eine Seite, jede Woche neu.",
+     "text": "Das Layout lässt Platz für einen Stift, denn der Koch streicht immer etwas durch."
+    }
+   ]
+  }
+ }
+}

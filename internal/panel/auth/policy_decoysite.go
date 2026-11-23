@@ -3,8 +3,6 @@
 package auth
 
 import (
-	"google.golang.org/protobuf/proto"
-
 	decoysitev1 "github.com/mistgate/mistgate/gen/mistgate/decoysite/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/decoysite/v1/decoysitev1connect"
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -21,7 +19,9 @@ import (
 //   - everything that puts a site on a node or the panel, takes it off, marks it ready, reverts it, deletes it, or saves a new
 //     version of a ready site: the owner's approval, through the plan and apply tools.
 //
-// EditDecoySiteFile, UpdateDecoySite, CopyDecoySite, SetPanelDecoySource and ListDecoyPages / GetDecoyPagePreview stay the owner's own.
+// EditDecoySiteFile, UpdateDecoySite, CopyDecoySite, SetPanelDecoySource, ListDecoyPages / GetDecoyPagePreview and the three template
+// calls (ListDecoyTemplates, PreviewDecoyTemplate, GenerateDecoySite) stay the owner's own: an agent makes its sites its own way.
+// So do the three calls about the photo keys and source (GetDecoyPhotos, SetDecoyPhotosKey, SetDecoyPhotosSource): an agent cannot read or change a key.
 func init() {
 	for _, p := range []string{
 		decoysitev1connect.DecoySiteServiceListDecoySitesProcedure,
@@ -41,6 +41,12 @@ func init() {
 		decoysitev1connect.DecoySiteServiceListDecoyPagesProcedure,
 		decoysitev1connect.DecoySiteServiceGetDecoyPagePreviewProcedure,
 		decoysitev1connect.DecoySiteServiceGetDecoyFileProcedure,
+		decoysitev1connect.DecoySiteServiceListDecoyTemplatesProcedure,
+		decoysitev1connect.DecoySiteServicePreviewDecoyTemplateProcedure,
+		decoysitev1connect.DecoySiteServiceGenerateDecoySiteProcedure,
+		decoysitev1connect.DecoySiteServiceGetDecoyPhotosProcedure,
+		decoysitev1connect.DecoySiteServiceSetDecoyPhotosKeyProcedure,
+		decoysitev1connect.DecoySiteServiceSetDecoyPhotosSourceProcedure,
 	} {
 		procedureLevels[p] = levelOwner
 	}
@@ -77,14 +83,5 @@ func init() {
 	grantProcedures["decoy_site_revert"] = []string{decoysitev1connect.DecoySiteServiceRevertDecoySiteProcedure}
 	grantProcedures["decoy_site_delete"] = []string{decoysitev1connect.DecoySiteServiceDeleteDecoySiteProcedure}
 	// the plan of an assignment asks what it would replace: a dry run changes nothing, even for a draft that is not ready yet
-	planningExtra[decoysitev1connect.DecoySiteServiceAssignDecoySiteProcedure] = struct {
-		message func() proto.Message
-		dry     func(proto.Message) bool
-	}{
-		message: func() proto.Message { return &decoysitev1.AssignDecoySiteRequest{} },
-		dry: func(m proto.Message) bool {
-			r, ok := m.(*decoysitev1.AssignDecoySiteRequest)
-			return ok && r.GetDryRun()
-		},
-	}
+	planningExtra[decoysitev1connect.DecoySiteServiceAssignDecoySiteProcedure] = planningCheck((*decoysitev1.AssignDecoySiteRequest).GetDryRun)
 }

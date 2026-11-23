@@ -1,0 +1,201 @@
+{
+ "ui": {
+  "platforms": "Plateformes",
+  "col_name": "Nom",
+  "col_size": "Taille",
+  "nav_label": "Navigation",
+  "footer": "Publié sous licence MIT.",
+  "nav_home": "Présentation",
+  "nav_changelog": "Historique des versions",
+  "nav_install": "Installation",
+  "nav_roadmap": "Feuille de route",
+  "home_title": "Présentation",
+  "desc_changelog": "Toutes les versions de {brand}, avec ce qui a changé dans chacune.",
+  "desc_install": "Comment installer {brand} : paquets des distributions, compilation depuis les sources et sommes de contrôle de chaque version.",
+  "desc_roadmap": "Sur quoi travaillent les mainteneurs de {brand} et ce qui vient ensuite.",
+  "nf_title": "Page introuvable",
+  "nf_text": "Cette page n'existe pas, ou elle a été déplacée depuis la dernière version.",
+  "nf_back": "Retour à la présentation",
+  "features_h": "Pourquoi {brand}",
+  "start_h": "Pour commencer",
+  "latest_h": "Dernière version",
+  "all_releases": "Toutes les versions",
+  "get_it": "Installer",
+  "read_log": "Lire l'historique des versions",
+  "changelog_h": "Historique des versions",
+  "changelog_intro": "Toutes les versions, de la plus récente à la plus ancienne. Les numéros suivent le schéma habituel : majeure, mineure, correctif.",
+  "released": "Publiée le",
+  "install_h": "Installation",
+  "install_intro": "{brand} n'est pas fourni sous forme de binaire prêt à l'emploi. Les distributions le proposent en paquet, et le compiler depuis l'archive des sources prend quelques minutes.",
+  "pkg_h": "Depuis votre distribution",
+  "pkg_note": "La version des paquets peut avoir quelques semaines de retard sur la dernière version ; le tableau plus bas indique quelle version attendre depuis l'archive des sources.",
+  "src_h": "Compiler depuis les sources",
+  "src_intro": "Il vous faut un compilateur C et make. La compilation prend environ une minute. L'archive des sources de chaque version porte le nom de la version.",
+  "sums_h": "Versions et sommes de contrôle",
+  "sums_intro": "Chaque version a une archive des sources. Vérifiez sa somme de contrôle SHA-256 avant de la compiler.",
+  "col_ver": "Version",
+  "col_date": "Publiée le",
+  "col_sum": "SHA-256 de l'archive des sources",
+  "roadmap_h": "Feuille de route",
+  "roadmap_intro": "Ce sur quoi travaillent les mainteneurs, à peu près dans l'ordre. Les plans changent ; l'historique des versions garde la trace de ce qui s'est vraiment passé.",
+  "now_h": "En cours",
+  "next_h": "Ensuite",
+  "later_h": "Plus tard",
+  "licence_h": "Licence",
+  "licence_p": "{brand} est un logiciel libre, publié sous licence MIT. Utilisez-le, modifiez-le et partagez-le.",
+  "rel_back": "Toutes les versions",
+  "rel_more": "Autres versions",
+  "rel_src_h": "Archive des sources",
+  "pkgs": [
+   {
+    "s": "Debian et Ubuntu"
+   },
+   {
+    "s": "Fedora"
+   },
+   {
+    "s": "Arch Linux"
+   },
+   {
+    "s": "macOS avec Homebrew"
+   }
+  ]
+ },
+ "bundles": {
+  "watch": {
+   "vars": {
+    "brand": {
+     "join": [
+      ["Galet", "Marais", "Lanterne", "Cairn", "Braise", "Fable", "Sterne", "Ortie", "Ardoise", "Mousse"],
+      ["watch", "tail", "glance", "notice", "sentry", "peek"]
+     ]
+    }
+   },
+   "tagline": "Lancez une commande quand vos fichiers changent",
+   "desc": "{brand} surveille un dossier et lance une commande dès que quelque chose y change.",
+   "overview": "{brand} surveille un dossier et lance une commande dès que quelque chose y change. C'est un petit programme rapide pour ceux qui en ont assez d'enregistrer un fichier puis de basculer vers une autre fenêtre.",
+   "features": [
+    {
+     "h": "Rapide à prendre en main",
+     "p": "Une commande, aucun fichier de configuration."
+    },
+    {
+     "h": "Des réglages raisonnables",
+     "p": "Ignore les fichiers temporaires des éditeurs, les dossiers de gestion de versions et les produits de compilation."
+    },
+    {
+     "h": "Partout pareil",
+     "p": "Linux, macOS et Windows, avec les mêmes options."
+    }
+   ],
+   "quick": "{cmd} src 'make test'",
+   "changes": [
+    {"k": "Ajouté", "t": "La surveillance de plusieurs dossiers à la fois."},
+    {"k": "Ajouté", "t": "Une option de délai pour attendre un moment de calme avant de lancer la commande."},
+    {"k": "Ajouté", "t": "De la couleur dans la sortie quand le terminal la gère."},
+    {"k": "Corrigé", "t": "Un plantage rare quand un dossier surveillé était supprimé."},
+    {"k": "Corrigé", "t": "Des exécutions en double quand un éditeur enregistrait un fichier en deux temps."},
+    {"k": "Corrigé", "t": "Les chemins contenant des espaces sous Windows."},
+    {"k": "Modifié", "t": "Le délai par défaut est désormais de 200 millisecondes au lieu de 50."},
+    {"k": "Modifié", "t": "Les motifs à ignorer suivent les mêmes règles que la plupart des outils de gestion de versions."},
+    {"k": "Ajouté", "t": "Une option once qui lance la commande une seule fois puis s'arrête."},
+    {"k": "Corrigé", "t": "Une consommation de mémoire qui augmentait lentement sur de très gros dossiers."},
+    {"k": "Modifié", "t": "Les messages d'erreur indiquent maintenant quel dossier les a provoqués."},
+    {"k": "Ajouté", "t": "L'autocomplétion pour les interpréteurs de commandes courants."}
+   ],
+   "now": ["Un démarrage plus rapide sur les gros dossiers", "De meilleurs messages quand une commande échoue"],
+   "next": ["Un fichier de configuration pour les réglages de chaque projet", "Des paquets pour les principales distributions Linux"],
+   "later": ["Un mode silencieux pour les scripts", "Une surveillance fiable des disques réseau"]
+  },
+  "images": {
+   "vars": {
+    "brand": {
+     "join": [
+      ["Pixel", "Tuile", "Grain", "Cadre", "Obturateur", "Objectif", "Focale", "Cadrage", "Sepia", "Mat"],
+      ["fit", "trim", "shrink", "pack", "batch", "scale"]
+     ]
+    }
+   },
+   "tagline": "Redimensionnez un dossier entier d'images d'un coup",
+   "desc": "{brand} redimensionne et compresse des images en lot et laisse les originaux tranquilles.",
+   "overview": "{brand} redimensionne et compresse des images en lot. Indiquez-lui un dossier et la taille voulue ; il fait le reste et laisse les originaux intacts.",
+   "features": [
+    {
+     "h": "Le lot d'abord",
+     "p": "Des centaines de fichiers à la fois, en utilisant tous les cœurs."
+    },
+    {
+     "h": "Les originaux restent intacts",
+     "p": "Les résultats vont dans un nouveau dossier."
+    },
+    {
+     "h": "Un résultat prévisible",
+     "p": "Les mêmes fichiers donnent toujours les mêmes octets."
+    }
+   ],
+   "quick": "{cmd} photos --width 1600 --out small",
+   "changes": [
+    {"k": "Ajouté", "t": "La prise en charge du format WebP en sortie."},
+    {"k": "Ajouté", "t": "Une option de qualité pour le JPEG et le WebP."},
+    {"k": "Corrigé", "t": "Les photos prises en mode portrait qui sortaient couchées."},
+    {"k": "Corrigé", "t": "Un plantage sur les fichiers sans extension."},
+    {"k": "Modifié", "t": "Les fichiers produits gardent la date de modification d'origine."},
+    {"k": "Ajouté", "t": "Une option d'essai à blanc qui liste ce qui serait fait."},
+    {"k": "Corrigé", "t": "L'affichage lent de la progression sur les gros lots."},
+    {"k": "Modifié", "t": "Une consommation de mémoire réduite pour les très grandes images."},
+    {"k": "Ajouté", "t": "Le redimensionnement à une hauteur maximale, en plus de la largeur."},
+    {"k": "Corrigé", "t": "Des couleurs fausses sur les images avec un profil intégré."},
+    {"k": "Modifié", "t": "L'aide contient maintenant des exemples."},
+    {"k": "Ajouté", "t": "Une option de suffixe pour nommer les fichiers redimensionnés."}
+   ],
+   "now": ["Un décodage JPEG plus rapide", "Une barre de progression discrète"],
+   "next": ["Le recadrage selon un rapport fixe", "Des paquets pour les principales distributions Linux"],
+   "later": ["La prise en charge des images animées", "Un petit mode d'aperçu"]
+  },
+  "backup": {
+   "vars": {
+    "brand": {
+     "join": [
+      ["Grenier", "Cave", "Rayon", "Tiroir", "Coffre", "Malle", "Cellier", "Placard", "Armoire", "Garde"],
+      ["copy", "keep", "stash", "save", "mirror", "store"]
+     ]
+    }
+   },
+   "tagline": "Des sauvegardes simples et fiables d'un dossier",
+   "desc": "{brand} copie un dossier ailleurs et garde les anciennes versions sous forme de fichiers ordinaires.",
+   "overview": "{brand} copie un dossier ailleurs et garde les anciennes versions, pour qu'une erreur de mardi dernier puisse encore être annulée. Les sauvegardes sont des fichiers ordinaires qu'on peut ouvrir sans {brand}.",
+   "features": [
+    {
+     "h": "Des fichiers ordinaires",
+     "p": "Aucun format spécial à déverrouiller plus tard."
+    },
+    {
+     "h": "Des versions",
+     "p": "Gardez autant d'instantanés que vous voulez."
+    },
+    {
+     "h": "Il se vérifie lui-même",
+     "p": "Une commande verify compare une sauvegarde à sa source."
+    }
+   ],
+   "quick": "{cmd} notes /sauvegardes/notes",
+   "changes": [
+    {"k": "Ajouté", "t": "Une commande verify qui compare une sauvegarde à sa source."},
+    {"k": "Ajouté", "t": "Les instantanés peuvent être gardés pendant un nombre de jours ou un nombre de copies."},
+    {"k": "Corrigé", "t": "Les fichiers modifiés pendant une sauvegarde qui étaient copiés deux fois."},
+    {"k": "Corrigé", "t": "Des droits d'accès faux sur les fichiers restaurés."},
+    {"k": "Modifié", "t": "Les fichiers inchangés ne sont plus recopiés."},
+    {"k": "Ajouté", "t": "Une commande restore avec un mode d'essai à blanc."},
+    {"k": "Corrigé", "t": "Un plantage sur les dossiers aux noms de chemin très longs."},
+    {"k": "Modifié", "t": "La progression ne s'affiche que quand la sortie est un terminal."},
+    {"k": "Ajouté", "t": "Une commande list qui affiche les instantanés d'une sauvegarde."},
+    {"k": "Corrigé", "t": "Les sauvegardes vers des disques réseau qui s'arrêtaient après un délai dépassé."},
+    {"k": "Modifié", "t": "Les instantanés sont nommés par date plutôt que par numéro."},
+    {"k": "Ajouté", "t": "Une option pour exclure des fichiers selon un motif."}
+   ],
+   "now": ["Une copie plus rapide de nombreux petits fichiers", "Un rapport de vérification plus clair"],
+   "next": ["Le chiffrement des sauvegardes au repos", "La sauvegarde vers un second emplacement en une seule étape"],
+   "later": ["Un outil graphique de restauration", "Une planification intégrée"]
+  }
+ }
+}

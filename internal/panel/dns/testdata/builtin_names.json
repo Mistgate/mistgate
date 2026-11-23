@@ -1,0 +1,128 @@
+{
+  "dns_builtin_adblock": {
+    "ru": "AdGuard: без рекламы",
+    "en": "AdGuard: no ads",
+    "zh": "AdGuard：无广告",
+    "fa": "AdGuard: بدون تبلیغ",
+    "tr": "AdGuard: reklamsız"
+  },
+  "dns_builtin_ads_device": {
+    "ru": "Без рекламы на устройстве",
+    "en": "No ads on the device",
+    "zh": "设备端拦截广告",
+    "fa": "مسدودسازی تبلیغ روی دستگاه",
+    "tr": "Cihazda reklam engeli"
+  },
+  "dns_builtin_cloudflare": {
+    "ru": "Cloudflare: без фильтров",
+    "en": "Cloudflare: no filtering",
+    "zh": "Cloudflare：无过滤",
+    "fa": "Cloudflare: بدون فیلتر",
+    "tr": "Cloudflare: filtresiz"
+  },
+  "dns_builtin_cloudflare_family": {
+    "ru": "Cloudflare Family: без вредоносных и 18+",
+    "en": "Cloudflare Family: no malware, no 18+",
+    "zh": "Cloudflare Family：无恶意网站和成人内容",
+    "fa": "Cloudflare Family: بدون بدافزار و محتوای بزرگسالان",
+    "tr": "Cloudflare Family: zararlı ve +18 yok"
+  },
+  "dns_builtin_cloudflare_security": {
+    "ru": "Cloudflare Security: защита от вредоносных",
+    "en": "Cloudflare Security: malware blocking",
+    "zh": "Cloudflare Security：拦截恶意网站",
+    "fa": "Cloudflare Security: مسدودسازی بدافزار",
+    "tr": "Cloudflare Security: zararlı yazılım engeli"
+  },
+  "dns_builtin_cn_split": {
+    "ru": "Китай: китайские сайты напрямую",
+    "en": "China: Chinese sites direct",
+    "zh": "中国：国内网站直连",
+    "fa": "چین: سایت‌های چینی مستقیم",
+    "tr": "Çin: Çin siteleri doğrudan"
+  },
+  "dns_builtin_dnssb": {
+    "ru": "DNS.SB: без фильтров",
+    "en": "DNS.SB: no filtering",
+    "zh": "DNS.SB：无过滤",
+    "fa": "DNS.SB: بدون فیلتر",
+    "tr": "DNS.SB: filtresiz"
+  },
+  "dns_builtin_family": {
+    "ru": "AdGuard Family: без рекламы и 18+",
+    "en": "AdGuard Family: no ads, no 18+",
+    "zh": "AdGuard Family：无广告和成人内容",
+    "fa": "AdGuard Family: بدون تبلیغ و محتوای بزرگسالان",
+    "tr": "AdGuard Family: reklam ve +18 yok"
+  },
+  "dns_builtin_google": {
+    "ru": "Google: без фильтров",
+    "en": "Google: no filtering",
+    "zh": "Google：无过滤",
+    "fa": "Google: بدون فیلتر",
+    "tr": "Google: filtresiz"
+  },
+  "dns_builtin_opendns_family": {
+    "ru": "OpenDNS FamilyShield: без 18+",
+    "en": "OpenDNS FamilyShield: no 18+",
+    "zh": "OpenDNS FamilyShield：无成人内容",
+    "fa": "OpenDNS FamilyShield: بدون محتوای بزرگسالان",
+    "tr": "OpenDNS FamilyShield: +18 yok"
+  },
+  "dns_builtin_quad9": {
+    "ru": "Quad9: защита от вредоносных",
+    "en": "Quad9: malware blocking",
+    "zh": "Quad9：拦截恶意网站",
+    "fa": "Quad9: مسدودسازی بدافزار",
+    "tr": "Quad9: zararlı yazılım engeli"
+  },
+  "dns_builtin_ru_geo": {
+    "ru": "Россия: российские сайты напрямую (список сообщества)",
+    "en": "Russia: Russian sites direct (community list)",
+    "zh": "俄罗斯：俄罗斯网站直连（社区列表）",
+    "fa": "روسیه: سایت‌های روسی مستقیم (فهرست جامعه)",
+    "tr": "Rusya: Rus siteleri doğrudan (topluluk listesi)"
+  },
+  "dns_builtin_ru_proxied": {
+    "ru": "Россия: всё через VPN",
+    "en": "Russia: all through VPN",
+    "zh": "俄罗斯：全部经 VPN",
+    "fa": "روسیه: همه‌چیز از راه VPN",
+    "tr": "Rusya: her şey VPN üzerinden"
+  },
+  "dns_builtin_ru_split": {
+    "ru": "Россия: .ru напрямую",
+    "en": "Russia: .ru direct",
+    "zh": "俄罗斯：.ru 直连",
+    "fa": "روسیه: ‎.ru مستقیم",
+    "tr": "Rusya: .ru doğrudan"
+  },
+  "dns_builtin_standard": {
+    "ru": "Cloudflare + Google",
+    "en": "Cloudflare + Google",
+    "zh": "Cloudflare + Google",
+    "fa": "Cloudflare + Google",
+    "tr": "Cloudflare + Google"
+  },
+  "dns_builtin_yandex": {
+    "ru": "Яндекс DNS",
+    "en": "Yandex DNS",
+    "zh": "Yandex DNS",
+    "fa": "Yandex DNS",
+    "tr": "Yandex DNS"
+  },
+  "dns_builtin_yandex_family": {
+    "ru": "Яндекс семейный: без 18+",
+    "en": "Yandex Family: no 18+",
+    "zh": "Yandex Family：无成人内容",
+    "fa": "Yandex Family: بدون محتوای بزرگسالان",
+    "tr": "Yandex Family: +18 yok"
+  },
+  "dns_builtin_yandex_safe": {
+    "ru": "Яндекс безопасный: защита от вредоносных",
+    "en": "Yandex Safe: malware blocking",
+    "zh": "Yandex Safe：拦截恶意网站",
+    "fa": "Yandex Safe: مسدودسازی بدافزار",
+    "tr": "Yandex Safe: zararlı yazılım engeli"
+  }
+}

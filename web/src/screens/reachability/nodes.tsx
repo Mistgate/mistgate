@@ -45,7 +45,8 @@ function cellOf(t: T, source: ReachSource, on: boolean, lane: Lane | undefined, 
   return { word: say.word, cls: say.tone === "part" ? "part" : say.tone === "mut" ? "mut" : "" };
 }
 
-/** One of the seven days of the strip: the worst verdict any source had on it; nothing seen is an empty cell. */
+/** One of the seven days of the strip: the worst verdict any live source had on it; nothing seen is an empty cell. A block list that
+ * holds the address says nothing of whether traffic passes, so it colours no day. */
 export type Day = { from: number; to: number; verdict: CountryVerdict | null };
 
 const worse = (a: CountryVerdict | null, b: CountryVerdict): CountryVerdict => {
@@ -67,7 +68,7 @@ export function daysOf(lanes: readonly Lane[], now: number): Day[] {
     const b = i === 0 ? now : next.getTime() / 1000;
     let verdict: CountryVerdict | null = null;
     for (const lane of lanes)
-      for (const s of segmentsOf(lane, a, b)) if (s.to > s.from || (s.from >= a && s.from < b)) if (verdictKind(s.verdict) !== "unknown") verdict = worse(verdict, s.verdict);
+      for (const s of segmentsOf(lane, a, b)) if (s.to > s.from || (s.from >= a && s.from < b)) if (verdictKind(s.verdict) !== "unknown" && verdictKind(s.verdict) !== "listed") verdict = worse(verdict, s.verdict);
     days.push({ from: a, to: b, verdict });
   }
   return days;

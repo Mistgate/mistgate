@@ -1,0 +1,144 @@
+{
+ "style": {
+  "scheme": "dark",
+  "palettes": [
+   {
+    "name": "lime",
+    "d": {"bg": "#0a0a0a", "fg": "#e8e8e3", "ac": "#c6ff3d", "a2": "#7fd6e8"}
+   },
+   {
+    "name": "orange",
+    "d": {"bg": "#0b0a09", "fg": "#ece8e2", "ac": "#ff9f43", "a2": "#7fd6e8"}
+   },
+   {
+    "name": "cyan",
+    "d": {"bg": "#080b0d", "fg": "#e3eaec", "ac": "#5ee1f0", "a2": "#c6ff3d"}
+   },
+   {
+    "name": "pink",
+    "d": {"bg": "#0b090b", "fg": "#ece6ec", "ac": "#ff7ac6", "a2": "#7fd6e8"}
+   },
+   {
+    "name": "amber",
+    "d": {"bg": "#0a0a0a", "fg": "#eae8de", "ac": "#ffd23f", "a2": "#7fd6e8"}
+   },
+   {
+    "name": "violet",
+    "d": {"bg": "#09090d", "fg": "#e6e6f0", "ac": "#b7a6ff", "a2": "#c6ff3d"}
+   }
+  ],
+  "fonts": [
+   {"head": "mono", "body": "mono", "fw": 700, "ls": "-.04em", "lh": "1", "tt": "uppercase", "lsl": ".14em", "fsl": ".78rem"},
+   {"head": "mono", "body": "sans", "fw": 700, "ls": "-.035em", "lh": "1", "label": "mono", "tt": "uppercase", "lsl": ".12em", "fsl": ".76rem"},
+   {"head": "sans", "body": "mono", "fw": 750, "ls": "-.035em", "lh": "1", "label": "mono", "tt": "uppercase", "lsl": ".1em", "fsl": ".76rem"}
+  ],
+  "radius": [0, 2],
+  "radius_s": [0, 2],
+  "radius_b": [0, 4],
+  "density": [0.95, 1.05],
+  "width": [1280, 1360],
+  "measure": [640, 720],
+  "base": [15, 16],
+  "scale": [1.3, 1.4],
+  "lh": [1.55, 1.65],
+  "stroke": [1.6, 2],
+  "border": [1, 1],
+  "shadows": [
+   "none"
+  ]
+ },
+ "title": {
+  "en": "Open-source project page",
+  "ru": "Страница open-source проекта (с журналом изменений)"
+ },
+ "layouts": 3,
+ "pages": [
+  {
+   "name": "home",
+   "tmpl": "home.html.tmpl",
+   "paths": [
+    "index.html"
+   ],
+   "nav": "nav_home",
+   "title": "home_title",
+   "desc": "desc"
+  },
+  {
+   "name": "changelog",
+   "tmpl": "changelog.html.tmpl",
+   "paths": [
+    "changelog.html",
+    "changelog/index.html",
+    "releases/index.html",
+    "history.html"
+   ],
+   "nav": "nav_changelog",
+   "desc": "desc_changelog"
+  },
+  {
+   "name": "install",
+   "tmpl": "install.html.tmpl",
+   "paths": [
+    "install.html",
+    "install/index.html",
+    "get/index.html",
+    "packages.html"
+   ],
+   "nav": "nav_install",
+   "desc": "desc_install"
+  },
+  {
+   "name": "roadmap",
+   "tmpl": "roadmap.html.tmpl",
+   "paths": [
+    "roadmap.html",
+    "roadmap/index.html",
+    "plans/index.html",
+    "next.html"
+   ],
+   "nav": "nav_roadmap",
+   "desc": "desc_roadmap"
+  },
+  {
+   "name": "release",
+   "tmpl": "release.html.tmpl",
+   "paths": [
+    "releases/{slug}.html",
+    "release/{slug}/index.html",
+    "changelog/{slug}.html",
+    "v/{slug}/index.html"
+   ],
+   "each": "releases",
+   "desc": "desc_changelog"
+  }
+ ],
+ "home_blocks": [
+  "install",
+  "features",
+  "start",
+  "changelog",
+  "roadmap"
+ ],
+ "home_fixed": 0,
+ "lists": [
+  {
+   "name": "releases",
+   "min": 6,
+   "max": 8,
+   "semver": true,
+   "dates": {
+    "end": "2026-11-06",
+    "gap_min": 16,
+    "gap_max": 38
+   },
+   "sub": [
+    {
+     "field": "notes",
+     "from": "changes",
+     "min": 2,
+     "max": 4
+    }
+   ]
+  }
+ ]
+}
