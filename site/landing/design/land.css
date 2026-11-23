@@ -845,6 +845,30 @@ html[data-lg="ZH"] .lp h1,html[data-lg="ZH"] .lp h2{letter-spacing:0;line-height
 .lp .lx-mn a{display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 12px;border-radius:10px;font-size:16px;color:var(--text)}
 .lp .lx-mn a:hover{background:var(--step)}
 .lp .lx-mn a .i{color:var(--muted)}
+/* two cards of the features block draw a piece of the panel as it is, not a board: the piece sits in .pnr (the container of the panel's own narrow rules) and is scaled to the width of the frame, so its layout is the same at every width */
+.lpe .lx-sc{container:lxs/inline-size}
+.lpe .lx-sc>.pnr{--k:.48;--z:1;position:absolute;left:0;top:0;width:calc(100%/(var(--k)*var(--z)));transform:scale(calc(var(--k)*var(--z)));transform-origin:0 0}
+.lpe .lx-sd>.pnr{--z:.86}
+@container lxs (min-width:308px){.lpe .lx-sc>.pnr{--k:.55}}
+@container lxs (min-width:350px){.lpe .lx-sc>.pnr{--k:.625}}
+@container lxs (min-width:400px){.lpe .lx-sc>.pnr{--k:.714}}
+@container lxs (min-width:456px){.lpe .lx-sc>.pnr{--k:.814}}
+@container lxs (min-width:520px){.lpe .lx-sc>.pnr{--k:.929}}
+.lpe .lx-sc .pn{display:block;min-height:0;padding:20px 20px 0;background:none}
+.lpe .lx-sd .pn{padding-top:14px}
+.lpe .lx-sd .us-db .rc-pb{margin:0}
+.lpe .lx-sc .us-dlg{border-radius:20px;max-height:none;animation:none}
+.lpe .lx-sum{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:12px;background:var(--step)}
+.lpe .lx-sum>svg{flex:none;margin-top:2px;width:18px;height:18px;color:var(--acc)}
+.lpe .lx-sum>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.lpe .lx-sum b{font-size:13px;font-weight:500}
+.lpe .lx-sum span{font-size:12px;line-height:16px;color:var(--muted)}
+.lpe .lx-cmp{width:100%;border-collapse:collapse;font-size:13px}
+.lpe .lx-cmp th{padding-bottom:6px;font-size:11px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:end}
+.lpe .lx-cmp td{padding:6px 0;border-top:1px solid var(--hair);text-align:end;font-variant-numeric:tabular-nums}
+.lpe .lx-cmp th:first-child,.lpe .lx-cmp td:first-child{text-align:start}
+.lpe .lx-cmp td:nth-child(2){font-weight:500}
+.lpe .lx-cmp td.same{color:var(--muted)}
 @container lpr (max-width:900px){
 .lpe{padding:0 16px 48px}
 .lpe .lx-h .stg .rel{transform:scale(.64)}
