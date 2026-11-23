@@ -1,5 +1,6 @@
 ---
 title: 安装面板
+seoTitle: "在自己的 Linux 服务器上安装 VPN 面板 — Mistgate"
 description: 下载或构建 Mistgate，使用 mistgate setup 准备面板，通过 systemd 运行，并首次登录。
 ---
 

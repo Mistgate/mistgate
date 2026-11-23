@@ -1,5 +1,6 @@
 ---
 title: Comparison with other panels
+seoTitle: "Mistgate vs 3x-ui, Marzban, Remnawave: panel comparison"
 description: How Mistgate compares with 3x-ui, Marzban, PasarGuard, Remnawave, Hiddify Manager and s-ui, where the others are ahead, and the sources, as checked on 2026-10-09.
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: Mistgate 文档
+seoTitle: "Mistgate 文档：安装、节点、协议、API"
 description: 文档包含哪些内容、在哪里查找，以及阅读顺序。
 ---
 

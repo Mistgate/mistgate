@@ -1,5 +1,6 @@
 ---
 title: Mistgate belgeleri
+seoTitle: "Mistgate belgeleri: kurulum, düğümler, protokoller, API"
 description: Belgelerde neler olduğu, nerede bulunacağı ve hangi sırayla okunacağı.
 ---
 

@@ -64,7 +64,7 @@ function readPage(lang, file) {
   }
   if (!fm.title) warn(`${lang}/${key}.md: no title in front matter`);
   if (!fm.description) warn(`${lang}/${key}.md: no description in front matter`);
-  return { lang, key, url: pageUrl(lang, key), date: dates.get(`${lang}/${key}.md`), title: String(fm.title ?? key), description: String(fm.description ?? ""), body: m ? raw.slice(m[0].length) : raw };
+  return { lang, key, url: pageUrl(lang, key), date: dates.get(`${lang}/${key}.md`), title: String(fm.title ?? key), seoTitle: fm.seoTitle ? String(fm.seoTitle) : undefined, description: String(fm.description ?? ""), body: m ? raw.slice(m[0].length) : raw };
 }
 
 // the star count on the GitHub button, if GitHub answers within 5 s (an offline build has none; app.js refreshes it anyway).

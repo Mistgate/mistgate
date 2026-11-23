@@ -119,7 +119,7 @@ Chrome is taken from `CHROME`, or from the usual places. The shots of `check` go
   time (the pre-render) and in the browser (what scripts assemble on the fly), over the part of the dictionary the page can show, in one language.
 * **CSS** of the design is cut to the classes the page's boards can use; fonts are the ones of `web/src/fonts`.
 * **Links** of the design (`Docs.dc.html#…`) are resolved by `links.json` to the pages the docs generator builds; a bare `Docs.dc.html` is the start page of the docs, `/docs/`.
-* **Title and description** of the home page (not of the app page) per language are in `pipeline/meta.json`.
+* **Title and description** of the home page and of the app page per language are in `pipeline/meta.json` (the home page's `title` is written as it is; without one it is "Mistgate — <h1>"). A docs page can word its `<title>` separately with `seoTitle:` in its front matter.
 * **Images** the design refers to as `/_blob/<hash>` are the files of `design/blobs/<hash>.svg` (copied by `sync`); a file is named in `assets/` by its content, so copies of one picture are one file. A hash with no file gets a stand-in drawn by the build (flags, logos), listed in `build/report.json` (`standIns`) and in the build output.
 
 ## What the generator gets beyond the contract

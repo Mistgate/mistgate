@@ -189,7 +189,7 @@ for (const page of PAGES) for (const lang of LANGS) {
     body: `pages/${page}.${lang}.html`, title: '', description: '', css: blocking, modules: [rel(js.main)], preload: js.pre.map(rel), dir: lang === 'fa' ? 'rtl' : 'ltr',
     htmlAttrs: { 'data-lg': lang.toUpperCase() }, fonts: siteFonts(lang), fetch: [bundles[`${page}:${lang}`]],
   });
-  if (page === 'main') { const s = sm[lang]; m.title = s?.h1 ? `Mistgate — ${s.h1}` : ''; m.description = s?.description || ''; if (!s?.description) { m.todo = true; warn(`main/${lang}: no title/description in meta.json`); } }
+  if (page === 'main') { const s = sm[lang]; m.title = s?.title || (s?.h1 ? `Mistgate — ${s.h1}` : ''); m.description = s?.description || ''; if (!s?.description) { m.todo = true; warn(`main/${lang}: no title/description in meta.json`); } }
 }
 writeFileSync(join(BUILD, 'manifest.json'), JSON.stringify(manifest, null, 2));
 lap('manifest written');
@@ -201,7 +201,7 @@ if (!args.includes('--no-prerender')) {
   for (const [k, html] of Object.entries(pre.fragments)) { const [page, lang] = k.split(':'); writeFileSync(join(BUILD, manifest.pages[page][lang].body), html); }
   for (const page of PAGES) for (const lang of LANGS) { // titles of the app page: from the design, translated
     const m = manifest.pages[page][lang], r = pre.report[`${page}:${lang}`] || {};
-    if (page === 'app') { m.title = r.h1 ? (/Mistgate/i.test(r.h1) ? r.h1 : `${r.h1} · Mistgate`) : ''; m.description = r.lead || ''; if (!r.h1) { m.todo = true; warn(`app/${lang}: no title in the first render`); } }
+    if (page === 'app') { const s = sm.app?.[lang]; m.title = s?.title || (r.h1 ? (/Mistgate/i.test(r.h1) ? r.h1 : `${r.h1} · Mistgate`) : ''); m.description = s?.description || r.lead || ''; if (!r.h1 && !s?.title) { m.todo = true; warn(`app/${lang}: no title in the first render`); } }
   }
   lap(`pre-rendered ${Object.keys(pre.fragments).length} pages`);
 }

@@ -25,7 +25,7 @@ export const T = {
     notFound: "Страница не найдена", notFoundText: "Такой страницы нет. Возможно, она переехала или ещё не написана.", toHome: "К документации",
   },
   zh: {
-    hreflang: "zh-Hans", htmlLang: "zh-CN", ogLocale: "zh_CN", name: "简体中文", short: "中文", docs: "文档", home: "首页", siteTitle: "Mistgate 文档",
+    hreflang: "zh-Hans", htmlLang: "zh-Hans", ogLocale: "zh_CN", name: "简体中文", short: "中文", docs: "文档", home: "首页", siteTitle: "Mistgate 文档",
     skip: "跳到正文", menu: "菜单", closeMenu: "关闭菜单", navLabel: "文档", crumbs: "面包屑导航",
     search: "搜索文档", searchLabel: "搜索文档", searchEmpty: "没有找到结果。换个词试试。", searchClose: "关闭搜索", searchIn: "位于",
     onPage: "本页内容", prev: "上一页", next: "下一页", edit: "在 GitHub 上编辑此页", theme: "切换主题", github: "GitHub 上的 Mistgate", stars: "GitHub 上的 Mistgate，{n} 个星标",
@@ -110,10 +110,11 @@ function githubButton(t, stars) {
 // the font files a page needs at once: Turkish letters (ş ğ İ) are in latin-ext, Persian ones in Vazirmatn
 const PRELOAD = { ru: ["onest-cyrillic", "onest-latin"], fa: ["vazirmatn-arabic", "onest-latin"], tr: ["onest-latin", "onest-latin-ext"] };
 
-function head({ lang, t, title, description, canonical, alternates, assets, noindex, home, ld }) {
+function head({ lang, t, title, seoTitle, description, canonical, alternates, assets, noindex, home, ld }) {
   const fonts = (PRELOAD[lang] ?? ["onest-latin"]).map((f) => `<link rel="preload" href="/fonts/${f}.woff2" as="font" type="font/woff2" crossorigin>`).join("\n");
   const alts = alternates.map((a) => `<link rel="alternate" hreflang="${a.lang}" href="${SITE}${a.url}">`).join("\n");
-  const fullTitle = home ? title : `${title} — ${t.siteTitle}`;
+  // seoTitle (front matter): the whole <title>, worded for the search result; the page keeps its own title in the sidebar, the crumbs and the h1
+  const fullTitle = seoTitle ?? (home ? title : `${title} — ${t.siteTitle}`);
   return `<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(fullTitle)}</title>
@@ -220,7 +221,7 @@ export function renderDoc(ctx) {
   return `<!doctype html>
 <html lang="${t.htmlLang}"${t.dir ? ` dir="${t.dir}"` : ""}>
 <head>
-${head({ lang, t, title: page.title, description: page.description, canonical: page.url, alternates, assets, home: isHome, ld: docLd({ lang, t, page, nav, crumbGroup, isHome }) })}
+${head({ lang, t, title: page.title, seoTitle: page.seoTitle, description: page.description, canonical: page.url, alternates, assets, home: isHome, ld: docLd({ lang, t, page, nav, crumbGroup, isHome }) })}
 </head>
 <body class="mg" data-t="${bodyData(t)}"${st.tone ? ` data-tone="${st.tone}"` : ""}>
 <a class="skip" href="#content">${esc(t.skip)}</a>

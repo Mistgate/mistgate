@@ -1,5 +1,6 @@
 ---
 title: Overview
+seoTitle: "What is Mistgate: a VPN panel for a small fleet"
 description: What Mistgate is and is not, who it is for, and how its parts fit together.
 ---
 

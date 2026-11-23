@@ -1,5 +1,6 @@
 ---
 title: AmneziaWG
+seoTitle: "Панель для AmneziaWG: 2.0 и 3.1, ключ на устройство — Mistgate"
 description: Профили AmneziaWG 3.1 и 2.0, их параметры и виды маскировки, бэкенды ноды (userspace и модуль ядра) и ключи на каждое устройство, которые люди импортируют в AmneziaVPN.
 ---
 
