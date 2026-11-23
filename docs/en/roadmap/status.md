@@ -3,24 +3,26 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.1.89`; the 0.2.0 line is being tested as development builds. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.2.0`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.1.89
+  meta: v0.1.0 – v0.2.0
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.1.89
+      release: v0.2.0
       current: true
       points:
-        - "**Relays pass on AmneziaWG servers (v0.1.89).** Pick the AmneziaWG server in the relay window as for VLESS and Hysteria2; everyone who may use both nodes gets a key of their own for the way through the entry. The \"· IPv6\" server of AmneziaWG has its own key too. See [Relays](../guide/relays.md)."
-        - "**System updates for the whole fleet in one run (v0.1.88).** Tick nodes in **Updates → Server systems** and start one run: the quietest node goes first as a canary, the rest follow one at a time or in batches; a node that says \"try later\" waits and is retried; a real failure stops the run with the choices Retry, Skip and continue, Close. Ordinary packages can be installed as well as security updates. See [Server operating system](../operations/updates.md#server-operating-system)."
-        - "**Security updates and a reboot of one node from the panel (v0.1.86).** The panel waits for the node to come back, checks the kernel and the node's profiles, and only then says done; the node refuses a reboot that is not safe, and says why. See [Update one server's system](../operations/updates.md)."
-        - "**A device that has not connected for 30 days frees its place in the limit (v0.1.88).** The period is set in **Subscriptions**, from 7 to 365 days, or switched off; the device is not deleted and its keys stay valid."
-        - "**Security.** Fixes from a review of the panel and the node link (v0.1.88 and v0.1.89): update the panel first, then every node. The panel's own update channel is read from a file that root owns, `/etc/mistgate/panel-update-channel`; without it the channel is stable."
+        - "**The whole interface redrawn.** Every screen, the windows, the phone layout and the person's own page; in **Users → People**, **QR and send** opens one window with the link, the QR code and the page password. See [Client apps](../guide/client-apps.md)."
+        - "**Decoy sites: a library and sites from a template.** A library of sites with drafts and versions, put on nodes or on the panel's address; **From a template** builds a site of one of ten kinds for one of seventeen countries, in that country's language; with your own free Pexels or Pixabay key it gets real photographs, served from the node. See [A site from a template](../guide/decoy-site.md#a-site-from-a-template)."
+        - "**One TCP 443 for several services.** VLESS (REALITY and TLS), TrustTunnel and MTProto can share one TCP port of a node, told apart by the name the client asks for; when a port is taken, the profile window offers **Put beside on 443**, with a name and the DNS record to add. See [One 443 for everyone](../guide/shared-port.md)."
+        - "**TrustTunnel and a bridge for relays (both experimental).** TrustTunnel is a VPN inside ordinary HTTPS with a real certificate, for the official TrustTunnel apps, switched on per person. When a relay's entry cannot reach its exit, the bridge lets the exit connect to the entry; a relay's **Method** is **Auto (recommended)**, **Forwarding only** or **Bridge only**. See [TrustTunnel](../guide/trusttunnel.md) and [Relays](../guide/relays.md)."
+        - "**Groups and subscriptions.** A person can be in several groups: the main one decides DNS, the Mihomo template, response headers and the colour, the extra ones add profiles and nodes. The **New node** window asks **Who gets this node**: **Everyone**, **Some groups** or **Nobody yet**. Your own Mihomo templates, response headers and routing for Happ and INCY are set in **Subscriptions**; a DNS preset sends Russian sites direct by a community list. See [Users and groups](../guide/users-and-groups.md) and [DNS](../guide/dns.md)."
+        - "**New on nodes.** **Find sites nearby** on the **Profiles** tab scans the node's /24 for a REALITY target of the node's own; **Measure the channel** on the **Server** tab fills the link with 8 streams for 10 seconds each way against your own nodes, only on your command; every 15 minutes each node fetches a list of sites through its WARP, and a WARP+ key is set on the **Exit** tab; a router or a server of yours inside a country can check your nodes from its own network as an own probe (experimental). See [Nodes](../guide/nodes.md), [WARP](../guide/warp.md) and [Own probes](../operations/probes.md)."
+        - "**Updating from v0.1.89.** After a backup, update the panel first, then every node. A node with an old agent keeps working, but TrustTunnel, a shared TCP 443, the relay bridge, measuring the channel and the decoy-site library need the new agent. Cancelling a rollout while a step runs works the same for node and system updates, and an update no longer rolls a node back for a profile that was already failing. Do not put the v0.1.89 binary back by hand on upgraded data: restore the backup made before the update. See [Updates](../operations/updates.md)."
     - title: Profiles
       section: profiles
       points:
@@ -47,6 +49,7 @@ Mistgate is in **beta**; the current release is `v0.1.89`; the 0.2.0 line is bei
       points:
         - "[Users and groups](../guide/users-and-groups.md): traffic quotas with periods, terms, [devices by device ID](../guide/users-and-groups.md#devices-and-the-device-limit) with a limit in three modes, speed per person and per device; a group also decides which nodes its people reach."
         - "The People tab sorted by any column, with device counts, and bulk actions on several users at once."
+        - "A device that has not connected for 30 days frees its place in the limit (v0.1.88). The period is set in **Subscriptions**, from 7 to 365 days, or switched off; the device is not deleted and its keys stay valid."
     - title: Subscriptions
       section: subscriptions
       points:
@@ -72,6 +75,7 @@ Mistgate is in **beta**; the current release is `v0.1.89`; the 0.2.0 line is bei
       points:
         - "[What's new](../operations/updates.md#whats-new): the release notes between your version and the available one, in the interface language."
         - "[Signed node agent updates](../operations/updates.md), one node at a time, now or on a schedule, with a health gate and automatic rollback."
+        - "[System updates of the servers](../operations/updates.md#server-operating-system): security updates and a reboot of one node from the panel, which waits for the node to come back and checks its kernel and profiles before it says done, while the node refuses a reboot that is not safe and says why (v0.1.86); or one run for the whole fleet (v0.1.88): the quietest node goes first as a canary, the rest follow one at a time or in batches, a node that says \"try later\" is retried, and a real failure stops the run with the choices Retry, Skip and continue, Close. Ordinary packages can be installed as well as security updates."
         - "Panel self-update from signed GitHub releases, with a rollback when the new panel does not stay up."
         - "[Release channels](../operations/updates.md#release-channels) (stable, testing, development) for the panel and its nodes, and a backup offered before the panel updates itself."
         - "[A one-line panel install](../getting-started/install-panel.md#one-line-install) that verifies the release signature."
@@ -89,35 +93,27 @@ Mistgate is in **beta**; the current release is `v0.1.89`; the 0.2.0 line is bei
       points:
         - "The admin, the user page, the node install page, Telegram messages and these docs in English, Russian and Simplified Chinese, the admin and the user page also in Persian and Turkish; sign-in with a passkey or a password with an authenticator code, optional Cloudflare Turnstile, an audit log. See [Security](../operations/security.md)."
         - "A code audit (v0.1.84) went over sign-in, subscriptions, the node link, MCP and the assistant; the gaps it found are closed. See [Security](../operations/security.md)."
+        - "**Security fixes.** Fixes from a review of the panel and the node link (v0.1.88 and v0.1.89): update the panel first, then every node. The panel's own update channel is read from a file that root owns, `/etc/mistgate/panel-update-channel`; without it the channel is stable."
         - "A [decoy site](../guide/decoy-site.md) at the panel's address hides the admin from strangers."
         - "[Encrypted backups](../operations/backups.md) to Cloudflare R2 on a schedule, with retention, or to a file on the owner's computer; restore in the panel or on a new server with the installer."
         - "[Panel logs, retention, export and metrics](../operations/troubleshooting.md#panel-logs-retention-export-and-metrics) for the owner, and the reveal animation (on by default, switched off per device in **Settings → Interface**)."
 - status: now
   title: Now
-  meta: v0.2.0-dev.1 – dev.14, v0.1.34 – v0.1.81
-  lead: "First what the 0.2.0 development builds added (not for production panels: the stable release is `v0.1.89`, and 0.2.0 has no date), then what earlier releases added and is being proven in production."
+  meta: v0.1.34 – v0.2.0
+  lead: "Released, and still being proven in production: first the experimental parts of v0.2.0 and the Windows app (a separate project), then what earlier releases added."
   cards:
-    - title: "The whole interface redrawn"
-      icon: layers
-      text: "Every screen, the windows, the phone layout and the person's own page; QR codes are made by the server, with rounded shapes and a logo that never costs the code its reading. See [Client apps](../guide/client-apps.md)."
-    - title: "Decoy sites: a library and sites from a template"
+    - title: TrustTunnel in production
+      section: profiles
+      text: "New in v0.2.0 and experimental. Give a key to one or two people first and check that the official app connects from their networks before you hand it out widely. See [TrustTunnel](../guide/trusttunnel.md)."
+    - title: The relay bridge in production
+      section: nodes
+      text: "New in v0.2.0, experimental, TCP only. Existing relays got the method **Auto (recommended)**, so a relay can move to the bridge by itself after two failed checks: after the first switch, read the relay's events and check that people reconnect. See [Relays](../guide/relays.md)."
+    - title: Own probes in production
+      section: reachability
+      text: "New in v0.2.0 and experimental. A router (Keenetic with Entware) or a server of yours inside a country checks your nodes from its own network: start with one probe and compare its answer with the other sources in the *From Russia* column before you rely on it. See [Own probes](../operations/probes.md)."
+    - title: Sites from a template in production
       section: settings
-      text: "A library of sites with drafts and versions, put on nodes. **From a template** builds a site of one of ten kinds for one of seventeen countries, in that country's language, with inner pages and a 404; with your own free key to Pexels or Pixabay it gets real photographs, served from the node. The key is stored encrypted and is part of a backup. See [A site from a template](../guide/decoy-site.md#a-site-from-a-template)."
-    - title: "One TCP 443 for several services"
-      section: nodes
-      text: "VLESS REALITY, VLESS over TLS, TrustTunnel and MTProto can share one TCP port of a node, told apart by the name the client asks for; the panel offers to put a new profile beside the taken one and shows the DNS record, and the node page has a card of the shared port with its counters. See [One 443 for everyone](../guide/shared-port.md)."
-    - title: "WARP: a reach check and WARP+"
-      section: nodes
-      text: "Every 15 minutes the panel fetches a list of sites through each node's WARP and raises an alert when a site blocks the exit; a licence key (WARP+) can be set for a node's account. See [WARP](../guide/warp.md)."
-    - title: "Who gets a node, and groups"
-      section: users
-      text: "A node goes to everyone, to chosen groups or to nobody yet; a person can be in several groups, the main one decides DNS, the Mihomo template and the colour, the extra ones add their profiles and nodes. See [Users and groups](../guide/users-and-groups.md)."
-    - title: "DNS for the apps, and routing for Happ"
-      section: subscriptions
-      text: "A built-in DNS preset sends Russian sites direct by a community list the app updates itself; a split rule takes any geosite category and Russia as a country. A `happ://` or `incy://` routing link can be set for every group or for chosen ones. See [DNS](../guide/dns.md)."
-    - title: "Rollouts: cancel, rollback reasons, the channel measure"
-      section: updates
-      text: "Cancelling a rollout while a step runs works the same for node and system updates; a rollback names the profile that did not pass and why. A node's channel can be measured: 8 streams for 10 seconds each way, then \"written X, measured Y: set Z?\". See [Updates](../operations/updates.md)."
+      text: "New in v0.2.0. Look at the preview, and open the saved site in a browser, before you put it on a node. Photographs come from Pexels or Pixabay, and when one source refuses, the panel does not switch to the other. See [A site from a template](../guide/decoy-site.md#a-site-from-a-template)."
     - title: "The Mistgate app for Windows"
       section: settings
       text: "A separate project, [mistgate-client](https://github.com/Mistgate/mistgate-client): Hysteria2, AmneziaWG and VLESS in one app, routing by site and by program, a kill switch. It works with these panels, through the owner's switch in **Subscriptions → Who gets what**, and with plain subscription links."
@@ -198,7 +194,7 @@ Mistgate is in **beta**; the current release is `v0.1.89`; the 0.2.0 line is bei
   cards:
     - title: Community routing lists
       section: subscriptions
-      text: "Ready rule sets maintained by the community, updated by themselves. The first, for Russia's sites \"direct\", is in the 0.2.0 builds as a DNS preset; the full list of local sites and a mode for mobile whitelists are still to come."
+      text: "Ready rule sets maintained by the community, updated by themselves. The first, for Russia's sites \"direct\", is in v0.2.0 as a DNS preset; the full list of local sites and a mode for mobile whitelists are still to come."
     - title: A choice of the protocol core per node
       section: updates
       text: "The protocol cores (Xray, Hysteria2) are built into the node agent, so today a node runs the core its agent was built with. If a core ever changes in a way old client apps cannot follow and that cannot be bridged on the server, the panel will offer two agent builds, one with the older core and one with the newer, and let you pick one per node, with the same signed rollout and rollback. Until then a new core ships with the compatibility old clients need."
