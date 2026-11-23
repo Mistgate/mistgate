@@ -17,7 +17,7 @@ Hysteria2، VLESS و AmneziaWG. دو فایل اجرایی Go، به‌علاو�
 <a href="go.mod"><img alt="نسخهٔ Go" src="https://img.shields.io/github/go-mod/go-version/Mistgate/mistgate"></a>
 </p>
 
-<p><a href="https://mistgate.app/"><b>مستندات</b></a> · <a href="#شروع-سریع"><b>نصب</b></a> · <a href="#پروتکل‌ها"><b>پروتکل‌ها</b></a> · <a href="#آیا-پایدار-است"><b>آیا پایدار است؟</b></a> · <a href="#مقایسه-با-پنل‌های-دیگر"><b>مقایسه</b></a> · <a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh.md">简体中文</a> · <a href="README.tr.md">Türkçe</a></p>
+<p><a href="https://mistgate.app/docs/"><b>مستندات</b></a> · <a href="#شروع-سریع"><b>نصب</b></a> · <a href="#پروتکل‌ها"><b>پروتکل‌ها</b></a> · <a href="#آیا-پایدار-است"><b>آیا پایدار است؟</b></a> · <a href="#مقایسه-با-پنل‌های-دیگر"><b>مقایسه</b></a> · <a href="README.md">English</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh.md">简体中文</a> · <a href="README.tr.md">Türkçe</a></p>
 
 <p><sub><b>بتا.</b> تا نسخهٔ 1.0 ممکن است چیزهایی تغییر کند. <a href="https://mistgate.app/roadmap/status/">وضعیت و نقشهٔ راه</a></sub></p>
 
@@ -226,7 +226,7 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 
 ## مستندات
 
-همه‌چیز در [mistgate.app](https://mistgate.app/) و در [پوشهٔ `docs`](docs/README.md) هست. مستندات به زبان‌های انگلیسی، روسی و چینی نوشته شده و پیوندهای زیر به نسخهٔ انگلیسی می‌روند. جاهای خوب برای شروع:
+همه‌چیز در [mistgate.app](https://mistgate.app/docs/) و در [پوشهٔ `docs`](docs/README.md) هست. مستندات به زبان‌های انگلیسی، روسی و چینی نوشته شده و پیوندهای زیر به نسخهٔ انگلیسی می‌روند. جاهای خوب برای شروع:
 
 - [نمای کلی](docs/en/getting-started/overview.md) و [پیش‌نیازها](docs/en/getting-started/requirements.md)
 - [نصب پنل](docs/en/getting-started/install-panel.md)، [نصب نود از راه SSH](docs/en/getting-started/ssh-install.md)، [نخستین کاربران](docs/en/getting-started/first-users.md)

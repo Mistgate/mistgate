@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Панель · Поиск</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./pn.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0;background:#0c0c0e}</style>
+</helmet>
+<div class="pnr an-host">
+<div class="{{rootCls}}">
+<div class="sr" role="dialog" aria-modal="true" aria-label="Поиск">
+  <label class="sr-q">
+    <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"></path></svg>
+    <input class="sr-in" placeholder="Нода, человек, раздел или действие" aria-label="Поиск" autocomplete="off" spellcheck="false" onInput="{{onQ}}" onKeyDown="{{onKey}}">
+    <button type="button" class="kbd sr-esc" onClick="{{close}}">Esc</button>
+  </label>
+
+  <div class="sr-b" role="listbox" aria-label="Результаты">
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+      <div class="sr-g">
+        <div class="sr-gh"><span>{{g.t}}</span><span class="mono">{{g.n}}</span></div>
+        <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="3">
+          <button type="button" role="option" aria-selected="{{r.on}}" class="sr-r {{r.cls}}" onClick="{{r.go}}" onMouseEnter="{{r.hover}}">
+            <span class="sr-ic {{r.kind}}" style="--tc: {{r.tc}}; --ac: {{r.ac}}" aria-hidden="true"><sc-if value="{{r.isFlag}}" hint-placeholder-val="{{false}}"><i class="fl {{r.f}}"></i></sc-if><sc-if value="{{r.isAva}}" hint-placeholder-val="{{false}}">{{r.l}}</sc-if><sc-if value="{{r.isIcon}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24"><path d="{{r.d}}"></path></svg></sc-if></span>
+            <span class="sr-t {{r.mono}}">{{r.a}}<mark>{{r.m}}</mark>{{r.z}}</span>
+            <span class="sr-s">{{r.s}}</span>
+            <span class="sr-st {{r.sc}}"><sc-if value="{{r.hasSt}}" hint-placeholder-val="{{false}}"><i class="dot {{r.sc}}" aria-hidden="true"></i></sc-if>{{r.st}}</span>
+            <span class="kbd sr-en" aria-hidden="true">Enter</span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-for>
+    <sc-if value="{{none}}" hint-placeholder-val="{{false}}">
+      <div class="sr-no"><b>Ничего не нашлось</b><span>Ищите по имени ноды, городу, человеку или названию раздела</span></div>
+    </sc-if>
+  </div>
+
+  <div class="sr-f"><span><span class="kbd">↑</span><span class="kbd">↓</span>выбрать</span><span><span class="kbd">Enter</span>открыть</span><span class="sr-fc mono">{{count}}</span></div>
+</div>
+
+<sc-if value="{{solo}}" hint-placeholder-val="{{true}}">
+  <!-- переключатель состояний макета, в продукт не идёт -->
+  <div class="an-demo" role="group" aria-label="Состояния макета">
+    <span class="dl">Запрос</span>
+    <div class="seg"><sc-for list="{{demo}}" as="o" hint-placeholder-count="4"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div>
+    <span class="dl">Тема</span>
+    <div class="seg"><button type="button" aria-pressed="{{thD}}" onClick="{{setDark}}">тёмная</button><button type="button" aria-pressed="{{thL}}" onClick="{{setLight}}">светлая</button></div>
+  </div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"query":{"editor":"text","default":"","section":"Состояние"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Вид"},"light":{"editor":null},"embedded":{"editor":null},"onClose":{"editor":null},"onAct":{"editor":null},"$preview":{"width":800,"height":640}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { q: null, sel: 0 }; }
+  componentDidMount() { try { const el = document.querySelector('.sr-in'); if (el) { if (this.props.query) el.value = this.props.query; if (this.props.embedded) el.focus(); } } catch (er) {} }
+  renderVals() {
+    const s = this.state, q = (s.q != null ? s.q : (this.props.query || '')).trim(), ql = q.toLowerCase();
+    const NAV = [['Обзор', '', 'lav', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'], ['Ноды', '', 'sky', 'M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01'], ['Пользователи', '', 'sand', 'M9 11a3.500 3.500 0 1 0 0-7 3.500 3.500 0 0 0 0 7zM3 20c0-3.300 2.700-6 6-6s6 2.700 6 6M16 4.500a3.500 3.500 0 0 1 0 6.500M21 20c0-2.600-1.600-4.800-4-5.600'], ['Профили', 'Настройка', 'sage', 'M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4'], ['Подписки', 'Настройка', 'acc', 'M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1'], ['Сайты-ширмы', 'Настройка', 'sand', 'M3.500 6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2zM3.500 9h17M6.500 6.500h.01M9 6.500h.01'], ['Здоровье', 'Эксплуатация', 'rose', 'M3 12h4l2.500-6 4 12 2.500-6h5'], ['Доступность', 'Эксплуатация', 'sky', 'M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM8.500 15.500a5 5 0 0 1 0-7M15.500 8.500a5 5 0 0 1 0 7M5.600 18.400a9 9 0 0 1 0-12.800M18.400 5.600a9 9 0 0 1 0 12.800'], ['Обновления', 'Эксплуатация', 'sky', 'M20 12a8 8 0 1 1-2.300-5.600M20 4v4h-4'], ['ИИ', 'Система', 'lav', 'M12 3l1.800 5.200L19 10l-5.200 1.800L12 17l-1.800-5.200L5 10l5.200-1.800z'], ['Интеграции', 'Система', 'lav', 'M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4'], ['Настройки', 'Система', 'sand', 'M12.220 2h-.440a2 2 0 0 0-2 2v.180a2 2 0 0 1-1 1.730l-.430.250a2 2 0 0 1-2 0l-.150-.080a2 2 0 0 0-2.730.730l-.220.380a2 2 0 0 0 .730 2.730l.150.100a2 2 0 0 1 1 1.720v.510a2 2 0 0 1-1 1.740l-.150.090a2 2 0 0 0-.730 2.730l.220.380a2 2 0 0 0 2.730.730l.150-.080a2 2 0 0 1 2 0l.430.250a2 2 0 0 1 1 1.730V20a2 2 0 0 0 2 2h.440a2 2 0 0 0 2-2v-.180a2 2 0 0 1 1-1.730l.430-.250a2 2 0 0 1 2 0l.150.080a2 2 0 0 0 2.730-.730l.220-.390a2 2 0 0 0-.730-2.730l-.150-.080a2 2 0 0 1-1-1.740v-.500a2 2 0 0 1 1-1.740l.150-.090a2 2 0 0 0 .730-2.730l-.220-.380a2 2 0 0 0-2.730-.730l-.150.080a2 2 0 0 1-2 0l-.430-.250a2 2 0 0 1-1-1.730V4a2 2 0 0 0-2-2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z']];
+    const PLUS = 'M12 5v14M5 12h14', light = !!this.props.light;
+    const ALL = [
+      { g: 'Ноды', rows: [['de', 'de1', 'Франкфурт', 'warn', '1 замечание'], ['fi', 'fi1', 'Хельсинки', 'warn', '1 замечание'], ['nl', 'nl1', 'Амстердам', 'warn', '1 замечание'], ['ru', 'msk1', 'Москва', '', 'Работает']].map((n) => ({ kind: 'flag', f: n[0], t: n[1], s: n[2], sc: n[3], st: n[4], mono: 'mono', keys: n[2] })) },
+      { g: 'Люди', rows: [['alice', 'de1 · Hysteria2', '#c9b8e8', 'онлайн'], ['bob', 'nl1 · VLESS', '#8ec8ea', 'онлайн'], ['carol', 'fi1 · Hysteria2', '#dcc68c', 'онлайн'], ['dave', 'de1 · AmneziaWG 3.1', '#9fd6cf', 'онлайн'], ['erin', 'msk1 · через RU', '#e8b98f', 'онлайн']].map((u) => ({ kind: 'ava', t: u[0], l: u[0][0].toUpperCase(), s: u[1], ac: u[2], sc: '', st: u[3], keys: u[1] })) },
+      { g: 'Разделы', rows: NAV.map((x) => ({ kind: 'nav', t: x[0], s: x[1], tc: 'var(--' + x[2] + ')', d: x[3], keys: x[1] })) },
+      { g: 'Действия', rows: [{ kind: 'act', t: 'Добавить ноду по SSH', d: PLUS, act: 'add', keys: 'нода сервер ssh новая' }, { kind: 'act', t: 'Добавить ноду командой', d: PLUS, act: 'cmd', keys: 'нода сервер команда' }, { kind: 'act', t: 'Добавить человека', d: PLUS, act: 'user', keys: 'пользователь человек новый' }, { kind: 'act', t: light ? 'Включить тёмную тему' : 'Включить светлую тему', d: light ? 'M20 14.500A8.500 8.500 0 0 1 9.500 4a8.500 8.500 0 1 0 10.500 10.500z' : 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 3v2M12 19v2M3 12h2M19 12h2M5.600 5.600l1.400 1.400M17 17l1.400 1.400M5.600 18.400L7 17M17 7l1.400-1.400', act: light ? 'dark' : 'light', keys: 'тема светлая тёмная' }] }
+    ];
+    const hit = (r) => !ql || r.t.toLowerCase().indexOf(ql) >= 0 || (r.keys || '').toLowerCase().split(/[\s·]+/).some((w) => w.indexOf(ql) === 0);
+    // без запроса показываем действия и ноды; с запросом — всё, что подошло
+    const shown = (ql ? ALL : [ALL[3], ALL[0]]).map((g) => ({ g: g.g, rows: g.rows.filter(hit).slice(0, ql ? 5 : 4) })).filter((g) => g.rows.length);
+    const flat = []; shown.forEach((g) => g.rows.forEach((r) => flat.push(r)));
+    const sel = Math.min(s.sel, Math.max(0, flat.length - 1));
+    const run = (r) => { if (r.act && this.props.onAct) this.props.onAct(r.act); else if (this.props.onClose) this.props.onClose(); };
+    const setQ = (v) => { try { const el = document.querySelector('.sr-in'); if (el) el.value = v; } catch (er) {} this.setState({ q: v, sel: 0 }); };
+    let k = 0;
+    return {
+      thD: (s.th || this.props.theme) === 'light' ? 'false' : 'true', thL: (s.th || this.props.theme) === 'light' ? 'true' : 'false', setDark: () => this.setState({ th: 'dark' }), setLight: () => this.setState({ th: 'light' }),
+      rootCls: this.props.embedded ? 'an-w' : 'pn an-solo an-w' + ((s.th || this.props.theme) === 'light' ? ' light' : ''), solo: !this.props.embedded,
+      close: () => { if (this.props.onClose) this.props.onClose(); else setQ(''); },
+      onQ: (e) => this.setState({ q: e.currentTarget.value, sel: 0 }),
+      onKey: (e) => { if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ sel: Math.min(flat.length - 1, sel + 1) }); } else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ sel: Math.max(0, sel - 1) }); } else if (e.key === 'Enter') { e.preventDefault(); if (flat[sel]) run(flat[sel]); } else if (e.key === 'Escape') { e.preventDefault(); if (this.props.onClose) this.props.onClose(); else setQ(''); } },
+      groups: shown.map((g) => ({ t: g.g, n: ql ? String(g.rows.length) : '', rows: g.rows.map((r) => { const i = k++, p = ql ? r.t.toLowerCase().indexOf(ql) : -1; return { on: i === sel ? 'true' : 'false', cls: i === sel ? 'on' : '', kind: r.kind, isFlag: r.kind === 'flag', isAva: r.kind === 'ava', isIcon: r.kind === 'nav' || r.kind === 'act', f: r.f || '', l: r.l || '', d: r.d || '', tc: r.tc || 'var(--muted)', ac: r.ac || 'transparent', mono: r.mono || '', a: p >= 0 ? r.t.slice(0, p) : r.t, m: p >= 0 ? r.t.slice(p, p + ql.length) : '', z: p >= 0 ? r.t.slice(p + ql.length) : '', s: r.s || '', st: r.st || '', sc: r.sc || '', hasSt: r.kind === 'flag', go: () => run(r), hover: () => { if (i !== sel) this.setState({ sel: i }); } }; }) })),
+      none: flat.length === 0,
+      count: ql ? (flat.length ? flat.length + ' из ' + ALL.reduce((a, g) => a + g.rows.filter(hit).length, 0) : '') : '',
+      demo: [['', 'пусто'], ['de', '«de»'], ['на', '«на»'], ['qwe', 'ничего']].map((d) => ({ t: d[1], on: q === d[0] ? 'true' : 'false', pick: () => setQ(d[0]) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

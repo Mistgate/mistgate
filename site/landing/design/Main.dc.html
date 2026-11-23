@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Mistgate — лендинг</title>
+<script src="./support.js"></script>
+<script src="./land.i18n.js"></script>
+<link rel="stylesheet" href="./land.css">
+<link rel="stylesheet" href="./app-s.css">
+<link rel="stylesheet" href="./app-zh-s.css">
+<link rel="stylesheet" href="./app-fa-s.css">
+<link rel="stylesheet" href="./sub-s.css">
+<link rel="stylesheet" href="./pn.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+body{margin:0;background:#0c0c0e}
+</style>
+</helmet>
+<div class="lp-root {{bootCls}}">
+<div class="lp {{jsCls}}" style="--acc: {{accent}}">
+<div class="wrap">
+
+<header class="top">
+  <a class="brand" href="Docs.dc.html" aria-label="Mistgate"><img src="/_blob/8c37605685d2760a887b6ec623cfcfd2" alt=""><span>mist<b>gate</b></span></a>
+  <nav aria-label="Разделы"><a href="#tour">Панель</a><a href="#app">Приложение</a><a href="#protocols">Протоколы</a><a href="#compare">Сравнение</a><a href="Docs.dc.html">Документация</a></nav>
+  <a class="btn sm gh" href="https://github.com/Mistgate/mistgate" aria-label="Код на GitHub, 298 звёзд"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 2.8-2.7 3.8-5.5 4.3-2.6.4-4.2 1-5.2 2.1"/></svg><span class="st"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 4 2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8z"/></svg>298</span></a>
+  <div class="lx-lg" data-noi18n><button type="button" class="btn sm" aria-haspopup="listbox" aria-expanded="{{lgEx}}" aria-label="Language" onClick="{{lgTog}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.500 2.700 2.500 15.300 0 18M12 3c-2.500 2.700-2.500 15.300 0 18"/></svg><span class="mono">{{lgCur}}</span><svg class="i ch" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button><sc-if value="{{lgOpen}}" hint-placeholder-val="{{false}}"><div class="lx-lgm" role="listbox"><sc-for list="{{lgs}}" as="l" hint-placeholder-count="5"><button type="button" role="option" class="{{l.on}}" aria-selected="{{l.sel}}" onClick="{{l.pick}}"><span>{{l.n}}</span><span class="mono">{{l.c}}</span></button></sc-for></div></sc-if></div>
+  <a class="btn sm pri lx-ins" href="#install" aria-label="Установить"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><span>Установить</span></a>
+  <button type="button" class="btn sm lx-bg" aria-label="Меню" aria-expanded="{{mnEx}}" onClick="{{mnTog}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="{{mnD}}"/></svg></button>
+  <sc-if value="{{mnOpen}}" hint-placeholder-val="{{false}}"><nav class="lx-mn" aria-label="Меню"><a href="#tour" onClick="{{mnTog}}">Панель</a><a href="#app" onClick="{{mnTog}}">Приложение</a><a href="#protocols" onClick="{{mnTog}}">Протоколы</a><a href="#compare" onClick="{{mnTog}}">Сравнение</a><a href="Docs.dc.html">Документация</a><a href="https://github.com/Mistgate/mistgate">Код на GitHub<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16L16 8M9 8h7v7"/></svg></a></nav></sc-if>
+</header>
+
+<!-- первый экран: панель сама добавляет ноду -->
+<section class="hero">
+  <canvas class="lx-mx" aria-hidden="true"></canvas>
+  <i class="lx-halo" aria-hidden="true"></i>
+  <div class="hero-t">
+    <h1><span class="ln"><span>Панель для своего</span></span><span class="ln"><span>небольшого VPN</span></span></h1>
+    <p class="hero-s">Несколько своих серверов и люди, с которыми вы ими делитесь. Каждому одна ссылка, а приложение само подтягивает все положенные ему серверы</p>
+    <div class="hero-a">
+      <a class="btn pri" href="#install">Установить панель</a>
+      <a class="btn" href="#how">Как это устроено</a>
+    </div>
+    <p class="hero-m">Бета · открытый код, AGPL-3.0 · Linux amd64 и arm64 · SQLite, без Docker</p>
+  </div>
+
+</section>
+</div>
+</div>
+<div class="lpe hero-e {{jsCls}}"><div class="emb pwin" data-ui data-tour="nodes" data-bwm="400" data-hbm="740" data-hm="740" aria-hidden="true"><div class="lx-phc" data-noi18n aria-hidden="true"><div class="lx-st"><b class="mono">9:41</b><span><svg viewBox="0 0 18 12"><path d="M1 9h2v3H1zM5.500 6.500h2V12h-2zM10 3.500h2V12h-2zM14.500 0h2v12h-2z"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.200c2.300 0 4.400.900 6 2.400l1-1.100A10.300 10.300 0 0 0 8 .600C5.300.600 2.800 1.700 1 3.500l1 1.100a8.700 8.700 0 0 1 6-2.400zm0 3.300c1.400 0 2.700.500 3.700 1.400l1-1.100A7 7 0 0 0 8 3.900a7 7 0 0 0-4.700 1.900l1 1.100c1-.900 2.300-1.400 3.700-1.400zm0 3.200c-.800 0-1.500.300-2 .800l2 2.200 2-2.200c-.500-.500-1.200-.800-2-.800z"/></svg><svg viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="16" height="8" rx="1.500"/><path d="M24 4v4c.800-.300 1.300-1 1.300-2s-.500-1.700-1.300-2z" opacity=".5"/></svg></span></div><div class="lx-url"><svg class="i" viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z"/></svg><span class="mono">panel.example.com</span></div></div><div class="pwin-s"><dc-import name="PnNodes" hint-size="1440px,860px"></dc-import></div><i class="tcur" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3l14 8.500-6.200 1.300L10.500 19z"></path></svg></i></div></div>
+<div class="lp {{jsCls}}" style="--acc: {{accent}}">
+<div class="wrap">
+
+
+<div class="marq" aria-hidden="true"><div class="marq-t"><sc-for list="{{marq}}" as="m" hint-placeholder-count="12"><span class="tag {{m.c}}">{{m.t}}</span></sc-for></div></div>
+
+<!-- четыре шага -->
+<section class="sec" id="how">
+  <div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Быстрый старт</span><h2>От чистого сервера до ссылки у друга</h2></div>
+  <div class="steps rv">
+    <button type="button" class="card stp {{h0}}" onMouseEnter="{{hov0}}" onClick="{{hov0}}"><i class="bar2" aria-hidden="true"></i><span class="num">1</span><h3>Установите панель</h3><p>Одна команда на чистом Linux-сервере проверяет подписанный манифест и запускает панель под systemd</p><span class="fr"><span class="mono"><span class="p">$</span> curl -fsSL mistgate.app/install.sh | sudo bash</span><span class="mono" style="color: var(--muted)">Setup link: …/setup#&lt;token&gt;</span></span></button>
+    <button type="button" class="card stp {{h1}}" onMouseEnter="{{hov1}}" onClick="{{hov1}}"><i class="bar2" aria-hidden="true"></i><span class="num">2</span><h3>Добавьте ноду</h3><p>Панель установит агент по SSH или выдаст команду для запуска на сервере</p><span class="fr"><span class="ln2"><i class="fl de" aria-hidden="true"></i><b class="mono">de1</b><span class="tag ok">на связи</span></span><span class="ln2"><i class="fl nl" aria-hidden="true"></i><b class="mono">nl1</b><span class="tag ok">на связи</span></span></span></button>
+    <button type="button" class="card stp {{h2}}" onMouseEnter="{{hov2}}" onClick="{{hov2}}"><i class="bar2" aria-hidden="true"></i><span class="num">3</span><h3>Раздайте ссылки</h3><p>Назначьте профиль ноде, создайте пользователя и отправьте ему ссылку</p><span class="fr"><span class="ln2"><span class="ava" aria-hidden="true">A</span>Alice<span class="tag">3 устройства</span></span><span class="mono" style="color: var(--muted)">vpn.example.com/k7Qm2xR9</span></span></button>
+    <button type="button" class="card stp {{h3}}" onMouseEnter="{{hov3}}" onClick="{{hov3}}"><i class="bar2" aria-hidden="true"></i><span class="num">4</span><h3>Включите алерты и бэкапы</h3><p>Подключите Telegram, проверьте настройки безопасности и включите зашифрованные копии</p><span class="fr"><span class="ln2"><i class="dot blip" aria-hidden="true"></i>fi1 моргнул 4 мин</span><span class="ln2"><i class="dot" aria-hidden="true"></i>Копия зашифрована<span class="tag">03:00</span></span></span></button>
+  </div>
+</section>
+
+<!-- панель в деле: настоящие экраны -->
+<section class="sec pre" id="tour">
+  <div class="sh c rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Панель в деле</span><h2>Как выглядит панель</h2><p>Это настоящие экраны, а не картинки. Курсор сам показывает обычные действия</p></div>
+  <div class="lx-tabs rv" role="tablist" aria-label="Экраны панели"><sc-for list="{{trTabs}}" as="t" hint-placeholder-count="6"><button type="button" class="lx-tab" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"/></svg>{{t.n}}</button></sc-for></div>
+</section>
+</div>
+</div>
+<div class="lpe {{jsCls}}"><div class="lx-shw rv">
+  <div class="lp lx-sx {{trSw}}" style="--acc: {{accent}}"><span class="lx-n mono">{{trNum}}</span><h3>{{trH}}</h3><p>{{trP}}</p><ul><sc-for list="{{trB}}" as="b" hint-placeholder-count="3"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{b.t}}</li></sc-for></ul><a class="lx-more" href="{{trDoc}}">{{trDocT}}<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><div class="seg lx-dv" role="group" aria-label="Версия"><button type="button" aria-pressed="{{dvPc}}" onClick="{{setPc}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H4zM9 20h6M12 16v4"/></svg>Компьютер</button><button type="button" aria-pressed="{{dvPh}}" onClick="{{setPh}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM11 18h2"/></svg>Телефон</button></div></div>
+  <div class="emb pwin tr-box" data-ui data-h="860" data-x="264" data-w="1176" data-bwm="400" data-hbm="740" data-hm="740" data-dv="{{dvAttr}}" data-tour="{{trKey}}" aria-hidden="true"><div class="lx-phc" data-noi18n aria-hidden="true"><div class="lx-st"><b class="mono">9:41</b><span><svg viewBox="0 0 18 12"><path d="M1 9h2v3H1zM5.500 6.500h2V12h-2zM10 3.500h2V12h-2zM14.500 0h2v12h-2z"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.200c2.300 0 4.400.900 6 2.400l1-1.100A10.300 10.300 0 0 0 8 .600C5.300.600 2.800 1.700 1 3.500l1 1.100a8.700 8.700 0 0 1 6-2.400zm0 3.300c1.400 0 2.700.500 3.700 1.400l1-1.100A7 7 0 0 0 8 3.900a7 7 0 0 0-4.700 1.900l1 1.100c1-.900 2.300-1.400 3.700-1.400zm0 3.200c-.800 0-1.500.300-2 .800l2 2.200 2-2.200c-.500-.500-1.200-.800-2-.800z"/></svg><svg viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="16" height="8" rx="1.500"/><path d="M24 4v4c.800-.300 1.300-1 1.300-2s-.500-1.700-1.300-2z" opacity=".5"/></svg></span></div><div class="lx-url"><svg class="i" viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z"/></svg><span class="mono">panel.example.com</span></div></div><sc-if value="{{trIs_ov}}" hint-placeholder-val="{{true}}"><div class="pwin-s"><dc-import name="PnOverview" hint-size="1440px,860px"></dc-import></div></sc-if><sc-if value="{{trIs_nd}}" hint-placeholder-val="{{false}}"><div class="pwin-s"><dc-import name="PnNodes" hint-size="1440px,860px"></dc-import></div></sc-if><sc-if value="{{trIs_us}}" hint-placeholder-val="{{false}}"><div class="pwin-s"><dc-import name="PnUsers" hint-size="1440px,860px"></dc-import></div></sc-if><sc-if value="{{trIs_hl}}" hint-placeholder-val="{{false}}"><div class="pwin-s"><dc-import name="PnHealth" hint-size="1440px,860px"></dc-import></div></sc-if><sc-if value="{{trIs_rc}}" hint-placeholder-val="{{false}}"><div class="pwin-s"><dc-import name="PnReach" hint-size="1440px,860px"></dc-import></div></sc-if><sc-if value="{{trIs_up}}" hint-placeholder-val="{{false}}"><div class="pwin-s"><dc-import name="PnUpdates" hint-size="1440px,860px"></dc-import></div></sc-if><i class="tcur" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3l14 8.500-6.200 1.300L10.500 19z"></path></svg></i></div>
+</div></div>
+<div class="lp {{jsCls}}" style="--acc: {{accent}}">
+<div class="wrap">
+
+<!-- возможности: настоящие фрагменты панели -->
+<section class="sec pre" id="features">
+  <div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Возможности</span><h2>Всё, что нужно маленькому флоту</h2><p>Без биллинга, тарифов и витрины. Только то, чем пользуется человек, который держит несколько серверов для своих</p></div>
+</section>
+</div>
+</div>
+<div class="lpe {{jsCls}}"><div class="lx-fx">
+  <article class="lx-c s4 rv"><div class="lx-shot" data-ui data-shot data-sel=".page > section.card:not(.hero)" data-fit="1" data-pad="16" style="--pan: -70px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnOverview" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Проверки глазами клиента</h3><p>Каждые 5 минут панель подключается к каждому серверу, как приложение, и показывает результат по каждой ноде</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv" style="--d: 80ms"><div class="lp lx-h"><div class="stg memv" data-ui>
+        <div class="big">16–20<small>МиБ памяти в простое</small></div>
+        <div class="hbs">
+          <div class="hb me2"><span>Mistgate</span><span class="mono">16–20</span><i style="--w: 4.4%"></i></div>
+          <div class="hb"><span>3x-ui</span><span class="mono">68–74</span><i style="--w: 16%"></i></div>
+          <div class="hb"><span>PasarGuard</span><span class="mono">262–265</span><i style="--w: 58%"></i></div>
+          <div class="hb"><span>Remnawave</span><span class="mono">426–454</span><i style="--w: 100%"></i></div>
+        </div>
+      </div></div><div class="lp lx-t"><h3>Два бинарника на Go</h3><p>Без Docker и сервера БД: SQLite и systemd. В простое панель занимает 16–20 МиБ памяти</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv"><div class="lx-shot" data-ui data-shot data-sel=".sb-tab" data-k=".58" data-pad="20" data-pre="[role=tab]|^Доктор" style="--pan: -150px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnHealth" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Доктор на каждой ноде</h3><p>23 проверки хоста и десять исправлений. Без вашего подтверждения ни одно не запускается</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv" style="--d: 80ms"><div class="lx-shot" data-ui data-shot data-sel=".sb-tab" data-k=".58" data-pad="20" style="--pan: -190px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnReach" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Видно ли изнутри страны</h3><p>Необязательная проверка доступности серверов по сетям. Большинство источников работает только в России</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv" style="--d: 160ms"><div class="lx-shot" data-ui data-shot data-sel=".sb-tab" data-k=".58" data-pad="20" style="--pan: -170px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnUpdates" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Обновления с канарейкой</h3><p>Сначала одна нода и 5 минут проверки, потом пачками. Не прошла проверку: вернётся прежняя сборка</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s3 rv"><div class="lx-shot" data-ui data-shot data-sel=".fz-cv" data-k="1.2" data-km="1.1" data-cx="250" data-cxm="185" data-cy="215" data-cine="1" data-pre=".fz-bar .seg button|^Карта$" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnNodes" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Ретрансляции и карта флота</h3><p>Если сервер не открывается из каких-то сетей, люди попадают на него через другую вашу ноду. Она только пересылает зашифрованный трафик</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s3 rv" style="--d: 80ms"><div class="lx-shot" data-ui data-shot data-sel=".as" data-k=".86" data-c="1" data-dy="300" data-pre=".an-demo .seg button|^Ответ и план$" style="--pan: -140px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnAssistant" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Ассистент и MCP</h3><p>Ассистент работает с вашим ключом облачной модели и готовит изменения, которые применяете вы. По MCP внешний агент читает флот, рискованное ждёт одобрения</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv"><div class="lx-shot" data-ui data-shot data-sel=".up-tr" data-fit="1" data-pad="12" style="--pan: -200px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnUser" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Квоты, сроки и устройства</h3><p>У каждого человека квота трафика, срок, лимит устройств и лимиты скорости. Устройства видны по отдельности</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv" style="--d: 80ms"><div class="lx-shot" data-ui data-shot data-sel=".ig-grid > .col" data-fit="1" data-pad="12" style="--pan: -220px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnIntegrations" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Алерты в Telegram</h3><p>Алерты видны в админке и приходят в Telegram. Бот только присылает алерты</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv" style="--d: 160ms"><div class="lp lx-h"><div class="stg col" data-ui>
+        <div class="seg sm2"><button type="button" aria-pressed="{{decOut}}" onClick="{{pickOut}}">Видит посторонний</button><button type="button" aria-pressed="{{decIn}}" onClick="{{pickIn}}">Видите вы</button></div>
+        <sc-if value="{{isOut}}" hint-placeholder-val="{{true}}"><div class="pg"><span class="url"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z"/></svg>panel.example.com</span><h4>Заметки о путешествиях</h4><p>Обычный сайт: пара статей и страница «О себе». Формы входа здесь нет</p></div></sc-if>
+        <sc-if value="{{isIn}}" hint-placeholder-val="{{false}}"><div class="pg"><span class="url"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z"/></svg>panel.example.com/<span style="color: var(--acc)">&lt;секретный путь&gt;</span></span><h4>Вход в панель</h4><span class="btn sm pri" style="align-self: flex-start">Войти по passkey</span></div></sc-if>
+      </div></div><div class="lp lx-t"><h3>Сайт-ширма</h3><p>Посторонний видит обычный сайт, а админка доступна по секретному пути или имени хоста. Сайты для нод панель собирает из шаблона: десять видов, язык страны и фотографии по вашему ключу Pexels или Pixabay</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv"><div class="lp lx-h"><div class="stg col" data-ui><div class="pg"><span class="url"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z"/></svg>DoH · Cloudflare</span><h4>Российские сайты напрямую</h4><p>Для всех, для группы или для одного человека</p></div></div></div><div class="lp lx-t"><h3>DNS-пресеты для приложений</h3><p>Пресет задаёт, какие DNS-серверы спрашивает приложение человека и как (обычный DNS, DoT или DoH), с правилами для страны или списка сайтов и блокировкой рекламы. Его можно дать всем, группе или одному человеку</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv" style="--d: 80ms"><div class="lx-shot" data-ui data-shot data-sel=".sb-tab" data-k=".58" data-pad="20" data-pre="[role=tab]|^Система серверов" style="--pan: -170px" aria-hidden="true"><div class="pwin-s" style="height: 1400px"><dc-import name="PnUpdates" hint-size="1440px,1400px"></dc-import></div></div><div class="lp lx-t"><h3>Обновления системы на серверах</h3><p>Видно, каким серверам нужны обновления безопасности или перезагрузка, и не нужно заходить на каждый. Один сервер можно обновить или перезагрузить, несколько — пустить раскаткой: сначала канарейка, потом по несколько, после каждого проверка здоровья, на первом сбое остановка</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+  <article class="lx-c s2 rv" style="--d: 160ms"><div class="lp lx-h"><div class="stg col" data-ui><div class="pg"><span class="url"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01"/></svg>Cloudflare R2</span><h4>Копия проверена</h4><p>Что в копии и что у вас сейчас, рядом. Пока вы не подтвердите, ничего не меняется</p><span class="btn sm pri" style="align-self: flex-start">Восстановить</span></div></div></div><div class="lp lx-t"><h3>Бэкапы и аккуратное восстановление</h3><p>Бэкапы уходят в ваш бакет Cloudflare R2 по расписанию или по кнопке и шифруются ещё в панели ключом, который вы храните офлайн. Перед восстановлением панель проверяет копию и показывает, что в ней и что у вас сейчас; пока вы не подтвердите, ничего не меняется</p><a class="lx-more" href="Docs.dc.html">Подробнее<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div></article>
+</div></div>
+<div class="lp {{jsCls}}" style="--acc: {{accent}}">
+<div class="wrap">
+
+<!-- страница пользователя: настоящий экран -->
+<section class="sec pre" id="link">
+  <div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Страница пользователя</span><h2>Одна ссылка, и у человека всё на месте</h2><p>Приложения на ядре Mihomo (kl!ck, FlClash, Clash Verge Rev) получают по ней все три протокола, Happ получает Hysteria2 и VLESS, а AmneziaVPN берёт ключ на каждое устройство прямо со страницы</p></div>
+</section>
+</div>
+</div>
+<div class="lpe {{jsCls}}"><div class="emb sub rv" data-ui data-tour="sub" data-bw="1200" data-w="1200" data-h="860" data-bwm="390" data-hbm="1500" data-hm="700" aria-hidden="true"><div class="lx-phc" data-noi18n aria-hidden="true"><div class="lx-st"><b class="mono">9:41</b><span><svg viewBox="0 0 18 12"><path d="M1 9h2v3H1zM5.500 6.500h2V12h-2zM10 3.500h2V12h-2zM14.500 0h2v12h-2z"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.200c2.300 0 4.400.900 6 2.400l1-1.100A10.300 10.300 0 0 0 8 .600C5.300.600 2.800 1.700 1 3.500l1 1.100a8.700 8.700 0 0 1 6-2.400zm0 3.300c1.400 0 2.700.500 3.700 1.400l1-1.100A7 7 0 0 0 8 3.900a7 7 0 0 0-4.700 1.900l1 1.100c1-.900 2.300-1.400 3.700-1.400zm0 3.200c-.800 0-1.500.300-2 .800l2 2.200 2-2.200c-.500-.500-1.200-.800-2-.800z"/></svg><svg viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="16" height="8" rx="1.500"/><path d="M24 4v4c.800-.300 1.300-1 1.300-2s-.500-1.700-1.300-2z" opacity=".5"/></svg></span></div><div class="lx-url"><svg class="i" viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z"/></svg><span class="mono">vpn.example.com/k7Qm2xR9</span></div></div><div class="pwin-s"><sc-if value="{{subPc}}" hint-placeholder-val="{{true}}"><dc-import name="SubPage" accent="mint" hint-size="1200px,860px"></dc-import></sc-if><sc-if value="{{subPh}}" hint-placeholder-val="{{false}}"><dc-import name="SubPhone" accent="mint" hint-size="390px,1500px"></dc-import></sc-if></div><i class="tcur" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3l14 8.500-6.200 1.300L10.500 19z"></path></svg></i></div></div>
+<div class="lp {{jsCls}}" style="--acc: {{accent}}">
+<div class="wrap">
+<!-- приложение: настоящий экран клиента -->
+<section class="sec pre" id="app">
+  <div class="apph rv">
+    <div class="sh"><span class="kick"><i class="dot" aria-hidden="true"></i>Mistgate для Windows · бета 0.1</span><h2>Приложение само находит рабочий путь</h2><p>И честно говорит, когда что-то заблокировано. Hysteria2, AmneziaWG, VLESS и TrustTunnel в одном окне, для панелей Mistgate и для обычных ссылок подписки</p></div>
+    <div class="appa"><div class="row3"><a class="btn pri" href="https://github.com/Mistgate/mistgate-client/releases/latest"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Скачать для Windows</a><a class="btn lx-ab" href="AppPage.dc.html" data-page="app">Всё о приложении<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="btn gh" href="https://github.com/Mistgate/mistgate-client" aria-label="Код на GitHub"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 2.8-2.7 3.8-5.5 4.3-2.6.4-4.2 1-5.2 2.1"/></svg>GitHub</a></div><span class="hint">Windows 10 и 11, x64 · AGPL-3.0</span></div>
+  </div>
+  <div class="lx-as rv"><div class="lx-tabs lx-atabs" role="tablist" aria-label="Экраны приложения"><sc-for list="{{aTabs}}" as="t" hint-placeholder-count="5"><button type="button" class="lx-tab" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"/></svg>{{t.n}}<sc-if value="{{t.soon}}" hint-placeholder-val="{{false}}"><em class="lx-soon">скоро</em></sc-if></button></sc-for></div><p class="lx-acap">{{aCap}}</p></div>
+</section>
+</div>
+</div>
+<div class="lpe {{jsCls}}"><div class="emb appw rv" aria-hidden="true"><div class="dots" aria-hidden="true"></div><div class="lx-app" data-ui data-tour="app" data-bw="1000" data-w="1000" data-h="660" data-wm="560" data-hmp="660" data-xm="0"><div class="pwin-s"><sc-if value="{{ap.MainRU}}" hint-placeholder-val="{{true}}"><dc-import name="AppMain" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.MainEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainEn" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.MainZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainZh" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.MainFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainFa" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.MainTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainTr" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.RoutesRU}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutes" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.RoutesEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesEn" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.RoutesZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesZh" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.RoutesFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesFa" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.RoutesTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesTr" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.DiagRU}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiag" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.DiagEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagEn" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.DiagZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagZh" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.DiagFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagFa" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.DiagTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagTr" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.SetRU}}" hint-placeholder-val="{{false}}"><dc-import name="AppSet" accent="lavender" section="conn" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.SetEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppSetEn" accent="lavender" section="conn" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.SetZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppSetZh" accent="lavender" section="conn" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.SetFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppSetFa" accent="lavender" section="conn" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.SetTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppSetTr" accent="lavender" section="conn" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.BypRU}}" hint-placeholder-val="{{false}}"><dc-import name="AppByp" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.BypEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypEn" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.BypZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypZh" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.BypFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypFa" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.BypTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypTr" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if></div><i class="tcur" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3l14 8.500-6.200 1.300L10.500 19z"></path></svg></i></div></div></div>
+<div class="lp {{jsCls}}" style="--acc: {{accent}}">
+<div class="wrap">
+<section class="sec post">
+  <div class="apf rv"><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v8M7 7a7 7 0 1 0 10 0"/></svg><div><b>Одна кнопка, четыре протокола</b><span>Hysteria2, AmneziaWG, VLESS и TrustTunnel. «Авто» берёт сервер, который отвечает быстрее всех прямо сейчас</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM8.5 16.5H16a3.5 3.5 0 0 0 0-7"/></svg><div><b>Маршруты</b><span>«Умный» оставляет местные сайты и домашнюю сеть мимо VPN, «Только выбранное» пускает лишь отмеченное, «Всё» — весь трафик</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.500-7-10V6z"/></svg><div><b>Kill switch</b><span>Пока туннель лежит, с ПК ничего не уходит: на время подключения или всегда</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12 2.5-6h5"/></svg><div><b>Проверка сети</b><span>Одна кнопка показывает, какие серверы и какие пути к ним работают отсюда</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v5H4zM4 13h16v5H4zM8 8.500h.01M8 15.500h.01"/></svg><div><b>Локальный прокси</b><span>SOCKS5 и HTTP для программ и домашних устройств, которые не умеют в VPN сами</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4L3 11l6 2.500L11.500 20l3.500-5 4 3z"/></svg><div><b>Прокси для Telegram</b><span>Из панели: одно нажатие передаёт прокси в Telegram</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12h6M10 8H8a4 4 0 0 0 0 8h2M14 8h2a4 4 0 0 1 0 8h-2"/></svg><div><b>С панелью Mistgate и без неё</b><span>Ссылка подписки, ссылки hysteria2://, vless:// или tt://, профиль Mihomo или конфиг AmneziaWG</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6zM9.5 12l2 2 3.5-4"/></svg><div><b>Приватность</b><span>В журнале нет ключей, ссылок, адресов серверов, имён сайтов и программ. Панель не узнаёт, что вы открываете</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><div><b>Обновления</b><span>Из релизов репозитория. Приложение ставит только установщик, подписанный ключом проекта</span></div></div></div>
+  <div class="lx-plat rv"><div class="lx-plh"><h3>Сейчас Windows, остальные платформы позже</h3><p>Клиент в бете. Android, iOS, macOS и Linux появятся позже</p></div><div class="lx-pls"><a class="lx-pl on" href="https://github.com/Mistgate/mistgate-client/releases/latest"><span class="lx-pli" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H4zM9 20h6M12 16v4"/></svg></span><b>Windows</b><span>10 и 11, x64</span><em><i></i>Бета 0.1</em></a><div class="lx-pl"><span class="lx-pli" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2"/></svg></span><b>Android</b><em>Позже</em></div><div class="lx-pl"><span class="lx-pli" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h9a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM17 8h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-2M9 17h1"/></svg></span><b>iOS</b><em>Позже</em></div><div class="lx-pl"><span class="lx-pli" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M6 5h12a1 1 0 0 1 1 1v9H5V6a1 1 0 0 1 1-1zM3 18h18M10 15v0"/></svg></span><b>macOS</b><em>Позже</em></div><div class="lx-pl"><span class="lx-pli" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 10l3 2.5L8 15M13 15h3"/></svg></span><b>Linux</b><em>Позже</em></div></div></div>
+  <p class="apn rv">У установщика пока нет сертификата подписи кода Windows, поэтому SmartScreen может предупредить о неизвестном издателе. Обновления проверяются собственной подписью проекта</p>
+</section>
+
+<!-- протоколы -->
+<section class="sec" id="protocols">
+  <div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Протоколы и маршруты</span><h2>Что умеет нода и чего не умеет нарочно</h2><p>Три основных протокола, два экспериментальных, выход через WARP и ретрансляции через ваши же ноды</p></div>
+  <div class="pr-b rv">
+    <div class="tabs" role="tablist" aria-label="Протоколы"><sc-for list="{{tabs}}" as="t" hint-placeholder-count="8"><button type="button" class="tab" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}"><b>{{t.n}}</b><small>{{t.s}}</small></button></sc-for></div>
+    <div class="card lx-prx" role="tabpanel">
+      <div class="lx-ph"><span class="lx-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="{{prD}}"/></svg></span><div class="lx-pt"><h3>{{prN}}<sc-if value="{{prExp}}" hint-placeholder-val="{{false}}"><span class="tag soon">эксперимент</span></sc-if></h3><p>{{prLead}}</p></div><div class="lx-pa"><sc-if value="{{prHasPage}}" hint-placeholder-val="{{true}}"><a class="btn sm" href="{{prRepo}}">Страница протокола<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></sc-if><a class="btn sm" href="{{prDoc}}">Документация<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16L16 8M9 8h7v7"/></svg></a></div></div>
+      <sc-if value="{{prHasRoute}}" hint-placeholder-val="{{true}}"><div class="lx-rt {{prSw}}" data-ui aria-hidden="true"><sc-for list="{{prRoute}}" as="x" hint-placeholder-count="5"><sc-if value="{{x.node}}" hint-placeholder-val="{{true}}"><span class="lx-nd"><svg class="i" viewBox="0 0 24 24"><path d="{{x.d}}"/></svg>{{x.t}}</span></sc-if><sc-if value="{{x.wire}}" hint-placeholder-val="{{false}}"><span class="lx-wr {{x.c}}"><small>{{x.t}}</small><i></i><i></i></span></sc-if></sc-for></div></sc-if>
+      <sc-if value="{{prIsRelay}}" hint-placeholder-val="{{false}}"><div class="lx-rt rl" data-ui><div class="rel">
+          <svg viewBox="0 0 480 216" aria-hidden="true">
+            <path class="no" d="M84 56H396"/>
+            <path class="ok" d="M56 78C56 170 120 164 190 164"/><path class="ok" d="M290 164C360 164 424 170 424 78"/>
+            <circle class="pk" r="3.5"><animateMotion dur="2.6s" repeatCount="indefinite" path="M56 78C56 170 120 164 190 164"/></circle>
+            <circle class="pk" r="3.5"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite" path="M56 78C56 170 120 164 190 164"/></circle>
+            <circle class="pk" r="3.5"><animateMotion dur="2.6s" begin=".6s" repeatCount="indefinite" path="M290 164C360 164 424 170 424 78"/></circle>
+            <circle class="pk" r="3.5"><animateMotion dur="2.6s" begin="1.9s" repeatCount="indefinite" path="M290 164C360 164 424 170 424 78"/></circle>
+          </svg>
+          <span class="rn" style="left: 56px; top: 56px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H4zM9 20h6M12 16v4"/></svg>Вы</span>
+          <span class="rn x" style="left: 240px; top: 56px"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>напрямую не открывается</span>
+          <span class="rn" style="left: 424px; top: 56px"><i class="fl de" aria-hidden="true"></i><b>de1</b></span>
+          <span class="rn hub" style="left: 240px; top: 164px"><i class="fl ru" aria-hidden="true"></i><b>msk1</b><span class="tag ru">через RU</span></span>
+        </div></div></sc-if>
+      <div class="bands {{prSw}}"><sc-for list="{{bands}}" as="b" hint-placeholder-count="4"><div class="band"><span class="band-k">{{b.k}}</span><span class="band-t">{{b.t}}<small>{{b.n}}</small></span><sc-if value="{{b.has}}" hint-placeholder-val="{{false}}"><span class="tag {{b.c}}">{{b.s}}</span></sc-if></div></sc-for></div>
+      <sc-if value="{{prHasApps}}" hint-placeholder-val="{{true}}"><div class="lx-pf"><span>Чем подключаться</span><sc-for list="{{prApps}}" as="a" hint-placeholder-count="3"><span class="tag">{{a.t}}</span></sc-for></div></sc-if>
+    </div>
+  </div>
+</section>
+
+<!-- дальше: другие страницы -->
+<section class="sec" id="more">
+  <div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Дальше</span><h2>Подробнее по каждой теме</h2></div>
+  <div class="lx-nx">
+    <a class="card lx-nc rv" href="AppPage.dc.html" data-page="app"><span class="lx-pi lav" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v8M7 7a7 7 0 1 0 10 0"/></svg></span><h3>Приложение для Windows</h3><p>Экраны, маршруты, kill switch, проверка сети и установка</p><span class="lx-go">Страница приложения<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+    <a class="card lx-nc rv" style="--d: 80ms" href="#protocols" data-page="protocols"><span class="lx-pi sky" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg></span><h3>Протоколы</h3><p>По странице на каждый: когда выбирать, что настраивается и чем подключаться</p><span class="lx-go">Страницы протоколов<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+    <a class="card lx-nc rv" style="--d: 160ms" href="Docs.dc.html"><span class="lx-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11M9 8h6"/></svg></span><h3>Документация</h3><p>Установка, руководство, эксплуатация и справочник на mistgate.app</p><span class="lx-go">Открыть документацию<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16L16 8M9 8h7v7"/></svg></span></a>
+  </div>
+</section>
+
+<!-- сравнение -->
+<section class="sec" id="compare">
+  <div class="cph rv">
+    <div class="sh"><span class="kick"><i class="dot" aria-hidden="true"></i>Сравнение</span><h2>Где другие панели впереди, а где мы</h2></div>
+    <div class="cpf" role="tablist" aria-label="Что сравнить"><sc-for list="{{cgs}}" as="g" hint-placeholder-count="5"><button type="button" role="tab" aria-selected="{{g.sel}}" onClick="{{g.pick}}">{{g.n}}</button></sc-for></div>
+  </div>
+  <div class="rv"><div class="card cmp {{cmpCls}}" data-ui>
+    <div class="cmp-x">
+      <div class="cmp-t" role="table" aria-label="Сравнение панелей">
+        <div class="cr hd" role="row"><span role="columnheader"><span class="sr">Критерий</span></span><span class="mine" role="columnheader"><img src="/_blob/8c37605685d2760a887b6ec623cfcfd2" alt="">Mistgate</span><span role="columnheader">3x-ui</span><span role="columnheader">Marzban</span><span role="columnheader">PasarGuard</span><span role="columnheader">Remnawave</span><span role="columnheader">Hiddify</span><span role="columnheader">s-ui</span></div>
+        <sc-for list="{{crows}}" as="r" hint-placeholder-count="9">
+          <div class="cr {{r.cls}}" style="--i: {{r.i}}" role="row"><span class="ft" role="rowheader">{{r.t}}</span><sc-for list="{{r.cells}}" as="v" hint-placeholder-count="7"><span class="cv {{v.k}}" role="cell"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="{{v.d}}"/></svg><span><b>{{v.x}}</b><small>{{v.n}}</small></span></span></sc-for></div>
+        </sc-for>
+      </div>
+    </div>
+    <div class="cmp-n"><span class="lg3"><span class="cv y"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>да</span><span class="cv p"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13c2.300-3 4.700-3 7 0s4.700 3 7 0"/></svg>частично</span><span class="cv n"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>нет</span><span class="cv q">— не указано в README и документации проекта</span></span><a href="Docs.dc.html">Полная таблица с источниками, проверена 9 октября 2026</a></div>
+    <sc-if value="{{waveCmp}}" hint-placeholder-val="{{false}}"><div class="wave" aria-hidden="true"><i></i></div></sc-if>
+  </div></div>
+  <p class="apn rv">Другие панели впереди по числу протоколов, размеру сообщества и полноценным Telegram-ботам. Память измерена на тестовом сервере с 1 vCPU и 1 ГБ, без подключённой ноды</p>
+</section>
+
+<!-- честно -->
+<section class="sec">
+  <div class="sh rv"><span class="kick"><i class="dot blip" aria-hidden="true"></i>Бета, v0.2.0</span><h2>Чего пока нет и как выходят релизы</h2></div>
+  <div class="two">
+    <div class="card hn rv">
+      <h3>Пока нет</h3>
+      <div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2"/></svg><span><b>Приложения для macOS и Linux.</b> Своё приложение есть только для Windows</span></div>
+      <div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2"/></svg><span><b>Полноценного Telegram-бота.</b> Бот только присылает алерты</span></div>
+      <div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2"/></svg><span><b>Стабильного API.</b> До версии 1.0 API, настройки и протокол нод могут меняться</span></div>
+      <div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2"/></svg><span><b>Готовой версии для Cloudflare Workers.</b> Она предварительная</span></div>
+    </div>
+    <div class="card hn ok rv" style="--d: 80ms">
+      <h3>Уже так</h3>
+      <div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Только подписанные сборки.</b> Релизы подписываются офлайн-ключом, панель и ноды других не принимают</span></div>
+      <div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Обновления с канарейкой.</b> Ноды обновляются поэтапно, панель только с подтверждения и с откатом</span></div>
+      <div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Проверки на каждый push.</b> Тесты, vet, race-детектор, govulncheck и линт</span></div>
+      <div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Шесть серверов автора.</b> Проект каждый день работает для семьи и друзей</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- установка -->
+<section class="sec" id="install">
+  <div class="rv"><div class="card go {{goCls}}">
+    <div class="go-l">
+      <h2>Одна команда на чистом сервере</h2>
+      <p>Она проверит подписанный манифест, запустит панель под systemd и выдаст одноразовую ссылку настройки</p>
+      <div class="req"><span class="tag">Linux amd64 или arm64</span><span class="tag">systemd и root</span><span class="tag">домен указывает на сервер</span><span class="tag">TCP 80 и 443 свободны</span></div>
+      <button type="button" class="lx-aib" onClick="{{aiOpen}}"><span class="lx-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l1.800 5.200L19 10l-5.200 1.800L12 17l-1.800-5.200L5 10l5.200-1.800zM18.500 15.500l.700 2 2 .700-2 .700-.700 2-.700-2-2-.700 2-.700z"/></svg></span><span class="lx-ait"><b>Можно и с ИИ-агентом</b><small>Он пройдёт шаги сам, по готовому промпту</small></span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </div>
+    <div class="ins gl" data-ui>
+      <div><label class="lab" for="lp-dom">Домен панели</label><input class="inp" id="lp-dom" value="{{dom}}" onChange="{{setDom}}" spellcheck="false" autocomplete="off"></div>
+      <div class="term"><span class="ty"><span class="p">$</span> curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://{{domClean}}</span><span class="o">Setup link: https://{{domClean}}/&lt;secret&gt;/setup#&lt;token&gt;</span><span class="p">$</span> <span class="caret" aria-hidden="true"></span></div>
+      <p class="hint">Ссылка настройки работает один раз и живёт 30 минут</p>
+      <div class="ins-f"><button type="button" class="btn pri" onClick="{{copyCmd}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h11v11H9zM5 15V4h11"/></svg>{{cmdLabel}}</button><a class="btn" href="Docs.dc.html#panel">Открыть инструкцию</a></div>
+    </div>
+    <sc-if value="{{waveGo}}" hint-placeholder-val="{{false}}"><div class="wave" aria-hidden="true"><i></i></div></sc-if>
+  </div></div>
+  <sc-if value="{{aiOn}}" hint-placeholder-val="{{false}}"><div class="lx-aiw {{aiFx}}" onClick="{{aiClose}}"><div class="card lx-ai" role="dialog" aria-modal="true" aria-label="Работа с ИИ-агентом" onClick="{{aiStop}}"><i class="lx-grab" aria-hidden="true"></i>
+    <div class="lx-aih"><span class="lx-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l1.800 5.200L19 10l-5.200 1.800L12 17l-1.800-5.200L5 10l5.200-1.800zM18.500 15.500l.700 2 2 .700-2 .700-.700 2-.700-2-2-.700 2-.700z"/></svg></span><div><h3>Работа с ИИ-агентом</h3><p>Три готовых промпта. Скопируйте нужный в агента и заполните строки в разделе «Заполните»</p></div><button type="button" class="btn sm lx-aix" aria-label="Закрыть" onClick="{{aiClose}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="lx-ais" role="tablist" aria-label="Промпты"><sc-for list="{{aiTabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}">{{t.n}}</button></sc-for></div>
+    <div class="lx-aim"><div><span>Агент</span><b>{{aiAgent}}</b></div><div><span>Что нужно</span><b>{{aiNeed}}</b></div><div><span>Что он делает</span><b>{{aiDoes}}</b></div></div>
+    <div class="{{aiCls}}" data-noi18n data-ui><span class="lx-aik">prompt</span><sc-for list="{{aiLines}}" as="l" hint-placeholder-count="10"><div class="{{l.c}}"><span>{{l.a}}</span><i>{{l.b}}</i></div></sc-for></div>
+    <div class="lx-aif"><span class="hint">Аккаунт владельца вы создаёте сами, агент этого не делает</span><button type="button" class="btn pri" onClick="{{aiCopy}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h11v11H9zM5 15V4h11"/></svg>{{aiCopyLabel}}</button><a class="btn" href="{{aiDoc}}">Открыть полный промпт<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16L16 8M9 8h7v7"/></svg></a></div>
+  </div></div></sc-if>
+</section>
+
+<footer class="ftr">
+  <div class="card ftc rv">
+    <div class="ft-top">
+      <div class="ft-b"><span class="brand"><img src="/_blob/8c37605685d2760a887b6ec623cfcfd2" alt=""><span>mist<b>gate</b></span></span><p>Панель для нескольких своих серверов и людей, с которыми вы ими делитесь</p><div class="row3"><a class="btn sm pri" href="#install">Установить панель</a><a class="btn sm" href="https://github.com/Mistgate/mistgate-client/releases/latest">Скачать приложение</a></div></div>
+      <div><h3>Начало</h3><nav aria-label="Начало"><a href="Docs.dc.html">Начало работы</a><a href="Docs.dc.html#panel">Установка панели</a><a href="Docs.dc.html">План развития</a></nav></div>
+      <div><h3>Документация</h3><nav aria-label="Документация"><a href="Docs.dc.html">Руководство</a><a href="Docs.dc.html">Эксплуатация</a><a href="Docs.dc.html">Справочник</a></nav></div>
+      <div><h3>Код</h3><nav aria-label="Код"><a href="https://github.com/Mistgate/mistgate">Панель на GitHub</a><a href="https://github.com/Mistgate/mistgate-client">Приложение на GitHub</a><a href="Docs.dc.html">Сравнение и бенчмарки</a></nav></div>
+    </div>
+    <div class="ft-bot"><span>AGPL-3.0 · открытый код · бета</span><span class="langs" data-noi18n><sc-for list="{{lgs}}" as="l" hint-placeholder-count="5"><button type="button" class="{{l.on}}" aria-pressed="{{l.sel}}" onClick="{{l.pick}}">{{l.c}}</button></sc-for></span></div>
+    <canvas class="lx-wm" aria-hidden="true"></canvas>
+  </div>
+</footer>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#7dd3a0","options":["#7dd3a0","#b8acf2","#8ec8ea","#dcc68c"]},"$preview":{"width":1440,"height":12925}}'>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = { ip: '203.0.113.24', name: 'pl1', auth: 'pw', run: 0, added: false, dlg: true, wave: '', tr: 'ov', trn: 0, lang: (() => { let l = 'RU'; try { l = localStorage.getItem('mg-lang') || 'RU'; } catch (e) {} window.MG_LANG = l; return l; })(), hs: 0, hold: false, conn: 'off', secs: 2542, sel: 0, tab: 0, dom: 'panel.example.com', cg: 'top', cgn: 0, dec: 'out', decHold: false, ap: 0, copied: false, appr: false, js: false };
+    this._t = [];
+  }
+  later(fn, ms) { const id = setTimeout(fn, ms); this._t.push(id); return id; }
+  fire(k) { clearTimeout(this._w); this.setState({ wave: '' }); this.later(() => this.setState({ wave: k }), 20); this._w = this.later(() => this.setState({ wave: '' }), 2000); }
+  componentDidMount() {
+    this.setState({ js: true });
+    const all = () => Array.prototype.slice.call(document.querySelectorAll('.lp-root .rv'));
+    this.later(() => {
+      if (typeof IntersectionObserver === 'undefined') { all().forEach((e) => e.classList.add('in')); return; }
+      this._io = new IntersectionObserver((es) => es.forEach((x) => {
+        if (!x.isIntersecting) return;
+        x.target.classList.add('in'); this._io.unobserve(x.target);
+      }), { rootMargin: '0px 0px -10% 0px' });
+      all().forEach((e) => this._io.observe(e));
+    }, 60);
+    this.later(() => all().forEach((e) => e.classList.add('in')), 3500);
+    this.later(() => this.tourInit(), 400);
+    this.later(() => this.mxInit(), 80);
+    this.later(() => this.wmInit(), 300);
+    const go = () => { if (this._went) return; this._went = true; requestAnimationFrame(() => requestAnimationFrame(() => this.setState({ boot: 1 }))); };
+    try { document.fonts.ready.then(() => this.later(go, 160)); } catch (e) {}
+    this.later(go, 1600);
+    this._i3 = setInterval(() => { if (!this.state.decHold) this.setState({ dec: this.state.dec === 'out' ? 'in' : 'out' }); }, 3600);
+    this._i2 = setInterval(() => { if (!this.state.hold) this.setState({ hs: (this.state.hs + 1) % 4 }); }, 3200);
+  }
+  componentWillUnmount() { if (this._sio) this._sio.disconnect(); if (this._mxOff) this._mxOff(); if (this._wmOff) this._wmOff(); if (this._tio) this._tio.disconnect(); if (this._fit) window.removeEventListener('resize', this._fit); Object.keys(this._tr || {}).forEach((k) => { clearTimeout(this._tr[k].tm); clearTimeout(this._tr[k].back); }); this._t.forEach(clearTimeout); clearInterval(this._i1); clearInterval(this._i2); clearInterval(this._i3); if (this._io) this._io.disconnect(); }
+  tourDefs() {
+    const W = (ms) => ({ w: ms }), C = (c, o) => Object.assign({ c: c }, o || {}), S = (c, o) => Object.assign({ c: c, silent: true }, o || {});
+    return {
+      nodes: [S('.demo .seg button', { t: /^4$/ }), S('.an-x', { opt: true }), W(1800), C('.ph .btn.pri'), W(1100), C('.an-w .btn.pri'), { until: '.an-w .btn.pri', t: /Продолжить/, max: 9000 }, W(1200), C('.an-w .an-c', { ax: .04 }), W(700), C('.an-w .btn.pri', { t: /Продолжить/ }), { until: '.an-w .btn.pri', t: /Запустить/, max: 9000 }, W(900), C('.an-w .btn.pri', { t: /Запустить/ }), { until: '.an-w .btn', t: /Открыть ноду/, max: 20000 }, W(1100), C('.an-w .btn', { t: /Открыть ноду/ }), S('.demo .seg button', { t: /^5$/ }), W(6500)],
+      ov: [S('.demo div:nth-of-type(2) button', { t: /^4$/ }), W(2000), C('.main .btn.sm', { t: /^Сжать$/ }), W(3400), C('.main .btn.sm', { t: /^Ретрансляция$/ }), W(3400), C('.main .btn.sm', { t: /^Продлить$/ }), W(5200)],
+      us: [S('.demo .seg button', { t: /^закрыто$/ }), W(1800), C('.ph .btn.pri'), W(1300), C('.us-dlg input', { type: 'kate', ax: .2 }), W(500), C('.us-dlg .us-gp', { n: 1 }), W(900), C('.us-dlg .mono', { t: /^300 ГБ$/ }), W(900), C('.us-dlg .btn.pri', { t: /Создать/ }), W(7000)],
+      hl: [S('.demo .seg button', { t: /^есть алерты$/ }), S('.main [role=tab]', { t: /^Алерты/ }), W(2000), C('.main .btn.sm.pri', { t: /Сжать журнал/ }), W(1500), C('.pn .btn.pri', { t: /^Применить$/ }), W(3600), C('.main [role=tab]', { t: /^Проверки/ }), W(3400), C('.main [role=tab]', { t: /^Доктор/ }), W(3800), C('.main [role=tab]', { t: /^Люди/ }), W(3200)],
+      app: ({ Main: [S('.dev button', { t: /^Off$/ }), W(1600), C('[data-app] .pw'), W(6000), C('[data-app] .rsel', { n: 4 }), W(5000), C('[data-app] .sv-tabs [role=tab]', { n: 1 }), W(3800), C('[data-app] .sv-tabs [role=tab]', { n: 0 }), W(1800)],
+        Routes: [W(2200), C('[data-app] .cat', { n: 2 }), W(2800), C('[data-app] .utabs button', { n: 1 }), W(3200), C('[data-app] .utabs button', { n: 2 }), W(3200), C('[data-app] .utabs button', { n: 0 }), W(1600)],
+        Diag: [S('.dev button', { t: /^Idle$/, opt: true }), W(1600), C('[data-app] .cta'), { until: '[data-app] .dr-b', max: 16000 }, W(2000), C('[data-app] .dr-b', { n: 0 }), W(4600)],
+        Set: [W(2000), C('[data-app] .sx-ni', { n: 3 }), W(3000), C('[data-app] .sx-ni', { n: 6 }), W(3000), C('[data-app] .sx-ni', { n: 4 }), W(3000), C('[data-app] .sx-ni', { n: 0 }), W(1400)],
+        Byp: [S('.dev button', { t: /^Off$/ }), W(1600), C('[data-app] .pw'), { until: '[data-app] .bp-n', max: 16000 }, W(2600), C('[data-app] .bp-sh', { n: 0 }), W(3600), C('[data-app] .bp-seg button', { n: 1 }), W(3000), C('[data-app] .bp-seg button', { n: 0 }), W(1600)] })[(this.state && this.state.as) || 'Main'],
+      nd: [W(1600), C('.fz-bar .seg button', { t: /^Пути$/ }), W(3400), C('.fz-bar .seg button', { t: /^Карта$/, pc: 1 }), { w: 4400, pc: 1 }, C('.fz-bar .seg button', { t: /^Нагрузка$/ }), W(3400), C('.fz-bar .seg button', { t: /^Список$/ }), W(1400)],
+      rc: [W(2400), C('.main [role=tab]', { t: /^События/ }), W(3400), C('.main [role=tab]', { t: /^Источники/ }), W(3800), C('.main [role=tab]', { t: /^Ноды/ }), W(1600)],
+      up: [W(2400), C('.main [role=tab]', { t: /^Агенты нод/ }), W(3600), C('.main [role=tab]', { t: /^Система серверов/ }), W(3600), C('.main [role=tab]', { t: /^Эта панель/ }), W(1600)],
+      sub: [W(1800), C('.cS .u-tab', { t: /^Telegram/ }), W(3600), C('.cS .u-tab', { t: /^Устройства/ }), W(3600), C('.cS .u-tab', { t: /^Серверы/ }), W(4200)]
+    };
+  }
+  slInit() {
+    const root = document.querySelector('.lp-root'); if (!root || this._slo) return;
+    const Q = '.lx-tabs,.cpf,.tabs,.lx-dv,.lx-ais', SEL = '[aria-selected="true"],[aria-pressed="true"]';
+    const target = (g) => g.classList.contains('lx-atabs') ? [root.querySelector('.lx-app'), root.querySelector('.lx-acap')] : g.classList.contains('lx-tabs') ? [root.querySelector('.lx-shw .emb'), root.querySelector('.lx-sx')] : g.classList.contains('tabs') ? [g.parentElement.querySelector('.lx-prx')] : g.classList.contains('cpf') ? [root.querySelector('.card.cmp')] : g.classList.contains('lx-dv') ? [root.querySelector('.lx-shw .emb')] : [root.querySelector('.lx-aic'), root.querySelector('.lx-aim')];
+    const upd = () => { this._slq = 0; Array.prototype.forEach.call(root.querySelectorAll(Q), (g) => { const b = g.querySelector(SEL); if (!b || !b.offsetWidth) return; const kids = Array.prototype.slice.call(g.querySelectorAll('button,[role=tab]')), i = kids.indexOf(b);
+      g.style.setProperty('--ix', b.offsetLeft + 'px'); g.style.setProperty('--iy', b.offsetTop + 'px'); g.style.setProperty('--iw', b.offsetWidth + 'px'); g.style.setProperty('--ih', b.offsetHeight + 'px');
+      if (!g.classList.contains('lx-sl')) { g.classList.add('lx-sl'); g._i = i; setTimeout(() => g.classList.add('lx-sla'), 60); return; }
+      if (g._i !== i) { const dir = i > g._i ? 1 : -1; g._i = i; target(g).forEach((t) => { if (!t) return; t.style.setProperty('--sd', dir); t.classList.remove('lx-swp'); void t.offsetWidth; t.classList.add('lx-swp'); clearTimeout(t._sw); t._sw = setTimeout(() => t.classList.remove('lx-swp'), 700); }); } }); };
+    const kick = () => { if (this._slq) return; this._slq = requestAnimationFrame(upd); };
+    this._slo = new MutationObserver((ms) => { for (let k = 0; k < ms.length; k++) { const m = ms[k], t = m.target; if (m.type === 'attributes' || (t.closest && t.closest(Q)) || (m.addedNodes.length && m.addedNodes[0].querySelector && m.addedNodes[0].querySelector(Q))) { kick(); return; } } });
+    this._slo.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-selected', 'aria-pressed'] });
+    window.addEventListener('resize', kick); [0, 400, 1500, 3200].forEach((ms) => setTimeout(kick, ms)); this._slk = kick;
+  }
+  tourInit() {
+    this.slInit();
+    this._tr = {};
+    const boxes = Array.prototype.slice.call(document.querySelectorAll('.lp-root [data-tour]'));
+    const root = document.querySelector('.lp-root');
+    const fit = () => { const nr = root.clientWidth < 620; if (nr !== !!this.state.nr) this.setState({ nr: nr }); boxes.forEach((b) => { const s = b.querySelector('.pwin-s'); if (!s || !b.clientWidth) return; const A = (n, d) => +(b.getAttribute('data-' + n) || d), rtl = this.state.lang === 'FA', dv = b.getAttribute('data-dv'), ph = b.hasAttribute('data-bwm') && (dv === 'ph' || (dv !== 'pc' && nr)); b.classList.toggle('ph', ph); const bw = ph ? A('bwm', 400) : A('bw', 1440), bh = ph ? A('hbm', 1200) : A('h', 860), pan = !ph && nr && b.hasAttribute('data-wm'), mob = ph || pan, w = ph ? bw : (pan ? A('wm', 640) : A('w', bw)), vh = ph ? Math.min(bh, A('hm', 720)) : (pan ? Math.min(bh, A('hmp', bh)) : A('vh', bh)), k = b.clientWidth / w; if (b._mode !== (ph ? 'ph' : pan ? 'pan' : 'pc')) { b._mode = ph ? 'ph' : pan ? 'pan' : 'pc'; b._px = null; b._py = null; } const x = ph ? 0 : (pan ? (b._px != null ? b._px : A('xm', (bw - w) / 2)) : (rtl && b.hasAttribute('data-x') ? 0 : A('x', 0))), y = mob ? (b._py != null ? b._py : 0) : A('y', 0); const C = ph ? 88 : 0; b._v = { k: k, w: w, vh: vh, bw: bw, bh: bh, mob: mob, x: x, y: y, top: C }; s.style.top = C + 'px'; s.style.width = bw + 'px'; s.style.height = bh + 'px'; s.style.setProperty('--bh', bh + 'px'); s.style.setProperty('--cx', (mob ? 0 : x) + 'px'); s.style.transform = 'translate(' + (-x * k).toFixed(1) + 'px,' + (-y * k).toFixed(1) + 'px) scale(' + k.toFixed(4) + ')'; b.style.height = Math.round(vh * k + C) + 'px'; b.classList.toggle('pan', mob); }); };
+    const shots = Array.prototype.slice.call(document.querySelectorAll('.lp-root [data-shot]'));
+    const shot = () => shots.forEach((b) => { const s = b.querySelector('.pwin-s'), d = (n) => b.getAttribute('data-' + n); if (!s) return; if (d('pre') && !b._pre) { const a = d('pre').split('|'), re = new RegExp(a[1]), ru = (x) => ((window.MG_I18N && window.MG_I18N.ru ? window.MG_I18N.ru(x) : x.textContent) || '').trim(), e = Array.prototype.slice.call(s.querySelectorAll(a[0])).filter((x) => re.test(ru(x)))[0]; if (!e) return; b._pre = true; e.click(); return; } const nar0 = b.clientWidth < 420, keep = nar0 && d('km'), nar = nar0 && !keep; s.style.width = nar ? '420px' : ''; const el = s.querySelector(d('sel')); if (!el) return; s.style.transform = 'none'; const sr = s.getBoundingClientRect(), er = el.getBoundingClientRect(), pad = +(d('pad') || 0); if (!er.width) return; let k = d('fit') ? b.clientWidth / (er.width + pad * 2) : +(d('k') || .6); if (nar) k = d('fit') ? Math.min(1, k) : .82; if (keep) k = +d('km'); let x = (er.left - sr.left - pad) * k, y = (er.top - sr.top - pad + +(d('dy') || 0)) * k; if (d('c')) x = (er.left - sr.left + er.width / 2 + (keep ? +(d('dxm') || 0) : 0)) * k - b.clientWidth / 2; else if (this.state.lang === 'FA' && !d('fit')) x = (er.right - sr.left + pad) * k - b.clientWidth; if (d('cine')) { const ns = Array.prototype.slice.call(el.querySelectorAll('.fz-gn')); if (!ns.length) return; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; ns.forEach((n) => { const r = n.getBoundingClientRect(); x0 = Math.min(x0, r.left - sr.left); x1 = Math.max(x1, r.right - sr.left); y0 = Math.min(y0, r.top - sr.top); y1 = Math.max(y1, r.bottom - sr.top); }); const W = b.clientWidth, H = b.clientHeight, pad = 44; k = Math.max(.62, Math.min(1.2, H * .74 / (y1 - y0 + 60))); const full = (x1 - x0 + pad * 2) * k; y = (y0 + y1) / 2 * k - H / 2; if (full <= W) { x = (x0 + x1) / 2 * k - W / 2; s.style.setProperty('--dx', '0px'); } else { x = (x0 - pad) * k; s.style.setProperty('--dx', (-(full - W)).toFixed(1) + 'px'); } b.classList.add('cine'); } s.style.transform = 'translate(' + (-x).toFixed(1) + 'px,' + (-y).toFixed(1) + 'px) scale(' + k.toFixed(4) + ')'; b.classList.add('rdy'); });
+    if (typeof IntersectionObserver !== 'undefined') { this._sio = new IntersectionObserver((es) => es.forEach((x) => { const b = x.target, s = b.querySelector('.pwin-s'); if (!s) return; if (x.isIntersecting && !b._in) { b._in = true; if (b.classList.contains('rdy')) { s.style.display = 'none'; void s.offsetHeight; s.style.display = ''; } b.classList.add('go'); } else if (!x.isIntersecting && b._in) { b._in = false; b.classList.remove('go'); } }), { threshold: .35 }); shots.forEach((b) => this._sio.observe(b)); }
+    const both = () => { fit(); shot(); }; both(); [500, 1400, 3000].forEach((ms) => setTimeout(shot, ms)); this._fit = both; window.addEventListener('resize', both);
+    let still = false; try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    if (still || typeof IntersectionObserver === 'undefined') return;
+    this._tio = new IntersectionObserver((es) => es.forEach((x) => { const k = x.target.getAttribute('data-tour'), st = this._tr[k] || (this._tr[k] = { i: 0, box: x.target }); st.vis = x.isIntersecting && x.intersectionRatio >= .4; this.tourKick(k); }), { threshold: [0, .4, .7] });
+    boxes.forEach((b) => this._tio.observe(b));
+  }
+  tourSwap(from, to) { const a = this._tr && this._tr[from]; if (!this._tr) return; let box = null; if (a) { clearTimeout(a.tm); clearTimeout(a.back); box = a.box; delete this._tr[from]; const cur = box.querySelector('.tcur'); if (cur) cur.classList.remove('on'); } if (!box) box = document.querySelector('.lp-root .emb.tr-box'); if (!box) return; box._px = null; box._py = null; this._tr[to] = { i: 0, box: box, vis: true }; this.tabIn('.lx-tab[aria-selected="true"]'); if (this._fit) this._fit(); setTimeout(() => { if (this._fit) this._fit(); this.tourKick(to); }, 700); }
+  // the whole prompt is the longest code block of its section on the docs page the sheet links to; without it the sheet keeps the beginning
+  aiLoad() {
+    const a = document.querySelector('.lp-root .lx-aif a[href]'), k = this.state.lang + (this.state.ai || 0), seen = this._aip || (this._aip = {});
+    let u; try { u = new URL(a.href); } catch (e) { return; }
+    if (seen[k] || u.origin !== location.origin) return; seen[k] = 1;
+    fetch(u.pathname).then((r) => r.ok ? r.text() : '').then((t) => {
+      const h = new DOMParser().parseFromString(t, 'text/html').getElementById(decodeURIComponent(u.hash.slice(1))); let best = '';
+      for (let e = h && h.nextElementSibling; e && e.tagName !== 'H2'; e = e.nextElementSibling) e.querySelectorAll('pre').forEach((p) => { if (p.textContent.length > best.length) best = p.textContent; });
+      if (best) this.setState({ aiFull: Object.assign({}, this.state.aiFull, { [k]: best }) }); else seen[k] = 0;
+    }).catch(() => { seen[k] = 0; });
+  }
+  setLang(l) { try { localStorage.setItem('mg-lang', l); } catch (e) {} window.MG_LANG = l; this.setState({ lang: l }); Array.prototype.forEach.call(document.querySelectorAll('.lp-root .pn .lb'), (e) => { if (/^(RU|EN|TR|ZH|FA)$/.test(e.textContent.trim())) e.textContent = l; }); if (window.MG_I18N && window.MG_I18N.kick) window.MG_I18N.kick(); const a = this._tr && this._tr.app; if (a) { clearTimeout(a.tm); a.i = 0; a.busy = false; setTimeout(() => this.tourKick('app'), 900); } [200, 900, 2000].forEach((ms) => setTimeout(() => { if (this._fit) this._fit(); }, ms)); }
+  setDv(v) { this.setState({ dv: v }); const st = this._tr && this._tr[this.state.tr]; if (st) { clearTimeout(st.tm); st.i = 0; st.busy = false; const c = st.box.querySelector('.tcur'); if (c) c.classList.remove('on'); } [80, 500].forEach((ms) => setTimeout(() => { if (this._fit) this._fit(); }, ms)); setTimeout(() => this.tourKick(this.state.tr), 900); }
+  setAs(k, auto) { const st = this._tr && this._tr.app; if (st) { clearTimeout(st.tm); clearTimeout(st.back); st.i = 0; st.busy = false; st.hold = false; st.box._px = null; st.box._py = null; const c = st.box.querySelector('.tcur'); if (c) c.classList.remove('on'); } this.setState({ as: k }); setTimeout(() => this.tabIn('.lx-atabs .lx-tab[aria-selected="true"]'), 80); [120, 700].forEach((ms) => setTimeout(() => { if (this._fit) this._fit(); }, ms)); setTimeout(() => this.tourKick('app'), 1300); }
+  tabIn(q) { try { const t = document.querySelector(q), b = t && t.parentElement; if (b && b.scrollWidth > b.clientWidth + 2) b.scrollTo({ left: Math.max(0, t.offsetLeft - b.offsetLeft - (b.clientWidth - t.offsetWidth) / 2), behavior: 'smooth' }); } catch (e) {} }
+  trNext(k) { const O = ['ov', 'nd', 'us', 'hl', 'rc', 'up'], n = O[(O.indexOf(k) + 1) % O.length]; if (this.state.tr !== k) return; const cur = this._tr[k] && this._tr[k].box.querySelector('.tcur'); if (cur) cur.classList.remove('on'); this.setState({ tr: n }); setTimeout(() => this.tourSwap(k, n), 60); }
+  tourHold(k, on) { const st = this._tr && this._tr[k]; if (!st) return; st.hold = on; clearTimeout(st.tm); clearTimeout(st.back); const cur = st.box.querySelector('.tcur'); if (on) { st.busy = false; if (cur) cur.classList.remove('on'); } else { st.back = setTimeout(() => { st.i = 0; this.tourKick(k); }, 2400); } }
+  tourKick(k) { const st = this._tr[k]; if (!st || st.busy || !st.vis || st.hold) return; st.busy = true; this.tourStep(k); }
+  tourStep(k) {
+    const st = this._tr[k], steps = this.tourDefs()[k] || [];
+    if (!st.vis || st.hold || !steps.length) { st.busy = false; return; }
+    if (st.i >= steps.length) { st.i = 0; if (st.box.classList.contains('tr-box') && this.trNext) { st.busy = false; return this.trNext(k); } if (k === 'app' && this.setAs) { st.busy = false; const O = ['Main', 'Routes', 'Diag', 'Set', 'Byp']; return this.setAs(O[(O.indexOf(this.state.as || 'Main') + 1) % O.length], true); } }
+    if (st.i === 0) { const sc0 = st.box.querySelector('.pnr'); if (sc0 && sc0.scrollTop) sc0.scrollTop = 0; }
+    const sp = steps[st.i % steps.length], next = (ms) => { st.tm = setTimeout(() => this.tourStep(k), ms); };
+    const find = () => { const list = Array.prototype.slice.call(st.box.querySelectorAll(sp.c || sp.until)).filter((e) => sp.silent || e.getClientRects().length); const src = (e) => ((window.MG_I18N && window.MG_I18N.ru ? window.MG_I18N.ru(e) : e.textContent) || '').trim(); return sp.t ? list.filter((e) => sp.t.test(src(e)))[sp.n || 0] : list[sp.n || 0]; };
+    if (sp.pc && st.box.classList.contains('ph')) { st.i++; return next(20); }
+    if (sp.w) { st.i++; return next(sp.w); }
+    if (sp.until) { if (find()) { st.i++; st.t0 = 0; return next(60); } st.t0 = st.t0 || Date.now(); if (Date.now() - st.t0 > (sp.max || 8000)) { st.t0 = 0; st.i = 0; } return next(250); }
+    const el = find(); st.i++;
+    if (!el) { if (!sp.opt) st.i = 0; return next(sp.opt ? 40 : 1500); }
+    if (sp.silent) { el.click(); return next(sp.after || 80); }
+    const cur = st.box.querySelector('.tcur'), br = st.box.getBoundingClientRect(), r = el.getBoundingClientRect(), V = st.box._v, sEl = st.box.querySelector('.pwin-s'), ax = sp.ax == null ? .5 : sp.ax;
+    let x = r.left - br.left + r.width * ax, y = r.top - br.top + r.height * .55;
+    if (V && sEl && V.mob) { const sr = sEl.getBoundingClientRect(), kc = sr.width / V.bw || 1, bx = (r.left - sr.left) / kc + r.width / kc * ax, by = (r.top - sr.top) / kc + r.height / kc * .55, sc = st.box.classList.contains('ph') ? sEl.querySelector('.pnr') : null; if (sc) { let dy = 0; if (el.closest('.an-scrim')) { if (sc.scrollTop) { dy = -sc.scrollTop; sc.scrollTop = 0; } } else if (!el.closest('.mnav') && (by < 90 || by > V.vh - 150)) { const nt = Math.max(0, Math.min(sc.scrollHeight - sc.clientHeight, sc.scrollTop + by - V.vh * .45)); dy = nt - sc.scrollTop; try { sc.scrollTo({ top: nt, behavior: 'smooth' }); } catch (e) { sc.scrollTop = nt; } } x = bx * V.k; y = (by - dy) * V.k + V.top; } else { const px = Math.max(0, Math.min(V.bw - V.w, bx - V.w / 2)), py = Math.max(0, Math.min(V.bh - V.vh, by - V.vh / 2)); st.box._px = px; st.box._py = py; V.x = px; V.y = py; sEl.style.transform = 'translate(' + (-px * V.k).toFixed(1) + 'px,' + (-py * V.k).toFixed(1) + 'px) scale(' + V.k.toFixed(4) + ')'; x = (bx - px) * V.k; y = (by - py) * V.k + V.top; } }
+    if (y < 0 || y > br.height + 4 || !cur) { el.click(); return next(sp.after || 700); }
+    cur.classList.add('on'); cur.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+    st.tm = setTimeout(() => { cur.classList.add('dn'); st.tm = setTimeout(() => { cur.classList.remove('dn'); if (st.hold) return; if (!sp.type) { el.click(); return next(sp.after || 500); } let n = 0, set = null; try { el.focus({ preventScroll: true }); set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; } catch (e) {} const tick = () => { if (st.hold || !set) return; set.call(el, sp.type.slice(0, ++n)); el.dispatchEvent(new Event('input', { bubbles: true })); if (n < sp.type.length) st.tm = setTimeout(tick, 110); else { try { el.blur(); } catch (e) {} next(sp.after || 500); } }; tick(); }, 170); }, 820);
+  }
+  mxInit() {
+    const cv = document.querySelector('.lp-root .lx-mx'); if (!cv || !cv.getContext) return;
+    const ctx = cv.getContext('2d'), S = 18; let W = 0, H = 0, dpr = 1, pts = [], raf = 0, vis = true, t0 = performance.now(), px = -9999, py = -9999, still = false;
+    try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    const size = () => { const r = cv.getBoundingClientRect(); if (!r.width) return; dpr = Math.min(2, window.devicePixelRatio || 1); W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); pts = []; const ox = (W % S) / 2, oy = 8; for (let y = oy; y < H; y += S) for (let x = ox; x < W; x += S) { const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; pts.push([x, y, (h - Math.floor(h)) * 6.283]); } };
+    const draw = (now) => {
+      raf = 0; if (!W) size(); const t = (now - t0) / 1000, cx = W / 2, cy = 375, R = Math.max(W, H) * .62, tx = W / 2, ty = 375, rx = Math.min(390, W * .44), ry = 215;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+      const r1 = (t * 120) % R, r2 = (t * 120 + R / 2) % R, f1 = 1 - r1 / R, f2 = 1 - r2 / R;
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i], dx = p[0] - cx, dy = p[1] - cy, d = Math.sqrt(dx * dx + dy * dy);
+        let a = .18 + .07 * Math.sin(p[0] * .011 + p[1] * .019 - t * .9);
+        const tw = Math.sin(t * 1.6 + p[2]); if (tw > .95) a += (tw - .95) * 6;
+        const g1 = (d - r1) / 44, g2 = (d - r2) / 44; a += Math.exp(-g1 * g1) * .78 * f1 + Math.exp(-g2 * g2) * .78 * f2;
+        const qx = p[0] - px, qy = p[1] - py, q = qx * qx + qy * qy; if (q < 40000) a += Math.exp(-q / 9000) * .4;
+        const ex = (p[0] - tx) / rx, ey = (p[1] - ty) / ry, e = ex * ex + ey * ey; const mk = W < 600 ? .3 : .06; if (e < 1.5) a *= e < .8 ? mk : mk + (1 - mk) * (e - .8) / .7;
+        const ed = Math.min(p[0], W - p[0]) / Math.min(180, W * .125), eb = (H - p[1]) / Math.min(200, H * .2); if (ed < 1) a *= ed * ed; if (eb < 1) a *= eb * eb;
+        if (a < .03) continue; if (a > 1) a = 1;
+        const hot = a > .34, s = hot ? .9 + a * .8 : 1;
+        ctx.fillStyle = hot ? 'rgba(125,211,160,' + a.toFixed(3) + ')' : 'rgba(243,243,245,' + a.toFixed(3) + ')';
+        if (hot) { ctx.beginPath(); ctx.arc(p[0], p[1], s, 0, 6.283); ctx.fill(); } else ctx.fillRect(p[0] - .75, p[1] - .75, 1.5, 1.5);
+      }
+      if (vis && !still) raf = requestAnimationFrame(draw);
+    };
+    const kick = () => { if (!raf) raf = requestAnimationFrame(draw); };
+    const move = (e) => { const r = cv.getBoundingClientRect(); px = e.clientX - r.left; py = e.clientY - r.top; };
+    const root = document.querySelector('.lp-root'); root.addEventListener('pointermove', move, { passive: true });
+    const rs = () => { size(); kick(); }; window.addEventListener('resize', rs);
+    let io = null; if (typeof IntersectionObserver !== 'undefined') { io = new IntersectionObserver((es) => { vis = es[0].isIntersecting; if (vis) kick(); }); io.observe(cv); }
+    size(); kick();
+    this._mxOff = () => { cancelAnimationFrame(raf); root.removeEventListener('pointermove', move); window.removeEventListener('resize', rs); if (io) io.disconnect(); };
+  }
+  wmInit() {
+    const cv = document.querySelector('.lp-root .lx-wm'); if (!cv || !cv.getContext) return;
+    const ctx = cv.getContext('2d'), t0 = performance.now(); let W = 0, H = 0, dpr = 1, S = 9, pts = [], raf = 0, vis = false, px = -9999, py = -9999, still = false, t1 = -1;
+    try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    const build = () => {
+      const r = cv.getBoundingClientRect(); if (!r.width || !r.height) return; W = r.width; H = r.height; dpr = Math.min(2, window.devicePixelRatio || 1); cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); S = W < 600 ? 5 : (W < 1000 ? 7 : 9);
+      const off = document.createElement('canvas'); off.width = Math.ceil(W); off.height = Math.ceil(H); const o = off.getContext('2d'); let fs = H * 1.2; const F = (n) => '600 ' + n + 'px Onest, system-ui, sans-serif';
+      try { o.letterSpacing = '-0.04em'; } catch (e) {} o.font = F(fs); let tw = o.measureText('mistgate').width; if (tw > W * .97) { fs *= W * .97 / tw; o.font = F(fs); tw = o.measureText('mistgate').width; }
+      const x0 = (W - tw) / 2, mw = o.measureText('mist').width; o.fillStyle = '#fff'; o.textBaseline = 'alphabetic'; o.fillText('mistgate', x0, H * .5 + fs * .36);
+      const d = o.getImageData(0, 0, off.width, off.height).data; pts = []; const LB = []; for (let i = 1; i <= 8; i++) LB.push(x0 + o.measureText('mistgate'.slice(0, i)).width);
+      for (let y = S / 2; y < H; y += S) for (let x = S / 2; x < W; x += S) { const a = d[((y | 0) * off.width + (x | 0)) * 4 + 3], h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; const on = a > 110 ? 1 : 0, r = h - Math.floor(h); let li = 0; while (li < 7 && x > LB[li]) li++; const c2 = Math.sin(Math.round(x / S) * 91.7 + li * 13.1) * 9973.1, cj = c2 - Math.floor(c2); pts.push([x, y, on, x > x0 + mw ? 1 : 0, r * 6.283, on ? li * .24 + cj * .3 + ((H - y) / S) * .034 : .4 + r * 2.6]); }
+    };
+    const draw = (now) => {
+      raf = 0; if (!pts.length) build(); const t = (now - t0) / 1000, ti = still ? 99 : (t1 < 0 ? -1 : (now - t1) / 1000), sx = ((t * .16) % 1.5 - .25) * W;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i], on = p[2], g = (p[0] - sx + (p[1] - H / 2) * .35) / 70, sw = ti > 4.2 ? Math.exp(-g * g) : 0; let yy = p[1], fl = 0; if (ti < 6) { if (ti < 0) continue; const T = p[5]; if (on) { const f0 = T - (p[1] / S) * .016; if (ti < f0) continue; if (ti < T) yy = p[1] - Math.ceil((T - ti) / .016) * S; else fl = Math.exp(-(ti - T) * 7); if (yy < 0) continue; } else if (ti < T) continue; }
+        let a = on ? .42 + .2 * Math.sin(p[0] * .014 + p[1] * .03 - t * 1.3) + sw * .5 + fl * .6 : .035 + sw * .1;
+        if (!on) { const tw = Math.sin(t * 1.4 + p[4]); if (tw > .96) a += (tw - .96) * 5; }
+        const qx = p[0] - px, qy = p[1] - py, q = qx * qx + qy * qy; if (q < 36000) a += Math.exp(-q / 7000) * (on ? .5 : .3);
+        const fy = Math.min(1, (H - p[1]) / (H * .28)); if (yy === p[1]) a *= .35 + .65 * fy; if (a < .03) continue; if (a > 1) a = 1;
+        ctx.fillStyle = (on && p[3]) || (!on && a > .25) ? 'rgba(125,211,160,' + a.toFixed(3) + ')' : 'rgba(243,243,245,' + a.toFixed(3) + ')';
+        if (on) { ctx.beginPath(); ctx.arc(p[0], yy, S * .24 + a * S * .14, 0, 6.283); ctx.fill(); } else ctx.fillRect(p[0] - .7, p[1] - .7, 1.4, 1.4);
+      }
+      if (vis && !still) raf = requestAnimationFrame(draw);
+    };
+    const kick = () => { if (!raf) raf = requestAnimationFrame(draw); };
+    const move = (e) => { const r = cv.getBoundingClientRect(); px = e.clientX - r.left; py = e.clientY - r.top; };
+    const root = document.querySelector('.lp-root'); root.addEventListener('pointermove', move, { passive: true });
+    const rs = () => { build(); kick(); }; window.addEventListener('resize', rs);
+    let io = null; if (typeof IntersectionObserver !== 'undefined') { io = new IntersectionObserver((es) => { vis = es[0].isIntersecting; if (vis && es[0].intersectionRatio >= .45 && t1 < 0) t1 = performance.now(); if (vis) kick(); }, { threshold: [0, .45, .8] }); io.observe(cv); } else { vis = true; t1 = performance.now(); }
+    try { document.fonts.ready.then(rs); } catch (e) {} build(); kick();
+    this._wmOff = () => { cancelAnimationFrame(raf); root.removeEventListener('pointermove', move); window.removeEventListener('resize', rs); if (io) io.disconnect(); };
+  }
+  start() {
+    if (this.state.run > 0 && this.state.run < 5) return;
+    this.setState({ run: 1, dlg: true, added: false });
+    [2, 3, 4].forEach((n, i) => this.later(() => this.setState({ run: n }), 850 * (i + 1)));
+    this.later(() => { this.setState({ run: 5, dlg: false, added: true }); this.fire('win'); }, 850 * 4 + 300);
+  }
+  connect() {
+    if (this.state.conn === 'ing') return;
+    if (this.state.conn === 'on') { this.setState({ conn: 'off' }); return; }
+    this.setState({ conn: 'ing' });
+    this.later(() => { this.setState({ conn: 'on', secs: 0 }); this.fire('app'); }, 1500);
+  }
+  renderVals() {
+    const s = this.state;
+    const dom = (s.dom || '').replace(/^https?:\/\//, '').trim() || 'panel.example.com';
+    const STEPS = [['Сервер проверен', 'linux · amd64 · systemd'], ['Порты открыты в UFW', '443/udp · 443/tcp'], ['Агент поставлен', 'подпись верна'], ['Доктор: 23 проверки', 'всё в порядке']];
+    const cls = (i) => (s.run > i + 1 ? 'done' : (s.run === i + 1 ? 'busy' : ''));
+    const MARQ = [['Hysteria2', 'ok'], ['VLESS REALITY', 'dir'], ['AmneziaWG 3.1', 'ru'], ['AmneziaWG 2.0', ''], ['Cloudflare WARP', 'warp'], ['XHTTP', ''], ['MTProto', ''], ['TrustTunnel', ''], ['xray-core', 'dir'], ['Mihomo', ''], ['sing-box', ''], ['SQLite', 'warp'], ['systemd', ''], ['Go', 'ok'], ['Linux amd64', ''], ['Linux arm64', ''], ['MCP', 'ru'], ['Telegram-алерты', 'dir'], ['Let’s Encrypt', ''], ['AGPL-3.0', 'ok'], ['5 языков', '']];
+    const SERVERS = [['de', 'Германия', 39, '', ''], ['nl', 'Нидерланды', 44, 'WARP', 'warp'], ['fi', 'Финляндия', 52, '', ''], ['ee', 'Эстония', 58, 'через RU', 'ru'], ['pl', 'Польша', 61, 'напрямую', 'dir']];
+    const G = 'Docs.dc.html#';
+    const RI = { dev: 'M4 5h16v11H4zM9 20h6M12 16v4', node: 'M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01', net: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.500 2.700 2.500 15.300 0 18M12 3c-2.500 2.700-2.500 15.300 0 18', cloud: 'M7 18a4 4 0 0 1-.6-7.950A6 6 0 0 1 18 9.500a4.250 4.250 0 0 1-.5 8.500z', site: 'M3.500 6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2zM3.500 9h17M6.500 6.500h.01M9 6.500h.01' };
+    const N = (t, i) => ({ node: true, wire: false, t: t, d: RI[i], c: '' }), Wr = (t, c) => ({ node: false, wire: true, t: t, d: '', c: c || '' });
+    const TABS = [
+      { k: 'hysteria2', n: 'Hysteria2', s: 'UDP · QUIC', d: 'M13 3L5 14h6l-1 7 8-11h-6z', lead: 'Стартовый вариант: официальное ядро Hysteria2 на UDP 443', doc: 'DocHy2.dc.html', page: 'https://github.com/Mistgate/hysteria',
+        route: [N('Устройство', 'dev'), Wr('UDP 443 · QUIC', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Интернет', 'net')],
+        rows: [['Обфускация', 'Salamander по умолчанию', 'Gecko экспериментально, можно и без обфускации', ''], ['Смена портов', 'Диапазон от 1024, до 20 000 портов', 'передаётся только в формате Mihomo', ''], ['Сертификат', 'Let’s Encrypt или самоподписанный с закреплением', 'второй работает и по IP', ''], ['Посторонним', 'Порт отвечает сайтом по HTTP/3 и HTTPS', 'BBR включён по умолчанию', '']],
+        apps: ['Mistgate для Windows', 'Happ', 'приложения на Mihomo'] },
+      { k: 'vless', n: 'VLESS', s: 'TCP · xray-core', d: RI.net, lead: 'Для сетей, где режут UDP и QUIC', doc: G + 'vless/', page: 'https://github.com/Mistgate/Xray-core',
+        route: [N('Устройство', 'dev'), Wr('TCP 443 · REALITY', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Интернет', 'net')],
+        rows: [['REALITY', 'Поверх XHTTP или TCP (RAW + Vision)', 'сертификат не нужен, работает по IP', ''], ['TLS', 'Поверх XHTTP или WebSocket', 'напрямую или за CDN', ''], ['Цель REALITY', '«Сайт этой ноды» или «Другой сайт»', 'по умолчанию сайт этой ноды', ''], ['Один порт на несколько', 'VLESS, TrustTunnel и MTProto делят TCP 443 на одной ноде', 'по имени, которое запрашивает клиент; Hysteria2 рядом, на UDP', '']],
+        apps: ['Mistgate для Windows', 'Happ', 'приложения на Mihomo', 'sing-box, без XHTTP'] },
+      { k: 'amneziawg', n: 'AmneziaWG', s: '3.1 и 2.0', d: 'M4 15.500a3.500 3.500 0 1 0 7 0 3.500 3.500 0 0 0-7 0zM11 15.500h9M17 15.500v-3', lead: 'Отдельный ключ на каждое устройство', doc: G + 'amneziawg/', page: 'https://github.com/amnezia-vpn/amneziawg-go',
+        route: [N('Устройство', 'dev'), Wr('UDP · свой ключ', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Интернет', 'net')],
+        rows: [['Версия 3.1', 'По умолчанию', 'защита заголовков, случайные хвосты и таймеры', ''], ['Версия 2.0', 'Для старых клиентов', 'Hiddify, GL.iNet, стабильный Keenetic 5.1. Версий 1.5 и 1.0 нет', ''], ['Ключи', 'На устройство, работают на всех нодах профиля', 'порт UDP случайный, от 10 000 до 60 000', ''], ['На ноде', 'amneziawg-go в userspace или модуль ядра', 'режим «Авто» выбирает сам, MTU 1280', '']],
+        apps: ['AmneziaVPN', 'Mistgate для Windows', 'приложения на Mihomo'] },
+      { k: 'trusttunnel', n: 'TrustTunnel', s: 'эксперимент', exp: true, d: 'M4.500 19v-6.500a7.500 7.500 0 0 1 15 0V19M9.500 19v-6a2.500 2.500 0 0 1 5 0v6', lead: 'VPN внутри обычного HTTPS с настоящим сертификатом', doc: G + 'trusttunnel/', page: 'https://github.com/Mistgate/trusttunnel-go',
+        route: [N('Устройство', 'dev'), Wr('HTTPS · HTTP/2', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Интернет', 'net')],
+        rows: [['Транспорт', 'HTTP/2, при желании HTTP/3', 'TCP, UDP и DNS', ''], ['На ноде', 'Собственный движок Mistgate в агенте ноды', 'чужой программы на ноде нет', ''], ['Ключ', 'Ссылка tt:// или QR на каждый сервер', 'со страницы человека, не из подписки', ''], ['Честно', 'Не обещает пройти там, где не проходят другие', 'новый протокол, на практике ещё не проверен', 'эксперимент']],
+        apps: ['официальные приложения TrustTunnel', 'Mistgate для Windows'] },
+      { k: 'mtproto', n: 'MTProto', s: 'эксперимент', exp: true, d: 'M20 4L3 11l6 2.500L11 20l3-4.500 4 3z', lead: 'Прокси только для Telegram, это не VPN', doc: G + 'mtproto/', page: 'https://github.com/Mistgate/mistgate/tree/main/internal/mtproto',
+        route: [N('Telegram', 'dev'), Wr('TCP 443 · Fake TLS', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Серверы Telegram', 'cloud')],
+        rows: [['Fake TLS', 'Рукопожатие TLS 1.3', 'посторонним отвечает настоящий сайт', ''], ['Ключ', 'Один на человека', 'место устройства не занимает', ''], ['Ссылка', 'tg://proxy на странице человека', 'в подписку не входит', ''], ['Честно', 'В России блокируется волнами', '', 'эксперимент']],
+        apps: ['Telegram'] },
+      { k: 'warp', n: 'WARP', s: 'выход через Cloudflare', d: RI.cloud, lead: 'Сайты видят адрес Cloudflare, а не вашей ноды', doc: G + 'warp/', page: false,
+        route: [N('Устройство', 'dev'), Wr('любой профиль', 'ok'), N('Нода', 'node'), Wr('WARP', 'warp'), N('Cloudflare', 'cloud'), Wr('', 'warp'), N('Интернет', 'net')],
+        rows: [['Для чего', 'Hysteria2, VLESS и AmneziaWG', '', ''], ['Где выбирается', 'В профиле: «Напрямую» или «WARP»', '', ''], ['Аккаунт', 'Один на ноду', 'регистрация из панели или импорт wgcf', ''], ['Честно', 'Без рабочего WARP такие профили трафик не пропускают', '', '']],
+        apps: [] },
+      { k: 'relays', n: 'Ретрансляции', s: 'вход через другую ноду', d: 'M4 8h13l-3-3M20 16H7l3 3', lead: 'Когда сервер блокируют по адресу или сети', doc: G + 'relays/', page: false, relay: true, route: [],
+        rows: [['Как работает', 'Порт на входной ноде пересылает трафик как есть', 'шифрование идёт от устройства до выхода', ''], ['Что видит вход', 'Адреса, время и объёмы', 'не сайты, не содержимое и не ключи', ''], ['Включение', 'Проверка плеча, включение, проверка пути', 'путь проверяется с третьей ноды', ''], ['Ограничения', 'Только IPv4 и один порт', 'без смены портов', '']],
+        apps: [] },
+      { k: 'none', n: 'Чего нет', s: 'не поддерживаются', d: 'M7 7l10 10M17 7L7 17', lead: 'Меньше протоколов, зато каждый проверяется', doc: 'Docs.dc.html', page: false, route: [],
+        rows: [['Нет', 'VMess, Trojan, Shadowsocks, TUIC', '', 'нет'], ['Нет', 'Обычный WireGuard', 'AmneziaWG версий 1.5 и 1.0 тоже нет', 'нет'], ['Новые протоколы', 'Подключаются через контракт протокольного плагина', 'к той же ссылке подписки', '']],
+        apps: [] }
+    ];
+    const SHOW = {
+      ov: ['Обзор', 'Что требует внимания', 'Здоровье и нагрузка флота, открытые замечания и последние события на одном экране', ['У каждого замечания готовое действие', 'Проверки глазами клиента по каждой ноде', 'Онлайн, скорость и трафик за сутки'], 'operations/health/', 'Как устроено здоровье'],
+      nd: ['Ноды', 'Весь флот на одной странице', 'Список, пути, карта и нагрузка. Карта показывает, как люди попадают на каждый сервер', ['Нода добавляется из браузера по SSH или одноразовой командой', 'Ретрансляция включается после проверки пути', 'Панель открывает порты в UFW или firewalld и ставит подписанный агент'], 'getting-started/add-node/', 'Добавление ноды'],
+      us: ['Люди', 'Новый человек за минуту', 'Имя, группа и квота. Дальше человек получает одну ссылку, и приложение само подтягивает положенные ему серверы', ['Одна ссылка на человека', 'Квота, срок и лимит устройств', 'Изменение пользователя не перезапускает сервер'], 'getting-started/first-users/', 'Первые пользователи'],
+      hl: ['Здоровье', 'Алерты, проверки и доктор', 'Каждые 5 минут панель подключается к каждому серверу, как приложение', ['Доктор делает 23 проверки хоста на каждой ноде', 'Десять исправлений, ни одно без вашего подтверждения', 'Алерты в админке и в Telegram'], 'operations/health/', 'Здоровье'],
+      rc: ['Доступность', 'Открываются ли серверы изнутри страны', 'Необязательная проверка по сетям разных типов. Большинство источников работает только в России', ['Пробы Globalping в домашних и мобильных сетях', 'Списки блокировок и ТСПУ-зонд с вашей ноды', 'Пробы добровольцев и SIM-пробы'], 'operations/reachability/', 'Доступность'],
+      up: ['Обновления', 'С канарейкой и откатом', 'Ноды сами не обновляются. Раскатка начинается с одной ноды и встаёт на паузу, если что-то не так', ['Канарейке даётся 5 минут на проверку', 'Агент откатывается сам, если не подключился', 'Панель обновляется только с подтверждения и хранит копию данных'], 'operations/updates/', 'Обновления']
+    };
+    const SHO = ['ov', 'nd', 'us', 'hl', 'rc', 'up'];
+    const SHI = { ov: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', nd: RI.node, us: 'M9 11a3.500 3.500 0 1 0 0-7 3.500 3.500 0 0 0 0 7zM3 20c0-3.300 2.700-6 6-6s6 2.700 6 6M16 4.500a3.500 3.500 0 0 1 0 6.500M21 20c0-2.600-1.600-4.800-4-5.600', hl: 'M3 12h4l2.500-6 4 12 2.500-6h5', rc: 'M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM8.500 15.500a5 5 0 0 1 0-7M15.500 8.500a5 5 0 0 1 0 7M5.600 18.400a9 9 0 0 1 0-12.800M18.400 5.600a9 9 0 0 1 0 12.800', up: 'M20 12a8 8 0 1 1-2.300-5.600M20 4v4h-4' };
+    const AIP = {
+      RU: [
+        ['Ты устанавливаешь VPN-панель Mistgate (https://github.com/Mistgate/mistgate) на чистый', 'Linux-сервер для меня, по SSH с этого компьютера. Следуй этому промпту и официальной', 'инструкции https://mistgate.app/ru/getting-started/install-panel/ ; если они расходятся,', 'остановись и спроси меня.', '', '== Заполните ==', 'SERVER:      203.0.113.10        # адрес сервера', 'SSH_USER:    root                # root или пользователь с sudo', 'DOMAIN:      panel.example.com   # его A- (и AAAA-) запись должна указывать на SERVER', 'ADMIN_MODE:  prefix              # prefix | host <секретное имя хоста> | listener 127.0.0.1:8081', 'LANGUAGE:    русский             # язык, на котором ты со мной говоришь', '', '== Правила =='],
+        ['Ты работаешь с моей VPN-панелью Mistgate через её MCP-сервер (инструменты вроде', 'fleet_status, protocols_list, profiles_list, profile_create_plan, node_install_plan,', 'user_create_plan). Сначала прочитай инструкции сервера.', 'Справочник: https://mistgate.app/ru/reference/mcp/', '', '== Заполните ==', 'NEW_SERVER:    203.0.113.20       # публичный SSH-адрес новой ноды', 'SSH_PORT:      22', 'SSH_LOGIN:     root               # root или пользователь с беспарольным «sudo -n»', 'NODE_NAME:     de1                # 2-24 символа: a-z, 0-9, дефис', 'NODE_ADDRESS:  de1.example.com    # домен или IP, к которому подключаются клиенты', 'COUNTRY:       DE                 # две буквы, по желанию', 'PROVIDER:      Example Hosting    # по желанию', 'GROUP:         Все                # группа для новых пользователей', 'PROFILE_NAME:  Main               # профиль для создания после установки ноды', 'USERS:         Alice, Bob         # кого создать'],
+        ['Ты работаешь в репозитории Mistgate (https://github.com/Mistgate/mistgate): панель', 'VPN-флота и агент ноды на Go с админкой на React. Прежде чем что-то менять, прочитай', 'AGENTS.md и CONTRIBUTING.md и следуй им.', '', '== Задача ==', '<опишите изменение или ошибку и что должно получиться>', '', '== Правила ==', '- Работай в новой ветке. Изменение маленькое и по делу; никакого постороннего рефакторинга.']
+      ],
+      EN: [
+        ['You are installing the Mistgate VPN panel (https://github.com/Mistgate/mistgate) on a fresh', 'Linux server for me, over SSH from this computer. Follow this prompt and the official guide', 'https://mistgate.app/getting-started/install-panel/ ; if they disagree, stop and ask me.', '', '== Fill in ==', 'SERVER:      203.0.113.10        # address of the server', 'SSH_USER:    root                # root, or a user with sudo', 'DOMAIN:      panel.example.com   # its A (and AAAA) record must point at SERVER', 'ADMIN_MODE:  prefix              # prefix | host <secret host name> | listener 127.0.0.1:8081', 'LANGUAGE:    English             # the language you talk to me in', '', '== Rules =='],
+        ['You are operating my Mistgate VPN panel through its MCP server (tools such as fleet_status,', 'protocols_list, profiles_list, profile_create_plan, node_install_plan and user_create_plan).', 'Read the server\'s instructions first. Reference:', 'https://mistgate.app/reference/mcp/', '', '== Fill in ==', 'NEW_SERVER:    203.0.113.20       # public SSH address of the new node', 'SSH_PORT:      22', 'SSH_LOGIN:     root               # root, or a user with passwordless "sudo -n"', 'NODE_NAME:     de1                # 2-24 characters: a-z, 0-9, dash', 'NODE_ADDRESS:  de1.example.com    # domain or IP that clients connect to', 'COUNTRY:       DE                 # two letters, optional', 'PROVIDER:      Example Hosting    # optional', 'GROUP:         Everyone           # the group for the new users', 'PROFILE_NAME:  Main               # the profile to create after installing the node', 'USERS:         Alice, Bob         # people to create', 'LANGUAGE:      English            # the language you talk to me in'],
+        ['You are working on the Mistgate repository (https://github.com/Mistgate/mistgate): a Go VPN', 'fleet panel and node agent with a React admin. Before you change anything, read AGENTS.md', 'and CONTRIBUTING.md and follow them.', '', '== Task ==', '<describe the change or the bug, with what you expect to happen>', '', '== Rules ==', '- Work on a new branch. Keep the change small and focused; no unrelated refactoring.']
+      ]
+    };
+    const AIT = [
+      ['Установка панели', 'Claude Code, Codex CLI или другой агент, который выполняет команды на вашем компьютере', 'SSH-доступ к чистому Linux-серверу и домен, который на него указывает', 'Проверяет сервер, скачивает и проверяет релиз, запускает mistgate setup, ставит юнит systemd и отдаёт вам ссылку настройки', '#установка-mistgate-с-ai-агентом'],
+      ['Ноды и флот', 'Любой MCP-клиент: Claude Code, Claude Desktop, Codex CLI', 'Работающая панель и API-токен', 'Ставит ноду по SSH с вашим одобрением, проверяет профиль на ней, создаёт пользователей и докладывает о здоровье', '#ноды-и-флот-через-mcp'],
+      ['Доработка кода', 'Coding-агент в копии репозитория', 'Go, Node.js и pnpm', 'Делает изменение так, как принято в проекте, и запускает проверки', '#доработка-кода-с-coding-агентом']
+    ];
+    const aiF = (s.aiFull || {})[s.lang + (s.ai || 0)];
+    const aiL = (aiF ? aiF.replace(/\n+$/, '').split('\n') : AIP[s.lang === 'RU' ? 'RU' : 'EN'][s.ai || 0]).map((l) => { const i = l.indexOf('  #'), hd = /^== .* ==$/.test(l); return { a: (i >= 0 ? l.slice(0, i) : l) || ' ', b: i >= 0 ? l.slice(i) : '', c: hd ? 'hd' : (/^[A-Z_]+:/.test(l) ? 'kv' : '') }; });
+    const CG = [['top', 'Главное'], ['base', 'Основа'], ['proto', 'Протоколы'], ['users', 'Люди и интеграции'], ['ops', 'Эксплуатация'], ['all', 'Всё']];
+    const CR = [
+      ['base', 1, 'Работает без Docker', 'y', 'y', 'p|через Compose', 'p', 'n|нужен Docker', 'y', 'y'],
+      ['base', 0, 'База данных', 't|SQLite', 't|SQLite, Postgres', 't|SQLite, MySQL', 't|SQLite, MySQL, Postgres', 't|Postgres, Redis', 't|MySQL, Redis', 't|SQLite'],
+      ['base', 1, 'Память в простое, МиБ', 't|16–20', 't|68–74', 'q', 't|262–265', 't|426–454', 'q', 'q'],
+      ['base', 0, 'Установка одной командой', 'y', 'y', 'y', 'y', 'n|Compose', 'y', 'y'],
+      ['base', 1, 'Нода из панели по SSH', 'y', 'n|вручную', 'n|вручную', 'n|вручную', 'n|вручную', 'n|вручную', 'q'],
+      ['proto', 1, 'Hysteria2', 'y', 'y', 'q', 'y', 'p|в конфигах клиента', 'y', 'y'],
+      ['proto', 0, 'VLESS REALITY и XHTTP', 'y', 'y', 'p|XHTTP не указан', 'p|XHTTP не указан', 'y', 'y', 'q'],
+      ['proto', 1, 'AmneziaWG', 'y|2.0 и 3.1', 'y|3.1', 'q', 'q', 'q', 'q', 'q'],
+      ['proto', 1, 'MTProto для Telegram', 'p|эксперимент', 'q', 'q', 'q', 'q', 'q', 'q'],
+      ['proto', 0, 'WARP', 'y', 'y', 'q', 'p|инструкция', 'p|от сообщества', 'y', 'y'],
+      ['proto', 1, 'VMess, Trojan, Shadowsocks', 'n', 'y', 'y', 'y', 'p|без VMess', 'y', 'y'],
+      ['proto', 0, 'TUIC', 'n', 'y', 'q', 'q', 'q', 'y', 'y'],
+      ['proto', 0, 'Обычный WireGuard', 'n', 'y', 'q', 'y', 'p|passthrough', 'y', 'q'],
+      ['users', 0, 'Трафик и срок на человека', 'y', 'y', 'y', 'y', 'y', 'y', 'y'],
+      ['users', 0, 'Лимит устройств', 'y|ключ на устройство', 'y|HWID и IP', 'q', 'y|HWID', 'y|HWID', 'q', 'q'],
+      ['users', 1, 'Telegram-бот', 'p|только алерты', 'y', 'y', 'y', 'p|уведомления', 'y', 'q'],
+      ['users', 0, 'API', 'y', 'y', 'y', 'y', 'y', 'y', 'y'],
+      ['users', 1, 'MCP-сервер для ИИ-агентов', 'y', 'q', 'q', 'q', 'p|от сообщества', 'q', 'q'],
+      ['ops', 0, 'Здоровье и алерты', 'y', 'y|мониторинг туннеля по желанию', 'p', 'p', 'y', 'p', 'q'],
+      ['ops', 0, 'Подписанные релизы', 'y', 'p|файлы .sha256', 'q', 'q', 'q', 'q', 'q'],
+      ['ops', 0, 'Сайт-ширма', 'y', 'q', 'q', 'q', 'q', 'q', 'q'],
+      ['ops', 0, 'Блокировка торрентов', 'y', 'q', 'q', 'q', 'y|плагин', 'q', 'q'],
+      ['ops', 0, 'Версия для Cloudflare Workers', 'p|предварительная', 'n', 'n', 'n', 'n', 'n', 'n']
+    ];
+    const CD = { y: 'M5 12.5l4.5 4.5L19 7.5', p: 'M5 13c2.3-3 4.7-3 7 0s4.7 3 7 0', n: 'M7 7l10 10M17 7L7 17', q: '', t: '' };
+    const crows = [];
+    CG.slice(1, 5).forEach((g) => {
+      const rs = CR.filter((r) => (s.cg === 'all' ? r[0] === g[0] : (s.cg === 'top' ? r[1] && r[0] === g[0] : r[0] === s.cg && r[0] === g[0])));
+      if (!rs.length) return;
+      if (s.cg === 'all') crows.push({ cls: 'grp ' + (s.cgn % 2 ? 'rb' : 'ra'), i: crows.length, t: g[1], cells: [] });
+      rs.forEach((r) => crows.push({ cls: s.cgn % 2 ? 'rb' : 'ra', i: crows.length, t: r[2], cells: r.slice(3).map((v, i) => { const a = v.split('|'); const k = a[0]; return { k: k + (i === 0 ? ' mine' : ''), d: CD[k], x: k === 't' ? a[1] : (k === 'q' ? '—' : ''), n: k === 't' ? '' : (a[1] || '') }; }) }));
+    });
+    const cur = SERVERS[s.sel];
+    const t = s.secs, pad = (n) => (n < 10 ? '0' + n : '' + n);
+    const hov = (i) => () => this.setState({ hs: i, hold: true });
+    const cmd = 'curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://' + dom;
+    return {
+      bootCls: s.boot ? 'lx-go' : 'lx-boot',
+      accent: this.props.accent ?? '#7dd3a0', jsCls: s.js ? 'js' : '',
+      winCls: s.wave === 'win' ? 'waving' : '', waveWin: s.wave === 'win', waveApp: s.wave === 'app', waveGo: s.wave === 'go', waveCmp: s.wave === 'cmp', cmpCls: s.wave === 'cmp' ? 'waving' : '',
+      appCls: s.conn + (s.wave === 'app' ? ' waving' : ''), goCls: s.wave === 'go' ? 'waving' : '',
+      ip: s.ip, name: s.name || 'pl1', setIp: (e) => this.setState({ ip: e.target.value }), setName: (e) => this.setState({ name: e.target.value }),
+      pwOn: s.auth === 'pw' ? 'true' : 'false', keyOn: s.auth === 'key' ? 'true' : 'false',
+      pickPw: () => this.setState({ auth: 'pw' }), pickKey: () => this.setState({ auth: 'key' }),
+      authNote: s.auth === 'pw' ? 'Пароль используется один раз и не сохраняется' : 'Панель зайдёт своим ключом, добавьте его в authorized_keys',
+      steps: STEPS.map((x, i) => ({ t: x[0], d: x[1], cls: cls(i) })), wz0: cls(0), wz1: cls(1), wz2: cls(2), wz3: cls(3),
+      dlg: s.dlg, added: s.added, nodeCount: s.added ? '5' : '4', health: s.added ? '5 нод · все на связи' : '4 ноды · все на связи',
+      runLabel: s.run > 0 && s.run < 5 ? 'Ставлю агент…' : 'Поставить на ноду',
+      start: () => this.start(), openDlg: () => { if (s.run === 0 || s.run === 5) this.setState({ dlg: true, run: 0 }); },
+      marq: MARQ.concat(MARQ).map((m) => ({ t: m[0], c: m[1] })),
+      h0: s.hs === 0 ? 'on' : '', h1: s.hs === 1 ? 'on' : '', h2: s.hs === 2 ? 'on' : '', h3: s.hs === 3 ? 'on' : '',
+      hov0: hov(0), hov1: hov(1), hov2: hov(2), hov3: hov(3),
+      spot0: (e) => { const r = e.currentTarget.getBoundingClientRect(); e.currentTarget.style.setProperty('--mx', (e.clientX - r.left) + 'px'); e.currentTarget.style.setProperty('--my', (e.clientY - r.top) + 'px'); },
+      hrows: [['de', 'de1', -1, 'на связи', ''], ['nl', 'nl1', -1, 'на связи', ''], ['fi', 'fi1', 18, 'моргнул 4 мин', 'blip']].map((r, ri) => ({ f: r[0], n: r[1], s: r[3], sc: r[4], t: Array.from({ length: 24 }, (_, k) => ({ c: k === r[2] ? 'blip' : '', d: ((k + ri * 3) * 0.09).toFixed(2) + 's' })) })),
+      decOut: s.dec === 'out' ? 'true' : 'false', decIn: s.dec === 'in' ? 'true' : 'false', isOut: s.dec === 'out', isIn: s.dec === 'in',
+      pickOut: () => this.setState({ dec: 'out', decHold: true }), pickIn: () => this.setState({ dec: 'in', decHold: true }),
+      plan: ['Снять nl1 с раздачи', 'Перезапустить hy2 на nl1', 'Проверить глазами клиента и вернуть'].map((t, i) => ({ t: t, c: s.ap > i + 1 ? 'done' : (s.ap === i + 1 ? 'busy' : '') })),
+      apLabel: s.ap === 0 ? 'Применить' : (s.ap < 4 ? 'Выполняю…' : 'Готово, повторить'),
+      approve: () => { if (s.ap > 0 && s.ap < 4) return; this.setState({ ap: 1 }); [2, 3, 4].forEach((n, i) => this.later(() => this.setState({ ap: n }), 800 * (i + 1))); },
+      reject: () => { if (s.ap === 0 || s.ap === 4) this.setState({ ap: 0 }); },
+      connLabel: s.conn === 'on' ? 'Подключено' : (s.conn === 'ing' ? 'Подключение' : 'Отключено'),
+      pwOnA: s.conn === 'off' ? 'false' : 'true', toggle: () => this.connect(),
+      timer: Math.floor(t / 3600) + ':' + pad(Math.floor(t / 60) % 60) + ':' + pad(t % 60),
+      down: (5.9 + Math.sin(t * 1.7) * 0.4).toFixed(1).replace('.', ','), up: (1.6 + Math.cos(t * 1.3) * 0.2).toFixed(1).replace('.', ','),
+      cur: { f: cur[0], n: cur[1], ms: cur[2], s: s.sel === 0 ? 'Авто · самый быстрый' : 'Выбран вами' },
+      servers: SERVERS.map((v, i) => ({ f: v[0], n: v[1], ms: v[2], tag: v[3], tc: v[4], hasTag: !!v[3], cls: s.sel === i ? 'on' : '', pick: () => { this.setState({ sel: i }); if (s.conn === 'on') { this.setState({ conn: 'off' }); this.later(() => this.connect(), 30); } } })),
+      dvAttr: s.dv || '', dvPc: (s.dv || (s.nr ? 'ph' : 'pc')) === 'pc' ? 'true' : 'false', dvPh: (s.dv || (s.nr ? 'ph' : 'pc')) === 'ph' ? 'true' : 'false', setPc: () => this.setDv('pc'), setPh: () => this.setDv('ph'), subPc: !s.nr, subPh: !!s.nr,
+      ap: (() => { const o = {}, a = s.as || 'Main'; ['Main', 'Routes', 'Diag', 'Set', 'Byp'].forEach((k) => ['RU', 'EN', 'ZH', 'FA', 'TR'].forEach((l) => { o[k + l] = a === k && s.lang === l; })); return o; })(),
+      aTabs: [['Main', 'Подключение', 'M12 4v8M7 7a7 7 0 1 0 10 0'], ['Routes', 'Маршруты', 'M6 19a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM8.5 16.5H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5'], ['Diag', 'Проверка сети', 'M3 12h4l2.5-6 4 12 2.5-6h5'], ['Set', 'Настройки', 'M4 7h9M17 7h3M4 17h3M11 17h9M15 4.5v5M9 14.5v5'], ['Byp', 'Обход без VPN', 'M3 16h2.2a6.8 6.8 0 0 1 13.6 0H21M12 14.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6z']].map((t) => ({ n: t[1], d: t[2], soon: t[0] === 'Byp', sel: (s.as || 'Main') === t[0] ? 'true' : 'false', pick: () => this.setAs(t[0]) })),
+      aCap: ({ Main: 'Одна кнопка. «Авто» берёт сервер, который отвечает быстрее всех прямо сейчас, сервер и протокол можно выбрать и самому', Routes: '«Умный», «Только выбранное» или «Всё». Правила по готовым подборкам, своим спискам, сайтам и программам', Diag: 'Одна кнопка показывает, какие серверы и какие пути к ним работают отсюда', Set: 'Kill switch, локальный прокси, уведомления Windows, тёмная и светлая темы, пять языков', Byp: 'В разработке: открывает сайты без сервера и подписки. Не скрывает адрес и не шифрует трафик' })[s.as || 'Main'],
+      aiFx: s.aiFx ? 'fx' : '', aiOn: !!s.aiOn, aiOpen: () => { let fx = false; try { fx = document.documentElement.scrollHeight > window.innerHeight + 200 && window.innerHeight < 1400; } catch (e) {} this.setState({ aiOn: true, aiFx: fx }); this.later(() => this.aiLoad(), 0); if (fx) return; this.later(() => { const e = document.querySelector('.lp-root .lx-ai'); if (e && e.scrollIntoView) e.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 80); }, aiClose: () => this.setState({ aiOn: false }), aiCls: aiF ? 'lx-aic full' : 'lx-aic', aiCopyLabel: s.aiCopied ? 'Скопировано' : 'Скопировать промпт',
+      aiCopy: () => { if (!aiF) { const a = document.querySelector('.lp-root .lx-aif a[href]'); if (a) location.href = a.href; return; } try { navigator.clipboard.writeText(aiF).catch(() => {}); } catch (e) {} this.setState({ aiCopied: true }); this.later(() => this.setState({ aiCopied: false }), 1800); }, aiStop: (e) => e.stopPropagation(),
+      aiTabs: AIT.map((t, i) => ({ n: t[0], sel: (s.ai || 0) === i ? 'true' : 'false', pick: () => { this.setState({ ai: i }); this.later(() => this.aiLoad(), 0); } })), aiAgent: AIT[s.ai || 0][1], aiNeed: AIT[s.ai || 0][2], aiDoes: AIT[s.ai || 0][3], aiLines: aiL, aiDoc: 'Docs.dc.html',
+      mnOpen: !!s.mnOpen, mnEx: s.mnOpen ? 'true' : 'false', mnTog: () => this.setState({ mnOpen: !s.mnOpen, lgOpen: false }), mnD: s.mnOpen ? 'M6 6l12 12M18 6L6 18' : 'M4 7h16M4 12h16M4 17h16',
+      lgCur: s.lang, lgOpen: !!s.lgOpen, lgEx: s.lgOpen ? 'true' : 'false', lgTog: () => this.setState({ lgOpen: !s.lgOpen }),
+      lgs: [['EN', 'English'], ['RU', 'Русский'], ['ZH', '简体中文'], ['FA', 'فارسی'], ['TR', 'Türkçe']].map((x) => x[0]).map((c) => ({ c: c, n: { EN: 'English', RU: 'Русский', ZH: '简体中文', FA: 'فارسی', TR: 'Türkçe' }[c], on: s.lang === c ? 'on' : '', sel: s.lang === c ? 'true' : 'false', pick: () => { this.setState({ lgOpen: false }); this.setLang(c); } })), appRU: s.lang === 'RU', appEN: s.lang === 'EN', appZH: s.lang === 'ZH', appFA: s.lang === 'FA', appTR: s.lang === 'TR',
+      tabs: TABS.map((x, i) => ({ n: x.n, s: x.s, sel: s.tab === i ? 'true' : 'false', pick: () => { this.setState({ tab: i }); this.later(() => this.tabIn('#protocols .tab[aria-selected="true"]'), 60); } })),
+      bands: TABS[s.tab].rows.map((b) => ({ k: b[0], t: b[1], n: b[2], s: b[3], has: !!b[3], c: b[3] === 'эксперимент' ? 'soon' : '' })),
+      prKey: TABS[s.tab].k, prN: TABS[s.tab].n, prD: TABS[s.tab].d, prLead: TABS[s.tab].lead, prDoc: TABS[s.tab].doc, prExp: !!TABS[s.tab].exp, prHasPage: !!TABS[s.tab].page, prRepo: TABS[s.tab].page || '', prSw: 'lx-sw' + (s.tab % 2),
+      prHasRoute: TABS[s.tab].route.length > 0, prRoute: TABS[s.tab].route, prIsRelay: !!TABS[s.tab].relay, prHasApps: TABS[s.tab].apps.length > 0, prApps: TABS[s.tab].apps.map((a) => ({ t: a })),
+      trKey: s.tr, trIs_ov: s.tr === 'ov', trIs_nd: s.tr === 'nd', trIs_us: s.tr === 'us', trIs_hl: s.tr === 'hl', trIs_rc: s.tr === 'rc', trIs_up: s.tr === 'up',
+      trNum: '0' + (SHO.indexOf(s.tr) + 1) + ' / 0' + SHO.length, trH: SHOW[s.tr][1], trP: SHOW[s.tr][2], trB: SHOW[s.tr][3].map((t) => ({ t: t })), trDoc: 'Docs.dc.html', trDocT: SHOW[s.tr][5], trSw: 'lx-sw' + (SHO.indexOf(s.tr) % 2),
+      trTabs: SHO.map((k) => ({ n: SHOW[k][0], d: SHI[k], sel: s.tr === k ? 'true' : 'false', pick: () => { if (s.tr === k) return; const old = s.tr; this.setState({ tr: k }); this.later(() => this.tourSwap(old, k), 60); } })),
+      cgs: CG.map((g) => ({ n: g[1], sel: s.cg === g[0] ? 'true' : 'false', pick: () => { if (s.cg === g[0]) return; this.setState({ cg: g[0], cgn: s.cgn + 1 }); this.fire('cmp'); } })), crows: crows,
+      dom: s.dom, domClean: dom, setDom: (e) => this.setState({ dom: e.target.value }),
+      copyCmd: () => { try { navigator.clipboard.writeText(cmd).catch(() => {}); } catch (e) {} this.setState({ copied: true }); this.fire('go'); this.later(() => this.setState({ copied: false }), 1800); },
+      cmdLabel: s.copied ? 'Скопировано' : 'Скопировать команду'
+    };
+  }
+}
+</script>
+</body>
+</html>

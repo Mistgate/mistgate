@@ -1,0 +1,23 @@
+{
+  "_": "The title and the description of the landing's home page (/, /ru/ ...) per language; build.mjs writes the title as \"Mistgate — <h1>\". They are the texts the old docs home carried.",
+  "en": {
+    "h1": "A self-hosted panel for a small VPN",
+    "description": "Mistgate is a self-hosted panel for a small VPN: a few servers of your own and the people you share them with. Hysteria2, VLESS and AmneziaWG; two Go binaries, SQLite and systemd."
+  },
+  "ru": {
+    "h1": "Панель для своего небольшого VPN",
+    "description": "Mistgate — панель для своего небольшого VPN: несколько своих серверов и люди, с которыми вы ими делитесь. Hysteria2, VLESS и AmneziaWG; два бинарника на Go, SQLite и systemd."
+  },
+  "zh": {
+    "h1": "自托管的小型 VPN 面板",
+    "description": "Mistgate 是一个自托管面板，用来管理你自己的几台 VPN 服务器，以及和你一起用它们的人。支持 Hysteria2、VLESS 和 AmneziaWG；两个 Go 二进制文件，SQLite 加 systemd。"
+  },
+  "fa": {
+    "h1": "پنلی برای VPN کوچک خودتان",
+    "description": "Mistgate پنلی برای یک VPN کوچک است که روی سرور خودتان اجرا می‌شود: چند سرور از آنِ خودتان و کسانی که سرورها را با آن‌ها شریک می‌شوید. Hysteria2، VLESS و AmneziaWG؛ دو فایل اجرایی Go، به‌علاوهٔ SQLite و systemd."
+  },
+  "tr": {
+    "h1": "Kendi küçük VPN'iniz için bir panel",
+    "description": "Mistgate, küçük bir VPN için kendi sunucunuzda çalışan bir paneldir: size ait birkaç sunucu ve onları paylaştığınız insanlar. Hysteria2, VLESS ve AmneziaWG; iki Go ikili dosyası, SQLite ve systemd."
+  }
+}

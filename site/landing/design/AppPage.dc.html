@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Приложение · Mistgate — лендинг</title>
+<script src="./support.js"></script>
+<script src="./land.i18n.js"></script>
+<link rel="stylesheet" href="./land.css">
+<link rel="stylesheet" href="./app-s.css">
+<link rel="stylesheet" href="./app-zh-s.css">
+<link rel="stylesheet" href="./app-fa-s.css">
+<link rel="stylesheet" href="./sub-s.css">
+<link rel="stylesheet" href="./pn.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+body{margin:0;background:#0c0c0e}
+</style>
+</helmet>
+<div class="lp-root lx-appp {{bootCls}}">
+<div class="lp {{jsCls}}" style="--acc: {{accent}}">
+<div class="wrap">
+
+<header class="top">
+  <a class="brand" href="Main.dc.html" aria-label="Mistgate"><img src="/_blob/8c37605685d2760a887b6ec623cfcfd2" alt=""><span>mist<b>gate</b></span></a>
+  <nav aria-label="Разделы"><a href="#screens">Экраны</a><a href="#features">Возможности</a><a href="#protocols">Протоколы</a><a href="#install">Установка</a><a href="#privacy">Приватность</a><a href="Main.dc.html">Панель<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></nav>
+  <a class="btn sm gh" href="https://github.com/Mistgate/mistgate-client" aria-label="Код на GitHub"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 2.8-2.7 3.8-5.5 4.3-2.6.4-4.2 1-5.2 2.1"/></svg></a>
+  <div class="lx-lg" data-noi18n><button type="button" class="btn sm" aria-haspopup="listbox" aria-expanded="{{lgEx}}" aria-label="Language" onClick="{{lgTog}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.500 2.700 2.500 15.300 0 18M12 3c-2.500 2.700-2.500 15.300 0 18"/></svg><span class="mono">{{lgCur}}</span><svg class="i ch" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button><sc-if value="{{lgOpen}}" hint-placeholder-val="{{false}}"><div class="lx-lgm" role="listbox"><sc-for list="{{lgs}}" as="l" hint-placeholder-count="5"><button type="button" role="option" class="{{l.on}}" aria-selected="{{l.sel}}" onClick="{{l.pick}}"><span>{{l.n}}</span><span class="mono">{{l.c}}</span></button></sc-for></div></sc-if></div>
+  <a class="btn sm pri lx-ins" href="https://github.com/Mistgate/mistgate-client/releases/latest" aria-label="Скачать"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><span>Скачать</span></a>
+  <button type="button" class="btn sm lx-bg" aria-label="Меню" aria-expanded="{{mnEx}}" onClick="{{mnTog}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="{{mnD}}"/></svg></button>
+  <sc-if value="{{mnOpen}}" hint-placeholder-val="{{false}}"><nav class="lx-mn" aria-label="Меню"><a href="#screens" onClick="{{mnTog}}">Экраны</a><a href="#features" onClick="{{mnTog}}">Возможности</a><a href="#protocols" onClick="{{mnTog}}">Протоколы</a><a href="#install" onClick="{{mnTog}}">Установка</a><a href="#privacy" onClick="{{mnTog}}">Приватность</a><a href="Main.dc.html">Панель<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a href="https://github.com/Mistgate/mistgate-client">Код на GitHub<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16L16 8M9 8h7v7"/></svg></a></nav></sc-if>
+</header>
+
+<section class="hero lx-aph" id="top">
+  <canvas class="lx-mx" aria-hidden="true"></canvas>
+  <i class="lx-halo" aria-hidden="true"></i>
+  <div class="hero-t">
+    <span class="kick"><i class="dot" aria-hidden="true"></i>Бета 0.1 · только Windows</span>
+    <h1><span class="ln"><span>Mistgate для Windows</span></span><span class="ln"><span>сам находит рабочий путь</span></span></h1>
+    <p class="hero-s">И честно говорит, когда что-то заблокировано. Hysteria2, AmneziaWG, VLESS и TrustTunnel в одном окне, для панелей Mistgate и для обычных ссылок подписки</p>
+    <div class="hero-a">
+      <a class="btn pri" href="https://github.com/Mistgate/mistgate-client/releases/latest"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Скачать для Windows</a>
+      <a class="btn gh" href="https://github.com/Mistgate/mistgate-client"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 2.8-2.7 3.8-5.5 4.3-2.3.4-4.300 1-5.500 2.200"/></svg>GitHub</a>
+    </div>
+    <p class="hero-m">Windows 10 и 11, x64 · открытый код, AGPL-3.0</p>
+  </div>
+</section>
+<section class="sec pre lx-apt" id="screens">
+  <div class="lx-as rv"><div class="lx-tabs lx-atabs" role="tablist" aria-label="Экраны приложения"><sc-for list="{{aTabs}}" as="t" hint-placeholder-count="5"><button type="button" class="lx-tab" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"/></svg>{{t.n}}<sc-if value="{{t.soon}}" hint-placeholder-val="{{false}}"><em class="lx-soon">скоро</em></sc-if></button></sc-for></div><p class="lx-acap">{{aCap}}</p></div>
+</section>
+</div>
+</div>
+<div class="lpe {{jsCls}}"><div class="emb appw rv" aria-hidden="true"><div class="dots" aria-hidden="true"></div><div class="lx-app" data-ui data-tour="app" data-bw="1000" data-w="1000" data-h="660" data-wm="560" data-hmp="660" data-xm="0"><div class="pwin-s"><sc-if value="{{ap.MainRU}}" hint-placeholder-val="{{true}}"><dc-import name="AppMain" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.MainEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainEn" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.MainZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainZh" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.MainFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainFa" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.MainTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainTr" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.RoutesRU}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutes" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.RoutesEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesEn" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.RoutesZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesZh" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.RoutesFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesFa" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.RoutesTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesTr" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.DiagRU}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiag" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.DiagEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagEn" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.DiagZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagZh" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.DiagFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagFa" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.DiagTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagTr" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.SetRU}}" hint-placeholder-val="{{false}}"><dc-import name="AppSet" accent="lavender" section="conn" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.SetEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppSetEn" accent="lavender" section="conn" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.SetZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppSetZh" accent="lavender" section="conn" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.SetFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppSetFa" accent="lavender" section="conn" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.SetTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppSetTr" accent="lavender" section="conn" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.BypRU}}" hint-placeholder-val="{{false}}"><dc-import name="AppByp" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.BypEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypEn" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.BypZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypZh" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.BypFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypFa" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{ap.BypTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypTr" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if></div><i class="tcur" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3l14 8.500-6.200 1.300L10.500 19z"></path></svg></i></div></div></div>
+<div class="lp {{jsCls}}" style="--acc: {{accent}}">
+<div class="wrap">
+<section class="sec post" id="features">
+  <div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Возможности</span><h2>Подписка добавляется один раз</h2><p>Приложение само обновляет список серверов, подключается тем протоколом, который работает в вашей сети, и пускает через VPN только то, что вы хотите</p></div>
+  <div class="apf rv"><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v8M7 7a7 7 0 1 0 10 0"/></svg><div><b>Одна кнопка, четыре протокола</b><span>Hysteria2, AmneziaWG, VLESS и TrustTunnel. «Авто» берёт сервер, который отвечает быстрее всех прямо сейчас</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM8.5 16.5H16a3.5 3.5 0 0 0 0-7"/></svg><div><b>Маршруты</b><span>«Умный» оставляет местные сайты и домашнюю сеть мимо VPN, «Только выбранное» пускает лишь отмеченное, «Всё» — весь трафик</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.500-7-10V6z"/></svg><div><b>Kill switch</b><span>Пока туннель лежит, с ПК ничего не уходит: на время подключения или всегда</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12 2.5-6h5"/></svg><div><b>Проверка сети</b><span>Одна кнопка показывает, какие серверы и какие пути к ним работают отсюда</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v5H4zM4 13h16v5H4zM8 8.500h.01M8 15.500h.01"/></svg><div><b>Локальный прокси</b><span>SOCKS5 и HTTP для программ и домашних устройств, которые не умеют в VPN сами</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4L3 11l6 2.500L11.500 20l3.500-5 4 3z"/></svg><div><b>Прокси для Telegram</b><span>Из панели: одно нажатие передаёт прокси в Telegram</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12h6M10 8H8a4 4 0 0 0 0 8h2M14 8h2a4 4 0 0 1 0 8h-2"/></svg><div><b>С панелью Mistgate и без неё</b><span>Ссылка подписки, ссылки hysteria2://, vless:// или tt://, профиль Mihomo или конфиг AmneziaWG</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6zM9.5 12l2 2 3.5-4"/></svg><div><b>Приватность</b><span>В журнале нет ключей, ссылок, адресов серверов, имён сайтов и программ. Панель не узнаёт, что вы открываете</span></div></div><div class="apf-i"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><div><b>Обновления</b><span>Из релизов репозитория. Приложение ставит только установщик, подписанный ключом проекта</span></div></div></div>
+</section>
+</div>
+</div>
+<section class="lx-gd" id="guide">
+<div class="lp {{jsCls}}" style="--acc: {{accent}}"><div class="wrap"><div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Гайд</span><h2>От первой кнопки до своих правил</h2><p>Пять шагов. Нажмите на любой, чтобы посмотреть его ещё раз</p></div></div></div>
+<div class="lx-gg rv">
+<div class="lp lx-gl" style="--acc: {{accent}}"><div class="lx-gs {{gApar}}" style="--gn: {{gAn}}; --gi: {{gAi}}; --gd: {{gAd}}ms"><i class="lx-gsl" aria-hidden="true"><i></i></i><sc-for list="{{gA}}" as="g" hint-placeholder-count="4"><button type="button" class="lx-g {{g.cls}}" aria-pressed="{{g.sel}}" onClick="{{g.pick}}" style="--gd: {{g.dur}}ms"><span class="lx-gn">{{g.n}}</span><span class="lx-gt"><b>{{g.t}}</b><span class="lx-gx"><span>{{g.d}}</span></span></span><i class="lx-gb" aria-hidden="true"></i></button></sc-for></div></div>
+<div class="lpe {{jsCls}} lx-gw" aria-hidden="true"><div class="dots" aria-hidden="true"></div><div class="lx-app lx-gapp" data-ui data-tour="ga" data-bw="1000" data-w="1000" data-h="660" data-wm="560" data-hmp="660" data-xm="0"><div class="pwin-s"><sc-if value="{{gAp.MainRU}}" hint-placeholder-val="{{true}}"><dc-import name="AppMain" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.MainEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainEn" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.MainZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainZh" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.MainFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainFa" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.MainTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppMainTr" accent="lavender" state="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.RoutesRU}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutes" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.RoutesEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesEn" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.RoutesZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesZh" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.RoutesFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesFa" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.RoutesTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppRoutesTr" accent="lavender" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.DiagRU}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiag" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.DiagEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagEn" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.DiagZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagZh" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.DiagFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagFa" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gAp.DiagTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppDiagTr" accent="lavender" check="idle" hint-size="1000px,660px"></dc-import></sc-if></div><i class="tcur" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3l14 8.500-6.200 1.300L10.500 19z"></path></svg></i></div></div>
+</div>
+</section>
+<section class="lx-gd rev" id="bypass">
+<div class="lp {{jsCls}}" style="--acc: {{accent}}"><div class="wrap"><div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Обход без VPN</span><h2>Когда сервер не нужен</h2><p>В разработке: открывает сайты без сервера и подписки. Не скрывает адрес и не шифрует трафик</p></div></div></div>
+<div class="lx-gg rv">
+<div class="lp lx-gl" style="--acc: {{accent}}"><div class="lx-gs {{gBpar}}" style="--gn: {{gBn}}; --gi: {{gBi}}; --gd: {{gBd}}ms"><i class="lx-gsl" aria-hidden="true"><i></i></i><sc-for list="{{gB}}" as="g" hint-placeholder-count="4"><button type="button" class="lx-g {{g.cls}}" aria-pressed="{{g.sel}}" onClick="{{g.pick}}" style="--gd: {{g.dur}}ms"><span class="lx-gn">{{g.n}}</span><span class="lx-gt"><b>{{g.t}}</b><span class="lx-gx"><span>{{g.d}}</span></span></span><i class="lx-gb" aria-hidden="true"></i></button></sc-for></div></div>
+<div class="lpe {{jsCls}} lx-gw" aria-hidden="true"><div class="dots" aria-hidden="true"></div><div class="lx-app lx-gapp" data-ui data-tour="gb" data-bw="1000" data-w="1000" data-h="660" data-wm="560" data-hmp="660" data-xm="0"><div class="pwin-s"><sc-if value="{{gBp.BypRU}}" hint-placeholder-val="{{true}}"><dc-import name="AppByp" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gBp.BypEN}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypEn" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gBp.BypZH}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypZh" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gBp.BypFA}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypFa" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if><sc-if value="{{gBp.BypTR}}" hint-placeholder-val="{{false}}"><dc-import name="AppBypTr" accent="lavender" mode="off" hint-size="1000px,660px"></dc-import></sc-if></div><i class="tcur" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3l14 8.500-6.200 1.300L10.500 19z"></path></svg></i></div></div>
+</div>
+</section>
+<div class="lp {{jsCls}}" style="--acc: {{accent}}">
+<div class="wrap">
+<section class="sec" id="protocols">
+  <div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Протоколы</span><h2>Четыре протокола в одной службе</h2><p>Все четыре работают внутри одной службы Windows и одного адаптера wintun</p></div>
+  <div class="card lx-ptb rv"><div class="lx-ptr hd"><span>Протокол</span><span>В приложении</span><span>Что поддерживает</span></div><div class="lx-ptr"><b class="mono">Hysteria2</b><span>Официальное ядро Hysteria2, встроено</span><span>UDP (QUIC). Обфускация Salamander, смена портов</span></div><div class="lx-ptr"><b class="mono">AmneziaWG</b><span>amneziawg-go, встроен</span><span>Версии 2.0 и 3.1, ключ на устройство из панели Mistgate или файл .conf</span></div><div class="lx-ptr"><b class="mono">VLESS</b><span>Xray-core, встроен</span><span>REALITY или TLS, RAW с Vision, XHTTP и WebSocket</span></div><div class="lx-ptr"><b class="mono">TrustTunnel</b><span>Собственный клиент приложения</span><span>HTTP/2 поверх TLS, TCP и UDP. Сертификат проверяется по корневым сертификатам системы или по отпечатку от панели</span></div></div>
+  <p class="lx-ptn rv"><span class="tag">Не поддерживаются</span>VMess, Trojan, Shadowsocks, TUIC и обычный WireGuard</p>
+</section>
+<section class="sec" id="install">
+  <div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Установка</span><h2>Три шага до первой кнопки</h2><p>Windows 10 или 11, x64</p></div>
+  <div class="steps lx-st3 rv"><div class="lx-sc"><div class="lx-sv" aria-hidden="true"><span class="lx-sr"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span class="mono">MistgateSetup_&lt;версия&gt;_x64.exe</span><i class="lx-sa"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg></i></span></div><div class="lx-sb"><span class="lx-sn">01</span><h3>Скачайте установщик</h3><p>Из последнего релиза на GitHub</p></div></div><div class="lx-sc"><div class="lx-sv" aria-hidden="true"><span class="lx-sr"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.9 8.3 7 10 4.1-1.7 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg><span class="lx-st">Фоновая служба</span><span class="tag">один раз</span></span></div><div class="lx-sb"><span class="lx-sn">02</span><h3>Разрешите установку</h3><p>Windows один раз спросит права администратора: приложение ставит фоновую службу, которая держит туннель</p></div></div><div class="lx-sc"><div class="lx-sv" aria-hidden="true"><span class="lx-sr"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span class="mono lx-sm">vpn.example.com/k7Qm2xR9</span><i class="lx-sp"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v8"/><path d="M7.5 7a7 7 0 1 0 9 0"/></svg></i></span></div><div class="lx-sb"><span class="lx-sn">03</span><h3>Вставьте ссылку подписки</h3><p>И нажмите большую кнопку</p></div></div></div>
+  <div class="lx-cta rv"><a class="btn pri" href="https://github.com/Mistgate/mistgate-client/releases/latest"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Скачать для Windows</a><a class="btn" href="https://github.com/Mistgate/mistgate-client/blob/main/docs/build.md">Как собрать самому<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16L16 8M9 8h7v7"/></svg></a></div>
+  <p class="apn rv">У установщика пока нет сертификата подписи кода Windows, поэтому SmartScreen может предупредить о неизвестном издателе. Обновления проверяются собственной подписью проекта</p>
+</section>
+<section class="sec" id="privacy">
+  <div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Приватность</span><h2>Что приложение знает и что отправляет</h2></div>
+  <div class="lx-nx"><div class="card lx-nc lx-pv rv"><span class="lx-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z"/></svg></span><h3>Ключи под защитой Windows</h3><p>Ключи устройства и данные серверов лежат в хранилище, которое Windows шифрует для учётной записи службы</p></div><div class="card lx-nc lx-pv rv" style="--d: 80ms"><span class="lx-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM9 9h6M9 13h4"/></svg></span><h3>Чистый журнал</h3><p>В журнале нет ключей, ссылок, адресов серверов, имён сайтов и программ</p></div><div class="card lx-nc lx-pv rv" style="--d: 160ms"><span class="lx-pi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6zM9.5 12l2 2 3.5-4"/></svg></span><h3>Отчёт только по вашей кнопке</h3><p>Приложение не сообщает панели, что вы открываете. Отладочный отчёт уходит с ПК только по вашей кнопке, и перед отправкой его видно построчно</p></div></div>
+</section>
+<section class="sec" id="status">
+  <div class="sh rv"><span class="kick"><i class="dot" aria-hidden="true"></i>Состояние</span><h2>Это бета, проект молодой</h2><p>Версия 0.1. До 1.0 возможны изменения</p></div>
+  <div class="lx-plat rv"><div class="lx-plh"><h3>Сейчас Windows, остальные платформы позже</h3><p>Клиент в бете. Android, iOS, macOS и Linux появятся позже</p></div><div class="lx-pls"><a class="lx-pl on" href="https://github.com/Mistgate/mistgate-client/releases/latest"><span class="lx-pli" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H4zM9 20h6M12 16v4"/></svg></span><b>Windows</b><span>10 и 11, x64</span><em><i></i>Бета 0.1</em></a><div class="lx-pl"><span class="lx-pli" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2"/></svg></span><b>Android</b><em>Позже</em></div><div class="lx-pl"><span class="lx-pli" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h9a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM17 8h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-2M9 17h1"/></svg></span><b>iOS</b><em>Позже</em></div><div class="lx-pl"><span class="lx-pli" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M6 5h12a1 1 0 0 1 1 1v9H5V6a1 1 0 0 1 1-1zM3 18h18M10 15v0"/></svg></span><b>macOS</b><em>Позже</em></div><div class="lx-pl"><span class="lx-pli" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 10l3 2.5L8 15M13 15h3"/></svg></span><b>Linux</b><em>Позже</em></div></div></div>
+  <div class="two lx-two">
+    <div class="card hn rv"><h3>Пока нет</h3><div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/></svg><span><b>Сертификата подписи кода Windows.</b> SmartScreen может предупредить о неизвестном издателе</span></div><div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/></svg><span><b>Своего экрана удаления.</b> Приложение удаляется через «Установленные приложения» Windows, вместе со службой</span></div><div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/></svg><span><b>Сборок для других платформ.</b> Android, iOS, macOS и Linux появятся позже</span></div></div>
+    <div class="card hn ok rv" style="--d: 80ms"><h3>Уже так</h3><div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Открытый код.</b> AGPL-3.0, у встроенных библиотек свои лицензии: Xray-core, Hysteria, amneziawg-go, gVisor и wintun</span></div><div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Подписанные обновления.</b> Приложение ставит только установщик, подписанный ключом проекта</span></div><div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Пять языков.</b> Английский, русский, китайский, фарси и турецкий</span></div></div>
+  </div>
+  <div class="lx-cta rv"><a class="btn" href="https://github.com/Mistgate/mistgate-client/issues">Сообщить о проблеме<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16L16 8M9 8h7v7"/></svg></a><a class="btn" href="Main.dc.html">Панель Mistgate<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+</section>
+
+<footer class="ftr">
+  <div class="card ftc rv">
+    <div class="ft-top">
+      <div class="ft-b"><span class="brand"><img src="/_blob/8c37605685d2760a887b6ec623cfcfd2" alt=""><span>mist<b>gate</b></span></span><p>Панель для нескольких своих серверов и людей, с которыми вы ими делитесь</p><div class="row3"><a class="btn sm pri" href="Main.dc.html">Установить панель</a><a class="btn sm" href="https://github.com/Mistgate/mistgate-client/releases/latest">Скачать приложение</a></div></div>
+      <div><h3>Начало</h3><nav aria-label="Начало"><a href="Docs.dc.html">Начало работы</a><a href="Docs.dc.html#panel">Установка панели</a><a href="Docs.dc.html">План развития</a></nav></div>
+      <div><h3>Документация</h3><nav aria-label="Документация"><a href="Docs.dc.html">Руководство</a><a href="Docs.dc.html">Эксплуатация</a><a href="Docs.dc.html">Справочник</a></nav></div>
+      <div><h3>Код</h3><nav aria-label="Код"><a href="https://github.com/Mistgate/mistgate">Панель на GitHub</a><a href="https://github.com/Mistgate/mistgate-client">Приложение на GitHub</a><a href="Docs.dc.html">Сравнение и бенчмарки</a></nav></div>
+    </div>
+    <div class="ft-bot"><span>AGPL-3.0 · открытый код · бета</span><span class="langs" data-noi18n><sc-for list="{{lgs}}" as="l" hint-placeholder-count="5"><button type="button" class="{{l.on}}" aria-pressed="{{l.sel}}" onClick="{{l.pick}}">{{l.c}}</button></sc-for></span></div>
+    <canvas class="lx-wm" aria-hidden="true"></canvas>
+  </div>
+</footer>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#7dd3a0","options":["#7dd3a0","#b8acf2","#8ec8ea","#dcc68c"]},"$preview":{"width":1440,"height":7700}}'>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = { ip: '203.0.113.24', name: 'pl1', auth: 'pw', run: 0, added: false, dlg: true, wave: '', tr: 'ov', trn: 0, lang: (() => { let l = 'RU'; try { l = localStorage.getItem('mg-lang') || 'RU'; } catch (e) {} window.MG_LANG = l; return l; })(), hs: 0, hold: false, conn: 'off', secs: 2542, sel: 0, tab: 0, dom: 'panel.example.com', cg: 'top', cgn: 0, dec: 'out', decHold: false, ap: 0, copied: false, appr: false, js: false };
+    this._t = [];
+  }
+  later(fn, ms) { const id = setTimeout(fn, ms); this._t.push(id); return id; }
+  fire(k) { clearTimeout(this._w); this.setState({ wave: '' }); this.later(() => this.setState({ wave: k }), 20); this._w = this.later(() => this.setState({ wave: '' }), 2000); }
+  componentDidMount() {
+    this.setState({ js: true });
+    const all = () => Array.prototype.slice.call(document.querySelectorAll('.lp-root .rv'));
+    this.later(() => {
+      if (typeof IntersectionObserver === 'undefined') { all().forEach((e) => e.classList.add('in')); return; }
+      this._io = new IntersectionObserver((es) => es.forEach((x) => {
+        if (!x.isIntersecting) return;
+        x.target.classList.add('in'); this._io.unobserve(x.target);
+      }), { rootMargin: '0px 0px -10% 0px' });
+      all().forEach((e) => this._io.observe(e));
+    }, 60);
+    this.later(() => all().forEach((e) => e.classList.add('in')), 3500);
+    this.later(() => this.tourInit(), 400);
+    this.later(() => this.mxInit(), 80);
+    this.later(() => this.wmInit(), 300);
+    const go = () => { if (this._went) return; this._went = true; requestAnimationFrame(() => requestAnimationFrame(() => this.setState({ boot: 1 }))); };
+    try { document.fonts.ready.then(() => this.later(go, 160)); } catch (e) {}
+    this.later(go, 1600);
+    this._i3 = setInterval(() => { if (!this.state.decHold) this.setState({ dec: this.state.dec === 'out' ? 'in' : 'out' }); }, 3600);
+    this._i2 = setInterval(() => { if (!this.state.hold) this.setState({ hs: (this.state.hs + 1) % 4 }); }, 3200);
+  }
+  componentWillUnmount() { if (this._sio) this._sio.disconnect(); if (this._mxOff) this._mxOff(); if (this._wmOff) this._wmOff(); if (this._tio) this._tio.disconnect(); if (this._fit) window.removeEventListener('resize', this._fit); Object.keys(this._tr || {}).forEach((k) => { clearTimeout(this._tr[k].tm); clearTimeout(this._tr[k].back); }); this._t.forEach(clearTimeout); clearInterval(this._i1); clearInterval(this._i2); clearInterval(this._i3); if (this._io) this._io.disconnect(); }
+  tourDefs() {
+    const W = (ms) => ({ w: ms }), C = (c, o) => Object.assign({ c: c }, o || {}), S = (c, o) => Object.assign({ c: c, silent: true }, o || {});
+    return {
+      nodes: [S('.demo .seg button', { t: /^4$/ }), S('.an-x', { opt: true }), W(1800), C('.ph .btn.pri'), W(1100), C('.an-w .btn.pri'), { until: '.an-w .btn.pri', t: /Продолжить/, max: 9000 }, W(1200), C('.an-w .an-c', { ax: .04 }), W(700), C('.an-w .btn.pri', { t: /Продолжить/ }), { until: '.an-w .btn.pri', t: /Запустить/, max: 9000 }, W(900), C('.an-w .btn.pri', { t: /Запустить/ }), { until: '.an-w .btn', t: /Открыть ноду/, max: 20000 }, W(1100), C('.an-w .btn', { t: /Открыть ноду/ }), S('.demo .seg button', { t: /^5$/ }), W(6500)],
+      ov: [S('.demo div:nth-of-type(2) button', { t: /^4$/ }), W(2000), C('.main .btn.sm', { t: /^Сжать$/ }), W(3400), C('.main .btn.sm', { t: /^Ретрансляция$/ }), W(3400), C('.main .btn.sm', { t: /^Продлить$/ }), W(5200)],
+      us: [S('.demo .seg button', { t: /^закрыто$/ }), W(1800), C('.ph .btn.pri'), W(1300), C('.us-dlg input', { type: 'kate', ax: .2 }), W(500), C('.us-dlg .us-gp', { n: 1 }), W(900), C('.us-dlg .mono', { t: /^300 ГБ$/ }), W(900), C('.us-dlg .btn.pri', { t: /Создать/ }), W(7000)],
+      hl: [S('.demo .seg button', { t: /^есть алерты$/ }), S('.main [role=tab]', { t: /^Алерты/ }), W(2000), C('.main .btn.sm.pri', { t: /Сжать журнал/ }), W(1500), C('.pn .btn.pri', { t: /^Применить$/ }), W(3600), C('.main [role=tab]', { t: /^Проверки/ }), W(3400), C('.main [role=tab]', { t: /^Доктор/ }), W(3800), C('.main [role=tab]', { t: /^Люди/ }), W(3200)],
+      app: ({ Main: [S('.dev button', { t: /^Off$/ }), W(1600), C('[data-app] .pw'), W(6000), C('[data-app] .rsel', { n: 4 }), W(5000), C('[data-app] .sv-tabs [role=tab]', { n: 1 }), W(3800), C('[data-app] .sv-tabs [role=tab]', { n: 0 }), W(1800)],
+        Routes: [W(2200), C('[data-app] .cat', { n: 2 }), W(2800), C('[data-app] .utabs button', { n: 1 }), W(3200), C('[data-app] .utabs button', { n: 2 }), W(3200), C('[data-app] .utabs button', { n: 0 }), W(1600)],
+        Diag: [S('.dev button', { t: /^Idle$/, opt: true }), W(1600), C('[data-app] .cta'), { until: '[data-app] .dr-b', max: 16000 }, W(2000), C('[data-app] .dr-b', { n: 0 }), W(4600)],
+        Set: [W(2000), C('[data-app] .sx-ni', { n: 3 }), W(3000), C('[data-app] .sx-ni', { n: 6 }), W(3000), C('[data-app] .sx-ni', { n: 4 }), W(3000), C('[data-app] .sx-ni', { n: 0 }), W(1400)],
+        Byp: [S('.dev button', { t: /^Off$/ }), W(1600), C('[data-app] .pw'), { until: '[data-app] .bp-n', max: 16000 }, W(2600), C('[data-app] .bp-sh', { n: 0 }), W(3600), C('[data-app] .bp-seg button', { n: 1 }), W(3000), C('[data-app] .bp-seg button', { n: 0 }), W(1600)] })[(this.state && this.state.as) || 'Main'],
+      ga: this.gTours().A[(this.state && this.state.gA) || 0], gb: this.gTours().B[(this.state && this.state.gB) || 0], gc: [].concat.apply([], this.gTours().C), gd: [].concat.apply([], this.gTours().D.map((x, i) => [{ g: i, gk: 'gD' }].concat(x))), ge: [].concat.apply([], this.gTours().E.map((x, i) => [{ g: i, gk: 'gE' }].concat(x))), gf: [].concat.apply([], this.gTours().F.map((x, i) => [{ g: i, gk: 'gF' }].concat(x))),
+      nd: [W(1600), C('.fz-bar .seg button', { t: /^Пути$/ }), W(3400), C('.fz-bar .seg button', { t: /^Карта$/, pc: 1 }), { w: 4400, pc: 1 }, C('.fz-bar .seg button', { t: /^Нагрузка$/ }), W(3400), C('.fz-bar .seg button', { t: /^Список$/ }), W(1400)],
+      rc: [W(2400), C('.main [role=tab]', { t: /^События/ }), W(3400), C('.main [role=tab]', { t: /^Источники/ }), W(3800), C('.main [role=tab]', { t: /^Ноды/ }), W(1600)],
+      up: [W(2400), C('.main [role=tab]', { t: /^Агенты нод/ }), W(3600), C('.main [role=tab]', { t: /^Система серверов/ }), W(3600), C('.main [role=tab]', { t: /^Эта панель/ }), W(1600)],
+      sub: [W(1800), C('.cS .u-tab', { t: /^Telegram/ }), W(3600), C('.cS .u-tab', { t: /^Устройства/ }), W(3600), C('.cS .u-tab', { t: /^Серверы/ }), W(4200)]
+    };
+  }
+  slInit() {
+    const root = document.querySelector('.lp-root'); if (!root || this._slo) return;
+    const Q = '.lx-tabs,.cpf,.tabs,.lx-dv,.lx-ais', SEL = '[aria-selected="true"],[aria-pressed="true"]';
+    const target = (g) => g.classList.contains('lx-atabs') ? [root.querySelector('.lx-app'), root.querySelector('.lx-acap')] : g.classList.contains('lx-tabs') ? [root.querySelector('.lx-shw .emb'), root.querySelector('.lx-sx')] : g.classList.contains('tabs') ? [g.parentElement.querySelector('.lx-prx')] : g.classList.contains('cpf') ? [root.querySelector('.card.cmp')] : g.classList.contains('lx-dv') ? [root.querySelector('.lx-shw .emb')] : [root.querySelector('.lx-aic'), root.querySelector('.lx-aim')];
+    const upd = () => { this._slq = 0; Array.prototype.forEach.call(root.querySelectorAll(Q), (g) => { const b = g.querySelector(SEL); if (!b || !b.offsetWidth) return; const kids = Array.prototype.slice.call(g.querySelectorAll('button,[role=tab]')), i = kids.indexOf(b);
+      g.style.setProperty('--ix', b.offsetLeft + 'px'); g.style.setProperty('--iy', b.offsetTop + 'px'); g.style.setProperty('--iw', b.offsetWidth + 'px'); g.style.setProperty('--ih', b.offsetHeight + 'px');
+      if (!g.classList.contains('lx-sl')) { g.classList.add('lx-sl'); g._i = i; setTimeout(() => g.classList.add('lx-sla'), 60); return; }
+      if (g._i !== i) { const dir = i > g._i ? 1 : -1; g._i = i; target(g).forEach((t) => { if (!t) return; t.style.setProperty('--sd', dir); t.classList.remove('lx-swp'); void t.offsetWidth; t.classList.add('lx-swp'); clearTimeout(t._sw); t._sw = setTimeout(() => t.classList.remove('lx-swp'), 700); }); } }); };
+    const kick = () => { if (this._slq) return; this._slq = requestAnimationFrame(upd); };
+    this._slo = new MutationObserver((ms) => { for (let k = 0; k < ms.length; k++) { const m = ms[k], t = m.target; if (m.type === 'attributes' || (t.closest && t.closest(Q)) || (m.addedNodes.length && m.addedNodes[0].querySelector && m.addedNodes[0].querySelector(Q))) { kick(); return; } } });
+    this._slo.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-selected', 'aria-pressed'] });
+    window.addEventListener('resize', kick); [0, 400, 1500, 3200].forEach((ms) => setTimeout(kick, ms)); this._slk = kick;
+  }
+  tourInit() {
+    this.slInit();
+    this._tr = {};
+    const boxes = Array.prototype.slice.call(document.querySelectorAll('.lp-root [data-tour]'));
+    const root = document.querySelector('.lp-root');
+    const fit = () => { const nr = root.clientWidth < 620; if (nr !== !!this.state.nr) this.setState({ nr: nr }); boxes.forEach((b) => { const s = b.querySelector('.pwin-s'); if (!s || !b.clientWidth) return; const A = (n, d) => +(b.getAttribute('data-' + n) || d), rtl = this.state.lang === 'FA', dv = b.getAttribute('data-dv'), ph = b.hasAttribute('data-bwm') && (dv === 'ph' || (dv !== 'pc' && nr)); b.classList.toggle('ph', ph); const bw = ph ? A('bwm', 400) : A('bw', 1440), bh = ph ? A('hbm', 1200) : A('h', 860), pan = !ph && nr && b.hasAttribute('data-wm'), mob = ph || pan, w = ph ? bw : (pan ? A('wm', 640) : A('w', bw)), vh = ph ? Math.min(bh, A('hm', 720)) : (pan ? Math.min(bh, A('hmp', bh)) : A('vh', bh)), k = b.clientWidth / w; if (b._mode !== (ph ? 'ph' : pan ? 'pan' : 'pc')) { b._mode = ph ? 'ph' : pan ? 'pan' : 'pc'; b._px = null; b._py = null; } const x = ph ? 0 : (pan ? (b._px != null ? b._px : A('xm', (bw - w) / 2)) : (rtl && b.hasAttribute('data-x') ? 0 : A('x', 0))), y = mob ? (b._py != null ? b._py : 0) : A('y', 0); const C = ph ? 88 : 0; b._v = { k: k, w: w, vh: vh, bw: bw, bh: bh, mob: mob, x: x, y: y, top: C }; s.style.top = C + 'px'; s.style.width = bw + 'px'; s.style.height = bh + 'px'; s.style.setProperty('--bh', bh + 'px'); s.style.setProperty('--cx', (mob ? 0 : x) + 'px'); s.style.transform = 'translate(' + (-x * k).toFixed(1) + 'px,' + (-y * k).toFixed(1) + 'px) scale(' + k.toFixed(4) + ')'; b.style.height = Math.round(vh * k + C) + 'px'; b.classList.toggle('pan', mob); }); };
+    const shots = Array.prototype.slice.call(document.querySelectorAll('.lp-root [data-shot]'));
+    const shot = () => shots.forEach((b) => { const s = b.querySelector('.pwin-s'), d = (n) => b.getAttribute('data-' + n); if (!s) return; if (d('pre') && !b._pre) { const a = d('pre').split('|'), re = new RegExp(a[1]), ru = (x) => ((window.MG_I18N && window.MG_I18N.ru ? window.MG_I18N.ru(x) : x.textContent) || '').trim(), e = Array.prototype.slice.call(s.querySelectorAll(a[0])).filter((x) => re.test(ru(x)))[0]; if (!e) return; b._pre = true; e.click(); return; } const nar0 = b.clientWidth < 420, keep = nar0 && d('km'), nar = nar0 && !keep; s.style.width = nar ? '420px' : ''; const el = s.querySelector(d('sel')); if (!el) return; s.style.transform = 'none'; const sr = s.getBoundingClientRect(), er = el.getBoundingClientRect(), pad = +(d('pad') || 0); if (!er.width) return; let k = d('fit') ? b.clientWidth / (er.width + pad * 2) : +(d('k') || .6); if (nar) k = d('fit') ? Math.min(1, k) : .82; if (keep) k = +d('km'); let x = (er.left - sr.left - pad) * k, y = (er.top - sr.top - pad + +(d('dy') || 0)) * k; if (d('c')) x = (er.left - sr.left + er.width / 2 + (keep ? +(d('dxm') || 0) : 0)) * k - b.clientWidth / 2; else if (this.state.lang === 'FA' && !d('fit')) x = (er.right - sr.left + pad) * k - b.clientWidth; if (d('cine')) { const ns = Array.prototype.slice.call(el.querySelectorAll('.fz-gn')); if (!ns.length) return; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; ns.forEach((n) => { const r = n.getBoundingClientRect(); x0 = Math.min(x0, r.left - sr.left); x1 = Math.max(x1, r.right - sr.left); y0 = Math.min(y0, r.top - sr.top); y1 = Math.max(y1, r.bottom - sr.top); }); const W = b.clientWidth, H = b.clientHeight, pad = 44; k = Math.max(.62, Math.min(1.2, H * .74 / (y1 - y0 + 60))); const full = (x1 - x0 + pad * 2) * k; y = (y0 + y1) / 2 * k - H / 2; if (full <= W) { x = (x0 + x1) / 2 * k - W / 2; s.style.setProperty('--dx', '0px'); } else { x = (x0 - pad) * k; s.style.setProperty('--dx', (-(full - W)).toFixed(1) + 'px'); } b.classList.add('cine'); } s.style.transform = 'translate(' + (-x).toFixed(1) + 'px,' + (-y).toFixed(1) + 'px) scale(' + k.toFixed(4) + ')'; b.classList.add('rdy'); });
+    if (typeof IntersectionObserver !== 'undefined') { this._sio = new IntersectionObserver((es) => es.forEach((x) => { const b = x.target, s = b.querySelector('.pwin-s'); if (!s) return; if (x.isIntersecting && !b._in) { b._in = true; if (b.classList.contains('rdy')) { s.style.display = 'none'; void s.offsetHeight; s.style.display = ''; } b.classList.add('go'); } else if (!x.isIntersecting && b._in) { b._in = false; b.classList.remove('go'); } }), { threshold: .35 }); shots.forEach((b) => this._sio.observe(b)); }
+    const both = () => { fit(); shot(); }; both(); [500, 1400, 3000].forEach((ms) => setTimeout(shot, ms)); this._fit = both; window.addEventListener('resize', both);
+    let still = false; try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    if (still || typeof IntersectionObserver === 'undefined') return;
+    this._tio = new IntersectionObserver((es) => es.forEach((x) => { const k = x.target.getAttribute('data-tour'), st = this._tr[k] || (this._tr[k] = { i: 0, box: x.target }); st.vis = x.isIntersecting && x.intersectionRatio >= .4; this.tourKick(k); }), { threshold: [0, .4, .7] });
+    boxes.forEach((b) => this._tio.observe(b));
+  }
+  tourSwap(from, to) { const a = this._tr && this._tr[from]; if (!this._tr) return; let box = null; if (a) { clearTimeout(a.tm); clearTimeout(a.back); box = a.box; delete this._tr[from]; const cur = box.querySelector('.tcur'); if (cur) cur.classList.remove('on'); } if (!box) box = document.querySelector('.lp-root .emb.tr-box'); if (!box) return; box._px = null; box._py = null; this._tr[to] = { i: 0, box: box, vis: true }; this.tabIn('.lx-tab[aria-selected="true"]'); if (this._fit) this._fit(); setTimeout(() => { if (this._fit) this._fit(); this.tourKick(to); }, 700); }
+  setLang(l) { try { localStorage.setItem('mg-lang', l); } catch (e) {} window.MG_LANG = l; this.setState({ lang: l }); Array.prototype.forEach.call(document.querySelectorAll('.lp-root .pn .lb'), (e) => { if (/^(RU|EN|TR|ZH|FA)$/.test(e.textContent.trim())) e.textContent = l; }); if (window.MG_I18N && window.MG_I18N.kick) window.MG_I18N.kick(); const a = this._tr && this._tr.app; if (a) { clearTimeout(a.tm); a.i = 0; a.busy = false; setTimeout(() => this.tourKick('app'), 900); } [200, 900, 2000].forEach((ms) => setTimeout(() => { if (this._fit) this._fit(); }, ms)); }
+  setDv(v) { this.setState({ dv: v }); const st = this._tr && this._tr[this.state.tr]; if (st) { clearTimeout(st.tm); st.i = 0; st.busy = false; const c = st.box.querySelector('.tcur'); if (c) c.classList.remove('on'); } [80, 500].forEach((ms) => setTimeout(() => { if (this._fit) this._fit(); }, ms)); setTimeout(() => this.tourKick(this.state.tr), 900); }
+  setAs(k, auto) { const st = this._tr && this._tr.app; if (st) { clearTimeout(st.tm); clearTimeout(st.back); st.i = 0; st.busy = false; st.hold = false; st.box._px = null; st.box._py = null; const c = st.box.querySelector('.tcur'); if (c) c.classList.remove('on'); } this.setState({ as: k }); setTimeout(() => this.tabIn('.lx-atabs .lx-tab[aria-selected="true"]'), 80); [120, 700].forEach((ms) => setTimeout(() => { if (this._fit) this._fit(); }, ms)); setTimeout(() => this.tourKick('app'), 1300); }
+  gDefs() { return {
+      A: [['Main', 'Нажмите кнопку', '«Авто» берёт сервер, который отвечает быстрее всех прямо сейчас'], ['Main', 'Или выберите сервер сами', 'Сервер и протокол можно выбрать из списка'], ['Routes', 'Решите, что идёт через VPN', '«Умный» оставляет местные сайты и домашнюю сеть мимо VPN, «Только выбранное» пускает лишь отмеченное, «Всё» — весь трафик'], ['Routes', 'Добавьте свои правила', 'Правила по готовым подборкам, своим спискам, сайтам и программам'], ['Diag', 'Проверьте сеть', 'Одна кнопка показывает, какие серверы и какие пути к ним работают отсюда']],
+      B: [['Byp', 'Включите обход', 'Открывает сайты напрямую, без сервера. Подписка не нужна'], ['Byp', 'Посмотрите, что открылось', 'Способ подбирается сам под вашу сеть'], ['Byp', 'Выберите, что открывать', 'Сервисы из каталога и свои сайты'], ['Byp', 'Помните, чем обход не VPN', 'Не скрывает адрес и не шифрует трафик']],
+      C: [['Nd', 'Сервер', 'Адрес и порт SSH. Панель читает ключ сервера, логин и пароль пока не отправляются'], ['Nd', 'Вход⁠', 'Сверьте отпечаток ключа с консолью хостера, заполните данные ноды и выберите способ входа'], ['Nd', 'Проверка', 'Система, память, nftables и связь с панелью. До запуска сервер не меняется'], ['Nd', 'Установка', 'Задание идёт по этапам. Окно можно закрыть, установка продолжится в фоне']],
+      D: [['Us', 'Новый пользователь', 'Пользователи → Новый пользователь'], ['Us', 'Имя и группа', 'Группа решает, какие профили получит человек'], ['Us', 'Лимиты', 'Квота, срок и число устройств. Значения по умолчанию подойдут для начала'], ['Us', 'Создать', 'Ссылка подписки сразу попадает в буфер обмена']],
+      E: [['Pf', 'Откройте профиль', 'Профили → нужный профиль. Настройки разложены по группам'], ['Pf', 'Выберите сертификат', 'Let’s Encrypt нужен домен и открытые порты 80 и 443. Самоподписанный работает и по IP'], ['Pf', 'Смените обфускацию', 'Критичные поля помечены: они ломают уже выданные серверы, пока приложение не обновит подписку'], ['Pf', 'Сохраните', 'Перед сохранением редактор показывает, что изменится и кого это заденет']],
+      F: [['Lg', 'Войти по passkey', 'Отпечаток пальца, лицо, PIN-код или ключ безопасности. Ключ остаётся на вашем устройстве'], ['Lg', 'Другим способом', 'Логин, пароль и код из приложения-аутентификатора. Пять неверных паролей за час блокируют логин на 15 минут'], ['Lg', 'Если passkey не подошёл', 'Passkey работает только на том адресе админки, который сохранила команда setup']] }; }
+  gTours() { const W = (ms) => ({ w: ms }), C = (c, o) => Object.assign({ c: c }, o || {}), S = (c, o) => Object.assign({ c: c, silent: true }, o || {}); return {
+      A: [[S('.dev button', { t: /^Off$/ }), W(1500), C('[data-app] .pw'), W(6200)], [W(700), C('[data-app] .rsel', { n: 4 }), W(2600), C('[data-app] .rsel', { n: 2 }), W(2600)], [W(1500), C('[data-app] .mr-b', { n: 1 }), W(2600), C('[data-app] .mr-b', { n: 2 }), W(2800), C('[data-app] .mr-b', { n: 0 }), W(1400)], [W(700), C('[data-app] .cat', { n: 2 }), W(2400), C('[data-app] .utabs button', { n: 1 }), W(2800), C('[data-app] .utabs button', { n: 2 }), W(2800), C('[data-app] .utabs button', { n: 0 }), W(1200)], [S('.dev button', { t: /^Idle$/, opt: true }), W(1500), C('[data-app] .cta'), { until: '[data-app] .dr-b', max: 16000 }, W(1800), C('[data-app] .dr-b', { n: 0 }), W(4200)]],
+      B: [[S('.dev button', { t: /^Off$/ }), W(1500), C('[data-app] .pw'), { until: '[data-app] .bp-n', max: 16000 }, W(2800)], [W(700), C('[data-app] .bp-sh', { n: 0 }), W(3600), C('[data-app] .bp-sh', { n: 0 }), W(900)], [W(700), C('[data-app] .bp-seg button', { n: 1 }), W(3200), C('[data-app] .bp-seg button', { n: 0 }), W(1400)], [W(700), C('[data-app] .bp-det'), W(5600), C('[data-app] .bp-sheet .addb'), W(1200)]],
+      C: [[S('.demo .seg button', { t: /^4$/ }), S('.an-x', { opt: true }), W(1800), C('.ph .btn.pri'), W(1400), C('.an-w .btn.pri'), { until: '.an-w .btn.pri', t: /Продолжить/, max: 9000 }, W(600)], [W(1200), C('.an-w .an-c', { ax: .04 }), W(900), C('.an-w .btn.pri', { t: /Продолжить/ }), { until: '.an-w .btn.pri', t: /Запустить/, max: 9000 }, W(400)], [W(3200), C('.an-w .btn.pri', { t: /Запустить/ }), W(500)], [{ until: '.an-w .btn', t: /Открыть ноду/, max: 20000 }, W(1400), C('.an-w .btn', { t: /Открыть ноду/ }), S('.demo .seg button', { t: /^5$/ }), W(5200)]],
+      D: [[S('.demo .seg button', { t: /^закрыто$/ }), W(1800), C('.ph .btn.pri'), W(1500)], [W(500), C('.us-dlg input', { type: 'kate', ax: .2 }), W(600), C('.us-dlg .us-gp', { n: 1 }), W(1200)], [W(500), C('.us-dlg .mono', { t: /^300 ГБ$/ }), W(1800)], [W(500), C('.us-dlg .btn.pri', { t: /Создать/ }), W(6500)]],
+      E: [[S('.demo .seg button', { t: /^VLESS$/ }), S('.demo .seg button', { t: /^Hysteria2$/ }), W(3000)], [W(600), C('.pp-row[data-k="cert"] .pp-seg button', { n: 1 }), W(3000)], [W(600), C('.pp-row[data-k="obf"] .pp-seg button', { n: 2 }), W(3000)], [W(500), C('.pp-save .btn.pri'), W(4200), C('.pp-dlg footer .btn.pri'), W(5200)]],
+      F: [[S('.an-demo .seg button', { t: /^Вход$/ }), W(1700), C('.lg-go'), W(3800)], [S('.an-demo .seg button', { t: /^Вход$/ }), W(600), C('.lg-or'), W(900), C('.lg-m input[type="password"]', { type: 'correct-horse-42' }), W(200), C('.otp input', { n: 0, type: '4' }), C('.otp input', { n: 1, type: '1' }), C('.otp input', { n: 2, type: '9' }), C('.otp input', { n: 3, type: '2' }), C('.otp input', { n: 4, type: '7' }), C('.otp input', { n: 5, type: '5' }), C('.lg-go'), W(3400)], [S('.an-demo .seg button', { t: /^Не подошёл$/ }), W(4200)]] }; }
+  gVals(k) { const d = this.gDefs()[k], T = this.gTours()[k], cur = this.state['g' + k] || 0, scr = d[cur][0], lang = this.state.lang || 'RU', p = {};
+    d.forEach((x) => { p[x[0]] = x[0] === scr; ['RU', 'EN', 'ZH', 'FA', 'TR'].forEach((l) => { p[x[0] + l] = x[0] === scr && l === lang; }); });
+    return { p: p, list: d.map((x, i) => ({ n: (i < 9 ? '0' : '') + (i + 1), t: x[1], d: x[2], cls: i === cur ? 'on' : '', sel: i === cur ? 'true' : 'false', dur: T[i].reduce((a, q) => a + (q.w || (q.until ? 3600 : q.silent ? 80 : 1500)), 0), pick: () => this.setG(k, i) })) }; }
+  setG(k, i) { if (k === 'C' || k === 'D' || k === 'E' || k === 'F') { const key = 'g' + k.toLowerCase(), st = this._tr && this._tr[key], T = this.gTours()[k], n = ((i % T.length) + T.length) % T.length, o = {}; o['g' + k] = n; this.setState(o); this._gHold = Date.now() + 2600; if (!st) return; clearTimeout(st.tm); clearTimeout(st.back); st.i = 0; st.t0 = 0; st.busy = false; st.hold = false; st.ff = T.slice(0, n).reduce((a, x) => a + x.length + (k !== 'C' ? 1 : 0), 0) + (k !== 'C' ? 1 : 0); const c = st.box.querySelector('.tcur'); if (c) c.classList.remove('on'); setTimeout(() => this.tourKick(key), 150); return; }
+    const key = 'g' + k.toLowerCase(), d = this.gDefs()[k], n = ((i % d.length) + d.length) % d.length, same = d[this.state['g' + k] || 0][0] === d[n][0], st = this._tr && this._tr[key];
+    if (st) { clearTimeout(st.tm); clearTimeout(st.back); st.i = 0; st.t0 = 0; st.busy = false; st.hold = false; st.box._px = null; st.box._py = null; const c = st.box.querySelector('.tcur'); if (c) c.classList.remove('on'); if (!same) { const b = st.box; b.style.setProperty('--sd', 1); b.classList.remove('lx-swp'); void b.offsetWidth; b.classList.add('lx-swp'); clearTimeout(b._sw); b._sw = setTimeout(() => b.classList.remove('lx-swp'), 700); } }
+    const o = {}; o['g' + k] = n; this.setState(o); [120, 700].forEach((ms) => setTimeout(() => { if (this._fit) this._fit(); }, ms)); if (st) setTimeout(() => this.tourKick(key), same ? 400 : 1300); }
+  tabIn(q) { try { const t = document.querySelector(q), b = t && t.parentElement; if (b && b.scrollWidth > b.clientWidth + 2) b.scrollTo({ left: Math.max(0, t.offsetLeft - b.offsetLeft - (b.clientWidth - t.offsetWidth) / 2), behavior: 'smooth' }); } catch (e) {} }
+  trNext(k) { const O = ['ov', 'nd', 'us', 'hl', 'rc', 'up'], n = O[(O.indexOf(k) + 1) % O.length]; if (this.state.tr !== k) return; const cur = this._tr[k] && this._tr[k].box.querySelector('.tcur'); if (cur) cur.classList.remove('on'); this.setState({ tr: n }); setTimeout(() => this.tourSwap(k, n), 60); }
+  tourHold(k, on) { const st = this._tr && this._tr[k]; if (!st) return; st.hold = on; clearTimeout(st.tm); clearTimeout(st.back); const cur = st.box.querySelector('.tcur'); if (on) { st.busy = false; if (cur) cur.classList.remove('on'); } else { st.back = setTimeout(() => { st.i = 0; this.tourKick(k); }, 2400); } }
+  tourKick(k) { const st = this._tr[k]; if (!st || st.busy || !st.vis || st.hold) return; st.busy = true; this.tourStep(k); }
+  tourStep(k) {
+    const st = this._tr[k], steps = this.tourDefs()[k] || [];
+    if (!st.vis || st.hold || !steps.length) { st.busy = false; return; }
+    if (st.i >= steps.length) { st.i = 0; if (st.box.classList.contains('tr-box') && this.trNext) { st.busy = false; return this.trNext(k); } if (k === 'gc' || k === 'gd' || k === 'ge' || k === 'gf') { st.ff = 0; } else if (/^g[ab]$/.test(k)) { st.busy = false; const K = k.charAt(1).toUpperCase(); return this.setG(K, (this.state['g' + K] || 0) + 1); } if (k === 'app' && this.setAs) { st.busy = false; const O = ['Main', 'Routes', 'Diag', 'Set', 'Byp']; return this.setAs(O[(O.indexOf(this.state.as || 'Main') + 1) % O.length], true); } }
+    if (st.i === 0) { const sc0 = st.box.querySelector('.pnr'); if (sc0 && sc0.scrollTop) sc0.scrollTop = 0; }
+    const sp = steps[st.i % steps.length], next = (ms) => { st.tm = setTimeout(() => this.tourStep(k), ms); };
+    const find = () => { const list = Array.prototype.slice.call(st.box.querySelectorAll(sp.c || sp.until)).filter((e) => sp.silent || e.getClientRects().length); const src = (e) => ((window.MG_I18N && window.MG_I18N.ru ? window.MG_I18N.ru(e) : e.textContent) || '').trim(); return sp.t ? list.filter((e) => sp.t.test(src(e)))[sp.n || 0] : list[sp.n || 0]; };
+    if (sp.pc && st.box.classList.contains('ph')) { st.i++; return next(20); }
+    if (sp.g != null) { st.i++; if (!(st.ff >= st.i)) { const o = {}; o[sp.gk] = sp.g; this.setState(o); } return next(20); } if (sp.w) { st.i++; return next(st.ff >= st.i ? 30 : sp.w); }
+    if (sp.until) { if (find()) { st.i++; st.t0 = 0; return next(60); } st.t0 = st.t0 || Date.now(); if (Date.now() - st.t0 > (sp.max || 8000)) { st.t0 = 0; st.i = 0; } return next(250); }
+    const el = find(); st.i++;
+    if (!el) { if (!sp.opt) st.i = 0; return next(sp.opt ? 40 : 1500); }
+    if (sp.silent || st.ff >= st.i) { if (sp.type && !sp.silent) { try { el.value = sp.type; el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} } el.click(); return next(sp.silent ? (sp.after || 80) : 160); }
+    const cur = st.box.querySelector('.tcur'), br = st.box.getBoundingClientRect(), r = el.getBoundingClientRect(), V = st.box._v, sEl = st.box.querySelector('.pwin-s'), ax = sp.ax == null ? .5 : sp.ax;
+    let x = r.left - br.left + r.width * ax, y = r.top - br.top + r.height * .55;
+    if (V && sEl && V.mob) { const sr = sEl.getBoundingClientRect(), kc = sr.width / V.bw || 1, bx = (r.left - sr.left) / kc + r.width / kc * ax, by = (r.top - sr.top) / kc + r.height / kc * .55, sc = st.box.classList.contains('ph') ? sEl.querySelector('.pnr') : null; if (sc) { let dy = 0; if (el.closest('.an-scrim')) { if (sc.scrollTop) { dy = -sc.scrollTop; sc.scrollTop = 0; } } else if (!el.closest('.mnav') && (by < 90 || by > V.vh - 150)) { const nt = Math.max(0, Math.min(sc.scrollHeight - sc.clientHeight, sc.scrollTop + by - V.vh * .45)); dy = nt - sc.scrollTop; try { sc.scrollTo({ top: nt, behavior: 'smooth' }); } catch (e) { sc.scrollTop = nt; } } x = bx * V.k; y = (by - dy) * V.k + V.top; } else { const px = Math.max(0, Math.min(V.bw - V.w, bx - V.w / 2)), py = Math.max(0, Math.min(V.bh - V.vh, by - V.vh / 2)); st.box._px = px; st.box._py = py; V.x = px; V.y = py; sEl.style.transform = 'translate(' + (-px * V.k).toFixed(1) + 'px,' + (-py * V.k).toFixed(1) + 'px) scale(' + V.k.toFixed(4) + ')'; x = (bx - px) * V.k; y = (by - py) * V.k + V.top; } }
+    if (y < 0 || y > br.height + 4 || !cur) { el.click(); return next(sp.after || 700); }
+    cur.classList.add('on'); cur.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+    st.tm = setTimeout(() => { cur.classList.add('dn'); st.tm = setTimeout(() => { cur.classList.remove('dn'); if (st.hold) return; if (!sp.type) { el.click(); return next(sp.after || 500); } let n = 0, set = null; try { el.focus({ preventScroll: true }); set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; } catch (e) {} const tick = () => { if (st.hold || !set) return; set.call(el, sp.type.slice(0, ++n)); el.dispatchEvent(new Event('input', { bubbles: true })); if (n < sp.type.length) st.tm = setTimeout(tick, 110); else { try { el.blur(); } catch (e) {} next(sp.after || 500); } }; tick(); }, 170); }, 820);
+  }
+  mxInit() {
+    const cv = document.querySelector('.lp-root .lx-mx'); if (!cv || !cv.getContext) return;
+    const ctx = cv.getContext('2d'), S = 18; let W = 0, H = 0, dpr = 1, pts = [], raf = 0, vis = true, t0 = performance.now(), px = -9999, py = -9999, still = false;
+    try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    const size = () => { const r = cv.getBoundingClientRect(); if (!r.width) return; dpr = Math.min(2, window.devicePixelRatio || 1); W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); pts = []; const ox = (W % S) / 2, oy = 8; for (let y = oy; y < H; y += S) for (let x = ox; x < W; x += S) { const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; pts.push([x, y, (h - Math.floor(h)) * 6.283]); } };
+    const draw = (now) => {
+      raf = 0; if (!W) size(); const t = (now - t0) / 1000, cx = W / 2, cy = 375, R = Math.max(W, H) * .62, tx = W / 2, ty = 375, rx = Math.min(390, W * .44), ry = 215;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+      const r1 = (t * 120) % R, r2 = (t * 120 + R / 2) % R, f1 = 1 - r1 / R, f2 = 1 - r2 / R;
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i], dx = p[0] - cx, dy = p[1] - cy, d = Math.sqrt(dx * dx + dy * dy);
+        let a = .18 + .07 * Math.sin(p[0] * .011 + p[1] * .019 - t * .9);
+        const tw = Math.sin(t * 1.6 + p[2]); if (tw > .95) a += (tw - .95) * 6;
+        const g1 = (d - r1) / 44, g2 = (d - r2) / 44; a += Math.exp(-g1 * g1) * .78 * f1 + Math.exp(-g2 * g2) * .78 * f2;
+        const qx = p[0] - px, qy = p[1] - py, q = qx * qx + qy * qy; if (q < 40000) a += Math.exp(-q / 9000) * .4;
+        const ex = (p[0] - tx) / rx, ey = (p[1] - ty) / ry, e = ex * ex + ey * ey; const mk = W < 600 ? .3 : .06; if (e < 1.5) a *= e < .8 ? mk : mk + (1 - mk) * (e - .8) / .7;
+        const ed = Math.min(p[0], W - p[0]) / Math.min(180, W * .125), eb = (H - p[1]) / Math.min(200, H * .2); if (ed < 1) a *= ed * ed; if (eb < 1) a *= eb * eb;
+        if (a < .03) continue; if (a > 1) a = 1;
+        const hot = a > .34, s = hot ? .9 + a * .8 : 1;
+        ctx.fillStyle = hot ? 'rgba(125,211,160,' + a.toFixed(3) + ')' : 'rgba(243,243,245,' + a.toFixed(3) + ')';
+        if (hot) { ctx.beginPath(); ctx.arc(p[0], p[1], s, 0, 6.283); ctx.fill(); } else ctx.fillRect(p[0] - .75, p[1] - .75, 1.5, 1.5);
+      }
+      if (vis && !still) raf = requestAnimationFrame(draw);
+    };
+    const kick = () => { if (!raf) raf = requestAnimationFrame(draw); };
+    const move = (e) => { const r = cv.getBoundingClientRect(); px = e.clientX - r.left; py = e.clientY - r.top; };
+    const root = document.querySelector('.lp-root'); root.addEventListener('pointermove', move, { passive: true });
+    const rs = () => { size(); kick(); }; window.addEventListener('resize', rs);
+    let io = null; if (typeof IntersectionObserver !== 'undefined') { io = new IntersectionObserver((es) => { vis = es[0].isIntersecting; if (vis) kick(); }); io.observe(cv); }
+    size(); kick();
+    this._mxOff = () => { cancelAnimationFrame(raf); root.removeEventListener('pointermove', move); window.removeEventListener('resize', rs); if (io) io.disconnect(); };
+  }
+  wmInit() {
+    const cv = document.querySelector('.lp-root .lx-wm'); if (!cv || !cv.getContext) return;
+    const ctx = cv.getContext('2d'), t0 = performance.now(); let W = 0, H = 0, dpr = 1, S = 9, pts = [], raf = 0, vis = false, px = -9999, py = -9999, still = false, t1 = -1;
+    try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    const build = () => {
+      const r = cv.getBoundingClientRect(); if (!r.width || !r.height) return; W = r.width; H = r.height; dpr = Math.min(2, window.devicePixelRatio || 1); cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); S = W < 600 ? 5 : (W < 1000 ? 7 : 9);
+      const off = document.createElement('canvas'); off.width = Math.ceil(W); off.height = Math.ceil(H); const o = off.getContext('2d'); let fs = H * 1.2; const F = (n) => '600 ' + n + 'px Onest, system-ui, sans-serif';
+      try { o.letterSpacing = '-0.04em'; } catch (e) {} o.font = F(fs); let tw = o.measureText('mistgate').width; if (tw > W * .97) { fs *= W * .97 / tw; o.font = F(fs); tw = o.measureText('mistgate').width; }
+      const x0 = (W - tw) / 2, mw = o.measureText('mist').width; o.fillStyle = '#fff'; o.textBaseline = 'alphabetic'; o.fillText('mistgate', x0, H * .5 + fs * .36);
+      const d = o.getImageData(0, 0, off.width, off.height).data; pts = []; const LB = []; for (let i = 1; i <= 8; i++) LB.push(x0 + o.measureText('mistgate'.slice(0, i)).width);
+      for (let y = S / 2; y < H; y += S) for (let x = S / 2; x < W; x += S) { const a = d[((y | 0) * off.width + (x | 0)) * 4 + 3], h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; const on = a > 110 ? 1 : 0, r = h - Math.floor(h); let li = 0; while (li < 7 && x > LB[li]) li++; const c2 = Math.sin(Math.round(x / S) * 91.7 + li * 13.1) * 9973.1, cj = c2 - Math.floor(c2); pts.push([x, y, on, x > x0 + mw ? 1 : 0, r * 6.283, on ? li * .24 + cj * .3 + ((H - y) / S) * .034 : .4 + r * 2.6]); }
+    };
+    const draw = (now) => {
+      raf = 0; if (!pts.length) build(); const t = (now - t0) / 1000, ti = still ? 99 : (t1 < 0 ? -1 : (now - t1) / 1000), sx = ((t * .16) % 1.5 - .25) * W;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i], on = p[2], g = (p[0] - sx + (p[1] - H / 2) * .35) / 70, sw = ti > 4.2 ? Math.exp(-g * g) : 0; let yy = p[1], fl = 0; if (ti < 6) { if (ti < 0) continue; const T = p[5]; if (on) { const f0 = T - (p[1] / S) * .016; if (ti < f0) continue; if (ti < T) yy = p[1] - Math.ceil((T - ti) / .016) * S; else fl = Math.exp(-(ti - T) * 7); if (yy < 0) continue; } else if (ti < T) continue; }
+        let a = on ? .42 + .2 * Math.sin(p[0] * .014 + p[1] * .03 - t * 1.3) + sw * .5 + fl * .6 : .035 + sw * .1;
+        if (!on) { const tw = Math.sin(t * 1.4 + p[4]); if (tw > .96) a += (tw - .96) * 5; }
+        const qx = p[0] - px, qy = p[1] - py, q = qx * qx + qy * qy; if (q < 36000) a += Math.exp(-q / 7000) * (on ? .5 : .3);
+        const fy = Math.min(1, (H - p[1]) / (H * .28)); if (yy === p[1]) a *= .35 + .65 * fy; if (a < .03) continue; if (a > 1) a = 1;
+        ctx.fillStyle = (on && p[3]) || (!on && a > .25) ? 'rgba(125,211,160,' + a.toFixed(3) + ')' : 'rgba(243,243,245,' + a.toFixed(3) + ')';
+        if (on) { ctx.beginPath(); ctx.arc(p[0], yy, S * .24 + a * S * .14, 0, 6.283); ctx.fill(); } else ctx.fillRect(p[0] - .7, p[1] - .7, 1.4, 1.4);
+      }
+      if (vis && !still) raf = requestAnimationFrame(draw);
+    };
+    const kick = () => { if (!raf) raf = requestAnimationFrame(draw); };
+    const move = (e) => { const r = cv.getBoundingClientRect(); px = e.clientX - r.left; py = e.clientY - r.top; };
+    const root = document.querySelector('.lp-root'); root.addEventListener('pointermove', move, { passive: true });
+    const rs = () => { build(); kick(); }; window.addEventListener('resize', rs);
+    let io = null; if (typeof IntersectionObserver !== 'undefined') { io = new IntersectionObserver((es) => { vis = es[0].isIntersecting; if (vis && es[0].intersectionRatio >= .45 && t1 < 0) t1 = performance.now(); if (vis) kick(); }, { threshold: [0, .45, .8] }); io.observe(cv); } else { vis = true; t1 = performance.now(); }
+    try { document.fonts.ready.then(rs); } catch (e) {} build(); kick();
+    this._wmOff = () => { cancelAnimationFrame(raf); root.removeEventListener('pointermove', move); window.removeEventListener('resize', rs); if (io) io.disconnect(); };
+  }
+  start() {
+    if (this.state.run > 0 && this.state.run < 5) return;
+    this.setState({ run: 1, dlg: true, added: false });
+    [2, 3, 4].forEach((n, i) => this.later(() => this.setState({ run: n }), 850 * (i + 1)));
+    this.later(() => { this.setState({ run: 5, dlg: false, added: true }); this.fire('win'); }, 850 * 4 + 300);
+  }
+  connect() {
+    if (this.state.conn === 'ing') return;
+    if (this.state.conn === 'on') { this.setState({ conn: 'off' }); return; }
+    this.setState({ conn: 'ing' });
+    this.later(() => { this.setState({ conn: 'on', secs: 0 }); this.fire('app'); }, 1500);
+  }
+  renderVals() {
+    const s = this.state;
+    const dom = (s.dom || '').replace(/^https?:\/\//, '').trim() || 'panel.example.com';
+    const STEPS = [['Сервер проверен', 'linux · amd64 · systemd'], ['Порты открыты в UFW', '443/udp · 443/tcp'], ['Агент поставлен', 'подпись верна'], ['Доктор: 23 проверки', 'всё в порядке']];
+    const cls = (i) => (s.run > i + 1 ? 'done' : (s.run === i + 1 ? 'busy' : ''));
+    const MARQ = [['Hysteria2', 'ok'], ['VLESS REALITY', 'dir'], ['AmneziaWG 3.1', 'ru'], ['AmneziaWG 2.0', ''], ['Cloudflare WARP', 'warp'], ['XHTTP', ''], ['MTProto', ''], ['TrustTunnel', ''], ['xray-core', 'dir'], ['Mihomo', ''], ['sing-box', ''], ['SQLite', 'warp'], ['systemd', ''], ['Go', 'ok'], ['Linux amd64', ''], ['Linux arm64', ''], ['MCP', 'ru'], ['Telegram-алерты', 'dir'], ['Let’s Encrypt', ''], ['AGPL-3.0', 'ok'], ['5 языков', '']];
+    const SERVERS = [['de', 'Германия', 39, '', ''], ['nl', 'Нидерланды', 44, 'WARP', 'warp'], ['fi', 'Финляндия', 52, '', ''], ['ee', 'Эстония', 58, 'через RU', 'ru'], ['pl', 'Польша', 61, 'напрямую', 'dir']];
+    const G = 'https://mistgate.app/ru/guide/';
+    const RI = { dev: 'M4 5h16v11H4zM9 20h6M12 16v4', node: 'M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01', net: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.500 2.700 2.500 15.300 0 18M12 3c-2.500 2.700-2.500 15.300 0 18', cloud: 'M7 18a4 4 0 0 1-.6-7.950A6 6 0 0 1 18 9.500a4.250 4.250 0 0 1-.5 8.500z', site: 'M3.500 6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2zM3.500 9h17M6.500 6.500h.01M9 6.500h.01' };
+    const N = (t, i) => ({ node: true, wire: false, t: t, d: RI[i], c: '' }), Wr = (t, c) => ({ node: false, wire: true, t: t, d: '', c: c || '' });
+    const TABS = [
+      { k: 'hysteria2', n: 'Hysteria2', s: 'UDP · QUIC', d: 'M13 3L5 14h6l-1 7 8-11h-6z', lead: 'Стартовый вариант: официальное ядро Hysteria2 на UDP 443', doc: G + 'hysteria2/', page: true,
+        route: [N('Устройство', 'dev'), Wr('UDP 443 · QUIC', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Интернет', 'net')],
+        rows: [['Обфускация', 'Salamander по умолчанию', 'Gecko экспериментально, можно и без обфускации', ''], ['Смена портов', 'Диапазон от 1024, до 20 000 портов', 'передаётся только в формате Mihomo', ''], ['Сертификат', 'Let’s Encrypt или самоподписанный с закреплением', 'второй работает и по IP', ''], ['Посторонним', 'Порт отвечает сайтом по HTTP/3 и HTTPS', 'BBR включён по умолчанию', '']],
+        apps: ['Mistgate для Windows', 'Happ', 'приложения на Mihomo'] },
+      { k: 'vless', n: 'VLESS', s: 'TCP · xray-core', d: RI.net, lead: 'Для сетей, где режут UDP и QUIC', doc: G + 'vless/', page: true,
+        route: [N('Устройство', 'dev'), Wr('TCP 443 · REALITY', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Интернет', 'net')],
+        rows: [['REALITY', 'Поверх XHTTP или TCP (RAW + Vision)', 'сертификат не нужен, работает по IP', ''], ['TLS', 'Поверх XHTTP или WebSocket', 'напрямую или за CDN', ''], ['Цель REALITY', '«Сайт этой ноды» или «Другой сайт»', 'по умолчанию сайт этой ноды', ''], ['Один порт на несколько', 'VLESS, TrustTunnel и MTProto делят TCP 443 на одной ноде', 'по имени, которое запрашивает клиент; Hysteria2 рядом, на UDP', '']],
+        apps: ['Mistgate для Windows', 'Happ', 'приложения на Mihomo', 'sing-box, без XHTTP'] },
+      { k: 'amneziawg', n: 'AmneziaWG', s: '3.1 и 2.0', d: 'M4 15.500a3.500 3.500 0 1 0 7 0 3.500 3.500 0 0 0-7 0zM11 15.500h9M17 15.500v-3', lead: 'Отдельный ключ на каждое устройство', doc: G + 'amneziawg/', page: true,
+        route: [N('Устройство', 'dev'), Wr('UDP · свой ключ', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Интернет', 'net')],
+        rows: [['Версия 3.1', 'По умолчанию', 'защита заголовков, случайные хвосты и таймеры', ''], ['Версия 2.0', 'Для старых клиентов', 'Hiddify, GL.iNet, стабильный Keenetic 5.1. Версий 1.5 и 1.0 нет', ''], ['Ключи', 'На устройство, работают на всех нодах профиля', 'порт UDP случайный, от 10 000 до 60 000', ''], ['На ноде', 'amneziawg-go в userspace или модуль ядра', 'режим «Авто» выбирает сам, MTU 1280', '']],
+        apps: ['AmneziaVPN', 'Mistgate для Windows', 'приложения на Mihomo'] },
+      { k: 'trusttunnel', n: 'TrustTunnel', s: 'эксперимент', exp: true, d: 'M4.500 19v-6.500a7.500 7.500 0 0 1 15 0V19M9.500 19v-6a2.500 2.500 0 0 1 5 0v6', lead: 'VPN внутри обычного HTTPS с настоящим сертификатом', doc: G + 'trusttunnel/', page: true,
+        route: [N('Устройство', 'dev'), Wr('HTTPS · HTTP/2', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Интернет', 'net')],
+        rows: [['Транспорт', 'HTTP/2, при желании HTTP/3', 'TCP, UDP и DNS', ''], ['На ноде', 'Собственный движок Mistgate в агенте ноды', 'чужой программы на ноде нет', ''], ['Ключ', 'Ссылка tt:// или QR на каждый сервер', 'со страницы человека, не из подписки', ''], ['Честно', 'Не обещает пройти там, где не проходят другие', 'новый протокол, на практике ещё не проверен', 'эксперимент']],
+        apps: ['официальные приложения TrustTunnel', 'Mistgate для Windows'] },
+      { k: 'mtproto', n: 'MTProto', s: 'эксперимент', exp: true, d: 'M20 4L3 11l6 2.500L11 20l3-4.500 4 3z', lead: 'Прокси только для Telegram, это не VPN', doc: G + 'mtproto/', page: true,
+        route: [N('Telegram', 'dev'), Wr('TCP 443 · Fake TLS', 'ok'), N('Нода', 'node'), Wr('напрямую'), N('Серверы Telegram', 'cloud')],
+        rows: [['Fake TLS', 'Рукопожатие TLS 1.3', 'посторонним отвечает настоящий сайт', ''], ['Ключ', 'Один на человека', 'место устройства не занимает', ''], ['Ссылка', 'tg://proxy на странице человека', 'в подписку не входит', ''], ['Честно', 'В России блокируется волнами', '', 'эксперимент']],
+        apps: ['Telegram'] },
+      { k: 'warp', n: 'WARP', s: 'выход через Cloudflare', d: RI.cloud, lead: 'Сайты видят адрес Cloudflare, а не вашей ноды', doc: G + 'warp/', page: false,
+        route: [N('Устройство', 'dev'), Wr('любой профиль', 'ok'), N('Нода', 'node'), Wr('WARP', 'warp'), N('Cloudflare', 'cloud'), Wr('', 'warp'), N('Интернет', 'net')],
+        rows: [['Для чего', 'Hysteria2, VLESS и AmneziaWG', '', ''], ['Где выбирается', 'В профиле: «Напрямую» или «WARP»', '', ''], ['Аккаунт', 'Один на ноду', 'регистрация из панели или импорт wgcf', ''], ['Честно', 'Без рабочего WARP такие профили трафик не пропускают', '', '']],
+        apps: [] },
+      { k: 'relays', n: 'Ретрансляции', s: 'вход через другую ноду', d: 'M4 8h13l-3-3M20 16H7l3 3', lead: 'Когда сервер блокируют по адресу или сети', doc: G + 'relays/', page: false, relay: true, route: [],
+        rows: [['Как работает', 'Порт на входной ноде пересылает трафик как есть', 'шифрование идёт от устройства до выхода', ''], ['Что видит вход', 'Адреса, время и объёмы', 'не сайты, не содержимое и не ключи', ''], ['Включение', 'Проверка плеча, включение, проверка пути', 'путь проверяется с третьей ноды', ''], ['Ограничения', 'Только IPv4 и один порт', 'без смены портов', '']],
+        apps: [] },
+      { k: 'none', n: 'Чего нет', s: 'не поддерживаются', d: 'M7 7l10 10M17 7L7 17', lead: 'Меньше протоколов, зато каждый проверяется', doc: 'https://mistgate.app/ru/reference/architecture/', page: false, route: [],
+        rows: [['Нет', 'VMess, Trojan, Shadowsocks, TUIC', '', 'нет'], ['Нет', 'Обычный WireGuard', 'AmneziaWG версий 1.5 и 1.0 тоже нет', 'нет'], ['Новые протоколы', 'Подключаются через контракт протокольного плагина', 'к той же ссылке подписки', '']],
+        apps: [] }
+    ];
+    const SHOW = {
+      ov: ['Обзор', 'Что требует внимания', 'Здоровье и нагрузка флота, открытые замечания и последние события на одном экране', ['У каждого замечания готовое действие', 'Проверки глазами клиента по каждой ноде', 'Онлайн, скорость и трафик за сутки'], 'operations/health/', 'Как устроено здоровье'],
+      nd: ['Ноды', 'Весь флот на одной странице', 'Список, пути, карта и нагрузка. Карта показывает, как люди попадают на каждый сервер', ['Нода добавляется из браузера по SSH или одноразовой командой', 'Ретрансляция включается после проверки пути', 'Панель открывает порты в UFW или firewalld и ставит подписанный агент'], 'getting-started/add-node/', 'Добавление ноды'],
+      us: ['Люди', 'Новый человек за минуту', 'Имя, группа и квота. Дальше человек получает одну ссылку, и приложение само подтягивает положенные ему серверы', ['Одна ссылка на человека', 'Квота, срок и лимит устройств', 'Изменение пользователя не перезапускает сервер'], 'getting-started/first-users/', 'Первые пользователи'],
+      hl: ['Здоровье', 'Алерты, проверки и доктор', 'Каждые 5 минут панель подключается к каждому серверу, как приложение', ['Доктор делает 23 проверки хоста на каждой ноде', 'Десять исправлений, ни одно без вашего подтверждения', 'Алерты в админке и в Telegram'], 'operations/health/', 'Здоровье'],
+      rc: ['Доступность', 'Открываются ли серверы изнутри страны', 'Необязательная проверка по сетям разных типов. Большинство источников работает только в России', ['Пробы Globalping в домашних и мобильных сетях', 'Списки блокировок и ТСПУ-зонд с вашей ноды', 'Пробы добровольцев и SIM-пробы'], 'operations/reachability/', 'Доступность'],
+      up: ['Обновления', 'С канарейкой и откатом', 'Ноды сами не обновляются. Раскатка начинается с одной ноды и встаёт на паузу, если что-то не так', ['Канарейке даётся 5 минут на проверку', 'Агент откатывается сам, если не подключился', 'Панель обновляется только с подтверждения и хранит копию данных'], 'operations/updates/', 'Обновления']
+    };
+    const SHO = ['ov', 'nd', 'us', 'hl', 'rc', 'up'];
+    const SHI = { ov: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', nd: RI.node, us: 'M9 11a3.500 3.500 0 1 0 0-7 3.500 3.500 0 0 0 0 7zM3 20c0-3.300 2.700-6 6-6s6 2.700 6 6M16 4.500a3.500 3.500 0 0 1 0 6.500M21 20c0-2.600-1.600-4.800-4-5.600', hl: 'M3 12h4l2.500-6 4 12 2.500-6h5', rc: 'M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM8.500 15.500a5 5 0 0 1 0-7M15.500 8.500a5 5 0 0 1 0 7M5.600 18.400a9 9 0 0 1 0-12.800M18.400 5.600a9 9 0 0 1 0 12.800', up: 'M20 12a8 8 0 1 1-2.300-5.600M20 4v4h-4' };
+    const AIP = {
+      RU: [
+        ['Ты устанавливаешь VPN-панель Mistgate (https://github.com/Mistgate/mistgate) на чистый', 'Linux-сервер для меня, по SSH с этого компьютера. Следуй этому промпту и официальной', 'инструкции https://mistgate.app/ru/getting-started/install-panel/ ; если они расходятся,', 'остановись и спроси меня.', '', '== Заполните ==', 'SERVER:      203.0.113.10        # адрес сервера', 'SSH_USER:    root                # root или пользователь с sudo', 'DOMAIN:      panel.example.com   # его A- (и AAAA-) запись должна указывать на SERVER', 'ADMIN_MODE:  prefix              # prefix | host <секретное имя хоста> | listener 127.0.0.1:8081', 'LANGUAGE:    русский             # язык, на котором ты со мной говоришь', '', '== Правила =='],
+        ['Ты работаешь с моей VPN-панелью Mistgate через её MCP-сервер (инструменты вроде', 'fleet_status, protocols_list, profiles_list, profile_create_plan, node_install_plan,', 'user_create_plan). Сначала прочитай инструкции сервера.', 'Справочник: https://mistgate.app/ru/reference/mcp/', '', '== Заполните ==', 'NEW_SERVER:    203.0.113.20       # публичный SSH-адрес новой ноды', 'SSH_PORT:      22', 'SSH_LOGIN:     root               # root или пользователь с беспарольным «sudo -n»', 'NODE_NAME:     de1                # 2-24 символа: a-z, 0-9, дефис', 'NODE_ADDRESS:  de1.example.com    # домен или IP, к которому подключаются клиенты', 'COUNTRY:       DE                 # две буквы, по желанию', 'PROVIDER:      Example Hosting    # по желанию', 'GROUP:         Все                # группа для новых пользователей', 'PROFILE_NAME:  Main               # профиль для создания после установки ноды', 'USERS:         Alice, Bob         # кого создать'],
+        ['Ты работаешь в репозитории Mistgate (https://github.com/Mistgate/mistgate): панель', 'VPN-флота и агент ноды на Go с админкой на React. Прежде чем что-то менять, прочитай', 'AGENTS.md и CONTRIBUTING.md и следуй им.', '', '== Задача ==', '<опишите изменение или ошибку и что должно получиться>', '', '== Правила ==', '- Работай в новой ветке. Изменение маленькое и по делу; никакого постороннего рефакторинга.']
+      ],
+      EN: [
+        ['You are installing the Mistgate VPN panel (https://github.com/Mistgate/mistgate) on a fresh', 'Linux server for me, over SSH from this computer. Follow this prompt and the official guide', 'https://mistgate.app/getting-started/install-panel/ ; if they disagree, stop and ask me.', '', '== Fill in ==', 'SERVER:      203.0.113.10        # address of the server', 'SSH_USER:    root                # root, or a user with sudo', 'DOMAIN:      panel.example.com   # its A (and AAAA) record must point at SERVER', 'ADMIN_MODE:  prefix              # prefix | host <secret host name> | listener 127.0.0.1:8081', 'LANGUAGE:    English             # the language you talk to me in', '', '== Rules =='],
+        ['You are operating my Mistgate VPN panel through its MCP server (tools such as fleet_status,', 'protocols_list, profiles_list, profile_create_plan, node_install_plan and user_create_plan).', 'Read the server\'s instructions first. Reference:', 'https://mistgate.app/reference/mcp/', '', '== Fill in ==', 'NEW_SERVER:    203.0.113.20       # public SSH address of the new node', 'SSH_PORT:      22', 'SSH_LOGIN:     root               # root, or a user with passwordless "sudo -n"', 'NODE_NAME:     de1                # 2-24 characters: a-z, 0-9, dash', 'NODE_ADDRESS:  de1.example.com    # domain or IP that clients connect to', 'COUNTRY:       DE                 # two letters, optional', 'PROVIDER:      Example Hosting    # optional', 'GROUP:         Everyone           # the group for the new users', 'PROFILE_NAME:  Main               # the profile to create after installing the node', 'USERS:         Alice, Bob         # people to create', 'LANGUAGE:      English            # the language you talk to me in'],
+        ['You are working on the Mistgate repository (https://github.com/Mistgate/mistgate): a Go VPN', 'fleet panel and node agent with a React admin. Before you change anything, read AGENTS.md', 'and CONTRIBUTING.md and follow them.', '', '== Task ==', '<describe the change or the bug, with what you expect to happen>', '', '== Rules ==', '- Work on a new branch. Keep the change small and focused; no unrelated refactoring.']
+      ]
+    };
+    const AIT = [
+      ['Установка панели', 'Claude Code, Codex CLI или другой агент, который выполняет команды на вашем компьютере', 'SSH-доступ к чистому Linux-серверу и домен, который на него указывает', 'Проверяет сервер, скачивает и проверяет релиз, запускает mistgate setup, ставит юнит systemd и отдаёт вам ссылку настройки', '#установка-mistgate-с-ai-агентом'],
+      ['Ноды и флот', 'Любой MCP-клиент: Claude Code, Claude Desktop, Codex CLI', 'Работающая панель и API-токен', 'Ставит ноду по SSH с вашим одобрением, проверяет профиль на ней, создаёт пользователей и докладывает о здоровье', '#ноды-и-флот-через-mcp'],
+      ['Доработка кода', 'Coding-агент в копии репозитория', 'Go, Node.js и pnpm', 'Делает изменение так, как принято в проекте, и запускает проверки', '#доработка-кода-с-coding-агентом']
+    ];
+    const aiL = (AIP[s.lang === 'RU' ? 'RU' : 'EN'][s.ai || 0]).map((l) => { const i = l.indexOf('  #'), hd = /^== .* ==$/.test(l); return { a: (i >= 0 ? l.slice(0, i) : l) || ' ', b: i >= 0 ? l.slice(i) : '', c: hd ? 'hd' : (/^[A-Z_]+:/.test(l) ? 'kv' : '') }; });
+    const CG = [['top', 'Главное'], ['base', 'Основа'], ['proto', 'Протоколы'], ['users', 'Люди и интеграции'], ['ops', 'Эксплуатация'], ['all', 'Всё']];
+    const CR = [
+      ['base', 1, 'Работает без Docker', 'y', 'y', 'p|через Compose', 'p', 'n|нужен Docker', 'y', 'y'],
+      ['base', 0, 'База данных', 't|SQLite', 't|SQLite, Postgres', 't|SQLite, MySQL', 't|SQLite, MySQL, Postgres', 't|Postgres, Redis', 't|MySQL, Redis', 't|SQLite'],
+      ['base', 1, 'Память в простое, МиБ', 't|16–20', 't|68–74', 'q', 't|262–265', 't|426–454', 'q', 'q'],
+      ['base', 0, 'Установка одной командой', 'y', 'y', 'y', 'y', 'n|Compose', 'y', 'y'],
+      ['base', 1, 'Нода из панели по SSH', 'y', 'n|вручную', 'n|вручную', 'n|вручную', 'n|вручную', 'n|вручную', 'q'],
+      ['proto', 1, 'Hysteria2', 'y', 'y', 'q', 'y', 'p|в конфигах клиента', 'y', 'y'],
+      ['proto', 0, 'VLESS REALITY и XHTTP', 'y', 'y', 'p|XHTTP не указан', 'p|XHTTP не указан', 'y', 'y', 'q'],
+      ['proto', 1, 'AmneziaWG', 'y|2.0 и 3.1', 'y|3.1', 'q', 'q', 'q', 'q', 'q'],
+      ['proto', 1, 'MTProto для Telegram', 'p|эксперимент', 'q', 'q', 'q', 'q', 'q', 'q'],
+      ['proto', 0, 'WARP', 'y', 'y', 'q', 'p|инструкция', 'p|от сообщества', 'y', 'y'],
+      ['proto', 1, 'VMess, Trojan, Shadowsocks', 'n', 'y', 'y', 'y', 'p|без VMess', 'y', 'y'],
+      ['proto', 0, 'TUIC', 'n', 'y', 'q', 'q', 'q', 'y', 'y'],
+      ['proto', 0, 'Обычный WireGuard', 'n', 'y', 'q', 'y', 'p|passthrough', 'y', 'q'],
+      ['users', 0, 'Трафик и срок на человека', 'y', 'y', 'y', 'y', 'y', 'y', 'y'],
+      ['users', 0, 'Лимит устройств', 'y|ключ на устройство', 'y|HWID и IP', 'q', 'y|HWID', 'y|HWID', 'q', 'q'],
+      ['users', 1, 'Telegram-бот', 'p|только алерты', 'y', 'y', 'y', 'p|уведомления', 'y', 'q'],
+      ['users', 0, 'API', 'y', 'y', 'y', 'y', 'y', 'y', 'y'],
+      ['users', 1, 'MCP-сервер для ИИ-агентов', 'y', 'q', 'q', 'q', 'p|от сообщества', 'q', 'q'],
+      ['ops', 0, 'Здоровье и алерты', 'y', 'p', 'p', 'p', 'y', 'p', 'q'],
+      ['ops', 0, 'Подписанные релизы', 'y', 'p|файлы .sha256', 'q', 'q', 'q', 'q', 'q'],
+      ['ops', 0, 'Сайт-ширма', 'y', 'q', 'q', 'q', 'q', 'q', 'q'],
+      ['ops', 0, 'Блокировка торрентов', 'y', 'q', 'q', 'q', 'y|плагин', 'q', 'q'],
+      ['ops', 0, 'Версия для Cloudflare Workers', 'p|предварительная', 'n', 'n', 'n', 'n', 'n', 'n']
+    ];
+    const CD = { y: 'M5 12.5l4.5 4.5L19 7.5', p: 'M5 13c2.3-3 4.7-3 7 0s4.7 3 7 0', n: 'M7 7l10 10M17 7L7 17', q: '', t: '' };
+    const crows = [];
+    CG.slice(1, 5).forEach((g) => {
+      const rs = CR.filter((r) => (s.cg === 'all' ? r[0] === g[0] : (s.cg === 'top' ? r[1] && r[0] === g[0] : r[0] === s.cg && r[0] === g[0])));
+      if (!rs.length) return;
+      if (s.cg === 'all') crows.push({ cls: 'grp ' + (s.cgn % 2 ? 'rb' : 'ra'), i: crows.length, t: g[1], cells: [] });
+      rs.forEach((r) => crows.push({ cls: s.cgn % 2 ? 'rb' : 'ra', i: crows.length, t: r[2], cells: r.slice(3).map((v, i) => { const a = v.split('|'); const k = a[0]; return { k: k + (i === 0 ? ' mine' : ''), d: CD[k], x: k === 't' ? a[1] : (k === 'q' ? '—' : ''), n: k === 't' ? '' : (a[1] || '') }; }) }));
+    });
+    const cur = SERVERS[s.sel];
+    const t = s.secs, pad = (n) => (n < 10 ? '0' + n : '' + n);
+    const hov = (i) => () => this.setState({ hs: i, hold: true });
+    const cmd = 'curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https://' + dom;
+    return {
+      bootCls: s.boot ? 'lx-go' : 'lx-boot',
+      accent: this.props.accent ?? '#7dd3a0', jsCls: s.js ? 'js' : '',
+      winCls: s.wave === 'win' ? 'waving' : '', waveWin: s.wave === 'win', waveApp: s.wave === 'app', waveGo: s.wave === 'go', waveCmp: s.wave === 'cmp', cmpCls: s.wave === 'cmp' ? 'waving' : '',
+      appCls: s.conn + (s.wave === 'app' ? ' waving' : ''), goCls: s.wave === 'go' ? 'waving' : '',
+      ip: s.ip, name: s.name || 'pl1', setIp: (e) => this.setState({ ip: e.target.value }), setName: (e) => this.setState({ name: e.target.value }),
+      pwOn: s.auth === 'pw' ? 'true' : 'false', keyOn: s.auth === 'key' ? 'true' : 'false',
+      pickPw: () => this.setState({ auth: 'pw' }), pickKey: () => this.setState({ auth: 'key' }),
+      authNote: s.auth === 'pw' ? 'Пароль используется один раз и не сохраняется' : 'Панель зайдёт своим ключом, добавьте его в authorized_keys',
+      steps: STEPS.map((x, i) => ({ t: x[0], d: x[1], cls: cls(i) })), wz0: cls(0), wz1: cls(1), wz2: cls(2), wz3: cls(3),
+      dlg: s.dlg, added: s.added, nodeCount: s.added ? '5' : '4', health: s.added ? '5 нод · все на связи' : '4 ноды · все на связи',
+      runLabel: s.run > 0 && s.run < 5 ? 'Ставлю агент…' : 'Поставить на ноду',
+      start: () => this.start(), openDlg: () => { if (s.run === 0 || s.run === 5) this.setState({ dlg: true, run: 0 }); },
+      marq: MARQ.concat(MARQ).map((m) => ({ t: m[0], c: m[1] })),
+      h0: s.hs === 0 ? 'on' : '', h1: s.hs === 1 ? 'on' : '', h2: s.hs === 2 ? 'on' : '', h3: s.hs === 3 ? 'on' : '',
+      hov0: hov(0), hov1: hov(1), hov2: hov(2), hov3: hov(3),
+      spot0: (e) => { const r = e.currentTarget.getBoundingClientRect(); e.currentTarget.style.setProperty('--mx', (e.clientX - r.left) + 'px'); e.currentTarget.style.setProperty('--my', (e.clientY - r.top) + 'px'); },
+      hrows: [['de', 'de1', -1, 'на связи', ''], ['nl', 'nl1', -1, 'на связи', ''], ['fi', 'fi1', 18, 'моргнул 4 мин', 'blip']].map((r, ri) => ({ f: r[0], n: r[1], s: r[3], sc: r[4], t: Array.from({ length: 24 }, (_, k) => ({ c: k === r[2] ? 'blip' : '', d: ((k + ri * 3) * 0.09).toFixed(2) + 's' })) })),
+      decOut: s.dec === 'out' ? 'true' : 'false', decIn: s.dec === 'in' ? 'true' : 'false', isOut: s.dec === 'out', isIn: s.dec === 'in',
+      pickOut: () => this.setState({ dec: 'out', decHold: true }), pickIn: () => this.setState({ dec: 'in', decHold: true }),
+      plan: ['Снять nl1 с раздачи', 'Перезапустить hy2 на nl1', 'Проверить глазами клиента и вернуть'].map((t, i) => ({ t: t, c: s.ap > i + 1 ? 'done' : (s.ap === i + 1 ? 'busy' : '') })),
+      apLabel: s.ap === 0 ? 'Применить' : (s.ap < 4 ? 'Выполняю…' : 'Готово, повторить'),
+      approve: () => { if (s.ap > 0 && s.ap < 4) return; this.setState({ ap: 1 }); [2, 3, 4].forEach((n, i) => this.later(() => this.setState({ ap: n }), 800 * (i + 1))); },
+      reject: () => { if (s.ap === 0 || s.ap === 4) this.setState({ ap: 0 }); },
+      connLabel: s.conn === 'on' ? 'Подключено' : (s.conn === 'ing' ? 'Подключение' : 'Отключено'),
+      pwOnA: s.conn === 'off' ? 'false' : 'true', toggle: () => this.connect(),
+      timer: Math.floor(t / 3600) + ':' + pad(Math.floor(t / 60) % 60) + ':' + pad(t % 60),
+      down: (5.9 + Math.sin(t * 1.7) * 0.4).toFixed(1).replace('.', ','), up: (1.6 + Math.cos(t * 1.3) * 0.2).toFixed(1).replace('.', ','),
+      cur: { f: cur[0], n: cur[1], ms: cur[2], s: s.sel === 0 ? 'Авто · самый быстрый' : 'Выбран вами' },
+      servers: SERVERS.map((v, i) => ({ f: v[0], n: v[1], ms: v[2], tag: v[3], tc: v[4], hasTag: !!v[3], cls: s.sel === i ? 'on' : '', pick: () => { this.setState({ sel: i }); if (s.conn === 'on') { this.setState({ conn: 'off' }); this.later(() => this.connect(), 30); } } })),
+      dvAttr: s.dv || '', dvPc: (s.dv || (s.nr ? 'ph' : 'pc')) === 'pc' ? 'true' : 'false', dvPh: (s.dv || (s.nr ? 'ph' : 'pc')) === 'ph' ? 'true' : 'false', setPc: () => this.setDv('pc'), setPh: () => this.setDv('ph'), subPc: !s.nr, subPh: !!s.nr,
+      gA: this.gVals('A').list, gAp: this.gVals('A').p, gB: this.gVals('B').list, gBp: this.gVals('B').p, gC: this.gVals('C').list, gCp: this.gVals('C').p, gD: this.gVals('D').list, gDp: this.gVals('D').p, gE: this.gVals('E').list, gEp: this.gVals('E').p, gEn: 4, gEi: s.gE || 0, gEpar: 'p' + ((s.gE || 0) % 2), gEd: this.gVals('E').list[s.gE || 0].dur, gF: this.gVals('F').list, gFp: this.gVals('F').p, gFn: 3, gFi: s.gF || 0, gFpar: 'p' + ((s.gF || 0) % 2), gFd: this.gVals('F').list[s.gF || 0].dur, gAn: 5, gBn: 4, gCn: 4, gDn: 4, gAi: s.gA || 0, gBi: s.gB || 0, gCi: s.gC || 0, gDi: s.gD || 0, gApar: 'p' + ((s.gA || 0) % 2), gBpar: 'p' + ((s.gB || 0) % 2), gCpar: 'p' + ((s.gC || 0) % 2), gDpar: 'p' + ((s.gD || 0) % 2), gAd: this.gVals('A').list[s.gA || 0].dur, gBd: this.gVals('B').list[s.gB || 0].dur, gCd: this.gVals('C').list[s.gC || 0].dur, gDd: this.gVals('D').list[s.gD || 0].dur,
+      ap: (() => { const o = {}, a = s.as || 'Main'; ['Main', 'Routes', 'Diag', 'Set', 'Byp'].forEach((k) => ['RU', 'EN', 'ZH', 'FA', 'TR'].forEach((l) => { o[k + l] = a === k && s.lang === l; })); return o; })(),
+      aTabs: [['Main', 'Подключение', 'M12 4v8M7 7a7 7 0 1 0 10 0'], ['Routes', 'Маршруты', 'M6 19a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM8.5 16.5H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5'], ['Diag', 'Проверка сети', 'M3 12h4l2.5-6 4 12 2.5-6h5'], ['Set', 'Настройки', 'M4 7h9M17 7h3M4 17h3M11 17h9M15 4.5v5M9 14.5v5'], ['Byp', 'Обход без VPN', 'M3 16h2.2a6.8 6.8 0 0 1 13.6 0H21M12 14.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6z']].map((t) => ({ n: t[1], d: t[2], soon: t[0] === 'Byp', sel: (s.as || 'Main') === t[0] ? 'true' : 'false', pick: () => this.setAs(t[0]) })),
+      aCap: ({ Main: 'Одна кнопка. «Авто» берёт сервер, который отвечает быстрее всех прямо сейчас, сервер и протокол можно выбрать и самому', Routes: '«Умный», «Только выбранное» или «Всё». Правила по готовым подборкам, своим спискам, сайтам и программам', Diag: 'Одна кнопка показывает, какие серверы и какие пути к ним работают отсюда', Set: 'Kill switch, локальный прокси, уведомления Windows, тёмная и светлая темы, пять языков', Byp: 'В разработке: открывает сайты без сервера и подписки. Не скрывает адрес и не шифрует трафик' })[s.as || 'Main'],
+      aiFx: s.aiFx ? 'fx' : '', aiOn: !!s.aiOn, aiOpen: () => { let fx = false; try { fx = document.documentElement.scrollHeight > window.innerHeight + 200 && window.innerHeight < 1400; } catch (e) {} this.setState({ aiOn: true, aiFx: fx }); if (fx) return; this.later(() => { const e = document.querySelector('.lp-root .lx-ai'); if (e && e.scrollIntoView) e.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 80); }, aiClose: () => this.setState({ aiOn: false }), aiStop: (e) => e.stopPropagation(),
+      aiTabs: AIT.map((t, i) => ({ n: t[0], sel: (s.ai || 0) === i ? 'true' : 'false', pick: () => this.setState({ ai: i }) })), aiAgent: AIT[s.ai || 0][1], aiNeed: AIT[s.ai || 0][2], aiDoes: AIT[s.ai || 0][3], aiLines: aiL, aiDoc: 'https://mistgate.app/ru/getting-started/ai-agents/' + AIT[s.ai || 0][4],
+      mnOpen: !!s.mnOpen, mnEx: s.mnOpen ? 'true' : 'false', mnTog: () => this.setState({ mnOpen: !s.mnOpen, lgOpen: false }), mnD: s.mnOpen ? 'M6 6l12 12M18 6L6 18' : 'M4 7h16M4 12h16M4 17h16',
+      lgCur: s.lang, lgOpen: !!s.lgOpen, lgEx: s.lgOpen ? 'true' : 'false', lgTog: () => this.setState({ lgOpen: !s.lgOpen }),
+      lgs: [['EN', 'English'], ['RU', 'Русский'], ['ZH', '简体中文'], ['FA', 'فارسی'], ['TR', 'Türkçe']].map((x) => x[0]).map((c) => ({ c: c, n: { EN: 'English', RU: 'Русский', ZH: '简体中文', FA: 'فارسی', TR: 'Türkçe' }[c], on: s.lang === c ? 'on' : '', sel: s.lang === c ? 'true' : 'false', pick: () => { this.setState({ lgOpen: false }); this.setLang(c); } })), appRU: s.lang === 'RU', appEN: s.lang === 'EN', appZH: s.lang === 'ZH', appFA: s.lang === 'FA', appTR: s.lang === 'TR',
+      tabs: TABS.map((x, i) => ({ n: x.n, s: x.s, sel: s.tab === i ? 'true' : 'false', pick: () => { this.setState({ tab: i }); this.later(() => this.tabIn('#protocols .tab[aria-selected="true"]'), 60); } })),
+      bands: TABS[s.tab].rows.map((b) => ({ k: b[0], t: b[1], n: b[2], s: b[3], has: !!b[3], c: b[3] === 'эксперимент' ? 'soon' : '' })),
+      prKey: TABS[s.tab].k, prN: TABS[s.tab].n, prD: TABS[s.tab].d, prLead: TABS[s.tab].lead, prDoc: TABS[s.tab].doc, prExp: !!TABS[s.tab].exp, prHasPage: !!TABS[s.tab].page, prSw: 'lx-sw' + (s.tab % 2),
+      prHasRoute: TABS[s.tab].route.length > 0, prRoute: TABS[s.tab].route, prIsRelay: !!TABS[s.tab].relay, prHasApps: TABS[s.tab].apps.length > 0, prApps: TABS[s.tab].apps.map((a) => ({ t: a })),
+      trKey: s.tr, trIs_ov: s.tr === 'ov', trIs_nd: s.tr === 'nd', trIs_us: s.tr === 'us', trIs_hl: s.tr === 'hl', trIs_rc: s.tr === 'rc', trIs_up: s.tr === 'up',
+      trNum: '0' + (SHO.indexOf(s.tr) + 1) + ' / 0' + SHO.length, trH: SHOW[s.tr][1], trP: SHOW[s.tr][2], trB: SHOW[s.tr][3].map((t) => ({ t: t })), trDoc: 'https://mistgate.app/ru/' + SHOW[s.tr][4], trDocT: SHOW[s.tr][5], trSw: 'lx-sw' + (SHO.indexOf(s.tr) % 2),
+      trTabs: SHO.map((k) => ({ n: SHOW[k][0], d: SHI[k], sel: s.tr === k ? 'true' : 'false', pick: () => { if (s.tr === k) return; const old = s.tr; this.setState({ tr: k }); this.later(() => this.tourSwap(old, k), 60); } })),
+      cgs: CG.map((g) => ({ n: g[1], sel: s.cg === g[0] ? 'true' : 'false', pick: () => { if (s.cg === g[0]) return; this.setState({ cg: g[0], cgn: s.cgn + 1 }); this.fire('cmp'); } })), crows: crows,
+      dom: s.dom, domClean: dom, setDom: (e) => this.setState({ dom: e.target.value }),
+      copyCmd: () => { try { navigator.clipboard.writeText(cmd).catch(() => {}); } catch (e) {} this.setState({ copied: true }); this.fire('go'); this.later(() => this.setState({ copied: false }), 1800); },
+      cmdLabel: s.copied ? 'Скопировано' : 'Скопировать команду'
+    };
+  }
+}
+</script>
+</body>
+</html>

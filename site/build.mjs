@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { createHl, createRenderer, parseNav } from "./src/markdown.mjs";
 import { T, renderDoc, render404, THEME_INIT, formatStars } from "./src/layout.mjs";
-import { SITE, GITHUB, LANGS, COMPLETE, pageUrl } from "./src/urls.mjs";
+import { SITE, GITHUB, LANGS, COMPLETE, pageUrl, landingUrl } from "./src/urls.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 // MG_DOCS / MG_DIST point the build at another docs tree / output (the test builds a fixture that way)
@@ -33,7 +33,7 @@ const assets = { css: hashed("style", "css", css), js: hashed("app", "js", js) }
 out(assets.css, css);
 out(assets.js, js);
 for (const f of readdirSync(join(BRAND, "fonts"))) if (/\.(woff2|txt)$/.test(f)) { mkdirSync(join(DIST, "fonts"), { recursive: true }); copyFileSync(join(BRAND, "fonts", f), join(DIST, "fonts", f)); }
-// the product videos (docs/images/video): the MP4s and their posters, played by the home page and the docs pages
+// the product videos (docs/images/video): the MP4s and their posters, played by the docs pages
 const VIDEOS = join(ROOT, "..", "docs", "images", "video");
 for (const f of readdirSync(VIDEOS)) if (/^[a-z]+-(poster-)?[a-z]+\.(mp4|webp)$/.test(f) && (f.endsWith(".mp4") || f.includes("-poster-"))) { mkdirSync(join(DIST, "video"), { recursive: true }); copyFileSync(join(VIDEOS, f), join(DIST, "video", f)); }
 out("install.sh", readFileSync(INSTALLER));
@@ -197,6 +197,7 @@ out("_headers", `/*
 const files = new Set(walk2(DIST).map((f) => "/" + relative(DIST, f).replace(/\\/g, "/")));
 function walk2(d) { return readdirSync(d).flatMap((n) => { const p = join(d, n); return statSync(p).isDirectory() ? walk2(p) : [p]; }); }
 const broken = [];
+const landings = new Set(LANGS.map(landingUrl));
 for (const f of files) {
   if (!f.endsWith(".html")) continue;
   const html = readFileSync(join(DIST, f), "utf8");
@@ -204,6 +205,7 @@ for (const f of files) {
   for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
     const h = m[1];
     if (/^(https?:|mailto:|data:)/.test(h)) continue;
+    if (landings.has(h)) continue; // the landing (/, /ru/ ...) is built by landing/ and checked by merge.mjs
     const [path, rawFrag] = h.split("#");
     const frag = rawFrag && decodeURIComponent(rawFrag); // markdown-it percent-encodes a Cyrillic anchor; the id is raw
     const target = path === "" ? self : path;

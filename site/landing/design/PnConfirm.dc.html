@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Панель · Подтверждение</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./pn.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0;background:#0c0c0e}</style>
+</helmet>
+<div class="pnr an-host">
+<div class="{{rootCls}}">
+<section class="cfm {{cfCls}}" role="dialog" aria-modal="true" aria-label="Подтверждение">
+  <button type="button" class="ic cfm-x" aria-label="Отмена" onClick="{{close}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+  <div class="cfm-o {{ringCls}}" aria-hidden="true"><i></i><i></i><span><svg class="i" viewBox="0 0 24 24"><path d="{{icon}}"></path></svg></span></div>
+  <h2>{{h}}</h2>
+  <p>{{p}}</p>
+  <div class="cfm-w"><span class="cfm-wi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h13l-3-3M20 16H7l3 3"></path></svg></span><div><span>Действие от имени owner</span><b>{{what}}</b></div></div>
+
+  <sc-if value="{{byKey}}" hint-placeholder-val="{{true}}">
+    <button type="button" class="btn pri cfm-go {{busyCls}}" onClick="{{go}}"><sc-if value="{{waiting}}" hint-placeholder-val="{{false}}"><span class="an-sp" aria-hidden="true"></span></sc-if><sc-if value="{{still}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10a2 2 0 0 0-2 2c0 1.020-.100 2.510-.260 4M14 13.120c0 2.380 0 6.380-1 8.880M17.290 21.020c.120-.600.430-2.300.500-3.020M2 12a10 10 0 0 1 18-6M2 16h.01M21.800 16c.200-2 .131-5.354 0-6M5 19.500C5.500 18 6 15 6 12a6 6 0 0 1 .340-2M8.650 22c.210-.660.450-1.320.570-2M9 6.800a6 6 0 0 1 9 5.200v2"></path></svg></sc-if>{{goT}}</button>
+    <div class="cfm-r"><button type="button" class="btn" onClick="{{swap}}">Код из приложения</button><button type="button" class="btn" onClick="{{close}}">Отмена</button></div>
+  </sc-if>
+  <sc-if value="{{byCode}}" hint-placeholder-val="{{false}}">
+    <div class="otp" role="group" aria-label="Код из приложения"><input inputmode="numeric" maxlength="1" aria-label="Цифра 1" onInput="{{otp}}" onKeyDown="{{otpKey}}"><input inputmode="numeric" maxlength="1" aria-label="Цифра 2" onInput="{{otp}}" onKeyDown="{{otpKey}}"><input inputmode="numeric" maxlength="1" aria-label="Цифра 3" onInput="{{otp}}" onKeyDown="{{otpKey}}"><i aria-hidden="true"></i><input inputmode="numeric" maxlength="1" aria-label="Цифра 4" onInput="{{otp}}" onKeyDown="{{otpKey}}"><input inputmode="numeric" maxlength="1" aria-label="Цифра 5" onInput="{{otp}}" onKeyDown="{{otpKey}}"><input inputmode="numeric" maxlength="1" aria-label="Цифра 6" onInput="{{otp}}" onKeyDown="{{otpKey}}"></div>
+    <button type="button" class="btn pri cfm-go {{busyCls}}" aria-disabled="{{codeOff}}" onClick="{{goCode}}"><sc-if value="{{waiting}}" hint-placeholder-val="{{false}}"><span class="an-sp" aria-hidden="true"></span></sc-if>{{codeT}}</button>
+    <div class="cfm-r"><button type="button" class="btn" onClick="{{swap}}">По passkey</button><button type="button" class="btn" onClick="{{close}}">Отмена</button></div>
+  </sc-if>
+</section>
+
+<sc-if value="{{solo}}" hint-placeholder-val="{{true}}">
+  <!-- переключатель состояний макета, в продукт не идёт -->
+  <div class="an-demo" role="group" aria-label="Состояния макета">
+    <span class="dl">Состояние</span>
+    <div class="seg"><sc-for list="{{demo}}" as="o" hint-placeholder-count="5"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div>
+    <span class="dl">Тема</span>
+    <div class="seg"><button type="button" aria-pressed="{{thD}}" onClick="{{setDark}}">тёмная</button><button type="button" aria-pressed="{{thL}}" onClick="{{setLight}}">светлая</button></div>
+  </div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","options":["idle","wait","err","code","ok"],"default":"idle","section":"Состояние"},"what":{"editor":"text","default":"Включить ретрансляцию fi1 через msk1","section":"Состояние"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Вид"},"embedded":{"editor":null},"onOk":{"editor":null},"onClose":{"editor":null},"$preview":{"width":520,"height":640}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { view: null, full: false }; }
+  componentWillUnmount() { clearTimeout(this._t); }
+  renderVals() {
+    const s = this.state, view = s.view || this.props.view || 'idle';
+    const set = (v, o) => { clearTimeout(this._t); this.setState(Object.assign({ view: v }, o || {})); };
+    const code = view === 'code' || view === 'codewait', waiting = view === 'wait' || view === 'codewait', ok = view === 'ok';
+    const done = () => { set('ok'); this._t = setTimeout(() => { if (this.props.onOk) this.props.onOk(); }, 900); };
+    return {
+      thD: (s.th || this.props.theme) === 'light' ? 'false' : 'true', thL: (s.th || this.props.theme) === 'light' ? 'true' : 'false', setDark: () => this.setState({ th: 'dark' }), setLight: () => this.setState({ th: 'light' }),
+      rootCls: this.props.embedded ? 'an-w' : 'pn an-solo an-w' + ((s.th || this.props.theme) === 'light' ? ' light' : ''), solo: !this.props.embedded,
+      cfCls: ok ? 'ok' : (view === 'err' ? 'err' : ''), ringCls: waiting ? 'on' : (ok ? 'ok' : ''),
+      icon: ok ? 'M5 12.500l4.500 4.500L19 7.500' : 'M12 10a2 2 0 0 0-2 2c0 1.020-.100 2.510-.260 4M14 13.120c0 2.380 0 6.380-1 8.880M17.290 21.020c.120-.600.430-2.300.500-3.020M2 12a10 10 0 0 1 18-6M2 16h.01M21.800 16c.200-2 .131-5.354 0-6M5 19.500C5.500 18 6 15 6 12a6 6 0 0 1 .340-2M8.650 22c.210-.660.450-1.320.570-2M9 6.800a6 6 0 0 1 9 5.200v2',
+      h: ok ? 'Подтверждено' : (view === 'err' ? 'Не получилось подтвердить' : 'Подтвердите, что это вы'),
+      p: ok ? 'Применяю изменение' : (view === 'err' ? 'Passkey не подошёл или запрос отменён. Сервер не менялся' : (view === 'wait' ? 'Подтвердите в окне браузера: отпечаток, Face ID или ключ безопасности' : 'Для этого действия панель просит свежее подтверждение')),
+      what: this.props.what || 'Включить ретрансляцию fi1 через msk1',
+      byKey: !code && !ok, still: !waiting, byCode: code, waiting: waiting, busyCls: waiting ? 'busy' : '',
+      goT: view === 'wait' ? 'Жду passkey' : (view === 'err' ? 'Попробовать ещё раз' : 'Подтвердить по passkey'),
+      go: () => { if (waiting) return; set('wait'); this._t = setTimeout(done, 1400); },
+      codeOff: s.full ? 'false' : 'true', codeT: view === 'codewait' ? 'Проверяю' : 'Подтвердить',
+      goCode: () => { if (!s.full || waiting) return; set('codewait'); this._t = setTimeout(done, 900); },
+      otp: (e) => { const el = e.currentTarget; el.value = el.value.replace(/\D/g, '').slice(-1); const all = [...el.parentElement.querySelectorAll('input')]; if (el.value) { const n = all[all.indexOf(el) + 1]; if (n) n.focus(); } const full = all.every((x) => x.value); if (full !== this.state.full) this.setState({ full: full, err: '' }); },
+      otpKey: (e) => { if (e.key === 'Backspace' && !e.currentTarget.value) { const all = [...e.currentTarget.parentElement.querySelectorAll('input')]; const p = all[all.indexOf(e.currentTarget) - 1]; if (p) { p.value = ''; p.focus(); } if (this.state.full) this.setState({ full: false }); } },
+      swap: () => set(code ? 'idle' : 'code', { full: false }),
+      close: () => { clearTimeout(this._t); if (this.props.onClose) this.props.onClose(); else set('idle', { full: false }); },
+      demo: [['idle', 'Запрос'], ['wait', 'Ждёт passkey'], ['err', 'Не подошёл'], ['code', 'Код'], ['ok', 'Подтверждено']].map((d) => ({ t: d[1], on: (view === d[0] || (d[0] === 'code' && view === 'codewait')) ? 'true' : 'false', pick: () => set(d[0], { full: false }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

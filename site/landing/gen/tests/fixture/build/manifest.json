@@ -1,0 +1,185 @@
+{
+  "v": 1,
+  "designVersion": "fixture",
+  "langs": [
+    "en",
+    "ru",
+    "zh",
+    "fa",
+    "tr"
+  ],
+  "pages": {
+    "main": {
+      "en": {
+        "body": "pages/main.en.html",
+        "title": "Mistgate: Self-hosted panel for a small VPN",
+        "description": "Self-hosted panel for a small VPN.",
+        "css": [
+          "assets/land.1a2b3c4d.css"
+        ],
+        "modules": [
+          "assets/main.1a2b3c4d.js"
+        ],
+        "preload": [
+          "assets/rt.1a2b3c4d.js",
+          "assets/onest-latin.1a2b3c4d.woff2"
+        ],
+        "dir": "ltr"
+      },
+      "ru": {
+        "body": "pages/main.ru.html",
+        "title": "Mistgate: Панель для небольшого VPN на своих серверах",
+        "description": "Панель для небольшого VPN на своих серверах.",
+        "css": [
+          "assets/land.1a2b3c4d.css"
+        ],
+        "modules": [
+          "assets/main.1a2b3c4d.js"
+        ],
+        "preload": [
+          "assets/rt.1a2b3c4d.js",
+          "assets/onest-latin.1a2b3c4d.woff2"
+        ],
+        "dir": "ltr"
+      },
+      "zh": {
+        "body": "pages/main.zh.html",
+        "title": "Mistgate: 自托管的小型 VPN 面板",
+        "description": "自托管的小型 VPN 面板.",
+        "css": [
+          "assets/land.1a2b3c4d.css"
+        ],
+        "modules": [
+          "assets/main.1a2b3c4d.js"
+        ],
+        "preload": [
+          "assets/rt.1a2b3c4d.js",
+          "assets/onest-latin.1a2b3c4d.woff2"
+        ],
+        "dir": "ltr"
+      },
+      "fa": {
+        "body": "pages/main.fa.html",
+        "title": "Mistgate: پنل خودمیزبان برای یک VPN کوچک",
+        "description": "پنل خودمیزبان برای یک VPN کوچک.",
+        "css": [
+          "assets/land.1a2b3c4d.css"
+        ],
+        "modules": [
+          "assets/main.1a2b3c4d.js"
+        ],
+        "preload": [
+          "assets/rt.1a2b3c4d.js",
+          "assets/onest-latin.1a2b3c4d.woff2"
+        ],
+        "dir": "rtl"
+      },
+      "tr": {
+        "body": "pages/main.tr.html",
+        "title": "Mistgate: Küçük bir VPN için kendi sunucunuzda panel",
+        "description": "Küçük bir VPN için kendi sunucunuzda panel.",
+        "css": [
+          "assets/land.1a2b3c4d.css"
+        ],
+        "modules": [
+          "assets/main.1a2b3c4d.js"
+        ],
+        "preload": [
+          "assets/rt.1a2b3c4d.js",
+          "assets/onest-latin.1a2b3c4d.woff2"
+        ],
+        "dir": "ltr"
+      }
+    },
+    "app": {
+      "en": {
+        "body": "pages/app.en.html",
+        "title": "Mistgate: Application",
+        "description": "Self-hosted panel for a small VPN. Application",
+        "css": [
+          "assets/land.1a2b3c4d.css"
+        ],
+        "modules": [
+          "assets/app.1a2b3c4d.js"
+        ],
+        "preload": [
+          "assets/rt.1a2b3c4d.js",
+          "assets/onest-latin.1a2b3c4d.woff2"
+        ],
+        "dir": "ltr"
+      },
+      "ru": {
+        "body": "pages/app.ru.html",
+        "title": "Mistgate: Приложение",
+        "description": "Панель для небольшого VPN на своих серверах. Приложение",
+        "css": [
+          "assets/land.1a2b3c4d.css"
+        ],
+        "modules": [
+          "assets/app.1a2b3c4d.js"
+        ],
+        "preload": [
+          "assets/rt.1a2b3c4d.js",
+          "assets/onest-latin.1a2b3c4d.woff2"
+        ],
+        "dir": "ltr"
+      },
+      "zh": {
+        "body": "pages/app.zh.html",
+        "title": "Mistgate: 应用",
+        "description": "自托管的小型 VPN 面板. 应用",
+        "css": [
+          "assets/land.1a2b3c4d.css"
+        ],
+        "modules": [
+          "assets/app.1a2b3c4d.js"
+        ],
+        "preload": [
+          "assets/rt.1a2b3c4d.js",
+          "assets/onest-latin.1a2b3c4d.woff2"
+        ],
+        "dir": "ltr"
+      },
+      "fa": {
+        "body": "pages/app.fa.html",
+        "title": "Mistgate: برنامه",
+        "description": "پنل خودمیزبان برای یک VPN کوچک. برنامه",
+        "css": [
+          "assets/land.1a2b3c4d.css"
+        ],
+        "modules": [
+          "assets/app.1a2b3c4d.js"
+        ],
+        "preload": [
+          "assets/rt.1a2b3c4d.js",
+          "assets/onest-latin.1a2b3c4d.woff2"
+        ],
+        "dir": "rtl"
+      },
+      "tr": {
+        "body": "pages/app.tr.html",
+        "title": "Mistgate: Uygulama",
+        "description": "Küçük bir VPN için kendi sunucunuzda panel. Uygulama",
+        "css": [
+          "assets/land.1a2b3c4d.css"
+        ],
+        "modules": [
+          "assets/app.1a2b3c4d.js"
+        ],
+        "preload": [
+          "assets/rt.1a2b3c4d.js",
+          "assets/onest-latin.1a2b3c4d.woff2"
+        ],
+        "dir": "ltr"
+      }
+    }
+  },
+  "assets": [
+    "assets/land.1a2b3c4d.css",
+    "assets/main.1a2b3c4d.js",
+    "assets/app.1a2b3c4d.js",
+    "assets/rt.1a2b3c4d.js",
+    "assets/onest-latin.1a2b3c4d.woff2",
+    "assets/logo.1a2b3c4d.svg"
+  ]
+}

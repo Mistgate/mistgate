@@ -143,6 +143,44 @@ jobs:
       - run: pnpm --dir site build
       - run: pnpm --dir site test
 
+  site:
+    # mistgate.app as one folder: the docs (site/build.mjs) and the landing (landing/pipeline, then the Rust page generator
+    # landing/gen) merged by site/merge.mjs, which stops on a path two sides write, a broken link in either direction, a page
+    # without its content security policy, or a sitemap that disagrees with the pages. The stand with headless Chrome
+    # (landing/pipeline `pnpm check`) is not run here. Nothing is deployed from CI.
+    runs-on: ubuntu-24.04
+    env:
+      MG_STARS: "" # the docs build asks GitHub for the star count; none here
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          package_json_file: site/package.json
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            site/pnpm-lock.yaml
+            site/landing/pipeline/pnpm-lock.yaml
+      - run: pnpm --dir site install --frozen-lockfile
+      - run: pnpm --dir site/landing/pipeline install --frozen-lockfile
+      # the toolchain is the one site/landing/gen/rust-toolchain.toml names; the runner's rustup installs it
+      - name: Rust toolchain of the page generator
+        working-directory: site/landing/gen
+        run: rustup show active-toolchain || rustup toolchain install --profile minimal
+      - run: cargo test --release --locked
+        working-directory: site/landing/gen
+      - run: pnpm --dir site build:all
+      - run: pnpm --dir site/landing/pipeline test # after the build: its output tests run only when build/ exists
+      - name: Private names in the built site
+        # the pattern is a repository secret, not a line of this public file (a variable would be printed in the public log); without it the step only says so
+        env:
+          PRIVATE_NAMES_PATTERN: ${{ secrets.PRIVATE_NAMES_PATTERN }}
+        run: |
+          if [ -z "$PRIVATE_NAMES_PATTERN" ]; then echo "::notice::secrets.PRIVATE_NAMES_PATTERN is not set: the private-names scan did not run"; exit 0; fi
+          if grep -rIilE "$PRIVATE_NAMES_PATTERN" site/public; then echo "private names in the built site" >&2; exit 1; fi
+
   watcher-worker:
     runs-on: ubuntu-24.04
     steps:

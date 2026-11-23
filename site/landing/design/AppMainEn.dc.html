@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mistgate · Home</title>
+<script src="./support.js"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@500..700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="cA" data-app><div class="desk">
+<div class="mg app t-{{theme}} a-{{accent}} {{wavingCls}} {{brC}}" style="--ox:308px;--oy:270px;{{brStyle}}">
+
+  <nav class="rail" aria-label="Sections">
+    <img class="rlogo {{brLogoC}}" src="{{logo}}" alt="{{brAlt}}" width="32" height="32">
+    <a class="rb on" href="#app" aria-current="page"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2.2"/></svg><span class="rbl">Home</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2.6"/><circle cx="18" cy="5" r="2.6"/><path d="M8.6 19H16.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h7.9"/></svg><span class="rbl">Routes</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6.5 5 13 2.5-6.5H21"/></svg><span class="rbl">Diagnostics</span><i class="rdot {{rdDiag}}" aria-hidden="true"></i></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="rbl">Settings</span><i class="rdot {{rdSet}}" aria-hidden="true"></i></a>
+    <a class="rb sub" href="https://vpn.example.com" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"/></svg><span class="rbl">Subscription page</span></a>
+  </nav>
+
+  <div class="content">
+    <header class="tb">
+    <div class="bp-mode" role="tablist" aria-label="Mode"><a role="tab" class="on" aria-selected="true" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5.5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6z"/></svg>VPN</a><a role="tab" class="" aria-selected="false" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="15" r="2.2"/><path d="M3 15h2.2a6.8 6.8 0 0 1 13.6 0H21"/></svg>Bypass</a></div>
+    <sc-if value="{{bn.on}}" hint-placeholder-val="{{false}}">
+    <div class="bn {{bn.tone}}" role="status">
+      <a class="bn-m" href="{{bn.href}}"><span class="gl g-{{bn.icon}}" aria-hidden="true"></span><b>{{bn.t}}</b><span class="bn-s {{bn.sC}}">{{bn.s}}</span></a>
+      <sc-if value="{{bn.hasAct}}" hint-placeholder-val="{{false}}"><a class="bn-a" href="{{bn.href}}">{{bn.act}}</a></sc-if>
+      <button class="bn-x" onClick="{{bn.close}}" aria-label="Hide"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+    </div>
+    </sc-if>
+    <div class="cap">
+      <button aria-label="Minimize to tray"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button aria-label="Maximize"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg></button>
+      <button aria-label="Close window"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    </header>
+
+    <main class="body">
+      <div class="left">
+      <section class="stage s-{{phase}} {{blkCls}} {{csCls}}" aria-label="Connection">
+        <div class="mx" aria-hidden="true"><canvas class="mxc"></canvas><i class="m0"></i><i class="m1"></i><i class="m2"></i><i class="m3"></i><i class="m4"></i><i class="m5"></i><i class="m6"></i></div>
+
+        <sc-if value="{{isNone}}" hint-placeholder-val="{{false}}">
+          <div class="onb">
+            <div class="onb-logo rise" aria-hidden="true"><i></i><i></i><img src="{{logo}}" alt="" width="54" height="54"></div>
+            <h2 class="onb-t rise d1">Add your subscription</h2>
+            <p class="onb-s rise d1">Paste the link from your VPN provider — servers appear right away</p>
+            <label class="onb-in rise d2"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"/></svg><input type="text" placeholder="https://…, vless://… or tt://…" aria-label="Subscription link" spellcheck="false"><button class="onb-go" onClick="{{addSub}}" aria-label="Add subscription"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></label>
+            <button class="clip rise d2" onClick="{{addSub}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4.5" width="12" height="16" rx="2.5"/><path d="M9.5 4.5V3.5h5v1"/><path d="M9.5 11h5M9.5 14.5h3"/></svg><span>Link found in clipboard</span><b>Use it</b></button>
+            <p class="onb-alt rise d3"><button onClick="{{addFile}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h8l4 4V20a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 20z"/><path d="M14 3.5V8h4"/><path d="M12 11.5v5M9.5 14l2.5 2.5 2.5-2.5"/></svg>Import from file</button><i aria-hidden="true"></i><a href="https://vpn.example.com" target="_blank" rel="noopener">Where do I get a link?</a></p>
+          </div>
+        </sc-if>
+        <sc-if value="{{notNone}}" hint-placeholder-val="{{true}}">
+        <div class="top">
+          <sc-if value="{{isOn}}" hint-placeholder-val="{{true}}">
+            <div class="chips2 rise"><p class="chip" role="status"><span class="dot live"></span>Connected</p><a class="rchip" href="#app" title="Open routes"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5"/></svg>All except RU sites<svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a></div>
+            <p class="timer rise d1" aria-label="Connected for">{{timer}}</p>
+          </sc-if>
+          <sc-if value="{{isIng}}" hint-placeholder-val="{{false}}">
+            <p class="ttl rise" role="status">{{ingT}}</p>
+            <span class="comet rise d1" aria-hidden="true"></span>
+            <p class="cstep rise d1" aria-live="polite"><span class="shim {{stepCls}}">{{stepTxt}}</span></p>
+          </sc-if>
+          <sc-if value="{{blk}}" hint-placeholder-val="{{false}}">
+            <p class="ttl rise {{blkTone}}" role="status">{{blkT}}</p>
+            <p class="sub-t rise d1">{{blkS}}</p>
+          </sc-if>
+          <sc-if value="{{hasCs}}" hint-placeholder-val="{{false}}">
+            <p class="ttl rise {{csTone}}" role="status">{{csT}}</p>
+            <span class="comet rise d1 {{csComet}}" aria-hidden="true"></span>
+            <p class="sub-t rise d1">{{csS}}</p>
+          </sc-if>
+          <sc-if value="{{offOk}}" hint-placeholder-val="{{false}}">
+            <p class="ttl rise" role="status">VPN is off</p>
+            <p class="sub-t rise d1">We’ll pick the fastest server for you</p>
+          </sc-if>
+        </div>
+
+        <div class="orb">
+          <span class="ring r-off" aria-hidden="true"></span>
+          <span class="ring r-ing" aria-hidden="true"></span>
+          <span class="ring r-on" aria-hidden="true"></span>
+          <span class="halo" aria-hidden="true"></span>
+          <button class="pw" onClick="{{toggle}}" aria-pressed="{{pressed}}" aria-label="{{pwLabel}}"><span class="lay l-off"></span><span class="lay l-ing"></span><span class="lay l-on"></span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg></button>
+        </div>
+
+        <div class="bot">
+          <sc-if value="{{blk}}" hint-placeholder-val="{{false}}">
+            <div class="blk-b rise">
+              <sc-if value="{{isExpired}}" hint-placeholder-val="{{false}}">
+                <a class="cta" href="https://vpn.example.com" target="_blank" rel="noopener">Renew subscription<svg class="i go" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+                <p class="cta-sub">Your servers and settings stay as they are</p>
+              </sc-if>
+              <sc-if value="{{isRemoved}}" hint-placeholder-val="{{false}}">
+                <button class="cta" onClick="{{addSub}}">Add this PC again</button>
+                <p class="cta-sub">3 of 5 device slots are free</p>
+              </sc-if>
+              <sc-if value="{{isNoSrv}}" hint-placeholder-val="{{false}}">
+                <button class="cta ghost {{refCls}}" onClick="{{refreshSub}}"><svg class="i rf" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg>{{refTxt}}</button>
+                <p class="cta-sub">Last updated 3 minutes ago</p>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{csAct}}" hint-placeholder-val="{{false}}">
+            <div class="blk-b rise">
+              <sc-if value="{{isErr}}" hint-placeholder-val="{{false}}">
+                <div class="cta-row"><a class="cta" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6.5 5 13 2.5-6.5H21"/></svg>Check network</a><a class="cta ghost" href="#app">Ask admin for help</a></div>
+                <p class="cta-sub">We’ll keep trying in the background</p>
+              </sc-if>
+              <sc-if value="{{isKs}}" hint-placeholder-val="{{false}}">
+                <div class="cta-row"><button class="cta" onClick="{{csConnect}}">Connect VPN</button><button class="cta ghost" onClick="{{csUnblock}}">Unblock internet</button></div>
+                <p class="cta-sub">Kill switch can be changed in Settings</p>
+              </sc-if>
+              <sc-if value="{{isSvc}}" hint-placeholder-val="{{false}}">
+                <button class="cta {{fixCls}}" onClick="{{csFix}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5.5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6z"/><path d="m9.5 12 2 2 3.5-4"/></svg>{{fixTxt}}</button>
+                <p class="cta-sub">Windows will ask for administrator rights</p>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{showBar}}" hint-placeholder-val="{{true}}">
+          <div class="cwrap">
+            <div class="cbar rise">
+              <button class="cb-srv" onClick="{{tabVpn}}" aria-label="Server {{cur.title}}. Pick another in the list">
+                <span class="fl"><img src="{{cur.flag}}" alt="{{cur.flagLabel}}"></span>
+                <span class="tx"><b>{{cur.country}}<span>{{cur.suf}}</span></b><span>{{cur.srvSub}}</span></span>
+              </button>
+              <span class="cb-div" aria-hidden="true"></span>
+              <button class="cb-pr {{cur.fam}}" onClick="{{togglePop}}" aria-expanded="{{popOpen}}" aria-haspopup="listbox" aria-label="Protocol {{cur.label}}. Change">
+                <span class="pic"><sc-if value="{{cur.isWl}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6a3 3 0 0 1 3 3v4a3 3 0 0 0 3 3h6"/><path d="m18 14 3 3-3 3"/></svg></sc-if><sc-if value="{{cur.isH2}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/></svg></sc-if><sc-if value="{{cur.isVless}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3z"/></svg></sc-if><sc-if value="{{cur.isAwg}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4"/><path d="m10.4 12.6 9.1-9.1"/><path d="m16 6 3 3"/><path d="m13.8 8.2 2 2"/></svg></sc-if><sc-if value="{{cur.isTt}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19v-6.5a7.5 7.5 0 0 1 15 0V19"/><path d="M9.5 19v-6a2.5 2.5 0 0 1 5 0v6"/></svg></sc-if></span>
+                <span class="tx"><b>{{cur.label}}</b><span>{{cur.prSub}}</span></span>
+                <svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+            <sc-if value="{{popOpen}}" hint-placeholder-val="{{false}}">
+              <div class="pop" role="listbox" aria-label="Protocol">
+                <p class="pop-h">Protocol on {{cur.title}}</p>
+                <button class="po {{poAutoCls}}" role="option" aria-selected="{{profAuto}}" onClick="{{pickProfAuto}}"><span class="poi a"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.9 9 19.5 11 13.9 13 12 18.5 10.1 13 4.5 11 10.1 9z"/><path d="M18.5 15.5v4M16.5 17.5h4"/></svg></span><span class="pot"><b>Auto</b><span>Picks what works on your network</span></span></button>
+                <sc-for list="{{profs}}" as="o" hint-placeholder-count="5">
+                  <button class="po {{o.cls}}" role="option" aria-selected="{{o.on}}" onClick="{{o.pick}}"><span class="poi {{o.fam}}"><sc-if value="{{o.isH2}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/></svg></sc-if><sc-if value="{{o.isVless}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3z"/></svg></sc-if><sc-if value="{{o.isAwg}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4"/><path d="m10.4 12.6 9.1-9.1"/><path d="m16 6 3 3"/><path d="m13.8 8.2 2 2"/></svg></sc-if><sc-if value="{{o.isTt}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19v-6.5a7.5 7.5 0 0 1 15 0V19"/><path d="M9.5 19v-6a2.5 2.5 0 0 1 5 0v6"/></svg></sc-if></span><span class="pot"><b>{{o.label}}</b><span>{{o.full}}</span></span></button>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+          </sc-if>
+          <sc-if value="{{isOn}}" hint-placeholder-val="{{true}}">
+            <div class="spd rise d2" role="group" aria-label="Speed and latency">
+              <span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></svg>{{down}} <small>Mbps</small></span>
+              <span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>{{up}} <small>Mbps</small></span>
+              <span>{{msTxt.cur}} <small>ms</small></span>
+            </div>
+            <sc-if value="{{wl.onNow}}" hint-placeholder-val="{{false}}"><p class="det wl rise d3" role="status"><svg class="i s16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6a3 3 0 0 1 3 3v4a3 3 0 0 0 3 3h6"/><path d="m18 14 3 3-3 3"/></svg>for allowlists · backup channel</p></sc-if>
+            <sc-if value="{{det.on}}" hint-placeholder-val="{{true}}"><a class="det rise d3 {{det.c}}" href="#app"><svg class="i s16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.01"/></svg>{{det.t}}<b>{{det.a}}<svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></b></a></sc-if>
+          </sc-if>
+          <sc-if value="{{csNote}}" hint-placeholder-val="{{false}}">
+            <p class="cta-sub cs-note rise d2">{{csNoteT}}</p>
+          </sc-if>
+          <sc-if value="{{offOk}}" hint-placeholder-val="{{false}}">
+            <p class="offrow rise d2"><a class="rchip" href="#app" title="Open routes"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5"/></svg>All except RU sites<svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a></p>
+          </sc-if>
+        </div>
+        </sc-if>
+      </section>
+      <sc-if value="{{hasPlan}}" hint-placeholder-val="{{true}}">
+      <div class="plan" aria-label="Subscription">
+        <a class="pl" href="https://vpn.example.com" target="_blank" rel="noopener" aria-label="Subscription: {{sub.tV}} {{sub.tS}}. Open subscription page">
+          <span class="gauge lav {{sub.tG}}" style="--p:{{sub.tP}};--n:{{sub.tN}}" aria-hidden="true"><sc-if value="{{sub.tInf}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 9 13.75 9.375M10 9C9.088 7.786 7.636 7 6 7a5 5 0 0 0 0 10c1.636 0 3.088-.786 4-2l.334-.5"/><path d="m10 9 4 6c.912 1.214 2.364 2 4 2a5 5 0 0 0 0-10c-1.636 0-3.088.786-4 2"/></svg></sc-if><sc-if value="{{sub.tFin}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></sc-if></span>
+          <span class="tx"><span class="k">Subscription</span><b>{{sub.tV}}</b><span class="s {{sub.tG}}">{{sub.tS}}</span></span>
+        </a>
+        <a class="pl" href="https://vpn.example.com" target="_blank" rel="noopener" aria-label="Data: {{sub.dV}} {{sub.dS}}. Open subscription page">
+          <span class="gauge sky {{sub.dG}}" style="--p:{{sub.dP}};--n:{{sub.dN}}" aria-hidden="true"><sc-if value="{{sub.dInf}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 9 13.75 9.375M10 9C9.088 7.786 7.636 7 6 7a5 5 0 0 0 0 10c1.636 0 3.088-.786 4-2l.334-.5"/><path d="m10 9 4 6c.912 1.214 2.364 2 4 2a5 5 0 0 0 0-10c-1.636 0-3.088.786-4 2"/></svg></sc-if><sc-if value="{{sub.dFin}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v6c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6"/><path d="M5 12v6c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-6"/></svg></sc-if></span>
+          <span class="tx"><span class="k">Data</span><b>{{sub.dV}}</b><span class="s {{sub.dG}}">{{sub.dS}}</span></span>
+        </a>
+        <a class="pl" href="https://vpn.example.com" target="_blank" rel="noopener" aria-label="Devices: {{sub.vV}} {{sub.vS}}. Open subscription page">
+          <span class="gauge mint slots {{sub.vG}}" style="--p:{{sub.vP}};--n:{{sub.vN}}" aria-hidden="true"><sc-if value="{{sub.vInf}}" hint-placeholder-val="{{false}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 9 13.75 9.375M10 9C9.088 7.786 7.636 7 6 7a5 5 0 0 0 0 10c1.636 0 3.088-.786 4-2l.334-.5"/><path d="m10 9 4 6c.912 1.214 2.364 2 4 2a5 5 0 0 0 0-10c-1.636 0-3.088.786-4 2"/></svg></sc-if><sc-if value="{{sub.vFin}}" hint-placeholder-val="{{true}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="13" height="9.5" rx="1.8"/><path d="M1.8 18h10.4"/><rect x="16.5" y="8.5" width="5.5" height="11" rx="1.6"/></svg></sc-if></span>
+          <span class="tx"><span class="k">Devices</span><b>{{sub.vV}}</b><span class="s {{sub.vG}}">{{sub.vS}}</span></span>
+        </a>
+      </div>
+      </sc-if>
+      </div>
+
+    <div class="stip {{tipC}} {{tip.kc}}" style="left:{{tipX}}px;top:{{tipY}}px" role="tooltip">
+      <div class="stip-h"><sc-if value="{{tip.isWl}}" hint-placeholder-val="{{false}}"><span class="wli"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6a3 3 0 0 1 3 3v4a3 3 0 0 0 3 3h6"/><path d="m18 14 3 3-3 3"/></svg><span class="fl"><img src="{{tip.flag}}" alt=""></span></span></sc-if><sc-if value="{{tip.notWl}}" hint-placeholder-val="{{true}}"><span class="fl"><img src="{{tip.flag}}" alt=""></span></sc-if><span class="tx"><b>{{tip.title}}</b><span>{{tip.city}}</span></span><span class="stip-ms {{tip.msC}}">{{tip.ms}}<small>ms</small></span></div>
+      <div class="stip-kv">
+        <div><span>Host</span><b class="m">{{tip.host}}</b></div>
+        <div><span>IP</span><b class="m">{{tip.ip}}</b></div>
+        <div><span>Route</span><b>{{tip.route}}</b></div>
+      </div>
+      <div class="stip-p"><sc-for list="{{tip.pl}}" as="q" hint-placeholder-count="2"><span class="stip-c {{q.c}}">{{q.t}}</span></sc-for></div>
+      <sc-if value="{{tip.notWl}}" hint-placeholder-val="{{true}}"><div class="stip-l"><span>Load</span><span class="bar" aria-hidden="true"><i class="{{tip.loadC}}" style="width:{{tip.load}}%"></i></span><b>{{tip.load}}%</b></div></sc-if>
+      <sc-if value="{{tip.isWl}}" hint-placeholder-val="{{false}}"><div class="stip-w"><p><span class="gl g-dashboard-speed" aria-hidden="true"></span>Backup channel: speed may be lower than usual</p><sc-if value="{{tip.noUdp}}" hint-placeholder-val="{{false}}"><p class="no"><span class="gl g-gamepad" aria-hidden="true"></span>Calls and games do not work</p></sc-if></div></sc-if>
+    </div>
+    <section class="servers {{svCls}}" aria-label="Servers">
+      <div class="sv-h">
+        <div class="subwrap">
+          <button class="subsel" onClick="{{toggleSubs}}" aria-expanded="{{subsOpen}}" aria-haspopup="listbox" aria-label="Subscription: {{sub.name}}. Switch">
+            <span class="sav {{sub.tone}}">{{sub.ini}}</span>
+            <span class="tx"><b><span class="snm">{{sub.name}}</span><span class="srct {{sub.srcCls}}">{{sub.srcT}}</span></b><span class="{{sub.metaC}}">{{sub.meta}}</span></span>
+            <svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <sc-if value="{{subsOpen}}" hint-placeholder-val="{{false}}">
+            <div class="subpop" role="listbox" aria-label="Subscriptions">
+              <p class="pop-h">Your subscriptions</p>
+              <sc-for list="{{subs}}" as="u" hint-placeholder-count="4">
+                <div class="so {{u.cls}}" role="option" aria-selected="{{u.on}}">
+                  <button class="so-b" onClick="{{u.pick}}">
+                    <span class="sav {{u.tone}}">{{u.ini}}</span>
+                    <span class="tx"><b><span class="snm">{{u.name}}</span><span class="srct {{u.srcCls}}">{{u.srcT}}</span></b><span class="sl"><em class="{{u.stCls}}">{{u.st}}</em><i aria-hidden="true">·</i>{{u.host}}</span></span>
+                  </button>
+                  <span class="so-r">
+                  <svg class="i ok" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+                  <button class="so-more" onClick="{{u.menu}}" aria-label="Actions for {{u.name}}" aria-expanded="{{u.mOpen}}" aria-haspopup="menu"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></svg></button>
+                  </span>
+                  <sc-if value="{{u.mOpen}}" hint-placeholder-val="{{false}}">
+                    <div class="somenu" role="menu">
+                      <button role="menuitem"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg>Update now</button>
+                      <button role="menuitem"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>Rename</button>
+                      <button role="menuitem"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"/></svg>Copy link</button>
+                      <span class="sm-sep" role="separator"></span>
+                      <button class="danger" role="menuitem" onClick="{{u.ask}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></svg>{{u.rmT}}</button>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              <div class="sp2" role="separator"></div>
+              <button class="so add" onClick="{{toggleSubs}}"><span class="sav add"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span class="tx"><b>Add subscription</b><span>Paste a link from your provider</span></span></button>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+      <div class="sv-tabs">
+        <div class="seg" role="tablist" aria-label="Server type">
+          <button role="tab" class="{{vpnTabCls}}" aria-selected="{{isVpn}}" onClick="{{tabVpn}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5.5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6z"/></svg>VPN servers <span class="k">{{srvN}}</span></button>
+          <button role="tab" class="{{tgTabCls}}" aria-selected="{{isTg}}" onClick="{{tabTg}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg>Telegram proxies <span class="k">{{tgN}}</span></button>
+        </div>
+      </div>
+
+      <sc-if value="{{isVpn}}" hint-placeholder-val="{{true}}">
+      <sc-if value="{{isExpired}}" hint-placeholder-val="{{false}}">
+        <div class="xban rise"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.4v.01"/></svg><span>Subscription expired — servers are paused until you renew</span></div>
+      </sc-if>
+      <sc-if value="{{noSrvList}}" hint-placeholder-val="{{false}}">
+        <div class="empty srv-e rise">
+          <span class="e-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="7" rx="2"/><rect x="3.5" y="13" width="17" height="7" rx="2"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/></svg></span>
+          <b>{{seT}}</b>
+          <p>{{seS}}</p>
+        </div>
+      </sc-if>
+      <sc-if value="{{hasSrv}}" hint-placeholder-val="{{true}}">
+      <sc-if value="{{wl.hint}}" hint-placeholder-val="{{false}}">
+      <div class="wlh rise" role="status">
+        <span class="wlh-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6a3 3 0 0 1 3 3v4a3 3 0 0 0 3 3h6"/><path d="m18 14 3 3-3 3"/></svg></span>
+        <span class="tx"><b>Regular servers do not respond</b><span>Try the channel for allowlists?</span><em>Backup channel: speed may be lower than usual</em></span>
+        <span class="wlh-a"><button class="addb {{wl.tryC}}" onClick="{{wl.tryGo}}">{{wl.tryT}}</button><button class="wlh-n" onClick="{{wl.hintOff}}">Not now</button></span>
+      </div>
+      </sc-if>
+      <div class="srow">
+        <label class="search">
+          <svg class="i s16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+          <input type="search" placeholder="Country or city" aria-label="Find a server">
+          <kbd>Ctrl K</kbd>
+        </label>
+        <button class="icb ping {{allBusy}}" aria-label="Test speed of all servers" title="Test ping of all servers" onClick="{{pingAll}}"><svg class="i s16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 18.5a9.2 9.2 0 1 1 16.8 0"/><path d="M12 6.2v1.6M5.9 9.3l1.1 1M18.1 9.3l-1.1 1"/><path class="ndl" d="M12 14.2 16.3 9.6"/><circle cx="12" cy="14.2" r="1.6"/></svg></button>
+        <button class="icb sync {{refCls}}" aria-label="Update subscription" title="Update subscription · last update 3 min ago" onClick="{{refreshSub}}"><svg class="i s16 rf" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg></button>
+      </div>
+
+      <div class="list" aria-label="Servers">
+        <button class="r {{autoCls}}" aria-pressed="{{isAuto}}" onClick="{{pickAuto}}">
+          <span class="auto"><svg class="i s16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.9 9 19.5 11 13.9 13 12 18.5 10.1 13 4.5 11 10.1 9z"/><path d="M18.5 15.5v4M16.5 17.5h4"/></svg></span>
+          <span class="nm"><b>Auto</b><span>Fastest working server on your network</span></span>
+          <span class="sig {{sigCls.de}}"><span class="b" aria-hidden="true"><i></i><i></i><i></i></span><span class="sp" aria-hidden="true"></span><span class="v">{{msTxt.de}}<small>ms</small></span></span>
+        </button>
+        <p class="lbl lblw"><span>All servers</span><a class="lbl-t {{badLbl}}" href="#srv-trouble"><i aria-hidden="true"></i>{{badN}}</a></p>
+        <sc-for list="{{rows}}" as="n" hint-placeholder-count="8">
+        <div class="r {{n.rcls}} {{n.vrow}}" onMouseEnter="{{n.hin}}" onMouseLeave="{{n.hout}}">
+          <button class="rsel" aria-pressed="{{n.on}}" onClick="{{n.pick}}">
+            <span class="fl"><img src="{{n.flag}}" alt="Flag of {{n.country}}"></span>
+            <span class="nm"><b><span class="nmt">{{n.country}}<span class="c">{{n.suf}}</span></span><span class="mk {{n.mkc}}">{{n.mark}}</span><sc-if value="{{n.now}}" hint-placeholder-val="{{false}}"><span class="now">now</span></sc-if></b></span>
+            <span class="vchip sm {{n.vc}}"><span class="gl g-{{n.vi}}" aria-hidden="true"></span>{{n.vt}}</span><span class="pis {{n.pisC}}" role="img" aria-label="{{n.label}}" title="{{n.label}}"><sc-if value="{{n.h2}}" hint-placeholder-val="{{true}}"><span class="pi h2"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/></svg></span></sc-if><sc-if value="{{n.vless}}" hint-placeholder-val="{{true}}"><span class="pi vless"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3z"/></svg></span></sc-if><sc-if value="{{n.awg}}" hint-placeholder-val="{{false}}"><span class="pi awg"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4"/><path d="m10.4 12.6 9.1-9.1"/><path d="m16 6 3 3"/><path d="m13.8 8.2 2 2"/></svg></span></sc-if><sc-if value="{{n.tt}}" hint-placeholder-val="{{false}}"><span class="pi tt"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19v-6.5a7.5 7.5 0 0 1 15 0V19"/><path d="M9.5 19v-6a2.5 2.5 0 0 1 5 0v6"/></svg></span></sc-if></span>
+          </button>
+          <button class="sig {{n.sig}} {{n.sigX}}" onClick="{{n.ping}}" aria-label="Test latency to {{n.id}}" title="Test latency"><span class="b" aria-hidden="true"><i></i><i></i><i></i></span><span class="sp" aria-hidden="true"></span><span class="v">{{n.ms}}<small>ms</small></span></button>
+        </div>
+        </sc-for>
+        <p class="lbl lblw {{badLbl}}" id="srv-trouble"><span>Trouble on this network</span><a href="#app">Why?</a></p>
+        <sc-for list="{{rowsBad}}" as="n" hint-placeholder-count="2">
+        <div class="r {{n.rcls}} {{n.vrow}}" onMouseEnter="{{n.hin}}" onMouseLeave="{{n.hout}}">
+          <button class="rsel" aria-pressed="{{n.on}}" onClick="{{n.pick}}">
+            <span class="fl"><img src="{{n.flag}}" alt="Flag of {{n.country}}"></span>
+            <span class="nm"><b><span class="nmt">{{n.country}}<span class="c">{{n.suf}}</span></span><span class="mk {{n.mkc}}">{{n.mark}}</span><sc-if value="{{n.now}}" hint-placeholder-val="{{false}}"><span class="now">now</span></sc-if></b></span>
+            <span class="vchip sm {{n.vc}}"><span class="gl g-{{n.vi}}" aria-hidden="true"></span>{{n.vt}}</span><span class="pis {{n.pisC}}" role="img" aria-label="{{n.label}}" title="{{n.label}}"><sc-if value="{{n.h2}}" hint-placeholder-val="{{true}}"><span class="pi h2"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/></svg></span></sc-if><sc-if value="{{n.vless}}" hint-placeholder-val="{{true}}"><span class="pi vless"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3z"/></svg></span></sc-if><sc-if value="{{n.awg}}" hint-placeholder-val="{{false}}"><span class="pi awg"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4"/><path d="m10.4 12.6 9.1-9.1"/><path d="m16 6 3 3"/><path d="m13.8 8.2 2 2"/></svg></span></sc-if><sc-if value="{{n.tt}}" hint-placeholder-val="{{false}}"><span class="pi tt"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19v-6.5a7.5 7.5 0 0 1 15 0V19"/><path d="M9.5 19v-6a2.5 2.5 0 0 1 5 0v6"/></svg></span></sc-if></span>
+          </button>
+          <button class="sig {{n.sig}} {{n.sigX}}" onClick="{{n.ping}}" aria-label="Test latency to {{n.id}}" title="Test latency"><span class="b" aria-hidden="true"><i></i><i></i><i></i></span><span class="sp" aria-hidden="true"></span><span class="v">{{n.ms}}<small>ms</small></span></button>
+        </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{wl.has}}" hint-placeholder-val="{{false}}">
+      <div class="r wlr wlp {{wl.rcls}}" id="srv-wl" onMouseEnter="{{wl.hin}}" onMouseLeave="{{wl.hout}}">
+        <button class="rsel" aria-pressed="{{wl.on}}" onClick="{{wl.pick}}">
+          <span class="wli"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6a3 3 0 0 1 3 3v4a3 3 0 0 0 3 3h6"/><path d="m18 14 3 3-3 3"/></svg><span class="fl"><img src="{{wl.flag}}" alt=""></span></span>
+          <span class="nm"><b><span class="nmt">For allowlists</span><sc-if value="{{wl.now}}" hint-placeholder-val="{{false}}"><span class="now">now</span></sc-if></b><span>{{wl.sub}}</span></span>
+        </button>
+        <span class="sig slow {{wl.sigC}}">{{wl.sigT}}</span>
+        <sc-if value="{{wl.multi}}" hint-placeholder-val="{{false}}"><div class="wlcs" role="radiogroup" aria-label="For allowlists"><sc-for list="{{wl.list}}" as="c" hint-placeholder-count="3"><button class="wlc {{c.c}}" role="radio" aria-checked="{{c.on}}" onClick="{{c.pick}}"><span class="fl"><img src="{{c.flag}}" alt=""></span>{{c.n}}</button></sc-for></div></sc-if>
+      </div>
+      </sc-if>
+      </sc-if>
+      </sc-if>
+
+      <sc-if value="{{isTg}}" hint-placeholder-val="{{false}}">
+      <sc-if value="{{noTg}}" hint-placeholder-val="{{false}}">
+        <div class="empty srv-e rise">
+          <span class="e-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg></span>
+          <b>{{tgeT}}</b>
+          <p>{{tgeS}}</p>
+        </div>
+      </sc-if>
+      <sc-if value="{{hasTg}}" hint-placeholder-val="{{true}}">
+      <p class="tg-note rise"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.01"/></svg>Telegram works through these proxies even when VPN is off</p>
+      <div class="list tg rise d1" aria-label="Telegram proxies">
+        <div class="r tgr">
+          <span class="fl"><img src="/_blob/5a45af717ce4d720751cf765c6d0a732" alt="Flag of Finland"></span>
+          <span class="nm"><b><span class="nmt">Finland<span class="c"> · Helsinki</span></span></b><span class="mt"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg>MTProto · port 443</span></span>
+          <span class="sig q3"><span class="b" aria-hidden="true"><i></i><i></i><i></i></span><span class="v">39<small>ms</small></span></span>
+          <button class="tgo" onClick="{{tgOpen}}" aria-label="Add proxy Finland, Helsinki to Telegram" title="Open in Telegram"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg></button>
+        </div>
+        <div class="r tgr">
+          <span class="fl"><img src="/_blob/e03fb05e0bdcc00f476374f00844dcf0" alt="Flag of Netherlands"></span>
+          <span class="nm"><b><span class="nmt">Netherlands<span class="c"> · Amsterdam</span></span></b><span class="mt"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg>MTProto · port 443</span></span>
+          <span class="sig q3"><span class="b" aria-hidden="true"><i></i><i></i><i></i></span><span class="v">48<small>ms</small></span></span>
+          <button class="tgo" onClick="{{tgOpen}}" aria-label="Add proxy Netherlands, Amsterdam to Telegram" title="Open in Telegram"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg></button>
+        </div>
+        <div class="r tgr">
+          <span class="fl"><img src="/_blob/e496c2fcbf4e9bb39112cabd5bf7f493" alt="Flag of Germany"></span>
+          <span class="nm"><b>Germany</b><span class="mt"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg>MTProto · port 443</span></span>
+          <span class="sig q2"><span class="b" aria-hidden="true"><i></i><i></i><i></i></span><span class="v">52<small>ms</small></span></span>
+          <button class="tgo" onClick="{{tgOpen}}" aria-label="Add proxy Germany to Telegram" title="Open in Telegram"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg></button>
+        </div>
+      </div>
+      <sc-if value="{{tgWarn}}" hint-placeholder-val="{{false}}">
+        <div class="tgwarn rise"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg><span class="tx"><b>Telegram isn’t installed</b><span>Copy the proxy link and open it where Telegram is</span></span><button class="lsb {{tgCopyCls}}" onClick="{{tgCopy}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg><span>{{tgCopyTxt}}</span></button></div>
+      </sc-if>
+      <sc-if value="{{tgOk}}" hint-placeholder-val="{{false}}">
+        <p class="tgok rise"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg>Opening Telegram — confirm the proxy there</p>
+      </sc-if>
+      <p class="tg-foot {{tgFootCls}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5z"/></svg>Telegram opens and asks to confirm</p>
+      </sc-if>
+      </sc-if>
+    </section>
+    </main>
+
+  </div>
+
+  <sc-if value="{{rmOpen}}" hint-placeholder-val="{{false}}">
+    <div class="scrim" onClick="{{rmCancel}}"></div>
+    <div class="sheet conf" role="alertdialog" aria-label="Remove subscription">
+      <span class="cf-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></svg></span>
+      <b class="cf-t">{{rmTitle}}</b>
+      <p class="cf-p">{{rmText}}</p>
+      <div class="cf-a"><button class="lsb" onClick="{{rmCancel}}">Cancel</button><button class="addb danger" onClick="{{rmDo}}">{{rmBtn}}</button></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ad.open}}" hint-placeholder-val="{{false}}">
+    <div class="scrim" onClick="{{ad.close}}"></div>
+    <div class="sheet add {{ad.c}}" role="dialog" aria-label="Add subscription" style="{{ad.style}}">
+      <sc-if value="{{ad.isCheck}}" hint-placeholder-val="{{false}}">
+        <div class="ad-chk"><span class="ad-spin" aria-hidden="true"></span><b>Checking the link…</b><span>{{ad.host}}</span></div>
+      </sc-if>
+      <sc-if value="{{ad.isConfirm}}" hint-placeholder-val="{{false}}">
+        <div class="ad-h">
+          <sc-if value="{{ad.hasLogo}}" hint-placeholder-val="{{false}}"><span class="ad-logo {{ad.lc}}"><img src="{{ad.logo}}" alt=""></span></sc-if>
+          <sc-if value="{{ad.noLogo}}" hint-placeholder-val="{{true}}"><span class="sav big {{ad.iniC}}">{{ad.ini}}<span class="gl g-folder" aria-hidden="true"></span></span></sc-if>
+          <span class="tx"><b>{{ad.name}}</b><span>{{ad.host}}</span></span>
+          <span class="ad-src"><span class="gl g-{{ad.srcI}}" aria-hidden="true"></span>{{ad.srcT}}</span>
+        </div>
+        <div class="ad-f"><span><b>{{ad.f1}}</b><i>{{ad.f1s}}</i></span><span><b>{{ad.f2}}</b><i>{{ad.f2s}}</i></span><span><b>{{ad.f3}}</b><i>{{ad.f3s}}</i></span></div>
+        <sc-if value="{{ad.isMg}}" hint-placeholder-val="{{true}}">
+          <div class="ad-dev"><span class="ad-slots" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="me"></i><i></i><i></i></span><span class="tx"><b>This PC will be device 3 of 5</b><span>You can remove devices on the subscription page</span></span></div>
+        </sc-if>
+        <sc-if value="{{ad.isBasic}}" hint-placeholder-val="{{false}}">
+          <p class="ad-note"><span class="gl g-info-circle" aria-hidden="true"></span>Works without a provider’s panel, so block reports and help from an admin aren’t available</p>
+        </sc-if>
+        <div class="ad-a"><button class="lsb" onClick="{{ad.close}}">Not now</button><button class="addb" onClick="{{ad.go}}">{{ad.goT}}</button></div>
+        <p class="ad-n">Nothing is added until you press the button</p>
+      </sc-if>
+      <sc-if value="{{ad.isErr}}" hint-placeholder-val="{{false}}">
+        <span class="cf-ic {{ad.tone}}"><span class="gl g-{{ad.ei}}" aria-hidden="true"></span></span>
+        <b class="cf-t">{{ad.et}}</b>
+        <p class="cf-p">{{ad.ep}}</p>
+        <div class="cf-a"><button class="lsb" onClick="{{ad.b2Go}}">{{ad.b2}}</button><button class="addb" onClick="{{ad.b1Go}}">{{ad.b1}}</button></div>
+      </sc-if>
+      <sc-if value="{{ad.isConsent}}" hint-placeholder-val="{{false}}">
+        <div class="ad-cs-h"><span class="mono lav"><span class="gl g-shield-search" aria-hidden="true"></span></span><span class="tx"><b>Help find blocks?</b><span>Optional. You can change it later in Settings</span></span></div>
+        <div class="ad-cs-t"><span class="tx"><b>Send anonymous block reports</b><span>Your provider sees what gets blocked and fixes servers faster</span></span><button class="sw {{ad.consentCls}}" role="switch" aria-checked="{{ad.consentAria}}" aria-label="Send anonymous block reports" onClick="{{ad.toggleConsent}}"></button></div>
+        <ul class="ad-cs-l">
+          <li class="y"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Which servers and protocols don’t work on your network</li>
+          <li class="y"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Your internet provider and region</li>
+          <li class="n"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>Never: sites you open, your address or anything about you</li>
+        </ul>
+        <div class="ad-a one"><button class="addb" onClick="{{ad.done}}">Continue</button></div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ad.isDrop}}" hint-placeholder-val="{{false}}">
+    <div class="drop" role="status"><div class="drop-in"><span class="gl g-folder-plus" aria-hidden="true"></span><b>Drop the file to add a subscription</b><span>A config or a text file with links</span></div></div>
+  </sc-if>
+
+  <sc-if value="{{wave}}" hint-placeholder-val="{{false}}">
+    <div class="wave" aria-hidden="true"><canvas class="wvc"></canvas><i></i></div>
+  </sc-if>
+
+</div>
+  <div class="dev dtop" role="toolbar" aria-label="Prototype states">
+    <div class="dg"><span class="dl">Connection</span><div class="ds"><button class="{{dv.ph_off}}" onClick="{{dvSet.ph_off}}">Off</button><button class="{{dv.ph_ing}}" onClick="{{dvSet.ph_ing}}">Connecting</button><button class="{{dv.ph_on}}" onClick="{{dvSet.ph_on}}">On</button><button class="{{dv.cs_rec}}" onClick="{{dvSet.cs_rec}}">Reconnect</button><button class="{{dv.cs_offline}}" onClick="{{dvSet.cs_offline}}">Offline</button><button class="{{dv.cs_error}}" onClick="{{dvSet.cs_error}}">Error</button><button class="{{dv.cs_ks}}" onClick="{{dvSet.cs_ks}}">Kill switch</button><button class="{{dv.cs_svc}}" onClick="{{dvSet.cs_svc}}">Service</button></div></div>
+    <div class="dg"><span class="dl">Servers</span><div class="ds"><button class="{{dv.sv_0}}" onClick="{{dvSet.sv_0}}">None</button><button class="{{dv.sv_2}}" onClick="{{dvSet.sv_2}}">2</button><button class="{{dv.sv_8}}" onClick="{{dvSet.sv_8}}">8</button><button class="{{dv.sv_24}}" onClick="{{dvSet.sv_24}}">24</button></div></div>
+    <div class="dg"><span class="dl">Theme</span><div class="ds"><button class="{{dv.th_dark}}" onClick="{{dvSet.th_dark}}">Dark</button><button class="{{dv.th_light}}" onClick="{{dvSet.th_light}}">Light</button></div></div>
+  </div>
+  <div class="dev" role="toolbar" aria-label="Subscription states">
+    <div class="dg"><span class="dl">Subscription</span><div class="ds"><button class="{{dv.pl_0}}" onClick="{{dvSet.pl_0}}">Limited</button><button class="{{dv.pl_1}}" onClick="{{dvSet.pl_1}}">Unlimited</button><button class="{{dv.pl_2}}" onClick="{{dvSet.pl_2}}">No end date</button><button class="{{dv.pl_3}}" onClick="{{dvSet.pl_3}}">Expiring</button><button class="{{dv.pl_4}}" onClick="{{dvSet.pl_4}}">Expired</button><button class="{{dv.pl_5}}" onClick="{{dvSet.pl_5}}">None</button></div></div>
+    <div class="dg"><span class="dl">Allowlist</span><div class="ds"><button class="{{dv.wl_none}}" onClick="{{dvSet.wl_none}}">None</button><button class="{{dv.wl_yes}}" onClick="{{dvSet.wl_yes}}">List</button><button class="{{dv.wl_on}}" onClick="{{dvSet.wl_on}}">On</button><button class="{{dv.wl_down}}" onClick="{{dvSet.wl_down}}">Down</button><button class="{{dv.wl_hint}}" onClick="{{dvSet.wl_hint}}">Hint</button></div></div>
+      <div class="dg"><span class="dl">Channels</span><div class="ds"><button class="{{dv.wn_1}}" onClick="{{dvSet.wn_1}}">1</button><button class="{{dv.wn_3}}" onClick="{{dvSet.wn_3}}">3</button><button class="{{dv.wn_5}}" onClick="{{dvSet.wn_5}}">5</button></div></div>
+      <div class="dg"><span class="dl">UDP</span><div class="ds"><button class="{{dv.udp_no}}" onClick="{{dvSet.udp_no}}">No</button><button class="{{dv.udp_yes}}" onClick="{{dvSet.udp_yes}}">Yes</button></div></div>
+      <div class="dg"><span class="dl">Telegram</span><div class="ds"><button class="{{dv.tg_ok}}" onClick="{{dvSet.tg_ok}}">Installed</button><button class="{{dv.tg_missing}}" onClick="{{dvSet.tg_missing}}">Not installed</button></div></div>
+  </div>
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["on","off","ing","sw"],"default":"on","section":"State"},"wl":{"editor":"enum","options":["none","yes","down"],"default":"none","section":"State"},"wln":{"editor":"enum","options":["1","3","5"],"default":"1","section":"State"},"wltip":{"editor":"enum","options":["closed","open"],"default":"closed","section":"State"},"udp":{"editor":"enum","options":["no","yes"],"default":"no","section":"State"},"prof":{"editor":"enum","options":["auto","h2","vt","awg","tt"],"default":"auto","section":"State"},"sel":{"editor":"enum","options":["auto","de","nl","ru","wl"],"default":"auto","section":"State"},"list":{"editor":"enum","options":["top","end"],"default":"top","section":"State"},"tab":{"editor":"enum","options":["vpn","telegram"],"default":"vpn","section":"State"},"pop":{"editor":"enum","options":["closed","open"],"default":"closed","section":"State"},"subs":{"editor":"enum","options":["closed","open"],"default":"closed","section":"State"},"sub":{"editor":"enum","options":["mine","work","family","test","expired","none"],"default":"mine","section":"State"},"srv":{"editor":"enum","options":["0","2","8","24"],"default":"8","section":"State"},"telegram":{"editor":"enum","options":["ok","missing"],"default":"ok","section":"State"},"add":{"editor":"enum","options":["none","check","confirm","consent","badlink","limit","expired","offline","drop","basic"],"default":"none","section":"State"},"banner":{"editor":"enum","options":["none","news","debug","update","newver"],"default":"none","section":"State"},"det":{"editor":"enum","options":["udp","dpi","none"],"default":"udp","section":"State"},"subst":{"editor":"enum","options":["ok","removed","stale"],"default":"ok","section":"State"},"brand":{"editor":"enum","options":["mistgate","polar","sunline","onyx"],"default":"mistgate","section":"Look"},"conn":{"editor":"enum","options":["none","rec","offline","error","ks","svc"],"default":"none","section":"State"},"why":{"editor":"enum","options":["net","sleep"],"default":"net","section":"State"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"accent":{"editor":"enum","options":["lavender","mint","sand","rose"],"default":"lavender","section":"Look"},"$preview":{"width":1160,"height":800}}'>
+class Component extends DCLogic {
+  componentDidMount() { this.mxBoot();
+    if (this.props.list === 'end') setTimeout(() => { const l = document.querySelector('.list'); if (l) l.scrollTop = l.scrollHeight; }, 700);
+    if (this.props.wltip === 'open') setTimeout(() => this.wlTip(), 1100);
+    this.tick = setInterval(() => {
+      if (this.phase() === 'on') this.setState({ secs: this.secs() + 1 });
+    }, 1000);
+  }
+  componentWillUnmount() { if (this._mxOff) this._mxOff();
+    clearInterval(this.tick); clearTimeout(this.t1); clearTimeout(this.t2);
+  }
+  mxBoot() {
+    const S = 12, self = this; let raf = 0, cv = null, ctx = null, W = 0, H = 0, dpr = 1, pts = [], cx = 0, cy = 0, waves = [], ph = '', emitAt = 0, col = '#b8acf2', base = '255,255,255', readAt = 0, px = -9999, py = -9999, still = false, wv = null, wvT = 0;
+    try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    const fit = (c) => { const w = c.offsetWidth, h = c.offsetHeight; if (!w || !h) return false; dpr = Math.min(2, window.devicePixelRatio || 1); c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); return true; };
+    const grid = () => { pts = []; const ox = ((W % S) / 2) + S / 2, oy = ((H % S) / 2) + S / 2; for (let y = oy; y < H; y += S) for (let x = ox; x < W; x += S) { const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; pts.push([x, y, (h - Math.floor(h)) * 6.283]); } };
+    const emit = (amp, w, v, a) => waves.push({ t: performance.now(), amp: amp, w: w, v: v, a: a });
+    this._mxPulse = (k) => emit(5 * (k || 1), 30, 300, .8 * (k || 1));
+    const frame = (now) => {
+      raf = requestAnimationFrame(frame);
+      if (document.documentElement.classList.contains('idle')) return; /* окно не в фокусе или скрыто: ничего не рисуем */
+      const root = document.querySelector('.mg.app'), stage = root && root.querySelector('.stage'); if (!stage) return;
+      const c = stage.querySelector('.mxc'); if (!c) return;
+      if (c !== cv || c.offsetWidth !== W || c.offsetHeight !== H) { cv = c; if (!fit(c)) return; W = c.offsetWidth; H = c.offsetHeight; ctx = c.getContext('2d'); grid(); readAt = 0; }
+      if (now > readAt) { readAt = now + 240; const cs = getComputedStyle(stage), v = cs.getPropertyValue('--st').trim(); if (v) col = v; base = root.classList.contains('t-light') ? '20,20,28' : '255,255,255';
+        const o = stage.querySelector('.orb'), a = c.getBoundingClientRect(); if (o && a.width) { const b = o.getBoundingClientRect(), k = W / a.width; cx = (b.left + b.width / 2 - a.left) * k; cy = (b.top + b.height / 2 - a.top) * k; } else { cx = W / 2; cy = H / 2; } }
+      const p2 = stage.classList.contains('s-on') ? 'on' : stage.classList.contains('s-ing') ? 'ing' : 'off';
+      if (p2 !== ph) { if (p2 === 'on' && ph) { emit(11, 44, 520, 1); setTimeout(() => emit(7, 36, 430, .8), 170); setTimeout(() => emit(4, 30, 360, .55), 380); } ph = p2; emitAt = now + (p2 === 'ing' ? 80 : 1500); }
+      if (now > emitAt && !still) { if (ph === 'ing') { emit(4.5, 28, 310, .7); emitAt = now + 640; } else if (ph === 'on') { emit(4, 40, 170, .6); emitAt = now + 4200; } else { emit(2.2, 52, 96, .22); emitAt = now + 5600; } }
+      const t = now / 1000, R = Math.max(W, H) * .78; waves = waves.filter((w) => (now - w.t) / 1000 * w.v < R + 80);
+      const wr = waves.map((w) => { const r = (now - w.t) / 1000 * w.v, f = Math.max(0, 1 - r / R); return [r, w.w, w.amp * f, w.a * Math.pow(f, .8)]; });
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+      const b0 = ph === 'off' ? .06 : .075; ctx.fillStyle = 'rgba(' + base + ',' + b0 + ')'; const hot = [];
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i], dx = p[0] - cx, dy = p[1] - cy, d = Math.sqrt(dx * dx + dy * dy) || 1; let lum = 0, off = 0;
+        for (let j = 0; j < wr.length; j++) { const w = wr[j], g = (d - w[0]) / w[1]; if (g > 3 || g < -3) continue; const e = Math.exp(-g * g); lum += e * w[3]; off += -g * e * w[2] * 1.9; }
+        if (ph !== 'off') { const tw = Math.sin(t * 1.3 + p[2]); if (tw > .965) lum += (tw - .965) * 16; }
+        const qx = p[0] - px, qy = p[1] - py, q = qx * qx + qy * qy; let ox = 0, oy = 0; if (q < 22000) { const e = Math.exp(-q / 3800); lum += e * .5; const qd = Math.sqrt(q) || 1; ox = qx / qd * e * 4; oy = qy / qd * e * 4; }
+        if (lum < .045) { ctx.fillRect(p[0] - 2, p[1] - 2, 4, 4); continue; }
+        hot.push(p[0] + dx / d * off + ox, p[1] + dy / d * off + oy, lum > 1 ? 1 : lum);
+      }
+      ctx.fillStyle = col;
+      for (let i = 0; i < hot.length; i += 3) { const a = hot[i + 2], s = 4 + a * 2.6; ctx.globalAlpha = Math.min(1, .1 + a * .92); ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(hot[i] - s / 2, hot[i + 1] - s / 2, s, s, 1.1 + a); else ctx.rect(hot[i] - s / 2, hot[i + 1] - s / 2, s, s); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      /* волна через всё окно: фронт из точек, а не цветная заливка */
+      const wc = root.querySelector('.wvc');
+      if (wc) { if (!wv) wvT = now; if (wc !== wv) { wv = wc; fit(wc); } const w = wc.offsetWidth, h = wc.offsetHeight, x = wc.getContext('2d'), a = wc.getBoundingClientRect(), b = c.getBoundingClientRect(), k = w / (a.width || w), ux = (b.left - a.left) * k + cx, uy = (b.top - a.top) * k + cy;
+        const u = Math.min(1, (now - wvT) / 1900), r = (1 - Math.pow(1 - u, 1.6)) * Math.hypot(w, h) * .8, fa = Math.pow(1 - u, .9); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h); x.fillStyle = col;
+        if (u < 1) for (let yy = S / 2; yy < h; yy += S) for (let xx = S / 2; xx < w; xx += S) { const dx = xx - ux, dy = yy - uy, d = Math.sqrt(dx * dx + dy * dy) || 1, g = (d - r) / 58; if (g > 2.4 || g < -2.4) continue; const e = Math.exp(-g * g), o = -g * e * 16, s = 2.4 + e * 3.4; x.globalAlpha = e * fa * .85; x.fillRect(xx + dx / d * o - s / 2, yy + dy / d * o - s / 2, s, s); }
+        x.globalAlpha = 1; } else wv = null;
+    };
+    const move = (e) => { if (!cv) return; const a = cv.getBoundingClientRect(); if (!a.width) return; const k = W / a.width; px = (e.clientX - a.left) * k; py = (e.clientY - a.top) * k; };
+    const out = () => { px = py = -9999; };
+    document.addEventListener('pointermove', move, { passive: true }); document.addEventListener('pointerleave', out);
+    raf = requestAnimationFrame(frame);
+    this._mxOff = () => { cancelAnimationFrame(raf); document.removeEventListener('pointermove', move); document.removeEventListener('pointerleave', out); };
+  }
+  st() { return this.state || {}; }
+  wlTip() { const el = document.querySelector('.r.wlr'); if (!el) return; const l = el.closest('.list'); if (l) l.scrollTop = l.scrollHeight; const r = el.getBoundingClientRect(), sv = el.closest('.servers').getBoundingClientRect(), rtl = getComputedStyle(el).direction === 'rtl'; this.setState({ tipId: 'wl', tipX: Math.round(rtl ? sv.right + 10 : sv.left - 282), tipY: Math.round(Math.max(sv.top, Math.min(r.top - 10, sv.bottom - Math.max((document.querySelector('.stip') || {}).offsetHeight || 250, 356)))) }); }
+  wlEnd() { setTimeout(() => { const l = document.querySelector('.list'); if (l) l.scrollTop = l.scrollHeight; }, 60); }
+  openAdd(kind) { clearTimeout(this.ta); this.setState({ add: 'check' }); this.ta = setTimeout(() => this.setState({ add: kind }), 900); }
+  phase() { return this.st().phase || (this.props.state === 'off' ? 'off' : (this.props.state === 'ing' || this.props.state === 'sw' ? 'ing' : 'on')); }
+  isSw() { return this.st().sw !== undefined ? this.st().sw : this.props.state === 'sw'; }
+  secs() { const s = this.st().secs; return typeof s === 'number' ? s : 2539; }
+  pingOne(id, base) {
+    this.setState({ checking: Object.assign({}, this.st().checking, { [id]: true }) });
+    setTimeout(() => {
+      const v = Math.max(6, Math.round(base + (Math.random() * 14 - 5)));
+      this.setState({
+        pings: Object.assign({}, this.st().pings, { [id]: v }),
+        checking: Object.assign({}, this.st().checking, { [id]: false }),
+        flash: Object.assign({}, this.st().flash, { [id]: true })
+      });
+      setTimeout(() => this.setState({ flash: Object.assign({}, this.st().flash, { [id]: false }) }), 750);
+    }, 550 + Math.random() * 650);
+  }
+  pingAll() {
+    (this.nodes || []).forEach((n, i) => setTimeout(() => this.pingOne(n[0], n[4]), i * 140));
+  }
+  runSteps() {
+    clearTimeout(this.ts);
+    const go = (k) => {
+      if (this.phase() !== 'ing') return;
+      this.setState({ cstep: k % 4 });
+      this.ts = setTimeout(() => go(k + 1), 620);
+    };
+    go(0);
+  }
+  switchTo(id) {
+    clearTimeout(this.t1); clearTimeout(this.t2); clearTimeout(this.ts);
+    this.setState({ sel: id, pop: false, phase: 'ing', sw: true, wave: false, cstep: 2 });
+    this.t1 = setTimeout(() => this.setState({ phase: 'on', sw: false, secs: 0 }), 1600);
+  }
+  toggle() {
+    if (this.blk) return;
+    if (this.cs === 'offline' || this.cs === 'svc') return;
+    if (this.cs === 'rec') { this.setState({ cs: '', phase: 'off', wave: false }); return; }
+    if (this.cs === 'error' || this.cs === 'ks') { this.setState({ cs: '' }); this.setPhase('ing'); this.t1 = setTimeout(() => this.setPhase('on'), 1900); return; }
+    const p = this.phase();
+    clearTimeout(this.t1); clearTimeout(this.t2);
+    if (p !== 'off') { this.setState({ phase: 'off', sw: false, wave: false }); return; }
+    this.setState({ phase: 'ing', sw: false, wave: false, cstep: 0 });
+    setTimeout(() => this.runSteps(), 0);
+    this.t1 = setTimeout(() => {
+      this.setState({ phase: 'on', secs: 0, wave: true });
+      this.t2 = setTimeout(() => this.setState({ wave: false }), 1900);
+    }, 1900);
+  }
+  setPhase(p) {
+    clearTimeout(this.t1); clearTimeout(this.t2);
+    if (this.st().cs) this.setState({ cs: '' });
+    if (p === 'on') {
+      this.setState({ phase: 'on', secs: 0, wave: true });
+      this.t2 = setTimeout(() => this.setState({ wave: false }), 1900);
+    } else {
+      this.setState({ phase: p, sw: false, wave: false, cstep: 0 });
+      if (p === 'ing') setTimeout(() => this.runSteps(), 0);
+    }
+  }
+  renderVals() {
+    const logos = { lavender: '/_blob/0b62512895ad639ab01894d9cfc68db6', mint: '/_blob/7e2cbe098a3f586b63d3e07c56f17a01', sand: '/_blob/12736226f7d078aa98183de30675f863', rose: '/_blob/766bb9e952957b786b037a8ba7882911' };
+    const theme = (this.st().theme || this.props.theme) === 'light' ? 'light' : 'dark';
+    const accent = logos[this.props.accent] ? this.props.accent : 'lavender';
+    const phase = this.phase();
+    const sel = this.st().sel || this.props.sel || 'auto';
+    const tab = this.st().tab || this.props.tab || 'vpn';
+    const prof = this.st().prof || this.props.prof || 'auto';
+    const popOpen = this.st().pop !== undefined ? this.st().pop : this.props.pop === 'open';
+    const NODES_ALL = [["de", "de", "Germany", ["h2", "h2w", "vt", "vx", "awg", "tt"], 39, ""], ["de2", "de", "Germany", ["h2", "h2w", "vt", "vx"], 44, ""], ["mass", "de", "Germany", ["h2"], 61, ""], ["be", "by", "Belarus", ["h2", "vt", "vx"], 58, "RU"], ["nl", "nl", "Netherlands", ["h2", "h2w", "vt", "vx", "awg", "tt"], 48, ""], ["ru", "ru", "Russia", ["h2", "vt", "vx", "tt"], 12, ""], ["ru2", "ru", "Russia", ["h2", "vt", "vx"], 15, ""], ["ro", "ro", "Romania", ["h2", "h2w", "vt", "vx"], 63, ""], ["fi", "fi", "Finland", ["h2", "vt", "vx", "awg"], 41, ""], ["nl2", "nl", "Netherlands", ["h2", "vt"], 51, ""], ["lv", "lv", "Latvia", ["h2", "vt", "vx"], 36, ""], ["pl", "pl", "Poland", ["h2", "vt", "vx"], 45, ""], ["ee", "ee", "Estonia", ["h2", "vt"], 38, ""], ["se", "se", "Sweden", ["h2", "vt", "vx", "awg"], 55, ""], ["fr", "fr", "France", ["h2", "h2w", "vt", "vx"], 62, ""], ["de3", "de", "Germany", ["vt", "vx"], 47, ""], ["fi2", "fi", "Finland", ["awg"], 43, ""], ["pl2", "pl", "Poland", ["vt"], 49, ""], ["nl3", "nl", "Netherlands", ["h2", "awg"], 53, ""], ["se2", "se", "Sweden", ["vt", "vx"], 58, ""], ["fr2", "fr", "France", ["h2"], 66, ""], ["ro2", "ro", "Romania", ["vt", "vx"], 70, ""], ["lv2", "lv", "Latvia", ["h2", "vt"], 40, ""], ["ee3", "ee", "Estonia", ["awg"], 42, ""]];
+    const svN = this.st().svN !== undefined ? this.st().svN : (this.props.srv !== undefined ? Number(this.props.srv) : 8);
+    const siPre = this.st().si !== undefined ? this.st().si : ({ mine: 0, work: 1, family: 2, test: 3, expired: 4, none: 5 }[this.props.sub] || 0);
+    const TCITY = { de: 'Frankfurt', by: 'Minsk', nl: 'Amsterdam', ru: 'Moscow', ro: 'Bucharest', fi: 'Helsinki', lv: 'Riga', pl: 'Warsaw', ee: 'Tallinn', se: 'Stockholm', fr: 'Paris' };
+    const CITY = { nl: 'Amsterdam', fi: 'Helsinki', ro: 'Bucharest, Pipera Business District' }, V6 = { ru2: true, nl2: true }, NAMEOF = {}, CNT = {};
+    NODES_ALL.forEach((n) => { CNT[n[2]] = (CNT[n[2]] || 0) + 1; NAMEOF[n[0]] = CITY[n[0]] ? ' · ' + CITY[n[0]] : (CNT[n[2]] > 1 ? ' ' + CNT[n[2]] : ''); });
+    const NODES = siPre === 5 ? [] : (svN === 2 ? [NODES_ALL[0], NODES_ALL[4]] : NODES_ALL.slice(0, svN));
+    const FAM = { h2: 'h2', h2w: 'h2', vt: 'vless', vx: 'vless', awg: 'awg', tt: 'tt' };
+    const LABEL = { h2: 'HY2', h2w: 'HY2 · WARP', vt: 'VLESS · TCP', vx: 'VLESS · XHTTP', awg: 'AWG 3.1', tt: 'TT' };
+    const FULL = { h2: 'Hysteria2 · UDP', h2w: 'Hysteria2 with WARP exit', vt: 'VLESS · TCP · REALITY', vx: 'VLESS · XHTTP', awg: 'AmneziaWG 3.1 · UDP', tt: 'TrustTunnel · TCP + UDP' };
+    const node = NODES.find((n) => n[0] === (sel === 'auto' ? 'de' : sel)) || NODES[0] || NODES_ALL[0];
+    const p = prof !== 'auto' && node[3].indexOf(prof) >= 0 ? prof : (node[3].indexOf('vt') >= 0 ? 'vt' : node[3][0]);
+    const isProfAuto = !(prof !== 'auto' && node[3].indexOf(prof) >= 0);
+    this.nodes = NODES;
+    const pings = this.st().pings || {}, checking = this.st().checking || {}, flash = this.st().flash || {};
+    const msOf = (n) => (pings[n[0]] != null ? pings[n[0]] : n[4]);
+    const qOf = (v) => (v <= 50 ? 'q3' : (v <= 90 ? 'q2' : 'q1'));
+    const sigCls = {}, msTxt = {}, ping = {};
+    NODES.forEach((n) => {
+      const v = msOf(n);
+      sigCls[n[0]] = qOf(v) + (checking[n[0]] ? ' busy' : '') + (flash[n[0]] ? ' flash' : '');
+      msTxt[n[0]] = String(v);
+      ping[n[0]] = () => this.pingOne(n[0], n[4]);
+    });
+    const anyBusy = NODES.some((n) => checking[n[0]]);
+    const FLAGS = {"de": "/_blob/e496c2fcbf4e9bb39112cabd5bf7f493", "by": "/_blob/9754caebe7308258301ba71a8be3f1ba", "nl": "/_blob/e03fb05e0bdcc00f476374f00844dcf0", "ru": "/_blob/b7fc87ada36d9ca5dfc18fe7a2bc5731", "ro": "/_blob/5fcef1b651d4897d4bd86b5dfbd3e9a7", "fi": "/_blob/5a45af717ce4d720751cf765c6d0a732", "lv": "/_blob/d180aa55fd40e176066228d566483f35", "pl": "/_blob/ebb260239dba6f20ae05c4141595c5d8", "ee": "/_blob/69cc6dc0929efcc6e75647d8e6f109d6", "se": "/_blob/88eea889887d7bcbe74de260284a1989", "fr": "/_blob/bcb7cc899cc25353d05e6f5134e9a424"};
+    const NAMES = { h2: 'Hysteria2', vless: 'VLESS', awg: 'AmneziaWG', tt: 'TrustTunnel' };
+    // вердикт последней проверки сети — тот же, что на экране «Диагностика»
+    const VERD = { nl: 'slow', ro: 'freeze', fi: 'down', pl: 'config' };
+    const VDX = { slow: ['Slowed down', 'dashboard-speed', 'warn', 1], freeze: ['Freezes', 'snow-flake', 'ice', 2], down: ['Server down', 'cloud-xmark', 'neu', 3], config: ['Config error', 'wrench', 'lav', 4] };
+    const cs0 = this.st().cs !== undefined ? this.st().cs : (this.props.conn && this.props.conn !== 'none' ? this.props.conn : '');
+    const wlK = this.st().wl !== undefined ? this.st().wl : (this.props.wl || 'none'), wlHas = wlK !== 'none' && NODES.length > 0 && siPre < 4, wlDown = wlK === 'down', wlSel = wlHas && !wlDown && sel === 'wl';
+    const wlN = Number(this.st().wlN !== undefined ? this.st().wlN : (this.props.wln || 1)), WLL = [['nl', 'Netherlands'], ['de', 'Germany'], ['fi', 'Finland'], ['lv', 'Latvia'], ['pl', 'Poland']].slice(0, wlN), wlC = WLL.find((x) => x[0] === this.st().wlCur) || WLL[0];
+    const pickSrv = (id) => { const to = id === 'auto' ? 'de' : id; if (phase === 'on' && !cs0 && to !== (wlSel ? 'wl' : node[0])) this.switchTo(id); else this.setState({ sel: id, pop: false }); };
+    const bnK0 = this.st().bn !== undefined ? this.st().bn : (this.props.banner || 'none');
+    const NEWV = bnK0 === 'newver' ? { mass: 1, ru2: 1 } : {};
+    const rows = NODES.map((n) => {
+      const fams = []; n[3].forEach((k) => { if (fams.indexOf(FAM[k]) < 0) fams.push(FAM[k]); });
+      const mark = NEWV[n[0]] ? 'Needs update' : (n[5] ? 'via ' + n[5] : (V6[n[0]] ? 'IPv6' : ''));
+      const hh = n[0].split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7), load = 12 + hh % 71;
+      const tipD = { flag: FLAGS[n[1]], title: n[2] + NAMEOF[n[0]], city: TCITY[n[1]] || '', host: n[0] + '.vpn.example.com', ip: [45 + hh % 140, 10 + hh % 229, 3 + (hh >> 3) % 250, 2 + (hh >> 5) % 252].join('.'),
+        route: n[5] ? 'Relay in Russia' : 'Straight to server', pl: fams.map((x) => ({ c: x, t: NAMES[x] })), load: load, loadC: load > 70 ? 'hi' : '',
+        ms: NEWV[n[0]] || VERD[n[0]] === 'down' ? '—' : msTxt[n[0]], msC: NEWV[n[0]] || VERD[n[0]] === 'down' ? 'nov' : '' };
+      return { tipD: tipD, hin: (e) => { const el = e.currentTarget || e.target.closest('.r'), r = el.getBoundingClientRect(), sv = el.closest('.servers').getBoundingClientRect(), rtl = getComputedStyle(el).direction === 'rtl';
+          this.setState({ tipId: n[0], tipX: Math.round(rtl ? sv.right + 10 : sv.left - 282), tipY: Math.round(Math.max(sv.top, Math.min(r.top - 10, sv.bottom - ((document.querySelector('.stip') || {}).offsetHeight || 250)))) }); },
+        hout: () => this.setState({ tipId: '' }),
+        id: n[0], country: n[2], suf: NAMEOF[n[0]], mark: mark, mkc: mark ? (NEWV[n[0]] ? 'upd' : '') : 'hide', flag: FLAGS[n[1]], via: n[5], hasVia: !!n[5], now: phase === 'on' && n[0] === node[0] && !wlSel,
+        h2: fams.indexOf('h2') >= 0, vless: fams.indexOf('vless') >= 0, awg: fams.indexOf('awg') >= 0, tt: fams.indexOf('tt') >= 0, label: fams.map((x) => NAMES[x]).join(', '),
+        rcls: sel === n[0] ? 'on' : '', on: sel === n[0] ? 'true' : 'false', pick: () => pickSrv(n[0]),
+        vd: VERD[n[0]] || '', vt: VERD[n[0]] ? VDX[VERD[n[0]]][0] : '', vi: VERD[n[0]] ? VDX[VERD[n[0]]][1] : 'check', vc: VERD[n[0]] ? VDX[VERD[n[0]]][2] : 'hide', vo: VERD[n[0]] ? VDX[VERD[n[0]]][3] : 0,
+        vrow: NEWV[n[0]] || VERD[n[0]] === 'down' || VERD[n[0]] === 'config' ? 'dead' : '', pisC: VERD[n[0]] || NEWV[n[0]] ? 'hide' : '', sigX: NEWV[n[0]] || VERD[n[0]] === 'down' ? 'nov' : '',
+        sig: NEWV[n[0]] || VERD[n[0]] === 'down' ? '' : sigCls[n[0]], ping: ping[n[0]], ms: NEWV[n[0]] || VERD[n[0]] === 'down' ? '—' : msTxt[n[0]] };
+    });
+    const tipRow = rows.filter((x) => x.id === this.st().tipId)[0];
+    if (tipRow) this.lastTip = tipRow.tipD;
+    const noUdp = (this.st().udp !== undefined ? this.st().udp : (this.props.udp || 'no')) !== 'yes';
+    if (this.st().tipId === 'wl' && wlHas) this.lastTip = { isWl: true, flag: FLAGS[wlC[0]], title: wlC[1], city: 'For allowlists', host: 'dns.vpn.example.com', ip: '203.0.113.53', route: 'Fallback channel over DNS', pl: [{ c: 'wl', t: 'Allowlist' }], load: 0, loadC: '', kc: 'wl', ms: wlDown ? 'unavailable' : 'backup', msC: wlDown ? 'nov wl' : 'wl', noUdp: noUdp };
+    const tip0 = this.lastTip || (rows[0] ? rows[0].tipD : { pl: [] }), tip = Object.assign({ isWl: false }, tip0, { notWl: !tip0.isWl });
+    const rcls = {}, rOn = {}, pickN = {}, nowN = {};
+    NODES.forEach((n) => {
+      rcls[n[0]] = sel === n[0] ? 'on' : '';
+      rOn[n[0]] = sel === n[0] ? 'true' : 'false';
+      pickN[n[0]] = () => pickSrv(n[0]);
+      nowN[n[0]] = phase === 'on' && n[0] === node[0] && !wlSel;
+    });
+    const cur = { cc: node[1], flag: FLAGS[node[1]], country: node[2], suf: NAMEOF[node[0]], title: node[2] + NAMEOF[node[0]], node: node[0], flagLabel: 'Flag of ' + node[2], fam: FAM[p], label: LABEL[p],
+      isH2: FAM[p] === 'h2', isVless: FAM[p] === 'vless', isAwg: FAM[p] === 'awg', isTt: FAM[p] === 'tt', ms: String(msOf(node)),
+      sub: '', srvSub: (sel === 'auto' ? 'Auto' : 'Picked by you') + ' · ' + (node[5] ? 'via ' + node[5] : 'direct'), prSub: isProfAuto ? 'Auto' : 'Picked by you' };
+    if (wlSel) Object.assign(cur, { cc: wlC[0], flag: FLAGS[wlC[0]], country: wlC[1], suf: '', title: wlC[1], node: 'wl', flagLabel: wlC[1], fam: 'wl', label: 'Allowlist', isH2: false, isVless: false, isAwg: false, isTt: false, isWl: true, ms: '—', srvSub: 'fallback channel', prSub: 'over DNS' });
+    const profs = node[3].map((k) => ({ fam: FAM[k], label: LABEL[k], full: FULL[k], isH2: FAM[k] === 'h2', isVless: FAM[k] === 'vless', isAwg: FAM[k] === 'awg', isTt: FAM[k] === 'tt',
+      cls: !isProfAuto && k === p ? 'on' : '', on: !isProfAuto && k === p ? 'true' : 'false', pick: () => this.setState({ prof: k, pop: false }) }));
+    const SUBS = [{"name": "My subscription", "ini": "M", "tone": "lav", "host": "vpn.example.com", "st": "24 days left", "stCls": "", "meta": "8 servers · 24 days left", "tV": "24 days", "tS": "until Nov 30", "tP": "80%", "tG": "", "tN": 1, "tInf": false, "tFin": true, "dV": "64.8 GB", "dS": "left of 100 GB", "dP": "65%", "dG": "", "dN": 1, "dInf": false, "dFin": true, "vV": "2 of 5", "vS": "devices in use", "vP": "40%", "vG": "", "vN": 5, "vInf": false, "vFin": true, "src": "mg", "srcT": "Mistgate", "srcCls": "src-mg"}, {"name": "Work", "ini": "W", "tone": "sky", "host": "corp.example.net/sub", "st": "Unlimited", "stCls": "", "meta": "5 servers · unlimited", "tV": "Lifetime", "tS": "no end date", "tP": "100%", "tG": "inf", "tN": 1, "tInf": true, "tFin": false, "dV": "182 GB", "dS": "used · no cap", "dP": "100%", "dG": "inf", "dN": 1, "dInf": true, "dFin": false, "vV": "3", "vS": "no limit", "vP": "100%", "vG": "inf", "vN": 1, "vInf": true, "vFin": false, "src": "link", "srcT": "Link", "srcCls": "src-link"}, {"name": "Family", "ini": "F", "tone": "mint", "host": "home.example.com", "st": "No end date", "stCls": "", "meta": "6 servers · no end date", "tV": "Lifetime", "tS": "no end date", "tP": "100%", "tG": "inf", "tN": 1, "tInf": true, "tFin": false, "dV": "38 GB", "dS": "left of 50 GB", "dP": "76%", "dG": "", "dN": 1, "dInf": false, "dFin": true, "vV": "4 of 6", "vS": "devices in use", "vP": "67%", "vG": "", "vN": 6, "vInf": false, "vFin": true, "src": "mg", "srcT": "Mistgate", "srcCls": "src-mg"}, {"name": "grpc test", "ini": "G", "tone": "sand", "host": "test-servers.conf", "st": "3 days left", "stCls": "warn", "meta": "2 servers · 3 days left", "tV": "3 days", "tS": "until Nov 12", "tP": "10%", "tG": "warn", "tN": 1, "tInf": false, "tFin": true, "dV": "4.1 GB", "dS": "left of 20 GB", "dP": "20%", "dG": "", "dN": 1, "dInf": false, "dFin": true, "vV": "1 of 1", "vS": "limit reached", "vP": "100%", "vG": "warn", "vN": 1, "vInf": false, "vFin": true, "src": "file", "srcT": "File", "srcCls": "src-file"}, {"name": "My subscription", "ini": "M", "tone": "lav", "host": "vpn.example.com", "st": "Expired", "stCls": "bad", "meta": "8 servers · expired Nov 2", "tV": "Expired", "tS": "on Nov 2", "tP": "0%", "tG": "bad", "tN": 1, "tInf": false, "tFin": true, "dV": "—", "dS": "renew to use", "dP": "0%", "dG": "", "dN": 1, "dInf": false, "dFin": true, "vV": "2 of 5", "vS": "devices", "vP": "40%", "vG": "", "vN": 5, "vInf": false, "vFin": true, "src": "mg", "srcT": "Mistgate", "srcCls": "src-mg"}, {"name": "No subscription", "ini": "+", "tone": "add", "host": "", "st": "", "stCls": "", "meta": "Add one to get servers", "tV": "—", "tS": "", "tP": "0%", "tG": "", "tN": 1, "tInf": false, "tFin": true, "dV": "—", "dS": "", "dP": "0%", "dG": "", "dN": 1, "dInf": false, "dFin": true, "vV": "—", "vS": "", "vP": "0%", "vG": "", "vN": 1, "vInf": false, "vFin": true, "src": "", "srcT": "", "srcCls": "hide"}];
+    const SUBIX = { mine: 0, work: 1, family: 2, test: 3, expired: 4, none: 5 };
+    const si = this.st().si !== undefined ? this.st().si : (SUBIX[this.props.sub] || 0);
+    const subsOpen = this.st().subsPop !== undefined ? this.st().subsPop : this.props.subs === 'open';
+    const gone = this.st().gone || [];
+    const mFor = this.st().mFor;
+    const subs = SUBS.slice(0, 4).map((u, i) => Object.assign({}, u, { i: i, cls: i === si ? 'on' : '', on: i === si ? 'true' : 'false', pick: () => this.setState({ si: i, subsPop: false, mFor: undefined }),
+      mOpen: mFor === i, menu: () => this.setState({ mFor: mFor === i ? undefined : i }),
+      ask: () => this.setState({ rmAsk: i, mFor: undefined }), rmT: u.src === 'mg' ? 'Sign out of this PC' : 'Remove',
+      rm: () => { const g = gone.concat([i]); const left = [0, 1, 2, 3].filter((k) => g.indexOf(k) < 0); this.setState({ gone: g, mFor: undefined, si: i === si ? (left.length ? left[0] : 5) : si }); } })).filter((u) => gone.indexOf(u.i) < 0);
+    const s = this.secs();
+    const timer = Math.floor(s / 3600) + ':' + String(Math.floor(s / 60) % 60).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    const subst = this.st().subst !== undefined ? this.st().subst : (this.props.subst || 'ok');
+    const blk = si === 5 ? 'none' : (si === 4 ? 'expired' : (subst === 'removed' && si === 0 ? 'removed' : (NODES.length === 0 ? 'nosrv' : '')));
+    this.blk = blk;
+    const CSX = {"rec": ["Reconnecting…", "Network changed — traffic is held safely", ""], "offline": ["No internet", "We’ll connect as soon as it’s back", ""], "error": ["No server answers", "Tried 12 ways on 8 servers from your network", "warn"], "ks": ["Internet is blocked", "VPN is off, so nothing leaves this PC", ""], "svc": ["Service isn’t responding", "Mistgate needs its background service to connect", "warn"]};
+    if (this.props.why === 'sleep') CSX.rec[1] = 'Your PC woke up — traffic is held safely';
+    const csRaw = this.st().cs !== undefined ? this.st().cs : (this.props.conn && this.props.conn !== 'none' ? this.props.conn : '');
+    const cs = blk ? '' : csRaw;
+    this.cs = cs;
+    const ph = blk ? 'off' : (cs === 'rec' ? 'ing' : (cs ? 'off' : phase));
+    rows.forEach((r) => { if (ph !== 'on') r.now = false; });
+    Object.keys(nowN).forEach((k) => { if (ph !== 'on') nowN[k] = false; });
+    const BLK = { none: ['Add a subscription', 'Paste the link from your VPN provider to get servers', ''], expired: ['Subscription expired', 'Renew it to connect again', 'bad'], nosrv: ['No servers yet', 'Your subscription has no servers right now', ''], removed: ['This PC was removed', 'It’s no longer in the subscription, so VPN can’t connect', 'bad'] };
+    /*BRANDS*/const BRS = {"polar": {"name": "Polar VPN", "host": "polar.example", "logo": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='24' fill='%232f6fed'/%3E%3Cpath d='M24 8.5l3.7 11.8L39.5 24l-11.8 3.7L24 39.5l-3.7-11.8L8.5 24l11.8-3.7z' fill='%23fff'/%3E%3C/svg%3E", "shape": "round", "ini": "P", "dark": {"raw": "#2f6fed", "accent": "#558efa", "ink": "#0c0c0e", "text": "#558efb", "moved": true, "c_ink": 6.2, "c_text": 5.8}, "light": {"raw": "#2f6fed", "accent": "#2f6fed", "ink": "#ffffff", "text": "#2f6fed", "moved": false, "c_ink": 4.5, "c_text": 4.5}}, "sunline": {"name": "Sunline", "host": "sunline.example", "logo": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 44'%3E%3Ccircle cx='22' cy='22' r='9' fill='%23ffb800'/%3E%3Cg stroke='%23ffb800' stroke-width='3.4' stroke-linecap='round'%3E%3Cpath d='M22 3.5v4.5M22 36v4.5M3.5 22H8M36 22h4.5M9 9l3.2 3.2M31.8 31.8L35 35M35 9l-3.2 3.2M12.2 31.8L9 35'/%3E%3C/g%3E%3Ctext x='50' y='30' font-family='Arial,Helvetica,sans-serif' font-size='24' font-weight='700' letter-spacing='-.5' fill='%231b1b1f'%3Esunline%3C/text%3E%3C/svg%3E", "shape": "wide", "ini": "S", "dark": {"raw": "#ffd400", "accent": "#ffd400", "ink": "#0c0c0e", "text": "#ffd400", "moved": false, "c_ink": 13.7, "c_text": 12.7}, "light": {"raw": "#ffd400", "accent": "#efc705", "ink": "#0c0c0e", "text": "#8a7203", "moved": true, "c_ink": 12.0, "c_text": 4.7}}, "onyx": {"name": "Onyx Net", "host": "onyx.example", "logo": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='11' fill='%23141416'/%3E%3Ccircle cx='24' cy='24' r='10.5' fill='none' stroke='%23fff' stroke-width='5'/%3E%3C/svg%3E", "shape": "square", "ini": "O", "dark": {"raw": "#141416", "accent": "#929294", "ink": "#0c0c0e", "text": "#929295", "moved": true, "c_ink": 6.3, "c_text": 5.9}, "light": {"raw": "#141416", "accent": "#141416", "ink": "#ffffff", "text": "#141416", "moved": false, "c_ink": 18.4, "c_text": 18.4}}};/*END*/
+    const BR = BRS[this.props.brand] || null, BT = BR ? BR[theme] : null;
+    const brTok = BT ? '--accent:' + BT.accent + ';--ink:' + BT.ink + ';--accent-text:' + BT.text : '';
+    const sub0 = SUBS[si];
+    const tgCount = blk === 'none' || sub0.src !== 'mg' ? 0 : 3;
+    const subV = Object.assign({}, sub0, { meta: blk === 'none' ? sub0.meta : sub0.meta.replace(/^\d+ servers/, NODES.length + ' servers') });
+    if (subst === 'stale' && si === 0) { subV.meta = 'Couldn’t update · using the copy from 09:12'; subV.metaC = 'stale'; }
+    if (BR && si === 0) { subV.name = BR.name; subV.ini = BR.ini; }
+    const ref = !!this.st().ref;
+    const tgMissing = this.st().tgm !== undefined ? this.st().tgm : this.props.telegram === 'missing';
+    const dv = {}, dvOn = {}, dvSet = {};
+    const devOpt = (k, v, on, fn) => { dv[k + '_' + v] = on ? 'on' : ''; dvOn[k + '_' + v] = on ? 'true' : 'false'; dvSet[k + '_' + v] = fn; };
+    [0, 2, 8, 24].forEach((v) => devOpt('sv', v, svN === v && si !== 5, () => this.setState({ svN: v, si: si === 5 ? 0 : si, tab: 'vpn' })));
+    ['off', 'ing', 'on'].forEach((v) => devOpt('ph', v, ph === v && !cs, () => this.setPhase(v)));
+    ['rec', 'offline', 'error', 'ks', 'svc'].forEach((v) => devOpt('cs', v, cs === v, () => { clearTimeout(this.t1); clearTimeout(this.t2); this.setState({ cs: v, wave: false, si: si > 3 ? 0 : si, svN: svN || 8 }); }));
+    [0, 1, 2, 3, 4, 5].forEach((v) => devOpt('pl', v, si === v, () => this.setState({ si: v, subsPop: false })));
+    [['ok', false], ['missing', true]].forEach((v) => devOpt('tg', v[0], tgMissing === v[1], () => this.setState({ tgm: v[1], tgw: false, tab: 'telegram' })));
+    ['dark', 'light'].forEach((v) => devOpt('th', v, theme === v, () => this.setState({ theme: v })));
+    const wlHintOn = wlHas && !wlDown && !this.st().wlHintOff && (cs === 'error' || (!!this.st().wlTry && ph === 'ing'));
+    const wlBase = { cs: '', wlHintOff: false, wlTry: false, tab: 'vpn', si: si > 3 ? 0 : si, svN: svN || 8 };
+    devOpt('wl', 'none', !wlHas, () => this.setState(Object.assign({}, wlBase, { wl: 'none', sel: sel === 'wl' ? 'auto' : sel })));
+    devOpt('wl', 'yes', wlHas && !wlDown && !wlSel && !wlHintOn, () => { this.setState(Object.assign({}, wlBase, { wl: 'yes', sel: sel === 'wl' ? 'auto' : sel })); this.wlEnd(); });
+    devOpt('wl', 'on', wlSel && !wlHintOn, () => { clearTimeout(this.t1); clearTimeout(this.t2); this.setState(Object.assign({}, wlBase, { wl: 'yes', sel: 'wl', phase: 'on', sw: false })); this.wlEnd(); });
+    devOpt('wl', 'down', wlHas && wlDown, () => { this.setState(Object.assign({}, wlBase, { wl: 'down', sel: sel === 'wl' ? 'auto' : sel })); this.wlEnd(); });
+    devOpt('wl', 'hint', wlHintOn, () => { clearTimeout(this.t1); clearTimeout(this.t2); this.setState(Object.assign({}, wlBase, { wl: 'yes', sel: sel === 'wl' ? 'auto' : sel, cs: 'error', wave: false })); });
+    [1, 3, 5].forEach((v) => devOpt('wn', v, wlN === v, () => { this.setState(Object.assign({ wlN: v, wlCur: 'nl' }, wlHas ? {} : { wl: 'yes' })); }));
+    [['no', true], ['yes', false]].forEach((v) => devOpt('udp', v[0], noUdp === v[1], () => { this.setState({ udp: v[0] }); if (wlHas) setTimeout(() => this.wlTip(), 80); }));
+    const wlTrying = !!this.st().wlTry && ph === 'ing';
+    const wl = { has: wlHas, flag: FLAGS[wlC[0]], country: wlC[1], multi: wlN > 1 && !wlDown, list: WLL.map((x) => ({ n: x[1], flag: FLAGS[x[0]], c: x[0] === wlC[0] ? 'on' : '', on: x[0] === wlC[0] ? 'true' : 'false', pick: () => { if (wlSel && ph === 'on' && !cs && x[0] !== wlC[0]) { this.setState({ wlCur: x[0] }); this.switchTo('wl'); } else { this.setState({ wlCur: x[0], sel: 'wl', pop: false }); if (phase === 'on' && !cs0 && !wlSel) this.switchTo('wl'); } } })), rcls: (wlSel ? 'on ' : '') + (wlDown ? 'dead' : ''), on: wlSel ? 'true' : 'false', now: wlSel && ph === 'on' && !cs,
+      sub: wlDown ? 'Not coming up right now' : 'Backup channel for when regular servers are blocked' + (wlN > 1 ? '' : ' · ' + wlC[1]), sigT: wlDown ? 'unavailable' : 'backup', sigC: wlDown ? 'off' : '', pick: () => { if (!wlDown) pickSrv('wl'); },
+      hin: (e) => { const el = e.currentTarget || e.target.closest('.r'), r = el.getBoundingClientRect(), sv = el.closest('.servers').getBoundingClientRect(), rtl = getComputedStyle(el).direction === 'rtl';
+        this.setState({ tipId: 'wl', tipX: Math.round(rtl ? sv.right + 10 : sv.left - 282), tipY: Math.round(Math.max(sv.top, Math.min(r.top - 10, sv.bottom - Math.max((document.querySelector('.stip') || {}).offsetHeight || 250, 356)))) }); },
+      hout: () => this.setState({ tipId: '' }), what: (e) => { if (e && e.preventDefault) e.preventDefault(); if (this.st().tipId === 'wl') this.setState({ tipId: '' }); else this.wlTip(); },
+      onNow: wlSel && ph === 'on' && !cs, hint: wlHintOn, hintOff: () => this.setState({ wlHintOff: true }),
+      tryC: wlTrying ? 'busy' : '', tryT: wlTrying ? 'Connecting…' : 'Try it',
+      tryGo: () => { if (wlTrying) return; clearTimeout(this.t1); clearTimeout(this.t2); this.setState({ sel: 'wl', cs: '', pop: false, wlTry: true, phase: 'ing', sw: false, wave: false, cstep: 2 }); this.t1 = setTimeout(() => { this.setState({ phase: 'on', secs: 0, wave: true, wlTry: false }); this.wlEnd(); this.t2 = setTimeout(() => this.setState({ wave: false }), 1900); }, 2100); } };
+    // ---- баннер в шапке: один, самый важный ----
+    const bnK = this.st().bn !== undefined ? this.st().bn : (this.props.banner || 'none');
+    const BN = { news: ['megaphone', 'From your provider', 'Maintenance on Nov 14, 02:00–04:00', 'Settings.dc.html', '', ''], debug: ['lifebelt', 'Your admin asks for diagnostics', 'It helps fix your connection', 'Diag.dc.html', 'Send', ''], update: ['cloud-download', 'Mistgate 1.5.0 is ready', 'Restart to finish', 'Settings.dc.html', 'Restart', ''], newver: ['warning-circle', 'Some servers need a newer Mistgate', 'Update to use them', 'Settings.dc.html', 'Update', 'warn'] };
+    const bnD = blk === 'none' ? null : BN[bnK];
+    const bn = bnD ? { on: true, icon: bnD[0], t: bnD[1], s: bnD[2], sC: bnD[4] ? 'hide' : '', href: bnD[3], act: bnD[4], hasAct: !!bnD[4], tone: bnD[5], close: () => this.setState({ bn: 'none' }) } : { on: false };
+    // ---- плашка детектора: не больше одной ----
+    const detK = this.props.det || 'udp';
+    const DET = { udp: ['UDP is blocked — using VLESS · TCP', 'Details', ''], dpi: ['Looks like blocking on your route', 'Check', 'warn'] };
+    const det = DET[detK] ? { on: true, t: DET[detK][0], a: DET[detK][1], c: DET[detK][2] } : { on: false };
+    // ---- лист добавления подписки ----
+    const adK = this.st().add !== undefined ? this.st().add : (this.props.add || 'none');
+    const AERR = { badlink: ['link', 'This link doesn’t work', 'It may be mistyped or already replaced. Copy it again from your subscription page', 'Paste another link', 'Close', ''], limit: ['laptop', 'All 5 devices are in use', 'Remove one on the subscription page and try again — the link stays here', 'Open subscription page', 'Try again', 'warn'], expired: ['calendar', 'This subscription has ended', 'It ended on Nov 2. Renew it and the same link will work again', 'Renew', 'Close', 'bad'], offline: ['cloud-xmark', 'Can’t reach the provider', 'Its server isn’t answering. Your link is fine — try again in a minute', 'Try again', 'Close', ''] };
+    const adErr = AERR[adK], adBasic = adK === 'basic', first = si === 5;
+    const ad = { open: adK !== 'none' && adK !== 'drop', isDrop: adK === 'drop', isCheck: adK === 'check', isConfirm: adK === 'confirm' || adBasic, isMg: adK === 'confirm', isBasic: adBasic, isConsent: adK === 'consent', isErr: !!adErr,
+      style: adBasic ? '' : brTok, c: adErr ? 'conf' : '', name: adBasic ? 'servers.json' : (BR ? BR.name : 'My subscription'), host: adBasic ? 'File on this PC' : (BR ? BR.host : 'vpn.example.com'),
+      hasLogo: !adBasic && !!BR, noLogo: adBasic || !BR, logo: BR ? BR.logo : '', lc: BR ? 'br-' + BR.shape : '', ini: adBasic ? '' : 'M', iniC: adBasic ? 'file' : 'lav',
+      srcT: adBasic ? 'From a file' : 'Opened from your browser', srcI: adBasic ? 'folder' : 'link',
+      f1: adBasic ? '6' : '8', f1s: 'servers', f2: adBasic ? '3' : 'Nov 30', f2s: adBasic ? 'protocols' : 'valid until', f3: adBasic ? '∞' : '64.8 GB', f3s: adBasic ? 'no end date' : 'data left',
+      goT: adBasic ? 'Add 6 servers' : 'Connect this PC',
+      ei: adErr ? adErr[0] : 'link', et: adErr ? adErr[1] : '', ep: adErr ? adErr[2] : '', b1: adErr ? adErr[3] : '', b2: adErr ? adErr[4] : '', tone: adErr ? adErr[5] : '',
+      consentCls: this.st().consent ? 'on' : '', consentAria: this.st().consent ? 'true' : 'false', toggleConsent: () => this.setState({ consent: !this.st().consent }),
+      close: () => { clearTimeout(this.ta); this.setState({ add: 'none' }); },
+      go: () => { if (adBasic) this.setState({ add: 'none', si: 2, svN: 8 }); else if (first) this.setState({ add: 'consent' }); else this.setState({ add: 'none', si: 0, svN: 8, subst: 'ok' }); },
+      done: () => this.setState({ add: 'none', si: 0, svN: 8 }),
+      b1Go: () => { if (adK === 'offline') this.openAdd('confirm'); else this.setState({ add: 'none' }); },
+      b2Go: () => { if (adK === 'limit') this.openAdd('confirm'); else this.setState({ add: 'none' }); } };
+
+    return {
+      dv: dv, dvOn: dvOn, dvSet: dvSet, wl: wl,
+      ingT: this.isSw() ? 'Switching server' : 'Connecting',
+      stepTxt: this.isSw() ? 'To %s — your traffic is held safely'.replace('%s', cur.country) : ['Checking your network', 'UDP looks blocked — trying TCP', 'Reaching %s'.replace('%s', cur.title), 'Securing the tunnel'][this.st().cstep || 0],
+      rdDiag: (ph === 'on' && !cs) || cs === 'error' ? '' : 'hide', rdSet: si === 3 || si === 4 ? '' : 'hide',
+      stepCls: (this.st().cstep || 0) % 2 ? 'sB' : 'sA',
+      sbc: [0, 1, 2, 3].map((k) => (k < (this.st().cstep || 0) ? 'done' : (k === (this.st().cstep || 0) ? 'now' : ''))),
+      theme: theme, accent: accent, logo: BR && si !== 5 ? BR.logo : logos[accent], ad: ad, bn: bn, det: wlSel ? { on: false } : det,
+      brC: BR && si !== 5 ? 'branded' : '', brStyle: BR && si !== 5 ? brTok : '', brLogoC: BR && si !== 5 ? 'br br-' + BR.shape : '', brAlt: BR && si !== 5 ? BR.name : 'mistgate', phase: ph,
+      isOn: ph === 'on' && !cs, isOff: ph === 'off', isIng: ph === 'ing' && !cs, offOk: ph === 'off' && !blk && !cs,
+      hasCs: !!cs, csT: cs ? CSX[cs][0] : '', csS: cs ? CSX[cs][1] : '', csTone: cs ? CSX[cs][2] : '', csComet: cs === 'rec' ? '' : 'hide',
+      csCls: cs === 'offline' || cs === 'svc' ? 's-blk' : (cs === 'ks' ? 'cs-ks' : (cs === 'error' ? 'cs-err' : '')),
+      csAct: cs === 'error' || cs === 'ks' || cs === 'svc', isErr: cs === 'error', isKs: cs === 'ks', isSvc: cs === 'svc',
+      showBar: !blk && !(cs === 'error' || cs === 'ks' || cs === 'svc'), csNote: cs === 'rec' || cs === 'offline', csNoteT: cs === 'rec' ? 'Usually takes a few seconds' : 'Checking the connection every few seconds',
+      csConnect: () => { this.setState({ cs: '' }); this.setPhase('on'); }, csUnblock: () => this.setState({ cs: '', phase: 'off' }),
+      fixCls: this.st().fix ? 'busy' : '', fixTxt: this.st().fix ? 'Fixing…' : 'Fix it', csFix: () => { this.setState({ fix: true }); setTimeout(() => this.setState({ fix: false, cs: '', phase: 'off' }), 1400); },
+      blk: !!blk, notBlk: !blk, blkCls: blk ? 's-blk' : '', blkT: blk ? BLK[blk][0] : '', blkS: blk ? BLK[blk][1] : '', blkTone: blk ? BLK[blk][2] : '',
+      isExpired: blk === 'expired', isNone: blk === 'none', notNone: blk !== 'none', tgN: tgCount, noTg: tgCount === 0, hasTg: tgCount > 0, tgeT: blk === 'none' ? 'No proxies yet' : 'This subscription has no Telegram proxies', tgeS: blk === 'none' ? 'They appear here as soon as you add a subscription' : 'Your provider hasn’t added any yet', isNoSrv: blk === 'nosrv', isRemoved: blk === 'removed', hasPlan: blk !== 'none',
+      tip: tip, tipC: this.st().tipId ? 'show' : '', tipX: this.st().tipX || 0, tipY: this.st().tipY || 0,
+      rows: rows.filter((r) => !r.vd), rowsBad: rows.filter((r) => r.vd).sort((x, y) => x.vo - y.vo), badLbl: rows.some((r) => r.vd) ? '' : 'hide', badN: '%s with trouble'.replace('%s', rows.filter((r) => r.vd).length), srvN: NODES.length, hasSrv: NODES.length > 0, noSrvList: NODES.length === 0,
+      seT: blk === 'none' ? 'No servers yet' : 'This subscription has no servers', seS: blk === 'none' ? 'They appear here as soon as you add a subscription' : 'Your provider may be updating it. Try again in a few minutes',
+      svCls: blk === 'expired' ? 'dim' : '',
+      refCls: ref ? 'busy' : '', refTxt: ref ? 'Updating…' : 'Update subscription',
+      refreshSub: () => { const n = NODES.length || 8; this.setState({ ref: true }); setTimeout(() => this.setState({ ref: false, svN: n }), 1300); },
+      addSub: () => this.openAdd('confirm'), addFile: () => this.openAdd('basic'),
+      wave: !!this.st().wave, wavingCls: this.st().wave ? 'waving' : '',
+      toggle: () => this.toggle(),
+      pressed: phase === 'off' ? 'false' : 'true',
+      pwLabel: cs === 'error' ? 'Try again' : (phase === 'on' ? 'Disconnect VPN' : (phase === 'ing' ? 'Cancel connecting' : 'Connect VPN')),
+      timer: timer,
+      down: (6.3 + Math.sin(s * 1.7) * 0.4).toFixed(1), up: (1.4 + Math.cos(s * 1.3) * 0.2).toFixed(1),
+      cur: cur, notOn: phase !== 'on',
+      isAuto: sel === 'auto', autoCls: sel === 'auto' ? 'on' : '',
+      isVpn: tab !== 'telegram', isTg: tab === 'telegram',
+      vpnTabCls: tab !== 'telegram' ? 'on' : '', tgTabCls: tab === 'telegram' ? 'on' : '',
+      tabVpn: () => this.setState({ tab: 'vpn' }), tabTg: () => this.setState({ tab: 'telegram' }),
+      pickAuto: () => pickSrv('auto'),
+      rcls: rcls, rOn: rOn, pickN: pickN, nowN: nowN,
+      tgWarn: !!this.st().tgw, tgOk: !!this.st().tgok, tgFootCls: this.st().tgw || this.st().tgok ? 'hide' : '',
+      tgOpen: () => { if (tgMissing) this.setState({ tgw: true, tgCopied: false }); else { this.setState({ tgok: true }); setTimeout(() => this.setState({ tgok: false }), 2200); } },
+      tgCopy: () => this.setState({ tgCopied: true }), tgCopyCls: this.st().tgCopied ? 'done' : '', tgCopyTxt: this.st().tgCopied ? 'Copied' : 'Copy link',
+      sub: subV, subs: subs,
+      rmOpen: this.st().rmAsk !== undefined && this.st().rmAsk !== null, rmName: this.st().rmAsk != null ? SUBS[this.st().rmAsk].name : '',
+      rmTitle: this.st().rmAsk != null ? (SUBS[this.st().rmAsk].src === 'mg' ? 'Sign out of “%s”?' : 'Remove “%s”?').replace('%s', SUBS[this.st().rmAsk].name) : '',
+      rmText: this.st().rmAsk != null && SUBS[this.st().rmAsk].src === 'mg' ? 'This PC leaves the subscription and frees one device slot. Its servers disappear from Mistgate. To come back, you’ll need the link again.' : 'Its servers disappear from Mistgate. Nothing changes on the provider’s side, and you can add the link again later.',
+      rmBtn: this.st().rmAsk != null && SUBS[this.st().rmAsk].src === 'mg' ? 'Sign out' : 'Remove',
+      rmCancel: () => this.setState({ rmAsk: null }),
+      rmDo: () => { const i = this.st().rmAsk; const g = gone.concat([i]); const left = [0, 1, 2, 3].filter((k) => g.indexOf(k) < 0); this.setState({ gone: g, rmAsk: null, si: i === si ? (left.length ? left[0] : 5) : si, subsPop: false }); }, subsOpen: !!subsOpen, toggleSubs: () => this.setState({ subsPop: !subsOpen, pop: false }),
+      sigCls: sigCls, msTxt: Object.assign({ cur: wlSel ? '—' : String(msOf(node)) }, msTxt), ping: ping, pingAll: () => this.pingAll(), allBusy: anyBusy ? 'busy' : '',
+      profAuto: isProfAuto, poAutoCls: isProfAuto ? 'on' : '', profs: profs,
+      popOpen: !!popOpen && !wlSel, togglePop: () => { if (!wlSel) this.setState({ pop: !popOpen }); },
+      pickProfAuto: () => this.setState({ prof: 'auto', pop: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

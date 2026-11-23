@@ -1,0 +1,23 @@
+[package]
+name = "mistgate-site-gen"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-only"
+description = "Page generator for the Mistgate landing site: build/manifest.json + body fragments -> dist/<url>/index.html"
+
+[[bin]]
+name = "mistgate-site-gen"
+path = "src/main.rs"
+
+[dependencies]
+# Leptos renders the document to a string at build time: no server, no wasm, no hydration reaches the browser.
+leptos = { version = "=0.8.23", default-features = false, features = ["ssr"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 2
+lto = "thin"
+codegen-units = 4
+strip = true
