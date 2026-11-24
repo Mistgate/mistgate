@@ -48,7 +48,7 @@ func TestDNSMigrationUpgradesExistingData(t *testing.T) {
 	if err := s.R.QueryRowContext(ctx, `SELECT u.name, coalesce(u.dns_preset_id, 'none') FROM user u WHERE id = 'usr_a'`).Scan(&name, &dns); err != nil || name != "old user" || dns != "none" {
 		t.Fatalf("user after upgrade: %q %q %v", name, dns, err)
 	}
-	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&n); err != nil || n != 11 { // 18 less the seven that 00157 retired
+	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&n); err != nil || n != 16 { // 18 less the seven that 00157 retired, plus the five of 00158
 		t.Fatalf("built-in presets: %d %v", n, err)
 	}
 	d := s.DNS()
@@ -150,6 +150,7 @@ func TestDNSSplitDirectMigrationUpgradesFrom7(t *testing.T) {
 	}
 	wantOrder := []string{
 		"dns_builtin_ru_split", "dns_builtin_ru_geo", "dns_builtin_ru_proxied", "dns_builtin_cn_split",
+		"dns_builtin_ir_split", "dns_builtin_tr_split", "dns_builtin_kz_split", "dns_builtin_by_split", "dns_builtin_uz_split",
 		"dns_builtin_standard",
 		"dns_builtin_adblock", "dns_builtin_ads_device",
 		"dns_builtin_family",
@@ -161,7 +162,7 @@ func TestDNSSplitDirectMigrationUpgradesFrom7(t *testing.T) {
 		t.Errorf("order = %v, want %v", order, wantOrder)
 	}
 	var builtins int
-	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&builtins); err != nil || builtins != 11 {
+	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&builtins); err != nil || builtins != 16 {
 		t.Errorf("built-ins: %d %v", builtins, err)
 	}
 

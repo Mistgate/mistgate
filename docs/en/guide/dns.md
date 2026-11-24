@@ -110,6 +110,24 @@ The option is on in the three built-in Russian presets, **Russia: .ru direct**, 
 
 **What the block does not cover.** According to public analyses (Habr, ntc.party), Max also learns the device's public address through third-party services (`api.ipify.org`, `ifconfig.me`, `checkip.amazonaws.com`, Yandex, `ip.mail.ru`), and takes the VPN flag from Android itself. The panel does not block those addresses: other programs need them. The block stops Max from sending what it collected, but if the app moves to other domains or hard-coded addresses, the list will have to be extended. The sources are public and disputed by the company itself, so they cannot be fully verified.
 
+### Torrents direct
+
+**Send torrent clients direct** makes the apps send the traffic of torrent clients and the public trackers past the VPN, after the ad and Max blocks and before the split. A swarm through the tunnel is slow and costs the server's traffic; direct, it uses the person's own connection. It is off in every preset, built-in ones too: turn it on in the preset where it is wanted.
+
+**Before you turn it on.** The person's real address is then visible to the other members of the swarm, which the VPN would hide. And a tracker blocked in their country does not open when it goes direct.
+
+| App | What happens |
+|:--|:--|
+| Apps on the mihomo core | By the program: `PROCESS-NAME` rules for the usual torrent clients on Windows, macOS, Linux and Android (the panel's own list, the program names and Android packages of qBittorrent, uTorrent, BitTorrent, Transmission, Deluge, Tixati, BitComet, Vuze, BiglyBT, FrostWire, LibreTorrent, Flud and a few more) and the rule set of the public trackers `category-public-tracker`, all to `DIRECT`. Not applied in a profile built from a group template. |
+| sing-box JSON | By the program (`process_name` on desktop systems, `package_name` on Android), by the BitTorrent protocol and by the rule set of the trackers, all to the direct outbound. |
+| Xray JSON | By the protocol (`bittorrent`, which the config's sniffing recognises: not every torrent is recognised, an encrypted one may pass) and by `geosite:category-public-tracker`. Xray cannot tell the program, so there are no program names. |
+| Happ | **Not applied**: the preset's torrent rules do not reach it. |
+| AmneziaVPN and AmneziaWG keys, other base64 apps | **Not applied**: they get no rules from the panel. |
+
+In the editor, **What each app gets** says the same per app: "by program" (Mihomo, sing-box), "by protocol, not all" (Xray), "no torrent rules" (Happ, AmneziaWG keys). A client that is not in the panel's list is sent direct only where the format also goes by the protocol.
+
+**Next to the node's torrent blocker.** [Torrent protection](torrent-protection.md) of a node blocks the BitTorrent traffic that reaches the node. Torrents that the preset sends direct never reach it, so the blocker has nothing to catch there; it stays as a safety net for what the rules miss: a client that is not in the list, an unrecognised or encrypted torrent in Xray, an app with no such rules (Happ, AmneziaWG keys). Keep it on where the hoster punishes complaints.
+
 ## The built-in presets
 
 Built-in presets exist on every install. They can be edited, not deleted.

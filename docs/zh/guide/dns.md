@@ -110,6 +110,24 @@ DNS 预设决定用户的应用会向哪些 DNS 服务器发送查询，以及�
 
 **屏蔽无法覆盖的部分。** 根据公开分析（Habr、ntc.party），Max 还会通过第三方服务（`api.ipify.org`、`ifconfig.me`、`checkip.amazonaws.com`、Yandex、`ip.mail.ru`）获取设备的公网地址，并从 Android 本身读取 VPN 标志。面板不会屏蔽这些地址：其他程序需要它们。屏蔽可以阻止 Max 发送收集到的信息，但如果应用改用其他域名或硬编码地址，就需要扩充列表。这些资料是公开的，且被该公司本身否认，无法完全核实。
 
+### 种子下载直连
+
+**种子下载直连** 会让应用把种子客户端和公共 tracker 的流量绕过 VPN 直连，位置在广告和 Max 屏蔽之后、分流之前。隧道里的做种又慢又耗服务器流量；直连则使用用户自己的网络。所有预设默认关闭，内置预设也一样：在需要的预设里自行开启。
+
+**开启之前。** 这样一来，其他下载者会看到用户的真实地址，而 VPN 原本会把它隐藏。在其所在国家被屏蔽的 tracker，直连也打不开。
+
+| 应用 | 效果 |
+|:--|:--|
+| mihomo 内核的应用 | 按程序：为 Windows、macOS、Linux 和 Android 上常见的种子客户端写入 `PROCESS-NAME` 规则（面板自己的列表：qBittorrent、uTorrent、BitTorrent、Transmission、Deluge、Tixati、BitComet、Vuze、BiglyBT、FrostWire、LibreTorrent、Flud 等的程序名和 Android 包名），以及公共 tracker 规则集 `category-public-tracker`，全部走 `DIRECT`。由分组模板生成的配置中不适用。 |
+| sing-box JSON | 按程序（桌面系统用 `process_name`，Android 用 `package_name`）、按 BitTorrent 协议、按 tracker 规则集，全部走直连出口。 |
+| Xray JSON | 按协议（`bittorrent`，由配置的嗅探识别：并非所有种子都能识别，加密的可能漏过）和 `geosite:category-public-tracker`。Xray 无法识别程序，因此没有程序名。 |
+| Happ | **不适用**：预设的种子规则到不了它。 |
+| AmneziaVPN 和 AmneziaWG 密钥、其他 base64 应用 | **不适用**：它们不会从面板得到规则。 |
+
+编辑器里的**每个应用会得到什么**按应用给出同样的说明：「按程序」（Mihomo、sing-box）、「按协议，非全部」（Xray）、「无种子规则」（Happ、AmneziaWG 密钥）。不在面板列表中的客户端，只有在该格式也按协议判断时才会直连。
+
+**与节点的种子拦截并用。** 节点的[种子保护](torrent-protection.md)会拦截到达节点的 BitTorrent 流量。预设已让直连的种子到不了节点，拦截在那里无事可做；它仍是兜底，处理规则漏掉的部分：不在列表中的客户端、Xray 中未识别或加密的种子、没有此类规则的应用（Happ、AmneziaWG 密钥）。托管商会因投诉惩罚的节点请保持开启。
+
 ## 内置预设
 
 每次安装都会包含内置预设。可以编辑，但不能删除。

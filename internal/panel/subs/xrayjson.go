@@ -112,6 +112,7 @@ type xrayRule struct {
 	Type        string   `json:"type"`
 	InboundTag  []string `json:"inboundTag,omitempty"`
 	IP          []string `json:"ip,omitempty"`
+	Protocol    []string `json:"protocol,omitempty"`
 	Domain      []string `json:"domain,omitempty"`
 	Port        string   `json:"port,omitempty"`
 	Network     string   `json:"network,omitempty"`
@@ -264,6 +265,11 @@ func xrayRules(d *dns.XrayDNS) []xrayRule {
 		if len(d.Block) > 0 { // after the DNS rules (a resolver's own traffic is not a site), before private and direct
 			rules = append(rules, xrayRule{Type: "field", Domain: d.Block, OutboundTag: xrayBlockTag})
 		}
+	}
+	if d != nil && d.Torrent { // after the blocks, before the split: the BitTorrent protocol (the inbound sniffs) and the public trackers
+		rules = append(rules,
+			xrayRule{Type: "field", Protocol: []string{"bittorrent"}, OutboundTag: xrayDirectTag},
+			xrayRule{Type: "field", Domain: []string{"geosite:" + dns.TorrentSite}, OutboundTag: xrayDirectTag})
 	}
 	rules = append(rules, xrayRule{Type: "field", IP: xrayPrivate, OutboundTag: xrayDirectTag})
 	if d != nil && (len(d.Direct) > 0 || len(d.DirectGeo) > 0) {

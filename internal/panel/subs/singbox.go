@@ -85,6 +85,8 @@ type singboxRoute struct {
 
 type singboxRule struct {
 	Protocol     string   `json:"protocol,omitempty"`
+	ProcessName  []string `json:"process_name,omitempty"`
+	PackageName  []string `json:"package_name,omitempty"`
 	IPIsPrivate  bool     `json:"ip_is_private,omitempty"`
 	DomainSuffix []string `json:"domain_suffix,omitempty"`
 	RuleSet      []string `json:"rule_set,omitempty"`
@@ -194,6 +196,13 @@ func (p singboxProfile) build() ([]byte, error) {
 		}
 		if len(d.RuleSets) > 0 {
 			cfg.Route.RuleSet = d.RuleSets
+		}
+		if len(d.TorrentSets) > 0 { // torrent clients direct: after the drops, before the split
+			cfg.Route.Rules = append(cfg.Route.Rules,
+				singboxRule{ProcessName: d.TorrentProcesses, Action: "route", Outbound: singboxDirectTag},
+				singboxRule{PackageName: d.TorrentPackages, Action: "route", Outbound: singboxDirectTag},
+				singboxRule{Protocol: "bittorrent", Action: "route", Outbound: singboxDirectTag},
+				singboxRule{RuleSet: d.TorrentSets, Action: "route", Outbound: singboxDirectTag})
 		}
 		if len(d.Direct) > 0 {
 			cfg.Route.Rules = append(cfg.Route.Rules, singboxRule{DomainSuffix: d.Direct, Action: "route", Outbound: singboxDirectTag})

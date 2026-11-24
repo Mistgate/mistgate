@@ -196,7 +196,8 @@ func (p mihomoProfile) build() ([]byte, error) {
 
 	var direct []string
 	var providers, block []dns.MihomoProvider
-	var blockDomains []string
+	var blockDomains, torrentApps []string
+	var torrent []dns.MihomoProvider
 	if p.preset != nil {
 		d, err := p.preset.MihomoDNS(group)
 		if err != nil {
@@ -209,13 +210,14 @@ func (p mihomoProfile) build() ([]byte, error) {
 			providers = d.Providers
 			block = d.Block
 			blockDomains = d.BlockDomains
+			torrentApps, torrent = d.TorrentApps, d.Torrent
 		}
 	}
-	if len(providers)+len(block) > 0 {
+	if len(providers)+len(block)+len(torrent) > 0 {
 		// The lists of a country (dns.SplitRule.Geo): downloaded through the group, so that they arrive where the sites they
 		// name are the point. The key "proxy" is the group's name, which groupName kept free of anything YAML or a rule line would read.
 		rp := newMap()
-		for _, pr := range append(slices.Clone(block), providers...) {
+		for _, pr := range append(append(slices.Clone(block), torrent...), providers...) {
 			rp.set(pr.Name, newMap().
 				set("type", strNode("http")).set("behavior", strNode(pr.Behavior)).set("format", strNode("mrs")).
 				set("interval", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.Itoa(dns.MihomoProviderInterval)}).
@@ -229,6 +231,12 @@ func (p mihomoProfile) build() ([]byte, error) {
 	}
 	for _, pr := range block { // first of all: the ad list is dropped whatever else matches
 		rules.Content = append(rules.Content, quoted(pr.RuleTo("REJECT")))
+	}
+	for _, a := range torrentApps { // torrent clients by their program, then the public trackers: after the blocks, before the split
+		rules.Content = append(rules.Content, quoted("PROCESS-NAME,"+a+",DIRECT"))
+	}
+	for _, pr := range torrent {
+		rules.Content = append(rules.Content, quoted(pr.Rule()))
 	}
 	for _, s := range direct {
 		rules.Content = append(rules.Content, quoted("DOMAIN-SUFFIX,"+s+",DIRECT"))

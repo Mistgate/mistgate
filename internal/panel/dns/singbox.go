@@ -48,6 +48,9 @@ type SingboxDNS struct {
 	BlockSets []string
 	// BlockDomains are the suffixes of Preset.BlockMax: a DNS rule (NXDOMAIN) and a route rule (reject) each, ahead of the rule sets.
 	BlockDomains []string
+	// Torrent rules (Preset.TorrentDirect): program names, Android packages and the tracker rule set, each a route rule to the direct outbound
+	// (with the protocol bittorrent), after the blocks and before the split. The tracker set is also in RuleSets.
+	TorrentProcesses, TorrentPackages, TorrentSets []string
 	// Notes (English) say what of the preset a sing-box profile cannot carry.
 	Notes []string
 }
@@ -115,6 +118,10 @@ func (p Preset) SingboxDNS(group string) (SingboxDNS, error) {
 		out.RuleSets = append(out.RuleSets, SingboxRuleSet{Type: "remote", Tag: adsTag, Format: "binary", URL: fmt.Sprintf(singboxGeositeURL, adsSite)})
 		out.BlockSets = []string{adsTag}
 		out.Section.Rules = append(out.Section.Rules, SingboxDNSRule{RuleSet: out.BlockSets, Action: "predefined", Rcode: "NXDOMAIN"})
+	}
+	if p.TorrentDirect {
+		out.RuleSets = append(out.RuleSets, SingboxRuleSet{Type: "remote", Tag: torrentTag, Format: "binary", URL: fmt.Sprintf(singboxGeositeURL, TorrentSite)})
+		out.TorrentProcesses, out.TorrentPackages, out.TorrentSets = torrentProcesses, torrentPackages, []string{torrentTag}
 	}
 	splits := 0
 	for _, sp := range split {

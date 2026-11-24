@@ -18,15 +18,16 @@ var retiredSeven = []string{
 func TestDNSRetireSevenMigration(t *testing.T) {
 	ctx := context.Background()
 	s := openTemp(t)
-	d := s.DNS()
 	prov := cnProvider(t, s)
 
+	// read by SQL: after a rollback the table lacks the columns that the store of today selects
 	present := func(id string) (DNSPreset, bool) {
-		r, err := d.Get(ctx, id)
-		if err != nil {
-			return DNSPreset{}, false
-		}
-		return r, true
+		var r DNSPreset
+		var b int
+		err := s.R.QueryRowContext(ctx, `SELECT id, name, description, builtin, servers, preferred_transport FROM dns_preset WHERE id = ?`, id).
+			Scan(&r.ID, &r.Name, &r.Description, &b, &r.ServersJSON, &r.Transport)
+		r.Builtin = b == 1
+		return r, err == nil
 	}
 
 	// A new installation: none of the seven, the others are there.

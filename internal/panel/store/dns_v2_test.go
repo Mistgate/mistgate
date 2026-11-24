@@ -92,7 +92,7 @@ func TestDNSv2MigrationUpgradesFrom9(t *testing.T) {
 		t.Errorf("custom = %+v", c)
 	}
 	var builtins int
-	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&builtins); err != nil || builtins != 11 { // 18 less the seven that 00157 retired (the edited Yandex DNS and the suffixed Cloudflare stay as own presets)
+	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&builtins); err != nil || builtins != 16 { // 18 less the seven that 00157 retired, plus the five of 00158 (the edited Yandex DNS and the suffixed Cloudflare stay as own presets)
 		t.Errorf("built-ins: %d %v", builtins, err)
 	}
 	// references and the default are untouched

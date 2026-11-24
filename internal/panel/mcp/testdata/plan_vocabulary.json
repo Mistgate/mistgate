@@ -261,6 +261,7 @@
     "text",
     "timezone",
     "to",
+    "torrent_direct",
     "update_block",
     "update_interval_hours",
     "used",

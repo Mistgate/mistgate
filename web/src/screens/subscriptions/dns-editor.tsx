@@ -54,7 +54,7 @@ import { Grid, path, Row, Section, Svg, Toggle } from "./parts";
 import { useSaveSettings } from "./queries";
 import "./subs-dns.css";
 
-type Draft = { name: string; description: string; servers: DnsServerN[]; split: SplitRuleN[]; ipv4Only: boolean; splitDirect: boolean; blockAds: boolean; blockMax: boolean; transport: DnsTransport };
+type Draft = { name: string; description: string; servers: DnsServerN[]; split: SplitRuleN[]; ipv4Only: boolean; splitDirect: boolean; blockAds: boolean; blockMax: boolean; torrentDirect: boolean; transport: DnsTransport };
 
 // The panel keeps split suffixes as punycode; the admin reads and types them as Unicode (".рф"), the panel converts back.
 const draftOf = (p?: Preset): Draft =>
@@ -68,9 +68,10 @@ const draftOf = (p?: Preset): Draft =>
         splitDirect: p.splitDirect,
         blockAds: p.blockAds,
         blockMax: p.blockMax,
+        torrentDirect: p.torrentDirect,
         transport: p.preferredTransport === DnsTransport.UNSPECIFIED ? DnsTransport.PLAIN : p.preferredTransport,
       }
-    : { name: "", description: "", servers: [], split: [], ipv4Only: false, splitDirect: false, blockAds: false, blockMax: false, transport: DnsTransport.PLAIN };
+    : { name: "", description: "", servers: [], split: [], ipv4Only: false, splitDirect: false, blockAds: false, blockMax: false, torrentDirect: false, transport: DnsTransport.PLAIN };
 
 /** A viewer who may not change presets reads the same form: the fields hold their text, nothing adds, removes or switches. */
 const Ro = createContext(false);
@@ -104,6 +105,7 @@ export function PresetEditor({ preset, data, t, fallback, onClose }: { preset?: 
     // an update carries the flag only when it was changed here: absent, the panel keeps what is stored
     blockAds: preset && d.blockAds === preset.blockAds ? undefined : d.blockAds,
     blockMax: preset && d.blockMax === preset.blockMax ? undefined : d.blockMax,
+    torrentDirect: preset && d.torrentDirect === preset.torrentDirect ? undefined : d.torrentDirect,
     preferredTransport: d.transport,
     servers: cleanServers(d.servers),
     split: cleanSplit(d.split),
@@ -234,6 +236,7 @@ export function PresetEditor({ preset, data, t, fallback, onClose }: { preset?: 
               <div className="sb-tgs">
                 <Toggle title={t("subs.dns.blockAds")} hint={t("subs.dns.blockAdsHint")} checked={d.blockAds} disabled={ro} onChange={(on) => setD({ ...d, blockAds: on })} />
                 <Toggle title={t("subs.dns.blockMax")} hint={t("subs.dns.blockMaxHint")} checked={d.blockMax} disabled={ro} onChange={(on) => setD({ ...d, blockMax: on })} />
+                <Toggle title={t("subs.dns.torrent")} hint={t("subs.dns.torrentHint")} checked={d.torrentDirect} disabled={ro} onChange={(on) => setD({ ...d, torrentDirect: on })} />
                 <Toggle title={t("subs.dns.direct")} hint={t("subs.dns.directHint")} checked={d.splitDirect} disabled={ro} onChange={(on) => setD({ ...d, splitDirect: on })} />
                 <Toggle title={t("subs.dns.ipv4")} hint={t("subs.dns.ipv4Hint")} checked={d.ipv4Only} disabled={ro} onChange={(on) => setD({ ...d, ipv4Only: on })} />
                 {preset && !preset.isDefault && write && (
@@ -270,7 +273,7 @@ export function PresetEditor({ preset, data, t, fallback, onClose }: { preset?: 
         side={
           <>
             <Section tone="mint" icon={path.phone} title={t("subs.dns.apps")}>
-              <AppsGet servers={d.servers} transport={d.transport} blockMax={d.blockMax} data={data} catalog={catalog} t={t} />
+              <AppsGet servers={d.servers} transport={d.transport} blockMax={d.blockMax} torrents={d.torrentDirect} data={data} catalog={catalog} t={t} />
             </Section>
             <div className="sb-edf">
               {ro ? (
@@ -327,6 +330,8 @@ const appName: Partial<Record<DnsClient, Key>> = {
   [DnsClient.SINGBOX]: "subs.dns.app.singbox",
   [DnsClient.AMNEZIAWG]: "subs.dns.app.amneziawg",
 };
+/** What each app does with "torrent clients direct": by program (Mihomo, sing-box), by protocol (Xray), nothing (the rest). */
+const torrentNote: Partial<Record<DnsClient, Key>> = { [DnsClient.MIHOMO]: "subs.dns.torrent.prog", [DnsClient.SINGBOX]: "subs.dns.torrent.prog", [DnsClient.XRAY]: "subs.dns.torrent.proto" };
 const appWhy: Partial<Record<DnsClient, Key>> = { [DnsClient.HAPP]: "subs.dns.why.happ", [DnsClient.MIHOMO]: "subs.dns.why.mihomo", [DnsClient.XRAY]: "subs.dns.why.xray", [DnsClient.AMNEZIAWG]: "subs.dns.why.amneziawg" };
 
 /**
@@ -334,7 +339,7 @@ const appWhy: Partial<Record<DnsClient, Key>> = { [DnsClient.HAPP]: "subs.dns.wh
  * row per app (the board's .sb-get). sing-box takes one main resolver (internal/panel/dns/singbox.go): with more than one it says
  * the rest are dropped. With no server nothing is said but "nothing".
  */
-function AppsGet({ servers, transport, blockMax, data, catalog, t }: { servers: DnsServerN[]; transport: DnsTransport; blockMax: boolean; data: DnsData; catalog: Catalog; t: Tx }) {
+function AppsGet({ servers, transport, blockMax, torrents, data, catalog, t }: { servers: DnsServerN[]; transport: DnsTransport; blockMax: boolean; torrents: boolean; data: DnsData; catalog: Catalog; t: Tx }) {
   const results = appResults(servers, transport, data.clientSupport, catalog);
   return (
     <div className="sb-get">
@@ -343,11 +348,12 @@ function AppsGet({ servers, transport, blockMax, data, catalog, t }: { servers: 
         const ok = got !== null && got === transport;
         const why = servers.length === 0 ? "" : !ok ? t(appWhy[r.client] ?? "subs.dns.why.mihomo") : r.client === DnsClient.SINGBOX && r.resolvers > 1 ? t("subs.dns.why.singbox") : "";
         const noMax = blockMax && servers.length > 0 && r.client === DnsClient.AMNEZIAWG ? t("subs.dns.why.awgMax") : ""; // a key has no rules: Max is not blocked
+        const torrent = torrents && servers.length > 0 ? t(torrentNote[r.client] ?? "subs.dns.torrent.none") : ""; // what the app does with the torrent switch
         return (
           <div key={r.client} className={cx(got === null && "no")}>
             <span>{t(appName[r.client] ?? "subs.dns.app.happ")}</span>
             <b>{got === null ? t("subs.dns.res.none") : t(transportKey[got])}</b>
-            <em>{[why, noMax].filter(Boolean).join(" · ")}</em>
+            <em>{[why, noMax, torrent].filter(Boolean).join(" · ")}</em>
           </div>
         );
       })}
