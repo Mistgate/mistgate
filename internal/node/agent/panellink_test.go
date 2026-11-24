@@ -37,12 +37,15 @@ import (
 // answers 404 under a refused prefix (an address that stopped answering), and closes every session under a dropped
 // prefix right after its HelloAck (an address that answers and then goes silent).
 type sessionLinkPanel struct {
-	h        *harness
-	hellos   chan string
-	sessions chan string              // the link prefix of every session that got as far as the Hello
-	settings *pb.NodeSettings         // the HelloAck's; nil = empty
-	push     chan *pb.ConnectResponse // sent on the session that is up
-	applies  chan *pb.ApplyResult     // every ApplyResult the agent sent
+	h                *harness
+	hellos           chan string
+	sessions         chan string                 // the link prefix of every session that got as far as the Hello
+	settings         *pb.NodeSettings            // the HelloAck's; nil = empty
+	settingsByPrefix map[string]*pb.NodeSettings // immutable per-address HelloAck settings
+	beforeAck        func(prefix string)         // immutable hook for coordinating an in-flight handshake with CLI writes
+	afterAck         func(prefix string)         // immutable hook for coordinating peer closure after HelloAck
+	push             chan *pb.ConnectResponse    // sent on the session that is up
+	applies          chan *pb.ApplyResult        // every ApplyResult the agent sent
 
 	mu      sync.Mutex
 	refused map[string]bool
@@ -142,10 +145,16 @@ func (p *sessionLinkPanel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case p.sessions <- prefix:
 	default:
 	}
+	if p.beforeAck != nil {
+		p.beforeAck(prefix)
+	}
 	if link.Write(ctx, &pb.ConnectResponse{Message: &pb.ConnectResponse_HelloAck{HelloAck: &pb.HelloAck{
-		ServerTimeUnix: time.Now().Unix(), Settings: cmp.Or(p.settings, &pb.NodeSettings{}),
+		ServerTimeUnix: time.Now().Unix(), Settings: cmp.Or(p.settingsByPrefix[prefix], p.settings, &pb.NodeSettings{}),
 	}}}) != nil {
 		return
+	}
+	if p.afterAck != nil {
+		p.afterAck(prefix)
 	}
 	if dropped {
 		return
@@ -375,7 +384,7 @@ func TestSetPanelLink(t *testing.T) {
 
 	m := readMeta(t, h.dir)
 	m.Link = "wss://old.example.com/" + strings.Repeat("o", 24) + "/"
-	if err := saveMeta(h.dir, m); err != nil {
+	if err := saveMeta(h.dir, &m); err != nil {
 		t.Fatal(err)
 	}
 	if err := SetPanelLink(h.dir, "wss://panel.example.com/x"); err == nil {
@@ -427,6 +436,9 @@ func prevLinkHarness(t *testing.T) (h *harness, lp *sessionLinkPanel, a, b strin
 	h.a.linkHTTPClient = server.Client()
 	h.a.meta.Link, h.a.cfg.LinkURL, h.a.meta.NextLink = a, a, b
 	h.a.resetAfter = 25 * time.Millisecond
+	if err := saveMeta(h.dir, &h.a.meta); err != nil {
+		t.Fatal(err)
+	}
 	return h, lp, a, b
 }
 
@@ -489,7 +501,7 @@ func TestPrevLinkWhenTheCurrentDropsAfterHelloAck(t *testing.T) {
 	h.a.resetAfter = time.Minute
 	h.a.meta.Link, h.a.cfg.LinkURL, h.a.meta.NextLink, h.a.meta.PrevLink = b, b, "", a
 	h.a.meta.LinkSince = time.Now().Add(-time.Hour).Unix()
-	if err := saveMeta(h.dir, h.a.meta); err != nil {
+	if err := saveMeta(h.dir, &h.a.meta); err != nil {
 		t.Fatal(err)
 	}
 	lp.drop('b')
@@ -619,7 +631,7 @@ func TestPrevAddressKeptPast7DaysByUnhealthySessions(t *testing.T) {
 	h.a.resetAfter = 500 * time.Millisecond // healthy after 1 s
 	h.a.meta.Link, h.a.cfg.LinkURL, h.a.meta.NextLink, h.a.meta.PrevLink = b, b, "", a
 	h.a.meta.LinkSince = time.Now().Add(-8 * 24 * time.Hour).Unix()
-	if err := saveMeta(h.dir, h.a.meta); err != nil {
+	if err := saveMeta(h.dir, &h.a.meta); err != nil {
 		t.Fatal(err)
 	}
 	lp.refuse('a') // the fallback finds nothing: the agent stays on b and its previous address stays a
@@ -672,7 +684,7 @@ func TestPrevAddressNoneLeavesAgentJSON(t *testing.T) {
 	h.a.linkHTTPClient = server.Client()
 	h.a.meta.Link, h.a.cfg.LinkURL = a, a
 	h.a.resetAfter = 25 * time.Millisecond
-	if err := saveMeta(h.dir, h.a.meta); err != nil {
+	if err := saveMeta(h.dir, &h.a.meta); err != nil {
 		t.Fatal(err)
 	}
 	before, err := os.ReadFile(filepath.Join(h.dir, fileMeta))

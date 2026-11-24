@@ -147,6 +147,7 @@ type Agent struct {
 	// change at run time and are guarded by metaMu; the rest of meta is fixed at start.
 	metaMu           sync.Mutex
 	triedNext        bool             // connectLoop only: the last session tried meta.NextLink
+	triedPrev        bool             // connectLoop only: the last turn tried prev; a pending next gets the following turn
 	currentFailed    bool             // connectLoop only: the last session over the current link did not hold (panellink.go)
 	panelLinkIgnored atomic.Bool      // an mTLS node has logged that it does not follow a panel link address
 	nextAnswered     atomic.Bool      // a direct probe from the bridge reached meta.NextLink: the next session tries it
@@ -192,6 +193,8 @@ type Agent struct {
 	cancel                  context.CancelCauseFunc
 	runCtx                  context.Context                                  // agent lifetime; link-only update downloads must outlive their panel session
 	sessionEpoch            atomic.Uint64                                    // advances after each authenticated HelloAck
+	sessionAckAt            time.Time                                        // connectLoop/runSession only: health starts at HelloAck, not dialing
+	sessionEndedAt          *atomic.Pointer[time.Time]                       // per-session first receive failure/cancellation, before cleanup
 	offsetAt                atomic.Pointer[time.Time]                        // when offset was measured, with its monotonic reading; nil = never
 	elapsed                 func(since time.Time) (wall, mono time.Duration) // test seam: wall and monotonic time since offsetAt
 
@@ -783,6 +786,7 @@ func (a *Agent) connectLoop(ctx context.Context) {
 		via := a.choosePanelPath(path)
 		started := time.Now()
 		epoch := a.sessionEpoch.Load()
+		a.sessionAckAt = time.Time{}
 		var err error
 		switch {
 		case via != "":
@@ -801,7 +805,7 @@ func (a *Agent) connectLoop(ctx context.Context) {
 		// A session that authenticated but died within a couple of minutes is not a working path: a filter that lets the handshake
 		// through and freezes the flow after a few KiB gives exactly this. Counting it as a success would hold the agent on a
 		// direct path that never stays up.
-		healthy := established && lived >= a.healthyAfter()
+		healthy := established && a.sessionHealthy()
 		if errors.Is(err, errReturnDirect) {
 			a.log.Info("the panel is reachable directly again; leaving the bridge", "code", "agent_panel_direct_back", "via", via)
 			path.onBridge, path.failures, path.since, path.trial = false, 0, endedAt, true
@@ -918,6 +922,15 @@ func (a *Agent) bridgeFallbackFailureLimit() int {
 
 // healthyAfter is how long an authenticated session must live to count as proof that the path works.
 func (a *Agent) healthyAfter() time.Duration { return 2 * a.backoffResetAfter() }
+
+// sessionHealthy uses the captured transport lifetime, never the time spent waiting for teardown.
+func (a *Agent) sessionHealthy() bool {
+	if a.sessionAckAt.IsZero() || a.sessionEndedAt == nil {
+		return false
+	}
+	end := a.sessionEndedAt.Load()
+	return end != nil && end.Sub(a.sessionAckAt) >= a.healthyAfter()
+}
 
 func (a *Agent) bridgeProbeInterval() time.Duration {
 	if a.bridgeProbeEvery > 0 {
@@ -1039,20 +1052,7 @@ func (a *Agent) sessionViaBridge(ctx context.Context, entryNodeID string) error 
 		return a.bridgedFn(ctx, entryNodeID)
 	}
 	if a.linkOnly() {
-		// Every other turn the new link address, through the bridge like the current one (a node whose direct path is
-		// closed moves to it there). One that does not establish leaves the turn to the current address, so a wrong new
-		// address does not cost the node its bridge.
-		if next := a.nextLink(); next != "" && !a.triedNext {
-			a.triedNext = true
-			epoch := a.sessionEpoch.Load()
-			err := a.nextLinkSession(ctx, next, entryNodeID)
-			if ctx.Err() != nil || a.sessionEpoch.Load() != epoch {
-				return err
-			}
-		} else {
-			a.triedNext = false
-		}
-		return a.linkSessionVia(ctx, entryNodeID)
+		return a.linkNodeSession(ctx, entryNodeID)
 	}
 	if a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
 		err := a.linkSessionVia(ctx, entryNodeID)
@@ -1339,23 +1339,8 @@ func (a *Agent) linkOnly() bool {
 // a direct probe from the bridge reached it; after a turn on which the current link did not hold (did not establish, or
 // ended before healthyAfter), the previous panel address (panellink.go); else the link or mTLS as before.
 func (a *Agent) session(ctx context.Context) error {
-	nextAnswered := a.nextAnswered.Swap(false)
-	if next := a.nextLink(); next != "" && (!a.triedNext || nextAnswered) {
-		a.triedNext = true
-		return a.nextLinkSession(ctx, next, "")
-	}
-	a.triedNext = false
-	if a.currentFailed {
-		a.currentFailed = false
-		if prev := a.prevLink(); prev != "" {
-			return a.prevSession(ctx, prev)
-		}
-	}
 	if a.linkOnly() {
-		started := time.Now()
-		err := a.linkSession(ctx, a.dialCurrentLink)
-		a.currentFailed = a.didNotHold(ctx, err, started)
-		return err
+		return a.linkNodeSession(ctx, "")
 	}
 	if a.linkURL() != "" && a.linkAdvertised.Load() && a.linkWait() <= 0 {
 		err := a.linkSession(ctx, a.dialLink)
@@ -1438,11 +1423,29 @@ func (a *Agent) linkSessionOn(ctx context.Context, dial func(context.Context) (*
 }
 
 func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, viaNodeID string) error {
+	ended := new(atomic.Pointer[time.Time])
+	a.sessionEndedAt = ended
+	markEnded := func() {
+		if ended.Load() != nil {
+			return
+		}
+		now := time.Now()
+		ended.CompareAndSwap(nil, &now)
+	}
+	cancelTransport := cancel
+	cancel = func() {
+		markEnded()
+		cancelTransport()
+	}
 	defer stream.Close()
 	defer cancel()
 	ctx := stream.Context()
 	// Closing the transport on cancellation wakes a blocked receive for both HTTP/2 and WebSocket sessions.
-	go func() { <-ctx.Done(); _ = stream.Close() }()
+	go func() {
+		<-ctx.Done()
+		markEnded()
+		_ = stream.Close()
+	}()
 
 	if err := stream.Send(a.helloVia(ctx, viaNodeID)); err != nil {
 		if errors.Is(err, io.EOF) { // the real error is on the response side
@@ -1474,10 +1477,13 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, via
 		return errors.New("first panel message is not HelloAck")
 	}
 	a.sessionEpoch.Add(1)
+	a.sessionAckAt = time.Now()
 	if link, ok := stream.(*websocketAgentTransport); ok {
 		link.established = true
 		if link.onEstablished != nil {
-			link.onEstablished()
+			if err := link.onEstablished(); err != nil {
+				return err
+			}
 		}
 	}
 	a.linkAdvertised.Store(ack.LinkSupported)
@@ -1535,6 +1541,7 @@ func (a *Agent) runSession(cancel context.CancelFunc, stream agentTransport, via
 	for {
 		msg, err := stream.Receive()
 		if err != nil {
+			markEnded()
 			if holdExpired.Load() { // the end of the stream is endHeldSession's (its drain, then its cancel), not a real error
 				return errSwitchTransport
 			}

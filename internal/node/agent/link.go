@@ -30,7 +30,7 @@ type websocketAgentTransport struct {
 	closeOnce   sync.Once
 	established bool
 	// onEstablished runs once the HelloAck arrived over this link (a new link address is then committed: panellink.go).
-	onEstablished func()
+	onEstablished func() error
 }
 
 func (s *websocketAgentTransport) Context() context.Context { return s.ctx }

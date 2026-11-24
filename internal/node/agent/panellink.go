@@ -10,22 +10,20 @@ import (
 )
 
 // A new panel link address (NodeSettings.panel_link_url, Meta.NextLink): the agent tries it in turn with the address it
-// has, and keeps it once a session over it succeeds. The address it had stays as the previous one (Meta.PrevLink): after
-// a turn on which the current address did not hold, the agent tries the previous one, and goes back to it once a session
-// over it succeeds, so a wrong address does not cut the node off.
+// has, and keeps it once a session over it succeeds. The last proven address stays as the previous one (Meta.PrevLink):
+// consecutive switches cannot replace it until the current link passes healthyAfter, with proof persisted for restart.
+// After a turn on which the current address did not hold, the agent tries the previous one and returns on HelloAck.
 //
-// "Did not hold" is connectLoop's measure of a working path: a direct session over the current address that did not
-// establish (HelloAck), or that ended before healthyAfter. An address that answers the Hello and then goes silent is a
-// failure like one that does not answer at all; that includes the first session over a new address, the one that
-// committed it.
+// "Did not hold" means no HelloAck, or less than healthyAfter elapsed since HelloAck. Dialing and authentication time
+// never count as health. The direct path and bridge use the same rule, including the session that commits a new address.
 //
 // Only a link node (one enrolled over the link: Meta.Link set) follows a new address. An mTLS node ignores it: following
 // it would make the node link-only, with no way back to mTLS once the previous address expires.
 //
 // The previous address is not kept for ever: its domain may later belong to someone else, and the node would keep
 // knocking on it. Once the new address has worked for prevAddressKeep the agent forgets it. "Has worked for" is
-// approximated as: a direct session over the current address stays up healthyAfter past its HelloAck (a healthy
-// session) prevAddressKeep or more after the address took over (Meta.LinkSince). The previous address is then dropped at
+// approximated as: a session over the current address stays up healthyAfter past its HelloAck (a healthy session)
+// prevAddressKeep or more after the address took over (Meta.LinkSince). The previous address is then dropped at
 // once, in memory and in agent.json, so the fallback never dials an expired one. An address that has had no healthy
 // session since that point (one that died on day 1, however long ago it was committed, or one that answers and drops
 // every session) keeps its previous address, and the fallback to it still works. agent.json without link_since (written
@@ -101,7 +99,7 @@ func (a *Agent) applyPanelLink(st *pb.NodeSettings) (fresh bool) {
 		fresh = true
 	}
 	if dirty {
-		if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
+		if err := saveMeta(a.cfg.StateDir, &a.meta); err != nil {
 			a.log.Error("panel link address not saved", "err", err)
 		}
 	}
@@ -112,109 +110,154 @@ func (a *Agent) applyPanelLink(st *pb.NodeSettings) (fresh bool) {
 	return fresh
 }
 
-// nextLinkSession runs a session over the new link address, through the panel bridge of entry node viaNodeID when set
-// (sessionViaBridge). Once its HelloAck arrives the address replaces the old one for good, and a direct session counts as
-// one over the current address: if it does not hold, the next turn tries the previous address. A failure before the
-// HelloAck is an ordinary connection failure (backoff), and the next turn uses the old address.
-func (a *Agent) nextLinkSession(ctx context.Context, next, viaNodeID string) error {
-	a.log.Info("trying the new panel link address", "via", viaNodeID)
-	started := time.Now()
-	err := a.linkSessionOn(ctx, func(ctx context.Context) (*websocketAgentTransport, func(), error) {
-		t, cleanup, err := a.dialLinkBase(ctx, next, viaNodeID)
+// linkNodeSession chooses the next, current or previous address with the same policy on the direct path and bridge.
+func (a *Agent) linkNodeSession(ctx context.Context, via string) error {
+	triedPrev := a.triedPrev
+	a.triedPrev = false
+	if a.currentFailed {
+		a.currentFailed = false
+		if prev := a.prevLink(); prev != "" && (!triedPrev || a.nextLink() == "") {
+			a.triedPrev = true
+			epoch := a.sessionEpoch.Load()
+			err := a.prevSession(ctx, prev, via)
+			if via == "" || ctx.Err() != nil || a.sessionEpoch.Load() != epoch {
+				return err
+			}
+			// A failed candidate is not a failed bridge. Retry the current address in this turn without consuming
+			// the pending next address's schedule (or a direct-probe hint).
+			return a.linkAddressSession(ctx, a.linkURL(), via, nil)
+		}
+	}
+	nextAnswered := via == "" && a.nextAnswered.Swap(false)
+	// Favor fallback after a failed current session, but never twice in a row ahead of a pending next address.
+	// The previous candidate already took a turn, so next is due even if an earlier next attempt failed.
+	if next := a.nextLink(); next != "" && (!a.triedNext || nextAnswered || triedPrev) {
+		a.triedNext = true
+		epoch := a.sessionEpoch.Load()
+		err := a.nextLinkSession(ctx, next, via)
+		if via == "" || ctx.Err() != nil || a.sessionEpoch.Load() != epoch {
+			return err
+		}
+		// An unreachable next address must not cost the node its working bridge.
+	} else {
+		a.triedNext = false
+	}
+	return a.linkAddressSession(ctx, a.linkURL(), via, nil)
+}
+
+// linkAddressSession measures health from HelloAck, never from dialing. The same measurement records current-address
+// failures, confirms a new address and expires a previous address, whether direct or through a bridge.
+func (a *Agent) linkAddressSession(ctx context.Context, raw, via string, commit func() bool) error {
+	established := false
+	var healthy *time.Timer
+	done := make(chan struct{})
+	err := a.linkSessionOn(ctx, func(sctx context.Context) (*websocketAgentTransport, func(), error) {
+		t, cleanup, err := a.dialLinkBase(sctx, raw, via)
 		if err == nil {
-			t.onEstablished = func() { a.commitNextLink(next) }
+			t.onEstablished = func() error {
+				deadline := a.sessionAckAt.Add(a.healthyAfter())
+				ended := a.sessionEndedAt
+				if commit != nil && !commit() {
+					return errSwitchTransport // a newer operator intent superseded this connection
+				}
+				established = true
+				healthy = time.AfterFunc(time.Until(deadline), func() {
+					defer close(done)
+					if sctx.Err() == nil && ended.Load() == nil {
+						a.confirmHealthyLink(raw)
+					}
+				})
+				return nil
+			}
 		}
 		return t, cleanup, err
-	}, viaNodeID)
-	if a.linkURL() == next {
-		// The old address's failure says nothing about the new one; a session through a bridge, nothing about the direct
-		// path.
-		a.currentFailed = viaNodeID == "" && a.didNotHold(ctx, err, started)
+	}, via)
+	if healthy != nil && !healthy.Stop() {
+		<-done // finish the health write before the next turn can change addresses
 	}
-	if errors.Is(err, errLinkNotEstablished) {
-		return fmt.Errorf("new panel link address: %v", err) // not errLinkNotEstablished: no mTLS hold period for it
+	healthySession := established && a.sessionHealthy()
+	if healthySession {
+		// Promotion or timer scheduling may have used the remaining deadline. A completed healthy lifetime is still
+		// proof, even if cancellation stopped the timer before it could persist that proof.
+		a.confirmHealthyLink(raw)
+	}
+	if a.linkURL() == raw {
+		a.currentFailed = ctx.Err() == nil && !errors.Is(err, errSwitchTransport) &&
+			!healthySession
 	}
 	return err
 }
 
-// didNotHold reports a session over the current link address, started at started, that is no proof the address works: it
-// did not establish, or it ended before healthyAfter. The agent stopping and a session that ended at once because its
-// HelloAck brought a new link address (errSwitchTransport) say nothing about the address.
-func (a *Agent) didNotHold(ctx context.Context, err error, started time.Time) bool {
-	if ctx.Err() != nil || errors.Is(err, errSwitchTransport) {
-		return false
+// nextLinkSession commits a new address at HelloAck; a short session then triggers fallback on the next turn.
+func (a *Agent) nextLinkSession(ctx context.Context, next, via string) error {
+	a.log.Info("trying the new panel link address", "via", via)
+	a.metaMu.Lock()
+	revision := a.meta.NextLinkRevision
+	pending := a.meta.NextLink == next
+	a.metaMu.Unlock()
+	if !pending {
+		return errSwitchTransport
 	}
-	return errors.Is(err, errLinkNotEstablished) || time.Since(started) < a.healthyAfter()
+	err := a.linkAddressSession(ctx, next, via, func() bool { return a.commitNextLink(next, revision) })
+	if errors.Is(err, errLinkNotEstablished) {
+		return fmt.Errorf("new panel link address: %v", err) // no mTLS hold period for it
+	}
+	return err
 }
 
-func (a *Agent) commitNextLink(next string) {
+func (a *Agent) commitNextLink(next, revision string) bool {
 	a.metaMu.Lock()
 	defer a.metaMu.Unlock()
-	if a.meta.NextLink != next || a.meta.Link == "" {
-		return
+	if a.meta.Link == "" {
+		return false
 	}
-	a.meta.PrevLink = a.meta.Link // the address in use until now
-	a.meta.LinkSince = a.linkNow().Unix()
-	a.meta.Link, a.meta.NextLink = next, ""
-	a.cfg.LinkURL = next
-	if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
+	promoted, err := promoteNextLink(a.cfg.StateDir, &a.meta, next, revision, a.linkNow().Unix())
+	if err != nil {
 		a.log.Error("new panel link address not saved", "err", err)
-		return
+		return false
 	}
+	a.triedNext = false // a superseding intent gets its own first turn
+	if !promoted {
+		return false
+	}
+	a.cfg.LinkURL = next
 	a.log.Info("new panel link address in use")
+	return true
 }
 
-// dialCurrentLink dials the current link address. Once a session over it is healthy (healthyAfter past its HelloAck),
-// the previous panel address may expire (forgetExpiredPrev).
-func (a *Agent) dialCurrentLink(ctx context.Context) (*websocketAgentTransport, func(), error) {
-	link := a.linkURL()
-	t, cleanup, err := a.dialLinkBase(ctx, link, "")
-	if err == nil {
-		// ctx is the session's: it ends with the session, and the timer with it.
-		t.onEstablished = func() {
-			healthy := time.AfterFunc(a.healthyAfter(), func() {
-				if ctx.Err() == nil {
-					a.forgetExpiredPrev(link)
-				}
-			})
-			context.AfterFunc(ctx, func() { healthy.Stop() })
-		}
-	}
-	return t, cleanup, err
-}
-
-// forgetExpiredPrev drops the previous panel address once a session over the current link address link is healthy,
-// when link took over prevAddressKeep or more ago. Without a previous address it changes nothing (agent.json is not
-// rewritten).
-func (a *Agent) forgetExpiredPrev(link string) {
+// confirmHealthyLink persists proof of the current address, so a later switch may replace the fallback even after a
+// restart. An unconfirmed intermediate address must never replace the last known-good fallback.
+func (a *Agent) confirmHealthyLink(link string) {
 	a.metaMu.Lock()
 	defer a.metaMu.Unlock()
 	if a.meta.Link != link || a.meta.PrevLink == "" {
 		return
 	}
-	if a.linkNow().Sub(time.Unix(a.meta.LinkSince, 0)) < prevAddressKeep {
+	dirty := !a.meta.LinkHealthy
+	a.meta.LinkHealthy = true
+	expired := a.linkNow().Sub(time.Unix(a.meta.LinkSince, 0)) >= prevAddressKeep
+	if expired {
+		a.meta.PrevLink, a.meta.LinkSince = "", 0
+		dirty = true
+	}
+	if !dirty {
 		return
 	}
-	a.meta.PrevLink, a.meta.LinkSince = "", 0
-	if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
-		a.log.Error("forgotten previous panel address not saved", "err", err)
+	if err := saveMeta(a.cfg.StateDir, &a.meta); err != nil {
+		a.log.Error("panel link health not saved", "err", err)
 		return
 	}
-	a.log.Info("the new panel address has worked long enough; previous address forgotten")
+	if expired {
+		a.log.Info("the new panel address has worked long enough; previous address forgotten")
+	}
 }
 
 // prevSession runs a session over the previous link address prev. Once its HelloAck arrives the previous address is
 // the current one again. A failure is an ordinary connection failure (backoff), and the next turn uses the current
 // address.
-func (a *Agent) prevSession(ctx context.Context, prev string) error {
-	a.log.Info("the panel address does not answer; trying the previous one")
-	err := a.linkSession(ctx, func(ctx context.Context) (*websocketAgentTransport, func(), error) {
-		t, cleanup, err := a.dialLinkBase(ctx, prev, "")
-		if err == nil {
-			t.onEstablished = func() { a.commitPrevLink(prev) }
-		}
-		return t, cleanup, err
-	})
+func (a *Agent) prevSession(ctx context.Context, prev, via string) error {
+	a.log.Info("the panel address does not answer; trying the previous one", "via", via)
+	err := a.linkAddressSession(ctx, prev, via, func() bool { return a.commitPrevLink(prev) })
 	if errors.Is(err, errLinkNotEstablished) {
 		return fmt.Errorf("previous panel link address: %v", err) // not errLinkNotEstablished: no mTLS hold period for it
 	}
@@ -222,17 +265,18 @@ func (a *Agent) prevSession(ctx context.Context, prev string) error {
 }
 
 // commitPrevLink makes the previous link address current again and drops the one that stopped answering.
-func (a *Agent) commitPrevLink(prev string) {
+func (a *Agent) commitPrevLink(prev string) bool {
 	a.metaMu.Lock()
 	defer a.metaMu.Unlock()
-	if a.meta.PrevLink != prev {
-		return
-	}
-	a.meta.Link, a.meta.PrevLink, a.meta.LinkSince = prev, "", 0
-	a.cfg.LinkURL = prev
-	if err := saveMeta(a.cfg.StateDir, a.meta); err != nil {
+	rolledBack, err := rollbackPreviousLink(a.cfg.StateDir, &a.meta, prev)
+	if err != nil {
 		a.log.Error("previous panel address not saved", "err", err)
-		return
+		return false
 	}
+	if !rolledBack {
+		return false
+	}
+	a.cfg.LinkURL = prev
 	a.log.Info("back on the previous panel address")
+	return true
 }

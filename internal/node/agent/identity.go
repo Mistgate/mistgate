@@ -67,6 +67,9 @@ type Meta struct {
 	// NextLink is a new link address the panel sent (NodeSettings.panel_link_url) or `set-panel` saved. The agent tries it
 	// in turn with its current one and makes it Link once a session over it succeeds. Only a link node (Link set) has one.
 	NextLink string `json:"next_link,omitempty"`
+	// NextLinkRevision identifies the last persisted next-link intent, including an explicit clear. Writers compare it
+	// under the metadata lock so an old agent snapshot cannot consume or replace a newer set-panel request.
+	NextLinkRevision string `json:"next_link_revision,omitempty"`
 	// PrevLink is the link address the agent used before its last new link address took over. After a session over the
 	// current link that did not hold (no HelloAck, or ended before healthyAfter), the agent tries the previous address and
 	// makes it current again once a session over it succeeds. LinkSince (unix seconds) is when Link took over from it; the
@@ -74,15 +77,9 @@ type Meta struct {
 	// is no previous address.
 	PrevLink  string `json:"prev_link,omitempty"`
 	LinkSince int64  `json:"link_since,omitempty"`
-}
-
-// saveMeta writes agent.json.
-func saveMeta(dir string, m Meta) error {
-	b, err := json.Marshal(m)
-	if err != nil {
-		return err
-	}
-	return writeFileAtomic(filepath.Join(dir, fileMeta), b, 0o600)
+	// LinkHealthy records a session that held for healthyAfter after HelloAck. Until then PrevLink remains the last
+	// known-good address, even if another candidate is committed or the agent restarts.
+	LinkHealthy bool `json:"link_healthy,omitempty"`
 }
 
 // SetPanelLink saves linkURL as the panel link address the agent tries next (Meta.NextLink); the running agent reads it
@@ -95,25 +92,27 @@ func SetPanelLink(stateDir, linkURL string) error {
 	if !IsEnrolled(stateDir) {
 		return errors.New("node is not enrolled")
 	}
-	raw, err := os.ReadFile(filepath.Join(stateDir, fileMeta))
-	if errors.Is(err, os.ErrNotExist) {
-		return errors.New("node is not enrolled")
-	} else if err != nil {
-		return err
-	}
-	var m Meta
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return fmt.Errorf("%s: %w", fileMeta, err)
-	}
-	if m.Link == "" {
-		return errors.New("this node connects to the panel over mTLS (agent.json has no link); only a node enrolled with --link-url can change its panel link address")
-	}
-	if linkURL == m.Link {
-		m.NextLink = ""
-	} else {
-		m.NextLink = linkURL
-	}
-	return saveMeta(stateDir, m)
+	return withMetaLock(stateDir, func() error {
+		m, err := readMetaFileUnlocked(stateDir)
+		if errors.Is(err, os.ErrNotExist) {
+			return errors.New("node is not enrolled")
+		} else if err != nil {
+			return err
+		}
+		if m.Link == "" {
+			return errors.New("this node connects to the panel over mTLS (agent.json has no link); only a node enrolled with --link-url can change its panel link address")
+		}
+		if linkURL == m.Link {
+			m.NextLink = ""
+		} else {
+			m.NextLink = linkURL
+		}
+		// Even reasserting the same address is a new operator intent: an already in-flight commit must not consume it.
+		if err := reviseNextLink(&m); err != nil {
+			return err
+		}
+		return writeMeta(stateDir, m)
+	})
 }
 
 type identity struct {
@@ -248,18 +247,18 @@ func Enroll(ctx context.Context, cfg EnrollConfig) (Meta, error) {
 		return Meta{}, err
 	}
 	_ = os.Chmod(cfg.StateDir, 0o700) // the directory may pre-exist with looser bits
-	metaJSON, _ := json.Marshal(meta)
-	for _, f := range []struct {
-		name string
-		data []byte
-	}{
-		{fileCA, []byte(m.CaCertificatePem)},
-		{fileMeta, metaJSON},
-		{fileIdentity, identityPEM(key, m.CertificatePem)}, // last: its presence means "enrolled"
-	} {
-		if err := writeFileAtomic(filepath.Join(cfg.StateDir, f.name), f.data, 0o600); err != nil {
-			return Meta{}, err
+	// Enrollment replaces the identity, not a running agent snapshot: never merge the old identity's link intent.
+	// Publish CA, fresh metadata and finally the identity under the same lock used by metadata writers.
+	if err := withMetaLock(cfg.StateDir, func() error {
+		if err := writeFileAtomic(filepath.Join(cfg.StateDir, fileCA), []byte(m.CaCertificatePem), 0o600); err != nil {
+			return err
 		}
+		if err := writeMeta(cfg.StateDir, meta); err != nil {
+			return err
+		}
+		return writeFileAtomic(filepath.Join(cfg.StateDir, fileIdentity), identityPEM(key, m.CertificatePem), 0o600)
+	}); err != nil {
+		return Meta{}, err
 	}
 	if cfg.ResumePendingKey {
 		if err := os.Remove(filepath.Join(cfg.StateDir, filePendingKey)); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -419,17 +418,28 @@ func identityPEM(key *ecdsa.PrivateKey, certPEM string) []byte {
 }
 
 func loadIdentity(dir string) (*identity, error) {
-	idPEM, err := os.ReadFile(filepath.Join(dir, fileIdentity))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, ErrNotEnrolled
-	} else if err != nil {
-		return nil, err
+	// Enrollment publishes all three files under this lock. Capture the complete
+	// snapshot before parsing so a forced enrollment cannot mix two identities.
+	var idPEM, caPEM, metaJSON []byte
+	err := withMetaLock(dir, func() error {
+		var err error
+		idPEM, err = os.ReadFile(filepath.Join(dir, fileIdentity))
+		if errors.Is(err, os.ErrNotExist) {
+			return ErrNotEnrolled
+		}
+		if err != nil {
+			return err
+		}
+		caPEM, err = os.ReadFile(filepath.Join(dir, fileCA))
+		if err != nil {
+			return err
+		}
+		metaJSON, err = os.ReadFile(filepath.Join(dir, fileMeta))
+		return err
+	})
+	if idPEM == nil && errors.Is(err, os.ErrNotExist) {
+		return nil, ErrNotEnrolled // the state directory itself does not exist
 	}
-	caPEM, err := os.ReadFile(filepath.Join(dir, fileCA))
-	if err != nil {
-		return nil, err
-	}
-	metaJSON, err := os.ReadFile(filepath.Join(dir, fileMeta))
 	if err != nil {
 		return nil, err
 	}
@@ -610,12 +620,24 @@ func newHTTPClient(tc *tls.Config, dial time.Duration, h2 *http.HTTP2Config) *ht
 
 // writeFileAtomic writes data to a temp file in the same directory and renames it over path.
 func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, mode); err != nil {
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer os.Remove(tmp)
+	if err := f.Chmod(mode); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
 		return err
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
 		return err
 	}
 	return nil
