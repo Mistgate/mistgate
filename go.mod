@@ -223,7 +223,7 @@ replace github.com/apernet/hysteria/core/v2 => ./third_party/hysteria-core
 // REALITY that still takes the ClientHellos Xray 26.3.27 took (third_party/reality/MISTGATE.md).
 replace github.com/xtls/reality => ./third_party/reality
 
-// Xray-core v26.11.9 (upstream commit 676eaf66f8f0, the one require names) plus three commits (Vision's TrafficState fields made
-// atomic; mux XUDP.Status set under XUDPManager's lock; the build with quic-go 0.65, which Hysteria v2.14.0 needs), from the public fork github.com/Mistgate/Xray-core (its README says
+// Xray-core v26.11.9 (upstream commit 676eaf66f8f0, the one require names) plus four commits (Vision's TrafficState fields made
+// atomic; mux XUDP.Status set under XUDPManager's lock; the build with quic-go 0.65, which Hysteria v2.14.0 needs; the HTTP outbound without text/template, which cost the panel binary over 20 MB), from the public fork github.com/Mistgate/Xray-core (its README says
 // what and why). Pin a commit of the fork, not a branch.
-replace github.com/xtls/xray-core => github.com/Mistgate/Xray-core v0.0.0-20261124010021-55d85b485a4a
+replace github.com/xtls/xray-core => github.com/Mistgate/Xray-core v0.0.0-20261124180955-37e7d9fc8cce
