@@ -70,7 +70,8 @@ type SubsSettingsV struct {
 		ShowQR            bool `json:"show_qr"`
 		DeviceSelfService bool `json:"device_self_service"`
 		PagePassword      bool `json:"page_password"`
-		DNSChoice         bool `json:"dns_choice"` // people pick the DNS of each server on their page (off when absent)
+		DNSChoice         bool `json:"dns_choice"`    // people pick the DNS of each server on their page (off when absent)
+		RUDirectKey       bool `json:"ru_direct_key"` // people may take the AmneziaWG key "Russian services direct" (off when absent)
 	} `json:"user_page"`
 	Apps                map[string][]subsAppV `json:"apps"` // by platform, in display order
 	Rules               []serveRuleV          `json:"rules"`
@@ -147,6 +148,7 @@ func subsSettingsView(r *adminv1.GetSubscriptionSettingsResponse) *SubsSettingsV
 	o := s.GetUserPage()
 	v.UserPage.ShowAnnouncement, v.UserPage.ShowSupport, v.UserPage.ShowQR = o.GetShowAnnouncement(), o.GetShowSupport(), o.GetShowQr()
 	v.UserPage.DeviceSelfService, v.UserPage.PagePassword, v.UserPage.DNSChoice = subsettings.SelfService(s), subsettings.PagePassword(s), subsettings.DNSChoice(s)
+	v.UserPage.RUDirectKey = subsettings.RUDirect(s)
 	for _, a := range s.GetApps() {
 		p := platformWord(a.GetPlatform())
 		v.Apps[p] = append(v.Apps[p], subsAppV{

@@ -208,6 +208,15 @@ func (s *Service) loadDevice(ctx context.Context, owner, deviceID string) (*devi
 // a FailedPrecondition whose message starts with a stable code: user_disabled, app_disabled, profile_not_in_group,
 // no_inbound, "agent too old", device_limit ("device_limit: 5/5"), subnet_full.
 func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platform, label string) (store.AccessAWGDevice, []DeviceConfig, error) {
+	return s.AddAWGDeviceRoute(ctx, by, userID, profileID, platform, label, "")
+}
+
+// AddAWGDeviceRoute is AddAWGDevice for a key with a route: "" (all through the VPN) or awg.RouteRUDirect (the Russian services
+// around the VPN). Whether the owner offers that route to people is the page's check (subs), not this one: the admin may issue it.
+func (s *Service) AddAWGDeviceRoute(ctx context.Context, by, userID, profileID, platform, label, route string) (store.AccessAWGDevice, []DeviceConfig, error) {
+	if route != "" && route != awg.RouteRUDirect {
+		return store.AccessAWGDevice{}, nil, invalid("route must be empty or %q", awg.RouteRUDirect)
+	}
 	platform, label, err := cleanDeviceInput(platform, label, true)
 	if err != nil {
 		return store.AccessAWGDevice{}, nil, err
@@ -283,7 +292,7 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 	now := s.now()
 	_, err = a.AddAWGDevice(ctx, store.AWGDeviceAdd{
 		Device:    store.AccessDevice{ID: devID, UserID: u.ID, Platform: platform, Model: label},
-		ProfileID: p.ID, MaxIdx: maxIdx, Limit: u.DeviceLimit,
+		ProfileID: p.ID, MaxIdx: maxIdx, Limit: u.DeviceLimit, Route: route,
 	}, now, s.awgIssuer(proto, u.ID, devID, p.ID, merged))
 	var limit *store.AccessLimitError
 	switch {
@@ -300,7 +309,11 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 		return store.AccessAWGDevice{}, nil, s.internal("add device", err)
 	}
 	s.notify.StateChanged()
-	s.audit(ctx, by, "device_create", map[string]any{"user": u.ID, "device": devID, "profile": p.ID})
+	params := map[string]any{"user": u.ID, "device": devID, "profile": p.ID}
+	if route != "" {
+		params["route"] = route
+	}
+	s.audit(ctx, by, "device_create", params)
 	dev, err := a.AWGDevice(ctx, devID)
 	if err != nil {
 		return store.AccessAWGDevice{}, nil, s.internal("get device", err)
@@ -534,6 +547,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			DNS: servers, NodeAddr: f.Node.Address, DisplayName: names[i],
 			// Same rule as the subscription: no IPv6 address of the tunnel where the exit gives the client no IPv6.
 			NoIPv6Egress: !ipv6Egress(f.Node, egressOf(sc.merged)),
+			RUDirect:     sc.dev.Route == awg.RouteRUDirect,
 		}
 		in.Format = plugin.FormatAWGConf
 		conf, ok1 := sc.proto.Render(in)
@@ -625,6 +639,9 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 	}
 	if len(out) == 0 {
 		return nil, s.internal("render device config", errors.New("no inbound produced a config"))
+	}
+	if sc.dev.Route == awg.RouteRUDirect {
+		held[ruSigKey] = awg.RUDirectVersion // the version of the list this key holds, measured by markDNSStale
 	}
 	if markEpoch || recordDNS {
 		var epoch *int64

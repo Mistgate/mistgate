@@ -551,6 +551,7 @@ type subsPageArgs struct {
 	DeviceSelfService *bool   `json:"device_self_service,omitempty"`
 	PagePassword      *bool   `json:"page_password,omitempty"`
 	DNSChoice         *bool   `json:"dns_choice,omitempty"`
+	RUDirectKey       *bool   `json:"ru_direct_key,omitempty"`
 	HappPing          *string `json:"happ_ping,omitempty" jsonschema:"off or tcp"`
 	HappPingOnOpen    *bool   `json:"happ_ping_on_open,omitempty"`
 	SettingsHash      string  `json:"settings_hash,omitempty" jsonschema:"-"`
@@ -558,9 +559,9 @@ type subsPageArgs struct {
 
 var subsPageSet = changeSpec[subsPageArgs]{
 	name: "subscription_page_set", min: ProfileOperator, danger: true, procs: settingsProcs,
-	desc: "Set options users see on the public subscription page (announcement, support, QR, device self-service, page password and DNS choices) and Happ ping behavior. Every user sees the page change; always waits for owner approval.",
+	desc: "Set options users see on the public subscription page (announcement, support, QR, device self-service, page password, DNS choices and the AmneziaWG key “Russian services direct”) and Happ ping behavior. Every user sees the page change; always waits for owner approval.",
 	plan: func(c *call, a subsPageArgs) (*planned, error) {
-		if a.ShowAnnouncement == nil && a.ShowSupport == nil && a.ShowQR == nil && a.DeviceSelfService == nil && a.PagePassword == nil && a.DNSChoice == nil && a.HappPing == nil && a.HappPingOnOpen == nil {
+		if a.ShowAnnouncement == nil && a.ShowSupport == nil && a.ShowQR == nil && a.DeviceSelfService == nil && a.PagePassword == nil && a.DNSChoice == nil && a.RUDirectKey == nil && a.HappPing == nil && a.HappPingOnOpen == nil {
 			return nil, errors.New("give at least one page or Happ setting to change")
 		}
 		cur, err := c.subscriptionSnapshot()
@@ -591,6 +592,9 @@ var subsPageSet = changeSpec[subsPageArgs]{
 		if a.DNSChoice != nil {
 			page.AllowDnsChoice = a.DNSChoice
 		}
+		if a.RUDirectKey != nil {
+			page.AllowRuDirectKey = a.RUDirectKey
+		}
 		if a.HappPing != nil {
 			switch strings.ToLower(strings.TrimSpace(*a.HappPing)) {
 			case "off":
@@ -617,7 +621,7 @@ var subsPageSet = changeSpec[subsPageArgs]{
 			key      string
 			from, to bool
 			changed  bool
-		}{{"show_announcement", before.GetUserPage().GetShowAnnouncement(), page.GetShowAnnouncement(), a.ShowAnnouncement != nil}, {"show_support", before.GetUserPage().GetShowSupport(), page.GetShowSupport(), a.ShowSupport != nil}, {"show_qr", before.GetUserPage().GetShowQr(), page.GetShowQr(), a.ShowQR != nil}, {"device_self_service", subsettings.SelfService(before), subsettings.SelfService(next), a.DeviceSelfService != nil}, {"page_password", subsettings.PagePassword(before), subsettings.PagePassword(next), a.PagePassword != nil}, {"dns_choice", subsettings.DNSChoice(before), subsettings.DNSChoice(next), a.DNSChoice != nil}} {
+		}{{"show_announcement", before.GetUserPage().GetShowAnnouncement(), page.GetShowAnnouncement(), a.ShowAnnouncement != nil}, {"show_support", before.GetUserPage().GetShowSupport(), page.GetShowSupport(), a.ShowSupport != nil}, {"show_qr", before.GetUserPage().GetShowQr(), page.GetShowQr(), a.ShowQR != nil}, {"device_self_service", subsettings.SelfService(before), subsettings.SelfService(next), a.DeviceSelfService != nil}, {"page_password", subsettings.PagePassword(before), subsettings.PagePassword(next), a.PagePassword != nil}, {"dns_choice", subsettings.DNSChoice(before), subsettings.DNSChoice(next), a.DNSChoice != nil}, {"ru_direct_key", subsettings.RUDirect(before), subsettings.RUDirect(next), a.RUDirectKey != nil}} {
 			if f.changed && f.from != f.to {
 				from, to := strconv.FormatBool(f.from), strconv.FormatBool(f.to)
 				facts = append(facts, changeFact(f.key, from+" -> "+to, from, to))
@@ -667,6 +671,9 @@ var subsPageSet = changeSpec[subsPageArgs]{
 		}
 		if a.DNSChoice != nil {
 			page.AllowDnsChoice = a.DNSChoice
+		}
+		if a.RUDirectKey != nil {
+			page.AllowRuDirectKey = a.RUDirectKey
 		}
 		if a.HappPing != nil {
 			if *a.HappPing == "tcp" {

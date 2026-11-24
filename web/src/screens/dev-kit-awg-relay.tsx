@@ -15,7 +15,7 @@ import { meQuery } from "@/lib/session";
 import { ChangeRelayPort } from "@/screens/node/relays";
 import { useWays, WaysTab } from "@/screens/node/ways";
 import { settingsQuery } from "@/screens/subscriptions/queries";
-import { DeviceConfigsModal, type DeviceRef } from "@/screens/users/awg-devices";
+import { AddDeviceModal, DeviceConfigsModal, type DeviceRef } from "@/screens/users/awg-devices";
 import { ConnectionAlerts, ConnectionCounts } from "@/screens/users/user-connection";
 
 // Development only, /dev-kit?only=awg-relay&state=…: AmneziaWG through a relay (awg-relay-plan §2.3, §9), on made-up data and a
@@ -125,7 +125,7 @@ const viaRu = {
   conf: "[Interface]\nPrivateKey = BBBB\nAddress = 10.66.4.12/32\n\n[Peer]\nEndpoint = msk1.example.com:51820\n",
 } as unknown as DeviceConfig;
 const nl1 = { ...direct, inboundId: "inb_awg_nl1", nodeId: "nod_nl1", nodeName: "nl1", countryCode: "NL", confFilename: "nl1-31.conf" } as unknown as DeviceConfig;
-const phone: DeviceRef = { id: "dev_k", label: "Pixel 7", platform: "android", profileName: "AWG 3.1", version: "3.1", address: "10.66.4.9", stale: false };
+const phone: DeviceRef = { id: "dev_k", label: "Pixel 7", platform: "android", profileName: "AWG 3.1", version: "3.1", address: "10.66.4.9", stale: false, route: "" };
 
 const connRow = (over: object) => ({
   deviceId: "dev_k", nodeId: "nod_de1", nodeName: "de1", inboundId: "inb_awg_de1", profileName: "AWG 3.1", protocol: "awg", connects: 14, rejects: 0, drops: 0, stalls: 0, onlineS: 7200, lastHourUnix: now - 40 * min,
@@ -141,6 +141,26 @@ const aliceDevices = [
   { id: "dev_k", kind: DeviceKind.KEY, model: "Pixel 7", platform: "android" },
   { id: "dev_l", kind: DeviceKind.KEY, model: "Laptop", platform: "windows" },
 ] as never;
+
+// "Add a device" with the route picked: a click on the select and on its second option, as a hand would
+function AddDeviceKit({ pick }: { pick: boolean }) {
+  useEffect(() => {
+    if (!pick) return;
+    const id = window.setInterval(() => {
+      const trigger = document.querySelectorAll<HTMLElement>("[role=dialog] [role=combobox]")[1];
+      if (!trigger) return;
+      const ru = [...document.querySelectorAll<HTMLElement>("[role=option]")].find((o) => /Russian|Российск/.test(o.textContent ?? ""));
+      if (ru) {
+        ru.click();
+        window.clearInterval(id);
+      } else if (trigger.getAttribute("aria-expanded") !== "true") {
+        for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) trigger.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+      }
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [pick]);
+  return <AddDeviceModal open onOpenChange={() => {}} userId="usr_alice" userName="Alice" profiles={[{ id: "p1", name: "AWG 3.1" }] as never} onCreated={() => {}} />;
+}
 
 function Shot({ id, children }: { id: string; children: ReactNode }) {
   return <section data-shot={id}>{children}</section>;
@@ -169,6 +189,19 @@ export function AwgRelayKit() {
       return (
         <Mock>
           <DeviceConfigsModal device={phone} initial={state === "device" ? [direct, viaRu, nl1] : [viaRu, direct, nl1]} onClose={() => {}} onChanged={() => {}} />
+        </Mock>
+      );
+    case "device-ru":
+      return (
+        <Mock>
+          <DeviceConfigsModal device={{ ...phone, label: "iPhone", platform: "ios", route: "ru-direct", address: "10.66.4.9" }} initial={[direct, nl1]} onClose={() => {}} onChanged={() => {}} />
+        </Mock>
+      );
+    case "add":
+    case "add-ru":
+      return (
+        <Mock>
+          <AddDeviceKit pick={state === "add-ru"} />
         </Mock>
       );
     case "history":

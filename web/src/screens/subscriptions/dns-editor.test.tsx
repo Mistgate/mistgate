@@ -469,6 +469,8 @@ describe("the editor", () => {
     expect(row.querySelector(".sb-no")!.textContent).toBe("1");
     // asked in plain DNS: Happ and Amnezia both get it, with nothing to add
     expect([...document.querySelectorAll(".sb-get > div")].map((r) => r.querySelector("b")!.textContent)).toEqual(["Plain", "Plain"]);
+    // and an Amnezia key does not promise more than the two resolvers
+    expect(document.querySelectorAll(".sb-get > div")[1]!.querySelector("em")!.textContent).toBe("two resolvers only");
     // DoH: Happ keeps it, an Amnezia key only holds addresses
     await click([...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === "DoH"));
     const get = [...document.querySelectorAll(".sb-get > div")].map((r) => [r.querySelector("b")!.textContent, r.querySelector("em")!.textContent]);

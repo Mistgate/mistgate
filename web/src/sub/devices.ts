@@ -43,7 +43,7 @@ type RowSpec = {
   more?: boolean;
   busy?: boolean;
   /** A key that needs a new one: the mark (with why, as its title) and, when the page may issue keys, the button. */
-  stale?: false | "profile" | "dns";
+  stale?: false | "profile" | "dns" | "routes";
   /** The page may issue keys (self-service): the stale mark has its button. */
   serve?: boolean;
   error?: HTMLElement | null;
@@ -67,7 +67,7 @@ function row(c: Ctx, o: RowSpec): Kid[] {
     ? h(
         "div",
         { class: "sk" },
-        h("span", { class: "u-tag work", title: o.stale === "dns" ? t.staleDns : o.serve ? t.staleD : t.keysByAdmin }, t.awgStale),
+        h("span", { class: "u-tag work", title: o.stale === "dns" ? t.staleDns : o.stale === "routes" ? t.staleRu : o.serve ? t.staleD : t.keysByAdmin }, t.awgStale),
         o.serve && h("button", { class: "u-btn pri", type: "button", "data-k": `amz-stale-${o.id}`, disabled: o.busy, "aria-busy": o.busy ? "true" : false, on: { click: () => a.amz.stale(o.id) } }, o.busy ? h("span", { class: "spin" }) : icon("refresh"), o.busy ? t.awgBusy : t.newKey),
       )
     : null;
@@ -163,7 +163,7 @@ function keyRow(c: Ctx, x: AwgDevice, serve: boolean): Kid[] {
     id: x.id,
     ico: devIcon(x.platform, true),
     name,
-    meta: t.keyMeta(keyAppName(d, x.platform as never), tail),
+    meta: t.keyMeta(keyAppName(d, x.platform as never), tail) + (x.route === "ru-direct" ? ` · ${t.adRuTag}` : ""),
     when: when(c, x.last_handshake_unix, x.online, t.awgNever, t.awgHandshake),
     more: serve,
     busy,

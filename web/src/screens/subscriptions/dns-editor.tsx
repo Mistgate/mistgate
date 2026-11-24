@@ -346,7 +346,7 @@ function AppsGet({ servers, transport, blockMax, torrents, data, catalog, t }: {
       {results.map((r) => {
         const got = r.transport ?? null;
         const ok = got !== null && got === transport;
-        const why = servers.length === 0 ? "" : !ok ? t(appWhy[r.client] ?? "subs.dns.why.mihomo") : r.client === DnsClient.SINGBOX && r.resolvers > 1 ? t("subs.dns.why.singbox") : "";
+        const why = servers.length === 0 ? "" : !ok ? t(appWhy[r.client] ?? "subs.dns.why.mihomo") : r.client === DnsClient.SINGBOX && r.resolvers > 1 ? t("subs.dns.why.singbox") : r.client === DnsClient.AMNEZIAWG ? t("subs.dns.why.amneziawgOk") : "";
         const noMax = blockMax && servers.length > 0 && r.client === DnsClient.AMNEZIAWG ? t("subs.dns.why.awgMax") : ""; // a key has no rules: Max is not blocked
         const torrent = torrents && servers.length > 0 ? t(torrentNote[r.client] ?? "subs.dns.torrent.none") : ""; // what the app does with the torrent switch
         return (

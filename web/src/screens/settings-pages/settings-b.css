@@ -124,7 +124,7 @@
   width: auto;
   display: inline-flex;
 }
-.sx .sx-af>div:first-child button {
+.sx .sx-af>div:first-child [role="radio"] {
   flex: none;
   padding-inline: 14px;
 }

@@ -21,13 +21,13 @@ import { sbDemo } from "./demo-sb";
 import { Grid, path, Section, Svg, Toggle } from "./parts";
 import { dnsPresetsQuery, pickerUsersQuery, useSaveSettings } from "./queries";
 
-type Options = { showAnnouncement: boolean; showSupport: boolean; showQr: boolean; allowDeviceSelfService: boolean; requirePagePassword: boolean; allowDnsChoice: boolean };
+type Options = { showAnnouncement: boolean; showSupport: boolean; showQr: boolean; allowDeviceSelfService: boolean; requirePagePassword: boolean; allowDnsChoice: boolean; allowRuDirectKey: boolean };
 type LinkOffer = { presetIds: string[]; defaultPresetId: string };
 type Draft = { apps: PlatformApp[]; options: Options; linkDns: LinkOffer };
 const draftOf = (s: Settings): Draft => ({
   apps: s.apps,
   linkDns: { presetIds: s.linkDns?.presetIds ?? [], defaultPresetId: s.linkDns?.defaultPresetId ?? "" },
-  options: { showAnnouncement: s.userPage?.showAnnouncement ?? true, showSupport: s.userPage?.showSupport ?? true, showQr: s.userPage?.showQr ?? true, allowDeviceSelfService: s.userPage?.allowDeviceSelfService ?? true, requirePagePassword: s.userPage?.requirePagePassword ?? true, allowDnsChoice: s.userPage?.allowDnsChoice ?? false },
+  options: { showAnnouncement: s.userPage?.showAnnouncement ?? true, showSupport: s.userPage?.showSupport ?? true, showQr: s.userPage?.showQr ?? true, allowDeviceSelfService: s.userPage?.allowDeviceSelfService ?? true, requirePagePassword: s.userPage?.requirePagePassword ?? true, allowDnsChoice: s.userPage?.allowDnsChoice ?? false, allowRuDirectKey: s.userPage?.allowRuDirectKey ?? false },
 });
 const descMax = 80;
 /** How many presets the page may offer for the apps on the link (the panel's limit). */
@@ -111,6 +111,7 @@ function PageForm({ settings, picked, onPick }: { settings: Settings; picked: st
               <Toggle title={t("subs.page.opt.qr")} hint={t("sx.page.qrHint")} checked={d.options.showQr} onChange={(on) => setOpt("showQr", on)} />
               <Toggle title={t("subs.page.opt.password")} hint={t("subs.page.opt.passwordHint")} checked={d.options.requirePagePassword} onChange={(on) => setOpt("requirePagePassword", on)} />
               <Toggle title={t("awg.page.selfService")} hint={t("awg.page.selfServiceHint")} checked={d.options.allowDeviceSelfService} onChange={(on) => setOpt("allowDeviceSelfService", on)} />
+              <Toggle title={t("awg.page.ruDirect")} hint={t("awg.page.ruDirectHint")} checked={d.options.allowRuDirectKey} onChange={(on) => setOpt("allowRuDirectKey", on)} />
               <Toggle title={t("subs.page.opt.dnsChoice")} hint={t("subs.page.opt.dnsChoiceHint")} checked={d.options.allowDnsChoice} onChange={(on) => setOpt("allowDnsChoice", on)} />
             </div>
           </Section>

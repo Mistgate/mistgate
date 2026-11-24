@@ -3,17 +3,18 @@ title: Status and roadmap
 description: What Mistgate releases already do, what is being tested now, what comes next and what 1.0 needs, and the known limits of the current release.
 ---
 
-Mistgate is in **beta**; the current release is `v0.2.0`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
+Mistgate is in **beta**; the current release is `v0.2.1`. It runs in production, but the API, the stored settings and the node protocol may still change before 1.0. The rest of these docs describe only what the code does today; the plans are on this page. The plans have no dates: "Next" and "Later" give the order, not a schedule.
 
 ```roadmap
 - status: released
   title: Released
-  meta: v0.1.0 – v0.2.0
+  meta: v0.1.0 – v0.2.1
   lead: Everything below is in a release and in the docs. First what the current release brought, then the rest by admin section.
   cards:
     - title: New in the current release
       icon: tag
-      release: v0.2.0
+      release: v0.2.1
+      tag: 0.2.x
       current: true
       points:
         - "**The whole interface redrawn.** Every screen, the windows, the phone layout and the person's own page; in **Users → People**, **QR and send** opens one window with the link, the QR code and the page password. See [Client apps](../guide/client-apps.md)."
@@ -23,6 +24,7 @@ Mistgate is in **beta**; the current release is `v0.2.0`. It runs in production,
         - "**Groups and subscriptions.** A person can be in several groups: the main one decides DNS, the Mihomo template, response headers and the colour, the extra ones add profiles and nodes. The **New node** window asks **Who gets this node**: **Everyone**, **Some groups** or **Nobody yet**. Your own Mihomo templates, response headers and routing for Happ and INCY are set in **Subscriptions**; a DNS preset sends Russian sites direct by a community list. See [Users and groups](../guide/users-and-groups.md) and [DNS](../guide/dns.md)."
         - "**New on nodes.** **Find sites nearby** on the **Profiles** tab scans the node's /24 for a REALITY target of the node's own; **Measure the channel** on the **Server** tab fills the link with 8 streams for 10 seconds each way against your own nodes, only on your command; every 15 minutes each node fetches a list of sites through its WARP, and a WARP+ key is set on the **Exit** tab; a router or a server of yours inside a country can check your nodes from its own network as an own probe (experimental). See [Nodes](../guide/nodes.md), [WARP](../guide/warp.md) and [Own probes](../operations/probes.md)."
         - "**Updating from v0.1.89.** After a backup, update the panel first, then every node. A node with an old agent keeps working, but TrustTunnel, a shared TCP 443, the relay bridge, measuring the channel and the decoy-site library need the new agent. Cancelling a rollout while a step runs works the same for node and system updates, and an update no longer rolls a node back for a profile that was already failing. Do not put the v0.1.89 binary back by hand on upgraded data: restore the backup made before the update. See [Updates](../operations/updates.md)."
+        - "**Fixes in v0.2.1.** A relay through a bridge no longer cuts off the end of a transfer; two libraries that had vulnerability warnings are updated; a downloaded config keeps its `.conf` name in Firefox on Android."
     - title: Profiles
       section: profiles
       points:

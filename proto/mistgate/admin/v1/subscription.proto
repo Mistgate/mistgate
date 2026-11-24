@@ -241,6 +241,10 @@ message UserPageOptions {
   // People may pick, on their page, one of the DNS presets the owner offers on each server (DnsService.SetNodeDnsOptions).
   // Absent = false: a new feature does not switch itself on for settings stored before it existed.
   optional bool allow_dns_choice = 6;
+  // People may take, on their page, the AmneziaWG key "Russian services direct" next to the ordinary one: its AllowedIPs leave the
+  // networks of the big Russian services out, so they do not see the node's address. Absent = false: a new feature does not
+  // switch itself on for settings stored before it existed.
+  optional bool allow_ru_direct_key = 7;
 }
 
 enum SubFormat {

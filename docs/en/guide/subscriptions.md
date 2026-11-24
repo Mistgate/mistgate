@@ -186,6 +186,7 @@ Below the list, **Minimum versions** holds the table behind the states: per app 
 | v2rayN | 7.12.6 | 7.20.0 |
 | Mihomo core (the version comes from the User-Agent) | 1.19.9 | never (Firefox_120 / Safari_16_0 carry no share) |
 | kl!ck (its own version; it is Mihomo inside) | 0.4.0 | never (Firefox_120 / Safari_16_0 carry no share) |
+| Mistgate (the Windows app; Xray inside, the same core in every release) | 0.1.0 | 0.1.0 |
 | sing-box (SFA, SFI, SFM), Karing, NekoBox | does not work | does not work |
 | Hiddify, Streisand, FoXray, v2RayTun, INCY, OneXray, Shadowrocket, FlClash, Clash Verge, Mihomo Party, Clash Meta for Android | unknown | unknown |
 
