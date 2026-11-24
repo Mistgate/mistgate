@@ -559,7 +559,8 @@ export function shortAddress(kind: DnsServerKind, address: string): string {
   }
 }
 
-// The built-in presets have one stored name (Russian). Any other UI language shows these while the stored name is still
+// Seven of these (yandex, cloudflare, google, dnssb and the three family ones) are retired built-ins (migration 00157): one that was assigned
+// or changed lives on as an own preset under its id, so its name is still translated. The built-in presets have one stored name (Russian). Any other UI language shows these while the stored name is still
 // the stock one; a name an admin edited is shown as stored. The Chinese names are the ones the user page shows
 // (internal/panel/dns/node.go builtinNames); model.test.ts holds both to internal/panel/dns/testdata/builtin_names.json.
 // The Persian ".ru" starts with a left-to-right mark: a leading dot would otherwise take the right-to-left side of the

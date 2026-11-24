@@ -143,6 +143,9 @@ func (s *Service) EffectiveOnNode(ctx context.Context, userID, nodeID string) (P
 // shown as it is). The provider catalog's own English names ("Default", "Basic") do not say what a preset is for. The
 // names are the ones the admin shows (web/src/screens/subscriptions/model.ts builtinNames): both are pinned to
 // testdata/builtin_names.json by a test on each side. Only the descriptions below are the user page's alone.
+// Seven of them (dns_builtin_yandex and six of 00011: the unfiltered Cloudflare, Google and DNS.SB, the three family ones) are no longer
+// built-ins (00157): one that was assigned or changed stays as the owner's own preset under its id, and its stock name and description
+// still read in the visitor's language, so the words stay.
 var builtinNames = map[string]struct{ ru, en, zh, fa, tr string }{
 	"dns_builtin_ru_split":   {"Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连", "روسیه: ‎.ru مستقیم", "Rusya: .ru doğrudan"},
 	"dns_builtin_ru_proxied": {"Россия: всё через VPN", "Russia: all through VPN", "俄罗斯：全部经 VPN", "روسیه: همه‌چیز از راه VPN", "Rusya: her şey VPN üzerinden"},
@@ -168,7 +171,7 @@ var builtinNames = map[string]struct{ ru, en, zh, fa, tr string }{
 
 // NameIn is the name of the preset in the language of the page.
 func (p Preset) NameIn(lang string) string {
-	if b, ok := builtinNames[p.ID]; ok && p.Builtin && p.Name == b.ru {
+	if b, ok := builtinNames[p.ID]; ok && p.Name == b.ru { // not only a built-in: a retired one stays under its id (00157)
 		switch lang {
 		case "ru":
 			return b.ru
@@ -215,7 +218,7 @@ var builtinDescriptions = map[string]struct{ en, zh, fa, tr string }{
 // split; a description of an owner's own preset is one text, shown in any language.
 func (p Preset) DescriptionIn(lang string) string {
 	ru, en, ok := strings.Cut(p.Description, "\n")
-	if !p.Builtin || !ok {
+	if _, known := builtinDescriptions[p.ID]; !ok || (!p.Builtin && !known) { // a retired built-in keeps its two-language text (00157)
 		return strings.TrimSpace(p.Description)
 	}
 	if lang == "ru" {

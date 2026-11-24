@@ -53,7 +53,7 @@ func newDNSRig(t *testing.T, mut func(*subs.Config)) *dnsRig {
 	}
 	d := m.st.DNS()
 	must(0, d.SetNodeOptions(m.ctx, "nod_1", []string{"dns_builtin_adblock", "dns_builtin_standard", "dns_builtin_family"}, "dns_builtin_adblock"))
-	must(0, d.SetNodeOptions(m.ctx, "nod_2", []string{"dns_builtin_yandex", "dns_builtin_standard"}, "dns_builtin_yandex"))
+	must(0, d.SetNodeOptions(m.ctx, "nod_2", []string{"dns_builtin_quad9", "dns_builtin_standard"}, "dns_builtin_quad9"))
 	h, cache := m.handler(func(c *subs.Config) {
 		c.MinInterval = 10 * time.Second // the cache the pick has to drop
 		if mut != nil {
@@ -184,7 +184,7 @@ func TestServersOnThePage(t *testing.T) {
 		strings.Join(strs(dd["options"]), ",") != "dns_builtin_adblock,dns_builtin_standard,dns_builtin_family" {
 		t.Errorf("de1 dns = %v", dd)
 	}
-	if nd := obj(nl["dns"]); nd["effective"] != "dns_builtin_yandex" || len(arr(nd["options"])) != 2 {
+	if nd := obj(nl["dns"]); nd["effective"] != "dns_builtin_quad9" || len(arr(nd["options"])) != 2 {
 		t.Errorf("nl1 dns = %v", nd)
 	}
 	dns := obj(d["dns"])
@@ -198,7 +198,7 @@ func TestServersOnThePage(t *testing.T) {
 		byID[obj(p)["id"].(string)] = obj(p)
 	}
 	if len(byID) != 5 || byID["dns_builtin_adblock"]["name"] != "AdGuard: no ads" || byID["dns_builtin_adblock"]["description"] != "AdGuard DNS: no ads, no trackers" ||
-		byID["dns_builtin_adblock"]["category"] != "no_ads" || byID["dns_builtin_family"]["category"] != "family" || byID["dns_builtin_yandex"]["category"] != "regional" ||
+		byID["dns_builtin_adblock"]["category"] != "no_ads" || byID["dns_builtin_family"]["category"] != "family" || byID["dns_builtin_quad9"]["category"] != "security" ||
 		byID["dns_builtin_standard"]["category"] != "regular" || byID["dns_builtin_ru_split"]["name"] != "Russia: .ru direct" {
 		t.Errorf("dns_presets = %v", d["dns_presets"])
 	}
@@ -422,14 +422,14 @@ func TestPickingADNS(t *testing.T) {
 
 	// A Mihomo client fetched the profile a moment ago: the cached view must not hide the pick from its next refresh.
 	before := awgProxyDNS(t, r.h, tok)
-	if before["de1.example.com"] != adblockPair || before["nl1.example.com"] != "77.88.8.8, 77.88.8.1" {
+	if before["de1.example.com"] != adblockPair || before["nl1.example.com"] != "9.9.9.9, 149.112.112.112" {
 		t.Fatalf("node defaults in the Mihomo profile: %v", before)
 	}
 	mihomoBefore := parseYAML(t, fetch(r.h, "/"+tok, mihomoUA).Body.Bytes())
 
 	add := decodeAnswer(t, c.post("/devices", r.addBody("phone")))
 	dev := add.Device["id"].(string)
-	if got := lineValue(add.Configs[0]["conf"].(string), "DNS"); got != adblockPair && got != "77.88.8.8, 77.88.8.1" {
+	if got := lineValue(add.Configs[0]["conf"].(string), "DNS"); got != adblockPair && got != "9.9.9.9, 149.112.112.112" {
 		t.Errorf("a new key carries the DNS of its node: %q", got)
 	}
 	time.Sleep(5 * time.Millisecond) // a pick and a fetch are told apart by the millisecond
@@ -478,7 +478,7 @@ func TestPickingADNS(t *testing.T) {
 		t.Errorf("device after the fetch: %v", got.Device)
 	}
 	for _, cfg := range got.Configs {
-		want := map[string]string{"nod_1": familyPair, "nod_2": "77.88.8.8, 77.88.8.1"}[cfg["node_id"].(string)]
+		want := map[string]string{"nod_1": familyPair, "nod_2": "9.9.9.9, 149.112.112.112"}[cfg["node_id"].(string)]
 		if lineValue(cfg["conf"].(string), "DNS") != want {
 			t.Errorf("%v: DNS = %q, want %q", cfg["node_id"], lineValue(cfg["conf"].(string), "DNS"), want)
 		}
@@ -559,7 +559,7 @@ func TestPickingADNSRefusals(t *testing.T) {
 	want("a server that is not theirs", c.post("/dns", pickBody("nod_nope", "dns_builtin_standard")), 404, "not_found")
 	want("a preset the node does not offer", c.post("/dns", pickBody("nod_1", "dns_builtin_quad9")), 409, "not_allowed")
 	want("a preset that does not exist", c.post("/dns", pickBody("nod_1", "dns_nope")), 409, "not_allowed")
-	want("a preset of another node", c.post("/dns", pickBody("nod_1", "dns_builtin_yandex")), 409, "not_allowed")
+	want("a preset of another node", c.post("/dns", pickBody("nod_1", "dns_builtin_quad9")), 409, "not_allowed")
 	must(0, r.st.DNS().SetNodeOptions(r.ctx, "nod_2", nil, ""))
 	want("a node that offers nothing", c.post("/dns", pickBody("nod_2", "dns_builtin_standard")), 409, "not_allowed")
 	only := call{r.h, t, func() string {

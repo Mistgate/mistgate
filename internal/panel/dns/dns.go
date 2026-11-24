@@ -419,7 +419,6 @@ type presetGroup struct {
 var builtinCategory = map[string]presetGroup{
 	"dns_builtin_ru_split":   {CategoryRegional, "RU"},
 	"dns_builtin_ru_proxied": {CategoryRegional, "RU"},
-	"dns_builtin_yandex":     {CategoryRegional, "RU"},
 	"dns_builtin_ru_geo":     {CategoryRegional, "RU"},
 	"dns_builtin_cn_split":   {CategoryRegional, "CN"},
 	"dns_builtin_standard":   {Category: CategoryRegular},

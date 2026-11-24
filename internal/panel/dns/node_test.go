@@ -48,14 +48,14 @@ func TestEffectiveDNSOnANode(t *testing.T) {
 	e.group("grp", "dns_builtin_family") // the group's preset: the rule of rung 3
 	e.user("alice", "grp", "")
 	e.user("bob", "grp", "dns_builtin_quad9") // bob's own preset wins over the group's, on rung 3
-	e.offer("nod_ru", "dns_builtin_yandex", "dns_builtin_yandex", "dns_builtin_standard")
+	e.offer("nod_ru", "dns_builtin_cloudflare_security", "dns_builtin_cloudflare_security", "dns_builtin_standard")
 	e.offer("nod_de", "dns_builtin_adblock", "dns_builtin_adblock", "dns_builtin_standard", "dns_builtin_family")
 	// nod_nl offers nothing; nod_no_default has options but none is the default
 	e.node("nod_nd", "w1")
 	e.offer("nod_nd", "", "dns_builtin_adblock", "dns_builtin_standard")
 
 	for _, c := range []struct{ user, node, want, why string }{
-		{"alice", "nod_ru", "dns_builtin_yandex", "the node's default"},
+		{"alice", "nod_ru", "dns_builtin_cloudflare_security", "the node's default"},
 		{"alice", "nod_de", "dns_builtin_adblock", "the node's default"},
 		{"alice", "nod_nl", "dns_builtin_family", "no options: the group's preset, as before"},
 		{"bob", "nod_nl", "dns_builtin_quad9", "no options: the user's own preset, as before"},
@@ -79,7 +79,7 @@ func TestEffectiveDNSOnANode(t *testing.T) {
 	if got := e.onNode("bob", "nod_de"); got != "dns_builtin_adblock" {
 		t.Errorf("alice's pick reached bob: %s", got)
 	}
-	if got := e.onNode("alice", "nod_ru"); got != "dns_builtin_yandex" {
+	if got := e.onNode("alice", "nod_ru"); got != "dns_builtin_cloudflare_security" {
 		t.Errorf("a pick on another node reached this one: %s", got)
 	}
 	// The node stops offering the preset: the pick stays but does nothing, the default applies.
@@ -174,7 +174,7 @@ func TestUserDnsChoicesAndReset(t *testing.T) {
 	e.user("alice", "grp", "")
 	e.user("bob", "grp", "")
 	e.offer("nod_a", "dns_builtin_adblock", "dns_builtin_adblock", "dns_builtin_standard")
-	e.offer("nod_b", "dns_builtin_yandex", "dns_builtin_yandex", "dns_builtin_standard")
+	e.offer("nod_b", "dns_builtin_cloudflare_security", "dns_builtin_cloudflare_security", "dns_builtin_standard")
 	e.pick("alice", "nod_b", "dns_builtin_standard")
 	e.pick("alice", "nod_a", "dns_builtin_standard")
 	e.pick("bob", "nod_a", "dns_builtin_standard")
@@ -196,7 +196,7 @@ func TestUserDnsChoicesAndReset(t *testing.T) {
 	if err != nil || rr.Msg.Removed != 2 {
 		t.Fatalf("reset: %v %v", rr, err)
 	}
-	if got := e.onNode("alice", "nod_b"); got != "dns_builtin_yandex" {
+	if got := e.onNode("alice", "nod_b"); got != "dns_builtin_cloudflare_security" {
 		t.Errorf("after the reset: %s", got)
 	}
 	if got := e.onNode("bob", "nod_a"); got != "dns_builtin_adblock" { // bob's pick is gone with the offer; alice's reset did not touch it
@@ -235,7 +235,11 @@ func TestPresetWordsForThePage(t *testing.T) {
 		{Preset{ID: "dns_builtin_adblock", Name: "Мой блок", Description: "Моё\nMine", Builtin: true}, "en", "Мой блок", "Mine"},
 		{Preset{ID: "dns_abc", Name: "Домашний", Description: "Только у меня"}, "en", "Домашний", "Только у меня"},
 		{Preset{ID: "dns_abc", Name: "Home", Description: "line one\nline two"}, "ru", "Home", "line one\nline two"},
-		{Preset{ID: "dns_builtin_yandex", Name: "Яндекс DNS", Builtin: true}, "en", "Yandex DNS", ""},
+		// a retired built-in (00157) that stays as an own preset: the words are still translated, the two-language description still split
+		{Preset{ID: "dns_builtin_google", Name: "Google: без фильтров", Description: "Google Public DNS: без фильтров\nGoogle Public DNS: no filtering"}, "en", "Google: no filtering", "Google Public DNS: no filtering"},
+		{Preset{ID: "dns_builtin_google", Name: "Google: без фильтров", Description: "Google Public DNS: без фильтров\nGoogle Public DNS: no filtering"}, "zh", "Google：无过滤", "Google Public DNS：不过滤"},
+		{Preset{ID: "dns_builtin_google", Name: "Google: без фильтров", Description: "Google Public DNS: без фильтров\nGoogle Public DNS: no filtering"}, "ru", "Google: без фильтров", "Google Public DNS: без фильтров"},
+		{Preset{ID: "dns_builtin_google", Name: "Мой Google", Description: "Одна строка"}, "tr", "Мой Google", "Одна строка"},
 	} {
 		if got := c.p.NameIn(c.lang); got != c.name {
 			t.Errorf("%s/%s name %q, want %q", c.p.ID, c.lang, got, c.name)
@@ -295,8 +299,9 @@ func TestEveryBuiltInPresetHasItsWords(t *testing.T) {
 			t.Errorf("%s: stored English description %q has no entry in builtinDescriptions (%+v)", id, en, d)
 		}
 	}
-	if n != len(builtinNames) || n != len(builtinDescriptions) {
-		t.Errorf("%d built-in presets, %d names, %d descriptions", n, len(builtinNames), len(builtinDescriptions))
+	const retired = 7 // words kept for the presets that 00157 took out of the built-ins
+	if n+retired != len(builtinNames) || n+retired != len(builtinDescriptions) {
+		t.Errorf("%d built-in presets (and %d retired), %d names, %d descriptions", n, retired, len(builtinNames), len(builtinDescriptions))
 	}
 }
 

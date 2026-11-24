@@ -48,12 +48,12 @@ func TestLinkDNSPrecedence(t *testing.T) {
 	e.user("alice", "grp", "")
 	e.user("bob", "grp", "dns_builtin_quad9")
 	e.user("carol", "fam", "")
-	if err := e.s.SetDefaultPresetID(e.ctx, "dns_builtin_yandex"); err != nil {
+	if err := e.s.SetDefaultPresetID(e.ctx, "dns_builtin_cloudflare_security"); err != nil {
 		t.Fatal(err)
 	}
 
 	// no offer: the old rule
-	for user, want := range map[string]string{"alice": "dns_builtin_yandex", "bob": "dns_builtin_quad9", "carol": "dns_builtin_family"} {
+	for user, want := range map[string]string{"alice": "dns_builtin_cloudflare_security", "bob": "dns_builtin_quad9", "carol": "dns_builtin_family"} {
 		if got := e.link(user); got != want {
 			t.Errorf("no offer, %s: %s, want %s", user, got, want)
 		}
@@ -81,7 +81,7 @@ func TestLinkDNSPrecedence(t *testing.T) {
 	if p, _, err := e.s.Effective(e.ctx, "bob"); err != nil || p.ID != "dns_builtin_quad9" {
 		t.Errorf("the keys of bob: %s %v", p.ID, err)
 	}
-	if got := e.onNode("alice", "nod_de"); got != "dns_builtin_yandex" {
+	if got := e.onNode("alice", "nod_de"); got != "dns_builtin_cloudflare_security" {
 		t.Errorf("the keys of alice on a node: %s", got)
 	}
 	// and a pick per server is the keys' alone
@@ -93,13 +93,13 @@ func TestLinkDNSPrecedence(t *testing.T) {
 
 	// the owner stops offering adblock: alice and bob fall back, carol keeps her pick
 	e.offerLink("", "dns_builtin_standard", "dns_builtin_ru_split")
-	for user, want := range map[string]string{"alice": "dns_builtin_yandex", "bob": "dns_builtin_quad9", "carol": "dns_builtin_ru_split"} {
+	for user, want := range map[string]string{"alice": "dns_builtin_cloudflare_security", "bob": "dns_builtin_quad9", "carol": "dns_builtin_ru_split"} {
 		if got := e.link(user); got != want {
 			t.Errorf("no longer offered, %s: %s, want %s", user, got, want)
 		}
 	}
 	st, err := e.s.SubscriptionState(e.ctx, "alice")
-	if err != nil || st.Link.Choice != "" || st.Link.Default != "dns_builtin_yandex" || strings.Join(st.Link.Options, ",") != "dns_builtin_standard,dns_builtin_ru_split" {
+	if err != nil || st.Link.Choice != "" || st.Link.Default != "dns_builtin_cloudflare_security" || strings.Join(st.Link.Options, ",") != "dns_builtin_standard,dns_builtin_ru_split" {
 		t.Errorf("alice's link state: %+v %v", st.Link, err)
 	}
 	// offered again: the pick works again (it was kept)
@@ -180,7 +180,7 @@ func TestUserDnsChoicesShowAndResetTheLinkPick(t *testing.T) {
 	e.user("alice", "grp", "")
 	e.user("bob", "grp", "")
 	e.offerLink("", "dns_builtin_adblock", "dns_builtin_standard")
-	e.offer("nod_de", "dns_builtin_yandex", "dns_builtin_yandex", "dns_builtin_standard")
+	e.offer("nod_de", "dns_builtin_cloudflare_security", "dns_builtin_cloudflare_security", "dns_builtin_standard")
 
 	get := func(user string) *adminv1.GetUserDnsChoicesResponse {
 		t.Helper()

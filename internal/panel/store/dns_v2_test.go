@@ -73,7 +73,6 @@ func TestDNSv2MigrationUpgradesFrom9(t *testing.T) {
 		// new
 		"dns_builtin_cloudflare":          `[{"variant":"cloudflare/standard"}]`,
 		"dns_builtin_yandex_safe":         `[{"variant":"yandex/safe"}]`,
-		"dns_builtin_opendns_family":      `[{"variant":"opendns/familyshield"}]`,
 		"dns_builtin_cloudflare_security": `[{"variant":"cloudflare/security"}]`,
 	}
 	for id, want := range wantServers {
@@ -85,15 +84,15 @@ func TestDNSv2MigrationUpgradesFrom9(t *testing.T) {
 	if !strings.Contains(ru.SplitJSON, `"servers":[{"variant":"yandex/basic"}]`) || !ru.SplitDirect || ru.Name != "Россия: .ru напрямую" {
 		t.Errorf("ru split = %+v", ru)
 	}
-	// the custom preset owned the name: the built-in took a suffix
-	if cf := get("dns_builtin_cloudflare"); cf.Name != "Cloudflare: без фильтров (встроенный)" || !cf.Builtin || !strings.Contains(cf.Description, "\n") || cf.SplitJSON != "[]" {
+	// the custom preset owned the name: the built-in took a suffix, so it differs from the stock one and 00157 left it as an own preset
+	if cf := get("dns_builtin_cloudflare"); cf.Name != "Cloudflare: без фильтров (встроенный)" || cf.Builtin || !strings.Contains(cf.Description, "\n") || cf.SplitJSON != "[]" {
 		t.Errorf("new cloudflare built-in = %+v", cf)
 	}
 	if c := get("dns_custom"); c.Name != "cloudflare: без фильтров" || c.Builtin {
 		t.Errorf("custom = %+v", c)
 	}
 	var builtins int
-	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&builtins); err != nil || builtins != 18 {
+	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&builtins); err != nil || builtins != 11 { // 18 less the seven that 00157 retired (the edited Yandex DNS and the suffixed Cloudflare stay as own presets)
 		t.Errorf("built-ins: %d %v", builtins, err)
 	}
 	// references and the default are untouched

@@ -184,7 +184,7 @@ func TestMihomoDNSBuiltins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) < 15 {
+	if len(rows) < 11 {
 		t.Fatalf("%d presets", len(rows))
 	}
 	for _, row := range rows {
