@@ -60,3 +60,15 @@ func TestPublicPortSaveStillNotifies(t *testing.T) {
 		t.Fatalf("desired-state notifications=%d want 1", f.notify.n.Load())
 	}
 }
+
+func TestRelayAutomaticPortAvoidsPublicForward(t *testing.T) {
+	f := newRelayFix(t)
+	entry := f.vlessWith("entry", `{"port":19443,"client_port":443,"transport":"tcp","reality":{"target":"www.example.org:443"}}`)
+	f.inbound(entry.Id, "nod_fi1")
+	exit := f.vlessWith("exit", `{"port":443,"transport":"tcp","reality":{"target":"www.example.org:443"}}`)
+	in := f.inbound(exit.Id, "nod_de1")
+	relay := must(f.create(in.Id, "nod_fi1", 0))
+	if relay.Port == 443 || relay.Port == 19443 {
+		t.Fatalf("automatic relay port overlaps a public forward: %d", relay.Port)
+	}
+}

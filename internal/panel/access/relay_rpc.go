@@ -188,6 +188,9 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 	}
 	network := spec.Listen.Network
 	port := uint16(m.Port)
+	if port == 0 {
+		others = reservePublicPorts(others)
+	}
 	var naturalPort uint16
 	if f.Profile.Protocol == "awg" {
 		var settings struct {

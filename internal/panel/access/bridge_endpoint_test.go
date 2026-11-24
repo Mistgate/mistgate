@@ -1,6 +1,8 @@
 package access
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -205,5 +207,26 @@ func TestEnsureBridgeEndpointUsesPublicVLESSSite(t *testing.T) {
 	}
 	if node.BridgePort == 0 {
 		t.Fatal("site no longer public on 443 was reused for bridge")
+	}
+}
+
+func TestEnsureBridgeEndpointAvoidsForwardedPublicPorts(t *testing.T) {
+	for _, port := range []uint16{443, 8443} {
+		t.Run(strconv.Itoa(int(port)), func(t *testing.T) {
+			f := newRelayFix(t)
+			settings := fmt.Sprintf(`{"port":19443,"client_port":%d,"transport":"tcp","reality":{"target":"www.example.org:443"}}`, port)
+			p := f.vlessWith("forwarded reality", settings)
+			f.inbound(p.Id, "nod_fi1")
+			if err := f.st.SetNodeBridgePort(f.ctx, "nod_fi1", port); err != nil {
+				t.Fatal(err)
+			}
+			node, err := f.s.ensureBridgeEndpoint(f.ctx, "nod_fi1", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if node.BridgePort == 0 || node.BridgePort == port || node.BridgePort == 19443 {
+				t.Fatalf("bridge overlaps public forward or listener: %d", node.BridgePort)
+			}
+		})
 	}
 }

@@ -29,6 +29,7 @@ func (s *Service) ensureBridgeEndpoint(ctx context.Context, entryID string, extr
 		}
 		base = append(base, other)
 	}
+	base = reservePublicPorts(base)
 	// The bridge rides the node's own site on 443 when one answers there (plugin.TCPPortOwners): a Hysteria2 site that gave
 	// the port up to a TCP inbound is not that site.
 	owns443 := publicBridgeSite(base)
@@ -103,4 +104,16 @@ func publicBridgeSite(inbounds []nodeListen) bool {
 		public = append(public, sp)
 	}
 	return plugin.TCPPortOwners(public)[443].Site
+}
+
+// reservePublicPorts keeps automatically allocated listeners off an existing TCP
+// forward's public endpoint. Its local listener can be on a different port.
+func reservePublicPorts(listens []nodeListen) []nodeListen {
+	for _, in := range listens {
+		port := protocols.ClientPort(in.settings, in.spec.Listen.Port)
+		if in.spec.Listen.Network == "tcp" && port != in.spec.Listen.Port {
+			listens = append(listens, nodeListen{l: plugin.Listen{Network: "tcp", Port: port}})
+		}
+	}
+	return listens
 }
