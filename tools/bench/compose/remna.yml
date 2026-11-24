@@ -1,5 +1,5 @@
-# Remnawave panel 3.4.5: the official docker-compose-prod.yml (tag 3.4.5), with three changes: images pinned
-# (backend 3 -> 3.4.5), cgroup_parent on every service (the shared 1 vCPU / 1 GB budget), host paths for the env file.
+# Remnawave panel 3.4.11: the official docker-compose-prod.yml (tag 3.4.11), with three changes: images pinned
+# (backend 3 -> 3.4.11), cgroup_parent on every service (the shared 1 vCPU / 1 GB budget), host paths for the env file.
 x-common: &common
   ulimits:
     nofile:
@@ -22,7 +22,7 @@ x-env: &env
 
 services:
   remnawave:
-    image: remnawave/backend:3.4.5
+    image: remnawave/backend:3.4.11
     container_name: remnawave
     hostname: remnawave
     <<: [*common, *logging, *env]

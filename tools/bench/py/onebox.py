@@ -144,7 +144,7 @@ class MistBox(Box):
     PANEL = ("11.11.0.1", 18080)
     D = DATA + "/box-mg"
     NODE_STATE = DATA + "/box-mg-node"
-    NODE_IMAGE = "bench/mgnode:0.1.33"
+    NODE_IMAGE = bench.NODE_IMAGE
     NODE_ENV = ""
     core_restart_on_user_change = "no: the node agent adds and removes users in the running Hysteria2 server"
 
@@ -260,13 +260,16 @@ class XuiBox(Box):
     core_restart_on_user_change = "to be measured (3x-ui restarts Xray on client changes)"
 
     def wipe(self):
+        self.cred = None
         sh("docker compose -p %s -f %s down -v 2>&1 | tail -1; rm -rf %s; mkdir -p %s/cert" % (self.P, self.F, self.DD, self.DD), check=False)
         sh("openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout %s/cert/key.pem -out %s/cert/cert.pem -days 30 -subj /CN=bench.test 2>/dev/null" % (self.DD, self.DD), check=False)
 
     def _login(self):
         c = Client(self.IP, 2053)
+        if not getattr(self, "cred", None):
+            self.cred = bench.xui_credentials("bench_3xui_box")
         st, b, _ = c.req("GET", "/csrf-token")
-        st, b, _ = c.req("POST", "/login", body={"username": "admin", "password": "admin"}, headers={"X-CSRF-Token": b["obj"]})
+        st, b, _ = c.req("POST", "/login", body={"username": self.cred[0], "password": self.cred[1]}, headers={"X-CSRF-Token": b["obj"]})
         assert st == 200 and b.get("success"), (st, b)
         st, b, _ = c.req("GET", "/csrf-token")
         c.h["X-CSRF-Token"] = b["obj"]

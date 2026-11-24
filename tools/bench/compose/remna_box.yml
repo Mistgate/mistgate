@@ -1,5 +1,5 @@
-# Remnawave 3.4.5 one-server scenario: the official docker-compose-prod.yml stack (backend, Postgres 18.4, Valkey 9) plus the official
-# node image (remnawave/node 3.4.2, Xray core inside), all in the one 2 vCPU / 2 GB slice (cgroup_parent on every service).
+# Remnawave 3.4.11 one-server scenario: the official docker-compose-prod.yml stack (backend, Postgres 18.4, Valkey 9) plus the official
+# node image (remnawave/node 3.4.6, Xray core inside), all in the one 2 vCPU / 2 GB slice (cgroup_parent on every service).
 # The backend and the node sit on the isolated bench-box network with fixed addresses; Postgres and Valkey stay on the stack's own network.
 x-common: &common
   ulimits:
@@ -21,7 +21,7 @@ x-env: &env
 
 services:
   remnawave:
-    image: remnawave/backend:3.4.5
+    image: remnawave/backend:3.4.11
     container_name: remnawave
     hostname: remnawave
     <<: [*common, *logging, *env]
@@ -89,7 +89,7 @@ services:
       retries: 3
 
   remnanode:
-    image: remnawave/node:3.4.2
+    image: remnawave/node:3.4.6
     container_name: remnanode
     hostname: remnanode
     <<: [*common, *logging]
