@@ -59,7 +59,7 @@ sequenceDiagram
 
 ### 自动选择服务器
 
-启用**自动选择服务器**（位于**下发规则**规则列表下方的卡片，默认开启）后，Mihomo/Clash YAML 和 sing-box JSON 会带有 `Auto` 分组，Xray JSON 则把 `Auto` 配置放在最前，每五分钟通过 `https://www.gstatic.com/generate_204` 检测每台服务器。检测请求经由正在检测的服务器发出，因此家中网络屏蔽该网址不会影响检测结果。新安装会默认使用 `Auto`；用户在应用中手动选择的服务器仍会保持生效。只有一台服务器时不会生成 `Auto`。此设置不影响 AmneziaVPN，也不影响使用链接列表的 Happ（链接列表没有分组）。
+启用**自动选择服务器**（位于**下发规则**规则列表下方的卡片，默认开启）后，Mihomo/Clash YAML 和 sing-box JSON 会带有 `Auto` 分组，Xray JSON 则把 `Auto` 配置放在最前，按所选间隔通过 `https://www.gstatic.com/generate_204` 检测每台服务器：开关下方的**检测服务器的间隔**可选 1、2、5（默认）或 10 分钟。间隔越短，越早发现失效的服务器，但检测请求更多，手机上也会多耗一点电；在 Xray JSON 中该值即 observatory 的 `probeInterval`。检测请求经由正在检测的服务器发出，因此家中网络屏蔽该网址不会影响检测结果。新安装会默认使用 `Auto`；用户在应用中手动选择的服务器仍会保持生效。只有一台服务器时不会生成 `Auto`。此设置不影响 AmneziaVPN，也不影响使用链接列表的 Happ（链接列表没有分组）。
 
 Xray JSON 中的 `Auto` 配置包含所有服务器，并通过由 Xray observatory 提供数据的 `leastPing` 负载均衡器转发流量：每个新连接走上次检测中响应最快的服务器，首次检测完成前走第一台服务器。与 Mihomo 的 `url-test` 不同，它没有容差，因此两台服务器响应速度相近时，检测之后新连接可能在它们之间切换。
 

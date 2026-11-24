@@ -31,6 +31,7 @@ type singboxProfile struct {
 	names      []string // the tag of each line, parallel to lines ("" or missing = "server")
 	preset     *dns.Preset
 	autoSelect bool
+	autoSecs   int // seconds between the checks of the Auto group; 0 = the default
 	// note: the one entry that says why there are no servers; "" = build the servers. none: the entry for a person whose servers
 	// all failed to render (never an empty answer).
 	note, none string
@@ -151,7 +152,7 @@ func (p singboxProfile) build() ([]byte, error) {
 		selectDefault = autoTag
 		var err error
 		auto, err = json.Marshal(singboxURLTest{
-			Type: "urltest", Tag: autoTag, Outbounds: slices.Clone(tags), URL: "https://www.gstatic.com/generate_204", Interval: "5m", Tolerance: 50,
+			Type: "urltest", Tag: autoTag, Outbounds: slices.Clone(tags), URL: "https://www.gstatic.com/generate_204", Interval: subsettings.AutoEvery(p.autoSecs), Tolerance: 50,
 		})
 		if err != nil {
 			return nil, err
@@ -242,7 +243,7 @@ func (p singboxProfile) placeholder(note string) ([]byte, error) {
 func (h *handler) writeSingbox(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings) {
 	b := h.brand(r.Context())
 	title := h.title(set, b)
-	p := singboxProfile{title: title, lines: v.Lines, autoSelect: subsettings.LinkAutoSelect(set), log: h.cfg.Log, note: h.appNote(v, b.Language, plugin.FormatSingbox), none: noServersNote(b.Language)}
+	p := singboxProfile{title: title, lines: v.Lines, autoSelect: subsettings.LinkAutoSelect(set), autoSecs: subsettings.LinkAutoInterval(set), log: h.cfg.Log, note: h.appNote(v, b.Language, plugin.FormatSingbox), none: noServersNote(b.Language)}
 	if p.note == "" {
 		p.preset = h.linkPreset(r.Context(), v)
 		if len(v.Servers) == len(v.Lines) && len(v.Servers) > 0 {

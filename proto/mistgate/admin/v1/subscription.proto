@@ -78,6 +78,9 @@ message SubscriptionSettings {
   // The owner's own routing profiles for the apps Happ and INCY, one for each of the groups they name; a person gets one profile at most,
   // by their main group. The list is replaced as a whole. Checked on save (see RoutingProfile); at most 20 profiles.
   repeated RoutingProfile routing_profiles = 19;
+  // Seconds between the server checks of the Auto group in the Mihomo, sing-box and Xray JSON documents: 60, 120, 300 or 600.
+  // Absent = 300 (what these documents always had).
+  optional uint32 link_auto_interval = 20;
 }
 
 // One routing profile of the owner, for Happ and INCY: what goes direct, through the VPN and to the block list, the app's DNS and the

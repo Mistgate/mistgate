@@ -43,6 +43,7 @@ type xrayProfile struct {
 	names      []string // the remarks of each line, parallel to lines ("" or missing = a numbered default)
 	preset     *dns.Preset
 	autoSelect bool
+	autoSecs   int // seconds between the checks of the Auto group; 0 = the default
 	// note: the one entry that says why there are no servers (no access, a refused device); "" = build the servers.
 	// none: the entry for a person whose servers all failed to render (never an empty answer).
 	note, none string
@@ -237,7 +238,7 @@ func (p xrayProfile) build() ([]byte, error) {
 			},
 			Observatory: &xrayObservatory{
 				SubjectSelector: []string{xrayAutoProxyPrefix}, ProbeURL: xrayAutoProbeURL,
-				ProbeInterval: "5m", EnableConcurrency: true,
+				ProbeInterval: subsettings.AutoEvery(p.autoSecs), EnableConcurrency: true,
 			},
 		}
 		if d != nil {
@@ -318,7 +319,7 @@ func xrayPlaceholder(note string) ([]byte, error) {
 // load percentage only for Happ), the dns section of the user's effective preset.
 func (h *handler) writeXrayJSON(w http.ResponseWriter, r *http.Request, token string, v access.SubView, set *adminv1.SubscriptionSettings) {
 	b := h.brand(r.Context())
-	p := xrayProfile{lines: v.Lines, log: h.cfg.Log, autoSelect: subsettings.LinkAutoSelect(set), note: h.appNote(v, b.Language, plugin.FormatXrayJSON), none: noServersNote(b.Language)}
+	p := xrayProfile{lines: v.Lines, log: h.cfg.Log, autoSelect: subsettings.LinkAutoSelect(set), autoSecs: subsettings.LinkAutoInterval(set), note: h.appNote(v, b.Language, plugin.FormatXrayJSON), none: noServersNote(b.Language)}
 	if p.note == "" {
 		p.preset = h.linkPreset(r.Context(), v)
 		if len(v.Servers) == len(v.Lines) && len(v.Servers) > 0 {

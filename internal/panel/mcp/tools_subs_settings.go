@@ -418,6 +418,7 @@ type subsLinkLimitsArgs struct {
 	DeviceIdleAfterDays *uint32 `json:"device_idle_after_days,omitempty" jsonschema:"idle after this many days without a connection; 0 disables it; otherwise 7 to 365"`
 	LinkAWG             *bool   `json:"link_awg,omitempty" jsonschema:"include AmneziaWG servers in subscription link apps"`
 	LinkAutoSelect      *bool   `json:"link_auto_select,omitempty" jsonschema:"put automatic server selection (Auto) first in the Mihomo, sing-box and Xray JSON subscription documents"`
+	LinkAutoInterval    *uint32 `json:"link_auto_interval,omitempty" jsonschema:"seconds between the server checks of the Auto group: 60, 120, 300 or 600"`
 	SettingsHash        string  `json:"settings_hash,omitempty" jsonschema:"-"`
 }
 
@@ -442,10 +443,10 @@ func linkModeWord(s *adminv1.SubscriptionSettings) string {
 
 var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 	name: "subscription_link_limits_set", min: ProfileOperator, danger: true, procs: settingsProcs,
-	desc: "Set device-limit handling and the idle period for subscription link apps, whether link apps include AmneziaWG entries, and whether Mihomo and sing-box profiles include automatic server selection. The idle period is 30 days by default, 0 disables it, and otherwise accepts 7 to 365 days. Strict mode refuses shared no-device-id users; turning link_awg off drops the link keys of the link apps on the next fetch (not those of the Mistgate app). Always waits for owner approval.",
+	desc: "Set device-limit handling and the idle period for subscription link apps, whether link apps include AmneziaWG entries, whether Mihomo and sing-box profiles include automatic server selection, and how often the Auto group checks the servers (60, 120, 300 or 600 seconds). The idle period is 30 days by default, 0 disables it, and otherwise accepts 7 to 365 days. Strict mode refuses shared no-device-id users; turning link_awg off drops the link keys of the link apps on the next fetch (not those of the Mistgate app). Always waits for owner approval.",
 	plan: func(c *call, a subsLinkLimitsArgs) (*planned, error) {
-		if a.Mode == nil && a.DeviceIdleAfterDays == nil && a.LinkAWG == nil && a.LinkAutoSelect == nil {
-			return nil, errors.New("give mode, device_idle_after_days, link_awg, link_auto_select, or a combination")
+		if a.Mode == nil && a.DeviceIdleAfterDays == nil && a.LinkAWG == nil && a.LinkAutoSelect == nil && a.LinkAutoInterval == nil {
+			return nil, errors.New("give mode, device_idle_after_days, link_awg, link_auto_select, link_auto_interval, or a combination")
 		}
 		cur, err := c.subscriptionSnapshot()
 		if err != nil {
@@ -493,6 +494,14 @@ var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 				facts = append(facts, changeFact("link_auto_select", strconv.FormatBool(before)+" -> "+strconv.FormatBool(*a.LinkAutoSelect), strconv.FormatBool(before), strconv.FormatBool(*a.LinkAutoSelect)))
 			}
 		}
+		if a.LinkAutoInterval != nil {
+			before := strconv.Itoa(subsettings.LinkAutoInterval(cur.settings))
+			after := strconv.FormatUint(uint64(*a.LinkAutoInterval), 10)
+			if before != after {
+				next.LinkAutoInterval = a.LinkAutoInterval
+				facts = append(facts, changeFact("link_auto_interval", before+" -> "+after, before, after))
+			}
+		}
 		if len(facts) == 0 {
 			return nil, errors.New("nothing to change: the settings already look like this")
 		}
@@ -523,6 +532,9 @@ var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 		}
 		if a.LinkAutoSelect != nil {
 			next.LinkAutoSelect = a.LinkAutoSelect
+		}
+		if a.LinkAutoInterval != nil {
+			next.LinkAutoInterval = a.LinkAutoInterval
 		}
 		if err := c.saveSubscriptionSettings(a.SettingsHash, next); err != nil {
 			return done{}, err

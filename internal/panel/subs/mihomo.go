@@ -31,6 +31,7 @@ type mihomoProfile struct {
 	names      []string // the server name of each line, parallel to lines ("" or missing = keep the plugin's own)
 	preset     *dns.Preset
 	autoSelect bool
+	autoSecs   int  // seconds between the checks of the Auto group; 0 = the default
 	note       bool // lines hold the one entry that says why there are no servers: the profile is the built-in one, never a template
 	log        *slog.Logger
 }
@@ -145,7 +146,7 @@ func (p mihomoProfile) render(tplName, tplText string) (body []byte, templated b
 // lacks is the resolvers of the person's preset with respect-rules on: no group name is known here for a "#group" fragment, and the
 // split, ad and country rules of the preset (and the policy and providers they need) are the built-in profile's, not a template's.
 func (p mihomoProfile) buildFromTemplate(text string) ([]byte, error) {
-	opt := subsettings.MihomoOptions{AutoSelect: p.autoSelect}
+	opt := subsettings.MihomoOptions{AutoSelect: p.autoSelect, AutoInterval: p.autoSecs}
 	if p.preset != nil {
 		if d, err := p.preset.MihomoDNS(""); err != nil {
 			if p.log != nil {
@@ -180,7 +181,7 @@ func (p mihomoProfile) build() ([]byte, error) {
 	if p.autoSelect && len(names) > 1 {
 		auto := uniqueName(subsettings.AutoName, taken)
 		selectMembers = append([]string{auto}, selectMembers...)
-		autoGroup = subsettings.MihomoAutoGroup(auto, names)
+		autoGroup = subsettings.MihomoAutoGroup(auto, names, p.autoSecs)
 	}
 	members := append(selectMembers, "DIRECT")
 

@@ -159,6 +159,7 @@
     "last_seen",
     "level",
     "limits",
+    "link_auto_interval",
     "link_auto_select",
     "link_awg",
     "link_awg_keys",

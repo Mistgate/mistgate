@@ -1,8 +1,9 @@
+import { Segmented } from "@/components/ui/segmented";
 import { useToast } from "@/components/ui/toast";
 import { errorText } from "@/lib/errors";
 import { useTx } from "@/screens/users/t";
 import type { Settings } from "./model";
-import { Toggle } from "./parts";
+import { Row, Toggle } from "./parts";
 import { useSaveSettings } from "./queries";
 
 /** Whether the link apps get the "Auto" group: absent (settings saved before the switch existed) is on. */
@@ -28,4 +29,36 @@ export function LinkAutoCard({ settings }: { settings: Settings }) {
     );
 
   return <Toggle id="link-auto" title={t("subs.linkAuto.title")} hint={t(on ? "subs.linkAuto.on" : "subs.linkAuto.off")} checked={on} disabled={save.isPending} onChange={flip} />;
+}
+
+/** The seconds between the checks the panel accepts, and the one a settings record without the choice means. */
+export const autoIntervals = [60, 120, 300, 600] as const;
+export const autoIntervalDefault = 300;
+export const linkAutoInterval = (s: Pick<Settings, "linkAutoInterval">) => s.linkAutoInterval ?? autoIntervalDefault;
+
+/** How often the Auto group checks the servers; under the switch, shown only while Auto is on. Saved at once. */
+export function LinkAutoIntervalRow({ settings }: { settings: Settings }) {
+  const t = useTx();
+  const toast = useToast();
+  const save = useSaveSettings();
+  const pick = (v: string) =>
+    void save.mutateAsync((cur) => ({ ...cur, linkAutoInterval: Number(v) })).then(
+      () => {
+        toast(t("subs.saved"));
+      },
+      (e: unknown) => toast.error(errorText(e, t)),
+    );
+  return (
+    <div className="pp-rows">
+      <Row label={t("subs.linkAuto.every")} hint={t("subs.linkAuto.everyHint")}>
+        <Segmented
+          aria-label={t("subs.linkAuto.everyAria")}
+          value={String(linkAutoInterval(settings))}
+          onValueChange={pick}
+          options={autoIntervals.map((n) => ({ value: String(n), label: t(`subs.linkAuto.s${n}`) }))}
+          className="sb-seg"
+        />
+      </Row>
+    </div>
+  );
 }

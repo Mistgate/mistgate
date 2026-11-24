@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -147,6 +148,28 @@ func LinkAWG(s *adminv1.SubscriptionSettings) bool {
 // the switch existed have no key: absent means on, so an upgrade keeps the current server list usable by default.
 func LinkAutoSelect(s *adminv1.SubscriptionSettings) bool {
 	return s == nil || s.LinkAutoSelect == nil || *s.LinkAutoSelect
+}
+
+// DefaultAutoInterval is the seconds between the server checks of the Auto group when the owner has not chosen (what the documents always had).
+const DefaultAutoInterval = 300
+
+// AutoIntervals are the checks the owner may choose, in seconds.
+var AutoIntervals = []uint32{60, 120, 300, 600}
+
+// LinkAutoInterval is the seconds between the server checks of the Auto group: absent (settings stored before the choice existed) is 300.
+func LinkAutoInterval(s *adminv1.SubscriptionSettings) int {
+	if s == nil || s.LinkAutoInterval == nil {
+		return DefaultAutoInterval
+	}
+	return int(*s.LinkAutoInterval)
+}
+
+// AutoEvery writes secs (0 = the default) as the duration the sing-box and Xray documents take: "1m", "2m", "5m", "10m".
+func AutoEvery(secs int) string {
+	if secs <= 0 {
+		secs = DefaultAutoInterval
+	}
+	return strconv.Itoa(secs/60) + "m"
 }
 
 // DNSChoice reports whether people may pick the DNS of each server on the public page (DnsService.SetNodeDnsOptions says what
@@ -382,6 +405,9 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 	if s.DeviceIdleAfterDays != nil && s.GetDeviceIdleAfterDays() != 0 &&
 		(s.GetDeviceIdleAfterDays() < 7 || s.GetDeviceIdleAfterDays() > 365) {
 		return invalid("device_idle_after_days: must be 0 or between 7 and 365")
+	}
+	if s.LinkAutoInterval != nil && !slices.Contains(AutoIntervals, *s.LinkAutoInterval) {
+		return invalid("link_auto_interval: must be 60, 120, 300 or 600 seconds")
 	}
 	if _, ok := adminv1.HappPing_name[int32(s.HappPing)]; !ok {
 		return invalid("happ_ping: unknown value")

@@ -80,6 +80,7 @@ type SubsSettingsV struct {
 	DeviceIdleAfterDays uint32                `json:"device_idle_after_days"` // 0 = off; otherwise 7..365
 	LinkAWG             bool                  `json:"link_awg"`
 	LinkAutoSelect      bool                  `json:"link_auto_select"`
+	LinkAutoInterval    int                   `json:"link_auto_interval"` // seconds: 60, 120, 300 or 600
 	SharedLinkUsers     uint32                `json:"shared_link_users"`
 	LinkAWGKeys         uint32                `json:"link_awg_keys"`
 	HappPing            string                `json:"happ_ping"`
@@ -125,7 +126,7 @@ func subsSettingsView(r *adminv1.GetSubscriptionSettingsResponse) *SubsSettingsV
 		Title: nm(s.GetTitle()), EffectiveTitle: nm(r.GetEffectiveTitle()), Announcement: clean(s.GetAnnouncement(), 1000),
 		SupportURL: clean(s.GetSupportUrl(), 500), UpdateIntervalHours: s.GetUpdateIntervalHours(), ServerNameTemplate: nm(s.GetServerNameTemplate()),
 		Apps: map[string][]subsAppV{}, Rules: []serveRuleV{}, DefaultDNSPresetID: clean(s.GetDefaultDnsPresetId(), 60),
-		LinkDeviceLimit: linkModeWord(s), DeviceIdleAfterDays: s.GetDeviceIdleAfterDays(), LinkAWG: subsettings.LinkAWG(s), LinkAutoSelect: subsettings.LinkAutoSelect(s), SharedLinkUsers: r.GetSharedLinkUsers(),
+		LinkDeviceLimit: linkModeWord(s), DeviceIdleAfterDays: s.GetDeviceIdleAfterDays(), LinkAWG: subsettings.LinkAWG(s), LinkAutoSelect: subsettings.LinkAutoSelect(s), LinkAutoInterval: subsettings.LinkAutoInterval(s), SharedLinkUsers: r.GetSharedLinkUsers(),
 		LinkAWGKeys: r.GetLinkAwgKeys(), HappPing: happPingWord(s.GetHappPing()), HappPingOnOpen: s.GetHappPingOnOpen(),
 		ResponseHeaders: []responseHeaderV{}, ReservedHeaders: r.GetReservedHeaderNames(), MihomoTemplates: mihomoTemplateViews(s), RoutingProfiles: routingProfileViews(s),
 	}
