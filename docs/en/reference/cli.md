@@ -163,6 +163,10 @@ mistgate admin-address --admin-listen host:port [--data-dir DIR]
 
 Moves the admin to a separate listener, dropping the admin host and the secret admin prefix, the way `mistgate setup --admin-listen` sets it up. It is the way back in when the admin's public address no longer works. The public URL, the agent SNI and the secret subscription, link and probe prefixes stay as they are. It prints the new admin URL (`http://localhost:<port>/`) and a reminder that passkeys registered for the previous address no longer work there: sign in with the password and authenticator code, then add a new passkey. Then restart the panel: `mistgate serve` reads the stored address itself, so the service needs no `--admin-listen` (a flag there would later differ from the setting).
 
+Before saving a changed address, the command tries to bind it; a bind failure leaves the settings unchanged. An identical stored listener is not probed because the running panel may own it. The check cannot reserve a port across a restart. Port 80 uses the browser's normalized origin and URL, `http://localhost/` (no `:80`).
+
+The command refuses a conflicting `MISTGATE_ADMIN_LISTEN` in its own environment. It cannot inspect another process's flags or environment, nor predict a future service invocation. Before restarting, remove `--admin-listen` from the service command and `MISTGATE_ADMIN_LISTEN` from the service environment (then reload the service configuration if required). Outside `--dev`, `serve` itself refuses a nonempty override that differs from the stored address, after normal flag parsing: a flag takes precedence over the environment.
+
 After the move:
 
 - There is no way back to a public admin. No command sets an admin host or a secret admin prefix again, and `setup` keeps a configured installation as it is. The admin stays on the listener, reached through an SSH tunnel such as `ssh -L 8443:127.0.0.1:8443 panel.example.com`.

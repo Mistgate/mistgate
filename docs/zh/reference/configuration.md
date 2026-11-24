@@ -22,7 +22,7 @@ description: mistgate serve 和 mistgate setup 的所有标志、对应的环境
 | `--acme-domain` | `MISTGATE_ACME_DOMAIN` | none | 为此主机名获取 Let’s Encrypt 证书。可重复指定。仅接受普通主机名，不接受通配符。通过公共监听器使用 TLS-ALPN-01 验证，因此该监听器必须能从端口 443 访问。使用此选项即表示接受 CA 的服务条款。若同时指定 `--tls-cert`，这些主机名使用 Let’s Encrypt 证书，其他名称使用静态证书。 |
 | `--acme-email` | `MISTGATE_ACME_EMAIL` | none | Let’s Encrypt 的联系邮箱。可选。 |
 | `--acme-http` | `MISTGATE_ACME_HTTP` | `:80` | 仅配合 `--acme-domain` 使用，用于 ACME HTTP-01 验证和从 HTTP 重定向到 HTTPS。其他主机名和未知路径会得到伪装站点的 404。传入空值 `--acme-http=` 或将 `MISTGATE_ACME_HTTP=` 设为空，可关闭此监听器。 |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | the address setup stored | 为管理后台单独提供普通 HTTP 监听器。仅适用于通过 `setup --admin-listen` 设置的安装；若使用私密前缀或主机名，则会报错。此项会覆盖已存储的地址，但通行密钥仍绑定到 setup 保存的端口。 |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | the address setup stored | 为管理后台单独提供普通 HTTP 监听器。除 `--dev` 外，非空覆盖值必须与保存的地址相同，否则拒绝启动。命令行参数优先于环境变量。请通过 `mistgate admin-address` 更改设置，而不是覆盖服务参数。 |
 | `--agent-listen` | `MISTGATE_AGENT_LISTEN` | none (`127.0.0.1:8082` with `--dev`) | 为节点 Agent 接入端点单独提供 TLS 监听器。未设置时，Agent 会使用带私密 TLS 名称的公共监听器，因此公共监听器必须启用 TLS。 |
 | `--agent-addr` | `MISTGATE_AGENT_ADDR` | derived | Agent 要连接的 `host:port`，会写入新安装命令。未设置时：若 `--agent-listen` 指定了具体主机（非空、不是 `0.0.0.0` 或 `[::]`），则使用该值；否则使用公共 URL 的主机和端口（URL 未指定端口时使用 443）。已注册的节点会保留注册时使用的地址。 |
 | `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` | none | 可信反向代理的 CIDR 或 IP；其 `X-Forwarded-For` 请求头会被采信。代理必须自行设置或覆盖该请求头；只写入 `Forwarded` 的代理不受支持。可重复指定。未设置时，无论请求头内容如何，TCP 对端都被视为客户端。 |

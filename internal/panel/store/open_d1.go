@@ -22,6 +22,9 @@ var errCloudflareUnavailable = errors.New("store: not available in the Cloudflar
 // Open is unavailable in the Cloudflare edition; use OpenD1 with the Worker binding.
 func Open(context.Context, string) (*Store, error) { return nil, errCloudflareUnavailable }
 
+// OpenExisting is unavailable in the Cloudflare edition; use OpenD1 with the Worker binding.
+func OpenExisting(context.Context, string) (*Store, error) { return nil, errCloudflareUnavailable }
+
 // SchemaVersions is unavailable in the Cloudflare edition because the database is a D1 binding.
 func SchemaVersions(context.Context, string) (db, binary int64, err error) {
 	return 0, 0, errCloudflareUnavailable

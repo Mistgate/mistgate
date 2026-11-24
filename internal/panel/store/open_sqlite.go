@@ -23,6 +23,20 @@ const sqliteReaderPoolSize = 4
 // database file is created with mode 0600 (SQLite gives the -wal and -shm files the
 // same mode); an existing file with wider permissions is tightened.
 func Open(ctx context.Context, path string) (*Store, error) {
+	return openSQLite(ctx, path, true)
+}
+
+// OpenExisting opens an existing database without migrations or data backfills.
+// Recovery commands use it to avoid changing unrelated state before validation.
+// It retains Open's private-file permissions and SQLite connection conventions.
+func OpenExisting(ctx context.Context, path string) (*Store, error) {
+	if _, err := os.Stat(path); err != nil {
+		return nil, err
+	}
+	return openSQLite(ctx, path, false)
+}
+
+func openSQLite(ctx context.Context, path string, migrate bool) (*Store, error) {
 	if err := makePrivate(path); err != nil {
 		return nil, err
 	}
@@ -38,13 +52,15 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, err
 	}
 	s := &Store{W: w, R: r, readGate: make(chan struct{}, sqliteReaderPoolSize)}
-	if err := s.migrate(ctx); err != nil {
-		s.Close()
-		return nil, err
-	}
-	if err := s.BackfillDecoyVersions(ctx); err != nil {
-		s.Close()
-		return nil, fmt.Errorf("read the decoy versions the migration made: %w", err)
+	if migrate {
+		if err := s.migrate(ctx); err != nil {
+			s.Close()
+			return nil, err
+		}
+		if err := s.BackfillDecoyVersions(ctx); err != nil {
+			s.Close()
+			return nil, fmt.Errorf("read the decoy versions the migration made: %w", err)
+		}
 	}
 	for _, suffix := range []string{"-wal", "-shm"} { // belt and braces next to the umask and SQLite's own rule
 		if err := chmodIfExists(path + suffix); err != nil {

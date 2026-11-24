@@ -115,7 +115,10 @@ func (in *instance) listenAdmin(listen string) error {
 	}
 	in.AdminListen, in.AdminHost, in.AdminPrefix = listen, "", "/"
 	in.RPID = "localhost"
-	in.RPOrigins = []string{"http://localhost:" + port}
+	in.RPOrigins = []string{"http://localhost"}
+	if port != "80" {
+		in.RPOrigins[0] += ":" + port
+	}
 	return nil
 }
 
@@ -139,6 +142,15 @@ func checkAdminListen(listen string) (port string, err error) {
 		return "", fmt.Errorf("--admin-listen %q: the host must be on loopback (127.0.0.1, ::1 or localhost); the admin listener serves plain HTTP and is reached through an SSH tunnel", listen)
 	}
 	return port, nil
+}
+
+// checkAdminOverride runs after serve's flag parsing (flags override the environment).
+// admin-address can check its own environment, not another process's service arguments.
+func checkAdminOverride(override, stored string) error {
+	if override != "" && override != stored {
+		return fmt.Errorf("--admin-listen or MISTGATE_ADMIN_LISTEN conflicts with the stored admin address; remove the override from the service command and environment, then restart the panel (use `mistgate admin-address --admin-listen host:port` to change the stored address)")
+	}
+	return nil
 }
 
 // newSecretPrefix is "/" + 24 random base32 characters (120 bits) + "/".
