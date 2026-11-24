@@ -65,8 +65,9 @@ func NewServer(config *Config) (Server, error) {
 		DisablePathManager:             true,
 	}
 	tr := &quic.Transport{
-		Conn:       config.Conn,
-		DisableGSO: config.QUICConfig.DisableGSO,
+		Conn:        config.Conn,
+		DisableGSO:  config.QUICConfig.DisableGSO,
+		ConnContext: config.QUICConfig.ConnContext, // Mistgate patch, see MISTGATE.md
 	}
 	// A nil key means quic-go never sends stateless resets. Clients then have to
 	// wait for the idle timeout to notice the server is gone, so keep them on
@@ -122,6 +123,11 @@ func (s *serverImpl) Close() error {
 }
 
 func (s *serverImpl) handleClient(conn *quic.Conn) {
+	defer congestion.Forget(conn) // after ConnDisconnect, which may still read LostPackets
+	cel, _ := s.config.EventLogger.(ConnEventLogger)
+	if cel != nil {
+		cel.Accepted(conn)
+	}
 	handler := newH3sHandler(s.config, conn)
 	h3s := http3.Server{
 		Handler:          handler,
@@ -133,7 +139,9 @@ func (s *serverImpl) handleClient(conn *quic.Conn) {
 		if tl := s.config.TrafficLogger; tl != nil {
 			tl.LogOnlineState(handler.authID, false)
 		}
-		if el := s.config.EventLogger; el != nil {
+		if cel != nil {
+			cel.ConnDisconnect(conn, handler.authID, err)
+		} else if el := s.config.EventLogger; el != nil {
 			el.Disconnect(conn.RemoteAddr(), handler.authID, err)
 		}
 	}
@@ -183,7 +191,7 @@ func (h *h3sHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.authID = id
 			if h.config.IgnoreClientBandwidth {
 				// Ignore client bandwidth and use the configured congestion controller.
-				congestion.UseConfigured(h.conn, h.config.CongestionConfig.Type, h.config.CongestionConfig.BBRProfile)
+				congestion.UseConfiguredCounting(h.conn, h.config.CongestionConfig.Type, h.config.CongestionConfig.BBRProfile)
 				actualTx = 0
 			} else {
 				// actualTx = min(serverTx, clientRx)
@@ -193,10 +201,10 @@ func (h *h3sHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					actualTx = h.config.BandwidthConfig.MaxTx
 				}
 				if actualTx > 0 {
-					congestion.UseBrutal(h.conn, actualTx, h.config.BandwidthConfig.DisableLossCompensation)
+					congestion.UseBrutalCounting(h.conn, actualTx, h.config.BandwidthConfig.DisableLossCompensation)
 				} else {
 					// Client doesn't know its own bandwidth, use the configured congestion controller.
-					congestion.UseConfigured(h.conn, h.config.CongestionConfig.Type, h.config.CongestionConfig.BBRProfile)
+					congestion.UseConfiguredCounting(h.conn, h.config.CongestionConfig.Type, h.config.CongestionConfig.BBRProfile)
 				}
 			}
 			// Auth OK, send response
@@ -211,7 +219,11 @@ func (h *h3sHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				tl.LogOnlineState(id, true)
 			}
 			if el := h.config.EventLogger; el != nil {
-				el.Connect(h.conn.RemoteAddr(), id, actualTx)
+				if cel, ok := el.(ConnEventLogger); ok {
+					cel.ConnConnect(h.conn, id, actualTx)
+				} else {
+					el.Connect(h.conn.RemoteAddr(), id, actualTx)
+				}
 			}
 			// Initialize UDP session manager (if UDP is enabled)
 			// We use sync.Once to make sure that only one goroutine is started,
@@ -337,11 +349,18 @@ func (h *h3sHandler) handleTCPRequest(stream *utils.QStream) {
 	if len(putback) > 0 {
 		n, _ := tConn.Write(putback)
 		streamStats.Tx.Add(uint64(n))
+		// Mistgate patch (see MISTGATE.md): the put back bytes are the client's upload, so count them like the rest. The sniffer of
+		// v2.13.0 puts back what it read, up to a few KB per stream, no longer the 3 bytes of v2.12.3.
+		if trafficLogger != nil && !trafficLogger.LogTraffic(h.authID, uint64(n), 0) {
+			err = errDisconnect
+		}
 	}
 	// Start proxying
-	if trafficLogger != nil {
+	switch {
+	case err != nil: // the traffic logger asked to disconnect the client
+	case trafficLogger != nil:
 		err = copyTwoWayEx(h.authID, stream, tConn, trafficLogger, streamStats)
-	} else {
+	default:
 		// Use the fast path if no traffic logger is set
 		err = copyTwoWay(stream, tConn)
 	}

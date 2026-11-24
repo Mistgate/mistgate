@@ -17,9 +17,9 @@ require (
 	filippo.io/age v1.3.2
 	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260828
 	github.com/anthropics/anthropic-sdk-go/v2 v2.7.0
-	github.com/apernet/hysteria/core/v2 v2.13.0
-	github.com/apernet/hysteria/extras/v2 v2.13.0
-	github.com/apernet/quic-go v0.63.1-0.20261004180939-a10df75c260c
+	github.com/apernet/hysteria/core/v2 v2.14.0
+	github.com/apernet/hysteria/extras/v2 v2.14.0
+	github.com/apernet/quic-go v0.65.1-0.20261109005002-2895f039137a
 	github.com/aws/aws-sdk-go-v2 v1.47.1
 	github.com/aws/aws-sdk-go-v2/config v1.33.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.6
@@ -103,6 +103,7 @@ require (
 	github.com/docker/go-connections v0.8.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/expr-lang/expr v1.17.8 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect

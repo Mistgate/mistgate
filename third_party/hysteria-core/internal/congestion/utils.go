@@ -3,6 +3,8 @@ package congestion
 import (
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/apernet/hysteria/core/v2/internal/congestion/bbr"
 	"github.com/apernet/hysteria/core/v2/internal/congestion/brutal"
@@ -35,7 +37,11 @@ func NormalizeBBRProfile(profile string) (string, error) {
 }
 
 func UseBBR(conn *quic.Conn, profile bbr.Profile) {
-	conn.SetCongestionControl(bbr.NewBbrSender(
+	useBBR(conn, profile, false)
+}
+
+func useBBR(conn *quic.Conn, profile bbr.Profile, count bool) {
+	set(conn, count, bbr.NewBbrSender(
 		bbr.DefaultClock{},
 		seedPacketSize(conn.InitialPacketSize(), bbr.GetInitialPacketSize(conn.RemoteAddr())),
 		profile,
@@ -59,8 +65,60 @@ func seedPacketSize(quicSize, byAddr congestion.ByteCount) congestion.ByteCount 
 }
 
 func UseBrutal(conn *quic.Conn, tx uint64, disableLossCompensation bool) {
-	conn.SetCongestionControl(brutal.NewBrutalSender(tx, disableLossCompensation))
+	set(conn, false, brutal.NewBrutalSender(tx, disableLossCompensation))
 }
+
+// UseConfiguredCounting and UseBrutalCounting are the server's (a Mistgate patch, see MISTGATE.md): they also count the lost
+// packets of the connection for LostPackets, which the server forgets when the connection ends. A client uses the plain
+// ones: nothing would forget its connections.
+func UseConfiguredCounting(conn *quic.Conn, congestionType, bbrProfile string) {
+	if congestionType != TypeReno {
+		useBBR(conn, bbr.Profile(bbrProfile), true)
+	}
+}
+
+func UseBrutalCounting(conn *quic.Conn, tx uint64, disableLossCompensation bool) {
+	set(conn, true, brutal.NewBrutalSender(tx, disableLossCompensation))
+}
+
+// Mistgate patch (see MISTGATE.md): quic-go counts lost packets into ConnectionStats.PacketsLost only in its own congestion
+// controller, so under BBR or Brutal they stay at zero. quic-go calls OnCongestionEvent once for every packet it declares lost
+// whatever the controller, so a wrapper counts them.
+type lossCounting struct {
+	congestion.CongestionControlEx
+	lost *atomic.Uint64
+}
+
+func (l lossCounting) OnCongestionEvent(number congestion.PacketNumber, lostBytes, priorInFlight congestion.ByteCount) {
+	if lostBytes > 0 { // an ECN congestion event reports no bytes
+		l.lost.Add(1)
+	}
+	l.CongestionControlEx.OnCongestionEvent(number, lostBytes, priorInFlight)
+}
+
+var losses sync.Map // *quic.Conn -> *atomic.Uint64
+
+func set(conn *quic.Conn, count bool, cc congestion.CongestionControlEx) {
+	if !count {
+		conn.SetCongestionControl(cc)
+		return
+	}
+	lost := &atomic.Uint64{}
+	losses.Store(conn, lost)
+	conn.SetCongestionControl(lossCounting{cc, lost})
+}
+
+// LostPackets is the number of packets declared lost on conn while a replacement controller runs; false when quic-go's own
+// controller runs, whose ConnectionStats.PacketsLost counts them (and keeps what it counted before the replacement).
+func LostPackets(conn *quic.Conn) (uint64, bool) {
+	if v, ok := losses.Load(conn); ok {
+		return v.(*atomic.Uint64).Load(), true
+	}
+	return 0, false
+}
+
+// Forget drops conn's loss counter; the server calls it when the connection is done.
+func Forget(conn *quic.Conn) { losses.Delete(conn) }
 
 func UseConfigured(conn *quic.Conn, congestionType, bbrProfile string) {
 	switch congestionType {
