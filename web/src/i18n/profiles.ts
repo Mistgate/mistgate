@@ -153,6 +153,8 @@ export const en = {
   "profiles.f.hysteria2.egress.enum.warp": "WARP",
   "profiles.f.vless.port.title": "TCP port",
   "profiles.f.vless.port.hint": "Port the node listens on. Port 80 is kept for Let's Encrypt.",
+  "profiles.f.vless.client_port.title": "Public port",
+  "profiles.f.vless.client_port.hint": "Port clients connect to through a TCP proxy. 0 uses the listening port. Configure forwarding separately; use the CDN port for a CDN.",
   "profiles.f.mtproto.port.title": "TCP port",
   "profiles.f.mtproto.port.hint": "Port the node listens on for Telegram clients.",
   "profiles.f.mtproto.fake_tls.kind.title": "Name in the TLS handshake",
@@ -374,6 +376,8 @@ export const ru: typeof en = {
   "profiles.f.hysteria2.egress.enum.warp": "WARP",
   "profiles.f.vless.port.title": "TCP-порт",
   "profiles.f.vless.port.hint": "Порт, на котором слушает нода. Порт 80 оставлен для Let's Encrypt.",
+  "profiles.f.vless.client_port.title": "Внешний порт",
+  "profiles.f.vless.client_port.hint": "Порт подключения через TCP-прокси. 0 — порт прослушивания. Перенаправление настраивается отдельно; для CDN используйте порт CDN.",
   "profiles.f.mtproto.port.title": "TCP-порт",
   "profiles.f.mtproto.port.hint": "Порт, на котором нода слушает клиентов Telegram.",
   "profiles.f.mtproto.fake_tls.kind.title": "Имя в TLS-рукопожатии",
@@ -591,6 +595,8 @@ export const zh: typeof en = {
   "profiles.f.hysteria2.egress.enum.warp": "WARP",
   "profiles.f.vless.port.title": "TCP 端口",
   "profiles.f.vless.port.hint": "节点监听的端口。80 端口保留给 Let's Encrypt。",
+  "profiles.f.vless.client_port.title": "对外端口",
+  "profiles.f.vless.client_port.hint": "客户端通过 TCP 代理连接的端口。0 表示使用监听端口。转发需单独配置；使用 CDN 时请填写 CDN 端口。",
   "profiles.f.mtproto.port.title": "TCP 端口",
   "profiles.f.mtproto.port.hint": "节点监听 Telegram 客户端的端口。",
   "profiles.f.mtproto.fake_tls.kind.title": "TLS 握手中的名称",
@@ -665,6 +671,8 @@ export const zh: typeof en = {
 };
 
 export const fa: typeof en = {
+  "profiles.f.vless.client_port.title": "پورت عمومی",
+  "profiles.f.vless.client_port.hint": "پورتی که کلاینت از طریق پراکسی TCP به آن وصل می‌شود. ۰ از پورت شنود استفاده می‌کند. انتقال پورت را جداگانه تنظیم کن؛ برای CDN از پورت CDN استفاده کن.",
   "profiles.title": "پروفایل‌ها",
   "profiles.create": "پروفایل جدید",
   "profiles.nodes": "نود",
@@ -881,6 +889,8 @@ export const fa: typeof en = {
 };
 
 export const tr: typeof en = {
+  "profiles.f.vless.client_port.title": "Dış port",
+  "profiles.f.vless.client_port.hint": "İstemcilerin TCP proxy üzerinden bağlandığı port. 0 dinleme portunu kullanır. Yönlendirmeyi ayrıca yapılandır; CDN için CDN portunu kullan.",
   "profiles.title": "Profiller",
   "profiles.create": "Yeni profil",
   "profiles.nodes": "düğüm",

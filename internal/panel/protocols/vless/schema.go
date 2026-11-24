@@ -21,6 +21,11 @@ const settingsSchema = `{
       "title": "TCP port", "description": "Port the node listens on. Port 80 is kept for Let's Encrypt.",
       "x-group": "basics", "x-order": 10, "x-critical": true
     },
+    "client_port": {
+      "type": "integer", "minimum": 0, "maximum": 65535, "default": 0,
+      "title": "Public port", "description": "Port clients connect to when a TCP proxy forwards to this node. 0 uses the listening port. Configure the forwarding separately; for a CDN use its port instead.",
+      "x-group": "advanced", "x-order": 5, "x-critical": true
+    },
     "transport": {
       "type": "string", "enum": ["xhttp", "tcp", "ws"], "default": "xhttp",
       "x-enum-labels": {"xhttp": "XHTTP", "tcp": "TCP (RAW + Vision)", "ws": "WebSocket"},

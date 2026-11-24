@@ -207,7 +207,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
           const s = states[i.state] ?? states[InboundState.UNSPECIFIED];
           // the last port check of this profile's port: a dot that leads to it in the ways in
           const tcp = networkOf(i.protocol) === "tcp";
-          const checked = tcp ? data.tcpChecks?.find((c) => c.port === i.port && c.verdict) : data.portChecks?.find((c) => c.port === i.port && c.verdict);
+          const checked = tcp ? data.tcpChecks?.find((c) => c.port === (i.clientPort || i.port) && c.verdict) : data.portChecks?.find((c) => c.port === i.port && c.verdict);
           const cs = cells(t, fmt, i, now, checked && (tcp ? tcpPill(t, checked.verdict) : verdictPill(t, checked as never)));
           const kind = i.lastError ? inboundErrorKind(i.lastError) : null;
           const cell = checkRow?.cells.find((c) => c.deployed && c.inboundId === i.id);

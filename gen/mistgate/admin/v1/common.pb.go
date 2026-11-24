@@ -545,6 +545,8 @@ type Inbound struct {
 	// The target REALITY forwards strangers to as this inbound has it built: "self" (the node's own site), "host:port", or "" for an
 	// inbound that is not VLESS REALITY. The edit window and the neighbour card say what strangers see now and after a change.
 	RealityTarget string `protobuf:"bytes,21,opt,name=reality_target,json=realityTarget,proto3" json:"reality_target,omitempty"`
+	// Public port at the node address; 0 means the listen port. The agent still listens on port.
+	ClientPort    uint32 `protobuf:"varint,22,opt,name=client_port,json=clientPort,proto3" json:"client_port,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -724,6 +726,13 @@ func (x *Inbound) GetRealityTarget() string {
 		return x.RealityTarget
 	}
 	return ""
+}
+
+func (x *Inbound) GetClientPort() uint32 {
+	if x != nil {
+		return x.ClientPort
+	}
+	return 0
 }
 
 // AmneziaWG interface state of one inbound (agent.v1.AwgHealth).
@@ -1840,7 +1849,7 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"A\n" +
 	"\rProtocolCount\x12\x1a\n" +
 	"\bprotocol\x18\x01 \x01(\tR\bprotocol\x12\x14\n" +
-	"\x05users\x18\x02 \x01(\rR\x05users\"\x8a\x06\n" +
+	"\x05users\x18\x02 \x01(\rR\x05users\"\xab\x06\n" +
 	"\aInbound\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1865,7 +1874,9 @@ const file_mistgate_admin_v1_common_proto_rawDesc = "" +
 	"\x17direct_in_subscriptions\x18\x12 \x01(\bR\x15directInSubscriptions\x12\x10\n" +
 	"\x03cdn\x18\x13 \x01(\bR\x03cdn\x126\n" +
 	"\x17reality_target_override\x18\x14 \x01(\tR\x15realityTargetOverride\x12%\n" +
-	"\x0ereality_target\x18\x15 \x01(\tR\rrealityTarget\"\x8f\x03\n" +
+	"\x0ereality_target\x18\x15 \x01(\tR\rrealityTarget\x12\x1f\n" +
+	"\vclient_port\x18\x16 \x01(\rR\n" +
+	"clientPort\"\x8f\x03\n" +
 	"\x10AwgInboundStatus\x12\x18\n" +
 	"\abackend\x18\x01 \x01(\tR\abackend\x12'\n" +
 	"\x0fbackend_version\x18\x02 \x01(\tR\x0ebackendVersion\x12\x19\n" +

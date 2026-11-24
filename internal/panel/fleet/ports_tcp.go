@@ -41,8 +41,9 @@ const (
 
 // tcpSpec is one enabled inbound of the node as the panel builds it for the agent.
 type tcpSpec struct {
-	Profile string
-	Spec    plugin.InboundSpec
+	Profile  string
+	Spec     plugin.InboundSpec
+	Settings json.RawMessage // profile settings: public ports are deliberately absent from the agent spec
 }
 
 // tcpTarget is one TCP port to probe and what to say about it.
@@ -85,7 +86,11 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 		plain[i] = s.Spec
 	}
 	owners := plugin.TCPPortOwners(plain) // the node closes a Hysteria2 site on a TCP port another inbound holds
-	shares := plugin.TCPSharePlan(plain)  // services that share a port by SNI: the probe asks the default route
+	public := slices.Clone(plain)
+	for i, s := range sorted {
+		public[i].Listen.Port = protocols.ClientPort(s.Settings, s.Spec.Listen.Port)
+	}
+	shares := plugin.TCPSharePlan(public) // services that share a port by SNI: the probe asks the default route
 
 	byPort := make(map[uint16]tcpTarget)
 	add := func(t tcpTarget) {
@@ -103,7 +108,7 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 	for _, s := range sorted {
 		spec := s.Spec
 		pin := pins[spec.ID]
-		if p := shares[spec.Listen.Port]; p.Front() && spec.Listen.Network == "tcp" && spec.ID != p.Default {
+		if p := shares[protocols.ClientPort(s.Settings, spec.Listen.Port)]; p.Front() && spec.Listen.Network == "tcp" && spec.ID != p.Default {
 			continue // one target per port: what answers there without a name is the default route's service
 		}
 		switch {
@@ -111,6 +116,7 @@ func tcpTargets(specs []tcpSpec, pins map[string]string) []tcpTarget {
 			sni, ownName := vlessProbeName(spec)
 			t := tcpTarget{Port: spec.Listen.Port, Role: tcpRoleVLESS, Profile: s.Profile, Kind: tcpcheck.KindTLS, SNI: sni, Pin: pin,
 				PublicCert: hasPublicCertificate(spec.TLS)}
+			t.Port = protocols.ClientPort(s.Settings, spec.Listen.Port)
 			if ownName {
 				t.ALPN = alpn(t.Port, spec.TLS)
 			}
@@ -332,7 +338,7 @@ func (f *Fleet) tcpSpecsOf(ctx context.Context, target store.NodeRow) ([]tcpSpec
 		if err != nil {
 			continue
 		}
-		specs = append(specs, tcpSpec{Profile: inbound.ProfileName, Spec: spec})
+		specs = append(specs, tcpSpec{Profile: inbound.ProfileName, Spec: spec, Settings: json.RawMessage(inbound.Settings)})
 		if pin, ok := protocols.NormalizePin(inbound.CertPin); ok {
 			pins[inbound.ID] = pin
 		}

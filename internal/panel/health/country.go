@@ -16,6 +16,7 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -270,7 +271,7 @@ func countryPorts(ts []*target) []uint16 {
 		}
 		switch {
 		case t.spec.Listen.Network == "tcp":
-			add(t.spec.Listen.Port)
+			add(protocols.ClientPort(t.settings, t.spec.Listen.Port))
 		case t.in.Protocol == "hysteria2":
 			add(plugin.Hy2SitePort(t.spec))
 		}
@@ -297,7 +298,7 @@ func countryPreferredPort(ts []*target) uint16 {
 				Security string `json:"security"`
 			}
 			if json.Unmarshal(t.settings, &settings) == nil && strings.EqualFold(settings.Security, "reality") {
-				p = t.spec.Listen.Port
+				p = protocols.ClientPort(t.settings, t.spec.Listen.Port)
 			}
 		}
 		if slices.Contains(ports, p) {

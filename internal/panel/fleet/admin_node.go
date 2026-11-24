@@ -400,6 +400,9 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 	if n.BridgePort == 0 || n.BridgePort == 443 {
 		return "", ""
 	}
+	if _, ok := f.bridgeTLSName(ctx, n); ok {
+		return "", ""
+	}
 	inbounds, err := f.st.FleetInbounds(ctx, n.ID, false)
 	if err != nil {
 		return "port_443_taken", ""
@@ -418,7 +421,7 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 		if err != nil {
 			continue
 		}
-		if spec.Protocol == "vless" && spec.Listen.Network == "tcp" && spec.Listen.Port == 443 {
+		if spec.Protocol == "vless" && spec.Listen.Network == "tcp" && protocols.ClientPort(json.RawMessage(row.Settings), spec.Listen.Port) == 443 {
 			vless443 = true
 			if v, _ := plugin.VLESSOf(spec); v.Security == "reality" && !v.TargetSelf() {
 				return "reality_external_target", row.ProfileID
@@ -434,7 +437,7 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 			}
 			continue
 		}
-		if spec.Protocol == "vless" && spec.Listen.Port == 443 && bridgeVLESSOwnSite([]tcpSpec{{Profile: inbound.row.ProfileName, Spec: spec}}, inbound.row.ProfileName) {
+		if spec.Protocol == "vless" && spec.Listen.Port == 443 && bridgeVLESSOwnSite([]tcpSpec{{Profile: inbound.row.ProfileName, Spec: spec, Settings: json.RawMessage(inbound.row.Settings)}}, inbound.row.ProfileName) {
 			continue
 		}
 		holds := spec.Listen.Network == "tcp" && (spec.Listen.Port == 443 || spec.Listen.HopFrom != 0 && spec.Listen.HopFrom <= 443 && spec.Listen.HopTo >= 443)
@@ -718,6 +721,7 @@ func (f *Fleet) inboundMsg(n store.NodeRow, row store.FleetInboundRow) *adminv1.
 	if spec, err := f.buildSpec(n, row); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
 		out.Cdn = plugin.ServerCDN(spec)
+		out.ClientPort = uint32(protocols.ClientPort(json.RawMessage(row.Settings), spec.Listen.Port))
 		out.RealityTarget = plugin.RealityTargetShown(spec)
 	}
 	return out

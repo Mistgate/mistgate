@@ -62,6 +62,8 @@ func (s *Service) controlRelay(ctx context.Context, id string, notify, settle bo
 // so that the caller decides again with its result.
 func (s *Service) controlRelayOnce(ctx context.Context, l store.RelayLink, entry store.NodeRow, notify, settle bool) bool {
 	now := s.now()
+	to, key := s.relayTarget(ctx, l)
+	l = l.ForTarget(to, key)
 	c, _ := l.Check()
 	port := entry.BridgeEndpointPort()
 	reach := c.ReverseReach

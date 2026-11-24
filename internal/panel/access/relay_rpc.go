@@ -104,7 +104,7 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 	}
 	if f, merged, err := s.loadFull(ctx, l.InboundID); err == nil {
 		if spec, err := s.buildSpec(f, merged); err == nil {
-			out.ExitPort = uint32(spec.Listen.Port)
+			out.ExitPort = uint32(protocols.ClientPort(merged, spec.Listen.Port))
 		}
 	}
 	fillRelayMode(out, l)

@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/mistgate/mistgate/internal/agentcap"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/tcpcheck"
 )
@@ -90,7 +91,7 @@ func (r relayRun) reverseSiteTarget(ctx context.Context) (tcpTarget, bool, error
 			continue
 		}
 		for _, spec := range specs {
-			if spec.Profile != target.Profile || spec.Spec.Protocol != "vless" || spec.Spec.Listen.Network != "tcp" || spec.Spec.Listen.Port != 443 {
+			if spec.Profile != target.Profile || spec.Spec.Protocol != "vless" || spec.Spec.Listen.Network != "tcp" || protocols.ClientPort(spec.Settings, spec.Spec.Listen.Port) != 443 {
 				continue
 			}
 			if _, ownSite := vlessProbeName(spec.Spec); ownSite {

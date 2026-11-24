@@ -185,3 +185,25 @@ func TestEnsureBridgeEndpointRidesTheDefaultRouteOfASharedPort(t *testing.T) {
 		t.Fatalf("beside a service with the node's own site the bridge port = %d, want 0 (that site)", node.BridgePort)
 	}
 }
+
+func TestEnsureBridgeEndpointUsesPublicVLESSSite(t *testing.T) {
+	f := newRelayFix(t)
+	p := must(f.s.CreateProfile(f.ctx, req(&adminv1.CreateProfileRequest{Protocol: "vless", Name: "forwarded site", SettingsJson: `{"port":19443,"client_port":443}`}))).Msg.Profile
+	f.inbound(p.Id, "nod_fi1")
+	node, err := f.s.ensureBridgeEndpoint(f.ctx, "nod_fi1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.BridgePort != 0 {
+		t.Fatalf("public own site was ignored: port %d", node.BridgePort)
+	}
+	settings := `{"client_port":8443}`
+	must(f.s.UpdateProfile(f.ctx, req(&adminv1.UpdateProfileRequest{ProfileId: p.Id, ExpectedVersion: p.Version, SettingsJson: &settings})))
+	node, err = f.s.ensureBridgeEndpoint(f.ctx, "nod_fi1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.BridgePort == 0 {
+		t.Fatal("site no longer public on 443 was reused for bridge")
+	}
+}

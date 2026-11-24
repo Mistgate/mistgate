@@ -241,3 +241,67 @@ func relayModeStoreProof(t *testing.T, st *Store) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func relayTargetChangeProof(t *testing.T, st *Store) {
+	ctx := context.Background()
+	now := time.Date(2026, 11, 24, 0, 0, 0, 0, time.UTC)
+	relayFixture(t, st)
+	if err := st.CreateRelay(ctx, Relay{ID: "rly_target", InboundID: "inb_de1_vl", ViaNodeID: "nod_fi1", Network: "tcp", Port: 2443}, now); err != nil {
+		t.Fatal(err)
+	}
+	c := RelayCheck{At: now.Unix(), Network: "tcp", Port: 2443, To: "192.0.2.10:443", Leg: RelayStage{Status: "ok"}}
+	if err := st.SetRelayCheck(ctx, "rly_target", c); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetRelayDirectStreak(ctx, "rly_target", 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetRelayCheck(ctx, "rly_target", c); err != nil {
+		t.Fatal(err)
+	}
+	if mustRelay(t, st, "rly_target").DirectStreak() != 2 {
+		t.Fatal("same target lost recovery streak")
+	}
+	c.To = "192.0.2.10:8443"
+	if err := st.SetRelayCheck(ctx, "rly_target", c); err != nil {
+		t.Fatal(err)
+	}
+	if mustRelay(t, st, "rly_target").DirectStreak() != 0 {
+		t.Fatal("new target inherited recovery streak")
+	}
+}
+
+func profileSelectiveBumpProof(t *testing.T, st *Store) {
+	ctx := context.Background()
+	relayFixture(t, st)
+	p, err := st.Access().Profile(ctx, "prf_hy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Name = "changed profile"
+	changed, err := st.Access().UpdateProfile(ctx, p, p.Version, []string{"inb_de1_hy", "inb_de1_vl"}, false, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := func(id string) uint64 {
+		t.Helper()
+		row, err := st.FleetInbound(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return row.SpecVersion
+	}
+	if version("inb_de1_hy") != 2 || version("inb_nl1_hy") != 1 || version("inb_de1_vl") != 1 {
+		t.Fatal("bumped an unlisted inbound or one of another profile")
+	}
+	_, err = st.Access().UpdateProfile(ctx, p, p.Version, []string{"inb_nl1_hy"}, false, time.Now())
+	if !errors.Is(err, ErrAccessVersion) || version("inb_nl1_hy") != 1 {
+		t.Fatalf("stale update modified inbounds: %v", err)
+	}
+	if _, err = st.Access().UpdateProfile(ctx, changed, changed.Version, nil, false, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if version("inb_de1_hy") != 2 {
+		t.Fatal("client-only update changed inbound version")
+	}
+}

@@ -111,6 +111,8 @@ message Inbound {
   // The target REALITY forwards strangers to as this inbound has it built: "self" (the node's own site), "host:port", or "" for an
   // inbound that is not VLESS REALITY. The edit window and the neighbour card say what strangers see now and after a change.
   string reality_target = 21;
+  // Public port at the node address; 0 means the listen port. The agent still listens on port.
+  uint32 client_port = 22;
 }
 
 // AmneziaWG interface state of one inbound (agent.v1.AwgHealth).

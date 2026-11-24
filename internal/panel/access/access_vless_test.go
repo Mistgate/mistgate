@@ -169,7 +169,7 @@ func TestDecoyPausedRules(t *testing.T) {
 	e := newEnv(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", tt.add, tt.others)
+			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", tt.add, nil, tt.others)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -206,7 +206,7 @@ func TestDecoyPausedPort80OnlyForACME(t *testing.T) {
 	for mode, want := range map[plugin.TLSMode]bool{plugin.TLSAcmeDomain: true, plugin.TLSAcmeIP: true, plugin.TLSSelfSigned: false} {
 		spec := plugin.InboundSpec{Protocol: "hysteria2", Listen: plugin.Listen{Network: "udp", Port: 443}, TLS: plugin.TLS{Mode: mode}, Settings: []byte(`{}`)}
 		hy2 := nodeListen{profile: "hy2", protocol: "hysteria2", enabled: true, l: spec.Listen, spec: spec}
-		got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", vless, []nodeListen{hy2})
+		got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", vless, nil, []nodeListen{hy2})
 		if err != nil || len(got) != 1 {
 			t.Fatalf("mode %d: %v %+v", mode, err, got)
 		}
@@ -291,7 +291,7 @@ func TestDecoyPausedPort80FromStoredCheck(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			put("nod_de1", tt.rows...)
-			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", vless, []nodeListen{hy2})
+			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", vless, nil, []nodeListen{hy2})
 			if err != nil || len(got) != 1 {
 				t.Fatalf("%v %+v", err, got)
 			}
@@ -331,7 +331,7 @@ func TestHy2SiteTakenByTrustTunnel(t *testing.T) {
 		"hysteria2 beside trusttunnel on 8443": {hy2, []nodeListen{ttOn(8443)}, nil},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", tc.add, tc.others)
+			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", tc.add, nil, tc.others)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -378,7 +378,7 @@ func TestHy2SiteTakenByMTProto(t *testing.T) {
 		"a disabled site":                  {mt, []nodeListen{func() nodeListen { n := hy2Other; n.enabled = false; return n }()}, nil},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", tc.add, tc.others)
+			got, err := e.s.inboundWarnings(e.ctx, "nod_de1", "de1", "added", tc.add, nil, tc.others)
 			if err != nil {
 				t.Fatal(err)
 			}

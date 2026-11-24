@@ -48,6 +48,14 @@ The editor groups the settings into **Basics**, **Obfuscation** and **Advanced**
 
 The XHTTP settings apply to the XHTTP transport only. Which server name and which short ID a device gets is fixed by the device, so its link does not change from one update of the subscription to the next.
 
+## Public TCP port
+
+If a TCP forward exposes the node on a different port, set **Public TCP port** (`client_port`) to that external port. For example, with TCP 443 forwarded to the listener on 19443, keep **TCP port** at 19443 and set `client_port` to 443. Leaving it at 0 uses the listener port, including a node's port override.
+
+This changes subscriptions, relay destinations and external checks; it does not create the forward or open a firewall. Every node using the profile needs the same external port. Configure the forward for each advertised address family, including IPv6. A relay's entry port still takes precedence for its client links. With a CDN host, use the CDN port instead; `client_port` must remain 0.
+
+For an ACME certificate, the certificate authority must still reach the node on public TCP 443 (TLS-ALPN-01) or 80 (HTTP-01). Forward TLS unchanged to the listener. A successful TLS-ALPN probe checks the listener's capability; it does not prove that a certificate was issued.
+
 ## TLS and a CDN
 
 Choose TLS with XHTTP or WebSocket for a direct connection or a CDN. A direct connection needs an ACME domain certificate. The node can answer ACME TLS-ALPN-01 on TCP 443 and HTTP-01 on TCP 80 when that port is available. The certificate is issued on demand and renews without restarting the inbound.

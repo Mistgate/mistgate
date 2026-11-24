@@ -83,7 +83,8 @@ func (x *reverseControlFix) bridge(up bool) {
 
 func (x *reverseControlFix) monitor(ok bool, streak uint32) {
 	x.t.Helper()
-	if err := x.st.SetRelayMonitorCheck(x.ctx, x.id, store.RelayMonitorCheck{AtUnix: x.clock.Unix(), OK: ok, FailStreak: streak, TargetKey: "k"}); err != nil {
+	_, key := x.s.relayTarget(x.ctx, x.relayOf(x.id))
+	if err := x.st.SetRelayMonitorCheck(x.ctx, x.id, store.RelayMonitorCheck{AtUnix: x.clock.Unix(), OK: ok, FailStreak: streak, TargetKey: key}); err != nil {
 		x.t.Fatal(err)
 	}
 }

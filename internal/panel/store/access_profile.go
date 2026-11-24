@@ -73,11 +73,11 @@ func (a Access) Profiles(ctx context.Context) ([]AccessProfile, error) {
 }
 
 // UpdateProfile writes name, settings and secrets of p (matched by ID) when its stored version equals
-// expectedVersion, bumps the version and, with bumpInbounds, the spec_version of the profile's inbounds. With
+// expectedVersion, bumps the version and the spec_version of the listed changed inbounds. With
 // bumpEpoch it also raises critical_epoch in the same transaction: every device that received its config before
 // is then "stale" (an x-critical change of an AWG profile).
 // ErrAccessVersion on mismatch, ErrAccessExists on a name clash. Returns the stored row.
-func (a Access) UpdateProfile(ctx context.Context, p AccessProfile, expectedVersion uint32, bumpInbounds, bumpEpoch bool, now time.Time) (AccessProfile, error) {
+func (a Access) UpdateProfile(ctx context.Context, p AccessProfile, expectedVersion uint32, bumpInbounds []string, bumpEpoch bool, now time.Time) (AccessProfile, error) {
 	stmts := []Stmt{
 		guard(`EXISTS (SELECT 1 FROM profile WHERE id = ? AND version = ?)`, p.ID, int64(expectedVersion)),
 		{Query: `UPDATE profile SET name = ?, settings_json = ?, secrets_enc = ?, version = version + 1, updated_at = ? WHERE id = ?`,
@@ -86,8 +86,8 @@ func (a Access) UpdateProfile(ctx context.Context, p AccessProfile, expectedVers
 	if bumpEpoch {
 		stmts = append(stmts, Stmt{Query: `UPDATE profile SET critical_epoch = critical_epoch + 1 WHERE id = ?`, Args: []any{p.ID}})
 	}
-	if bumpInbounds {
-		stmts = append(stmts, Stmt{Query: `UPDATE inbound SET spec_version = spec_version + 1, updated_at = ? WHERE profile_id = ?`, Args: []any{unix(now), p.ID}})
+	for _, id := range bumpInbounds {
+		stmts = append(stmts, Stmt{Query: `UPDATE inbound SET spec_version = spec_version + 1, updated_at = ? WHERE id = ? AND profile_id = ?`, Args: []any{unix(now), id, p.ID}})
 	}
 	_, err := a.s.batch(ctx, stmts...)
 	if errors.Is(err, errGuard) {

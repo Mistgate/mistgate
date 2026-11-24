@@ -234,7 +234,8 @@ func TestRelayModeChangeNotifiesDesiredStateOnce(t *testing.T) {
 	if err := f.st.SetRelayCheck(f.ctx, created.Id, check); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.st.SetRelayMonitorCheck(f.ctx, created.Id, store.RelayMonitorCheck{AtUnix: now, FailStreak: 2, TargetKey: "same-target"}); err != nil {
+	_, targetKey := f.s.relayTarget(f.ctx, link)
+	if err := f.st.SetRelayMonitorCheck(f.ctx, created.Id, store.RelayMonitorCheck{AtUnix: now, FailStreak: 2, TargetKey: targetKey}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.st.SetRelayBridgeSide(f.ctx, created.Id, "exit", &store.RelayBridgeSideCheck{Connected: true, Conns: 1, SinceUnix: now - 10, AtUnix: now}); err != nil {

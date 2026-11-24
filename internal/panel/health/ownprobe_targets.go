@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mistgate/mistgate/internal/panel/countryreach"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/hysteria2"
 	"github.com/mistgate/mistgate/internal/panel/protocols/vless"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -91,7 +92,7 @@ func (s *Service) ProbeTargets(ctx context.Context) ([]ProbeTarget, error) {
 				if _, _, other := plugin.RealityTarget(t.spec); other {
 					kind = "fetch"
 				}
-				tlsTargets = append(tlsTargets, ProbeTarget{NodeID: n.node.ID, IP: ip, Port: t.spec.Listen.Port, Kind: kind, SNI: sni, Path: path})
+				tlsTargets = append(tlsTargets, ProbeTarget{NodeID: n.node.ID, IP: ip, Port: protocols.ClientPort(t.settings, t.spec.Listen.Port), Kind: kind, SNI: sni, Path: path})
 			case hysteria2.ID:
 				sni := probeName(t.spec)
 				if !countryreach.ProbeSNI(sni) {

@@ -37,6 +37,22 @@ func vlessSpec(id string, port uint16, settings string, tls plugin.TLS) tcpSpec 
 
 const realityOther = `{"security":"reality","reality":{"target":"www.example.org:443","server_names":["www.example.org"]}}`
 
+func TestTCPTargetsUsePublicPortWithoutChangingListener(t *testing.T) {
+	s := vlessSpec("a", 19443, realityOther, plugin.TLS{})
+	s.Settings = json.RawMessage(`{"client_port":443}`)
+	got := tcpTargets([]tcpSpec{s}, nil)
+	if len(got) != 1 || got[0].Port != 443 || got[0].SNI != "www.example.org" || got[0].ALPN {
+		t.Fatalf("public TCP target = %+v", got)
+	}
+	if s.Spec.Listen.Port != 19443 {
+		t.Fatal("public probe changed the internal listener")
+	}
+	s.Settings = json.RawMessage(`{"client_port":0}`)
+	if got := tcpTargets([]tcpSpec{s}, nil); len(got) != 1 || got[0].Port != 19443 {
+		t.Fatalf("default TCP target = %+v", got)
+	}
+}
+
 func TestTCPTargets(t *testing.T) {
 	pin := "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
 	for name, tc := range map[string]struct {
@@ -359,6 +375,26 @@ func TestCheckPortsProbesTCPAfterUDPAndStoresTheRows(t *testing.T) {
 	}
 	if got := x.count(`SELECT count(*) FROM audit WHERE action = 'node.ports_check' AND params LIKE '%"tcp_ports":"80,443,8443"%'`); got != 1 {
 		t.Errorf("audit rows with the TCP ports = %d, want 1", got)
+	}
+}
+
+func TestCheckPortsUsesProfilePublicPort(t *testing.T) {
+	x, target, targetConn := tcpCheckTarget(t)
+	x.exec(`UPDATE inbound SET enabled = 0 WHERE id = 'inb_hy2'`)
+	x.exec(`UPDATE profile SET settings_json = '{"port":19443,"client_port":443,"network":"tcp","reality":{"target":"www.example.org:443","server_names":["www.example.org"]}}' WHERE id = 'prf_vless'`)
+	_, senderConn := addPortCheckPeer(x, "sender", "provider-b", "DE", agentcap.UDPCheck, agentcap.TCPCheck)
+	result := startPortCheckRPC(x.ctx, x, target.nodeID, 2053)
+	driveUDPPart(targetConn, senderConn)
+	probe := waitTCPProbe(senderConn)
+	if len(probe.Targets) != 1 || probe.Targets[0].Port != 443 || probe.Targets[0].Sni != "www.example.org" {
+		t.Fatalf("public port probe = %+v", probe)
+	}
+	replyPortCommand(senderConn, probe.RequestId, &agentv1.CommandResult{Ok: true, Params: map[string]string{
+		"family": "4", "t443": "ours",
+	}})
+	got := <-result
+	if got.err != nil || len(got.response.Tcp) != 1 || got.response.Tcp[0].Port != 443 || got.response.Tcp[0].Verdict != "ours" {
+		t.Fatalf("public port check = %+v, %v", got.response, got.err)
 	}
 }
 

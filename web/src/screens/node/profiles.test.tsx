@@ -49,8 +49,8 @@ vi.mock("@/lib/api", () => ({
 }));
 // no router in the test: a link is an anchor that carries its target
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, params, search, hash, className, onClick }: { children?: ReactNode; to: string; params?: object; search?: object; hash?: string; className?: string; onClick?: () => void }) => (
-    <a href={to + (hash ? `#${hash}` : "")} data-params={JSON.stringify(params ?? {})} data-search={JSON.stringify(search ?? {})} className={className} onClick={onClick}>
+  Link: ({ children, to, params, search, hash, className, onClick, "aria-label": ariaLabel }: { "aria-label"?: string; children?: ReactNode; to: string; params?: object; search?: object; hash?: string; className?: string; onClick?: () => void }) => (
+    <a aria-label={ariaLabel} href={to + (hash ? `#${hash}` : "")} data-params={JSON.stringify(params ?? {})} data-search={JSON.stringify(search ?? {})} className={className} onClick={onClick}>
       {children}
     </a>
   ),
@@ -967,5 +967,16 @@ describe("who may change the servers on a node", () => {
     expect(labels()).not.toContain("Add profile");
     expect(text()).toContain("Only the owner can add, change or remove profiles on a node.");
     expect(document.querySelector("[role=dialog]")).toBeNull();
+  });
+});
+
+describe("public TCP port checks", () => {
+  it.each([19443, 443])("matches the public check for listener %i", async (port) => {
+    getNodeConnections.mockResolvedValue({ supported: true, inbounds: [] });
+    await mount(data({
+      inbounds: [{ id: "inb_public", profileId: "prf_public", profileName: "public", protocol: "vless", clientPort: 443, state: InboundState.ACTIVE, port, tlsServerName: "node.example.com", certNotAfterUnix: 0, certPinSha256: "", lastError: "" }],
+      tcpChecks: [{ port: 443, profile: "public", role: "vless", verdict: "ours" }],
+    }));
+    expect(document.querySelector('a[aria-label*="Reaches Mistgate"]')).not.toBeNull();
   });
 });

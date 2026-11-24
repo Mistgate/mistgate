@@ -141,7 +141,7 @@ func TestSchemaAndDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"/cdn/host", "/cdn/port", "/port", "/reality/server_names", "/reality/short_ids", "/reality/target", "/reality/target_kind", "/security", "/sni", "/tls_mode", "/transport", "/ws/host", "/ws/path", "/xhttp/host", "/xhttp/path", "/xhttp/x_padding_bytes"}
+	want := []string{"/cdn/host", "/cdn/port", "/client_port", "/port", "/reality/server_names", "/reality/short_ids", "/reality/target", "/reality/target_kind", "/security", "/sni", "/tls_mode", "/transport", "/ws/host", "/ws/path", "/xhttp/host", "/xhttp/path", "/xhttp/x_padding_bytes"}
 	if strings.Join(crit, ",") != strings.Join(want, ",") {
 		t.Errorf("x-critical = %v, want %v", crit, want)
 	}

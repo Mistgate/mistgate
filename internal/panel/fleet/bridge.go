@@ -3,9 +3,11 @@ package fleet
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -101,9 +103,6 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 			}
 			entries[l.ViaNodeID] = entry
 		}
-		if !l.BridgeWanted(now, entry.BridgeEndpointPort()) {
-			continue
-		}
 		if !bridgePathValid(entry.BridgePath) || !bridgePortValid(entry.BridgePort) || !bridgeNodeIDPattern.MatchString(entry.ID) ||
 			!bridgeRelayIDPattern.MatchString(l.ID) || entry.Address == "" {
 			continue
@@ -121,6 +120,11 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 			continue
 		}
 		if spec.Listen.Network != "tcp" || spec.Listen.Port == 0 {
+			continue
+		}
+		port := protocols.ClientPort(json.RawMessage(row.Settings), spec.Listen.Port)
+		l = l.ForTarget(net.JoinHostPort(n.Address, strconv.Itoa(int(port))), l.TargetKey(row, n.Address, port))
+		if !l.BridgeWanted(now, entry.BridgeEndpointPort()) {
 			continue
 		}
 		d := dials[entry.ID]
@@ -204,7 +208,7 @@ func (f *Fleet) bridgeTLSName(ctx context.Context, entry store.NodeRow) (tcpTarg
 
 func bridgeVLESSOwnSite(specs []tcpSpec, profile string) bool {
 	for _, spec := range specs {
-		if spec.Profile != profile || spec.Spec.Protocol != "vless" || spec.Spec.Listen.Network != "tcp" || spec.Spec.Listen.Port != 443 {
+		if spec.Profile != profile || spec.Spec.Protocol != "vless" || spec.Spec.Listen.Network != "tcp" || protocols.ClientPort(spec.Settings, spec.Spec.Listen.Port) != 443 {
 			continue
 		}
 		if _, own := vlessProbeName(spec.Spec); own {

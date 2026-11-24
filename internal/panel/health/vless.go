@@ -76,7 +76,7 @@ func dialVLESS(ctx context.Context, t Target, o DialOptions) (Tunnel, error) {
 // its TCP port with others by SNI is told apart from them and probed by its own route.
 func vlessProbeParams(t Target) (panelvless.ClientParams, bool) {
 	return panelvless.ResolveClientParams(protocols.RenderInput{
-		Settings: t.Settings,
+		Settings: t.Settings, ClientPort: t.ClientPort,
 		Inbound: protocols.InboundView{
 			ID: t.Inbound.ID, Node: protocols.NodeView{ID: t.Node.ID, Name: t.Node.Name, Address: t.Node.Address,
 				CountryCode: t.Node.CountryCode},

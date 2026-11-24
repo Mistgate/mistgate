@@ -200,3 +200,11 @@ vless://<uuid>@de1.example.com:443?encryption=none&fp=chrome&mode=auto&path=%2Fq
 - 节点**入口**标签页（**直连**）中的**检测端口**会从另一台节点检查 TCP 连接能否抵达 Mistgate，详见[节点](nodes.md)。这只是一个观测点，不会执行完整的 REALITY 握手。要查看客户端实际能看到的内容，请从其他网络测试（`nc -vz de1.example.com 8443`），或使用手机连接。
 - sing-box JSON 只承载基于 TCP（RAW + Vision）和 WebSocket 的 VLESS，不支持 XHTTP；Xray JSON 和 Mihomo YAML 支持所有类型。参见[各格式支持哪些协议配置](subscriptions.md#各格式支持哪些协议配置)。
 - 尚未使用真实 CDN 测试经 CDN 连接的 VLESS，详见[VLESS 经 CDN 连接](#vless-经-cdn-连接)。
+
+## 公开 TCP 端口
+
+如果 TCP 转发对外使用的端口与节点监听端口不同，把 **公开 TCP 端口**（`client_port`）设为外部端口。例如，公网 TCP 443 转发到本机 19443 时，监听端口仍为 19443，`client_port` 设为 443。设为 0 时沿用监听端口，包括节点上的端口覆盖。
+
+这个设置影响订阅、中转出口和外部探测，不会创建转发或开放防火墙。同一配置下的所有节点必须使用相同的外部端口；发布了 IPv6 地址时，也要配置对应的 IPv6 转发。通过中转生成的客户端链接仍优先使用中转入口端口。配置 CDN 域名时应使用 CDN 端口，`client_port` 必须为 0。
+
+ACME 证书签发仍要求证书机构能访问公网 TCP 443（TLS-ALPN-01）或 80（HTTP-01）。转发必须原样传递 TLS。TLS-ALPN 探测通过只能证明监听器具备响应能力，不代表证书已经签发。

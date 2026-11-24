@@ -185,6 +185,7 @@ type RenderInput struct {
 	Capabilities []string        // name=value entries from X-Mistgate-Caps; used by FormatMistgate only
 	Settings     json.RawMessage // merged, secrets in place
 	Inbound      InboundView
+	ClientPort   uint16 // public entry port; overrides the profile public port
 	UserID       string
 	UserName     string
 	DeviceID     string

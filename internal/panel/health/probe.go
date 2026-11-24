@@ -41,12 +41,13 @@ type Tunnel interface {
 
 // Target is what a Dialer needs to connect to one inbound as a client.
 type Target struct {
-	Node     store.NodeRow
-	Inbound  store.FleetInboundRow
-	Spec     plugin.InboundSpec
-	Settings []byte // merged profile settings (secrets in place)
-	CredID   string // the system credential's id (AWG: the id of the probe "device", for its signature)
-	Secret   string // the system credential's secret: what a client presents
+	Node       store.NodeRow
+	Inbound    store.FleetInboundRow
+	Spec       plugin.InboundSpec
+	Settings   []byte // merged profile settings (secrets in place)
+	ClientPort uint16 // alternate entry port, instead of the profile's public port
+	CredID     string // the system credential's id (AWG: the id of the probe "device", for its signature)
+	Secret     string // the system credential's secret: what a client presents
 }
 
 // DialOptions bound a dial.
@@ -154,10 +155,12 @@ func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped b
 	rctx, cancel := context.WithTimeout(ctx, min(s.cfg.HandshakeTimeout+time.Duration(requests)*s.cfg.ProbeTimeout+reuseTimeout, budget))
 	defer cancel()
 	dialNode := t.node
+	var clientPort uint16
 	if t.relay != nil {
 		dialNode = t.relay.entry
+		clientPort = t.spec.Listen.Port
 	}
-	tn, err := s.cfg.Dialers[t.in.Protocol](rctx, Target{Node: dialNode, Inbound: t.in, Spec: t.spec, Settings: t.settings, CredID: cred.CredID, Secret: secret},
+	tn, err := s.cfg.Dialers[t.in.Protocol](rctx, Target{Node: dialNode, Inbound: t.in, Spec: t.spec, Settings: t.settings, ClientPort: clientPort, CredID: cred.CredID, Secret: secret},
 		DialOptions{HandshakeTimeout: s.cfg.HandshakeTimeout, ProbeTimeout: s.cfg.ProbeTimeout})
 	if err != nil {
 		var pe *ProbeError

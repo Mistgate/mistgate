@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net"
 	"net/netip"
@@ -11,6 +12,7 @@ import (
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -117,17 +119,12 @@ func (s *Service) realityTargetOwnRefusal(ctx context.Context, f store.AccessInb
 // the node may carry its reverse bridge on that site (the node has no bridge port of its own): the exit verifies the entry by the name and
 // pin of that site, so with another site shown there it has nothing to verify and stops dialing. A warning, not a refusal: the relay
 // falls back to the forward way unless the owner fixed it to reverse, and the owner may be moving the bridge elsewhere.
-func (s *Service) bridgeSiteWarning(ctx context.Context, nodeID, nodeName string, spec plugin.InboundSpec, others []nodeListen) (*adminv1.StatusReason, error) {
-	if spec.Protocol != "vless" || spec.Listen.Network != "tcp" || spec.Listen.Port != 443 {
+func (s *Service) bridgeSiteWarning(ctx context.Context, nodeID, nodeName string, spec plugin.InboundSpec, settings json.RawMessage, others []nodeListen) (*adminv1.StatusReason, error) {
+	if spec.Protocol != "vless" || spec.Listen.Network != "tcp" || protocols.ClientPort(settings, spec.Listen.Port) != 443 {
 		return nil, nil
 	}
-	specs := []plugin.InboundSpec{spec}
-	for _, o := range others {
-		if o.enabled && o.spec.Protocol != "" {
-			specs = append(specs, o.spec)
-		}
-	}
-	if plugin.TCPPortOwners(specs)[443].Site {
+	candidates := append([]nodeListen{{enabled: true, spec: spec, settings: settings}}, others...)
+	if publicBridgeSite(candidates) {
 		return nil, nil
 	}
 	node, err := s.st.Node(ctx, nodeID)
