@@ -109,14 +109,20 @@ func dnsSig(servers []string) string {
 	return pair[0] + "," + pair[1]
 }
 
+// ruSigKey is where a "Russian services direct" key records the version of the list it holds in dns_sig (no node has this id).
+const ruSigKey = "_ru"
+
 // markDNSStale sets DNSStale of AWG devices of the person u: the nodes where the DNS that applies now is not the one the key
 // was issued with. Whatever changed it counts (the person's pick or its removal, the owner's offer or default, an edited
-// or deleted preset). A key with nothing recorded, or on a node the person no longer uses, is not stale.
+// or deleted preset). A key with nothing recorded, or on a node the person no longer uses, is not stale. The same goes for the list
+// of a "Russian services direct" key (RouteStale): it records the version of the list it was rendered with (awg.RUDirectVersion).
 func (s *Service) markDNSStale(u store.AccessUser, gs store.AccessGroups, full []store.AccessInboundFull, n *nodeDNS, devs []store.AccessAWGDevice) {
 	now := map[string]string{} // node id -> the pair that applies to the person now ("" = unknown)
 	for i := range devs {
 		d := &devs[i]
 		d.DNSStale = nil
+		list := d.DNSSig[ruSigKey]
+		d.RouteStale = d.Route == awg.RouteRUDirect && list != "" && list != awg.RUDirectVersion
 		for _, f := range full {
 			held, ok := d.DNSSig[f.Node.ID]
 			if !ok || f.Profile.ID != d.ProfileID || !s.usable(f, gs, u) || slices.Contains(d.DNSStale, f.Node.ID) {

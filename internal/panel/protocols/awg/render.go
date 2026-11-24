@@ -59,6 +59,9 @@ type clientConfig struct {
 	server string // server public key
 	masked bool
 	noIPv6 bool // the exit gives the client no IPv6: no format carries the tunnel's IPv6 address (RenderInput.NoIPv6Egress)
+	// ruDirect: the .conf and the vpn:// key carry AllowedIPs without the networks of the Russian services, and no IPv6 address
+	// (RenderInput.RUDirect; the Mihomo proxy and the checker never do).
+	ruDirect bool
 }
 
 func (c clientConfig) v31() bool { return c.s.Version == Version31 }
@@ -126,6 +129,7 @@ func buildClient(in protocols.RenderInput) (clientConfig, bool) {
 	}
 	c.ip4, c.ip6 = ps.IP4, ps.IP6
 	c.noIPv6 = in.NoIPv6Egress
+	c.ruDirect = in.RUDirect && (in.Format == plugin.FormatAWGConf || in.Format == plugin.FormatAmneziaVPN)
 
 	var pub struct {
 		PublicKey string `json:"public_key"`
@@ -195,9 +199,9 @@ func (c clientConfig) endpoint() string { return net.JoinHostPort(c.host, strcon
 
 // addr6 is the tunnel's IPv6 address the client is given: none when the exit gives it no IPv6. Without a source address
 // the device refuses IPv6 at once and the app uses IPv4, where an address with nowhere to go makes it wait for a timeout.
-// AllowedIPs keep ::/0 either way: the device's real IPv6 must not leave around the tunnel.
+// AllowedIPs keep ::/0 either way, except in a "Russian services direct" key (no IPv6 at all, as its list is IPv4 only).
 func (c clientConfig) addr6() string {
-	if c.noIPv6 {
+	if c.noIPv6 || c.ruDirect {
 		return ""
 	}
 	return c.ip6
@@ -212,6 +216,14 @@ func (c clientConfig) address() string {
 }
 
 func (c clientConfig) allowedIPs() []string { return []string{"0.0.0.0/0", "::/0"} } // iOS needs ::/0
+
+// keyAllowedIPs is the AllowedIPs of the .conf and of the vpn:// key: all of it, or the world minus the Russian services.
+func (c clientConfig) keyAllowedIPs() []string {
+	if c.ruDirect {
+		return RUDirectAllowedIPs()
+	}
+	return c.allowedIPs()
+}
 
 func onOff(b bool) string {
 	if b {
@@ -265,7 +277,7 @@ func (c clientConfig) conf() string {
 	b.WriteString("\n[Peer]\n")
 	line("PublicKey", c.server)
 	line("PresharedKey", c.psk)
-	line("AllowedIPs", strings.Join(c.allowedIPs(), ", "))
+	line("AllowedIPs", strings.Join(c.keyAllowedIPs(), ", "))
 	line("Endpoint", c.endpoint())
 	if o.PersistentKeepalive != "" {
 		line("PersistentKeepalive", o.PersistentKeepalive)
@@ -346,7 +358,7 @@ func (c clientConfig) vpnDoc() vpnDoc {
 	last := vpnLast{
 		Config: c.conf(), HostName: c.host, Port: c.port, ClientIP: c.ip4,
 		ClientPrivKey: c.priv, ClientPubKey: c.pub, ServerPubKey: c.server, PSKKey: c.psk, ClientID: c.pub,
-		AllowedIPs: c.allowedIPs(), PersistentKeepAlive: o.PersistentKeepalive, MTU: strconv.Itoa(c.s.MTU),
+		AllowedIPs: c.keyAllowedIPs(), PersistentKeepAlive: o.PersistentKeepalive, MTU: strconv.Itoa(c.s.MTU),
 		Jc: strconv.Itoa(o.Jc), Jmin: strconv.Itoa(o.Jmin), Jmax: strconv.Itoa(o.Jmax),
 		S1: strconv.Itoa(o.S1), S2: strconv.Itoa(o.S2), S3: strconv.Itoa(o.S3), S4: strconv.Itoa(o.S4),
 		H1: o.H1, H2: o.H2, H3: o.H3, H4: o.H4,

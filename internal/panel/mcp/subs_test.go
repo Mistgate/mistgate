@@ -342,6 +342,15 @@ func TestSubscriptionDNSChoiceRoundTrips(t *testing.T) {
 	if !get().UserPage.DNSChoice {
 		t.Fatal("the switch is not shown")
 	}
+	if get().UserPage.RUDirectKey {
+		t.Fatal("the key \"Russian services direct\" reads as on without the setting")
+	}
+	e.w.mu.Lock()
+	e.w.subs.UserPage.AllowRuDirectKey = proto.Bool(true)
+	e.w.mu.Unlock()
+	if !get().UserPage.RUDirectKey {
+		t.Fatal("the switch of the key \"Russian services direct\" is not shown")
+	}
 
 	p := decode[PlanOut](t, mustOK(t, s, "subscription_app_upsert_plan", myClient))
 	e.plans.decide(p.PlanID, true)

@@ -32,6 +32,8 @@ export type DeviceRef = {
   version: string;
   address: string;
   stale: boolean;
+  /** "" = all through the VPN, "ru-direct" = the Russian services around it. */
+  route: string;
 };
 
 // ---- add ----
@@ -57,6 +59,7 @@ export function AddDeviceModal({
   const [profileId, setProfileId] = useState("");
   const [platform, setPlatform] = useState<string>(() => guessPlatform(navigator.userAgent, navigator.maxTouchPoints));
   const [label, setLabel] = useState("");
+  const [route, setRoute] = useState("");
   const [busy, setBusy] = useState(false);
   const chosen = profiles.find((p) => p.id === profileId)?.id ?? profiles[0]?.id ?? "";
 
@@ -64,11 +67,11 @@ export function AddDeviceModal({
     if (!chosen || busy) return;
     setBusy(true);
     try {
-      const res = await devicesApi.createAwgDevice({ userId, profileId: chosen, platform, label: label.trim() });
+      const res = await devicesApi.createAwgDevice({ userId, profileId: chosen, platform, label: label.trim(), route });
       const d = res.device!;
       onOpenChange(false);
       setLabel("");
-      onCreated({ id: d.id, label: d.model, platform: d.platform, profileName: d.awgProfileName, version: d.awgVersion, address: d.address, stale: d.stale }, res.configs);
+      onCreated({ id: d.id, label: d.model, platform: d.platform, profileName: d.awgProfileName, version: d.awgVersion, address: d.address, stale: d.stale, route: d.awgRoute }, res.configs);
     } catch (e) {
       toast.error(deviceError(e, t));
     } finally {
@@ -114,6 +117,11 @@ export function AddDeviceModal({
         <div className="flex flex-col gap-1.5">
           <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("awg.add.platform")}</span>
           <Select aria-label={t("awg.add.platform")} value={platform} onValueChange={setPlatform} options={platforms.map((p) => ({ value: p, label: platformLabel(p, t) }))} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-bold tracking-[0.1em] text-muted uppercase">{t("awg.add.route")}</span>
+          <Select aria-label={t("awg.add.route")} value={route} onValueChange={setRoute} options={[{ value: "", label: t("awg.add.routeAll") }, { value: "ru-direct", label: t("awg.add.routeRu") }]} />
+          {route !== "" && <span className="text-xs leading-snug text-muted">{t("awg.add.routeHint")}</span>}
         </div>
         <TextField label={t("awg.add.label")} hint={t("awg.add.labelHint")} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={40} placeholder={platformLabel(platform, t)} autoComplete="off" />
         {/* a form with one text field submits on Enter only with a submit button in it */}
@@ -223,6 +231,7 @@ function ConfigsBody({ device, initial, onClose, onChanged }: { device: DeviceRe
   // the path through an entry sits right under the direct config of its node, named "de1 · via RU"; the IPv6 one is "de1 · IPv6"
   const pathOf = (c: DeviceConfig) => (c.viaNodeId ? viaLabel(t, c.viaCountry) : c.ipv6 ? "IPv6" : "");
   const via = pathOf(cfg);
+  const direct = device.route === "ru-direct";
   const nameOf = (c: DeviceConfig) => (pathOf(c) ? `${c.nodeName} · ${pathOf(c)}` : c.nodeName);
   const nodeOptions = configs.map((c) => ({ value: configKey(c), label: nameOf(c), icon: c.countryCode ? <Flag code={c.countryCode} /> : undefined }));
   return (
@@ -230,19 +239,23 @@ function ConfigsBody({ device, initial, onClose, onChanged }: { device: DeviceRe
       <div className="flex flex-wrap gap-1.5">
         <Chip mono>{device.address || "—"}</Chip>
         <Chip>{t("awg.cfg.keyInside")}</Chip>
+        {direct && <Chip>{t("awg.route.ru")}</Chip>}
       </div>
       {cfg.stale && <Notice>{t("awg.cfg.stale")}</Notice>}
       {via && <Notice tone="quiet">{t("awg.cfg.viaNote", { via })}</Notice>}
+      {direct && <Notice tone="quiet">{t("awg.cfg.qrDirect")}</Notice>}
 
       <div className="flex flex-col items-center gap-4 md:flex-row md:items-start">
-        <div className="flex flex-none flex-col items-center gap-2">
-          {qrFailed ? (
-            <p className="max-w-[220px] rounded-xl bg-surface-2 p-3 text-center text-xs leading-snug text-muted">{t("awg.cfg.qrTooLong")}</p>
-          ) : (
-            <QrCode value={cfg.conf} label={t("awg.cfg.qrLabel")} size={252} onFail={() => setQrFailed(true)} />
-          )}
-          <span className="max-w-[240px] text-center text-[11px] leading-snug text-muted">{t("awg.cfg.qrHint")}</span>
-        </div>
+        {direct ? null : (
+          <div className="flex flex-none flex-col items-center gap-2">
+            {qrFailed ? (
+              <p className="max-w-[220px] rounded-xl bg-surface-2 p-3 text-center text-xs leading-snug text-muted">{t("awg.cfg.qrTooLong")}</p>
+            ) : (
+              <QrCode value={cfg.conf} label={t("awg.cfg.qrLabel")} size={252} onFail={() => setQrFailed(true)} />
+            )}
+            <span className="max-w-[240px] text-center text-[11px] leading-snug text-muted">{t("awg.cfg.qrHint")}</span>
+          </div>
+        )}
         <div className="flex w-full min-w-0 flex-1 flex-col gap-2.5">
           {nodeOptions.length > 1 ? (
             <div className="flex flex-col gap-1.5">
