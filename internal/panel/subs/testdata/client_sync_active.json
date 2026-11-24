@@ -76,6 +76,7 @@
     ],
     "split_direct": true,
     "block_ads": false,
+    "block_max": false,
     "ipv4_only": false
   },
   "servers": [

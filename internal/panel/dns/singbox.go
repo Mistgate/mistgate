@@ -46,6 +46,8 @@ type SingboxDNS struct {
 	// BlockSets are the tags of the ad list's rule set (Preset.BlockAds), whose first entry in RuleSets it is: the first DNS rule
 	// answers it NXDOMAIN and the route rule after ip_is_private rejects its connections.
 	BlockSets []string
+	// BlockDomains are the suffixes of Preset.BlockMax: a DNS rule (NXDOMAIN) and a route rule (reject) each, ahead of the rule sets.
+	BlockDomains []string
 	// Notes (English) say what of the preset a sing-box profile cannot carry.
 	Notes []string
 }
@@ -103,6 +105,10 @@ func (p Preset) SingboxDNS(group string) (SingboxDNS, error) {
 	out.Section.Servers = append(out.Section.Servers, singboxServer(main[0], SingboxRemoteTag, group))
 	if n := len(main) - 1; n > 0 {
 		out.Notes = append(out.Notes, fmt.Sprintf("%d fallback resolver(s) dropped: sing-box takes one main resolver", n))
+	}
+	if p.BlockMax {
+		out.BlockDomains = maxDomains
+		out.Section.Rules = append(out.Section.Rules, SingboxDNSRule{DomainSuffix: maxDomains, Action: "predefined", Rcode: "NXDOMAIN"})
 	}
 	if p.BlockAds {
 		// predefined NXDOMAIN, not reject: sing-box turns a DNS reject into drop after 50 hits in 30 s, and the pages then wait out the timeout.

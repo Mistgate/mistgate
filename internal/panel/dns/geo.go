@@ -74,6 +74,10 @@ const (
 	adsTag  = "geosite-" + adsSite
 )
 
+// maxDomains are the own domains of the messenger Max (VK) that a preset with BlockMax makes the apps drop: the site and the API
+// host it reports the VPN to. Suffixes, lower-case. Not sferum.ru (a separate school service that v2fly files under Max) and nothing of VK's.
+var maxDomains = []string{"max.ru", "oneme.ru"}
+
 // Where the rule-set files live. %s is the list name.
 const (
 	mihomoGeositeURL  = "https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/%s.mrs"

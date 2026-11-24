@@ -28,16 +28,16 @@ function panel(w: World, presets: Preset[]) {
   let n = 0;
   const view = (): DnsData => ({ presets: list.map((p) => ({ ...p, isDefault: p.id === def })), providers, clientSupport });
   const server = (s: Preset["servers"][number]) => ({ kind: s.kind, address: s.address, providerVariant: s.providerVariant ?? "" });
-  type Req = { id?: string; name: string; description: string; servers: Preset["servers"]; split: Preset["split"]; ipv4Only: boolean; splitDirect: boolean; blockAds?: boolean; preferredTransport: DnsTransport };
+  type Req = { id?: string; name: string; description: string; servers: Preset["servers"]; split: Preset["split"]; ipv4Only: boolean; splitDirect: boolean; blockAds?: boolean; blockMax?: boolean; preferredTransport: DnsTransport };
   w.patch(dns, {
     listDnsPresets: (async () => view()) as () => unknown,
     createDnsPreset: (async (r: Req) => {
-      const p: Preset = { ...r, id: `dns_own_${++n}`, builtin: false, servers: r.servers.map(server), split: r.split, userCount: 0, isDefault: false, category: DnsCategory.UNSPECIFIED, country: "", blockAds: !!r.blockAds } as Preset;
+      const p: Preset = { ...r, id: `dns_own_${++n}`, builtin: false, servers: r.servers.map(server), split: r.split, userCount: 0, isDefault: false, category: DnsCategory.UNSPECIFIED, country: "", blockAds: !!r.blockAds, blockMax: !!r.blockMax } as Preset;
       list = [...list, p];
       return { preset: p };
     }) as (r: never) => unknown,
     updateDnsPreset: (async (r: Req) => {
-      list = list.map((p) => (p.id === r.id ? ({ ...p, ...r, servers: r.servers.map(server), blockAds: r.blockAds ?? p.blockAds } as Preset) : p));
+      list = list.map((p) => (p.id === r.id ? ({ ...p, ...r, servers: r.servers.map(server), blockAds: r.blockAds ?? p.blockAds, blockMax: r.blockMax ?? p.blockMax } as Preset) : p));
       return { preset: list.find((p) => p.id === r.id) };
     }) as (r: never) => unknown,
     deleteDnsPreset: (async (r: { id: string }) => {

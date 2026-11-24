@@ -163,6 +163,9 @@ message DnsPreset {
   // The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
   // Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
   bool block_ads = 14;
+  // The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
+  // report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
+  bool block_max = 15;
 }
 
 message ListDnsPresetsRequest {}
@@ -191,6 +194,9 @@ message CreateDnsPresetRequest {
   // The apps drop the domains of the community list category-ads-all themselves, before any other rule (Mihomo,
   // Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
   bool block_ads = 8;
+  // The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
+  // report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
+  bool block_max = 9;
 }
 
 message CreateDnsPresetResponse {
@@ -215,6 +221,10 @@ message UpdateDnsPresetRequest {
   // Xray, sing-box, Happ; AmneziaWG keys and the plain link list have no rules).
   // Absent keeps the stored value (clients that predate this field).
   optional bool block_ads = 9;
+  // The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
+  // report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
+  // Absent keeps the stored value.
+  optional bool block_max = 10;
 }
 
 message UpdateDnsPresetResponse {

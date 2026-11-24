@@ -93,17 +93,34 @@ The list is not the same everywhere. Mihomo and sing-box get about 900 domains. 
 
 **Turning it off for one person.** Give them a preset without the flag on the user card (**Access** → **DNS**): their own preset goes before the group's and the default. If people pick their DNS on the page, their own pick comes first: they pick another preset there, or you take this one out of the list. To turn it off for everyone, switch the flag off in the preset.
 
+### The Max messenger
+
+The Russian messenger Max (VK) sends a report to its servers when it starts: the device's public address, a flag that a VPN is running, and the reachability of several sites. So that the app cannot reach its servers while the VPN is on and cannot pass on the address of your node, **Block the Max messenger in the apps** makes the apps drop its own domains `max.ru` and `oneme.ru` (with subdomains) before any other rule, including the "`.ru` direct" rule: otherwise `max.ru` would go direct by its ending. **Max will not work while the VPN is on: that is the point.** The domains of VK, Mail, Odnoklassniki and the school platform Sferum are not touched.
+
+The option is on in the three built-in Russian presets, **Russia: .ru direct**, **Russia: Russian sites direct (community list)** and **Russia: all through VPN** (Max reports the VPN whichever way Russian sites go): after the update it starts working for everyone who uses them. Your own presets do not get it: turn it on in the preset. To turn it off, switch it off in the preset (built-in presets can be edited).
+
+| App | What happens |
+|:--|:--|
+| Apps on the mihomo core | The rules `DOMAIN-SUFFIX,max.ru,REJECT` and `DOMAIN-SUFFIX,oneme.ru,REJECT` are the first in the profile. Not applied in a profile built from a group template: the preset's rules are not added to it. |
+| sing-box JSON | DNS answers these domains with an empty answer and connections to them are rejected. |
+| Xray JSON | `domain:max.ru` and `domain:oneme.ru` go nowhere. |
+| Happ | The same domains among the blocked sites. Happ applies the profile to the whole device, so the block also holds for the person's other subscriptions in Happ. |
+| AmneziaVPN and AmneziaWG keys | **Not applied**: a key holds only DNS addresses, Max works there. |
+| Other base64 apps (v2rayNG, Hiddify, Streisand, Shadowrocket) | **Not applied**: they get no rules from the panel. |
+
+**What the block does not cover.** According to public analyses (Habr, ntc.party), Max also learns the device's public address through third-party services (`api.ipify.org`, `ifconfig.me`, `checkip.amazonaws.com`, Yandex, `ip.mail.ru`), and takes the VPN flag from Android itself. The panel does not block those addresses: other programs need them. The block stops Max from sending what it collected, but if the app moves to other domains or hard-coded addresses, the list will have to be extended. The sources are public and disputed by the company itself, so they cannot be fully verified.
+
 ## The built-in presets
 
 Built-in presets exist on every install. They can be edited, not deleted.
 
 | Category | Preset | What it does |
 |:--|:--|:--|
-| Russia | **Russia: .ru direct** (the built-in default) | `.ru`, `.su`, `.рф`, Yandex, VK and bank domains are asked at Yandex DNS and open directly, bypassing the VPN; everything else goes through the VPN to Cloudflare and Google. For people inside Russia. |
-| Russia | **Russia: all through VPN** | Everything through the VPN, Cloudflare and Google for every domain. For people abroad. |
+| Russia | **Russia: .ru direct** (the built-in default) | `.ru`, `.su`, `.рф`, Yandex, VK and bank domains are asked at Yandex DNS and open directly, bypassing the VPN; everything else goes through the VPN to Cloudflare and Google. For people inside Russia. The Max messenger is blocked (see "The Max messenger"). |
+| Russia | **Russia: all through VPN** | Everything through the VPN, Cloudflare and Google for every domain. For people abroad. The Max messenger is blocked (see "The Max messenger"). |
 | Russia | **Yandex DNS** | Yandex DNS for everything. |
 | China | **China: Chinese sites direct** | The sites of the Chinese lists (see "Country lists") are asked at AliDNS and DNSPod and open directly, bypassing the VPN; everything else goes through the VPN to Cloudflare and Google. For people inside China. Not the default: choose it as the default for everyone, or give it to a group. AliDNS and DNSPod are in the catalog with plain DNS only. |
-| Russia | **Russia: Russian sites direct (community list)** | The same suffixes and Yandex DNS as **Russia: .ru direct**, plus the `ru` country list: the known Russian services of a community list (not every site) open directly, bypassing the VPN, and the app downloads and refreshes the list itself. Everything else goes through the VPN to Cloudflare and Google. Not the default; **Russia: .ru direct** is left as it was. Xray and Happ need the code `category-ru` in the app's `geosite.dat`: an app without it cannot start the config. AmneziaWG keys and the plain link list carry no rules. |
+| Russia | **Russia: Russian sites direct (community list)** | The same suffixes and Yandex DNS as **Russia: .ru direct**, plus the `ru` country list: the known Russian services of a community list (not every site) open directly, bypassing the VPN, and the app downloads and refreshes the list itself. Everything else goes through the VPN to Cloudflare and Google. Not the default; **Russia: .ru direct** is left as it was. Xray and Happ need the code `category-ru` in the app's `geosite.dat`: an app without it cannot start the config. AmneziaWG keys and the plain link list carry no rules. Max is blocked, as in **Russia: .ru direct**. |
 | Regular | **Cloudflare + Google** | Cloudflare and Google for everything. |
 | Regular | **Cloudflare: no filtering**, **Google: no filtering**, **DNS.SB: no filtering** | One provider, no filtering. |
 | No ads | **AdGuard: no ads** | Blocks ads and trackers. |
