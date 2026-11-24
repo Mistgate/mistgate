@@ -8,7 +8,7 @@ description: Memory, CPU, disk, start time and subscription load of Mistgate, 3x
 - **Memory.** Alone on a 1 vCPU / 1 GB panel host, with 0 to 200 users, the Mistgate panel holds 39-44 MiB of private memory, 3x-ui 73-76, PasarGuard 273-277 and Remnawave 436-464. Mistgate is still the smallest, but it is 23 MiB heavier than in October (16-20) and its lead over 3x-ui shrank from 3.7 to 1.8 times. With the VPN core and the database on one server the first two change places: 92 MiB for Mistgate, 81 for 3x-ui, 312 for PasarGuard and 815 for Remnawave (October: 57, 74, 297, 761). The panel binary grew from 62 to 112 MB.
 - **Users and restarts do not touch the tunnel.** Adding and removing users and restarting the panel under a running Hysteria2 tunnel dropped no connection in Mistgate or in Remnawave. 3x-ui restarts its Xray core when users change (512 streams dropped on the bad day) and when its container restarts (128); PasarGuard dropped 128 streams when its panel container restarted.
 - **Tunnel speed is measured this time, on a quiet machine, with and without the core pinned to two physical cores.** With 16 and 64 parallel downloads all four panels reach 5.5 to 6.1 Gbit/s on the 2 vCPU box and Mistgate is 3 to 10 % ahead; with one stream Mistgate carries 5.7 Gbit/s against 3.7 to 4.0 for the others. On the bad day (64 streams while 300 subscription requests per second and one user change per second hit the panel) the tunnel keeps 87-89 % of its speed with Mistgate, 65-66 % with 3x-ui, 53-61 % with PasarGuard and 30-47 % with Remnawave. The repetitions of one panel are within 10 % of each other in every throughput cell, so the numbers are published (see [The tunnel: phases B and D](#the-tunnel-phases-b-and-d)).
-- **Weak spots of Mistgate.** The growth in memory and disk above. A small request inside a loaded tunnel waits 0.6-0.9 ms longer at p95 than with the others (1.9-3.3 ms against 1.1-2.8; the 29 ms of October was a fault of the test setup, see [After the fixes](#after-the-fixes)). Cold start doubled (0.33 to 0.66 s; still the fastest). Creating 1000 users through the API took 38 s, twice the 18 s of 3x-ui (Remnawave 26, PasarGuard 40), mostly because of the admin API rate limit (see the note under the one-server table). The uncached subscription path, which was slow in October, was not measured again on v0.2.1.
+- **Weak spots of Mistgate.** The growth in memory and disk above; where it comes from, and what is already fixed in the main branch, is in [its own section](#where-the-growth-between-v0132-and-v021-comes-from). A small request inside a loaded tunnel waits 0.6-0.9 ms longer at p95 than with the others (1.9-3.3 ms against 1.1-2.8; the 29 ms of October was a fault of the test setup, see [After the fixes](#after-the-fixes)). Cold start doubled (0.33 to 0.66 s; still the fastest). Creating 1000 users through the API took 38 s, twice the 18 s of 3x-ui (Remnawave 26, PasarGuard 40), mostly because of the admin API rate limit (see the note under the one-server table). The uncached subscription path, which was slow in October, was not measured again on v0.2.1.
 - **Subscription throughput of the shipped build is not measured:** it allows 60 fetches per link and hour, so the load test only measured how fast it refuses.
 - One desktop CPU, one WSL2 machine, three repetitions: read [What the numbers do not tell you](#what-the-numbers-do-not-tell-you) before quoting any figure.
 
@@ -45,7 +45,107 @@ Two scenarios:
 | Panel binary or images on disk (MB) | 62 → **112** | 462 → 456 | 462 → 487 | 1551 → 1537 |
 | Cold start, empty data (s) | 0.33 → **0.66** | 2.12 → 2.27 | 11.6 → 11.4 | 14.2 → 13.9 |
 
-  **Mistgate's panel got bigger, in memory and on disk.** Alone it is still the smallest (39-44 MiB against 73-76 for 3x-ui), but the lead over 3x-ui shrank from 3.7 times to 1.8 times, and on one server 3x-ui is now 11 MiB below it. The binary grew from 62 to 112 MB mainly because the panel now links the Xray core (the VLESS engine and the panel's own health helper) and the SDK of the AI assistant, neither of which v0.1.32 had; the larger web interface and the embedded site templates add a few MB. The 23 MiB more private memory at idle was traced only in part: the `init` functions of the packages allocate 7.9 MiB (measured with `GODEBUG=inittrace=1`), the rest was not attributed and is the first thing to look for. The other three panels moved by 3 to 7 %.
+  **Mistgate's panel got bigger, in memory and on disk.** Alone it is still the smallest (39-44 MiB against 73-76 for 3x-ui), but the lead over 3x-ui shrank from 3.7 times to 1.8 times, and on one server 3x-ui is now 11 MiB below it. The memory did not grow because of the Xray core or the SDK of the AI assistant: builds without them differ from the full one by 1-2 MiB, which is within the noise of that test. More than half of the growth is the tool schemas of the panel's MCP servers, which the panel built at start (716 tool registrations); the rest is spread over the Go heap, the runtime and SQLite. The binary grew from 62 to 112 MB, and there the cause is code: 23 MB of the 50 come from a single import in the HTTP outbound of the Xray-core fork, the AI assistant's SDK, the larger web interface and the embedded site templates add the rest. The other three panels moved by 3 to 7 %. The breakdown with the figures is in [Where the growth between v0.1.32 and v0.2.1 comes from](#where-the-growth-between-v0132-and-v021-comes-from).
+
+## Where the growth between v0.1.32 and v0.2.1 comes from
+
+A separate analysis of 24 November 2026, on the same machine and with the same protocol as the tables of this page: the panel alone in a slice of 1 vCPU / 1 GB, 300 s of idle, a window of 60 s, 3 repetitions, medians with the minimum and maximum in brackets. v0.1.32 and v0.2.1 were measured side by side. The tables of this page are not changed by it: they are the measurements of the released v0.2.1.
+
+### Panel memory
+
+| Private memory, panel only (MiB) | 0 users | 200 users |
+|:--|--:|--:|
+| v0.1.32 | 16.3 (16.1-16.6) | 20.5 (20.1-20.8) |
+| v0.2.1 | 36.9 (36.0-37.1) | 41.5 (40.7-41.7) |
+| v0.2.1 with the MCP servers built on first use (test build) | 25.3 (25.2-25.4) | 30.1 (30.0-30.2) |
+
+The same v0.2.1 binary showed 39 / 44 MiB in the main series above, 2.5 MiB more than here: that is the spread between two series, not a difference between builds. The growth is 20.6 MiB with no users and 21.0 with 200. Where the 21.0 MiB at 200 users goes:
+
+| Part | Growth (MiB) |
+|:--|--:|
+| Live heap (what the Go program really holds) | +11.2 |
+| Heap above the live part (garbage until the next collection, fragmentation) | +6.9 |
+| Free pages of the heap | -0.3 |
+| Stacks and runtime bookkeeping | +1.4 |
+| Outside the Go heap (SQLite, libc) | +2.2 |
+
+The rows add up to 21.4 against 21.0 measured: the estimates carry an error of about 1 MiB. The live heap, +11.2 MiB, by owner:
+
+| Owner of the live heap | Growth (MiB) |
+|:--|--:|
+| MCP servers (tool schemas) | +5.6 |
+| `init` of all other packages | +1.8 |
+| Protobuf descriptions and connect handlers | +2.0 |
+| Log ring | +0.62 |
+| Release list | +0.46 |
+| Template of the subscription page | +0.28 |
+| Everything else | +0.4 |
+
+**The main cause is the MCP servers.** At start the panel built two sets of them, one for the HTTP endpoint and one for the built-in assistant, three profiles each: 716 tool registrations, every one with its schema, whether or not anyone ever called it. Building them on first use, in the same protocol, takes 11.6 MiB off with no users and 11.4 MiB with 200 (the last row of the first table).
+
+**The Xray core and the assistant's SDK are not the cause of the memory growth.** Builds without them, measured at the 100th second on an empty database, 3 repetitions: without the Xray core -1.0 MiB, without the SDK -2.1 MiB, without both -1.0 MiB, with a noise of about 2 MiB. They matter for the binary, not for memory.
+
+With 1000 users another 5 MiB or so of the panel were held by the gzip writers of the stream from the panel to the node.
+
+### One server, by process
+
+Panel and node on one server, 1000 users, the node started natively (not in a container as in the one-server tests above). The spread was recorded only for the node.
+
+| Private memory (MiB) | v0.1.32 | v0.2.1 |
+|:--|--:|--:|
+| Slice, no traffic | 49.7 | 78.5 |
+| Panel, no traffic | 37.0 | 67.0 |
+| Node, no traffic | 10.9 (10.0-11.2) | 10.7 (10.0-11.0) |
+| Slice, after 5 s of traffic | 56.0 | 84.6 |
+| Panel, after 5 s of traffic | 36.0 | 62.2 |
+| Node, after 5 s of traffic | 16.9 | 19.4 |
+
+The growth is in the panel (+30 MiB at rest); the node did not grow at rest. The panel's share includes the gzip writers mentioned above.
+
+### Binary size
+
+61.94 MB in v0.1.32, 111.66 MB in v0.2.1 (+49.7 MB).
+
+| Part | Size (MB) |
+|:--|--:|
+| One `text/template` import in the HTTP outbound of the Xray-core fork: with it the linker keeps every exported method of every type of the program | 23.4 |
+| The AI assistant's SDK | 5.4-9.2 |
+| The Xray code itself | about 4 |
+| Embedded web interface | +5.8 |
+| Embedded site templates | +1.9 |
+| Mistgate's own code (the text of the binary, MiB) | +6.1 |
+
+### Cold start
+
+Setup and serve until the panel is ready, 9 repetitions.
+
+| Cold start, empty data (s) | v0.1.32 | v0.2.1 |
+|:--|--:|--:|
+| Started directly, no `systemd-run` | 0.134 | 0.417 |
+| Through `systemd-run` | 0.229 | 0.516 |
+| In the table above (3 repetitions, `systemd-run`) | 0.33 | 0.66 |
+
+The absolute figures differ between the three rows, the ratio is the same, about 2.2 times. Of the 0.28 s of growth:
+
+| Part | Cost |
+|:--|:--|
+| Applying migrations to an empty database: 145 against 47 | 266 ms against 62 ms (+0.20 s) |
+| Building the panel (mostly the MCP servers) | +64 ms |
+| `init` of the packages | +9 ms |
+
+### What did not add up
+
+- 2.5 MiB between the series: this analysis gives 36.9 / 41.5 MiB for v0.2.1, the main series above 39 / 44, same binary.
+- 6.4 MiB on one server: the one-server pair of the page (57 to 92) grew by about 6.4 MiB more than the pair above (the page's figures are rounded). The set-ups differ (there the node ran in a container, here natively), and the difference was not explained.
+- About 0.9 MiB of the memory growth are not attributed to any part; the estimates have an error of about 1 MiB.
+
+### Fixed after v0.2.1
+
+These changes are in the main branch, were **not** in the v0.2.1 release, and the tables of this page do not include them. The summary table will be measured again on the next release.
+
+- The MCP servers are built on first use, one set for the endpoint and the assistant together. The panel on an empty database at the 100th second: 42.5 to 29.4 MiB (3 repetitions: 42.6 / 42.5 / 42.0 before, 30.5 / 29.4 / 29.0 after); readiness 0.15 to 0.09 s.
+- Messages from the panel to the node shorter than 16 KiB are not compressed. The effect at 1000 users in this form was not measured.
+- The Xray-core fork no longer imports `text/template`: the panel binary without the embedded interface is 80.0 MB instead of 103.4 MB.
 
 ## Results: panel only (1 vCPU, 1 GB)
 
@@ -247,7 +347,7 @@ The small-request latency inside a loaded tunnel (phase B: 29 ms at p95 in two o
 
 Open work:
 
-1. Find where the extra 23 MiB of idle private memory of v0.2.1 comes from (39-44 MiB against 16-20 in v0.1.32). The `init` functions of the packages allocate 7.9 MiB of it; the rest is not attributed.
+1. Measure the whole protocol of this page again on the next release (the fixes of the main branch are not in v0.2.1); explain the 6.4 MiB by which the one-server growth on this page exceeds the growth in the analysis (the node runs in a container here, natively there); fold the 145 migrations into a shorter chain, which is most of the slower cold start. See [Where the growth between v0.1.32 and v0.2.1 comes from](#where-the-growth-between-v0132-and-v021-comes-from).
 2. Measure the uncached subscription path and the supplementary builds again on v0.2.1, and the cold-cache pass.
 3. Look at the one-stream gap of the tunnel (5.7 Gbit/s against 3.7-4.0): it is in Mistgate's favour, but no cause has been found.
 
