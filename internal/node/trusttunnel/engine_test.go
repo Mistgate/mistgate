@@ -831,11 +831,11 @@ func TestUDPFlowLimitEvictsAndClosesOldestSocket(t *testing.T) {
 		outbound.mu.Unlock()
 		t.Fatalf("created UDP sockets = %d, want %d", len(outbound.udpSockets), maxUDPFlows+1)
 	}
-	oldestClosed := outbound.udpSockets[0].isClosed.Load()
+	oldest := outbound.udpSockets[0]
 	outbound.mu.Unlock()
-	if !oldestClosed {
-		t.Fatal("oldest UDP flow socket was not closed on eviction")
-	}
+	// The egress counts a socket when it opens it; the engine closes the evicted one just after, before the
+	// datagram goes out, so the closing is awaited rather than read at once.
+	waitFor(t, 2*time.Second, func() bool { return oldest.isClosed.Load() })
 	_ = writer.Close()
 	_ = response.Body.Close()
 }
