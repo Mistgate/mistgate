@@ -212,6 +212,7 @@ type core struct {
 	upd                *update.Service
 	wsv                *warp.Service
 	asst               assistantRPC
+	mcpServers         mcpServerSet // the MCP servers of the profiles, shared by the endpoint and the assistant (VPS only)
 	assistantRetention assistantRetention
 	sched              scheduledTasks // the scheduled tasks (VPS only; nil on the edge)
 	desired            func(ctx context.Context, nodeID string) ([]statehash.Inbound, error)

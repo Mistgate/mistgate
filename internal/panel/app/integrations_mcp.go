@@ -13,11 +13,17 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
+// mcpServerSet holds the MCP servers of the profiles; the endpoint and the assistant share one, so a profile is built once,
+// on first use, for both.
+type mcpServerSet = *mcp.ServerSet
+
+func newMCPServerSet() mcpServerSet { return new(mcp.ServerSet) }
+
 // mcpEndpoint is httpserver.Config.MCP: the MCP handler behind the bearer middleware of auth.
 // onWaiting (may be nil) is told when a plan starts waiting for the owner's approval (the Telegram alert).
-func mcpEndpoint(authSvc *auth.Service, st *store.Store, limiter securitylimit.Limiter, log *slog.Logger, onWaiting func(tool, tokenName string), now func() time.Time) func(api http.Handler) http.Handler {
+func mcpEndpoint(authSvc *auth.Service, st *store.Store, limiter securitylimit.Limiter, log *slog.Logger, onWaiting func(tool, tokenName string), now func() time.Time, servers mcpServerSet) func(api http.Handler) http.Handler {
 	return func(api http.Handler) http.Handler {
-		h, err := mcp.New(mcpConfig(authSvc, st, limiter, log, onWaiting, now, api))
+		h, err := mcp.New(mcpConfig(authSvc, st, limiter, log, onWaiting, now, api, servers))
 		if err != nil {
 			// New fails only on a missing part, a programming error: serve nothing rather than something unguarded.
 			log.Error("mcp endpoint is off", "err", err)

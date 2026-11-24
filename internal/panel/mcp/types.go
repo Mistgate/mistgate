@@ -132,4 +132,7 @@ type Config struct {
 	UserChangeBudget func(ctx context.Context) (used, limit int, exempt bool, err error)
 	Now              func() time.Time // default time.Now
 	Log              *slog.Logger
+	// Servers (optional) is shared by New and NewAssistant so each profile's tools are built once for both; nil gives each
+	// constructor its own set. Both must then get equivalent Configs.
+	Servers *ServerSet
 }
