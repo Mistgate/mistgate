@@ -143,6 +143,9 @@ func (s *Service) EffectiveOnNode(ctx context.Context, userID, nodeID string) (P
 // shown as it is). The provider catalog's own English names ("Default", "Basic") do not say what a preset is for. The
 // names are the ones the admin shows (web/src/screens/subscriptions/model.ts builtinNames): both are pinned to
 // testdata/builtin_names.json by a test on each side. Only the descriptions below are the user page's alone.
+// Seven of them (dns_builtin_yandex and six of 00011: the unfiltered Cloudflare, Google and DNS.SB, the three family ones) are no longer
+// built-ins (00157): one that was assigned or changed stays as the owner's own preset under its id, and its stock name and description
+// still read in the visitor's language, so the words stay.
 var builtinNames = map[string]struct{ ru, en, zh, fa, tr string }{
 	"dns_builtin_ru_split":   {"Россия: .ru напрямую", "Russia: .ru direct", "俄罗斯：.ru 直连", "روسیه: ‎.ru مستقیم", "Rusya: .ru doğrudan"},
 	"dns_builtin_ru_proxied": {"Россия: всё через VPN", "Russia: all through VPN", "俄罗斯：全部经 VPN", "روسیه: همه‌چیز از راه VPN", "Rusya: her şey VPN üzerinden"},
@@ -162,13 +165,19 @@ var builtinNames = map[string]struct{ ru, en, zh, fa, tr string }{
 	"dns_builtin_opendns_family":      {"OpenDNS FamilyShield: без 18+", "OpenDNS FamilyShield: no 18+", "OpenDNS FamilyShield：无成人内容", "OpenDNS FamilyShield: بدون محتوای بزرگسالان", "OpenDNS FamilyShield: +18 yok"},
 	"dns_builtin_cloudflare_security": {"Cloudflare Security: защита от вредоносных", "Cloudflare Security: malware blocking", "Cloudflare Security：拦截恶意网站", "Cloudflare Security: مسدودسازی بدافزار", "Cloudflare Security: zararlı yazılım engeli"},
 	"dns_builtin_yandex_safe":         {"Яндекс безопасный: защита от вредоносных", "Yandex Safe: malware blocking", "Yandex Safe：拦截恶意网站", "Yandex Safe: مسدودسازی بدافزار", "Yandex Safe: zararlı yazılım engeli"},
+	// 00158_dns_builtin_countries.sql
+	"dns_builtin_ir_split": {"Иран: иранские сайты напрямую", "Iran: Iranian sites direct", "伊朗：伊朗网站直连", "ایران: سایت‌های ایرانی مستقیم", "İran: İran siteleri doğrudan"},
+	"dns_builtin_tr_split": {"Турция: .tr напрямую", "Turkey: .tr direct", "土耳其：.tr 直连", "ترکیه: ‎.tr مستقیم", "Türkiye: .tr doğrudan"},
+	"dns_builtin_kz_split": {"Казахстан: .kz напрямую", "Kazakhstan: .kz direct", "哈萨克斯坦：.kz 直连", "قزاقستان: ‎.kz مستقیم", "Kazakistan: .kz doğrudan"},
+	"dns_builtin_by_split": {"Беларусь: .by напрямую", "Belarus: .by direct", "白俄罗斯：.by 直连", "بلاروس: ‎.by مستقیم", "Belarus: .by doğrudan"},
+	"dns_builtin_uz_split": {"Узбекистан: .uz напрямую", "Uzbekistan: .uz direct", "乌兹别克斯坦：.uz 直连", "ازبکستان: ‎.uz مستقیم", "Özbekistan: .uz doğrudan"},
 	// 00088_dns_builtin_ads_device.sql
 	"dns_builtin_ads_device": {"Без рекламы на устройстве", "No ads on the device", "设备端拦截广告", "مسدودسازی تبلیغ روی دستگاه", "Cihazda reklam engeli"},
 }
 
 // NameIn is the name of the preset in the language of the page.
 func (p Preset) NameIn(lang string) string {
-	if b, ok := builtinNames[p.ID]; ok && p.Builtin && p.Name == b.ru {
+	if b, ok := builtinNames[p.ID]; ok && p.Name == b.ru { // not only a built-in: a retired one stays under its id (00157)
 		switch lang {
 		case "ru":
 			return b.ru
@@ -207,6 +216,12 @@ var builtinDescriptions = map[string]struct{ en, zh, fa, tr string }{
 	"dns_builtin_opendns_family":      {"OpenDNS FamilyShield: no 18+ content", "OpenDNS FamilyShield：拦截成人内容", "OpenDNS FamilyShield: بدون محتوای بزرگسالان", "OpenDNS FamilyShield: 18+ içerik yok"},
 	"dns_builtin_cloudflare_security": {"Cloudflare Security: blocks malware domains", "Cloudflare Security：拦截恶意域名", "Cloudflare Security: دامنه‌های بدافزار را مسدود می‌کند", "Cloudflare Security: zararlı alan adlarını engeller"},
 	"dns_builtin_yandex_safe":         {"Yandex DNS, safe mode: no malware, no fraud sites", "Yandex DNS 安全模式：拦截恶意和诈骗网站", "Yandex DNS، حالت امن: بدون بدافزار و سایت‌های کلاهبرداری", "Yandex DNS, güvenli mod: zararlı yazılım ve dolandırıcılık sitesi yok"},
+	// 00158_dns_builtin_countries.sql
+	"dns_builtin_ir_split": {"Iranian sites direct by a community list, everything else through the VPN; the app downloads and updates the list itself", "按社区列表直连伊朗网站，其余走 VPN；列表由应用自行下载和更新", "سایت‌های ایرانی طبق فهرست جامعه مستقیم، بقیه از طریق VPN؛ برنامه فهرست را خودش دانلود و به‌روز می‌کند", "Topluluk listesine göre İran siteleri doğrudan, geri kalan her şey VPN üzerinden; liste uygulama tarafından indirilir ve güncellenir"},
+	"dns_builtin_tr_split": {"Sites on .tr direct, everything else through the VPN", ".tr 网站直连，其余走 VPN", "سایت‌های ‎.tr مستقیم، بقیه از طریق VPN", ".tr siteleri doğrudan, geri kalan her şey VPN üzerinden"},
+	"dns_builtin_kz_split": {"Sites on .kz and .қаз direct, everything else through the VPN", ".kz 和 .қаз 网站直连，其余走 VPN", "سایت‌های ‎.kz و ‎.қаз مستقیم، بقیه از طریق VPN", ".kz ve .қаз siteleri doğrudan, geri kalan her şey VPN üzerinden"},
+	"dns_builtin_by_split": {"Sites on .by and .бел direct, everything else through the VPN", ".by 和 .бел 网站直连，其余走 VPN", "سایت‌های ‎.by و ‎.бел مستقیم، بقیه از طریق VPN", ".by ve .бел siteleri doğrudan, geri kalan her şey VPN üzerinden"},
+	"dns_builtin_uz_split": {"Sites on .uz direct, everything else through the VPN", ".uz 网站直连，其余走 VPN", "سایت‌های ‎.uz مستقیم، بقیه از طریق VPN", ".uz siteleri doğrudan, geri kalan her şey VPN üzerinden"},
 	// 00088_dns_builtin_ads_device.sql
 	"dns_builtin_ads_device": {"The app drops ads and trackers by the category-ads-all list; Cloudflare and Google for DNS", "应用按 category-ads-all 列表自行拦截广告和跟踪器；DNS 使用 Cloudflare 和 Google", "برنامه تبلیغات و ردیاب‌ها را با فهرست category-ads-all حذف می‌کند؛ DNS از Cloudflare و Google", "Uygulama reklamları ve izleyicileri category-ads-all listesiyle engeller; DNS için Cloudflare ve Google"},
 }
@@ -215,7 +230,7 @@ var builtinDescriptions = map[string]struct{ en, zh, fa, tr string }{
 // split; a description of an owner's own preset is one text, shown in any language.
 func (p Preset) DescriptionIn(lang string) string {
 	ru, en, ok := strings.Cut(p.Description, "\n")
-	if !p.Builtin || !ok {
+	if _, known := builtinDescriptions[p.ID]; !ok || (!p.Builtin && !known) { // a retired built-in keeps its two-language text (00157)
 		return strings.TrimSpace(p.Description)
 	}
 	if lang == "ru" {

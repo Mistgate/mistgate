@@ -219,7 +219,7 @@ const pageApps = boardApps.map(([plat, name, len, rec]) => ({
   description: "x".repeat(len),
   recommended: rec,
 }));
-const pageSettings = (over: Record<string, unknown> = {}, offer: { presetIds: string[]; defaultPresetId: string } = { presetIds: ["dns_builtin_cloudflare", "dns_builtin_quad9", "dns_builtin_adblock"], defaultPresetId: "dns_builtin_cloudflare" }) =>
+const pageSettings = (over: Record<string, unknown> = {}, offer: { presetIds: string[]; defaultPresetId: string } = { presetIds: ["dns_builtin_ru_split", "dns_builtin_quad9", "dns_builtin_adblock"], defaultPresetId: "dns_builtin_ru_split" }) =>
   (w: World) => {
     w.settings = { ...w.settings, apps: pageApps, userPage: { showAnnouncement: true, showSupport: true, showQr: true, allowDeviceSelfService: true, requirePagePassword: false, allowDnsChoice: false, ...over }, linkDns: offer } as unknown as Settings;
     const data: DnsData = { presets: boardPresets, providers, clientSupport } as unknown as DnsData;

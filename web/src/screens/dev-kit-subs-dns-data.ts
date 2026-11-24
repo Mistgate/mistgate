@@ -50,22 +50,25 @@ export const rule = (suffixes: string[], servers: DnsServerN[], geo: string[] = 
 
 type Make = Partial<Preset> & { id: string; name: string };
 const preset = (p: Make): Preset => ({
-  description: "", builtin: true, servers: [], split: [], ipv4Only: false, userCount: 0, isDefault: false, splitDirect: false, preferredTransport: DnsTransport.PLAIN, category: DnsCategory.REGULAR, country: "", blockAds: false, blockMax: false, ...p,
+  description: "", builtin: true, servers: [], split: [], ipv4Only: false, userCount: 0, isDefault: false, splitDirect: false, preferredTransport: DnsTransport.PLAIN, category: DnsCategory.REGULAR, country: "", blockAds: false, blockMax: false, torrentDirect: false, ...p,
 });
 
 /** The ids the board's "Как выбрать" names. */
-export const ids = { cf: "dns_builtin_cloudflare", q9: "dns_builtin_quad9", ag: "dns_builtin_adblock", fam: "dns_builtin_cloudflare_family", ru: "dns_builtin_ru_split", proxied: "dns_builtin_ru_proxied", ruGeo: "dns_builtin_ru_geo", geoOwn: "dns_own_geo", ads: "dns_builtin_ads_device", office: "dns_own_office", long: "dns_own_long", cn: "dns_own_cn" } as const;
+export const ids = { cf: "dns_builtin_cloudflare", q9: "dns_builtin_quad9", ag: "dns_builtin_adblock", fam: "dns_builtin_family", ru: "dns_builtin_ru_split", proxied: "dns_builtin_ru_proxied", ruGeo: "dns_builtin_ru_geo", geoOwn: "dns_own_geo", ads: "dns_builtin_ads_device", office: "dns_own_office", long: "dns_own_long", cn: "dns_own_cn" } as const;
 
-/** The board's five presets of the list (Cloudflare the default, "Россия" with the split), under the panel's own ids and names. */
+/**
+ * The board's five presets of the list under the panel's own ids and names: "Россия: .ru напрямую" the default (a built-in), and "Cloudflare" as
+ * it is after migration 00157 on a panel that used it: one of the seven retired built-ins that stayed as the owner's own preset (no «встроенный»).
+ */
 export const boardPresets: Preset[] = [
-  preset({ id: ids.cf, name: "Cloudflare: без фильтров", description: "Быстрый публичный резолвер\nFast public resolver", servers: [cat("cloudflare/standard")], preferredTransport: DnsTransport.DOH, userCount: 3, isDefault: true }),
-  preset({ id: ids.q9, name: "Quad9: защита от вредоносных", description: "С блокировкой вредоносных доменов\nBlocks malicious domains", servers: [cat("quad9/standard")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.SECURITY }),
-  preset({ id: ids.ag, name: "AdGuard: без рекламы", description: "Режет рекламу и трекеры на уровне DNS\nCuts ads and trackers at the DNS level", servers: [cat("adguard/default")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.NO_ADS, blockAds: false }),
-  preset({ id: ids.fam, name: "Cloudflare Family: без вредоносных и 18+", description: "Cloudflare Family: без взрослых сайтов\nCloudflare Family: no adult sites", servers: [cat("cloudflare/family")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.FAMILY }),
   preset({
     id: ids.ru, name: "Россия: .ru напрямую", description: "Российские домены через Яндекс, остальное через Cloudflare\nRussian domains through Yandex, the rest through Cloudflare",
-    servers: [cat("cloudflare/standard")], split: [rule([".ru", ".su", ".xn--p1ai"], [cat("yandex/basic")])], splitDirect: true, preferredTransport: DnsTransport.DOH, category: DnsCategory.REGIONAL, country: "RU",
+    servers: [cat("cloudflare/standard")], split: [rule([".ru", ".su", ".xn--p1ai"], [cat("yandex/basic")])], splitDirect: true, preferredTransport: DnsTransport.DOH, category: DnsCategory.REGIONAL, country: "RU", userCount: 3, isDefault: true, blockMax: true,
   }),
+  preset({ id: ids.cf, name: "Cloudflare: без фильтров", description: "Cloudflare 1.1.1.1: быстрый DNS без фильтров\nCloudflare 1.1.1.1: fast DNS, no filtering", builtin: false, servers: [cat("cloudflare/standard")], preferredTransport: DnsTransport.DOH, userCount: 3 }),
+  preset({ id: ids.q9, name: "Quad9: защита от вредоносных", description: "С блокировкой вредоносных доменов\nBlocks malicious domains", servers: [cat("quad9/standard")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.SECURITY }),
+  preset({ id: ids.ag, name: "AdGuard: без рекламы", description: "Режет рекламу и трекеры на уровне DNS\nCuts ads and trackers at the DNS level", servers: [cat("adguard/default")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.NO_ADS, blockAds: false }),
+  preset({ id: ids.fam, name: "AdGuard Family: без рекламы и 18+", description: "AdGuard Family: без рекламы и сайтов для взрослых\nAdGuard Family: no ads, no adult sites", servers: [cat("adguard/family")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.FAMILY }),
 ];
 
 const proxied = preset({
@@ -80,6 +83,20 @@ export const cnSplit = preset({
   id: "dns_builtin_cn_split", name: "Китай: китайские сайты напрямую", description: "Китайские сайты через AliDNS, остальное через Cloudflare\nChinese sites through AliDNS, the rest through Cloudflare",
   servers: [cat("cloudflare/standard")], split: [rule([], [cat("alidns/standard")], ["cn"])], splitDirect: true, category: DnsCategory.REGIONAL, country: "CN",
 });
+
+/** The five country built-ins of migration 00158: Iran by the list ir, the others by the endings of their domains. */
+const countrySplit = (code: string, name: string, description: string, suffixes: string[], geo: string[] = []) =>
+  preset({
+    id: `dns_builtin_${code.toLowerCase()}_split`, name, description, servers: [cat("cloudflare/standard")], split: [rule(suffixes, [cat("google/standard")], geo)],
+    splitDirect: true, category: DnsCategory.REGIONAL, country: code,
+  });
+export const countryPresets: Preset[] = [
+  countrySplit("IR", "Иран: иранские сайты напрямую", "Иранские сайты напрямую по списку сообщества, остальное через VPN; приложение само скачивает и обновляет список\nIranian sites direct by a community list, everything else through the VPN", [], ["ir"]),
+  countrySplit("TR", "Турция: .tr напрямую", "Сайты на .tr напрямую, остальное через VPN\nSites on .tr direct, everything else through the VPN", [".tr"]),
+  countrySplit("KZ", "Казахстан: .kz напрямую", "Сайты на .kz и .қаз напрямую, остальное через VPN\nSites on .kz and .қаз direct, everything else through the VPN", [".kz", ".xn--80ao21a"]),
+  countrySplit("BY", "Беларусь: .by напрямую", "Сайты на .by и .бел напрямую, остальное через VPN\nSites on .by and .бел direct, everything else through the VPN", [".by", ".xn--90ais"]),
+  countrySplit("UZ", "Узбекистан: .uz напрямую", "Сайты на .uz напрямую, остальное через VPN\nSites on .uz direct, everything else through the VPN", [".uz"]),
+];
 
 /** The built-in "Russia: Russian sites direct (community list)": the suffixes of the stock split plus the country list "ru". */
 const ruGeo = preset({
@@ -97,7 +114,7 @@ export const geoOwn = preset({
 /** An own preset: the Office (a catalog server, a plain one, a split to Yandex, ads blocked), the one that has a person or two. */
 export const office = preset({
   id: ids.office, name: "Офис", description: "Для офиса в Москве", builtin: false, servers: [cat("quad9/standard"), own("203.0.113.53")], split: [rule([".ru", ".рф"], [own("203.0.113.77")])],
-  splitDirect: true, blockAds: true, userCount: 4, category: DnsCategory.UNSPECIFIED,
+  splitDirect: true, blockAds: true, torrentDirect: true, userCount: 4, category: DnsCategory.UNSPECIFIED,
 });
 
 /** What the panel shows when it has been used a while: the board's five, the other built-ins, and presets of its own with people on them. */
@@ -107,6 +124,7 @@ export const manyPresets: Preset[] = [
   proxied,
   adsDevice,
   cnSplit,
+  ...countryPresets,
   office,
   geoOwn,
   preset({ id: "dns_own_kids", name: "Детский", description: "Для детей и школы", builtin: false, servers: [cat("cloudflare/family"), cat("yandex/family")], preferredTransport: DnsTransport.DOT, userCount: 6, category: DnsCategory.UNSPECIFIED }),

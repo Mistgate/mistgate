@@ -28,6 +28,7 @@ const stripes: Record<string, Stripes> = {
   RO: { v: ["#002b7f", "#fcd116", "#ce1126"] },
   BE: { v: ["#000", "#fdda24", "#ef3340"] },
   IR: { h: ["#239f40", "#fff", "#da0000"] },
+  UZ: { h: ["#0099b5", "#ce1126", "#fff", "#ce1126", "#1eb53a"], w: [8, 0.5, 7, 0.5, 8] },
   MD: { v: ["#0046ae", "#ffd200", "#cc092f"] },
   RS: { h: ["#c6363c", "#0c4076", "#fff"] },
   SK: { h: ["#fff", "#0b4ea2", "#ee1c25"] },

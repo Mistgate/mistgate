@@ -101,11 +101,15 @@ func quotedSeqOf(vs []string) *yaml.Node {
 	return n
 }
 
-// MihomoAutoGroup is the url-test group over members (the one definition of it: the built-in profile and a template both use it).
-func MihomoAutoGroup(name string, members []string) *yaml.Node {
+// MihomoAutoGroup is the url-test group over members (the one definition of it: the built-in profile and a template both use it);
+// interval is the seconds between its checks, 0 = the default.
+func MihomoAutoGroup(name string, members []string, interval int) *yaml.Node {
+	if interval <= 0 {
+		interval = DefaultAutoInterval
+	}
 	return mapOf(
 		strNode("name"), quotedNode(name), strNode("type"), strNode("url-test"), strNode("proxies"), quotedSeqOf(members),
-		strNode("url"), quotedNode(autoURL), strNode("interval"), intNode(300), strNode("tolerance"), intNode(50),
+		strNode("url"), quotedNode(autoURL), strNode("interval"), intNode(interval), strNode("tolerance"), intNode(50),
 		strNode("lazy"), &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"}, strNode("timeout"), intNode(5000),
 	)
 }
@@ -361,6 +365,8 @@ type MihomoServer struct {
 type MihomoOptions struct {
 	// AutoSelect adds the Auto group (link_auto_select), unless the template has a name Auto.
 	AutoSelect bool
+	// AutoInterval is the seconds between the checks of the Auto group; 0 = the default.
+	AutoInterval int
 	// DNS is the dns section to add when the template has none (absent or null); nil adds nothing.
 	DNS *yaml.Node
 }
@@ -420,7 +426,7 @@ func ApplyMihomoTemplate(text string, servers []MihomoServer, opt MihomoOptions)
 	if addAuto {
 		g := list("proxy-groups")
 		g.Style = 0
-		g.Content = append(g.Content, MihomoAutoGroup(AutoName, names))
+		g.Content = append(g.Content, MihomoAutoGroup(AutoName, names, opt.AutoInterval))
 	}
 	if opt.DNS != nil {
 		if v, i := rootValue(t.root, "dns"); v == nil {

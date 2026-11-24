@@ -166,6 +166,10 @@ message DnsPreset {
   // The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
   // report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
   bool block_max = 15;
+  // The apps send the traffic of torrent clients direct, past the VPN, after the ad and Max blocks and before the split: Mihomo and sing-box
+  // by the name of the program (and the Android package) and by the public trackers, Xray by the BitTorrent protocol and the trackers; Happ and
+  // AmneziaWG keys and the plain link list have no such rules. Off by default: the person's real address is then seen in the swarm.
+  bool torrent_direct = 16;
 }
 
 message ListDnsPresetsRequest {}
@@ -197,6 +201,10 @@ message CreateDnsPresetRequest {
   // The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
   // report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
   bool block_max = 9;
+  // The apps send the traffic of torrent clients direct, past the VPN, after the ad and Max blocks and before the split: Mihomo and sing-box
+  // by the name of the program (and the Android package) and by the public trackers, Xray by the BitTorrent protocol and the trackers; Happ and
+  // AmneziaWG keys and the plain link list have no such rules. Off by default: the person's real address is then seen in the swarm.
+  bool torrent_direct = 10;
 }
 
 message CreateDnsPresetResponse {
@@ -225,6 +233,11 @@ message UpdateDnsPresetRequest {
   // report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
   // Absent keeps the stored value.
   optional bool block_max = 10;
+  // The apps send the traffic of torrent clients direct, past the VPN, after the ad and Max blocks and before the split: Mihomo and sing-box
+  // by the name of the program (and the Android package) and by the public trackers, Xray by the BitTorrent protocol and the trackers; Happ and
+  // AmneziaWG keys and the plain link list have no such rules. Off by default: the person's real address is then seen in the swarm.
+  // Absent keeps the stored value.
+  optional bool torrent_direct = 11;
 }
 
 message UpdateDnsPresetResponse {

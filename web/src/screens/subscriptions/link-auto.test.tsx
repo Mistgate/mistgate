@@ -26,10 +26,10 @@ afterEach(() => {
   for (const m of [getSubscriptionSettings, updateSubscriptionSettings]) m.mockReset();
 });
 
-const settings = (linkAutoSelect: boolean | undefined) => ({ title: "", rules: [], apps: [], linkAutoSelect }) as unknown as Settings;
+const settings = (linkAutoSelect: boolean | undefined, linkAutoInterval?: number) => ({ title: "", rules: [], apps: [], linkAutoSelect, linkAutoInterval }) as unknown as Settings;
 
-async function mount(linkAutoSelect: boolean | undefined) {
-  getSubscriptionSettings.mockResolvedValue({ settings: settings(linkAutoSelect), effectiveTitle: "" });
+async function mount(linkAutoSelect: boolean | undefined, interval?: number) {
+  getSubscriptionSettings.mockResolvedValue({ settings: settings(linkAutoSelect, interval), effectiveTitle: "" });
   updateSubscriptionSettings.mockImplementation(async (r: { settings: Settings }) => ({ settings: r.settings }));
   host = document.createElement("div");
   document.body.append(host);
@@ -39,7 +39,7 @@ async function mount(linkAutoSelect: boolean | undefined) {
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <LinkAutoCard settings={settings(linkAutoSelect)} />
+          <LinkAutoCard settings={settings(linkAutoSelect, interval)} />
         </ToastProvider>
       </QueryClientProvider>,
     ),
@@ -70,5 +70,23 @@ describe("Automatic server choice", () => {
     await click(toggle());
     await settle();
     expect(saved()).toBe(true);
+  });
+});
+
+describe("Interval of the Auto checks", () => {
+  const radio = (label: string) => [...document.querySelectorAll("[role=radio]")].find((e) => e.textContent === label)!;
+  const savedInterval = () => (updateSubscriptionSettings.mock.calls.at(-1)?.[0] as { settings: Settings } | undefined)?.settings.linkAutoInterval;
+  it("reads 5 minutes when the settings predate the choice, and saves the picked one at once", async () => {
+    await mount(true);
+    expect(radio("5 min").getAttribute("aria-checked")).toBe("true");
+    await click(radio("1 min"));
+    await settle();
+    expect(savedInterval()).toBe(60);
+  });
+
+  it("shows the saved choice", async () => {
+    await mount(true, 600);
+    expect(radio("10 min").getAttribute("aria-checked")).toBe("true");
+    expect(document.body.textContent).toContain("Check the servers every");
   });
 });

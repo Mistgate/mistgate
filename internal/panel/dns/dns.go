@@ -46,6 +46,8 @@ type Preset struct {
 	// BlockMax: the apps drop the domains of the messenger Max (maxDomains) before any other rule, so that it cannot report
 	// the VPN (same formats as BlockAds).
 	BlockMax bool
+	// TorrentDirect: the apps send the traffic of torrent clients direct (torrent.go), after the blocks and before the split.
+	TorrentDirect bool
 	// Transport is the preferred transport (plain, dot, doh); see Resolve. Never empty for a stored preset.
 	Transport Kind
 }
@@ -94,7 +96,7 @@ func (s *Service) Handler() (string, http.Handler) {
 }
 
 func fromRow(r store.DNSPreset) (Preset, error) {
-	p := Preset{ID: r.ID, Name: r.Name, Description: r.Description, Builtin: r.Builtin, IPv4Only: r.IPv4Only, SplitDirect: r.SplitDirect, BlockAds: r.BlockAds, BlockMax: r.BlockMax, Transport: Kind(r.Transport)}
+	p := Preset{ID: r.ID, Name: r.Name, Description: r.Description, Builtin: r.Builtin, IPv4Only: r.IPv4Only, SplitDirect: r.SplitDirect, BlockAds: r.BlockAds, BlockMax: r.BlockMax, TorrentDirect: r.TorrentDirect, Transport: Kind(r.Transport)}
 	if p.Transport == "" {
 		p.Transport = KindPlain
 	}
@@ -125,7 +127,7 @@ func toRow(p Preset) (store.DNSPreset, error) {
 	if p.Transport == "" {
 		p.Transport = KindPlain
 	}
-	return store.DNSPreset{ID: p.ID, Name: p.Name, Description: p.Description, Builtin: p.Builtin, IPv4Only: p.IPv4Only, SplitDirect: p.SplitDirect, BlockAds: p.BlockAds, BlockMax: p.BlockMax,
+	return store.DNSPreset{ID: p.ID, Name: p.Name, Description: p.Description, Builtin: p.Builtin, IPv4Only: p.IPv4Only, SplitDirect: p.SplitDirect, BlockAds: p.BlockAds, BlockMax: p.BlockMax, TorrentDirect: p.TorrentDirect,
 		Transport: string(p.Transport), ServersJSON: string(sv), SplitJSON: string(sp)}, nil
 }
 
@@ -419,9 +421,13 @@ type presetGroup struct {
 var builtinCategory = map[string]presetGroup{
 	"dns_builtin_ru_split":   {CategoryRegional, "RU"},
 	"dns_builtin_ru_proxied": {CategoryRegional, "RU"},
-	"dns_builtin_yandex":     {CategoryRegional, "RU"},
 	"dns_builtin_ru_geo":     {CategoryRegional, "RU"},
 	"dns_builtin_cn_split":   {CategoryRegional, "CN"},
+	"dns_builtin_ir_split":   {CategoryRegional, "IR"},
+	"dns_builtin_tr_split":   {CategoryRegional, "TR"},
+	"dns_builtin_kz_split":   {CategoryRegional, "KZ"},
+	"dns_builtin_by_split":   {CategoryRegional, "BY"},
+	"dns_builtin_uz_split":   {CategoryRegional, "UZ"},
 	"dns_builtin_standard":   {Category: CategoryRegular},
 	"dns_builtin_adblock":    {Category: CategoryNoAds},
 	"dns_builtin_ads_device": {Category: CategoryNoAds},
@@ -459,7 +465,7 @@ func splitFromProto(in []*adminv1.DnsSplitRule) []SplitRule {
 
 func presetProto(p Preset, users int, isDefault bool) *adminv1.DnsPreset {
 	out := &adminv1.DnsPreset{
-		Id: p.ID, Name: p.Name, Description: p.Description, Builtin: p.Builtin, Ipv4Only: p.IPv4Only, SplitDirect: p.SplitDirect, BlockAds: p.BlockAds, BlockMax: p.BlockMax,
+		Id: p.ID, Name: p.Name, Description: p.Description, Builtin: p.Builtin, Ipv4Only: p.IPv4Only, SplitDirect: p.SplitDirect, BlockAds: p.BlockAds, BlockMax: p.BlockMax, TorrentDirect: p.TorrentDirect,
 		UserCount: uint32(users), IsDefault: isDefault, PreferredTransport: transportToProto(p.Transport), Category: categoryToProto(CategoryOf(p)), Country: CountryOf(p),
 	}
 	for _, s := range p.Servers {
@@ -594,7 +600,7 @@ func (s *Service) CreateDnsPreset(ctx context.Context, req *connect.Request[admi
 	if err != nil {
 		return nil, s.fail("create preset", err)
 	}
-	row, err := toRow(Preset{ID: store.NewID("dns_"), Name: name, Description: desc, Servers: servers, Split: split, IPv4Only: m.Ipv4Only, SplitDirect: m.SplitDirect, BlockAds: m.BlockAds, BlockMax: m.BlockMax, Transport: transport})
+	row, err := toRow(Preset{ID: store.NewID("dns_"), Name: name, Description: desc, Servers: servers, Split: split, IPv4Only: m.Ipv4Only, SplitDirect: m.SplitDirect, BlockAds: m.BlockAds, BlockMax: m.BlockMax, TorrentDirect: m.TorrentDirect, Transport: transport})
 	if err != nil {
 		return nil, s.internal("encode preset", err)
 	}
@@ -621,8 +627,8 @@ func (s *Service) UpdateDnsPreset(ctx context.Context, req *connect.Request[admi
 		return nil, s.fail("update preset", err)
 	}
 	transport := transportFromProto(m.PreferredTransport)
-	blockAds, blockMax := m.BlockAds != nil && *m.BlockAds, m.BlockMax != nil && *m.BlockMax
-	if transport == "" || m.BlockAds == nil || m.BlockMax == nil { // a client that predates a field: keep what is stored
+	blockAds, blockMax, torrents := m.BlockAds != nil && *m.BlockAds, m.BlockMax != nil && *m.BlockMax, m.TorrentDirect != nil && *m.TorrentDirect
+	if transport == "" || m.BlockAds == nil || m.BlockMax == nil || m.TorrentDirect == nil { // a client that predates a field: keep what is stored
 		old, err := s.st.DNS().Get(ctx, m.Id)
 		if err != nil {
 			return nil, s.fail("update preset", err)
@@ -636,11 +642,14 @@ func (s *Service) UpdateDnsPreset(ctx context.Context, req *connect.Request[admi
 		if m.BlockMax == nil {
 			blockMax = old.BlockMax
 		}
+		if m.TorrentDirect == nil {
+			torrents = old.TorrentDirect
+		}
 	}
 	if transport, err = NormalizeTransport(transport); err != nil {
 		return nil, s.fail("update preset", err)
 	}
-	row, err := toRow(Preset{ID: m.Id, Name: name, Description: desc, Servers: servers, Split: split, IPv4Only: m.Ipv4Only, SplitDirect: m.SplitDirect, BlockAds: blockAds, BlockMax: blockMax, Transport: transport})
+	row, err := toRow(Preset{ID: m.Id, Name: name, Description: desc, Servers: servers, Split: split, IPv4Only: m.Ipv4Only, SplitDirect: m.SplitDirect, BlockAds: blockAds, BlockMax: blockMax, TorrentDirect: torrents, Transport: transport})
 	if err != nil {
 		return nil, s.internal("encode preset", err)
 	}

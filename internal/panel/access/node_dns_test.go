@@ -18,7 +18,7 @@ import (
 const (
 	adblockPair  = "94.140.14.14, 94.140.15.15"
 	standardPair = "1.1.1.1, 8.8.8.8"
-	yandexPair   = "77.88.8.8, 77.88.8.1"
+	quad9Pair    = "9.9.9.9, 149.112.112.112"
 )
 
 // offer is what the owner offers on a node.
@@ -77,15 +77,15 @@ func TestKeysCarryTheDNSOfTheirNode(t *testing.T) {
 	}
 
 	e.offer("nod_de1", "dns_builtin_adblock", "dns_builtin_adblock", "dns_builtin_standard")
-	e.offer("nod_nl1", "dns_builtin_yandex", "dns_builtin_yandex")
-	if got := fetch(dev); got["nod_de1"] != adblockPair || got["nod_nl1"] != yandexPair {
+	e.offer("nod_nl1", "dns_builtin_quad9", "dns_builtin_quad9")
+	if got := fetch(dev); got["nod_de1"] != adblockPair || got["nod_nl1"] != quad9Pair {
 		t.Fatalf("node defaults: %v", got)
 	}
 	e.clock = e.clock.Add(time.Minute)
 	if err := e.s.SetPageDNS(e.ctx, uid, PageDNSChoice{NodeID: "nod_de1", PresetID: "dns_builtin_standard"}); err != nil {
 		t.Fatal(err)
 	}
-	if got := fetch(dev); got["nod_de1"] != standardPair || got["nod_nl1"] != yandexPair {
+	if got := fetch(dev); got["nod_de1"] != standardPair || got["nod_nl1"] != quad9Pair {
 		t.Fatalf("after the pick on de1: %v", got)
 	}
 	// Back to the node's default.
@@ -117,8 +117,8 @@ func TestMihomoAWGProxiesCarryTheDNSOfTheirNode(t *testing.T) {
 	m, uid, token := awgOnBothNodes(t)
 	e := m.e
 	e.offer("nod_de1", "dns_builtin_adblock", "dns_builtin_adblock")
-	e.offer("nod_nl1", "dns_builtin_yandex", "dns_builtin_yandex")
-	if err := e.s.SetPageDNS(e.ctx, uid, PageDNSChoice{NodeID: "nod_nl1", PresetID: "dns_builtin_yandex"}); err != nil {
+	e.offer("nod_nl1", "dns_builtin_quad9", "dns_builtin_quad9")
+	if err := e.s.SetPageDNS(e.ctx, uid, PageDNSChoice{NodeID: "nod_nl1", PresetID: "dns_builtin_quad9"}); err != nil {
 		t.Fatal(err)
 	}
 	v := must(e.s.SubscriptionWith(e.ctx, token, SubOptions{Format: plugin.FormatMihomo}))
@@ -132,7 +132,7 @@ func TestMihomoAWGProxiesCarryTheDNSOfTheirNode(t *testing.T) {
 			}
 			continue
 		}
-		want := map[string]string{"nod_de1": "94.140.14.14", "nod_nl1": "77.88.8.8"}[s.NodeID]
+		want := map[string]string{"nod_de1": "94.140.14.14", "nod_nl1": "9.9.9.9"}[s.NodeID]
 		if !strings.Contains(line, `"`+want+`"`) && !strings.Contains(line, want) {
 			t.Errorf("%s: no %s in %s", s.NodeID, want, line)
 		}
@@ -227,7 +227,7 @@ func TestSubViewNodes(t *testing.T) {
 	}
 
 	e.offer("nod_de1", "dns_builtin_adblock", "dns_builtin_adblock", "dns_builtin_standard", "dns_builtin_family")
-	e.offer("nod_nl1", "", "dns_builtin_yandex", "dns_builtin_standard") // options and no default: the old rule applies
+	e.offer("nod_nl1", "", "dns_builtin_quad9", "dns_builtin_standard") // options and no default: the old rule applies
 	e.clock = e.clock.Add(time.Second)
 	if err := e.s.SetPageDNS(e.ctx, u2.Id, PageDNSChoice{NodeID: "nod_de1", PresetID: "dns_builtin_family"}); err != nil {
 		t.Fatal(err)
@@ -254,7 +254,7 @@ func TestSubViewNodes(t *testing.T) {
 		ids = append(ids, p.ID)
 	}
 	slices.Sort(ids)
-	if want := []string{"dns_builtin_adblock", "dns_builtin_family", "dns_builtin_ru_split", "dns_builtin_standard", "dns_builtin_yandex"}; !slices.Equal(ids, want) {
+	if want := []string{"dns_builtin_adblock", "dns_builtin_family", "dns_builtin_quad9", "dns_builtin_ru_split", "dns_builtin_standard"}; !slices.Equal(ids, want) {
 		t.Errorf("presets = %v, want %v", ids, want)
 	}
 }
@@ -320,7 +320,7 @@ func TestKeyIsStaleAfterADNSPick(t *testing.T) {
 	m, uid, token := awgOnBothNodes(t)
 	e := m.e
 	e.offer("nod_de1", "dns_builtin_adblock", "dns_builtin_adblock", "dns_builtin_standard")
-	e.offer("nod_nl1", "dns_builtin_yandex", "dns_builtin_yandex", "dns_builtin_standard")
+	e.offer("nod_nl1", "dns_builtin_quad9", "dns_builtin_quad9", "dns_builtin_standard")
 	d1 := must(e.s.CreateAwgDevice(e.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: uid, ProfileId: m.profile, Platform: "ios", Label: "one"}))).Msg.Device.Id
 	d2 := must(e.s.CreateAwgDevice(e.ctx, req(&adminv1.CreateAwgDeviceRequest{UserId: uid, ProfileId: m.profile, Platform: "android", Label: "two"}))).Msg.Device.Id
 	stale := func() (map[string][]string, map[string][]string) {
@@ -386,11 +386,11 @@ func TestKeyIsStaleAfterADNSPick(t *testing.T) {
 	if len(devs) != 1 || !same(devs[d1], "nod_nl1") {
 		t.Errorf("after the rotation: %v", devs)
 	}
-	e.offer("nod_nl1", "dns_builtin_yandex", "dns_builtin_yandex")
+	e.offer("nod_nl1", "dns_builtin_quad9", "dns_builtin_quad9")
 	if devs, nodes = stale(); len(devs) != 1 || !same(devs[d2], "nod_nl1") || !same(nodes["nod_nl1"], d2) {
 		t.Errorf("after the offer was withdrawn: %v %v", devs, nodes)
 	}
-	e.offer("nod_nl1", "dns_builtin_yandex", "dns_builtin_yandex", "dns_builtin_standard") // offered again: the pick works again
+	e.offer("nod_nl1", "dns_builtin_quad9", "dns_builtin_quad9", "dns_builtin_standard") // offered again: the pick works again
 	if devs, _ = stale(); !same(devs[d1], "nod_nl1") {
 		t.Errorf("offered again: %v", devs)
 	}

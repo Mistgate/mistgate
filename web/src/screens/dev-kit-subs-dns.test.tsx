@@ -65,7 +65,7 @@ const apps = () => [...document.querySelectorAll(".sb-get > div")].map((r) => [r
 const says: Record<string, () => void> = {
   dns: () => {
     expect(rows()).toHaveLength(5);
-    expect(document.querySelector(".dq-now")!.textContent).toContain("Cloudflare: no filtering");
+    expect(document.querySelector(".dq-now")!.textContent).toContain("Russia: .ru direct");
     expect(document.querySelector(".dq-now")!.textContent).toContain("Link-based apps (Happ, Klick, Mihomo Party)");
     expect(rows()[0]!.querySelector(".dq-def")!.getAttribute("aria-checked")).toBe("true");
     expect(rows().filter((r) => r.querySelector(".dq-def")!.getAttribute("aria-checked") === "true")).toHaveLength(1);
@@ -81,7 +81,7 @@ const says: Record<string, () => void> = {
   },
   "dns-cf": () => {
     expect(input().value).toBe("Cloudflare: без фильтров");
-    expect(text()).toContain(en["sx.dns.edBuiltin"]);
+    expect(text()).toContain(en["sx.dns.edOwn"]); // a retired built-in that stayed as an own preset (migration 00157)
     expect(document.querySelectorAll(".sb-srvs .sb-srv")).toHaveLength(1);
     expect(apps()).toEqual([
       ["Happ", "DoH", ""],
@@ -99,7 +99,7 @@ const says: Record<string, () => void> = {
     expect(document.querySelector(".dq-now")!.textContent).toContain("Quad9");
   },
   "dns-users": () => {
-    expect(rows()).toHaveLength(13);
+    expect(rows()).toHaveLength(18);
     expect(rows()[0]!.querySelector(".dq-u")!.textContent).toBe("alldefault");
     expect([...document.querySelectorAll('.dq-cat [role="radio"]')].map((c) => c.textContent)).toContain("Own4");
   },
@@ -119,7 +119,7 @@ const says: Record<string, () => void> = {
     expect(button(en["subs.dns.new"])).toBeUndefined();
     expect(rows().every((r) => !r.querySelector<HTMLButtonElement>(".dq-def")!.disabled)).toBe(true);
   },
-  "dns-edge": () => expect(rows()).toHaveLength(13),
+  "dns-edge": () => expect(rows()).toHaveLength(18),
   "dns-own": () => {
     expect(input().value).toBe("Офис");
     expect(document.querySelectorAll(".sb-srvs .sb-srv")).toHaveLength(3); // the main two and the one of the rule
@@ -198,7 +198,7 @@ describe("the scenes of the DNS tab", () => {
   it.each(["ru", "zh", "fa", "tr"] as const)("the list, an editor and the question draw in %s", async (lang) => {
     await draw("dns-users", 60, lang);
     expect(text()).not.toMatch(/\b(sx\.dns|subs\.dns)\./);
-    expect(rows()).toHaveLength(13);
+    expect(rows()).toHaveLength(18);
     act(() => root?.unmount());
     host?.remove();
     await draw("dns-ask-used", 60, lang);
@@ -210,9 +210,9 @@ describe("the scenes of the DNS tab", () => {
   it("answers a click on a dot from memory: the default moves, the note says so, Undo moves it back, nothing leaves the page", async () => {
     await draw("dns", 60);
     const dot = (i: number) => rows()[i]!.querySelector<HTMLButtonElement>(".dq-def")!;
-    await act(async () => void dot(1).dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await act(async () => void dot(2).dispatchEvent(new MouseEvent("click", { bubbles: true }))); // row 2 is Quad9 (row 1 is the retired Cloudflare, an own preset)
     await wait(80);
-    expect(dot(1).getAttribute("aria-checked")).toBe("true");
+    expect(dot(2).getAttribute("aria-checked")).toBe("true");
     expect(dot(0).getAttribute("aria-checked")).toBe("false");
     expect(text()).toContain(fill(en["sx.dns.nowDef"], { name: "Quad9: malware blocking" }));
     await act(async () => void button(en["common.undo"])!.dispatchEvent(new MouseEvent("click", { bubbles: true })));

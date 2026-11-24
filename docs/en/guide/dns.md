@@ -46,7 +46,7 @@ A split rule is a list of suffixes (type one and press Enter: `.ru`, `gosuslugi.
 
 ### Country lists
 
-Next to suffixes (or instead of them) a split rule can name a whole country by a code: `cn` is China and `ru` is Russia, the sites of the country's geosite list and the addresses of its geoip list, thousands of domains that no hand-made list of suffixes would hold. The panel also knows `ir` (Iran), but no built-in preset uses it. A rule needs suffixes or a country list; an unknown code is refused ("unknown country list"). The built-ins **China: Chinese sites direct** and **Russia: Russian sites direct (community list)** are such rules. The Russian list (`category-ru` and `ru`, in the `geosite.dat` and `geoip.dat` files of Xray and Happ) holds the well-known Russian services, not every site: what is not in it goes through the VPN.
+Next to suffixes (or instead of them) a split rule can name a whole country by a code: `cn` is China and `ru` is Russia, the sites of the country's geosite list and the addresses of its geoip list, thousands of domains that no hand-made list of suffixes would hold. `ir` is Iran, and **Iran: Iranian sites direct** uses it. A rule needs suffixes or a country list; an unknown code is refused ("unknown country list"). The built-ins **China: Chinese sites direct** and **Russia: Russian sites direct (community list)** are such rules. The Russian list (`category-ru` and `ru`, in the `geosite.dat` and `geoip.dat` files of Xray and Happ) holds the well-known Russian services, not every site: what is not in it goes through the VPN.
 
 In the editor, **All sites of a country** under a rule's suffixes switches a country on. It offers **China** and **Russia**: the ones with a built-in preset and resolvers checked from inside the country. A rule that already names another code (set through the API, `DnsService`) shows it too, so it can be turned off. A rule with a country and no suffixes is complete: its suffix field just stays empty. Under the countries, **Site category (geosite)** takes a category by name (see "Site categories").
 
@@ -110,6 +110,24 @@ The option is on in the three built-in Russian presets, **Russia: .ru direct**, 
 
 **What the block does not cover.** According to public analyses (Habr, ntc.party), Max also learns the device's public address through third-party services (`api.ipify.org`, `ifconfig.me`, `checkip.amazonaws.com`, Yandex, `ip.mail.ru`), and takes the VPN flag from Android itself. The panel does not block those addresses: other programs need them. The block stops Max from sending what it collected, but if the app moves to other domains or hard-coded addresses, the list will have to be extended. The sources are public and disputed by the company itself, so they cannot be fully verified.
 
+### Torrents direct
+
+**Send torrent clients direct** makes the apps send the traffic of torrent clients and the public trackers past the VPN, after the ad and Max blocks and before the split. A swarm through the tunnel is slow and costs the server's traffic; direct, it uses the person's own connection. It is off in every preset, built-in ones too: turn it on in the preset where it is wanted.
+
+**Before you turn it on.** The person's real address is then visible to the other members of the swarm, which the VPN would hide. And a tracker blocked in their country does not open when it goes direct.
+
+| App | What happens |
+|:--|:--|
+| Apps on the mihomo core | By the program: `PROCESS-NAME` rules for the usual torrent clients on Windows, macOS, Linux and Android (the panel's own list, the program names and Android packages of qBittorrent, uTorrent, BitTorrent, Transmission, Deluge, Tixati, BitComet, Vuze, BiglyBT, FrostWire, LibreTorrent, Flud and a few more) and the rule set of the public trackers `category-public-tracker`, all to `DIRECT`. Not applied in a profile built from a group template. |
+| sing-box JSON | By the program (`process_name` on desktop systems, `package_name` on Android), by the BitTorrent protocol and by the rule set of the trackers, all to the direct outbound. |
+| Xray JSON | By the protocol (`bittorrent`, which the config's sniffing recognises: not every torrent is recognised, an encrypted one may pass) and by `geosite:category-public-tracker`. Xray cannot tell the program, so there are no program names. |
+| Happ | **Not applied**: the preset's torrent rules do not reach it. |
+| AmneziaVPN and AmneziaWG keys, other base64 apps | **Not applied**: they get no rules from the panel. |
+
+In the editor, **What each app gets** says the same per app: "by program" (Mihomo, sing-box), "by protocol, not all" (Xray), "no torrent rules" (Happ, AmneziaWG keys). A client that is not in the panel's list is sent direct only where the format also goes by the protocol.
+
+**Next to the node's torrent blocker.** [Torrent protection](torrent-protection.md) of a node blocks the BitTorrent traffic that reaches the node. Torrents that the preset sends direct never reach it, so the blocker has nothing to catch there; it stays as a safety net for what the rules miss: a client that is not in the list, an unrecognised or encrypted torrent in Xray, an app with no such rules (Happ, AmneziaWG keys). Keep it on where the hoster punishes complaints.
+
 ## The built-in presets
 
 Built-in presets exist on every install. They can be edited, not deleted.
@@ -118,17 +136,24 @@ Built-in presets exist on every install. They can be edited, not deleted.
 |:--|:--|:--|
 | Russia | **Russia: .ru direct** (the built-in default) | `.ru`, `.su`, `.рф`, Yandex, VK and bank domains are asked at Yandex DNS and open directly, bypassing the VPN; everything else goes through the VPN to Cloudflare and Google. For people inside Russia. The Max messenger is blocked (see "The Max messenger"). |
 | Russia | **Russia: all through VPN** | Everything through the VPN, Cloudflare and Google for every domain. For people abroad. The Max messenger is blocked (see "The Max messenger"). |
-| Russia | **Yandex DNS** | Yandex DNS for everything. |
 | China | **China: Chinese sites direct** | The sites of the Chinese lists (see "Country lists") are asked at AliDNS and DNSPod and open directly, bypassing the VPN; everything else goes through the VPN to Cloudflare and Google. For people inside China. Not the default: choose it as the default for everyone, or give it to a group. AliDNS and DNSPod are in the catalog with plain DNS only. |
+| Iran | **Iran: Iranian sites direct** | The sites of the Iranian lists (`category-ir` and `ir`, see "Country lists") are asked at Google and open directly, bypassing the VPN; everything else goes through the VPN to Cloudflare. For people inside Iran. Not the default; nobody is moved to it. |
+| Turkey | **Turkey: .tr direct** | Sites on `.tr` are asked at Google and open directly; everything else goes through the VPN to Cloudflare. For people inside Turkey. |
+| Kazakhstan | **Kazakhstan: .kz direct** | The same for `.kz` and `.қаз`. |
+| Belarus | **Belarus: .by direct** | The same for `.by` and `.бел`. |
+| Uzbekistan | **Uzbekistan: .uz direct** | The same for `.uz`. |
 | Russia | **Russia: Russian sites direct (community list)** | The same suffixes and Yandex DNS as **Russia: .ru direct**, plus the `ru` country list: the known Russian services of a community list (not every site) open directly, bypassing the VPN, and the app downloads and refreshes the list itself. Everything else goes through the VPN to Cloudflare and Google. Not the default; **Russia: .ru direct** is left as it was. Xray and Happ need the code `category-ru` in the app's `geosite.dat`: an app without it cannot start the config. AmneziaWG keys and the plain link list carry no rules. Max is blocked, as in **Russia: .ru direct**. |
 | Regular | **Cloudflare + Google** | Cloudflare and Google for everything. |
-| Regular | **Cloudflare: no filtering**, **Google: no filtering**, **DNS.SB: no filtering** | One provider, no filtering. |
 | No ads | **AdGuard: no ads** | Blocks ads and trackers. |
 | No ads | **No ads on the device** | The apps block ads and trackers themselves by the `category-ads-all` list (see "Ads and trackers"); Cloudflare and Google for DNS. Nobody is moved to it: give it to a person or a group, or make it the default. |
-| For kids | **AdGuard Family: no ads, no 18+**, **Cloudflare Family: no malware, no 18+**, **Yandex Family: no 18+**, **OpenDNS FamilyShield: no 18+** | Blocks adult content (and ads or malware, as the name says). |
+| For kids | **AdGuard Family: no ads, no 18+** | Blocks ads, trackers and adult content. |
 | Security | **Quad9: malware blocking**, **Cloudflare Security: malware blocking**, **Yandex Safe: malware blocking** | Blocks known malware and phishing domains. |
 
-**How to choose?** on the tab gives the short answer: people in Russia: **Russia: .ru direct**; people abroad: **Russia: all through VPN**; no ads: **AdGuard: no ads**. People inside China: **China: Chinese sites direct**. People inside Russia who want the list of known services instead of the suffixes alone: **Russia: Russian sites direct (community list)**. No ads in the apps themselves, whatever the DNS servers: **No ads on the device**. **AdGuard: no ads** filters at the DNS server, so it works in AmneziaWG keys too; **No ads on the device** works with any servers and next to a split, but only in Mihomo, sing-box, Xray JSON and Happ.
+The five country presets are not tested from inside the countries: the panel checked a local resolver only for Russia (Yandex DNS) and China (AliDNS and DNSPod). Here Google answers the direct sites, as it does from anywhere; whether it is reachable and fast from inside Iran, Turkey, Kazakhstan, Belarus and Uzbekistan, and whether a country filters it, has not been checked. If it does not work for someone, give them a custom preset with a local resolver of their provider. The domain presets know only the endings: a site of the country on `.com` goes through the VPN.
+
+**Retired built-ins.** Seven presets that were one catalog server each are no longer built-in: **Yandex DNS**, **Cloudflare: no filtering**, **Google: no filtering**, **DNS.SB: no filtering**, **Cloudflare Family: no malware, no 18+**, **Yandex Family: no 18+** and **OpenDNS FamilyShield: no 18+**. On an existing install, one that is used anywhere (by a person, a group, as the default, in a node's offer, in the link's offer or in a person's own pick) or that you edited stays as an ordinary own preset: same name and id, nobody notices, and you can now delete it when it is not the default. Every other one is removed, and a new install does not have them. Any of these servers is still one tap away in a custom preset: **New preset** → add a server from the catalog.
+
+**How to choose?** on the tab gives the short answer: people in Russia: **Russia: .ru direct**; people abroad: **Russia: all through VPN**; no ads: **AdGuard: no ads**. People inside China: **China: Chinese sites direct**. People in another country: the preset of their country (Iran, Turkey, Kazakhstan, Belarus, Uzbekistan). People inside Russia who want the list of known services instead of the suffixes alone: **Russia: Russian sites direct (community list)**. No ads in the apps themselves, whatever the DNS servers: **No ads on the device**. **AdGuard: no ads** filters at the DNS server, so it works in AmneziaWG keys too; **No ads on the device** works with any servers and next to a split, but only in Mihomo, sing-box, Xray JSON and Happ.
 
 ## The DNS tab
 
