@@ -305,13 +305,20 @@ func New(st *store.Store, v *vault.Vault, reg *protocols.Registry, cfg Config) (
 	return f, nil
 }
 
+// agentCompressMinBytes: a message of the long Connect stream shorter than this goes out as it is, even to a node that
+// accepts gzip (pings, acks, deltas). Every compressed message takes a gzip writer from connect's pool and the pool keeps
+// those writers until the GC lets go, which across many streams was memory held for nothing. A full desired state of a
+// busy node is far above it and is still compressed; a node that asks for gzip gets it as before, an older node never
+// notices the difference because the body of a stream message says per message whether it is compressed.
+const agentCompressMinBytes = 16 << 10
+
 // AgentHandler serves EnrollmentService and AgentService. Mount it on the agent endpoint only (TLS with
 // AgentTLSConfig); it refuses requests that did not arrive with the agent SNI.
 func (f *Fleet) AgentHandler() http.Handler {
 	mux := http.NewServeMux()
 	p, h := agentv1connect.NewEnrollmentServiceHandler(enrollmentService{f}, connect.WithReadMaxBytes(16<<10))
 	mux.Handle(p, h)
-	p, h = agentv1connect.NewAgentServiceHandler(agentService{f}, connect.WithReadMaxBytes(4<<20))
+	p, h = agentv1connect.NewAgentServiceHandler(agentService{f}, connect.WithReadMaxBytes(4<<20), connect.WithCompressMinBytes(agentCompressMinBytes))
 	mux.Handle(p, h)
 	return f.agentMiddleware(mux)
 }

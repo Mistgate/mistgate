@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
+	"sync"
 	"time"
 
 	sdkauth "github.com/modelcontextprotocol/go-sdk/auth"
@@ -33,13 +35,13 @@ func New(c Config) (http.Handler, error) {
 		c.Log = slog.Default()
 	}
 	e := &env{cfg: c, now: c.Now}
-	servers := map[Profile]*mcp.Server{}
-	for _, p := range profiles {
-		servers[p] = e.newServer(p)
+	servers := c.Servers
+	if servers == nil {
+		servers = new(ServerSet)
 	}
 	sdk := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		if ti := sdkauth.TokenInfoFromContext(r.Context()); ti != nil && len(ti.Scopes) > 0 {
-			return servers[Profile(ti.Scopes[0])] // nil for an unknown profile: the SDK answers 400
+			return servers.get(e, Profile(ti.Scopes[0])) // nil for an unknown profile: the SDK answers 400
 		}
 		return nil
 	}, &mcp.StreamableHTTPOptions{
@@ -76,6 +78,38 @@ func New(c Config) (http.Handler, error) {
 		r = r.WithContext(context.WithValue(r.Context(), remoteKey{}, r.RemoteAddr))
 		toTokenInfo.ServeHTTP(w, r)
 	}), nil
+}
+
+// ServerSet holds the MCP server of each profile and builds one on its first use, once, however many requests ask at the
+// same moment. Building registers every tool of the profile and keeps its JSON schemas on the heap, which a panel that
+// nobody talks to over MCP should not pay for. The zero value is ready; Config.Servers lets New and NewAssistant share one
+// set, so a profile is built once for both. The tool handlers of a server use the Config of whoever built it first, so
+// sharers must pass equivalent Configs.
+type ServerSet struct{ slots sync.Map } // Profile -> *serverSlot
+
+type serverSlot struct {
+	once sync.Once
+	srv  *mcp.Server
+}
+
+// get returns the server of a profile, built on the first call; nil for a profile the registry does not know.
+func (s *ServerSet) get(e *env, p Profile) *mcp.Server {
+	if !slices.Contains(profiles, p) {
+		return nil
+	}
+	v, ok := s.slots.Load(p)
+	if !ok {
+		v, _ = s.slots.LoadOrStore(p, new(serverSlot))
+	}
+	sl := v.(*serverSlot)
+	sl.once.Do(func() { sl.srv = e.newServer(p) })
+	return sl.srv
+}
+
+// built says whether the server of a profile exists yet (tests).
+func (s *ServerSet) built(p Profile) bool {
+	v, ok := s.slots.Load(p)
+	return ok && v.(*serverSlot).srv != nil
 }
 
 // acquire takes one of the token's maxConcurrent slots.
