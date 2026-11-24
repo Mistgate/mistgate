@@ -139,6 +139,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
           am().configs[r.device.id] = r.configs;
           am().created = r.device.id; // the dialog turns into the key of this device
           f.label = "";
+          f.route = ""; // the next key starts from the ordinary one
           marked?.();
         },
       );

@@ -736,6 +736,7 @@ describe("the key \"Russian services direct\"", () => {
     on.a.create();
     await settle();
     expect(on.data.amnezia?.devices.at(-1)?.route).toBe("ru-direct");
+    expect(on.st.amz.form.route).toBe(""); // the next key starts from the ordinary one
     const off = setup("many", api);
     off.a.form({ route: "ru-direct" }); // a stale choice cannot reach a page that does not offer it
     off.a.create();
