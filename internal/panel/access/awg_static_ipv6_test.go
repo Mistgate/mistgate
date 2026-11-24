@@ -187,8 +187,28 @@ func TestStaticAWGDeviceOmitsHiddenDirectConfig(t *testing.T) {
 		t.Fatalf("address hidden, after a rotation: configs %+v, %v", configs, err)
 	}
 
+	// A device made while the address is hidden starts with the same paths.
+	if _, configs, err = e.s.AddAWGDevice(e.ctx, "", f.user, f.profile, "ios", "alice-tablet"); err != nil || len(configs) != 1 || configs[0].ViaNodeID != "nod_fi1" {
+		t.Fatalf("a new device with the address hidden: configs %+v, %v", configs, err)
+	}
+
+	// The IPv6 entry alone is a way in too.
 	e.sql(`UPDATE relay SET enabled = 0 WHERE id = 'rly_fi1'`)
-	if _, _, err = e.s.DeviceConfigs(e.ctx, "", "", dev.ID); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Fatalf("address hidden and no relay: %v; want a failed precondition", err)
+	e.sql(`UPDATE node SET ipv6_entry = ? WHERE id = ?`, entryAddr, f.nodeID)
+	if _, configs, err = e.s.DeviceConfigs(e.ctx, "", "", dev.ID); err != nil || len(configs) != 1 || !configs[0].IPv6 {
+		t.Fatalf("address hidden, IPv6 entry only: configs %+v, %v", configs, err)
+	}
+
+	// No path left: the configs are refused, and no new device is made to sit in the limit without one.
+	e.sql(`UPDATE node SET ipv6_entry = '' WHERE id = ?`, f.nodeID)
+	if _, _, err = e.s.DeviceConfigs(e.ctx, "", "", dev.ID); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "no_inbound") {
+		t.Fatalf("address hidden and no path: %v; want no_inbound", err)
+	}
+	before := e.count(`SELECT count(*) FROM device`)
+	if _, _, err = e.s.AddAWGDevice(e.ctx, "", f.user, f.profile, "ios", "alice-watch"); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "no_inbound") {
+		t.Fatalf("a new device with no path: %v; want no_inbound", err)
+	}
+	if after := e.count(`SELECT count(*) FROM device`); after != before {
+		t.Errorf("a refused device was created: %d rows, was %d", after, before)
 	}
 }

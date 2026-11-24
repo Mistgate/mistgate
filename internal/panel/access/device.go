@@ -275,6 +275,12 @@ func (s *Service) AddAWGDeviceRoute(ctx context.Context, by, userID, profileID, 
 	if err != nil {
 		return store.AccessAWGDevice{}, nil, s.internal("profile network", err)
 	}
+	// Refused before the device exists: one with no config would only take a place in the limit.
+	if ok, err := s.deviceWayIn(ctx, ins, merged, gs, u); err != nil {
+		return store.AccessAWGDevice{}, nil, err
+	} else if !ok {
+		return store.AccessAWGDevice{}, nil, failed("no_inbound")
+	}
 	if label == "" {
 		existing, err := a.AWGDevices(ctx, u.ID)
 		if err != nil {
@@ -485,6 +491,25 @@ func viaLabel(country string) string {
 	return " · via entry"
 }
 
+// deviceWayIn reports whether a device of these inbounds would get a config: an inbound whose address is shown, or a hidden
+// one with an IPv6 entry or a usable relay (the paths renderDeviceConfigs gives).
+func (s *Service) deviceWayIn(ctx context.Context, ins []store.AccessInboundFull, merged json.RawMessage, gs store.AccessGroups, u store.AccessUser) (bool, error) {
+	if slices.ContainsFunc(ins, func(f store.AccessInboundFull) bool { return f.Inbound.DirectInSubscriptions }) {
+		return true, nil
+	}
+	links, err := s.st.RelayLinks(ctx, store.RelayFilter{})
+	if err != nil {
+		return false, s.internal("read relays for device configs", err)
+	}
+	relaysOf := s.subRelays(links, ins, gs, u, plugin.FormatURIList)
+	for _, f := range ins {
+		if spec, err := s.buildSpec(f, merged); err == nil && len(serverPaths(f.Node, spec, relaysOf[f.Inbound.ID])) > 1 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // renderDeviceConfigs renders the .conf and the vpn:// key of the device for each usable inbound of its profile.
 // markEpoch records the profile's current epoch on the credential (the user now holds current configs); recordDNS records
 // the DNS each config carries (the key now holds it), what "stale DNS" is measured against.
@@ -643,7 +668,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 		}
 	}
 	if len(out) == 0 && hidden {
-		return nil, failed("no_way_in") // every address is hidden and no IPv6 entry or relay is usable
+		return nil, failed("no_inbound") // every address is hidden and no IPv6 entry or relay is usable
 	}
 	if len(out) == 0 {
 		return nil, s.internal("render device config", errors.New("no inbound produced a config"))
