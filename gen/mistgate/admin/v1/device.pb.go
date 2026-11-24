@@ -29,7 +29,10 @@ type CreateAwgDeviceRequest struct {
 	// "ios", "android", "windows", "macos", "linux", "other".
 	Platform string `protobuf:"bytes,3,opt,name=platform,proto3" json:"platform,omitempty"`
 	// 1..40 characters; empty = "<platform> <n>".
-	Label         string `protobuf:"bytes,4,opt,name=label,proto3" json:"label,omitempty"`
+	Label string `protobuf:"bytes,4,opt,name=label,proto3" json:"label,omitempty"`
+	// "" = every address goes through the VPN (the default); "ru-direct" = the key leaves the networks of the big Russian services out
+	// of AllowedIPs and carries no IPv6 address (no QR code: it is too long). The owner may issue it whether or not people are offered it.
+	Route         string `protobuf:"bytes,5,opt,name=route,proto3" json:"route,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -88,6 +91,13 @@ func (x *CreateAwgDeviceRequest) GetPlatform() string {
 func (x *CreateAwgDeviceRequest) GetLabel() string {
 	if x != nil {
 		return x.Label
+	}
+	return ""
+}
+
+func (x *CreateAwgDeviceRequest) GetRoute() string {
+	if x != nil {
+		return x.Route
 	}
 	return ""
 }
@@ -666,13 +676,14 @@ var File_mistgate_admin_v1_device_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_device_proto_rawDesc = "" +
 	"\n" +
-	"\x1emistgate/admin/v1/device.proto\x12\x11mistgate.admin.v1\x1a\x1cmistgate/admin/v1/user.proto\"\x82\x01\n" +
+	"\x1emistgate/admin/v1/device.proto\x12\x11mistgate.admin.v1\x1a\x1cmistgate/admin/v1/user.proto\"\x98\x01\n" +
 	"\x16CreateAwgDeviceRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
 	"profile_id\x18\x02 \x01(\tR\tprofileId\x12\x1a\n" +
 	"\bplatform\x18\x03 \x01(\tR\bplatform\x12\x14\n" +
-	"\x05label\x18\x04 \x01(\tR\x05label\"\xb4\x01\n" +
+	"\x05label\x18\x04 \x01(\tR\x05label\x12\x14\n" +
+	"\x05route\x18\x05 \x01(\tR\x05route\"\xb4\x01\n" +
 	"\x17CreateAwgDeviceResponse\x121\n" +
 	"\x06device\x18\x01 \x01(\v2\x19.mistgate.admin.v1.DeviceR\x06device\x129\n" +
 	"\aconfigs\x18\x02 \x03(\v2\x1f.mistgate.admin.v1.DeviceConfigR\aconfigs\x12+\n" +

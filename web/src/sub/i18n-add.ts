@@ -68,6 +68,18 @@ const ru = {
   adFullOf: "мест занято",
   adFullD: (call: boolean): string => (call ? "Удалите устройство, которым больше не пользуетесь, или напишите в поддержку, добавим место" : "Удалите устройство, которым больше не пользуетесь"),
   adOpenDevs: "Открыть устройства",
+  // the route of a key: "Russian services direct" next to the ordinary key
+  adRouteT: "Что идёт через VPN",
+  adRouteAllT: "Всё через VPN",
+  adRouteAllD: "Обычный ключ: весь трафик идёт через сервер. Есть QR-код",
+  adRouteRuT: "Российские сервисы напрямую",
+  adRouteRuD: "Яндекс, VK, банки и другие российские сервисы идут мимо VPN и не видят адрес сервера. Без QR-кода — файл или ссылка",
+  adRouteRuNote: "Приложение всё равно видит, что VPN включён. IPv6 в этом ключе нет. Список сервисов устаревает — тогда нужно будет получить ключ заново.",
+  adRuTag: "Россия напрямую",
+  adRuMeta: (app: string) => `Российские сервисы идут мимо VPN. Раздельное туннелирование ${app} для этого сервера не работает`,
+  qrTooBigRu: "В этом ключе длинный список сетей, он не помещается в QR-код. Скачайте файл или скопируйте ключ",
+  staleRu: "Список российских сервисов обновился — получите ключ заново. Сам ключ останется прежним.",
+  dgStaleRuD: "Список российских сервисов обновился — получите ключ заново. Сам ключ останется прежним",
 };
 
 export type AddDict = typeof ru;
@@ -122,6 +134,17 @@ const en: AddDict = {
   adFullOf: "slots used",
   adFullD: (call) => (call ? "Remove a device you no longer use, or message support and we’ll add a slot" : "Remove a device you no longer use"),
   adOpenDevs: "Open devices",
+  adRouteT: "What goes through the VPN",
+  adRouteAllT: "Everything through the VPN",
+  adRouteAllD: "The usual key: all traffic goes through the server. Has a QR code",
+  adRouteRuT: "Russian services direct",
+  adRouteRuD: "Yandex, VK, banks and other Russian services go around the VPN and do not see the server’s address. No QR code — a file or a link",
+  adRouteRuNote: "The app still sees that a VPN is on. This key has no IPv6. The list of services ages — then you will need to get the key again.",
+  adRuTag: "Russia direct",
+  adRuMeta: (app) => `Russian services go around the VPN. ${app}’s own split tunnelling does not work for this server`,
+  qrTooBigRu: "This key holds a long list of networks, too long for a QR code. Download the file or copy the key",
+  staleRu: "The list of Russian services was updated — get the key again. The key itself stays the same.",
+  dgStaleRuD: "The list of Russian services was updated — get the key again. The key itself stays the same",
 };
 
 const zh: AddDict = {
@@ -172,6 +195,17 @@ const zh: AddDict = {
   adFullOf: "个名额已占用",
   adFullD: (call) => (call ? "请删除不再使用的设备，或联系我们增加名额" : "请删除不再使用的设备"),
   adOpenDevs: "打开设备列表",
+  adRouteT: "哪些流量走 VPN",
+  adRouteAllT: "全部走 VPN",
+  adRouteAllD: "普通密钥：所有流量都经过服务器。有二维码",
+  adRouteRuT: "俄罗斯服务直连",
+  adRouteRuD: "Yandex、VK、银行等俄罗斯服务绕过 VPN，看不到服务器的地址。没有二维码，只有文件或链接",
+  adRouteRuNote: "应用仍然能看到 VPN 已开启。此密钥没有 IPv6。服务列表会过时，届时需要重新获取密钥。",
+  adRuTag: "俄罗斯直连",
+  adRuMeta: (app) => `俄罗斯服务绕过 VPN。${app} 自带的分流功能对此服务器不起作用`,
+  qrTooBigRu: "此密钥包含很长的网络列表，放不进二维码。请下载文件或复制密钥",
+  staleRu: "俄罗斯服务列表已更新，请重新获取密钥。密钥本身不变。",
+  dgStaleRuD: "俄罗斯服务列表已更新，请重新获取密钥。密钥本身不变",
 };
 
 const fa: AddDict = {
@@ -222,6 +256,17 @@ const fa: AddDict = {
   adFullOf: "جا پر است",
   adFullD: (call) => (call ? "دستگاهی را که دیگر استفاده نمی‌کنید حذف کنید یا به پشتیبانی پیام بدهید تا جا اضافه کنیم" : "دستگاهی را که دیگر استفاده نمی‌کنید حذف کنید"),
   adOpenDevs: "باز کردن دستگاه‌ها",
+  adRouteT: "چه چیزی از VPN می‌گذرد",
+  adRouteAllT: "همه‌چیز از VPN",
+  adRouteAllD: "کلید معمولی: همهٔ ترافیک از سرور می‌گذرد. کد QR دارد",
+  adRouteRuT: "سرویس‌های روسی مستقیم",
+  adRouteRuD: "یاندکس، VK، بانک‌ها و دیگر سرویس‌های روسی بدون VPN می‌روند و نشانی سرور را نمی‌بینند. بدون کد QR — فایل یا پیوند",
+  adRouteRuNote: "برنامه هنوز می‌بیند که VPN روشن است. این کلید IPv6 ندارد. فهرست سرویس‌ها کهنه می‌شود — آن‌وقت باید کلید را دوباره بگیرید.",
+  adRuTag: "روسیه مستقیم",
+  adRuMeta: (app) => `سرویس‌های روسی بدون VPN می‌روند. تونل‌زنی جداگانهٔ ${iso(app)} برای این سرور کار نمی‌کند`,
+  qrTooBigRu: "این کلید فهرست بلندی از شبکه‌ها دارد و در کد QR جا نمی‌شود. فایل را دانلود کنید یا کلید را کپی کنید",
+  staleRu: "فهرست سرویس‌های روسی به‌روز شد — کلید را دوباره بگیرید. خود کلید همان می‌ماند.",
+  dgStaleRuD: "فهرست سرویس‌های روسی به‌روز شد — کلید را دوباره بگیرید. خود کلید همان می‌ماند",
 };
 
 const tr: AddDict = {
@@ -272,6 +317,17 @@ const tr: AddDict = {
   adFullOf: "yer dolu",
   adFullD: (call) => (call ? "Artık kullanmadığınız bir cihazı kaldırın ya da desteğe yazın, yer ekleyelim" : "Artık kullanmadığınız bir cihazı kaldırın"),
   adOpenDevs: "Cihazları aç",
+  adRouteT: "VPN’den ne geçsin",
+  adRouteAllT: "Her şey VPN’den",
+  adRouteAllD: "Her zamanki anahtar: tüm trafik sunucudan geçer. QR kodu var",
+  adRouteRuT: "Rus hizmetleri doğrudan",
+  adRouteRuD: "Yandex, VK, bankalar ve diğer Rus hizmetleri VPN’i atlar ve sunucunun adresini görmez. QR kodu yok — dosya ya da bağlantı",
+  adRouteRuNote: "Uygulama yine de VPN’in açık olduğunu görür. Bu anahtarda IPv6 yok. Hizmet listesi eskir — o zaman anahtarı yeniden almanız gerekir.",
+  adRuTag: "Rusya doğrudan",
+  adRuMeta: (app) => `Rus hizmetleri VPN’i atlar. ${app} uygulamasının kendi bölünmüş tünelleme ayarı bu sunucu için çalışmaz`,
+  qrTooBigRu: "Bu anahtar uzun bir ağ listesi taşır, QR koduna sığmaz. Dosyayı indirin ya da anahtarı kopyalayın",
+  staleRu: "Rus hizmetleri listesi güncellendi — anahtarı yeniden alın. Anahtarın kendisi aynı kalır.",
+  dgStaleRuD: "Rus hizmetleri listesi güncellendi — anahtarı yeniden alın. Anahtarın kendisi aynı kalır",
 };
 
 export const add: Record<Lang, AddDict> = { ru, en, zh, fa, tr };

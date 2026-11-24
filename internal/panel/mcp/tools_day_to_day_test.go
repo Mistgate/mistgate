@@ -153,8 +153,8 @@ func TestSubscriptionSettingsPlansAndApplies(t *testing.T) {
 				t.Fatalf("link limits: %+v", e.w.subs)
 			}
 		}},
-		{"page", map[string]any{"show_qr": false, "device_self_service": false, "dns_choice": true, "happ_ping": "tcp", "happ_ping_on_open": true}, func(t *testing.T, e *testEnv) {
-			if e.w.subs.GetUserPage().GetShowQr() || e.w.subs.GetUserPage().GetAllowDeviceSelfService() || !e.w.subs.GetUserPage().GetAllowDnsChoice() || e.w.subs.GetHappPing() != adminv1.HappPing_HAPP_PING_TCP || !e.w.subs.GetHappPingOnOpen() {
+		{"page", map[string]any{"show_qr": false, "device_self_service": false, "dns_choice": true, "ru_direct_key": true, "happ_ping": "tcp", "happ_ping_on_open": true}, func(t *testing.T, e *testEnv) {
+			if e.w.subs.GetUserPage().GetShowQr() || e.w.subs.GetUserPage().GetAllowDeviceSelfService() || !e.w.subs.GetUserPage().GetAllowDnsChoice() || !e.w.subs.GetUserPage().GetAllowRuDirectKey() || e.w.subs.GetHappPing() != adminv1.HappPing_HAPP_PING_TCP || !e.w.subs.GetHappPingOnOpen() {
 				t.Fatalf("page: %+v", e.w.subs)
 			}
 		}},

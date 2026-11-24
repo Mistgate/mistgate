@@ -9,7 +9,7 @@ import type { AwgDevice, Lang, MgData } from "./types";
 // so a test can use a fake.
 
 export type Api = {
-  addDevice(endpoints: string, body: { profile_id: string; platform: string; label: string }): Promise<Answer>;
+  addDevice(endpoints: string, body: { profile_id: string; platform: string; label: string; route?: string }): Promise<Answer>;
   getConfigs(endpoints: string, id: string): Promise<Answer>;
   rotateKey(endpoints: string, id: string): Promise<Answer>;
   revokeDevice(endpoints: string, id: string): Promise<void>;
@@ -131,7 +131,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
       void run(
         "add",
         endpoints(),
-        (url) => api.addDevice(url, { profile_id: f.profile, platform: f.platform, label: name }),
+        (url) => api.addDevice(url, { profile_id: f.profile, platform: f.platform, label: name, route: data.amnezia?.ru_direct ? f.route : "" }),
         (r) => {
           if (!r.device || !data.amnezia) throw new ApiError(0, "failed");
           data.amnezia.devices.push(r.device);
@@ -139,6 +139,7 @@ export function amzActions({ data, st, render, api, reveal, focus, locked, marke
           am().configs[r.device.id] = r.configs;
           am().created = r.device.id; // the dialog turns into the key of this device
           f.label = "";
+          f.route = ""; // the next key starts from the ordinary one
           marked?.();
         },
       );

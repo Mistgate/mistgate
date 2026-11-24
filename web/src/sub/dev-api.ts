@@ -76,6 +76,10 @@ const nodes = (profile = ""): AwgConfig[] => {
   const on = pageServers().filter((x) => x.connections.some((c) => c.way === "key" && c.profile_id === profile));
   return on.length > 0 ? on.map((x) => cfg(x.id.replace(/^nod_/, ""), x.country_code)) : fixed();
 };
+// the key of the route "Russian services direct" has no QR code: its list of networks does not fit one
+const madeRoute = new Map<string, string>();
+const routeOf = (device: string) => madeRoute.get(device) ?? pageData().amnezia?.devices?.find((x) => x.id === device)?.route ?? "";
+const noQr = (list: AwgConfig[], route: string): AwgConfig[] => (route === "ru-direct" ? list.map((c) => ({ ...c, qr: null })) : list);
 const profileOf = (device: string) => madeOn.get(device) ?? pageData().amnezia?.devices?.find((x) => x.id === device)?.profile_id ?? "";
 
 /** The dev server's password form accepts abcd-2345; three wrong tries in a row get the "try later" answer. */
@@ -89,7 +93,7 @@ export async function devUnlock(_url: string, password: string): Promise<void> {
 }
 
 // the page's own data, to answer a DNS choice with the server (or the link apps' DNS) as it would be afterwards
-const pageData = (): { servers?: unknown; dns?: { link?: unknown }; amnezia?: { devices?: { id: string; profile_id: string }[] } } => {
+const pageData = (): { servers?: unknown; dns?: { link?: unknown }; amnezia?: { devices?: { id: string; profile_id: string; route?: string }[] } } => {
   try {
     return JSON.parse(document.getElementById("mg-data")?.textContent ?? "{}") as ReturnType<typeof pageData>;
   } catch {
@@ -133,19 +137,21 @@ export const devApi: Api & DnsApi = {
       profile_id: body.profile_id,
       profile_name: "Main",
       version: "3.1",
-      address: `10.66.4.${n % 250}, fd66:66:0:1::${n % 250}`,
+      address: `10.66.4.${n % 250}${body.route === "ru-direct" ? "" : `, fd66:66:0:1::${n % 250}`}`,
+      route: body.route,
       min_clients: [{ client: "amnezia", app: "AmneziaVPN", min: "5.0.1.5" }],
     });
     madeOn.set(device.id, body.profile_id);
-    return { device, configs: nodes(body.profile_id) };
+    madeRoute.set(device.id, device.route);
+    return { device, configs: noQr(nodes(body.profile_id), device.route) };
   },
   async getConfigs(_e, id): Promise<Answer> {
     await pause();
-    return { configs: nodes(profileOf(id)) };
+    return { configs: noQr(nodes(profileOf(id)), routeOf(id)) };
   },
   async rotateKey(_e, id): Promise<Answer> {
     await pause();
-    return { configs: nodes(profileOf(id)) };
+    return { configs: noQr(nodes(profileOf(id)), routeOf(id)) };
   },
   async revokeDevice() {
     await pause();

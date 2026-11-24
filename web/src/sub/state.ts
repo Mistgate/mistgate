@@ -39,7 +39,7 @@ export type AmzState = {
   configs: Record<string, AwgConfig[]>;
   node: Record<string, number>;
   /** The form of a new device; `list`: the servers of the chosen key are unfolded under the choice. */
-  form: { profile: string; platform: string; label: string; list: boolean };
+  form: { profile: string; platform: string; label: string; list: boolean; route: "" | "ru-direct" };
   /** The platform this page is open on ("" unknown): the app the page names first for it. */
   here: string;
 };
@@ -60,7 +60,7 @@ export const newAmzState = (platform: string, profile: string, here = ""): AmzSt
   rename: null,
   configs: {},
   node: {},
-  form: { profile, platform, label: "", list: false },
+  form: { profile, platform, label: "", list: false, route: "" },
   here,
 });
 

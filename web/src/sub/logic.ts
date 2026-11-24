@@ -81,7 +81,8 @@ export function awgDevice(raw: unknown): AwgDevice {
     last_handshake_unix: num(d.last_handshake_unix),
     online: d.online === true,
     stale: d.stale === true,
-    stale_reason: d.stale_reason === "dns" ? "dns" : "profile",
+    stale_reason: d.stale_reason === "dns" || d.stale_reason === "routes" ? d.stale_reason : "profile",
+    route: d.route === "ru-direct" ? "ru-direct" : "",
     min_clients: minClients(d.min_clients),
   };
 }
@@ -194,6 +195,7 @@ export function normalize(raw: unknown): MgData {
         devices: list(am.devices).map(awgDevice).filter((x) => x.id !== ""),
         profiles: list(am.profiles).map(awgProfile).filter((p) => p.id !== ""),
         can_add: am.can_add === true,
+        ru_direct: am.ru_direct === true,
         self_service: am.self_service === true,
         endpoints: str(am.endpoints),
       }

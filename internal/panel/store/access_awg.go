@@ -76,8 +76,9 @@ type AWGIssue func(idx int) (cred AccessCred, publicKey string, err error)
 type AWGDeviceAdd struct {
 	Device    AccessDevice // ID, UserID, Platform, Model, CreatedAt
 	ProfileID string
-	MaxIdx    int // the largest peer index of the profile's client network
-	Limit     int // the user's device limit
+	MaxIdx    int    // the largest peer index of the profile's client network
+	Route     string // the key's route (device.awg_route): "" or awg's ru-direct; the caller has checked it
+	Limit     int    // the user's device limit
 }
 
 func accMapErr(err error) error {
@@ -137,6 +138,9 @@ func (a Access) AddAWGDevice(ctx context.Context, add AWGDeviceAdd, now time.Tim
 		}
 		stmts = append(stmts, accInsertCredStmts([]AccessCred{cred})...)
 		stmts = append(stmts, awgInsertPeerStmt(cred.ID, add.ProfileID, idx, publicKey, now))
+		if add.Route != "" {
+			stmts = append(stmts, Stmt{Query: `UPDATE device SET awg_route = ? WHERE id = ?`, Args: []any{add.Route, device.ID}})
+		}
 		return stmts, nil
 	})
 	if err != nil {
@@ -749,9 +753,14 @@ type AccessAWGDevice struct {
 	ConfigEpoch, CriticalEpoch                  int64
 	// DNSSig is written by RecordDeviceConfig for each node config the device receives; anything else reads as nothing recorded.
 	DNSSig map[string]string
+	// Route is how the key routes: "" = all through the VPN, "ru-direct" = the Russian services around it (device.awg_route).
+	Route string
 	// DNSStale lists the nodes where the DNS that applies to the person is not the one the key holds. The store leaves it
 	// empty: only the access module knows what applies.
 	DNSStale []string
+	// RouteStale: the key is a "Russian services direct" one and holds another version of the list than the panel has now.
+	// The store leaves it false, like DNSStale.
+	RouteStale bool
 }
 
 // AccessAWGDeviceScope is the read-only state needed to render one device's configs.
@@ -776,17 +785,18 @@ func scanAWGDevice(r rowScanner) (AccessAWGDevice, error) {
 	var id, userID, platform, model, osVersion sql.NullString
 	var first, last, created sql.NullInt64
 	var profileID, profileName, profileSettings sql.NullString
-	var credID, dataJSON, publicKey, dnsSig sql.NullString
+	var credID, dataJSON, publicKey, dnsSig, route sql.NullString
 	var secretEnc []byte
 	var idx, configEpoch, criticalEpoch sql.NullInt64
 	if err := r.Scan(&id, &userID, &platform, &model, &osVersion, &first, &last, &created,
-		&profileID, &profileName, &profileSettings, &credID, &dataJSON, &secretEnc, &publicKey, &idx, &configEpoch, &criticalEpoch, &dnsSig); err != nil {
+		&profileID, &profileName, &profileSettings, &credID, &dataJSON, &secretEnc, &publicKey, &idx, &configEpoch, &criticalEpoch, &dnsSig, &route); err != nil {
 		return AccessAWGDevice{}, err
 	}
 	d.ID, d.UserID, d.Platform, d.Model, d.OSVersion = id.String, userID.String, platform.String, model.String, osVersion.String
 	d.ProfileID, d.ProfileName, d.ProfileSettingsJSON = profileID.String, profileName.String, profileSettings.String
 	d.CredID, d.DataJSON, d.SecretEnc, d.PublicKey = credID.String, dataJSON.String, secretEnc, publicKey.String
 	d.Idx, d.ConfigEpoch, d.CriticalEpoch = int(idx.Int64), configEpoch.Int64, criticalEpoch.Int64
+	d.Route = route.String
 	d.AWG, d.Protocols = true, []string{"awg"}
 	if first.Valid && first.Int64 != 0 {
 		d.FirstSeenAt = fromUnix(first.Int64)
@@ -804,15 +814,15 @@ func scanAWGDevice(r rowScanner) (AccessAWGDevice, error) {
 }
 
 func scanAWGDeviceWithProfile(r rowScanner) (AccessAWGDevice, AccessProfile, error) {
-	values, err := scanRowValues(r, 27)
+	values, err := scanRowValues(r, 28)
 	if err != nil {
 		return AccessAWGDevice{}, AccessProfile{}, err
 	}
-	device, err := scanAWGDevice(batchRow(values[:19]))
+	device, err := scanAWGDevice(batchRow(values[:20]))
 	if err != nil {
 		return AccessAWGDevice{}, AccessProfile{}, err
 	}
-	profile, err := scanAccessProfile(batchRow(values[19:]))
+	profile, err := scanAccessProfile(batchRow(values[20:]))
 	if err != nil {
 		return AccessAWGDevice{}, AccessProfile{}, err
 	}
@@ -822,7 +832,7 @@ func scanAWGDeviceWithProfile(r rowScanner) (AccessAWGDevice, AccessProfile, err
 func (a Access) awgDevices(ctx context.Context, where string, arg any) ([]AccessAWGDevice, error) {
 	rows, err := a.s.R.QueryContext(ctx,
 		`SELECT d.id, d.user_id, d.platform, d.model, d.os_version, d.first_seen_at, d.last_seen_at, d.created_at,
-		   p.id, p.name, p.settings_json, c.id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch, c.dns_sig
+		   p.id, p.name, p.settings_json, c.id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch, c.dns_sig, d.awg_route
 		 FROM device d
 		 JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND c.path = ''
 		 JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0
@@ -879,7 +889,7 @@ func (a Access) AWGDeviceScope(ctx context.Context, deviceID string) (AccessAWGD
 			coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at AS device_created_at,
 			p.id AS device_profile_id, p.name AS device_profile_name, p.settings_json AS device_profile_settings,
 			c.id AS credential_id, c.data_json AS credential_data, c.secret_enc AS credential_secret, ap.public_key, ap.idx,
-			c.config_epoch, p.critical_epoch, coalesce(c.dns_sig, '') AS dns_sig,
+			c.config_epoch, p.critical_epoch, coalesce(c.dns_sig, '') AS dns_sig, d.awg_route AS awg_route,
 			p.id AS profile_id, p.protocol AS profile_protocol, p.name AS profile_name, p.settings_json AS profile_settings_json,
 			p.secrets_enc AS profile_secrets_enc, p.version AS profile_version, p.created_at AS profile_created_at, p.updated_at AS profile_updated_at
 			FROM device d

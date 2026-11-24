@@ -155,6 +155,12 @@ func DNSChoice(s *adminv1.SubscriptionSettings) bool {
 	return s.GetUserPage().GetAllowDnsChoice()
 }
 
+// RUDirect reports whether people may take the AmneziaWG key "Russian services direct" on the public page (UserPageOptions
+// allow_ru_direct_key). Settings stored before the key existed have none: absent means off, a new feature does not switch itself on.
+func RUDirect(s *adminv1.SubscriptionSettings) bool {
+	return s.GetUserPage().GetAllowRuDirectKey()
+}
+
 // m3RulesKey marks an installation whose stored settings were given the Mihomo format rules (see MigrateM3).
 const m3RulesKey = "sub_rules_m3"
 
