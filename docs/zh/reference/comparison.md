@@ -34,7 +34,7 @@ description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Man
 | 许可证 | AGPL-3.0 | GPL-3.0 | AGPL-3.0 | AGPL-3.0 | AGPL-3.0 | GPL-3.0 | GPL-3.0 |
 | Docker | 不使用：systemd、静态二进制文件 | 可选 | 部分：安装程序使用 Compose；文档提供手动安装步骤 | 部分：Compose | 面板和节点都需要 | 可选 | 可选 |
 | 一行安装程序 | 是 | 是 | 是 | 是 | 否：Compose、社群脚本 | 是 | 是 |
-| 内存 | 面板：空闲时 16–20 MiB，实测¹；节点：SSH 安装程序需要 256 MB | 空闲时 68–74 MiB，实测¹ | ? | 空闲时 262–265 MiB，实测¹；文档说明：最低 1 GB，建议 2 GB | 空闲时 426–454 MiB，实测¹；文档说明：面板最低 2 GB，建议 4 GB；节点最低 1 GB | ? | ? |
+| 内存 | 面板：空闲时 39–44 MiB，实测¹；节点：SSH 安装程序需要 256 MB | 空闲时 73–76 MiB，实测¹ | ? | 空闲时 273–277 MiB，实测¹；文档说明：最低 1 GB，建议 2 GB | 空闲时 436–464 MiB，实测¹；文档说明：面板最低 2 GB，建议 4 GB；节点最低 1 GB | ? | ? |
 | 核心 | Hysteria2；VLESS 使用 xray-core；AmneziaWG 使用用户态或内核 | Xray、进程内的 TUIC、AmneziaWG | Xray | Xray、WireGuard 核心；已宣布推出 sing-box 节点 | Xray | Xray 和 sing-box | sing-box |
 | VLESS REALITY / XHTTP | 是 / 是 | 是 / 是 | 是 / ? | 是 / ? | 是 / 是 | 是 / 是 | ?（源代码中包含 VLESS） |
 | VMess、Trojan、Shadowsocks | 否 | 是 | 是 | 是 | 部分：Trojan 和 Shadowsocks；未列出 VMess | 是 | 是（源代码中包含） |
@@ -59,17 +59,17 @@ description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Man
 | 签名发布版本 | 是：使用离线密钥，可复现构建，节点只安装签名版本 | 部分：`.sha256` 文件 | ? | ? | ? | ? | ? |
 | Cloudflare Workers 版 | 预览：[尚未在真实 Cloudflare 账户上运行](../getting-started/install-edge.md) | 否 | 否 | 否 | 否 | 否 | 否 |
 | GitHub 星标数 | 1 | 约 47.7k | 约 7.4k | 约 2.7k | 约 5.2k | 约 9.3k | 约 10.0k |
-| 最新版本 | v0.1.32 | v3.9.0（2026-10-03） | v0.8.4（2025-01-09） | v5.4.1（2026-09-12） | 3.4.5（2026-10-06） | v13.0.3（2026-09-26） | v1.6.4（2026-10-07） |
+| 最新版本 | v0.2.1 | v3.11.0（2026-10-25） | v0.8.4（2025-01-09） | v5.6.0（2026-11-03） | 3.4.11（2026-11-14） | v13.0.3（2026-09-26） | v1.6.4（2026-10-07） |
 
 ¹ 本项目在一台测试机上测量：1 vCPU / 1 GB 服务器上，面板进程组的匿名私有内存；空闲状态、0 到 200 个用户、没有节点连接（3x-ui 包含其 Xray 核心和 fail2ban）。未测量 Marzban、Hiddify Manager 和 s-ui。
 
-在运行 VPN 核心、数据库并承载 Hysteria2 流量的 2 vCPU / 2 GB 服务器上，Mistgate（面板和节点）空闲时占用 57 MiB，在「高负载日」占用 80 MiB（64 条隧道流、每秒 300 个订阅请求、每秒添加一个用户并移除一个用户）；3x-ui 的对应数据为 74 和 129 MiB，PasarGuard 为 297 和 347 MiB，Remnawave 为 761 和 1,114 MiB。测量方法、版本以及 Mistgate 较慢的部分见[基准测试](benchmarks.md)。端到端测试会检查面板空闲内存是否低于 80 MB，以及节点 Agent 是否低于 100 MB。
+在运行 VPN 核心、数据库并承载 Hysteria2 流量的 2 vCPU / 2 GB 服务器上，Mistgate（面板和节点）空闲时占用 92 MiB，在「高负载日」占用 123 MiB（64 条隧道流、每秒 300 个订阅请求、每秒添加一个用户并移除一个用户）；3x-ui 的对应数据为 81 和 118 MiB，PasarGuard 为 312 和 374 MiB，Remnawave 为 815 和 1,159 MiB。在这台服务器上 3x-ui 占用的内存比 Mistgate 少；单独的面板则是 Mistgate 更小（39–44 MiB，对比 73–76）。测量方法、版本以及 Mistgate 较慢的部分见[基准测试](benchmarks.md)。端到端测试会检查面板空闲内存是否低于 80 MB，以及节点 Agent 是否低于 100 MB。
 
 Marzban 目前只接受维护（上次发布于 2025 年 1 月）；其用户正在转向 PasarGuard。PasarGuard 是在独立仓库中开发的后继项目，并非 GitHub fork（派生版本）。Marzneshin 已停止活跃开发。
 
 ## 来源
 
-于 2026-10-09 核对。检查了各项目的 README、文档和发布说明，以及当天从 GitHub API 获取的星标数和最新版本。
+于 2026-10-09 核对。检查了各项目的 README、文档和发布说明，以及当天从 GitHub API 获取的星标数和最新版本。2026-11-24 仅重新核对了 Mistgate、3x-ui、PasarGuard 和 Remnawave 的最新版本（GitHub Releases，用于[基准测试](benchmarks.md)）；表中其余内容未重新核对。
 
 | 项目 | 仓库 | 文档 |
 |:--|:--|:--|

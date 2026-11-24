@@ -1,8 +1,8 @@
-# 3x-ui v3.9.0: the project's docker-compose.yml, with three changes: the published image instead of `build:`,
+# 3x-ui v3.11.0: the project's docker-compose.yml, with three changes: the published image instead of `build:`,
 # ports bound to 127.0.0.1 (isolation), and cgroup_parent (the shared 1 vCPU / 1 GB budget).
 services:
   3xui:
-    image: ghcr.io/mhsanaei/3x-ui:v3.9.0
+    image: ghcr.io/mhsanaei/3x-ui:v3.11.0
     container_name: bench_3xui
     cgroup_parent: bench-panel.slice
     cap_add:

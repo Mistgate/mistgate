@@ -134,7 +134,7 @@
 
 - 某些网络无法访问某台服务器时，用户可以经由你的另一个节点连接，该节点只转发加密流量。面板在启用前检查路径，之后持续监测；节点页面的入口以图的形式列在列表旁，展示用户如何到达服务器；节点列表页还有整个集群的地图。[中转](docs/zh/guide/relays.md)
 - 可选的检测：按网络查看你的服务器在某国境内能否打开——Globalping 在家庭和移动网络中通过 IPv4 和 IPv6 的探测、志愿者和 SIM 探测点、封锁名单，以及从你自己节点发起的 TSPU 探测。大多数来源只在俄罗斯可用。[可达性](docs/zh/operations/reachability.md)
-- 不需要 Docker，也不需要数据库服务器。在 1 vCPU / 1 GB 的服务器上，面板空闲时占用 16–20 MiB 内存。[基准测试](docs/zh/reference/benchmarks.md)里也写了 Mistgate 较慢的地方。
+- 不需要 Docker，也不需要数据库服务器。在 1 vCPU / 1 GB 的服务器上，面板空闲时占用 39–44 MiB 内存。[基准测试](docs/zh/reference/benchmarks.md)里也写了 Mistgate 较慢的地方。
 - 陌生人打开面板地址只会看到伪装站点；管理后台位于私密路径或私密主机名之后。
 - 谁能用哪台服务器：节点可以给所有人、选定的用户组，或暂时不给任何人，一个人也可以属于多个用户组。[用户组](docs/zh/guide/users-and-groups.md)
 - Windows 桌面应用 [Mistgate](https://github.com/Mistgate/mistgate-client) 可配合这些面板，也可用于普通订阅链接。
@@ -207,7 +207,7 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 |:--|:--|:--|:--|:--|:--|:--|
 | 无需 Docker 即可运行 | ✅ | ✅ | ❌ | ✅ | 🟡 部分 | ✅ |
 | 数据库 | SQLite | SQLite 或 PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite、MySQL、MariaDB 或 PostgreSQL | SQLite |
-| 面板空闲时占用 RAM | 16–20 MiB¹ | 68–74 MiB¹ | 426–454 MiB¹ | 未测量 | 262–265 MiB¹ | 未测量 |
+| 面板空闲时占用 RAM | 39–44 MiB¹ | 73–76 MiB¹ | 436–464 MiB¹ | 未测量 | 273–277 MiB¹ | 未测量 |
 | 在面板中添加节点（SSH） | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
 | Hysteria2 | ✅ | ✅ | 🟡 部分 | ✅ | ✅ | ✅ |
 | VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
