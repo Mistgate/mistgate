@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/apernet/hysteria/core/v2/server"
 	"github.com/apernet/hysteria/extras/v2/outbounds"
 
 	"github.com/mistgate/mistgate/internal/node/engine"
@@ -100,12 +101,16 @@ func New(resolvers func() []string, opts ...Option) *Direct {
 	return &Direct{ad: &outbounds.PluggableOutboundAdapter{PluggableOutbound: s}}
 }
 
-func (d *Direct) TCP(addr string) (net.Conn, error) { return d.ad.TCP(addr) }
+// noInfo is the RequestInfo (hysteria v2.14.0 Outbound) handed to the adapter: egress has no per-client context and
+// none of its stages reads it.
+var noInfo = &server.RequestInfo{}
 
-func (d *Direct) CheckUDP(addr string) error { return d.ad.CheckUDP(addr) }
+func (d *Direct) TCP(addr string) (net.Conn, error) { return d.ad.TCP(noInfo, addr) }
+
+func (d *Direct) CheckUDP(addr string) error { return d.ad.CheckUDP(noInfo, addr) }
 
 func (d *Direct) UDP(addr string) (engine.EgressUDP, error) {
-	c, err := d.ad.UDP(addr)
+	c, err := d.ad.UDP(noInfo, addr)
 	if err != nil {
 		return nil, err
 	}

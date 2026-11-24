@@ -114,7 +114,7 @@ func New(env engine.Env) (engine.Engine, error) {
 func (e *eng) Protocol() string { return Protocol }
 
 func (e *eng) Version() string {
-	v := "v2.13.0"
+	v := "v2.14.0"
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, d := range bi.Deps {
 			if d.Path == "github.com/apernet/hysteria/core/v2" && d.Version != "" {
@@ -710,7 +710,7 @@ type outbound struct {
 	in *inbound
 }
 
-func (o outbound) TCP(addr string) (net.Conn, error) {
+func (o outbound) TCP(_ *server.RequestInfo, addr string) (net.Conn, error) {
 	var userID string
 	if o.in != nil && o.in.e.torrentEnabled.Load() {
 		userID = o.in.takeRequestUserID(addr)
@@ -724,8 +724,8 @@ func (o outbound) TCP(addr string) (net.Conn, error) {
 		o.in.reportTorrent(torrentguard.ProtocolBitTorrentTCP, torrentguard.EvidenceTCPHandshake, "tcp", userID, port)
 	}), nil
 }
-func (o outbound) CheckUDP(addr string) error { return o.e.CheckUDP(addr) }
-func (o outbound) UDP(addr string) (server.UDPConn, error) {
+func (o outbound) CheckUDP(_ *server.RequestInfo, addr string) error { return o.e.CheckUDP(addr) }
+func (o outbound) UDP(_ *server.RequestInfo, addr string) (server.UDPConn, error) {
 	var userID string
 	if o.in != nil && o.in.e.torrentEnabled.Load() {
 		userID = o.in.takeRequestUserID(addr)
