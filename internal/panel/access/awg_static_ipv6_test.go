@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"connectrpc.com/connect"
+
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg/vpnkey"
 )
@@ -161,5 +163,52 @@ func TestStaticAWGDeviceWithoutAFreeAddressKeepsTheDirectConfig(t *testing.T) {
 	}
 	if n := e.count(`SELECT count(*) FROM device_credential WHERE device_id = ? AND path = 'ipv6'`, dev.Device.Id); n != 0 {
 		t.Errorf("IPv6 keys = %d, want none", n)
+	}
+}
+
+// An inbound whose address is hidden from subscriptions gives a device only its other paths; with none left, a clear refusal.
+func TestStaticAWGDeviceOmitsHiddenDirectConfig(t *testing.T) {
+	f := newAWGFixture(t)
+	e := f.e
+	e.sql(`INSERT INTO node (id, name, address, country_code, state, agent_caps, created_at) VALUES ('nod_fi1', 'fi1', '198.51.100.21', 'FI', 'active', 'relay-forward/1', 2)`)
+	e.sql(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
+		VALUES ('rly_fi1', ?, 'nod_fi1', 'udp', 8443, 1, 'active', ?, 1, 1)`, f.inbound, `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`)
+	dev, configs, err := e.s.AddAWGDevice(e.ctx, "", f.user, f.profile, "ios", "alice-phone")
+	if err != nil || len(configs) != 2 {
+		t.Fatalf("with the address shown: %d configs, %v; want direct and the one through fi1", len(configs), err)
+	}
+
+	e.sql(`UPDATE inbound SET direct_in_subscriptions = 0 WHERE id = ?`, f.inbound)
+	_, configs, err = e.s.DeviceConfigs(e.ctx, "", "", dev.ID)
+	if err != nil || len(configs) != 1 || configs[0].ViaNodeID != "nod_fi1" {
+		t.Fatalf("address hidden: configs %+v, %v; want only the one through fi1", configs, err)
+	}
+	if _, configs, err = e.s.RotateDevice(e.ctx, "", "", dev.ID); err != nil || len(configs) != 1 || configs[0].ViaNodeID != "nod_fi1" {
+		t.Fatalf("address hidden, after a rotation: configs %+v, %v", configs, err)
+	}
+
+	// A device made while the address is hidden starts with the same paths.
+	if _, configs, err = e.s.AddAWGDevice(e.ctx, "", f.user, f.profile, "ios", "alice-tablet"); err != nil || len(configs) != 1 || configs[0].ViaNodeID != "nod_fi1" {
+		t.Fatalf("a new device with the address hidden: configs %+v, %v", configs, err)
+	}
+
+	// The IPv6 entry alone is a way in too.
+	e.sql(`UPDATE relay SET enabled = 0 WHERE id = 'rly_fi1'`)
+	e.sql(`UPDATE node SET ipv6_entry = ? WHERE id = ?`, entryAddr, f.nodeID)
+	if _, configs, err = e.s.DeviceConfigs(e.ctx, "", "", dev.ID); err != nil || len(configs) != 1 || !configs[0].IPv6 {
+		t.Fatalf("address hidden, IPv6 entry only: configs %+v, %v", configs, err)
+	}
+
+	// No path left: the configs are refused, and no new device is made to sit in the limit without one.
+	e.sql(`UPDATE node SET ipv6_entry = '' WHERE id = ?`, f.nodeID)
+	if _, _, err = e.s.DeviceConfigs(e.ctx, "", "", dev.ID); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "no_inbound") {
+		t.Fatalf("address hidden and no path: %v; want no_inbound", err)
+	}
+	before := e.count(`SELECT count(*) FROM device`)
+	if _, _, err = e.s.AddAWGDevice(e.ctx, "", f.user, f.profile, "ios", "alice-watch"); connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "no_inbound") {
+		t.Fatalf("a new device with no path: %v; want no_inbound", err)
+	}
+	if after := e.count(`SELECT count(*) FROM device`); after != before {
+		t.Errorf("a refused device was created: %d rows, was %d", after, before)
 	}
 }
