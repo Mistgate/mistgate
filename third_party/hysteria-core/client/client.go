@@ -150,7 +150,7 @@ func (c *clientImpl) connect() (*HandshakeInfo, error) {
 	if authResp.RxAuto {
 		// Server asks client to use bandwidth detection,
 		// ignore local bandwidth config and use the configured congestion controller.
-		congestion.UseConfiguredCounting(conn, c.config.CongestionConfig.Type, c.config.CongestionConfig.BBRProfile)
+		congestion.UseConfigured(conn, c.config.CongestionConfig.Type, c.config.CongestionConfig.BBRProfile)
 	} else {
 		// actualTx = min(serverRx, clientTx)
 		actualTx = authResp.Rx
@@ -159,10 +159,10 @@ func (c *clientImpl) connect() (*HandshakeInfo, error) {
 			actualTx = c.config.BandwidthConfig.MaxTx
 		}
 		if actualTx > 0 {
-			congestion.UseBrutalCounting(conn, actualTx, c.config.BandwidthConfig.DisableLossCompensation)
+			congestion.UseBrutal(conn, actualTx, c.config.BandwidthConfig.DisableLossCompensation)
 		} else {
 			// We don't know our own bandwidth either, use the configured congestion controller.
-			congestion.UseConfiguredCounting(conn, c.config.CongestionConfig.Type, c.config.CongestionConfig.BBRProfile)
+			congestion.UseConfigured(conn, c.config.CongestionConfig.Type, c.config.CongestionConfig.BBRProfile)
 		}
 	}
 	_ = resp.Body.Close()
@@ -241,19 +241,7 @@ func (c *clientImpl) Close() error {
 	_ = c.conn.CloseWithError(closeErrCodeOK, "")
 	_ = c.tr.Close()
 	_ = c.pktConn.Close()
-	congestion.Forget(c.conn)
 	return nil
-}
-
-// ConnectionStats is the statistics of the client's QUIC connection, with the packets lost under BBR and Brutal counted
-// too (a Mistgate patch, see MISTGATE.md): quic-go's own count covers the handshake and the authentication, the
-// replacement's what came after. Read it before Close.
-func (c *clientImpl) ConnectionStats() quic.ConnectionStats {
-	st := c.conn.ConnectionStats()
-	if n, ok := congestion.LostPackets(c.conn); ok {
-		st.PacketsLost += n
-	}
-	return st
 }
 
 var nonPermanentErrors = []error{
@@ -325,6 +313,8 @@ func (c *tcpConn) SetWriteDeadline(t time.Time) error {
 
 type udpIOImpl struct {
 	Conn *quic.Conn
+
+	lastAddr string // Address of the last message received
 }
 
 func (io *udpIOImpl) ReceiveMessage() (*protocol.UDPMessage, error) {
@@ -334,11 +324,12 @@ func (io *udpIOImpl) ReceiveMessage() (*protocol.UDPMessage, error) {
 			// Connection error, this will stop the session manager
 			return nil, err
 		}
-		udpMsg, err := protocol.ParseUDPMessage(msg)
+		udpMsg, err := protocol.ParseUDPMessageReuseAddr(msg, io.lastAddr)
 		if err != nil {
 			// Invalid message, this is fine - just wait for the next
 			continue
 		}
+		io.lastAddr = udpMsg.Addr
 		return udpMsg, nil
 	}
 }

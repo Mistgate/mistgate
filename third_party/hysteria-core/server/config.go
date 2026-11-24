@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -135,10 +134,6 @@ type QUICConfig struct {
 	DisablePathMTUDiscovery        bool // The server may still override this to true on unsupported platforms.
 	DisableGSO                     bool
 	DisableStatelessReset          bool
-	// ConnContext is quic.Transport.ConnContext (a Mistgate patch, see MISTGATE.md): called for every connection the
-	// server creates, before its handshake; the context it is given ends when the connection does, also when the
-	// handshake fails, with the reason as its cause. nil = not set.
-	ConnContext func(context.Context, *quic.ClientInfo) (context.Context, error)
 }
 
 type CongestionConfig struct {
@@ -166,10 +161,19 @@ type RequestHook interface {
 // to make a "connected" UDP connection that does not accept packets from other addresses.
 // In fact, the default implementation simply uses net.ListenUDP for a "full-cone" behavior.
 // CheckUDP is used to check if a UDP packet to reqAddr is permitted (useful for e.g. ACL).
+// info describes the client connection the request comes from, and is never nil.
 type Outbound interface {
-	TCP(reqAddr string) (net.Conn, error)
-	UDP(reqAddr string) (UDPConn, error)
-	CheckUDP(reqAddr string) error
+	TCP(info *RequestInfo, reqAddr string) (net.Conn, error)
+	UDP(info *RequestInfo, reqAddr string) (UDPConn, error)
+	CheckUDP(info *RequestInfo, reqAddr string) error
+}
+
+// RequestInfo carries per-connection context to outbounds.
+// The same RequestInfo may be shared by multiple requests from the same client
+// connection, so implementations must not modify it.
+type RequestInfo struct {
+	AuthID     string   // ID returned by the Authenticator
+	ClientAddr net.Addr // Remote address of the client's QUIC connection
 }
 
 // UDPConn is like net.PacketConn, but uses string for addresses.
@@ -185,11 +189,11 @@ var defaultOutboundDialer = net.Dialer{
 	Timeout: 10 * time.Second,
 }
 
-func (o *defaultOutbound) TCP(reqAddr string) (net.Conn, error) {
+func (o *defaultOutbound) TCP(info *RequestInfo, reqAddr string) (net.Conn, error) {
 	return defaultOutboundDialer.Dial("tcp", reqAddr)
 }
 
-func (o *defaultOutbound) UDP(reqAddr string) (UDPConn, error) {
+func (o *defaultOutbound) UDP(info *RequestInfo, reqAddr string) (UDPConn, error) {
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		return nil, err
@@ -197,7 +201,7 @@ func (o *defaultOutbound) UDP(reqAddr string) (UDPConn, error) {
 	return &defaultUDPConn{conn}, nil
 }
 
-func (o *defaultOutbound) CheckUDP(reqAddr string) error {
+func (o *defaultOutbound) CheckUDP(info *RequestInfo, reqAddr string) error {
 	return nil
 }
 
@@ -242,31 +246,6 @@ type EventLogger interface {
 	TCPError(addr net.Addr, id, reqAddr string, err error)
 	UDPRequest(addr net.Addr, id string, sessionID uint32, reqAddr string)
 	UDPError(addr net.Addr, id string, sessionID uint32, err error)
-}
-
-// LostPackets is the number of packets declared lost on conn (a Mistgate patch, see MISTGATE.md): quic-go's
-// ConnectionStats.PacketsLost counts them only under quic-go's own congestion controller, which runs the handshake and the
-// authentication and stops counting when the server swaps in BBR or Brutal; the replacement's losses are counted apart.
-// Valid until the server is done with the connection (after ConnDisconnect).
-func LostPackets(conn *quic.Conn) uint64 {
-	n := conn.ConnectionStats().PacketsLost
-	if m, ok := congestion.LostPackets(conn); ok {
-		n += m
-	}
-	return n
-}
-
-// ConnEventLogger is an optional extension of EventLogger (a Mistgate patch, see MISTGATE.md at the module root): when
-// the EventLogger also implements it, the server hands over the QUIC connection itself. A caller needs it for statistics
-// of one connection (RTT, loss, packets sent and received) and to tell its connections apart: the address of a
-// connection moves when the path manager is off (port hopping), so it does not name one.
-type ConnEventLogger interface {
-	// Accepted is called once for every QUIC connection whose handshake completed, before any authentication.
-	Accepted(conn *quic.Conn)
-	// ConnConnect is called instead of Connect for an authenticated connection.
-	ConnConnect(conn *quic.Conn, id string, tx uint64)
-	// ConnDisconnect is called instead of Disconnect when an authenticated connection ends.
-	ConnDisconnect(conn *quic.Conn, id string, err error)
 }
 
 type HyStream interface {
