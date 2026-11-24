@@ -223,13 +223,7 @@ replace github.com/apernet/hysteria/core/v2 => ./third_party/hysteria-core
 // REALITY that still takes the ClientHellos Xray 26.3.27 took (third_party/reality/MISTGATE.md).
 replace github.com/xtls/reality => ./third_party/reality
 
-// Xray-core v26.11.9 (upstream commit 676eaf66f8f0, the one require names) plus two commits (Vision's TrafficState fields made
-// atomic; mux XUDP.Status set under XUDPManager's lock), from the public fork github.com/Mistgate/Xray-core (its README says
+// Xray-core v26.11.9 (upstream commit 676eaf66f8f0, the one require names) plus three commits (Vision's TrafficState fields made
+// atomic; mux XUDP.Status set under XUDPManager's lock; the build with quic-go 0.65, which Hysteria v2.14.0 needs), from the public fork github.com/Mistgate/Xray-core (its README says
 // what and why). Pin a commit of the fork, not a branch.
-replace github.com/xtls/xray-core => github.com/Mistgate/Xray-core v0.0.0-20261123133952-66e16d25229f
-
-// HOLD: the Hysteria core v2.14.0 asks for quic-go v0.65.1, but the Xray-core fork pinned above still calls http3's HTTPStream() with
-// the one-value signature of quic-go v0.63 (transport/internet/masque/connectip/proxy.go). Until the fork has the two-value change and a
-// new commit is pinned, quic-go stays at the version Mistgate had with Hysteria v2.13.0; then delete this replace and use the
-// HTTPStream() (*Stream, error) form in internal/node/trusttunnel/h3.go (third_party/hysteria-core/MISTGATE.md, "Held on quic-go").
-replace github.com/apernet/quic-go => github.com/apernet/quic-go v0.63.1-0.20261004180939-a10df75c260c
+replace github.com/xtls/xray-core => github.com/Mistgate/Xray-core v0.0.0-20261124010021-55d85b485a4a

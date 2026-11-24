@@ -35,8 +35,9 @@ Upstream v2.14.0 over v2.13.0 touched `server/udp.go` (one reused `UDPMessage` i
 (`handleTCPRequest` builds the `RequestInfo` for the TCP dial; `udpIOImpl` has one for the UDP ones and keeps the last address it
 parsed), `client/client.go` and `client/udp.go` (the same address reuse, one reused send message), `internal/protocol/proxy.go`
 (`ParseUDPMessageReuseAddr`, a hand written parser in place of `bytes.Buffer` and `binary.Read`), `internal/utils/atomic.go`
-(`AtomicTime` as an `atomic.Int64` offset, no allocation in `Set`), the mocks and tests, and asks for quic-go v0.65.1 (the apernet
-fork). None of these hunks overlaps ours (the nearest, the `udpIOImpl` literal in `ServeHTTP`, follows our `ConnConnect` call): the patches
+(`AtomicTime` as an `atomic.Int64` offset, no allocation in `Set`), the mocks and tests, and bumped quic-go to v0.65.1 (the apernet
+fork), which made `http3.HTTPStreamer.HTTPStream()` return an error: the Xray-core fork pinned in `go.mod` has a commit for it, and
+`internal/node/trusttunnel/h3.go` takes the error. None of these hunks overlaps ours (the nearest, the `udpIOImpl` literal in `ServeHTTP`, follows our `ConnConnect` call): the patches
 were carried over unchanged (a line offset only) and stand where they stood. `RequestHook`, `EventLogger`
 and `TrafficLogger` did not change; the new expr-based ACL engine of v2.14.0 is in `extras/v2`; Mistgate does not use it (see the size note below). Mistgate adapts
 only its `Outbound` implementations (`internal/node/hysteria2/hysteria2.go`, `internal/node/egress/egress.go`). `extras/v2` v2.14.0
@@ -58,11 +59,3 @@ hunks above again (they are small and marked by `ConnEventLogger`, `LostPackets`
 The same tree is published as branch `mistgate` of `github.com/Mistgate/hysteria` (its `core/` directory), one commit on top of the upstream
 version named above, for anyone who wants the patch without Mistgate. Mistgate itself builds from this directory, not from the
 fork. When this copy moves to a new upstream version or its patch changes, push the same tree to that branch in the same change.
-
-## Held on quic-go
-
-Upstream v2.14.0 asks for quic-go v0.65.1, but Mistgate's `go.mod` holds `github.com/apernet/quic-go` at the v0.63.1 pseudo-version it had
-with v2.13.0 (a `replace`): the Xray-core fork pinned there calls `http3.HTTPStreamer.HTTPStream()` as in v0.63, and v0.65 made it return
-`(*Stream, error)`, so `transport/internet/masque/connectip` would not build. The core v2.14.0 builds and passes its tests on v0.63.1. To lift the
-hold: put `str, err := streamer.HTTPStream(); if err != nil { return nil, err }` into the fork's `connectip/proxy.go`, pin the new commit in the
-`replace` of xray-core, delete the quic-go `replace` and take the two-value form in `internal/node/trusttunnel/h3.go`.
