@@ -186,6 +186,7 @@ REALITY 握手可以携带后量子密钥份额（X25519MLKEM768）。较新的 
 | v2rayN | 7.12.6 | 7.20.0 |
 | Mihomo 内核（版本取自 User-Agent） | 1.19.9 | 从不（Firefox_120 / Safari_16_0 不带该份额） |
 | kl!ck（按其自身版本；内部是 Mihomo） | 0.4.0 | 从不（Firefox_120 / Safari_16_0 不带该份额） |
+| Mistgate（Windows 应用；内部是 Xray，各版本核心相同） | 0.1.0 | 0.1.0 |
 | sing-box（SFA、SFI、SFM）、Karing、NekoBox | 不可用 | 不可用 |
 | Hiddify、Streisand、FoXray、v2RayTun、INCY、OneXray、Shadowrocket、FlClash、Clash Verge、Mihomo Party、Clash Meta for Android | 未知 | 未知 |
 

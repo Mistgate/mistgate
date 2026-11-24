@@ -96,6 +96,9 @@ func TestClientVerdicts(t *testing.T) {
 		{"kl!ck 0.5.1", "kl!ck/0.5.1", "windows", "chrome", ClientOK, "", ""},
 		{"kl!ck 0.5.1 with firefox", "kl!ck/0.5.1", "windows", "firefox", ClientUnsupported, ReasonFingerprint, ""},
 		{"kl!ck 0.5.1 with safari", "kl!ck/0.5.1", "macos", "safari", ClientUnsupported, ReasonFingerprint, ""},
+		{"Mistgate app 0.1.8", "Mistgate/0.1.8", "windows", "chrome", ClientOK, "", ""},
+		{"Mistgate app 0.1.8 with firefox", "Mistgate/0.1.8", "windows", "firefox", ClientOK, "", ""},
+		{"Mistgate app, ios fingerprint is classical", "Mistgate/0.1.8", "windows", "ios", ClientUnsupported, ReasonFingerprint, ""},
 		{"FlClash: the core is not in its User-Agent", "FlClash/v0.8.60", "windows", "chrome", ClientUnknown, ReasonNoThreshold, ""},
 		{"Shadowrocket: an own implementation", "Shadowrocket/2086", "ios", "chrome", ClientUnknown, ReasonNoThreshold, ""},
 		{"Streisand: Xray-based, no version found", "Streisand/1.4", "ios", "chrome", ClientUnknown, ReasonNoThreshold, ""},
@@ -162,7 +165,7 @@ func TestClientDefaultsAreWellFormed(t *testing.T) {
 	for _, c := range []struct{ app, platform, chrome, other string }{
 		{"happ", "android", "3.1.1", "3.20.0"}, {"happ", "windows", "0.3.6", "2.10.0"}, {"happ", "ios", "", "4.8.0"},
 		{"v2rayng", "", "1.10.3", "2.0.16"}, {"v2rayn", "", "7.12.6", "7.20.0"},
-		{"mihomo", "", "1.19.9", NeverVersion}, {"klick", "", "0.4.0", NeverVersion},
+		{"mihomo", "", "1.19.9", NeverVersion}, {"klick", "", "0.4.0", NeverVersion}, {"mistgate", "", "0.1.0", "0.1.0"},
 	} {
 		i := slices.IndexFunc(clientDefaults, func(r ClientRule) bool { return r.App == c.app && r.Platform == c.platform })
 		if i < 0 || clientDefaults[i].MinChrome != c.chrome || clientDefaults[i].MinOther != c.other {
