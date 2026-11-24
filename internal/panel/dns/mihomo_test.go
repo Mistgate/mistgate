@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -205,8 +206,9 @@ func TestMihomoDNSBuiltins(t *testing.T) {
 				t.Errorf("%s: %q", row.ID, s)
 			}
 		}
-		geo := row.ID == "dns_builtin_cn_split" || row.ID == "dns_builtin_ru_geo"
-		if (len(d.Policy) > 0) != (row.ID == "dns_builtin_ru_split" || geo) || (!geo && len(d.Policy) != len(d.Direct)) {
+		geo := row.ID == "dns_builtin_cn_split" || row.ID == "dns_builtin_ru_geo" || row.ID == "dns_builtin_ir_split"
+		suffixes := slices.Contains([]string{"dns_builtin_ru_split", "dns_builtin_tr_split", "dns_builtin_kz_split", "dns_builtin_by_split", "dns_builtin_uz_split"}, row.ID)
+		if (len(d.Policy) > 0) != (suffixes || geo) || (!geo && len(d.Policy) != len(d.Direct)) {
 			t.Errorf("%s: policy %v direct %v", row.ID, d.Policy, d.Direct)
 		}
 		if (len(d.Providers) > 0) != geo {

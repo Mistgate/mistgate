@@ -181,6 +181,7 @@ const how: readonly { who: Key; id: string; name: Key }[] = [
   { who: "subs.dns.how.ru", id: "dns_builtin_ru_split", name: "subs.dns.how.ru.name" },
   { who: "subs.dns.how.abroad", id: "dns_builtin_ru_proxied", name: "subs.dns.how.abroad.name" },
   { who: "subs.dns.how.ads", id: "dns_builtin_adblock", name: "subs.dns.how.ads.name" },
+  { who: "subs.dns.how.other", id: "", name: "subs.dns.how.other.name" }, // no one preset: the one of their country
 ];
 
 /** What is inside a preset, one line: "Cloudflare · Google · DoH · .ru direct". */

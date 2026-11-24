@@ -123,6 +123,7 @@ func TestSeed(t *testing.T) {
 	// grouped by category: Russia, regular, no ads, family, security
 	want := []string{
 		"dns_builtin_ru_split", "dns_builtin_ru_geo", "dns_builtin_ru_proxied", "dns_builtin_cn_split",
+		"dns_builtin_ir_split", "dns_builtin_tr_split", "dns_builtin_kz_split", "dns_builtin_by_split", "dns_builtin_uz_split",
 		"dns_builtin_standard",
 		"dns_builtin_adblock", "dns_builtin_ads_device",
 		"dns_builtin_family",
@@ -133,14 +134,17 @@ func TestSeed(t *testing.T) {
 	}
 	wantCat := map[string]adminv1.DnsCategory{
 		"dns_builtin_ru_split": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL, "dns_builtin_ru_geo": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL, "dns_builtin_ru_proxied": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL,
-		"dns_builtin_cn_split": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL,
+		"dns_builtin_cn_split": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL, "dns_builtin_ir_split": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL,
+		"dns_builtin_tr_split": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL, "dns_builtin_kz_split": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL,
+		"dns_builtin_by_split": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL, "dns_builtin_uz_split": adminv1.DnsCategory_DNS_CATEGORY_REGIONAL,
 		"dns_builtin_standard": adminv1.DnsCategory_DNS_CATEGORY_REGULAR,
 		"dns_builtin_adblock":  adminv1.DnsCategory_DNS_CATEGORY_NO_ADS,
 		"dns_builtin_family":   adminv1.DnsCategory_DNS_CATEGORY_FAMILY,
 		"dns_builtin_quad9":    adminv1.DnsCategory_DNS_CATEGORY_SECURITY, "dns_builtin_cloudflare_security": adminv1.DnsCategory_DNS_CATEGORY_SECURITY,
 		"dns_builtin_yandex_safe": adminv1.DnsCategory_DNS_CATEGORY_SECURITY, "dns_builtin_ads_device": adminv1.DnsCategory_DNS_CATEGORY_NO_ADS,
 	}
-	wantCountry := map[string]string{"dns_builtin_ru_split": "RU", "dns_builtin_ru_geo": "RU", "dns_builtin_ru_proxied": "RU", "dns_builtin_cn_split": "CN"}
+	wantCountry := map[string]string{"dns_builtin_ru_split": "RU", "dns_builtin_ru_geo": "RU", "dns_builtin_ru_proxied": "RU", "dns_builtin_cn_split": "CN",
+		"dns_builtin_ir_split": "IR", "dns_builtin_tr_split": "TR", "dns_builtin_kz_split": "KZ", "dns_builtin_by_split": "BY", "dns_builtin_uz_split": "UZ"}
 	for _, p := range r.Msg.Presets {
 		if p.Category != wantCat[p.Id] {
 			t.Errorf("preset %s category = %v, want %v", p.Id, p.Category, wantCat[p.Id])
@@ -169,9 +173,9 @@ func TestSeed(t *testing.T) {
 			t.Errorf("ru split has no suffix %s: %v", s, ru.Split[0].Suffixes)
 		}
 	}
-	// only the Russia (both) and China splits go direct; the proxied Russia preset has no split at all
+	// the Russia (both), China, Iran, Turkey, Kazakhstan, Belarus and Uzbekistan splits go direct; the proxied Russia preset has no split at all
 	for id, p := range e.list() {
-		if p.SplitDirect != (id == "dns_builtin_ru_split" || id == "dns_builtin_ru_geo" || id == "dns_builtin_cn_split") {
+		if p.SplitDirect != slices.Contains([]string{"dns_builtin_ru_split", "dns_builtin_ru_geo", "dns_builtin_cn_split", "dns_builtin_ir_split", "dns_builtin_tr_split", "dns_builtin_kz_split", "dns_builtin_by_split", "dns_builtin_uz_split"}, id) {
 			t.Errorf("preset %s split_direct=%v", id, p.SplitDirect)
 		}
 	}
@@ -214,7 +218,7 @@ func TestCRUD(t *testing.T) {
 	}
 	// the list order: built-ins first, then custom by name
 	r, _ := e.s.ListDnsPresets(ctx, connect.NewRequest(&adminv1.ListDnsPresetsRequest{}))
-	if n := len(r.Msg.Presets); n != 12 || r.Msg.Presets[11].Id != p.Id {
+	if n := len(r.Msg.Presets); n != 17 || r.Msg.Presets[16].Id != p.Id {
 		t.Fatalf("list = %d presets", n)
 	}
 	_, err = e.s.UpdateDnsPreset(ctx, connect.NewRequest(&adminv1.UpdateDnsPresetRequest{Id: "dns_nope", Name: "x", Servers: []*adminv1.DnsServer{plain("1.1.1.1")}}))
@@ -376,7 +380,7 @@ func TestValidation(t *testing.T) {
 	rules := func(n int) []SplitRule {
 		var r []SplitRule
 		for i := range n {
-			r = append(r, SplitRule{Suffixes: []string{fmt.Sprintf("d%d.example", i)}, Servers: good})
+			r = append(r, SplitRule{Suffixes: []string{fmt.Sprintf("d%d.example", i)}, Servers: []Server{{Kind: KindPlain, Address: "9.9.9.9"}}})
 		}
 		return r
 	}
@@ -385,6 +389,26 @@ func TestValidation(t *testing.T) {
 	}
 	if _, _, _, _, err := Clean("n", "", good, rules(65)); err == nil {
 		t.Error("65 rules accepted")
+	}
+	// a split rule is answered by a server of its own: the same address, the same catalog variant (by its addresses), the same DoH host
+	// as a main server is refused with a code and the rule that holds it
+	for name, c := range map[string]struct {
+		main  []Server
+		split Server
+	}{
+		"same address":          {good, Server{Kind: KindPlain, Address: "1.1.1.1"}},
+		"same address and port": {good, Server{Kind: KindPlain, Address: "1.1.1.1:5353"}},
+		"catalog and address":   {[]Server{{Variant: "cloudflare/standard"}}, Server{Kind: KindPlain, Address: "1.0.0.1"}},
+		"same variant":          {[]Server{{Variant: "google/standard"}}, Server{Variant: "google/standard"}},
+		"same DoH host":         {[]Server{{Kind: KindDoH, Address: "https://dns.example/dns-query"}}, Server{Kind: KindDoH, Address: "https://dns.example/other"}},
+	} {
+		_, _, _, _, err := Clean("n", "", c.main, []SplitRule{{Suffixes: []string{"a.example"}, Servers: []Server{{Kind: KindPlain, Address: "9.9.9.9"}}}, {Suffixes: []string{"b.example"}, Servers: []Server{c.split}}})
+		if err == nil || !strings.HasPrefix(err.Error(), "split_server_same: rule=2&server=") {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if _, _, _, _, err := Clean("n", "", []Server{{Variant: "cloudflare/standard"}}, []SplitRule{{Suffixes: []string{"a.example"}, Servers: []Server{{Variant: "google/standard"}}}}); err != nil {
+		t.Errorf("different providers: %v", err)
 	}
 	if _, _, _, _, err := Clean("n", "", good, []SplitRule{{Suffixes: nil, Servers: good}}); err == nil {
 		t.Error("rule without suffixes accepted")
