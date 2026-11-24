@@ -1870,10 +1870,6 @@ a.up-gtag:hover {
 .up-nd.none .up-cb {
   opacity: 0.35;
 }
-.up-nd[aria-checked="false"]:not(.none) .up-tag {
-  background: var(--step);
-  color: var(--muted);
-}
 .up-cb {
   display: grid;
   place-items: center;

@@ -228,7 +228,7 @@
   grid-template-columns: repeat(2,minmax(0,1fr));
   gap: 8px;
 }
-.sbp .pf-opt>button {
+.sbp .pf-opt>[role="radio"] {
   display: grid;
   grid-template-columns: 18px minmax(0,1fr);
   gap: 12px;
@@ -237,12 +237,13 @@
   border-radius: 12px;
   border: 1px solid var(--border);
   text-align: start;
+  cursor: pointer;
   transition: border-color .15s var(--e),background-color .15s var(--e);
 }
-.sbp .pf-opt>button:hover {
+.sbp .pf-opt>[role="radio"]:hover {
   background: color-mix(in srgb,var(--text) 3%,transparent);
 }
-.sbp .pf-opt>button[aria-checked="true"] {
+.sbp .pf-opt>[role="radio"][aria-checked="true"] {
   border-color: var(--accent-line);
   background: color-mix(in srgb,var(--accent-mark) 5%,transparent);
 }
@@ -432,10 +433,6 @@
   align-self: flex-start;
   max-width: 100%;
 }
-.sbp .pp-seg button.dis {
-  opacity: .4;
-  cursor: default;
-}
 .sbp .pp-q1 {
   display: flex;
   flex-wrap: wrap;
@@ -462,7 +459,7 @@
 .sbp .pp-cards {
   grid-template-columns: repeat(2,minmax(0,1fr));
 }
-.sbp .pp-cards>button {
+.sbp .pp-cards>[role="radio"] {
   padding: 12px;
 }
 .sbp .pp-as {
@@ -1962,7 +1959,7 @@
     overflow-x: auto;
     scrollbar-width: none;
   }
-  .sbp .sb-add .sb-seg button {
+  .sbp .sb-add .sb-seg [role="radio"] {
     flex: none;
   }
 }
@@ -2047,14 +2044,6 @@
   background: var(--surface-2);
   border-color: transparent;
   color: var(--text);
-}
-/* the state tiles and the chips are radios in the product (one choice, arrow keys), pressed buttons on the board */
-.sbp .sb-tiles>button[aria-checked="true"] {
-  border-color: var(--accent-mark);
-  background: color-mix(in srgb, var(--accent-mark) 5%, var(--surface));
-}
-.sbp .sb-tiles>button[aria-checked="false"]:hover {
-  border-color: color-mix(in srgb, var(--text) 26%, transparent);
 }
 .sbp .sb-nf {
   display: flex;
