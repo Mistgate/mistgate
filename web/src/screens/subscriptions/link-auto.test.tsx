@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
-import { LinkAutoCard, LinkAutoIntervalRow } from "./link-auto";
+import { LinkAutoCard } from "./link-auto";
 import type { Settings } from "./model";
 
 const getSubscriptionSettings = vi.fn();
@@ -39,8 +39,7 @@ async function mount(linkAutoSelect: boolean | undefined, interval?: number) {
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <LinkAutoCard settings={settings(linkAutoSelect)} />
-          <LinkAutoIntervalRow settings={settings(linkAutoSelect, interval)} />
+          <LinkAutoCard settings={settings(linkAutoSelect, interval)} />
         </ToastProvider>
       </QueryClientProvider>,
     ),

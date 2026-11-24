@@ -28,7 +28,12 @@ export function LinkAutoCard({ settings }: { settings: Settings }) {
       (e: unknown) => toast.error(errorText(e, t)),
     );
 
-  return <Toggle id="link-auto" title={t("subs.linkAuto.title")} hint={t(on ? "subs.linkAuto.on" : "subs.linkAuto.off")} checked={on} disabled={save.isPending} onChange={flip} />;
+  return (
+    <>
+      <Toggle id="link-auto" title={t("subs.linkAuto.title")} hint={t(on ? "subs.linkAuto.on" : "subs.linkAuto.off")} checked={on} disabled={save.isPending} onChange={flip} />
+      {on && <LinkAutoIntervalRow settings={settings} />}
+    </>
+  );
 }
 
 /** The seconds between the checks the panel accepts, and the one a settings record without the choice means. */
@@ -36,8 +41,8 @@ export const autoIntervals = [60, 120, 300, 600] as const;
 export const autoIntervalDefault = 300;
 export const linkAutoInterval = (s: Pick<Settings, "linkAutoInterval">) => s.linkAutoInterval ?? autoIntervalDefault;
 
-/** How often the Auto group checks the servers; under the switch, shown only while Auto is on. Saved at once. */
-export function LinkAutoIntervalRow({ settings }: { settings: Settings }) {
+/** How often the Auto group checks the servers; right under the switch (LinkAutoCard draws it), only while Auto is on. Saved at once. */
+function LinkAutoIntervalRow({ settings }: { settings: Settings }) {
   const t = useTx();
   const toast = useToast();
   const save = useSaveSettings();
@@ -49,7 +54,7 @@ export function LinkAutoIntervalRow({ settings }: { settings: Settings }) {
       (e: unknown) => toast.error(errorText(e, t)),
     );
   return (
-    <div className="pp-rows">
+    <div className="pp-rows sb-ai">
       <Row label={t("subs.linkAuto.every")} hint={t("subs.linkAuto.everyHint")}>
         <Segmented
           aria-label={t("subs.linkAuto.everyAria")}

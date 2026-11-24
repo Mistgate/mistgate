@@ -11,7 +11,7 @@ import { useDebounced } from "@/screens/users/ui";
 import { ClientApiCard } from "./client-api";
 import { DeviceIdleCard } from "./device-idle";
 import { DeviceLimitCard } from "./device-limit";
-import { LinkAutoCard, LinkAutoIntervalRow, linkAutoOn } from "./link-auto";
+import { LinkAutoCard } from "./link-auto";
 import { LinkAwgCard } from "./link-awg";
 import { formatKey, move, ruleFormats, singboxAgents, type Rule, type Settings } from "./model";
 import { Glyph, Grid, path, Section, Svg } from "./parts";
@@ -47,7 +47,6 @@ export function RulesTab({ settings }: { settings: Settings }) {
               <LinkAutoCard settings={settings} />
               <LinkAwgCard settings={settings} />
             </div>
-            {linkAutoOn(settings) && <LinkAutoIntervalRow settings={settings} />}
           </Section>
           <DeviceLimitCard settings={settings} />
           <DeviceIdleCard settings={settings} />
