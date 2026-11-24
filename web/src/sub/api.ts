@@ -69,7 +69,7 @@ export const unlock = async (url: string, password: string) => {
   await post(url, "", { password });
 };
 
-export const addDevice = async (endpoints: string, body: { profile_id: string; platform: string; label: string }) => answer(await post(endpoints, "", body));
+export const addDevice = async (endpoints: string, body: { profile_id: string; platform: string; label: string; route?: string }) => answer(await post(endpoints, "", body));
 export const getConfigs = async (endpoints: string, id: string) => answer(await post(endpoints, `/${encodeURIComponent(id)}/configs`, {}));
 export const rotateKey = async (endpoints: string, id: string) => answer(await post(endpoints, `/${encodeURIComponent(id)}/rotate`, {}));
 export const revokeDevice = async (endpoints: string, id: string) => {

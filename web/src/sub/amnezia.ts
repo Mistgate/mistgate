@@ -106,6 +106,29 @@ export function keyBody(c: AmzCtx): HTMLElement {
           ...set.servers.map((x) => h("li", null, flag(c, { country_code: x.cc, place: "", label: x.country }, true), h("span", { class: "nm" }, h("bdi", null, x.country), x.mark && h("span", { class: "id" }, x.mark)), x.host && h("span", { class: "dom" }, x.host))),
         ),
     );
+  // the owner offers "Russian services direct": two cards of one kind, the ordinary key first; what the second one costs under it
+  const routes = [["", t.adRouteAllT, t.adRouteAllD], ["ru-direct", t.adRouteRuT, t.adRouteRuD]] as const;
+  const routeField =
+    d.amnezia?.ru_direct &&
+    h(
+      "div",
+      { class: "a-fld" },
+      h("p", { class: "a-lbl", id: "nd-r" }, t.adRouteT),
+      h(
+        "div",
+        { class: "a-sets rt", role: "radiogroup", "aria-labelledby": "nd-r" },
+        ...routes.map(([r, title, line]) => {
+          const on = f.route === r;
+          return h(
+            "button",
+            { class: `a-set${on ? " on" : ""}`, type: "button", role: "radio", "aria-checked": on, "data-k": `amz-route-${r || "all"}`, on: { click: () => a.amz.form({ route: r }, true) } },
+            h("span", { class: "a-rd" }),
+            h("span", { class: "tx" }, h("span", { class: "t" }, title), h("span", { class: "d" }, line)),
+          );
+        }),
+      ),
+      f.route === "ru-direct" && h("p", { class: "u-hint" }, t.adRouteRuNote),
+    );
   return h(
     "form",
     {
@@ -130,6 +153,7 @@ export function keyBody(c: AmzCtx): HTMLElement {
       h("label", { class: "a-lbl", for: "a-nm" }, t.awgName, h("span", null, t.optional)),
       h("input", { class: "a-inp", id: "a-nm", "data-k": "amz-label", type: "text", dir: "auto", maxlength: 40, autocomplete: "off", placeholder: t.awgNamePh[f.platform as keyof typeof t.awgNamePh], value: f.label, on: { input: (e) => a.amz.form({ label: (e.target as HTMLInputElement).value }) } }),
     ),
+    routeField,
     versionField,
     setsField,
     err && h("p", { class: "a-err", role: "alert" }, icon("warn"), t.err(err, s.amz.retryMin)),
@@ -239,7 +263,8 @@ export function readyBody(c: AmzCtx, x: AwgDevice): HTMLElement {
   else if (versions.length > 0) meta.push(metaRow("info", t.needApp(versions)));
   // the key through an entry is another server in the app: said once, where it is picked
   if (cfg.via_node_id || cfg.ipv6) meta.push(metaRow("info", t.viaKeyNote(cfg.via_node_id ? t.chipVia(cfg.via_country) : "IPv6", app)));
-  if (!qr) meta.push(metaRow("info", t.qrTooBig));
+  if (x.route === "ru-direct") meta.push(metaRow("info", t.adRuMeta(app)));
+  if (!qr) meta.push(metaRow("info", x.route === "ru-direct" ? t.qrTooBigRu : t.qrTooBig));
   return h(
     "div",
     { class: "a-b" },

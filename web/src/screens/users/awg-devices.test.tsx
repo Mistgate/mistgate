@@ -16,7 +16,7 @@ const config = (over: Partial<DeviceConfig>) =>
 const direct = config({});
 const throughRu = config({ conf: "[Interface]\nPrivateKey = via\n", vpnKey: "vpn://via", confFilename: "de1-31-via-ru.conf", viaCountry: "RU", viaNodeId: "nod_msk1" });
 const throughIPv6 = config({ conf: "[Interface]\nPrivateKey = v6\n", vpnKey: "vpn://v6", confFilename: "de1-31-ipv6.conf", ipv6: true });
-const device: DeviceRef = { id: "dev_1", label: "Pixel", platform: "android", profileName: "AWG 3.1", version: "3.1", address: "10.66.4.5", stale: false };
+const device: DeviceRef = { id: "dev_1", label: "Pixel", platform: "android", profileName: "AWG 3.1", version: "3.1", address: "10.66.4.5", stale: false, route: "" };
 
 vi.mock("@/lib/api", async (orig) => ({ ...(await orig<object>()), devices: { getDeviceConfigs: vi.fn() }, users: { revokeDevice: vi.fn() } }));
 vi.mock("@/components/qr-code", () => ({ QrCode: ({ value }: { value: string }) => <div data-testid="qr" data-value={value} /> }));
@@ -33,7 +33,7 @@ afterEach(() => {
   root = host = null;
 });
 
-async function mount(initial: DeviceConfig[]) {
+async function mount(initial: DeviceConfig[], dev: DeviceRef = device) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -42,7 +42,7 @@ async function mount(initial: DeviceConfig[]) {
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <DeviceConfigsModal device={device} initial={initial} onClose={() => {}} onChanged={() => {}} />
+          <DeviceConfigsModal device={dev} initial={initial} onClose={() => {}} onChanged={() => {}} />
         </ToastProvider>
       </QueryClientProvider>,
     ),
@@ -60,6 +60,14 @@ describe("the configs of an AmneziaWG device", () => {
     expect(dialog().textContent).toContain("de1");
     expect(dialog().textContent).not.toContain("separate key");
     expect(qr()).toContain("direct");
+  });
+
+  it("a key that leaves the Russian services out says so and has no QR code: the file and the key are there, and why there is no code", async () => {
+    await mount([direct], { ...device, route: "ru-direct" });
+    expect(dialog().querySelector("[data-testid=qr]")).toBeNull();
+    expect(dialog().textContent).toContain(en["awg.route.ru"]);
+    expect(dialog().textContent).toContain(en["awg.cfg.qrDirect"]);
+    expect(dialog().textContent).toContain(en["awg.cfg.download"]);
   });
 
   it("a config through an entry shares the node of the direct one and is picked apart from it, with its own QR code, and says once what it is", async () => {

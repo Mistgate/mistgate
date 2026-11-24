@@ -708,6 +708,56 @@ describe("the add-a-device dialog", () => {
   });
 });
 
+describe("the key \"Russian services direct\"", () => {
+  const form = (name: string, amz: Partial<AmzState> = {}) => dialog(data(name), { amz: { pane: "key", ...amz } });
+  const keyBox = (d: MgData, id: string) => {
+    const r = dialog(d, { platform: "ios", amz: { open: id, configs: { [id]: [{ ...cfg("de1"), qr: null }] } } });
+    const box = document.createElement("div");
+    box.append(...(deviceModal(r.c) as Node[]));
+    return box;
+  };
+
+  it("the form offers two choices of one height when the owner allows it, the ordinary one chosen", () => {
+    const b = form("ru-direct").box;
+    expect([...b.querySelectorAll(".a-sets.rt .a-set .t")].map(text)).toEqual(["Всё через VPN", "Российские сервисы напрямую"]);
+    expect([...b.querySelectorAll(".a-sets.rt .a-set")].map((x) => x.getAttribute("aria-checked"))).toEqual(["true", "false"]);
+    expect(text(b.querySelectorAll(".a-sets.rt .a-set .d")[1])).toBe("Яндекс, VK, банки и другие российские сервисы идут мимо VPN и не видят адрес сервера. Без QR-кода — файл или ссылка");
+    expect(b.querySelector("#nd-r + .u-hint")).toBeNull(); // the cost is said once the second one is chosen
+    const on = form("ru-direct", { form: { ...newAmzState("ios", "p31").form, route: "ru-direct" } }).box;
+    expect(text(on.querySelector(".a-fld .u-hint"))).toContain("Приложение всё равно видит, что VPN включён");
+    expect(form("many").box.querySelector(".a-sets.rt")).toBeNull(); // not offered: the form is as it was
+  });
+
+  it("the key is made with the chosen route, and with none when the owner does not offer it", async () => {
+    const calls: unknown[] = [];
+    const api = fakeApi({ addDevice: async (_e, b) => (calls.push(b.route), { device: awgDevice({ id: "dev_new", platform: b.platform, label: b.label, profile_id: b.profile_id, route: b.route }), configs: [cfg("de1")] }) });
+    const on = setup("ru-direct", api);
+    on.a.form({ route: "ru-direct" });
+    on.a.create();
+    await settle();
+    expect(on.data.amnezia?.devices.at(-1)?.route).toBe("ru-direct");
+    const off = setup("many", api);
+    off.a.form({ route: "ru-direct" }); // a stale choice cannot reach a page that does not offer it
+    off.a.create();
+    await settle();
+    expect(calls).toEqual(["ru-direct", ""]);
+  });
+
+  it("the row says what the key is, the ready key says why it has no code, and an outdated list has its own words", () => {
+    const d = data("ru-direct");
+    const list = view(d, state("ios", { returning: true, tab: "devices", devicesOpen: true }), actions());
+    expect(text(row(list, "d9").querySelector(".mt"))).toContain("Россия напрямую");
+    expect(text(row(list, "d3").querySelector(".mt"))).not.toContain("Россия напрямую");
+    const box = keyBox(d, "d9");
+    expect(box.querySelector(".a-side .u-qr")).toBeNull();
+    expect(text(box)).toContain("не помещается в QR-код");
+    expect(text(box)).toContain("Российские сервисы идут мимо VPN. Раздельное туннелирование AmneziaVPN для этого сервера не работает");
+    expect(text(keyBox(data("ru-direct"), "d3"))).not.toContain("не помещается в QR-код"); // an ordinary key has its own line
+    const stale = view(data("ru-direct-stale"), state("ios", { returning: true, tab: "devices", devicesOpen: true }), actions());
+    expect(row(stale, "d9").querySelector(".u-tag.work")?.getAttribute("title")).toBe(t.staleRu);
+  });
+});
+
 describe("the 'new key needed' card", () => {
   const page = (d: MgData) => view(d, state("android", { returning: true, tab: "devices", devicesOpen: true }), actions());
 

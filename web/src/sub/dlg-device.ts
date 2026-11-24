@@ -168,7 +168,7 @@ export function staleWindow(c: Ctx): Kid[] {
     body: h(
       "div",
       { class: "a-b" },
-      h("p", { class: "a-lead" }, x.stale_reason === "dns" ? t.dgStaleDnsD : t.dgStaleD),
+      h("p", { class: "a-lead" }, x.stale_reason === "dns" ? t.dgStaleDnsD : x.stale_reason === "routes" ? t.dgStaleRuD : t.dgStaleD),
       h("ol", { class: "a-steps" }, ...steps.map((s, i) => h("li", { class: "a-st" }, h("span", { class: "a-n" }, String(i + 1)), h("div", { class: "tx" }, s)))),
       err,
     ),

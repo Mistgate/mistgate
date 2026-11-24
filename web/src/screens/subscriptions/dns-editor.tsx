@@ -338,7 +338,7 @@ function AppsGet({ servers, transport, data, catalog, t }: { servers: DnsServerN
       {results.map((r) => {
         const got = r.transport ?? null;
         const ok = got !== null && got === transport;
-        const why = servers.length === 0 ? "" : !ok ? t(appWhy[r.client] ?? "subs.dns.why.mihomo") : r.client === DnsClient.SINGBOX && r.resolvers > 1 ? t("subs.dns.why.singbox") : "";
+        const why = servers.length === 0 ? "" : !ok ? t(appWhy[r.client] ?? "subs.dns.why.mihomo") : r.client === DnsClient.SINGBOX && r.resolvers > 1 ? t("subs.dns.why.singbox") : r.client === DnsClient.AMNEZIAWG ? t("subs.dns.why.amneziawgOk") : "";
         return (
           <div key={r.client} className={cx(got === null && "no")}>
             <span>{t(appName[r.client] ?? "subs.dns.app.happ")}</span>

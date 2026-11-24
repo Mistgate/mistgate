@@ -384,6 +384,10 @@ button.a-set:hover { background: color-mix(in srgb, var(--text) 3%, transparent)
 .a-set .t { display: flex; align-items: center; gap: 8px; font-size: 15px; line-height: 20px; font-weight: 500; }
 .a-set .d { font-size: 13px; line-height: 20px; color: var(--sec); }
 .a-set .u-tag { height: 20px; padding: 0 6px; font-weight: 400; }
+/* the route of a key: two cards of one height, the radio at the first line */
+.a-sets.rt { display: grid; grid-auto-rows: 1fr; }
+.a-sets.rt .a-set { align-items: flex-start; padding: 12px 16px; }
+.a-sets.rt .a-rd { margin-block-start: 2px; }
 .a-fls { display: flex; flex: none; gap: 4px; }
 .a-fls .fl2 { width: 20px; height: 14px; border-radius: 3px; }
 .a-fls .x { font: 400 12px/14px var(--mono); color: var(--muted); }
