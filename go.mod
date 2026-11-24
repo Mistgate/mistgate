@@ -227,3 +227,9 @@ replace github.com/xtls/reality => ./third_party/reality
 // atomic; mux XUDP.Status set under XUDPManager's lock), from the public fork github.com/Mistgate/Xray-core (its README says
 // what and why). Pin a commit of the fork, not a branch.
 replace github.com/xtls/xray-core => github.com/Mistgate/Xray-core v0.0.0-20261123133952-66e16d25229f
+
+// HOLD: the Hysteria core v2.14.0 asks for quic-go v0.65.1, but the Xray-core fork pinned above still calls http3's HTTPStream() with
+// the one-value signature of quic-go v0.63 (transport/internet/masque/connectip/proxy.go). Until the fork has the two-value change and a
+// new commit is pinned, quic-go stays at the version Mistgate had with Hysteria v2.13.0; then delete this replace and use the
+// HTTPStream() (*Stream, error) form in internal/node/trusttunnel/h3.go (third_party/hysteria-core/MISTGATE.md, "Held on quic-go").
+replace github.com/apernet/quic-go => github.com/apernet/quic-go v0.63.1-0.20261004180939-a10df75c260c
