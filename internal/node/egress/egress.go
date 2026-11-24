@@ -25,10 +25,12 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/apernet/hysteria/extras/v2/outbounds"
 
+	"github.com/mistgate/mistgate/internal/node/destblock"
 	"github.com/mistgate/mistgate/internal/node/engine"
 )
 
@@ -42,6 +44,9 @@ const (
 
 // ErrBlocked is returned for destinations that are not public unicast addresses.
 var ErrBlocked = errors.New("egress: destination address not allowed")
+
+// errNameBlocked is ErrBlocked for a destination whose name the BlockNames list holds; the identity tells callers to count it.
+var errNameBlocked = fmt.Errorf("%w", ErrBlocked)
 
 // ErrNoIPv4 is returned for a destination that has no IPv4 address while the egress is IPv4-only (IPv4OnlyWhen).
 var ErrNoIPv4 = errors.New("egress: no IPv4 address (IPv6 for clients is off on this node)")
@@ -72,6 +77,16 @@ type Option func(*stage)
 
 // AllowPrivate permits loopback, private and link-local destinations and the node's own addresses (tests, dev).
 func AllowPrivate() Option { return func(s *stage) { s.allowPrivate = true } }
+
+// BlockNames refuses destinations by name. list is asked on every dial and datagram, so a new list needs no new egress
+// (nil or empty: nothing is blocked, the egress behaves as without this option). A destination given as a domain that
+// the list holds is refused with ErrBlocked before it is resolved. A destination given as an IP address is let through, but
+// the client's first bytes are read for the name: TLS SNI on a TCP connection (the connection is closed, no byte reaches
+// the server) and the QUIC Initial of UDP (its datagrams are dropped). onBlock, if not nil, runs once per connection or UDP
+// session that was blocked, never per packet.
+func BlockNames(list func() *destblock.List, onBlock func()) Option {
+	return func(s *stage) { s.names, s.onBlock = list, onBlock }
+}
 
 // New builds the direct egress. resolvers is called per lookup (engine.Env.DNS), so a node settings
 // change needs no restart; "host" or "host:port" entries, tried in order; nil or empty = system resolver.
@@ -119,27 +134,48 @@ type stage struct {
 	res          *resolver
 	self         *selfAddrs
 	allowPrivate bool
-	device       string      // WithDevice
-	ipv4Only     bool        // IPv4Only
-	v4When       func() bool // IPv4OnlyWhen
+	device       string                 // WithDevice
+	ipv4Only     bool                   // IPv4Only
+	v4When       func() bool            // IPv4OnlyWhen
+	names        func() *destblock.List // BlockNames
+	onBlock      func()                 // BlockNames
+}
+
+// admit is prepare for the start of a connection or UDP session: a name the list holds is counted.
+func (s *stage) admit(a *outbounds.AddrEx) error {
+	err := s.prepare(a)
+	if err == errNameBlocked && s.onBlock != nil {
+		s.onBlock()
+	}
+	return err
 }
 
 func (s *stage) TCP(a *outbounds.AddrEx) (net.Conn, error) {
-	if err := s.prepare(a); err != nil {
+	if err := s.admit(a); err != nil {
 		return nil, err
 	}
-	return s.next.TCP(a)
+	c, err := s.next.TCP(a)
+	if err != nil {
+		return nil, err
+	}
+	// A name the list holds is refused in prepare; one that arrives as an IP address is read from the client's first bytes.
+	if s.names != nil && isIP(a.Host) {
+		if l := s.names(); !l.Empty() {
+			c = destblock.WrapTCP(c, l, s.onBlock)
+		}
+	}
+	return c, nil
 }
 
 func (s *stage) CheckUDP(a *outbounds.AddrEx) error {
-	if err := s.prepare(a); err != nil {
+	if err := s.admit(a); err != nil {
 		return err
 	}
 	return s.next.CheckUDP(a)
 }
 
 func (s *stage) UDP(a *outbounds.AddrEx) (outbounds.UDPConn, error) {
-	if err := s.prepare(a); err != nil {
+	if err := s.admit(a); err != nil {
 		return nil, err
 	}
 	c, err := s.next.UDP(a)
@@ -149,21 +185,47 @@ func (s *stage) UDP(a *outbounds.AddrEx) (outbounds.UDPConn, error) {
 	return &udpConn{UDPConn: c, s: s}, nil
 }
 
+func isIP(host string) bool {
+	_, err := netip.ParseAddr(host)
+	return err == nil
+}
+
 // udpConn re-checks every outgoing datagram: one UDP session may be told a new destination, and the
 // dialer resolves domains itself when ResolveInfo is empty.
 type udpConn struct {
 	outbounds.UDPConn
-	s *stage
+	s        *stage
+	quic     destblock.QUICGuard
+	reported atomic.Bool // onBlock ran for this session
 }
 
 func (c *udpConn) WriteTo(b []byte, a *outbounds.AddrEx) (int, error) {
 	if err := c.s.prepare(a); err != nil {
+		if err == errNameBlocked {
+			c.report()
+		}
 		return 0, err
+	}
+	// A datagram to an IP address carries its name only in a QUIC Initial: the datagrams of a flow that names the list are dropped.
+	if c.s.names != nil && isIP(a.Host) {
+		if l := c.s.names(); !l.Empty() && c.quic.Drop(l, a.Host, a.Port, b) {
+			c.report()
+			return len(b), nil
+		}
 	}
 	return c.UDPConn.WriteTo(b, a)
 }
 
+func (c *udpConn) report() {
+	if c.s.onBlock != nil && c.reported.CompareAndSwap(false, true) {
+		c.s.onBlock()
+	}
+}
+
 func (s *stage) prepare(a *outbounds.AddrEx) error {
+	if s.names != nil && s.names().Match(a.Host) { // before the resolver: a blocked name costs no lookup and no dial
+		return errNameBlocked
+	}
 	var v4, v6 net.IP
 	if a.ResolveInfo != nil {
 		v4, v6 = a.ResolveInfo.IPv4, a.ResolveInfo.IPv6
