@@ -171,6 +171,7 @@ class MistBox(Box):
         st, b, _ = self.rpc("AuthService", "FinishStepUp", {"totpCode": totp(self.totp, step)})
         assert st == 200, (st, b)
         self.last_step = step
+        self.stepup_t = time.time()
 
     def setup(self, n):
         out = sh("%s/mistgate setup --data-dir %s --public-url http://localhost:18080" % (BIN, self.D))
@@ -227,6 +228,15 @@ class MistBox(Box):
             raise RuntimeError("mistgate node never served: " + sh("docker logs bench_mgnode_box 2>&1 | tail -20", check=False))
         self.auths = collect_auths(self)
         self.server = "%s:%d" % self.link_host
+        # v0.2 hands the node its users a moment after the subscription shows the server line: wait until the last user can really connect
+        t0 = time.time()
+        while time.time() - t0 < 300:
+            out = sh("%s tp -server %s -auth '%s' -sink %s -streams 1 -d 2s -probe 0" % (HYLOAD, self.server, self.auths[-1], SINK_ADDR), check=False)
+            if '"gbit_s":0,' not in out and '"error"' not in out:
+                break
+            time.sleep(2)
+        self.user_sync_wait_s = time.time() - t0
+        log("mistgate box: last user can connect after %.0fs" % self.user_sync_wait_s)
 
     def restart_panel_only(self):
         sh("systemctl restart bench-mg-box")
@@ -244,6 +254,8 @@ class MistBox(Box):
         self.users["c%d" % i] = b["user"]["id"]
 
     def api_del_user(self, i):
+        if time.time() - self.stepup_t > 240:                  # deleting users needs a step-up, which lasts 5 minutes (v0.2)
+            self._stepup()
         st, b, _ = self.c.req("POST", self.admin_path + "api/mistgate.admin.v1.UserService/DeleteUsers", body={"userIds": [self.users.pop("c%d" % i)]})
         assert st == 200, (st, b)
 
@@ -331,7 +343,7 @@ class XuiBox(Box):
         assert st == 200 and b.get("success"), (st, b)
 
     def versions(self):
-        return {"3x-ui": "v3.9.0", "xray": "26.9.30 (as logged by the container)"}
+        return {"3x-ui": "v3.11.0", "xray": "26.10.21 (as logged by the container)"}
 
 
 # ---------------------------------------------------------------- Remnawave
@@ -435,7 +447,7 @@ class RemBox(Box):
         raise AssertionError((st, b, tries))
 
     def versions(self):
-        return {"remnawave backend": "3.4.5", "remnawave node": "3.4.2 (Xray 26.7.28)", "postgres": "18.4", "valkey": "9-alpine"}
+        return {"remnawave backend": "3.4.11", "remnawave node": "3.4.6 (Xray 26.11.9)", "postgres": "18.4", "valkey": "9-alpine"}
 
 
 # ---------------------------------------------------------------- PasarGuard
@@ -535,7 +547,7 @@ class PgBox(Box):
         assert st in (200, 204), (st, b)
 
     def versions(self):
-        return {"pasarguard panel": "v5.4.1 (SQLite)", "pasarguard node": "v0.5.4 (Xray 26.3.27)"}
+        return {"pasarguard panel": "v5.6.0 (SQLite)", "pasarguard node": "v0.5.7 (Xray 26.10.31)"}
 
 
 # ---------------------------------------------------------------- driver
