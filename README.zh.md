@@ -209,9 +209,9 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 | 数据库 | SQLite | SQLite 或 PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite、MySQL、MariaDB 或 PostgreSQL | SQLite |
 | 面板空闲时占用 RAM | 39–44 MiB¹ | 73–76 MiB¹ | 436–464 MiB¹ | 未测量 | 273–277 MiB¹ | 未测量 |
 | 在面板中添加节点（SSH） | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
-| Hysteria2 | ✅ | ✅ | 🟡 部分 | ✅ | ✅ | ✅ |
+| Hysteria2 | ✅ 原生 | ✅ | 🟡 部分 | ✅ | ✅ | ✅ |
 | VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| AmneziaWG | ✅ 2.0 和 3.1 | ✅ 3.1 | ❌ | ❌ | ❌ | ❌ |
+| AmneziaWG | ✅ 原生, 2.0 和 3.1 | ✅ 3.1 | ❌ | ❌ | ❌ | ❌ |
 | TrustTunnel | ✅ 实验性 | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Telegram 代理（MTProto） | ✅ 实验性 | ✅ | ❌ | ✅ | ✅ 源代码中包含 | ❌ |
 | WireGuard | ❌ | ✅ | 🟡 仅通过内核配置 | ✅ | ✅ | ✅ |
@@ -226,7 +226,7 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 | Telegram 机器人 | 🟡 仅告警 | ✅ | 🟡 部分 | ✅ | ✅ | 🟡 仅第三方机器人 |
 | 面向 AI 智能体的内置 MCP 服务器 | ✅ | ❌ | ❌ | ? | ? | ? |
 
-¹ 整个面板进程组空闲时的私有内存，0 到 200 个用户，未连接节点，在 1 vCPU / 1 GB 的测试服务器上测得（3x-ui 包含它的 Xray 内核和 fail2ban）。方法、版本和局限见[基准测试](docs/zh/reference/benchmarks.md)。「?」表示该项目自己的 README 和文档中没有说明。其他项目的「❌」表示它自己明确这样说，或其源代码中没有提到该功能（2026-11-24 的代码搜索）。
+¹ 整个面板进程组空闲时的私有内存，0 到 200 个用户，未连接节点，在 1 vCPU / 1 GB 的测试服务器上测得（3x-ui 包含它的 Xray 内核和 fail2ban）。方法、版本和局限见[基准测试](docs/zh/reference/benchmarks.md)。「?」表示该项目自己的 README 和文档中没有说明。其他项目的「❌」表示它自己明确这样说，或其源代码中没有提到该功能（2026-11-24 的代码搜索）。“原生”指节点上运行的是该协议自己的核心，而不是 Xray 或 sing-box 内的重新实现。
 
 在协议覆盖范围、社区规模、管理员角色和功能完整的 Telegram 机器人方面，其他面板更领先。带来源的完整对照表（核对于 2026-10-09，部分于 2026-11-24 复核）见[与其他面板的对比](docs/zh/reference/comparison.md)。
 

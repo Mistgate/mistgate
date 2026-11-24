@@ -209,9 +209,9 @@ An AI agent that can run `ssh` can do these steps with the prompt in the [AI age
 | Database | SQLite | SQLite or PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite, MySQL, MariaDB or PostgreSQL | SQLite |
 | Panel RAM, idle | 39-44 MiB¹ | 73-76 MiB¹ | 436-464 MiB¹ | not measured | 273-277 MiB¹ | not measured |
 | Add a node from the panel (SSH) | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
-| Hysteria2 | ✅ | ✅ | 🟡 partial | ✅ | ✅ | ✅ |
+| Hysteria2 | ✅ native | ✅ | 🟡 partial | ✅ | ✅ | ✅ |
 | VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| AmneziaWG | ✅ 2.0 and 3.1 | ✅ 3.1 | ❌ | ❌ | ❌ | ❌ |
+| AmneziaWG | ✅ native, 2.0 and 3.1 | ✅ 3.1 | ❌ | ❌ | ❌ | ❌ |
 | TrustTunnel | ✅ experimental | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Telegram proxy (MTProto) | ✅ experimental | ✅ | ❌ | ✅ | ✅ in the source | ❌ |
 | WireGuard | ❌ | ✅ | 🟡 core config only | ✅ | ✅ | ✅ |
@@ -226,7 +226,7 @@ An AI agent that can run `ssh` can do these steps with the prompt in the [AI age
 | Telegram bot | 🟡 alerts only | ✅ | 🟡 partial | ✅ | ✅ | 🟡 third-party bot |
 | Built-in MCP server for AI agents | ✅ | ❌ | ❌ | ? | ? | ? |
 
-¹ Private memory of the whole panel group, idle, 0 to 200 users, no node attached, on a 1 vCPU / 1 GB test server (3x-ui includes its Xray core and fail2ban). Method, versions and limits: [Benchmarks](docs/en/reference/benchmarks.md). "?" means the project's own README and docs do not say. "❌" for another project means it says so itself, or its source code does not mention the feature (a code search on 2026-11-24).
+¹ Private memory of the whole panel group, idle, 0 to 200 users, no node attached, on a 1 vCPU / 1 GB test server (3x-ui includes its Xray core and fail2ban). Method, versions and limits: [Benchmarks](docs/en/reference/benchmarks.md). "?" means the project's own README and docs do not say. "❌" for another project means it says so itself, or its source code does not mention the feature (a code search on 2026-11-24). "native" means the protocol's own core runs on the node, not a reimplementation inside Xray or sing-box.
 
 Others are ahead in protocol breadth, community size, admin roles and full Telegram bots. The full table with sources, checked on 2026-10-09 and in part again on 2026-11-24, is in [Comparison with other panels](docs/en/reference/comparison.md).
 
