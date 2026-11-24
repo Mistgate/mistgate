@@ -103,7 +103,7 @@ const torrents = editor("dns-torrent", "DNS: a preset that sends torrent clients
 const geoEmpty = editor("dns-geo-empty", "DNS: a split rule with a country on and the field «Site category» empty", ids.cf, { demo: { draft: { split: [rule([".ru"], [cat("yandex/basic")], ["ru"])] } } });
 const geoChips = editor("dns-geo-chips", "DNS: a split rule with two country lists and two site categories (chips)", ids.geoOwn, { list: manyPresets });
 const split = editor("dns-split", "DNS: a preset with split rules (suffixes, a country, servers of their own)", ids.ru, {
-  list: [...boardPresets.slice(0, 4), { ...boardPresets[4]!, split: [rule([".ru", ".su", ".xn--p1ai"], [cat("yandex/basic")]), rule([], [cat("alidns/standard"), own("203.0.113.9")], ["cn"])] }],
+  list: [...boardPresets.slice(1), { ...boardPresets[0]!, split: [rule([".ru", ".su", ".xn--p1ai"], [cat("yandex/basic")]), rule([], [cat("alidns/standard"), own("203.0.113.9")], ["cn"])] }],
 });
 
 export const dnsScenes: SceneDef[] = [

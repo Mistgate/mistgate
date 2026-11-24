@@ -54,18 +54,21 @@ const preset = (p: Make): Preset => ({
 });
 
 /** The ids the board's "Как выбрать" names. */
-export const ids = { cf: "dns_builtin_cloudflare", q9: "dns_builtin_quad9", ag: "dns_builtin_adblock", fam: "dns_builtin_cloudflare_family", ru: "dns_builtin_ru_split", proxied: "dns_builtin_ru_proxied", ruGeo: "dns_builtin_ru_geo", geoOwn: "dns_own_geo", ads: "dns_builtin_ads_device", office: "dns_own_office", long: "dns_own_long", cn: "dns_own_cn" } as const;
+export const ids = { cf: "dns_builtin_cloudflare", q9: "dns_builtin_quad9", ag: "dns_builtin_adblock", fam: "dns_builtin_family", ru: "dns_builtin_ru_split", proxied: "dns_builtin_ru_proxied", ruGeo: "dns_builtin_ru_geo", geoOwn: "dns_own_geo", ads: "dns_builtin_ads_device", office: "dns_own_office", long: "dns_own_long", cn: "dns_own_cn" } as const;
 
-/** The board's five presets of the list (Cloudflare the default, "Россия" with the split), under the panel's own ids and names. */
+/**
+ * The board's five presets of the list under the panel's own ids and names: "Россия: .ru напрямую" the default (a built-in), and "Cloudflare" as
+ * it is after migration 00157 on a panel that used it: one of the seven retired built-ins that stayed as the owner's own preset (no «встроенный»).
+ */
 export const boardPresets: Preset[] = [
-  preset({ id: ids.cf, name: "Cloudflare: без фильтров", description: "Быстрый публичный резолвер\nFast public resolver", servers: [cat("cloudflare/standard")], preferredTransport: DnsTransport.DOH, userCount: 3, isDefault: true }),
-  preset({ id: ids.q9, name: "Quad9: защита от вредоносных", description: "С блокировкой вредоносных доменов\nBlocks malicious domains", servers: [cat("quad9/standard")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.SECURITY }),
-  preset({ id: ids.ag, name: "AdGuard: без рекламы", description: "Режет рекламу и трекеры на уровне DNS\nCuts ads and trackers at the DNS level", servers: [cat("adguard/default")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.NO_ADS, blockAds: false }),
-  preset({ id: ids.fam, name: "Cloudflare Family: без вредоносных и 18+", description: "Cloudflare Family: без взрослых сайтов\nCloudflare Family: no adult sites", servers: [cat("cloudflare/family")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.FAMILY }),
   preset({
     id: ids.ru, name: "Россия: .ru напрямую", description: "Российские домены через Яндекс, остальное через Cloudflare\nRussian domains through Yandex, the rest through Cloudflare",
-    servers: [cat("cloudflare/standard")], split: [rule([".ru", ".su", ".xn--p1ai"], [cat("yandex/basic")])], splitDirect: true, preferredTransport: DnsTransport.DOH, category: DnsCategory.REGIONAL, country: "RU",
+    servers: [cat("cloudflare/standard")], split: [rule([".ru", ".su", ".xn--p1ai"], [cat("yandex/basic")])], splitDirect: true, preferredTransport: DnsTransport.DOH, category: DnsCategory.REGIONAL, country: "RU", userCount: 3, isDefault: true, blockMax: true,
   }),
+  preset({ id: ids.cf, name: "Cloudflare: без фильтров", description: "Cloudflare 1.1.1.1: быстрый DNS без фильтров\nCloudflare 1.1.1.1: fast DNS, no filtering", builtin: false, servers: [cat("cloudflare/standard")], preferredTransport: DnsTransport.DOH, userCount: 3 }),
+  preset({ id: ids.q9, name: "Quad9: защита от вредоносных", description: "С блокировкой вредоносных доменов\nBlocks malicious domains", servers: [cat("quad9/standard")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.SECURITY }),
+  preset({ id: ids.ag, name: "AdGuard: без рекламы", description: "Режет рекламу и трекеры на уровне DNS\nCuts ads and trackers at the DNS level", servers: [cat("adguard/default")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.NO_ADS, blockAds: false }),
+  preset({ id: ids.fam, name: "AdGuard Family: без рекламы и 18+", description: "AdGuard Family: без рекламы и сайтов для взрослых\nAdGuard Family: no ads, no adult sites", servers: [cat("adguard/family")], preferredTransport: DnsTransport.DOH, userCount: 1, category: DnsCategory.FAMILY }),
 ];
 
 const proxied = preset({
