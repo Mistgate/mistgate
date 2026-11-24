@@ -42,6 +42,7 @@ func TestTokenReachableResponsesCarryNoSecret(t *testing.T) {
 		"mistgate.admin.v1.SubscriptionSettings.support_url":                  "the public support link every user's page shows",
 		"mistgate.admin.v1.SubscriptionSettings.link_awg":                     "a bool controlling AWG in subscription profiles, not a key",
 		"mistgate.admin.v1.SubscriptionSettings.link_auto_select":             "a bool controlling automatic server groups in subscription profiles",
+		"mistgate.admin.v1.SubscriptionSettings.link_auto_interval":           "seconds between the server checks of the Auto group (60, 120, 300 or 600), a number and no credential",
 		"mistgate.admin.v1.PlatformApp.download_url":                          "a public app download link every user's page shows",
 		"mistgate.admin.v1.PlatformApp.add_link_template":                     "a template with placeholders; the subscription URL is filled in only on the user's own page",
 		"mistgate.admin.v1.UserPageOptions.require_page_password":             "a bool: whether the pages ask for a password",
