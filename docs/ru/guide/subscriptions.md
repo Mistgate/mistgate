@@ -186,6 +186,7 @@ kl!ck и другие Mihomo-приложения получают сервер�
 | v2rayN | 7.12.6 | 7.20.0 |
 | Ядро Mihomo (версия берётся из User-Agent) | 1.19.9 | никогда (Firefox_120 / Safari_16_0 не несут share) |
 | kl!ck (по его версии; внутри Mihomo) | 0.4.0 | никогда (Firefox_120 / Safari_16_0 не несут share) |
+| Mistgate (приложение для Windows; внутри Xray, во всех выпусках одно ядро) | 0.1.0 | 0.1.0 |
 | sing-box (SFA, SFI, SFM), Karing, NekoBox | не работает | не работает |
 | Hiddify, Streisand, FoXray, v2RayTun, INCY, OneXray, Shadowrocket, FlClash, Clash Verge, Mihomo Party, Clash Meta for Android | неизвестно | неизвестно |
 

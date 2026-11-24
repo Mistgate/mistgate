@@ -87,11 +87,6 @@
   align-self: flex-start;
   max-width: 100%;
 }
-/* L4611 */
-.pf .pp-seg button.dis {
-  opacity: .4;
-  cursor: default;
-}
 /* L4630 */
 /* L4644 */
 .pf .pp-show {
