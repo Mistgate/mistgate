@@ -86,8 +86,9 @@ func (a Access) UpdateProfile(ctx context.Context, p AccessProfile, expectedVers
 	if bumpEpoch {
 		stmts = append(stmts, Stmt{Query: `UPDATE profile SET critical_epoch = critical_epoch + 1 WHERE id = ?`, Args: []any{p.ID}})
 	}
-	for _, id := range bumpInbounds {
-		stmts = append(stmts, Stmt{Query: `UPDATE inbound SET spec_version = spec_version + 1, updated_at = ? WHERE id = ? AND profile_id = ?`, Args: []any{unix(now), id, p.ID}})
+	if len(bumpInbounds) > 0 {
+		stmts = append(stmts, Stmt{Query: `UPDATE inbound SET spec_version = spec_version + 1, updated_at = ?
+			WHERE profile_id = ? AND id IN (SELECT value FROM json_each(?))`, Args: []any{unix(now), p.ID, accJSON(bumpInbounds)}})
 	}
 	_, err := a.s.batch(ctx, stmts...)
 	if errors.Is(err, errGuard) {

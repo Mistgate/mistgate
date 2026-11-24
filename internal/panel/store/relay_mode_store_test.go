@@ -279,7 +279,7 @@ func profileSelectiveBumpProof(t *testing.T, st *Store) {
 		t.Fatal(err)
 	}
 	p.Name = "changed profile"
-	changed, err := st.Access().UpdateProfile(ctx, p, p.Version, []string{"inb_de1_hy", "inb_de1_vl"}, false, time.Now())
+	changed, err := st.Access().UpdateProfile(ctx, p, p.Version, []string{"inb_de1_hy", "inb_de1_hy", "inb_de1_vl"}, false, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
