@@ -517,7 +517,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 	title, brand, lang := s.keyNaming(ctx)
 	public, names, files := keyNames(title, brand, lang, nodes)
 	var out []DeviceConfig
-	pathAdded := false
+	pathAdded, hidden := false, false
 	fileUsed := map[string]bool{}
 	for _, name := range files {
 		fileUsed[name] = true
@@ -558,12 +558,17 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			continue
 		}
 		held[f.Node.ID] = dnsSig(servers)
-		out = append(out, DeviceConfig{
-			InboundID: f.Inbound.ID, NodeID: f.Node.ID, NodeName: f.Node.Name, CountryCode: f.Node.CountryCode, Server: public[i],
-			ProfileName: f.Profile.Name, AWGVersion: version, Conf: string(conf.Data), VPNKey: string(key.Data),
-			ConfFilename: files[i], Stale: sc.dev.Stale(),
-			MinClients: reqs, Warnings: warnings,
-		})
+		// Same rule as the subscription: an inbound whose address is hidden gives only its other paths (IPv6 entry, relays).
+		if f.Inbound.DirectInSubscriptions {
+			out = append(out, DeviceConfig{
+				InboundID: f.Inbound.ID, NodeID: f.Node.ID, NodeName: f.Node.Name, CountryCode: f.Node.CountryCode, Server: public[i],
+				ProfileName: f.Profile.Name, AWGVersion: version, Conf: string(conf.Data), VPNKey: string(key.Data),
+				ConfFilename: files[i], Stale: sc.dev.Stale(),
+				MinClients: reqs, Warnings: warnings,
+			})
+		} else {
+			hidden = true
+		}
 		if maxIdxErr != nil {
 			continue
 		}
@@ -636,6 +641,9 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			cfg.Server, cfg.Conf, cfg.VPNKey, cfg.ConfFilename = public[i]+mark, string(pathConf.Data), string(pathKey.Data), filename
 			out = append(out, cfg)
 		}
+	}
+	if len(out) == 0 && hidden {
+		return nil, failed("no_way_in") // every address is hidden and no IPv6 entry or relay is usable
 	}
 	if len(out) == 0 {
 		return nil, s.internal("render device config", errors.New("no inbound produced a config"))
