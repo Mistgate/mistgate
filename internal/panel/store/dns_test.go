@@ -48,7 +48,7 @@ func TestDNSMigrationUpgradesExistingData(t *testing.T) {
 	if err := s.R.QueryRowContext(ctx, `SELECT u.name, coalesce(u.dns_preset_id, 'none') FROM user u WHERE id = 'usr_a'`).Scan(&name, &dns); err != nil || name != "old user" || dns != "none" {
 		t.Fatalf("user after upgrade: %q %q %v", name, dns, err)
 	}
-	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&n); err != nil || n != 18 {
+	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&n); err != nil || n != 16 { // 18 less the seven that 00157 retired, plus the five of 00158
 		t.Fatalf("built-in presets: %d %v", n, err)
 	}
 	d := s.DNS()
@@ -149,18 +149,20 @@ func TestDNSSplitDirectMigrationUpgradesFrom7(t *testing.T) {
 		order = append(order, r.ID)
 	}
 	wantOrder := []string{
-		"dns_builtin_ru_split", "dns_builtin_ru_geo", "dns_builtin_ru_proxied", "dns_builtin_yandex", "dns_builtin_cn_split",
-		"dns_builtin_standard", "dns_builtin_cloudflare", "dns_builtin_google", "dns_builtin_dnssb",
+		"dns_builtin_ru_split", "dns_builtin_ru_geo", "dns_builtin_ru_proxied", "dns_builtin_cn_split",
+		"dns_builtin_ir_split", "dns_builtin_tr_split", "dns_builtin_kz_split", "dns_builtin_by_split", "dns_builtin_uz_split",
+		"dns_builtin_standard",
 		"dns_builtin_adblock", "dns_builtin_ads_device",
-		"dns_builtin_family", "dns_builtin_cloudflare_family", "dns_builtin_yandex_family", "dns_builtin_opendns_family",
+		"dns_builtin_family",
 		"dns_builtin_quad9", "dns_builtin_cloudflare_security", "dns_builtin_yandex_safe",
-		"dns_custom",
+		// 00157 retired the other six; Yandex DNS is used (usr_3) and edited, so it stays as an own preset, listed with them
+		"dns_custom", "dns_builtin_yandex",
 	}
 	if !slices.Equal(order, wantOrder) {
 		t.Errorf("order = %v, want %v", order, wantOrder)
 	}
 	var builtins int
-	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&builtins); err != nil || builtins != 18 {
+	if err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM dns_preset WHERE builtin = 1`).Scan(&builtins); err != nil || builtins != 16 {
 		t.Errorf("built-ins: %d %v", builtins, err)
 	}
 

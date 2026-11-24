@@ -72,6 +72,12 @@ describe("the panel's refusal codes", () => {
     for (const c of ["os_blocked", "node_updating"]) expect(errorCodes).toContain(c);
   });
 
+  it("words a split server that is also a main server, with the rule and the address", () => {
+    expect(say("split_server_same: rule=2&server=1.1.1.1", Code.InvalidArgument)).toBe("Rule 2: 1.1.1.1 is also a main server. Give the country's sites a resolver of their own, or its queries leave through the VPN together with everything else.");
+    expect(say("split_server_same: rule=2&server=1.1.1.1", Code.InvalidArgument, "ru")).toContain("Правило 2: 1.1.1.1 уже есть среди основных серверов");
+    expect(errorCodes).toContain("split_server_same");
+  });
+
   it("name the feature an edition cannot run, in the page's language", () => {
     const refused = "unavailable_in_edition: feature=backups"; // internal/panel/edition.Refuse
     expect(say(refused, Code.FailedPrecondition)).toBe("Not available in the Cloudflare edition yet: Backups.");

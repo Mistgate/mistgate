@@ -28,16 +28,16 @@ function panel(w: World, presets: Preset[]) {
   let n = 0;
   const view = (): DnsData => ({ presets: list.map((p) => ({ ...p, isDefault: p.id === def })), providers, clientSupport });
   const server = (s: Preset["servers"][number]) => ({ kind: s.kind, address: s.address, providerVariant: s.providerVariant ?? "" });
-  type Req = { id?: string; name: string; description: string; servers: Preset["servers"]; split: Preset["split"]; ipv4Only: boolean; splitDirect: boolean; blockAds?: boolean; blockMax?: boolean; preferredTransport: DnsTransport };
+  type Req = { id?: string; name: string; description: string; servers: Preset["servers"]; split: Preset["split"]; ipv4Only: boolean; splitDirect: boolean; blockAds?: boolean; blockMax?: boolean; torrentDirect?: boolean; preferredTransport: DnsTransport };
   w.patch(dns, {
     listDnsPresets: (async () => view()) as () => unknown,
     createDnsPreset: (async (r: Req) => {
-      const p: Preset = { ...r, id: `dns_own_${++n}`, builtin: false, servers: r.servers.map(server), split: r.split, userCount: 0, isDefault: false, category: DnsCategory.UNSPECIFIED, country: "", blockAds: !!r.blockAds, blockMax: !!r.blockMax } as Preset;
+      const p: Preset = { ...r, id: `dns_own_${++n}`, builtin: false, servers: r.servers.map(server), split: r.split, userCount: 0, isDefault: false, category: DnsCategory.UNSPECIFIED, country: "", blockAds: !!r.blockAds, blockMax: !!r.blockMax, torrentDirect: !!r.torrentDirect } as Preset;
       list = [...list, p];
       return { preset: p };
     }) as (r: never) => unknown,
     updateDnsPreset: (async (r: Req) => {
-      list = list.map((p) => (p.id === r.id ? ({ ...p, ...r, servers: r.servers.map(server), blockAds: r.blockAds ?? p.blockAds, blockMax: r.blockMax ?? p.blockMax } as Preset) : p));
+      list = list.map((p) => (p.id === r.id ? ({ ...p, ...r, servers: r.servers.map(server), blockAds: r.blockAds ?? p.blockAds, blockMax: r.blockMax ?? p.blockMax, torrentDirect: r.torrentDirect ?? p.torrentDirect } as Preset) : p));
       return { preset: list.find((p) => p.id === r.id) };
     }) as (r: never) => unknown,
     deleteDnsPreset: (async (r: { id: string }) => {
@@ -99,10 +99,11 @@ const list = scene("dns", "DNS: the board's «список» (five presets, Clou
 const fresh = editor("dns-new", "DNS: the board's «новый» (an empty preset, nothing to get)", "new");
 const cf = editor("dns-cf", "DNS: the board's «Cloudflare» (open: the server, DoH, what each app gets)", ids.cf);
 const users = scene("dns-users", "DNS: a panel in use (people on the presets, presets of its own, the built-ins)", { list: manyPresets, h: 1300 });
+const torrents = editor("dns-torrent", "DNS: a preset that sends torrent clients direct (the switch, what each app gets)", ids.office, { list: manyPresets });
 const geoEmpty = editor("dns-geo-empty", "DNS: a split rule with a country on and the field «Site category» empty", ids.cf, { demo: { draft: { split: [rule([".ru"], [cat("yandex/basic")], ["ru"])] } } });
 const geoChips = editor("dns-geo-chips", "DNS: a split rule with two country lists and two site categories (chips)", ids.geoOwn, { list: manyPresets });
 const split = editor("dns-split", "DNS: a preset with split rules (suffixes, a country, servers of their own)", ids.ru, {
-  list: [...boardPresets.slice(0, 4), { ...boardPresets[4]!, split: [rule([".ru", ".su", ".xn--p1ai"], [cat("yandex/basic")]), rule([], [cat("alidns/standard"), own("203.0.113.9")], ["cn"])] }],
+  list: [...boardPresets.slice(1), { ...boardPresets[0]!, split: [rule([".ru", ".su", ".xn--p1ai"], [cat("yandex/basic")]), rule([], [cat("alidns/standard"), own("203.0.113.9")], ["cn"])] }],
 });
 
 export const dnsScenes: SceneDef[] = [
@@ -114,6 +115,7 @@ export const dnsScenes: SceneDef[] = [
   scene("dns-cat", "DNS: a category chosen (No ads)", { list: manyPresets, demo: { cat: String(DnsCategory.NO_ADS) }, h: 700 }),
   scene("dns-just", "DNS: the default was just changed (the row's flash, the new name, the note with Undo)", { demo: { just: ids.q9, nowDefault: "Quad9: защита от вредоносных" }, list: boardPresets.map((p) => ({ ...p, isDefault: p.id === ids.q9 })) }),
   users,
+  torrents,
   scene("dns-ads", "DNS: the built-in «No ads on the device» (its tag) among the others", { list: [...boardPresets.slice(0, 3), manyPresets.find((p) => p.id === ids.ads)!], h: 700 }),
   scene("dns-nodef", "DNS: no preset is the default yet", { list: boardPresets.map((p) => ({ ...p, isDefault: false })), h: 800 }),
   scene("dns-empty", "DNS: no presets at all", { list: [], h: 600 }),

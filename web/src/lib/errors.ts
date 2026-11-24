@@ -32,6 +32,8 @@ export const errorCodes = [
   "sub_address_missing",
   "preset_is_default",
   "preset_builtin",
+  // a split rule of a DNS preset answered by one of the preset's main servers (Clean, "rule=<n>&server=<address>")
+  "split_server_same",
   // a profile on a node (CreateInbound / UpdateInbound)
   "acme_needs_domain",
   "reality_needs_domain",

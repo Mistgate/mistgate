@@ -684,7 +684,11 @@ type DnsPreset struct {
 	BlockAds bool `protobuf:"varint,14,opt,name=block_ads,json=blockAds,proto3" json:"block_ads,omitempty"`
 	// The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
 	// report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
-	BlockMax      bool `protobuf:"varint,15,opt,name=block_max,json=blockMax,proto3" json:"block_max,omitempty"`
+	BlockMax bool `protobuf:"varint,15,opt,name=block_max,json=blockMax,proto3" json:"block_max,omitempty"`
+	// The apps send the traffic of torrent clients direct, past the VPN, after the ad and Max blocks and before the split: Mihomo and sing-box
+	// by the name of the program (and the Android package) and by the public trackers, Xray by the BitTorrent protocol and the trackers; Happ and
+	// AmneziaWG keys and the plain link list have no such rules. Off by default: the person's real address is then seen in the swarm.
+	TorrentDirect bool `protobuf:"varint,16,opt,name=torrent_direct,json=torrentDirect,proto3" json:"torrent_direct,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -824,6 +828,13 @@ func (x *DnsPreset) GetBlockMax() bool {
 	return false
 }
 
+func (x *DnsPreset) GetTorrentDirect() bool {
+	if x != nil {
+		return x.TorrentDirect
+	}
+	return false
+}
+
 type ListDnsPresetsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -941,7 +952,11 @@ type CreateDnsPresetRequest struct {
 	BlockAds bool `protobuf:"varint,8,opt,name=block_ads,json=blockAds,proto3" json:"block_ads,omitempty"`
 	// The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
 	// report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
-	BlockMax      bool `protobuf:"varint,9,opt,name=block_max,json=blockMax,proto3" json:"block_max,omitempty"`
+	BlockMax bool `protobuf:"varint,9,opt,name=block_max,json=blockMax,proto3" json:"block_max,omitempty"`
+	// The apps send the traffic of torrent clients direct, past the VPN, after the ad and Max blocks and before the split: Mihomo and sing-box
+	// by the name of the program (and the Android package) and by the public trackers, Xray by the BitTorrent protocol and the trackers; Happ and
+	// AmneziaWG keys and the plain link list have no such rules. Off by default: the person's real address is then seen in the swarm.
+	TorrentDirect bool `protobuf:"varint,10,opt,name=torrent_direct,json=torrentDirect,proto3" json:"torrent_direct,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1039,6 +1054,13 @@ func (x *CreateDnsPresetRequest) GetBlockMax() bool {
 	return false
 }
 
+func (x *CreateDnsPresetRequest) GetTorrentDirect() bool {
+	if x != nil {
+		return x.TorrentDirect
+	}
+	return false
+}
+
 type CreateDnsPresetResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Preset        *DnsPreset             `protobuf:"bytes,1,opt,name=preset,proto3" json:"preset,omitempty"`
@@ -1105,7 +1127,12 @@ type UpdateDnsPresetRequest struct {
 	// The apps drop the Russian messenger Max's own domains (max.ru, oneme.ru), before any other rule, so the app cannot
 	// report the VPN. Same formats as block_ads; AmneziaWG keys and the plain link list have no rules.
 	// Absent keeps the stored value.
-	BlockMax      *bool `protobuf:"varint,10,opt,name=block_max,json=blockMax,proto3,oneof" json:"block_max,omitempty"`
+	BlockMax *bool `protobuf:"varint,10,opt,name=block_max,json=blockMax,proto3,oneof" json:"block_max,omitempty"`
+	// The apps send the traffic of torrent clients direct, past the VPN, after the ad and Max blocks and before the split: Mihomo and sing-box
+	// by the name of the program (and the Android package) and by the public trackers, Xray by the BitTorrent protocol and the trackers; Happ and
+	// AmneziaWG keys and the plain link list have no such rules. Off by default: the person's real address is then seen in the swarm.
+	// Absent keeps the stored value.
+	TorrentDirect *bool `protobuf:"varint,11,opt,name=torrent_direct,json=torrentDirect,proto3,oneof" json:"torrent_direct,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1206,6 +1233,13 @@ func (x *UpdateDnsPresetRequest) GetBlockAds() bool {
 func (x *UpdateDnsPresetRequest) GetBlockMax() bool {
 	if x != nil && x.BlockMax != nil {
 		return *x.BlockMax
+	}
+	return false
+}
+
+func (x *UpdateDnsPresetRequest) GetTorrentDirect() bool {
+	if x != nil && x.TorrentDirect != nil {
+		return *x.TorrentDirect
 	}
 	return false
 }
@@ -1910,7 +1944,7 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\fDnsSplitRule\x12\x1a\n" +
 	"\bsuffixes\x18\x01 \x03(\tR\bsuffixes\x126\n" +
 	"\aservers\x18\x02 \x03(\v2\x1c.mistgate.admin.v1.DnsServerR\aservers\x12\x10\n" +
-	"\x03geo\x18\x03 \x03(\tR\x03geo\"\xba\x04\n" +
+	"\x03geo\x18\x03 \x03(\tR\x03geo\"\xe1\x04\n" +
 	"\tDnsPreset\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1929,12 +1963,13 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\bcategory\x18\f \x01(\x0e2\x1e.mistgate.admin.v1.DnsCategoryR\bcategory\x12\x18\n" +
 	"\acountry\x18\r \x01(\tR\acountry\x12\x1b\n" +
 	"\tblock_ads\x18\x0e \x01(\bR\bblockAds\x12\x1b\n" +
-	"\tblock_max\x18\x0f \x01(\bR\bblockMax\"\x17\n" +
+	"\tblock_max\x18\x0f \x01(\bR\bblockMax\x12%\n" +
+	"\x0etorrent_direct\x18\x10 \x01(\bR\rtorrentDirect\"\x17\n" +
 	"\x15ListDnsPresetsRequest\"\xda\x01\n" +
 	"\x16ListDnsPresetsResponse\x126\n" +
 	"\apresets\x18\x01 \x03(\v2\x1c.mistgate.admin.v1.DnsPresetR\apresets\x12<\n" +
 	"\tproviders\x18\x02 \x03(\v2\x1e.mistgate.admin.v1.DnsProviderR\tproviders\x12J\n" +
-	"\x0eclient_support\x18\x03 \x03(\v2#.mistgate.admin.v1.ClientDnsSupportR\rclientSupport\"\x89\x03\n" +
+	"\x0eclient_support\x18\x03 \x03(\v2#.mistgate.admin.v1.ClientDnsSupportR\rclientSupport\"\xb0\x03\n" +
 	"\x16CreateDnsPresetRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x126\n" +
@@ -1944,9 +1979,11 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\fsplit_direct\x18\x06 \x01(\bR\vsplitDirect\x12P\n" +
 	"\x13preferred_transport\x18\a \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\x12\x1b\n" +
 	"\tblock_ads\x18\b \x01(\bR\bblockAds\x12\x1b\n" +
-	"\tblock_max\x18\t \x01(\bR\bblockMax\"O\n" +
+	"\tblock_max\x18\t \x01(\bR\bblockMax\x12%\n" +
+	"\x0etorrent_direct\x18\n" +
+	" \x01(\bR\rtorrentDirect\"O\n" +
 	"\x17CreateDnsPresetResponse\x124\n" +
-	"\x06preset\x18\x01 \x01(\v2\x1c.mistgate.admin.v1.DnsPresetR\x06preset\"\xbf\x03\n" +
+	"\x06preset\x18\x01 \x01(\v2\x1c.mistgate.admin.v1.DnsPresetR\x06preset\"\xfe\x03\n" +
 	"\x16UpdateDnsPresetRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1958,11 +1995,13 @@ const file_mistgate_admin_v1_dns_proto_rawDesc = "" +
 	"\x13preferred_transport\x18\b \x01(\x0e2\x1f.mistgate.admin.v1.DnsTransportR\x12preferredTransport\x12 \n" +
 	"\tblock_ads\x18\t \x01(\bH\x00R\bblockAds\x88\x01\x01\x12 \n" +
 	"\tblock_max\x18\n" +
-	" \x01(\bH\x01R\bblockMax\x88\x01\x01B\f\n" +
+	" \x01(\bH\x01R\bblockMax\x88\x01\x01\x12*\n" +
+	"\x0etorrent_direct\x18\v \x01(\bH\x02R\rtorrentDirect\x88\x01\x01B\f\n" +
 	"\n" +
 	"_block_adsB\f\n" +
 	"\n" +
-	"_block_max\"O\n" +
+	"_block_maxB\x11\n" +
+	"\x0f_torrent_direct\"O\n" +
 	"\x17UpdateDnsPresetResponse\x124\n" +
 	"\x06preset\x18\x01 \x01(\v2\x1c.mistgate.admin.v1.DnsPresetR\x06preset\"(\n" +
 	"\x16DeleteDnsPresetRequest\x12\x0e\n" +
