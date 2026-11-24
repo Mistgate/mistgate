@@ -1,10 +1,10 @@
 ---
 title: 与其他面板对比
 seoTitle: "Mistgate 对比 3x-ui、Marzban、Remnawave：面板对比"
-description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Manager 和 s-ui 的对比、其他项目领先之处，以及截至 2026-10-09 核对过的来源。
+description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Manager 和 s-ui 的对比、其他项目领先之处，以及截至 2026-10-09 核对过的来源（2026-10-09，部分于 2026-11-24）。
 ---
 
-本页将 Mistgate 与同类用途中最常用的几款自托管面板做对比。每个单元格都在 2026-10-09 对照项目自己的 README、文档和发布说明核实；「?」表示项目未说明。项目变化很快，作出决定前请先查看来源；发现单元格内容过时时，请提交 issue。
+本页将 Mistgate 与同类用途中最常用的几款自托管面板做对比。每个单元格都在 2026-10-09 对照项目自己的 README、文档和发布说明核实；「?」表示项目未说明。2026-11-24 重新核对了 README 表格中原为「?」或「部分」的单元格，以及新增的行。项目变化很快，作出决定前请先查看来源；发现单元格内容过时时，请提交 issue。
 
 ## Mistgate 的不同之处
 
@@ -22,6 +22,7 @@ description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Man
 - **订阅格式。** 其他面板提供 Xray JSON、sing-box、Clash、Stash 或 Outline。Mistgate 提供 URI 列表、Mihomo YAML、Xray JSON、sing-box JSON 和 AmneziaVPN 密钥；并非每个协议配置都适用于每种格式，参见[各格式支持哪些协议配置](../guide/subscriptions.md#各格式支持哪些协议配置)。
 - **社群与成熟度。** 3x-ui 约有 47.7k 个 GitHub 星标，s-ui 约有 10.0k 个，Hiddify Manager 约有 9.3k 个。Mistgate 是处于早期发布阶段的新项目。
 - **设备限制。** 3x-ui、PasarGuard 和 Remnawave 根据 HWID 限制设备数量。Mistgate 也是如此，并且给每台设备单独的密钥、在线状态和流量，因此可以删除或拉黑一台设备而不影响其他设备。
+- **管理员角色。** PasarGuard 和 Hiddify Manager 有多个带角色的管理员；Remnawave 的文档说明它不支持多管理员。Mistgate 目前只有一个管理员；三种角色（所有者、助手、只读）用于 API 令牌，参见[安全](../operations/security.md#管理员角色)。
 - **Telegram。** 3x-ui、Marzban、PasarGuard 和 Hiddify Manager 提供完整的 Telegram 机器人。Mistgate 会发送告警；完整机器人**计划中**。
 - **安装。** Mistgate 的一行安装程序会在安装面板前验证面板签名清单。
 
@@ -36,26 +37,28 @@ description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Man
 | 一行安装程序 | 是 | 是 | 是 | 是 | 否：Compose、社群脚本 | 是 | 是 |
 | 内存 | 面板：空闲时 39–44 MiB，实测¹；节点：SSH 安装程序需要 256 MB | 空闲时 73–76 MiB，实测¹ | ? | 空闲时 273–277 MiB，实测¹；文档说明：最低 1 GB，建议 2 GB | 空闲时 436–464 MiB，实测¹；文档说明：面板最低 2 GB，建议 4 GB；节点最低 1 GB | ? | ? |
 | 核心 | Hysteria2；VLESS 使用 xray-core；AmneziaWG 使用用户态或内核 | Xray、进程内的 TUIC、AmneziaWG | Xray | Xray、WireGuard 核心；已宣布推出 sing-box 节点 | Xray | Xray 和 sing-box | sing-box |
-| VLESS REALITY / XHTTP | 是 / 是 | 是 / 是 | 是 / ? | 是 / ? | 是 / 是 | 是 / 是 | ?（源代码中包含 VLESS） |
-| VMess、Trojan、Shadowsocks | 否 | 是 | 是 | 是 | 部分：Trojan 和 Shadowsocks；未列出 VMess | 是 | 是（源代码中包含） |
-| Hysteria2 | 是 | 是 | ? | 是 | 部分：仅在 Xray JSON 客户端配置中提供 | 是 | 是（源代码中包含） |
-| TUIC | 否 | 是（v5） | ? | ? | ? | 是 | 是（源代码中包含） |
-| WireGuard | 否 | 是 | ? | 是 | 部分：透传 | 是 | ? |
+| VLESS REALITY / XHTTP | 是 / 是 | 是 / 是 | 是 / ? | 是 / ? | 是 / 是 | 是 / 是 | 是 / ? |
+| VMess、Trojan、Shadowsocks | 否 | 是 | 是 | 是 | 部分：Trojan 和 Shadowsocks；未列出 VMess | 是 | 是 |
+| Hysteria2 | 是 | 是 | ? | 是 | 部分：仅在 Xray JSON 客户端配置中提供 | 是 | 是 |
+| TUIC | 否 | 是（v5） | ? | ? | ? | 是 | 是 |
+| WireGuard | 否 | 是 | ? | 是 | 部分：仅通过内核配置 | 是 | ? |
 | AmneziaWG | 是：2.0 和 3.1，每台设备单独使用密钥 | 是：用户态的 3.1 | ? | ? | ? | ? | ? |
-| MTProto（Telegram 代理） | 实验性：Fake TLS，每位用户一个密钥，仅供 Telegram 应用使用 | ? | ? | ? | ? | ? | ? |
+| MTProto（Telegram 代理） | 实验性：Fake TLS，每位用户一个密钥，仅供 Telegram 应用使用 | 是：内置 `mtg` 进程，每个客户端一个 FakeTLS 密钥 | ? | ? | ? | 是：MTProxy FakeTLS 和网页代理 | ? |
 | TrustTunnel | 实验性：HTTPS 之上的 VPN，为官方应用提供 `tt://` 密钥 | ? | ? | ? | ? | ? | ? |
 | 多个节点 | 是：Agent 使用双向 TLS | 是：主面板管理其他 3x-ui 面板 | 是：marzban-node | 是 | 是 | 是：父子面板 | ? |
 | 添加节点的方式 | 从面板通过 SSH 添加，或使用一次性命令 | 手动：每个节点运行完整的 3x-ui 面板 | 手动 | 手动 | 手动：使用生成的 compose 文件 | 手动：使用子面板 | ? |
-| 订阅格式 | URI 列表、Mihomo YAML、AmneziaVPN `vpn://` 密钥、Xray JSON、sing-box JSON、网页 | base64、Xray JSON、Clash/Mihomo | V2ray、Clash、ClashMeta | V2ray、Clash、ClashMeta、sing-box、Outline | Xray JSON、base64、Mihomo、Stash、Clash、sing-box | sub、sub64、Xray、sing-box、Clash、ClashMeta、WireGuard | 链接、sing-box、Clash.Meta |
+| 经入口节点中转 | 是：从入口节点转发到出口节点，在面板中配置，启用前和之后每 5 分钟检测 | 部分：出站链，手动配置 | ? | ? | 部分：文档中的桥接，手动配置 | 是：中转域名；中转服务器用脚本搭建 | ? |
+| 订阅格式 | URI 列表、Mihomo YAML、AmneziaVPN `vpn://` 密钥、Xray JSON、sing-box JSON、网页 | base64、Xray JSON、Clash/Mihomo | V2ray、Clash、ClashMeta | V2ray、Clash、ClashMeta、Xray JSON、sing-box、Outline | Xray JSON、base64、Mihomo、Stash、Clash、sing-box | sub、sub64、Xray、sing-box、Clash、ClashMeta、WireGuard | 链接、sing-box、Clash.Meta |
 | 每用户流量与有效期 | 是 | 是 | 是 | 是 | 是 | 是 | 是 |
 | 设备限制 | 是：HWID，每台设备有自己的名额和密钥 | 是：HWID 和 IP | ? | 是：HWID | 是：HWID | ? | ? |
-| Telegram 机器人 | 部分：告警；完整机器人**计划中** | 是（也支持 Discord） | 是 | 是 | 部分：通知、Telegram 登录 | 是 | ? |
+| 多个管理员和角色 | 否：只有一个管理员；角色用于 API 令牌 | ? | 部分：多管理员，开发中 | 是：带范围的角色（RBAC） | 否 | 是：超级管理员、管理员、代理 | ? |
+| Telegram 机器人 | 部分：告警；完整机器人**计划中** | 是（也支持 Discord） | 是 | 是 | 部分：通知、Telegram 登录 | 是 | 部分：仅第三方机器人 |
 | API | 是：Connect、只读 / 操作员 / 管理员令牌 | 是：REST、范围受限的令牌 | 是：REST、webhook | 是：REST、webhook | 是：OpenAPI、范围受限的令牌、webhook | 是 | 是 |
 | AI 智能体（MCP） | 是：内置，支持计划 / 执行和所有者审批 | ? | ? | ? | 否：没有官方服务器；社群提供了相关服务器 | ? | ? |
 | WARP 出口 | 是：按协议配置设置，故障时停止转发（不回退直连） | 是 | ? | 部分：提供指南 | 部分：社群方案 | 是 | 是（源代码中包含） |
-| 运行状况和告警 | 是：客户端视角检测、带修复的节点诊断、告警生命周期、Telegram | 是：Telegram 告警、可选的隧道监视器 | 部分 | 部分 | 是：状态、Prometheus、流量告警 | 部分 | ? |
+| 运行状况和告警 | 是：客户端视角检测、带修复的节点诊断、告警生命周期、Telegram | 是：Telegram 告警、可选的隧道监视器 | 部分 | 部分 | 是：状态、Prometheus、流量告警 | 部分 | 部分：仅状态 |
 | BT 下载拦截 | 是：在内核中拦截；事件会记录匹配内容和目标端口，不记录地址 | ? | ? | ? | 是：通过插件实现 | ? | ? |
-| 伪装站点 | 是 | ? | ? | ? | ? | ? | ? |
+| 伪装站点 | 是 | 部分：仅 Hysteria2 的伪装 | 是：主页模板 | ? | ? | 是：Decoy Site 设置 | ? |
 | 签名发布版本 | 是：使用离线密钥，可复现构建，节点只安装签名版本 | 部分：`.sha256` 文件 | ? | ? | ? | ? | ? |
 | Cloudflare Workers 版 | 预览：[尚未在真实 Cloudflare 账户上运行](../getting-started/install-edge.md) | 否 | 否 | 否 | 否 | 否 | 否 |
 | GitHub 星标数 | 1 | 约 47.7k | 约 7.4k | 约 2.7k | 约 5.2k | 约 9.3k | 约 10.0k |
@@ -69,7 +72,7 @@ Marzban 目前只接受维护（上次发布于 2025 年 1 月）；其用户正
 
 ## 来源
 
-于 2026-10-09 核对。检查了各项目的 README、文档和发布说明，以及当天从 GitHub API 获取的星标数和最新版本。2026-11-24 仅重新核对了 Mistgate、3x-ui、PasarGuard 和 Remnawave 的最新版本（GitHub Releases，用于[基准测试](benchmarks.md)）；表中其余内容未重新核对。
+于 2026-10-09 核对。检查了各项目的 README、文档和发布说明，以及当天从 GitHub API 获取的星标数和最新版本。2026-11-24 重新核对了 Mistgate、3x-ui、PasarGuard 和 Remnawave 的最新版本（GitHub Releases，用于[基准测试](benchmarks.md)），以及 README 表格中原为「?」或「部分」的单元格和新增的行（TrustTunnel、Telegram 代理、WireGuard、TUIC、中转、伪装站点、设备限制、管理员），依据是[2026-11-24 的答案](#2026-11-24-的答案)一节列出的页面；表中其余内容未重新核对。
 
 | 项目 | 仓库 | 文档 |
 |:--|:--|:--|
@@ -80,3 +83,14 @@ Marzban 目前只接受维护（上次发布于 2025 年 1 月）；其用户正
 | Remnawave | [remnawave/panel](https://github.com/remnawave/panel) | [docs.rw](https://docs.rw) |
 | Hiddify Manager | [hiddify/Hiddify-Manager](https://github.com/hiddify/Hiddify-Manager) | [hiddify.com](https://hiddify.com) |
 | s-ui | [alireza0/s-ui](https://github.com/alireza0/s-ui) | [Wiki](https://github.com/alireza0/s-ui/wiki) |
+
+## 2026-11-24 的答案
+
+2026-11-24 的答案所依据的页面。只有当其中一页明确说明时，单元格才写「是」「否」或「部分」；否则写「?」。
+
+- **3x-ui：** [README](https://github.com/MHSanaei/3x-ui#readme)（协议列表、TUIC、WireGuard、HWID 设备限制、出站代理链）；[Inbounds](https://docs.sanaei.dev/docs/config/inbounds)（MTProto 由内置的 `mtg` 进程提供）；[Clients](https://docs.sanaei.dev/docs/config/clients)（HWID 设备）；[Transports](https://docs.sanaei.dev/docs/config/transports)（Hysteria2 的 `masquerade`、`dialerProxy`）；[TUIC](https://docs.sanaei.dev/docs/config/tuic)。
+- **Marzban：** [README](https://github.com/Gozargah/Marzban#readme)（“Multi-admin support (WIP)”、`HOME_PAGE_TEMPLATE`、“Decoy page template”）。
+- **PasarGuard：** [README](https://github.com/PasarGuard/panel#readme)（协议列表、HWID 设备限制、带 RBAC 的多管理员）；[Admin roles](https://docs.pasarguard.org/en/panel/admin_roles)；[Settings](https://docs.pasarguard.org/en/panel/settings)（订阅格式，其中有 `xray`）。
+- **Remnawave：** [Comparison of functions](https://docs.rw/overview/comparison-of-functions)（“Multi-admin support: No”，WireGuard 主机只能通过内核实现）；[Server-side routing](https://docs.rw/learn-en/server-routing)（手动配置的“桥接”）；[HWID device limit](https://docs.rw/features/hwid-device-limit)；[Awesome Remnawave](https://docs.rw/awesome-remnawave)（社群项目）。
+- **Hiddify Manager：** [README](https://github.com/hiddify/Hiddify-Manager#readme)（协议列表、Telegram 代理、三种管理员角色）；[All settings](https://hiddify.com/manager/configuration-and-advanced-settings/Settings-reference/)（“Decoy Site”）；[Telegram proxy](https://hiddify.com/manager/configuration-and-advanced-settings/How-to-set-up-Telegram-proxy-on-Hiddify/)；[My account and admin security](https://hiddify.com/manager/configuration-and-advanced-settings/My-account-and-admin-security-in-HiddifyManager/)；[Relay domains](https://hiddify.com/manager/domain-worker-cdn-and-tunneling/How-to-add-relay-domain-to-Hiddify-manager/)。
+- **s-ui：** [README](https://github.com/alireza0/s-ui#readme)（协议列表、“Client & Traffic & System Status”、第三方的 Telegram 机器人）和 wiki 页面 [Configuration objects](https://github.com/alireza0/s-ui/wiki/Configuration-Objects)（TLS 对象中的 `reality`）。

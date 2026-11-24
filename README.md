@@ -210,17 +210,25 @@ An AI agent that can run `ssh` can do these steps with the prompt in the [AI age
 | Panel RAM, idle | 39-44 MiB¹ | 73-76 MiB¹ | 436-464 MiB¹ | not measured | 273-277 MiB¹ | not measured |
 | Add a node from the panel (SSH) | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
 | Hysteria2 | ✅ | ✅ | 🟡 partial | ✅ | ✅ | ✅ |
-| VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | AmneziaWG | ✅ 2.0 and 3.1 | ✅ 3.1 | ? | ? | ? | ? |
+| TrustTunnel | ✅ experimental | ? | ? | ? | ? | ? |
+| Telegram proxy (MTProto) | ✅ experimental | ✅ | ? | ✅ | ? | ? |
+| WireGuard | ❌ | ✅ | 🟡 core config only | ✅ | ✅ | ? |
+| TUIC | ❌ | ✅ | ? | ✅ | ? | ✅ |
 | VMess, Trojan, Shadowsocks | ❌ | ✅ | 🟡 partial | ✅ | ✅ | ✅ |
-| Xray JSON or sing-box subscriptions | ✅ both | Xray JSON | ✅ both | ✅ both | sing-box | sing-box |
-| Health checks and alerts | ✅ client-eye checks, node doctor, reachability from a country | ✅ tunnel monitor (opt-in) | ✅ status, Prometheus | 🟡 partial | 🟡 partial | ? |
-| Telegram bot | 🟡 alerts only | ✅ | 🟡 partial | ✅ | ✅ | ? |
+| Xray JSON or sing-box subscriptions | ✅ both | Xray JSON | ✅ both | ✅ both | ✅ both | sing-box |
+| Relay through an entry node | ✅ | 🟡 outbound chaining | 🟡 bridge by hand | ✅ relay domains | ? | ? |
+| Decoy site | ✅ | 🟡 Hysteria2 only | ? | ✅ | ? | ? |
+| Device limit | ✅ | ✅ | ✅ | ? | ✅ | ? |
+| Several admins with roles | ❌ one admin | ? | ❌ | ✅ | ✅ | ? |
+| Health checks and alerts | ✅ client-eye checks, node doctor, reachability from a country | ✅ tunnel monitor (opt-in) | ✅ status, Prometheus | 🟡 partial | 🟡 partial | 🟡 status only |
+| Telegram bot | 🟡 alerts only | ✅ | 🟡 partial | ✅ | ✅ | 🟡 third-party bot |
 | Built-in MCP server for AI agents | ✅ | ? | ❌ | ? | ? | ? |
 
 ¹ Private memory of the whole panel group, idle, 0 to 200 users, no node attached, on a 1 vCPU / 1 GB test server (3x-ui includes its Xray core and fail2ban). Method, versions and limits: [Benchmarks](docs/en/reference/benchmarks.md). "?" means the project's own README and docs do not say.
 
-Others are ahead in protocol breadth, community size and full Telegram bots. The full table with sources, checked on 2026-10-09, is in [Comparison with other panels](docs/en/reference/comparison.md).
+Others are ahead in protocol breadth, community size, admin roles and full Telegram bots. The full table with sources, checked on 2026-10-09 and in part again on 2026-11-24, is in [Comparison with other panels](docs/en/reference/comparison.md).
 
 ## Documentation
 

@@ -210,17 +210,25 @@ curl -fsSL https://mistgate.app/install.sh | sudo bash -s -- --public-url https:
 | 面板空闲时占用 RAM | 39–44 MiB¹ | 73–76 MiB¹ | 436–464 MiB¹ | 未测量 | 273–277 MiB¹ | 未测量 |
 | 在面板中添加节点（SSH） | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
 | Hysteria2 | ✅ | ✅ | 🟡 部分 | ✅ | ✅ | ✅ |
-| VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | AmneziaWG | ✅ 2.0 和 3.1 | ✅ 3.1 | ? | ? | ? | ? |
+| TrustTunnel | ✅ 实验性 | ? | ? | ? | ? | ? |
+| Telegram 代理（MTProto） | ✅ 实验性 | ✅ | ? | ✅ | ? | ? |
+| WireGuard | ❌ | ✅ | 🟡 仅通过内核配置 | ✅ | ✅ | ? |
+| TUIC | ❌ | ✅ | ? | ✅ | ? | ✅ |
 | VMess、Trojan、Shadowsocks | ❌ | ✅ | 🟡 部分 | ✅ | ✅ | ✅ |
-| Xray JSON 或 sing-box 订阅 | ✅ 两者都有 | Xray JSON | ✅ 两者都有 | ✅ 两者都有 | sing-box | sing-box |
-| 健康检查和告警 | ✅ 客户端视角检测、节点诊断、从国家视角检测可达性 | ✅ 隧道监控（需手动开启） | ✅ 状态、Prometheus | 🟡 部分 | 🟡 部分 | ? |
-| Telegram 机器人 | 🟡 仅告警 | ✅ | 🟡 部分 | ✅ | ✅ | ? |
+| Xray JSON 或 sing-box 订阅 | ✅ 两者都有 | Xray JSON | ✅ 两者都有 | ✅ 两者都有 | ✅ 两者都有 | sing-box |
+| 经入口节点中转 | ✅ | 🟡 出站链 | 🟡 手动配置桥接 | ✅ 中转域名 | ? | ? |
+| 伪装站点 | ✅ | 🟡 仅 Hysteria2 | ? | ✅ | ? | ? |
+| 设备限制 | ✅ | ✅ | ✅ | ? | ✅ | ? |
+| 多个管理员和角色 | ❌ 仅一个管理员 | ? | ❌ | ✅ | ✅ | ? |
+| 健康检查和告警 | ✅ 客户端视角检测、节点诊断、从国家视角检测可达性 | ✅ 隧道监控（需手动开启） | ✅ 状态、Prometheus | 🟡 部分 | 🟡 部分 | 🟡 仅状态 |
+| Telegram 机器人 | 🟡 仅告警 | ✅ | 🟡 部分 | ✅ | ✅ | 🟡 仅第三方机器人 |
 | 面向 AI 智能体的内置 MCP 服务器 | ✅ | ? | ❌ | ? | ? | ? |
 
 ¹ 整个面板进程组空闲时的私有内存，0 到 200 个用户，未连接节点，在 1 vCPU / 1 GB 的测试服务器上测得（3x-ui 包含它的 Xray 内核和 fail2ban）。方法、版本和局限见[基准测试](docs/zh/reference/benchmarks.md)。「?」表示该项目自己的 README 和文档中没有说明。
 
-在协议覆盖范围、社区规模和功能完整的 Telegram 机器人方面，其他面板更领先。带来源的完整对照表（核对于 2026-10-09）见[与其他面板的对比](docs/zh/reference/comparison.md)。
+在协议覆盖范围、社区规模、管理员角色和功能完整的 Telegram 机器人方面，其他面板更领先。带来源的完整对照表（核对于 2026-10-09，部分于 2026-11-24 复核）见[与其他面板的对比](docs/zh/reference/comparison.md)。
 
 ## 文档
 
