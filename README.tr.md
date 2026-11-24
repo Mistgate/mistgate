@@ -211,11 +211,11 @@ Ardından:
 | Panelden düğüm ekleme (SSH) | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
 | Hysteria2 | ✅ | ✅ | 🟡 kısmen | ✅ | ✅ | ✅ |
 | VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| AmneziaWG | ✅ 2.0 ve 3.1 | ✅ 3.1 | ? | ? | ? | ? |
-| TrustTunnel | ✅ deneysel | ? | ? | ? | ? | ? |
-| Telegram proxy (MTProto) | ✅ deneysel | ✅ | ? | ✅ | ? | ? |
-| WireGuard | ❌ | ✅ | 🟡 yalnızca çekirdek yapılandırmasıyla | ✅ | ✅ | ? |
-| TUIC | ❌ | ✅ | ? | ✅ | ? | ✅ |
+| AmneziaWG | ✅ 2.0 ve 3.1 | ✅ 3.1 | ❌ | ❌ | ❌ | ❌ |
+| TrustTunnel | ✅ deneysel | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Telegram proxy (MTProto) | ✅ deneysel | ✅ | ❌ | ✅ | ✅ kaynak kodunda | ❌ |
+| WireGuard | ❌ | ✅ | 🟡 yalnızca çekirdek yapılandırmasıyla | ✅ | ✅ | ✅ |
+| TUIC | ❌ | ✅ | ❌ | ✅ | 🟡 sing-box çekirdeği, yalnızca kaynak kodunda | ✅ |
 | VMess, Trojan, Shadowsocks | ❌ | ✅ | 🟡 kısmen | ✅ | ✅ | ✅ |
 | Xray JSON ya da sing-box abonelikleri | ✅ ikisi de | Xray JSON | ✅ ikisi de | ✅ ikisi de | ✅ ikisi de | sing-box |
 | Giriş düğümü üzerinden aktarma | ✅ | 🟡 giden zincirleme | 🟡 elle köprü | ✅ aktarma alan adları | ? | ? |
@@ -224,9 +224,9 @@ Ardından:
 | Rollü birden çok yönetici | ❌ tek yönetici | ? | ❌ | ✅ | ✅ | ? |
 | Sağlık kontrolleri ve uyarılar | ✅ istemci gözüyle kontroller, düğüm Teşhisi, bir ülkenin içinden erişilebilirlik | ✅ tünel izleme (isteğe bağlı) | ✅ durum, Prometheus | 🟡 kısmen | 🟡 kısmen | 🟡 yalnızca durum |
 | Telegram botu | 🟡 yalnızca uyarılar | ✅ | 🟡 kısmen | ✅ | ✅ | 🟡 yalnızca üçüncü taraf botu |
-| Yapay zekâ ajanları için yerleşik MCP sunucusu | ✅ | ? | ❌ | ? | ? | ? |
+| Yapay zekâ ajanları için yerleşik MCP sunucusu | ✅ | ❌ | ❌ | ? | ? | ? |
 
-¹ Tüm panel süreç grubunun özel belleği; boşta, 0 ile 200 arası kullanıcı, bağlı düğüm yok, 1 vCPU / 1 GB'lık bir test sunucusunda (3x-ui'de Xray çekirdeği ve fail2ban dahil). Yöntem, sürümler ve sınırlar: [Performans testleri](docs/en/reference/benchmarks.md). “?”, projenin kendi README'sinin ve belgelerinin bu konuda bir şey söylemediği anlamına gelir.
+¹ Tüm panel süreç grubunun özel belleği; boşta, 0 ile 200 arası kullanıcı, bağlı düğüm yok, 1 vCPU / 1 GB'lık bir test sunucusunda (3x-ui'de Xray çekirdeği ve fail2ban dahil). Yöntem, sürümler ve sınırlar: [Performans testleri](docs/en/reference/benchmarks.md). “?”, projenin kendi README'sinin ve belgelerinin bu konuda bir şey söylemediği anlamına gelir. Başka bir proje için “❌”, projenin bunu kendisinin söylediği ya da kaynak kodunun bu özellikten söz etmediği anlamına gelir (2026-11-24 tarihli kod araması).
 
 Protokol çeşitliliğinde, topluluk büyüklüğünde, yönetici rollerinde ve tam Telegram botlarında diğerleri önde. Kaynaklarıyla birlikte, 2026-10-09'da ve kısmen 2026-11-24'te yeniden kontrol edilmiş tam tablo [Diğer panellerle karşılaştırma](docs/en/reference/comparison.md) sayfasında.
 

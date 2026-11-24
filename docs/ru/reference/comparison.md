@@ -40,11 +40,11 @@ description: Чем Mistgate отличается от 3x-ui, Marzban, PasarGuar
 | VLESS REALITY / XHTTP | да / да | да / да | да / ? | да / ? | да / да | да / да | да / ? |
 | VMess, Trojan, Shadowsocks | нет | да | да | да | частично: Trojan и Shadowsocks, VMess не указан | да | да |
 | Hysteria2 | да | да | ? | да | частично: только в клиентских конфигах Xray JSON | да | да |
-| TUIC | нет | да (v5) | ? | ? | ? | да | да |
-| WireGuard | нет | да | ? | да | частично: только через конфиг ядра | да | ? |
-| AmneziaWG | да: 2.0 и 3.1, ключ на каждое устройство | да: 3.1 в userspace | ? | ? | ? | ? | ? |
-| MTProto (прокси для Telegram) | экспериментально: Fake TLS, ключ на человека, только для приложения Telegram | да: встроенный процесс `mtg`, секрет FakeTLS на клиента | ? | ? | ? | да: MTProxy FakeTLS и веб-прокси | ? |
-| TrustTunnel | экспериментально: VPN поверх HTTPS, ключи `tt://` для официальных приложений | ? | ? | ? | ? | ? | ? |
+| TUIC | нет | да (v5) | ? | частично: ядро sing-box, только в исходниках | нет (в исходниках нет) | да | да |
+| WireGuard | нет | да | ? | да | частично: только через конфиг ядра | да | да |
+| AmneziaWG | да: 2.0 и 3.1, ключ на каждое устройство | да: 3.1 в userspace | ? | нет (в исходниках нет) | нет (в исходниках нет) | нет (в исходниках нет) | нет (в исходниках нет) |
+| MTProto (прокси для Telegram) | экспериментально: Fake TLS, ключ на человека, только для приложения Telegram | да: встроенный процесс `mtg`, секрет FakeTLS на клиента | ? | да (в исходниках) | нет (в исходниках нет) | да: MTProxy FakeTLS и веб-прокси | нет (в исходниках нет) |
+| TrustTunnel | экспериментально: VPN поверх HTTPS, ключи `tt://` для официальных приложений | нет (в исходниках нет) | ? | нет (в исходниках нет) | нет (в исходниках нет) | нет (в исходниках нет) | нет (в исходниках нет) |
 | Несколько нод | да: агент по взаимному TLS | да: главная панель управляет другими панелями 3x-ui | да: marzban-node | да | да | да: родительская и дочерние панели | ? |
 | Как добавляется нода | из панели по SSH или одноразовой командой | вручную: полная 3x-ui на каждой ноде | вручную | вручную | вручную: сгенерированный compose-файл | вручную: дочерняя панель | ? |
 | Ретрансляция через ноду входа | да: пересылка с ноды входа на ноду выхода, настраивается в панели, проверяется до включения и каждые 5 минут | частично: цепочка исходящих, вручную | ? | ? | частично: описанный в документации мост, вручную | да: домены-реле; сервер-реле настраивается скриптом | ? |
@@ -54,7 +54,7 @@ description: Чем Mistgate отличается от 3x-ui, Marzban, PasarGuar
 | Несколько админов с ролями | нет: один админ; роли действуют для API-токенов | ? | частично: несколько админов, в разработке | да: роли с областями доступа (RBAC) | нет | да: суперадмин, админ, агент | ? |
 | Telegram-бот | частично: алерты; полный бот **Планируется** | да (и Discord) | да | да | частично: уведомления, вход через Telegram | да | частично: только сторонний бот |
 | API | да: Connect, токены readonly / operator / admin | да: REST, токены с правами | да: REST, вебхуки | да: REST, вебхуки | да: OpenAPI, токены с правами, вебхуки | да | да |
-| ИИ-агенты (MCP) | да: встроен, «план → применить», одобрения владельца | ? | ? | ? | своего сервера нет, есть от сообщества | ? | ? |
+| ИИ-агенты (MCP) | да: встроен, «план → применить», одобрения владельца | нет (в исходниках нет) | ? | ? | своего сервера нет, есть от сообщества | ? | ? |
 | Выход через WARP | да: на профиль, при обрыве закрывается | да | ? | частично: инструкция | частично: от сообщества | да | да (в исходниках) |
 | Здоровье и алерты | да: проверки глазами клиента, доктор нод с исправлениями, жизненный цикл алертов, Telegram | да: алерты в Telegram, монитор туннеля (включается отдельно) | частично | частично | да: статус, Prometheus, алерты по трафику | частично | частично: только статус |
 | Блокировка торрентов | да: в ядре; в событии остаются признак и порт назначения, адресов нет | ? | ? | ? | да: плагин | ? | ? |
@@ -86,7 +86,7 @@ Marzban только поддерживается (последний релиз
 
 ## Ответы от 24 ноября 2026 года
 
-Страницы, на которых держатся ответы от 24 ноября 2026 года. Клетка говорит «да», «нет» или «частично» только если об этом сказано на одной из них; иначе в ней «?».
+Страницы, на которых держатся ответы от 24 ноября 2026 года. Клетка говорит «да», «нет» или «частично», если об этом сказано на одной из них. «нет (в исходниках нет)» и «да (в исходниках)» получены поиском по исходному коду проекта (ниже). Всё остальное — «?».
 
 - **3x-ui:** [README](https://github.com/MHSanaei/3x-ui#readme) (список протоколов, TUIC, WireGuard, лимиты устройств по HWID, цепочки исходящих); [Inbounds](https://docs.sanaei.dev/docs/config/inbounds) (MTProto отдаёт встроенный процесс `mtg`); [Clients](https://docs.sanaei.dev/docs/config/clients) (устройства HWID); [Transports](https://docs.sanaei.dev/docs/config/transports) (`masquerade` у Hysteria2, `dialerProxy`); [TUIC](https://docs.sanaei.dev/docs/config/tuic).
 - **Marzban:** [README](https://github.com/Gozargah/Marzban#readme) («Multi-admin support (WIP)», `HOME_PAGE_TEMPLATE`, «Decoy page template»).
@@ -94,3 +94,5 @@ Marzban только поддерживается (последний релиз
 - **Remnawave:** [Comparison of functions](https://docs.rw/overview/comparison-of-functions) («Multi-admin support: No», хосты WireGuard только через ядро); [Server-side routing](https://docs.rw/learn-en/server-routing) («мост», настраиваемый вручную); [HWID device limit](https://docs.rw/features/hwid-device-limit); [Awesome Remnawave](https://docs.rw/awesome-remnawave) (проекты сообщества).
 - **Hiddify Manager:** [README](https://github.com/hiddify/Hiddify-Manager#readme) (список протоколов, прокси для Telegram, три роли админов); [All settings](https://hiddify.com/manager/configuration-and-advanced-settings/Settings-reference/) («Decoy Site»); [Telegram proxy](https://hiddify.com/manager/configuration-and-advanced-settings/How-to-set-up-Telegram-proxy-on-Hiddify/); [My account and admin security](https://hiddify.com/manager/configuration-and-advanced-settings/My-account-and-admin-security-in-HiddifyManager/); [Relay domains](https://hiddify.com/manager/domain-worker-cdn-and-tunneling/How-to-add-relay-domain-to-Hiddify-manager/).
 - **s-ui:** [README](https://github.com/alireza0/s-ui#readme) (список протоколов, «Client & Traffic & System Status», Telegram-бот от третьей стороны) и страница вики [Configuration objects](https://github.com/alireza0/s-ui/wiki/Configuration-Objects) (`reality` в объекте TLS).
+
+**Как проверялось «в исходниках нет».** 24 ноября 2026 года в исходном коде [MHSanaei/3x-ui](https://github.com/MHSanaei/3x-ui), [remnawave/panel](https://github.com/remnawave/panel), [remnawave/node](https://github.com/remnawave/node), [hiddify/Hiddify-Manager](https://github.com/hiddify/Hiddify-Manager), [hiddify/HiddifyPanel](https://github.com/hiddify/HiddifyPanel), [PasarGuard/panel](https://github.com/PasarGuard/panel), [PasarGuard/node](https://github.com/PasarGuard/node) и [alireza0/s-ui](https://github.com/alireza0/s-ui) искали слова `trusttunnel`, `mtproto`, `amnezia`, `tuic`, `wireguard` и, для 3x-ui, `modelcontextprotocol`. Нет совпадений — «нет (в исходниках нет)», есть — «да (в исходниках)» или «частично». Поиск может пропустить возможность под другим названием, поэтому он слабее, чем утверждение в документации. Marzban не искали. Три находки: в панели PasarGuard есть тип ядра `mtproto` (`app/db/models.py`) и TUIC в коде подписки sing-box (`app/subscription/singbox.py`), хотя ни README, ни документация о них не говорят; клиентские приложения Hiddify (hiddify-core, hiddify-app) упоминают TrustTunnel, а панель Hiddify Manager — нет; единственное совпадение `modelcontextprotocol` в 3x-ui — зависимость сайта документации, а не панели.

@@ -211,11 +211,11 @@ An AI agent that can run `ssh` can do these steps with the prompt in the [AI age
 | Add a node from the panel (SSH) | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
 | Hysteria2 | ✅ | ✅ | 🟡 partial | ✅ | ✅ | ✅ |
 | VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| AmneziaWG | ✅ 2.0 and 3.1 | ✅ 3.1 | ? | ? | ? | ? |
-| TrustTunnel | ✅ experimental | ? | ? | ? | ? | ? |
-| Telegram proxy (MTProto) | ✅ experimental | ✅ | ? | ✅ | ? | ? |
-| WireGuard | ❌ | ✅ | 🟡 core config only | ✅ | ✅ | ? |
-| TUIC | ❌ | ✅ | ? | ✅ | ? | ✅ |
+| AmneziaWG | ✅ 2.0 and 3.1 | ✅ 3.1 | ❌ | ❌ | ❌ | ❌ |
+| TrustTunnel | ✅ experimental | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Telegram proxy (MTProto) | ✅ experimental | ✅ | ❌ | ✅ | ✅ in the source | ❌ |
+| WireGuard | ❌ | ✅ | 🟡 core config only | ✅ | ✅ | ✅ |
+| TUIC | ❌ | ✅ | ❌ | ✅ | 🟡 sing-box core, only in the source | ✅ |
 | VMess, Trojan, Shadowsocks | ❌ | ✅ | 🟡 partial | ✅ | ✅ | ✅ |
 | Xray JSON or sing-box subscriptions | ✅ both | Xray JSON | ✅ both | ✅ both | ✅ both | sing-box |
 | Relay through an entry node | ✅ | 🟡 outbound chaining | 🟡 bridge by hand | ✅ relay domains | ? | ? |
@@ -224,9 +224,9 @@ An AI agent that can run `ssh` can do these steps with the prompt in the [AI age
 | Several admins with roles | ❌ one admin | ? | ❌ | ✅ | ✅ | ? |
 | Health checks and alerts | ✅ client-eye checks, node doctor, reachability from a country | ✅ tunnel monitor (opt-in) | ✅ status, Prometheus | 🟡 partial | 🟡 partial | 🟡 status only |
 | Telegram bot | 🟡 alerts only | ✅ | 🟡 partial | ✅ | ✅ | 🟡 third-party bot |
-| Built-in MCP server for AI agents | ✅ | ? | ❌ | ? | ? | ? |
+| Built-in MCP server for AI agents | ✅ | ❌ | ❌ | ? | ? | ? |
 
-¹ Private memory of the whole panel group, idle, 0 to 200 users, no node attached, on a 1 vCPU / 1 GB test server (3x-ui includes its Xray core and fail2ban). Method, versions and limits: [Benchmarks](docs/en/reference/benchmarks.md). "?" means the project's own README and docs do not say.
+¹ Private memory of the whole panel group, idle, 0 to 200 users, no node attached, on a 1 vCPU / 1 GB test server (3x-ui includes its Xray core and fail2ban). Method, versions and limits: [Benchmarks](docs/en/reference/benchmarks.md). "?" means the project's own README and docs do not say. "❌" for another project means it says so itself, or its source code does not mention the feature (a code search on 2026-11-24).
 
 Others are ahead in protocol breadth, community size, admin roles and full Telegram bots. The full table with sources, checked on 2026-10-09 and in part again on 2026-11-24, is in [Comparison with other panels](docs/en/reference/comparison.md).
 

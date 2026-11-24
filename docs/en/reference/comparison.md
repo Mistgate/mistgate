@@ -40,11 +40,11 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 | VLESS REALITY / XHTTP | yes / yes | yes / yes | yes / ? | yes / ? | yes / yes | yes / yes | yes / ? |
 | VMess, Trojan, Shadowsocks | no | yes | yes | yes | partial: Trojan and Shadowsocks; VMess not listed | yes | yes |
 | Hysteria2 | yes | yes | ? | yes | partial: in Xray JSON client configs only | yes | yes |
-| TUIC | no | yes (v5) | ? | ? | ? | yes | yes |
-| WireGuard | no | yes | ? | yes | partial: core-level setup only | yes | ? |
-| AmneziaWG | yes: 2.0 and 3.1, a key per device | yes: 3.1 in userspace | ? | ? | ? | ? | ? |
-| MTProto (Telegram proxy) | experimental: Fake TLS, a key per person, for the Telegram app only | yes: a bundled `mtg` process, a FakeTLS secret per client | ? | ? | ? | yes: MTProxy FakeTLS and a web proxy | ? |
-| TrustTunnel | experimental: a VPN over HTTPS, `tt://` keys for the official apps | ? | ? | ? | ? | ? | ? |
+| TUIC | no | yes (v5) | ? | partial: a sing-box core, in the source only | no (not in the source) | yes | yes |
+| WireGuard | no | yes | ? | yes | partial: core-level setup only | yes | yes |
+| AmneziaWG | yes: 2.0 and 3.1, a key per device | yes: 3.1 in userspace | ? | no (not in the source) | no (not in the source) | no (not in the source) | no (not in the source) |
+| MTProto (Telegram proxy) | experimental: Fake TLS, a key per person, for the Telegram app only | yes: a bundled `mtg` process, a FakeTLS secret per client | ? | yes (in the source) | no (not in the source) | yes: MTProxy FakeTLS and a web proxy | no (not in the source) |
+| TrustTunnel | experimental: a VPN over HTTPS, `tt://` keys for the official apps | no (not in the source) | ? | no (not in the source) | no (not in the source) | no (not in the source) | no (not in the source) |
 | Several nodes | yes: an agent over mutual TLS | yes: a master panel manages other 3x-ui panels | yes: marzban-node | yes | yes | yes: parent and child panels | ? |
 | How a node is added | from the panel over SSH, or a one-time command | by hand: a full 3x-ui per node | by hand | by hand | by hand: a generated compose file | by hand: a child panel | ? |
 | Relay through an entry node | yes: a forward from an entry node to an exit node, set up in the panel, checked before it is switched on and every 5 minutes | partial: outbound chaining, by hand | ? | ? | partial: a documented bridge, by hand | yes: relay domains; the relay server is set up by script | ? |
@@ -54,7 +54,7 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 | Several admins with roles | no: one admin; roles apply to API tokens | ? | partial: multi-admin, work in progress | yes: roles with scopes (RBAC) | no | yes: super admin, admin, agent | ? |
 | Telegram bot | partial: alerts; a full bot **Planned** | yes (and Discord) | yes | yes | partial: notifications, Telegram login | yes | partial: a third-party bot only |
 | API | yes: Connect, readonly / operator / admin tokens | yes: REST, scoped tokens | yes: REST, webhooks | yes: REST, webhooks | yes: OpenAPI, scoped tokens, webhooks | yes | yes |
-| AI agents (MCP) | yes: built in, plan / apply, owner approvals | ? | ? | ? | no first-party server; community ones exist | ? | ? |
+| AI agents (MCP) | yes: built in, plan / apply, owner approvals | no (not in the source) | ? | ? | no first-party server; community ones exist | ? | ? |
 | WARP exit | yes: per profile, fails closed | yes | ? | partial: a guide | partial: community | yes | yes (in the source) |
 | Health and alerts | yes: client-eye checks, node doctor with fixes, alert lifecycle, Telegram | yes: Telegram alerts, an opt-in tunnel monitor | partial | partial | yes: status, Prometheus, traffic alerts | partial | partial: status only |
 | Torrent blocking | yes: in the kernel; an event keeps what matched and the destination port, no addresses | ? | ? | ? | yes: a plugin | ? | ? |
@@ -86,7 +86,7 @@ Checked on 2026-10-09. Each project's README, documentation and release notes; t
 
 ## The 2026-11-24 answers
 
-Pages the answers of 2026-11-24 rest on. A cell says "yes", "no" or "partial" only when one of them says so; otherwise it is "?".
+Pages the answers of 2026-11-24 rest on. A cell says "yes", "no" or "partial" when one of them says so. "no (not in the source)" and "yes (in the source)" come from a search in the project's source code (below). Everything else is "?".
 
 - **3x-ui:** the [README](https://github.com/MHSanaei/3x-ui#readme) (the protocol list, TUIC, WireGuard, HWID device limits, outbound proxy chaining); [Inbounds](https://docs.sanaei.dev/docs/config/inbounds) (MTProto served by a bundled `mtg` process); [Clients](https://docs.sanaei.dev/docs/config/clients) (HWID devices); [Transports](https://docs.sanaei.dev/docs/config/transports) (the Hysteria2 `masquerade`, `dialerProxy`); [TUIC](https://docs.sanaei.dev/docs/config/tuic).
 - **Marzban:** the [README](https://github.com/Gozargah/Marzban#readme) ("Multi-admin support (WIP)", `HOME_PAGE_TEMPLATE`, "Decoy page template").
@@ -94,3 +94,5 @@ Pages the answers of 2026-11-24 rest on. A cell says "yes", "no" or "partial" on
 - **Remnawave:** [Comparison of functions](https://docs.rw/overview/comparison-of-functions) ("Multi-admin support: No", WireGuard hosts only through the core); [Server-side routing](https://docs.rw/learn-en/server-routing) (a "bridge" set up by hand); [HWID device limit](https://docs.rw/features/hwid-device-limit); [Awesome Remnawave](https://docs.rw/awesome-remnawave) (projects of the community).
 - **Hiddify Manager:** the [README](https://github.com/hiddify/Hiddify-Manager#readme) (the protocol list, a Telegram proxy, three admin roles); [All settings](https://hiddify.com/manager/configuration-and-advanced-settings/Settings-reference/) ("Decoy Site"); [Telegram proxy](https://hiddify.com/manager/configuration-and-advanced-settings/How-to-set-up-Telegram-proxy-on-Hiddify/); [My account and admin security](https://hiddify.com/manager/configuration-and-advanced-settings/My-account-and-admin-security-in-HiddifyManager/); [Relay domains](https://hiddify.com/manager/domain-worker-cdn-and-tunneling/How-to-add-relay-domain-to-Hiddify-manager/).
 - **s-ui:** the [README](https://github.com/alireza0/s-ui#readme) (the protocol list, "Client & Traffic & System Status", a Telegram bot by a third party) and the wiki page [Configuration objects](https://github.com/alireza0/s-ui/wiki/Configuration-Objects) (`reality` in the TLS object).
+
+**How "not in the source" was checked.** On 2026-11-24 the words `trusttunnel`, `mtproto`, `amnezia`, `tuic`, `wireguard` and, for 3x-ui, `modelcontextprotocol` were searched for in the source code of [MHSanaei/3x-ui](https://github.com/MHSanaei/3x-ui), [remnawave/panel](https://github.com/remnawave/panel), [remnawave/node](https://github.com/remnawave/node), [hiddify/Hiddify-Manager](https://github.com/hiddify/Hiddify-Manager), [hiddify/HiddifyPanel](https://github.com/hiddify/HiddifyPanel), [PasarGuard/panel](https://github.com/PasarGuard/panel), [PasarGuard/node](https://github.com/PasarGuard/node) and [alireza0/s-ui](https://github.com/alireza0/s-ui). No hit gives "no (not in the source)", a hit gives "yes (in the source)" or "partial". A search can miss a feature that goes under another name, so this is weaker than a statement in the documentation. Marzban was not searched. Three findings: the PasarGuard panel has a core type `mtproto` (`app/db/models.py`) and TUIC in its sing-box subscription code (`app/subscription/singbox.py`), neither of which its README or documentation mentions; the Hiddify client apps (hiddify-core, hiddify-app) mention TrustTunnel, the Hiddify Manager panel does not; the only `modelcontextprotocol` hit in 3x-ui is a dependency of its documentation site, not of the panel.

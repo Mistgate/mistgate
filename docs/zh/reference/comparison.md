@@ -40,11 +40,11 @@ description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Man
 | VLESS REALITY / XHTTP | 是 / 是 | 是 / 是 | 是 / ? | 是 / ? | 是 / 是 | 是 / 是 | 是 / ? |
 | VMess、Trojan、Shadowsocks | 否 | 是 | 是 | 是 | 部分：Trojan 和 Shadowsocks；未列出 VMess | 是 | 是 |
 | Hysteria2 | 是 | 是 | ? | 是 | 部分：仅在 Xray JSON 客户端配置中提供 | 是 | 是 |
-| TUIC | 否 | 是（v5） | ? | ? | ? | 是 | 是 |
-| WireGuard | 否 | 是 | ? | 是 | 部分：仅通过内核配置 | 是 | ? |
-| AmneziaWG | 是：2.0 和 3.1，每台设备单独使用密钥 | 是：用户态的 3.1 | ? | ? | ? | ? | ? |
-| MTProto（Telegram 代理） | 实验性：Fake TLS，每位用户一个密钥，仅供 Telegram 应用使用 | 是：内置 `mtg` 进程，每个客户端一个 FakeTLS 密钥 | ? | ? | ? | 是：MTProxy FakeTLS 和网页代理 | ? |
-| TrustTunnel | 实验性：HTTPS 之上的 VPN，为官方应用提供 `tt://` 密钥 | ? | ? | ? | ? | ? | ? |
+| TUIC | 否 | 是（v5） | ? | 部分：sing-box 内核，仅源代码中包含 | 否（源代码中没有） | 是 | 是 |
+| WireGuard | 否 | 是 | ? | 是 | 部分：仅通过内核配置 | 是 | 是 |
+| AmneziaWG | 是：2.0 和 3.1，每台设备单独使用密钥 | 是：用户态的 3.1 | ? | 否（源代码中没有） | 否（源代码中没有） | 否（源代码中没有） | 否（源代码中没有） |
+| MTProto（Telegram 代理） | 实验性：Fake TLS，每位用户一个密钥，仅供 Telegram 应用使用 | 是：内置 `mtg` 进程，每个客户端一个 FakeTLS 密钥 | ? | 是（源代码中包含） | 否（源代码中没有） | 是：MTProxy FakeTLS 和网页代理 | 否（源代码中没有） |
+| TrustTunnel | 实验性：HTTPS 之上的 VPN，为官方应用提供 `tt://` 密钥 | 否（源代码中没有） | ? | 否（源代码中没有） | 否（源代码中没有） | 否（源代码中没有） | 否（源代码中没有） |
 | 多个节点 | 是：Agent 使用双向 TLS | 是：主面板管理其他 3x-ui 面板 | 是：marzban-node | 是 | 是 | 是：父子面板 | ? |
 | 添加节点的方式 | 从面板通过 SSH 添加，或使用一次性命令 | 手动：每个节点运行完整的 3x-ui 面板 | 手动 | 手动 | 手动：使用生成的 compose 文件 | 手动：使用子面板 | ? |
 | 经入口节点中转 | 是：从入口节点转发到出口节点，在面板中配置，启用前和之后每 5 分钟检测 | 部分：出站链，手动配置 | ? | ? | 部分：文档中的桥接，手动配置 | 是：中转域名；中转服务器用脚本搭建 | ? |
@@ -54,7 +54,7 @@ description: Mistgate 与 3x-ui、Marzban、PasarGuard、Remnawave、Hiddify Man
 | 多个管理员和角色 | 否：只有一个管理员；角色用于 API 令牌 | ? | 部分：多管理员，开发中 | 是：带范围的角色（RBAC） | 否 | 是：超级管理员、管理员、代理 | ? |
 | Telegram 机器人 | 部分：告警；完整机器人**计划中** | 是（也支持 Discord） | 是 | 是 | 部分：通知、Telegram 登录 | 是 | 部分：仅第三方机器人 |
 | API | 是：Connect、只读 / 操作员 / 管理员令牌 | 是：REST、范围受限的令牌 | 是：REST、webhook | 是：REST、webhook | 是：OpenAPI、范围受限的令牌、webhook | 是 | 是 |
-| AI 智能体（MCP） | 是：内置，支持计划 / 执行和所有者审批 | ? | ? | ? | 否：没有官方服务器；社群提供了相关服务器 | ? | ? |
+| AI 智能体（MCP） | 是：内置，支持计划 / 执行和所有者审批 | 否（源代码中没有） | ? | ? | 否：没有官方服务器；社群提供了相关服务器 | ? | ? |
 | WARP 出口 | 是：按协议配置设置，故障时停止转发（不回退直连） | 是 | ? | 部分：提供指南 | 部分：社群方案 | 是 | 是（源代码中包含） |
 | 运行状况和告警 | 是：客户端视角检测、带修复的节点诊断、告警生命周期、Telegram | 是：Telegram 告警、可选的隧道监视器 | 部分 | 部分 | 是：状态、Prometheus、流量告警 | 部分 | 部分：仅状态 |
 | BT 下载拦截 | 是：在内核中拦截；事件会记录匹配内容和目标端口，不记录地址 | ? | ? | ? | 是：通过插件实现 | ? | ? |
@@ -86,7 +86,7 @@ Marzban 目前只接受维护（上次发布于 2025 年 1 月）；其用户正
 
 ## 2026-11-24 的答案
 
-2026-11-24 的答案所依据的页面。只有当其中一页明确说明时，单元格才写「是」「否」或「部分」；否则写「?」。
+2026-11-24 的答案所依据的页面。当其中一页明确说明时，单元格写「是」「否」或「部分」。「否（源代码中没有）」和「是（源代码中包含）」来自对项目源代码的搜索（见下）。其余都是「?」。
 
 - **3x-ui：** [README](https://github.com/MHSanaei/3x-ui#readme)（协议列表、TUIC、WireGuard、HWID 设备限制、出站代理链）；[Inbounds](https://docs.sanaei.dev/docs/config/inbounds)（MTProto 由内置的 `mtg` 进程提供）；[Clients](https://docs.sanaei.dev/docs/config/clients)（HWID 设备）；[Transports](https://docs.sanaei.dev/docs/config/transports)（Hysteria2 的 `masquerade`、`dialerProxy`）；[TUIC](https://docs.sanaei.dev/docs/config/tuic)。
 - **Marzban：** [README](https://github.com/Gozargah/Marzban#readme)（“Multi-admin support (WIP)”、`HOME_PAGE_TEMPLATE`、“Decoy page template”）。
@@ -94,3 +94,5 @@ Marzban 目前只接受维护（上次发布于 2025 年 1 月）；其用户正
 - **Remnawave：** [Comparison of functions](https://docs.rw/overview/comparison-of-functions)（“Multi-admin support: No”，WireGuard 主机只能通过内核实现）；[Server-side routing](https://docs.rw/learn-en/server-routing)（手动配置的“桥接”）；[HWID device limit](https://docs.rw/features/hwid-device-limit)；[Awesome Remnawave](https://docs.rw/awesome-remnawave)（社群项目）。
 - **Hiddify Manager：** [README](https://github.com/hiddify/Hiddify-Manager#readme)（协议列表、Telegram 代理、三种管理员角色）；[All settings](https://hiddify.com/manager/configuration-and-advanced-settings/Settings-reference/)（“Decoy Site”）；[Telegram proxy](https://hiddify.com/manager/configuration-and-advanced-settings/How-to-set-up-Telegram-proxy-on-Hiddify/)；[My account and admin security](https://hiddify.com/manager/configuration-and-advanced-settings/My-account-and-admin-security-in-HiddifyManager/)；[Relay domains](https://hiddify.com/manager/domain-worker-cdn-and-tunneling/How-to-add-relay-domain-to-Hiddify-manager/)。
 - **s-ui：** [README](https://github.com/alireza0/s-ui#readme)（协议列表、“Client & Traffic & System Status”、第三方的 Telegram 机器人）和 wiki 页面 [Configuration objects](https://github.com/alireza0/s-ui/wiki/Configuration-Objects)（TLS 对象中的 `reality`）。
+
+**「源代码中没有」是怎样核对的。** 2026-11-24，在 [MHSanaei/3x-ui](https://github.com/MHSanaei/3x-ui)、[remnawave/panel](https://github.com/remnawave/panel)、[remnawave/node](https://github.com/remnawave/node)、[hiddify/Hiddify-Manager](https://github.com/hiddify/Hiddify-Manager)、[hiddify/HiddifyPanel](https://github.com/hiddify/HiddifyPanel)、[PasarGuard/panel](https://github.com/PasarGuard/panel)、[PasarGuard/node](https://github.com/PasarGuard/node) 和 [alireza0/s-ui](https://github.com/alireza0/s-ui) 的源代码中搜索了 `trusttunnel`、`mtproto`、`amnezia`、`tuic`、`wireguard`，对 3x-ui 还搜索了 `modelcontextprotocol`。没有命中写「否（源代码中没有）」，有命中写「是（源代码中包含）」或「部分」。搜索可能漏掉以别的名字出现的功能，所以不如文档中的明确说明可靠。Marzban 没有搜索。三点发现：PasarGuard 面板有内核类型 `mtproto`（`app/db/models.py`），其 sing-box 订阅代码中有 TUIC（`app/subscription/singbox.py`），而它的 README 和文档都没有提到；Hiddify 的客户端应用（hiddify-core、hiddify-app）提到了 TrustTunnel，Hiddify Manager 面板没有；3x-ui 中唯一的 `modelcontextprotocol` 命中是其文档站点的依赖，不是面板的依赖。
