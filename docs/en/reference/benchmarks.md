@@ -89,9 +89,9 @@ With 1000 users another 5 MiB or so of the panel were held by the gzip writers o
 
 ### One server, by process
 
-Panel and node on one server, 1000 users, the node started natively (not in a container as in the one-server tests above). The spread was recorded only for the node.
+Panel and node on one server, 1000 users, the node started natively (not in a container as in the one-server tests above). The older build here is v0.1.33; 3 repetitions, medians.
 
-| Private memory (MiB) | v0.1.32 | v0.2.1 |
+| Private memory (MiB) | v0.1.33 | v0.2.1 |
 |:--|--:|--:|
 | Slice, no traffic | 49.7 | 78.5 |
 | Panel, no traffic | 37.0 | 67.0 |
@@ -137,7 +137,7 @@ The absolute figures differ between the three rows, the ratio is the same, about
 
 - 2.5 MiB between the series: this analysis gives 36.9 / 41.5 MiB for v0.2.1, the main series above 39 / 44, same binary.
 - 6.4 MiB on one server: the one-server pair of the page (57 to 92) grew by about 6.4 MiB more than the pair above (the page's figures are rounded). The set-ups differ (there the node ran in a container, here natively), and the difference was not explained.
-- About 0.9 MiB of the memory growth are not attributed to any part; the estimates have an error of about 1 MiB.
+- Counted by cause (MCP servers, garbage between collections, SQLite, the runtime), about 0.9 MiB of the memory growth is not attributed; the estimates have an error of about 1 MiB.
 
 ### Fixed after v0.2.1
 
