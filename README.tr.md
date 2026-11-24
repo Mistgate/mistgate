@@ -134,7 +134,7 @@ Ayrıca:
 
 - Bazı ağlardan bir sunucuya ulaşılamıyorsa kişiler ona başka bir düğümünüz üzerinden bağlanır; o düğüm yalnızca şifreli trafiği iletir. Panel yolu açmadan önce kontrol eder, sonra da izlemeye devam eder; düğüm sayfasındaki Giriş yolları, kişilerin sunucuya nasıl ulaştığını gösteren bir grafiktir; Düğümler sayfasında ise tüm düğümlerin haritası vardır. [Aktarıcılar](docs/en/guide/relays.md)
 - İsteğe bağlı olarak, sunucularınızın bir ülkenin içinden açılıp açılmadığını ağ ağ kontrol edebilirsiniz: ev ve mobil ağlarda IPv4 ve IPv6 üzerinden Globalping ölçümleri, gönüllü ve SIM ölçüm noktaları, engelleme listeleri ve kendi düğümünüzden bir TSPU ölçümü. Kaynakların çoğu yalnızca Rusya'da çalışır. [Erişilebilirlik](docs/en/operations/reachability.md)
-- Docker yok, veritabanı sunucusu yok. Panel boştayken 1 vCPU / 1 GB'lık bir sunucuda 16-20 MiB bellek kullanır. [Performans testleri](docs/en/reference/benchmarks.md), Mistgate'in daha yavaş kaldığı yerler dahil.
+- Docker yok, veritabanı sunucusu yok. Panel boştayken 1 vCPU / 1 GB'lık bir sunucuda 39-44 MiB bellek kullanır. [Performans testleri](docs/en/reference/benchmarks.md), Mistgate'in daha yavaş kaldığı yerler dahil.
 - Panelin adresini açan yabancılar bir kamuflaj sitesi görür; yönetim paneli gizli bir yolun ya da ana bilgisayar adının arkasındadır.
 - Hangi sunucu kime: bir düğüm herkese, seçili gruplara ya da şimdilik hiç kimseye verilir; bir kişi birkaç grupta olabilir. [Gruplar](docs/en/guide/users-and-groups.md)
 - Windows için bir masaüstü uygulaması, [Mistgate](https://github.com/Mistgate/mistgate-client), bu panellerle ve düz abonelik bağlantılarıyla çalışır.
@@ -207,7 +207,7 @@ Ardından:
 |:--|:--|:--|:--|:--|:--|:--|
 | Docker olmadan çalışır | ✅ | ✅ | ❌ | ✅ | 🟡 kısmen | ✅ |
 | Veritabanı | SQLite | SQLite veya PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite, MySQL, MariaDB veya PostgreSQL | SQLite |
-| Boştaki panelin RAM kullanımı | 16-20 MiB¹ | 68-74 MiB¹ | 426-454 MiB¹ | ölçülmedi | 262-265 MiB¹ | ölçülmedi |
+| Boştaki panelin RAM kullanımı | 39-44 MiB¹ | 73-76 MiB¹ | 436-464 MiB¹ | ölçülmedi | 273-277 MiB¹ | ölçülmedi |
 | Panelden düğüm ekleme (SSH) | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
 | Hysteria2 | ✅ | ✅ | 🟡 kısmen | ✅ | ✅ | ✅ |
 | VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |

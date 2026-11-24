@@ -34,7 +34,7 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 | Licence | AGPL-3.0 | GPL-3.0 | AGPL-3.0 | AGPL-3.0 | AGPL-3.0 | GPL-3.0 | GPL-3.0 |
 | Docker | not used: systemd, static binaries | optional | partial: the installer uses Compose; a manual install is documented | partial: Compose | required for the panel and the node | optional | optional |
 | One-line installer | yes | yes | yes | yes | no: Compose, community scripts | yes | yes |
-| Memory | panel: 16-20 MiB idle, measured¹; node: the SSH installer needs 256 MB | 68-74 MiB idle, measured¹ | ? | 262-265 MiB idle, measured¹; documented: 1 GB minimum, 2 GB recommended | 426-454 MiB idle, measured¹; documented: panel 2 GB minimum, 4 GB recommended; node 1 GB minimum | ? | ? |
+| Memory | panel: 39-44 MiB idle, measured¹; node: the SSH installer needs 256 MB | 73-76 MiB idle, measured¹ | ? | 273-277 MiB idle, measured¹; documented: 1 GB minimum, 2 GB recommended | 436-464 MiB idle, measured¹; documented: panel 2 GB minimum, 4 GB recommended; node 1 GB minimum | ? | ? |
 | Core | Hysteria2; xray-core for VLESS; AmneziaWG in userspace or the kernel | Xray, TUIC in process, AmneziaWG | Xray | Xray, a WireGuard core; a sing-box node announced | Xray | Xray and sing-box | sing-box |
 | VLESS REALITY / XHTTP | yes / yes | yes / yes | yes / ? | yes / ? | yes / yes | yes / yes | ? (VLESS is in the source) |
 | VMess, Trojan, Shadowsocks | no | yes | yes | yes | partial: Trojan and Shadowsocks; VMess not listed | yes | yes (in the source) |
@@ -59,17 +59,17 @@ This page compares Mistgate with the self-hosted panels people most often run fo
 | Signed releases | yes: offline key, reproducible, nodes install only signed builds | partial: `.sha256` files | ? | ? | ? | ? | ? |
 | Edition on Cloudflare Workers | preview: [not yet run on a real Cloudflare account](../getting-started/install-edge.md) | no | no | no | no | no | no |
 | GitHub stars | 1 | about 47.7k | about 7.4k | about 2.7k | about 5.2k | about 9.3k | about 10.0k |
-| Latest release | v0.1.32 | v3.9.0 (2026-10-03) | v0.8.4 (2025-01-09) | v5.4.1 (2026-09-12) | 3.4.5 (2026-10-06) | v13.0.3 (2026-09-26) | v1.6.4 (2026-10-07) |
+| Latest release | v0.2.1 | v3.11.0 (2026-10-25) | v0.8.4 (2025-01-09) | v5.6.0 (2026-11-03) | 3.4.11 (2026-11-14) | v13.0.3 (2026-09-26) | v1.6.4 (2026-10-07) |
 
 ¹ Measured by this project on one test machine: private memory (anon) of the whole panel group, idle, with 0 to 200 users and no node connected, on a 1 vCPU / 1 GB server (3x-ui includes its Xray core and fail2ban). Marzban, Hiddify Manager and s-ui were not measured.
 
-On a 2 vCPU / 2 GB server with the VPN core, the database and Hysteria2 traffic, Mistgate (panel and node) held 57 MiB idle and 80 MiB on a "bad day" (64 tunnel streams, 300 subscription requests per second and one user added and one removed per second); the same figures were 74 and 129 MiB for 3x-ui, 297 and 347 MiB for PasarGuard, 761 and 1,114 MiB for Remnawave. The method, the versions and where Mistgate is slower are on the [Benchmarks](benchmarks.md) page. The end-to-end test checks the panel's idle memory against 80 MB and the node agent's against 100 MB.
+On a 2 vCPU / 2 GB server with the VPN core, the database and Hysteria2 traffic, Mistgate (panel and node) held 92 MiB idle and 123 MiB on a "bad day" (64 tunnel streams, 300 subscription requests per second and one user added and one removed per second); the same figures were 81 and 118 MiB for 3x-ui, 312 and 374 MiB for PasarGuard, 815 and 1,159 MiB for Remnawave. On that server 3x-ui uses less memory than Mistgate; the panel alone is smaller in Mistgate (39-44 MiB against 73-76). The method, the versions and where Mistgate is slower are on the [Benchmarks](benchmarks.md) page. The end-to-end test checks the panel's idle memory against 80 MB and the node agent's against 100 MB.
 
 Marzban gets maintenance only (its last release is from January 2025), and its users are moving to PasarGuard, a successor developed in a separate repository rather than a GitHub fork. Marzneshin is dormant.
 
 ## Sources
 
-Checked on 2026-10-09. Each project's README, documentation and release notes; the stars and the latest releases from the GitHub API on that day.
+Checked on 2026-10-09. Each project's README, documentation and release notes; the stars and the latest releases from the GitHub API on that day. On 2026-11-24 only the latest releases of Mistgate, 3x-ui, PasarGuard and Remnawave were checked again (GitHub releases, for the [benchmark](benchmarks.md)); the rest of the table was not.
 
 | Project | Repository | Documentation |
 |:--|:--|:--|

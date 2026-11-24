@@ -134,7 +134,7 @@ Also in the box:
 
 - When some networks cannot reach a server, people get to it through another of your nodes, which only forwards the encrypted traffic. The panel checks the path before switching it on and watches it afterwards; Ways in on the node page is a graph of how people reach the server, and the Nodes page maps the whole fleet. [Relays](docs/en/guide/relays.md)
 - Optional checks of whether your servers open from inside a country, network by network: Globalping probes on home and mobile networks over IPv4 and IPv6, volunteer and SIM probes, block lists and a TSPU probe from your own node. Most sources work only in Russia. [Reachability](docs/en/operations/reachability.md)
-- No Docker, no database server. The panel idles at 16-20 MiB of memory on a 1 vCPU / 1 GB server. [Benchmarks](docs/en/reference/benchmarks.md), including where Mistgate is slower.
+- No Docker, no database server. The panel idles at 39-44 MiB of memory on a 1 vCPU / 1 GB server. [Benchmarks](docs/en/reference/benchmarks.md), including where Mistgate is slower.
 - Strangers who open the panel's address see a decoy site; the admin is behind a secret path or host name.
 - Who gets which server: a node goes to everyone, to chosen groups or to nobody yet, and a person can be in several groups. [Groups](docs/en/guide/users-and-groups.md)
 - A desktop app for Windows, [Mistgate](https://github.com/Mistgate/mistgate-client), works with these panels and with plain subscription links.
@@ -207,7 +207,7 @@ An AI agent that can run `ssh` can do these steps with the prompt in the [AI age
 |:--|:--|:--|:--|:--|:--|:--|
 | Runs without Docker | ✅ | ✅ | ❌ | ✅ | 🟡 partial | ✅ |
 | Database | SQLite | SQLite or PostgreSQL | PostgreSQL + Redis | MySQL + Redis | SQLite, MySQL, MariaDB or PostgreSQL | SQLite |
-| Panel RAM, idle | 16-20 MiB¹ | 68-74 MiB¹ | 426-454 MiB¹ | not measured | 262-265 MiB¹ | not measured |
+| Panel RAM, idle | 39-44 MiB¹ | 73-76 MiB¹ | 436-464 MiB¹ | not measured | 273-277 MiB¹ | not measured |
 | Add a node from the panel (SSH) | ✅ | ❌ | ❌ | ❌ | ❌ | ? |
 | Hysteria2 | ✅ | ✅ | 🟡 partial | ✅ | ✅ | ✅ |
 | VLESS REALITY | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
