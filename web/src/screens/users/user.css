@@ -923,6 +923,10 @@ a.up-gtag:hover {
   background: var(--warning-soft);
   color: var(--warning-text);
 }
+.up-badge.ru {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
 .up-badge.idle {
   background: var(--tone-sky-bg);
   color: var(--tone-blip);

@@ -12,7 +12,7 @@ import type { MgData } from "./types";
 //   lang=en|ru|zh|fa|tr    the language (before the one remembered on this device)      theme=light|dark, as=<platform>: main.ts
 //   tab=servers|telegram|trusttunnel|devices      more=1 the long list of devices unfolded      proxy=<n> the n-th proxy of the Telegram and TrustTunnel panels
 //   sheet=pick|link|conn|key|full      the window "New device" at that step (full: no place left)       sheet=made  a key made in the window ("ready")
-//   &profile=<profile id>  the key chosen in the form      &list=1  its servers unfolded (the key form, sheet=key)
+//   &profile=<profile id>  the key chosen in the form      &list=1  its servers unfolded (the key form, sheet=key)      &route=ru-direct  its second choice
 //   key=<device id>[&country=<n>]      the key of a device (the n-th config)        renew=<device id>    the new key of a stale device
 //   menu=<id>   the menu of a device       rename=<id>       ask=remove:<id>|rotate:<id>       stale=<id>  the question of a stale key
 //   dns=<server id>|link  [&dnsall=0|1 the scope]  [&dnsdone=1 the result  [&dnsskip=<server ids> the servers that did not offer it]]
@@ -49,6 +49,7 @@ export function devScene(query: URLSearchParams, data: MgData, st: State, a: Act
   const profile = q("profile");
   if (profile) st.amz.form.profile = profile;
   if (q("list") === "1") st.amz.form.list = true;
+  if (q("route") === "ru-direct") st.amz.form.route = "ru-direct";
   st.amz.menu = q("menu");
   const key = q("key");
   if (key) {

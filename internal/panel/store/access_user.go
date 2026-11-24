@@ -1139,7 +1139,7 @@ func (a Access) SubscriptionData(ctx context.Context, userID string, since time.
 			coalesce((SELECT group_concat(DISTINCT c.protocol) FROM device_credential c WHERE c.device_id = d.id AND c.revoked_at IS NULL), '') AS protocols`+accDeviceTail(now)+`
 			FROM device d WHERE d.user_id = ? AND d.revoked_at IS NULL AND `+accDeviceLive+` ORDER BY d.created_at, d.id`, userID)
 	r.add(appendRows(&awgDevices, scanAWGDevice), `SELECT d.id, d.user_id, d.platform, d.model, d.os_version, coalesce(d.first_seen_at, 0) AS first_seen_at, coalesce(d.last_seen_at, 0) AS last_seen_at, d.created_at,
-			p.id AS profile_id, p.name AS profile_name, p.settings_json AS profile_settings_json, c.id AS credential_id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch, coalesce(c.dns_sig, '') AS dns_sig
+			p.id AS profile_id, p.name AS profile_name, p.settings_json AS profile_settings_json, c.id AS credential_id, c.data_json, c.secret_enc, ap.public_key, ap.idx, c.config_epoch, p.critical_epoch, coalesce(c.dns_sig, '') AS dns_sig, d.awg_route AS awg_route
 			FROM device d
 			JOIN device_credential c ON c.device_id = d.id AND c.revoked_at IS NULL AND c.profile_id IS NOT NULL AND c.path = ''
 			JOIN awg_peer ap ON ap.credential_id = c.id AND ap.released_at = 0

@@ -230,6 +230,8 @@ This table is about the preset that applies to the person: for the apps on the l
 
 Without a split, Happ's direct resolver is set to the main one too, so a site a person's own Happ rules send direct still uses the preset (an ad-blocking preset stays ad-blocking).
 
+Routing by country or by suffix never reaches an AmneziaVPN key: a key holds addresses, not domains. Keeping Russian services off the node's address in such a key is a separate kind of key, **Russian services direct** ([AmneziaWG](amneziawg.md#key-russian-services-direct)): it works by IP ranges of the big services, not by domain, and the DNS preset has no part in it. The whole country by domain is what AmneziaWG inside a Mihomo profile does.
+
 ## When a change reaches people
 
 - **Apps on the link** (Happ, apps on the mihomo core, Xray JSON and sing-box apps) get it with their next subscription update: within the refresh interval, 12 hours by default. A person can refresh the subscription by hand.
