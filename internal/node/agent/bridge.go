@@ -104,10 +104,7 @@ func (a *Agent) bridgePanelAddress() string {
 		}
 		return ""
 	}
-	link := a.cfg.LinkURL
-	if link == "" {
-		link = a.meta.Link
-	}
+	link := a.linkURL() // a link node's cfg.LinkURL is its meta.Link: New and every new-address commit set both
 	u, err := parseLinkBase(link)
 	if err != nil || u.Hostname() == "" {
 		return ""

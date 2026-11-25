@@ -158,7 +158,8 @@ setup 在各种模式下生成的值：
 | `identity.pem` | 节点的私钥和面板 CA 签发的证书，保存在同一文件中。文件存在表示节点「已注册」。 |
 | `enroll-pending.pem` | 使用 `--resume-key` 发起注册（SSH 安装）时生成的私钥，只保留到注册成功为止。 |
 | `ca.pem` | 面板 CA：Agent 唯一信任的证书颁发机构。 |
-| `agent.json` | 面板地址、私密 TLS 名称和节点 ID。 |
+| `agent.json` | 面板地址、私密 TLS 名称和节点 ID。连接节点还保存 `link`、待尝试的 `next_link`、`prev_link`（最后确认可用的地址）、`link_since`（切换时间）和 `link_healthy`（会话在 HelloAck 后持续了 2 分钟）。连续切换时，在当前地址确认健康前保留已知可用的备用地址，重启后也一样。直连和桥接会话采用相同规则；切换至少 7 天后的健康会话会删除 `prev_link` 和 `link_since`。地址字段包含私密前缀。`next_link_revision` 防止 Agent 的旧状态覆盖更新的 CLI 请求。 |
+| `agent.json.lock` | Agent 与 `set-panel` 共用的跨进程锁。运行期间请勿删除。写入使用唯一临时文件和原子替换；Agent 后续写入会保留并发的 CLI 请求。 |
 | `state.json` | 最近应用的状态，因此即使面板不可用，服务器也会在节点重启后恢复运行。文件中包含协议配置密钥（混淆密码、服务器密钥、WARP 密钥）和节点验证用户所需的内容（Hysteria2 令牌哈希、AmneziaWG 公钥和预共享密钥），绝不包含客户端私钥或原始令牌。 |
 | `certs/` | 节点上服务器使用的证书：Let’s Encrypt 状态和自签名证书。 |
 | `last_version` | 上次启动的版本。 |
