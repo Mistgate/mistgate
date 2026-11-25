@@ -303,8 +303,11 @@ type SubscriptionSettings struct {
 	// The owner's own routing profiles for the apps Happ and INCY, one for each of the groups they name; a person gets one profile at most,
 	// by their main group. The list is replaced as a whole. Checked on save (see RoutingProfile); at most 20 profiles.
 	RoutingProfiles []*RoutingProfile `protobuf:"bytes,19,rep,name=routing_profiles,json=routingProfiles,proto3" json:"routing_profiles,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Seconds between the server checks of the Auto group in the Mihomo, sing-box and Xray JSON documents: 60, 120, 300 or 600.
+	// Absent = 300 (what these documents always had).
+	LinkAutoInterval *uint32 `protobuf:"varint,20,opt,name=link_auto_interval,json=linkAutoInterval,proto3,oneof" json:"link_auto_interval,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *SubscriptionSettings) Reset() {
@@ -468,6 +471,13 @@ func (x *SubscriptionSettings) GetRoutingProfiles() []*RoutingProfile {
 		return x.RoutingProfiles
 	}
 	return nil
+}
+
+func (x *SubscriptionSettings) GetLinkAutoInterval() uint32 {
+	if x != nil && x.LinkAutoInterval != nil {
+		return *x.LinkAutoInterval
+	}
+	return 0
 }
 
 // One routing profile of the owner, for Happ and INCY: what goes direct, through the VPN and to the block list, the app's DNS and the
@@ -1114,8 +1124,12 @@ type UserPageOptions struct {
 	// People may pick, on their page, one of the DNS presets the owner offers on each server (DnsService.SetNodeDnsOptions).
 	// Absent = false: a new feature does not switch itself on for settings stored before it existed.
 	AllowDnsChoice *bool `protobuf:"varint,6,opt,name=allow_dns_choice,json=allowDnsChoice,proto3,oneof" json:"allow_dns_choice,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// People may take, on their page, the AmneziaWG key "Russian services direct" next to the ordinary one: its AllowedIPs leave the
+	// networks of the big Russian services out, so they do not see the node's address. Absent = false: a new feature does not
+	// switch itself on for settings stored before it existed.
+	AllowRuDirectKey *bool `protobuf:"varint,7,opt,name=allow_ru_direct_key,json=allowRuDirectKey,proto3,oneof" json:"allow_ru_direct_key,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *UserPageOptions) Reset() {
@@ -1186,6 +1200,13 @@ func (x *UserPageOptions) GetRequirePagePassword() bool {
 func (x *UserPageOptions) GetAllowDnsChoice() bool {
 	if x != nil && x.AllowDnsChoice != nil {
 		return *x.AllowDnsChoice
+	}
+	return false
+}
+
+func (x *UserPageOptions) GetAllowRuDirectKey() bool {
+	if x != nil && x.AllowRuDirectKey != nil {
+		return *x.AllowRuDirectKey
 	}
 	return false
 }
@@ -2299,7 +2320,7 @@ var File_mistgate_admin_v1_subscription_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\n" +
-	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xf1\b\n" +
+	"$mistgate/admin/v1/subscription.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xbb\t\n" +
 	"\x14SubscriptionSettings\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\"\n" +
 	"\fannouncement\x18\x02 \x01(\tR\fannouncement\x12\x1f\n" +
@@ -2321,11 +2342,13 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\x16device_idle_after_days\x18\x10 \x01(\rH\x03R\x13deviceIdleAfterDays\x88\x01\x01\x12L\n" +
 	"\x10response_headers\x18\x11 \x03(\v2!.mistgate.admin.v1.ResponseHeaderR\x0fresponseHeaders\x12L\n" +
 	"\x10mihomo_templates\x18\x12 \x03(\v2!.mistgate.admin.v1.MihomoTemplateR\x0fmihomoTemplates\x12L\n" +
-	"\x10routing_profiles\x18\x13 \x03(\v2!.mistgate.admin.v1.RoutingProfileR\x0froutingProfilesB\x14\n" +
+	"\x10routing_profiles\x18\x13 \x03(\v2!.mistgate.admin.v1.RoutingProfileR\x0froutingProfiles\x121\n" +
+	"\x12link_auto_interval\x18\x14 \x01(\rH\x04R\x10linkAutoInterval\x88\x01\x01B\x14\n" +
 	"\x12_link_device_limitB\v\n" +
 	"\t_link_awgB\x13\n" +
 	"\x11_link_auto_selectB\x19\n" +
-	"\x17_device_idle_after_days\"\xb7\x01\n" +
+	"\x17_device_idle_after_daysB\x15\n" +
+	"\x13_link_auto_interval\"\xb7\x01\n" +
 	"\x0eRoutingProfile\x12\x18\n" +
 	"\aprofile\x18\x01 \x01(\tR\aprofile\x12\x19\n" +
 	"\bonly_add\x18\x02 \x01(\bR\aonlyAdd\x12\x1f\n" +
@@ -2383,17 +2406,19 @@ const file_mistgate_admin_v1_subscription_proto_rawDesc = "" +
 	"\fdownload_url\x18\x04 \x01(\tR\vdownloadUrl\x12*\n" +
 	"\x11add_link_template\x18\x05 \x01(\tR\x0faddLinkTemplate\x12 \n" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x12 \n" +
-	"\vrecommended\x18\a \x01(\bR\vrecommended\"\xef\x02\n" +
+	"\vrecommended\x18\a \x01(\bR\vrecommended\"\xbb\x03\n" +
 	"\x0fUserPageOptions\x12+\n" +
 	"\x11show_announcement\x18\x01 \x01(\bR\x10showAnnouncement\x12!\n" +
 	"\fshow_support\x18\x02 \x01(\bR\vshowSupport\x12\x17\n" +
 	"\ashow_qr\x18\x03 \x01(\bR\x06showQr\x12>\n" +
 	"\x19allow_device_self_service\x18\x04 \x01(\bH\x00R\x16allowDeviceSelfService\x88\x01\x01\x127\n" +
 	"\x15require_page_password\x18\x05 \x01(\bH\x01R\x13requirePagePassword\x88\x01\x01\x12-\n" +
-	"\x10allow_dns_choice\x18\x06 \x01(\bH\x02R\x0eallowDnsChoice\x88\x01\x01B\x1c\n" +
+	"\x10allow_dns_choice\x18\x06 \x01(\bH\x02R\x0eallowDnsChoice\x88\x01\x01\x122\n" +
+	"\x13allow_ru_direct_key\x18\a \x01(\bH\x03R\x10allowRuDirectKey\x88\x01\x01B\x1c\n" +
 	"\x1a_allow_device_self_serviceB\x18\n" +
 	"\x16_require_page_passwordB\x13\n" +
-	"\x11_allow_dns_choice\"b\n" +
+	"\x11_allow_dns_choiceB\x16\n" +
+	"\x14_allow_ru_direct_key\"b\n" +
 	"\tServeRule\x12\x1f\n" +
 	"\vua_contains\x18\x01 \x01(\tR\n" +
 	"uaContains\x124\n" +

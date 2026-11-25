@@ -1,5 +1,6 @@
 ---
 title: Install the panel
+seoTitle: "Install a self-hosted VPN panel on Linux — Mistgate"
 description: Download or build Mistgate, prepare the panel with mistgate setup, run it under systemd and sign in for the first time.
 ---
 

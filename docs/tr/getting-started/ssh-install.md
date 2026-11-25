@@ -3,7 +3,7 @@ title: SSH ile düğüm kurma
 description: Panelin düğüm ajanını temiz bir sunucuya kendi anahtarıyla ya da bir parolayla SSH üzerinden kurmasına izin verin, kurulum işlerini izleyin, iptal edin ve yeniden deneyin, kayıtlı SSH erişimini yönetin.
 ---
 
-SSH kurulumunda panelin kendisi yeni sunucuya bağlanır, onu kontrol eder, düğüm ajanını kurar ve bağlanmasını bekler: sunucuya hiçbir şey kopyalamaz ve hiçbir komut yapıştırmazsınız. Bu sahibin işidir ve **Düğümler → Düğüm ekle → SSH ile otomatik kur** yolundan başlar. Bir yapay zekâ ajanı aynı kurulumu MCP üzerinden başlatabilir ve siz onu yönetim panelinde onaylarsınız: bkz. [Yapay zekâ ajanı kılavuzu](ai-agents.md). Panel sunucuya SSH ile ulaşamıyorsa [elle kurulumu](add-node.md) kullanın.
+SSH kurulumunda panelin kendisi yeni sunucuya bağlanır, onu kontrol eder, düğüm ajanını kurar ve bağlanmasını bekler: sunucuya hiçbir şey kopyalamaz ve hiçbir komut yapıştırmazsınız. Bu sahibin işidir ve **Düğümler → Düğüm ekle → SSH ile** yolundan başlar. Bir yapay zekâ ajanı aynı kurulumu MCP üzerinden başlatabilir ve siz onu yönetim panelinde onaylarsınız: bkz. [Yapay zekâ ajanı kılavuzu](ai-agents.md). Panel sunucuya SSH ile ulaşamıyorsa [elle kurulumu](add-node.md) kullanın.
 
 ## Nelere ihtiyacınız var
 

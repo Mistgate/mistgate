@@ -193,6 +193,9 @@ type RenderInput struct {
 	// NoIPv6Egress: the client gets no IPv6 out of the exit node, so no format of an AmneziaWG server carries an IPv6 address of the tunnel (AllowedIPs keep ::/0).
 	// The other formats ignore it; false (the zero value) changes nothing.
 	NoIPv6Egress bool
+	// RUDirect: the key of a device that sends the Russian services around the tunnel (awg.RouteRUDirect). Only the .conf and the
+	// vpn:// key of an AmneziaWG server read it: AllowedIPs without those networks, no IPv6 address of the tunnel.
+	RUDirect bool
 
 	// L3 protocols (awg). For FormatMihomo, Fragment.Data is ONE proxy as an element of a YAML list built
 	// from yaml.v3 nodes (never string templates: node and user names are hostile input); the assembler

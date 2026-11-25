@@ -3,7 +3,7 @@ title: Assistant
 description: A cloud model in the admin that answers about your nodes, people and errors and prepares changes you apply. Providers, where the data goes, memory, limits and safety.
 ---
 
-# Assistant
+![The assistant's window: a question, the answer with proposed changes, Approve and apply, and the line that it was applied](../../images/readme/assistant-dark-en.webp)
 
 The assistant is a chat in the admin with a cloud model you connect with your own API key. Ask it which nodes had problems, why someone cannot connect, who is over the device limit; ask it to make a group, change the subscription texts or turn a profile off for a node. It looks things up with the panel's own tools and prepares every change as a card in the panel's words. **Nothing changes until you press Apply.**
 

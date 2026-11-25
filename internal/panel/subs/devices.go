@@ -30,7 +30,8 @@ import (
 // POST with JSON in and out, all only for a valid token (an unknown one gets the decoy and counts as a miss, like a
 // fetch):
 //
-//	POST <link>/devices                    {"profile_id","platform","label"}  add a device, answers with its configs
+//	POST <link>/devices                    {"profile_id","platform","label","route"}  add a device, answers with its configs
+//	                                       (route "ru-direct" only when the owner offers it: else 403 ru_direct_disabled)
 //	POST <link>/devices/<id>/configs                                           the configs again (marks them received)
 //	POST <link>/devices/<id>/rotate                                            a new key on the same address
 //	POST <link>/devices/<id>/revoke                                            remove the device
@@ -42,7 +43,7 @@ import (
 
 // Devices is what the endpoints call; *access.Service implements it. A Source that does not leaves the endpoints off.
 type Devices interface {
-	AddAWGDevice(ctx context.Context, by, userID, profileID, platform, label string) (store.AccessAWGDevice, []access.DeviceConfig, error)
+	AddAWGDeviceRoute(ctx context.Context, by, userID, profileID, platform, label, route string) (store.AccessAWGDevice, []access.DeviceConfig, error)
 	DeviceConfigs(ctx context.Context, by, owner, deviceID string) (store.AccessAWGDevice, []access.DeviceConfig, error)
 	RotateDevice(ctx context.Context, by, owner, deviceID string) (store.AccessAWGDevice, []access.DeviceConfig, error)
 	RelabelDevice(ctx context.Context, owner, deviceID, label string) (store.AccessAWGDevice, error)
@@ -76,18 +77,22 @@ type pageAWGDevice struct {
 	Online            bool   `json:"online"`
 	Stale             bool   `json:"stale"` // the profile changed or the person picked another DNS: fetch the configs and re-import them
 	// StaleReason says why: "profile" (the servers changed: a new key is needed) or "dns" (the DNS of a server changed: the same
-	// key, fetched again, carries it); "" when the device is not stale.
-	StaleReason string          `json:"stale_reason"`
-	MinClients  []pageMinClient `json:"min_clients"`
+	// key, fetched again, carries it) or "routes" (the list of a "Russian services direct" key is out of date: same); "" when the device is not stale.
+	StaleReason string `json:"stale_reason"`
+	// Route is how the key routes: "" (all through the VPN) or "ru-direct" (the Russian services around it).
+	Route      string          `json:"route"`
+	MinClients []pageMinClient `json:"min_clients"`
 }
 
 // staleOf is whether a device needs its configs again and why. A changed profile outranks a changed DNS: it needs more.
-func staleOf(profileStale bool, dnsStale []string) (stale bool, reason string) {
+func staleOf(profileStale bool, dnsStale []string, routeStale bool) (stale bool, reason string) {
 	switch {
 	case profileStale:
 		return true, "profile"
 	case len(dnsStale) > 0:
 		return true, "dns"
+	case routeStale:
+		return true, "routes"
 	}
 	return false, ""
 }
@@ -105,6 +110,7 @@ type pageAmnezia struct {
 	Devices     []pageAWGDevice  `json:"devices"`
 	Profiles    []pageAWGProfile `json:"profiles"` // what "add a device" can pick from
 	CanAdd      bool             `json:"can_add"`
+	RUDirect    bool             `json:"ru_direct"`    // the owner offers the key "Russian services direct" next to the ordinary one
 	SelfService bool             `json:"self_service"` // false: keys come from the admin, the page only lists the devices
 	Endpoints   string           `json:"endpoints"`    // base URL of the self-service calls ("" = none: the admin's preview), <link>/devices
 }
@@ -125,21 +131,21 @@ func minClientsJSON(rs []protocols.ClientReq) []pageMinClient {
 // admin's switch; the preview (the admin's look at the page) shows it as it is but has no endpoints: it cannot write.
 // A person whose subscription is not active still gets it when they have the app or keys: the keys are listed and can be
 // renamed and removed (the calls allow it), while nothing can be added (can_add false, no profiles to add on).
-func amneziaData(v access.SubView, link string, selfService, preview bool, now time.Time) *pageAmnezia {
+func amneziaData(v access.SubView, link string, selfService, ruDirect, preview bool, now time.Time) *pageAmnezia {
 	hasKeys := slices.ContainsFunc(v.Devices, func(d access.SubDevice) bool { return d.AWG != nil })
 	if !v.AccessAmnezia && !(v.Status != access.StatusActive && (v.AppAmnezia || hasKeys)) {
 		return nil
 	}
-	a := &pageAmnezia{Devices: []pageAWGDevice{}, Profiles: []pageAWGProfile{}, SelfService: selfService}
+	a := &pageAmnezia{Devices: []pageAWGDevice{}, Profiles: []pageAWGProfile{}, SelfService: selfService, RUDirect: ruDirect}
 	for _, d := range v.Devices {
 		if d.AWG == nil {
 			continue
 		}
-		stale, reason := staleOf(d.AWG.Stale, d.AWG.DNSStale)
+		stale, reason := staleOf(d.AWG.Stale, d.AWG.DNSStale, d.AWG.RouteStale)
 		a.Devices = append(a.Devices, pageAWGDevice{
 			ID: d.ID, Platform: d.Platform, Label: d.Model, ProfileID: d.AWG.ProfileID, ProfileName: d.AWG.ProfileName,
 			Version: d.AWG.Version, Address: d.AWG.Address, LastHandshakeUnix: unixOrZero(d.AWG.LastHandshake),
-			Online: online(d.AWG.LastHandshake, now), Stale: stale, StaleReason: reason, MinClients: minClientsJSON(d.AWG.MinClients),
+			Online: online(d.AWG.LastHandshake, now), Stale: stale, StaleReason: reason, Route: d.AWG.Route, MinClients: minClientsJSON(d.AWG.MinClients),
 		})
 	}
 	for _, p := range v.AWGProfiles {
@@ -185,7 +191,8 @@ func deviceOf(d store.AccessAWGDevice, cfgs []access.DeviceConfig, now time.Time
 		Version: profileVersion(d.ProfileSettingsJSON), Address: addressOf(d.DataJSON),
 		LastHandshakeUnix: unixOrZero(d.LastSeenAt), Online: online(d.LastSeenAt, now), MinClients: []pageMinClient{},
 	}
-	out.Stale, out.StaleReason = staleOf(d.Stale(), d.DNSStale)
+	out.Stale, out.StaleReason = staleOf(d.Stale(), d.DNSStale, d.RouteStale)
+	out.Route = d.Route
 	if len(cfgs) > 0 {
 		out.Version = cfgs[0].AWGVersion
 		out.MinClients = minClientsJSON(cfgs[0].MinClients)
@@ -279,11 +286,16 @@ func (h *handler) serveDevices(w http.ResponseWriter, r *http.Request, token, su
 			ProfileID string `json:"profile_id"`
 			Platform  string `json:"platform"`
 			Label     string `json:"label"`
+			Route     string `json:"route"`
 		}
 		if !readJSON(w, r, &in) {
 			return
 		}
-		dev, cfgs, err = h.dev.AddAWGDevice(ctx, by, v.UserID, in.ProfileID, in.Platform, in.Label)
+		if in.Route == awg.RouteRUDirect && !subsettings.RUDirect(h.settings(ctx)) {
+			jsonError(w, http.StatusForbidden, "ru_direct_disabled", "")
+			return
+		}
+		dev, cfgs, err = h.dev.AddAWGDeviceRoute(ctx, by, v.UserID, in.ProfileID, in.Platform, in.Label, in.Route)
 	case action == "configs":
 		dev, cfgs, err = h.dev.DeviceConfigs(ctx, by, v.UserID, deviceID)
 	case action == "rotate":

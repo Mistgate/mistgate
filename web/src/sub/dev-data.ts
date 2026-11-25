@@ -82,6 +82,7 @@ const awg = (id: string, platform: string, label: string, ago: number, extra: Pa
   online: ago >= 0 && ago < 120,
   stale: false,
   stale_reason: "profile",
+  route: "",
   min_clients: [
     { client: "amnezia", app: "AmneziaVPN", min: "5.0.1.5" },
     { client: "amnezia", app: "AmneziaWG Android", min: "v3.1.20260814" },
@@ -100,7 +101,7 @@ const richKeys = [awg("d3", "ios", "iPhone", 40), awg("d6", "other", "Router", 3
 
 const main: AwgProfile ={ id: "p31", name: "Main", version: "3.1", egress: "direct", countries: ["DE", "FI"] };
 // "dev:" = the sample answers the self-service calls itself (dev-api.ts); a real page carries the link's own address
-const amz = (devices: AwgDevice[], extra: Partial<AmneziaData> = {}): AmneziaData => ({ devices, profiles: [main], can_add: true, self_service: true, endpoints: "dev:", ...extra });
+const amz = (devices: AwgDevice[], extra: Partial<AmneziaData> = {}): AmneziaData => ({ devices, profiles: [main], can_add: true, self_service: true, ru_direct: false, endpoints: "dev:", ...extra });
 
 // ---- servers and DNS ----
 const presets: DnsPreset[] = [
@@ -198,6 +199,7 @@ const base: MgData = {
 };
 
 const withUser = (u: Partial<MgData["user"]>): MgData["user"] => ({ ...base.user, ...u });
+const ruKey = awg("d9", "ios", "iPhone", 40, { route: "ru-direct" });
 const keys = (list: AwgDevice[], extra: Partial<AmneziaData> = {}) => amz(list, extra);
 
 // a returning visit: the app fetched the subscription, two keys
@@ -257,6 +259,10 @@ export const cases: Record<string, MgData> = {
   amnezia: { ...base, user: withUser({ devices_used: 2 }), devices: [...shared(30, true), asDevice(pixel)], amnezia: keys([pixel]) },
   // a friend of the AmneziaVPN app alone: no link apps, the keys only
   "keys-only": { ...base, access: { happ: false, amnezia: true }, server_count: 0, user: withUser({ devices_used: 2 }), devices: [pixel, macbook].map(asDevice), amnezia: keys([pixel, macbook]), servers: [{ ...fra, connections: fra.connections.filter((c) => c.way === "key") }, mow] },
+  // the owner offers "Russian services direct": two choices in the key form, a key of that route in the list (open with &sheet=key[&route=ru-direct], &key=d9)
+  "ru-direct": { ...base, user: withUser({ device_limit: 8, devices_used: 3 }), devices: [...shared(30, true), asDevice(pixel), asDevice(ruKey)], amnezia: amz([pixel, ruKey], { ru_direct: true }) },
+  // its list of networks went out of date (&stale=d9)
+  "ru-direct-stale": { ...base, user: withUser({ device_limit: 8, devices_used: 3 }), devices: [...shared(30, true), asDevice(pixel), asDevice(ruKey)], amnezia: amz([pixel, { ...ruKey, stale: true, stale_reason: "routes" }], { ru_direct: true }) },
   "amnezia-empty": { ...base, user: withUser({ devices_used: 0 }), devices: [], amnezia: amz([]) },
   // the owner issues the keys: no buttons, "ask for a key"
   "amnezia-off": { ...base, user: withUser({ devices_used: 4, device_limit: 8 }), devices: [...shared(30, true), ...[pixel, macbook, winbox].map(asDevice)], amnezia: amz([pixel, macbook, winbox], { self_service: false, can_add: false, endpoints: "" }) },

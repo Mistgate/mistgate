@@ -13,9 +13,26 @@ const dist = join(siteRoot, "dist");
 
 function page(lang, key) {
   const prefix = lang === "en" ? "" : `${lang}/`;
-  const path = key === "index" ? `${prefix}index.html` : `${prefix}${key}/index.html`;
+  const path = `${prefix}${key === "index" ? "docs" : key}/index.html`;
   return readFileSync(join(dist, path), "utf8");
 }
+
+test("the docs home is /docs/ in each language: the logo leads to the landing, Home and the crumbs to the docs home", () => {
+  for (const [lang, base] of [["en", ""], ["ru", "/ru"], ["zh", "/zh"], ["fa", "/fa"], ["tr", "/tr"]]) {
+    const home = page(lang, "index"), inner = page(lang, "getting-started/overview");
+    assert.ok(home.includes(`<link rel="canonical" href="https://mistgate.app${base}/docs/">`), `${lang}: canonical`);
+    assert.ok(home.includes(`<link rel="alternate" hreflang="x-default" href="https://mistgate.app/docs/">`), `${lang}: x-default`);
+    assert.ok(!home.includes('class="crumbs"') && !home.includes('class="pns"'), `${lang}: no crumbs and no previous/next on the home`);
+    for (const html of [home, inner]) {
+      assert.equal(html.match(new RegExp(`<a class="brand" href="${base}/"`, "g"))?.length, 2, `${lang}: the logo of the header and of the sidebar lead to the landing`);
+      assert.ok(html.includes(`<a class="nav-link" href="${base}/docs/"`), `${lang}: Home in the sidebar`);
+    }
+    assert.ok(inner.includes(`<nav class="crumbs"`) && inner.includes(`<a href="${base}/docs/">`), `${lang}: the first crumb`);
+    assert.ok(!existsSync(join(dist, base.slice(1), "index.html")), `${lang}: the docs write no landing page`);
+    assert.ok(JSON.parse(readFileSync(join(dist, base.slice(1), "search-index.json"), "utf8")).some((p) => p.u === `${base}/docs/`), `${lang}: the search finds the docs home`);
+  }
+  assert.ok(readFileSync(join(dist, "404.html"), "utf8").includes('<a class="btn btn--primary" href="/docs/">'));
+});
 
 test("the install script is published at the stable URL as plain text", () => {
   const published = readFileSync(join(dist, "install.sh"));
@@ -50,7 +67,7 @@ test("the status page draws its roadmap block as phases with cards, listed and s
     assert.ok(toc.includes(phases[2]) && !toc.includes(card), `${lang}: the table of contents lists phases, not cards`);
     assert.ok(html.includes(`<h3 id=`) && html.includes(card));
     assert.ok(html.includes(`href="${base}/getting-started/install-edge/"`), `${lang}: card links point to site pages`);
-    assert.ok(/<span class="rm-ver">v0\.1\.\d+<\/span>/.test(html), `${lang}: the current release card carries a version badge`);
+    assert.ok(/<span class="rm-ver">v0\.\d+\.\d+<\/span>/.test(html), `${lang}: the current release card carries a version badge`);
     const index = JSON.parse(readFileSync(join(dist, lang === "en" ? "search-index.json" : "ru/search-index.json"), "utf8")).find((p) => p.u === `${base}/roadmap/status/`);
     assert.ok(index.h.some(([t]) => t === card), `${lang}: cards are in the search index`);
     assert.ok(index.k.some(([c]) => c === "mistgate edge deploy"), `${lang}: names in cards are searchable`);
@@ -110,9 +127,9 @@ test("node guides show the SSH install choice, and updates show the published pa
   const updatesEn = page("en", "operations/updates");
   const updatesRu = page("ru", "operations/updates");
 
-  assert.ok(addEn.includes("Install automatically over SSH"));
+  assert.ok(addEn.includes("Over SSH"));
   assert.ok(addEn.includes('href="/getting-started/ssh-install/"'));
-  assert.ok(addRu.includes("Запустить автоустановку по SSH"));
+  assert.ok(addRu.includes("По SSH"));
   assert.ok(addRu.includes('href="/ru/getting-started/ssh-install/"'));
   assert.ok(sshEn.includes("Saved SSH access"));
   assert.ok(sshEn.includes("--token-stdin"));
@@ -125,14 +142,13 @@ test("node guides show the SSH install choice, and updates show the published pa
   assert.ok(updatesRu.includes("Проверить GitHub"));
 });
 
-test("the device-ID column of the client apps is answers in every language, and fa and tr mark what is planned", () => {
+test("the device-ID column of the client apps is answers in every language, and the fa and tr overviews name the app for Windows", () => {
   for (const lang of LANGS) {
     const html = page(lang, "guide/client-apps");
     assert.equal(html.match(/class="yn yn--yes"/g)?.length, 3, `${lang}: three apps send an ID ("Yes." and "Yes, by default.")`);
     assert.equal(html.match(/class="yn yn--no"/g)?.length, 1, `${lang}: one row says no`);
   }
-  assert.ok(page("fa", "getting-started/overview").includes('<strong class="planned">برنامه‌ریزی‌شده</strong>'));
-  assert.ok(page("tr", "getting-started/overview").includes('<strong class="planned">Planlanıyor</strong>'));
+  for (const lang of ["fa", "tr"]) assert.ok(page(lang, "getting-started/overview").includes("github.com/Mistgate/mistgate-client"), `${lang}: the overview names the app for Windows`);
 });
 
 // Emphasis that CommonMark does not close (a ** next to full-width punctuation and a letter) shows up as literal asterisks:

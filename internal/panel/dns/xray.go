@@ -34,6 +34,8 @@ type XrayDNS struct {
 	// Block are the lists whose domains the routing drops (Preset.BlockAds): "geosite:category-ads-all", sent to a blackhole
 	// outbound. The rule comes after the resolvers' and the OS's DNS rules and before private and direct.
 	Block []string
+	// Torrent: the routing sends the BitTorrent protocol and the public trackers (Preset.TorrentDirect) direct, after the Block rule.
+	Torrent bool
 	// DirectIPs are the addresses of the split resolvers: the routing rule for XrayDNSTag sends them direct (the
 	// main resolvers' traffic goes through the proxy).
 	DirectIPs []string
@@ -97,6 +99,12 @@ func (p Preset) XrayDNS() (XrayDNS, error) {
 	if p.BlockAds {
 		out.Block = []string{"geosite:" + adsSite}
 	}
+	if p.BlockMax {
+		for _, s := range maxDomains {
+			out.Block = append(out.Block, "domain:"+s)
+		}
+	}
+	out.Torrent = p.TorrentDirect
 	return out, nil
 }
 

@@ -1,6 +1,6 @@
 # Hysteria core, patched for Mistgate
 
-A copy of `github.com/apernet/hysteria/core/v2` **v2.13.0** (MIT, `LICENSE.md`), used through a `replace` in Mistgate's
+A copy of `github.com/apernet/hysteria/core/v2` **v2.14.0** (MIT, `LICENSE.md`), used through a `replace` in Mistgate's
 `go.mod`. Everything is upstream except a few small patches, meant to go upstream as pull requests:
 
 - `server/config.go`: `ConnEventLogger`, an optional extension of `EventLogger` with `Accepted(conn)`,
@@ -30,6 +30,19 @@ name a connection because it moves with port hopping (`DisablePathManager`). See
 `design/connection-diagnostics-gaps.md` (B1, B2, step S2). `ConnContext` gives the reason a handshake failed (links/3: timeouts,
 TLS alerts sent and received), which tells a path that drops the answer from a client that refuses the certificate.
 
+Upstream v2.14.0 over v2.13.0 touched `server/udp.go` (one reused `UDPMessage` in `receiveLoop`), `server/config.go` (`Outbound.TCP`, `UDP` and `CheckUDP` now take a
+`*RequestInfo` first, with the `AuthID` and the `ClientAddr` of the QUIC connection; the new type is defined next to it), `server/server.go`
+(`handleTCPRequest` builds the `RequestInfo` for the TCP dial; `udpIOImpl` has one for the UDP ones and keeps the last address it
+parsed), `client/client.go` and `client/udp.go` (the same address reuse, one reused send message), `internal/protocol/proxy.go`
+(`ParseUDPMessageReuseAddr`, a hand written parser in place of `bytes.Buffer` and `binary.Read`), `internal/utils/atomic.go`
+(`AtomicTime` as an `atomic.Int64` offset, no allocation in `Set`), the mocks and tests, and bumped quic-go to v0.65.1 (the apernet
+fork), which made `http3.HTTPStreamer.HTTPStream()` return an error: the Xray-core fork pinned in `go.mod` has a commit for it, and
+`internal/node/trusttunnel/h3.go` takes the error. None of these hunks overlaps ours (the nearest, the `udpIOImpl` literal in `ServeHTTP`, follows our `ConnConnect` call): the patches
+were carried over unchanged (a line offset only) and stand where they stood. `RequestHook`, `EventLogger`
+and `TrafficLogger` did not change; the new expr-based ACL engine of v2.14.0 is in `extras/v2`; Mistgate does not use it (see the size note below). Mistgate adapts
+only its `Outbound` implementations (`internal/node/hysteria2/hysteria2.go`, `internal/node/egress/egress.go`). `extras/v2` v2.14.0
+brings `github.com/expr-lang/expr` (MIT) into the node binary through `outbounds/acl` (the package is imported as a whole), about 4.7 MB.
+
 Upstream v2.13.0 over v2.12.3 touched `server/udp.go`, `server/config.go` (the `RequestHook` doc and `UDP` signature), `server/server.go`
 (`udpIOImpl.Hook`), the UDP mocks and tests, and bumped quic-go; none of the hunks above overlap with it, they were carried over
 unchanged. Since v2.13.0 `RequestHook.UDP(packets [][]byte, reqAddr *string) (done bool, err error)` holds a session's first
@@ -38,7 +51,8 @@ hook (`internal/node/hysteria2/sniffing.go`) answers done at once for an IP-lite
 
 To move to a new upstream version: copy the new `core/v2` module from the Go module cache over this directory, apply the
 hunks above again (they are small and marked by `ConnEventLogger`, `LostPackets` and `ConnContext`), update the version here and in `go.mod`'s
-`require`, and run `go build ./...` and the Hysteria2 engine tests (`go test ./internal/node/hysteria2/`).
+`require` (and `extras/v2`, and the quic-go version the new core asks for), and run `go build ./...` and the Hysteria2 engine tests
+(`go test ./internal/node/hysteria2/`).
 
 ## Published fork
 

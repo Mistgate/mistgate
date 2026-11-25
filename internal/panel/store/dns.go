@@ -33,6 +33,8 @@ type DNSPreset struct {
 	Builtin, IPv4Only      bool
 	SplitDirect            bool   // the split rules' domains bypass the VPN (Happ)
 	BlockAds               bool   // the apps drop the ad and tracker domains themselves (category-ads-all)
+	BlockMax               bool   // the apps drop the domains of the messenger Max (max.ru, oneme.ru)
+	TorrentDirect          bool   // the apps send the traffic of torrent clients direct
 	Transport              string // preferred transport: plain, dot or doh
 	ServersJSON, SplitJSON string
 	CreatedAt, UpdatedAt   time.Time
@@ -44,13 +46,13 @@ type DNS struct{ s *Store }
 // DNS returns the dns module's queries.
 func (s *Store) DNS() DNS { return DNS{s} }
 
-const dnsCols = `id, name, description, builtin, servers, split, ipv4_only, split_direct, block_ads, preferred_transport, created_at, updated_at`
+const dnsCols = `id, name, description, builtin, servers, split, ipv4_only, split_direct, block_ads, block_max, torrent_direct, preferred_transport, created_at, updated_at`
 
 func scanDNSPreset(r rowScanner) (DNSPreset, error) {
 	var p DNSPreset
-	var b, v4, sd, ba, c, u int64
-	err := r.Scan(&p.ID, &p.Name, &p.Description, &b, &p.ServersJSON, &p.SplitJSON, &v4, &sd, &ba, &p.Transport, &c, &u)
-	p.Builtin, p.IPv4Only, p.SplitDirect, p.BlockAds = b == 1, v4 == 1, sd == 1, ba == 1
+	var b, v4, sd, ba, bm, td, c, u int64
+	err := r.Scan(&p.ID, &p.Name, &p.Description, &b, &p.ServersJSON, &p.SplitJSON, &v4, &sd, &ba, &bm, &td, &p.Transport, &c, &u)
+	p.Builtin, p.IPv4Only, p.SplitDirect, p.BlockAds, p.BlockMax, p.TorrentDirect = b == 1, v4 == 1, sd == 1, ba == 1, bm == 1, td == 1
 	p.CreatedAt, p.UpdatedAt = fromUnix(c), fromUnix(u)
 	return p, err
 }
@@ -95,8 +97,8 @@ func (d DNS) Exists(ctx context.Context, id string) (bool, error) {
 // Create inserts a custom preset. ErrDNSExists on a name clash.
 func (d DNS) Create(ctx context.Context, p DNSPreset) error {
 	_, err := d.s.W.ExecContext(ctx,
-		`INSERT INTO dns_preset (`+dnsCols+`) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.Name, p.Description, p.ServersJSON, p.SplitJSON, accBool(p.IPv4Only), accBool(p.SplitDirect), accBool(p.BlockAds), p.Transport, unix(p.CreatedAt), unix(p.UpdatedAt))
+		`INSERT INTO dns_preset (`+dnsCols+`) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Name, p.Description, p.ServersJSON, p.SplitJSON, accBool(p.IPv4Only), accBool(p.SplitDirect), accBool(p.BlockAds), accBool(p.BlockMax), accBool(p.TorrentDirect), p.Transport, unix(p.CreatedAt), unix(p.UpdatedAt))
 	if accIsUnique(err) {
 		return ErrDNSExists
 	}
@@ -106,8 +108,8 @@ func (d DNS) Create(ctx context.Context, p DNSPreset) error {
 // Update replaces the editable fields of a preset (the built-ins too). ErrNotFound, ErrDNSExists.
 func (d DNS) Update(ctx context.Context, p DNSPreset) error {
 	res, err := d.s.W.ExecContext(ctx,
-		`UPDATE dns_preset SET name = ?, description = ?, servers = ?, split = ?, ipv4_only = ?, split_direct = ?, block_ads = ?, preferred_transport = ?, updated_at = ? WHERE id = ?`,
-		p.Name, p.Description, p.ServersJSON, p.SplitJSON, accBool(p.IPv4Only), accBool(p.SplitDirect), accBool(p.BlockAds), p.Transport, unix(p.UpdatedAt), p.ID)
+		`UPDATE dns_preset SET name = ?, description = ?, servers = ?, split = ?, ipv4_only = ?, split_direct = ?, block_ads = ?, block_max = ?, torrent_direct = ?, preferred_transport = ?, updated_at = ? WHERE id = ?`,
+		p.Name, p.Description, p.ServersJSON, p.SplitJSON, accBool(p.IPv4Only), accBool(p.SplitDirect), accBool(p.BlockAds), accBool(p.BlockMax), accBool(p.TorrentDirect), p.Transport, unix(p.UpdatedAt), p.ID)
 	if accIsUnique(err) {
 		return ErrDNSExists
 	}

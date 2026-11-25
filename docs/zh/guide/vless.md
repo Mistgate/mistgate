@@ -1,5 +1,6 @@
 ---
 title: VLESS REALITY
+seoTitle: "VLESS REALITY 面板：配置、用户、目标 — Mistgate"
 description: "VLESS 协议配置：通过 TCP 和 XHTTP 使用 REALITY，或通过 XHTTP 和 WebSocket 使用 TLS，可直连或经 CDN 连接。了解何时选择它而不是 Hysteria2、各项设置、REALITY 目标、端口，以及应用会收到和需要什么。"
 ---
 

@@ -17,9 +17,9 @@ require (
 	filippo.io/age v1.3.2
 	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260828
 	github.com/anthropics/anthropic-sdk-go/v2 v2.7.0
-	github.com/apernet/hysteria/core/v2 v2.13.0
-	github.com/apernet/hysteria/extras/v2 v2.13.0
-	github.com/apernet/quic-go v0.63.1-0.20261004180939-a10df75c260c
+	github.com/apernet/hysteria/core/v2 v2.14.0
+	github.com/apernet/hysteria/extras/v2 v2.14.0
+	github.com/apernet/quic-go v0.65.1-0.20261109005002-2895f039137a
 	github.com/aws/aws-sdk-go-v2 v1.47.1
 	github.com/aws/aws-sdk-go-v2/config v1.33.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.6
@@ -103,6 +103,7 @@ require (
 	github.com/docker/go-connections v0.8.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/expr-lang/expr v1.17.8 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
@@ -117,7 +118,7 @@ require (
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/gorilla/websocket v1.5.4-0.20240701034025-d67f41855da4 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/huin/goupnp v1.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -187,9 +188,10 @@ require (
 	go.lsp.dev/uri v0.3.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0 // indirect
-	go.opentelemetry.io/otel v1.46.0 // indirect
-	go.opentelemetry.io/otel/metric v1.46.0 // indirect
-	go.opentelemetry.io/otel/trace v1.46.0 // indirect
+	go.opentelemetry.io/otel v1.47.0 // indirect
+	go.opentelemetry.io/otel/log v1.47.0 // indirect
+	go.opentelemetry.io/otel/metric v1.47.0 // indirect
+	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
@@ -221,6 +223,7 @@ replace github.com/apernet/hysteria/core/v2 => ./third_party/hysteria-core
 // REALITY that still takes the ClientHellos Xray 26.3.27 took (third_party/reality/MISTGATE.md).
 replace github.com/xtls/reality => ./third_party/reality
 
-// Xray-core v26.11.9 (upstream commit 676eaf66f8f0, the one require names) plus one commit that makes Vision's TrafficState fields
-// atomic, from the public fork github.com/Mistgate/Xray-core (its README says what and why). Pin a commit of the fork, not a branch.
-replace github.com/xtls/xray-core => github.com/Mistgate/Xray-core v0.0.0-20261115163343-9699c0aacb48
+// Xray-core v26.11.9 (upstream commit 676eaf66f8f0, the one require names) plus four commits (Vision's TrafficState fields made
+// atomic; mux XUDP.Status set under XUDPManager's lock; the build with quic-go 0.65, which Hysteria v2.14.0 needs; the HTTP outbound without text/template, which cost the panel binary over 20 MB), from the public fork github.com/Mistgate/Xray-core (its README says
+// what and why). Pin a commit of the fork, not a branch.
+replace github.com/xtls/xray-core => github.com/Mistgate/Xray-core v0.0.0-20261124180955-37e7d9fc8cce

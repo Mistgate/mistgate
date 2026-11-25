@@ -9,7 +9,7 @@ It is **off by default**, and the Cloudflare edition has none. It is the owner's
 
 ## In the admin
 
-**Reachability → Sources → Own probes.** The switch turns the source on; the list shows each probe with its state:
+**Reachability → Sources → Own probes**: the **Sources** tab, then **Own probes** in its list of sources. **Switch on** turns the source on; the card says in a few words how the probes are doing (for example “2 of 3 working”, with the time of the last check), and the list shows each probe with its state:
 
 - **Waiting for install**: the command was made and not run yet (it works for 24 hours; after that make a new one).
 - **Works**: it asked the panel within the last hour. The row says when it was heard from, its operator and the city you typed, and how many checks it made in 24 hours.
@@ -19,7 +19,7 @@ It is **off by default**, and the Cloudflare edition has none. It is the owner's
 - **No filtering on its path**: the probe's reference address, which a filter blocks, opened. A probe on such a network (a router abroad, for example) sees no blocks, so a node it reaches proves nothing and its "reachable" counts as unsure. This is the right state for a probe outside the country, and it is shown before the first point appears.
 - A row can also say that the **reference address could not be tried** (the probe has no network of its own, or `ref=off` is set in its configuration): its points prove nothing then.
 
-**Check now** asks the probe for a round at its next contact, within about 15 minutes. **Revoke** is permanent; **Disconnect** at the bottom switches the source off and keeps the probes (they wake up when you switch it on).
+**Check now** asks the probe for a round at its next contact, within about 15 minutes. **Revoke** is permanent; **Pause** at the bottom switches the source off at once (the toast offers Undo); **Disconnect** asks first and does the same. Neither deletes a probe: they wake up when you switch the source on again.
 
 ## What it needs
 

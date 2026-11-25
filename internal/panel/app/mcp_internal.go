@@ -17,11 +17,12 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/store"
 )
 
-func mcpConfig(authSvc *auth.Service, st *store.Store, limiter securitylimit.Limiter, log *slog.Logger, onWaiting func(tool, tokenName string), now func() time.Time, api http.Handler) mcp.Config {
+func mcpConfig(authSvc *auth.Service, st *store.Store, limiter securitylimit.Limiter, log *slog.Logger, onWaiting func(tool, tokenName string), now func() time.Time, api http.Handler, servers *mcp.ServerSet) mcp.Config {
 	return mcp.Config{
-		Plans: planStore{st: st, onWaiting: onWaiting},
-		Auth:  mcpAuth{authSvc},
-		API:   api,
+		Plans:   planStore{st: st, onWaiting: onWaiting},
+		Auth:    mcpAuth{authSvc},
+		API:     api,
+		Servers: servers,
 		Audit: func(ctx context.Context, e mcp.AuditEntry) {
 			params := "{}"
 			if b, err := json.Marshal(e.Params); err == nil {

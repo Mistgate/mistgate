@@ -3,6 +3,8 @@ title: WARP
 description: 了解如何让协议配置的流量经 Cloudflare WARP 出口、如何为节点获取账户、「停止转发（不回退直连）」的含义，以及如何查看和修复 WARP 连接。
 ---
 
+![节点的 WARP 卡片：隧道正常、出口检查通过，随后隧道中断，卡片提供重启](../../images/readme/warp-dark-en.webp)
+
 默认情况下，协议配置的流量会从节点自身的地址离开。使用 WARP 后，流量会改经 Cloudflare 网络离开：网站看到的是 Cloudflare 地址，而不是服务商分配给你的地址。每个节点最多有一个 WARP 账户，该节点上所有使用 WARP 出口的协议配置都会经由此账户传输。Hysteria2、VLESS 和 AmneziaWG 协议配置都可以使用 WARP。
 
 ## 工作方式
@@ -120,7 +122,7 @@ description: 了解如何让协议配置的流量经 Cloudflare WARP 出口、�
 
 ## 拒绝 WARP 的网站
 
-有些网站会在某个 Cloudflare 数据中心（colo）向 WARP 地址显示拦截页面，换一个 colo 又正常，而隧道本身是健康的。面板每 15 分钟让每个 WARP 在线的节点通过自己的隧道请求一份简短的网站清单，并报告哪些网站返回拦截页面。清单默认使用内置的一份（`notion.com`、`discord.com`、`chatgpt.com`、`claude.ai`），你可以修改；清单为空则关闭检查。清单只能通过 API 设置（`WarpReachService.GetWarpReachSettings` 和 `UpdateWarpReachSettings`，仅限所有者，最多 8 个小写主机名，审计记录为 `warp_reach_settings`）。
+有些网站会在某个 Cloudflare 数据中心（colo）向 WARP 地址显示拦截页面，换一个 colo 又正常，而隧道本身是健康的。面板每 15 分钟让每个 WARP 在线的节点通过自己的隧道请求一份简短的网站清单，并报告哪些网站返回拦截页面。清单默认使用内置的一份（`notion.com`、`discord.com`、`chatgpt.com`、`claude.ai`），你可以修改；清单为空则关闭检查。所有者在**设置 → 系统**的**WARP 可达性检测**卡片上修改清单：网站以标签形式列出，**添加网站**接受 `example.com` 这样的名称（不含地址、端口或路径，最多 8 个，小写），**保存**后生效。卡片上的标记说明当前使用哪份清单：**内置列表**、**你的列表**或**检测已关闭**（清单为空），**恢复内置列表**会换回默认清单。API 中也有同样的调用（`WarpReachService.GetWarpReachSettings` 和 `UpdateWarpReachSettings`，仅限所有者，审计记录为 `warp_reach_settings`）。
 
 - 节点最多读取页面的 64 KiB，最多跟随一次重定向，并且解析域名后会拒绝其自身网络内的任何地址。Agent 版本过旧的节点不会应答，WARP 卡片会注明。
 - HTTP 451，或已知类型的 403 页面（Cloudflare 错误 1006 至 1012 或 1020、“Sorry, you have been blocked”、Akamai 的 “Access Denied” 页面、CloudFront 的国家屏蔽、网站自己的“在您所在国家不可用”）的结论为 `blocked`。单纯的 403、验证页面、限流和服务器错误为 `error`；没有应答为 `unreachable`。

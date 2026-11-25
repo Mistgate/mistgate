@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Mistgate · Bypass</title>
+<script src="./support.js"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@500..700&amp;family=Noto+Sans+SC:wght@400..800&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="cAzh" data-app><div class="desk">
+<div class="mg app t-{{theme}} a-{{accent}}">
+
+  <nav class="rail" aria-label="Sections">
+    <img class="rlogo" src="{{logo}}" alt="mistgate" width="32" height="32">
+    <a class="rb on" href="#app" aria-current="page"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2.2"/></svg><span class="rbl">主页</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2.6"/><circle cx="18" cy="5" r="2.6"/><path d="M8.6 19H16.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h7.9"/></svg><span class="rbl">路由</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6.5 5 13 2.5-6.5H21"/></svg><span class="rbl">诊断</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="rbl">设置</span></a>
+    <a class="rb sub" href="https://vpn.example.com" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"/></svg><span class="rbl">订阅页面</span></a>
+  </nav>
+
+  <div class="content">
+    <header class="tb">
+    <div class="bp-mode m2" role="tablist" aria-label="模式"><a role="tab" class="{{vpnLock}}" aria-selected="false" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5.5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6z"/></svg>VPN</a><a role="tab" class="on" aria-selected="true" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="15" r="2.2"/><path d="M3 15h2.2a6.8 6.8 0 0 1 13.6 0H21"/></svg>绕过</a></div>
+    <div class="cap">
+      <button aria-label="Minimize to tray"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button aria-label="Maximize"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg></button>
+      <button aria-label="Close window"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    </header>
+
+    <main class="body">
+      <div class="left">
+      <section class="stage bp-st s-{{phase}} {{stCls}}" aria-label="绕过">
+        <div class="mx" aria-hidden="true"><canvas class="mxc"></canvas></div>
+        <div class="top">
+          <sc-if value="{{isOff}}" hint-placeholder-val="{{false}}">
+            <p class="ttl rise" role="status">绕过已关闭</p>
+            <p class="sub-t rise d1">直接打开网站，无需服务器。无需订阅</p>
+          </sc-if>
+          <sc-if value="{{isBusy}}" hint-placeholder-val="{{false}}">
+            <p class="ttl rise" role="status">{{busyT}}</p>
+            <span class="comet rise d1" aria-hidden="true"></span>
+            <p class="cstep rise d1" aria-live="polite"><span class="shim {{stepCls}}">{{stepT}}</span><b>{{stepN}}</b></p>
+          </sc-if>
+          <sc-if value="{{isOn}}" hint-placeholder-val="{{true}}">
+            <div class="chips2 rise"><p class="chip bp-chip {{chipC}}" role="status"><span class="dot"></span>{{chipT}}</p><span class="rchip"><span class="gl g-{{net.ic}}" aria-hidden="true" style="width:14px;height:14px"></span>{{net.t}}</span></div>
+            <p class="bp-n rise d1">{{onT}} <b>{{okN}}</b><small> / </small><b>{{allN}}</b></p>
+          </sc-if>
+          <sc-if value="{{isDead}}" hint-placeholder-val="{{false}}">
+            <p class="ttl rise bad" role="status">绕过在这里帮不上忙</p>
+            <p class="sub-t rise d1">移动网络只放行白名单网站</p>
+          </sc-if>
+          <sc-if value="{{isErr}}" hint-placeholder-val="{{false}}">
+            <p class="ttl rise bad" role="status">绕过未能启动</p>
+            <p class="sub-t rise d1">Mistgate 服务无响应</p>
+          </sc-if>
+        </div>
+
+        <div class="orb">
+          <span class="ring r-off" aria-hidden="true"></span>
+          <span class="ring r-ing" aria-hidden="true"></span>
+          <span class="ring r-on" aria-hidden="true"></span>
+          <span class="halo" aria-hidden="true"></span>
+          <button class="pw" onClick="{{toggle}}" aria-pressed="{{pressed}}" aria-label="{{pwLabel}}"><span class="lay l-off"></span><span class="lay l-ing"></span><span class="lay l-on"></span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg></button>
+        </div>
+
+        <div class="bot">
+          <sc-if value="{{isErr}}" hint-placeholder-val="{{false}}">
+            <div class="blk-b rise">
+              <button class="cta" onClick="{{fix}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5.5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6z"/><path d="m9.5 12 2 2 3.5-4"/></svg>启动服务</button>
+              <p class="cta-sub">Windows 将请求管理员权限</p>
+            </div>
+          </sc-if>
+          <sc-if value="{{isDead}}" hint-placeholder-val="{{false}}">
+            <div class="blk-b rise">
+              <sc-if value="{{hasSub}}" hint-placeholder-val="{{true}}">
+                <a class="cta" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6a3 3 0 0 1 3 3v4a3 3 0 0 0 3 3h6"/><path d="m18 14 3 3-3 3"/></svg>开启白名单网络专用 VPN</a>
+                <p class="cta-sub">你的订阅中有适用于此类网络的服务器</p>
+              </sc-if>
+              <sc-if value="{{noSub}}" hint-placeholder-val="{{false}}">
+                <a class="cta ghost" href="#app">添加 VPN 订阅</a>
+                <p class="cta-sub">在这种网络中只有 VPN 能打开网站</p>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{showBar}}" hint-placeholder-val="{{true}}">
+            <div class="bp-bar rise">
+              <button class="{{reCls}}" onClick="{{recheck}}" aria-label="重新检查">
+                <span class="pic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg></span>
+                <span class="tx"><b>{{reT}}</b><span>{{reS}}</span></span>
+              </button>
+              <span class="cb-div" aria-hidden="true"></span>
+              <span class="bp-set">
+                <span class="tx"><b>方法集</b><span class="m">{{setV}}</span></span>
+              </span>
+            </div>
+          </sc-if>
+          <sc-if value="{{isOff}}" hint-placeholder-val="{{false}}">
+            <p class="offrow rise d2"><button class="bp-det" onClick="{{openAbout}}"><span class="gl g-info-circle" aria-hidden="true"></span>不隐藏地址，也不加密<b>详情<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></b></button></p>
+          </sc-if>
+          <sc-if value="{{hasDet}}" hint-placeholder-val="{{true}}">
+            <button class="bp-det rise d2 {{det.c}}" onClick="{{det.go}}"><span class="gl g-{{det.ic}}" aria-hidden="true"></span>{{det.t}}<b>{{det.a}}<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></b></button>
+          </sc-if>
+          <sc-if value="{{isRe}}" hint-placeholder-val="{{false}}">
+            <p class="cta-sub cs-note rise d2">新结果返回前沿用之前的结果</p>
+          </sc-if>
+        </div>
+      </section>
+
+      <div class="plan bp-plan" aria-label="须知">
+        <div class="bp-f">
+          <span class="k"><span class="gl g-{{net.ic}}" aria-hidden="true"></span>网络<i class="{{net.newC}}" aria-hidden="true"></i></span>
+          <b>{{net.t}}</b><span class="s">{{net.s}}</span>
+        </div>
+        <div class="bp-f">
+          <span class="k"><span class="gl g-eye" aria-hidden="true"></span>隐私</span>
+          <b>与不用 VPN 相同</b><span class="s">地址可见</span>
+        </div>
+        <div class="bp-f">
+          <span class="k"><span class="gl g-shield-xmark" aria-hidden="true"></span>Kill switch</span>
+          <b>已关闭</b><span class="s">没有服务器</span>
+        </div>
+      </div>
+      </div>
+
+    <section class="servers" aria-label="打开哪些内容">
+      <div class="bp-h">
+        <span class="mono sky"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="15" r="2.2"/><path d="M3 15h2.2a6.8 6.8 0 0 1 13.6 0H21"/></svg></span>
+        <span class="nm"><b>无服务器绕过</b><span>{{headS}}</span></span>
+        <button class="icb {{reCls}}" onClick="{{recheck}}" aria-label="重新检查" title="重新检查"><svg class="i s16" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg></button>
+      </div>
+      <div class="bp-tabs">
+        <div class="bp-seg two {{tabC2}}" role="tablist" aria-label="打开哪些内容">
+          <button role="tab" class="{{tab1C}}" aria-selected="{{isSvc}}" onClick="{{tab1}}">服务 <span class="k">{{allN}}</span></button>
+          <button role="tab" class="{{tab2C}}" aria-selected="{{isSites}}" onClick="{{tab2}}">我的网站 <span class="k">{{sitesN}}</span></button>
+        </div>
+      </div>
+
+      <sc-if value="{{isSvc}}" hint-placeholder-val="{{true}}">
+      <div class="bp-sum" aria-label="{{sumT}}">
+        <span class="bp-segs" aria-hidden="true"><sc-for list="{{segs}}" as="g" hint-placeholder-count="6"><i class="{{g.c}}"></i></sc-for></span>
+        <span class="bp-sumt"><b>{{sumN}}</b> {{sumT}}</span>
+      </div>
+      <div class="bp-list" aria-label="服务">
+        <sc-for list="{{svcs}}" as="s" hint-placeholder-count="6">
+        <div class="bp-s {{s.c}}">
+          <div class="bp-sh" role="button" tabindex="0" aria-expanded="{{s.open}}" onClick="{{s.tog}}">
+            <span class="mono {{s.tone}}"><span class="gl g-{{s.ic}}" aria-hidden="true"></span></span>
+            <span class="nm"><b>{{s.name}}</b>
+              <sc-if value="{{s.multi}}" hint-placeholder-val="{{true}}"><span class="bp-mini"><sc-for list="{{s.parts}}" as="p" hint-placeholder-count="2"><em class="{{p.c}}"><i></i>{{p.n}}</em></sc-for></span></sc-if>
+              <sc-if value="{{s.single}}" hint-placeholder-val="{{false}}"><span class="bp-one">{{s.sub}}</span></sc-if>
+            </span>
+            <sc-if value="{{s.hasChip}}" hint-placeholder-val="{{true}}"><span class="vchip sm {{s.chipC}}"><i></i>{{s.chipT}}</span></sc-if>
+            <sc-if value="{{s.hasPri}}" hint-placeholder-val="{{false}}"><button class="bp-a pri" onClick="{{s.pri}}">{{s.priT}}</button></sc-if>
+            <sc-if value="{{s.hasSw}}" hint-placeholder-val="{{false}}"><button class="sw {{s.swC}}" role="switch" aria-checked="{{s.en}}" aria-label="通过绕过打开 {{s.name}}" onClick="{{s.sw}}"></button></sc-if>
+            <svg class="i bp-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+          <sc-if value="{{s.open}}" hint-placeholder-val="{{false}}">
+          <div class="bp-body">
+            <div class="bp-ps">
+              <sc-for list="{{s.parts}}" as="p" hint-placeholder-count="2">
+                <div class="bp-p {{p.c}}"><i class="bp-d" aria-hidden="true"></i><span class="bp-pn">{{p.n}}</span><span class="bp-po">{{p.o}}</span><span class="bp-pm">{{p.m}}</span></div>
+              </sc-for>
+            </div>
+            <sc-if value="{{s.hasNote}}" hint-placeholder-val="{{false}}"><p class="bp-note {{s.noteC}}"><span class="gl g-{{s.noteI}}" aria-hidden="true"></span>{{s.noteT}}</p></sc-if>
+            <div class="bp-acts">
+              <span class="bp-when">{{s.when}}</span>
+              <sc-if value="{{s.hasAct}}" hint-placeholder-val="{{false}}"><button class="bp-a {{s.actC}}" onClick="{{s.go}}">{{s.actT}}</button></sc-if>
+              <sc-if value="{{s.hasOff}}" hint-placeholder-val="{{true}}"><button class="bp-a ghost" onClick="{{s.sw}}">{{s.offT}}</button></sc-if>
+            </div>
+          </div>
+          </sc-if>
+        </div>
+        </sc-for>
+        <a class="bp-r bp-link" href="#app"><span class="mono neu"><span class="gl g-view-grid" aria-hidden="true"></span></span><span class="nm"><b class="t">服务目录</b><span>选择通过绕过打开的内容</span></span><span class="bp-go">路由<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span></a>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{isSites}}" hint-placeholder-val="{{false}}">
+      <div class="bp-list rise" aria-label="我的网站">
+        <sc-for list="{{sites}}" as="r" hint-placeholder-count="3">
+        <div class="bp-r">
+          <span class="mono {{r.tone}}"><span class="gl g-internet" aria-hidden="true"></span></span>
+          <span class="nm"><b>{{r.host}}</b><span>{{r.sub}}</span></span>
+          <sc-if value="{{r.noAct}}" hint-placeholder-val="{{true}}"><span class="vchip sm {{r.chipC}}"><i></i>{{r.chipT}}</span></sc-if>
+          <sc-if value="{{r.hasAct}}" hint-placeholder-val="{{false}}"><button class="bp-a" onClick="{{r.go}}">{{r.actT}}</button></sc-if>
+        </div>
+        </sc-for>
+        <a class="bp-r bp-link" href="#app"><span class="mono neu"><span class="gl g-view-grid" aria-hidden="true"></span></span><span class="nm"><b class="t">网站和例外</b><span>添加网站或从绕过中移除</span></span><span class="bp-go">路由<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span></a>
+      </div>
+      </sc-if>
+    </section>
+    </main>
+
+  </div>
+
+  <sc-if value="{{about}}" hint-placeholder-val="{{false}}">
+    <div class="scrim" onClick="{{closeAbout}}"></div>
+    <div class="sheet bp-sheet" role="dialog" aria-label="绕过与 VPN 的区别">
+      <h3>绕过能打开网站，但不会隐藏你</h3>
+      <div class="bp-cmp">
+        <div class="bp-col" style="--c:var(--sky)">
+          <b><i></i>绕过</b>
+          <p class="y"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>无需服务器，无需订阅</p>
+          <p class="y"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>方法会根据你的网络自动匹配</p>
+          <p class="n"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>不隐藏你的地址，也不加密流量</p>
+          <p class="n"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>地址本身被封或网络只放行白名单时无能为力</p>
+          <p class="n"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>不保证速度，运营商调整后可能失效</p>
+        </div>
+        <div class="bp-col" style="--c:var(--mint)">
+          <b><i></i>VPN</b>
+          <p class="y"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>流量经由服务器并被加密</p>
+          <p class="y"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>对网站隐藏你的地址</p>
+          <p class="y"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>在绕过无能为力的地方也能用</p>
+          <p class="y"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>连接中断时 Kill switch 会切断网络</p>
+          <p class="n"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>需要订阅</p>
+        </div>
+      </div>
+      <p class="bp-ord">有订阅时，每个网站依次： <span class="mk">直连</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span class="mk">经绕过</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span class="mk" style="background:var(--tone-lav-bg);color:var(--tone-lav)">经 VPN</span></p>
+      <div class="cf-a"><button class="addb" onClick="{{closeAbout}}" style="justify-content:center">知道了</button></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{wave}}" hint-placeholder-val="{{false}}">
+    <div class="wave" aria-hidden="true"><canvas class="wvc"></canvas></div>
+  </sc-if>
+
+</div>
+  <div lang="en" class="dev dtop" role="toolbar" aria-label="Prototype states">
+    <div class="dg"><span class="dl">Bypass</span><div class="ds"><button class="{{dv.m_off}}" onClick="{{dvSet.m_off}}">Off</button><button class="{{dv.m_start}}" onClick="{{dvSet.m_start}}">Starting</button><button class="{{dv.m_probe}}" onClick="{{dvSet.m_probe}}">Probing</button><button class="{{dv.m_on}}" onClick="{{dvSet.m_on}}">Works</button><button class="{{dv.m_re}}" onClick="{{dvSet.m_re}}">Recheck</button><button class="{{dv.m_err}}" onClick="{{dvSet.m_err}}">Error</button></div></div>
+    <div class="dg"><span class="dl">Network</span><div class="ds"><button class="{{dv.n_home}}" onClick="{{dvSet.n_home}}">Home</button><button class="{{dv.n_slow}}" onClick="{{dvSet.n_slow}}">Throttled</button><button class="{{dv.n_deep}}" onClick="{{dvSet.n_deep}}">Deep search</button><button class="{{dv.n_mobile}}" onClick="{{dvSet.n_mobile}}">Allowlist only</button></div></div>
+  </div>
+  <div lang="en" class="dev" role="toolbar" aria-label="Prototype context">
+    <div class="dg"><span class="dl">Subscription</span><div class="ds"><button class="{{dv.s_yes}}" onClick="{{dvSet.s_yes}}">Yes</button><button class="{{dv.s_no}}" onClick="{{dvSet.s_no}}">No</button></div></div>
+    <div class="dg"><span class="dl">Telegram</span><div class="ds"><button class="{{dv.t_no}}" onClick="{{dvSet.t_no}}">Not linked</button><button class="{{dv.t_yes}}" onClick="{{dvSet.t_yes}}">Linked</button></div></div>
+    <div class="dg"><span class="dl">Theme</span><div class="ds"><button class="{{dv.th_dark}}" onClick="{{dvSet.th_dark}}">Dark</button><button class="{{dv.th_light}}" onClick="{{dvSet.th_light}}">Light</button></div></div>
+  </div>
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode": {"editor": "enum", "options": ["off", "start", "probe", "on", "re", "err"], "default": "on", "section": "State"}, "net": {"editor": "enum", "options": ["home", "slow", "deep", "mobile"], "default": "home", "section": "State"}, "sub": {"editor": "enum", "options": ["yes", "no"], "default": "yes", "section": "State"}, "tg": {"editor": "enum", "options": ["no", "yes"], "default": "no", "section": "State"}, "tab": {"editor": "enum", "options": ["svc", "sites", "exc"], "default": "svc", "section": "State"}, "theme": {"editor": "enum", "options": ["dark", "light"], "default": "dark", "section": "Look"}, "accent": {"editor": "enum", "options": ["lavender", "mint", "sand", "rose"], "default": "lavender", "section": "Look"}}'>
+class Component extends DCLogic {
+  componentDidMount() { this.mxBoot(); }
+  componentWillUnmount() { clearTimeout(this.t1); clearTimeout(this.t2); clearInterval(this.tp); if (this._mxOff) this._mxOff(); }
+  st() { return this.state || {}; }
+  mode() { return this.st().mode || this.props.mode || 'on'; }
+  net() { return this.st().net || this.props.net || 'home'; }
+  tg() { return (this.st().tg || this.props.tg || 'no') === 'yes'; }
+  hasSub() { return (this.st().sub || this.props.sub || 'yes') === 'yes'; }
+  /* тестовые данные сценариев: части сервисов и их итоги */
+  data() {
+    const n = this.net(), tg = this.tg(), P = (name, o, m) => ({ n: name, o: o, m: m || '' });
+    const yt = { id: 'yt', name: 'YouTube', ic: 'media-video', tone: 'rose' }, dc = { id: 'dc', name: 'Discord', ic: 'headset', tone: 'lav' }, tl = { id: 'tg', name: 'Telegram', ic: 'send-diagonal', tone: 'sky', linked: tg }, wa = { id: 'wa', name: 'WhatsApp', ic: 'chat-bubble', tone: 'sand' }, ig = { id: 'ig', name: 'Instagram', ic: 'camera', tone: 'neu' }, fb = { id: 'fb', name: 'Facebook', ic: 'community', tone: 'sky' };
+    const one = n === 'mobile' ? P('服务', 'wl') : null; wa.parts = [one || P('服务', 'by', '方法 5')]; ig.parts = [one || (n === 'deep' ? P('服务', 'ip') : P('服务', 'by', '方法 4'))]; fb.parts = [one || P('服务', 'by', '方法 4')];
+    if (n === 'mobile') { yt.parts = [P('网站', 'wl'), P('视频', 'wl'), P('QUIC', 'wl')]; dc.parts = [P('网站和聊天', 'wl'), P('语音', 'none', '首次通话前')]; tl.parts = [P('消息', 'wl'), P('通话', 'wl')]; }
+    else if (n === 'deep') { yt.parts = [P('网站', 'by', '方法 9'), P('视频', 'by', '18 Mbps · 方法 9'), P('QUIC', 'tcp')]; dc.parts = [P('网站和聊天', 'deep', '自 14:02'), P('语音', 'none', '首次通话前')]; tl.parts = [P('消息', 'ip'), P('通话', 'ip')]; }
+    else { yt.parts = [P('网站', 'by', '方法 4'), n === 'slow' ? P('视频', 'slow', '1.4 Mbps · 方法 4') : P('视频', 'by', '24 Mbps · 方法 4'), P('QUIC', 'tcp')]; dc.parts = [P('网站和聊天', 'by', '方法 7'), P('语音', 'none', '首次通话前')]; tl.parts = [P('消息', 'by', '方法 2'), P('通话', 'by', '方法 2')]; }
+    return [yt, dc, tl, wa, ig, fb];
+  }
+  total() { return this.tg() ? 10 : 8; }
+  runProbe(re) {
+    clearInterval(this.tp); clearTimeout(this.t1); const N = this.total();
+    this.setState({ mode: re ? 're' : 'probe', done: 0, fresh: false });
+    this.tp = setInterval(() => { const d = (this.st().done || 0) + 1; if (this._mxPulse) this._mxPulse(.75);
+      if (d >= N) { clearInterval(this.tp); this.setState({ done: N }); this.t1 = setTimeout(() => { this.setState({ mode: 'on', fresh: true, wave: !re && this.net() !== 'mobile' }); this.t1 = setTimeout(() => this.setState({ wave: false }), 2100); }, 520); } else this.setState({ done: d }); }, 560);
+  }
+  toggle() {
+    const m = this.mode(); clearInterval(this.tp); clearTimeout(this.t1);
+    if (m !== 'off') { this.setState({ mode: 'off', wave: false }); return; }
+    this.setState({ mode: 'start' }); this.t1 = setTimeout(() => this.runProbe(false), 1400);
+  }
+  renderVals() {
+    const logos = { lavender: '/_blob/0b62512895ad639ab01894d9cfc68db6', mint: '/_blob/7e2cbe098a3f586b63d3e07c56f17a01', sand: '/_blob/12736226f7d078aa98183de30675f863', rose: '/_blob/766bb9e952957b786b037a8ba7882911' };
+    const s = this.st(), theme = (s.theme || this.props.theme) === 'light' ? 'light' : 'dark', accent = logos[this.props.accent] ? this.props.accent : 'lavender';
+    const mode = this.mode(), net = this.net(), tg = this.tg(), hasSub = this.hasSub(), N = this.total(), vpn = s.vpn || {}, tab = s.tab || this.props.tab || 'svc';
+    const busy = mode === 'start' || mode === 'probe' || mode === 're', probing = mode === 'probe' || mode === 're';
+    const done = s.done != null ? s.done : (probing ? 4 : N), dead = mode === 'on' && net === 'mobile', off = mode === 'off' || mode === 'err' || mode === 'start';
+    const OT = { by: '经绕过', self: '可直接打开', slow: '较慢', ip: '地址被封', wl: '仅白名单', deep: '寻找方法', ex: '方案已用尽', chk: '检查中', none: '未检查', vpn: '经 VPN', tcp: '已禁用，视频走 TCP', unl: '未指向' };
+    const OC = { by: 'by', self: 'self', slow: 'slow', ip: 'bad', wl: 'bad', ex: 'bad', deep: 'deep', chk: 'chk', none: 'none', vpn: 'vpn', tcp: 'none', unl: 'none' };
+    const ago = s.fresh ? '刚刚' : '2 分钟前';
+    let idx = 0, okN = 0, cur = '', slowYt = false, deepName = '', firstOpen = ''; const segs = [];
+    const svcs = this.data().map((d) => {
+      const dis = !!(s.dis || {})[d.id], unl = d.id === 'tg' && !tg && !dis, inVpn = !!vpn[d.id], start = idx; let pend = false;
+      const parts = d.parts.map((p) => {
+        let o = p.o, m = p.m, c = '';
+        if (unl) { o = 'unl'; m = ''; }
+        else { const i = idx++;
+          if (off || dis) { o = 'none'; m = ''; }
+          else if (inVpn) { o = 'vpn'; m = ''; }
+          else if (mode === 'probe' && i >= done) { o = 'chk'; m = ''; pend = true; if (!cur) cur = d.name + ' · ' + p.n.toLowerCase(); }
+          else if (mode === 're' && i >= done) { c = ' re'; pend = true; if (!cur) cur = d.name + ' · ' + p.n.toLowerCase(); }
+          else if (probing && i === done - 1) c = ' in'; }
+        return { n: p.n, o: OT[o], m: m, c: 'p-' + OC[o] + c.replace(' ', ' p-'), code: o };
+      });
+      const main = d.parts[0].o, anySlow = d.parts.some((p) => p.o === 'slow'), bad = main === 'ip' || main === 'wl' || main === 'ex', deep = main === 'deep', live = !off && !unl && !dis;
+      const opens = live && !inVpn && !bad && !deep; if (opens && mode !== 'probe') okN++; if (opens && mode === 'probe' && !pend) okN++;
+      if (live && !inVpn && anySlow && d.id === 'yt') slowYt = true; if (live && !inVpn && deep) deepName = d.name;
+      let chipC = '', chipT = '', note = null, act = null;
+      let pri = null; const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
+      if (unl) { pri = s.tgAsk ? null : { t: '连接', go: (e) => { stop(e); this.setState({ tgAsk: true }); this.t2 = setTimeout(() => { this.setState({ tg: 'yes', tgAsk: false, done: 10, fresh: true }); if (this._mxPulse) this._mxPulse(1.2); }, 1900); } };
+        note = s.tgAsk ? { c: 'sky', i: 'send-diagonal', t: '正在打开 Telegram — 请在其中确认代理' } : { c: '', i: 'info-circle', t: 'Telegram 会自行打开并请求确认。无需在客户端输入任何内容' }; }
+      else if (live) {
+        if (inVpn) { chipC = 'lav'; chipT = '经 VPN'; act = { t: '改回绕过', c: '', go: () => this.setState({ vpn: Object.assign({}, vpn, { [d.id]: false }) }) }; }
+        else if (mode === 'probe' && pend) { chipC = 'neu'; chipT = '检查中'; }
+        else {
+          if (bad) { chipC = 'bad'; chipT = '打不开'; } else if (deep) { chipC = 'lav'; chipT = '寻找方法'; } else if (anySlow) { chipC = 'warn'; chipT = '较慢'; } else { chipC = 'ice'; chipT = '可打开'; }
+          if ((bad || deep || anySlow) && hasSub) act = { t: '走 VPN', c: '', go: () => this.setState({ vpn: Object.assign({}, vpn, { [d.id]: true }) }) };
+          if (main === 'wl') note = null;
+          else if (main === 'ip') note = { c: '', i: 'prohibition', t: '运营商封锁了该地址，任何方法都无效。绕过在这里无能为力' + (hasSub ? '' : '，可使用 VPN') };
+          else if (deep) note = { c: '', i: 'timer', t: '快速匹配未成功，正在后台深入搜索。需要几分钟' + (hasSub ? '，期间可先用 VPN' : '') };
+          else if (anySlow) note = { c: 'warn', i: 'dashboard-speed', t: '运营商对视频限速。绕过可能无法解除' + (hasSub ? '' : '，可使用 VPN') };
+          else if (d.id === 'tg') note = { c: '', i: 'info-circle', t: 'Mistgate 运行期间有效' };
+          else if (d.id === 'dc') note = { c: '', i: 'info-circle', t: '语音将在首次通话时检查：这需要登录账号' };
+        }
+      }
+      const end = idx, hit = probing && !unl && !dis && done === end && end > start, multi = parts.length > 1;
+      const problem = live && !inVpn && !(mode === 'probe' && pend) && (bad || deep || anySlow);
+      const open = (s.open || {})[d.id] != null ? !!(s.open || {})[d.id] : (mode === 'on' && !dead && problem && firstOpen === '' ? (firstOpen = d.id, true) : false);
+      const seg = dis || off || unl ? '' : inVpn ? 'vpn' : (mode === 'probe' && pend) ? 'chk' : bad ? 'bad' : deep ? 'deep' : anySlow ? 'slow' : 'ok';
+      segs.push({ c: seg ? 'sg-' + seg : '' });
+      const p0 = parts[0], sub = dis ? '你已关闭' : off ? '未检查' : p0.o + (p0.m ? ' · ' + p0.m : '');
+      const sw = (e) => { stop(e); this.setState({ dis: Object.assign({}, s.dis || {}, { [d.id]: !dis }) }); };
+      if (dis) { chipC = 'neu'; chipT = '已关闭'; }
+      return { name: d.name, ic: d.ic, tone: d.tone, parts: parts, multi: multi, single: !multi, sub: sub, c: (hit ? 'hit ' : '') + (open ? 'open ' : '') + (dis ? 'dis' : ''), open: open,
+        tog: () => this.setState({ open: Object.assign({}, s.open || {}, { [d.id]: !open }) }),
+        when: unl ? '尚未指向客户端' : dis ? '绕过不处理它' : off ? '开启后检查' : inVpn ? '经由服务器' : (mode === 'probe' && pend) ? '正在匹配' : '检查于 ' + ago,
+        hasChip: !!chipT && !pri, chipC: chipC, chipT: chipT, hasPri: !!pri, priT: pri ? pri.t : '', pri: pri ? pri.go : stop,
+        hasSw: false, swC: dis ? '' : 'on', en: dis ? 'false' : 'true', sw: sw, hasOff: false, offT: '',
+        hasAct: !!act, actT: act ? act.t : '', actC: act ? act.c : '', go: act ? act.go : () => {}, hasNote: !!note, noteC: note ? note.c : '', noteI: note ? note.i : 'info-circle', noteT: note ? note.t : '' };
+    });
+    const sites = [['forum.example.com', 'self', ''], ['video.example.com', 'by', '方法 3'], ['files.example.com', 'ip', '']].map((r) => {
+      const o = off ? 'none' : vpn[r[0]] ? 'vpn' : net === 'mobile' ? 'wl' : r[1], bad = o === 'ip' || o === 'wl';
+      const chip = { none: ['neu', '未检查'], vpn: ['lav', '经 VPN'], self: ['neu', '可直接打开'], by: ['ice', '经绕过'], ip: ['bad', '被封'], wl: ['bad', '被封'] }[o]; if (o === 'vpn') chip[1] = '经 VPN';
+      return { noAct: !((bad && hasSub) || o === 'vpn'), tone: bad ? 'rose' : o === 'by' ? 'sky' : o === 'vpn' ? 'lav' : 'neu', host: r[0], sub: o === 'by' ? r[2] + ' · 检查于 ' + ago : o === 'none' ? '绕过已关闭' : o === 'vpn' ? '经由服务器' : o === 'ip' ? '地址被运营商封锁' : o === 'wl' ? '网络只放行白名单' : '检查于 ' + ago, chipC: chip[0], chipT: chip[1],
+        hasAct: (bad && hasSub) || o === 'vpn', actT: o === 'vpn' ? '改回' : '走 VPN', go: () => this.setState({ vpn: Object.assign({}, vpn, { [r[0]]: o !== 'vpn' }) }) };
+    });
+    const mobile = net === 'mobile', netV = { ic: mobile ? 'smartphone-device' : 'wifi', t: mobile ? '移动网络' : 'Wi‑Fi', s: mode === 're' ? '新网络，刚刚' : mobile ? '新网络，2 分钟前' : '方法已记住', newC: mode === 're' || mobile ? 'new' : '' };
+    let det = { c: '', ic: 'info-circle', t: '不隐藏地址，也不加密', a: '详情', go: () => this.setState({ about: true }) };
+    if (slowYt) det = { c: 'warn', ic: 'dashboard-speed', t: 'YouTube 被运营商限速', a: hasSub ? '走 VPN' : '详情', go: () => (hasSub ? this.setState({ vpn: Object.assign({}, vpn, { yt: true }) }) : this.setState({ about: true })) };
+    else if (deepName) det = { c: '', ic: 'timer', t: '正在后台为以下服务寻找方法：' + deepName + '', a: '详情', go: () => this.setState({ tab: 'svc', about: true }) };
+    const set = (o) => () => { clearInterval(this.tp); clearTimeout(this.t1); this.setState(Object.assign({ wave: false }, o)); };
+    const dvOn = (b) => (b ? 'on' : ''), dv = {}, dvSet = {};
+    ['off', 'start', 'probe', 'on', 're', 'err'].forEach((k) => { dv['m_' + k] = dvOn(mode === k); });
+    dvSet.m_off = set({ mode: 'off' }); dvSet.m_start = set({ mode: 'start' }); dvSet.m_on = set({ mode: 'on', done: null }); dvSet.m_err = set({ mode: 'err' });
+    dvSet.m_probe = () => this.runProbe(false); dvSet.m_re = () => this.runProbe(true);
+    ['home', 'slow', 'deep', 'mobile'].forEach((k) => { dv['n_' + k] = dvOn(net === k); dvSet['n_' + k] = () => { this.setState({ net: k, vpn: {} }); if (this.mode() !== 'off' && this.mode() !== 'err') setTimeout(() => this.runProbe(true), 0); }; });
+    dv.s_yes = dvOn(hasSub); dv.s_no = dvOn(!hasSub); dvSet.s_yes = () => this.setState({ sub: 'yes' }); dvSet.s_no = () => this.setState({ sub: 'no', vpn: {} });
+    dv.t_no = dvOn(!tg); dv.t_yes = dvOn(tg); dvSet.t_no = () => this.setState({ tg: 'no', tgAsk: false, done: null }); dvSet.t_yes = () => this.setState({ tg: 'yes', tgAsk: false, done: null });
+    dv.th_dark = dvOn(theme === 'dark'); dv.th_light = dvOn(theme === 'light'); dvSet.th_dark = () => this.setState({ theme: 'dark' }); dvSet.th_light = () => this.setState({ theme: 'light' });
+    return {
+      theme: theme, accent: accent, logo: logos[accent], dv: dv, dvSet: dvSet,
+      phase: busy ? 'ing' : mode === 'on' ? 'on' : 'off', stCls: (dead ? 'bp-dead ' : '') + (mode === 'err' ? 'bp-err cs-err' : ''),
+      isOff: mode === 'off', isBusy: busy, isOn: mode === 'on' && !dead, isDead: dead, isErr: mode === 'err', isRe: mode === 're',
+      busyT: mode === 'start' ? '正在开启绕过' : mode === 're' ? '正在重新检查网络' : '正在匹配方法',
+      stepT: mode === 'start' ? '正在启用网络适配器' : (cur || '正在汇总结果'), stepCls: done % 2 ? 'sB' : 'sA', stepN: probing ? Math.min(done, N) + ' / ' + N : '',
+      chipT: '绕过运行中', chipC: '', onT: okN === 1 ? '可打开' : '可打开', okN: okN, allN: 6, segs: segs, sumT: mode === 'err' ? '服务无响应' : off ? '开启后检查' : mode === 'probe' ? '正在匹配' : dead ? '网络只放行白名单' : mode === 're' ? '正在重新检查' : '可打开', sumN: (mode === 'on' && !dead) || mode === 're' ? okN + ' / 6' : '', net: netV,
+      toggle: () => this.toggle(), pressed: mode === 'off' ? 'false' : 'true', pwLabel: mode === 'off' ? '开启绕过' : '关闭绕过',
+      fix: () => { this.setState({ mode: 'start' }); this.t1 = setTimeout(() => this.runProbe(false), 1400); },
+      hasSub: hasSub, noSub: !hasSub, showBar: (mode === 'on' && !dead) || mode === 're', recheck: () => { if (mode === 'on' || mode === 're') this.runProbe(true); }, reCls: mode === 're' ? 'busy' : '',
+      reT: mode === 're' ? '检查中' : '重新检查', reS: mode === 're' ? Math.min(done, N) + ' / ' + N + ' 项' : '上次匹配：' + ago, setV: '11月9日',
+      hasDet: mode === 'on' && !dead, det: det, openAbout: () => this.setState({ about: true }), closeAbout: () => this.setState({ about: false }), about: !!s.about, wave: !!s.wave,
+      headS: mode === 'off' ? '已关闭 · 无需订阅' : mode === 'err' ? '服务无响应' : mode === 'start' ? '正在开启' : probing ? '正在匹配 · ' + Math.min(done, N) + ' / ' + N : dead ? '网络只放行白名单' : '检查于 ' + ago + ' · ' + netV.t,
+      tabC: tab === 'sites' ? 't2' : tab === 'exc' ? 't3' : '', isSvc: tab === 'svc', isSites: tab === 'sites', isExc: tab === 'exc', tab1C: dvOn(tab === 'svc'), tab2C: dvOn(tab === 'sites'), tab3C: dvOn(tab === 'exc'),
+      tab1: () => this.setState({ tab: 'svc' }), tab2: () => this.setState({ tab: 'sites' }), tab3: () => this.setState({ tab: 'exc' }),
+      vpnLock: hasSub ? '' : 'lock', tabC2: tab === 'sites' ? 'm2' : '',
+      svcs: svcs, sites: sites, sitesN: sites.length, excN: 2, addSite: () => {},
+    };
+  }
+  mxBoot() {
+    const S = 12, self = this; let raf = 0, cv = null, ctx = null, W = 0, H = 0, dpr = 1, pts = [], cx = 0, cy = 0, waves = [], ph = '', emitAt = 0, col = '#b8acf2', base = '255,255,255', readAt = 0, px = -9999, py = -9999, still = false, wv = null, wvT = 0;
+    try { still = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    const fit = (c) => { const w = c.offsetWidth, h = c.offsetHeight; if (!w || !h) return false; dpr = Math.min(2, window.devicePixelRatio || 1); c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); return true; };
+    const grid = () => { pts = []; const ox = ((W % S) / 2) + S / 2, oy = ((H % S) / 2) + S / 2; for (let y = oy; y < H; y += S) for (let x = ox; x < W; x += S) { const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; pts.push([x, y, (h - Math.floor(h)) * 6.283]); } };
+    const emit = (amp, w, v, a) => waves.push({ t: performance.now(), amp: amp, w: w, v: v, a: a });
+    this._mxPulse = (k) => emit(5 * (k || 1), 30, 300, .8 * (k || 1));
+    const frame = (now) => {
+      raf = requestAnimationFrame(frame);
+      const root = document.querySelector('.mg.app'), stage = root && root.querySelector('.stage'); if (!stage) return;
+      const c = stage.querySelector('.mxc'); if (!c) return;
+      if (c !== cv || c.offsetWidth !== W || c.offsetHeight !== H) { cv = c; if (!fit(c)) return; W = c.offsetWidth; H = c.offsetHeight; ctx = c.getContext('2d'); grid(); readAt = 0; }
+      if (now > readAt) { readAt = now + 240; const cs = getComputedStyle(stage), v = cs.getPropertyValue('--st').trim(); if (v) col = v; base = root.classList.contains('t-light') ? '20,20,28' : '255,255,255';
+        const o = stage.querySelector('.orb'), a = c.getBoundingClientRect(); if (o && a.width) { const b = o.getBoundingClientRect(), k = W / a.width; cx = (b.left + b.width / 2 - a.left) * k; cy = (b.top + b.height / 2 - a.top) * k; } else { cx = W / 2; cy = H / 2; } }
+      const p2 = stage.classList.contains('s-on') ? 'on' : stage.classList.contains('s-ing') ? 'ing' : 'off';
+      if (p2 !== ph) { if (p2 === 'on' && ph) { emit(11, 44, 520, 1); setTimeout(() => emit(7, 36, 430, .8), 170); setTimeout(() => emit(4, 30, 360, .55), 380); } ph = p2; emitAt = now + (p2 === 'ing' ? 80 : 1500); }
+      if (now > emitAt && !still) { if (ph === 'ing') { emit(4.5, 28, 310, .7); emitAt = now + 640; } else if (ph === 'on') { emit(4, 40, 170, .6); emitAt = now + 4200; } else { emit(2.2, 52, 96, .22); emitAt = now + 5600; } }
+      const t = now / 1000, R = Math.max(W, H) * .78; waves = waves.filter((w) => (now - w.t) / 1000 * w.v < R + 80);
+      const wr = waves.map((w) => { const r = (now - w.t) / 1000 * w.v, f = Math.max(0, 1 - r / R); return [r, w.w, w.amp * f, w.a * Math.pow(f, .8)]; });
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+      const b0 = ph === 'off' ? .06 : .075; ctx.fillStyle = 'rgba(' + base + ',' + b0 + ')'; const hot = [];
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i], dx = p[0] - cx, dy = p[1] - cy, d = Math.sqrt(dx * dx + dy * dy) || 1; let lum = 0, off = 0;
+        for (let j = 0; j < wr.length; j++) { const w = wr[j], g = (d - w[0]) / w[1]; if (g > 3 || g < -3) continue; const e = Math.exp(-g * g); lum += e * w[3]; off += -g * e * w[2] * 1.9; }
+        if (ph !== 'off') { const tw = Math.sin(t * 1.3 + p[2]); if (tw > .965) lum += (tw - .965) * 16; }
+        const qx = p[0] - px, qy = p[1] - py, q = qx * qx + qy * qy; let ox = 0, oy = 0; if (q < 22000) { const e = Math.exp(-q / 3800); lum += e * .5; const qd = Math.sqrt(q) || 1; ox = qx / qd * e * 4; oy = qy / qd * e * 4; }
+        if (lum < .045) { ctx.fillRect(p[0] - 2, p[1] - 2, 4, 4); continue; }
+        hot.push(p[0] + dx / d * off + ox, p[1] + dy / d * off + oy, lum > 1 ? 1 : lum);
+      }
+      ctx.fillStyle = col;
+      for (let i = 0; i < hot.length; i += 3) { const a = hot[i + 2], s = 4 + a * 2.6; ctx.globalAlpha = Math.min(1, .1 + a * .92); ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(hot[i] - s / 2, hot[i + 1] - s / 2, s, s, 1.1 + a); else ctx.rect(hot[i] - s / 2, hot[i + 1] - s / 2, s, s); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      /* волна через всё окно: фронт из точек, а не цветная заливка */
+      const wc = root.querySelector('.wvc');
+      if (wc) { if (!wv) wvT = now; if (wc !== wv) { wv = wc; fit(wc); } const w = wc.offsetWidth, h = wc.offsetHeight, x = wc.getContext('2d'), a = wc.getBoundingClientRect(), b = c.getBoundingClientRect(), k = w / (a.width || w), ux = (b.left - a.left) * k + cx, uy = (b.top - a.top) * k + cy;
+        const u = Math.min(1, (now - wvT) / 1900), r = (1 - Math.pow(1 - u, 1.6)) * Math.hypot(w, h) * .8, fa = Math.pow(1 - u, .9); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h); x.fillStyle = col;
+        if (u < 1) for (let yy = S / 2; yy < h; yy += S) for (let xx = S / 2; xx < w; xx += S) { const dx = xx - ux, dy = yy - uy, d = Math.sqrt(dx * dx + dy * dy) || 1, g = (d - r) / 58; if (g > 2.4 || g < -2.4) continue; const e = Math.exp(-g * g), o = -g * e * 16, s = 2.4 + e * 3.4; x.globalAlpha = e * fa * .85; x.fillRect(xx + dx / d * o - s / 2, yy + dy / d * o - s / 2, s, s); }
+        x.globalAlpha = 1; } else wv = null;
+    };
+    const move = (e) => { if (!cv) return; const a = cv.getBoundingClientRect(); if (!a.width) return; const k = W / a.width; px = (e.clientX - a.left) * k; py = (e.clientY - a.top) * k; };
+    const out = () => { px = py = -9999; };
+    document.addEventListener('pointermove', move, { passive: true }); document.addEventListener('pointerleave', out);
+    raf = requestAnimationFrame(frame);
+    this._mxOff = () => { cancelAnimationFrame(raf); document.removeEventListener('pointermove', move); document.removeEventListener('pointerleave', out); };
+  }
+}
+</script>
+</body>
+</html>

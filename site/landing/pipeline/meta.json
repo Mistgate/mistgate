@@ -1,0 +1,51 @@
+{
+  "_": "The title and the description of the home page (/, /ru/ ...) per language, and of the app page under \"app\". `title` is written as it is; without it the title is \"Mistgate — <h1>\" (the h1 is the old home line, kept for that). They were the texts the old docs home carried.",
+  "en": {
+    "h1": "A self-hosted panel for a small VPN",
+    "description": "A self-hosted VPN panel for a few servers of your own and the people you share them with. Hysteria2, VLESS and AmneziaWG; two Go binaries, SQLite, no Docker.",
+    "title": "Mistgate: self-hosted VPN panel, VLESS Reality and Hysteria2"
+  },
+  "ru": {
+    "h1": "Панель для своего небольшого VPN",
+    "description": "Панель управления VPN для нескольких своих серверов и людей, с которыми вы ими делитесь. Hysteria2, VLESS и AmneziaWG; два бинарника на Go, SQLite, без Docker.",
+    "title": "Mistgate — панель управления своим VPN: VLESS, Hysteria2"
+  },
+  "zh": {
+    "h1": "自托管的小型 VPN 面板",
+    "description": "Mistgate 是一个自托管面板，用来管理你自己的几台 VPN 服务器，以及和你一起用它们的人。支持 Hysteria2、VLESS 和 AmneziaWG；两个 Go 二进制文件，SQLite 加 systemd。",
+    "title": "Mistgate：自托管 VPN 面板，支持 VLESS Reality 和 Hysteria2"
+  },
+  "fa": {
+    "h1": "پنلی برای VPN کوچک خودتان",
+    "description": "پنل مدیریت VPN برای چند سرور شخصی و افرادی که آن‌ها را با ایشان شریک می‌شوید. Hysteria2، VLESS و AmneziaWG؛ دو فایل اجرایی Go، SQLite و systemd.",
+    "title": "Mistgate: پنل مدیریت VPN خودمیزبان برای VLESS Reality و Hysteria2"
+  },
+  "tr": {
+    "h1": "Kendi küçük VPN'iniz için bir panel",
+    "description": "Birkaç kendi sunucunuz ve onları paylaştığınız kişiler için VPN yönetim paneli. Hysteria2, VLESS ve AmneziaWG; iki Go ikili dosyası, SQLite ve systemd.",
+    "title": "Mistgate: VLESS Reality ve Hysteria2 için kendi sunucunuzda VPN paneli"
+  },
+  "app": {
+    "_": "The title and the description of the app page (/app/, /ru/app/ ...): its own sentences, not the first lines of the page.",
+    "en": {
+      "title": "Mistgate for Windows: VPN client for VLESS and Hysteria2",
+      "description": "A VPN client for Windows that finds a working path on its own and says honestly when something is blocked. Hysteria2, AmneziaWG, VLESS and TrustTunnel."
+    },
+    "ru": {
+      "title": "Mistgate для Windows: VPN-клиент для VLESS и Hysteria2",
+      "description": "VPN-клиент для Windows сам находит рабочий путь и честно говорит, когда что-то заблокировано. Hysteria2, AmneziaWG, VLESS и TrustTunnel в одном окне."
+    },
+    "zh": {
+      "title": "Mistgate Windows 版：支持 VLESS 和 Hysteria2 的 VPN 客户端",
+      "description": "Windows 版 VPN 客户端：自动找到可用线路，被封锁时如实告知。Hysteria2、AmneziaWG、VLESS 和 TrustTunnel 集于一个窗口，适用于 Mistgate 面板和普通订阅链接。"
+    },
+    "fa": {
+      "title": "Mistgate برای Windows: کلاینت VPN برای VLESS و Hysteria2",
+      "description": "کلاینت VPN برای Windows خودش مسیرِ کارا را پیدا می‌کند و وقتی چیزی مسدود است صادقانه می‌گوید. Hysteria2، AmneziaWG، VLESS و TrustTunnel در یک پنجره."
+    },
+    "tr": {
+      "title": "Windows için Mistgate: VLESS ve Hysteria2 VPN istemcisi",
+      "description": "Windows için VPN istemcisi çalışan yolu kendi bulur, bir şey engellendiğinde dürüstçe söyler. Hysteria2, AmneziaWG, VLESS ve TrustTunnel tek pencerede."
+    }
+  }
+}

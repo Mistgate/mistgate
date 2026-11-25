@@ -49,7 +49,7 @@ const data: DnsData = { presets: [], providers: [], clientSupport: [] };
 const server = { kind: DnsServerKind.PLAIN, address: "223.5.5.5", providerVariant: "" };
 const presetWith = (split: Preset["split"]): Preset => ({
   id: "dns_custom_cn", name: "China split", description: "", builtin: false, servers: [{ ...server, address: "1.1.1.1" }], split,
-  ipv4Only: false, userCount: 0, isDefault: false, splitDirect: true, preferredTransport: DnsTransport.PLAIN, category: DnsCategory.REGIONAL, country: "CN", blockAds: false,
+  ipv4Only: false, userCount: 0, isDefault: false, splitDirect: true, preferredTransport: DnsTransport.PLAIN, category: DnsCategory.REGIONAL, country: "CN", blockAds: false, blockMax: false, torrentDirect: false,
 });
 
 function Editor({ preset, onClose = () => {}, with: d = data }: { preset?: Preset; onClose?: () => void; with?: DnsData }) {
@@ -142,7 +142,7 @@ describe("the country lists of a split rule", () => {
     updateDnsPreset.mockResolvedValue({});
     await mount(presetWith([{ suffixes: [], geo: ["geosite:telegram"], servers: [server] }]));
     expect(categories()).toEqual(["telegram"]);
-    expect([...document.querySelectorAll('[role=group][aria-label="Rule 1 · All sites of a country"] button')].map((b) => b.textContent)).toEqual(["China", "Russia"]);
+    expect([...document.querySelectorAll('[role=group][aria-label="Rule 1 · All sites of a country"] button')].map((b) => b.textContent)).toEqual(["China", "Russia", "Iran"]);
     expect(alertText()).toBe("");
     await type(categoryBox, "geosite:Category-Media-RU, telegram");
     await enter(categoryBox);
@@ -179,6 +179,60 @@ describe("the country lists of a split rule", () => {
     await type(box, "com.cn");
     await act(async () => void document.querySelector(box)!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
     expect([...document.querySelectorAll(".sb-chips > span")].map((c) => c.textContent)).toEqual([".cn", "com.cn"]);
+  });
+});
+
+describe("blocking the Max messenger in the apps", () => {
+  const max = () => option("Block the Max messenger in the apps");
+  const sent = () => updateDnsPreset.mock.calls[0]![0] as { blockMax?: boolean; blockAds?: boolean };
+
+  it("shows the switch with its hint, off for a preset without the flag, and saves it turned on", async () => {
+    updateDnsPreset.mockResolvedValue({});
+    await mount(presetWith([]));
+    expect(document.body.textContent).toContain("AmneziaVPN and AmneziaWG keys have no rules, so Max is not blocked there");
+    expect(max().getAttribute("aria-checked")).toBe("false");
+    await click(max());
+    await click(button("Save"));
+    expect(sent().blockMax).toBe(true);
+    expect(sent().blockAds).toBeUndefined();
+  });
+
+  it("turns it off on a preset that has it, and leaves it out of an update that did not touch it", async () => {
+    updateDnsPreset.mockResolvedValue({});
+    await mount({ ...presetWith([]), blockMax: true });
+    expect(max().getAttribute("aria-checked")).toBe("true");
+    await click(option("IPv4 only"));
+    await click(button("Save"));
+    expect(sent().blockMax).toBeUndefined();
+    updateDnsPreset.mockClear();
+    await mount({ ...presetWith([]), blockMax: true });
+    await click(max());
+    await click(button("Save"));
+    expect(sent().blockMax).toBe(false);
+  });
+});
+
+describe("torrent clients direct", () => {
+  const torrent = () => option("Send torrent clients direct");
+  const sent = () => updateDnsPreset.mock.calls[0]![0] as { torrentDirect?: boolean };
+
+  it("is off for a preset without the flag, warns about the real address, and saves it turned on", async () => {
+    updateDnsPreset.mockResolvedValue({});
+    await mount(presetWith([]));
+    expect(document.body.textContent).toContain("The person's real address is then visible to the other members of the swarm, and trackers blocked in their country will not open directly");
+    expect(torrent().getAttribute("aria-checked")).toBe("false");
+    await click(torrent());
+    await click(button("Save"));
+    expect(sent().torrentDirect).toBe(true);
+  });
+
+  it("tells what each app does with it, and leaves the flag out of an update that did not touch it", async () => {
+    updateDnsPreset.mockResolvedValue({});
+    await mount({ ...presetWith([]), torrentDirect: true });
+    expect(torrent().getAttribute("aria-checked")).toBe("true");
+    await click(option("IPv4 only"));
+    await click(button("Save"));
+    expect(sent().torrentDirect).toBeUndefined();
   });
 });
 
@@ -415,6 +469,8 @@ describe("the editor", () => {
     expect(row.querySelector(".sb-no")!.textContent).toBe("1");
     // asked in plain DNS: Happ and Amnezia both get it, with nothing to add
     expect([...document.querySelectorAll(".sb-get > div")].map((r) => r.querySelector("b")!.textContent)).toEqual(["Plain", "Plain"]);
+    // and an Amnezia key does not promise more than the two resolvers
+    expect(document.querySelectorAll(".sb-get > div")[1]!.querySelector("em")!.textContent).toBe("two resolvers only");
     // DoH: Happ keeps it, an Amnezia key only holds addresses
     await click([...document.querySelectorAll<HTMLElement>("[role=radio]")].find((r) => r.textContent === "DoH"));
     const get = [...document.querySelectorAll(".sb-get > div")].map((r) => [r.querySelector("b")!.textContent, r.querySelector("em")!.textContent]);
@@ -422,6 +478,9 @@ describe("the editor", () => {
       ["DoH", ""],
       ["Plain", "a key can only hold IP addresses"],
     ]);
+    // Max blocked: an Amnezia key has no rules, and its row says so
+    await click(option("Block the Max messenger in the apps"));
+    expect([...document.querySelectorAll(".sb-get > div")].map((r) => r.querySelector("em")!.textContent)).toEqual(["", "a key can only hold IP addresses · Max is not blocked: a key has no rules"]);
     // the same variant cannot be added twice
     await click(button("From the catalog"));
     expect(pick("Cloudflare · Standard").disabled).toBe(true);

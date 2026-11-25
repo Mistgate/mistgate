@@ -323,6 +323,67 @@ func Clean(name, description string, servers []Server, split []SplitRule) (n, d 
 	if srv, err = normServers("servers", servers); err != nil {
 		return
 	}
-	sp, err = normSplit(split)
+	if sp, err = normSplit(split); err != nil {
+		return
+	}
+	err = splitServersDiffer(srv, sp)
 	return
+}
+
+// serverKeys are the names a server is known by to a client's rules: its addresses and, for DoH and DoT, its host name. The direct rule
+// of Xray JSON picks a split resolver by its address (XrayDNS.DirectIPs), so a main and a split server that share one would send the
+// main queries direct as well.
+func serverKeys(s Server) []string {
+	if v, _, ok := LookupVariant(s.Variant); ok {
+		keys := v.addresses(true)
+		if v.DoTHost != "" {
+			keys = append(keys, strings.ToLower(v.DoTHost))
+		}
+		if u, err := url.Parse(v.DoHURL); err == nil && u.Hostname() != "" {
+			keys = append(keys, strings.ToLower(u.Hostname()))
+		}
+		return keys
+	}
+	host := s.Address
+	switch s.Kind {
+	case KindDoH:
+		if u, err := url.Parse(s.Address); err == nil {
+			host = u.Hostname()
+		}
+	default:
+		if ap, err := netip.ParseAddrPort(host); err == nil {
+			host = ap.Addr().String()
+		} else if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+	}
+	if a, err := netip.ParseAddr(host); err == nil {
+		host = a.Unmap().String()
+	}
+	keys := []string{strings.ToLower(host)}
+	if s.Kind != KindPlain {
+		keys = append(keys, hostIPs(s.Kind, host)...)
+	}
+	return keys
+}
+
+// splitServersDiffer refuses a split rule that is answered by one of the main servers (a code the admin words in every language:
+// "split_server_same: rule=<n>&server=<address>", web/src/lib/errors.ts).
+func splitServersDiffer(main []Server, split []SplitRule) error {
+	seen := map[string]bool{}
+	for _, m := range main {
+		for _, k := range serverKeys(m) {
+			seen[k] = true
+		}
+	}
+	for i, r := range split {
+		for _, sv := range r.Servers {
+			for _, k := range serverKeys(sv) {
+				if seen[k] {
+					return bad("split_server_same: rule=%d&server=%s", i+1, url.QueryEscape(k))
+				}
+			}
+		}
+	}
+	return nil
 }

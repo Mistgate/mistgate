@@ -1,14 +1,14 @@
 # Benchmark harness
 
-The scripts, load generators and compose files behind [Benchmarks](../../docs/en/reference/benchmarks.md) ([ru](../../docs/ru/reference/benchmarks.md)): Mistgate v0.1.32 (panel only) and v0.1.33 (one server), 3x-ui v3.9.0, Remnawave 3.4.5 and PasarGuard v5.4.1 measured on the same small server, panel only and as a one-server setup with the VPN core and Hysteria2 traffic. All data is invented (`user1`..`userN`, `node1.bench.test`, `203.0.113.x`); every service listens on loopback or on an isolated Docker network.
+The scripts, load generators and compose files behind [Benchmarks](../../docs/en/reference/benchmarks.md) ([ru](../../docs/ru/reference/benchmarks.md)): Mistgate v0.2.1, 3x-ui v3.11.0, Remnawave 3.4.11 (node 3.4.6) and PasarGuard v5.6.0 (node v0.5.7) measured on 24 November 2026 on the same small server, panel only and as a one-server setup with the VPN core and Hysteria2 traffic (the October series, v0.1.32 / v0.1.33 against v3.9.0, 3.4.5 and v5.4.1, is kept in `results/2026-10`). All data is invented (`user1`..`userN`, `node1.bench.test`, `203.0.113.x`); every service listens on loopback or on an isolated Docker network.
 
-**Read this before you run anything.** The harness changes the machine it runs on. It writes systemd slices into `/etc/systemd/system`, imports and pulls Docker images (about 2.5 GB), creates the Docker networks `bench-iso` and `bench-box`, adds about 1,200 alias addresses on the `bench-box` bridge, starts and kills containers and `systemd-run` units named `bench*`, drops the page cache when you pass `--dropcaches` and, with `--pin`, changes CPU affinity. Run it on a dedicated test machine or a throwaway VM, as root. `cleanup.sh` removes what the harness created, including the images by name and `$BENCH_ROOT`; read it first if the machine runs anything else.
+**Read this before you run anything.** The harness changes the machine it runs on. It writes systemd slices into `/etc/systemd/system`, imports and pulls Docker images (about 2.4 GB), creates the Docker networks `bench-iso` and `bench-box`, adds about 1,200 alias addresses on the `bench-box` bridge, starts and kills containers and `systemd-run` units named `bench*`, drops the page cache when you pass `--dropcaches` and, with `--pin`, changes CPU affinity. Run it on a dedicated test machine or a throwaway VM, as root. `cleanup.sh` removes what the harness created, including the images by name and `$BENCH_ROOT`; read it first if the machine runs anything else.
 
 ## Requirements
 
-- Linux with systemd and cgroup v2 (the runs were made in WSL2, Ubuntu 24.04, kernel 6.6), root, Docker with Compose v2, Python 3, Go 1.26+ (for `hyload`), `openssl`, `iproute2`, `taskset`, `curl`.
+- Linux with systemd and cgroup v2 (the runs were made in WSL2, Ubuntu 24.04, kernel 6.6; keep `$BENCH_ROOT` on the Linux disk, not on a Windows drive mounted into WSL, which changes start times and SQLite), root, Docker with Compose v2, Python 3, Go 1.26+ (for `hyload`), `openssl`, `iproute2`, `taskset`, `curl`.
 - Spare capacity beside the limited slices: the clients run outside them and use 150-250 % of one CPU in the one-server test. The reference machine had 16 threads and 15.5 GB of RAM; on a smaller one the clients compete with the measured group.
-- The release under test: `mistgate` and `mistgate-node` (the panel-only runs used a build from the v0.1.32 tag, the one-server runs one from the v0.1.33 tag, both without a release key), plus the `.env.sample` of the Remnawave release and the `env.example` of the PasarGuard release named at the top of `compose/remna.yml` and `compose/pasar.yml`.
+- The release under test: `mistgate` and `mistgate-node` (built from the v0.2.1 tag with `mistgate release build`, without a release key), plus the `.env.sample` of the Remnawave release and the `env.example` of the PasarGuard release named at the top of `compose/remna.yml` and `compose/pasar.yml`.
 
 ## Layout
 
@@ -25,7 +25,8 @@ The scripts, load generators and compose files behind [Benchmarks](../../docs/en
 | `compose/` | the compose files as used, with the changes from the projects' own files noted at the top of each |
 | `mistgate-bench-variants.diff` | the two-line changes of the supplementary "limits off" builds. Never the shipped build |
 | `profiling/` | the `net/http/pprof` overlay files and `mkoverlay.py` for `go build -overlay` |
-| `results/` | the aggregated tables and per-repetition CSVs the page is built from. `onebox` and `box1g` hold the 12 October series (v0.1.33, `GOMAXPROCS` fix) without the tunnel throughput and latency rows, which the page withholds; `box_pin2` is the pinned check of the first series, taken with the old harness (no `GOMAXPROCS`), kept for reference and no longer on the page. The raw JSON and the 1 Hz samples are not published |
+| `results/2026-11/` | the aggregated tables (`table_*.md`) and per-repetition CSVs (`*/per_rep.csv`) the page is built from: `main` (panel only), `box` (one server, quota only, phases A to E), `box_quiet` (phases B and D with the group pinned to two physical cores) and `box1g` (1 vCPU / 1 GB). The rows the page withholds (the small request in phase D, the throughput of phase E) are not in the CSVs. The raw JSON and the 1 Hz samples are not published |
+| `results/2026-10/` | the October series (v0.1.32 / v0.1.33) with its tables and CSVs, and `results/profiling-summary.txt` and `tail_diag.json` of the October profiling pass. `box_pin2` there is the pinned check of the first series, taken with the old harness (no `GOMAXPROCS`) |
 
 ## Run
 
@@ -39,10 +40,10 @@ cd "$BENCH_ROOT"
 
 `setup.sh` creates `bench-panel.slice` (`CPUQuota=100%`, `MemoryMax=1G`, no swap), copies the harness, builds `loadgen` and `hyload`, and writes the two `.env` files with random secrets.
 
-`onebox.py` runs the node from the image `bench/mgnode:0.1.33`, which is not pulled but made from the node binary (`bench.py` makes the `0.1.32` one for the panel-only runs):
+Both scripts run the node from the image `bench/mgnode:0.2.1` (the `NODE_IMAGE` constant of `bench.py`), which is not pulled but made from the node binary; `bench.py` makes it when it is missing, or by hand:
 
 ```sh
-mkdir /tmp/mgn && cp "$BENCH_ROOT/bin/mistgate-node" /tmp/mgn/ && tar -c -C /tmp/mgn mistgate-node | docker import --change 'ENTRYPOINT ["/mistgate-node"]' - bench/mgnode:0.1.33 && rm -rf /tmp/mgn
+mkdir /tmp/mgn && cp "$BENCH_ROOT/bin/mistgate-node" /tmp/mgn/ && tar -c -C /tmp/mgn mistgate-node | docker import --change 'ENTRYPOINT ["/mistgate-node"]' - bench/mgnode:0.2.1 && rm -rf /tmp/mgn
 ```
 
 Panel only, as in the main series (the group was also pinned to one host CPU, the last one; see the page for why and for the unpinned comparison):
@@ -52,15 +53,17 @@ systemctl set-property --runtime bench-panel.slice AllowedCPUs=15   # the last o
 python3 bench.py --panels mistgate,3xui,remnawave,pasarguard --reps 3 --idle 300 --load 60 --users 200 --conc 50 --tag main
 ```
 
-The `mistgate-nolimit` and `mistgate-nolimit-nocache` panels need those binaries in `$BENCH_ROOT/bin/`: build them from the v0.1.32 tag with `mistgate-bench-variants.diff` applied (the comment at the top of the diff says which file gets which change).
+The `mistgate-nolimit` and `mistgate-nolimit-nocache` panels need those binaries in `$BENCH_ROOT/bin/`: build them from the v0.1.32 tag with `mistgate-bench-variants.diff` applied (not part of the November series, which used the shipped build only) (the comment at the top of the diff says which file gets which change).
 
 One server, 2 vCPU / 2 GB, 1000 users (phases A idle, B throughput, C many clients, D bad day, E panel restart):
 
 ```sh
 python3 onebox.py --panels mistgate,3xui,remnawave,pasarguard --reps 3 --users 1000 --phases ABCDE --bad-dur 120 --storm-rate 300 --tag box
 python3 onebox.py --panels mistgate,3xui,remnawave,pasarguard --reps 1 --users 1000 --vcpu 1 --mem 1G --phases ABDE --settle 30 --idle 90 --bad-dur 120 --storm-rate 300 --tag box1g
-python3 onebox.py --panels ... --reps 3 --users 1000 --phases BD --bad-dur 120 --storm-rate 300 --probe 97ms --pin 0,1,8,9 --client-cpus 2-7,10-15 --tag box_quiet   # pinned to two physical cores, clients on the others
+python3 onebox.py --panels mistgate,3xui,remnawave,pasarguard --reps 3 --users 1000 --phases BD --bad-dur 120 --storm-rate 300 --probe 97ms --pin 0,1,8,9 --client-cpus 2-7,10-15 --tag box_quiet   # pinned to two physical cores, clients on the others
 ```
+
+The November series used exactly these commands. What the newer versions changed in the harness: 3x-ui v3.10 and later print a random first panel user to the container log instead of `admin/admin` (both scripts read it from there), and Mistgate v0.2 hands the node its users a few seconds after the subscription shows the server line and asks for a fresh step-up (5 minutes) before deleting users (`onebox.py` waits for the last user and refreshes the step-up).
 
 `--probe` sets the interval of the small request through the tunnel (default 100 ms; 97 ms lets its phase drift against the 100 ms CFS period of the quota). Every core container gets `GOMAXPROCS` equal to the vCPUs of the box. The CPU numbers in `--pin`, `--client-cpus`, in `AllowedCPUs=15` and in the `taskset` calls of the scripts assume a 16-thread host (threads 0 and 8 share a core); change them for yours. Results land in `$BENCH_ROOT/out/<tag>/`: one JSON and one `*_samples.csv` per panel and repetition. Turn them into tables with:
 

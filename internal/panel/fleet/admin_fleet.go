@@ -18,7 +18,7 @@ type fleetService struct{ f *Fleet }
 // and the like stay on the node's own Events tab.
 var feedEvents = &store.CodeMatch{
 	MinSeverity: 2,
-	Codes:       []string{"node_down", "node_blip", "node_recovered", "node_enrolled", "node_retired", "engine_failed", "client_logs_received", "client_logs_declined"},
+	Codes:       []string{"node_down", "node_blip", "panel_link_gap", "node_recovered", "node_enrolled", "node_retired", "engine_failed", "client_logs_received", "client_logs_declined"},
 	Prefixes:    []string{"update_", "user_"},
 }
 

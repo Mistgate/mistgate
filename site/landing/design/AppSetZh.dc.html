@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Mistgate · Settings</title>
+<script src="./support.js"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@500..700&amp;family=Noto+Sans+SC:wght@400..800&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="cAzh" data-app><div class="desk">
+<div class="mg app t-{{theme}} a-{{accent}} {{lgHue}}" style="--accent:{{accHex}};--ink:{{inkHex}};--lh:{{lh}}">
+
+  <nav class="rail" aria-label="Sections">
+    <img class="rlogo {{brLogoC}}" src="{{logo}}" alt="{{brAlt}}" width="32" height="32">
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2.2"/></svg><span class="rbl">主页</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2.6"/><circle cx="18" cy="5" r="2.6"/><path d="M8.6 19H16.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h7.9"/></svg><span class="rbl">路由</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6.5 5 13 2.5-6.5H21"/></svg><span class="rbl">诊断</span><i class="rdot {{rdDiag}}" aria-hidden="true"></i></a>
+    <a class="rb on" href="#app" aria-current="page"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="rbl">设置</span><i class="rdot {{rdSet}}" aria-hidden="true"></i></a>
+    <a class="rb sub" href="https://vpn.example.com" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"/></svg><span class="rbl">订阅页面</span></a>
+  </nav>
+  <div class="content">
+    <header class="tb">
+    <sc-if value="{{bn.on}}" hint-placeholder-val="{{false}}">
+    <div class="bn {{bn.tone}}" role="status">
+      <a class="bn-m" href="{{bn.href}}"><span class="gl g-{{bn.icon}}" aria-hidden="true"></span><b>{{bn.t}}</b><span class="bn-s {{bn.sC}}">{{bn.s}}</span></a>
+      <sc-if value="{{bn.hasAct}}" hint-placeholder-val="{{false}}"><a class="bn-a" href="{{bn.href}}">{{bn.act}}</a></sc-if>
+      <button class="bn-x" onClick="{{bn.close}}" aria-label="隐藏"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+    </div>
+    </sc-if>
+    <div class="tbs {{tbs.c}}">
+      <a class="tbs-s" href="#app" title="Open Home"><i class="tbs-d" aria-hidden="true"></i><span>{{tbs.t}}</span><span class="tbs-m {{tbs.mc}}">{{tbs.m}}</span></a>
+      <button class="tbs-p" onClick="{{tbs.go}}" aria-label="{{tbs.a}}" title="{{tbs.a}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg></button>
+    </div>
+    <div class="cap">
+      <button aria-label="Minimize to tray"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button aria-label="Maximize"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg></button>
+      <button aria-label="Close window"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    </header>
+    <main class="sxm">
+      <aside class="sx-l">
+        <h1 class="h1x">设置</h1>
+        <p class="rt-sub">Mistgate {{ver}}</p>
+        <nav class="sx-nav" aria-label="Settings sections">
+          <sc-for list="{{nav}}" as="n" hint-placeholder-count="8"><button class="sx-ni {{n.c}}" onClick="{{n.go}}" aria-current="{{n.cur}}"><span class="gl g-{{n.g}}" aria-hidden="true"></span><span class="t">{{n.t}}</span><span class="bd {{n.bc}}">{{n.b}}</span></button></sc-for>
+        </nav>
+      </aside>
+      <section class="sx-r" aria-label="{{secT}}">
+      <sc-if value="{{is.conn}}" hint-placeholder-val="{{true}}"><div class="sx-pg rise"><div class="sx-h"><h2>连接</h2><p>Mistgate 如何连接，以及 VPN 断开时如何处理</p></div><div class="sx-g "><p class="sx-gt">Kill Switch</p><div class="sx-card"><div class="sx-row col"><div class="sx-rt"><span class="mono rose"><span class="gl g-lock" aria-hidden="true"></span></span><span class="tx"><b>无 VPN 时阻断网络</b><span>{{ksNote}}</span></span></div><div class="pick" role="radiogroup" aria-label="无 VPN 时阻断网络"><button role="radio" class="{{ks.off}}" aria-checked="{{ksA.off}}" onClick="{{ksSet.off}}">关闭</button><button role="radio" class="{{ks.while}}" aria-checked="{{ksA.while}}" onClick="{{ksSet.while}}">连接期间</button><button role="radio" class="{{ks.always}}" aria-checked="{{ksA.always}}" onClick="{{ksSet.always}}">始终</button></div></div><button class="sx-row lk {{excCls}}" onClick="{{openExc}}"><span class="mono sky"><span class="gl g-home-simple" aria-hidden="true"></span></span><span class="tx"><b>阻断时仍允许</b><span>{{excSum}}</span></span><svg class="i chv" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div><div class="sx-g "><p class="sx-gt">启动与连接</p><div class="sx-card"><div class="sx-row "><span class="mono lav"><span class="gl g-computer" aria-hidden="true"></span></span><span class="tx"><b>Windows 启动时连接</b><span>Mistgate 随 Windows 启动并连接上次的服务器</span></span><button class="sw {{T.auto}}" role="switch" aria-checked="{{A.auto}}" onClick="{{tg.auto}}" aria-label="Windows 启动时连接"></button></div><div class="sx-row "><span class="mono mint"><span class="gl g-gamepad" aria-hidden="true"></span></span><span class="tx"><b>游戏模式</b><span>优先使用 AmneziaWG，游戏可保持快速 UDP 和开放 NAT</span></span><button class="sw {{T.game}}" role="switch" aria-checked="{{A.game}}" onClick="{{tg.game}}" aria-label="游戏模式"></button></div><div class="sx-row "><span class="mono wl"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6a3 3 0 0 1 3 3v4a3 3 0 0 0 3 3h6"/><path d="m18 14 3 3-3 3"/></svg></span><span class="tx"><b>自动切换到白名单通道</b><span>常规服务器无响应时。这是备用通道，可能较慢；默认关闭</span></span><button class="sw {{T.wl}}" role="switch" aria-checked="{{A.wl}}" onClick="{{tg.wl}}" aria-label="自动切换到白名单通道"></button></div><div class="sx-row col"><div class="sx-rt"><span class="mono sand"><span class="gl g-flash" aria-hidden="true"></span></span><span class="tx"><b>协议</b><span>{{prNote}}</span></span></div><div class="pick" role="radiogroup" aria-label="协议"><button role="radio" class="{{pr.auto}}" aria-checked="{{prA.auto}}" onClick="{{prSet.auto}}">自动</button><button role="radio" class="{{pr.h2}}" aria-checked="{{prA.h2}}" onClick="{{prSet.h2}}">Hysteria2</button><button role="radio" class="{{pr.awg}}" aria-checked="{{prA.awg}}" onClick="{{prSet.awg}}">AmneziaWG</button><button role="radio" class="{{pr.vless}}" aria-checked="{{prA.vless}}" onClick="{{prSet.vless}}">VLESS</button><button role="radio" class="{{pr.tt}}" aria-checked="{{prA.tt}}" onClick="{{prSet.tt}}">TrustTunnel</button></div></div></div></div></div></sc-if>
+      <sc-if value="{{is.exc}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><button class="sx-back" onClick="{{closeExc}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>连接</button><div class="sx-h"><h2>阻断时仍允许</h2><p>Kill Switch 阻断网络时，这些仍可使用。其流量直连，不经过 VPN</p></div><div class="sx-g "><div class="sx-card"><div class="sx-row "><span class="mono sky"><span class="gl g-home-simple" aria-hidden="true"></span></span><span class="tx"><b>本地网络</b><span>打印机、电视、共享文件夹及 Wi-Fi 中的其他设备</span></span><button class="sw {{T.lan}}" role="switch" aria-checked="{{A.lan}}" onClick="{{tg.lan}}" aria-label="Allow local network"></button></div></div></div><div class="sx-g"><p class="sx-gt">地址</p><div class="sx-card"><div class="sx-add"><span class="sx-in"><span class="gl g-plus" aria-hidden="true"></span><input type="text" placeholder="IP、网段或域名，例如 10.0.0.0/8" aria-label="Address to allow"></span><button class="addb sm">添加</button></div><sc-for list="{{excList}}" as="e" hint-placeholder-count="3"><div class="sx-row ad"><span class="mono neu"><span class="gl g-globe" aria-hidden="true"></span></span><span class="tx"><b class="mo">{{e.a}}</b><span>{{e.n}}</span></span><button class="icx" onClick="{{e.rm}}" aria-label="Remove {{e.a}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div></sc-for><p class="sx-empty {{excEmpty}}">暂无地址</p></div></div></div></sc-if>
+      <sc-if value="{{is.sub}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>订阅</h2><p>当前使用的订阅。可在主页切换订阅</p></div><div class="sx-ban {{B.c}} {{B.show}} rise"><span class="mono {{B.tone}}"><span class="gl b-megaphone g-megaphone" aria-hidden="true"></span><span class="gl b-laptop g-laptop" aria-hidden="true"></span><span class="gl b-xmark-circle g-xmark-circle" aria-hidden="true"></span><span class="gl b-cloud-xmark g-cloud-xmark" aria-hidden="true"></span><span class="gl b-info-circle g-info-circle" aria-hidden="true"></span><span class="gl b-calendar g-calendar" aria-hidden="true"></span></span><span class="tx"><b>{{B.t}}</b><span>{{B.s}}</span></span><button class="addb sm {{B.bc}}">{{B.b}}</button></div><div class="sx-sub {{subDim}}"><div class="sb-top"><img class="sb-logo {{S.logoC}}" src="{{logo}}" alt="" width="44" height="44"><span class="sb-ini {{S.iniC}}">{{S.ini}}</span><span class="tx"><b><span class="sbn">{{S.name}}</span><span class="srct {{S.srcCls}}">{{S.srcT}}</span></b><span><i class="dot {{S.stC}}"></i>{{S.st}} · {{S.host}}</span></span><span class="sb-act {{S.pageCls}}"><a class="lsb" href="https://vpn.example.com" target="_blank" rel="noopener"><span class="gl g-chat-bubble" aria-hidden="true"></span>客服</a><a class="lsb" href="https://vpn.example.com" target="_blank" rel="noopener">订阅页面<svg class="i ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></a></span></div><div class="sb-stats"><div class="sb-st {{S.eC}}"><span class="k"><span class="gl g-calendar" aria-hidden="true"></span>到期</span><b>{{S.e}}</b><span class="s">{{S.eS}}</span><i class="bar"><i style="width:{{S.eP}}"></i></i></div><div class="sb-st {{S.dC}}"><span class="k"><span class="gl g-data-transfer-both" aria-hidden="true"></span>流量</span><b>{{S.d}}</b><span class="s">{{S.dS}}</span><i class="bar"><i style="width:{{S.dP}}"></i></i></div><div class="sb-st {{S.vC}}"><span class="k"><span class="gl g-laptop" aria-hidden="true"></span>设备</span><b>{{S.v}}</b><span class="s">{{S.vS}}</span><i class="bar"><i style="width:{{S.vP}}"></i></i></div></div><div class="sb-sync {{syncCls}} {{syncGrp}}"><span class="gl g-cloud-sync" aria-hidden="true"></span><span class="tx"><b>{{syncT}}</b><span>{{syncS}}</span></span><button class="lsb {{syncBtnCls}}" onClick="{{syncNow}}"><span class="gl rf g-refresh" aria-hidden="true"></span><span>{{syncBtn}}</span></button></div></div><div class="sx-g {{devGrp}}"><p class="sx-gt">此订阅中的设备<span class="hn">请在订阅页面移除设备</span></p><div class="sx-card"><sc-if value="{{renaming}}" hint-placeholder-val="{{false}}"><div class="sx-ren rise"><div class="sx-add ren"><span class="sx-in"><span class="gl g-computer" aria-hidden="true"></span><input type="text" value="Lime-Desktop" aria-label="Name of this PC"></span><button class="lsb" onClick="{{renClose}}">取消</button><button class="addb sm" onClick="{{renClose}}">保存</button></div><p class="sx-note">服务商会在设备列表中看到此名称</p></div></sc-if><sc-for list="{{devs}}" as="d" hint-placeholder-count="2"><div class="sx-row dv"><span class="mono {{d.tone}}"><span class="gl d-computer g-computer" aria-hidden="true"></span><span class="gl d-smartphone-device g-smartphone-device" aria-hidden="true"></span><span class="gl d-laptop g-laptop" aria-hidden="true"></span></span><span class="tx"><b><span class="dvn">{{d.n}}</span><span class="me {{d.meC}}">这台电脑</span></b><span>{{d.s}}</span></span><button class="lsb {{d.renC}}" onClick="{{renOpen}}"><span class="gl g-edit-pencil" aria-hidden="true"></span>重命名</button></div></sc-for></div></div><div class="sx-g {{basicGrp}}"><div class="sx-card"><div class="sx-row"><span class="mono neu"><span class="gl g-link" aria-hidden="true"></span></span><span class="tx"><b>通过链接添加</b><span>设备管理、发现封锁和管理员协助仅适用于 Mistgate 订阅，请向服务商索取</span></span></div></div></div><div class="sx-g "><div class="sx-card"><div class="sx-row "><span class="mono rose"><span class="gl g-log-out" aria-hidden="true"></span></span><span class="tx"><b>{{outT}}</b><span>{{outS}}</span></span><button class="lsb dang">{{outB}}</button></div></div></div></div></sc-if>
+      <sc-if value="{{is.priv}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>隐私</h2><p>Mistgate 会发送什么、发给谁，哪些留在这台电脑上</p></div><div class="sx-g"><p class="sx-gt">帮助发现封锁</p><div class="sx-card"><div class="sx-row {{repCls}}"><span class="mono sand"><span class="gl g-shield-search" aria-hidden="true"></span></span><span class="tx"><b>帮助发现封锁</b><span>{{repSub}}</span></span><button class="sw {{T.rep}}" role="switch" aria-checked="{{A.rep}}" onClick="{{tg.rep}}" aria-label="帮助发现封锁"></button></div><div class="sx-ls {{repLs}}"><p class="ok"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg><span><b>会发送：</b> 哪些服务器和线路可用、网络类型和运营商、时间</span></p><p class="no"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg><span><b>绝不发送：</b> 您访问的网站、IP、密钥、电脑名称</span></p><p class="tm"><span class="gl g-clock" aria-hidden="true"></span><span>{{repLast}}</span></p></div><p class="sx-foot"><span class="gl g-info-circle" aria-hidden="true"></span>每个订阅单独设置</p></div></div><div class="sx-g "><p class="sx-gt">管理员协助</p><div class="sx-card"><div class="sx-row "><span class="mono lav"><span class="gl g-journal-page" aria-hidden="true"></span></span><span class="tx"><b>诊断数据，仅在您求助时发送</b><span>发送前您可查看全部内容。只有订阅管理员能收到，管理员也可向您索取</span></span><a class="lsb" href="#app">诊断<svg class="i chv" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a></div></div></div><div class="sx-g "><p class="sx-gt">在这台电脑上</p><div class="sx-card"><div class="sx-row "><span class="mono neu"><span class="gl g-archive" aria-hidden="true"></span></span><span class="tx"><b>服务日志</b><span>最近 24 小时，不会自行离开这台电脑。密钥和地址已移除</span></span><button class="lsb {{logCls}}" onClick="{{clearLog}}"><span class="gl g-bin" aria-hidden="true"></span><span>{{logBtn}}</span></button></div></div></div></div></sc-if>
+      <sc-if value="{{is.look}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>外观</h2><p>主题、强调色、语言和窗口行为</p></div><div class="sx-g"><div class="sx-card"><div class="sx-row tmr"><span class="mono lav"><span class="gl g-half-moon" aria-hidden="true"></span></span><span class="tx"><b>主题</b></span><div class="pick" role="radiogroup" aria-label="主题"><button role="radio" class="{{tm.dark}}" aria-checked="{{tmA.dark}}" onClick="{{tmSet.dark}}">深色</button><button role="radio" class="{{tm.light}}" aria-checked="{{tmA.light}}" onClick="{{tmSet.light}}">浅色</button></div></div><div class="sx-row col acc"><div class="sx-rt"><span class="mono rose"><span class="gl g-color-filter" aria-hidden="true"></span></span><span class="tx"><b>强调色</b><span>按钮、开关和高亮。默认使用服务商选择的颜色</span></span></div><div class="acs-row" role="radiogroup" aria-label="强调色"><sc-for list="{{accs}}" as="a" hint-placeholder-count="7"><button class="acs {{a.c}}" role="radio" aria-checked="{{a.on}}" onClick="{{a.go}}" style="--c:{{a.hex}};--ck:{{a.ck}}"><span class="dc"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span><span class="an">{{a.t}}</span></button></sc-for></div><div class="acc-own"><span class="k">自定义</span><label class="hex"><span>#</span><input type="text" value="{{hexTxt}}" maxlength="6" spellcheck="false" aria-label="Custom accent color, hex"><button class="hx-sw" style="background:{{accHex}}" onClick="{{accCustom}}" aria-label="Pick a custom color"></button></label><span class="acc-note {{noteC}}">这台电脑使用自定义颜色<i>·</i><button class="rst" onClick="{{accReset}}">使用服务商颜色</button></span></div></div></div></div><div class="sx-g"><p class="sx-gt">语言</p><div class="sx-card"><div class="sx-row lng"><span class="mono sky"><span class="gl g-translate" aria-hidden="true"></span></span><span class="tx"><b>语言</b><span>Mistgate 及其通知</span></span><div class="sx-sel"><button class="lsb" aria-expanded="{{langX}}" onClick="{{langTog}}">{{langT}}<svg class="i chv" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><sc-if value="{{langOpen}}" hint-placeholder-val="{{false}}"><div class="sx-pop rise" role="listbox"><sc-for list="{{langs}}" as="l" hint-placeholder-count="5"><button role="option" class="{{l.c}}" aria-selected="{{l.a}}" onClick="{{l.go}}"><span class="nt" dir="{{l.dir}}">{{l.n}}</span><span class="en">{{l.e}}</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></button></sc-for></div></sc-if></div></div></div></div><div class="sx-g "><p class="sx-gt">窗口</p><div class="sx-card"><div class="sx-row "><span class="mono lav"><span class="gl g-app-window" aria-hidden="true"></span></span><span class="tx"><b>启动时最小化</b><span>Windows 启动时，Mistgate 在托盘中打开</span></span><button class="sw {{T.min}}" role="switch" aria-checked="{{A.min}}" onClick="{{tg.min}}" aria-label="启动时最小化"></button></div><div class="sx-row "><span class="mono neu"><span class="gl g-xmark" aria-hidden="true"></span></span><span class="tx"><b>关闭窗口后继续运行</b><span>× 按钮会将 Mistgate 隐藏到托盘，VPN 保持开启</span></span><button class="sw {{T.tray}}" role="switch" aria-checked="{{A.tray}}" onClick="{{tg.tray}}" aria-label="关闭窗口后继续运行"></button></div></div></div></div></sc-if>
+      <sc-if value="{{is.notif}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>通知</h2><p>仅在需要您注意时提醒。点击即可打开对应界面</p></div><div class="sx-toast-w"><span class="pvl">预览</span><div class="ty-toast pv-{{npv}}" aria-hidden="true"><div class="to-h"><img src="{{logo}}" alt="" width="16" height="16"><span>Mistgate</span><i>当前</i></div><div class="to-b"><span class="mono {{tst.tone}}"><span class="gl pi pi-n0 g-wifi-off" aria-hidden="true"></span><span class="gl pi pi-n1 g-data-transfer-both" aria-hidden="true"></span><span class="gl pi pi-n2 g-calendar" aria-hidden="true"></span><span class="gl pi pi-n3 g-computer" aria-hidden="true"></span><span class="gl pi pi-n4 g-cloud-check" aria-hidden="true"></span></span><span class="tx"><b>{{tst.t}}</b><span>{{tst.s}}</span></span></div></div></div><div class="sx-g"><div class="sx-card"><div class="sx-row mst"><span class="mono lav"><span class="gl g-bell" aria-hidden="true"></span></span><span class="tx"><b>Windows 通知</b><span>显示在屏幕角落和通知中心</span></span><button class="sw {{T.nt}}" role="switch" aria-checked="{{A.nt}}" onClick="{{tg.nt}}" aria-label="Windows 通知"></button></div><div class="sx-nl {{ntDim}}"><div class="sx-row nr {{nprC.n0}}"><span class="mono rose"><span class="gl g-wifi-off" aria-hidden="true"></span></span><span class="tx"><b>连接断开超过 30 秒</b></span><button class="lsb ico pvb" onClick="{{npr.n0}}" aria-label="Preview: Connection lost for over 30 s" title="预览"><span class="gl g-eye" aria-hidden="true"></span></button><button class="sw {{T.n0}}" role="switch" aria-checked="{{A.n0}}" onClick="{{tg.n0}}" aria-label="连接断开超过 30 秒"></button></div><div class="sx-row nr {{nprC.n1}}"><span class="mono sky"><span class="gl g-data-transfer-both" aria-hidden="true"></span></span><span class="tx"><b>已切换到备用线路</b></span><button class="lsb ico pvb" onClick="{{npr.n1}}" aria-label="Preview: Switched to a backup way" title="预览"><span class="gl g-eye" aria-hidden="true"></span></button><button class="sw {{T.n1}}" role="switch" aria-checked="{{A.n1}}" onClick="{{tg.n1}}" aria-label="已切换到备用线路"></button></div><div class="sx-row nr {{nprC.n2}}"><span class="mono sand"><span class="gl g-calendar" aria-hidden="true"></span></span><span class="tx"><b>订阅将在 3 天后到期</b></span><button class="lsb ico pvb" onClick="{{npr.n2}}" aria-label="Preview: Subscription ends in 3 days" title="预览"><span class="gl g-eye" aria-hidden="true"></span></button><button class="sw {{T.n2}}" role="switch" aria-checked="{{A.n2}}" onClick="{{tg.n2}}" aria-label="订阅将在 3 天后到期"></button></div><div class="sx-row nr {{nprC.n3}}"><span class="mono lav"><span class="gl g-computer" aria-hidden="true"></span></span><span class="tx"><b>这台电脑已从订阅中移除</b></span><button class="lsb ico pvb" onClick="{{npr.n3}}" aria-label="Preview: This PC removed from subscription" title="预览"><span class="gl g-eye" aria-hidden="true"></span></button><button class="sw {{T.n3}}" role="switch" aria-checked="{{A.n3}}" onClick="{{tg.n3}}" aria-label="这台电脑已从订阅中移除"></button></div><div class="sx-row nr {{nprC.n4}}"><span class="mono mint"><span class="gl g-cloud-check" aria-hidden="true"></span></span><span class="tx"><b>更新已安装</b></span><button class="lsb ico pvb" onClick="{{npr.n4}}" aria-label="Preview: Update installed" title="预览"><span class="gl g-eye" aria-hidden="true"></span></button><button class="sw {{T.n4}}" role="switch" aria-checked="{{A.n4}}" onClick="{{tg.n4}}" aria-label="更新已安装"></button></div></div></div></div></div></sc-if>
+      <sc-if value="{{is.upd}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>更新</h2><p>新版本均经签名。Mistgate 只安装开发者签名的版本</p></div><div class="sx-upd {{U.c}}"><div class="up-top"><span class="up-ic"><img src="{{U.logo}}" alt="" width="40" height="40"></span><span class="tx"><b>{{U.t}}</b><span>{{U.s}}</span></span><span class="up-act"><button class="lsb {{U.b2c}}" onClick="{{U.do2}}">{{U.b2}}</button><button class="{{U.bc}}" onClick="{{U.do}}"><span class="gl rf g-refresh" aria-hidden="true"></span>{{U.b}}</button></span></div><div class="up-bar {{U.barC}}"><i style="width:{{U.p}}"></i></div><div class="up-new {{U.newC}}"><p class="h">1.5.0 的新功能 <span class="need"><span class="gl g-server" aria-hidden="true"></span>您的 2 台服务器需要此版本</span></p><ul><li>支持服务商的 Mist 协议服务器</li><li>在移动网络中更快切换到备用线路</li><li>Windows 更新后 Kill Switch 继续生效</li></ul></div></div><div class="sx-g "><div class="sx-card"><div class="sx-row "><span class="mono mint"><span class="gl g-cloud-download" aria-hidden="true"></span></span><span class="tx"><b>自动安装更新</b><span>后台下载，重启 Mistgate 时安装</span></span><button class="sw {{T.au}}" role="switch" aria-checked="{{A.au}}" onClick="{{tg.au}}" aria-label="自动安装更新"></button></div><div class="sx-row col"><div class="sx-rt"><span class="mono lav"><span class="gl g-git-fork" aria-hidden="true"></span></span><span class="tx"><b>更新通道</b><span>{{chNote}}</span></span></div><div class="pick" role="radiogroup" aria-label="更新通道"><button role="radio" class="{{ch.stable}}" aria-checked="{{chA.stable}}" onClick="{{chSet.stable}}">稳定版</button><button role="radio" class="{{ch.beta}}" aria-checked="{{chA.beta}}" onClick="{{chSet.beta}}">测试版</button></div></div></div></div></div></sc-if>
+      <sc-if value="{{is.proxy}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>本地代理</h2><p>用于绕过 VPN 的应用，以及家中的电视或游戏机</p></div><div class="sx-g "><div class="sx-card"><div class="sx-row "><span class="mono sky"><span class="gl g-server-connection" aria-hidden="true"></span></span><span class="tx"><b>本地代理</b><span>{{pxSub}}</span></span><button class="sw {{pxOnC}}" role="switch" aria-checked="{{pxOnA}}" onClick="{{pxTog}}" aria-label="本地代理"></button></div></div></div><div class="sx-uses {{pxOffShow}}"><div class="us"><span class="mono lav"><span class="gl g-app-window" aria-hidden="true"></span></span><b>绕过 VPN 的应用</b><span>部分游戏和启动器会绕过网络适配器</span></div><div class="us"><span class="mono sky"><span class="gl g-modern-tv" aria-hidden="true"></span></span><b>电视和游戏机</b><span>在电视上设置代理即可使用您的订阅</span></div><div class="us"><span class="mono mint"><span class="gl g-computer" aria-hidden="true"></span></span><b>家中的其他电脑</b><span>无需在它们上安装任何软件</span></div></div><div class="sx-stack {{pxOnShow}}"><div class="sx-g"><p class="sx-gt">地址</p><div class="sx-card"><div class="sx-row ad"><span class="mono neu"><span class="gl g-server-connection" aria-hidden="true"></span></span><span class="tx"><b>SOCKS5</b><span class="mo">{{pxHost}}:1080</span></span><button class="lsb"><span class="gl g-copy" aria-hidden="true"></span>复制</button></div><div class="sx-row ad"><span class="mono neu"><span class="gl g-globe" aria-hidden="true"></span></span><span class="tx"><b>HTTP</b><span class="mo">{{pxHost}}:8080</span></span><button class="lsb"><span class="gl g-copy" aria-hidden="true"></span>复制</button></div><div class="sx-row"><span class="mono sand"><span class="gl g-wifi" aria-hidden="true"></span></span><span class="tx"><b>允许我的网络中的设备</b><span>{{lanSub}}</span></span><button class="sw {{pxLanC}}" role="switch" aria-checked="{{pxLanA}}" onClick="{{pxLanTog}}" aria-label="允许我的网络中的设备"></button></div></div></div><div class="sx-g"><p class="sx-gt">登录信息</p><div class="sx-card"><div class="sx-row ad"><span class="mono neu"><span class="gl g-user" aria-hidden="true"></span></span><span class="tx"><b>用户名</b><span class="mo">mistgate</span></span><button class="lsb"><span class="gl g-copy" aria-hidden="true"></span>复制</button></div><div class="sx-row ad"><span class="mono neu"><span class="gl g-key" aria-hidden="true"></span></span><span class="tx"><b>密码</b><span class="mo">{{pwd}}</span></span><button class="lsb ico" onClick="{{pwdTog}}" aria-label="Show password"><span class="gl g-eye" aria-hidden="true"></span></button><button class="lsb"><span class="gl g-copy" aria-hidden="true"></span>复制</button><button class="lsb"><span class="gl g-refresh" aria-hidden="true"></span>新</button></div></div></div></div></div></sc-if>
+      <sc-if value="{{is.about}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-ab rise"><img src="{{logo}}" alt="" width="64" height="64"><b>Mistgate</b><span>版本 {{ver}} · 稳定版</span><span class="m">服务 {{ver}} · Windows 11 24H2</span><button class="lsb {{verCls}}" onClick="{{copyVer}}"><span class="gl g-copy" aria-hidden="true"></span><span>{{verBtn}}</span></button></div><div class="sx-g "><div class="sx-card"><div class="sx-row "><span class="mono mint"><span class="gl g-cpu" aria-hidden="true"></span></span><span class="tx"><b>后台服务</b><span><i class="dot ok"></i>运行中 · 3 小时前启动</span></span><button class="lsb"><span class="gl g-restart" aria-hidden="true"></span>重启</button></div><div class="sx-row "><span class="mono lav"><span class="gl g-code-brackets" aria-hidden="true"></span></span><span class="tx"><b>源代码</b><span>基于 MIT 许可证开源</span></span><a class="lsb" href="https://example.com" target="_blank" rel="noopener">打开<svg class="i ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></a></div><div class="sx-row "><span class="mono neu"><span class="gl g-page-star" aria-hidden="true"></span></span><span class="tx"><b>许可证</b><span>Mistgate 使用的组件</span></span><a class="lsb" href="https://example.com" target="_blank" rel="noopener">打开<svg class="i ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></a></div><div class="sx-row "><span class="mono sky"><span class="gl g-privacy-policy" aria-hidden="true"></span></span><span class="tx"><b>隐私</b><span>Mistgate 存储和发送的内容</span></span><a class="lsb" href="https://example.com" target="_blank" rel="noopener">打开<svg class="i ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></a></div></div></div><p class="sx-foot c"><span class="gl g-info-circle" aria-hidden="true"></span>服务器由“{{S.name}}”运营，而非 Mistgate</p></div></sc-if>
+      </section>
+    </main>
+  </div>
+  <sc-if value="{{ksAsk}}" hint-placeholder-val="{{false}}">
+    <div class="scrim" onClick="{{ksNo}}"></div>
+    <div class="sheet conf" role="alertdialog" aria-label="Turn on Always mode">
+      <span class="cf-ic"><span class="gl g-lock" aria-hidden="true"></span></span>
+      <b class="cf-t">没有 VPN 就断网？</b>
+      <p class="cf-p">在“始终”模式下，未连接 VPN 时这台电脑上的任何程序都无法联网，重启后或 Mistgate 关闭时也一样。</p>
+      <p class="cf-n"><span class="gl g-info-circle" aria-hidden="true"></span><span>如需在不使用 VPN 时恢复网络，请打开 Mistgate 并点击“解除阻断”。</span></p>
+      <div class="cf-a"><button class="lsb" onClick="{{ksNo}}">取消</button><button class="addb" onClick="{{ksYes}}">开启</button></div>
+    </div>
+  </sc-if>
+</div>
+  <div lang="en" class="dev dtop" role="toolbar" aria-label="Subscription states">
+    <div class="dg"><span class="dl">Subscription</span><div class="ds"><button class="{{dv.sb_ok}}" onClick="{{dvSet.sb_ok}}">Normal</button><button class="{{dv.sb_warn}}" onClick="{{dvSet.sb_warn}}">Ends soon</button><button class="{{dv.sb_limit}}" onClick="{{dvSet.sb_limit}}">5 of 5</button><button class="{{dv.sb_removed}}" onClick="{{dvSet.sb_removed}}">Removed</button><button class="{{dv.sb_offline}}" onClick="{{dvSet.sb_offline}}">Panel offline</button><button class="{{dv.sb_old}}" onClick="{{dvSet.sb_old}}">Old panel</button><button class="{{dv.sb_news}}" onClick="{{dvSet.sb_news}}">Message</button><button class="{{dv.sb_basic}}" onClick="{{dvSet.sb_basic}}">Link</button></div></div>
+  </div>
+  <div lang="en" class="dev" role="toolbar" aria-label="Other states">
+    <div class="dg"><span class="dl">Update</span><div class="ds"><button class="{{dv.up_latest}}" onClick="{{dvSet.up_latest}}">Latest</button><button class="{{dv.up_checking}}" onClick="{{dvSet.up_checking}}">Checking</button><button class="{{dv.up_available}}" onClick="{{dvSet.up_available}}">New</button><button class="{{dv.up_downloading}}" onClick="{{dvSet.up_downloading}}">Loading</button><button class="{{dv.up_ready}}" onClick="{{dvSet.up_ready}}">Ready</button><button class="{{dv.up_failed}}" onClick="{{dvSet.up_failed}}">Failed</button><button class="{{dv.up_badsig}}" onClick="{{dvSet.up_badsig}}">Bad file</button></div></div>
+    <div class="dg"><span class="dl">Proxy</span><div class="ds"><button class="{{dv.px_off}}" onClick="{{dvSet.px_off}}">Off</button><button class="{{dv.px_on}}" onClick="{{dvSet.px_on}}">On</button><button class="{{dv.px_lan}}" onClick="{{dvSet.px_lan}}">Network</button></div></div>
+    <div class="dg"><span class="dl">Theme</span><div class="ds"><button class="{{dv.th_dark}}" onClick="{{dvSet.th_dark}}">Dark</button><button class="{{dv.th_light}}" onClick="{{dvSet.th_light}}">Light</button></div></div>
+  </div>
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"section":{"editor":"enum","options":["conn","exc","sub","priv","look","notif","upd","proxy","about"],"default":"conn","section":"State"},"sub":{"editor":"enum","options":["ok","warn","limit","removed","offline","old","news","basic"],"default":"ok","section":"State"},"update":{"editor":"enum","options":["latest","checking","available","downloading","ready","failed","badsig"],"default":"latest","section":"State"},"proxy":{"editor":"enum","options":["off","on","lan"],"default":"off","section":"State"},"acc":{"editor":"enum","options":["panel","mint","lavender","sky","sand","rose","sage","custom"],"default":"panel","section":"Look"},"lang":{"editor":"enum","options":["closed","open"],"default":"closed","section":"State"},"confirm":{"editor":"enum","options":["none","ks"],"default":"none","section":"State"},"rename":{"editor":"enum","options":["no","yes"],"default":"no","section":"State"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"accent":{"editor":"enum","options":["lavender","mint","sand","rose"],"default":"lavender","section":"Look"},"$preview":{"width":1160,"height":800}}'>
+class Component extends DCLogic {
+  st() { return this.state || {}; }
+  runUpd(from) {
+    clearTimeout(this.ut);
+    if (from === 'check') {
+      this.setState({ up: 'checking', sec: 'upd' });
+      this.ut = setTimeout(() => this.setState({ up: 'available' }), 1400);
+      return;
+    }
+    let p = 8;
+    this.setState({ up: 'downloading', upP: p });
+    const tick = () => {
+      if (this.st().up !== 'downloading') return;
+      p += 11 + Math.round(Math.random() * 9);
+      if (p >= 100) { this.setState({ up: 'ready', upP: 100 }); return; }
+      this.setState({ upP: p });
+      this.ut = setTimeout(tick, 380);
+    };
+    this.ut = setTimeout(tick, 380);
+  }
+  renderVals() {
+    const logos = { lavender: '/_blob/0b62512895ad639ab01894d9cfc68db6', mint: '/_blob/7e2cbe098a3f586b63d3e07c56f17a01', sand: '/_blob/12736226f7d078aa98183de30675f863', rose: '/_blob/766bb9e952957b786b037a8ba7882911' };
+    const s0 = this.st(), pr = this.props;
+    const thSel = s0.thSel || ((pr.theme === 'light') ? 'light' : 'dark');
+    const theme = thSel === 'light' ? 'light' : 'dark';
+    const accent = logos[pr.accent] ? pr.accent : 'lavender';
+    let sec = s0.sec || pr.section || 'conn';
+    const sb = s0.sb || pr.sub || 'ok';
+    const up = s0.up || pr.update || 'latest';
+    const px = s0.px || pr.proxy || 'off';
+    const basic = sb === 'basic';
+    // статус VPN в шапке: виден на всех экранах, кроме Главной
+    const vp = s0.vp || (this.props.vpn === 'off' ? 'off' : 'on');
+    const tbs = { c: 'v-' + vp, t: vp === 'on' ? '已连接' : (vp === 'ing' ? '正在连接…' : 'VPN 已关闭'), m: vp === 'on' ? '德国' : '', mc: vp === 'on' ? '' : 'hide', a: vp === 'off' ? '连接 VPN' : '断开 VPN',
+      go: () => { clearTimeout(this.vt); if (vp === 'off') { this.setState({ vp: 'ing' }); this.vt = setTimeout(() => this.setState({ vp: 'on' }), 1300); } else this.setState({ vp: 'off' }); } };
+
+    const ON = Object.assign({ wl: false, auto: true, game: false, lan: true, nt: true, n0: true, n1: true, n2: true, n3: true, n4: false, min: true, tray: true, au: true, rep: false }, s0.on || {});
+    const T = {}, A = {}, tg = {};
+    Object.keys(ON).forEach((k) => { T[k] = ON[k] ? 'on' : ''; A[k] = ON[k] ? 'true' : 'false'; tg[k] = () => this.setState({ on: Object.assign({}, ON, { [k]: !ON[k] }) }); });
+    const mkPick = (name, val, opts, set) => {
+      const c = {}, a = {}, f = {};
+      opts.forEach((o) => { c[o] = o === val ? 'on' : ''; a[o] = o === val ? 'true' : 'false'; f[o] = () => set(o); });
+      return [c, a, f];
+    };
+    const ksV = s0.ks || 'while', prV = s0.pr || '自动', chV = s0.ch || 'stable';
+    // «Always» включается только после подтверждения: без VPN интернета не будет даже после перезагрузки
+    const ksAsk = s0.ksAsk !== undefined ? s0.ksAsk : pr.confirm === 'ks';
+    const [ks, ksA, ksSet] = mkPick('ks', ksV, ['off', 'while', 'always'], (o) => (o === 'always' && ksV !== 'always' ? this.setState({ ksAsk: true }) : this.setState({ ks: o, ksAsk: false })));
+    const [prk, prA, prSet] = mkPick('pr', prV, ['自动', 'h2', 'awg', 'vless', 'tt'], (o) => this.setState({ pr: o }));
+    const [ch, chA, chSet] = mkPick('ch', chV, ['stable', 'beta'], (o) => this.setState({ ch: o }));
+    const KSN = { off: '关闭 — 如果 VPN 断开，应用会不经 VPN 联网', while: '如果 VPN 断开，恢复之前这台电脑不会有任何流量外发', always: '除非 VPN 已开启，否则完全无法上网，重启后也一样' };
+    const PRN = { auto: 'Mistgate 会尝试每种方式，并保留在您网络中可用的那一种', h2: '仅使用 Hysteria2。如果被封锁，Mistgate 不会自动切换', awg: '仅使用 AmneziaWG。如果被封锁，Mistgate 不会自动切换', vless: '仅使用 VLESS。如果被封锁，Mistgate 不会自动切换', tt: '仅使用 TrustTunnel。如果被封锁，Mistgate 不会自动切换' };
+    const EX0 = [['192.168.1.50', '家用 NAS'], ['10.0.0.0/8', '工作网络'], ['office.example.com', '办公门户']];
+    const gone = s0.exGone || [];
+    const excList = EX0.filter((e) => gone.indexOf(e[0]) < 0).map((e) => ({ a: e[0], n: e[1], rm: () => this.setState({ exGone: gone.concat([e[0]]) }) }));
+    const excSum = ksV === 'off' ? 'Kill Switch 已关闭 — 不会阻断任何流量' : ((ON.lan ? '本地网络' : '无本地项') + (excList.length ? ' 和 ' + excList.length + (excList.length === 1 ? ' 个地址' : ' 个地址') : ''));
+
+    // подписка
+    const SBX = {
+      ok: { e: '11月30日', eS: '剩余 24 天', eP: '80%', d: '64.8 GB', dS: '剩余 / 共 100 GB', dP: '65%', v: '2/5', vS: '3 个空位', vP: '40%' },
+      warn: { e: '11月8日', eS: '剩余 2 天', eP: '7%', eC: 'warn', d: '7.6 GB', dS: '剩余 / 共 100 GB', dP: '8%', dC: 'warn', v: '2/5', vS: '3 个空位', vP: '40%' },
+      limit: { e: '11月30日', eS: '剩余 24 天', eP: '80%', d: '64.8 GB', dS: '剩余 / 共 100 GB', dP: '65%', v: '5/5', vS: '没有空位', vP: '100%', vC: 'warn' },
+      removed: { e: '11月30日', eS: '剩余 24 天', eP: '80%', d: '64.8 GB', dS: '剩余 / 共 100 GB', dP: '65%', v: '1/5', vS: '这台电脑不在列表中', vP: '20%', vC: 'bad' },
+      basic: { e: '12月30日', eS: '来自链接', eP: '90%', d: '38 GB', dS: '剩余 / 共 50 GB', dP: '76%', v: '—', vS: '链接订阅不显示', vP: '0%', vC: 'na' } };
+    const sx = Object.assign({ eC: '', dC: '', vC: '' }, SBX[sb] || SBX.ok);
+    const S = Object.assign(sx, basic ? { name: '工作', ini: '工', logoC: 'hide', iniC: '', srcT: '链接', srcCls: 'src-link', host: 'corp.example.net/sub', st: '有效', stC: 'ok', pageCls: 'hide' }
+      : { name: '我的订阅', ini: '', logoC: '', iniC: 'hide', srcT: 'Mistgate', srcCls: 'src-mg', host: 'vpn.example.com', st: sb === 'removed' ? '此电脑已被移除' : (sb === 'warn' ? '即将到期' : '有效'), stC: sb === 'removed' ? 'bad' : (sb === 'warn' ? 'warn' : 'ok'), pageCls: '' });
+    const BAN = {
+      warn: { c: 'warn', tone: 'sand', g: 'calendar', t: '2 天后到期，流量已用 92%', s: '请在订阅页面续订，以便 VPN 继续工作', b: '续订' },
+      limit: { c: 'info', tone: 'lav', g: 'laptop', t: '5 台设备名额已用完', s: '若要添加其他电脑或手机，请在订阅页面移除一台设备', b: '打开页面' },
+      removed: { c: 'bad', tone: 'rose', g: 'xmark-circle', t: '这台电脑已从订阅中移除', s: '它已在订阅页面被移除。重新添加之前 VPN 无法连接', b: '重新添加' },
+      offline: { c: 'warn', tone: 'sand', g: 'cloud-xmark', t: '无法连接服务商', s: 'Mistgate 正在使用已保存的副本。服务器和套餐信息可能已过期', b: '' },
+      old: { c: 'info', tone: 'neu', g: 'info-circle', t: '您服务商的面板版本较旧', s: '在服务商更新面板之前，发现封锁和管理员协助不可用。其他功能正常', b: '' },
+      news: { c: 'news', tone: 'lav', g: 'megaphone', t: '来自“我的订阅” · 今天', s: '11月14日 02:00–04:00 维护。德国的服务器可能会重启一次', b: '客服' } };
+    const bn = BAN[sb];
+    const B = bn ? Object.assign({}, bn, { show: '', bc: bn.b ? '' : 'hide', c: bn.c + ' bg-' + bn.g }) : { show: 'hide', c: '', tone: '', t: '', s: '', b: '', bc: 'hide' };
+    const DEVS = [['Lime-Desktop', 'Windows 11 · 当前在线', 'computer', 'lav', true], ['Pixel 8', 'Android · 2 小时前', 'smartphone-device', 'sky'], ['MacBook Air', 'macOS · 昨天', 'laptop', 'mint'], ['客厅电脑', 'Windows 10 · 5 天前', 'computer', 'sand'], ['iPhone 15', 'iOS · 3 周前', 'smartphone-device', 'rose']];
+    const renaming = s0.ren !== undefined ? s0.ren : pr.rename === 'yes';
+    const devs = DEVS.slice(renaming ? 1 : 0, sb === 'limit' ? 5 : 2).map((d) => ({ n: d[0], s: d[1], tone: d[3] + ' dv-' + d[2], meC: d[4] ? '' : 'hide', renC: d[4] && !renaming ? '' : 'hide' }));
+    const syncing = !!s0.syncing;
+    const syncT = sb === 'offline' ? '更新失败' : (syncing ? '正在更新…' : '4 分钟前更新');
+    const syncS = sb === 'offline' ? '正在使用 09:12 保存的副本' : (basic ? '每小时检查一次链接' : '每 10 分钟检查一次更改');
+
+    // уведомления
+    const TST = { n0: ['连接已断开', '30 秒无响应。Mistgate 重试期间，您的流量会被安全拦住。', 'rose'], n1: ['已切换到备用线路', '此网络封锁了 UDP，Mistgate 已将您切换到 VLESS · TCP。', 'sky'],
+      n2: ['订阅将在 3 天后到期', '“我的订阅”将于 11 月 9 日到期。续订后 VPN 才能继续使用。', 'sand'], n3: ['这台电脑已被移除', '这台电脑已不在“我的订阅”中，VPN 无法连接。', 'lav'], n4: ['Mistgate 已更新到 1.5.0', '新版本已安装并正在运行。', 'mint'] };
+    const npv = s0.npv || 'n1';
+    const npr = {}, nprC = {};
+    Object.keys(TST).forEach((k) => { npr[k] = () => this.setState({ npv: k }); nprC[k] = k === npv ? 'pv' : ''; });
+
+    // обновления
+    const ver = s0.updated ? '1.5.0' : '1.4.2';
+    const UP = {
+      latest: { c: 'latest', t: '已是最新版本', s: 'Mistgate ' + ver + ' · 今天 09:12 已检查', b: '检查更新', bc: 'lsb', b2: '', do: () => this.runUpd('check') },
+      checking: { c: 'checking', t: '正在检查更新…', s: 'Mistgate ' + ver, b: '正在检查…', bc: 'lsb dis', b2: '' },
+      available: { c: 'available', t: '1.5.0 版本可用', s: '14.2 MB · 11月5日发布', b: '下载并安装', bc: 'addb', b2: '', do: () => this.runUpd('dl') },
+      downloading: { c: 'downloading', t: '正在下载 1.5.0…', s: '', b: '取消', bc: 'lsb', b2: '', do: () => { clearTimeout(this.ut); this.setState({ up: 'available' }); } },
+      ready: { c: 'ready', t: '1.5.0 已可安装', s: '只需几秒钟。VPN 会自动重新连接', b: '立即重启', bc: 'addb', b2: '稍后', do: () => this.setState({ up: 'latest', updated: true }), do2: () => this.setState({ up: 'latest' }) },
+      failed: { c: 'failed', t: '更新失败', s: '下载中断。当前版本继续可用', b: '重试', bc: 'lsb', b2: '', do: () => this.runUpd('dl') },
+      badsig: { c: 'failed', t: '更新未通过校验', s: '文件签名不匹配，因此未安装任何内容。当前版本仍可正常使用', b: '重新下载', bc: 'lsb', b2: '', do: () => this.runUpd('dl') } };
+    const U = Object.assign({ do: () => {}, do2: () => {} }, UP[up]);
+    const upP = s0.upP !== undefined ? s0.upP : 62;
+    if (up === 'downloading') U.s = (14.2 * upP / 100).toFixed(1) + ' / 14.2 MB · 约剩 ' + Math.max(2, Math.round((100 - upP) / 4)) + ' 秒';
+    U.p = upP + '%'; U.barC = up === 'downloading' ? '' : 'hide'; U.newC = (up === 'available' || up === 'ready') ? '' : 'hide'; U.b2c = U.b2 ? '' : 'hide';
+
+    // прокси
+    const pxOn = px !== 'off', pxLan = px === 'lan';
+    const langs0 = [['en', 'English', '英语', 'ltr'], ['ru', 'Русский', '俄语', 'ltr'], ['zh', '中文', '中文', 'ltr'], ['fa', 'فارسی', '波斯语', 'rtl'], ['tr', 'Türkçe', '土耳其语', 'ltr']];
+    const lg = s0.lg || 'zh';
+    const langOpen = s0.lo !== undefined ? s0.lo : pr.lang === 'open';
+    const langs = langs0.map((l) => ({ n: l[1], e: l[0] === 'en' ? '' : l[2], dir: l[3], c: l[0] === lg ? 'on' : '', a: l[0] === lg ? 'true' : 'false', go: () => this.setState({ lg: l[0], lo: false }) }));
+
+    const NAV = [["conn", "network", "连接"], ["sub", "page-star", "订阅"], ["priv", "eye-closed", "隐私"], ["look", "half-moon", "外观"], ["notif", "bell", "通知"], ["upd", "cloud-download", "更新"], ["proxy", "server-connection", "本地代理"], ["about", "info-circle", "关于"]];
+    const subBad = { warn: 1, limit: 1, removed: 1, offline: 1 }[sb];
+    const navSec = sec === 'exc' ? 'conn' : sec;
+    const nav = NAV.map((n) => {
+      let b = '', bc = 'hide';
+      if (n[0] === 'sub' && subBad) { b = ''; bc = 'dot ' + (sb === 'removed' ? 'bad' : 'warn'); }
+      if (n[0] === 'upd' && (up === 'available' || up === 'ready')) { b = '新'; bc = 'new'; }
+      if (n[0] === 'proxy') { b = pxOn ? '开' : ''; bc = pxOn ? 'onb' : 'hide'; }
+      return { g: n[1], t: n[2], c: n[0] === navSec ? 'on' : '', cur: n[0] === navSec ? 'page' : 'false', b: b, bc: bc, go: () => this.setState({ sec: n[0], lo: false }) };
+    });
+    const is = {}; ['conn', 'exc', 'sub', 'priv', 'look', 'notif', 'upd', 'proxy', 'about'].forEach((k) => { is[k] = k === sec; });
+
+    // dev
+    const dv = {}, dvSet = {};
+    const dvOpt = (k, v, on, f) => { dv[k + '_' + v] = on ? 'on' : ''; dvSet[k + '_' + v] = f; };
+    ['ok', 'warn', 'limit', 'removed', 'offline', 'old', 'news', 'basic'].forEach((v) => dvOpt('sb', v, sb === v, () => this.setState({ sb: v, sec: 'sub' })));
+    ['latest', 'checking', 'available', 'downloading', 'ready', 'failed', 'badsig'].forEach((v) => dvOpt('up', v, up === v, () => { clearTimeout(this.ut); this.setState({ up: v, sec: 'upd', upP: 62 }); }));
+    ['off', 'on', 'lan'].forEach((v) => dvOpt('px', v, px === v, () => this.setState({ px: v, sec: 'proxy' })));
+    ['dark', 'light'].forEach((v) => dvOpt('th', v, theme === v, () => this.setState({ thSel: v })));
+    const [tm, tmA, tmSet] = mkPick('tm', theme, ['dark', 'light'], (o) => this.setState({ thSel: o }));
+    // акцент: по умолчанию — цвет из панели оператора; свой цвет хранится только на этом ПК
+    const PANEL = '#b8acf2';
+    const ACC = [['panel', '服务商配色', PANEL], ['mint', '薄荷', '#7dd3a0'], ['lavender', '薰衣草', '#b8acf2'], ['sky', '天蓝', '#8ec8ea'], ['sand', '沙色', '#dcc68c'], ['rose', '玫瑰', '#e6a6b0'], ['sage', '鼠尾草', '#b3cc8f']];
+    const DEMO = ['#ff8a5c', '#3b6cf6', '#2fbf9b', '#c2410c'];
+    const accSel = s0.acc || pr.acc || 'panel';
+    const hexOf = (k) => (k === 'custom' ? (s0.cHex || DEMO[0]) : (ACC.find((x) => x[0] === k) || ACC[0])[2]);
+    const accHex = hexOf(accSel);
+    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+    const lum = (h) => { const c = rgb(h).map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4))); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+    const inkOf = (h) => ((lum(h) + 0.05) / 0.05 >= 1.05 / (lum(h) + 0.05) ? '#0c0c0e' : '#ffffff');
+    const hueOf = (h) => { const [r, g, b] = rgb(h), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (!d) return 0; let x = mx === r ? ((g - b) / d) % 6 : (mx === g ? (b - r) / d + 2 : (r - g) / d + 4); x *= 60; return x < 0 ? x + 360 : x; };
+    const accs = ACC.map((x) => ({ t: x[1], hex: x[2], ck: inkOf(x[2]), c: (x[0] === accSel ? 'on' : '') + (x[0] === 'panel' ? ' pan' : ''), on: x[0] === accSel ? 'true' : 'false', go: () => this.setState({ acc: x[0] }) }));
+    const LOGO_BY = { '#b8acf2': 'lavender', '#7dd3a0': 'mint', '#dcc68c': 'sand', '#e6a6b0': 'rose' };
+    const logoKey = LOGO_BY[accHex];
+    U.logo = (up === 'failed' || up === 'badsig') ? logos.sand : ((up === 'ready' || up === 'available') ? logos.mint : logos[logoKey || 'lavender']);
+
+    const repOn = ON.rep && !basic && sb !== 'old';
+    return {
+      theme: theme, accent: accent, logo: logos[logoKey || 'lavender'], lgHue: logoKey ? '' : 'lg-hue', lh: Math.round(hueOf(accHex) - 249) + 'deg', accHex: accHex, inkHex: inkOf(accHex), ver: ver, nav: nav, is: is, secT: (NAV.find((n) => n[0] === navSec) || NAV[0])[2],
+      T: T, A: A, tg: tg, dv: dv, dvSet: dvSet,
+      ks: ks, ksA: ksA, ksSet: ksSet, pr: prk, prA: prA, prSet: prSet, ch: ch, chA: chA, chSet: chSet,
+      ksNote: KSN[ksV], prNote: PRN[prV], chNote: chV === 'beta' ? '提前约一周获得新功能。偶尔可能出现问题' : '经过测试的版本。推荐',
+      excSum: excSum, excCls: ksV === 'off' ? 'dim' : '', openExc: () => this.setState({ sec: 'exc' }), closeExc: () => this.setState({ sec: 'conn' }), excList: excList, excEmpty: excList.length ? 'hide' : '',
+      S: S, B: B, subDim: sb === 'removed' ? 'dim' : '', devs: devs, devGrp: (basic || sb === 'removed') ? 'hide' : '', basicGrp: basic ? '' : 'hide',
+      renaming: renaming && !basic && sb !== 'removed', renOpen: () => this.setState({ ren: true }), renClose: () => this.setState({ ren: false }),
+      syncT: syncT, syncS: syncS, syncCls: sb === 'offline' ? 'warn' : '', syncGrp: sb === 'removed' ? 'hide' : '', syncBtn: sb === 'offline' ? '重试' : (syncing ? '正在更新' : '立即更新'), syncBtnCls: syncing ? 'busy' : '',
+      syncNow: () => { this.setState({ syncing: true }); clearTimeout(this.syt); this.syt = setTimeout(() => this.setState({ syncing: false }), 1300); },
+      supCls: basic ? 'hide' : '', outT: basic ? '移除此订阅' : '在此电脑上退出', outS: basic ? '其服务器将从 Mistgate 中消失。之后可以再次添加链接' : '释放一个设备名额。若要恢复，需要再次使用链接', outB: basic ? '移除' : '退出',
+      repSub: basic ? '链接订阅不可用' : (sb === 'old' ? '您服务商的面板暂不支持此功能' : '匿名 · 发送给“我的订阅”'), repCls: (basic || sb === 'old') ? 'dis' : '', repLs: (basic || sb === 'old') ? 'hide' : '',
+      repLast: repOn ? '上次发送：今天 13:58 · 本周 4 次' : '这台电脑尚未发送任何内容',
+      logCls: s0.logCleared ? 'done' : '', logBtn: s0.logCleared ? '已清除' : '清除日志', clearLog: () => this.setState({ logCleared: true }),
+      tm: tm, tmA: tmA, tmSet: tmSet, accs: accs, hexTxt: accHex.slice(1), noteC: accSel === 'panel' ? 'hide' : '', accReset: () => this.setState({ acc: 'panel' }),
+      accCustom: () => { const i = (DEMO.indexOf(s0.cHex || '') + 1) % DEMO.length; this.setState({ acc: 'custom', cHex: accSel === 'custom' ? DEMO[i] : (s0.cHex || DEMO[0]) }); }, langOpen: langOpen, langX: langOpen ? 'true' : 'false', langTog: () => this.setState({ lo: !langOpen }), langs: langs, langT: langs0.find((l) => l[0] === lg)[1],
+      tst: { t: TST[npv][0], s: TST[npv][1], tone: TST[npv][2] }, npv: npv, npr: npr, nprC: nprC, ntDim: ON.nt ? '' : 'off',
+      U: U,
+      pxOnC: pxOn ? 'on' : '', pxOnA: pxOn ? 'true' : 'false', pxTog: () => this.setState({ px: pxOn ? 'off' : 'on' }), pxOffShow: pxOn ? 'hide' : '', pxOnShow: pxOn ? 'rise' : 'hide',
+      pxSub: pxOn ? (pxLan ? '开启 · 对您 Wi-Fi 中知道密码的设备开放' : '开启 · 仅这台电脑上的应用可用') : '关闭 · 这台电脑没有监听任何端口',
+      pxHost: pxLan ? '192.168.1.24' : '127.0.0.1', pxLanC: pxLan ? 'on' : '', pxLanA: pxLan ? 'true' : 'false', pxLanTog: () => this.setState({ px: pxLan ? 'on' : 'lan' }),
+      lanSub: pxLan ? '此 Wi-Fi 上知道密码的任何人都可以使用您的订阅' : '关闭 · 仅这台电脑', pwd: s0.pwdShow ? 'k7Rf-29qd-Xm4e' : '••••-••••-••••', pwdTog: () => this.setState({ pwdShow: !s0.pwdShow }),
+      tbs: tbs, rdDiag: '', rdSet: 'hide', ksAsk: ksAsk, ksNo: () => this.setState({ ksAsk: false }), ksYes: () => this.setState({ ks: 'always', ksAsk: false }),
+      verCls: s0.verCopied ? 'done' : '', verBtn: s0.verCopied ? '已复制' : '复制版本信息', copyVer: () => this.setState({ verCopied: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

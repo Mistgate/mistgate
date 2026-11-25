@@ -60,7 +60,7 @@ type assistantAuth interface {
 // local memory tools belong to AssistantService and every panel tool comes from registry.go at runtime.
 type AssistantServer struct {
 	e       *env
-	servers map[Profile]*sdk.Server
+	servers *ServerSet
 }
 
 // NewAssistant creates the in-process assistant MCP server using the same configuration as the HTTP MCP endpoint.
@@ -75,9 +75,9 @@ func NewAssistant(c Config) (*AssistantServer, error) {
 		c.Log = slog.Default()
 	}
 	e := &env{cfg: c, now: c.Now}
-	servers := make(map[Profile]*sdk.Server, len(profiles))
-	for _, p := range profiles {
-		servers[p] = e.newServer(p)
+	servers := c.Servers
+	if servers == nil {
+		servers = new(ServerSet)
 	}
 	return &AssistantServer{e: e, servers: servers}, nil
 }
@@ -85,7 +85,7 @@ func NewAssistant(c Config) (*AssistantServer, error) {
 // OpenAssistant starts an MCP SDK in-memory client/server session for one admin turn.
 func (s *AssistantServer) OpenAssistant(ctx context.Context, identity AssistantIdentity) (AssistantSession, error) {
 	profile := Profile(identity.Profile)
-	server := s.servers[profile]
+	server := s.servers.get(s.e, profile)
 	if identity.TokenID == "" || identity.AdminID == "" || server == nil || profile.rank() == 0 {
 		return nil, errors.New("mcp assistant: invalid identity")
 	}

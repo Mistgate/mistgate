@@ -151,7 +151,10 @@ func (stream *streamState) startHTTP3() error {
 	if !ok {
 		return errors.New("http3 response writer does not expose its request stream")
 	}
-	raw := streamer.HTTPStream()
+	raw, err := streamer.HTTPStream() // quic-go 0.65: fails if the header cannot be sent or a body was written
+	if err != nil {
+		return err
+	}
 	stream.useHTTP3(raw, func() {
 		code := quic.StreamErrorCode(http3.ErrCodeRequestCanceled)
 		raw.CancelRead(code)

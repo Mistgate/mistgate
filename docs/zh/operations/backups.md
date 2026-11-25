@@ -3,6 +3,8 @@ title: 面板加密备份
 description: 配置 Cloudflare R2 备份，将恢复私钥（identity）保存在离线位置，并将面板恢复到新的数据目录。
 ---
 
+![“从备份恢复”窗口：文件已检查，摘要与当前对照，正在恢复，面板已回来](../../images/readme/backups-dark-en.webp)
+
 Mistgate 可以将定时或按需创建的面板备份上传到 Cloudflare R2 存储桶。**备份默认关闭，只有所有者配置后才会启用**。每个归档文件都会在离开面板前使用 age 加密；Cloudflare 存储的是密文，而不是数据库内容。
 
 ## 开启备份前

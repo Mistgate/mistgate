@@ -208,6 +208,15 @@ func (s *Service) loadDevice(ctx context.Context, owner, deviceID string) (*devi
 // a FailedPrecondition whose message starts with a stable code: user_disabled, app_disabled, profile_not_in_group,
 // no_inbound, "agent too old", device_limit ("device_limit: 5/5"), subnet_full.
 func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platform, label string) (store.AccessAWGDevice, []DeviceConfig, error) {
+	return s.AddAWGDeviceRoute(ctx, by, userID, profileID, platform, label, "")
+}
+
+// AddAWGDeviceRoute is AddAWGDevice for a key with a route: "" (all through the VPN) or awg.RouteRUDirect (the Russian services
+// around the VPN). Whether the owner offers that route to people is the page's check (subs), not this one: the admin may issue it.
+func (s *Service) AddAWGDeviceRoute(ctx context.Context, by, userID, profileID, platform, label, route string) (store.AccessAWGDevice, []DeviceConfig, error) {
+	if route != "" && route != awg.RouteRUDirect {
+		return store.AccessAWGDevice{}, nil, invalid("route must be empty or %q", awg.RouteRUDirect)
+	}
 	platform, label, err := cleanDeviceInput(platform, label, true)
 	if err != nil {
 		return store.AccessAWGDevice{}, nil, err
@@ -266,6 +275,12 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 	if err != nil {
 		return store.AccessAWGDevice{}, nil, s.internal("profile network", err)
 	}
+	// Refused before the device exists: one with no config would only take a place in the limit.
+	if ok, err := s.deviceWayIn(ctx, ins, merged, gs, u); err != nil {
+		return store.AccessAWGDevice{}, nil, err
+	} else if !ok {
+		return store.AccessAWGDevice{}, nil, failed("no_inbound")
+	}
 	if label == "" {
 		existing, err := a.AWGDevices(ctx, u.ID)
 		if err != nil {
@@ -283,7 +298,7 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 	now := s.now()
 	_, err = a.AddAWGDevice(ctx, store.AWGDeviceAdd{
 		Device:    store.AccessDevice{ID: devID, UserID: u.ID, Platform: platform, Model: label},
-		ProfileID: p.ID, MaxIdx: maxIdx, Limit: u.DeviceLimit,
+		ProfileID: p.ID, MaxIdx: maxIdx, Limit: u.DeviceLimit, Route: route,
 	}, now, s.awgIssuer(proto, u.ID, devID, p.ID, merged))
 	var limit *store.AccessLimitError
 	switch {
@@ -300,7 +315,11 @@ func (s *Service) AddAWGDevice(ctx context.Context, by, userID, profileID, platf
 		return store.AccessAWGDevice{}, nil, s.internal("add device", err)
 	}
 	s.notify.StateChanged()
-	s.audit(ctx, by, "device_create", map[string]any{"user": u.ID, "device": devID, "profile": p.ID})
+	params := map[string]any{"user": u.ID, "device": devID, "profile": p.ID}
+	if route != "" {
+		params["route"] = route
+	}
+	s.audit(ctx, by, "device_create", params)
 	dev, err := a.AWGDevice(ctx, devID)
 	if err != nil {
 		return store.AccessAWGDevice{}, nil, s.internal("get device", err)
@@ -472,6 +491,25 @@ func viaLabel(country string) string {
 	return " · via entry"
 }
 
+// deviceWayIn reports whether a device of these inbounds would get a config: an inbound whose address is shown, or a hidden
+// one with an IPv6 entry or a usable relay (the paths renderDeviceConfigs gives).
+func (s *Service) deviceWayIn(ctx context.Context, ins []store.AccessInboundFull, merged json.RawMessage, gs store.AccessGroups, u store.AccessUser) (bool, error) {
+	if slices.ContainsFunc(ins, func(f store.AccessInboundFull) bool { return f.Inbound.DirectInSubscriptions }) {
+		return true, nil
+	}
+	links, err := s.st.RelayLinks(ctx, store.RelayFilter{})
+	if err != nil {
+		return false, s.internal("read relays for device configs", err)
+	}
+	relaysOf := s.subRelays(links, ins, gs, u, plugin.FormatURIList)
+	for _, f := range ins {
+		if spec, err := s.buildSpec(f, merged); err == nil && len(serverPaths(f.Node, spec, relaysOf[f.Inbound.ID])) > 1 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // renderDeviceConfigs renders the .conf and the vpn:// key of the device for each usable inbound of its profile.
 // markEpoch records the profile's current epoch on the credential (the user now holds current configs); recordDNS records
 // the DNS each config carries (the key now holds it), what "stale DNS" is measured against.
@@ -504,7 +542,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 	title, brand, lang := s.keyNaming(ctx)
 	public, names, files := keyNames(title, brand, lang, nodes)
 	var out []DeviceConfig
-	pathAdded := false
+	pathAdded, hidden := false, false
 	fileUsed := map[string]bool{}
 	for _, name := range files {
 		fileUsed[name] = true
@@ -534,6 +572,7 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			DNS: servers, NodeAddr: f.Node.Address, DisplayName: names[i],
 			// Same rule as the subscription: no IPv6 address of the tunnel where the exit gives the client no IPv6.
 			NoIPv6Egress: !ipv6Egress(f.Node, egressOf(sc.merged)),
+			RUDirect:     sc.dev.Route == awg.RouteRUDirect,
 		}
 		in.Format = plugin.FormatAWGConf
 		conf, ok1 := sc.proto.Render(in)
@@ -544,12 +583,17 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			continue
 		}
 		held[f.Node.ID] = dnsSig(servers)
-		out = append(out, DeviceConfig{
-			InboundID: f.Inbound.ID, NodeID: f.Node.ID, NodeName: f.Node.Name, CountryCode: f.Node.CountryCode, Server: public[i],
-			ProfileName: f.Profile.Name, AWGVersion: version, Conf: string(conf.Data), VPNKey: string(key.Data),
-			ConfFilename: files[i], Stale: sc.dev.Stale(),
-			MinClients: reqs, Warnings: warnings,
-		})
+		// Same rule as the subscription: an inbound whose address is hidden gives only its other paths (IPv6 entry, relays).
+		if f.Inbound.DirectInSubscriptions {
+			out = append(out, DeviceConfig{
+				InboundID: f.Inbound.ID, NodeID: f.Node.ID, NodeName: f.Node.Name, CountryCode: f.Node.CountryCode, Server: public[i],
+				ProfileName: f.Profile.Name, AWGVersion: version, Conf: string(conf.Data), VPNKey: string(key.Data),
+				ConfFilename: files[i], Stale: sc.dev.Stale(),
+				MinClients: reqs, Warnings: warnings,
+			})
+		} else {
+			hidden = true
+		}
 		if maxIdxErr != nil {
 			continue
 		}
@@ -623,8 +667,14 @@ func (s *Service) renderDeviceConfigs(ctx context.Context, sc *deviceScope, mark
 			out = append(out, cfg)
 		}
 	}
+	if len(out) == 0 && hidden {
+		return nil, failed("no_inbound") // every address is hidden and no IPv6 entry or relay is usable
+	}
 	if len(out) == 0 {
 		return nil, s.internal("render device config", errors.New("no inbound produced a config"))
+	}
+	if sc.dev.Route == awg.RouteRUDirect {
+		held[ruSigKey] = awg.RUDirectVersion // the version of the list this key holds, measured by markDNSStale
 	}
 	if markEpoch || recordDNS {
 		var epoch *int64

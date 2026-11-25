@@ -40,7 +40,7 @@ func TestSharedAccessScannersHandleNullColumns(t *testing.T) {
 
 	awgRow := []any{
 		"dev_null", "usr_null", nil, nil, nil, nil, nil, nil,
-		"prf_null", nil, nil, "crd_null", nil, nil, nil, nil, nil, nil, nil,
+		"prf_null", nil, nil, "crd_null", nil, nil, nil, nil, nil, nil, nil, nil,
 		"prf_null", nil, nil, nil, nil, nil, nil, nil,
 	}
 	device, profile, err := scanAWGDeviceWithProfile(batchRow(awgRow))
@@ -58,7 +58,7 @@ func TestSharedAccessScannersHandleNullColumns(t *testing.T) {
 	if !reflect.DeepEqual(profile, AccessProfile{ID: "prf_null"}) {
 		t.Fatalf("scanAWGDeviceWithProfile profile = %#v", profile)
 	}
-	deviceOnly, err := scanAWGDevice(batchRow(awgRow[:19]))
+	deviceOnly, err := scanAWGDevice(batchRow(awgRow[:20]))
 	if err != nil || !reflect.DeepEqual(deviceOnly, wantDevice) {
 		t.Fatalf("scanAWGDevice = %#v, %v; want %#v", deviceOnly, err, wantDevice)
 	}

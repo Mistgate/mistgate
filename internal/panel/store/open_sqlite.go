@@ -5,6 +5,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	_ "embed" // schemaSnapshotSQL
 	"errors"
 	"fmt"
 	"io/fs"
@@ -18,6 +19,14 @@ import (
 )
 
 const sqliteReaderPoolSize = 4
+
+// schemaSnapshotSQL builds the schema and the data of a new, fully migrated database in one transaction. The migration chain
+// is slow on an empty file (about 180 ADD COLUMN, each making SQLite read the whole schema again), the script is not.
+// Regenerate it with the command in its first lines whenever a migration is added; TestSchemaSnapshot fails until you do.
+// The chain stays: goose still runs after the snapshot, and brings a database the snapshot does not cover up to date.
+//
+//go:embed schema_snapshot.sql
+var schemaSnapshotSQL string
 
 // Open opens (creating if needed) the database at path and applies migrations. The
 // database file is created with mode 0600 (SQLite gives the -wal and -shm files the
@@ -121,7 +130,43 @@ func openDB(path string, maxConns int, readOnly bool) (*sql.DB, error) {
 	return db, nil
 }
 
+// applySnapshot builds a database that has no schema yet from the snapshot text and reports whether it did. The check and
+// the script share one BEGIN IMMEDIATE transaction, so of two processes opening the same new file one builds it and the
+// other finds it built.
+func (s *Store) applySnapshot(ctx context.Context, snapshot string) (bool, error) {
+	conn, err := s.W.Conn(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, `BEGIN IMMEDIATE`); err != nil {
+		return false, err
+	}
+	rollback := func() { _, _ = conn.ExecContext(context.WithoutCancel(ctx), `ROLLBACK`) }
+	var objects int
+	if err := conn.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master`).Scan(&objects); err != nil {
+		rollback()
+		return false, err
+	}
+	if objects > 0 {
+		rollback()
+		return false, nil
+	}
+	if _, err := conn.ExecContext(ctx, snapshot); err != nil {
+		rollback()
+		return false, fmt.Errorf("apply the schema snapshot: %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, `COMMIT`); err != nil {
+		rollback()
+		return false, fmt.Errorf("commit the schema snapshot: %w", err)
+	}
+	return true, nil
+}
+
 func (s *Store) migrate(ctx context.Context) error {
+	if _, err := s.applySnapshot(ctx, schemaSnapshotSQL); err != nil {
+		return err
+	}
 	sub, err := fs.Sub(migrationsFS, "migrations")
 	if err != nil {
 		return err

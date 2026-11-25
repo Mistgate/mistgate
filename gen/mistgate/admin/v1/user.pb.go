@@ -1746,8 +1746,10 @@ type Device struct {
 	// When the nodes last counted a connection of the device (a session they saw, or the newest hour with connections or online time
 	// in the connection counters); 0 = none counted. For a link device last_seen_unix is its last subscription fetch, not this.
 	LastOnlineUnix int64 `protobuf:"varint,25,opt,name=last_online_unix,json=lastOnlineUnix,proto3" json:"last_online_unix,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// AmneziaWG key: "" = all through the VPN, "ru-direct" = the Russian services go around it (CreateAwgDeviceRequest.route).
+	AwgRoute      string `protobuf:"bytes,26,opt,name=awg_route,json=awgRoute,proto3" json:"awg_route,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -1946,6 +1948,13 @@ func (x *Device) GetLastOnlineUnix() int64 {
 		return x.LastOnlineUnix
 	}
 	return 0
+}
+
+func (x *Device) GetAwgRoute() string {
+	if x != nil {
+		return x.AwgRoute
+	}
+	return ""
 }
 
 type DayTraffic struct {
@@ -4293,7 +4302,7 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x125\n" +
 	"\x06counts\x18\x03 \x01(\v2\x1d.mistgate.admin.v1.UserCountsR\x06counts\")\n" +
 	"\x0eGetUserRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xb6\x06\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xd3\x06\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bplatform\x18\x02 \x01(\tR\bplatform\x12\x14\n" +
@@ -4322,7 +4331,8 @@ const file_mistgate_admin_v1_user_proto_rawDesc = "" +
 	"\x10enrol_link_stale\x18\x16 \x01(\bR\x0eenrolLinkStale\x12\x12\n" +
 	"\x04idle\x18\x17 \x01(\bR\x04idle\x12*\n" +
 	"\x0fidle_since_unix\x18\x18 \x01(\x03B\x020\x02R\ridleSinceUnix\x12,\n" +
-	"\x10last_online_unix\x18\x19 \x01(\x03B\x020\x02R\x0elastOnlineUnix\"E\n" +
+	"\x10last_online_unix\x18\x19 \x01(\x03B\x020\x02R\x0elastOnlineUnix\x12\x1b\n" +
+	"\tawg_route\x18\x1a \x01(\tR\bawgRoute\"E\n" +
 	"\n" +
 	"DayTraffic\x12\x1d\n" +
 	"\bday_unix\x18\x01 \x01(\x03B\x020\x02R\adayUnix\x12\x18\n" +

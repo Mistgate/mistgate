@@ -3,21 +3,23 @@ title: Telegram alerts
 description: Send the panel's alerts to Telegram. Set up the bot with BotFather, link your chat, what is sent and to whom, and use the panel watcher for outage alerts.
 ---
 
+![The Integrations page: the bot, the chat that waits for Start, then linked, and a test message sent](../../images/readme/telegram-dark-en.webp)
+
 The panel can write to your Telegram when something needs a human: a node goes down or comes back, a check fails, a backup fails, a new release is out, an agent's plan waits for your approval. It is **off until the owner sets a bot up**, and it only sends alerts: there are no commands, nothing to approve or change from the chat. An approval stays in the admin, behind a passkey or an authenticator code.
 
 ## Set up the bot (owner)
 
 1. In Telegram, open [@BotFather](https://t.me/BotFather), send `/newbot` and follow the questions. Give the bot a name and a username of your own; do not reuse a bot that another program reads.
 2. Copy the token BotFather sends (`123456789:AA…`).
-3. In the admin, open **Integrations → Telegram alerts**, paste the token under **Bot** and choose **Save bot**. The panel asks for a fresh sign-in confirmation, checks the token with Telegram (`getMe`) and shows the bot's `@username`.
+3. In the admin, open **Integrations**, paste the token into **Bot token** in the **Bot** row and choose **Save bot**. The panel asks for a fresh sign-in confirmation, checks the token with Telegram (`getMe`) and shows the bot's `@username`.
 
-The token is encrypted with the panel master key, like the other secrets, and is never returned by the API: the screen shows "Token is set" and the username only. **Replace token** sets another one; **Remove bot** forgets it. A different bot, or none, **unlinks every chat** (a chat belongs to a bot); the same bot pasted again keeps them. Saving and removing the bot are written to the [audit log](security.md) (`telegram_bot_set`, `telegram_bot_clear`) with the bot's username and never the token.
+The token is encrypted with the panel master key, like the other secrets, and is never returned by the API: the screen shows "Token is set" and the username only. **Replace token** sets another one; **Remove** (it asks first, and its button reads **Remove bot**) forgets it. A different bot, or none, **unlinks every chat** (a chat belongs to a bot); the same bot pasted again keeps them. Saving and removing the bot are written to the [audit log](security.md) (`telegram_bot_set`, `telegram_bot_clear`) with the bot's username and never the token.
 
 The panel never takes a webhook: it asks Telegram for new messages (long polling) only to hear the linking code below, so it works behind the decoy site with no inbound port. Telegram does not let a bot with a webhook be polled, so setting the bot **removes a webhook** left on it. Give the panel a bot that nothing else reads: if another program polls it, the card says so ("Another program reads this bot's messages").
 
 ## Link your chat (every admin)
 
-Each admin links their own chat; the owner does not link anyone else. Open **Integrations → Telegram alerts → Link my Telegram** (a helper or a read-only admin sees this part of the card too, once the owner has set a bot):
+Each admin links their own chat; the owner does not link anyone else. Open **Integrations** and press **Link chat** in the **Your chat** row (a helper or a read-only admin sees this part of the page too, once the owner has set a bot):
 
 1. The panel asks for a fresh sign-in confirmation and shows a one-time code and a button **Open in Telegram** (`https://t.me/<bot>?start=<code>`).
 2. In Telegram, press **Start**. If you prefer, send `/start <code>` to the bot yourself.
@@ -25,7 +27,7 @@ Each admin links their own chat; the owner does not link anyone else. Open **Int
 
 The code works **once** and for **10 minutes**; a new code replaces the old one. Only a private chat can be linked, not a group. A chat sending anything else to the bot gets no reply at all, so a stranger who finds the bot learns nothing from it. A chat belongs to one admin: linking it to another admin moves it.
 
-Once linked you can switch **Send me alerts** off without unlinking, **Send test** (one message to your chat, at most one every 10 seconds), or **Unlink**. Linking and unlinking are written to the audit log (`telegram_link`, `telegram_unlink`). The card also shows your **Chat ID**, which the panel watcher uses.
+Once linked you can set **Alerts** to **Off** without unlinking (the switch reads **Send me** while it is on), **Send test** (one message to your chat, at most one every 10 seconds), or **Unlink**. Linking and unlinking are written to the audit log (`telegram_link`, `telegram_unlink`). The card also shows your **Chat ID**, which the panel watcher uses.
 
 ## What is sent, and to whom
 

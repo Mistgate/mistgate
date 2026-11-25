@@ -2181,3 +2181,134 @@ func TestTrafficVolumeIsOnlyForTheNodeAlertsItNames(t *testing.T) {
 		}
 	}
 }
+
+// putPortCheck stores the latest UDP delivery check of a node port as of the test clock.
+func (e *env) putPortCheck(node string, port uint16, verdict, sender string) {
+	e.t.Helper()
+	got := uint32(150)
+	if verdict != "ok" {
+		got = 100
+	}
+	check := store.PortCheck{NodeID: node, Address: node + ".example.com", Port: port, Sent: 150, Got: got, Verdict: verdict, Sender: sender, CheckedAt: e.clock.Now()}
+	if err := e.st.PutPortChecks(e.ctx, []store.PortCheck{check}); err != nil {
+		e.t.Fatal(err)
+	}
+}
+
+// A UDP timeout is the panel's own path when a clean delivery check from another node reached the port after the series
+// of failures began; an older, lossy or panel-sent check says nothing, and the old diagnosis stays.
+func TestUDPTimeoutIsThePanelsPathWhenAnotherNodeReachesThePort(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		before       bool // the check is taken before the first failed round
+		verdict, who string
+		why          string
+		severity     int
+	}{
+		{"clean check from another node after the series began", false, "ok", "nl1", "panel_udp_path", sevWarning},
+		{"clean check older than the series", true, "ok", "nl1", "udp_blocked", sevCritical},
+		{"lossy check after the series began", false, "lossy", "nl1", "udp_blocked", sevCritical},
+		{"clean check sent by the panel", false, "ok", "panel", "udp_blocked", sevCritical},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			e.node("de1", "hetzner", true)
+			e.node("nl1", "ovh", true)
+			a, v := e.inbound("de1", 8443), e.vlessInbound("de1", 443) // a is the only hy2 inbound of the node
+			e.pass(a)
+			e.pass(v)
+			if tc.before {
+				e.putPortCheck("de1", 8443, tc.verdict, tc.who)
+			}
+			e.clock.Advance(time.Minute)
+			e.fail(a, "timeout")
+			if !tc.before {
+				e.putPortCheck("de1", 8443, tc.verdict, tc.who)
+			}
+			e.fail(a, "timeout")
+			// a lossy check also opens its own port_lossy alert; only check_failed is judged here
+			al, ok := e.active()["check_failed/de1/"+a]
+			if !ok || al.WhyKey != "health.alert.check_failed.why."+tc.why || al.Severity != tc.severity {
+				t.Fatalf("alert (found %v): why %s severity %d, want %s %d", ok, al.WhyKey, al.Severity, tc.why, tc.severity)
+			}
+		})
+	}
+}
+
+// Every UDP profile of a node timing out is no_traffic and udp_all_blocked until other nodes' clean checks reach all
+// of its ports: then it is one warning per profile about the panel's path, and the node is not "without traffic".
+func TestAllUDPTimeoutsWithCleanPortChecksAreThePanelsPath(t *testing.T) {
+	for _, bothClean := range []bool{true, false} {
+		e := newEnv(t)
+		e.node("de1", "hetzner", true)
+		e.node("nl1", "ovh", true)
+		a, b := e.inbound("de1", 443), e.inbound("de1", 8443)
+		e.fail(a, "timeout")
+		e.fail(b, "timeout")
+		e.putPortCheck("de1", 443, "ok", "nl1")
+		if bothClean {
+			e.putPortCheck("de1", 8443, "ok", "nl1")
+		} else {
+			e.putPortCheck("de1", 8443, "lossy", "nl1")
+		}
+		e.fail(a, "timeout")
+		e.fail(b, "timeout")
+		got := e.active()
+		if !bothClean {
+			if nt := got["no_traffic/de1/"]; nt.WhyKey != "health.alert.no_traffic.why.udp_all_blocked" || nt.Severity != sevCritical {
+				t.Fatalf("one port without a clean check: %+v", nt)
+			}
+			continue
+		}
+		want(t, got, "check_failed/de1/"+a, "check_failed/de1/"+b)
+		for _, in := range []string{a, b} {
+			if al := got["check_failed/de1/"+in]; al.WhyKey != "health.alert.check_failed.why.panel_udp_path" || al.Severity != sevWarning {
+				t.Fatalf("%s: %+v", in, al)
+			}
+		}
+		if noTraffic, _, _, _ := e.s.NodeHealth("de1"); noTraffic {
+			t.Fatal("node marked without traffic")
+		}
+	}
+}
+
+// A series of UDP timeouts without a fresh clean check asks for one delivery check of the node, at most once an hour.
+func TestUDPTimeoutsAskForOneDeliveryCheckAnHour(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "hetzner", true)
+	calls := make(chan string, 10)
+	e.s.cfg.CheckPortsUDP = func(_ context.Context, node string, _ []uint16) ([]store.PortCheck, string, string) {
+		calls <- node
+		return nil, "", ""
+	}
+	a := e.inbound("de1", 8443)
+	e.fail(a, "timeout")
+	select {
+	case node := <-calls:
+		t.Fatalf("asked for a check after one failed round: %s", node)
+	case <-time.After(50 * time.Millisecond):
+	}
+	e.fail(a, "timeout")
+	select {
+	case node := <-calls:
+		if node != "de1" {
+			t.Fatalf("check of %s", node)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no delivery check was asked for")
+	}
+	e.fail(a, "timeout")
+	e.fail(a, "timeout")
+	select {
+	case node := <-calls:
+		t.Fatalf("second check inside the hour: %s", node)
+	case <-time.After(100 * time.Millisecond):
+	}
+	e.clock.Advance(61 * time.Minute)
+	e.fail(a, "timeout")
+	select {
+	case <-calls:
+	case <-time.After(2 * time.Second):
+		t.Fatal("no delivery check an hour later")
+	}
+}

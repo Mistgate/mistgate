@@ -111,7 +111,7 @@ function copy(text: string, done?: () => void, message?: string, from?: HTMLElem
 }
 
 function download(filename: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  const url = URL.createObjectURL(new Blob([text], { type: "application/octet-stream" }));
   const link = h("a", { href: url, download: filename });
   document.body.append(link);
   link.click();

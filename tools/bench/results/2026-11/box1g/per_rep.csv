@@ -1,0 +1,101 @@
+panel,rep,metric,value
+3xui,1,"A: private memory, anon+kernel (MiB)",85.6043956043956
+mistgate,1,"A: private memory, anon+kernel (MiB)",108.79563015109889
+pasarguard,1,"A: private memory, anon+kernel (MiB)",316.64268313172045
+remnawave,1,"A: private memory, anon+kernel (MiB)",850.4151356456044
+3xui,1,A: anon only (MiB),83.03700206043956
+mistgate,1,A: anon only (MiB),106.85375171703296
+pasarguard,1,A: anon only (MiB),307.13352654569894
+remnawave,1,A: anon only (MiB),808.9329069368132
+3xui,1,"A: memory.current (MiB, with page cache)",92.97716346153847
+mistgate,1,"A: memory.current (MiB, with page cache)",115.58962912087912
+pasarguard,1,"A: memory.current (MiB, with page cache)",332.920656922043
+remnawave,1,"A: memory.current (MiB, with page cache)",876.8772750686813
+3xui,1,A: CPU of the box (% of 1 vCPU),0.49226996218196845
+mistgate,1,A: CPU of the box (% of 1 vCPU),0.18904219818426368
+pasarguard,1,A: CPU of the box (% of 1 vCPU),0.2882271671905608
+remnawave,1,A: CPU of the box (% of 1 vCPU),3.675952409213242
+3xui,1,A: processes,3
+mistgate,1,A: processes,2
+pasarguard,1,A: processes,3
+remnawave,1,A: processes,36
+3xui,1,A: containers,1
+mistgate,1,A: containers,1
+pasarguard,1,A: containers,2
+remnawave,1,A: containers,4
+3xui,1,Setup of 1000 users (s),19.234963417053223
+mistgate,1,Setup of 1000 users (s),54.57863974571228
+pasarguard,1,Setup of 1000 users (s),40.82302284240723
+remnawave,1,Setup of 1000 users (s),29.911524534225464
+3xui,1,C: anon+kernel (MiB),0
+mistgate,1,C: anon+kernel (MiB),0
+pasarguard,1,C: anon+kernel (MiB),0
+remnawave,1,C: anon+kernel (MiB),0
+3xui,1,D: tunnel streams dropped,512
+mistgate,1,D: tunnel streams dropped,0
+pasarguard,1,D: tunnel streams dropped,0
+remnawave,1,D: tunnel streams dropped,256
+3xui,1,D: tunnel reconnects,6
+mistgate,1,D: tunnel reconnects,0
+pasarguard,1,D: tunnel reconnects,0
+remnawave,1,D: tunnel reconnects,3
+3xui,1,"D: subscription storm (requests/s, all responses)",109.06625251327132
+mistgate,1,"D: subscription storm (requests/s, all responses)",299.9863149558058
+pasarguard,1,"D: subscription storm (requests/s, all responses)",55.05554900412561
+remnawave,1,"D: subscription storm (requests/s, all responses)",183.06390155720158
+3xui,1,D: subscription storm 200 responses/s,109.06625251327132
+mistgate,1,D: subscription storm 200 responses/s,299.9863149558058
+pasarguard,1,D: subscription storm 200 responses/s,55.05554900412561
+remnawave,1,D: subscription storm 200 responses/s,100.03809156169429
+3xui,1,"D: subscription p95 (ms, 200 only)",680.059
+mistgate,1,"D: subscription p95 (ms, 200 only)",8.298
+pasarguard,1,"D: subscription p95 (ms, 200 only)",1804.528
+remnawave,1,"D: subscription p95 (ms, 200 only)",404.219
+3xui,1,D: subscription non-200 (%),0
+mistgate,1,D: subscription non-200 (%),0
+pasarguard,1,D: subscription non-200 (%),0
+remnawave,1,D: subscription non-200 (%),45.35345815819641
+3xui,1,D: admin add-user p95 (ms),703.2666206359863
+mistgate,1,D: admin add-user p95 (ms),19.336700439453125
+pasarguard,1,D: admin add-user p95 (ms),2497.121810913086
+remnawave,1,D: admin add-user p95 (ms),309.83710289001465
+3xui,1,D: admin remove-user p95 (ms),1031.8629741668701
+mistgate,1,D: admin remove-user p95 (ms),1.6069412231445312
+pasarguard,1,D: admin remove-user p95 (ms),2089.416265487671
+remnawave,1,D: admin remove-user p95 (ms),98.97708892822266
+3xui,1,D: admin list call p95 (ms),323.60363006591797
+mistgate,1,D: admin list call p95 (ms),12.372970581054688
+pasarguard,1,D: admin list call p95 (ms),1751.2388229370117
+remnawave,1,D: admin list call p95 (ms),91.0499095916748
+3xui,1,D: admin API errors,0
+mistgate,1,D: admin API errors,0
+pasarguard,1,D: admin API errors,0
+remnawave,1,D: admin API errors,44
+3xui,1,D: box CPU (% of 1 vCPU),91.49436716884132
+mistgate,1,D: box CPU (% of 1 vCPU),98.77316226067497
+pasarguard,1,D: box CPU (% of 1 vCPU),97.94798342841334
+remnawave,1,D: box CPU (% of 1 vCPU),98.45285601648065
+3xui,1,D: anon+kernel (MiB),120.37503150201613
+mistgate,1,D: anon+kernel (MiB),134.8431263130252
+pasarguard,1,D: anon+kernel (MiB),352.55628255208336
+remnawave,1,D: anon+kernel (MiB),814.3135832457983
+3xui,1,E: admin HTTP answers again after (s),1.4925577640533447
+mistgate,1,E: admin HTTP answers again after (s),0.4155137538909912
+pasarguard,1,E: admin HTTP answers again after (s),7.326067209243774
+remnawave,1,E: admin HTTP answers again after (s),12.962661743164062
+3xui,1,E: admin API answers again after (s),1.5448415279388428
+mistgate,1,E: admin API answers again after (s),0.4834616184234619
+pasarguard,1,E: admin API answers again after (s),7.664236545562744
+remnawave,1,E: admin API answers again after (s),13.060115575790405
+3xui,1,E: seconds with zero tunnel traffic (of 60),2
+mistgate,1,E: seconds with zero tunnel traffic (of 60),0
+pasarguard,1,E: seconds with zero tunnel traffic (of 60),5
+remnawave,1,E: seconds with zero tunnel traffic (of 60),2
+3xui,1,E: streams dropped,128
+mistgate,1,E: streams dropped,0
+pasarguard,1,E: streams dropped,128
+remnawave,1,E: streams dropped,128
+3xui,1,E: tunnel reconnects,2
+mistgate,1,E: tunnel reconnects,0
+pasarguard,1,E: tunnel reconnects,1
+remnawave,1,E: tunnel reconnects,2

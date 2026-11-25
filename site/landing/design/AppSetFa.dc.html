@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="fa">
+<head>
+<meta charset="utf-8">
+<title>Mistgate · Settings</title>
+<script src="./support.js"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@500..700&amp;family=Vazirmatn:wght@400..800&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="cAfa" data-app><div dir="rtl" class="desk">
+<div class="mg app t-{{theme}} a-{{accent}} {{lgHue}}" style="--accent:{{accHex}};--ink:{{inkHex}};--lh:{{lh}}">
+
+  <nav class="rail" aria-label="Sections">
+    <img class="rlogo {{brLogoC}}" src="{{logo}}" alt="{{brAlt}}" width="32" height="32">
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2.2"/></svg><span class="rbl">خانه</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2.6"/><circle cx="18" cy="5" r="2.6"/><path d="M8.6 19H16.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h7.9"/></svg><span class="rbl">مسیرها</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6.5 5 13 2.5-6.5H21"/></svg><span class="rbl">عیب‌یابی</span><i class="rdot {{rdDiag}}" aria-hidden="true"></i></a>
+    <a class="rb on" href="#app" aria-current="page"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="rbl">تنظیمات</span><i class="rdot {{rdSet}}" aria-hidden="true"></i></a>
+    <a class="rb sub" href="https://vpn.example.com" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"/></svg><span class="rbl">صفحه اشتراک</span></a>
+  </nav>
+  <div class="content">
+    <header class="tb">
+    <sc-if value="{{bn.on}}" hint-placeholder-val="{{false}}">
+    <div class="bn {{bn.tone}}" role="status">
+      <a class="bn-m" href="{{bn.href}}"><span class="gl g-{{bn.icon}}" aria-hidden="true"></span><b>{{bn.t}}</b><span class="bn-s {{bn.sC}}">{{bn.s}}</span></a>
+      <sc-if value="{{bn.hasAct}}" hint-placeholder-val="{{false}}"><a class="bn-a" href="{{bn.href}}">{{bn.act}}</a></sc-if>
+      <button class="bn-x" onClick="{{bn.close}}" aria-label="پنهان کردن"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+    </div>
+    </sc-if>
+    <div class="tbs {{tbs.c}}">
+      <a class="tbs-s" href="#app" title="Open Home"><i class="tbs-d" aria-hidden="true"></i><span>{{tbs.t}}</span><span class="tbs-m {{tbs.mc}}">{{tbs.m}}</span></a>
+      <button class="tbs-p" onClick="{{tbs.go}}" aria-label="{{tbs.a}}" title="{{tbs.a}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg></button>
+    </div>
+    <div class="cap">
+      <button aria-label="Minimize to tray"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button aria-label="Maximize"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg></button>
+      <button aria-label="Close window"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    </header>
+    <main class="sxm">
+      <aside class="sx-l">
+        <h1 class="h1x">تنظیمات</h1>
+        <p class="rt-sub">Mistgate {{ver}}</p>
+        <nav class="sx-nav" aria-label="Settings sections">
+          <sc-for list="{{nav}}" as="n" hint-placeholder-count="8"><button class="sx-ni {{n.c}}" onClick="{{n.go}}" aria-current="{{n.cur}}"><span class="gl g-{{n.g}}" aria-hidden="true"></span><span class="t">{{n.t}}</span><span class="bd {{n.bc}}">{{n.b}}</span></button></sc-for>
+        </nav>
+      </aside>
+      <section class="sx-r" aria-label="{{secT}}">
+      <sc-if value="{{is.conn}}" hint-placeholder-val="{{true}}"><div class="sx-pg rise"><div class="sx-h"><h2>اتصال</h2><p>نحوه اتصال Mistgate و اینکه با قطع VPN چه می‌شود</p></div><div class="sx-g "><p class="sx-gt">کلید قطع اضطراری</p><div class="sx-card"><div class="sx-row col"><div class="sx-rt"><span class="mono rose"><span class="gl g-lock" aria-hidden="true"></span></span><span class="tx"><b>قطع اینترنت بدون VPN</b><span>{{ksNote}}</span></span></div><div class="pick" role="radiogroup" aria-label="قطع اینترنت بدون VPN"><button role="radio" class="{{ks.off}}" aria-checked="{{ksA.off}}" onClick="{{ksSet.off}}">خاموش</button><button role="radio" class="{{ks.while}}" aria-checked="{{ksA.while}}" onClick="{{ksSet.while}}">هنگام اتصال</button><button role="radio" class="{{ks.always}}" aria-checked="{{ksA.always}}" onClick="{{ksSet.always}}">همیشه</button></div></div><button class="sx-row lk {{excCls}}" onClick="{{openExc}}"><span class="mono sky"><span class="gl g-home-simple" aria-hidden="true"></span></span><span class="tx"><b>مجاز هنگام مسدودی</b><span>{{excSum}}</span></span><svg class="i chv" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div><div class="sx-g "><p class="sx-gt">شروع و اتصال</p><div class="sx-card"><div class="sx-row "><span class="mono lav"><span class="gl g-computer" aria-hidden="true"></span></span><span class="tx"><b>اتصال هنگام شروع ویندوز</b><span>‏Mistgate با ویندوز اجرا و به آخرین سرور وصل می‌شود</span></span><button class="sw {{T.auto}}" role="switch" aria-checked="{{A.auto}}" onClick="{{tg.auto}}" aria-label="اتصال هنگام شروع ویندوز"></button></div><div class="sx-row "><span class="mono mint"><span class="gl g-gamepad" aria-hidden="true"></span></span><span class="tx"><b>حالت بازی</b><span>ابتدا AmneziaWG امتحان می‌شود تا بازی‌ها UDP سریع و NAT باز داشته باشند</span></span><button class="sw {{T.game}}" role="switch" aria-checked="{{A.game}}" onClick="{{tg.game}}" aria-label="حالت بازی"></button></div><div class="sx-row "><span class="mono wl"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6a3 3 0 0 1 3 3v4a3 3 0 0 0 3 3h6"/><path d="m18 14 3 3-3 3"/></svg></span><span class="tx"><b>خودکار به کانال لیست سفید برو</b><span>وقتی سرورهای عادی پاسخ نمی‌دهند. این کانال پشتیبان است و ممکن است کندتر باشد؛ به‌طور پیش‌فرض خاموش است</span></span><button class="sw {{T.wl}}" role="switch" aria-checked="{{A.wl}}" onClick="{{tg.wl}}" aria-label="خودکار به کانال لیست سفید برو"></button></div><div class="sx-row col"><div class="sx-rt"><span class="mono sand"><span class="gl g-flash" aria-hidden="true"></span></span><span class="tx"><b>پروتکل</b><span>{{prNote}}</span></span></div><div class="pick" role="radiogroup" aria-label="پروتکل"><button role="radio" class="{{pr.auto}}" aria-checked="{{prA.auto}}" onClick="{{prSet.auto}}">خودکار</button><button role="radio" class="{{pr.h2}}" aria-checked="{{prA.h2}}" onClick="{{prSet.h2}}">Hysteria2</button><button role="radio" class="{{pr.awg}}" aria-checked="{{prA.awg}}" onClick="{{prSet.awg}}">AmneziaWG</button><button role="radio" class="{{pr.vless}}" aria-checked="{{prA.vless}}" onClick="{{prSet.vless}}">VLESS</button><button role="radio" class="{{pr.tt}}" aria-checked="{{prA.tt}}" onClick="{{prSet.tt}}">TrustTunnel</button></div></div></div></div></div></sc-if>
+      <sc-if value="{{is.exc}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><button class="sx-back" onClick="{{closeExc}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>اتصال</button><div class="sx-h"><h2>مجاز هنگام مسدودی</h2><p>این‌ها هنگام قطع اینترنت توسط کلید اضطراری هم کار می‌کنند. ترافیکشان مستقیم و بدون VPN است</p></div><div class="sx-g "><div class="sx-card"><div class="sx-row "><span class="mono sky"><span class="gl g-home-simple" aria-hidden="true"></span></span><span class="tx"><b>شبکه محلی</b><span>چاپگرها، تلویزیون، پوشه‌های اشتراکی و دیگر دستگاه‌های وای‌فای شما</span></span><button class="sw {{T.lan}}" role="switch" aria-checked="{{A.lan}}" onClick="{{tg.lan}}" aria-label="Allow local network"></button></div></div></div><div class="sx-g"><p class="sx-gt">نشانی‌ها</p><div class="sx-card"><div class="sx-add"><span class="sx-in"><span class="gl g-plus" aria-hidden="true"></span><input type="text" placeholder="‏IP، بازه یا دامنه — مثلاً 10.0.0.0/8" aria-label="Address to allow"></span><button class="addb sm">افزودن</button></div><sc-for list="{{excList}}" as="e" hint-placeholder-count="3"><div class="sx-row ad"><span class="mono neu"><span class="gl g-globe" aria-hidden="true"></span></span><span class="tx"><b class="mo">{{e.a}}</b><span>{{e.n}}</span></span><button class="icx" onClick="{{e.rm}}" aria-label="Remove {{e.a}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div></sc-for><p class="sx-empty {{excEmpty}}">هنوز نشانی‌ای نیست</p></div></div></div></sc-if>
+      <sc-if value="{{is.sub}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>اشتراک</h2><p>اشتراک فعال. جابه‌جایی بین اشتراک‌ها در صفحه خانه</p></div><div class="sx-ban {{B.c}} {{B.show}} rise"><span class="mono {{B.tone}}"><span class="gl b-megaphone g-megaphone" aria-hidden="true"></span><span class="gl b-laptop g-laptop" aria-hidden="true"></span><span class="gl b-xmark-circle g-xmark-circle" aria-hidden="true"></span><span class="gl b-cloud-xmark g-cloud-xmark" aria-hidden="true"></span><span class="gl b-info-circle g-info-circle" aria-hidden="true"></span><span class="gl b-calendar g-calendar" aria-hidden="true"></span></span><span class="tx"><b>{{B.t}}</b><span>{{B.s}}</span></span><button class="addb sm {{B.bc}}">{{B.b}}</button></div><div class="sx-sub {{subDim}}"><div class="sb-top"><img class="sb-logo {{S.logoC}}" src="{{logo}}" alt="" width="44" height="44"><span class="sb-ini {{S.iniC}}">{{S.ini}}</span><span class="tx"><b><span class="sbn">{{S.name}}</span><span class="srct {{S.srcCls}}">{{S.srcT}}</span></b><span><i class="dot {{S.stC}}"></i>{{S.st}} · {{S.host}}</span></span><span class="sb-act {{S.pageCls}}"><a class="lsb" href="https://vpn.example.com" target="_blank" rel="noopener"><span class="gl g-chat-bubble" aria-hidden="true"></span>پشتیبانی</a><a class="lsb" href="https://vpn.example.com" target="_blank" rel="noopener">صفحه اشتراک<svg class="i ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></a></span></div><div class="sb-stats"><div class="sb-st {{S.eC}}"><span class="k"><span class="gl g-calendar" aria-hidden="true"></span>پایان</span><b>{{S.e}}</b><span class="s">{{S.eS}}</span><i class="bar"><i style="width:{{S.eP}}"></i></i></div><div class="sb-st {{S.dC}}"><span class="k"><span class="gl g-data-transfer-both" aria-hidden="true"></span>حجم</span><b>{{S.d}}</b><span class="s">{{S.dS}}</span><i class="bar"><i style="width:{{S.dP}}"></i></i></div><div class="sb-st {{S.vC}}"><span class="k"><span class="gl g-laptop" aria-hidden="true"></span>دستگاه‌ها</span><b>{{S.v}}</b><span class="s">{{S.vS}}</span><i class="bar"><i style="width:{{S.vP}}"></i></i></div></div><div class="sb-sync {{syncCls}} {{syncGrp}}"><span class="gl g-cloud-sync" aria-hidden="true"></span><span class="tx"><b>{{syncT}}</b><span>{{syncS}}</span></span><button class="lsb {{syncBtnCls}}" onClick="{{syncNow}}"><span class="gl rf g-refresh" aria-hidden="true"></span><span>{{syncBtn}}</span></button></div></div><div class="sx-g {{devGrp}}"><p class="sx-gt">دستگاه‌های این اشتراک<span class="hn">حذف در صفحه اشتراک</span></p><div class="sx-card"><sc-if value="{{renaming}}" hint-placeholder-val="{{false}}"><div class="sx-ren rise"><div class="sx-add ren"><span class="sx-in"><span class="gl g-computer" aria-hidden="true"></span><input type="text" value="Lime-Desktop" aria-label="Name of this PC"></span><button class="lsb" onClick="{{renClose}}">لغو</button><button class="addb sm" onClick="{{renClose}}">ذخیره</button></div><p class="sx-note">ارائه‌دهنده این نام را در فهرست دستگاه‌ها می‌بیند</p></div></sc-if><sc-for list="{{devs}}" as="d" hint-placeholder-count="2"><div class="sx-row dv"><span class="mono {{d.tone}}"><span class="gl d-computer g-computer" aria-hidden="true"></span><span class="gl d-smartphone-device g-smartphone-device" aria-hidden="true"></span><span class="gl d-laptop g-laptop" aria-hidden="true"></span></span><span class="tx"><b><span class="dvn">{{d.n}}</span><span class="me {{d.meC}}">این رایانه</span></b><span>{{d.s}}</span></span><button class="lsb {{d.renC}}" onClick="{{renOpen}}"><span class="gl g-edit-pencil" aria-hidden="true"></span>تغییر نام</button></div></sc-for></div></div><div class="sx-g {{basicGrp}}"><div class="sx-card"><div class="sx-row"><span class="mono neu"><span class="gl g-link" aria-hidden="true"></span></span><span class="tx"><b>با لینک اضافه شده</b><span>دستگاه‌ها، یافتن مسدودی‌ها و کمک مدیر فقط با اشتراک Mistgate کار می‌کنند. از ارائه‌دهنده بخواهید</span></span></div></div></div><div class="sx-g "><div class="sx-card"><div class="sx-row "><span class="mono rose"><span class="gl g-log-out" aria-hidden="true"></span></span><span class="tx"><b>{{outT}}</b><span>{{outS}}</span></span><button class="lsb dang">{{outB}}</button></div></div></div></div></sc-if>
+      <sc-if value="{{is.priv}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>حریم خصوصی</h2><p>‏Mistgate چه چیزی را برای چه کسی می‌فرستد و چه چیزی در این رایانه می‌ماند</p></div><div class="sx-g"><p class="sx-gt">کمک به یافتن مسدودی‌ها</p><div class="sx-card"><div class="sx-row {{repCls}}"><span class="mono sand"><span class="gl g-shield-search" aria-hidden="true"></span></span><span class="tx"><b>کمک به یافتن مسدودی‌ها</b><span>{{repSub}}</span></span><button class="sw {{T.rep}}" role="switch" aria-checked="{{A.rep}}" onClick="{{tg.rep}}" aria-label="کمک به یافتن مسدودی‌ها"></button></div><div class="sx-ls {{repLs}}"><p class="ok"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg><span><b>ارسال می‌شود:</b> کدام سرورها و مسیرها کار می‌کنند، نوع شبکه و اپراتور، زمان</span></p><p class="no"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg><span><b>هرگز ارسال نمی‌شود:</b> سایت‌هایی که باز می‌کنید، IP شما، کلیدها، نام رایانه</span></p><p class="tm"><span class="gl g-clock" aria-hidden="true"></span><span>{{repLast}}</span></p></div><p class="sx-foot"><span class="gl g-info-circle" aria-hidden="true"></span>برای هر اشتراک جداگانه تنظیم می‌شود</p></div></div><div class="sx-g "><p class="sx-gt">کمک از مدیر</p><div class="sx-card"><div class="sx-row "><span class="mono lav"><span class="gl g-journal-page" aria-hidden="true"></span></span><span class="tx"><b>داده‌های عیب‌یابی، فقط وقتی کمک بخواهید</b><span>پیش از ارسال همه‌چیز را می‌بینید. فقط مدیر اشتراک شما آن را دریافت می‌کند — او هم می‌تواند درخواستش کند</span></span><a class="lsb" href="#app">عیب‌یابی<svg class="i chv" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a></div></div></div><div class="sx-g "><p class="sx-gt">در این رایانه</p><div class="sx-card"><div class="sx-row "><span class="mono neu"><span class="gl g-archive" aria-hidden="true"></span></span><span class="tx"><b>گزارش سرویس</b><span>24 ساعت اخیر؛ خودبه‌خود از این رایانه خارج نمی‌شود. کلیدها و نشانی‌ها حذف شده‌اند</span></span><button class="lsb {{logCls}}" onClick="{{clearLog}}"><span class="gl g-bin" aria-hidden="true"></span><span>{{logBtn}}</span></button></div></div></div></div></sc-if>
+      <sc-if value="{{is.look}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>ظاهر</h2><p>پوسته، رنگ اصلی، زبان و رفتار پنجره</p></div><div class="sx-g"><div class="sx-card"><div class="sx-row tmr"><span class="mono lav"><span class="gl g-half-moon" aria-hidden="true"></span></span><span class="tx"><b>پوسته</b></span><div class="pick" role="radiogroup" aria-label="پوسته"><button role="radio" class="{{tm.dark}}" aria-checked="{{tmA.dark}}" onClick="{{tmSet.dark}}">تیره</button><button role="radio" class="{{tm.light}}" aria-checked="{{tmA.light}}" onClick="{{tmSet.light}}">روشن</button></div></div><div class="sx-row col acc"><div class="sx-rt"><span class="mono rose"><span class="gl g-color-filter" aria-hidden="true"></span></span><span class="tx"><b>رنگ اصلی</b><span>دکمه‌ها، کلیدها و برجسته‌سازی‌ها. پیش‌فرض: رنگ انتخابی ارائه‌دهنده</span></span></div><div class="acs-row" role="radiogroup" aria-label="رنگ اصلی"><sc-for list="{{accs}}" as="a" hint-placeholder-count="7"><button class="acs {{a.c}}" role="radio" aria-checked="{{a.on}}" onClick="{{a.go}}" style="--c:{{a.hex}};--ck:{{a.ck}}"><span class="dc"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span><span class="an">{{a.t}}</span></button></sc-for></div><div class="acc-own"><span class="k">سفارشی</span><label class="hex"><span>#</span><input type="text" value="{{hexTxt}}" maxlength="6" spellcheck="false" aria-label="Custom accent color, hex"><button class="hx-sw" style="background:{{accHex}}" onClick="{{accCustom}}" aria-label="Pick a custom color"></button></label><span class="acc-note {{noteC}}">این رایانه رنگ خودش را دارد<i>·</i><button class="rst" onClick="{{accReset}}">رنگ ارائه‌دهنده</button></span></div></div></div></div><div class="sx-g"><p class="sx-gt">زبان</p><div class="sx-card"><div class="sx-row lng"><span class="mono sky"><span class="gl g-translate" aria-hidden="true"></span></span><span class="tx"><b>زبان</b><span>‏Mistgate و اعلان‌های آن</span></span><div class="sx-sel"><button class="lsb" aria-expanded="{{langX}}" onClick="{{langTog}}">{{langT}}<svg class="i chv" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><sc-if value="{{langOpen}}" hint-placeholder-val="{{false}}"><div class="sx-pop rise" role="listbox"><sc-for list="{{langs}}" as="l" hint-placeholder-count="5"><button role="option" class="{{l.c}}" aria-selected="{{l.a}}" onClick="{{l.go}}"><span class="nt" dir="{{l.dir}}">{{l.n}}</span><span class="en">{{l.e}}</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></button></sc-for></div></sc-if></div></div></div></div><div class="sx-g "><p class="sx-gt">پنجره</p><div class="sx-card"><div class="sx-row "><span class="mono lav"><span class="gl g-app-window" aria-hidden="true"></span></span><span class="tx"><b>شروع به‌صورت کوچک‌شده</b><span>با شروع ویندوز، Mistgate در سینی سیستم باز می‌شود</span></span><button class="sw {{T.min}}" role="switch" aria-checked="{{A.min}}" onClick="{{tg.min}}" aria-label="شروع به‌صورت کوچک‌شده"></button></div><div class="sx-row "><span class="mono neu"><span class="gl g-xmark" aria-hidden="true"></span></span><span class="tx"><b>ادامه کار پس از بستن پنجره</b><span>دکمه × برنامه را به سینی سیستم می‌برد. VPN روشن می‌ماند</span></span><button class="sw {{T.tray}}" role="switch" aria-checked="{{A.tray}}" onClick="{{tg.tray}}" aria-label="ادامه کار پس از بستن پنجره"></button></div></div></div></div></sc-if>
+      <sc-if value="{{is.notif}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>اعلان‌ها</h2><p>فقط وقتی چیزی به توجه شما نیاز دارد. با کلیک، صفحه مربوط باز می‌شود</p></div><div class="sx-toast-w"><span class="pvl">پیش‌نمایش</span><div class="ty-toast pv-{{npv}}" aria-hidden="true"><div class="to-h"><img src="{{logo}}" alt="" width="16" height="16"><span>Mistgate</span><i>اکنون</i></div><div class="to-b"><span class="mono {{tst.tone}}"><span class="gl pi pi-n0 g-wifi-off" aria-hidden="true"></span><span class="gl pi pi-n1 g-data-transfer-both" aria-hidden="true"></span><span class="gl pi pi-n2 g-calendar" aria-hidden="true"></span><span class="gl pi pi-n3 g-computer" aria-hidden="true"></span><span class="gl pi pi-n4 g-cloud-check" aria-hidden="true"></span></span><span class="tx"><b>{{tst.t}}</b><span>{{tst.s}}</span></span></div></div></div><div class="sx-g"><div class="sx-card"><div class="sx-row mst"><span class="mono lav"><span class="gl g-bell" aria-hidden="true"></span></span><span class="tx"><b>اعلان‌های ویندوز</b><span>در گوشه صفحه و مرکز اعلان‌ها</span></span><button class="sw {{T.nt}}" role="switch" aria-checked="{{A.nt}}" onClick="{{tg.nt}}" aria-label="اعلان‌های ویندوز"></button></div><div class="sx-nl {{ntDim}}"><div class="sx-row nr {{nprC.n0}}"><span class="mono rose"><span class="gl g-wifi-off" aria-hidden="true"></span></span><span class="tx"><b>قطع اتصال بیش از 30 ثانیه</b></span><button class="lsb ico pvb" onClick="{{npr.n0}}" aria-label="Preview: Connection lost for over 30 s" title="پیش‌نمایش"><span class="gl g-eye" aria-hidden="true"></span></button><button class="sw {{T.n0}}" role="switch" aria-checked="{{A.n0}}" onClick="{{tg.n0}}" aria-label="قطع اتصال بیش از 30 ثانیه"></button></div><div class="sx-row nr {{nprC.n1}}"><span class="mono sky"><span class="gl g-data-transfer-both" aria-hidden="true"></span></span><span class="tx"><b>به مسیر پشتیبان جابه‌جا شد</b></span><button class="lsb ico pvb" onClick="{{npr.n1}}" aria-label="Preview: Switched to a backup way" title="پیش‌نمایش"><span class="gl g-eye" aria-hidden="true"></span></button><button class="sw {{T.n1}}" role="switch" aria-checked="{{A.n1}}" onClick="{{tg.n1}}" aria-label="به مسیر پشتیبان جابه‌جا شد"></button></div><div class="sx-row nr {{nprC.n2}}"><span class="mono sand"><span class="gl g-calendar" aria-hidden="true"></span></span><span class="tx"><b>اشتراک 3 روز دیگر تمام می‌شود</b></span><button class="lsb ico pvb" onClick="{{npr.n2}}" aria-label="Preview: Subscription ends in 3 days" title="پیش‌نمایش"><span class="gl g-eye" aria-hidden="true"></span></button><button class="sw {{T.n2}}" role="switch" aria-checked="{{A.n2}}" onClick="{{tg.n2}}" aria-label="اشتراک 3 روز دیگر تمام می‌شود"></button></div><div class="sx-row nr {{nprC.n3}}"><span class="mono lav"><span class="gl g-computer" aria-hidden="true"></span></span><span class="tx"><b>این رایانه از اشتراک حذف شد</b></span><button class="lsb ico pvb" onClick="{{npr.n3}}" aria-label="Preview: This PC removed from subscription" title="پیش‌نمایش"><span class="gl g-eye" aria-hidden="true"></span></button><button class="sw {{T.n3}}" role="switch" aria-checked="{{A.n3}}" onClick="{{tg.n3}}" aria-label="این رایانه از اشتراک حذف شد"></button></div><div class="sx-row nr {{nprC.n4}}"><span class="mono mint"><span class="gl g-cloud-check" aria-hidden="true"></span></span><span class="tx"><b>به‌روزرسانی نصب شد</b></span><button class="lsb ico pvb" onClick="{{npr.n4}}" aria-label="Preview: Update installed" title="پیش‌نمایش"><span class="gl g-eye" aria-hidden="true"></span></button><button class="sw {{T.n4}}" role="switch" aria-checked="{{A.n4}}" onClick="{{tg.n4}}" aria-label="به‌روزرسانی نصب شد"></button></div></div></div></div></div></sc-if>
+      <sc-if value="{{is.upd}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>به‌روزرسانی‌ها</h2><p>نسخه‌های جدید امضا شده‌اند. Mistgate فقط نسخه‌های امضاشده توسعه‌دهندگان را نصب می‌کند</p></div><div class="sx-upd {{U.c}}"><div class="up-top"><span class="up-ic"><img src="{{U.logo}}" alt="" width="40" height="40"></span><span class="tx"><b>{{U.t}}</b><span>{{U.s}}</span></span><span class="up-act"><button class="lsb {{U.b2c}}" onClick="{{U.do2}}">{{U.b2}}</button><button class="{{U.bc}}" onClick="{{U.do}}"><span class="gl rf g-refresh" aria-hidden="true"></span>{{U.b}}</button></span></div><div class="up-bar {{U.barC}}"><i style="width:{{U.p}}"></i></div><div class="up-new {{U.newC}}"><p class="h">تازه‌های 1.5.0 <span class="need"><span class="gl g-server" aria-hidden="true"></span>برای 2 سرور شما لازم است</span></p><ul><li>با سرورهای پروتکل Mist ارائه‌دهنده کار می‌کند</li><li>جابه‌جایی سریع‌تر به مسیر پشتیبان در شبکه موبایل</li><li>کلید قطع اضطراری پس از به‌روزرسانی ویندوز هم کار می‌کند</li></ul></div></div><div class="sx-g "><div class="sx-card"><div class="sx-row "><span class="mono mint"><span class="gl g-cloud-download" aria-hidden="true"></span></span><span class="tx"><b>نصب خودکار به‌روزرسانی‌ها</b><span>در پس‌زمینه دانلود و هنگام راه‌اندازی دوباره نصب می‌شود</span></span><button class="sw {{T.au}}" role="switch" aria-checked="{{A.au}}" onClick="{{tg.au}}" aria-label="نصب خودکار به‌روزرسانی‌ها"></button></div><div class="sx-row col"><div class="sx-rt"><span class="mono lav"><span class="gl g-git-fork" aria-hidden="true"></span></span><span class="tx"><b>کانال به‌روزرسانی</b><span>{{chNote}}</span></span></div><div class="pick" role="radiogroup" aria-label="کانال به‌روزرسانی"><button role="radio" class="{{ch.stable}}" aria-checked="{{chA.stable}}" onClick="{{chSet.stable}}">پایدار</button><button role="radio" class="{{ch.beta}}" aria-checked="{{chA.beta}}" onClick="{{chSet.beta}}">بتا</button></div></div></div></div></div></sc-if>
+      <sc-if value="{{is.proxy}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-h"><h2>پروکسی محلی</h2><p>برای برنامه‌هایی که VPN را نادیده می‌گیرند و تلویزیون یا کنسول خانه</p></div><div class="sx-g "><div class="sx-card"><div class="sx-row "><span class="mono sky"><span class="gl g-server-connection" aria-hidden="true"></span></span><span class="tx"><b>پروکسی محلی</b><span>{{pxSub}}</span></span><button class="sw {{pxOnC}}" role="switch" aria-checked="{{pxOnA}}" onClick="{{pxTog}}" aria-label="پروکسی محلی"></button></div></div></div><div class="sx-uses {{pxOffShow}}"><div class="us"><span class="mono lav"><span class="gl g-app-window" aria-hidden="true"></span></span><b>برنامه‌هایی که VPN را دور می‌زنند</b><span>برخی بازی‌ها و لانچرها آداپتور شبکه را دور می‌زنند</span></div><div class="us"><span class="mono sky"><span class="gl g-modern-tv" aria-hidden="true"></span></span><b>تلویزیون و کنسول‌ها</b><span>پروکسی را روی تلویزیون تنظیم کنید تا از اشتراک شما استفاده کند</span></div><div class="us"><span class="mono mint"><span class="gl g-computer" aria-hidden="true"></span></span><b>رایانه‌های دیگر خانه</b><span>بدون نصب چیزی روی آن‌ها</span></div></div><div class="sx-stack {{pxOnShow}}"><div class="sx-g"><p class="sx-gt">نشانی‌ها</p><div class="sx-card"><div class="sx-row ad"><span class="mono neu"><span class="gl g-server-connection" aria-hidden="true"></span></span><span class="tx"><b>SOCKS5</b><span class="mo">{{pxHost}}:1080</span></span><button class="lsb"><span class="gl g-copy" aria-hidden="true"></span>کپی</button></div><div class="sx-row ad"><span class="mono neu"><span class="gl g-globe" aria-hidden="true"></span></span><span class="tx"><b>HTTP</b><span class="mo">{{pxHost}}:8080</span></span><button class="lsb"><span class="gl g-copy" aria-hidden="true"></span>کپی</button></div><div class="sx-row"><span class="mono sand"><span class="gl g-wifi" aria-hidden="true"></span></span><span class="tx"><b>اجازه به دستگاه‌های شبکه من</b><span>{{lanSub}}</span></span><button class="sw {{pxLanC}}" role="switch" aria-checked="{{pxLanA}}" onClick="{{pxLanTog}}" aria-label="اجازه به دستگاه‌های شبکه من"></button></div></div></div><div class="sx-g"><p class="sx-gt">ورود</p><div class="sx-card"><div class="sx-row ad"><span class="mono neu"><span class="gl g-user" aria-hidden="true"></span></span><span class="tx"><b>نام کاربری</b><span class="mo">mistgate</span></span><button class="lsb"><span class="gl g-copy" aria-hidden="true"></span>کپی</button></div><div class="sx-row ad"><span class="mono neu"><span class="gl g-key" aria-hidden="true"></span></span><span class="tx"><b>گذرواژه</b><span class="mo">{{pwd}}</span></span><button class="lsb ico" onClick="{{pwdTog}}" aria-label="Show password"><span class="gl g-eye" aria-hidden="true"></span></button><button class="lsb"><span class="gl g-copy" aria-hidden="true"></span>کپی</button><button class="lsb"><span class="gl g-refresh" aria-hidden="true"></span>جدید</button></div></div></div></div></div></sc-if>
+      <sc-if value="{{is.about}}" hint-placeholder-val="{{false}}"><div class="sx-pg rise"><div class="sx-ab rise"><img src="{{logo}}" alt="" width="64" height="64"><b>Mistgate</b><span>نسخه {{ver}} · پایدار</span><span class="m">سرویس {{ver}} · Windows 11 24H2</span><button class="lsb {{verCls}}" onClick="{{copyVer}}"><span class="gl g-copy" aria-hidden="true"></span><span>{{verBtn}}</span></button></div><div class="sx-g "><div class="sx-card"><div class="sx-row "><span class="mono mint"><span class="gl g-cpu" aria-hidden="true"></span></span><span class="tx"><b>سرویس پس‌زمینه</b><span><i class="dot ok"></i>در حال اجرا · 3 ساعت پیش شروع شد</span></span><button class="lsb"><span class="gl g-restart" aria-hidden="true"></span>راه‌اندازی دوباره</button></div><div class="sx-row "><span class="mono lav"><span class="gl g-code-brackets" aria-hidden="true"></span></span><span class="tx"><b>کد منبع</b><span>متن‌باز با مجوز MIT</span></span><a class="lsb" href="https://example.com" target="_blank" rel="noopener">بازکردن<svg class="i ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></a></div><div class="sx-row "><span class="mono neu"><span class="gl g-page-star" aria-hidden="true"></span></span><span class="tx"><b>مجوزها</b><span>اجزایی که Mistgate با آن‌ها ساخته شده</span></span><a class="lsb" href="https://example.com" target="_blank" rel="noopener">بازکردن<svg class="i ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></a></div><div class="sx-row "><span class="mono sky"><span class="gl g-privacy-policy" aria-hidden="true"></span></span><span class="tx"><b>حریم خصوصی</b><span>آنچه Mistgate نگه می‌دارد و می‌فرستد</span></span><a class="lsb" href="https://example.com" target="_blank" rel="noopener">بازکردن<svg class="i ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></a></div></div></div><p class="sx-foot c"><span class="gl g-info-circle" aria-hidden="true"></span>سرورها را «{{S.name}}» اداره می‌کند، نه Mistgate</p></div></sc-if>
+      </section>
+    </main>
+  </div>
+  <sc-if value="{{ksAsk}}" hint-placeholder-val="{{false}}">
+    <div class="scrim" onClick="{{ksNo}}"></div>
+    <div class="sheet conf" role="alertdialog" aria-label="Turn on Always mode">
+      <span class="cf-ic"><span class="gl g-lock" aria-hidden="true"></span></span>
+      <b class="cf-t">بدون VPN اینترنت قطع شود؟</b>
+      <p class="cf-p">در حالت «همیشه» تا VPN وصل نباشد هیچ‌چیز در این رایانه به اینترنت وصل نمی‌شود — حتی پس از راه‌اندازی دوباره یا بسته‌بودن Mistgate.</p>
+      <p class="cf-n"><span class="gl g-info-circle" aria-hidden="true"></span><span>برای برگرداندن اینترنت بدون VPN، Mistgate را باز کنید و «رفع مسدودی اینترنت» را بزنید.</span></p>
+      <div class="cf-a"><button class="lsb" onClick="{{ksNo}}">لغو</button><button class="addb" onClick="{{ksYes}}">روشن‌کردن</button></div>
+    </div>
+  </sc-if>
+</div>
+  <div lang="en" class="dev dtop" role="toolbar" aria-label="Subscription states">
+    <div class="dg"><span class="dl">Subscription</span><div class="ds"><button class="{{dv.sb_ok}}" onClick="{{dvSet.sb_ok}}">Normal</button><button class="{{dv.sb_warn}}" onClick="{{dvSet.sb_warn}}">Ends soon</button><button class="{{dv.sb_limit}}" onClick="{{dvSet.sb_limit}}">5 of 5</button><button class="{{dv.sb_removed}}" onClick="{{dvSet.sb_removed}}">Removed</button><button class="{{dv.sb_offline}}" onClick="{{dvSet.sb_offline}}">Panel offline</button><button class="{{dv.sb_old}}" onClick="{{dvSet.sb_old}}">Old panel</button><button class="{{dv.sb_news}}" onClick="{{dvSet.sb_news}}">Message</button><button class="{{dv.sb_basic}}" onClick="{{dvSet.sb_basic}}">Link</button></div></div>
+  </div>
+  <div lang="en" class="dev" role="toolbar" aria-label="Other states">
+    <div class="dg"><span class="dl">Update</span><div class="ds"><button class="{{dv.up_latest}}" onClick="{{dvSet.up_latest}}">Latest</button><button class="{{dv.up_checking}}" onClick="{{dvSet.up_checking}}">Checking</button><button class="{{dv.up_available}}" onClick="{{dvSet.up_available}}">New</button><button class="{{dv.up_downloading}}" onClick="{{dvSet.up_downloading}}">Loading</button><button class="{{dv.up_ready}}" onClick="{{dvSet.up_ready}}">Ready</button><button class="{{dv.up_failed}}" onClick="{{dvSet.up_failed}}">Failed</button><button class="{{dv.up_badsig}}" onClick="{{dvSet.up_badsig}}">Bad file</button></div></div>
+    <div class="dg"><span class="dl">Proxy</span><div class="ds"><button class="{{dv.px_off}}" onClick="{{dvSet.px_off}}">Off</button><button class="{{dv.px_on}}" onClick="{{dvSet.px_on}}">On</button><button class="{{dv.px_lan}}" onClick="{{dvSet.px_lan}}">Network</button></div></div>
+    <div class="dg"><span class="dl">Theme</span><div class="ds"><button class="{{dv.th_dark}}" onClick="{{dvSet.th_dark}}">Dark</button><button class="{{dv.th_light}}" onClick="{{dvSet.th_light}}">Light</button></div></div>
+  </div>
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"section":{"editor":"enum","options":["conn","exc","sub","priv","look","notif","upd","proxy","about"],"default":"conn","section":"State"},"sub":{"editor":"enum","options":["ok","warn","limit","removed","offline","old","news","basic"],"default":"ok","section":"State"},"update":{"editor":"enum","options":["latest","checking","available","downloading","ready","failed","badsig"],"default":"latest","section":"State"},"proxy":{"editor":"enum","options":["off","on","lan"],"default":"off","section":"State"},"acc":{"editor":"enum","options":["panel","mint","lavender","sky","sand","rose","sage","custom"],"default":"panel","section":"Look"},"lang":{"editor":"enum","options":["closed","open"],"default":"closed","section":"State"},"confirm":{"editor":"enum","options":["none","ks"],"default":"none","section":"State"},"rename":{"editor":"enum","options":["no","yes"],"default":"no","section":"State"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"accent":{"editor":"enum","options":["lavender","mint","sand","rose"],"default":"lavender","section":"Look"},"$preview":{"width":1160,"height":800}}'>
+class Component extends DCLogic {
+  faDigits() {
+    if (this.faMo || typeof document === 'undefined') return;
+    const root = document.querySelector('[dir=rtl]');
+    if (!root) return;
+    const D = '۰۱۲۳۴۵۶۷۸۹';
+    const tok = (m) => ((m.match(/\./g) || []).length > 1 || m.indexOf('/') >= 0) ? m
+      : m.replace(/\.(?=\d)/g, '٫').replace(/,(?=\d{3})/g, '٬').replace(/\d/g, (d) => D[+d]);
+    const conv = (n) => {
+      const s = n.data;
+      if (!/\d/.test(s)) return;
+      if (n.parentElement && n.parentElement.closest('input,textarea,kbd,.dev,.mo,.lg,.ty-bar')) return;
+      // число остаётся латинским, если оно часть обозначения: стоит вплотную к латинице («Windows 11», «Hysteria2», «24H2») или после слова «порт»
+      const t = s.replace(/\d[\d.,:\/]*\d|\d/g, (m, i) => {
+        const before = s.slice(0, i).replace(/\s+$/, ''), after = s.charAt(i + m.length);
+        return (/[A-Za-z\-#]$/.test(before) || /[A-Za-z]/.test(after) || /(پورت|درگاه)$/.test(before)) ? m : tok(m);
+      }).replace(/([۰-۹])%/g, '$1٪');
+      if (t !== s) n.data = t;
+    };
+    const walk = (el) => { const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) conv(n); };
+    walk(root);
+    this.faMo = new MutationObserver((ms) => ms.forEach((m) => {
+      if (m.type === 'characterData') conv(m.target);
+      else m.addedNodes.forEach((x) => { if (x.nodeType === 3) conv(x); else if (x.nodeType === 1) walk(x); });
+    }));
+    this.faMo.observe(root, { subtree: true, childList: true, characterData: true });
+  }
+  componentWillUnmount() { if (this.faMo) this.faMo.disconnect(); }
+  componentDidUpdate() { this.faDigits(); }
+  componentDidMount() { this.faDigits(); }
+
+  st() { return this.state || {}; }
+  runUpd(from) {
+    clearTimeout(this.ut);
+    if (from === 'check') {
+      this.setState({ up: 'checking', sec: 'upd' });
+      this.ut = setTimeout(() => this.setState({ up: 'available' }), 1400);
+      return;
+    }
+    let p = 8;
+    this.setState({ up: 'downloading', upP: p });
+    const tick = () => {
+      if (this.st().up !== 'downloading') return;
+      p += 11 + Math.round(Math.random() * 9);
+      if (p >= 100) { this.setState({ up: 'ready', upP: 100 }); return; }
+      this.setState({ upP: p });
+      this.ut = setTimeout(tick, 380);
+    };
+    this.ut = setTimeout(tick, 380);
+  }
+  renderVals() {
+    const logos = { lavender: '/_blob/0b62512895ad639ab01894d9cfc68db6', mint: '/_blob/7e2cbe098a3f586b63d3e07c56f17a01', sand: '/_blob/12736226f7d078aa98183de30675f863', rose: '/_blob/766bb9e952957b786b037a8ba7882911' };
+    const s0 = this.st(), pr = this.props;
+    const thSel = s0.thSel || ((pr.theme === 'light') ? 'light' : 'dark');
+    const theme = thSel === 'light' ? 'light' : 'dark';
+    const accent = logos[pr.accent] ? pr.accent : 'lavender';
+    let sec = s0.sec || pr.section || 'conn';
+    const sb = s0.sb || pr.sub || 'ok';
+    const up = s0.up || pr.update || 'latest';
+    const px = s0.px || pr.proxy || 'off';
+    const basic = sb === 'basic';
+    // статус VPN в шапке: виден на всех экранах, кроме Главной
+    const vp = s0.vp || (this.props.vpn === 'off' ? 'off' : 'on');
+    const tbs = { c: 'v-' + vp, t: vp === 'on' ? 'متصل' : (vp === 'ing' ? 'در حال اتصال…' : '‏VPN خاموش است'), m: vp === 'on' ? 'آلمان' : '', mc: vp === 'on' ? '' : 'hide', a: vp === 'off' ? 'اتصال VPN' : 'قطع VPN',
+      go: () => { clearTimeout(this.vt); if (vp === 'off') { this.setState({ vp: 'ing' }); this.vt = setTimeout(() => this.setState({ vp: 'on' }), 1300); } else this.setState({ vp: 'off' }); } };
+
+    const ON = Object.assign({ wl: false, auto: true, game: false, lan: true, nt: true, n0: true, n1: true, n2: true, n3: true, n4: false, min: true, tray: true, au: true, rep: false }, s0.on || {});
+    const T = {}, A = {}, tg = {};
+    Object.keys(ON).forEach((k) => { T[k] = ON[k] ? 'on' : ''; A[k] = ON[k] ? 'true' : 'false'; tg[k] = () => this.setState({ on: Object.assign({}, ON, { [k]: !ON[k] }) }); });
+    const mkPick = (name, val, opts, set) => {
+      const c = {}, a = {}, f = {};
+      opts.forEach((o) => { c[o] = o === val ? 'on' : ''; a[o] = o === val ? 'true' : 'false'; f[o] = () => set(o); });
+      return [c, a, f];
+    };
+    const ksV = s0.ks || 'while', prV = s0.pr || 'خودکار', chV = s0.ch || 'stable';
+    // «Always» включается только после подтверждения: без VPN интернета не будет даже после перезагрузки
+    const ksAsk = s0.ksAsk !== undefined ? s0.ksAsk : pr.confirm === 'ks';
+    const [ks, ksA, ksSet] = mkPick('ks', ksV, ['off', 'while', 'always'], (o) => (o === 'always' && ksV !== 'always' ? this.setState({ ksAsk: true }) : this.setState({ ks: o, ksAsk: false })));
+    const [prk, prA, prSet] = mkPick('pr', prV, ['خودکار', 'h2', 'awg', 'vless', 'tt'], (o) => this.setState({ pr: o }));
+    const [ch, chA, chSet] = mkPick('ch', chV, ['stable', 'beta'], (o) => this.setState({ ch: o }));
+    const KSN = { off: 'خاموش — اگر VPN قطع شود، برنامه‌ها بدون آن آنلاین می‌شوند', while: 'اگر VPN قطع شود، تا برگشتنش چیزی از این رایانه خارج نمی‌شود', always: 'تا VPN روشن نباشد اصلاً اینترنت نیست، حتی پس از راه‌اندازی مجدد' };
+    const PRN = { auto: '‏Mistgate همه راه‌ها را امتحان می‌کند و راهی را که در شبکه شما کار می‌کند نگه می‌دارد', h2: 'فقط Hysteria2. اگر مسدود شود، Mistgate خودش تغییر نمی‌دهد', awg: 'فقط AmneziaWG. اگر مسدود شود، Mistgate خودش تغییر نمی‌دهد', vless: 'فقط VLESS. اگر مسدود شود، Mistgate خودش تغییر نمی‌دهد', tt: 'فقط TrustTunnel. اگر مسدود شود، Mistgate خودش تغییر نمی‌دهد' };
+    const EX0 = [['192.168.1.50', '‏NAS خانه'], ['10.0.0.0/8', 'شبکه کاری'], ['office.example.com', 'پورتال اداری']];
+    const gone = s0.exGone || [];
+    const excList = EX0.filter((e) => gone.indexOf(e[0]) < 0).map((e) => ({ a: e[0], n: e[1], rm: () => this.setState({ exGone: gone.concat([e[0]]) }) }));
+    const excSum = ksV === 'off' ? 'کلید قطع اضطراری خاموش است — چیزی مسدود نمی‌شود' : ((ON.lan ? 'شبکه محلی' : 'هیچ مورد محلی') + (excList.length ? ' و ' + excList.length + (excList.length === 1 ? ' نشانی' : ' نشانی') : ''));
+
+    // подписка
+    const SBX = {
+      ok: { e: '30 نوامبر', eS: '24 روز مانده', eP: '80%', d: '64.8 گیگابایت', dS: 'مانده از 100 گیگابایت', dP: '65%', v: '2 از 5', vS: '3 جای خالی', vP: '40%' },
+      warn: { e: '8 نوامبر', eS: '2 روز مانده', eP: '7%', eC: 'warn', d: '7.6 گیگابایت', dS: 'مانده از 100 گیگابایت', dP: '8%', dC: 'warn', v: '2 از 5', vS: '3 جای خالی', vP: '40%' },
+      limit: { e: '30 نوامبر', eS: '24 روز مانده', eP: '80%', d: '64.8 گیگابایت', dS: 'مانده از 100 گیگابایت', dP: '65%', v: '5 از 5', vS: 'جای خالی نیست', vP: '100%', vC: 'warn' },
+      removed: { e: '30 نوامبر', eS: '24 روز مانده', eP: '80%', d: '64.8 گیگابایت', dS: 'مانده از 100 گیگابایت', dP: '65%', v: '1 از 5', vS: 'این رایانه در فهرست نیست', vP: '20%', vC: 'bad' },
+      basic: { e: '30 دسامبر', eS: 'از لینک', eP: '90%', d: '38 گیگابایت', dS: 'مانده از 50 گیگابایت', dP: '76%', v: '—', vS: 'برای لینک‌ها نمایش داده نمی‌شود', vP: '0%', vC: 'na' } };
+    const sx = Object.assign({ eC: '', dC: '', vC: '' }, SBX[sb] || SBX.ok);
+    const S = Object.assign(sx, basic ? { name: 'کار', ini: 'ک', logoC: 'hide', iniC: '', srcT: 'لینک', srcCls: 'src-link', host: 'corp.example.net/sub', st: 'فعال', stC: 'ok', pageCls: 'hide' }
+      : { name: 'اشتراک من', ini: '', logoC: '', iniC: 'hide', srcT: 'Mistgate', srcCls: 'src-mg', host: 'vpn.example.com', st: sb === 'removed' ? 'این رایانه حذف شده' : (sb === 'warn' ? 'به‌زودی تمام می‌شود' : 'فعال'), stC: sb === 'removed' ? 'bad' : (sb === 'warn' ? 'warn' : 'ok'), pageCls: '' });
+    const BAN = {
+      warn: { c: 'warn', tone: 'sand', g: 'calendar', t: '2 روز دیگر تمام می‌شود، 92% حجم مصرف شده', s: 'در صفحه اشتراک تمدید کنید تا VPN کار کند', b: 'تمدید' },
+      limit: { c: 'info', tone: 'lav', g: 'laptop', t: 'هر 5 دستگاه در حال استفاده‌اند', s: 'برای افزودن رایانه یا گوشی دیگر، یکی را در صفحه اشتراک حذف کنید', b: 'بازکردن صفحه' },
+      removed: { c: 'bad', tone: 'rose', g: 'xmark-circle', t: 'این رایانه از اشتراک حذف شده', s: 'در صفحه اشتراک حذف شده است. تا دوباره اضافه نشود VPN وصل نمی‌شود', b: 'افزودن دوباره' },
+      offline: { c: 'warn', tone: 'sand', g: 'cloud-xmark', t: 'دسترسی به ارائه‌دهنده ممکن نیست', s: '‏Mistgate با نسخه ذخیره‌شده کار می‌کند. سرورها و طرح ممکن است قدیمی باشند', b: '' },
+      old: { c: 'info', tone: 'neu', g: 'info-circle', t: 'پنل ارائه‌دهنده شما قدیمی‌تر است', s: 'تا وقتی پنل را به‌روز نکنند، یافتن مسدودی‌ها و کمک مدیر در دسترس نیست. بقیه چیزها کار می‌کند', b: '' },
+      news: { c: 'news', tone: 'lav', g: 'megaphone', t: 'از «اشتراک من» · امروز', s: 'تعمیرات در 14 نوامبر، 02:00 تا 04:00. سرورهای آلمان ممکن است یک بار راه‌اندازی مجدد شوند', b: 'پشتیبانی' } };
+    const bn = BAN[sb];
+    const B = bn ? Object.assign({}, bn, { show: '', bc: bn.b ? '' : 'hide', c: bn.c + ' bg-' + bn.g }) : { show: 'hide', c: '', tone: '', t: '', s: '', b: '', bc: 'hide' };
+    const DEVS = [['Lime-Desktop', '‏Windows 11 · اکنون آنلاین', 'computer', 'lav', true], ['Pixel 8', '‏Android · 2 ساعت پیش', 'smartphone-device', 'sky'], ['MacBook Air', '‏macOS · دیروز', 'laptop', 'mint'], ['رایانه پذیرایی', '‏Windows 10 · 5 روز پیش', 'computer', 'sand'], ['iPhone 15', '‏iOS · 3 هفته پیش', 'smartphone-device', 'rose']];
+    const renaming = s0.ren !== undefined ? s0.ren : pr.rename === 'yes';
+    const devs = DEVS.slice(renaming ? 1 : 0, sb === 'limit' ? 5 : 2).map((d) => ({ n: d[0], s: d[1], tone: d[3] + ' dv-' + d[2], meC: d[4] ? '' : 'hide', renC: d[4] && !renaming ? '' : 'hide' }));
+    const syncing = !!s0.syncing;
+    const syncT = sb === 'offline' ? 'به‌روزرسانی نشد' : (syncing ? 'در حال به‌روزرسانی…' : '4 دقیقه پیش به‌روز شد');
+    const syncS = sb === 'offline' ? 'از نسخه ذخیره‌شده ساعت 09:12 استفاده می‌شود' : (basic ? 'هر ساعت لینک را بررسی می‌کند' : 'هر 10 دقیقه تغییرات را بررسی می‌کند');
+
+    // уведомления
+    const TST = { n0: ['اتصال قطع شد', '30 ثانیه پاسخی نیامد. تا Mistgate دوباره تلاش می‌کند، ترافیک شما امن نگه داشته می‌شود.', 'rose'], n1: ['به مسیر پشتیبان جابه‌جا شد', 'در این شبکه UDP مسدود است؛ Mistgate شما را به VLESS · TCP منتقل کرد.', 'sky'],
+      n2: ['اشتراک 3 روز دیگر تمام می‌شود', '«اشتراک من» 9 نوامبر تمام می‌شود. برای ادامه کار VPN آن را تمدید کنید.', 'sand'], n3: ['این رایانه حذف شده', 'این رایانه دیگر در «اشتراک من» نیست و VPN وصل نمی‌شود.', 'lav'], n4: ['‏Mistgate به نسخه 1.5.0 به‌روز شد', 'نسخه جدید نصب شده و در حال اجراست.', 'mint'] };
+    const npv = s0.npv || 'n1';
+    const npr = {}, nprC = {};
+    Object.keys(TST).forEach((k) => { npr[k] = () => this.setState({ npv: k }); nprC[k] = k === npv ? 'pv' : ''; });
+
+    // обновления
+    const ver = s0.updated ? '1.5.0' : '1.4.2';
+    const UP = {
+      latest: { c: 'latest', t: 'آخرین نسخه را دارید', s: '‏Mistgate ' + ver + ' · امروز 09:12 بررسی شد', b: 'بررسی به‌روزرسانی', bc: 'lsb', b2: '', do: () => this.runUpd('check') },
+      checking: { c: 'checking', t: 'در حال بررسی به‌روزرسانی…', s: '‏Mistgate ' + ver, b: 'در حال بررسی…', bc: 'lsb dis', b2: '' },
+      available: { c: 'available', t: 'نسخه 1.5.0 در دسترس است', s: '14.2 مگابایت · انتشار 5 نوامبر', b: 'دانلود و نصب', bc: 'addb', b2: '', do: () => this.runUpd('dl') },
+      downloading: { c: 'downloading', t: 'در حال دانلود 1.5.0…', s: '', b: 'لغو', bc: 'lsb', b2: '', do: () => { clearTimeout(this.ut); this.setState({ up: 'available' }); } },
+      ready: { c: 'ready', t: '1.5.0 آماده نصب است', s: 'چند ثانیه طول می‌کشد. VPN خودش دوباره وصل می‌شود', b: 'اکنون راه‌اندازی مجدد', bc: 'addb', b2: 'بعداً', do: () => this.setState({ up: 'latest', updated: true }), do2: () => this.setState({ up: 'latest' }) },
+      failed: { c: 'failed', t: 'به‌روزرسانی نشد', s: 'دانلود قطع شد. نسخه فعلی شما همچنان کار می‌کند', b: 'تلاش دوباره', bc: 'lsb', b2: '', do: () => this.runUpd('dl') },
+      badsig: { c: 'failed', t: 'به‌روزرسانی از بررسی رد شد', s: 'امضای فایل مطابقت ندارد، برای همین چیزی نصب نشد. نسخه فعلی همچنان کار می‌کند', b: 'دانلود دوباره', bc: 'lsb', b2: '', do: () => this.runUpd('dl') } };
+    const U = Object.assign({ do: () => {}, do2: () => {} }, UP[up]);
+    const upP = s0.upP !== undefined ? s0.upP : 62;
+    if (up === 'downloading') U.s = (14.2 * upP / 100).toFixed(1) + ' از 14.2 مگابایت · حدود ' + Math.max(2, Math.round((100 - upP) / 4)) + ' ثانیه مانده';
+    U.p = upP + '%'; U.barC = up === 'downloading' ? '' : 'hide'; U.newC = (up === 'available' || up === 'ready') ? '' : 'hide'; U.b2c = U.b2 ? '' : 'hide';
+
+    // прокси
+    const pxOn = px !== 'off', pxLan = px === 'lan';
+    const langs0 = [['en', 'English', 'انگلیسی', 'ltr'], ['ru', 'Русский', 'روسی', 'ltr'], ['zh', '中文', 'چینی', 'ltr'], ['fa', 'فارسی', 'فارسی', 'rtl'], ['tr', 'Türkçe', 'ترکی', 'ltr']];
+    const lg = s0.lg || 'fa';
+    const langOpen = s0.lo !== undefined ? s0.lo : pr.lang === 'open';
+    const langs = langs0.map((l) => ({ n: l[1], e: l[0] === 'en' ? '' : l[2], dir: l[3], c: l[0] === lg ? 'on' : '', a: l[0] === lg ? 'true' : 'false', go: () => this.setState({ lg: l[0], lo: false }) }));
+
+    const NAV = [["conn", "network", "اتصال"], ["sub", "page-star", "اشتراک"], ["priv", "eye-closed", "حریم خصوصی"], ["look", "half-moon", "ظاهر"], ["notif", "bell", "اعلان‌ها"], ["upd", "cloud-download", "به‌روزرسانی‌ها"], ["proxy", "server-connection", "پروکسی محلی"], ["about", "info-circle", "درباره"]];
+    const subBad = { warn: 1, limit: 1, removed: 1, offline: 1 }[sb];
+    const navSec = sec === 'exc' ? 'conn' : sec;
+    const nav = NAV.map((n) => {
+      let b = '', bc = 'hide';
+      if (n[0] === 'sub' && subBad) { b = ''; bc = 'dot ' + (sb === 'removed' ? 'bad' : 'warn'); }
+      if (n[0] === 'upd' && (up === 'available' || up === 'ready')) { b = 'جدید'; bc = 'new'; }
+      if (n[0] === 'proxy') { b = pxOn ? 'روشن' : ''; bc = pxOn ? 'onb' : 'hide'; }
+      return { g: n[1], t: n[2], c: n[0] === navSec ? 'on' : '', cur: n[0] === navSec ? 'page' : 'false', b: b, bc: bc, go: () => this.setState({ sec: n[0], lo: false }) };
+    });
+    const is = {}; ['conn', 'exc', 'sub', 'priv', 'look', 'notif', 'upd', 'proxy', 'about'].forEach((k) => { is[k] = k === sec; });
+
+    // dev
+    const dv = {}, dvSet = {};
+    const dvOpt = (k, v, on, f) => { dv[k + '_' + v] = on ? 'on' : ''; dvSet[k + '_' + v] = f; };
+    ['ok', 'warn', 'limit', 'removed', 'offline', 'old', 'news', 'basic'].forEach((v) => dvOpt('sb', v, sb === v, () => this.setState({ sb: v, sec: 'sub' })));
+    ['latest', 'checking', 'available', 'downloading', 'ready', 'failed', 'badsig'].forEach((v) => dvOpt('up', v, up === v, () => { clearTimeout(this.ut); this.setState({ up: v, sec: 'upd', upP: 62 }); }));
+    ['off', 'on', 'lan'].forEach((v) => dvOpt('px', v, px === v, () => this.setState({ px: v, sec: 'proxy' })));
+    ['dark', 'light'].forEach((v) => dvOpt('th', v, theme === v, () => this.setState({ thSel: v })));
+    const [tm, tmA, tmSet] = mkPick('tm', theme, ['dark', 'light'], (o) => this.setState({ thSel: o }));
+    // акцент: по умолчанию — цвет из панели оператора; свой цвет хранится только на этом ПК
+    const PANEL = '#b8acf2';
+    const ACC = [['panel', 'رنگ ارائه‌دهنده', PANEL], ['mint', 'نعنایی', '#7dd3a0'], ['lavender', 'اسطوخودوس', '#b8acf2'], ['sky', 'آسمانی', '#8ec8ea'], ['sand', 'شنی', '#dcc68c'], ['rose', 'رز', '#e6a6b0'], ['sage', 'مریم‌گلی', '#b3cc8f']];
+    const DEMO = ['#ff8a5c', '#3b6cf6', '#2fbf9b', '#c2410c'];
+    const accSel = s0.acc || pr.acc || 'panel';
+    const hexOf = (k) => (k === 'custom' ? (s0.cHex || DEMO[0]) : (ACC.find((x) => x[0] === k) || ACC[0])[2]);
+    const accHex = hexOf(accSel);
+    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+    const lum = (h) => { const c = rgb(h).map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4))); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+    const inkOf = (h) => ((lum(h) + 0.05) / 0.05 >= 1.05 / (lum(h) + 0.05) ? '#0c0c0e' : '#ffffff');
+    const hueOf = (h) => { const [r, g, b] = rgb(h), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (!d) return 0; let x = mx === r ? ((g - b) / d) % 6 : (mx === g ? (b - r) / d + 2 : (r - g) / d + 4); x *= 60; return x < 0 ? x + 360 : x; };
+    const accs = ACC.map((x) => ({ t: x[1], hex: x[2], ck: inkOf(x[2]), c: (x[0] === accSel ? 'on' : '') + (x[0] === 'panel' ? ' pan' : ''), on: x[0] === accSel ? 'true' : 'false', go: () => this.setState({ acc: x[0] }) }));
+    const LOGO_BY = { '#b8acf2': 'lavender', '#7dd3a0': 'mint', '#dcc68c': 'sand', '#e6a6b0': 'rose' };
+    const logoKey = LOGO_BY[accHex];
+    U.logo = (up === 'failed' || up === 'badsig') ? logos.sand : ((up === 'ready' || up === 'available') ? logos.mint : logos[logoKey || 'lavender']);
+
+    const repOn = ON.rep && !basic && sb !== 'old';
+    return {
+      theme: theme, accent: accent, logo: logos[logoKey || 'lavender'], lgHue: logoKey ? '' : 'lg-hue', lh: Math.round(hueOf(accHex) - 249) + 'deg', accHex: accHex, inkHex: inkOf(accHex), ver: ver, nav: nav, is: is, secT: (NAV.find((n) => n[0] === navSec) || NAV[0])[2],
+      T: T, A: A, tg: tg, dv: dv, dvSet: dvSet,
+      ks: ks, ksA: ksA, ksSet: ksSet, pr: prk, prA: prA, prSet: prSet, ch: ch, chA: chA, chSet: chSet,
+      ksNote: KSN[ksV], prNote: PRN[prV], chNote: chV === 'beta' ? 'قابلیت‌های تازه حدود یک هفته زودتر. به‌ندرت ممکن است چیزی خراب شود' : 'نسخه‌های آزموده‌شده. توصیه می‌شود',
+      excSum: excSum, excCls: ksV === 'off' ? 'dim' : '', openExc: () => this.setState({ sec: 'exc' }), closeExc: () => this.setState({ sec: 'conn' }), excList: excList, excEmpty: excList.length ? 'hide' : '',
+      S: S, B: B, subDim: sb === 'removed' ? 'dim' : '', devs: devs, devGrp: (basic || sb === 'removed') ? 'hide' : '', basicGrp: basic ? '' : 'hide',
+      renaming: renaming && !basic && sb !== 'removed', renOpen: () => this.setState({ ren: true }), renClose: () => this.setState({ ren: false }),
+      syncT: syncT, syncS: syncS, syncCls: sb === 'offline' ? 'warn' : '', syncGrp: sb === 'removed' ? 'hide' : '', syncBtn: sb === 'offline' ? 'تلاش دوباره' : (syncing ? 'در حال به‌روزرسانی' : 'به‌روزرسانی اکنون'), syncBtnCls: syncing ? 'busy' : '',
+      syncNow: () => { this.setState({ syncing: true }); clearTimeout(this.syt); this.syt = setTimeout(() => this.setState({ syncing: false }), 1300); },
+      supCls: basic ? 'hide' : '', outT: basic ? 'حذف این اشتراک' : 'خروج از این رایانه', outS: basic ? 'سرورهای آن از Mistgate حذف می‌شوند. بعداً می‌توانید لینک را دوباره اضافه کنید' : 'یک جای دستگاه آزاد می‌شود. برای بازگشت دوباره به لینک نیاز دارید', outB: basic ? 'حذف' : 'خروج',
+      repSub: basic ? 'برای اشتراک‌های لینکی در دسترس نیست' : (sb === 'old' ? 'پنل ارائه‌دهنده شما هنوز از این پشتیبانی نمی‌کند' : 'ناشناس · برای «اشتراک من» ارسال می‌شود'), repCls: (basic || sb === 'old') ? 'dis' : '', repLs: (basic || sb === 'old') ? 'hide' : '',
+      repLast: repOn ? 'آخرین ارسال امروز 13:58 · 4 بار در این هفته' : 'چیزی از این رایانه ارسال نشده',
+      logCls: s0.logCleared ? 'done' : '', logBtn: s0.logCleared ? 'پاک شد' : 'پاک‌کردن گزارش', clearLog: () => this.setState({ logCleared: true }),
+      tm: tm, tmA: tmA, tmSet: tmSet, accs: accs, hexTxt: accHex.slice(1), noteC: accSel === 'panel' ? 'hide' : '', accReset: () => this.setState({ acc: 'panel' }),
+      accCustom: () => { const i = (DEMO.indexOf(s0.cHex || '') + 1) % DEMO.length; this.setState({ acc: 'custom', cHex: accSel === 'custom' ? DEMO[i] : (s0.cHex || DEMO[0]) }); }, langOpen: langOpen, langX: langOpen ? 'true' : 'false', langTog: () => this.setState({ lo: !langOpen }), langs: langs, langT: langs0.find((l) => l[0] === lg)[1],
+      tst: { t: TST[npv][0], s: TST[npv][1], tone: TST[npv][2] }, npv: npv, npr: npr, nprC: nprC, ntDim: ON.nt ? '' : 'off',
+      U: U,
+      pxOnC: pxOn ? 'on' : '', pxOnA: pxOn ? 'true' : 'false', pxTog: () => this.setState({ px: pxOn ? 'off' : 'on' }), pxOffShow: pxOn ? 'hide' : '', pxOnShow: pxOn ? 'rise' : 'hide',
+      pxSub: pxOn ? (pxLan ? 'روشن · برای دستگاه‌های Wi-Fi شما با رمز باز است' : 'روشن · فقط برنامه‌های این رایانه می‌توانند استفاده کنند') : 'خاموش · چیزی روی این رایانه گوش نمی‌دهد',
+      pxHost: pxLan ? '192.168.1.24' : '127.0.0.1', pxLanC: pxLan ? 'on' : '', pxLanA: pxLan ? 'true' : 'false', pxLanTog: () => this.setState({ px: pxLan ? 'on' : 'lan' }),
+      lanSub: pxLan ? 'هر کسی در این Wi-Fi که رمز را بداند می‌تواند از اشتراک شما استفاده کند' : 'خاموش · فقط این رایانه', pwd: s0.pwdShow ? 'k7Rf-29qd-Xm4e' : '••••-••••-••••', pwdTog: () => this.setState({ pwdShow: !s0.pwdShow }),
+      tbs: tbs, rdDiag: '', rdSet: 'hide', ksAsk: ksAsk, ksNo: () => this.setState({ ksAsk: false }), ksYes: () => this.setState({ ks: 'always', ksAsk: false }),
+      verCls: s0.verCopied ? 'done' : '', verBtn: s0.verCopied ? 'کپی شد' : 'کپی اطلاعات نسخه', copyVer: () => this.setState({ verCopied: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

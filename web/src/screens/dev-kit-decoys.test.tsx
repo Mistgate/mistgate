@@ -8,6 +8,7 @@ import { dictionaries, plainText, setLang } from "@/i18n";
 import { DecoysScreen } from "./decoys/list";
 import { DecoySiteScreen } from "./decoys/site";
 import { frames, sceneOf } from "./dev-kit-decoys";
+import { demoBlog } from "./dev-kit-decoys-real";
 
 // The scenes of /dev-kit?only=decoys draw the real screens on made-up data: every state a scene names must draw, in every language.
 
@@ -77,8 +78,8 @@ describe("the scenes of the Decoy sites screens", () => {
     if (state === "dlg-up-unsafe") expect(text()).toContain("img/latest");
     if (state === "dlg-tpl") expect(document.querySelectorAll(".dz-ways.tpl .dz-way")).toHaveLength(10);
     if (state === "dlg-tpl-wait") expect(document.querySelector(".dz-fr")?.textContent).toContain(en["dz.tpl.loading"]);
-    if (state === "dlg-tpl-view") expect(document.querySelector(".dz-fr iframe")?.getAttribute("srcdoc")).toContain("Rainy Reader");
-    if (state === "dlg-tpl-view") expect(text()).toContain(en["dz.tpl.footView"].replace("{name}", "Rainy Reader"));
+    if (state === "dlg-tpl-view") expect(document.querySelector(".dz-fr iframe")?.getAttribute("srcdoc")).toContain(demoBlog.name);
+    if (state === "dlg-tpl-view") expect(text()).toContain(en["dz.tpl.footView"].replace("{name}", demoBlog.name));
     if (state === "dlg-tpl-run") expect(text()).toContain(en["dz.tpl.footRun"]);
     if (state === "dlg-tpl-err") expect(text()).toContain(en["err.decoy_library_full"]);
     if (state === "dlg-tpl-nokey") {
@@ -162,6 +163,6 @@ describe("the scenes of the Decoy sites screens", () => {
     host?.remove();
     await draw("dlg-tpl-view");
     expect(text()).toContain(dictionaries[lang]["dz.tpl.create"]);
-    expect(plainText(text())).toContain(dictionaries[lang]["dz.tpl.footView"].replace("{name}", "Rainy Reader"));
+    expect(plainText(text())).toContain(dictionaries[lang]["dz.tpl.footView"].replace("{name}", demoBlog.name));
   });
 });

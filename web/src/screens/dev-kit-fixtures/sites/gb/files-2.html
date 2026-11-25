@@ -1,0 +1,863 @@
+<!DOCTYPE html><html lang="en-GB"><head><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; font-src data:; style-src &#39;unsafe-inline&#39;; form-action &#39;none&#39;"/>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+	<title>Quillhand: Send a file</title>
+<meta name="description" content="Share files up to 500 MB with a single link, from Quillhand."/>
+  <meta name="theme-color" content="#f6f0ff"/>
+  <meta name="color-scheme" content="light"/>
+
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMjUiIGZpbGw9IiNjNGE4ZmYiLz48cGF0aCBkPSJNMCA0NiBMMzUgMzUgTDY0IDQ2IFY2NCBIMHoiIGZpbGw9IiNmZmQyM2YiIG9wYWNpdHk9Ii45Ii8+PGNpcmNsZSBjeD0iNDEiIGN5PSIxNiIgcj0iNyIgZmlsbD0iIzBiMGIxMCIvPjwvc3ZnPg=="/>
+
+<style>:root{ color-scheme:light;
+  --bg:#f6f0ff;--band:#ede7f6;
+--sf:#ffffff;
+  --sf2:#e6dfef;
+  --fg:#1a1228;--mu:#635b6f;
+  --ln:#dcd5e5;
+--ln2:#c1bbcb;
+--ac:#c4a8ff;--ai:#0b0b10;--a2:#ffd23f;
+	--so:#f0e7ff;--ok:#238557; --wa:#a3660a; --bd:#b82d23;
+--oks:#7be0b0;
+--was:#ff8fb3; --bds:#8ab6ff; --r:18px;
+  --rs:13px;--rb:28px;--bw:3px;
+--w:1244px;--wt:687px; --s:calc(8px*1.04);--sec:75px;--gut:21px;--fb:system-ui, -apple-system,"Segoe UI",
+Roboto, "Helvetica Neue",
+Arial,sans-serif;
+  --fh:ui-rounded,"SF Pro Rounded","Nunito",
+"Segoe UI",system-ui,  sans-serif;
+--fl:system-ui,-apple-system,
+"Segoe UI",Roboto,
+"Helvetica Neue",
+Arial,sans-serif;
+	--fm:ui-monospace,
+SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+monospace;
+--fwh:900; --lsh:-.03em;
+	--lhh:1;
+	--ttl:none;
+  --lsl:.06em;--fsl:.78rem;--t0:17px;
+--t1:24.7px;
+--t2:35.8px;--t3:clamp(26px,
+3.61vw,51.9px);--t4:clamp(37.7px, 5.23vw,75.4px);
+--t5:clamp(54.7px, 7.59vw,
+109.3px);
+	--ts:9.7px;--sh:4px 4px 0 var(--fg)}
+*,
+*::before, *::after{
+  box-sizing:border-box}
+[hidden]{display:none!important}
+html{
+-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;
+display:flex;
+flex-direction:column;background:var(--bg);
+color:var(--fg); font:17px/1.53 var(--fb);-webkit-font-smoothing:antialiased}
+main{
+	flex:1}
+h1,
+h2,  h3, h4{
+	font-family:var(--fh);font-weight:var(--fwh);
+  line-height:var(--lhh);margin:0 0 .5em; letter-spacing:var(--lsh)}
+h1{ font-size:clamp(1.75rem, 4.4vw,2.6rem)}
+h2{
+font-size:clamp(1.3rem,3vw,  1.7rem)}
+h3{
+  font-size:1.12rem}
+p{ margin:0 0 1em}
+ul,  ol{
+	margin:0 0 1em;
+	padding-left:1.25em}
+a{ color:var(--ac)}
+img, svg{
+  max-width:100%}
+code,pre,  kbd{
+  font-family:var(--fm);
+	font-size:.92em}
+pre{
+  margin:0 0 1em;padding:14px 16px;
+overflow-x:auto; background:var(--sf);color:var(--fg);
+  border:1px solid var(--ln);
+border-radius:var(--rs);
+line-height:1.55}
+pre code{
+font-size:inherit}
+.mor-wrap{
+  width:100%;
+	max-width:var(--w);margin:0 auto;
+padding-left:var(--gut);
+	padding-right:var(--gut)}
+.mor-mu{color:var(--mu)}
+.mor-ic{
+  width:1.25em;
+height:1.25em;flex:none;
+	vertical-align:-.25em;
+	fill:none; stroke:currentColor;
+  stroke-width:2.3; stroke-linecap:round;stroke-linejoin:round}
+.mor-art{
+display:block;width:100%;height:100%}
+.mor-mark{
+width:28px; height:28px;
+flex:none}
+.mor-mn{
+	display:none}
+.mor-mnb{ display:flex;align-items:center;
+  justify-content:center;
+width:44px;
+	height:44px; margin-right:-8px;list-style:none;cursor:pointer;color:var(--fg);border-radius:var(--rs)}
+.mor-mnb::-webkit-details-marker{
+display:none}
+.mor-mnb .mor-ic{ width:26px; height:26px}
+.mor-mn .mor-mnb .mor-ic:nth-child(2),.mor-mn[open] .mor-mnb .mor-ic:nth-child(1){
+	display:none}
+.mor-mn[open] .mor-mnb .mor-ic:nth-child(2){display:inline-block}
+.mor-mnl{ position:absolute;left:0;
+right:0;
+  top:100%;
+  z-index:5;
+	display:flex;
+flex-direction:column;
+	padding:6px var(--gut) 14px;
+  background:var(--sf);
+  border-bottom:1px solid var(--ln);
+  box-shadow:0 14px 24px rgba(0,0,0, .12)}
+.mor-mnl a{ padding:12px 2px;color:var(--fg);
+text-decoration:none; border-bottom:1px solid var(--ln);font-size:1.05rem}
+.mor-mnl a[aria-current]{
+  color:var(--ac);
+font-weight:600}
+.mor-mnl a:last-child{border-bottom:0}
+@media (max-width:720px){
+	.mor-nav{
+  display:none}
+  .mor-mn{ display:block}
+	.mor-hdin{
+	flex-wrap:nowrap}
+  }
+.mor-lg{display:grid;
+	grid-template-columns:minmax(0, 1fr) 230px;
+gap:var(--sec) 56px;
+  padding-top:48px;
+	align-items:start}
+.mor-lgt{max-width:var(--wt)}
+.mor-lgt h2{margin-top:1.8em;scroll-margin-top:24px}
+.mor-toc{position:sticky;
+top:24px; padding:18px 20px;border:1px solid var(--ln);
+  border-radius:var(--r);
+  background:var(--sf);
+  font-size:.92rem}
+.mor-toc h2{
+  margin:0 0 10px; color:var(--mu);font:700 .78rem var(--fb);
+	letter-spacing:.07em; text-transform:uppercase}
+.mor-toc ol{
+margin:0;padding:0;list-style:none;counter-reset:t}
+.mor-toc li{counter-increment:t;padding:5px 0 5px 22px;
+	position:relative}
+.mor-toc li::before{content:counter(t);position:absolute;left:0; color:var(--mu);
+font-variant-numeric:tabular-nums}
+.mor-toc a{ color:var(--fg);
+	text-decoration:none}
+.mor-toc a:hover{ color:var(--ac)}
+.mor-nf{
+display:grid;grid-template-columns:1fr 1fr;
+	gap:40px;
+align-items:center;padding-top:72px;
+  padding-bottom:24px}
+.mor-code{
+	margin:0 0 .1em;
+	color:var(--ac);font:var(--fwh) clamp(5rem, 16vw, 11rem)/.9 var(--fh);letter-spacing:var(--lsh)}
+.mor-nfa{ border-radius:var(--rb);
+overflow:hidden;
+  aspect-ratio:4/3;
+	background:var(--band)}
+.mor-cmap{margin:0 0 28px;border:1px solid var(--ln); border-radius:var(--r);
+  overflow:hidden;background:var(--band)}
+.mor-cmap figcaption{ padding:12px 16px;
+	background:var(--sf);
+border-top:1px solid var(--ln)}
+.mor-fld{
+	display:flex;flex-direction:column;
+  gap:6px;margin-bottom:14px}
+.mor-fld label{
+  font-size:.92rem; font-weight:600}
+.mor-fld input,.mor-fld textarea{
+  width:100%;
+  padding:.65em .8em;
+border:1px solid var(--ln);
+  border-radius:var(--rs);
+  background:var(--sf);
+  color:var(--fg); font:inherit}
+.mor-fld textarea{
+	resize:vertical}
+.mor-fld input:focus,.mor-fld textarea:focus{
+outline:2px solid var(--ac);
+  outline-offset:1px}
+.mor-cform{max-width:520px}
+.mor-cfs{margin:0 0 14px; color:var(--bd)}
+@media (max-width:720px){.mor-lg{grid-template-columns:1fr;
+	padding-top:28px}
+  .mor-toc{
+	position:static;
+order:-1}
+	.mor-nf{ grid-template-columns:1fr;
+padding-top:36px;
+gap:24px}
+  }
+@media (max-width:560px){ .mor-hdin{ padding-top:12px; padding-bottom:10px}
+}
+.mor-dchart{display:block;width:100%;
+  height:auto}
+.mor-dline{
+fill:none;stroke:var(--ac);
+  stroke-width:2.4; stroke-linejoin:round;
+stroke-linecap:round; vector-effect:non-scaling-stroke}
+.mor-darea{fill:var(--ac);opacity:.14}
+.mor-dgrid{fill:none;stroke:var(--ln);
+	stroke-width:1;
+	vector-effect:non-scaling-stroke}
+.mor-dbars{fill:var(--ac);opacity:.38}
+.mor-dpt{
+fill:var(--ac)}
+.mor-dcal,.mor-did,.mor-dmap,  .mor-dstamp{ display:block; width:100%;
+height:auto}
+.mor-dc0{
+  fill:var(--sf2)}
+.mor-dc1{fill:var(--wa)}
+.mor-dc2{
+	fill:var(--bd)}
+.mor-di0{
+	fill:var(--ac)}
+.mor-di1{ fill:var(--a2)}
+.mor-di2{fill:var(--fg)}
+.mor-di3{ fill:var(--mu)}
+.mor-dmg{
+	fill:var(--band)}
+.mor-dmb{
+fill:var(--sf2);stroke:var(--sf2);stroke-width:6;
+stroke-linejoin:round}
+.mor-dmp{
+  fill:var(--oks);
+stroke:var(--oks);
+  stroke-width:6; stroke-linejoin:round}
+.mor-dmt{
+  fill:var(--ok);
+opacity:.55}
+.mor-dmr{fill:none;
+  stroke:var(--so);
+  stroke-width:16;stroke-linecap:round}
+.mor-dms{
+fill:none;stroke:var(--ln);
+  stroke-width:7}
+.mor-dmm{ fill:none;stroke:var(--ln2);stroke-width:12}
+.mor-dml{fill:var(--mu);
+	font-family:var(--fb);
+	paint-order:stroke; stroke:var(--sf);
+stroke-width:3}
+.mor-dmh{
+  fill:var(--ac);
+  opacity:.18}
+.mor-dpin{
+  fill:var(--ac)}
+.mor-dpi{fill:var(--ai)}
+.mor-dsb{
+  fill:var(--fg)}
+.mor-dsd{ fill:none; stroke:var(--bg);stroke-width:1.2;
+  stroke-dasharray:2 5;
+	opacity:.7}
+.mor-dst{ fill:var(--bg);
+font-family:var(--fh);font-weight:700;
+text-transform:uppercase}
+.mor-dsm{
+fill:var(--a2)}
+.mor-dhc{color:var(--mu)}
+.mor-dhs{ color:var(--ok)}
+.mor-dhf{ color:var(--wa)}
+.mor-dhk{
+	color:var(--a2)}
+.mor-dhn{ color:var(--ac)}
+.mor-dhp{
+color:var(--mu);
+	user-select:none}
+.mor-dhm{font-weight:600}
+
+:root{ --p1:var(--oks);
+  --p2:var(--ac); --p3:var(--was); --p4:var(--a2); --line:var(--bw) solid var(--fg) }
+h1, h2,h3,h4{color:var(--fg)}
+h2{ font-size:var(--t3);line-height:1.1}
+a{color:inherit}
+.mor-top{position:relative}
+.mor-topin{ display:flex;
+	align-items:center;
+	justify-content:space-between;
+  gap:20px;height:84px}
+.mor-logo{display:flex;
+  align-items:center;
+	gap:10px;min-width:0;color:var(--fg);font:var(--fwh) 1.5rem/1 var(--fh); letter-spacing:-.02em;text-decoration:none}
+.mor-logo span{
+  min-width:0;
+  overflow:hidden;
+line-height:1.35;text-overflow:ellipsis}
+.mor-logo .mor-mark{width:34px;
+	height:34px}
+.mor-nav{
+  display:flex; gap:6px;
+font-weight:650}
+.mor-nav a{padding:9px 16px; border:var(--bw) solid transparent;
+  border-radius:99px; color:var(--fg);
+text-decoration:none}
+.mor-nav a:hover{
+border-color:var(--fg)}
+.mor-nav a[aria-current]{border-color:var(--fg); background:var(--ac)}
+.mor-btn{
+display:inline-flex;
+	align-items:center;
+  justify-content:center;
+	gap:10px;padding:.72em 1.3em;
+border:var(--line);
+	border-radius:var(--rs);background:var(--ac);
+color:var(--fg);font:800 1.05rem/1.2 var(--fb);
+box-shadow:4px 4px 0 var(--fg);
+  text-decoration:none;
+cursor:pointer;
+  transition:transform .12s,  box-shadow .12s}
+.mor-btn:hover{
+	transform:translate(-1px, -1px); box-shadow:6px 6px 0 var(--fg)}
+.mor-btn:active{
+  transform:translate(3px,3px);box-shadow:1px 1px 0 var(--fg)}
+.mor-btn:focus-visible{ outline:3px solid var(--fg);outline-offset:3px}
+.mor-btn .mor-ic{
+	stroke-width:3}
+.mor-pk{background:var(--a2)}
+.mor-ghost{ background:var(--sf)}
+.mor-mnb{ border:var(--line);
+  border-radius:var(--rs);
+	background:var(--sf);margin-right:0}
+.mor-mnl{
+	background:var(--bg);border-bottom:var(--line);
+	box-shadow:none}
+.mor-mnl a{
+border-bottom:var(--bw) solid var(--fg);font-weight:700}
+.mor-mnl a[aria-current]{color:var(--fg);
+  background:var(--ac)}
+.mor-sticker{
+  display:inline-block;
+padding:6px 16px;
+	border:var(--line);
+border-radius:99px;background:var(--p4);font:700 .85rem var(--fm); letter-spacing:.06em;
+	text-transform:uppercase; transform:rotate(-2deg)}
+h1{margin:22px 0 20px;font-size:calc(var(--t5)*.8);
+	line-height:1.1}
+.mor-mk{display:inline-block;max-width:100%; padding:0 .16em .08em;
+margin:0 -.04em; border-radius:.16em; background:var(--a2);
+	line-height:1.08}
+.mor-lead{
+	max-width:28em;margin:0 0 28px;
+color:var(--mu);
+font-size:clamp(18px,1.6vw, 23px)}
+.mor-fine{
+	font:600 .92rem var(--fm)}
+.mor-bx{border:var(--line);border-radius:var(--r);background:var(--sf);box-shadow:var(--sh)}
+.mor-hero > *{
+  min-width:0}
+.mor-hero{
+	display:grid;
+  align-items:center; gap:clamp(28px,
+4vw,  64px);padding-top:clamp(20px,3vw,  48px);
+	padding-bottom:clamp(48px,6vw,
+88px)}
+.mor-dz{
+	position:relative;
+  padding:clamp(24px, 3vw,40px); border:3px dashed var(--fg);border-radius:var(--rb);background:var(--sf); box-shadow:8px 8px 0 var(--fg);text-align:center}
+.mor-tag{
+	position:absolute;
+  top:-18px;
+  right:24px;padding:4px 14px;
+	border:var(--line);
+  border-radius:99px;
+background:var(--p3);
+  font:700 .88rem var(--fm);transform:rotate(3deg)}
+.mor-drop{display:flex;
+	flex-direction:column;
+	align-items:center;gap:8px;padding:8px;border-radius:var(--r);cursor:pointer}
+.mor-drop:focus-visible{outline:3px solid var(--fg);
+outline-offset:4px}
+.mor-over{background:var(--so)}
+.mor-dh{ margin-top:8px;font:var(--fwh) var(--t2)/1.15 var(--fh);
+letter-spacing:-.02em;overflow-wrap:anywhere}
+.mor-dhint{margin-bottom:14px;color:var(--mu)}
+.mor-stack{
+	width:min(100%, 340px);height:auto}
+.mor-sk{ fill:none;
+stroke:var(--fg);stroke-width:3px;
+	stroke-linejoin:round;
+  stroke-linecap:round}
+.mor-sk *{
+vector-effect:non-scaling-stroke}
+.mor-f1{
+  fill:var(--p1)}
+.mor-f2{
+  fill:var(--p2)}
+.mor-f3{
+	fill:var(--p3)}
+.mor-f4{
+fill:var(--p4)}
+.mor-fw{
+  fill:var(--sf)}
+.mor-state{ padding:12px 4px;
+  text-align:left}
+.mor-fileline{display:flex;flex-wrap:wrap;justify-content:space-between;
+	gap:4px 12px;margin-bottom:14px;
+	font-weight:700;
+overflow-wrap:anywhere}
+.mor-fsize{
+font-family:var(--fm)}
+.mor-bar{
+  height:16px;
+	overflow:hidden;
+border:var(--line);
+	border-radius:99px;
+background:var(--bg)}
+.mor-bar i{
+  display:block; width:0;height:100%;background:var(--ac);border-right:var(--line);
+  transition:width 1.4s ease}
+.mor-msg{margin:16px 0 14px; font-weight:600}
+.mor-fail{padding:.5em .8em;
+border:var(--line);
+	border-radius:var(--rs);
+background:color-mix(in srgb,var(--bd) 22%,
+var(--sf))}
+.mor-feats{
+	display:grid;
+grid-template-columns:repeat(3,
+1fr);
+gap:24px;
+	padding-top:clamp(24px,
+3vw,  40px);padding-bottom:clamp(56px, 7vw,
+104px)}
+.mor-ft{padding:28px; border-radius:var(--rb)}
+.mor-ft:nth-child(1){background:var(--p1);transform:rotate(-1deg)}
+.mor-ft:nth-child(2){
+  background:var(--p2);transform:rotate(1deg)}
+.mor-ft:nth-child(3){
+  background:var(--p3);transform:rotate(-.6deg)}
+.mor-fi{display:block;margin-bottom:46px}
+.mor-fi .mor-ic{
+width:44px;height:44px;stroke-width:1.7}
+.mor-ft h3{margin:0 0 8px;
+	font-size:var(--t1)}
+.mor-ft p{ margin:0}
+.mor-band{padding:clamp(56px,  7vw,  104px) 0;
+  border-radius:calc(var(--rb)*1.6) calc(var(--rb)*1.6) 0 0;background:var(--fg);
+color:var(--bg)}
+.mor-band h2,
+.mor-band h3{
+color:inherit}
+.mor-sh{ display:flex;flex-wrap:wrap;
+  align-items:flex-end;justify-content:space-between;
+  gap:16px 24px; margin-bottom:44px}
+.mor-sh h2{margin:0;
+  font-size:var(--t4);
+  line-height:1.05}
+.mor-sh p{
+  max-width:20em; margin:0; color:color-mix(in srgb,var(--bg) 75%, var(--fg));
+font-size:1.1rem}
+.mor-steps{display:grid;
+grid-template-columns:repeat(3, 1fr);
+	gap:24px; margin:0;padding:0;
+	list-style:none}
+.mor-sc{padding:30px; border:var(--line);
+border-color:var(--bg);
+border-radius:var(--rb);
+background:var(--bg);
+  color:var(--fg)}
+.mor-sc b, .mor-row > b{
+display:grid; place-items:center;
+  width:64px;height:64px;margin-bottom:28px;
+	border:var(--line);border-radius:50%;
+	font:var(--fwh) 1.9rem/1 var(--fh)}
+.mor-sc:nth-child(1) b,
+.mor-row:nth-child(1) > b{
+	background:var(--p1)}
+.mor-sc:nth-child(2) b, .mor-row:nth-child(2) > b{
+background:var(--p2)}
+.mor-sc:nth-child(3) b,
+.mor-row:nth-child(3) > b{background:var(--p4)}
+.mor-sc h3{ margin:0 0 8px;
+font-size:var(--t2)}
+.mor-sc p{
+margin:0;color:var(--mu)}
+.mor-morep{
+margin:36px 0 0}
+.mor-inv{
+	border-color:var(--bg);
+	box-shadow:4px 4px 0 var(--bg); background:var(--fg);color:var(--bg)}
+.mor-inv:hover{
+box-shadow:6px 6px 0 var(--bg)}
+.mor-lim{
+	display:grid; grid-template-columns:1fr 1fr;align-items:start;gap:clamp(28px, 5vw, 80px);
+  padding-top:clamp(56px,  7vw,104px); padding-bottom:clamp(56px,7vw,
+104px)}
+.mor-lim > div,
+.mor-lg2 > div{
+	min-width:0}
+.mor-sh2{
+	margin-bottom:28px}
+.mor-sh2 h2,.mor-lg2 h2{
+  margin:0 0 16px;
+font-size:var(--t3);
+	line-height:1.1}
+.mor-sh2 p{
+margin:14px 0 0;
+color:var(--mu)}
+.mor-big{display:grid;
+	grid-template-columns:1fr 1fr;
+gap:20px;
+  margin-bottom:20px}
+.mor-bg{ display:flex;
+flex-direction:column;
+justify-content:space-between;gap:20px;
+	min-width:0;
+  padding:24px;
+	border-radius:var(--rb)}
+.mor-bg:nth-child(1){ background:var(--p1)}
+.mor-bg:nth-child(2){background:var(--p3)}
+.mor-bg:nth-child(3){background:var(--p2)}
+.mor-bg:nth-child(4){
+background:var(--p4)}
+.mor-bg b{
+font:var(--fwh) clamp(2rem, 3.6vw,3.2rem)/1.1 var(--fh);
+	letter-spacing:-.03em;
+	overflow-wrap:anywhere}
+.mor-bgs b{font-size:clamp(1.4rem, 2vw,1.9rem); letter-spacing:-.02em}
+.mor-bg span{
+  font-weight:650}
+.mor-tbx{
+	overflow:hidden}
+.mor-tbx table{width:100%;
+border-collapse:collapse}
+.mor-tbx th,.mor-tbx td{
+padding:16px 22px;border-top:var(--line);text-align:left;vertical-align:top}
+.mor-tbx tr:first-child > *{ border-top:0}
+.mor-tbx th{font-weight:500}
+.mor-tbx td{text-align:right;
+font-weight:750}
+.mor-qa{margin-bottom:14px; border:var(--line);border-radius:var(--r);background:var(--sf);box-shadow:4px 4px 0 var(--fg)}
+.mor-qa summary{ display:flex;
+  align-items:center;
+  justify-content:space-between;gap:16px;
+  padding:20px 24px;
+	font:800 1.15rem/1.3 var(--fb);
+	letter-spacing:-.01em;
+list-style:none;
+cursor:pointer}
+.mor-qa summary::-webkit-details-marker{display:none}
+.mor-qa summary:focus-visible{ outline:3px solid var(--fg);outline-offset:3px;
+	border-radius:var(--r)}
+.mor-qa i{ display:grid; flex:none;
+place-items:center;width:32px;
+	height:32px;
+border:var(--line); border-radius:50%;
+	background:var(--ac); font:900 1.1rem/1 var(--fb); font-style:normal}
+.mor-qa i::before{
+content:"+"}
+.mor-qa[open] i::before{ content:"–"}
+.mor-qa p{margin:0;
+	padding:0 24px 22px;
+color:var(--mu)}
+.mor-pgh{
+  padding:clamp(20px,  3vw,
+48px) 0 clamp(36px,  5vw,  72px)}
+.mor-pgh .mor-lead{
+margin:0}
+.mor-rows{
+	margin:0;
+padding:0;
+	list-style:none}
+.mor-row{ display:grid;
+grid-template-columns:84px minmax(0, 1fr) minmax(0, 1fr);align-items:center;gap:clamp(20px,3vw,48px);
+  margin-bottom:28px;padding:32px}
+.mor-row > b{width:84px;
+  height:84px;
+margin:0;
+font-size:2.7rem}
+.mor-row:nth-child(2){background:var(--bg)}
+.mor-row h2{ margin:0 0 8px;
+  font-size:var(--t3);line-height:1.1}
+.mor-row p{margin:0;
+	font-size:1.2rem;color:var(--mu)}
+.mor-il{
+  width:100%;
+  max-width:340px;height:auto;
+	justify-self:end}
+.mor-cta{
+  padding:clamp(40px, 6vw,
+88px) 0;text-align:center}
+.mor-cta h2{margin:0 0 24px;
+font-size:var(--t4);
+  line-height:1.05}
+.mor-big4{grid-template-columns:repeat(4,  1fr);
+margin-bottom:clamp(40px,5vw, 64px)}
+.mor-lg2{
+	display:grid;
+	grid-template-columns:1fr 1fr;
+  align-items:start;
+gap:clamp(24px,
+4vw,  64px)}
+.mor-foot{
+	margin-top:0;padding:56px 0 0;
+overflow:hidden;border-top:var(--line);background:var(--ac);
+	color:var(--fg)}
+.mor-fg{
+display:grid;
+grid-template-columns:1.5fr 1fr 1fr 1fr; gap:36px}
+.mor-fg h4{
+margin:0 0 14px;font:700 .9rem var(--fm);
+  letter-spacing:.06em;text-transform:uppercase}
+.mor-fg a{
+  display:block;padding:4px 0;font-weight:600; text-decoration:none}
+.mor-fg a:hover{text-decoration:underline}
+.mor-fg .mor-logo{
+	display:flex;
+	padding:0}
+.mor-fg p{max-width:20em;
+	margin:12px 0 0; font-weight:600}
+.mor-fine2{
+display:flex;
+flex-wrap:wrap;
+  justify-content:space-between; gap:6px 24px; margin-top:40px; font:600 .88rem var(--fm)}
+.mor-wm{margin:8px 0 0;
+	font:var(--fwh) min(200px,calc(120vw/9))/1.3 var(--fh);
+letter-spacing:-.04em;
+	white-space:nowrap}
+.mor-lg{ padding-top:clamp(28px,  4vw,  56px);
+  padding-bottom:clamp(40px,5vw,72px)}
+.mor-lgt h1{font-size:var(--t4)}
+.mor-lgt{
+	counter-reset:s}
+.mor-lgt h2{display:flex; align-items:center;
+	gap:14px;
+counter-increment:s;
+	margin-top:1.6em;
+  font-size:var(--t2)}
+.mor-lgt h2::before{content:counter(s);
+	display:grid;
+	flex:none;place-items:center;width:44px;
+height:44px;border:var(--line);border-radius:50%;background:var(--p1);
+font:var(--fwh) 1.1rem/1 var(--fh)}
+.mor-lgt h2:nth-of-type(4n+2)::before{ background:var(--p2)}
+.mor-lgt h2:nth-of-type(4n+3)::before{
+	background:var(--p3)}
+.mor-lgt h2:nth-of-type(4n+4)::before{background:var(--p4)}
+.mor-toc{border:var(--line);
+  border-radius:var(--r);
+background:var(--sf);
+box-shadow:var(--sh)}
+.mor-toc h2{
+	color:var(--fg); font-family:var(--fm)}
+.mor-toc li::before{
+  color:var(--fg); font-weight:700}
+.mor-code{color:var(--fg);
+	text-shadow:6px 6px 0 var(--p1)}
+.mor-nfa{border:var(--line);
+	box-shadow:8px 8px 0 var(--fg); transform:rotate(2deg)}
+.mor-hb{ margin-bottom:clamp(40px,  5vw,  72px);border-bottom:var(--line); background:var(--p2)}
+.mor-hb .mor-hero{
+	grid-template-columns:1fr 1.05fr;padding-top:clamp(40px,  5vw,72px);padding-bottom:clamp(56px,  6vw,96px)}
+.mor-hb .mor-mk{
+background:var(--sf)}
+.mor-hb .mor-lead{
+color:var(--fg)}
+.mor-pol{
+max-width:320px;margin:0 0 20px;
+	padding:10px 10px 0;border:var(--line);
+border-radius:var(--rs);
+background:var(--sf);
+	box-shadow:var(--sh);
+  transform:rotate(-2deg);
+line-height:0}
+.mor-pol img,  .mor-pol svg{
+	width:100%;height:auto;
+border-radius:calc(var(--rs) - 4px)}
+.mor-pol::after{ content:"";
+  display:block;
+  height:30px}
+@media (max-width:900px){ .mor-nav{
+display:none} .mor-mn{display:block}
+.mor-hero,  .mor-lim,.mor-lg2{grid-template-columns:minmax(0,
+1fr)}
+.mor-steps,.mor-feats{grid-template-columns:1fr}.mor-fg{
+grid-template-columns:1fr 1fr} .mor-fb{
+  grid-column:1/-1}.mor-band{border-radius:28px 28px 0 0}.mor-ft:nth-child(n){
+transform:none}.mor-row{
+  grid-template-columns:64px minmax(0,1fr)}.mor-row > b{
+	width:64px;
+	height:64px;
+font-size:2rem}
+  .mor-il{grid-column:1/-1;
+  justify-self:start;max-width:260px}
+	.mor-big4{
+	grid-template-columns:1fr 1fr}
+	.mor-fi{
+  margin-bottom:24px}
+  .mor-hc .mor-drop{display:flex;
+  text-align:center}
+  .mor-hc .mor-stack{ width:min(100%,340px)}
+	.mor-hc .mor-drop > :not(.mor-stack){
+	justify-self:center}
+  .mor-hb .mor-hero{grid-template-columns:minmax(0, 1fr); padding-bottom:56px} }
+@media (max-width:560px){
+.mor-topbtn{ display:none}
+	.mor-bx,
+.mor-qa{
+  box-shadow:4px 4px 0 var(--fg)}.mor-dz{box-shadow:5px 5px 0 var(--fg)}
+.mor-big,  .mor-big4{ grid-template-columns:1fr}.mor-sh{margin-bottom:28px}
+.mor-row{padding:22px;gap:16px 18px} .mor-sc{
+padding:24px} .mor-tbx th,.mor-tbx td{padding:14px 16px} .mor-qa summary{padding:16px 18px}
+	.mor-qa p{
+padding:0 18px 18px}
+  h1{font-size:clamp(2rem,10.4vw,  var(--t5));
+  overflow-wrap:anywhere;hyphens:auto} .mor-lgt h1{ font-size:clamp(2rem,9vw,  var(--t4))} }
+@media (max-width:720px){.mor-lg{
+grid-template-columns:minmax(0,  1fr)}
+}
+.mor-lg > *{
+min-width:0}
+.mor-lgt h1,  .mor-lgt h2{
+overflow-wrap:anywhere;
+hyphens:auto}
+</style>
+</head>
+<body>
+<header class="mor-top">
+<div class="mor-wrap mor-topin">
+<a class="mor-logo" data-page="index.html"><svg class="mor-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="25" fill="#c4a8ff"></rect><path d="M0 46 L35 35 L64 46 V64 H0z" fill="#ffd23f" opacity=".9"></path><circle cx="41" cy="16" r="7" fill="#0b0b10"></circle></svg><span>Quillhand</span></a>
+<nav class="mor-nav" aria-label="Main"><a aria-current="page" data-page="index.html">Send a file</a><a data-page="how-it-works.html">How it works</a><a data-page="faq.html">Limits and FAQ</a></nav>
+  <a class="mor-btn mor-topbtn" data-page="index.html">Choose file</a>
+<details class="mor-mn"><summary class="mor-mnb" aria-label="Main"><svg viewBox="0 0 24 24" aria-hidden="true" class="mor-ic" width="24" height="24" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" class="mor-ic"><path d="M6 6l12 12M18 6L6 18"></path></svg></summary><div class="mor-mnl"><a aria-current="page" data-page="index.html">Send a file</a><a data-page="how-it-works.html">How it works</a><a data-page="faq.html">Limits and FAQ</a><a data-page="privacy/index.html">Privacy</a><a data-page="legal/terms.html">Terms of use</a></div>
+     </details>
+</div>
+     </header>
+	
+<main>
+<section class="mor-hb">
+<div class="mor-wrap mor-hero">
+<div class="mor-dz">
+<span class="mor-tag">500 MB</span>
+<div class="mor-drop" id="mor-d" tabindex="0" role="button" aria-label="Drop a file here">
+<svg class="mor-stack" viewBox="0 0 360 190" aria-hidden="true" focusable="false">
+<g class="mor-sk">
+<g transform="rotate(-6 110 90)"><path class="mor-f1" d="M70 22h70l24 24v86H70z"></path><path class="mor-fw" d="M140 22v24h24"></path></g>
+<g transform="rotate(7 250 86)"><path class="mor-f2" d="M210 18h70l24 24v90H210z"></path><path class="mor-fw" d="M280 18v24h24"></path></g>
+<g transform="translate(5 0)"><path class="mor-f3" d="M140 34h80l26 26v100H140z"></path><path class="mor-fw" d="M220 34v26h26"></path>
+<circle class="mor-fw" cx="172" cy="108" r="9"></circle><path class="mor-f4" d="M150 152l24-26 18 16 14-12 24 22z"></path></g>
+<path d="M30 168h300"></path>
+</g>
+</svg>
+<strong class="mor-dh">Drop a file here</strong>
+<span class="mor-dhint">or choose one from your device, up to 500 MB</span>
+<button class="mor-btn mor-pk" id="mor-pick" type="button"><svg class="mor-ic" viewBox="0 0 24 24" width="24" height="24" focusable="false" aria-hidden="true"><path d="M12 16V5M7.5 9.5L12 5l4.5 4.5M5 19h14"></path></svg>Choose file</button>
+<input type="file" id="mor-in" hidden=""/>
+</div>
+<div class="mor-state" id="mor-s" role="status" hidden="">
+<div class="mor-fileline"><span class="mor-fname" id="mor-fn"></span><span class="mor-fsize" id="mor-fz"></span></div>
+<div class="mor-bar"><i id="mor-bi"></i></div>
+		<p class="mor-msg" id="mor-m"></p>
+  <button class="mor-btn mor-ghost" id="mor-again" type="button" hidden="">Try again</button>
+</div>
+	</div>
+  
+<div class="mor-ht"><span class="mor-sticker">Assignments</span>
+<h1>Hand in your <span class="mor-mk">work</span></h1>
+<p class="mor-lead">Upload your assignment here before the deadline. One file, up to 500 MB.</p>
+      <span class="mor-fine">Files are removed automatically when the link expires.</span></div>
+  </div>
+ </section>
+     <section class="mor-wrap mor-feats">
+<div class="mor-ft mor-bx"><span class="mor-fi"><svg class="mor-ic" focusable="false" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span><h3>Links that expire</h3>
+<p>Every link works for 30 days, so nothing is left lying around.</p>
+	</div>
+	<div class="mor-ft mor-bx"><span class="mor-fi"><svg class="mor-ic" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1-4 4-6 8-6s7 2 8 6M4 4l16 16"></path></svg></span><h3>No sign-up</h3>
+      <p>Files up to 500 MB can be sent without an account.</p>
+
+</div>
+ <div class="mor-ft mor-bx"><span class="mor-fi"><svg viewBox="0 0 24 24" aria-hidden="true" width="24" height="24" focusable="false" class="mor-ic"><path d="M13 3L5 13.500h6L10 21l8-10.500h-6z"></path></svg></span><h3>Plain and quick</h3>
+      <p>Add a file, copy the link, pass it on. That is all there is to it.</p>
+</div>
+      </section>
+     <section class="mor-wrap mor-lim">
+<div>
+<div class="mor-sh2"><h2>Limits and FAQ</h2>
+<p>The numbers that matter, in one place.</p>
+	</div>
+<div class="mor-big"><div class="mor-bx mor-bg"><b>500 MB</b><span>Largest file</span></div>
+ <div class="mor-bx mor-bg"><b>30 days</b><span>Link lifetime</span></div>
+
+</div>
+		<div class="mor-tbx mor-bx"><table><tbody><tr><th scope="row">Files per upload</th>
+      <td>One (zip several files together)</td>
+		</tr>
+        <tr><th scope="row">Downloads per link</th>
+   <td>Unlimited until it expires</td>
+      </tr>
+      </tbody></table>
+  </div>
+
+  </div>
+
+<div>
+<div class="mor-sh2"><h2>Common questions</h2>
+    </div>
+		<details class="mor-qa" open=""><summary>Do I need an account?<i></i></summary><p>No. You can send files up to 500 MB without signing in.</p>
+
+</details>
+<details class="mor-qa"><summary>How long does my link last?<i></i></summary><p>Links work for 30 days. After that the file is deleted and the link stops working.</p>
+ </details>
+<details class="mor-qa"><summary>Can the recipient see my name?<i></i></summary><p>Only if you tell them. The download page shows nothing about you.</p>
+    </details>
+<details class="mor-qa"><summary>What happens to my file once the link expires?<i></i></summary><p>It is removed from storage. We do not keep a copy.</p>
+</details>
+</div>
+    </section>
+     <section class="mor-band">
+<div class="mor-wrap">
+<div class="mor-sh"><h2>How it works</h2>
+
+<p>Three steps, nothing to set up.</p>
+ </div>
+        <ol class="mor-steps"><li class="mor-sc"><b>1</b><h3>Choose a file</h3>
+    <p>Drop the file on the start page or pick it from your device.</p>
+     </li>
+  <li class="mor-sc"><b>2</b><h3>Get a link</h3>
+
+  <p>When the upload is done you get a link that you can copy.</p>
+    </li>
+     <li class="mor-sc"><b>3</b><h3>Share the link</h3>
+     <p>Anyone who has the link can download the file until it expires.</p>
+      </li>
+     </ol>
+     <p class="mor-morep"><a class="mor-btn mor-ghost mor-inv" data-page="how-it-works.html">How it works<svg aria-hidden="true" class="mor-ic" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a></p>
+		</div>
+      </section>
+    </main>
+
+<footer class="mor-foot">
+<div class="mor-wrap">
+<div class="mor-fg">
+<div class="mor-fb"><a class="mor-logo" data-page="index.html"><svg class="mor-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="25" fill="#c4a8ff"></rect><path d="M0 46 L35 35 L64 46 V64 H0z" fill="#ffd23f" opacity=".9"></path><circle cx="41" cy="16" r="7" fill="#0b0b10"></circle></svg><span>Quillhand</span></a><p>Share files up to 500 MB with a single link, from Quillhand.</p>
+     </div>
+ <div><h4>Main</h4>
+		<a class="mor-fa" data-page="index.html">Send a file</a><a class="mor-fa" data-page="how-it-works.html">How it works</a><a class="mor-fa" data-page="faq.html">Limits and FAQ</a></div>
+   <div><h4>Privacy</h4>
+  <a class="mor-fa" data-page="privacy/index.html">What we keep</a><a class="mor-fa" data-page="privacy/index.html">How long we keep it</a><a class="mor-fa" data-page="privacy/index.html">Who can see it</a></div>
+<div><h4>Terms of use</h4>
+<a class="mor-fa" data-page="legal/terms.html">Using the service</a><a class="mor-fa" data-page="legal/terms.html">Your part</a><a class="mor-fa" data-page="legal/terms.html">What is not allowed</a></div>
+</div>
+     <div class="mor-fine2"><span>Files are removed automatically when the link expires.</span><span>© 2015–2026 Quillhand</span></div>
+
+  <div class="mor-wm" aria-hidden="true">Quillhand</div>
+        </div>
+    </footer>
+		
+
+
+
+</body></html>

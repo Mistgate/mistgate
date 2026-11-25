@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Mistgate · Diagnostics</title>
+<script src="./support.js"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@500..700&amp;family=Noto+Sans+SC:wght@400..800&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="cAzh" data-app><div class="desk">
+<div class="mg app t-{{theme}} a-{{accent}}">
+
+  <nav class="rail" aria-label="Sections">
+    <img class="rlogo {{brLogoC}}" src="{{logo}}" alt="{{brAlt}}" width="32" height="32">
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2.2"/></svg><span class="rbl">主页</span></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2.6"/><circle cx="18" cy="5" r="2.6"/><path d="M8.6 19H16.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h7.9"/></svg><span class="rbl">路由</span></a>
+    <a class="rb on" href="#app" aria-current="page"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6.5 5 13 2.5-6.5H21"/></svg><span class="rbl">诊断</span><i class="rdot {{rdDiag}}" aria-hidden="true"></i></a>
+    <a class="rb" href="#app"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="rbl">设置</span><i class="rdot {{rdSet}}" aria-hidden="true"></i></a>
+    <a class="rb sub" href="https://vpn.example.com" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1"/></svg><span class="rbl">订阅页面</span></a>
+  </nav>
+
+  <div class="content">
+    <header class="tb">
+    <sc-if value="{{bn.on}}" hint-placeholder-val="{{false}}">
+    <div class="bn {{bn.tone}}" role="status">
+      <a class="bn-m" href="{{bn.href}}"><span class="gl g-{{bn.icon}}" aria-hidden="true"></span><b>{{bn.t}}</b><span class="bn-s {{bn.sC}}">{{bn.s}}</span></a>
+      <sc-if value="{{bn.hasAct}}" hint-placeholder-val="{{false}}"><a class="bn-a" href="{{bn.href}}">{{bn.act}}</a></sc-if>
+      <button class="bn-x" onClick="{{bn.close}}" aria-label="隐藏"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+    </div>
+    </sc-if>
+    <div class="tbs {{tbs.c}}">
+      <a class="tbs-s" href="#app" title="Open Home"><i class="tbs-d" aria-hidden="true"></i><span>{{tbs.t}}</span><span class="tbs-m {{tbs.mc}}">{{tbs.m}}</span></a>
+      <button class="tbs-p" onClick="{{tbs.go}}" aria-label="{{tbs.a}}" title="{{tbs.a}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg></button>
+    </div>
+    <div class="cap">
+      <button aria-label="Minimize to tray"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button aria-label="Maximize"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg></button>
+      <button aria-label="Close window"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    </header>
+
+    <main class="dgm">
+      <section class="dg-l">
+        <h1 class="h1x">诊断</h1>
+        <p class="rt-sub">找出无法使用的原因</p>
+        <sc-if value="{{asked}}" hint-placeholder-val="{{false}}">
+          <div class="ask rise"><span class="gl g-user-badge-check" aria-hidden="true"></span><span class="tx"><b>管理员请求诊断数据</b><span>以便协助处理您的连接问题</span></span><button class="addb sm2" onClick="{{openRep}}">查看</button></div>
+        </sc-if>
+
+        <div class="ck">
+          <sc-if value="{{isIdle}}" hint-placeholder-val="{{false}}">
+            <div class="ck-idle rise">
+              <div class="radar" aria-hidden="true"><i></i><i></i><i></i><span class="sweep"></span><span class="gl g-activity" aria-hidden="true"></span></div>
+              <b>检查您的网络</b>
+              <p>测试每台服务器，并查找封锁、限速和地址篡改。约 2 分半钟，期间连接不会中断</p>
+              <button class="cta" onClick="{{start}}">检查网络</button>
+              <p class="ck-last">尚未在此网络检查</p>
+            </div>
+          </sc-if>
+          <sc-if value="{{isRun}}" hint-placeholder-val="{{false}}">
+            <div class="ck-run rise">
+              <div class="rn-h">
+                <div class="rn-ring" style="--rp:{{runPct}}" aria-hidden="true"><span>{{runPct}}</span></div>
+                <div class="tx"><b class="shim">正在检查网络</b><span>{{runTime}}</span></div>
+              </div>
+              <div class="tl">
+                <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+                  <div class="tl-s {{s.c}}"><span class="tl-n"><i aria-hidden="true"></i><span class="okc"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span></span><span class="tx"><b>{{s.name}}</b><span>{{s.note}}</span></span></div>
+                </sc-for>
+              </div>
+              <button class="lnk3" onClick="{{cancel}}">取消检查</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{isDone}}" hint-placeholder-val="{{true}}">
+            <div class="ck-done rise">
+              <div class="vh {{R.tone}}"><span class="vh-ic"><span class="gl wi g-warning-circle" aria-hidden="true"></span><span class="gl ci g-check-circle" aria-hidden="true"></span></span><span class="tx"><b>{{R.title}}</b><span>{{R.sub}}</span></span></div>
+              <div class="sum">
+                <sc-for list="{{facts}}" as="f" hint-placeholder-count="4"><div class="sm-r"><span class="gl g-{{f.g}}" aria-hidden="true"></span><span class="k">{{f.k}}</span><span class="v {{f.c}}">{{f.v}}</span></div></sc-for>
+              </div>
+              <button class="cta ck-go" onClick="{{start}}"><svg class="i rf" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.57 12.66A7.6 7.6 0 1 1 17.37 6.63L19.3 8.55"/><path d="M19.3 4.75v3.8h-3.8"/></svg><span class="cg-t"><b>重新测试服务器</b><small>48 分钟后可再次完整检查</small></span></button>
+              <div class="ck-meta"><span><span class="gl g-clock" aria-hidden="true"></span>2 分钟前已检查</span><button class="lnk2 {{sumCls}}" onClick="{{copySum}}"><span class="gl g-copy" aria-hidden="true"></span>{{copyTxt2}}</button></div>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{showHelp}}" hint-placeholder-val="{{true}}">
+        <div class="help">
+          <span class="mono lav"><span class="gl g-lifebelt" aria-hidden="true"></span></span>
+          <span class="tx"><b>还是不行？</b><span>{{helpTxt}}</span></span>
+          <button class="lsb" onClick="{{openRep}}">{{helpBtn}}</button>
+        </div>
+        </sc-if>
+        <sc-if value="{{isMg}}" hint-placeholder-val="{{true}}">
+        <div class="anon {{anonBox}}">
+          <span class="tx"><b>帮助发现封锁</b><span>{{anonTxt}}<sc-if value="{{anonMore}}" hint-placeholder-val="{{false}}"> <a class="anon-l" href="#app">发送内容</a></sc-if></span></span>
+          <button class="sw {{anonCls}}" role="switch" aria-checked="{{anonOn}}" onClick="{{toggleAnon}}" aria-label="Help find blocks: share anonymous data with My subscription"></button>
+        </div>
+        </sc-if>
+      </section>
+
+      <section class="lcard dg-r" aria-label="结果">
+        <div class="utabs" role="tablist" aria-label="View">
+          <button class="{{tCls.res}}" role="tab" aria-selected="{{tOn.res}}" onClick="{{tPick.res}}"><span class="gl g-check-circle" aria-hidden="true"></span>结果</button>
+          <button class="{{tCls.log}}" role="tab" aria-selected="{{tOn.log}}" onClick="{{tPick.log}}"><span class="gl g-journal-page" aria-hidden="true"></span>日志<span class="k">3 条新记录</span></button>
+        </div>
+        <sc-if value="{{isRes}}" hint-placeholder-val="{{true}}">
+          <sc-if value="{{hasRes}}" hint-placeholder-val="{{true}}">
+            <div class="dres">
+              <div class="best {{bestCls}}"><span class="gl g-star" aria-hidden="true"></span><span class="tx"><b>最适合您的网络</b><span>{{R.best}}</span></span><button class="lsb sm">使用</button></div>
+              <p class="sec-h">服务器<span class="n">{{R.srvSum}}</span></p>
+              <div class="dlist">
+              <sc-for list="{{srvRows}}" as="x" hint-placeholder-count="4">
+                <div class="dr {{x.oc}}">
+                  <button class="dr-b" onClick="{{x.tog}}" aria-expanded="{{x.ox}}">
+                    <span class="mono {{x.tone}} {{x.fc}}"><img class="{{x.ic}}" src="{{x.flag}}" alt=""><span class="gl g-{{x.g}} {{x.gc}}" aria-hidden="true"></span></span>
+                    <span class="tx"><b>{{x.name}}<span class="term {{x.termC}}">{{x.term}}</span></b><span>{{x.meta}}</span></span>
+                    <span class="vchip {{x.vc}}"><span class="gl g-{{x.vi}}" aria-hidden="true"></span>{{x.vt}}</span>
+                    <svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                  <div class="dr-act {{x.actC}}"><button class="addb sm {{x.actBtnC}}" onClick="{{x.actGo}}">{{x.actT}}</button><span class="dr-ok {{x.actOkC}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg>{{x.actDone}}</span></div>
+                  <sc-if value="{{x.isOpen}}" hint-placeholder-val="{{false}}">
+                    <div class="dr-d {{x.ddc}}">
+                      <div class="hops {{x.hpc}}" aria-label="Route hops"><span class="hop {{x.hc.0}}"><i></i><small>1</small></span><span class="hop {{x.hc.1}}"><i></i><small>2</small></span><span class="hop {{x.hc.2}}"><i></i><small>3</small></span><span class="hop {{x.hc.3}}"><i></i><small>4</small></span><span class="hop {{x.hc.4}}"><i></i><small>5</small></span><span class="hop {{x.hc.5}}"><i></i><small>6</small></span><span class="hop {{x.hc.6}}"><i></i><small>7</small></span><span class="hop {{x.hc.7}}"><i></i><small>8</small></span><span class="hop {{x.hc.8}}"><i></i><small>9</small></span><span class="hop {{x.hc.9}}"><i></i><small>10</small></span><span class="hop {{x.hc.10}}"><i></i><small>11</small></span></div>
+                      <div class="pths {{x.ppc}}"><p class="pths-h">到此服务器的线路</p><div class="pth {{x.p0.c}}"><span class="pth-n">{{x.p0.n}}</span><span class="pth-m">{{x.p0.m}}</span><span class="vchip sm {{x.p0.vc}}"><span class="gl g-{{x.p0.vi}}" aria-hidden="true"></span>{{x.p0.vt}}</span></div><div class="pth {{x.p1.c}}"><span class="pth-n">{{x.p1.n}}</span><span class="pth-m">{{x.p1.m}}</span><span class="vchip sm {{x.p1.vc}}"><span class="gl g-{{x.p1.vi}}" aria-hidden="true"></span>{{x.p1.vt}}</span></div><div class="pth {{x.p2.c}}"><span class="pth-n">{{x.p2.n}}</span><span class="pth-m">{{x.p2.m}}</span><span class="vchip sm {{x.p2.vc}}"><span class="gl g-{{x.p2.vi}}" aria-hidden="true"></span>{{x.p2.vt}}</span></div><div class="pth {{x.p3.c}}"><span class="pth-n">{{x.p3.n}}</span><span class="pth-m">{{x.p3.m}}</span><span class="vchip sm {{x.p3.vc}}"><span class="gl g-{{x.p3.vi}}" aria-hidden="true"></span>{{x.p3.vt}}</span></div></div>
+                      <p class="dl-l {{x.l0c}}">{{x.l0}}</p><p class="dl-l {{x.l1c}}">{{x.l1}}</p>
+                      <p class="conf {{x.cc}}"><span class="gl g-community" aria-hidden="true"></span>{{x.conf}}</p>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              </div>
+              <p class="sec-h">网络<span class="n {{netCls}}">{{R.netSum}}</span></p>
+              <div class="dlist">
+              <sc-for list="{{netRows}}" as="x" hint-placeholder-count="4">
+                <div class="dr {{x.oc}}">
+                  <button class="dr-b" onClick="{{x.tog}}" aria-expanded="{{x.ox}}">
+                    <span class="mono {{x.tone}} {{x.fc}}"><img class="{{x.ic}}" src="{{x.flag}}" alt=""><span class="gl g-{{x.g}} {{x.gc}}" aria-hidden="true"></span></span>
+                    <span class="tx"><b>{{x.name}}<span class="term {{x.termC}}">{{x.term}}</span></b><span>{{x.meta}}</span></span>
+                    <span class="vchip {{x.vc}}"><span class="gl g-{{x.vi}}" aria-hidden="true"></span>{{x.vt}}</span>
+                    <svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                  <div class="dr-act {{x.actC}}"><button class="addb sm {{x.actBtnC}}" onClick="{{x.actGo}}">{{x.actT}}</button><span class="dr-ok {{x.actOkC}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg>{{x.actDone}}</span></div>
+                  <sc-if value="{{x.isOpen}}" hint-placeholder-val="{{false}}">
+                    <div class="dr-d {{x.ddc}}">
+                      <div class="hops {{x.hpc}}" aria-label="Route hops"><span class="hop {{x.hc.0}}"><i></i><small>1</small></span><span class="hop {{x.hc.1}}"><i></i><small>2</small></span><span class="hop {{x.hc.2}}"><i></i><small>3</small></span><span class="hop {{x.hc.3}}"><i></i><small>4</small></span><span class="hop {{x.hc.4}}"><i></i><small>5</small></span><span class="hop {{x.hc.5}}"><i></i><small>6</small></span><span class="hop {{x.hc.6}}"><i></i><small>7</small></span><span class="hop {{x.hc.7}}"><i></i><small>8</small></span><span class="hop {{x.hc.8}}"><i></i><small>9</small></span><span class="hop {{x.hc.9}}"><i></i><small>10</small></span><span class="hop {{x.hc.10}}"><i></i><small>11</small></span></div>
+                      <div class="pths {{x.ppc}}"><p class="pths-h">到此服务器的线路</p><div class="pth {{x.p0.c}}"><span class="pth-n">{{x.p0.n}}</span><span class="pth-m">{{x.p0.m}}</span><span class="vchip sm {{x.p0.vc}}"><span class="gl g-{{x.p0.vi}}" aria-hidden="true"></span>{{x.p0.vt}}</span></div><div class="pth {{x.p1.c}}"><span class="pth-n">{{x.p1.n}}</span><span class="pth-m">{{x.p1.m}}</span><span class="vchip sm {{x.p1.vc}}"><span class="gl g-{{x.p1.vi}}" aria-hidden="true"></span>{{x.p1.vt}}</span></div><div class="pth {{x.p2.c}}"><span class="pth-n">{{x.p2.n}}</span><span class="pth-m">{{x.p2.m}}</span><span class="vchip sm {{x.p2.vc}}"><span class="gl g-{{x.p2.vi}}" aria-hidden="true"></span>{{x.p2.vt}}</span></div><div class="pth {{x.p3.c}}"><span class="pth-n">{{x.p3.n}}</span><span class="pth-m">{{x.p3.m}}</span><span class="vchip sm {{x.p3.vc}}"><span class="gl g-{{x.p3.vi}}" aria-hidden="true"></span>{{x.p3.vt}}</span></div></div>
+                      <p class="dl-l {{x.l0c}}">{{x.l0}}</p><p class="dl-l {{x.l1c}}">{{x.l1}}</p>
+                      <p class="conf {{x.cc}}"><span class="gl g-community" aria-hidden="true"></span>{{x.conf}}</p>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{noRes}}" hint-placeholder-val="{{false}}">
+            <div class="empty">
+              <span class="e-ic"><span class="gl g-shield-search" aria-hidden="true"></span></span>
+              <b>{{emT}}</b>
+              <p>{{emS}}</p>
+              <div class="e-act {{emBtn}}"><button class="addb" onClick="{{start}}">检查网络</button></div>
+            </div>
+          </sc-if>
+        </sc-if>
+        <sc-if value="{{isLog}}" hint-placeholder-val="{{false}}">
+          <div class="lgbar">
+            <label class="search lgs"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input type="text" placeholder="搜索日志" aria-label="搜索日志"></label>
+            <div class="lgf" role="tablist" aria-label="Level">
+              <button class="{{lfCls.all}}" onClick="{{lfPick.all}}">全部</button>
+              <button class="{{lfCls.warn}}" onClick="{{lfPick.warn}}"><i class="lvd warn" aria-hidden="true"></i>警告<span class="k">3</span></button>
+              <button class="{{lfCls.error}}" onClick="{{lfPick.error}}"><i class="lvd error" aria-hidden="true"></i>错误<span class="k">1</span></button>
+            </div>
+          </div>
+          <div class="lg">
+            <p class="lg-day">今天</p>
+            <sc-for list="{{logRows}}" as="g" hint-placeholder-count="12">
+              <div class="lgl {{g.lv}}" title="{{g.lvT}}"><time>{{g.t}}</time><i class="ld" aria-hidden="true"></i><span class="lsrc">{{g.src}}</span><span class="msg">{{g.msg}}</span></div>
+            </sc-for>
+          </div>
+          <div class="lgfoot">
+            <button class="lvb {{liveCls}}" onClick="{{toggleLive}}"><i aria-hidden="true"></i>{{liveTxt}}</button>
+            <span class="lgn">{{logN}} 条记录 · 最近 24 小时</span>
+            <button class="lsb sm"><span class="gl g-copy" aria-hidden="true"></span><span>复制</span></button>
+            <button class="lsb sm"><span class="gl g-download" aria-hidden="true"></span><span>保存</span></button>
+            <button class="lsb sm ghost">清空</button>
+          </div>
+        </sc-if>
+      </section>
+    </main>
+  </div>
+
+  <sc-if value="{{repShown}}" hint-placeholder-val="{{false}}">
+    <div class="scrim" onClick="{{closeRep}}"></div>
+    <div class="sheet" role="dialog" aria-label="向管理员求助">
+      <sc-if value="{{repForm}}" hint-placeholder-val="{{true}}">
+        <div class="sh-h"><div class="tx"><b>{{shTitle}}</b><span>{{shSub}}</span></div><button class="back" onClick="{{closeRep}}" aria-label="关闭"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>
+        <p class="sh-p">{{shP}}</p>
+        <div class="parts">
+          <sc-for list="{{parts}}" as="p" hint-placeholder-count="6">
+            <button class="part {{p.cls}}" role="checkbox" aria-checked="{{p.on}}" onClick="{{p.flip}}"><span class="cb"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span><span class="gl g-{{p.g}}" aria-hidden="true"></span><span class="tx"><b>{{p.name}}</b><span>{{p.sub}}</span></span></button>
+          </sc-for>
+        </div>
+        <p class="never"><span class="gl g-lock" aria-hidden="true"></span>绝不包含：电脑名称、访问的网站、密钥、您的 IP</p>
+        <label class="ta"><textarea placeholder="发生了什么？（选填）" aria-label="What happened"></textarea></label>
+        <div class="sh-f">
+          <button class="lnk2"><span class="gl g-eye" aria-hidden="true"></span>查看内容</button>
+          <span class="sz">{{repSize}}</span>
+          <sc-if value="{{intakeOn}}" hint-placeholder-val="{{true}}"><button class="addb" onClick="{{sendRep}}"><span class="gl g-send-diagonal" aria-hidden="true"></span>发送给管理员</button></sc-if>
+          <sc-if value="{{intakeOff}}" hint-placeholder-val="{{false}}"><button class="addb" onClick="{{closeRep}}"><span class="gl g-download" aria-hidden="true"></span>保存为文件</button></sc-if>
+        </div>
+        <sc-if value="{{offWarn}}" hint-placeholder-val="{{false}}"><p class="sh-warn"><span class="gl g-warning-circle" aria-hidden="true"></span>管理员暂不支持在应用内接收诊断数据。请保存文件后发送给管理员</p></sc-if>
+      </sc-if>
+      <sc-if value="{{repSent}}" hint-placeholder-val="{{false}}">
+        <div class="sent rise">
+          <span class="sent-ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9"/></svg></span>
+          <b>已发送给管理员</b>
+          <p>将此代码告诉客服，以便找到您的诊断数据</p>
+          <div class="code"><span>MG-7K3F</span><button class="lsb {{copyCls}}" onClick="{{copy}}"><span class="gl g-copy" aria-hidden="true"></span><span>{{copyTxt}}</span></button></div>
+          <button class="lsb" onClick="{{closeRep}}">完成</button>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+</div>
+  <div lang="en" class="dev dtop" role="toolbar" aria-label="Prototype states">
+    <div class="dg"><span class="dl">Check</span><div class="ds"><button class="{{dv.ck_idle}}" onClick="{{dvSet.ck_idle}}">Not run</button><button class="{{dv.ck_run}}" onClick="{{dvSet.ck_run}}">Running</button><button class="{{dv.ck_issues}}" onClick="{{dvSet.ck_issues}}">Issues</button><button class="{{dv.ck_good}}" onClick="{{dvSet.ck_good}}">All good</button></div></div>
+    <div class="dg"><span class="dl">Tab</span><div class="ds"><button class="{{dv.tb_res}}" onClick="{{dvSet.tb_res}}">Results</button><button class="{{dv.tb_log}}" onClick="{{dvSet.tb_log}}">Log</button></div></div>
+  </div>
+  <div lang="en" class="dev" role="toolbar" aria-label="Report states">
+    <div class="dg"><span class="dl">Debug report</span><div class="ds"><button class="{{dv.rp_closed}}" onClick="{{dvSet.rp_closed}}">Closed</button><button class="{{dv.rp_open}}" onClick="{{dvSet.rp_open}}">Open</button><button class="{{dv.rp_sent}}" onClick="{{dvSet.rp_sent}}">Sent</button><button class="{{dv.rp_off}}" onClick="{{dvSet.rp_off}}">Intake off</button><button class="{{dv.rp_asked}}" onClick="{{dvSet.rp_asked}}">Admin asks</button></div></div>
+    <div class="dg"><span class="dl">Mode</span><div class="ds"><button class="{{dv.md_mg}}" onClick="{{dvSet.md_mg}}">Mistgate</button><button class="{{dv.md_basic}}" onClick="{{dvSet.md_basic}}">Basic</button></div></div>
+    <div class="dg"><span class="dl">Theme</span><div class="ds"><button class="{{dv.th_dark}}" onClick="{{dvSet.th_dark}}">Dark</button><button class="{{dv.th_light}}" onClick="{{dvSet.th_light}}">Light</button></div></div>
+  </div>
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"check":{"editor":"enum","options":["idle","run","issues","good"],"default":"issues","section":"State"},"tab":{"editor":"enum","options":["res","log"],"default":"res","section":"State"},"report":{"editor":"enum","options":["closed","open","sent","off","asked"],"default":"closed","section":"State"},"mode":{"editor":"enum","options":["mg","basic"],"default":"mg","section":"State"},"anon":{"editor":"enum","options":["off","on","fresh","sending","old"],"default":"off","section":"State"},"op":{"editor":"enum","options":["known","unknown"],"default":"known","section":"State"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"accent":{"editor":"enum","options":["lavender","mint","sand","rose"],"default":"lavender","section":"Look"},"$preview":{"width":1160,"height":800}}'>
+class Component extends DCLogic {
+  st() { return this.state || {}; }
+  start() {
+    clearTimeout(this.tk);
+    this.setState({ ck: 'run', step: 0, t0: 0 });
+    const go = (k) => {
+      if (this.st().ck !== 'run') return;
+      if (k >= 5) { this.setState({ ck: 'issues', open: { net0: true, srv0: true } }); return; }
+      this.setState({ step: k });
+      this.tk = setTimeout(() => go(k + 1), 1300);
+    };
+    this.tk = setTimeout(() => go(0), 30);
+  }
+  renderVals() {
+    const logos = { lavender: '/_blob/0b62512895ad639ab01894d9cfc68db6', mint: '/_blob/7e2cbe098a3f586b63d3e07c56f17a01', sand: '/_blob/12736226f7d078aa98183de30675f863', rose: '/_blob/766bb9e952957b786b037a8ba7882911' };
+    const s0 = this.st();
+    const theme = (s0.theme || this.props.theme) === 'light' ? 'light' : 'dark';
+    const accent = logos[this.props.accent] ? this.props.accent : 'lavender';
+    const ck = s0.ck || this.props.check || 'issues';
+    const tab = s0.tab || this.props.tab || 'res';
+    const rep = s0.rep || this.props.report || 'closed';
+    const RES = {"issues": {"srv": [{"flag": "/_blob/e496c2fcbf4e9bb39112cabd5bf7f493", "name": "德国", "v": "ok", "alt": "", "meta": "通过 VLESS · TCP 可用 — 4 种方式中有 2 种可通", "paths": [{"n": "VLESS · TCP · 直连", "v": "ok", "m": "38 毫秒 · 12.4 Mbps"}, {"n": "VLESS · TCP · 经 RU 中继", "v": "ok", "m": "61 毫秒 · 9.8 Mbps"}, {"n": "Hysteria2 · 直连", "v": "blocked", "m": "UDP 无响应"}, {"n": "Hysteria2 · WARP 出口", "v": "blocked", "m": "UDP 无响应"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/e03fb05e0bdcc00f476374f00844dcf0", "name": "荷兰 · 阿姆斯特丹", "v": "slow", "alt": "", "meta": "Hysteria2 的速度几秒后下降；VLESS · TCP 正常", "paths": [{"n": "Hysteria2 · 直连", "v": "slow", "m": "丢包增加但延迟不变 · 3.1 Mbps"}, {"n": "VLESS · TCP · 直连", "v": "ok", "m": "48 毫秒 · 11.0 Mbps"}, {"n": "AmneziaWG · 直连", "v": "app", "m": "Mistgate 无法启动此协议"}], "conf": "您运营商的 214 位用户也遇到", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5fcef1b651d4897d4bd86b5dfbd3e9a7", "name": "罗马尼亚", "v": "freeze", "alt": "", "meta": "可以连接，但下载在 64 KB 后停止", "paths": [{"n": "VLESS · TCP · 直连", "v": "freeze", "m": "64 KB 后停滞 6 秒"}, {"n": "VLESS · XHTTP · 直连", "v": "freeze", "m": "64 KB 后停滞 6 秒"}], "conf": "看起来是 DPI 在切断长连接", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5a45af717ce4d720751cf765c6d0a732", "name": "芬兰 · 赫尔辛基", "v": "down", "alt": "", "meta": "是服务器本身没有响应 — 这不是封锁", "paths": [{"n": "AmneziaWG · 直连", "v": "down", "m": "服务器无响应"}, {"n": "VLESS · TCP · 直连", "v": "down", "m": "服务器拒绝连接"}], "conf": "其他人也遇到同样的问题 — 服务商已知晓", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/ebb260239dba6f20ae05c4141595c5d8", "name": "波兰", "v": "config", "alt": "", "meta": "订阅中此服务器的设置有误。只有服务商能修复", "paths": [{"n": "VLESS · TCP · 直连", "v": "config", "m": "服务器拒绝了密钥"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": ["告知服务商", "已发送给服务商"]}], "net": [{"flag": "", "name": "路径上的封锁", "v": "blocked", "alt": "在第 6 跳发现", "meta": "从境外网站的长时间下载可能会卡住。Mistgate 会让您保持使用 VLESS · TCP", "paths": [], "conf": "您运营商的 1,204 位用户也遇到", "g": "shield-search", "tone": "sand", "hops": [{"n": "1", "c": "ok"}, {"n": "2", "c": "ok"}, {"n": "3", "c": "ok"}, {"n": "4", "c": "ok"}, {"n": "5", "c": "ok"}, {"n": "6", "c": "bad"}, {"n": "7", "c": "off"}, {"n": "8", "c": "off"}, {"n": "9", "c": "off"}, {"n": "10", "c": "off"}, {"n": "11", "c": "off"}], "lines": ["被封锁的测试地址在第 6 跳（共 11 跳）被切断", "对照地址通过每一跳"], "hasFlag": false, "term": "DPI · ТСПУ", "act": []}, {"flag": "", "name": "快速协议", "v": "blocked", "alt": "", "meta": "Hysteria2 和 AmneziaWG 在此网络中不可用。Mistgate 改用 VLESS · TCP", "paths": [], "conf": "这在您运营商的移动网络中很常见", "g": "antenna-signal", "tone": "sky", "hops": [], "lines": ["QUIC 和 AmneziaWG 无响应", "TCP 443 在所有服务器上可用"], "hasFlag": false, "term": "UDP", "act": []}, {"flag": "", "name": "游戏和语音聊天", "v": "slow", "alt": "受限", "meta": "部分游戏的匹配和语音聊天可能失败", "paths": [], "conf": "", "g": "gamepad", "tone": "lav", "hops": [], "lines": ["NAT 类型：中等 — 部分游戏无法创建对局", "语音聊天可能只能单向连接"], "hasFlag": false, "term": "NAT", "act": ["开启游戏模式", "游戏模式已开启"]}, {"flag": "", "name": "您的 Wi-Fi", "v": "net", "alt": "丢包", "meta": "约 8% 的数据包在到达运营商之前丢失 — 请靠近路由器", "paths": [], "conf": "", "g": "wifi", "tone": "sky", "hops": [], "lines": ["丢包发生在这台电脑与路由器之间，而不是运营商处", "路由器响应时间为 3–140 毫秒，正常应低于 10 毫秒"], "hasFlag": false, "term": "", "act": []}, {"flag": "", "name": "网站地址", "v": "ok", "alt": "未被篡改", "meta": "没有人篡改您访问的网站地址", "paths": [], "conf": "", "g": "dns", "tone": "mint", "hops": [], "lines": ["已检查 40 个热门网站 — 没有应答被篡改", "DNS 通过 VPN，运营商看不到"], "hasFlag": false, "term": "DNS", "act": []}, {"flag": "", "name": "限速", "v": "ok", "alt": "未发现", "meta": "会话期间速度保持稳定", "paths": [], "conf": "", "g": "activity", "tone": "neu", "hops": [], "lines": ["速度在 11–12 Mbps 保持了整整一分钟", "最初几 MB 之后速度没有下降"], "hasFlag": false, "term": "限流", "act": []}, {"flag": "", "name": "境外网站", "v": "ok", "alt": "可访问", "meta": "此网络未切断境外网站", "paths": [], "conf": "", "g": "list", "tone": "sand", "hops": [], "lines": ["48 个境外测试网站全部可打开", "移动网络白名单模式当前未启用"], "hasFlag": false, "term": "白名单", "act": []}], "title": "已连接，有限制", "sub": "快速协议在这里被封锁", "tone": "warn", "facts": [["antenna-signal", "网络", "移动网络 · Example Mobile", ""], ["server", "服务器", "2/5 可用", "warn"], ["shield-search", "封锁", "已发现", "bad"], ["gamepad", "游戏", "受限", "warn"]], "srvSum": "2/5 可用", "netSum": "4 个问题", "best": "VLESS · TCP 连接阿姆斯特丹 — 您运营商 94% 的用户可用"}, "good": {"srv": [{"flag": "/_blob/e496c2fcbf4e9bb39112cabd5bf7f493", "name": "德国", "v": "ok", "alt": "", "meta": "4 种方式全部可用 · Hysteria2 最快", "paths": [{"n": "Hysteria2 · 直连", "v": "ok", "m": "31 毫秒 · 48.2 Mbps"}, {"n": "Hysteria2 · WARP 出口", "v": "ok", "m": "44 毫秒 · 30.5 Mbps"}, {"n": "VLESS · TCP · 直连", "v": "ok", "m": "36 毫秒 · 21.0 Mbps"}, {"n": "VLESS · TCP · 经 RU 中继", "v": "ok", "m": "58 毫秒 · 14.2 Mbps"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/e03fb05e0bdcc00f476374f00844dcf0", "name": "荷兰 · 阿姆斯特丹", "v": "ok", "alt": "", "meta": "3 种方式全部可用", "paths": [{"n": "Hysteria2 · 直连", "v": "ok", "m": "42 毫秒 · 39.0 Mbps"}, {"n": "VLESS · TCP · 直连", "v": "ok", "m": "47 毫秒 · 18.3 Mbps"}, {"n": "AmneziaWG · 直连", "v": "ok", "m": "45 毫秒 · 33.1 Mbps"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5fcef1b651d4897d4bd86b5dfbd3e9a7", "name": "罗马尼亚", "v": "ok", "alt": "", "meta": "两种方式都可用", "paths": [{"n": "VLESS · TCP · 直连", "v": "ok", "m": "63 毫秒 · 15.7 Mbps"}, {"n": "VLESS · XHTTP · 直连", "v": "ok", "m": "66 毫秒 · 12.2 Mbps"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}, {"flag": "/_blob/5a45af717ce4d720751cf765c6d0a732", "name": "芬兰 · 赫尔辛基", "v": "ok", "alt": "", "meta": "两种方式都可用", "paths": [{"n": "AmneziaWG · 直连", "v": "ok", "m": "39 毫秒 · 35.5 Mbps"}, {"n": "VLESS · TCP · 直连", "v": "ok", "m": "41 毫秒 · 19.9 Mbps"}], "conf": "", "g": "", "tone": "", "hops": [], "lines": [], "hasFlag": true, "term": "", "act": []}], "net": [{"flag": "", "name": "路径上的封锁", "v": "ok", "alt": "未发现", "meta": "测试地址通过每一跳", "paths": [], "conf": "", "g": "shield-search", "tone": "sand", "hops": [{"n": "1", "c": "ok"}, {"n": "2", "c": "ok"}, {"n": "3", "c": "ok"}, {"n": "4", "c": "ok"}, {"n": "5", "c": "ok"}, {"n": "6", "c": "ok"}, {"n": "7", "c": "ok"}, {"n": "8", "c": "ok"}, {"n": "9", "c": "ok"}, {"n": "10", "c": "ok"}, {"n": "11", "c": "ok"}], "lines": ["测试地址和对照地址通过全部 11 跳"], "hasFlag": false, "term": "DPI · ТСПУ", "act": []}, {"flag": "", "name": "快速协议", "v": "ok", "alt": "可用", "meta": "Hysteria2 和 AmneziaWG 在这里可用", "paths": [], "conf": "", "g": "antenna-signal", "tone": "sky", "hops": [], "lines": ["所有服务器的 QUIC 和 AmneziaWG 均有响应"], "hasFlag": false, "term": "UDP", "act": []}, {"flag": "", "name": "游戏和语音聊天", "v": "ok", "alt": "正常", "meta": "游戏和语音聊天连接正常", "paths": [], "conf": "", "g": "gamepad", "tone": "lav", "hops": [], "lines": ["NAT 类型：开放", "对局和语音聊天双向连接正常"], "hasFlag": false, "term": "NAT", "act": []}, {"flag": "", "name": "网站地址", "v": "ok", "alt": "未被篡改", "meta": "没有人篡改您访问的网站地址", "paths": [], "conf": "", "g": "dns", "tone": "mint", "hops": [], "lines": ["已检查 40 个热门网站 — 没有应答被篡改", "DNS 通过 VPN，运营商看不到"], "hasFlag": false, "term": "DNS", "act": []}, {"flag": "", "name": "限速", "v": "ok", "alt": "未发现", "meta": "会话期间速度保持稳定", "paths": [], "conf": "", "g": "activity", "tone": "neu", "hops": [], "lines": ["速度在 11–12 Mbps 保持了整整一分钟", "最初几 MB 之后速度没有下降"], "hasFlag": false, "term": "限流", "act": []}, {"flag": "", "name": "境外网站", "v": "ok", "alt": "可访问", "meta": "此网络未切断境外网站", "paths": [], "conf": "", "g": "list", "tone": "sand", "hops": [], "lines": ["48 个境外测试网站全部可打开", "移动网络白名单模式当前未启用"], "hasFlag": false, "term": "白名单", "act": []}], "title": "一切正常", "sub": "没有封锁，所有服务器都有响应", "tone": "ok", "facts": [["wifi", "网络", "Wi-Fi · Example Telecom", ""], ["server", "服务器", "4/4 可用", "ok"], ["shield-search", "封锁", "无", "ok"], ["gamepad", "游戏", "正常", "ok"]], "srvSum": "4/4 可用", "netSum": "一切正常", "best": "Hysteria2 连接德国 — 对您运营商的用户最快"}};
+    const VD = {"ok": ["可用", "check-circle", "ok"], "slow": ["被限速", "dashboard-speed", "warn"], "freeze": ["连接卡死", "snow-flake", "ice"], "blocked": ["被封锁", "prohibition", "bad"], "down": ["服务器故障", "cloud-xmark", "neu"], "config": ["配置错误", "wrench", "lav"], "net": ["您的网络", "wifi-off", "sand"], "app": ["应用错误", "bug", "slate"]};
+    const md = s0.md || this.props.mode || 'mg';
+    // статус VPN в шапке: виден на всех экранах, кроме Главной
+    const vp = s0.vp || (this.props.vpn === 'off' ? 'off' : 'on');
+    const tbs = { c: 'v-' + vp, t: vp === 'on' ? '已连接' : (vp === 'ing' ? '正在连接…' : 'VPN 已关闭'), m: vp === 'on' ? '德国' : '', mc: vp === 'on' ? '' : 'hide', a: vp === 'off' ? '连接 VPN' : '断开 VPN',
+      go: () => { clearTimeout(this.vt); if (vp === 'off') { this.setState({ vp: 'ing' }); this.vt = setTimeout(() => this.setState({ vp: 'on' }), 1300); } else this.setState({ vp: 'off' }); } };
+
+    const opU = this.props.op === 'unknown' && md === 'mg', full = md === 'mg' && !opU;
+    const key = ck === 'good' ? 'good' : 'issues';
+    const R = RES[key];
+    const open = s0.open || (key === 'issues' ? { net0: true, srv0: true } : {});
+    const acted = s0.acted || {};
+    const mk = (arr, pfx) => arr.map((x, i) => {
+      const id = pfx + i, o = !!open[id], d = VD[x.v], hasD = !!(x.lines.length || x.hops.length || x.paths.length || (x.conf && full));
+      const ps = [0, 1, 2, 3].map((k) => { const q = x.paths[k]; if (!q) return { c: 'hide', n: '', m: '', vc: '', vi: '', vt: '' }; const dv = VD[q.v]; return { c: '', n: q.n, m: q.m, vc: dv[2], vi: dv[1], vt: dv[0] }; });
+      return Object.assign({}, x, { vt: x.alt || d[0], vi: d[1], vc: d[2], hc: x.hops.map((h) => h.c), hpc: x.hops.length ? '' : 'hide', ppc: x.paths.length ? '' : 'hide',
+        p0: ps[0], p1: ps[1], p2: ps[2], p3: ps[3], l0: x.lines[0] || '', l1: x.lines[1] || '', l0c: x.lines[0] ? '' : 'hide', l1c: x.lines[1] ? '' : 'hide',
+        cc: x.conf && (full || x.conf.indexOf('看起来') === 0) ? '' : 'hide', ddc: (x.lines.length || x.hops.length || x.paths.length || x.conf) ? '' : 'hide',
+        isOpen: o && hasD, oc: (o && hasD ? 'open' : '') + (hasD ? '' : ' nod'), ox: o ? 'true' : 'false', fc: x.hasFlag ? 'flag' : '', ic: x.hasFlag ? '' : 'hide', gc: x.hasFlag ? 'hide' : '',
+        termC: x.term ? '' : 'hide', actC: x.act.length && (md === 'mg' || !x.hasFlag) ? '' : 'hide', actT: x.act[0] || '', actDone: x.act[1] || '', actBtnC: acted[id] ? 'hide' : '', actOkC: acted[id] ? '' : 'hide',
+        actGo: () => this.setState({ acted: Object.assign({}, acted, { [id]: true }) }),
+        tog: () => { if (hasD) this.setState({ open: Object.assign({}, open, { [id]: !o }) }); } });
+    });
+    const STEPS = [["server", "服务器", "每台服务器的每种方式"], ["shield-search", "路径上的封锁", "正在查找您与服务器之间的过滤器"], ["antenna-signal", "快速协议和游戏", "UDP 和 NAT 类型"], ["dns", "网站地址", "DNS 应答是否被篡改"], ["list", "境外网站", "在此网络中是否被切断"]];
+    const step = s0.step !== undefined ? s0.step : (this.props.check === 'run' ? 1 : 0);
+    const DONE = ['5 台服务器中有 2 台可用', '在第 6 跳发现过滤器', '快速协议被封锁 · 游戏受限', '未被篡改', '可访问'];
+    const steps = STEPS.map((x, i) => ({ g: x[0], name: x[1], note: i < step ? DONE[i] : x[2], c: i < step ? 'sdone' : (i === step ? 'snow' : '') }));
+    const LOG = [["14:02:11", "info", "guard", "Germany \u00b7 VLESS \u00b7 TCP is healthy, rtt 38 ms"], ["14:02:09", "info", "guard", "Netherlands \u2192 VLESS \u00b7 TCP (udp_blocked)"], ["14:02:08", "warn", "guard", "Netherlands \u00b7 Hysteria2: no QUIC answer, 3 tries"], ["14:01:58", "info", "detect", "tspuprobe: hop 6 cuts the test address, control ok"], ["14:01:41", "info", "detect", "dns: system and DoH answers match (3/3)"], ["14:01:33", "error", "path", "Romania: download stalled at 64 KiB, idle 6 s"], ["14:01:20", "info", "net", "interface: Wi-Fi \u2192 Mobile hotspot, metered"], ["14:01:19", "info", "core", "network changed, rechecking paths"], ["14:00:02", "info", "sub", "subscription synced, 8 servers, no changes"], ["13:58:52", "info", "guard", "Germany: rtt back to 41 ms"], ["13:58:47", "warn", "guard", "Germany: rtt jump 38 \u2192 210 ms, watching"], ["13:55:10", "info", "core", "connected \u00b7 Germany \u00b7 VLESS \u00b7 TCP"], ["13:55:08", "info", "core", "route found in 1.9 s (3 candidates)"], ["13:55:06", "info", "core", "connect requested by user"]];
+    const lf = s0.lf || 'all';
+    const LV = { info: 'INFO', warn: 'WARN', error: 'ERR' };
+    const logRows = LOG.filter((r) => lf === 'all' || (lf === 'warn' ? r[1] !== 'info' : r[1] === 'error')).map((r) => ({ t: r[0], lv: r[1], lvT: LV[r[1]], src: r[2], msg: r[3] }));
+    const PARTS = [["cpu", "系统", "应用、服务和 Windows 版本，设置"], ["clock", "时间线", "最近 24 小时的连接状态和路由变化"], ["activity", "路径", "每条路径的延迟、丢包和错误"], ["shield-search", "检查", "最新诊断结果"], ["network", "网络", "网络接口、路由、DNS、防火墙状态"], ["journal-page", "服务日志", "最近 24 小时，敏感信息已移除"]];
+    const poff = s0.poff || {};
+    const parts = PARTS.map((p, i) => ({ g: p[0], name: p[1], sub: p[2], cls: poff[i] ? '' : 'on', on: poff[i] ? 'false' : 'true', flip: () => this.setState({ poff: Object.assign({}, poff, { [i]: !poff[i] }) }) }));
+    const kb = [38, 22, 61, 9, 14, 96];
+    const size = PARTS.reduce((a, p, i) => a + (poff[i] ? 0 : kb[i]), 0);
+    // отчёты о блокировках: выключено, включено и уже отправляли, включено и ещё не отправляли, идёт отправка, панель не принимает
+    const anonK = s0.anonK !== undefined ? s0.anonK : (this.props.anon || 'off');
+    const anon = anonK !== 'off' && anonK !== 'old';
+    const ANON = { off: '关闭 · 不发送任何内容。开启后会匿名告知“我的订阅”这里封锁了什么', on: '开启 · 上次报告于今天 13:58 发送。', fresh: '开启 · 尚未发送任何内容。', sending: '开启 · 正在发送报告…', old: '您服务商的面板暂不支持此功能' };
+    const dv = {}, dvSet = {};
+    const devOpt = (k, v, on, fn) => { dv[k + '_' + v] = on ? 'on' : ''; dvSet[k + '_' + v] = fn; };
+    ['idle', 'run', 'issues', 'good'].forEach((v) => devOpt('ck', v, ck === v, () => { clearTimeout(this.tk); this.setState({ ck: v, step: v === 'run' ? 1 : 0, open: v === 'issues' ? { net0: true } : {} }); }));
+    ['res', 'log'].forEach((v) => devOpt('tb', v, tab === v, () => this.setState({ tab: v })));
+    ['closed', 'open', 'sent', 'off', 'asked'].forEach((v) => devOpt('rp', v, rep === v, () => this.setState({ rep: v, copied: false })));
+    ['mg', 'basic'].forEach((v) => devOpt('md', v, md === v, () => this.setState({ md: v, rep: 'closed' })));
+    ['dark', 'light'].forEach((v) => devOpt('th', v, theme === v, () => this.setState({ theme: v })));
+    const T = ['res', 'log'], tCls = {}, tOn = {}, tPick = {};
+    T.forEach((k) => { tCls[k] = k === tab ? 'on' : ''; tOn[k] = k === tab ? 'true' : 'false'; tPick[k] = () => this.setState({ tab: k }); });
+    const LF = ['all', 'warn', 'error'], lfCls = {}, lfPick = {};
+    LF.forEach((k) => { lfCls[k] = k === lf ? 'on' : ''; lfPick[k] = () => this.setState({ lf: k }); });
+    const done = ck === 'issues' || ck === 'good';
+    return {
+      dv: dv, dvSet: dvSet, theme: theme, accent: accent, logo: logos[accent],
+      isIdle: ck === 'idle', isRun: ck === 'run', isDone: done,
+      R: R, facts: R.facts.map((f, i) => ({ g: f[0], k: f[1], v: i === 0 && !full ? f[2].split(' · ')[0] + (opU ? ' · 运营商未知' : '') : f[2], c: f[3] })), srvRows: mk(R.srv, 'srv'), netRows: mk(R.net, 'net'), netCls: key === 'issues' ? 'warn' : 'okc',
+      hasRes: done, noRes: !done, emBtn: 'hide',
+      emT: ck === 'run' ? '结果将显示在这里' : '暂无结果', emS: ck === 'run' ? '先检查服务器，然后是封锁、快速协议、地址和境外网站' : '在左侧开始检查 — 每台服务器和您网络的结论将显示在这里',
+      ovTxt: done ? '2 分钟前已检查' : (ck === 'run' ? '正在检查…' : '尚未检查'), rTitle: tab === 'log' ? '服务日志' : '结果',
+      steps: steps, runPct: [10, 32, 54, 74, 90][step] + '%', runTime: '约 ' + ['2½ 分钟', '1 分 50 秒', '1 分 10 秒', '40 秒', '15 秒'][step] + '后完成 · 连接不会中断',
+      start: () => this.start(), cancel: () => { clearTimeout(this.tk); this.setState({ ck: 'idle' }); },
+      isRes: tab === 'res', isLog: tab === 'log', tCls: tCls, tOn: tOn, tPick: tPick,
+      logRows: logRows, lfCls: lfCls, lfPick: lfPick, logN: logRows.length,
+      liveCls: s0.paused ? 'off' : '', liveTxt: s0.paused ? '已暂停' : '实时', toggleLive: () => this.setState({ paused: !s0.paused }),
+      anonCls: anon ? 'on' : '', anonOn: anon ? 'true' : 'false', toggleAnon: () => { if (anonK !== 'old') this.setState({ anonK: anon ? 'off' : 'fresh' }); }, anonBox: anonK === 'old' ? 'dis' : '', anonMore: anon,
+      repShown: rep === 'open' || rep === 'off' || rep === 'sent', repForm: rep === 'open' || rep === 'off', repSent: rep === 'sent',
+      intakeOn: rep === 'open' && md === 'mg', intakeOff: rep === 'off' || md === 'basic', offWarn: rep === 'off' && md === 'mg', asked: rep === 'asked' && md === 'mg',
+      isMg: md === 'mg', showHelp: ck !== 'good' && ck !== 'run' && !(rep === 'asked' && md === 'mg'), bestCls: full ? '' : 'hide',
+      helpTxt: md === 'mg' ? '将诊断发送给订阅的管理员' : '将诊断保存为文件，发送给帮助您的人',
+      helpBtn: md === 'mg' ? '请求帮助' : '保存文件',
+      shTitle: md === 'mg' ? '向管理员求助' : '保存诊断', shSub: md === 'mg' ? '诊断信息只发送给 vpn.example.com 的管理员' : '在您分享之前只保存在这台电脑上',
+      shP: md === 'mg' ? '管理员可以看到连接情况，从而为您提供帮助。' : '选择要写入文件的内容。由您决定发给谁。',
+      anonTxt: ANON[anonK] || ANON.off,
+      copyTxt2: s0.sumCopied ? '已复制' : '复制摘要', sumCls: s0.sumCopied ? 'done' : '', copySum: () => this.setState({ sumCopied: true }),
+      openRep: () => this.setState({ rep: 'open' }), closeRep: () => this.setState({ rep: 'closed' }), sendRep: () => this.setState({ rep: 'sent', copied: false }),
+      tbs: tbs, rdDiag: 'hide', rdSet: 'hide',
+      parts: parts, repSize: '约 ' + size + ' KB',
+      copyCls: s0.copied ? 'done' : '', copyTxt: s0.copied ? '已复制' : '复制', copy: () => this.setState({ copied: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

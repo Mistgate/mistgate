@@ -1,9 +1,9 @@
-# PasarGuard v5.4.1 one-server scenario: the default (SQLite) panel container exactly as the project ships it (host network,
-# UVICORN_HOST=127.0.0.1 in the env file) and the official node image (pasarguard/node v0.5.4, Xray core inside) on the isolated
+# PasarGuard v5.6.0 one-server scenario: the default (SQLite) panel container exactly as the project ships it (host network,
+# UVICORN_HOST=127.0.0.1 in the env file) and the official node image (pasarguard/node v0.5.7, Xray core inside) on the isolated
 # bench-box network with a fixed address. Both containers are in the one 2 vCPU / 2 GB slice.
 services:
   pasarguard:
-    image: pasarguard/panel:v5.4.1
+    image: pasarguard/panel:v5.6.0
     container_name: bench_pasarguard_box
     restart: "no"
     cgroup_parent: bench-box.slice
@@ -13,7 +13,7 @@ services:
       - ${BENCH_ROOT:-/root/bench}/data/box-pasar:/var/lib/pasarguard
       - ${BENCH_ROOT:-/root/bench}/data/box-pasar-cert:/certs:ro
   pasarguard-node:
-    image: pasarguard/node:v0.5.4
+    image: pasarguard/node:v0.5.7
     container_name: bench_pasarguard_node_box
     restart: "no"
     cgroup_parent: bench-box.slice

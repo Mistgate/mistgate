@@ -10,7 +10,7 @@ A user is a person who gets access. Each user has one **main group** and can be 
 A person gets a server when all of this holds:
 
 - the person is active (not disabled, not past their term, not over their quota);
-- one group of the person holds the profile **and** gets the node: the same group for both (a group can leave nodes out), see [A person in several groups](#a-person-in-several-groups);
+- one group of the person holds the profile **and** gets the node: the same group for both (a group can leave nodes out, and a node that is held back from groups is in none), see [A person in several groups](#a-person-in-several-groups) and [Who gets a node](nodes.md#the-nodes-list);
 - the profile is on a node the person may use (all nodes, or the ones picked for them);
 - that profile on the node is switched on and running or starting;
 - one of the person's app switches allows the protocol (the **Telegram proxy** switch is the one for MTProto, and **TrustTunnel** the one for the official TrustTunnel apps).
@@ -25,7 +25,7 @@ A person has one **main group** and any number of **extra groups** (16 groups in
 
 The rule is by pairs: the profile P on the node N reaches the person when **one and the same group** of theirs holds P and gets N. A profile does not go to a node that only another group of theirs gets. Example: *family* (the main group) holds Hysteria2 and keeps the node own1 back; *alice-home* holds AmneziaWG and gets own1. Alice, in both, gets Hysteria2 on de1 and nl1, and on own1 only AmneziaWG, not Hysteria2. A person's own choice of nodes still filters what the groups give. The person's credentials stay one per inbound, however many groups hold the profile.
 
-On the person's page, **Access** → **What they get**:
+On the person's page, **Access and limits** → **What they get**:
 
 - **Main group** is the select it always was. Picking a group the person is an extra member of makes it the main one and keeps the old main group as an extra one, so nothing is lost; picking any other group replaces the main group, as before.
 - **Also in** lists the extra groups as chips (the chip's menu: **Make main**, **Open the group**, **Remove from the group**) and has **Add to a group**.
@@ -97,19 +97,19 @@ The API takes many users in one call too. See [API](../reference/api.md).
 
 ## Creating a user
 
-**New user** opens the form:
+**Add a person** (or **New person** on an empty list) opens the window **New person**:
 
 | Field | Default | What it is |
 |:--|:--|:--|
 | **Name** | | Required, unique (case does not matter), up to 64 characters. |
-| **Group** | "Everyone" if there is such a group, else the first | The line **Gets** under it says what a person of this group gets: the subscription and AmneziaVPN keys, on how many nodes. A red line says when they would get nothing. **Edit group** opens the group. |
-| **Quota** | 100 GB | Steps of 10 GB; 0 is **Unlimited**. The hint under it names the period. |
-| **Resets** | **Monthly** | **Daily**, **Weekly**, **Monthly** or **Never**. See [Quota periods](#quota-periods). |
-| **Term** | 30 days | Steps of 5 days; 0 means it never expires. Access pauses afterwards. |
+| **Group** | "Everyone" if there is such a group, else the first | The **Result** panel says what a person of this group gets: the subscription and AmneziaVPN keys, on how many nodes. A red line says when they would get nothing. **Edit group** opens the group. |
+| **Traffic per month** | 100 GB | Ready values 50, 100 and 300 GB, **no limit**, or **Other** with steps of 10 GB (0 is no limit). The hint under it names the period. |
+| **Resets** | **Monthly** | Under **More**: **Daily**, **Weekly**, **Monthly** or **Never**. See [Quota periods](#quota-periods). |
+| **Term** | 30 days | Ready values 30 days, 90 days, a year and **no expiry**, or **Other** with steps of 5 days. Access pauses afterwards. |
 | **Devices** | 5 | 1–100: how many devices can connect. |
 | **Apps in the subscription** | what the group gives | The link-app switch and **AmneziaVPN**. Until you touch them, they follow the group: a way the group gives nothing for starts off, with the reason under it. **Telegram proxy** is off by default and is not part of this choice: it is an addition, see [Telegram proxy](#telegram-proxy). |
 | **All nodes** | on | New nodes are added by themselves. Off: tick nodes; new nodes will not be added. |
-| **More** | folded | **DNS**: a preset of the user's own, inherited when empty (see [DNS](dns.md)). **Speed limits**: **Speed per person** and **Speed per device**, both unlimited by default (see [Limits](#limits)). |
+| **More** | folded | **DNS**: a preset of the user's own, inherited when empty (see [DNS](dns.md)). **Speed limits**: **Speed per person** and **Speed per device**, both without a limit by default (see [Limits](#limits)). **Resets**, see above. |
 
 When there is no group yet, the form shows the group form inline. **Create** makes the user and opens the link window; the link (and the page password, when pages ask for one) is copied for you to send. If the person would get nothing yet, the window says why before the link goes out.
 
@@ -117,17 +117,19 @@ Gigabytes are decimal: 100 GB is 100,000,000,000 bytes.
 
 ## The user card
 
-The header shows the name and status, the apps, the group and the term ("until 12 October · 14 d"), with three buttons: **Disable** (or **Enable**), **Extend 30 days** (off for a user without expiry) and **Subscription link**.
+The header shows the name and status, the group, the term ("until October 12 · 14 d"), the devices ("3 of 5 devices") and whether the person is online, with two buttons: **Extend 30 days** (off for a user without expiry) and **Disable** (or **Enable**). Under it are the tabs **Overview**, **Devices**, **Access and limits**, **Logs** and **Settings**. The subscription link is on **Overview**. The sections below follow the tabs: **Traffic** is on **Overview**; **Devices**, **Telegram proxy** and **TrustTunnel** on **Devices**; **DNS picked on the page**, **Limits** and **Access** on **Access and limits**; **Subscription page** and **Danger zone** on **Settings**.
 
-Under it, a strip explains a stop and offers the quick fix:
+Above the tab, a strip says why access is stopped (or what is missing) and offers the quick fix. It shows the first case that fits, in this order:
 
-| Stop | Strip | Button |
+| Case | Strip | Button |
 |:--|:--|:--|
-| Term ended | "The term ended 3 days ago — access is paused." | **Extend 30 days** |
-| Quota used up | "The 100 GB quota is used up — access is paused until it resets or you raise it." | **+50 GB** |
-| Device limit | "Device limit (5) reached — a new device can't connect." | **+1 device** |
+| Disabled | "Disabled by you" and under it "The link doesn’t work; devices and keys are kept. Enable it and everything works again without a new link" | **Enable** |
+| Term ended | "The term ended 3 days ago" (on the day itself "The term ended today — access is paused.") and under it "Access paused. Extend it and everything works again without a new link" | **Extend 30 days** |
+| Quota used up | "Quota used up" and under it "Used 100 of 100 GB, access is paused until the reset on December 1" | **Reset** (asks to confirm) and **+50 GB** |
+| Never connected | "Never connected" and under it "Send the person the subscription link. They open it, pick an app and connect on their own" | **Subscription link** |
+| Device limit | "All 5 places are taken" and under it "A new device cannot connect until a place is free" | **Raise the limit to 6** |
 
-In the **Only count** mode nothing is refused, so this strip is not shown. A person over the limit gets a quiet line under the heading of **Devices** instead: "The limit only counts for now: apps over it still connect", with a link to **Limit mode**.
+A read-only admin sees the strip without the buttons. In the **Only count** mode nothing is refused, so the device-limit strip is not shown. A person over the limit gets a quiet line under the heading of **Devices** instead: "The limit only counts for now: apps over it still connect.", with a link to **Limit mode**.
 
 ### Traffic
 
@@ -184,14 +186,14 @@ Once a person has picked a DNS on their page (see **DNS choice on the page**), t
 
 | Setting | Steps and range |
 |:--|:--|
-| **Quota** | 10 GB, 0–10000 GB; 0 is **Unlimited**. |
-| **Resets** | **Daily**, **Weekly**, **Monthly** or **Never**; saved as soon as you pick. A person given a rolling 30-day period through the API or MCP also has **Every 30 days**. |
-| **Term** | 5 days, up to 3650; ∞ is **Never**. "−" on ∞ sets 30 days. |
-| **Devices** | 1, from 1 to 100. |
-| **Speed per person** | Steps of 5 Mbit/s, 0–10000; 0 is **Unlimited**. All the person's devices together, on one node. Experimental. |
-| **Speed per device** | The same steps. Each device on its own. Experimental. |
+| **Quota** | Ready values 50, 100 and 300 GB and **Unlimited**; **Other** takes any number of GB, 0–10000. |
+| **Resets** | **Daily**, **Weekly**, **Monthly** or **Never**. A person given a rolling 30-day period through the API or MCP also has **Every 30 days**. |
+| **Term** | The buttons **+30 days**, **+90 days** and **Never**. |
+| **Devices** | A stepper by 1, from 1 to 100. |
+| **Speed per person** | Ready values **Unlimited**, 20, 50 and 100 Mbit/s; **Other** takes 0–10000 (0 is unlimited). All the person's devices together, on one node. Experimental. |
+| **Speed per device** | Ready values **Unlimited**, 10, 20 and 50 Mbit/s; **Other** as above. Each device on its own. Experimental. |
 
-A change is saved as soon as you stop clicking.
+A change waits for **Save** at the foot of the card ("Changes not saved"); **Cancel** drops it.
 
 The speed limits apply to Hysteria2 and VLESS. AmneziaWG applies neither.
 
@@ -255,7 +257,7 @@ With no group at all, the tab offers **Create "Everyone" with all profiles** and
 
 - **Name**, up to 64 characters.
 - **Profiles in the group**: every profile is ticked for a new group; untick what the group should not give.
-- **Nodes enabled for the group**: every node is on for a new group; turn one off to take it away from everyone in the group — its servers leave every subscription format and the devices' keys stop going to it. A node you hold back (see [Who gets a node](nodes.md#the-nodes-list)) is off for a new group, and a group page cannot switch it on: the node is shown locked, with the reason in its row, and the All nodes switch stays off while one is held back; give it from the node. Other new nodes stay on. A node is switched off at once, without a confirmation: no key stops working, those people just stop reaching that node.
+- **Nodes enabled for the group**: every node is on for a new group; turn one off to take it away from everyone in the group — its servers leave every subscription format and the devices' keys stop going to it. A node you hold back (see [Who gets a node](nodes.md#the-nodes-list): the first node of a panel goes to every group, every later one goes to nobody until you give it to groups, in the **Add node** window or from the node's page) is off for a new group, and a group page cannot switch it on: the node is shown locked, with the reason in its row, and the All nodes switch stays off while one is held back; give it from the node. Other new nodes stay on. A node is switched off at once, without a confirmation: no key stops working, those people just stop reaching that node.
 - **More** → **DNS**: the group's preset; empty means the instance default.
 
 Editing a group changes access for everyone in it ("3 users are in this group; the change applies to all of them"). Taking a profile away from a group with people first shows what they lose, with the AmneziaVPN keys that stop working, and the button turns into "Take it away from 3 people".
@@ -264,9 +266,9 @@ Profiles can also be added to a group from the profile's page (**Add to a group*
 
 ### Adding and moving people
 
-- One person: user card → **Access** → **Main group** (move) or **Also in** (add or remove), with the preview of what they lose and get.
+- One person: user card → **Access and limits** → **Main group** (move) or **Also in** (add or remove), with the preview of what they lose and get.
 - Several people into a group: the group's page → **People** → **Add people here**. [Add | Move] sits at the top of the panel and **Add** is on when it opens: the group becomes an extra group of each ticked person, nothing is lost and their main group stays. **Move** makes it their main group and, before it does, says what they lose (what their extra groups give stays). The group's **People** list says who has it as an extra group ("extra"); an extra member's menu has **Make main** and **Remove from the group**.
-- Everyone who has the group as the main group: **Settings** → **Move everyone** (extra members stay), or delete the group and move them (below).
+- Everyone who has the group as the main group: **Settings** → **Move everyone to another group** (extra members stay), or delete the group and move them (below).
 
 ### Deleting a group
 

@@ -1,0 +1,749 @@
+<!DOCTYPE html><html lang="en-GB"><head><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; font-src data:; style-src &#39;unsafe-inline&#39;; form-action &#39;none&#39;"/>
+<meta charset="utf-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Sign in – Hazelbridge</title>
+<meta name="description" content="Sign in to your Hazelbridge account."/>
+     <meta name="theme-color" content="#0a0e1f"/>
+  <meta name="color-scheme" content="dark"/>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDMgNjEgMzIgMzIgNjEgMyAzMnoiIGZpbGw9IiM4YjliZmYiLz48dGV4dCB4PSIzMiIgZm9udC1zaXplPSIzNyIgdGV4dC1hbmNob3I9Im1pZGRsZSIKZmlsbD0iIzBiMGIxMCIgIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWksc2Fucy1zZXJpZiIgIHk9IjQ0Igpmb250LXdlaWdodD0iNzAwIj5IPC90ZXh0Pjwvc3ZnPg=="/>
+        <style>:root{ color-scheme:dark;--bg:#0a0e1f;--band:#0d1330;--sf:#131a3a;
+--sf2:#1b2350;--fg:#e8ebf7; --mu:#aab3d6;--ln:#1f2851;--ln2:#28316a;
+  --ac:#8b9bff;
+  --ai:#0b0b10;
+--a2:#5eead4;
+	--so:#1f2543;--ok:#54c993;--wa:#f0a638;
+	--bd:#e7685f;
+  --oks:#193336;
+--was:#382c24;
+	--bds:#36202c;
+	--r:23px;
+--rs:16px;
+  --rb:27px; --bw:1px; --w:1271px;
+--wt:671px;
+--s:calc(8px*1.06); --sec:76px;--gut:21px;
+	--fb:system-ui,
+-apple-system,
+"Segoe UI",
+Roboto, "Helvetica Neue",Arial, sans-serif;
+	--fh:"Avenir Next", Avenir,Montserrat,
+"Century Gothic",
+"Segoe UI", system-ui,
+sans-serif; --fl:system-ui,
+-apple-system,
+"Segoe UI",  Roboto,"Helvetica Neue", Arial,sans-serif;
+--fm:ui-monospace, SFMono-Regular, Menlo,Consolas,
+"Liberation Mono", monospace;
+--fwh:650;--lsh:-.04em;--lhh:1;
+--ttl:none;--lsl:.06em;--fsl:.78rem;
+	--t0:17px;
+	--t1:23.8px;--t2:33.3px;--t3:clamp(23.3px, 3.23vw,  46.5px);--t4:clamp(32.6px, 4.52vw,65.1px);
+	--t5:clamp(45.6px,6.33vw,  91.1px);
+--ts:10.3px;--sh:none}
+*,
+*::before, *::after{
+box-sizing:border-box}
+[hidden]{
+	display:none!important}
+html{
+	-webkit-text-size-adjust:100%}
+body{
+margin:0; min-height:100vh;display:flex;flex-direction:column;
+  background:var(--bg);
+color:var(--fg); font:17px/1.57 var(--fb);
+	-webkit-font-smoothing:antialiased}
+main{
+	flex:1}
+h1, h2,h3,
+h4{font-family:var(--fh);font-weight:var(--fwh);line-height:var(--lhh);margin:0 0 .5em;
+letter-spacing:var(--lsh)}
+h1{
+font-size:clamp(1.75rem,4.4vw,2.6rem)}
+h2{
+  font-size:clamp(1.3rem, 3vw,
+1.7rem)}
+h3{
+  font-size:1.12rem}
+p{
+margin:0 0 1em}
+ul,  ol{margin:0 0 1em;
+	padding-left:1.25em}
+a{color:var(--ac)}
+img,svg{max-width:100%}
+code,pre,kbd{
+	font-family:var(--fm);
+  font-size:.92em}
+pre{ margin:0 0 1em; padding:14px 16px;
+  overflow-x:auto;
+  background:var(--sf); color:var(--fg); border:1px solid var(--ln);
+border-radius:var(--rs);
+  line-height:1.55}
+pre code{font-size:inherit}
+.vl-wrap{
+width:100%; max-width:var(--w);
+	margin:0 auto;padding-left:var(--gut);padding-right:var(--gut)}
+.vl-mu{ color:var(--mu)}
+.vl-ic{
+width:1.25em;
+  height:1.25em;
+flex:none;
+  vertical-align:-.25em;
+  fill:none;stroke:currentColor;
+	stroke-width:1.8;stroke-linecap:round;
+stroke-linejoin:round}
+.vl-art{ display:block;
+	width:100%; height:100%}
+.vl-mark{
+width:28px;
+height:28px;
+flex:none}
+.vl-mn{display:none}
+.vl-mnb{
+  display:flex;align-items:center;
+  justify-content:center;width:44px;
+  height:44px;
+	margin-right:-8px;list-style:none; cursor:pointer;color:var(--fg);
+	border-radius:var(--rs)}
+.vl-mnb::-webkit-details-marker{
+display:none}
+.vl-mnb .vl-ic{
+	width:26px;height:26px}
+.vl-mn .vl-mnb .vl-ic:nth-child(2),
+.vl-mn[open] .vl-mnb .vl-ic:nth-child(1){
+display:none}
+.vl-mn[open] .vl-mnb .vl-ic:nth-child(2){display:inline-block}
+.vl-mnl{position:absolute;left:0;
+right:0;top:100%; z-index:5;display:flex;
+	flex-direction:column;
+	padding:6px var(--gut) 14px;
+  background:var(--sf);
+  border-bottom:1px solid var(--ln);
+box-shadow:0 14px 24px rgba(0, 0,
+0,  .12)}
+.vl-mnl a{ padding:12px 2px;color:var(--fg); text-decoration:none;
+border-bottom:1px solid var(--ln);
+font-size:1.05rem}
+.vl-mnl a[aria-current]{
+	color:var(--ac);
+font-weight:600}
+.vl-mnl a:last-child{
+	border-bottom:0}
+@media (max-width:720px){.vl-nav{
+	display:none}.vl-mn{display:block}.vl-hdin{
+	flex-wrap:nowrap}
+	}
+.vl-lg{ display:grid;
+  grid-template-columns:minmax(0,
+1fr) 230px; gap:var(--sec) 56px;padding-top:48px;
+  align-items:start}
+.vl-lgt{
+	max-width:var(--wt)}
+.vl-lgt h2{margin-top:1.8em;
+scroll-margin-top:24px}
+.vl-toc{position:sticky;top:24px;padding:18px 20px;border:1px solid var(--ln);border-radius:var(--r);background:var(--sf); font-size:.92rem}
+.vl-toc h2{
+  margin:0 0 10px; color:var(--mu);font:700 .78rem var(--fb);letter-spacing:.07em;
+	text-transform:uppercase}
+.vl-toc ol{margin:0;padding:0;
+	list-style:none;counter-reset:t}
+.vl-toc li{
+  counter-increment:t;padding:5px 0 5px 22px;position:relative}
+.vl-toc li::before{
+	content:counter(t);
+position:absolute;
+	left:0;color:var(--mu); font-variant-numeric:tabular-nums}
+.vl-toc a{color:var(--fg);text-decoration:none}
+.vl-toc a:hover{ color:var(--ac)}
+.vl-nf{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:40px;
+align-items:center;padding-top:72px;
+  padding-bottom:24px}
+.vl-code{margin:0 0 .1em; color:var(--ac); font:var(--fwh) clamp(5rem, 16vw,
+11rem)/.9 var(--fh);
+letter-spacing:var(--lsh)}
+.vl-nfa{
+  border-radius:var(--rb);overflow:hidden;
+	aspect-ratio:4/3;
+	background:var(--band)}
+.vl-cmap{
+margin:0 0 28px;border:1px solid var(--ln);
+  border-radius:var(--r); overflow:hidden;
+	background:var(--band)}
+.vl-cmap figcaption{padding:12px 16px;
+	background:var(--sf); border-top:1px solid var(--ln)}
+.vl-fld{display:flex;flex-direction:column;
+gap:6px;
+  margin-bottom:14px}
+.vl-fld label{
+  font-size:.92rem;font-weight:600}
+.vl-fld input,
+.vl-fld textarea{width:100%;padding:.65em .8em;
+border:1px solid var(--ln); border-radius:var(--rs); background:var(--sf);
+	color:var(--fg);
+  font:inherit}
+.vl-fld textarea{
+resize:vertical}
+.vl-fld input:focus,.vl-fld textarea:focus{ outline:2px solid var(--ac);
+	outline-offset:1px}
+.vl-cform{ max-width:520px}
+.vl-cfs{margin:0 0 14px;
+color:var(--bd)}
+@media (max-width:720px){
+.vl-lg{grid-template-columns:1fr;
+	padding-top:28px}.vl-toc{
+	position:static;
+order:-1}.vl-nf{
+  grid-template-columns:1fr; padding-top:36px;
+gap:24px}
+}
+@media (max-width:560px){ .vl-hdin{
+	padding-top:12px;
+	padding-bottom:10px}}
+.vl-dchart{
+display:block;width:100%;height:auto}
+.vl-dline{
+fill:none;
+	stroke:var(--ac);
+	stroke-width:2.4;
+  stroke-linejoin:round; stroke-linecap:round;vector-effect:non-scaling-stroke}
+.vl-darea{fill:var(--ac);opacity:.14}
+.vl-dgrid{fill:none;
+	stroke:var(--ln);stroke-width:1;
+  vector-effect:non-scaling-stroke}
+.vl-dbars{
+	fill:var(--ac);
+  opacity:.38}
+.vl-dpt{ fill:var(--ac)}
+.vl-dcal,.vl-did,.vl-dmap,.vl-dstamp{
+	display:block;
+  width:100%;
+	height:auto}
+.vl-dc0{fill:var(--sf2)}
+.vl-dc1{fill:var(--wa)}
+.vl-dc2{ fill:var(--bd)}
+.vl-di0{
+fill:var(--ac)}
+.vl-di1{
+	fill:var(--a2)}
+.vl-di2{
+	fill:var(--fg)}
+.vl-di3{ fill:var(--mu)}
+.vl-dmg{fill:var(--band)}
+.vl-dmb{fill:var(--sf2);stroke:var(--sf2);
+	stroke-width:6; stroke-linejoin:round}
+.vl-dmp{
+  fill:var(--oks);
+stroke:var(--oks);stroke-width:6; stroke-linejoin:round}
+.vl-dmt{fill:var(--ok);
+opacity:.55}
+.vl-dmr{
+  fill:none;stroke:var(--so);
+stroke-width:16;
+  stroke-linecap:round}
+.vl-dms{fill:none;
+stroke:var(--ln);
+stroke-width:7}
+.vl-dmm{fill:none;
+  stroke:var(--ln2);
+  stroke-width:12}
+.vl-dml{ fill:var(--mu); font-family:var(--fb);paint-order:stroke; stroke:var(--sf);
+	stroke-width:3}
+.vl-dmh{
+	fill:var(--ac);
+opacity:.18}
+.vl-dpin{
+  fill:var(--ac)}
+.vl-dpi{
+  fill:var(--ai)}
+.vl-dsb{fill:var(--fg)}
+.vl-dsd{
+	fill:none;stroke:var(--bg); stroke-width:1.2; stroke-dasharray:2 5;
+	opacity:.7}
+.vl-dst{
+	fill:var(--bg);font-family:var(--fh);font-weight:700;text-transform:uppercase}
+.vl-dsm{
+fill:var(--a2)}
+.vl-dhc{
+color:var(--mu)}
+.vl-dhs{
+  color:var(--ok)}
+.vl-dhf{color:var(--wa)}
+.vl-dhk{
+  color:var(--a2)}
+.vl-dhn{
+  color:var(--ac)}
+.vl-dhp{color:var(--mu);
+  user-select:none}
+.vl-dhm{font-weight:600}
+
+h1,  h2,
+h3{ color:var(--fg)}
+h1{
+margin:24px 0 20px;
+font-size:var(--t5);line-height:.98;
+	overflow-wrap:anywhere;
+  hyphens:auto}
+a{
+	color:inherit}
+.vl-top{
+	position:relative;border-bottom:1px solid var(--ln); background:var(--band)}
+.vl-topin{display:flex;align-items:center;justify-content:space-between;gap:24px;height:76px}
+.vl-logo{display:flex;
+  align-items:center;
+	gap:10px;min-width:0;
+  color:var(--fg);
+  font:650 1.2rem/1 var(--fh);letter-spacing:-.01em;text-decoration:none; position:relative}
+.vl-logo span{min-width:0;
+  overflow:hidden;
+	line-height:1.35;text-overflow:ellipsis}
+.vl-logo .vl-mark{
+width:30px;
+  height:30px}
+.vl-nav{display:flex; gap:6px;
+	font-size:.94rem}
+.vl-nav a{padding:8px 16px;border-radius:99px;color:var(--mu);
+text-decoration:none}
+.vl-nav a:hover{
+color:var(--fg)}
+.vl-nav a[aria-current]{
+background:var(--sf2); color:var(--fg)}
+.vl-mnb{
+  margin-right:0;border:1px solid var(--ln2);border-radius:var(--rs);background:var(--sf)}
+.vl-mnl{
+  background:var(--band);border-bottom:1px solid var(--ln);box-shadow:none}
+.vl-mnl a{border-bottom-color:var(--ln)}
+.vl-mnl a[aria-current]{ color:var(--ac)}
+.vl-btn{
+display:inline-flex;
+	align-items:center;
+  justify-content:center; gap:10px; min-height:52px;
+	padding:0 26px;
+border:0;
+border-radius:var(--rs);
+background:var(--ac);color:var(--ai);font:650 1rem var(--fb);
+	text-decoration:none;
+cursor:pointer}
+.vl-btn:hover{
+filter:brightness(1.08)}
+.vl-btn:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+.vl-wide{width:100%; min-height:54px; font-size:1.05rem}
+.vl-wide:disabled{
+opacity:.7;cursor:progress}
+.vl-inv{background:var(--bg);color:var(--fg)}
+.vl-kick{
+display:inline-flex;
+	align-items:center;padding:6px 14px;
+border:1px solid var(--ln2);
+	border-radius:99px;
+  color:color-mix(in srgb,
+var(--ac) 70%, var(--fg));
+	font:600 .8rem var(--fl);letter-spacing:.08em;
+  text-transform:uppercase}
+.vl-lead{ max-width:28em;
+  margin:0 0 30px;
+	color:var(--mu);font-size:clamp(17px,1.4vw,
+21px)}
+.vl-bul{display:grid;gap:14px;
+margin:0; padding:0;
+  list-style:none}
+.vl-bul li{
+	display:flex;
+gap:12px; align-items:center;
+font-size:1.05rem}
+.vl-bul .vl-ic{width:24px;
+height:24px;
+color:var(--a2)}
+.vl-ill{ display:block;width:100%;
+	height:auto}
+.vl-gl{fill:none;
+  stroke:var(--ln2);
+	stroke-width:1.2px}
+.vl-gr,.vl-gr2{fill:none;stroke:var(--ac);stroke-width:2px}
+.vl-gr2{ stroke:var(--ln2);
+  stroke-width:1.2px}
+.vl-ga{
+fill:none;stroke:var(--a2);
+  stroke-width:2px;
+stroke-linecap:round}
+.vl-lk{
+fill:var(--ac)}
+.vl-sh{
+  fill:none;stroke:var(--ac);stroke-width:12px;
+	stroke-linecap:round}
+.vl-kh{
+  fill:var(--band)}
+.vl-qm{
+  fill:none;
+stroke:var(--band); stroke-width:10px;stroke-linecap:round}
+.vl-d1{
+	fill:var(--a2)}
+.vl-d2{fill:var(--ln2)}
+.vl-ghost{position:absolute;
+	pointer-events:none}
+.vl-split{
+	display:grid;min-height:min(100vh,860px)}
+.vl-pl{
+  position:relative; overflow:hidden;
+  display:flex;flex-direction:column;
+	justify-content:space-between;gap:48px;
+  padding:clamp(28px,  3.4vw,  52px) clamp(24px,5vw, 80px);background:var(--band)}
+.vl-pl .vl-ghost{right:-8%;
+bottom:-9%;
+  width:64%}
+.vl-ht{ position:relative;
+	max-width:620px}
+.vl-meta{
+	position:relative;
+color:var(--mu);font-size:.88rem}
+.vl-fr{ display:flex;
+  flex-direction:column;justify-content:center;padding:clamp(24px, 4vw,64px)}
+.vl-fc{width:100%;max-width:420px;margin:0 auto}
+.vl-form h2{margin:0 0 26px;
+	font-size:clamp(1.6rem,2.4vw,  2.1rem); letter-spacing:-.03em}
+.vl-fld{gap:8px;
+  margin-bottom:20px}
+.vl-fld label{color:var(--mu); font-size:.9rem; font-weight:500}
+.vl-fld input{
+	min-height:52px;padding:0 16px;
+  border:1px solid var(--ln2); border-radius:var(--rs);background:var(--sf);
+	color:var(--fg)}
+.vl-fld input:focus{
+	outline:2px solid var(--ac);outline-offset:1px; border-color:var(--ac)}
+.vl-row{
+  display:flex;flex-wrap:wrap;
+	align-items:center;justify-content:space-between;
+gap:8px 12px;margin:2px 0 24px;font-size:.92rem}
+.vl-row a{
+	color:color-mix(in srgb, var(--ac) 70%,var(--fg))}
+.vl-chk{display:flex;align-items:center;gap:10px;
+  cursor:pointer}
+.vl-chk input{
+  appearance:none; flex:none; width:20px;
+	height:20px;margin:0;
+  border:1.5px solid var(--ln2);
+border-radius:6px;background:var(--sf);
+  cursor:pointer}
+.vl-chk input:checked{ border-color:var(--ac);
+background:var(--ac);
+box-shadow:inset 0 0 0 4px var(--sf)}
+.vl-chk input:focus-visible{
+	outline:2px solid var(--ac); outline-offset:2px}
+.vl-err{margin:0 0 14px;padding:.65em .85em;border:1px solid var(--bd);border-radius:var(--rs);background:var(--bds);color:var(--fg); font-size:.92rem}
+.vl-err[hidden]{ display:none}
+.vl-sub{ display:flex;
+  justify-content:center;gap:18px;margin:26px 0 0;color:var(--mu);font-size:.9rem}
+.vl-sub a{text-decoration:none}
+.vl-sub a:hover{
+	color:var(--fg)}
+.vl-sec{
+	padding-top:clamp(56px,  7vw,
+104px);
+	padding-bottom:clamp(56px,  7vw, 104px)}
+.vl-help{display:grid; grid-template-columns:1fr 1.3fr;
+	gap:clamp(32px,
+6vw, 96px);
+align-items:start}
+.vl-help > *{min-width:0}
+.vl-big{
+margin:0 0 16px; font-size:var(--t4);line-height:1.05;letter-spacing:-.035em}
+.vl-intro{max-width:26em;
+	margin:0 0 32px;
+	color:var(--mu);
+	font-size:1.1rem}
+.vl-still{ padding:28px; border:1px solid var(--ln2);border-radius:var(--rb);background:var(--sf)}
+.vl-still h3{
+	margin:0 0 8px;font-size:1.2rem}
+.vl-still p{
+  margin:0;
+color:var(--mu)}
+.vl-steps{
+  margin:0;padding:0;
+  list-style:none; counter-reset:s}
+.vl-steps li{
+counter-increment:s;display:grid; grid-template-columns:64px 1fr; gap:20px;align-items:center;
+  padding:24px 0;
+border-top:1px solid var(--ln);
+font-size:1.15rem}
+.vl-steps li:last-child{
+  border-bottom:1px solid var(--ln)}
+.vl-steps li::before{
+  content:counter(s,decimal-leading-zero);
+	color:var(--mu);font:var(--fwh) 2.1rem/1 var(--fh);letter-spacing:-.03em;
+	font-variant-numeric:tabular-nums}
+.vl-priv{padding-bottom:clamp(56px,7vw,104px);
+	border-top:1px solid var(--ln);
+  background:var(--band)}
+.vl-priv .vl-intro{margin-bottom:0}
+.vl-pg{
+  display:grid;
+  grid-template-columns:repeat(4,  minmax(0,1fr));gap:20px;
+  margin-top:40px}
+.vl-pg > div{padding:24px;
+	border:1px solid var(--ln);border-radius:var(--r);background:var(--bg)}
+.vl-pi{ display:block;margin-bottom:18px;
+	color:var(--ac)}
+.vl-pi .vl-ic,.vl-ic2 .vl-ic{ width:28px;
+height:28px}
+.vl-pg h3{
+margin:0 0 8px; font-size:1.1rem;
+	font-weight:600;
+letter-spacing:0}
+.vl-pg p{ margin:0;color:var(--mu);
+  font-size:.95rem}
+.vl-hero{
+position:relative;overflow:hidden;
+border-bottom:1px solid var(--ln);
+  background:var(--band)}
+.vl-hgrid{
+	position:relative;
+	display:grid;
+	grid-template-columns:minmax(0,  1.2fr) minmax(0,
+1fr); gap:48px;align-items:center;padding-top:clamp(40px, 5vw, 80px);padding-bottom:clamp(40px,5vw,80px)}
+.vl-hgrid1{ padding-top:clamp(40px, 5vw,  80px);padding-bottom:clamp(40px,5vw,  80px)}
+.vl-hgrid2{
+  display:grid;
+grid-template-columns:minmax(0,1.2fr) minmax(0, 1fr);
+	gap:48px;align-items:center;padding-top:clamp(40px,5vw,80px);
+	padding-bottom:clamp(40px,5vw,80px)}
+.vl-hgrid2 .vl-ill{
+  max-width:420px;justify-self:end}
+.vl-hgrid1 h1,  .vl-hgrid2 h1{ font-size:var(--t4)}
+.vl-hgrid1 .vl-lead,
+.vl-hgrid2 .vl-lead{margin:0}
+.vl-g2{display:grid;grid-template-columns:1fr 1fr;
+gap:20px;
+  margin:0;padding:0;list-style:none}
+.vl-st{display:flex;
+  flex-direction:column; gap:clamp(28px,4vw,56px);
+	min-height:210px;
+padding:32px;border:1px solid var(--ln2);border-radius:var(--rb); background:var(--sf)}
+.vl-st b{color:var(--mu);
+	font:var(--fwh) 3.4rem/.8 var(--fh);
+letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.vl-st p{
+margin:0;
+font-size:1.25rem;
+  line-height:1.4; letter-spacing:-.01em}
+.vl-still:not(.vl-still2){
+display:grid;grid-template-columns:1fr auto;gap:32px;align-items:center;
+margin-top:20px; padding:clamp(28px, 3.4vw,
+48px);
+border:0;
+	border-radius:calc(var(--rb)*1.2);background:var(--ac);
+  color:var(--ai)}
+.vl-still:not(.vl-still2) h2{margin:0 0 8px;
+color:inherit;font-size:var(--t3);
+  letter-spacing:-.035em}
+.vl-still:not(.vl-still2) p{
+  max-width:38em;
+  color:inherit;font-size:1.1rem}
+.vl-pv{display:grid; grid-template-columns:260px minmax(0,
+1fr); gap:clamp(32px,  6vw,  96px);
+align-items:start}
+.vl-toc2{
+position:sticky;
+  top:24px; font-size:.94rem}
+.vl-toc2 h6{ margin:0 0 12px;
+  color:var(--mu);
+font:600 .75rem var(--fl); letter-spacing:.1em;text-transform:uppercase}
+.vl-toc2 a{
+  display:block; padding:8px 14px;
+  border-left:2px solid var(--ln);color:var(--mu); text-decoration:none}
+.vl-toc2 a:hover{ border-color:var(--ac);color:var(--fg)}
+.vl-it{
+	display:grid;grid-template-columns:72px minmax(0,
+1fr);gap:24px;
+  padding:36px 0;
+	border-top:1px solid var(--ln);
+scroll-margin-top:16px}
+.vl-it:nth-of-type(1){
+border-top:0;padding-top:0}
+.vl-ic2{
+  display:grid;place-items:center;width:64px;
+	height:64px; border:1px solid var(--ln2); border-radius:var(--r); background:var(--sf);color:var(--ac)}
+.vl-ic2 .vl-ic{
+	width:30px; height:30px}
+.vl-it h2{ margin:0 0 8px; font-size:var(--t3);line-height:1.1;letter-spacing:-.035em}
+.vl-it p{
+	max-width:34em;
+	margin:0; color:var(--mu);font-size:1.1rem}
+.vl-back{ margin:36px 0 0}
+.vl-foot{margin-top:0;
+padding:56px 0 32px;
+  border-top:1px solid var(--ln);background:color-mix(in srgb,var(--bg) 60%,  #000)}
+.vl-fg{
+display:grid;
+	grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px}
+.vl-fg h6{ margin:0 0 14px;
+	color:var(--mu); font:600 .8rem var(--fl);
+letter-spacing:.08em; text-transform:uppercase}
+.vl-fg a{
+	display:block;padding:4px 0;color:var(--mu);font-size:.94rem;text-decoration:none}
+.vl-fg a:hover{
+	color:var(--fg)}
+.vl-fg .vl-logo{
+	display:flex;
+  padding:0;
+color:var(--fg)}
+.vl-fg p{max-width:20em;
+	margin:14px 0 0;
+  color:var(--mu); font-size:.94rem}
+.vl-fbar{display:flex;flex-wrap:wrap;justify-content:space-between;
+  gap:6px 16px;
+margin-top:40px; color:var(--mu);font-size:.88rem}
+.vl-lg{ padding-bottom:clamp(40px,5vw,  72px)}
+.vl-toc{
+border-color:var(--ln); background:var(--sf)}
+.vl-code{ color:var(--ac)}
+.vl-nfa{
+border:1px solid var(--ln2)}
+.vl-split{grid-template-columns:minmax(0,1fr) minmax(0, 1.25fr)}
+.vl-pl{order:2;
+	justify-content:flex-start;gap:36px}
+.vl-fr{
+	order:1; background:var(--bg)}
+.vl-pl .vl-ghost{
+position:relative;
+right:auto;bottom:auto; order:3;
+	width:min(100%, 460px);
+	margin:auto 0 -6% auto}
+.vl-pl .vl-logo{
+order:0}
+.vl-pl .vl-ht{
+  order:1}
+.vl-pl .vl-meta{display:none}
+.vl-ph{
+position:absolute;
+inset:0;opacity:.28}
+.vl-ph img,.vl-ph svg{ width:100%;height:100%;object-fit:cover}
+@media (max-width:900px){ .vl-nav{display:none}
+	.vl-mn{display:block}
+  .vl-split,  .vl-hgrid,.vl-hgrid2,  .vl-help,.vl-pv, .vl-still:not(.vl-still2){
+grid-template-columns:1fr}
+  .vl-split{min-height:0} .vl-pl{gap:36px} .vl-pl .vl-ghost{position:relative; right:auto;
+bottom:auto;
+order:5;width:min(86%,
+460px);
+  margin:0 auto -48px}
+.vl-fr{ padding:40px 20px 56px}
+	.vl-pl{order:0} .vl-fr{
+order:1}
+	.vl-meta{ display:none} .vl-pg{
+	grid-template-columns:1fr 1fr} .vl-fg{grid-template-columns:1fr 1fr} .vl-fb{ grid-column:1/-1}
+  .vl-toc2{
+display:none}.vl-hgrid2 .vl-ill{
+justify-self:center; max-width:300px;grid-row:1}
+	.vl-still:not(.vl-still2) .vl-btn{
+  justify-self:start}}
+@media (max-width:560px){ .vl-pg,.vl-g2{grid-template-columns:1fr}
+.vl-steps li{grid-template-columns:48px 1fr;
+font-size:1.05rem} .vl-it{
+grid-template-columns:52px minmax(0,
+1fr);
+gap:16px}
+.vl-ic2{
+	width:52px;
+	height:52px}
+  .vl-st{
+	min-height:0;
+	padding:24px}
+	h1{ font-size:clamp(2rem, 10vw,var(--t5))}
+.vl-hgrid1 h1,
+.vl-hgrid2 h1,.vl-hgrid h1{ font-size:clamp(2rem,  9.6vw,
+var(--t4))}}
+</style>
+   </head>
+<body>
+<main>
+<section class="vl-split">
+<div class="vl-pl">
+<div class="vl-ghost"><svg class="vl-ill" viewBox="0 0 640 560" aria-hidden="true" focusable="false">
+<g class="vl-gl"><path d="M-16 560L320 330M84 560L320 330M184 560L320 330M284 560L320 330M384 560L320 330M484 560L320 330M584 560L320 330"></path>
+<path d="M0 540H640M20 500H620M70 460H570M120 430H520M170 404H470M220 384H420"></path></g>
+<g class="vl-gr"><circle cx="320" cy="250" r="198" opacity=".25"></circle><circle cx="320" cy="250" r="144" opacity=".45"></circle><circle cx="320" cy="250" r="94" opacity=".9"></circle></g>
+<g class="vl-ga"><path d="M320 55v40M320 400v-40M134 250h40M510 250h-40" opacity=".7"></path></g>
+<rect class="vl-lk" x="262" y="206" width="116" height="92" rx="20"></rect>
+<path class="vl-sh" d="M286 206v-18a34 34 0 0168 0v18"></path>
+<circle class="vl-kh" cx="320" cy="248" r="11"></circle><rect class="vl-kh" x="316" y="252" width="8" height="26" rx="4"></rect>
+<g class="vl-d1"><circle cx="500" cy="143" r="6"></circle><circle cx="147" cy="330" r="5"></circle><circle cx="540" cy="329" r="4"></circle></g>
+<g class="vl-d2"><circle cx="110" cy="170" r="5"></circle><circle cx="560" cy="203" r="5"></circle><circle cx="206" cy="90" r="4"></circle></g>
+</svg></div>
+        <a class="vl-logo" data-page="index.html"><svg class="vl-mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 3 61 32 32 61 3 32z" fill="#8b9bff"></path><text x="32" font-size="37" text-anchor="middle" fill="#0b0b10" font-family="system-ui,sans-serif" y="44" font-weight="700">H</text></svg><span>Hazelbridge</span></a>
+<div class="vl-ht"><span class="vl-kick">Document archive</span>
+<h1>Open your archive</h1>
+        <p class="vl-lead">Contracts, receipts and letters are kept here for you, and kept private.</p>
+
+<ul class="vl-bul"><li><svg class="vl-ic" viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l3 3 5-6"></path></svg><span>Contracts and receipts</span></li>
+   <li><svg focusable="false" class="vl-ic" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l3 3 5-6"></path></svg><span>Letters in one place</span></li>
+		<li><svg focusable="false" viewBox="0 0 24 24" class="vl-ic" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l3 3 5-6"></path></svg><span>Access that you control</span></li>
+        </ul>
+		</div>
+		<div class="vl-meta"><span>Secure account access</span></div>
+	</div>
+   <div class="vl-fr"><div class="vl-fc"><form class="vl-form" id="vl-f" novalidate="">
+<h2>Sign in</h2>
+		<div class="vl-fld"><label for="vl-u">Email address</label><input id="vl-u" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"/></div>
+  <div class="vl-fld"><label for="vl-p">Password</label><input id="vl-p" type="password" autocomplete="current-password"/></div>
+        <div class="vl-row"><label class="vl-chk"><input type="checkbox"/><span>Keep me signed in</span></label><a data-page="help/index.html">Forgot password?</a></div>
+      <p class="vl-err" id="vl-e" role="alert" hidden=""></p>
+    <button class="vl-btn vl-wide" id="vl-b" type="button">Sign in</button>
+<p class="vl-sub"><a data-page="help/index.html">Help</a><a data-page="legal/privacy.html">Privacy</a></p>
+    </form>
+</div>
+   </div>
+    </section>
+   <section class="vl-sec"><div class="vl-wrap vl-help">
+<div><h2 class="vl-big">Trouble signing in?</h2>
+    <p class="vl-intro">Most sign-in problems have a simple cause. Work through these steps before you contact anyone.</p>
+
+<div class="vl-still vl-still2"><h3>Still stuck?</h3>
+        <p>Ask the person who manages Hazelbridge for your organisation to reset your password. For security reasons we cannot reset it over the phone or by email.</p>
+      </div>
+        </div>
+		<ol class="vl-steps"><li>Check that Caps Lock is off; passwords are case sensitive.</li>
+  <li>Look for a stray space at the start or end of your username.</li>
+<li>Try again in a new browser window with no saved form data.</li>
+<li>Wait ten minutes if you have tried several times without success.</li>
+
+</ol>
+      </div>
+		</section>
+     <section class="vl-sec vl-priv"><div class="vl-wrap">
+<h2 class="vl-big">Privacy notice</h2>
+      <p class="vl-intro">We keep as little about you as we can and look after what we keep. This is a short account of what that is and why.</p>
+      <div class="vl-pg"><div><span class="vl-pi"><svg viewBox="0 0 24 24" aria-hidden="true" width="24" height="24" class="vl-ic"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 018 0v3"></path></svg></span><h3>What we keep</h3>
+        <p>Your username, the times you signed in and the details that belong to your account. Nothing else.</p>
+    </div>
+   <div><span class="vl-pi"><svg width="24" height="24" class="vl-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"></path></svg></span><h3>What we use it for</h3>
+  <p>To let you sign in and to protect your account from anyone else. We do not sell information about our users.</p>
+        </div>
+
+<div><span class="vl-pi"><svg class="vl-ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M9 10v.01M15 10v.01M8.5 14.5c2 2 5 2 7 0"></path></svg></span><h3>Cookies</h3>
+        <p>We use only the cookies the service needs in order to work. There are no advertising or analytics cookies.</p>
+ </div>
+ <div><span class="vl-pi"><svg class="vl-ic" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg></span><h3>Your rights</h3>
+    <p>You can ask to see, correct or delete the information we hold about you. Ask the person who manages your account.</p>
+</div>
+</div>
+	</div>
+    </section>
+     </main>
+ <footer class="vl-foot">
+<div class="vl-wrap">
+<div class="vl-fg">
+<div class="vl-fb"><a class="vl-logo" data-page="index.html"><svg class="vl-mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 3 61 32 32 61 3 32z" fill="#8b9bff"></path><text x="32" font-size="37" text-anchor="middle" fill="#0b0b10" font-family="system-ui,sans-serif" y="44" font-weight="700">H</text></svg><span>Hazelbridge</span></a><p>Sign in to your Hazelbridge account.</p>
+
+</div>
+ <div class="vl-fcol"><h6 class="vl-fh6">Main</h6><a class="vl-fa" data-page="index.html">Sign in</a><a class="vl-fa" data-page="help/index.html">Help</a><a class="vl-fa" data-page="legal/privacy.html">Privacy</a><a class="vl-fa" data-page="conditions.html">Terms of use</a></div>
+
+  <div class="vl-fcol"><h6 class="vl-fh6">Help</h6><a class="vl-fa" data-page="help/index.html">Trouble signing in?</a><a class="vl-fa" data-page="help/index.html">Still stuck?</a></div>
+     <div class="vl-fcol"><h6 class="vl-fh6">Privacy</h6><a class="vl-fa" data-page="legal/privacy.html">What we keep</a><a class="vl-fa" data-page="legal/privacy.html">What we use it for</a><a class="vl-fa" data-page="legal/privacy.html">Cookies</a></div>
+     </div>
+        <div class="vl-fbar"><span>All rights reserved.</span><span>© 2023–2026 Hazelbridge</span></div>
+		</div>
+		</footer>
+   
+
+
+
+</body></html>

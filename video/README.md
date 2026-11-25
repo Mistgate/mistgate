@@ -6,10 +6,10 @@ composition rendered to MP4 in English, Russian and Chinese; the hero also in Pe
 
 | Video | File | What it shows |
 | --- | --- | --- |
-| hero | `hero.html` | the Overview, a node sg1 installed over SSH from the browser, a profile put on it, alice's page with Singapore |
-| link | `link.html` | a new person, carol, her one link and QR code, her own page: one-tap add, the QR for another device, servers, devices |
-| health | `health.html` | the folded alerts, one opened, the doctor's fix for an oversized journal, the check green |
-| telegram | `telegram.html` | a new MTProto profile with Fake TLS, on every node and in the groups at once, alice's Telegram proxy links |
+| hero | `hero.html` | the Overview, a node sg1 installed over SSH from the browser (the New node window, its four steps), a profile put on it, alice's page with Singapore |
+| link | `link.html` | a new person, carol, her one link and QR code, her own page: Add a device, an app, one tap, her servers |
+| health | `health.html` | the open alerts, one opened, the doctor's fix for an oversized journal, the doctor green |
+| telegram | `telegram.html` | a new MTProto profile (the wizard) with Fake TLS, on every node and in the groups at once, alice's Telegram proxy links |
 
 ## How it is made
 
@@ -76,6 +76,24 @@ the WebP and the poster are copied there as they are.
 Stills of a composition without a render, to check a cut: `node stills.mjs hero.html en <dir> 3.5,12,24.4`.
 HyperFrames' own preview works too: `npx hyperframes preview`.
 
+## Clips for the README
+
+The loops beside the features in the README (`docs/images/readme/<clip>-<dark|light>-en.webp`, 840 px wide, 12 fps, a few
+seconds each, about 50-250 kB) are not films of the pipeline above. `clips.mjs` plays a short scene of the admin's dev-kit
+(`/dev-kit?only=...`, invented data, nothing leaves the page) in headless Chrome with a drawn pointer that moves, hovers and
+clicks, takes Chrome's screencast and encodes it with ffmpeg. The takes (the scene, the crop, the steps) are at the top of the
+file; the other languages' READMEs use the same English clips.
+
+```sh
+pnpm --dir web exec vite --host 127.0.0.1 --port 5293 --strictPort     # in its own terminal
+cd video
+node clips.mjs decoys                 # one take, both themes
+node clips.mjs addnode health --theme dark --out /tmp/clips
+node clips.mjs --probe "/dev-kit?only=decoys-page&state=dlg-tpl" 1440 900   # what can be clicked on a scene
+```
+
+Chrome is always started with `--headless=old`: the new headless mode opens windows on some systems.
+
 ## Settings
 
 | Variable | Default | |
@@ -83,6 +101,8 @@ HyperFrames' own preview works too: `npx hyperframes preview`.
 | `CHROME` | the usual Chrome path of the platform | the Chrome the takes are filmed in |
 | `ADMIN_ORIGIN`, `SUB_ORIGIN` | `http://127.0.0.1:5293`, `:5294` | the two Vite servers |
 | `CDP_PORT` | `9381` | a different one per take to film several at once |
+| `TAKES_OUT` | `video/assets/takes` | where the frames of a take go (try a take elsewhere without touching the footage the compositions use) |
+| `DPR` | the take's own (2) | the device pixel ratio of the footage; `DPR=1` makes a quick, soft try of a take |
 | `VIDEO_OUT` | `video/out` | where the delivery files go |
 
 `make.mjs` runs HyperFrames with its telemetry, update check and installs switched off. HyperFrames is pinned in

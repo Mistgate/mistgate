@@ -1555,7 +1555,7 @@ func (w *world) CreateDnsPreset(_ context.Context, r *connect.Request[adminv1.Cr
 	w.dnsCreateReq = append(w.dnsCreateReq, proto.Clone(r.Msg).(*adminv1.CreateDnsPresetRequest))
 	p := &adminv1.DnsPreset{Id: "dns_created", Name: r.Msg.GetName(), Description: r.Msg.GetDescription(), Servers: proto.Clone(&adminv1.DnsPreset{Servers: r.Msg.GetServers()}).(*adminv1.DnsPreset).GetServers(),
 		Split: proto.Clone(&adminv1.DnsPreset{Split: r.Msg.GetSplit()}).(*adminv1.DnsPreset).GetSplit(), Ipv4Only: r.Msg.GetIpv4Only(), SplitDirect: r.Msg.GetSplitDirect(),
-		PreferredTransport: r.Msg.GetPreferredTransport(), BlockAds: r.Msg.GetBlockAds()}
+		PreferredTransport: r.Msg.GetPreferredTransport(), BlockAds: r.Msg.GetBlockAds(), BlockMax: r.Msg.GetBlockMax()}
 	w.dnsPresets[p.GetId()] = proto.Clone(p).(*adminv1.DnsPreset)
 	return connect.NewResponse(&adminv1.CreateDnsPresetResponse{Preset: p}), nil
 }
@@ -1573,6 +1573,9 @@ func (w *world) UpdateDnsPreset(_ context.Context, r *connect.Request[adminv1.Up
 	p.Ipv4Only, p.SplitDirect, p.PreferredTransport = r.Msg.GetIpv4Only(), r.Msg.GetSplitDirect(), r.Msg.GetPreferredTransport()
 	if r.Msg.BlockAds != nil {
 		p.BlockAds = r.Msg.GetBlockAds()
+	}
+	if r.Msg.BlockMax != nil {
+		p.BlockMax = r.Msg.GetBlockMax()
 	}
 	w.dnsPresets[p.GetId()] = proto.Clone(p).(*adminv1.DnsPreset)
 	return connect.NewResponse(&adminv1.UpdateDnsPresetResponse{Preset: p}), nil

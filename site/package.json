@@ -11,9 +11,10 @@
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "build": "node build.mjs",
+    "build:all": "node merge.mjs",
     "serve": "node serve.mjs",
     "wiki": "node wiki.mjs",
-    "test": "node --test test/docs.test.mjs test/parity.test.mjs test/brand.test.mjs test/diagrams.test.mjs test/zh.test.mjs test/fa-tr.test.mjs wiki.test.mjs"
+    "test": "node --test test/docs.test.mjs test/parity.test.mjs test/brand.test.mjs test/diagrams.test.mjs test/zh.test.mjs test/fa-tr.test.mjs wiki.test.mjs test/merge.test.mjs test/seo.test.mjs"
   },
   "dependencies": {
     "markdown-it": "^14.1.0",

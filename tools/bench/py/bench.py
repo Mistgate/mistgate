@@ -8,6 +8,7 @@ import urllib.parse
 ROOT = os.environ.get("BENCH_ROOT", "/root/bench"); BIN = ROOT + "/bin"; DATA = ROOT + "/data"
 SLICE = "bench-panel.slice"; SL = "/sys/fs/cgroup/bench.slice/bench-panel.slice"
 UA = "v2rayN/7.5.0"
+NODE_IMAGE = "bench/mgnode:0.2.1"      # made from the mistgate-node binary of the release under test (see README)
 FW = {"X-Forwarded-For": "127.0.0.1", "X-Forwarded-Proto": "https"}   # what a TLS reverse proxy in front of Remnawave sends
 
 
@@ -201,12 +202,22 @@ class ComposePanel(Panel):
         sh("docker compose -p %s -f %s down" % (self.P, self.F), check=False)
 
 
+def xui_credentials(container):
+    """3x-ui v3.10 and later: a new database gets a random first panel user, printed once to the container log (no more admin/admin)."""
+    for _ in range(100):
+        m = re.search(r"Username: (\S+)\s+Password: (\S+)", sh("docker logs %s 2>&1" % container, check=False))
+        if m:
+            return m.group(1), m.group(2)
+        time.sleep(0.2)
+    raise RuntimeError("no generated 3x-ui user in the log of " + container)
+
+
 class XUI(ComposePanel):
     name = "3xui"
     ready_port = 2053
     P, F = "bench3xui", ROOT + "/3xui/compose.yml"
 
-    def images(self): return ["ghcr.io/mhsanaei/3x-ui:v3.9.0"]
+    def images(self): return ["ghcr.io/mhsanaei/3x-ui:v3.11.0"]
     def data_dirs(self): return [DATA + "/3xui"]
 
     def wipe(self):
@@ -214,8 +225,9 @@ class XUI(ComposePanel):
 
     def bootstrap(self):
         c = Client("127.0.0.1", 2053)
+        user, pw = xui_credentials("bench_3xui")
         st, b, _ = c.req("GET", "/csrf-token")
-        st, b, _ = c.req("POST", "/login", body={"username": "admin", "password": "admin"}, headers={"X-CSRF-Token": b["obj"]})
+        st, b, _ = c.req("POST", "/login", body={"username": user, "password": pw}, headers={"X-CSRF-Token": b["obj"]})
         assert st == 200 and b.get("success"), (st, b)
         st, b, _ = c.req("GET", "/csrf-token")
         c.h["X-CSRF-Token"] = b["obj"]
@@ -245,7 +257,7 @@ class XUI(ComposePanel):
         return ["http://127.0.0.1:%d%s%s" % (sub_port, sub_path, ids["user%d" % i]) for i in range(1, n + 1)]
 
     def versions(self):
-        return {"3x-ui": "v3.9.0 (ghcr.io/mhsanaei/3x-ui:v3.9.0)"}
+        return {"3x-ui": "v3.11.0 (ghcr.io/mhsanaei/3x-ui:v3.11.0)"}
 
 
 class Remna(ComposePanel):
@@ -256,7 +268,7 @@ class Remna(ComposePanel):
     sub_headers = ["X-Forwarded-For: 127.0.0.1", "X-Forwarded-Proto: https"]
     P, F = "benchremna", ROOT + "/remna/compose.yml"
 
-    def images(self): return ["remnawave/backend:3.4.5", "postgres:18.4", "valkey/valkey:9-alpine"]
+    def images(self): return ["remnawave/backend:3.4.11", "postgres:18.4", "valkey/valkey:9-alpine"]
     def data_dirs(self): return ["/var/lib/docker/volumes/remnawave-db-data", "/var/lib/docker/volumes/valkey-socket"]
 
     def wipe(self):
@@ -292,7 +304,7 @@ class Remna(ComposePanel):
         return out
 
     def versions(self):
-        return {"remnawave backend": "3.4.5", "postgres": "18.4", "valkey": "9-alpine"}
+        return {"remnawave backend": "3.4.11", "postgres": "18.4", "valkey": "9-alpine"}
 
 
 class Pasar(ComposePanel):
@@ -300,7 +312,7 @@ class Pasar(ComposePanel):
     ready_port = 8000
     P, F = "benchpasar", ROOT + "/pasar/compose.yml"
 
-    def images(self): return ["pasarguard/panel:v5.4.1"]
+    def images(self): return ["pasarguard/panel:v5.6.0"]
     def data_dirs(self): return [DATA + "/pasar"]
 
     def wipe(self):
@@ -333,7 +345,7 @@ class Pasar(ComposePanel):
         return out
 
     def versions(self):
-        return {"pasarguard panel": "v5.4.1 (database: SQLite, the installer default)"}
+        return {"pasarguard panel": "v5.6.0 (database: SQLite, the installer default)"}
 
 
 class Mistgate(Panel):
@@ -349,9 +361,9 @@ class Mistgate(Panel):
     def binaries(self): return [self.bin]
 
     def prepare_once(self):
-        if "bench/mgnode" not in sh("docker images --format '{{.Repository}}:{{.Tag}}'"):
+        if NODE_IMAGE not in sh("docker images --format '{{.Repository}}:{{.Tag}}'").split():
             sh("rm -rf /tmp/mgn && mkdir /tmp/mgn && cp %s/mistgate-node /tmp/mgn/ && tar -c -C /tmp/mgn mistgate-node | "
-               "docker import --change 'ENTRYPOINT [\"/mistgate-node\"]' - bench/mgnode:0.1.32 && rm -rf /tmp/mgn" % BIN)
+               "docker import --change 'ENTRYPOINT [\"/mistgate-node\"]' - %s && rm -rf /tmp/mgn" % (BIN, NODE_IMAGE))
         if self.NET not in sh("docker network ls --format '{{.Name}}'"):
             sh("docker network create --internal --subnet %s --gateway %s %s" % (self.SUBNET, self.GW, self.NET))
 
@@ -421,10 +433,10 @@ class Mistgate(Panel):
         nid = b["node"]["id"]
         cmd = b["installCommand"]
         a = {k: re.search(r"--%s (\S+)" % k, cmd).group(1) for k in ("panel", "sni", "ca-sha256", "token")}
-        sh("docker run --rm --network %s -v %s:/state bench/mgnode:0.1.32 enroll --panel %s --sni %s --ca-sha256 %s --token %s --state-dir /state"
-           % (self.NET, self.NODE_STATE, a["panel"], a["sni"], a["ca-sha256"], a["token"]))
-        sh("docker run -d --name bench_mgnode --network %s --cpus 2 --memory 2g --memory-swap 2g -v %s:/state bench/mgnode:0.1.32 run --state-dir /state"
-           % (self.NET, self.NODE_STATE))
+        sh("docker run --rm --network %s -v %s:/state %s enroll --panel %s --sni %s --ca-sha256 %s --token %s --state-dir /state"
+           % (self.NET, self.NODE_STATE, NODE_IMAGE, a["panel"], a["sni"], a["ca-sha256"], a["token"]))
+        sh("docker run -d --name bench_mgnode --network %s --cpus 2 --memory 2g --memory-swap 2g -v %s:/state %s run --state-dir /state"
+           % (self.NET, self.NODE_STATE, NODE_IMAGE))
         st, b, _ = self.rpc("ProfileService", "CreateInbound", {"profileId": pid, "nodeId": nid})
         assert st == 200, (st, b)
         st, b, _ = self.rpc("GroupService", "CreateGroup", {"name": "everyone", "profileIds": [pid]})

@@ -1,0 +1,7 @@
+# generated: the board pipeline writes build/, the page generator writes dist/, cargo writes gen/target/
+/build/
+/dist/
+/gen/target/
+node_modules/
+.profile/
+scratch/
