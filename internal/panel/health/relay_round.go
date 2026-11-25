@@ -2,11 +2,8 @@ package health
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -42,12 +39,7 @@ func relayTargetKey(t *target) string {
 	if t == nil || t.relay == nil {
 		return ""
 	}
-	link := t.relay.link
-	key := strings.Join([]string{link.ID, link.ViaNodeID, t.relay.entry.Address, t.node.Address, t.in.ID, t.in.ProfileID, t.in.Protocol,
-		strconv.FormatUint(uint64(t.in.ProfileVersion), 10), strconv.FormatUint(t.in.SpecVersion, 10), t.in.TLSNameOverride, t.in.RealityTargetOverride,
-		link.Network, strconv.Itoa(int(link.Port)), strconv.Itoa(int(t.relay.exitPort))}, "\x00")
-	sum := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(sum[:])
+	return t.relay.link.TargetKey(t.in, t.node.Address, t.relay.exitPort)
 }
 
 // roundRelay probes the exit inbound through the entry's forwarded port. Its result lives in check_json.monitor and never

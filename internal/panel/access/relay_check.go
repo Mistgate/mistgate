@@ -41,15 +41,27 @@ const relayApplyWait = 30 * time.Second
 
 // relayTo is the target the forward points at: the exit's address and its server's port, the text a check is made for.
 func (s *Service) relayTo(ctx context.Context, l store.RelayLink) string {
+	to, _ := s.relayTarget(ctx, l)
+	return to
+}
+
+func (s *Service) relayTarget(ctx context.Context, l store.RelayLink) (string, string) {
 	f, merged, err := s.loadFull(ctx, l.InboundID)
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	spec, err := s.buildSpec(f, merged)
 	if err != nil {
-		return ""
+		return "", ""
 	}
-	return net.JoinHostPort(f.Node.Address, strconv.Itoa(int(spec.Listen.Port)))
+	return relayEndpoint(l, f, spec.Listen.Port)
+}
+
+func relayEndpoint(l store.RelayLink, f store.AccessInboundFull, port uint16) (string, string) {
+	row := store.FleetInboundRow{ID: f.Inbound.ID, ProfileID: f.Profile.ID, Protocol: f.Profile.Protocol,
+		ProfileVersion: f.Profile.Version, SpecVersion: f.Inbound.SpecVersion,
+		TLSNameOverride: f.Inbound.TLSServerNameOverride, RealityTargetOverride: f.Inbound.RealityTargetOverride}
+	return net.JoinHostPort(f.Node.Address, strconv.Itoa(int(port))), l.TargetKey(row, f.Node.Address, port)
 }
 
 // relayCheckGate lets a relay be switched on: its latest check proved the leg or found it unverifiable, recently, for this target.
@@ -60,7 +72,7 @@ func (s *Service) relayCheckGate(ctx context.Context, l store.RelayLink) error {
 		return coded(connect.CodeFailedPrecondition, "relay_unchecked")
 	}
 	age := s.now().Sub(time.Unix(c.Leg.At, 0))
-	if age > relayCheckTTL || age < -time.Minute || c.Network != l.Network || c.To != s.relayTo(ctx, l) {
+	if age > relayCheckTTL || age < -time.Minute || c.Network != l.Network || c.To == "" || c.To != s.relayTo(ctx, l) {
 		return coded(connect.CodeFailedPrecondition, "relay_check_stale")
 	}
 	if !c.Leg.Acceptable() {

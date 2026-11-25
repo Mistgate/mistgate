@@ -234,7 +234,8 @@ func TestRelayModeChangeNotifiesDesiredStateOnce(t *testing.T) {
 	if err := f.st.SetRelayCheck(f.ctx, created.Id, check); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.st.SetRelayMonitorCheck(f.ctx, created.Id, store.RelayMonitorCheck{AtUnix: now, FailStreak: 2, TargetKey: "same-target"}); err != nil {
+	_, targetKey := f.s.relayTarget(f.ctx, link)
+	if err := f.st.SetRelayMonitorCheck(f.ctx, created.Id, store.RelayMonitorCheck{AtUnix: now, FailStreak: 2, TargetKey: targetKey}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.st.SetRelayBridgeSide(f.ctx, created.Id, "exit", &store.RelayBridgeSideCheck{Connected: true, Conns: 1, SinceUnix: now - 10, AtUnix: now}); err != nil {
@@ -312,6 +313,18 @@ func TestRelayGateNeedsAFreshPassingLegForThisTarget(t *testing.T) {
 	must(c.check(f.ctx, r.Id))
 	f.s.cfg.CheckRelay = nil
 	wantMsg(t, gate(), "failed_precondition: relay_unchecked")
+}
+
+func TestRelayGateRejectsAnUnknownDestination(t *testing.T) {
+	f, checker, r := newCheckedFix(t)
+	check := must(checker.check(f.ctx, r.Id))
+	check.To = "" // no endpoint on the stored proof
+	if err := f.st.SetRelayCheck(f.ctx, r.Id, check); err != nil {
+		t.Fatal(err)
+	}
+	link := f.relayOf(r.Id)
+	f.sql(`DELETE FROM inbound WHERE id = ?`, link.InboundID) // target removed after the relay was read
+	wantMsg(t, f.s.relayCheckGate(f.ctx, link), "failed_precondition: relay_check_stale")
 }
 
 func TestCheckRelayRPCStoresAndAuditsAndSwitchesNothing(t *testing.T) {

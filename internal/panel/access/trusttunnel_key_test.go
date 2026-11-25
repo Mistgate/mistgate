@@ -247,6 +247,7 @@ func TestTrustTunnelKeyLinksIncludeOnlyTCPRelayTwins(t *testing.T) {
 		relay := must(e.s.CreateRelay(e.ctx, req(&adminv1.CreateRelayRequest{InboundId: inboundID, ViaNodeId: entry, Port: port}))).Msg.Relay
 		e.sql(`UPDATE relay SET enabled = 1, state = 'active' WHERE id = ?`, relay.Id)
 		check := store.RelayCheck{At: e.clock.Unix(), Leg: store.RelayStage{Status: "ok"}, Path: store.RelayStage{Status: "ok"}}
+		check.Network, check.Port, check.To = relay.Network, uint16(relay.Port), e.s.relayTo(e.ctx, store.RelayLink{Relay: store.Relay{InboundID: inboundID}})
 		check.Settle()
 		if err := e.st.SetRelayCheck(e.ctx, relay.Id, check); err != nil {
 			t.Fatal(err)
@@ -434,6 +435,7 @@ func TestTrustTunnelKeyLinksHaveTheIPv6TwinBeforeTheRelayTwins(t *testing.T) {
 	relay := must(e.s.CreateRelay(e.ctx, req(&adminv1.CreateRelayRequest{InboundId: inboundID, ViaNodeId: "nod_nl1", Port: 8443}))).Msg.Relay
 	e.sql(`UPDATE relay SET enabled = 1, state = 'active' WHERE id = ?`, relay.Id)
 	check := store.RelayCheck{At: e.clock.Unix(), Leg: store.RelayStage{Status: "ok"}, Path: store.RelayStage{Status: "ok"}}
+	check.Network, check.Port, check.To = relay.Network, uint16(relay.Port), e.s.relayTo(e.ctx, store.RelayLink{Relay: store.Relay{InboundID: inboundID}})
 	check.Settle()
 	if err := e.st.SetRelayCheck(e.ctx, relay.Id, check); err != nil {
 		t.Fatal(err)

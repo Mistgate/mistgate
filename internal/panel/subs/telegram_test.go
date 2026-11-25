@@ -222,7 +222,7 @@ func TestTelegramPageLinksCarryNoInternalNames(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := m.st.W.Exec(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
-		VALUES ('rly_1', ?, 'nod_2', 'tcp', 9443, 1, 'active', ?, 1, 1)`, inbound, `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`); err != nil {
+		VALUES ('rly_1', ?, 'nod_2', 'tcp', 9443, 1, 'active', ?, 1, 1)`, inbound, successfulRelayCheck(t, m.st, inbound, "tcp", 9443)); err != nil {
 		t.Fatal(err)
 	}
 	_, tok := m.person("alice", true)
