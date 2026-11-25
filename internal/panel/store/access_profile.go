@@ -72,22 +72,40 @@ func (a Access) Profiles(ctx context.Context) ([]AccessProfile, error) {
 	return out, rows.Err()
 }
 
+// ProfileInboundChanges records the enabled inbounds on non-retired nodes used to plan a settings edit.
+type ProfileInboundChanges struct {
+	Versions map[string]uint64
+	Changed  []string
+}
+
 // UpdateProfile writes name, settings and secrets of p (matched by ID) when its stored version equals
-// expectedVersion, bumps the version and, with bumpInbounds, the spec_version of the profile's inbounds. With
+// expectedVersion, bumps the version and the spec_version of the listed changed inbounds. With
 // bumpEpoch it also raises critical_epoch in the same transaction: every device that received its config before
 // is then "stale" (an x-critical change of an AWG profile).
 // ErrAccessVersion on mismatch, ErrAccessExists on a name clash. Returns the stored row.
-func (a Access) UpdateProfile(ctx context.Context, p AccessProfile, expectedVersion uint32, bumpInbounds, bumpEpoch bool, now time.Time) (AccessProfile, error) {
-	stmts := []Stmt{
-		guard(`EXISTS (SELECT 1 FROM profile WHERE id = ? AND version = ?)`, p.ID, int64(expectedVersion)),
-		{Query: `UPDATE profile SET name = ?, settings_json = ?, secrets_enc = ?, version = version + 1, updated_at = ? WHERE id = ?`,
-			Args: []any{p.Name, p.SettingsJSON, p.SecretsEnc, unix(now), p.ID}},
+func (a Access) UpdateProfile(ctx context.Context, p AccessProfile, expectedVersion uint32, changes *ProfileInboundChanges, bumpEpoch bool, now time.Time) (AccessProfile, error) {
+	stmts := []Stmt{guard(`EXISTS (SELECT 1 FROM profile WHERE id = ? AND version = ?)`, p.ID, int64(expectedVersion))}
+	if changes != nil {
+		versions, err := json.Marshal(changes.Versions)
+		if err != nil {
+			return AccessProfile{}, err
+		}
+		// Check the same enabled set as InboundsFull; a concurrent edit must be planned again.
+		stmts = append(stmts, guard(`(WITH live AS (
+			SELECT i.id, i.spec_version FROM inbound i JOIN node n ON n.id = i.node_id
+			WHERE i.profile_id = ? AND i.enabled = 1 AND n.state <> 'retired'
+		), expected AS (SELECT key, value FROM json_each(?))
+		SELECT (SELECT count(*) FROM live) = (SELECT count(*) FROM expected)
+			AND NOT EXISTS (SELECT id, spec_version FROM live EXCEPT SELECT key, value FROM expected))`, p.ID, string(versions)))
+	}
+	stmts = append(stmts, Stmt{Query: `UPDATE profile SET name = ?, settings_json = ?, secrets_enc = ?, version = version + 1, updated_at = ? WHERE id = ?`,
+		Args: []any{p.Name, p.SettingsJSON, p.SecretsEnc, unix(now), p.ID}})
+	if changes != nil && len(changes.Changed) > 0 {
+		stmts = append(stmts, Stmt{Query: `UPDATE inbound SET spec_version = spec_version + 1, updated_at = ?
+			WHERE profile_id = ? AND id IN (SELECT value FROM json_each(?))`, Args: []any{unix(now), p.ID, accJSON(changes.Changed)}})
 	}
 	if bumpEpoch {
 		stmts = append(stmts, Stmt{Query: `UPDATE profile SET critical_epoch = critical_epoch + 1 WHERE id = ?`, Args: []any{p.ID}})
-	}
-	if bumpInbounds {
-		stmts = append(stmts, Stmt{Query: `UPDATE inbound SET spec_version = spec_version + 1, updated_at = ? WHERE profile_id = ?`, Args: []any{unix(now), p.ID}})
 	}
 	_, err := a.s.batch(ctx, stmts...)
 	if errors.Is(err, errGuard) {
