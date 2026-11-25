@@ -315,6 +315,24 @@ func TestRelayGateNeedsAFreshPassingLegForThisTarget(t *testing.T) {
 	wantMsg(t, gate(), "failed_precondition: relay_unchecked")
 }
 
+func TestRelaySettleDiscardsOnlyTheOldExitLeg(t *testing.T) {
+	x := newReverseControlFix(t, store.RelayModeDNAT)
+	x.check(x.stage("fail", 0), x.stage("ok", 0), store.RelayStage{}, store.RelayStage{})
+	x.sql(`UPDATE relay SET port = 34443 WHERE id = ?`, x.id)
+	if !x.s.relayNeedsBridge(x.ctx, x.relayOf(x.id)) {
+		t.Fatal("moving only the entry port discarded the same exit's failed leg")
+	}
+	x.sql(`UPDATE node SET address = 'other.example.com' WHERE id = 'nod_de1'`)
+	if err := x.s.relaySettle(x.ctx, x.relayOf(x.id)); err != nil {
+		t.Fatalf("a working new forward was disabled because the old exit needed a bridge: %v", err)
+	}
+	link := x.relayOf(x.id)
+	check, _ := link.Check()
+	if !link.Enabled || link.ActiveMode != store.RelayModeDNAT || check.Path.Status != "ok" || check.To != x.s.relayTo(x.ctx, link) {
+		t.Fatalf("new forward was not checked directly: enabled=%v mode=%s check=%+v", link.Enabled, link.ActiveMode, check)
+	}
+}
+
 func TestRelayGateRejectsAnUnknownDestination(t *testing.T) {
 	f, checker, r := newCheckedFix(t)
 	check := must(checker.check(f.ctx, r.Id))

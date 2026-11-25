@@ -64,6 +64,11 @@ func relayEndpoint(l store.RelayLink, f store.AccessInboundFull, port uint16) (s
 	return net.JoinHostPort(f.Node.Address, strconv.Itoa(int(port))), l.TargetKey(row, f.Node.Address, port)
 }
 
+// The leg ends at the exit; moving the entry's listen port invalidates the path but not the leg.
+func (s *Service) relayLegMatches(ctx context.Context, l store.RelayLink, c store.RelayCheck) bool {
+	return c.Network == l.Network && c.To != "" && c.To == s.relayTo(ctx, l)
+}
+
 // relayCheckGate lets a relay be switched on: its latest check proved the leg or found it unverifiable, recently, for this target.
 // (The leg does not depend on the entry's port; a port moved after the check is covered by the path check that follows the switch.)
 func (s *Service) relayCheckGate(ctx context.Context, l store.RelayLink) error {
@@ -72,7 +77,7 @@ func (s *Service) relayCheckGate(ctx context.Context, l store.RelayLink) error {
 		return coded(connect.CodeFailedPrecondition, "relay_unchecked")
 	}
 	age := s.now().Sub(time.Unix(c.Leg.At, 0))
-	if age > relayCheckTTL || age < -time.Minute || c.Network != l.Network || c.To == "" || c.To != s.relayTo(ctx, l) {
+	if age > relayCheckTTL || age < -time.Minute || !s.relayLegMatches(ctx, l, c) {
 		return coded(connect.CodeFailedPrecondition, "relay_check_stale")
 	}
 	if !c.Leg.Acceptable() {
@@ -243,14 +248,11 @@ func (s *Service) relaySettle(ctx context.Context, l store.RelayLink) error {
 		if err != nil {
 			return s.internal("read relay after bridge", err)
 		}
-		if current.ActiveMode != store.RelayModeReverse && current.Mode == store.RelayModeAuto {
-			check, _ := current.Check()
-			if check.Leg.Status == "fail" && freshRelayStage(check.ReverseReach, s.now(), relayCheckTTL) && check.ReverseReach.Status == "ok" {
-				s.changeRelayMode(ctx, current, store.RelayModeReverse, "leg_failed")
-				current, err = s.st.RelayLink(context.WithoutCancel(ctx), l.ID)
-				if err != nil {
-					return s.internal("read relay after mode change", err)
-				}
+		if current.ActiveMode != store.RelayModeReverse && current.Mode == store.RelayModeAuto && s.relayNeedsBridge(ctx, current) {
+			s.changeRelayMode(ctx, current, store.RelayModeReverse, "leg_failed")
+			current, err = s.st.RelayLink(context.WithoutCancel(ctx), l.ID)
+			if err != nil {
+				return s.internal("read relay after mode change", err)
 			}
 		}
 		if current.Mode == store.RelayModeReverse && current.ActiveMode != store.RelayModeReverse {
@@ -312,7 +314,7 @@ func (s *Service) relayNeedsBridge(ctx context.Context, l store.RelayLink) bool 
 		return true
 	}
 	check, ok := l.Check()
-	if !ok || l.Mode != store.RelayModeAuto || !freshRelayStage(check.Leg, s.now(), relayCheckTTL) || check.Leg.Status != "fail" {
+	if !ok || l.Mode != store.RelayModeAuto || !freshRelayStage(check.Leg, s.now(), relayCheckTTL) || check.Leg.Status != "fail" || !s.relayLegMatches(ctx, l, check) {
 		return false
 	}
 	entry, err := s.st.Node(ctx, l.ViaNodeID)
