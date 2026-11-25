@@ -313,7 +313,7 @@ Start-up errors of `mistgate serve` and what they mean:
 | ``master key: … (run `mistgate setup`)`` | `master.key` is missing and there is no database yet: run `mistgate setup`. |
 | `master key: … is missing but the database exists: restore master.key from your backup …` | The installation lost its key. Put `master.key` back from a backup. `setup` refuses here: a new key cannot read the stored secrets. |
 | `vault: … is accessible to group or others …; run chmod 600 on it` | Run `chmod 600` on the key file. |
-| `--admin-listen conflicts with the stored admin address …` | The installation was set up for a secret host or prefix; drop `--admin-listen`. |
+| `--admin-listen or MISTGATE_ADMIN_LISTEN conflicts with the stored admin address …` | A nonempty override differs from the stored address. Remove `--admin-listen` from the service command and `MISTGATE_ADMIN_LISTEN` from its environment, reload the service configuration if required, then restart the panel. Flags take precedence over the environment. To change the stored address, use [`mistgate admin-address`](../reference/cli.md#mistgate-admin-address); that command sees only its own environment, not another process's service flags or environment. |
 | `--tls-cert and --tls-key go together` | Give both or neither. |
 
 ## Panel logs, retention, export and metrics
