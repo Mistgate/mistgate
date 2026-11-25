@@ -145,7 +145,13 @@ type Agent struct {
 
 	// A new panel link address (panellink.go). meta.Link, meta.NextLink, meta.PrevLink, meta.LinkSince and cfg.LinkURL
 	// change at run time and are guarded by metaMu; the rest of meta is fixed at start.
-	metaMu           sync.Mutex
+	metaMu sync.Mutex
+	// leftLink (guarded by metaMu) is the link address this run rolled back from: it did not hold, and the node is on its
+	// previous address again. The panel keeps sending that address in every HelloAck; it is saved as the pending next
+	// address but does not end the session (applyPanelLink), or the node would switch there and back without ever
+	// staying. It is forgotten when the panel sends another address, when an address is committed, and on restart (it
+	// lives in memory only): a repaired address is tried again then.
+	leftLink         string
 	triedNext        bool             // connectLoop only: the last session tried meta.NextLink
 	triedPrev        bool             // connectLoop only: the last turn tried prev; a pending next gets the following turn
 	currentFailed    bool             // connectLoop only: the last session over the current link did not hold (panellink.go)

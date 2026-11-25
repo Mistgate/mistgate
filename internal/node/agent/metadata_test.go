@@ -3,6 +3,7 @@ package agent
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,6 +19,16 @@ const (
 	metadataNextLink = "wss://next.example.com/next-secret-prefix-0123456789/"
 	metadataNewLink  = "wss://new.example.com/new-secret-prefix-0123456789/"
 )
+
+func readMetaFile(dir string) (Meta, error) {
+	var m Meta
+	err := withMetaLock(dir, func() error {
+		var err error
+		m, err = readMetaFileUnlocked(dir)
+		return err
+	})
+	return m, err
+}
 
 func metadataFixture(t *testing.T) (string, Meta) {
 	t.Helper()
@@ -364,5 +375,27 @@ func TestMetadataSaveDoesNotRewriteImmutableIdentity(t *testing.T) {
 		if m.NextLink != metadataNewLink || m.NextLinkRevision == "" {
 			t.Fatal("save did not refresh pending intent")
 		}
+	}
+}
+
+// "enroll --force" can run while the agent is up. The agent's snapshot of the old enrollment must not overwrite it.
+func TestMetadataSaveRefusesAnotherEnrollment(t *testing.T) {
+	dir, m := metadataFixture(t)
+	other := Meta{Panel: "other.example.com:443", SNI: "other-agent.example.com", NodeID: "other-node"}
+	raw, err := json.Marshal(other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, fileMeta)
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m.LinkHealthy = true
+	if err := saveMeta(dir, &m); err == nil || !strings.Contains(err.Error(), "another enrollment") {
+		t.Fatalf("saveMeta over another enrollment = %v", err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(raw, after) {
+		t.Fatalf("%s changed: %v", fileMeta, err)
 	}
 }

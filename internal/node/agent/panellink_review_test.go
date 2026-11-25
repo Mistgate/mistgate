@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -71,7 +72,11 @@ func TestPrevLinkConsecutiveSwitches(t *testing.T) {
 				}
 				t.Run(name, func(t *testing.T) {
 					h, lp, a, b := prevLinkHarness(t)
-					h.a.resetAfter = 100 * time.Millisecond
+					// B must prove healthy only in the healthy case; every other session here is short by design.
+					h.a.resetAfter = time.Minute
+					if healthy {
+						h.a.resetAfter = 100 * time.Millisecond
+					}
 					cURL, _ := url.Parse(b)
 					cURL.Path = "/" + linkPrefix('c') + "/"
 					c := cURL.String()
@@ -94,6 +99,7 @@ func TestPrevLinkConsecutiveSwitches(t *testing.T) {
 						endSession(t, h)
 					}
 					_ = end()
+					h.a.resetAfter = time.Minute // C and the fallback are short sessions, whatever B needed (no turn runs now)
 					if restart {
 						client, dialer := h.a.linkHTTPClient, h.a.bridgeDialer
 						h.a = h.newAgent()
@@ -129,15 +135,18 @@ func TestPrevLinkConsecutiveSwitches(t *testing.T) {
 // Dialing takes longer than healthyAfter, but B drops immediately after HelloAck: it is still an unhealthy address.
 func TestPrevLinkHealthStartsAtHelloAck(t *testing.T) {
 	h, lp, a, b := prevLinkHarness(t)
-	h.a.resetAfter = 50 * time.Millisecond
+	h.a.resetAfter = 500 * time.Millisecond // healthy after 1 s: the short sessions below end within a few ms
 	lp.drop('b')
+	var dials atomic.Int32
 	directLinkClient(h, func(ctx context.Context, network, address string) (net.Conn, error) {
-		timer := time.NewTimer(2 * h.a.healthyAfter())
-		defer timer.Stop()
-		select {
-		case <-timer.C:
-		case <-ctx.Done():
-			return nil, ctx.Err()
+		if dials.Add(1) == 1 { // only the dial to B outlasts the health threshold
+			timer := time.NewTimer(h.a.healthyAfter() + 100*time.Millisecond)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
 		}
 		return (&net.Dialer{}).DialContext(ctx, network, address)
 	})
@@ -170,6 +179,7 @@ func TestPrevLinkBridgeCurrentShortAndHealthy(t *testing.T) {
 			}
 			via := bridgeLinkHarness(t, h, a)
 			if !healthy {
+				h.a.resetAfter = time.Minute // the dropped B session is short by design
 				lp.drop('b')
 			}
 			end := startLinkTurn(t, h, via)
@@ -295,12 +305,14 @@ func TestPrevLinkBridgeShortCurrentDoesNotStarveNext(t *testing.T) {
 	}
 	lp.refuse('a')
 	lp.drop('b')
+	h.a.resetAfter = time.Minute // the dropped B session is short by design
 	via := bridgeLinkHarness(t, h, a)
 	end := startLinkTurn(t, h, via)
 	if lp.session(t) != linkPrefix('b') {
 		t.Fatal("fallback did not retry current on the same bridge")
 	}
 	_ = end()
+	h.a.resetAfter = 25 * time.Millisecond // C must prove healthy (no turn runs now)
 	if !h.a.currentFailed || lp.dialsTo('a') != 1 || lp.dialsTo('b') != 1 || lp.dialsTo('c') != 0 {
 		t.Fatal("first turn did not favor previous and count the short current session as a failure")
 	}
@@ -410,7 +422,7 @@ func TestPanelLinkHealthExcludesTeardown(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			h := newHarness(t, harnessOpts{noStart: true})
-			h.a.resetAfter = 50 * time.Millisecond
+			h.a.resetAfter = 500 * time.Millisecond // healthy after 1 s: the session below ends at once
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 			stream := &teardownGateTransport{ctx: ctx, cancelled: cancellation,
@@ -428,7 +440,7 @@ func TestPanelLinkHealthExcludesTeardown(t *testing.T) {
 			case <-time.After(5 * time.Second):
 				t.Fatal("session teardown did not start")
 			}
-			time.Sleep(2 * h.a.healthyAfter())
+			time.Sleep(h.a.healthyAfter() + 100*time.Millisecond)
 			release.Do(func() { close(stream.release) })
 			select {
 			case <-done:

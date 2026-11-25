@@ -25,16 +25,6 @@ func withMetaLock(dir string, fn func() error) error {
 	return fn()
 }
 
-func readMetaFile(dir string) (Meta, error) {
-	var m Meta
-	err := withMetaLock(dir, func() error {
-		var err error
-		m, err = readMetaFileUnlocked(dir)
-		return err
-	})
-	return m, err
-}
-
 // readMetaFileUnlocked requires withMetaLock, including for reads during metadata transactions.
 func readMetaFileUnlocked(dir string) (Meta, error) {
 	var m Meta
@@ -77,6 +67,10 @@ func saveMeta(dir string, m *Meta) error {
 		current, err := readMetaFileUnlocked(dir)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
+		}
+		if err == nil && current.NodeID != m.NodeID {
+			// "enroll --force" ran while the agent was up: this snapshot belongs to the old enrollment.
+			return errors.New(fileMeta + " belongs to another enrollment")
 		}
 		if err == nil && current.NextLinkRevision != next.NextLinkRevision {
 			next.NextLink = current.NextLink

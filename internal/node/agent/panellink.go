@@ -85,6 +85,9 @@ func (a *Agent) applyPanelLink(st *pb.NodeSettings) (fresh bool) {
 		}
 		return false
 	}
+	if raw != a.leftLink {
+		a.leftLink = "" // the panel moved on to another address: the one this run left may be tried again
+	}
 	dirty := false
 	switch raw {
 	case a.meta.Link:
@@ -96,11 +99,12 @@ func (a *Agent) applyPanelLink(st *pb.NodeSettings) (fresh bool) {
 	default:
 		a.meta.NextLink = raw
 		dirty = true
-		fresh = true
+		fresh = raw != a.leftLink // the address this run rolled back from is kept as pending, but must not end the session
 	}
 	if dirty {
 		if err := saveMeta(a.cfg.StateDir, &a.meta); err != nil {
 			a.log.Error("panel link address not saved", "err", err)
+			fresh = false // no reconnect loop when the address cannot be saved
 		}
 	}
 	a.metaMu.Unlock()
@@ -217,6 +221,7 @@ func (a *Agent) commitNextLink(next, revision string) bool {
 		return false
 	}
 	a.triedNext = false // a superseding intent gets its own first turn
+	a.leftLink = ""
 	if !promoted {
 		return false
 	}
@@ -276,6 +281,7 @@ func (a *Agent) commitPrevLink(prev string) bool {
 	if !rolledBack {
 		return false
 	}
+	a.leftLink = a.cfg.LinkURL
 	a.cfg.LinkURL = prev
 	a.log.Info("back on the previous panel address")
 	return true

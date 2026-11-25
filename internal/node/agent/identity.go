@@ -634,6 +634,11 @@ func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 		_ = f.Close()
 		return err
 	}
+	// The agent rewrites agent.json while it runs: without the sync a power loss can leave a renamed, truncated file.
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
 	if err := f.Close(); err != nil {
 		return err
 	}

@@ -327,6 +327,39 @@ func TestNextLinkCommitsAfterASession(t *testing.T) {
 	committedTo(t, h, b, a)
 }
 
+// B answers the Hello and drops the session, and the panel names B in every HelloAck and DesiredState. After the rollback
+// to A the node stays on A: the address it left does not end the session again, and B is not dialled a second time.
+func TestPanelLinkRollbackSurvivesPanelResend(t *testing.T) {
+	h, lp, a, b := prevLinkHarness(t)
+	h.a.meta.NextLink = ""
+	h.a.resetAfter = time.Minute // no session here is healthy
+	lp.settings = &pb.NodeSettings{PanelLinkUrl: b}
+	lp.drop('b')
+	h.start()
+	for _, want := range []byte{'a', 'b', 'a'} {
+		if got := lp.session(t); got != linkPrefix(want) {
+			t.Fatalf("session on %q, want %q", got[:1], string(want))
+		}
+	}
+	eventually(t, func() bool { return h.a.linkURL() == a && h.a.prevLink() == "" }, "the rollback to A")
+
+	// The session on A is alive: it takes a DesiredState and reports the apply.
+	ds := fullState(1)
+	ds.Settings = &pb.NodeSettings{PanelLinkUrl: b}
+	lp.push <- &pb.ConnectResponse{Message: &pb.ConnectResponse_DesiredState{DesiredState: ds}}
+	select {
+	case r := <-lp.applies:
+		if r.Status != pb.ApplyStatus_APPLY_STATUS_APPLIED || r.Revision != 1 {
+			t.Fatalf("apply result %v revision %d", r.Status, r.Revision)
+		}
+	case <-time.After(8 * time.Second):
+		t.Fatal("no ApplyResult: the session on the current address did not stay up")
+	}
+	if h.a.linkURL() != a || lp.dialsTo('b') != 1 || lp.dialsTo('a') != 2 || len(lp.sessions) != 0 {
+		t.Fatalf("link %v, dials a=%d b=%d, extra sessions %d", h.a.linkURL() == a, lp.dialsTo('a'), lp.dialsTo('b'), len(lp.sessions))
+	}
+}
+
 // A new link address in a DesiredState is saved and tried at the next reconnect: the session it came in reports the
 // apply and goes on.
 func TestNextLinkFromADesiredStateWaitsForTheNextSession(t *testing.T) {
@@ -628,7 +661,7 @@ func TestPrevAddressKeptWithin7Days(t *testing.T) {
 // lives healthyAfter forgets it.
 func TestPrevAddressKeptPast7DaysByUnhealthySessions(t *testing.T) {
 	h, lp, a, b := prevLinkHarness(t)
-	h.a.resetAfter = 500 * time.Millisecond // healthy after 1 s
+	h.a.resetAfter = time.Second // healthy after 2 s: the 200 ms sessions below stay unhealthy even on a loaded machine
 	h.a.meta.Link, h.a.cfg.LinkURL, h.a.meta.NextLink, h.a.meta.PrevLink = b, b, "", a
 	h.a.meta.LinkSince = time.Now().Add(-8 * 24 * time.Hour).Unix()
 	if err := saveMeta(h.dir, &h.a.meta); err != nil {
