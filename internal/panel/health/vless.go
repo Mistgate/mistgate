@@ -4,6 +4,7 @@ package health
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -80,7 +81,7 @@ func vlessProbeParams(t Target) (panelvless.ClientParams, bool) {
 		Inbound: protocols.InboundView{
 			ID: t.Inbound.ID, Node: protocols.NodeView{ID: t.Node.ID, Name: t.Node.Name, Address: t.Node.Address,
 				CountryCode: t.Node.CountryCode},
-			Port: t.Spec.Listen.Port, TLSServerName: t.Spec.TLS.ServerName, TLSMode: t.Spec.TLS.Mode,
+			Port: cmp.Or(t.Inbound.PublicPort, t.Spec.Listen.Port), TLSServerName: t.Spec.TLS.ServerName, TLSMode: t.Spec.TLS.Mode,
 			CertPinSHA256: t.Inbound.CertPin,
 		},
 		DeviceID: t.CredID, Secret: t.Secret, InboundPublic: []byte(t.Inbound.PluginPublic),

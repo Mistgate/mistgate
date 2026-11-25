@@ -282,6 +282,12 @@ describe("a port whose test is blocked while the protocol works", () => {
 describe("the TCP rows and the renewal line", () => {
   const vless = inbound({ id: "inb_v", profileName: "VLESS · 443", port: 443, protocol: "vless" });
 
+  it("associates an external check with the forwarded inbound only once", async () => {
+    await mount(data({ inbounds: [inbound({ protocol: "vless", profileName: "Tokyo", port: 19443, publicPort: 443 })], tcpChecks: [tcp({ port: 443, role: "vless" })] }));
+    expect(rows().filter((r) => r.includes("tcp/443") && r.includes("Tokyo"))).toHaveLength(1);
+    expect(rows().some((r) => r.includes("tcp/19443"))).toBe(false);
+  });
+
   it("shows each verdict, who answered, and what listens, after the UDP rows", async () => {
     await mount(
       data({

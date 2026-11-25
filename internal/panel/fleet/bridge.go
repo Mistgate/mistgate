@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"regexp"
@@ -204,7 +205,7 @@ func (f *Fleet) bridgeTLSName(ctx context.Context, entry store.NodeRow) (tcpTarg
 
 func bridgeVLESSOwnSite(specs []tcpSpec, profile string) bool {
 	for _, spec := range specs {
-		if spec.Profile != profile || spec.Spec.Protocol != "vless" || spec.Spec.Listen.Network != "tcp" || spec.Spec.Listen.Port != 443 {
+		if spec.Profile != profile || spec.Spec.Protocol != "vless" || spec.Spec.Listen.Network != "tcp" || cmp.Or(spec.PublicPort, spec.Spec.Listen.Port) != 443 {
 			continue
 		}
 		if _, own := vlessProbeName(spec.Spec); own {

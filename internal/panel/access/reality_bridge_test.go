@@ -46,6 +46,27 @@ func TestAnotherSiteOn443WarnsOfTheBridgeOfARelay(t *testing.T) {
 	if w := has(check("")); w != nil {
 		t.Fatalf("own site kept: %+v", w)
 	}
+	// Moving just the advertised endpoint takes the existing bridge off public 443.
+	f.sql(`UPDATE inbound SET port_override = 19443, public_port = 443 WHERE id = ?`, self.Id)
+	public := uint32(8443)
+	moved, err := f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{InboundId: self.Id, PublicPort: &public, ValidateOnly: true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if has(moved.Msg.Warnings) == nil {
+		t.Errorf("moving the site off public 443: %v", moved.Msg.Warnings)
+	}
+	off := false
+	disabled := must(f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{InboundId: self.Id, Enabled: &off, ValidateOnly: true})))
+	if has(disabled.Msg.Warnings) == nil {
+		t.Fatal("disabling the forwarded site gave no bridge warning")
+	}
+	f.sql(`UPDATE inbound SET public_port = 9443 WHERE id = ?`, self.Id)
+	unrelated := must(f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{InboundId: self.Id, PublicPort: &public, ValidateOnly: true})))
+	if has(unrelated.Msg.Warnings) != nil {
+		t.Fatal("editing an unrelated public port warned about the bridge")
+	}
+	f.sql(`UPDATE inbound SET public_port = 443 WHERE id = ?`, self.Id)
 	// a bridge of its own port does not need the site
 	f.sql(`UPDATE node SET bridge_port = 8443 WHERE id = 'nod_fi1'`)
 	if w := has(check("shop.example.com:443")); w != nil {

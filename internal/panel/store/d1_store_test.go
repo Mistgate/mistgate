@@ -2784,3 +2784,5 @@ func TestD1NodeShare(t *testing.T) {
 		t.Fatalf("after all: %+v %v", shares["nod_nl1"], err)
 	}
 }
+
+func TestD1NodePublicPort(t *testing.T) { nodePublicPortProof(t, openD1Store(t)) }

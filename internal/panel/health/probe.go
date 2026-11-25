@@ -157,7 +157,11 @@ func (s *Service) attempt(ctx context.Context, t *target) (res Result, skipped b
 	if t.relay != nil {
 		dialNode = t.relay.entry
 	}
-	tn, err := s.cfg.Dialers[t.in.Protocol](rctx, Target{Node: dialNode, Inbound: t.in, Spec: t.spec, Settings: t.settings, CredID: cred.CredID, Secret: secret},
+	dialInbound := t.in
+	if t.relay != nil {
+		dialInbound.PublicPort = 0
+	} // the relay spec already carries the entry port
+	tn, err := s.cfg.Dialers[t.in.Protocol](rctx, Target{Node: dialNode, Inbound: dialInbound, Spec: t.spec, Settings: t.settings, CredID: cred.CredID, Secret: secret},
 		DialOptions{HandshakeTimeout: s.cfg.HandshakeTimeout, ProbeTimeout: s.cfg.ProbeTimeout})
 	if err != nil {
 		var pe *ProbeError

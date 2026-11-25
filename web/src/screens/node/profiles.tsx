@@ -207,7 +207,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
           const s = states[i.state] ?? states[InboundState.UNSPECIFIED];
           // the last port check of this profile's port: a dot that leads to it in the ways in
           const tcp = networkOf(i.protocol) === "tcp";
-          const checked = tcp ? data.tcpChecks?.find((c) => c.port === i.port && c.verdict) : data.portChecks?.find((c) => c.port === i.port && c.verdict);
+          const checked = tcp ? data.tcpChecks?.find((c) => c.port === (i.publicPort || i.port) && c.verdict) : data.portChecks?.find((c) => c.port === i.port && c.verdict);
           const cs = cells(t, fmt, i, now, checked && (tcp ? tcpPill(t, checked.verdict) : verdictPill(t, checked as never)));
           const kind = i.lastError ? inboundErrorKind(i.lastError) : null;
           const cell = checkRow?.cells.find((c) => c.deployed && c.inboundId === i.id);
@@ -345,6 +345,11 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
   const named = (inbound.protocol !== "vless" || !!inbound.tlsServerName || !!inbound.tlsServerNameOverride || (!!inbound.lastError && nameFixes(inboundErrorKind(inbound.lastError)))) && !target.own;
   const was = { port: inbound.port ? String(inbound.port) : "", sni: inbound.tlsServerName, enabled: inbound.state !== InboundState.DISABLED };
   const [port, setPort] = useState(was.port);
+  const savedPublicPort = inbound.publicPort ? String(inbound.publicPort) : "";
+  const [publicPort, setPublicPort] = useState(savedPublicPort);
+  const changePublicPort = publicPort !== savedPublicPort ? Number(publicPort) : undefined;
+  const publicPortError = !portOk(publicPort) ? t("node.profiles.portError") : Number(publicPort) === 80 ? t("field.port.reserved") : undefined;
+  const portsValid = portOk(port) && !publicPortError;
   const [sni, setSni] = useState(was.sni);
   const [enabled, setEnabled] = useState(was.enabled);
   // the port "Change port" put in, and why (another profile holds the old one, or a program outside the panel does)
@@ -353,8 +358,8 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
 
   const touched = { port: port !== was.port, sni: sni !== was.sni, enabled: enabled !== was.enabled };
   const check = useInboundCheck(
-    portOk(port)
-      ? { kind: "update", inboundId: inbound.id, port: touched.port ? port : undefined, sni: touched.sni ? sni.trim() : undefined, enabled: touched.enabled ? enabled : undefined }
+    portsValid
+      ? { kind: "update", inboundId: inbound.id, publicPort: changePublicPort, port: touched.port ? port : undefined, sni: touched.sni ? sni.trim() : undefined, enabled: touched.enabled ? enabled : undefined }
       : null,
   );
   // "Change port": the field opens on a port that is free on this node (the server's picker), once
@@ -369,6 +374,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
     mutationFn: (allowLossy: boolean) =>
       profilesApi.updateInbound({
         inboundId: inbound.id,
+        publicPort: changePublicPort,
         portOverride: touched.port ? (port ? Number(port) : 0) : undefined,
         tlsServerNameOverride: touched.sni ? sni.trim() : undefined,
         enabled: touched.enabled ? enabled : undefined,
@@ -392,7 +398,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
   const portError = !portOk(port) ? t("node.profiles.portError") : fieldError(["port_taken", "port_in_hop", "hop_taken"]);
   const sniError = fieldError(["sni_needs_domain", "sni_invalid", "acme_needs_domain", "reality_needs_domain", "mtproto_needs_domain"]);
   const effective = check.state === "ok" ? check.inbound : undefined;
-  const dirty = touched.port || touched.sni || touched.enabled || target.touched;
+  const dirty = changePublicPort !== undefined || touched.port || touched.sni || touched.enabled || target.touched;
   // a refusal no field above words (the Save button is off for it): a notice at the foot says why, so the button is never off in silence
   const unexplained = refused && !share && !lossy && !portError && !sniError ? refused : null;
   return (
@@ -400,7 +406,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (dirty && portOk(port) && !refused && !target.blocked) save.mutate(false);
+          if (dirty && portsValid && !refused && !target.blocked) save.mutate(false);
         }}
         className="flex flex-col gap-3.5"
       >
@@ -474,6 +480,20 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
             spellCheck={false}
           />
         )}
+        {inbound.protocol === "vless" && !inbound.cdn && (
+          <TextField
+            label={t("node.profiles.publicPort")}
+            value={publicPort}
+            onChange={(e) => {
+              setPublicPort(e.target.value);
+              save.reset();
+            }}
+            inputMode="numeric"
+            placeholder={port || String(inbound.port)}
+            error={publicPortError}
+            mono
+          />
+        )}
         {target.field}
         <label className="flex items-center gap-3">
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -499,7 +519,7 @@ function EditInbound({ inbound, focus, nodeId, nodeAddress, onClose }: { inbound
           <Button variant="ghost" size="md" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button type="submit" variant="primary" size="md" disabled={!dirty || !portOk(port) || !!refused || target.blocked || save.isPending}>
+          <Button type="submit" variant="primary" size="md" disabled={!dirty || !portsValid || !!refused || target.blocked || save.isPending}>
             {save.isPending && touched.port && port ? t("ports.saving", { port }) : t("common.save")}
           </Button>
         </div>

@@ -241,3 +241,27 @@ func relayModeStoreProof(t *testing.T, st *Store) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func nodePublicPortProof(t *testing.T, st *Store) {
+	ctx := context.Background()
+	relayFixture(t, st)
+	a := st.Access()
+	old, err := a.Inbound(ctx, "inb_de1_vl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := old
+	updated.PublicPort = 2443
+	if err = a.UpdateInbound(ctx, updated, old, false, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	stale := old
+	stale.DirectInSubscriptions = false
+	if err = a.UpdateInbound(ctx, stale, old, false, time.Now()); !errors.Is(err, ErrAccessVersion) {
+		t.Fatalf("stale update erased endpoint: %v", err)
+	}
+	row, err := st.FleetInbound(ctx, old.ID)
+	if err != nil || row.PublicPort != 2443 || row.SpecVersion != old.SpecVersion {
+		t.Fatalf("public port or version changed incorrectly: port=%d version=%d err=%v", row.PublicPort, row.SpecVersion, err)
+	}
+}

@@ -1,6 +1,7 @@
 package access
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -104,7 +105,7 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 	}
 	if f, merged, err := s.loadFull(ctx, l.InboundID); err == nil {
 		if spec, err := s.buildSpec(f, merged); err == nil {
-			out.ExitPort = uint32(spec.Listen.Port)
+			out.ExitPort = uint32(cmp.Or(f.Inbound.PublicPort, spec.Listen.Port))
 		}
 	}
 	fillRelayMode(out, l)
@@ -187,7 +188,11 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 		return nil, err
 	}
 	network := spec.Listen.Network
+	exitPort := cmp.Or(f.Inbound.PublicPort, spec.Listen.Port)
 	port := uint16(m.Port)
+	if port == 0 {
+		others = reservePublicPorts(others)
+	}
 	var naturalPort uint16
 	if f.Profile.Protocol == "awg" {
 		var settings struct {
@@ -212,8 +217,8 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 		}
 	case naturalPort != 0:
 		port = naturalPort
-	case relayPortOK(uint32(spec.Listen.Port)) && clashOf(plugin.Listen{Network: network, Port: spec.Listen.Port}, others) == nil:
-		port = spec.Listen.Port // the same port as on the exit, when it is free here
+	case relayPortOK(uint32(exitPort)) && clashOf(plugin.Listen{Network: network, Port: exitPort}, others) == nil:
+		port = exitPort // the same port as on the exit, when it is free here
 	default:
 		free := freePorts(f.Profile.Protocol, 1, func(p uint16) bool {
 			return relayPortOK(uint32(p)) && clashOf(plugin.Listen{Network: network, Port: p}, others) == nil

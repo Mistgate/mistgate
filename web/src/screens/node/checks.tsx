@@ -20,7 +20,7 @@ import { Spin, transportOf } from "./parts";
 import { HistoryCard, ResultLine, SlowMark, useRunChecks } from "@/screens/health/history";
 
 /** The client-side checks of one node, on its Overview (the board's card): a row per profile with its day of hourly cells and its time. */
-export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: readonly { id: string; port: number; protocol: string }[] }) {
+export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: readonly { id: string; port: number; publicPort?: number; cdn?: boolean; protocol: string }[] }) {
   const t = useT();
   const fmt = useFmt();
   const [from, setFrom] = useState<number | null>(null); // the newest cell at the press: null while no round is waited for
@@ -106,7 +106,7 @@ export function NodeChecks({ nodeId, inbounds }: { nodeId: string; inbounds?: re
                 className="flex min-w-0 flex-col text-start"
               >
                 <b title={col.profileName} className="truncate font-medium">{col.profileName}</b>
-                {inbound && <span className="font-mono text-[11px] font-normal text-muted">{`${transportOf(inbound.protocol)}/${inbound.port}`}</span>}
+                {inbound && <span className="font-mono text-[11px] font-normal text-muted">{inbound.cdn ? "CDN" : `${transportOf(inbound.protocol)}/${inbound.publicPort || inbound.port}`}</span>}
               </button>
               <span role="img" aria-label={t("ov.tick.aria")} className={cx("nd-tk max-[720px]:order-3 max-[720px]:col-span-full", busy && "scan", came && "adv")}>
                 {ticks.map((k, i) => (

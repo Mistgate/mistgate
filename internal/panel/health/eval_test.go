@@ -185,10 +185,41 @@ func TestVLESSFailuresCountAsNoTrafficWithoutUDPDiagnosis(t *testing.T) {
 	}
 }
 
+func TestForwardedInboundAlertPorts(t *testing.T) {
+	e := newEnv(t)
+	e.node("de1", "provider", true)
+	id := e.vlessInbound("de1", 19443)
+	udp := e.inbound("de1", 443)
+	e.exec(`UPDATE inbound SET public_port = 443 WHERE id = ?`, id)
+	e.pass(id)
+	e.fail(udp, "timeout")
+	e.fail(udp, "timeout")
+	if a := e.active()["check_failed/de1/"+udp]; a.WhyKey != "health.alert.check_failed.why.timeout" {
+		t.Errorf("TCP answering on the same external port was counted as another port: %+v", a)
+	}
+	e.pass(udp)
+	e.fail(id, "refused")
+	e.fail(id, "refused")
+	if got := e.active()["check_failed/de1/"+id].Params["port"]; got != "443" {
+		t.Errorf("failed probe port = %q, want 443", got)
+	}
+	e.fail(udp, "timeout")
+	e.fail(udp, "timeout")
+	if got := e.active()["no_traffic/de1/"].Params["ports"]; got != "443" {
+		t.Errorf("failed external ports = %q, want 443", got)
+	}
+	e.pass(udp)
+	e.exec(`UPDATE inbound SET state = 'failed' WHERE id = ?`, id)
+	e.evaluate()
+	if a := e.active()["check_failed/de1/"+id]; a.WhyKey != "health.alert.check_failed.why.not_started" || a.Params["port"] != "19443" {
+		t.Errorf("listener failure should name the local port: %+v", a)
+	}
+}
+
 func TestCDNFailureDoesNotMakeNodeNoTraffic(t *testing.T) {
 	e := newEnv(t)
 	e.node("de1", "provider", true)
-	id := e.vlessCDNInbound("de1", 443)
+	id := e.vlessCDNInbound("de1", 19443)
 	e.fail(id, "refused")
 	e.fail(id, "refused")
 
@@ -198,7 +229,7 @@ func TestCDNFailureDoesNotMakeNodeNoTraffic(t *testing.T) {
 		t.Fatalf("a CDN-only failure opened no_traffic: %+v", alerts["no_traffic/de1/"])
 	}
 	alert := alerts["check_failed/de1/"+id]
-	if alert.WhyKey != "health.alert.check_failed.why.via_cdn" || alert.Params["cdn_host"] != "cdn.example.org" {
+	if alert.WhyKey != "health.alert.check_failed.why.via_cdn" || alert.Params["cdn_host"] != "cdn.example.org" || alert.Params["port"] != "443" {
 		t.Fatalf("CDN check alert: %+v", alert)
 	}
 	if noTraffic, failed, total, _ := e.s.NodeHealth("de1"); noTraffic || failed != 0 || total != 0 {

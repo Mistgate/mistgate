@@ -1088,3 +1088,14 @@ func TestAccessToolsAreReadonlyAndLeakNothing(t *testing.T) {
 		t.Fatal("successful access report exposes user IDs")
 	}
 }
+
+func TestBlockDiagnosisUsesPublicPort(t *testing.T) {
+	x := accInbound{ID: "inb", NodeID: "de", Protocol: "vless", Port: 19443, PublicPort: 443}
+	b := newBlockCtx(&accessInput{Nodes: []accNode{{ID: "de", Status: "online"}}, Inbounds: []accInbound{x}})
+	for _, p := range []uint32{443, 19443} {
+		got := b.wayStates(map[string]*blockNodeV{"de": {Classes: []blockClassV{{Class: clsPortBlocked, Confidence: confHigh, port: p}}}})[x.ID]
+		if (got.State == stateFailing) != (p == 443) {
+			t.Fatalf("evidence on %d: %+v", p, got)
+		}
+	}
+}

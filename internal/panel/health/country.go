@@ -270,7 +270,7 @@ func countryPorts(ts []*target) []uint16 {
 		}
 		switch {
 		case t.spec.Listen.Network == "tcp":
-			add(t.spec.Listen.Port)
+			add(t.nodePort())
 		case t.in.Protocol == "hysteria2":
 			add(plugin.Hy2SitePort(t.spec))
 		}
@@ -297,7 +297,7 @@ func countryPreferredPort(ts []*target) uint16 {
 				Security string `json:"security"`
 			}
 			if json.Unmarshal(t.settings, &settings) == nil && strings.EqualFold(settings.Security, "reality") {
-				p = t.spec.Listen.Port
+				p = t.nodePort()
 			}
 		}
 		if slices.Contains(ports, p) {

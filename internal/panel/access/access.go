@@ -400,6 +400,9 @@ func nodeView(n store.AccessNode) protocols.NodeView {
 
 // buildSpec turns a stored inbound (with its profile and node) into the node-side spec.
 func (s *Service) buildSpec(f store.AccessInboundFull, settings json.RawMessage) (plugin.InboundSpec, error) {
+	if f.Inbound.PublicPort != 0 && f.Profile.Protocol != "vless" {
+		return plugin.InboundSpec{}, errors.New("public port requires VLESS")
+	}
 	proto, ok := s.reg.Get(f.Profile.Protocol)
 	if !ok {
 		return plugin.InboundSpec{}, fmt.Errorf("unknown protocol %q", f.Profile.Protocol)
@@ -415,9 +418,9 @@ func (s *Service) buildSpec(f store.AccessInboundFull, settings json.RawMessage)
 		return plugin.InboundSpec{}, &protocols.RealityTargetError{Reason: "unsupported", Target: f.Inbound.RealityTargetOverride}
 	}
 	spec, err := proto.BuildInbound(protocols.InboundInput{
-		Profile:               protocols.ProfileView{ID: f.Profile.ID, Version: f.Profile.Version, Settings: settings},
-		Node:                  nodeView(f.Node),
-		PortOverride:          f.Inbound.PortOverride,
+		Profile:    protocols.ProfileView{ID: f.Profile.ID, Version: f.Profile.Version, Settings: settings},
+		Node:       nodeView(f.Node),
+		PublicPort: f.Inbound.PublicPort, PortOverride: f.Inbound.PortOverride,
 		TLSServerNameOverride: f.Inbound.TLSServerNameOverride,
 		RealityTargetOverride: f.Inbound.RealityTargetOverride,
 		SpecVersion:           f.Inbound.SpecVersion,

@@ -76,3 +76,5 @@ func TestRelayReverseMigrationUpDown(t *testing.T) {
 	}
 	check("after up again")
 }
+
+func TestSQLiteNodePublicPort(t *testing.T) { nodePublicPortProof(t, openTemp(t)) }

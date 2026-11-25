@@ -695,7 +695,7 @@ func classScopeMatch(c blockClassV, x *accInbound) bool {
 	case c.inbound != "":
 		return c.inbound == x.ID
 	case strings.HasPrefix(c.Scope, "port:"):
-		return c.port == x.Port && netOf(x.Protocol) == "tcp"
+		return c.port == x.entryPort() && netOf(x.Protocol) == "tcp"
 	case c.protocol == "udp":
 		return hasUDPPath(x)
 	case c.protocol != "":

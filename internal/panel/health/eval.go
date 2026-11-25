@@ -504,10 +504,13 @@ func (s *Service) derive(ctx context.Context, now time.Time, sn *snapshot, live 
 						sev = sevCritical // the node's only inbound of that protocol
 					}
 					code := f.c.last.ErrorCode
-					params := map[string]string{"inbound": f.t.in.ID, "profile": f.t.in.ProfileName, "port": strconv.Itoa(int(f.t.spec.Listen.Port)),
+					params := map[string]string{"inbound": f.t.in.ID, "profile": f.t.in.ProfileName, "port": strconv.Itoa(int(f.t.nodePort())),
 						"error_code": code, "error_detail": f.c.last.ErrorDetail}
 					if cdn != "" {
 						params["cdn_host"] = cdn
+						if route, ok := vlessProbeParams(Target{Node: f.t.node, Inbound: f.t.in, Spec: f.t.spec, Settings: f.t.settings}); ok {
+							params["port"] = strconv.Itoa(int(route.Port))
+						}
 					}
 					add(cond{key: key{kCheckFailed, n.ID, f.t.in.ID}, severity: sev,
 						why:    "health.alert.check_failed.why." + variant,
@@ -710,7 +713,7 @@ func whyVariant(f probed, all []probed) string {
 			break
 		}
 		for _, o := range all {
-			if o.t != f.t && o.passing() && o.t.spec.Listen.Port != f.t.spec.Listen.Port {
+			if o.t != f.t && o.passing() && cdnHost(o.t) == "" && o.t.nodePort() != f.t.nodePort() {
 				return "udp_blocked" // another inbound of the node answers on another port: the hoster cuts this one
 			}
 		}
@@ -759,11 +762,11 @@ func udpProbeProtocol(protocol string) bool {
 	return protocol == "hysteria2" || protocol == "awg"
 }
 
-// failedPorts are the distinct listen ports of the failing inbounds, in order.
+// failedPorts are the distinct external node ports of the failing inbounds, in order.
 func failedPorts(failing []probed) []string {
 	var nums []int
 	for _, f := range failing {
-		if p := int(f.t.spec.Listen.Port); p != 0 && !slices.Contains(nums, p) {
+		if p := int(f.t.nodePort()); p != 0 && !slices.Contains(nums, p) {
 			nums = append(nums, p)
 		}
 	}

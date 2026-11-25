@@ -31,7 +31,7 @@ export type InboundCheck =
 
 export type CheckRequest =
   | { kind: "create"; nodeId: string; profileId: string; port: string; sni: string }
-  | { kind: "update"; inboundId: string; port?: string; sni?: string; enabled?: boolean };
+  | { kind: "update"; inboundId: string; publicPort?: number; port?: string; sni?: string; enabled?: boolean };
 
 const asPort = (p: string) => (p ? Number(p) : 0);
 const subject = (r: CheckRequest) => (r.kind === "create" ? `${r.nodeId}/${r.profileId}` : r.inboundId);
@@ -46,7 +46,7 @@ async function ask(req: CheckRequest, signal: AbortSignal) {
   }
   const r = await profilesApi.updateInbound(
     {
-      inboundId: req.inboundId,
+      inboundId: req.inboundId, publicPort: req.publicPort,
       portOverride: req.port === undefined ? undefined : asPort(req.port),
       tlsServerNameOverride: req.sni,
       enabled: req.enabled,

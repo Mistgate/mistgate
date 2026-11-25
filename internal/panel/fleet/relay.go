@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"cmp"
 	"context"
 	"sort"
 	"time"
@@ -42,7 +43,7 @@ func (f *Fleet) relayForwards(ctx context.Context, n store.NodeRow, caps []strin
 			f.log.Warn("relay: the server's spec does not build, the forward is left out", "relay", l.ID, "inbound", l.InboundID, "err", err)
 			continue
 		}
-		fwd := plugin.RelayForward{ID: l.ID, Network: l.Network, Port: l.Port, ToHost: exit.Address, ToPort: spec.Listen.Port}
+		fwd := plugin.RelayForward{ID: l.ID, Network: l.Network, Port: l.Port, ToHost: exit.Address, ToPort: cmp.Or(row.PublicPort, spec.Listen.Port)}
 		if bridgePathValid(n.BridgePath) && bridgePortValid(n.BridgePort) && reverseCarried(l, n.ID, caps) { // A bad endpoint cannot be carried as a reverse forward.
 			fwd.Mode, fwd.ExitNodeID = store.RelayModeReverse, l.ExitNodeID
 		}

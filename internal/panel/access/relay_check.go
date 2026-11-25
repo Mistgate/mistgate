@@ -49,7 +49,7 @@ func (s *Service) relayTo(ctx context.Context, l store.RelayLink) string {
 	if err != nil {
 		return ""
 	}
-	return net.JoinHostPort(f.Node.Address, strconv.Itoa(int(spec.Listen.Port)))
+	return net.JoinHostPort(f.Node.Address, strconv.Itoa(int(cmp.Or(f.Inbound.PublicPort, spec.Listen.Port))))
 }
 
 // relayCheckGate lets a relay be switched on: its latest check proved the leg or found it unverifiable, recently, for this target.
@@ -606,7 +606,7 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 			} else if spec, err := s.buildSpec(f, merged); err != nil {
 				c.Unsupported = "build_failed"
 			} else {
-				c.Network, c.Port, c.Hop = spec.Listen.Network, uint32(spec.Listen.Port), spec.Listen.HopFrom != 0
+				c.Network, c.Port, c.Hop = spec.Listen.Network, uint32(cmp.Or(f.Inbound.PublicPort, spec.Listen.Port)), spec.Listen.HopFrom != 0
 				c.Unsupported = protocols.IPv6Unsupported(spec)
 			}
 			c.ReverseBlocked = reverseBlockedOf(c.Network, entry.AgentCaps, n.AgentCaps)
