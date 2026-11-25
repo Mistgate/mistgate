@@ -9,9 +9,12 @@ export const LANGS = ["en", "ru", "zh", "fa", "tr"];
  *  the panel-wording tests (brand.test) cover it. fa and tr have no wiki strings yet (wiki.mjs keeps en, ru and zh). */
 export const COMPLETE = { en: true, ru: true, zh: true, fa: false, tr: false };
 
-/** docs/<lang>/guide/nodes.md (key "guide/nodes") -> /guide/nodes/, /ru/guide/nodes/, /fa/guide/nodes/ ...; key "index" is the language home. */
+/** docs/<lang>/guide/nodes.md (key "guide/nodes") -> /guide/nodes/, /ru/guide/nodes/, /fa/guide/nodes/ ...; key "index" is the start
+ *  page of the docs: /docs/, /ru/docs/ ... (the language home, / and /ru/, is the landing that landing/ builds). */
 export function pageUrl(lang, key) {
   const base = lang === "en" ? "" : `/${lang}`;
-  return key === "index" ? `${base}/` : `${base}/${key}/`;
+  return key === "index" ? `${base}/docs/` : `${base}/${key}/`;
 }
+/** The landing of a language: /, /ru/ ... */
+export const landingUrl = (lang) => (lang === "en" ? "/" : `/${lang}/`);
 export const editUrl = (lang, key) => `${GITHUB}/edit/main/docs/${lang}/${key}.md`;

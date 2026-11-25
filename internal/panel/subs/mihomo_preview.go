@@ -70,7 +70,7 @@ func (s *Service) PreviewMihomoTemplate(ctx context.Context, req *connect.Reques
 		resp.Warnings = append(resp.Warnings, &adminv1.MihomoWarning{Code: w.Code, Arg: w.Arg})
 	}
 	if p.preset != nil {
-		if d, err := p.preset.MihomoDNS(""); err == nil && len(d.Direct)+len(d.Providers)+len(d.Block) > 0 {
+		if d, err := p.preset.MihomoDNS(""); err == nil && len(d.Direct)+len(d.Providers)+len(d.Block)+len(d.BlockDomains)+len(d.Torrent) > 0 {
 			resp.Warnings = append(resp.Warnings, &adminv1.MihomoWarning{Code: subsettings.WarnPresetRulesSkipped})
 		}
 	}

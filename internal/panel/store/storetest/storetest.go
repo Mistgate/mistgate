@@ -1,9 +1,11 @@
 //go:build !js
 
-// Package storetest gives tests a migrated panel database quickly. store.Open on a new file runs every migration, which
-// takes about 0.15 s, and 4.3 s under -race: in a package whose tests each open a store (internal/panel/fleet opens one per
-// test, four hundred of them) the migrations were most of the race job's time. Path runs them once per test binary, keeps the
-// result in memory, and gives each test its own copy of it, which store.Open then opens in about 75 ms under -race.
+// Package storetest gives tests a migrated panel database quickly. store.Open on a new file used to run every migration,
+// which took about 0.3 s, and 4.3 s under -race: in a package whose tests each open a store (internal/panel/fleet opens one per
+// test, four hundred of them) the migrations were most of the race job's time. Open now builds a new file from an embedded
+// snapshot of the finished schema (store/schema_snapshot.sql), about 55 ms without -race (not measured under it), and goose
+// then finds every migration applied. Path still builds the database once per test binary, keeps the result in memory, and
+// gives each test its own copy of it, which store.Open then opens in about 75 ms under -race (measured before the snapshot).
 //
 // The copy is the same database a fresh store.Open would make: the template is a store.Open on an empty file, checkpointed and
 // closed, and opening the copy runs store.Open's start-up work again (it finds every migration applied).

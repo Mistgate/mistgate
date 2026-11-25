@@ -7,5 +7,5 @@ contact_links:
     url: https://github.com/Mistgate/mistgate/security/advisories/new
     about: Report privately, not in a public issue. / Сообщите приватно. / 请私下报告，不要公开提交。
   - name: Docs / Документация / 文档
-    url: https://mistgate.app/
+    url: https://mistgate.app/docs/
     about: Install, nodes, protocols, troubleshooting.

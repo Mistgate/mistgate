@@ -150,7 +150,7 @@ func TestMihomoSubscription(t *testing.T) {
 		strings.Join(p.Groups[1].Proxies, "|") != p.Proxies[0]["name"].(string)+"|"+p.Proxies[1]["name"].(string) {
 		t.Errorf("groups = %+v (title %q)", p.Groups, title)
 	}
-	if p.Rules[len(p.Rules)-1] != "MATCH,"+title || p.Rules[0] != "DOMAIN-SUFFIX,ru,DIRECT" {
+	if p.Rules[len(p.Rules)-1] != "MATCH,"+title || p.Rules[0] != "DOMAIN-SUFFIX,max.ru,REJECT" || p.Rules[1] != "DOMAIN-SUFFIX,oneme.ru,REJECT" || p.Rules[2] != "DOMAIN-SUFFIX,ru,DIRECT" {
 		t.Errorf("rules = %v", p.Rules)
 	}
 	ns, _ := p.DNS["nameserver"].([]any)

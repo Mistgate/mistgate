@@ -1,5 +1,6 @@
 ---
 title: Hysteria2
+seoTitle: "Hysteria2 server panel: users, ports, certificates — Mistgate"
 description: Every Hysteria2 setting in the profile editor, how the node handles the traffic, and what the apps receive and need.
 ---
 

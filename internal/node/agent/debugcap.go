@@ -165,10 +165,10 @@ func (d *debugState) addFinal(c *debugCapture, recs ...logRecord) {
 	}
 }
 
-// scrubCaptured is the journal's pass over a record, plus key-shaped runs: addresses become <ip>, xray's names are cut, only the
+// scrubCaptured is the journal's pass over a record, plus e-mail addresses and key-shaped runs: addresses become <ip>, xray's names are cut, only the
 // allow-listed attributes stay, and every text is cut to a bound. The debug level is kept for the line.
 func scrubCaptured(rec logRecord, l slog.Level) logRecord {
-	clean := func(s string) string { return keyRun.ReplaceAllString(scrub(rec.source, s), "<key>") }
+	clean := func(s string) string { return keyRun.ReplaceAllString(scrub(rec.source, logscrub.Emails(s)), "<key>") }
 	out := logRecord{at: rec.at, level: rec.level, source: logscrub.Clip(rec.source, 32)}
 	if l < slog.LevelInfo {
 		out.level = pb.Severity_SEVERITY_DEBUG

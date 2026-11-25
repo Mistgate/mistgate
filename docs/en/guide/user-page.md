@@ -3,6 +3,8 @@ title: User page
 description: What a person sees when they open their link in a browser, how the page password works, and how the admin previews the page.
 ---
 
+![A person's card in the admin: traffic, the subscription link and the window with its QR code](../../images/readme/link-dark-en.webp)
+
 The user page is what a browser gets at a person's subscription link: a page made for that person, with their status, their traffic and simple steps to connect. It is the page you send people to; they do not need an account or the admin. Its options and the apps it recommends are set on the **User page** tab of **Subscriptions** (see [Subscriptions](subscriptions.md)).
 
 ## What the person sees
@@ -129,6 +131,8 @@ With **Devices on the page** on (the default), a person manages their own device
 - For each device: **Show key** as the main action, and the **⋯** menu with **Rename**, **Replace key** (the old one stops working at once) and **Remove** (the VPN on it stops at once). Remove and Replace ask first, in the row.
 - The key window: **Country** (one connection per node; "Each country is a separate connection"), **Copy key**, **Download file**, the steps and a QR code. A server is named as on the **Channel utilization** card and in the person's app: by its country and location, never by the node's name in the panel; a node with neither is "Server", and a repeated name gets a number ("Germany 2"). The key's connection in AmneziaVPN carries the same name after the subscription title ("Mistgate · Germany 2").
 - When an old key stops working (a critical change of the profile, a new port or address of a node), the device says "new key needed", and **Get a new key** walks the person through replacing it.
+
+When the owner turns on **Key "Russian services direct"** in **Subscriptions** → **User page** (off by default), the key form has one more choice, shown as two items of one size: "Everything through the VPN" and "Russian services direct" ("Yandex, VK, banks and other Russian services go around the VPN and do not see the server's address. No QR code: a file or a link."). Under the second one the page says that the app still sees that a VPN is on, that the key has no IPv6, and that the list ages. The device row says "Russia direct". When the list changes, only these keys say "new key needed". With the switch off the choice is not offered and the endpoint refuses it (`403 ru_direct_disabled`); keys made earlier keep working. See [AmneziaWG](amneziawg.md#key-russian-services-direct).
 
 Limits: only an active person can add a device, show a key or replace one; the device limit applies ("All slots are used. Remove a device you no longer use, or message us"); and one client network may make 20 such requests an hour, with a total ceiling of 100 per link. Showing a key counts too. With the option off, the page lists the keys and says "Keys come from the admin — message us if you need a new one."
 

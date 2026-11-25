@@ -5,6 +5,8 @@ description: 面向 AI 智能体的面板内置 MCP 服务器、客户端连接�
 
 面板内置了模型上下文协议（MCP）服务器，AI 智能体可以读取集群信息并执行日常变更。它与[管理 API](api.md)使用相同的 API 令牌和方法：令牌的权限级别决定智能体能看到什么、可以执行什么，并且每次调用都会记入审计日志。变更不会通过一次调用直接生效：智能体先制定变更计划，再执行计划；风险最高的变更需要等待所有者在管理后台批准。
 
+![方案、批准、执行](../diagrams/mcp-plan-apply.svg)
+
 下方的 HTTP 端点仅在 VPS 版中提供。Cloudflare 版第 1 阶段不提供 `/mcp`；计划在第 2 阶段通过单独的 Worker 服务绑定提供支持。
 
 ## 端点
@@ -181,8 +183,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `subscription_app_remove` | 操作员 | `platform`、`name` | 始终 |
 | `subscription_rules_set` | 操作员 | 完整的有序 `rules` 列表，每项为 `ua_contains` 加 `format`（`base64_uris`、`user_page`、`decoy`、`mihomo_yaml`、`xray_json`、`singbox_json`）；第一个匹配项生效 | 始终 |
 | `subscription_texts_set` | 操作员 | 仅需更改的字段：`title`、`announcement`、`support_url`、`update_interval_hours`、`server_name_template`、`response_headers`（自定义响应头的完整有序列表：`name`、`value`，可选 `base64`、`formats`（`base64_uris`、`mihomo_yaml`、`xray_json`、`singbox_json`；为空表示全部）和 `groups`（分组 ID；为空表示所有分组）；`[]` 表示全部移除；与保存**订阅 → 响应头**时的检查相同：被保留的名称会被拒绝，最多 20 项） | 始终 |
-| `subscription_link_limits_set` | 操作员 | `mode`（`track`、`enforce`、`strict`）、`link_awg`（在链接应用中包含 AmneziaWG）、`link_auto_select`（在 Mihomo、sing-box 和 Xray JSON 中把 Auto 放在最前），或任意组合。严格模式的计划会报告将被拒绝的共享链接用户；关闭 `link_awg` 会报告下次拉取时将被移除的链接密钥（Mistgate 应用的密钥不在其中） | 始终 |
-| `subscription_page_set` | 操作员 | 仅需更改的字段：`show_announcement`、`show_support`、`show_qr`、`device_self_service`、`page_password`、`dns_choice`、`happ_ping`（`off`、`tcp`）和 `happ_ping_on_open` | 始终 |
+| `subscription_link_limits_set` | 操作员 | `mode`（`track`、`enforce`、`strict`）、`link_awg`（在链接应用中包含 AmneziaWG）、`link_auto_select`（在 Mihomo、sing-box 和 Xray JSON 中把 Auto 放在最前）、`link_auto_interval`（Auto 检测的间隔秒数：60、120、300 或 600），或任意组合。严格模式的计划会报告将被拒绝的共享链接用户；关闭 `link_awg` 会报告下次拉取时将被移除的链接密钥（Mistgate 应用的密钥不在其中） | 始终 |
+| `subscription_page_set` | 操作员 | 仅需更改的字段：`show_announcement`、`show_support`、`show_qr`、`device_self_service`、`page_password`、`dns_choice`、`ru_direct_key`、`happ_ping`（`off`、`tcp`）和 `happ_ping_on_open` | 始终 |
 | `subscription_mihomo_template_set` | 操作员 | `name`（1 至 60 个字符，不区分大小写且唯一）以及 `yaml`（完整文本，最多 64 KiB，只能有一个 YAML 文档；名称尚不存在时必填）、`group_ids`（获得该模板的分组的完整列表；`[]` 表示不给任何人；一个分组最多只有一个模板），或单独的 `remove: true`。检查方式与在**订阅 → Mihomo 模板**中保存完全相同；含有清洗标记（`[redacted]`、`[token]`、`[key]`、`[link]`、`[uuid]`、`[confirm]`、`[private key]`、`[config]`）的文本会被拒绝，代码为 `template_has_redaction_markers` | 始终 |
 | `subscription_routing_set` | 操作员 | `name`（1 至 60 个字符，不区分大小写且唯一；也是应用显示的 `Name`）和 `profile`（所有者粘贴的内容：`happ://routing/onadd/…`、`incy://…` 或 `://routing/add/…` 链接、JSON 的 base64，或 JSON 本身；最多 128 KiB 文本，读取后最多 32 KiB；对尚不存在的名称必填）、`mode`（`add_and_turn_on` 或 `add_only`；省略时采用粘贴链接自带的模式）、`group_ids`（按主分组得到此配置的分组的完整列表；`[]` 表示无人得到）或 `all_groups: true`（二者不能同时给），或单独的 `remove: true`。读取方式与在**订阅 → 路由**中保存完全一致：只保留应用文档中列出的字段；类型错误、geo 文件或 DoH 地址不是 `https`、配置超过 32 KiB 都会被拒绝；含有清理器标记（`[redacted]` 等）的文本以 `template_has_redaction_markers` 拒绝 | 总是 |
 | `dns_settings_set` | 操作员 | `default_preset_id`、有序的 `link_preset_ids` 和 `link_default_preset_id`；只需提供要更改的字段 | 始终 |
@@ -190,8 +192,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `group_update` | 操作员 | `group_id` 以及仅需更改的字段：`name`、`profile_ids`、`dns_preset_id`、`color`、`disabled_node_ids` | 始终 |
 | `node_sharing_set` | 操作员 | 计划：`node`、`mode`（`all`、`listed` 或 `none`），`listed` 时还需 `group_ids`（来自 `groups_list`）；应用：仅 `confirm_token`。选择节点分发给哪些分组：`all` 为所有分组，包括之后新建的分组；`listed` 只给所列分组，之后新建的分组不会获得该节点；`none` 不给任何分组，直到你把它分给某个分组。计划会写明节点、将获得它的分组，以及有多少人获得和失去它（使用全部节点或选择了该节点的活跃用户）；若计划之后分发状态发生变化，应用会被拒绝。用 `group_update` 为分组打开被保留的节点会被拒绝（`node_held`）：请使用本工具。 | 始终 |
 | `group_delete` | 操作员 | 无人以其为主分组的分组的 `group_id`。作为某人主分组的分组会被拒绝；请先用 `user_update` 移动成员。以其为附加分组的用户只是离开该分组（计划会统计人数） | 否 |
-| `dns_preset_create` | 管理员 | `name`、`description`、`servers`，可选 `split`（规则由 `suffixes`、`geo` 和 `servers` 组成；`geo` 可填 `cn`、`ru` 等国家代码，或写成 `geosite:<名称>` 的网站分类，例如 `geosite:telegram`：面板只检查名称的格式，名称不存在时由应用提示）、`ipv4_only`、`split_direct`、`preferred_transport`（`plain`、`dot`、`doh`）、`block_ads` | 始终 |
-| `dns_preset_update` | 管理员 | `preset_id` 以及可编辑字段：`name`、`description`、`servers`、`split`、`ipv4_only`、`split_direct`、`preferred_transport`、`block_ads` | 始终 |
+| `dns_preset_create` | 管理员 | `name`、`description`、`servers`，可选 `split`（规则由 `suffixes`、`geo` 和 `servers` 组成；`geo` 可填 `cn`、`ru` 等国家代码，或写成 `geosite:<名称>` 的网站分类，例如 `geosite:telegram`：面板只检查名称的格式，名称不存在时由应用提示）、`ipv4_only`、`split_direct`、`preferred_transport`（`plain`、`dot`、`doh`）、`block_ads`, `block_max`, `torrent_direct` | 始终 |
+| `dns_preset_update` | 管理员 | `preset_id` 以及可编辑字段：`name`、`description`、`servers`、`split`、`ipv4_only`、`split_direct`、`preferred_transport`、`block_ads`, `block_max`, `torrent_direct` | 始终 |
 | `dns_preset_delete` | 管理员 | `preset_id`；内置预设和实例默认预设会被拒绝，用户和分组将回退到实例默认值 | 始终 |
 | `profile_create` | 管理员 | 计划：`protocol`、`name`、可选 JSON `settings`（缺少的字段使用协议默认值）、`node_ids`、现有 `group_ids`、`port_overrides`（节点 ID 到端口）、`sni_overrides`（节点 ID 到该节点上新入站的名称，用于多个服务按 SNI 共用的 TCP 端口）、`allow_lossy_port`；执行：仅 `confirm_token`。对于标记为 `x-secret` 的敏感字段，省略该字段、使用 `"••••"` 保留原值，或使用 `"$generate"`；不得传入明文值 | 始终 |
 | `profile_update` | 管理员 | 计划：`profile_id`、可选 `name`、RFC 7386 JSON Merge Patch `settings_patch`（省略的敏感字段会保留原值；拒绝补丁中的 `null` 值）、`allow_lossy_port`；执行：仅 `confirm_token`。敏感字段遵循相同规则：省略、`"••••"` 或 `"$generate"` | 始终 |
@@ -214,7 +216,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `relay` | 管理员 | 计划参数：`action` 及其参数；执行时只接收 `confirm_token`。`create`：`node`（入口，ID 或精确名称）、`inbound_id`（来自 `relay_candidates`），以及可选的 `port`（443 或 1024 到 65535；省略时，若出口的端口在入口上空闲则用它，否则用一个空闲端口）。`enable`、`disable` 和 `delete`：`relay_id`。`port`：`relay_id` 和 `port`。计划会不带地址地说明这项更改：入口、出口、服务器、端口、国家检测如何看待两端、最近一次检测，以及用户会看到什么；入口与出口同国家时附一条 `warning` 事实（提示，不是拒绝）；AmneziaWG 服务器另有一条 `awg_path_keys` 事实（被允许使用两个节点的人各得一个经入口的专属密钥；AmneziaVPN 密钥需要重新导入，使用订阅链接的应用在下次刷新时获得），端口在空闲时取适合协议配置样式的端口 | 始终 |
 | `rollout_start` | 管理员 | 计划：`nodes`（`updates_status` 中 1 到 20 个节点 ID；也接受旧参数 `node_ids`，但不能同时提供）；执行：仅 `confirm_token`。计划显示受信任的签名版本、金丝雀顺序（在线人数较少优先，然后是入站较少）、批次大小，以及每个节点的名称、Agent 版本和在线人数；计划固定精确节点集合及发布包版本/构建号 | 始终（step-up） |
 | `os_rollout_start` | 管理员 | 计划：`node_ids`（`os_updates_status` 中的 1–20 个 id）、`mode`（`security`、`all`：安装普通软件包和安全更新，或 `reboot_only`）、可选 `batch_size`（1–5，默认 1）和 `reboot`（软件包模式用 `never` 或 `if_required`；`reboot_only` 用 `if_required` 或 `always`）；应用：仅 `confirm_token`。计划固定 id、模式、重启策略和批次大小。计划显示金丝雀和顺序（先在线人数较少，再 inbound 较少），以及每个不可信节点名称、待处理/安全更新、下一个内核、是否需要重启、在线人数和重启阻塞原因；还会列出当前会被跳过的节点。会警告 unattended-upgrades 自动重启和缺失的 AmneziaWG 模块。 | 始终（step-up） |
-| `os_rollout_cancel` | 管理员 | `os_updates_status` 中的 `rollout_id`。关闭已停止的系统更新（其告警随之清除）或尚未开始的更新；节点上正在运行的任务无法停止，会被拒绝 | 始终（step-up） |
+| `os_rollout_cancel` | 管理员 | `os_updates_status` 中的 `rollout_id`。取消系统更新：立即跳过尚未开始的节点，并关闭已停止的更新（其告警随之清除）。节点上已在运行的任务不会被打断，更新会在该节点的步骤有结果后以已取消结束 | 始终（step-up） |
 | `os_rollout_pause` | 管理员 | 计划：`os_updates_status` 中的 `rollout_id`；应用：仅 `confirm_token`。已在节点上运行的任务会完成并通过健康检查后再暂停；后续任务等待 | 始终（step-up） |
 | `os_rollout_resume` | 管理员 | 计划：`rollout_id`，可选 `skip_failed`；应用：仅 `confirm_token`。默认将失败步骤重试一次；设置 `skip_failed` 则跳过失败步骤并继续 | 始终（step-up） |
 | `node_update_schedule` | 管理员 | 计划参数：`node_id`、`local_datetime`（使用 `updates_status` 中的偏移量，格式为 `YYYY-MM-DDTHH:mm`，至少提前一分钟且最多提前一年）；计划会固定受信任的版本和偏移量 | 始终 |
@@ -222,7 +224,7 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 | `update_timezone` | 管理员 | `timezone_offset_minutes`（UTC 固定偏移量，范围为 -720 到 840，每次递增 15 分钟；`180` 表示 GMT+3） | 始终 |
 | `update_download_timeout` | 管理员 | `timeout_seconds`（300 到 7200 秒；只影响新发送的更新，已经开始的步骤保留发送时捕获的窗口） | 始终 |
 | `log_level` | 管理员 | `level`（`debug`、`info`、`warn` 或 `error`）。设置面板的日志级别，直到下次重启，之后回到 `--log-level` / `MISTGATE_LOG_LEVEL`。不删除任何内容。 | 否 |
-| `node_debug_capture` | 管理员 | `node`、`level`（`debug` 或 `info`，默认 `debug`）、`sources`（最多 8 个日志来源，如 `agent`、`hysteria2`、`xray`、`awg`、`kernel`；为空表示全部）、`duration_s`（1 至 900，默认 300）。节点必须在线，且其 Agent 声明了 `debug/1`；每个节点同一时间只有一个抓取。节点为这些来源提高日志级别，保存最多 20000 条记录（4 MiB），时间到了把清理后的记录发出，并自行恢复级别。用 `node_debug_logs` 读取结果。写入审计日志：谁请求的、节点、来源和时长。 `kernel` 来源会读取从抓取开始前 30 分钟到抓取结束期间的内核日志；防火墙数据包日志只计数，不保存。对于使用内核后端的 AWG 节点，选择 `awg` 会在抓取期间启用模块调试，并在摘要中列出 5 秒内未得到响应的握手发起次数。`kernel` 来源需要 `debug/2`，其他来源仍使用 `debug/1`。| 否 |
+| `node_debug_capture` | 管理员 | `node`、`level`（`debug` 或 `info`，默认 `debug`）、`sources`（最多 8 个日志来源，如 `agent`、`hysteria2`、`xray`、`awg`、`kernel`；为空表示全部）、`duration_s`（1 至 900，默认 300）。节点必须在线，且其 Agent 声明了 `debug/1`；每个节点同一时间只有一个抓取。节点为这些来源提高日志级别，保存最多 20000 条记录（4 MiB），时间到了把清理后的记录发出，并自行恢复级别。用 `node_debug_logs` 读取结果。 来源 `xray` 在 `debug` 级别下还会保留 Xray 的连接日志：被接受的请求、连接被拒绝的原因（未知密钥、REALITY 把客户端转到伪装站点）以及连接结束的原因，每行带会话编号 `[N]`，同一连接的各行靠它关联。客户端地址、密钥、账户名、SNI 和目标主机名都会被去掉（目标显示为 `<ip>` 或 `<host>` 加端口）。`info` 级别只保留 Xray 的警告和错误。Xray 的日志级别即时切换，不重启任何监听端口，抓取之外记录的内容不比平时多。写入审计日志：谁请求的、节点、来源和时长。 `kernel` 来源会读取从抓取开始前 30 分钟到抓取结束期间的内核日志；防火墙数据包日志只计数，不保存。对于使用内核后端的 AWG 节点，选择 `awg` 会在抓取期间启用模块调试，并在摘要中列出 5 秒内未得到响应的握手发起次数。`kernel` 来源需要 `debug/2`，其他来源仍使用 `debug/1`。| 否 |
 | `retention` | 管理员 | `values`：设置名称及其新值（名称、单位和范围见 `retention_status`）。更短的时间会在下一次每小时清理时永久删除更早的行。 | 总是（需 step-up） |
 | `task_create` | 管理员 | 计划：`name`、`kind`（`check` 或 `assistant`）、`schedule`（`every 15m`、`every 2h`、`daily 07:30`、`weekly mon 07:30`，按面板时区；检查任务最多每 5 分钟一次，助手任务每 15 分钟一次），检查任务的 `steps`（1 到 8 步：`tool`、`args`、由 `path`、`op` 和 `value` 组成的 `conditions`、`error_is_problem`），助手任务的 `prompt`（最多 4000 个字符），`notify_telegram`、`disabled`；apply：只需 `confirm_token`。计划按面板自己的规则检查任务：检查可以调用哪些工具（操作员配置的读取和探测工具，不含计划、apply 和任务工具）、按各工具的 schema 检查参数、条件、最小间隔，以及名称、参数和提示中没有机密（`secret_in_task`）。最多 50 个任务。任务属于所有者，其运行使用操作员配置。 | 总是 |
 | `task_update` | 管理员 | 计划：`task_id` 和要修改的字段（`name`、`schedule`、`steps` 替换全部旧步骤、`prompt`、`notify_telegram`、`enabled`）；类型不变。修改后的任务从干净状态开始：已打开的告警关闭。若在 apply 之前任务已在面板中被修改，apply 返回 `changed_since_plan`。 | 总是 |
@@ -309,7 +311,7 @@ Mistgate 应用是 `apps` 的第四个字段（`mistgate`，默认开启）。�
 
 ### 所有者在哪里审批
 
-此类计划会显示在管理后台的 **AI → 等待你处理** 中，并带有角标；如果所有者已绑定 Telegram，面板还会发送一条计划等待审批的通知，其中包含指向该页面的链接（只能在管理后台中作出决定：参见[Telegram 告警](../operations/telegram-alerts.md)）。所有者会看到面板对变更的描述、风险提示、智能体的理由（标记为「由智能体撰写，面板未做核实。」）和剩余时间，然后选择：
+此类计划会显示在管理后台的 **AI → 等待您处理** 中，并带有角标；如果所有者已绑定 Telegram，面板还会发送一条计划等待审批的通知，其中包含指向该页面的链接（只能在管理后台中作出决定：参见[Telegram 告警](../operations/telegram-alerts.md)）。所有者会看到面板对变更的描述、风险提示、智能体的理由（标记为「由智能体撰写，面板未做核实。」）和剩余时间，然后选择：
 
 - **批准**：要求所有者再次使用通行密钥或身份验证器验证码。之后智能体只能执行此计划。
 - **拒绝**：智能体执行计划时会失败，并返回「rejected by the owner」。
@@ -337,7 +339,7 @@ Mistgate 应用是 `apps` 的第四个字段（`mistgate`，默认开启）。�
    }
    ```
 
-   计划的 `needs_approval` 为 true，风险标记为 `user_page`。向所有者展示计划，请其在 **AI → 等待你处理** 中批准，然后使用 `confirm_token` 调用 `subscription_app_upsert_apply`。
+   计划的 `needs_approval` 为 true，风险标记为 `user_page`。向所有者展示计划，请其在 **AI → 等待您处理** 中批准，然后使用 `confirm_token` 调用 `subscription_app_upsert_apply`。
 3. The same for macOS: the same arguments with `"platform": "macos"`.
 4. 要让 kl!ck 排在前面，请在两个平台上分别制定一个计划，取消 Happ 的推荐标记：`{"platform": "windows", "name": "Happ", "recommended": false, "reason": "kl!ck leads on the desktop"}`，然后将平台改为 `"macos"` 再执行一次。更新现有应用时只需提供变更字段。
 

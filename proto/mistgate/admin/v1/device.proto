@@ -39,6 +39,9 @@ message CreateAwgDeviceRequest {
   string platform = 3;
   // 1..40 characters; empty = "<platform> <n>".
   string label = 4;
+  // "" = every address goes through the VPN (the default); "ru-direct" = the key leaves the networks of the big Russian services out
+  // of AllowedIPs and carries no IPv6 address (no QR code: it is too long). The owner may issue it whether or not people are offered it.
+  string route = 5;
 }
 
 message CreateAwgDeviceResponse {

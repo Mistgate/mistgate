@@ -434,6 +434,35 @@ func TestReview12_CountersHaveDirectionAndCumulativeStreams(t *testing.T) {
 	}
 }
 
+// A session that ends cleanly (the person half-closes, the target echoes everything and closes) must reach the person whole:
+// the exit may not cancel its HTTP/2 streams while the last of the target's bytes is still on its way to the entry.
+func TestBridgeCleanEndDeliversEveryByteToThePerson(t *testing.T) {
+	pki := newTestPKI(t)
+	target := startBannerTarget(t, "")
+	_, dialer, _, relayPort := newBridgeFixtureConfigured(t, target.port, pki, 0, nil, nil)
+	waitFor(t, 10*time.Second, func() bool {
+		states := dialer.States()
+		return len(states) == 1 && states[0].Conns == 2
+	}, "dialer did not connect both TLS pool connections")
+	request := bytes.Repeat([]byte("0123456789abcdef"), 16<<10) // 256 KiB: more than the HTTP/2 stream window holds in flight
+	for i := 0; i < 5; i++ {
+		conn, err := net.DialTimeout("tcp", relayAddress(relayPort), 3*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+		go func() {
+			_, _ = conn.Write(request)
+			_ = conn.(*net.TCPConn).CloseWrite()
+		}()
+		got, err := io.ReadAll(conn)
+		_ = conn.Close()
+		if err != nil || !bytes.Equal(got, request) {
+			t.Fatalf("round %d: got %d of %d bytes, err = %v", i, len(got), len(request), err)
+		}
+	}
+}
+
 func asymmetricEchoThroughRelay(port uint16, greeting, request []byte, timeout time.Duration) error {
 	conn, err := net.DialTimeout("tcp", relayAddress(port), 3*time.Second)
 	if err != nil {

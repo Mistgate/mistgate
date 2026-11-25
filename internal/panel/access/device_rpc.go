@@ -24,7 +24,7 @@ func (s *Service) deviceProto(d store.AccessAWGDevice) *adminv1.Device {
 		Online:    !d.LastSeenAt.IsZero() && s.now().Sub(d.LastSeenAt) < awgOnlineWindow,
 		Protocols: []string{"awg"},
 		Kind:      adminv1.DeviceKind_DEVICE_KIND_KEY, OsVersion: d.OSVersion, Client: d.Client,
-		AwgProfileId: d.ProfileID, AwgProfileName: d.ProfileName, AwgVersion: awgVersion([]byte(d.ProfileSettingsJSON)),
+		AwgProfileId: d.ProfileID, AwgProfileName: d.ProfileName, AwgVersion: awgVersion([]byte(d.ProfileSettingsJSON)), AwgRoute: d.Route,
 		Stale: d.Stale(), Address: deviceAddress(d.DataJSON), LastHandshakeUnix: unixOrZero(d.LastSeenAt),
 	}
 }
@@ -48,7 +48,7 @@ func configProtos(cfgs []DeviceConfig) []*adminv1.DeviceConfig {
 
 func (s *Service) CreateAwgDevice(ctx context.Context, req *connect.Request[adminv1.CreateAwgDeviceRequest]) (*connect.Response[adminv1.CreateAwgDeviceResponse], error) {
 	m := req.Msg
-	dev, cfgs, err := s.AddAWGDevice(ctx, actor(ctx), m.UserId, m.ProfileId, m.Platform, m.Label)
+	dev, cfgs, err := s.AddAWGDeviceRoute(ctx, actor(ctx), m.UserId, m.ProfileId, m.Platform, m.Label, m.Route)
 	if err != nil {
 		return nil, err
 	}

@@ -286,7 +286,7 @@ func buildPageData(v access.SubView, link, title, lang string, set *adminv1.Subs
 	if opt.GetShowQr() {
 		d.QR = pageQROf(link)
 	}
-	d.Amnezia = amneziaData(v, link, subsettings.SelfService(set), preview, now)
+	d.Amnezia = amneziaData(v, link, subsettings.SelfService(set), subsettings.RUDirect(set), preview, now)
 	if v.AppTelegram {
 		d.Telegram = pageTelegramOf(v, lang)
 	}

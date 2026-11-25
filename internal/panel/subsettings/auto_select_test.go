@@ -34,3 +34,28 @@ func TestLinkAutoSelectAbsentMeansOnAndSurvivesSettingsRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestLinkAutoIntervalDefaultAndChoices(t *testing.T) {
+	if LinkAutoInterval(nil) != 300 || LinkAutoInterval(Defaults()) != 300 || Defaults().LinkAutoInterval != nil {
+		t.Fatal("an absent link_auto_interval must read as 300 and Defaults must leave it unset")
+	}
+	for _, secs := range []uint32{60, 120, 300, 600} {
+		s := Defaults()
+		s.LinkAutoInterval = proto.Uint32(secs)
+		if err := Validate(s); err != nil || LinkAutoInterval(s) != int(secs) {
+			t.Errorf("%d s: err %v", secs, err)
+		}
+	}
+	for _, secs := range []uint32{0, 20, 59, 301, 3600} {
+		s := Defaults()
+		s.LinkAutoInterval = proto.Uint32(secs)
+		if Validate(s) == nil {
+			t.Errorf("%d s was accepted", secs)
+		}
+	}
+	for secs, want := range map[int]string{0: "5m", 60: "1m", 120: "2m", 300: "5m", 600: "10m"} {
+		if got := AutoEvery(secs); got != want {
+			t.Errorf("AutoEvery(%d) = %q, want %q", secs, got, want)
+		}
+	}
+}

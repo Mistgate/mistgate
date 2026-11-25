@@ -432,6 +432,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 		return connect.NewError(connect.CodeAborted, errors.New("superseded by a newer stream"))
 	}
 	helloAt := f.now()
+	f.own.heard(id, helloAt, f.keepaliveEvery()) // before the Step: a returning node's connectEvents asks about this gap
 	tr, stepErr := core.Step(sctx, &state, SessionEvent{Kind: EventHello, At: helloAt, Frame: first})
 	resetSessionAlarm(alarmTimer, tr.NextAlarm, helloAt)
 	if tr.Close != nil && state.InstanceID == "" {
@@ -513,6 +514,7 @@ func (a agentService) runSession(ctx context.Context, id string, pc peerCert, ow
 				return endErr()
 			}
 			now := f.now()
+			f.own.heard(id, now, f.keepaliveEvery())
 			if !frameBucket.allow(now) {
 				if m.Seq != 0 {
 					// A reliable frame is never skipped: the ack of a later one would cover it and the batch would be lost.
@@ -629,6 +631,13 @@ func (f *Fleet) connectEvents(ctx context.Context, id string, prev store.NodeRow
 	if lastCode == "node_down" {
 		f.event(ctx, 1, "node_recovered", id, params)
 	} else if gap >= time.Minute && gap < blipWindow {
+		if secs, hit, first := f.own.gapAt(prev.LastSeenAt, f.keepaliveEvery()); hit {
+			// The panel heard nobody for a while: that is its own silence, not a blip of this node. One event per silence, none per node.
+			if first {
+				f.event(ctx, 1, "panel_link_gap", "", map[string]string{"seconds": fmt.Sprint(secs)})
+			}
+			return
+		}
 		f.event(ctx, 1, "node_blip", id, params)
 		if h := f.hooks(); h != nil && params["rebooted"] != "true" {
 			h.NodeReturned(ctx, id, last, now) // the history record of the blip

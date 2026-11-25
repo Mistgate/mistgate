@@ -426,15 +426,16 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-@media (width <= 1240px) {
-  .sbp .dq-h .dq-cat {
-    order: 3;
-    flex-basis: 100%;
-    margin: 0;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
+/* Seven countries and the categories no longer fit one row beside the heading: the chips take a row of their own at every width and scroll
+   along it, as the tabs of the page do. */
+.sbp .dq-h .dq-cat {
+  order: 3;
+  flex-basis: 100%;
+  margin: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-block-end: 2px;
 }
 
 /* ---- the list: what the board's rules leave to the product */

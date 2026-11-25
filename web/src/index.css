@@ -281,10 +281,17 @@
     outline: 2px solid var(--accent-mark);
     outline-offset: 2px;
   }
-  button {
+  /* Base UI draws a switch, a radio and a checkbox as a span with a role: the pointer a button gets here is theirs too */
+  button,
+  [role="radio"],
+  [role="switch"],
+  [role="checkbox"] {
     cursor: pointer;
   }
-  button:disabled {
+  button:disabled,
+  [role="radio"][data-disabled],
+  [role="switch"][data-disabled],
+  [role="checkbox"][data-disabled] {
     cursor: default;
   }
   ::placeholder {

@@ -397,14 +397,14 @@ describe("format labels", () => {
 
 describe("the country lists of a split rule in the editor", () => {
   const server = { kind: DnsServerKind.PLAIN, address: "223.5.5.5", providerVariant: "" };
-  it("offers China and Russia, and any other code a rule already holds so it can be turned off", () => {
-    expect(geoChoices([])).toEqual(["cn", "ru"]);
-    expect(geoChoices(["cn"])).toEqual(["cn", "ru"]);
-    expect(geoChoices(["ir"])).toEqual(["cn", "ru", "ir"]);
+  it("offers China, Russia and Iran, and any other code a rule already holds so it can be turned off", () => {
+    expect(geoChoices([])).toEqual(["cn", "ru", "ir"]);
+    expect(geoChoices(["cn"])).toEqual(["cn", "ru", "ir"]);
+    expect(geoChoices(["tr"])).toEqual(["cn", "ru", "ir", "tr"]);
   });
   it("keeps the site categories of a rule out of the country pills", () => {
-    expect(geoChoices(["geosite:telegram", "ir"])).toEqual(["cn", "ru", "ir"]);
-    expect(geoChoices(["geosite:telegram"])).toEqual(["cn", "ru"]);
+    expect(geoChoices(["geosite:telegram", "tr"])).toEqual(["cn", "ru", "ir", "tr"]);
+    expect(geoChoices(["geosite:telegram"])).toEqual(["cn", "ru", "ir"]);
   });
   it("reads the categories typed in one go: lower-cased, with or without the prefix, no repeats, the badly written apart", () => {
     expect(parseCategories(" Telegram, geosite:Category-Media-RU;telegram  geolocation-!cn google@cn")).toEqual({

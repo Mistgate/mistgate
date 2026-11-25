@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Панель · Ассистент</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./pn.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=JetBrains+Mono:wght@400..700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0;background:#0c0c0e}</style>
+</helmet>
+<div class="pnr an-host">
+<div class="{{rootCls}}">
+<section class="as" role="dialog" aria-label="Ассистент">
+  <div class="wave as-wv" aria-hidden="true"><i></i></div>
+  <span class="as-eg a" aria-hidden="true"></span><span class="as-eg b" aria-hidden="true"></span>
+  <header class="as-h">
+    <sc-if value="{{chat}}" hint-placeholder-val="{{true}}"><span class="as-lg" aria-hidden="true"><svg class="cat" viewBox="0 0 48 48" aria-hidden="true"><path class="cat-h" d="M24 43c-9 0-16-6-16-15 0-3.500.800-6.500 2-9L9 6l10 7c1.600-.400 3.300-.600 5-.600s3.400.200 5 .600L39 6l-1 13c1.200 2.500 2 5.500 2 9 0 9-7 15-16 15z"></path><ellipse class="cat-l" cx="17.500" cy="27" rx="2.600" ry="3.700"></ellipse><ellipse class="cat-r" cx="30.500" cy="27" rx="2.600" ry="3.700"></ellipse><path class="cat-w" d="M27.300 28.300q3.200-3.800 6.400 0"></path></svg></span></sc-if>
+    <sc-if value="{{hist}}" hint-placeholder-val="{{false}}"><button type="button" class="ic as-bk" aria-label="Назад к разговору" onClick="{{toggleHist}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></button></sc-if>
+    <div class="as-ht"><b>{{title}}</b><span class="{{subCls}}">{{sub}}</span></div>
+    <sc-if value="{{chat}}" hint-placeholder-val="{{true}}"><button type="button" class="ic" aria-label="Разговоры" aria-pressed="{{histOn}}" onClick="{{toggleHist}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.500 7h10M9.500 12h10M9.500 17h10M4.500 7h.01M4.500 12h.01M4.500 17h.01"></path></svg></button></sc-if>
+    <button type="button" class="ic" aria-label="Новый разговор" onClick="{{fresh}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+    <sc-if value="{{chat}}" hint-placeholder-val="{{true}}"><button type="button" class="ic" aria-label="Настройки ассистента"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.220 2h-.440a2 2 0 0 0-2 2v.180a2 2 0 0 1-1 1.730l-.430.250a2 2 0 0 1-2 0l-.150-.080a2 2 0 0 0-2.730.730l-.220.380a2 2 0 0 0 .730 2.730l.150.100a2 2 0 0 1 1 1.720v.510a2 2 0 0 1-1 1.740l-.150.090a2 2 0 0 0-.730 2.730l.220.380a2 2 0 0 0 2.730.730l.150-.080a2 2 0 0 1 2 0l.430.250a2 2 0 0 1 1 1.730V20a2 2 0 0 0 2 2h.440a2 2 0 0 0 2-2v-.180a2 2 0 0 1 1-1.730l.430-.250a2 2 0 0 1 2 0l.150.080a2 2 0 0 0 2.730-.730l.220-.390a2 2 0 0 0-.730-2.730l-.150-.080a2 2 0 0 1-1-1.740v-.500a2 2 0 0 1 1-1.740l.150-.090a2 2 0 0 0 .730-2.730l-.220-.380a2 2 0 0 0-2.730-.730l-.150.080a2 2 0 0 1-2 0l-.430-.250a2 2 0 0 1-1-1.730V4a2 2 0 0 0-2-2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path></svg></button></sc-if>
+    <button type="button" class="ic" aria-label="Закрыть" onClick="{{close}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+  </header>
+
+  <sc-if value="{{hist}}" hint-placeholder-val="{{false}}">
+    <div class="as-hs">
+      <div class="as-ht2">
+        <label class="as-hq"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"></path></svg><input placeholder="Найти разговор" aria-label="Найти разговор" autocomplete="off" onInput="{{onHq}}"></label>
+      </div>
+      <div class="as-b as-hl">
+        <sc-for list="{{days}}" as="d" hint-placeholder-count="2">
+          <div class="as-hg">
+            <div class="as-hd"><span>{{d.t}}</span><span class="mono">{{d.n}}</span></div>
+            <sc-for list="{{d.rows}}" as="c" hint-placeholder-count="2">
+              <div class="as-hr {{c.cls}}"><button type="button" class="as-ho" onClick="{{c.open}}"><span class="as-h1"><b>{{c.t}}</b><span>{{c.time}}</span></span><span class="as-h2">{{c.s}}</span></button><button type="button" class="ic as-hx" aria-label="Удалить разговор" onClick="{{c.del}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4.500h4V7M7 7l1 12.500h8L17 7"></path></svg></button></div>
+            </sc-for>
+          </div>
+        </sc-for>
+        <sc-if value="{{histNone}}" hint-placeholder-val="{{false}}"><div class="as-e"><b>{{histNoneT}}</b><p>Разговоры зашифрованы и видны только вам</p></div></sc-if>
+      </div>
+      <sc-if value="{{histAny}}" hint-placeholder-val="{{true}}"><div class="as-hf"><span>Зашифрованы, видны только вам</span><button type="button" class="an-lk" onClick="{{delAll}}">Удалить все</button></div></sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{chat}}" hint-placeholder-val="{{true}}">
+  <div class="as-b">
+    <!-- не подключён -->
+    <sc-if value="{{isOff}}" hint-placeholder-val="{{false}}">
+      <div class="as-e">
+        <span class="as-eo off" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"></path></svg></span>
+        <b>Ассистент не подключён</b>
+        <p>Он работает на облачной модели с вашим ключом: Anthropic, DeepSeek, Z.ai, Ollama Cloud или свой OpenAI-совместимый провайдер</p>
+        <button type="button" class="btn pri">Подключить</button>
+      </div>
+    </sc-if>
+
+    <!-- начало разговора -->
+    <sc-if value="{{isEmpty}}" hint-placeholder-val="{{true}}">
+      <div class="as-e">
+        <span class="as-eo" aria-hidden="true"><svg class="cat" viewBox="0 0 48 48" aria-hidden="true"><path class="cat-h" d="M24 43c-9 0-16-6-16-15 0-3.500.800-6.500 2-9L9 6l10 7c1.600-.400 3.300-.600 5-.600s3.400.200 5 .600L39 6l-1 13c1.200 2.500 2 5.500 2 9 0 9-7 15-16 15z"></path><ellipse class="cat-l" cx="17.500" cy="27" rx="2.600" ry="3.700"></ellipse><ellipse class="cat-r" cx="30.500" cy="27" rx="2.600" ry="3.700"></ellipse><path class="cat-w" d="M27.300 28.300q3.200-3.800 6.400 0"></path></svg></span>
+        <b>Спросите про ноды и людей</b>
+        <p>Могу разобраться с нодами, людьми и ошибками и подготовить изменения — применяете их вы</p>
+        <div class="as-sg">
+          <sc-for list="{{tips}}" as="t" hint-placeholder-count="3"><button type="button" onClick="{{t.ask}}"><span>{{t.t}}</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"></path></svg></button></sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- разговор -->
+    <sc-if value="{{hasLog}}" hint-placeholder-val="{{false}}"><div class="as-day"><span>Сегодня</span></div></sc-if>
+    <sc-for list="{{msgs}}" as="m" hint-placeholder-count="2">
+      <sc-if value="{{m.isUser}}" hint-placeholder-val="{{false}}"><div class="as-uw"><span class="as-mt">Страница: Обзор</span><div class="as-u">{{m.text}}</div><span class="as-mt mono">{{m.time}}</span></div></sc-if>
+      <sc-if value="{{m.isBot}}" hint-placeholder-val="{{true}}">
+        <div class="as-a">
+          <div class="as-ah"><span class="as-av" aria-hidden="true"><svg class="cat" viewBox="0 0 48 48" aria-hidden="true"><path class="cat-h" d="M24 43c-9 0-16-6-16-15 0-3.500.800-6.500 2-9L9 6l10 7c1.600-.400 3.300-.600 5-.600s3.400.200 5 .600L39 6l-1 13c1.200 2.500 2 5.500 2 9 0 9-7 15-16 15z"></path><ellipse class="cat-l" cx="17.500" cy="27" rx="2.600" ry="3.700"></ellipse><ellipse class="cat-r" cx="30.500" cy="27" rx="2.600" ry="3.700"></ellipse><path class="cat-w" d="M27.300 28.300q3.200-3.800 6.400 0"></path></svg></span><b>Ассистент</b><span class="mono">{{m.time}}</span></div>
+          <sc-if value="{{m.hasThink}}" hint-placeholder-val="{{false}}"><div class="as-rs">{{m.thinkT}} <b class="mono">{{m.sec}}</b></div></sc-if>
+          <sc-if value="{{m.hasTools}}" hint-placeholder-val="{{false}}">
+            <div class="as-tc {{m.tcCls}}">
+              <button type="button" class="as-tch" aria-expanded="{{m.openOn}}" onClick="{{m.toggle}}"><span class="as-ts {{m.tsCls}}" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"></path></svg></span><span>{{m.toolsT}}</span><svg class="i as-cv" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"></path></svg></button>
+              <sc-if value="{{m.open}}" hint-placeholder-val="{{true}}">
+                <sc-for list="{{m.tools}}" as="k" hint-placeholder-count="1"><div class="as-tr {{k.cls}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01"></path></svg><b>{{k.t}}</b><span class="tag mono">{{k.a}}</span><span class="as-ts {{k.cls}}" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"></path></svg></span></div></sc-for>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{m.thinking}}" hint-placeholder-val="{{false}}"><div class="as-thw"><span class="as-th" aria-hidden="true"><i></i><i></i><i></i></span>Ассистент думает…</div></sc-if>
+          <sc-for list="{{m.lines}}" as="l" hint-placeholder-count="3"><p class="{{l.cls}}"><sc-if value="{{l.hasNode}}" hint-placeholder-val="{{false}}"><button type="button" class="as-nc mono" title="Открыть ноду"><i class="dot {{l.dc}}" aria-hidden="true"></i>{{l.node}}<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"></path></svg></button></sc-if>{{l.t}}</p></sc-for>
+          <sc-if value="{{m.hasPlan}}" hint-placeholder-val="{{false}}">
+            <div class="as-pl {{m.planCls}}">
+              <div class="as-plh"><span>Предлагаемое изменение</span><span class="mono">{{m.planNote}}</span></div>
+              <b>{{m.planT}}</b>
+              <ul><sc-for list="{{m.facts}}" as="f" hint-placeholder-count="2"><li><span class="mono">{{f.k}}</span>{{f.v}}</li></sc-for></ul>
+              <sc-if value="{{m.hasWarn}}" hint-placeholder-val="{{false}}"><p class="as-w"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.500l8.500 14.500h-17zM12 10.500v4M12 17v.01"></path></svg>{{m.warn}}</p></sc-if>
+              <sc-if value="{{m.planOpen}}" hint-placeholder-val="{{true}}"><div class="as-pa"><button type="button" class="btn sm" onClick="{{m.reject}}">Отклонить</button><button type="button" class="btn sm pri {{m.busyCls}}" onClick="{{m.apply}}"><sc-if value="{{m.busy}}" hint-placeholder-val="{{false}}"><span class="an-sp" aria-hidden="true"></span></sc-if>{{m.applyT}}</button></div></sc-if>
+              <sc-if value="{{m.planDone}}" hint-placeholder-val="{{false}}"><div class="as-ps"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="{{m.doneD}}"></path></svg>{{m.doneT}}</div></sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{m.hasErr}}" hint-placeholder-val="{{false}}">
+            <div class="as-er"><b>{{m.errT}}</b><span>{{m.errS}}</span><button type="button" class="btn sm">ИИ → Ассистент</button></div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{chat}}" hint-placeholder-val="{{true}}">
+  <footer class="as-f">
+    <div class="as-in">
+      <sc-if value="{{ctx}}" hint-placeholder-val="{{true}}"><div class="as-cr"><span class="tag as-cx"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"></path></svg>Страница: Обзор<button type="button" aria-label="Не передавать страницу" onClick="{{dropCtx}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"></path></svg></button></span></div></sc-if>
+      <input class="as-ti" placeholder="{{ph}}" aria-label="Сообщение ассистенту" autocomplete="off" onKeyDown="{{onKey}}" aria-disabled="{{inOffA}}">
+      <div class="as-ir">
+        <div class="as-mw">
+          <button type="button" class="as-md" aria-haspopup="listbox" aria-expanded="{{mdOn}}" onClick="{{toggleMd}}"><span class="as-pv mono" aria-hidden="true">{{provL}}</span><span>{{modelT}}</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"></path></svg></button>
+          <sc-if value="{{md}}" hint-placeholder-val="{{false}}">
+            <div class="as-mp">
+              <div class="as-m2">
+                <div class="as-m2p" role="tablist" aria-label="Провайдер">
+                  <sc-for list="{{provs}}" as="g" hint-placeholder-count="4"><button type="button" role="tab" aria-selected="{{g.on}}" class="as-pt {{g.cls}}" onClick="{{g.pick}}" onMouseEnter="{{g.pick}}"><span class="as-pv mono" aria-hidden="true">{{g.l}}</span><span>{{g.t}}</span><i class="dot" aria-hidden="true"></i></button></sc-for>
+                </div>
+                <div class="as-m2m" role="listbox" aria-label="Модель">
+                  <p class="as-m2n">{{pvNote}}</p>
+                  <sc-for list="{{models}}" as="o" hint-placeholder-count="3"><button type="button" role="option" aria-selected="{{o.on}}" class="as-mo" onClick="{{o.pick}}"><span class="mono">{{o.t}}</span><span>{{o.s}}</span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.500l4.500 4.500L19 7.500"></path></svg></button></sc-for>
+                  <sc-if value="{{pvNone}}" hint-placeholder-val="{{false}}"><div class="as-m2e"><span>Ключ не добавлен</span><button type="button" class="btn sm">Подключить</button></div></sc-if>
+                </div>
+              </div>
+              <div class="as-dp"><div class="as-dpl"><span>Размышление</span><b>{{depthT}}</b><span class="as-dph">{{depthH}}</span></div><div class="as-sl {{depthCls}}" role="radiogroup" aria-label="Глубина размышления" style="--p: {{depthP}}"><i class="as-slf" aria-hidden="true"></i><span class="as-sp" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><sc-for list="{{depths}}" as="d" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{d.on}}" aria-label="{{d.t}}" onClick="{{d.pick}}"><i aria-hidden="true"></i></button></sc-for><span class="as-slt" aria-hidden="true"></span></div></div>
+            </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{canSend}}" hint-placeholder-val="{{true}}"><button type="button" class="as-go" aria-label="Отправить" onClick="{{send}}"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button></sc-if>
+        <sc-if value="{{running}}" hint-placeholder-val="{{false}}"><button type="button" class="as-go stop" aria-label="Остановить" onClick="{{stop}}"><i aria-hidden="true"></i></button></sc-if>
+      </div>
+    </div>
+    <div class="as-fm"><span>Изменения ассистент только готовит, применяете их вы</span></div>
+  </footer>
+  </sc-if>
+</section>
+
+<sc-if value="{{solo}}" hint-placeholder-val="{{true}}">
+  <!-- переключатель состояний макета, в продукт не идёт -->
+  <div class="an-demo" role="group" aria-label="Состояния макета">
+    <span class="dl">Состояние</span>
+    <div class="seg"><sc-for list="{{demo}}" as="o" hint-placeholder-count="6"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div>
+    <span class="dl">Тема</span>
+    <div class="seg"><button type="button" aria-pressed="{{thD}}" onClick="{{setDark}}">тёмная</button><button type="button" aria-pressed="{{thL}}" onClick="{{setLight}}">светлая</button></div>
+  </div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","options":["empty","think","answer","done","err","off"],"default":"empty","section":"Состояние"},"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Вид"},"embedded":{"editor":null},"onClose":{"editor":null},"onAct":{"editor":null},"onAsk":{"editor":null},"$preview":{"width":480,"height":760}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { view: null, log: null, run: false, busy: -1, hist: false, gone: {}, hq: '', md: false, pv: '', model: 'an:claude-sonnet-5-5', depth: 1, ctx: true }; }
+  componentDidMount() { try { if (this.props.embedded) { const el = document.querySelector('.as-ti'); if (el) el.focus(); } } catch (er) {} }
+  componentDidUpdate() { try { const b = document.querySelector('.as-b'); if (b) b.scrollTop = b.scrollHeight; } catch (er) {} }
+  componentWillUnmount() { clearInterval(this._i); clearTimeout(this._t); }
+  scripts() {
+    return [
+      { q: 'У каких нод сегодня были проблемы?', tools: [['Fleet digest', '24 h']],
+        lines: [['', 'За сутки ни одна нода не падала: все 4 на связи, критичных алертов нет. Замечаний три, все некритичные'], ['#', 'Открытые замечания (3)'], ['fi1', 'не открывается из части сетей, три проверки подряд'], ['nl1', 'в 11:20 пропадала на 2 минуты, сертификат истекает через 9 дней'], ['de1', 'журнал systemd занял 3,8 ГБ'], ['', 'msk1 без замечаний. Для fi1 могу включить ретрансляцию через msk1']],
+        plan: { id: 'r-fi1', t: 'Включить ретрансляцию fi1 через msk1', facts: [['fi1', 'три проверки подряд не проходят из части сетей'], ['msk1', 'на связи, путь до fi1 проверен']], warn: 'Меняет то, что работает на нодах, поэтому нужен владелец', owner: true, done: 'Применено, fi1 идёт через msk1' } },
+      { q: 'Кто превысил лимит устройств?', tools: [['Users', 'devices']],
+        lines: [['', 'Никто не превысил'], ['', 'Ближе всех bob: 3 устройства из 3. Четвёртое он добавить не сможет, пока не удалит одно']] },
+      { q: 'Сделай группу для семьи с профилем Hysteria2', tools: [['Groups', 'list'], ['Profiles', 'de1']],
+        lines: [['', 'Группы «Семья» пока нет. Подготовил её с профилем Hysteria2 на de1']],
+        plan: { id: 'grp', t: 'Создать группу «Семья»', facts: [['профиль', 'Hysteria2 · 443 на de1'], ['люди', 'пока никого, добавите после создания']], warn: '', owner: false, done: 'Применено, группа создана' } },
+      { q: 'Сделай сайт-заглушку для nl1', tools: [['Nodes', 'nl1']],
+        lines: [['', 'Собрал простой сайт из трёх файлов. Он заменит сайт, который сейчас стоит на nl1']],
+        plan: { id: 'site', t: 'Поставить на nl1 свой сайт', facts: [['нода', 'nl1 · Амстердам'], ['файл', 'index.html · 4,1 КБ'], ['файл', 'style.css · 1,8 КБ'], ['файл', 'favicon.svg · 0,6 КБ'], ['всего', '3 файла · 6,5 КБ из 2 МиБ'], ['sha256', '9f2c…a41e']], warn: 'Посмотреть сайт до установки пока нельзя: увидишь его после применения', owner: true, done: 'Применено, на nl1 стоит новый сайт' } },
+      { q: 'Добавь в шаблон семьи блокировку рекламы', tools: [['Subscription', 'templates']],
+        lines: [['', 'В шаблон «Для семьи» добавил список правил и правило REJECT для него']],
+        plan: { id: 'tpl', t: 'Изменить шаблон Mihomo «Для семьи»', facts: [['действие', 'изменить текст'], ['группы', 'Семья, без изменений'], ['размер', '0,2 → 0,3 КиБ'], ['хеш', '51c0…7be2'], ['хосты', 'example.com'], ['замечания', 'в шаблоне нет dns']], warn: 'Самого текста в плане нет. Прочитать его можно в «Подписках» → «Шаблоны Mihomo»', owner: true, done: 'Применено, шаблон сохранён' } }
+    ];
+  }
+  preset(view) {
+    const S = this.scripts()[0], full = { bot: true, sc: 0, tools: 1, shown: 9, plan: true, sec: 4 };
+    if (view === 'think') return [{ user: S.q }, { bot: true, sc: 0, tools: 1, shown: 0, tick: 6 }];
+    if (view === 'answer') return [{ user: S.q }, full];
+    if (view === 'done') return [{ user: S.q }, Object.assign({}, full, { st: 'ok' })];
+    if (view === 'err') return [{ user: S.q }, { bot: true, sc: -1, err: true }];
+    return [];
+  }
+  renderVals() {
+    const s = this.state, view = s.view || this.props.view || 'empty';
+    const SC = this.scripts(), log = s.log || this.preset(view), stat = !s.log;
+    const off = view === 'off' && !s.log;
+    const HS = [['Сегодня', [['a', 'Проблемы нод за сегодня', 'Замечаний три, все некритичные', '14:21'], ['b', 'Почему bob не подключается', 'Упёрся в лимит устройств: 3 из 3', '11:02']]], ['Вчера', [['c', 'Группа для семьи', 'Создал группу «Семья» с Hysteria2', '19:40'], ['d', 'Сертификат на nl1', 'Истекает через 10 дней, продление займёт минуту', '09:15']]], ['Ранее', [['e', 'Что занимает диск на de1', 'Журнал systemd, 3,1 ГБ', '9 ноября']]]];
+    const hsLeft = HS.reduce((a, d) => a + d[1].filter((c) => !s.gone[c[0]] && (!s.hq || (c[1] + ' ' + c[2]).toLowerCase().indexOf(s.hq) >= 0)).length, 0);
+    const PV = [['an', 'Anthropic', 'An', 'США, не для обучения', [['claude-opus-5-5', 'по умолчанию'], ['claude-sonnet-5-5', ''], ['claude-haiku-5-5', '']]], ['za', 'Z.ai', 'Z', 'Сингапур, содержимое не хранится', [['GLM-5.3', ''], ['GLM-5.3-Flash', '']]], ['ol', 'Ollama Cloud', 'Ol', 'США, не для обучения', [['deepseek-v4.1-flash', '']]], ['ds', 'DeepSeek', 'Ds', 'Китай, может использовать для обучения', []]];
+    const curP = PV.find((x) => x[0] === s.model.split(':')[0]) || PV[0], curM = s.model.split(':')[1], seeP = PV.find((x) => x[0] === s.pv) || curP;
+    const halt = () => { clearInterval(this._i); clearTimeout(this._t); };
+    const ask = (i, text) => {
+      if (this.state.run || off) return; halt(); if (this.state.md) this.setState({ md: false });
+      const base = (this.state.log || this.preset(view)).concat([{ user: text || SC[i].q }, { bot: true, sc: i, tools: 0, shown: 0, tick: 0 }]);
+      this.setState({ log: base, run: true, view: 'live' });
+      this._i = setInterval(() => {
+        const l = this.state.log.slice(), m = Object.assign({}, l[l.length - 1]), sc = SC[m.sc]; m.tick = (m.tick || 0) + 1; if (m.tick % 2 && m.tick < 4) { l[l.length - 1] = m; this.setState({ log: l }); return; }
+        if (m.tools < sc.tools.length) m.tools++;
+        else if (m.shown < sc.lines.length) m.shown++;
+        else { if (sc.plan) m.plan = true; m.sec = Math.max(1, Math.round(m.tick * 0.52)); halt(); l[l.length - 1] = m; this.setState({ log: l, run: false }); return; }
+        l[l.length - 1] = m; this.setState({ log: l });
+      }, 520);
+    };
+    const setPlan = (idx, st) => { const l = (this.state.log || log).slice(); l[idx] = Object.assign({}, l[idx], { st: st }); this.setState({ log: l, busy: -1, view: 'live' }); };
+    return {
+      thD: (s.th || this.props.theme) === 'light' ? 'false' : 'true', thL: (s.th || this.props.theme) === 'light' ? 'true' : 'false', setDark: () => this.setState({ th: 'dark' }), setLight: () => this.setState({ th: 'light' }),
+      rootCls: this.props.embedded ? 'an-w' : 'pn an-solo an-w' + ((s.th || this.props.theme) === 'light' ? ' light' : ''), solo: !this.props.embedded,
+      model: off ? 'провайдер не выбран' : curP[1] + ' · ' + curM,
+      close: () => { if (this.props.onClose) this.props.onClose(); },
+      fresh: () => { halt(); this.setState({ log: [], run: false, busy: -1, view: 'live', hist: false }); },
+      sub: s.hist ? (hsLeft ? hsLeft + ' ' + (hsLeft === 1 ? 'разговор' : (hsLeft < 5 ? 'разговора' : 'разговоров')) : 'пусто') : (off ? 'провайдер не выбран' : curP[1] + ' · ' + curM), subCls: s.hist ? 'as-sb' : 'mono',
+      title: s.hist ? 'Разговоры' : 'Ассистент', hist: s.hist, chat: !s.hist, histOn: s.hist ? 'true' : 'false', toggleHist: () => this.setState({ hist: !s.hist, hq: '' }),
+      onHq: (e) => this.setState({ hq: e.currentTarget.value.trim().toLowerCase() }),
+      days: HS.map((d) => ({ t: d[0], n: '', rows: d[1].filter((c) => !s.gone[c[0]] && (!s.hq || (c[1] + ' ' + c[2]).toLowerCase().indexOf(s.hq) >= 0)).map((c) => ({ t: c[1], s: c[2], time: c[0] === 'a' ? 'сейчас' : c[3], cls: c[0] === 'a' ? 'on' : '', open: () => { halt(); this.setState({ hist: false, view: 'answer', log: null, run: false, busy: -1 }); }, del: () => { const g = Object.assign({}, s.gone); g[c[0]] = 1; this.setState({ gone: g }); } })) })).filter((d) => d.rows.length),
+      histCount: hsLeft + ' ' + (hsLeft === 1 ? 'разговор' : (hsLeft < 5 ? 'разговора' : 'разговоров')), histNone: hsLeft === 0, histAny: hsLeft > 0, histNoneT: s.hq ? 'Такого разговора нет' : 'Разговоров пока нет',
+      delAll: () => { const g = {}; HS.forEach((d) => d[1].forEach((c) => { g[c[0]] = 1; })); this.setState({ gone: g }); },
+      ctx: s.ctx, dropCtx: () => this.setState({ ctx: false }),
+      md: s.md && !off, mdOn: s.md ? 'true' : 'false', toggleMd: () => { if (!off) this.setState({ md: !s.md, pv: '' }); }, provL: off ? '–' : curP[2], modelT: off ? 'Провайдер не выбран' : curP[1] + ' · ' + curM,
+      provs: PV.map((g) => ({ t: g[1], l: g[2], on: g[0] === seeP[0] ? 'true' : 'false', cls: g[0] === curP[0] ? 'as-cur' : '', pick: () => { if (s.pv !== g[0]) this.setState({ pv: g[0] }); } })),
+      pvNote: seeP[3], pvNone: seeP[4].length === 0,
+      models: seeP[4].map((o) => ({ t: o[0], s: o[1], on: s.model === seeP[0] + ':' + o[0] ? 'true' : 'false', pick: () => this.setState({ model: seeP[0] + ':' + o[0], md: false, pv: '' }) })),
+      depthT: ['Быстро', 'Обычно', 'Тщательно'][s.depth], depthH: ['отвечает сразу', 'думает перед ответом', 'дольше, но глубже'][s.depth], depthP: String(s.depth / 2), depthCls: 'd' + s.depth,
+      depths: ['Быстро', 'Обычно', 'Тщательно'].map((t, i) => ({ t: t, on: s.depth === i ? 'true' : 'false', pick: () => this.setState({ depth: i }) })),
+      isOff: off, isEmpty: !off && log.length === 0, hasLog: log.length > 0,
+      tips: SC.map((x, i) => ({ t: x.q, ask: () => ask(i) })),
+      msgs: log.map((m, idx) => {
+        if (m.user) return { isUser: true, isBot: false, text: m.user, time: '14:21' };
+        const sc = SC[m.sc] || { tools: [], lines: [] }, p = sc.plan, live = s.run && idx === log.length - 1;
+        return {
+          isUser: false, isBot: true,
+          time: '14:21', hasThink: !m.err && (live || (stat && view === 'think')), thinkT: 'Размышляю', sec: (live ? Math.max(1, Math.round((m.tick || 0) * 0.52)) : (m.sec || Math.max(1, Math.round((m.tick || 6) * 0.52)))) + ' с',
+          hasTools: sc.tools.length > 0 && (m.tools > 0 || live), open: m.open != null ? m.open : (live || !!(stat && view === 'think')), openOn: (m.open != null ? m.open : live) ? 'true' : 'false',
+          toggle: () => { const l = (this.state.log || log).slice(); l[idx] = Object.assign({}, l[idx], { open: !(m.open != null ? m.open : live) }); this.setState({ log: l, view: s.view || view }); },
+          tcCls: (m.open != null ? m.open : live) ? 'open' : '', tsCls: m.tools >= sc.tools.length && !(live && m.shown === 0 && m.tools < sc.tools.length) ? (live && m.tools < sc.tools.length ? 'now' : 'done') : 'now',
+          toolsT: (live || (stat && view === 'think') ? 'Использую ' : 'Использовано ') + sc.tools.length + (sc.tools.length === 1 ? ' инструмент' : ' инструмента') + (live || (stat && view === 'think') ? '…' : ' · ' + (m.sec || 4) + ' с'),
+          tools: sc.tools.slice(0, live ? Math.min(sc.tools.length, m.tools + 1) : Math.max(1, m.tools)).map((t, i) => ({ t: t[0], a: t[1], cls: i < m.tools ? 'done' : 'now' })),
+          thinking: (live && m.tools >= sc.tools.length && m.shown === 0) || (stat && view === 'think'),
+          lines: sc.lines.slice(0, m.shown).map((x) => ({ node: x[0], hasNode: !!x[0] && x[0] !== '#', dc: x[0] === 'msk1' ? '' : 'warn', t: x[1], cls: x[0] === '#' ? 'as-hh' : (x[0] ? 'as-li' : '') })),
+          hasPlan: !!(m.plan && p), planT: p ? p.t : '', planNote: m.st ? '' : 'истекает через 10 минут',
+          facts: p ? p.facts.map((f) => ({ k: f[0], v: f[1] })) : [], hasWarn: !!(p && p.warn), warn: p ? p.warn : '',
+          planCls: m.st || '', planOpen: !!(m.plan && !m.st), planDone: !!m.st,
+          busy: s.busy === idx, busyCls: s.busy === idx ? 'busy' : '',
+          applyT: s.busy === idx ? 'Жду passkey' : (p && p.owner ? 'Одобрить и применить' : 'Применить'),
+          apply: () => { if (s.busy >= 0) return; const fin = () => { setPlan(idx, 'ok'); if (this.props.onAct) this.props.onAct(p.id); }; if (p.owner && this.props.onAsk) this.props.onAsk(p.t, fin); else if (p.owner) { this.setState({ busy: idx }); this._t = setTimeout(fin, 1100); } else fin(); },
+          reject: () => setPlan(idx, 'no'),
+          doneT: m.st === 'ok' ? p.done : 'Отклонено, ничего не менялось', doneD: m.st === 'ok' ? 'M5 12.500l4.500 4.500L19 7.500' : 'M6 6l12 12M18 6L6 18',
+          hasErr: !!m.err, errT: 'Месячный бюджет исчерпан', errS: 'Увеличьте «Бюджет в месяц, $» или дождитесь следующего месяца'
+        };
+      }),
+      ph: off ? 'Сначала подключите провайдера' : 'Спросите или попросите что-то изменить', inOffA: off ? 'true' : 'false',
+      canSend: !s.run, running: s.run,
+      send: (e) => { try { const el = e.currentTarget.closest('.as-in').querySelector('input'); const v = el.value.trim(); if (!v) return; el.value = ''; ask(0, v); } catch (er) {} },
+      onKey: (e) => { if (e.key === 'Enter') { const v = e.currentTarget.value.trim(); if (!v) return; e.currentTarget.value = ''; ask(0, v); } else if (e.key === 'Escape' && this.props.onClose) this.props.onClose(); },
+      stop: () => { halt(); this.setState({ run: false }); },
+      demo: [['hist', 'Разговоры'], ['empty', 'Начало'], ['think', 'Думает'], ['answer', 'Ответ и план'], ['done', 'Применено'], ['err', 'Ошибка'], ['off', 'Не подключён']].map((d) => ({ t: d[1], on: (d[0] === 'hist' ? s.hist : (!s.hist && !s.log && view === d[0])) ? 'true' : 'false', pick: () => { halt(); if (d[0] === 'hist') { this.setState({ hist: true, gone: {}, hq: '' }); return; } this.setState({ hist: false }); if (d[0] === 'think') { this.setState({ log: [], run: false, busy: -1, view: 'live' }); setTimeout(() => ask(0), 60); } else this.setState({ view: d[0], log: null, run: false, busy: -1 }); } }))
+    };
+  }
+}
+</script>
+</body>
+</html>

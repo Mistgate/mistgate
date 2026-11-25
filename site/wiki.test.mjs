@@ -62,8 +62,8 @@ test("page layout: italic lead, no front matter, edit and site links", () => {
   const r = get(build(), "Установка-панели.md");
   assert.match(r, /docs\/ru\/start\/one\.md\)/);
   assert.match(r, /https:\/\/mistgate\.app\/ru\/start\/one\/\)/);
-  assert.match(get(build(), "Docs.md"), /\(https:\/\/mistgate\.app\/\)<\/sub>/);
-  assert.match(get(build(), "Docs-(RU).md"), /mistgate\.app\/ru\/\)<\/sub>/);
+  assert.match(get(build(), "Docs.md"), /\(https:\/\/mistgate\.app\/docs\/\)<\/sub>/);
+  assert.match(get(build(), "Docs-(RU).md"), /mistgate\.app\/ru\/docs\/\)<\/sub>/);
 });
 
 test("callouts become GitHub alerts in both languages; plain quotes and fences stay", () => {

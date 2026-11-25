@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mgd" viewBox="0 0 720 450" width="720" height="450" role="img" aria-labelledby="title desc">
+<title id="title">Один TCP 443, несколько сервисов</title>
+<desc id="desc">Посетители приходят на TCP 443 ноды. Агент ноды читает в первых байтах имя, которое запрашивает посетитель, и передаёт соединение сервису с этим именем, ничего не расшифровывая. Посетитель без имени, с чужим именем или не по TLS попадает на сервис по умолчанию, собственный сайт ноды.</desc>
+<style>
+.mgd{--d-bg:var(--mgd-bg,#ffffff);--d-box:var(--mgd-box,#f8f8f6);--d-line:var(--mgd-line,#e3e3df);--d-text:var(--mgd-text,#16161a);--d-muted:var(--mgd-muted,#6b6b73);--d-lav:var(--mgd-lav,#473a73);--d-lav-bg:var(--mgd-lav-bg,#eae8fc);--d-sky:var(--mgd-sky,#174e6a);--d-sky-bg:var(--mgd-sky-bg,#e0f0fa);--d-mint:var(--mgd-mint,#00582f);--d-mint-bg:var(--mgd-mint-bg,#dcf3e4);--d-sage:var(--mgd-sage,#3b511d);--d-sage-bg:var(--mgd-sage-bg,#e8f1e0);--d-sand:var(--mgd-sand,#5c4a12);--d-sand-bg:var(--mgd-sand-bg,#f5efdf);--d-rose:var(--mgd-rose,#67343e);--d-rose-bg:var(--mgd-rose-bg,#f9e6e8)}
+@media (prefers-color-scheme:dark){.mgd{--d-bg:var(--mgd-bg,#141417);--d-box:var(--mgd-box,#0c0c0e);--d-line:var(--mgd-line,#25252b);--d-text:var(--mgd-text,#f3f3f5);--d-muted:var(--mgd-muted,#8b8b94);--d-lav:var(--mgd-lav,#b8acf2);--d-lav-bg:var(--mgd-lav-bg,#2d2b38);--d-sky:var(--mgd-sky,#8ec8ea);--d-sky-bg:var(--mgd-sky-bg,#263037);--d-mint:var(--mgd-mint,#7dd3a0);--d-mint-bg:var(--mgd-mint-bg,#243229);--d-sage:var(--mgd-sage,#b0cc90);--d-sage-bg:var(--mgd-sage-bg,#2c3126);--d-sand:var(--mgd-sand,#dcc68c);--d-sand-bg:var(--mgd-sand-bg,#332f25);--d-rose:var(--mgd-rose,#e6a6b0);--d-rose-bg:var(--mgd-rose-bg,#362a2c)}}
+.mgd text{font-family:Onest,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--d-text)}
+.mgd .bg{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .card{fill:var(--d-box);stroke:var(--d-line)}
+.mgd .pill{fill:var(--d-bg);stroke:var(--d-line)}
+.mgd .h{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.mgd .t{font-size:13px;font-weight:700}
+.mgd .s{font-size:13px;fill:var(--d-muted)}
+.mgd .m{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;fill:var(--d-muted)}
+.mgd .lav{--t:var(--d-lav);--tb:var(--d-lav-bg)}
+.mgd .sky{--t:var(--d-sky);--tb:var(--d-sky-bg)}
+.mgd .mint{--t:var(--d-mint);--tb:var(--d-mint-bg)}
+.mgd .sage{--t:var(--d-sage);--tb:var(--d-sage-bg)}
+.mgd .sand{--t:var(--d-sand);--tb:var(--d-sand-bg)}
+.mgd .rose{--t:var(--d-rose);--tb:var(--d-rose-bg)}
+.mgd .grey{--t:var(--d-muted);--tb:var(--d-line)}
+.mgd .chip{fill:var(--tb)}
+.mgd .ico{fill:none;stroke:var(--t);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .edge{fill:var(--tb);stroke:var(--t);stroke-opacity:.45}
+.mgd .flow{fill:none;stroke:var(--t);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mgd .wide{stroke-width:3}
+.mgd .dash{stroke-dasharray:5 5}
+.mgd .head{fill:var(--t)}
+.mgd .badge{fill:var(--t)}
+.mgd .bn{font-size:11px;font-weight:800;fill:var(--d-bg);text-anchor:middle}
+.mgd .tt{fill:var(--t)}
+.mgd .rule{stroke:var(--d-line)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="719" height="449" rx="16"/>
+<rect class="card" x="24" y="64" width="190" height="48" rx="11"/>
+<g class="mint"><rect class="chip" x="36" y="77" width="22" height="22" rx="7"/><svg x="40.5" y="81.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M7 3h10v18H7zM11 18h2"/></svg></g>
+<text class="t" x="68" y="86">Клиент</text>
+<text class="m" x="68" y="101">tt.example.com</text>
+<rect class="card" x="24" y="150" width="190" height="48" rx="11"/>
+<g class="mint"><rect class="chip" x="36" y="163" width="22" height="22" rx="7"/><svg x="40.5" y="167.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M7 3h10v18H7zM11 18h2"/></svg></g>
+<text class="t" x="68" y="172">Клиент</text>
+<text class="m" x="68" y="187">de1.example.com</text>
+<rect class="card" x="24" y="262" width="190" height="48" rx="11"/>
+<g class="rose"><rect class="chip" x="36" y="275" width="22" height="22" rx="7"/><svg x="40.5" y="279.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></g>
+<text class="t" x="68" y="284">Посторонний</text>
+<text class="m" x="68" y="299">без имени или не TLS</text>
+<rect class="card" x="264" y="40" width="196" height="290" rx="16"/>
+<g class="sky"><rect class="chip" x="280" y="56" width="26" height="26" rx="7"/><svg x="285" y="61" width="16" height="16" viewBox="0 0 24 24"><path class="ico" d="M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01"/></svg></g>
+<text class="h" x="316" y="74">Агент ноды</text>
+<text class="m" x="280" y="104">TCP 443</text>
+<text class="s" x="280" y="132">Читает в первых байтах</text>
+<text class="s" x="280" y="149">имя, которое запрашивает</text>
+<text class="s" x="280" y="166">посетитель (SNI), и</text>
+<text class="s" x="280" y="183">передаёт соединение.</text>
+<text class="s" x="280" y="200">Ничего не расшифровывает</text>
+<text class="s" x="280" y="217">и ничего не отвечает.</text>
+<rect class="card" x="520" y="64" width="176" height="48" rx="11"/>
+<g class="lav"><rect class="chip" x="532" y="77" width="22" height="22" rx="7"/><svg x="536.5" y="81.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 20V11a8 8 0 0 1 16 0v9M8.5 20v-8.5a3.5 3.5 0 0 1 7 0V20M2.5 20h19"/></svg></g>
+<text class="t" x="564" y="86">TrustTunnel</text>
+<text class="m" x="564" y="101">tt.example.com</text>
+<rect class="card" x="520" y="150" width="176" height="48" rx="11"/>
+<g class="sky"><rect class="chip" x="532" y="163" width="22" height="22" rx="7"/><svg x="536.5" y="167.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3zM9 12l2.2 2.2L15.5 10"/></svg></g>
+<text class="t" x="564" y="172">VLESS REALITY</text>
+<text class="m" x="564" y="187">de1.example.com</text>
+<text class="s" x="520" y="222">по умолчанию: собственный</text>
+<text class="s" x="520" y="237">сайт ноды</text>
+<rect class="card" x="520" y="262" width="176" height="48" rx="11"/>
+<g class="sage"><rect class="chip" x="532" y="275" width="22" height="22" rx="7"/><svg x="536.5" y="279.5" width="13" height="13" viewBox="0 0 24 24"><path class="ico" d="M4 5h16v11H9l-5 4V5z"/></svg></g>
+<text class="t" x="564" y="284">MTProto</text>
+<text class="m" x="564" y="299">tg.example.com</text>
+<g class="mint"><path class="flow " d="M214 88L257 88"/><path class="head" d="M264 88l-8 -4.5v9z"/></g>
+<g class="mint"><path class="flow " d="M460 88L513 88"/><path class="head" d="M520 88l-8 -4.5v9z"/></g>
+<g class="mint"><path class="flow " d="M214 174L257 174"/><path class="head" d="M264 174l-8 -4.5v9z"/></g>
+<g class="mint"><path class="flow " d="M460 174L513 174"/><path class="head" d="M520 174l-8 -4.5v9z"/></g>
+<g class="rose"><path class="flow dash" d="M214 286L257 286"/><path class="head" d="M264 286l-8 -4.5v9z"/></g>
+<g class="rose"><path class="flow dash" d="M460 286L490 286L490 186L513 186"/><path class="head" d="M520 186l-8 -4.5v9z"/></g>
+<g class="mint"><circle class="badge" cx="489" cy="124" r="10"/><text class="bn" x="489" y="128">1</text></g>
+<g class="rose"><circle class="badge" cx="489" cy="262" r="10"/><text class="bn" x="489" y="266">2</text></g>
+<line class="rule" x1="24" y1="360" x2="696" y2="360"/>
+<g class="mint"><circle class="badge" cx="34" cy="386" r="10"/><text class="bn" x="34" y="390">1</text></g>
+<text class="s" x="54" y="391">Имя, которое держит сервис: отвечает</text>
+<text class="s" x="54" y="409">он, как будто он один на порту.</text>
+<g class="rose"><circle class="badge" cx="382" cy="386" r="10"/><text class="bn" x="382" y="390">2</text></g>
+<text class="s" x="402" y="391">Всё остальное (нет имени, чужое имя, не</text>
+<text class="s" x="402" y="409">TLS, сервис не работает): сервис по умолчанию.</text>
+</svg>

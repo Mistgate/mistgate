@@ -408,7 +408,7 @@ func TestJSONFormatsHostileNames(t *testing.T) {
 	s := fetch(h, "/"+tok, sfaUA)
 	xd := parseXray(t, x.Body.Bytes())
 	sd := parseSingbox(t, s.Body.Bytes())
-	if len(xd) != 1 || len(xd[0].Outbounds) != 3 || len(sd.Outbounds) != 3 || len(sd.Inbounds) != 1 {
+	if len(xd) != 1 || len(xd[0].Outbounds) != 4 || len(sd.Outbounds) != 3 || len(sd.Inbounds) != 1 { // Xray: proxy, direct, dns-out and the blackhole of the default preset's Max block
 		t.Fatalf("a hostile name changed the structure:\n%s\n%s", x.Body.String(), s.Body.String())
 	}
 	for name, body := range map[string]string{"xray": x.Body.String(), "sing-box": s.Body.String()} {

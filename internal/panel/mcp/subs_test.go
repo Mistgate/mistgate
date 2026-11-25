@@ -102,6 +102,24 @@ func TestSubscriptionLinkAutoSelectPlan(t *testing.T) {
 	}
 }
 
+func TestSubscriptionLinkAutoIntervalPlan(t *testing.T) {
+	e := newTestEnv(t)
+	_, secret := e.token(ProfileOperator)
+	s := e.session(secret)
+	mustFail(t, s, "subscription_link_limits_set_plan", map[string]any{"link_auto_interval": 20})
+	plan := decode[PlanOut](t, mustOK(t, s, "subscription_link_limits_set_plan", map[string]any{"link_auto_interval": 120}))
+	if f := factIn(t, storedFacts(t, e), "link_auto_interval"); f.Value != "300 -> 120" {
+		t.Fatalf("fact = %+v", f)
+	}
+	if err := e.plans.decide(plan.PlanID, true); err != nil {
+		t.Fatal(err)
+	}
+	apply := decode[ApplyOut](t, mustOK(t, s, "subscription_link_limits_set_apply", map[string]any{"confirm_token": plan.ConfirmToken}))
+	if apply.Status != StatusApplied || e.w.subs.GetLinkAutoInterval() != 120 {
+		t.Fatalf("apply = %+v, interval = %d", apply, e.w.subs.GetLinkAutoInterval())
+	}
+}
+
 func TestSubscriptionAppAddWaitsForTheOwner(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileOperator)
@@ -341,6 +359,15 @@ func TestSubscriptionDNSChoiceRoundTrips(t *testing.T) {
 	e.w.mu.Unlock()
 	if !get().UserPage.DNSChoice {
 		t.Fatal("the switch is not shown")
+	}
+	if get().UserPage.RUDirectKey {
+		t.Fatal("the key \"Russian services direct\" reads as on without the setting")
+	}
+	e.w.mu.Lock()
+	e.w.subs.UserPage.AllowRuDirectKey = proto.Bool(true)
+	e.w.mu.Unlock()
+	if !get().UserPage.RUDirectKey {
+		t.Fatal("the switch of the key \"Russian services direct\" is not shown")
 	}
 
 	p := decode[PlanOut](t, mustOK(t, s, "subscription_app_upsert_plan", myClient))

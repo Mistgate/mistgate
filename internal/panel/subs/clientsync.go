@@ -358,6 +358,7 @@ type clientSyncDNS struct {
 	Split       []clientDNSSplitRule `json:"split"`
 	SplitDirect bool                 `json:"split_direct"`
 	BlockAds    bool                 `json:"block_ads"`
+	BlockMax    bool                 `json:"block_max"`
 	IPv4Only    bool                 `json:"ipv4_only"`
 }
 
@@ -499,7 +500,7 @@ func clientDNSOf(p dns.Preset) *clientSyncDNS {
 		return nil
 	}
 	out := &clientSyncDNS{Transport: string(p.Transport), Servers: dnsEndpoints(main), Split: []clientDNSSplitRule{},
-		SplitDirect: p.SplitDirect, BlockAds: p.BlockAds, IPv4Only: p.IPv4Only}
+		SplitDirect: p.SplitDirect, BlockAds: p.BlockAds, BlockMax: p.BlockMax, IPv4Only: p.IPv4Only}
 	for _, rule := range split {
 		out.Split = append(out.Split, clientDNSSplitRule{Suffixes: nonNil(rule.Suffixes), Geo: nonNil(rule.Geo), Servers: dnsEndpoints(rule.Endpoints)})
 	}

@@ -199,7 +199,11 @@ type SubAWG struct {
 	Address                string // "10.66.4.5, fd66:66:0:1::5"
 	Stale                  bool   // the profile changed in a way that breaks the config the device holds
 	// DNSStale lists the nodes where the DNS that applies to the person is not the one this device's key holds (see markDNSStale).
-	DNSStale      []string
+	DNSStale []string
+	// Route is the key's route ("" or awg.RouteRUDirect); RouteStale: a "Russian services direct" key whose list is not the
+	// panel's current one (see markDNSStale).
+	Route         string
+	RouteStale    bool
 	LastHandshake time.Time
 	MinClients    []protocols.ClientReq
 }
@@ -439,7 +443,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			sd.LastSeen = ad.LastSeenAt
 			sd.AWG = &SubAWG{
 				ProfileID: ad.ProfileID, ProfileName: ad.ProfileName, Version: awgVersion([]byte(ad.ProfileSettingsJSON)),
-				Address: deviceAddress(ad.DataJSON), Stale: ad.Stale(), LastHandshake: ad.LastSeenAt,
+				Address: deviceAddress(ad.DataJSON), Stale: ad.Stale(), Route: ad.Route, LastHandshake: ad.LastSeenAt,
 				MinClients: s.awgMinClients(ad.ProfileSettingsJSON),
 			}
 		}
@@ -799,7 +803,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 	s.markDNSStale(u, gs, full, n, awgDevs)
 	for _, ad := range awgDevs {
 		if i := slices.IndexFunc(v.Devices, func(d SubDevice) bool { return d.ID == ad.ID }); i >= 0 && v.Devices[i].AWG != nil {
-			v.Devices[i].AWG.DNSStale = ad.DNSStale
+			v.Devices[i].AWG.DNSStale, v.Devices[i].AWG.RouteStale = ad.DNSStale, ad.RouteStale
 		}
 	}
 	s.nodeDNSData(ctx, &v, n, awgDevs)

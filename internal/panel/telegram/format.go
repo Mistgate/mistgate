@@ -159,6 +159,7 @@ var whyVariants = map[string]localizedText{
 	"via_cdn":          {en: "the check goes through the CDN; check the CDN and the origin", ru: "проверка идёт через CDN; проверьте CDN и источник", zh: "检测请求经过 CDN，请检查 CDN 和源站"},
 	"udp_blocked":      {en: "the hoster seems to block UDP on this port", ru: "хостер, похоже, режет UDP на этом порту", zh: "服务商似乎封锁了这个端口的 UDP"},
 	"udp_all_blocked":  {en: "the hoster seems to block UDP on the whole node", ru: "хостер, похоже, режет весь UDP на ноде", zh: "服务商似乎封锁了整个节点的 UDP"},
+	"panel_udp_path":   {en: "the panel's path to this UDP port loses packets; other nodes reach it", ru: "UDP теряется на пути от панели; другие ноды порт достают", zh: "面板到此 UDP 端口的链路丢包，其他节点可以连通"},
 	"timeout":          {en: "the handshake does not complete", ru: "рукопожатие не завершается", zh: "握手无法完成"},
 	"auth":             {en: "the panel’s check account is refused", ru: "проверочная учётка панели отклонена", zh: "面板的检测账户被拒绝"},
 	"tls":              {en: "the certificate does not match", ru: "сертификат не подходит", zh: "证书不匹配"},

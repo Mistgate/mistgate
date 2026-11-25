@@ -59,7 +59,7 @@ test("a build with two fa and two tr pages succeeds and links nothing that is mi
 
 test("the language menu lists five languages in order, the same page where it exists, else that language's home", () => {
   const names = ["English", "Русский", "简体中文", "فارسی", "Türkçe"];
-  for (const page of ["getting-started/overview/index.html", "fa/getting-started/overview/index.html", "tr/index.html"]) {
+  for (const page of ["getting-started/overview/index.html", "fa/getting-started/overview/index.html", "tr/docs/index.html"]) {
     const m = menu(read(page));
     const at = names.map((n) => m.indexOf(`>${n}<`));
     assert.ok(at.every((x, i) => x > 0 && (i === 0 || x > at[i - 1])), `${page}: ${names.join(", ")}`);
@@ -67,8 +67,8 @@ test("the language menu lists five languages in order, the same page where it ex
   const en = menu(read("getting-started/overview/index.html"));
   assert.match(en, /href="\/fa\/getting-started\/overview\/" lang="fa" hreflang="fa"/);
   assert.match(en, /href="\/tr\/getting-started\/overview\/" lang="tr" hreflang="tr"/);
-  assert.match(menu(read("guide/nodes/index.html")), /href="\/fa\/" lang="fa"/, "a page fa lacks: the fa home");
-  assert.match(menu(read("fa/index.html")), /<span class="lang__cur" lang="fa">FA<\/span>/);
+  assert.match(menu(read("guide/nodes/index.html")), /href="\/fa\/docs\/" lang="fa"/, "a page fa lacks: the fa docs home");
+  assert.match(menu(read("fa/docs/index.html")), /<span class="lang__cur" lang="fa">FA<\/span>/);
 });
 
 test("a Persian page is right to left in Vazirmatn; a Turkish one preloads the letters it needs", () => {
@@ -99,7 +99,7 @@ test("the fa sidebar lists every English page; an untranslated one opens the Eng
   // not listed there: the English title, marked as English, in the group English puts it in
   assert.match(nav, /href="\/guide\/nodes\/" hreflang="en">[\s\S]*?<span lang="en" dir="ltr">Nodes<\/span><span class="en-mark"/);
   assert.match(nav, /<div class="grp__label">شروع کار<\/div>[\s\S]*?href="\/getting-started\/ssh-install\/"/, "a getting-started page joins the fa group");
-  assert.doesNotMatch(side(read("tr/index.html")), /href="\/tr\/getting-started\/add-node\/"/);
+  assert.doesNotMatch(side(read("tr/docs/index.html")), /href="\/tr\/getting-started\/add-node\/"/);
 });
 
 test("links from a fa page to an untranslated page go to English, with the anchor only when the English page has it", () => {
@@ -129,18 +129,15 @@ test("a drawing or a video a language does not have yet is the English one", () 
   assert.match(build.stdout, /health-poster-fa\.webp does not exist, showing health-poster-en\.webp/);
 });
 
-test("the fa and tr homes are translated, play their own demo and send untranslated pages to English with the mark", () => {
-  for (const [lang, h1] of [["fa", "پنلی برای VPN کوچک خودتان"], ["tr", "Kendi küçük VPN'iniz için bir panel"]]) {
-    const html = read(`${lang}/index.html`);
-    assert.ok(html.includes(`<h1 class="hero__h1">${h1}</h1>`), `${lang} h1`);
-    assert.match(html, new RegExp(`video/hero-${lang}\\.mp4`));
-    assert.match(html, /English · Русский · 简体中文 · فارسی · Türkçe/);
+test("the fa and tr docs homes are pages like the others, in their own language and direction; the 404 speaks fa", () => {
+  for (const [lang, h1] of [["fa", "مستندات Mistgate"], ["tr", "Mistgate belgeleri"]]) {
+    const html = read(`${lang}/docs/index.html`);
+    assert.ok(html.includes(`<h1 class="doc-h1">${h1}</h1>`), `${lang} h1`);
     assert.match(html, new RegExp(`href="/${lang}/getting-started/overview/"`));
-    assert.match(html, /<li><a href="\/guide\/nodes\/"><span[^>]*>[^<]+<\/span><span class="en-mark"/, `${lang}: section cards mark English pages`);
+    assert.match(html, new RegExp(`<link rel="canonical" href="https://mistgate\\.app/${lang}/docs/">`));
   }
-  assert.match(read("fa/index.html"), /<a class="btn btn--primary" href="\/getting-started\/install-panel\/">نصب پنل<svg class="ico ico--flip"/);
+  assert.match(read("fa/docs/index.html"), /<html lang="fa" dir="rtl">/);
   assert.match(read("404.html"), /<p class="doc-lead" lang="fa" dir="rtl">/);
-  assert.ok(read("tr/index.html").includes('<th lang="en">Mistgate</th><th lang="en">3x-ui</th>'), "product names keep English capitals on a Turkish page");
 });
 
 test("the fa search index holds its pages and finds the English ones by the sidebar's name; the matcher folds fa and tr", () => {

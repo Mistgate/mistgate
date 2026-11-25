@@ -169,7 +169,7 @@ func TestBundleHTTP2StallThenResetRepeated(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ln := &blackholeLn{Listener: inner}
+			ln := &blackholeLn{Listener: inner, holdTimeout: true}
 			r := newRB2Server(t, e.s, h2, ln, h2conf)
 			for round := 0; round < 6; round++ {
 				firstCtx, cancelFirst := context.WithCancel(context.Background())
@@ -233,6 +233,8 @@ func TestBundleHTTP2StallThenResetRepeated(t *testing.T) {
 				if firstSend.offset != resumeOffset || !firstSend.zombie {
 					t.Fatalf("round %d: resumed first send offset=%d, old zombie=%v", round, firstSend.offset, firstSend.zombie)
 				}
+				// The overlap is recorded: the old connection's write timeout may land now.
+				close(blocked.timeout)
 				suffix = append(suffix, resumed.Msg().Data...)
 				for resumed.Receive() {
 					suffix = append(suffix, resumed.Msg().Data...)
@@ -369,8 +371,11 @@ func TestBundleHTTP2SlowReaderThatKeepsMakingProgress(t *testing.T) {
 // the way a TCP send buffer to a vanished peer behaves.
 type blackholeLn struct {
 	net.Listener
-	mu    sync.Mutex
-	conns []*blackholeConn
+	// holdTimeout gives each connection a gate: a passed write deadline fails the blocked write only after the test
+	// closes it. The resume then always meets the old handler inside its write, however slow the machine is.
+	holdTimeout bool
+	mu          sync.Mutex
+	conns       []*blackholeConn
 }
 
 func (l *blackholeLn) Accept() (net.Conn, error) {
@@ -379,6 +384,9 @@ func (l *blackholeLn) Accept() (net.Conn, error) {
 		return nil, err
 	}
 	bc := &blackholeConn{Conn: c, blocked: make(chan struct{}), closed: make(chan struct{})}
+	if l.holdTimeout {
+		bc.timeout = make(chan struct{})
+	}
 	l.mu.Lock()
 	l.conns = append(l.conns, bc)
 	l.mu.Unlock()
@@ -406,6 +414,19 @@ type blackholeConn struct {
 	blockOnce   sync.Once
 	blocked     chan struct{}
 	closed      chan struct{}
+	timeout     chan struct{} // nil: the deadline applies as soon as it passes
+}
+
+func (c *blackholeConn) timeoutHeld() bool {
+	if c.timeout == nil {
+		return false
+	}
+	select {
+	case <-c.timeout:
+		return false
+	default:
+		return true
+	}
 }
 
 func (c *blackholeConn) Write(b []byte) (int, error) {
@@ -417,7 +438,7 @@ func (c *blackholeConn) Write(b []byte) (int, error) {
 		return 0, net.ErrClosed
 	}
 	for {
-		if d := c.deadline.Load(); d != 0 && time.Now().UnixNano() > d {
+		if d := c.deadline.Load(); d != 0 && time.Now().UnixNano() > d && !c.timeoutHeld() {
 			// The timeout makes this simulated TCP path terminal so TLS can finish closing the connection.
 			c.writeFailed.Store(true)
 			return 0, os.ErrDeadlineExceeded

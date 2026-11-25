@@ -29,12 +29,12 @@ if (!takes[takeName]) throw new Error(`unknown take "${takeName}"; known: ${Obje
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2); // easeInOutCubic
 
 async function film(take) {
-  const out = join(here, "assets", "takes", `${takeName}-${lang}`);
+  const out = join(process.env.TAKES_OUT || join(here, "assets", "takes"), `${takeName}-${lang}`);
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   const b = await launch(join(tmpdir(), `mg-video-${takeName}-${lang}`));
   const log = (s) => console.log(`[${takeName}-${lang}] ${s}`);
-  const vp = take.viewport ?? { width: 1600, height: 1000, dpr: 2, mobile: false };
+  const vp = { ...(take.viewport ?? { width: 1600, height: 1000, dpr: 2, mobile: false }), ...(process.env.DPR && { dpr: Number(process.env.DPR) }) };
   const mocks = {};
   const holds = []; // API answers kept back for a number of frames (the page shows its busy state meanwhile)
   const track = { fps: FPS, viewport: vp, frames: [], marks: {}, clicks: [], rects: {} };

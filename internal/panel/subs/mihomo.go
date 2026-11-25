@@ -31,6 +31,7 @@ type mihomoProfile struct {
 	names      []string // the server name of each line, parallel to lines ("" or missing = keep the plugin's own)
 	preset     *dns.Preset
 	autoSelect bool
+	autoSecs   int  // seconds between the checks of the Auto group; 0 = the default
 	note       bool // lines hold the one entry that says why there are no servers: the profile is the built-in one, never a template
 	log        *slog.Logger
 }
@@ -145,7 +146,7 @@ func (p mihomoProfile) render(tplName, tplText string) (body []byte, templated b
 // lacks is the resolvers of the person's preset with respect-rules on: no group name is known here for a "#group" fragment, and the
 // split, ad and country rules of the preset (and the policy and providers they need) are the built-in profile's, not a template's.
 func (p mihomoProfile) buildFromTemplate(text string) ([]byte, error) {
-	opt := subsettings.MihomoOptions{AutoSelect: p.autoSelect}
+	opt := subsettings.MihomoOptions{AutoSelect: p.autoSelect, AutoInterval: p.autoSecs}
 	if p.preset != nil {
 		if d, err := p.preset.MihomoDNS(""); err != nil {
 			if p.log != nil {
@@ -180,7 +181,7 @@ func (p mihomoProfile) build() ([]byte, error) {
 	if p.autoSelect && len(names) > 1 {
 		auto := uniqueName(subsettings.AutoName, taken)
 		selectMembers = append([]string{auto}, selectMembers...)
-		autoGroup = subsettings.MihomoAutoGroup(auto, names)
+		autoGroup = subsettings.MihomoAutoGroup(auto, names, p.autoSecs)
 	}
 	members := append(selectMembers, "DIRECT")
 
@@ -195,6 +196,8 @@ func (p mihomoProfile) build() ([]byte, error) {
 
 	var direct []string
 	var providers, block []dns.MihomoProvider
+	var blockDomains, torrentApps []string
+	var torrent []dns.MihomoProvider
 	if p.preset != nil {
 		d, err := p.preset.MihomoDNS(group)
 		if err != nil {
@@ -206,13 +209,15 @@ func (p mihomoProfile) build() ([]byte, error) {
 			direct = d.Direct
 			providers = d.Providers
 			block = d.Block
+			blockDomains = d.BlockDomains
+			torrentApps, torrent = d.TorrentApps, d.Torrent
 		}
 	}
-	if len(providers)+len(block) > 0 {
+	if len(providers)+len(block)+len(torrent) > 0 {
 		// The lists of a country (dns.SplitRule.Geo): downloaded through the group, so that they arrive where the sites they
 		// name are the point. The key "proxy" is the group's name, which groupName kept free of anything YAML or a rule line would read.
 		rp := newMap()
-		for _, pr := range append(slices.Clone(block), providers...) {
+		for _, pr := range append(append(slices.Clone(block), torrent...), providers...) {
 			rp.set(pr.Name, newMap().
 				set("type", strNode("http")).set("behavior", strNode(pr.Behavior)).set("format", strNode("mrs")).
 				set("interval", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.Itoa(dns.MihomoProviderInterval)}).
@@ -221,8 +226,17 @@ func (p mihomoProfile) build() ([]byte, error) {
 		root.set("rule-providers", rp.n)
 	}
 	rules := seqNode()
+	for _, s := range blockDomains { // Max: the very first rules, ahead of DOMAIN-SUFFIX,ru,DIRECT
+		rules.Content = append(rules.Content, quoted("DOMAIN-SUFFIX,"+s+",REJECT"))
+	}
 	for _, pr := range block { // first of all: the ad list is dropped whatever else matches
 		rules.Content = append(rules.Content, quoted(pr.RuleTo("REJECT")))
+	}
+	for _, a := range torrentApps { // torrent clients by their program, then the public trackers: after the blocks, before the split
+		rules.Content = append(rules.Content, quoted("PROCESS-NAME,"+a+",DIRECT"))
+	}
+	for _, pr := range torrent {
+		rules.Content = append(rules.Content, quoted(pr.Rule()))
 	}
 	for _, s := range direct {
 		rules.Content = append(rules.Content, quoted("DOMAIN-SUFFIX,"+s+",DIRECT"))

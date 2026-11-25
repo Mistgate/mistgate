@@ -121,7 +121,7 @@ function DnsOptionsForm({ nodeId, saved, data }: { nodeId: string; saved: Saved 
         sub={
           <>
             {t("subs.dnsOpt.warn")}
-            {data.presets.some((p) => p.blockAds) && <span className="mt-1 block">{t("subs.dns.awgNoBlock")}</span>}
+            {data.presets.some((p) => p.blockAds || p.blockMax) && <span className="mt-1 block">{t("subs.dns.awgNoBlock")}</span>}
           </>
         }
         count={ids.length > 0 ? t("subs.dnsOpt.count", { n: ids.length, max: maxOffered }) : undefined}

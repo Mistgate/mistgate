@@ -19,6 +19,7 @@ import { setTheme, useTheme } from "@/lib/theme";
 import { Shot } from "@/screens/dev-kit-redesign";
 import { demoNodes, demoSites, fileText, fillerSites, looks, pageDoc, type DemoSite } from "./dev-kit-decoys-data";
 import { PHOTO_STUBS } from "./dev-kit-decoys-photos";
+import { demoBlog, realSite } from "./dev-kit-decoys-real";
 import type { UploadDemo } from "./decoys/create";
 import type { TemplateDemo } from "./decoys/template";
 import { DecoysScreen, type DecoysDemo } from "./decoys/list";
@@ -218,16 +219,18 @@ function installFake(w: World) {
       return { html: pageDoc(siteId.replace("dsi_", ""), page, 0), path };
     },
     listDecoyTemplates: async () => templateAnswer,
-    previewDecoyTemplate: async ({ kind, seed }: { kind: string; seed: string }) => {
+    previewDecoyTemplate: async ({ kind, seed, country }: { kind: string; seed: string; country?: string }) => {
       if (w.fail === "preview") throw new ConnectError("unavailable", Code.Unavailable);
       if (!seed) variant += 1;
       const n = seed ? Number.parseInt(seed.slice(0, 4), 16) - 0x1000 : variant;
       const look = templateLook[kind] ?? "tpl";
       const on = w.photos[w.photos.source];
+      // a real site of the generator (dev-kit-fixtures) when there is one and no photos are asked for; the drawn stand-ins otherwise
+      const real = on ? null : realSite(kind, country ?? "gb", n);
       return {
-        html: pageDoc(look, 0, n, on ? PHOTO_STUBS : undefined),
+        html: real?.html ?? pageDoc(look, 0, n, on ? PHOTO_STUBS : undefined),
         seed: seed || `${(variant + 0x1000).toString(16)}0000000000000000`.slice(0, 16),
-        name: looks[look]!.brand,
+        name: real?.name ?? looks[look]!.brand,
         photos: on ? "used" : "no_key",
         photosSource: w.photos.source,
       };
@@ -328,16 +331,16 @@ const templates: Record<string, TemplateDemo> = {
   "dlg-tpl": { phase: "pick" },
   "dlg-tpl-nl": { phase: "pick", country: "nl" },
   "dlg-tpl-wait": { phase: "view", kind: "blog" },
-  "dlg-tpl-view": { phase: "view", kind: "blog", country: "de", html: pageDoc("tpl", 0), name: "Rainy Reader" },
-  "dlg-tpl-run": { phase: "run", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader" },
-  "dlg-tpl-err": { phase: "err", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader", error: "decoy_library_full" },
+  "dlg-tpl-view": { phase: "view", kind: "blog", country: "de", html: demoBlog.html, name: demoBlog.name },
+  "dlg-tpl-run": { phase: "run", kind: "blog", html: demoBlog.html, name: demoBlog.name },
+  "dlg-tpl-err": { phase: "err", kind: "blog", html: demoBlog.html, name: demoBlog.name, error: "decoy_library_full" },
   // the photos of a site: no key (drawn), the key being typed, a site with photos, Pixabay asked to wait, Pexels looked at without a
   // key (it gives none out now), both keys with Pexels in use
-  "dlg-tpl-nokey": { phase: "view", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader", photos: "no_key", photosSource: "pixabay" },
-  "dlg-tpl-keyform": { phase: "view", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader", photos: "no_key", photosSource: "pixabay", key: { form: true } },
+  "dlg-tpl-nokey": { phase: "view", kind: "blog", html: demoBlog.html, name: demoBlog.name, photos: "no_key", photosSource: "pixabay" },
+  "dlg-tpl-keyform": { phase: "view", kind: "blog", html: demoBlog.html, name: demoBlog.name, photos: "no_key", photosSource: "pixabay", key: { form: true } },
   "dlg-tpl-photos": { phase: "view", kind: "blog", html: pageDoc("tpl", 0, 0, PHOTO_STUBS), name: "Rainy Reader", photos: "used", photosSource: "pixabay" },
-  "dlg-tpl-limit": { phase: "view", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader", photos: "limit", photosSource: "pixabay" },
-  "dlg-tpl-pexels": { phase: "view", kind: "blog", html: pageDoc("tpl", 0), name: "Rainy Reader", photos: "no_key", photosSource: "pixabay", key: { pick: "pexels" } },
+  "dlg-tpl-limit": { phase: "view", kind: "blog", html: demoBlog.html, name: demoBlog.name, photos: "limit", photosSource: "pixabay" },
+  "dlg-tpl-pexels": { phase: "view", kind: "blog", html: demoBlog.html, name: demoBlog.name, photos: "no_key", photosSource: "pixabay", key: { pick: "pexels" } },
   "dlg-tpl-both": { phase: "view", kind: "blog", html: pageDoc("tpl", 0, 0, PHOTO_STUBS), name: "Rainy Reader", photos: "used", photosSource: "pexels" },
 };
 const listDemos = (state: string): DecoysDemo | undefined => {

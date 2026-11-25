@@ -52,11 +52,11 @@ A pending node whose command has expired needs a **New install command**; the ol
 
 `install` needs root and an enrolled state directory: run `enroll` first, with the same `--state-dir` if you changed it.
 
-If **Create install command** in the admin fails with "panel address is not configured", the panel does not know the address agents should dial: run setup with `--public-url`, or serve with `--agent-addr` (see [CLI](../reference/cli.md)).
+If **Get install command** in the admin fails with "panel address is not configured", the panel does not know the address agents should dial: run setup with `--public-url`, or serve with `--agent-addr` (see [CLI](../reference/cli.md)).
 
 ## An SSH installation fails
 
-**Nodes → Add node → Install automatically over SSH** connects from the panel's server, so the node's SSH port must be reachable from there, and the node must reach the panel back. When a job fails, the wizard says why and offers **Retry installation** (with the SSH password again; it continues from where it stopped) and **Open install manager**, which shows the exact reason.
+**Nodes → Add node → Over SSH** connects from the panel's server, so the node's SSH port must be reachable from there, and the node must reach the panel back. When a job fails, the wizard says why and offers **Retry installation** (with the SSH password again; it continues from where it stopped) and **Open install manager**, which shows the exact reason.
 
 The most common causes:
 
@@ -154,25 +154,25 @@ The person's mobile operator cuts the traffic, not the node or the hoster: UDP t
 
 ## The bridge does not hold
 
-This is about a relay whose way is **Auto** or **Via bridge** (see [Relays](../guide/relays.md)). Look at the **Way** line of the relay and at its checks on the entry node's page: *from the exit to the entry, for a bridge* and *Bridge held by the exit*.
+This is about a relay whose method is **Auto** or **Bridge only** (see [Relays](../guide/relays.md)). Look at the **Method** block of the pair and at its checks on the entry node's page: *from the exit to the entry, for a bridge* and *Bridge held by the exit*.
 
 **How it shows**
 
-- The relay stays **Direct** although people say it is cut.
-- **Via bridge** is refused: "A bridge is not possible for this relay: ...", or "A bridge is not available for this server: its path cannot be checked."
-- A `relay_down` alert opens with the stage `bridge`, or the relay goes back to **Direct** by itself with the reason "The bridge did not hold while direct works".
+- The relay stays on forwarding although people say it is cut.
+- **Bridge only** is refused: "A bridge is not possible for this relay: ...", or "A bridge is not available for this server: its path cannot be checked."
+- A `relay_down` alert opens with the stage `bridge`, or the relay goes back to forwarding by itself with the reason "The bridge did not hold while direct works".
 - A bridge that works turns new people away, or quiet sessions end after two minutes.
 
 **What it means and what to do**
 
 | What you see | What it means | What to do |
 |:--|:--|:--|
-| The relay stays Direct while direct is cut | **Auto** moves to the bridge only after two failed checks in a row (the panel checks about every 10 minutes), and only when the bridge is up and the exit reaches the entry. The check *from the exit to the entry* says why not. | `timeout`: the exit does not reach the entry's site either, so a bridge will not help here. "Something other than its site answers": find what holds the bridge port on the entry. "Nothing to check against": the entry has no site of its own on 443 yet; the panel prepares one when the first relay in **Auto** or **Via bridge** exists. "The agent cannot run this check": update it. |
+| The relay stays on forwarding while direct is cut | **Auto** moves to the bridge only after two failed checks in a row (the panel checks about every 10 minutes), and only when the bridge is up and the exit reaches the entry. The check *from the exit to the entry* says why not. | `timeout`: the exit does not reach the entry's site either, so a bridge will not help here. "Something other than its site answers": find what holds the bridge port on the entry. "Nothing to check against": the entry has no site of its own on 443 yet; the panel prepares one when the first relay in **Auto** or **Via bridge** exists. "The agent cannot run this check": update it. |
 | "A bridge is not possible: UDP" | The bridge carries TCP only. | Hysteria2 and AmneziaWG stay direct. |
 | "... the agent of the entry (the exit) is too old" | Both agents need the bridge. | Update the named node on the Updates page. |
-| "... its path cannot be checked" | The bridge starts only after the panel proves, from a third node, that people get through the entry to the server. A server it cannot prove (an MTProto server whose Fake TLS falls back to another site) never passes. | Choose **Direct** for this server. |
+| "... its path cannot be checked" | The bridge starts only after the panel proves, from a third node, that people get through the entry to the server. A server it cannot prove (an MTProto server whose Fake TLS falls back to another site) never passes. | Choose **Forwarding only** for this relay. |
 | `relay_down` with the stage `bridge`, the exit shows no connection | The exit holds no connection to the entry. The bridge line names the agent's error. `pin_mismatch`: the exit sees another certificate than the one the entry reported (a renewal in progress, or something between them); wait a few minutes. `no_verification`: the exit has no certificate pin yet, because the entry has not reported its site. `port_conflict`: another listener holds the bridge port of the entry. `connection_limit` or `queue_full`: the entry is overloaded. | Fix what the code names. The panel sends the exit a new pin by itself after a renewal. |
-| The relay went back to Direct, reason "bridge did not hold" | Direct works, and two checks in a row found the bridge broken. | The panel does not try the bridge again for 30 minutes unless the direct leg fails. Fix the bridge and wait, or choose **Via bridge**. |
+| The relay went back to forwarding, reason "bridge did not hold" | Direct works, and two checks in a row found the bridge broken. | The panel does not try the bridge again for 30 minutes unless the direct leg fails. Fix the bridge and wait, or choose **Bridge only**. |
 | The relay stays on the bridge for hours although direct works again | Going back takes at least an hour: three passes in a row, 30 minutes apart, then a flow test of 8 MB. | Nothing is wrong. The row shows "Returning to direct: k of 3". If the flow test fails, the next one waits at least 6 hours. |
 | New people are turned away, or the line says **nearly full** | One connection of the bridge serves 121 people. Two connections: 242 people. Four: 484. From 80 % the panel moves from two to four by itself. | At four, add a second entry: the line offers **Another entry for ...**. |
 | A quiet session ends after about two minutes | The bridge closes a session that sends nothing for two minutes (direct would keep it longer). | An app without keep-alive reconnects by itself. Nothing to fix on the node. |
@@ -334,7 +334,7 @@ On the VPS edition the owner finds these in **Settings → System**; an admin-pr
 When a node misbehaves and its warnings are not enough, the owner can ask it to log in detail for a few minutes. On the node's page, **Server → Debug capture**, pick the sources (the agent, `hysteria2`, `vless`, `xray`, `awg`, `update`, `kernel`; none picked means all), the level (debug or info) and the length (1, 5, 10 or 15 minutes), then press **Debug for N min**. A countdown shows the time left; **Stop and show** ends it at once. When the time is up the node sends what it kept and the panel shows the records with filters for level, source and text. The `kernel` source reads the node's kernel log from 30 minutes before capture start through the end; firewall packet-log lines are counted in its summary and not kept. On a kernel-backend node, `awg` turns on the module's debug output during the capture and adds a summary of handshake initiations without a response within five seconds.
 
 - **Limits.** One capture per node at a time, at most 15 minutes, at most 20000 records and 4 MiB (what does not fit is counted, not kept). The node puts its log level back when the capture ends, and a restart of the agent ends it too: nothing is written to disk on the node. The panel keeps a capture and its records 24 hours and at most 5 captures per node; the hourly sweep deletes the rest (VPS edition only).
-- **What is in it.** Every record is cleaned on the node (client addresses become `<ip>`, key-shaped text is removed, host names are cut from xray's lines, and only the node journal's short list of attributes is kept), again when the panel stores it, and once more when it is read, with the panel's secret names removed. Debug lines of the chosen sources go only to the capture, not to the node's own log.
+- **What is in it.** Every record is cleaned on the node (client addresses become `<ip>`, key-shaped text is removed, host names are cut from xray's lines, and only the node journal's short list of attributes is kept), again when the panel stores it, and once more when it is read, with the panel's secret names removed. Debug lines of the chosen sources go only to the capture, not to the node's own log. With `xray` at level debug the capture also holds Xray's connection lines (accepted requests, refusals such as an unknown key or a REALITY fallback, why a connection ended), each with a session number `[N]` that ties one connection's lines together; client addresses, keys, account names, SNI and destination host names are cut out, a destination keeps only its port. Outside a capture those lines are dropped as before.
 - **Who and what is recorded.** The owner starts and stops a capture in the admin. An admin-profile token starts one with `node_debug_capture_plan` / `node_debug_capture_apply` and reads it with `node_debug_logs` (a capture or a node, filters `min_level`, `source`, `query`, `limit`, `cursor`). Every start is in the audit log with who asked, the node, the sources and the duration. An agent that is too old (it does not list `debug/1`) and a node that is offline are refused without anything being sent. The Cloudflare edition does not have it.
 
 ## A node did not come back after an OS update

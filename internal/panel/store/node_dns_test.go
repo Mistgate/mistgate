@@ -83,19 +83,19 @@ func TestNodeDNSOptionsAndPicks(t *testing.T) {
 	execT(t, s, `INSERT INTO user (id, name, group_id, period_start, sub_token_hash, sub_token_enc, created_at) VALUES ('usr_a', 'u', 'grp_a', 1, x'01', x'02', 1)`)
 	d := s.DNS()
 
-	if err := d.SetNodeOptions(ctx, "nod_a", []string{"dns_builtin_yandex", "dns_builtin_standard"}, "dns_builtin_yandex"); err != nil {
+	if err := d.SetNodeOptions(ctx, "nod_a", []string{"dns_builtin_quad9", "dns_builtin_standard"}, "dns_builtin_quad9"); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.SetNodeOptions(ctx, "nod_b", []string{"dns_builtin_adblock"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	got, err := d.NodeOptions(ctx)
-	if err != nil || len(got["nod_a"]) != 2 || got["nod_a"][0].PresetID != "dns_builtin_yandex" || !got["nod_a"][0].Default ||
+	if err != nil || len(got["nod_a"]) != 2 || got["nod_a"][0].PresetID != "dns_builtin_quad9" || !got["nod_a"][0].Default ||
 		got["nod_a"][1].PresetID != "dns_builtin_standard" || got["nod_a"][1].Default || len(got["nod_b"]) != 1 || got["nod_b"][0].Default {
 		t.Fatalf("options = %+v, %v", got, err)
 	}
 	// Replacing reorders and moves the default; an empty list clears the node.
-	if err := d.SetNodeOptions(ctx, "nod_a", []string{"dns_builtin_standard", "dns_builtin_yandex"}, "dns_builtin_standard"); err != nil {
+	if err := d.SetNodeOptions(ctx, "nod_a", []string{"dns_builtin_standard", "dns_builtin_quad9"}, "dns_builtin_standard"); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := d.NodeOptions(ctx); got["nod_a"][0].PresetID != "dns_builtin_standard" || !got["nod_a"][0].Default || got["nod_a"][1].Default {
@@ -115,7 +115,7 @@ func TestNodeDNSOptionsAndPicks(t *testing.T) {
 	}
 
 	t0 := time.UnixMilli(1_700_000_000_123)
-	if err := d.SetUserNodeChoice(ctx, "usr_a", "nod_a", "dns_builtin_yandex", t0); err != nil {
+	if err := d.SetUserNodeChoice(ctx, "usr_a", "nod_a", "dns_builtin_quad9", t0); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.SetUserNodeChoice(ctx, "usr_a", "nod_a", "dns_builtin_standard", t0.Add(time.Millisecond)); err != nil {

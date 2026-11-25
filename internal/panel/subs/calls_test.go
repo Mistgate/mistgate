@@ -24,7 +24,7 @@ var errNoDevice = connect.NewError(connect.CodeNotFound, nil)
 func (f fakeDevs) SubscriptionWith(ctx context.Context, token string, _ access.SubOptions) (access.SubView, error) {
 	return f.Subscription(ctx, token)
 }
-func (fakeDevs) AddAWGDevice(context.Context, string, string, string, string, string) (store.AccessAWGDevice, []access.DeviceConfig, error) {
+func (fakeDevs) AddAWGDeviceRoute(context.Context, string, string, string, string, string, string) (store.AccessAWGDevice, []access.DeviceConfig, error) {
 	return store.AccessAWGDevice{}, nil, errNoDevice
 }
 func (fakeDevs) DeviceConfigs(context.Context, string, string, string) (store.AccessAWGDevice, []access.DeviceConfig, error) {

@@ -86,6 +86,8 @@ func (r ClientRule) same(o ClientRule) bool {
 //	  Firefox_120 and safari as Safari_16_0, which carry no share in any version, so MinOther is NeverVersion.
 //	kl!ck: Mihomo unmodified; its first release (0.4.0) asks as mihomo/1.19.31, so every release has the share with chrome and
 //	  none with firefox or safari. The device row keeps kl!ck's own version, not its core's.
+//	Mistgate (the Windows app, its own project): Xray-core 26.3.27 or newer in every release v0.1.0 to v0.1.8, which has the share
+//	  with chrome, firefox and safari; the oldest release is the minimum. A device on v0.1.8 sent only new-style hellos to the nodes.
 //	sing-box (SFA, SFI, SFM, SFT), Karing, NekoBox: the REALITY client removes the share unconditionally; no version helps.
 //	Hiddify (its sing-box fork added a key_share option on 2026-10-27), Streisand, FoXray, v2RayTun, INCY, OneXray, Shadowrocket,
 //	FlClash, Clash Verge, Mihomo Party, Clash Meta for Android: the version-to-core mapping is not published; unknown.
@@ -98,6 +100,7 @@ var clientDefaults = []ClientRule{
 	{App: "v2rayng", Core: CoreXray, MinChrome: "1.10.3", MinOther: "2.0.16", Title: "v2rayNG"},
 	{App: "v2rayn", Core: CoreXray, MinChrome: "7.12.6", MinOther: "7.20.0", Title: "v2rayN"},
 	{App: "klick", Core: CoreMihomo, MinChrome: "0.4.0", MinOther: NeverVersion, Title: "kl!ck"},
+	{App: "mistgate", Core: CoreXray, MinChrome: "0.1.0", MinOther: "0.1.0", Title: "Mistgate"},
 	{App: "mihomo", Core: CoreMihomo, MinChrome: "1.19.9", MinOther: NeverVersion, Title: "Mihomo core"},
 	{App: "singbox", Core: CoreSingbox, Unsupported: true, Title: "sing-box (SFA, SFI, SFM)"},
 	{App: "karing", Core: CoreSingbox, Unsupported: true, Title: "Karing"},

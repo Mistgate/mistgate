@@ -45,6 +45,12 @@ type MihomoDNS struct {
 	// Block are the rule providers of the ad list (Preset.BlockAds) and the RULE-SET rules to REJECT that go with them. Their
 	// rules come before every other rule, whatever the split says.
 	Block []MihomoProvider
+	// BlockDomains are the suffixes of Preset.BlockMax: DOMAIN-SUFFIX,<s>,REJECT, the very first rules of the profile.
+	BlockDomains []string
+	// TorrentApps and Torrent are the rules of Preset.TorrentDirect that follow the blocks: PROCESS-NAME,<name>,DIRECT for each name, and the
+	// public trackers' rule set to DIRECT (its provider is in Torrent, written with the others).
+	TorrentApps []string
+	Torrent     []MihomoProvider
 	// Notes (English) say what of the preset a Mihomo profile cannot carry.
 	Notes []string
 }
@@ -117,6 +123,13 @@ func (p Preset) MihomoDNS(group string) (MihomoDNS, error) {
 	}
 	if p.BlockAds {
 		out.Block = []MihomoProvider{{Name: adsTag, Behavior: "domain", URL: fmt.Sprintf(mihomoGeositeURL, adsSite)}}
+	}
+	if p.BlockMax {
+		out.BlockDomains = maxDomains
+	}
+	if p.TorrentDirect {
+		out.TorrentApps = torrentApps()
+		out.Torrent = []MihomoProvider{{Name: torrentTag, Behavior: "domain", URL: fmt.Sprintf(mihomoGeositeURL, TorrentSite)}}
 	}
 	if len(out.ProxyServerNameserver) == 0 {
 		out.ProxyServerNameserver = []string{"system"}

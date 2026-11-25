@@ -127,7 +127,8 @@ describe("the Doctor tab", () => {
     expect(card().querySelector(".fl-wv")).not.toBeNull();
     expect(card().querySelectorAll(".fl-eg")).toHaveLength(2);
     await act(async () => answer({ nowUnix: 1, nodes: [] }));
-    expect(host!.querySelector(".fl-loop")).toBeNull();
+    // react-query hands the mutation's new state to the component on a setTimeout(0), which act() does not wait for
+    await act(async () => vi.waitFor(() => expect(host!.querySelector(".fl-loop")).toBeNull(), { timeout: 3000 }));
     setEffectsEnabled(false);
     await act(async () => void (await new Promise((r) => setTimeout(r, 0))));
     expect(host!.querySelector(".fl-wv, .fl-eg, .fl-loop")).toBeNull();

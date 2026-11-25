@@ -3,6 +3,8 @@ title: WARP
 description: How to send a profile's traffic out through Cloudflare WARP, how to get an account for a node, what fail-closed means, and how to read and fix the WARP link.
 ---
 
+![The WARP card of a node: the tunnel is up and the egress check passes, then the tunnel goes down and the card offers a restart](../../images/readme/warp-dark-en.webp)
+
 By default a profile's traffic leaves a node from the node's own address. With WARP it leaves through Cloudflare's network instead: sites see a Cloudflare address, not your hoster's. A node has at most one WARP account, and every profile with the WARP exit on that node goes through it. Hysteria2, VLESS and AmneziaWG profiles can use it.
 
 ## How it fits together
@@ -120,7 +122,7 @@ A node's account is a free one unless you give it a paid WARP+ license key. On t
 
 ## Sites that refuse WARP
 
-Some sites show a block page to WARP addresses at one Cloudflare colo and not at another, while the tunnel itself is healthy. Every 15 minutes the panel asks each node whose WARP is up to fetch a short list of sites through its tunnel and to say which answer with a block page. The list is the panel's built-in one (`notion.com`, `discord.com`, `chatgpt.com`, `claude.ai`) unless you change it; an empty list switches the check off. The list is set in the API only (`WarpReachService.GetWarpReachSettings` and `UpdateWarpReachSettings`, owner only, at most 8 lower-case host names, audited as `warp_reach_settings`).
+Some sites show a block page to WARP addresses at one Cloudflare colo and not at another, while the tunnel itself is healthy. Every 15 minutes the panel asks each node whose WARP is up to fetch a short list of sites through its tunnel and to say which answer with a block page. The list is the panel's built-in one (`notion.com`, `discord.com`, `chatgpt.com`, `claude.ai`) unless you change it; an empty list switches the check off. The owner changes the list in **Settings → System**, on the **WARP reach check** card: the sites are chips, **Add a site** takes a name such as `example.com` (no address, port or path; at most 8, lower case) and **Save** stores the list. A tag on the card says which list is in force: **built-in list**, **your list** or **check off** (an empty list), and **Restore the built-in list** brings the default back. The same is in the API (`WarpReachService.GetWarpReachSettings` and `UpdateWarpReachSettings`, owner only, audited as `warp_reach_settings`).
 
 - The node reads at most 64 KiB of a page, follows at most one redirect, and refuses any address inside its own network after resolving the name. A node whose agent is older answers nothing, and the WARP card says so.
 - The verdict is `blocked` for HTTP 451 or a 403 page of a known kind (a Cloudflare error 1006 to 1012 or 1020, "Sorry, you have been blocked", an Akamai "Access Denied" page, CloudFront's country block, a site's own "not available in your country"). A bare 403, a challenge page, a rate limit and a server error read `error`; no answer reads `unreachable`.

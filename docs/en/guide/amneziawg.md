@@ -1,5 +1,6 @@
 ---
 title: AmneziaWG
+seoTitle: "AmneziaWG server panel: 2.0 and 3.1, a key per device — Mistgate"
 description: AmneziaWG 3.1 and 2.0 profiles, their parameters and mimicry looks, the userspace and kernel backends of a node, and the per-device keys people import into AmneziaVPN.
 ---
 
@@ -176,6 +177,7 @@ In the user card, under **Devices** → **AmneziaVPN keys**, **Add device** open
 
 - **Profile**, when the group has more than one AmneziaWG profile on a node;
 - **Platform**: iPhone / iPad, Android, Windows, Mac, Linux or Other;
+- **Route**: **Everything through the VPN** (the usual key) or **Russian services direct** (see [below](#key-russian-services-direct));
 - **Name**, up to 40 characters; empty uses the platform name.
 
 **Create** makes a key pair and a tunnel address, and the config window opens at once. A device counts against the person's device limit. The add is refused when the limit is reached, the user is disabled, AmneziaVPN is switched off for them, the profile is not in their group or not on any node they may use, or the client network is full. It is also refused if every usable node has connected before but none reports AmneziaWG support; update an agent on one of those nodes before adding the device.
@@ -208,6 +210,21 @@ On a computer, import the file, not the key: with the key the MTU can be wrong a
 Both keep the node address they were issued with, and only that: the node's [IPv6 entry](nodes.md#ipv6-entry) never changes them, because a key does not update itself and a new address would break it silently.
 
 The config carries `AllowedIPs = 0.0.0.0/0, ::/0` (everything through the tunnel) and two DNS servers. They are the first two plain IPv4 servers of the DNS that applies to the person on that node (their per-server choice when the owner allows it, else the DNS preset); when it has none, the built-in 1.1.1.1 and 8.8.8.8 are written and the window says so. AmneziaWG cannot split DNS: the main servers are used for every domain. The DNS is written into the key: after the person picks another DNS for a server on their page, the key itself stays the same, but they have to press **Get a new key** to get the new DNS (until then the device says "new key needed"). See [DNS](dns.md).
+
+## Key "Russian services direct"
+
+The usual key sends all traffic through the node, so Russian services (Yandex, VK, banks, Max) see the node's address and may hand it to a blocklist. The AmneziaVPN apps have no routing by domain, but they honour `AllowedIPs`; so for them there is a second kind of key, in which `AllowedIPs` is the whole IPv4 world minus the networks of the big Russian services. Those services go around the VPN and never see the node.
+
+- **Who it is for**: a person who wants Yandex, VK, banks and the like not to see the node's address. You turn it on in **Subscriptions** → **User page** → **Key "Russian services direct"** (off by default). Then the person's page, when they add a key, shows two items side by side: "Everything through the VPN" and "Russian services direct". In the user card, **Add a device** has a **Route** select; you can issue this key whether or not the switch is on. A device with this key carries a "RU direct" tag in the list and in its window. The route belongs to the device: **Replace key** keeps it, and the device limit counts it like any other key.
+- **What is in the key**: `AllowedIPs` of 1 366 entries (about 21 KB; the `.conf` is about 22 KB, the `vpn://` line about 14 KB), made from 169 networks: Yandex (AS13238 and the ranges of its sites), VK (AS47541), Mail.ru (AS47764), the big banks, state services, mobile operators and shops. The tunnel address has no IPv6. There is no QR code, because the key does not fit one: the person and you get the file and the `vpn://` line, and the window says why. The list is built from companies' networks and not from "all of Russia" (13 000 networks, 32 000 entries) on purpose: phones start to fail at about 2 400 to 3 100 entries.
+- **Limits**, which the page says too:
+  - the app still sees that a VPN is on (an operating-system flag): a service no longer sees the node's address, but a bank that refuses to work with a VPN on still refuses;
+  - there is no IPv6 in the tunnel;
+  - a Russian service behind a foreign CDN goes through the VPN, and a foreign site inside a Yandex or VK network goes direct;
+  - the list ages. When the panel gets a new list, only these keys show "new key needed" on the person's page; the key itself stays the same, the person fetches it again and imports it. Ordinary keys are not touched;
+  - while `AllowedIPs` is not complete, AmneziaVPN's own split tunnelling is off for this server.
+- The key was tried on an iPhone with AmneziaVPN 5.1.1.11; Android and Windows have not been checked yet.
+- **The whole country, by domain**, is what AmneziaWG inside a Mihomo profile gives (see [AmneziaWG through the subscription](#amneziawg-through-the-subscription)): there the DNS preset with a country list works, which a key cannot do.
 
 ## The AmneziaVPN app
 

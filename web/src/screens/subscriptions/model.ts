@@ -118,11 +118,11 @@ export function chipLabel(chip: string, t: Tx): string {
 }
 
 /**
- * The country lists the split-rule editor offers: China and Russia, the ones with a built-in preset and resolvers checked from
- * inside the country. The panel knows "ir" too (internal/panel/dns/geo.go); a rule that already holds it, or any other
- * code, shows it as well so it can be seen and turned off.
+ * The country lists the split-rule editor offers: China, Russia and Iran, the ones with a built-in preset that goes by a list (Russia and
+ * China with resolvers checked from inside the country, Iran not). A rule that already holds another code shows it as well so it can be
+ * seen and turned off.
  */
-const geoOffered = ["cn", "ru"];
+const geoOffered = ["cn", "ru", "ir"];
 export const geoChoices = (have: readonly string[]): string[] => [...new Set([...geoOffered, ...have.filter((g) => !g.startsWith(geositePrefix))])];
 /** The category names of a rule ("telegram" for "geosite:telegram"). */
 export const geoCategories = (geo: readonly string[]): string[] => geo.filter((g) => g.startsWith(geositePrefix)).map((g) => g.slice(geositePrefix.length));
@@ -559,7 +559,8 @@ export function shortAddress(kind: DnsServerKind, address: string): string {
   }
 }
 
-// The built-in presets have one stored name (Russian). Any other UI language shows these while the stored name is still
+// Seven of these (yandex, cloudflare, google, dnssb and the three family ones) are retired built-ins (migration 00157): one that was assigned
+// or changed lives on as an own preset under its id, so its name is still translated. The built-in presets have one stored name (Russian). Any other UI language shows these while the stored name is still
 // the stock one; a name an admin edited is shown as stored. The Chinese names are the ones the user page shows
 // (internal/panel/dns/node.go builtinNames); model.test.ts holds both to internal/panel/dns/testdata/builtin_names.json.
 // The Persian ".ru" starts with a left-to-right mark: a leading dot would otherwise take the right-to-left side of the
@@ -582,6 +583,11 @@ export const builtinNames: Record<string, { ru: string; en: string; zh: string; 
   dns_builtin_opendns_family: { ru: "OpenDNS FamilyShield: без 18+", en: "OpenDNS FamilyShield: no 18+", zh: "OpenDNS FamilyShield：无成人内容", fa: "OpenDNS FamilyShield: بدون محتوای بزرگسالان", tr: "OpenDNS FamilyShield: +18 yok" },
   dns_builtin_cloudflare_security: { ru: "Cloudflare Security: защита от вредоносных", en: "Cloudflare Security: malware blocking", zh: "Cloudflare Security：拦截恶意网站", fa: "Cloudflare Security: مسدودسازی بدافزار", tr: "Cloudflare Security: zararlı yazılım engeli" },
   dns_builtin_yandex_safe: { ru: "Яндекс безопасный: защита от вредоносных", en: "Yandex Safe: malware blocking", zh: "Yandex Safe：拦截恶意网站", fa: "Yandex Safe: مسدودسازی بدافزار", tr: "Yandex Safe: zararlı yazılım engeli" },
+  dns_builtin_ir_split: { ru: "Иран: иранские сайты напрямую", en: "Iran: Iranian sites direct", zh: "伊朗：伊朗网站直连", fa: "ایران: سایت‌های ایرانی مستقیم", tr: "İran: İran siteleri doğrudan" },
+  dns_builtin_tr_split: { ru: "Турция: .tr напрямую", en: "Turkey: .tr direct", zh: "土耳其：.tr 直连", fa: "ترکیه: ‎.tr مستقیم", tr: "Türkiye: .tr doğrudan" },
+  dns_builtin_kz_split: { ru: "Казахстан: .kz напрямую", en: "Kazakhstan: .kz direct", zh: "哈萨克斯坦：.kz 直连", fa: "قزاقستان: ‎.kz مستقیم", tr: "Kazakistan: .kz doğrudan" },
+  dns_builtin_by_split: { ru: "Беларусь: .by напрямую", en: "Belarus: .by direct", zh: "白俄罗斯：.by 直连", fa: "بلاروس: ‎.by مستقیم", tr: "Belarus: .by doğrudan" },
+  dns_builtin_uz_split: { ru: "Узбекистан: .uz напрямую", en: "Uzbekistan: .uz direct", zh: "乌兹别克斯坦：.uz 直连", fa: "ازبکستان: ‎.uz مستقیم", tr: "Özbekistan: .uz doğrudan" },
   dns_builtin_ads_device: { ru: "Без рекламы на устройстве", en: "No ads on the device", zh: "设备端拦截广告", fa: "مسدودسازی تبلیغ روی دستگاه", tr: "Cihazda reklam engeli" },
 };
 

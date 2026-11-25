@@ -111,8 +111,10 @@ export type AwgDevice = {
   last_handshake_unix: number;
   online: boolean;
   stale: boolean; // fetch the config again and re-import it
-  /** Why: the profile changed, or the DNS of one of its servers did (the key itself stays the same). */
-  stale_reason: "profile" | "dns";
+  /** Why: the profile changed, or the DNS of one of its servers did, or the list of a "Russian services direct" key (the key itself stays the same). */
+  stale_reason: "profile" | "dns" | "routes";
+  /** How the key routes: "" = all through the VPN, "ru-direct" = the Russian services around it (no QR code, no IPv6). */
+  route: "" | "ru-direct";
   min_clients: MinClient[];
 };
 /** An AmneziaWG profile a device can be added on; the page names it by its countries and exit, never by `name`. */
@@ -121,6 +123,8 @@ export type AmneziaData = {
   devices: AwgDevice[];
   profiles: AwgProfile[];
   can_add: boolean;
+  /** The owner offers the key "Russian services direct" next to the ordinary one. */
+  ru_direct: boolean;
   self_service: boolean; // false: the page only shows the devices
   endpoints: string; // base URL of the self-service calls ("" = none)
 };

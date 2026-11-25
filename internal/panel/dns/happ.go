@@ -165,6 +165,11 @@ func happBuild(p Preset) (happProfile, []string, error) {
 	if p.BlockAds {
 		block = []string{"geosite:" + adsSite} // the app ships the geo files, like for DirectSites
 	}
+	if p.BlockMax {
+		for _, s := range maxDomains {
+			block = append(block, "domain:"+s)
+		}
+	}
 	if direct == nil {
 		direct = []string{}
 	}

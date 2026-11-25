@@ -83,7 +83,7 @@ export function DevicesPanel({
   const showTg = telegramShown(user, profiles, devices);
   const showTt = trustTunnelShown(user, profiles, devices);
   const nameOf = (d: Device) => d.model || platformLabel(d.platform, t);
-  const refOf = (d: Device): DeviceRef => ({ id: d.id, label: d.model, platform: d.platform, profileName: d.awgProfileName, version: d.awgVersion, address: d.address, stale: d.stale });
+  const refOf = (d: Device): DeviceRef => ({ id: d.id, label: d.model, platform: d.platform, profileName: d.awgProfileName, version: d.awgVersion, address: d.address, stale: d.stale, route: d.awgRoute });
   const ask = (d: Device) => {
     setAsking(d);
     setAskOpen(true);
@@ -175,6 +175,7 @@ export function DevicesPanel({
                     <>
                       <IdleBadge d={d} t={t} />
                       {d.stale && <span className="up-badge warn">{t("awg.dev.stale")}</span>}
+                      {d.awgRoute === "ru-direct" && <span className="up-badge ru">{t("awg.route.ru")}</span>}
                     </>
                   }
                   line={

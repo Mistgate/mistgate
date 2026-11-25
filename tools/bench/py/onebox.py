@@ -144,7 +144,7 @@ class MistBox(Box):
     PANEL = ("11.11.0.1", 18080)
     D = DATA + "/box-mg"
     NODE_STATE = DATA + "/box-mg-node"
-    NODE_IMAGE = "bench/mgnode:0.1.33"
+    NODE_IMAGE = bench.NODE_IMAGE
     NODE_ENV = ""
     core_restart_on_user_change = "no: the node agent adds and removes users in the running Hysteria2 server"
 
@@ -171,6 +171,7 @@ class MistBox(Box):
         st, b, _ = self.rpc("AuthService", "FinishStepUp", {"totpCode": totp(self.totp, step)})
         assert st == 200, (st, b)
         self.last_step = step
+        self.stepup_t = time.time()
 
     def setup(self, n):
         out = sh("%s/mistgate setup --data-dir %s --public-url http://localhost:18080" % (BIN, self.D))
@@ -227,6 +228,15 @@ class MistBox(Box):
             raise RuntimeError("mistgate node never served: " + sh("docker logs bench_mgnode_box 2>&1 | tail -20", check=False))
         self.auths = collect_auths(self)
         self.server = "%s:%d" % self.link_host
+        # v0.2 hands the node its users a moment after the subscription shows the server line: wait until the last user can really connect
+        t0 = time.time()
+        while time.time() - t0 < 300:
+            out = sh("%s tp -server %s -auth '%s' -sink %s -streams 1 -d 2s -probe 0" % (HYLOAD, self.server, self.auths[-1], SINK_ADDR), check=False)
+            if '"gbit_s":0,' not in out and '"error"' not in out:
+                break
+            time.sleep(2)
+        self.user_sync_wait_s = time.time() - t0
+        log("mistgate box: last user can connect after %.0fs" % self.user_sync_wait_s)
 
     def restart_panel_only(self):
         sh("systemctl restart bench-mg-box")
@@ -244,6 +254,8 @@ class MistBox(Box):
         self.users["c%d" % i] = b["user"]["id"]
 
     def api_del_user(self, i):
+        if time.time() - self.stepup_t > 240:                  # deleting users needs a step-up, which lasts 5 minutes (v0.2)
+            self._stepup()
         st, b, _ = self.c.req("POST", self.admin_path + "api/mistgate.admin.v1.UserService/DeleteUsers", body={"userIds": [self.users.pop("c%d" % i)]})
         assert st == 200, (st, b)
 
@@ -260,13 +272,16 @@ class XuiBox(Box):
     core_restart_on_user_change = "to be measured (3x-ui restarts Xray on client changes)"
 
     def wipe(self):
+        self.cred = None
         sh("docker compose -p %s -f %s down -v 2>&1 | tail -1; rm -rf %s; mkdir -p %s/cert" % (self.P, self.F, self.DD, self.DD), check=False)
         sh("openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout %s/cert/key.pem -out %s/cert/cert.pem -days 30 -subj /CN=bench.test 2>/dev/null" % (self.DD, self.DD), check=False)
 
     def _login(self):
         c = Client(self.IP, 2053)
+        if not getattr(self, "cred", None):
+            self.cred = bench.xui_credentials("bench_3xui_box")
         st, b, _ = c.req("GET", "/csrf-token")
-        st, b, _ = c.req("POST", "/login", body={"username": "admin", "password": "admin"}, headers={"X-CSRF-Token": b["obj"]})
+        st, b, _ = c.req("POST", "/login", body={"username": self.cred[0], "password": self.cred[1]}, headers={"X-CSRF-Token": b["obj"]})
         assert st == 200 and b.get("success"), (st, b)
         st, b, _ = c.req("GET", "/csrf-token")
         c.h["X-CSRF-Token"] = b["obj"]
@@ -328,7 +343,7 @@ class XuiBox(Box):
         assert st == 200 and b.get("success"), (st, b)
 
     def versions(self):
-        return {"3x-ui": "v3.9.0", "xray": "26.9.30 (as logged by the container)"}
+        return {"3x-ui": "v3.11.0", "xray": "26.10.21 (as logged by the container)"}
 
 
 # ---------------------------------------------------------------- Remnawave
@@ -432,7 +447,7 @@ class RemBox(Box):
         raise AssertionError((st, b, tries))
 
     def versions(self):
-        return {"remnawave backend": "3.4.5", "remnawave node": "3.4.2 (Xray 26.7.28)", "postgres": "18.4", "valkey": "9-alpine"}
+        return {"remnawave backend": "3.4.11", "remnawave node": "3.4.6 (Xray 26.11.9)", "postgres": "18.4", "valkey": "9-alpine"}
 
 
 # ---------------------------------------------------------------- PasarGuard
@@ -532,7 +547,7 @@ class PgBox(Box):
         assert st in (200, 204), (st, b)
 
     def versions(self):
-        return {"pasarguard panel": "v5.4.1 (SQLite)", "pasarguard node": "v0.5.4 (Xray 26.3.27)"}
+        return {"pasarguard panel": "v5.6.0 (SQLite)", "pasarguard node": "v0.5.7 (Xray 26.10.31)"}
 
 
 # ---------------------------------------------------------------- driver
