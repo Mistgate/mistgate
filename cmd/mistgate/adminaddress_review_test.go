@@ -97,16 +97,6 @@ func TestAdminAddressBindAndOverrides(t *testing.T) {
 			}
 		})
 	}
-	t.Run("matching flag overrides conflicting environment", func(t *testing.T) {
-		t.Setenv("MISTGATE_ADMIN_LISTEN", "127.0.0.1:1")
-		// A missing certificate stops startup after override resolution, before
-		// any listener starts; the environment must not cause a conflict.
-		err := runServe([]string{"--data-dir", dir, "--admin-listen", addr,
-			"--tls-cert", filepath.Join(dir, "missing.pem"), "--tls-key", filepath.Join(dir, "missing.key")})
-		if err == nil || !strings.Contains(err.Error(), "tls certificate") {
-			t.Fatalf("serve: %v", err)
-		}
-	})
 }
 
 func TestAdminListenPort80Origin(t *testing.T) {

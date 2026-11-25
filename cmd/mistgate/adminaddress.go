@@ -74,8 +74,12 @@ func runAdminAddress(args []string, out io.Writer) error {
 		return err
 	}
 	fmt.Fprintf(out, "Admin URL: %s\n", in.adminURL())
-	fmt.Fprintln(out, "Passkeys were registered for the previous address and no longer work here. Sign in with your password and authenticator code, then add a new passkey.")
+	// From one loopback port to another the RP ID stays localhost and the passkeys keep working.
+	if current["rp_id"] != in.RPID {
+		fmt.Fprintln(out, "Passkeys were registered for the previous address and no longer work here. Sign in with your password and authenticator code, then add a new passkey.")
+	}
 	fmt.Fprintln(out, "Before restarting, remove --admin-listen from the service command and MISTGATE_ADMIN_LISTEN from its environment. This command cannot inspect another process's arguments or environment; serve refuses a conflicting override. The trial bind cannot reserve the address across a restart.")
+	fmt.Fprintln(out, "Run this command while the panel is running: the trial bind then also sees the panel's own ports (443, 80). If the panel does not start afterwards, its log names the port; run this command again with another one.")
 	fmt.Fprintln(out, "Restart the panel.")
 	return nil
 }
