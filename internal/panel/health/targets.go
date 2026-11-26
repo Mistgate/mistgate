@@ -1,6 +1,7 @@
 package health
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -141,6 +142,14 @@ type target struct {
 	relay    *relayTargetInfo
 }
 
+// nodePort is the port reached at the node address (before any CDN routing).
+func (t *target) nodePort() uint16 {
+	if t.relay != nil {
+		return t.relay.link.Port
+	}
+	return cmp.Or(t.in.PublicPort, t.spec.Listen.Port)
+}
+
 type relayTargetInfo struct {
 	link  store.RelayLink
 	entry store.NodeRow
@@ -226,9 +235,9 @@ func (s *Service) build(n store.NodeRow, row store.FleetInboundRow) (plugin.Inbo
 		}
 	}
 	spec, err := p.BuildInbound(protocols.InboundInput{
-		Profile:               protocols.ProfileView{ID: row.ProfileID, Version: row.ProfileVersion, Settings: settings},
-		Node:                  protocols.NodeView{ID: n.ID, Name: n.Name, Address: n.Address, CountryCode: n.CountryCode},
-		PortOverride:          row.PortOverride,
+		Profile:    protocols.ProfileView{ID: row.ProfileID, Version: row.ProfileVersion, Settings: settings},
+		Node:       protocols.NodeView{ID: n.ID, Name: n.Name, Address: n.Address, CountryCode: n.CountryCode},
+		PublicPort: row.PublicPort, PortOverride: row.PortOverride,
 		TLSServerNameOverride: row.TLSNameOverride,
 		RealityTargetOverride: row.RealityTargetOverride,
 		SpecVersion:           row.SpecVersion,

@@ -268,6 +268,8 @@ message CreateInboundRequest {
   // the host becomes the one name REALITY accepts there. Empty = the profile's target. Refusals: reality_target_unsupported,
   // reality_target_invalid, reality_target_same_node, reality_target_own (as listed above).
   string reality_target_override = 9;
+  // Public VLESS entry port on this node; 0 follows the listener.
+  uint32 public_port = 10;
 }
 
 message CreateInboundResponse {
@@ -297,6 +299,8 @@ message UpdateInboundRequest {
   // As CreateInboundRequest.reality_target_override; absent = leave unchanged, "" = back to the profile's target. A change
   // restarts the server and clients get the new name with their next subscription update.
   optional string reality_target_override = 8;
+  // Absent leaves it unchanged; 0 clears the override.
+  optional uint32 public_port = 9;
 }
 
 message UpdateInboundResponse {

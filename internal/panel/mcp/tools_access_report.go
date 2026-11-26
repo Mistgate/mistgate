@@ -63,6 +63,7 @@ type accessCellV struct {
 	Protocol     string `json:"protocol"`
 	Transport    string `json:"transport,omitempty"`
 	Port         uint32 `json:"port"`
+	PublicPort   uint32 `json:"public_port,omitempty"`
 	Network      string `json:"network"`
 	Egress       string `json:"egress,omitempty"`
 	CDN          bool   `json:"cdn,omitempty"`
@@ -440,7 +441,7 @@ func (a *accessCtx) cell(x *accInbound, devs map[string]*devAgg, rows []accRow) 
 	in := a.in
 	n := a.byID[x.NodeID]
 	p := in.Profiles[x.ProfileID]
-	c := &accessCellV{NodeID: x.NodeID, InboundID: x.ID, Profile: nm(p.Name), Protocol: normProtocol(x.Protocol), Transport: transportOf(p.Summary), Port: x.Port,
+	c := &accessCellV{NodeID: x.NodeID, InboundID: x.ID, Profile: nm(p.Name), Protocol: normProtocol(x.Protocol), Transport: transportOf(p.Summary), Port: x.Port, PublicPort: x.PublicPort,
 		Network: networkOfInbound(x), Egress: clean(x.Egress, 20), CDN: x.CDN, InSubs: x.Direct, State: x.State, AttemptsObservable: normProtocol(x.Protocol) != "vless"}
 	if n != nil {
 		c.Node = nm(n.Name)
@@ -695,7 +696,7 @@ func classScopeMatch(c blockClassV, x *accInbound) bool {
 	case c.inbound != "":
 		return c.inbound == x.ID
 	case strings.HasPrefix(c.Scope, "port:"):
-		return c.port == x.Port && netOf(x.Protocol) == "tcp"
+		return c.port == x.entryPort() && netOf(x.Protocol) == "tcp"
 	case c.protocol == "udp":
 		return hasUDPPath(x)
 	case c.protocol != "":
@@ -784,7 +785,7 @@ func (a *accessCtx) findings() []accessFindingV {
 				continue
 			}
 			for _, w := range working {
-				if normProtocol(w.Protocol) == normProtocol(f.Protocol) && netOf(w.Protocol) == netOf(f.Protocol) && w.Port == f.Port {
+				if normProtocol(w.Protocol) == normProtocol(f.Protocol) && netOf(w.Protocol) == netOf(f.Protocol) && w.entryPort() == f.entryPort() {
 					continue
 				}
 				if normProtocol(w.Protocol) == normProtocol(f.Protocol) {
@@ -793,7 +794,7 @@ func (a *accessCtx) findings() []accessFindingV {
 				fw, ww := a.ways[f.ID], a.ways[w.ID]
 				ev := []string{"conn:" + f.ID, "conn:" + w.ID, "check:" + nid}
 				add(accessFindingV{Code: "protocol_blocked_on_node", Severity: "error", Node: nm(n.Name), Evidence: ev, Affected: a.affectedBy(f.ID),
-					Detail: map[string]string{"blocked": normProtocol(f.Protocol) + "/" + netOf(f.Protocol) + "/" + u32(f.Port), "works": normProtocol(w.Protocol) + "/" + netOf(w.Protocol) + "/" + u32(w.Port),
+					Detail: map[string]string{"blocked": normProtocol(f.Protocol) + "/" + netOf(f.Protocol) + "/" + u32(f.entryPort()), "works": normProtocol(w.Protocol) + "/" + netOf(w.Protocol) + "/" + u32(w.entryPort()),
 						"blocked_by": strings.Join(fw.BlockedBy, ","), "works_by": strings.Join(ww.WorksBy, ","),
 						"operators": strings.Join(cleanAll(summarizeVantages(a.vant(nid)).darkOps, 40, 8), ",")}})
 				break

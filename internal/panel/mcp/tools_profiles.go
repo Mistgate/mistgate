@@ -91,7 +91,7 @@ func profileReadTools() []toolDef {
 				inbounds := make([]profileInboundV, 0, len(r.Msg.GetInbounds()))
 				for _, ib := range r.Msg.GetInbounds() {
 					inbounds = append(inbounds, profileInboundV{
-						ID: ib.GetId(), NodeID: ib.GetNodeId(), NodeName: nm(ib.GetNodeName()), Port: ib.GetPort(),
+						ID: ib.GetId(), NodeID: ib.GetNodeId(), NodeName: nm(ib.GetNodeName()), Port: ib.GetPort(), PublicPort: ib.GetPublicPort(),
 						TLSServerName: clean(ib.GetTlsServerName(), 253),
 						PortOverride:  ib.GetPortOverride(), TLSServerNameOverride: clean(ib.GetTlsServerNameOverride(), 253),
 						Enabled: ib.GetEnabled(), State: enumName("INBOUND_STATE_", ib.GetState().String()),
@@ -156,6 +156,7 @@ type profileInboundV struct {
 	NodeID                string `json:"node_id"`
 	NodeName              string `json:"node_name"`
 	Port                  uint32 `json:"port"`
+	PublicPort            uint32 `json:"public_port,omitempty"`
 	TLSServerName         string `json:"tls_server_name,omitempty"`
 	PortOverride          uint32 `json:"port_override"`
 	TLSServerNameOverride string `json:"tls_server_name_override,omitempty"`

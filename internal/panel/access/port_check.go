@@ -43,6 +43,7 @@ func freePortCandidates(spec plugin.InboundSpec, n int, others []nodeListen,
 	if n <= 0 {
 		return nil
 	}
+	others = reservePublicPorts(others)
 	limit := len(twinPreferred) + 64
 	candidates := freePorts(spec.Protocol, limit, func(port uint16) bool { return portAllowed(spec, port, others) })
 	udpListens := specUDPListens(spec)

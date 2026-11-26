@@ -1,6 +1,7 @@
 package access
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -23,19 +24,16 @@ func (s *Service) ensureBridgeEndpoint(ctx context.Context, entryID string, extr
 		return store.NodeRow{}, err
 	}
 	base := make([]nodeListen, 0, len(others)+1)
-	var specs []plugin.InboundSpec
 	for _, other := range others {
 		if other.protocol == "bridge" {
 			continue
 		}
 		base = append(base, other)
-		if other.enabled && other.spec.Protocol != "" {
-			specs = append(specs, other.spec)
-		}
 	}
+	base = reservePublicPorts(base)
 	// The bridge rides the node's own site on 443 when one answers there (plugin.TCPPortOwners): a Hysteria2 site that gave
 	// the port up to a TCP inbound is not that site.
-	owns443 := plugin.TCPPortOwners(specs)[443].Site
+	owns443 := publicBridgeSite(base)
 	if extra != nil {
 		base = append(base, nodeListen{profile: "relay being created", protocol: relayProtocol, enabled: true, l: *extra})
 	}
@@ -81,4 +79,42 @@ func (s *Service) ensureBridgeEndpoint(ctx context.Context, entryID string, extr
 		s.notify.StateChanged() // a probe of the old endpoint carries its port, so it cannot be mistaken for one of this
 	}
 	return n, nil
+}
+
+// publicBridgeSite keeps local listener ownership separate from reachability on 443.
+func publicBridgeSite(inbounds []nodeListen) bool {
+	var specs []plugin.InboundSpec
+	for _, in := range inbounds {
+		if in.enabled && in.spec.Protocol != "" {
+			specs = append(specs, in.spec)
+		}
+	}
+	owners := plugin.TCPPortOwners(specs)
+	var public []plugin.InboundSpec
+	for _, in := range inbounds {
+		if !in.enabled || in.spec.Protocol == "" {
+			continue
+		}
+		sp := in.spec
+		if sp.Protocol == "hysteria2" && owners[plugin.Hy2SitePort(sp)].ID != sp.ID {
+			continue
+		}
+		if sp.Listen.Network == "tcp" {
+			sp.Listen.Port = cmp.Or(in.publicPort, sp.Listen.Port)
+		}
+		public = append(public, sp)
+	}
+	return plugin.TCPPortOwners(public)[443].Site
+}
+
+// reservePublicPorts keeps automatically allocated listeners off an existing TCP
+// forward's public endpoint. Its local listener can be on a different port.
+func reservePublicPorts(listens []nodeListen) []nodeListen {
+	for _, in := range listens {
+		port := cmp.Or(in.publicPort, in.spec.Listen.Port)
+		if in.spec.Listen.Network == "tcp" && port != in.spec.Listen.Port {
+			listens = append(listens, nodeListen{l: plugin.Listen{Network: "tcp", Port: port}})
+		}
+	}
+	return listens
 }

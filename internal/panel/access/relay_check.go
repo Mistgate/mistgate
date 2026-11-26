@@ -634,7 +634,7 @@ func (s *Service) ListRelayCandidates(ctx context.Context, req *connect.Request[
 			} else if spec, err := s.buildSpec(f, merged); err != nil {
 				c.Unsupported = "build_failed"
 			} else {
-				c.Network, c.Port, c.Hop = spec.Listen.Network, uint32(spec.Listen.Port), spec.Listen.HopFrom != 0
+				c.Network, c.Port, c.Hop = spec.Listen.Network, uint32(f.RelayInbound().RelayExit(f.Node.Address, spec.Listen.Port).Port), spec.Listen.HopFrom != 0
 				c.Unsupported = protocols.IPv6Unsupported(spec)
 			}
 			c.ReverseBlocked = reverseBlockedOf(c.Network, entry.AgentCaps, n.AgentCaps)

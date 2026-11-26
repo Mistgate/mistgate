@@ -205,7 +205,11 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 		return nil, err
 	}
 	network := spec.Listen.Network
+	exitPort := f.RelayInbound().RelayExit(f.Node.Address, spec.Listen.Port).Port
 	port := uint16(m.Port)
+	if port == 0 {
+		others = reservePublicPorts(others)
+	}
 	var naturalPort uint16
 	if f.Profile.Protocol == "awg" {
 		var settings struct {
@@ -230,8 +234,8 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 		}
 	case naturalPort != 0:
 		port = naturalPort
-	case relayPortOK(uint32(spec.Listen.Port)) && clashOf(plugin.Listen{Network: network, Port: spec.Listen.Port}, others) == nil:
-		port = spec.Listen.Port // the same port as on the exit, when it is free here
+	case relayPortOK(uint32(exitPort)) && clashOf(plugin.Listen{Network: network, Port: exitPort}, others) == nil:
+		port = exitPort // the same port as on the exit, when it is free here
 	default:
 		free := freePorts(f.Profile.Protocol, 1, func(p uint16) bool {
 			return relayPortOK(uint32(p)) && clashOf(plugin.Listen{Network: network, Port: p}, others) == nil

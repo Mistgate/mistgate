@@ -64,6 +64,7 @@ type ProfileView struct {
 type InboundInput struct {
 	Profile               ProfileView
 	Node                  NodeView
+	PublicPort            uint16 // node-local entry, never sent to the agent
 	PortOverride          uint16 // 0 = none
 	TLSServerNameOverride string
 	// RealityTargetOverride is "host:port" of the site a VLESS REALITY inbound shows on this node instead of its profile's target

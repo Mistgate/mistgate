@@ -3,6 +3,7 @@
 package mcp
 
 import (
+	"cmp"
 	"slices"
 	"strconv"
 	"strings"
@@ -74,11 +75,13 @@ type accTCPCheck struct {
 
 type accInbound struct {
 	ID, NodeID, ProfileID, Protocol, Egress string
-	Port                                    uint32
+	Port, PublicPort                        uint32
 	Enabled, Direct, CDN, H3                bool
 	State                                   string // active, pending, failed, disabled
 	LastErrorCode                           string
 }
+
+func (x accInbound) entryPort() uint32 { return cmp.Or(x.PublicPort, x.Port) }
 
 type accProfile struct{ ID, Name, Protocol, Summary string }
 
@@ -551,7 +554,7 @@ func (b *blockCtx) diagnose(n *accNode) blockNodeV {
 			continue
 		}
 		if x.State == "failed" {
-			broken[x.Port] = true
+			broken[x.entryPort()] = true
 			add(blockClassV{Class: clsBroken, Scope: "inbound:" + x.ID, Confidence: confHigh, hard: true, inbound: x.ID, port: x.Port, protocol: x.Protocol,
 				Evidence: []string{"inbound:" + x.ID}, Detail: map[string]string{"state": "failed", "error": x.LastErrorCode},
 				Explain: "The server " + x.Protocol + " on port " + u32(x.Port) + " failed to start or apply on the node (" + clean(x.LastErrorCode, 40) + "): an engine or host problem, not a block."})
@@ -972,7 +975,7 @@ func (b *blockCtx) addCounterClasses(n *accNode, cc *accCountry, km *accKlick, v
 	}
 	if len(failingUDP) > 0 && len(workingUDP) > 0 && !ipBlocked {
 		for _, x := range failingUDP {
-			if broken[x.Port] {
+			if broken[x.entryPort()] {
 				continue
 			}
 			conf := confLow
@@ -1111,7 +1114,7 @@ func (b *blockCtx) wayStates(diags map[string]*blockNodeV) map[string]*wayV {
 			for _, c := range d.Classes {
 				switch c.Class {
 				case clsBroken:
-					if c.inbound == x.ID || c.port == x.Port && c.inbound == "" && net == "tcp" {
+					if c.inbound == x.ID || c.port == x.entryPort() && c.inbound == "" && net == "tcp" {
 						w.State = stateBroken
 						w.BlockedBy = append(w.BlockedBy, clsBroken)
 					}
@@ -1130,7 +1133,7 @@ func (b *blockCtx) wayStates(diags map[string]*blockNodeV) map[string]*wayV {
 					hard = true
 					w.BlockedBy = append(w.BlockedBy, clsIPBlocked)
 				case clsPortBlocked:
-					if net == "tcp" && c.port == x.Port && c.Confidence != confLow {
+					if net == "tcp" && c.port == x.entryPort() && c.Confidence != confLow {
 						if hasUDPPath(&x) {
 							w.Soft = true
 						} else {
@@ -1169,7 +1172,7 @@ func (b *blockCtx) wayStates(diags map[string]*blockNodeV) map[string]*wayV {
 			cc := in.Countries[x.NodeID]
 			if cc != nil && net == "tcp" {
 				for _, p := range cc.TSPU {
-					if p.Port == x.Port && p.Verdict == "open" {
+					if p.Port == x.entryPort() && p.Verdict == "open" {
 						w.WorksBy = append(w.WorksBy, "tspu_open")
 					}
 				}

@@ -222,7 +222,7 @@ func (r relayRun) leg(ctx context.Context) store.RelayStage {
 		st, _ := r.udpStage(out, sender)
 		return st
 	}
-	target, ok := relayTCPTarget(r.spec, r.row, r.spec.Listen.Port)
+	target, ok := relayTCPTarget(r.spec, r.row, r.row.RelayExit(r.exit.Address, r.spec.Listen.Port).Port)
 	if !ok {
 		return r.stage("skipped", "unverifiable", portSenderID(sender))
 	}

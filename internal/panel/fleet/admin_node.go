@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/base32"
@@ -410,6 +411,7 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 	}
 	var specs []inboundSpec
 	vless443 := false
+	var forwarded443 uint16
 	for _, row := range inbounds {
 		if !row.Enabled {
 			continue
@@ -418,8 +420,14 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 		if err != nil {
 			continue
 		}
-		if spec.Protocol == "vless" && spec.Listen.Network == "tcp" && spec.Listen.Port == 443 {
+		if spec.Protocol == "vless" && spec.Listen.Network == "tcp" && cmp.Or(row.PublicPort, spec.Listen.Port) == 443 {
 			vless443 = true
+			if spec.Listen.Port != 443 {
+				if forwarded443 != 0 && forwarded443 != spec.Listen.Port {
+					return "port_443_taken", row.ProfileID
+				}
+				forwarded443 = spec.Listen.Port
+			}
 			if v, _ := plugin.VLESSOf(spec); v.Security == "reality" && !v.TargetSelf() {
 				return "reality_external_target", row.ProfileID
 			}
@@ -428,13 +436,16 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 	}
 	for _, inbound := range specs {
 		spec := inbound.spec
+		if forwarded443 != 0 && (plugin.Hy2SitePort(spec) == 443 || spec.Listen.Network == "tcp" && spec.Listen.Port == 443) {
+			return "port_443_taken", inbound.row.ProfileID
+		}
 		if spec.Protocol == "hysteria2" && plugin.Hy2SitePort(spec) == 443 {
 			if !vless443 {
 				return "", ""
 			}
 			continue
 		}
-		if spec.Protocol == "vless" && spec.Listen.Port == 443 && bridgeVLESSOwnSite([]tcpSpec{{Profile: inbound.row.ProfileName, Spec: spec}}, inbound.row.ProfileName) {
+		if spec.Protocol == "vless" && spec.Listen.Port == 443 && bridgeVLESSOwnSite([]tcpSpec{{Profile: inbound.row.ProfileName, Spec: spec, PublicPort: inbound.row.PublicPort}}, inbound.row.ProfileName) {
 			continue
 		}
 		holds := spec.Listen.Network == "tcp" && (spec.Listen.Port == 443 || spec.Listen.HopFrom != 0 && spec.Listen.HopFrom <= 443 && spec.Listen.HopTo >= 443)
@@ -715,9 +726,11 @@ func (f *Fleet) inboundMsg(n store.NodeRow, row store.FleetInboundRow) *adminv1.
 	if !row.Enabled {
 		out.State = adminv1.InboundState_INBOUND_STATE_DISABLED
 	}
+	out.PublicPort = uint32(row.PublicPort)
 	if spec, err := f.buildSpec(n, row); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
 		out.Cdn = plugin.ServerCDN(spec)
+
 		out.RealityTarget = plugin.RealityTargetShown(spec)
 	}
 	return out

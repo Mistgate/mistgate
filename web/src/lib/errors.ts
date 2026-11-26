@@ -38,7 +38,7 @@ export const errorCodes = [
   "acme_needs_domain",
   "reality_needs_domain",
   "mtproto_needs_domain",
-  "port_taken",
+  "port_taken", "public_port_taken",
   // services that share a TCP port by SNI (plugin.TCPSharePlan): the name is held, no service shows the node's site, a service has no
   // name, the agent is too old
   "sni_taken",

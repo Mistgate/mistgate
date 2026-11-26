@@ -1088,3 +1088,32 @@ func TestAccessToolsAreReadonlyAndLeakNothing(t *testing.T) {
 		t.Fatal("successful access report exposes user IDs")
 	}
 }
+
+func TestBlockDiagnosisUsesPublicPort(t *testing.T) {
+	x := accInbound{ID: "inb", NodeID: "de", Protocol: "vless", Port: 19443, PublicPort: 443}
+	b := newBlockCtx(&accessInput{Nodes: []accNode{{ID: "de", Status: "online"}}, Inbounds: []accInbound{x}})
+	for _, p := range []uint32{443, 19443} {
+		got := b.wayStates(map[string]*blockNodeV{"de": {Classes: []blockClassV{{Class: clsPortBlocked, Confidence: confHigh, port: p}}}})[x.ID]
+		if (got.State == stateFailing) != (p == 443) {
+			t.Fatalf("evidence on %d: %+v", p, got)
+		}
+	}
+
+	// The finding names the port clients reach, not the listener the forward ends at.
+	f := newFx().node("be", "BE", "online").node("msk1", "RU", "online").group("family", "prf_vless", "prf_hy2").users("family", 4, 1699990000)
+	v := f.inbound("be", "prf_vless", "vless", 19443)
+	f.in.Inbounds[len(f.in.Inbounds)-1].PublicPort = 8443
+	h := f.inbound("be", "prf_hy2", "hysteria2", 443)
+	f.in.Totals[h] = hy2Good()
+	f.rows("family", h, "be", accRow{Connects: 5, OnlineS: 100})
+	f.rows("family", v, "be", accRow{OnlineS: 0})
+	f.cc("be", "partial", func(c *accCountry) {
+		c.TSPU = ports(443, "open", 8443, "blocked")
+		c.Vantages = []accVantage{vant("MTS", "home", "dark", false), vant("Tele2", "mobile", "dark", false), vant("Rostelecom", "home", "reach", true)}
+	})
+	f.cc("msk1", "ok", func(c *accCountry) { c.Vantages = []accVantage{vant("Rostelecom", "home", "reach", true)} })
+	pb := accFinding(buildAccess(f.in), "protocol_blocked_on_node", "be")
+	if pb == nil || pb.Detail["blocked"] != "vless/tcp/8443" || pb.Detail["works"] != "hysteria2/udp/443" {
+		t.Fatalf("protocol_blocked_on_node: %+v", pb)
+	}
+}

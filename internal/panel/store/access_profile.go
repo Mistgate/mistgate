@@ -192,6 +192,7 @@ type AccessInbound struct {
 	TLSServerNameOverride string
 	// RealityTargetOverride is "host:port" of the site this node shows instead of the profile's REALITY target; "" = the profile's.
 	RealityTargetOverride string
+	PublicPort            uint16
 	Enabled               bool
 	DirectInSubscriptions bool
 	SpecVersion           uint64
@@ -210,7 +211,7 @@ type AccessInbound struct {
 }
 
 const accInboundCols = `i.id AS inbound_id, i.profile_id AS inbound_profile_id, i.node_id AS inbound_node_id,
-	i.port_override AS inbound_port_override, i.tls_server_name_override AS inbound_tls_server_name_override, i.reality_target_override AS inbound_reality_target_override, i.enabled AS inbound_enabled,
+	i.port_override AS inbound_port_override, i.tls_server_name_override AS inbound_tls_server_name_override, i.reality_target_override AS inbound_reality_target_override, i.public_port AS inbound_public_port, i.enabled AS inbound_enabled,
 	i.direct_in_subscriptions AS inbound_direct_in_subscriptions,
 	i.spec_version AS inbound_spec_version, i.state AS inbound_state, i.last_error AS inbound_last_error,
 	i.cert_pin_sha256 AS inbound_cert_pin_sha256, i.cert_not_after AS inbound_cert_not_after, i.created_at AS inbound_created_at,
@@ -220,10 +221,11 @@ const accInboundCols = `i.id AS inbound_id, i.profile_id AS inbound_profile_id, 
 func scanAccessInbound(r rowScanner) (AccessInbound, error) {
 	var i AccessInbound
 	var id, profileID, nodeID, tlsName, realityTarget, state, lastError, certPin, pluginPublic, healthJSON sql.NullString
-	var port, enabled, directInSubscriptions, specVersion, notAfter, created, updated, healthAt sql.NullInt64
-	err := r.Scan(&id, &profileID, &nodeID, &port, &tlsName, &realityTarget, &enabled, &directInSubscriptions, &specVersion,
+	var port, publicPort, enabled, directInSubscriptions, specVersion, notAfter, created, updated, healthAt sql.NullInt64
+	err := r.Scan(&id, &profileID, &nodeID, &port, &tlsName, &realityTarget, &publicPort, &enabled, &directInSubscriptions, &specVersion,
 		&state, &lastError, &certPin, &notAfter, &created, &updated,
 		&i.PluginStateEnc, &pluginPublic, &healthJSON, &healthAt)
+	i.PublicPort = uint16(publicPort.Int64)
 	i.ID, i.ProfileID, i.NodeID = id.String, profileID.String, nodeID.String
 	i.PortOverride, i.TLSServerNameOverride, i.RealityTargetOverride = uint16(port.Int64), tlsName.String, realityTarget.String
 	i.Enabled, i.DirectInSubscriptions, i.SpecVersion = enabled.Int64 == 1, directInSubscriptions.Int64 == 1, uint64(specVersion.Int64)
@@ -253,10 +255,10 @@ func accNullPort(p uint16) any {
 // deleted in the same transaction, so the key is never on both sides.
 func (a Access) CreateInbound(ctx context.Context, i AccessInbound) error {
 	_, err := a.s.batch(ctx,
-		Stmt{Query: `INSERT INTO inbound (id, profile_id, node_id, port_override, tls_server_name_override, reality_target_override, enabled, spec_version, state,
+		Stmt{Query: `INSERT INTO inbound (id, profile_id, node_id, port_override, tls_server_name_override, public_port, reality_target_override, enabled, spec_version, state,
 		   plugin_state_enc, plugin_public_json, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'pending', ?, ?, ?, ?)`,
-			Args: []any{i.ID, i.ProfileID, i.NodeID, accNullPort(i.PortOverride), i.TLSServerNameOverride, i.RealityTargetOverride, int64(accBool(i.Enabled)),
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'pending', ?, ?, ?, ?)`,
+			Args: []any{i.ID, i.ProfileID, i.NodeID, accNullPort(i.PortOverride), i.TLSServerNameOverride, i.PublicPort, i.RealityTargetOverride, int64(accBool(i.Enabled)),
 				i.PluginStateEnc, accPublicJSON(i.PluginPublicJSON), unix(i.CreatedAt), unix(i.CreatedAt)}},
 		Stmt{Query: `DELETE FROM awg_retained_key WHERE profile_id = ? AND node_id = ?`, Args: []any{i.ProfileID, i.NodeID}},
 	)
@@ -311,16 +313,16 @@ func (a Access) InboundsOfNode(ctx context.Context, nodeID string) ([]AccessInbo
 // ErrAccessVersion when the row changed since it was read, ErrNotFound when it is gone. When resetState is set the
 // state goes back to pending (enabled) or disabled, until the node reports again.
 func (a Access) UpdateInbound(ctx context.Context, i, was AccessInbound, resetState bool, now time.Time) error {
-	q := `UPDATE inbound SET port_override = ?, tls_server_name_override = ?, reality_target_override = ?, enabled = ?, direct_in_subscriptions = ?, spec_version = ?, updated_at = ?`
+	q := `UPDATE inbound SET port_override = ?, tls_server_name_override = ?, public_port = ?, reality_target_override = ?, enabled = ?, direct_in_subscriptions = ?, spec_version = ?, updated_at = ?`
 	if resetState {
 		q += `, state = CASE WHEN ? = 1 THEN 'pending' ELSE 'disabled' END, last_error = ''`
 	}
-	q += ` WHERE id = ? AND port_override IS ? AND tls_server_name_override = ? AND reality_target_override = ? AND enabled = ? AND direct_in_subscriptions = ? AND spec_version = ?`
-	args := []any{accNullPort(i.PortOverride), i.TLSServerNameOverride, i.RealityTargetOverride, accBool(i.Enabled), accBool(i.DirectInSubscriptions), i.SpecVersion, unix(now)}
+	q += ` WHERE id = ? AND port_override IS ? AND tls_server_name_override = ? AND public_port = ? AND reality_target_override = ? AND enabled = ? AND direct_in_subscriptions = ? AND spec_version = ?`
+	args := []any{accNullPort(i.PortOverride), i.TLSServerNameOverride, i.PublicPort, i.RealityTargetOverride, accBool(i.Enabled), accBool(i.DirectInSubscriptions), i.SpecVersion, unix(now)}
 	if resetState {
 		args = append(args, accBool(i.Enabled))
 	}
-	args = append(args, i.ID, accNullPort(was.PortOverride), was.TLSServerNameOverride, was.RealityTargetOverride, accBool(was.Enabled), accBool(was.DirectInSubscriptions), was.SpecVersion)
+	args = append(args, i.ID, accNullPort(was.PortOverride), was.TLSServerNameOverride, was.PublicPort, was.RealityTargetOverride, accBool(was.Enabled), accBool(was.DirectInSubscriptions), was.SpecVersion)
 	res, err := a.s.W.ExecContext(ctx, q, args...)
 	if err != nil {
 		return err
@@ -524,19 +526,19 @@ func (a Access) InboundsFull(ctx context.Context, nodeID string) ([]AccessInboun
 }
 
 func scanAccessInboundFull(r rowScanner) (AccessInboundFull, error) {
-	values, err := scanRowValues(r, 42)
+	values, err := scanRowValues(r, 43)
 	if err != nil {
 		return AccessInboundFull{}, err
 	}
-	inbound, err := scanAccessInbound(batchRow(values[:19]))
+	inbound, err := scanAccessInbound(batchRow(values[:20]))
 	if err != nil {
 		return AccessInboundFull{}, err
 	}
-	profile, err := scanAccessProfile(batchRow(values[19:27]))
+	profile, err := scanAccessProfile(batchRow(values[20:28]))
 	if err != nil {
 		return AccessInboundFull{}, err
 	}
-	node, err := scanAccessNode(batchRow(values[27:]))
+	node, err := scanAccessNode(batchRow(values[28:]))
 	if err != nil {
 		return AccessInboundFull{}, err
 	}

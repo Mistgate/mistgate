@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+func TestSQLiteNodePublicPort(t *testing.T) { nodePublicPortProof(t, openTemp(t)) }
+
 func TestRelayModeSQLite(t *testing.T) {
 	relayModeStoreProof(t, openTemp(t))
 }

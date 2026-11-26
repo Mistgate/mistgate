@@ -1436,6 +1436,8 @@ func TestD1RewrittenTelegramMethods(t *testing.T) {
 	}
 }
 
+func TestD1NodePublicPort(t *testing.T) { nodePublicPortProof(t, openD1Store(t)) }
+
 func TestD1ProfileSelectiveBump(t *testing.T) { profileSelectiveBumpProof(t, openD1Store(t)) }
 
 func TestD1RewrittenAccessMethods(t *testing.T) {

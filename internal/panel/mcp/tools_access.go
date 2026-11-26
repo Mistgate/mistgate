@@ -244,7 +244,7 @@ func (c *call) gatherAccess(in *accessInput, nodeRef, groupRef string, withUsers
 		}
 		for _, x := range r.Msg.GetInbounds() {
 			in.Inbounds = append(in.Inbounds, accInbound{ID: clean(x.GetId(), 80), NodeID: n.ID, ProfileID: clean(x.GetProfileId(), 80), Protocol: clean(x.GetProtocol(), 40),
-				Egress: clean(x.GetEgress(), 20), Port: x.GetPort(), Enabled: x.GetEnabled(), Direct: x.GetDirectInSubscriptions(), CDN: x.GetCdn(),
+				Egress: clean(x.GetEgress(), 20), Port: x.GetPort(), PublicPort: x.GetPublicPort(), Enabled: x.GetEnabled(), Direct: x.GetDirectInSubscriptions(), CDN: x.GetCdn(),
 				State: inboundStateName(x.GetState()), LastErrorCode: errorCode(x.GetLastError())})
 		}
 		for _, p := range r.Msg.GetPortChecks() {
