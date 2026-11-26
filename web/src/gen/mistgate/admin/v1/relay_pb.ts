@@ -1130,6 +1130,9 @@ export const DeleteRelayResponseSchema: GenMessage<DeleteRelayResponse> = /*@__P
  * default) keeps the family in use and, when a check finds its leg dead, tries the other one once per half hour and keeps it only
  * if that leg passes. The entry carries an IPv6 leg in userspace (its agent lists "relay-forward/2"): the kernel cannot rewrite a
  * packet from one family into the other. The exit needs nothing and people's subscriptions are the same in both families.
+ * In the reverse way the same family is the way the exit reaches the entry's bridge site (the reverse reach check and the speed
+ * test probe that address, and the site listens on both families, so no agent update is needed). The bridge is one transport per
+ * pair of nodes, so its family is chosen for the pair: a pair cannot pin one relay to ipv4 and another to ipv6 (leg_conflict).
  *
  * A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), after CheckRelay made a check less than 15
  * minutes ago that fits the way the relay would go:

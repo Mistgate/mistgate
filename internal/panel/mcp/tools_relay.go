@@ -153,7 +153,7 @@ var relayChange = changeSpec[relayArgs]{
 	desc: "Make, switch on, switch off, move, change the leg family of or delete a relay (action create, enable, disable, port, leg or delete). A relay is a port on an entry node that passes one server of an exit node on, unchanged. An unverifiable check does not block enabling; a failed check does. " +
 		"Always needs the owner's approval in the admin panel: it changes what the entry node forwards and what people's subscriptions hold. " +
 		"create makes the relay and switches it on after the leg from the entry to the exit and the path from a third node through the entry pass or are unverifiable; a relay that fails stays switched off and the apply reports the stage. " +
-		"leg ipv6 makes the entry reach the exit over IPv6 while people keep connecting to the entry over IPv4 (auto tries both); the entry's agent needs relay-forward/2. " +
+		"leg ipv6 makes the hop between the entry and the exit use IPv6 while people keep connecting to the entry over IPv4 (auto tries both); the direct way needs the entry's agent to list relay-forward/2, the bridge only needs the entry's IPv6 address. " +
 		"enable runs the same checks. Look at relay_candidates first; check with relay_check; the plan never shows an address.",
 	plan: func(c *call, a relayArgs) (*planned, error) {
 		if err := relayArgsShape(a); err != nil {
@@ -524,7 +524,7 @@ func (c *call) relayChangePlan(a relayArgs) (*planned, error) {
 		}
 		facts = append(facts, Fact{Key: "leg", Value: legOrAuto(r.GetLeg()) + " -> " + a.Leg},
 			Fact{Key: "active_leg", Value: r.GetActiveLeg()},
-			Fact{Key: "exit_has_ipv6", Value: "the panel offers an IPv6 leg only from an exit whose IPv6 address passed a check from the entry"})
+			Fact{Key: "exit_has_ipv6", Value: "an IPv6 leg needs the other node's IPv6 address, proved by a check from this side: the exit's for the direct way, the entry's for the bridge"})
 		summary = "Change the address family of the hop between the entry and the exit. People keep connecting to the entry as they do; only the entry-to-exit leg moves. The owner has to approve it first."
 		effect = "A relay that is on installs the new forward and the path is checked from outside; if that fails the relay is switched off. Auto follows the leg that works by itself, at most once per half hour."
 	default: // relayDelete

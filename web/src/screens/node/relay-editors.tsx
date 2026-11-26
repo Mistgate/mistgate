@@ -101,8 +101,10 @@ export function LegEditor({ r, onClose }: { r: RelayMsg; onClose: () => void }) 
   const [value, setValue] = useState<Leg>(((r.leg || "auto") as Leg));
   const [error, setError] = useState<unknown>(null);
   const [pending, setPending] = useState(false);
+  // The direct way over IPv6 needs the userspace forwarder at the entry; the bridge only needs the entry's IPv6 address.
+  const v6Blocked = r.mode === "dnat" && !r.ipv6LegSupported;
   const pick = async (m: Leg) => {
-    if (m === value || pending || (m === "ipv6" && !r.ipv6LegSupported)) return;
+    if (m === value || pending || (m === "ipv6" && v6Blocked)) return;
     setPending(true);
     setError(null);
     try {
@@ -125,8 +127,8 @@ export function LegEditor({ r, onClose }: { r: RelayMsg; onClose: () => void }) 
             key={m}
             type="button"
             aria-pressed={value === m}
-            aria-disabled={m === "ipv6" && !r.ipv6LegSupported}
-            title={m === "ipv6" && !r.ipv6LegSupported ? t("relay.gate.agent_old") : undefined}
+            aria-disabled={m === "ipv6" && v6Blocked}
+            title={m === "ipv6" && v6Blocked ? t("relay.gate.agent_old") : undefined}
             onClick={() => void pick(m)}
             className={cx(
               "h-7 rounded-ctl px-3 text-[13px] transition-colors duration-150 ease-out hover:text-fg aria-disabled:cursor-default aria-disabled:opacity-45 aria-disabled:hover:text-sec",
