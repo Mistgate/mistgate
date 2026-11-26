@@ -114,6 +114,7 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 		Enabled: l.Enabled, State: inboundStates[l.State], LastError: l.LastError, ToIp: l.ToIP, ExitLive: l.Live(),
 		AgentSupported: slices.Contains(l.ViaNodeCaps, agentcap.RelayForward), CreatedUnix: l.CreatedAt.Unix(),
 		Check: s.relayCheckOf(ctx, l), Leg: l.Leg, ActiveLeg: l.ActiveFamily(),
+		Ipv6LegSupported: slices.Contains(l.ViaNodeCaps, agentcap.RelayForwardV6),
 	}
 	if !l.AppliedAt.IsZero() {
 		out.AppliedUnix = l.AppliedAt.Unix()

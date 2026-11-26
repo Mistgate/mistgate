@@ -425,6 +425,19 @@ describe("the editors under a server's row", () => {
     await click(buttonIn(editor(), "Cancel"));
     expect(document.querySelector("[data-testid=relay-port-editor]")).toBeNull();
   });
+
+  it("Address family… changes the leg of the hop, and IPv6 stays shut for an agent that cannot carry it", async () => {
+    listRelays.mockResolvedValue({ relays: [relay({ leg: "auto", activeLeg: "4", ipv6LegSupported: true })] });
+    updateRelay.mockResolvedValue({ relay: relay({ leg: "ipv6", activeLeg: "6", ipv6LegSupported: true }) });
+    await mount(<Rows />);
+    await menuItem(rowOf("VLESS · TCP"), "Address family…");
+    const leg = () => document.querySelector<HTMLElement>("[data-testid=relay-leg-editor]")!;
+    expect(leg().textContent).toContain("People reach the entry as before");
+    await click(buttonIn(leg(), "IPv6"));
+    await settle();
+    expect(updateRelay).toHaveBeenCalledWith({ id: "rly_1", leg: "ipv6" });
+    expect(buttonIn(leg(), "IPv6")?.getAttribute("aria-pressed")).toBe("true");
+  });
 });
 
 describe("a relay that was just made", () => {

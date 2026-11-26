@@ -73,17 +73,16 @@ func udpEcho(t *testing.T, network, addr string) *net.UDPConn {
 	return pc
 }
 
-func waitCounters(t *testing.T, s *Server, id string) Counters {
+func waitCounters(t *testing.T, s *Server, id string, ok func(Counters) bool) Counters {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		c := s.Counters()[id]
-		if c.Bytes > 0 && c.BytesBack > 0 {
+		if c := s.Counters()[id]; ok(c) {
 			return c
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatalf("counters of %s did not move both ways: %+v", id, s.Counters()[id])
+	t.Fatalf("counters of %s did not reach what the test expects: %+v", id, s.Counters()[id])
 	return Counters{}
 }
 
@@ -97,7 +96,7 @@ func TestTCPForwardToIPv6(t *testing.T) {
 
 	s := New()
 	defer s.Close()
-	if errs := s.Sync([]Forward{{ID: "rly_a", Network: "tcp", Port: port, To: to}}); len(errs) != 0 {
+	if errs := s.Sync([]Forward{{ID: "rly_a", Network: "tcp", Port: port, To: to, Address: net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port)))}}); len(errs) != 0 {
 		t.Fatalf("sync: %v", errs)
 	}
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port))), 2*time.Second)
@@ -116,7 +115,7 @@ func TestTCPForwardToIPv6(t *testing.T) {
 	if string(got) != "hello over the family" {
 		t.Fatalf("echo = %q", got)
 	}
-	c := waitCounters(t, s, "rly_a")
+	c := waitCounters(t, s, "rly_a", func(c Counters) bool { return c.Bytes > 0 && c.BytesBack > 0 })
 	if c.BytesBack == 0 {
 		t.Fatalf("nothing counted back: %+v", c)
 	}
@@ -132,7 +131,7 @@ func TestUDPForwardToIPv6(t *testing.T) {
 
 	s := New()
 	defer s.Close()
-	if errs := s.Sync([]Forward{{ID: "rly_u", Network: "udp", Port: port, To: to}}); len(errs) != 0 {
+	if errs := s.Sync([]Forward{{ID: "rly_u", Network: "udp", Port: port, To: to, Address: net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port)))}}); len(errs) != 0 {
 		t.Fatalf("sync: %v", errs)
 	}
 	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: int(port)})
@@ -154,7 +153,9 @@ func TestUDPForwardToIPv6(t *testing.T) {
 			t.Fatalf("reply = %q", buf[:n])
 		}
 	}
-	c := waitCounters(t, s, "rly_u")
+	c := waitCounters(t, s, "rly_u", func(c Counters) bool {
+		return c.Bytes >= 12 && c.BytesBack >= 12 && c.Packets >= 3 && c.PacketsBack >= 3
+	})
 	if c.Bytes < 12 || c.BytesBack < 12 || c.Packets < 3 || c.PacketsBack < 3 {
 		t.Fatalf("counters = %+v", c)
 	}
@@ -169,13 +170,13 @@ func TestSyncReplacesAndStops(t *testing.T) {
 
 	s := New()
 	defer s.Close()
-	if errs := s.Sync([]Forward{{ID: "rly_a", Network: "tcp", Port: port, To: to}}); len(errs) != 0 {
+	if errs := s.Sync([]Forward{{ID: "rly_a", Network: "tcp", Port: port, To: to, Address: net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port)))}}); len(errs) != 0 {
 		t.Fatalf("sync: %v", errs)
 	}
-	if errs := s.Sync([]Forward{{ID: "rly_a", Network: "tcp", Port: port, To: to}}); len(errs) != 0 {
+	if errs := s.Sync([]Forward{{ID: "rly_a", Network: "tcp", Port: port, To: to, Address: net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port)))}}); len(errs) != 0 {
 		t.Fatalf("the same forward again: %v", errs)
 	}
-	if errs := s.Sync([]Forward{{ID: "rly_a", Network: "tcp", Port: port, To: netip.MustParseAddrPort("127.0.0.1:9")}}); len(errs) != 0 {
+	if errs := s.Sync([]Forward{{ID: "rly_a", Network: "tcp", Port: port, To: netip.MustParseAddrPort("127.0.0.1:9"), Address: net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port)))}}); len(errs) != 0 {
 		t.Fatalf("a changed target: %v", errs)
 	}
 	if errs := s.Sync(nil); len(errs) != 0 {

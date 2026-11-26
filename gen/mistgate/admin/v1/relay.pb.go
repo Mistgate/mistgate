@@ -90,9 +90,12 @@ type Relay struct {
 	// IPv6 when the IPv4 leg dies), "ipv4" or "ipv6". People always reach the entry as they did; only this hop changes.
 	Leg string `protobuf:"bytes,34,opt,name=leg,proto3" json:"leg,omitempty"`
 	// The family the leg uses now: "4" or "6". Only the panel changes it (with leg "auto", when a check proves the other family).
-	ActiveLeg     string `protobuf:"bytes,35,opt,name=active_leg,json=activeLeg,proto3" json:"active_leg,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ActiveLeg string `protobuf:"bytes,35,opt,name=active_leg,json=activeLeg,proto3" json:"active_leg,omitempty"`
+	// The entry's agent can carry an IPv6 leg (it lists "relay-forward/2"). False for an older agent: ipv6 is refused and auto
+	// never tries it.
+	Ipv6LegSupported bool `protobuf:"varint,36,opt,name=ipv6_leg_supported,json=ipv6LegSupported,proto3" json:"ipv6_leg_supported,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Relay) Reset() {
@@ -368,6 +371,13 @@ func (x *Relay) GetActiveLeg() string {
 		return x.ActiveLeg
 	}
 	return ""
+}
+
+func (x *Relay) GetIpv6LegSupported() bool {
+	if x != nil {
+		return x.Ipv6LegSupported
+	}
+	return false
 }
 
 // The bridge of a reverse relay (agent.proto BridgeState), as the panel last had it from the two agents.
@@ -1906,7 +1916,7 @@ var File_mistgate_admin_v1_relay_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\n" +
-	"\x1dmistgate/admin/v1/relay.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\x8a\t\n" +
+	"\x1dmistgate/admin/v1/relay.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xb8\t\n" +
 	"\x05Relay\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1950,7 +1960,8 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\x06bridge\x18! \x01(\v2\x1e.mistgate.admin.v1.RelayBridgeR\x06bridge\x12\x10\n" +
 	"\x03leg\x18\" \x01(\tR\x03leg\x12\x1d\n" +
 	"\n" +
-	"active_leg\x18# \x01(\tR\tactiveLeg\"\xf4\x01\n" +
+	"active_leg\x18# \x01(\tR\tactiveLeg\x12,\n" +
+	"\x12ipv6_leg_supported\x18$ \x01(\bR\x10ipv6LegSupported\"\xf4\x01\n" +
 	"\vRelayBridge\x12\x1c\n" +
 	"\tconnected\x18\x01 \x01(\bR\tconnected\x12\x14\n" +
 	"\x05conns\x18\x02 \x01(\rR\x05conns\x12\x15\n" +
