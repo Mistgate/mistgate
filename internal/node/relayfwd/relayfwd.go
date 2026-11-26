@@ -26,12 +26,15 @@ const (
 	// IdleUDP is how long a UDP session lives without a datagram from its client. QUIC keepalives and AmneziaWG's are well
 	// inside it; a client that comes back from a network change starts a session of its own.
 	IdleUDP = 2 * time.Minute
-	// MaxSessionsPerForward bounds the UDP sessions of one port; a NAT table of the kernel has a limit too.
-	MaxSessionsPerForward = 4096
-	// MaxConnsPerForward bounds the open TCP connections of one port.
-	MaxConnsPerForward = 4096
-	// udpBuffer is one datagram, the largest a UDP socket can carry.
-	udpBuffer = 64 * 1024
+	// MaxSessionsPerForward bounds the UDP sessions of one port; a NAT table of the kernel has a limit too. Each session holds
+	// one reply buffer, so this is what bounds the memory of one port.
+	MaxSessionsPerForward = 2048
+	// MaxConnsPerForward bounds the open TCP connections of one port. Past either cap a new connection is closed at once, as the
+	// bridge does when its pool is full.
+	MaxConnsPerForward = 2048
+	// udpBuffer is one datagram: far above the path MTU of Hysteria2 and AmneziaWG, and above anything a client sends. A
+	// datagram that fills it is dropped rather than forwarded truncated.
+	udpBuffer = 16 * 1024
 	// acceptRetry is how soon a failed Accept is tried again.
 	acceptRetry = 50 * time.Millisecond
 	// sweepEvery is how often idle UDP sessions are closed.
@@ -407,6 +410,9 @@ func (f *forward) udpLoop(pc *net.UDPConn) {
 			}
 			continue
 		}
+		if n == len(buf) {
+			continue // possibly truncated: a corrupted datagram is worse than a lost one
+		}
 		s := f.session(client)
 		if s == nil {
 			continue
@@ -463,6 +469,9 @@ func (f *forward) replyLoop(s *udpSession) {
 		if err != nil {
 			f.dropSession(s.client)
 			return
+		}
+		if n == len(buf) {
+			continue // possibly truncated: drop it
 		}
 		s.last.Store(f.srv.now().UnixNano())
 		if _, err := f.udp.WriteToUDPAddrPort(buf[:n], s.client); err != nil {

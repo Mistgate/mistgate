@@ -507,8 +507,12 @@ func relaysFromPB(l *pb.RelayForwards) ([]plugin.RelayForward, []error) {
 		if family == "4" {
 			family = ""
 		}
+		if family != "" && family != "6" {
+			rejected = append(rejected, rejectf("relay %s: bad family", f.RelayId))
+			continue
+		}
 		if (mode != "" && mode != "reverse") || (mode == "reverse" && (f.Network != "tcp" || f.ExitNodeId == "" || !bridgeNodeIDPattern.MatchString(f.ExitNodeId))) ||
-			(mode == "" && f.ExitNodeId != "") || (family != "" && family != "6") || (family == "6" && (mode == "reverse" || f.Network == "")) {
+			(mode == "" && f.ExitNodeId != "") || (family == "6" && mode == "reverse") {
 			rejected = append(rejected, rejectf("relay %s: bad mode", f.RelayId))
 			continue
 		}
