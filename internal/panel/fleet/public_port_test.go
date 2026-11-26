@@ -110,3 +110,23 @@ func TestReverseBridgeKeepsLocalTargetPort(t *testing.T) {
 		t.Fatalf("forward public target: %+v, err %v", forwards, err)
 	}
 }
+
+func TestBridgePortReasonDoesNotHideRelayBehindForwardedSite(t *testing.T) {
+	x := newRelayEnv(t)
+	x.entryTLSite()
+	x.givePath(8443)
+	x.exec(`UPDATE inbound SET port_override=19443,public_port=443 WHERE id='inb_entry_tls'`)
+	entry, err := x.st.Node(x.ctx, x.entry.nodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reason, _ := x.f.bridgePortReason(x.ctx, entry); reason != "" {
+		t.Fatalf("uncontested site: %q", reason)
+	}
+	if err := x.st.CreateRelay(x.ctx, store.Relay{ID: "rly_collision", InboundID: relayInbound, ViaNodeID: entry.ID, Network: "tcp", Port: 443}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if reason, _ := x.f.bridgePortReason(x.ctx, entry); reason != "port_443_taken" {
+		t.Fatalf("forwarded site hid relay: %q", reason)
+	}
+}

@@ -16,9 +16,10 @@ import (
 // portSubject says who asks for the port: the profile (named in a refusal) and what the node's agent lists (nil: the node has not
 // said yet, so it is not refused for being old: the deployment withholds what an old agent cannot take).
 type portSubject struct {
-	Profile string
-	Agent   []string
-	Address string // the node's address, for the name a refusal suggests
+	PublicPort uint16
+	Profile    string
+	Agent      []string
+	Address    string // the node's address, for the name a refusal suggests
 }
 
 // isSharePeer says other is an inbound of the node that spec may share its TCP port with: both listen on the same TCP port, with no

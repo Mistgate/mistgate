@@ -206,3 +206,5 @@ Nodes run the Xray 26.11.9 core. Its REALITY library, as released, sends every a
 If TCP 443 forwards to a VLESS listener on 19443, edit the inbound on that node and set its public port to 443. Leave the listener at 19443. Other nodes using the profile are unaffected. Clearing the public port follows the effective listener again.
 
 The panel advertises and checks the external port; it does not create the forward. Configure forwarding for every advertised address family. A relay still advertises its own entry port. For a CDN host use the CDN port instead.
+
+A forward takes the whole public TCP port. A different TCP listener, a Hysteria2 website or a relay entry on that port conflicts with it; UDP traffic on the same number does not.

@@ -755,3 +755,43 @@ func TestUnverifiableTCPRelayCanBeSwitchedOn(t *testing.T) {
 		t.Fatalf("switched-on unverifiable relay: enabled=%v state=%s check=%+v", link.Enabled, link.State, check)
 	}
 }
+
+func TestSwitchOnRelayToForwardedPublicPort(t *testing.T) {
+	x := newCheckEnv(t, "entry", "exit", "s1")
+	x.exec(`UPDATE inbound SET port_override=19443, public_port=443 WHERE id='inb_vless'`)
+	x.tcpRelay(false)
+	acc, err := accesssvc.New(x.st, x.v, x.f.reg, x.f, nil, accesssvc.Config{CheckRelay: x.f.CheckRelay})
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc.SetRelayWaitForTest(10*time.Second, 10*time.Millisecond)
+	res := x.start("rly_t")
+	leg := tcpRun(x.ec, "ours", 443)
+	c := result(t, res)
+	if leg.Host != addrExit || leg.Targets[0].Port != 443 || c.To != addrExit+":443" || !c.Leg.Acceptable() {
+		t.Fatalf("wrong exit check: request=%v result=%+v", leg, c)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := acc.UpdateRelay(x.ctx, connect.NewRequest(&adminv1.UpdateRelayRequest{Id: "rly_t", Enabled: new(true)}))
+		done <- err
+	}()
+	ds := x.ec.next(x.em)
+	if ds.Relays == nil || len(ds.Relays.Items) != 1 || ds.Relays.Items[0].ToPort != 443 || ds.Relays.Items[0].Port != 7443 {
+		t.Fatalf("wrong forward: %v", ds.Relays)
+	}
+	r := applied(ds, x.em.hash())
+	r.GetApplyResult().Relays = []*agentv1.RelayResult{{RelayId: "rly_t", Ok: true, ToIp: addrExit}}
+	x.ec.send(0, r)
+	path := tcpRun(x.c1, "ours", 7443)
+	if path.Host != addrEntry || path.Targets[0].Port != 7443 {
+		t.Fatal(path)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	l, err := x.st.RelayLink(x.ctx, "rly_t")
+	if err != nil || !l.Enabled || !l.Proven() {
+		t.Fatalf("relay not proven and enabled: %+v %v", l, err)
+	}
+}

@@ -63,6 +63,7 @@ type accessCellV struct {
 	Protocol     string `json:"protocol"`
 	Transport    string `json:"transport,omitempty"`
 	Port         uint32 `json:"port"`
+	PublicPort   uint32 `json:"public_port,omitempty"`
 	Network      string `json:"network"`
 	Egress       string `json:"egress,omitempty"`
 	CDN          bool   `json:"cdn,omitempty"`
@@ -440,7 +441,7 @@ func (a *accessCtx) cell(x *accInbound, devs map[string]*devAgg, rows []accRow) 
 	in := a.in
 	n := a.byID[x.NodeID]
 	p := in.Profiles[x.ProfileID]
-	c := &accessCellV{NodeID: x.NodeID, InboundID: x.ID, Profile: nm(p.Name), Protocol: normProtocol(x.Protocol), Transport: transportOf(p.Summary), Port: x.Port,
+	c := &accessCellV{NodeID: x.NodeID, InboundID: x.ID, Profile: nm(p.Name), Protocol: normProtocol(x.Protocol), Transport: transportOf(p.Summary), Port: x.Port, PublicPort: x.PublicPort,
 		Network: networkOfInbound(x), Egress: clean(x.Egress, 20), CDN: x.CDN, InSubs: x.Direct, State: x.State, AttemptsObservable: normProtocol(x.Protocol) != "vless"}
 	if n != nil {
 		c.Node = nm(n.Name)

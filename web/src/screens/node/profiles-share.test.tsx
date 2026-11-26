@@ -208,6 +208,7 @@ describe("editing the port of a profile that moves onto a port another holds", (
   it("rejects invalid public ports without rewriting them and clears only the external override", async () => {
     updateInbound.mockResolvedValue({ warnings: [] });
     await mount(data({ inbounds: [inb({ port: 19443, publicPort: 443 })] }));
+    expect(text()).toContain("tcp/443 → 19443");
     await click(button("Edit"));
     const input = field("Public TCP port (optional)");
     await type(input, "100000");

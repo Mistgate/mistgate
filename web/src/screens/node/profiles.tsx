@@ -78,7 +78,8 @@ function certCell(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell {
  * every row line up. Anything that is not AmneziaWG reads as TLS.
  */
 function cells(t: T, fmt: Fmt, i: Plain<Inbound>, now: number, dot?: Cell["dot"]): Cell[] {
-  const port: Cell = { label: t("node.profiles.port"), value: i.port ? `${networkOf(i.protocol) ?? "udp"}/${i.port}` : "", mono: true, dot };
+  const portLabel = i.publicPort && i.publicPort !== i.port ? `${i.publicPort} → ${i.port}` : i.port;
+  const port: Cell = { label: t("node.profiles.port"), value: i.port ? `${networkOf(i.protocol) ?? "udp"}/${portLabel}` : "", mono: true, dot };
   const egress: Cell = { label: t("node.profiles.egress"), value: i.egress ? t(i.egress === "warp" ? "node.profiles.egress.warp" : "node.profiles.egress.direct") : "" };
   if (i.protocol === "awg") {
     const a = i.awg;
@@ -249,7 +250,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
                   <Link to="/profiles/$id" params={{ id: i.profileId }} className="truncate font-medium hover:text-accent-text hover:underline">
                     {i.profileName}
                   </Link>
-                  <span className="font-mono text-[11px] font-normal text-muted">{i.port ? `${networkOf(i.protocol) ?? "udp"}/${i.port}` : protocolName(i.protocol)}</span>
+                  <span dir="ltr" className="font-mono text-[11px] font-normal text-muted">{cs[0].value || protocolName(i.protocol)}</span>
                 </div>
                 <span className={cx("inline-flex items-center gap-2 text-[13px] whitespace-nowrap", kindTextClass[s.kind])}>
                   <StatusDot kind={s.kind} />

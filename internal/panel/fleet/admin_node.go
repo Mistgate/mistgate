@@ -401,9 +401,6 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 	if n.BridgePort == 0 || n.BridgePort == 443 {
 		return "", ""
 	}
-	if _, ok := f.bridgeTLSName(ctx, n); ok {
-		return "", ""
-	}
 	inbounds, err := f.st.FleetInbounds(ctx, n.ID, false)
 	if err != nil {
 		return "port_443_taken", ""
@@ -414,6 +411,7 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 	}
 	var specs []inboundSpec
 	vless443 := false
+	var forwarded443 uint16
 	for _, row := range inbounds {
 		if !row.Enabled {
 			continue
@@ -424,6 +422,12 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 		}
 		if spec.Protocol == "vless" && spec.Listen.Network == "tcp" && cmp.Or(row.PublicPort, spec.Listen.Port) == 443 {
 			vless443 = true
+			if spec.Listen.Port != 443 {
+				if forwarded443 != 0 && forwarded443 != spec.Listen.Port {
+					return "port_443_taken", row.ProfileID
+				}
+				forwarded443 = spec.Listen.Port
+			}
 			if v, _ := plugin.VLESSOf(spec); v.Security == "reality" && !v.TargetSelf() {
 				return "reality_external_target", row.ProfileID
 			}
@@ -432,6 +436,9 @@ func (f *Fleet) bridgePortReason(ctx context.Context, n store.NodeRow) (string, 
 	}
 	for _, inbound := range specs {
 		spec := inbound.spec
+		if forwarded443 != 0 && (plugin.Hy2SitePort(spec) == 443 || spec.Listen.Network == "tcp" && spec.Listen.Port == 443) {
+			return "port_443_taken", inbound.row.ProfileID
+		}
 		if spec.Protocol == "hysteria2" && plugin.Hy2SitePort(spec) == 443 {
 			if !vless443 {
 				return "", ""

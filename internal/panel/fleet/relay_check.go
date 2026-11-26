@@ -1,12 +1,9 @@
 package fleet
 
 import (
-	"cmp"
 	"context"
 	"errors"
-	"net"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/mistgate/mistgate/internal/agentcap"
@@ -70,7 +67,7 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 	check := store.RelayCheck{At: now.Unix(), Network: link.Network, Port: link.Port}
 	spec, specErr := f.buildSpec(exit, row)
 	if specErr == nil {
-		check.To = net.JoinHostPort(exit.Address, strconv.Itoa(int(cmp.Or(row.PublicPort, spec.Listen.Port))))
+		check.To = row.RelayExit(exit.Address, spec.Listen.Port).String()
 	}
 	if !runLeg || !runPath {
 		// a stage that does not run keeps what the last check of the same target found (its own at_unix says how old that is): the
@@ -222,7 +219,7 @@ func (r relayRun) leg(ctx context.Context) store.RelayStage {
 		st, _ := r.udpStage(out, sender)
 		return st
 	}
-	target, ok := relayTCPTarget(r.spec, r.row, cmp.Or(r.row.PublicPort, r.spec.Listen.Port))
+	target, ok := relayTCPTarget(r.spec, r.row, r.row.RelayExit(r.exit.Address, r.spec.Listen.Port).Port)
 	if !ok {
 		return r.stage("skipped", "unverifiable", portSenderID(sender))
 	}

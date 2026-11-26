@@ -2,6 +2,7 @@ package access
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -11,6 +12,7 @@ import (
 
 func TestPublicPortBelongsToOneInbound(t *testing.T) {
 	f := newRelayFix(t)
+	must(f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{InboundId: f.server.Id, Enabled: new(false)}))) // leave public TCP 443 free
 	p := f.vlessWith("shared", `{"port":19443,"transport":"tcp","reality":{"target":"www.example.org:443"}}`)
 	a := f.inbound(p.Id, "nod_de1")
 	b := f.inbound(p.Id, "nod_fi1")
@@ -64,6 +66,7 @@ func TestRelayUsesPublicExitPort(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newRelayFix(t)
+			must(f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{InboundId: f.server.Id, Enabled: new(false)}))) // leave public TCP 443 free
 			p := f.vlessWith("shared", `{"port":19443,"transport":"tcp","reality":{"target":"www.example.org:443"}}`)
 			create := func(node string, listen, public uint32) *adminv1.Inbound {
 				t.Helper()
@@ -90,4 +93,53 @@ func TestRelayUsesPublicExitPort(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestForwardConflictsWithSiteInEitherOrder(t *testing.T) {
+	f := newRelayFix(t)
+	p := f.vlessWith("forward", `{"port":19443,"transport":"tcp","reality":{"target":"www.example.org:443"}}`)
+	id := f.inbound(p.Id, "nod_de1").Id
+	update := func(id string, port *uint32, enabled *bool, dry bool) error {
+		_, err := f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{InboundId: id, PublicPort: port, Enabled: enabled, ValidateOnly: dry}))
+		return err
+	}
+	port := uint32(443)
+	for _, dry := range []bool{true, false} {
+		wantMsg(t, update(id, &port, nil, dry), "already_exists: public_port_taken: node=de1&port=443&profile=files")
+	}
+	if err := update(f.server.Id, nil, new(false), false); err != nil {
+		t.Fatal(err)
+	}
+	if err := update(id, &port, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, dry := range []bool{true, false} {
+		wantMsg(t, update(f.server.Id, nil, new(true), dry), "already_exists: public_port_taken: node=de1&port=443&profile=forward")
+	}
+	if err := update(id, new(uint32), nil, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := update(f.server.Id, nil, new(true), false); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestForwardConflictsWithRelayOnCreateAndMove(t *testing.T) {
+	f := newRelayFix(t)
+	p := f.vlessWith("forward", `{"port":19443,"transport":"tcp","reality":{"target":"www.example.org:443"}}`)
+	exit := f.inbound(p.Id, "nod_nl1")
+	entry := f.inbound(p.Id, "nod_fi1")
+	r := must(f.create(exit.Id, "nod_fi1", 8443))
+	port := uint32(8443)
+	_, err := f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{InboundId: entry.Id, PublicPort: &port}))
+	if err == nil || !strings.Contains(err.Error(), "public_port_taken") {
+		t.Fatalf("forward onto relay port: %v", err)
+	}
+	port = 9443
+	must(f.s.UpdateInbound(f.ctx, req(&adminv1.UpdateInboundRequest{InboundId: entry.Id, PublicPort: &port})))
+	_, err = f.update(&adminv1.UpdateRelayRequest{Id: r.Id, Port: &port})
+	wantMsg(t, err, "already_exists: public_port_taken: node=fi1&port=9443&profile=forward")
+	second := f.inbound(p.Id, "nod_de1")
+	_, err = f.create(second.Id, "nod_fi1", port)
+	wantMsg(t, err, "already_exists: public_port_taken: node=fi1&port=9443&profile=forward")
 }

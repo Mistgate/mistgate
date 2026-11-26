@@ -851,6 +851,22 @@ func clashOfExcept(l plugin.Listen, others []nodeListen, skip func(o nodeListen,
 	return nil
 }
 
+// A forward takes its whole public TCP port. Identical forwards to a shared local
+// listener are one route; UDP on the same number is independent of that route.
+func forwardCollision(a, b nodeListen) uint16 {
+	for _, pair := range [2][2]nodeListen{{a, b}, {b, a}} {
+		src, other := pair[0], pair[1]
+		p := src.publicPort
+		if p == 0 || p == src.l.Port {
+			continue
+		}
+		if (p == other.publicPort && other.l.Port != src.l.Port) || plugin.Hy2SitePort(other.spec) == p || listenOverlap(plugin.Listen{Network: "tcp", Port: p}, other.l) {
+			return p
+		}
+	}
+	return 0
+}
+
 // freePortFor is a port an inbound listening as l could take instead of l.Port, with its own hop range and, for UDP,
 // stored bad checks excluded; 0 when none is free.
 func freePortFor(spec plugin.InboundSpec, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) uint16 {
@@ -868,6 +884,15 @@ func freePortFor(spec plugin.InboundSpec, others []nodeListen, checks map[uint16
 // (shareRefusal): the agent puts a front on the port and tells them apart by the name in the ClientHello.
 func portRefusal(spec plugin.InboundSpec, node string, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time, who portSubject) error {
 	l := spec.Listen
+	candidate := nodeListen{spec: spec, l: l, publicPort: who.PublicPort}
+	for _, peer := range others {
+		if !peer.enabled && peer.protocol != relayProtocol {
+			continue
+		}
+		if port := forwardCollision(candidate, peer); port != 0 {
+			return coded(connect.CodeAlreadyExists, "public_port_taken", "node", node, "port", strconv.Itoa(int(port)), "profile", peer.profile)
+		}
+	}
 	if l.HopFrom != 0 {
 		// the range alone: its start stands in for the port, so that only the range is compared
 		if c := clashOf(plugin.Listen{Network: l.Network, Port: l.HopFrom, HopFrom: l.HopFrom, HopTo: l.HopTo}, others); c != nil {
@@ -957,7 +982,7 @@ type inboundAdmission struct {
 // admitInbound is what the three calls ask before an inbound goes on a node: the refusal for its ports, the warnings, and the loss of
 // a UDP port. lossyOverride is set when the admin chose to save a port that was found lossy, for the audit.
 func (s *Service) admitInbound(ctx context.Context, a inboundAdmission) (warnings []*adminv1.StatusReason, lossyOverride bool, err error) {
-	if err = portRefusal(a.spec, a.node.Name, a.others, a.checks, s.now(), portSubject{Profile: a.profile, Agent: a.node.AgentCaps, Address: a.node.Address}); err != nil {
+	if err = portRefusal(a.spec, a.node.Name, a.others, a.checks, s.now(), portSubject{PublicPort: a.publicPort, Profile: a.profile, Agent: a.node.AgentCaps, Address: a.node.Address}); err != nil {
 		return nil, false, err
 	}
 	if warnings, err = s.inboundWarnings(ctx, a.node.ID, a.node.Name, a.profile, a.spec, a.others); err != nil {

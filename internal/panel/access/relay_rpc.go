@@ -1,7 +1,6 @@
 package access
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -105,7 +104,7 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 	}
 	if f, merged, err := s.loadFull(ctx, l.InboundID); err == nil {
 		if spec, err := s.buildSpec(f, merged); err == nil {
-			out.ExitPort = uint32(cmp.Or(f.Inbound.PublicPort, spec.Listen.Port))
+			out.ExitPort = uint32(f.RelayInbound().RelayExit(f.Node.Address, spec.Listen.Port).Port)
 		}
 	}
 	fillRelayMode(out, l)
@@ -188,7 +187,7 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 		return nil, err
 	}
 	network := spec.Listen.Network
-	exitPort := cmp.Or(f.Inbound.PublicPort, spec.Listen.Port)
+	exitPort := f.RelayInbound().RelayExit(f.Node.Address, spec.Listen.Port).Port
 	port := uint16(m.Port)
 	if port == 0 {
 		others = reservePublicPorts(others)

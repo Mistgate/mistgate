@@ -150,6 +150,9 @@ func TestProfileReadToolsMaskSecretsAndExposePlacement(t *testing.T) {
 		t.Errorf("warnings/formats were omitted: %+v", profiles.Profiles[0])
 	}
 
+	e.w.mu.Lock()
+	e.w.profiles["prf_test"].inbounds = append(e.w.profiles["prf_test"].inbounds, &adminv1.Inbound{Id: "forwarded", Protocol: "vless", Port: 19443, PublicPort: 443})
+	e.w.mu.Unlock()
 	profileText := mustOK(t, s, "profile_get", map[string]any{"profile_id": "prf_test"})
 	noCanary(t, "profile_get", profileText)
 	profile := decode[profileGetV](t, profileText)
@@ -160,7 +163,7 @@ func TestProfileReadToolsMaskSecretsAndExposePlacement(t *testing.T) {
 	if got := settings["tls"].(map[string]any)["password"]; got != profileSecretMask {
 		t.Errorf("profile secret = %v", got)
 	}
-	if len(profile.Inbounds) != 1 {
+	if len(profile.Inbounds) != 2 || profile.Inbounds[1].Port != 19443 || profile.Inbounds[1].PublicPort != 443 {
 		t.Fatalf("inbounds: %+v", profile.Inbounds)
 	}
 	inbound := profile.Inbounds[0]
