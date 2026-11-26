@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"cmp"
 	"net"
 	"strconv"
 	"testing"
@@ -20,16 +21,18 @@ func TestRelayTargetAgreesAcrossFleetHealthAndAccess(t *testing.T) {
 	for _, tc := range []struct {
 		name, address string
 		override      uint16
+		public        uint16 // the inbound's public port: the exit port the entry forwards to, instead of the listener's
 		port          uint16 // the exit's server port the entry forwards to
 	}{
-		{"port_override", addrExit, 24443, 24443},
-		{"ipv6_exit", "2001:db8::10", 0, 8443},
-		{"ipv6_exit_with_port_override", "2001:db8::10", 24443, 24443},
+		{"port_override", addrExit, 24443, 0, 24443},
+		{"ipv6_exit", "2001:db8::10", 0, 0, 8443},
+		{"ipv6_exit_with_port_override", "2001:db8::10", 24443, 0, 24443},
+		{"public_port_over_listener", addrExit, 19443, 443, 443},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			x := newCheckEnv(t, "entry", "exit", "s1")
 			x.exec(`UPDATE node SET address = ? WHERE id = ?`, tc.address, x.exit.nodeID)
-			x.exec(`UPDATE inbound SET port_override = NULLIF(?, 0), tls_server_name_override = 'front.example.com' WHERE id = 'inb_vless'`, tc.override)
+			x.exec(`UPDATE inbound SET port_override = NULLIF(?, 0), public_port = ?, tls_server_name_override = 'front.example.com' WHERE id = 'inb_vless'`, tc.override, tc.public)
 			x.tcpRelay(true)
 
 			// the real check, as the owner's check of the relay runs it
@@ -58,8 +61,8 @@ func TestRelayTargetAgreesAcrossFleetHealthAndAccess(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if spec.Listen.Port != tc.port {
-				t.Fatalf("the exit's server port = %d, want %d", spec.Listen.Port, tc.port)
+			if want := cmp.Or(tc.override, 8443); spec.Listen.Port != want {
+				t.Fatalf("the exit's server port = %d, want %d", spec.Listen.Port, want)
 			}
 			_, key := link.Target(row, exit.Address, spec.Listen.Port)
 			if err := x.st.SetRelayMonitorCheck(x.ctx, "rly_t", store.RelayMonitorCheck{AtUnix: time.Now().Unix(), OK: true, TargetKey: key}); err != nil {

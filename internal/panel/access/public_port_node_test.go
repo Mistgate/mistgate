@@ -2,8 +2,10 @@ package access
 
 import (
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -159,5 +161,27 @@ func TestForwardOnlyReservesThePublicTCPRoute(t *testing.T) {
 				t.Fatalf("incorrect collision for %+v", tc.peer)
 			}
 		})
+	}
+}
+
+func tcpVlessSpec(port uint16) plugin.InboundSpec {
+	return plugin.InboundSpec{Protocol: "vless", Listen: plugin.Listen{Network: "tcp", Port: port}}
+}
+
+// A port another inbound of the node publishes is not offered as a new port for a TCP server, as a port it listens on is not.
+func TestFreePortCandidatesSkipsAPeersPublicPort(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	peer := func(public uint16) []nodeListen {
+		spec := tcpVlessSpec(19443)
+		return []nodeListen{{enabled: true, publicPort: public, l: spec.Listen, spec: spec}}
+	}
+	spec := tcpVlessSpec(8443)
+	control := freePortCandidates(spec, 5, peer(0), nil, now)
+	if len(control) == 0 {
+		t.Fatal("no candidates for a node without published ports")
+	}
+	published := control[0]
+	if got := freePortCandidates(spec, 5, peer(published), nil, now); slices.Contains(got, published) {
+		t.Fatalf("port %d is published by a neighbour but offered again: %v", published, got)
 	}
 }
