@@ -77,7 +77,7 @@ func (s updSource) fetchLink(ctx context.Context, name string, offset uint64, w 
 		return 0, fmt.Errorf("%w: missing download token", update.ErrPermanent)
 	}
 	a := s.a
-	rawURL, err := linkDownloadURL(a.cfg.LinkURL, a.meta.NodeID, name)
+	rawURL, err := linkDownloadURL(a.linkURL(), a.meta.NodeID, name)
 	if err != nil {
 		return 0, fmt.Errorf("%w: invalid link download URL: %v", update.ErrPermanent, err)
 	}

@@ -204,17 +204,19 @@ func TestTrustTunnelCredentialReachesTheNodeOnlyForTheAppDevice(t *testing.T) {
 
 // The relay twin of a TrustTunnel server is the app's alone, and goes with the person's Mistgate switch.
 func TestTrustTunnelRelayIsUsableOnlyInTheMistgateFormat(t *testing.T) {
-	e := newEnv(t)
+	f := newRelayFix(t)
+	e := f.env
 	registerTrustTunnelForTest(t, e)
-	link := store.RelayLink{Relay: store.Relay{Enabled: true, State: "active", ViaNodeID: "nod_fi1",
-		CheckJSON: `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`},
-		ExitEnabled: true, ExitState: "active", ExitNodeState: "active", ViaNodeState: "active"}
-	exit := store.AccessInboundFull{
-		Inbound: store.AccessInbound{Enabled: true, State: "active"},
-		Profile: store.AccessProfile{ID: "prf_tt", Protocol: "trusttunnel"},
-		Node:    store.AccessNode{ID: "nod_de1", State: "active"},
+	profile := must(e.s.CreateProfile(e.ctx, req(&adminv1.CreateProfileRequest{Protocol: "trusttunnel", Name: "tt", SettingsJson: `{"port":8444,"tls_mode":"acme_domain"}`}))).Msg.Profile
+	inbound := f.inbound(profile.Id, "nod_de1")
+	r := must(f.create(inbound.Id, "nod_fi1", 8443))
+	f.switchOn(r.Id)
+	link := f.relayOf(r.Id)
+	exit, _, err := e.s.loadFull(e.ctx, inbound.Id)
+	if err != nil {
+		t.Fatal(err)
 	}
-	group := store.AccessGroups{{ProfileIDs: []string{"prf_tt"}}}
+	group := store.AccessGroups{{ProfileIDs: []string{profile.Id}}}
 	user := store.AccessUser{NodeIDs: []string{"nod_de1", "nod_fi1"}, AppHapp: true}
 	if !e.s.relayUsableFor(link, exit, group, user, plugin.FormatMistgate) {
 		t.Fatal("the app is refused the relay twin of a TrustTunnel server")

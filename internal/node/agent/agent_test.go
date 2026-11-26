@@ -156,6 +156,76 @@ func TestEnrollStoresIdentity(t *testing.T) {
 	}
 }
 
+func TestEnrollForceReplacesOldMetadata(t *testing.T) {
+	for _, name := range []string{"pending link", "cleared link revision", "malformed JSON"} {
+		t.Run(name, func(t *testing.T) {
+			oldPanel := newFakePanel(t)
+			dir := t.TempDir()
+			oldMeta, err := Enroll(context.Background(), EnrollConfig{
+				StateDir: dir, Panel: oldPanel.addr(), SNI: testSNI, CASHA256: oldPanel.fingerprint(), Token: oldPanel.token,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			oldID, err := loadIdentity(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Both a pending address and an explicit clear belong only to the old enrollment.
+			oldMeta.Link = "wss://old.example.com/abcdefghijklmnop/"
+			oldMeta.PrevLink = "wss://previous.example.com/abcdefghijklmnop/"
+			oldMeta.LinkSince = 123
+			oldMeta.LinkHealthy = true
+			oldMeta.NextLinkRevision = "old-identity-revision"
+			if name == "pending link" {
+				oldMeta.NextLink = "wss://pending.example.com/abcdefghijklmnop/"
+			}
+			raw, err := json.Marshal(oldMeta)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if name == "malformed JSON" {
+				raw = []byte(`{"node_id":`)
+			}
+			if err := os.WriteFile(filepath.Join(dir, fileMeta), raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			panel := newFakePanel(t)
+			got, err := Enroll(context.Background(), EnrollConfig{
+				StateDir: dir, Panel: panel.addr(), SNI: testSNI, CASHA256: panel.fingerprint(), Token: panel.token, Force: true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := Meta{Panel: panel.addr(), SNI: testSNI, NodeID: "nod_test"}
+			if got != want {
+				t.Fatalf("returned metadata = %+v, want fresh %+v", got, want)
+			}
+			id, err := loadIdentity(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if id.meta != want {
+				t.Fatalf("reloaded metadata = %+v, want fresh %+v", id.meta, want)
+			}
+			if !id.caCert.Equal(panel.caCert) {
+				t.Fatal("reloaded CA is not the new panel's CA")
+			}
+			if err := id.cert.Leaf.CheckSignatureFrom(panel.caCert); err != nil {
+				t.Fatalf("reloaded certificate does not belong to the new enrollment: %v", err)
+			}
+			if id.cert.Leaf.PublicKey.(*ecdsa.PublicKey).Equal(oldID.cert.Leaf.PublicKey) {
+				t.Fatal("forced enrollment retained the old identity key")
+			}
+			if uri := id.cert.Leaf.URIs[0].String(); uri != "mistgate://node/"+got.NodeID {
+				t.Fatalf("reloaded certificate URI = %q, metadata node = %q", uri, got.NodeID)
+			}
+		})
+	}
+}
+
 func TestInterruptedEnrollmentReusesPendingKey(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "state")
 	first, firstCSR, err := pendingKeyAndCSR(dir, false)

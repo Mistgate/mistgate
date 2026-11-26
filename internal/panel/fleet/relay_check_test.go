@@ -467,6 +467,9 @@ func TestCheckRelayPathOnlyKeepsTheLegOfTheSameTarget(t *testing.T) {
 	if leg.Path.Status != "" || !leg.OK {
 		t.Fatalf("leg only: %+v", leg)
 	}
+	// Moving only the entry port needs a fresh path test; the entry-to-exit leg is unchanged.
+	port := uint16(9443)
+	x.setRelay("rly_u", store.RelayPatch{Port: &port})
 	x.live("rly_u")
 	res = x.start("rly_u", store.RelayStagePath)
 	udpRun(x.xc, x.c1, 4443, udpCheckSendCount)
@@ -519,6 +522,24 @@ func TestCheckRelayTCPProvesTheServerAtBothStages(t *testing.T) {
 		t.Fatalf("refused leg: %+v", c)
 	}
 	idle(t, 100*time.Millisecond, x.c1)
+}
+
+func TestRelayCheckDoesNotCarryDirectSpeedAcrossExits(t *testing.T) {
+	x := newCheckEnv(t, "entry", "exit")
+	x.tcpRelay(false)
+	speed := store.RelayStage{Status: "ok", At: time.Now().Unix(), MB: 8}
+	if err := x.st.SetRelayCheck(x.ctx, "rly_t", store.RelayCheck{At: speed.At, Network: "tcp", Port: 7443, To: addrExit + ":8443", DirectSpeed: speed}); err != nil {
+		t.Fatal(err)
+	}
+	for _, address := range []string{addrExit, "203.0.113.99"} {
+		x.exec(`UPDATE node SET address = ? WHERE id = ?`, address, x.exit.nodeID)
+		res := x.start("rly_t", store.RelayStageLeg)
+		tcpRun(x.ec, "ours", 8443)
+		c := result(t, res)
+		if (c.DirectSpeed == speed) != (address == addrExit) {
+			t.Fatalf("speed proof for %s: %+v", address, c.DirectSpeed)
+		}
+	}
 }
 
 func TestCheckRelayMTProtoOwnFallbackAtBothStages(t *testing.T) {

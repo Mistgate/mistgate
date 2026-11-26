@@ -102,6 +102,8 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 			}
 			entries[l.ViaNodeID] = entry
 		}
+		// Filtering a link by its target only removes evidence, so a relay that does not want the bridge on its raw state
+		// does not want it after the filter: skip it before reading the inbound and building its spec.
 		if !l.BridgeWanted(now, entry.BridgeEndpointPort()) {
 			continue
 		}
@@ -122,6 +124,10 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 			continue
 		}
 		if spec.Listen.Network != "tcp" || spec.Listen.Port == 0 {
+			continue
+		}
+		l, _ = l.ForInbound(row, n.Address, spec.Listen.Port)
+		if !l.BridgeWanted(now, entry.BridgeEndpointPort()) {
 			continue
 		}
 		d := dials[entry.ID]

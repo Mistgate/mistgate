@@ -84,7 +84,10 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 	if prev, ok := link.Check(); ok {
 		// the reverse stages answer a question of the entry's site, not of this run's target: one that does not run keeps what the
 		// last check found, and its own at_unix says how old that is
-		check.ReverseReach, check.ReverseSpeed, check.DirectSpeed = prev.ReverseReach, prev.ReverseSpeed, prev.DirectSpeed
+		check.ReverseReach, check.ReverseSpeed = prev.ReverseReach, prev.ReverseSpeed
+		if prev.Network == check.Network && prev.To == check.To && prev.Port == check.Port && check.To != "" {
+			check.DirectSpeed = prev.DirectSpeed
+		}
 		if check.ReverseReach.Port != 0 && check.ReverseReach.Port != entry.BridgeEndpointPort() ||
 			check.ReverseReach.Port == 0 && check.ReverseReach.At > 0 && entry.BridgeEndpointPort() != 443 {
 			check.ReverseReach = store.RelayStage{} // a probe of the endpoint the entry had before says nothing about this one

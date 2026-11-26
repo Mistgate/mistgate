@@ -21,6 +21,7 @@ commands:
   backup    private recovery-key setup and offline restore of an encrypted panel backup
   auth      operator commands on the panel server: "auth turnstile off" is the captcha kill switch,
             "auth reset-login <login>" a new password and authenticator app after a lost phone
+  admin-address  move the admin to a separate listener after its address broke: --admin-listen host:port
   mcp       stdio proxy to the panel's MCP endpoint for agent clients: --url <admin url> --token-file <file>
   release   the owner's release key and signed releases: "release keygen", "release build", "release sign", "release asndb";
             on the panel server "release trust-key" after a key rotation
@@ -45,6 +46,8 @@ func main() {
 		err = runBackup(os.Args[2:], os.Stdout)
 	case "auth":
 		err = runAuth(os.Args[2:], os.Stdout)
+	case "admin-address":
+		err = runAdminAddress(os.Args[2:], os.Stdout)
 	case "release":
 		err = runRelease(os.Args[2:], os.Stdout)
 	case "edge":
