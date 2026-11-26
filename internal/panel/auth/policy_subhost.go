@@ -33,5 +33,5 @@ func init() {
 	grantProcedures["subscription_host_set"] = []string{SubHostSetProcedure}
 	grantProcedures["subscription_host_move"] = []string{SubHostMoveProcedure, SubHostFinishProcedure, SubHostCancelProcedure}
 	grantProcedures["subscription_host_caa_waive"] = []string{SubHostWaiveCAAProcedure}
-	grantProcedures["subscription_host_disable"] = []string{SubHostOffProcedure, SubHostFinishProcedure, SubHostCancelProcedure}
+	grantProcedures["subscription_host_disable"] = []string{SubHostOffProcedure}
 }
