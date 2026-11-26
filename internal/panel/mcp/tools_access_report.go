@@ -785,7 +785,7 @@ func (a *accessCtx) findings() []accessFindingV {
 				continue
 			}
 			for _, w := range working {
-				if normProtocol(w.Protocol) == normProtocol(f.Protocol) && netOf(w.Protocol) == netOf(f.Protocol) && w.Port == f.Port {
+				if normProtocol(w.Protocol) == normProtocol(f.Protocol) && netOf(w.Protocol) == netOf(f.Protocol) && w.entryPort() == f.entryPort() {
 					continue
 				}
 				if normProtocol(w.Protocol) == normProtocol(f.Protocol) {
@@ -794,7 +794,7 @@ func (a *accessCtx) findings() []accessFindingV {
 				fw, ww := a.ways[f.ID], a.ways[w.ID]
 				ev := []string{"conn:" + f.ID, "conn:" + w.ID, "check:" + nid}
 				add(accessFindingV{Code: "protocol_blocked_on_node", Severity: "error", Node: nm(n.Name), Evidence: ev, Affected: a.affectedBy(f.ID),
-					Detail: map[string]string{"blocked": normProtocol(f.Protocol) + "/" + netOf(f.Protocol) + "/" + u32(f.Port), "works": normProtocol(w.Protocol) + "/" + netOf(w.Protocol) + "/" + u32(w.Port),
+					Detail: map[string]string{"blocked": normProtocol(f.Protocol) + "/" + netOf(f.Protocol) + "/" + u32(f.entryPort()), "works": normProtocol(w.Protocol) + "/" + netOf(w.Protocol) + "/" + u32(w.entryPort()),
 						"blocked_by": strings.Join(fw.BlockedBy, ","), "works_by": strings.Join(ww.WorksBy, ","),
 						"operators": strings.Join(cleanAll(summarizeVantages(a.vant(nid)).darkOps, 40, 8), ",")}})
 				break
