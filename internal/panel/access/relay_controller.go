@@ -63,6 +63,13 @@ func (s *Service) controlRelay(ctx context.Context, id string, notify, settle bo
 func (s *Service) controlRelayOnce(ctx context.Context, l store.RelayLink, entry store.NodeRow, notify, settle bool) bool {
 	now := s.now()
 	l = s.relayViewOf(ctx, l)
+	if l.Leg == store.RelayLegAuto {
+		// A leg that dies moves the relay to the other family by itself, and back when that one dies: the check the health round
+		// just stored is the evidence, and tryOtherLeg asks for the other family's leg before it keeps the move.
+		if c, ok := l.Check(); ok && c.Leg.Status == "fail" && s.tryOtherLeg(ctx, l) {
+			return true // the family changed: decide again with its check
+		}
+	}
 	c, _ := l.Check()
 	port := entry.BridgeEndpointPort()
 	reach := c.ReverseReach

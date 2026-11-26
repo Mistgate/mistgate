@@ -24,6 +24,8 @@ type fakeChecker struct {
 	mu   sync.Mutex
 	leg  store.RelayStage
 	path store.RelayStage
+	// legByActive answers the leg for a family ("4" or "6") when it is set, else leg is used.
+	legByActive map[string]store.RelayStage
 	// reverse and speed are what the reverse stages answer when they are asked for.
 	reverse, speed, direct store.RelayStage
 	err                    error
@@ -58,6 +60,9 @@ func (c *fakeChecker) check(ctx context.Context, id string, stages ...string) (s
 	}
 	if runLeg {
 		out.Leg = c.leg
+		if alt, ok := c.legByActive[link.ActiveFamily()]; ok {
+			out.Leg = alt
+		}
 		out.Leg.At = now
 	}
 	if runPath {
@@ -674,12 +679,12 @@ func TestListRelayCandidates(t *testing.T) {
 			t.Errorf("hints asked for %q %v", entry, ids)
 		}
 		return map[string]*adminv1.RelayCountryHint{
-				"nod_fr1": {Verdict: "partial", Dark: []string{"Mobile A", "Mobile B"}, AtUnix: 100},
-				"nod_de1": {Verdict: "ok", AtUnix: 90},
-				"nod_fi1": {Verdict: "ok", AtUnix: 95},
-			}, map[string]*adminv1.RelayReachHint{
-				"nod_fr1": {Verdict: "reach", Source: "refs_pass", AtUnix: 80},
-			}
+			"nod_fr1": {Verdict: "partial", Dark: []string{"Mobile A", "Mobile B"}, AtUnix: 100},
+			"nod_de1": {Verdict: "ok", AtUnix: 90},
+			"nod_fi1": {Verdict: "ok", AtUnix: 95},
+		}, map[string]*adminv1.RelayReachHint{
+			"nod_fr1": {Verdict: "reach", Source: "refs_pass", AtUnix: 80},
+		}
 	})
 	resp = list()
 	got = byID(resp)

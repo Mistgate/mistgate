@@ -40,6 +40,8 @@ type relayRuntime struct {
 	fwdUDP        map[uint16]struct{}
 	hosts         map[string]relayLookup
 	logged        map[string]string // relay id -> the last failure logged, so one is logged once
+	// listenAddr is a test seam of the userspace forwards: nil listens on every local address, as production does.
+	listenAddr func(network string, port uint16) string
 
 	// Test seams; nil = the real thing.
 	lookup func(ctx context.Context, host string) (netip.Addr, error)
@@ -213,6 +215,9 @@ func (a *Agent) syncRelays(ctx context.Context, next *model) {
 				continue
 			}
 			acceptedPorts = append(acceptedPorts, hostctl.Forward{ID: f.ID, Network: f.Network, Port: f.Port, ToPort: 1})
+			if rt.listenAddr != nil {
+				fw.Address = rt.listenAddr(fw.Network, fw.Port)
+			}
 			userspace = append(userspace, fw)
 			continue
 		}

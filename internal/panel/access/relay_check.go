@@ -109,6 +109,12 @@ func (s *Service) relayLegMatches(ctx context.Context, l store.RelayLink, c stor
 // (The leg does not depend on the entry's port; a port moved after the check is covered by the path check that follows the switch.)
 func (s *Service) relayCheckGate(ctx context.Context, l store.RelayLink) error {
 	c, ok := l.Check()
+	if ok && l.Leg == store.RelayLegAuto && c.Leg.Status == "fail" && s.tryOtherLeg(ctx, l) {
+		// The other family proved the leg: the relay is now checked for the target it would really forward to.
+		if next, err := s.st.RelayLink(ctx, l.ID); err == nil {
+			l, c, ok = next, mustRelayCheck(next), true
+		}
+	}
 	if !ok || s.cfg.CheckRelay == nil || c.Leg.Status == "" {
 		return coded(connect.CodeFailedPrecondition, "relay_unchecked")
 	}
@@ -120,6 +126,80 @@ func (s *Service) relayCheckGate(ctx context.Context, l store.RelayLink) error {
 		return coded(connect.CodeFailedPrecondition, "relay_check_failed", "stage", store.RelayStageLeg, "code", c.Leg.Code)
 	}
 	return nil
+}
+
+// relayLegRetry is how soon the panel tries the other address family again after a move: one probe per half hour, not one per
+// check, and the leg of a dead family stays dead for much longer than that.
+const relayLegRetry = 30 * time.Minute
+
+// mustRelayCheck is the stored check of a relay reloaded after a move of the leg family; no check means an empty one, and the
+// gate refuses it as unchecked.
+func mustRelayCheck(l store.RelayLink) store.RelayCheck {
+	c, _ := l.Check()
+	return c
+}
+
+// tryOtherLeg moves an auto relay to the other address family when the family in use cannot reach the exit, and keeps the move
+// only when the leg check of the other family passes. Explicit families never move. It returns true when the family in use
+// changed; the caller then reads the relay and its check again.
+func (s *Service) tryOtherLeg(ctx context.Context, l store.RelayLink) bool {
+	if l.Leg != store.RelayLegAuto || s.cfg.CheckRelay == nil {
+		return false
+	}
+	from := l.ActiveFamily()
+	to := store.RelayFamily6
+	if from == store.RelayFamily6 {
+		to = store.RelayFamily4
+	}
+	if to == store.RelayFamily6 {
+		if !slices.Contains(l.ViaNodeCaps, agentcap.RelayForwardV6) {
+			return false
+		}
+		if _, ok := s.relayExitIPv6(ctx, l); !ok {
+			return false // no address to try: not a dead leg, a missing one, and the check says so
+		}
+	}
+	now := s.now()
+	if !l.LegTriedAt.IsZero() && now.Sub(l.LegTriedAt) < relayLegRetry {
+		return false
+	}
+	if err := s.st.SetRelayActiveLeg(ctx, l.ID, to, now, now); err != nil {
+		if !errors.Is(err, store.ErrNotFound) {
+			s.log.Warn("access: move the relay leg", "code", "relay_leg_store_failed", "relay", l.ID, "err", err)
+		}
+		return false
+	}
+	s.notify.StateChanged()
+	c, err := s.cfg.CheckRelay(ctx, l.ID, store.RelayStageLeg)
+	if err == nil && c.Leg.Status == "ok" {
+		s.log.Info("relay leg moved to the other family", "code", "relay_leg_changed", "relay", l.ID, "from", from, "to", to)
+		if err := s.st.InsertEvent(ctx, store.EventRow{Time: now, Severity: 1, Code: "relay_leg_changed", Source: "panel", NodeID: l.ViaNodeID,
+			Params: map[string]string{"relay": l.ID, "from": from, "to": to}}); err != nil {
+			s.log.Warn("record relay leg change", "code", "relay_leg_event_failed", "relay", l.ID, "err", err)
+		}
+		return true
+	}
+	// The other family does not work either: put the family back, stamp the attempt so the next one waits, and leave the relay
+	// with the failure of the family it had.
+	if err := s.st.SetRelayActiveLeg(ctx, l.ID, from, s.now(), s.now()); err != nil && !errors.Is(err, store.ErrNotFound) {
+		s.log.Warn("access: put the relay leg back", "code", "relay_leg_restore_failed", "relay", l.ID, "err", err)
+	}
+	s.notify.StateChanged()
+	return false
+}
+
+// relayExitIPv6 is the exit's address for an IPv6 leg, when it has one.
+func (s *Service) relayExitIPv6(ctx context.Context, l store.RelayLink) (string, bool) {
+	exit, err := s.st.Access().Node(ctx, l.ExitNodeID)
+	if err != nil {
+		return "", false
+	}
+	d, err := s.st.IPv6Doctor(ctx, l.ExitNodeID)
+	if err != nil {
+		d = store.IPv6Doctor{State: store.IPv6Unknown}
+	}
+	host, _, ok := store.RelayHostFor(store.Relay{ActiveLeg: store.RelayFamily6}, exit.Address, exit.IPv6Entry, d)
+	return host, ok
 }
 
 // relayModeGate is the rule for switching a relay on in the mode asked for (relay.proto CheckRelay and the contract of the way):
