@@ -119,6 +119,9 @@ const (
 	UpdateGuard = "update-guard/1"
 	// UpdateLink is the update capability of an edge link-only agent; a VPS agent is asked for update/1.
 	UpdateLink = "update-link/1"
+	// PanelLink: a link node follows NodeSettings.panel_link_url to a new panel link address. Only a link node lists it: an mTLS
+	// node ignores the address.
+	PanelLink = "panel-link/1"
 	// OSStatus advertises the read-only OS snapshot stream. It is deliberately not os-update/1: an agent that reads the system can
 	// be unable to run a job. OSUpdate: the agent runs OS jobs on request (agent.proto "OS UPDATES").
 	OSStatus = "os-status/1"

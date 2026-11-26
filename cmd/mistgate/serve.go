@@ -134,10 +134,8 @@ func runServe(args []string) error {
 		if in, err = loadInstance(ctx, st); err != nil {
 			return err
 		}
-		if *adminListen != "" && in.AdminListen == "" {
-			// Host and prefix modes have the admin on the public listener and their WebAuthn
-			// origins derived from it; a second way in would be reachable but broken.
-			return errors.New("--admin-listen conflicts with the stored admin address (a secret host or path prefix); run setup with --admin-listen instead")
+		if err := checkAdminOverride(*adminListen, in.AdminListen); err != nil {
+			return err
 		}
 		if *adminListen == "" {
 			*adminListen = in.AdminListen
