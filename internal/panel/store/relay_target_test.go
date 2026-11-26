@@ -41,3 +41,24 @@ func TestRelayForTargetFiltersOnlyStaleEvidence(t *testing.T) {
 		})
 	}
 }
+
+func TestRelayTargetFollowsRouteNotProfileRevision(t *testing.T) {
+	l := RelayLink{Relay: Relay{ID: "r", Network: "tcp", Port: 3443}}
+	in := FleetInboundRow{ID: "in", ProfileID: "p", Protocol: "vless", SpecVersion: 1}
+	const addr = "2001:db8::1"
+	to, key := l.Target(in, addr, 443)
+	if to != "[2001:db8::1]:443" || key == "" {
+		t.Fatal(to, key)
+	}
+	in.ProfileVersion++
+	if s, k := l.Target(in, addr, 443); s != to || k != key {
+		t.Fatal("renaming the profile invalidated its route")
+	}
+	if s, k := l.Target(in, addr, 8443); s == to || k == key {
+		t.Fatal("new port kept old identity")
+	}
+	in.SpecVersion++
+	if _, k := l.Target(in, addr, 443); k == key {
+		t.Fatal("changed inbound kept old monitor")
+	}
+}

@@ -8,13 +8,14 @@ import (
 	"strings"
 )
 
-// TargetKey identifies the configuration a client-eye relay check exercised.
-func (l RelayLink) TargetKey(in FleetInboundRow, exitAddress string, exitPort uint16) string {
+// Target identifies the configuration a client-eye relay check exercised.
+func (l RelayLink) Target(in FleetInboundRow, exitAddress string, listen uint16) (string, string) {
+	exit := in.RelayExit(exitAddress, listen)
 	key := strings.Join([]string{l.ID, l.ViaNodeID, l.ViaNodeAddress, exitAddress, in.ID, in.ProfileID, in.Protocol,
-		strconv.FormatUint(uint64(in.ProfileVersion), 10), strconv.FormatUint(in.SpecVersion, 10), in.TLSNameOverride, in.RealityTargetOverride,
-		l.Network, strconv.Itoa(int(l.Port)), strconv.Itoa(int(exitPort))}, "\x00")
+		strconv.FormatUint(in.SpecVersion, 10), in.TLSNameOverride, in.RealityTargetOverride,
+		l.Network, strconv.Itoa(int(l.Port)), strconv.Itoa(int(exit.Port))}, "\x00")
 	sum := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(sum[:])
+	return exit.String(), hex.EncodeToString(sum[:])
 }
 
 // ForTarget is a read-only view without evidence from a previous endpoint. Bridge

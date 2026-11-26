@@ -39,7 +39,7 @@ func relayTargetKey(t *target) string {
 	if t == nil || t.relay == nil {
 		return ""
 	}
-	return t.relay.link.TargetKey(t.in, t.node.Address, t.relay.exitPort)
+	return t.relay.key
 }
 
 // roundRelay probes the exit inbound through the entry's forwarded port. Its result lives in check_json.monitor and never
@@ -96,19 +96,20 @@ func (s *Service) roundRelay(ctx context.Context, id string) (Result, bool) {
 			now.Unix() >= previous.Monitor.AtUnix && now.Sub(time.Unix(previous.Monitor.AtUnix, 0)) <= 2*s.interval(ctx)+time.Minute {
 			monitor.FailStreak = previous.Monitor.FailStreak + 1
 		}
+	}
+	// A passing client probe cannot replace the leg and path proof subscriptions require.
+	checked := false
+	if !monitor.OK || !link.Usable() {
 		if previous.Monitor != nil {
 			monitor.AutoCheckAt = previous.Monitor.AutoCheckAt
 			monitor.AutoCheckTargetKey = previous.Monitor.AutoCheckTargetKey
 		}
-	}
-
-	if !monitor.OK {
-		s.diagnoseRelay(ctx, link, key, &monitor)
+		checked = s.diagnoseRelay(ctx, link, key, &monitor)
 	}
 	if err := s.st.SetRelayMonitorCheck(ctx, link.ID, monitor); err != nil && err != store.ErrNotFound {
 		s.log.Warn("health: store relay monitor", "code", "relay_monitor_store_failed", "relay", link.ID, "err", err)
 	}
-	if link.Reverse() {
+	if link.Reverse() && !checked {
 		if check, ok := link.Check(); !ok || check.Leg.At <= 0 || now.Unix() >= check.Leg.At && now.Sub(time.Unix(check.Leg.At, 0)) >= relayAutoCheckInterval {
 			checkCtx, cancel := context.WithTimeout(ctx, roundBudget)
 			if _, err := s.fl.CheckRelay(checkCtx, link.ID, store.RelayStageLeg); err != nil && ctx.Err() == nil {
@@ -141,23 +142,23 @@ func (s *Service) relaySkip(ctx context.Context, t *target) (string, bool) {
 	return "", true
 }
 
-func (s *Service) diagnoseRelay(ctx context.Context, link store.RelayLink, targetKey string, monitor *store.RelayMonitorCheck) {
+func (s *Service) diagnoseRelay(ctx context.Context, link store.RelayLink, targetKey string, monitor *store.RelayMonitorCheck) bool {
 	id := link.ID
 	now := s.now()
 	due := monitor.AutoCheckTargetKey != targetKey || monitor.AutoCheckAt == 0 ||
 		(now.Unix() >= monitor.AutoCheckAt && now.Sub(time.Unix(monitor.AutoCheckAt, 0)) >= relayAutoCheckInterval)
 	if !due {
-		return
+		return false
 	}
 	monitor.AutoCheckAt, monitor.AutoCheckTargetKey = now.Unix(), targetKey
 	if err := s.st.SetRelayMonitorCheck(ctx, id, *monitor); err != nil {
 		s.log.Warn("health: reserve relay diagnosis", "code", "relay_diagnosis_reserve_failed", "relay", id, "err", err)
-		return
+		return false
 	}
 	checkCtx, cancel := context.WithTimeout(ctx, roundBudget)
 	defer cancel()
 	var stages []string
-	if link.Network == "tcp" && link.Mode != store.RelayModeDNAT && slices.Contains(link.ViaNodeCaps, agentcap.RelayReverse) &&
+	if !monitor.OK && link.Network == "tcp" && link.Mode != store.RelayModeDNAT && slices.Contains(link.ViaNodeCaps, agentcap.RelayReverse) &&
 		slices.Contains(link.ExitNodeCaps, agentcap.RelayReverse) {
 		// a failed round may be the direct way failing (or freezing): the controller then needs to know, in the same pass, whether
 		// the exit reaches the entry's bridge endpoint, or it cannot move the relay before the next diagnosis, half an hour on
@@ -166,7 +167,10 @@ func (s *Service) diagnoseRelay(ctx context.Context, link store.RelayLink, targe
 	check, err := s.fl.CheckRelay(checkCtx, id, stages...)
 	if err != nil {
 		s.log.Warn("health: diagnose relay", "code", "relay_diagnosis_failed", "relay", id, "err", err)
-		return
+		return true // the full check was attempted; do not immediately run the leg again
+	}
+	if monitor.OK {
+		return true
 	}
 	switch {
 	case link.Reverse() && check.Bridge.Status != "ok":
@@ -181,6 +185,7 @@ func (s *Service) diagnoseRelay(ctx context.Context, link store.RelayLink, targe
 	case check.Verified() && monitor.Stage != "freeze":
 		monitor.Stage = "path"
 	}
+	return true
 }
 
 func relayStageForCode(code string) string {

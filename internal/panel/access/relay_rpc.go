@@ -95,8 +95,8 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 	var to, key string
 	if f, merged, err := s.loadFull(ctx, l.InboundID); err == nil {
 		if spec, err := s.buildSpec(f, merged); err == nil {
-			port = spec.Listen.Port
-			to, key = relayEndpoint(l, f, port)
+			port = f.RelayInbound().RelayExit(f.Node.Address, spec.Listen.Port).Port
+			to, key = relayEndpoint(l, f, spec.Listen.Port)
 		}
 	}
 	l = l.ForTarget(to, key)

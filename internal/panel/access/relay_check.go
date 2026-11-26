@@ -4,10 +4,8 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"net"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -58,10 +56,7 @@ func (s *Service) relayTarget(ctx context.Context, l store.RelayLink) (string, s
 }
 
 func relayEndpoint(l store.RelayLink, f store.AccessInboundFull, port uint16) (string, string) {
-	row := store.FleetInboundRow{ID: f.Inbound.ID, ProfileID: f.Profile.ID, Protocol: f.Profile.Protocol,
-		ProfileVersion: f.Profile.Version, SpecVersion: f.Inbound.SpecVersion,
-		TLSNameOverride: f.Inbound.TLSServerNameOverride, RealityTargetOverride: f.Inbound.RealityTargetOverride}
-	return net.JoinHostPort(f.Node.Address, strconv.Itoa(int(port))), l.TargetKey(row, f.Node.Address, port)
+	return l.Target(f.RelayInbound(), f.Node.Address, port)
 }
 
 // The leg ends at the exit; moving the entry's listen port invalidates the path but not the leg.

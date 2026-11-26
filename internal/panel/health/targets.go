@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
-	"strconv"
 
 	"github.com/mistgate/mistgate/internal/panel/protocols"
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
@@ -144,9 +142,9 @@ type target struct {
 }
 
 type relayTargetInfo struct {
-	link     store.RelayLink
-	entry    store.NodeRow
-	exitPort uint16
+	link  store.RelayLink
+	entry store.NodeRow
+	key   string
 }
 
 // snapshot is every inbound of every non-retired node at one moment.
@@ -195,9 +193,8 @@ func (s *Service) snapshot(ctx context.Context) (*snapshot, error) {
 			continue
 		}
 		t := *exit
-		t.relay = &relayTargetInfo{link: link, entry: entry, exitPort: exit.spec.Listen.Port}
-		to := net.JoinHostPort(exit.node.Address, strconv.Itoa(int(t.relay.exitPort)))
-		t.relay.link = link.ForTarget(to, relayTargetKey(&t))
+		to, key := link.Target(exit.in, exit.node.Address, exit.spec.Listen.Port)
+		t.relay = &relayTargetInfo{link: link.ForTarget(to, key), entry: entry, key: key}
 		t.spec.Listen.Port = link.Port
 		sn.relayTargets[relayTargetID(link.ID)] = &t
 	}

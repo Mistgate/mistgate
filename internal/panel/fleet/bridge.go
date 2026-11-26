@@ -3,11 +3,9 @@ package fleet
 import (
 	"context"
 	"encoding/json"
-	"net"
 	"regexp"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
@@ -122,8 +120,7 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 		if spec.Listen.Network != "tcp" || spec.Listen.Port == 0 {
 			continue
 		}
-		port := spec.Listen.Port
-		l = l.ForTarget(net.JoinHostPort(n.Address, strconv.Itoa(int(port))), l.TargetKey(row, n.Address, port))
+		l = l.ForTarget(l.Target(row, n.Address, spec.Listen.Port))
 		if !l.BridgeWanted(now, entry.BridgeEndpointPort()) {
 			continue
 		}
