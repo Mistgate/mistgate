@@ -42,27 +42,38 @@ func (r relayRun) reverseReach(ctx context.Context) store.RelayStage {
 	return stage
 }
 
+// reverseStage is r.stage with the family of the entry address the reverse probes were sent to.
+func (r relayRun) reverseStage(status, code, sender string) store.RelayStage {
+	st := r.stage(status, code, sender)
+	st.Family = r.entryFamily
+	return st
+}
+
 func (r relayRun) reverseReachAt(ctx context.Context) store.RelayStage {
+	if !r.entryOK {
+		return r.reverseStage("fail", "no_ipv6_address", "")
+	}
 	target, ok, err := r.reverseSiteTarget(ctx)
 	if err != nil {
 		r.f.log.Warn("relay reverse reach: read entry site", "code", "store_failed", "relay", r.link.ID, "err", err)
-		return r.stage("fail", "failed", "")
+		return r.reverseStage("fail", "failed", "")
 	}
 	if !ok {
-		return r.stage("skipped", "entry_site_unavailable", "")
+		return r.reverseStage("skipped", "entry_site_unavailable", "")
 	}
 	live := r.live[r.exit.ID]
 	if !r.f.reachable(live, r.exit.ID) {
-		return r.stage("fail", "exit_offline", "")
+		return r.reverseStage("fail", "exit_offline", "")
 	}
 	if !slices.Contains(live.AgentCaps, agentcap.TCPCheck) {
-		return r.stage("skipped", "unsupported", r.exit.ID)
+		return r.reverseStage("skipped", "unsupported", r.exit.ID)
 	}
 	sender := portSender{node: r.exit, live: live}
-	stage, _ := r.tcpStage(ctx, r.entry.Address, sender, target)
+	stage, _ := r.tcpStage(ctx, r.entryHost, sender, target)
 	if stage.Code == "refused" {
-		return r.stage("skipped", "entry_site_unavailable", r.exit.ID)
+		return r.reverseStage("skipped", "entry_site_unavailable", r.exit.ID)
 	}
+	stage.Family = r.entryFamily
 	return stage
 }
 

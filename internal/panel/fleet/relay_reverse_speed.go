@@ -18,7 +18,13 @@ const relayReverseSpeedMB = 8
 
 // reverseSpeed is an explicit proof that the exit can send a full 8 MB flow to the entry.
 func (r relayRun) reverseSpeed(ctx context.Context) store.RelayStage {
-	stage := store.RelayStage{Sender: r.exit.ID, At: r.f.now().UTC().Unix()}
+	stage := store.RelayStage{Sender: r.exit.ID, At: r.f.now().UTC().Unix(), Family: r.entryFamily}
+	if !r.entryOK {
+		stage.Status, stage.Code = "fail", "no_ipv6_address"
+		return stage
+	}
+	entry := r.entry
+	entry.Address = r.entryHost // the flow must go over the leg's family, not the entry's own address
 	for _, id := range []string{r.exit.ID, r.entry.ID} {
 		if _, code := r.f.probeLive(r.live, id, agentcap.Speed); code != "" {
 			if code == "agent_too_old" {
@@ -42,7 +48,7 @@ func (r relayRun) reverseSpeed(ctx context.Context) store.RelayStage {
 	}
 	defer release()
 
-	result := r.f.runPathSpeed(ctx, r.exit, r.entry, "up", relayReverseSpeedMB)
+	result := r.f.runPathSpeed(ctx, r.exit, entry, "up", relayReverseSpeedMB)
 	stage.At, stage.MB = r.f.now().UTC().Unix(), result.MB
 	if result.Error != "" {
 		stage.Status, stage.Code = "fail", result.Error

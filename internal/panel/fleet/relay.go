@@ -57,17 +57,19 @@ func (f *Fleet) relayForwards(ctx context.Context, n store.NodeRow, caps []strin
 			continue
 		}
 		toFamily := ""
+		reverse := bridgePathValid(n.BridgePath) && bridgePortValid(n.BridgePort) && reverseCarried(l, n.ID, caps)
 		if family == store.RelayFamily6 {
-			if !slices.Contains(caps, agentcap.RelayForwardV6) {
-				f.log.Warn("relay: the entry's agent cannot carry an IPv6 leg", "relay", l.ID, "inbound", l.InboundID)
+			// The bridge carries the hop itself and only needs the entry's IPv6 address; the direct way needs the userspace forwarder.
+			if !reverse && !slices.Contains(caps, agentcap.RelayForwardV6) {
+				f.log.Warn("relay: the entry's agent cannot carry a direct IPv6 leg", "relay", l.ID, "inbound", l.InboundID)
 				continue
 			}
 			toFamily = store.RelayFamily6
 		}
 		to := row.RelayExit(host, spec.Listen.Port)
 		fwd := plugin.RelayForward{ID: l.ID, Network: l.Network, Port: l.Port, ToHost: to.Host, ToPort: to.Port, ToFamily: toFamily}
-		if bridgePathValid(n.BridgePath) && bridgePortValid(n.BridgePort) && reverseCarried(l, n.ID, caps) { // A bad endpoint cannot be carried as a reverse forward.
-			fwd.Mode, fwd.ExitNodeID, fwd.ToFamily = store.RelayModeReverse, l.ExitNodeID, "" // The bridge dials the entry; the exit's family is not its to_host.
+		if reverse { // A bad endpoint cannot be carried as a reverse forward; the bridge dials the entry, so the exit's family is not its to_host.
+			fwd.Mode, fwd.ExitNodeID, fwd.ToFamily = store.RelayModeReverse, l.ExitNodeID, ""
 		}
 		out = append(out, fwd)
 	}

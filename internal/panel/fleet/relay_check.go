@@ -71,6 +71,12 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 		doctor = store.IPv6Doctor{State: store.IPv6Unknown}
 	}
 	toHost, toFamily, hostOK := store.RelayHostFor(link.Relay, exit.Address, exit.IPv6Entry, doctor)
+	entryDoctor, entryDoctorErr := f.st.IPv6Doctor(ctx, entry.ID)
+	if entryDoctorErr != nil {
+		f.log.Warn("relay check: the entry's IPv6 facts", "relay", link.ID, "err", entryDoctorErr)
+		entryDoctor = store.IPv6Doctor{State: store.IPv6Unknown}
+	}
+	entryHost, entryFamily, entryOK := store.RelayHostFor(link.Relay, entry.Address, entry.IPv6Entry, entryDoctor)
 	spec, specErr := f.buildSpec(exit, row)
 	if specErr == nil && hostOK {
 		check.To = row.RelayExit(toHost, spec.Listen.Port).String()
@@ -100,7 +106,8 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 		}
 	}
 	rc := relayRun{f: f, link: link, entry: entry, exit: exit, spec: spec, row: row, now: now,
-		toHost: toHost, toFamily: toFamily, hostOK: hostOK}
+		toHost: toHost, toFamily: toFamily, hostOK: hostOK,
+		entryHost: entryHost, entryFamily: entryFamily, entryOK: entryOK}
 	if specErr == nil {
 		liveRows, err := f.Live(ctx)
 		if err != nil {
@@ -195,6 +202,10 @@ type relayRun struct {
 	// entry would forward to.
 	toHost, toFamily string
 	hostOK           bool
+	// entryHost is the entry's address for the same family, and entryFamily that family: the bridge is dialed there and the
+	// reverse probes go there. entryOK is false when the entry names no address of that family.
+	entryHost, entryFamily string
+	entryOK                bool
 }
 
 func (r relayRun) stage(status, code, sender string) store.RelayStage {
