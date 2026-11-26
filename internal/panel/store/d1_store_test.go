@@ -1436,6 +1436,8 @@ func TestD1RewrittenTelegramMethods(t *testing.T) {
 	}
 }
 
+func TestD1NodePublicPort(t *testing.T) { nodePublicPortProof(t, openD1Store(t)) }
+
 func TestD1RewrittenAccessMethods(t *testing.T) {
 	ctx := context.Background()
 	now := time.Unix(1_800_000_000, 0).UTC()
@@ -2784,5 +2786,3 @@ func TestD1NodeShare(t *testing.T) {
 		t.Fatalf("after all: %+v %v", shares["nod_nl1"], err)
 	}
 }
-
-func TestD1NodePublicPort(t *testing.T) { nodePublicPortProof(t, openD1Store(t)) }

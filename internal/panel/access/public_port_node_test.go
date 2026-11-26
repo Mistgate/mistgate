@@ -143,3 +143,21 @@ func TestForwardConflictsWithRelayOnCreateAndMove(t *testing.T) {
 	_, err = f.create(second.Id, "nod_fi1", port)
 	wantMsg(t, err, "already_exists: public_port_taken: node=fi1&port=9443&profile=forward")
 }
+
+func TestForwardOnlyReservesThePublicTCPRoute(t *testing.T) {
+	mapping := func(listen, public uint16) nodeListen {
+		return nodeListen{l: plugin.Listen{Network: "tcp", Port: listen}, publicPort: public}
+	}
+	a := mapping(19443, 443)
+	for _, tc := range []struct {
+		name  string
+		peer  nodeListen
+		clash bool
+	}{{"another listener", mapping(443, 0), true}, {"another destination", mapping(20443, 443), true}, {"same forward", mapping(19443, 443), false}, {"same listener different forward", mapping(19443, 8443), false}, {"UDP only", nodeListen{l: plugin.Listen{Network: "udp", Port: 443}}, false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			if (forwardCollision(a, tc.peer) != 0) != tc.clash || (forwardCollision(tc.peer, a) != 0) != tc.clash {
+				t.Fatalf("incorrect collision for %+v", tc.peer)
+			}
+		})
+	}
+}

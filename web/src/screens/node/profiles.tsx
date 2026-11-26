@@ -72,14 +72,19 @@ function certCell(t: T, fmt: Fmt, i: Plain<Inbound>, now: number): Cell {
   return { label, value: i.state === InboundState.ACTIVE ? "" : t("node.profiles.certNone") };
 }
 
+function inboundPortLabel(i: Plain<Inbound>): string {
+  if (!i.port) return "";
+  const ports = i.publicPort && i.publicPort !== i.port ? `${i.publicPort} → ${i.port}` : i.port;
+  return `${networkOf(i.protocol) ?? "udp"}/${ports}`;
+}
+
 /**
  * The facts a row shows: port and egress for every protocol, then a TLS protocol's domain and certificate, or a
  * WireGuard-family one's devices and backend (the backend's version is its tooltip). Always four, so the columns of
  * every row line up. Anything that is not AmneziaWG reads as TLS.
  */
 function cells(t: T, fmt: Fmt, i: Plain<Inbound>, now: number, dot?: Cell["dot"]): Cell[] {
-  const portLabel = i.publicPort && i.publicPort !== i.port ? `${i.publicPort} → ${i.port}` : i.port;
-  const port: Cell = { label: t("node.profiles.port"), value: i.port ? `${networkOf(i.protocol) ?? "udp"}/${portLabel}` : "", mono: true, dot };
+  const port: Cell = { label: t("node.profiles.port"), value: inboundPortLabel(i), mono: true, dot };
   const egress: Cell = { label: t("node.profiles.egress"), value: i.egress ? t(i.egress === "warp" ? "node.profiles.egress.warp" : "node.profiles.egress.direct") : "" };
   if (i.protocol === "awg") {
     const a = i.awg;
@@ -250,7 +255,7 @@ export function ProfilesTab({ data, addProfile, onAddClosed }: { data: Plain<Get
                   <Link to="/profiles/$id" params={{ id: i.profileId }} className="truncate font-medium hover:text-accent-text hover:underline">
                     {i.profileName}
                   </Link>
-                  <span dir="ltr" className="font-mono text-[11px] font-normal text-muted">{cs[0].value || protocolName(i.protocol)}</span>
+                  <span dir="ltr" className="font-mono text-[11px] font-normal text-muted">{inboundPortLabel(i) || protocolName(i.protocol)}</span>
                 </div>
                 <span className={cx("inline-flex items-center gap-2 text-[13px] whitespace-nowrap", kindTextClass[s.kind])}>
                   <StatusDot kind={s.kind} />
