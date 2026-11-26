@@ -14,6 +14,7 @@ import (
 	nodebridge "github.com/mistgate/mistgate/internal/node/bridge"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/relayfwd"
 	"github.com/mistgate/mistgate/internal/node/unit"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -316,6 +317,9 @@ func (a *Agent) doctorReportMsg(ctx context.Context, requestID string, rep *doct
 		reverseCounters = a.bridgeEntry.RelayCounters()
 	}
 	counters = append(counters, reverseRelayCounterResults(model.relays, reverseCounters, a.now())...)
+	if a.relayFwd != nil {
+		counters = append(counters, forwardRelayCounterResults(model.relays, a.relayFwd.Counters(), a.now())...)
+	}
 	if len(counters) == 0 {
 		return reportMsg(requestID, rep, errText)
 	}
@@ -348,7 +352,7 @@ func relayCounterResults(ctx context.Context, run func(context.Context, string, 
 	// inspect the nftables DNAT counters used by ordinary forwards.
 	dnatForwards := make([]plugin.RelayForward, 0, len(forwards))
 	for _, f := range forwards {
-		if f.Mode != "reverse" && f.ID != "" && (f.Network == "tcp" || f.Network == "udp") && f.Port != 0 {
+		if f.Mode != "reverse" && f.ToFamily != "6" && f.ID != "" && (f.Network == "tcp" || f.Network == "udp") && f.Port != 0 {
 			dnatForwards = append(dnatForwards, f)
 		}
 	}
@@ -388,6 +392,28 @@ func relayCounterResults(ctx context.Context, run func(context.Context, string, 
 			Params: map[string]string{"relay": f.ID, "network": f.Network, "port": strconv.FormatUint(uint64(f.Port), 10),
 				"bytes": strconv.FormatUint(counter.Bytes, 10), "packets": strconv.FormatUint(counter.Packets, 10),
 				"bytes_back": strconv.FormatUint(back.Bytes, 10), "packets_back": strconv.FormatUint(back.Packets, 10)}})
+	}
+	return results
+}
+
+// forwardRelayCounterResults is the counters of the forwards whose exit is reached over IPv6: they live in the userspace
+// forwarder, not in an nft table, and are reported in the same shape as the kernel ones.
+func forwardRelayCounterResults(forwards []plugin.RelayForward, counters map[string]relayfwd.Counters, now time.Time) []doctor.Result {
+	items := append([]plugin.RelayForward(nil), forwards...)
+	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+	results := make([]doctor.Result, 0, len(items))
+	for _, f := range items {
+		if f.Mode == "reverse" || f.ToFamily != "6" || f.ID == "" || (f.Network != "tcp" && f.Network != "udp") || f.Port == 0 {
+			continue
+		}
+		c, ok := counters[f.ID]
+		if !ok {
+			continue
+		}
+		results = append(results, doctor.Result{ID: "relay", Status: doctor.OK, Measured: now,
+			Params: map[string]string{"relay": f.ID, "network": f.Network, "port": strconv.FormatUint(uint64(f.Port), 10),
+				"bytes": strconv.FormatUint(c.Bytes, 10), "packets": strconv.FormatUint(c.Packets, 10),
+				"bytes_back": strconv.FormatUint(c.BytesBack, 10), "packets_back": strconv.FormatUint(c.PacketsBack, 10)}})
 	}
 	return results
 }

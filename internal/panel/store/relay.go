@@ -268,6 +268,13 @@ func (s *Store) UpdateRelay(ctx context.Context, id string, p RelayPatch, now ti
 	}
 	if p.Leg != nil {
 		set, args = append(set, `leg = ?`), append(args, *p.Leg)
+		// A family the owner pinned is the family in use at once; "auto" leaves the panel's choice alone.
+		switch *p.Leg {
+		case RelayLegIPv4:
+			set = append(set, `active_leg = '4'`)
+		case RelayLegIPv6:
+			set = append(set, `active_leg = '6'`)
+		}
 	}
 	if p.Enabled != nil || p.Port != nil {
 		set = append(set, `state = 'pending'`, `last_error = ''`, `to_ip = ''`, `applied_at = 0`)

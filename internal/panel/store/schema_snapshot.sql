@@ -949,7 +949,7 @@ CREATE TABLE relay (
     applied_at  INTEGER NOT NULL DEFAULT 0,
     check_json  TEXT    NOT NULL DEFAULT '{}' CHECK (json_valid(check_json)),
     created_at  INTEGER NOT NULL,
-    updated_at  INTEGER NOT NULL, mode TEXT NOT NULL DEFAULT 'auto' CHECK (mode IN ('auto', 'dnat', 'reverse')), active_mode TEXT NOT NULL DEFAULT 'dnat' CHECK (active_mode IN ('dnat', 'reverse')), mode_changed_at INTEGER NOT NULL DEFAULT 0, mode_reason TEXT NOT NULL DEFAULT '',
+    updated_at  INTEGER NOT NULL, mode TEXT NOT NULL DEFAULT 'auto' CHECK (mode IN ('auto', 'dnat', 'reverse')), active_mode TEXT NOT NULL DEFAULT 'dnat' CHECK (active_mode IN ('dnat', 'reverse')), mode_changed_at INTEGER NOT NULL DEFAULT 0, mode_reason TEXT NOT NULL DEFAULT '', leg TEXT NOT NULL DEFAULT 'auto' CHECK (leg IN ('auto', 'ipv4', 'ipv6')), active_leg TEXT NOT NULL DEFAULT '4' CHECK (active_leg IN ('4', '6')), leg_tried_at INTEGER NOT NULL DEFAULT 0,
     UNIQUE (inbound_id, via_node_id),
     UNIQUE (via_node_id, network, port)
 ) STRICT;

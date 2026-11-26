@@ -132,6 +132,11 @@ message Relay {
   string reverse_blocked = 32;
   // The state of the bridge as the agents last reported it; absent while there is no report (a DNAT relay never has one).
   RelayBridge bridge = 33;
+  // The address family of the leg between the entry and the exit: "auto" (the owner's default: the panel uses IPv4 and moves to
+  // IPv6 when the IPv4 leg dies), "ipv4" or "ipv6". People always reach the entry as they did; only this hop changes.
+  string leg = 34;
+  // The family the leg uses now: "4" or "6". Only the panel changes it (with leg "auto", when a check proves the other family).
+  string active_leg = 35;
 }
 
 // The bridge of a reverse relay (agent.proto BridgeState), as the panel last had it from the two agents.
@@ -348,6 +353,8 @@ message CreateRelayRequest {
   uint32 port = 3;
   // "auto", "dnat" or "reverse"; empty = "auto".
   string mode = 4;
+  // "auto", "ipv4" or "ipv6"; empty = "auto".
+  string leg = 5;
 }
 
 message CreateRelayResponse {
@@ -360,6 +367,8 @@ message UpdateRelayRequest {
   optional uint32 port = 3;
   // "auto", "dnat" or "reverse"; unset = unchanged.
   optional string mode = 4;
+  // "auto", "ipv4" or "ipv6"; unset = unchanged.
+  optional string leg = 5;
 }
 
 message UpdateRelayResponse {

@@ -2,10 +2,12 @@ package fleet
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"time"
 
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
+	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
@@ -42,10 +44,30 @@ func (f *Fleet) relayForwards(ctx context.Context, n store.NodeRow, caps []strin
 			f.log.Warn("relay: the server's spec does not build, the forward is left out", "relay", l.ID, "inbound", l.InboundID, "err", err)
 			continue
 		}
-		to := row.RelayExit(exit.Address, spec.Listen.Port)
-		fwd := plugin.RelayForward{ID: l.ID, Network: l.Network, Port: l.Port, ToHost: to.Host, ToPort: to.Port}
+		doctor, err := f.st.IPv6Doctor(ctx, exit.ID)
+		if err != nil {
+			f.log.Warn("relay: the exit's IPv6 facts do not read, the forward is left out", "relay", l.ID, "err", err)
+			continue
+		}
+		host, family, ok := store.RelayHostFor(l.Relay, exit.Address, exit.IPv6Entry, doctor)
+		if !ok {
+			// The owner asked for the IPv6 leg and the exit names no usable address yet: the forward would point nowhere. The
+			// leg check says the same to the owner; nothing is installed.
+			f.log.Warn("relay: the exit has no address for the IPv6 leg, the forward is left out", "relay", l.ID, "inbound", l.InboundID)
+			continue
+		}
+		toFamily := ""
+		if family == store.RelayFamily6 {
+			if !slices.Contains(caps, agentcap.RelayForwardV6) {
+				f.log.Warn("relay: the entry's agent cannot carry an IPv6 leg", "relay", l.ID, "inbound", l.InboundID)
+				continue
+			}
+			toFamily = store.RelayFamily6
+		}
+		to := row.RelayExit(host, spec.Listen.Port)
+		fwd := plugin.RelayForward{ID: l.ID, Network: l.Network, Port: l.Port, ToHost: to.Host, ToPort: to.Port, ToFamily: toFamily}
 		if bridgePathValid(n.BridgePath) && bridgePortValid(n.BridgePort) && reverseCarried(l, n.ID, caps) { // A bad endpoint cannot be carried as a reverse forward.
-			fwd.Mode, fwd.ExitNodeID = store.RelayModeReverse, l.ExitNodeID
+			fwd.Mode, fwd.ExitNodeID, fwd.ToFamily = store.RelayModeReverse, l.ExitNodeID, "" // The bridge dials the entry; the exit's family is not its to_host.
 		}
 		out = append(out, fwd)
 	}

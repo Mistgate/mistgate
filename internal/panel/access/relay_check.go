@@ -37,7 +37,8 @@ const relayCheckTTL = 15 * time.Minute
 // the agent installs the table in a second or two; an entry that is off line never answers).
 const relayApplyWait = 30 * time.Second
 
-// relayTo is the target the forward points at: the exit's address and its server's port, the text a check is made for.
+// relayTo is the target the forward points at: the exit's address for the relay's active family and its server's port (the
+// public port when the inbound has one), the text a check is made for.
 func (s *Service) relayTo(ctx context.Context, l store.RelayLink) string {
 	to, _ := s.relayTarget(ctx, l)
 	return to
@@ -52,16 +53,33 @@ func (s *Service) relayTarget(ctx context.Context, l store.RelayLink) (string, s
 	if err != nil {
 		return "", ""
 	}
-	return relayEndpoint(l, f, spec.Listen.Port)
+	host := relayExitHost(l, f.Node)
+	if host == "" {
+		return "", ""
+	}
+	return relayEndpoint(l, f, host, spec.Listen.Port)
 }
 
-func relayEndpoint(l store.RelayLink, f store.AccessInboundFull, port uint16) (string, string) {
-	return l.Target(f.RelayInbound(), f.Node.Address, port)
+// relayExitHost is the exit's address for the relay's active family: the node's own address for IPv4, and for IPv6 its IPv6 entry
+// when it is on, else the first stable address the doctor named for its uplink. "" when the IPv6 leg has no address to point at.
+func relayExitHost(l store.RelayLink, n store.AccessNode) string {
+	if l.ActiveFamily() != store.RelayFamily6 {
+		return n.Address
+	}
+	host, _, ok := store.RelayHostFor(l.Relay, n.Address, n.IPv6Entry, n.IPv6)
+	if !ok {
+		return ""
+	}
+	return host
+}
+
+func relayEndpoint(l store.RelayLink, f store.AccessInboundFull, host string, port uint16) (string, string) {
+	return l.Target(f.RelayInbound(), host, port)
 }
 
 // relayView is the link seen for its exit inbound's current target (store.RelayLink.ForInbound).
-func relayView(l store.RelayLink, f store.AccessInboundFull, port uint16) store.RelayLink {
-	v, _ := l.ForInbound(f.RelayInbound(), f.Node.Address, port)
+func relayView(l store.RelayLink, f store.AccessInboundFull, host string, port uint16) store.RelayLink {
+	v, _ := l.ForInbound(f.RelayInbound(), host, port)
 	return v
 }
 
@@ -75,7 +93,11 @@ func (s *Service) relayViewOf(ctx context.Context, l store.RelayLink) store.Rela
 	if err != nil {
 		return l.ForTarget("", "")
 	}
-	return relayView(l, f, spec.Listen.Port)
+	host := relayExitHost(l, f.Node)
+	if host == "" {
+		return l.ForTarget("", "")
+	}
+	return relayView(l, f, host, spec.Listen.Port)
 }
 
 // The leg ends at the exit; moving the entry's listen port invalidates the path but not the leg.

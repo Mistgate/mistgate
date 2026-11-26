@@ -44,6 +44,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/awg"
 	"github.com/mistgate/mistgate/internal/node/awgprep"
 	nodebridge "github.com/mistgate/mistgate/internal/node/bridge"
+	"github.com/mistgate/mistgate/internal/node/relayfwd"
 	"github.com/mistgate/mistgate/internal/node/doctor"
 	"github.com/mistgate/mistgate/internal/node/engine"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
@@ -277,6 +278,7 @@ type Agent struct {
 	hostFirewallErr     string       // Last reported host-firewall sync failure; worker-owned.
 	relay               relayRuntime // relay forwards (relay.go); worker-owned
 	bridgeEntry         *nodebridge.Entry
+	relayFwd            *relayfwd.Server // forwards whose exit is on another address family
 	bridgeDialer        *nodebridge.Dialer
 	bridgeSite          *bridgeSiteServer
 	bridgeServeError    string
@@ -499,6 +501,8 @@ func New(cfg Config, engines map[string]engine.Factory, host hostctl.Host) (*Age
 	a.id.Store(id)
 	a.bridgeEntry = nodebridge.NewEntry()
 	a.bridgeEntry.SetLogger(a.log.With("source", "bridge"))
+	a.relayFwd = relayfwd.New()
+	a.relayFwd.SetLogger(a.log.With("source", "relayfwd"))
 	a.bridgeDialer = nodebridge.NewDialer(func() nodebridge.DialIdentity {
 		current := a.id.Load()
 		if current == nil || len(current.cert.Certificate) == 0 {
@@ -604,6 +608,9 @@ func (a *Agent) closeEngines() {
 		a.debug.shutdown()
 		if a.bridgeEntry != nil {
 			a.bridgeEntry.Close()
+		}
+		if a.relayFwd != nil {
+			a.relayFwd.Close()
 		}
 		if a.bridgeDialer != nil {
 			a.bridgeDialer.Close()

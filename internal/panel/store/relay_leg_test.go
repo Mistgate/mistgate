@@ -32,7 +32,7 @@ func TestRelayHostFor(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			host, fam, ok := RelayHostFor(Relay{ActiveLeg: tc.active}, tc.node, tc.doctor)
+			host, fam, ok := RelayHostFor(Relay{ActiveLeg: tc.active}, tc.node.Address, tc.node.IPv6Entry, tc.doctor)
 			if host != tc.host || fam != tc.fam || ok != tc.ok {
 				t.Fatalf("RelayHostFor = %q %q %v; want %q %q %v", host, fam, ok, tc.host, tc.fam, tc.ok)
 			}
