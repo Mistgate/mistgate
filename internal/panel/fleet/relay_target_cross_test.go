@@ -29,7 +29,7 @@ func TestRelayTargetAgreesAcrossFleetHealthAndAccess(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			x := newCheckEnv(t, "entry", "exit", "s1")
 			x.exec(`UPDATE node SET address = ? WHERE id = ?`, tc.address, x.exit.nodeID)
-			x.exec(`UPDATE inbound SET port_override = ?, tls_server_name_override = 'front.example.com' WHERE id = 'inb_vless'`, tc.override)
+			x.exec(`UPDATE inbound SET port_override = NULLIF(?, 0), tls_server_name_override = 'front.example.com' WHERE id = 'inb_vless'`, tc.override)
 			x.tcpRelay(true)
 
 			// the real check, as the owner's check of the relay runs it
