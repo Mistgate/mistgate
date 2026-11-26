@@ -17,6 +17,7 @@ Many flags fall back to an environment variable. A flag given on the command lin
 | `backup restore` | Decrypts a downloaded panel backup into a new data directory, offline. |
 | `auth turnstile off` | Switches the Cloudflare captcha off on the sign-in and setup pages. |
 | `auth reset-login` | Gives an admin a new password and authenticator app, or adds a password login. |
+| `admin-address` | Moves the admin to a separate listener when its public address no longer works. |
 | `mcp` | A local stdio proxy to the panel's MCP endpoint, for agent clients that cannot speak HTTP. |
 | `release keygen` | Makes the owner's release key. |
 | `release build` | Builds release binaries the one reproducible way (CI and `make build` use it). |
@@ -79,7 +80,7 @@ The link works once and expires in 30 minutes. Open it in a browser and create y
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` | Data directory (database, master key). |
 | `--public-url` | `MISTGATE_PUBLIC_URL` | none | URL of the public (decoy) site, for example `https://panel.example.com`. Also the base of the subscription links. |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | none | Serve the admin on this secret host name instead of a secret path prefix. |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | Serve the admin on a separate listener, for example `127.0.0.1:8081`. Cannot be combined with `--admin-host`. |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | Serve the admin on a separate listener, for example `127.0.0.1:8081`. The host must be on loopback (`127.0.0.1`, `::1` or `localhost`) and the port a number from 1 to 65535; anything else is refused. Cannot be combined with `--admin-host`. |
 | `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn relying party id. |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | derived | Comma-separated allowed WebAuthn origins. |
 
@@ -147,6 +148,31 @@ It prints the login, the new password, and the authenticator key as a QR code dr
 ```sh
 mistgate auth reset-login alice
 ```
+
+### mistgate admin-address
+
+```text
+mistgate admin-address --admin-listen host:port [--data-dir DIR]
+```
+
+| Flag | Environment | Default | Meaning |
+|---|---|---|---|
+| `--admin-listen` | none | none | `host:port` of the separate admin listener, e.g. `127.0.0.1:8443`, reached over an SSH tunnel. The host must be on loopback (`127.0.0.1`, `::1` or `localhost`) and the port a number from 1 to 65535. Required. |
+| `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | Data directory. The command refuses a directory without a panel database. |
+| `--dev` | `MISTGATE_DEV` | off | A development installation: data in `./.data`. |
+
+Moves the admin to a separate listener, dropping the admin host and the secret admin prefix, the way `mistgate setup --admin-listen` sets it up. It is the way back in when the admin's public address no longer works. The public URL, the agent SNI and the secret subscription, link and probe prefixes stay as they are. It prints the new admin URL (`http://localhost:<port>/`) and a reminder that passkeys registered for the previous address no longer work there: sign in with the password and authenticator code, then add a new passkey. Then restart the panel: `mistgate serve` reads the stored address itself, so the service needs no `--admin-listen` (a flag there would later differ from the setting).
+
+Before saving a changed address, the command tries to bind it; a bind failure leaves the settings unchanged. An identical stored listener is not probed because the running panel may own it. The check cannot reserve a port across a restart. Run the command while the panel is running: the trial bind then also sees the panel's own ports (443 and 80); with the panel stopped, an address on one of them is accepted and the panel then fails to start until the command is run again with another port. Port 80 uses the browser's normalized origin and URL, `http://localhost/` (no `:80`).
+
+The command refuses a conflicting `MISTGATE_ADMIN_LISTEN` in its own environment. It cannot inspect another process's flags or environment, nor predict a future service invocation. Before restarting, remove `--admin-listen` from the service command and `MISTGATE_ADMIN_LISTEN` from the service environment (then reload the service configuration if required). Outside `--dev`, `serve` itself refuses a nonempty override that differs from the stored address, after normal flag parsing: a flag takes precedence over the environment.
+
+After the move:
+
+- There is no way back to a public admin. No command sets an admin host or a secret admin prefix again, and `setup` keeps a configured installation as it is. The admin stays on the listener, reached through an SSH tunnel such as `ssh -L 8443:127.0.0.1:8443 panel.example.com`.
+- Telegram notifications lose their links to admin pages: a loopback address means nothing off the server, so the panel leaves them out.
+- MCP clients and scripts need the new address: `http://localhost:<port>/mcp` through the tunnel, or `mistgate mcp --url http://localhost:<port>/`. API tokens stay valid.
+- An admin who signed in with passkeys only has no password to fall back on. Run `mistgate auth reset-login` on the panel server: without a login it lists the admins, and `mistgate auth reset-login <new login> --admin <id>` gives that admin a password login with an authenticator app. See [mistgate auth](#mistgate-auth).
 
 ### mistgate mcp
 
@@ -243,6 +269,7 @@ Prints `mistgate <version>`, then `built <time>` when the binary was built with 
 | Command | What it does |
 |---|---|
 | `enroll` | Exchanges a one-time token for a node certificate. |
+| `set-panel` | Saves a new panel link address for the agent to switch to. |
 | `install` | Writes the hardened systemd unit, enables and starts it. |
 | `run` | Runs the agent in the foreground. |
 | `cleanup-net` | Removes the agent's tunnel interfaces, WARP routes and nftables tables. |
@@ -279,6 +306,15 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node
 next: mistgate-node install   (or, in the foreground: mistgate-node run)
 ```
+
+### mistgate-node set-panel
+
+| Flag | Environment | Default | Meaning |
+|---|---|---|---|
+| `--link-url` | none | none | The panel's new link address, `wss://host/<secret-prefix>/`. Required. |
+| `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | State directory. |
+
+Saves the address in `agent.json` as the one to try next; the node must be enrolled over the link (`--link-url`). On a node that connects over mTLS (no `link` in `agent.json`) the command refuses, leaves `agent.json` as it is and exits 1. After a restart the agent tries the new address and its current one in turn, and keeps the new one once a session over it succeeds. The agent keeps the previous address and goes back to it if the new one stops answering or drops the session within 2 minutes; the first session over the new address that lasts 2 minutes, 7 or more days after the switch, makes the agent forget the previous one. A panel can send the same change to its agents (`panel_link_url`); nothing sends it yet, and an mTLS node ignores it. The command is for a node that cannot reach the panel any more. It prints `Saved. Restart the agent: systemctl restart mistgate-node`.
 
 ### mistgate-node install
 

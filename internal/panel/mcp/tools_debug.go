@@ -162,8 +162,9 @@ var debugCapture = changeSpec[debugCaptureArgs]{
 	desc: "Capture one node's debug log for a few minutes: the node raises its log level for the chosen sources, keeps up to 20000 records (4 MiB) and ships them to the panel when the time is up (at most 15 minutes); " +
 		"then it puts the level back, and a restart of the agent ends the capture too. Read the result with node_debug_logs. The node must be online and its agent must support it (an older agent is refused). " +
 		"The kernel source reads the node's kernel log from 30 minutes before capture start through the end; firewall packet-log lines are counted in the summary and not kept. " +
+		"The xray source at level debug adds Xray's connection lines: the accepted request, why a connection was refused (unknown key, REALITY fallback to the cover site) and why it ended, each with a session number [N] that links the lines of one connection; at level info only Xray's warnings and errors. " +
 		"On a kernel-backend node, choosing awg turns on the module's debug output for the capture and adds a summary with handshake initiations that had no response within 5 seconds. " +
-		"One capture per node at a time. Records are cleaned on the node and in the panel: client addresses, secret names, keys and (for xray) host names are cut out. The start is audit-logged with who asked, the node, the sources and the duration.",
+		"One capture per node at a time. Records are cleaned on the node and in the panel: client addresses, secret names, keys, account names and (for xray) host names and SNI are cut out; an xray destination keeps only its port. The start is audit-logged with who asked, the node, the sources and the duration.",
 	plan: func(c *call, a debugCaptureArgs) (*planned, error) {
 		level := a.Level
 		if level == "" {

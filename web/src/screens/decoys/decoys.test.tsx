@@ -60,8 +60,14 @@ vi.mock("@tanstack/react-router", () => ({
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
-let root: Root | null = null;
-let host: HTMLDivElement | null = null;
+// Every root a test mounts, so none outlives its test: a root left mounted keeps polling the panel (the queries refetch every
+// 10 s) and calls the mocks of a later test. A test that mounts again unmounts the previous ones with unmountAll().
+const mounted: { root: Root; host: HTMLDivElement }[] = [];
+const unmountAll = () => {
+  act(() => mounted.forEach((m) => m.root.unmount()));
+  mounted.forEach((m) => m.host.remove());
+  mounted.length = 0;
+};
 beforeEach(() => {
   setLang("en");
   for (const f of Object.values(api)) f.mockReset();
@@ -71,11 +77,7 @@ beforeEach(() => {
   api.listDecoyPages.mockResolvedValue({ pages: ["index.html", "about.html"], files: [], has404: true });
   api.getDecoyFile.mockResolvedValue({ text: "<h1>Hi</h1>", size: 11, truncated: false });
 });
-afterEach(() => {
-  act(() => root?.unmount());
-  host?.remove();
-  root = host = null;
-});
+afterEach(unmountAll);
 
 const checks = (over: Record<string, unknown>[] = []) => [
   { code: "index_html", level: "required", ok: true, paths: [] },
@@ -102,9 +104,10 @@ const library = (sites: ReturnType<typeof site>[], over: Record<string, unknown>
 
 type Mount = { role?: Role; edge?: boolean; nodes?: ReturnType<typeof node>[]; lib?: ReturnType<typeof library>; detail?: Record<string, unknown> & { site: ReturnType<typeof site> } };
 async function mountUi(ui: ReactNode, o: Mount = {}) {
-  host = document.createElement("div");
+  const host = document.createElement("div");
   document.body.append(host);
-  root = createRoot(host);
+  const root = createRoot(host);
+  mounted.push({ root, host });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: Infinity } } });
   qc.setQueryData(meQuery.queryKey, { admin: { id: "adm_1", role: o.role ?? Role.OWNER }, ...(o.edge ? { edition: "edge", unavailable: ["decoy_own"] } : {}) } as never);
   qc.setQueryData(accessQuery.queryKey, { available: true } as never);
@@ -116,7 +119,7 @@ async function mountUi(ui: ReactNode, o: Mount = {}) {
     qc.setQueryData(pagesQuery(id, o.detail.site.bundleSha256).queryKey, { pages: ["index.html", "about.html"], files: [], has404: true } as never);
   }
   await act(async () =>
-    root!.render(
+    root.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>{ui}</ToastProvider>
       </QueryClientProvider>,
@@ -160,7 +163,7 @@ describe("the list", () => {
 
   it("fills the last row of the grid of nodes up to five cells, for any count of nodes and the panel", async () => {
     for (const count of [1, 4, 5, 9, 12, 13]) {
-      document.body.innerHTML = "";
+      unmountAll();
       await mountUi(list(), { lib: library(sites), nodes: Array.from({ length: count }, (_, i) => node(`n${i + 1}`)) });
       const now = document.querySelector("[data-shot=decoy-now]")!;
       const real = now.querySelectorAll(".dz-nw:not(.dz-nb)").length;
@@ -244,12 +247,12 @@ describe("the list", () => {
     await mountUi(list(), { lib: library([made, site("up")]), nodes });
     const meta = cards().map((c) => c.querySelector(".dz-src")?.textContent);
     expect(meta).toEqual([`${en["dz.src.template"]} · ${en["dz.tpl.blog"]}`, en["dz.src.upload"]]);
-    document.body.innerHTML = "";
+    unmountAll();
     await mountUi(page("dsi_tp"), { lib: library([made]), detail: { site: made } });
     expect(document.querySelector(".dz-meta .dz-src")?.textContent).toBe(`${en["dz.src.template"]} · ${en["dz.tpl.blog"]}`);
     expect(text()).toContain(en["dz.fact.template"].replace("{kind}", en["dz.tpl.blog"]));
     // a kind that a later release adds keeps the name the panel gave it
-    document.body.innerHTML = "";
+    unmountAll();
     await mountUi(list(), { lib: library([site("tp", { sourceLabel: "template:newkind" })]), nodes });
     expect(cards()[0]!.querySelector(".dz-src")?.textContent).toBe(`${en["dz.src.template"]} · newkind`);
   });
@@ -312,7 +315,7 @@ describe("a site from a template", () => {
   it("starts with the country most of the nodes that show a shared page stand in, with its flag, and the first country when there is none", async () => {
     api.listDecoyTemplates.mockResolvedValue(listed(kinds));
     const open2 = async (nodes: ReturnType<typeof node>[]) => {
-      document.body.innerHTML = "";
+      unmountAll();
       await mountUi(list(), { lib: library([site("a")]), nodes });
       await click(button(en["dz.new"]));
       await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.way.tpl"])));
@@ -383,7 +386,7 @@ describe("a site from a template", () => {
     expect(button(en["dz.tpl.create"])!.getAttribute("aria-disabled")).toBe("true");
     await click(button(en["dz.tpl.create"]));
     expect(api.generateDecoySite).not.toHaveBeenCalled();
-    document.body.innerHTML = "";
+    unmountAll();
     api.previewDecoyTemplate.mockReset().mockRejectedValue(new ConnectError("decoy_template_unknown", Code.InvalidArgument));
     await open();
     await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(en["dz.tpl.docs"])));
@@ -400,7 +403,7 @@ describe("a site from a template", () => {
     expect(text()).toContain("A new kind");
     for (const lang of ["ru", "zh", "fa", "tr"] as const) {
       setLang(lang);
-      document.body.innerHTML = "";
+      unmountAll();
       await mountUi(list(), { lib: library([]), nodes: [node("de1")] });
       await click(button(dictionaries[lang]["dz.new"]));
       await click([...document.querySelectorAll(".dz-way")].find((w) => w.textContent?.includes(dictionaries[lang]["dz.way.tpl"])));
@@ -450,7 +453,7 @@ describe("the photos of a generated site", () => {
     for (const source of ["pixabay", "pexels"]) {
       const name = source === "pexels" ? "Pexels" : "Pixabay";
       for (const photos of ["used", "no_key", "bad_key", "limit", "unavailable", "none_for_kind"]) {
-        document.body.innerHTML = "";
+        unmountAll();
         await view(photos, source);
         const line = row()?.querySelector(".ft")?.textContent;
         expect(line, `${source} ${photos}`).toContain(en[`dz.ph.st.${photos}` as "dz.ph.st.used"].replace("{name}", name));
@@ -460,7 +463,7 @@ describe("the photos of a generated site", () => {
       }
     }
     // a word this screen does not know is not shown as a key of the dictionary
-    document.body.innerHTML = "";
+    unmountAll();
     await view("something_new");
     expect(text()).not.toContain("dz.ph.st.");
   });

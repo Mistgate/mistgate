@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/mistgate/mistgate/internal/panel/store"
@@ -71,12 +73,9 @@ func newInstance(o setupOpts) (instance, error) {
 
 	switch {
 	case o.adminListen != "":
-		_, port, err := net.SplitHostPort(o.adminListen)
-		if err != nil {
-			return in, fmt.Errorf("--admin-listen %q: %w", o.adminListen, err)
+		if err := in.listenAdmin(o.adminListen); err != nil {
+			return in, err
 		}
-		in.RPID = "localhost"
-		in.RPOrigins = []string{"http://localhost:" + port}
 	case in.AdminHost != "":
 		scheme, port := "https", ""
 		if pub != nil {
@@ -106,6 +105,52 @@ func newInstance(o setupOpts) (instance, error) {
 		}
 	}
 	return in, nil
+}
+
+// listenAdmin is the admin on a separate listener: no admin host, no secret prefix, WebAuthn on localhost.
+func (in *instance) listenAdmin(listen string) error {
+	port, err := checkAdminListen(listen)
+	if err != nil {
+		return err
+	}
+	in.AdminListen, in.AdminHost, in.AdminPrefix = listen, "", "/"
+	in.RPID = "localhost"
+	in.RPOrigins = []string{"http://localhost"}
+	if port != "80" {
+		in.RPOrigins[0] += ":" + port
+	}
+	return nil
+}
+
+// checkAdminListen refuses an admin listener `mistgate serve` could not bring up or should not: it needs a host and a
+// port, the port is a number from 1 to 65535 written as the browser writes it in the WebAuthn origin, and the host is
+// on loopback. The listener serves the admin over plain HTTP without a secret prefix, and its WebAuthn origin is
+// localhost, so it is reached through an SSH tunnel; on any other address it would expose the admin and still not let
+// anyone sign in.
+func checkAdminListen(listen string) (port string, err error) {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return "", fmt.Errorf("--admin-listen %q: %w", listen, err)
+	}
+	if host == "" {
+		return "", fmt.Errorf("--admin-listen %q: the host is missing", listen)
+	}
+	if n, err := strconv.ParseUint(port, 10, 16); err != nil || n == 0 || strconv.FormatUint(n, 10) != port {
+		return "", fmt.Errorf("--admin-listen %q: the port must be a number from 1 to 65535", listen)
+	}
+	if ip, err := netip.ParseAddr(host); host != "localhost" && (err != nil || !ip.IsLoopback()) {
+		return "", fmt.Errorf("--admin-listen %q: the host must be on loopback (127.0.0.1, ::1 or localhost); the admin listener serves plain HTTP and is reached through an SSH tunnel", listen)
+	}
+	return port, nil
+}
+
+// checkAdminOverride runs after serve's flag parsing (flags override the environment).
+// admin-address can check its own environment, not another process's service arguments.
+func checkAdminOverride(override, stored string) error {
+	if override != "" && override != stored {
+		return fmt.Errorf("--admin-listen or MISTGATE_ADMIN_LISTEN conflicts with the stored admin address; remove the override from the service command and environment, then restart the panel (use `mistgate admin-address --admin-listen host:port` to change the stored address)")
+	}
+	return nil
 }
 
 // newSecretPrefix is "/" + 24 random base32 characters (120 bits) + "/".

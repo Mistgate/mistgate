@@ -167,6 +167,7 @@ speed-channel/1
 debug/1
 os-status/1
 os-update/1
+panel-link/1
 debug/2
 awg/1
 awg-fallback/1
