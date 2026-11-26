@@ -16,7 +16,7 @@ description: "无需公网地址运行面板：由一个节点在子域名上提
   - 443 上没有任何配置：此时填写**站点名称**，即另一个指向该节点的名称。agent 会在那里自己提供一个站点并为其获取证书（在 Let's Encrypt 签发之前为自签名证书）。
 
   以下情况会被拒绝：443 上目标为他人站点的 REALITY 配置、TCP 443 上的 Hysteria2 站点、443 上无法共享端口的配置，以及本身响应该子域名的配置。面板会说明原因；节点上的配置继续运行。
-- **所有 agent 都支持链接。** 所有节点的 agent 都必须具备 `ws-link/1` 和 `panel-link/1`。只要有节点缺少它们，面板就会拒绝，并列出这些节点，标注*请更新 agent*（[更新](../operations/updates.md)）。
+- **所有 agent 都支持链接。** 所有节点的 agent 都必须具备 `ws-link/1` 和 `panel-link/1`。只要有节点缺少它们，面板就会拒绝，并列出这些节点，标注*请更新 agent*（[更新](../operations/updates.md)）。 只有通过链接注册的节点才声明 `panel-link/1`；mTLS 节点不会自动迁移。
 - **DNS 记录。** 子域名的 A 记录指向节点地址；节点有 IPv6 时还需 AAAA 记录；如填写了站点名称，它也需要同样的记录。面板在启用前会检查这些记录；**检查记录**会显示它们当前解析到哪里。
 - 主机节点必须在线且未退役。
 
@@ -93,7 +93,7 @@ description: "无需公网地址运行面板：由一个节点在子域名上提
 2. 等到没有节点再使用面板自己的地址。
 3. 创建一份[加密备份](../operations/backups.md)。
 4. 在家中用 `mistgate backup restore` 将其恢复到新的数据目录（[在新面板上恢复](../operations/backups.md#在新面板上恢复)）。
-5. 把管理页面移到本地监听地址，然后启动面板。`mistgate admin-address` 随 [#60](https://github.com/Mistgate/mistgate/pull/60) 提供；在其发布之前，此步骤需要包含它的构建：
+5. 使用 [`mistgate admin-address`](../reference/cli.md#mistgate-admin-address) 把管理页面移到本地监听地址，然后启动面板：
 
    ```sh
    mistgate admin-address --admin-listen 127.0.0.1:8081 --data-dir NEW-DIR

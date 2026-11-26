@@ -319,9 +319,9 @@ The offline form enrolls the panel's first subscription host, which cannot reach
 | `--link-url` | none | none | The panel's new link address, `wss://host/<secret-prefix>/`. Required. |
 | `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | State directory. |
 
-Saves the address in `agent.json` as the one to try next; the node must be enrolled. After a restart the agent tries the new address and its current one in turn, and keeps the new one once a session over it succeeds. The agent keeps the previous address and goes back to it if the new one stops answering; once the new address has worked for 7 days, the agent forgets the previous one. The panel sends the same change to its agents (`panel_link_url`) when its address moves onto a [subscription host](../guide/subscription-host.md). An mTLS node takes it too: mTLS is then its previous address, it goes back to mTLS the same way, and its configured `--link-url` comes back with it. The command is for a node that cannot reach the panel any more. It prints `Saved. Restart the agent: systemctl restart mistgate-node`.
+Saves the address in `agent.json` as the one to try next; the node must be enrolled. After a restart the agent tries the new address and its current one in turn, and keeps the new one once a session over it succeeds. A link session ending within 2 minutes of HelloAck triggers fallback. The first healthy session 7 or more days after the switch makes the agent forget the previous address.
 
-Compatibility note: only link-enrolled nodes advertise `panel-link/1`; fleet settings remain capability-gated. The isolated mTLS transition is not reachable through fleet settings pending the transport decision, so automatic migration of an mTLS fleet behind NAT is not complete. A link session shorter than 2 minutes triggers fallback; forgetting the previous address requires a healthy session after 7 days.
+Only link-enrolled nodes receive the setting from the panel. An enrolled mTLS node can try the link only when an operator runs `set-panel` locally; if the link fails, the node can return to mTLS and regain its configured `--link-url`. Automatic migration of an mTLS fleet is not available pending the transport decision.
 
 ### mistgate-node install
 

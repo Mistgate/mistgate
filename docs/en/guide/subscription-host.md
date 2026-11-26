@@ -16,7 +16,7 @@ This is the VPS edition only. The Cloudflare edition already has a public addres
   - nothing on 443: then give a **Site name**, a second name pointing at the node. The agent shows a site for it there and gets a certificate (self-signed until Let's Encrypt issues one).
 
   Refused: a REALITY profile on 443 whose target is someone else's site, a Hysteria2 site on TCP 443, a profile on 443 that cannot share the port, and a profile that answers to the subdomain itself. The panel names the reason; the node's profiles keep running.
-- **Every agent supports the link.** All nodes must run an agent with `ws-link/1` and `panel-link/1`. The panel refuses while some node lacks them and lists those nodes with *update the agent* ([Updates](../operations/updates.md)).
+- **Every agent supports the link.** All nodes must run an agent with `ws-link/1` and `panel-link/1`. The panel refuses while some node lacks them and lists those nodes with *update the agent* ([Updates](../operations/updates.md)). Only link-enrolled nodes advertise `panel-link/1`; automatic migration of mTLS nodes is not available.
 - **DNS records.** An A record for the subdomain pointing at the node's address, an AAAA record if the node has IPv6, and the same for the site name if you give one. The panel checks them before it enables the host; **Check records** shows what they resolve to.
 - The host node must be online and not retired.
 
@@ -93,7 +93,7 @@ A host that never became ready turns off at once: nothing moved to it, so the pa
 2. Wait until no node uses the panel's own address any more.
 3. Take an [encrypted backup](../operations/backups.md).
 4. At home, restore it into a new data directory with `mistgate backup restore` ([Restore on a new panel](../operations/backups.md#restore-on-a-new-panel)).
-5. Move the admin to a local listener, then start the panel. `mistgate admin-address` comes with [#60](https://github.com/Mistgate/mistgate/pull/60); until it is released, this step needs a build with it:
+5. Move the admin to a local listener with [`mistgate admin-address`](../reference/cli.md#mistgate-admin-address), then start the panel:
 
    ```sh
    mistgate admin-address --admin-listen 127.0.0.1:8081 --data-dir NEW-DIR

@@ -1689,7 +1689,8 @@ type Hello struct {
 	// "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
 	// "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
 	// by an agent that can also run OS jobs; the panel sends UpdateOs only when it is listed.
-	// "panel-link/1" (NodeSettings.panel_link_url: the agent moves to a new panel link address on its own, an mTLS one too).
+	// "panel-link/1" (NodeSettings.panel_link_url: a link node moves to a new panel link address on its own); only a link node
+	// lists it, an mTLS node ignores the address.
 	// "link-fetch/1": a link-only agent fetches update files and the network table over the link with HelloAck.fetch_token
 	// (see "LINK FETCH"). It does not list "nets/1" or "update/1" itself, so an older VPS panel never sends it an update it
 	// cannot fetch; a VPS panel that serves the route reads "link-fetch/1" with "update-link/1" as both.
@@ -7028,12 +7029,10 @@ type NodeSettings struct {
 	// False is the default; old panels leave the agent silent and running no apt simulation.
 	OsStatus bool `protobuf:"varint,15,opt,name=os_status,json=osStatus,proto3" json:"os_status,omitempty"`
 	// A new link address of the panel (the base URL wss://host/<secret-prefix>/, as at enrollment). Empty = no change.
-	// The panel sends it, in HelloAck and DesiredState settings, only to agents with "panel-link/1", and only once the
-	// panel's address is on a subscription host (design/adr/0018-panel-behind-nat.md), whose agents reach it only by the link.
-	// An mTLS node follows it too and keeps mTLS as its previous address (agent.json prev_mtls). The agent
-	// saves it as its next address and tries it at its next reconnect: in a HelloAck that session ends at once, in a
-	// DesiredState the session goes on. The new address is committed only after a HelloAck over it, on a session the
-	// panel's CA signed; until then and while it does not answer, the agent keeps using its current address.
+	// The panel sends it in HelloAck and DesiredState settings only to agents with "panel-link/1" when its subscription host
+	// is ready or when returning from it to a public address. An mTLS node ignores the setting. The agent saves the address
+	// to try at the next reconnect: in a HelloAck that session ends at once, in a DesiredState the session goes on. The new
+	// address is committed only after a HelloAck over it on a session the panel's CA signed.
 	PanelLinkUrl string `protobuf:"bytes,17,opt,name=panel_link_url,json=panelLinkUrl,proto3" json:"panel_link_url,omitempty"`
 	// The node's subscription host role (see "SUBSCRIPTION HOST"); unset = none. Read only by agents with "sub-host/1".
 	SubHost       *SubHostRole `protobuf:"bytes,18,opt,name=sub_host,json=subHost,proto3" json:"sub_host,omitempty"`

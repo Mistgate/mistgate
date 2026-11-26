@@ -323,7 +323,10 @@ func TestNextLinkAlternatesWithTheOldTransport(t *testing.T) {
 	}))
 	t.Cleanup(bad.Close)
 	h.a.linkHTTPClient = bad.Client()
-	h.a.meta.NextLink = linkBaseOf(bad, 'b')
+	if err := SetPanelLink(h.dir, linkBaseOf(bad, 'b')); err != nil {
+		t.Fatal(err)
+	}
+	h.a.meta = readMeta(t, h.dir)
 	h.a.backoffMin, h.a.backoffMax = 10*time.Millisecond, 20*time.Millisecond
 	h.start()
 

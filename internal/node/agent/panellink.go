@@ -284,4 +284,5 @@ func (a *Agent) commitPrevLink(prev string) bool {
 		a.cfg.LinkURL = prev
 	}
 	a.log.Info("back on the previous panel address")
+	return true
 }

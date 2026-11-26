@@ -158,7 +158,7 @@ type Agent struct {
 	panelLinkIgnored atomic.Bool      // an mTLS node has logged that it does not follow a panel link address
 	nextAnswered     atomic.Bool      // a direct probe from the bridge reached meta.NextLink: the next session tries it
 	linkClock        func() time.Time // the clock of meta.LinkSince; nil = a.now (tests move it days ahead)
-	configLink       string // the configured optional link restored when returning to mTLS
+	configLink       string           // the configured optional link restored when returning to mTLS
 
 	engines            map[string]engine.Engine
 	protocols          []string // sorted keys of engines
