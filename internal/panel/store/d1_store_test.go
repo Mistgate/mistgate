@@ -1436,6 +1436,8 @@ func TestD1RewrittenTelegramMethods(t *testing.T) {
 	}
 }
 
+func TestD1ProfileSelectiveBump(t *testing.T) { profileSelectiveBumpProof(t, openD1Store(t)) }
+
 func TestD1RewrittenAccessMethods(t *testing.T) {
 	ctx := context.Background()
 	now := time.Unix(1_800_000_000, 0).UTC()
@@ -1762,7 +1764,7 @@ func TestD1RewrittenAccessMethods(t *testing.T) {
 		st := openD1Store(t)
 		createProfile(t, st, "prf_update_profile")
 		p := AccessProfile{ID: "prf_update_profile", Name: "Renamed", SettingsJSON: `{"updated":true}`}
-		got, err := st.Access().UpdateProfile(ctx, p, 1, false, true, now.Add(time.Minute))
+		got, err := st.Access().UpdateProfile(ctx, p, 1, nil, true, now.Add(time.Minute))
 		if err != nil || got.Name != "Renamed" || got.Version != 2 {
 			t.Fatalf("updated profile = %+v, %v", got, err)
 		}
