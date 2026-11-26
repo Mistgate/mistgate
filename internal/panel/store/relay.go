@@ -271,9 +271,9 @@ func (s *Store) UpdateRelay(ctx context.Context, id string, p RelayPatch, now ti
 		// A family the owner pinned is the family in use at once; "auto" leaves the panel's choice alone.
 		switch *p.Leg {
 		case RelayLegIPv4:
-			set = append(set, `active_leg = '4'`)
+			set = append(set, `active_leg = '4'`, `leg_tried_at = 0`)
 		case RelayLegIPv6:
-			set = append(set, `active_leg = '6'`)
+			set = append(set, `active_leg = '6'`, `leg_tried_at = 0`)
 		}
 	}
 	if p.Enabled != nil || p.Port != nil {

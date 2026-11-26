@@ -23,6 +23,9 @@ func TestAutoLegMovesToIPv6WhenTheIPv4LegDies(t *testing.T) {
 	withIPv6Exit(f)
 	c.leg, c.legByActive = badLeg, map[string]store.RelayStage{store.RelayFamily6: okLeg}
 	must(f.s.CheckRelay(f.ctx, req(&adminv1.CheckRelayRequest{Id: r.Id})))
+	if l := f.relayOf(r.Id); l.ActiveFamily() != store.RelayFamily6 || l.LegTriedAt.IsZero() {
+		t.Fatalf("after the check: active %q, tried %v; want the IPv6 leg proved", l.ActiveFamily(), l.LegTriedAt)
+	}
 	reportsForward(f, r.Id, true, "")
 	on := true
 	got := must(f.update(&adminv1.UpdateRelayRequest{Id: r.Id, Enabled: &on}))

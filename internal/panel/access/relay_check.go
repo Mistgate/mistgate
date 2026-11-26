@@ -163,6 +163,7 @@ func (s *Service) tryOtherLeg(ctx context.Context, l store.RelayLink) bool {
 	if !l.LegTriedAt.IsZero() && now.Sub(l.LegTriedAt) < relayLegRetry {
 		return false
 	}
+	before, beforeOK := l.Check()
 	if err := s.st.SetRelayActiveLeg(ctx, l.ID, to, now, now); err != nil {
 		if !errors.Is(err, store.ErrNotFound) {
 			s.log.Warn("access: move the relay leg", "code", "relay_leg_store_failed", "relay", l.ID, "err", err)
@@ -183,6 +184,17 @@ func (s *Service) tryOtherLeg(ctx context.Context, l store.RelayLink) bool {
 	// with the failure of the family it had.
 	if err := s.st.SetRelayActiveLeg(ctx, l.ID, from, s.now(), s.now()); err != nil && !errors.Is(err, store.ErrNotFound) {
 		s.log.Warn("access: put the relay leg back", "code", "relay_leg_restore_failed", "relay", l.ID, "err", err)
+	}
+	if beforeOK {
+		// The check of the tried family must not stand as the check of the family in use: the gate compares its target with the
+		// forward the relay would install, and the two would never match.
+		if err := s.st.SetRelayCheck(ctx, l.ID, before); err != nil && !errors.Is(err, store.ErrNotFound) {
+			s.log.Warn("access: put the relay check back", "code", "relay_leg_check_restore_failed", "relay", l.ID, "err", err)
+		}
+	} else {
+		// The first check of this relay: there is no earlier result to put back, so ask the family in use once more. Its failure
+		// is what the owner must see, and the gate must compare the target the relay would really forward to.
+		_, _ = s.cfg.CheckRelay(ctx, l.ID, store.RelayStageLeg)
 	}
 	s.notify.StateChanged()
 	return false
@@ -624,6 +636,12 @@ func (s *Service) CheckRelay(ctx context.Context, req *connect.Request[adminv1.C
 		return nil, notFound("relay")
 	case err != nil:
 		return nil, s.internal("check relay", err)
+	}
+	if link.Leg == store.RelayLegAuto && c.Leg.Status == "fail" && s.tryOtherLeg(ctx, link) {
+		// The owner's check of an auto relay moved the leg to the other family and proved it there: the answer is that check.
+		if next, err := s.st.RelayLink(ctx, link.ID); err == nil {
+			c = mustRelayCheck(next)
+		}
 	}
 	s.controlRelay(ctx, link.ID, true, true)
 	s.audit(ctx, actor(ctx), "relay.check", map[string]any{"relay": link.ID, "via": link.ViaNodeName, "exit": link.ExitNodeName,
