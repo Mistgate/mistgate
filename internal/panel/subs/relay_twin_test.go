@@ -5,18 +5,21 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
+	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
 	"gopkg.in/yaml.v3"
 )
@@ -24,6 +27,23 @@ import (
 // The twin of a relay in every format (cascade plan §7), against the real access module: the exit's server on de1 (DE) and,
 // next to it, the same server through the relay on fi1 (FI), which forwards port 8443. The files in testdata are what each
 // format answers; the credential of the device is the one random value and is masked.
+
+// The relay probe records what it tested, including the generated port of an AWG profile.
+func successfulRelayCheck(t *testing.T, st *store.Store, inbound, network string, entryPort uint16) string {
+	t.Helper()
+	var host string
+	var port int
+	if err := st.R.QueryRow(`SELECT n.address, COALESCE(NULLIF(i.port_override, 0), json_extract(p.settings_json, '$.port'))
+ FROM inbound i JOIN node n ON n.id=i.node_id JOIN profile p ON p.id=i.profile_id WHERE i.id=?`, inbound).Scan(&host, &port); err != nil {
+		t.Fatal(err)
+	}
+	check := store.RelayCheck{At: 1, To: net.JoinHostPort(host, strconv.Itoa(port)), Network: network, Port: entryPort, Leg: store.RelayStage{Status: "ok"}, Path: store.RelayStage{Status: "ok"}, OK: true}
+	raw, err := json.Marshal(check)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
 
 type relayRig struct {
 	*rig
@@ -46,7 +66,7 @@ func newRelayRig(t *testing.T) *relayRig {
 	}))).Msg.Profile
 	in := must(r.svc.CreateInbound(r.ctx, connect.NewRequest(&adminv1.CreateInboundRequest{ProfileId: p.Id, NodeId: "nod_1"}))).Msg.Inbound
 	if _, err := r.st.W.Exec(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
-		VALUES ('rly_1', ?, 'nod_2', 'udp', 8443, 1, 'active', ?, 1, 1)`, in.Id, `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`); err != nil {
+		VALUES ('rly_1', ?, 'nod_2', 'udp', 8443, 1, 'active', ?, 1, 1)`, in.Id, successfulRelayCheck(t, r.st, in.Id, "udp", 8443)); err != nil {
 		t.Fatal(err)
 	}
 	g := must(r.svc.CreateGroup(r.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "relayed", ProfileIds: []string{p.Id}}))).Msg.Group.Id
@@ -151,7 +171,7 @@ func TestRelayTwinOnlyForThePeopleOfTheEntry(t *testing.T) {
 		t.Errorf("a person with the entry: %d servers", n)
 	}
 	// The relay fails its path check: the twin is gone from the next subscription of everyone.
-	if _, err := m.st.W.Exec(`UPDATE relay SET check_json = ? WHERE id = 'rly_1'`, `{"at":2,"leg":{"status":"ok"},"path":{"status":"fail","code":"broken"},"ok":false,"stage":"path"}`); err != nil {
+	if _, err := m.st.W.Exec(`UPDATE relay SET check_json = json_patch(check_json, '{"at":2,"path":{"status":"fail","code":"broken"},"ok":false,"stage":"path"}') WHERE id = 'rly_1'`); err != nil {
 		t.Fatal(err)
 	}
 	if n := count(m.token("late", "nod_1", "nod_2")); n != 1 {
@@ -174,7 +194,7 @@ func TestMihomoAWGRelayTwinUsesItsOwnKeyAndURIListOmitsAWG(t *testing.T) {
 	}
 	if _, err := m.st.W.Exec(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
 		VALUES ('rly_awg_msk1', ?, 'nod_msk1', 'udp', 8443, 1, 'active', ?, 1, 1)`, inboundID,
-		`{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`); err != nil {
+		successfulRelayCheck(t, m.st, inboundID, "udp", 8443)); err != nil {
 		t.Fatal(err)
 	}
 	h, _ := m.handler(func(c *subs.Config) { c.MinInterval = -1 })
@@ -275,7 +295,7 @@ func TestAWGRelayNetworkFullLeavesTheDirectProxy(t *testing.T) {
 	group := must(m.svc.CreateGroup(m.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "alice", ProfileIds: []string{m.profile, tiny.Id}}))).Msg.Group.Id
 	if _, err := m.st.W.Exec(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
 		VALUES ('rly_awg_msk1', ?, 'nod_msk1', 'udp', 8443, 1, 'active', ?, 1, 1)`, inbound.Id,
-		`{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`); err != nil {
+		successfulRelayCheck(t, m.st, inbound.Id, "udp", 8443)); err != nil {
 		t.Fatal(err)
 	}
 	bobID, _ := m.user("bob", func(c *adminv1.CreateUserRequest) { c.GroupId = group })

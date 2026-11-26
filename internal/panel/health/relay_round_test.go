@@ -3,7 +3,9 @@ package health
 import (
 	"context"
 	"errors"
+	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,7 +172,7 @@ func TestEnabledRelayJoinsPeriodicClientEyeRounds(t *testing.T) {
 	}
 	target := sn.relayTargets[relayTargetID(id)]
 	if target == nil || target.node.ID != "de1" || target.relay.entry.ID != "fi1" ||
-		target.spec.Listen.Port != 8443 || target.relay.exitPort != 443 {
+		target.spec.Listen.Port != 8443 || target.relay.key == "" {
 		t.Fatalf("relay target = %+v", target)
 	}
 	e.s.sched[exitInbound] = &schedule{next: e.clock.Now().Add(time.Hour)}
@@ -330,5 +332,72 @@ func TestDoctorReportCopiesTheCountersOfAReverseListenerWithoutPackets(t *testin
 	check, ok := link.Check()
 	if !ok || check.Counters == nil || check.Counters.Bytes != 65536 || check.Counters.Packets != 0 {
 		t.Fatalf("stored relay counters = %+v, check ok=%v", check.Counters, ok)
+	}
+}
+
+func TestPassingRelayRoundRenewsChangedExitOnce(t *testing.T) {
+	p := newProbeServer(t)
+	p.srv.Config.Handler.(*http.ServeMux).HandleFunc("/download", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(make([]byte, relayDownloadBytes)) })
+	e, _, id := newRelayMonitorEnv(t, func(c *Config) {
+		c.Probe204URL, c.ProbeTraceURL = p.url204, p.urlTr
+		c.ProbeDownloadURL = strings.Replace(p.url204, "/generate_204", "/download", 1)
+		c.Dialers = map[string]Dialer{"hysteria2": func(context.Context, Target, DialOptions) (Tunnel, error) { return p.tunnel(), nil }}
+	})
+	check := store.RelayCheck{At: e.clock.Now().Unix(), Network: "udp", Port: 8443, To: "de1.example.com:443", Leg: store.RelayStage{Status: "ok"}, Path: store.RelayStage{Status: "ok"}}
+	check.Settle()
+	if err := e.st.SetRelayCheck(e.ctx, id, check); err != nil {
+		t.Fatal(err)
+	}
+	setRelayMonitor(t, e, id, true, 0, "")
+	e.exec(`UPDATE node SET address='new.example.com' WHERE id='de1'`)
+	calls := 0
+	e.fl.relayCheck = func(ctx context.Context, id string, stages ...string) (store.RelayCheck, error) {
+		calls++
+		if len(stages) != 0 {
+			t.Fatalf("expected both leg and path, got %v", stages)
+		}
+		check.To = "new.example.com:443"
+		return check, e.st.SetRelayCheck(ctx, id, check)
+	}
+	for i := 0; i < 2; i++ {
+		res, ok := e.s.roundRelay(e.ctx, relayTargetID(id))
+		if !ok || res.Status != cOK {
+			t.Fatalf("round %d: %+v", i, res)
+		}
+		l, err := e.st.RelayLink(e.ctx, id)
+		if err != nil || !l.Usable() || calls != 1 {
+			t.Fatalf("round %d usable=%v checks=%d err=%v", i, l.Usable(), calls, err)
+		}
+		c, _ := l.Check()
+		if c.To != "new.example.com:443" || c.Monitor == nil || !c.Monitor.OK || c.Monitor.Stage != "" {
+			t.Fatalf("stale check or failed monitor: %+v", c)
+		}
+	}
+}
+
+func TestPassingReverseRoundChecksThePathWithoutRequiringADirectLeg(t *testing.T) {
+	e, _, id := newRelayMonitorEnv(t)
+	e.exec(`UPDATE relay SET network='tcp' WHERE id=?`, id)
+	if err := e.st.SetRelayActiveMode(e.ctx, id, store.RelayModeReverse, "leg_failed", e.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	l, err := e.st.RelayLink(e.ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.fl.relayCheck = func(ctx context.Context, id string, stages ...string) (store.RelayCheck, error) {
+		if !slices.Equal(stages, []string{store.RelayStagePath}) {
+			t.Fatalf("failed direct leg would skip the path in stages %v", stages)
+		}
+		c := store.RelayCheck{Network: "tcp", Port: l.Port, To: "de1.example.com:443", Leg: store.RelayStage{Status: "fail"}, Path: store.RelayStage{Status: "ok"}}
+		return c, e.st.SetRelayCheck(ctx, id, c)
+	}
+	m := store.RelayMonitorCheck{OK: true, AtUnix: e.clock.Now().Unix()}
+	if !e.s.diagnoseRelay(e.ctx, l, "target", &m) {
+		t.Fatal("no recheck")
+	}
+	l, err = e.st.RelayLink(e.ctx, id)
+	if err != nil || !l.Usable() || m.Stage != "" {
+		t.Fatalf("bridge still unusable: %v %v monitor=%v", l.Usable(), err, m)
 	}
 }

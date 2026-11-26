@@ -23,7 +23,7 @@ func TestSyncAWGRelayAddedLaterIssuesThePathKey(t *testing.T) {
 
 	if _, err := e.st.W.Exec(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
 		VALUES ('rly_awg_msk1', ?, 'nod_msk1', 'udp', 8443, 1, 'active', ?, 1, 1)`, e.inboundOf(e.awg),
-		`{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`); err != nil {
+		successfulRelayCheck(t, e.st, e.inboundOf(e.awg), "udp", 8443)); err != nil {
 		t.Fatal(err)
 	}
 	after := e.mustSync(device.Key).paths("awg")

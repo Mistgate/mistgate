@@ -59,7 +59,11 @@ func addHealthyCountryRelay(t *testing.T, c *countryEnv, id, inboundID, network 
 		t.Fatal(err)
 	}
 	c.exec(`UPDATE relay SET state = 'active' WHERE id = ?`, id)
-	check := store.RelayCheck{At: now.Unix(), Network: network, Port: port, To: "203.0.113.10:443",
+	to := "de1.example.com:443"
+	if network == "udp" {
+		to = "de1.example.com:8443"
+	}
+	check := store.RelayCheck{At: now.Unix(), Network: network, Port: port, To: to,
 		Leg: store.RelayStage{Status: "ok"}, Path: store.RelayStage{Status: "ok"}}
 	check.Settle()
 	if err := c.st.SetRelayCheck(c.ctx, id, check); err != nil {
@@ -70,7 +74,12 @@ func addHealthyCountryRelay(t *testing.T, c *countryEnv, id, inboundID, network 
 
 func setCountryRelayMonitor(t *testing.T, c *countryEnv, id string, ok bool, streak uint32) {
 	t.Helper()
-	if err := c.st.SetRelayMonitorCheck(c.ctx, id, store.RelayMonitorCheck{AtUnix: c.clock.Now().Unix(), OK: ok, FailStreak: streak}); err != nil {
+	c.s.invalidateSnapshot()
+	key := relayTargetKey(c.mustSnapshot().relayTargets[relayTargetID(id)])
+	if key == "" {
+		t.Fatalf("missing monitor target for %s", id)
+	}
+	if err := c.st.SetRelayMonitorCheck(c.ctx, id, store.RelayMonitorCheck{TargetKey: key, AtUnix: c.clock.Now().Unix(), OK: ok, FailStreak: streak}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -162,7 +171,11 @@ func TestCountryBlockedAlertReturnsToWarningAfterRelayFailsTwice(t *testing.T) {
 	addHealthyCountryRelay(t, c, "rly_vless", fixture.vless, "tcp", 8443)
 	addHealthyCountryRelay(t, c, "rly_hysteria2", fixture.hysteria2, "udp", 8443)
 	var transitions []Transition
-	c.s.cfg.OnTransition = func(tr Transition) { transitions = append(transitions, tr) }
+	c.s.cfg.OnTransition = func(tr Transition) {
+		if tr.Alert.Kind == "country_blocked" {
+			transitions = append(transitions, tr)
+		}
+	}
 	opened := openCountryRelayAlert(t, c)
 	setCountryRelayMonitor(t, c, "rly_vless", false, 1) // one failed round is not a failed relay
 	c.evaluate()
@@ -174,7 +187,7 @@ func TestCountryBlockedAlertReturnsToWarningAfterRelayFailsTwice(t *testing.T) {
 
 	active := c.active()
 	a := active["country_blocked/de1/"]
-	if len(active) != 1 || a.ID != opened.ID || a.Severity != sevWarning || a.WhyKey != "health.alert.country_blocked.why.blocked" {
+	if len(active) != 2 || active["relay_down/msk1/rly_vless"].Severity != sevWarning || a.ID != opened.ID || a.Severity != sevWarning || a.WhyKey != "health.alert.country_blocked.why.blocked" {
 		t.Fatalf("country alert after relay failures = %+v; alerts = %+v", a, active)
 	}
 	// raised in place out of info: told as an open (the one that was quiet), not as a second alert
@@ -220,5 +233,26 @@ func TestCountryBlockedOpenAlertIsLoweredInPlaceWhenRelaysBecomeHealthy(t *testi
 	}
 	if len(transitions) != 1 || transitions[0].Resolved {
 		t.Fatalf("lowering emitted another transition: %+v", transitions)
+	}
+}
+
+func TestCountryBlockedAlertNeedsCurrentRelayEvidence(t *testing.T) {
+	c := newCountryEnv(t)
+	f := newCountryRelayFixture(t, c)
+	addHealthyCountryRelay(t, c, "rly_vless", f.vless, "tcp", 8443)
+	addHealthyCountryRelay(t, c, "rly_hy", f.hysteria2, "udp", 8443)
+	if a := openCountryRelayAlert(t, c); a.Severity != sevInfo {
+		t.Fatalf("current evidence: severity = %v", a.Severity)
+	}
+	c.exec(`UPDATE inbound SET spec_version = spec_version + 1 WHERE id = ?`, f.vless)
+	c.evaluate()
+	if a := c.active()["country_blocked/de1/"]; a.Severity != sevWarning {
+		t.Errorf("old monitor lowered the alert: severity = %v", a.Severity)
+	}
+	c.exec(`UPDATE inbound SET port_override = 24443 WHERE id = ?`, f.vless)
+	setCountryRelayMonitor(t, c, "rly_vless", true, 0)
+	c.evaluate()
+	if a := c.active()["country_blocked/de1/"]; a.Severity != sevWarning {
+		t.Errorf("old exit check lowered the alert: severity = %v", a.Severity)
 	}
 }

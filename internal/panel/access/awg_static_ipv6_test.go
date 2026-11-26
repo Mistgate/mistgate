@@ -116,7 +116,7 @@ func TestStaticAWGDeviceListsIPv6BeforeRelays(t *testing.T) {
 	e.sql(`UPDATE node SET ipv6_entry = ? WHERE id = ?`, entryAddr, f.nodeID)
 	e.sql(`INSERT INTO node (id, name, address, country_code, state, agent_caps, created_at) VALUES ('nod_fi1', 'fi1', '198.51.100.21', 'FI', 'active', 'relay-forward/1', 2)`)
 	e.sql(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
-		VALUES ('rly_fi1', ?, 'nod_fi1', 'udp', 8443, 1, 'active', ?, 1, 1)`, f.inbound, `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`)
+		VALUES ('rly_fi1', ?, 'nod_fi1', 'udp', 8443, 1, 'active', ?, 1, 1)`, f.inbound, e.passingRelayJSON(f.inbound, "udp", 8443))
 
 	_, configs, err := e.s.AddAWGDevice(e.ctx, "", f.user, f.profile, "ios", "alice-phone")
 	if err != nil {
@@ -172,7 +172,7 @@ func TestStaticAWGDeviceOmitsHiddenDirectConfig(t *testing.T) {
 	e := f.e
 	e.sql(`INSERT INTO node (id, name, address, country_code, state, agent_caps, created_at) VALUES ('nod_fi1', 'fi1', '198.51.100.21', 'FI', 'active', 'relay-forward/1', 2)`)
 	e.sql(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
-		VALUES ('rly_fi1', ?, 'nod_fi1', 'udp', 8443, 1, 'active', ?, 1, 1)`, f.inbound, `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`)
+		VALUES ('rly_fi1', ?, 'nod_fi1', 'udp', 8443, 1, 'active', ?, 1, 1)`, f.inbound, e.passingRelayJSON(f.inbound, "udp", 8443))
 	dev, configs, err := e.s.AddAWGDevice(e.ctx, "", f.user, f.profile, "ios", "alice-phone")
 	if err != nil || len(configs) != 2 {
 		t.Fatalf("with the address shown: %d configs, %v; want direct and the one through fi1", len(configs), err)

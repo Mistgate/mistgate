@@ -101,6 +101,7 @@ func TestListRelaysIncludesMonitorAndCounters(t *testing.T) {
 	f := newRelayFix(t)
 	r := must(f.create(f.server.Id, "nod_fi1", 0))
 	monitor := store.RelayMonitorCheck{AtUnix: f.clock.Unix(), OK: false, Stage: "freeze", Code: "freeze", ResponseMS: 23, FailStreak: 2}
+	_, monitor.TargetKey = f.s.relayTarget(f.ctx, f.relayOf(r.Id))
 	if err := f.st.SetRelayMonitorCheck(f.ctx, r.Id, monitor); err != nil {
 		t.Fatal(err)
 	}
@@ -344,16 +345,18 @@ func TestConcurrentCreateRelay(t *testing.T) {
 // The rule that makes a relay usable for a person: the relay is on, the exit's server is usable for them, and the entry is
 // one of their nodes. It is the user-free part (Live) that decides what the entry forwards.
 func TestRelayUsableRule(t *testing.T) {
-	e := newEnv(t)
-	link := store.RelayLink{Relay: store.Relay{Enabled: true, State: "active", ViaNodeID: "nod_fi1",
-		CheckJSON: `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`},
-		ExitEnabled: true, ExitState: "active", ExitNodeState: "active", ViaNodeState: "active"}
-	exit := store.AccessInboundFull{
-		Inbound: store.AccessInbound{Enabled: true, State: "active"},
-		Profile: store.AccessProfile{ID: "prf_1", Protocol: "hysteria2"},
-		Node:    store.AccessNode{ID: "nod_de1", State: "active"},
+	f := newRelayFix(t)
+	e := f.env
+	profile := f.base
+	inbound := f.server
+	r := must(f.create(inbound.Id, "nod_fi1", 8443))
+	f.switchOn(r.Id)
+	link := f.relayOf(r.Id)
+	exit, _, err := e.s.loadFull(e.ctx, inbound.Id)
+	if err != nil {
+		t.Fatal(err)
 	}
-	group := store.AccessGroup{ProfileIDs: []string{"prf_1"}}
+	group := store.AccessGroup{ProfileIDs: []string{profile.Id}}
 	user := store.AccessUser{NodeIDs: []string{"nod_de1", "nod_fi1"}, AppHapp: true}
 	if !e.s.relayUsable(link, exit, store.AccessGroups{group}, user) {
 		t.Fatal("a relay everything allows is not usable")

@@ -1315,7 +1315,7 @@ func TestSyncPathsOfOneServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := e.st.W.Exec(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
-		VALUES ('rly_1', ?, 'nod_2', 'udp', 8443, 1, 'active', ?, 1, 1)`, inbound, `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`); err != nil {
+		VALUES ('rly_1', ?, 'nod_2', 'udp', 8443, 1, 'active', ?, 1, 1)`, inbound, successfulRelayCheck(t, e.st, inbound, "udp", 8443)); err != nil {
 		t.Fatal(err)
 	}
 	_, tok := e.person("alice", nil)
