@@ -158,7 +158,10 @@ func (s *Service) diagnoseRelay(ctx context.Context, link store.RelayLink, targe
 	checkCtx, cancel := context.WithTimeout(ctx, roundBudget)
 	defer cancel()
 	var stages []string
-	if !monitor.OK && link.Network == "tcp" && link.Mode != store.RelayModeDNAT && slices.Contains(link.ViaNodeCaps, agentcap.RelayReverse) &&
+	if monitor.OK && link.Reverse() {
+		// A failed direct leg is normal on the bridge. A full check would skip the working path.
+		stages = []string{store.RelayStagePath}
+	} else if !monitor.OK && link.Network == "tcp" && link.Mode != store.RelayModeDNAT && slices.Contains(link.ViaNodeCaps, agentcap.RelayReverse) &&
 		slices.Contains(link.ExitNodeCaps, agentcap.RelayReverse) {
 		// a failed round may be the direct way failing (or freezing): the controller then needs to know, in the same pass, whether
 		// the exit reaches the entry's bridge endpoint, or it cannot move the relay before the next diagnosis, half an hour on
@@ -167,7 +170,7 @@ func (s *Service) diagnoseRelay(ctx context.Context, link store.RelayLink, targe
 	check, err := s.fl.CheckRelay(checkCtx, id, stages...)
 	if err != nil {
 		s.log.Warn("health: diagnose relay", "code", "relay_diagnosis_failed", "relay", id, "err", err)
-		return true // the full check was attempted; do not immediately run the leg again
+		return true // keep the periodic leg probe for the next round
 	}
 	if monitor.OK {
 		return true

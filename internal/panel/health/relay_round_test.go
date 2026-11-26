@@ -374,3 +374,30 @@ func TestPassingRelayRoundRenewsChangedExitOnce(t *testing.T) {
 		}
 	}
 }
+
+func TestPassingReverseRoundChecksThePathWithoutRequiringADirectLeg(t *testing.T) {
+	e, _, id := newRelayMonitorEnv(t)
+	e.exec(`UPDATE relay SET network='tcp' WHERE id=?`, id)
+	if err := e.st.SetRelayActiveMode(e.ctx, id, store.RelayModeReverse, "leg_failed", e.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	l, err := e.st.RelayLink(e.ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.fl.relayCheck = func(ctx context.Context, id string, stages ...string) (store.RelayCheck, error) {
+		if !slices.Equal(stages, []string{store.RelayStagePath}) {
+			t.Fatalf("failed direct leg would skip the path in stages %v", stages)
+		}
+		c := store.RelayCheck{Network: "tcp", Port: l.Port, To: "de1.example.com:443", Leg: store.RelayStage{Status: "fail"}, Path: store.RelayStage{Status: "ok"}}
+		return c, e.st.SetRelayCheck(ctx, id, c)
+	}
+	m := store.RelayMonitorCheck{OK: true, AtUnix: e.clock.Now().Unix()}
+	if !e.s.diagnoseRelay(e.ctx, l, "target", &m) {
+		t.Fatal("no recheck")
+	}
+	l, err = e.st.RelayLink(e.ctx, id)
+	if err != nil || !l.Usable() || m.Stage != "" {
+		t.Fatalf("bridge still unusable: %v %v monitor=%v", l.Usable(), err, m)
+	}
+}
