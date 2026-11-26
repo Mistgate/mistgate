@@ -167,9 +167,12 @@ func (s *Service) RunCountryNow(ctx context.Context, nodeID string) *adminv1.Cou
 		return s.nowView(nodeID, next, now)
 	}
 
+	// The answer is built before the work starts: sources that finish at once would otherwise have cleared nowRunning already,
+	// and the answer would say the round is over and its sources interrupted.
+	v := s.nowView(nodeID, next, now)
 	s.nowWG.Add(1)
 	go s.nowWork(ctx, nodeID, next.At, runs)
-	return s.nowView(nodeID, next, now)
+	return v
 }
 
 // nowWork runs the sources that took the request and keeps what each one answered.
