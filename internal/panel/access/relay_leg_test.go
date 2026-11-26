@@ -92,3 +92,22 @@ func TestIPv6LegNeedsTheAgentsCapability(t *testing.T) {
 		t.Fatalf("an agent without relay-forward/2 carried an IPv6 leg: %q", l.ActiveFamily())
 	}
 }
+
+// The bridge's hop has a family too: an auto reverse relay whose v4 reach failed moves to the entry's IPv6 address when the
+// exit's probe of that address passes.
+func TestReverseAutoLegMovesToIPv6WhenTheExitReachesTheEntryThere(t *testing.T) {
+	f, c, r := newCheckedFix(t)
+	f.sql(`UPDATE node SET ipv6_entry = '2001:db8::5' WHERE id = 'nod_fi1'`) // the entry's address for the bridge
+	mode := store.RelayModeReverse
+	must(f.update(&adminv1.UpdateRelayRequest{Id: r.Id, Mode: &mode}))
+	c.reverse, c.reverseByFamily = badLeg, map[string]store.RelayStage{store.RelayFamily6: okLeg}
+	must(f.s.CheckRelay(f.ctx, req(&adminv1.CheckRelayRequest{Id: r.Id, ReverseReach: true})))
+	l := f.relayOf(r.Id)
+	if l.ActiveFamily() != store.RelayFamily6 || l.LegTriedAt.IsZero() {
+		t.Fatalf("after the reverse check: active %q, tried %v; want the IPv6 bridge leg proved", l.ActiveFamily(), l.LegTriedAt)
+	}
+	chk, ok := l.Check()
+	if !ok || chk.ReverseReach.Status != "ok" || chk.ReverseReach.Family != store.RelayFamily6 {
+		t.Fatalf("the check of the moved bridge leg: %+v, %v", chk.ReverseReach, ok)
+	}
+}

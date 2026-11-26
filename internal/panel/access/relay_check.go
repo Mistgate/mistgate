@@ -109,7 +109,7 @@ func (s *Service) relayLegMatches(ctx context.Context, l store.RelayLink, c stor
 // (The leg does not depend on the entry's port; a port moved after the check is covered by the path check that follows the switch.)
 func (s *Service) relayCheckGate(ctx context.Context, l store.RelayLink) error {
 	c, ok := l.Check()
-	if ok && l.Leg == store.RelayLegAuto && c.Leg.Status == "fail" && s.tryOtherLeg(ctx, l) {
+	if ok && l.Leg == store.RelayLegAuto && c.Leg.Status == "fail" && s.tryOtherLeg(ctx, l, false) {
 		// The other family proved the leg: the relay is now checked for the target it would really forward to.
 		if next, err := s.st.RelayLink(ctx, l.ID); err == nil {
 			l, c, ok = next, mustRelayCheck(next), true
@@ -139,10 +139,11 @@ func mustRelayCheck(l store.RelayLink) store.RelayCheck {
 	return c
 }
 
-// tryOtherLeg moves an auto relay to the other address family when the family in use cannot reach the exit, and keeps the move
-// only when the leg check of the other family passes. Explicit families never move. It returns true when the family in use
+// tryOtherLeg moves an auto relay to the other address family when the family in use cannot carry it, and keeps the move only
+// when the probe of the other family passes. viaReverse says which evidence counts: the direct leg (the entry reaches the exit)
+// or the bridge's reach (the exit reaches the entry). Explicit families never move. It returns true when the family in use
 // changed; the caller then reads the relay and its check again.
-func (s *Service) tryOtherLeg(ctx context.Context, l store.RelayLink) bool {
+func (s *Service) tryOtherLeg(ctx context.Context, l store.RelayLink, viaReverse bool) bool {
 	if l.Leg != store.RelayLegAuto || s.cfg.CheckRelay == nil {
 		return false
 	}
@@ -151,11 +152,22 @@ func (s *Service) tryOtherLeg(ctx context.Context, l store.RelayLink) bool {
 	if from == store.RelayFamily6 {
 		to = store.RelayFamily4
 	}
+	stage := store.RelayStageLeg
+	if viaReverse {
+		stage = store.RelayStageReverseReach
+	}
 	if to == store.RelayFamily6 {
-		if !slices.Contains(l.ViaNodeCaps, agentcap.RelayForwardV6) {
+		// The direct way over IPv6 needs the userspace forward at the entry; the bridge does not: its site listens on both families.
+		if !viaReverse && !slices.Contains(l.ViaNodeCaps, agentcap.RelayForwardV6) {
 			return false
 		}
-		if _, ok := s.relayExitIPv6(ctx, l); !ok {
+		var ok bool
+		if viaReverse {
+			_, ok = s.relayEntryIPv6(ctx, l)
+		} else {
+			_, ok = s.relayExitIPv6(ctx, l)
+		}
+		if !ok {
 			return false // no address to try: not a dead leg, a missing one, and the check says so
 		}
 	}
@@ -171,9 +183,10 @@ func (s *Service) tryOtherLeg(ctx context.Context, l store.RelayLink) bool {
 		return false
 	}
 	s.notify.StateChanged()
-	c, err := s.cfg.CheckRelay(ctx, l.ID, store.RelayStageLeg)
-	if err == nil && c.Leg.Status == "ok" {
-		s.log.Info("relay leg moved to the other family", "code", "relay_leg_changed", "relay", l.ID, "from", from, "to", to)
+	c, err := s.cfg.CheckRelay(ctx, l.ID, stage)
+	passed := err == nil && (viaReverse && c.ReverseReach.Status == "ok" || !viaReverse && c.Leg.Status == "ok")
+	if passed {
+		s.log.Info("relay leg moved to the other family", "code", "relay_leg_changed", "relay", l.ID, "from", from, "to", to, "via_reverse", viaReverse)
 		if err := s.st.InsertEvent(ctx, store.EventRow{Time: now, Severity: 1, Code: "relay_leg_changed", Source: "panel", NodeID: l.ViaNodeID,
 			Params: map[string]string{"relay": l.ID, "from": from, "to": to}}); err != nil {
 			s.log.Warn("record relay leg change", "code", "relay_leg_event_failed", "relay", l.ID, "err", err)
@@ -193,10 +206,22 @@ func (s *Service) tryOtherLeg(ctx context.Context, l store.RelayLink) bool {
 		}
 	} else {
 		// The first check of this relay: there is no earlier result to put back, so ask the family in use once more. Its failure
-		// is what the owner must see, and the gate must compare the target the relay would really forward to.
-		_, _ = s.cfg.CheckRelay(ctx, l.ID, store.RelayStageLeg)
+		// is what the owner must see, and the gate must compare the target the relay would really use.
+		_, _ = s.cfg.CheckRelay(ctx, l.ID, stage)
 	}
 	s.notify.StateChanged()
+	return false
+}
+
+// relayViaReverse says which evidence the relay's way depends on: true when it stands (or is pinned) in the bridge, where the exit
+// reaches the entry; false when it is the direct forward, where the entry reaches the exit.
+func relayViaReverse(l store.RelayLink) bool {
+	switch l.Mode {
+	case store.RelayModeReverse:
+		return true
+	case store.RelayModeAuto:
+		return l.ActiveMode == store.RelayModeReverse
+	}
 	return false
 }
 
@@ -211,6 +236,20 @@ func (s *Service) relayExitIPv6(ctx context.Context, l store.RelayLink) (string,
 		d = store.IPv6Doctor{State: store.IPv6Unknown}
 	}
 	host, _, ok := store.RelayHostFor(store.Relay{ActiveLeg: store.RelayFamily6}, exit.Address, exit.IPv6Entry, d)
+	return host, ok
+}
+
+// relayEntryIPv6 is the entry's address for a reverse relay's IPv6 leg, when it has one.
+func (s *Service) relayEntryIPv6(ctx context.Context, l store.RelayLink) (string, bool) {
+	entry, err := s.st.Access().Node(ctx, l.ViaNodeID)
+	if err != nil {
+		return "", false
+	}
+	d, err := s.st.IPv6Doctor(ctx, l.ViaNodeID)
+	if err != nil {
+		d = store.IPv6Doctor{State: store.IPv6Unknown}
+	}
+	host, _, ok := store.RelayHostFor(store.Relay{ActiveLeg: store.RelayFamily6}, entry.Address, entry.IPv6Entry, d)
 	return host, ok
 }
 
@@ -243,6 +282,17 @@ func (s *Service) relayModeGate(ctx context.Context, l store.RelayLink, mode str
 			restore()
 			return direct
 		}
+		if check.ReverseReach.Status == "fail" && l.Leg == store.RelayLegAuto && s.tryOtherLeg(ctx, l, true) {
+			// The exit could not reach the entry's bridge site over the family in use: the other family may carry the bridge, and
+			// the check runs again for it before the way is chosen.
+			if next, err := s.st.RelayLink(ctx, l.ID); err == nil {
+				l = next
+			}
+			if check, err = s.cfg.CheckRelay(ctx, l.ID); err != nil {
+				restore()
+				return direct
+			}
+		}
 		entry, err := s.st.Node(ctx, l.ViaNodeID)
 		if err != nil {
 			restore()
@@ -252,7 +302,7 @@ func (s *Service) relayModeGate(ctx context.Context, l store.RelayLink, mode str
 		case check.Leg.Acceptable():
 			restore()
 			return nil
-		case check.Leg.Status == "fail" && check.ReverseReachOK(s.now(), entry.BridgeEndpointPort()):
+		case check.Leg.Status == "fail" && check.ReverseReachOK(s.now(), entry.BridgeEndpointPort(), l.ActiveFamily()):
 			return nil
 		}
 		restore()
@@ -273,6 +323,15 @@ func (s *Service) reverseRelayGate(ctx context.Context, l store.RelayLink, mode 
 	if s.cfg.CheckRelay == nil {
 		return coded(connect.CodeFailedPrecondition, "reverse_unavailable", "reason", "reverse_reach_unknown")
 	}
+	if l.Leg == store.RelayLegAuto {
+		// The bridge's own probe is the evidence here: a v4 reach that failed and a v6 one that passes move the pair, and the site
+		// does not depend on the family.
+		if c, ok := l.Check(); ok && c.ReverseReach.Status == "fail" && s.tryOtherLeg(ctx, l, true) {
+			if next, err := s.st.RelayLink(ctx, l.ID); err == nil {
+				l = next
+			}
+		}
+	}
 	entry, restore, err := s.prepareBridgeSite(ctx, l, mode)
 	if err != nil {
 		return coded(connect.CodeFailedPrecondition, "reverse_unavailable", "reason", "reverse_reach_unknown")
@@ -282,7 +341,7 @@ func (s *Service) reverseRelayGate(ctx context.Context, l store.RelayLink, mode 
 		restore()
 		return coded(connect.CodeFailedPrecondition, "reverse_unavailable", "reason", "reverse_reach_failed")
 	}
-	if !check.ReverseReachOK(s.now(), entry.BridgeEndpointPort()) {
+	if !check.ReverseReachOK(s.now(), entry.BridgeEndpointPort(), l.ActiveFamily()) {
 		restore()
 		reason := "reverse_reach_unknown"
 		switch {
@@ -446,7 +505,7 @@ func (s *Service) relayNeedsBridge(ctx context.Context, l store.RelayLink) bool 
 		return false
 	}
 	entry, err := s.st.Node(ctx, l.ViaNodeID)
-	return err == nil && check.ReverseReachOK(s.now(), entry.BridgeEndpointPort())
+	return err == nil && check.ReverseReachOK(s.now(), entry.BridgeEndpointPort(), l.ActiveFamily())
 }
 
 // awaitRelayBridge waits for the exit's agent to report the bridge held for 10 seconds: "" when it does, else why not (an error
@@ -637,10 +696,18 @@ func (s *Service) CheckRelay(ctx context.Context, req *connect.Request[adminv1.C
 	case err != nil:
 		return nil, s.internal("check relay", err)
 	}
-	if link.Leg == store.RelayLegAuto && c.Leg.Status == "fail" && s.tryOtherLeg(ctx, link) {
-		// The owner's check of an auto relay moved the leg to the other family and proved it there: the answer is that check.
-		if next, err := s.st.RelayLink(ctx, link.ID); err == nil {
-			c = mustRelayCheck(next)
+	if link.Leg == store.RelayLegAuto {
+		if relayViaReverse(link) {
+			if c.ReverseReach.Status == "fail" && s.tryOtherLeg(ctx, link, true) {
+				if next, err := s.st.RelayLink(ctx, link.ID); err == nil {
+					c = mustRelayCheck(next)
+				}
+			}
+		} else if c.Leg.Status == "fail" && s.tryOtherLeg(ctx, link, false) {
+			// The owner's check of an auto relay moved the leg to the other family and proved it there: the answer is that check.
+			if next, err := s.st.RelayLink(ctx, link.ID); err == nil {
+				c = mustRelayCheck(next)
+			}
 		}
 	}
 	s.controlRelay(ctx, link.ID, true, true)

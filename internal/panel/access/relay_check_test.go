@@ -26,6 +26,8 @@ type fakeChecker struct {
 	path store.RelayStage
 	// legByActive answers the leg for a family ("4" or "6") when it is set, else leg is used.
 	legByActive map[string]store.RelayStage
+	// reverseByFamily answers the bridge's reach for a family; reverse is used for the rest.
+	reverseByFamily map[string]store.RelayStage
 	// reverse and speed are what the reverse stages answer when they are asked for.
 	reverse, speed, direct store.RelayStage
 	err                    error
@@ -71,7 +73,11 @@ func (c *fakeChecker) check(ctx context.Context, id string, stages ...string) (s
 	}
 	if slices.Contains(stages, store.RelayStageReverseReach) || runLeg && out.Leg.Status == "fail" || runReverseSpeed {
 		out.ReverseReach = c.reverse
+		if alt, ok := c.reverseByFamily[link.ActiveFamily()]; ok {
+			out.ReverseReach = alt
+		}
 		out.ReverseReach.At = now
+		out.ReverseReach.Family = link.ActiveFamily() // the probe went to the entry's address of this family
 		if entry, err := c.f.st.Node(ctx, link.ViaNodeID); err == nil {
 			out.ReverseReach.Port = entry.BridgeEndpointPort() // the probe says which endpoint it was made for
 		}

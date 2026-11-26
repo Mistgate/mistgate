@@ -64,16 +64,22 @@ func (s *Service) controlRelayOnce(ctx context.Context, l store.RelayLink, entry
 	now := s.now()
 	l = s.relayViewOf(ctx, l)
 	if l.Leg == store.RelayLegAuto {
-		// A leg that dies moves the relay to the other family by itself, and back when that one dies: the check the health round
-		// just stored is the evidence, and tryOtherLeg asks for the other family's leg before it keeps the move.
-		if c, ok := l.Check(); ok && c.Leg.Status == "fail" && s.tryOtherLeg(ctx, l) {
-			return true // the family changed: decide again with its check
+		// A family that dies moves the relay to the other one by itself, and back when that one dies: the check the health round
+		// just stored is the evidence. Which stage counts depends on the way the relay stands in.
+		if c, ok := l.Check(); ok {
+			if relayViaReverse(l) {
+				if c.ReverseReach.Status == "fail" && s.tryOtherLeg(ctx, l, true) {
+					return true
+				}
+			} else if c.Leg.Status == "fail" && s.tryOtherLeg(ctx, l, false) {
+				return true
+			}
 		}
 	}
 	c, _ := l.Check()
 	port := entry.BridgeEndpointPort()
 	reach := c.ReverseReach
-	if !c.ReverseReachOK(now, port) && reach.Status == "ok" {
+	if !c.ReverseReachOK(now, port, l.ActiveFamily()) && reach.Status == "ok" {
 		reach = store.RelayStage{} // passed, but for another endpoint or too long ago: not evidence
 	}
 	in := store.RelayModeInput{

@@ -36,6 +36,9 @@ type RelayStage struct {
 	DurationMS  uint32  `json:"duration_ms,omitempty"`
 	// Port is the TCP port of the bridge endpoint a reverse_reach probe was made for (0 for every other stage).
 	Port uint16 `json:"port,omitempty"`
+	// Family is the address family of the entry a reverse_reach or reverse_speed probe was sent to: "4" or "6". Empty is "4":
+	// every probe made before the leg had a family went to the entry's own IPv4 address.
+	Family string `json:"family,omitempty"`
 }
 
 // Unverifiable says the stage was skipped because it could not attribute a TLS identity to the server.
