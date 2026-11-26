@@ -38,7 +38,7 @@ type Relay struct {
 	Mode, ActiveMode, ModeReason string
 	ModeChangedAt                time.Time
 	// The address family of the leg between the two nodes (relay.proto Relay.leg): Leg is the owner's choice ("auto", "ipv4" or
-	// "ipv6", migration 00160), ActiveLeg the family in use now ("4" or "6"), LegTriedAt when the panel last moved the family by
+	// "ipv6", migration 00161), ActiveLeg the family in use now ("4" or "6"), LegTriedAt when the panel last moved the family by
 	// itself (zero = never).
 	Leg, ActiveLeg string
 	LegTriedAt     time.Time
@@ -54,7 +54,7 @@ const (
 	RelayFamily6 = "6"
 )
 
-// ActiveFamily is the family a relay's leg uses now, "4" for a row that predates migration 00160 (or was not read from the table).
+// ActiveFamily is the family a relay's leg uses now, "4" for a row that predates migration 00161 (or was not read from the table).
 func (r Relay) ActiveFamily() string {
 	if r.ActiveLeg == RelayFamily6 {
 		return RelayFamily6

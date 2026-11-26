@@ -23,7 +23,7 @@ import "mistgate/admin/v1/common.proto";
 //   back to DNAT when the leg is alive again (reason in Relay.mode_reason); "dnat" and "reverse" pin the way.
 //
 // THE LEG'S ADDRESS FAMILY (Relay.leg is the owner's choice, Relay.active_leg "4" or "6" what stands now). People always reach
-// the entry as they do; only the hop from the entry to the exit may change. "ipv4" is what every relay did before migration 00160.
+// the entry as they do; only the hop from the entry to the exit may change. "ipv4" is what every relay did before migration 00161.
 // "ipv6" takes the exit's IPv6 entry when it is on, else the first stable address the doctor names for the exit's uplink, and the
 // leg check proves this entry reaches it; a node with no such address fails the check with "no_ipv6_address". "auto" (the
 // default) keeps the family in use and, when a check finds its leg dead, tries the other one once per half hour and keeps it only

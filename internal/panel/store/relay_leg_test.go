@@ -40,7 +40,7 @@ func TestRelayHostFor(t *testing.T) {
 	}
 }
 
-// The leg columns (migration 00160): a new relay is 'auto' on IPv4, the owner may pin a family, and the panel may move the family
+// The leg columns (migration 00161): a new relay is 'auto' on IPv4, the owner may pin a family, and the panel may move the family
 // in use without touching the owner's choice.
 func TestRelayLegStore(t *testing.T) {
 	st := openTemp(t)

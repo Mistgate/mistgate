@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// The address family of a relay's leg (relay.proto Relay.leg, migration 00160): people always reach the entry the way they did,
+// The address family of a relay's leg (relay.proto Relay.leg, migration 00161): people always reach the entry the way they did,
 // and only the hop between the entry and the exit may change its family. The entry takes the exit's IPv6 entry when it is on
 // (verified from outside, nodes.ipv6_entry), else the first stable address the doctor names for the node's uplink; the leg check
 // then proves that this entry reaches it.
