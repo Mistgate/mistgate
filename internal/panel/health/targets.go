@@ -193,8 +193,8 @@ func (s *Service) snapshot(ctx context.Context) (*snapshot, error) {
 			continue
 		}
 		t := *exit
-		to, key := link.Target(exit.in, exit.node.Address, exit.spec.Listen.Port)
-		t.relay = &relayTargetInfo{link: link.ForTarget(to, key), entry: entry, key: key}
+		view, key := link.ForInbound(exit.in, exit.node.Address, exit.spec.Listen.Port)
+		t.relay = &relayTargetInfo{link: view, entry: entry, key: key}
 		t.spec.Listen.Port = link.Port
 		sn.relayTargets[relayTargetID(link.ID)] = &t
 	}

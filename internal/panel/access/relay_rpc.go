@@ -66,8 +66,7 @@ func (s *Service) relayUsableFor(l store.RelayLink, exit store.AccessInboundFull
 	if err != nil {
 		return false
 	}
-	l = l.ForTarget(relayEndpoint(l, exit, spec.Listen.Port))
-	return relayPathUsable(l)
+	return relayPathUsable(relayView(l, exit, spec.Listen.Port))
 }
 
 // relayRecipientUsable is the subscriber part shared by an existing relay and a candidate with no relay state yet.
@@ -92,14 +91,16 @@ func relayAgentOK(n store.AccessNode) bool {
 
 func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Relay {
 	var port uint16
-	var to, key string
+	targeted := false
 	if f, merged, err := s.loadFull(ctx, l.InboundID); err == nil {
 		if spec, err := s.buildSpec(f, merged); err == nil {
 			port = f.RelayInbound().RelayExit(f.Node.Address, spec.Listen.Port).Port
-			to, key = relayEndpoint(l, f, spec.Listen.Port)
+			l, targeted = relayView(l, f, spec.Listen.Port), true
 		}
 	}
-	l = l.ForTarget(to, key)
+	if !targeted {
+		l = l.ForTarget("", "")
+	}
 	out := &adminv1.Relay{
 		Id: l.ID, InboundId: l.InboundID, ExitNodeId: l.ExitNodeID, ExitNodeName: l.ExitNodeName,
 		ProfileId: l.ProfileID, ProfileName: l.ProfileName, Protocol: l.Protocol,

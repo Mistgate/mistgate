@@ -59,6 +59,25 @@ func relayEndpoint(l store.RelayLink, f store.AccessInboundFull, port uint16) (s
 	return l.Target(f.RelayInbound(), f.Node.Address, port)
 }
 
+// relayView is the link seen for its exit inbound's current target (store.RelayLink.ForInbound).
+func relayView(l store.RelayLink, f store.AccessInboundFull, port uint16) store.RelayLink {
+	v, _ := l.ForInbound(f.RelayInbound(), f.Node.Address, port)
+	return v
+}
+
+// relayViewOf is relayView for a link whose exit inbound is read here; one whose target cannot be built has no evidence at all.
+func (s *Service) relayViewOf(ctx context.Context, l store.RelayLink) store.RelayLink {
+	f, merged, err := s.loadFull(ctx, l.InboundID)
+	if err != nil {
+		return l.ForTarget("", "")
+	}
+	spec, err := s.buildSpec(f, merged)
+	if err != nil {
+		return l.ForTarget("", "")
+	}
+	return relayView(l, f, spec.Listen.Port)
+}
+
 // The leg ends at the exit; moving the entry's listen port invalidates the path but not the leg.
 func (s *Service) relayLegMatches(ctx context.Context, l store.RelayLink, c store.RelayCheck) bool {
 	return c.Network == l.Network && c.To != "" && c.To == s.relayTo(ctx, l)

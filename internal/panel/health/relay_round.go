@@ -224,7 +224,7 @@ func (s *Service) addRelayDownConds(ctx context.Context, now time.Time, sn *snap
 		if t == nil {
 			continue
 		}
-		check, ok := link.Check()
+		check, ok := t.relay.link.Check() // the view for the current target: a legacy-keyed monitor is re-keyed there
 		if !ok || check.Monitor == nil {
 			d.holdKeys[k] = true
 			continue
