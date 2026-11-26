@@ -80,6 +80,8 @@ func TestRelayForInboundAcceptsLegacyMonitorKey(t *testing.T) {
 			`"monitor":{"at_unix":5,"ok":true,"target_key":%q,"auto_check_at":7,"auto_check_target_key":%q}}`, to, target, auto)
 		return c
 	}
+	forwarded := in
+	forwarded.PublicPort = 8443
 	for _, tc := range []struct {
 		name, target, auto string
 		in                 FleetInboundRow
@@ -88,12 +90,13 @@ func TestRelayForInboundAcceptsLegacyMonitorKey(t *testing.T) {
 		{"legacy", legacy, legacy, in, true},
 		{"current", current, current, in, true},
 		{"foreign", "other", "other", in, false},
+		{"legacy_before_public_port_changed", legacy, legacy, forwarded, false},
 		{"legacy_of_an_older_profile_revision", legacy, legacy, FleetInboundRow{ID: "in", ProfileID: "p", Protocol: "vless", ProfileVersion: 4, SpecVersion: 1}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			view, key := withMonitor(tc.target, tc.auto).ForInbound(tc.in, addr, 443)
 			c, _ := view.Check()
-			if key != current {
+			if _, want := l.Target(tc.in, addr, 443); key != want {
 				t.Fatalf("key = %q, want the current one", key)
 			}
 			if (c.Monitor != nil) != tc.kept {

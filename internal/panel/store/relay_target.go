@@ -35,7 +35,8 @@ func (l RelayLink) legacyTargetKey(in FleetInboundRow, exitAddress string, liste
 func (l RelayLink) ForInbound(in FleetInboundRow, exitAddress string, listen uint16) (RelayLink, string) {
 	to, key := l.Target(in, exitAddress, listen)
 	if c, ok := l.Check(); ok && c.Monitor != nil {
-		legacy := l.legacyTargetKey(in, exitAddress, listen)
+		// Old monitors proved the port reached from the entry, not a different local listener.
+		legacy := l.legacyTargetKey(in, exitAddress, in.RelayExit(exitAddress, listen).Port)
 		m := *c.Monitor
 		if m.TargetKey == legacy {
 			m.TargetKey = key
