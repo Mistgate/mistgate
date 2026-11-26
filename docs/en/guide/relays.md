@@ -38,7 +38,7 @@ A relay in a country with censorship is under that country's law: its hoster may
 
 People then have both the node's own server and the one through the entry. To give them only the one through the entry, turn the server off under **In subscriptions** in **Direct** on the exit node's **Ways in** tab (see [Nodes](nodes.md#direct)): it keeps running for the relay.
 
-Accounting stays on the exit: traffic, quotas, speed limits, devices and [torrent protection](torrent-protection.md) work per person as before. The exit sees the entry's address instead of the person's. The traffic crosses the entry twice (from people and to the exit), so the entry's own traffic limit and load count both, and the latency is the person to the entry plus the entry to the exit. MTU does not change.
+Accounting stays on the exit: traffic, quotas, speed limits, devices and [torrent protection](torrent-protection.md) work per person as before. The exit sees the entry's address instead of the person's. The traffic crosses the entry twice (from people and to the exit), so the entry's own traffic limit and load count both, and the latency is the person to the entry plus the entry to the exit. MTU does not change for a kernel forward; an IPv6 leg carried in userspace re-sends each UDP datagram over the other family, so a smaller MTU on that hop shows up as loss until the client's QUIC adapts.
 
 ## Add a relay
 
