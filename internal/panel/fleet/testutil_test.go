@@ -444,7 +444,7 @@ func (m *model) apply(ds *agentv1.DesiredState) bool {
 		m.relays = nil
 		for _, r := range ds.Relays.Items {
 			m.relays = append(m.relays, plugin.RelayForward{ID: r.RelayId, Network: r.Network, Port: uint16(r.Port), ToHost: r.ToHost, ToPort: uint16(r.ToPort),
-				Mode: r.Mode, ExitNodeID: r.ExitNodeId})
+				ToFamily: r.ToFamily, Mode: r.Mode, ExitNodeID: r.ExitNodeId})
 		}
 	}
 	if ds.BridgeServe != nil { // present replaces the setting (an empty message stops the bridge); absent in a delta keeps it

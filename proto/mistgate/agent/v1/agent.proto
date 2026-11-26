@@ -462,6 +462,11 @@ package mistgate.agent.v1;
 //     exists so that a delta can say "none any more".
 //   - The agent resolves to_host itself (A records only, the node's resolvers) and again about every five minutes; it
 //     keeps the last address that worked when a lookup fails. A forward whose host never resolved is failed.
+//   - ADDRESS FAMILY (RelayForward.to_family). Empty or "4": the kernel forward of this section. "6": the exit is reached over
+//     IPv6 and the port is forwarded in userspace instead, because DNAT cannot cross address families: the agent listens on the
+//     port itself (TCP and UDP), dials to_host for each connection (or keeps one session per client address for UDP) and passes
+//     the bytes on unchanged. to_host is an IPv6 literal then (the panel sends the address it proved). The userspace forward
+//     claims its TCP port like a kernel one, is counted by the doctor from the agent's own counters, and needs "relay-forward/2".
 //   - The agent refuses a forward (RelayResult.error "refused: <why>") whose port is not 443 or at least 1024, is an sshd
 //     port, is the port or hop range of one of its own inbounds, repeats the network and port of another forward, whose
 //     address is not a public unicast IPv4 or is its own, and every forward after the 64th. Other refusals are
@@ -1052,7 +1057,7 @@ message Hello {
   // "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
   // LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "links/3" (the LinkCounters fields from
   // hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "vless-hello-kex/1" (the LinkCounters fields hello_pq, hello_classic and hello_unknown), and "journal/1" (StatsBatch.journal; see
-  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "relay-reverse/1" (RelayForward.mode, DesiredState.bridge_serve, DesiredState.bridge_dials, ApplyResult.bridges, StatsBatch.bridges; see "REVERSE RELAY"), and "tcp-share/1" (StatsBatch.shared_ports; see "SHARED TCP PORT"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug), and "warp-reach/1" (WarpReach; see "WARP REACH"), and "sni-scan/1" (SniScan; see "NEIGHBOR SITES"), and "vless-target/1" (a VLESS REALITY inbound with another site may carry that site's name in Tls.server_name with Tls.mode unspecified: no certificate, the name is the one reality.server_names entry; a panel sends such an inbound only to an agent that lists it).
+  // JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "relay-forward/2" (RelayForward.to_family: a forward whose exit is reached over IPv6, carried in userspace; see "RELAY FORWARDS"), and "relay-reverse/1" (RelayForward.mode, DesiredState.bridge_serve, DesiredState.bridge_dials, ApplyResult.bridges, StatsBatch.bridges; see "REVERSE RELAY"), and "tcp-share/1" (StatsBatch.shared_ports; see "SHARED TCP PORT"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug), and "warp-reach/1" (WarpReach; see "WARP REACH"), and "sni-scan/1" (SniScan; see "NEIGHBOR SITES"), and "vless-target/1" (a VLESS REALITY inbound with another site may carry that site's name in Tls.server_name with Tls.mode unspecified: no certificate, the name is the one reality.server_names entry; a panel sends such an inbound only to an agent that lists it).
   // An agent that predates the field sends none, which the panel reads as "no optional features".
   // "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
   // "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
@@ -2067,7 +2072,8 @@ message RelayForward {
   string network = 2;
   // The port this node listens on (443, or 1024 and above).
   uint32 port = 3;
-  // The exit: an IPv4 literal or a name (the agent resolves it, A records only).
+  // The exit: an IPv4 literal or a name (the agent resolves it, A records only). With to_family "6": an IPv6 literal, and the
+  // agent forwards the port in userspace (see to_family).
   string to_host = 4;
   uint32 to_port = 5;
   // "" | "dnat" | "reverse" (see "REVERSE RELAY"); "" and "dnat" are the same plain forward, the panel sends "". Sent only to an
@@ -2075,6 +2081,11 @@ message RelayForward {
   string mode = 6;
   // mode "reverse": the exit node whose bridge carries the connections of this port. Empty otherwise.
   string exit_node_id = 7;
+  // The address family of to_host: "4" or "6". Empty = "4" (an older panel). A "6" target is forwarded in userspace, not by
+  // the kernel: NAT cannot cross address families, so the agent listens on the port itself, dials the exit over IPv6 for every
+  // connection (or keeps a session per client address for UDP) and passes the bytes on unchanged. Sent only to an agent with
+  // "relay-forward/2".
+  string to_family = 8;
 }
 
 // The entry side of the bridge (agent.proto "REVERSE RELAY").

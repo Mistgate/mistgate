@@ -85,9 +85,17 @@ type Relay struct {
 	// yet counts as old. Computed, not stored; not the same as agent_supported, which is only about the entry and "relay-forward/1".
 	ReverseBlocked string `protobuf:"bytes,32,opt,name=reverse_blocked,json=reverseBlocked,proto3" json:"reverse_blocked,omitempty"`
 	// The state of the bridge as the agents last reported it; absent while there is no report (a DNAT relay never has one).
-	Bridge        *RelayBridge `protobuf:"bytes,33,opt,name=bridge,proto3" json:"bridge,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Bridge *RelayBridge `protobuf:"bytes,33,opt,name=bridge,proto3" json:"bridge,omitempty"`
+	// The address family of the leg between the entry and the exit: "auto" (the owner's default: the panel uses IPv4 and moves to
+	// IPv6 when the IPv4 leg dies), "ipv4" or "ipv6". People always reach the entry as they did; only this hop changes.
+	Leg string `protobuf:"bytes,34,opt,name=leg,proto3" json:"leg,omitempty"`
+	// The family the leg uses now: "4" or "6". Only the panel changes it (with leg "auto", when a check proves the other family).
+	ActiveLeg string `protobuf:"bytes,35,opt,name=active_leg,json=activeLeg,proto3" json:"active_leg,omitempty"`
+	// The entry's agent can carry an IPv6 leg (it lists "relay-forward/2"). False for an older agent: ipv6 is refused and auto
+	// never tries it.
+	Ipv6LegSupported bool `protobuf:"varint,36,opt,name=ipv6_leg_supported,json=ipv6LegSupported,proto3" json:"ipv6_leg_supported,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Relay) Reset() {
@@ -349,6 +357,27 @@ func (x *Relay) GetBridge() *RelayBridge {
 		return x.Bridge
 	}
 	return nil
+}
+
+func (x *Relay) GetLeg() string {
+	if x != nil {
+		return x.Leg
+	}
+	return ""
+}
+
+func (x *Relay) GetActiveLeg() string {
+	if x != nil {
+		return x.ActiveLeg
+	}
+	return ""
+}
+
+func (x *Relay) GetIpv6LegSupported() bool {
+	if x != nil {
+		return x.Ipv6LegSupported
+	}
+	return false
 }
 
 // The bridge of a reverse relay (agent.proto BridgeState), as the panel last had it from the two agents.
@@ -1565,7 +1594,9 @@ type CreateRelayRequest struct {
 	ViaNodeId string `protobuf:"bytes,2,opt,name=via_node_id,json=viaNodeId,proto3" json:"via_node_id,omitempty"`
 	Port      uint32 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
 	// "auto", "dnat" or "reverse"; empty = "auto".
-	Mode          string `protobuf:"bytes,4,opt,name=mode,proto3" json:"mode,omitempty"`
+	Mode string `protobuf:"bytes,4,opt,name=mode,proto3" json:"mode,omitempty"`
+	// "auto", "ipv4" or "ipv6"; empty = "auto".
+	Leg           string `protobuf:"bytes,5,opt,name=leg,proto3" json:"leg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1628,6 +1659,13 @@ func (x *CreateRelayRequest) GetMode() string {
 	return ""
 }
 
+func (x *CreateRelayRequest) GetLeg() string {
+	if x != nil {
+		return x.Leg
+	}
+	return ""
+}
+
 type CreateRelayResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Relay         *Relay                 `protobuf:"bytes,1,opt,name=relay,proto3" json:"relay,omitempty"`
@@ -1678,7 +1716,9 @@ type UpdateRelayRequest struct {
 	Enabled *bool                  `protobuf:"varint,2,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
 	Port    *uint32                `protobuf:"varint,3,opt,name=port,proto3,oneof" json:"port,omitempty"`
 	// "auto", "dnat" or "reverse"; unset = unchanged.
-	Mode          *string `protobuf:"bytes,4,opt,name=mode,proto3,oneof" json:"mode,omitempty"`
+	Mode *string `protobuf:"bytes,4,opt,name=mode,proto3,oneof" json:"mode,omitempty"`
+	// "auto", "ipv4" or "ipv6"; unset = unchanged.
+	Leg           *string `protobuf:"bytes,5,opt,name=leg,proto3,oneof" json:"leg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1737,6 +1777,13 @@ func (x *UpdateRelayRequest) GetPort() uint32 {
 func (x *UpdateRelayRequest) GetMode() string {
 	if x != nil && x.Mode != nil {
 		return *x.Mode
+	}
+	return ""
+}
+
+func (x *UpdateRelayRequest) GetLeg() string {
+	if x != nil && x.Leg != nil {
+		return *x.Leg
 	}
 	return ""
 }
@@ -1869,7 +1916,7 @@ var File_mistgate_admin_v1_relay_proto protoreflect.FileDescriptor
 
 const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\n" +
-	"\x1dmistgate/admin/v1/relay.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xd9\b\n" +
+	"\x1dmistgate/admin/v1/relay.proto\x12\x11mistgate.admin.v1\x1a\x1emistgate/admin/v1/common.proto\"\xb8\t\n" +
 	"\x05Relay\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1910,7 +1957,11 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"modeReason\x12#\n" +
 	"\rdirect_streak\x18\x1f \x01(\rR\fdirectStreak\x12'\n" +
 	"\x0freverse_blocked\x18  \x01(\tR\x0ereverseBlocked\x126\n" +
-	"\x06bridge\x18! \x01(\v2\x1e.mistgate.admin.v1.RelayBridgeR\x06bridge\"\xf4\x01\n" +
+	"\x06bridge\x18! \x01(\v2\x1e.mistgate.admin.v1.RelayBridgeR\x06bridge\x12\x10\n" +
+	"\x03leg\x18\" \x01(\tR\x03leg\x12\x1d\n" +
+	"\n" +
+	"active_leg\x18# \x01(\tR\tactiveLeg\x12,\n" +
+	"\x12ipv6_leg_supported\x18$ \x01(\bR\x10ipv6LegSupported\"\xf4\x01\n" +
 	"\vRelayBridge\x12\x1c\n" +
 	"\tconnected\x18\x01 \x01(\bR\tconnected\x12\x14\n" +
 	"\x05conns\x18\x02 \x01(\rR\x05conns\x12\x15\n" +
@@ -2016,24 +2067,27 @@ const file_mistgate_admin_v1_relay_proto_rawDesc = "" +
 	"\x11ListRelaysRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"F\n" +
 	"\x12ListRelaysResponse\x120\n" +
-	"\x06relays\x18\x01 \x03(\v2\x18.mistgate.admin.v1.RelayR\x06relays\"{\n" +
+	"\x06relays\x18\x01 \x03(\v2\x18.mistgate.admin.v1.RelayR\x06relays\"\x8d\x01\n" +
 	"\x12CreateRelayRequest\x12\x1d\n" +
 	"\n" +
 	"inbound_id\x18\x01 \x01(\tR\tinboundId\x12\x1e\n" +
 	"\vvia_node_id\x18\x02 \x01(\tR\tviaNodeId\x12\x12\n" +
 	"\x04port\x18\x03 \x01(\rR\x04port\x12\x12\n" +
-	"\x04mode\x18\x04 \x01(\tR\x04mode\"E\n" +
+	"\x04mode\x18\x04 \x01(\tR\x04mode\x12\x10\n" +
+	"\x03leg\x18\x05 \x01(\tR\x03leg\"E\n" +
 	"\x13CreateRelayResponse\x12.\n" +
-	"\x05relay\x18\x01 \x01(\v2\x18.mistgate.admin.v1.RelayR\x05relay\"\x93\x01\n" +
+	"\x05relay\x18\x01 \x01(\v2\x18.mistgate.admin.v1.RelayR\x05relay\"\xb2\x01\n" +
 	"\x12UpdateRelayRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\aenabled\x18\x02 \x01(\bH\x00R\aenabled\x88\x01\x01\x12\x17\n" +
 	"\x04port\x18\x03 \x01(\rH\x01R\x04port\x88\x01\x01\x12\x17\n" +
-	"\x04mode\x18\x04 \x01(\tH\x02R\x04mode\x88\x01\x01B\n" +
+	"\x04mode\x18\x04 \x01(\tH\x02R\x04mode\x88\x01\x01\x12\x15\n" +
+	"\x03leg\x18\x05 \x01(\tH\x03R\x03leg\x88\x01\x01B\n" +
 	"\n" +
 	"\b_enabledB\a\n" +
 	"\x05_portB\a\n" +
-	"\x05_mode\"E\n" +
+	"\x05_modeB\x06\n" +
+	"\x04_leg\"E\n" +
 	"\x13UpdateRelayResponse\x12.\n" +
 	"\x05relay\x18\x01 \x01(\v2\x18.mistgate.admin.v1.RelayR\x05relay\"$\n" +
 	"\x12DeleteRelayRequest\x12\x0e\n" +

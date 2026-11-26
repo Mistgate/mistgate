@@ -22,6 +22,17 @@ import "mistgate/admin/v1/common.proto";
 //   mode "auto" (the default) lets the panel choose: DNAT while the leg works, reverse when it does not and the pair can do it,
 //   back to DNAT when the leg is alive again (reason in Relay.mode_reason); "dnat" and "reverse" pin the way.
 //
+// THE LEG'S ADDRESS FAMILY (Relay.leg is the owner's choice, Relay.active_leg "4" or "6" what stands now). People always reach
+// the entry as they do; only the hop from the entry to the exit may change. "ipv4" is what every relay did before migration 00161.
+// "ipv6" takes the exit's IPv6 entry when it is on, else the first stable address the doctor names for the exit's uplink, and the
+// leg check proves this entry reaches it; a node with no such address fails the check with "no_ipv6_address". "auto" (the
+// default) keeps the family in use and, when a check finds its leg dead, tries the other one once per half hour and keeps it only
+// if that leg passes. The entry carries an IPv6 leg in userspace (its agent lists "relay-forward/2"): the kernel cannot rewrite a
+// packet from one family into the other. The exit needs nothing and people's subscriptions are the same in both families.
+// In the reverse way the same family is the way the exit reaches the entry's bridge site (the reverse reach check and the speed
+// test probe that address, and the site listens on both families, so no agent update is needed). The bridge is one transport per
+// pair of nodes, so its family is chosen for the pair: a pair cannot pin one relay to ipv4 and another to ipv6 (leg_conflict).
+//
 // A relay is created SWITCHED OFF. It is switched on by UpdateRelay(enabled), after CheckRelay made a check less than 15
 // minutes ago that fits the way the relay would go:
 //   - dnat: the leg check (the entry node to the exit's server) must pass or be skipped as "unverifiable".
@@ -132,6 +143,14 @@ message Relay {
   string reverse_blocked = 32;
   // The state of the bridge as the agents last reported it; absent while there is no report (a DNAT relay never has one).
   RelayBridge bridge = 33;
+  // The address family of the leg between the entry and the exit: "auto" (the owner's default: the panel uses IPv4 and moves to
+  // IPv6 when the IPv4 leg dies), "ipv4" or "ipv6". People always reach the entry as they did; only this hop changes.
+  string leg = 34;
+  // The family the leg uses now: "4" or "6". Only the panel changes it (with leg "auto", when a check proves the other family).
+  string active_leg = 35;
+  // The entry's agent can carry an IPv6 leg (it lists "relay-forward/2"). False for an older agent: ipv6 is refused and auto
+  // never tries it.
+  bool ipv6_leg_supported = 36;
 }
 
 // The bridge of a reverse relay (agent.proto BridgeState), as the panel last had it from the two agents.
@@ -348,6 +367,8 @@ message CreateRelayRequest {
   uint32 port = 3;
   // "auto", "dnat" or "reverse"; empty = "auto".
   string mode = 4;
+  // "auto", "ipv4" or "ipv6"; empty = "auto".
+  string leg = 5;
 }
 
 message CreateRelayResponse {
@@ -360,6 +381,8 @@ message UpdateRelayRequest {
   optional uint32 port = 3;
   // "auto", "dnat" or "reverse"; unset = unchanged.
   optional string mode = 4;
+  // "auto", "ipv4" or "ipv6"; unset = unchanged.
+  optional string leg = 5;
 }
 
 message UpdateRelayResponse {

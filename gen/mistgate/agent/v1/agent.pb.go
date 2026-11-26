@@ -1684,7 +1684,7 @@ type Hello struct {
 	// "SPEED LIMITS"), and "country-probe/1" (CountryProbe; see "COUNTRY PROBE"), and "links/1" (StatsBatch.links; see
 	// LinkCounters), and "links/2" (the LinkCounters fields from client_closes on), and "links/3" (the LinkCounters fields from
 	// hs_unfinished on, and the VLESS hellos, hellos_foreign and connects), and "vless-hello-kex/1" (the LinkCounters fields hello_pq, hello_classic and hello_unknown), and "journal/1" (StatsBatch.journal; see
-	// JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "relay-reverse/1" (RelayForward.mode, DesiredState.bridge_serve, DesiredState.bridge_dials, ApplyResult.bridges, StatsBatch.bridges; see "REVERSE RELAY"), and "tcp-share/1" (StatsBatch.shared_ports; see "SHARED TCP PORT"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug), and "warp-reach/1" (WarpReach; see "WARP REACH"), and "sni-scan/1" (SniScan; see "NEIGHBOR SITES"), and "vless-target/1" (a VLESS REALITY inbound with another site may carry that site's name in Tls.server_name with Tls.mode unspecified: no certificate, the name is the one reality.server_names entry; a panel sends such an inbound only to an agent that lists it).
+	// JournalEntry), and "probe/1" (UdpSend.df, TcpTarget kind "connect", PathTrace; see "PATH PROBE"), and "relay-forward/1" (DesiredState.relays, ApplyResult.relays; see "RELAY FORWARDS"), and "relay-forward/2" (RelayForward.to_family: a forward whose exit is reached over IPv6, carried in userspace; see "RELAY FORWARDS"), and "relay-reverse/1" (RelayForward.mode, DesiredState.bridge_serve, DesiredState.bridge_dials, ApplyResult.bridges, StatsBatch.bridges; see "REVERSE RELAY"), and "tcp-share/1" (StatsBatch.shared_ports; see "SHARED TCP PORT"), and "speed/1" (speed_test; see "PATH SPEED"), and "debug/1" (DebugCapture, DebugCaptureReport; see "DEBUG CAPTURE"), and "debug/2" (kernel debug-capture source and AWG kernel debug), and "warp-reach/1" (WarpReach; see "WARP REACH"), and "sni-scan/1" (SniScan; see "NEIGHBOR SITES"), and "vless-target/1" (a VLESS REALITY inbound with another site may carry that site's name in Tls.server_name with Tls.mode unspecified: no certificate, the name is the one reality.server_names entry; a panel sends such an inbound only to an agent that lists it).
 	// An agent that predates the field sends none, which the panel reads as "no optional features".
 	// "nets/1" enables StatsBatch.networks and person_networks; client addresses are never sent.
 	// "os-status/1" permits read-only OsStatus snapshots. "os-update/1" (UpdateOs; see "OS UPDATES") is listed together with it
@@ -7329,14 +7329,20 @@ type RelayForward struct {
 	Network string `protobuf:"bytes,2,opt,name=network,proto3" json:"network,omitempty"`
 	// The port this node listens on (443, or 1024 and above).
 	Port uint32 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
-	// The exit: an IPv4 literal or a name (the agent resolves it, A records only).
+	// The exit: an IPv4 literal or a name (the agent resolves it, A records only). With to_family "6": an IPv6 literal, and the
+	// agent forwards the port in userspace (see to_family).
 	ToHost string `protobuf:"bytes,4,opt,name=to_host,json=toHost,proto3" json:"to_host,omitempty"`
 	ToPort uint32 `protobuf:"varint,5,opt,name=to_port,json=toPort,proto3" json:"to_port,omitempty"`
 	// "" | "dnat" | "reverse" (see "REVERSE RELAY"); "" and "dnat" are the same plain forward, the panel sends "". Sent only to an
 	// agent with "relay-reverse/1".
 	Mode string `protobuf:"bytes,6,opt,name=mode,proto3" json:"mode,omitempty"`
 	// mode "reverse": the exit node whose bridge carries the connections of this port. Empty otherwise.
-	ExitNodeId    string `protobuf:"bytes,7,opt,name=exit_node_id,json=exitNodeId,proto3" json:"exit_node_id,omitempty"`
+	ExitNodeId string `protobuf:"bytes,7,opt,name=exit_node_id,json=exitNodeId,proto3" json:"exit_node_id,omitempty"`
+	// The address family of to_host: "4" or "6". Empty = "4" (an older panel). A "6" target is forwarded in userspace, not by
+	// the kernel: NAT cannot cross address families, so the agent listens on the port itself, dials the exit over IPv6 for every
+	// connection (or keeps a session per client address for UDP) and passes the bytes on unchanged. Sent only to an agent with
+	// "relay-forward/2".
+	ToFamily      string `protobuf:"bytes,8,opt,name=to_family,json=toFamily,proto3" json:"to_family,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7416,6 +7422,13 @@ func (x *RelayForward) GetMode() string {
 func (x *RelayForward) GetExitNodeId() string {
 	if x != nil {
 		return x.ExitNodeId
+	}
+	return ""
+}
+
+func (x *RelayForward) GetToFamily() string {
+	if x != nil {
+		return x.ToFamily
 	}
 	return ""
 }
@@ -10176,7 +10189,7 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\fbridge_dials\x18\n" +
 	" \x01(\v2\x1e.mistgate.agent.v1.BridgeDialsR\vbridgeDials\"F\n" +
 	"\rRelayForwards\x125\n" +
-	"\x05items\x18\x01 \x03(\v2\x1f.mistgate.agent.v1.RelayForwardR\x05items\"\xbf\x01\n" +
+	"\x05items\x18\x01 \x03(\v2\x1f.mistgate.agent.v1.RelayForwardR\x05items\"\xdc\x01\n" +
 	"\fRelayForward\x12\x19\n" +
 	"\brelay_id\x18\x01 \x01(\tR\arelayId\x12\x18\n" +
 	"\anetwork\x18\x02 \x01(\tR\anetwork\x12\x12\n" +
@@ -10185,7 +10198,8 @@ const file_mistgate_agent_v1_agent_proto_rawDesc = "" +
 	"\ato_port\x18\x05 \x01(\rR\x06toPort\x12\x12\n" +
 	"\x04mode\x18\x06 \x01(\tR\x04mode\x12 \n" +
 	"\fexit_node_id\x18\a \x01(\tR\n" +
-	"exitNodeId\"v\n" +
+	"exitNodeId\x12\x1b\n" +
+	"\tto_family\x18\b \x01(\tR\btoFamily\"v\n" +
 	"\vBridgeServe\x12\x12\n" +
 	"\x04port\x18\x01 \x01(\rR\x04port\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\"\n" +

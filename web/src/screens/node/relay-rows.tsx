@@ -16,7 +16,7 @@ import { msText } from "@/lib/health";
 import { agentError, checkReason, enableGate, relayState, statePill, unverifiable, type RelayMsg, type RelayState, type Stage } from "@/lib/relay";
 import { modeOf } from "@/lib/relay-bridge";
 import { useNow } from "@/lib/time";
-import { ModeEditor, PortEditor } from "./relay-editors";
+import { LegEditor, ModeEditor, PortEditor } from "./relay-editors";
 import { waysDemo } from "./ways-demo";
 import { useCountryOf, useRemoveRelay, type RelayRuns } from "./relays";
 
@@ -69,15 +69,15 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
   // a relay that was just made grows into its row (the board's nd-new) and is washed (Fresh): decided when the row first appears, the wash takes the mark
   const [grow] = useState(() => effectsEnabled() && isFresh("relay", r.id));
   const fresh = useFresh<HTMLLIElement>("relay", r.id);
-  // the port and the method open under the row, in place of a window
-  const [edit, setEdit] = useState<"port" | "mode" | null>(startEdit ?? null);
+  // the port, the method and the leg's family open under the row, in place of a window
+  const [edit, setEdit] = useState<"port" | "mode" | "leg" | null>(startEdit ?? null);
   const state: RelayState = busy === "check" || busy === "on" ? "checking" : relayState(r);
   const gate = enableGate(r, nowS);
   const reason = checkReason(t, r);
   const ago = (u: number) => fmt.ago(u, nowS * 1000);
   const mode = modeOf(r);
   const reverse = r.enabled && r.activeMode === "reverse";
-  const port = [t("nw.sv.port", { net: r.network || "tcp", port: r.port, entry: r.viaNodeName }), mode === "reverse" ? t("nw.mode.reverse") : mode === "dnat" ? t("nw.mode.dnat") : ""].filter(Boolean);
+  const port = [t("nw.sv.port", { net: r.network || "tcp", port: r.port, entry: r.viaNodeName }), mode === "reverse" ? t("nw.mode.reverse") : mode === "dnat" ? t("nw.mode.dnat") : "", r.activeLeg === "6" ? t("nw.leg.six") : ""].filter(Boolean);
   const failed = state === "failed";
   const forwardDrop = failed && r.enabled && r.lastError === "forward_drop";
   const agent = failed && r.enabled && r.state === InboundState.FAILED && !forwardDrop ? agentError(t, r.lastError, { entry: r.viaNodeName, exit: r.exitNodeName }) : "";
@@ -165,6 +165,9 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
                   <button type="button" role="menuitem" onClick={pick(() => setEdit("mode"))}>
                     {t("wy.mn.way")}
                   </button>
+                  <button type="button" role="menuitem" onClick={pick(() => setEdit("leg"))}>
+                    {t("nw.leg.edit")}
+                  </button>
                   <button type="button" role="menuitem" className={ask ? "ask" : "risk"} disabled={!!busy} onClick={ask ? pick(onRemove) : () => setMenu("ask")}>
                     {ask ? t("wy.mn.sure") : t("wy.mn.remove")}
                   </button>
@@ -203,6 +206,7 @@ export function RelayRow({ r, busy, note, nowS, people, ccEntry, ccExit, onCheck
       )}
       {edit === "port" && <PortEditor key={`${r.id}/${r.port}`} r={r} onClose={() => setEdit(null)} />}
       {edit === "mode" && <ModeEditor key={r.id} r={r} onClose={() => setEdit(null)} />}
+      {edit === "leg" && <LegEditor key={`${r.id}/${r.leg}`} r={r} onClose={() => setEdit(null)} />}
       {open && (
         <>
           <div className="wy-chain" data-testid="relay-chain">

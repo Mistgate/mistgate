@@ -12,6 +12,7 @@ import (
 	"github.com/mistgate/mistgate/internal/node/bridge"
 	"github.com/mistgate/mistgate/internal/node/egress"
 	"github.com/mistgate/mistgate/internal/node/hostctl"
+	"github.com/mistgate/mistgate/internal/node/relayfwd"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -35,8 +36,12 @@ type relayRuntime struct {
 	listeners     map[string]bridge.RelayListener
 	pending       []bridge.RelayListener // reverse listeners waiting for host INPUT rules
 	listenerPorts map[uint16]struct{}    // reverse TCP ports that need host INPUT firewall access
+	fwdTCP        map[uint16]struct{}    // userspace forward ports (the other family) that need host INPUT access
+	fwdUDP        map[uint16]struct{}
 	hosts         map[string]relayLookup
 	logged        map[string]string // relay id -> the last failure logged, so one is logged once
+	// listenAddr is a test seam of the userspace forwards: nil listens on every local address, as production does.
+	listenAddr func(network string, port uint16) string
 
 	// Test seams; nil = the real thing.
 	lookup func(ctx context.Context, host string) (netip.Addr, error)
@@ -174,6 +179,7 @@ func (a *Agent) syncRelays(ctx context.Context, next *model) {
 	guard := a.relayGuard(next)
 	var accepted []hostctl.Forward
 	var acceptedPorts []hostctl.Forward
+	var userspace []relayfwd.Forward
 	reverse := make(map[string]bridge.RelayListener)
 	results := make(map[string]*pb.RelayResult, len(next.relays))
 	for _, f := range next.relays { // sorted by id: on a clash the earlier id wins
@@ -195,6 +201,25 @@ func (a *Agent) syncRelays(ctx context.Context, next *model) {
 			}
 			reverse[f.ID] = bridge.RelayListener{RelayID: f.ID, ExitNodeID: f.ExitNodeID, Port: f.Port}
 			continue // Reverse forwards never resolve or dial the panel's to_host/to_port.
+		}
+		if f.ToFamily == "6" {
+			// The exit is on the other address family: the kernel cannot rewrite a packet across families, so the agent carries
+			// this port in userspace. The panel sends a literal it has proved; no lookup happens here.
+			fw, err := userspaceForward(f, guard)
+			if err != nil {
+				r.Error = err.Error()
+				continue
+			}
+			if err := hostctl.ValidateForwardPort(f.ID, f.Network, f.Port, acceptedPorts, guard); err != nil {
+				r.Error = "refused: " + strings.TrimPrefix(err.Error(), "forward "+f.ID+": ")
+				continue
+			}
+			acceptedPorts = append(acceptedPorts, hostctl.Forward{ID: f.ID, Network: f.Network, Port: f.Port, ToPort: 1})
+			if rt.listenAddr != nil {
+				fw.Address = rt.listenAddr(fw.Network, fw.Port)
+			}
+			userspace = append(userspace, fw)
+			continue
 		}
 		if !hostSupported {
 			r.Error = "unsupported_host"
@@ -243,7 +268,7 @@ func (a *Agent) syncRelays(ctx context.Context, next *model) {
 		}
 		a.bridgeEntry.SyncListeners(keepList)
 	}
-	rt.claims, rt.listenerPorts, rt.pending = nil, nil, nil
+	rt.claims, rt.listenerPorts, rt.pending, rt.fwdTCP, rt.fwdUDP = nil, nil, nil, nil, nil
 	rt.listeners = activeListeners
 	for _, fw := range accepted {
 		r := results[fw.ID]
@@ -258,6 +283,38 @@ func (a *Agent) syncRelays(ctx context.Context, next *model) {
 			}
 			rt.claims[fw.Port] = "relay:" + fw.ID
 		}
+	}
+	// The userspace forwards are made exactly the list that passed; one that fails does not take the kernel ones with it.
+	fwdErrs := map[string]error{}
+	if a.relayFwd != nil {
+		fwdErrs = a.relayFwd.Sync(userspace)
+	} else {
+		for _, u := range userspace {
+			fwdErrs[u.ID] = errors.New("unsupported_host")
+		}
+	}
+	for _, u := range userspace {
+		r := results[u.ID]
+		if err := fwdErrs[u.ID]; err != nil {
+			r.Error = err.Error()
+			continue
+		}
+		r.Ok, r.ToIp = true, u.To.Addr().String()
+		if u.Network == "tcp" {
+			if rt.claims == nil {
+				rt.claims = map[uint16]string{}
+			}
+			rt.claims[u.Port] = "relay:" + u.ID
+			if rt.fwdTCP == nil {
+				rt.fwdTCP = map[uint16]struct{}{}
+			}
+			rt.fwdTCP[u.Port] = struct{}{}
+			continue
+		}
+		if rt.fwdUDP == nil {
+			rt.fwdUDP = map[uint16]struct{}{}
+		}
+		rt.fwdUDP[u.Port] = struct{}{}
 	}
 	for id, l := range activeListeners {
 		if r := results[id]; r != nil {
@@ -384,6 +441,26 @@ func (a *Agent) logRelayFailures(results []*pb.RelayResult) {
 	}
 }
 
+// userspaceForward is the userspace side of a forward whose exit is on the other address family. to_host is a literal the panel
+// proved: a name would resolve to whichever family the resolver likes, which is exactly what must not happen here.
+func userspaceForward(f plugin.RelayForward, guard hostctl.ForwardGuard) (relayfwd.Forward, error) {
+	ip, err := netip.ParseAddr(f.ToHost)
+	if err != nil {
+		return relayfwd.Forward{}, errors.New("refused: not an address")
+	}
+	ip = ip.Unmap()
+	if !hostctl.PublicIPv6(ip) {
+		return relayfwd.Forward{}, errors.New("refused: not a public IPv6 address")
+	}
+	if guard.IsSelf != nil && guard.IsSelf(ip) {
+		return relayfwd.Forward{}, errors.New("refused: an address of this node")
+	}
+	if f.ToPort == 0 {
+		return relayfwd.Forward{}, errors.New("refused: no target port")
+	}
+	return relayfwd.Forward{ID: f.ID, Network: f.Network, Port: f.Port, To: netip.AddrPortFrom(ip, f.ToPort)}, nil
+}
+
 func relaysUse(relays []plugin.RelayForward, host string) bool {
 	for _, f := range relays {
 		if f.ToHost == host {
@@ -426,13 +503,22 @@ func relaysFromPB(l *pb.RelayForwards) ([]plugin.RelayForward, []error) {
 		if mode == "dnat" {
 			mode = ""
 		}
+		family := f.ToFamily
+		if family == "4" {
+			family = ""
+		}
+		if family != "" && family != "6" {
+			rejected = append(rejected, rejectf("relay %s: bad family", f.RelayId))
+			continue
+		}
 		if (mode != "" && mode != "reverse") || (mode == "reverse" && (f.Network != "tcp" || f.ExitNodeId == "" || !bridgeNodeIDPattern.MatchString(f.ExitNodeId))) ||
-			(mode == "" && f.ExitNodeId != "") {
+			(mode == "" && f.ExitNodeId != "") || (family == "6" && mode == "reverse") {
 			rejected = append(rejected, rejectf("relay %s: bad mode", f.RelayId))
 			continue
 		}
 		seen[f.RelayId] = true
-		out = append(out, plugin.RelayForward{ID: f.RelayId, Network: f.Network, Port: uint16(f.Port), ToHost: f.ToHost, ToPort: uint16(f.ToPort), Mode: mode, ExitNodeID: f.ExitNodeId})
+		out = append(out, plugin.RelayForward{ID: f.RelayId, Network: f.Network, Port: uint16(f.Port), ToHost: f.ToHost, ToPort: uint16(f.ToPort),
+			ToFamily: family, Mode: mode, ExitNodeID: f.ExitNodeId})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, rejected
@@ -449,7 +535,8 @@ func relaysToPB(rs []plugin.RelayForward) *pb.RelayForwards {
 		if mode == "dnat" {
 			mode = ""
 		}
-		l.Items[i] = &pb.RelayForward{RelayId: f.ID, Network: f.Network, Port: uint32(f.Port), ToHost: f.ToHost, ToPort: uint32(f.ToPort), Mode: mode, ExitNodeId: f.ExitNodeID}
+		l.Items[i] = &pb.RelayForward{RelayId: f.ID, Network: f.Network, Port: uint32(f.Port), ToHost: f.ToHost, ToPort: uint32(f.ToPort),
+			ToFamily: f.ToFamily, Mode: mode, ExitNodeId: f.ExitNodeID}
 	}
 	return l
 }

@@ -120,14 +120,16 @@ const (
 	relayEnable  = "enable"
 	relayDisable = "disable"
 	relayPort    = "port"
+	relayLeg     = "leg"
 	relayDelete  = "delete"
 )
 
 type relayArgs struct {
 	ReasonField
-	Action    string `json:"action" jsonschema:"create, enable, disable, port or delete"`
+	Action    string `json:"action" jsonschema:"create, enable, disable, port, leg or delete"`
 	Mode      string `json:"mode,omitempty" jsonschema:"auto, dnat or reverse; for create or enable, empty means auto or unchanged"`
-	RelayID   string `json:"relay_id,omitempty" jsonschema:"the relay (relays_list): for enable, disable, port and delete"`
+	Leg       string `json:"leg,omitempty" jsonschema:"auto, ipv4 or ipv6: the address family of the hop between the entry and the exit (people always reach the entry as they do); for create, empty means auto; for the leg action"`
+	RelayID   string `json:"relay_id,omitempty" jsonschema:"the relay (relays_list): for enable, disable, port, leg and delete"`
 	Node      string `json:"node,omitempty" jsonschema:"the entry node, id or exact name: for create"`
 	InboundID string `json:"inbound_id,omitempty" jsonschema:"the exit's server, an inbound_id from relay_candidates: for create"`
 	Port      uint32 `json:"port,omitempty" jsonschema:"the port on the entry, 443 or 1024-65535: required for port; for create, omit it to let the panel choose (the exit's port when it is free on the entry)"`
@@ -148,9 +150,10 @@ var relayChange = changeSpec[relayArgs]{
 	procs: procs(adminv1connect.NodeServiceListNodesProcedure, adminv1connect.RelayServiceListRelaysProcedure,
 		adminv1connect.RelayServiceListRelayCandidatesProcedure, adminv1connect.RelayServiceCheckRelayProcedure,
 		adminv1connect.RelayServiceCreateRelayProcedure, adminv1connect.RelayServiceUpdateRelayProcedure, adminv1connect.RelayServiceDeleteRelayProcedure),
-	desc: "Make, switch on, switch off, move or delete a relay (action create, enable, disable, port or delete). A relay is a port on an entry node that passes one server of an exit node on, unchanged. An unverifiable check does not block enabling; a failed check does. " +
+	desc: "Make, switch on, switch off, move, change the leg family of or delete a relay (action create, enable, disable, port, leg or delete). A relay is a port on an entry node that passes one server of an exit node on, unchanged. An unverifiable check does not block enabling; a failed check does. " +
 		"Always needs the owner's approval in the admin panel: it changes what the entry node forwards and what people's subscriptions hold. " +
 		"create makes the relay and switches it on after the leg from the entry to the exit and the path from a third node through the entry pass or are unverifiable; a relay that fails stays switched off and the apply reports the stage. " +
+		"leg ipv6 makes the hop between the entry and the exit use IPv6 while people keep connecting to the entry over IPv4 (auto tries both); the direct way needs the entry's agent to list relay-forward/2, the bridge only needs the entry's IPv6 address. " +
 		"enable runs the same checks. Look at relay_candidates first; check with relay_check; the plan never shows an address.",
 	plan: func(c *call, a relayArgs) (*planned, error) {
 		if err := relayArgsShape(a); err != nil {
@@ -164,7 +167,7 @@ var relayChange = changeSpec[relayArgs]{
 	apply: func(c *call, a relayArgs, _ Plan) (done, error) {
 		switch a.Action {
 		case relayCreate:
-			r, err := c.cl.Relay.CreateRelay(c.ctx, connect.NewRequest(&adminv1.CreateRelayRequest{InboundId: a.InboundID, ViaNodeId: a.Node, Port: a.Port, Mode: a.Mode}))
+			r, err := c.cl.Relay.CreateRelay(c.ctx, connect.NewRequest(&adminv1.CreateRelayRequest{InboundId: a.InboundID, ViaNodeId: a.Node, Port: a.Port, Mode: a.Mode, Leg: a.Leg}))
 			if err != nil {
 				return done{}, apiError(err)
 			}
@@ -190,6 +193,11 @@ var relayChange = changeSpec[relayArgs]{
 			}
 			port := strconv.FormatUint(uint64(a.Port), 10)
 			return doneWith("relay_moved", "Relay moved to port "+port+".", "relay", a.RelayID, "port", port), nil
+		case relayLeg:
+			if _, err := c.cl.Relay.UpdateRelay(c.ctx, connect.NewRequest(&adminv1.UpdateRelayRequest{Id: a.RelayID, Leg: &a.Leg})); err != nil {
+				return done{}, relayRefusal("Relay ", apiError(err))
+			}
+			return doneWith("relay_leg", "Relay leg set to "+legOrAuto(a.Leg)+".", "relay", a.RelayID, "leg", a.Leg), nil
 		default: // relayDelete: the shape was checked in the plan
 			if _, err := c.cl.Relay.DeleteRelay(c.ctx, connect.NewRequest(&adminv1.DeleteRelayRequest{Id: a.RelayID})); err != nil {
 				return done{}, apiError(err)
@@ -205,14 +213,14 @@ func relayArgsShape(a relayArgs) error {
 	switch a.Action {
 	case relayCreate:
 		if !has(a.Node) || !has(a.InboundID) || has(a.RelayID) {
-			return errors.New("create takes node (the entry), inbound_id (the exit's server), and optionally port and mode")
+			return errors.New("create takes node (the entry), inbound_id (the exit's server), and optionally port, mode and leg")
 		}
 		if err := validID("inbound_id", a.InboundID); err != nil {
 			return err
 		}
-	case relayEnable, relayDisable, relayDelete, relayPort:
+	case relayEnable, relayDisable, relayDelete, relayPort, relayLeg:
 		if !has(a.RelayID) || has(a.Node) || has(a.InboundID) {
-			return errors.New(a.Action + " takes relay_id (and mode for enable, port for port) and nothing else")
+			return errors.New(a.Action + " takes relay_id (and mode for enable, port for port, leg for leg) and nothing else")
 		}
 		if err := validID("relay_id", a.RelayID); err != nil {
 			return err
@@ -223,16 +231,32 @@ func relayArgsShape(a relayArgs) error {
 		if a.Action != relayEnable && a.Mode != "" {
 			return errors.New("mode is given for create or enable only")
 		}
+		if a.Action == relayLeg && a.Leg == "" {
+			return errors.New("leg takes a family: auto, ipv4 or ipv6")
+		}
 	default:
-		return errors.New("action must be create, enable, disable, port or delete")
+		return errors.New("action must be create, enable, disable, port, leg or delete")
 	}
 	if a.Mode != "" && a.Mode != "auto" && a.Mode != "dnat" && a.Mode != "reverse" {
 		return errors.New("mode must be auto, dnat or reverse")
+	}
+	if a.Leg != "" && a.Action != relayCreate && a.Action != relayLeg {
+		return errors.New("leg is given for create or the leg action only")
+	}
+	if a.Leg != "" && a.Leg != "auto" && a.Leg != "ipv4" && a.Leg != "ipv6" {
+		return errors.New("leg must be auto, ipv4 or ipv6")
 	}
 	if a.Port != 0 && !relayPortOK(a.Port) {
 		return errors.New("port must be 443 or between 1024 and 65535")
 	}
 	return nil
+}
+
+func legOrAuto(leg string) string {
+	if leg == "" {
+		return "auto"
+	}
+	return leg
 }
 
 func countryText(c *adminv1.RelayCountryHint) string {
@@ -296,6 +320,7 @@ func (c *call) relayCreatePlan(a relayArgs) (*planned, error) {
 		{Key: "exit", Value: nm(cand.GetNodeName()), Untrusted: true},
 		{Key: "server", Value: nm(cand.GetProfileName()) + " (" + clean(cand.GetProtocol(), 40) + ", " + clean(cand.GetNetwork(), 8) + " " + strconv.Itoa(int(cand.GetPort())) + ")", Untrusted: true},
 		{Key: "entry_port", Value: port},
+		{Key: "leg", Value: legOrAuto(a.Leg)},
 		{Key: "exit_seen_from_inside", Value: countryText(cand.GetCountry()), Untrusted: true},
 		{Key: "entry_seen_from_inside", Value: countryText(r.Msg.GetEntryCountry()), Untrusted: true},
 		{Key: "entry_reaches_exit", Value: relayReachText(cand.GetReach())},
@@ -332,7 +357,7 @@ func (c *call) relayCreatePlan(a relayArgs) (*planned, error) {
 	return &planned{
 		Summary: "Make a relay on one entry node for one server of an exit node, and switch it on if its checks pass or cannot verify it. The entry node gets one forwarding rule for its port. The owner has to approve it first.",
 		Facts:   facts, Danger: []string{dangerFleet},
-		Params: relayArgs{Action: relayCreate, Node: id, InboundID: a.InboundID, Port: a.Port, Mode: a.Mode},
+		Params: relayArgs{Action: relayCreate, Node: id, InboundID: a.InboundID, Port: a.Port, Mode: a.Mode, Leg: a.Leg},
 	}, nil
 }
 
@@ -493,6 +518,15 @@ func (c *call) relayChangePlan(a relayArgs) (*planned, error) {
 		if r.GetEnabled() {
 			effect += " A relay that is on installs the new forward and the path is checked from outside; if that fails the relay is switched off."
 		}
+	case relayLeg:
+		if a.Leg == r.GetLeg() {
+			return nil, errors.New("the relay already uses that leg family")
+		}
+		facts = append(facts, Fact{Key: "leg", Value: legOrAuto(r.GetLeg()) + " -> " + a.Leg},
+			Fact{Key: "active_leg", Value: r.GetActiveLeg()},
+			Fact{Key: "exit_has_ipv6", Value: "an IPv6 leg needs the other node's IPv6 address, proved by a check from this side: the exit's for the direct way, the entry's for the bridge"})
+		summary = "Change the address family of the hop between the entry and the exit. People keep connecting to the entry as they do; only the entry-to-exit leg moves. The owner has to approve it first."
+		effect = "A relay that is on installs the new forward and the path is checked from outside; if that fails the relay is switched off. Auto follows the leg that works by itself, at most once per half hour."
 	default: // relayDelete
 		summary = "Delete one relay: the entry node stops forwarding its port. The owner has to approve it first."
 		effect = relayOffNote

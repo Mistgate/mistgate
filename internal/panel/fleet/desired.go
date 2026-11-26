@@ -456,7 +456,7 @@ func relayProtoAlways(rs []plugin.RelayForward) *agentv1.RelayForwards {
 	out := &agentv1.RelayForwards{Items: make([]*agentv1.RelayForward, 0, len(rs))}
 	for _, r := range rs {
 		out.Items = append(out.Items, &agentv1.RelayForward{RelayId: r.ID, Network: r.Network, Port: uint32(r.Port), ToHost: r.ToHost, ToPort: uint32(r.ToPort),
-			Mode: r.Mode, ExitNodeId: r.ExitNodeID})
+			Mode: r.Mode, ExitNodeId: r.ExitNodeID, ToFamily: r.ToFamily})
 	}
 	return out
 }

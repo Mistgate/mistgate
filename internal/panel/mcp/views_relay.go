@@ -77,6 +77,9 @@ type relayV struct {
 	Mode           string        `json:"mode"`
 	ActiveMode     string        `json:"active_mode"`
 	ModeReason     string        `json:"mode_reason,omitempty"`
+	Leg            string        `json:"leg"`        // auto, ipv4 or ipv6: the owner's choice of the hop between the nodes
+	ActiveLeg      string        `json:"active_leg"` // "4" or "6": the family in use now
+	IPv6LegOK      bool          `json:"ipv6_leg_supported"`
 	ReverseBlocked string        `json:"reverse_blocked,omitempty"`
 	Bridge         *relayBridgeV `json:"bridge,omitempty"`
 	CreatedUnix    int64         `json:"created_unix"`
@@ -104,6 +107,7 @@ func relayView(r *adminv1.Relay) relayV {
 		LastErrorCode: errorCode(r.GetLastError()), AgentSupported: r.GetAgentSupported(),
 		CreatedUnix: r.GetCreatedUnix(), AppliedUnix: r.GetAppliedUnix(), Mode: clean(r.GetMode(), 12),
 		ActiveMode: clean(r.GetActiveMode(), 12), ModeReason: clean(r.GetModeReason(), 32), ReverseBlocked: clean(r.GetReverseBlocked(), 32),
+		Leg: clean(r.GetLeg(), 8), ActiveLeg: clean(r.GetActiveLeg(), 4), IPv6LegOK: r.GetIpv6LegSupported(),
 	}
 	if b := r.GetBridge(); b != nil {
 		v.Bridge = &relayBridgeV{Connected: b.GetConnected(), Conns: b.GetConns(), RTTMS: b.GetRttMs(), SinceUnix: b.GetSinceUnix(), ErrorCode: errorCode(b.GetError()),

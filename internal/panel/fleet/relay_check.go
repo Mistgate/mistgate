@@ -65,9 +65,21 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 
 	now := f.now().UTC()
 	check := store.RelayCheck{At: now.Unix(), Network: link.Network, Port: link.Port}
+	doctor, doctorErr := f.st.IPv6Doctor(ctx, exit.ID)
+	if doctorErr != nil {
+		f.log.Warn("relay check: the exit's IPv6 facts", "code", "relay_check_ipv6_facts_failed", "relay", link.ID, "err", doctorErr)
+		doctor = store.IPv6Doctor{State: store.IPv6Unknown}
+	}
+	toHost, toFamily, hostOK := store.RelayHostFor(link.Relay, exit.Address, exit.IPv6Entry, doctor)
+	entryDoctor, entryDoctorErr := f.st.IPv6Doctor(ctx, entry.ID)
+	if entryDoctorErr != nil {
+		f.log.Warn("relay check: the entry's IPv6 facts", "code", "relay_check_ipv6_facts_failed", "relay", link.ID, "err", entryDoctorErr)
+		entryDoctor = store.IPv6Doctor{State: store.IPv6Unknown}
+	}
+	entryHost, entryFamily, entryOK := store.RelayHostFor(link.Relay, entry.Address, entry.IPv6Entry, entryDoctor)
 	spec, specErr := f.buildSpec(exit, row)
-	if specErr == nil {
-		check.To = row.RelayExit(exit.Address, spec.Listen.Port).String()
+	if specErr == nil && hostOK {
+		check.To = row.RelayExit(toHost, spec.Listen.Port).String()
 	}
 	if !runLeg || !runPath {
 		// a stage that does not run keeps what the last check of the same target found (its own at_unix says how old that is): the
@@ -93,7 +105,9 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 			check.ReverseReach = store.RelayStage{} // a probe of the endpoint the entry had before says nothing about this one
 		}
 	}
-	rc := relayRun{f: f, link: link, entry: entry, exit: exit, spec: spec, row: row, now: now}
+	rc := relayRun{f: f, link: link, entry: entry, exit: exit, spec: spec, row: row, now: now,
+		toHost: toHost, toFamily: toFamily, hostOK: hostOK,
+		entryHost: entryHost, entryFamily: entryFamily, entryOK: entryOK}
 	if specErr == nil {
 		liveRows, err := f.Live(ctx)
 		if err != nil {
@@ -105,6 +119,10 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 	case specErr != nil:
 		f.log.Warn("relay check: the server's spec does not build", "relay", link.ID, "err", specErr)
 		check.Leg = rc.stage("fail", "spec", "")
+		check.Path = rc.stage("skipped", "leg_failed", "")
+	case !hostOK:
+		// The owner asked for the IPv6 leg and the exit names no usable address: nothing to probe, nothing to install.
+		check.Leg = rc.stage("fail", "no_ipv6_address", "")
 		check.Path = rc.stage("skipped", "leg_failed", "")
 	default:
 		if runLeg {
@@ -180,6 +198,14 @@ type relayRun struct {
 	row         store.FleetInboundRow
 	live        map[string]store.NodeLiveRow
 	now         time.Time
+	// toHost is the exit's address for the relay's active family, and toFamily that family: the leg probes exactly what the
+	// entry would forward to.
+	toHost, toFamily string
+	hostOK           bool
+	// entryHost is the entry's address for the same family, and entryFamily that family: the bridge is dialed there and the
+	// reverse probes go there. entryOK is false when the entry names no address of that family.
+	entryHost, entryFamily string
+	entryOK                bool
 }
 
 func (r relayRun) stage(status, code, sender string) store.RelayStage {
@@ -218,7 +244,7 @@ func (r relayRun) leg(ctx context.Context) store.RelayStage {
 		if code := r.online(r.exit.ID, "exit_offline"); code != "" {
 			return r.stage("fail", code, "")
 		}
-		out := r.f.runPortCheckAttempt(ctx, r.exit, r.live[r.exit.ID], sender, portDial{Host: r.exit.Address}, []uint16{r.spec.Listen.Port})
+		out := r.f.runPortCheckAttempt(ctx, r.exit, r.live[r.exit.ID], sender, portDial{Host: r.toHost}, []uint16{r.spec.Listen.Port})
 		st, _ := r.udpStage(out, sender)
 		return st
 	}
@@ -226,7 +252,7 @@ func (r relayRun) leg(ctx context.Context) store.RelayStage {
 	if !ok {
 		return r.stage("skipped", "unverifiable", portSenderID(sender))
 	}
-	st, _ := r.tcpStage(ctx, r.exit.Address, sender, target)
+	st, _ := r.tcpStage(ctx, r.toHost, sender, target)
 	return st
 }
 

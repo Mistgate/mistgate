@@ -90,6 +90,70 @@ export function PortEditor({ r, onClose }: { r: RelayMsg; onClose: () => void })
   );
 }
 
+/** "Address family…": the family of the hop from the entry to the exit, three buttons; the IPv6 one is greyed when the entry's agent cannot carry it. */
+const legs = ["auto", "ipv4", "ipv6"] as const;
+export type Leg = (typeof legs)[number];
+
+export function LegEditor({ r, onClose }: { r: RelayMsg; onClose: () => void }) {
+  const t = useT();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [value, setValue] = useState<Leg>(((r.leg || "auto") as Leg));
+  const [error, setError] = useState<unknown>(null);
+  const [pending, setPending] = useState(false);
+  // The direct way over IPv6 needs the userspace forwarder at the entry; the bridge only needs the entry's IPv6 address.
+  const v6Blocked = r.mode === "dnat" && !r.ipv6LegSupported;
+  const pick = async (m: Leg) => {
+    if (m === value || pending || (m === "ipv6" && v6Blocked)) return;
+    setPending(true);
+    setError(null);
+    try {
+      await relaysApi.updateRelay({ id: r.id, leg: m });
+      setValue(m);
+      toast(t("common.saved"));
+    } catch (e) {
+      setError(e);
+    } finally {
+      setPending(false);
+      void qc.invalidateQueries({ queryKey: ["relays"] });
+    }
+  };
+  return (
+    <div className="wy-ed" data-testid="relay-leg-editor">
+      <span className="wy-sl">{t("nw.s.leg")}</span>
+      <div role="group" aria-label={t("nw.s.leg")} className="flex w-fit max-w-full gap-0.5 rounded-field border border-line bg-canvas p-0.5 max-[720px]:w-full max-[720px]:flex-col">
+        {legs.map((m) => (
+          <button
+            key={m}
+            type="button"
+            aria-pressed={value === m}
+            aria-disabled={m === "ipv6" && v6Blocked}
+            title={m === "ipv6" && v6Blocked ? t("relay.gate.agent_old") : undefined}
+            onClick={() => void pick(m)}
+            className={cx(
+              "h-7 rounded-ctl px-3 text-[13px] transition-colors duration-150 ease-out hover:text-fg aria-disabled:cursor-default aria-disabled:opacity-45 aria-disabled:hover:text-sec",
+              value === m ? "bg-surface-2 text-fg" : "text-sec",
+            )}
+          >
+            {t(`nw.leg.opt.${m}` as const)}
+          </button>
+        ))}
+      </div>
+      <small>{t("nw.leg.hint")}</small>
+      {error != null && (
+        <Notice tone="danger" className="items-start">
+          {errorText(error, t)}
+        </Notice>
+      )}
+      <div>
+        <Button size="md" type="button" onClick={onClose}>
+          {t("common.done")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** "Method…": the three ways in a row of buttons, a click saves it; the bridge is greyed with its reason where the server cannot use one. */
 export function ModeEditor({ r, onClose }: { r: RelayMsg; onClose: () => void }) {
   const t = useT();

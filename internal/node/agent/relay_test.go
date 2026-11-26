@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -554,5 +556,48 @@ func TestRelaySnapshot(t *testing.T) {
 	m.relays = []plugin.RelayForward{{ID: "rly_a", Network: "tcp", Port: 8443, ToHost: "203.0.113.7", ToPort: 443}}
 	if got := m.snapshot().Relays; got == nil || len(got.Items) != 1 || got.Items[0].RelayId != "rly_a" || got.Items[0].ToPort != 443 {
 		t.Errorf("snapshot relays = %v", got)
+	}
+}
+
+// A forward whose exit is on another address family is not handed to the kernel: the agent carries the port in userspace, claims
+// it, opens host INPUT for both networks, and reports the counters of the forwarder.
+func TestRelaysOfTheOtherFamilyAreCarriedInUserspace(t *testing.T) {
+	l := newRelayLab(t)
+	l.a.relay.listenAddr = func(_ string, port uint16) string {
+		return net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port)))
+	}
+	v6 := relay("rly_v6", "udp", 44443, "2001:db8::7", 443)
+	v6.ToFamily = "6"
+	v4 := relay("rly_v4", "tcp", 44444, "203.0.113.7", 443)
+	res := apply(t, l, withRelays(fullState(1), relays(v4, v6)))
+	got := results(res)
+	if r := got["rly_v6"]; r == nil || !r.Ok || r.ToIp != "2001:db8::7" {
+		t.Fatalf("the IPv6 forward: %+v", r)
+	}
+	if r := got["rly_v4"]; r == nil || !r.Ok {
+		t.Fatalf("the IPv4 forward: %+v", r)
+	}
+	if last := l.host.last(); len(last) != 1 || last[0].ID != "rly_v4" {
+		t.Fatalf("the kernel was given %+v, want only the IPv4 forward", last)
+	}
+	if _, ok := l.a.relayFwd.Counters()["rly_v6"]; !ok {
+		t.Fatalf("the userspace forward is not running: %v", l.a.relayFwd.Counters())
+	}
+	if _, ok := l.a.relay.fwdUDP[44443]; !ok {
+		t.Fatalf("udp 44443 needs host INPUT access, the agent has %v", l.a.relay.fwdUDP)
+	}
+
+	// A private address of the other family is refused like a private IPv4 one, and never installed.
+	bad := relay("rly_bad", "tcp", 44445, "fd00::1", 443)
+	bad.ToFamily = "6"
+	res = apply(t, l, withRelays(fullState(2), relays(bad)))
+	if r := results(res)["rly_bad"]; r == nil || r.Ok || !strings.Contains(r.Error, "not a public IPv6") {
+		t.Fatalf("a unique-local exit: %+v", r)
+	}
+
+	// Gone from the list: the port is given back.
+	apply(t, l, withRelays(fullState(3), nil))
+	if c := l.a.relayFwd.Counters(); len(c) != 0 {
+		t.Fatalf("forwards still running: %v", c)
 	}
 }

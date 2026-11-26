@@ -646,6 +646,12 @@ func (a *Agent) syncInboundPorts(ctx context.Context, next *model, active map[st
 	for port := range a.relay.listenerPorts {
 		tcpSet[port] = struct{}{}
 	}
+	for port := range a.relay.fwdTCP {
+		tcpSet[port] = struct{}{}
+	}
+	for port := range a.relay.fwdUDP {
+		udpSet[hostctl.UDPInboundPort{Port: port}] = struct{}{}
+	}
 	for _, listener := range a.relay.pending {
 		tcpSet[listener.Port] = struct{}{}
 	}

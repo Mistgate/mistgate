@@ -5,7 +5,7 @@ description: When a relay helps people whose network blocks a node abroad, what 
 
 A **relay** is a port on one node, the **entry**, that passes the encrypted traffic of a server on another node, the **exit**, on to it unchanged. People whose network blocks the exit's address connect to the entry instead; the entry hands their bytes to the exit, and the exit does everything else. Nothing is decrypted on the way: the session still runs from the person's phone to the exit.
 
-The entry node forwards with the kernel (one `nftables` table of its own, `mistgate_relay`, with a DNAT rule per relay), so it costs almost no CPU or memory. It holds no keys of the relayed server.
+The entry node forwards with the kernel (one `nftables` table of its own, `mistgate_relay`, with a DNAT rule per relay), so it costs almost no CPU or memory. It holds no keys of the relayed server. The exception is a relay whose exit is reachable only over IPv6 (see “Address family of the leg” below): the kernel cannot rewrite a packet from one family into the other, so the entry carries it in userspace, like the bridge.
 
 ## When it helps
 
@@ -38,7 +38,7 @@ A relay in a country with censorship is under that country's law: its hoster may
 
 People then have both the node's own server and the one through the entry. To give them only the one through the entry, turn the server off under **In subscriptions** in **Direct** on the exit node's **Ways in** tab (see [Nodes](nodes.md#direct)): it keeps running for the relay.
 
-Accounting stays on the exit: traffic, quotas, speed limits, devices and [torrent protection](torrent-protection.md) work per person as before. The exit sees the entry's address instead of the person's. The traffic crosses the entry twice (from people and to the exit), so the entry's own traffic limit and load count both, and the latency is the person to the entry plus the entry to the exit. MTU does not change.
+Accounting stays on the exit: traffic, quotas, speed limits, devices and [torrent protection](torrent-protection.md) work per person as before. The exit sees the entry's address instead of the person's. The traffic crosses the entry twice (from people and to the exit), so the entry's own traffic limit and load count both, and the latency is the person to the entry plus the entry to the exit. MTU does not change for a kernel forward; an IPv6 leg carried in userspace re-sends each UDP datagram over the other family, so a smaller MTU on that hop shows up as loss until the client's QUIC adapts.
 
 ## Add a relay
 
@@ -149,7 +149,19 @@ An AmneziaWG server is not in link lists (URI): that format cannot carry it.
 | A server whose Let's Encrypt certificate is issued for the node's IP address | Apps would reject that address on the entry. | Use a certificate for a name, or a self-signed one with a pin. |
 | A server with a port-hopping range | A relay passes one port. | The twin uses that one port: port hopping does not work through a relay. |
 
-A relay works over **IPv4** only: the entry's forward uses IPv4 on both sides. If the entry's name has an `AAAA` record and an app picks the IPv6 address, it does not connect. Keep only an `A` record for that name, or give the node its address instead of the name.
+## Address family of the leg
+
+People always reach the entry the way they do today. Only the hop from the entry to the exit can change its family: **Address family…** in the relay row's **⋯** menu (or `leg` in the `relay` MCP tool) sets it to **Auto**, **IPv4** or **IPv6**.
+
+- **Auto** (the default) uses IPv4 and moves to IPv6 by itself when the IPv4 leg dies — at most one move per half hour, and only after the IPv6 leg passes a check. When IPv6 dies, it moves back the same way. A family you pin never moves.
+- **IPv6** takes the exit's IPv6 address: its **IPv6 entry** when that is on (it passed a check from outside), else the first stable address the doctor names for its uplink. The leg check proves that this entry reaches that address and the server's own port; when the exit names no such address the check fails with `no_ipv6_address` and nothing is installed.
+- The exit needs nothing: its servers already listen on every interface, so its own IPv4 still carries people to the internet. The entry needs a working IPv6 uplink for the direct way, and its agent must list `relay-forward/2` there (an older agent cannot carry that leg; update it on **Updates**). In the reverse way the bridge's site already listens on both families, so no agent update is needed for it.
+
+Because the kernel cannot rewrite a packet from IPv4 to IPv6, an IPv6 leg is carried in userspace on the entry: it binds the port, opens one connection to the exit per person (one session per client address for UDP) and passes the bytes on unchanged. The traffic still crosses the entry twice, so the entry's traffic limit and load count it, and the entry is no longer “almost no CPU”: it moves the bytes. UDP servers (Hysteria2, AmneziaWG) work through an IPv6 leg as through an IPv4 one. The listener of such a relay is dual-stack, so the old advice “keep only an A record for the entry's name” does not apply to it.
+
+In the **reverse** way the same setting is the family of the hop the other way round: it is the family the exit uses to reach the entry's bridge site, and the reverse reach check and its speed test probe that address. The bridge is one transport for a pair of nodes, so its family is chosen for the pair: a relay pinned to IPv6 makes the exit dial the entry's IPv6 address, and pinning one relay of a pair to IPv4 while another is pinned to IPv6 is refused (`leg_conflict`). **Auto** moves on a failed reverse reach as well, with the same half-hour limit.
+
+IPv6 is filtered too, and its block lists change: that is what **Auto** is for. The relay row shows the family in use (“leg over IPv6”), and the row's chain shows whether the hop passes.
 
 ## With MCP
 

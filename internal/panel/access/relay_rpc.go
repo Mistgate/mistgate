@@ -66,7 +66,11 @@ func (s *Service) relayUsableFor(l store.RelayLink, exit store.AccessInboundFull
 	if err != nil {
 		return false
 	}
-	return relayPathUsable(relayView(l, exit, spec.Listen.Port))
+	host := relayExitHost(l, exit.Node)
+	if host == "" {
+		return false
+	}
+	return relayPathUsable(relayView(l, exit, host, spec.Listen.Port))
 }
 
 // relayRecipientUsable is the subscriber part shared by an existing relay and a candidate with no relay state yet.
@@ -95,7 +99,9 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 	if f, merged, err := s.loadFull(ctx, l.InboundID); err == nil {
 		if spec, err := s.buildSpec(f, merged); err == nil {
 			port = f.RelayInbound().RelayExit(f.Node.Address, spec.Listen.Port).Port
-			l, targeted = relayView(l, f, spec.Listen.Port), true
+			if host := relayExitHost(l, f.Node); host != "" {
+				l, targeted = relayView(l, f, host, spec.Listen.Port), true
+			}
 		}
 	}
 	if !targeted {
@@ -107,7 +113,8 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 		ViaNodeId: l.ViaNodeID, ViaNodeName: l.ViaNodeName, Network: l.Network, Port: uint32(l.Port),
 		Enabled: l.Enabled, State: inboundStates[l.State], LastError: l.LastError, ToIp: l.ToIP, ExitLive: l.Live(),
 		AgentSupported: slices.Contains(l.ViaNodeCaps, agentcap.RelayForward), CreatedUnix: l.CreatedAt.Unix(),
-		Check: s.relayCheckOf(ctx, l),
+		Check: s.relayCheckOf(ctx, l), Leg: l.Leg, ActiveLeg: l.ActiveFamily(),
+		Ipv6LegSupported: slices.Contains(l.ViaNodeCaps, agentcap.RelayForwardV6),
 	}
 	if !l.AppliedAt.IsZero() {
 		out.AppliedUnix = l.AppliedAt.Unix()
@@ -149,6 +156,13 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 	}
 	if !store.ValidRelayMode(mode) {
 		return nil, invalid("mode must be auto, dnat or reverse")
+	}
+	leg := m.Leg
+	if leg == "" {
+		leg = store.RelayLegAuto
+	}
+	if !store.ValidRelayLeg(leg) {
+		return nil, invalid("leg must be auto, ipv4 or ipv6")
 	}
 	if m.InboundId == "" || m.ViaNodeId == "" {
 		return nil, invalid("inbound_id and via_node_id are required")
@@ -206,6 +220,14 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 	}
 	network := spec.Listen.Network
 	exitPort := f.RelayInbound().RelayExit(f.Node.Address, spec.Listen.Port).Port
+	if leg == store.RelayLegIPv6 && (mode == store.RelayModeDNAT || network == "udp") &&
+		!slices.Contains(entry.AgentCaps, agentcap.RelayForwardV6) {
+		// Without the bridge there is no way to carry this leg: the direct forward over IPv6 needs the userspace forwarder.
+		return nil, coded(connect.CodeFailedPrecondition, "agent_old", "node", entry.Name)
+	}
+	if s.relayLegConflict(ctx, entry.ID, f.Node.ID, network, mode, leg, "") {
+		return nil, coded(connect.CodeFailedPrecondition, "leg_conflict", "exit", f.Node.Name)
+	}
 	port := uint16(m.Port)
 	if port == 0 {
 		others = reservePublicPorts(others)
@@ -245,7 +267,7 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 		}
 		port = free[0]
 	}
-	r := store.Relay{ID: store.NewID("rly_"), InboundID: f.Inbound.ID, ViaNodeID: entry.ID, Network: network, Port: port}
+	r := store.Relay{ID: store.NewID("rly_"), InboundID: f.Inbound.ID, ViaNodeID: entry.ID, Network: network, Port: port, Leg: leg}
 	r.Mode = mode
 	if mode == store.RelayModeReverse {
 		candidate := store.RelayLink{Relay: r, ViaNodeCaps: entry.AgentCaps, ExitNodeCaps: f.Node.AgentCaps}
@@ -288,6 +310,30 @@ func (s *Service) CreateRelay(ctx context.Context, req *connect.Request[adminv1.
 }
 
 // relayStoreError turns a refusal of the relay table into the coded error the caller sees.
+// relayLegConflict says whether pinning leg on a relay of this pair would contradict another relay that shares the bridge: the
+// bridge is one transport per pair, so its relays cannot pin different families.
+func (s *Service) relayLegConflict(ctx context.Context, entryID, exitID, network, mode, leg, selfID string) bool {
+	if leg != store.RelayLegIPv4 && leg != store.RelayLegIPv6 {
+		return false
+	}
+	if mode == store.RelayModeDNAT || network != "tcp" {
+		return false
+	}
+	links, err := s.st.RelayLinks(ctx, store.RelayFilter{NodeID: entryID})
+	if err != nil {
+		return false
+	}
+	for _, o := range links {
+		if o.ID == selfID || o.ExitNodeID != exitID || o.Network != "tcp" || o.Mode == store.RelayModeDNAT {
+			continue
+		}
+		if (o.Leg == store.RelayLegIPv4 || o.Leg == store.RelayLegIPv6) && o.Leg != leg {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Service) relayStoreError(err error, entry, exit string, port uint16, op string) error {
 	switch {
 	case errors.Is(err, store.ErrRelayExists):
@@ -327,6 +373,31 @@ func (s *Service) UpdateRelay(ctx context.Context, req *connect.Request[adminv1.
 			modeChanged = true
 		}
 	}
+	if m.Leg != nil {
+		if !store.ValidRelayLeg(*m.Leg) {
+			return nil, invalid("leg must be auto, ipv4 or ipv6")
+		}
+		if *m.Leg != link.Leg {
+			mode := link.Mode
+			if patch.Mode != nil {
+				mode = *patch.Mode
+			}
+			if *m.Leg == store.RelayLegIPv6 && (mode == store.RelayModeDNAT || link.Network == "udp") {
+				entry, err := s.st.Access().Node(ctx, link.ViaNodeID)
+				if err != nil {
+					return nil, s.internal("get node", err)
+				}
+				if !slices.Contains(entry.AgentCaps, agentcap.RelayForwardV6) {
+					return nil, coded(connect.CodeFailedPrecondition, "agent_old", "node", entry.Name)
+				}
+			}
+			if s.relayLegConflict(ctx, link.ViaNodeID, link.ExitNodeID, link.Network, mode, *m.Leg, link.ID) {
+				return nil, coded(connect.CodeFailedPrecondition, "leg_conflict", "exit", link.ExitNodeName)
+			}
+			patch.Leg = m.Leg
+			params["leg"] = *m.Leg
+		}
+	}
 	if m.Port != nil && uint16(*m.Port) != link.Port {
 		p := uint16(*m.Port)
 		patch.Port = &p
@@ -363,7 +434,7 @@ func (s *Service) UpdateRelay(ctx context.Context, req *connect.Request[adminv1.
 			return nil, err
 		}
 	}
-	if patch.Enabled == nil && patch.Port == nil && patch.Mode == nil {
+	if patch.Enabled == nil && patch.Port == nil && patch.Mode == nil && patch.Leg == nil {
 		return connect.NewResponse(&adminv1.UpdateRelayResponse{Relay: s.relayMsg(ctx, link)}), nil
 	}
 
@@ -405,7 +476,7 @@ func (s *Service) UpdateRelay(ctx context.Context, req *connect.Request[adminv1.
 	}
 	// A relay that is on after this change (switched on now, or moved to another port) has a new forward nobody has reached
 	// from outside: wait for the entry to install it and check the path, or switch the relay off again.
-	if next.Enabled && (patch.Enabled != nil || patch.Port != nil || patch.Mode != nil && *patch.Mode == store.RelayModeReverse) {
+	if next.Enabled && (patch.Enabled != nil || patch.Port != nil || patch.Leg != nil || patch.Mode != nil && *patch.Mode == store.RelayModeReverse) {
 		if err := s.relaySettleFn(ctx, next); err != nil {
 			return nil, err
 		}

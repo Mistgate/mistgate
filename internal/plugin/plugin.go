@@ -58,6 +58,9 @@ type RelayForward struct {
 	Port    uint16
 	ToHost  string
 	ToPort  uint16
+	// ToFamily is "4" (and empty, what every forward was before IPv6 legs) or "6": an agent forwards a "6" target in userspace,
+	// the kernel cannot cross address families. The omitempty keeps the JSON of a plain forward as it was.
+	ToFamily string `json:"ToFamily,omitempty"`
 	// Mode is "" (and "dnat": the same plain forward) or "reverse"; ExitNodeID names the exit whose bridge carries a reverse forward.
 	// Both are empty for an agent without agentcap.RelayReverse (the omitempty keeps the JSON the panel digests of a plain forward as it was).
 	Mode       string `json:"Mode,omitempty"`

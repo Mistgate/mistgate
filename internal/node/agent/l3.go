@@ -148,6 +148,9 @@ func (a *Agent) capabilities() []string {
 	}
 	if rh, ok := a.host.(hostctl.RelayHost); ok && rh.RelaySupported() {
 		caps = append(caps, agentcap.RelayForward)
+		if a.relayFwd != nil {
+			caps = append(caps, agentcap.RelayForwardV6)
+		}
 	}
 	if a.bridgeEntry != nil {
 		caps = append(caps, agentcap.RelayReverse)

@@ -83,6 +83,15 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 	exits := map[string]bool{}
 	dials := map[string]*plugin.BridgeDial{}
 	entries := map[string]store.NodeRow{}
+	entryDoctors := map[string]store.IPv6Doctor{}
+	// The bridge is one transport per pair, so its hop has one address family: IPv6 when any of the pair's relays that may use the
+	// bridge uses it. A pair that mixes a pinned IPv4 relay with a pinned IPv6 one is refused when the relay is made or changed.
+	pairV6 := map[string]bool{}
+	for _, l := range links {
+		if l.ExitNodeID == n.ID && l.Network == "tcp" && l.Mode != store.RelayModeDNAT && l.ActiveFamily() == store.RelayFamily6 {
+			pairV6[l.ViaNodeID] = true
+		}
+	}
 	for _, l := range links {
 		if !l.Live() || l.Network != "tcp" || !slices.Contains(l.ViaNodeCaps, agentcap.RelayReverse) || !slices.Contains(l.ExitNodeCaps, agentcap.RelayReverse) {
 			continue
@@ -108,7 +117,25 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 			continue
 		}
 		if !bridgePathValid(entry.BridgePath) || !bridgePortValid(entry.BridgePort) || !bridgeNodeIDPattern.MatchString(entry.ID) ||
-			!bridgeRelayIDPattern.MatchString(l.ID) || entry.Address == "" {
+			!bridgeRelayIDPattern.MatchString(l.ID) {
+			continue
+		}
+		family := store.RelayFamily4
+		if pairV6[entry.ID] {
+			family = store.RelayFamily6
+		}
+		doctor, ok := entryDoctors[entry.ID]
+		if !ok {
+			doctor, err = f.st.IPv6Doctor(ctx, entry.ID)
+			if err != nil {
+				f.log.Warn("relay: the entry's IPv6 facts do not read, the bridge is left out", "code", "relay_bridge_ipv6_facts_failed", "relay", l.ID, "err", err)
+				continue
+			}
+			entryDoctors[entry.ID] = doctor
+		}
+		host, _, hostOK := store.RelayHostFor(store.Relay{ActiveLeg: family}, entry.Address, entry.IPv6Entry, doctor)
+		if !hostOK {
+			f.log.Warn("relay: the entry has no address for the bridge's IPv6 leg", "code", "relay_bridge_no_ipv6", "relay", l.ID)
 			continue
 		}
 		if _, ok := dials[entry.ID]; !ok && len(dials) >= bridgeMaxDials {
@@ -132,7 +159,7 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 		}
 		d := dials[entry.ID]
 		if d == nil {
-			d = &plugin.BridgeDial{EntryNodeID: entry.ID, Host: entry.Address, Port: entry.BridgeEndpointPort(), Path: entry.BridgePath, PanelVia: true}
+			d = &plugin.BridgeDial{EntryNodeID: entry.ID, Host: host, Port: entry.BridgeEndpointPort(), Path: entry.BridgePath, PanelVia: true}
 			if entry.BridgePort != 0 {
 				d.PinSHA256 = l.BridgeSitePin(entry.BridgePort, now)
 			} else if target, ok := f.bridgeTLSName(ctx, entry); ok {

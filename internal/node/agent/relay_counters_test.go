@@ -8,6 +8,7 @@ import (
 
 	"github.com/mistgate/mistgate/internal/node/bridge"
 	"github.com/mistgate/mistgate/internal/node/doctor"
+	"github.com/mistgate/mistgate/internal/node/relayfwd"
 	"github.com/mistgate/mistgate/internal/plugin"
 )
 
@@ -60,5 +61,29 @@ func TestReverseRelayCounterResultsUseListenerBothDirections(t *testing.T) {
 		return nil, nil
 	}, forwards, time.Now()); len(nft) != 0 {
 		t.Fatalf("nft results for reverse relay: %+v", nft)
+	}
+}
+
+// The counters of a forward carried in userspace come from the forwarder, not from nft, and only a "6" forward is counted that
+// way: a kernel forward of the same list is left to relayCounterResults.
+func TestForwardRelayCounterResultsUseTheUserspaceForwarder(t *testing.T) {
+	forwards := []plugin.RelayForward{
+		{ID: "rly_v6", Network: "udp", Port: 9443, ToFamily: "6"},
+		{ID: "rly_v4", Network: "tcp", Port: 8443},
+	}
+	now := time.Unix(1, 0)
+	got := forwardRelayCounterResults(forwards, map[string]relayfwd.Counters{
+		"rly_v6": {Bytes: 100, BytesBack: 75, Packets: 3, PacketsBack: 2},
+	}, now)
+	if len(got) != 1 || got[0].ID != "relay" || got[0].Measured != now || got[0].Params["relay"] != "rly_v6" ||
+		got[0].Params["network"] != "udp" || got[0].Params["port"] != "9443" || got[0].Params["bytes"] != "100" ||
+		got[0].Params["bytes_back"] != "75" || got[0].Params["packets"] != "3" || got[0].Params["packets_back"] != "2" {
+		t.Fatalf("userspace counters = %+v", got)
+	}
+	if nft := relayCounterResults(context.Background(), func(context.Context, string, ...string) ([]byte, error) {
+		t.Fatal("a userspace forward must not read DNAT counters")
+		return nil, nil
+	}, forwards[:1], time.Now()); len(nft) != 0 {
+		t.Fatalf("nft results for a userspace forward: %+v", nft)
 	}
 }

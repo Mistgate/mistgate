@@ -105,11 +105,11 @@ func TestMovingBridgeEndpointInvalidatesReverseReach(t *testing.T) {
 	if !ok || entry.BridgeEndpointPort() == 443 {
 		t.Fatalf("the entry's 443 is the REALITY site, so the bridge needs a port of its own: %d", entry.BridgeEndpointPort())
 	}
-	if check.ReverseReachOK(f.clock, entry.BridgeEndpointPort()) {
+	if check.ReverseReachOK(f.clock, entry.BridgeEndpointPort(), store.RelayFamily4) {
 		t.Fatalf("a probe made before the bridge had this endpoint (no port: the first version's 443) passed for %d: %+v", entry.BridgeEndpointPort(), check.ReverseReach)
 	}
 	check.ReverseReach.Port = entry.BridgeEndpointPort()
-	if !check.ReverseReachOK(f.clock, entry.BridgeEndpointPort()) || check.ReverseReachOK(f.clock, 443) {
+	if !check.ReverseReachOK(f.clock, entry.BridgeEndpointPort(), store.RelayFamily4) || check.ReverseReachOK(f.clock, 443, store.RelayFamily4) {
 		t.Fatalf("a probe carries the port it was made for, and passes for that port only: %+v", check.ReverseReach)
 	}
 }

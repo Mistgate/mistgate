@@ -37,6 +37,29 @@ type Relay struct {
 	// changed (zero = never) and ModeReason why (relay.proto Relay.mode_reason).
 	Mode, ActiveMode, ModeReason string
 	ModeChangedAt                time.Time
+	// The address family of the leg between the two nodes (relay.proto Relay.leg): Leg is the owner's choice ("auto", "ipv4" or
+	// "ipv6", migration 00161), ActiveLeg the family in use now ("4" or "6"), LegTriedAt when the panel last moved the family by
+	// itself (zero = never).
+	Leg, ActiveLeg string
+	LegTriedAt     time.Time
+}
+
+// The owner's choice of the leg family (relay.proto Relay.leg) and the family in use (Relay.active_leg).
+const (
+	RelayLegAuto = "auto"
+	RelayLegIPv4 = "ipv4"
+	RelayLegIPv6 = "ipv6"
+
+	RelayFamily4 = "4"
+	RelayFamily6 = "6"
+)
+
+// ActiveFamily is the family a relay's leg uses now, "4" for a row that predates migration 00161 (or was not read from the table).
+func (r Relay) ActiveFamily() string {
+	if r.ActiveLeg == RelayFamily6 {
+		return RelayFamily6
+	}
+	return RelayFamily4
 }
 
 // RelayLink is a relay with what the panel knows of its two ends.
@@ -79,7 +102,7 @@ type RelayFilter struct {
 // The columns of a relay whose names the joined tables share are aliased: a batched read (D1) answers by column name.
 const relayCols = `r.id AS relay_id, r.inbound_id, r.via_node_id, r.network, r.port, r.enabled AS relay_enabled, r.state AS relay_state,
 	r.last_error, r.to_ip, r.applied_at, r.check_json, r.created_at, r.updated_at,
-	r.mode, r.active_mode, r.mode_changed_at, r.mode_reason`
+	r.mode, r.active_mode, r.mode_changed_at, r.mode_reason, r.leg, r.active_leg, r.leg_tried_at`
 
 const relayLinkQuery = `SELECT ` + relayCols + `,
 		x.id AS exit_node_id, x.name AS exit_node_name, x.state AS exit_node_state, i.enabled AS inbound_enabled, i.state AS inbound_state,
@@ -94,14 +117,14 @@ const relayLinkQuery = `SELECT ` + relayCols + `,
 
 func scanRelay(r rowScanner, extra ...any) (Relay, error) {
 	var v Relay
-	var port, applied, created, updated, modeChanged int64
+	var port, applied, created, updated, modeChanged, legTried int64
 	dest := append([]any{&v.ID, &v.InboundID, &v.ViaNodeID, &v.Network, &port, &v.Enabled, &v.State, &v.LastError, &v.ToIP, &applied,
-		&v.CheckJSON, &created, &updated, &v.Mode, &v.ActiveMode, &modeChanged, &v.ModeReason}, extra...)
+		&v.CheckJSON, &created, &updated, &v.Mode, &v.ActiveMode, &modeChanged, &v.ModeReason, &v.Leg, &v.ActiveLeg, &legTried}, extra...)
 	if err := r.Scan(dest...); err != nil {
 		return Relay{}, err
 	}
 	v.Port, v.AppliedAt, v.CreatedAt, v.UpdatedAt = uint16(port), fleetTime(applied), fromUnix(created), fromUnix(updated)
-	v.ModeChangedAt = fleetTime(modeChanged)
+	v.ModeChangedAt, v.LegTriedAt = fleetTime(modeChanged), fleetTime(legTried)
 	return v, nil
 }
 
@@ -206,9 +229,9 @@ func (s *Store) CreateRelay(ctx context.Context, r Relay, now time.Time) error {
 	_, err := s.batch(ctx,
 		guard(`EXISTS (SELECT 1 FROM inbound i JOIN node x ON x.id = i.node_id JOIN node e ON e.id = ?2
 			WHERE i.id = ?1 AND x.state <> 'retired' AND e.state <> 'retired' AND x.id <> e.id)`, r.InboundID, r.ViaNodeID),
-		Stmt{Query: `INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, mode, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, 0, 'pending', '{}', COALESCE(NULLIF(?, ''), 'auto'), ?, ?)`,
-			Args: []any{r.ID, r.InboundID, r.ViaNodeID, r.Network, int64(r.Port), r.Mode, unix(now), unix(now)}},
+		Stmt{Query: `INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, mode, leg, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, 0, 'pending', '{}', COALESCE(NULLIF(?, ''), 'auto'), COALESCE(NULLIF(?, ''), 'auto'), ?, ?)`,
+			Args: []any{r.ID, r.InboundID, r.ViaNodeID, r.Network, int64(r.Port), r.Mode, r.Leg, unix(now), unix(now)}},
 	)
 	switch {
 	case errors.Is(err, errGuard):
@@ -226,6 +249,7 @@ type RelayPatch struct {
 	Enabled *bool
 	Port    *uint16
 	Mode    *string // the owner's choice, one of the Relay* mode words; changes no state of the forward
+	Leg     *string // the owner's choice, one of the RelayLeg* words; changes no state of the forward
 }
 
 // UpdateRelay applies the patch. A change of the switch or the port puts the relay back to pending (the agent has not
@@ -241,6 +265,16 @@ func (s *Store) UpdateRelay(ctx context.Context, id string, p RelayPatch, now ti
 	}
 	if p.Mode != nil {
 		set, args = append(set, `mode = ?`), append(args, *p.Mode)
+	}
+	if p.Leg != nil {
+		set, args = append(set, `leg = ?`), append(args, *p.Leg)
+		// A family the owner pinned is the family in use at once; "auto" leaves the panel's choice alone.
+		switch *p.Leg {
+		case RelayLegIPv4:
+			set = append(set, `active_leg = '4'`, `leg_tried_at = 0`)
+		case RelayLegIPv6:
+			set = append(set, `active_leg = '6'`, `leg_tried_at = 0`)
+		}
 	}
 	if p.Enabled != nil || p.Port != nil {
 		set = append(set, `state = 'pending'`, `last_error = ''`, `to_ip = ''`, `applied_at = 0`)

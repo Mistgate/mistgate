@@ -166,12 +166,19 @@ func freshStage(stage RelayStage, now time.Time, maxAge time.Duration) bool {
 
 // ReverseReachOK says the exit reached the entry's bridge endpoint lately: a passing reverse_reach, not older than 15 minutes and
 // not from the future, made for the endpoint the entry has NOW (port 0 on a stage is the 443 the first version probed).
-func (c RelayCheck) ReverseReachOK(now time.Time, endpointPort uint16) bool {
+func (c RelayCheck) ReverseReachOK(now time.Time, endpointPort uint16, family string) bool {
 	port := c.ReverseReach.Port
 	if port == 0 {
 		port = 443
 	}
-	return c.ReverseReach.Status == "ok" && port == endpointPort && freshStage(c.ReverseReach, now, relayModeCheckFresh)
+	probed := c.ReverseReach.Family
+	if probed == "" {
+		probed = RelayFamily4 // a probe made before the leg had a family went to the entry's own IPv4 address
+	}
+	if family == "" {
+		family = RelayFamily4
+	}
+	return c.ReverseReach.Status == "ok" && port == endpointPort && probed == family && freshStage(c.ReverseReach, now, relayModeCheckFresh)
 }
 
 // BridgeWanted says the panel wants the exit to hold its connections to the entry for this relay now. The reverse way needs them;
@@ -193,7 +200,7 @@ func (l RelayLink) BridgeWanted(now time.Time, endpointPort uint16) bool {
 		return true
 	}
 	c, ok := l.Check()
-	if !ok || !c.ReverseReachOK(now, endpointPort) {
+	if !ok || !c.ReverseReachOK(now, endpointPort, l.ActiveFamily()) {
 		return false
 	}
 	legFailed := freshStage(c.Leg, now, relayModeCheckFresh) && c.Leg.Status == "fail"

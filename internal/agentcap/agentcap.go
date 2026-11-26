@@ -58,6 +58,10 @@ const (
 	// bridge_dials, ApplyResult.bridges, StatsBatch.bridges; agent.proto "REVERSE RELAY"); a pair of agents needs it at both ends.
 	RelayForward = "relay-forward/1"
 	RelayReverse = "relay-reverse/1"
+	// RelayForwardV6: the agent forwards a port whose exit it reaches over IPv6 in userspace (RelayForward.to_family), because
+	// DNAT cannot cross address families. An agent with only relay-forward/1 gets no such forward: the panel offers an IPv6 leg
+	// only where it is listed.
+	RelayForwardV6 = "relay-forward/2"
 )
 
 // The reports and requests of a node: counters, probes, checks and captures.

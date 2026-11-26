@@ -85,6 +85,13 @@ func PublicIPv4(a netip.Addr) bool {
 	return a.As4()[0] != 0 && a.As4()[0] < 240
 }
 
+// PublicIPv6 says whether a is a public unicast IPv6 address: not a unique-local, loopback, link-local, multicast or mapped
+// IPv4 one. Documentation ranges pass: they are what tests use.
+func PublicIPv6(a netip.Addr) bool {
+	a = a.Unmap()
+	return a.Is6() && !a.Is4In6() && a.IsGlobalUnicast() && !a.IsPrivate() && !a.IsLinkLocalUnicast() && !a.IsMulticast()
+}
+
 // check is what makes a Forward renderable at all.
 func (f Forward) check() error {
 	switch {
