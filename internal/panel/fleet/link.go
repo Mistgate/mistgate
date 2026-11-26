@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
@@ -75,9 +76,13 @@ func (f *Fleet) LinkHandler() http.Handler {
 	// routed (it needs a node identity); a renewing link agent sends ConnectRequest.renew on its session.
 	enroll := connect.NewUnaryHandler(agentv1connect.EnrollmentServiceEnrollProcedure, enrollmentService{f}.Enroll,
 		connect.WithReadMaxBytes(16<<10))
-	var sessions http.Handler = f.linkSocketHandler()
-	if f.cfg.Remote != nil {
+	// The Worker delegates WebSockets to a Durable Object. A compile-time condition keeps the
+	// native socket and its VPS-only session hooks out of the wasm binary.
+	var sessions http.Handler
+	if runtime.GOOS == "js" || f.cfg.Remote != nil {
 		sessions = LinkMarker()
+	} else {
+		sessions = f.linkSocketHandler()
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == agentv1connect.EnrollmentServiceEnrollProcedure {
@@ -90,7 +95,11 @@ func (f *Fleet) LinkHandler() http.Handler {
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/fetch/") {
-			f.linkFetch(w, r)
+			if runtime.GOOS == "js" {
+				http.NotFound(w, r)
+			} else {
+				f.linkFetch(w, r)
+			}
 			return
 		}
 		sessions.ServeHTTP(w, r)
