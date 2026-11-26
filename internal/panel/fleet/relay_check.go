@@ -67,13 +67,13 @@ func (f *Fleet) CheckRelay(ctx context.Context, relayID string, stages ...string
 	check := store.RelayCheck{At: now.Unix(), Network: link.Network, Port: link.Port}
 	doctor, doctorErr := f.st.IPv6Doctor(ctx, exit.ID)
 	if doctorErr != nil {
-		f.log.Warn("relay check: the exit's IPv6 facts", "relay", link.ID, "err", doctorErr)
+		f.log.Warn("relay check: the exit's IPv6 facts", "code", "relay_check_ipv6_facts_failed", "relay", link.ID, "err", doctorErr)
 		doctor = store.IPv6Doctor{State: store.IPv6Unknown}
 	}
 	toHost, toFamily, hostOK := store.RelayHostFor(link.Relay, exit.Address, exit.IPv6Entry, doctor)
 	entryDoctor, entryDoctorErr := f.st.IPv6Doctor(ctx, entry.ID)
 	if entryDoctorErr != nil {
-		f.log.Warn("relay check: the entry's IPv6 facts", "relay", link.ID, "err", entryDoctorErr)
+		f.log.Warn("relay check: the entry's IPv6 facts", "code", "relay_check_ipv6_facts_failed", "relay", link.ID, "err", entryDoctorErr)
 		entryDoctor = store.IPv6Doctor{State: store.IPv6Unknown}
 	}
 	entryHost, entryFamily, entryOK := store.RelayHostFor(link.Relay, entry.Address, entry.IPv6Entry, entryDoctor)

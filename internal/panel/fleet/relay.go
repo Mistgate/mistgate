@@ -46,14 +46,14 @@ func (f *Fleet) relayForwards(ctx context.Context, n store.NodeRow, caps []strin
 		}
 		doctor, err := f.st.IPv6Doctor(ctx, exit.ID)
 		if err != nil {
-			f.log.Warn("relay: the exit's IPv6 facts do not read, the forward is left out", "relay", l.ID, "err", err)
+			f.log.Warn("relay: the exit's IPv6 facts do not read, the forward is left out", "code", "relay_leg_ipv6_facts_failed", "relay", l.ID, "err", err)
 			continue
 		}
 		host, family, ok := store.RelayHostFor(l.Relay, exit.Address, exit.IPv6Entry, doctor)
 		if !ok {
 			// The owner asked for the IPv6 leg and the exit names no usable address yet: the forward would point nowhere. The
 			// leg check says the same to the owner; nothing is installed.
-			f.log.Warn("relay: the exit has no address for the IPv6 leg, the forward is left out", "relay", l.ID, "inbound", l.InboundID)
+			f.log.Warn("relay: the exit has no address for the IPv6 leg, the forward is left out", "code", "relay_leg_no_ipv6", "relay", l.ID, "inbound", l.InboundID)
 			continue
 		}
 		toFamily := ""
@@ -61,7 +61,7 @@ func (f *Fleet) relayForwards(ctx context.Context, n store.NodeRow, caps []strin
 		if family == store.RelayFamily6 {
 			// The bridge carries the hop itself and only needs the entry's IPv6 address; the direct way needs the userspace forwarder.
 			if !reverse && !slices.Contains(caps, agentcap.RelayForwardV6) {
-				f.log.Warn("relay: the entry's agent cannot carry a direct IPv6 leg", "relay", l.ID, "inbound", l.InboundID)
+				f.log.Warn("relay: the entry's agent cannot carry a direct IPv6 leg", "code", "relay_leg_agent_old", "relay", l.ID, "inbound", l.InboundID)
 				continue
 			}
 			toFamily = store.RelayFamily6

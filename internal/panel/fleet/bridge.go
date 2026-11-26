@@ -128,14 +128,14 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 		if !ok {
 			doctor, err = f.st.IPv6Doctor(ctx, entry.ID)
 			if err != nil {
-				f.log.Warn("relay: the entry's IPv6 facts do not read, the bridge is left out", "relay", l.ID, "err", err)
+				f.log.Warn("relay: the entry's IPv6 facts do not read, the bridge is left out", "code", "relay_bridge_ipv6_facts_failed", "relay", l.ID, "err", err)
 				continue
 			}
 			entryDoctors[entry.ID] = doctor
 		}
 		host, _, hostOK := store.RelayHostFor(store.Relay{ActiveLeg: family}, entry.Address, entry.IPv6Entry, doctor)
 		if !hostOK {
-			f.log.Warn("relay: the entry has no address for the bridge's IPv6 leg", "relay", l.ID)
+			f.log.Warn("relay: the entry has no address for the bridge's IPv6 leg", "code", "relay_bridge_no_ipv6", "relay", l.ID)
 			continue
 		}
 		if _, ok := dials[entry.ID]; !ok && len(dials) >= bridgeMaxDials {
