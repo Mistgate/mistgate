@@ -130,6 +130,9 @@ func (r *pathRig) reached(prefix string) func() bool {
 // established marks a session as authenticated (as runSession does after a HelloAck), then lives for d (until ctx ends when d < 0).
 func (r *pathRig) established(ctx context.Context, d time.Duration, err error) error {
 	r.a.sessionEpoch.Add(1)
+	r.a.sessionAckAt = time.Now()
+	r.a.sessionEndedAt = new(atomic.Pointer[time.Time])
+	defer func() { now := time.Now(); r.a.sessionEndedAt.Store(&now) }()
 	if d < 0 {
 		<-ctx.Done()
 		return ctx.Err()

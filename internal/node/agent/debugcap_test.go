@@ -477,3 +477,45 @@ func TestDebugCaptureCostsNothingWhenOff(t *testing.T) {
 		t.Error("debug enabled with no capture")
 	}
 }
+
+// An engine that keeps lines from the process log (xray's connection lines) asks its logger whether Debug is on for its source:
+// that is true while a capture wants the source, and not before or after. (A debug capture raises the process level, so the
+// answer is also true for every source then; the capture's own filter drops what it did not ask for.)
+func TestDebugCaptureTellsASourceThatItIsWanted(t *testing.T) {
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name    string
+		level   slog.Level
+		sources map[string]bool
+		want    bool
+	}{
+		{"asked", slog.LevelDebug, map[string]bool{"xray": true}, true},
+		{"every source", slog.LevelDebug, nil, true},
+		{"another source", slog.LevelDebug, map[string]bool{"hysteria2": true}, false},
+		{"info only", slog.LevelInfo, map[string]bool{"xray": true}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			lv := new(slog.LevelVar)
+			lv.Set(slog.LevelWarn)
+			d := newDebugState(lv, time.Now)
+			log := slog.New(&ringHandler{ring: newLogRing(), dbg: d, inner: slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: lv})}).With("source", "xray")
+			if log.Enabled(ctx, slog.LevelDebug) {
+				t.Fatal("Debug is on before the capture")
+			}
+			d.start("req_x", tc.level, tc.sources, time.Hour, func(string) {})
+			if got := d.wants("xray", slog.LevelDebug); got != tc.want {
+				t.Errorf("capture wants xray Debug = %v, want %v", got, tc.want)
+			}
+			if tc.want && !log.Enabled(ctx, slog.LevelDebug) {
+				t.Error("Enabled(Debug) is false while the capture wants the source")
+			}
+			if !tc.want && tc.level == slog.LevelInfo && log.Enabled(ctx, slog.LevelDebug) {
+				t.Error("an Info capture turned Debug on")
+			}
+			d.shutdown()
+			if log.Enabled(ctx, slog.LevelDebug) {
+				t.Error("Debug stays on after the capture")
+			}
+		})
+	}
+}

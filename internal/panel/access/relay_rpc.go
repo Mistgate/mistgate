@@ -55,7 +55,18 @@ func (s *Service) relayUsable(l store.RelayLink, exit store.AccessInboundFull, g
 
 // relayUsableFor is relayUsable for a subscription of the given format (see usableForFormat).
 func (s *Service) relayUsableFor(l store.RelayLink, exit store.AccessInboundFull, gs store.AccessGroups, u store.AccessUser, format plugin.ClientFormat) bool {
-	return relayPathUsable(l) && s.relayRecipientUsableFor(l, exit, gs, u, format)
+	if !l.Enabled || l.State != "active" || !s.relayRecipientUsableFor(l, exit, gs, u, format) {
+		return false
+	}
+	settings, err := s.mergedSettings(exit.Profile)
+	if err != nil {
+		return false
+	}
+	spec, err := s.buildSpec(exit, settings)
+	if err != nil {
+		return false
+	}
+	return relayPathUsable(relayView(l, exit, spec.Listen.Port))
 }
 
 // relayRecipientUsable is the subscriber part shared by an existing relay and a candidate with no relay state yet.
@@ -79,6 +90,17 @@ func relayAgentOK(n store.AccessNode) bool {
 }
 
 func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Relay {
+	var port uint16
+	targeted := false
+	if f, merged, err := s.loadFull(ctx, l.InboundID); err == nil {
+		if spec, err := s.buildSpec(f, merged); err == nil {
+			port = f.RelayInbound().RelayExit(f.Node.Address, spec.Listen.Port).Port
+			l, targeted = relayView(l, f, spec.Listen.Port), true
+		}
+	}
+	if !targeted {
+		l = l.ForTarget("", "")
+	}
 	out := &adminv1.Relay{
 		Id: l.ID, InboundId: l.InboundID, ExitNodeId: l.ExitNodeID, ExitNodeName: l.ExitNodeName,
 		ProfileId: l.ProfileID, ProfileName: l.ProfileName, Protocol: l.Protocol,
@@ -102,11 +124,7 @@ func (s *Service) relayMsg(ctx context.Context, l store.RelayLink) *adminv1.Rela
 			}
 		}
 	}
-	if f, merged, err := s.loadFull(ctx, l.InboundID); err == nil {
-		if spec, err := s.buildSpec(f, merged); err == nil {
-			out.ExitPort = uint32(f.RelayInbound().RelayExit(f.Node.Address, spec.Listen.Port).Port)
-		}
-	}
+	out.ExitPort = uint32(port)
 	fillRelayMode(out, l)
 	return out
 }

@@ -22,7 +22,7 @@ description: mistgate serve 和 mistgate setup 的所有标志、对应的环境
 | `--acme-domain` | `MISTGATE_ACME_DOMAIN` | none | 为此主机名获取 Let’s Encrypt 证书。可重复指定。仅接受普通主机名，不接受通配符。通过公共监听器使用 TLS-ALPN-01 验证，因此该监听器必须能从端口 443 访问。使用此选项即表示接受 CA 的服务条款。若同时指定 `--tls-cert`，这些主机名使用 Let’s Encrypt 证书，其他名称使用静态证书。 |
 | `--acme-email` | `MISTGATE_ACME_EMAIL` | none | Let’s Encrypt 的联系邮箱。可选。 |
 | `--acme-http` | `MISTGATE_ACME_HTTP` | `:80` | 仅配合 `--acme-domain` 使用，用于 ACME HTTP-01 验证和从 HTTP 重定向到 HTTPS。其他主机名和未知路径会得到伪装站点的 404。传入空值 `--acme-http=` 或将 `MISTGATE_ACME_HTTP=` 设为空，可关闭此监听器。 |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | the address setup stored | 为管理后台单独提供普通 HTTP 监听器。仅适用于通过 `setup --admin-listen` 设置的安装；若使用私密前缀或主机名，则会报错。此项会覆盖已存储的地址，但通行密钥仍绑定到 setup 保存的端口。 |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | the address setup stored | 为管理后台单独提供普通 HTTP 监听器。除 `--dev` 外，非空覆盖值必须与保存的地址相同，否则拒绝启动。命令行参数优先于环境变量。请通过 `mistgate admin-address` 更改设置，而不是覆盖服务参数。 |
 | `--agent-listen` | `MISTGATE_AGENT_LISTEN` | none (`127.0.0.1:8082` with `--dev`) | 为节点 Agent 接入端点单独提供 TLS 监听器。未设置时，Agent 会使用带私密 TLS 名称的公共监听器，因此公共监听器必须启用 TLS。 |
 | `--agent-addr` | `MISTGATE_AGENT_ADDR` | derived | Agent 要连接的 `host:port`，会写入新安装命令。未设置时：若 `--agent-listen` 指定了具体主机（非空、不是 `0.0.0.0` 或 `[::]`），则使用该值；否则使用公共 URL 的主机和端口（URL 未指定端口时使用 443）。已注册的节点会保留注册时使用的地址。 |
 | `--trusted-proxy` | `MISTGATE_TRUSTED_PROXY` | none | 可信反向代理的 CIDR 或 IP；其 `X-Forwarded-For` 请求头会被采信。代理必须自行设置或覆盖该请求头；只写入 `Forwarded` 的代理不受支持。可重复指定。未设置时，无论请求头内容如何，TCP 对端都被视为客户端。 |
@@ -45,7 +45,7 @@ description: mistgate serve 和 mistgate setup 的所有标志、对应的环境
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` | 创建数据目录、主密钥和数据库的位置。 |
 | `--public-url` | `MISTGATE_PUBLIC_URL` | none | 公共（伪装）站点的 URL，格式为 `http(s)://host[:port]`，例如 `https://panel.example.com`。这是订阅链接和 Agent 地址的基础地址。除非指定 `--admin-host` 或 `--admin-listen`，否则必须设置；始终建议设置。 |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | none | 使用此私密主机名提供管理后台，而不是使用私密路径前缀。 |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | 使用单独的监听器提供管理后台，例如 `127.0.0.1:8081`。不能与 `--admin-host` 同时使用。 |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | 使用单独的监听器提供管理后台，例如 `127.0.0.1:8081`。主机必须是环回地址（`127.0.0.1`、`::1` 或 `localhost`），端口必须是 1 到 65535 之间的数字；其他地址会被拒绝。不能与 `--admin-host` 同时使用。 |
 | `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn 依赖方 ID。 |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | derived | WebAuthn 和管理后台状态变更请求允许使用的浏览器来源，使用逗号分隔。 |
 
@@ -158,7 +158,8 @@ setup 在各种模式下生成的值：
 | `identity.pem` | 节点的私钥和面板 CA 签发的证书，保存在同一文件中。文件存在表示节点「已注册」。 |
 | `enroll-pending.pem` | 使用 `--resume-key` 发起注册（SSH 安装）时生成的私钥，只保留到注册成功为止。 |
 | `ca.pem` | 面板 CA：Agent 唯一信任的证书颁发机构。 |
-| `agent.json` | 面板地址、私密 TLS 名称和节点 ID。 |
+| `agent.json` | 面板地址、私密 TLS 名称和节点 ID。连接节点还保存 `link`、待尝试的 `next_link`、`prev_link`（最后确认可用的地址）、`link_since`（切换时间）和 `link_healthy`（会话在 HelloAck 后持续了 2 分钟）。连续切换时，在当前地址确认健康前保留已知可用的备用地址，重启后也一样。直连和桥接会话采用相同规则；切换至少 7 天后的健康会话会删除 `prev_link` 和 `link_since`。地址字段包含私密前缀。`next_link_revision` 防止 Agent 的旧状态覆盖更新的 CLI 请求。 |
+| `agent.json.lock` | Agent 与 `set-panel` 共用的跨进程锁。运行期间请勿删除。写入使用唯一临时文件和原子替换；Agent 后续写入会保留并发的 CLI 请求。 |
 | `state.json` | 最近应用的状态，因此即使面板不可用，服务器也会在节点重启后恢复运行。文件中包含协议配置密钥（混淆密码、服务器密钥、WARP 密钥）和节点验证用户所需的内容（Hysteria2 令牌哈希、AmneziaWG 公钥和预共享密钥），绝不包含客户端私钥或原始令牌。 |
 | `certs/` | 节点上服务器使用的证书：Let’s Encrypt 状态和自签名证书。 |
 | `last_version` | 上次启动的版本。 |

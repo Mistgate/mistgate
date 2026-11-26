@@ -117,7 +117,9 @@ func (a *Agent) capabilities() []string {
 			caps = append(caps, agentcap.OSUpdate)
 		}
 	}
-	if !a.linkOnly() {
+	if a.linkOnly() {
+		caps = append(caps, agentcap.PanelLink) // an mTLS node ignores a panel link address (panellink.go)
+	} else {
 		caps = append(caps, agentcap.Nets)
 	}
 	if kernelDebugSupported() {

@@ -268,7 +268,7 @@ func TestStaticAWGPathKeysFollowRotationAndRemoval(t *testing.T) {
 	for _, n := range []struct{ id, name, addr, cc string }{{"nod_fi1", "fi1", "198.51.100.21", "FI"}, {"nod_nl1", "nl1", "198.51.100.22", "NL"}} {
 		e.sql(`INSERT INTO node (id, name, address, country_code, state, agent_caps, created_at) VALUES (?, ?, ?, ?, 'active', 'relay-forward/1', 2)`, n.id, n.name, n.addr, n.cc)
 		e.sql(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
-			VALUES ('rly_' || ?, ?, ?, 'udp', 8443, 1, 'active', ?, 1, 1)`, n.name, f.inbound, n.id, `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`)
+			VALUES ('rly_' || ?, ?, ?, 'udp', 8443, 1, 'active', ?, 1, 1)`, n.name, f.inbound, n.id, e.passingRelayJSON(f.inbound, "udp", 8443))
 	}
 	privateKey := func(conf string) string {
 		for _, line := range strings.Split(conf, "\n") {

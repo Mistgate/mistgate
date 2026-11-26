@@ -151,9 +151,9 @@ func (t *target) nodePort() uint16 {
 }
 
 type relayTargetInfo struct {
-	link     store.RelayLink
-	entry    store.NodeRow
-	exitPort uint16
+	link  store.RelayLink
+	entry store.NodeRow
+	key   string
 }
 
 // snapshot is every inbound of every non-retired node at one moment.
@@ -202,7 +202,8 @@ func (s *Service) snapshot(ctx context.Context) (*snapshot, error) {
 			continue
 		}
 		t := *exit
-		t.relay = &relayTargetInfo{link: link, entry: entry, exitPort: exit.nodePort()}
+		view, key := link.ForInbound(exit.in, exit.node.Address, exit.spec.Listen.Port)
+		t.relay = &relayTargetInfo{link: view, entry: entry, key: key}
 		t.spec.Listen.Port = link.Port
 		sn.relayTargets[relayTargetID(link.ID)] = &t
 	}

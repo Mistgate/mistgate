@@ -21,6 +21,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"github.com/mistgate/mistgate/internal/statehash"
 )
 
 func (s *Service) protocol(id string) (protocols.Protocol, error) {
@@ -272,36 +273,15 @@ func (s *Service) CreateProfile(ctx context.Context, req *connect.Request[adminv
 	return connect.NewResponse(&adminv1.CreateProfileResponse{Profile: sum}), nil
 }
 
-// profileImpact computes what changing a profile from oldMerged to newMerged does to its inbounds and users.
-func (s *Service) profileImpact(ctx context.Context, p store.AccessProfile, proto protocols.Protocol, oldMerged, newMerged json.RawMessage) (*adminv1.ProfileImpact, error) {
-	a := s.st.Access()
-	full, err := a.InboundsFull(ctx, "")
-	if err != nil {
-		return nil, s.internal("inbounds", err)
-	}
-	impact := &adminv1.ProfileImpact{CriticalFields: protocols.ChangedPointers(oldMerged, newMerged, s.criticalPtrs[p.Protocol])}
-	restartedNodes := map[string]bool{}
-	for _, f := range full {
-		if f.Profile.ID != p.ID || !f.Inbound.Enabled {
-			continue
-		}
-		oldSpec, oldErr := s.buildSpec(f, oldMerged)
-		newSpec, newErr := s.buildSpec(f, newMerged)
-		if newErr != nil {
-			return nil, nodeBuildRefusal(newErr, f.Node.Name)
-		}
-		if oldErr != nil || specChanged(oldSpec, newSpec) {
-			impact.InboundsRestarted++
-			restartedNodes[f.Node.ID] = true
-		}
-	}
+// addAffectedUsers fills in the user impact for the same inbounds the edit will restart.
+func (s *Service) addAffectedUsers(ctx context.Context, impact *adminv1.ProfileImpact, profileID string, proto protocols.Protocol, restartedNodes map[string]bool) error {
 	if len(restartedNodes) == 0 {
-		return impact, nil
+		return nil
 	}
 	happ, amnezia, telegram, trustTunnel, _ := clientApps(proto)
-	users, err := a.ProfileUsers(ctx, p.ID, happ, amnezia, telegram, trustTunnel)
+	users, err := s.st.Access().ProfileUsers(ctx, profileID, happ, amnezia, telegram, trustTunnel)
 	if err != nil {
-		return nil, s.internal("profile users", err)
+		return s.internal("profile users", err)
 	}
 	// A critical change of a protocol the subscription carries breaks the server for everyone who has it, until their
 	// app refreshes the subscription: all of them are named. Otherwise the people online there reconnect (a per-device
@@ -318,7 +298,7 @@ func (s *Service) profileImpact(ctx context.Context, p store.AccessProfile, prot
 			impact.AffectedUserNames = append(impact.AffectedUserNames, u.Name)
 		}
 	}
-	return impact, nil
+	return nil
 }
 
 // addReissue counts the devices whose issued config an x-critical change breaks and adds their owners to the
@@ -338,12 +318,6 @@ func (s *Service) addReissue(ctx context.Context, impact *adminv1.ProfileImpact,
 		}
 	}
 	return nil
-}
-
-// specChanged compares everything that reaches the node except the version counter.
-func specChanged(a, b plugin.InboundSpec) bool {
-	return a.Enabled != b.Enabled || a.Listen != b.Listen || a.TLS != b.TLS || a.Egress != b.Egress ||
-		!bytes.Equal(a.Settings, b.Settings)
 }
 
 func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv1.UpdateProfileRequest]) (*connect.Response[adminv1.UpdateProfileResponse], error) {
@@ -391,17 +365,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 		}
 	}
 	settingsChanged := !bytes.Equal(oldMerged, newMerged)
-	impact, err := s.profileImpact(ctx, p, proto, oldMerged, newMerged)
-	if err != nil {
-		return nil, err
-	}
-	// An x-critical change of a per-device profile breaks every config already issued: its devices become stale.
-	reissue := protocols.IsPerDevice(proto) && settingsChanged && len(impact.CriticalFields) > 0
-	if reissue {
-		if err := s.addReissue(ctx, impact, p.ID); err != nil {
-			return nil, err
-		}
-	}
+	impact := &adminv1.ProfileImpact{CriticalFields: protocols.ChangedPointers(oldMerged, newMerged, s.criticalPtrs[p.Protocol])}
 	inbounds, err := a.InboundsOfProfile(ctx, p.ID)
 	if err != nil {
 		return nil, s.internal("profile inbounds", err)
@@ -415,34 +379,54 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 		portChanged bool
 	}
 	var changedPorts []changedInboundPort
+	var changes *store.ProfileInboundChanges
+	if settingsChanged {
+		changes = &store.ProfileInboundChanges{Versions: make(map[string]uint64)}
+	}
 	var portWarnings []*adminv1.StatusReason
 	var lossyOverrides []changedInboundPort
-	if settingsChanged {
-		full, err := a.InboundsFull(ctx, "")
-		if err != nil {
-			return nil, s.internal("profile inbounds", err)
+	restartedNodes := map[string]bool{}
+	full, err := a.InboundsFull(ctx, "")
+	if err != nil {
+		return nil, s.internal("profile inbounds", err)
+	}
+	for _, f := range full {
+		if f.Profile.ID != p.ID || !f.Inbound.Enabled {
+			continue
 		}
-		for _, f := range full {
-			if f.Profile.ID != p.ID || !f.Inbound.Enabled {
-				continue
-			}
-			oldSpec, oldErr := s.buildSpec(f, oldMerged)
-			newSpec, newErr := s.buildSpec(f, newMerged)
-			if newErr != nil {
-				return nil, nodeBuildRefusal(newErr, f.Node.Name)
-			}
-			if oldErr == nil && !specChanged(oldSpec, newSpec) {
-				continue
-			}
-			others, _, err := s.nodeInbounds(ctx, f.Node.ID, f.Inbound.ID)
-			if err != nil {
-				return nil, err
-			}
-			changedPorts = append(changedPorts, changedInboundPort{
-				wasSite443: oldErr == nil && vlessSite443(oldSpec, f.Inbound.PublicPort),
-				publicPort: f.Inbound.PublicPort, node: f.Node, spec: newSpec, others: others,
-				portChanged: oldErr != nil || oldSpec.Listen.Port != newSpec.Listen.Port,
-			})
+		newSpec, newErr := s.buildSpec(f, newMerged)
+		if newErr != nil {
+			return nil, nodeBuildRefusal(newErr, f.Node.Name)
+		}
+		if changes == nil {
+			continue
+		}
+		changes.Versions[f.Inbound.ID] = f.Inbound.SpecVersion
+		oldSpec, oldErr := s.buildSpec(f, oldMerged)
+		if oldErr == nil && statehash.Spec(oldSpec) == statehash.Spec(newSpec) {
+			continue
+		}
+		others, _, err := s.nodeInbounds(ctx, f.Node.ID, f.Inbound.ID)
+		if err != nil {
+			return nil, err
+		}
+		restartedNodes[f.Node.ID] = true
+		changes.Changed = append(changes.Changed, f.Inbound.ID)
+		changedPorts = append(changedPorts, changedInboundPort{
+			wasSite443: oldErr == nil && vlessSite443(oldSpec, f.Inbound.PublicPort),
+			publicPort: f.Inbound.PublicPort, node: f.Node, spec: newSpec, others: others,
+			portChanged: oldErr != nil || oldSpec.Listen.Port != newSpec.Listen.Port,
+		})
+	}
+	impact.InboundsRestarted = uint32(len(changedPorts))
+	if err := s.addAffectedUsers(ctx, impact, p.ID, proto, restartedNodes); err != nil {
+		return nil, err
+	}
+	// An x-critical change of a per-device profile breaks every config already issued: its devices become stale.
+	reissue := protocols.IsPerDevice(proto) && settingsChanged && len(impact.CriticalFields) > 0
+	if reissue {
+		if err := s.addReissue(ctx, impact, p.ID); err != nil {
+			return nil, err
 		}
 	}
 	if len(changedPorts) > 0 {
@@ -479,7 +463,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			return nil, s.internal("seal settings", err)
 		}
 		next.SettingsJSON, next.SecretsEnc = pub, sealed
-		switch next, err = a.UpdateProfile(ctx, next, m.ExpectedVersion, settingsChanged, reissue, s.now()); {
+		switch next, err = a.UpdateProfile(ctx, next, m.ExpectedVersion, changes, reissue, s.now()); {
 		case errors.Is(err, store.ErrAccessVersion):
 			return nil, coded(connect.CodeAborted, "stale_version")
 		case errors.Is(err, store.ErrAccessExists):

@@ -1,6 +1,7 @@
 package access
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,8 @@ func (f *relayFix) switchOn(id string) {
 	f.t.Helper()
 	f.sql(`UPDATE relay SET enabled = 1, state = 'active' WHERE id = ?`, id)
 	c := store.RelayCheck{At: 1, Leg: store.RelayStage{Status: "ok"}, Path: store.RelayStage{Status: "ok"}}
+	l := f.relayOf(id)
+	c.To, c.Network, c.Port = f.s.relayTo(f.ctx, l), l.Network, l.Port
 	c.Settle()
 	if err := f.st.SetRelayCheck(f.ctx, id, c); err != nil {
 		f.t.Fatal(err)
@@ -177,6 +180,8 @@ func TestNoTwinUnlessTheRelayIsUsableForThePerson(t *testing.T) {
 	unverifiable := store.RelayCheck{At: 1,
 		Leg:  store.RelayStage{Status: "skipped", Code: "unverifiable"},
 		Path: store.RelayStage{Status: "skipped", Code: "unverifiable"}}
+	l := f.relayOf(r.Id)
+	unverifiable.To, unverifiable.Network, unverifiable.Port = f.s.relayTo(f.ctx, l), l.Network, l.Port
 	unverifiable.Settle()
 	if err := f.st.SetRelayCheck(f.ctx, r.Id, unverifiable); err != nil {
 		t.Fatal(err)
@@ -249,4 +254,10 @@ func TestNoTwinForAnAmneziaWGServer(t *testing.T) {
 			}
 		}
 	}
+}
+
+func (e *env) passingRelayJSON(inbound, network string, port uint16) string {
+	c := store.RelayCheck{At: 1, Network: network, Port: port, To: e.s.relayTo(e.ctx, store.RelayLink{Relay: store.Relay{InboundID: inbound}}), Leg: store.RelayStage{Status: "ok"}, Path: store.RelayStage{Status: "ok"}}
+	c.Settle()
+	return string(must(json.Marshal(c)))
 }

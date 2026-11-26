@@ -17,6 +17,7 @@ Mistgate 有两个二进制文件：`mistgate` 是面板，`mistgate-node` 是�
 | `backup restore` | 在离线状态下将下载的面板备份解密到新的数据目录。 |
 | `auth turnstile off` | 关闭登录页和设置页上的 Cloudflare 人机验证。 |
 | `auth reset-login` | 为管理员设置新密码和身份验证器应用，或添加密码登录方式。 |
+| `admin-address` | 当管理后台的公开地址不再可用时，将其移到单独的监听地址。 |
 | `mcp` | 为无法使用 HTTP 的智能体客户端提供连接面板 MCP 端点的本地 stdio 代理。 |
 | `release keygen` | 生成所有者的发布密钥。 |
 | `release build` | 以唯一可复现的方式构建发布二进制文件（CI 和 `make build` 都使用此命令）。 |
@@ -79,7 +80,7 @@ The link works once and expires in 30 minutes. Open it in a browser and create y
 | `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` | 数据目录（数据库、主密钥）。 |
 | `--public-url` | `MISTGATE_PUBLIC_URL` | none | 公共（伪装）站点的 URL，例如 `https://panel.example.com`。此 URL 也是订阅链接的基础地址。 |
 | `--admin-host` | `MISTGATE_ADMIN_HOST` | none | 使用此私密主机名提供管理后台，而不是使用私密路径前缀。 |
-| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | 使用单独的监听器提供管理后台，例如 `127.0.0.1:8081`。不能与 `--admin-host` 同时使用。 |
+| `--admin-listen` | `MISTGATE_ADMIN_LISTEN` | none | 使用单独的监听器提供管理后台，例如 `127.0.0.1:8081`。主机必须是环回地址（`127.0.0.1`、`::1` 或 `localhost`），端口必须是 1 到 65535 之间的数字；其他地址会被拒绝。不能与 `--admin-host` 同时使用。 |
 | `--rp-id` | `MISTGATE_RP_ID` | derived | WebAuthn 依赖方 ID。 |
 | `--rp-origins` | `MISTGATE_RP_ORIGINS` | derived | 允许的 WebAuthn 来源，使用逗号分隔。 |
 
@@ -147,6 +148,31 @@ mistgate auth reset-login [<login>] [--admin ID] [--qr-invert] [--data-dir DIR]
 ```sh
 mistgate auth reset-login alice
 ```
+
+### mistgate admin-address
+
+```text
+mistgate admin-address --admin-listen host:port [--data-dir DIR]
+```
+
+| 标志 | 环境变量 | 默认值 | 含义 |
+|---|---|---|---|
+| `--admin-listen` | none | none | 单独的管理后台监听地址 `host:port`，例如 `127.0.0.1:8443`，通过 SSH 隧道访问。主机必须是环回地址（`127.0.0.1`、`::1` 或 `localhost`），端口必须是 1 到 65535 之间的数字。必填。 |
+| `--data-dir` | `MISTGATE_DATA_DIR` | `/var/lib/mistgate` (`./.data` with `--dev`) | 数据目录。若目录中没有面板数据库，命令会拒绝执行。 |
+| `--dev` | `MISTGATE_DEV` | off | 开发安装：数据位于 `./.data`。 |
+
+将管理后台移到单独的监听地址，并去掉管理后台主机名和私密管理前缀，效果与 `mistgate setup --admin-listen` 的设置相同。当管理后台的公开地址不再可用时，可用它重新进入面板。公开 URL、Agent SNI 以及订阅、连接和探测的私密前缀保持不变。命令会输出新的管理后台地址（`http://localhost:<port>/`），并提醒为原地址注册的通行密钥在此处不再可用：请使用密码和身份验证器代码登录，然后添加新的通行密钥。之后重启面板即可：`mistgate serve` 会自行读取已保存的地址，因此无需在服务中添加 `--admin-listen`（那里的参数日后会与设置不一致）。
+
+保存新地址前，命令会尝试绑定该地址；绑定失败不会更改设置。若地址与已保存的监听地址完全相同，则不探测，因为运行中的面板可能已占用它。此检查无法在重启之前保留端口。请在面板运行时执行此命令：这样试绑定也能看到面板自己占用的端口（443 和 80）；面板停止时，这些端口上的地址会被接受，面板随后无法启动，直到用另一个端口重新执行此命令。端口 80 使用浏览器规范化的 origin 和 URL：`http://localhost/`（不带 `:80`）。
+
+若命令自身环境中的 `MISTGATE_ADMIN_LISTEN` 与新地址冲突，则拒绝操作。命令无法查看其他进程的参数或环境，也无法预知未来服务的启动方式。重启前，请从服务命令中移除 `--admin-listen`，从服务环境中移除 `MISTGATE_ADMIN_LISTEN`（必要时重新加载服务配置）。除 `--dev` 外，`serve` 会在正常解析参数后拒绝与保存地址不同的非空覆盖值：命令行参数优先于环境变量。
+
+迁移之后：
+
+- 无法再回到公开的管理后台。没有任何命令会重新设置管理后台主机名或私密管理前缀，`setup` 也会保持已配置的安装不变。管理后台留在单独的监听地址上，通过 SSH 隧道访问，例如 `ssh -L 8443:127.0.0.1:8443 panel.example.com`。
+- Telegram 通知中不再包含指向管理后台页面的链接：环回地址在服务器之外没有意义，因此面板不再附上这些链接。
+- MCP 客户端和脚本需要使用新地址：通过隧道访问 `http://localhost:<port>/mcp`，或使用 `mistgate mcp --url http://localhost:<port>/`。API 令牌仍然有效。
+- 仅使用通行密钥登录的管理员没有可用的密码。请在面板服务器上运行 `mistgate auth reset-login`：不带登录名时会列出管理员，`mistgate auth reset-login <新登录名> --admin <id>` 会为该管理员添加密码登录和身份验证器应用。参见 [mistgate auth](#mistgate-auth)。
 
 ### mistgate mcp
 
@@ -243,6 +269,7 @@ mistgate edge setup-link --file FILE
 | 命令 | 功能 |
 |---|---|
 | `enroll` | 使用一次性令牌换取节点证书。 |
+| `set-panel` | 保存新的面板连接地址，供 Agent 切换使用。 |
 | `install` | 写入加固配置的 systemd 单元，并启用和启动它。 |
 | `run` | 在前台运行 Agent。 |
 | `cleanup-net` | 移除 Agent 的隧道接口、WARP 路由和 nftables 表。 |
@@ -279,6 +306,15 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node
 next: mistgate-node install   (or, in the foreground: mistgate-node run)
 ```
+
+### mistgate-node set-panel
+
+| 标志 | 环境变量 | 默认值 | 含义 |
+|---|---|---|---|
+| `--link-url` | none | none | 面板的新连接地址，`wss://host/<secret-prefix>/`。必填。 |
+| `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | 状态目录。 |
+
+把该地址保存到 `agent.json`，作为下次尝试的地址；节点必须是通过连接（`--link-url`）注册的。对于通过 mTLS 连接的节点（`agent.json` 中没有 `link`），命令会拒绝执行，保持 `agent.json` 不变，并以状态 1 退出。重启后，Agent 会轮流尝试新地址和当前地址，一旦通过新地址建立会话就保留它。Agent 会记住之前的地址，新地址不再响应或在 2 分钟内断开会话时就回到之前的地址；切换满 7 天后，通过新地址的会话首次持续 2 分钟时，Agent 会忘掉之前的地址。面板可以把同样的更改发送给各 Agent（`panel_link_url`）；目前还没有任何功能发送它，mTLS 节点也会忽略它。此命令用于已无法连到面板的节点。命令输出 `Saved. Restart the agent: systemctl restart mistgate-node`。
 
 ### mistgate-node install
 

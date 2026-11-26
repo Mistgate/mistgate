@@ -20,5 +20,5 @@ func (in FleetInboundRow) RelayExit(address string, listen uint16) RelayExit {
 
 // RelayInbound projects the same routing fields from the access view as the fleet query.
 func (f AccessInboundFull) RelayInbound() FleetInboundRow {
-	return FleetInboundRow{PublicPort: f.Inbound.PublicPort, ID: f.Inbound.ID, ProfileID: f.Profile.ID, Protocol: f.Profile.Protocol, SpecVersion: f.Inbound.SpecVersion, TLSNameOverride: f.Inbound.TLSServerNameOverride, RealityTargetOverride: f.Inbound.RealityTargetOverride}
+	return FleetInboundRow{PublicPort: f.Inbound.PublicPort, ID: f.Inbound.ID, ProfileID: f.Profile.ID, Protocol: f.Profile.Protocol, ProfileVersion: f.Profile.Version, SpecVersion: f.Inbound.SpecVersion, TLSNameOverride: f.Inbound.TLSServerNameOverride, RealityTargetOverride: f.Inbound.RealityTargetOverride}
 }

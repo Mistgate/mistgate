@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/mistgate/mistgate/internal/plugin"
@@ -262,16 +263,29 @@ func BridgePool(prev uint32, prevAt int64, clients uint32, bps uint64, now time.
 // SetRelayDirectStreak stores the count of good direct checks in check_json.direct_streak (0 removes it). ErrNotFound when the
 // relay is gone.
 func (s *Store) SetRelayDirectStreak(ctx context.Context, id string, streak uint32) error {
-	return s.SetRelayDirectState(ctx, id, streak, 0)
+	link, err := s.RelayLink(ctx, id)
+	if err != nil {
+		return err
+	}
+	return s.SetRelayDirectState(ctx, link, streak, 0)
 }
 
-// SetRelayDirectState stores the streak and the timestamp of its latest sample. D1 returns JSON numbers as REAL, so both values
-// are cast back to integers in SQL.
-func (s *Store) SetRelayDirectState(ctx context.Context, id string, streak uint32, at int64) error {
+// SetRelayDirectState only counts a sample for the endpoint the controller read.
+// A check that replaces that endpoint before this write wins (ErrAccessVersion).
+func (s *Store) SetRelayDirectState(ctx context.Context, link RelayLink, streak uint32, at int64) error {
+	c, _ := link.Check()
+	const guard = ` WHERE id = ? AND COALESCE(json_extract(check_json, '$.to'), '') = ?
+ AND COALESCE(json_extract(check_json, '$.network'), '') = ? AND COALESCE(json_extract(check_json, '$.port'), 0) = CAST(? AS INTEGER)`
+	var err error
 	if streak == 0 {
-		return s.relayCheckMember(ctx, `UPDATE relay SET check_json = json_remove(COALESCE(check_json, '{}'), '$.direct_streak', '$.direct_streak_at') WHERE id = ?`, id)
+		err = s.relayCheckMember(ctx, `UPDATE relay SET check_json = json_remove(COALESCE(check_json, '{}'), '$.direct_streak', '$.direct_streak_at')`+guard, link.ID, c.To, c.Network, c.Port)
+	} else {
+		err = s.relayCheckMember(ctx, `UPDATE relay SET check_json = json_set(COALESCE(check_json, '{}'), '$.direct_streak', CAST(? AS INTEGER), '$.direct_streak_at', CAST(? AS INTEGER))`+guard, int64(min(streak, 3)), at, link.ID, c.To, c.Network, c.Port)
 	}
-	return s.relayCheckMember(ctx, `UPDATE relay SET check_json = json_set(COALESCE(check_json, '{}'), '$.direct_streak', CAST(? AS INTEGER), '$.direct_streak_at', CAST(? AS INTEGER)) WHERE id = ?`, int64(min(streak, 3)), at, id)
+	if errors.Is(err, ErrNotFound) {
+		return ErrAccessVersion
+	}
+	return err
 }
 
 func (s *Store) relayCheckMember(ctx context.Context, query string, args ...any) error {

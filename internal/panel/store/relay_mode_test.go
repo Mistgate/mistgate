@@ -78,3 +78,5 @@ func TestRelayReverseMigrationUpDown(t *testing.T) {
 	}
 	check("after up again")
 }
+
+func TestRelayTargetChangeSQLite(t *testing.T) { relayTargetChangeProof(t, openTemp(t)) }
