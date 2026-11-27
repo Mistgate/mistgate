@@ -64,7 +64,7 @@ func (s *syncEnv) addRelay(inbound, cc, network string) {
 		}
 	}
 	if _, err := s.st.W.Exec(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
-		VALUES ('rly_'||?, ?, 'nod_2', ?, 8443, 1, 'active', ?, 1, 1)`, inbound, inbound, network, `{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`); err != nil {
+		VALUES ('rly_'||?, ?, 'nod_2', ?, 8443, 1, 'active', ?, 1, 1)`, inbound, inbound, network, successfulRelayCheck(s.t, s.st, inbound, network, 8443)); err != nil {
 		s.t.Fatal(err)
 	}
 }
@@ -246,7 +246,7 @@ func TestSyncAWGRelayPathCarriesItsOwnKeyAndTunnelAddress(t *testing.T) {
 	inbound := e.inboundOf(e.awg)
 	if _, err := e.st.W.Exec(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
 		VALUES ('rly_awg_msk1', ?, 'nod_msk1', 'udp', 8443, 1, 'active', ?, 1, 1)`, inbound,
-		`{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`); err != nil {
+		successfulRelayCheck(t, e.st, inbound, "udp", 8443)); err != nil {
 		t.Fatal(err)
 	}
 	_, token := e.person("alice", nil)

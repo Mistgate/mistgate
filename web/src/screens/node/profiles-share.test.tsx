@@ -205,6 +205,28 @@ describe("adding a profile whose name the node's port already holds", () => {
 });
 
 describe("editing the port of a profile that moves onto a port another holds", () => {
+  it("rejects invalid public ports without rewriting them and clears only the external override", async () => {
+    updateInbound.mockResolvedValue({ warnings: [] });
+    await mount(data({ inbounds: [inb({ port: 19443, publicPort: 443 })] }));
+    expect(text()).toContain("tcp/443 → 19443");
+    await click(button("Edit"));
+    const input = field("Public TCP port (optional)");
+    await type(input, "100000");
+    expect(input?.value).toBe("100000");
+    expect(disabled(saveButton())).toBe(true);
+    await type(input, "80");
+    expect(text()).toContain("Port 80 is kept for");
+    expect(disabled(saveButton())).toBe(true);
+    await type(input, "");
+    await checked();
+    await click(saveButton());
+    await settle();
+    const writes = updateInbound.mock.calls.map(([r]) => r).filter((r) => !r.validateOnly);
+    expect(writes).toHaveLength(1);
+    expect(writes[0].publicPort).toBe(0);
+    expect(writes[0].portOverride).toBeUndefined();
+  });
+
   it("offers the name in the dialog, keeps Save off with the reason in view, and saves once the name is put", async () => {
     updateInbound.mockImplementation(async (req: { validateOnly?: boolean; portOverride?: number; tlsServerNameOverride?: string }) => {
       const a = panel({ portOverride: req.portOverride ?? 8443, tlsServerNameOverride: req.tlsServerNameOverride ?? "de1.example.com" });

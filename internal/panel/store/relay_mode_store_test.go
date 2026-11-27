@@ -126,7 +126,7 @@ func relayModeStoreProof(t *testing.T, st *Store) {
 	if err := st.SetRelayBridgeSide(ctx, "rly_a", "exit", &exitSide); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetRelayDirectState(ctx, "rly_a", 2, now.Unix()-30); err != nil {
+	if err := st.SetRelayDirectState(ctx, mustRelay(t, st, "rly_a"), 2, now.Unix()-30); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.SetRelayCheck(ctx, "rly_a", RelayCheck{At: now.Unix() + 2, Network: "tcp", Port: 8443,
@@ -240,4 +240,75 @@ func relayModeStoreProof(t *testing.T, st *Store) {
 	}
 }
 
+func nodePublicPortProof(t *testing.T, st *Store) {
+	ctx := context.Background()
+	relayFixture(t, st)
+	a := st.Access()
+	old, err := a.Inbound(ctx, "inb_de1_vl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := old
+	updated.PublicPort = 2443
+	if err = a.UpdateInbound(ctx, updated, old, false, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	stale := old
+	stale.DirectInSubscriptions = false
+	if err = a.UpdateInbound(ctx, stale, old, false, time.Now()); !errors.Is(err, ErrAccessVersion) {
+		t.Fatalf("stale update erased endpoint: %v", err)
+	}
+	row, err := st.FleetInbound(ctx, old.ID)
+	if err != nil || row.PublicPort != 2443 || row.SpecVersion != old.SpecVersion {
+		t.Fatalf("public port or version changed incorrectly: port=%d version=%d err=%v", row.PublicPort, row.SpecVersion, err)
+	}
+}
+
 func ptr[T any](v T) *T { return &v }
+
+func relayTargetChangeProof(t *testing.T, st *Store) {
+	ctx := context.Background()
+	now := time.Date(2026, 11, 24, 0, 0, 0, 0, time.UTC)
+	relayFixture(t, st)
+	if err := st.CreateRelay(ctx, Relay{ID: "rly_target", InboundID: "inb_de1_vl", ViaNodeID: "nod_fi1", Network: "tcp", Port: 2443}, now); err != nil {
+		t.Fatal(err)
+	}
+	c := RelayCheck{At: now.Unix(), Network: "tcp", Port: 2443, To: "192.0.2.10:443", Leg: RelayStage{Status: "ok"}}
+	if err := st.SetRelayCheck(ctx, "rly_target", c); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetRelayDirectStreak(ctx, "rly_target", 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetRelayCheck(ctx, "rly_target", c); err != nil {
+		t.Fatal(err)
+	}
+	if mustRelay(t, st, "rly_target").DirectStreak() != 2 {
+		t.Fatal("same target lost recovery streak")
+	}
+	c.Port++
+	if err := st.SetRelayCheck(ctx, "rly_target", c); err != nil {
+		t.Fatal(err)
+	}
+	if mustRelay(t, st, "rly_target").DirectStreak() != 0 {
+		t.Fatal("new entry port inherited recovery streak")
+	}
+	if err := st.SetRelayDirectStreak(ctx, "rly_target", 2); err != nil {
+		t.Fatal(err)
+	}
+	old := mustRelay(t, st, "rly_target")
+	c.To = "192.0.2.10:8443"
+	if err := st.SetRelayCheck(ctx, "rly_target", c); err != nil {
+		t.Fatal(err)
+	}
+	if mustRelay(t, st, "rly_target").DirectStreak() != 0 {
+		t.Fatal("new target inherited recovery streak")
+	}
+	// A controller that already read the old check finishes after the new check was stored.
+	if err := st.SetRelayDirectState(ctx, old, 3, now.Unix()); !errors.Is(err, ErrAccessVersion) {
+		t.Fatalf("stale write: %v", err)
+	}
+	if mustRelay(t, st, "rly_target").DirectStreak() != 0 {
+		t.Fatal("late controller write restored the previous endpoint's streak")
+	}
+}

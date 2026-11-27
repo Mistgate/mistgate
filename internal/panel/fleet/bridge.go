@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"regexp"
@@ -101,6 +102,8 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 			}
 			entries[l.ViaNodeID] = entry
 		}
+		// Filtering a link by its target only removes evidence, so a relay that does not want the bridge on its raw state
+		// does not want it after the filter: skip it before reading the inbound and building its spec.
 		if !l.BridgeWanted(now, entry.BridgeEndpointPort()) {
 			continue
 		}
@@ -121,6 +124,10 @@ func (f *Fleet) bridgeDesired(ctx context.Context, n store.NodeRow, caps []strin
 			continue
 		}
 		if spec.Listen.Network != "tcp" || spec.Listen.Port == 0 {
+			continue
+		}
+		l, _ = l.ForInbound(row, n.Address, spec.Listen.Port)
+		if !l.BridgeWanted(now, entry.BridgeEndpointPort()) {
 			continue
 		}
 		d := dials[entry.ID]
@@ -204,7 +211,7 @@ func (f *Fleet) bridgeTLSName(ctx context.Context, entry store.NodeRow) (tcpTarg
 
 func bridgeVLESSOwnSite(specs []tcpSpec, profile string) bool {
 	for _, spec := range specs {
-		if spec.Profile != profile || spec.Spec.Protocol != "vless" || spec.Spec.Listen.Network != "tcp" || spec.Spec.Listen.Port != 443 {
+		if spec.Profile != profile || spec.Spec.Protocol != "vless" || spec.Spec.Listen.Network != "tcp" || cmp.Or(spec.PublicPort, spec.Spec.Listen.Port) != 443 {
 			continue
 		}
 		if _, own := vlessProbeName(spec.Spec); own {

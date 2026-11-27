@@ -90,10 +90,10 @@ func TestStaticAWGConfigsIncludeASeparateConfigForEachRelay(t *testing.T) {
 		VALUES ('nod_nl1', 'nl1', '192.0.2.11', 'NL', 'active', 'relay-forward/1', 3)`)
 	e.sql(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
 		VALUES ('rly_msk1', ?, 'nod_msk1', 'udp', 8443, 1, 'active', ?, 1, 1)`, f.inbound,
-		`{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`)
+		e.passingRelayJSON(f.inbound, "udp", 8443))
 	e.sql(`INSERT INTO relay (id, inbound_id, via_node_id, network, port, enabled, state, check_json, created_at, updated_at)
 		VALUES ('rly_nl1', ?, 'nod_nl1', 'udp', 9443, 1, 'active', ?, 1, 1)`, f.inbound,
-		`{"at":1,"leg":{"status":"ok"},"path":{"status":"ok"},"ok":true}`)
+		e.passingRelayJSON(f.inbound, "udp", 9443))
 	e.sql(`UPDATE user SET device_limit = 1 WHERE id = ?`, f.user)
 
 	device := f.add(f.user, "alice")

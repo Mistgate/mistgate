@@ -62,6 +62,7 @@ func (s *Service) controlRelay(ctx context.Context, id string, notify, settle bo
 // so that the caller decides again with its result.
 func (s *Service) controlRelayOnce(ctx context.Context, l store.RelayLink, entry store.NodeRow, notify, settle bool) bool {
 	now := s.now()
+	l = s.relayViewOf(ctx, l)
 	c, _ := l.Check()
 	port := entry.BridgeEndpointPort()
 	reach := c.ReverseReach
@@ -93,8 +94,12 @@ func (s *Service) controlRelayOnce(ctx context.Context, l store.RelayLink, entry
 		s.notify.StateChanged()
 	}
 	if decision.DirectStreak != l.DirectStreak() || decision.DirectStreakAt != l.DirectStreakAt() {
-		if err := s.st.SetRelayDirectState(ctx, l.ID, decision.DirectStreak, decision.DirectStreakAt); err != nil && !errors.Is(err, store.ErrNotFound) {
+		if err := s.st.SetRelayDirectState(ctx, l, decision.DirectStreak, decision.DirectStreakAt); err != nil {
+			if errors.Is(err, store.ErrAccessVersion) {
+				return false
+			}
 			s.log.Warn("store relay direct streak", "code", "relay_direct_streak_failed", "relay", l.ID, "err", err)
+			return false
 		}
 	}
 	if decision.ActiveMode != l.ActiveMode || decision.ModeReason != l.ModeReason {

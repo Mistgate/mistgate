@@ -21,6 +21,7 @@ import (
 	"github.com/mistgate/mistgate/internal/panel/protocols/awg"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/plugin"
+	"github.com/mistgate/mistgate/internal/statehash"
 )
 
 func (s *Service) protocol(id string) (protocols.Protocol, error) {
@@ -272,36 +273,15 @@ func (s *Service) CreateProfile(ctx context.Context, req *connect.Request[adminv
 	return connect.NewResponse(&adminv1.CreateProfileResponse{Profile: sum}), nil
 }
 
-// profileImpact computes what changing a profile from oldMerged to newMerged does to its inbounds and users.
-func (s *Service) profileImpact(ctx context.Context, p store.AccessProfile, proto protocols.Protocol, oldMerged, newMerged json.RawMessage) (*adminv1.ProfileImpact, error) {
-	a := s.st.Access()
-	full, err := a.InboundsFull(ctx, "")
-	if err != nil {
-		return nil, s.internal("inbounds", err)
-	}
-	impact := &adminv1.ProfileImpact{CriticalFields: protocols.ChangedPointers(oldMerged, newMerged, s.criticalPtrs[p.Protocol])}
-	restartedNodes := map[string]bool{}
-	for _, f := range full {
-		if f.Profile.ID != p.ID || !f.Inbound.Enabled {
-			continue
-		}
-		oldSpec, oldErr := s.buildSpec(f, oldMerged)
-		newSpec, newErr := s.buildSpec(f, newMerged)
-		if newErr != nil {
-			return nil, nodeBuildRefusal(newErr, f.Node.Name)
-		}
-		if oldErr != nil || specChanged(oldSpec, newSpec) {
-			impact.InboundsRestarted++
-			restartedNodes[f.Node.ID] = true
-		}
-	}
+// addAffectedUsers fills in the user impact for the same inbounds the edit will restart.
+func (s *Service) addAffectedUsers(ctx context.Context, impact *adminv1.ProfileImpact, profileID string, proto protocols.Protocol, restartedNodes map[string]bool) error {
 	if len(restartedNodes) == 0 {
-		return impact, nil
+		return nil
 	}
 	happ, amnezia, telegram, trustTunnel, _ := clientApps(proto)
-	users, err := a.ProfileUsers(ctx, p.ID, happ, amnezia, telegram, trustTunnel)
+	users, err := s.st.Access().ProfileUsers(ctx, profileID, happ, amnezia, telegram, trustTunnel)
 	if err != nil {
-		return nil, s.internal("profile users", err)
+		return s.internal("profile users", err)
 	}
 	// A critical change of a protocol the subscription carries breaks the server for everyone who has it, until their
 	// app refreshes the subscription: all of them are named. Otherwise the people online there reconnect (a per-device
@@ -318,7 +298,7 @@ func (s *Service) profileImpact(ctx context.Context, p store.AccessProfile, prot
 			impact.AffectedUserNames = append(impact.AffectedUserNames, u.Name)
 		}
 	}
-	return impact, nil
+	return nil
 }
 
 // addReissue counts the devices whose issued config an x-critical change breaks and adds their owners to the
@@ -338,12 +318,6 @@ func (s *Service) addReissue(ctx context.Context, impact *adminv1.ProfileImpact,
 		}
 	}
 	return nil
-}
-
-// specChanged compares everything that reaches the node except the version counter.
-func specChanged(a, b plugin.InboundSpec) bool {
-	return a.Enabled != b.Enabled || a.Listen != b.Listen || a.TLS != b.TLS || a.Egress != b.Egress ||
-		!bytes.Equal(a.Settings, b.Settings)
 }
 
 func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv1.UpdateProfileRequest]) (*connect.Response[adminv1.UpdateProfileResponse], error) {
@@ -391,8 +365,61 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 		}
 	}
 	settingsChanged := !bytes.Equal(oldMerged, newMerged)
-	impact, err := s.profileImpact(ctx, p, proto, oldMerged, newMerged)
+	impact := &adminv1.ProfileImpact{CriticalFields: protocols.ChangedPointers(oldMerged, newMerged, s.criticalPtrs[p.Protocol])}
+	inbounds, err := a.InboundsOfProfile(ctx, p.ID)
 	if err != nil {
+		return nil, s.internal("profile inbounds", err)
+	}
+	type changedInboundPort struct {
+		wasSite443  bool
+		publicPort  uint16
+		node        store.AccessNode
+		spec        plugin.InboundSpec
+		others      []nodeListen
+		portChanged bool
+	}
+	var changedPorts []changedInboundPort
+	var changes *store.ProfileInboundChanges
+	if settingsChanged {
+		changes = &store.ProfileInboundChanges{Versions: make(map[string]uint64)}
+	}
+	var portWarnings []*adminv1.StatusReason
+	var lossyOverrides []changedInboundPort
+	restartedNodes := map[string]bool{}
+	full, err := a.InboundsFull(ctx, "")
+	if err != nil {
+		return nil, s.internal("profile inbounds", err)
+	}
+	for _, f := range full {
+		if f.Profile.ID != p.ID || !f.Inbound.Enabled {
+			continue
+		}
+		newSpec, newErr := s.buildSpec(f, newMerged)
+		if newErr != nil {
+			return nil, nodeBuildRefusal(newErr, f.Node.Name)
+		}
+		if changes == nil {
+			continue
+		}
+		changes.Versions[f.Inbound.ID] = f.Inbound.SpecVersion
+		oldSpec, oldErr := s.buildSpec(f, oldMerged)
+		if oldErr == nil && statehash.Spec(oldSpec) == statehash.Spec(newSpec) {
+			continue
+		}
+		others, _, err := s.nodeInbounds(ctx, f.Node.ID, f.Inbound.ID)
+		if err != nil {
+			return nil, err
+		}
+		restartedNodes[f.Node.ID] = true
+		changes.Changed = append(changes.Changed, f.Inbound.ID)
+		changedPorts = append(changedPorts, changedInboundPort{
+			wasSite443: oldErr == nil && vlessSite443(oldSpec, f.Inbound.PublicPort),
+			publicPort: f.Inbound.PublicPort, node: f.Node, spec: newSpec, others: others,
+			portChanged: oldErr != nil || oldSpec.Listen.Port != newSpec.Listen.Port,
+		})
+	}
+	impact.InboundsRestarted = uint32(len(changedPorts))
+	if err := s.addAffectedUsers(ctx, impact, p.ID, proto, restartedNodes); err != nil {
 		return nil, err
 	}
 	// An x-critical change of a per-device profile breaks every config already issued: its devices become stale.
@@ -400,46 +427,6 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 	if reissue {
 		if err := s.addReissue(ctx, impact, p.ID); err != nil {
 			return nil, err
-		}
-	}
-	inbounds, err := a.InboundsOfProfile(ctx, p.ID)
-	if err != nil {
-		return nil, s.internal("profile inbounds", err)
-	}
-	type changedInboundPort struct {
-		node        store.AccessNode
-		spec        plugin.InboundSpec
-		others      []nodeListen
-		portChanged bool
-	}
-	var changedPorts []changedInboundPort
-	var portWarnings []*adminv1.StatusReason
-	var lossyOverrides []changedInboundPort
-	if settingsChanged {
-		full, err := a.InboundsFull(ctx, "")
-		if err != nil {
-			return nil, s.internal("profile inbounds", err)
-		}
-		for _, f := range full {
-			if f.Profile.ID != p.ID || !f.Inbound.Enabled {
-				continue
-			}
-			oldSpec, oldErr := s.buildSpec(f, oldMerged)
-			newSpec, newErr := s.buildSpec(f, newMerged)
-			if newErr != nil {
-				return nil, nodeBuildRefusal(newErr, f.Node.Name)
-			}
-			if oldErr == nil && !specChanged(oldSpec, newSpec) {
-				continue
-			}
-			others, _, err := s.nodeInbounds(ctx, f.Node.ID, f.Inbound.ID)
-			if err != nil {
-				return nil, err
-			}
-			changedPorts = append(changedPorts, changedInboundPort{
-				node: f.Node, spec: newSpec, others: others,
-				portChanged: oldErr != nil || oldSpec.Listen.Port != newSpec.Listen.Port,
-			})
 		}
 	}
 	if len(changedPorts) > 0 {
@@ -459,7 +446,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			}
 		}
 		for _, changed := range changedPorts {
-			warnings, override, err := s.admitInbound(ctx, inboundAdmission{node: changed.node, profile: p.Name, spec: changed.spec, others: changed.others,
+			warnings, override, err := s.admitInbound(ctx, inboundAdmission{node: changed.node, profile: p.Name, spec: changed.spec, publicPort: changed.publicPort, wasSite443: changed.wasSite443, others: changed.others,
 				checks: portChecks[changed.node.ID], moved: changed.portChanged, check: m.DryRun, allowLossy: m.AllowLossyPort})
 			if err != nil {
 				return nil, err
@@ -479,7 +466,7 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			return nil, s.internal("seal settings", err)
 		}
 		next.SettingsJSON, next.SecretsEnc = pub, sealed
-		switch next, err = a.UpdateProfile(ctx, next, m.ExpectedVersion, settingsChanged, reissue, s.now()); {
+		switch next, err = a.UpdateProfile(ctx, next, m.ExpectedVersion, changes, reissue, s.now()); {
 		case errors.Is(err, store.ErrAccessVersion):
 			return nil, coded(connect.CodeAborted, "stale_version")
 		case errors.Is(err, store.ErrAccessExists):
@@ -712,9 +699,11 @@ func (s *Service) inboundProto(f store.AccessInboundFull, settings json.RawMessa
 	if !f.Inbound.CertNotAfter.IsZero() {
 		out.CertNotAfterUnix = f.Inbound.CertNotAfter.Unix()
 	}
+	out.PublicPort = uint32(f.Inbound.PublicPort)
 	if spec, err := s.buildSpec(f, settings); err == nil {
 		out.Port, out.TlsServerName, out.Egress = uint32(spec.Listen.Port), spec.TLS.ServerName, spec.Egress
 		out.Cdn = plugin.ServerCDN(spec)
+
 		out.RealityTarget = plugin.RealityTargetShown(spec)
 	}
 	out.Awg = awgStatus(f.Inbound)
@@ -757,12 +746,13 @@ func (s *Service) loadFull(ctx context.Context, inboundID string) (store.AccessI
 
 // nodeListen is another inbound of a node as the port check sees it: its profile, protocol and listener ports.
 type nodeListen struct {
-	profile  string
-	protocol string
-	enabled  bool
-	l        plugin.Listen
-	listens  []plugin.Listen
-	spec     plugin.InboundSpec
+	publicPort uint16
+	profile    string
+	protocol   string
+	enabled    bool
+	l          plugin.Listen
+	listens    []plugin.Listen
+	spec       plugin.InboundSpec
 }
 
 func inboundListens(spec plugin.InboundSpec) []plugin.Listen {
@@ -811,7 +801,7 @@ func (s *Service) nodeInbounds(ctx context.Context, nodeID, skip string) (listen
 			return nil, nil, s.internal("open profile secrets", err)
 		}
 		if os, err := s.buildSpec(o, merged); err == nil {
-			listens = append(listens, nodeListen{profile: o.Profile.Name, protocol: os.Protocol, enabled: o.Inbound.Enabled, l: os.Listen, listens: inboundListens(os), spec: os})
+			listens = append(listens, nodeListen{profile: o.Profile.Name, protocol: os.Protocol, enabled: o.Inbound.Enabled, l: os.Listen, listens: inboundListens(os), spec: os, publicPort: o.Inbound.PublicPort})
 		}
 	}
 	forwards, err := s.st.RelayLinks(ctx, store.RelayFilter{ViaNodeID: nodeID})
@@ -848,6 +838,22 @@ func clashOfExcept(l plugin.Listen, others []nodeListen, skip func(o nodeListen,
 	return nil
 }
 
+// A forward takes its whole public TCP port. Identical forwards to a shared local
+// listener are one route; UDP on the same number is independent of that route.
+func forwardCollision(a, b nodeListen) uint16 {
+	for _, pair := range [2][2]nodeListen{{a, b}, {b, a}} {
+		src, other := pair[0], pair[1]
+		p := src.publicPort
+		if p == 0 || p == src.l.Port {
+			continue
+		}
+		if (p == other.publicPort && other.l.Port != src.l.Port) || plugin.Hy2SitePort(other.spec) == p || listenOverlap(plugin.Listen{Network: "tcp", Port: p}, other.l) {
+			return p
+		}
+	}
+	return 0
+}
+
 // freePortFor is a port an inbound listening as l could take instead of l.Port, with its own hop range and, for UDP,
 // stored bad checks excluded; 0 when none is free.
 func freePortFor(spec plugin.InboundSpec, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time) uint16 {
@@ -865,6 +871,15 @@ func freePortFor(spec plugin.InboundSpec, others []nodeListen, checks map[uint16
 // (shareRefusal): the agent puts a front on the port and tells them apart by the name in the ClientHello.
 func portRefusal(spec plugin.InboundSpec, node string, others []nodeListen, checks map[uint16]store.PortCheck, now time.Time, who portSubject) error {
 	l := spec.Listen
+	candidate := nodeListen{spec: spec, l: l, publicPort: who.PublicPort}
+	for _, peer := range others {
+		if !peer.enabled && peer.protocol != relayProtocol {
+			continue
+		}
+		if port := forwardCollision(candidate, peer); port != 0 {
+			return coded(connect.CodeAlreadyExists, "public_port_taken", "node", node, "port", strconv.Itoa(int(port)), "profile", peer.profile)
+		}
+	}
 	if l.HopFrom != 0 {
 		// the range alone: its start stands in for the port, so that only the range is compared
 		if c := clashOf(plugin.Listen{Network: l.Network, Port: l.HopFrom, HopFrom: l.HopFrom, HopTo: l.HopTo}, others); c != nil {
@@ -935,12 +950,14 @@ func nodeBuildRefusal(err error, node string) error {
 
 // inboundAdmission is an inbound that is being put on a node, as CreateInbound, UpdateInbound and UpdateProfile see it.
 type inboundAdmission struct {
-	node    store.AccessNode
-	profile string // the profile's name, for what is said about it
-	spec    plugin.InboundSpec
-	others  []nodeListen
-	checks  map[uint16]store.PortCheck // the node's stored UDP port checks
-	extra   []*adminv1.StatusReason    // warnings of the call itself, told after the inbound's and before the port's
+	wasSite443 bool
+	publicPort uint16
+	node       store.AccessNode
+	profile    string // the profile's name, for what is said about it
+	spec       plugin.InboundSpec
+	others     []nodeListen
+	checks     map[uint16]store.PortCheck // the node's stored UDP port checks
+	extra      []*adminv1.StatusReason    // warnings of the call itself, told after the inbound's and before the port's
 	// moved: the port is new to the node (a new inbound, a new port, an inbound switched on), so a lossy one is refused
 	// and, in a real run, probed. Otherwise a lossy port the node already has only warns.
 	moved bool
@@ -952,11 +969,16 @@ type inboundAdmission struct {
 // admitInbound is what the three calls ask before an inbound goes on a node: the refusal for its ports, the warnings, and the loss of
 // a UDP port. lossyOverride is set when the admin chose to save a port that was found lossy, for the audit.
 func (s *Service) admitInbound(ctx context.Context, a inboundAdmission) (warnings []*adminv1.StatusReason, lossyOverride bool, err error) {
-	if err = portRefusal(a.spec, a.node.Name, a.others, a.checks, s.now(), portSubject{Profile: a.profile, Agent: a.node.AgentCaps, Address: a.node.Address}); err != nil {
+	if err = portRefusal(a.spec, a.node.Name, a.others, a.checks, s.now(), portSubject{PublicPort: a.publicPort, Profile: a.profile, Agent: a.node.AgentCaps, Address: a.node.Address}); err != nil {
 		return nil, false, err
 	}
 	if warnings, err = s.inboundWarnings(ctx, a.node.ID, a.node.Name, a.profile, a.spec, a.others); err != nil {
 		return nil, false, err
+	}
+	if w, err := s.bridgeSiteWarning(ctx, a); err != nil {
+		return nil, false, err
+	} else if w != nil {
+		warnings = append(warnings, w)
 	}
 	warnings = append(warnings, a.extra...)
 	bad, cachedBad := cachedSpecPortLossy(a.spec, a.checks, s.now())
@@ -1077,11 +1099,6 @@ func (s *Service) inboundWarnings(ctx context.Context, nodeID, nodeName, profile
 		return nil, port80Err
 	}
 	warnings = append(warnings, shareWarnings(nodeName, spec, profileName, others)...)
-	if w, err := s.bridgeSiteWarning(ctx, nodeID, nodeName, spec, others); err != nil {
-		return nil, err
-	} else if w != nil {
-		warnings = append(warnings, w)
-	}
 	if spec.Egress != "warp" {
 		return warnings, nil
 	}
@@ -1159,6 +1176,13 @@ func listenOverlap(a, b plugin.Listen) bool {
 	return false
 }
 
+func checkPublicPort(port uint32) error {
+	if port == 80 || port > 65535 {
+		return invalid("public port must be 0-65535 and cannot be 80")
+	}
+	return nil
+}
+
 func checkOverrides(port uint32, sni string) (uint16, string, error) {
 	if port > 65535 {
 		return 0, "", invalid("port override must be 1-65535")
@@ -1172,12 +1196,15 @@ func checkOverrides(port uint32, sni string) (uint16, string, error) {
 func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv1.CreateInboundRequest]) (*connect.Response[adminv1.CreateInboundResponse], error) {
 	m := req.Msg
 	a := s.st.Access()
+	if err := checkPublicPort(m.PublicPort); err != nil {
+		return nil, err
+	}
 	port, sni, err := checkOverrides(m.PortOverride, m.TlsServerNameOverride)
 	if err != nil {
 		return nil, err
 	}
 	f := store.AccessInboundFull{Inbound: store.AccessInbound{
-		ID: store.NewID("inb_"), ProfileID: m.ProfileId, NodeID: m.NodeId, PortOverride: port, TLSServerNameOverride: sni,
+		ID: store.NewID("inb_"), ProfileID: m.ProfileId, NodeID: m.NodeId, PublicPort: uint16(m.PublicPort), PortOverride: port, TLSServerNameOverride: sni,
 		RealityTargetOverride: strings.TrimSpace(m.RealityTargetOverride), Enabled: true, DirectInSubscriptions: true, SpecVersion: 1, State: "pending", CreatedAt: s.now(),
 	}}
 	var proto protocols.Protocol
@@ -1287,7 +1314,7 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 	if err := s.hostRefusalOf(ctx, f.Node.ID, f.Node.Name, spec, true); err != nil {
 		return nil, err
 	}
-	warnings, lossyOverride, err := s.admitInbound(ctx, inboundAdmission{node: f.Node, profile: f.Profile.Name, spec: spec, others: others,
+	warnings, lossyOverride, err := s.admitInbound(ctx, inboundAdmission{node: f.Node, profile: f.Profile.Name, spec: spec, publicPort: f.Inbound.PublicPort, others: others,
 		checks: portChecks[f.Node.ID], moved: true, check: m.ValidateOnly, allowLossy: m.AllowLossyPort})
 	if err != nil {
 		return nil, err
@@ -1330,6 +1357,12 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 	oldSpec, oldErr := s.buildSpec(f, merged)
 	storedTarget := in.RealityTargetOverride
 	specChangedByAdmin := false
+	if m.PublicPort != nil {
+		if err := checkPublicPort(*m.PublicPort); err != nil {
+			return nil, err
+		}
+		in.PublicPort = uint16(*m.PublicPort)
+	}
 	if m.PortOverride != nil {
 		port, _, err := checkOverrides(*m.PortOverride, "")
 		if err != nil {
@@ -1401,8 +1434,9 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 	if err := s.hostRefusalOf(ctx, f.Node.ID, f.Node.Name, spec, in.Enabled); err != nil {
 		return nil, err
 	}
+	wasSite443 := oldEnabled && oldErr == nil && vlessSite443(oldSpec, was.PublicPort)
 	if in.Enabled {
-		adm := inboundAdmission{node: f.Node, profile: f.Profile.Name, spec: spec, others: others, checks: portChecks[f.Node.ID],
+		adm := inboundAdmission{wasSite443: wasSite443, node: f.Node, profile: f.Profile.Name, spec: spec, publicPort: f.Inbound.PublicPort, others: others, checks: portChecks[f.Node.ID],
 			moved: oldErr != nil || oldSpec.Listen.Port != spec.Listen.Port || !oldEnabled, check: m.ValidateOnly, allowLossy: m.AllowLossyPort}
 		if directInSubscriptionsChanged && oldDirectInSubscriptions && !in.DirectInSubscriptions {
 			warning, err := s.inboundNoWayInWarning(ctx, f, spec)
@@ -1416,6 +1450,12 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		if warnings, lossyOverride, err = s.admitInbound(ctx, adm); err != nil {
 			return nil, err
 		}
+	} else if wasSite443 {
+		if w, err := s.bridgeSiteWarning(ctx, inboundAdmission{node: f.Node, others: others, wasSite443: true}); err != nil {
+			return nil, err
+		} else if w != nil {
+			warnings = append(warnings, w)
+		}
 	}
 	if m.ValidateOnly {
 		return connect.NewResponse(&adminv1.UpdateInboundResponse{Inbound: s.inboundProto(f, merged), Warnings: warnings,
@@ -1426,7 +1466,7 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		f.Inbound = in
 	}
 	desiredChanged := specChangedByAdmin || enabledChanged
-	if desiredChanged || directInSubscriptionsChanged {
+	if desiredChanged || directInSubscriptionsChanged || in.PublicPort != was.PublicPort {
 		if err := s.st.Access().UpdateInbound(ctx, in, was, desiredChanged, s.now()); errors.Is(err, store.ErrAccessVersion) {
 			return nil, coded(connect.CodeAborted, "stale_inbound")
 		} else if errors.Is(err, store.ErrNotFound) {
@@ -1448,11 +1488,11 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		}
 		s.audit(ctx, actor(ctx), "inbound_update", map[string]any{"inbound": in.ID, "profile": f.Profile.Name, "node": f.Node.Name,
 			"port": spec.Listen.Port, "enabled": in.Enabled, "direct_in_subscriptions": in.DirectInSubscriptions,
-			"reality_target": in.RealityTargetOverride})
+			"public_port": in.PublicPort, "reality_target": in.RealityTargetOverride})
 		if lossyOverride {
 			s.auditLossyPort(ctx, f.Node.Name, spec.Listen.Port)
 		}
-		if desiredChanged {
+		if desiredChanged || was.PublicPort != in.PublicPort {
 			s.notify.StateChanged()
 		}
 	}

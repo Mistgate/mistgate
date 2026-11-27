@@ -470,7 +470,7 @@ func TestUpdateProfileRaceUsesExpectedVersion(t *testing.T) {
 	for _, name := range []string{"First update", "Second update"} {
 		go func(name string) {
 			<-start
-			_, err := a.UpdateProfile(ctx, AccessProfile{ID: "prf_update_race", Name: name, SettingsJSON: `{}`}, 1, false, false, t0)
+			_, err := a.UpdateProfile(ctx, AccessProfile{ID: "prf_update_race", Name: name, SettingsJSON: `{}`}, 1, nil, false, t0)
 			results <- err
 		}(name)
 	}

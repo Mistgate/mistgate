@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"cmp"
 	"context"
 	"slices"
 
@@ -90,7 +91,7 @@ func (r relayRun) reverseSiteTarget(ctx context.Context) (tcpTarget, bool, error
 			continue
 		}
 		for _, spec := range specs {
-			if spec.Profile != target.Profile || spec.Spec.Protocol != "vless" || spec.Spec.Listen.Network != "tcp" || spec.Spec.Listen.Port != 443 {
+			if spec.Profile != target.Profile || spec.Spec.Protocol != "vless" || spec.Spec.Listen.Network != "tcp" || cmp.Or(spec.PublicPort, spec.Spec.Listen.Port) != 443 {
 				continue
 			}
 			if _, ownSite := vlessProbeName(spec.Spec); ownSite {

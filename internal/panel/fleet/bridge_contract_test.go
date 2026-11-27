@@ -115,7 +115,7 @@ func (x *relayEnv) relayWithBridgeCandidate(id string, active string) {
 		x.t.Fatal(err)
 	}
 	now := x.f.now().Unix()
-	if err := x.st.SetRelayCheck(x.ctx, id, store.RelayCheck{At: now, Network: "tcp", Port: 7443, Leg: store.RelayStage{Status: "fail", Code: "timeout", At: now},
+	if err := x.st.SetRelayCheck(x.ctx, id, store.RelayCheck{At: now, Network: "tcp", Port: 7443, To: "exit.example.com:4443", Leg: store.RelayStage{Status: "fail", Code: "timeout", At: now},
 		ReverseReach: store.RelayStage{Status: "ok", At: now, Port: 8443}}); err != nil {
 		x.t.Fatal(err)
 	}

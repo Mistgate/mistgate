@@ -141,6 +141,14 @@ TCP 443 is also where a Hysteria2 profile serves its web site. A VLESS profile w
 
 Two profiles cannot listen on the same TCP port of a node, with one exception: VLESS, TrustTunnel and MTProto can stand together on one TCP port, 443 for example, when each has a name of its own and one of them shows the node's own site (see [One 443 for everyone](shared-port.md)). A TCP port and a UDP port with the same number do not clash.
 
+### Public TCP port
+
+If TCP 443 forwards to a VLESS listener on 19443, open the profile on that node (the **Profiles** tab) and set **Public TCP port (optional)** to 443. Leave the listener at 19443. Other nodes using the profile are unaffected. Clearing the field follows the effective listener again.
+
+The panel advertises and checks the external port; it does not create the forward. Configure forwarding for every advertised address family. A relay still advertises its own entry port. For a CDN host use the CDN port instead.
+
+A forward takes the whole public TCP port. A different TCP listener, a Hysteria2 website or a relay entry on that port conflicts with it; UDP traffic on the same number does not.
+
 ## How the node handles destinations
 
 VLESS does not sniff HTTP, TLS or QUIC: it can hold the first datagram of a flow for up to 200 ms and nothing here routes by a sniffed name. If the app asks for a literal IP, the node keeps that IP as the destination whatever name the traffic carries. If the app asks for a domain, the node resolves that name with this node's DNS resolvers; WARP egress uses the same node-side DNS. See [DNS](dns.md) and [WARP](warp.md).

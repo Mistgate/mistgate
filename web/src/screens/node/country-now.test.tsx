@@ -177,7 +177,7 @@ const checksOf = (now: CountryNow[], at = NOW - 120) => ({
 });
 
 let qc: QueryClient;
-async function mountCard() {
+async function mountCard(inbound = { id: "inb_1", port: 443, publicPort: 0, cdn: false, protocol: "hysteria2" }) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -186,7 +186,7 @@ async function mountCard() {
     root!.render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <NodeChecks nodeId="nod_de1" inbounds={[{ id: "inb_1", port: 443, protocol: "hysteria2" }]} />
+          <NodeChecks nodeId="nod_de1" inbounds={[inbound]} />
         </ToastProvider>
       </QueryClientProvider>,
     ),
@@ -200,6 +200,14 @@ const press = async () => {
 };
 
 describe("the Overview card of the node: 'Check now'", () => {
+  it.each([[false, "tcp/443"], [true, "CDN"]] as const)("labels the tested route (CDN: %s)", async (cdn, label) => {
+    getChecks.mockResolvedValue({ ...checksOf([]), columns: [{ profileId: "prf_1", profileName: "Tokyo", protocol: "vless" }] });
+    await mountCard({ id: "inb_1", port: 19443, publicPort: cdn ? 0 : 443, cdn, protocol: "vless" });
+    const row = host!.querySelector(".nd-pr button");
+    expect(row?.textContent).toContain(label);
+    expect(row?.textContent).not.toContain("19443");
+  });
+
   it("a press that runs only the profiles does not start the radar: nothing is asked of the country", async () => {
     setEffectsEnabled(true);
     getChecks.mockResolvedValue(checksOf([]));

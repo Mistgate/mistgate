@@ -2,6 +2,7 @@ package access
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -689,6 +690,7 @@ func (s *Service) subView(ctx context.Context, u store.AccessUser, touch bool, o
 			UserID: u.ID, UserName: u.Name, DeviceID: rd.dev.ID, Secret: secret,
 			InboundPublic: json.RawMessage(f.Inbound.PluginPublicJSON),
 		}
+		in.Inbound.Port = cmp.Or(f.Inbound.PublicPort, in.Inbound.Port)
 		in.NoIPv6Egress = !srv.IPv6Egress
 		if protocols.IsPerDevice(proto) {
 			// An AmneziaWG proxy carries a resolver of its own: the DNS of its node. (Hysteria2 has none; the URI list has no AWG.)

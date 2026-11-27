@@ -83,7 +83,8 @@ func (x *reverseControlFix) bridge(up bool) {
 
 func (x *reverseControlFix) monitor(ok bool, streak uint32) {
 	x.t.Helper()
-	if err := x.st.SetRelayMonitorCheck(x.ctx, x.id, store.RelayMonitorCheck{AtUnix: x.clock.Unix(), OK: ok, FailStreak: streak, TargetKey: "k"}); err != nil {
+	_, key := x.s.relayTarget(x.ctx, x.relayOf(x.id))
+	if err := x.st.SetRelayMonitorCheck(x.ctx, x.id, store.RelayMonitorCheck{AtUnix: x.clock.Unix(), OK: ok, FailStreak: streak, TargetKey: key}); err != nil {
 		x.t.Fatal(err)
 	}
 }
@@ -115,7 +116,7 @@ func TestControllerRunsTheProofOfTheDirectWayItself(t *testing.T) {
 		x.check(x.stage("ok", 0), x.stage("ok", 0), x.stage("ok", 0), store.RelayStage{})
 		x.bridge(true)
 		x.monitor(true, 0)
-		if err := x.st.SetRelayDirectState(x.ctx, x.id, 2, x.clock.Add(-31*time.Minute).Unix()); err != nil {
+		if err := x.st.SetRelayDirectState(x.ctx, x.relayOf(x.id), 2, x.clock.Add(-31*time.Minute).Unix()); err != nil {
 			t.Fatal(err)
 		}
 		return x

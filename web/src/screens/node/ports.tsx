@@ -349,7 +349,7 @@ export function Ports({
       inbound: i,
     });
   for (const c of tcp) {
-    const ins = own.filter((i) => i.port === c.port && i.protocol === "vless");
+    const ins = own.filter((i) => (i.publicPort || i.port) === c.port && i.protocol === "vless");
     if (ins.length === 0)
       table.push({ key: `tcp/${c.port}`, net: "tcp", port: c.port, tcp: c });
     for (const i of ins)
@@ -365,12 +365,12 @@ export function Ports({
     (x) =>
       x.protocol === "vless" &&
       x.port > 0 &&
-      !tcp.some((c) => c.port === x.port),
+      !tcp.some((c) => c.port === (x.publicPort || x.port)),
   ))
     table.push({
-      key: `tcp/${i.port}/${i.id}`,
+      key: `tcp/${i.publicPort || i.port}/${i.id}`,
       net: "tcp",
-      port: i.port,
+      port: i.publicPort || i.port,
       inbound: i,
     });
   const udpRows = table.filter((r) => r.net === "udp");

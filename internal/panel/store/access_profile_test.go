@@ -128,3 +128,5 @@ func withPort(i AccessInbound, port uint16) AccessInbound {
 	i.SpecVersion++
 	return i
 }
+
+func TestProfileSelectiveBumpSQLite(t *testing.T) { profileSelectiveBumpProof(t, openTemp(t)) }

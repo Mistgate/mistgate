@@ -370,9 +370,9 @@ func (f *Fleet) buildSpec(n store.NodeRow, row store.FleetInboundRow) (plugin.In
 		}
 	}
 	spec, err := p.BuildInbound(protocols.InboundInput{
-		Profile:               protocols.ProfileView{ID: row.ProfileID, Version: row.ProfileVersion, Settings: settings},
-		Node:                  protocols.NodeView{ID: n.ID, Name: n.Name, Address: n.Address, CountryCode: n.CountryCode},
-		PortOverride:          row.PortOverride,
+		Profile:    protocols.ProfileView{ID: row.ProfileID, Version: row.ProfileVersion, Settings: settings},
+		Node:       protocols.NodeView{ID: n.ID, Name: n.Name, Address: n.Address, CountryCode: n.CountryCode},
+		PublicPort: row.PublicPort, PortOverride: row.PortOverride,
 		TLSServerNameOverride: row.TLSNameOverride,
 		RealityTargetOverride: row.RealityTargetOverride,
 		SpecVersion:           row.SpecVersion,

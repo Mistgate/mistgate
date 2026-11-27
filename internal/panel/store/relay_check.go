@@ -190,9 +190,13 @@ func (s *Store) SetRelayCheck(ctx context.Context, id string, c RelayCheck) erro
 	}
 	// D1 can bind a number as REAL. Cast the root timestamp and port so json_set writes integers into the check document.
 	res, err := s.W.ExecContext(ctx, `UPDATE relay SET check_json = json_patch(
-		json_remove(COALESCE(check_json, '{}'), '$.at', '$.network', '$.port', '$.to', '$.leg', '$.path', '$.reverse_reach', '$.reverse_speed', '$.direct_speed', '$.ok', '$.stage'),
+		json_remove(CASE WHEN COALESCE(json_extract(check_json, '$.to'), '') <> ?
+			OR COALESCE(json_extract(check_json, '$.network'), '') <> ?
+			OR COALESCE(json_extract(check_json, '$.port'), 0) <> CAST(? AS INTEGER)
+			THEN json_remove(COALESCE(check_json, '{}'), '$.direct_streak', '$.direct_streak_at')
+			ELSE COALESCE(check_json, '{}') END, '$.at', '$.network', '$.port', '$.to', '$.leg', '$.path', '$.reverse_reach', '$.reverse_speed', '$.direct_speed', '$.ok', '$.stage'),
 		json_set(json(?), '$.at', CAST(? AS INTEGER), '$.port', CAST(? AS INTEGER)))
-		WHERE id = ?`, string(b), c.At, c.Port, id)
+		WHERE id = ?`, c.To, c.Network, c.Port, string(b), c.At, c.Port, id)
 	if err != nil {
 		return err
 	}

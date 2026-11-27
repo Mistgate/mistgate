@@ -185,3 +185,21 @@ func TestEnsureBridgeEndpointRidesTheDefaultRouteOfASharedPort(t *testing.T) {
 		t.Fatalf("beside a service with the node's own site the bridge port = %d, want 0 (that site)", node.BridgePort)
 	}
 }
+
+// A REALITY of another site that listens on 19443 and is published on 443 holds 443 as much as a listener on it would: the bridge
+// takes a port of its own, not the public port of that forward.
+func TestEnsureBridgeEndpointAvoidsAForwardedPublicPort(t *testing.T) {
+	f := newRelayFix(t)
+	profile := must(f.s.CreateProfile(f.ctx, req(&adminv1.CreateProfileRequest{Protocol: "vless", Name: "external reality",
+		SettingsJson: `{"port":443,"transport":"tcp","security":"reality","reality":{"target_kind":"site","target":"site.example.net:443","server_names":["site.example.net"],"short_ids":["aabbccdd"],"fingerprint":"chrome"},"xhttp":{"mode":"auto","x_padding_bytes":"100-1000"},"egress":"direct"}`}))).Msg.Profile
+	in := f.inbound(profile.Id, "nod_fi1")
+	f.sql(`UPDATE inbound SET port_override = 19443, public_port = 443 WHERE id = ?`, in.Id)
+
+	node, err := f.s.ensureBridgeEndpoint(f.ctx, "nod_fi1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.BridgePort == 0 || node.BridgePort == 443 || node.BridgePort == 19443 {
+		t.Fatalf("bridge port = %d, want a port of its own: 443 is published by the forward and 19443 is its listener", node.BridgePort)
+	}
+}

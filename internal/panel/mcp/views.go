@@ -406,6 +406,7 @@ type inboundV struct {
 	Profile               string `json:"profile"`
 	Protocol              string `json:"protocol"`
 	Port                  uint32 `json:"port"`
+	PublicPort            uint32 `json:"public_port,omitempty"`
 	State                 string `json:"state"`
 	LastError             string `json:"last_error,omitempty"`
 	DirectInSubscriptions bool   `json:"direct_in_subscriptions"`
@@ -512,7 +513,7 @@ func nodeGetView(r *adminv1.GetNodeResponse) *NodeGetV {
 	}
 	for _, in := range r.GetInbounds() {
 		v.Inbounds = append(v.Inbounds, inboundV{
-			ID: in.GetId(), Profile: nm(in.GetProfileName()), Protocol: clean(in.GetProtocol(), 40), Port: in.GetPort(),
+			ID: in.GetId(), Profile: nm(in.GetProfileName()), Protocol: clean(in.GetProtocol(), 40), Port: in.GetPort(), PublicPort: in.GetPublicPort(),
 			State: enumName("INBOUND_STATE_", in.GetState().String()), LastError: clean(in.GetLastError(), 200),
 			DirectInSubscriptions: in.GetDirectInSubscriptions(), CDN: in.GetCdn(),
 			RealityTarget: clean(in.GetRealityTarget(), 300), RealityTargetOverride: clean(in.GetRealityTargetOverride(), 300),

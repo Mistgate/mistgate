@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+func TestSQLiteNodePublicPort(t *testing.T) { nodePublicPortProof(t, openTemp(t)) }
+
 func TestRelayModeSQLite(t *testing.T) {
 	relayModeStoreProof(t, openTemp(t))
 }
@@ -76,3 +78,5 @@ func TestRelayReverseMigrationUpDown(t *testing.T) {
 	}
 	check("after up again")
 }
+
+func TestRelayTargetChangeSQLite(t *testing.T) { relayTargetChangeProof(t, openTemp(t)) }
