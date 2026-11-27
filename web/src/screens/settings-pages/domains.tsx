@@ -76,7 +76,7 @@ const bridgeReasons = ["unreachable", "tls", "pin_mismatch", "refused", "no_veri
 function RecordCheck({ r }: { r: CheckSubscriptionHostDomainResponse }) {
   const t = useT();
   return (
-    <Pb tone={r.matches ? "ok" : "part"} title={r.matches ? t("set.domains.subHost.matches") : t("set.domains.subHost.mismatch")}>
+    <Pb tone={r.matches ? "ok" : "part"} className="sx-pbm" title={r.matches ? t("set.domains.subHost.matches") : t("set.domains.subHost.mismatch")}>
       {t("set.domains.subHost.found", { found: r.found.join(", ") || "—" })} {t("set.domains.subHost.expected", { expected: r.expected.join(", ") || "—" })}
     </Pb>
   );
@@ -165,7 +165,7 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
     );
   };
   const error = failure && (
-    <Pb tone="bad">
+    <Pb tone="bad" className="sx-pbm">
       {failure.text}
       {failure.code === "sub_host_nodes_lack_link" && host.lackingLink.length > 0 && (
         <ul className="list-disc ps-5">
@@ -188,8 +188,10 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
             <Select value={node} onValueChange={(v) => pickNode(v, domain)} options={options([])} aria-label={t("set.domains.subHost.node")} />
           </Row>
         </Rows>
-        <TextField label={t("set.domains.subHost.domain")} hint={t("set.domains.subHost.domainHint")} value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="sub.example.com" mono maxLength={253} autoComplete="off" />
-        <TextField label={t("set.domains.subHost.siteName")} hint={t("set.domains.subHost.siteNameHint")} value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="www.example.com" mono maxLength={253} autoComplete="off" />
+        <Rows className="gap-3">
+          <TextField label={t("set.domains.subHost.domain")} hint={t("set.domains.subHost.domainHint")} value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="sub.example.com" mono maxLength={253} autoComplete="off" />
+          <TextField label={t("set.domains.subHost.siteName")} hint={t("set.domains.subHost.siteNameHint")} value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="www.example.com" mono maxLength={253} autoComplete="off" />
+        </Rows>
         {check && <RecordCheck r={check} />}
         {error}
         <Foot>
@@ -284,16 +286,21 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
             <Select value={node === host.nodeId ? "" : node} onValueChange={(v) => pickNode(v, host.domain)} options={options([host.nodeId])} aria-label={t("set.domains.subHost.moveTo")} />
           </Row>
         </Rows>
-        <TextField label={t("set.domains.subHost.siteName")} hint={t("set.domains.subHost.siteNameHint")} value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="www.example.com" mono maxLength={253} autoComplete="off" />
+        <Rows>
+          <TextField label={t("set.domains.subHost.siteName")} hint={t("set.domains.subHost.siteNameHint")} value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="www.example.com" mono maxLength={253} autoComplete="off" />
+        </Rows>
         <Foot>
           <BusyButton busy={busy === "move"} disabled={!node || node === host.nodeId || !!busy} onClick={() => void run("move", () => subHost.startSubscriptionHostMove({ nodeId: node, siteName: siteName.trim() }))}>
             {t("set.domains.subHost.move")}
           </BusyButton>
         </Foot>
-        <TextField label={t("set.domains.subHost.publicUrl")} hint={t("set.domains.subHost.publicUrlHint")} value={publicUrl} onChange={(e) => setPublicUrl(e.target.value)} placeholder="https://panel.example.com" mono maxLength={300} autoComplete="off" />
+        <Rows>
+          <TextField label={t("set.domains.subHost.publicUrl")} hint={t("set.domains.subHost.publicUrlHint")} value={publicUrl} onChange={(e) => setPublicUrl(e.target.value)} placeholder="https://panel.example.com" mono maxLength={300} autoComplete="off" />
+        </Rows>
         {askNoAddress && (
           <Pb
             tone="bad"
+            className="sx-pbm"
             action={
               <BusyButton variant="danger" busy={busy === "off"} disabled={!!busy} onClick={() => void disable(true)}>
                 {t("set.domains.subHost.noAddressYes")}
@@ -326,6 +333,7 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
   const force = (
     <Pb
       tone="part"
+      className="sx-pbm"
       action={
         <BusyButton variant="danger" disabled={!!busy} onClick={() => void finish(true)}>
           {t("set.domains.subHost.forceYes")}
