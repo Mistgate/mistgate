@@ -71,6 +71,8 @@ The record names the panel's certificate account. A panel restored or moved with
 
 While a node is the host, the panel refuses a change to its profiles that would leave it unfit (`sub_host_inbound_unfit`): a REALITY profile on 443 that borrows another site, a Hysteria2 site on 443, a profile that takes the subdomain, or switching off or deleting the only site on 443 when there is no site name. Keep the port for the node's own site, or move the host first.
 
+If you configured a **Site name**, the agent keeps its own site available for the bridge even when a profile on 443 fails to start. A working profile using that same name still receives matching connections.
+
 ## Moving to another node
 
 Both the move and turning the host off happen in two phases, and you finish each one yourself.

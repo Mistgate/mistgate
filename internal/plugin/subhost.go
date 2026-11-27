@@ -12,7 +12,7 @@ import (
 // The ids of the host's routes on the front of TCP 443. Inbound ids never hold "~".
 const (
 	SubHostRouteID     = "~sub-host"      // the subscription names: to the panel, over the bridge
-	SubHostSiteRouteID = "~sub-host-site" // the agent's own site, when no inbound on 443 serves one
+	SubHostSiteRouteID = "~sub-host-site" // the agent's own site, independent of inbounds
 )
 
 // SubHostPort is the port the host serves the subscription names on.
@@ -22,7 +22,7 @@ const SubHostPort = 443
 type SubHostRole struct {
 	Names []string // the subscription names, lower case
 	Path  string   // the bridge path the panel calls
-	// SiteName is the name of the agent's own site on 443 (ACME), used when no inbound there serves the node's site.
+	// SiteName pins the agent's own site on 443 (ACME). When empty, an inbound must provide the site.
 	SiteName string
 	// LinkSources are the fleet nodes' addresses: connections from them are agent links, with capacity of their own.
 	LinkSources []netip.Prefix
@@ -57,7 +57,8 @@ func SubHostRoutesOn(port uint16, role SubHostRole, specs []InboundSpec) ([]TCPE
 	if len(names) == 0 {
 		return nil, SubHostNamesInvalid
 	}
-	tcpOn443, ownSite := false, false
+	site := routeName(role.SiteName)
+	tcpOn443, ownSite, inboundOwnsName := false, false, false
 	for _, s := range specs {
 		if s.Listen.Network != "tcp" || s.Listen.Port != port {
 			continue
@@ -73,6 +74,12 @@ func SubHostRoutesOn(port uint16, role SubHostRole, specs []InboundSpec) ([]TCPE
 		if slices.ContainsFunc(r.Names, func(n string) bool { return slices.Contains(names, n) }) {
 			return nil, SubHostNameTaken
 		}
+		if slices.Contains(r.Names, site) {
+			if !r.Site {
+				return nil, SubHostNameTaken
+			}
+			inboundOwnsName = true
+		}
 		ownSite = ownSite || r.Site
 	}
 	if !tcpOn443 {
@@ -83,20 +90,20 @@ func SubHostRoutesOn(port uint16, role SubHostRole, specs []InboundSpec) ([]TCPE
 		}
 	}
 	routes := []TCPExtraRoute{{Port: port, Route: TCPRoute{ID: SubHostRouteID, Protocol: "sub-host", Names: names}}}
-	if ownSite {
-		return routes, ""
-	}
-	site := routeName(role.SiteName)
-	switch {
-	case site == "":
+	if site == "" {
+		if ownSite {
+			return routes, ""
+		}
 		return nil, SubHostSiteNameRequired
-	case slices.Contains(names, site):
+	}
+	if slices.Contains(names, site) {
 		return nil, SubHostSiteNameConflict
 	}
-	for _, s := range specs {
-		if r, ok := tcpRoute(s); ok && s.Listen.Network == "tcp" && s.Listen.Port == port && slices.Contains(r.Names, site) {
-			return nil, SubHostNameTaken
-		}
+	// A matching inbound keeps its exact SNI while healthy. Keep the agent's site as the default
+	// even then: an inbound that fails to start must not take down the way back to the panel.
+	siteRoute := TCPRoute{ID: SubHostSiteRouteID, Protocol: "sub-host-site", Site: true}
+	if !inboundOwnsName {
+		siteRoute.Names = []string{site}
 	}
-	return append(routes, TCPExtraRoute{Port: port, Route: TCPRoute{ID: SubHostSiteRouteID, Protocol: "sub-host-site", Names: []string{site}, Site: true}}), ""
+	return append(routes, TCPExtraRoute{Port: port, Route: siteRoute}), ""
 }

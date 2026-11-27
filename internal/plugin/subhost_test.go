@@ -24,6 +24,11 @@ func TestSubHostRoutes(t *testing.T) {
 	role := SubHostRole{Names: []string{"Sub.Example.com.", "sub.example.com"}, Path: "/p", SiteName: "de1-site.example.com"}
 	subRoute := TCPExtraRoute{Port: 443, Route: TCPRoute{ID: SubHostRouteID, Protocol: "sub-host", Names: []string{"sub.example.com"}}}
 	siteRoute := TCPExtraRoute{Port: 443, Route: TCPRoute{ID: SubHostSiteRouteID, Protocol: "sub-host-site", Names: []string{"de1-site.example.com"}, Site: true}}
+	fallbackRoute := siteRoute
+	fallbackRoute.Route.Names = nil
+	inboundSite := SubHostRole{Names: role.Names, Path: role.Path}
+	sameName := role
+	sameName.SiteName = "de1.example.com"
 	for _, tc := range []struct {
 		name   string
 		role   SubHostRole
@@ -32,12 +37,14 @@ func TestSubHostRoutes(t *testing.T) {
 		unfit  string
 	}{
 		{"nothing on 443: the agent's own site", role, nil, []TCPExtraRoute{subRoute, siteRoute}, ""},
-		{"VLESS TLS is the site", role, []InboundSpec{vlessTLS}, []TCPExtraRoute{subRoute}, ""},
-		{"REALITY self is the site", role, []InboundSpec{realitySelf}, []TCPExtraRoute{subRoute}, ""},
-		{"TrustTunnel is the site", role, []InboundSpec{trust}, []TCPExtraRoute{subRoute}, ""},
-		{"the MTProto decoy is the site", role, []InboundSpec{mtDecoy}, []TCPExtraRoute{subRoute}, ""},
+		{"VLESS TLS keeps the explicit site", role, []InboundSpec{vlessTLS}, []TCPExtraRoute{subRoute, siteRoute}, ""},
+		{"REALITY self keeps the explicit site", role, []InboundSpec{realitySelf}, []TCPExtraRoute{subRoute, siteRoute}, ""},
+		{"TrustTunnel keeps the explicit site", role, []InboundSpec{trust}, []TCPExtraRoute{subRoute, siteRoute}, ""},
+		{"the MTProto decoy keeps the explicit site", role, []InboundSpec{mtDecoy}, []TCPExtraRoute{subRoute, siteRoute}, ""},
+		{"matching inbound site leaves an unnamed fallback", sameName, []InboundSpec{vlessTLS}, []TCPExtraRoute{subRoute, fallbackRoute}, ""},
+		{"without a site name the inbound provides the site", inboundSite, []InboundSpec{vlessTLS}, []TCPExtraRoute{subRoute}, ""},
 		{"MTProto with another site: the agent's site is the default", role, []InboundSpec{mtOther}, []TCPExtraRoute{subRoute, siteRoute}, ""},
-		{"a Hysteria2 site gives 443 up to a TCP inbound", role, []InboundSpec{hy2, vlessTLS}, []TCPExtraRoute{subRoute}, ""},
+		{"a Hysteria2 site gives 443 up to a TCP inbound", role, []InboundSpec{hy2, vlessTLS}, []TCPExtraRoute{subRoute, siteRoute}, ""},
 		{"REALITY with someone else's site", role, []InboundSpec{vlessTLS, realityOther}, nil, SubHostRealityForeign},
 		{"a Hysteria2 site holds TCP 443", role, []InboundSpec{hy2}, nil, SubHostHysteria2Site},
 		{"an inbound that cannot share", role, []InboundSpec{socks}, nil, SubHostPortUnshareable},
@@ -59,15 +66,14 @@ func TestSubHostRoutes(t *testing.T) {
 	}
 }
 
-// The host's routes come before the inbounds: they keep their names, make a front of a port with one inbound, and an
-// inbound that serves the node's site stays the default.
+// The host's routes make a front of a port with one inbound. When configured, the agent's site is the default.
 func TestTCPSharePlanWithExtraRoutes(t *testing.T) {
 	vlessTLS, _, _, _, _, mtOther, _, socks := subHostSpecs()
 	role := SubHostRole{Names: []string{"sub.example.com"}, SiteName: "de1-site.example.com"}
 
 	extra, _ := SubHostRoutes(role, []InboundSpec{vlessTLS})
 	p := TCPSharePlan([]InboundSpec{vlessTLS}, extra...)[443]
-	if !p.Front() || p.Default != "inb_b" || len(p.Routes) != 2 || p.Routes[0].ID != SubHostRouteID {
+	if !p.Front() || p.Default != SubHostSiteRouteID || len(p.Routes) != 3 || p.Routes[0].ID != SubHostRouteID || len(p.Shadowed) != 0 {
 		t.Fatalf("one inbound and the host: %+v", p)
 	}
 

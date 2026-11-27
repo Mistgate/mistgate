@@ -15,9 +15,9 @@ func withSubHostPort(t *testing.T, port uint16) {
 	t.Cleanup(func() { subHostPort = old })
 }
 
-// The host role on the agent with real engines, on loopback: the subscription name gets a route of the shared port, beside
-// an inbound's site or the agent's own; without the panel it is answered by the site, never reset; a role the inbounds do
-// not fit installs nothing and says why; without the role nothing of it is left.
+// The host role on the agent with real engines, on loopback: the subscription name and the agent's site keep their
+// routes beside an inbound. Without the panel the subscription name is answered by the site; a role the inbounds
+// do not fit installs nothing and says why; without the role nothing of it is left.
 func TestSubHostRoleOnTheAgent(t *testing.T) {
 	r := newShareRig(t)
 	withSubHostPort(t, r.port)
@@ -25,15 +25,18 @@ func TestSubHostRoleOnTheAgent(t *testing.T) {
 	role := &pb.SubHostRole{Names: []string{"sub.example.test"}, Path: "/sub-host-bridge-path", SiteName: "site.example.test"}
 	a.applySubHost(&pb.NodeSettings{SubHost: role})
 
-	// One TrustTunnel inbound: its site is the default, the host's route makes the port shared.
+	// One TrustTunnel inbound: it has its own name, the configured agent site remains the default.
 	r.wantRunning(r.apply(r.tt("inb_a", "tt.example.test")), "inb_a")
-	if sp := r.front(); sp == nil || sp.def != "inb_a" {
-		t.Fatalf("front %+v, want the inbound's site as the default", sp)
+	if sp := r.front(); sp == nil || sp.def != plugin.SubHostSiteRouteID {
+		t.Fatalf("front %+v, want the agent's site as the default", sp)
 	}
-	if got := r.cn("sub.example.test"); got != "tt.example.test" {
-		t.Fatalf("subscription name without the panel answered by %q, want the node's site", got)
+	if got := r.cn("tt.example.test"); got != "tt.example.test" {
+		t.Fatalf("the inbound name answered by %q, want its own site", got)
 	}
-	if st := a.subHostStatus(); st == nil || st.Error != "" || st.PanelConns != 0 || st.SitePinSha256 != "" {
+	if got := r.cn("sub.example.test"); got != "site.example.test" {
+		t.Fatalf("subscription name without the panel answered by %q, want the agent's site", got)
+	}
+	if st := a.subHostStatus(); st == nil || st.Error != "" || st.PanelConns != 0 || st.SitePinSha256 == "" {
 		t.Fatalf("status %+v", st)
 	}
 	if cfg := a.hostEntry.Serving(); cfg.Path != role.Path || cfg.Peer != 1 || !cfg.PassClient {
@@ -73,6 +76,33 @@ func TestSubHostRoleOnTheAgent(t *testing.T) {
 	if cfg := a.hostEntry.Serving(); cfg.Path != "" {
 		t.Fatal("the host entry still serves")
 	}
+}
+
+func TestSubHostSiteSurvivesFailedInboundOnItsName(t *testing.T) {
+	r := newShareRig(t)
+	withSubHostPort(t, r.port)
+	const site = "site.example.test"
+	r.h.a.applySubHost(&pb.NodeSettings{SubHost: &pb.SubHostRole{
+		Names: []string{"sub.example.test"}, Path: "/sub-host-bridge-path", SiteName: site,
+	}})
+	r.apply()
+	conn := r.open(site)
+	conn.get()
+
+	in := r.wsTLS("inb_w", site)
+	in.Spec.Egress = "warp"
+	r.wantFailed(r.apply(in), in.InboundId, errWarpNotConfigured)
+	conn.get()
+	if got := r.cn(site); got != site {
+		t.Fatalf("host name after a failed apply answered by %q, want %q", got, site)
+	}
+	r.wantFailed(r.sweep(), in.InboundId, errWarpNotConfigured)
+	conn.get()
+
+	in.Spec = r.wsTLS(in.InboundId, site).Spec
+	in.Spec.SpecVersion++
+	r.wantRunning(r.apply(in), in.InboundId)
+	conn.get()
 }
 
 // A host freshly installed over SSH has its role in agent.json and no state: the agent routes at its start, before the panel

@@ -107,8 +107,7 @@ func (p TCPPortShare) Front() bool { return len(p.Routes) >= 2 && p.Default != "
 // site is no route: it gives its port up to any TCP inbound (TCPPortOwners).
 //
 // extra are services of the node that are no inbound (a subscription host's route, SubHostRoutes). They claim their names
-// before any inbound, and count towards the two; an inbound that serves the node's own site is still the default before an
-// extra one that does.
+// before any inbound, and count towards the two. An extra site, when present, is the default.
 func TCPSharePlan(specs []InboundSpec, extra ...TCPExtraRoute) map[uint16]TCPPortShare {
 	sorted := slices.Clone(specs)
 	slices.SortStableFunc(sorted, func(a, b InboundSpec) int { return cmp.Compare(a.ID, b.ID) })
@@ -133,11 +132,14 @@ func TCPSharePlan(specs []InboundSpec, extra ...TCPExtraRoute) map[uint16]TCPPor
 		if len(routes)+len(extras[port]) < 2 || broken[port] {
 			continue
 		}
-		plan[port] = shareWithExtra(extras[port], routes)
+		if e := extras[port]; len(e) > 0 {
+			routes = append(e, routes...)
+		}
+		plan[port] = shareOf(routes)
 	}
 	for port, routes := range extras {
 		if _, inbounds := byPort[port]; !inbounds && len(routes) >= 2 {
-			plan[port] = shareWithExtra(routes, nil)
+			plan[port] = shareOf(routes)
 		}
 	}
 	return plan
@@ -147,25 +149,6 @@ func TCPSharePlan(specs []InboundSpec, extra ...TCPExtraRoute) map[uint16]TCPPor
 type TCPExtraRoute struct {
 	Port  uint16
 	Route TCPRoute
-}
-
-// shareWithExtra settles a port's names with the extra routes first, then picks the default: the first inbound route that
-// serves the node's own site, else the first extra one that does.
-func shareWithExtra(extra, inbounds []TCPRoute) TCPPortShare {
-	if len(extra) == 0 {
-		return shareOf(inbounds)
-	}
-	p := shareOf(append(slices.Clone(extra), inbounds...))
-	isExtra := func(id string) bool { return slices.ContainsFunc(extra, func(r TCPRoute) bool { return r.ID == id }) }
-	p.Default = ""
-	for _, pass := range []bool{false, true} {
-		for _, r := range p.Routes {
-			if p.Default == "" && r.Site && isExtra(r.ID) == pass {
-				p.Default = r.ID
-			}
-		}
-	}
-	return p
 }
 
 // shareOf settles the names of the routes of one port, which come by id: the lower id keeps a name, a route that asks for a name
