@@ -34,6 +34,8 @@ This is the VPS edition only. The Cloudflare edition already has a public addres
 
    The node cannot reach a panel behind NAT yet, so the server check marks the panel as unreachable without stopping, and the panel enrolls the node inside the SSH session: the node makes its key, the panel signs it, and the role and the link address go to the node on standard input, never on its command line. If a record does not point at the server, the install stops with a DNS error; **Continue anyway** goes on without the check, for example behind a DNS proxy. If the install fails after the role is on, the panel turns the role off again.
 
+4. Once the node is connected, open **Settings → Domains** from the last step of the wizard. Add the [CAA record](#caa-record) using the displayed value and wait until the host is ready before creating subscription links.
+
 ## Enabling on an existing panel
 
 Open **Settings → Domains**, card **Subscription host**:

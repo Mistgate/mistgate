@@ -246,12 +246,10 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
   const [jobId, setJobId] = useState(seed?.jobId ?? "");
   // the new node may carry the subscription address (a panel behind NAT): offered while no node does, VPS edition only
   const hostable = !useEdition().off("subscription_host");
-  const subHostOff = useQuery({ ...subHostQuery, refetchInterval: false, enabled: hostable }).data?.state === SubscriptionHostState.OFF;
   const [asSubHost, setAsSubHost] = useState(false);
   const [subDomain, setSubDomain] = useState("");
   const [subSiteTyped, setSubSite] = useState<string | null>(null);
   const [dnsMismatch, setDnsMismatch] = useState(false);
-  const hostInstall = hostable && subHostOff && asSubHost;
   // the node's own name (its address when that is a host name) until the owner types one (#55)
   const subSite = subSiteTyped ?? siteNameOf(address, subDomain);
   const [optionsOpen, setOptionsOpen] = useState(seed?.optionsOpen ?? false);
@@ -268,6 +266,8 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
   const { password, setPassword } = login;
   // the how-to under the panel key: open for a key not in use yet, and whenever the server refused it
   const [howTo, setHowTo] = useState<boolean | null>(null);
+
+  const [installingHost, setInstallingHost] = useState(false);
 
   const job = useQuery({
     queryKey: ["node-provision", jobId],
@@ -289,6 +289,13 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
     retry: false,
     refetchInterval: () => (terminalStates.has(job.data?.state ?? "") ? false : 2_500),
   });
+
+  const jobDone = job.data?.state === "completed";
+  const nodeId = job.data?.nodeId;
+  const subHost = useQuery({ ...subHostQuery, refetchInterval: jobDone && installingHost ? subHostQuery.refetchInterval : false, enabled: hostable });
+  const subHostOff = subHost.data?.state === SubscriptionHostState.OFF;
+  const hostInstall = hostable && subHostOff && asSubHost;
+  const hostPending = installingHost && !(subHost.data?.nodeId === nodeId && subHost.data?.ready);
 
   const labels = [t("node.ssh.step.server"), t("node.ssh.step.login"), t("node.ssh.step.check"), t("node.ssh.step.install")];
   // a refusal is worded by the way in it used and a refused panel key opens the how-to; a key that needs its passphrase
@@ -313,8 +320,6 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
   const jobState = job.data?.state ?? "";
   // the install manager speaks the admin's language: it cannot read the SPA's choice by itself
   const installManagerHref = new URL(`nodes/install?lang=${fmt.lang}&job=${encodeURIComponent(jobId)}`, document.baseURI).href;
-  const jobDone = jobState === "completed";
-  const nodeId = job.data?.nodeId;
   const jobFailed = jobState === "failed";
   const jobCancelled = jobState === "cancelled";
   const jobStopped = jobFailed || jobCancelled;
@@ -324,9 +329,10 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
   useEffect(() => {
     if (!jobDone && !jobFailed) return;
     if (jobDone && nodeId) markFresh("node", nodeId); // the new node's card is washed once
+    if (jobDone && installingHost) void qc.invalidateQueries({ queryKey: subHostQuery.queryKey });
     void qc.invalidateQueries({ queryKey: ["nodes"] });
     void qc.invalidateQueries({ queryKey: ["overview"] });
-  }, [jobDone, jobFailed, nodeId, qc]);
+  }, [jobDone, jobFailed, nodeId, installingHost, qc]);
 
   async function getFingerprint(event?: FormEvent) {
     event?.preventDefault();
@@ -428,6 +434,7 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
       if (!response.job?.id) throw new Error("provision_job_missing");
       if (share.ask) rememberShare(share.choice);
       login.clearSecrets(); // the job holds them now, sealed; a retry asks again
+      setInstallingHost(hostInstall);
       setJobId(response.job.id);
       qc.setQueryData(["node-provision", response.job.id], response.job);
       setStep(3);
@@ -652,6 +659,7 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
                         hint={t("set.domains.subHost.installSiteHint")}
                         required
                       />
+                      <Notice>{t("set.domains.subHost.installAfter")}</Notice>
                     </>
                   )}
                 </div>
@@ -980,6 +988,10 @@ export function SSHNodeInstall({ draft, onDraft, onMode, onClose, seed }: Props)
             line={[job.data?.name ?? name, location.trim() || (country !== noCountry ? fmt.country(country) : ""), host.trim()].filter(Boolean).join(" · ")}
             onClose={onClose}
             onOpen={openNode}
+            openHostSettings={hostPending ? () => {
+              onClose();
+              void navigate({ to: "/settings/$section", params: { section: "domains" } });
+            } : undefined}
           />
         )}
       </div>
@@ -1094,7 +1106,7 @@ function PanelKeyBox({ howTo, onHowTo }: { howTo: boolean; onHowTo: (open: boole
 }
 
 /** The window's last page (.an-dn): the node is installed and connected; the next thing is a profile on it. */
-export function NodeReady({ nodeId, line, onClose, onOpen }: { nodeId: string; line: string; onClose: () => void; onOpen: (tab?: "profiles") => void }) {
+export function NodeReady({ nodeId, line, onClose, onOpen, openHostSettings }: { nodeId: string; line: string; onClose: () => void; onOpen: (tab?: "profiles") => void; openHostSettings?: () => void }) {
   const t = useT();
   // a node installed again may have its profiles already: the next step is a profile only when it has none
   const live = useQuery({
@@ -1114,6 +1126,14 @@ export function NodeReady({ nodeId, line, onClose, onOpen }: { nodeId: string; l
         </div>
         <h2>{t("node.ssh.done")}</h2>
         <p className="an-line an-mono">{line}</p>
+        {openHostSettings && (
+          <Notice title={t("set.domains.subHost.installPending")} className="text-start">
+            {t("set.domains.subHost.installAfter")}{" "}
+            <button type="button" onClick={openHostSettings} className="font-medium text-accent-text underline underline-offset-2">
+              {t("set.domains.subHost.linkMissingGo", { settings: t("nav.settings"), tab: t("settings.domains") })}
+            </button>
+          </Notice>
+        )}
         {needsProfile && (
           <div className="an-nx">
             <span className="an-pi" aria-hidden>

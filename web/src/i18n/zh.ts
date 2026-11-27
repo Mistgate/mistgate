@@ -277,7 +277,7 @@ const core: CoreMessages = {
   "err.node_offline": "节点未连接。请在它的 Agent 重新上线后再试。",
   "err.agent_too_old": "此节点的 Agent 版本过旧，无法执行此操作。请在「更新」页面更新它。",
   "err.node_retired": "此节点已从集群退役。",
-  "err.sub_address_missing": "未设置订阅链接地址。在面板所在服务器上运行 `mistgate setup` 即可设置。",
+  "err.sub_address_missing": "订阅地址尚未就绪，请检查「设置 → 域名」。",
   "err.preset_is_default": "这是默认预设。请先将其他预设设为默认。",
   "err.preset_builtin": "内置预设无法删除。",
 

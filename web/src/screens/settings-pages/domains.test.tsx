@@ -184,9 +184,13 @@ describe("Settings → Domains → subscription host", () => {
     expect(subHost.setSubscriptionHost).toHaveBeenLastCalledWith({ nodeId: "nod_a", domain: "sub.example.com", siteName: "", skipDnsCheck: true });
   });
   it("caa: Proceed without CAA asks first, then waives; a waiver is shown", async () => {
-    withState(SubscriptionHostState.ON, { domain: "sub.example.com", nodeId: "nod_a", notReady: ["caa"], caaStatus: "absent", caaRecord: 'sub.example.com. CAA 0 issue "letsencrypt.org"' });
+    const value = "letsencrypt.org; accounturi=https://acme.example.com/acct/42; validationmethods=tls-alpn-01";
+    withState(SubscriptionHostState.ON, { domain: "sub.example.com", nodeId: "nod_a", notReady: ["caa"], caaStatus: "absent", caaRecord: `sub.example.com. CAA 0 issue "${value}"` });
     subHost.waiveSubscriptionHostCAA.mockResolvedValue({ host: { ...base, state: SubscriptionHostState.ON, domain: "sub.example.com", nodeId: "nod_a", ready: true, caaWaived: true } });
     await mount();
+    const caaRow = [...document.querySelectorAll("[data-card=subhost] .pp-row")].find((row) => row.querySelector("b")?.textContent === en["set.domains.subHost.caa"]);
+    expect(caaRow?.querySelector("code")?.textContent).toBe(value);
+    expect(text()).toContain("sub.example.com with flag 0 and tag issue");
     await click(button(en["set.domains.subHost.caaWaive"]));
     expect(subHost.waiveSubscriptionHostCAA).not.toHaveBeenCalled();
     expect(text()).toContain(en["set.domains.subHost.caaWaiveAsk"]);

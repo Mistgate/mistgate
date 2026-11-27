@@ -226,14 +226,17 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
 
   if (host.state === SubscriptionHostState.ON) {
     const disable = (force: boolean) => run("off", () => subHost.disableSubscriptionHost({ publicUrl: publicUrl.trim(), force }));
+    const caaAction = !host.ready && host.notReady.includes("caa") && host.caaStatus !== "account_pending";
+    const caaStatus = host.caaStatus === "present" || host.caaStatus === "absent" || host.caaStatus === "account_pending" ? host.caaStatus : "unknown";
+    const caaValue = host.caaRecord.match(/ CAA 0 issue "([^"]+)"$/)?.[1];
     return (
       <>
         <p className="sb-lead">{t("set.domains.subHost.onNode", { node: nameOf(host.nodeId) })}</p>
         {head}
         {host.ready ? (
-          <Pb tone="ok">{t("set.domains.subHost.readyYes")}</Pb>
+          <Pb tone="ok" className="sx-pbm">{t("set.domains.subHost.readyYes")}</Pb>
         ) : (
-          <Pb tone="part" title={t("set.domains.subHost.readyNo")}>
+          <Pb tone="part" className="sx-pbm" title={t("set.domains.subHost.readyNo")}>
             <ul className="sx-steps" data-testid="subhost-steps">
               {steps.map((s) => (
                 <li key={s} data-done={!host.notReady.includes(s) || undefined}>
@@ -248,9 +251,10 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
             {t("set.domains.subHost.caaWaived")}
           </Pb>
         )}
-        {!host.ready && host.notReady.includes("caa") && host.caaStatus !== "account_pending" && (
+        {caaAction && (
           <Pb
             tone="part"
+            className="sx-pbm"
             action={
               askNoCAA ? (
                 <BusyButton variant="danger" busy={busy === "caa"} disabled={!!busy} onClick={() => void run("caa", () => subHost.waiveSubscriptionHostCAA({}))}>
@@ -263,13 +267,14 @@ export function SubHostCard({ host }: { host: SubscriptionHost }) {
               )
             }
           >
-            {askNoCAA ? t("set.domains.subHost.caaWaiveAsk") : t("set.domains.subHost.caa.absent")}
+            {askNoCAA ? t("set.domains.subHost.caaWaiveAsk") : t(`set.domains.subHost.caa.${caaStatus}`)}
           </Pb>
         )}
         {host.caaRecord && (
           <Rows>
-            <Row label={t("set.domains.subHost.caa")} hint={t(`set.domains.subHost.caa.${(["present", "absent", "account_pending"].includes(host.caaStatus) ? host.caaStatus : "unknown") as "present"}`)}>
-              <CmdRow value={host.caaRecord} wrap />
+            <Row label={t("set.domains.subHost.caa")} hint={caaValue ? t("set.domains.subHost.caaFields", { name: host.domain }) : undefined}>
+              <CmdRow value={caaValue ?? host.caaRecord} wrap />
+              {!caaAction && <p className="text-xs text-muted">{t(`set.domains.subHost.caa.${caaStatus}`)}</p>}
             </Row>
           </Rows>
         )}

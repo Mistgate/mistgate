@@ -22,6 +22,18 @@ import { QueryError } from "@/components/ui/query-error";
 import { plainText } from "@/i18n";
 import { useTx } from "./t";
 
+export function SubscriptionAddressNotice() {
+  const t = useTx();
+  return (
+    <Notice tone="warn">
+      {t("set.domains.subHost.linkMissing")}{" "}
+      <Link to="/settings/$section" params={{ section: "domains" }} className="font-bold whitespace-nowrap text-accent-text hover:underline">
+        {t("set.domains.subHost.linkMissingGo", { settings: t("nav.settings"), tab: t("settings.domains") })}
+      </Link>
+    </Notice>
+  );
+}
+
 /**
  * Whom the window is for: the apps switched on, and (when known) what the person's page offers now (`access`) and the
  * group, so an empty page is said before the link goes out.
@@ -176,14 +188,8 @@ function LinkWindow({ open, target, initialUrl, initialPassword, onClose }: { op
       }
     >
       {error ? (
-        // no public address yet: the way out is a subscription host (or `mistgate setup`), not a retry
         errorCode(ConnectError.from(fetched.error).rawMessage) === "sub_address_missing" ? (
-          <Notice tone="warn">
-            {t("set.domains.subHost.linkMissing")}{" "}
-            <Link to="/settings/$section" params={{ section: "domains" }} className="font-bold whitespace-nowrap text-accent-text hover:underline">
-              {t("set.domains.subHost.linkMissingGo", { settings: t("nav.settings"), tab: t("settings.domains") })}
-            </Link>
-          </Notice>
+          <SubscriptionAddressNotice />
         ) : (
           <QueryError error={fetched.error} onRetry={() => void fetched.refetch()} />
         )

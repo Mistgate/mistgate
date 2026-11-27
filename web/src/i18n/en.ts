@@ -289,7 +289,7 @@ const core = {
   "err.node_offline": "The node is not connected. Try again when its agent is back.",
   "err.agent_too_old": "The node’s agent is too old for this. Update it on the Updates page.",
   "err.node_retired": "The node is retired from the fleet.",
-  "err.sub_address_missing": "The subscription link address is not set. `mistgate setup` sets it on the panel’s server.",
+  "err.sub_address_missing": "The subscription address is not ready. Check Settings → Domains.",
   "err.preset_is_default": "This is the default preset. Make another one the default first.",
   "err.preset_builtin": "A built-in preset cannot be deleted.",
 

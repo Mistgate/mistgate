@@ -276,7 +276,7 @@ const core: CoreMessages = {
   "err.node_offline": "Düğümle bağlantı yok. Ajan geri gelince yeniden dene.",
   "err.agent_too_old": "Düğümdeki ajan bunun için çok eski. Güncellemeler sayfasından güncelle.",
   "err.node_retired": "Düğüm kullanımdan kaldırıldı.",
-  "err.sub_address_missing": "Abonelik bağlantısı adresi ayarlanmamış. Adresi panelin sunucusunda `mistgate setup` ayarlar.",
+  "err.sub_address_missing": "Abonelik adresi henüz hazır değil. Ayarlar → Alan adları bölümünü kontrol et.",
   "err.preset_is_default": "Bu varsayılan ön ayar. Önce başka birini varsayılan yap.",
   "err.preset_builtin": "Yerleşik ön ayar silinemez.",
   "field.port.out_of_range": "Port 1 ile 65535 arasında olmalı",
