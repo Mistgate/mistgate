@@ -104,8 +104,8 @@ func promoteNextLink(dir string, m *Meta, next, attemptRevision string, since in
 		}
 		changed := latest.Link != next
 		if changed {
-			if latest.PrevLink == "" || latest.LinkHealthy {
-				latest.PrevLink = latest.Link
+			if (latest.PrevLink == "" && !latest.PrevMTLS) || latest.LinkHealthy {
+				latest.PrevLink, latest.PrevMTLS = latest.Link, latest.Link == ""
 			}
 			latest.Link = next
 			latest.LinkHealthy = false
@@ -123,7 +123,7 @@ func promoteNextLink(dir string, m *Meta, next, attemptRevision string, since in
 		if err := writeMeta(dir, latest); err != nil {
 			return err
 		}
-		m.Link, m.PrevLink = latest.Link, latest.PrevLink
+		m.Link, m.PrevLink, m.PrevMTLS = latest.Link, latest.PrevLink, latest.PrevMTLS
 		m.LinkHealthy, m.LinkSince = latest.LinkHealthy, latest.LinkSince
 		m.NextLink, m.NextLinkRevision = latest.NextLink, latest.NextLinkRevision
 		promoted = changed
@@ -143,13 +143,14 @@ func rollbackPreviousLink(dir string, m *Meta, prev string) (bool, error) {
 		if err != nil {
 			return err
 		}
-		if prev == "" || m.PrevLink != prev || latest.PrevLink != prev || latest.Link != m.Link || latest.Link == prev {
+		if (prev == "" && !m.PrevMTLS) || m.PrevLink != prev || latest.PrevLink != prev ||
+			latest.PrevMTLS != m.PrevMTLS || latest.Link != m.Link || latest.Link == prev {
 			m.NextLink, m.NextLinkRevision = latest.NextLink, latest.NextLinkRevision
 			return nil
 		}
-		latest.Link, latest.PrevLink, latest.LinkSince = prev, "", 0
+		latest.Link, latest.PrevLink, latest.PrevMTLS, latest.LinkSince = prev, "", false, 0
 		latest.LinkHealthy = false
-		if latest.NextLink == prev {
+		if prev != "" && latest.NextLink == prev {
 			latest.NextLink = ""
 			if err := reviseNextLink(&latest); err != nil {
 				return err
@@ -158,7 +159,7 @@ func rollbackPreviousLink(dir string, m *Meta, prev string) (bool, error) {
 		if err := writeMeta(dir, latest); err != nil {
 			return err
 		}
-		m.Link, m.PrevLink = latest.Link, latest.PrevLink
+		m.Link, m.PrevLink, m.PrevMTLS = latest.Link, latest.PrevLink, latest.PrevMTLS
 		m.LinkHealthy, m.LinkSince = latest.LinkHealthy, latest.LinkSince
 		m.NextLink, m.NextLinkRevision = latest.NextLink, latest.NextLinkRevision
 		rolledBack = true

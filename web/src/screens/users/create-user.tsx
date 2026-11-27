@@ -1,3 +1,4 @@
+import { ConnectError } from "@connectrpc/connect";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
@@ -18,7 +19,7 @@ import type { Group } from "@/gen/mistgate/admin/v1/group_pb";
 import { users } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { useEdition } from "@/lib/edition";
-import { errorText } from "@/lib/errors";
+import { errorCode, errorText } from "@/lib/errors";
 import { nodesQuery } from "@/lib/queries";
 import { useLinkAppNames } from "@/screens/subscriptions/queries";
 import { avatarIndex, GB, groupTone, reachOf } from "./format";
@@ -29,7 +30,7 @@ import { groupsQuery, profileListQuery } from "./rpc";
 import { useTx, type Tx } from "./t";
 import { InfoTip, ResetSelect, resetCode } from "./ui";
 import { MistgateAppRow } from "./mistgate-app";
-import { LinkModal, linkTargetOf } from "./link-modal";
+import { LinkModal, linkTargetOf, SubscriptionAddressNotice } from "./link-modal";
 import { AppLink } from "./nav";
 
 export type Created = { user: User; url: string; password: string };
@@ -229,7 +230,6 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
   const [speed, setSpeed] = useState(0); // bit/s, 0 = no limit
   const [devSpeed, setDevSpeed] = useState(0);
   const [more, setMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const groups = groupList.data ?? [];
   const nodeItems = nodeList.data?.nodes ?? [];
@@ -268,7 +268,6 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
       markFresh("user", res.user.id); // the row is washed once, when it shows up in the list
       onCreated({ user: userN(res.user), url: res.subscriptionUrl, password: res.pagePassword });
     },
-    onError: (e) => setError(errorText(e, t)),
   });
 
   const toggleNode = (id: string) => {
@@ -300,7 +299,6 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
   const extras = [speed, devSpeed, dnsPreset ? 1 : 0, reset !== QuotaReset.MONTH ? 1 : 0].filter((v) => v > 0).length;
   const submit = () => {
     if (!ready) return;
-    setError(null);
     create.mutate();
   };
 
@@ -578,7 +576,11 @@ function CreateForm({ onCreated, onClose, startName, startGroup }: { onCreated: 
           <p className="text-xs leading-4 text-muted @max-[672px]/usd:hidden">{t("ul.new.linkNote")}</p>
         </aside>
       </div>
-      {error && <Notice tone="danger">{error}</Notice>}
+      {create.error && (
+        errorCode(ConnectError.from(create.error).rawMessage) === "sub_address_missing"
+          ? <SubscriptionAddressNotice />
+          : <Notice tone="danger">{errorText(create.error, t)}</Notice>
+      )}
       <div className="sticky -bottom-6 -mx-6 -mb-6 flex flex-wrap items-center gap-2 border-t border-line @max-[720px]/win:-bottom-5 @max-[720px]/win:-mx-4 @max-[720px]/win:-mb-5 bg-[color-mix(in_srgb,var(--text)_2%,var(--surface))] px-6 py-3.5 @max-[720px]/win:px-4 @max-[720px]/win:py-3">
         <span className="me-auto min-w-0 text-xs text-muted @max-[672px]/usd:basis-full">{name.trim() ? t("ul.new.enter") : t("ul.new.footEmpty")}</span>
         <Button variant="secondary" size="lg" onClick={onClose}>

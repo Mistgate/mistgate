@@ -110,7 +110,7 @@ func (a *Agent) reconnectWarp(ctx context.Context) *pb.CommandResult {
 
 // capabilities is the Hello.capabilities list of this build.
 func (a *Agent) capabilities() []string {
-	caps := []string{agentcap.Doctor, agentcap.Bandwidth, agentcap.ClientIPv6, agentcap.WSLink, agentcap.TCPCheck, agentcap.Decoy, agentcap.Links, agentcap.Links2, agentcap.Links3, agentcap.Journal, agentcap.Probe, agentcap.SNIScan, agentcap.Speed, agentcap.SpeedChannel, agentcap.Debug}
+	caps := []string{agentcap.Doctor, agentcap.Bandwidth, agentcap.ClientIPv6, agentcap.WSLink, agentcap.TCPCheck, agentcap.Decoy, agentcap.Links, agentcap.Links2, agentcap.Links3, agentcap.Journal, agentcap.Probe, agentcap.SNIScan, agentcap.Speed, agentcap.SpeedChannel, agentcap.Debug, agentcap.LinkFetch}
 	if a.canOSUpdate() {
 		caps = append(caps, agentcap.OSStatus)
 		if a.cfg.OSUpdate != nil {
@@ -139,6 +139,9 @@ func (a *Agent) capabilities() []string {
 	}
 	if a.sharesTCP() {
 		caps = append(caps, agentcap.TCPShare)
+		if a.cfg.Certs != nil { // the host's own site needs the certificate source
+			caps = append(caps, agentcap.SubHost)
+		}
 	}
 	if a.appliesUserRateLimit() {
 		caps = append(caps, agentcap.UserRateLimit)
@@ -174,6 +177,7 @@ func (a *Agent) capabilities() []string {
 		caps = append(caps, agentcap.AWGPrepare)
 	}
 	updateCaps := a.upd.Capabilities()
+	// A link-only agent updates over the link; a VPS panel derives update/1 and nets/1 from link-fetch/1.
 	if a.linkOnly() {
 		if slices.Contains(updateCaps, agentcap.Update) {
 			caps = append(caps, agentcap.UpdateLink)

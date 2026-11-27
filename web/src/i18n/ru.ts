@@ -37,6 +37,7 @@ import { ru as fleetuiRu } from "./fleetui";
 import { ru as clientlogsRu } from "./clientlogs";
 import { ru as trusttunnelRu } from "./trusttunnel";
 import { ru as tcpshareRu } from "./tcpshare";
+import { ru as subhostRu } from "./subhost";
 import { ru as shellRu } from "./shell";
 import { ru as nodesviewRu } from "./nodesview";
 import { ru as nodeswaysRu } from "./nodesways";
@@ -280,7 +281,7 @@ const core: CoreMessages = {
   "err.node_offline": "Нода не на связи — попробуй, когда агент вернётся.",
   "err.agent_too_old": "Агент на ноде слишком старый для этого — обнови его на странице «Обновления».",
   "err.node_retired": "Нода выведена из флота.",
-  "err.sub_address_missing": "Не задан адрес ссылок подписки — его задаёт `mistgate setup` на сервере панели.",
+  "err.sub_address_missing": "Адрес подписок ещё не готов. Проверь раздел «Настройки → Домены».",
   "err.preset_is_default": "Это пресет по умолчанию — сначала назначь другой.",
   "err.preset_builtin": "Встроенный пресет нельзя удалить.",
 
@@ -333,4 +334,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "Сертификат Let’s Encrypt на IP-адрес пока недоступен: возьми домен или самоподписанный",
 };
 
-export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...probesRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu, ...osupdatesRu, ...fleetuiRu, ...clientlogsRu, ...trusttunnelRu, ...tcpshareRu, ...shellRu, ...overviewRu, ...nodesviewRu, ...windowsRu, ...nodepageRu, ...userslistRu, ...userspageRu, ...usersgroupRu, ...usersextraRu, ...decoysitesRu, ...planwordsRu, ...nodeswaysRu, ...nodewaysRu, ...profilespageRu, ...healthpageRu, ...reachpageRu, ...profilesrvRu, ...profilenewRu, ...subspnRu, ...subshxRu, ...subsrtRu, ...subsdnsRu, ...updatespageRu, ...settingspageRu, ...aipageRu, ...igpageRu, ...aspageRu, ...nodeshareRu, ...channelRu, ...countrynowRu, ...sniRu };
+export const ru: Messages = { ...core, ...opsRu, ...usersRu, ...securityRu, ...profilesRu, ...subsRu, ...healthRu, ...updatesRu, ...awgRu, ...warpRu, ...integrationsRu, ...telegramRu, ...portsRu, ...editionRu, ...decoyRu, ...bulkRu, ...countryRu, ...probesRu, ...connectionsRu, ...journalRu, ...relayRu, ...waysRu, ...tgproxyRu, ...clientcompatRu, ...protocolsRu, ...aiRu, ...graphRu, ...waysgraphRu, ...fleetmapRu, ...observabilityRu, ...debugRu, ...resourcesRu, ...tasksRu, ...followupRu, ...osupdatesRu, ...fleetuiRu, ...clientlogsRu, ...trusttunnelRu, ...tcpshareRu, ...subhostRu, ...shellRu, ...overviewRu, ...nodesviewRu, ...windowsRu, ...nodepageRu, ...userslistRu, ...userspageRu, ...usersgroupRu, ...usersextraRu, ...decoysitesRu, ...planwordsRu, ...nodeswaysRu, ...nodewaysRu, ...profilespageRu, ...healthpageRu, ...reachpageRu, ...profilesrvRu, ...profilenewRu, ...subspnRu, ...subshxRu, ...subsrtRu, ...subsdnsRu, ...updatespageRu, ...settingspageRu, ...aipageRu, ...igpageRu, ...aspageRu, ...nodeshareRu, ...channelRu, ...countrynowRu, ...sniRu };

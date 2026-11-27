@@ -237,8 +237,34 @@ func TestApplyPanelLink(t *testing.T) {
 	}
 }
 
-// An mTLS agent (no link in agent.json) ignores a panel link address, in settings or in agent.json: nothing is written,
-// it does not become link-only and has no new address to try. A running one stays on its mTLS session.
+// An mTLS agent (no link in agent.json) that gets settings without a link address stays as it is: nothing is written,
+// it does not become link-only and has no new address to try.
+func TestMTLSAgentStaysMTLSWithoutANewLink(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	a := h.a
+	if a.linkOnly() {
+		t.Fatal("harness agent is link-only")
+	}
+	before, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.applyPanelLink(&pb.NodeSettings{}) {
+		t.Fatal("settings without a link address asked for a reconnect")
+	}
+	after, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatalf("%s changed:\n%s\n%s", fileMeta, before, after)
+	}
+	if a.linkOnly() || a.nextLink() != "" {
+		t.Fatalf("linkOnly=%v nextLink=%q", a.linkOnly(), a.nextLink())
+	}
+}
+
+// An mTLS agent ignores a panel-supplied link address and keeps its session running.
 func TestMTLSAgentIgnoresAPanelLink(t *testing.T) {
 	h := newHarness(t, harnessOpts{noStart: true})
 	a := h.a
@@ -285,28 +311,43 @@ func TestMTLSAgentIgnoresAPanelLink(t *testing.T) {
 		t.Fatal("the mTLS session ended for a link address")
 	}
 	unchanged()
-
-	a.metaMu.Lock()
-	a.meta.NextLink = link // an agent.json with next_link but no link
-	a.metaMu.Unlock()
-	if a.nextLink() != "" {
-		t.Fatal("an mTLS agent would try a new link address")
-	}
 }
 
-// A new link address that fails is tried every other turn, the current address in between.
-func TestNextLinkAlternatesWithTheCurrentLink(t *testing.T) {
-	h, lp, a, b := prevLinkHarness(t)
-	lp.refuse('b')
+// A new link address that fails is tried every other turn, the old way to the panel in between.
+func TestNextLinkAlternatesWithTheOldTransport(t *testing.T) {
+	h := newHarness(t, harnessOpts{noStart: true})
+	var hits atomic.Int32
+	bad := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(bad.Close)
+	h.a.linkHTTPClient = bad.Client()
+	if err := SetPanelLink(h.dir, linkBaseOf(bad, 'b')); err != nil {
+		t.Fatal(err)
+	}
+	h.a.meta = readMeta(t, h.dir)
+	h.a.backoffMin, h.a.backoffMax = 10*time.Millisecond, 20*time.Millisecond
 	h.start()
-	if got := lp.session(t); got != linkPrefix('a') || lp.dialsTo('b') != 1 {
-		t.Fatalf("new address tried %d times before the current one, want 1", lp.dialsTo('b'))
+
+	waitConnect := func() {
+		select {
+		case <-h.panel.connects:
+		case <-time.After(5 * time.Second):
+			t.Fatal("no mTLS session after the failed new address")
+		}
 	}
-	endSession(t, h)
-	if got := lp.session(t); got != linkPrefix('a') || lp.dialsTo('b') != 2 {
-		t.Fatalf("new address tried %d times, want 2", lp.dialsTo('b'))
+	waitConnect()
+	if hits.Load() != 1 {
+		t.Fatalf("new address tried %d times before the old one, want 1", hits.Load())
 	}
-	if h.a.nextLink() != b || h.a.linkURL() != a {
+	eventually(t, func() bool { return h.a.cur.Load() != nil }, "mTLS session")
+	h.a.cur.Load().cancel()
+	waitConnect()
+	if hits.Load() != 2 {
+		t.Fatalf("new address tried %d times, want 2", hits.Load())
+	}
+	if h.a.nextLink() == "" || h.a.linkOnly() {
 		t.Fatal("a failed new address was committed")
 	}
 }
@@ -324,7 +365,7 @@ func TestNextLinkCommitsAfterASession(t *testing.T) {
 	if got := lp.session(t); got != linkPrefix('b') {
 		t.Fatal("the next session was not on the new address")
 	}
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 }
 
 // B answers the Hello and drops the session, and the panel names B in every HelloAck and DesiredState. After the rollback
@@ -394,7 +435,7 @@ func TestNextLinkFromADesiredStateWaitsForTheNextSession(t *testing.T) {
 	if got := lp.session(t); got != linkPrefix('b') {
 		t.Fatal("the next session was not on the new address")
 	}
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 }
 
 func TestSetPanelLink(t *testing.T) {
@@ -404,30 +445,14 @@ func TestSetPanelLink(t *testing.T) {
 		t.Fatalf("not enrolled: %v", err)
 	}
 	h := newHarness(t, harnessOpts{noStart: true})
-	before, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := SetPanelLink(h.dir, link); err == nil || !strings.Contains(err.Error(), "mTLS") {
-		t.Fatalf("an mTLS node: %v", err)
-	}
-	if after, err := os.ReadFile(filepath.Join(h.dir, fileMeta)); err != nil || !bytes.Equal(before, after) {
-		t.Fatalf("%s changed for an mTLS node: %v", fileMeta, err)
-	}
-
-	m := readMeta(t, h.dir)
-	m.Link = "wss://old.example.com/" + strings.Repeat("o", 24) + "/"
-	if err := saveMeta(h.dir, &m); err != nil {
-		t.Fatal(err)
-	}
 	if err := SetPanelLink(h.dir, "wss://panel.example.com/x"); err == nil {
 		t.Fatal("a bad address was saved")
 	}
 	if err := SetPanelLink(h.dir, link); err != nil {
 		t.Fatal(err)
 	}
-	if got := readMeta(t, h.dir); got.NextLink != link || got.Link != m.Link || got.Panel == "" {
-		t.Fatalf("saved %+v", got)
+	if m := readMeta(t, h.dir); m.NextLink != link || m.Panel == "" {
+		t.Fatalf("saved %+v", m)
 	}
 }
 
@@ -475,16 +500,22 @@ func prevLinkHarness(t *testing.T) (h *harness, lp *sessionLinkPanel, a, b strin
 	return h, lp, a, b
 }
 
+func (a *Agent) prevLink() string {
+	link, _ := a.prevAddress()
+	return link
+}
+
 // committedTo waits until the agent uses link (and has saved it) with prev as its previous address.
-func committedTo(t *testing.T, h *harness, link, prev string) {
+func committedTo(t *testing.T, h *harness, link, prev string, prevMTLS bool) {
 	t.Helper()
 	eventually(t, func() bool {
 		h.a.metaMu.Lock()
 		defer h.a.metaMu.Unlock()
-		return h.a.meta.Link == link && h.a.cfg.LinkURL == link && h.a.meta.NextLink == "" && h.a.meta.PrevLink == prev
+		return h.a.meta.Link == link && h.a.cfg.LinkURL == cmp.Or(link, h.a.configLink) && h.a.meta.NextLink == "" &&
+			h.a.meta.PrevLink == prev && h.a.meta.PrevMTLS == prevMTLS
 	}, "link and previous address")
-	if m := readMeta(t, h.dir); m.Link != link || m.NextLink != "" || m.PrevLink != prev {
-		t.Fatalf("saved link=%t next=%t prev=%t", m.Link == link, m.NextLink == "", m.PrevLink == prev)
+	if m := readMeta(t, h.dir); m.Link != link || m.NextLink != "" || m.PrevLink != prev || m.PrevMTLS != prevMTLS {
+		t.Fatalf("saved link=%t next=%t prev=%t prev_mtls=%v", m.Link == link, m.NextLink == "", m.PrevLink == prev, m.PrevMTLS)
 	}
 }
 
@@ -495,14 +526,14 @@ func TestPrevLinkWhenTheNewOneStopsAnswering(t *testing.T) {
 	if got := lp.session(t); got != linkPrefix('b') {
 		t.Fatal("the first session was not on the new address")
 	}
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 
 	lp.refuse('b')
 	endHealthySession(t, h)
 	if got := lp.session(t); got != linkPrefix('a') {
 		t.Fatal("the next session was not on the previous address")
 	}
-	committedTo(t, h, a, "")
+	committedTo(t, h, a, "", false)
 	if !h.a.linkOnly() || lp.dialsTo('b') < 2 {
 		t.Fatalf("linkOnly=%v, new address dialled %d times", h.a.linkOnly(), lp.dialsTo('b'))
 	}
@@ -521,7 +552,7 @@ func TestPrevLinkWhenTheNewOneDropsAfterHelloAck(t *testing.T) {
 	if got := lp.session(t); got != linkPrefix('a') {
 		t.Fatal("the next session was not on the previous address")
 	}
-	committedTo(t, h, a, "")
+	committedTo(t, h, a, "", false)
 	if n := lp.dialsTo('b'); n != 1 {
 		t.Fatalf("new address dialled %d times, want 1", n)
 	}
@@ -545,7 +576,45 @@ func TestPrevLinkWhenTheCurrentDropsAfterHelloAck(t *testing.T) {
 	if got := lp.session(t); got != linkPrefix('a') {
 		t.Fatal("the next session was not on the previous address")
 	}
-	committedTo(t, h, a, "")
+	committedTo(t, h, a, "", false)
+}
+
+// An mTLS agent whose first link address stops answering goes back to mTLS and is no longer link-only. Its configured
+// link (not advertised by the panel, so never dialled) is its optional link again.
+func TestPrevMTLSWhenTheNewLinkStopsAnswering(t *testing.T) {
+	configured := "wss://link.example.com/" + linkPrefix('c') + "/"
+	h := newHarness(t, harnessOpts{noStart: true, cfg: func(c *Config) { c.LinkURL = configured }})
+	if h.a.linkOnly() || h.a.linkURL() != configured {
+		t.Fatal("the configured link was not taken as the optional link")
+	}
+	lp := newSessionLinkPanel(h)
+	server := httptest.NewTLSServer(lp)
+	t.Cleanup(server.Close)
+	b := linkBaseOf(server, 'b')
+	h.a.linkHTTPClient = server.Client()
+	if err := SetPanelLink(h.dir, b); err != nil {
+		t.Fatal(err)
+	}
+	h.a.meta = readMeta(t, h.dir)
+	h.start()
+	lp.session(t)
+	committedTo(t, h, b, "", true)
+	if !h.a.linkOnly() {
+		t.Fatal("not link-only on the new link")
+	}
+	select {
+	case <-h.panel.connects:
+		t.Fatal("a mTLS session before the new link failed")
+	default:
+	}
+
+	lp.refuse('b')
+	endSession(t, h)
+	h.waitConnected()
+	committedTo(t, h, "", "", false)
+	if h.a.linkOnly() || h.a.linkURL() != configured {
+		t.Fatalf("linkOnly=%v, configured link kept=%v after the return to mTLS", h.a.linkOnly(), h.a.linkURL() == configured)
+	}
 }
 
 // The previous address survives a restart: an agent that starts on a committed link that does not answer goes back.
@@ -553,7 +622,7 @@ func TestPrevLinkAfterARestart(t *testing.T) {
 	h, lp, a, b := prevLinkHarness(t)
 	h.start()
 	lp.session(t)
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 	if err := h.stop(); err != nil {
 		t.Fatal(err)
 	}
@@ -561,7 +630,7 @@ func TestPrevLinkAfterARestart(t *testing.T) {
 	lp.refuse('b')
 	client := h.a.linkHTTPClient
 	h.a = h.newAgent()
-	if h.a.prevLink() != a || h.a.linkURL() != b || !h.a.linkOnly() {
+	if p, mtls := h.a.prevAddress(); p != a || mtls || h.a.linkURL() != b || !h.a.linkOnly() {
 		t.Fatal("the restarted agent lost its link or its previous address")
 	}
 	h.a.linkHTTPClient = client
@@ -569,7 +638,7 @@ func TestPrevLinkAfterARestart(t *testing.T) {
 	if got := lp.session(t); got != linkPrefix('a') {
 		t.Fatal("the restarted agent did not go back to the previous address")
 	}
-	committedTo(t, h, a, "")
+	committedTo(t, h, a, "", false)
 }
 
 // While the current link answers, the previous address is never dialled.
@@ -577,7 +646,7 @@ func TestPrevLinkUnusedWhileTheCurrentAnswers(t *testing.T) {
 	h, lp, a, b := prevLinkHarness(t)
 	h.start()
 	lp.session(t)
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 	for range 3 {
 		endHealthySession(t, h)
 		if got := lp.session(t); got != linkPrefix('b') {
@@ -587,7 +656,7 @@ func TestPrevLinkUnusedWhileTheCurrentAnswers(t *testing.T) {
 	if n := lp.dialsTo('a'); n != 0 {
 		t.Fatalf("previous address dialled %d times", n)
 	}
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 }
 
 // skewLinkClock makes the clock of Meta.LinkSince run ahead of the real one by the returned value (nanoseconds).
@@ -614,14 +683,14 @@ func TestPrevAddressForgottenAfterTheNewOneWorked7Days(t *testing.T) {
 	skew := skewLinkClock(h)
 	h.start()
 	lp.session(t)
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 	if since := readMeta(t, h.dir).LinkSince; since == 0 || time.Since(time.Unix(since, 0)).Abs() > time.Minute {
 		t.Fatalf("link_since %d is not the commit time", since)
 	}
 
 	skew.Store(int64(8 * 24 * time.Hour))
 	nextHealthy(t, h)
-	committedTo(t, h, b, "")
+	committedTo(t, h, b, "", false)
 	raw, err := os.ReadFile(filepath.Join(h.dir, fileMeta))
 	if err != nil {
 		t.Fatal(err)
@@ -645,12 +714,12 @@ func TestPrevAddressKeptWithin7Days(t *testing.T) {
 	skew := skewLinkClock(h)
 	h.start()
 	lp.session(t)
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 	since := readMeta(t, h.dir).LinkSince
 
 	skew.Store(int64(24 * time.Hour))
 	nextHealthy(t, h)
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 	if got := readMeta(t, h.dir).LinkSince; got != since {
 		t.Fatalf("link_since %d, want %d", got, since)
 	}
@@ -675,7 +744,7 @@ func TestPrevAddressKeptPast7DaysByUnhealthySessions(t *testing.T) {
 		}
 		eventually(t, func() bool { return h.a.cur.Load() != nil }, "a panel session")
 		time.Sleep(200 * time.Millisecond)
-		committedTo(t, h, b, a)
+		committedTo(t, h, b, a, false)
 		dials := lp.dialsTo('a')
 		endSession(t, h)
 		eventually(t, func() bool { return lp.dialsTo('a') > dials }, "the fallback to the previous address")
@@ -683,7 +752,7 @@ func TestPrevAddressKeptPast7DaysByUnhealthySessions(t *testing.T) {
 	if got := lp.session(t); got != linkPrefix('b') {
 		t.Fatal("a session was not on the current address")
 	}
-	committedTo(t, h, b, "")
+	committedTo(t, h, b, "", false)
 }
 
 // The new address took over 8 days ago but has not established a session since: the previous address was not
@@ -693,7 +762,7 @@ func TestPrevAddressFallbackAfter7DaysWhenTheNewOneFails(t *testing.T) {
 	skew := skewLinkClock(h)
 	h.start()
 	lp.session(t)
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 
 	skew.Store(int64(8 * 24 * time.Hour))
 	lp.refuse('b')
@@ -701,7 +770,7 @@ func TestPrevAddressFallbackAfter7DaysWhenTheNewOneFails(t *testing.T) {
 	if got := lp.session(t); got != linkPrefix('a') {
 		t.Fatal("the next session was not on the previous address")
 	}
-	committedTo(t, h, a, "")
+	committedTo(t, h, a, "", false)
 	if since := readMeta(t, h.dir).LinkSince; since != 0 {
 		t.Fatalf("link_since %d kept without a previous address", since)
 	}
@@ -759,7 +828,7 @@ func TestNextLinkMovesABridgedNode(t *testing.T) {
 	if got := lp.session(t); got != linkPrefix('b') {
 		t.Fatal("the node did not come back over the new address")
 	}
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 }
 
 // directLinkClient is the link client of h with a direct path that dial decides; through a bridge the agent replaces
@@ -835,7 +904,7 @@ func TestNextLinkThroughTheBridge(t *testing.T) {
 		}
 		endSession(t, h)
 	}
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 	lp.mu.Lock()
 	via := lp.via[linkPrefix('b')]
 	lp.mu.Unlock()

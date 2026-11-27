@@ -173,7 +173,8 @@ func TestInstallPageInEnglishAndChinese(t *testing.T) {
 		"unsupported_os", "unsupported_architecture", "systemd_required", "panel_unreachable", "insufficient_resources", "insufficient_disk_space",
 		"node_not_connected", "ssh_connection_failed", "ssh_connection_refused", "ssh_preflight_failed", "node_identity_mismatch", "node_state_unavailable",
 		"node_retired", "host_firewall_configuration_failed", "nftables_install_failed", "agent_bundle_unavailable", "agent_transfer_failed", "node_enrollment_failed", "node_name_taken",
-		"systemd_install_failed", "ssh_target_refused", "a_code_from_tomorrow"} {
+		"systemd_install_failed", "ssh_target_refused", "subscription_host_unavailable", "subscription_host_activation_failed", "subscription_host_dns_mismatch",
+		"subscription_host_tunnel_down", "panel_link_not_configured", "a_code_from_tomorrow"} {
 		errs = append(errs, errorLabel(code))
 	}
 	errs = append(errs, edgeTimeoutMessage, edgeTimeoutLabel, userError(connect.NewError(connect.CodeFailedPrecondition, errors.New("ssh_target_refused")), ""))

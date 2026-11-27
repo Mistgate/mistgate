@@ -124,6 +124,23 @@ export const errorCodes = [
   // the root update helper follows /etc/mistgate/panel-update-channel (InstallPanelUpdate, FailedPrecondition): "channel=<selected>&allowed=<policy>"
   "panel_update_channel_not_allowed",
   "panel_update_channel_config_invalid",
+  // the subscription host (subhost.proto) and the changes that would leave it unfit (access): "sub_host_node_unfit: reason=<key of
+  // subhost.unfit.*>", "sub_host_inbound_unfit: node=<name>&reason=<key>"; the lists are comma-separated
+  "sub_host_wrong_state",
+  "sub_host_domain_invalid",
+  "sub_host_site_name_invalid",
+  "sub_host_node_unfit",
+  "sub_host_nodes_lack_link",
+  "sub_host_dns_mismatch",
+  "sub_host_return_url_required",
+  "sub_host_nodes_pending",
+  "sub_host_same_node",
+  "sub_host_in_use",
+  "sub_host_inbound_unfit",
+  // finishing a move before the next node can carry the subdomain: "sub_host_next_not_ready: not_ready=<steps, comma-separated>"
+  "sub_host_next_not_ready",
+  // proceeding without the CAA record before the panel has an ACME account to tie the waiver to
+  "sub_host_caa_account_pending",
 ] as const;
 
 /**
@@ -190,6 +207,43 @@ export function shareRefusalText(t: T, code: string, vars: Record<string, string
   return t(key, { protocol: "", ...vars });
 }
 
+const subHostSteps = ["host_offline", "host_error", "site_cert", "bridge", "panel_cert", "caa"];
+
+export const subHostUnfit = [
+  "retired",
+  "offline",
+  "agent_too_old",
+  "site_name_required",
+  "site_name_conflict",
+  "names_invalid",
+  "reality_foreign_target",
+  "hysteria2_site_443",
+  "port_443_unshareable",
+  "name_taken",
+  "front_down",
+  "identity_unavailable",
+  "bad_config",
+  "site_certificate_unavailable",
+];
+
+/** The words of a subscription host refusal: why a node cannot serve it (a key of "subhost.unfit.*"), and its lists spaced out. */
+function subHostVars(t: T, vars: Record<string, string>): Record<string, string> {
+  const reason = vars.reason ?? "";
+  const list = (v: string | undefined) => (v ?? "").split(",").filter(Boolean).join(", ");
+  return {
+    ...vars,
+    reason: subHostUnfit.includes(reason) ? t(`subhost.unfit.${reason as "offline"}`) : reason,
+    nodes: list(vars.nodes),
+    not_ready: (vars.not_ready ?? "")
+      .split(",")
+      .filter(Boolean)
+      .map((s) => (subHostSteps.includes(s) ? t(`set.domains.subHost.step.${s as "bridge"}`) : s))
+      .join("; "),
+    found: list(vars.found) || "—",
+    expected: list(vars.expected) || "—",
+  };
+}
+
 /** Our sentence for a message whose code is listed, else undefined. */
 function known(c: ConnectError, t: T): string | undefined {
   const code = errorCode(c.rawMessage) as (typeof errorCodes)[number];
@@ -220,7 +274,9 @@ function known(c: ConnectError, t: T): string | undefined {
             ? relayVars(t, vars)
             : code === "os_blocked"
               ? osVars(t, vars)
-              : vars;
+              : code.startsWith("sub_host_")
+                ? subHostVars(t, vars)
+                : vars;
   return t(`err.${code}`, filled);
 }
 

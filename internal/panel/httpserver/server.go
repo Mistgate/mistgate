@@ -111,6 +111,14 @@ type Config struct {
 	// AdminURL and SubscriptionBase are where the admin is reached and the base of the subscription links, as `mistgate
 	// setup` stored them: InstanceService shows them to the owner (Settings -> Domains), read-only.
 	AdminURL, SubscriptionBase string
+	// PublicTunnel and PublicTunnelTLS are the connections of the subscription host's subdomain (internal/panel/subhost) and
+	// their TLS: they get the public handler, but never the admin or the mTLS agent endpoint. nil = none.
+	PublicTunnel    net.Listener
+	PublicTunnelTLS *tls.Config
+	// PublicTunnelReady closes once a subscription host is set: the tunnel's server starts then, never on a panel without one.
+	PublicTunnelReady <-chan struct{}
+	// SubscriptionBaseNow, when set, is SubscriptionBase of the moment (a public address that changes while the panel runs).
+	SubscriptionBaseNow func() string
 
 	// MCP, if set, builds the handler of the MCP endpoint from the in-process admin API: the services
 	// behind the session middleware, request paths without the "/api" prefix. The result is served at <admin>/mcp, and only
@@ -290,7 +298,7 @@ func New(cfg Config, a *auth.Service, st *store.Store) (*Server, error) {
 	}
 
 	authPath, authHandler := a.Handler()
-	inst := &instanceAPI{st: st, log: cfg.Log, adminURL: cfg.AdminURL, subBase: cfg.SubscriptionBase}
+	inst := &instanceAPI{st: st, log: cfg.Log, adminURL: cfg.AdminURL, subBase: cfg.SubscriptionBase, subBaseNow: cfg.SubscriptionBaseNow}
 	instPath, instHandler := inst.handler()
 	s.api = apiRouter{{authPath, authHandler}, {instPath, instHandler}}
 	seen := map[string]bool{authPath: true, instPath: true}
@@ -487,7 +495,9 @@ func (s *Server) allow(l *ratelimit.Limiter, w http.ResponseWriter, r *http.Requ
 func (s *Server) Public() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = s.withPublicContext(r) // auth.ClientIPFrom for the mounts and the agent endpoint
-		if s.agentRequest(r) {
+		// Through a subscription host only the public surface: the admin and the mTLS agent endpoint are never exposed on a node.
+		tunneled := r.Context().Value(tunnelConnKey{}) != nil
+		if !tunneled && s.agentRequest(r) {
 			s.serveAgent(w, r) // its own limit
 			return
 		}
@@ -502,13 +512,13 @@ func (s *Server) Public() http.Handler {
 			s.agentLink.ServeHTTP(w, r)
 			return
 		}
-		if canonical && s.hostAdmin != nil && ctEqual(hostOnly(r.Host), s.cfg.AdminHost) {
+		if canonical && !tunneled && s.hostAdmin != nil && ctEqual(hostOnly(r.Host), s.cfg.AdminHost) {
 			if s.allow(s.adminLim, w, r) {
 				s.hostAdmin.ServeHTTP(w, r)
 			}
 			return
 		}
-		if canonical && s.prefixAdmin != nil && hasSecretPrefix(r.URL.Path, s.cfg.AdminPrefix) {
+		if canonical && !tunneled && s.prefixAdmin != nil && hasSecretPrefix(r.URL.Path, s.cfg.AdminPrefix) {
 			if s.allow(s.adminLim, w, r) {
 				s.prefixAdmin.ServeHTTP(w, r)
 			}
@@ -542,11 +552,16 @@ func (s *Server) agentLinkRequest(r *http.Request) bool {
 	if strings.HasPrefix(rel, "/link/") {
 		return len(strings.TrimPrefix(rel, "/link/")) > 0 && !strings.Contains(strings.TrimPrefix(rel, "/link/"), "/")
 	}
-	if r.Method != http.MethodGet || !strings.HasPrefix(rel, "/update/") {
+	if r.Method != http.MethodGet {
 		return false
 	}
-	parts := strings.Split(strings.TrimPrefix(rel, "/update/"), "/")
-	return len(parts) == 2 && parts[0] != "" && parts[1] != ""
+	for _, route := range []string{"/update/", "/fetch/"} { // the edge's update download; a link agent's fetch (fleet/link_fetch.go)
+		if strings.HasPrefix(rel, route) {
+			parts := strings.Split(strings.TrimPrefix(rel, route), "/")
+			return len(parts) == 2 && parts[0] != "" && parts[1] != ""
+		}
+	}
+	return false
 }
 
 func isWebSocketUpgrade(r *http.Request) bool {
@@ -726,7 +741,35 @@ func (s *Server) Serve(ctx context.Context, o ServeOptions) error {
 		ls = append(ls, listener{"acme-http", mk(o.ACMEHTTP, s.acmeHTTP(mgr, o.ACMEDomains, port), nil), false})
 	}
 
-	errc := make(chan error, len(ls))
+	errc := make(chan error, len(ls)+1)
+	if s.cfg.PublicTunnel != nil && s.cfg.PublicTunnelTLS != nil {
+		srv := mk("", s.Public(), nil)
+		srv.ConnContext = func(ctx context.Context, _ net.Conn) context.Context {
+			return context.WithValue(ctx, tunnelConnKey{}, true)
+		}
+		stopped := make(chan struct{})
+		go func() {
+			if s.cfg.PublicTunnelReady != nil {
+				select {
+				case <-s.cfg.PublicTunnelReady:
+				case <-stopped:
+					return
+				}
+			}
+			s.cfg.Log.Info("listening", "listener", "public-tunnel", "tls", true)
+			err := srv.Serve(tls.NewListener(s.cfg.PublicTunnel, s.cfg.PublicTunnelTLS))
+			if errors.Is(err, net.ErrClosed) { // the service closed its listener on the way out: a clean stop
+				err = http.ErrServerClosed
+			}
+			errc <- err
+		}()
+		defer func() {
+			close(stopped)
+			sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			srv.Shutdown(sctx)
+		}()
+	}
 	for _, l := range ls {
 		ln, err := net.Listen("tcp", l.srv.Addr)
 		if err != nil {
@@ -756,3 +799,6 @@ func (s *Server) Serve(ctx context.Context, o ServeOptions) error {
 	}
 	return first
 }
+
+// tunnelConnKey marks a request that came through a subscription host (Config.PublicTunnel).
+type tunnelConnKey struct{}

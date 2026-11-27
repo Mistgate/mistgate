@@ -14,6 +14,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"sort"
 	"strconv"
@@ -54,6 +55,8 @@ type DialIdentity struct {
 	NodeID         string
 	CertificateDER []byte
 	PrivateKey     *ecdsa.PrivateKey
+	// Panel: the panel calls a subscription host (its certificate is spiffe://panel/<id>); the proof is MakePanelProof.
+	Panel bool
 }
 
 type DialSpec struct {
@@ -89,6 +92,7 @@ type dialTiming struct {
 	targetTimeout  time.Duration
 	keepAlive      time.Duration
 	streamIdle     time.Duration
+	writeProgress  time.Duration
 	pendingWorkers int
 	retryJitter    func(time.Duration) time.Duration
 }
@@ -110,6 +114,7 @@ func defaultDialTiming() dialTiming {
 		targetTimeout:  BridgeTargetDialTimeout,
 		keepAlive:      BridgeKeepAlive,
 		streamIdle:     BridgeStreamIdleTimeout,
+		writeProgress:  BridgeProgressTimeout,
 		pendingWorkers: PendingWorkersPerConn,
 	}
 }
@@ -139,11 +144,27 @@ type Dialer struct {
 	clock       func() time.Time
 	panelActive bool
 	closed      bool
+	localDial   LocalDial
 }
+
+// LocalTargetNetwork is the network of a target the exit reaches through its local dial (SetLocalDial) rather than a port
+// of its own: the panel's listener of a subscription host's connections lives in its process.
+const LocalTargetNetwork = "panel"
+
+// LocalDial opens a connection to target for a person the entry carries; client is the person's address, invalid when the
+// entry does not pass it.
+type LocalDial func(ctx context.Context, target plugin.BridgeTarget, client netip.AddrPort) (net.Conn, error)
 
 func NewDialer(identity func() DialIdentity) *Dialer {
 	return &Dialer{identity: identity, runs: map[string]*dialRun{}, states: map[string]DialState{},
 		timing: defaultDialTiming(), clock: time.Now}
+}
+
+// SetLocalDial sets the dial of LocalTargetNetwork targets. Call it once, before the first Sync.
+func (d *Dialer) SetLocalDial(dial LocalDial) {
+	d.mu.Lock()
+	d.localDial = dial
+	d.mu.Unlock()
 }
 
 func (d *Dialer) SetClock(now func() time.Time) {
@@ -182,7 +203,7 @@ func (d *Dialer) Sync(ctx context.Context, specs []DialSpec) {
 			delete(desired, id)
 			continue
 		}
-		normalized, code := normalizeDial(spec.Dial)
+		normalized, code := normalizeDial(spec.Dial, d.localDial != nil)
 		if code != "" {
 			delete(d.runs, id)
 			run.cancel()
@@ -212,7 +233,7 @@ func (d *Dialer) Sync(ctx context.Context, specs []DialSpec) {
 			d.states[id] = st
 			continue
 		}
-		dial, code := normalizeDial(spec.Dial)
+		dial, code := normalizeDial(spec.Dial, d.localDial != nil)
 		if code != "" {
 			st := d.states[id]
 			st.PeerNodeID, st.Conns, st.Since, st.RTT, st.Error = id, 0, time.Time{}, 0, code
@@ -266,7 +287,8 @@ func sameDial(a, b plugin.BridgeDial) bool {
 		a.SNI == b.SNI && a.PinSHA256 == b.PinSHA256 && a.Path == b.Path && a.PanelVia == b.PanelVia
 }
 
-func normalizeDial(d plugin.BridgeDial) (plugin.BridgeDial, string) {
+// normalizeDial checks a dial; local says the dialer has a local dial (SetLocalDial), so LocalTargetNetwork targets are fine.
+func normalizeDial(d plugin.BridgeDial, local bool) (plugin.BridgeDial, string) {
 	if !nodeIDPattern.MatchString(d.EntryNodeID) || d.Host == "" || d.Port == 0 || !validBridgePath(d.Path) ||
 		len(d.Targets) == 0 || len(d.Targets) > maxBridgeListeners {
 		return plugin.BridgeDial{}, "bad_config"
@@ -288,7 +310,8 @@ func normalizeDial(d plugin.BridgeDial) (plugin.BridgeDial, string) {
 	}
 	seen := map[string]bool{}
 	for _, target := range d.Targets {
-		if !relayIDPattern.MatchString(target.RelayID) || target.Network != "tcp" || target.Port == 0 || seen[target.RelayID] {
+		if !relayIDPattern.MatchString(target.RelayID) || seen[target.RelayID] ||
+			!(target.Network == "tcp" && target.Port != 0 || local && target.Network == LocalTargetNetwork) {
 			return plugin.BridgeDial{}, "target_not_local"
 		}
 		seen[target.RelayID] = true
@@ -368,7 +391,7 @@ func (d *Dialer) runConnection(run *dialRun, slotCtx context.Context, index int)
 			delay = min(delay*2, d.timing.retryMax)
 			continue
 		}
-		transport := &http2.Transport{}
+		transport := newBridgeTransport(identity.Panel)
 		cc, err := transport.NewClientConn(conn)
 		if err != nil {
 			_ = conn.Close()
@@ -655,6 +678,7 @@ func (d *Dialer) pingLoop(ctx context.Context, run *dialRun, cc *http2.ClientCon
 
 type pairResponses struct {
 	relayID    string
+	client     netip.AddrPort // the person's address, when the entry passes it
 	down       *http.Response
 	up         *http.Response
 	downWriter *io.PipeWriter
@@ -867,6 +891,11 @@ func (d *Dialer) openPair(ctx context.Context, cancel context.CancelFunc, dial p
 		return nil, "", errors.New("bad bridge response")
 	}
 	responses.relayID = relayID
+	// A subscription host says whom it carries (ServeConfig.PassClient); anything that is no global unicast address (a
+	// loopback, link-local, multicast or unspecified one) is left out.
+	if client, err := netip.ParseAddrPort(responses.down.Header.Get(ClientHeader)); err == nil && passableClient(client) {
+		responses.client = netip.AddrPortFrom(client.Addr().Unmap(), client.Port())
+	}
 	return responses, "", nil
 }
 
@@ -906,7 +935,13 @@ func (d *Dialer) serveClient(run *dialRun, cc *http2.ClientConn, tracker *connTr
 		return
 	}
 	ctx, stopIdle := context.WithCancel(run.ctx)
-	targetConn, err := dialLocalTarget(ctx, target.Port, d.timing.targetTimeout, d.timing.keepAlive)
+	var targetConn net.Conn
+	var err error
+	if target.Network == LocalTargetNetwork && d.localDial != nil {
+		targetConn, err = d.localDial(ctx, target, responses.client)
+	} else {
+		targetConn, err = dialLocalTarget(ctx, target.Port, d.timing.targetTimeout, d.timing.keepAlive)
+	}
 	if err != nil {
 		stopIdle()
 		d.setError(run, "target_connect")
@@ -953,12 +988,22 @@ func (d *Dialer) bridgeLocal(ctx context.Context, run *dialRun, target plugin.Br
 
 func (d *Dialer) responseToTarget(ctx context.Context, run *dialRun, dst *idleConn, src io.Reader, tracker *connTracker) error {
 	buf := make([]byte, 32<<10)
+	// Only the panel's exit (a subscription host's in-memory targets) bounds a target's write progress; an agent's exit
+	// keeps the behaviour it always had.
+	progress := time.Duration(0)
+	if d.identity().Panel {
+		progress = d.timing.writeProgress
+	}
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		n, readErr := src.Read(buf)
 		if n > 0 {
+			// A target that stops reading for writeProgress loses the stream, as a person who stops reading does at the entry.
+			if progress > 0 {
+				_ = dst.SetWriteDeadline(time.Now().Add(progress))
+			}
 			if err := writeFull(dst, buf[:n]); err != nil {
 				return err
 			}
@@ -1002,6 +1047,30 @@ func (d *Dialer) targetToDown(ctx context.Context, run *dialRun, src *idleConn, 
 
 func dialTLS(ctx context.Context, dial plugin.BridgeDial, identity DialIdentity) (net.Conn, Proof, error) {
 	return dialTLSWithTimeout(ctx, dial, identity, BridgeDialTimeout, BridgeKeepAlive, nil)
+}
+
+// The exit's HTTP/2 receive windows, set rather than left to x/net's client defaults (4 MiB a stream, 1 GiB a connection),
+// which bound nothing. They travel inside TLS, so only the entry sees them. The entry's side stays sitehttp's, as every site's.
+const (
+	bridgeStreamWindow = 1 << 20
+	bridgeConnWindow   = 16 << 20
+	bridgeWriteTimeout = BridgeProgressTimeout // a TLS connection the entry stops reading from is closed
+)
+
+// newBridgeTransport is the exit's HTTP/2 client. The panel's exit (a subscription host's people, up to 400 on four
+// connections) announces explicit windows and a write timeout; x/net reads the windows from a net/http Transport it is
+// configured on. An agent's exit keeps x/net's defaults, as it always had.
+func newBridgeTransport(panel bool) *http2.Transport {
+	if !panel {
+		return &http2.Transport{}
+	}
+	t1 := &http.Transport{HTTP2: &http.HTTP2Config{MaxReceiveBufferPerStream: bridgeStreamWindow, MaxReceiveBufferPerConnection: bridgeConnWindow}}
+	t2, err := http2.ConfigureTransports(t1)
+	if err != nil { // only when t1 was configured already, which this one is not
+		t2 = &http2.Transport{}
+	}
+	t2.WriteByteTimeout = bridgeWriteTimeout
+	return t2
 }
 
 func dialTLSWithTimeout(ctx context.Context, dial plugin.BridgeDial, identity DialIdentity, timeout, keepAlive time.Duration, roots *x509.CertPool) (net.Conn, Proof, error) {
@@ -1062,7 +1131,11 @@ func dialTLSWithTimeout(ctx context.Context, dial plugin.BridgeDial, identity Di
 			return nil, Proof{}, errors.New("no_verification")
 		}
 		gotPin := sha256.Sum256(state.PeerCertificates[0].Raw)
-		if subtle.ConstantTimeCompare(wantPin, gotPin[:]) != 1 {
+		// A subscription host can switch from its pinned bootstrap leaf to ACME before the
+		// panel hears about it (including after a restart). Accept a trusted chain for the
+		// configured site name in that case, but keep regular relay pins strict.
+		if subtle.ConstantTimeCompare(wantPin, gotPin[:]) != 1 &&
+			!(identity.Panel && verifiedSiteChain(state.PeerCertificates, dial.SNI, roots)) {
 			_ = conn.Close()
 			return nil, Proof{}, errors.New("pin_mismatch")
 		}
@@ -1072,12 +1145,31 @@ func dialTLSWithTimeout(ctx context.Context, dial plugin.BridgeDial, identity Di
 		_ = conn.Close()
 		return nil, Proof{}, fmt.Errorf("tls_exporter: %w", err)
 	}
-	proof, err := MakeProof(dial.EntryNodeID, exporter, identity.CertificateDER, identity.PrivateKey)
+	makeProof := MakeProof
+	if identity.Panel {
+		makeProof = MakePanelProof
+	}
+	proof, err := makeProof(dial.EntryNodeID, exporter, identity.CertificateDER, identity.PrivateKey)
 	if err != nil {
 		_ = conn.Close()
 		return nil, Proof{}, err
 	}
 	return conn, proof, nil
+}
+
+func verifiedSiteChain(chain []*x509.Certificate, name string, roots *x509.CertPool) bool {
+	if name == "" {
+		return false
+	}
+	opts := x509.VerifyOptions{DNSName: name, Roots: roots}
+	if len(chain) > 1 {
+		opts.Intermediates = x509.NewCertPool()
+		for _, cert := range chain[1:] {
+			opts.Intermediates.AddCert(cert)
+		}
+	}
+	_, err := chain[0].Verify(opts)
+	return err == nil
 }
 
 func waitDial(ctx context.Context, wait time.Duration) bool {
@@ -1267,4 +1359,11 @@ func (t *connTracker) noteTaken(now time.Time) int {
 	}
 	t.taken = append(kept, now)
 	return len(t.taken)
+}
+
+// passableClient: a person's address an entry tells its exit (ClientHeader): a global unicast address with a port. Anything
+// else (loopback, link-local, multicast, unspecified, a zone) is never sent nor taken.
+func passableClient(client netip.AddrPort) bool {
+	a := client.Addr().Unmap()
+	return a.IsValid() && a.Zone() == "" && a.IsGlobalUnicast() && client.Port() != 0
 }

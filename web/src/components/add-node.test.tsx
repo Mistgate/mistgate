@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { StepUpRequiredSchema } from "@/gen/mistgate/admin/v1/auth_pb";
 import { NodeStatus } from "@/gen/mistgate/admin/v1/common_pb";
+import { SubscriptionHostState } from "@/gen/mistgate/subhost/v1/subhost_pb";
 import { fill, type T } from "@/i18n";
 import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
@@ -19,6 +20,7 @@ const checkSSH = vi.fn();
 const startNodeProvision = vi.fn();
 const getNodeProvision = vi.fn();
 const listNodeProvisionEvents = vi.fn();
+const getSubscriptionHost = vi.fn();
 const retryNodeProvision = vi.fn();
 const finishStepUp = vi.fn();
 // the saved access of other nodes: one with panelKeyFingerprint makes the panel key the default way in
@@ -29,6 +31,7 @@ vi.mock("@/lib/api", () => ({
   auth: { finishStepUp: (...a: unknown[]) => finishStepUp(...a), beginStepUp: vi.fn() },
   webauthnSupported: () => false,
   nodes: { createEnrollment: (...a: unknown[]) => createEnrollment(...a), getNode: (...a: unknown[]) => getNode(...a) },
+  subHost: { getSubscriptionHost: (...a: unknown[]) => getSubscriptionHost(...a) },
   provisioning: {
     getSSHFingerprint: (...a: unknown[]) => getSSHFingerprint(...a),
     checkSSH: (...a: unknown[]) => checkSSH(...a),
@@ -59,7 +62,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [createEnrollment, getNode, getSSHFingerprint, checkSSH, startNodeProvision, getNodeProvision, listNodeProvisionEvents, retryNodeProvision, finishStepUp, navigate]) m.mockReset();
+  for (const m of [createEnrollment, getNode, getSSHFingerprint, checkSSH, startNodeProvision, getNodeProvision, listNodeProvisionEvents, getSubscriptionHost, retryNodeProvision, finishStepUp, navigate]) m.mockReset();
   accessList = [];
   calm = true;
 });
@@ -93,6 +96,7 @@ async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
 
 async function open() {
   host = document.createElement("div");
+  if (!getSubscriptionHost.getMockImplementation()) getSubscriptionHost.mockResolvedValue({});
   document.body.append(host);
   root = createRoot(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -576,12 +580,17 @@ describe("the add-node window", () => {
   });
 
   const job = { id: "prv_1", nodeId: "nod_1", name: "de1", errorCode: "" };
-  async function startInstall(over: Partial<typeof preflight & { nftables: boolean }> = {}) {
+  async function startInstall(over: Partial<typeof preflight & { nftables: boolean }> = {}, asHost = false) {
     getSSHFingerprint.mockResolvedValue({ host: "de1.example.com", port: 22, fingerprint: "SHA256:server-key" });
     checkSSH.mockResolvedValue({ preflight: { distribution: "Ubuntu", version: "22.04", architecture: "amd64", cpuCount: 2, memoryBytes: 1n, diskAvailableBytes: 1n, systemd: true, panelReachable: true, nftables: true, ...over } });
     startNodeProvision.mockResolvedValue({ job: { ...job, state: "queued", phase: "queued" } });
     await open();
     await fillServer();
+    if (asHost) {
+      await click(document.querySelector('[role="checkbox"]'));
+      await type(input("sub.example.com"), "sub.example.com");
+      expect(text()).toContain(en["set.domains.subHost.installAfter"]);
+    }
     await probe();
     const password = () => document.querySelector<HTMLInputElement>('input[type="password"]')!;
     await type(password(), "check-only-secret");
@@ -626,6 +635,19 @@ describe("the add-node window", () => {
     await click(button("Open node"));
     expect(navigate).toHaveBeenCalledWith({ to: "/nodes/$id", params: { id: "nod_1" } });
   }, 10_000);
+
+  it("a completed host install points to Domains when the subscription host is still waiting for CAA", async () => {
+    getSubscriptionHost.mockResolvedValueOnce({ host: { state: SubscriptionHostState.OFF } })
+      .mockResolvedValue({ host: { state: SubscriptionHostState.ON, nodeId: "nod_1", ready: false, notReady: ["caa"] } });
+    getNodeProvision.mockResolvedValue({ job: { ...job, state: "completed", phase: "completed" } });
+    listNodeProvisionEvents.mockResolvedValue({ events: [] });
+    getNode.mockResolvedValue({ inbounds: [] });
+    await startInstall({}, true);
+    expect(text()).toContain(en["node.ssh.done"]);
+    expect(text()).toContain(en["set.domains.subHost.installPending"]);
+    await click(button("Settings → Domains"));
+    expect(navigate).toHaveBeenCalledWith({ to: "/settings/$section", params: { section: "domains" } });
+  });
 
   it("has a stage of its own for the nftables package when the server has none, and where it stopped", async () => {
     getNodeProvision.mockResolvedValue({ job: { ...job, state: "failed", phase: "failed", errorCode: "nftables_install_failed" } });

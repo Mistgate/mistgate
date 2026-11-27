@@ -93,7 +93,7 @@ func TestPrevLinkConsecutiveSwitches(t *testing.T) {
 						t.Fatal("first session did not use B")
 					}
 					if healthy {
-						committedTo(t, h, b, a)
+						committedTo(t, h, b, a, false)
 						eventually(t, func() bool { return readMeta(t, h.dir).LinkHealthy }, "persisted healthy B")
 						h.a.applyPanelLink(&pb.NodeSettings{PanelLinkUrl: c})
 						endSession(t, h)
@@ -118,12 +118,12 @@ func TestPrevLinkConsecutiveSwitches(t *testing.T) {
 					if healthy {
 						want, prefix = b, linkPrefix('b')
 					}
-					committedTo(t, h, c, want)
+					committedTo(t, h, c, want, false)
 					end = startLinkTurn(t, h, via)
 					if lp.session(t) != prefix {
 						t.Fatal("short C session did not fall back to the last healthy address")
 					}
-					committedTo(t, h, want, "")
+					committedTo(t, h, want, "", false)
 					endSession(t, h)
 					_ = end()
 				})
@@ -155,7 +155,7 @@ func TestPrevLinkHealthStartsAtHelloAck(t *testing.T) {
 		t.Fatal("first session did not use B")
 	}
 	_ = end()
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 	end = startLinkTurn(t, h, "")
 	if lp.session(t) != linkPrefix('a') {
 		t.Fatal("dial time incorrectly made the short B session healthy")
@@ -187,14 +187,14 @@ func TestPrevLinkBridgeCurrentShortAndHealthy(t *testing.T) {
 				t.Fatal("first bridged session did not use B")
 			}
 			if healthy {
-				committedTo(t, h, b, "")
+				committedTo(t, h, b, "", false)
 				endSession(t, h)
 			}
 			if err := end(); errors.Is(err, errSwitchTransport) {
 				t.Fatal("unexpected transport switch")
 			}
 			if !healthy {
-				committedTo(t, h, b, a)
+				committedTo(t, h, b, a, false)
 			}
 			end = startLinkTurn(t, h, via)
 			want := linkPrefix('a')
@@ -218,7 +218,7 @@ func TestPanelLinkPendingCLIWriteSurvivesSessionPersistence(t *testing.T) {
 	if lp.session(t) != linkPrefix('b') {
 		t.Fatal("first session did not use B")
 	}
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 	cURL, _ := url.Parse(b)
 	cURL.Path = "/" + linkPrefix('c') + "/"
 	c := cURL.String()
@@ -238,7 +238,7 @@ func TestPanelLinkPendingCLIWriteSurvivesSessionPersistence(t *testing.T) {
 	if lp.session(t) != linkPrefix('c') {
 		t.Fatal("restarted agent did not follow the pending CLI address")
 	}
-	committedTo(t, h, c, b)
+	committedTo(t, h, c, b, false)
 	endSession(t, h)
 	_ = end()
 }
@@ -320,7 +320,7 @@ func TestPrevLinkBridgeShortCurrentDoesNotStarveNext(t *testing.T) {
 	if lp.session(t) != linkPrefix('c') {
 		t.Fatal("repeated previous/current failures starved the pending next address")
 	}
-	committedTo(t, h, c, a)
+	committedTo(t, h, c, a, false)
 	eventually(t, func() bool { return readMeta(t, h.dir).LinkHealthy }, "healthy pending address through bridge")
 	if lp.dialsTo('a') != 1 || lp.dialsTo('b') != 1 || lp.dialsTo('c') != 1 {
 		t.Fatal("pending next address did not get the second bridge turn")
@@ -377,7 +377,7 @@ func TestPanelLinkInFlightPromotionRespectsCLIIntent(t *testing.T) {
 				t.Fatal("next turn did not follow the latest CLI intent")
 			}
 			if reassert {
-				committedTo(t, h, b, a)
+				committedTo(t, h, b, a, false)
 			}
 			endSession(t, h)
 			_ = end()
@@ -507,7 +507,7 @@ func TestPanelLinkHealthDeadlineIncludesPromotion(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("session did not finish after promotion")
 	}
-	committedTo(t, h, b, a)
+	committedTo(t, h, b, a, false)
 	if !h.a.sessionHealthy() || h.a.currentFailed || !readMeta(t, h.dir).LinkHealthy {
 		t.Fatal("HelloAck-based health classification and persisted proof disagree after promotion wait")
 	}
@@ -565,9 +565,9 @@ func TestPrevLinkInFlightRollbackConsumesOnlyMatchingCLIIntent(t *testing.T) {
 				t.Fatal("next turn did not follow the post-rollback intent")
 			}
 			if unrelated {
-				committedTo(t, h, request, a)
+				committedTo(t, h, request, a, false)
 			} else {
-				committedTo(t, h, a, "")
+				committedTo(t, h, a, "", false)
 			}
 			endSession(t, h)
 			_ = end()
@@ -592,7 +592,7 @@ func TestPrevLinkPendingRetainedFallbackAfterRestart(t *testing.T) {
 			if lp.session(t) != linkPrefix('b') {
 				t.Fatal("first switch did not use B")
 			}
-			committedTo(t, h, b, a)
+			committedTo(t, h, b, a, false)
 			if healthy {
 				eventually(t, func() bool { return readMeta(t, h.dir).LinkHealthy }, "persisted proof of B")
 			}
@@ -615,7 +615,7 @@ func TestPrevLinkPendingRetainedFallbackAfterRestart(t *testing.T) {
 			if healthy {
 				prev = b
 			}
-			committedTo(t, h, a, prev)
+			committedTo(t, h, a, prev, false)
 			saved := readMeta(t, h.dir)
 			if saved.PrevLink == saved.Link || saved.LinkHealthy ||
 				(!healthy && saved.LinkSince != 0) || (healthy && saved.LinkSince == 0) {

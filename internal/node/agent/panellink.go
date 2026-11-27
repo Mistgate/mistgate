@@ -17,9 +17,6 @@ import (
 // "Did not hold" means no HelloAck, or less than healthyAfter elapsed since HelloAck. Dialing and authentication time
 // never count as health. The direct path and bridge use the same rule, including the session that commits a new address.
 //
-// Only a link node (one enrolled over the link: Meta.Link set) follows a new address. An mTLS node ignores it: following
-// it would make the node link-only, with no way back to mTLS once the previous address expires.
-//
 // The previous address is not kept for ever: its domain may later belong to someone else, and the node would keep
 // knocking on it. Once the new address has worked for prevAddressKeep the agent forgets it. "Has worked for" is
 // approximated as: a session over the current address stays up healthyAfter past its HelloAck (a healthy session)
@@ -47,27 +44,21 @@ func (a *Agent) linkURL() string {
 	return a.cfg.LinkURL
 }
 
-// nextLink is the new link address to try, "" for none. An mTLS node has none, whatever agent.json says.
 func (a *Agent) nextLink() string {
 	a.metaMu.Lock()
 	defer a.metaMu.Unlock()
-	if a.meta.Link == "" {
-		return ""
-	}
 	return a.meta.NextLink
 }
 
-// prevLink is the previous link address, "" for none.
-func (a *Agent) prevLink() string {
+// prevAddress is the previous panel address: a link base, or mtls for the pinned mTLS endpoint ("", false: none).
+func (a *Agent) prevAddress() (link string, mtls bool) {
 	a.metaMu.Lock()
 	defer a.metaMu.Unlock()
-	return a.meta.PrevLink
+	return a.meta.PrevLink, a.meta.PrevMTLS
 }
 
-// applyPanelLink takes in NodeSettings.panel_link_url, from a HelloAck or a DesiredState. A new address is saved as
-// Meta.NextLink and tried at the next reconnect; the session it came in goes on. fresh: a new address was saved (a
-// HelloAck session then ends at once, before it started any work: runSession). An empty field changes nothing, and an
-// mTLS node ignores the address.
+// applyPanelLink saves a panel-supplied next address for a link node. A fresh HelloAck request ends its session early;
+// DesiredState leaves the session running. An empty address or one sent to an mTLS node is ignored.
 func (a *Agent) applyPanelLink(st *pb.NodeSettings) (fresh bool) {
 	raw := st.GetPanelLinkUrl()
 	if raw == "" {
@@ -120,7 +111,7 @@ func (a *Agent) linkNodeSession(ctx context.Context, via string) error {
 	a.triedPrev = false
 	if a.currentFailed {
 		a.currentFailed = false
-		if prev := a.prevLink(); prev != "" && (!triedPrev || a.nextLink() == "") {
+		if prev, mtls := a.prevAddress(); (prev != "" || mtls && via == "") && (!triedPrev || a.nextLink() == "") {
 			a.triedPrev = true
 			epoch := a.sessionEpoch.Load()
 			err := a.prevSession(ctx, prev, via)
@@ -212,9 +203,6 @@ func (a *Agent) nextLinkSession(ctx context.Context, next, via string) error {
 func (a *Agent) commitNextLink(next, revision string) bool {
 	a.metaMu.Lock()
 	defer a.metaMu.Unlock()
-	if a.meta.Link == "" {
-		return false
-	}
 	promoted, err := promoteNextLink(a.cfg.StateDir, &a.meta, next, revision, a.linkNow().Unix())
 	if err != nil {
 		a.log.Error("new panel link address not saved", "err", err)
@@ -235,14 +223,14 @@ func (a *Agent) commitNextLink(next, revision string) bool {
 func (a *Agent) confirmHealthyLink(link string) {
 	a.metaMu.Lock()
 	defer a.metaMu.Unlock()
-	if a.meta.Link != link || a.meta.PrevLink == "" {
+	if a.meta.Link != link || (a.meta.PrevLink == "" && !a.meta.PrevMTLS) {
 		return
 	}
 	dirty := !a.meta.LinkHealthy
 	a.meta.LinkHealthy = true
 	expired := a.linkNow().Sub(time.Unix(a.meta.LinkSince, 0)) >= prevAddressKeep
 	if expired {
-		a.meta.PrevLink, a.meta.LinkSince = "", 0
+		a.meta.PrevLink, a.meta.PrevMTLS, a.meta.LinkSince = "", false, 0
 		dirty = true
 	}
 	if !dirty {
@@ -257,11 +245,19 @@ func (a *Agent) confirmHealthyLink(link string) {
 	}
 }
 
-// prevSession runs a session over the previous link address prev. Once its HelloAck arrives the previous address is
+// prevSession runs a session over the previous address. Once its HelloAck arrives the previous address is
 // the current one again. A failure is an ordinary connection failure (backoff), and the next turn uses the current
 // address.
 func (a *Agent) prevSession(ctx context.Context, prev, via string) error {
 	a.log.Info("the panel address does not answer; trying the previous one", "via", via)
+	if prev == "" { // mTLS fallback is attempted directly, as before.
+		return a.mtlsSessionOn(ctx, "", func() error {
+			if !a.commitPrevLink(prev) {
+				return errSwitchTransport
+			}
+			return nil
+		})
+	}
 	err := a.linkAddressSession(ctx, prev, via, func() bool { return a.commitPrevLink(prev) })
 	if errors.Is(err, errLinkNotEstablished) {
 		return fmt.Errorf("previous panel link address: %v", err) // not errLinkNotEstablished: no mTLS hold period for it
@@ -282,7 +278,11 @@ func (a *Agent) commitPrevLink(prev string) bool {
 		return false
 	}
 	a.leftLink = a.cfg.LinkURL
-	a.cfg.LinkURL = prev
+	if prev == "" {
+		a.cfg.LinkURL = a.configLink
+	} else {
+		a.cfg.LinkURL = prev
+	}
 	a.log.Info("back on the previous panel address")
 	return true
 }

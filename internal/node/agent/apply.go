@@ -71,6 +71,7 @@ func (a *Agent) applyDesired(ctx context.Context, ds *pb.DesiredState) *pb.Apply
 	a.clearChangedApplyMarkers(ds, next)
 	if ds.Settings != nil {
 		a.settings.Store(ds.Settings)
+		a.applySubHost(ds.Settings) // before the fronts are planned below
 		if ds.Settings.GetOsStatus() {
 			a.wakeOsStatusReader()
 		}
@@ -207,6 +208,7 @@ func (a *Agent) reconcile(ctx context.Context, next *model, force map[string]boo
 	}
 	a.syncTCPClaims(ctx, claimedTCP) // a Hysteria2 site gives its TCP port up here, before the front binds it
 	a.syncFronts(fronts)
+	a.syncHost(ctx, fronts)
 	now := a.now()
 	results := make([]*pb.InboundResult, 0, len(next.inbounds))
 	for _, id := range next.ids() {

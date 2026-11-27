@@ -37,6 +37,7 @@ import { fa as fleetuiFa } from "./fleetui";
 import { fa as clientlogsFa } from "./clientlogs";
 import { fa as trusttunnelFa } from "./trusttunnel";
 import { fa as tcpshareFa } from "./tcpshare";
+import { fa as subhostFa } from "./subhost";
 import { fa as shellFa } from "./shell";
 import { fa as nodesviewFa } from "./nodesview";
 import { fa as nodeswaysFa } from "./nodesways";
@@ -274,7 +275,7 @@ const core: CoreMessages = {
   "err.node_offline": "نود متصل نیست. وقتی ایجنتش برگشت دوباره تلاش کن.",
   "err.agent_too_old": "ایجنت این نود برای این کار خیلی قدیمی است. در صفحهٔ «به‌روزرسانی‌ها» به‌روزش کن.",
   "err.node_retired": "این نود از رده خارج شده است.",
-  "err.sub_address_missing": "آدرس لینک اشتراک تنظیم نشده است. `mistgate setup` آن را روی سرور پنل تنظیم می‌کند.",
+  "err.sub_address_missing": "نشانی اشتراک هنوز آماده نیست. «تنظیمات ← دامنه‌ها» را بررسی کن.",
   "err.preset_is_default": "این پیش‌تنظیم پیش‌فرض است. اول یکی دیگر را پیش‌فرض کن.",
   "err.preset_builtin": "پیش‌تنظیم داخلی را نمی‌شود حذف کرد.",
   "field.port.out_of_range": "پورت از 1 تا 65535 است",
@@ -326,4 +327,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "گواهی Let’s Encrypt برای نشانی IP هنوز در دسترس نیست: دامنه یا گواهی خودامضا را انتخاب کن",
 };
 
-export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...probesFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa, ...osupdatesFa, ...fleetuiFa, ...clientlogsFa, ...trusttunnelFa, ...tcpshareFa, ...shellFa, ...overviewFa, ...nodesviewFa, ...windowsFa, ...nodepageFa, ...userslistFa, ...userspageFa, ...usersgroupFa, ...usersextraFa, ...decoysitesFa, ...planwordsFa, ...nodeswaysFa, ...nodewaysFa, ...profilespageFa, ...healthpageFa, ...reachpageFa, ...profilesrvFa, ...profilenewFa, ...subspnFa, ...subshxFa, ...subsrtFa, ...subsdnsFa, ...updatespageFa, ...settingspageFa, ...aipageFa, ...igpageFa, ...aspageFa, ...nodeshareFa, ...channelFa, ...countrynowFa, ...sniFa };
+export const fa: Messages = { ...core, ...opsFa, ...usersFa, ...securityFa, ...profilesFa, ...subsFa, ...healthFa, ...updatesFa, ...awgFa, ...warpFa, ...integrationsFa, ...telegramFa, ...portsFa, ...editionFa, ...decoyFa, ...bulkFa, ...countryFa, ...probesFa, ...connectionsFa, ...journalFa, ...relayFa, ...waysFa, ...tgproxyFa, ...clientcompatFa, ...protocolsFa, ...aiFa, ...graphFa, ...waysgraphFa, ...fleetmapFa, ...observabilityFa, ...debugFa, ...resourcesFa, ...tasksFa, ...followupFa, ...osupdatesFa, ...fleetuiFa, ...clientlogsFa, ...trusttunnelFa, ...tcpshareFa, ...subhostFa, ...shellFa, ...overviewFa, ...nodesviewFa, ...windowsFa, ...nodepageFa, ...userslistFa, ...userspageFa, ...usersgroupFa, ...usersextraFa, ...decoysitesFa, ...planwordsFa, ...nodeswaysFa, ...nodewaysFa, ...profilespageFa, ...healthpageFa, ...reachpageFa, ...profilesrvFa, ...profilenewFa, ...subspnFa, ...subshxFa, ...subsrtFa, ...subsdnsFa, ...updatespageFa, ...settingspageFa, ...aipageFa, ...igpageFa, ...aspageFa, ...nodeshareFa, ...channelFa, ...countrynowFa, ...sniFa };

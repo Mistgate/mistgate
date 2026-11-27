@@ -18,7 +18,7 @@ func TestHelloInfoCleansNodeReportedDisplayText(t *testing.T) {
 		LastUpdate: &agentv1.LastUpdate{Outcome: agentv1.UpdateOutcome_UPDATE_OUTCOME_FAILED, FromVersion: "v1\u202e.0", Reason: "bad\u2066signature"},
 	}
 
-	info := helloInfo(hello)
+	info := helloInfo(hello, true)
 	if info.AgentVersion != "v1.2" || info.Facts.Hostname != "de1" || info.Facts.OS != "Debian" || info.Facts.Kernel != "6.1.0" || info.Facts.Engines[0].Protocol != "awg" {
 		t.Fatalf("node display text kept format controls: %+v", info)
 	}

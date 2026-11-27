@@ -322,7 +322,7 @@ func (c *SessionCore) hello(ctx context.Context, tr *coreTransition, event Sessi
 	if h.NodeId != "" && h.NodeId != tr.state.NodeID {
 		c.f.log.Warn("hello names another node than the certificate", "code", "node_identity_mismatch", "cert_node", tr.state.NodeID)
 	}
-	info := helloInfo(h)
+	info := helloInfo(h, c.f.cfg.Remote == nil)
 	prev, acked, err := c.f.st.NodeHello(ctx, tr.state.NodeID, tr.state.OwnerGeneration, info, event.At)
 	if errors.Is(err, store.ErrNodeRetired) {
 		tr.Close = &SessionClose{Class: CloseFailedPrecondition, Reason: "node retired"}
@@ -625,6 +625,7 @@ func (c *SessionCore) stats(ctx context.Context, tr *coreTransition, seq uint64,
 		c.l3Stats(ctx, tr.state, st, out.InboundIDs, now)
 		c.f.recordBridgeReports(ctx, tr.state.NodeID, st.Bridges, now)
 		c.f.recordSharedPorts(ctx, tr.state.NodeID, st.SharedPorts, now)
+		c.f.recordSubHost(tr.state.NodeID, st.GetSubHost())
 		if out.OffNode > 0 || out.Clamped > 0 {
 			c.statsAdjusted(ctx, tr.state, out.OffNode, out.Clamped, now)
 		}

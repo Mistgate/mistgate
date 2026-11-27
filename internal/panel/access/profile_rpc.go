@@ -451,6 +451,9 @@ func (s *Service) UpdateProfile(ctx context.Context, req *connect.Request[adminv
 			if err != nil {
 				return nil, err
 			}
+			if err := s.hostRefusalOf(ctx, changed.node.ID, changed.node.Name, changed.spec, true); err != nil {
+				return nil, err
+			}
 			portWarnings = append(portWarnings, warnings...)
 			if override {
 				lossyOverrides = append(lossyOverrides, changed)
@@ -1308,6 +1311,9 @@ func (s *Service) CreateInbound(ctx context.Context, req *connect.Request[adminv
 			return nil, s.internal("read UDP port checks", err)
 		}
 	}
+	if err := s.hostRefusalOf(ctx, f.Node.ID, f.Node.Name, spec, true); err != nil {
+		return nil, err
+	}
 	warnings, lossyOverride, err := s.admitInbound(ctx, inboundAdmission{node: f.Node, profile: f.Profile.Name, spec: spec, publicPort: f.Inbound.PublicPort, others: others,
 		checks: portChecks[f.Node.ID], moved: true, check: m.ValidateOnly, allowLossy: m.AllowLossyPort})
 	if err != nil {
@@ -1424,6 +1430,9 @@ func (s *Service) UpdateInbound(ctx context.Context, req *connect.Request[adminv
 		if err != nil {
 			return nil, s.internal("read UDP port checks", err)
 		}
+	}
+	if err := s.hostRefusalOf(ctx, f.Node.ID, f.Node.Name, spec, in.Enabled); err != nil {
+		return nil, err
 	}
 	wasSite443 := oldEnabled && oldErr == nil && vlessSite443(oldSpec, was.PublicPort)
 	if in.Enabled {
@@ -1545,6 +1554,12 @@ func (s *Service) DeleteInbound(ctx context.Context, req *connect.Request[adminv
 	// node keeps it (see CreateInbound); re-sealed here under the pair's AAD, in the delete's own transaction.
 	retain := func(enc []byte, profileID, nodeID string) ([]byte, error) {
 		return s.retainKey(enc, req.Msg.InboundId, profileID, nodeID)
+	}
+	if ierr == nil {
+		node, _ := a.Node(ctx, in.NodeID)
+		if err := s.hostRefusalOfDelete(ctx, in.NodeID, node.Name, in.ID); err != nil {
+			return nil, err
+		}
 	}
 	relays, err := s.st.RelayLinks(ctx, store.RelayFilter{InboundID: req.Msg.InboundId}) // they go with the server (foreign key)
 	if err != nil {

@@ -122,6 +122,10 @@ const (
 	// PanelLink: a link node follows NodeSettings.panel_link_url to a new panel link address. Only a link node lists it: an mTLS
 	// node ignores the address.
 	PanelLink = "panel-link/1"
+	// LinkFetch: a link-only agent fetches updates and the network table over its authenticated link session.
+	LinkFetch = "link-fetch/1"
+	// SubHost: the agent can route a subscription domain to the panel over the bridge.
+	SubHost = "sub-host/1"
 	// OSStatus advertises the read-only OS snapshot stream. It is deliberately not os-update/1: an agent that reads the system can
 	// be unable to run a job. OSUpdate: the agent runs OS jobs on request (agent.proto "OS UPDATES").
 	OSStatus = "os-status/1"

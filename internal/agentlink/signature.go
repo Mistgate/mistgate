@@ -9,12 +9,13 @@ import (
 )
 
 const (
-	agentDomain   = "mistgate-agent-link/1\x00"
-	agentDomainV2 = "mistgate-agent-link/2\x00"
-	panelDomain   = "mistgate-panel-link/1\x00"
-	bridgeDomain  = "mistgate-bridge/1\x00"
-	scalarSize    = 32
-	signatureSize = 2 * scalarSize
+	agentDomain       = "mistgate-agent-link/1\x00"
+	agentDomainV2     = "mistgate-agent-link/2\x00"
+	panelDomain       = "mistgate-panel-link/1\x00"
+	bridgeDomain      = "mistgate-bridge/1\x00"
+	panelBridgeDomain = "mistgate-sub-host/1\x00"
+	scalarSize        = 32
+	signatureSize     = 2 * scalarSize
 )
 
 // AgentDigest hashes the mistgate-agent-link/1 domain, NUL-separated node ID and audience, and panel nonce with SHA-256.
@@ -44,6 +45,18 @@ func BridgeDigest(entryNodeID string, exporter []byte) []byte {
 	message = append(message, bridgeDomain...)
 	message = append(message, exporter...)
 	message = append(message, entryNodeID...)
+	h := sha256.Sum256(message)
+	return h[:]
+}
+
+// PanelBridgeDigest is BridgeDigest in the panel's own domain (mistgate-sub-host/1): the panel, as the exit of a subscription
+// host's bridge, signs it with its short fleet certificate (design/adr/0018-panel-behind-nat.md). A bridge proof never
+// verifies as a panel proof, nor the other way round.
+func PanelBridgeDigest(hostNodeID string, exporter []byte) []byte {
+	message := make([]byte, 0, len(panelBridgeDomain)+len(exporter)+len(hostNodeID))
+	message = append(message, panelBridgeDomain...)
+	message = append(message, exporter...)
+	message = append(message, hostNodeID...)
 	h := sha256.Sum256(message)
 	return h[:]
 }

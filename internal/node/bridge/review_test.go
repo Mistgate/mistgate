@@ -529,7 +529,7 @@ func TestBridgeProofCacheExpiresWithCertificate(t *testing.T) {
 	certHash := sha256.Sum256(proof.CertificateDER)
 	sigHash := sha256.Sum256(proof.Signature)
 	e.authCache[key] = cachedProof{exitID: "nod_de1", certHash: certHash, sigHash: sigHash, notAfter: expiredLeaf.NotAfter, last: now}
-	if _, err := e.verifyRequest("nod_msk1", exporter, proof, pki.roots, map[string]struct{}{"nod_de1": {}}, now); err == nil {
+	if _, err := e.verifyRequest(PeerAgents, "nod_msk1", exporter, proof, pki.roots, map[string]struct{}{"nod_de1": {}}, now); err == nil {
 		t.Fatal("an expired proof was accepted from the authentication cache")
 	}
 }
@@ -737,6 +737,49 @@ func TestReview11_DERPinEmptySNIAndTrustedRoots(t *testing.T) {
 	if conn, _, err = dialTLSWithTimeout(ctx, base, identity, time.Second, time.Second, nil); err == nil {
 		_ = conn.Close()
 		t.Fatal("a non-system test CA was accepted without a pin or explicit roots")
+	}
+}
+
+func TestSubscriptionHostBridgeAcceptsTrustedSiteAfterBootstrapPinChanges(t *testing.T) {
+	pki := newTestPKI(t)
+	server := httptest.NewUnstartedServer(http.NotFoundHandler())
+	server.EnableHTTP2 = true
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{pki.serverCert}}
+	server.StartTLS()
+	defer server.Close()
+	addr := server.Listener.Addr().(*net.TCPAddr)
+	bootstrap := newTestPKI(t)
+	dial := plugin.BridgeDial{EntryNodeID: "nod_msk1", Host: addr.IP.String(), Port: uint16(addr.Port), SNI: "msk1.example", PinSHA256: bootstrap.pin}
+	panel := DialIdentity{NodeID: PanelPeerID, CertificateDER: pki.exitDER, PrivateKey: pki.exitKey, Panel: true}
+	agent := DialIdentity{NodeID: "nod_de1", CertificateDER: pki.exitDER, PrivateKey: pki.exitKey}
+	for _, tc := range []struct {
+		name     string
+		identity DialIdentity
+		sni      string
+		roots    *x509.CertPool
+		want     string
+	}{
+		{"new trusted leaf", panel, dial.SNI, pki.roots, ""},
+		{"untrusted CA", panel, dial.SNI, bootstrap.roots, "pin_mismatch"},
+		{"wrong site name", panel, "another.example", pki.roots, "pin_mismatch"},
+		{"no site name", panel, "", pki.roots, "pin_mismatch"},
+		{"regular relay keeps its pin", agent, dial.SNI, pki.roots, "pin_mismatch"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := dial
+			d.SNI = tc.sni
+			conn, _, err := dialTLSWithTimeout(context.Background(), d, tc.identity, time.Second, time.Second, tc.roots)
+			if conn != nil {
+				_ = conn.Close()
+			}
+			if tc.want == "" {
+				if err != nil || conn == nil {
+					t.Fatalf("could not reconnect with the old bootstrap pin: %v", err)
+				}
+			} else if err == nil || err.Error() != tc.want {
+				t.Fatalf("got %v, want %s", err, tc.want)
+			}
+		})
 	}
 }
 

@@ -142,7 +142,7 @@ func (h *handler) crossOrigin(r *http.Request) bool {
 		unsafe.Method = http.MethodPost
 		r = unsafe
 	}
-	return h.cop.Check(r) != nil
+	return h.checkOrigin(r) != nil
 }
 
 func (h *handler) serveClientLeave(w http.ResponseWriter, r *http.Request, dev store.AccessDevice, keyHash []byte, client string, locked bool) {

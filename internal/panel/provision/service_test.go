@@ -256,7 +256,7 @@ func TestRetryNodeProvisionTakesCancelledJobsButNotRetiredNodes(t *testing.T) {
 	if err := retry(); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("retry of a queued job = %v", err)
 	}
-	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now); err != nil {
+	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := retry(); err != nil {
@@ -265,7 +265,7 @@ func TestRetryNodeProvisionTakesCancelledJobsButNotRetiredNodes(t *testing.T) {
 	if got, _ := st.NodeProvisionJob(ctx, job.ID); got.State != "queued" || len(got.Secret) == 0 {
 		t.Fatalf("retried job = %+v", got)
 	}
-	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now); err != nil {
+	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now, nil); err != nil {
 		t.Fatal(err)
 	}
 	manager.state = "retired"
@@ -491,4 +491,8 @@ func TestPlainTextCountsCharacters(t *testing.T) {
 	if !validPlainText(strings.Repeat("я", 100), 100) || validPlainText(strings.Repeat("я", 101), 100) || validPlainText("bad\xff", 100) {
 		t.Fatal("validPlainText must count characters, not bytes, and refuse invalid UTF-8")
 	}
+}
+
+func (testNodeManager) EnrollInSession(context.Context, string, []byte) (string, []byte, []byte, error) {
+	return "", nil, nil, errors.New("no offline enrolment in this test")
 }

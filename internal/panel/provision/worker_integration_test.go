@@ -1,6 +1,7 @@
 package provision
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -388,7 +389,17 @@ type e2eNodeManager struct {
 	state           string
 	enrollmentToken string
 	connected       bool
+	enrollments     int      // tokens issued
+	sessionCSRs     [][]byte // what EnrollInSession was given
 }
+
+// What EnrollInSession answers: the node of the job the subscription host tests seed, and its certificates.
+const e2eSessionNodeID = "nod_hhhhhhhhhhhhhhhhhhhhhhhhhh"
+
+var (
+	e2eSessionCert = []byte("-----BEGIN CERTIFICATE-----\nbm9kZQ==\n-----END CERTIFICATE-----\n")
+	e2eSessionCA   = []byte("-----BEGIN CERTIFICATE-----\nY2E=\n-----END CERTIFICATE-----\n")
+)
 
 func TestWaitOnlineStopsWhenNodeIsRetired(t *testing.T) {
 	manager := &e2eNodeManager{state: "retired"}
@@ -452,6 +463,7 @@ func (m *e2eNodeManager) CreateProvisionEnrollment(_ context.Context, _ NodeSpec
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.state, m.enrollmentToken = "pending", "one-time-enrollment-secret"
+	m.enrollments++
 	return m.enrollmentToken, strings.Repeat("a", 64), nil
 }
 
@@ -551,4 +563,15 @@ func acceptProvisionSSH(t *testing.T, listener net.Listener, config *ssh.ServerC
 			}
 		}(conn)
 	}
+}
+
+func (m *e2eNodeManager) EnrollInSession(_ context.Context, token string, csr []byte) (string, []byte, []byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if token == "" || token != m.enrollmentToken {
+		return "", nil, nil, errors.New("enrolment token refused")
+	}
+	m.sessionCSRs = append(m.sessionCSRs, bytes.Clone(csr))
+	m.enrollmentToken = "" // used
+	return e2eSessionNodeID, e2eSessionCert, e2eSessionCA, nil
 }

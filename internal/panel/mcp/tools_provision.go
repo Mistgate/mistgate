@@ -18,6 +18,8 @@ import (
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
+	subhostv1 "github.com/mistgate/mistgate/gen/mistgate/subhost/v1"
+	"github.com/mistgate/mistgate/gen/mistgate/subhost/v1/subhostv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/provision"
 )
@@ -80,11 +82,18 @@ type nodeInstallArgs struct {
 	CountryCode string `json:"country_code,omitempty" jsonschema:"two-letter country code"`
 	Location    string `json:"location,omitempty" jsonschema:"city or region"`
 	Provider    string `json:"provider,omitempty" jsonschema:"hosting provider"`
+	// The first subscription host (a panel behind NAT): the node enrols inside the SSH session and serves the subdomain; the
+	// owner's approval of this plan covers that too.
+	SubscriptionHostDomain string `json:"subscription_host_domain,omitempty" jsonschema:"optional subdomain whose DNS points at this server: the panel's public address moves onto it once the node is ready (for a panel the server cannot reach)"`
+	SiteName               string `json:"site_name,omitempty" jsonschema:"with subscription_host_domain: a second name pointing at the server, for the node's own site on 443; defaults to address when that is a host name"`
+	SkipDNSCheck           bool   `json:"skip_dns_check,omitempty" jsonschema:"with subscription_host_domain: skip the DNS check when DNS is proxied or not yet visible"`
 }
 
 type nodeInstallParams struct {
 	Host, Username, Name, Address, CountryCode, Location, Provider, Fingerprint string
+	SubscriptionHostDomain, SiteName                                            string
 	Port                                                                        uint32
+	SkipDNSCheck                                                                bool
 }
 
 func nodeInstallPlanTool() toolDef {
@@ -92,7 +101,9 @@ func nodeInstallPlanTool() toolDef {
 	return toolDef{
 		name: PlanTool(base), min: ProfileAdmin, procs: procs(
 			adminv1connect.ProvisioningServiceGetSSHFingerprintProcedure,
-			adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure),
+			adminv1connect.ProvisioningServiceGetPanelSSHKeyProcedure,
+			subhostv1connect.SubscriptionHostServiceGetSubscriptionHostProcedure,
+			subhostv1connect.SubscriptionHostServiceCheckSubscriptionHostDomainProcedure),
 		free: true, isPlan: true, danger: true,
 		desc: "Prepare installation of a Mistgate node over SSH. This reads the public SSH host key and panel public key. Never ask for or pass a server password: " +
 			"the owner compares the host key fingerprint and chooses Password or Panel key on the approval screen in the admin panel. Tell the user to approve the plan there.",
@@ -127,6 +138,45 @@ func nodeInstallPlanTool() toolDef {
 					resolved := nodeInstallParams{Host: fingerprint.Msg.GetHost(), Port: fingerprint.Msg.GetPort(), Username: in.Username,
 						Name: strings.ToLower(in.Name), Address: in.Address, CountryCode: strings.ToUpper(in.CountryCode),
 						Location: in.Location, Provider: in.Provider, Fingerprint: fingerprint.Msg.GetFingerprint()}
+					if in.SubscriptionHostDomain != "" {
+						if resolved.SubscriptionHostDomain, err = subHostDomain(in.SubscriptionHostDomain); err != nil {
+							return nil, nil, errors.New("subscription_host_domain: give a subdomain such as sub.example.com")
+						}
+						if resolved.SiteName, err = subHostSiteName(in.SiteName); err != nil {
+							return nil, nil, err
+						}
+						if resolved.SiteName == "" { // the node's own name, not asked for again
+							resolved.SiteName = siteNameOf(resolved.Address, resolved.SubscriptionHostDomain)
+						}
+						if resolved.SiteName == "" || resolved.SiteName == resolved.SubscriptionHostDomain {
+							return nil, nil, errors.New("site_name: give a second name pointing at the server, other than the subdomain (address is no host name to use)")
+						}
+						resolved.SkipDNSCheck = in.SkipDNSCheck
+						// what the panel would refuse at apply, said now: the owner's typed password is not spent on it
+						h, err := c.subHost()
+						if err != nil {
+							return nil, nil, scrubError(err)
+						}
+						if h.GetState() != subhostv1.SubscriptionHostState_SUBSCRIPTION_HOST_STATE_OFF {
+							return nil, nil, errors.New("the panel already has a subscription host (" + subHostState(h.GetState()) + "); install an ordinary node")
+						}
+						if len(h.GetLackingLink()) > 0 {
+							return nil, nil, errors.New("update the agent on the nodes that cannot follow the panel to a new link address first (see subscription_host_get)")
+						}
+						if !resolved.SkipDNSCheck {
+							r, err := c.cl.SubHost.CheckSubscriptionHostDomain(c.e.cfg.Auth.WithPlanning(c.ctx), connect.NewRequest(&subhostv1.CheckSubscriptionHostDomainRequest{
+								Address: resolved.Host, Domain: resolved.SubscriptionHostDomain, SiteName: resolved.SiteName}))
+							if err != nil {
+								return nil, nil, scrubError(apiError(err))
+							}
+							if !r.Msg.GetMatches() {
+								return nil, nil, errors.New("the names do not point at the server yet (found " + clean(strings.Join(r.Msg.GetFound(), ", "), 300) +
+									"; expected " + clean(strings.Join(r.Msg.GetExpected(), ", "), 300) + "); fix the DNS records or set skip_dns_check")
+							}
+						}
+					} else if in.SkipDNSCheck || in.SiteName != "" {
+						return nil, nil, errors.New("site_name and skip_dns_check apply only with subscription_host_domain")
+					}
 					params, err := json.Marshal(resolved)
 					if err != nil {
 						return nil, nil, errors.New("could not store the plan")
@@ -141,6 +191,13 @@ func nodeInstallPlanTool() toolDef {
 							{Key: "panel_ssh_key", Value: panelKey.Msg.GetPublicKey()},
 							{Key: "address", Value: nm(resolved.Address), Untrusted: true}, {Key: "installation", Value: "signed current agent bundle; waits for the new node to connect"}},
 						Danger: []string{dangerStepUp, dangerFleet}, Params: resolved,
+					}
+					if resolved.SubscriptionHostDomain != "" {
+						planned.Facts = append(planned.Facts, Fact{Key: "subscription_host", Value: resolved.SubscriptionHostDomain, Untrusted: true},
+							Fact{Key: "site_name", Value: resolved.SiteName, Untrusted: true})
+						if resolved.SkipDNSCheck {
+							planned.Facts = append(planned.Facts, Fact{Key: "dns", Value: "check skipped: the names may not point at this server"})
+						}
 					}
 					out, err := e.createPlan(c, base, params, reason, planned)
 					if err != nil {
@@ -174,6 +231,7 @@ func nodeInstallApplyTool() toolDef {
 						started, err := c.cl.Provisioning.StartNodeProvision(c.ctx, connect.NewRequest(&adminv1.StartNodeProvisionRequest{
 							ConfirmInstall: true, Name: p.Name, Address: p.Address, CountryCode: p.CountryCode, Location: p.Location, Provider: p.Provider,
 							SshHost: p.Host, SshPort: p.Port, SshUsername: p.Username, Fingerprint: p.Fingerprint, PlanId: pl.ID,
+							SubscriptionHostDomain: p.SubscriptionHostDomain, SubscriptionHostSiteName: p.SiteName, SkipDnsCheck: p.SkipDNSCheck,
 						}))
 						if err != nil {
 							return done{}, apiError(err)

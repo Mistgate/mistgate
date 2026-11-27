@@ -37,6 +37,7 @@ import { tr as fleetuiTr } from "./fleetui";
 import { tr as clientlogsTr } from "./clientlogs";
 import { tr as trusttunnelTr } from "./trusttunnel";
 import { tr as tcpshareTr } from "./tcpshare";
+import { tr as subhostTr } from "./subhost";
 import { tr as shellTr } from "./shell";
 import { tr as nodesviewTr } from "./nodesview";
 import { tr as nodeswaysTr } from "./nodesways";
@@ -275,7 +276,7 @@ const core: CoreMessages = {
   "err.node_offline": "Düğümle bağlantı yok. Ajan geri gelince yeniden dene.",
   "err.agent_too_old": "Düğümdeki ajan bunun için çok eski. Güncellemeler sayfasından güncelle.",
   "err.node_retired": "Düğüm kullanımdan kaldırıldı.",
-  "err.sub_address_missing": "Abonelik bağlantısı adresi ayarlanmamış. Adresi panelin sunucusunda `mistgate setup` ayarlar.",
+  "err.sub_address_missing": "Abonelik adresi henüz hazır değil. Ayarlar → Alan adları bölümünü kontrol et.",
   "err.preset_is_default": "Bu varsayılan ön ayar. Önce başka birini varsayılan yap.",
   "err.preset_builtin": "Yerleşik ön ayar silinemez.",
   "field.port.out_of_range": "Port 1 ile 65535 arasında olmalı",
@@ -327,4 +328,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "IP adresi için Let’s Encrypt sertifikası henüz yok: bir alan adı ya da kendi imzalı sertifikayı seç",
 };
 
-export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr, ...trusttunnelTr, ...tcpshareTr, ...shellTr, ...overviewTr, ...nodesviewTr, ...windowsTr, ...nodepageTr, ...userslistTr, ...userspageTr, ...usersgroupTr, ...usersextraTr, ...decoysitesTr, ...planwordsTr, ...nodeswaysTr, ...nodewaysTr, ...profilespageTr, ...healthpageTr, ...reachpageTr, ...profilesrvTr, ...profilenewTr, ...subspnTr, ...subshxTr, ...subsrtTr, ...subsdnsTr, ...updatespageTr, ...settingspageTr, ...aipageTr, ...igpageTr, ...aspageTr, ...nodeshareTr, ...channelTr, ...countrynowTr, ...sniTr };
+export const tr: Messages = { ...core, ...opsTr, ...usersTr, ...securityTr, ...profilesTr, ...subsTr, ...healthTr, ...updatesTr, ...awgTr, ...warpTr, ...integrationsTr, ...telegramTr, ...portsTr, ...editionTr, ...decoyTr, ...bulkTr, ...countryTr, ...probesTr, ...connectionsTr, ...journalTr, ...relayTr, ...waysTr, ...tgproxyTr, ...clientcompatTr, ...protocolsTr, ...aiTr, ...graphTr, ...waysgraphTr, ...fleetmapTr, ...observabilityTr, ...debugTr, ...resourcesTr, ...tasksTr, ...followupTr, ...osupdatesTr, ...fleetuiTr, ...clientlogsTr, ...trusttunnelTr, ...tcpshareTr, ...subhostTr, ...shellTr, ...overviewTr, ...nodesviewTr, ...windowsTr, ...nodepageTr, ...userslistTr, ...userspageTr, ...usersgroupTr, ...usersextraTr, ...decoysitesTr, ...planwordsTr, ...nodeswaysTr, ...nodewaysTr, ...profilespageTr, ...healthpageTr, ...reachpageTr, ...profilesrvTr, ...profilenewTr, ...subspnTr, ...subshxTr, ...subsrtTr, ...subsdnsTr, ...updatespageTr, ...settingspageTr, ...aipageTr, ...igpageTr, ...aspageTr, ...nodeshareTr, ...channelTr, ...countrynowTr, ...sniTr };

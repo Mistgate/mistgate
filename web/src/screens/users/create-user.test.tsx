@@ -1,3 +1,4 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -22,8 +23,8 @@ vi.mock("@/lib/api", async (orig) => ({
   subscriptions: { getSubscriptionSettings: () => Promise.resolve({ settings: { apps: [{ kind: App.HAPP, name: "Happ" }] }, effectiveTitle: "" }) },
 }));
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, className }: { children?: ReactNode; to: string; className?: string }) => (
-    <a href={to} className={className}>
+  Link: ({ children, to, params, className }: { children?: ReactNode; to: string; params?: { section: string }; className?: string }) => (
+    <a href={params ? to.replace("$section", params.section) : to} className={className}>
       {children}
     </a>
   ),
@@ -98,6 +99,18 @@ describe("the new user form", () => {
     await click(button("Create"));
     await settle();
     expect(createUser).toHaveBeenCalledWith(expect.objectContaining({ name: "carol", groupId: "grp_all", apps: { happ: true, amnezia: false, telegram: false, mistgate: true } }));
+  });
+
+  it("keeps the draft and links to Domains if the subscription address is not ready", async () => {
+    createUser.mockRejectedValue(new ConnectError("sub_address_missing", Code.FailedPrecondition));
+    await mount([group()]);
+    const name = document.querySelector<HTMLInputElement>("input[placeholder='For example, carol']")!;
+    await type(name, "carol");
+    await click(button("Create"));
+    await settle();
+    expect(name.value).toBe("carol");
+    expect(document.querySelector('a[href="/settings/domains"]')?.textContent).toBe("Settings → Domains");
+    expect(text()).not.toContain("mistgate setup");
   });
 
   it("offers the Mistgate app on for the new person, switches it off alone, and locks it while the subscription link is off", async () => {

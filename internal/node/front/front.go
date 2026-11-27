@@ -52,6 +52,7 @@ type Stats struct {
 	Timeouts      uint64 // closed: no complete hello in time
 	Evicted       uint64 // closed: more than maxPending unfinished, this was the oldest
 	RouteDown     uint64 // went to the default route: the route's service is not running (SetDown), or did not Accept in time
+	Diverted      uint64 // went to the default route: its route's service handed it back (Divert)
 	Refused       uint64 // closed: nobody Accepted it in time (the default route too), or the route went away
 	NoRoute       uint64 // closed: nowhere to send it
 	Panics        uint64
@@ -83,6 +84,7 @@ type Front struct {
 
 	accepted, noSNI, unknownName, notTLS, badHello, tooLarge atomic.Uint64
 	timeouts, evicted, refused, noRoute, panics, routeDown   atomic.Uint64
+	diverted                                                 atomic.Uint64
 	lastOverloadLog, lastPanicLog                            atomic.Int64 // unix ns
 }
 
@@ -202,7 +204,7 @@ func (f *Front) Stats() Stats {
 	s := Stats{
 		Accepted: f.accepted.Load(), NoSNI: f.noSNI.Load(), UnknownName: f.unknownName.Load(), NotTLS: f.notTLS.Load(),
 		BadHello: f.badHello.Load(), HelloTooLarge: f.tooLarge.Load(), Timeouts: f.timeouts.Load(),
-		Evicted: f.evicted.Load(), RouteDown: f.routeDown.Load(), Refused: f.refused.Load(), NoRoute: f.noRoute.Load(), Panics: f.panics.Load(),
+		Evicted: f.evicted.Load(), RouteDown: f.routeDown.Load(), Diverted: f.diverted.Load(), Refused: f.refused.Load(), NoRoute: f.noRoute.Load(), Panics: f.panics.Load(),
 		Delivered: map[string]uint64{},
 	}
 	f.rmu.Lock()
@@ -371,7 +373,11 @@ func (f *Front) handOff(p *pending, rt *route, head []byte) (ok, refused bool) {
 	if tcp, isTCP := p.conn.(*net.TCPConn); isTCP && rt.ka != nil {
 		_ = tcp.SetKeepAliveConfig(*rt.ka)
 	}
-	out := newReplayConn(p.conn, head)
+	return f.deliver(newReplayConn(p.conn, head), rt, p.gone)
+}
+
+// deliver waits up to routeWait for rt's Accept to take out; gone ends the wait early (the connection was evicted).
+func (f *Front) deliver(out net.Conn, rt *route, gone <-chan struct{}) (ok, refused bool) {
 	timer := time.NewTimer(f.routeWait)
 	defer timer.Stop()
 	rt.q.delivered.Add(1) // before the hand-off, so whoever accepted it already sees it counted
@@ -382,11 +388,39 @@ func (f *Front) handOff(p *pending, rt *route, head []byte) (ok, refused bool) {
 		refused = true
 	case <-rt.q.gone:
 		refused = true
-	case <-p.gone:
+	case <-gone:
 	case <-f.done:
 	}
 	rt.q.delivered.Add(^uint64(0))
 	return false, refused
+}
+
+// Divert hands conn, which a route's Accept returned and whose service has read nothing of it, to the default route: what a
+// stranger gets. A service that cannot take a connection after all (a subscription host whose panel is away, or one at its
+// limits) sends it there rather than closing it, which would tell a prober the name is handled apart. False: there is no
+// default route (or it is down), or it did not Accept in time; the caller closes conn then.
+func (f *Front) Divert(conn net.Conn) bool {
+	t := f.table.Load()
+	if t.def == nil || t.def.q.down.Load() {
+		f.noRoute.Add(1)
+		return false
+	}
+	f.diverted.Add(1)
+	// the default route's keepalive, as if the connection had been routed there in the first place
+	if t.def.ka != nil {
+		inner := conn
+		if r, ok := conn.(*replayConn); ok {
+			inner = r.Conn
+		}
+		if tcp, ok := inner.(*net.TCPConn); ok {
+			_ = tcp.SetKeepAliveConfig(*t.def.ka)
+		}
+	}
+	ok, refused := f.deliver(conn, t.def, nil)
+	if refused {
+		f.refused.Add(1)
+	}
+	return ok
 }
 
 // noteUnknown counts a name no route holds, if it looks like a host name: the names are the client's to choose.

@@ -105,10 +105,14 @@ func (p TCPPortShare) Front() bool { return len(p.Routes) >= 2 && p.Default != "
 // returns the ports where two of them or more listen. A port where one inbound cannot take part (another protocol than
 // VLESS, TrustTunnel and MTProto, or no name to be told apart by) is not in the result: it keeps the old rule. A Hysteria2
 // site is no route: it gives its port up to any TCP inbound (TCPPortOwners).
-func TCPSharePlan(specs []InboundSpec) map[uint16]TCPPortShare {
+//
+// extra are services of the node that are no inbound (a subscription host's route, SubHostRoutes). They claim their names
+// before any inbound, and count towards the two. An extra site, when present, is the default.
+func TCPSharePlan(specs []InboundSpec, extra ...TCPExtraRoute) map[uint16]TCPPortShare {
 	sorted := slices.Clone(specs)
 	slices.SortStableFunc(sorted, func(a, b InboundSpec) int { return cmp.Compare(a.ID, b.ID) })
 	byPort := make(map[uint16][]TCPRoute)
+	extras := make(map[uint16][]TCPRoute)
 	broken := make(map[uint16]bool)
 	for _, s := range sorted {
 		if s.Listen.Network != "tcp" || s.Listen.Port == 0 {
@@ -118,14 +122,33 @@ func TCPSharePlan(specs []InboundSpec) map[uint16]TCPPortShare {
 		byPort[s.Listen.Port] = append(byPort[s.Listen.Port], r)
 		broken[s.Listen.Port] = broken[s.Listen.Port] || !ok
 	}
+	for _, e := range extra {
+		if e.Port != 0 {
+			extras[e.Port] = append(extras[e.Port], e.Route)
+		}
+	}
 	plan := make(map[uint16]TCPPortShare)
 	for port, routes := range byPort {
-		if len(routes) < 2 || broken[port] {
+		if len(routes)+len(extras[port]) < 2 || broken[port] {
 			continue
+		}
+		if e := extras[port]; len(e) > 0 {
+			routes = append(e, routes...)
 		}
 		plan[port] = shareOf(routes)
 	}
+	for port, routes := range extras {
+		if _, inbounds := byPort[port]; !inbounds && len(routes) >= 2 {
+			plan[port] = shareOf(routes)
+		}
+	}
 	return plan
+}
+
+// TCPExtraRoute is a service of a TCP port that is no inbound (TCPSharePlan).
+type TCPExtraRoute struct {
+	Port  uint16
+	Route TCPRoute
 }
 
 // shareOf settles the names of the routes of one port, which come by id: the lower id keeps a name, a route that asks for a name

@@ -683,3 +683,48 @@ func TestReplayConn(t *testing.T) {
 		t.Fatalf("half-close: %v", err)
 	}
 }
+
+// A service that took a connection and cannot serve it hands it, unread, to the default route (Divert): the default gets the
+// hello and what followed. With no default route the caller keeps it.
+func TestDivertGoesToTheDefault(t *testing.T) {
+	r := newRig(t, nil, nil)
+	hello := helloOf(t, "b.example.com")
+	c := r.dial()
+	_, _ = c.Write(append(bytes.Clone(hello), "after"...))
+	took, err := accept(t, r.lst["b"], time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	diverted := make(chan bool, 1)
+	go func() { diverted <- r.f.Divert(took) }() // it waits for the default route's Accept
+	got, err := accept(t, r.lst["a"], time.Second)
+	if err != nil {
+		t.Fatalf("the default route got nothing: %v", err)
+	}
+	defer got.Close()
+	want := append(bytes.Clone(hello), "after"...)
+	buf := make([]byte, len(want))
+	if _, err := io.ReadFull(got, buf); err != nil || !bytes.Equal(buf, want) {
+		t.Fatalf("the default route read %q, %v", buf, err)
+	}
+	if !<-diverted {
+		t.Fatal("Divert refused with a default route")
+	}
+	if s := r.f.Stats(); s.Diverted != 1 || s.Delivered["b"] != 1 || s.Delivered["a"] != 1 || s.Refused != 0 {
+		t.Fatalf("stats %+v", s)
+	}
+
+	r.f.SetRoutes(routesAB(), "")
+	_, _ = r.dial().Write(helloOf(t, "b.example.com"))
+	took, err = accept(t, r.lst["b"], time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer took.Close()
+	if r.f.Divert(took) {
+		t.Fatal("Divert took a connection with no default route")
+	}
+	if s := r.f.Stats(); s.NoRoute != 1 {
+		t.Fatalf("stats %+v", s)
+	}
+}

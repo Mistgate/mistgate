@@ -37,6 +37,7 @@ import { zh as fleetuiZh } from "./fleetui";
 import { zh as clientlogsZh } from "./clientlogs";
 import { zh as trusttunnelZh } from "./trusttunnel";
 import { zh as tcpshareZh } from "./tcpshare";
+import { zh as subhostZh } from "./subhost";
 import { zh as shellZh } from "./shell";
 import { zh as nodesviewZh } from "./nodesview";
 import { zh as nodeswaysZh } from "./nodesways";
@@ -276,7 +277,7 @@ const core: CoreMessages = {
   "err.node_offline": "节点未连接。请在它的 Agent 重新上线后再试。",
   "err.agent_too_old": "此节点的 Agent 版本过旧，无法执行此操作。请在「更新」页面更新它。",
   "err.node_retired": "此节点已从集群退役。",
-  "err.sub_address_missing": "未设置订阅链接地址。在面板所在服务器上运行 `mistgate setup` 即可设置。",
+  "err.sub_address_missing": "订阅地址尚未就绪，请检查「设置 → 域名」。",
   "err.preset_is_default": "这是默认预设。请先将其他预设设为默认。",
   "err.preset_builtin": "内置预设无法删除。",
 
@@ -329,4 +330,4 @@ const core: CoreMessages = {
   "field.hysteria2.tls_mode.unsupported": "暂不支持为 IP 地址申请 Let’s Encrypt 证书：请使用域名或自签名证书",
 };
 
-export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...tcpshareZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...usersextraZh, ...decoysitesZh, ...planwordsZh, ...nodeswaysZh, ...nodewaysZh, ...profilespageZh, ...healthpageZh, ...reachpageZh, ...profilesrvZh, ...profilenewZh, ...subspnZh, ...subshxZh, ...subsrtZh, ...subsdnsZh, ...updatespageZh, ...settingspageZh, ...aipageZh, ...igpageZh, ...aspageZh, ...nodeshareZh, ...channelZh, ...countrynowZh, ...sniZh };
+export const zh: Messages = { ...core, ...opsZh, ...usersZh, ...securityZh, ...profilesZh, ...subsZh, ...healthZh, ...updatesZh, ...awgZh, ...warpZh, ...integrationsZh, ...telegramZh, ...portsZh, ...editionZh, ...decoyZh, ...bulkZh, ...countryZh, ...probesZh, ...connectionsZh, ...journalZh, ...relayZh, ...waysZh, ...tgproxyZh, ...clientcompatZh, ...protocolsZh, ...aiZh, ...graphZh, ...waysgraphZh, ...fleetmapZh, ...observabilityZh, ...debugZh, ...resourcesZh, ...tasksZh, ...followupZh, ...osupdatesZh, ...fleetuiZh, ...clientlogsZh, ...trusttunnelZh, ...tcpshareZh, ...subhostZh, ...shellZh, ...overviewZh, ...nodesviewZh, ...windowsZh, ...nodepageZh, ...userslistZh, ...userspageZh, ...usersgroupZh, ...usersextraZh, ...decoysitesZh, ...planwordsZh, ...nodeswaysZh, ...nodewaysZh, ...profilespageZh, ...healthpageZh, ...reachpageZh, ...profilesrvZh, ...profilenewZh, ...subspnZh, ...subshxZh, ...subsrtZh, ...subsdnsZh, ...updatespageZh, ...settingspageZh, ...aipageZh, ...igpageZh, ...aspageZh, ...nodeshareZh, ...channelZh, ...countrynowZh, ...sniZh };

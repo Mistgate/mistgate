@@ -2,7 +2,7 @@
 // (internal/panel/edition); the admin says so in these words instead of showing a button that does nothing. English is the
 // source of truth: `ru` is type-checked against it. The admin speaks «ты». Never rename an id: the server sends them.
 /** The feature ids MeResponse.unavailable carries (internal/panel/edition). */
-export const editionFeatures = ["backups", "mcp", "assistant", "health_checks", "agent_logs", "panel_update", "decoy_own", "tspu_probe", "os_updates", "own_probes", "sni_scan", "trusttunnel"] as const;
+export const editionFeatures = ["backups", "mcp", "assistant", "health_checks", "agent_logs", "panel_update", "decoy_own", "tspu_probe", "os_updates", "own_probes", "sni_scan", "trusttunnel", "subscription_host"] as const;
 export type EditionFeature = (typeof editionFeatures)[number];
 
 export const en = {
@@ -20,6 +20,7 @@ export const en = {
   "edition.feature.sni_scan": "Looking for sites near the node",
   "edition.feature.assistant": "The assistant",
   "edition.feature.trusttunnel": "TrustTunnel profiles and keys",
+  "edition.feature.subscription_host": "Subscription host (a panel behind NAT)",
   // what to do instead, where there is something
   "edition.hint.mcp": "Tokens you already have are listed and can be revoked; new ones cannot be created yet.",
 };
@@ -38,6 +39,7 @@ export const ru: typeof en = {
   "edition.feature.sni_scan": "Подбор сайтов рядом с нодой",
   "edition.feature.assistant": "Ассистент",
   "edition.feature.trusttunnel": "Профили и ключи TrustTunnel",
+  "edition.feature.subscription_host": "Хост подписок (панель за NAT)",
   "edition.hint.mcp": "Уже выданные токены видны и отзываются; новые пока создать нельзя.",
 };
 
@@ -56,6 +58,7 @@ export const zh: typeof en = {
   "edition.feature.sni_scan": "查找节点附近的站点",
   "edition.feature.assistant": "助手",
   "edition.feature.trusttunnel": "TrustTunnel 配置和密钥",
+  "edition.feature.subscription_host": "订阅主机（NAT 后的面板）",
   "edition.hint.mcp": "已有的令牌可以查看和吊销，暂时无法创建新令牌。",
 };
 
@@ -73,6 +76,7 @@ export const fa: typeof en = {
   "edition.feature.sni_scan": "یافتن سایت‌های نزدیک نود",
   "edition.feature.assistant": "دستیار",
   "edition.feature.trusttunnel": "پروفایل‌ها و کلیدهای TrustTunnel",
+  "edition.feature.subscription_host": "میزبان اشتراک (پنل پشت NAT)",
   "edition.hint.mcp": "توکن‌هایی که قبلاً صادر شده‌اند دیده و ابطال می‌شوند؛ ساختن توکن جدید هنوز ممکن نیست.",
 };
 
@@ -90,5 +94,6 @@ export const tr: typeof en = {
   "edition.feature.sni_scan": "Düğümün yakınındaki siteleri bulma",
   "edition.feature.assistant": "Asistan",
   "edition.feature.trusttunnel": "TrustTunnel profilleri ve anahtarları",
+  "edition.feature.subscription_host": "Abonelik sunucusu (NAT arkasındaki panel)",
   "edition.hint.mcp": "Daha önce verilmiş token'lar listelenir ve iptal edilebilir; yenileri henüz oluşturulamaz.",
 };

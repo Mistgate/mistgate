@@ -88,7 +88,7 @@ func TestNodeProvisionJobRecoversAndKeepsEventsRedacted(t *testing.T) {
 	if claimed.State != "running" || claimed.Phase != "connecting" {
 		t.Fatalf("claimed job = %+v", claimed)
 	}
-	if err := st.RequeueNodeProvisionJobs(ctx, now.Add(2*time.Minute)); err != nil {
+	if err := st.RequeueNodeProvisionJobs(ctx, now.Add(2*time.Minute), nil); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err = st.NodeProvisionJob(ctx, job.ID)
@@ -157,10 +157,10 @@ func TestRetryNodeProvisionJobOnlyFromTheStateRead(t *testing.T) {
 	}
 
 	// a cancelled job can be retried, unless its name went to a live node meanwhile
-	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(2*time.Minute)); err != nil {
+	if _, _, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(2*time.Minute), nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.FinishCancelledNodeProvisionJob(ctx, job.ID, now.Add(2*time.Minute)); err != nil {
+	if _, err := st.FinishCancelledNodeProvisionJob(ctx, job.ID, now.Add(2*time.Minute), nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.W.ExecContext(ctx, `INSERT INTO node (id, name, address, state, created_at) VALUES ('nod_other', 'edge-retry', 'x.example.com', 'pending', ?)`, now.Unix()); err != nil {
@@ -192,7 +192,7 @@ func TestCancelQueuedProvisionClearsCredentialsAndCannotBeClaimed(t *testing.T) 
 	if err := st.CreateNodeProvisionJob(ctx, job); err != nil {
 		t.Fatal(err)
 	}
-	state, changed, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(time.Minute))
+	state, changed, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(time.Minute), nil)
 	if err != nil || state != "cancelled" || !changed {
 		t.Fatalf("cancel queued = %q, %v, %v", state, changed, err)
 	}
@@ -203,7 +203,7 @@ func TestCancelQueuedProvisionClearsCredentialsAndCannotBeClaimed(t *testing.T) 
 	if _, ok, err := st.ClaimNodeProvisionJob(ctx, now.Add(2*time.Minute)); err != nil || ok {
 		t.Fatalf("cancelled job was claimed: ok=%v err=%v", ok, err)
 	}
-	if _, changed, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(3*time.Minute)); err != nil || changed {
+	if _, changed, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(3*time.Minute), nil); err != nil || changed {
 		t.Fatalf("repeated cancel = changed %v, err %v", changed, err)
 	}
 	events, _, err := st.NodeProvisionEvents(ctx, job.ID, 0, 10)
@@ -233,7 +233,7 @@ func TestCancelRunningProvisionIsTerminalAndSurvivesRestart(t *testing.T) {
 			if _, ok, err := st.ClaimNodeProvisionJob(ctx, now); err != nil || !ok {
 				t.Fatalf("claim running job: ok=%v err=%v", ok, err)
 			}
-			state, changed, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(time.Minute))
+			state, changed, err := st.RequestCancelNodeProvisionJob(ctx, job.ID, now.Add(time.Minute), nil)
 			if err != nil || state != "cancel_requested" || !changed {
 				t.Fatalf("request cancellation = %q, %v, %v", state, changed, err)
 			}
@@ -241,10 +241,10 @@ func TestCancelRunningProvisionIsTerminalAndSurvivesRestart(t *testing.T) {
 				t.Fatalf("active worker reverted cancellation: %v", err)
 			}
 			if finishByRestart {
-				if err := st.RequeueNodeProvisionJobs(ctx, now.Add(3*time.Minute)); err != nil {
+				if err := st.RequeueNodeProvisionJobs(ctx, now.Add(3*time.Minute), nil); err != nil {
 					t.Fatal(err)
 				}
-			} else if changed, err := st.FinishCancelledNodeProvisionJob(ctx, job.ID, now.Add(3*time.Minute)); err != nil || !changed {
+			} else if changed, err := st.FinishCancelledNodeProvisionJob(ctx, job.ID, now.Add(3*time.Minute), nil); err != nil || !changed {
 				t.Fatalf("worker finalizes cancellation: changed=%v err=%v", changed, err)
 			}
 			loaded, err := st.NodeProvisionJob(ctx, job.ID)
@@ -405,4 +405,37 @@ func TestRequeueNodeProvisionJobsLeavesOtherStatesAlone(t *testing.T) {
 
 func TestNodeProvisionJobsPendingAndQueued(t *testing.T) {
 	checkProvisionPending(t, openTemp(t))
+}
+
+// Requeue gives a job it fails as interrupted, or cancels after a cancel was asked, the residual secret it is handed, in the
+// same batch; a requeued job keeps its own secret, and a job without a residual is cleared.
+func TestRequeueKeepsResiduals(t *testing.T) {
+	st := openTemp(t)
+	ctx := context.Background()
+	now := time.Unix(1_800_000_000, 0).UTC()
+	mk := func(id, name, state string, attempt int) {
+		t.Helper()
+		job := NodeProvisionJob{ID: id, NodeID: "nod_" + id, Name: name, Address: name + ".example.com", SSHHost: "198.51.100.22", SSHPort: 22,
+			HostFingerprint: "SHA256:pin", Secret: []byte("sealed-" + id), CreatedBy: "adm_test", CreatedAt: now, UpdatedAt: now}
+		if err := st.CreateNodeProvisionJob(ctx, job); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.W.ExecContext(ctx, `UPDATE node_provision_job SET state = ?, attempt = ? WHERE id = ?`, state, attempt, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk("prv_int", "edge-int", "running", MaxProvisionAttempts)
+	mk("prv_can", "edge-can", "cancel_requested", 1)
+	mk("prv_req", "edge-req", "running", 1)
+	mk("prv_none", "edge-none", "cancel_requested", 1)
+	keep := map[string][]byte{"prv_int": []byte("residual-int"), "prv_can": []byte("residual-can"), "prv_req": []byte("residual-req")}
+	if err := st.RequeueNodeProvisionJobs(ctx, now.Add(time.Minute), keep); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]string{"prv_int": "failed residual-int", "prv_can": "cancelled residual-can", "prv_req": "queued sealed-prv_req", "prv_none": "cancelled "} {
+		job, err := st.NodeProvisionJob(ctx, id)
+		if err != nil || job.State+" "+string(job.Secret) != want {
+			t.Errorf("%s = %q %q, want %q (%v)", id, job.State, job.Secret, want, err)
+		}
+	}
 }

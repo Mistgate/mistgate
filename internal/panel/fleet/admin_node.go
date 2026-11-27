@@ -746,8 +746,9 @@ func randomToken() string {
 func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[adminv1.CreateEnrollmentRequest]) (*connect.Response[adminv1.CreateEnrollmentResponse], error) {
 	f := s.f
 	m := req.Msg
-	linkOnly := f.cfg.Remote != nil // the edge edition: agents enrol and run over the link (no mTLS endpoint)
-	if linkOnly && f.cfg.LinkURL == "" {
+	// The edge edition, or a panel behind a subscription host: agents enrol and run over the link (no mTLS endpoint to reach).
+	linkOnly := f.cfg.Remote != nil || f.sub.linkEnrollment.Load()
+	if linkOnly && f.linkURL() == "" {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("link address is not configured"))
 	}
 	if !linkOnly && f.cfg.PanelAddr == "" {
@@ -810,7 +811,7 @@ func (s nodeService) CreateEnrollment(ctx context.Context, req *connect.Request[
 	f.audit(ctx, "node.create_enrollment", audit)
 	install := installCommand(f.cfg.PanelAddr, f.cfg.AgentSNI, f.ca.fingerprint, token)
 	if linkOnly {
-		install = linkInstallCommand(f.cfg.LinkURL, f.ca.fingerprint, token)
+		install = linkInstallCommand(f.linkURL(), f.ca.fingerprint, token)
 	}
 	return connect.NewResponse(&adminv1.CreateEnrollmentResponse{
 		Node:           f.nodeMsg(ctx, n, nil, 0, 0, nil, now, store.NodeLiveRow{NodeID: n.ID}, panelBundle, store.NodeHealthSummary{}, store.IPv6Doctor{}, f.shareOf(ctx, n.ID)), // pending: no checks yet
@@ -1263,6 +1264,9 @@ func (s nodeService) RetireNode(ctx context.Context, req *connect.Request[adminv
 	}
 	if req.Msg.ConfirmName != n.Name {
 		return nil, invalid("confirm_name does not match the node name")
+	}
+	if f.subHostNode(n.ID) {
+		return nil, errSubHostInUse
 	}
 	live, err := f.liveRowsForNode(ctx, n.ID, false)
 	if err != nil {

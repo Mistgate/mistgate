@@ -1618,7 +1618,7 @@ export const SetDecoyPhotosSourceResponseSchema: GenMessage<SetDecoyPhotosSource
  * or on the panel itself. A package of its own on purpose, like mistgate.trusttunnel.v1: the Cloudflare edition keeps no
  * bundles, so its Workers link none of this code and answer every procedure with unavailable_in_edition: feature=decoy_own.
  * Owner only (internal/panel/auth policy_decoysite.go). File contents never reach the audit log or any other log.
- * 
+ *
  * Refusals are FAILED_PRECONDITION / INVALID_ARGUMENT / NOT_FOUND / ALREADY_EXISTS whose message is a stable code, optionally
  * followed by ": key=value" (values URL-escaped): decoy_site_not_found, decoy_name_taken, decoy_name_invalid, decoy_note_invalid,
  * decoy_library_full, decoy_site_in_use (nodes=<ids>, panel=1), decoy_site_draft, decoy_site_not_draft, decoy_version_not_found,

@@ -73,11 +73,20 @@ func (s updSource) Fetch(ctx context.Context, name string, offset uint64, w io.W
 }
 
 func (s updSource) fetchLink(ctx context.Context, name string, offset uint64, w io.Writer) (uint64, error) {
-	if s.token == "" {
-		return 0, fmt.Errorf("%w: missing download token", update.ErrPermanent)
-	}
+	// The edge's update command carries its own token for the /update/ route; anything else uses the session's token on the VPS
+	// panel's /fetch/ route. Without either there is nothing to ask with yet: the next session brings a token.
 	a := s.a
-	rawURL, err := linkDownloadURL(a.linkURL(), a.meta.NodeID, name)
+	token, route := s.token, linkDownloadURL
+	if token == "" {
+		if p := a.fetchToken.Load(); p != nil {
+			token = *p
+		}
+		route = linkFetchURL
+	}
+	if token == "" {
+		return 0, fmt.Errorf("%w: no link fetch token", update.ErrRetryLater)
+	}
+	rawURL, err := route(a.linkURL(), a.meta.NodeID, name)
 	if err != nil {
 		return 0, fmt.Errorf("%w: invalid link download URL: %v", update.ErrPermanent, err)
 	}
@@ -105,13 +114,18 @@ func (s updSource) fetchLink(ctx context.Context, name string, offset uint64, w 
 	requestClient := *client
 	requestClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	headers := make(http.Header)
-	headers.Set("Authorization", "Bearer "+s.token)
+	headers.Set("Authorization", "Bearer "+token)
 	total, err := rangedGET(requestCtx, &requestClient, rawURL, offset, w, rangedGETPolicy{
 		headers: headers,
 		parseRange: func(value string, offset uint64) (uint64, error) {
 			return parseRangedContentRange(value, offset, 0, false)
 		},
 		statusError: func(status int) error {
+			// the session's token is unknown to the panel (it restarted, or the grace after the session ended): the next
+			// session brings a new one, so this is for later, never a failed file
+			if status == http.StatusUnauthorized && s.token == "" {
+				return fmt.Errorf("%w: the panel does not know the link fetch token", update.ErrRetryLater)
+			}
 			return &httpStatusError{status: status}
 		},
 		requestError: func(err error) error {
@@ -147,6 +161,15 @@ func (r linkStallReader) Read(p []byte) (int, error) {
 }
 
 func linkDownloadURL(linkBase, nodeID, name string) (string, error) {
+	return linkRouteURL(linkBase, "/update/", nodeID, name)
+}
+
+// linkFetchURL is the VPS panel's LINK FETCH route (agent.proto), which takes the session's fetch token.
+func linkFetchURL(linkBase, nodeID, name string) (string, error) {
+	return linkRouteURL(linkBase, "/fetch/", nodeID, name)
+}
+
+func linkRouteURL(linkBase, route, nodeID, name string) (string, error) {
 	if nodeID == "" || name == "" {
 		return "", errors.New("node id and file name are required")
 	}
@@ -155,8 +178,8 @@ func linkDownloadURL(linkBase, nodeID, name string) (string, error) {
 		return "", err
 	}
 	escapedPrefix := strings.TrimRight(u.EscapedPath(), "/")
-	u.Path = strings.TrimRight(u.Path, "/") + "/update/" + nodeID + "/" + name
-	u.RawPath = escapedPrefix + "/update/" + url.PathEscape(nodeID) + "/" + url.PathEscape(name)
+	u.Path = strings.TrimRight(u.Path, "/") + route + nodeID + "/" + name
+	u.RawPath = escapedPrefix + route + url.PathEscape(nodeID) + "/" + url.PathEscape(name)
 	u.Scheme = "https"
 	u.RawQuery = ""
 	u.ForceQuery = false

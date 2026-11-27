@@ -268,7 +268,7 @@ Prints `mistgate <version>`, then `built <time>` when the binary was built with 
 
 | Command | What it does |
 |---|---|
-| `enroll` | Exchanges a one-time token for a node certificate. |
+| `enroll` | Exchanges a one-time token for a node certificate, or enrolls the first subscription host offline. |
 | `set-panel` | Saves a new panel link address for the agent to switch to. |
 | `install` | Writes the hardened systemd unit, enables and starts it. |
 | `run` | Runs the agent in the foreground. |
@@ -299,6 +299,9 @@ chmod +x /root/mistgate-node && /root/mistgate-node enroll --panel panel.example
 | `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | State directory. |
 | `--force` | none | off | Replace an existing identity. |
 | `--resume-key` | none | off | Keep the new private key in `enroll-pending.pem` in the state directory until enrollment succeeds and use it again on the next try, so an interrupted enrollment can be retried: the panel answers a repeat with the same token and key within 10 minutes with the same certificate. With `--force` a new key is made. |
+| `--offline-csr` | none | off | Offline enrollment, step 1: keep a new key in `enroll-pending.pem` (or reuse the one there) and print its certificate request as one line, `csr=<base64 DER>`. |
+| `--offline-finish` | none | off | Offline enrollment, step 2: read from stdin one JSON line with the link address and the subscription host role (`{"link_url":…,"sub_host":{"names":[…],"path":…,"site_name":…}}`, kept out of the command line), then the node certificate and the panel's CA certificate (PEM), and store them with the pending key. Prints `pin=<sha256>` of the site certificate when the role has a site name. |
+| `--node-id` | none | none | With `--offline-finish`: the node id the panel gave. |
 
 `--panel`, `--sni`, `--ca-sha256` and a token (`--token`, `MISTGATE_ENROLL_TOKEN` or `--token-stdin`) are required; without them `enroll` exits with 2. A token works once, within the time the panel showed (an hour by default). The panel's [SSH install](../getting-started/ssh-install.md) runs the same `enroll` and `install` over SSH, with the token on stdin and `--token-stdin --resume-key`. On success it prints the node id and the next step:
 
@@ -307,6 +310,8 @@ enrolled as nod_… with panel.example.com:443; state in /var/lib/mistgate-node
 next: mistgate-node install   (or, in the foreground: mistgate-node run)
 ```
 
+The offline form enrolls the panel's first subscription host, which cannot reach a panel behind NAT yet. The panel's SSH install runs both steps itself: it reads the request of `--offline-csr`, issues the certificate, and passes the role line and the certificates to `--offline-finish` on stdin; it reads back only the `pin=` line. The node is then a link-only agent with the subscription host role. `--offline-csr` and `--offline-finish` exclude each other and `--token`, `--token-stdin`, `--panel`, `--sni` and `--link-url`; `--offline-finish` needs `--node-id` and `--ca-sha256`. The CA must have the `--ca-sha256` fingerprint and the certificate must belong to the pending key. With `--force` both replace an existing identity. See [Subscription host](../guide/subscription-host.md).
+
 ### mistgate-node set-panel
 
 | Flag | Environment | Default | Meaning |
@@ -314,7 +319,9 @@ next: mistgate-node install   (or, in the foreground: mistgate-node run)
 | `--link-url` | none | none | The panel's new link address, `wss://host/<secret-prefix>/`. Required. |
 | `--state-dir` | `MISTGATE_NODE_STATE_DIR` | `/var/lib/mistgate-node` | State directory. |
 
-Saves the address in `agent.json` as the one to try next; the node must be enrolled over the link (`--link-url`). On a node that connects over mTLS (no `link` in `agent.json`) the command refuses, leaves `agent.json` as it is and exits 1. After a restart the agent tries the new address and its current one in turn, and keeps the new one once a session over it succeeds. The agent keeps the previous address and goes back to it if the new one stops answering or drops the session within 2 minutes; the first session over the new address that lasts 2 minutes, 7 or more days after the switch, makes the agent forget the previous one. A panel can send the same change to its agents (`panel_link_url`); nothing sends it yet, and an mTLS node ignores it. The command is for a node that cannot reach the panel any more. It prints `Saved. Restart the agent: systemctl restart mistgate-node`.
+Saves the address in `agent.json` as the one to try next; the node must be enrolled. After a restart the agent tries the new address and its current one in turn, and keeps the new one once a session over it succeeds. A link session ending within 2 minutes of HelloAck triggers fallback. The first healthy session 7 or more days after the switch makes the agent forget the previous address.
+
+Only link-enrolled nodes receive the setting from the panel. An enrolled mTLS node can try the link only when an operator runs `set-panel` locally; if the link fails, the node can return to mTLS and regain its configured `--link-url`. Automatic migration of an mTLS fleet is not available pending the transport decision.
 
 ### mistgate-node install
 

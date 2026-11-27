@@ -550,6 +550,15 @@ func TestLinkHandlerAnswersWithTheMarkerOnTheEdge(t *testing.T) {
 	if w := serve(h, ""); w.Code != http.StatusNotFound {
 		t.Fatalf("edge request without an upgrade: status %d", w.Code)
 	}
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		req := httptest.NewRequest(method, "/fetch/"+nodeID+"/bundle", nil)
+		req.Header.Set("Upgrade", "websocket")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusNotFound || w.Header().Get(LinkMarkerHeader) != "" {
+			t.Fatalf("edge fetch %s: status %d, marker %q", method, w.Code, w.Header().Get(LinkMarkerHeader))
+		}
+	}
 	// Without a Remote the handler still serves the socket itself (a plain GET is not an upgrade).
 	r.e.f.cfg.Remote = nil
 	if w := serve(r.e.f.LinkHandler(), "websocket"); w.Header().Get(LinkMarkerHeader) != "" {

@@ -60,18 +60,22 @@ func TestMetadataPromotionRequiresMatchingPendingAddress(t *testing.T) {
 
 func TestMetadataPromotionPreservesKnownGoodLink(t *testing.T) {
 	for _, tc := range []struct {
-		name    string
-		prev    string
-		healthy bool
-		want    string
+		name     string
+		prev     string
+		prevMTLS bool
+		healthy  bool
+		want     string
+		wantMTLS bool
 	}{
 		{name: "first", want: metadataOldLink},
 		{name: "unproven", prev: metadataNewLink, want: metadataNewLink},
 		{name: "healthy", prev: metadataNewLink, healthy: true, want: metadataOldLink},
+		{name: "unproven after mTLS", prevMTLS: true, wantMTLS: true},
+		{name: "healthy after mTLS", prevMTLS: true, healthy: true, want: metadataOldLink},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir, m := metadataFixture(t)
-			m.PrevLink, m.LinkHealthy = tc.prev, tc.healthy
+			m.PrevLink, m.PrevMTLS, m.LinkHealthy = tc.prev, tc.prevMTLS, tc.healthy
 			if err := saveMeta(dir, &m); err != nil {
 				t.Fatal(err)
 			}
@@ -82,7 +86,7 @@ func TestMetadataPromotionPreservesKnownGoodLink(t *testing.T) {
 			if err != nil || !promoted {
 				t.Fatalf("promotion = %v, %v", promoted, err)
 			}
-			if m.Link != metadataNextLink || m.PrevLink != tc.want || m.LinkHealthy || m.LinkSince != 123 || m.NextLink != "" || m.NextLinkRevision == attemptRevision || m.NextLinkRevision == "" {
+			if m.Link != metadataNextLink || m.PrevLink != tc.want || m.PrevMTLS != tc.wantMTLS || m.LinkHealthy || m.LinkSince != 123 || m.NextLink != "" || m.NextLinkRevision == attemptRevision || m.NextLinkRevision == "" {
 				t.Fatalf("incorrect promoted metadata: %+v", m)
 			}
 			if m.NodeID != "caller-node" || m.Panel != "caller-panel" || m.SNI != "caller-sni" {

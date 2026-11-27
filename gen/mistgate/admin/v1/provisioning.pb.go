@@ -243,8 +243,11 @@ type CheckSSHRequest struct {
 	// An owner's private key is used only for this check. It is never retained.
 	PrivateKey           string `protobuf:"bytes,7,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
 	PrivateKeyPassphrase string `protobuf:"bytes,8,opt,name=private_key_passphrase,json=privateKeyPassphrase,proto3" json:"private_key_passphrase,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// The first subscription host (design/adr/0018-panel-behind-nat.md): the server need not reach the panel, and the preflight
+	// probes this domain on 443 instead (informational). Empty = an ordinary node. Not offered by the Cloudflare edition.
+	SubscriptionHostDomain string `protobuf:"bytes,9,opt,name=subscription_host_domain,json=subscriptionHostDomain,proto3" json:"subscription_host_domain,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *CheckSSHRequest) Reset() {
@@ -329,6 +332,13 @@ func (x *CheckSSHRequest) GetPrivateKey() string {
 func (x *CheckSSHRequest) GetPrivateKeyPassphrase() string {
 	if x != nil {
 		return x.PrivateKeyPassphrase
+	}
+	return ""
+}
+
+func (x *CheckSSHRequest) GetSubscriptionHostDomain() string {
+	if x != nil {
+		return x.SubscriptionHostDomain
 	}
 	return ""
 }
@@ -527,9 +537,15 @@ type StartNodeProvisionRequest struct {
 	PrivateKey           string `protobuf:"bytes,15,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
 	PrivateKeyPassphrase string `protobuf:"bytes,16,opt,name=private_key_passphrase,json=privateKeyPassphrase,proto3" json:"private_key_passphrase,omitempty"`
 	// Who the new node is handed out to once installed (see CreateEnrollmentRequest.sharing); unset = the panel decides.
-	Sharing       *NodeSharing `protobuf:"bytes,17,opt,name=sharing,proto3" json:"sharing,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Sharing *NodeSharing `protobuf:"bytes,17,opt,name=sharing,proto3" json:"sharing,omitempty"`
+	// The first subscription host: its subdomain (A/AAAA records pointing at the server), the name of the node's own site on 443
+	// (a second name pointing at it, ACME), and whether to skip the DNS check of both. The node enrols inside the SSH session.
+	// Empty domain = an ordinary node. Not offered by the Cloudflare edition.
+	SubscriptionHostDomain   string `protobuf:"bytes,18,opt,name=subscription_host_domain,json=subscriptionHostDomain,proto3" json:"subscription_host_domain,omitempty"`
+	SubscriptionHostSiteName string `protobuf:"bytes,19,opt,name=subscription_host_site_name,json=subscriptionHostSiteName,proto3" json:"subscription_host_site_name,omitempty"`
+	SkipDnsCheck             bool   `protobuf:"varint,20,opt,name=skip_dns_check,json=skipDnsCheck,proto3" json:"skip_dns_check,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *StartNodeProvisionRequest) Reset() {
@@ -679,6 +695,27 @@ func (x *StartNodeProvisionRequest) GetSharing() *NodeSharing {
 		return x.Sharing
 	}
 	return nil
+}
+
+func (x *StartNodeProvisionRequest) GetSubscriptionHostDomain() string {
+	if x != nil {
+		return x.SubscriptionHostDomain
+	}
+	return ""
+}
+
+func (x *StartNodeProvisionRequest) GetSubscriptionHostSiteName() string {
+	if x != nil {
+		return x.SubscriptionHostSiteName
+	}
+	return ""
+}
+
+func (x *StartNodeProvisionRequest) GetSkipDnsCheck() bool {
+	if x != nil {
+		return x.SkipDnsCheck
+	}
+	return false
 }
 
 type RetryNodeProvisionRequest struct {
@@ -2464,7 +2501,7 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12 \n" +
 	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\x12\x1c\n" +
-	"\talgorithm\x18\x04 \x01(\tR\talgorithm\"\x8e\x02\n" +
+	"\talgorithm\x18\x04 \x01(\tR\talgorithm\"\xc8\x02\n" +
 	"\x0fCheckSSHRequest\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12 \n" +
@@ -2474,7 +2511,8 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\ruse_panel_key\x18\x06 \x01(\bR\vusePanelKey\x12\x1f\n" +
 	"\vprivate_key\x18\a \x01(\tR\n" +
 	"privateKey\x124\n" +
-	"\x16private_key_passphrase\x18\b \x01(\tR\x14privateKeyPassphrase\"\x8d\x03\n" +
+	"\x16private_key_passphrase\x18\b \x01(\tR\x14privateKeyPassphrase\x128\n" +
+	"\x18subscription_host_domain\x18\t \x01(\tR\x16subscriptionHostDomain\"\x8d\x03\n" +
 	"\rNodePreflight\x12\"\n" +
 	"\fdistribution\x18\x01 \x01(\tR\fdistribution\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x16\n" +
@@ -2489,7 +2527,7 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	" \x01(\bR\x0epanelReachable\x12\x1a\n" +
 	"\bnftables\x18\v \x01(\bR\bnftables\"R\n" +
 	"\x10CheckSSHResponse\x12>\n" +
-	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xde\x04\n" +
+	"\tpreflight\x18\x01 \x01(\v2 .mistgate.admin.v1.NodePreflightR\tpreflight\"\xfd\x05\n" +
 	"\x19StartNodeProvisionRequest\x12'\n" +
 	"\x0fconfirm_install\x18\x01 \x01(\bR\x0econfirmInstall\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -2509,7 +2547,10 @@ const file_mistgate_admin_v1_provisioning_proto_rawDesc = "" +
 	"\vprivate_key\x18\x0f \x01(\tR\n" +
 	"privateKey\x124\n" +
 	"\x16private_key_passphrase\x18\x10 \x01(\tR\x14privateKeyPassphrase\x128\n" +
-	"\asharing\x18\x11 \x01(\v2\x1e.mistgate.admin.v1.NodeSharingR\asharing\"\xc1\x02\n" +
+	"\asharing\x18\x11 \x01(\v2\x1e.mistgate.admin.v1.NodeSharingR\asharing\x128\n" +
+	"\x18subscription_host_domain\x18\x12 \x01(\tR\x16subscriptionHostDomain\x12=\n" +
+	"\x1bsubscription_host_site_name\x18\x13 \x01(\tR\x18subscriptionHostSiteName\x12$\n" +
+	"\x0eskip_dns_check\x18\x14 \x01(\bR\fskipDnsCheck\"\xc1\x02\n" +
 	"\x19RetryNodeProvisionRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12'\n" +
 	"\x0fconfirm_install\x18\x02 \x01(\bR\x0econfirmInstall\x12\x1a\n" +

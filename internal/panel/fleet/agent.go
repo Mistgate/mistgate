@@ -18,6 +18,7 @@ import (
 	agentv1 "github.com/mistgate/mistgate/gen/mistgate/agent/v1"
 	"github.com/mistgate/mistgate/internal/agentcap"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -570,10 +571,16 @@ func sessionCloseError(close *SessionClose) error {
 	return connect.NewError(code, errors.New(close.Reason))
 }
 
-// helloInfo takes what the node says about itself. Every string is bounded: they are stored and shown in the UI.
-func helloInfo(h *agentv1.Hello) store.HelloInfo {
+// helloInfo takes what the node says about itself. Every string is bounded: they are stored and shown in the UI. vps: this
+// panel serves the link fetch route (LINK FETCH), so a link-only agent that lists link-fetch/1 gets the network table and
+// VPS updates over it, as if it listed nets/1 and update/1. The agent does not list those itself: an older VPS panel would
+// then send it updates it cannot fetch.
+func helloInfo(h *agentv1.Hello, vps bool) store.HelloInfo {
 	info := store.HelloInfo{AgentVersion: clipText(h.AgentVersion, 64), APIVersion: h.ApiVersion, Instance: h.InstanceId,
 		Built: h.Built, Caps: capabilities(h), LastUpdateJSON: lastUpdateJSON(h.LastUpdate)}
+	if vps && slices.Contains(info.Caps, agentcap.LinkFetch) {
+		info.Caps = linkFetchCaps(info.Caps)
+	}
 	if slices.Contains(info.Caps, agentcap.Nets) {
 		info.NetworksDBSHA256 = validNetworksDigest(h.NetworksDbSha256)
 	}
@@ -605,6 +612,19 @@ func helloInfo(h *agentv1.Hello) store.HelloInfo {
 		info.Facts.Engines = append(info.Facts.Engines, store.EngineRow{Protocol: clipText(e.Protocol, 64), Version: clipText(e.Version, 64)})
 	}
 	return info
+}
+
+// linkFetchCaps adds what a link-fetch/1 agent can do on a VPS panel: nets/1, and update/1 when it can update itself over the
+// link (update-link/1).
+func linkFetchCaps(caps []string) []string {
+	out := slices.Clone(caps)
+	if !slices.Contains(out, agentcap.Nets) {
+		out = append(out, agentcap.Nets)
+	}
+	if slices.Contains(out, agentcap.UpdateLink) && !slices.Contains(out, agentcap.Update) {
+		out = append(out, agentcap.Update)
+	}
+	return out
 }
 
 // connectEvents records a blip (short gap) or a recovery (after node_down) when a node comes back.
@@ -741,6 +761,11 @@ func settingsSig(s *agentv1.NodeSettings) string {
 	if s.PanelLinkUrl != "" { // absent unless a panel link address is set: other signatures stay as they were
 		h := sha256.Sum256([]byte(s.PanelLinkUrl)) // the address holds a secret prefix; the signature stays in session state
 		sig += "|panel-link=" + hex.EncodeToString(h[:])
+	}
+	if r := s.GetSubHost(); r != nil { // absent unless the node is a host; the role holds the secret bridge path: only its hash
+		b, _ := proto.MarshalOptions{Deterministic: true}.Marshal(r)
+		h := sha256.Sum256(b)
+		sig += "|sub-host=" + hex.EncodeToString(h[:])
 	}
 	return sig
 }
