@@ -1131,7 +1131,11 @@ func dialTLSWithTimeout(ctx context.Context, dial plugin.BridgeDial, identity Di
 			return nil, Proof{}, errors.New("no_verification")
 		}
 		gotPin := sha256.Sum256(state.PeerCertificates[0].Raw)
-		if subtle.ConstantTimeCompare(wantPin, gotPin[:]) != 1 {
+		// A subscription host can switch from its pinned bootstrap leaf to ACME before the
+		// panel hears about it (including after a restart). Accept a trusted chain for the
+		// configured site name in that case, but keep regular relay pins strict.
+		if subtle.ConstantTimeCompare(wantPin, gotPin[:]) != 1 &&
+			!(identity.Panel && verifiedSiteChain(state.PeerCertificates, dial.SNI, roots)) {
 			_ = conn.Close()
 			return nil, Proof{}, errors.New("pin_mismatch")
 		}
@@ -1151,6 +1155,21 @@ func dialTLSWithTimeout(ctx context.Context, dial plugin.BridgeDial, identity Di
 		return nil, Proof{}, err
 	}
 	return conn, proof, nil
+}
+
+func verifiedSiteChain(chain []*x509.Certificate, name string, roots *x509.CertPool) bool {
+	if name == "" {
+		return false
+	}
+	opts := x509.VerifyOptions{DNSName: name, Roots: roots}
+	if len(chain) > 1 {
+		opts.Intermediates = x509.NewCertPool()
+		for _, cert := range chain[1:] {
+			opts.Intermediates.AddCert(cert)
+		}
+	}
+	_, err := chain[0].Verify(opts)
+	return err == nil
 }
 
 func waitDial(ctx context.Context, wait time.Duration) bool {

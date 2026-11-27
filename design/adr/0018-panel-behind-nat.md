@@ -22,7 +22,9 @@ never sees a token, a subscription or a key.
 calls an entry's site and keeps pairs of long POST requests open, and the entry hangs the connections that come to it
 on a free pair. The panel is the exit and the host the entry. The panel calls the host's own site on 443 with Chrome's
 ClientHello (uTLS), verifies it by its public certificate (or the leaf's pin while it has none), and speaks HTTP/2 as a
-browser would. A previous design (a mark in the hello's session id, a fleet client certificate in the handshake, a
+browser would. If the panel restarts with the bootstrap pin after the site obtained its public certificate, it can
+reconnect by verifying the certificate chain and the configured site name. Pins for ordinary node relays remain strict.
+A previous design (a mark in the hello's session id, a fleet client certificate in the handshake, a
 two-minute clock window and a replay cache) was rejected: the replay cache was lost on a restart, the certificate
 showed in the packet sizes, and every one of those pieces was new code on the wire.
 
