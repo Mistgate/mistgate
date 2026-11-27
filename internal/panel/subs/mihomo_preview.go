@@ -3,6 +3,7 @@ package subs
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"connectrpc.com/connect"
@@ -26,7 +27,7 @@ func (s *Service) PreviewMihomoTemplate(ctx context.Context, req *connect.Reques
 		return nil, s.internal("preview load", err)
 	}
 	autoOn := subsettings.LinkAutoSelect(set)
-	if err := subsettings.CheckMihomoTemplate(m.Yaml, autoOn); err != nil {
+	if err := subsettings.CheckMihomoGroups(m.Yaml, m.GroupIds, autoOn); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	if s.preview == nil {
@@ -45,14 +46,24 @@ func (s *Service) PreviewMihomoTemplate(ctx context.Context, req *connect.Reques
 		lang = b.Language
 	}
 	p := mihomoProfileOf(v, set, s.effectiveTitle(ctx, set), lang, time.Now(), s.log)
+	if !slices.Contains(m.GroupIds, v.GroupID) {
+		p.groupID = ""
+	}
 	eff, _ := s.dns.(Effective)
 	p.preset = linkPresetOf(ctx, v, eff, s.log)
 	if !p.note {
 		p.lines = redactedLines(p.lines)
 	}
-	body, templated, err := p.render("draft", m.Yaml)
+	body, selected, templated, err := p.render("draft", m.Yaml)
 	if err != nil {
 		return nil, s.internal("preview render", err)
+	}
+	if p.note {
+		// The profile ignores templates when serving a note, but the editor still needs the variant's warnings.
+		selected, err = subsettings.ResolveMihomoGroup(m.Yaml, p.groupID)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
 	}
 	resp := &adminv1.PreviewMihomoTemplateResponse{Yaml: string(body)}
 	if g, err := s.st.Access().Group(ctx, v.GroupID); err == nil {
@@ -66,7 +77,7 @@ func (s *Service) PreviewMihomoTemplate(ctx context.Context, req *connect.Reques
 			resp.NotServed = "no_access"
 		}
 	}
-	for _, w := range subsettings.MihomoTemplateWarnings(m.Yaml, autoOn) {
+	for _, w := range subsettings.MihomoTemplateWarnings(selected, autoOn) {
 		resp.Warnings = append(resp.Warnings, &adminv1.MihomoWarning{Code: w.Code, Arg: w.Arg})
 	}
 	if p.preset != nil {

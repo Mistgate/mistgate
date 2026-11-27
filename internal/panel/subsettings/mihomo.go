@@ -527,7 +527,7 @@ func ruleTarget(line string) string {
 
 // ---- the document ----
 
-// validateMihomoTemplates is the check of a save: the list, then each template's name, groups and text (CheckMihomoTemplate).
+// validateMihomoTemplates is the check of a save: the list, then each template's name, groups and variants (CheckMihomoGroups).
 func validateMihomoTemplates(s *adminv1.SubscriptionSettings) error {
 	list := s.GetMihomoTemplates()
 	if len(list) > MaxMihomoTemplates {
@@ -572,7 +572,7 @@ func validateMihomoTemplates(s *adminv1.SubscriptionSettings) error {
 	}
 	autoOn := LinkAutoSelect(s)
 	for i, t := range list { // the parse of each is the expensive part: after every cheap check of all of them
-		if err := CheckMihomoTemplate(t.Yaml, autoOn); err != nil {
+		if err := CheckMihomoGroups(t.Yaml, t.GroupIds, autoOn); err != nil {
 			return invalid("mihomo_templates[%d] (%q).yaml: %v", i, t.Name, err)
 		}
 	}

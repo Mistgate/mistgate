@@ -27,6 +27,7 @@ import (
 // mihomoProfile is what the assembler needs about one user's subscription.
 type mihomoProfile struct {
 	title      string
+	groupID    string // primary group, or empty when previewing only the common part
 	lines      []string // proxies, each a YAML list with one element (plugin.Fragment.Data)
 	names      []string // the server name of each line, parallel to lines ("" or missing = keep the plugin's own)
 	preset     *dns.Preset
@@ -126,11 +127,13 @@ func (p mihomoProfile) servers() []subsettings.MihomoServer {
 // is what a person gets when there is no template (tplText ""), when they get a note instead of servers (the note must be seen: a
 // template's groups would hide it), when none of their servers can be used, and when the template does not build (a stored text that
 // this version cannot read: a log line with the template's name, never its text). tplName is for that line only.
-func (p mihomoProfile) render(tplName, tplText string) (body []byte, templated bool, err error) {
+// selected is the source after group selection, for preview warnings even if no servers could be inserted.
+func (p mihomoProfile) render(tplName, tplText string) (body []byte, selected string, templated bool, err error) {
 	if tplText != "" && !p.note {
-		switch body, err := p.buildFromTemplate(tplText); {
+		body, selected, err = p.buildFromTemplate(tplText)
+		switch {
 		case err == nil:
-			return body, true, nil
+			return body, selected, true, nil
 		case errors.Is(err, subsettings.ErrNoServers):
 		default:
 			if p.log != nil {
@@ -139,13 +142,17 @@ func (p mihomoProfile) render(tplName, tplText string) (body []byte, templated b
 		}
 	}
 	body, err = p.build()
-	return body, false, err
+	return body, selected, false, err
 }
 
-// buildFromTemplate puts the servers of the person into a template (subsettings.ApplyMihomoTemplate). The dns section the template
+// buildFromTemplate selects the group variant, then puts the person's servers into it. The dns section the template
 // lacks is the resolvers of the person's preset with respect-rules on: no group name is known here for a "#group" fragment, and the
 // split, ad and country rules of the preset (and the policy and providers they need) are the built-in profile's, not a template's.
-func (p mihomoProfile) buildFromTemplate(text string) ([]byte, error) {
+func (p mihomoProfile) buildFromTemplate(text string) (body []byte, selected string, err error) {
+	selected, err = subsettings.ResolveMihomoGroup(text, p.groupID)
+	if err != nil {
+		return nil, "", err
+	}
 	opt := subsettings.MihomoOptions{AutoSelect: p.autoSelect, AutoInterval: p.autoSecs}
 	if p.preset != nil {
 		if d, err := p.preset.MihomoDNS(""); err != nil {
@@ -157,7 +164,8 @@ func (p mihomoProfile) buildFromTemplate(text string) ([]byte, error) {
 			opt.DNS = dnsNode(d, true)
 		}
 	}
-	return subsettings.ApplyMihomoTemplate(text, p.servers(), opt)
+	body, err = subsettings.ApplyMihomoTemplate(selected, p.servers(), opt)
+	return body, selected, err
 }
 
 // build writes the profile. Lines that do not parse as one proxy are skipped (and logged without their text: it holds

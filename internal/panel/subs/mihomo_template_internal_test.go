@@ -35,7 +35,7 @@ var hostileNames = []string{
 
 func templated(t *testing.T, tpl string, p mihomoProfile) (string, bool) {
 	t.Helper()
-	b, used, err := p.render("tpl", tpl)
+	b, _, used, err := p.render("tpl", tpl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,7 +384,7 @@ func TestMihomoTemplateUnusableIsLoggedNotServed(t *testing.T) {
 		var logs bytes.Buffer
 		p := mihomoProfile{title: "T", lines: []string{fixture(t, hy2Line)}, preset: ruSplit(), autoSelect: true, log: slog.New(slog.NewTextHandler(&logs, nil))}
 		want, _ := mihomoProfile{title: "T", lines: p.lines, preset: ruSplit(), autoSelect: true}.build()
-		out, used, err := p.render("Router, v2", text)
+		out, _, used, err := p.render("Router, v2", text)
 		if err != nil || used || string(out) != string(want) {
 			t.Errorf("%s: used %v, err %v", name, used, err)
 		}
@@ -423,7 +423,7 @@ func BenchmarkMihomoTemplate(b *testing.B) {
 			b.SetBytes(int64(len(text)))
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				if _, used, err := p.render("t", text); err != nil || !used {
+				if _, _, used, err := p.render("t", text); err != nil || !used {
 					b.Fatal(used, err)
 				}
 			}

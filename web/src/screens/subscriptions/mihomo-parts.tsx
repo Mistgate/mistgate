@@ -1,15 +1,18 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { QueryError } from "@/components/ui/query-error";
+import { downloadText } from "@/lib/awg";
 import { cx } from "@/lib/cx";
 import type { Tx } from "@/screens/users/t";
 import { hxDemo } from "./demo";
 import { Chips, HxChip, Msg, Opt, People, RowHead } from "./hx-parts";
+import { condition, editSource, groupLimit, inactiveRefs, sourceSelection, variants, writeTransfer, type Group, type Selection, type Source, type SourceDraft, type SourceIssue } from "./mihomo-source";
+import { MihomoYamlPreview } from "./mihomo-yaml-preview";
 import { templateBytes, templateFileMax, templateLimit, type HeaderProblem, type MihomoTemplate } from "./model";
 
-export type Row = MihomoTemplate & { k: number }; // k: the row's own key, so that a delete keeps what is typed where it was
-export type Group = { id: string; name: string };
+export type Row = MihomoTemplate & { k: number; source?: SourceDraft }; // k: the row's own key, so that a delete keeps what is typed where it was
 export type Refusal = { text: string; line?: number };
 export type Warning = { code: string; arg: string };
 export type Check = UseQueryResult<{ warnings: Warning[]; groupName: string; notServed: string; yaml: string }>;
@@ -19,9 +22,16 @@ export type Status = { kind: "bad" | "part" | "ok" | "wait"; label: string };
 export const kb = (bytes: number, t: Tx): string => (bytes / 1024).toLocaleString(t.locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** What the form itself can see in a text that is worth a look (the panel's own notes come from the panel): no dns of its own, other hosts it names, nobody it is for. */
-export function textWarnings(r: Pick<MihomoTemplate, "yaml" | "groupIds">, t: Tx): string[] {
+export function textWarnings(r: Pick<MihomoTemplate, "yaml" | "groupIds"> & { source?: Source }, t: Tx): string[] {
   const out: string[] = [];
-  if (r.yaml.trim() !== "" && !/^dns\s*:/m.test(r.yaml)) out.push(t("sx.hx.m.wNoDns"));
+  if (r.source) {
+    for (const yaml of variants(r.yaml, r.source, r.groupIds)) {
+      if (yaml.trim() !== "" && !/^dns\s*:/m.test(yaml)) {
+        out.push(t("sx.hx.m.wNoDns"));
+        break;
+      }
+    }
+  }
   const hosts = [...new Set([...r.yaml.matchAll(/https?:\/\/([^\s/'"]+)/g)].map((m) => m[1]!))].slice(0, 20);
   if (hosts.length > 0) out.push(t("sx.hx.m.wHosts", { hosts: hosts.join(", ") }));
   if (r.groupIds.length === 0) out.push(t("sx.hx.m.wFree"));
@@ -47,6 +57,10 @@ export function problemText(p: HeaderProblem, t: Tx): string {
   }
 }
 
+export function sourceIssueText(issue: SourceIssue, t: Tx): string {
+  return t(`sx.hx.m.source.${issue.kind}`, { group: issue.group ?? "" });
+}
+
 type RowProps = {
   t: Tx;
   row: Row;
@@ -56,13 +70,15 @@ type RowProps = {
   groups: Group[];
   groupsLoading: boolean;
   others: Row[];
+  draft: SourceDraft | undefined;
+  source: { yaml: string; source?: Source; issue?: SourceIssue };
   status: Status | null;
   errors: { text: string; line?: number }[];
   warnings: string[];
   asking: boolean;
   atLimit: boolean;
   onToggle: () => void;
-  onChange: (p: Partial<MihomoTemplate>) => void;
+  onChange: (p: Partial<Omit<Row, "k">>) => void;
   onDuplicate: () => void;
   onAsk: (on: boolean) => void;
   onDelete: () => void;
@@ -70,27 +86,57 @@ type RowProps = {
 };
 
 /** One template of the list: its head (name, groups and size, state) and, while it is open, its editor. */
-export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, others, status, errors, warnings, asking, atLimit, onToggle, onChange, onDuplicate, onAsk, onDelete, onFile }: RowProps) {
+export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, draft, source, others, status, errors, warnings, asking, atLimit, onToggle, onChange, onDuplicate, onAsk, onDelete, onFile }: RowProps) {
   const area = useRef<HTMLTextAreaElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(() => hxDemo.drag ?? false);
-  const bytes = templateBytes(row.yaml);
-  const names = groups.filter((g) => row.groupIds.includes(g.id)).map((g) => g.name);
+  const [operation, setOperation] = useState<SourceIssue | null>(null);
+  const [download, setDownload] = useState<string | null>(null);
+  const [chooser, setChooser] = useState<{ draft: SourceDraft; selection: Selection; ids: string[] } | null>(null);
+  const bytes = templateBytes(source.yaml);
+  const assigned = groups.filter((g) => row.groupIds.includes(g.id));
+  const names = assigned.map((g) => g.name);
   const takenBy = (id: string) => others.find((o) => o.groupIds.includes(id));
   const busy = groups.filter((g) => takenBy(g.id));
   const toggle = (id: string) => onChange({ groupIds: row.groupIds.includes(id) ? row.groupIds.filter((x) => x !== id) : [...row.groupIds, id] });
+  const selected = chooser?.ids.filter((id) => assigned.some((g) => g.id === id)) ?? [];
+  const inactive = source.source && !groupsLoading ? inactiveRefs(source.source, groups, row.groupIds) : [];
   const unnamed = row.name.trim() || t("sx.hx.m.unnamed");
-  const goTo = (line: number) => {
+  const goTo = (line: number, cursor = false) => {
     const el = area.current;
     if (!el) return;
-    const at = row.yaml.split("\n").slice(0, line - 1).reduce((s, l) => s + l.length + 1, 0);
+    const lines = el.value.split("\n");
+    const at = lines.slice(0, line - 1).reduce((s, l) => s + l.length + 1, 0);
     el.focus();
-    el.setSelectionRange(at, at + (row.yaml.split("\n")[line - 1]?.length ?? 0));
+    el.setSelectionRange(at, at + (cursor ? 0 : lines[line - 1]?.length ?? 0));
     el.scrollTop = Math.max(0, (line - 3) * 20);
+  };
+  const choose = () => {
+    const el = area.current;
+    if (!el || !draft) return;
+    const selection = sourceSelection(draft.text, el.selectionStart, el.selectionEnd);
+    setOperation(selection.issue ?? null);
+    if (!selection.value) return;
+    const ids = selection.value.block?.refs.flatMap((name) => {
+      const id = draft.names.get(name);
+      return id ? [id] : [];
+    }) ?? [];
+    setChooser({ draft, selection: selection.value, ids });
+  };
+  const applyCondition = (ids: string[]) => {
+    if (!chooser) return;
+    onChange({ source: condition(chooser.draft, chooser.selection, ids, groups) });
+    setChooser(null);
+  };
+  const exportSource = () => {
+    if (source.issue) return setOperation(source.issue);
+    const output = writeTransfer(row.name, source.yaml, row.groupIds, groups, draft);
+    setOperation(output.issue ?? null);
+    if (output.value !== undefined) setDownload(output.value);
   };
   return (
     <div className={cx("hx-r", status?.kind === "bad" && "bad", open && "on")}>
-      <RowHead n={n} open={open} onToggle={onToggle} meta={status?.label ?? ""} metaClass={cx("mt-st", status?.kind === "bad" && "bad", status?.kind === "part" && "part")}>
+      <RowHead n={n} open={open} onToggle={() => { setOperation(null); onToggle(); }} meta={status?.label ?? ""} metaClass={cx("mt-st", status?.kind === "bad" && "bad", status?.kind === "part" && "part")}>
         <b>{unnamed}</b>
         <span>{t("sx.hx.m.sub", { groups: names.length > 0 ? names.join(", ") : t("sx.hx.m.noGroups"), kib: kb(bytes, t) })}</span>
       </RowHead>
@@ -134,9 +180,13 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, oth
               wrap="off"
               aria-label={t("sx.hx.m.text")}
               data-noi18n
-              value={row.yaml}
+              value={draft?.text ?? row.yaml}
               readOnly={!owner}
-              onChange={(e) => onChange({ yaml: e.target.value })}
+              onChange={(e) => {
+                if (!draft) return;
+                setOperation(null);
+                onChange({ source: editSource(draft, e.target.value, groups) });
+              }}
               onDragOver={(e) => {
                 if (owner && e.dataTransfer.types.includes("Files")) {
                   e.preventDefault();
@@ -155,6 +205,12 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, oth
             />
             {owner && (
               <div className="mt-up">
+                <Button className="sb-btn" disabled={groupsLoading} onClick={choose}>{t("sx.hx.m.onlyGroups")}</Button>
+                <Button className="sb-btn" disabled={groupsLoading} onClick={exportSource}>{t("sx.hx.m.export")}</Button>
+              </div>
+            )}
+            {owner && (
+              <div className="mt-up">
                 <input ref={file} type="file" hidden accept=".yaml,.yml,.txt,text/yaml,text/plain" aria-label={t("sx.hx.m.load")} onChange={(e) => (onFile(e.target.files?.[0]), (e.target.value = ""))} />
                 <Button className="sb-btn" onClick={() => file.current?.click()}>
                   {t("sx.hx.m.load")}
@@ -163,14 +219,20 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, oth
               </div>
             )}
           </div>
-          {errors.map((m) => (
-            <Msg key={m.text} kind="bad">
+          {[...errors, ...(operation && operation !== source.issue ? [{ text: sourceIssueText(operation, t), line: operation.kind === "header" ? undefined : operation.line }] : [])].map((m, i) => (
+            <Msg key={`${m.text}:${i}`} kind="bad">
               {m.text}
               {m.line && (
-                <button type="button" className="mono mt-ln" aria-label={t("sx.hx.m.lineGo", { n: m.line })} onClick={() => goTo(m.line!)}>
+                <button type="button" className="mono mt-ln" aria-label={t("sx.hx.m.lineGo", { n: m.line })} onClick={() => goTo(m.line!, operation?.kind === "inactive" && operation.line === m.line)}>
                   {t("sx.hx.m.line", { n: m.line })}
                 </button>
               )}
+            </Msg>
+          ))}
+          {inactive.map((m, i) => (
+            <Msg key={`${m.line}:${i}`} kind="part">
+              {sourceIssueText(m, t)}
+              <button type="button" className="mono mt-ln" aria-label={t("sx.hx.m.lineGo", { n: m.line })} onClick={() => goTo(m.line, true)}>{t("sx.hx.m.line", { n: m.line })}</button>
             </Msg>
           ))}
           {warnings.map((w) => (
@@ -201,6 +263,52 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, oth
                 </Button>
               </div>
             ))}
+          {chooser && (
+            <Modal
+              open
+              onOpenChange={(o) => { if (!o) setChooser(null); }}
+              title={t("sx.hx.m.onlyGroups")}
+              description={t(assigned.length ? "sx.hx.m.conditionHint" : "sx.hx.m.conditionEmpty")}
+              closeLabel={t("common.close")}
+              footer={
+                <>
+                  {chooser.selection.block && <Button onClick={() => applyCondition([])}>{t("sx.hx.m.conditionRemove")}</Button>}
+                  <Button onClick={() => setChooser(null)}>{t("sx.hx.m.cancel")}</Button>
+                  <Button variant="primary" disabled={selected.length === 0 || selected.length > groupLimit} onClick={() => applyCondition(selected)}>{t("sx.hx.m.conditionApply")}</Button>
+                </>
+              }
+            >
+              {assigned.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {assigned.map((g) => (
+                    <label className="flex items-center gap-2" key={g.id}>
+                      <input type="checkbox" checked={selected.includes(g.id)} onChange={(e) => setChooser({ ...chooser, ids: e.target.checked ? [...selected, g.id] : selected.filter((id) => id !== g.id) })} />
+                      {g.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+              {chooser.selection.block && <p>{t("sx.hx.m.conditionCommon")}</p>}
+            </Modal>
+          )}
+          {download !== null && (
+            <Modal
+              open
+              onOpenChange={(o) => { if (!o) setDownload(null); }}
+              title={t("sx.hx.m.export")}
+              description={t("sx.hx.m.exportHint")}
+              closeLabel={t("common.close")}
+              footer={
+                <>
+                  <Button onClick={() => setDownload(null)}>{t("sx.hx.m.cancel")}</Button>
+                  <Button variant="primary" onClick={() => {
+                    downloadText("mihomo-template.yaml", download);
+                    setDownload(null);
+                  }}>{t("sx.hx.m.exportConfirm")}</Button>
+                </>
+              }
+            />
+          )}
         </div>
       )}
     </div>
@@ -246,7 +354,7 @@ export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, vali
   const ready = !!row && valid && !!r && !r.notServed;
   const profile = ready && (mine || anyway);
   let yaml: ReactNode = null;
-  if (profile && r) yaml = <pre className="pp-pre mt-pre" tabIndex={0} aria-label={t("sx.hx.m.pvYaml")} data-noi18n>{r.yaml}</pre>;
+  if (profile && r) yaml = <pre className="pp-pre mt-pre" tabIndex={0} aria-label={t("sx.hx.m.pvYaml")} data-noi18n><MihomoYamlPreview text={r.yaml} /></pre>;
   else if (row && valid && !r && q.isError) yaml = <QueryError error={q.error} onRetry={() => void q.refetch()} />;
   else if (row && valid && !r && userId !== "") yaml = <div className="hx-sk" aria-busy="true" />;
 

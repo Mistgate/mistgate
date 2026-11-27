@@ -523,6 +523,12 @@
   direction: ltr;
   text-align: left;
 }
+.sbp .mt-pre .mt-token-key { color: light-dark(#175d9a, #8fc9ff); }
+.sbp .mt-pre .mt-token-string { color: light-dark(#206633, #a5dc8d); }
+.sbp .mt-pre :is(.mt-token-number, .mt-token-boolean, .mt-token-null) {
+  color: light-dark(#8e3c07, #ffb778);
+}
+.sbp .mt-pre .mt-token-comment { color: light-dark(#5b606a, #a7acb8); }
 @media (width <= 640px) {
   .sbp .mt-y {
     min-height: 240px;

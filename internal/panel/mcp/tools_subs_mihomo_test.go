@@ -279,6 +279,68 @@ func TestTemplateSetPlanShowsHostsAndNotTheText(t *testing.T) {
 	}
 }
 
+func TestMihomoTemplateConditionalWarningsAndHosts(t *testing.T) {
+	text := strings.Replace(routerTemplate, "  - MATCH,Proxy\n", `# @mistgate-if ["grp_router","grp_pc"]
+  - DOMAIN-SUFFIX,assigned.example,AssignedMissing
+# @mistgate-end
+# @mistgate-if ["grp_router"]
+  - DOMAIN-SUFFIX,router.example,RouterMissing
+# @mistgate-end
+  - DOMAIN-SUFFIX,common.example,CommonMissing
+  - MATCH,Proxy
+`, 1) + `# @mistgate-if ["grp_router"]
+dns:
+  enable: true
+  nameserver: ["https://router.example/dns-query"]
+# @mistgate-end
+# @mistgate-if ["grp_unassigned"]
+dns:
+  enable: true
+  nameserver: ["https://unused.example/dns-query"]
+rules:
+  - MATCH,UnassignedMissing
+# @mistgate-end
+`
+	e := mihomoEnv(t)
+	_, secret := e.token(ProfileOperator)
+	s := e.session(secret)
+	p := decode[PlanOut](t, mustOK(t, s, "subscription_mihomo_template_set_plan", map[string]any{
+		"name": "Shared", "yaml": text, "group_ids": []string{"grp_router", "grp_pc"}, "reason": "add group variants",
+	}))
+	facts := storedFacts(t, e)
+	if got := factIn(t, facts, "hosts").Value; got != "router.example, rules.example.com, unused.example" {
+		t.Errorf("plan hosts = %q", got)
+	}
+	if got := factIn(t, facts, "sha256_12").Value; got != hashText(text)[:12] {
+		t.Errorf("plan hash = %q", got)
+	}
+	checkWarnings := func(got []string) {
+		t.Helper()
+		counts := map[string]int{}
+		for _, w := range got {
+			counts[w]++
+		}
+		if len(got) != 4 || counts["own_dns"] != 1 || counts["unknown_rule_target:CommonMissing"] != 1 ||
+			counts["unknown_rule_target:AssignedMissing"] != 1 || counts["unknown_rule_target:RouterMissing"] != 1 {
+			t.Errorf("warnings: %v", got)
+		}
+	}
+	checkWarnings(strings.Split(factIn(t, facts, "warnings").Value, ", "))
+	if err := e.plans.decide(p.PlanID, true); err != nil {
+		t.Fatal(err)
+	}
+	mustOK(t, s, "subscription_mihomo_template_set_apply", map[string]any{"confirm_token": p.ConfirmToken})
+	list := decode[SubsSettingsV](t, mustOK(t, s, "subscription_settings_get", map[string]any{}))
+	if len(list.MihomoTemplates) != 1 || list.MihomoTemplates[0].Warnings != 4 {
+		t.Fatalf("settings list: %+v", list.MihomoTemplates)
+	}
+	checkWarnings(list.MihomoTemplates[0].WarningCodes)
+	read := decode[MihomoTemplateTextV](t, mustOK(t, s, "subscription_mihomo_template_get", map[string]any{"name": "Shared"}))
+	if read.Text != text || read.SHA256 != hashText(text)[:12] || read.Lossy {
+		t.Fatal("the template read did not return the complete canonical source")
+	}
+}
+
 func captureLogs(t *testing.T) *bytes.Buffer {
 	t.Helper()
 	var buf bytes.Buffer

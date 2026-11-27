@@ -2,6 +2,9 @@ package subs_test
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -9,6 +12,7 @@ import (
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/subs"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
@@ -92,4 +96,88 @@ func TestMihomoTemplatesThroughTheSettingsAPI(t *testing.T) {
 		return
 	}
 	t.Fatal("no audit row")
+}
+
+func TestMihomoTemplateGroupIdentityFollowsID(t *testing.T) {
+	r := newTemplateRig(t, func(cfg *subs.Config) { cfg.MinInterval = -1 })
+	settings, preview := headerService(r.m3rig), r.previewService(t, plainPreset)
+	owner := auth.WithAdmin(r.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
+	createGroup := func(name string) string {
+		t.Helper()
+		return must(r.svc.CreateGroup(r.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: name, ProfileIds: []string{r.profile}}))).Msg.Group.Id
+	}
+	old := createGroup("Router")
+	text := groupTemplate + "mode: rule\n" + fmt.Sprintf("# @mistgate-if [%q]\nmixed-port: 1080\n# @mistgate-end\n", old)
+	set := subsettings.Defaults()
+	set.MihomoTemplates = []*adminv1.MihomoTemplate{{Name: "home", Yaml: text, GroupIds: []string{r.group, old}}}
+	save := func() *adminv1.MihomoTemplate {
+		t.Helper()
+		got := must(settings.UpdateSubscriptionSettings(owner, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))).Msg.Settings.MihomoTemplates[0]
+		r.cache.Invalidate() // mirrors the shared settings cache used by the panel
+		if got.Yaml != text {
+			t.Fatalf("group changes rewrote the source:\n%s", got.Yaml)
+		}
+		return got
+	}
+	check := func(user, token, name string, port any) {
+		t.Helper()
+		body := groupAnswer(t, r.body(t, token))
+		resp, err := r.preview(t, preview, user, text, set.MihomoTemplates[0].GroupIds...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		draft := groupAnswer(t, resp.Yaml)
+		if resp.GroupName != name || body["mode"] != "rule" || draft["mode"] != "rule" || body["mixed-port"] != port || draft["mixed-port"] != port {
+			t.Errorf("group %q: subscription mode/port = %v/%v, preview group/mode/port = %q/%v/%v",
+				name, body["mode"], body["mixed-port"], resp.GroupName, draft["mode"], draft["mixed-port"])
+		}
+	}
+	save()
+	router, token := r.user("router", func(req *adminv1.CreateUserRequest) { req.GroupId = old })
+	check(router, token, "Router", 1080)
+	renamed := "Renamed Router"
+	must(r.svc.UpdateGroup(r.ctx, connect.NewRequest(&adminv1.UpdateGroupRequest{GroupId: old, Name: &renamed})))
+	check(router, token, renamed, 1080)
+
+	must(r.svc.DeleteGroup(r.ctx, connect.NewRequest(&adminv1.DeleteGroupRequest{GroupId: old, MoveUsersTo: r.group})))
+	got := save() // a tab still sends the old assignment; the API prunes it without touching the source
+	if !slices.Equal(got.GroupIds, []string{r.group}) {
+		t.Fatalf("deleted group's assignment was retained: %v", got.GroupIds)
+	}
+	set.MihomoTemplates[0].GroupIds = got.GroupIds
+	check(router, token, "g", nil)
+	recreated := createGroup(renamed)
+	if recreated == old {
+		t.Fatal("the recreated group unexpectedly reused the deleted ID")
+	}
+	set.MihomoTemplates[0].GroupIds = append(set.MihomoTemplates[0].GroupIds, recreated)
+	save()
+	newRouter, newToken := r.user("new-router", func(req *adminv1.CreateUserRequest) { req.GroupId = recreated })
+	check(newRouter, newToken, renamed, nil)
+}
+
+func TestMihomoTemplateInvalidVariantLeavesSettingsUnchanged(t *testing.T) {
+	r := newTemplateRig(t, nil)
+	svc := headerService(r.m3rig)
+	preview := r.previewService(t, plainPreset)
+	owner := auth.WithAdmin(r.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
+	user, _ := r.user("phone", nil)
+	groups := []string{r.group, r.group2}
+	original := "mode: rule\n" + groupTemplate
+	r.save(t, nil, &adminv1.MihomoTemplate{Name: "shared", Yaml: original, GroupIds: groups})
+	bad := original + fmt.Sprintf("# @mistgate-if [%q]\nmixed-port: 7890\n# @mistgate-end\n# @mistgate-if [%q]\nmode: global\n# @mistgate-end\n", r.group, r.group2)
+	set := subsettings.Defaults()
+	set.Title = "rejected title"
+	set.MihomoTemplates = []*adminv1.MihomoTemplate{{Name: "shared", Yaml: bad, GroupIds: groups}}
+	_, saveErr := svc.UpdateSubscriptionSettings(owner, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))
+	_, previewErr := r.preview(t, preview, user, bad, groups...) // phone's variant is valid, but the whole draft is rejected
+	for _, err := range []error{saveErr, previewErr} {
+		if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), r.group2) || !strings.Contains(err.Error(), "line 10") {
+			t.Errorf("expected the later error in the router variant, got %v", err)
+		}
+	}
+	read := must(svc.GetSubscriptionSettings(owner, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg.Settings
+	if read.Title == set.Title || len(read.MihomoTemplates) != 1 || read.MihomoTemplates[0].Yaml != original {
+		t.Fatal("the rejected draft modified the saved settings")
+	}
 }

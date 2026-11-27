@@ -2,6 +2,7 @@ package subs_test
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -46,6 +47,7 @@ func TestMihomoTemplatesAreTheOwnersToChange(t *testing.T) {
 	// the owner saves two templates
 	first := subsettings.Defaults()
 	first.MihomoTemplates = []*adminv1.MihomoTemplate{mihomoTemplate("router", m.group2, temp), mihomoTemplate("pc", m.group)}
+	first.MihomoTemplates[0].Yaml += fmt.Sprintf("# @mistgate-if [%q]\nmixed-port: 1080\n# @mistgate-end\n", temp)
 	if err := save(owner, first); err != nil {
 		t.Fatalf("the owner: %v", err)
 	}
@@ -53,6 +55,9 @@ func TestMihomoTemplatesAreTheOwnersToChange(t *testing.T) {
 
 	// a helper changes a template: the name, the text, the groups, a new one, a removed one: refused, and nothing is saved
 	denied("a new text", changed(func(s *adminv1.SubscriptionSettings) { s.MihomoTemplates[0].Yaml += "# more\n"; s.Title = "by helper" }))
+	denied("the group condition", changed(func(s *adminv1.SubscriptionSettings) {
+		s.MihomoTemplates[0].Yaml = strings.Replace(s.MihomoTemplates[0].Yaml, temp, m.group2, 1)
+	}))
 	denied("a new name", changed(func(s *adminv1.SubscriptionSettings) { s.MihomoTemplates[0].Name = "router2" }))
 	denied("fewer groups", changed(func(s *adminv1.SubscriptionSettings) {
 		s.MihomoTemplates[0].GroupIds = s.MihomoTemplates[0].GroupIds[:1]

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, useEffect, useState } from "react";
@@ -6,11 +7,14 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/toast";
 import { Role } from "@/gen/mistgate/admin/v1/auth_pb";
+import { GroupSchema } from "@/gen/mistgate/admin/v1/group_pb";
 import { en } from "@/i18n/en";
 import { dictionaries, fill } from "@/i18n";
 import { meQuery } from "@/lib/session";
+import { groupsQuery } from "@/screens/users/rpc";
 import { LeaveGuard } from "./guard";
 import { MihomoTab } from "./mihomo";
+import { canonicalSource, condition, displaySource, editSource, mapTransfer, parseSource, readTransfer, sourceSelection, variants, writeTransfer } from "./mihomo-source";
 import { kib, starterTemplate, templateBytes, templateProblems, templateRefusal, textKey, type MihomoTemplate, type Settings } from "./model";
 
 // Subscriptions -> Mihomo templates: the list with its counters and states, the editor (the groups that are taken, the text with its
@@ -20,6 +24,11 @@ import { kib, starterTemplate, templateBytes, templateProblems, templateRefusal,
 const getSubscriptionSettings = vi.fn();
 const updateSubscriptionSettings = vi.fn();
 const previewMihomoTemplate = vi.fn();
+const downloadText = vi.fn();
+vi.mock("@/lib/awg", async (orig) => ({ ...(await orig<object>()), downloadText: (...a: unknown[]) => downloadText(...a) }));
+
+const defaultGroups = [{ id: "grp_router", name: "ROUTER" }, { id: "grp_pc", name: "PC" }, { id: "grp_mobile", name: "MOBILE" }];
+let localGroups = defaultGroups;
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<object>()),
   subscriptions: {
@@ -27,7 +36,7 @@ vi.mock("@/lib/api", async (orig) => ({
     updateSubscriptionSettings: (...a: unknown[]) => updateSubscriptionSettings(...a),
     previewMihomoTemplate: (...a: unknown[]) => previewMihomoTemplate(...a),
   },
-  groups: { listGroups: async () => ({ groups: [{ id: "grp_router", name: "ROUTER" }, { id: "grp_pc", name: "PC" }, { id: "grp_mobile", name: "MOBILE" }] }) },
+  groups: { listGroups: async () => ({ groups: localGroups }) },
   users: { listUsers: async () => ({ users: users() }) },
 }));
 
@@ -58,7 +67,8 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   root = host = null;
-  for (const m of [getSubscriptionSettings, updateSubscriptionSettings, previewMihomoTemplate]) m.mockReset();
+  for (const m of [getSubscriptionSettings, updateSubscriptionSettings, previewMihomoTemplate, downloadText]) m.mockReset();
+  localGroups = defaultGroups;
   blocker = { status: "idle" };
   blockerOpts = null;
   people = [
@@ -104,6 +114,7 @@ async function mount(list: MihomoTemplate[], opts: { role?: Role; initial?: numb
     ),
   );
   await settle();
+  return qc;
 }
 const settle = async (ms = 0) => {
   for (let i = 0; i < 8; i++) await act(async () => void (await new Promise((r) => setTimeout(r, ms))));
@@ -124,6 +135,261 @@ const typeInto = (el: HTMLInputElement | HTMLTextAreaElement, value: string) =>
   });
 const sent = () => (updateSubscriptionSettings.mock.calls.at(-1)?.[0] as { settings: Settings } | undefined)?.settings;
 const refuse = (msg: string) => new ConnectError(msg, Code.InvalidArgument);
+
+const marker = (refs: string[]) => `# @mistgate-if ${JSON.stringify(refs)}`;
+const endMarker = "# @mistgate-end";
+const optionsFor = (name: string) => [...document.querySelectorAll<HTMLSelectElement>("select")].find((s) => s.labels?.[0]?.textContent?.startsWith(fill(en["sx.hx.m.importGroup"], { name })))!;
+const chooseOption = (el: HTMLSelectElement, value: string) => act(async () => {
+  el.value = value;
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+});
+const loadFile = async (contents: string) => {
+  const input = document.querySelector<HTMLInputElement>("input[type=file]")!;
+  await act(async () => {
+    Object.defineProperty(input, "files", { value: [new File([contents], "mihomo-template.yaml")], configurable: true });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await settle();
+};
+
+describe("Mihomo group source", () => {
+  const nested = `rules:\n${marker(["grp_router", "grp_pc"])}\n  - DOMAIN,x.test,DIRECT\n  # keep this comment\n${endMarker}\n  - MATCH,DIRECT`;
+  it.each([
+    ["legacy and indented literals", "a: |\r\n  # @mistgate-if []\n  still a literal\n# not @mistgate-end", [], ["a: |\r\n  # @mistgate-if []\n  still a literal\n# not @mistgate-end"]],
+    ["rules; identical active sets", nested, ["grp_router", "grp_pc", "grp_mobile"], [
+      "rules:\n\n\n\n\n  - MATCH,DIRECT",
+      "rules:\n\n  - DOMAIN,x.test,DIRECT\n  # keep this comment\n\n  - MATCH,DIRECT",
+    ]],
+    ["mixed line endings and EOF marker", `a: 1\r\n${marker(["grp_router"])}\t\r\nb: 2\n${endMarker}`, ["grp_router"], ["a: 1\r\n\r\n\n", "a: 1\r\n\r\nb: 2\n"]],
+    ["unassigned references stay inactive", nested, ["grp_mobile"], ["rules:\n\n\n\n\n  - MATCH,DIRECT"]],
+    ["separate blocks for one group", `mode: rule\n${marker(["grp_router"])}\nredir-port: 1182\n${endMarker}\nrules:\n${marker(["grp_router", "grp_pc"])}\n  - DOMAIN,x.test,DIRECT\n${endMarker}\n  - MATCH,DIRECT\n`, ["grp_router", "grp_pc"], [
+      "mode: rule\n\n\n\nrules:\n\n\n\n  - MATCH,DIRECT\n",
+      "mode: rule\n\nredir-port: 1182\n\nrules:\n\n  - DOMAIN,x.test,DIRECT\n\n  - MATCH,DIRECT\n",
+      "mode: rule\n\n\n\nrules:\n\n  - DOMAIN,x.test,DIRECT\n\n  - MATCH,DIRECT\n",
+    ]],
+  ] as const)("%s", (_name, yaml, assigned, want) => {
+    const parsed = parseSource(yaml, true);
+    expect(parsed.issue).toBeUndefined();
+    expect([...variants(yaml, parsed.value!, assigned)]).toEqual(want);
+  });
+
+  it.each([
+    ["missing end", marker(["grp_router"]), 2],
+    ["stray end", endMarker, 2],
+    ["nested", `${marker(["grp_router"])}\n${marker(["grp_pc"])}\n${endMarker}\n${endMarker}`, 3],
+    ["unknown reserved keyword", "# @mistgate-typo", 2],
+    ["trailing end text", `${marker(["grp_router"])}\nb: 2\n${endMarker} # oops`, 4],
+    ["trailing if text", `${marker(["grp_router"])} more\n${endMarker}`, 2],
+    ["malformed JSON", "# @mistgate-if [01]\n# @mistgate-end", 2],
+    ["empty list", `${marker([])}\n${endMarker}`, 2],
+    ["repeat", `${marker(["grp_pc", "grp_pc"])}\n${endMarker}`, 2],
+    ["bad ID", `${marker(["grp\npc"])}\n${endMarker}`, 2],
+    ["group limit", `${marker(Array.from({ length: 101 }, (_, i) => `grp_${i}`))}\n${endMarker}`, 2],
+  ] as const)("rejects %s with source line", (_name, yaml, line) => {
+    expect(parseSource(`a: 1\n${yaml}`, true).issue).toEqual({ kind: "syntax", line });
+  });
+
+  it.each([
+    ["end at next line", "rules:\n  - alpha\n  - bravo\n", 9, 17, `rules:\n${marker(["ROUTER"])}\n  - alpha\n${endMarker}\n  - bravo\n`],
+    ["collapsed with CRLF and no final newline", "mode: rule\r\nx: 1", 12, 12, `mode: rule\r\n${marker(["ROUTER"])}\r\nx: 1\r\n${endMarker}`],
+    ["partial selection over lines", "one\ntwo\nthree", 2, 6, `${marker(["ROUTER"])}\none\ntwo\n${endMarker}\nthree`],
+  ] as const)("wraps complete lines: %s", (_name, yaml, from, to, want) => {
+    const selection = sourceSelection(yaml, from, to);
+    expect(selection.issue).toBeUndefined();
+    expect(condition(displaySource(yaml, defaultGroups), selection.value!, ["grp_router"], defaultGroups).text).toBe(want);
+  });
+
+  it("protects noncollapsed selections that touch conditions and leaves empty lines alone", () => {
+    expect(sourceSelection(nested, 1, nested.length).issue?.kind).toBe("selection");
+    expect(sourceSelection("a: 1\n \nb: 2\n", 6, 6).issue).toEqual({ kind: "emptyLine", line: 2 });
+  });
+
+  it("remaps only operands, preserves escaping, and never assigns a stale alias to a new ID", () => {
+    const groups = [{ id: "grp_router", name: 'Дом, "Роутер"' }, defaultGroups[1]!];
+    const yaml = `label: grp_router\r\n# @mistgate-if\t[ \"grp_router\" ] \r\n  # @mistgate-keep grp_router\n${endMarker}`;
+    const draft = displaySource(yaml, groups);
+    expect(draft.text).toBe(`label: grp_router\r\n# @mistgate-if\t[ ${JSON.stringify(groups[0]!.name)} ] \r\n  # @mistgate-keep grp_router\n${endMarker}`);
+    const changed = [{ id: "grp_new", name: groups[0]!.name }, { id: "grp_router", name: "Renamed" }];
+    expect(canonicalSource(editSource(draft, draft.text, changed)).value).toBe(yaml);
+    expect(canonicalSource(editSource(draft, draft.text, changed.slice(0, 1))).value).toBe(yaml);
+    expect(writeTransfer("Дом", yaml, ["grp_new"], changed.slice(0, 1), draft).issue).toEqual({ kind: "inactive", line: 2, group: "grp_router" });
+    const file = writeTransfer('Дом "1"', yaml, ["grp_router", "grp_pc"], groups, draft).value!;
+    const transfer = readTransfer(file).value!;
+    expect(transfer).toEqual({ name: 'Дом "1"', groups: [groups[0]!.name, "PC"], text: draft.text });
+    expect(mapTransfer(transfer.text, new Map([[groups[0]!.name, "grp_other"]])).value).toBe(yaml.replace('[ "grp_router" ]', '[ "grp_other" ]'));
+  });
+});
+
+describe("editing and transferring group blocks", () => {
+  it("wraps the selected list item, previews with IDs, and saves the exact canonical source", async () => {
+    const yaml = `${GOOD}rules:\n  - DOMAIN,router.test,Proxy\n  - MATCH,Proxy\n`;
+    const inserted = (ref: string) => `${GOOD}rules:\n${marker([ref])}\n  - DOMAIN,router.test,Proxy\n${endMarker}\n  - MATCH,Proxy\n`;
+    previewMihomoTemplate.mockImplementation(async ({ userId, yaml, groupIds }: { userId: string; yaml: string; groupIds: string[] }) => {
+      const router = userId === "usr_alice";
+      const source = parseSource(yaml, true).value!;
+      return reply({ yaml: [...variants(yaml, source, groupIds.filter((g) => g === (router ? "grp_router" : "grp_pc")))].at(-1), groupName: router ? "ROUTER" : "PC" });
+    });
+    await mount([tpl("Shared", ["grp_router", "grp_pc"], yaml)]);
+    area().setSelectionRange(yaml.indexOf("router.test"), yaml.indexOf("  - MATCH"));
+    await click(buttonWith(en["sx.hx.m.onlyGroups"]));
+    const box = document.querySelector<HTMLInputElement>('[role=dialog] input[type=checkbox]')!;
+    expect(box.parentElement?.textContent).toBe("ROUTER");
+    expect(document.querySelectorAll('[role=dialog] input[type=checkbox]')).toHaveLength(2);
+    await click(box);
+    await click(buttonWith(en["sx.hx.m.conditionApply"]));
+    expect(area().value).toBe(inserted("ROUTER"));
+    await debounced();
+    expect(previewMihomoTemplate).toHaveBeenCalledWith({ userId: "usr_alice", yaml: inserted("grp_router"), groupIds: ["grp_router", "grp_pc"] }, expect.anything());
+    expect(document.querySelector("pre.mt-pre")?.textContent).toContain("router.test");
+    await click(buttonWith("bob"));
+    await settle();
+    expect(previewMihomoTemplate).toHaveBeenCalledWith({ userId: "usr_bob", yaml: inserted("grp_router"), groupIds: ["grp_router", "grp_pc"] }, expect.anything());
+    expect(document.querySelector("pre.mt-pre")?.textContent).toContain("MATCH,Proxy");
+    expect(document.querySelector("pre.mt-pre")?.textContent).not.toContain("router.test");
+    expect(document.querySelector("pre.mt-pre")?.textContent).not.toContain("@mistgate");
+    await click(buttonWith(en["subs.save"]));
+    await settle();
+    expect(sent()?.mihomoTemplates).toEqual([tpl("Shared", ["grp_router", "grp_pc"], inserted("grp_router"))]);
+  });
+
+  it("refuses overlapping blocks and explicitly confirms that removing a condition makes the lines common", async () => {
+    const yaml = `${GOOD}${marker(["grp_router"])}\nmode: rule\n${endMarker}`;
+    await mount([tpl("Shared", ["grp_router", "grp_pc"], yaml)]);
+    const displayed = area().value;
+    area().setSelectionRange(0, displayed.length);
+    await click(buttonWith(en["sx.hx.m.onlyGroups"]));
+    expect(text()).toContain(en["sx.hx.m.source.selection"]);
+    expect(area().value).toBe(displayed);
+    area().setSelectionRange(displayed.indexOf("mode: rule"), displayed.indexOf("mode: rule"));
+    await click(buttonWith(en["sx.hx.m.onlyGroups"]));
+    expect(text()).toContain(en["sx.hx.m.conditionCommon"]);
+    await click(buttonWith(en["sx.hx.m.cancel"]));
+    expect(area().value).toBe(displayed);
+    await click(buttonWith(en["sx.hx.m.onlyGroups"]));
+    const boxes = [...document.querySelectorAll<HTMLInputElement>('[role=dialog] input[type=checkbox]')];
+    expect(boxes.map((x) => x.checked)).toEqual([true, false]);
+    await click(boxes[0]);
+    await click(boxes[1]);
+    await click(buttonWith(en["sx.hx.m.conditionApply"]));
+    expect(area().value).toContain(marker(["PC"]));
+    const at = area().value.indexOf("mode: rule");
+    area().setSelectionRange(at, at);
+    await click(buttonWith(en["sx.hx.m.onlyGroups"]));
+    await click(buttonWith(en["sx.hx.m.conditionRemove"]));
+    expect(area().value).toBe(`${GOOD}mode: rule`);
+  });
+
+  it("looks for DNS in effective variants rather than treating conditional DNS as common", async () => {
+    const conditional = GOOD.replace("dns:\n  enable: true\n", `${marker(["grp_router"])}\ndns:\n  enable: true\n${endMarker}\n`);
+    await mount([tpl("Shared", ["grp_router", "grp_pc"], conditional)]);
+    expect(text()).toContain(en["sx.hx.m.wNoDns"]);
+    await typeInto(area(), GOOD);
+    expect(text()).not.toContain(en["sx.hx.m.wNoDns"]);
+  });
+
+  it("keeps a draft's group identity across refresh, rename and recreation, until explicitly reassigned", async () => {
+    const guard = vi.fn();
+    const yaml = `${GOOD}${marker(["grp_router"])}\nmode: rule\n${endMarker}\n`;
+    const qc = await mount([tpl("Shared", ["grp_router"], yaml)], { guard });
+    expect(guard.mock.calls.at(-1)).toEqual([false]);
+    await typeInto(area(), area().value + "# unsaved\n");
+    await act(async () => void qc.setQueryData(groupsQuery.queryKey, [create(GroupSchema, { id: "grp_router", name: "Renamed" })]));
+    await settle();
+    expect(area().value).toContain(marker(["ROUTER"]));
+    await act(async () => void qc.setQueryData(groupsQuery.queryKey, [create(GroupSchema, { id: "grp_new", name: "ROUTER" })]));
+    await settle();
+    expect(text()).toContain(fill(en["sx.hx.m.source.inactive"], { group: "grp_router" }));
+    await click(chipOf("ROUTER"));
+    await click(buttonWith(en["sx.hx.m.export"]));
+    expect(downloadText).not.toHaveBeenCalled();
+    expect(buttonWith(en["sx.hx.m.exportConfirm"])).toBeUndefined();
+    await click(buttonWith(en["subs.save"]));
+    await settle();
+    expect(sent()?.mihomoTemplates).toEqual([tpl("Shared", ["grp_new"], yaml + "# unsaved\n")]);
+    const savedYaml = sent()!.mihomoTemplates[0]!.yaml;
+    expect([...variants(savedYaml, parseSource(savedYaml, true).value!, ["grp_new"])]).toHaveLength(1);
+    await click(document.querySelector("button.mt-ln"));
+    await click(buttonWith(en["sx.hx.m.onlyGroups"]));
+    await click(document.querySelector('[role=dialog] input[type=checkbox]'));
+    await click(buttonWith(en["sx.hx.m.conditionApply"]));
+    await click(buttonWith(en["subs.save"]));
+    await settle();
+    expect(sent()?.mihomoTemplates).toEqual([tpl("Shared", ["grp_new"], yaml.replace(marker(["grp_router"]), marker(["grp_new"])) + "# unsaved\n")]);
+  });
+
+  it("exports the draft and imports its assignments and variants on a panel with different IDs", async () => {
+    const yaml = `${GOOD}${marker(["grp_router"])}\nredir-port: 1182\n${endMarker}\n`;
+    await mount([tpl("Shared", ["grp_router", "grp_pc"], yaml)]);
+    await typeInto(document.querySelector("#mt-name")!, 'Home, "Lab"');
+    await typeInto(area(), area().value + "# unsaved\n");
+    await click(buttonWith(en["sx.hx.m.export"]));
+    expect(text()).toContain(en["sx.hx.m.exportHint"]);
+    await click(buttonWith(en["sx.hx.m.exportConfirm"]));
+    expect(downloadText).toHaveBeenCalledOnce();
+    const [filename, payload] = downloadText.mock.calls[0]! as [string, string];
+    expect(filename).toBe("mihomo-template.yaml");
+    expect(payload).toBe(`# @mistgate-template \"Home, \\\"Lab\\\"\"\n# @mistgate-groups [\"ROUTER\",\"PC\"]\n${yaml.replace(marker(["grp_router"]), marker(["ROUTER"]))}# unsaved\n`);
+    expect(updateSubscriptionSettings).not.toHaveBeenCalled();
+
+    await act(async () => root?.unmount());
+    host?.remove();
+    localGroups = [{ id: "grp_route2", name: "ROUTER" }, { id: "grp_desktop2", name: "Desktop" }, { id: "grp_busy", name: "PC" }];
+    const other = tpl("Other", ["grp_busy"]);
+    await mount([tpl("Target"), other]);
+    await loadFile(payload);
+    expect(optionsFor("ROUTER").value).toBe("grp_route2");
+    expect(optionsFor("PC").value).toBe("");
+    expect([...optionsFor("PC").options].find((o) => o.value === "grp_busy")?.disabled).toBe(true);
+    expect([...optionsFor("PC").options].find((o) => o.value === "grp_route2")?.disabled).toBe(true);
+    expect(buttonWith(en["sx.hx.m.importApply"]).hasAttribute("disabled")).toBe(true);
+    await click(buttonWith(en["sx.hx.m.cancel"]));
+    expect(area().value).toBe(GOOD);
+    expect(document.querySelector<HTMLInputElement>("#mt-name")?.value).toBe("Target");
+    await loadFile(payload);
+    await chooseOption(optionsFor("PC"), "grp_desktop2");
+    await click(buttonWith(en["sx.hx.m.importApply"]));
+    expect(area().value).toBe(yaml.replace(marker(["grp_router"]), marker(["ROUTER"])) + "# unsaved\n");
+    expect(chipOf("Desktop").getAttribute("aria-pressed")).toBe("true");
+    expect(updateSubscriptionSettings).not.toHaveBeenCalled();
+    await click(buttonWith(en["subs.save"]));
+    await settle();
+    const mapped = yaml.replace(marker(["grp_router"]), marker(["grp_route2"])) + "# unsaved\n";
+    expect(sent()?.mihomoTemplates).toEqual([tpl('Home, "Lab"', ["grp_route2", "grp_desktop2"], mapped), other]);
+    const from = yaml + "# unsaved\n";
+    expect([...variants(mapped, parseSource(mapped, true).value!, ["grp_route2", "grp_desktop2"])]).toEqual([...variants(from, parseSource(from, true).value!, ["grp_router", "grp_pc"])]);
+  });
+
+  it.each([
+    ["malformed header", '# @mistgate-template \"Shared\"\n# @mistgate-groups [\"ROUTER\",]\nx: 1\n', en["sx.hx.m.source.header"]],
+    ["misplaced header", '# comment\nx: 1\n# @mistgate-template \"Shared\"\n# @mistgate-groups []\n', en["sx.hx.m.source.header"]],
+    ["duplicate manifest group", '# @mistgate-template \"Shared\"\n# @mistgate-groups [\"ROUTER\",\"ROUTER\"]\nx: 1\n', en["sx.hx.m.source.header"]],
+    ["unlisted operand", `# @mistgate-template \"Shared\"\n# @mistgate-groups [\"ROUTER\"]\n${marker(["PC"])}\nx: 1\n${endMarker}\n`, fill(en["sx.hx.m.source.unknown"], { group: "PC" })],
+    ["unassigned operand in headerless file", `${marker(["PC"])}\nx: 1\n${endMarker}\n`, fill(en["sx.hx.m.source.unknown"], { group: "PC" })],
+  ])("rejects %s without changing the draft", async (_name, file, issue) => {
+    await mount([tpl("Original", ["grp_router"])]);
+    await loadFile(file);
+    expect(text()).toContain(issue);
+    expect(area().value).toBe(GOOD);
+    expect(chipOf("ROUTER").getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector<HTMLInputElement>("#mt-name")?.value).toBe("Original");
+    expect(buttonWith(en["subs.save"]).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("maps a valid headerless file with current assignments, and rejects a manually typed unknown name", async () => {
+    await mount([tpl("Original", ["grp_router"])]);
+    const body = `${GOOD}${marker(["ROUTER"])}\nmode: rule\n${endMarker}\n`;
+    await loadFile(body);
+    expect(area().value).toBe(body);
+    expect(document.querySelector<HTMLInputElement>("#mt-name")?.value).toBe("Original");
+    await typeInto(area(), body.replace(marker(["ROUTER"]), marker(["Unknown"])));
+    expect(text()).toContain(fill(en["sx.hx.m.source.unknown"], { group: "Unknown" }));
+    expect(buttonWith(en["subs.save"]).hasAttribute("disabled")).toBe(true);
+    await typeInto(area(), body);
+    await click(buttonWith(en["subs.save"]));
+    await settle();
+    expect(sent()?.mihomoTemplates).toEqual([tpl("Original", ["grp_router"], body.replace(marker(["ROUTER"]), marker(["grp_router"])))]);
+  });
+});
 
 describe("the pieces the form says early", () => {
   it("counts a text as the panel does, in KiB", () => {
@@ -360,6 +626,31 @@ describe("the preview", () => {
     const out = document.querySelector<HTMLPreElement>("pre.mt-pre")!;
     expect(out.textContent).toContain("de1.example.com");
     expect(text()).toContain(en["sx.hx.m.pvKeys"]);
+  });
+  it("highlights the selected YAML without changing its text or interpreting markup", async () => {
+    const router = 'mixed-port: 1080\nprofile:\n  enable: true # router\nurl: "https://example.com/a#b"\nlabel: "<img src=x>"\n';
+    const pc = "mode: rule\n";
+    let resolvePC!: () => void;
+    const pendingPC = new Promise<void>((resolve) => { resolvePC = resolve; });
+    previewMihomoTemplate.mockImplementation(async ({ userId }: { userId: string }) => {
+      if (userId === "usr_alice") return reply({ yaml: router });
+      await pendingPC;
+      return reply({ yaml: pc });
+    });
+    await mount([tpl("Home", ["grp_router", "grp_pc"])]);
+    await debounced();
+    const preview = () => document.querySelector("pre.mt-pre")!;
+    expect(preview().textContent).toBe(router);
+    expect(preview().querySelector("img")).toBeNull();
+    expect(preview().querySelector(".mt-token-number")?.textContent).toBe("1080");
+    expect(preview().querySelector(".mt-token-boolean")?.textContent).toBe("true");
+    expect(preview().querySelector(".mt-token-string")?.textContent).toBe('"https://example.com/a#b"');
+    expect(preview().querySelector(".mt-token-comment")?.textContent).toBe("# router");
+    await click(buttonWith("bob"));
+    expect(document.querySelector("pre.mt-pre")).toBeNull();
+    resolvePC();
+    await debounced();
+    expect(preview().textContent).toBe(pc);
   });
   it("outcome 1: the person of a group of the template gets the template", async () => {
     await mount([tpl("Home routers", ["grp_router"])]);

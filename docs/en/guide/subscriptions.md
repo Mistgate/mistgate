@@ -286,11 +286,27 @@ Changes wait for **Save**; **Discard** drops them. They apply at the next fetch,
 
 ## Mihomo templates
 
-By default the Mihomo YAML is the panel's own profile: your servers, one group to pick from, an `Auto` group and the DNS of the person's preset. The **Mihomo templates** tab lets you write your own profile for chosen groups: your proxy groups, rules and rule lists, with the person's servers put in. One template can go to several groups (the router and the PC of the same family get different ones), and a group named by no template gets the panel's own profile. A person is in one group, so they get one template.
+By default the Mihomo YAML is the panel's own profile: your servers, one group to pick from, an `Auto` group and the DNS of the person's preset. The **Mihomo templates** tab lets you write your own profile for chosen groups: your proxy groups, rules and rule lists, with the person's servers put in. A person gets the template assigned to their primary group, or the panel's own profile if no template is assigned. Additional groups affect access, not the choice of template or its blocks.
 
 Only the owner changes templates. A template is the whole config its people get, with the `proxy-providers` and rules it names, which is more than the other settings of this section. A helper reads the templates and uses the preview, but a save of theirs that adds, deletes or changes a template (its name, text or groups) is refused with `mihomo_templates_owner_only`; the rest of the settings stay open to them. The same holds for a token: an agent changes a template only through the owner's approval of its plan.
 
 The tab lists the templates (name, groups, size, a mark for errors and warnings). **Add template**, **Duplicate** (for a second device, start from a copy of the first) and **Delete** work on the list; a template has a **Name**, its **Groups** (a group already in another template is shown as taken) and the YAML text, which you type, paste or load with **Load .yaml**. Nothing is saved before **Save**. A change reaches people with their next fetch (in the Cloudflare edition, within a minute).
+
+### Sharing one template across groups
+
+Assign the same template to Router and Phone. Select lines, click **Only for groups**, and pick Router:
+
+```yaml
+mode: rule
+# @mistgate-if ["Router"]
+redir-port: 1182
+tproxy-port: 1181
+# @mistgate-end
+```
+
+Directives start in the first column, even inside a list. Keep the YAML lines at their original indentation. Multiple names mean any one of those primary groups. Blocks cannot nest. The shared part and every assigned variant must be valid. Preview with a person to inspect the selected variant as highlighted YAML. Removing a condition makes its lines shared; removing an assignment leaves the block in the source but disables it for that group.
+
+Download the source to move a template to another panel. On import, match all group names with local groups not assigned to another template, then confirm and save. Manually written secrets remain in the file. Do not load this source into Mihomo directly: it ignores directive comments. Subscription responses contain the resolved config.
 
 ### What the panel changes
 
