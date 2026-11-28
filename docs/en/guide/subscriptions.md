@@ -294,7 +294,7 @@ The tab lists the templates (name, groups, size, a mark for errors and warnings)
 
 ### Sharing one template across groups
 
-Assign the same template to Router and Phone. Select lines, click **Only for groups**, and pick Router:
+Assign the same template to Router and Phone. Select lines in the highlighted editor, click **Set groups for these lines**, and pick Router. The list above the editor shows each block's lines and groups and lets you change them:
 
 ```yaml
 mode: rule

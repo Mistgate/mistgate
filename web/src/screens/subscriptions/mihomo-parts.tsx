@@ -1,5 +1,5 @@
 import type { UseQueryResult } from "@tanstack/react-query";
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { QueryError } from "@/components/ui/query-error";
@@ -88,11 +88,14 @@ type RowProps = {
 /** One template of the list: its head (name, groups and size, state) and, while it is open, its editor. */
 export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, draft, source, others, status, errors, warnings, asking, atLimit, onToggle, onChange, onDuplicate, onAsk, onDelete, onFile }: RowProps) {
   const area = useRef<HTMLTextAreaElement>(null);
+  const ink = useRef<HTMLPreElement>(null);
+  const helpId = useId();
   const file = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(() => hxDemo.drag ?? false);
+  const [composing, setComposing] = useState(false);
   const [operation, setOperation] = useState<SourceIssue | null>(null);
   const [download, setDownload] = useState<string | null>(null);
-  const [chooser, setChooser] = useState<{ draft: SourceDraft; selection: Selection; ids: string[] } | null>(null);
+  const [chooser, setChooser] = useState<{ draft: SourceDraft; selection: Selection; ids: string[]; from: number; to: number } | null>(null);
   const bytes = templateBytes(source.yaml);
   const assigned = groups.filter((g) => row.groupIds.includes(g.id));
   const names = assigned.map((g) => g.name);
@@ -101,6 +104,8 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
   const toggle = (id: string) => onChange({ groupIds: row.groupIds.includes(id) ? row.groupIds.filter((x) => x !== id) : [...row.groupIds, id] });
   const selected = chooser?.ids.filter((id) => assigned.some((g) => g.id === id)) ?? [];
   const inactive = source.source && !groupsLoading ? inactiveRefs(source.source, groups, row.groupIds) : [];
+  const blocks = source.source?.blocks ?? [];
+  const input = open ? (draft?.text ?? row.yaml).replace(/\r\n?/g, "\n") : "";
   const unnamed = row.name.trim() || t("sx.hx.m.unnamed");
   const goTo = (line: number, cursor = false) => {
     const el = area.current;
@@ -111,17 +116,21 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
     el.setSelectionRange(at, at + (cursor ? 0 : lines[line - 1]?.length ?? 0));
     el.scrollTop = Math.max(0, (line - 3) * 20);
   };
-  const choose = () => {
+  const choose = (line?: number) => {
+    if (line !== undefined) goTo(line, true);
     const el = area.current;
     if (!el || !draft) return;
-    const selection = sourceSelection(draft.text, el.selectionStart, el.selectionEnd);
-    setOperation(selection.issue ?? null);
-    if (!selection.value) return;
-    const ids = selection.value.block?.refs.flatMap((name) => {
+    const result = sourceSelection(draft.text, el.selectionStart, el.selectionEnd);
+    setOperation(result.issue ?? null);
+    if (!result.value) return;
+    const selection = result.value;
+    const ids = selection.block?.refs.flatMap((name) => {
       const id = draft.names.get(name);
       return id ? [id] : [];
     }) ?? [];
-    setChooser({ draft, selection: selection.value, ids });
+    const from = selection.block ? selection.block.open + 2 : selection.lines.findIndex((line) => line.start === selection.start) + 1;
+    const to = selection.block ? Math.max(from, selection.block.close) : selection.lines.findIndex((line) => line.end === selection.end) + 1;
+    setChooser({ draft, selection, ids, from, to });
   };
   const applyCondition = (ids: string[]) => {
     if (!chooser) return;
@@ -172,43 +181,69 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
               <span>{t("sx.hx.m.text")}</span>
               <span className={cx("mono", bytes > templateLimit.bytes && "bad")}>{t("sx.hx.m.textSz", { kib: kb(bytes, t), max: templateLimit.bytes >> 10 })}</span>
             </div>
-            <textarea
-              ref={area}
-              className={cx("an-i mono mt-y", drag && "drag")}
-              rows={16}
-              spellCheck={false}
-              wrap="off"
-              aria-label={t("sx.hx.m.text")}
-              data-noi18n
-              value={draft?.text ?? row.yaml}
-              readOnly={!owner}
-              onChange={(e) => {
-                if (!draft) return;
-                setOperation(null);
-                onChange({ source: editSource(draft, e.target.value, groups) });
-              }}
-              onDragOver={(e) => {
-                if (owner && e.dataTransfer.types.includes("Files")) {
-                  e.preventDefault();
-                  setDrag(true);
-                }
-              }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={(e) => {
-                setDrag(false);
-                const f = e.dataTransfer.files[0];
-                if (owner && f) {
-                  e.preventDefault();
-                  onFile(f);
-                }
-              }}
-            />
             {owner && (
-              <div className="mt-up">
-                <Button className="sb-btn" disabled={groupsLoading} onClick={choose}>{t("sx.hx.m.onlyGroups")}</Button>
-                <Button className="sb-btn" disabled={groupsLoading} onClick={exportSource}>{t("sx.hx.m.export")}</Button>
-              </div>
+              <>
+                <p className="hx-note" id={helpId}>{t(assigned.length ? "sx.hx.m.conditionHelp" : "sx.hx.m.conditionEmpty")}</p>
+                <div className="mt-up">
+                  <Button className="sb-btn" disabled={groupsLoading || assigned.length === 0} onClick={() => choose()}>{t("sx.hx.m.onlyGroups")}</Button>
+                  <Button className="sb-btn" disabled={groupsLoading} onClick={exportSource}>{t("sx.hx.m.export")}</Button>
+                </div>
+                {blocks.length > 0 && (
+                  <ul className="mt-blocks" aria-label={t("sx.hx.m.conditionTitle")}>
+                    {blocks.map((block) => (
+                      <li key={block.open}>
+                        <span id={`${helpId}-${block.open}`}>{t("sx.hx.m.conditionEntry", { from: block.open + 2, to: Math.max(block.open + 2, block.close), groups: block.refs.map((id) => groups.find((g) => g.id === id)?.name ?? id).join(", ") })}</span>
+                        <Button className="sb-btn" aria-describedby={`${helpId}-${block.open}`} disabled={groupsLoading} onClick={() => choose(block.open + 1)}>{t("sx.hx.m.conditionEdit")}</Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
+            <div className="mt-editor">
+              <div className="mt-y-mirror" aria-hidden="true" data-noi18n>
+                <pre ref={ink} className="mt-y-ink"><MihomoYamlPreview text={input} /></pre>
+              </div>
+              <textarea
+                ref={area}
+                className={cx("an-i mono mt-y", drag && "drag", composing && "composing")}
+                rows={16}
+                spellCheck={false}
+                wrap="off"
+                aria-label={t("sx.hx.m.text")}
+                aria-describedby={owner ? helpId : undefined}
+                data-noi18n
+                value={input}
+                readOnly={!owner}
+                onScroll={(e) => {
+                  if (!ink.current) return;
+                  const { scrollLeft, scrollTop } = e.currentTarget;
+                  ink.current.style.transform = `translate(${-scrollLeft}px, ${-scrollTop}px)`;
+                }}
+                onCompositionStart={() => setComposing(true)}
+                onCompositionEnd={() => setComposing(false)}
+                onChange={(e) => {
+                  if (!draft) return;
+                  setOperation(null);
+                  onChange({ source: editSource(draft, e.target.value, groups) });
+                }}
+                onDragOver={(e) => {
+                  if (owner && e.dataTransfer.types.includes("Files")) {
+                    e.preventDefault();
+                    setDrag(true);
+                  }
+                }}
+                onDragLeave={() => setDrag(false)}
+                onDrop={(e) => {
+                  setDrag(false);
+                  const f = e.dataTransfer.files[0];
+                  if (owner && f) {
+                    e.preventDefault();
+                    onFile(f);
+                  }
+                }}
+              />
+            </div>
             {owner && (
               <div className="mt-up">
                 <input ref={file} type="file" hidden accept=".yaml,.yml,.txt,text/yaml,text/plain" aria-label={t("sx.hx.m.load")} onChange={(e) => (onFile(e.target.files?.[0]), (e.target.value = ""))} />
@@ -267,8 +302,8 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
             <Modal
               open
               onOpenChange={(o) => { if (!o) setChooser(null); }}
-              title={t("sx.hx.m.onlyGroups")}
-              description={t(assigned.length ? "sx.hx.m.conditionHint" : "sx.hx.m.conditionEmpty")}
+              title={t("sx.hx.m.conditionTitle")}
+              description={assigned.length ? t("sx.hx.m.conditionHint", { from: chooser.from, to: chooser.to }) : t("sx.hx.m.conditionEmpty")}
               closeLabel={t("common.close")}
               footer={
                 <>

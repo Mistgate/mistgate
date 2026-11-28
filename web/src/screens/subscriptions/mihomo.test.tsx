@@ -221,6 +221,18 @@ describe("Mihomo group source", () => {
 });
 
 describe("editing and transferring group blocks", () => {
+  it("colors the source while keeping the native editor text and literal YAML values", async () => {
+    await mount([tpl("Shared", ["grp_router"])]);
+    const yaml = 'mixed-port: 1080\nlabel: "<img src=x>"\n# note\n';
+    await typeInto(area(), yaml);
+    const layer = document.querySelector(".mt-y-mirror")!;
+    expect(area().value).toBe(yaml);
+    expect(layer.textContent).toBe(yaml);
+    expect(layer.querySelector(".mt-token-number")?.textContent).toBe("1080");
+    expect(layer.querySelector(".mt-token-comment")?.textContent).toBe("# note");
+    expect(layer.querySelector("img")).toBeNull();
+  });
+
   it("wraps the selected list item, previews with IDs, and saves the exact canonical source", async () => {
     const yaml = `${GOOD}rules:\n  - DOMAIN,router.test,Proxy\n  - MATCH,Proxy\n`;
     const inserted = (ref: string) => `${GOOD}rules:\n${marker([ref])}\n  - DOMAIN,router.test,Proxy\n${endMarker}\n  - MATCH,Proxy\n`;
@@ -232,12 +244,15 @@ describe("editing and transferring group blocks", () => {
     await mount([tpl("Shared", ["grp_router", "grp_pc"], yaml)]);
     area().setSelectionRange(yaml.indexOf("router.test"), yaml.indexOf("  - MATCH"));
     await click(buttonWith(en["sx.hx.m.onlyGroups"]));
+    const from = yaml.slice(0, yaml.indexOf("  - DOMAIN")).split("\n").length;
+    expect(text()).toContain(fill(en["sx.hx.m.conditionHint"], { from: String(from), to: String(from) }));
     const box = document.querySelector<HTMLInputElement>('[role=dialog] input[type=checkbox]')!;
     expect(box.parentElement?.textContent).toBe("ROUTER");
     expect(document.querySelectorAll('[role=dialog] input[type=checkbox]')).toHaveLength(2);
     await click(box);
     await click(buttonWith(en["sx.hx.m.conditionApply"]));
     expect(area().value).toBe(inserted("ROUTER"));
+    expect(document.querySelector(".mt-blocks")?.textContent).toContain(fill(en["sx.hx.m.conditionEntry"], { from: String(from + 1), to: String(from + 1), groups: "ROUTER" }));
     await debounced();
     expect(previewMihomoTemplate).toHaveBeenCalledWith({ userId: "usr_alice", yaml: inserted("grp_router"), groupIds: ["grp_router", "grp_pc"] }, expect.anything());
     expect(document.querySelector("pre.mt-pre")?.textContent).toContain("router.test");
@@ -260,21 +275,19 @@ describe("editing and transferring group blocks", () => {
     await click(buttonWith(en["sx.hx.m.onlyGroups"]));
     expect(text()).toContain(en["sx.hx.m.source.selection"]);
     expect(area().value).toBe(displayed);
-    area().setSelectionRange(displayed.indexOf("mode: rule"), displayed.indexOf("mode: rule"));
-    await click(buttonWith(en["sx.hx.m.onlyGroups"]));
+    area().setSelectionRange(0, 0);
+    await click(buttonWith(en["sx.hx.m.conditionEdit"]));
     expect(text()).toContain(en["sx.hx.m.conditionCommon"]);
     await click(buttonWith(en["sx.hx.m.cancel"]));
     expect(area().value).toBe(displayed);
-    await click(buttonWith(en["sx.hx.m.onlyGroups"]));
+    await click(buttonWith(en["sx.hx.m.conditionEdit"]));
     const boxes = [...document.querySelectorAll<HTMLInputElement>('[role=dialog] input[type=checkbox]')];
     expect(boxes.map((x) => x.checked)).toEqual([true, false]);
     await click(boxes[0]);
     await click(boxes[1]);
     await click(buttonWith(en["sx.hx.m.conditionApply"]));
     expect(area().value).toContain(marker(["PC"]));
-    const at = area().value.indexOf("mode: rule");
-    area().setSelectionRange(at, at);
-    await click(buttonWith(en["sx.hx.m.onlyGroups"]));
+    await click(buttonWith(en["sx.hx.m.conditionEdit"]));
     await click(buttonWith(en["sx.hx.m.conditionRemove"]));
     expect(area().value).toBe(`${GOOD}mode: rule`);
   });
