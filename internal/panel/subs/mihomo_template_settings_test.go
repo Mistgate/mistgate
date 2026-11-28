@@ -1,16 +1,22 @@
 package subs_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/instance"
+	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
 	"github.com/mistgate/mistgate/internal/panel/store"
 	"github.com/mistgate/mistgate/internal/panel/subs"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
@@ -179,5 +185,132 @@ func TestMihomoTemplateInvalidVariantLeavesSettingsUnchanged(t *testing.T) {
 	read := must(svc.GetSubscriptionSettings(owner, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg.Settings
 	if read.Title == set.Title || len(read.MihomoTemplates) != 1 || read.MihomoTemplates[0].Yaml != original {
 		t.Fatal("the rejected draft modified the saved settings")
+	}
+}
+
+func TestMihomoTemplateDeletedAssignmentDoesNotRequireAuto(t *testing.T) {
+	m := newM3Rig(t)
+	svc := headerService(m)
+	owner := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
+	temp := must(m.svc.CreateGroup(m.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "temp", ProfileIds: []string{m.profile}}))).Msg.Group.Id
+	text := groupTemplate + fmt.Sprintf("# @mistgate-if [%q]\n    proxies: [Auto]\n# @mistgate-end\n", temp)
+	set := subsettings.Defaults()
+	set.MihomoTemplates = []*adminv1.MihomoTemplate{{Name: "shared", Yaml: text, GroupIds: []string{m.group, temp}}}
+	update := func() (*connect.Response[adminv1.UpdateSubscriptionSettingsResponse], error) {
+		return svc.UpdateSubscriptionSettings(owner, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))
+	}
+	must(update())
+
+	set.LinkAutoSelect = proto.Bool(false)
+	if _, err := update(); connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "Auto") {
+		t.Fatalf("the live group's block must still require Auto: %v", err)
+	}
+	must(m.svc.DeleteGroup(m.ctx, connect.NewRequest(&adminv1.DeleteGroupRequest{GroupId: temp})))
+	saved := must(update()).Msg.Settings
+	stored := must(subsettings.Load(m.ctx, m.st))
+	for _, got := range []*adminv1.SubscriptionSettings{saved, stored} {
+		if subsettings.LinkAutoSelect(got) || len(got.MihomoTemplates) != 1 {
+			t.Fatalf("Auto off with deleted group: %v", got)
+		}
+		if tpl := got.MihomoTemplates[0]; !slices.Equal(tpl.GroupIds, []string{m.group}) || tpl.Yaml != text {
+			t.Fatalf("only the deleted assignment should be pruned: %v", tpl)
+		}
+	}
+	if !slices.Equal(set.MihomoTemplates[0].GroupIds, []string{m.group, temp}) {
+		t.Fatal("reconciliation modified the request")
+	}
+}
+
+func TestMihomoTemplateRejectedGroupsLeaveDNSUnchanged(t *testing.T) {
+	m := newM3Rig(t)
+	svc := subs.NewService(m.st, subsettings.NewCache(m.st, nil), builtin.Registry(),
+		func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, dns.New(m.st), nil)
+	owner := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
+	get := func() *adminv1.SubscriptionSettings {
+		return must(svc.GetSubscriptionSettings(owner, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg.Settings
+	}
+	before := get()
+	for _, tc := range []struct {
+		name, diagnostic string
+		templates        []*adminv1.MihomoTemplate
+	}{
+		{"unknown group", "mihomo_templates[0].group_ids: no such group", []*adminv1.MihomoTemplate{mihomoTemplate("unknown", "grp_nosuchgroup")}},
+		{"nil entry", "mihomo_templates[1]", []*adminv1.MihomoTemplate{mihomoTemplate("valid", m.group), nil}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			set := subsettings.Defaults()
+			set.MihomoTemplates = tc.templates
+			set.DefaultDnsPresetId = "dns_builtin_standard"
+			set.LinkDns = &adminv1.LinkDnsOptions{PresetIds: []string{"dns_builtin_adblock"}, DefaultPresetId: "dns_builtin_adblock"}
+			_, err := svc.UpdateSubscriptionSettings(owner, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))
+			if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), tc.diagnostic) {
+				t.Fatalf("expected %q, got %v", tc.diagnostic, err)
+			}
+			if after := get(); !proto.Equal(before, after) {
+				t.Fatalf("rejected update changed settings or DNS: before %v, after %v", before, after)
+			}
+		})
+	}
+}
+
+type dnsBeforeMihomoSettingsSave struct {
+	*dns.Service
+	afterDefaultWrite func()
+}
+
+func (d dnsBeforeMihomoSettingsSave) SetDefaultPresetID(ctx context.Context, id string) error {
+	if err := d.Service.SetDefaultPresetID(ctx, id); err != nil {
+		return err
+	}
+	d.afterDefaultWrite()
+	return nil
+}
+
+func TestMihomoTemplateCanceledSettingsSave(t *testing.T) {
+	m := newM3Rig(t)
+	owner := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
+	cache := subsettings.NewCache(m.st, nil)
+	set := subsettings.Defaults()
+	set.MihomoTemplates = []*adminv1.MihomoTemplate{mihomoTemplate("router")}
+	set.DeviceIdleAfterDays = proto.Uint32(0) // the cache can proceed straight to validation
+	before := must(subsettings.Load(m.ctx, m.st))
+
+	for _, tc := range []struct {
+		name  string
+		early bool
+		want  connect.Code
+	}{
+		{name: "canceled before validation", early: true, want: connect.CodeCanceled},
+		{name: "deadline before validation", early: true, want: connect.CodeDeadlineExceeded},
+		{name: "canceled before second validation", want: connect.CodeCanceled},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(owner)
+			defer cancel()
+			if tc.want == connect.CodeDeadlineExceeded {
+				var stop context.CancelFunc
+				ctx, stop = context.WithDeadline(ctx, time.Now().Add(-time.Second))
+				defer stop()
+			} else if tc.early {
+				cancel()
+			}
+			dnsWritten := false
+			d := dnsBeforeMihomoSettingsSave{Service: dns.New(m.st), afterDefaultWrite: func() {
+				dnsWritten = true
+				cancel()
+			}}
+			svc := subs.NewService(m.st, cache, builtin.Registry(),
+				func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, d, nil)
+			_, err := svc.UpdateSubscriptionSettings(ctx, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))
+			if got := connect.CodeOf(err); got != tc.want {
+				t.Fatalf("got %v, want %v", err, tc.want)
+			}
+			if want := !tc.early; dnsWritten != want {
+				t.Fatalf("DNS write = %v, want %v", dnsWritten, want)
+			}
+			if after := must(subsettings.Load(m.ctx, m.st)); !proto.Equal(before, after) {
+				t.Fatal("interrupted save changed the subscription settings")
+			}
+		})
 	}
 }

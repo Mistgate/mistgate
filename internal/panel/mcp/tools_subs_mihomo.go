@@ -36,9 +36,14 @@ const (
 	maxMihomoArgsJSON = 192 << 10
 	maxHostFacts      = 20
 	maxHostChars      = 100
+
+	// The settings list can have 20 templates: give their warning samples at most 10 KiB together.
+	mihomoListWarningBytes = 512
+	mihomoPlanWarningBytes = 2 << 10
+
 	dangerMihomo      = dangerPage
-	mihomoGroupSyntax = "Group-only YAML starts on a separate, unindented line `# @mistgate-if [\"grp_router\",\"grp_pc\"]` and ends with `# @mistgate-end`; blocks cannot nest. " +
-		"The JSON array lists group IDs, not names. A block is included only for a listed primary group assigned to this template. Everything outside blocks is common."
+	mihomoGroupSyntax = "Group-only YAML starts on a separate, unindented line `# @mistgate-if [\"grp_router\",\"grp_pc\"]` and ends with `# @mistgate-end`; blocks can nest. " +
+		"The JSON arrays list original panel group IDs, not names. Only the person's primary group is used: it must be assigned to the template and listed in every enclosing block. Everything outside blocks is common."
 )
 
 // redactionMarker matches what scrub puts in the place of a secret or a link. A text that has one was read through the scrubber
@@ -61,21 +66,23 @@ func refuseRedacted(text string) error {
 
 // mihomoTemplateV is one template as the settings read shows it: no text.
 type mihomoTemplateV struct {
-	Name         string   `json:"name"`
-	GroupIDs     []string `json:"group_ids"`
-	Bytes        int      `json:"bytes"`
-	SHA256       string   `json:"sha256_12"`
-	Warnings     int      `json:"warnings"`
-	WarningCodes []string `json:"warning_codes,omitempty"`
+	Name                string   `json:"name"`
+	GroupIDs            []string `json:"group_ids"`
+	Bytes               int      `json:"bytes"`
+	SHA256              string   `json:"sha256_12"`
+	Warnings            int      `json:"warnings"` // total distinct findings before sampling
+	WarningCodes        []string `json:"warning_codes,omitempty"`
+	WarningCodesOmitted int      `json:"warning_codes_omitted,omitempty"`
 }
 
 func mihomoTemplateViews(s *adminv1.SubscriptionSettings) []mihomoTemplateV {
 	out := make([]mihomoTemplateV, 0, len(s.GetMihomoTemplates()))
 	autoOn := subsettings.LinkAutoSelect(s)
 	for _, t := range s.GetMihomoTemplates() {
-		codes := warningWords(templateWarnings(t, autoOn), 60)
+		warnings := templateWarnings(t, autoOn)
+		codes := warningWords(warnings, 60, mihomoListWarningBytes)
 		out = append(out, mihomoTemplateV{Name: nm(t.GetName()), GroupIDs: cleanIDs(t.GetGroupIds()), Bytes: len(t.GetYaml()),
-			SHA256: hashText(t.GetYaml())[:12], Warnings: len(codes), WarningCodes: codes})
+			SHA256: hashText(t.GetYaml())[:12], Warnings: len(warnings), WarningCodes: codes, WarningCodesOmitted: len(warnings) - len(codes)})
 	}
 	return out
 }
@@ -89,14 +96,29 @@ func templateWarnings(t *adminv1.MihomoTemplate, autoOn bool) []subsettings.Miho
 	return w
 }
 
-// warningWords writes the findings as "code" or "code:argument"; an argument is a word of the text, so it is cut.
-func warningWords(list []subsettings.MihomoWarning, max int) []string {
-	out := make([]string, 0, len(list))
+// warningWords samples whole findings in discovery order, still cleaning and capping each argument.
+// The budget covers a JSON array of the words, which also bounds the same words joined with ", " as one JSON string.
+func warningWords(list []subsettings.MihomoWarning, argMax, budget int) []string {
+	var out []string
+	budget -= 2 // array brackets
 	for _, w := range list {
 		word := w.Code
 		if w.Arg != "" {
-			word += ":" + clean(w.Arg, max)
+			word += ":" + clean(w.Arg, argMax)
 		}
+		size := 3 // two quotes and a comma (or the separator in the joined string)
+		for _, r := range word {
+			switch r {
+			case '&', '<', '>':
+				size += 6 // the stored approval fact uses JSON with HTML escaping
+			default:
+				size += jsonLen(r)
+			}
+		}
+		if size > budget {
+			break
+		}
+		budget -= size
 		out = append(out, word)
 	}
 	return out
@@ -306,7 +328,7 @@ func (a mihomoTemplateSetArgs) build(cur *adminv1.SubscriptionSettings, groups m
 
 var mihomoTemplateSet = changeSpec[mihomoTemplateSetArgs]{
 	name: auth.MihomoTemplateTool, min: ProfileOperator, danger: true, maxArgs: maxMihomoArgsJSON,
-	procs: slices.Concat(settingsProcs, procs(adminv1connect.GroupServiceListGroupsProcedure)),
+	procs: settingsProcs,
 	desc: "Create, change or delete one own Mihomo YAML template and the groups whose people get it (the Mihomo YAML answer of their subscription link is built from it; the panel puts the person's servers into `proxies` and an `Auto` group into `proxy-groups`). " +
 		mihomoGroupSyntax + " " +
 		"Give name and yaml (the whole text, at most 64 KiB) and/or group_ids (the whole list), or name and remove. The text is checked as the admin's save checks it, and a text that holds the scrubber's markers ([redacted], [token], [key], [link]...) is refused: read a template with subscription_mihomo_template_get only to understand it. " +
@@ -327,7 +349,7 @@ var mihomoTemplateSet = changeSpec[mihomoTemplateSetArgs]{
 		if slices.EqualFunc(cur.settings.MihomoTemplates, ch.next.MihomoTemplates, func(x, y *adminv1.MihomoTemplate) bool { return proto.Equal(x, y) }) {
 			return nil, errors.New("nothing to change: the template already looks like this")
 		}
-		if err := checked(ch.next); err != nil { // normalized and validated whole, as a save does
+		if err := c.checkSettings(ch.next, groups); err != nil { // normalized and validated whole, as a save does
 			return nil, err
 		}
 		facts := mihomoTemplateFacts(ch, groups, subsettings.LinkAutoSelect(ch.next))
@@ -360,7 +382,7 @@ var mihomoTemplateSet = changeSpec[mihomoTemplateSetArgs]{
 		if err != nil { // a group of the plan was deleted since, or the stored plan was cut
 			return done{}, failure("changed_since_plan", "the plan no longer applies ("+clean(err.Error(), 160)+"): make a new plan")
 		}
-		if err := c.saveSubscriptionSettings(a.SettingsHash, ch.next); err != nil {
+		if err := c.saveSubscriptionSettings(a.SettingsHash, ch.next, groups); err != nil {
 			return done{}, err
 		}
 		return doneWith("subscription_mihomo_template_updated", "Mihomo template saved."), nil
@@ -406,8 +428,13 @@ func mihomoTemplateFacts(ch *mihomoChange, groups map[string]string, autoOn bool
 		}
 	}
 	facts = append(facts, Fact{Key: "hosts", Value: hostText, Untrusted: true})
-	if w := warningWords(templateWarnings(t, autoOn), 40); len(w) > 0 {
-		facts = append(facts, Fact{Key: "warnings", Value: strings.Join(w, ", "), Untrusted: true})
+	if warnings := templateWarnings(t, autoOn); len(warnings) > 0 {
+		words := warningWords(warnings, 40, mihomoPlanWarningBytes)
+		value := strings.Join(words, ", ")
+		if omitted := len(warnings) - len(words); omitted > 0 {
+			value += fmt.Sprintf(" (and %d more; %d total)", omitted, len(warnings))
+		}
+		facts = append(facts, Fact{Key: "warnings", Value: value, Untrusted: true})
 	}
 	return append(facts, codedFact("effect", "the people of these groups get this template in the Mihomo YAML answer of their link; the text is not shown here. The panel does not open the addresses in it: the apps of the people do.", "mihomo_template"))
 }

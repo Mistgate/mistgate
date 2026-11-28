@@ -1,6 +1,6 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { Ace } from "ace-builds";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -15,7 +15,7 @@ import { condition, editSource, groupLimit, inactiveRefs, sourceSelection, varia
 import { MihomoSourceEditor } from "./mihomo-source-editor";
 import { templateBytes, templateFileMax, templateLimit, type HeaderProblem, type MihomoTemplate } from "./model";
 
-export type Row = MihomoTemplate & { k: number; source?: SourceDraft }; // k: the row's own key, so that a delete keeps what is typed where it was
+export type Row = MihomoTemplate & { k: number; source?: SourceDraft; editorVersion?: number };
 export type Refusal = { text: string; line?: number };
 export type Warning = { code: string; arg: string };
 export type Check = UseQueryResult<{ warnings: Warning[]; groupName: string; notServed: string; yaml: string }>;
@@ -28,12 +28,14 @@ export const kb = (bytes: number, t: Tx): string => (bytes / 1024).toLocaleStrin
 export function textWarnings(r: Pick<MihomoTemplate, "yaml" | "groupIds"> & { source?: Source }, t: Tx): string[] {
   const out: string[] = [];
   if (r.source) {
+    let withDns = false;
+    let withoutDns = false;
     for (const yaml of variants(r.yaml, r.source, r.groupIds)) {
-      if (yaml.trim() !== "" && !/^dns\s*:/m.test(yaml)) {
-        out.push(t("sx.hx.m.wNoDns"));
-        break;
-      }
+      if (/^dns\s*:/m.test(yaml)) withDns = true;
+      else if (yaml.trim() !== "") withoutDns = true;
+      if (withDns && withoutDns) break;
     }
+    if (withoutDns) out.push(t(withDns ? "sx.hx.m.wVariantsNoDns" : "sx.hx.m.wNoDns"));
   }
   const hosts = [...new Set([...r.yaml.matchAll(/https?:\/\/([^\s/'"]+)/g)].map((m) => m[1]!))].slice(0, 20);
   if (hosts.length > 0) out.push(t("sx.hx.m.wHosts", { hosts: hosts.join(", ") }));
@@ -92,6 +94,11 @@ type RowProps = {
 export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, draft, source, others, status, errors, warnings, asking, atLimit, onToggle, onChange, onDuplicate, onAsk, onDelete, onFile }: RowProps) {
   const editor = useRef<Ace.Editor>(null);
   const helpId = useId();
+  const keyboardHelpId = `${helpId}-keyboard`;
+  const applyingCondition = useRef(false);
+  // Ace displays LF; record only the newline style of revisions reached by a structured edit.
+  const conditionEol = useRef(new Map<number, string>());
+  const queuedChange = useRef(false);
   const file = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(() => hxDemo.drag ?? false);
   const [selectedVariant, setSelectedVariant] = useState("all");
@@ -100,6 +107,9 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
   const [operation, setOperation] = useState<SourceIssue | null>(null);
   const [download, setDownload] = useState<string | null>(null);
   const [chooser, setChooser] = useState<{ draft: SourceDraft; selection: Selection; ids: string[]; from: number; to: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!open) conditionEol.current.clear();
+  }, [open]);
   const bytes = templateBytes(source.yaml);
   const assigned = groups.filter((g) => row.groupIds.includes(g.id));
   const names = assigned.map((g) => g.name);
@@ -146,8 +156,49 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
     setChooser({ draft, selection, ids, from, to });
   };
   const applyCondition = (ids: string[]) => {
-    if (!chooser) return;
-    onChange({ source: condition(chooser.draft, chooser.selection, ids, groups) });
+    const instance = editor.current;
+    if (!chooser || !instance) return;
+    if (chooser.draft.text !== draft?.text) {
+      setChooser(null);
+      return;
+    }
+    const next = condition(chooser.draft, chooser.selection, ids, groups);
+    const before = instance.getValue();
+    const after = next.text.replace(/\r\n?/g, "\n");
+    if (before !== after) {
+      // Change only the differing span and bracket its deltas as one undo step.
+      let start = 0;
+      let end = before.length;
+      let nextEnd = after.length;
+      while (start < end && start < nextEnd && before[start] === after[start]) start++;
+      while (start < end && start < nextEnd && before[end - 1] === after[nextEnd - 1]) {
+        end--;
+        nextEnd--;
+      }
+      const { session } = instance;
+      const doc = session.getDocument();
+      const range = { start: doc.indexToPosition(start), end: doc.indexToPosition(end) };
+      applyingCondition.current = true;
+      session.markUndoGroup();
+      const undo = session.getUndoManager();
+      const keepEndings = conditionEol.current.size > 0 || chooser.draft.text.includes("\r\n") || next.text.includes("\r\n");
+      const remember = (text: string) => {
+        const endings = (text.match(/\r?\n/g) ?? []).map((eol) => eol === "\r\n" ? "1" : "0").join("");
+        conditionEol.current.set(undo.getRevision(), endings);
+      };
+      if (keepEndings) remember(chooser.draft.text);
+      try {
+        session.replace(range, after.slice(start, nextEnd));
+      } finally {
+        session.markUndoGroup();
+        if (keepEndings) remember(next.text);
+        undo.startNewGroup();
+        applyingCondition.current = false;
+      }
+    }
+    // Keep aliases from the condition operation even when the text is later undone.
+    setOperation(null);
+    onChange({ source: next });
     setChooser(null);
   };
   const exportSource = () => {
@@ -203,6 +254,7 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
               <span>{t("sx.hx.m.text")}</span>
               <span className={cx("mono", bytes > templateLimit.bytes && "bad")}>{t("sx.hx.m.textSz", { kib: kb(bytes, t), max: templateLimit.bytes >> 10 })}</span>
             </div>
+            <p id={keyboardHelpId} className="sr-only">{t(owner ? "sx.hx.m.editorKeyboard" : "sx.hx.m.readOnlyKeyboard")}</p>
             {owner && (
               <>
                 <p className="hx-note" id={helpId}>{t(assigned.length ? "sx.hx.m.conditionHelp" : "sx.hx.m.conditionEmpty")}</p>
@@ -275,15 +327,36 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
               <MihomoSourceEditor
                 editorRef={editor}
                 label={t("sx.hx.m.text")}
-                description={owner ? helpId : undefined}
+                description={owner ? `${keyboardHelpId} ${helpId}` : keyboardHelpId}
                 text={input}
                 readOnly={!owner}
                 blocks={blocks}
                 variant={variant}
                 onChange={(value) => {
-                  if (!draft) return;
-                  setOperation(null);
-                  onChange({ source: editSource(draft, value, groups) });
+                  if (!draft || applyingCondition.current) return;
+                  const update = (text: string) => {
+                    if (text === draft.text) return;
+                    setOperation(null);
+                    onChange({ source: editSource(draft, text, groups) });
+                  };
+                  if (conditionEol.current.size === 0) {
+                    update(draft.text.includes("\r\n") && !/(?<!\r)\n/.test(draft.text) ? value.replace(/\n/g, "\r\n") : value);
+                    return;
+                  }
+                  if (queuedChange.current) return;
+                  queuedChange.current = true;
+                  // Undo/redo can emit multiple deltas before Ace updates the final revision.
+                  queueMicrotask(() => {
+                    queuedChange.current = false;
+                    const instance = editor.current;
+                    if (!instance) return;
+                    const style = conditionEol.current.get(instance.session.getUndoManager().getRevision());
+                    const value = instance.getValue();
+                    if (value === input && style === undefined) return;
+                    let line = 0;
+                    const crlf = draft.text.includes("\r\n") && !/(?<!\r)\n/.test(draft.text);
+                    update(value.replace(/\n/g, () => (style === undefined ? crlf : style[line++] === "1") ? "\r\n" : "\n"));
+                  });
                 }}
               />
             </div>
@@ -406,15 +479,18 @@ type PreviewProps = {
   q: Check;
   /** Nothing is wrong with the open text, so that the panel was asked about it. */
   valid: boolean;
+  /** Whether the response is for the current draft, rather than the debounced one. */
+  fresh?: boolean;
 };
 
 /** What one person gets: the person, the verdict and why, and (for the template that is theirs) the profile, read only. */
-export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, valid }: PreviewProps) {
+export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, valid, fresh = true }: PreviewProps) {
   const [anyway, setAnyway] = useState(false);
   const previewEditor = useRef<Ace.Editor>(null);
+  const keyboardHelpId = useId();
   const list = users.data ?? [];
   const person = list.find((u) => u.id === userId);
-  const r = q.data;
+  const r = fresh ? q.data : undefined;
   const group = groups.find((g) => g.id === person?.groupId)?.name ?? r?.groupName ?? "";
   const tOf = person ? rows.findIndex((x) => x.groupIds.includes(person.groupId)) : -1;
   const mine = !!row && tOf >= 0 && rows[tOf]!.k === row.k;
@@ -424,6 +500,7 @@ export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, vali
   if (rows.length === 0) head = [t("sx.hx.m.rBuilt"), t("sx.hx.m.rNoTpl"), ""];
   else if (row && valid && r?.notServed === "no_access") head = [t("sx.hx.m.rOff"), t("sx.hx.m.rOffS"), "part"];
   else if (row && valid && r?.notServed === "no_servers") head = [t("sx.hx.m.rNoSrv"), t("sx.hx.m.rNoSrvS"), "part"];
+  else if (!fresh && valid && row && userId !== "") head = [t("sx.hx.m.rThis"), t("sx.hx.m.rWait"), ""];
   else if (tOf < 0) head = [t("sx.hx.m.rBuilt"), t("sx.hx.m.rNoGrp", { group }), ""];
   else if (!mine) head = [t("sx.hx.m.rOther"), t("sx.hx.m.rOtherS", { group, tpl }), ""];
   else if (!valid) head = [t("sx.hx.m.rBad"), t("sx.hx.m.rBadS"), "bad"];
@@ -437,17 +514,18 @@ export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, vali
     yaml = (
       <div key={`${row.k}:${userId}`} className="mt-preview grid min-w-0 gap-2">
         <div className="flex justify-end">
-          <CopyButton value={r.yaml} label={t("sx.hx.m.pvCopy")} onFail={() => {
+          <CopyButton value={r.yaml} exact label={t("sx.hx.m.pvCopy")} onFail={() => {
             previewEditor.current?.selectAll();
             previewEditor.current?.focus();
           }} />
         </div>
         <div className="mt-editor">
-          <MihomoSourceEditor editorRef={previewEditor} label={t("sx.hx.m.pvYaml")} text={r.yaml} readOnly />
+          <p id={keyboardHelpId} className="sr-only">{t("sx.hx.m.readOnlyKeyboard")}</p>
+          <MihomoSourceEditor editorRef={previewEditor} label={t("sx.hx.m.pvYaml")} description={keyboardHelpId} text={r.yaml} readOnly />
         </div>
       </div>
     );
-  } else if (row && valid && !r && q.isError) yaml = <QueryError error={q.error} onRetry={() => void q.refetch()} />;
+  } else if (fresh && row && valid && !r && q.isError) yaml = <QueryError error={q.error} onRetry={() => void q.refetch()} />;
   else if (row && valid && !r && userId !== "") yaml = <div className="hx-sk" aria-busy="true" />;
 
   return (

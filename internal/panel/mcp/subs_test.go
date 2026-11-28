@@ -102,6 +102,67 @@ func TestSubscriptionLinkAutoSelectPlan(t *testing.T) {
 	}
 }
 
+func TestSubscriptionLinkAutoSelectWithMihomoGroupBlocks(t *testing.T) {
+	const source = `mode: rule
+# @mistgate-if ["grp_2"]
+proxy-groups:
+  - {name: Choose, type: select, proxies: [Auto]}
+# @mistgate-end
+rules:
+  - MATCH,DIRECT
+`
+	for _, tc := range []struct {
+		name    string
+		deleted bool
+	}{
+		{name: "live group refuses disabling Auto"},
+		{name: "deleted group allows disabling Auto", deleted: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newTestEnv(t)
+			e.w.subs.MihomoTemplates = []*adminv1.MihomoTemplate{{Name: "Home", Yaml: source, GroupIds: []string{"grp_1", "grp_2"}}}
+			if tc.deleted {
+				delete(e.w.groups, "grp_2")
+			}
+			raw, err := proto.MarshalOptions{Deterministic: true}.Marshal(e.w.subs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, secret := e.token(ProfileOperator)
+			s := e.session(secret)
+			args := map[string]any{"link_auto_select": false}
+			if !tc.deleted {
+				if out := mustFail(t, s, "subscription_link_limits_set_plan", args); !strings.Contains(out, "grp_2") || !strings.Contains(out, "refers to Auto") {
+					t.Fatalf("wrong plan failure: %s", out)
+				}
+				if len(e.w.subsReq) != 0 || !subsettings.LinkAutoSelect(e.w.subs) {
+					t.Fatal("refused plan changed settings")
+				}
+				return
+			}
+			plan := decode[PlanOut](t, mustOK(t, s, "subscription_link_limits_set_plan", args))
+			stored := decode[subsLinkLimitsArgs](t, e.plans.only().ParamsJSON)
+			if !plan.NeedsApproval || stored.SettingsHash != hashText(string(raw)) || len(e.w.subsReq) != 0 {
+				t.Fatalf("plan = %+v, stored settings hash = %q, saves = %d", plan, stored.SettingsHash, len(e.w.subsReq))
+			}
+			if err := e.plans.decide(plan.PlanID, true); err != nil {
+				t.Fatal(err)
+			}
+			applied := decode[ApplyOut](t, mustOK(t, s, "subscription_link_limits_set_apply", map[string]any{"confirm_token": plan.ConfirmToken}))
+			if applied.Status != StatusApplied || subsettings.LinkAutoSelect(e.w.subs) {
+				t.Fatalf("apply = %+v, Auto = %t", applied, subsettings.LinkAutoSelect(e.w.subs))
+			}
+			want := &adminv1.MihomoTemplate{Name: "Home", Yaml: source, GroupIds: []string{"grp_1"}}
+			if got := e.w.subs.GetMihomoTemplates(); len(got) != 1 || !proto.Equal(got[0], want) {
+				t.Fatalf("apply changed the authored YAML or a live assignment: %v", got)
+			}
+			if calls := e.w.calls(pUpdateSubs); len(calls) != 1 || calls[0].Approved != plan.PlanID {
+				t.Fatalf("save did not run under the approved plan: %+v", calls)
+			}
+		})
+	}
+}
+
 func TestSubscriptionLinkAutoIntervalPlan(t *testing.T) {
 	e := newTestEnv(t)
 	_, secret := e.token(ProfileOperator)

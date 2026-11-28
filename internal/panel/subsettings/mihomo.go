@@ -2,6 +2,7 @@ package subsettings
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -129,14 +130,53 @@ func MihomoTemplateFor(s *adminv1.SubscriptionSettings, groupID string) *adminv1
 
 // ---- reading a template ----
 
-// yamlErr is a YAML parser's message without its "yaml: " prefix (it names the line); the errors of a read into a value come as one
-// line each, with the panel's name of the value for the Go type.
-func yamlErr(err error) string {
+// mihomoYAMLDiagnostic preserves the parser's individual messages so source positions can be remapped before joining them.
+type mihomoYAMLDiagnostic struct {
+	err    error
+	prefix string
+}
+
+func (d mihomoYAMLDiagnostic) Error() string { return d.message(nil) }
+
+func (d mihomoYAMLDiagnostic) message(sourceLine func(int) int) string {
 	var te *yaml.TypeError
-	if errors.As(err, &te) && len(te.Errors) > 0 {
-		return typeNames.Replace(strings.Join(te.Errors, "; "))
+	if errors.As(d.err, &te) && len(te.Errors) > 0 {
+		messages := te.Errors
+		if sourceLine != nil {
+			messages = make([]string, len(te.Errors))
+			for i, message := range te.Errors {
+				messages[i] = mihomoDiagnosticLines(message, sourceLine)
+			}
+		}
+		return d.prefix + typeNames.Replace(strings.Join(messages, "; "))
 	}
-	return strings.TrimPrefix(err.Error(), "yaml: ")
+	message := strings.TrimPrefix(d.err.Error(), "yaml: ")
+	if sourceLine != nil {
+		message = mihomoDiagnosticLines(message, sourceLine)
+	}
+	return d.prefix + message
+}
+
+func mihomoDiagnosticLines(message string, sourceLine func(int) int) string {
+	after, ok := strings.CutPrefix(message, "line ")
+	if !ok {
+		return message
+	}
+	n, detail, ok := strings.Cut(after, ":")
+	line, err := strconv.Atoi(n)
+	if !ok || err != nil || line <= 0 {
+		return message
+	}
+	// A yaml.v3 duplicate-key diagnostic names both the duplicate and the first definition.
+	if strings.HasPrefix(detail, " mapping key ") {
+		const marker = " already defined at line "
+		if i := strings.LastIndex(detail, marker); i >= 0 {
+			if first, err := strconv.Atoi(detail[i+len(marker):]); err == nil && first > 0 {
+				detail = detail[:i+len(marker)] + strconv.Itoa(sourceLine(first))
+			}
+		}
+	}
+	return "line " + strconv.Itoa(sourceLine(line)) + ":" + detail
 }
 
 var typeNames = strings.NewReplacer("subsettings.tplNamed", "a proxy", "subsettings.tplGroup", "a group", "[]subsettings.tplNamed", "the proxies", "[]subsettings.tplGroup", "the groups")
@@ -150,7 +190,7 @@ func parseDocument(text string) (doc, root *yaml.Node, err error) {
 		if errors.Is(err, io.EOF) {
 			return nil, nil, errors.New("no YAML document")
 		}
-		return nil, nil, errors.New(yamlErr(err))
+		return nil, nil, mihomoYAMLDiagnostic{err: err}
 	}
 	var more yaml.Node
 	if err := dec.Decode(&more); !errors.Is(err, io.EOF) {
@@ -236,7 +276,7 @@ func loadTemplate(text string) (*tplInfo, error) {
 		Groups  []tplGroup `yaml:"proxy-groups"`
 	}
 	if err := root.Decode(&d); err != nil {
-		return nil, errors.New(yamlErr(err))
+		return nil, mihomoYAMLDiagnostic{err: err}
 	}
 	t := &tplInfo{doc: doc, root: root, proxies: d.Proxies, groups: d.Groups, names: map[string]bool{}}
 	add := func(what string, i int, name string) error {
@@ -288,7 +328,7 @@ func (t *tplInfo) checkRefs(autoOn bool) error {
 				loaded = true
 				if v, _ := rootValue(t.root, "proxy-providers"); v != nil {
 					if err := v.Decode(&providers); err != nil && !isNull(v) {
-						return errors.New("proxy-providers: " + yamlErr(err))
+						return mihomoYAMLDiagnostic{err: err, prefix: "proxy-providers: "}
 					}
 				}
 			}
@@ -303,6 +343,13 @@ func (t *tplInfo) checkRefs(autoOn bool) error {
 // CheckMihomoTemplate is the save of one template's text, without its name and groups: it returns the first thing a save refuses. autoOn
 // is link_auto_select of the document.
 func CheckMihomoTemplate(text string, autoOn bool) error {
+	return checkMihomoTemplate(context.Background(), text, autoOn, nil)
+}
+
+func checkMihomoTemplate(ctx context.Context, text string, autoOn bool, sourceError func(error) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	switch {
 	case text == "":
 		return errors.New("the text is empty")
@@ -310,6 +357,12 @@ func CheckMihomoTemplate(text string, autoOn bool) error {
 		return fmt.Errorf("%d bytes, at most %d", len(text), MaxMihomoTemplateBytes)
 	case !utf8.ValidString(text):
 		return errors.New("the text is not valid UTF-8")
+	}
+	mapError := func(err error) error {
+		if sourceError != nil {
+			return sourceError(err)
+		}
+		return err
 	}
 	// The whole text into a value: this expands every alias (an alias bomb fails here: "excessive aliasing") and refuses a key given
 	// twice, which a read into nodes, or into a struct of some of the keys, does not do. The second Decode is for a second document.
@@ -319,22 +372,31 @@ func CheckMihomoTemplate(text string, autoOn bool) error {
 		if errors.Is(err, io.EOF) {
 			return errors.New("no YAML document")
 		}
-		return errors.New(yamlErr(err))
+		return mapError(mihomoYAMLDiagnostic{err: err})
 	}
 	if err := dec.Decode(new(any)); !errors.Is(err, io.EOF) {
 		return errors.New("more than one YAML document (a second `---`)")
 	}
-	t, err := loadTemplate(text)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
+	t, err := loadTemplate(text)
+	if err != nil {
+		return mapError(err)
+	}
 	if err := t.checkRefs(autoOn); err != nil {
+		return mapError(err)
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	// A trial build with two servers, as a person would get it: an error of the encoder is found here, not in the apps.
 	out, err := ApplyMihomoTemplate(text, trialServers(), MihomoOptions{AutoSelect: autoOn})
 	if err != nil {
 		return fmt.Errorf("trial build: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if _, _, err := parseDocument(string(out)); err != nil {
 		return fmt.Errorf("trial build does not read back: %w", err)
@@ -435,7 +497,7 @@ func ApplyMihomoTemplate(text string, servers []MihomoServer, opt MihomoOptions)
 			t.root.Content[i] = opt.DNS
 		}
 	}
-	untagMerge(t.doc)
+	prepareMihomoYAML(t.doc)
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
@@ -448,14 +510,20 @@ func ApplyMihomoTemplate(text string, servers []MihomoServer, opt MihomoOptions)
 	return buf.Bytes(), nil
 }
 
-// untagMerge makes the merge keys `<<` plain again: the encoder would write them as `!!merge <<`, which Mihomo reads but other
-// readers of the same file may not. Aliases are not followed (their target is part of the tree already).
-func untagMerge(n *yaml.Node) {
-	if n.Kind == yaml.ScalarNode && n.Tag == "!!merge" && n.Value == "<<" {
-		n.Tag = ""
+// Write plain merge keys for YAML readers that do not accept an explicit merge tag.
+// yaml.v3 can add a newline when emitting folded scalars with keep chomping.
+// Emit those values literally instead. Do not follow aliases: the target is already in the tree.
+func prepareMihomoYAML(n *yaml.Node) {
+	if n.Kind == yaml.ScalarNode {
+		if n.Tag == "!!merge" && n.Value == "<<" {
+			n.Tag = ""
+		}
+		if n.Style&yaml.FoldedStyle != 0 && strings.HasSuffix(n.Value, "\n\n") {
+			n.Style = (n.Style &^ yaml.FoldedStyle) | yaml.LiteralStyle
+		}
 	}
 	for _, c := range n.Content {
-		untagMerge(c)
+		prepareMihomoYAML(c)
 	}
 }
 
@@ -528,7 +596,7 @@ func ruleTarget(line string) string {
 // ---- the document ----
 
 // validateMihomoTemplates is the check of a save: the list, then each template's name, groups and variants (CheckMihomoGroups).
-func validateMihomoTemplates(s *adminv1.SubscriptionSettings) error {
+func validateMihomoTemplates(ctx context.Context, s *adminv1.SubscriptionSettings) error {
 	list := s.GetMihomoTemplates()
 	if len(list) > MaxMihomoTemplates {
 		return invalid("mihomo_templates: at most %d", MaxMihomoTemplates)
@@ -572,11 +640,15 @@ func validateMihomoTemplates(s *adminv1.SubscriptionSettings) error {
 	}
 	autoOn := LinkAutoSelect(s)
 	for i, t := range list { // the parse of each is the expensive part: after every cheap check of all of them
-		if err := CheckMihomoGroups(t.Yaml, t.GroupIds, autoOn); err != nil {
+		err := CheckMihomoGroups(ctx, t.Yaml, t.GroupIds, autoOn)
+		if canceled := ctx.Err(); canceled != nil {
+			return canceled
+		}
+		if err != nil {
 			return invalid("mihomo_templates[%d] (%q).yaml: %v", i, t.Name, err)
 		}
 	}
-	return nil
+	return ctx.Err()
 }
 
 // normalizeMihomoTemplates trims the names (the text is kept as written).

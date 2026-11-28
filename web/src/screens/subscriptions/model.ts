@@ -768,11 +768,16 @@ export const starterTemplate = (auto: boolean): string =>
     "",
   ].join("\n");
 
+// The panel trims Unicode White_Space and uses Go's simple, non-contextual Unicode lowercase.
+export const trimTemplateName = (name: string): string => name.replace(/^\p{White_Space}+|\p{White_Space}+$/gu, "");
+export const templateNameKey = (name: string): string => Array.from(trimTemplateName(name), (c) => c === "İ" ? "i" : c.toLowerCase()).join("");
+
 /** What the form can say about a template before the panel does (the panel's save checks all of it again). */
 export function templateProblems(rows: readonly Pick<MihomoTemplate, "name" | "yaml">[], i: number): { name: HeaderProblem | null; text: HeaderProblem | null } {
   const r = rows[i]!;
-  const name = r.name.trim();
-  const taken = rows.some((o, j) => j !== i && o.name.trim().toLowerCase() === name.toLowerCase());
+  const name = trimTemplateName(r.name);
+  const key = templateNameKey(name);
+  const taken = rows.some((o, j) => j !== i && templateNameKey(o.name) === key);
   const bytes = templateBytes(r.yaml);
   return {
     name: name === "" ? { key: "subs.mt.err.noName" } : [...name].length > templateLimit.name ? { key: "subs.mt.err.nameLong", vars: { max: templateLimit.name } } : taken ? { key: "subs.mt.err.nameTaken" } : null,

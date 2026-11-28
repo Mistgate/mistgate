@@ -306,7 +306,9 @@ tproxy-port: 1181
 # @mistgate-end
 ```
 
-Directives start in the first column, even inside a list. Keep the YAML lines at their original indentation. A list matches any of its primary groups; a nested block matches only if the same group is in every enclosing list. For example, a Phone block inside a PC/Phone block applies only to Phone. Select lines inside a block to add a nested condition, or place the cursor inside to change the innermost block. Removing a condition leaves any enclosing or enclosed conditions in force. The shared part and each assigned variant must be valid.
+Directives start in the first column, even inside a list. Use LF or CRLF line endings and keep the YAML lines at their original indentation. A list matches any of its primary groups; a nested block matches only if the same group is in every enclosing list. For example, a Phone block inside a PC/Phone block applies only to Phone. Select lines inside a block to add a nested condition, or place the cursor inside to change the innermost block. Removing a condition leaves the YAML in place and may share it with more groups. Any outer and inner conditions still apply. The shared part and each assigned variant must be valid.
+
+Validation checks at most 1 MiB of resolved YAML across the shared part and distinct variants of one template.
 
 Line numbers in the editor refer to the source, even when sections are folded. Choose a group under **Source variant** to dim lines that will not be in its config. The read-only preview numbers the generated YAML separately, displays emoji as characters rather than YAML escapes, supports folding and search (`Ctrl+F`), and **Copy YAML** copies the complete preview, including folded sections.
 

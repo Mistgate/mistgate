@@ -9,8 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// The YAML v3 emitter escapes supplementary code points. Show printable ones
-// literally in the preview without reformatting the document or changing scalar values.
+// The YAML v3 emitter escapes supplementary code points. Show printable ones and
+// standard subdivision flags literally without changing scalar values.
 func readableMihomoPreview(body []byte) string {
 	if !bytes.Contains(body, []byte(`\U`)) {
 		return string(body)
@@ -60,23 +60,33 @@ func readableMihomoPreview(body []byte) string {
 			return
 		}
 		for i++; i+1 < len(body) && body[i] != '"'; i++ {
-			if body[i] != '\\' {
+			escaped := body[i] == '\\'
+			if !escaped && !bytes.HasPrefix(body[i:], []byte("🏴")) {
 				continue
 			}
-			if i+10 <= len(body) && body[i+1] == 'U' {
-				value, err := strconv.ParseUint(string(body[i+2:i+10]), 16, 32)
-				if err == nil && value > 0xffff && value <= utf8.MaxRune && unicode.IsPrint(rune(value)) {
-					if out == nil {
-						out = make([]byte, 0, len(body))
-					}
-					out = append(out, body[copied:i]...)
-					out = utf8.AppendRune(out, rune(value))
-					copied = i + 10
-					i += 9
-					continue
-				}
+			r, width := mihomoPreviewRune(body[i:])
+			var tags [5]byte
+			var tagWidth int
+			if r == '🏴' {
+				tags, tagWidth = mihomoSubdivisionTags(body[i+width:])
 			}
-			i++ // Skip the escaped byte, including a literal backslash or quote.
+			if tagWidth > 0 || escaped && r > 0xffff && unicode.IsPrint(r) {
+				if out == nil {
+					out = make([]byte, 0, len(body))
+				}
+				out = append(out, body[copied:i]...)
+				out = utf8.AppendRune(out, r)
+				if tagWidth > 0 {
+					for _, tag := range tags {
+						out = utf8.AppendRune(out, 0xe0000+rune(tag))
+					}
+					out = utf8.AppendRune(out, '\U000e007f')
+				}
+				copied = i + width + tagWidth
+				i = copied - 1
+			} else if escaped {
+				i++ // Skip the escaped byte, including a literal backslash or quote.
+			}
 		}
 	}
 	visit(&doc)
@@ -84,4 +94,37 @@ func readableMihomoPreview(body []byte) string {
 		return string(body)
 	}
 	return string(append(out, body[copied:]...))
+}
+
+func mihomoPreviewRune(body []byte) (rune, int) {
+	if len(body) == 0 || body[0] != '\\' {
+		return utf8.DecodeRune(body)
+	}
+	if len(body) >= 10 && body[1] == 'U' {
+		value, err := strconv.ParseUint(string(body[2:10]), 16, 32)
+		if err == nil && value <= utf8.MaxRune {
+			return rune(value), 10
+		}
+	}
+	return 0, 0
+}
+
+// After a black flag, the only RGI tag sequences are gbeng, gbsct and gbwls,
+// each terminated by CANCEL TAG. Leave other invisible tag escapes alone.
+func mihomoSubdivisionTags(body []byte) (tags [5]byte, width int) {
+	for i := range tags {
+		r, n := mihomoPreviewRune(body[width:])
+		if r < '\U000e0061' || r > '\U000e007a' {
+			return tags, 0
+		}
+		tags[i] = byte(r - 0xe0000)
+		width += n
+	}
+	switch string(tags[:]) {
+	case "gbeng", "gbsct", "gbwls":
+		if r, n := mihomoPreviewRune(body[width:]); r == '\U000e007f' {
+			return tags, width + n
+		}
+	}
+	return tags, 0
 }

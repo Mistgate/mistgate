@@ -1,5 +1,5 @@
 import { Code, ConnectError } from "@connectrpc/connect";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { hxDemo } from "./demo";
 import { useLeaveGuard } from "./guard";
 import { CardHead, Foot, Msg, Nothing } from "./hx-parts";
 import { linkAutoOn } from "./link-auto";
-import { starterTemplate, templateBytes, templateLimit, templateProblems, templateRefusal, type MihomoTemplate, type Settings } from "./model";
+import { starterTemplate, templateBytes, templateLimit, templateNameKey, templateProblems, templateRefusal, trimTemplateName, type MihomoTemplate, type Settings } from "./model";
 import { fileTooBig, kb, MtPreview, panelWarnings, problemText, sourceIssueText, TemplateRow, textWarnings, type Check, type Refusal, type Row, type Status } from "./mihomo-parts";
 import { canonicalSource, displaySource, mapTransfer, parseSource, readTransfer, variants, type Transfer } from "./mihomo-source";
 import { mihomoPreviewQuery, pickerUsersQuery, useSaveSettings } from "./queries";
@@ -29,11 +29,12 @@ function refusalOf(e: unknown, t: Tx): Refusal & { index?: number } {
 
 /** A name not used yet: `base`, else `base 2`, `base 3` ... (kept within the panel's length). */
 function freeName(base: string, rows: readonly Row[]): string {
-  const used = new Set(rows.map((r) => r.name.trim().toLowerCase()));
+  const used = new Set(rows.map((r) => templateNameKey(r.name)));
   const cut = [...base].slice(0, templateLimit.name - 4).join("");
   for (let n = 1; ; n++) {
     const name = n === 1 ? base : `${cut} ${n}`;
-    if (!used.has(name.toLowerCase())) return [...name].slice(0, templateLimit.name).join("");
+    const candidate = [...name].slice(0, templateLimit.name).join("");
+    if (!used.has(templateNameKey(candidate))) return candidate;
   }
 }
 
@@ -71,6 +72,7 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
   const toast = useToast();
   const save = useSaveSettings();
   const owner = useIsOwner();
+  const queryClient = useQueryClient();
   const groups = useQuery(groupsQuery);
   const users = useQuery(pickerUsersQuery);
   const groupList = groups.data;
@@ -108,18 +110,27 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
   });
   const total = sources.reduce((n, r) => n + templateBytes(r.yaml), 0);
   const tooBig = total > templateLimit.total;
-  const dirty = JSON.stringify(sources.map((r, j) => norm({ ...r, groupIds: rows[j]!.groupIds }))) !== JSON.stringify(saved.map(norm));
+  const dirty = rows.some((r, j) => r.source && sources[j]!.issue) ||
+    JSON.stringify(sources.map((r, j) => norm({ ...r, groupIds: rows[j]!.groupIds }))) !== JSON.stringify(saved.map(norm));
   const busy = save.isPending || !!hxDemo.busy;
 
   // what the panel says of each text (every template, for the list; the open one, for the editor and the preview), as typed 0.4 s ago
   const list = users.data ?? [];
-  const listUser = list[0]?.id ?? "";
-  const userId = list.some((u) => u.id === picked) ? picked : (list.find((u) => cur?.groupIds.includes(u.groupId))?.id ?? listUser);
+  const listPerson = list[0];
+  const person = list.find((u) => u.id === picked) ?? list.find((u) => cur?.groupIds.includes(u.groupId)) ?? listPerson;
+  const userId = person?.id ?? "";
   const drafts = useDebounced(sources, 400);
-  const checks: Check[] = useQueries({ queries: drafts.map((r) => ({ ...mihomoPreviewQuery(listUser, r.yaml, r.groupIds), enabled: listUser !== "" && !r.issue && r.common.trim() !== "" })) }) as Check[];
+  const checks: Check[] = useQueries({ queries: drafts.map((r) => ({ ...mihomoPreviewQuery(listPerson?.id ?? "", listPerson?.groupId ?? "", r.yaml, r.groupIds), enabled: !!listPerson && !r.issue && r.common.trim() !== "" })) }) as Check[];
+  const draftIsCurrent = (draft: (typeof drafts)[number] | undefined) => {
+    if (!draft) return false;
+    const current = sources.find((r) => r.k === draft.k);
+    return !!current && !current.issue && current.yaml === draft.yaml && current.groupIds.length === draft.groupIds.length &&
+      current.groupIds.every((id, j) => id === draft.groupIds[j]);
+  };
   const dcur = drafts.find((r) => r.k === sel);
-  const q = useQuery({ ...mihomoPreviewQuery(userId, dcur?.yaml ?? "", dcur?.groupIds ?? []), enabled: !!dcur && !dcur.issue && userId !== "" && dcur.common.trim() !== "" });
+  const q = useQuery({ ...mihomoPreviewQuery(userId, person?.groupId ?? "", dcur?.yaml ?? "", dcur?.groupIds ?? []), enabled: !!dcur && !dcur.issue && userId !== "" && dcur.common.trim() !== "" });
   const invalid = (c?: Check) => !!c?.isError && ConnectError.from(c.error).code === Code.InvalidArgument;
+  const fresh = draftIsCurrent(dcur);
   const anyInvalid = checks.some(invalid) || invalid(q as Check);
   const valid = problems.every((p) => !p.name && !p.text) && !sources.some((r) => r.issue) && !tooBig && !anyInvalid;
   const bad = !valid;
@@ -161,6 +172,9 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
     setSel(sel === k ? null : k);
     setAsking(null);
   };
+  const replace = (k: number, replacement: Pick<Row, "yaml"> & Partial<Pick<Row, "name" | "groupIds">>) => {
+    patch(k, { ...replacement, source: undefined, editorVersion: fileRequest.current + 1 });
+  };
   async function take(k: number, f: File | undefined) {
     if (!f || !owner) return;
     const request = ++fileRequest.current;
@@ -176,18 +190,37 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
     if (request !== fileRequest.current) return;
     const file = readTransfer(yaml);
     if (file.issue) return rejected(sourceIssueText(file.issue, t), file.issue.line);
-    const assigned = groupList?.filter((g) => rows.find((r) => r.k === k)?.groupIds.includes(g.id)) ?? [];
-    if (!file.value) {
-      const mapping = new Map(assigned.filter((g) => assigned.filter((other) => other.name === g.name).length === 1).map((g) => [g.name, g.id]));
-      const ordinary = mapTransfer(yaml, mapping);
-      if (ordinary.issue) return rejected(sourceIssueText(ordinary.issue, t), ordinary.issue.line);
-      patch(k, { yaml: ordinary.value, source: undefined });
+    const ordinary = file.value ? undefined : parseSource(yaml);
+    if (ordinary?.issue) return rejected(sourceIssueText(ordinary.issue, t), ordinary.issue.line);
+    if (ordinary?.value?.blocks.length === 0) {
+      replace(k, { yaml });
       return;
     }
-    const available = (groupList ?? []).filter((g) => !rows.some((r) => r.k !== k && r.groupIds.includes(g.id)));
+    let localGroups = queryClient.getQueryData(groupsQuery.queryKey);
+    if ((file.value?.groups.length ?? 1) > 0 &&
+        (!localGroups || queryClient.getQueryState(groupsQuery.queryKey)?.fetchStatus === "fetching")) {
+      try {
+        localGroups = await queryClient.fetchQuery({ ...groupsQuery, staleTime: 0 });
+      } catch (e) {
+        if (request === fileRequest.current) rejected(errorText(e, t));
+        return;
+      }
+    }
+    if (request !== fileRequest.current) return;
+    const local = localGroups ?? [];
+    if (!file.value) {
+      const assignedIds = rows.find((r) => r.k === k)?.groupIds ?? [];
+      const assigned = local.filter((g) => assignedIds.includes(g.id));
+      const mapping = new Map(assigned.filter((g) => !assigned.some((other) => other !== g && other.name === g.name)).map((g) => [g.name, g.id]));
+      const mapped = mapTransfer(yaml, mapping);
+      if (mapped.issue) return rejected(sourceIssueText(mapped.issue, t), mapped.issue.line);
+      replace(k, { yaml: mapped.value });
+      return;
+    }
+    const available = local.filter((g) => !rows.some((r) => r.k !== k && r.groupIds.includes(g.id)));
     const mapping = new Map<string, string>();
     for (const g of file.value.groups) {
-      const same = groupList?.filter((local) => local.name === g) ?? [];
+      const same = local.filter((group) => group.name === g);
       if (same.length === 1 && available.includes(same[0]!)) mapping.set(g, same[0]!.id);
     }
     setFileErr(null);
@@ -196,8 +229,9 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
   function discard() {
     fileRequest.current++;
     setTransfer(null);
-    setRows(saved.map((x, k) => ({ ...x, k })));
-    setSel(start);
+    const restored = saved.map((x) => ({ ...x, k: keys.current++ }));
+    setRows(restored);
+    setSel(start === null ? null : restored[start]?.k ?? null);
     setRefusal(null);
     setAsking(null);
     setFileErr(null);
@@ -206,7 +240,7 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
 
   function onSave() {
     if (!valid || !known) return;
-    const out = sources.map((r) => ({ name: r.name.trim(), yaml: r.yaml, groupIds: r.groupIds }));
+    const out = sources.map((r) => ({ name: trimTemplateName(r.name), yaml: r.yaml, groupIds: r.groupIds }));
     onKeep(i < 0 ? null : i); // before the save: the form starts again when the new settings arrive, which is before the save answers
     save
       .mutateAsync((c) => ({ ...c, mihomoTemplates: out }))
@@ -243,8 +277,11 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
     return () => clearTimeout(id);
   }, []);
 
-  const checkOf = (r: Row) => (r.k === sel ? (q as Check) : checks[drafts.findIndex((d) => d.k === r.k)]);
-  const shownRefusal = (r: Row): (Refusal & { k?: number }) | null => (refusal?.k === r.k ? refusal : r.k === sel && q.isError && ConnectError.from(q.error).code === Code.InvalidArgument ? templateRefusal(ConnectError.from(q.error).rawMessage) : null);
+  const checkOf = (r: Row) => {
+    const at = drafts.findIndex((d) => d.k === r.k);
+    return draftIsCurrent(drafts[at]) ? (r.k === sel ? (q as Check) : checks[at]) : undefined;
+  };
+  const shownRefusal = (r: Row): (Refusal & { k?: number }) | null => (refusal?.k === r.k ? refusal : r.k === sel && fresh && invalid(q as Check) ? templateRefusal(ConnectError.from(q.error).rawMessage) : null);
   const warningsOf = (r: Row): string[] => {
     const s = sources[rows.indexOf(r)]!;
     return [...new Set([...panelWarnings(checkOf(r)?.data?.warnings ?? [], t), ...textWarnings(s, t)])];
@@ -274,7 +311,7 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
 
   const wholeRefusal = refusal && refusal.k === undefined ? refusal : null;
   const hint = tooBig ? t("sx.hx.m.ftOver", { max: templateLimit.total >> 10 }) : bad ? t("sx.hx.m.ftBad") : done ? t("subs.saved") : dirty ? t("sx.hx.m.ftDirty") : rows.length >= templateLimit.count ? t("sx.hx.m.ftMax", { max: templateLimit.count }) : t("sx.hx.m.ftHint");
-  const previewValid = !!cur && !invalid(q as Check) && !problems[i]!.text && !sources[i]!.issue && !shownRefusal(cur);
+  const previewValid = !!cur && !(fresh && invalid(q as Check)) && !problems[i]!.text && !sources[i]!.issue && !shownRefusal(cur);
   const available = transfer ? (groupList ?? []).filter((g) => !rows.some((r) => r.k !== transfer.k && r.groupIds.includes(g.id))) : [];
   const transferIds = transfer?.file.groups.map((name) => transfer.mapping.get(name) ?? "") ?? [];
   const complete = !!transfer && !!known && transferIds.every((id) => available.some((g) => g.id === id)) && new Set(transferIds).size === transferIds.length;
@@ -286,7 +323,7 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
   const importEmpty = importSource && !(variants(imported!, importSource, []).next().value ?? "").trim();
   const importIssue = importProblems?.name ?? importProblems?.text ?? (importEmpty ? { key: "subs.mt.err.empty" as const } : null);
   const importTooBig = imported !== undefined && target >= 0 && total - templateBytes(sources[target]!.yaml) + templateBytes(imported) > templateLimit.total;
-  const importBadName = transfer && /[\p{Cc}\p{Cs}]/u.test(transfer.file.name);
+  const importBadName = transfer && /[\p{Cc}\p{Cs}]/u.test(trimTemplateName(transfer.file.name));
 
   return (
     <div className="hx-tab mt-tab">
@@ -299,7 +336,7 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
             <div className="hx-l">
               {rows.map((r, n) => (
                 <TemplateRow
-                  key={r.k}
+                  key={`${r.k}:${r.editorVersion ?? 0}`}
                   t={t}
                   row={r}
                   n={n + 1}
@@ -347,7 +384,7 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
           </section>
         </div>
         <div className="col">
-          <MtPreview t={t} row={cur} rows={rows} groups={groupList ?? []} users={users} userId={userId} onPick={setPicked} q={q as Check} valid={previewValid} />
+          <MtPreview t={t} row={cur} rows={rows} groups={groupList ?? []} users={users} userId={userId} onPick={setPicked} q={q as Check} valid={previewValid} fresh={fresh} />
         </div>
       </div>
 
@@ -363,7 +400,7 @@ function MihomoForm({ settings, start, done: carried, onKeep, onShown }: FormPro
               <Button onClick={() => setTransfer(null)}>{t("sx.hx.m.cancel")}</Button>
               <Button variant="primary" disabled={!importedRow || !!importIssue || importTooBig || !!importBadName} onClick={() => {
                 if (!importedRow) return;
-                patch(transfer.k, { ...importedRow, source: undefined });
+                replace(transfer.k, importedRow);
                 setTransfer(null);
               }}>{t("sx.hx.m.importApply")}</Button>
             </>

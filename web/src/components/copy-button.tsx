@@ -21,6 +21,7 @@ export function CopyButton({
   variant = "secondary",
   full,
   iconOnly,
+  exact,
   onFail,
 }: {
   value: string;
@@ -30,6 +31,8 @@ export function CopyButton({
   full?: boolean;
   /** Only the glyph (36 wide, the board's .btn.sm.ic2.cpb next to a value): `label` is its name, and it says "Copied" while it does. */
   iconOnly?: boolean;
+  /** Preserve the input verbatim instead of stripping display-only bidi controls. */
+  exact?: boolean;
   /** The browser refused: the caller can select the text for the person to copy by hand. */
   onFail?: () => void;
 }) {
@@ -39,7 +42,7 @@ export function CopyButton({
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(plainText(value));
+      await navigator.clipboard.writeText(exact ? value : plainText(value));
       setDone(true);
       setTimeout(() => setDone(false), 2000);
     } catch {

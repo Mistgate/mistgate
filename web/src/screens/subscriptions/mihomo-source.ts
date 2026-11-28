@@ -1,14 +1,21 @@
 const prefix = "# @mistgate-";
 export const groupLimit = 100; // subsettings.maxHeaderGroups
 const nonIDChar = /[^a-zA-Z0-9_-]/;
+const directiveStart = /(?:^|[\r\n\u0085\u2028\u2029])# @mistgate-/u;
+const unsupportedEol = /\r(?!\n)|[\u0085\u2028\u2029]/u;
 
 export type Group = { id: string; name: string };
-export type SourceIssue = { kind: "syntax" | "unknown" | "inactive" | "header" | "selection" | "emptyLine"; line: number; group?: string };
+export type SourceIssue = { kind: "syntax" | "unknown" | "inactive" | "header" | "selection" | "emptyLine" | "lineBreak"; line: number; group?: string };
 type Result<T> = { value: T; issue?: never } | { value?: never; issue: SourceIssue };
 type SourceLine = { start: number; body: string; eol: string; end: number };
 type Block = { open: number; close: number; parent: number; refs: string[]; json: string; before: string };
 export type Source = { lines: SourceLine[]; blocks: Block[] };
 export type SourceDraft = { text: string; names: ReadonlyMap<string, string> };
+
+function lineBreakIssue(text: string): SourceIssue | undefined {
+  const bad = unsupportedEol.exec(text);
+  if (bad) return { kind: "lineBreak", line: text.slice(0, bad.index).split("\n").length };
+}
 
 function sourceLines(text: string): SourceLine[] {
   const lines: SourceLine[] = [];
@@ -35,8 +42,16 @@ function namesOf(value: unknown, allowEmpty: boolean): string[] | undefined {
   return value;
 }
 
+function openingMarker(body: string) {
+  const token = /^(# @mistgate-if[ \t]+)(\[[^\r\n\u0085\u2028\u2029]*\][ \t]*)$(?![\s\S])/u.exec(body);
+  const refs = token && namesOf(jsonOf(token[2]!), false);
+  return refs ? { refs, json: token[2]!, before: token[1]! } : undefined;
+}
+
 export function parseSource(text: string, ids = false): Result<Source> {
-  if (!text.startsWith(prefix) && !text.includes(`\n${prefix}`)) return { value: { lines: [], blocks: [] } };
+  if (!text.includes(prefix) || !directiveStart.test(text)) return { value: { lines: [], blocks: [] } };
+  const bad = lineBreakIssue(text);
+  if (bad) return { issue: bad };
   const lines = sourceLines(text);
   const blocks: Block[] = [];
   let pending = -1;
@@ -51,11 +66,9 @@ export function parseSource(text: string, ids = false): Result<Source> {
       pending = block.parent;
       continue;
     }
-    const token = /^(# @mistgate-if[ \t]+)(\[[^\n]*\][ \t]*)$(?![\s\S])/u.exec(body);
-    if (!token) return { issue };
-    const refs = namesOf(jsonOf(token[2]!), false);
-    if (!refs || (ids && refs.some((id) => id.length > 64 || nonIDChar.test(id)))) return { issue };
-    blocks.push({ open: i, close: -1, parent: pending, refs, json: token[2]!, before: token[1]! });
+    const marker = openingMarker(body);
+    if (!marker || (ids && marker.refs.some((id) => id.length > 64 || nonIDChar.test(id)))) return { issue };
+    blocks.push({ open: i, close: -1, parent: pending, ...marker });
     pending = blocks.length - 1;
   }
   return pending >= 0 ? { issue: { kind: "syntax", line: blocks[pending]!.open + 1 } } : { value: { lines, blocks } };
@@ -103,8 +116,14 @@ export function displaySource(text: string, groups: readonly Group[]): SourceDra
 
 export function editSource(draft: SourceDraft, text: string, groups: readonly Group[]): SourceDraft {
   const names = new Map(draft.names);
-  for (const g of groups) {
-    if (g.name !== "" && !names.has(g.name) && groups.filter((other) => other.name === g.name).length === 1) names.set(g.name, g.id);
+  if (!text.includes(prefix)) return { text, names };
+  // A complete opening marker binds its names even before the whole block is closed.
+  for (const line of sourceLines(text)) {
+    for (const ref of openingMarker(line.body)?.refs ?? []) {
+      if (names.has(ref)) continue;
+      const group = groups.find((g) => g.name === ref);
+      if (group && !groups.some((g) => g !== group && g.name === ref)) names.set(ref, group.id);
+    }
   }
   return { text, names };
 }
@@ -125,7 +144,7 @@ export function activeBlocks(blocks: Source["blocks"], id: string): boolean[] {
   return chosen;
 }
 
-/** One common variant, then each different set of active blocks. Keep parser line coordinates. */
+/** One common variant, then each different set of active blocks, with only the kept YAML lines. */
 export function* variants(text: string, source: Source, assigned: readonly string[]): Generator<string, void, unknown> {
   if (source.blocks.length === 0) {
     yield text;
@@ -146,9 +165,8 @@ export function* variants(text: string, source: Source, assigned: readonly strin
       } else if (source.blocks[open]?.close === row) {
         open = source.blocks[open]!.parent;
       } else if (open < 0 || chosen[open]) {
-        out += line.body;
+        out += line.body + line.eol;
       }
-      out += line.eol;
     }
     yield out;
   }
@@ -160,6 +178,8 @@ export type Selection = { start: number; end: number; eol: string; block?: Block
 export function sourceSelection(text: string, from: number, to: number): Result<Selection> {
   const parsed = parseSource(text);
   if (parsed.issue) return { issue: parsed.issue };
+  const bad = lineBreakIssue(text);
+  if (bad) return { issue: bad };
   const lines = parsed.value.lines.length ? parsed.value.lines : sourceLines(text);
   let removed = 0;
   let first = -1;
@@ -213,6 +233,8 @@ export type Transfer = { name: string; groups: string[]; text: string };
 /** Ordinary files are left alone. Headers are reserved at column zero, just like body directives. */
 export function readTransfer(text: string): Result<Transfer | null> {
   if (!text.includes(prefix)) return { value: null };
+  const bad = directiveStart.test(text) && lineBreakIssue(text);
+  if (bad) return { issue: bad };
   const lines = sourceLines(text);
   const header = /^# @mistgate-(?:template|groups)(?:[ \t]|$(?![\s\S]))/;
   const misplaced = lines.findIndex((l, i) => i > 1 && header.test(l.body));

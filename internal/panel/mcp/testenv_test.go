@@ -1513,11 +1513,11 @@ func (w *world) GetSubscriptionSettings(context.Context, *connect.Request[adminv
 }
 
 // UpdateSubscriptionSettings is the real save's check and store: what the MCP layer sends must pass the admin's validation.
-func (w *world) UpdateSubscriptionSettings(_ context.Context, r *connect.Request[adminv1.UpdateSubscriptionSettingsRequest]) (*connect.Response[adminv1.UpdateSubscriptionSettingsResponse], error) {
+func (w *world) UpdateSubscriptionSettings(ctx context.Context, r *connect.Request[adminv1.UpdateSubscriptionSettingsRequest]) (*connect.Response[adminv1.UpdateSubscriptionSettingsResponse], error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.subsReq = append(w.subsReq, r.Msg)
-	if err := subsettings.Validate(r.Msg.GetSettings()); err != nil {
+	if err := subsettings.ValidateContext(ctx, r.Msg.GetSettings()); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	w.subs = proto.Clone(r.Msg.GetSettings()).(*adminv1.SubscriptionSettings)

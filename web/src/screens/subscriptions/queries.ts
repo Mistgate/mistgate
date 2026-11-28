@@ -67,12 +67,12 @@ export const headerPreviewQuery = (userId: string, userAgent: string, headers: R
 
 /**
  * What the panel makes of a template text for one person (the profile and what to look at), asked of the text as the form holds it.
- * A text the panel would refuse comes back as an error (InvalidArgument) that names the line. The key carries a short hash of the
- * text, not the text; a save refreshes every one of these.
+ * A text the panel would refuse comes back as an error (InvalidArgument) that names the line. The key includes the person's
+ * current primary group and a short hash of the source; a save refreshes every one of these.
  */
-export const mihomoPreviewQuery = (userId: string, yaml: string, groupIds: string[]) =>
+export const mihomoPreviewQuery = (userId: string, primaryGroupId: string, yaml: string, groupIds: string[]) =>
   queryOptions({
-    queryKey: ["subs", "mt-preview", userId, textKey(yaml), groupIds],
+    queryKey: ["subs", "mt-preview", userId, primaryGroupId, textKey(yaml), groupIds],
     queryFn: async ({ signal }) => plain(await subscriptions.previewMihomoTemplate({ userId, yaml, groupIds }, { signal })),
     staleTime: 60_000,
     retry: false,

@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
@@ -194,6 +195,26 @@ func TestMihomoTemplateAutoAndTheSwitch(t *testing.T) {
 	off.LinkAutoSelect = new(bool)
 	if err := Validate(off); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "Auto") {
 		t.Errorf("switch off: %v", err)
+	}
+}
+
+func TestMihomoSettingsValidationCanceled(t *testing.T) {
+	set := withTemplates(tpl("router", "mode: rule\n# @mistgate-end", "grp_a"))
+	if err := Validate(set); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("without cancellation, the broken template must be refused: %v", err)
+	}
+
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	expired, stop := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer stop()
+	for _, ctx := range []context.Context{canceled, expired} {
+		if err := ValidateContext(ctx, set); err != ctx.Err() {
+			t.Errorf("whole document: got %v, want %v", err, ctx.Err())
+		}
+		if err := validateMihomoTemplates(ctx, set); err != ctx.Err() {
+			t.Errorf("template validation: got %v, want %v", err, ctx.Err())
+		}
 	}
 }
 

@@ -27,7 +27,7 @@ import (
 // mihomoProfile is what the assembler needs about one user's subscription.
 type mihomoProfile struct {
 	title      string
-	groupID    string // primary group, or empty when previewing only the common part
+	groupID    string   // primary group, or empty when previewing only the common part
 	lines      []string // proxies, each a YAML list with one element (plugin.Fragment.Data)
 	names      []string // the server name of each line, parallel to lines ("" or missing = keep the plugin's own)
 	preset     *dns.Preset

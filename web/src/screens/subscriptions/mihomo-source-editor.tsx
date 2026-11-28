@@ -49,7 +49,7 @@ type Props = {
   editorRef: RefObject<ace.Ace.Editor | null>;
   text: string;
   label: string;
-  description?: string;
+  description: string;
   readOnly: boolean;
   blocks?: Source["blocks"];
   variant?: string;
@@ -116,9 +116,14 @@ export function MihomoSourceEditor({ editorRef, text, label, description, readOn
     const instance = editorRef.current!;
     instance.setReadOnly(readOnly);
     instance.setOption("textInputAriaLabel", label);
-    const input = host.current!.querySelector("textarea")!;
-    if (description) input.setAttribute("aria-describedby", description);
-    else input.removeAttribute("aria-describedby");
+    instance.textInput.setAriaLabel();
+    const input = instance.textInput.getElement();
+    input.setAttribute("aria-describedby", description);
+    input.setAttribute("aria-readonly", String(readOnly));
+    const { scroller } = instance.renderer;
+    scroller.setAttribute("aria-label", label);
+    scroller.setAttribute("aria-describedby", description);
+    scroller.removeAttribute("aria-roledescription");
   }, [description, editorRef, label, readOnly]);
 
   useLayoutEffect(() => {

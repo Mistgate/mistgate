@@ -21,25 +21,53 @@ import (
 // credential), and the servers of the person come out with their name, type, address and port only: the owner sees where the
 // servers went in the template, not the keys of the person.
 func (s *Service) PreviewMihomoTemplate(ctx context.Context, req *connect.Request[adminv1.PreviewMihomoTemplateRequest]) (*connect.Response[adminv1.PreviewMihomoTemplateResponse], error) {
-	m := req.Msg
-	set, err := subsettings.Load(ctx, s.st) // not the cache: the draft is checked against what is saved
-	if err != nil {
-		return nil, s.internal("preview load", err)
+	contextError := func(err error) error {
+		if canceled := ctx.Err(); canceled != nil {
+			err = canceled
+		}
+		switch {
+		case errors.Is(err, context.Canceled):
+			return connect.NewError(connect.CodeCanceled, context.Canceled)
+		case errors.Is(err, context.DeadlineExceeded):
+			return connect.NewError(connect.CodeDeadlineExceeded, context.DeadlineExceeded)
+		default:
+			return nil
+		}
 	}
-	autoOn := subsettings.LinkAutoSelect(set)
-	if err := subsettings.CheckMihomoGroups(m.Yaml, m.GroupIds, autoOn); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	internal := func(what string, err error) error {
+		if canceled := contextError(err); canceled != nil {
+			return canceled
+		}
+		return s.internal(what, err)
+	}
+	if err := contextError(nil); err != nil {
+		return nil, err
 	}
 	if s.preview == nil {
 		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("the preview is not available"))
 	}
+	m := req.Msg
+	set, err := subsettings.Load(ctx, s.st) // not the cache: the draft is checked against what is saved
+	if err != nil {
+		return nil, internal("preview load", err)
+	}
 	v, err := s.preview.PreviewSubscriptionWith(ctx, m.UserId, access.SubOptions{
 		Format: plugin.FormatMihomo, NoLinkAWG: !subsettings.LinkAWG(set), IncludeEffectiveDNS: true,
 	})
+	if canceled := contextError(err); canceled != nil {
+		return nil, canceled
+	}
 	if errors.Is(err, access.ErrUnknownToken) {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("no such person"))
 	} else if err != nil {
 		return nil, s.internal("preview view", err)
+	}
+	autoOn := subsettings.LinkAutoSelect(set)
+	if err := subsettings.CheckMihomoGroups(ctx, m.Yaml, m.GroupIds, autoOn); err != nil {
+		if canceled := contextError(err); canceled != nil {
+			return nil, canceled
+		}
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	var lang string
 	if b, err := s.brand(ctx); err == nil {
@@ -56,7 +84,7 @@ func (s *Service) PreviewMihomoTemplate(ctx context.Context, req *connect.Reques
 	}
 	body, selected, templated, err := p.render("draft", m.Yaml)
 	if err != nil {
-		return nil, s.internal("preview render", err)
+		return nil, internal("preview render", err)
 	}
 	if p.note {
 		// The profile ignores templates when serving a note, but the editor still needs the variant's warnings.
@@ -69,7 +97,7 @@ func (s *Service) PreviewMihomoTemplate(ctx context.Context, req *connect.Reques
 	if g, err := s.st.Access().Group(ctx, v.GroupID); err == nil {
 		resp.GroupName = g.Name
 	} else if !errors.Is(err, store.ErrNotFound) {
-		return nil, s.internal("preview group", err)
+		return nil, internal("preview group", err)
 	}
 	if !templated {
 		resp.NotServed = "no_servers"
@@ -87,6 +115,9 @@ func (s *Service) PreviewMihomoTemplate(ctx context.Context, req *connect.Reques
 	}
 	if len(m.GroupIds) == 0 {
 		resp.Warnings = append(resp.Warnings, &adminv1.MihomoWarning{Code: subsettings.WarnUnused})
+	}
+	if err := contextError(nil); err != nil {
+		return nil, err
 	}
 	return connect.NewResponse(resp), nil
 }

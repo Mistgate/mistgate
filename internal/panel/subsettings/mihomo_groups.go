@@ -1,15 +1,20 @@
 package subsettings
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"unicode/utf8"
 )
 
 const mihomoDirective = "# @mistgate-"
+
+// Bound the combined validation work, not just the size of the stored source or the number of groups.
+const maxMihomoVariantBytes = 16 * MaxMihomoTemplateBytes
 
 type mihomoGroupBlock struct {
 	start, body, end, after int // byte offsets: opening mark, body, closing mark, next line
@@ -17,9 +22,48 @@ type mihomoGroupBlock struct {
 	ids                     []string
 }
 
+// A marker after any YAML line break is still reserved. Reject unusual breaks anywhere in a conditional
+// source, including raw CRs in JSON arguments, but hand legacy YAML to the parser unchanged.
+func mihomoUnusualLineBreak(text string) int {
+	if !strings.ContainsAny(text, "\r\u0085\u2028\u2029") {
+		return 0
+	}
+	first, marked := 0, false
+	for line := 1; text != ""; line++ {
+		marked = marked || strings.HasPrefix(text, mihomoDirective)
+		if marked && first != 0 {
+			return first
+		}
+		i := strings.IndexAny(text, "\r\n\u0085\u2028\u2029")
+		if i < 0 {
+			break
+		}
+		text = text[i:]
+		switch {
+		case strings.HasPrefix(text, "\r\n"):
+			text = text[2:]
+		case text[0] == '\n':
+			text = text[1:]
+		default:
+			if first == 0 {
+				first = line
+			}
+			if marked {
+				return first
+			}
+			_, size := utf8.DecodeRuneInString(text)
+			text = text[size:]
+		}
+	}
+	return 0
+}
+
 func mihomoGroupBlocks(text string) ([]mihomoGroupBlock, error) {
 	if !strings.Contains(text, mihomoDirective) {
 		return nil, nil
+	}
+	if line := mihomoUnusualLineBreak(text); line != 0 {
+		return nil, fmt.Errorf("line %d: group blocks support only LF and CRLF line breaks", line)
 	}
 	var blocks []mihomoGroupBlock
 	open := -1
@@ -38,7 +82,7 @@ func mihomoGroupBlocks(text string) ([]mihomoGroupBlock, error) {
 			switch word {
 			case "if":
 				var ids []string
-				if strings.ContainsRune(args, '\r') || json.Unmarshal([]byte(args), &ids) != nil || len(ids) == 0 {
+				if json.Unmarshal([]byte(args), &ids) != nil || len(ids) == 0 {
 					return nil, fmt.Errorf("line %d: # @mistgate-if requires a non-empty JSON array of group IDs", number)
 				}
 				if len(ids) > maxHeaderGroups {
@@ -75,67 +119,117 @@ func mihomoGroupBlocks(text string) ([]mihomoGroupBlock, error) {
 	return blocks, nil
 }
 
-// blankMihomoLines discards the line contents, keeping the original LF or CRLF in place.
-func blankMihomoLines(out *strings.Builder, text string) {
-	for {
-		i := strings.IndexByte(text, '\n')
-		if i < 0 {
-			return
+type mihomoVariant struct {
+	text   string
+	blocks []mihomoGroupBlock
+	keep   func(int) bool // nil selects common YAML
+}
+
+// omissions yields ordered, non-overlapping ranges of whole source lines. Jumping over an excluded
+// block excludes all its children, regardless of their conditions.
+func (v mihomoVariant) omissions(yield func(start, end int) bool) {
+	open := -1
+	for i := 0; i < len(v.blocks) || open >= 0; {
+		if open >= 0 && (i == len(v.blocks) || v.blocks[open].next == i) {
+			b := v.blocks[open]
+			if !yield(b.end, b.after) {
+				return
+			}
+			open = b.parent
+			continue
 		}
-		if i > 0 && text[i-1] == '\r' {
-			out.WriteByte('\r')
+		b := v.blocks[i]
+		if v.keep != nil && v.keep(i) {
+			if !yield(b.start, b.body) {
+				return
+			}
+			open, i = i, i+1
+		} else {
+			if !yield(b.start, b.after) {
+				return
+			}
+			i = b.next
 		}
-		out.WriteByte('\n')
-		text = text[i+1:]
 	}
 }
 
-// A nil keep selects the common variant.
-func resolveMihomoBlocks(text string, blocks []mihomoGroupBlock, keep func(int) bool) string {
-	if len(blocks) == 0 {
-		return text
+func (v mihomoVariant) size() int {
+	size := len(v.text)
+	for start, end := range v.omissions {
+		size -= end - start
+	}
+	return size
+}
+
+func (v mihomoVariant) resolve(size int) string {
+	if len(v.blocks) == 0 {
+		return v.text
 	}
 	var out strings.Builder
-	out.Grow(len(text))
-	at, open := 0, -1
-	for i := 0; i < len(blocks) || open >= 0; {
-		if open >= 0 && (i == len(blocks) || blocks[open].next == i) {
-			b := blocks[open]
-			out.WriteString(text[at:b.end])
-			blankMihomoLines(&out, text[b.end:b.after])
-			at, open = b.after, b.parent
-			continue
-		}
-		b := blocks[i]
-		out.WriteString(text[at:b.start])
-		if keep != nil && keep(i) {
-			blankMihomoLines(&out, text[b.start:b.body])
-			at, open, i = b.body, i, i+1
-		} else {
-			blankMihomoLines(&out, text[b.start:b.after])
-			at, i = b.after, b.next
-		}
+	out.Grow(size)
+	at := 0
+	for start, end := range v.omissions {
+		out.WriteString(v.text[at:start])
+		at = end
 	}
-	out.WriteString(text[at:])
+	out.WriteString(v.text[at:])
 	return out.String()
 }
 
-// ResolveMihomoGroup selects the blocks for one primary group (or just the common YAML for an empty ID), keeping source line
-// numbers. The caller decides whether the template is assigned to the group before passing its ID.
+// sourceError builds the line map only for a failed validation, never for a served or valid variant.
+func (v mihomoVariant) sourceError(err error) error {
+	if len(v.blocks) == 0 {
+		return err
+	}
+	type jump struct{ line, skipped int }
+	var jumps []jump
+	at, line, skipped := 0, 1, 0
+	for start, end := range v.omissions {
+		if end == len(v.text) { // EOF diagnostics point to the start of the trailing omission.
+			break
+		}
+		line += strings.Count(v.text[at:start], "\n")
+		skipped += strings.Count(v.text[start:end], "\n")
+		jumps = append(jumps, jump{line, skipped})
+		at = end
+	}
+	sourceLine := func(line int) int {
+		i := sort.Search(len(jumps), func(i int) bool { return jumps[i].line > line })
+		if i != 0 {
+			return line + jumps[i-1].skipped
+		}
+		return line
+	}
+	if diagnostic, ok := err.(mihomoYAMLDiagnostic); ok {
+		return errors.New(diagnostic.message(sourceLine))
+	}
+	return errors.New(mihomoDiagnosticLines(err.Error(), sourceLine))
+}
+
+// ResolveMihomoGroup selects the blocks for one primary group (or just the common YAML for an empty ID).
+// Markers and excluded lines are omitted, with all other bytes preserved. The caller decides whether the template is assigned
+// to the group before passing its ID.
 func ResolveMihomoGroup(text, groupID string) (string, error) {
 	blocks, err := mihomoGroupBlocks(text)
 	if err != nil {
 		return "", err
 	}
-	if groupID == "" {
-		return resolveMihomoBlocks(text, blocks, nil), nil
+	if len(blocks) == 0 {
+		return text, nil
 	}
-	return resolveMihomoBlocks(text, blocks, func(i int) bool { return slices.Contains(blocks[i].ids, groupID) }), nil
+	variant := mihomoVariant{text: text, blocks: blocks}
+	if groupID != "" {
+		variant.keep = func(i int) bool { return slices.Contains(blocks[i].ids, groupID) }
+	}
+	return variant.resolve(variant.size()), nil
 }
 
 // visitMihomoVariants passes the common variant followed by each distinct pattern of enabled blocks in assignment order.
 // A bitmap per group records only the selections; each resolved YAML document is used and discarded in turn.
-func visitMihomoVariants(text string, groupIDs []string, visit func(groupID, resolved string) error) error {
+func visitMihomoVariants(ctx context.Context, text string, groupIDs []string, visit func(groupID, resolved string, variant mihomoVariant) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if len(text) > MaxMihomoTemplateBytes {
 		return fmt.Errorf("%d bytes, at most %d", len(text), MaxMihomoTemplateBytes)
 	}
@@ -149,7 +243,24 @@ func visitMihomoVariants(text string, groupIDs []string, visit func(groupID, res
 	if err != nil {
 		return err
 	}
-	if err := visit("", resolveMihomoBlocks(text, blocks, nil)); err != nil {
+	work := 0
+	check := func(id string, keep func(int) bool) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		variant := mihomoVariant{text: text, blocks: blocks, keep: keep}
+		size := variant.size()
+		work += size
+		if work > maxMihomoVariantBytes {
+			return fmt.Errorf("group variants exceed the validation limit of %d resolved YAML bytes", maxMihomoVariantBytes)
+		}
+		err := visit(id, variant.resolve(size), variant)
+		if canceled := ctx.Err(); canceled != nil {
+			return canceled
+		}
+		return err
+	}
+	if err := check("", nil); err != nil {
 		return err
 	}
 	if len(blocks) == 0 || len(groupIDs) == 0 {
@@ -178,8 +289,7 @@ func visitMihomoVariants(text string, groupIDs []string, visit func(groupID, res
 			continue
 		}
 		seen[string(mask)] = true
-		resolved := resolveMihomoBlocks(text, blocks, func(i int) bool { return mask[i/8]&(1<<(i%8)) != 0 })
-		if err := visit(id, resolved); err != nil {
+		if err := check(id, func(i int) bool { return mask[i/8]&(1<<(i%8)) != 0 }); err != nil {
 			return err
 		}
 	}
@@ -187,9 +297,17 @@ func visitMihomoVariants(text string, groupIDs []string, visit func(groupID, res
 }
 
 // CheckMihomoGroups checks the common YAML and every distinct variant served to an assigned primary group.
-func CheckMihomoGroups(text string, groupIDs []string, autoOn bool) error {
-	return visitMihomoVariants(text, groupIDs, func(groupID, resolved string) error {
-		if err := CheckMihomoTemplate(resolved, autoOn); err != nil {
+func CheckMihomoGroups(ctx context.Context, text string, groupIDs []string, autoOn bool) error {
+	return visitMihomoVariants(ctx, text, groupIDs, func(groupID, resolved string, variant mihomoVariant) error {
+		// A conditional source can disappear entirely. Keep its missing-document diagnostic distinct
+		// from that of a completely empty source.
+		var err error
+		if resolved == "" && len(variant.blocks) != 0 {
+			err = errors.New("no YAML document")
+		} else {
+			err = checkMihomoTemplate(ctx, resolved, autoOn, variant.sourceError)
+		}
+		if err != nil {
 			if groupID == "" {
 				return fmt.Errorf("common: %w", err)
 			}
@@ -204,7 +322,7 @@ func CheckMihomoGroups(text string, groupIDs []string, autoOn bool) error {
 func MihomoGroupWarnings(text string, groupIDs []string, autoOn bool) []MihomoWarning {
 	var out []MihomoWarning
 	seen := map[MihomoWarning]bool{}
-	_ = visitMihomoVariants(text, groupIDs, func(_, resolved string) error {
+	_ = visitMihomoVariants(context.Background(), text, groupIDs, func(_, resolved string, _ mihomoVariant) error {
 		for _, w := range MihomoTemplateWarnings(resolved, autoOn) {
 			if !seen[w] {
 				seen[w] = true
