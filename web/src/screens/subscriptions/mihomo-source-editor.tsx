@@ -5,7 +5,7 @@ import "ace-builds/src-noconflict/theme-github_dark";
 import "ace-builds/src-noconflict/theme-github_light_default";
 import "ace-builds/src-noconflict/ext-searchbox";
 import { useTheme } from "@/lib/theme";
-import type { Source } from "./mihomo-source";
+import { activeBlocks, type Source } from "./mihomo-source";
 
 const Range = ace.Range;
 const directive = /^# @mistgate-(?:if[ \t]|end[ \t]*$)/;
@@ -125,8 +125,11 @@ export function MihomoSourceEditor({ editorRef, text, label, description, readOn
     if (variant === "all") return;
     const session = editorRef.current!.session;
     const markers: number[] = [];
-    for (const { open, close, refs } of blocks) {
-      if (!refs.includes(variant)) markers.push(session.addMarker(new Range(open, 0, close, 1), "mt-dropped", "fullLine", true));
+    const chosen = activeBlocks(blocks, variant);
+    for (const [i, { open, close, parent }] of blocks.entries()) {
+      if (!chosen[i] && (parent < 0 || chosen[parent])) {
+        markers.push(session.addMarker(new Range(open, 0, close, 1), "mt-dropped", "fullLine", true));
+      }
     }
     return () => { for (const marker of markers) session.removeMarker(marker); };
   }, [blocks, editorRef, variant]);

@@ -6,7 +6,7 @@ export type Group = { id: string; name: string };
 export type SourceIssue = { kind: "syntax" | "unknown" | "inactive" | "header" | "selection" | "emptyLine"; line: number; group?: string };
 type Result<T> = { value: T; issue?: never } | { value?: never; issue: SourceIssue };
 type SourceLine = { start: number; body: string; eol: string; end: number };
-type Block = { open: number; close: number; refs: string[]; json: string; before: string };
+type Block = { open: number; close: number; parent: number; refs: string[]; json: string; before: string };
 export type Source = { lines: SourceLine[]; blocks: Block[] };
 export type SourceDraft = { text: string; names: ReadonlyMap<string, string> };
 
@@ -39,24 +39,26 @@ export function parseSource(text: string, ids = false): Result<Source> {
   if (!text.startsWith(prefix) && !text.includes(`\n${prefix}`)) return { value: { lines: [], blocks: [] } };
   const lines = sourceLines(text);
   const blocks: Block[] = [];
-  let pending: Omit<Block, "close"> | undefined;
+  let pending = -1;
   for (let i = 0; i < lines.length; i++) {
     const body = lines[i]!.body;
     if (!body.startsWith(prefix)) continue;
     const issue = { kind: "syntax", line: i + 1 } as const;
     if (/^# @mistgate-end[ \t]*$(?![\s\S])/.test(body)) {
-      if (!pending) return { issue };
-      blocks.push({ ...pending, close: i });
-      pending = undefined;
+      if (pending < 0) return { issue };
+      const block = blocks[pending]!;
+      block.close = i;
+      pending = block.parent;
       continue;
     }
     const token = /^(# @mistgate-if[ \t]+)(\[[^\n]*\][ \t]*)$(?![\s\S])/u.exec(body);
-    if (!token || pending) return { issue };
+    if (!token) return { issue };
     const refs = namesOf(jsonOf(token[2]!), false);
     if (!refs || (ids && refs.some((id) => id.length > 64 || nonIDChar.test(id)))) return { issue };
-    pending = { open: i, refs, json: token[2]!, before: token[1]! };
+    blocks.push({ open: i, close: -1, parent: pending, refs, json: token[2]!, before: token[1]! });
+    pending = blocks.length - 1;
   }
-  return pending ? { issue: { kind: "syntax", line: pending.open + 1 } } : { value: { lines, blocks } };
+  return pending >= 0 ? { issue: { kind: "syntax", line: blocks[pending]!.open + 1 } } : { value: { lines, blocks } };
 }
 
 /** Replace only the JSON strings on opening markers. Leave spacing and all other bytes as written. */
@@ -116,6 +118,13 @@ export function inactiveRefs(source: Source, groups: readonly Group[], assigned:
   return source.blocks.flatMap((b) => b.refs.filter((id) => !assigned.includes(id) || !groups.some((g) => g.id === id)).map((id) => ({ kind: "inactive", line: b.open + 1, group: groups.find((g) => g.id === id)?.name ?? id })));
 }
 
+/** A nested condition is active only if every ancestor matches the same primary group. */
+export function activeBlocks(blocks: Source["blocks"], id: string): boolean[] {
+  const chosen: boolean[] = [];
+  for (const b of blocks) chosen.push((b.parent < 0 || chosen[b.parent] === true) && b.refs.includes(id));
+  return chosen;
+}
+
 /** One common variant, then each different set of active blocks. Keep parser line coordinates. */
 export function* variants(text: string, source: Source, assigned: readonly string[]): Generator<string, void, unknown> {
   if (source.blocks.length === 0) {
@@ -124,31 +133,30 @@ export function* variants(text: string, source: Source, assigned: readonly strin
   }
   const seen = new Set<string>();
   for (const id of ["", ...assigned]) {
-    const chosen = source.blocks.map((b) => b.refs.includes(id));
+    const chosen = activeBlocks(source.blocks, id);
     const signature = chosen.map((on) => +on).join("");
     if (seen.has(signature)) continue;
     seen.add(signature);
-    let at = 0;
+    let next = 0;
+    let open = -1;
     let out = "";
-    for (const [i, b] of source.blocks.entries()) {
-      while (at < b.open) {
-        const l = source.lines[at++]!;
-        out += l.body + l.eol;
+    for (const [row, line] of source.lines.entries()) {
+      if (source.blocks[next]?.open === row) {
+        open = next++;
+      } else if (source.blocks[open]?.close === row) {
+        open = source.blocks[open]!.parent;
+      } else if (open < 0 || chosen[open]) {
+        out += line.body;
       }
-      out += source.lines[at++]!.eol;
-      while (at < b.close) {
-        const l = source.lines[at++]!;
-        out += (chosen[i] ? l.body : "") + l.eol;
-      }
-      out += source.lines[at++]!.eol;
+      out += line.eol;
     }
-    yield out + text.slice(source.lines[at - 1]!.end);
+    yield out;
   }
 }
 
 export type Selection = { start: number; end: number; eol: string; block?: Block; lines: SourceLine[] };
 
-/** HTML textareas expose LF offsets even when the underlying draft still contains CRLF. */
+/** The editor exposes LF offsets even when the stored draft still contains CRLF. */
 export function sourceSelection(text: string, from: number, to: number): Result<Selection> {
   const parsed = parseSource(text);
   if (parsed.issue) return { issue: parsed.issue };
@@ -167,8 +175,16 @@ export function sourceSelection(text: string, from: number, to: number): Result<
   if (first < 0) return { issue: { kind: "emptyLine", line: lines.length + 1 } };
   const a = lines[first]!;
   const b = lines[last]!;
-  const block = parsed.value.blocks.find((x) => x.open <= last && x.close >= first);
-  if (block && from !== to) return { issue: { kind: "selection", line: first + 1 } };
+  let block: Block | undefined;
+  for (const b of parsed.value.blocks) {
+    if (from === to) {
+      if (b.open <= first && first <= b.close) block = b;
+      continue;
+    }
+    const opensInside = first <= b.open && b.open <= last;
+    const closesInside = first <= b.close && b.close <= last;
+    if (opensInside !== closesInside) return { issue: { kind: "selection", line: first + 1 } };
+  }
   if (!block && from === to && !a.body.trim()) return { issue: { kind: "emptyLine", line: first + 1 } };
   return { value: { start: a.start, end: b.end, eol: a.eol || lines.find((l) => l.eol)?.eol || "\n", block, lines } };
 }

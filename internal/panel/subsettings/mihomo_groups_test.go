@@ -28,6 +28,8 @@ func TestResolveMihomoGroup(t *testing.T) {
 		{"mixed line breaks", mixed, "grp_a", "mode: rule\r\n\r\nport: 1080\n\r\nrules: [MATCH]\n\r\n\r\n"},
 		{"last line without LF", mixed, "grp_b", "mode: rule\r\n\r\n\n\r\nrules: [MATCH]\n\r\nmixed-port: 1081\r\n"},
 		{"empty ID is common", mixed, "", "mode: rule\r\n\r\n\n\r\nrules: [MATCH]\n\r\n\r\n"},
+		{"nested intersection", "mode: rule\n# @mistgate-if [\"grp_a\",\"grp_b\"]\r\nlog-level: info\n# @mistgate-if [\"grp_b\",\"grp_c\"]\nallow-lan: true\n# @mistgate-end\nipv6: false\n# @mistgate-end", "grp_b", "mode: rule\n\r\nlog-level: info\n\nallow-lan: true\n\nipv6: false\n"},
+		{"matching child under excluded parent", "mode: rule\n# @mistgate-if [\"grp_a\"]\n# @mistgate-if [\"grp_b\"]\ninvalid: [\n# @mistgate-end\n# @mistgate-end", "grp_b", "mode: rule\n\n\n\n\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := ResolveMihomoGroup(tc.source, tc.group)
@@ -55,7 +57,7 @@ func TestMihomoGroupDirectiveErrors(t *testing.T) {
 	}{
 		{"missing end", "# @mistgate-if [\"grp_a\"]\nmode: rule\n", "line 2: # @mistgate-if has no matching"},
 		{"stray end", "# @mistgate-end", "line 2: # @mistgate-end has no matching"},
-		{"nested", "# @mistgate-if [\"grp_a\"]\r\n# @mistgate-if [\"grp_b\"]\n# @mistgate-end", "line 3: nested"},
+		{"unclosed outer block", "# @mistgate-if [\"grp_a\"]\r\n# @mistgate-if [\"grp_b\"]\n# @mistgate-end", "line 2: # @mistgate-if has no matching"},
 		{"unknown", "# @mistgate-maybe", "line 2: unknown"},
 		{"end tail", "# @mistgate-if [\"grp_a\"]\n# @mistgate-end # no tail", "line 3: # @mistgate-end does not take arguments"},
 		{"if tail", "# @mistgate-if [\"grp_a\"] []\n# @mistgate-end", "line 2: # @mistgate-if requires"},
@@ -81,6 +83,17 @@ func TestMihomoGroupDirectiveErrors(t *testing.T) {
 				t.Fatalf("resolver got %q, %v; want no text and %q", resolved, err, tc.want)
 			}
 		})
+	}
+}
+
+func TestMihomoNestedValidationUsesEffectiveGroups(t *testing.T) {
+	const text = "mode: rule\n# @mistgate-if [\"grp_a\"]\n# @mistgate-if [\"grp_b\"]\ninvalid: [\n# @mistgate-end\n# @mistgate-end\n"
+	if err := CheckMihomoGroups(text, []string{"grp_a", "grp_b"}, true); err != nil {
+		t.Fatal(err)
+	}
+	overlap := strings.Replace(text, `["grp_a"]`, `["grp_a","grp_b"]`, 1)
+	if err := CheckMihomoGroups(overlap, []string{"grp_a", "grp_b"}, true); err == nil || !strings.Contains(err.Error(), `group "grp_b"`) {
+		t.Fatalf("matching child must be validated for grp_b, got %v", err)
 	}
 }
 

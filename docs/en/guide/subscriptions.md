@@ -304,7 +304,7 @@ tproxy-port: 1181
 # @mistgate-end
 ```
 
-Directives start in the first column, even inside a list. Keep the YAML lines at their original indentation. Multiple names mean any one of those primary groups. Blocks cannot nest. The shared part and every assigned variant must be valid. Preview with a person to inspect the selected variant as highlighted YAML. Removing a condition makes its lines shared; removing an assignment leaves the block in the source but disables it for that group.
+Directives start in the first column, even inside a list. Keep the YAML lines at their original indentation. A list matches any of its primary groups; a nested block matches only if the same group is in every enclosing list. For example, a Phone block inside a PC/Phone block applies only to Phone. Select lines inside a block to add a nested condition, or place the cursor inside to change the innermost block. Removing a condition leaves any enclosing or enclosed conditions in force. The shared part and each assigned variant must be valid.
 
 Line numbers in the editor refer to the source, even when sections are folded. Choose a group under **Source variant** to dim lines that will not be in its config without removing them from the editor. The preview still shows the selected person's generated config.
 

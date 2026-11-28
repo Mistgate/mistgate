@@ -13,6 +13,7 @@ const mihomoDirective = "# @mistgate-"
 
 type mihomoGroupBlock struct {
 	start, body, end, after int // byte offsets: opening mark, body, closing mark, next line
+	parent, next, line      int // opening-order indices; next skips the entire subtree
 	ids                     []string
 }
 
@@ -21,8 +22,7 @@ func mihomoGroupBlocks(text string) ([]mihomoGroupBlock, error) {
 		return nil, nil
 	}
 	var blocks []mihomoGroupBlock
-	var open mihomoGroupBlock
-	openLine := 0
+	open := -1
 	for offset, number := 0, 1; offset < len(text); number++ {
 		line, rest, lf := strings.Cut(text[offset:], "\n")
 		after := len(text) - len(rest)
@@ -37,9 +37,6 @@ func mihomoGroupBlocks(text string) ([]mihomoGroupBlock, error) {
 			}
 			switch word {
 			case "if":
-				if openLine != 0 {
-					return nil, fmt.Errorf("line %d: nested # @mistgate-if (block opened on line %d)", number, openLine)
-				}
 				var ids []string
 				if strings.ContainsRune(args, '\r') || json.Unmarshal([]byte(args), &ids) != nil || len(ids) == 0 {
 					return nil, fmt.Errorf("line %d: # @mistgate-if requires a non-empty JSON array of group IDs", number)
@@ -54,26 +51,26 @@ func mihomoGroupBlocks(text string) ([]mihomoGroupBlock, error) {
 					}
 					seen[id] = true
 				}
-				open = mihomoGroupBlock{start: offset, body: after, ids: ids}
-				openLine = number
+				blocks = append(blocks, mihomoGroupBlock{start: offset, body: after, ids: ids, parent: open, line: number})
+				open = len(blocks) - 1
 			case "end":
 				if args != "" {
 					return nil, fmt.Errorf("line %d: # @mistgate-end does not take arguments", number)
 				}
-				if openLine == 0 {
+				if open < 0 {
 					return nil, fmt.Errorf("line %d: # @mistgate-end has no matching # @mistgate-if", number)
 				}
-				open.end, open.after = offset, after
-				blocks = append(blocks, open)
-				openLine = 0
+				block := &blocks[open]
+				block.end, block.after, block.next = offset, after, len(blocks)
+				open = block.parent
 			default:
 				return nil, fmt.Errorf("line %d: unknown # @mistgate- directive", number)
 			}
 		}
 		offset = after
 	}
-	if openLine != 0 {
-		return nil, fmt.Errorf("line %d: # @mistgate-if has no matching # @mistgate-end", openLine)
+	if open >= 0 {
+		return nil, fmt.Errorf("line %d: # @mistgate-if has no matching # @mistgate-end", blocks[open].line)
 	}
 	return blocks, nil
 }
@@ -100,19 +97,26 @@ func resolveMihomoBlocks(text string, blocks []mihomoGroupBlock, keep func(int) 
 	}
 	var out strings.Builder
 	out.Grow(len(text))
-	after := 0
-	for i, b := range blocks {
-		out.WriteString(text[after:b.start])
+	at, open := 0, -1
+	for i := 0; i < len(blocks) || open >= 0; {
+		if open >= 0 && (i == len(blocks) || blocks[open].next == i) {
+			b := blocks[open]
+			out.WriteString(text[at:b.end])
+			blankMihomoLines(&out, text[b.end:b.after])
+			at, open = b.after, b.parent
+			continue
+		}
+		b := blocks[i]
+		out.WriteString(text[at:b.start])
 		if keep != nil && keep(i) {
 			blankMihomoLines(&out, text[b.start:b.body])
-			out.WriteString(text[b.body:b.end])
-			blankMihomoLines(&out, text[b.end:b.after])
+			at, open, i = b.body, i, i+1
 		} else {
 			blankMihomoLines(&out, text[b.start:b.after])
+			at, i = b.after, b.next
 		}
-		after = b.after
 	}
-	out.WriteString(text[after:])
+	out.WriteString(text[at:])
 	return out.String()
 }
 
@@ -161,7 +165,7 @@ func visitMihomoVariants(text string, groupIDs []string, visit func(groupID, res
 	}
 	for i, block := range blocks {
 		for _, id := range block.ids {
-			if start, ok := assigned[id]; ok {
+			if start, ok := assigned[id]; ok && (block.parent < 0 || masks[start+block.parent/8]&(1<<(block.parent%8)) != 0) {
 				masks[start+i/8] |= 1 << (i % 8)
 			}
 		}

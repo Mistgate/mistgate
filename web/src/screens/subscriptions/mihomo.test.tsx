@@ -194,7 +194,7 @@ describe("Mihomo group source", () => {
   it.each([
     ["missing end", marker(["grp_router"]), 2],
     ["stray end", endMarker, 2],
-    ["nested", `${marker(["grp_router"])}\n${marker(["grp_pc"])}\n${endMarker}\n${endMarker}`, 3],
+    ["unclosed outer block", `${marker(["grp_router"])}\n${marker(["grp_pc"])}\n${endMarker}`, 2],
     ["unknown reserved keyword", "# @mistgate-typo", 2],
     ["trailing end text", `${marker(["grp_router"])}\nb: 2\n${endMarker} # oops`, 4],
     ["trailing if text", `${marker(["grp_router"])} more\n${endMarker}`, 2],
@@ -216,9 +216,30 @@ describe("Mihomo group source", () => {
     expect(selection.issue).toBeUndefined();
     expect(condition(displaySource(yaml, defaultGroups), selection.value!, ["grp_router"], defaultGroups).text).toBe(want);
   });
+  it("wraps inside a condition, exports nested names, and keeps only the intersection", () => {
+    const outer = `${marker(["grp_router", "grp_pc"])}\n`;
+    const yaml = `mode: rule\n${outer}ipv6: false\nmixed-port: 1080\n${endMarker}\n`;
+    const draft = displaySource(yaml, defaultGroups);
+    const start = draft.text.indexOf("mixed-port");
+    const end = draft.text.indexOf(endMarker);
+    expect(sourceSelection(draft.text, start, end + 1).issue?.kind).toBe("selection");
+    const wrapped = condition(draft, sourceSelection(draft.text, start, end).value!, ["grp_pc", "grp_mobile"], defaultGroups);
+    const canonical = canonicalSource(wrapped).value!;
+    const parsed = parseSource(canonical, true).value!;
+    const effective = [...variants(canonical, parsed, ["grp_router", "grp_pc", "grp_mobile"])].map((text) => text.split("\n").filter(Boolean));
+    expect(effective).toEqual([
+      ["mode: rule"],
+      ["mode: rule", "ipv6: false"],
+      ["mode: rule", "ipv6: false", "mixed-port: 1080"],
+    ]);
+    const transfer = writeTransfer("Shared", canonical, ["grp_router", "grp_pc", "grp_mobile"], defaultGroups, wrapped).value!;
+    expect(readTransfer(transfer).value?.text).toBe(wrapped.text);
+    expect(sourceSelection(wrapped.text, wrapped.text.indexOf("mixed-port"), wrapped.text.indexOf("mixed-port")).value?.block?.refs).toEqual(["PC", "MOBILE"]);
+  });
 
-  it("protects noncollapsed selections that touch conditions and leaves empty lines alone", () => {
-    expect(sourceSelection(nested, 1, nested.length).issue?.kind).toBe("selection");
+
+  it("rejects a selection that cuts a block in two and leaves empty lines alone", () => {
+    expect(sourceSelection(nested, 1, nested.indexOf(endMarker)).issue?.kind).toBe("selection");
     expect(sourceSelection("a: 1\n \nb: 2\n", 6, 6).issue).toEqual({ kind: "emptyLine", line: 2 });
   });
 
@@ -299,7 +320,7 @@ describe("editing and transferring group blocks", () => {
     const yaml = `${GOOD}${marker(["grp_router"])}\nmode: rule\n${endMarker}`;
     await mount([tpl("Shared", ["grp_router", "grp_pc"], yaml)]);
     const displayed = area().value;
-    area().setSelectionRange(0, displayed.length);
+    area().setSelectionRange(0, displayed.indexOf(endMarker));
     await click(buttonWith(en["sx.hx.m.onlyGroups"]));
     expect(text()).toContain(en["sx.hx.m.source.selection"]);
     expect(area().value).toBe(displayed);
