@@ -65,7 +65,7 @@ func (s *Service) PreviewMihomoTemplate(ctx context.Context, req *connect.Reques
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 	}
-	resp := &adminv1.PreviewMihomoTemplateResponse{Yaml: string(body)}
+	resp := &adminv1.PreviewMihomoTemplateResponse{Yaml: readableMihomoPreview(body)}
 	if g, err := s.st.Access().Group(ctx, v.GroupID); err == nil {
 		resp.GroupName = g.Name
 	} else if !errors.Is(err, store.ErrNotFound) {

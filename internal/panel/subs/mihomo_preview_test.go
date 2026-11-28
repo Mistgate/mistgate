@@ -111,6 +111,25 @@ func TestPreviewMihomoTemplate(t *testing.T) {
 	}
 }
 
+func TestPreviewMihomoShowsEmojiInNames(t *testing.T) {
+	r := newTemplateRig(t, nil)
+	const draft = "mode: rule\nproxy-groups:\n  - name: 🌍 VPN\n    type: select\n    include-all-proxies: true\nrules:\n  - MATCH,🌍 VPN\n"
+	r.save(t, func(s *adminv1.SubscriptionSettings) { s.ServerNameTemplate = "🇫🇮 {profile}" }, routerTemplate(r, r.group2))
+	alice, _ := r.newUser("alice", nil)
+	resp, err := r.preview(t, r.previewService(t, plainPreset), alice, draft, r.group2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := answerOf(t, resp.Yaml)
+	if !strings.Contains(resp.Yaml, "🇫🇮 ") || !strings.Contains(resp.Yaml, "🌍 VPN") {
+		t.Error("the preview did not show the generated and authored names as Unicode")
+	}
+	if len(a.Proxies) == 0 || !strings.HasPrefix(a.Proxies[0]["name"].(string), "🇫🇮 ") ||
+		len(a.Groups) == 0 || a.Groups[0].Name != "🌍 VPN" || len(a.Rules) == 0 || a.Rules[0] != "MATCH,🌍 VPN" {
+		t.Fatal("the Unicode preview did not preserve the names and rule")
+	}
+}
+
 // A preview writes nothing: not a device, not a credential, not the mark that the link was fetched.
 func TestPreviewMihomoTemplateWritesNothing(t *testing.T) {
 	r := newTemplateRig(t, nil)

@@ -493,6 +493,15 @@ describe("the pieces the form says early", () => {
     expect(starterTemplate(false)).toContain("proxies: [DIRECT]");
     expect(starterTemplate(false)).toContain("include-all-proxies: true");
   });
+  it("ships an inert group example that can be enabled for an assigned group", () => {
+    const starter = starterTemplate(true);
+    expect(parseSource(starter).value?.blocks).toHaveLength(0);
+    const enabled = starter.replace(/^# (# @mistgate-(?:if|end).*|redir-port: 1182)$/gm, "$1");
+    const mapped = mapTransfer(enabled, new Map([["Router", "grp_router"]])).value!;
+    const [common, router] = variants(mapped, parseSource(mapped, true).value!, ["grp_router", "grp_pc"]);
+    expect(common).not.toMatch(/^redir-port:/m);
+    expect(router).toMatch(/^redir-port: 1182$/m);
+  });
 });
 
 describe("no templates yet", () => {
