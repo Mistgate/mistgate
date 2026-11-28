@@ -51,12 +51,12 @@ type Props = {
   label: string;
   description?: string;
   readOnly: boolean;
-  blocks: Source["blocks"];
-  variant: string;
-  onChange: (text: string) => void;
+  blocks?: Source["blocks"];
+  variant?: string;
+  onChange?: (text: string) => void;
 };
 
-export function MihomoSourceEditor({ editorRef, text, label, description, readOnly, blocks, variant, onChange }: Props) {
+export function MihomoSourceEditor({ editorRef, text, label, description, readOnly, blocks, variant = "all", onChange }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const latestChange = useRef(onChange);
   const applying = useRef(false);
@@ -84,7 +84,7 @@ export function MihomoSourceEditor({ editorRef, text, label, description, readOn
     // Do not request Ace extensions that are not bundled with the application.
     for (const name of ["gotoline", "showSettingsMenu", "openCommandPallete", "openCommandPalette", "modeSelect"]) instance.commands.removeCommand(name);
     const change = () => {
-      if (!applying.current) latestChange.current(instance.getValue());
+      if (!applying.current) latestChange.current?.(instance.getValue());
     };
     instance.session.on("change", change);
     editorRef.current = instance;
@@ -122,7 +122,7 @@ export function MihomoSourceEditor({ editorRef, text, label, description, readOn
   }, [description, editorRef, label, readOnly]);
 
   useLayoutEffect(() => {
-    if (variant === "all") return;
+    if (!blocks || variant === "all") return;
     const session = editorRef.current!.session;
     const markers: number[] = [];
     const chosen = activeBlocks(blocks, variant);

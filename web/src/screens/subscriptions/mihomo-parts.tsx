@@ -1,6 +1,7 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { Ace } from "ace-builds";
 import { useId, useRef, useState, type ReactNode } from "react";
+import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Popover, PopRow } from "@/components/ui/popover";
@@ -12,7 +13,6 @@ import { hxDemo } from "./demo";
 import { Chips, HxChip, Msg, Opt, People, RowHead } from "./hx-parts";
 import { condition, editSource, groupLimit, inactiveRefs, sourceSelection, variants, writeTransfer, type Group, type Selection, type Source, type SourceDraft, type SourceIssue } from "./mihomo-source";
 import { MihomoSourceEditor } from "./mihomo-source-editor";
-import { MihomoYamlPreview } from "./mihomo-yaml-preview";
 import { templateBytes, templateFileMax, templateLimit, type HeaderProblem, type MihomoTemplate } from "./model";
 
 export type Row = MihomoTemplate & { k: number; source?: SourceDraft }; // k: the row's own key, so that a delete keeps what is typed where it was
@@ -411,6 +411,7 @@ type PreviewProps = {
 /** What one person gets: the person, the verdict and why, and (for the template that is theirs) the profile, read only. */
 export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, valid }: PreviewProps) {
   const [anyway, setAnyway] = useState(false);
+  const previewEditor = useRef<Ace.Editor>(null);
   const list = users.data ?? [];
   const person = list.find((u) => u.id === userId);
   const r = q.data;
@@ -432,8 +433,21 @@ export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, vali
   const ready = !!row && valid && !!r && !r.notServed;
   const profile = ready && (mine || anyway);
   let yaml: ReactNode = null;
-  if (profile && r) yaml = <pre className="pp-pre mt-pre" tabIndex={0} aria-label={t("sx.hx.m.pvYaml")} data-noi18n><MihomoYamlPreview text={r.yaml} /></pre>;
-  else if (row && valid && !r && q.isError) yaml = <QueryError error={q.error} onRetry={() => void q.refetch()} />;
+  if (profile && r) {
+    yaml = (
+      <div key={`${row.k}:${userId}`} className="mt-preview grid min-w-0 gap-2">
+        <div className="flex justify-end">
+          <CopyButton value={r.yaml} label={t("sx.hx.m.pvCopy")} onFail={() => {
+            previewEditor.current?.selectAll();
+            previewEditor.current?.focus();
+          }} />
+        </div>
+        <div className="mt-editor">
+          <MihomoSourceEditor editorRef={previewEditor} label={t("sx.hx.m.pvYaml")} text={r.yaml} readOnly />
+        </div>
+      </div>
+    );
+  } else if (row && valid && !r && q.isError) yaml = <QueryError error={q.error} onRetry={() => void q.refetch()} />;
   else if (row && valid && !r && userId !== "") yaml = <div className="hx-sk" aria-busy="true" />;
 
   return (

@@ -128,6 +128,8 @@ const heads = () => [...document.querySelectorAll<HTMLButtonElement>("button.hx-
 const head = (name: string) => heads().find((b) => b.querySelector("b")?.textContent === name)!;
 const chipOf = (label: string) => [...document.querySelectorAll(`[role=group][aria-label="${en["sx.hx.m.groups"]}"] button`)].find((b) => b.textContent === label)!;
 const kb = (n: number) => (n / 1024).toLocaleString("en", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const previewSelector = ".mt-preview .mt-source";
+const preview = () => ace.edit(document.querySelector<HTMLElement>(previewSelector)!);
 const area = () => {
   const editor = ace.edit(document.querySelector<HTMLElement>(".mt-source")!);
   const doc = editor.session.getDocument();
@@ -314,13 +316,13 @@ describe("editing and transferring group blocks", () => {
     expect(area().editor.getSelectedText()).toBe("  - DOMAIN,router.test,Proxy");
     await debounced();
     expect(previewMihomoTemplate).toHaveBeenCalledWith({ userId: "usr_alice", yaml: inserted("grp_router"), groupIds: ["grp_router", "grp_pc"] }, expect.anything());
-    expect(document.querySelector("pre.mt-pre")?.textContent).toContain("router.test");
+    expect(preview().getValue()).toContain("router.test");
     await click(buttonWith("bob"));
     await settle();
     expect(previewMihomoTemplate).toHaveBeenCalledWith({ userId: "usr_bob", yaml: inserted("grp_router"), groupIds: ["grp_router", "grp_pc"] }, expect.anything());
-    expect(document.querySelector("pre.mt-pre")?.textContent).toContain("MATCH,Proxy");
-    expect(document.querySelector("pre.mt-pre")?.textContent).not.toContain("router.test");
-    expect(document.querySelector("pre.mt-pre")?.textContent).not.toContain("@mistgate");
+    expect(preview().getValue()).toContain("MATCH,Proxy");
+    expect(preview().getValue()).not.toContain("router.test");
+    expect(preview().getValue()).not.toContain("@mistgate");
     await click(buttonWith(en["subs.save"]));
     await settle();
     expect(sent()?.mihomoTemplates).toEqual([tpl("Shared", ["grp_router", "grp_pc"], inserted("grp_router"))]);
@@ -698,11 +700,11 @@ describe("the preview", () => {
     await debounced();
     const call = previewMihomoTemplate.mock.calls.at(-1)?.[0] as { userId: string; yaml: string; groupIds: string[] };
     expect(call).toEqual({ userId: "usr_alice", yaml: "mixed-port: 1\n", groupIds: ["grp_router"] }); // alice: the person of the template's group
-    const out = document.querySelector<HTMLPreElement>("pre.mt-pre")!;
-    expect(out.textContent).toContain("de1.example.com");
+    expect(preview().getValue()).toContain("de1.example.com");
+    expect(preview().getReadOnly()).toBe(true);
     expect(text()).toContain(en["sx.hx.m.pvKeys"]);
   });
-  it("highlights the selected YAML without changing its text or interpreting markup", async () => {
+  it("copies the complete generated YAML even with a fold, and clears the old person's YAML while loading", async () => {
     const router = 'mixed-port: 1080\nprofile:\n  enable: true # router\nurl: "https://example.com/a#b"\nlabel: "<img src=x>"\n';
     const pc = "mode: rule\n";
     let resolvePC!: () => void;
@@ -714,18 +716,29 @@ describe("the preview", () => {
     });
     await mount([tpl("Home", ["grp_router", "grp_pc"])]);
     await debounced();
-    const preview = () => document.querySelector("pre.mt-pre")!;
-    expect(preview().textContent).toBe(router);
-    expect(preview().querySelector("img")).toBeNull();
-    expect(preview().querySelector(".mt-token-number")?.textContent).toBe("1080");
-    expect(preview().querySelector(".mt-token-boolean")?.textContent).toBe("true");
-    expect(preview().querySelector(".mt-token-string")?.textContent).toBe('"https://example.com/a#b"');
-    expect(preview().querySelector(".mt-token-comment")?.textContent).toBe("# router");
+    const editor = preview();
+    expect(editor.getValue()).toBe(router);
+    expect(document.querySelector(`${previewSelector} img`)).toBeNull();
+    await act(async () => {
+      editor.gotoLine(2);
+      editor.session.toggleFoldWidget();
+    });
+    expect(editor.session.getAllFolds()).toHaveLength(1);
+    const original = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    try {
+      await click(buttonWith(en["sx.hx.m.pvCopy"]));
+      expect(writeText).toHaveBeenCalledWith(router);
+    } finally {
+      if (original) Object.defineProperty(navigator, "clipboard", original);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
     await click(buttonWith("bob"));
-    expect(document.querySelector("pre.mt-pre")).toBeNull();
+    expect(document.querySelector(previewSelector)).toBeNull();
     resolvePC();
     await debounced();
-    expect(preview().textContent).toBe(pc);
+    expect(preview().getValue()).toBe(pc);
   });
   it("outcome 1: the person of a group of the template gets the template", async () => {
     await mount([tpl("Home routers", ["grp_router"])]);
@@ -739,9 +752,9 @@ describe("the preview", () => {
     await mount([tpl("Home routers", ["grp_router"])]);
     await debounced();
     expect(document.querySelector(".mt-res")!.textContent).toBe(en["sx.hx.m.rBuilt"] + fill(en["sx.hx.m.rNoGrp"], { group: "MOBILE" }));
-    expect(document.querySelector("pre.mt-pre")).toBeNull();
+    expect(document.querySelector(previewSelector)).toBeNull();
     await click(buttonWith(en["sx.hx.m.pvAnyway"]));
-    expect(document.querySelector("pre.mt-pre")!.textContent).toContain("de1.example.com");
+    expect(preview().getValue()).toContain("de1.example.com");
   });
   it("outcome 3: a person of the group of another template gets that one", async () => {
     people = [{ id: "usr_bob", name: "bob", groupId: "grp_pc" }];
@@ -753,14 +766,14 @@ describe("the preview", () => {
   it("outcome 3, nothing open: says who gets which", async () => {
     await mount([tpl("Home routers", ["grp_router"])], { initial: null });
     expect(document.querySelector(".mt-res")!.textContent).toContain(en["sx.hx.m.rOther"]);
-    expect(document.querySelector("pre.mt-pre")).toBeNull();
+    expect(document.querySelector(previewSelector)).toBeNull();
   });
   it("outcome 4: no access or no servers: the panel's own profile, and the reason", async () => {
     previewMihomoTemplate.mockResolvedValue(reply({ notServed: "no_access", yaml: "port: 7890\n" }));
     await mount([tpl("Home routers", ["grp_router"])]);
     await debounced();
     expect(document.querySelector(".mt-res")!.textContent).toBe(en["sx.hx.m.rOff"] + en["sx.hx.m.rOffS"]);
-    expect(document.querySelector("pre.mt-pre")).toBeNull();
+    expect(document.querySelector(previewSelector)).toBeNull();
     previewMihomoTemplate.mockResolvedValue(reply({ notServed: "no_servers", yaml: "port: 7890\n" }));
     await typeInto(area(), GOOD + "# x\n");
     await debounced();

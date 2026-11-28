@@ -306,7 +306,7 @@ tproxy-port: 1181
 
 Directives start in the first column, even inside a list. Keep the YAML lines at their original indentation. A list matches any of its primary groups; a nested block matches only if the same group is in every enclosing list. For example, a Phone block inside a PC/Phone block applies only to Phone. Select lines inside a block to add a nested condition, or place the cursor inside to change the innermost block. Removing a condition leaves any enclosing or enclosed conditions in force. The shared part and each assigned variant must be valid.
 
-Line numbers in the editor refer to the source, even when sections are folded. Choose a group under **Source variant** to dim lines that will not be in its config without removing them from the editor. The preview still shows the selected person's generated config.
+Line numbers in the editor refer to the source, even when sections are folded. Choose a group under **Source variant** to dim lines that will not be in its config. The read-only preview numbers the generated YAML separately, supports folding and search (`Ctrl+F`), and **Copy YAML** copies the complete preview, including folded sections.
 
 Download the source to move a template to another panel. On import, match all group names with local groups not assigned to another template, then confirm and save. Manually written secrets remain in the file. Do not load this source into Mihomo directly: it ignores directive comments. Subscription responses contain the resolved config.
 

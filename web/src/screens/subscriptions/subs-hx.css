@@ -538,21 +538,6 @@
 .sbp .mt-res.bad b {
   color: var(--danger-text);
 }
-.sbp .mt-pre {
-  max-height: 420px;
-  overflow: auto;
-  white-space: pre;
-  word-break: normal;
-  line-height: 20px;
-  direction: ltr;
-  text-align: left;
-}
-.sbp .mt-pre .mt-token-key { color: light-dark(#175d9a, #8fc9ff); }
-.sbp .mt-pre .mt-token-string { color: light-dark(#206633, #a5dc8d); }
-.sbp .mt-pre :is(.mt-token-number, .mt-token-boolean, .mt-token-null) {
-  color: light-dark(#8e3c07, #ffb778);
-}
-.sbp .mt-pre .mt-token-comment { color: light-dark(#5b606a, #a7acb8); }
 @media (width <= 640px) {
   .sbp .mt-cf {
     grid-template-columns: minmax(0,1fr) auto;
@@ -637,10 +622,6 @@
   outline: 2px solid var(--accent-mark);
   outline-offset: 2px;
   border-radius: 4px;
-}
-.sbp .mt-pre:focus-visible {
-  outline: 2px solid var(--accent-mark);
-  outline-offset: 2px;
 }
 .sbp .hx-whole {
   padding: 0 20px 16px;

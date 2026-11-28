@@ -162,6 +162,7 @@ export const en = {
   "sx.hx.m.pvNote": "Based on the text in the form now. Only the name, type, address and port of servers are shown",
   "sx.hx.m.pvAnyway": "Show what this text would give them",
   "sx.hx.m.pvYaml": "The person's profile",
+  "sx.hx.m.pvCopy": "Copy YAML",
   "sx.hx.m.pvNoUsers": "There is nobody to preview for yet",
 };
 
@@ -328,6 +329,7 @@ export const ru: typeof en = {
   "sx.hx.m.pvNote": "По тексту, который сейчас в форме. У серверов видны только имя, тип, адрес и порт",
   "sx.hx.m.pvAnyway": "Показать, что дал бы этот текст",
   "sx.hx.m.pvYaml": "Профиль человека",
+  "sx.hx.m.pvCopy": "Скопировать YAML",
   "sx.hx.m.pvNoUsers": "Людей пока нет, превью показать не на ком",
 };
 
@@ -494,6 +496,7 @@ export const zh: typeof en = {
   "sx.hx.m.pvNote": "依据表单当前文本。服务器仅显示名称、类型、地址和端口",
   "sx.hx.m.pvAnyway": "显示此文本会给他什么",
   "sx.hx.m.pvYaml": "此人的配置",
+  "sx.hx.m.pvCopy": "复制 YAML",
   "sx.hx.m.pvNoUsers": "还没有可预览的人",
 };
 
@@ -660,6 +663,7 @@ export const fa: typeof en = {
   "sx.hx.m.pvNote": "بر اساس متنی که الان در فرم است. از سرورها فقط نام، نوع، نشانی و پورت دیده می‌شود",
   "sx.hx.m.pvAnyway": "نشان بده این متن چه می‌دهد",
   "sx.hx.m.pvYaml": "نمایهٔ فرد",
+  "sx.hx.m.pvCopy": "کپی YAML",
   "sx.hx.m.pvNoUsers": "هنوز کسی برای پیش‌نمایش نیست",
 };
 
@@ -826,5 +830,6 @@ export const tr: typeof en = {
   "sx.hx.m.pvNote": "Formda şu an bulunan metne göre. Sunucuların yalnızca adı, türü, adresi ve portu görünür",
   "sx.hx.m.pvAnyway": "Bu metnin ne vereceğini göster",
   "sx.hx.m.pvYaml": "Kişinin profili",
+  "sx.hx.m.pvCopy": "YAML’ı kopyala",
   "sx.hx.m.pvNoUsers": "Henüz önizleme için kimse yok",
 };
