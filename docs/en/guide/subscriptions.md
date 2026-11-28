@@ -286,11 +286,33 @@ Changes wait for **Save**; **Discard** drops them. They apply at the next fetch,
 
 ## Mihomo templates
 
-By default the Mihomo YAML is the panel's own profile: your servers, one group to pick from, an `Auto` group and the DNS of the person's preset. The **Mihomo templates** tab lets you write your own profile for chosen groups: your proxy groups, rules and rule lists, with the person's servers put in. One template can go to several groups (the router and the PC of the same family get different ones), and a group named by no template gets the panel's own profile. A person is in one group, so they get one template.
+By default the Mihomo YAML is the panel's own profile: your servers, one group to pick from, an `Auto` group and the DNS of the person's preset. The **Mihomo templates** tab lets you write your own profile for chosen groups: your proxy groups, rules and rule lists, with the person's servers put in. A person gets the template assigned to their primary group, or the panel's own profile if no template is assigned. Additional groups affect access, not the choice of template or its blocks.
 
 Only the owner changes templates. A template is the whole config its people get, with the `proxy-providers` and rules it names, which is more than the other settings of this section. A helper reads the templates and uses the preview, but a save of theirs that adds, deletes or changes a template (its name, text or groups) is refused with `mihomo_templates_owner_only`; the rest of the settings stay open to them. The same holds for a token: an agent changes a template only through the owner's approval of its plan.
 
 The tab lists the templates (name, groups, size, a mark for errors and warnings). **Add template**, **Duplicate** (for a second device, start from a copy of the first) and **Delete** work on the list; a template has a **Name**, its **Groups** (a group already in another template is shown as taken) and the YAML text, which you type, paste or load with **Load .yaml**. Nothing is saved before **Save**. A change reaches people with their next fetch (in the Cloudflare edition, within a minute).
+
+### Sharing one template across groups
+
+New templates include a commented-out group block example. To activate it, assign the template to the group you want, use its name in the opening marker, and remove the extra `# ` from the three example lines.
+
+Assign the same template to Router and Phone. Select lines in the highlighted editor, click **Set groups for these lines**, and pick Router. Open **Blocks** beside **Source variant** to jump to a block or change its groups:
+
+```yaml
+mode: rule
+# @mistgate-if ["Router"]
+redir-port: 1182
+tproxy-port: 1181
+# @mistgate-end
+```
+
+Directives start in the first column, even inside a list. Use LF or CRLF line endings and keep the YAML lines at their original indentation. A list matches any of its primary groups; a nested block matches only if the same group is in every enclosing list. For example, a Phone block inside a PC/Phone block applies only to Phone. Select lines inside a block to add a nested condition, or place the cursor inside to change the innermost block. Removing a condition leaves the YAML in place and may share it with more groups. Any outer and inner conditions still apply. The shared part and each assigned variant must be valid.
+
+Validation checks at most 1 MiB of resolved YAML across the shared part and distinct variants of one template.
+
+Line numbers in the editor refer to the source, even when sections are folded. Choose a group under **Source variant** to dim lines that will not be in its config. The read-only preview numbers the generated YAML separately, displays emoji as characters rather than YAML escapes, supports folding and search (`Ctrl+F`), and **Copy YAML** copies the complete preview, including folded sections.
+
+Download the source to move a template to another panel. On import, match all group names with local groups not assigned to another template, then confirm and save. Manually written secrets remain in the file. Do not load this source into Mihomo directly: it ignores directive comments. Subscription responses contain the resolved config.
 
 ### What the panel changes
 

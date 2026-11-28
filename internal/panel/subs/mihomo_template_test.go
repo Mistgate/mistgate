@@ -2,11 +2,13 @@ package subs_test
 
 import (
 	"bytes"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -154,6 +156,234 @@ func TestMihomoTemplateAnswerOfAGroup(t *testing.T) {
 	}
 }
 
+func groupAnswer(t *testing.T, body string) map[string]any {
+	t.Helper()
+	if strings.Contains(body, "# @mistgate-") {
+		t.Fatalf("group markers were served:\n%s", body)
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(body), &doc); err != nil {
+		t.Fatalf("not YAML: %v\n%s", err, body)
+	}
+	return doc
+}
+
+func TestMihomoTemplateGroupBlocks(t *testing.T) {
+	r := newTemplateRig(t, nil)
+	preview := r.previewService(t, plainPreset)
+	router, routerToken := r.newUser("router", nil)
+	phone, phoneToken := r.user("phone", nil)
+	outside, outsideToken := r.plainUser("outside")
+	must(r.svc.UpdateUser(r.ctx, connect.NewRequest(&adminv1.UpdateUserRequest{UserId: phone, AddGroupIds: []string{r.group2}})))
+	untouched := r.body(t, outsideToken)
+
+	const zashboard = "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
+	text := "mode: rule\n" + fmt.Sprintf(`# @mistgate-if [%q]
+redir-port: 1182
+tproxy-port: 1181
+mixed-port: 1080
+profile: {store-selected: true}
+external-controller: 0.0.0.0:9090
+external-ui: ./zash
+external-ui-url: %q
+# @mistgate-end
+`, r.group2, zashboard) + groupTemplate + fmt.Sprintf(`rules:
+# @mistgate-if [%q,%q]
+  - DOMAIN,common-to-both.example,Proxy
+# @mistgate-end
+# @mistgate-if [%q]
+  - DOMAIN,router.example,RouterOnly
+# @mistgate-end
+# @mistgate-if [%q]
+  - DOMAIN,outside.example,Unassigned
+# @mistgate-end
+  - MATCH,Proxy
+`, r.group2, r.group, r.group2, r.plain)
+	groups := []string{r.group2, r.group}
+	r.save(t, nil, &adminv1.MihomoTemplate{Name: "home", Yaml: text, GroupIds: groups})
+
+	routerKeys := map[string]any{
+		"redir-port": 1182, "tproxy-port": 1181, "mixed-port": 1080,
+		"profile": map[string]any{"store-selected": true}, "external-controller": "0.0.0.0:9090",
+		"external-ui": "./zash", "external-ui-url": zashboard,
+	}
+	for _, tc := range []struct {
+		name, user, token string
+		wantRules         []any
+		wantWarning       string
+	}{
+		{"router", router, routerToken, []any{"DOMAIN,common-to-both.example,Proxy", "DOMAIN,router.example,RouterOnly", "MATCH,Proxy"}, "unknown_rule_target:RouterOnly"},
+		{"phone", phone, phoneToken, []any{"DOMAIN,common-to-both.example,Proxy", "MATCH,Proxy"}, ""},
+		{"unassigned", outside, outsideToken, []any{"MATCH,Proxy"}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := r.body(t, tc.token) // also materializes credentials before the read-only preview
+			resp, err := r.preview(t, preview, tc.user, text, groups...)
+			if err != nil || resp.NotServed != "" {
+				t.Fatalf("preview: %+v, %v", resp, err)
+			}
+			if got := warningCodes(resp); got != tc.wantWarning {
+				t.Errorf("preview warnings = %q, want %q", got, tc.wantWarning)
+			}
+			check := func(label, body string, hideKeys bool) {
+				t.Helper()
+				doc := groupAnswer(t, body)
+				if doc["mode"] != "rule" || !reflect.DeepEqual(doc["rules"], tc.wantRules) {
+					t.Errorf("%s common keys and rules: %v, %v", label, doc["mode"], doc["rules"])
+				}
+				for key, want := range routerKeys {
+					got, present := doc[key]
+					if tc.name == "router" && (!present || !reflect.DeepEqual(got, want)) || tc.name != "router" && present {
+						t.Errorf("%s %q = %v, present %t", label, key, got, present)
+					}
+				}
+				proxies, ok := doc["proxies"].([]any)
+				if !ok || len(proxies) == 0 {
+					t.Fatalf("%s has no servers", label)
+				}
+				first := proxies[0].(map[string]any)
+				if first["name"] != "p" || (first["password"] == nil) != hideKeys {
+					t.Errorf("%s server name or credential presence is wrong", label)
+				}
+				if hideKeys {
+					for _, proxy := range proxies {
+						p := proxy.(map[string]any)
+						if len(p) != 4 || p["name"] == nil || p["type"] == nil || p["server"] == nil || p["port"] == nil {
+							t.Error("preview proxy has unexpected fields")
+						}
+					}
+				}
+			}
+			check("preview", resp.Yaml, true)
+			if tc.name == "unassigned" {
+				if body != untouched {
+					t.Error("subscription for an unassigned group changed")
+				}
+			} else {
+				check("subscription", body, false)
+			}
+		})
+	}
+}
+
+func TestMihomoTemplateGroupBlocksThreeGroups(t *testing.T) {
+	r := newTemplateRig(t, nil)
+	preview := r.previewService(t, plainPreset)
+	router, routerToken := r.newUser("router", nil)
+	pc, pcToken := r.user("pc", nil)
+	mobile, mobileToken := r.plainUser("mobile")
+	groups := []string{r.group2, r.group, r.plain}
+
+	text := fmt.Sprintf(`mode: rule
+# @mistgate-if [%[1]q]
+find-process-mode: off
+# @mistgate-end
+# @mistgate-if [%[2]q,%[3]q]
+find-process-mode: strict
+# @mistgate-end
+# @mistgate-if [%[1]q,%[2]q]
+tun:
+  enable: true
+  stack: system
+# @mistgate-end
+# @mistgate-if [%[3]q]
+tun:
+  enable: true
+  stack: mixed
+  exclude-package: [org.example.demo]
+# @mistgate-end
+dns:
+  enable: true
+  fake-ip-filter:
+# @mistgate-if [%[3]q]
+    - "*"
+# @mistgate-end
+    - "*.lan"
+proxy-groups:
+  - name: Proxy
+    type: select
+    include-all-proxies: true
+    proxies:
+      - DIRECT
+# @mistgate-if [%[2]q]
+      - Desktop
+  - name: Desktop
+    type: select
+    use: [desktop]
+# @mistgate-end
+# @mistgate-if [%[2]q]
+proxy-providers:
+  desktop: {type: http, url: "https://example.com/desktop.yaml"}
+# @mistgate-end
+rules:
+# @mistgate-if [%[2]q]
+  # - DOMAIN,comment.example,Desktop
+  - DOMAIN,desktop.example,Desktop
+# @mistgate-end
+  - MATCH,Proxy
+`, groups[0], groups[1], groups[2])
+	r.save(t, nil, &adminv1.MihomoTemplate{Name: "all clients", Yaml: text, GroupIds: groups})
+
+	for _, tc := range []struct {
+		name, user, token, process, stack string
+	}{
+		{"ROUTER", router, routerToken, "off", "system"},
+		{"PC", pc, pcToken, "strict", "system"},
+		{"MOBILE", mobile, mobileToken, "strict", "mixed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := r.body(t, tc.token)
+			pr, err := r.preview(t, preview, tc.user, text, groups...)
+			if err != nil || pr.NotServed != "" || warningCodes(pr) != "own_dns" {
+				t.Fatalf("preview: %+v, %v", pr, err)
+			}
+			for _, output := range []string{body, pr.Yaml} {
+				doc := groupAnswer(t, output)
+				wantTun := map[string]any{"enable": true, "stack": tc.stack}
+				wantFilter := []any{"*.lan"}
+				wantRules := []any{"MATCH,Proxy"}
+				wantMembers := []any{"DIRECT"}
+				if tc.name == "MOBILE" {
+					wantTun["exclude-package"] = []any{"org.example.demo"}
+					wantFilter = []any{"*", "*.lan"}
+				}
+				if tc.name == "PC" {
+					wantRules = []any{"DOMAIN,desktop.example,Desktop", "MATCH,Proxy"}
+					wantMembers = append(wantMembers, "Desktop")
+					wantProvider := map[string]any{"desktop": map[string]any{"type": "http", "url": "https://example.com/desktop.yaml"}}
+					if !reflect.DeepEqual(doc["proxy-providers"], wantProvider) || !strings.Contains(output, "# - DOMAIN,comment.example,Desktop") {
+						t.Errorf("PC provider or comment was lost:\n%s", output)
+					}
+				} else if _, present := doc["proxy-providers"]; present || strings.Contains(output, "comment.example") {
+					t.Errorf("other group got the PC block:\n%s", output)
+				}
+				dns, _ := doc["dns"].(map[string]any)
+				if doc["find-process-mode"] != tc.process || !reflect.DeepEqual(doc["tun"], wantTun) ||
+					!reflect.DeepEqual(dns["fake-ip-filter"], wantFilter) || !reflect.DeepEqual(doc["rules"], wantRules) {
+					t.Errorf("wrong effective profile:\n%s", output)
+				}
+				groups := doc["proxy-groups"].([]any)
+				if got := groups[0].(map[string]any)["proxies"]; !reflect.DeepEqual(got, wantMembers) {
+					t.Errorf("Proxy members = %v, want %v", got, wantMembers)
+				}
+				var desktop bool
+				for _, g := range groups {
+					m := g.(map[string]any)
+					if m["name"] == "Desktop" {
+						desktop = true
+						if !reflect.DeepEqual(m["use"], []any{"desktop"}) {
+							t.Errorf("Desktop does not use its provider: %v", m)
+						}
+					}
+				}
+				if desktop != (tc.name == "PC") {
+					t.Errorf("Desktop group present = %t", desktop)
+				}
+			}
+		})
+	}
+}
+
 // plainUser is a person of the group no template names.
 func (r *templateRig) plainUser(name string) (id, token string) {
 	return r.user(name, func(c *adminv1.CreateUserRequest) { c.GroupId = r.plain })
@@ -269,22 +499,28 @@ func TestMihomoTemplateAutoSwitch(t *testing.T) {
 func TestMihomoTemplateUnreadableInTheDatabase(t *testing.T) {
 	r := newTemplateRig(t, nil)
 	_, alice := r.newUser("alice", nil)
-	set := subsettings.Defaults() // stored as it is, past the checks of a save
-	set.MihomoTemplates = []*adminv1.MihomoTemplate{{Name: "Router v9", Yaml: "proxy-groups: [\n  secret-token-text", GroupIds: []string{r.group2}}}
-	doc, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(set)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := r.st.SetSettings(r.ctx, map[string]string{subsettings.Key: string(doc)}); err != nil {
-		t.Fatal(err)
-	}
-	r.cache.Invalidate()
-	rec := fetch(r.h, "/"+alice, mihomoUA)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "MATCH,Mistgate") {
-		t.Fatalf("status %d:\n%s", rec.Code, rec.Body.String())
-	}
-	if l := r.logs.String(); !strings.Contains(l, "code=mihomo_template_unusable") || !strings.Contains(l, `template="Router v9"`) || strings.Contains(l, "secret-token-text") {
-		t.Errorf("log: %q", l)
+	for _, text := range []string{
+		"proxy-groups: [\n  secret-token-text",
+		fmt.Sprintf("mode: rule\n# @mistgate-if [%q]\nsecret-token-text: true\n", r.group2),
+	} {
+		r.logs.Reset()
+		set := subsettings.Defaults() // stored as it is, past the checks of a save
+		set.MihomoTemplates = []*adminv1.MihomoTemplate{{Name: "Router v9", Yaml: text, GroupIds: []string{r.group2}}}
+		doc, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(set)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.st.SetSettings(r.ctx, map[string]string{subsettings.Key: string(doc)}); err != nil {
+			t.Fatal(err)
+		}
+		r.cache.Invalidate()
+		body := r.body(t, alice)
+		if !strings.Contains(body, "MATCH,Mistgate") || strings.Contains(body, "secret-token-text") {
+			t.Fatalf("the built-in profile was not served:\n%s", body)
+		}
+		if l := r.logs.String(); !strings.Contains(l, "code=mihomo_template_unusable") || !strings.Contains(l, `template="Router v9"`) || strings.Contains(l, "secret-token-text") {
+			t.Errorf("log: %q", l)
+		}
 	}
 }
 
@@ -294,10 +530,17 @@ func TestMihomoTemplateNeverFetchesItsURLs(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hit <- r.URL.Path }))
 	defer ts.Close()
 	r := newTemplateRig(t, nil)
-	_, alice := r.newUser("alice", nil)
-	text := strings.Replace(r.router, "https://example.com/ads.mrs", ts.URL+"/ads.mrs", 1) + "x-list: " + ts.URL + "/list\n"
+	alice, token := r.newUser("alice", nil)
+	text := strings.Replace(r.router, "https://example.com/ads.mrs", ts.URL+"/ads.mrs", 1) +
+		fmt.Sprintf("# @mistgate-if [%q]\nx-list: %s/list\n# @mistgate-end\n", r.group2, ts.URL)
 	r.save(t, nil, &adminv1.MihomoTemplate{Name: "router", Yaml: text, GroupIds: []string{r.group2}})
-	r.body(t, alice)
+	if !strings.Contains(r.body(t, token), ts.URL+"/list") {
+		t.Fatal("the subscription did not render the conditional URL")
+	}
+	resp, err := r.preview(t, r.previewService(t, plainPreset), alice, text, r.group2)
+	if err != nil || !strings.Contains(resp.Yaml, ts.URL+"/list") {
+		t.Fatalf("preview did not render the conditional URL: %+v, %v", resp, err)
+	}
 	select {
 	case p := <-hit:
 		t.Fatalf("the panel fetched %s", p)

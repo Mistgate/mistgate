@@ -13,7 +13,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
-	"github.com/mistgate/mistgate/gen/mistgate/admin/v1/adminv1connect"
 	"github.com/mistgate/mistgate/internal/panel/auth"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
@@ -237,7 +236,7 @@ func (a routingSetArgs) build(cur *adminv1.SubscriptionSettings, groups map[stri
 
 var routingSet = changeSpec[routingSetArgs]{
 	name: auth.RoutingProfileTool, min: ProfileOperator, danger: true, maxArgs: maxMihomoArgsJSON,
-	procs: slices.Concat(settingsProcs, procs(adminv1connect.GroupServiceListGroupsProcedure)),
+	procs: settingsProcs,
 	desc: "Create, change or delete one own routing profile for the apps Happ and INCY and the groups whose people get it (by their main group; the answer of their subscription link carries it as the `routing` header, or as a line of the body when the link is too long). " +
 		"Give name and profile (what the owner pasted: a happ://routing/onadd/... or incy://... link, the base64 of the JSON, or the JSON) and/or mode, group_ids or all_groups, or name and remove. " +
 		"The profile is read as the admin's save reads it: only the fields the apps document are kept, the rest is dropped, a wrong type or a geo-file address that is not https is refused. The person's own DNS preset replaces the DNS fields of the profile; the rules stay the owner's. " +
@@ -258,7 +257,7 @@ var routingSet = changeSpec[routingSetArgs]{
 		if slices.EqualFunc(cur.settings.RoutingProfiles, ch.next.RoutingProfiles, func(x, y *adminv1.RoutingProfile) bool { return proto.Equal(x, y) }) {
 			return nil, errors.New("nothing to change: the profile already looks like this")
 		}
-		if err := checked(ch.next); err != nil { // normalized and validated whole, as a save does
+		if err := c.checkSettings(ch.next, groups); err != nil { // normalized and validated whole, as a save does
 			return nil, err
 		}
 		facts := routingFacts(ch, groups)
@@ -293,7 +292,7 @@ var routingSet = changeSpec[routingSetArgs]{
 		if err != nil { // a group of the plan was deleted since, or the stored plan was cut
 			return done{}, failure("changed_since_plan", "the plan no longer applies ("+clean(err.Error(), 160)+"): make a new plan")
 		}
-		if err := c.saveSubscriptionSettings(a.SettingsHash, ch.next); err != nil {
+		if err := c.saveSubscriptionSettings(a.SettingsHash, ch.next, groups); err != nil {
 			return done{}, err
 		}
 		return doneWith("subscription_routing_updated", "Routing profile saved."), nil

@@ -16,6 +16,7 @@ export function Popover({
   open,
   onOpenChange,
   className,
+  finalFocus,
   ...rest
 }: {
   trigger: ReactElement;
@@ -25,6 +26,7 @@ export function Popover({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   className?: string;
+  finalFocus?: BasePopover.Popup.Props["finalFocus"];
   /** Accessible name of the panel. */
   "aria-label"?: string;
 }) {
@@ -34,6 +36,7 @@ export function Popover({
       <BasePopover.Portal>
         <BasePopover.Positioner side="bottom" align={align} sideOffset={8} className="z-50 outline-none">
           <BasePopover.Popup
+            finalFocus={finalFocus}
             className={cx(
               "origin-(--transform-origin) rounded-pop border border-line bg-surface p-1.5 shadow-(--shadow-pop) outline-none transition-[opacity,translate,scale] duration-200 ease-out data-ending-style:translate-y-2 data-ending-style:opacity-0 data-starting-style:translate-y-2 data-starting-style:opacity-0",
               narrow ? "w-[220px]" : "w-[340px]",

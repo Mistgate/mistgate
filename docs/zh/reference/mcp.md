@@ -251,6 +251,8 @@ claude mcp add --transport http mistgate https://panel.example.com/<prefix>/mcp 
 
 `subscription_mihomo_template_get` 和 `subscription_mihomo_template_set` 用于[订阅](../guide/subscriptions.md#mihomo-模板)中的自有 Mihomo YAML 模板。读取按窗口进行，因为模板可达 64 KiB，而一次结果只有 32 KiB；文本会像智能体看到的一切内容一样被清洗，所以读到 `lossy: true` 的智能体无法把这段文本存回去：写入会以 `template_has_redaction_markers` 被拒绝，这样的模板需在管理面板中修改。修改模板是所有者的决定：设置的保存会拒绝其他任何人（`mihomo_templates_owner_only`），所以操作员令牌可以制定计划，而应用能通过，仅因为所有者批准了这个计划；其他工具都无法修改模板（它们按读取时的样子保存模板，而保存会拒绝模板有差异的协作者）。计划会读取全部设置并记住其状态，与其他订阅设置工具相同。所有者的审批卡片显示模板名称、分组、大小和文本的短哈希、面板的警告，以及模板中 http(s) 地址的主机（用户应用将从这些地址下载规则列表和服务器），但不显示文本本身。面板不会打开这些地址。文本不会进入审计日志，也不会进入助手保存的对话（只保留大小和短哈希）。
 
+在 `yaml` 中，条件标记从第一列开始：`# @mistgate-if ["grp_…"]` 开始条件块，`# @mistgate-end` 结束条件块。请使用 LF 或 CRLF 换行和分组 ID（而不是名称或导出文件的标题）。只有模板已分配给用户的主分组，并且该主分组同时匹配当前块与所有外层条件，用户才会收到这些行。验证覆盖公共部分和每个已分配的变体。
+
 `subscription_routing_set` 更改[订阅](../guide/subscriptions.md#happ-和-incy-的路由)中 Happ 和 INCY 的自有路由配置。配置按管理面板保存时的方式读取，并以面板用其已知字段重新写出的 JSON 存储，所以计划中保存的是将被保存的配置，而不是粘贴的文本。计划会读取全部设置并记住其状态，与其他订阅设置工具一样；若此后设置已改变，应用会被拒绝。所有者的审批卡片显示名称、分组、模式、规则数量、大小和简短哈希、链接是放在 `routing` 标头还是作为一行正文、应用下载 geo 文件的主机以及被略去的字段，但从不显示规则本身。面板不会打开其中任何地址。配置会被其分组中每个人的应用读取，并决定什么流量不走 VPN，因此该工具始终等待所有者批准。修改配置是所有者的决定，与模板相同：设置的保存会拒绝其他任何人（`routing_profiles_owner_only`），所以操作员令牌可以制定计划，而应用能通过，仅因为所有者批准了这个计划；其他设置工具按读取时的样子保存配置。
 
 Telegram 代理是 `user_create` 和 `user_update` 的 `apps` 中的三个开关之一。省略的字段保持用户原有的值，所以 `{"apps": {"telegram": true}}` 只更改 Telegram。开启会生成用户的 Telegram 密钥，关闭则吊销它；计划会把 Telegram 代理列在应用之中。`happ` 和 `amnezia` 中至少要保持开启一个：Telegram 是额外增加的。密钥本身没有对应的工具，也没有工具返回 `tg://proxy` 链接：重新签发或吊销密钥，以及读取链接，都由所有者在管理后台中完成（[MTProto](../guide/mtproto.md)）。

@@ -3,6 +3,7 @@
 package mcp
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -254,10 +255,31 @@ func visible(what, s string) error {
 	return nil
 }
 
-// checked normalizes and validates the changed document exactly as the admin's save does.
-func checked(s *adminv1.SubscriptionSettings) error {
+// checkSettings normalizes and validates a prospective save. Like the RPC, it excludes deleted
+// Mihomo assignments but leaves the authored YAML (including its now-inert conditions) intact.
+// Callers only pass inherited assignment IDs or new IDs they already checked against live groups.
+func (c *call) checkSettings(s *adminv1.SubscriptionSettings, groups map[string]string) error {
+	for _, t := range s.GetMihomoTemplates() {
+		if len(t.GetGroupIds()) == 0 {
+			continue
+		}
+		if groups == nil {
+			var err error
+			groups, err = c.groupNames()
+			if err != nil {
+				return err
+			}
+		}
+		t.GroupIds = slices.DeleteFunc(t.GroupIds, func(id string) bool {
+			_, live := groups[id]
+			return !live
+		})
+	}
 	subsettings.Normalize(s)
-	if err := subsettings.Validate(s); err != nil {
+	if err := subsettings.ValidateContext(c.ctx, s); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
 		return errors.New(strings.TrimPrefix(err.Error(), subsettings.ErrInvalid.Error()+": "))
 	}
 	return nil
@@ -277,7 +299,7 @@ type subsAppUpsertArgs struct {
 }
 
 // upsert is the document with one app added or changed; before is nil for an add.
-func (a subsAppUpsertArgs) upsert(s *adminv1.SubscriptionSettings) (next *adminv1.SubscriptionSettings, before, after *adminv1.PlatformApp, err error) {
+func (a subsAppUpsertArgs) upsert(c *call, s *adminv1.SubscriptionSettings) (next *adminv1.SubscriptionSettings, before, after *adminv1.PlatformApp, err error) {
 	p, err := platformOf(a.Platform)
 	if err != nil {
 		return nil, nil, nil, err
@@ -321,7 +343,7 @@ func (a subsAppUpsertArgs) upsert(s *adminv1.SubscriptionSettings) (next *adminv
 	if a.Recommended != nil {
 		after.Recommended = *a.Recommended
 	}
-	if err := checked(next); err != nil {
+	if err := c.checkSettings(next, nil); err != nil {
 		return nil, nil, nil, err
 	}
 	if before != nil && proto.Equal(before, after) {
@@ -337,7 +359,7 @@ type subsAppRemoveArgs struct {
 	SettingsHash string `json:"settings_hash,omitempty" jsonschema:"-"`
 }
 
-func (a subsAppRemoveArgs) remove(s *adminv1.SubscriptionSettings) (next *adminv1.SubscriptionSettings, gone *adminv1.PlatformApp, err error) {
+func (a subsAppRemoveArgs) remove(c *call, s *adminv1.SubscriptionSettings) (next *adminv1.SubscriptionSettings, gone *adminv1.PlatformApp, err error) {
 	p, err := platformOf(a.Platform)
 	if err != nil {
 		return nil, nil, err
@@ -356,7 +378,7 @@ func (a subsAppRemoveArgs) remove(s *adminv1.SubscriptionSettings) (next *adminv
 	}
 	gone = next.Apps[at]
 	next.Apps = append(next.Apps[:at], next.Apps[at+1:]...)
-	if err := checked(next); err != nil {
+	if err := c.checkSettings(next, nil); err != nil {
 		return nil, nil, err
 	}
 	return next, gone, nil
@@ -425,10 +447,8 @@ func appChanges(before, after *adminv1.PlatformApp) []Fact {
 	return out
 }
 
-var subsProcs = procs(adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure, adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure)
-
 var subsAppUpsert = changeSpec[subsAppUpsertArgs]{
-	name: "subscription_app_upsert", min: ProfileOperator, danger: true, procs: subsProcs,
+	name: "subscription_app_upsert", min: ProfileOperator, danger: true, procs: settingsProcs,
 	desc: "Add one app to the subscription page every user sees, or change one, identified by platform and name. For a change give only the fields " +
 		"that change; the rest stay. Checked exactly like a save in the admin panel. Always needs the owner's approval in the admin panel.",
 	plan: func(c *call, a subsAppUpsertArgs) (*planned, error) {
@@ -436,7 +456,7 @@ var subsAppUpsert = changeSpec[subsAppUpsertArgs]{
 		if err != nil {
 			return nil, err
 		}
-		_, before, after, err := a.upsert(cur)
+		_, before, after, err := a.upsert(c, cur)
 		if err != nil {
 			return nil, err
 		}
@@ -462,7 +482,7 @@ var subsAppUpsert = changeSpec[subsAppUpsertArgs]{
 		if hash != a.SettingsHash {
 			return done{}, changedSincePlan()
 		}
-		next, before, _, err := a.upsert(cur)
+		next, before, _, err := a.upsert(c, cur)
 		if err != nil {
 			return done{}, err
 		}
@@ -477,14 +497,14 @@ var subsAppUpsert = changeSpec[subsAppUpsertArgs]{
 }
 
 var subsAppRemove = changeSpec[subsAppRemoveArgs]{
-	name: "subscription_app_remove", min: ProfileOperator, danger: true, procs: subsProcs,
+	name: "subscription_app_remove", min: ProfileOperator, danger: true, procs: settingsProcs,
 	desc: "Remove one app, identified by platform and name, from the subscription page every user sees. Always needs the owner's approval in the admin panel.",
 	plan: func(c *call, a subsAppRemoveArgs) (*planned, error) {
 		cur, hash, err := c.subsSettings()
 		if err != nil {
 			return nil, err
 		}
-		_, gone, err := a.remove(cur)
+		_, gone, err := a.remove(c, cur)
 		if err != nil {
 			return nil, err
 		}
@@ -503,7 +523,7 @@ var subsAppRemove = changeSpec[subsAppRemoveArgs]{
 		if hash != a.SettingsHash {
 			return done{}, changedSincePlan()
 		}
-		next, _, err := a.remove(cur)
+		next, _, err := a.remove(c, cur)
 		if err != nil {
 			return done{}, err
 		}

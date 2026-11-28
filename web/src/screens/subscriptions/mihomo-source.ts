@@ -1,0 +1,284 @@
+const prefix = "# @mistgate-";
+export const groupLimit = 100; // subsettings.maxHeaderGroups
+const nonIDChar = /[^a-zA-Z0-9_-]/;
+const directiveStart = /(?:^|[\r\n\u0085\u2028\u2029])\uFEFF*# @mistgate-/u;
+const bomDirective = /^\uFEFF+# @mistgate-/u;
+const unsupportedEol = /\r(?!\n)|[\u0085\u2028\u2029]/u;
+
+export type Group = { id: string; name: string };
+export type SourceIssue = { kind: "syntax" | "unknown" | "inactive" | "header" | "selection" | "emptyLine" | "lineBreak"; line: number; group?: string };
+type Result<T> = { value: T; issue?: never } | { value?: never; issue: SourceIssue };
+type SourceLine = { start: number; body: string; eol: string; end: number };
+type Block = { open: number; close: number; parent: number; refs: string[]; json: string; before: string };
+export type Source = { lines: SourceLine[]; blocks: Block[] };
+export type SourceDraft = { text: string; names: ReadonlyMap<string, string> };
+
+function lineBreakIssue(text: string): SourceIssue | undefined {
+  const bad = unsupportedEol.exec(text);
+  if (bad) return { kind: "lineBreak", line: text.slice(0, bad.index).split("\n").length };
+}
+
+function sourceLines(text: string): SourceLine[] {
+  const lines: SourceLine[] = [];
+  for (let start = 0; start < text.length;) {
+    const lf = text.indexOf("\n", start);
+    const end = lf < 0 ? text.length : lf + 1;
+    const eol = lf < 0 ? "" : text[lf - 1] === "\r" ? "\r\n" : "\n";
+    lines.push({ start, body: text.slice(start, end - eol.length), eol, end });
+    start = end;
+  }
+  return lines;
+}
+
+function jsonOf(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+// These characters are valid in names but must not appear as physical YAML line breaks in a marker.
+function markerJSON(value: string | readonly string[]): string {
+  return JSON.stringify(value).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+}
+
+function namesOf(value: unknown, allowEmpty: boolean): string[] | undefined {
+  if (!Array.isArray(value) || (!allowEmpty && value.length === 0) || value.length > groupLimit || !value.every((v): v is string => typeof v === "string" && v !== "") || new Set(value).size !== value.length) return;
+  return value;
+}
+
+function openingMarker(body: string) {
+  const token = /^(# @mistgate-if[ \t]+)(\[[^\r\n\u0085\u2028\u2029]*\][ \t]*)$(?![\s\S])/u.exec(body);
+  const refs = token && namesOf(jsonOf(token[2]!), false);
+  return refs ? { refs, json: token[2]!, before: token[1]! } : undefined;
+}
+
+export function parseSource(text: string, ids = false): Result<Source> {
+  if (!text.includes(prefix) || !directiveStart.test(text)) return { value: { lines: [], blocks: [] } };
+  const bad = lineBreakIssue(text);
+  if (bad) return { issue: bad };
+  const lines = sourceLines(text);
+  const blocks: Block[] = [];
+  let pending = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const body = lines[i]!.body;
+    if (bomDirective.test(body)) return { issue: { kind: "syntax", line: i + 1 } };
+    if (!body.startsWith(prefix)) continue;
+    const issue = { kind: "syntax", line: i + 1 } as const;
+    if (/^# @mistgate-end[ \t]*$(?![\s\S])/.test(body)) {
+      if (pending < 0) return { issue };
+      const block = blocks[pending]!;
+      block.close = i;
+      pending = block.parent;
+      continue;
+    }
+    const marker = openingMarker(body);
+    if (!marker || (ids && marker.refs.some((id) => id.length > 64 || nonIDChar.test(id)))) return { issue };
+    blocks.push({ open: i, close: -1, parent: pending, ...marker });
+    pending = blocks.length - 1;
+  }
+  return pending >= 0 ? { issue: { kind: "syntax", line: blocks[pending]!.open + 1 } } : { value: { lines, blocks } };
+}
+
+/** Replace only the JSON strings on opening markers. Leave spacing and all other bytes as written. */
+function rewrite(text: string, source: Source, remap: (name: string, line: number) => string | SourceIssue): Result<string> {
+  let out = "";
+  let at = 0;
+  for (const block of source.blocks) {
+    const mapped: string[] = [];
+    for (const v of block.refs) {
+      const to = remap(v, block.open + 1);
+      if (typeof to !== "string") return { issue: to };
+      mapped.push(to);
+    }
+    const line = source.lines[block.open]!;
+    let j = 0;
+    const json = block.json.replace(/"(?:[^"\\]|\\.)*"/gu, (literal) => {
+      const i = j++;
+      return mapped[i] === block.refs[i] ? literal : markerJSON(mapped[i]!);
+    });
+    out += text.slice(at, line.start) + block.before + json;
+    at = line.end - line.eol.length;
+  }
+  return { value: out + text.slice(at) };
+}
+
+/** Keep aliases already used in a draft. A new ID never inherits a stale alias. */
+function groupAlias(names: Map<string, string>, id: string, groups: readonly Group[]): string {
+  for (const [alias, bound] of names) if (id === bound) return alias;
+  const name = groups.find((g) => g.id === id)?.name;
+  const claimed = (s: string) => names.has(s) || groups.some((g) => g.id !== id && g.name === s);
+  let alias = name && !claimed(name) ? name : `[${id}]`;
+  while (claimed(alias)) alias = `[${alias}]`;
+  names.set(alias, id);
+  return alias;
+}
+
+export function displaySource(text: string, groups: readonly Group[]): SourceDraft {
+  const names = new Map<string, string>();
+  const source = parseSource(text, true);
+  return { text: source.issue ? text : rewrite(text, source.value, (id) => groupAlias(names, id, groups)).value!, names };
+}
+
+export function editSource(draft: SourceDraft, text: string, groups: readonly Group[]): SourceDraft {
+  const names = new Map(draft.names);
+  if (!text.includes(prefix)) return { text, names };
+  // A complete opening marker binds its names even before the whole block is closed.
+  for (const line of sourceLines(text)) {
+    for (const ref of openingMarker(line.body)?.refs ?? []) {
+      if (names.has(ref)) continue;
+      const group = groups.find((g) => g.name === ref);
+      if (group && !groups.some((g) => g !== group && g.name === ref)) names.set(ref, group.id);
+    }
+  }
+  return { text, names };
+}
+
+export function canonicalSource({ text, names }: SourceDraft): Result<string> {
+  const source = parseSource(text);
+  return source.issue ? { issue: source.issue } : rewrite(text, source.value, (name, line) => names.get(name) ?? { kind: "unknown", line, group: name });
+}
+
+export function inactiveRefs(source: Source, groups: readonly Group[], assigned: readonly string[]): SourceIssue[] {
+  return source.blocks.flatMap((b) => b.refs.filter((id) => !assigned.includes(id) || !groups.some((g) => g.id === id)).map((id) => ({ kind: "inactive", line: b.open + 1, group: groups.find((g) => g.id === id)?.name ?? id })));
+}
+
+/** A nested condition is active only if every ancestor matches the same primary group. */
+export function activeBlocks(blocks: Source["blocks"], id: string): boolean[] {
+  const chosen: boolean[] = [];
+  for (const b of blocks) chosen.push((b.parent < 0 || chosen[b.parent] === true) && b.refs.includes(id));
+  return chosen;
+}
+
+/** One common variant, then each different set of active blocks, with only the kept YAML lines. */
+export function* variants(text: string, source: Source, assigned: readonly string[]): Generator<string, void, unknown> {
+  if (source.blocks.length === 0) {
+    yield text;
+    return;
+  }
+  const seen = new Set<string>();
+  for (const id of ["", ...assigned]) {
+    const chosen = activeBlocks(source.blocks, id);
+    const signature = chosen.map((on) => +on).join("");
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    let next = 0;
+    let open = -1;
+    let out = "";
+    for (const [row, line] of source.lines.entries()) {
+      if (source.blocks[next]?.open === row) {
+        open = next++;
+      } else if (source.blocks[open]?.close === row) {
+        open = source.blocks[open]!.parent;
+      } else if (open < 0 || chosen[open]) {
+        out += line.body + line.eol;
+      }
+    }
+    yield out;
+  }
+}
+
+export type Selection = { start: number; end: number; eol: string; block?: Block; lines: SourceLine[] };
+
+/** The editor exposes LF offsets even when the stored draft still contains CRLF. */
+export function sourceSelection(text: string, from: number, to: number): Result<Selection> {
+  const parsed = parseSource(text);
+  if (parsed.issue) return { issue: parsed.issue };
+  const bad = lineBreakIssue(text);
+  if (bad) return { issue: bad };
+  const lines = parsed.value.lines.length ? parsed.value.lines : sourceLines(text);
+  let removed = 0;
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]!;
+    const start = l.start - removed;
+    if (l.eol === "\r\n") removed++;
+    const end = l.end - removed;
+    if (start <= from && (from < end || (!l.eol && from === end))) first = i;
+    if (start < to || start === from) last = i;
+  }
+  if (first < 0) return { issue: { kind: "emptyLine", line: lines.length + 1 } };
+  const a = lines[first]!;
+  const b = lines[last]!;
+  let block: Block | undefined;
+  for (const b of parsed.value.blocks) {
+    if (from === to) {
+      if (b.open <= first && first <= b.close) block = b;
+      continue;
+    }
+    const opensInside = first <= b.open && b.open <= last;
+    const closesInside = first <= b.close && b.close <= last;
+    if (opensInside !== closesInside) return { issue: { kind: "selection", line: first + 1 } };
+  }
+  if (!block && from === to && !a.body.trim()) return { issue: { kind: "emptyLine", line: first + 1 } };
+  return { value: { start: a.start, end: b.end, eol: a.eol || lines.find((l) => l.eol)?.eol || "\n", block, lines } };
+}
+
+export function condition(draft: SourceDraft, selection: Selection, ids: string[], groups: readonly Group[]): SourceDraft {
+  const names = new Map(draft.names);
+  const aliases = ids.map((id) => groupAlias(names, id, groups));
+  const list = markerJSON(aliases);
+  const { text } = draft;
+  const { start, end, eol, block, lines } = selection;
+  if (block) {
+    const a = lines[block.open]!;
+    const b = lines[block.close]!;
+    if (ids.length) return { text: text.slice(0, a.start) + block.before + list + a.body.match(/[ \t]*$/)![0] + text.slice(a.end - a.eol.length), names };
+    // The separator inserted before an EOF closing marker was not part of the original last line.
+    const bodyEnd = b.eol || block.close === block.open + 1 ? b.start : b.start - lines[block.close - 1]!.eol.length;
+    return { text: text.slice(0, a.start) + text.slice(a.end, bodyEnd) + text.slice(b.end), names };
+  }
+  const selected = text.slice(start, end);
+  const terminated = selected.endsWith("\n");
+  return { text: `${text.slice(0, start)}${prefix}if ${list}${eol}${selected}${terminated ? "" : eol}${prefix}end${terminated ? eol : ""}${text.slice(end)}`, names };
+}
+
+export type Transfer = { name: string; groups: string[]; text: string };
+
+/** Ordinary files are left alone. Headers are reserved at column zero, just like body directives. */
+export function readTransfer(text: string): Result<Transfer | null> {
+  if (!text.includes(prefix)) return { value: null };
+  const bad = directiveStart.test(text) && lineBreakIssue(text);
+  if (bad) return { issue: bad };
+  const lines = sourceLines(text);
+  const bomLine = lines.findIndex((line) => bomDirective.test(line.body));
+  if (bomLine >= 0) return { issue: { kind: "syntax", line: bomLine + 1 } };
+  const header = /^# @mistgate-(?:template|groups)(?:[ \t]|$(?![\s\S]))/;
+  const misplaced = lines.findIndex((l, i) => i > 1 && header.test(l.body));
+  if (misplaced !== -1) return { issue: { kind: "header", line: misplaced + 1 } };
+  if (!lines.slice(0, 2).some((l) => header.test(l.body))) return { value: null };
+  const title = /^# @mistgate-template[ \t]+([^\n]+)$(?![\s\S])/.exec(lines[0]?.body ?? "");
+  const manifest = /^# @mistgate-groups[ \t]+([^\n]+)$(?![\s\S])/.exec(lines[1]?.body ?? "");
+  const name = jsonOf(title?.[1] ?? "");
+  if (typeof name !== "string") return { issue: { kind: "header", line: 1 } };
+  const groups = namesOf(jsonOf(manifest?.[1] ?? ""), true);
+  if (!groups) return { issue: { kind: "header", line: 2 } };
+  const body = text.slice(lines[1]!.end);
+  const checked = mapTransfer(body, new Map(groups.map((g) => [g, g])));
+  if (checked.issue) return { issue: { ...checked.issue, line: checked.issue.line + 2 } };
+  return { value: { name, groups, text: body } };
+}
+
+export function mapTransfer(text: string, mapping: ReadonlyMap<string, string>): Result<string> {
+  const source = parseSource(text);
+  return source.issue ? { issue: source.issue } : rewrite(text, source.value, (name, line) => mapping.get(name) ?? { kind: "unknown", line, group: name });
+}
+
+export function writeTransfer(name: string, text: string, assigned: readonly string[], groups: readonly Group[], draft?: SourceDraft): Result<string> {
+  const source = parseSource(text, true);
+  if (source.issue) return { issue: source.issue };
+  const inactive = inactiveRefs(source.value, groups, assigned)[0];
+  if (inactive) return { issue: inactive };
+  const listed = namesOf(assigned.map((id) => groups.find((g) => g.id === id)?.name), true);
+  if (!listed) return { issue: { kind: "header", line: 2 } };
+  const mapping = new Map(assigned.map((id, i) => [id, listed[i]!]));
+  const body = draft ? mapTransfer(draft.text, new Map([...draft.names].flatMap(([alias, id]) => {
+    const current = mapping.get(id);
+    return current ? [[alias, current] as const] : [];
+  }))) : rewrite(text, source.value, (id) => mapping.get(id)!);
+  if (body.issue) return { issue: body.issue };
+  const eol = body.value.match(/\r?\n/)?.[0] ?? "\n";
+  return { value: `${prefix}template ${markerJSON(name)}${eol}${prefix}groups ${markerJSON(listed)}${eol}${body.value}` };
+}

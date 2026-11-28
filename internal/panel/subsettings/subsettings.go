@@ -47,7 +47,7 @@ const (
 	maxIntervalH    = 72 // the admin's "Refresh every" field and the docs: 1-72 hours (0 = DefaultUpdateHours)
 )
 
-// ErrInvalid wraps every validation failure (the RPC maps it to INVALID_ARGUMENT).
+// ErrInvalid wraps refusals of invalid documents (the RPC maps it to INVALID_ARGUMENT).
 var ErrInvalid = errors.New("invalid subscription settings")
 
 func invalid(format string, a ...any) error {
@@ -393,6 +393,14 @@ func text(what, s string, max int) error {
 
 // Validate checks a whole document; nil = storable.
 func Validate(s *adminv1.SubscriptionSettings) error {
+	return ValidateContext(context.Background(), s)
+}
+
+// ValidateContext checks a whole document, returning the context error if validation is interrupted.
+func ValidateContext(ctx context.Context, s *adminv1.SubscriptionSettings) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if s == nil {
 		return invalid("settings missing")
 	}
@@ -482,7 +490,7 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 	if err := validateResponseHeaders(s.ResponseHeaders); err != nil {
 		return err
 	}
-	if err := validateMihomoTemplates(s); err != nil {
+	if err := validateMihomoTemplates(ctx, s); err != nil {
 		return err
 	}
 	if err := validateRoutingProfiles(s); err != nil {
@@ -505,7 +513,7 @@ func Validate(s *adminv1.SubscriptionSettings) error {
 			return invalid("%s: unknown format", w)
 		}
 	}
-	return nil
+	return ctx.Err()
 }
 
 // Normalize trims the free-text fields in place (what Update stores).
@@ -713,7 +721,7 @@ func (c *Cache) UpdateRevoking(ctx context.Context, s *adminv1.SubscriptionSetti
 		s.DeviceIdleAfterDays = proto.Uint32(days)
 	}
 	Normalize(s)
-	if err := Validate(s); err != nil {
+	if err := ValidateContext(ctx, s); err != nil {
 		return nil, 0, err
 	}
 	mode := linkModeStored(s.GetLinkDeviceLimit())

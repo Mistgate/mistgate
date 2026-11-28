@@ -753,7 +753,7 @@ func clientCapsPresent(r *http.Request) bool {
 // mihomoProfileOf is what the Mihomo profile of a view is built from: the proxies of the view (named like the base64 list names its
 // servers, never with the load percentage: see remarks), or the one entry that says why there are none. The preset is the caller's.
 func mihomoProfileOf(v access.SubView, set *adminv1.SubscriptionSettings, title, lang string, now time.Time, log *slog.Logger) mihomoProfile {
-	p := mihomoProfile{title: title, lines: v.Lines, autoSelect: subsettings.LinkAutoSelect(set), autoSecs: subsettings.LinkAutoInterval(set), log: log}
+	p := mihomoProfile{title: title, groupID: v.GroupID, lines: v.Lines, autoSelect: subsettings.LinkAutoSelect(set), autoSecs: subsettings.LinkAutoInterval(set), log: log}
 	if note := stateNote(v, lang, now); note != "" {
 		p.lines, p.names, p.note = []string{placeholderProxy}, []string{note}, true
 	} else if !subsettings.LinkAWG(set) && len(v.Lines) == 0 && len(v.AWGProfiles) > 0 {
@@ -776,7 +776,7 @@ func (h *handler) writeMihomo(w http.ResponseWriter, r *http.Request, token stri
 	if t := subsettings.MihomoTemplateFor(set, v.GroupID); t != nil {
 		tplName, tplText = t.Name, t.Yaml
 	}
-	body, _, err := p.render(tplName, tplText)
+	body, _, _, err := p.render(tplName, tplText)
 	if err != nil {
 		h.cfg.Log.Error("mihomo profile", "code", "subscription_mihomo_render_failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

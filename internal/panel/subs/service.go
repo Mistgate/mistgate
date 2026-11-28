@@ -73,6 +73,19 @@ func (s *Service) internal(what string, err error) error {
 	return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 }
 
+func (s *Service) settingsSaveError(what string, err error) error {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return connect.NewError(connect.CodeCanceled, context.Canceled)
+	case errors.Is(err, context.DeadlineExceeded):
+		return connect.NewError(connect.CodeDeadlineExceeded, context.DeadlineExceeded)
+	case errors.Is(err, subsettings.ErrInvalid):
+		return connect.NewError(connect.CodeInvalidArgument, err)
+	default:
+		return s.internal(what, err)
+	}
+}
+
 // fillDNS puts the instance default DNS preset id and the offer for the link apps (kept by the DNS module) into the settings
 // shown to the admin.
 func (s *Service) fillDNS(ctx context.Context, set *adminv1.SubscriptionSettings) error {
@@ -203,16 +216,19 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 	if err := s.ownerOnly(ctx, admin, req.Msg.GetSettings()); err != nil {
 		return nil, err
 	}
-	// The document is checked before anything is written, so an invalid one leaves the DNS offer as it was. Then the DNS offer
-	// is written before the settings: a deleted preset or an invalid offer must not leave the settings saved (and shared devices
-	// revoked) after a refused request.
-	pre, _ := proto.Clone(req.Msg.GetSettings()).(*adminv1.SubscriptionSettings)
-	if pre != nil {
-		pre.DefaultDnsPresetId, pre.LinkDns = "", nil
-		subsettings.Normalize(pre)
+	// Reconcile deleted assignments before validating variants: a stale group must not make a now-inert block fail validation.
+	// Both checks precede DNS writes. DNS is still written before settings so an invalid offer or a deleted DNS preset does
+	// not leave the settings saved (and shared devices revoked) after a refused request.
+	next, _ := proto.Clone(req.Msg.GetSettings()).(*adminv1.SubscriptionSettings)
+	if err := s.settingGroups(ctx, next); err != nil {
+		return nil, s.settingsSaveError("groups of the settings", err)
 	}
-	if err := subsettings.Validate(pre); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	if next != nil {
+		next.DefaultDnsPresetId, next.LinkDns = "", nil
+		subsettings.Normalize(next)
+	}
+	if err := subsettings.ValidateContext(ctx, next); err != nil {
+		return nil, s.settingsSaveError("validate", err)
 	}
 	if s.dns != nil {
 		if o := req.Msg.Settings.GetLinkDns(); o != nil { // absent: the offer stays as it is
@@ -220,31 +236,23 @@ func (s *Service) UpdateSubscriptionSettings(ctx context.Context, req *connect.R
 			case errors.Is(err, dns.ErrLinkOptions):
 				return nil, connect.NewError(connect.CodeInvalidArgument, err)
 			case err != nil:
-				return nil, s.internal("set link dns options", err)
+				return nil, s.settingsSaveError("set link dns options", err)
 			}
 		}
 		switch err := s.dns.SetDefaultPresetID(ctx, req.Msg.Settings.GetDefaultDnsPresetId()); {
 		case errors.Is(err, dns.ErrUnknownPreset):
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("default_dns_preset_id: no such preset"))
 		case err != nil:
-			return nil, s.internal("set default dns preset", err)
+			return nil, s.settingsSaveError("set default dns preset", err)
 		}
 	}
-	next, err := s.settingGroups(ctx, req.Msg.Settings)
-	if errors.Is(err, subsettings.ErrInvalid) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	} else if err != nil {
-		return nil, s.internal("groups of the settings", err)
-	}
 	set, revoked, err := s.settings.UpdateRevoking(ctx, next)
-	if errors.Is(err, subsettings.ErrInvalid) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	} else if err != nil {
-		return nil, s.internal("save", err)
+	if err != nil {
+		return nil, s.settingsSaveError("save", err)
 	}
 	set = proto.Clone(set).(*adminv1.SubscriptionSettings) // the cache keeps its own copy: the info is for this answer only
 	if err := s.fillDNS(ctx, set); err != nil {
-		return nil, s.internal("default dns preset", err)
+		return nil, s.settingsSaveError("default dns preset", err)
 	}
 	subsettings.FillRoutingInfo(set)
 	if revoked > 0 && s.notify != nil {
@@ -287,7 +295,7 @@ func (s *Service) ownerOnly(ctx context.Context, admin store.Admin, set *adminv1
 	}
 	stored, err := subsettings.Load(ctx, s.st)
 	if err != nil {
-		return s.internal("settings for the owner check", err)
+		return s.settingsSaveError("settings for the owner check", err)
 	}
 	differs := func(skip func(id string) bool) (templates, routing bool) {
 		templates = checkTemplates && templatesDiffer(set.GetMihomoTemplates(), stored.GetMihomoTemplates(), skip)
@@ -300,7 +308,7 @@ func (s *Service) ownerOnly(ctx context.Context, admin store.Admin, set *adminv1
 	// A group that was deleted since may still stand in the stored list: a save drops it (settingGroups), so it is not a change.
 	groups, err := s.st.Access().Groups(ctx)
 	if err != nil {
-		return s.internal("groups for the owner check", err)
+		return s.settingsSaveError("groups for the owner check", err)
 	}
 	live := make(map[string]bool, len(groups))
 	for _, g := range groups {
@@ -341,11 +349,10 @@ func templatesDiffer(a, b []*adminv1.MihomoTemplate, skip func(id string) bool) 
 	return false
 }
 
-// settingGroups checks the groups the own response headers and the Mihomo templates name. A group that does not exist is refused,
-// unless the stored settings already name it in the same list: it was deleted since, and drops out of the list here, so that a save
-// from another tab of the admin does not fail over it (the person of a deleted group cannot exist, so the entry never applied to
-// anyone). It returns the settings to store (a copy when anything changed).
-func (s *Service) settingGroups(ctx context.Context, set *adminv1.SubscriptionSettings) (*adminv1.SubscriptionSettings, error) {
+// settingGroups reconciles the response header, Mihomo template and routing profile assignments in a private copy of the request.
+// A nonexistent group is refused unless the stored settings already name it in the same list: it was deleted since and drops
+// out of the assignment list so a save from another tab does not fail over it.
+func (s *Service) settingGroups(ctx context.Context, set *adminv1.SubscriptionSettings) error {
 	used := false
 	for _, e := range set.GetResponseHeaders() {
 		used = used || len(e.GetGroupIds()) > 0
@@ -357,11 +364,11 @@ func (s *Service) settingGroups(ctx context.Context, set *adminv1.SubscriptionSe
 		used = used || len(e.GetGroupIds()) > 0
 	}
 	if !used {
-		return set, nil
+		return nil
 	}
 	groups, err := s.st.Access().Groups(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	live := make(map[string]bool, len(groups))
 	for _, g := range groups {
@@ -369,50 +376,58 @@ func (s *Service) settingGroups(ctx context.Context, set *adminv1.SubscriptionSe
 	}
 	stored, err := subsettings.Load(ctx, s.st)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	hadHeader, hadTemplate, hadRouting := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, e := range stored.GetRoutingProfiles() {
-		for _, id := range e.GroupIds {
+		for _, id := range e.GetGroupIds() {
 			hadRouting[id] = true
 		}
 	}
 	for _, e := range stored.GetResponseHeaders() {
-		for _, id := range e.GroupIds {
+		for _, id := range e.GetGroupIds() {
 			hadHeader[id] = true
 		}
 	}
 	for _, t := range stored.GetMihomoTemplates() {
-		for _, id := range t.GroupIds {
+		for _, id := range t.GetGroupIds() {
 			hadTemplate[id] = true
 		}
 	}
-	out := proto.Clone(set).(*adminv1.SubscriptionSettings)
-	for i, e := range out.ResponseHeaders {
+	for i, e := range set.ResponseHeaders {
+		if len(e.GetGroupIds()) == 0 {
+			continue
+		}
 		e.GroupIds = slices.DeleteFunc(e.GroupIds, func(id string) bool { return !live[id] && hadHeader[id] })
 		for _, id := range e.GroupIds {
 			if !live[id] {
-				return nil, fmt.Errorf("%w: response_headers[%d].group_ids: no such group", subsettings.ErrInvalid, i)
+				return fmt.Errorf("%w: response_headers[%d].group_ids: no such group", subsettings.ErrInvalid, i)
 			}
 		}
 	}
-	for i, t := range out.MihomoTemplates {
+	for i, t := range set.MihomoTemplates {
+		if len(t.GetGroupIds()) == 0 {
+			continue
+		}
 		t.GroupIds = slices.DeleteFunc(t.GroupIds, func(id string) bool { return !live[id] && hadTemplate[id] })
 		for _, id := range t.GroupIds {
 			if !live[id] {
-				return nil, fmt.Errorf("%w: mihomo_templates[%d].group_ids: no such group", subsettings.ErrInvalid, i)
+				return fmt.Errorf("%w: mihomo_templates[%d].group_ids: no such group", subsettings.ErrInvalid, i)
 			}
 		}
 	}
-	for i, e := range out.RoutingProfiles {
+	for i, e := range set.RoutingProfiles {
+		if len(e.GetGroupIds()) == 0 {
+			continue
+		}
 		e.GroupIds = slices.DeleteFunc(e.GroupIds, func(id string) bool { return !live[id] && hadRouting[id] })
 		for _, id := range e.GroupIds {
 			if !live[id] {
-				return nil, fmt.Errorf("%w: routing_profiles[%d].group_ids: no such group", subsettings.ErrInvalid, i)
+				return fmt.Errorf("%w: routing_profiles[%d].group_ids: no such group", subsettings.ErrInvalid, i)
 			}
 		}
 	}
-	return out, nil
+	return nil
 }
 
 // PreviewRoutingProfile reads what the owner pasted as a save does, and returns the entry that would be stored with what it holds.

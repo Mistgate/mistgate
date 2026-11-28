@@ -10,7 +10,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
@@ -196,6 +198,26 @@ func TestMihomoTemplateAutoAndTheSwitch(t *testing.T) {
 	}
 }
 
+func TestMihomoSettingsValidationCanceled(t *testing.T) {
+	set := withTemplates(tpl("router", "mode: rule\n# @mistgate-end", "grp_a"))
+	if err := Validate(set); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("without cancellation, the broken template must be refused: %v", err)
+	}
+
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	expired, stop := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer stop()
+	for _, ctx := range []context.Context{canceled, expired} {
+		if err := ValidateContext(ctx, set); err != ctx.Err() {
+			t.Errorf("whole document: got %v, want %v", err, ctx.Err())
+		}
+		if err := validateMihomoTemplates(ctx, set); err != ctx.Err() {
+			t.Errorf("template validation: got %v, want %v", err, ctx.Err())
+		}
+	}
+}
+
 func TestNormalizeTrimsTheTemplateName(t *testing.T) {
 	s := withTemplates(tpl("  Router \n", smallTemplate+"# kept as it is   \n"))
 	Normalize(s)
@@ -229,7 +251,7 @@ func TestMihomoTemplatesAreStoredAndRead(t *testing.T) {
 	if got := c.Get(ctx).MihomoTemplates; len(got) != 0 {
 		t.Fatalf("templates out of nothing: %v", got)
 	}
-	text := "# Router\n" + smallTemplate + "rules:\n  - MATCH,Proxy # all\n"
+	text := "# Router\n" + smallTemplate + "rules:\r\n# @mistgate-if [\"grp_a\"]\r\n  - DOMAIN,router.example,DIRECT\r\n# @mistgate-end\r\n  - MATCH,Proxy # all\n"
 	in := withTemplates(tpl("  Router  ", text, "grp_a", "grp_b"), tpl("PC", smallTemplate, "grp_c"))
 	if _, err := c.Update(ctx, in); err != nil {
 		t.Fatal(err)
@@ -241,14 +263,19 @@ func TestMihomoTemplatesAreStoredAndRead(t *testing.T) {
 	if e := out.MihomoTemplates[0]; e.Name != "Router" || e.Yaml != text || !slices.Equal(e.GroupIds, []string{"grp_a", "grp_b"}) {
 		t.Errorf("first: %+v", e)
 	}
-	if got := c.Get(ctx).MihomoTemplates; len(got) != 2 || got[1].Name != "PC" {
-		t.Errorf("the cache: %v", got)
+	cached := c.Get(ctx)
+	if got := cached.MihomoTemplates; len(got) != 2 || got[1].Name != "PC" {
+		t.Fatalf("the cache: %v", got)
 	}
-	if _, err := c.Update(ctx, withTemplates(tpl("bad", "a: [\n"))); !errors.Is(err, ErrInvalid) {
-		t.Errorf("a broken template was stored: %v", err)
+	badVariant := "mode: rule\n# @mistgate-if [\"grp_b\"]\nmode: direct\n# @mistgate-end\n"
+	if _, err := c.Update(ctx, withTemplates(tpl("bad", badVariant, "grp_b"))); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), `group "grp_b": line 3:`) {
+		t.Errorf("a broken group variant was not properly refused: %v", err)
 	}
-	if got := c.Get(ctx).MihomoTemplates; len(got) != 2 {
+	if got := c.Get(ctx); !proto.Equal(got, cached) {
 		t.Errorf("a refused save changed what is served: %v", got)
+	}
+	if got, err := Load(ctx, st); err != nil || !proto.Equal(got, out) {
+		t.Errorf("a refused save changed what is stored: %v, %v", got, err)
 	}
 	// a document stored before the field has none, and the other settings are as they were
 	old, err := Parse(`{"title":"Example VPN","response_headers":[{"name":"x-a","value":"v"}]}`)

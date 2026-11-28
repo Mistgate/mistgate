@@ -48,7 +48,7 @@ func (c *call) subscriptionSnapshot() (*subsSnapshot, error) {
 	return &subsSnapshot{settings: s, hash: h, shared: r.Msg.GetSharedLinkUsers(), awgKeys: r.Msg.GetLinkAwgKeys()}, nil
 }
 
-func (c *call) saveSubscriptionSettings(hash string, next *adminv1.SubscriptionSettings) error {
+func (c *call) saveSubscriptionSettings(hash string, next *adminv1.SubscriptionSettings, groups map[string]string) error {
 	cur, err := c.subscriptionSnapshot()
 	if err != nil {
 		return err
@@ -56,7 +56,7 @@ func (c *call) saveSubscriptionSettings(hash string, next *adminv1.SubscriptionS
 	if cur.hash != hash {
 		return changedSincePlan()
 	}
-	if err := checked(next); err != nil {
+	if err := c.checkSettings(next, groups); err != nil {
 		return err
 	}
 	if _, err := c.cl.Subs.UpdateSubscriptionSettings(c.ctx, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: next})); err != nil {
@@ -65,7 +65,8 @@ func (c *call) saveSubscriptionSettings(hash string, next *adminv1.SubscriptionS
 	return nil
 }
 
-var settingsProcs = procs(adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure, adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure)
+var settingsProcs = procs(adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure,
+	adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure, adminv1connect.GroupServiceListGroupsProcedure)
 
 type serveRuleArg struct {
 	UAContains string `json:"ua_contains" jsonschema:"case-insensitive substring of the User-Agent, e.g. happ or mihomo"`
@@ -126,10 +127,10 @@ var subsRulesSet = changeSpec[subsRulesArgs]{
 		}
 		next := proto.Clone(cur.settings).(*adminv1.SubscriptionSettings)
 		next.Rules = rules
-		if err := checked(next); err != nil {
+		if err := c.checkSettings(next, nil); err != nil {
 			return nil, err
 		}
-		if proto.Equal(cur.settings, next) {
+		if slices.EqualFunc(cur.settings.Rules, next.Rules, func(x, y *adminv1.ServeRule) bool { return proto.Equal(x, y) }) {
 			return nil, errors.New("nothing to change: the rules already look like this")
 		}
 		facts := []Fact{codedFact("rules", fmt.Sprintf("replace the ordered rules with %d entries", len(rules)), "rule_count", "n", strconv.Itoa(len(rules)))}
@@ -157,7 +158,7 @@ var subsRulesSet = changeSpec[subsRulesArgs]{
 		}
 		next := proto.Clone(cur.settings).(*adminv1.SubscriptionSettings)
 		next.Rules = rules
-		if err := c.saveSubscriptionSettings(a.SettingsHash, next); err != nil {
+		if err := c.saveSubscriptionSettings(a.SettingsHash, next, nil); err != nil {
 			return done{}, err
 		}
 		return doneWith("subscription_rules_updated", "Subscription serving rules updated."), nil
@@ -186,7 +187,7 @@ type subsTextsArgs struct {
 }
 
 var subsTextsSet = changeSpec[subsTextsArgs]{
-	name: "subscription_texts_set", min: ProfileOperator, danger: true, procs: slices.Concat(settingsProcs, procs(adminv1connect.GroupServiceListGroupsProcedure)),
+	name: "subscription_texts_set", min: ProfileOperator, danger: true, procs: settingsProcs,
 	desc: "Change the subscription title, announcement, support link, refresh interval, server-name template or the owner's own response headers shared by users. Give only fields to change. Text is shown in the owner's approval card; this always waits for approval.",
 	plan: func(c *call, a subsTextsArgs) (*planned, error) {
 		if a.Title == nil && a.Announcement == nil && a.SupportURL == nil && a.UpdateIntervalHours == nil && a.ServerNameTemplate == nil && a.ResponseHeaders == nil {
@@ -235,7 +236,7 @@ var subsTextsSet = changeSpec[subsTextsArgs]{
 				return nil, err
 			}
 			next.ResponseHeaders = list
-			if err := checked(next); err != nil { // normalized: the facts and the stored plan show what is saved
+			if err := c.checkSettings(next, groups); err != nil { // normalized: the facts and the stored plan show what is saved
 				return nil, err
 			}
 			if !slices.EqualFunc(cur.settings.ResponseHeaders, next.ResponseHeaders, func(x, y *adminv1.ResponseHeader) bool { return proto.Equal(x, y) }) {
@@ -247,8 +248,10 @@ var subsTextsSet = changeSpec[subsTextsArgs]{
 		if len(facts) == 0 {
 			return nil, errors.New("nothing to change: the settings already look like this")
 		}
-		if err := checked(next); err != nil {
-			return nil, err
+		if a.ResponseHeaders == nil {
+			if err := c.checkSettings(next, nil); err != nil {
+				return nil, err
+			}
 		}
 		a.SettingsHash = cur.hash
 		return &planned{Summary: "Change the shared subscription title, texts, own response headers or display settings. The owner must approve this change.", Facts: facts, Danger: []string{dangerPage}, Params: a}, nil
@@ -277,8 +280,9 @@ var subsTextsSet = changeSpec[subsTextsArgs]{
 		if a.ServerNameTemplate != nil {
 			next.ServerNameTemplate = *a.ServerNameTemplate
 		}
+		var groups map[string]string
 		if a.ResponseHeaders != nil {
-			groups, err := c.groupNames()
+			groups, err = c.groupNames()
 			if err != nil {
 				return done{}, err
 			}
@@ -288,7 +292,7 @@ var subsTextsSet = changeSpec[subsTextsArgs]{
 			}
 			next.ResponseHeaders = list
 		}
-		if err := c.saveSubscriptionSettings(a.SettingsHash, next); err != nil {
+		if err := c.saveSubscriptionSettings(a.SettingsHash, next, groups); err != nil {
 			return done{}, err
 		}
 		return doneWith("subscription_texts_updated", "Subscription text settings updated."), nil
@@ -505,7 +509,7 @@ var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 		if len(facts) == 0 {
 			return nil, errors.New("nothing to change: the settings already look like this")
 		}
-		if err := checked(next); err != nil {
+		if err := c.checkSettings(next, nil); err != nil {
 			return nil, err
 		}
 		a.SettingsHash = cur.hash
@@ -536,7 +540,7 @@ var subsLinkLimitsSet = changeSpec[subsLinkLimitsArgs]{
 		if a.LinkAutoInterval != nil {
 			next.LinkAutoInterval = a.LinkAutoInterval
 		}
-		if err := c.saveSubscriptionSettings(a.SettingsHash, next); err != nil {
+		if err := c.saveSubscriptionSettings(a.SettingsHash, next, nil); err != nil {
 			return done{}, err
 		}
 		return doneWith("subscription_link_limits_updated", "Subscription link settings updated."), nil
@@ -574,7 +578,7 @@ var subsPageSet = changeSpec[subsPageArgs]{
 			page = &adminv1.UserPageOptions{}
 			next.UserPage = page
 		}
-		before := proto.Clone(cur.settings).(*adminv1.SubscriptionSettings)
+		before := cur.settings
 		for _, f := range []struct {
 			in  *bool
 			dst *bool
@@ -610,11 +614,8 @@ var subsPageSet = changeSpec[subsPageArgs]{
 		if a.HappPingOnOpen != nil {
 			next.HappPingOnOpen = *a.HappPingOnOpen
 		}
-		if err := checked(next); err != nil {
+		if err := c.checkSettings(next, nil); err != nil {
 			return nil, err
-		}
-		if proto.Equal(before, next) {
-			return nil, errors.New("nothing to change: the settings already look like this")
 		}
 		facts := []Fact{}
 		for _, f := range []struct {
@@ -685,7 +686,7 @@ var subsPageSet = changeSpec[subsPageArgs]{
 		if a.HappPingOnOpen != nil {
 			next.HappPingOnOpen = *a.HappPingOnOpen
 		}
-		if err := c.saveSubscriptionSettings(a.SettingsHash, next); err != nil {
+		if err := c.saveSubscriptionSettings(a.SettingsHash, next, nil); err != nil {
 			return done{}, err
 		}
 		return doneWith("subscription_page_updated", "Subscription page options updated."), nil
@@ -709,7 +710,7 @@ type dnsSettingsArgs struct {
 
 var dnsSettingsSet = changeSpec[dnsSettingsArgs]{
 	name: "dns_settings_set", min: ProfileOperator, danger: true,
-	procs: procs(adminv1connect.SubscriptionServiceGetSubscriptionSettingsProcedure, adminv1connect.SubscriptionServiceUpdateSubscriptionSettingsProcedure, adminv1connect.DnsServiceListDnsPresetsProcedure),
+	procs: slices.Concat(settingsProcs, procs(adminv1connect.DnsServiceListDnsPresetsProcedure)),
 	desc:  "Set the instance-default DNS preset and the ordered DNS choices offered to apps that take subscription links. Users may choose from the offer if DNS choices are enabled on their page. Always waits for owner approval.",
 	plan: func(c *call, a dnsSettingsArgs) (*planned, error) {
 		if a.DefaultPresetID == nil && a.LinkPresetIDs == nil && a.LinkDefaultPresetID == nil {
@@ -796,7 +797,7 @@ var dnsSettingsSet = changeSpec[dnsSettingsArgs]{
 		if len(facts) == 0 {
 			return nil, errors.New("nothing to change: the DNS defaults and offer already look like this")
 		}
-		if err := checked(next); err != nil {
+		if err := c.checkSettings(next, nil); err != nil {
 			return nil, err
 		}
 		a.SettingsHash = cur.hash
@@ -827,7 +828,7 @@ var dnsSettingsSet = changeSpec[dnsSettingsArgs]{
 			}
 			next.LinkDns = link
 		}
-		if err := c.saveSubscriptionSettings(a.SettingsHash, next); err != nil {
+		if err := c.saveSubscriptionSettings(a.SettingsHash, next, nil); err != nil {
 			return done{}, err
 		}
 		return doneWith("dns_settings_updated", "DNS defaults and link-app offer updated."), nil

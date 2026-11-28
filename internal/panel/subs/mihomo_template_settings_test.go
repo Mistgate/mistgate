@@ -1,14 +1,24 @@
 package subs_test
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "github.com/mistgate/mistgate/gen/mistgate/admin/v1"
 	"github.com/mistgate/mistgate/internal/panel/auth"
+	"github.com/mistgate/mistgate/internal/panel/dns"
+	"github.com/mistgate/mistgate/internal/panel/instance"
+	"github.com/mistgate/mistgate/internal/panel/protocols/builtin"
 	"github.com/mistgate/mistgate/internal/panel/store"
+	"github.com/mistgate/mistgate/internal/panel/subs"
 	"github.com/mistgate/mistgate/internal/panel/subsettings"
 )
 
@@ -92,4 +102,215 @@ func TestMihomoTemplatesThroughTheSettingsAPI(t *testing.T) {
 		return
 	}
 	t.Fatal("no audit row")
+}
+
+func TestMihomoTemplateGroupIdentityFollowsID(t *testing.T) {
+	r := newTemplateRig(t, func(cfg *subs.Config) { cfg.MinInterval = -1 })
+	settings, preview := headerService(r.m3rig), r.previewService(t, plainPreset)
+	owner := auth.WithAdmin(r.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
+	createGroup := func(name string) string {
+		t.Helper()
+		return must(r.svc.CreateGroup(r.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: name, ProfileIds: []string{r.profile}}))).Msg.Group.Id
+	}
+	old := createGroup("Router")
+	text := groupTemplate + "mode: rule\n" + fmt.Sprintf("# @mistgate-if [%q]\nmixed-port: 1080\n# @mistgate-end\n", old)
+	set := subsettings.Defaults()
+	set.MihomoTemplates = []*adminv1.MihomoTemplate{{Name: "home", Yaml: text, GroupIds: []string{r.group, old}}}
+	save := func() *adminv1.MihomoTemplate {
+		t.Helper()
+		got := must(settings.UpdateSubscriptionSettings(owner, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))).Msg.Settings.MihomoTemplates[0]
+		r.cache.Invalidate() // mirrors the shared settings cache used by the panel
+		if got.Yaml != text {
+			t.Fatalf("group changes rewrote the source:\n%s", got.Yaml)
+		}
+		return got
+	}
+	check := func(user, token, name string, port any) {
+		t.Helper()
+		body := groupAnswer(t, r.body(t, token))
+		resp, err := r.preview(t, preview, user, text, set.MihomoTemplates[0].GroupIds...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		draft := groupAnswer(t, resp.Yaml)
+		if resp.GroupName != name || body["mode"] != "rule" || draft["mode"] != "rule" || body["mixed-port"] != port || draft["mixed-port"] != port {
+			t.Errorf("group %q: subscription mode/port = %v/%v, preview group/mode/port = %q/%v/%v",
+				name, body["mode"], body["mixed-port"], resp.GroupName, draft["mode"], draft["mixed-port"])
+		}
+	}
+	save()
+	router, token := r.user("router", func(req *adminv1.CreateUserRequest) { req.GroupId = old })
+	check(router, token, "Router", 1080)
+	renamed := "Renamed Router"
+	must(r.svc.UpdateGroup(r.ctx, connect.NewRequest(&adminv1.UpdateGroupRequest{GroupId: old, Name: &renamed})))
+	check(router, token, renamed, 1080)
+
+	must(r.svc.DeleteGroup(r.ctx, connect.NewRequest(&adminv1.DeleteGroupRequest{GroupId: old, MoveUsersTo: r.group})))
+	got := save() // a tab still sends the old assignment; the API prunes it without touching the source
+	if !slices.Equal(got.GroupIds, []string{r.group}) {
+		t.Fatalf("deleted group's assignment was retained: %v", got.GroupIds)
+	}
+	set.MihomoTemplates[0].GroupIds = got.GroupIds
+	check(router, token, "g", nil)
+	recreated := createGroup(renamed)
+	if recreated == old {
+		t.Fatal("the recreated group unexpectedly reused the deleted ID")
+	}
+	set.MihomoTemplates[0].GroupIds = append(set.MihomoTemplates[0].GroupIds, recreated)
+	save()
+	newRouter, newToken := r.user("new-router", func(req *adminv1.CreateUserRequest) { req.GroupId = recreated })
+	check(newRouter, newToken, renamed, nil)
+}
+
+func TestMihomoTemplateInvalidVariantLeavesSettingsUnchanged(t *testing.T) {
+	r := newTemplateRig(t, nil)
+	svc := headerService(r.m3rig)
+	preview := r.previewService(t, plainPreset)
+	owner := auth.WithAdmin(r.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
+	user, _ := r.user("phone", nil)
+	groups := []string{r.group, r.group2}
+	original := "mode: rule\n" + groupTemplate
+	r.save(t, nil, &adminv1.MihomoTemplate{Name: "shared", Yaml: original, GroupIds: groups})
+	bad := original + fmt.Sprintf("# @mistgate-if [%q]\nmixed-port: 7890\n# @mistgate-end\n# @mistgate-if [%q]\nmode: global\n# @mistgate-end\n", r.group, r.group2)
+	set := subsettings.Defaults()
+	set.Title = "rejected title"
+	set.MihomoTemplates = []*adminv1.MihomoTemplate{{Name: "shared", Yaml: bad, GroupIds: groups}}
+	_, saveErr := svc.UpdateSubscriptionSettings(owner, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))
+	_, previewErr := r.preview(t, preview, user, bad, groups...) // phone's variant is valid, but the whole draft is rejected
+	for _, err := range []error{saveErr, previewErr} {
+		if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), r.group2) || !strings.Contains(err.Error(), "line 10") {
+			t.Errorf("expected the later error in the router variant, got %v", err)
+		}
+	}
+	read := must(svc.GetSubscriptionSettings(owner, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg.Settings
+	if read.Title == set.Title || len(read.MihomoTemplates) != 1 || read.MihomoTemplates[0].Yaml != original {
+		t.Fatal("the rejected draft modified the saved settings")
+	}
+}
+
+func TestMihomoTemplateDeletedAssignmentDoesNotRequireAuto(t *testing.T) {
+	m := newM3Rig(t)
+	svc := headerService(m)
+	owner := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
+	temp := must(m.svc.CreateGroup(m.ctx, connect.NewRequest(&adminv1.CreateGroupRequest{Name: "temp", ProfileIds: []string{m.profile}}))).Msg.Group.Id
+	text := groupTemplate + fmt.Sprintf("# @mistgate-if [%q]\n    proxies: [Auto]\n# @mistgate-end\n", temp)
+	set := subsettings.Defaults()
+	set.MihomoTemplates = []*adminv1.MihomoTemplate{{Name: "shared", Yaml: text, GroupIds: []string{m.group, temp}}}
+	update := func() (*connect.Response[adminv1.UpdateSubscriptionSettingsResponse], error) {
+		return svc.UpdateSubscriptionSettings(owner, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))
+	}
+	must(update())
+
+	set.LinkAutoSelect = proto.Bool(false)
+	if _, err := update(); connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "Auto") {
+		t.Fatalf("the live group's block must still require Auto: %v", err)
+	}
+	must(m.svc.DeleteGroup(m.ctx, connect.NewRequest(&adminv1.DeleteGroupRequest{GroupId: temp})))
+	saved := must(update()).Msg.Settings
+	stored := must(subsettings.Load(m.ctx, m.st))
+	for _, got := range []*adminv1.SubscriptionSettings{saved, stored} {
+		if subsettings.LinkAutoSelect(got) || len(got.MihomoTemplates) != 1 {
+			t.Fatalf("Auto off with deleted group: %v", got)
+		}
+		if tpl := got.MihomoTemplates[0]; !slices.Equal(tpl.GroupIds, []string{m.group}) || tpl.Yaml != text {
+			t.Fatalf("only the deleted assignment should be pruned: %v", tpl)
+		}
+	}
+	if !slices.Equal(set.MihomoTemplates[0].GroupIds, []string{m.group, temp}) {
+		t.Fatal("reconciliation modified the request")
+	}
+}
+
+func TestMihomoTemplateRejectedGroupsLeaveDNSUnchanged(t *testing.T) {
+	m := newM3Rig(t)
+	svc := subs.NewService(m.st, subsettings.NewCache(m.st, nil), builtin.Registry(),
+		func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, dns.New(m.st), nil)
+	owner := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
+	get := func() *adminv1.SubscriptionSettings {
+		return must(svc.GetSubscriptionSettings(owner, connect.NewRequest(&adminv1.GetSubscriptionSettingsRequest{}))).Msg.Settings
+	}
+	before := get()
+	for _, tc := range []struct {
+		name, diagnostic string
+		templates        []*adminv1.MihomoTemplate
+	}{
+		{"unknown group", "mihomo_templates[0].group_ids: no such group", []*adminv1.MihomoTemplate{mihomoTemplate("unknown", "grp_nosuchgroup")}},
+		{"nil entry", "mihomo_templates[1]", []*adminv1.MihomoTemplate{mihomoTemplate("valid", m.group), nil}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			set := subsettings.Defaults()
+			set.MihomoTemplates = tc.templates
+			set.DefaultDnsPresetId = "dns_builtin_standard"
+			set.LinkDns = &adminv1.LinkDnsOptions{PresetIds: []string{"dns_builtin_adblock"}, DefaultPresetId: "dns_builtin_adblock"}
+			_, err := svc.UpdateSubscriptionSettings(owner, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))
+			if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), tc.diagnostic) {
+				t.Fatalf("expected %q, got %v", tc.diagnostic, err)
+			}
+			if after := get(); !proto.Equal(before, after) {
+				t.Fatalf("rejected update changed settings or DNS: before %v, after %v", before, after)
+			}
+		})
+	}
+}
+
+type dnsBeforeMihomoSettingsSave struct {
+	*dns.Service
+	afterDefaultWrite func()
+}
+
+func (d dnsBeforeMihomoSettingsSave) SetDefaultPresetID(ctx context.Context, id string) error {
+	if err := d.Service.SetDefaultPresetID(ctx, id); err != nil {
+		return err
+	}
+	d.afterDefaultWrite()
+	return nil
+}
+
+func TestMihomoTemplateCanceledSettingsSave(t *testing.T) {
+	m := newM3Rig(t)
+	owner := auth.WithAdmin(m.ctx, store.Admin{ID: "adm_templates", Role: store.RoleOwner})
+	cache := subsettings.NewCache(m.st, nil)
+	set := subsettings.Defaults()
+	set.MihomoTemplates = []*adminv1.MihomoTemplate{mihomoTemplate("router")}
+	set.DeviceIdleAfterDays = proto.Uint32(0) // the cache can proceed straight to validation
+	before := must(subsettings.Load(m.ctx, m.st))
+
+	for _, tc := range []struct {
+		name  string
+		early bool
+		want  connect.Code
+	}{
+		{name: "canceled before validation", early: true, want: connect.CodeCanceled},
+		{name: "deadline before validation", early: true, want: connect.CodeDeadlineExceeded},
+		{name: "canceled before second validation", want: connect.CodeCanceled},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(owner)
+			defer cancel()
+			if tc.want == connect.CodeDeadlineExceeded {
+				var stop context.CancelFunc
+				ctx, stop = context.WithDeadline(ctx, time.Now().Add(-time.Second))
+				defer stop()
+			} else if tc.early {
+				cancel()
+			}
+			dnsWritten := false
+			d := dnsBeforeMihomoSettingsSave{Service: dns.New(m.st), afterDefaultWrite: func() {
+				dnsWritten = true
+				cancel()
+			}}
+			svc := subs.NewService(m.st, cache, builtin.Registry(),
+				func(ctx context.Context) (instance.Settings, error) { return instance.Load(ctx, m.st) }, d, nil)
+			_, err := svc.UpdateSubscriptionSettings(ctx, connect.NewRequest(&adminv1.UpdateSubscriptionSettingsRequest{Settings: set}))
+			if got := connect.CodeOf(err); got != tc.want {
+				t.Fatalf("got %v, want %v", err, tc.want)
+			}
+			if want := !tc.early; dnsWritten != want {
+				t.Fatalf("DNS write = %v, want %v", dnsWritten, want)
+			}
+			if after := must(subsettings.Load(m.ctx, m.st)); !proto.Equal(before, after) {
+				t.Fatal("interrupted save changed the subscription settings")
+			}
+		})
+	}
 }

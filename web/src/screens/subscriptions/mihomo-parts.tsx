@@ -1,15 +1,21 @@
 import type { UseQueryResult } from "@tanstack/react-query";
-import { useRef, useState, type ReactNode } from "react";
+import type { Ace } from "ace-builds";
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { Popover, PopRow } from "@/components/ui/popover";
 import { QueryError } from "@/components/ui/query-error";
+import { downloadText } from "@/lib/awg";
 import { cx } from "@/lib/cx";
 import type { Tx } from "@/screens/users/t";
 import { hxDemo } from "./demo";
 import { Chips, HxChip, Msg, Opt, People, RowHead } from "./hx-parts";
+import { condition, editSource, groupLimit, inactiveRefs, sourceSelection, variants, writeTransfer, type Group, type Selection, type Source, type SourceDraft, type SourceIssue } from "./mihomo-source";
+import { MihomoSourceEditor } from "./mihomo-source-editor";
 import { templateBytes, templateFileMax, templateLimit, type HeaderProblem, type MihomoTemplate } from "./model";
 
-export type Row = MihomoTemplate & { k: number }; // k: the row's own key, so that a delete keeps what is typed where it was
-export type Group = { id: string; name: string };
+export type Row = MihomoTemplate & { k: number; source?: SourceDraft; editorVersion?: number };
 export type Refusal = { text: string; line?: number };
 export type Warning = { code: string; arg: string };
 export type Check = UseQueryResult<{ warnings: Warning[]; groupName: string; notServed: string; yaml: string }>;
@@ -19,9 +25,18 @@ export type Status = { kind: "bad" | "part" | "ok" | "wait"; label: string };
 export const kb = (bytes: number, t: Tx): string => (bytes / 1024).toLocaleString(t.locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** What the form itself can see in a text that is worth a look (the panel's own notes come from the panel): no dns of its own, other hosts it names, nobody it is for. */
-export function textWarnings(r: Pick<MihomoTemplate, "yaml" | "groupIds">, t: Tx): string[] {
+export function textWarnings(r: Pick<MihomoTemplate, "yaml" | "groupIds"> & { source?: Source }, t: Tx): string[] {
   const out: string[] = [];
-  if (r.yaml.trim() !== "" && !/^dns\s*:/m.test(r.yaml)) out.push(t("sx.hx.m.wNoDns"));
+  if (r.source) {
+    let withDns = false;
+    let withoutDns = false;
+    for (const yaml of variants(r.yaml, r.source, r.groupIds)) {
+      if (/^dns\s*:/m.test(yaml)) withDns = true;
+      else if (yaml.trim() !== "") withoutDns = true;
+      if (withDns && withoutDns) break;
+    }
+    if (withoutDns) out.push(t(withDns ? "sx.hx.m.wVariantsNoDns" : "sx.hx.m.wNoDns"));
+  }
   const hosts = [...new Set([...r.yaml.matchAll(/https?:\/\/([^\s/'"]+)/g)].map((m) => m[1]!))].slice(0, 20);
   if (hosts.length > 0) out.push(t("sx.hx.m.wHosts", { hosts: hosts.join(", ") }));
   if (r.groupIds.length === 0) out.push(t("sx.hx.m.wFree"));
@@ -47,6 +62,10 @@ export function problemText(p: HeaderProblem, t: Tx): string {
   }
 }
 
+export function sourceIssueText(issue: SourceIssue, t: Tx): string {
+  return t(`sx.hx.m.source.${issue.kind}`, { group: issue.group ?? "" });
+}
+
 type RowProps = {
   t: Tx;
   row: Row;
@@ -56,13 +75,15 @@ type RowProps = {
   groups: Group[];
   groupsLoading: boolean;
   others: Row[];
+  draft: SourceDraft | undefined;
+  source: { yaml: string; source?: Source; issue?: SourceIssue };
   status: Status | null;
   errors: { text: string; line?: number }[];
   warnings: string[];
   asking: boolean;
   atLimit: boolean;
   onToggle: () => void;
-  onChange: (p: Partial<MihomoTemplate>) => void;
+  onChange: (p: Partial<Omit<Row, "k">>) => void;
   onDuplicate: () => void;
   onAsk: (on: boolean) => void;
   onDelete: () => void;
@@ -70,27 +91,134 @@ type RowProps = {
 };
 
 /** One template of the list: its head (name, groups and size, state) and, while it is open, its editor. */
-export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, others, status, errors, warnings, asking, atLimit, onToggle, onChange, onDuplicate, onAsk, onDelete, onFile }: RowProps) {
-  const area = useRef<HTMLTextAreaElement>(null);
+export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, draft, source, others, status, errors, warnings, asking, atLimit, onToggle, onChange, onDuplicate, onAsk, onDelete, onFile }: RowProps) {
+  const editor = useRef<Ace.Editor>(null);
+  const helpId = useId();
+  const keyboardHelpId = `${helpId}-keyboard`;
+  const applyingCondition = useRef(false);
+  // Ace displays LF; record only the newline style of revisions reached by a structured edit.
+  const conditionEol = useRef(new Map<number, string>());
+  const queuedChange = useRef(false);
   const file = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(() => hxDemo.drag ?? false);
-  const bytes = templateBytes(row.yaml);
-  const names = groups.filter((g) => row.groupIds.includes(g.id)).map((g) => g.name);
+  const [selectedVariant, setSelectedVariant] = useState("all");
+  const [blocksOpen, setBlocksOpen] = useState(false);
+  const blockAction = useRef(false);
+  const [operation, setOperation] = useState<SourceIssue | null>(null);
+  const [download, setDownload] = useState<string | null>(null);
+  const [chooser, setChooser] = useState<{ draft: SourceDraft; selection: Selection; ids: string[]; from: number; to: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!open) conditionEol.current.clear();
+  }, [open]);
+  const bytes = templateBytes(source.yaml);
+  const assigned = groups.filter((g) => row.groupIds.includes(g.id));
+  const names = assigned.map((g) => g.name);
   const takenBy = (id: string) => others.find((o) => o.groupIds.includes(id));
   const busy = groups.filter((g) => takenBy(g.id));
   const toggle = (id: string) => onChange({ groupIds: row.groupIds.includes(id) ? row.groupIds.filter((x) => x !== id) : [...row.groupIds, id] });
+  const selected = chooser?.ids.filter((id) => assigned.some((g) => g.id === id)) ?? [];
+  const inactive = source.source && !groupsLoading ? inactiveRefs(source.source, groups, row.groupIds) : [];
+  const blocks = source.source?.blocks ?? [];
+  const blockDepths: number[] = [];
+  if (blocksOpen) {
+    for (const { parent } of blocks) blockDepths.push(parent < 0 ? 0 : Math.min(3, blockDepths[parent]! + 1));
+  }
+  const variant = selectedVariant === "" || assigned.some((g) => g.id === selectedVariant) ? selectedVariant : "all";
+  const input = open ? (draft?.text ?? row.yaml).replace(/\r\n?/g, "\n") : "";
   const unnamed = row.name.trim() || t("sx.hx.m.unnamed");
-  const goTo = (line: number) => {
-    const el = area.current;
-    if (!el) return;
-    const at = row.yaml.split("\n").slice(0, line - 1).reduce((s, l) => s + l.length + 1, 0);
-    el.focus();
-    el.setSelectionRange(at, at + (row.yaml.split("\n")[line - 1]?.length ?? 0));
-    el.scrollTop = Math.max(0, (line - 3) * 20);
+  const goTo = (line: number, cursor = false) => {
+    const instance = editor.current;
+    if (!instance) return;
+    const rowIndex = Math.max(0, Math.min(line - 1, instance.session.getLength() - 1));
+    instance.session.unfold(rowIndex);
+    instance.gotoLine(rowIndex + 1, 0);
+    if (!cursor) {
+      instance.selection.setSelectionRange({ start: { row: rowIndex, column: 0 }, end: { row: rowIndex, column: instance.session.getLine(rowIndex).length } });
+    }
+    instance.focus();
+  };
+  const choose = (line?: number) => {
+    if (line !== undefined) goTo(line, true);
+    const instance = editor.current;
+    if (!instance || !draft) return;
+    const { start, end } = instance.getSelectionRange();
+    const doc = instance.session.getDocument();
+    const result = sourceSelection(draft.text, doc.positionToIndex(start), doc.positionToIndex(end));
+    setOperation(result.issue ?? null);
+    if (!result.value) return;
+    const selection = result.value;
+    const ids = selection.block?.refs.flatMap((name) => {
+      const id = draft.names.get(name);
+      return id ? [id] : [];
+    }) ?? [];
+    const from = selection.block ? selection.block.open + 2 : selection.lines.findIndex((line) => line.start === selection.start) + 1;
+    const to = selection.block ? Math.max(from, selection.block.close) : selection.lines.findIndex((line) => line.end === selection.end) + 1;
+    setChooser({ draft, selection, ids, from, to });
+  };
+  const applyCondition = (ids: string[]) => {
+    const instance = editor.current;
+    if (!chooser || !instance) return;
+    if (chooser.draft.text !== draft?.text) {
+      setChooser(null);
+      return;
+    }
+    const next = condition(chooser.draft, chooser.selection, ids, groups);
+    const before = instance.getValue();
+    const after = next.text.replace(/\r\n?/g, "\n");
+    if (before !== after) {
+      // Change only the differing span and bracket its deltas as one undo step.
+      let start = 0;
+      let end = before.length;
+      let nextEnd = after.length;
+      while (start < end && start < nextEnd && before[start] === after[start]) start++;
+      while (start < end && start < nextEnd && before[end - 1] === after[nextEnd - 1]) {
+        end--;
+        nextEnd--;
+      }
+      const { session } = instance;
+      const doc = session.getDocument();
+      const range = { start: doc.indexToPosition(start), end: doc.indexToPosition(end) };
+      applyingCondition.current = true;
+      session.markUndoGroup();
+      const undo = session.getUndoManager();
+      const keepEndings = conditionEol.current.size > 0 || chooser.draft.text.includes("\r\n") || next.text.includes("\r\n");
+      const remember = (text: string) => {
+        const endings = (text.match(/\r?\n/g) ?? []).map((eol) => eol === "\r\n" ? "1" : "0").join("");
+        conditionEol.current.set(undo.getRevision(), endings);
+      };
+      if (keepEndings) remember(chooser.draft.text);
+      try {
+        session.replace(range, after.slice(start, nextEnd));
+      } finally {
+        session.markUndoGroup();
+        if (keepEndings) remember(next.text);
+        undo.startNewGroup();
+        applyingCondition.current = false;
+      }
+    }
+    // Keep aliases from the condition operation even when the text is later undone.
+    setOperation(null);
+    onChange({ source: next });
+    setChooser(null);
+  };
+  const exportSource = () => {
+    if (source.issue) return setOperation(source.issue);
+    const output = writeTransfer(row.name, source.yaml, row.groupIds, groups, draft);
+    setOperation(output.issue ?? null);
+    if (output.value !== undefined) setDownload(output.value);
+  };
+  const visitBlock = (line: number, edit: boolean) => {
+    blockAction.current = true;
+    setBlocksOpen(false);
+    if (edit) choose(line);
+    else {
+      editor.current?.container.scrollIntoView?.({ block: "nearest" });
+      goTo(line);
+    }
   };
   return (
     <div className={cx("hx-r", status?.kind === "bad" && "bad", open && "on")}>
-      <RowHead n={n} open={open} onToggle={onToggle} meta={status?.label ?? ""} metaClass={cx("mt-st", status?.kind === "bad" && "bad", status?.kind === "part" && "part")}>
+      <RowHead n={n} open={open} onToggle={() => { setOperation(null); onToggle(); }} meta={status?.label ?? ""} metaClass={cx("mt-st", status?.kind === "bad" && "bad", status?.kind === "part" && "part")}>
         <b>{unnamed}</b>
         <span>{t("sx.hx.m.sub", { groups: names.length > 0 ? names.join(", ") : t("sx.hx.m.noGroups"), kib: kb(bytes, t) })}</span>
       </RowHead>
@@ -126,33 +254,112 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, oth
               <span>{t("sx.hx.m.text")}</span>
               <span className={cx("mono", bytes > templateLimit.bytes && "bad")}>{t("sx.hx.m.textSz", { kib: kb(bytes, t), max: templateLimit.bytes >> 10 })}</span>
             </div>
-            <textarea
-              ref={area}
-              className={cx("an-i mono mt-y", drag && "drag")}
-              rows={16}
-              spellCheck={false}
-              wrap="off"
-              aria-label={t("sx.hx.m.text")}
-              data-noi18n
-              value={row.yaml}
-              readOnly={!owner}
-              onChange={(e) => onChange({ yaml: e.target.value })}
-              onDragOver={(e) => {
-                if (owner && e.dataTransfer.types.includes("Files")) {
-                  e.preventDefault();
-                  setDrag(true);
-                }
+            <p id={keyboardHelpId} className="sr-only">{t(owner ? "sx.hx.m.editorKeyboard" : "sx.hx.m.readOnlyKeyboard")}</p>
+            {owner && (
+              <>
+                <p className="hx-note" id={helpId}>{t(assigned.length ? "sx.hx.m.conditionHelp" : "sx.hx.m.conditionEmpty")}</p>
+                <div className="mt-up">
+                  <Button className="sb-btn" disabled={groupsLoading || assigned.length === 0} onClick={() => choose()}>{t("sx.hx.m.onlyGroups")}</Button>
+                  <Button className="sb-btn" disabled={groupsLoading} onClick={exportSource}>{t("sx.hx.m.export")}</Button>
+                </div>
+              </>
+            )}
+            {blocks.length > 0 && (
+              <div className="mt-variant">
+                <label className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span>{t("sx.hx.m.variant")}</span>
+                  <select className="an-i" aria-describedby={`${helpId}-variant`} value={variant} onChange={(e) => setSelectedVariant(e.target.value)}>
+                    <option value="all">{t("sx.hx.m.variantAll")}</option>
+                    <option value="">{t("sx.hx.m.variantCommon")}</option>
+                    {assigned.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                  </select>
+                </label>
+                <Popover
+                  align="start"
+                  open={blocksOpen}
+                  onOpenChange={(next) => {
+                    if (next) blockAction.current = false;
+                    setBlocksOpen(next);
+                  }}
+                  finalFocus={() => !blockAction.current}
+                  aria-label={t("sx.hx.m.blocks", { n: blocks.length })}
+                  trigger={<Button className="sb-btn">{t("sx.hx.m.blocks", { n: blocks.length })}</Button>}
+                >
+                  <ul className="mt-blocks grid max-h-[min(45vh,var(--available-height))] list-none gap-0.5 overflow-y-auto p-0.5">
+                    {blocks.map((block, i) => {
+                      const from = Math.min(block.open + 2, block.close + 1);
+                      const to = Math.max(from, block.close);
+                      const label = t("sx.hx.m.conditionEntry", {
+                        lines: from === to ? String(from) : `${from}–${to}`,
+                        groups: block.refs.map((id) => groups.find((g) => g.id === id)?.name ?? id).join(", "),
+                      });
+                      return (
+                        <li key={block.open} className="flex min-w-0 items-center gap-1" style={{ marginInlineStart: (blockDepths[i] ?? 0) * 8 }}>
+                          <PopRow className="h-auto min-h-9 min-w-0 flex-1 py-1 wrap-anywhere" onClick={() => visitBlock(from, false)}>{label}</PopRow>
+                          {owner && <Button size="sm" variant="ghost" className="shrink-0" aria-label={`${t("sx.hx.m.conditionEdit")}: ${label}`} disabled={groupsLoading} onClick={() => visitBlock(block.open + 1, true)}>{t("sx.hx.m.conditionEdit")}</Button>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </Popover>
+                <small id={`${helpId}-variant`} className="basis-full">{t("sx.hx.m.variantHint")}</small>
+              </div>
+            )}
+            <div
+              className={cx("mt-editor", drag && "drag")}
+              onDragOverCapture={(e) => {
+                if (!owner || !e.dataTransfer.types.includes("Files")) return;
+                e.preventDefault();
+                e.stopPropagation();
+                setDrag(true);
               }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={(e) => {
+              onDragLeave={(e) => {
+                if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDrag(false);
+              }}
+              onDropCapture={(e) => {
+                if (!owner || !e.dataTransfer.files.length) return;
+                e.preventDefault();
+                e.stopPropagation();
                 setDrag(false);
-                const f = e.dataTransfer.files[0];
-                if (owner && f) {
-                  e.preventDefault();
-                  onFile(f);
-                }
+                onFile(e.dataTransfer.files[0]);
               }}
-            />
+            >
+              <MihomoSourceEditor
+                editorRef={editor}
+                label={t("sx.hx.m.text")}
+                description={owner ? `${keyboardHelpId} ${helpId}` : keyboardHelpId}
+                text={input}
+                readOnly={!owner}
+                blocks={blocks}
+                variant={variant}
+                onChange={(value) => {
+                  if (!draft || applyingCondition.current) return;
+                  const update = (text: string) => {
+                    if (text === draft.text) return;
+                    setOperation(null);
+                    onChange({ source: editSource(draft, text, groups) });
+                  };
+                  if (conditionEol.current.size === 0) {
+                    update(draft.text.includes("\r\n") && !/(?<!\r)\n/.test(draft.text) ? value.replace(/\n/g, "\r\n") : value);
+                    return;
+                  }
+                  if (queuedChange.current) return;
+                  queuedChange.current = true;
+                  // Undo/redo can emit multiple deltas before Ace updates the final revision.
+                  queueMicrotask(() => {
+                    queuedChange.current = false;
+                    const instance = editor.current;
+                    if (!instance) return;
+                    const style = conditionEol.current.get(instance.session.getUndoManager().getRevision());
+                    const value = instance.getValue();
+                    if (value === input && style === undefined) return;
+                    let line = 0;
+                    const crlf = draft.text.includes("\r\n") && !/(?<!\r)\n/.test(draft.text);
+                    update(value.replace(/\n/g, () => (style === undefined ? crlf : style[line++] === "1") ? "\r\n" : "\n"));
+                  });
+                }}
+              />
+            </div>
             {owner && (
               <div className="mt-up">
                 <input ref={file} type="file" hidden accept=".yaml,.yml,.txt,text/yaml,text/plain" aria-label={t("sx.hx.m.load")} onChange={(e) => (onFile(e.target.files?.[0]), (e.target.value = ""))} />
@@ -163,14 +370,20 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, oth
               </div>
             )}
           </div>
-          {errors.map((m) => (
-            <Msg key={m.text} kind="bad">
+          {[...errors, ...(operation && operation !== source.issue ? [{ text: sourceIssueText(operation, t), line: operation.kind === "header" ? undefined : operation.line }] : [])].map((m, i) => (
+            <Msg key={`${m.text}:${i}`} kind="bad">
               {m.text}
               {m.line && (
-                <button type="button" className="mono mt-ln" aria-label={t("sx.hx.m.lineGo", { n: m.line })} onClick={() => goTo(m.line!)}>
+                <button type="button" className="mono mt-ln" aria-label={t("sx.hx.m.lineGo", { n: m.line })} onClick={() => goTo(m.line!, operation?.kind === "inactive" && operation.line === m.line)}>
                   {t("sx.hx.m.line", { n: m.line })}
                 </button>
               )}
+            </Msg>
+          ))}
+          {inactive.map((m, i) => (
+            <Msg key={`${m.line}:${i}`} kind="part">
+              {sourceIssueText(m, t)}
+              <button type="button" className="mono mt-ln" aria-label={t("sx.hx.m.lineGo", { n: m.line })} onClick={() => goTo(m.line, true)}>{t("sx.hx.m.line", { n: m.line })}</button>
             </Msg>
           ))}
           {warnings.map((w) => (
@@ -201,6 +414,52 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, oth
                 </Button>
               </div>
             ))}
+          {chooser && (
+            <Modal
+              open
+              onOpenChange={(o) => { if (!o) setChooser(null); }}
+              title={t("sx.hx.m.conditionTitle")}
+              description={assigned.length ? t("sx.hx.m.conditionHint", { from: chooser.from, to: chooser.to }) : t("sx.hx.m.conditionEmpty")}
+              closeLabel={t("common.close")}
+              footer={
+                <>
+                  {chooser.selection.block && <Button onClick={() => applyCondition([])}>{t("sx.hx.m.conditionRemove")}</Button>}
+                  <Button onClick={() => setChooser(null)}>{t("sx.hx.m.cancel")}</Button>
+                  <Button variant="primary" disabled={selected.length === 0 || selected.length > groupLimit} onClick={() => applyCondition(selected)}>{t("sx.hx.m.conditionApply")}</Button>
+                </>
+              }
+            >
+              {assigned.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {assigned.map((g) => (
+                    <label className="flex items-center gap-2" key={g.id}>
+                      <input type="checkbox" checked={selected.includes(g.id)} onChange={(e) => setChooser({ ...chooser, ids: e.target.checked ? [...selected, g.id] : selected.filter((id) => id !== g.id) })} />
+                      {g.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+              {chooser.selection.block && <p>{t("sx.hx.m.conditionCommon")}</p>}
+            </Modal>
+          )}
+          {download !== null && (
+            <Modal
+              open
+              onOpenChange={(o) => { if (!o) setDownload(null); }}
+              title={t("sx.hx.m.export")}
+              description={t("sx.hx.m.exportHint")}
+              closeLabel={t("common.close")}
+              footer={
+                <>
+                  <Button onClick={() => setDownload(null)}>{t("sx.hx.m.cancel")}</Button>
+                  <Button variant="primary" onClick={() => {
+                    downloadText("mihomo-template.yaml", download);
+                    setDownload(null);
+                  }}>{t("sx.hx.m.exportConfirm")}</Button>
+                </>
+              }
+            />
+          )}
         </div>
       )}
     </div>
@@ -220,14 +479,18 @@ type PreviewProps = {
   q: Check;
   /** Nothing is wrong with the open text, so that the panel was asked about it. */
   valid: boolean;
+  /** Whether the response is for the current draft, rather than the debounced one. */
+  fresh?: boolean;
 };
 
 /** What one person gets: the person, the verdict and why, and (for the template that is theirs) the profile, read only. */
-export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, valid }: PreviewProps) {
+export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, valid, fresh = true }: PreviewProps) {
   const [anyway, setAnyway] = useState(false);
+  const previewEditor = useRef<Ace.Editor>(null);
+  const keyboardHelpId = useId();
   const list = users.data ?? [];
   const person = list.find((u) => u.id === userId);
-  const r = q.data;
+  const r = fresh ? q.data : undefined;
   const group = groups.find((g) => g.id === person?.groupId)?.name ?? r?.groupName ?? "";
   const tOf = person ? rows.findIndex((x) => x.groupIds.includes(person.groupId)) : -1;
   const mine = !!row && tOf >= 0 && rows[tOf]!.k === row.k;
@@ -237,6 +500,7 @@ export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, vali
   if (rows.length === 0) head = [t("sx.hx.m.rBuilt"), t("sx.hx.m.rNoTpl"), ""];
   else if (row && valid && r?.notServed === "no_access") head = [t("sx.hx.m.rOff"), t("sx.hx.m.rOffS"), "part"];
   else if (row && valid && r?.notServed === "no_servers") head = [t("sx.hx.m.rNoSrv"), t("sx.hx.m.rNoSrvS"), "part"];
+  else if (!fresh && valid && row && userId !== "") head = [t("sx.hx.m.rThis"), t("sx.hx.m.rWait"), ""];
   else if (tOf < 0) head = [t("sx.hx.m.rBuilt"), t("sx.hx.m.rNoGrp", { group }), ""];
   else if (!mine) head = [t("sx.hx.m.rOther"), t("sx.hx.m.rOtherS", { group, tpl }), ""];
   else if (!valid) head = [t("sx.hx.m.rBad"), t("sx.hx.m.rBadS"), "bad"];
@@ -246,8 +510,22 @@ export function MtPreview({ t, row, rows, groups, users, userId, onPick, q, vali
   const ready = !!row && valid && !!r && !r.notServed;
   const profile = ready && (mine || anyway);
   let yaml: ReactNode = null;
-  if (profile && r) yaml = <pre className="pp-pre mt-pre" tabIndex={0} aria-label={t("sx.hx.m.pvYaml")} data-noi18n>{r.yaml}</pre>;
-  else if (row && valid && !r && q.isError) yaml = <QueryError error={q.error} onRetry={() => void q.refetch()} />;
+  if (profile && r) {
+    yaml = (
+      <div key={`${row.k}:${userId}`} className="mt-preview grid min-w-0 gap-2">
+        <div className="flex justify-end">
+          <CopyButton value={r.yaml} exact label={t("sx.hx.m.pvCopy")} onFail={() => {
+            previewEditor.current?.selectAll();
+            previewEditor.current?.focus();
+          }} />
+        </div>
+        <div className="mt-editor">
+          <p id={keyboardHelpId} className="sr-only">{t("sx.hx.m.readOnlyKeyboard")}</p>
+          <MihomoSourceEditor editorRef={previewEditor} label={t("sx.hx.m.pvYaml")} description={keyboardHelpId} text={r.yaml} readOnly />
+        </div>
+      </div>
+    );
+  } else if (fresh && row && valid && !r && q.isError) yaml = <QueryError error={q.error} onRetry={() => void q.refetch()} />;
   else if (row && valid && !r && userId !== "") yaml = <div className="hx-sk" aria-busy="true" />;
 
   return (

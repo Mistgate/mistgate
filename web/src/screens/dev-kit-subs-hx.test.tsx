@@ -1,4 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
+import * as ace from "ace-builds";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -98,7 +99,7 @@ const says: Record<string, () => void> = {
   mt: () => {
     expect(heads()).toHaveLength(2);
     expect(heads()[0]!.getAttribute("aria-expanded")).toBe("true");
-    expect(document.querySelector<HTMLTextAreaElement>("textarea.mt-y")!.value).toContain("mixed-port: 7890");
+    expect(ace.edit(document.querySelector<HTMLElement>(".hx-ed .mt-source")!).getValue()).toContain("mixed-port: 7890");
     expect(text()).toContain(en["sx.hx.m.intro"].slice(0, 30));
   },
   "mt-empty": () => {
@@ -112,10 +113,10 @@ const says: Record<string, () => void> = {
   "mt-ro-helper": () => {
     expect(text()).toContain(en["sx.hx.m.ro"]);
     expect(disabled(en["subs.save"])).toBeUndefined();
-    expect(document.querySelector<HTMLTextAreaElement>("textarea.mt-y")!.readOnly).toBe(true);
+    expect(ace.edit(document.querySelector<HTMLElement>(".hx-ed .mt-source")!).getReadOnly()).toBe(true);
   },
   "mt-closed": () => {
-    expect(document.querySelector("textarea.mt-y")).toBeNull();
+    expect(document.querySelector(".hx-ed .mt-source")).toBeNull();
     expect(verdict()).toContain(en["sx.hx.m.rOther"]);
   },
   "mt-second": () => expect(text()).toContain(en["sx.hx.m.busyEnd"]),
@@ -133,7 +134,7 @@ const says: Record<string, () => void> = {
   "mt-over": () => expect(text()).toContain(fill(en["sx.hx.m.ftOver"], { max: 256 })),
   "mt-big": () => expect(text()).toContain(fill(en["sx.hx.m.eBig"], { max: 64 })),
   "mt-file-big": () => expect(text()).toContain(en["sx.hx.m.eFile"]),
-  "mt-drag": () => expect(document.querySelector("textarea.mt-y")!.className).toContain("drag"),
+  "mt-drag": () => expect(document.querySelector(".hx-ed .mt-editor")?.classList.contains("drag")).toBe(true),
   "mt-max": () => expect(disabled(en["sx.hx.m.add"])).toBe(true),
   "mt-nobody": () => expect(text()).toContain(en["sx.hx.m.pvNoUsers"]),
   "mt-many": () => expect(document.querySelector("[role=combobox]")).not.toBeNull(),
@@ -153,12 +154,12 @@ const asks: Record<string, () => void> = {
   "hdr-pv-err": () => expect(text()).toContain(en["common.retry"]),
   mt: () => {
     expect(verdict()).toBe(en["sx.hx.m.rThis"] + fill(en["sx.hx.m.rThisS"], { group: "Семья" }));
-    expect(document.querySelector("pre.mt-pre")!.textContent).toContain("добавила панель");
+    expect(ace.edit(document.querySelector<HTMLElement>(".mt-preview .mt-source")!).getValue()).toContain("добавила панель");
   },
   "mt-err": () => {
     expect(document.querySelector("button.mt-ln")!.textContent).toBe(fill(en["sx.hx.m.line"], { n: 10 }));
     expect(verdict()).toContain(en["sx.hx.m.rBad"]);
-    expect(document.querySelector("pre.mt-pre")).toBeNull();
+    expect(document.querySelector(".mt-preview")).toBeNull();
   },
   "mt-warn": () => {
     expect(text()).toContain(en["subs.mt.warn.own_dns"]);
@@ -168,7 +169,7 @@ const asks: Record<string, () => void> = {
   "mt-leave": () => expect(text()).toContain(en["sx.leave.title"]),
   "mt-pv-bob": () => {
     expect(verdict()).toContain(en["sx.hx.m.rOther"]);
-    expect(document.querySelector("pre.mt-pre")).toBeNull();
+    expect(document.querySelector(".mt-preview")).toBeNull();
   },
   "mt-pv-carol": () => expect(verdict()).toContain(en["sx.hx.m.rOff"]),
   "mt-pv-dave": () => expect(verdict()).toContain(en["sx.hx.m.rNoSrv"]),
