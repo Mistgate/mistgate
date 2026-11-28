@@ -1,4 +1,5 @@
 import type { UseQueryResult } from "@tanstack/react-query";
+import type { Ace } from "ace-builds";
 import { useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -9,6 +10,7 @@ import type { Tx } from "@/screens/users/t";
 import { hxDemo } from "./demo";
 import { Chips, HxChip, Msg, Opt, People, RowHead } from "./hx-parts";
 import { condition, editSource, groupLimit, inactiveRefs, sourceSelection, variants, writeTransfer, type Group, type Selection, type Source, type SourceDraft, type SourceIssue } from "./mihomo-source";
+import { MihomoSourceEditor } from "./mihomo-source-editor";
 import { MihomoYamlPreview } from "./mihomo-yaml-preview";
 import { templateBytes, templateFileMax, templateLimit, type HeaderProblem, type MihomoTemplate } from "./model";
 
@@ -87,12 +89,11 @@ type RowProps = {
 
 /** One template of the list: its head (name, groups and size, state) and, while it is open, its editor. */
 export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, draft, source, others, status, errors, warnings, asking, atLimit, onToggle, onChange, onDuplicate, onAsk, onDelete, onFile }: RowProps) {
-  const area = useRef<HTMLTextAreaElement>(null);
-  const ink = useRef<HTMLPreElement>(null);
+  const editor = useRef<Ace.Editor>(null);
   const helpId = useId();
   const file = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(() => hxDemo.drag ?? false);
-  const [composing, setComposing] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState("all");
   const [operation, setOperation] = useState<SourceIssue | null>(null);
   const [download, setDownload] = useState<string | null>(null);
   const [chooser, setChooser] = useState<{ draft: SourceDraft; selection: Selection; ids: string[]; from: number; to: number } | null>(null);
@@ -105,22 +106,27 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
   const selected = chooser?.ids.filter((id) => assigned.some((g) => g.id === id)) ?? [];
   const inactive = source.source && !groupsLoading ? inactiveRefs(source.source, groups, row.groupIds) : [];
   const blocks = source.source?.blocks ?? [];
+  const variant = selectedVariant === "" || assigned.some((g) => g.id === selectedVariant) ? selectedVariant : "all";
   const input = open ? (draft?.text ?? row.yaml).replace(/\r\n?/g, "\n") : "";
   const unnamed = row.name.trim() || t("sx.hx.m.unnamed");
   const goTo = (line: number, cursor = false) => {
-    const el = area.current;
-    if (!el) return;
-    const lines = el.value.split("\n");
-    const at = lines.slice(0, line - 1).reduce((s, l) => s + l.length + 1, 0);
-    el.focus();
-    el.setSelectionRange(at, at + (cursor ? 0 : lines[line - 1]?.length ?? 0));
-    el.scrollTop = Math.max(0, (line - 3) * 20);
+    const instance = editor.current;
+    if (!instance) return;
+    const rowIndex = Math.max(0, Math.min(line - 1, instance.session.getLength() - 1));
+    instance.session.unfold(rowIndex);
+    instance.gotoLine(rowIndex + 1, 0);
+    if (!cursor) {
+      instance.selection.setSelectionRange({ start: { row: rowIndex, column: 0 }, end: { row: rowIndex, column: instance.session.getLine(rowIndex).length } });
+    }
+    instance.focus();
   };
   const choose = (line?: number) => {
     if (line !== undefined) goTo(line, true);
-    const el = area.current;
-    if (!el || !draft) return;
-    const result = sourceSelection(draft.text, el.selectionStart, el.selectionEnd);
+    const instance = editor.current;
+    if (!instance || !draft) return;
+    const { start, end } = instance.getSelectionRange();
+    const doc = instance.session.getDocument();
+    const result = sourceSelection(draft.text, doc.positionToIndex(start), doc.positionToIndex(end));
     setOperation(result.issue ?? null);
     if (!result.value) return;
     const selection = result.value;
@@ -200,47 +206,48 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
                 )}
               </>
             )}
-            <div className="mt-editor">
-              <div className="mt-y-mirror" aria-hidden="true" data-noi18n>
-                <pre ref={ink} className="mt-y-ink"><MihomoYamlPreview text={input} /></pre>
-              </div>
-              <textarea
-                ref={area}
-                className={cx("an-i mono mt-y", drag && "drag", composing && "composing")}
-                rows={16}
-                spellCheck={false}
-                wrap="off"
-                aria-label={t("sx.hx.m.text")}
-                aria-describedby={owner ? helpId : undefined}
-                data-noi18n
-                value={input}
+            {blocks.length > 0 && (
+              <label className="mt-variant">
+                <span>{t("sx.hx.m.variant")}</span>
+                <select className="an-i" aria-label={t("sx.hx.m.variant")} aria-describedby={`${helpId}-variant`} value={variant} onChange={(e) => setSelectedVariant(e.target.value)}>
+                  <option value="all">{t("sx.hx.m.variantAll")}</option>
+                  <option value="">{t("sx.hx.m.variantCommon")}</option>
+                  {assigned.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                </select>
+                <small id={`${helpId}-variant`}>{t("sx.hx.m.variantHint")}</small>
+              </label>
+            )}
+            <div
+              className={cx("mt-editor", drag && "drag")}
+              onDragOverCapture={(e) => {
+                if (!owner || !e.dataTransfer.types.includes("Files")) return;
+                e.preventDefault();
+                e.stopPropagation();
+                setDrag(true);
+              }}
+              onDragLeave={(e) => {
+                if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDrag(false);
+              }}
+              onDropCapture={(e) => {
+                if (!owner || !e.dataTransfer.files.length) return;
+                e.preventDefault();
+                e.stopPropagation();
+                setDrag(false);
+                onFile(e.dataTransfer.files[0]);
+              }}
+            >
+              <MihomoSourceEditor
+                editorRef={editor}
+                label={t("sx.hx.m.text")}
+                description={owner ? helpId : undefined}
+                text={input}
                 readOnly={!owner}
-                onScroll={(e) => {
-                  if (!ink.current) return;
-                  const { scrollLeft, scrollTop } = e.currentTarget;
-                  ink.current.style.transform = `translate(${-scrollLeft}px, ${-scrollTop}px)`;
-                }}
-                onCompositionStart={() => setComposing(true)}
-                onCompositionEnd={() => setComposing(false)}
-                onChange={(e) => {
+                blocks={blocks}
+                variant={variant}
+                onChange={(value) => {
                   if (!draft) return;
                   setOperation(null);
-                  onChange({ source: editSource(draft, e.target.value, groups) });
-                }}
-                onDragOver={(e) => {
-                  if (owner && e.dataTransfer.types.includes("Files")) {
-                    e.preventDefault();
-                    setDrag(true);
-                  }
-                }}
-                onDragLeave={() => setDrag(false)}
-                onDrop={(e) => {
-                  setDrag(false);
-                  const f = e.dataTransfer.files[0];
-                  if (owner && f) {
-                    e.preventDefault();
-                    onFile(f);
-                  }
+                  onChange({ source: editSource(draft, value, groups) });
                 }}
               />
             </div>

@@ -306,6 +306,8 @@ tproxy-port: 1181
 
 Directives start in the first column, even inside a list. Keep the YAML lines at their original indentation. Multiple names mean any one of those primary groups. Blocks cannot nest. The shared part and every assigned variant must be valid. Preview with a person to inspect the selected variant as highlighted YAML. Removing a condition makes its lines shared; removing an assignment leaves the block in the source but disables it for that group.
 
+Line numbers in the editor refer to the source, even when sections are folded. Choose a group under **Source variant** to dim lines that will not be in its config without removing them from the editor. The preview still shows the selected person's generated config.
+
 Download the source to move a template to another panel. On import, match all group names with local groups not assigned to another template, then confirm and save. Manually written secrets remain in the file. Do not load this source into Mihomo directly: it ignores directive comments. Subscription responses contain the resolved config.
 
 ### What the panel changes

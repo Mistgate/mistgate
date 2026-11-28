@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as ace from "ace-builds";
 import { act, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -127,11 +128,28 @@ const heads = () => [...document.querySelectorAll<HTMLButtonElement>("button.hx-
 const head = (name: string) => heads().find((b) => b.querySelector("b")?.textContent === name)!;
 const chipOf = (label: string) => [...document.querySelectorAll(`[role=group][aria-label="${en["sx.hx.m.groups"]}"] button`)].find((b) => b.textContent === label)!;
 const kb = (n: number) => (n / 1024).toLocaleString("en", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const area = () => document.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${en["sx.hx.m.text"]}"]`)!;
-const typeInto = (el: HTMLInputElement | HTMLTextAreaElement, value: string) =>
+const area = () => {
+  const editor = ace.edit(document.querySelector<HTMLElement>(".mt-source")!);
+  const doc = editor.session.getDocument();
+  return {
+    editor,
+    get value() { return editor.getValue(); },
+    get readOnly() { return editor.getReadOnly(); },
+    setSelectionRange(start: number, end: number) {
+      const a = doc.indexToPosition(start);
+      const b = doc.indexToPosition(end);
+      editor.selection.setSelectionRange(ace.Range.fromPoints(a, b));
+    },
+  };
+};
+const typeInto = (el: HTMLInputElement | ReturnType<typeof area>, value: string) =>
   act(async () => {
-    Object.getOwnPropertyDescriptor(el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, "value")!.set!.call(el, value);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
+    if ("editor" in el) {
+      el.editor.setValue(value, -1);
+    } else {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }
   });
 const sent = () => (updateSubscriptionSettings.mock.calls.at(-1)?.[0] as { settings: Settings } | undefined)?.settings;
 const refuse = (msg: string) => new ConnectError(msg, Code.InvalidArgument);
@@ -221,16 +239,26 @@ describe("Mihomo group source", () => {
 });
 
 describe("editing and transferring group blocks", () => {
-  it("colors the source while keeping the native editor text and literal YAML values", async () => {
-    await mount([tpl("Shared", ["grp_router"])]);
-    const yaml = 'mixed-port: 1080\nlabel: "<img src=x>"\n# note\n';
-    await typeInto(area(), yaml);
-    const layer = document.querySelector(".mt-y-mirror")!;
-    expect(area().value).toBe(yaml);
-    expect(layer.textContent).toBe(yaml);
-    expect(layer.querySelector(".mt-token-number")?.textContent).toBe("1080");
-    expect(layer.querySelector(".mt-token-comment")?.textContent).toBe("# note");
-    expect(layer.querySelector("img")).toBeNull();
+  it("dims the other group's lines without changing the source, folding or the preview selection", async () => {
+    const yaml = `${GOOD}rules:\n${marker(["grp_router"])}\n  - DOMAIN,example.com,Proxy\n${endMarker}\n  - MATCH,Proxy\n`;
+    await mount([tpl("Shared", ["grp_router", "grp_pc"], yaml)]);
+    const { editor, value } = area();
+    const { session } = editor;
+    const ruleRow = value.split("\n").findIndex((line) => line.includes("DOMAIN,"));
+    const select = document.querySelector<HTMLSelectElement>(".mt-variant select")!;
+    const dimmed = () => Object.values(session.getMarkers(true)).filter((marker) => marker.clazz === "mt-dropped");
+    await act(async () => {
+      editor.gotoLine(ruleRow - 1, 0);
+      session.toggleFoldWidget();
+    });
+    expect(session.getAllFolds().map(({ range }) => [range.start.row, range.end.row])).toEqual([[ruleRow - 2, ruleRow + 2]]);
+    await chooseOption(select, "grp_pc");
+    expect(dimmed().map(({ range }) => [range?.start.row, range?.end.row])).toEqual([[ruleRow - 1, ruleRow + 1]]);
+    expect(editor.getValue()).toBe(value);
+    expect(session.getAllFolds()).toHaveLength(1);
+    expect(buttonWith("alice").getAttribute("aria-pressed")).toBe("true");
+    await chooseOption(select, "grp_router");
+    expect(dimmed()).toHaveLength(0);
   });
 
   it("wraps the selected list item, previews with IDs, and saves the exact canonical source", async () => {
@@ -477,7 +505,7 @@ describe("the list", () => {
     expect(document.querySelector<HTMLInputElement>("#mt-name")!.value).toBe("B");
     expect(head("A").getAttribute("aria-expanded")).toBe("false");
     await click(head("B"));
-    expect(document.querySelector("textarea.mt-y")).toBeNull();
+    expect(document.querySelector(".mt-source")).toBeNull();
   });
   it("makes a copy after the template, without groups and with a name of its own", async () => {
     await mount([tpl("A", ["grp_router"], "a: 1\n"), tpl("Z", [], "z: 1\n")]);
@@ -553,8 +581,7 @@ describe("the editor", () => {
     await mount([tpl("Draft", ["grp_router"], "a: 1\nmode rule\nb: 2\n")]);
     await debounced();
     await click(document.querySelector("button.mt-ln"));
-    const a = area();
-    expect(a.value.slice(a.selectionStart, a.selectionEnd)).toBe("mode rule");
+    expect(area().editor.getSelectedText()).toBe("mode rule");
   });
   it("says early what is wrong with the name and the text, and does not save", async () => {
     await mount([tpl("A"), tpl("B")]);
@@ -618,11 +645,12 @@ describe("the editor", () => {
   });
   it("takes a file dropped on the text, and marks the text while one is over it", async () => {
     await mount([tpl("A")]);
-    const drag = (type: string, files: File[] = []) => act(async () => void area().dispatchEvent(Object.assign(new Event(type, { bubbles: true, cancelable: true }), { dataTransfer: { types: ["Files"], files } })));
+    const box = document.querySelector(".mt-editor")!;
+    const drag = (type: string, files: File[] = []) => act(async () => void box.dispatchEvent(Object.assign(new Event(type, { bubbles: true, cancelable: true }), { dataTransfer: { types: ["Files"], files } })));
     await drag("dragover");
-    expect(area().className).toContain("drag");
+    expect(box.classList.contains("drag")).toBe(true);
     await drag("dragleave");
-    expect(area().className).not.toContain("drag");
+    expect(box.classList.contains("drag")).toBe(false);
     await drag("drop", [new File(["dropped: 1\n"], "d.yaml")]);
     await settle();
     expect(area().value).toBe("dropped: 1\n");
