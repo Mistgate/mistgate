@@ -38,6 +38,11 @@ function jsonOf(text: string): unknown {
   }
 }
 
+// These characters are valid in names but must not appear as physical YAML line breaks in a marker.
+function markerJSON(value: string | readonly string[]): string {
+  return JSON.stringify(value).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+}
+
 function namesOf(value: unknown, allowEmpty: boolean): string[] | undefined {
   if (!Array.isArray(value) || (!allowEmpty && value.length === 0) || value.length > groupLimit || !value.every((v): v is string => typeof v === "string" && v !== "") || new Set(value).size !== value.length) return;
   return value;
@@ -91,7 +96,7 @@ function rewrite(text: string, source: Source, remap: (name: string, line: numbe
     let j = 0;
     const json = block.json.replace(/"(?:[^"\\]|\\.)*"/gu, (literal) => {
       const i = j++;
-      return mapped[i] === block.refs[i] ? literal : JSON.stringify(mapped[i]);
+      return mapped[i] === block.refs[i] ? literal : markerJSON(mapped[i]!);
     });
     out += text.slice(at, line.start) + block.before + json;
     at = line.end - line.eol.length;
@@ -214,7 +219,7 @@ export function sourceSelection(text: string, from: number, to: number): Result<
 export function condition(draft: SourceDraft, selection: Selection, ids: string[], groups: readonly Group[]): SourceDraft {
   const names = new Map(draft.names);
   const aliases = ids.map((id) => groupAlias(names, id, groups));
-  const list = JSON.stringify(aliases);
+  const list = markerJSON(aliases);
   const { text } = draft;
   const { start, end, eol, block, lines } = selection;
   if (block) {
@@ -266,8 +271,8 @@ export function writeTransfer(name: string, text: string, assigned: readonly str
   if (source.issue) return { issue: source.issue };
   const inactive = inactiveRefs(source.value, groups, assigned)[0];
   if (inactive) return { issue: inactive };
-  const listed = assigned.map((id) => groups.find((g) => g.id === id)?.name);
-  if (listed.some((g) => !g) || !namesOf(listed, true)) return { issue: { kind: "header", line: 2 } };
+  const listed = namesOf(assigned.map((id) => groups.find((g) => g.id === id)?.name), true);
+  if (!listed) return { issue: { kind: "header", line: 2 } };
   const mapping = new Map(assigned.map((id, i) => [id, listed[i]!]));
   const body = draft ? mapTransfer(draft.text, new Map([...draft.names].flatMap(([alias, id]) => {
     const current = mapping.get(id);
@@ -275,5 +280,5 @@ export function writeTransfer(name: string, text: string, assigned: readonly str
   }))) : rewrite(text, source.value, (id) => mapping.get(id)!);
   if (body.issue) return { issue: body.issue };
   const eol = body.value.match(/\r?\n/)?.[0] ?? "\n";
-  return { value: `${prefix}template ${JSON.stringify(name)}${eol}${prefix}groups ${JSON.stringify(listed)}${eol}${body.value}` };
+  return { value: `${prefix}template ${markerJSON(name)}${eol}${prefix}groups ${markerJSON(listed)}${eol}${body.value}` };
 }

@@ -275,6 +275,28 @@ describe("Mihomo group source", () => {
     expect(transfer).toEqual({ name: 'Дом "1"', groups: [groups[0]!.name, "PC"], text: draft.text });
     expect(mapTransfer(transfer.text, new Map([[groups[0]!.name, "grp_other"]])).value).toBe(yaml.replace('[ "grp_router" ]', '[ "grp_other" ]'));
   });
+
+  it("round-trips names containing Unicode line and paragraph separators as escaped operands", () => {
+    const group = { id: "grp_router", name: "Router\u2028Home\u2029Lab" };
+    const title = "Mihomo\u2029Home\u2028Lab";
+    const yaml = `mode: rule\n${marker([group.id])}\nredir-port: 1182\n${endMarker}\n`;
+    const shown = displaySource(yaml, [group]);
+    expect(shown.text).toContain('# @mistgate-if ["Router\\u2028Home\\u2029Lab"]');
+    expect(canonicalSource(shown).value).toBe(yaml);
+
+    const shared = "mode: rule\nredir-port: 1182\n";
+    const created = condition(displaySource(shared, [group]), sourceSelection(shared, shared.indexOf("redir-port"), shared.length).value!, [group.id], [group]);
+    expect(canonicalSource(created).value).toBe(yaml);
+
+    for (const draft of [undefined, shown]) {
+      const file = writeTransfer(title, yaml, [group.id], [group], draft).value!;
+      expect(file).not.toMatch(/[\u2028\u2029]/u);
+      const loaded = readTransfer(file).value!;
+      expect(loaded.name).toBe(title);
+      expect(loaded.groups).toEqual([group.name]);
+      expect(mapTransfer(loaded.text, new Map([[group.name, "grp_new"]])).value).toBe(yaml.replace(group.id, "grp_new"));
+    }
+  });
 });
 
 describe("editing and transferring group blocks", () => {
