@@ -30,7 +30,7 @@ func mihomoUnusualLineBreak(text string) int {
 	}
 	first, marked := 0, false
 	for line := 1; text != ""; line++ {
-		marked = marked || strings.HasPrefix(text, mihomoDirective)
+		marked = marked || strings.HasPrefix(strings.TrimLeft(text, "\ufeff"), mihomoDirective)
 		if marked && first != 0 {
 			return first
 		}
@@ -72,6 +72,10 @@ func mihomoGroupBlocks(text string) ([]mihomoGroupBlock, error) {
 		after := len(text) - len(rest)
 		if lf {
 			line = strings.TrimSuffix(line, "\r")
+		}
+		// yaml.v3 skips a BOM at the start of a line. Never let that turn a condition into a plain comment.
+		if strings.HasPrefix(line, "\ufeff") && strings.HasPrefix(strings.TrimLeft(line, "\ufeff"), mihomoDirective) {
+			return nil, fmt.Errorf("line %d: a group marker must not start with a byte order mark", number)
 		}
 		directive, marked := strings.CutPrefix(line, mihomoDirective)
 		if marked {

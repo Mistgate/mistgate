@@ -1,7 +1,8 @@
 const prefix = "# @mistgate-";
 export const groupLimit = 100; // subsettings.maxHeaderGroups
 const nonIDChar = /[^a-zA-Z0-9_-]/;
-const directiveStart = /(?:^|[\r\n\u0085\u2028\u2029])# @mistgate-/u;
+const directiveStart = /(?:^|[\r\n\u0085\u2028\u2029])\uFEFF*# @mistgate-/u;
+const bomDirective = /^\uFEFF+# @mistgate-/u;
 const unsupportedEol = /\r(?!\n)|[\u0085\u2028\u2029]/u;
 
 export type Group = { id: string; name: string };
@@ -57,6 +58,7 @@ export function parseSource(text: string, ids = false): Result<Source> {
   let pending = -1;
   for (let i = 0; i < lines.length; i++) {
     const body = lines[i]!.body;
+    if (bomDirective.test(body)) return { issue: { kind: "syntax", line: i + 1 } };
     if (!body.startsWith(prefix)) continue;
     const issue = { kind: "syntax", line: i + 1 } as const;
     if (/^# @mistgate-end[ \t]*$(?![\s\S])/.test(body)) {
@@ -236,6 +238,8 @@ export function readTransfer(text: string): Result<Transfer | null> {
   const bad = directiveStart.test(text) && lineBreakIssue(text);
   if (bad) return { issue: bad };
   const lines = sourceLines(text);
+  const bomLine = lines.findIndex((line) => bomDirective.test(line.body));
+  if (bomLine >= 0) return { issue: { kind: "syntax", line: bomLine + 1 } };
   const header = /^# @mistgate-(?:template|groups)(?:[ \t]|$(?![\s\S]))/;
   const misplaced = lines.findIndex((l, i) => i > 1 && header.test(l.body));
   if (misplaced !== -1) return { issue: { kind: "header", line: misplaced + 1 } };

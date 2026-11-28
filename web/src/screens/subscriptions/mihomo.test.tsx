@@ -201,6 +201,14 @@ describe("Mihomo group source", () => {
     expect(parseSource(yaml, true).issue).toEqual({ kind: "lineBreak", line: 1 });
   });
 
+  it("does not convert BOM-prefixed group markers to ordinary comments", () => {
+    const marked = `mode: rule\r\n\uFEFF${marker(["grp_router"])}\r\nredir-port: 1182\r\n\uFEFF${endMarker}`;
+    const issue = { kind: "syntax", line: 2 };
+    expect(parseSource(marked, true).issue).toEqual(issue);
+    expect(readTransfer(marked).issue).toEqual(issue);
+    expect(parseSource("\uFEFFmode: rule\n", true).value?.blocks).toHaveLength(0);
+  });
+
   it.each([
     ["missing end", marker(["grp_router"]), 2],
     ["stray end", endMarker, 2],

@@ -74,6 +74,26 @@ func TestMihomoGroupLineBreaks(t *testing.T) {
 	}
 }
 
+func TestMihomoGroupRejectsBOMPrefixedMarkers(t *testing.T) {
+	const opening = "# @mistgate-if [\"grp_a\"]\n"
+	const closing = "# @mistgate-end\n"
+	const block = "redir-port: 1182\n"
+	for _, tc := range []struct{ source, line string }{
+		{"\ufeff" + opening + block + "\ufeff" + closing + "mode: rule\n", "line 1:"},
+		{"mode: rule\r\n\ufeff" + opening + block + "\ufeff" + closing, "line 2:"},
+		{"mode: rule\n" + opening + block + "\ufeff" + closing, "line 4:"},
+	} {
+		if resolved, err := ResolveMihomoGroup(tc.source, ""); resolved != "" || err == nil ||
+			!strings.Contains(err.Error(), tc.line+" a group marker must not start with a byte order mark") {
+			t.Errorf("BOM-prefixed marker: got %q, %v", resolved, err)
+		}
+	}
+	const legacy = "\ufeffmode: rule\n# mentions # @mistgate-if in prose\n"
+	if resolved, err := ResolveMihomoGroup(legacy, ""); resolved != legacy || err != nil {
+		t.Errorf("ordinary BOM-prefixed YAML changed: %q, %v", resolved, err)
+	}
+}
+
 func TestMihomoGroupPreservesScalarContent(t *testing.T) {
 	for _, tc := range []struct{ style, separator string }{{"|+", "\n"}, {">+", " "}} {
 		t.Run(tc.style, func(t *testing.T) {
