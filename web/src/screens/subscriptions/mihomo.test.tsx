@@ -301,7 +301,17 @@ describe("editing and transferring group blocks", () => {
     await click(box);
     await click(buttonWith(en["sx.hx.m.conditionApply"]));
     expect(area().value).toBe(inserted("ROUTER"));
-    expect(document.querySelector(".mt-blocks")?.textContent).toContain(fill(en["sx.hx.m.conditionEntry"], { from: String(from + 1), to: String(from + 1), groups: "ROUTER" }));
+    expect(document.querySelector(".mt-blocks")).toBeNull();
+    await click(buttonWith(fill(en["sx.hx.m.blocks"], { n: "1" })));
+    const label = fill(en["sx.hx.m.conditionEntry"], { lines: String(from + 1), groups: "ROUTER" });
+    await act(async () => {
+      area().editor.gotoLine(from - 1, 0);
+      area().editor.session.toggleFoldWidget();
+    });
+    expect(area().editor.session.getAllFolds()).toHaveLength(1);
+    await click(buttonWith(label));
+    expect(area().editor.session.getAllFolds()).toHaveLength(0);
+    expect(area().editor.getSelectedText()).toBe("  - DOMAIN,router.test,Proxy");
     await debounced();
     expect(previewMihomoTemplate).toHaveBeenCalledWith({ userId: "usr_alice", yaml: inserted("grp_router"), groupIds: ["grp_router", "grp_pc"] }, expect.anything());
     expect(document.querySelector("pre.mt-pre")?.textContent).toContain("router.test");
@@ -325,10 +335,12 @@ describe("editing and transferring group blocks", () => {
     expect(text()).toContain(en["sx.hx.m.source.selection"]);
     expect(area().value).toBe(displayed);
     area().setSelectionRange(0, 0);
+    await click(buttonWith(fill(en["sx.hx.m.blocks"], { n: "1" })));
     await click(buttonWith(en["sx.hx.m.conditionEdit"]));
     expect(text()).toContain(en["sx.hx.m.conditionCommon"]);
     await click(buttonWith(en["sx.hx.m.cancel"]));
     expect(area().value).toBe(displayed);
+    await click(buttonWith(fill(en["sx.hx.m.blocks"], { n: "1" })));
     await click(buttonWith(en["sx.hx.m.conditionEdit"]));
     const boxes = [...document.querySelectorAll<HTMLInputElement>('[role=dialog] input[type=checkbox]')];
     expect(boxes.map((x) => x.checked)).toEqual([true, false]);
@@ -336,6 +348,7 @@ describe("editing and transferring group blocks", () => {
     await click(boxes[1]);
     await click(buttonWith(en["sx.hx.m.conditionApply"]));
     expect(area().value).toContain(marker(["PC"]));
+    await click(buttonWith(fill(en["sx.hx.m.blocks"], { n: "1" })));
     await click(buttonWith(en["sx.hx.m.conditionEdit"]));
     await click(buttonWith(en["sx.hx.m.conditionRemove"]));
     expect(area().value).toBe(`${GOOD}mode: rule`);

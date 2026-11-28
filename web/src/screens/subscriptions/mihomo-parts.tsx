@@ -3,6 +3,7 @@ import type { Ace } from "ace-builds";
 import { useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { Popover, PopRow } from "@/components/ui/popover";
 import { QueryError } from "@/components/ui/query-error";
 import { downloadText } from "@/lib/awg";
 import { cx } from "@/lib/cx";
@@ -94,6 +95,8 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
   const file = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(() => hxDemo.drag ?? false);
   const [selectedVariant, setSelectedVariant] = useState("all");
+  const [blocksOpen, setBlocksOpen] = useState(false);
+  const blockAction = useRef(false);
   const [operation, setOperation] = useState<SourceIssue | null>(null);
   const [download, setDownload] = useState<string | null>(null);
   const [chooser, setChooser] = useState<{ draft: SourceDraft; selection: Selection; ids: string[]; from: number; to: number } | null>(null);
@@ -106,6 +109,10 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
   const selected = chooser?.ids.filter((id) => assigned.some((g) => g.id === id)) ?? [];
   const inactive = source.source && !groupsLoading ? inactiveRefs(source.source, groups, row.groupIds) : [];
   const blocks = source.source?.blocks ?? [];
+  const blockDepths: number[] = [];
+  if (blocksOpen) {
+    for (const { parent } of blocks) blockDepths.push(parent < 0 ? 0 : Math.min(3, blockDepths[parent]! + 1));
+  }
   const variant = selectedVariant === "" || assigned.some((g) => g.id === selectedVariant) ? selectedVariant : "all";
   const input = open ? (draft?.text ?? row.yaml).replace(/\r\n?/g, "\n") : "";
   const unnamed = row.name.trim() || t("sx.hx.m.unnamed");
@@ -148,6 +155,15 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
     const output = writeTransfer(row.name, source.yaml, row.groupIds, groups, draft);
     setOperation(output.issue ?? null);
     if (output.value !== undefined) setDownload(output.value);
+  };
+  const visitBlock = (line: number, edit: boolean) => {
+    blockAction.current = true;
+    setBlocksOpen(false);
+    if (edit) choose(line);
+    else {
+      editor.current?.container.scrollIntoView?.({ block: "nearest" });
+      goTo(line);
+    }
   };
   return (
     <div className={cx("hx-r", status?.kind === "bad" && "bad", open && "on")}>
@@ -194,28 +210,48 @@ export function TemplateRow({ t, row, n, open, owner, groups, groupsLoading, dra
                   <Button className="sb-btn" disabled={groupsLoading || assigned.length === 0} onClick={() => choose()}>{t("sx.hx.m.onlyGroups")}</Button>
                   <Button className="sb-btn" disabled={groupsLoading} onClick={exportSource}>{t("sx.hx.m.export")}</Button>
                 </div>
-                {blocks.length > 0 && (
-                  <ul className="mt-blocks" aria-label={t("sx.hx.m.conditionTitle")}>
-                    {blocks.map((block) => (
-                      <li key={block.open}>
-                        <span id={`${helpId}-${block.open}`}>{t("sx.hx.m.conditionEntry", { from: block.open + 2, to: Math.max(block.open + 2, block.close), groups: block.refs.map((id) => groups.find((g) => g.id === id)?.name ?? id).join(", ") })}</span>
-                        <Button className="sb-btn" aria-describedby={`${helpId}-${block.open}`} disabled={groupsLoading} onClick={() => choose(block.open + 1)}>{t("sx.hx.m.conditionEdit")}</Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </>
             )}
             {blocks.length > 0 && (
-              <label className="mt-variant">
-                <span>{t("sx.hx.m.variant")}</span>
-                <select className="an-i" aria-label={t("sx.hx.m.variant")} aria-describedby={`${helpId}-variant`} value={variant} onChange={(e) => setSelectedVariant(e.target.value)}>
-                  <option value="all">{t("sx.hx.m.variantAll")}</option>
-                  <option value="">{t("sx.hx.m.variantCommon")}</option>
-                  {assigned.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-                </select>
-                <small id={`${helpId}-variant`}>{t("sx.hx.m.variantHint")}</small>
-              </label>
+              <div className="mt-variant">
+                <label className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span>{t("sx.hx.m.variant")}</span>
+                  <select className="an-i" aria-describedby={`${helpId}-variant`} value={variant} onChange={(e) => setSelectedVariant(e.target.value)}>
+                    <option value="all">{t("sx.hx.m.variantAll")}</option>
+                    <option value="">{t("sx.hx.m.variantCommon")}</option>
+                    {assigned.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                  </select>
+                </label>
+                <Popover
+                  align="start"
+                  open={blocksOpen}
+                  onOpenChange={(next) => {
+                    if (next) blockAction.current = false;
+                    setBlocksOpen(next);
+                  }}
+                  finalFocus={() => !blockAction.current}
+                  aria-label={t("sx.hx.m.blocks", { n: blocks.length })}
+                  trigger={<Button className="sb-btn">{t("sx.hx.m.blocks", { n: blocks.length })}</Button>}
+                >
+                  <ul className="mt-blocks grid max-h-[min(45vh,var(--available-height))] list-none gap-0.5 overflow-y-auto p-0.5">
+                    {blocks.map((block, i) => {
+                      const from = Math.min(block.open + 2, block.close + 1);
+                      const to = Math.max(from, block.close);
+                      const label = t("sx.hx.m.conditionEntry", {
+                        lines: from === to ? String(from) : `${from}–${to}`,
+                        groups: block.refs.map((id) => groups.find((g) => g.id === id)?.name ?? id).join(", "),
+                      });
+                      return (
+                        <li key={block.open} className="flex min-w-0 items-center gap-1" style={{ marginInlineStart: (blockDepths[i] ?? 0) * 8 }}>
+                          <PopRow className="h-auto min-h-9 min-w-0 flex-1 py-1 wrap-anywhere" onClick={() => visitBlock(from, false)}>{label}</PopRow>
+                          {owner && <Button size="sm" variant="ghost" className="shrink-0" aria-label={`${t("sx.hx.m.conditionEdit")}: ${label}`} disabled={groupsLoading} onClick={() => visitBlock(block.open + 1, true)}>{t("sx.hx.m.conditionEdit")}</Button>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </Popover>
+                <small id={`${helpId}-variant`} className="basis-full">{t("sx.hx.m.variantHint")}</small>
+              </div>
             )}
             <div
               className={cx("mt-editor", drag && "drag")}

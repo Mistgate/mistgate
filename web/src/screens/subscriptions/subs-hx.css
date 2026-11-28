@@ -494,26 +494,6 @@
 .sbp .mt-up .sb-btn {
   cursor: pointer;
 }
-.sbp .mt-blocks {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.sbp .mt-blocks li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 12px;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--sec);
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
 .sbp .mt-ln {
   margin-inline-start: 8px;
   font-size: 12px;
